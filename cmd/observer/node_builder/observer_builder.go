@@ -159,10 +159,10 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 	}
 }
 
-// FlowObserverServiceBuilder provides the common functionality needed to bootstrap a Flow staked and observer
+// ObserverServiceBuilder provides the common functionality needed to bootstrap a Flow staked and observer
 // It is composed of the FlowNodeBuilder, the ObserverServiceConfig and contains all the components and modules needed for the
 // staked and observers
-type FlowObserverServiceBuilder struct {
+type ObserverServiceBuilder struct {
 	*cmd.FlowNodeBuilder
 	*ObserverServiceConfig
 
@@ -194,11 +194,14 @@ type FlowObserverServiceBuilder struct {
 	RequestEng  *requester.Engine
 	FollowerEng *followereng.Engine
 	SyncEng     *synceng.Engine
+
+	// Public network
+	peerID peer.ID
 }
 
 // deriveBootstrapPeerIdentities derives the Flow Identity of the bootstrap peers from the parameters.
 // These are the identities of the staked and observers also acting as the DHT bootstrap server
-func (builder *FlowObserverServiceBuilder) deriveBootstrapPeerIdentities() error {
+func (builder *ObserverServiceBuilder) deriveBootstrapPeerIdentities() error {
 	// if bootstrap identities already provided (as part of alternate initialization as a library the skip reading command
 	// line params)
 	if builder.bootstrapIdentities != nil {
@@ -215,7 +218,7 @@ func (builder *FlowObserverServiceBuilder) deriveBootstrapPeerIdentities() error
 	return nil
 }
 
-func (builder *FlowObserverServiceBuilder) buildFollowerState() *FlowObserverServiceBuilder {
+func (builder *ObserverServiceBuilder) buildFollowerState() *ObserverServiceBuilder {
 	builder.Module("mutable follower state", func(node *cmd.NodeConfig) error {
 		// For now, we only support state implementations from package badger.
 		// If we ever support different implementations, the following can be replaced by a type-aware factory
@@ -240,7 +243,7 @@ func (builder *FlowObserverServiceBuilder) buildFollowerState() *FlowObserverSer
 	return builder
 }
 
-func (builder *FlowObserverServiceBuilder) buildSyncCore() *FlowObserverServiceBuilder {
+func (builder *ObserverServiceBuilder) buildSyncCore() *ObserverServiceBuilder {
 	builder.Module("sync core", func(node *cmd.NodeConfig) error {
 		syncCore, err := synchronization.New(node.Logger, node.SyncCoreConfig)
 		builder.SyncCore = syncCore
@@ -251,7 +254,7 @@ func (builder *FlowObserverServiceBuilder) buildSyncCore() *FlowObserverServiceB
 	return builder
 }
 
-func (builder *FlowObserverServiceBuilder) buildCommittee() *FlowObserverServiceBuilder {
+func (builder *ObserverServiceBuilder) buildCommittee() *ObserverServiceBuilder {
 	builder.Module("committee", func(node *cmd.NodeConfig) error {
 		// initialize consensus committee's membership state
 		// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
@@ -265,7 +268,7 @@ func (builder *FlowObserverServiceBuilder) buildCommittee() *FlowObserverService
 	return builder
 }
 
-func (builder *FlowObserverServiceBuilder) buildLatestHeader() *FlowObserverServiceBuilder {
+func (builder *ObserverServiceBuilder) buildLatestHeader() *ObserverServiceBuilder {
 	builder.Module("latest header", func(node *cmd.NodeConfig) error {
 		finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 		builder.Finalized, builder.Pending = finalized, pending
@@ -276,7 +279,7 @@ func (builder *FlowObserverServiceBuilder) buildLatestHeader() *FlowObserverServ
 	return builder
 }
 
-func (builder *FlowObserverServiceBuilder) buildFollowerCore() *FlowObserverServiceBuilder {
+func (builder *ObserverServiceBuilder) buildFollowerCore() *ObserverServiceBuilder {
 	builder.Component("follower core", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		// create a finalizer that will handle updating the protocol
 		// state when the follower detects newly finalized blocks
@@ -299,7 +302,7 @@ func (builder *FlowObserverServiceBuilder) buildFollowerCore() *FlowObserverServ
 	return builder
 }
 
-func (builder *FlowObserverServiceBuilder) buildFollowerEngine() *FlowObserverServiceBuilder {
+func (builder *ObserverServiceBuilder) buildFollowerEngine() *ObserverServiceBuilder {
 	builder.Component("follower engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		// initialize cleaner for DB
 		cleaner := storage.NewCleaner(node.Logger, node.DB, builder.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
@@ -332,7 +335,7 @@ func (builder *FlowObserverServiceBuilder) buildFollowerEngine() *FlowObserverSe
 	return builder
 }
 
-func (builder *FlowObserverServiceBuilder) buildFinalizedHeader() *FlowObserverServiceBuilder {
+func (builder *ObserverServiceBuilder) buildFinalizedHeader() *ObserverServiceBuilder {
 	builder.Component("finalized snapshot", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		finalizedHeader, err := synceng.NewFinalizedHeaderCache(node.Logger, node.State, builder.FinalizationDistributor)
 		if err != nil {
@@ -346,7 +349,7 @@ func (builder *FlowObserverServiceBuilder) buildFinalizedHeader() *FlowObserverS
 	return builder
 }
 
-func (builder *FlowObserverServiceBuilder) buildSyncEngine() *FlowObserverServiceBuilder {
+func (builder *ObserverServiceBuilder) buildSyncEngine() *ObserverServiceBuilder {
 	builder.Component("sync engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		sync, err := synceng.New(
 			node.Logger,
@@ -370,7 +373,7 @@ func (builder *FlowObserverServiceBuilder) buildSyncEngine() *FlowObserverServic
 	return builder
 }
 
-func (builder *FlowObserverServiceBuilder) BuildConsensusFollower() ObserverBuilder {
+func (builder *ObserverServiceBuilder) BuildConsensusFollower() ObserverBuilder {
 	builder.
 		buildFollowerState().
 		buildSyncCore().
@@ -386,20 +389,20 @@ func (builder *FlowObserverServiceBuilder) BuildConsensusFollower() ObserverBuil
 
 type Option func(*ObserverServiceConfig)
 
-func FlowAccessNode(opts ...Option) *FlowObserverServiceBuilder {
+func NewFlowObserverServiceBuilder(opts ...Option) *ObserverServiceBuilder {
 	config := DefaultObserverServiceConfig()
 	for _, opt := range opts {
 		opt(config)
 	}
 
-	return &FlowObserverServiceBuilder{
+	return &ObserverServiceBuilder{
 		ObserverServiceConfig:   config,
 		FlowNodeBuilder:         cmd.FlowNode(flow.RoleAccess.String(), config.baseOptions...),
 		FinalizationDistributor: pubsub.NewFinalizationDistributor(),
 	}
 }
 
-func (builder *FlowObserverServiceBuilder) ParseFlags() error {
+func (builder *ObserverServiceBuilder) ParseFlags() error {
 
 	builder.BaseFlags()
 
@@ -408,7 +411,7 @@ func (builder *FlowObserverServiceBuilder) ParseFlags() error {
 	return builder.ParseAndPrintFlags()
 }
 
-func (builder *FlowObserverServiceBuilder) extraFlags() {
+func (builder *ObserverServiceBuilder) extraFlags() {
 	builder.ExtraFlags(func(flags *pflag.FlagSet) {
 		defaultConfig := DefaultObserverServiceConfig()
 
@@ -451,7 +454,7 @@ func (builder *FlowObserverServiceBuilder) extraFlags() {
 // initNetwork creates the network.Network implementation with the given metrics, middleware, initial list of network
 // participants and topology used to choose peers from the list of participants. The list of participants can later be
 // updated by calling network.SetIDs.
-func (builder *FlowObserverServiceBuilder) initNetwork(nodeID module.Local,
+func (builder *ObserverServiceBuilder) initNetwork(nodeID module.Local,
 	networkMetrics module.NetworkMetrics,
 	middleware network.Middleware,
 	topology network.Topology,
@@ -531,18 +534,11 @@ func BootstrapIdentities(addresses []string, keys []string) (flow.IdentityList, 
 	return ids, nil
 }
 
-type ObserverServiceBuilder struct {
-	*FlowObserverServiceBuilder
-	peerID peer.ID
-}
-
-func NewObserverServiceBuilder(builder *FlowObserverServiceBuilder) *ObserverServiceBuilder {
+func NewObserverServiceBuilder(builder *ObserverServiceBuilder) *ObserverServiceBuilder {
 	// the observer node gets a version of the root snapshot file that does not contain any node addresses
 	// hence skip all the root snapshot validations that involved an identity address
 	builder.SkipNwAddressBasedValidations = true
-	return &ObserverServiceBuilder{
-		FlowObserverServiceBuilder: builder,
-	}
+	return builder
 }
 
 func (builder *ObserverServiceBuilder) initNodeInfo() error {
@@ -761,7 +757,7 @@ func (builder *ObserverServiceBuilder) enqueueMiddleware() {
 // Currently, the observer only runs the follower engine.
 func (builder *ObserverServiceBuilder) Build() (cmd.Node, error) {
 	builder.BuildConsensusFollower()
-	return builder.FlowObserverServiceBuilder.Build()
+	return builder.FlowNodeBuilder.Build()
 }
 
 // enqueuePublicNetworkInit enqueues the observer network component initialized for the observer

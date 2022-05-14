@@ -5,7 +5,7 @@ import (
 )
 
 func main() {
-	anb := nodebuilder.FlowAccessNode()
+	anb := nodebuilder.NewFlowObserverServiceBuilder()
 
 	anb.PrintBuildVersionDetails()
 
