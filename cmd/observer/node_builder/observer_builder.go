@@ -389,18 +389,6 @@ func (builder *FlowObserverServiceBuilder) BuildConsensusFollower() ObserverBuil
 
 type Option func(*ObserverServiceConfig)
 
-func WithBootStrapPeers(bootstrapNodes ...*flow.Identity) Option {
-	return func(config *ObserverServiceConfig) {
-		config.bootstrapIdentities = bootstrapNodes
-	}
-}
-
-func WithBaseOptions(baseOptions []cmd.Option) Option {
-	return func(config *ObserverServiceConfig) {
-		config.baseOptions = baseOptions
-	}
-}
-
 func FlowAccessNode(opts ...Option) *FlowObserverServiceBuilder {
 	config := DefaultObserverServiceConfig()
 	for _, opt := range opts {
