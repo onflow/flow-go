@@ -46,6 +46,7 @@ import (
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
+	consensus_follower "github.com/onflow/flow-go/follower"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -802,7 +803,7 @@ func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
 // of an explicit connect to the staked AN before the node attempts to subscribe to topics.
 func (builder *ObserverServiceBuilder) enqueueConnectWithStakedAN() {
 	builder.Component("upstream connector", func(_ *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		return newUpstreamConnector(builder.bootstrapIdentities, builder.LibP2PNode, builder.Logger), nil
+		return consensus_follower.NewUpstreamConnector(builder.bootstrapIdentities, builder.LibP2PNode, builder.Logger), nil
 	}).Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		proxy, err := apiservice.NewFlowAPIService(builder.bootstrapIdentities, builder.PeerUpdateInterval)
 		if err != nil {

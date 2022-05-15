@@ -25,7 +25,7 @@ type upstreamConnector struct {
 	maxRetries          uint64
 }
 
-func newUpstreamConnector(bootstrapIdentities flow.IdentityList, unstakedNode *p2p.Node, logger zerolog.Logger) *upstreamConnector {
+func NewUpstreamConnector(bootstrapIdentities flow.IdentityList, unstakedNode *p2p.Node, logger zerolog.Logger) *upstreamConnector {
 	return &upstreamConnector{
 		lm:                  lifecycle.NewLifecycleManager(),
 		bootstrapIdentities: bootstrapIdentities,

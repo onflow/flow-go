@@ -716,7 +716,7 @@ func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
 // of an explicit connect to the staked AN before the node attempts to subscribe to topics.
 func (builder *ObserverServiceBuilder) enqueueConnectWithStakedAN() {
 	builder.Component("upstream connector", func(_ *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		return newUpstreamConnector(builder.bootstrapIdentities, builder.LibP2PNode, builder.Logger), nil
+		return NewUpstreamConnector(builder.bootstrapIdentities, builder.LibP2PNode, builder.Logger), nil
 	})
 }
 
