@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
+	upstream "github.com/onflow/flow-go/upstream"
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
@@ -716,7 +717,7 @@ func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
 // of an explicit connect to the staked AN before the node attempts to subscribe to topics.
 func (builder *ObserverServiceBuilder) enqueueConnectWithStakedAN() {
 	builder.Component("upstream connector", func(_ *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		return NewUpstreamConnector(builder.bootstrapIdentities, builder.LibP2PNode, builder.Logger), nil
+		return upstream.NewUpstreamConnector(builder.bootstrapIdentities, builder.LibP2PNode, builder.Logger), nil
 	})
 }
 
