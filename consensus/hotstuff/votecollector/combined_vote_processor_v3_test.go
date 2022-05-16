@@ -15,6 +15,7 @@ import (
 
 	bootstrapDKG "github.com/onflow/flow-go/cmd/bootstrap/dkg"
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -397,7 +398,7 @@ func (s *CombinedVoteProcessorV3TestSuite) TestProcess_ConcurrentCreatingQC() {
 	s.reconstructor.On("EnoughShares").Return(true)
 
 	// at this point sending any vote should result in creating QC.
-	s.packer.On("Pack", s.proposal.Block.BlockID, mock.Anything).Return(stakingSigners, unittest.RandomBytes(128), nil)
+	s.packer.On("Pack", s.proposal.Block.View, mock.Anything).Return(stakingSigners, unittest.RandomBytes(128), nil)
 	s.onQCCreatedState.On("onQCCreated", mock.Anything).Return(nil).Once()
 
 	var startupWg, shutdownWg sync.WaitGroup
@@ -512,7 +513,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 		mergedSignerIDs := ([]flow.Identifier)(nil)
 		packedSigData := unittest.RandomBytes(128)
 		packer := &mockhotstuff.Packer{}
-		packer.On("Pack", block.BlockID, mock.Anything).Run(func(args mock.Arguments) {
+		packer.On("Pack", block.View, mock.Anything).Run(func(args mock.Arguments) {
 			blockSigData := args.Get(1).(*hotstuff.BlockSignatureData)
 			// in the following, we check validity for each field of `blockSigData` individually
 
@@ -559,9 +560,9 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 			// fill merged signers with collected signers
 			mergedSignerIDs = append(blockSigData.StakingSigners, blockSigData.RandomBeaconSigners...)
 		}).Return(
-			func(flow.Identifier, *hotstuff.BlockSignatureData) []flow.Identifier { return mergedSignerIDs },
-			func(flow.Identifier, *hotstuff.BlockSignatureData) []byte { return packedSigData },
-			func(flow.Identifier, *hotstuff.BlockSignatureData) error { return nil }).Once()
+			func(uint64, *hotstuff.BlockSignatureData) []flow.Identifier { return mergedSignerIDs },
+			func(uint64, *hotstuff.BlockSignatureData) []byte { return packedSigData },
+			func(uint64, *hotstuff.BlockSignatureData) error { return nil }).Once()
 
 		// track if QC was created
 		qcCreated := atomic.NewBool(false)
@@ -714,7 +715,7 @@ func TestCombinedVoteProcessorV3_OnlyRandomBeaconSigners(testifyT *testing.T) {
 
 	// Adding the vote should trigger QC generation. We expect `BlockSignatureData.StakingSigners`
 	// and `BlockSignatureData.AggregatedStakingSig` to be both empty, as there are no staking signatures.
-	packer.On("Pack", block.BlockID, mock.Anything).
+	packer.On("Pack", block.View, mock.Anything).
 		Run(func(args mock.Arguments) {
 			blockSigData := args.Get(1).(*hotstuff.BlockSignatureData)
 			require.Empty(testifyT, blockSigData.StakingSigners)
@@ -808,7 +809,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCLiveness(testifyT *testing.T)
 		mergedSignerIDs := append(stakingSigners.NodeIDs(), beaconSigners.NodeIDs()...)
 		packedSigData := unittest.RandomBytes(128)
 		packer := &mockhotstuff.Packer{}
-		packer.On("Pack", block.BlockID, mock.Anything).Return(mergedSignerIDs, packedSigData, nil)
+		packer.On("Pack", block.View, mock.Anything).Return(mergedSignerIDs, packedSigData, nil)
 
 		// track if QC was created
 		qcCreated := atomic.NewBool(false)
@@ -979,9 +980,11 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	committee := &mockhotstuff.Committee{}
-	committee.On("Identities", block.BlockID, mock.Anything).Return(allIdentities, nil)
-	committee.On("DKG", block.BlockID).Return(inmemDKG, nil)
+	committee := &mockhotstuff.DynamicCommittee{}
+	committee.On("IdentitiesByBlock", block.BlockID, mock.Anything).Return(allIdentities, nil)
+	committee.On("IdentitiesByEpoch", block.View, mock.Anything).Return(allIdentities, nil)
+	committee.On("WeightThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(allIdentities.TotalWeight()), nil)
+	committee.On("DKG", block.View).Return(inmemDKG, nil)
 
 	votes := make([]*model.Vote, 0, len(allIdentities))
 

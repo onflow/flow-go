@@ -36,13 +36,15 @@ func createVoter(blockView uint64, lastVotedView uint64, isBlockSafe, isCommitte
 	signer := &mocks.Signer{}
 	signer.On("CreateVote", mock.Anything).Return(expectVote, nil)
 
-	committee := &mocks.Committee{}
+	committee := &mocks.DynamicCommittee{}
 	me := unittest.IdentityFixture()
 	committee.On("Self").Return(me.NodeID, nil)
 	if isCommitteeMember {
-		committee.On("Identity", mock.Anything, me.NodeID).Return(me, nil)
+		committee.On("IdentityByEpoch", mock.Anything, me.NodeID).Return(me, nil)
+		committee.On("IdentityByBlock", mock.Anything, me.NodeID).Return(me, nil)
 	} else {
-		committee.On("Identity", mock.Anything, me.NodeID).Return(nil, model.NewInvalidSignerErrorf(""))
+		committee.On("IdentityByEpoch", mock.Anything, me.NodeID).Return(nil, model.NewInvalidSignerErrorf(""))
+		committee.On("IdentityByBlock", mock.Anything, me.NodeID).Return(nil, model.NewInvalidSignerErrorf(""))
 	}
 
 	voter := New(signer, forks, persist, committee, lastVotedView)

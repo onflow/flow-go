@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -66,6 +67,21 @@ func IsSporkRootSnapshot(snapshot Snapshot) (bool, error) {
 	if len(segment.Blocks) > 1 {
 		// spork root snapshots uniquely have only one block in the sealing segment
 		return false, nil
+	}
+	return true, nil
+}
+
+// IsEpochCommitted returns whether the epoch is committed.
+// No errors are expected during normal operations.
+func IsEpochCommitted(epoch Epoch) (bool, error) {
+	_, err := epoch.DKG()
+	// check for sentinel errors indicating un-setup or un-committed epoch
+	if errors.Is(err, ErrEpochNotCommitted) || errors.Is(err, ErrNextEpochNotSetup) {
+		return false, nil
+	}
+	// any other error is unexpected
+	if err != nil {
+		return false, fmt.Errorf("unexpected error while checking epoch committed status: %w", err)
 	}
 	return true, nil
 }

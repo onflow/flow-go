@@ -22,7 +22,7 @@ import (
 // a signature from a random beacon signer, which verifies either the signature share or
 // the reconstructed threshold signature.
 type CombinedVerifier struct {
-	committee     hotstuff.Committee
+	committee     hotstuff.Replicas
 	stakingHasher hash.Hasher
 	beaconHasher  hash.Hasher
 	packer        hotstuff.Packer
@@ -34,7 +34,7 @@ var _ hotstuff.Verifier = (*CombinedVerifier)(nil)
 // - the hotstuff committee's state is used to retrieve the public keys for the staking signature;
 // - the merger is used to combine and split staking and random beacon signatures;
 // - the packer is used to unpack QC for verification;
-func NewCombinedVerifier(committee hotstuff.Committee, packer hotstuff.Packer) *CombinedVerifier {
+func NewCombinedVerifier(committee hotstuff.Replicas, packer hotstuff.Packer) *CombinedVerifier {
 	return &CombinedVerifier{
 		committee:     committee,
 		stakingHasher: crypto.NewBLSKMAC(encoding.ConsensusVoteTag),
@@ -62,7 +62,7 @@ func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, blo
 		return fmt.Errorf("could not split signature for block %v: %w", block.BlockID, err)
 	}
 
-	dkg, err := c.committee.DKG(block.BlockID)
+	dkg, err := c.committee.DKG(block.View)
 	if err != nil {
 		return fmt.Errorf("could not get dkg: %w", err)
 	}
@@ -115,13 +115,13 @@ func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, b
 	if len(signers) == 0 {
 		return fmt.Errorf("empty list of signers: %w", model.ErrInvalidFormat)
 	}
-	dkg, err := c.committee.DKG(block.BlockID)
+	dkg, err := c.committee.DKG(block.View)
 	if err != nil {
 		return fmt.Errorf("could not get dkg data: %w", err)
 	}
 
 	// unpack sig data using packer
-	blockSigData, err := c.packer.Unpack(block.BlockID, signers.NodeIDs(), sigData)
+	blockSigData, err := c.packer.Unpack(block.View, signers.NodeIDs(), sigData)
 	if err != nil {
 		return fmt.Errorf("could not split signature: %w", err)
 	}
