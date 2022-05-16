@@ -19,6 +19,7 @@ jobs:
         test-category:
           - unit
           - unit-crypto
+          - unit-integration
           - integration-mvp
           - integration-ghost
           - integration-network

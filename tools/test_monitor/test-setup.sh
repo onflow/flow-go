@@ -21,9 +21,5 @@ case $TEST_CATEGORY in
   unit-crypto)
     make crypto_setup_tests
   ;;
-  *)
-    echo "unrecognized test category (test-setup):" $TEST_CATEGORY
-    exit 1
-  ;;
 esac
 
