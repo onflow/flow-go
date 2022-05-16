@@ -90,8 +90,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	//
 	// A collection with overlapping expiry window can be finalized or un-finalized.
 	// * to find all non-expired and finalized collections, we make use of an index
-	//   (main_chain_finalized_height -> cluster_block_id), to search for a range of main chain heights
-	//   which could be only referenced by collections with overlapping expiry windows.
+	//   (main_chain_finalized_height -> cluster_block_ids with respective reference height), to search for a range of main chain heights	//   which could be only referenced by collections with overlapping expiry windows.
 	// * to find all overlapping and un-finalized collections, we can't use the above index, because it's
 	//   only for finalized collections. Instead, we simply traverse along the chain up to the last
 	//   finalized block. This could possibly include some collections with expiry windows that DON'T
@@ -382,14 +381,14 @@ func (b *Builder) populateFinalizedAncestryLookup(minRefHeight, maxRefHeight uin
 	//
 	// Boundary conditions:
 	// 1. C's reference block height is equal to the lowest reference block height of
-	//    all its constituent transactions. Hence, C can contain T if and only if c <= t.
-	// 2. a transaction with reference block height T is eligible for inclusion in
-	//    any collection with reference block height C where C<=T<C+E
+	//    all its constituent transactions. Hence, for collection C to potentially contain T, it must satisfy c <= t.
+	// 2. For T to be eligible for inclusion in collection C, _none_ of the transactions within C are allowed
+	// to be expired w.r.t. C's reference block. Hence, for collection C to potentially contain T, it must satisfy t < c + E.
 	//
-	// Therefore, to guarantee that we find all possible duplicates, we need to check
-	// all collections with reference block height in the range (C-E,C+E). Since we
-	// know the actual maximum reference height included in this collection, we can
-	// further limit the search range to (C-E,maxRefHeight]
+	// Therefore, for collection C to potentially contain transaction T, it must satisfy t - E < c <= t.
+	// In other words, we only need to inspect collections with reference block height c ∈ (t-E, t].
+	// Consequently, for a set of transactions, with `minRefHeight` (`maxRefHeight`) being the smallest (largest)
+	// reference block height, we only need to inspect collections with c ∈ (minRefHeight-E, maxRefHeight].
 
 	// the finalized cluster blocks which could possibly contain any conflicting transactions
 	var clusterBlockIDs []flow.Identifier
