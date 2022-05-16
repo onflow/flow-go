@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
@@ -49,7 +50,8 @@ var defaultMissingCollsForAgeThreshold = missingCollsForAgeThreshold
 // Engine represents the ingestion engine, used to funnel data from other nodes
 // to a centralized location that can be queried by a user
 type Engine struct {
-	unit    *engine.Unit     // used to manage concurrency & shutdown
+	*component.ComponentManager
+	// unit    *engine.Unit     // used to manage concurrency & shutdown
 	log     zerolog.Logger   // used to log relevant actions with context
 	state   protocol.State   // used to access the  protocol state
 	me      module.Local     // used to access local node information
@@ -95,7 +97,6 @@ func New(
 
 	// initialize the propagation engine with its dependencies
 	eng := &Engine{
-		unit:                       engine.NewUnit(),
 		log:                        log.With().Str("engine", "ingestion").Logger(),
 		state:                      state,
 		me:                         me,
@@ -112,6 +113,10 @@ func New(
 		blocksToMarkExecuted:       blocksToMarkExecuted,
 		rpcEngine:                  rpcEngine,
 	}
+
+	// func(ctx irrecoverable.SignalerContext, ready ReadyFunc)
+	eng.ComponentManager = component.NewComponentManagerBuilder().
+		Build()
 
 	// register engine with the execution receipt provider
 	_, err := net.Register(engine.ReceiveReceipts, eng)
