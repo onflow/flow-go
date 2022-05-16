@@ -201,7 +201,8 @@ func (builder *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			builder.RpcEng = rpc.New(
+			var err error
+			builder.RpcEng, err = rpc.New(
 				node.Logger,
 				node.State,
 				builder.rpcConf,
@@ -222,6 +223,9 @@ func (builder *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.apiRatelimits,
 				builder.apiBurstlimits,
 			)
+			if err != nil {
+				return nil, err
+			}
 			return builder.RpcEng, nil
 		}).
 		Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
