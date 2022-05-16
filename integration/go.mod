@@ -16,13 +16,13 @@ require (
 	github.com/go-test/deep v1.0.7 // indirect
 	github.com/go-yaml/yaml v2.1.0+incompatible
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
-	github.com/onflow/cadence v0.21.3-0.20220509200929-9a1afbeeb449
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220422202806-92ad02a996cc
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220422202806-92ad02a996cc
-	github.com/onflow/flow-emulator v0.31.2-0.20220421202209-eb83f9bfda53
+	github.com/onflow/cadence v0.21.3-0.20220513161637-08b93d4bb7b9
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220513155751-c4c1f8d59f83
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220513155751-c4c1f8d59f83
+	github.com/onflow/flow-emulator v0.31.2-0.20220513151845-ef7513cb1cd0
 	github.com/onflow/flow-ft/lib/go/templates v0.2.0
-	github.com/onflow/flow-go v0.25.13-0.20220421201202-a0a5911268b6 // replaced by version on-disk
-	github.com/onflow/flow-go-sdk v0.24.1-0.20220421152843-9ce4d554036e
+	github.com/onflow/flow-go v0.25.13-0.20220513151142-7858f76e703b // replaced by version on-disk
+	github.com/onflow/flow-go-sdk v0.24.1-0.20220513205729-d1f58d47c4e3
 	github.com/onflow/flow-go/crypto v0.24.3
 	github.com/onflow/flow/protobuf/go/flow v0.2.5
 	github.com/plus3it/gorecurcopy v0.0.1

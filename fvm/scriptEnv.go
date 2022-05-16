@@ -87,7 +87,9 @@ func NewScriptEnvironment(
 
 	env.contracts = handler.NewContractHandler(
 		accounts,
-		true,
+		func() bool {
+			return true
+		},
 		func() []common.Address { return []common.Address{} },
 		func(address runtime.Address, code []byte) (bool, error) { return false, nil })
 
@@ -628,7 +630,6 @@ func (e *ScriptEnv) VerifySignature(
 	}
 
 	valid, err := crypto.VerifySignatureFromRuntime(
-		e.ctx.SignatureVerifier,
 		signature,
 		tag,
 		signedData,

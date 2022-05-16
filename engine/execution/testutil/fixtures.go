@@ -56,6 +56,19 @@ func UpdateContractDeploymentTransaction(contractName string, contract string, a
 		AddAuthorizer(chain.ServiceAddress())
 }
 
+func UpdateContractUnathorizedDeploymentTransaction(contractName string, contract string, authorizer flow.Address) *flow.TransactionBody {
+	encoded := hex.EncodeToString([]byte(contract))
+
+	return flow.NewTransactionBody().
+		SetScript([]byte(fmt.Sprintf(`transaction {
+              prepare(signer: AuthAccount) {
+                signer.contracts.update__experimental(name: "%s", code: "%s".decodeHex())
+              }
+            }`, contractName, encoded)),
+		).
+		AddAuthorizer(authorizer)
+}
+
 func CreateUnauthorizedContractDeploymentTransaction(contractName string, contract string, authorizer flow.Address) *flow.TransactionBody {
 	encoded := hex.EncodeToString([]byte(contract))
 
@@ -248,17 +261,24 @@ func CreateAccountsWithSimpleAddresses(
 	return accounts, nil
 }
 
-func RootBootstrappedLedger(vm *fvm.VirtualMachine, ctx fvm.Context) state.View {
+func RootBootstrappedLedger(vm *fvm.VirtualMachine, ctx fvm.Context, additionalOptions ...fvm.BootstrapProcedureOption) state.View {
 	view := fvmUtils.NewSimpleView()
 	programs := programs.NewEmptyPrograms()
 
 	// set 0 clusters to pass n_collectors >= n_clusters check
 	epochConfig := epochs.DefaultEpochConfig()
 	epochConfig.NumCollectorClusters = 0
-	bootstrap := fvm.Bootstrap(
-		unittest.ServiceAccountPublicKey,
+
+	options := []fvm.BootstrapProcedureOption{
 		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
 		fvm.WithEpochConfig(epochConfig),
+	}
+
+	options = append(options, additionalOptions...)
+
+	bootstrap := fvm.Bootstrap(
+		unittest.ServiceAccountPublicKey,
+		options...,
 	)
 
 	_ = vm.Run(

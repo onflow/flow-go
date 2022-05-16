@@ -165,6 +165,7 @@ func (i *TransactionInvoker) Process(
 
 	// read computationUsed from the environment. This will be used to charge fees.
 	computationUsed := env.ComputationUsed()
+	memoryUsed := env.MemoryUsed()
 
 	// log te execution intensities here, so tha they do not contain data from storage limit checks and
 	// transaction deduction, because the payer is not charged for those.
@@ -246,6 +247,7 @@ func (i *TransactionInvoker) Process(
 	// if tx failed this will only contain fee deduction logs
 	proc.Logs = append(proc.Logs, env.Logs()...)
 	proc.ComputationUsed = proc.ComputationUsed + computationUsed
+	proc.MemoryUsed = proc.MemoryUsed + memoryUsed
 
 	// based on the contract updates we decide how to clean up the programs
 	// for failed transactions we also do the same as

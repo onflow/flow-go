@@ -54,12 +54,12 @@ require (
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/multiformats/go-multihash v0.1.0
 	github.com/onflow/atree v0.3.0
-	github.com/onflow/cadence v0.21.3-0.20220509200929-9a1afbeeb449
+	github.com/onflow/cadence v0.21.3-0.20220513161637-08b93d4bb7b9
 	github.com/onflow/flow v0.2.5
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220422202806-92ad02a996cc
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220422202806-92ad02a996cc
-	github.com/onflow/flow-emulator v0.31.2-0.20220421202209-eb83f9bfda53
-	github.com/onflow/flow-go-sdk v0.24.1-0.20220421152843-9ce4d554036e
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220513155751-c4c1f8d59f83
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220513155751-c4c1f8d59f83
+	github.com/onflow/flow-emulator v0.31.2-0.20220513151845-ef7513cb1cd0
+	github.com/onflow/flow-go-sdk v0.24.1-0.20220513205729-d1f58d47c4e3
 	github.com/onflow/flow-go/crypto v0.24.3
 	github.com/onflow/flow/protobuf/go/flow v0.2.5
 	github.com/opentracing/opentracing-go v1.2.0
@@ -83,6 +83,7 @@ require (
 	golang.org/x/crypto v0.0.0-20211215165025-cf75a172585e
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
+	golang.org/x/sys v0.0.0-20220209214540-3681064d5158
 	golang.org/x/text v0.3.7
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
 	google.golang.org/api v0.70.0

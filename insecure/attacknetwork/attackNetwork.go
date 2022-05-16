@@ -29,7 +29,7 @@ type AttackNetwork struct {
 	server               *grpc.Server                // touch point of corrupted nodes with the mounted orchestrator.
 	orchestrator         insecure.AttackOrchestrator // the mounted orchestrator that implements certain attack logic.
 	codec                network.Codec
-	corruptedIds         flow.IdentityList                                    // identity of the corrupted nodes
+	corruptedNodeIds     flow.IdentityList                                    // identity of the corrupted nodes
 	corruptedConnections map[flow.Identifier]insecure.CorruptedNodeConnection // existing connections to the corrupted nodes.
 	corruptedConnector   insecure.CorruptedNodeConnector                      // connection generator to corrupted nodes.
 }
@@ -40,14 +40,14 @@ func NewAttackNetwork(
 	codec network.Codec,
 	orchestrator insecure.AttackOrchestrator,
 	connector insecure.CorruptedNodeConnector,
-	corruptedIds flow.IdentityList) (*AttackNetwork, error) {
+	corruptedNodeIds flow.IdentityList) (*AttackNetwork, error) {
 
 	attackNetwork := &AttackNetwork{
 		orchestrator:         orchestrator,
 		logger:               logger,
 		codec:                codec,
 		corruptedConnector:   connector,
-		corruptedIds:         corruptedIds,
+		corruptedNodeIds:     corruptedNodeIds,
 		corruptedConnections: make(map[flow.Identifier]insecure.CorruptedNodeConnection),
 	}
 
@@ -101,12 +101,12 @@ func (a *AttackNetwork) start(ctx irrecoverable.SignalerContext, address string)
 	wg.Wait()
 
 	// creates a connection to all corrupted nodes in the attack network.
-	for _, corruptedId := range a.corruptedIds {
-		connection, err := a.corruptedConnector.Connect(ctx, corruptedId.NodeID)
+	for _, corruptedNodeId := range a.corruptedNodeIds {
+		connection, err := a.corruptedConnector.Connect(ctx, corruptedNodeId.NodeID)
 		if err != nil {
-			return fmt.Errorf("could not establish corruptible connection to node %x: %w", corruptedId.NodeID, err)
+			return fmt.Errorf("could not establish corruptible connection to node %x: %w", corruptedNodeId.NodeID, err)
 		}
-		a.corruptedConnections[corruptedId.NodeID] = connection
+		a.corruptedConnections[corruptedNodeId.NodeID] = connection
 	}
 
 	// registers attack network for orchestrator.
@@ -184,7 +184,7 @@ func (a *AttackNetwork) processMessageFromCorruptedNode(message *insecure.Messag
 	}
 
 	err = a.orchestrator.HandleEventFromCorruptedNode(&insecure.Event{
-		CorruptedId:       sender,
+		CorruptedNodeId:   sender,
 		Channel:           network.Channel(message.ChannelID),
 		FlowProtocolEvent: event,
 		Protocol:          message.Protocol,
@@ -201,12 +201,12 @@ func (a *AttackNetwork) processMessageFromCorruptedNode(message *insecure.Messag
 // Send enforces dissemination of given event via its encapsulated corrupted node networking layer through the Flow network
 func (a *AttackNetwork) Send(event *insecure.Event) error {
 
-	connection, ok := a.corruptedConnections[event.CorruptedId]
+	connection, ok := a.corruptedConnections[event.CorruptedNodeId]
 	if !ok {
-		return fmt.Errorf("no connection available for corrupted conduit factory to node %x: ", event.CorruptedId)
+		return fmt.Errorf("no connection available for corrupted conduit factory to node %x: ", event.CorruptedNodeId)
 	}
 
-	msg, err := a.eventToMessage(event.CorruptedId, event.FlowProtocolEvent, event.Channel, event.Protocol, event.TargetNum, event.TargetIds...)
+	msg, err := a.eventToMessage(event.CorruptedNodeId, event.FlowProtocolEvent, event.Channel, event.Protocol, event.TargetNum, event.TargetIds...)
 	if err != nil {
 		return fmt.Errorf("could not convert event to message: %w", err)
 	}

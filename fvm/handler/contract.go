@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+type RestrictedDeploymentEnabledFunc func() bool
 type AuthorizedAccountsForContractDeploymentFunc func() []common.Address
 type UseContractAuditVoucherFunc func(address runtime.Address, code []byte) (bool, error)
 
@@ -26,7 +27,7 @@ type UseContractAuditVoucherFunc func(address runtime.Address, code []byte) (boo
 type ContractHandler struct {
 	accounts                    state.Accounts
 	draftUpdates                map[programs.ContractUpdateKey]programs.ContractUpdate
-	restrictedDeploymentEnabled bool
+	restrictedDeploymentEnabled RestrictedDeploymentEnabledFunc
 	authorizedAccounts          AuthorizedAccountsForContractDeploymentFunc
 	useContractAuditVoucher     UseContractAuditVoucherFunc
 	// handler doesn't have to be thread safe and right now
@@ -36,7 +37,7 @@ type ContractHandler struct {
 }
 
 func NewContractHandler(accounts state.Accounts,
-	restrictedDeploymentEnabled bool,
+	restrictedDeploymentEnabled RestrictedDeploymentEnabledFunc,
 	authorizedAccounts AuthorizedAccountsForContractDeploymentFunc,
 	useContractAuditVoucher UseContractAuditVoucherFunc,
 ) *ContractHandler {
@@ -205,7 +206,7 @@ func (h *ContractHandler) UpdateKeys() []programs.ContractUpdateKey {
 }
 
 func (h *ContractHandler) isAuthorized(signingAccounts []runtime.Address) bool {
-	if h.restrictedDeploymentEnabled {
+	if h.restrictedDeploymentEnabled() {
 		accs := h.authorizedAccounts()
 		for _, authorized := range accs {
 			for _, signer := range signingAccounts {
