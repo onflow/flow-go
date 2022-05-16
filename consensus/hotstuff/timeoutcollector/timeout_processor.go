@@ -123,7 +123,7 @@ func (p *TimeoutProcessor) Process(timeout *model.TimeoutObject) error {
 
 	err := p.validateTimeout(timeout)
 	if err != nil {
-		// handle error
+		return fmt.Errorf("received invalid timeout: %w", err)
 	}
 
 	totalWeight, err := p.sigAggregator.VerifyAndAdd(timeout.SignerID, timeout.SigData, timeout.HighestQC.View)
