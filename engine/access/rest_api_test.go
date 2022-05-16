@@ -99,8 +99,10 @@ func (suite *RestAPITestSuite) SetupTest() {
 		RESTListenAddr:         anyPort,
 	}
 
-	suite.rpcEng = rpc.New(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions,
+	var err error
+	suite.rpcEng, err = rpc.New(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions,
 		nil, suite.executionResults, suite.chainID, suite.metrics, 0, 0, false, false, nil, nil)
+	assert.NoError(suite.T(), err)
 	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
 
 	// wait for the server to startup
