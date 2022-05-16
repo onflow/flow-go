@@ -376,7 +376,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		rt := &testRuntime{
 			executeTransaction: func(script runtime.Script, r runtime.Context) error {
-
+				//nolint:staticcheck // SA1004: ignore
 				program, err := r.Interface.GetProgram(contractLocation)
 				require.NoError(t, err)
 				require.Nil(t, program)
@@ -441,7 +441,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				executionCalls++
 
 				// NOTE: set a program and revert all transactions but the system chunk transaction
-
+				//nolint:staticcheck // SA1004
 				program, err := r.Interface.GetProgram(contractLocation)
 				require.NoError(t, err)
 

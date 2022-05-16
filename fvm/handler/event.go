@@ -11,6 +11,13 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+var (
+	faulty_devnet34_txid, _     = flow.HexStringToIdentifier("016003ece13ccb9fce32d7d93c4408395856becbacc9e0587d667b594645fc0a")
+	faulty_devnet34_event_index = uint32(3)
+	faulty_devnet34_tx_index    = uint32(0)
+	faulty_devnet34_tx_payload  = []byte("{\"type\":\"Event\",\"value\":{\"id\":\"A.912d5440f7e3769e.FlowFees.FeesDeducted\",\"fields\":[{\"name\":\"amount\",\"value\":{\"type\":\"UFix64\",\"value\":\"0.00001000\"}},{\"name\":\"inclusionEffort\",\"value\":{\"type\":\"UFix64\",\"value\":\"1.00000000\"}},{\"name\":\"executionEffort\",\"value\":{\"type\":\"UFix64\",\"value\":\"0.00000000\"}}]}}")
+)
+
 // EventHandler collect events, separates out service events, and enforces event size limits
 type EventHandler struct {
 	chain                         flow.Chain
@@ -46,9 +53,15 @@ func (h *EventHandler) EmitEvent(event cadence.Event,
 		return nil
 	}
 
-	payload, err := jsoncdc.Encode(event)
-	if err != nil {
-		return errors.NewEncodingFailuref("failed to json encode a cadence event: %w", err)
+	var payload []byte
+	if txID == faulty_devnet34_txid && h.eventCollection.eventCounter == faulty_devnet34_event_index && txIndex == faulty_devnet34_tx_index {
+		payload = faulty_devnet34_tx_payload
+	} else {
+		var err error
+		payload, err = jsoncdc.Encode(event)
+		if err != nil {
+			return errors.NewEncodingFailuref("failed to json encode a cadence event: %w", err)
+		}
 	}
 
 	payloadSize := uint64(len(payload))
