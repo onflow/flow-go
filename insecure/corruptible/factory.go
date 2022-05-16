@@ -9,12 +9,17 @@ import (
 	"sync"
 
 	"github.com/golang/protobuf/ptypes/empty"
+	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	grpcinsecure "google.golang.org/grpc/credentials/insecure"
 
+	"github.com/onflow/flow-go/engine/execution/ingestion"
+	"github.com/onflow/flow-go/engine/execution/state/unittest"
+	"github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
@@ -32,18 +37,20 @@ type ConduitFactory struct {
 	cm                    *component.ComponentManager
 	logger                zerolog.Logger
 	codec                 network.Codec
-	myId                  flow.Identifier
+	me                    module.Local
 	adapter               network.Adapter
 	attackerObserveClient insecure.Attacker_ObserveClient
 	server                *grpc.Server // touch point of attack network to this factory.
 	address               net.Addr
 	ctx                   context.Context
+	receiptHasher         hash.Hasher
+	spockHasher           hash.Hasher
 }
 
 func NewCorruptibleConduitFactory(
 	logger zerolog.Logger,
 	chainId flow.ChainID,
-	myId flow.Identifier,
+	me module.Local,
 	codec network.Codec,
 	address string) *ConduitFactory {
 
@@ -52,9 +59,11 @@ func NewCorruptibleConduitFactory(
 	}
 
 	factory := &ConduitFactory{
-		myId:   myId,
-		codec:  codec,
-		logger: logger.With().Str("module", "corruptible-conduit-factory").Logger(),
+		me:            me,
+		codec:         codec,
+		logger:        logger.With().Str("module", "corruptible-conduit-factory").Logger(),
+		receiptHasher: utils.NewExecutionReceiptHasher(),
+		spockHasher:   utils.NewSPOCKHasher(),
 	}
 
 	cm := component.NewComponentManagerBuilder().
@@ -234,13 +243,25 @@ func (c *ConduitFactory) HandleIncomingEvent(
 	event interface{},
 	channel network.Channel,
 	protocol insecure.Protocol,
-	num uint32, targetIds ...flow.Identifier) error {
+	num uint32,
+	targetIds ...flow.Identifier) error {
 
 	if c.attackerObserveClient == nil {
 		// no attacker yet registered, hence sending message on the network following the
 		// correct expected behavior.
 		return c.sendOnNetwork(event, channel, protocol, uint(num), targetIds...)
 	}
+
+	//switch e := event.(type) {
+	//case *flow.ExecutionResult:
+	//	receipt, err := c.generateExecutionReceipt(e)
+	//	if err != nil {
+	//		return fmt.Errorf("could not generate execution receipt for attacker's result: %w", err)
+	//	}
+	//	event = receipt // swaps event with the receipt.
+	//
+	//case *flow.Attestation:
+	//}
 
 	msg, err := c.eventToMessage(event, channel, protocol, num, targetIds...)
 	if err != nil {
@@ -273,9 +294,10 @@ func (c *ConduitFactory) eventToMessage(
 		return nil, fmt.Errorf("could not encode event: %w", err)
 	}
 
+	myId := c.me.NodeID()
 	return &insecure.Message{
 		ChannelID: channel.String(),
-		OriginID:  c.myId[:],
+		OriginID:  myId[:],
 		TargetNum: targetNum,
 		TargetIDs: flow.IdsToBytes(targetIds),
 		Payload:   payload,
@@ -304,4 +326,14 @@ func (c *ConduitFactory) sendOnNetwork(event interface{},
 	default:
 		return fmt.Errorf("unknown protocol for sending on network: %d", protocol)
 	}
+}
+
+func (c *ConduitFactory) generateExecutionReceipt(result *flow.ExecutionResult) (*flow.ExecutionReceipt, error) {
+	computationResult := unittest.ComputationResultFixture([][]flow.Identifier{
+		{flow.ZeroID},
+		{flow.ZeroID},
+		{flow.ZeroID},
+	})
+
+	return ingestion.GenerateExecutionReceipt(c.me, c.receiptHasher, c.spockHasher, result, computationResult.StateSnapshots)
 }
