@@ -27,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/util"
 	storage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
 	sutil "github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -79,12 +80,12 @@ func (suite *BuilderSuite) SetupTest() {
 	suite.payloads = storage.NewClusterPayloads(metrics, suite.db)
 
 	clusterStateRoot, err := clusterkv.NewStateRoot(suite.genesis)
-	suite.Require().Nil(err)
+	suite.Require().NoError(err)
 	clusterState, err := clusterkv.Bootstrap(suite.db, clusterStateRoot)
-	suite.Require().Nil(err)
+	suite.Require().NoError(err)
 
 	suite.state, err = clusterkv.NewMutableState(clusterState, tracer, suite.headers, suite.payloads)
-	suite.Require().Nil(err)
+	suite.Require().NoError(err)
 
 	// just bootstrap with a genesis block, we'll use this as reference
 	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
@@ -114,39 +115,51 @@ func (suite *BuilderSuite) SetupTest() {
 		suite.Assert().True(added)
 	}
 
-	suite.builder = builder.NewBuilder(suite.db, tracer, suite.headers, suite.headers, suite.payloads, suite.pool)
+	suite.builder, _ = builder.NewBuilder(suite.db, tracer, suite.headers, suite.headers, suite.payloads, suite.pool)
 }
 
 // runs after each test finishes
 func (suite *BuilderSuite) TearDownTest() {
 	err := suite.db.Close()
-	suite.Assert().Nil(err)
+	suite.Assert().NoError(err)
 	err = os.RemoveAll(suite.dbdir)
-	suite.Assert().Nil(err)
+	suite.Assert().NoError(err)
 }
 
 func (suite *BuilderSuite) InsertBlock(block model.Block) {
 	err := suite.db.Update(procedure.InsertClusterBlock(&block))
-	suite.Assert().Nil(err)
+	suite.Assert().NoError(err)
 }
 
-func (suite *BuilderSuite) FinalizeBlock(blockID flow.Identifier) {
-	err := suite.db.Update(procedure.FinalizeClusterBlock(blockID))
-	suite.Assert().Nil(err)
+func (suite *BuilderSuite) FinalizeBlock(block model.Block) {
+	err := suite.db.Update(func(tx *badger.Txn) error {
+		var refBlock flow.Header
+		err := operation.RetrieveHeader(block.Payload.ReferenceBlockID, &refBlock)(tx)
+		if err != nil {
+			return err
+		}
+		err = procedure.FinalizeClusterBlock(block.ID())(tx)
+		if err != nil {
+			return err
+		}
+		err = operation.IndexClusterBlockByReferenceHeight(refBlock.Height, block.ID())(tx)
+		return err
+	})
+	suite.Assert().NoError(err)
 }
 
 // Payload returns a payload containing the given transactions, with a valid
 // reference block ID.
 func (suite *BuilderSuite) Payload(transactions ...*flow.TransactionBody) model.Payload {
 	final, err := suite.protoState.Final().Head()
-	suite.Require().Nil(err)
+	suite.Require().NoError(err)
 	return model.PayloadFromTransactions(final.ID(), transactions...)
 }
 
 // ProtoStateRoot returns the root block of the protocol state.
 func (suite *BuilderSuite) ProtoStateRoot() *flow.Header {
 	root, err := suite.protoState.Params().Root()
-	suite.Require().Nil(err)
+	suite.Require().NoError(err)
 	return root
 }
 
@@ -187,7 +200,7 @@ func (suite *BuilderSuite) TestBuildOn_Success() {
 	}
 
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), setter)
-	suite.Require().Nil(err)
+	suite.Require().NoError(err)
 
 	// setter should have been run
 	suite.Assert().Equal(expectedHeight, header.Height)
@@ -195,13 +208,13 @@ func (suite *BuilderSuite) TestBuildOn_Success() {
 	// should be able to retrieve built block from storage
 	var built model.Block
 	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
-	suite.Assert().Nil(err)
+	suite.Assert().NoError(err)
 	builtCollection := built.Payload.Collection
 
 	// should reference a valid reference block
 	// (since genesis is the only block, it's the only valid reference)
 	mainGenesis, err := suite.protoState.AtHeight(0).Head()
-	suite.Assert().Nil(err)
+	suite.Assert().NoError(err)
 	suite.Assert().Equal(mainGenesis.ID(), built.Payload.ReferenceBlockID)
 
 	// payload should include only items from mempool
@@ -210,8 +223,7 @@ func (suite *BuilderSuite) TestBuildOn_Success() {
 	suite.Assert().True(collectionContains(builtCollection, flow.GetIDs(mempoolTransactions)...))
 }
 
-// when there are transactions with an unknown reference block in the pool,
-// we should not include them in collections
+// when there are transactions with an unknown reference block in the pool, we should not include them in collections
 func (suite *BuilderSuite) TestBuildOn_WithUnknownReferenceBlock() {
 
 	// before modifying the mempool, note the valid transactions already in the pool
@@ -223,19 +235,99 @@ func (suite *BuilderSuite) TestBuildOn_WithUnknownReferenceBlock() {
 	suite.pool.Add(&unknownReferenceTx)
 
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
-	suite.Require().Nil(err)
+	suite.Require().NoError(err)
 
 	// should be able to retrieve built block from storage
 	var built model.Block
 	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
-	suite.Assert().Nil(err)
+	suite.Assert().NoError(err)
 	builtCollection := built.Payload.Collection
 
 	suite.Assert().Len(builtCollection.Transactions, 3)
 	// payload should include only the transactions with a valid reference block
 	suite.Assert().True(collectionContains(builtCollection, flow.GetIDs(validMempoolTransactions)...))
-	// should not contain the the unknown-reference transaction
+	// should not contain the unknown-reference transaction
 	suite.Assert().False(collectionContains(builtCollection, unknownReferenceTx.ID()))
+}
+
+// when there are transactions with a known but unfinalized reference block in the pool, we should not include them in collections
+func (suite *BuilderSuite) TestBuildOn_WithUnfinalizedReferenceBlock() {
+
+	// before modifying the mempool, note the valid transactions already in the pool
+	validMempoolTransactions := suite.pool.All()
+
+	// add an unfinalized block to the protocol state
+	genesis, err := suite.protoState.Final().Head()
+	suite.Require().NoError(err)
+	unfinalizedReferenceBlock := unittest.BlockWithParentFixture(genesis)
+	unfinalizedReferenceBlock.SetPayload(flow.EmptyPayload())
+	err = suite.protoState.Extend(context.Background(), unfinalizedReferenceBlock)
+	suite.Require().NoError(err)
+
+	// add a transaction with unfinalized reference block to the pool
+	unfinalizedReferenceTx := unittest.TransactionBodyFixture()
+	unfinalizedReferenceTx.ReferenceBlockID = unfinalizedReferenceBlock.ID()
+	suite.pool.Add(&unfinalizedReferenceTx)
+
+	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
+	suite.Require().NoError(err)
+
+	// should be able to retrieve built block from storage
+	var built model.Block
+	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
+	suite.Assert().NoError(err)
+	builtCollection := built.Payload.Collection
+
+	suite.Assert().Len(builtCollection.Transactions, 3)
+	// payload should include only the transactions with a valid reference block
+	suite.Assert().True(collectionContains(builtCollection, flow.GetIDs(validMempoolTransactions)...))
+	// should not contain the unfinalized-reference transaction
+	suite.Assert().False(collectionContains(builtCollection, unfinalizedReferenceTx.ID()))
+}
+
+// when there are transactions with an orphaned reference block in the pool, we should not include them in collections
+func (suite *BuilderSuite) TestBuildOn_WithOrphanedReferenceBlock() {
+
+	// before modifying the mempool, note the valid transactions already in the pool
+	validMempoolTransactions := suite.pool.All()
+
+	// add an orphaned block to the protocol state
+	genesis, err := suite.protoState.Final().Head()
+	suite.Require().NoError(err)
+	// create a block extending genesis which will be orphaned
+	orphan := unittest.BlockWithParentFixture(genesis)
+	orphan.SetPayload(flow.EmptyPayload())
+	err = suite.protoState.Extend(context.Background(), orphan)
+	suite.Require().NoError(err)
+	// create and finalize a block on top of genesis, orphaning `orphan`
+	block1 := unittest.BlockWithParentFixture(genesis)
+	block1.SetPayload(flow.EmptyPayload())
+	err = suite.protoState.Extend(context.Background(), block1)
+	suite.Require().NoError(err)
+	err = suite.protoState.Finalize(context.Background(), block1.ID())
+	suite.Require().NoError(err)
+
+	// add a transaction with orphaned reference block to the pool
+	orphanedReferenceTx := unittest.TransactionBodyFixture()
+	orphanedReferenceTx.ReferenceBlockID = orphan.ID()
+	suite.pool.Add(&orphanedReferenceTx)
+
+	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
+	suite.Require().NoError(err)
+
+	// should be able to retrieve built block from storage
+	var built model.Block
+	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
+	suite.Assert().NoError(err)
+	builtCollection := built.Payload.Collection
+
+	suite.Assert().Len(builtCollection.Transactions, 3)
+	// payload should include only the transactions with a valid reference block
+	suite.Assert().True(collectionContains(builtCollection, flow.GetIDs(validMempoolTransactions)...))
+	// should not contain the unknown-reference transaction
+	suite.Assert().False(collectionContains(builtCollection, orphanedReferenceTx.ID()))
+	// the transaction with orphaned reference should be removed from the mempool
+	suite.Assert().False(suite.pool.Has(orphanedReferenceTx.ID()))
 }
 
 func (suite *BuilderSuite) TestBuildOn_WithForks() {
@@ -264,12 +356,12 @@ func (suite *BuilderSuite) TestBuildOn_WithForks() {
 
 	// build on top of fork 1
 	header, err := suite.builder.BuildOn(block1.ID(), noopSetter)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// should be able to retrieve built block from storage
 	var built model.Block
 	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	builtCollection := built.Payload.Collection
 
 	// payload should include ONLY tx2 and tx3
@@ -293,27 +385,26 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingFinalizedBlock() {
 	finalizedBlock := unittest.ClusterBlockWithParent(suite.genesis)
 	finalizedBlock.SetPayload(finalizedPayload)
 	suite.InsertBlock(finalizedBlock)
-	t.Logf("finalized: id=%s\tparent_id=%s\theight=%d\n", finalizedBlock.ID(), finalizedBlock.Header.ParentID, finalizedBlock.Header.Height)
+	t.Logf("finalized: height=%d id=%s txs=%s parent_id=%s\t\n", finalizedBlock.Header.Height, finalizedBlock.ID(), finalizedPayload.Collection.Light(), finalizedBlock.Header.ParentID)
 
 	// build a block containing tx2 on the first block
 	unFinalizedPayload := suite.Payload(tx2)
 	unFinalizedBlock := unittest.ClusterBlockWithParent(&finalizedBlock)
 	unFinalizedBlock.SetPayload(unFinalizedPayload)
 	suite.InsertBlock(unFinalizedBlock)
-	t.Logf("unfinalized: id=%s\tparent_id=%s\theight=%d\n", unFinalizedBlock.ID(), unFinalizedBlock.Header.ParentID, unFinalizedBlock.Header.Height)
+	t.Logf("finalized: height=%d id=%s txs=%s parent_id=%s\t\n", unFinalizedBlock.Header.Height, unFinalizedBlock.ID(), unFinalizedPayload.Collection.Light(), unFinalizedBlock.Header.ParentID)
 
 	// finalize first block
-	err := suite.db.Update(procedure.FinalizeClusterBlock(finalizedBlock.ID()))
-	assert.Nil(t, err)
+	suite.FinalizeBlock(finalizedBlock)
 
 	// build on the un-finalized block
 	header, err := suite.builder.BuildOn(unFinalizedBlock.ID(), noopSetter)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// retrieve the built block from storage
 	var built model.Block
 	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	builtCollection := built.Payload.Collection
 
 	// payload should only contain tx3
@@ -353,17 +444,16 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingInvalidatedForks() {
 	t.Logf("invalidated: id=%s\tparent_id=%s\theight=%d\n", invalidatedBlock.ID(), invalidatedBlock.Header.ParentID, invalidatedBlock.Header.Height)
 
 	// finalize first block - this indirectly invalidates the second block
-	err := suite.db.Update(procedure.FinalizeClusterBlock(finalizedBlock.ID()))
-	assert.Nil(t, err)
+	suite.FinalizeBlock(finalizedBlock)
 
 	// build on the finalized block
 	header, err := suite.builder.BuildOn(finalizedBlock.ID(), noopSetter)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// retrieve the built block from storage
 	var built model.Block
 	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	builtCollection := built.Payload.Collection
 
 	// tx2 and tx3 should be in the built collection
@@ -377,11 +467,11 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 
 	// use a mempool with 2000 transactions, one per block
 	suite.pool = herocache.NewTransactions(2000, unittest.Logger(), metrics.NewNoopCollector())
-	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionSize(10000))
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionSize(10000))
 
 	// get a valid reference block ID
 	final, err := suite.protoState.Final().Head()
-	require.Nil(t, err)
+	require.NoError(t, err)
 	refID := final.ID()
 
 	// keep track of the head of the chain
@@ -390,10 +480,9 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 	// keep track of invalidated transaction IDs
 	var invalidatedTxIds []flow.Identifier
 
-	// create 1000 blocks containing 1000 transactions
-	//TODO for now limit this test to no more blocks than we look back by
-	// when de-duplicating transactions.
-	for i := 0; i < flow.DefaultTransactionExpiry-1; i++ {
+	// create a large history of blocks with invalidated forks every 3 blocks on
+	// average - build until the height exceeds transaction expiry
+	for i := 0; ; i++ {
 
 		// create a transaction
 		tx := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) {
@@ -405,7 +494,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 
 		// 1/3 of the time create a conflicting fork that will be invalidated
 		// don't do this the first and last few times to ensure we don't
-		// try to fork genesis and the the last block is the valid fork.
+		// try to fork genesis and the last block is the valid fork.
 		conflicting := rand.Intn(3) == 0 && i > 5 && i < 995
 
 		// by default, build on the head - if we are building a
@@ -413,7 +502,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 		parent := head
 		if conflicting {
 			err = suite.db.View(procedure.RetrieveClusterBlock(parent.Header.ParentID, &parent))
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			// add the transaction to the invalidated list
 			invalidatedTxIds = append(invalidatedTxIds, tx.ID())
 		}
@@ -427,21 +516,28 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 		// reset the valid head if we aren't building a conflicting fork
 		if !conflicting {
 			head = block
-			err = suite.db.Update(procedure.FinalizeClusterBlock(block.ID()))
-			assert.Nil(t, err)
+			suite.FinalizeBlock(block)
+			assert.NoError(t, err)
+		}
+
+		// stop building blocks once we've built a history which exceeds the transaction
+		// expiry length - this tests that deduplication works properly against old blocks
+		// which nevertheless have a potentially conflicting reference block
+		if head.Header.Height > flow.DefaultTransactionExpiry+100 {
+			break
 		}
 	}
 
 	t.Log("conflicting: ", len(invalidatedTxIds))
 
-	// build on the the head block
+	// build on the head block
 	header, err := suite.builder.BuildOn(head.ID(), noopSetter)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// retrieve the built block from storage
 	var built model.Block
 	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
-	require.Nil(t, err)
+	require.NoError(t, err)
 	builtCollection := built.Payload.Collection
 
 	// payload should only contain transactions from invalidated blocks
@@ -451,16 +547,16 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 
 func (suite *BuilderSuite) TestBuildOn_MaxCollectionSize() {
 	// set the max collection size to 1
-	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionSize(1))
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionSize(1))
 
 	// build a block
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
-	suite.Require().Nil(err)
+	suite.Require().NoError(err)
 
 	// retrieve the built block from storage
 	var built model.Block
 	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
-	suite.Require().Nil(err)
+	suite.Require().NoError(err)
 	builtCollection := built.Payload.Collection
 
 	// should be only 1 transaction in the collection
@@ -469,16 +565,16 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionSize() {
 
 func (suite *BuilderSuite) TestBuildOn_MaxCollectionByteSize() {
 	// set the max collection byte size to 400 (each tx is about 150 bytes)
-	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionByteSize(400))
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionByteSize(400))
 
 	// build a block
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
-	suite.Require().Nil(err)
+	suite.Require().NoError(err)
 
 	// retrieve the built block from storage
 	var built model.Block
 	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
-	suite.Require().Nil(err)
+	suite.Require().NoError(err)
 	builtCollection := built.Payload.Collection
 
 	// should be only 2 transactions in the collection, since each tx is ~273 bytes and the limit is 600 bytes
@@ -487,16 +583,16 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionByteSize() {
 
 func (suite *BuilderSuite) TestBuildOn_MaxCollectionTotalGas() {
 	// set the max gas to 20,000
-	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionTotalGas(20000))
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionTotalGas(20000))
 
 	// build a block
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
-	suite.Require().Nil(err)
+	suite.Require().NoError(err)
 
 	// retrieve the built block from storage
 	var built model.Block
 	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
-	suite.Require().Nil(err)
+	suite.Require().NoError(err)
 	builtCollection := built.Payload.Collection
 
 	// should be only 2 transactions in collection, since each transaction has gas limit of 9,999 and collection limit is set to 20,000
@@ -507,7 +603,7 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 
 	// create enough main-chain blocks that an expired transaction is possible
 	genesis, err := suite.protoState.Final().Head()
-	suite.Require().Nil(err)
+	suite.Require().NoError(err)
 
 	head := genesis
 	for i := 0; i < flow.DefaultTransactionExpiry+1; i++ {
@@ -516,15 +612,15 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 		block.Payload.Seals = nil
 		block.Header.PayloadHash = block.Payload.Hash()
 		err = suite.protoState.Extend(context.Background(), block)
-		suite.Require().Nil(err)
+		suite.Require().NoError(err)
 		err = suite.protoState.Finalize(context.Background(), block.ID())
-		suite.Require().Nil(err)
+		suite.Require().NoError(err)
 		head = block.Header
 	}
 
 	// reset the pool and builder
 	suite.pool = herocache.NewTransactions(10, unittest.Logger(), metrics.NewNoopCollector())
-	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool)
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool)
 
 	// insert a transaction referring genesis (now expired)
 	tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) {
@@ -547,12 +643,12 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 
 	// build a block
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
-	suite.Require().Nil(err)
+	suite.Require().NoError(err)
 
 	// retrieve the built block from storage
 	var built model.Block
 	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
-	suite.Require().Nil(err)
+	suite.Require().NoError(err)
 	builtCollection := built.Payload.Collection
 
 	// the block should only contain the un-expired transaction
@@ -566,19 +662,19 @@ func (suite *BuilderSuite) TestBuildOn_EmptyMempool() {
 
 	// start with an empty mempool
 	suite.pool = herocache.NewTransactions(1000, unittest.Logger(), metrics.NewNoopCollector())
-	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool)
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool)
 
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
-	suite.Require().Nil(err)
+	suite.Require().NoError(err)
 
 	var built model.Block
 	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
-	suite.Require().Nil(err)
+	suite.Require().NoError(err)
 
 	// should reference a valid reference block
 	// (since genesis is the only block, it's the only valid reference)
 	mainGenesis, err := suite.protoState.AtHeight(0).Head()
-	suite.Assert().Nil(err)
+	suite.Assert().NoError(err)
 	suite.Assert().Equal(mainGenesis.ID(), built.Payload.ReferenceBlockID)
 
 	// the payload should be empty
@@ -593,7 +689,7 @@ func (suite *BuilderSuite) TestBuildOn_NoRateLimiting() {
 	suite.ClearPool()
 
 	// create builder with no rate limit and max 10 tx/collection
-	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool,
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool,
 		builder.WithMaxCollectionSize(10),
 		builder.WithMaxPayerTransactionRate(0),
 	)
@@ -612,13 +708,13 @@ func (suite *BuilderSuite) TestBuildOn_NoRateLimiting() {
 	parentID := suite.genesis.ID()
 	for i := 0; i < 10; i++ {
 		header, err := suite.builder.BuildOn(parentID, noopSetter)
-		suite.Require().Nil(err)
+		suite.Require().NoError(err)
 		parentID = header.ID()
 
 		// each collection should be full with 10 transactions
 		var built model.Block
 		err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
-		suite.Assert().Nil(err)
+		suite.Assert().NoError(err)
 		suite.Assert().Len(built.Payload.Collection.Transactions, 10)
 	}
 }
@@ -634,7 +730,7 @@ func (suite *BuilderSuite) TestBuildOn_RateLimitNonPayer() {
 	suite.ClearPool()
 
 	// create builder with 5 tx/payer and max 10 tx/collection
-	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool,
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool,
 		builder.WithMaxCollectionSize(10),
 		builder.WithMaxPayerTransactionRate(5),
 	)
@@ -659,13 +755,13 @@ func (suite *BuilderSuite) TestBuildOn_RateLimitNonPayer() {
 	parentID := suite.genesis.ID()
 	for i := 0; i < 10; i++ {
 		header, err := suite.builder.BuildOn(parentID, noopSetter)
-		suite.Require().Nil(err)
+		suite.Require().NoError(err)
 		parentID = header.ID()
 
 		// each collection should be full with 10 transactions
 		var built model.Block
 		err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
-		suite.Assert().Nil(err)
+		suite.Assert().NoError(err)
 		suite.Assert().Len(built.Payload.Collection.Transactions, 10)
 	}
 }
@@ -678,7 +774,7 @@ func (suite *BuilderSuite) TestBuildOn_HighRateLimit() {
 	suite.ClearPool()
 
 	// create builder with 5 tx/payer and max 10 tx/collection
-	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool,
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool,
 		builder.WithMaxCollectionSize(10),
 		builder.WithMaxPayerTransactionRate(5),
 	)
@@ -697,13 +793,13 @@ func (suite *BuilderSuite) TestBuildOn_HighRateLimit() {
 	parentID := suite.genesis.ID()
 	for i := 0; i < 10; i++ {
 		header, err := suite.builder.BuildOn(parentID, noopSetter)
-		suite.Require().Nil(err)
+		suite.Require().NoError(err)
 		parentID = header.ID()
 
 		// each collection should be half-full with 5 transactions
 		var built model.Block
 		err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
-		suite.Assert().Nil(err)
+		suite.Assert().NoError(err)
 		suite.Assert().Len(built.Payload.Collection.Transactions, 5)
 	}
 }
@@ -716,7 +812,7 @@ func (suite *BuilderSuite) TestBuildOn_LowRateLimit() {
 	suite.ClearPool()
 
 	// create builder with .5 tx/payer and max 10 tx/collection
-	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool,
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool,
 		builder.WithMaxCollectionSize(10),
 		builder.WithMaxPayerTransactionRate(.5),
 	)
@@ -736,13 +832,13 @@ func (suite *BuilderSuite) TestBuildOn_LowRateLimit() {
 	parentID := suite.genesis.ID()
 	for i := 0; i < 10; i++ {
 		header, err := suite.builder.BuildOn(parentID, noopSetter)
-		suite.Require().Nil(err)
+		suite.Require().NoError(err)
 		parentID = header.ID()
 
 		// collections should either be empty or have 1 transaction
 		var built model.Block
 		err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
-		suite.Assert().Nil(err)
+		suite.Assert().NoError(err)
 		if i%2 == 0 {
 			suite.Assert().Len(built.Payload.Collection.Transactions, 1)
 		} else {
@@ -758,7 +854,7 @@ func (suite *BuilderSuite) TestBuildOn_UnlimitedPayer() {
 	// create builder with 5 tx/payer and max 10 tx/collection
 	// configure an unlimited payer
 	payer := unittest.RandomAddressFixture()
-	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool,
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool,
 		builder.WithMaxCollectionSize(10),
 		builder.WithMaxPayerTransactionRate(5),
 		builder.WithUnlimitedPayers(payer),
@@ -777,13 +873,13 @@ func (suite *BuilderSuite) TestBuildOn_UnlimitedPayer() {
 	parentID := suite.genesis.ID()
 	for i := 0; i < 10; i++ {
 		header, err := suite.builder.BuildOn(parentID, noopSetter)
-		suite.Require().Nil(err)
+		suite.Require().NoError(err)
 		parentID = header.ID()
 
 		// each collection should be full with 10 transactions
 		var built model.Block
 		err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
-		suite.Assert().Nil(err)
+		suite.Assert().NoError(err)
 		suite.Assert().Len(built.Payload.Collection.Transactions, 10)
 
 	}
@@ -835,9 +931,9 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		suite.db = unittest.BadgerDB(b, suite.dbdir)
 		defer func() {
 			err = suite.db.Close()
-			assert.Nil(b, err)
+			assert.NoError(b, err)
 			err = os.RemoveAll(suite.dbdir)
-			assert.Nil(b, err)
+			assert.NoError(b, err)
 		}()
 
 		metrics := metrics.NewNoopCollector()
@@ -850,10 +946,10 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		stateRoot, err := clusterkv.NewStateRoot(suite.genesis)
 
 		state, err := clusterkv.Bootstrap(suite.db, stateRoot)
-		assert.Nil(b, err)
+		assert.NoError(b, err)
 
 		suite.state, err = clusterkv.NewMutableState(state, tracer, suite.headers, suite.payloads)
-		assert.Nil(b, err)
+		assert.NoError(b, err)
 
 		// add some transactions to transaction pool
 		for i := 0; i < 3; i++ {
@@ -863,7 +959,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		}
 
 		// create the builder
-		suite.builder = builder.NewBuilder(suite.db, tracer, suite.headers, suite.headers, suite.payloads, suite.pool)
+		suite.builder, _ = builder.NewBuilder(suite.db, tracer, suite.headers, suite.headers, suite.payloads, suite.pool)
 	}
 
 	// create a block history to test performance against
@@ -871,12 +967,12 @@ func benchmarkBuildOn(b *testing.B, size int) {
 	for i := 0; i < size; i++ {
 		block := unittest.ClusterBlockWithParent(final)
 		err := suite.db.Update(procedure.InsertClusterBlock(&block))
-		require.Nil(b, err)
+		require.NoError(b, err)
 
 		// finalize the block 80% of the time, resulting in a fork-rate of 20%
 		if rand.Intn(100) < 80 {
 			err = suite.db.Update(procedure.FinalizeClusterBlock(block.ID()))
-			require.Nil(b, err)
+			require.NoError(b, err)
 			final = &block
 		}
 	}
@@ -884,6 +980,6 @@ func benchmarkBuildOn(b *testing.B, size int) {
 	b.StartTimer()
 	for n := 0; n < b.N; n++ {
 		_, err := suite.builder.BuildOn(final.ID(), noopSetter)
-		assert.Nil(b, err)
+		assert.NoError(b, err)
 	}
 }
