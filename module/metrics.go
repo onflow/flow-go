@@ -402,14 +402,14 @@ type ExecutionMetrics interface {
 
 type BackendScriptsMetrics interface {
 	// Record the round trip time while executing a script
-	ExecuteScriptRTT(dur time.Duration, size int)
+	ScriptExecuted(dur time.Duration, size int)
 }
 
 type TransactionMetrics interface {
 	BackendScriptsMetrics
 
 	// Record the round trip time while getting a transaction result
-	GetTransactionResultRTT(dur time.Duration, size int)
+	TransactionResultFetched(dur time.Duration, size int)
 
 	// TransactionReceived starts tracking of transaction execution/finalization/sealing
 	TransactionReceived(txID flow.Identifier, when time.Time)

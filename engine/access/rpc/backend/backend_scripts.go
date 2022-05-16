@@ -126,7 +126,7 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 			}
 
 			// log execution time
-			b.metrics.ExecuteScriptRTT(
+			b.metrics.ScriptExecuted(
 				time.Since(execStartTime),
 				len(script),
 			)

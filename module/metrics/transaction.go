@@ -21,8 +21,8 @@ type TransactionCollector struct {
 	timeToExecuted             prometheus.Summary
 	timeToFinalizedExecuted    prometheus.Summary
 	transactionSubmission      *prometheus.CounterVec
-	executeScriptDuration      *prometheus.CounterVec
-	transactionResultDuration  *prometheus.CounterVec
+	scriptExecutedDuration     *prometheus.HistogramVec
+	transactionResultDuration  *prometheus.HistogramVec
 	scriptSize                 *prometheus.HistogramVec
 }
 
@@ -84,17 +84,19 @@ func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log 
 			Subsystem: subsystemTransactionSubmission,
 			Help:      "counter for the success/failure of transaction submissions",
 		}, []string{"result"}),
-		executeScriptDuration: promauto.NewCounterVec(prometheus.CounterOpts{
-			Name:      "execute_script_rtt_duration",
+		scriptExecutedDuration: promauto.NewHistogramVec(prometheus.HistogramOpts{
+			Name:      "script_executed_duration",
 			Namespace: namespaceAccess,
 			Subsystem: subsystemTransactionSubmission,
-			Help:      "counter for the duration in ms of the round trip time for executing a script",
+			Help:      "histogram for the duration in ms of the round trip time for executing a script",
+			Buckets:   []float64{1, 100, 500, 1000, 2000, 5000},
 		}, []string{"script_size"}),
-		transactionResultDuration: promauto.NewCounterVec(prometheus.CounterOpts{
-			Name:      "transaction_result_rtt_duration",
+		transactionResultDuration: promauto.NewHistogramVec(prometheus.HistogramOpts{
+			Name:      "transaction_result_fetched_duration",
 			Namespace: namespaceAccess,
 			Subsystem: subsystemTransactionSubmission,
-			Help:      "counter for the duration in ms of the round trip time for getting a transaction result",
+			Help:      "histogram for the duration in ms of the round trip time for getting a transaction result",
+			Buckets:   []float64{1, 100, 500, 1000, 2000, 5000},
 		}, []string{"script_size"}),
 		scriptSize: promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Name:      "script_size",
@@ -107,18 +109,18 @@ func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log 
 	return tc
 }
 
-func (tc *TransactionCollector) ExecuteScriptRTT(dur time.Duration, size int) {
+func (tc *TransactionCollector) ScriptExecuted(dur time.Duration, size int) {
 	tc.scriptSizeHist(size, "ExecuteScript")
-	tc.executeScriptDuration.With(prometheus.Labels{
+	tc.scriptExecutedDuration.With(prometheus.Labels{
 		"script_size": tc.scriptSizeLabel(size),
-	}).Add(float64(dur.Milliseconds()))
+	}).Observe(float64(dur.Milliseconds()))
 }
 
-func (tc *TransactionCollector) GetTransactionResultRTT(dur time.Duration, size int) {
+func (tc *TransactionCollector) TransactionResultFetched(dur time.Duration, size int) {
 	tc.scriptSizeHist(size, "GetTransactionResult")
 	tc.transactionResultDuration.With(prometheus.Labels{
 		"script_size": tc.scriptSizeLabel(size),
-	}).Add(float64(dur.Milliseconds()))
+	}).Observe(float64(dur.Milliseconds()))
 }
 
 func (tc *TransactionCollector) scriptSizeLabel(size int) string {

@@ -279,7 +279,7 @@ func (b *backendTransactions) GetTransactionResult(
 		return nil, convertStorageError(err)
 	}
 
-	b.transactionMetrics.GetTransactionResultRTT(time.Since(start), len(tx.Script))
+	b.transactionMetrics.TransactionResultFetched(time.Since(start), len(tx.Script))
 
 	return &access.TransactionResult{
 		Status:        txStatus,

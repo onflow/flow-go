@@ -13,7 +13,7 @@ type BackendScriptsMetrics struct {
 	mock.Mock
 }
 
-// ExecuteScriptRTT provides a mock function with given fields: dur, size
-func (_m *BackendScriptsMetrics) ExecuteScriptRTT(dur time.Duration, size int) {
+// ScriptExecuted provides a mock function with given fields: dur, size
+func (_m *BackendScriptsMetrics) ScriptExecuted(dur time.Duration, size int) {
 	_m.Called(dur, size)
 }
