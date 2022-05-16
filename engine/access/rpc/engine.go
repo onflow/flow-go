@@ -89,7 +89,7 @@ func New(log zerolog.Logger,
 	rpcMetricsEnabled bool,
 	apiRatelimits map[string]int,  // the api rate limit (max calls per second) for each of the Access API e.g. Ping->100, GetTransaction->300
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the Access API e.g. Ping->50, GetTransaction->10
-) *Engine {
+) (*Engine, error) {
 
 	log = log.With().Str("engine", "rpc").Logger()
 
@@ -138,10 +138,11 @@ func New(log zerolog.Logger,
 		cacheSize = backend.DefaultConnectionPoolSize
 	}
 	cache, err := lru.New(cacheSize)
-
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not initialize connection pool cache")
+		log.Err(err).Msg("could not initialize connection pool cache")
+		return nil, err
 	}
+
 	connectionFactory := &backend.ConnectionFactoryImpl{
 		CollectionGRPCPort:        collectionGRPCPort,
 		ExecutionGRPCPort:         executionGRPCPort,
@@ -208,7 +209,7 @@ func New(log zerolog.Logger,
 		legacyaccess.NewHandler(backend, chainID.Chain()),
 	)
 
-	return eng
+	return eng, nil
 }
 
 // Ready returns a ready channel that is closed once the engine has fully
