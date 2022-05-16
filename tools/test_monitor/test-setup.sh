@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-echo "test-setup start"
-
 set -e
 shopt -s extglob
 
