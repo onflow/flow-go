@@ -266,6 +266,14 @@ var Pool = TransactionTypePool{
 			name:     "get signer vault",
 		},
 		&SimpleTxType{
+			paramMax: 4394,
+			body: `
+				let receiverRef =  getAccount(signer.address)
+					.getCapability(/public/flowTokenReceiver)
+			`,
+			name: "get receiver capability",
+		},
+		&SimpleTxType{
 			paramMax: 32369,
 			body: `let receiverRef = getAccount(signer.address)
 				.getCapability(/public/flowTokenReceiver)
@@ -369,6 +377,56 @@ var Pool = TransactionTypePool{
 			paramMax: 9519,
 			body:     `TestContract.mintNFT()`,
 			name:     "mint NFT",
+		},
+		&SimpleTxType{
+			paramMax: 4394,
+			body: `
+				let val = "f847b84000fb479cb398ab7e31d6f048c12ec5b5b679052589280cacde421af823f93fe927dfc3d1e371b172f97ceeac1bc235f60654184c83f4ea70dd3b7785ffb3c73802038203e8".decodeHex()
+			`,
+			name: "decode hex",
+		},
+		&SimpleTxType{
+			paramMax: 4394,
+			body: `
+				let val <- TestContract.createResource()
+				destroy val
+			`,
+			name: "create resource",
+		},
+		&SimpleTxType{
+			paramMax: 4394,
+			body: `
+				let val = TestContract.createStruct()
+			`,
+			name: "create struct",
+		},
+		&SimpleTxType{
+			paramMax: 4394,
+			body: `
+				let val = TestContract.createEmptyStruct()
+			`,
+			name: "create empty struct",
+		},
+		&SimpleTxType{
+			paramMax: 4394,
+			body: `
+				let array: [Int8] = []
+			`,
+			name: "create empty array",
+		},
+		&SimpleTxType{
+			paramMax: 4394,
+			body: `
+				var v: Int8 = 4
+				let array: [Int8] = [
+					v, v, v, v, v, v, v, v, v, v,
+					v, v, v, v, v, v, v, v, v, v,
+					v, v, v, v, v, v, v, v, v, v,
+					v, v, v, v, v, v, v, v, v, v,
+					v, v, v, v, v, v, v, v, v, v
+				]
+			`,
+			name: "create array",
 		},
 	},
 }

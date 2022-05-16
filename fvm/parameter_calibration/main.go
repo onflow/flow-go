@@ -209,6 +209,38 @@ func runTransactionsAndGetData(blocks int) *transactionDataCollector {
 					}
 				}
 
+				access(all) fun createStruct(): Foo {
+					return Foo(1, "foo")
+				}
+
+				access(all) fun createEmptyStruct(): Bar {
+					return Bar()
+				}
+
+				access(all) fun createResource(): @NFT {
+					return <- create NFT(
+						id: 1,
+						data: "hello"
+					)
+				}
+
+				pub struct Foo {
+					pub let id: UInt64
+					pub let data: String
+
+					init(
+						_ id: UInt64,
+						_ data: String,
+					) {
+						self.id = id
+						self.data = data
+					}
+				}
+
+				pub struct Bar {
+					init() {}
+				}
+
 				init() {
 					self.totalSupply = 0
 					self.nfts <- []
