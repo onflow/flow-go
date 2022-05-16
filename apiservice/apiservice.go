@@ -2,6 +2,7 @@ package apiservice
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"google.golang.org/grpc"
@@ -57,6 +58,7 @@ func NewFlowAPIService(accessNodeAddressAndPort flow.IdentityList, timeout time.
 
 type FlowAPIService struct {
 	access.AccessAPIServer
+	lock       sync.Mutex
 	roundRobin int
 	upstream   []access.AccessAPIClient
 }
@@ -66,13 +68,12 @@ func (h *FlowAPIService) client() (access.AccessAPIClient, error) {
 		return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
 	}
 
-	// concurrency constraints are soft
+	h.lock.Lock()
 	h.roundRobin++
-	index := h.roundRobin
-	// copy the array and the value to avoid crashes
-	upstream := h.upstream
-	index = index % len(upstream)
-	return upstream[index], nil
+	h.roundRobin = h.roundRobin % len(h.upstream)
+	ret := h.upstream[h.roundRobin]
+	h.lock.Unlock()
+	return ret, nil
 }
 
 func (h *FlowAPIService) Ping(context context.Context, req *access.PingRequest) (*access.PingResponse, error) {
