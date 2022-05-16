@@ -74,7 +74,7 @@ require (
 	github.com/spf13/cobra v1.3.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.10.1
-	github.com/stretchr/testify v1.7.1-0.20210824115523-ab6dc3262822
+	github.com/stretchr/testify v1.7.1
 	github.com/uber/jaeger-client-go v2.29.1+incompatible
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/vmihailenco/msgpack/v4 v4.3.11
@@ -96,3 +96,7 @@ require (
 )
 
 replace mellium.im/sasl => github.com/mellium/sasl v0.2.1
+
+replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.21.1-0.20220516232611-c3fcafba9222
+
+replace github.com/onflow/atree => github.com/dapperlabs/atree-internal v0.3.1-0.20220513013557-e7aa83fbc4e9
