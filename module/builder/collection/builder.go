@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
@@ -36,15 +37,7 @@ type Builder struct {
 	config         Config
 }
 
-func NewBuilder(
-	db *badger.DB,
-	tracer module.Tracer,
-	mainHeaders storage.Headers,
-	clusterHeaders storage.Headers,
-	payloads storage.ClusterPayloads,
-	transactions mempool.Transactions,
-	opts ...Opt,
-) *Builder {
+func NewBuilder(db *badger.DB, tracer module.Tracer, mainHeaders storage.Headers, clusterHeaders storage.Headers, payloads storage.ClusterPayloads, transactions mempool.Transactions, opts ...Opt) (*Builder, error) {
 
 	b := Builder{
 		db:             db,
@@ -60,276 +53,275 @@ func NewBuilder(
 		apply(&b.config)
 	}
 
-	return &b
+	// sanity check config
+	if b.config.ExpiryBuffer >= flow.DefaultTransactionExpiry {
+		return nil, fmt.Errorf("invalid configured expiry buffer exceeds tx expiry (%d > %d)", b.config.ExpiryBuffer, flow.DefaultTransactionExpiry)
+	}
+
+	return &b, nil
 }
 
 // BuildOn creates a new block built on the given parent. It produces a payload
 // that is valid with respect to the un-finalized chain it extends.
 func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error) (*flow.Header, error) {
-	var proposal cluster.Block
+	var proposal cluster.Block                 // proposal we are building
+	var parent flow.Header                     // parent of the proposal we are building
+	var clusterChainFinalizedBlock flow.Header // finalized block on the cluster chain
+	var refChainFinalizedHeight uint64         // finalized height on reference chain
+	var refChainFinalizedID flow.Identifier    // finalized block ID on reference chain
 
 	startTime := time.Now()
 
-	// first we construct a proposal in-memory, ensuring it is a valid extension
-	// of chain state -- this can be done in a read-only transaction
-	err := b.db.View(func(tx *badger.Txn) error {
+	// STEP ONE: build a lookup for excluding duplicated transactions.
+	// This is briefly how it works:
+	//
+	// Let E be the global transaction expiry.
+	// When incorporating a new collection C, with reference height R, we enforce
+	// that it contains only transactions with reference heights in [R,R+E).
+	// * if we are building C:
+	//   * we don't build expired collections (ie. our local finalized consensus height is at most R+E-1)
+	//   * we don't include transactions referencing un-finalized blocks
+	//   * therefore, C will contain only transactions with reference heights in [R,R+E)
+	// * if we are validating C:
+	//   * honest validators only consider C valid if all its transactions have reference heights in [R,R+E)
+	//
+	// Therefore, to check for duplicates, we only need a lookup for transactions in collection
+	// with expiry windows that overlap with our collection under construction.
+	//
+	// A collection with overlapping expiry window can be finalized or un-finalized.
+	// * to find all non-expired and finalized collections, we make use of an index
+	//   (main_chain_finalized_height -> cluster_block_ids with respective reference height), to search for a range of main chain heights	//   which could be only referenced by collections with overlapping expiry windows.
+	// * to find all overlapping and un-finalized collections, we can't use the above index, because it's
+	//   only for finalized collections. Instead, we simply traverse along the chain up to the last
+	//   finalized block. This could possibly include some collections with expiry windows that DON'T
+	//   overlap with our collection under construction, but it is unlikely and doesn't impact correctness.
+	//
+	// After combining both the finalized and un-finalized cluster blocks that overlap with our expiry window,
+	// we can iterate through their transactions, and build a lookup for excluding duplicated transactions.
+	err := b.db.View(func(btx *badger.Txn) error {
 
-		// STEP ONE: Load some things we need to do our work.
 		// TODO (ramtin): enable this again
 		// b.tracer.StartSpan(parentID, trace.COLBuildOnSetup)
 		// defer b.tracer.FinishSpan(parentID, trace.COLBuildOnSetup)
 
-		var parent flow.Header
-		err := operation.RetrieveHeader(parentID, &parent)(tx)
+		err := operation.RetrieveHeader(parentID, &parent)(btx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve parent: %w", err)
 		}
 
 		// retrieve the height and ID of the latest finalized block ON THE MAIN CHAIN
 		// this is used as the reference point for transaction expiry
-		var refChainFinalizedHeight uint64
-		err = operation.RetrieveFinalizedHeight(&refChainFinalizedHeight)(tx)
+		err = operation.RetrieveFinalizedHeight(&refChainFinalizedHeight)(btx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve main finalized height: %w", err)
 		}
-		var refChainFinalizedID flow.Identifier
-		err = operation.LookupBlockHeight(refChainFinalizedHeight, &refChainFinalizedID)(tx)
+		err = operation.LookupBlockHeight(refChainFinalizedHeight, &refChainFinalizedID)(btx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve main finalized ID: %w", err)
 		}
 
 		// retrieve the finalized boundary ON THE CLUSTER CHAIN
-		var clusterFinal flow.Header
-		err = procedure.RetrieveLatestFinalizedClusterHeader(parent.ChainID, &clusterFinal)(tx)
+		err = procedure.RetrieveLatestFinalizedClusterHeader(parent.ChainID, &clusterChainFinalizedBlock)(btx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve cluster final: %w", err)
 		}
-
-		// STEP TWO: create a lookup of all previously used transactions on the
-		// part of the chain we care about. We do this separately for
-		// un-finalized and finalized sections of the chain to decide whether to
-		// remove conflicting transactions from the mempool.
-
-		// TODO (ramtin): enable this again
-		// b.tracer.FinishSpan(parentID, trace.COLBuildOnSetup)
-		// b.tracer.StartSpan(parentID, trace.COLBuildOnUnfinalizedLookup)
-		// defer b.tracer.FinishSpan(parentID, trace.COLBuildOnUnfinalizedLookup)
-
-		// RATE LIMITING: the builder module can be configured to limit the
-		// rate at which transactions with a common payer are included in
-		// blocks. Depending on the configured limit, we either allow 1
-		// transaction every N sequential collections, or we allow K transactions
-		// per collection.
-
-		// keep track of transactions in the ancestry to avoid duplicates
-		lookup := newTransactionLookup()
-		// keep track of transactions to enforce rate limiting
-		limiter := newRateLimiter(b.config, parent.Height+1)
-
-		// look up previously included transactions in UN-FINALIZED ancestors
-		ancestorID := parentID
-		clusterFinalID := clusterFinal.ID()
-		for ancestorID != clusterFinalID {
-			ancestor, err := b.clusterHeaders.ByBlockID(ancestorID)
-			if err != nil {
-				return fmt.Errorf("could not get ancestor header (%x): %w", ancestorID, err)
-			}
-
-			if ancestor.Height <= clusterFinal.Height {
-				return fmt.Errorf("should always build on last finalized block")
-			}
-
-			payload, err := b.payloads.ByBlockID(ancestorID)
-			if err != nil {
-				return fmt.Errorf("could not get ancestor payload (%x): %w", ancestorID, err)
-			}
-
-			collection := payload.Collection
-			for _, tx := range collection.Transactions {
-				lookup.addUnfinalizedAncestor(tx.ID())
-				limiter.addAncestor(ancestor.Height, tx)
-			}
-			ancestorID = ancestor.ParentID
-		}
-
-		// TODO (ramtin): enable this again
-		// b.tracer.FinishSpan(parentID, trace.COLBuildOnUnfinalizedLookup)
-		// b.tracer.StartSpan(parentID, trace.COLBuildOnFinalizedLookup)
-		// defer b.tracer.FinishSpan(parentID, trace.COLBuildOnFinalizedLookup)
-
-		//TODO for now we check a fixed # of finalized ancestors - we should
-		// instead look back based on reference block ID and expiry
-		// ref: https://github.com/dapperlabs/flow-go/issues/3556
-		limit := clusterFinal.Height - flow.DefaultTransactionExpiry
-		if limit > clusterFinal.Height { // overflow check
-			limit = 0
-		}
-
-		// look up previously included transactions in FINALIZED ancestors
-		ancestorID = clusterFinal.ID()
-		ancestorHeight := clusterFinal.Height
-		for ancestorHeight > limit {
-			ancestor, err := b.clusterHeaders.ByBlockID(ancestorID)
-			if err != nil {
-				return fmt.Errorf("could not get ancestor header (%x): %w", ancestorID, err)
-			}
-			payload, err := b.payloads.ByBlockID(ancestorID)
-			if err != nil {
-				return fmt.Errorf("could not get ancestor payload (%x): %w", ancestorID, err)
-			}
-
-			collection := payload.Collection
-			for _, tx := range collection.Transactions {
-				lookup.addFinalizedAncestor(tx.ID())
-				limiter.addAncestor(ancestor.Height, tx)
-			}
-
-			ancestorID = ancestor.ParentID
-			ancestorHeight = ancestor.Height
-		}
-
-		// STEP THREE: build a payload of valid transactions, while at the same
-		// time figuring out the correct reference block ID for the collection.
-
-		// TODO (ramtin): enable this again
-		// b.tracer.FinishSpan(parentID, trace.COLBuildOnFinalizedLookup)
-		// b.tracer.StartSpan(parentID, trace.COLBuildOnCreatePayload)
-		// defer b.tracer.FinishSpan(parentID, trace.COLBuildOnCreatePayload)
-
-		minRefHeight := uint64(math.MaxUint64)
-		// start with the finalized reference ID (longest expiry time)
-		minRefID := refChainFinalizedID
-
-		var transactions []*flow.TransactionBody
-		var totalByteSize uint64
-		var totalGas uint64
-		for _, tx := range b.transactions.All() {
-
-			// if we have reached maximum number of transactions, stop
-			if uint(len(transactions)) >= b.config.MaxCollectionSize {
-				break
-			}
-
-			txByteSize := uint64(tx.ByteSize())
-			// ignore transactions with tx byte size bigger that the max amount per collection
-			// this case shouldn't happen ever since we keep a limit on tx byte size but in case
-			// we keep this condition
-			if txByteSize > b.config.MaxCollectionByteSize {
-				continue
-			}
-
-			// because the max byte size per tx is way smaller than the max collection byte size, we can stop here and not continue.
-			// to make it more effective in the future we can continue adding smaller ones
-			if totalByteSize+txByteSize > b.config.MaxCollectionByteSize {
-				break
-			}
-
-			// ignore transactions with max gas bigger that the max total gas per collection
-			// this case shouldn't happen ever but in case we keep this condition
-			if tx.GasLimit > b.config.MaxCollectionTotalGas {
-				continue
-			}
-
-			// cause the max gas limit per tx is way smaller than the total max gas per collection, we can stop here and not continue.
-			// to make it more effective in the future we can continue adding smaller ones
-			if totalGas+tx.GasLimit > b.config.MaxCollectionTotalGas {
-				break
-			}
-
-			// retrieve the main chain header that was used as reference
-			refHeader, err := b.mainHeaders.ByBlockID(tx.ReferenceBlockID)
-			if errors.Is(err, storage.ErrNotFound) {
-				continue // in case we are configured with liberal transaction ingest rules
-			}
-			if err != nil {
-				return fmt.Errorf("could not retrieve reference header: %w", err)
-			}
-
-			// for now, disallow un-finalized reference blocks
-			if refChainFinalizedHeight < refHeader.Height {
-				continue
-			}
-
-			// ensure the reference block is not too old
-			txID := tx.ID()
-			if refChainFinalizedHeight-refHeader.Height > uint64(flow.DefaultTransactionExpiry-b.config.ExpiryBuffer) {
-				// the transaction is expired, it will never be valid
-				b.transactions.Rem(txID)
-				continue
-			}
-
-			// check that the transaction was not already used in un-finalized history
-			if lookup.isUnfinalizedAncestor(txID) {
-				continue
-			}
-
-			// check that the transaction was not already included in finalized history.
-			if lookup.isFinalizedAncestor(txID) {
-				// remove from mempool, conflicts with finalized block will never be valid
-				b.transactions.Rem(txID)
-				continue
-			}
-
-			// enforce rate limiting rules
-			if limiter.shouldRateLimit(tx) {
-				continue
-			}
-
-			// ensure we find the lowest reference block height
-			if refHeader.Height < minRefHeight {
-				minRefHeight = refHeader.Height
-				minRefID = tx.ReferenceBlockID
-			}
-
-			// update per-payer transaction count
-			limiter.transactionIncluded(tx)
-
-			transactions = append(transactions, tx)
-			totalByteSize += txByteSize
-			totalGas += tx.GasLimit
-		}
-
-		// STEP FOUR: we have a set of transactions that are valid to include
-		// on this fork. Now we need to create the collection that will be
-		// used in the payload and construct the final proposal model
-		// TODO (ramtin): enable this again
-		// b.tracer.FinishSpan(parentID, trace.COLBuildOnCreatePayload)
-		// b.tracer.StartSpan(parentID, trace.COLBuildOnCreateHeader)
-		// defer b.tracer.FinishSpan(parentID, trace.COLBuildOnCreateHeader)
-
-		// build the payload from the transactions
-		payload := cluster.PayloadFromTransactions(minRefID, transactions...)
-
-		header := flow.Header{
-			ChainID:     parent.ChainID,
-			ParentID:    parentID,
-			Height:      parent.Height + 1,
-			PayloadHash: payload.Hash(),
-			Timestamp:   time.Now().UTC(),
-
-			// NOTE: we rely on the HotStuff-provided setter to set the other
-			// fields, which are related to signatures and HotStuff internals
-		}
-
-		// set fields specific to the consensus algorithm
-		err = setter(&header)
-		if err != nil {
-			return fmt.Errorf("could not set fields to header: %w", err)
-		}
-
-		proposal = cluster.Block{
-			Header:  &header,
-			Payload: &payload,
-		}
-
-		// TODO (ramtin): enable this again
-		// b.tracer.FinishSpan(parentID, trace.COLBuildOnCreateHeader)
-
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("could not build block: %w", err)
+		return nil, err
 	}
+
+	// pre-compute the minimum possible reference block height for transactions
+	// included in this collection (actual reference height may be greater)
+	minPossibleRefHeight := refChainFinalizedHeight - uint64(flow.DefaultTransactionExpiry-b.config.ExpiryBuffer)
+	if minPossibleRefHeight > refChainFinalizedHeight {
+		minPossibleRefHeight = 0 // overflow check
+	}
+
+	// TODO (ramtin): enable this again
+	// b.tracer.FinishSpan(parentID, trace.COLBuildOnSetup)
+	// b.tracer.StartSpan(parentID, trace.COLBuildOnUnfinalizedLookup)
+	// defer b.tracer.FinishSpan(parentID, trace.COLBuildOnUnfinalizedLookup)
+
+	// STEP TWO: create a lookup of all previously used transactions on the
+	// part of the chain we care about. We do this separately for
+	// un-finalized and finalized sections of the chain to decide whether to
+	// remove conflicting transactions from the mempool.
+
+	// keep track of transactions in the ancestry to avoid duplicates
+	lookup := newTransactionLookup()
+	// keep track of transactions to enforce rate limiting
+	limiter := newRateLimiter(b.config, parent.Height+1)
+
+	// RATE LIMITING: the builder module can be configured to limit the
+	// rate at which transactions with a common payer are included in
+	// blocks. Depending on the configured limit, we either allow 1
+	// transaction every N sequential collections, or we allow K transactions
+	// per collection.
+
+	// first, look up previously included transactions in UN-FINALIZED ancestors
+	err = b.populateUnfinalizedAncestryLookup(parentID, clusterChainFinalizedBlock.Height, lookup, limiter)
+	if err != nil {
+		return nil, fmt.Errorf("could not populate un-finalized ancestry lookout (parent_id=%x): %w", parentID, err)
+	}
+
+	// TODO (ramtin): enable this again
+	// b.tracer.FinishSpan(parentID, trace.COLBuildOnUnfinalizedLookup)
+	// b.tracer.StartSpan(parentID, trace.COLBuildOnFinalizedLookup)
+	// defer b.tracer.FinishSpan(parentID, trace.COLBuildOnFinalizedLookup)
+
+	// second, look up previously included transactions in FINALIZED ancestors
+	err = b.populateFinalizedAncestryLookup(minPossibleRefHeight, refChainFinalizedHeight, lookup, limiter)
+	if err != nil {
+		return nil, fmt.Errorf("could not populate finalized ancestry lookup: %w", err)
+	}
+
+	// TODO (ramtin): enable this again
+	// b.tracer.FinishSpan(parentID, trace.COLBuildOnFinalizedLookup)
+	// b.tracer.StartSpan(parentID, trace.COLBuildOnCreatePayload)
+	// defer b.tracer.FinishSpan(parentID, trace.COLBuildOnCreatePayload)
+
+	// STEP THREE: build a payload of valid transactions, while at the same
+	// time figuring out the correct reference block ID for the collection.
+
+	// keep track of the actual smallest reference height of all included transactions
+	minRefHeight := uint64(math.MaxUint64)
+	minRefID := refChainFinalizedID
+
+	var transactions []*flow.TransactionBody
+	var totalByteSize uint64
+	var totalGas uint64
+	for _, tx := range b.transactions.All() {
+
+		// if we have reached maximum number of transactions, stop
+		if uint(len(transactions)) >= b.config.MaxCollectionSize {
+			break
+		}
+
+		txByteSize := uint64(tx.ByteSize())
+		// ignore transactions with tx byte size bigger that the max amount per collection
+		// this case shouldn't happen ever since we keep a limit on tx byte size but in case
+		// we keep this condition
+		if txByteSize > b.config.MaxCollectionByteSize {
+			continue
+		}
+
+		// because the max byte size per tx is way smaller than the max collection byte size, we can stop here and not continue.
+		// to make it more effective in the future we can continue adding smaller ones
+		if totalByteSize+txByteSize > b.config.MaxCollectionByteSize {
+			break
+		}
+
+		// ignore transactions with max gas bigger that the max total gas per collection
+		// this case shouldn't happen ever but in case we keep this condition
+		if tx.GasLimit > b.config.MaxCollectionTotalGas {
+			continue
+		}
+
+		// cause the max gas limit per tx is way smaller than the total max gas per collection, we can stop here and not continue.
+		// to make it more effective in the future we can continue adding smaller ones
+		if totalGas+tx.GasLimit > b.config.MaxCollectionTotalGas {
+			break
+		}
+
+		// retrieve the main chain header that was used as reference
+		refHeader, err := b.mainHeaders.ByBlockID(tx.ReferenceBlockID)
+		if errors.Is(err, storage.ErrNotFound) {
+			continue // in case we are configured with liberal transaction ingest rules
+		}
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve reference header: %w", err)
+		}
+
+		// disallow un-finalized reference blocks
+		if refChainFinalizedHeight < refHeader.Height {
+			continue
+		}
+		// make sure the reference block is finalized and not orphaned
+		blockFinalizedAtReferenceHeight, err := b.mainHeaders.ByHeight(refHeader.Height)
+		if err != nil {
+			return nil, fmt.Errorf("could not check that reference block (id=%x) is finalized: %w", tx.ReferenceBlockID, err)
+		}
+		if blockFinalizedAtReferenceHeight.ID() != tx.ReferenceBlockID {
+			// the transaction references an orphaned block - it will never be valid
+			b.transactions.Rem(tx.ID())
+			continue
+		}
+
+		// ensure the reference block is not too old
+		if refHeader.Height < minPossibleRefHeight {
+			// the transaction is expired, it will never be valid
+			b.transactions.Rem(tx.ID())
+			continue
+		}
+
+		txID := tx.ID()
+		// check that the transaction was not already used in un-finalized history
+		if lookup.isUnfinalizedAncestor(txID) {
+			continue
+		}
+
+		// check that the transaction was not already included in finalized history.
+		if lookup.isFinalizedAncestor(txID) {
+			// remove from mempool, conflicts with finalized block will never be valid
+			b.transactions.Rem(txID)
+			continue
+		}
+
+		// enforce rate limiting rules
+		if limiter.shouldRateLimit(tx) {
+			continue
+		}
+
+		// ensure we find the lowest reference block height
+		if refHeader.Height < minRefHeight {
+			minRefHeight = refHeader.Height
+			minRefID = tx.ReferenceBlockID
+		}
+
+		// update per-payer transaction count
+		limiter.transactionIncluded(tx)
+
+		transactions = append(transactions, tx)
+		totalByteSize += txByteSize
+		totalGas += tx.GasLimit
+	}
+
+	// STEP FOUR: we have a set of transactions that are valid to include
+	// on this fork. Now we need to create the collection that will be
+	// used in the payload and construct the final proposal model
+	// TODO (ramtin): enable this again
+	// b.tracer.FinishSpan(parentID, trace.COLBuildOnCreatePayload)
+	// b.tracer.StartSpan(parentID, trace.COLBuildOnCreateHeader)
+	// defer b.tracer.FinishSpan(parentID, trace.COLBuildOnCreateHeader)
+
+	// build the payload from the transactions
+	payload := cluster.PayloadFromTransactions(minRefID, transactions...)
+
+	header := flow.Header{
+		ChainID:     parent.ChainID,
+		ParentID:    parentID,
+		Height:      parent.Height + 1,
+		PayloadHash: payload.Hash(),
+		Timestamp:   time.Now().UTC(),
+
+		// NOTE: we rely on the HotStuff-provided setter to set the other
+		// fields, which are related to signatures and HotStuff internals
+	}
+
+	// set fields specific to the consensus algorithm
+	err = setter(&header)
+	if err != nil {
+		return nil, fmt.Errorf("could not set fields to header: %w", err)
+	}
+
+	proposal = cluster.Block{
+		Header:  &header,
+		Payload: &payload,
+	}
+
+	// TODO (ramtin): enable this again
+	// b.tracer.FinishSpan(parentID, trace.COLBuildOnCreateHeader)
 
 	span, ctx, _ := b.tracer.StartCollectionSpan(context.Background(), proposal.ID(), trace.COLBuildOn, opentracing.StartTime(startTime))
 	defer span.Finish()
@@ -343,5 +335,100 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		return nil, fmt.Errorf("could not insert built block: %w", err)
 	}
 
-	return proposal.Header, err
+	return proposal.Header, nil
+}
+
+// populateUnfinalizedAncestryLookup traverses the unfinalized ancestry backward
+// to populate the transaction lookup (used for deduplication) and the rate limiter
+// (used to limit transaction submission by payer).
+//
+// The traversal begins with the block specified by parentID (the block we are
+// building on top of) and ends with the oldest unfinalized block in the ancestry.
+func (b *Builder) populateUnfinalizedAncestryLookup(parentID flow.Identifier, finalHeight uint64, lookup *transactionLookup, limiter *rateLimiter) error {
+
+	err := fork.TraverseBackward(b.clusterHeaders, parentID, func(ancestor *flow.Header) error {
+		payload, err := b.payloads.ByBlockID(ancestor.ID())
+		if err != nil {
+			return fmt.Errorf("could not retrieve ancestor payload: %w", err)
+		}
+
+		for _, tx := range payload.Collection.Transactions {
+			lookup.addUnfinalizedAncestor(tx.ID())
+			limiter.addAncestor(ancestor.Height, tx)
+		}
+		return nil
+	}, fork.ExcludingHeight(finalHeight))
+
+	return err
+}
+
+// populateFinalizedAncestryLookup traverses the reference block height index to
+// populate the transaction lookup (used for deduplication) and the rate limiter
+// (used to limit transaction submission by payer).
+//
+// The traversal is structured so that we check every collection whose reference
+// block height translates to a possible constituent transaction which could also
+// appear in the collection we are building.
+func (b *Builder) populateFinalizedAncestryLookup(minRefHeight, maxRefHeight uint64, lookup *transactionLookup, limiter *rateLimiter) error {
+
+	// Let E be the global transaction expiry constant, measured in blocks. For each
+	// T ∈ `includedTransactions`, we have to decide whether the transaction
+	// already appeared in _any_ finalized cluster block.
+	// Notation:
+	//   - consider a valid cluster block C and let c be its reference block height
+	//   - consider a transaction T ∈ `includedTransactions` and let t denote its
+	//     reference block height
+	//
+	// Boundary conditions:
+	// 1. C's reference block height is equal to the lowest reference block height of
+	//    all its constituent transactions. Hence, for collection C to potentially contain T, it must satisfy c <= t.
+	// 2. For T to be eligible for inclusion in collection C, _none_ of the transactions within C are allowed
+	// to be expired w.r.t. C's reference block. Hence, for collection C to potentially contain T, it must satisfy t < c + E.
+	//
+	// Therefore, for collection C to potentially contain transaction T, it must satisfy t - E < c <= t.
+	// In other words, we only need to inspect collections with reference block height c ∈ (t-E, t].
+	// Consequently, for a set of transactions, with `minRefHeight` (`maxRefHeight`) being the smallest (largest)
+	// reference block height, we only need to inspect collections with c ∈ (minRefHeight-E, maxRefHeight].
+
+	// the finalized cluster blocks which could possibly contain any conflicting transactions
+	var clusterBlockIDs []flow.Identifier
+	start, end := findRefHeightSearchRangeForConflictingClusterBlocks(minRefHeight, maxRefHeight)
+	err := b.db.View(operation.LookupClusterBlocksByReferenceHeightRange(start, end, &clusterBlockIDs))
+	if err != nil {
+		return fmt.Errorf("could not lookup finalized cluster blocks by reference height range [%d,%d]: %w", start, end, err)
+	}
+
+	for _, blockID := range clusterBlockIDs {
+		header, err := b.clusterHeaders.ByBlockID(blockID)
+		if err != nil {
+			return fmt.Errorf("could not retrieve cluster header (id=%x): %w", blockID, err)
+		}
+		payload, err := b.payloads.ByBlockID(blockID)
+		if err != nil {
+			return fmt.Errorf("could not retrieve cluster payload (block_id=%x): %w", blockID, err)
+		}
+		for _, tx := range payload.Collection.Transactions {
+			lookup.addFinalizedAncestor(tx.ID())
+			limiter.addAncestor(header.Height, tx)
+		}
+	}
+
+	return nil
+}
+
+// findRefHeightSearchRangeForConflictingClusterBlocks computes the range of reference
+// block heights of ancestor blocks which could possibly contain transactions
+// duplicating those in our collection under construction, based on the range of
+// reference heights of transactions in the collection under construction.
+//
+// Input range is the (inclusive) range of reference heights of transactions included
+// in the collection under construction. Output range is the (inclusive) range of
+// reference heights which need to be searched.
+func findRefHeightSearchRangeForConflictingClusterBlocks(minRefHeight, maxRefHeight uint64) (start, end uint64) {
+	start = minRefHeight - flow.DefaultTransactionExpiry + 1
+	if start > minRefHeight {
+		start = 0 // overflow check
+	}
+	end = maxRefHeight
+	return start, end
 }
