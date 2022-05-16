@@ -21,7 +21,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	upstream "github.com/onflow/flow-go/upstream"
 
-	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto"
@@ -35,7 +34,6 @@ import (
 	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
-	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/common/follower"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
@@ -46,7 +44,6 @@ import (
 	"github.com/onflow/flow-go/module/buffer"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/id"
-	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/network"
@@ -117,16 +114,8 @@ type FlowObserverServiceBuilder struct {
 	LibP2PNode                 *p2p.Node
 	FollowerState              protocol.MutableState
 	SyncCore                   *synchronization.Core
-	RpcEng                     *rpc.Engine
 	FinalizationDistributor    *pubsub.FinalizationDistributor
 	FinalizedHeader            *synceng.FinalizedHeaderCache
-	CollectionRPC              access.AccessAPIClient
-	TransactionTimings         *stdmap.TransactionTimings
-	CollectionsToMarkFinalized *stdmap.Times
-	CollectionsToMarkExecuted  *stdmap.Times
-	BlocksToMarkExecuted       *stdmap.Times
-	TransactionMetrics         module.TransactionMetrics
-	PingMetrics                module.PingMetrics
 	Committee                  hotstuff.Committee
 	Finalized                  *flow.Header
 	Pending                    []*flow.Header
