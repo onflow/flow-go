@@ -152,10 +152,12 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 			)
 		}
 		// a valid collection must contain only transactions within its expiry window
-		if maxRefHeight-minRefHeight >= flow.DefaultTransactionExpiry {
-			return state.NewInvalidExtensionErrorf(
-				"collection contains reference height range [%d,%d] exceeding expiry window size: %d",
-				minRefHeight, maxRefHeight, flow.DefaultTransactionExpiry)
+		if payload.Collection.Len() > 0 {
+			if maxRefHeight-minRefHeight >= flow.DefaultTransactionExpiry {
+				return state.NewInvalidExtensionErrorf(
+					"collection contains reference height range [%d,%d] exceeding expiry window size: %d",
+					minRefHeight, maxRefHeight, flow.DefaultTransactionExpiry)
+			}
 		}
 
 		// a valid collection must reference a valid reference block
@@ -256,14 +258,14 @@ func (m *MutableState) checkDupeTransactionsInFinalizedAncestry(includedTransact
 	//
 	// Boundary conditions:
 	// 1. C's reference block height is equal to the lowest reference block height of
-	//    all its constituent transactions. Hence, C can contain T if and only if c <= t.
-	// 2. a transaction with reference block height T is eligible for inclusion in
-	//    any collection with reference block height C where C<=T<C+E
+	//    all its constituent transactions. Hence, for collection C to potentially contain T, it must satisfy c <= t.
+	// 2. For T to be eligible for inclusion in collection C, _none_ of the transactions within C are allowed
+	// to be expired w.r.t. C's reference block. Hence, for collection C to potentially contain T, it must satisfy t < c + E.
 	//
-	// Therefore, to guarantee that we find all possible duplicates, we need to check
-	// all collections with reference block height in the range (C-E,C+E). Since we
-	// know the actual maximum reference height included in this collection, we can
-	// further limit the search range to (C-E,maxRefHeight]
+	// Therefore, for collection C to potentially contain transaction T, it must satisfy t - E < c <= t.
+	// In other words, we only need to inspect collections with reference block height c ∈ (t-E, t].
+	// Consequently, for a set of transactions, with `minRefHeight` (`maxRefHeight`) being the smallest (largest)
+	// reference block height, we only need to inspect collections with c ∈ (minRefHeight-E, maxRefHeight].
 
 	// the finalized cluster blocks which could possibly contain any conflicting transactions
 	var clusterBlockIDs []flow.Identifier
