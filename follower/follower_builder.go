@@ -338,7 +338,7 @@ func WithBaseOptions(baseOptions []cmd.Option) FollowerOption {
 	}
 }
 
-func FlowAccessNode(opts ...FollowerOption) *FlowObserverServiceBuilder {
+func FlowObserverService(opts ...FollowerOption) *FlowObserverServiceBuilder {
 	config := DefaultObserverServiceConfig()
 	for _, opt := range opts {
 		opt(config)
