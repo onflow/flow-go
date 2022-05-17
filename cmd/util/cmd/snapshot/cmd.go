@@ -17,6 +17,15 @@ var (
 	flagHeight  uint64
 )
 
+// This command can be used to retrieve a snapshot of the protocol state at any finalized height.
+// The resulting snapshot file can then be used to bootstrap another node's protocol state.
+// This can be useful for recovering a node which is very far behind, or has a corrupted database
+// that cannot be recovered otherwise.
+//
+// The recommended usage is to use a height which is just before the most recent epoch transition.
+// This way the node will have a root block below the current epoch, and will sync all blocks
+// from the current epoch.
+
 var Cmd = &cobra.Command{
 	Use:   "snapshot",
 	Short: "Retrieves a protocol state snapshot from the database, which can be used to instantiate another node",
