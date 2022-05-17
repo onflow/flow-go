@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - master
-      - '**/*bft*'
-      - '**/*6221*'
 
 env:
   BIGQUERY_DATASET: production_src_flow_test_metrics
