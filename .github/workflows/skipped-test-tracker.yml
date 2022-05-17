@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - master
+      - '**/*bft*'
+      - '**/*6221*'
 
 env:
   BIGQUERY_DATASET: production_src_flow_test_metrics
@@ -20,6 +22,7 @@ jobs:
           - unit
           - unit-crypto
           - unit-integration
+          - integration-bft
           - integration-mvp
           - integration-ghost
           - integration-network
@@ -31,7 +34,7 @@ jobs:
           - integration-verification
     env:
       TEST_CATEGORY: ${{ matrix.test-category }}
-      COMMIT_SHA: ${{ github.sha }} 
+      COMMIT_SHA: ${{ github.sha }}
       RUN_ID: ${{ github.run_id }}
       SKIPPED_TESTS_FILE: skipped-tests
     runs-on: ubuntu-latest
@@ -40,6 +43,7 @@ jobs:
       id: job_run_date
       run: echo "::set-output name=date::$(TZ=":America/Los_Angeles" date -Iseconds)"
     - name: Set up Cloud SDK
+      if: ${{ !env.ACT }}
       uses: google-github-actions/setup-gcloud@v0
       with:
         service_account_key: ${{ secrets.GCP_SA_KEY }}
@@ -61,7 +65,7 @@ jobs:
       with:
         timeout_minutes: 60
         max_attempts: 5
-        command: ./tools/test_monitor/run-tests.sh > test-output
+        command: ./tools/test_monitor/run-tests.sh | tee test-output
       env:
         JSON_OUTPUT: true
     - name: Process test results
@@ -70,6 +74,7 @@ jobs:
         JOB_STARTED: ${{ steps.job_run_date.outputs.date }}
         COMMIT_DATE: ${{ steps.commit_date.outputs.date }}
     - name: Upload results to BigQuery
+      if: ${{ !env.ACT }}
       uses: nick-fields/retry@v2
       with:
         timeout_minutes: 1
