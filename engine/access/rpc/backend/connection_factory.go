@@ -68,13 +68,14 @@ func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.D
 	return conn, nil
 }
 
-func (cf *ConnectionFactoryImpl) retrieveConnection(address string) (*grpc.ClientConn, error) {
+func (cf *ConnectionFactoryImpl) retrieveConnection(address string, timeout time.Duration) (*grpc.ClientConn, error) {
 	var conn *grpc.ClientConn
 	if res, ok := cf.ConnectionsCache.Get(address); ok {
 		conn = res.(*grpc.ClientConn)
 	}
 	if conn == nil || conn.GetState() != connectivity.Ready {
-		conn, err := cf.createConnection(address, cf.ExecutionNodeGRPCTimeout)
+		var err error
+		conn, err = cf.createConnection(address, timeout)
 		if err != nil {
 			return nil, err
 		}
@@ -90,7 +91,7 @@ func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string) (access.Acce
 		return nil, nil, err
 	}
 
-	conn, err := cf.retrieveConnection(grpcAddress)
+	conn, err := cf.retrieveConnection(grpcAddress, cf.CollectionNodeGRPCTimeout)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -107,7 +108,7 @@ func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (executio
 		return nil, nil, err
 	}
 
-	conn, err := cf.retrieveConnection(grpcAddress)
+	conn, err := cf.retrieveConnection(grpcAddress, cf.ExecutionNodeGRPCTimeout)
 	if err != nil {
 		return nil, nil, err
 	}

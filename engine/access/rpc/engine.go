@@ -136,8 +136,7 @@ func New(log zerolog.Logger,
 	}
 	cache, err := lru.New(cacheSize)
 	if err != nil {
-		log.Err(err).Msg("could not initialize connection pool cache")
-		return nil, err
+		return nil, fmt.Errorf("could not initialize connection pool cache: %w", err)
 	}
 
 	connectionFactory := &backend.ConnectionFactoryImpl{
