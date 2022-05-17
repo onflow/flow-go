@@ -51,7 +51,6 @@ import (
 	"github.com/onflow/flow-go/module/buffer"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/id"
-	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/network"
@@ -171,12 +170,7 @@ type ObserverServiceBuilder struct {
 	FinalizationDistributor    *pubsub.FinalizationDistributor
 	FinalizedHeader            *synceng.FinalizedHeaderCache
 	CollectionRPC              access.AccessAPIClient
-	TransactionTimings         *stdmap.TransactionTimings
-	CollectionsToMarkFinalized *stdmap.Times
-	CollectionsToMarkExecuted  *stdmap.Times
-	BlocksToMarkExecuted       *stdmap.Times
 	TransactionMetrics         module.TransactionMetrics
-	PingMetrics                module.PingMetrics
 	Committee                  hotstuff.Committee
 	Finalized                  *flow.Header
 	Pending                    []*flow.Header
@@ -802,7 +796,7 @@ func (builder *ObserverServiceBuilder) enqueueConnectWithStakedAN() {
 			node.Logger,
 			node.State,
 			builder.rpcConf,
-			builder.CollectionRPC,
+			nil,
 			builder.HistoricalAccessRPCs,
 			node.Storage.Blocks,
 			node.Storage.Headers,
