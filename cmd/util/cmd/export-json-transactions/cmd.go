@@ -8,10 +8,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/onflow/flow-go/cmd/util/cmd/common"
-	"github.com/onflow/flow-go/cmd/util/cmd/export-json-transactions/transactions"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
+	"github.com/onflow/flow-go/cmd/util/cmd/export-json-transactions/transactions"
 )
 
 var flagDatadir string
@@ -28,7 +29,6 @@ var Cmd = &cobra.Command{
 func init() {
 	Cmd.Flags().StringVar(&flagDatadir, "datadir", "/var/flow/data/protocol",
 		"the protocol state")
-	_ = Cmd.MarkFlagRequired("execution-state-dir")
 
 	Cmd.Flags().StringVar(&flagOutputDir, "output-dir", "",
 		"Directory to write transactions JSON to")

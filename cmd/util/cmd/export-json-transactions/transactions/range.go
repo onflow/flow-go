@@ -5,7 +5,6 @@ package transactions
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -106,7 +105,7 @@ func FindBlockTransactions(
 			txs = append(txs, &Transaction{
 				TxID:   tx.ID().String(),
 				Index:  txIndex,
-				Script: util.ToBase64(tx.Script),
+				Script: string(tx.Script),
 				Payer:  tx.Payer.String(),
 			})
 		}

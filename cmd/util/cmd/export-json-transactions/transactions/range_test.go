@@ -4,11 +4,12 @@ import (
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/require"
 )
 
 func TestFindBlockTransactions(t *testing.T) {
