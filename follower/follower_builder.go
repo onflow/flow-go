@@ -346,6 +346,7 @@ func FlowObserverService(opts ...FollowerOption) *FlowObserverServiceBuilder {
 
 	return &FlowObserverServiceBuilder{
 		ObserverServiceConfig:   config,
+		# TODO: using RoleAccess here for now. This should be refactored eventually to have its own role type
 		FlowNodeBuilder:         cmd.FlowNode(flow.RoleAccess.String(), config.baseOptions...),
 		FinalizationDistributor: pubsub.NewFinalizationDistributor(),
 	}
