@@ -94,7 +94,8 @@ func (h *ProgramsHandler) Get(location common.Location) (*interpreter.Program, b
 			if err != nil {
 				// ignore LedgerIntractionLimitExceededError errors
 				var interactionLimiExceededErr *errors.LedgerIntractionLimitExceededError
-				if !errors.As(err, &interactionLimiExceededErr) {
+				var memoryLimitExceededError *errors.MemoryLimitExceededError
+				if !(errors.As(err, &interactionLimiExceededErr) || errors.As(err, &memoryLimitExceededError)) {
 					panic(fmt.Sprintf("merge error while getting program, panic: %s", err))
 				}
 			}
