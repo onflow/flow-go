@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
 # This script runs the tests in the category specified by the TEST_CATEGORY environment variable.
+# Echo / logging statements send output to standard error to separate that output from test result output
+# (which sends output to standard output) which needs to be parsed.
 
 set -e
 shopt -s extglob
