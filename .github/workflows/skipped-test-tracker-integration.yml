@@ -5,6 +5,8 @@ on:
     branches:
       - staging
       - trying
+      - '**/*bft*'
+      - '**/*6221*'
   pull_request:
     branches:
       - master
@@ -22,6 +24,7 @@ jobs:
           - unit
           - unit-crypto
           - unit-integration
+          - integration-bft
           - integration-mvp
           - integration-ghost
           - integration-network
@@ -59,7 +62,7 @@ jobs:
       with:
         timeout_minutes: 60
         max_attempts: 5
-        command: ./tools/test_monitor/run-tests.sh > test-output
+        command: ./tools/test_monitor/run-tests.sh | tee test-output
       env:
         JSON_OUTPUT: true
     - name: Process test results
