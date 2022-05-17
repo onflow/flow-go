@@ -226,7 +226,7 @@ func (m *Middleware) UpdateNodeAddresses() {
 	m.log.Info().Msg("Updating protocol state node addresses")
 
 	ids := m.ov.Identities()
-	newInfos, invalid := peerInfosFromIDs(ids)
+	newInfos, invalid := PeerInfosFromIDs(ids)
 
 	for id, err := range invalid {
 		m.log.Err(err).Str("node_id", id.String()).Msg("failed to extract peer info from identity")
