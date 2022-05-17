@@ -199,8 +199,8 @@ func (c *ConduitFactory) processAttackerMessage(msg *insecure.Message) error {
 		}
 		event = receipt // swaps event with the receipt.
 
-	case *flow.Attestation:
-		approval, err := c.generateResultApproval(e)
+	case *flow.ResultApproval:
+		approval, err := c.generateResultApproval(&e.Body.Attestation)
 		if err != nil {
 			return fmt.Errorf("could not generate result approval for attacker's attestation: %w", err)
 		}

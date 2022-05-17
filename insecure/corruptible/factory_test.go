@@ -260,8 +260,8 @@ func TestProcessAttackerMessage(t *testing.T) {
 		})
 }
 
-// TestProcessAttackerMessage evaluates that corrupted conduit factory (ccf)
-// relays the messages coming from the attack network to its underlying flow network.
+// TestProcessAttackerMessage_ResultApproval evaluates that when corrupted conduit factory (ccf) receives a result approval,
+// it fills its related fields with its own credentials (e.g., signature), and passes it through the Flow network.
 func TestProcessAttackerMessage_ResultApproval(t *testing.T) {
 	withCorruptibleConduitFactory(t,
 		func(
@@ -270,11 +270,14 @@ func TestProcessAttackerMessage_ResultApproval(t *testing.T) {
 			flowNetwork *mocknetwork.Adapter, // mock flow network that ccf uses to communicate with authorized flow nodes.
 			stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that attack network uses to send messages to this ccf.
 		) {
-			// creates a corrupted event that attacker is sending on the flow network through the
+			// creates a corrupted result approval that attacker is sending on the flow network through the
 			// corrupted conduit factory.
+			// corrupted result approval dictated by attacker needs to only have the attestation field, as the rest will be
+			// filled up by the CCF.
+			dictatedAttestation := *unittest.AttestationFixture()
 			msg, _, _ := insecure.MessageFixture(t, cbor.NewCodec(), insecure.Protocol_PUBLISH, &flow.ResultApproval{
 				Body: flow.ResultApprovalBody{
-					Attestation: *unittest.AttestationFixture(),
+					Attestation: dictatedAttestation,
 				},
 			})
 
@@ -288,6 +291,30 @@ func TestProcessAttackerMessage_ResultApproval(t *testing.T) {
 			corruptedEventDispatchedOnFlowNetWg := sync.WaitGroup{}
 			corruptedEventDispatchedOnFlowNetWg.Add(1)
 			flowNetwork.On("PublishOnChannel", params...).Run(func(args testifymock.Arguments) {
+				approval, ok := args[1].(*flow.ResultApproval)
+				require.True(t, ok)
+
+				// attestation part of the approval must be the same as attacker dictates.
+				require.Equal(t, dictatedAttestation, approval.Body.Attestation)
+
+				// corrupted node should set the approver as its own id
+				require.Equal(t, corruptedId.NodeID, approval.Body.ApproverID)
+
+				// approval should have a valid attestation signature from corrupted node
+				id := approval.Body.Attestation.ID()
+				valid, err := corruptedId.StakingPubKey.Verify(approval.Body.AttestationSignature, id[:], factory.approvalHasher)
+				require.NoError(t, err)
+				require.True(t, valid)
+
+				// for now, we require a non-empty SPOCK
+				// TODO: check correctness of spock
+				require.NotEmpty(t, approval.Body.Spock)
+
+				// approval body should have a valid signature from corrupted node
+				bodyId := approval.Body.ID()
+				valid, err = corruptedId.StakingPubKey.Verify(approval.VerifierSignature, bodyId[:], factory.approvalHasher)
+				require.NoError(t, err)
+				require.True(t, valid)
 
 				corruptedEventDispatchedOnFlowNetWg.Done()
 			}).Return(nil).Once()
@@ -357,7 +384,7 @@ func withCorruptibleConduitFactory(t *testing.T,
 		}
 	}()
 
-	me := testutil.LocalFixture(t, unittest.IdentityFixture())
+	me := testutil.LocalFixture(t, corruptedIdentity)
 	ccf := NewCorruptibleConduitFactory(
 		unittest.Logger(),
 		flow.BftTestnet,
