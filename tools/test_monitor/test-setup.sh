@@ -29,5 +29,8 @@ case $TEST_CATEGORY in
    echo "running crypto setup">&2
 #    make crypto_setup_tests
  ;;
+  *)
+    echo "nothing to setup">&2
+  ;;
 esac
 
