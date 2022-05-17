@@ -3030,7 +3030,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
 
-			require.Equal(t, (&errors.StorageNotInitialized{}).Code(), tx.Err.Code())
+			require.Equal(t, (&errors.CadenceRuntimeError{}).Code(), tx.Err.Code())
 		}),
 	)
 
