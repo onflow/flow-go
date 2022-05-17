@@ -69,10 +69,12 @@ func (h *FlowAPIService) client() (access.AccessAPIClient, error) {
 	}
 
 	h.lock.Lock()
+	defer h.lock.Unlock()
+
 	h.roundRobin++
 	h.roundRobin = h.roundRobin % len(h.upstream)
 	ret := h.upstream[h.roundRobin]
-	h.lock.Unlock()
+
 	return ret, nil
 }
 
