@@ -3013,6 +3013,8 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 			lastAddress, err := chain.AddressAtIndex((1 << 45) - 1)
 			require.NoError(t, err)
 
+			balanceBefore := getBalance(vm, chain, ctx, view, accounts[0])
+
 			// transfer tokens to non-existent account
 			txBody := transferTokensTx(chain).
 				AddAuthorizer(accounts[0]).
@@ -3030,7 +3032,11 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
 
-			require.Equal(t, (&errors.StorageNotInitialized{}).Code(), tx.Err.Code())
+			require.Equal(t, (&errors.CadenceRuntimeError{}).Code(), tx.Err.Code())
+
+			balanceAfter := getBalance(vm, chain, ctx, view, accounts[0])
+
+			require.Equal(t, balanceAfter, balanceBefore)
 		}),
 	)
 
