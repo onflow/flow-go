@@ -13,6 +13,8 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-libp2p-core/routing"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
+	kbucket "github.com/libp2p/go-libp2p-kbucket"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
 
@@ -157,6 +159,14 @@ func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stre
 // GetIPPort returns the IP and Port the libp2p node is listening on.
 func (n *Node) GetIPPort() (string, string, error) {
 	return IPPortFromMultiAddress(n.host.Network().ListenAddresses()...)
+}
+
+func (n *Node) RoutingTable() *kbucket.RoutingTable {
+	return n.routing.(*dht.IpfsDHT).RoutingTable()
+}
+
+func (n *Node) ListPeers(topic string) []peer.ID {
+	return n.pubSub.ListPeers(topic)
 }
 
 // Subscribe subscribes the node to the given topic and returns the subscription
