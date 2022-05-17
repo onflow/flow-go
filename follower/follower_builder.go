@@ -440,7 +440,7 @@ type ObserverServiceBuilder struct {
 }
 
 func NewObserverServiceBuilder(builder *FlowObserverServiceBuilder) *ObserverServiceBuilder {
-	// the observer node gets a version of the root snapshot file that does not contain any node addresses
+	// the observer gets a version of the root snapshot file that does not contain any node addresses
 	// hence skip all the root snapshot validations that involved an identity address
 	builder.SkipNwAddressBasedValidations = true
 	return &ObserverServiceBuilder{
