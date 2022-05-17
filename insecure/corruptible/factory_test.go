@@ -3,6 +3,7 @@ package corruptible
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"net"
 	"sync"
 	"testing"
@@ -222,10 +223,54 @@ func TestProcessAttackerMessage(t *testing.T) {
 			factory *ConduitFactory, // the ccf itself
 			flowNetwork *mocknetwork.Adapter, // mock flow network that ccf uses to communicate with authorized flow nodes.
 			stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that attack network uses to send messages to this ccf.
-			msg *insecure.Message, // msg to be sent from orchestrator to the ccf.
-			event interface{}, // corresponding event of the message which is expected to be dispatched on flow network by ccf.
 		) {
-			params := []interface{}{network.Channel(msg.ChannelID), event, uint(3)}
+			// creates a corrupted event that attacker is sending on the flow network through the
+			// corrupted conduit factory.
+			msg, event, _ := insecure.MessageFixture(t, cbor.NewCodec(), insecure.Protocol_MULTICAST, &message.TestMessage{
+				Text: fmt.Sprintf("this is a test message: %d", rand.Int()),
+			})
+
+			params := []interface{}{network.Channel(msg.ChannelID), event.FlowProtocolEvent, uint(3)}
+			targetIds, err := flow.ByteSlicesToIds(msg.TargetIDs)
+			require.NoError(t, err)
+
+			for _, id := range targetIds {
+				params = append(params, id)
+			}
+			corruptedEventDispatchedOnFlowNetWg := sync.WaitGroup{}
+			corruptedEventDispatchedOnFlowNetWg.Add(1)
+			flowNetwork.On("MulticastOnChannel", params...).Run(func(args testifymock.Arguments) {
+				corruptedEventDispatchedOnFlowNetWg.Done()
+			}).Return(nil).Once()
+
+			// imitates a gRPC call from orchestrator to ccf through attack network
+			require.NoError(t, stream.Send(msg))
+
+			unittest.RequireReturnsBefore(
+				t,
+				corruptedEventDispatchedOnFlowNetWg.Wait,
+				1*time.Second,
+				"attacker's message was not dispatched on flow network on time")
+		})
+}
+
+// TestProcessAttackerMessage evaluates that corrupted conduit factory (ccf)
+// relays the messages coming from the attack network to its underlying flow network.
+func TestProcessAttackerMessage_ResultApproval(t *testing.T) {
+	withCorruptibleConduitFactory(t,
+		func(
+			corruptedId flow.Identity, // identity of ccf
+			factory *ConduitFactory, // the ccf itself
+			flowNetwork *mocknetwork.Adapter, // mock flow network that ccf uses to communicate with authorized flow nodes.
+			stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that attack network uses to send messages to this ccf.
+		) {
+			// creates a corrupted event that attacker is sending on the flow network through the
+			// corrupted conduit factory.
+			msg, event, _ := insecure.MessageFixture(t, cbor.NewCodec(), insecure.Protocol_MULTICAST, &message.TestMessage{
+				Text: fmt.Sprintf("this is a test message: %d", rand.Int()),
+			})
+
+			params := []interface{}{network.Channel(msg.ChannelID), event.FlowProtocolEvent, uint(3)}
 			targetIds, err := flow.ByteSlicesToIds(msg.TargetIDs)
 			require.NoError(t, err)
 
@@ -287,8 +332,6 @@ func withCorruptibleConduitFactory(t *testing.T,
 		*ConduitFactory, // the ccf itself
 		*mocknetwork.Adapter, // mock flow network that ccf uses to communicate with authorized flow nodes.
 		insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that attack network uses to send messages to this ccf.
-		*insecure.Message, // msg to be sent from orchestrator to the ccf.
-		interface{}, // corresponding event of the message which is expected to be dispatched on flow network by ccf.
 	)) {
 
 	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress("localhost:0"))
@@ -338,11 +381,7 @@ func withCorruptibleConduitFactory(t *testing.T,
 	stream, err := client.ProcessAttackerMessage(context.Background())
 	require.NoError(t, err)
 
-	// creates a corrupted event that attacker is sending on the flow network through the
-	// corrupted conduit factory.
-	msg, event, _ := insecure.MessageFixture(t, cbor.NewCodec(), insecure.Protocol_MULTICAST)
-
-	run(*corruptedIdentity, ccf, adapter, stream, msg, event.FlowProtocolEvent)
+	run(*corruptedIdentity, ccf, adapter, stream)
 
 	// terminates attackNetwork
 	cancel()

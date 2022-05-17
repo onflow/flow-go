@@ -13,10 +13,16 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+var WithTestContent = func() interface{} {
+	return &message.TestMessage{
+		Text: fmt.Sprintf("this is a test message: %d", rand.Int()),
+	}
+}
+
 // MessageFixture creates and returns a randomly generated gRPC message that is sent between a corruptible conduit and the attack network.
 // It also generates and returns the corresponding application-layer event of that message, which is sent between the attack network and the
 // orchestrator.
-func MessageFixture(t *testing.T, codec network.Codec, protocol Protocol) (*Message, *Event, *flow.Identity) {
+func MessageFixture(t *testing.T, codec network.Codec, protocol Protocol, content interface{}) (*Message, *Event, *flow.Identity) {
 	// fixture for content of message
 	originId := unittest.IdentifierFixture()
 
@@ -34,10 +40,6 @@ func MessageFixture(t *testing.T, codec network.Codec, protocol Protocol) (*Mess
 	}
 
 	channel := network.Channel("test-channel")
-	content := &message.TestMessage{
-		Text: fmt.Sprintf("this is a test message: %d", rand.Int()),
-	}
-
 	// encodes event to create payload
 	payload, err := codec.Encode(content)
 	require.NoError(t, err)
@@ -76,7 +78,9 @@ func MessageFixtures(t *testing.T, codec network.Codec, protocol Protocol, count
 	identities := flow.IdentityList{}
 
 	for i := 0; i < count; i++ {
-		m, e, id := MessageFixture(t, codec, protocol)
+		m, e, id := MessageFixture(t, codec, protocol, &message.TestMessage{
+			Text: fmt.Sprintf("this is a test message: %d", rand.Int()),
+		})
 
 		msgs[i] = m
 		events[i] = e
