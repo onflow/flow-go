@@ -65,7 +65,7 @@ jobs:
       with:
         timeout_minutes: 60
         max_attempts: 5
-        command: ./tools/test_monitor/run-tests.sh | tee test-output
+        command: ./tools/test_monitor/run-tests.sh > test-output
       env:
         JSON_OUTPUT: true
     - name: Process test results
