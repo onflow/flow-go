@@ -338,15 +338,11 @@ func (c *ConduitFactory) sendOnNetwork(event interface{},
 }
 
 func (c *ConduitFactory) generateExecutionReceipt(result *flow.ExecutionResult) (*flow.ExecutionReceipt, error) {
-	//computationResult := unittest.ComputationResultFixture([][]flow.Identifier{
-	//	{flow.ZeroID},
-	//	{flow.ZeroID},
-	//	{flow.ZeroID},
-	//})
-
+	// TODO: fill spock secret with dictated spock data from attacker.
 	return ingestion.GenerateExecutionReceipt(c.me, c.receiptHasher, c.spockHasher, result, []*delta.SpockSnapshot{})
 }
 
 func (c *ConduitFactory) generateResultApproval(attestation *flow.Attestation) (*flow.ResultApproval, error) {
+	// TODO: fill spock secret with dictated spock data from attacker.
 	return verifier.GenerateResultApproval(c.me, c.approvalHasher, c.spockHasher, attestation, []byte{})
 }
