@@ -38,12 +38,20 @@ type Replicas interface {
 	//   * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
 	LeaderForView(view uint64) (flow.Identifier, error)
 
-	// WeightThresholdForView returns the minimum weight required to form a QC
+	// QuorumThresholdForView returns the minimum total weight of votes required to form a QC
 	// for the given view. This weight threshold is computed using the total weight
 	// of the initial committee and is static over the course of an epoch.
 	// Returns the following expected errors for invalid inputs:
 	//   * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
-	WeightThresholdForView(view uint64) (uint64, error)
+	QuorumThresholdForView(view uint64) (uint64, error)
+
+	// TimeoutThresholdForView returns the minimum total weight of observed timeout objects
+	// required to safely timeout for the given view. This weight threshold is computed
+	// using the total weight of the initial committee and is static over the course of
+	// an epoch.
+	// Returns the following expected errors for invalid inputs:
+	//   * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
+	TimeoutThresholdForView(view uint64) (uint64, error)
 
 	// Self returns our own node identifier.
 	// TODO: ultimately, the own identity of the node is necessary for signing.

@@ -63,7 +63,7 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) e
 
 	// determine whether signers reach minimally required weight threshold for consensus
 	// TODO: handle model.ErrViewForUnknownEpoch when front-loading verification
-	threshold, err := v.committee.WeightThresholdForView(block.View)
+	threshold, err := v.committee.QuorumThresholdForView(block.View)
 	if err != nil {
 		return fmt.Errorf("could not get weight threshold for view %d: %w", block.View, err)
 	}

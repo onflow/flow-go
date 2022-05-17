@@ -156,7 +156,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 			return in.participants[int(view)%len(in.participants)].NodeID
 		}, nil,
 	)
-	in.committee.On("WeightThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(in.participants.TotalWeight()), nil)
+	in.committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(in.participants.TotalWeight()), nil)
 
 	// program the builder module behaviour
 	in.builder.On("BuildOn", mock.Anything, mock.Anything).Return(

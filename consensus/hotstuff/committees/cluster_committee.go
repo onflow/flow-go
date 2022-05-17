@@ -31,6 +31,7 @@ type Cluster struct {
 	// TODO: should use identity skeleton https://github.com/dapperlabs/flow-go/issues/6232
 	initialClusterMembers flow.IdentityList
 	weightThresholdForQC  uint64 // computed based on initial cluster committee weights
+	weightThresholdForTO  uint64 // computed based on initial cluster committee weights
 }
 
 var _ hotstuff.Replicas = (*Cluster)(nil)
@@ -49,6 +50,7 @@ func NewClusterCommittee(
 		return nil, fmt.Errorf("could not compute leader selection for cluster: %w", err)
 	}
 
+	totalWeight := cluster.Members().TotalWeight()
 	com := &Cluster{
 		state:     state,
 		payloads:  payloads,
@@ -60,7 +62,8 @@ func NewClusterCommittee(
 			filter.HasWeight(true),
 		),
 		initialClusterMembers: cluster.Members(),
-		weightThresholdForQC:  WeightThresholdToBuildQC(cluster.Members().TotalWeight()),
+		weightThresholdForQC:  WeightThresholdToBuildQC(totalWeight),
+		weightThresholdForTO:  WeightThresholdToTimeout(totalWeight),
 	}
 	return com, nil
 }
@@ -149,15 +152,26 @@ func (c *Cluster) LeaderForView(view uint64) (flow.Identifier, error) {
 	return c.selection.LeaderForView(view)
 }
 
-// WeightThresholdForView returns the weight threshold required to build a QC
+// QuorumThresholdForView returns the weight threshold required to build a QC
 // for the given view. The view parameter is the view in the cluster consensus.
 // Since clusters only exist for one epoch, and the weight threshold is static
 // over the course of an epoch, we don't need to check the view.
 //
 // No errors are expected during normal operation.
-func (c *Cluster) WeightThresholdForView(_ uint64) (uint64, error) {
+func (c *Cluster) QuorumThresholdForView(_ uint64) (uint64, error) {
 	return c.weightThresholdForQC, nil
 }
+
+// TimeoutThresholdForView returns the minimum weight of observed timeout objects to
+// safely immediately timeout for the current view. The view parameter is the view
+// in the cluster consensus. Since clusters only exist for one epoch, and the weight
+// threshold is static over the course of an epoch, we don't need to check the view.
+//
+// No errors are expected during normal operation.
+func (c *Cluster) TimeoutThresholdForView(_ uint64) (uint64, error) {
+	return c.weightThresholdForQC, nil
+}
+
 func (c *Cluster) Self() flow.Identifier {
 	return c.me
 }

@@ -83,7 +83,7 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 		func(view uint64) flow.Identifier { return identities[int(view)%len(identities)].NodeID },
 		nil,
 	)
-	s.committee.On("WeightThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(identities.TotalWeight()), nil)
+	s.committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(identities.TotalWeight()), nil)
 
 	// mock storage headers
 	s.headers = &mockstorage.Headers{}

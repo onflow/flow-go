@@ -22,6 +22,7 @@ type staticEpochInfo struct {
 	// TODO: should use identity skeleton https://github.com/dapperlabs/flow-go/issues/6232
 	initialCommittee     flow.IdentityList
 	weightThresholdForQC uint64 // computed based on initial committee weights
+	weightThresholdForTO uint64 // computed based on initial committee weights
 	dkg                  hotstuff.DKG
 }
 
@@ -50,12 +51,14 @@ func newStaticEpochInfo(epoch protocol.Epoch) (*staticEpochInfo, error) {
 		return nil, fmt.Errorf("could not get dkg: %w", err)
 	}
 
+	totalWeight := initialCommittee.TotalWeight()
 	epochInfo := &staticEpochInfo{
 		firstView:            firstView,
 		finalView:            finalView,
 		leaders:              leaders,
 		initialCommittee:     initialCommittee,
-		weightThresholdForQC: WeightThresholdToBuildQC(initialCommittee.TotalWeight()),
+		weightThresholdForQC: WeightThresholdToBuildQC(totalWeight),
+		weightThresholdForTO: WeightThresholdToTimeout(totalWeight),
 		dkg:                  dkg,
 	}
 	return epochInfo, nil
@@ -196,10 +199,10 @@ func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 	return epochInfo.leaders.LeaderForView(view)
 }
 
-// WeightThresholdForView returns the minimum weight required to build a valid
+// QuorumThresholdForView returns the minimum weight required to build a valid
 // QC in the given view. The weight threshold only changes at epoch boundaries
 // and is computed based on the initial committee weights.
-func (c *Consensus) WeightThresholdForView(view uint64) (uint64, error) {
+func (c *Consensus) QuorumThresholdForView(view uint64) (uint64, error) {
 	epochInfo, err := c.staticEpochInfoByView(view)
 	if err != nil {
 		return 0, err
@@ -209,6 +212,17 @@ func (c *Consensus) WeightThresholdForView(view uint64) (uint64, error) {
 
 func (c *Consensus) Self() flow.Identifier {
 	return c.me
+}
+
+// TimeoutThresholdForView returns the minimum weight of observed timeout objects
+// to safely immediately timeout for the current view. The weight threshold only
+// changes at epoch boundaries and is computed based on the initial committee weights.
+func (c *Consensus) TimeoutThresholdForView(view uint64) (uint64, error) {
+	epochInfo, err := c.staticEpochInfoByView(view)
+	if err != nil {
+		return 0, err
+	}
+	return epochInfo.weightThresholdForTO, nil
 }
 
 // DKG returns the DKG for epoch which includes the given view.

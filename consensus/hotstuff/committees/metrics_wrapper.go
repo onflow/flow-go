@@ -64,9 +64,16 @@ func (w CommitteeMetricsWrapper) LeaderForView(view uint64) (flow.Identifier, er
 	return id, err
 }
 
-func (w CommitteeMetricsWrapper) WeightThresholdForView(view uint64) (uint64, error) {
+func (w CommitteeMetricsWrapper) QuorumThresholdForView(view uint64) (uint64, error) {
 	processStart := time.Now()
-	id, err := w.committee.WeightThresholdForView(view)
+	id, err := w.committee.QuorumThresholdForView(view)
+	w.metrics.CommitteeProcessingDuration(time.Since(processStart))
+	return id, err
+}
+
+func (w CommitteeMetricsWrapper) TimeoutThresholdForView(view uint64) (uint64, error) {
+	processStart := time.Now()
+	id, err := w.committee.TimeoutThresholdForView(view)
 	w.metrics.CommitteeProcessingDuration(time.Since(processStart))
 	return id, err
 }
