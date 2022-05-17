@@ -88,13 +88,6 @@ type ObserverServiceConfig struct {
 	baseOptions             []cmd.Option
 }
 
-type PublicNetworkConfig struct {
-	// NetworkKey crypto.PublicKey // TODO: do we need a different key for the public network?
-	BindAddress string
-	Network     network.Network
-	Metrics     module.NetworkMetrics
-}
-
 // DefaultObserverServiceConfig defines all the default values for the ObserverServiceConfig
 func DefaultObserverServiceConfig() *ObserverServiceConfig {
 	return &ObserverServiceConfig{
@@ -346,7 +339,7 @@ func FlowObserverService(opts ...FollowerOption) *FlowObserverServiceBuilder {
 
 	return &FlowObserverServiceBuilder{
 		ObserverServiceConfig:   config,
-		# TODO: using RoleAccess here for now. This should be refactored eventually to have its own role type
+		// TODO: using RoleAccess here for now. This should be refactored eventually to have its own role type
 		FlowNodeBuilder:         cmd.FlowNode(flow.RoleAccess.String(), config.baseOptions...),
 		FinalizationDistributor: pubsub.NewFinalizationDistributor(),
 	}
