@@ -65,7 +65,7 @@ import (
 	consensus_follower "github.com/onflow/flow-go/upstream"
 )
 
-// ObserverBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node
+// ObserverServiceBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node
 // These functions are shared by staked and observer builders.
 // The Staked network allows the staked nodes to communicate among themselves, while the public network allows the
 // observers and an Access node to communicate.
@@ -80,10 +80,6 @@ import (
 //  +------------------------+                           ^
 //  | observer 3             |<--------------------------|
 //  +------------------------+
-
-type ObserverBuilder interface {
-	cmd.NodeBuilder
-}
 
 // ObserverServiceConfig defines all the user defined parameters required to bootstrap an access node
 // For a node running as a standalone process, the config fields will be populated from the command line params,
@@ -360,7 +356,7 @@ func (builder *ObserverServiceBuilder) buildSyncEngine() *ObserverServiceBuilder
 	return builder
 }
 
-func (builder *ObserverServiceBuilder) BuildConsensusFollower() ObserverBuilder {
+func (builder *ObserverServiceBuilder) BuildConsensusFollower() *ObserverServiceBuilder {
 	builder.
 		buildFollowerState().
 		buildSyncCore().
