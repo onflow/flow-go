@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -101,11 +100,12 @@ func (suite *Suite) SetupTest() {
 	require.NoError(suite.T(), err)
 
 	suite.eng = eng
-
 }
 
 // TestOnFinalizedBlock checks that when a block is received, a request for each individual collection is made
 func (suite *Suite) TestOnFinalizedBlock() {
+	// ctx, _ := irrecoverable.WithSignaler(context.Background())
+	// suite.eng.Start(ctx)
 
 	block := unittest.BlockFixture()
 	block.SetPayload(unittest.PayloadFixture(
@@ -146,17 +146,6 @@ func (suite *Suite) TestOnFinalizedBlock() {
 	// process the block through the finalized callback
 	suite.eng.OnFinalizedBlock(&hotstuffBlock)
 
-	// wait for engine shutdown
-	done := suite.eng.unit.Done()
-	assert.Eventually(suite.T(), func() bool {
-		select {
-		case <-done:
-			return true
-		default:
-			return false
-		}
-	}, time.Second, 20*time.Millisecond)
-
 	// assert that the block was retrieved and all collections were requested
 	suite.headers.AssertExpectations(suite.T())
 	suite.request.AssertNumberOfCalls(suite.T(), "EntityByID", len(block.Payload.Guarantees))
@@ -188,17 +177,6 @@ func (suite *Suite) TestOnCollection() {
 
 	// process the block through the collection callback
 	suite.eng.OnCollection(originID, &collection)
-
-	// wait for engine to be done processing
-	done := suite.eng.unit.Done()
-	assert.Eventually(suite.T(), func() bool {
-		select {
-		case <-done:
-			return true
-		default:
-			return false
-		}
-	}, time.Second, 20*time.Millisecond)
 
 	// check that the collection was stored and indexed, and we stored all transactions
 	suite.collections.AssertExpectations(suite.T())
@@ -273,17 +251,6 @@ func (suite *Suite) TestOnCollectionDuplicate() {
 
 	// process the block through the collection callback
 	suite.eng.OnCollection(originID, &collection)
-
-	// wait for engine to be done processing
-	done := suite.eng.unit.Done()
-	assert.Eventually(suite.T(), func() bool {
-		select {
-		case <-done:
-			return true
-		default:
-			return false
-		}
-	}, time.Second, 20*time.Millisecond)
 
 	// check that the collection was stored and indexed, and we stored all transactions
 	suite.collections.AssertExpectations(suite.T())
