@@ -169,8 +169,6 @@ type ObserverServiceBuilder struct {
 	RpcEng                     *rpc.Engine
 	FinalizationDistributor    *pubsub.FinalizationDistributor
 	FinalizedHeader            *synceng.FinalizedHeaderCache
-	CollectionRPC              access.AccessAPIClient
-	TransactionMetrics         module.TransactionMetrics
 	Committee                  hotstuff.Committee
 	Finalized                  *flow.Header
 	Pending                    []*flow.Header
