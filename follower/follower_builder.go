@@ -650,7 +650,7 @@ func (builder *FlowObserverServiceBuilder) enqueueMiddleware() {
 // Currently, the observer only runs the follower engine.
 func (builder *FlowObserverServiceBuilder) Build() (cmd.Node, error) {
 	builder.BuildConsensusFollower()
-	return builder.FlowObserverServiceBuilder.Build()
+	return builder.Build()
 }
 
 // enqueuePublicNetworkInit enqueues the observer network component initialized for the observer
