@@ -11,22 +11,21 @@ shopt -s extglob
 
 echo "test category (test-setup):" $TEST_CATEGORY>&2
 
-case $TEST_CATEGORY in
- integration-ghost|integration-mvp|integration-network|integration-epochs|integration-access|integration-collection|integration-consensus|integration-execution|integration-verification)
-    echo "running make docker-build-flow">&2
+case $TEST_CATEGORY in integration-ghost|integration-mvp|integration-network|integration-epochs|integration-access|integration-collection|integration-consensus|integration-execution|integration-verification)
+  echo "running make docker-build-flow">&2
 #    make docker-build-flow
  ;;
- integration-bft)
-   echo "running BFT make docker-build-flow-corrupted docker-build-flow">&2
+  integration-bft)
+    echo "running BFT make docker-build-flow-corrupted docker-build-flow">&2
 #    make docker-build-flow-corrupted docker-build-flow
  ;;
- unit)
-   echo "generating mocks for unit tests">&2
-#    make install-mock-generators
-#    make generate-mocks
+  unit)
+    echo "generating mocks for unit tests">&2
+    make install-mock-generators
+    make generate-mocks
  ;;
- unit-crypto)
-   echo "running crypto setup">&2
+  unit-crypto)
+    echo "running crypto setup">&2
 #    make crypto_setup_tests
  ;;
   *)
