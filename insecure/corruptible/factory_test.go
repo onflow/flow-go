@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc"
 	grpcinsecure "google.golang.org/grpc/credentials/insecure"
 
+	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
@@ -25,7 +26,13 @@ import (
 
 // TestRegisterAdapter_FailDoubleRegistration checks that CorruptibleConduitFactory can be registered with only one adapter.
 func TestRegisterAdapter_FailDoubleRegistration(t *testing.T) {
-	f := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet, unittest.IdentifierFixture(), cbor.NewCodec(), "localhost:0")
+	me := testutil.LocalFixture(t, unittest.IdentityFixture())
+	f := NewCorruptibleConduitFactory(
+		unittest.Logger(),
+		flow.BftTestnet,
+		me,
+		cbor.NewCodec(),
+		"localhost:0")
 
 	adapter := &mocknetwork.Adapter{}
 
@@ -39,7 +46,13 @@ func TestRegisterAdapter_FailDoubleRegistration(t *testing.T) {
 // TestNewConduit_HappyPath checks when factory has an adapter registered, it can successfully
 // create conduits.
 func TestNewConduit_HappyPath(t *testing.T) {
-	f := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet, unittest.IdentifierFixture(), cbor.NewCodec(), "localhost:0")
+	me := testutil.LocalFixture(t, unittest.IdentityFixture())
+	f := NewCorruptibleConduitFactory(
+		unittest.Logger(),
+		flow.BftTestnet,
+		me,
+		cbor.NewCodec(),
+		"localhost:0")
 	channel := network.Channel("test-channel")
 
 	adapter := &mocknetwork.Adapter{}
@@ -54,7 +67,13 @@ func TestNewConduit_HappyPath(t *testing.T) {
 // TestNewConduit_MissingAdapter checks when factory does not have an adapter registered,
 // any attempts on creating a conduit fails with an error.
 func TestNewConduit_MissingAdapter(t *testing.T) {
-	f := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet, unittest.IdentifierFixture(), cbor.NewCodec(), "localhost:0")
+	me := testutil.LocalFixture(t, unittest.IdentityFixture())
+	f := NewCorruptibleConduitFactory(
+		unittest.Logger(),
+		flow.BftTestnet,
+		me,
+		cbor.NewCodec(),
+		"localhost:0")
 	channel := network.Channel("test-channel")
 
 	c, err := f.NewConduit(context.Background(), channel)
@@ -65,8 +84,14 @@ func TestNewConduit_MissingAdapter(t *testing.T) {
 // TestFactoryHandleIncomingEvent_AttackerObserve evaluates that the incoming messages to the conduit factory are routed to the
 // registered attacker if one exists.
 func TestFactoryHandleIncomingEvent_AttackerObserve(t *testing.T) {
-	codec := cbor.NewCodec()
-	f := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet, unittest.IdentifierFixture(), codec, "localhost:0")
+	cboreCodec := cbor.NewCodec()
+	me := testutil.LocalFixture(t, unittest.IdentityFixture())
+	f := NewCorruptibleConduitFactory(
+		unittest.Logger(),
+		flow.BftTestnet,
+		me,
+		cboreCodec,
+		"localhost:0")
 	attacker := newMockAttackerObserverClient()
 	f.attackerObserveClient = attacker
 
@@ -92,7 +117,7 @@ func TestFactoryHandleIncomingEvent_AttackerObserve(t *testing.T) {
 	require.Equal(t, receivedMsg.Protocol, insecure.Protocol_MULTICAST)
 	require.Equal(t, receivedMsg.ChannelID, string(channel))
 
-	decodedEvent, err := codec.Decode(receivedMsg.Payload)
+	decodedEvent, err := cboreCodec.Decode(receivedMsg.Payload)
 	require.NoError(t, err)
 	require.Equal(t, event, decodedEvent)
 }
@@ -100,9 +125,15 @@ func TestFactoryHandleIncomingEvent_AttackerObserve(t *testing.T) {
 // TestFactoryHandleIncomingEvent_UnicastOverNetwork evaluates that the incoming unicast events to the conduit factory are routed to the
 // network adapter when no attacker registered to the factory.
 func TestFactoryHandleIncomingEvent_UnicastOverNetwork(t *testing.T) {
-	codec := cbor.NewCodec()
+	cborCodec := cbor.NewCodec()
+	me := testutil.LocalFixture(t, unittest.IdentityFixture())
 	// corruptible conduit factory with no attacker registered.
-	f := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet, unittest.IdentifierFixture(), codec, "localhost:0")
+	f := NewCorruptibleConduitFactory(
+		unittest.Logger(),
+		flow.BftTestnet,
+		me,
+		cborCodec,
+		"localhost:0")
 
 	adapter := &mocknetwork.Adapter{}
 	err := f.RegisterAdapter(adapter)
@@ -124,8 +155,14 @@ func TestFactoryHandleIncomingEvent_UnicastOverNetwork(t *testing.T) {
 // network adapter when no attacker registered to the factory.
 func TestFactoryHandleIncomingEvent_PublishOverNetwork(t *testing.T) {
 	codec := cbor.NewCodec()
+	me := testutil.LocalFixture(t, unittest.IdentityFixture())
 	// corruptible conduit factory with no attacker registered.
-	f := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet, unittest.IdentifierFixture(), codec, "localhost:0")
+	f := NewCorruptibleConduitFactory(
+		unittest.Logger(),
+		flow.BftTestnet,
+		me,
+		codec,
+		"localhost:0")
 
 	adapter := &mocknetwork.Adapter{}
 	err := f.RegisterAdapter(adapter)
@@ -146,8 +183,14 @@ func TestFactoryHandleIncomingEvent_PublishOverNetwork(t *testing.T) {
 // network adapter when no attacker registered to the factory.
 func TestFactoryHandleIncomingEvent_MulticastOverNetwork(t *testing.T) {
 	codec := cbor.NewCodec()
+	me := testutil.LocalFixture(t, unittest.IdentityFixture())
 	// corruptible conduit factory with no attacker registered.
-	f := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet, unittest.IdentifierFixture(), codec, "localhost:0")
+	f := NewCorruptibleConduitFactory(
+		unittest.Logger(),
+		flow.BftTestnet,
+		me,
+		codec,
+		"localhost:0")
 
 	adapter := &mocknetwork.Adapter{}
 	err := f.RegisterAdapter(adapter)
@@ -210,8 +253,14 @@ func TestProcessAttackerMessage(t *testing.T) {
 // on closing it.
 func TestEngineClosingChannel(t *testing.T) {
 	codec := cbor.NewCodec()
+	me := testutil.LocalFixture(t, unittest.IdentityFixture())
 	// corruptible conduit factory with no attacker registered.
-	f := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet, unittest.IdentifierFixture(), codec, "localhost:0")
+	f := NewCorruptibleConduitFactory(
+		unittest.Logger(),
+		flow.BftTestnet,
+		me,
+		codec,
+		"localhost:0")
 
 	adapter := &mocknetwork.Adapter{}
 	err := f.RegisterAdapter(adapter)
@@ -256,10 +305,11 @@ func withCorruptibleConduitFactory(t *testing.T,
 		}
 	}()
 
+	me := testutil.LocalFixture(t, unittest.IdentityFixture())
 	ccf := NewCorruptibleConduitFactory(
 		unittest.Logger(),
 		flow.BftTestnet,
-		corruptedIdentity.NodeID,
+		me,
 		cbor.NewCodec(),
 		"localhost:0",
 	)
