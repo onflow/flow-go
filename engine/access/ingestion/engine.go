@@ -180,7 +180,7 @@ func New(
 		AddWorker(e.processExecutionReceipts).
 		AddWorker(e.processFinalizedBlocks).
 		Build()
-	
+
 	// register engine with the execution receipt provider
 	_, err = net.Register(engine.ReceiveReceipts, e)
 	if err != nil {
