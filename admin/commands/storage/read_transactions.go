@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/cmd/export-json-transactions/transactions"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+	"github.com/rs/zerolog/log"
 )
 
 var _ commands.AdminCommand = (*GetTransactionsCommand)(nil)
@@ -41,6 +42,8 @@ func (c *GetTransactionsCommand) Handler(ctx context.Context, req *admin.Command
 		Collections: c.collections,
 	}
 
+	log.Info().Str("module", "admin-tool").Msgf("get transactions for height range [%v, %v]",
+		data.startHeight, data.endHeight)
 	blocks, err := finder.GetByHeightRange(data.startHeight, data.endHeight)
 	if err != nil {
 		return nil, err
