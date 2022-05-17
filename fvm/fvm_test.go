@@ -22,6 +22,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
+
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
@@ -3570,6 +3571,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 }
 
 func TestSettingExecutionWeights(t *testing.T) {
+
 	t.Run("transaction should fail with high weights", newVMTest().withBootstrapProcedureOptions(
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
@@ -3607,12 +3609,58 @@ func TestSettingExecutionWeights(t *testing.T) {
 			assert.True(t, errors.IsComputationLimitExceededError(tx.Err))
 		},
 	))
+
 	memoryWeights := make(map[common.MemoryKind]uint64)
 	for k, v := range weightedMeter.DefaultMemoryWeights {
 		memoryWeights[k] = v
 	}
 	memoryWeights[common.MemoryKindBool] = 20_000_000_000
-	t.Run("transaction should fail with high memory weights", newVMTest().withBootstrapProcedureOptions(
+
+	t.Run("normal transactions should fail with high memory weights", newVMTest().withBootstrapProcedureOptions(
+		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		fvm.WithExecutionMemoryWeights(
+			memoryWeights,
+		),
+	).withContextOptions(
+		fvm.WithMemoryLimit(10_000_000_000),
+	).run(
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+
+			// Create an account private key.
+			privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+			require.NoError(t, err)
+
+			// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+			accounts, err := testutil.CreateAccounts(vm, view, programs, privateKeys, chain)
+			require.NoError(t, err)
+
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(`
+				transaction {
+                  prepare(signer: AuthAccount) {
+					var a = false
+                  }
+                }
+			`)).
+				SetProposalKey(accounts[0], 0, 0).
+				AddAuthorizer(accounts[0]).
+				SetPayer(accounts[0])
+
+			err = testutil.SignTransaction(txBody, accounts[0], privateKeys[0], 0)
+			require.NoError(t, err)
+
+			tx := fvm.Transaction(txBody, 0)
+			err = vm.Run(ctx, tx, view, programs)
+			require.NoError(t, err)
+			require.Greater(t, tx.MemoryUsed, uint64(20_000_000_000))
+
+			assert.True(t, errors.IsMemoryLimitExceededError(tx.Err))
+		},
+	))
+
+	t.Run("service account transactions should not fail with high memory weights", newVMTest().withBootstrapProcedureOptions(
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
@@ -3642,11 +3690,12 @@ func TestSettingExecutionWeights(t *testing.T) {
 			tx := fvm.Transaction(txBody, 0)
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
-			require.Greater(t, tx.MemoryUsed, uint64(20_000_000_000))
+			require.Equal(t, uint64(0), tx.MemoryUsed)
 
-			assert.True(t, errors.IsMemoryLimitExceededError(tx.Err))
+			require.NoError(t, tx.Err)
 		},
 	))
+
 	t.Run("transaction should fail if create account weight is high", newVMTest().withBootstrapProcedureOptions(
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
@@ -3749,6 +3798,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			assert.True(t, errors.IsComputationLimitExceededError(tx.Err))
 		},
 	))
+
 	t.Run("transaction should not use up more computation that the transaction body itself", newVMTest().withBootstrapProcedureOptions(
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),

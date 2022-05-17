@@ -728,7 +728,7 @@ func (e *TransactionEnv) ComputationUsed() uint64 {
 }
 
 func (e *TransactionEnv) meterMemory(kind common.MemoryKind, intensity uint) error {
-	if e.sth.EnforceMemoryLimits {
+	if e.sth.EnforceMemoryLimits() {
 		return e.sth.State().MeterMemory(kind, intensity)
 	}
 	return nil
