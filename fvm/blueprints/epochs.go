@@ -6,13 +6,15 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
+	flowsdk "github.com/onflow/flow-go-sdk"
+	sdktemplates "github.com/onflow/flow-go-sdk/templates"
+
 	"github.com/onflow/flow-go/model/bootstrap"
-
-	"github.com/onflow/flow-go/module/epochs"
-
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/epochs"
 )
 
 const deployIDTableStakingTransactionTemplate = `
@@ -49,8 +51,8 @@ transaction(clusterWeights: [{String: UInt64}]) {
 		randomSource: %s,
 		collectorClusters: clusters,
         // NOTE: clusterQCs and dkgPubKeys are empty because these initial values are not used
-		clusterQCs: [],
-		dkgPubKeys: [],
+		clusterQCs: [] as [FlowClusterQC.ClusterQC],
+		dkgPubKeys: [] as [String],
 	)
   }
 }
@@ -213,21 +215,21 @@ func RegisterNodeTransaction(
 
 	// Use NetworkingKey as the public key of the machine account.
 	// We do this for tests/localnet but normally it should be a separate key.
-	accountKey := flow.AccountPublicKey{
+	accountKey := &flowsdk.AccountKey{
 		PublicKey: id.NetworkPubKey,
-		SignAlgo:  id.NetworkPubKey.Algorithm(),
+		SigAlgo:   id.NetworkPubKey.Algorithm(),
 		HashAlgo:  bootstrap.DefaultMachineAccountHashAlgo,
 		Weight:    1000,
 	}
 
-	encAccountKey, err := flow.EncodeRuntimeAccountPublicKey(accountKey)
+	cadenceCryptoKey, err := sdktemplates.AccountKeyToCadenceCryptoKey(accountKey)
 	if err != nil {
 		panic(err)
 	}
 
 	cadencePublicKeys := cadence.NewArray(
 		[]cadence.Value{
-			BytesToCadenceArray(encAccountKey),
+			cadenceCryptoKey,
 		},
 	)
 

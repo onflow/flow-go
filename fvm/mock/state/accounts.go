@@ -67,6 +67,27 @@ func (_m *Accounts) CheckAccountNotFrozen(address flow.Address) error {
 	return r0
 }
 
+// ContractExists provides a mock function with given fields: contractName, address
+func (_m *Accounts) ContractExists(contractName string, address flow.Address) (bool, error) {
+	ret := _m.Called(contractName, address)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(string, flow.Address) bool); ok {
+		r0 = rf(contractName, address)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string, flow.Address) error); ok {
+		r1 = rf(contractName, address)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Create provides a mock function with given fields: publicKeys, newAddress
 func (_m *Accounts) Create(publicKeys []flow.AccountPublicKey, newAddress flow.Address) error {
 	ret := _m.Called(publicKeys, newAddress)

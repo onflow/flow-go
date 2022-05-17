@@ -5,6 +5,7 @@ import (
 	"crypto/md5" //nolint:gosec
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
@@ -105,7 +106,10 @@ func New(
 			connFactory:       connFactory,
 			state:             state,
 			log:               log,
-			seenScripts:       make(map[[md5.Size]byte]time.Time),
+			seenScripts: &scriptMap{
+				scripts: make(map[[md5.Size]byte]time.Time),
+				lock:    sync.RWMutex{},
+			},
 		},
 		backendTransactions: backendTransactions{
 			staticCollectionRPC:  collectionRPC,

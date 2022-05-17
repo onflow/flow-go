@@ -7,7 +7,7 @@ import "github.com/onflow/flow-go/model/flow"
 type transactionLookup struct {
 	// set of transaction IDs in finalized ancestry
 	finalized map[flow.Identifier]struct{}
-	// set of transaction IDs in unfinalzied ancestry
+	// set of transaction IDs in unfinalized ancestry
 	unfinalized map[flow.Identifier]struct{}
 }
 

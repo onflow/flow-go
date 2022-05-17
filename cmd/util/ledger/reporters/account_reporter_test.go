@@ -48,7 +48,7 @@ func TestLookupValues(t *testing.T) {
 		return encodedInt
 	}
 
-	one := interpreter.NewIntValueFromInt64(1)
+	one := interpreter.NewUnmeteredIntValueFromInt64(1)
 
 	payload := []ledger.Payload{
 		{Key: createAccountPayloadKey(address1, state2.KeyExists), Value: []byte{1}},

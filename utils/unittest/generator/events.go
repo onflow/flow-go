@@ -25,7 +25,7 @@ func EventGenerator() *Events {
 func (g *Events) New() flow.Event {
 	location := common.StringLocation("test")
 	identifier := fmt.Sprintf("FooEvent%d", g.count)
-	typeID := location.TypeID(identifier)
+	typeID := location.TypeID(nil, identifier)
 
 	testEventType := &cadence.EventType{
 		Location:            location,
