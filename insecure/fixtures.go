@@ -13,12 +13,6 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-var WithTestContent = func() interface{} {
-	return &message.TestMessage{
-		Text: fmt.Sprintf("this is a test message: %d", rand.Int()),
-	}
-}
-
 // MessageFixture creates and returns a randomly generated gRPC message that is sent between a corruptible conduit and the attack network.
 // It also generates and returns the corresponding application-layer event of that message, which is sent between the attack network and the
 // orchestrator.
