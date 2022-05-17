@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"strconv"
 	"strings"
@@ -279,9 +280,9 @@ func TestConnectionPoolFull(t *testing.T) {
 	cache, _ := lru.New(2)
 	connectionFactory.ConnectionsCache = cache
 
-	cn1Address := cn1.listener.Addr().String()
-	cn2Address := cn2.listener.Addr().String()
-	cn3Address := cn3.listener.Addr().String()
+	cn1Address := "foo1:123"
+	cn2Address := "foo2:123"
+	cn3Address := "foo3:123"
 
 	// get a collection API client
 	_, closer, err := connectionFactory.GetAccessAPIClient(cn1Address)
@@ -305,9 +306,17 @@ func TestConnectionPoolFull(t *testing.T) {
 	assert.NoError(t, err)
 	defer closer.Close()
 
-	contains1 := connectionFactory.ConnectionsCache.Contains(cn1Address)
-	contains2 := connectionFactory.ConnectionsCache.Contains(cn2Address)
-	contains3 := connectionFactory.ConnectionsCache.Contains(cn3Address)
+	var hostnameOrIP string
+	hostnameOrIP, _, err = net.SplitHostPort(cn1Address)
+	grpcAddress1 := fmt.Sprintf("%s:%d", hostnameOrIP, connectionFactory.CollectionGRPCPort)
+	hostnameOrIP, _, err = net.SplitHostPort(cn2Address)
+	grpcAddress2 := fmt.Sprintf("%s:%d", hostnameOrIP, connectionFactory.CollectionGRPCPort)
+	hostnameOrIP, _, err = net.SplitHostPort(cn3Address)
+	grpcAddress3 := fmt.Sprintf("%s:%d", hostnameOrIP, connectionFactory.CollectionGRPCPort)
+
+	contains1 := connectionFactory.ConnectionsCache.Contains(grpcAddress1)
+	contains2 := connectionFactory.ConnectionsCache.Contains(grpcAddress2)
+	contains3 := connectionFactory.ConnectionsCache.Contains(grpcAddress3)
 
 	assert.True(t, contains1)
 	assert.False(t, contains2)
