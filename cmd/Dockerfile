@@ -9,6 +9,10 @@ RUN apt-get -y install cmake zip
 ## (2) Build the app binary
 FROM build-setup AS build-env
 
+# add the pubkey of github.com to knownhosts, so ssh-agent doesn't bark
+RUN mkdir -p /root/.ssh && ssh-keyscan -t rsa github.com >> /root/.ssh/known_hosts
+RUN git config --global 'url.ssh://git@github.com/.insteadof' https://github.com/
+
 # Build the app binary in /app
 RUN mkdir /app
 WORKDIR /app
@@ -19,7 +23,8 @@ ARG VERSION
 
 COPY . .
 
-RUN --mount=type=cache,target=/go/pkg/mod \
+RUN --mount=type=ssh \
+    --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     make crypto_setup_gopath
 
@@ -28,7 +33,8 @@ WORKDIR /app
 ARG GOARCH=amd64
 # Keep Go's build cache between builds.
 # https://github.com/golang/go/issues/27719#issuecomment-514747274
-RUN --mount=type=cache,target=/go/pkg/mod \
+RUN --mount=type=ssh \
+    --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     GO111MODULE=on CGO_ENABLED=1 GOOS=linux go build --tags "relic,netgo" -ldflags "-extldflags -static \
     -X 'github.com/onflow/flow-go/cmd/build.commit=${COMMIT}' -X  'github.com/onflow/flow-go/cmd/build.semver=${VERSION}'" \
