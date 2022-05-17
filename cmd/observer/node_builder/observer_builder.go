@@ -97,7 +97,6 @@ type ObserverServiceConfig struct {
 	bootstrapNodePublicKeys      []string
 	observerNetworkingKeyPath    string
 	bootstrapIdentities          flow.IdentityList // the identity list of bootstrap peers the node uses to discover other nodes
-	supportsPublicFollower       bool              // Observers will support streaming to observers later
 	collectionGRPCPort           uint              // deprecated
 	executionGRPCPort            uint              // deprecated
 	apiRatelimits                map[string]int
@@ -151,7 +150,6 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 		staked:                       false, // deprecated but kept to support temporary boostrap code
 		bootstrapNodeAddresses:       []string{},
 		bootstrapNodePublicKeys:      []string{},
-		supportsPublicFollower:       false,
 		PublicNetworkConfig: PublicNetworkConfig{
 			BindAddress: cmd.NotSet,
 			Metrics:     metrics.NewNoopCollector(),
@@ -441,13 +439,8 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 		flags.StringVar(&builder.observerNetworkingKeyPath, "observer-networking-key-path", defaultConfig.observerNetworkingKeyPath, "path to the networking key for observer")
 		flags.StringSliceVar(&builder.bootstrapNodeAddresses, "bootstrap-node-addresses", defaultConfig.bootstrapNodeAddresses, "the network addresses of the bootstrap access node if this is an observer e.g. access-001.mainnet.flow.org:9653,access-002.mainnet.flow.org:9653")
 		flags.StringSliceVar(&builder.bootstrapNodePublicKeys, "bootstrap-node-public-keys", defaultConfig.bootstrapNodePublicKeys, "the networking public key of the bootstrap access node if this is an observer (in the same order as the bootstrap node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
-		flags.BoolVar(&builder.supportsPublicFollower, "supports-unstaked-node", defaultConfig.supportsPublicFollower, "true if this staked access node supports observers")
 		flags.StringVar(&builder.PublicNetworkConfig.BindAddress, "public-network-address", defaultConfig.PublicNetworkConfig.BindAddress, "staked access node's public network bind address")
 	}).ValidateFlags(func() error {
-		if builder.supportsPublicFollower && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
-			return errors.New("public-network-address must be set if supports-unstaked-node is true")
-		}
-
 		return nil
 	})
 }
