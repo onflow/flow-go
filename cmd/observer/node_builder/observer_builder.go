@@ -805,7 +805,7 @@ func (builder *ObserverServiceBuilder) enqueueConnectWithStakedAN() {
 			node.Storage.Receipts,
 			node.Storage.Results,
 			node.RootChainID,
-			builder.TransactionMetrics,
+			nil,
 			builder.collectionGRPCPort,
 			builder.executionGRPCPort,
 			builder.retryEnabled,
