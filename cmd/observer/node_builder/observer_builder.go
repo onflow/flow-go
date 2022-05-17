@@ -611,6 +611,8 @@ func (builder *ObserverServiceBuilder) Initialize() error {
 
 	builder.enqueueConnectWithStakedAN()
 
+	builder.attachRPCEngine()
+
 	if builder.BaseConfig.MetricsEnabled {
 		builder.EnqueueMetricsServerInit()
 		if err := builder.RegisterBadgerMetrics(); err != nil {
@@ -785,35 +787,39 @@ func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
 func (builder *ObserverServiceBuilder) enqueueConnectWithStakedAN() {
 	builder.Component("upstream connector", func(_ *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		return consensus_follower.NewUpstreamConnector(builder.bootstrapIdentities, builder.LibP2PNode, builder.Logger), nil
-	}).Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		proxy, err := apiservice.NewFlowAPIService(builder.bootstrapIdentities, builder.PeerUpdateInterval)
-		if err != nil {
-			return nil, err
-		}
-		builder.RpcEng = rpc.New(
-			node.Logger,
-			node.State,
-			builder.rpcConf,
-			nil,
-			builder.HistoricalAccessRPCs,
-			node.Storage.Blocks,
-			node.Storage.Headers,
-			node.Storage.Collections,
-			node.Storage.Transactions,
-			node.Storage.Receipts,
-			node.Storage.Results,
-			node.RootChainID,
-			nil,
-			builder.collectionGRPCPort,
-			builder.executionGRPCPort,
-			builder.retryEnabled,
-			builder.rpcMetricsEnabled,
-			builder.apiRatelimits,
-			builder.apiBurstlimits,
-			proxy,
-		)
-		return builder.RpcEng, nil
 	})
+}
+
+func (builder *ObserverServiceBuilder) attachRPCEngine() {
+	builder.Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+                proxy, err := apiservice.NewFlowAPIService(builder.bootstrapIdentities, builder.PeerUpdateInterval)
+                if err != nil {
+                        return nil, err
+                }
+                builder.RpcEng = rpc.New(
+                        node.Logger,
+                        node.State,
+                        builder.rpcConf,
+                        nil,
+                        builder.HistoricalAccessRPCs,
+                        node.Storage.Blocks,
+                        node.Storage.Headers,
+                        node.Storage.Collections,
+                        node.Storage.Transactions,
+                        node.Storage.Receipts,
+                        node.Storage.Results,
+                        node.RootChainID,
+                        nil,
+                        builder.collectionGRPCPort,
+                        builder.executionGRPCPort,
+                        builder.retryEnabled,
+                        builder.rpcMetricsEnabled,
+                        builder.apiRatelimits,
+                        builder.apiBurstlimits,
+                        proxy,
+                )
+                return builder.RpcEng, nil
+        })
 }
 
 // initMiddleware creates the network.Middleware implementation with the libp2p factory function, metrics, peer update
