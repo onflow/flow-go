@@ -15,8 +15,10 @@ import (
 	grpcinsecure "google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/flow-go/engine/execution/ingestion"
-	"github.com/onflow/flow-go/engine/execution/state/unittest"
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/utils"
+	verutils "github.com/onflow/flow-go/engine/verification/utils"
+	"github.com/onflow/flow-go/engine/verification/verifier"
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -45,6 +47,7 @@ type ConduitFactory struct {
 	ctx                   context.Context
 	receiptHasher         hash.Hasher
 	spockHasher           hash.Hasher
+	approvalHasher        hash.Hasher
 }
 
 func NewCorruptibleConduitFactory(
@@ -59,11 +62,12 @@ func NewCorruptibleConduitFactory(
 	}
 
 	factory := &ConduitFactory{
-		me:            me,
-		codec:         codec,
-		logger:        logger.With().Str("module", "corruptible-conduit-factory").Logger(),
-		receiptHasher: utils.NewExecutionReceiptHasher(),
-		spockHasher:   utils.NewSPOCKHasher(),
+		me:             me,
+		codec:          codec,
+		logger:         logger.With().Str("module", "corruptible-conduit-factory").Logger(),
+		receiptHasher:  utils.NewExecutionReceiptHasher(),
+		spockHasher:    utils.NewSPOCKHasher(),
+		approvalHasher: verutils.NewResultApprovalHasher(),
 	}
 
 	cm := component.NewComponentManagerBuilder().
@@ -187,6 +191,22 @@ func (c *ConduitFactory) processAttackerMessage(msg *insecure.Message) error {
 		return fmt.Errorf("could not decode message: %w", err)
 	}
 
+	switch e := event.(type) {
+	case *flow.ExecutionResult:
+		receipt, err := c.generateExecutionReceipt(e)
+		if err != nil {
+			return fmt.Errorf("could not generate execution receipt for attacker's result: %w", err)
+		}
+		event = receipt // swaps event with the receipt.
+
+	case *flow.Attestation:
+		approval, err := c.generateResultApproval(e)
+		if err != nil {
+			return fmt.Errorf("could not generate result approval for attacker's attestation: %w", err)
+		}
+		event = approval // swaps event with the receipt.
+	}
+
 	targetIds, err := flow.ByteSlicesToIds(msg.TargetIDs)
 	if err != nil {
 		return fmt.Errorf("could not convert target ids from byte to identifiers: %w", err)
@@ -203,16 +223,16 @@ func (c *ConduitFactory) processAttackerMessage(msg *insecure.Message) error {
 // RegisterAttacker is a gRPC end-point for this conduit factory that lets an attacker register itself to it, so that the attacker can
 // control it.
 // Registering an attacker on a conduit is an exactly-once immutable operation, any second attempt after a successful registration returns an error.
-func (c *ConduitFactory) RegisterAttacker(ctx context.Context, in *insecure.AttackerRegisterMessage) (*empty.Empty, error) {
+func (c *ConduitFactory) RegisterAttacker(_ context.Context, in *insecure.AttackerRegisterMessage) (*empty.Empty, error) {
 	select {
 	case <-c.cm.ShutdownSignal():
 		return nil, fmt.Errorf("conduit factory has been shut down")
 	default:
-		return &empty.Empty{}, c.registerAttacker(ctx, in.Address)
+		return &empty.Empty{}, c.registerAttacker(in.Address)
 	}
 }
 
-func (c *ConduitFactory) registerAttacker(ctx context.Context, address string) error {
+func (c *ConduitFactory) registerAttacker(address string) error {
 	if c.attackerObserveClient != nil {
 		c.logger.Error().Str("address", address).Msg("attacker double-register detected")
 		return fmt.Errorf("illegal state: trying to register an attacker (%s) while one already exists", address)
@@ -251,17 +271,6 @@ func (c *ConduitFactory) HandleIncomingEvent(
 		// correct expected behavior.
 		return c.sendOnNetwork(event, channel, protocol, uint(num), targetIds...)
 	}
-
-	//switch e := event.(type) {
-	//case *flow.ExecutionResult:
-	//	receipt, err := c.generateExecutionReceipt(e)
-	//	if err != nil {
-	//		return fmt.Errorf("could not generate execution receipt for attacker's result: %w", err)
-	//	}
-	//	event = receipt // swaps event with the receipt.
-	//
-	//case *flow.Attestation:
-	//}
 
 	msg, err := c.eventToMessage(event, channel, protocol, num, targetIds...)
 	if err != nil {
@@ -329,11 +338,15 @@ func (c *ConduitFactory) sendOnNetwork(event interface{},
 }
 
 func (c *ConduitFactory) generateExecutionReceipt(result *flow.ExecutionResult) (*flow.ExecutionReceipt, error) {
-	computationResult := unittest.ComputationResultFixture([][]flow.Identifier{
-		{flow.ZeroID},
-		{flow.ZeroID},
-		{flow.ZeroID},
-	})
+	//computationResult := unittest.ComputationResultFixture([][]flow.Identifier{
+	//	{flow.ZeroID},
+	//	{flow.ZeroID},
+	//	{flow.ZeroID},
+	//})
 
-	return ingestion.GenerateExecutionReceipt(c.me, c.receiptHasher, c.spockHasher, result, computationResult.StateSnapshots)
+	return ingestion.GenerateExecutionReceipt(c.me, c.receiptHasher, c.spockHasher, result, []*delta.SpockSnapshot{})
+}
+
+func (c *ConduitFactory) generateResultApproval(attestation *flow.Attestation) (*flow.ResultApproval, error) {
+	return verifier.GenerateResultApproval(c.me, c.approvalHasher, c.spockHasher, attestation, []byte{})
 }
