@@ -69,8 +69,12 @@ func (s Static) LeaderForView(_ uint64) (flow.Identifier, error) {
 	return flow.ZeroID, fmt.Errorf("invalid for static committee")
 }
 
-func (s Static) WeightThresholdForView(_ uint64) (uint64, error) {
+func (s Static) QuorumThresholdForView(_ uint64) (uint64, error) {
 	return WeightThresholdToBuildQC(s.participants.TotalWeight()), nil
+}
+
+func (s Static) TimeoutThresholdForView(_ uint64) (uint64, error) {
+	return WeightThresholdToTimeout(s.participants.TotalWeight()), nil
 }
 
 func (s Static) Self() flow.Identifier {
