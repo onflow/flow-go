@@ -192,8 +192,8 @@ func (c *ConduitFactory) processAttackerMessage(msg *insecure.Message) error {
 	}
 
 	switch e := event.(type) {
-	case *flow.ExecutionResult:
-		receipt, err := c.generateExecutionReceipt(e)
+	case *flow.ExecutionReceipt:
+		receipt, err := c.generateExecutionReceipt(&e.ExecutionResult)
 		if err != nil {
 			return fmt.Errorf("could not generate execution receipt for attacker's result: %w", err)
 		}
