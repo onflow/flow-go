@@ -87,7 +87,10 @@ func NewScriptEnvironment(
 
 	env.contracts = handler.NewContractHandler(
 		accounts,
-		true,
+		func() bool {
+			return true
+		},
+		func() []common.Address { return []common.Address{} },
 		func() []common.Address { return []common.Address{} },
 		func(address runtime.Address, code []byte) (bool, error) { return false, nil })
 
@@ -108,21 +111,25 @@ func (e *ScriptEnv) setMeteringWeights() {
 		return
 	}
 
-	computationWeights, memoryWeights, err := getExecutionWeights(e, e.accounts)
-
+	computationWeights, err := getExecutionEffortWeights(e, e.accounts)
 	if err != nil {
 		e.ctx.Logger.
 			Info().
 			Err(err).
-			Msg("could not set execution weights. Using defaults")
-		return
+			Msg("could not set execution effort weights. Using defaults")
+	} else {
+		m.SetComputationWeights(computationWeights)
 	}
 
-	m.SetComputationWeights(computationWeights)
-	m.SetMemoryWeights(memoryWeights)
-}
-
-func (e *ScriptEnv) ResourceOwnerChanged(_ *interpreter.CompositeValue, _ common.Address, _ common.Address) {
+	memoryWeights, err := getExecutionMemoryWeights(e, e.accounts)
+	if err != nil {
+		e.ctx.Logger.
+			Info().
+			Err(err).
+			Msg("could not set execution memory weights. Using defaults")
+	} else {
+		m.SetMemoryWeights(memoryWeights)
+	}
 }
 
 func (e *ScriptEnv) seedRNG(header *flow.Header) {
@@ -560,13 +567,28 @@ func (e *ScriptEnv) ComputationUsed() uint64 {
 	return uint64(e.sth.State().TotalComputationUsed())
 }
 
-func (e *ScriptEnv) DecodeArgument(b []byte, _ cadence.Type) (cadence.Value, error) {
+func (e *ScriptEnv) meterMemory(kind common.MemoryKind, intensity uint) error {
+	if e.sth.EnforceMemoryLimits {
+		return e.sth.State().MeterMemory(kind, intensity)
+	}
+	return nil
+}
+
+func (e *ScriptEnv) MeterMemory(usage common.MemoryUsage) error {
+	return e.meterMemory(usage.Kind, uint(usage.Amount))
+}
+
+func (e *ScriptEnv) MemoryUsed() uint64 {
+	return uint64(e.sth.State().TotalMemoryUsed())
+}
+
+func (e *ScriptEnv) DecodeArgument(b []byte, t cadence.Type) (cadence.Value, error) {
 	if e.isTraceable() && e.ctx.ExtensiveTracing {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvDecodeArgument)
 		defer sp.Finish()
 	}
 
-	v, err := jsoncdc.Decode(b)
+	v, err := jsoncdc.Decode(e, b)
 	if err != nil {
 		err = errors.NewInvalidArgumentErrorf("argument is not json decodable: %w", err)
 		return nil, fmt.Errorf("decodeing argument failed: %w", err)
@@ -858,4 +880,12 @@ func (e *ScriptEnv) BLSAggregateSignatures(sigs [][]byte) ([]byte, error) {
 
 func (e *ScriptEnv) BLSAggregatePublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
 	return crypto.AggregatePublicKeys(keys)
+}
+
+func (e *ScriptEnv) ResourceOwnerChanged(
+	*interpreter.Interpreter,
+	*interpreter.CompositeValue,
+	common.Address,
+	common.Address,
+) {
 }

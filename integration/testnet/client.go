@@ -318,13 +318,16 @@ func (c *Client) CreateAccount(
 ) (sdk.Address, error) {
 
 	payerKey := payerAccount.Keys[0]
-	tx := templates.CreateAccount([]*sdk.AccountKey{accountKey}, nil, payer)
+	tx, err := templates.CreateAccount([]*sdk.AccountKey{accountKey}, nil, payer)
+	if err != nil {
+		return sdk.Address{}, fmt.Errorf("failed cusnctruct create account transaction %w", err)
+	}
 	tx.SetGasLimit(1000).
 		SetReferenceBlockID(latestBlockID).
 		SetProposalKey(payer, 0, payerKey.SequenceNumber).
 		SetPayer(payer)
 
-	err := c.SignAndSendTransaction(ctx, tx)
+	err = c.SignAndSendTransaction(ctx, tx)
 	if err != nil {
 		return sdk.Address{}, fmt.Errorf("failed to sign and send create account transaction %w", err)
 	}

@@ -42,6 +42,7 @@ type Accounts interface {
 	SetPublicKey(address flow.Address, keyIndex uint64, publicKey flow.AccountPublicKey) ([]byte, error)
 	GetContractNames(address flow.Address) ([]string, error)
 	GetContract(contractName string, address flow.Address) ([]byte, error)
+	ContractExists(contractName string, address flow.Address) (bool, error)
 	SetContract(contractName string, address flow.Address, contract []byte) error
 	DeleteContract(contractName string, address flow.Address) error
 	Create(publicKeys []flow.AccountPublicKey, newAddress flow.Address) error
@@ -542,12 +543,20 @@ func (a *StatefulAccounts) getContractNames(address flow.Address) (contractNames
 	return identifiers, nil
 }
 
-func (a *StatefulAccounts) GetContract(contractName string, address flow.Address) ([]byte, error) {
+func (a *StatefulAccounts) ContractExists(contractName string, address flow.Address) (bool, error) {
 	contractNames, err := a.getContractNames(address)
+	if err != nil {
+		return false, err
+	}
+	return contractNames.Has(contractName), nil
+}
+
+func (a *StatefulAccounts) GetContract(contractName string, address flow.Address) ([]byte, error) {
+	exists, err := a.ContractExists(contractName, address)
 	if err != nil {
 		return nil, err
 	}
-	if !contractNames.Has(contractName) {
+	if !exists {
 		return nil, nil
 	}
 	return a.getContract(contractName, address)

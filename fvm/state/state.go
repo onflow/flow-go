@@ -202,7 +202,7 @@ func (s *State) TotalComputationUsed() uint {
 }
 
 // ComputationIntensities returns computation intensities
-func (s *State) ComputationIntensities() meter.MeteredIntensities {
+func (s *State) ComputationIntensities() meter.MeteredComputationIntensities {
 	return s.meter.ComputationIntensities()
 }
 
@@ -212,12 +212,12 @@ func (s *State) TotalComputationLimit() uint {
 }
 
 // MeterMemory meters memory usage
-func (s *State) MeterMemory(kind common.ComputationKind, intensity uint) error {
+func (s *State) MeterMemory(kind common.MemoryKind, intensity uint) error {
 	return s.meter.MeterMemory(kind, intensity)
 }
 
 // MemoryIntensities returns computation intensities
-func (s *State) MemoryIntensities() meter.MeteredIntensities {
+func (s *State) MemoryIntensities() meter.MeteredMemoryIntensities {
 	return s.meter.MemoryIntensities()
 }
 

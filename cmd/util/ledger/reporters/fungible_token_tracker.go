@@ -142,6 +142,7 @@ func (r *FungibleTokenTracker) worker(
 		accounts := state.NewAccounts(sth)
 		storage := cadenceRuntime.NewStorage(
 			&migrations.AccountsAtreeLedger{Accounts: accounts},
+			nil,
 		)
 
 		owner, err := common.BytesToAddress(j.owner[:])
@@ -149,9 +150,10 @@ func (r *FungibleTokenTracker) worker(
 			panic(err)
 		}
 
+		inter := &interpreter.Interpreter{}
 		for _, domain := range domains {
-			storageMap := storage.GetStorageMap(owner, domain)
-			itr := storageMap.Iterator()
+			storageMap := storage.GetStorageMap(owner, domain, true)
+			itr := storageMap.Iterator(inter)
 			key, value := itr.Next()
 			for value != nil {
 				r.iterateChildren(append([]string{domain}, key), j.owner, value)
@@ -177,10 +179,11 @@ func (r *FungibleTokenTracker) iterateChildren(tr trace, addr flow.Address, valu
 
 	// because compValue.Kind == common.CompositeKindResource
 	// we could pass nil to the IsResourceKinded method
+	inter := &interpreter.Interpreter{}
 	if compValue.IsResourceKinded(nil) {
 		typeIDStr := string(compValue.TypeID())
 		if _, ok := r.vaultTypeIDs[typeIDStr]; ok {
-			b := uint64(compValue.GetField(nil, nil, "balance").(interpreter.UFix64Value))
+			b := uint64(compValue.GetField(inter, nil, "balance").(interpreter.UFix64Value))
 			if b > 0 {
 				r.rw.Write(TokenDataPoint{
 					Path:    tr.String(),
@@ -192,8 +195,9 @@ func (r *FungibleTokenTracker) iterateChildren(tr trace, addr flow.Address, valu
 		}
 
 		// iterate over fields of the composite value (skip the ones that are not resource typed)
-		compValue.ForEachField(func(key string, value interpreter.Value) {
-			r.iterateChildren(append(tr, key), addr, value)
-		})
+		compValue.ForEachField(inter,
+			func(key string, value interpreter.Value) {
+				r.iterateChildren(append(tr, key), addr, value)
+			})
 	}
 }

@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/fvm/programs"
+
 	"github.com/onflow/flow-go/fvm/handler"
 	stateMock "github.com/onflow/flow-go/fvm/mock/state"
 	"github.com/onflow/flow-go/fvm/state"
@@ -24,7 +26,7 @@ func TestContract_ChildMergeFunctionality(t *testing.T) {
 	err := accounts.Create(nil, address)
 	require.NoError(t, err)
 
-	contractHandler := handler.NewContractHandler(accounts, false, nil, nil)
+	contractHandler := handler.NewContractHandler(accounts, func() bool { return false }, nil, nil, nil)
 
 	// no contract initially
 	names, err := contractHandler.GetContractNames(rAdd)
@@ -66,38 +68,145 @@ func TestContract_ChildMergeFunctionality(t *testing.T) {
 	cont, err = contractHandler.GetContract(rAdd, "testContract")
 	require.NoError(t, err)
 	require.Equal(t, cont, []byte("ABC"))
+
+	// remove
+	err = contractHandler.RemoveContract(rAdd, "testContract", nil)
+	require.NoError(t, err)
+
+	// contract still there because no commit yet
+	cont, err = contractHandler.GetContract(rAdd, "testContract")
+	require.NoError(t, err)
+	require.Equal(t, cont, []byte("ABC"))
+
+	// commit removal
+	_, err = contractHandler.Commit()
+	require.NoError(t, err)
+
+	// contract should no longer be there
+	cont, err = contractHandler.GetContract(rAdd, "testContract")
+	require.NoError(t, err)
+	require.Equal(t, []byte(nil), cont)
 }
 
 func TestContract_AuthorizationFunctionality(t *testing.T) {
 	sth := state.NewStateHolder(state.NewState(utils.NewSimpleView()))
 	accounts := state.NewAccounts(sth)
-	address := flow.HexToAddress("01")
-	rAdd := runtime.Address(address)
-	err := accounts.Create(nil, address)
+
+	authAdd := flow.HexToAddress("01")
+	rAdd := runtime.Address(authAdd)
+	err := accounts.Create(nil, authAdd)
 	require.NoError(t, err)
 
-	unAuthAdd := flow.HexToAddress("02")
-	unAuthRAdd := runtime.Address(unAuthAdd)
-	err = accounts.Create(nil, unAuthAdd)
+	authRemove := flow.HexToAddress("02")
+	rRemove := runtime.Address(authRemove)
+	err = accounts.Create(nil, authRemove)
 	require.NoError(t, err)
 
-	contractHandler := handler.NewContractHandler(accounts,
-		true,
-		func() []common.Address { return []common.Address{rAdd} },
-		func(address runtime.Address, code []byte) (bool, error) { return false, nil })
-
-	// try to set contract by an unAuthRAdd
-	err = contractHandler.SetContract(rAdd, "testContract1", []byte("ABC"), []common.Address{unAuthRAdd})
-	require.Error(t, err)
-	require.False(t, contractHandler.HasUpdates())
-
-	// set contract by an authorized account
-	err = contractHandler.SetContract(rAdd, "testContract2", []byte("ABC"), []common.Address{rAdd})
+	authBoth := flow.HexToAddress("03")
+	rBoth := runtime.Address(authBoth)
+	err = accounts.Create(nil, authBoth)
 	require.NoError(t, err)
-	require.True(t, contractHandler.HasUpdates())
+
+	unAuth := flow.HexToAddress("04")
+	unAuthR := runtime.Address(unAuth)
+	err = accounts.Create(nil, unAuth)
+	require.NoError(t, err)
+
+	makeHandler := func() *handler.ContractHandler {
+		return handler.NewContractHandler(accounts,
+			func() bool { return true },
+			func() []common.Address { return []common.Address{rAdd, rBoth} },
+			func() []common.Address { return []common.Address{rRemove, rBoth} },
+			func(address runtime.Address, code []byte) (bool, error) { return false, nil })
+	}
+
+	t.Run("try to set contract with unauthorized account", func(t *testing.T) {
+		contractHandler := makeHandler()
+
+		err = contractHandler.SetContract(rAdd, "testContract1", []byte("ABC"), []common.Address{unAuthR})
+		require.Error(t, err)
+		require.False(t, contractHandler.HasUpdates())
+	})
+
+	t.Run("try to set contract with account only authorized for removal", func(t *testing.T) {
+		contractHandler := makeHandler()
+
+		err = contractHandler.SetContract(rAdd, "testContract1", []byte("ABC"), []common.Address{rRemove})
+		require.Error(t, err)
+		require.False(t, contractHandler.HasUpdates())
+	})
+
+	t.Run("set contract with account authorized for adding", func(t *testing.T) {
+		contractHandler := makeHandler()
+
+		err = contractHandler.SetContract(rAdd, "testContract2", []byte("ABC"), []common.Address{rAdd})
+		require.NoError(t, err)
+		require.True(t, contractHandler.HasUpdates())
+	})
+
+	t.Run("set contract with account authorized for adding and removing", func(t *testing.T) {
+		contractHandler := makeHandler()
+
+		err = contractHandler.SetContract(rAdd, "testContract2", []byte("ABC"), []common.Address{rBoth})
+		require.NoError(t, err)
+		require.True(t, contractHandler.HasUpdates())
+	})
+
+	t.Run("try to remove contract with unauthorized account", func(t *testing.T) {
+		contractHandler := makeHandler()
+
+		err = contractHandler.SetContract(rAdd, "testContract1", []byte("ABC"), []common.Address{rAdd})
+		require.NoError(t, err)
+		_, err = contractHandler.Commit()
+		require.NoError(t, err)
+
+		err = contractHandler.RemoveContract(unAuthR, "testContract2", []common.Address{unAuthR})
+		require.Error(t, err)
+		require.False(t, contractHandler.HasUpdates())
+	})
+
+	t.Run("remove contract account authorized for removal", func(t *testing.T) {
+		contractHandler := makeHandler()
+
+		err = contractHandler.SetContract(rAdd, "testContract1", []byte("ABC"), []common.Address{rAdd})
+		require.NoError(t, err)
+		_, err = contractHandler.Commit()
+		require.NoError(t, err)
+
+		err = contractHandler.RemoveContract(rRemove, "testContract2", []common.Address{rRemove})
+		require.NoError(t, err)
+		require.True(t, contractHandler.HasUpdates())
+	})
+
+	t.Run("try to remove contract with account only authorized for adding", func(t *testing.T) {
+		contractHandler := makeHandler()
+
+		err = contractHandler.SetContract(rAdd, "testContract1", []byte("ABC"), []common.Address{rAdd})
+		require.NoError(t, err)
+		_, err = contractHandler.Commit()
+		require.NoError(t, err)
+
+		err = contractHandler.RemoveContract(rAdd, "testContract2", []common.Address{rAdd})
+		require.Error(t, err)
+		require.False(t, contractHandler.HasUpdates())
+	})
+
+	t.Run("remove contract with account authorized for adding and removing", func(t *testing.T) {
+		contractHandler := makeHandler()
+
+		err = contractHandler.SetContract(rAdd, "testContract1", []byte("ABC"), []common.Address{rAdd})
+		require.NoError(t, err)
+		_, err = contractHandler.Commit()
+		require.NoError(t, err)
+
+		err = contractHandler.RemoveContract(rBoth, "testContract2", []common.Address{rBoth})
+		require.NoError(t, err)
+		require.True(t, contractHandler.HasUpdates())
+	})
 }
 
 func TestContract_DeploymentVouchers(t *testing.T) {
+
 	sth := state.NewStateHolder(state.NewState(utils.NewSimpleView()))
 	accounts := state.NewAccounts(sth)
 
@@ -111,9 +220,15 @@ func TestContract_DeploymentVouchers(t *testing.T) {
 	err = accounts.Create(nil, addressNoVoucher)
 	require.NoError(t, err)
 
-	contractHandler := handler.NewContractHandler(accounts,
-		true,
-		func() []common.Address { return []common.Address{} },
+	contractHandler := handler.NewContractHandler(
+		accounts,
+		func() bool { return true },
+		func() []common.Address {
+			return []common.Address{}
+		},
+		func() []common.Address {
+			return []common.Address{}
+		},
 		func(address runtime.Address, code []byte) (bool, error) {
 			if address.String() == addressWithVoucher.String() {
 				return true, nil
@@ -122,12 +237,95 @@ func TestContract_DeploymentVouchers(t *testing.T) {
 		})
 
 	// set contract without voucher
-	err = contractHandler.SetContract(addressNoVoucherRuntime, "testContract1", []byte("ABC"), []common.Address{addressNoVoucherRuntime})
+	err = contractHandler.SetContract(
+		addressNoVoucherRuntime,
+		"TestContract1",
+		[]byte("pub contract TestContract1 {}"),
+		[]common.Address{
+			addressNoVoucherRuntime,
+		},
+	)
 	require.Error(t, err)
 	require.False(t, contractHandler.HasUpdates())
 
 	// try to set contract with voucher
-	err = contractHandler.SetContract(addressWithVoucherRuntime, "testContract2", []byte("ABC"), []common.Address{addressWithVoucherRuntime})
+	err = contractHandler.SetContract(
+		addressWithVoucherRuntime,
+		"TestContract2",
+		[]byte("pub contract TestContract2 {}"),
+		[]common.Address{
+			addressWithVoucherRuntime,
+		},
+	)
+	require.NoError(t, err)
+	require.True(t, contractHandler.HasUpdates())
+}
+
+func TestContract_ContractUpdate(t *testing.T) {
+
+	sth := state.NewStateHolder(state.NewState(utils.NewSimpleView()))
+	accounts := state.NewAccounts(sth)
+
+	flowAddress := flow.HexToAddress("01")
+	runtimeAddress := runtime.Address(flowAddress)
+	err := accounts.Create(nil, flowAddress)
+	require.NoError(t, err)
+
+	var authorizationChecked bool
+
+	contractHandler := handler.NewContractHandler(
+		accounts,
+		func() bool { return true },
+		func() []common.Address {
+			return []common.Address{}
+		},
+		func() []common.Address {
+			return []common.Address{}
+		},
+		func(address runtime.Address, code []byte) (bool, error) {
+			// Ensure the voucher check is only called once,
+			// for the initial contract deployment,
+			// and not for the subsequent update
+			require.False(t, authorizationChecked)
+			authorizationChecked = true
+			return true, nil
+		},
+	)
+
+	// deploy contract with voucher
+	err = contractHandler.SetContract(
+		runtimeAddress,
+		"TestContract",
+		[]byte("pub contract TestContract {}"),
+		[]common.Address{
+			runtimeAddress,
+		},
+	)
+	require.NoError(t, err)
+	require.True(t, contractHandler.HasUpdates())
+
+	contractUpdateKeys, err := contractHandler.Commit()
+	require.NoError(t, err)
+	require.Equal(
+		t,
+		[]programs.ContractUpdateKey{
+			{
+				Address: flowAddress,
+				Name:    "TestContract",
+			},
+		},
+		contractUpdateKeys,
+	)
+
+	// try to update contract without voucher
+	err = contractHandler.SetContract(
+		runtimeAddress,
+		"TestContract",
+		[]byte("pub contract TestContract {}"),
+		[]common.Address{
+			runtimeAddress,
+		},
+	)
 	require.NoError(t, err)
 	require.True(t, contractHandler.HasUpdates())
 }
@@ -135,14 +333,21 @@ func TestContract_DeploymentVouchers(t *testing.T) {
 func TestContract_DeterministicErrorOnCommit(t *testing.T) {
 	mockAccounts := &stateMock.Accounts{}
 
-	mockAccounts.On("SetContract", mock.Anything, mock.Anything, mock.Anything).Return(func(contractName string, address flow.Address, contract []byte) error {
-		return fmt.Errorf("%s %s", contractName, address.Hex())
-	})
+	mockAccounts.On("ContractExists", mock.Anything, mock.Anything).
+		Return(false, nil)
 
-	contractHandler := handler.NewContractHandler(mockAccounts,
-		false,
+	mockAccounts.On("SetContract", mock.Anything, mock.Anything, mock.Anything).
+		Return(func(contractName string, address flow.Address, contract []byte) error {
+			return fmt.Errorf("%s %s", contractName, address.Hex())
+		})
+
+	contractHandler := handler.NewContractHandler(
+		mockAccounts,
+		func() bool { return false },
 		nil,
-		nil)
+		nil,
+		nil,
+	)
 
 	address1 := runtime.Address(flow.HexToAddress("0000000000000001"))
 	address2 := runtime.Address(flow.HexToAddress("0000000000000002"))
