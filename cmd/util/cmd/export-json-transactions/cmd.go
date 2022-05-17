@@ -20,6 +20,8 @@ var flagOutputDir string
 var flagStartHeight uint64
 var flagEndHeight uint64
 
+// example:
+// ./util export-json-transactions --output-dir ./ --datadir /var/fow/data/protocol/ --start-height 2 --end-height 242
 var Cmd = &cobra.Command{
 	Use:   "export-json-transactions",
 	Short: "exports transactions into a json file",
