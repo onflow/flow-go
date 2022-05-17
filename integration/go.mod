@@ -27,7 +27,7 @@ require (
 	github.com/onflow/flow/protobuf/go/flow v0.2.5
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/rs/zerolog v1.26.1
-	github.com/stretchr/testify v1.7.1-0.20210824115523-ab6dc3262822
+	github.com/stretchr/testify v1.7.1
 	github.com/uber/jaeger-lib v2.4.1+incompatible // indirect
 	github.com/vmihailenco/msgpack/v4 v4.3.12 // indirect
 	github.com/vmihailenco/tagparser v0.1.2 // indirect
@@ -38,3 +38,7 @@ require (
 //replace golang.org/x/sys => golang.org/x/sys v0.0.0-20200826173525-f9321e4c35a6
 
 replace github.com/onflow/flow-go => ../
+
+replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.21.1-0.20220516232611-c3fcafba9222
+
+replace github.com/onflow/atree => github.com/dapperlabs/atree-internal v0.3.1-0.20220513013557-e7aa83fbc4e9
