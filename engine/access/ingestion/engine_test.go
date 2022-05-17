@@ -104,9 +104,6 @@ func (suite *Suite) SetupTest() {
 
 // TestOnFinalizedBlock checks that when a block is received, a request for each individual collection is made
 func (suite *Suite) TestOnFinalizedBlock() {
-	// ctx, _ := irrecoverable.WithSignaler(context.Background())
-	// suite.eng.Start(ctx)
-
 	block := unittest.BlockFixture()
 	block.SetPayload(unittest.PayloadFixture(
 		unittest.WithGuarantees(unittest.CollectionGuaranteesFixture(4)...),
@@ -134,6 +131,7 @@ func (suite *Suite) TestOnFinalizedBlock() {
 	for _, guarantee := range block.Payload.Guarantees {
 		needed[guarantee.ID()] = struct{}{}
 	}
+
 	suite.request.On("EntityByID", mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			collID := args.Get(0).(flow.Identifier)

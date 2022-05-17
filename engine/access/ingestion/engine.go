@@ -108,7 +108,7 @@ func New(
 		}),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("could not create transaction message queue: %w", err)
+		return nil, fmt.Errorf("could not create execution receipts queue: %w", err)
 	}
 
 	executionReceiptsQueue := &engine.FifoMessageStore{FifoQueue: executionReceiptsRawQueue}
@@ -131,7 +131,7 @@ func New(
 		}),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("could not create transaction message queue: %w", err)
+		return nil, fmt.Errorf("could not create finalized block queue: %w", err)
 	}
 
 	finalizedBlocksQueue := &engine.FifoMessageStore{FifoQueue: finalizedBlocksRawQueue}
