@@ -536,7 +536,7 @@ func BootstrapIdentities(addresses []string, keys []string) (flow.IdentityList, 
 }
 
 func NewObserverServiceBuilder(builder *ObserverServiceBuilder) *ObserverServiceBuilder {
-	// the observer node gets a version of the root snapshot file that does not contain any node addresses
+	// the observer gets a version of the root snapshot file that does not contain any node addresses
 	// hence skip all the root snapshot validations that involved an identity address
 	builder.SkipNwAddressBasedValidations = true
 	return builder
