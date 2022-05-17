@@ -63,6 +63,10 @@ type FlowAPIService struct {
 	upstream   []access.AccessAPIClient
 }
 
+func (h *FlowAPIService) SetLocal(local *access.AccessAPIServer) {
+	h.AccessAPIServer = *local
+}
+
 func (h *FlowAPIService) client() (access.AccessAPIClient, error) {
 	if h.upstream == nil || len(h.upstream) == 0 {
 		return nil, status.Errorf(codes.Unimplemented, "method not implemented")
