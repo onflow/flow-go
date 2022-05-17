@@ -140,7 +140,7 @@ func New(
 		engine.NewNotifier(),
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*flow.TransactionBody)
+				_, ok := msg.Payload.(*model.Block)
 				return ok
 			},
 			Store: finalizedBlocksQueue,
@@ -180,7 +180,7 @@ func New(
 		AddWorker(e.processExecutionReceipts).
 		AddWorker(e.processFinalizedBlocks).
 		Build()
-
+	
 	// register engine with the execution receipt provider
 	_, err = net.Register(engine.ReceiveReceipts, e)
 	if err != nil {
@@ -248,6 +248,18 @@ func (e *Engine) processFinalizedBlocks(ctx irrecoverable.SignalerContext, ready
 	}
 }
 
+// process processes the given ingestion engine event. Events that are given
+// to this function originate within the expulsion engine on the node with the
+// given origin ID.
+func (e *Engine) process(originID flow.Identifier, event interface{}) error {
+	switch event.(type) {
+	case *flow.ExecutionReceipt:
+		return e.executionReceiptsHandler.Process(originID, event)
+	default:
+		return fmt.Errorf("invalid event type (%T)", event)
+	}
+}
+
 // SubmitLocal submits an event originating on the local node.
 func (e *Engine) SubmitLocal(event interface{}) {
 	err := e.process(e.me.NodeID(), event)
@@ -275,18 +287,6 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 // a blocking manner. It returns the potential processing error when done.
 func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
 	return e.process(originID, event)
-}
-
-// process processes the given ingestion engine event. Events that are given
-// to this function originate within the expulsion engine on the node with the
-// given origin ID.
-func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	switch event.(type) {
-	case *flow.ExecutionReceipt:
-		return e.executionReceiptsHandler.Process(originID, event)
-	default:
-		return fmt.Errorf("invalid event type (%T)", event)
-	}
 }
 
 // OnFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated
