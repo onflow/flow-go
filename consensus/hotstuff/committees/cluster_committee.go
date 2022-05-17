@@ -169,7 +169,7 @@ func (c *Cluster) QuorumThresholdForView(_ uint64) (uint64, error) {
 //
 // No errors are expected during normal operation.
 func (c *Cluster) TimeoutThresholdForView(_ uint64) (uint64, error) {
-	return c.weightThresholdForQC, nil
+	return c.weightThresholdForTO, nil
 }
 
 func (c *Cluster) Self() flow.Identifier {
