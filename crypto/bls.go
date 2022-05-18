@@ -17,10 +17,12 @@ package crypto
 //    (https://eprint.iacr.org/2019/403.pdf section 4)
 //  - expanding the message in hash-to-curve is using a cSHAKE-based KMAC128 with a domain separation tag.
 //    KMAC128 serves as the expand_message_xof function as per draft-irtf-cfrg-hash-to-curve.
+//  - the above results in the full ciphersuite BLS_SIG_BLS12381G1_XOF:KMAC128_SSWU_RO_POP_ for signatures
+//    and BLS_POP_BLS12381G1_XOF:KMAC128_SSWU_RO_POP_ for proofs of possession.
 //  - signature verification checks the membership of signature in G1
 //  - the public key membership check in G2 is implemented separately from the signature verification.
-//  - membership check in G1 is implemented using fast Bowe's check (https://eprint.iacr.org/2019/814.pdf)
-//  - membership check in G2 is using a simple scalar multiplication with the group order.
+//  - membership check in G1 is implemented using fast Bowe's check (to be updated to Scott's check).
+//  - membership check in G2 is using a simple scalar multiplication with the group order (to be updated to Scott's check).
 //  - multi-signature tools are defined in bls_multisg.go
 //  - SPoCK scheme based on BLS: verifies two signatures have been generated from the same message,
 //    that is unknown to the verifier.
