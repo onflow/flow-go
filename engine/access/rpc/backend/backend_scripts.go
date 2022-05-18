@@ -131,7 +131,7 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 			if b.log.GetLevel() == zerolog.DebugLevel {
 				executionTime := time.Now()
 				timestamp, seen := b.seenScripts.getLastSeen(encodedScript)
-        
+
 				// log if the script is unique in the time window
 				if !seen || executionTime.Sub(timestamp) >= uniqueScriptLoggingTimeWindow {
 					b.log.Debug().
