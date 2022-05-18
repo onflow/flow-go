@@ -25,7 +25,7 @@ type Transaction struct {
 	TxID   string `json:"tx_id"`
 	Index  int    `json:"tx_index"`
 	Script string `json:"script"`
-	Payer  string `json:"address"`
+	Payer  string `json:"payer_address"`
 }
 
 type Finder struct {
