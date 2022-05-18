@@ -19,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/mocknetwork"
 
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
@@ -112,9 +111,9 @@ func (suite *Suite) SetupTest() {
 	// suite.blocks.On("GetLastFullBlockHeight").Return(uint64(0), nil)
 	// suite.proto.snapshot.On("Head").Return(block.Header, nil)
 
-	ctx, _ := irrecoverable.WithSignaler(context.Background())
-	suite.eng.Start(ctx)
-	<-suite.eng.Ready()
+	// ctx, _ := irrecoverable.WithSignaler(context.Background())
+	// suite.eng.Start(ctx)
+	// <-suite.eng.Ready()
 }
 
 // TestOnFinalizedBlock checks that when a block is received, a request for each individual collection is made
@@ -162,7 +161,10 @@ func (suite *Suite) TestOnFinalizedBlock() {
 
 	// process the block through the finalized callback
 	suite.eng.OnFinalizedBlock(&hotstuffBlock)
-	wg.Wait()
+	suite.Assertions.Eventually(func() bool {
+		wg.Wait()
+		return true
+	}, time.Millisecond*20, time.Millisecond)
 
 	// assert that the block was retrieved and all collections were requested
 	suite.headers.AssertExpectations(suite.T())
