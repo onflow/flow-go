@@ -95,10 +95,6 @@ type ObserverServiceConfig struct {
 	apiRatelimits                map[string]int
 	apiBurstlimits               map[string]int
 	rpcConf                      rpc.Config
-	logTxTimeToFinalized         bool
-	logTxTimeToExecuted          bool
-	logTxTimeToFinalizedExecuted bool
-	retryEnabled                 bool
 	rpcMetricsEnabled            bool
 	baseOptions                  []cmd.Option
 
@@ -128,10 +124,6 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 			PreferredExecutionNodeIDs: nil,
 			FixedExecutionNodeIDs:     nil,
 		},
-		logTxTimeToFinalized:         false,
-		logTxTimeToExecuted:          false,
-		logTxTimeToFinalizedExecuted: false,
-		retryEnabled:                 false,
 		rpcMetricsEnabled:            false,
 		apiRatelimits:                nil,
 		apiBurstlimits:               nil,
@@ -408,11 +400,11 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 		flags.UintVar(&builder.rpcConf.MaxHeightRange, "rpc-max-height-range", defaultConfig.rpcConf.MaxHeightRange, "maximum size for height range requests")
 		flags.StringSliceVar(&builder.rpcConf.PreferredExecutionNodeIDs, "preferred-execution-node-ids", defaultConfig.rpcConf.PreferredExecutionNodeIDs, "comma separated list of execution nodes ids to choose from when making an upstream call e.g. b4a4dbdcd443d...,fb386a6a... etc.")
 		flags.StringSliceVar(&builder.rpcConf.FixedExecutionNodeIDs, "fixed-execution-node-ids", defaultConfig.rpcConf.FixedExecutionNodeIDs, "comma separated list of execution nodes ids to choose from when making an upstream call if no matching preferred execution id is found e.g. b4a4dbdcd443d...,fb386a6a... etc.")
-		flags.BoolVar(&builder.logTxTimeToFinalized, "log-tx-time-to-finalized", defaultConfig.logTxTimeToFinalized, "log transaction time to finalized")
-		flags.BoolVar(&builder.logTxTimeToExecuted, "log-tx-time-to-executed", defaultConfig.logTxTimeToExecuted, "log transaction time to executed")
-		flags.BoolVar(&builder.logTxTimeToFinalizedExecuted, "log-tx-time-to-finalized-executed", defaultConfig.logTxTimeToFinalizedExecuted, "log transaction time to finalized and executed")
-		flags.BoolVar(&builder.retryEnabled, "retry-enabled", defaultConfig.retryEnabled, "whether to enable the retry mechanism at the access node level")
-		flags.BoolVar(&builder.rpcMetricsEnabled, "rpc-metrics-enabled", defaultConfig.rpcMetricsEnabled, "whether to enable the rpc metrics")
+		flags.BoolVar(&dummyBool, "log-tx-time-to-finalized", false, "log transaction time to finalized")
+		flags.BoolVar(&dummyBool, "log-tx-time-to-executed", false, "log transaction time to executed")
+		flags.BoolVar(&dummyBool, "log-tx-time-to-finalized-executed", false, "log transaction time to finalized and executed")
+		flags.BoolVar(&dummyBool, "retry-enabled", false, "whether to enable the retry mechanism at the access node level")
+		flags.BoolVar(&dummyBool, "rpc-metrics-enabled", false, "whether to enable the rpc metrics")
 		flags.StringToIntVar(&builder.apiRatelimits, "api-rate-limits", defaultConfig.apiRatelimits, "per second rate limits for Access API methods e.g. Ping=300,GetTransaction=500 etc.")
 		flags.StringToIntVar(&builder.apiBurstlimits, "api-burst-limits", defaultConfig.apiBurstlimits, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
 		flags.BoolVar(&dummyBool, "staked", false, "deprecated - whether this node is a staked access node or not")
@@ -804,7 +796,7 @@ func (builder *ObserverServiceBuilder) attachRPCEngine() {
                         nil,
                         0,
                         0,
-                        builder.retryEnabled,
+                        false,
                         builder.rpcMetricsEnabled,
                         builder.apiRatelimits,
                         builder.apiBurstlimits,
