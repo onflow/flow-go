@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/rand"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/mocknetwork"
 
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
@@ -100,6 +102,18 @@ func (suite *Suite) SetupTest() {
 	require.NoError(suite.T(), err)
 
 	suite.eng = eng
+
+	// block := unittest.BlockFixture()
+	// block.SetPayload(unittest.PayloadFixture(
+	// 	unittest.WithGuarantees(unittest.CollectionGuaranteesFixture(4)...),
+	// ))
+	// block.Header.Height = 0
+
+	// suite.blocks.On("GetLastFullBlockHeight").Return(uint64(0), nil)
+	// suite.proto.snapshot.On("Head").Return(block.Header, nil)
+
+	ctx, _ := irrecoverable.WithSignaler(context.Background())
+	suite.eng.Start(ctx)
 }
 
 // TestOnFinalizedBlock checks that when a block is received, a request for each individual collection is made
@@ -132,17 +146,22 @@ func (suite *Suite) TestOnFinalizedBlock() {
 		needed[guarantee.ID()] = struct{}{}
 	}
 
+	wg := sync.WaitGroup{}
+	wg.Add(4)
+
 	suite.request.On("EntityByID", mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			collID := args.Get(0).(flow.Identifier)
 			_, pending := needed[collID]
 			suite.Assert().True(pending, "collection should be pending (%x)", collID)
 			delete(needed, collID)
+			wg.Done()
 		},
 	)
 
 	// process the block through the finalized callback
 	suite.eng.OnFinalizedBlock(&hotstuffBlock)
+	wg.Wait()
 
 	// assert that the block was retrieved and all collections were requested
 	suite.headers.AssertExpectations(suite.T())
@@ -152,7 +171,6 @@ func (suite *Suite) TestOnFinalizedBlock() {
 
 // TestOnCollection checks that when a Collection is received, it is persisted
 func (suite *Suite) TestOnCollection() {
-
 	originID := unittest.IdentifierFixture()
 	collection := unittest.CollectionFixture(5)
 	light := collection.Light()
