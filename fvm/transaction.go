@@ -33,6 +33,7 @@ type TransactionProcedure struct {
 	Events          []flow.Event
 	ServiceEvents   []flow.Event
 	ComputationUsed uint64
+	MemoryUsed      uint64
 	Err             errors.Error
 	Retried         int
 	TraceSpan       opentracing.Span
@@ -101,7 +102,7 @@ func (proc *TransactionProcedure) MemoryLimit(ctx Context) uint64 {
 	// TODO for BFT (enforce max computation limit, already checked by collection nodes)
 	// TODO let user select a lower limit for memory (when its part of fees)
 
-	memoryLimit := uint64(DefaultMemoryLimit) // TODO use the one set by tx
+	memoryLimit := ctx.MemoryLimit // TODO use the one set by tx
 	// if the memory limit is set to zero by user, fallback to the gas limit set by the context
 	if memoryLimit == 0 {
 		memoryLimit = ctx.MemoryLimit

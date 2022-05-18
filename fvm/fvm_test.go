@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"testing"
@@ -21,6 +22,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
+
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
@@ -548,12 +550,23 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		assert.Error(t, tx.Err)
 
-		assert.Contains(t, tx.Err.Error(), "setting contracts requires authorization from specific accounts")
+		assert.Contains(t, tx.Err.Error(), "deploying contracts requires authorization from specific accounts")
 		assert.Equal(t, (&errors.CadenceRuntimeError{}).Code(), tx.Err.Code())
 	})
 
-	t.Run("account update with set code fails if not signed by service account", func(t *testing.T) {
-		ledger := testutil.RootBootstrappedLedger(vm, ctx)
+	t.Run("account update with set code fails if not signed by service account if dis-allowed in the state", func(t *testing.T) {
+		ctx := fvm.NewContext(
+			zerolog.Nop(),
+			fvm.WithChain(chain),
+			fvm.WithCadenceLogging(true),
+			fvm.WithRestrictedDeployment(false),
+		)
+		restricted := true
+		ledger := testutil.RootBootstrappedLedger(
+			vm,
+			ctx,
+			fvm.WithRestrictedContractDeployment(&restricted),
+		)
 
 		// Create an account private key.
 		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -564,19 +577,91 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, err)
 
 		txBody := testutil.DeployUnauthorizedCounterContractTransaction(accounts[0])
+		txBody.SetProposalKey(accounts[0], 0, 0)
+		txBody.SetPayer(accounts[0])
 
-		err = testutil.SignTransaction(txBody, accounts[0], privateKeys[0], 0)
+		err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
 
 		tx := fvm.Transaction(txBody, 0)
 
 		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
 		require.NoError(t, err)
-
 		assert.Error(t, tx.Err)
 
-		assert.Contains(t, tx.Err.Error(), "setting contracts requires authorization from specific accounts")
+		assert.Contains(t, tx.Err.Error(), "deploying contracts requires authorization from specific accounts")
 		assert.Equal(t, (&errors.CadenceRuntimeError{}).Code(), tx.Err.Code())
+	})
+
+	t.Run("account update with set succeeds if not signed by service account if allowed in the state", func(t *testing.T) {
+		restricted := false
+		ledger := testutil.RootBootstrappedLedger(
+			vm,
+			ctx,
+			fvm.WithRestrictedContractDeployment(&restricted),
+		)
+
+		// Create an account private key.
+		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+		require.NoError(t, err)
+
+		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
+		require.NoError(t, err)
+
+		txBody := testutil.DeployUnauthorizedCounterContractTransaction(accounts[0])
+		txBody.SetProposalKey(accounts[0], 0, 0)
+		txBody.SetPayer(accounts[0])
+
+		err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
+		require.NoError(t, err)
+
+		tx := fvm.Transaction(txBody, 0)
+
+		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		require.NoError(t, err)
+		require.NoError(t, tx.Err)
+	})
+
+	t.Run("account update with update code succeeds if not signed by service account", func(t *testing.T) {
+		ledger := testutil.RootBootstrappedLedger(vm, ctx)
+
+		// Create an account private key.
+		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+		require.NoError(t, err)
+
+		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
+		require.NoError(t, err)
+
+		txBody := testutil.DeployCounterContractTransaction(accounts[0], chain)
+		txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
+		txBody.SetPayer(chain.ServiceAddress())
+
+		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
+		require.NoError(t, err)
+
+		err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		require.NoError(t, err)
+
+		tx := fvm.Transaction(txBody, 0)
+
+		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		require.NoError(t, err)
+		require.NoError(t, tx.Err)
+
+		txBody = testutil.UpdateUnauthorizedCounterContractTransaction(accounts[0])
+		txBody.SetProposalKey(accounts[0], 0, 0)
+		txBody.SetPayer(accounts[0])
+
+		err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
+		require.NoError(t, err)
+
+		tx = fvm.Transaction(txBody, 0)
+
+		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		require.NoError(t, err)
+		require.NoError(t, tx.Err)
 	})
 
 	t.Run("account update with set code succeeds when account is added as authorized account", func(t *testing.T) {
@@ -638,7 +723,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
 		require.NoError(t, err)
 		assert.Error(t, tx.Err)
-		assert.Contains(t, tx.Err.Error(), "setting contracts requires authorization from specific accounts")
+		assert.Contains(t, tx.Err.Error(), "deploying contracts requires authorization from specific accounts")
 		assert.Equal(t, (&errors.CadenceRuntimeError{}).Code(), tx.Err.Code())
 
 		// Generate an audit voucher
@@ -1477,7 +1562,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		require.Len(t, accountCreatedEvents, 1)
 
 		// read the address of the account created (e.g. "0x01" and convert it to flow.address)
-		data, err := jsoncdc.Decode(accountCreatedEvents[0].Payload)
+		data, err := jsoncdc.Decode(nil, accountCreatedEvents[0].Payload)
 		require.NoError(t, err)
 		address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
 
@@ -1613,7 +1698,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 
 	require.Len(t, accountCreatedEvents, 1)
 
-	data, err := jsoncdc.Decode(accountCreatedEvents[0].Payload)
+	data, err := jsoncdc.Decode(nil, accountCreatedEvents[0].Payload)
 	require.NoError(t, err)
 	address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
 
@@ -2909,6 +2994,53 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		}),
 	)
 
+	t.Run("Transaction fails because of recipient account not existing", newVMTest().withBootstrapProcedureOptions(
+		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+	).run(
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
+
+			// Create an account private key.
+			privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+			require.NoError(t, err)
+
+			// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+			accounts, err := testutil.CreateAccounts(vm, view, programs, privateKeys, chain)
+			require.NoError(t, err)
+
+			// non-existent account
+			lastAddress, err := chain.AddressAtIndex((1 << 45) - 1)
+			require.NoError(t, err)
+
+			balanceBefore := getBalance(vm, chain, ctx, view, accounts[0])
+
+			// transfer tokens to non-existent account
+			txBody := transferTokensTx(chain).
+				AddAuthorizer(accounts[0]).
+				AddArgument(jsoncdc.MustEncode(cadence.UFix64(1))).
+				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(lastAddress)))
+
+			txBody.SetProposalKey(accounts[0], 0, 0)
+			txBody.SetPayer(accounts[0])
+
+			err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
+			require.NoError(t, err)
+
+			tx := fvm.Transaction(txBody, 0)
+
+			err = vm.Run(ctx, tx, view, programs)
+			require.NoError(t, err)
+
+			require.Equal(t, (&errors.CadenceRuntimeError{}).Code(), tx.Err.Code())
+
+			balanceAfter := getBalance(vm, chain, ctx, view, accounts[0])
+
+			require.Equal(t, balanceAfter, balanceBefore)
+		}),
+	)
+
 	t.Run("Transaction sequence number check fails and sequence number is not incremented", newVMTest().withBootstrapProcedureOptions(
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
@@ -3062,7 +3194,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 		checkResult   func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure)
 	}
 
-	txFees := uint64(10_000)             // 0.0001
+	txFees := uint64(1_000)              // 0.00001
 	fundingAmount := uint64(100_000_000) // 1.0
 	transferAmount := uint64(123_456)
 	minimumStorageReservation := fvm.DefaultMinimumStorageReservation.ToGoValue().(uint64)
@@ -3124,7 +3256,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 				}
 				require.NotEmpty(t, feeDeduction.Payload)
 
-				payload, err := jsoncdc.Decode(feeDeduction.Payload)
+				payload, err := jsoncdc.Decode(nil, feeDeduction.Payload)
 				require.NoError(t, err)
 
 				event := payload.(cadence.Event)
@@ -3346,7 +3478,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			require.Len(t, accountCreatedEvents, 1)
 
 			// read the address of the account created (e.g. "0x01" and convert it to flow.address)
-			data, err := jsoncdc.Decode(accountCreatedEvents[0].Payload)
+			data, err := jsoncdc.Decode(nil, accountCreatedEvents[0].Payload)
 			require.NoError(t, err)
 			address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
 
@@ -3439,13 +3571,14 @@ func TestTransactionFeeDeduction(t *testing.T) {
 }
 
 func TestSettingExecutionWeights(t *testing.T) {
+
 	t.Run("transaction should fail with high weights", newVMTest().withBootstrapProcedureOptions(
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithExecutionEffortWeights(
-			weightedMeter.ExecutionWeights{
-				common.ComputationKindLoop: 100_000 << weightedMeter.MeterInternalPrecisionBytes,
+			weightedMeter.ExecutionEffortWeights{
+				common.ComputationKindLoop: 100_000 << weightedMeter.MeterExecutionInternalPrecisionBytes,
 			},
 		),
 	).run(
@@ -3476,13 +3609,100 @@ func TestSettingExecutionWeights(t *testing.T) {
 			assert.True(t, errors.IsComputationLimitExceededError(tx.Err))
 		},
 	))
+
+	memoryWeights := make(map[common.MemoryKind]uint64)
+	for k, v := range weightedMeter.DefaultMemoryWeights {
+		memoryWeights[k] = v
+	}
+	memoryWeights[common.MemoryKindBool] = 20_000_000_000
+
+	t.Run("normal transactions should fail with high memory weights", newVMTest().withBootstrapProcedureOptions(
+		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		fvm.WithExecutionMemoryWeights(
+			memoryWeights,
+		),
+	).withContextOptions(
+		fvm.WithMemoryLimit(10_000_000_000),
+	).run(
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+
+			// Create an account private key.
+			privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+			require.NoError(t, err)
+
+			// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+			accounts, err := testutil.CreateAccounts(vm, view, programs, privateKeys, chain)
+			require.NoError(t, err)
+
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(`
+				transaction {
+                  prepare(signer: AuthAccount) {
+					var a = false
+                  }
+                }
+			`)).
+				SetProposalKey(accounts[0], 0, 0).
+				AddAuthorizer(accounts[0]).
+				SetPayer(accounts[0])
+
+			err = testutil.SignTransaction(txBody, accounts[0], privateKeys[0], 0)
+			require.NoError(t, err)
+
+			tx := fvm.Transaction(txBody, 0)
+			err = vm.Run(ctx, tx, view, programs)
+			require.NoError(t, err)
+			require.Greater(t, tx.MemoryUsed, uint64(20_000_000_000))
+
+			assert.True(t, errors.IsMemoryLimitExceededError(tx.Err))
+		},
+	))
+
+	t.Run("service account transactions should not fail with high memory weights", newVMTest().withBootstrapProcedureOptions(
+		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		fvm.WithExecutionMemoryWeights(
+			memoryWeights,
+		),
+	).withContextOptions(
+		fvm.WithMemoryLimit(10_000_000_000),
+	).run(
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(`
+				transaction {
+                  prepare(signer: AuthAccount) {
+					var a = false
+                  }
+                }
+			`)).
+				SetProposalKey(chain.ServiceAddress(), 0, 0).
+				AddAuthorizer(chain.ServiceAddress()).
+				SetPayer(chain.ServiceAddress())
+
+			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+			require.NoError(t, err)
+
+			tx := fvm.Transaction(txBody, 0)
+			err = vm.Run(ctx, tx, view, programs)
+			require.NoError(t, err)
+			require.Equal(t, uint64(0), tx.MemoryUsed)
+
+			require.NoError(t, tx.Err)
+		},
+	))
+
 	t.Run("transaction should fail if create account weight is high", newVMTest().withBootstrapProcedureOptions(
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithExecutionEffortWeights(
-			weightedMeter.ExecutionWeights{
-				meter.ComputationKindCreateAccount: (fvm.DefaultComputationLimit + 1) << weightedMeter.MeterInternalPrecisionBytes,
+			weightedMeter.ExecutionEffortWeights{
+				meter.ComputationKindCreateAccount: (fvm.DefaultComputationLimit + 1) << weightedMeter.MeterExecutionInternalPrecisionBytes,
 			},
 		),
 	).run(
@@ -3515,8 +3735,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithExecutionEffortWeights(
-			weightedMeter.ExecutionWeights{
-				meter.ComputationKindCreateAccount: 100_000_000 << weightedMeter.MeterInternalPrecisionBytes,
+			weightedMeter.ExecutionEffortWeights{
+				meter.ComputationKindCreateAccount: 100_000_000 << weightedMeter.MeterExecutionInternalPrecisionBytes,
 			},
 		),
 	).run(
@@ -3550,8 +3770,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithExecutionEffortWeights(
-			weightedMeter.ExecutionWeights{
-				meter.ComputationKindCreateAccount: 100_000_000 << weightedMeter.MeterInternalPrecisionBytes,
+			weightedMeter.ExecutionEffortWeights{
+				meter.ComputationKindCreateAccount: 100_000_000 << weightedMeter.MeterExecutionInternalPrecisionBytes,
 			},
 		),
 	).run(
@@ -3578,19 +3798,23 @@ func TestSettingExecutionWeights(t *testing.T) {
 			assert.True(t, errors.IsComputationLimitExceededError(tx.Err))
 		},
 	))
+
 	t.Run("transaction should not use up more computation that the transaction body itself", newVMTest().withBootstrapProcedureOptions(
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithTransactionFee(fvm.DefaultTransactionFees),
 		fvm.WithExecutionEffortWeights(
-			weightedMeter.ExecutionWeights{
-				common.ComputationKindStatement: 1 << weightedMeter.MeterInternalPrecisionBytes,
+			weightedMeter.ExecutionEffortWeights{
+				common.ComputationKindStatement:          1 << weightedMeter.MeterExecutionInternalPrecisionBytes,
+				common.ComputationKindLoop:               0,
+				common.ComputationKindFunctionInvocation: 0,
 			},
 		),
 	).withContextOptions(
 		fvm.WithAccountStorageLimit(true),
 		fvm.WithTransactionFeesEnabled(true),
+		fvm.WithMemoryLimit(math.MaxUint64),
 	).run(
 		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 			// Use the maximum amount of computation so that the transaction still passes.
@@ -3641,7 +3865,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			for _, event := range tx.Events {
 				// the fee deduction event should only contain the max gas worth of execution effort.
 				if strings.Contains(string(event.Type), "FlowFees.FeesDeducted") {
-					ev, err := jsoncdc.Decode(event.Payload)
+					ev, err := jsoncdc.Decode(nil, event.Payload)
 					require.NoError(t, err)
 					assert.Equal(t, maxExecutionEffort, ev.(cadence.Event).Fields[2].ToGoValue().(uint64))
 				}

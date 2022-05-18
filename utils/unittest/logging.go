@@ -6,12 +6,14 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
 )
 
 var verbose = flag.Bool("vv", false, "print debugging logs")
+var globalOnce sync.Once
 
 func LogVerbose() {
 	*verbose = true
@@ -29,7 +31,9 @@ func Logger() zerolog.Logger {
 }
 
 func LoggerWithWriterAndLevel(writer io.Writer, level zerolog.Level) zerolog.Logger {
-	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
+	globalOnce.Do(func() {
+		zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
+	})
 	log := zerolog.New(writer).Level(level).With().Timestamp().Logger()
 	return log
 }

@@ -425,7 +425,7 @@ func prepareTx(t *testing.T,
 }
 
 func hasValidEventValue(t *testing.T, event flow.Event, value int) {
-	data, err := jsoncdc.Decode(event.Payload)
+	data, err := jsoncdc.Decode(nil, event.Payload)
 	require.NoError(t, err)
 	assert.Equal(t, int16(value), data.(cadence.Event).Fields[0].ToGoValue())
 }
