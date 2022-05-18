@@ -186,7 +186,7 @@ func testConcurrentExecutionReceipts(t *testing.T,
 		event := event // suppress loop variable
 
 		go func() {
-			err = wintermuteOrchestrator.HandleEventFromCorruptedNode(event)
+			err := wintermuteOrchestrator.HandleEventFromCorruptedNode(event)
 			require.NoError(t, err)
 
 			corruptedEnEventSendWG.Done()

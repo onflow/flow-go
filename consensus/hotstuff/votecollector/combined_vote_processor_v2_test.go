@@ -451,7 +451,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 			"staking signers: %v, beacon signers: %v\n\t"+
 			"required weight: %v", stakingSignersCount, beaconSignersCount, minRequiredWeight)
 
-		stakingTotalWeight, collectedShares := uint64(0), atomic.NewUint64(0)
+		stakingTotalWeight, collectedShares := *atomic.NewUint64(0), *atomic.NewUint64(0)
 
 		// setup aggregators and reconstructor
 		stakingAggregator := &mockhotstuff.WeightedSignatureAggregator{}
@@ -469,7 +469,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 		stakingAggregatorLock := &sync.Mutex{}
 
 		stakingAggregator.On("TotalWeight").Return(func() uint64 {
-			return stakingTotalWeight
+			return stakingTotalWeight.Load()
 		})
 		reconstructor.On("EnoughShares").Return(func() bool {
 			return collectedShares.Load() >= beaconSignersCount
@@ -497,7 +497,9 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 			// check that aggregated signers are part of all votes signers
 			// due to concurrent processing it is possible that Aggregate will return less that we have actually aggregated
 			// but still enough to construct the QC
+			stakingAggregatorLock.Lock()
 			require.Subset(t, aggregatedStakingSigners, blockSigData.StakingSigners)
+			stakingAggregatorLock.Unlock()
 			require.Nil(t, blockSigData.RandomBeaconSigners)
 			require.Nil(t, blockSigData.AggregatedRandomBeaconSig)
 			require.GreaterOrEqual(t, uint64(len(blockSigData.StakingSigners)),
@@ -560,7 +562,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 				signerID := args.Get(0).(flow.Identifier)
 				stakingAggregatorLock.Lock()
 				defer stakingAggregatorLock.Unlock()
-				stakingTotalWeight += sigWeight
+				stakingTotalWeight.Add(sigWeight)
 				aggregatedStakingSigners = append(aggregatedStakingSigners, signerID)
 			}).Return(uint64(0), nil).Maybe()
 		}
