@@ -3619,7 +3619,6 @@ func TestSettingExecutionWeights(t *testing.T) {
 		),
 	).run(
 		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
-			t.Skip("memory limit is hit during parsing, so this is not the correct error. Or is it?")
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(`
 				transaction {
@@ -3659,8 +3658,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 			require.NoError(t, err)
 			require.Greater(t, tx.MemoryUsed, uint64(100_000_000))
 
-			// TODO: memory limit is hit during parsing, so this is not the correct error. Or is it?
-			assert.True(t, errors.IsMemoryLimitExceededError(tx.Err))
+			var foo *errors.MemoryLimitExceededError
+			assert.ErrorAs(t, tx.Err, &foo)
 		},
 	))
 	t.Run("transaction should fail if create account weight is high", newVMTest().withBootstrapProcedureOptions(
