@@ -8,7 +8,10 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// SafetyRules produces votes for the given block
+// SafetyRules is a dedicated module that is responsible for persisting chain safety by producing
+// votes and timeouts. It follows voting and timeout rules for creating votes and timeouts respectively.
+// Caller can be sure that created vote or timeout doesn't break safety and can be used in consensus process.
+// SafetyRules relies on hotstuff.Persister to store latest state of hotstuff.SafetyData.
 type SafetyRules struct {
 	signer     hotstuff.Signer
 	persist    hotstuff.Persister

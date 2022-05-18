@@ -241,7 +241,6 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 		safetyData := &hotstuff.SafetyData{
 			LockedOneChainView:      highest.Header.View,
 			HighestAcknowledgedView: highest.Header.View,
-			LastTimeout:             nil,
 		}
 
 		parentView := highest.Header.View

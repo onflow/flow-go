@@ -65,7 +65,6 @@ func (s *SafetyRulesTestSuite) SetupTest() {
 	s.safetyData = &hotstuff.SafetyData{
 		LockedOneChainView:      s.bootstrapBlock.View,
 		HighestAcknowledgedView: s.bootstrapBlock.View,
-		LastTimeout:             nil,
 	}
 
 	s.safety = New(s.signer, s.persister, s.committee, s.safetyData)
@@ -77,7 +76,6 @@ func (s *SafetyRulesTestSuite) TestProduceVote_ShouldVote() {
 	expectedSafetyData := &hotstuff.SafetyData{
 		LockedOneChainView:      s.proposal.Block.QC.View,
 		HighestAcknowledgedView: s.proposal.Block.View,
-		LastTimeout:             nil,
 	}
 
 	expectedVote := makeVote(s.proposal.Block)
@@ -112,7 +110,6 @@ func (s *SafetyRulesTestSuite) TestProduceVote_ShouldVote() {
 	expectedSafetyData = &hotstuff.SafetyData{
 		LockedOneChainView:      s.proposal.Block.QC.View,
 		HighestAcknowledgedView: proposalWithTC.Block.View,
-		LastTimeout:             nil,
 	}
 
 	expectedVote = makeVote(proposalWithTC.Block)
@@ -137,7 +134,6 @@ func (s *SafetyRulesTestSuite) TestProduceVote_UpdateLockedOneChainView() {
 	expectedSafetyData := &hotstuff.SafetyData{
 		LockedOneChainView:      s.proposal.Block.QC.View,
 		HighestAcknowledgedView: s.proposal.Block.View,
-		LastTimeout:             nil,
 	}
 
 	expectedVote := makeVote(s.proposal.Block)

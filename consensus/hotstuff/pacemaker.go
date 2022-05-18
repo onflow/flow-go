@@ -8,9 +8,14 @@ import (
 )
 
 type LivenessData struct {
+	// CurrentView is the current active view tracked by PaceMaker. It's updated whenever
+	// PaceMaker sees evidence(QC or TC) for advancing to next view.
 	CurrentView uint64
-	LastViewTC  *flow.TimeoutCertificate
-	HighestQC   *flow.QuorumCertificate
+	// HighestQC is the highest QC(by view) observed by PaceMaker. QC can be observed on its own or as a part of TC.
+	HighestQC *flow.QuorumCertificate
+	// LastViewTC is the TC observed in last view(CurrentView-1), if previous round ended with QC, LastViewTC will be nil
+	// otherwise it has to be not nil.
+	LastViewTC *flow.TimeoutCertificate
 }
 
 // PaceMaker for HotStuff. The component is passive in that it only reacts to method calls.
