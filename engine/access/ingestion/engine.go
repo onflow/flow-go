@@ -53,10 +53,11 @@ var defaultMissingCollsForAgeThreshold = missingCollsForAgeThreshold
 // to a centralized location that can be queried by a user
 type Engine struct {
 	*component.ComponentManager
-	executionReceiptsHandler *engine.MessageHandler
-	executionReceiptsQueue   engine.MessageStore
-	finalizedBlockHandler    *engine.MessageHandler
-	finalizedBlockQueue      engine.MessageStore
+	messageHandler            *engine.MessageHandler
+	executionReceiptsNotifier engine.Notifier
+	executionReceiptsQueue    engine.MessageStore
+	finalizedBlockNotifier    engine.Notifier
+	finalizedBlockQueue       engine.MessageStore
 
 	log     zerolog.Logger   // used to log relevant actions with context
 	state   protocol.State   // used to access the  protocol state
@@ -100,7 +101,6 @@ func New(
 	blocksToMarkExecuted *stdmap.Times,
 	rpcEngine *rpc.Engine,
 ) (*Engine, error) {
-	// FIFO queue for execution receipts
 	executionReceiptsRawQueue, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(int(10)),
 		fifoqueue.WithLengthObserver(func(len int) {
@@ -112,17 +112,6 @@ func New(
 	}
 
 	executionReceiptsQueue := &engine.FifoMessageStore{FifoQueue: executionReceiptsRawQueue}
-	executionReceiptsHandler := engine.NewMessageHandler(
-		log,
-		engine.NewNotifier(),
-		engine.Pattern{
-			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*flow.TransactionBody)
-				return ok
-			},
-			Store: executionReceiptsQueue,
-		},
-	)
 
 	finalizedBlocksRawQueue, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(int(10)),
@@ -135,7 +124,8 @@ func New(
 	}
 
 	finalizedBlocksQueue := &engine.FifoMessageStore{FifoQueue: finalizedBlocksRawQueue}
-	finalizedBlocksHandler := engine.NewMessageHandler(
+
+	messageHandler := engine.NewMessageHandler(
 		log,
 		engine.NewNotifier(),
 		engine.Pattern{
@@ -144,6 +134,13 @@ func New(
 				return ok
 			},
 			Store: finalizedBlocksQueue,
+		},
+		engine.Pattern{
+			Match: func(msg *engine.Message) bool {
+				_, ok := msg.Payload.(*flow.TransactionBody)
+				return ok
+			},
+			Store: executionReceiptsQueue,
 		},
 	)
 
@@ -165,13 +162,15 @@ func New(
 		blocksToMarkExecuted:       blocksToMarkExecuted,
 		rpcEngine:                  rpcEngine,
 
-		// queue/handler for execution receipts
-		executionReceiptsHandler: executionReceiptsHandler,
-		executionReceiptsQueue:   executionReceiptsQueue,
+		// queue / notifier for execution receipts
+		executionReceiptsNotifier: engine.NewNotifier(),
+		executionReceiptsQueue:    executionReceiptsQueue,
 
-		// queue/handler for finalized blocks
-		finalizedBlockHandler: finalizedBlocksHandler,
-		finalizedBlockQueue:   finalizedBlocksQueue,
+		// queue / notifier for finalized blocks
+		finalizedBlockNotifier: engine.NewNotifier(),
+		finalizedBlockQueue:    finalizedBlocksQueue,
+
+		messageHandler: messageHandler,
 	}
 
 	// Add workers
@@ -191,10 +190,10 @@ func New(
 }
 
 func (e *Engine) processBackground(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	err := e.requestMissingCollections(ctx)
-	if err != nil {
-		e.log.Error().Err(err).Msg("requesting missing collections failed")
-	}
+	// err := e.requestMissingCollections(ctx)
+	// if err != nil {
+	// 	e.log.Error().Err(err).Msg("requesting missing collections failed")
+	// }
 	ready()
 
 	ticker := time.NewTicker(defaultFullBlockUpdateInterval)
@@ -210,11 +209,13 @@ func (e *Engine) processBackground(ctx irrecoverable.SignalerContext, ready comp
 
 func (e *Engine) processExecutionReceipts(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
+	notifier := e.executionReceiptsNotifier.Channel()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-e.executionReceiptsHandler.GetNotifier():
+		case <-notifier:
 			msg, _ := e.executionReceiptsQueue.Get()
 			receipt, _ := msg.Payload.(*flow.ExecutionReceipt)
 
@@ -230,11 +231,13 @@ func (e *Engine) processExecutionReceipts(ctx irrecoverable.SignalerContext, rea
 
 func (e *Engine) processFinalizedBlocks(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
+	notifier := e.finalizedBlockNotifier.Channel()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-e.finalizedBlockHandler.GetNotifier():
+		case <-notifier:
 			msg, _ := e.finalizedBlockQueue.Get()
 			hb, _ := msg.Payload.(*model.Block)
 			blockID := hb.BlockID
@@ -254,7 +257,9 @@ func (e *Engine) processFinalizedBlocks(ctx irrecoverable.SignalerContext, ready
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch event.(type) {
 	case *flow.ExecutionReceipt:
-		return e.executionReceiptsHandler.Process(originID, event)
+		e.messageHandler.Process(originID, event)
+		e.executionReceiptsNotifier.Notify()
+		return nil
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
@@ -291,7 +296,8 @@ func (e *Engine) Process(channel network.Channel, originID flow.Identifier, even
 
 // OnFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated
 func (e *Engine) OnFinalizedBlock(hb *model.Block) {
-	e.finalizedBlockHandler.Process(hb.BlockID, hb)
+	e.messageHandler.Process(hb.BlockID, hb)
+	e.finalizedBlockNotifier.Notify()
 }
 
 // processBlock handles an incoming finalized block.
