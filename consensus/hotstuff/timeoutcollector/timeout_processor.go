@@ -42,7 +42,7 @@ type highestQCTracker struct {
 // Track updates local state of highestQC if the provided instance is higher(by view)
 func (t *highestQCTracker) Track(qc *flow.QuorumCertificate) {
 	highestQC := t.HighestQC()
-	if highestQC != nil || highestQC.View >= qc.View {
+	if highestQC != nil && highestQC.View >= qc.View {
 		return
 	}
 
@@ -91,7 +91,8 @@ func NewTimeoutProcessor(committee hotstuff.Replicas,
 		partialTCTracker: accumulatedWeightTracker{
 			// TODO(active-pacemaker): fix this, add weight for f+1
 			//minRequiredWeight: hotstuff.ComputeWeightThresholdForHonestMajority(totalWeight),
-			done: *atomic.NewBool(false),
+			minRequiredWeight: 1,
+			done:              *atomic.NewBool(false),
 		},
 		tcTracker: accumulatedWeightTracker{
 			minRequiredWeight: qcThreshold,
