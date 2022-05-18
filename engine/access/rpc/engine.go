@@ -172,7 +172,7 @@ func New(log zerolog.Logger,
 	var localAPIServer accessproto.AccessAPIServer
 	localAPIServer = access.NewHandler(backend, chainID.Chain())
 	if proxy != nil {
-		proxy.SetLocal(&localAPIServer)
+		proxy.SetLocalAPI(localAPIServer)
 		localAPIServer = proxy
 	}
 

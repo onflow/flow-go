@@ -63,8 +63,8 @@ type FlowAPIService struct {
 	upstream   []access.AccessAPIClient
 }
 
-func (h *FlowAPIService) SetLocal(local *access.AccessAPIServer) {
-	h.AccessAPIServer = *local
+func (h *FlowAPIService) SetLocalAPI(local access.AccessAPIServer) {
+	h.AccessAPIServer = local
 }
 
 func (h *FlowAPIService) client() (access.AccessAPIClient, error) {
