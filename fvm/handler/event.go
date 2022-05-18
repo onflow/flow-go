@@ -12,10 +12,22 @@ import (
 )
 
 var (
-	faulty_devnet34_txid, _     = flow.HexStringToIdentifier("016003ece13ccb9fce32d7d93c4408395856becbacc9e0587d667b594645fc0a")
-	faulty_devnet34_event_index = uint32(3)
-	faulty_devnet34_tx_index    = uint32(0)
-	faulty_devnet34_tx_payload  = []byte("{\"type\":\"Event\",\"value\":{\"id\":\"A.912d5440f7e3769e.FlowFees.FeesDeducted\",\"fields\":[{\"name\":\"amount\",\"value\":{\"type\":\"UFix64\",\"value\":\"0.00001000\"}},{\"name\":\"inclusionEffort\",\"value\":{\"type\":\"UFix64\",\"value\":\"1.00000000\"}},{\"name\":\"executionEffort\",\"value\":{\"type\":\"UFix64\",\"value\":\"0.00000000\"}}]}}")
+	faulty_tx_override = map[flow.Identifier]struct {
+		eventIndex uint32
+		txIndex    uint32
+		payload    []byte
+	}{
+		flow.MustHexStringToIdentifier("016003ece13ccb9fce32d7d93c4408395856becbacc9e0587d667b594645fc0a"): {
+			eventIndex: 3,
+			txIndex:    0,
+			payload:    []byte("{\"type\":\"Event\",\"value\":{\"id\":\"A.912d5440f7e3769e.FlowFees.FeesDeducted\",\"fields\":[{\"name\":\"amount\",\"value\":{\"type\":\"UFix64\",\"value\":\"0.00001000\"}},{\"name\":\"inclusionEffort\",\"value\":{\"type\":\"UFix64\",\"value\":\"1.00000000\"}},{\"name\":\"executionEffort\",\"value\":{\"type\":\"UFix64\",\"value\":\"0.00000000\"}}]}}"),
+		},
+		flow.MustHexStringToIdentifier("358f50955d64b4e8cba98ac9d2b6042359def400405d318c209cca52e078e81b"): {
+			eventIndex: 3,
+			txIndex:    3,
+			payload:    []byte("{\"type\":\"Event\",\"value\":{\"id\":\"A.912d5440f7e3769e.FlowFees.FeesDeducted\",\"fields\":[{\"name\":\"amount\",\"value\":{\"type\":\"UFix64\",\"value\":\"0.00010000\"}},{\"name\":\"inclusionEffort\",\"value\":{\"type\":\"UFix64\",\"value\":\"1.00000000\"}},{\"name\":\"executionEffort\",\"value\":{\"type\":\"UFix64\",\"value\":\"0.00000000\"}}]}}"),
+		},
+	}
 )
 
 // EventHandler collect events, separates out service events, and enforces event size limits
@@ -54,9 +66,16 @@ func (h *EventHandler) EmitEvent(event cadence.Event,
 	}
 
 	var payload []byte
-	if txID == faulty_devnet34_txid && h.eventCollection.eventCounter == faulty_devnet34_event_index && txIndex == faulty_devnet34_tx_index {
-		payload = faulty_devnet34_tx_payload
-	} else {
+
+	for faultyID, faultyData := range faulty_tx_override {
+		if txID == faultyID {
+			if h.eventCollection.eventCounter == faultyData.eventIndex && txIndex == faultyData.txIndex {
+				payload = faultyData.payload
+			}
+		}
+	}
+
+	if len(payload) == 0 {
 		var err error
 		payload, err = jsoncdc.Encode(event)
 		if err != nil {
