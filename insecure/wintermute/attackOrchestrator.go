@@ -322,3 +322,14 @@ func (o *Orchestrator) replyWithAttestation(chunkDataPackRequestEvent *insecure.
 
 	return false, nil
 }
+
+// AttackState returns the corrupted and original execution results involved in this attack.
+// Boolean return value determines whether attack conducted.
+func (o *Orchestrator) AttackState() (flow.ExecutionResult, flow.ExecutionResult, bool) {
+	if o.state == nil {
+		// no attack yet conducted.
+		return flow.ExecutionResult{}, flow.ExecutionResult{}, false
+	}
+
+	return *o.state.corruptedResult, *o.state.originalResult, true
+}
