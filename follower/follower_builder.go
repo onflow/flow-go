@@ -121,8 +121,6 @@ type FlowObserverServiceBuilder struct {
 	// engines
 	FollowerEng *followereng.Engine
 	SyncEng     *synceng.Engine
-
-	peerID peer.ID
 }
 
 // deriveBootstrapPeerIdentities derives the Flow Identity of the bootstrap peers from the parameters.
@@ -430,14 +428,21 @@ func BootstrapIdentities(addresses []string, keys []string) (flow.IdentityList, 
 	return ids, nil
 }
 
-func NewObserverServiceBuilder(builder *FlowObserverServiceBuilder) *FlowObserverServiceBuilder {
+type ObserverServiceBuilder struct {
+	*FlowObserverServiceBuilder
+	peerID peer.ID
+}
+
+func NewObserverServiceBuilder(builder *FlowObserverServiceBuilder) *ObserverServiceBuilder {
 	// the observer gets a version of the root snapshot file that does not contain any node addresses
 	// hence skip all the root snapshot validations that involved an identity address
 	builder.SkipNwAddressBasedValidations = true
-	return builder
+	return &ObserverServiceBuilder{
+		FlowObserverServiceBuilder: builder,
+	}
 }
 
-func (builder *FlowObserverServiceBuilder) initNodeInfo() error {
+func (builder *ObserverServiceBuilder) initNodeInfo() error {
 	// use the networking key that has been passed in the config, or load from the configured file
 	networkingKey := builder.ObserverServiceConfig.NetworkKey
 
@@ -462,7 +467,7 @@ func (builder *FlowObserverServiceBuilder) initNodeInfo() error {
 	return nil
 }
 
-func (builder *FlowObserverServiceBuilder) InitIDProviders() {
+func (builder *ObserverServiceBuilder) InitIDProviders() {
 	builder.Module("id providers", func(node *cmd.NodeConfig) error {
 		idCache, err := p2p.NewProtocolStateIDCache(node.Logger, node.State, builder.ProtocolEvents)
 		if err != nil {
@@ -501,7 +506,7 @@ func (builder *FlowObserverServiceBuilder) InitIDProviders() {
 	})
 }
 
-func (builder *FlowObserverServiceBuilder) Initialize() error {
+func (builder *ObserverServiceBuilder) Initialize() error {
 	if err := builder.deriveBootstrapPeerIdentities(); err != nil {
 		return err
 	}
@@ -534,7 +539,7 @@ func (builder *FlowObserverServiceBuilder) Initialize() error {
 	return nil
 }
 
-func (builder *FlowObserverServiceBuilder) validateParams() error {
+func (builder *ObserverServiceBuilder) validateParams() error {
 	if builder.BaseConfig.BindAddr == cmd.NotSet || builder.BaseConfig.BindAddr == "" {
 		return errors.New("bind address not specified")
 	}
@@ -562,7 +567,7 @@ func (builder *FlowObserverServiceBuilder) validateParams() error {
 //		No connection gater
 // 		No connection manager
 // 		Default libp2p pubsub options
-func (builder *FlowObserverServiceBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2p.LibP2PFactoryFunc {
+func (builder *ObserverServiceBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2p.LibP2PFactoryFunc {
 	return func(ctx context.Context) (*p2p.Node, error) {
 		var pis []peer.AddrInfo
 
@@ -604,7 +609,7 @@ func (builder *FlowObserverServiceBuilder) initLibP2PFactory(networkKey crypto.P
 // initObserverLocal initializes the observer's ID, network key and network address
 // Currently, it reads a node-info.priv.json like any other node.
 // TODO: read the node ID from the special bootstrap files
-func (builder *FlowObserverServiceBuilder) initObserverLocal() func(node *cmd.NodeConfig) error {
+func (builder *ObserverServiceBuilder) initObserverLocal() func(node *cmd.NodeConfig) error {
 	return func(node *cmd.NodeConfig) error {
 		// for an observer, set the identity here explicitly since it will not be found in the protocol state
 		self := &flow.Identity{
@@ -626,7 +631,7 @@ func (builder *FlowObserverServiceBuilder) initObserverLocal() func(node *cmd.No
 
 // enqueueMiddleware enqueues the creation of the network middleware
 // this needs to be done before sync engine participants module
-func (builder *FlowObserverServiceBuilder) enqueueMiddleware() {
+func (builder *ObserverServiceBuilder) enqueueMiddleware() {
 	builder.
 		Module("network middleware", func(node *cmd.NodeConfig) error {
 
@@ -648,13 +653,13 @@ func (builder *FlowObserverServiceBuilder) enqueueMiddleware() {
 
 // Build enqueues the sync engine and the follower engine for the observer.
 // Currently, the observer only runs the follower engine.
-func (builder *FlowObserverServiceBuilder) Build() (cmd.Node, error) {
+func (builder *ObserverServiceBuilder) Build() (cmd.Node, error) {
 	builder.BuildConsensusFollower()
-	return builder.Build()
+	return builder.FlowObserverServiceBuilder.Build()
 }
 
 // enqueuePublicNetworkInit enqueues the observer network component initialized for the observer
-func (builder *FlowObserverServiceBuilder) enqueuePublicNetworkInit() {
+func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
 
 	builder.Component("unstaked network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
@@ -693,7 +698,7 @@ func (builder *FlowObserverServiceBuilder) enqueuePublicNetworkInit() {
 // (https://github.com/libp2p/go-libp2p-pubsub/issues/442). This means that an observer could end up not being
 // discovered by other observers if it subscribes to a topic before connecting to the staked AN. Hence, the need
 // of an explicit connect to the staked AN before the node attempts to subscribe to topics.
-func (builder *FlowObserverServiceBuilder) enqueueConnectWithStakedAN() {
+func (builder *ObserverServiceBuilder) enqueueConnectWithStakedAN() {
 	builder.Component("upstream connector", func(_ *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		return upstream.NewUpstreamConnector(builder.bootstrapIdentities, builder.LibP2PNode, builder.Logger), nil
 	})
@@ -701,7 +706,7 @@ func (builder *FlowObserverServiceBuilder) enqueueConnectWithStakedAN() {
 
 // initMiddleware creates the network.Middleware implementation with the libp2p factory function, metrics, peer update
 // interval, and validators. The network.Middleware is then passed into the initNetwork function.
-func (builder *FlowObserverServiceBuilder) initMiddleware(nodeID flow.Identifier,
+func (builder *ObserverServiceBuilder) initMiddleware(nodeID flow.Identifier,
 	networkMetrics module.NetworkMetrics,
 	factoryFunc p2p.LibP2PFactoryFunc,
 	validators ...network.MessageValidator) network.Middleware {

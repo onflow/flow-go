@@ -147,7 +147,7 @@ func getBaseOptions(config *Config) []cmd.Option {
 	return options
 }
 
-func buildObserver(accessNodeOptions []FollowerOption) (*FlowObserverServiceBuilder, error) {
+func buildObserver(accessNodeOptions []FollowerOption) (*ObserverServiceBuilder, error) {
 	anb := FlowObserverService(accessNodeOptions...)
 	nodeBuilder := NewObserverServiceBuilder(anb)
 
