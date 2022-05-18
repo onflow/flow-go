@@ -165,12 +165,6 @@ type WriteFileFunc func(relativePath string, data []byte) error
 // Only applicable for transient test networks.
 func WriteMachineAccountFiles(chainID flow.ChainID, nodeInfos []bootstrap.NodeInfo, write WriteJSONFileFunc) error {
 
-	// ensure the chain ID is for a transient chain, where it is possible to
-	// infer machine account addresses this way
-	if !chainID.Transient() {
-		return fmt.Errorf("cannot write default machine account files for non-transient network")
-	}
-
 	// write machine account key files for each node which has a machine account (LN/SN)
 	//
 	// for the machine account key, we keep track of the address index to map
