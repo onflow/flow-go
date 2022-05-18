@@ -38,3 +38,11 @@ func (_m *TransactionMetrics) TransactionReceived(txID flow.Identifier, when tim
 func (_m *TransactionMetrics) TransactionSubmissionFailed() {
 	_m.Called()
 }
+
+func (_m *TransactionMetrics) TotalConnectionsInPool(connectionCount uint, connectionPoolSize uint) {
+	_m.Called(connectionCount, connectionPoolSize)
+}
+
+func (_m *TransactionMetrics) ConnectionFromPoolRetrieved() {
+	_m.Called()
+}

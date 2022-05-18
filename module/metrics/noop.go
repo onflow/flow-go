@@ -146,6 +146,8 @@ func (nc *NoopCollector) TransactionReceived(txID flow.Identifier, when time.Tim
 func (nc *NoopCollector) TransactionFinalized(txID flow.Identifier, when time.Time)             {}
 func (nc *NoopCollector) TransactionExecuted(txID flow.Identifier, when time.Time)              {}
 func (nc *NoopCollector) TransactionExpired(txID flow.Identifier)                               {}
+func (nc *NoopCollector) TotalConnectionsInPool(connectionCount uint, connectionPoolSize uint)  {}
+func (nc *NoopCollector) ConnectionFromPoolRetrieved()                                          {}
 func (nc *NoopCollector) TransactionSubmissionFailed()                                          {}
 func (nc *NoopCollector) ChunkDataPackRequested()                                               {}
 func (nc *NoopCollector) ExecutionSync(syncing bool)                                            {}
