@@ -234,7 +234,7 @@ func orchestratorOutputSanityCheck(
 		require.ElementsMatch(t, corrEnIds, actualCorrEnIds)
 	}
 
-	// number of bounced receipts should match the expected value.
+	// number of passed through receipts should match the expected value.
 	actualBouncedReceiptCount := 0
 	for _, originalReceiptId := range orgReceiptIds {
 		if passThroughReceipts.Contains(originalReceiptId) {
