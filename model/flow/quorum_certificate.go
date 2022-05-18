@@ -14,8 +14,8 @@ type QuorumCertificate struct {
 
 	// For consensus cluster, the SigData is a serialization of the following fields
 	// - SigType []byte, bit-vector indicating the type of sig produced by the signer.
-	// - AggregatedStakingSig crypto.Signature,
-	// - AggregatedRandomBeaconSig crypto.Signature
+	// - AggregatedStakingSig []byte
+	// - AggregatedRandomBeaconSig []byte
 	// - ReconstructedRandomBeaconSig crypto.Signature
 	// For collector cluster HotStuff, SigData is simply the aggregated staking signatures
 	// from all signers.
