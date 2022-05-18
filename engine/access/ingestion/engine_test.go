@@ -114,6 +114,7 @@ func (suite *Suite) SetupTest() {
 
 	ctx, _ := irrecoverable.WithSignaler(context.Background())
 	suite.eng.Start(ctx)
+	<-suite.eng.Ready()
 }
 
 // TestOnFinalizedBlock checks that when a block is received, a request for each individual collection is made
