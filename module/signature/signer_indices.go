@@ -20,7 +20,7 @@ import (
 //
 // RETURN VALUES:
 //  *  `signerIndices` is a bit vector. Let signerIndices[i] denote the ith bit of `signerIndices`.
-//                             ┌ 1 if and only if canonicalIdentifiers[i] is in `stakingSigners` or  `beaconSigners`
+//                             ┌ 1 if and only if canonicalIdentifiers[i] is in `stakingSigners` or `beaconSigners`
 //          signerIndices[i] = └ 0 otherwise
 //      Let `n` be the length of `canonicalIdentifiers`. `signerIndices` contains at least `n` bits, though, we
 //      right-pad it with tailing zeros to full bytes.
@@ -45,7 +45,7 @@ import (
 //           01101110 11000000
 //  * second return parameter: `sigTypes`
 //    - Here, we restrict our focus on the signers, which we encoded in the previous step.
-//      In out example, nodes [B,C,E,F,G,I,J] signed in canonical order. This is exactly the same order,
+//      In our example, nodes [B,C,E,F,G,I,J] signed in canonical order. This is exactly the same order,
 //      as we have represented the signer in the last step.
 //    - For these 5 nodes in their canonical order, we encode each node's signature type as
 // 			bit-value 1: node was in beaconSigners
@@ -118,8 +118,8 @@ func EncodeSignerToIndicesAndSigType(
 //  * The input `signers` must be the set of signers in their canonical order.
 //
 // Expected Error returns during normal operations:
-//  * IncompatibleIndexSliceError indicates that `signerIndices` has the wrong length
-//  * IllegallyPaddedIndexSliceError is the vector is padded with bits other than 0
+//  * ErrIncompatibleBitVectorLength indicates that `signerIndices` has the wrong length
+//  * ErrIllegallyPaddedBitVector is the vector is padded with bits other than 0
 func DecodeSigTypeToStakingAndBeaconSigners(
 	signers flow.IdentityList,
 	sigType []byte,
@@ -211,8 +211,9 @@ func EncodeSignersToIndices(
 //  * The input `canonicalIdentifiers` must exhaustively list the set of authorized signers in their canonical order.
 //
 // Expected Error returns during normal operations:
-//  * IncompatibleIndexSliceError indicates that `signerIndices` has the wrong length
-//  * IllegallyPaddedIndexSliceError is the vector is padded with bits other than 0
+//  * ErrIncompatibleBitVectorLength indicates that `signerIndices` has the wrong length
+//  * ErrIllegallyPaddedBitVector is the vector is padded with bits other than 0
+//  * ErrInvalidChecksum if the input is shorter than the expected checksum contained therein
 func DecodeSignerIndicesToIdentifiers(
 	canonicalIdentifiers flow.IdentifierList,
 	prefixed []byte,
@@ -247,8 +248,9 @@ func DecodeSignerIndicesToIdentifiers(
 //  * The input `canonicalIdentifiers` must exhaustively list the set of authorized signers in their canonical order.
 //
 // Expected Error returns during normal operations:
-//  * IncompatibleIndexSliceError indicates that `signerIndices` has the wrong length
-//  * IllegallyPaddedIndexSliceError is the vector is padded with bits other than 0
+//  * ErrIncompatibleBitVectorLength indicates that `signerIndices` has the wrong length
+//  * ErrIllegallyPaddedBitVector is the vector is padded with bits other than 0
+//  * ErrInvalidChecksum if the input is shorter than the expected checksum contained therein
 func DecodeSignerIndicesToIdentities(
 	canonicalIdentities flow.IdentityList,
 	prefixed []byte,

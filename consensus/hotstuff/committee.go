@@ -6,7 +6,7 @@ import (
 )
 
 // Committee accounts for the fact that we might have multiple HotStuff instances
-// (collector committees and main consensus committee). Each hostuff instance is supposed to
+// (collector committees and main consensus committee). Each HotStuff instance is supposed to
 // have a dedicated Committee state.
 // A Committee provides subset of the protocol.State, which is restricted to exactly those
 // nodes that participate in the current HotStuff instance: the state of all legitimate HotStuff

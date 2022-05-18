@@ -1,6 +1,7 @@
 package signature_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -57,5 +58,23 @@ func TestPrefixCheckSum(t *testing.T) {
 		extracted, err := signature.CompareAndExtract(committee, signature.PrefixCheckSum(committee, data))
 		require.NoError(t, err)
 		require.Equal(t, data, extracted)
+	})
+}
+
+// Test_InvalidCheckSum verifies correct handling of invalid checksums. We expect:
+//  1. `SplitCheckSum` returns the expected sentinel error `ErrInvalidChecksum` is the input is shorter than 4 bytes
+//  2. `CompareAndExtract` returns `ErrInvalidChecksum` is the checksum does not match
+func Test_InvalidCheckSum(t *testing.T) {
+	t.Run("checksum too short", func(t *testing.T) {
+		for i := 0; i < 4; i++ {
+			_, _, err := signature.SplitCheckSum(unittest.RandomBytes(i))
+			require.True(t, errors.Is(err, signature.ErrInvalidChecksum))
+		}
+	})
+
+	t.Run("mismatching checksum", func(t *testing.T) {
+		committee := unittest.IdentifierListFixture(20)
+		_, err := signature.CompareAndExtract(committee, unittest.RandomBytes(112))
+		require.True(t, errors.Is(err, signature.ErrInvalidChecksum))
 	})
 }
