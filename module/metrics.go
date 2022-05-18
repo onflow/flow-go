@@ -441,6 +441,12 @@ type TransactionMetrics interface {
 
 	// TransactionSubmissionFailed should be called whenever we try to submit a transaction and it fails
 	TransactionSubmissionFailed()
+
+	// TotalConnectionsInPool updates the number connections to collection/execution nodes stored in the pool, and the size of the pool
+	TotalConnectionsInPool(connectionCount uint, connectionPoolSize uint)
+
+	// ConnectionFromPoolRetrieved tracks the number of times a connection to a collection/execution node is retrieved from the connection pool
+	ConnectionFromPoolRetrieved()
 }
 
 type PingMetrics interface {
