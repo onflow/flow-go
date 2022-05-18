@@ -234,14 +234,14 @@ func orchestratorOutputSanityCheck(
 		require.ElementsMatch(t, corrEnIds, actualCorrEnIds)
 	}
 
-	// number of bounced receipts should match the expected value.
-	actualBouncedReceiptCount := 0
+	// number of passed through receipts should match the expected value.
+	actualPassedThroughReceiptCount := 0
 	for _, originalReceiptId := range orgReceiptIds {
 		if passThroughReceipts.Contains(originalReceiptId) {
-			actualBouncedReceiptCount++
+			actualPassedThroughReceiptCount++
 		}
 	}
-	require.Equal(t, expBouncedReceiptCount, actualBouncedReceiptCount)
+	require.Equal(t, expBouncedReceiptCount, actualPassedThroughReceiptCount)
 }
 
 // receiptsWithDistinctResultFixture creates a set of execution receipts (with distinct result) one per given executor id.

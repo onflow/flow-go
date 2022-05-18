@@ -193,18 +193,26 @@ func (c *ConduitFactory) processAttackerMessage(msg *insecure.Message) error {
 
 	switch e := event.(type) {
 	case *flow.ExecutionReceipt:
-		receipt, err := c.generateExecutionReceipt(&e.ExecutionResult)
-		if err != nil {
-			return fmt.Errorf("could not generate execution receipt for attacker's result: %w", err)
+		if len(e.ExecutorSignature) == 0 {
+			// empty signature field on execution receipt means attacker is dictating a result to
+			// CCF, and the receipt fields must be filled out locally.
+			receipt, err := c.generateExecutionReceipt(&e.ExecutionResult)
+			if err != nil {
+				return fmt.Errorf("could not generate execution receipt for attacker's result: %w", err)
+			}
+			event = receipt // swaps event with the receipt.
 		}
-		event = receipt // swaps event with the receipt.
 
 	case *flow.ResultApproval:
-		approval, err := c.generateResultApproval(&e.Body.Attestation)
-		if err != nil {
-			return fmt.Errorf("could not generate result approval for attacker's attestation: %w", err)
+		if len(e.VerifierSignature) == 0 {
+			// empty signature field on result approval means attacker is dictating an attestation to
+			// CCF, and the approval fields must be filled out locally.
+			approval, err := c.generateResultApproval(&e.Body.Attestation)
+			if err != nil {
+				return fmt.Errorf("could not generate result approval for attacker's attestation: %w", err)
+			}
+			event = approval // swaps event with the receipt.
 		}
-		event = approval // swaps event with the receipt.
 	}
 
 	targetIds, err := flow.ByteSlicesToIds(msg.TargetIDs)
