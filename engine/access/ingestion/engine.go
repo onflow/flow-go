@@ -102,10 +102,7 @@ func New(
 	rpcEngine *rpc.Engine,
 ) (*Engine, error) {
 	executionReceiptsRawQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(int(10)),
-		fifoqueue.WithLengthObserver(func(len int) {
-			// mempoolMetrics.MempoolEntries(metrics.ResourceTransactionIngestQueue, uint(len))
-		}),
+		fifoqueue.WithCapacity(10_000),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create execution receipts queue: %w", err)
@@ -114,10 +111,7 @@ func New(
 	executionReceiptsQueue := &engine.FifoMessageStore{FifoQueue: executionReceiptsRawQueue}
 
 	finalizedBlocksRawQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(int(10)),
-		fifoqueue.WithLengthObserver(func(len int) {
-			// mempoolMetrics.MempoolEntries(metrics.ResourceTransactionIngestQueue, uint(len))
-		}),
+		fifoqueue.WithCapacity(10_000),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create finalized block queue: %w", err)
