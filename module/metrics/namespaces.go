@@ -33,6 +33,8 @@ const (
 const (
 	subsystemTransactionTiming     = "transaction_timing"
 	subsystemTransactionSubmission = "transaction_submission"
+	subsystemConnectionReuse       = "connection_reuse"
+	subsystemConnectionAdded       = "connection_added"
 )
 
 // Collection subsystem

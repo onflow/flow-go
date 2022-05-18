@@ -8,12 +8,12 @@ import (
 	"time"
 
 	lru "github.com/hashicorp/golang-lru"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
 

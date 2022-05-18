@@ -10,7 +10,6 @@ import (
 	"time"
 
 	lru "github.com/hashicorp/golang-lru"
-	modulemock "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/stretchr/testify/assert"
@@ -20,6 +19,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/access/mock"
+	modulemock "github.com/onflow/flow-go/module/mock"
 )
 
 func TestProxyAccessAPI(t *testing.T) {
@@ -344,10 +344,13 @@ func TestConnectionPoolFull(t *testing.T) {
 
 	var hostnameOrIP string
 	hostnameOrIP, _, err = net.SplitHostPort(cn1Address)
+	assert.NoError(t, err)
 	grpcAddress1 := fmt.Sprintf("%s:%d", hostnameOrIP, connectionFactory.CollectionGRPCPort)
 	hostnameOrIP, _, err = net.SplitHostPort(cn2Address)
+	assert.NoError(t, err)
 	grpcAddress2 := fmt.Sprintf("%s:%d", hostnameOrIP, connectionFactory.CollectionGRPCPort)
 	hostnameOrIP, _, err = net.SplitHostPort(cn3Address)
+	assert.NoError(t, err)
 	grpcAddress3 := fmt.Sprintf("%s:%d", hostnameOrIP, connectionFactory.CollectionGRPCPort)
 
 	contains1 := connectionFactory.ConnectionsCache.Contains(grpcAddress1)
