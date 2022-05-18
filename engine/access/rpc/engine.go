@@ -148,6 +148,8 @@ func New(log zerolog.Logger,
 		CollectionNodeGRPCTimeout: config.CollectionClientTimeout,
 		ExecutionNodeGRPCTimeout:  config.ExecutionClientTimeout,
 		ConnectionsCache:          cache,
+		CacheSize:                 uint(cacheSize),
+		TransactionMetrics:        transactionMetrics,
 	}
 
 	backend := backend.New(state,

@@ -59,4 +59,10 @@ func NewTransactionMetrics(t testing.TB) *TransactionMetrics {
 	t.Cleanup(func() { mock.AssertExpectations(t) })
 
 	return mock
+func (_m *TransactionMetrics) TotalConnectionsInPool(connectionCount uint, connectionPoolSize uint) {
+	_m.Called(connectionCount, connectionPoolSize)
+}
+
+func (_m *TransactionMetrics) ConnectionFromPoolRetrieved() {
+	_m.Called()
 }
