@@ -24,7 +24,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	"github.com/onflow/flow-go/utils/io"
 
-	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
@@ -93,13 +92,9 @@ type ObserverServiceConfig struct {
 	bootstrapNodePublicKeys      []string
 	observerNetworkingKeyPath    string
 	bootstrapIdentities          flow.IdentityList // the identity list of bootstrap peers the node uses to discover other nodes
-	collectionGRPCPort           uint              // deprecated
-	executionGRPCPort            uint              // deprecated
 	apiRatelimits                map[string]int
 	apiBurstlimits               map[string]int
 	rpcConf                      rpc.Config
-	ExecutionNodeAddress         string                   // deprecated
-	HistoricalAccessRPCs         []access.AccessAPIClient //deprecated
 	logTxTimeToFinalized         bool
 	logTxTimeToExecuted          bool
 	logTxTimeToFinalizedExecuted bool
@@ -120,8 +115,6 @@ type PublicNetworkConfig struct {
 // DefaultObserverServiceConfig defines all the default values for the ObserverServiceConfig
 func DefaultObserverServiceConfig() *ObserverServiceConfig {
 	return &ObserverServiceConfig{
-		collectionGRPCPort: 9000,
-		executionGRPCPort:  9000,
 		rpcConf: rpc.Config{
 			UnsecureGRPCListenAddr:    "0.0.0.0:9000",
 			SecureGRPCListenAddr:      "0.0.0.0:9001",
@@ -135,7 +128,6 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 			PreferredExecutionNodeIDs: nil,
 			FixedExecutionNodeIDs:     nil,
 		},
-		ExecutionNodeAddress:         "localhost:9000",
 		logTxTimeToFinalized:         false,
 		logTxTimeToExecuted:          false,
 		logTxTimeToFinalizedExecuted: false,
@@ -396,18 +388,21 @@ func (builder *ObserverServiceBuilder) ParseFlags() error {
 }
 
 func (builder *ObserverServiceBuilder) extraFlags() {
+	var dummyString string
+	var dummyBool bool
+	var dummyUint uint
 	builder.ExtraFlags(func(flags *pflag.FlagSet) {
 		defaultConfig := DefaultObserverServiceConfig()
 
-		flags.UintVar(&builder.collectionGRPCPort, "collection-ingress-port", defaultConfig.collectionGRPCPort, "the grpc ingress port for all collection nodes")
-		flags.UintVar(&builder.executionGRPCPort, "execution-ingress-port", defaultConfig.executionGRPCPort, "the grpc ingress port for all execution nodes")
+		flags.UintVar(&dummyUint, "collection-ingress-port", 0, "the grpc ingress port for all collection nodes")
+		flags.UintVar(&dummyUint, "execution-ingress-port", 0, "the grpc ingress port for all execution nodes")
 		flags.StringVarP(&builder.rpcConf.UnsecureGRPCListenAddr, "rpc-addr", "r", defaultConfig.rpcConf.UnsecureGRPCListenAddr, "the address the unsecured gRPC server listens on")
 		flags.StringVar(&builder.rpcConf.SecureGRPCListenAddr, "secure-rpc-addr", defaultConfig.rpcConf.SecureGRPCListenAddr, "the address the secure gRPC server listens on")
 		flags.StringVarP(&builder.rpcConf.HTTPListenAddr, "http-addr", "h", defaultConfig.rpcConf.HTTPListenAddr, "the address the http proxy server listens on")
 		flags.StringVar(&builder.rpcConf.RESTListenAddr, "rest-addr", defaultConfig.rpcConf.RESTListenAddr, "the address the REST server listens on (if empty the REST server will not be started)")
 		flags.StringVarP(&builder.rpcConf.CollectionAddr, "static-collection-ingress-addr", "", defaultConfig.rpcConf.CollectionAddr, "the address (of the collection node) to send transactions to")
-		flags.StringVarP(&builder.ExecutionNodeAddress, "script-addr", "s", defaultConfig.ExecutionNodeAddress, "the address (of the execution node) forward the script to")
-		flags.StringVarP(&builder.rpcConf.HistoricalAccessAddrs, "historical-access-addr", "", defaultConfig.rpcConf.HistoricalAccessAddrs, "comma separated rpc addresses for historical access nodes")
+		flags.StringVarP(&dummyString, "script-addr", "", "", "the address (of the execution node) forward the script to")
+		flags.StringVarP(&dummyString, "historical-access-addr", "", "", "comma separated rpc addresses for historical access nodes")
 		flags.DurationVar(&builder.rpcConf.CollectionClientTimeout, "collection-client-timeout", defaultConfig.rpcConf.CollectionClientTimeout, "grpc client timeout for a collection node")
 		flags.DurationVar(&builder.rpcConf.ExecutionClientTimeout, "execution-client-timeout", defaultConfig.rpcConf.ExecutionClientTimeout, "grpc client timeout for an execution node")
 		flags.UintVar(&builder.rpcConf.MaxHeightRange, "rpc-max-height-range", defaultConfig.rpcConf.MaxHeightRange, "maximum size for height range requests")
@@ -420,8 +415,7 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 		flags.BoolVar(&builder.rpcMetricsEnabled, "rpc-metrics-enabled", defaultConfig.rpcMetricsEnabled, "whether to enable the rpc metrics")
 		flags.StringToIntVar(&builder.apiRatelimits, "api-rate-limits", defaultConfig.apiRatelimits, "per second rate limits for Access API methods e.g. Ping=300,GetTransaction=500 etc.")
 		flags.StringToIntVar(&builder.apiBurstlimits, "api-burst-limits", defaultConfig.apiBurstlimits, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
-		var dummy bool
-		flags.BoolVar(&dummy, "staked", false, "deprecated - whether this node is a staked access node or not")
+		flags.BoolVar(&dummyBool, "staked", false, "deprecated - whether this node is a staked access node or not")
 		flags.StringVar(&builder.observerNetworkingKeyPath, "observer-networking-key-path", defaultConfig.observerNetworkingKeyPath, "path to the networking key for observer")
 		flags.StringSliceVar(&builder.bootstrapNodeAddresses, "bootstrap-node-addresses", defaultConfig.bootstrapNodeAddresses, "the network addresses of the bootstrap access node if this is an observer e.g. access-001.mainnet.flow.org:9653,access-002.mainnet.flow.org:9653")
 		flags.StringSliceVar(&builder.bootstrapNodePublicKeys, "bootstrap-node-public-keys", defaultConfig.bootstrapNodePublicKeys, "the networking public key of the bootstrap access node if this is an observer (in the same order as the bootstrap node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
@@ -799,7 +793,7 @@ func (builder *ObserverServiceBuilder) attachRPCEngine() {
                         node.State,
                         builder.rpcConf,
                         nil,
-                        builder.HistoricalAccessRPCs,
+                        nil,
                         node.Storage.Blocks,
                         node.Storage.Headers,
                         node.Storage.Collections,
@@ -808,8 +802,8 @@ func (builder *ObserverServiceBuilder) attachRPCEngine() {
                         node.Storage.Results,
                         node.RootChainID,
                         nil,
-                        builder.collectionGRPCPort,
-                        builder.executionGRPCPort,
+                        0,
+                        0,
                         builder.retryEnabled,
                         builder.rpcMetricsEnabled,
                         builder.apiRatelimits,
