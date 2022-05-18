@@ -305,13 +305,12 @@ func validPadding(bitVector []byte, numUsedBits int) error {
 	//   operator). Hence, condition 2 is satisfied if and only if the result is identical to zero.
 	// Note that this implementation is much more efficient than individually checking the padded bits, as we check all
 	// padded bits at once; furthermore, we only use multiplication, subtraction, shift, which are fast.
-	if l == 0 {
+	if numUsedBits&7 == 0 { // if numUsedBits is multiple of 8, then there are no padding bits to check
 		return nil
 	}
-	// the above check has ensured that lastByte does exist
+	// the above check has ensured that lastByte does exist (l==0 is excluded)
 	lastByte := bitVector[l-1]
-	numPaddedBits := 8*l - numUsedBits
-	if (lastByte << (8 - numPaddedBits)) != 0 {
+	if (lastByte << (numUsedBits & 7)) != 0 { // shift by numUsedBits % 8
 		return fmt.Errorf("some padded bits are not zero with %d used bits (bitVector: %x): %w", numUsedBits, bitVector, ErrIllegallyPaddedBitVector)
 	}
 
