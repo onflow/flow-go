@@ -97,15 +97,6 @@ type ObserverServiceConfig struct {
 	rpcConf                      rpc.Config
 	rpcMetricsEnabled            bool
 	baseOptions                  []cmd.Option
-
-	PublicNetworkConfig PublicNetworkConfig
-}
-
-type PublicNetworkConfig struct {
-	// NetworkKey crypto.PublicKey // TODO: do we need a different key for the public network?
-	BindAddress string
-	Network     network.Network
-	Metrics     module.NetworkMetrics
 }
 
 // DefaultObserverServiceConfig defines all the default values for the ObserverServiceConfig
@@ -129,10 +120,6 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 		apiBurstlimits:               nil,
 		bootstrapNodeAddresses:       []string{},
 		bootstrapNodePublicKeys:      []string{},
-		PublicNetworkConfig: PublicNetworkConfig{
-			BindAddress: cmd.NotSet,
-			Metrics:     metrics.NewNoopCollector(),
-		},
 		observerNetworkingKeyPath: cmd.NotSet,
 	}
 }
@@ -386,32 +373,32 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 	builder.ExtraFlags(func(flags *pflag.FlagSet) {
 		defaultConfig := DefaultObserverServiceConfig()
 
-		flags.UintVar(&dummyUint, "collection-ingress-port", 0, "the grpc ingress port for all collection nodes")
-		flags.UintVar(&dummyUint, "execution-ingress-port", 0, "the grpc ingress port for all execution nodes")
+		flags.UintVar(&dummyUint, "collection-ingress-port", 0, "deprecated - the grpc ingress port for all collection nodes")
+		flags.UintVar(&dummyUint, "execution-ingress-port", 0, "deprecated - the grpc ingress port for all execution nodes")
 		flags.StringVarP(&builder.rpcConf.UnsecureGRPCListenAddr, "rpc-addr", "r", defaultConfig.rpcConf.UnsecureGRPCListenAddr, "the address the unsecured gRPC server listens on")
 		flags.StringVar(&builder.rpcConf.SecureGRPCListenAddr, "secure-rpc-addr", defaultConfig.rpcConf.SecureGRPCListenAddr, "the address the secure gRPC server listens on")
 		flags.StringVarP(&builder.rpcConf.HTTPListenAddr, "http-addr", "h", defaultConfig.rpcConf.HTTPListenAddr, "the address the http proxy server listens on")
 		flags.StringVar(&builder.rpcConf.RESTListenAddr, "rest-addr", defaultConfig.rpcConf.RESTListenAddr, "the address the REST server listens on (if empty the REST server will not be started)")
 		flags.StringVarP(&builder.rpcConf.CollectionAddr, "static-collection-ingress-addr", "", defaultConfig.rpcConf.CollectionAddr, "the address (of the collection node) to send transactions to")
-		flags.StringVarP(&dummyString, "script-addr", "", "", "the address (of the execution node) forward the script to")
-		flags.StringVarP(&dummyString, "historical-access-addr", "", "", "comma separated rpc addresses for historical access nodes")
+		flags.StringVarP(&dummyString, "script-addr", "", "", "deprecated - the address (of the execution node) forward the script to")
+		flags.StringVarP(&dummyString, "historical-access-addr", "", "", "deprecated - comma separated rpc addresses for historical access nodes")
 		flags.DurationVar(&builder.rpcConf.CollectionClientTimeout, "collection-client-timeout", defaultConfig.rpcConf.CollectionClientTimeout, "grpc client timeout for a collection node")
 		flags.DurationVar(&builder.rpcConf.ExecutionClientTimeout, "execution-client-timeout", defaultConfig.rpcConf.ExecutionClientTimeout, "grpc client timeout for an execution node")
 		flags.UintVar(&builder.rpcConf.MaxHeightRange, "rpc-max-height-range", defaultConfig.rpcConf.MaxHeightRange, "maximum size for height range requests")
 		flags.StringSliceVar(&builder.rpcConf.PreferredExecutionNodeIDs, "preferred-execution-node-ids", defaultConfig.rpcConf.PreferredExecutionNodeIDs, "comma separated list of execution nodes ids to choose from when making an upstream call e.g. b4a4dbdcd443d...,fb386a6a... etc.")
 		flags.StringSliceVar(&builder.rpcConf.FixedExecutionNodeIDs, "fixed-execution-node-ids", defaultConfig.rpcConf.FixedExecutionNodeIDs, "comma separated list of execution nodes ids to choose from when making an upstream call if no matching preferred execution id is found e.g. b4a4dbdcd443d...,fb386a6a... etc.")
-		flags.BoolVar(&dummyBool, "log-tx-time-to-finalized", false, "log transaction time to finalized")
-		flags.BoolVar(&dummyBool, "log-tx-time-to-executed", false, "log transaction time to executed")
-		flags.BoolVar(&dummyBool, "log-tx-time-to-finalized-executed", false, "log transaction time to finalized and executed")
-		flags.BoolVar(&dummyBool, "retry-enabled", false, "whether to enable the retry mechanism at the access node level")
-		flags.BoolVar(&dummyBool, "rpc-metrics-enabled", false, "whether to enable the rpc metrics")
+		flags.BoolVar(&dummyBool, "log-tx-time-to-finalized", false, "deprecated - log transaction time to finalized")
+		flags.BoolVar(&dummyBool, "log-tx-time-to-executed", false, "deprecated - log transaction time to executed")
+		flags.BoolVar(&dummyBool, "log-tx-time-to-finalized-executed", false, "deprecated - log transaction time to finalized and executed")
+		flags.BoolVar(&dummyBool, "retry-enabled", false, "deprecated - whether to enable the retry mechanism at the access node level")
+		flags.BoolVar(&dummyBool, "rpc-metrics-enabled", false, "deprecated - whether to enable the rpc metrics")
 		flags.StringToIntVar(&builder.apiRatelimits, "api-rate-limits", defaultConfig.apiRatelimits, "per second rate limits for Access API methods e.g. Ping=300,GetTransaction=500 etc.")
 		flags.StringToIntVar(&builder.apiBurstlimits, "api-burst-limits", defaultConfig.apiBurstlimits, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
 		flags.BoolVar(&dummyBool, "staked", false, "deprecated - whether this node is a staked access node or not")
 		flags.StringVar(&builder.observerNetworkingKeyPath, "observer-networking-key-path", defaultConfig.observerNetworkingKeyPath, "path to the networking key for observer")
 		flags.StringSliceVar(&builder.bootstrapNodeAddresses, "bootstrap-node-addresses", defaultConfig.bootstrapNodeAddresses, "the network addresses of the bootstrap access node if this is an observer e.g. access-001.mainnet.flow.org:9653,access-002.mainnet.flow.org:9653")
 		flags.StringSliceVar(&builder.bootstrapNodePublicKeys, "bootstrap-node-public-keys", defaultConfig.bootstrapNodePublicKeys, "the networking public key of the bootstrap access node if this is an observer (in the same order as the bootstrap node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
-		flags.StringVar(&builder.PublicNetworkConfig.BindAddress, "public-network-address", defaultConfig.PublicNetworkConfig.BindAddress, "access node's public network bind address")
+		flags.StringVar(&dummyString, "public-network-address", "", "deprecated - access node's public network bind address")
 	}).ValidateFlags(func() error {
 		return nil
 	})
