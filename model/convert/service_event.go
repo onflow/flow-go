@@ -40,7 +40,7 @@ func ServiceEvent(chainID flow.ChainID, event flow.Event) (*flow.ServiceEvent, e
 func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error) {
 
 	// decode bytes using jsoncdc
-	payload, err := json.Decode(event.Payload)
+	payload, err := json.Decode(nil, event.Payload)
 	if err != nil {
 		return nil, fmt.Errorf("could not unmarshal event payload: %w", err)
 	}
@@ -136,7 +136,7 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 func convertServiceEventEpochCommit(event flow.Event) (*flow.ServiceEvent, error) {
 
 	// decode bytes using jsoncdc
-	payload, err := json.Decode(event.Payload)
+	payload, err := json.Decode(nil, event.Payload)
 	if err != nil {
 		return nil, fmt.Errorf("could not unmarshal event payload: %w", err)
 	}

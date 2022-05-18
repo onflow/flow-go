@@ -58,7 +58,7 @@ unittest-main:
 .PHONY: install-mock-generators
 install-mock-generators:
 	cd ${GOPATH}; \
-    GO111MODULE=on go install github.com/vektra/mockery/cmd/mockery@v1.1.2; \
+    GO111MODULE=on go install github.com/vektra/mockery/v2@v2.12.1; \
     GO111MODULE=on go install github.com/golang/mock/mockgen@v1.3.1;
 
 ############################################################################################
@@ -122,46 +122,46 @@ generate-proto:
 
 .PHONY: generate-mocks
 generate-mocks:
-	GO111MODULE=on mockery -name '(Connector|PingInfoProvider)' -dir=network/p2p -case=underscore -output="./network/mocknetwork" -outpkg="mocknetwork"
+	GO111MODULE=on mockery --name '(Connector|PingInfoProvider)' --dir=network/p2p --case=underscore --output="./network/mocknetwork" --outpkg="mocknetwork"
 	GO111MODULE=on mockgen -destination=storage/mocks/storage.go -package=mocks github.com/onflow/flow-go/storage Blocks,Headers,Payloads,Collections,Commits,Events,ServiceEvents,TransactionResults
 	GO111MODULE=on mockgen -destination=module/mocks/network.go -package=mocks github.com/onflow/flow-go/module Local,Requester
 	GO111MODULE=on mockgen -destination=network/mocknetwork/engine.go -package=mocknetwork github.com/onflow/flow-go/network Engine
 	GO111MODULE=on mockgen -destination=network/mocknetwork/mock_network.go -package=mocknetwork github.com/onflow/flow-go/network Network
-	GO111MODULE=on mockery -name '(ExecutionDataService|ExecutionDataCIDCache)' -dir=module/state_synchronization -case=underscore -output="./module/state_synchronization/mock" -outpkg="state_synchronization"
-	GO111MODULE=on mockery -name 'ExecutionState' -dir=engine/execution/state -case=underscore -output="engine/execution/state/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name 'BlockComputer' -dir=engine/execution/computation/computer -case=underscore -output="engine/execution/computation/computer/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name 'ComputationManager' -dir=engine/execution/computation -case=underscore -output="engine/execution/computation/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name 'EpochComponentsFactory' -dir=engine/collection/epochmgr -case=underscore -output="engine/collection/epochmgr/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name 'Backend' -dir=engine/collection/rpc -case=underscore -output="engine/collection/rpc/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name 'ProviderEngine' -dir=engine/execution/provider -case=underscore -output="engine/execution/provider/mock" -outpkg="mock"
-	(cd ./crypto && GO111MODULE=on mockery -name 'PublicKey' -case=underscore -output="../module/mock" -outpkg="mock")
-	GO111MODULE=on mockery -name '.*' -dir=state/cluster -case=underscore -output="state/cluster/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name '.*' -dir=module -case=underscore -tags="relic" -output="./module/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name '.*' -dir=module/mempool -case=underscore -output="./module/mempool/mock" -outpkg="mempool"
-	GO111MODULE=on mockery -name '.*' -dir=module/component -case=underscore -output="./module/component/mock" -outpkg="component"
-	GO111MODULE=on mockery -name '.*' -dir=network -case=underscore -output="./network/mocknetwork" -outpkg="mocknetwork"
-	GO111MODULE=on mockery -name '.*' -dir=storage -case=underscore -output="./storage/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name '.*' -dir="state/protocol" -case=underscore -output="state/protocol/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name '.*' -dir="state/protocol/events" -case=underscore -output="./state/protocol/events/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name '.*' -dir=engine/execution/computation/computer -case=underscore -output="./engine/execution/computation/computer/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name '.*' -dir=engine/execution/state -case=underscore -output="./engine/execution/state/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name '.*' -dir=engine/consensus -case=underscore -output="./engine/consensus/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name '.*' -dir=engine/consensus/approvals -case=underscore -output="./engine/consensus/approvals/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name '.*' -dir=fvm -case=underscore -output="./fvm/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name '.*' -dir=fvm/state -case=underscore -output="./fvm/mock/state" -outpkg="mock"
-	GO111MODULE=on mockery -name '.*' -dir=ledger -case=underscore -output="./ledger/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name 'SubscriptionManager' -dir=network/ -case=underscore -output="./network/mocknetwork" -outpkg="mocknetwork"
-	GO111MODULE=on mockery -name 'Vertex' -dir="./module/forest" -case=underscore -output="./module/forest/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name '.*' -dir="./consensus/hotstuff" -case=underscore -output="./consensus/hotstuff/mocks" -outpkg="mocks"
-	GO111MODULE=on mockery -name '.*' -dir="./engine/access/wrapper" -case=underscore -output="./engine/access/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name 'API' -dir="./access" -case=underscore -output="./access/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name 'ConnectionFactory' -dir="./engine/access/rpc/backend" -case=underscore -output="./engine/access/rpc/backend/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name 'IngestRPC' -dir="./engine/execution/ingestion" -case=underscore -tags relic -output="./engine/execution/ingestion/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name '.*' -dir=model/fingerprint -case=underscore -output="./model/fingerprint/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name 'ExecForkActor' --structname 'ExecForkActorMock' -dir=module/mempool/consensus/mock/ -case=underscore -output="./module/mempool/consensus/mock/" -outpkg="mock"
-	GO111MODULE=on mockery -name '.*' -dir=engine/verification/fetcher/ -case=underscore -output="./engine/verification/fetcher/mock" -outpkg="mockfetcher"
-	GO111MODULE=on mockery -name '.*' -dir=insecure/ -case=underscore -output="./insecure/mock"  -outpkg="mockinsecure"
-	GO111MODULE=on mockery -name '.*' -dir=./cmd/util/ledger/reporters -case=underscore -output="./cmd/util/ledger/reporters/mock" -outpkg="mock"
+	GO111MODULE=on mockery --name '(ExecutionDataService|ExecutionDataCIDCache)' --dir=module/state_synchronization --case=underscore --output="./module/state_synchronization/mock" --outpkg="state_synchronization"
+	GO111MODULE=on mockery --name 'ExecutionState' --dir=engine/execution/state --case=underscore --output="engine/execution/state/mock" --outpkg="mock"
+	GO111MODULE=on mockery --name 'BlockComputer' --dir=engine/execution/computation/computer --case=underscore --output="engine/execution/computation/computer/mock" --outpkg="mock"
+	GO111MODULE=on mockery --name 'ComputationManager' --dir=engine/execution/computation --case=underscore --output="engine/execution/computation/mock" --outpkg="mock"
+	GO111MODULE=on mockery --name 'EpochComponentsFactory' --dir=engine/collection/epochmgr --case=underscore --output="engine/collection/epochmgr/mock" --outpkg="mock"
+	GO111MODULE=on mockery --name 'Backend' --dir=engine/collection/rpc --case=underscore --output="engine/collection/rpc/mock" --outpkg="mock"
+	GO111MODULE=on mockery --name 'ProviderEngine' --dir=engine/execution/provider --case=underscore --output="engine/execution/provider/mock" --outpkg="mock"
+	(cd ./crypto && GO111MODULE=on mockery --name 'PublicKey' --case=underscore --output="../module/mock" --outpkg="mock")
+	GO111MODULE=on mockery --name '.*' --dir=state/cluster --case=underscore --output="state/cluster/mock" --outpkg="mock"
+	GO111MODULE=on mockery --name '.*' --dir=module --case=underscore --tags="relic" --output="./module/mock" --outpkg="mock"
+	GO111MODULE=on mockery --name '.*' --dir=module/mempool --case=underscore --output="./module/mempool/mock" --outpkg="mempool"
+	GO111MODULE=on mockery --name '.*' --dir=module/component --case=underscore --output="./module/component/mock" --outpkg="component"
+	GO111MODULE=on mockery --name '.*' --dir=network --case=underscore --output="./network/mocknetwork" --outpkg="mocknetwork"
+	GO111MODULE=on mockery --name '.*' --dir=storage --case=underscore --output="./storage/mock" --outpkg="mock"
+	GO111MODULE=on mockery --name '.*' --dir="state/protocol" --case=underscore --output="state/protocol/mock" --outpkg="mock"
+	GO111MODULE=on mockery --name '.*' --dir="state/protocol/events" --case=underscore --output="./state/protocol/events/mock" --outpkg="mock"
+	GO111MODULE=on mockery --name '.*' --dir=engine/execution/computation/computer --case=underscore --output="./engine/execution/computation/computer/mock" --outpkg="mock"
+	GO111MODULE=on mockery --name '.*' --dir=engine/execution/state --case=underscore --output="./engine/execution/state/mock" --outpkg="mock"
+	GO111MODULE=on mockery --name '.*' --dir=engine/consensus --case=underscore --output="./engine/consensus/mock" --outpkg="mock"
+	GO111MODULE=on mockery --name '.*' --dir=engine/consensus/approvals --case=underscore --output="./engine/consensus/approvals/mock" --outpkg="mock"
+	GO111MODULE=on mockery --name '.*' --dir=fvm --case=underscore --output="./fvm/mock" --outpkg="mock"
+	GO111MODULE=on mockery --name '.*' --dir=fvm/state --case=underscore --output="./fvm/mock/state" --outpkg="mock"
+	GO111MODULE=on mockery --name '.*' --dir=ledger --case=underscore --output="./ledger/mock" --outpkg="mock"
+	GO111MODULE=on mockery --name 'SubscriptionManager' --dir=network/ --case=underscore --output="./network/mocknetwork" --outpkg="mocknetwork"
+	GO111MODULE=on mockery --name 'Vertex' --dir="./module/forest" --case=underscore --output="./module/forest/mock" --outpkg="mock"
+	GO111MODULE=on mockery --name '.*' --dir="./consensus/hotstuff" --case=underscore --output="./consensus/hotstuff/mocks" --outpkg="mocks"
+	GO111MODULE=on mockery --name '.*' --dir="./engine/access/wrapper" --case=underscore --output="./engine/access/mock" --outpkg="mock"
+	GO111MODULE=on mockery --name 'API' --dir="./access" --case=underscore --output="./access/mock" --outpkg="mock"
+	GO111MODULE=on mockery --name 'ConnectionFactory' --dir="./engine/access/rpc/backend" --case=underscore --output="./engine/access/rpc/backend/mock" --outpkg="mock"
+	GO111MODULE=on mockery --name 'IngestRPC' --dir="./engine/execution/ingestion" --case=underscore --tags relic --output="./engine/execution/ingestion/mock" --outpkg="mock"
+	GO111MODULE=on mockery --name '.*' --dir=model/fingerprint --case=underscore --output="./model/fingerprint/mock" --outpkg="mock"
+	GO111MODULE=on mockery --name 'ExecForkActor' --structname 'ExecForkActorMock' --dir=module/mempool/consensus/mock/ --case=underscore --output="./module/mempool/consensus/mock/" --outpkg="mock"
+	GO111MODULE=on mockery --name '.*' --dir=engine/verification/fetcher/ --case=underscore --output="./engine/verification/fetcher/mock" --outpkg="mockfetcher"
+	GO111MODULE=on mockery --name '.*' --dir=insecure/ --case=underscore --output="./insecure/mock"  --outpkg="mockinsecure"
+	GO111MODULE=on mockery --name '.*' --dir=./cmd/util/ledger/reporters --case=underscore --output="./cmd/util/ledger/reporters/mock" --outpkg="mock"
 
 # this ensures there is no unused dependency being added by accident
 .PHONY: tidy
@@ -491,14 +491,14 @@ deploy-staging: update-deployment-image-name-staging apply-staging-files monitor
 apply-staging-files:
 	kconfig=$$(uuidgen); \
 	echo "$$KUBECONFIG_STAGING" > $$kconfig; \
-	files=$$(find ${K8S_YAMLS_LOCATION_STAGING} -type f \( -name "*.yml" -or -name "*.yaml" \)); \
+	files=$$(find ${K8S_YAMLS_LOCATION_STAGING} -type f \( --name "*.yml" -or --name "*.yaml" \)); \
 	echo "$$files" | xargs -I {} kubectl --kubeconfig=$$kconfig apply -f {}
 
 # Deployment YAMLs must have 'deployment' in their name.
 .PHONY: update-deployment-image-name-staging
 update-deployment-image-name-staging: CONTAINER=flow-test-net
 update-deployment-image-name-staging:
-	@files=$$(find ${K8S_YAMLS_LOCATION_STAGING} -type f \( -name "*.yml" -or -name "*.yaml" \) | grep deployment); \
+	@files=$$(find ${K8S_YAMLS_LOCATION_STAGING} -type f \( --name "*.yml" -or --name "*.yaml" \) | grep deployment); \
 	for file in $$files; do \
 		patched=`openssl rand -hex 8`; \
 		node=`echo "$$file" | grep -oP 'flow-\K\w+(?=-node-deployment.yml)'`; \

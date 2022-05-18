@@ -75,7 +75,7 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 		tx.PayloadSignatures,
 		tx.PayloadMessage(),
 		tx.ProposalKey,
-		newInvalidEnvelopeSignatureError,
+		newInvalidPayloadSignatureError,
 	)
 	if err != nil {
 		return errors.NewInvalidProposalSignatureError(tx.ProposalKey.Address, tx.ProposalKey.KeyIndex, err)
@@ -89,7 +89,7 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 		tx.EnvelopeSignatures,
 		tx.EnvelopeMessage(),
 		tx.ProposalKey,
-		newInvalidPayloadSignatureError,
+		newInvalidEnvelopeSignatureError,
 	)
 	if err != nil {
 		return errors.NewInvalidProposalSignatureError(tx.ProposalKey.Address, tx.ProposalKey.KeyIndex, err)
