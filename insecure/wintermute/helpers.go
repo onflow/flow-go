@@ -235,7 +235,7 @@ func orchestratorOutputSanityCheck(
 	}
 
 	// number of passed through receipts should match the expected value.
-	actualBouncedReceiptCount := 0
+	actualPassedThroughReceiptCount := 0
 	for _, originalReceiptId := range orgReceiptIds {
 		if passThroughReceipts.Contains(originalReceiptId) {
 			actualBouncedReceiptCount++
