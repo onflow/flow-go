@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/insecure/attacknetwork"
 	"github.com/onflow/flow-go/insecure/corruptible"
@@ -114,7 +115,7 @@ func withCorruptibleConduitFactory(t *testing.T, run func(*testing.T, flow.Ident
 	ccf := corruptible.NewCorruptibleConduitFactory(
 		unittest.Logger(),
 		flow.BftTestnet,
-		corruptedIdentity.NodeID,
+		testutil.LocalFixture(t, corruptedIdentity),
 		codec,
 		"localhost:0")
 

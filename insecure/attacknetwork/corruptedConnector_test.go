@@ -2,6 +2,8 @@ package attacknetwork
 
 import (
 	"context"
+	"fmt"
+	"math/rand"
 	"net"
 	"testing"
 	"time"
@@ -10,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -42,7 +45,9 @@ func TestConnectorHappyPath(t *testing.T) {
 		}()
 
 		// goroutine checks mock ccf for receiving the message sent over the connection.
-		msg, _, _ := insecure.MessageFixture(t, cbor.NewCodec(), insecure.Protocol_MULTICAST)
+		msg, _, _ := insecure.MessageFixture(t, cbor.NewCodec(), insecure.Protocol_MULTICAST, &message.TestMessage{
+			Text: fmt.Sprintf("this is a test message: %d", rand.Int()),
+		})
 		sentMsgReceived := make(chan struct{})
 		go func() {
 			receivedMsg := <-ccf.attackerMsg

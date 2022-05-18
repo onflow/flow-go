@@ -13,11 +13,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	sdk "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
+
 	hotstuffroot "github.com/onflow/flow-go/consensus/hotstuff"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	hotstuffPacker "github.com/onflow/flow-go/consensus/hotstuff/packer"
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/chunks"
@@ -820,6 +821,14 @@ func ResultApprovalFixture(opts ...func(*flow.ResultApproval)) *flow.ResultAppro
 	}
 
 	return &approval
+}
+
+func AttestationFixture() *flow.Attestation {
+	return &flow.Attestation{
+		BlockID:           IdentifierFixture(),
+		ExecutionResultID: IdentifierFixture(),
+		ChunkIndex:        uint64(0),
+	}
 }
 
 func StateCommitmentFixture() flow.StateCommitment {

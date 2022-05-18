@@ -201,24 +201,29 @@ func orchestratorOutputSanityCheck(
 	// keeps a map of (corrupted results ids -> execution node ids)
 	dictatedResults := make(map[flow.Identifier]flow.IdentifierList)
 
-	// keeps a list of all bounced back events.
-	bouncedReceipts := flow.IdentifierList{}
+	// keeps a list of all pass through receipts.
+	passThroughReceipts := flow.IdentifierList{}
 
 	for _, outputEvent := range outputEvents {
 		switch event := outputEvent.FlowProtocolEvent.(type) {
 		case *flow.ExecutionReceipt:
-			// makes sure sender is a corrupted execution node.
-			ok := corrEnIds.Contains(outputEvent.CorruptedNodeId)
-			require.True(t, ok)
-			// uses union to avoid adding duplicate.
-			bouncedReceipts = bouncedReceipts.Union(flow.IdentifierList{event.ID()})
-		case *flow.ExecutionResult:
-			resultId := event.ID()
-			if dictatedResults[resultId] == nil {
-				dictatedResults[resultId] = flow.IdentifierList{}
+			if len(event.ExecutorSignature.Bytes()) != 0 {
+				// a receipt with a non-empty signature is a pass-through receipt.
+				// makes sure sender is a corrupted execution node.
+				ok := corrEnIds.Contains(outputEvent.CorruptedNodeId)
+				require.True(t, ok)
+				// uses union to avoid adding duplicate.
+				passThroughReceipts = passThroughReceipts.Union(flow.IdentifierList{event.ID()})
+			} else {
+				// a receipt with an empty signature contains a dictated result from wintermute orchestrator.
+				// the rest of receipt will be filled by the corrupted node
+				resultId := event.ExecutionResult.ID()
+				if dictatedResults[resultId] == nil {
+					dictatedResults[resultId] = flow.IdentifierList{}
+				}
+				// uses union to avoid adding duplicate.
+				dictatedResults[resultId] = dictatedResults[resultId].Union(flow.IdentifierList{outputEvent.CorruptedNodeId})
 			}
-			// uses union to avoid adding duplicate.
-			dictatedResults[resultId] = dictatedResults[resultId].Union(flow.IdentifierList{outputEvent.CorruptedNodeId})
 		}
 	}
 
@@ -232,7 +237,7 @@ func orchestratorOutputSanityCheck(
 	// number of bounced receipts should match the expected value.
 	actualBouncedReceiptCount := 0
 	for _, originalReceiptId := range orgReceiptIds {
-		if bouncedReceipts.Contains(originalReceiptId) {
+		if passThroughReceipts.Contains(originalReceiptId) {
 			actualBouncedReceiptCount++
 		}
 	}

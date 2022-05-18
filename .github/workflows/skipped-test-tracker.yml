@@ -8,7 +8,7 @@ on:
 env:
   BIGQUERY_DATASET: production_src_flow_test_metrics
   BIGQUERY_TABLE: skipped_tests
-  GO_VERSION: 1.17
+  GO_VERSION: 1.18
 
 jobs:
   upload-skipped-test-summary:
