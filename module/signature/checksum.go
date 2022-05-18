@@ -29,10 +29,10 @@ func CheckSumFromIdentities(identities []flow.Identifier) [CheckSumLen]byte {
 
 // EncodeIdentities will concatenation all the identities into bytes
 func EncodeIdentities(identities []flow.Identifier) []byte {
-	// a simple concatenation is determinsitic, since each identifier has fixed length.
-	encoded := make([]byte, len(identities)*flow.IdentifierLen)
-	for i, id := range identities {
-		copy(encoded[i*flow.IdentifierLen:(i+1)*flow.IdentifierLen], id[:])
+	// a simple concatenation is deterministic, since each identifier has fixed length.
+	encoded := make([]byte, 0, len(identities)*flow.IdentifierLen)
+	for _, id := range identities {
+		encoded = append(encoded, id[:]...)
 	}
 	return encoded
 }
@@ -40,22 +40,22 @@ func EncodeIdentities(identities []flow.Identifier) []byte {
 // PrefixCheckSum prefix the given data with the checksum of the given identifier list
 func PrefixCheckSum(canonicalList []flow.Identifier, signrIndices []byte) []byte {
 	sum := CheckSumFromIdentities(canonicalList)
-	prefixed := make([]byte, len(sum)+len(signrIndices))
-	copy(prefixed[0:len(sum)], sum[:])
-	copy(prefixed[len(sum):], signrIndices[:])
+	prefixed := make([]byte, 0, len(sum)+len(signrIndices))
+	prefixed = append(prefixed, sum[:]...)
+	prefixed = append(prefixed, signrIndices[:]...)
 	return prefixed
 }
 
 // SplitCheckSum splits the given bytes into two parts:
 // - prefixed checksum of the canonical identifier list
 // - the signerIndices
-// the prefixed checksum is used to verify if the decoder is decoding the signer indices
-// using the same canonical identifier list
+// Expected error during normal operations:
+//  * ErrInvalidChecksum if the input is shorter than the expected checksum contained therein
 func SplitCheckSum(checkSumPrefixedSignerIndices []byte) ([CheckSumLen]byte, []byte, error) {
 	if len(checkSumPrefixedSignerIndices) < CheckSumLen {
 		return [CheckSumLen]byte{}, nil,
-			fmt.Errorf("expect checkSumPrefixedSignerIndices to have at least %v bytes, but got %v",
-				CheckSumLen, len(checkSumPrefixedSignerIndices))
+			fmt.Errorf("expect checkSumPrefixedSignerIndices to have at least %v bytes, but got %v: %w",
+				CheckSumLen, len(checkSumPrefixedSignerIndices), ErrInvalidChecksum)
 	}
 
 	var sum [CheckSumLen]byte
@@ -65,13 +65,15 @@ func SplitCheckSum(checkSumPrefixedSignerIndices []byte) ([CheckSumLen]byte, []b
 	return sum, signerIndices, nil
 }
 
-// CompareAndExtract reads the checksum from the given checkSumPrefixedSignerIndices
-// bytes, and compare with the checksum of the given identifier list.
-// it returns the signer indices if the checksum matches.
-// it returns error if splitting the checksum fails or the splitted checksum doesn't match
+// CompareAndExtract reads the checksum from the given `checkSumPrefixedSignerIndices`
+// and compares it with the checksum of the given identifier list.
+// It returns the signer indices if the checksum matches.
+// Inputs:
 // - canonicalList is the canonical list from decoder's view
 // - checkSumPrefixedSignerIndices is the signer indices created by the encoder,
 //   and prefixed with the checksum of the canonical list from encoder's view.
+// Expected error during normal operations:
+//  * ErrInvalidChecksum if the input is shorter than the expected checksum contained therein
 func CompareAndExtract(canonicalList []flow.Identifier, checkSumPrefixedSignerIndices []byte) ([]byte, error) {
 	// the checkSumPrefixedSignerIndices bytes contains two parts:
 	// 1. the checksum of the canonical identifier list from encoder's view
@@ -89,8 +91,8 @@ func CompareAndExtract(canonicalList []flow.Identifier, checkSumPrefixedSignerIn
 	decoderChecksum := CheckSumFromIdentities(canonicalList)
 	match := bytes.Equal(encoderChecksum[:], decoderChecksum[:])
 	if !match {
-		return nil, fmt.Errorf("decoder sees a canonical list %v, which has a different checksum %x than the encoder's checksum %x",
-			canonicalList, decoderChecksum, encoderChecksum)
+		return nil, fmt.Errorf("decoder sees a canonical list %v, which has a different checksum %x than the encoder's checksum %x: %w",
+			canonicalList, decoderChecksum, encoderChecksum, ErrInvalidChecksum)
 	}
 
 	return signerIndices, nil

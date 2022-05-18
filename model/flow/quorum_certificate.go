@@ -7,7 +7,9 @@ type QuorumCertificate struct {
 	View    uint64
 	BlockID Identifier
 
-	// SignerIDs holds the IDs of HotStuff participants that voted for the block.
+	// SignerIndices encodes the HotStuff participants whose vote is included in this QC.
+	// For `n` authorized consensus nodes, `SignerIndices` is an n-bit vector (padded with tailing
+	// zeros to reach full bytes). We list the nodes in their canonical order, as defined by the protocol.
 	// Note that for the main consensus committee, members can provide a staking or a threshold signature
 	// to indicate their HotStuff vote. In addition to contributing to consensus progress, committee members
 	// contribute to running the Random Beacon if they express their vote through a threshold signature.
@@ -20,13 +22,14 @@ type QuorumCertificate struct {
 	// - SigType []byte, bit-vector indicating the type of sig produced by the signer.
 	// - AggregatedStakingSig crypto.Signature,
 	// - AggregatedRandomBeaconSig crypto.Signature
-	// - ReconstrcutedRandomBeaconSig crypto.Signature
+	// - ReconstructedRandomBeaconSig crypto.Signature
 	// For collector cluster HotStuff, SigData is simply the aggregated staking signatures
 	// from all signers.
 	SigData []byte
 }
 
-// QuorumCertificateWithSignerIDs is a QuorumCertificat, where the signing nodes are identified via their `flow.Identifier`s instead of indices. Working with IDs as opposed to
+// QuorumCertificateWithSignerIDs is a QuorumCertificate, where the signing nodes are
+// identified via their `flow.Identifier`s instead of indices. Working with IDs as opposed to
 // indices is less efficient, but simpler, because we don't require a canonical node order.
 // It is used for bootstrapping new Epochs, because the FlowEpoch smart contract has no
 // notion of node ordering.

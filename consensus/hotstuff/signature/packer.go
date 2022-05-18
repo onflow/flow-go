@@ -26,7 +26,7 @@ func NewConsensusSigDataPacker(committees hotstuff.Committee) *ConsensusSigDataP
 	}
 }
 
-// Pack serializes the block signature data into raw bytes, suitable to creat a QC.
+// Pack serializes the block signature data into raw bytes, suitable to create a QC.
 // To pack the block signature data, we first build a compact data type, and then encode it into bytes.
 // Expected error returns during normal operations:
 //  * none; all errors are symptoms of inconsistent input data or corrupted internal state.

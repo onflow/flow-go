@@ -16,6 +16,9 @@ var (
 
 	// ErrIllegallyPaddedBitVector indicates that the index vector was padded with unexpected bit values.
 	ErrIllegallyPaddedBitVector = errors.New("index vector padded with unexpected bit values")
+
+	// ErrInvalidChecksum indicates that the index vector's checksum is invalid
+	ErrInvalidChecksum = errors.New("index vector's checksum is invalid")
 )
 
 /* ********************* InvalidSignatureIncludedError ********************* */
