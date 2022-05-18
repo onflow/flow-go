@@ -59,7 +59,7 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error
 	o.Lock()
 	defer o.Unlock()
 
-	switch protocolEvent := event.FlowProtocolEvent.(type) {
+	switch event.FlowProtocolEvent.(type) {
 
 	case *flow.ExecutionReceipt:
 		// orchestrator received execution receipt from corrupted EN after EN executed a block.
@@ -77,7 +77,11 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error
 			return fmt.Errorf("could not handle chunk data pack response event: %w", err)
 		}
 	default:
-		return fmt.Errorf("unexpected message type for wintermute attack orchestrator: %T", protocolEvent)
+		// passing through event as it is.
+		err := o.network.Send(event)
+		if err != nil {
+			return fmt.Errorf("could not send rpc on channel: %w", err)
+		}
 	}
 
 	return nil
@@ -315,7 +319,7 @@ func (o *Orchestrator) replyWithAttestation(chunkDataPackRequestEvent *insecure.
 			Str("channel", string(chunkDataPackRequestEvent.Channel)).
 			Uint32("targets_num", chunkDataPackRequestEvent.TargetNum).
 			Str("target_ids", fmt.Sprintf("%v", chunkDataPackRequestEvent.TargetIds)).
-			Msg("chunk data pack request event passed through")
+			Msg("chunk data pack request replied with attestation")
 
 		return true, nil
 	}
@@ -326,6 +330,9 @@ func (o *Orchestrator) replyWithAttestation(chunkDataPackRequestEvent *insecure.
 // AttackState returns the corrupted and original execution results involved in this attack.
 // Boolean return value determines whether attack conducted.
 func (o *Orchestrator) AttackState() (flow.ExecutionResult, flow.ExecutionResult, bool) {
+	o.Lock()
+	defer o.Unlock()
+
 	if o.state == nil {
 		// no attack yet conducted.
 		return flow.ExecutionResult{}, flow.ExecutionResult{}, false
