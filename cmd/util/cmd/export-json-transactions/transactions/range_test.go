@@ -3,7 +3,7 @@ package transactions
 import (
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	badger "github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
