@@ -184,10 +184,10 @@ func New(
 }
 
 func (e *Engine) processBackground(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	// err := e.requestMissingCollections(ctx)
-	// if err != nil {
-	// 	e.log.Error().Err(err).Msg("requesting missing collections failed")
-	// }
+	err := e.requestMissingCollections(ctx)
+	if err != nil {
+		e.log.Error().Err(err).Msg("requesting missing collections failed")
+	}
 	ready()
 
 	ticker := time.NewTicker(defaultFullBlockUpdateInterval)
