@@ -66,11 +66,11 @@ import (
 )
 
 // ObserverBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node
-// These functions are shared by staked and observer builders.
-// The Staked network allows the staked nodes to communicate among themselves, while the public network allows the
+// These functions are shared by observer builders.
+// The Staked network allows the access nodes to communicate among themselves, while the public network allows the
 // observers and an Access node to communicate.
 //
-//                                 public network                           staked network
+//                                 public network                           private network
 //  +------------------------+
 //  | observer 1             |<--------------------------|
 //  +------------------------+                           v
@@ -89,7 +89,6 @@ type ObserverBuilder interface {
 // For a node running as a standalone process, the config fields will be populated from the command line params,
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
 type ObserverServiceConfig struct {
-	staked                       bool // deprecated
 	bootstrapNodeAddresses       []string
 	bootstrapNodePublicKeys      []string
 	observerNetworkingKeyPath    string
@@ -144,7 +143,6 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 		rpcMetricsEnabled:            false,
 		apiRatelimits:                nil,
 		apiBurstlimits:               nil,
-		staked:                       false, // deprecated but kept to support temporary boostrap code
 		bootstrapNodeAddresses:       []string{},
 		bootstrapNodePublicKeys:      []string{},
 		PublicNetworkConfig: PublicNetworkConfig{
@@ -155,9 +153,8 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 	}
 }
 
-// ObserverServiceBuilder provides the common functionality needed to bootstrap a Flow staked and observer
-// It is composed of the FlowNodeBuilder, the ObserverServiceConfig and contains all the components and modules needed for the
-// staked and observers
+// ObserverServiceBuilder provides the common functionality needed to bootstrap a Flow observer service
+// It is composed of the FlowNodeBuilder, the ObserverServiceConfig and contains all the components and modules needed for the observers
 type ObserverServiceBuilder struct {
 	*cmd.FlowNodeBuilder
 	*ObserverServiceConfig
@@ -187,7 +184,7 @@ type ObserverServiceBuilder struct {
 }
 
 // deriveBootstrapPeerIdentities derives the Flow Identity of the bootstrap peers from the parameters.
-// These are the identities of the staked and observers also acting as the DHT bootstrap server
+// These are the identities of the observers also acting as the DHT bootstrap server
 func (builder *ObserverServiceBuilder) deriveBootstrapPeerIdentities() error {
 	// if bootstrap identities already provided (as part of alternate initialization as a library the skip reading command
 	// line params)
@@ -423,11 +420,12 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 		flags.BoolVar(&builder.rpcMetricsEnabled, "rpc-metrics-enabled", defaultConfig.rpcMetricsEnabled, "whether to enable the rpc metrics")
 		flags.StringToIntVar(&builder.apiRatelimits, "api-rate-limits", defaultConfig.apiRatelimits, "per second rate limits for Access API methods e.g. Ping=300,GetTransaction=500 etc.")
 		flags.StringToIntVar(&builder.apiBurstlimits, "api-burst-limits", defaultConfig.apiBurstlimits, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
-		flags.BoolVar(&builder.staked, "staked", defaultConfig.staked, "whether this node is a staked access node or not")
+		var dummy bool
+		flags.BoolVar(&dummy, "staked", false, "deprecated - whether this node is a staked access node or not")
 		flags.StringVar(&builder.observerNetworkingKeyPath, "observer-networking-key-path", defaultConfig.observerNetworkingKeyPath, "path to the networking key for observer")
 		flags.StringSliceVar(&builder.bootstrapNodeAddresses, "bootstrap-node-addresses", defaultConfig.bootstrapNodeAddresses, "the network addresses of the bootstrap access node if this is an observer e.g. access-001.mainnet.flow.org:9653,access-002.mainnet.flow.org:9653")
 		flags.StringSliceVar(&builder.bootstrapNodePublicKeys, "bootstrap-node-public-keys", defaultConfig.bootstrapNodePublicKeys, "the networking public key of the bootstrap access node if this is an observer (in the same order as the bootstrap node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
-		flags.StringVar(&builder.PublicNetworkConfig.BindAddress, "public-network-address", defaultConfig.PublicNetworkConfig.BindAddress, "staked access node's public network bind address")
+		flags.StringVar(&builder.PublicNetworkConfig.BindAddress, "public-network-address", defaultConfig.PublicNetworkConfig.BindAddress, "access node's public network bind address")
 	}).ValidateFlags(func() error {
 		return nil
 	})
@@ -779,11 +777,11 @@ func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
 }
 
 // enqueueConnectWithStakedAN enqueues the upstream connector component which connects the libp2p host of the observer
-// AN with the staked AN.
+// service with the AN.
 // Currently, there is an issue with LibP2P stopping advertisements of subscribed topics if no peers are connected
 // (https://github.com/libp2p/go-libp2p-pubsub/issues/442). This means that an observer could end up not being
-// discovered by other observers if it subscribes to a topic before connecting to the staked AN. Hence, the need
-// of an explicit connect to the staked AN before the node attempts to subscribe to topics.
+// discovered by other observers if it subscribes to a topic before connecting to the AN. Hence, the need
+// of an explicit connect to the AN before the node attempts to subscribe to topics.
 func (builder *ObserverServiceBuilder) enqueueConnectWithStakedAN() {
 	builder.Component("upstream connector", func(_ *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		return consensus_follower.NewUpstreamConnector(builder.bootstrapIdentities, builder.LibP2PNode, builder.Logger), nil
