@@ -10,12 +10,6 @@ type QuorumCertificate struct {
 	// SignerIndices encodes the HotStuff participants whose vote is included in this QC.
 	// For `n` authorized consensus nodes, `SignerIndices` is an n-bit vector (padded with tailing
 	// zeros to reach full bytes). We list the nodes in their canonical order, as defined by the protocol.
-	// Note that for the main consensus committee, members can provide a staking or a threshold signature
-	// to indicate their HotStuff vote. In addition to contributing to consensus progress, committee members
-	// contribute to running the Random Beacon if they express their vote through a threshold signature.
-	// In order to distinguish the signature types, the SigData has to be deserialized. Specifically,
-	// the field `SigData.SigType` (bit vector) indicates for each signer which sig type they provided.
-	// For collection cluster, the SignerIDs includes all the staking sig signers.
 	SignerIndices []byte
 
 	// For consensus cluster, the SigData is a serialization of the following fields
