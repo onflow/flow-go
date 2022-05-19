@@ -2,7 +2,7 @@
 
 The observer service provides a read-only point of contact to interact with the Flow network. It implements a subset of the [Access API](https://docs.onflow.org/access-api/). Users who need to change the state of the network should opt for running an Access node.
 
-It is a GRPC server which connects to a staked access node via libp2p, and forwards execute requests via GRPC. It is a scalable service.
+It is a gRPC scalable server which connects to a staked access node via libp2p, and forwards execute requests via gRPC.
 
 At a high level it does the following:
 
