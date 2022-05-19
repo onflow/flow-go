@@ -279,9 +279,9 @@ func TestConnectionPoolFull(t *testing.T) {
 	cache, _ := lru.New(2)
 	connectionFactory.ConnectionsCache = cache
 
-	cn1Address := cn1.listener.Addr().String()
-	cn2Address := cn2.listener.Addr().String()
-	cn3Address := cn3.listener.Addr().String()
+	cn1Address := "foo1:123"
+	cn2Address := "foo2:123"
+	cn3Address := "foo3:123"
 
 	// get a collection API client
 	_, closer, err := connectionFactory.GetAccessAPIClient(cn1Address)
