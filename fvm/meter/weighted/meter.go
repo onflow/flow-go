@@ -66,6 +66,7 @@ var (
 		common.MemoryKindAtreeMapMetaDataSlab:        1024,
 		common.MemoryKindAtreeMapElementOverhead:     64,
 		common.MemoryKindAtreeMapPreAllocatedElement: 24,
+		common.MemoryKindAtreeEncodedSlab:            1536,
 
 		// Static Types
 
