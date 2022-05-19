@@ -97,11 +97,13 @@ func Test_AsyncUploader(t *testing.T) {
 		require.Equal(t, 3, callCount)
 	})
 
-	//time.Sleep(1 * time.Second)
-
+	// This test shuts down the async uploader right after the upload has started. The upload has an error to force
+	// the retry mechanism to kick in (under normal circumstances). Since the component is shutting down, the retry
+	// should not kick in.
+	//
 	// sequence of events:
-	// 1. call upload with error - to force retrying
-	// 2. close component to stop retrying
+	// 1. create async uploader and initiate upload with an error - to force retrying
+	// 2. shut down async uploader right after upload initiated (not completed)
 	// 3. assert that upload called only once
 	t.Run("stopping component stops retrying", func(t *testing.T) {
 		testutils.SkipUnless(t, testutils.TEST_FLAKY, "flaky")
@@ -111,12 +113,14 @@ func Test_AsyncUploader(t *testing.T) {
 
 		// this wait group ensures that async uploader has a chance to start the upload before component is shut down
 		// otherwise, there's a race condition that can happen where the component can shut down before the async uploader
-		// has a chance to start (not finish) the upload
+		// has a chance to start the upload
 		wgUploadStarted := sync.WaitGroup{}
 		wgUploadStarted.Add(1)
 
-		wg := sync.WaitGroup{}
-		wg.Add(1)
+		// this wait group ensures that async uploader won't send an error (to test if retry will kick in) until
+		// the component has initiated shutting down (which should stop retry from working)
+		wgShutdownStarted := sync.WaitGroup{}
+		wgShutdownStarted.Add(1)
 		t.Log("added 1 to wait group grID:", string(bytes.Fields(debug.Stack())[1]))
 
 		uploader := &DummyUploader{
@@ -129,9 +133,9 @@ func Test_AsyncUploader(t *testing.T) {
 				//func() {
 				//	callCount++
 				//}()
-				t.Log("DummyUpload func() about to wg.Wait() grID:", string(bytes.Fields(debug.Stack())[1]))
-				wg.Wait()
-				t.Log("DummyUploader func() about to return error grID:", string(bytes.Fields(debug.Stack())[1]))
+				t.Log("DummyUpload func() waiting for component shutdown to start grID:", string(bytes.Fields(debug.Stack())[1]))
+				wgShutdownStarted.Wait()
+				t.Log("DummyUploader func() component shutdown started, about to return error grID:", string(bytes.Fields(debug.Stack())[1]))
 				return fmt.Errorf("this should return only once")
 			},
 		}
@@ -150,9 +154,10 @@ func Test_AsyncUploader(t *testing.T) {
 		// import unittest2 "github.com/onflow/flow-go/utils/unittest"
 		//unittest2.RequireCloseBefore(t, async.Done(), 5*time.Second, "async uploader not closed in time")
 		// stop component and check that it's fully stopped
+		t.Log("about to initiate shutdown grID: ", string(bytes.Fields(debug.Stack())[1]))
 		c := async.Done()
-		t.Log("about to call wg.Done() grID:", string(bytes.Fields(debug.Stack())[1]))
-		wg.Done()
+		t.Log("about to notify upload() that shutdown started and can continue uploading grID:", string(bytes.Fields(debug.Stack())[1]))
+		wgShutdownStarted.Done()
 		t.Log("about to read from async.Done() channel to see if it's closed grID:", string(bytes.Fields(debug.Stack())[1]))
 		_, ok := <-c
 		t.Log("about to check if async.Done() channel is closed grID:", string(bytes.Fields(debug.Stack())[1]))
