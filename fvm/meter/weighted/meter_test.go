@@ -1,9 +1,11 @@
 package weighted_test
 
 import (
+	"fmt"
 	"math"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence/runtime/common"
@@ -343,4 +345,28 @@ func TestWeightedComputationMetering(t *testing.T) {
 		err = m.MeterMemory(3, math.MaxUint32)
 		require.True(t, errors.IsMemoryLimitExceededError(err))
 	})
+}
+
+func TestMemoryWeights(t *testing.T) {
+	for kind := common.MemoryKindUnknown + 1; kind < common.MemoryKindLast; kind++ {
+		weight, ok := weighted.DefaultMemoryWeights[kind]
+		assert.True(t, ok, fmt.Sprintf("missing weight for memory kind '%s'", kind.String()))
+
+		// CadenceDictionarySize memory kind currently have '0' weight.
+		// TODO: Add a proper weight
+		if kind == common.MemoryKindCadenceDictionarySize {
+			continue
+		}
+
+		assert.Greater(
+			t,
+			weight,
+			uint64(0),
+			fmt.Sprintf(
+				"weight for memory kind '%s' is not a positive integer: %d",
+				kind.String(),
+				weight,
+			),
+		)
+	}
 }

@@ -34,7 +34,6 @@ var (
 		common.MemoryKindAddress:   32,
 		common.MemoryKindString:    138,
 		common.MemoryKindCharacter: 24,
-		common.MemoryKindMetaType:  0,
 		common.MemoryKindNumber:    8,
 		// weights for these values include the cost of the Go struct itself (first number)
 		// as well as the overhead for creation of the underlying atree (second number)
@@ -46,7 +45,7 @@ var (
 		common.MemoryKindOptional:                41,
 		common.MemoryKindNil:                     1,
 		common.MemoryKindVoid:                    1,
-		common.MemoryKindTypeValue:               0,
+		common.MemoryKindTypeValue:               17,
 		common.MemoryKindPathValue:               24,
 		common.MemoryKindCapabilityValue:         1,
 		common.MemoryKindLinkValue:               1,
@@ -154,16 +153,17 @@ var (
 
 		// AST nodes
 
-		common.MemoryKindProgram:        220,
-		common.MemoryKindIdentifier:     17,
-		common.MemoryKindArgument:       49,
-		common.MemoryKindBlock:          25,
-		common.MemoryKindFunctionBlock:  25,
-		common.MemoryKindParameter:      25,
-		common.MemoryKindParameterList:  59,
-		common.MemoryKindTransfer:       1,
-		common.MemoryKindMembers:        276,
-		common.MemoryKindTypeAnnotation: 25,
+		common.MemoryKindProgram:         220,
+		common.MemoryKindIdentifier:      17,
+		common.MemoryKindArgument:        49,
+		common.MemoryKindBlock:           25,
+		common.MemoryKindFunctionBlock:   25,
+		common.MemoryKindParameter:       25,
+		common.MemoryKindParameterList:   59,
+		common.MemoryKindTransfer:        1,
+		common.MemoryKindMembers:         276,
+		common.MemoryKindTypeAnnotation:  25,
+		common.MemoryKindDictionaryEntry: 33,
 
 		common.MemoryKindFunctionDeclaration:        49,
 		common.MemoryKindCompositeDeclaration:       65,
@@ -224,6 +224,7 @@ var (
 		common.MemoryKindRange:             1,
 		common.MemoryKindActivation:        128,
 		common.MemoryKindActivationEntries: 256,
+		common.MemoryKindElaboration:       501,
 
 		// sema types
 		common.MemoryKindVariableSizedSemaType: 51,
