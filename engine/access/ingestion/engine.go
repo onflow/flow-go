@@ -80,6 +80,7 @@ type Engine struct {
 	blocksToMarkExecuted       *stdmap.Times
 
 	rpcEngine *rpc.Engine
+	test      bool
 }
 
 // New creates a new access ingestion engine
@@ -165,6 +166,7 @@ func New(
 		finalizedBlockQueue:    finalizedBlocksQueue,
 
 		messageHandler: messageHandler,
+		test:           false,
 	}
 
 	// Add workers
@@ -184,9 +186,11 @@ func New(
 }
 
 func (e *Engine) processBackground(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	err := e.requestMissingCollections(ctx)
-	if err != nil {
-		e.log.Error().Err(err).Msg("requesting missing collections failed")
+	if !e.test {
+		err := e.requestMissingCollections(ctx)
+		if err != nil {
+			e.log.Error().Err(err).Msg("requesting missing collections failed")
+		}
 	}
 	ready()
 
@@ -251,9 +255,9 @@ func (e *Engine) processFinalizedBlocks(ctx irrecoverable.SignalerContext, ready
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch event.(type) {
 	case *flow.ExecutionReceipt:
-		e.messageHandler.Process(originID, event)
+		err := e.messageHandler.Process(originID, event)
 		e.executionReceiptsNotifier.Notify()
-		return nil
+		return err
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}

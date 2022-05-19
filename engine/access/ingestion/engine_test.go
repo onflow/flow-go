@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/mocknetwork"
 
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
@@ -100,6 +101,7 @@ func (suite *Suite) SetupTest() {
 		blocksToMarkExecuted, rpcEng)
 	require.NoError(suite.T(), err)
 
+	eng.test = true
 	suite.eng = eng
 
 	// block := unittest.BlockFixture()
@@ -111,9 +113,9 @@ func (suite *Suite) SetupTest() {
 	// suite.blocks.On("GetLastFullBlockHeight").Return(uint64(0), nil)
 	// suite.proto.snapshot.On("Head").Return(block.Header, nil)
 
-	// ctx, _ := irrecoverable.WithSignaler(context.Background())
-	// suite.eng.Start(ctx)
-	// <-suite.eng.Ready()
+	ctx, _ := irrecoverable.WithSignaler(context.Background())
+	suite.eng.Start(ctx)
+	<-suite.eng.Ready()
 }
 
 // TestOnFinalizedBlock checks that when a block is received, a request for each individual collection is made
