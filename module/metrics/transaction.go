@@ -98,7 +98,7 @@ func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log 
 			Subsystem: subsystemTransactionSubmission,
 			Help:      "histogram for the duration in ms of the round trip time for getting a transaction result",
 			Buckets:   []float64{1, 100, 500, 1000, 2000, 5000},
-		}, []string{"transaction_size"}),
+		}, []string{"payload_size"}),
 		scriptSize: promauto.NewHistogram(prometheus.HistogramOpts{
 			Name:      "script_size",
 			Namespace: namespaceAccess,
@@ -128,7 +128,7 @@ func (tc *TransactionCollector) TransactionResultFetched(dur time.Duration, size
 	// record the transaction result duration and transaction script/payload size
 	tc.transactionSize.Observe(float64(size / 1024))
 	tc.transactionResultDuration.With(prometheus.Labels{
-		"transaction_size": tc.sizeLabel(size),
+		"payload_size": tc.sizeLabel(size),
 	}).Observe(float64(dur.Milliseconds()))
 }
 
