@@ -37,6 +37,9 @@ const DefaultMaxHeightRange = 250
 // when recursively searching for a valid snapshot
 const DefaultSnapshotHistoryLimit = 50
 
+// DefaultConnectionPoolSize is the default size for the connection pool to collection and execution nodes
+const DefaultConnectionPoolSize = 10
+
 var preferredENIdentifiers flow.IdentifierList
 var fixedENIdentifiers flow.IdentifierList
 

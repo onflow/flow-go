@@ -132,7 +132,7 @@ func New(log zerolog.Logger,
 
 	cacheSize := config.ConnectionPoolSize
 	if cacheSize == 0 {
-		cacheSize = 10
+		cacheSize = backend.DefaultConnectionPoolSize
 	}
 	cache, err := lru.New(cacheSize)
 
