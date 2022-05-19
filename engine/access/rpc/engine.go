@@ -169,6 +169,7 @@ func New(log zerolog.Logger,
 		chain:              chainID.Chain(),
 	}
 
+	// Use the parent interface instead of :=, so that we can assign it to proxy
 	var localAPIServer accessproto.AccessAPIServer
 	localAPIServer = access.NewHandler(backend, chainID.Chain())
 	if proxy != nil {
