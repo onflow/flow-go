@@ -2,7 +2,7 @@ package flow
 
 import "github.com/onflow/flow-go/crypto"
 
-// TimeoutCertificate proves that a supermajority of consensus participants want to abandon the specified View.
+// TimeoutCertificate proves that a super-majority of consensus participants want to abandon the specified View.
 // At its core, a timeout certificate is an aggregation of TimeoutObjects, which individual nodes send to signal
 // their intent to leave the active view.
 type TimeoutCertificate struct {
@@ -17,4 +17,24 @@ type TimeoutCertificate struct {
 	// SigData is an aggregated signature from multiple TimeoutObjects, each from a different replica.
 	// In their TimeoutObjects, replicas sign the pair (View, HighestQCView) with their staking keys.
 	SigData crypto.Signature
+}
+
+func (t *TimeoutCertificate) Body() interface{} {
+	if t == nil {
+		return struct{}{}
+	}
+
+	return struct {
+		View        uint64
+		HighQCViews []uint64
+		HighestQC   QuorumCertificate
+		SignerIDs   []Identifier
+		SigData     crypto.Signature
+	}{
+		View:        t.View,
+		HighQCViews: t.TOHighQCViews,
+		HighestQC:   *t.TOHighestQC,
+		SignerIDs:   t.SignerIDs,
+		SigData:     t.SigData,
+	}
 }
