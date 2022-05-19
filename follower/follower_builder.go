@@ -57,7 +57,7 @@ import (
 	storage "github.com/onflow/flow-go/storage/badger"
 )
 
-// ObserverBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node
+// FlowBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node
 // These functions are shared by staked and observer builders.
 // The Staked network allows the staked nodes to communicate among themselves, while the public network allows the
 // observers and an Access node to communicate.
@@ -73,7 +73,7 @@ import (
 //  | observer 3             |<--------------------------|
 //  +------------------------+
 
-type ObserverBuilder interface {
+type FlowBuilder interface {
 	cmd.NodeBuilder
 }
 
@@ -121,6 +121,8 @@ type FlowObserverServiceBuilder struct {
 	// engines
 	FollowerEng *followereng.Engine
 	SyncEng     *synceng.Engine
+
+	peerID peer.ID
 }
 
 // deriveBootstrapPeerIdentities derives the Flow Identity of the bootstrap peers from the parameters.
@@ -297,7 +299,7 @@ func (builder *FlowObserverServiceBuilder) buildSyncEngine() *FlowObserverServic
 	return builder
 }
 
-func (builder *FlowObserverServiceBuilder) BuildConsensusFollower() ObserverBuilder {
+func (builder *FlowObserverServiceBuilder) BuildConsensusFollower() FlowBuilder {
 	builder.
 		buildFollowerState().
 		buildSyncCore().
@@ -430,7 +432,6 @@ func BootstrapIdentities(addresses []string, keys []string) (flow.IdentityList, 
 
 type ObserverServiceBuilder struct {
 	*FlowObserverServiceBuilder
-	peerID peer.ID
 }
 
 func NewObserverServiceBuilder(builder *FlowObserverServiceBuilder) *ObserverServiceBuilder {
