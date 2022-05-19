@@ -36,7 +36,8 @@ func New(
 // tc - the tc to be validated
 // During normal operations, the following error returns are expected:
 //  * model.InvalidTCError if the TC is invalid
-// Any other error should be threated as exception
+//  * model.ErrViewForUnknownEpoch if the TC refers unknown epoch
+// Any other error should be threaded as exception
 func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 	highestQC := tc.TOHighestQC
 
@@ -72,7 +73,6 @@ func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 	}
 
 	// determine whether signers reach minimally required weight threshold for consensus
-	// TODO: handle model.ErrViewForUnknownEpoch when front-loading verification
 	threshold, err := v.committee.WeightThresholdForView(tc.View)
 	if err != nil {
 		return fmt.Errorf("could not get weight threshold for view %d: %w", tc.View, err)
@@ -104,13 +104,16 @@ func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 
 // ValidateQC validates the QC
 // qc - the qc to be validated
+// During normal operations, the following error returns are expected:
+//  * model.InvalidQCError if the QC is invalid
+//  * model.ErrViewForUnknownEpoch if the QC refers unknown epoch
+// Any other error should be threaded as exception
 func (v *Validator) ValidateQC(qc *flow.QuorumCertificate) error {
 	// Retrieve the initial identities of consensus participants for this epoch,
 	// and those that signed the QC. IdentitiesByEpoch contains all nodes that were
 	// authorized to sign during this epoch. Ejection and dynamic weight adjustments
 	// are not taken into account here. By using an epoch-static set of authorized
 	// signers, we can check QC validity without needing all ancestor blocks.
-	// TODO: handle model.ErrViewForUnknownEpoch when front-loading verification
 	allParticipants, err := v.committee.IdentitiesByEpoch(qc.View, filter.Any)
 	if err != nil {
 		return fmt.Errorf("could not get consensus participants at view %d: %w", qc.View, err)
@@ -121,7 +124,6 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate) error {
 	}
 
 	// determine whether signers reach minimally required weight threshold for consensus
-	// TODO: handle model.ErrViewForUnknownEpoch when front-loading verification
 	threshold, err := v.committee.WeightThresholdForView(qc.View)
 	if err != nil {
 		return fmt.Errorf("could not get weight threshold for view %d: %w", qc.View, err)
@@ -154,6 +156,10 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate) error {
 // ValidateProposal validates the block proposal
 // A block is considered as valid if it's a valid extension of existing forks.
 // Note it doesn't check if it's conflicting with finalized block
+// During normal operations, the following error returns are expected:
+//  * model.InvalidBlockError if the block is invalid
+//  * model.ErrViewForUnknownEpoch if the proposal refers unknown epoch
+// Any other error should be threaded as exception
 func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 	qc := proposal.Block.QC
 	block := proposal.Block
@@ -168,7 +174,6 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 	}
 
 	// check the proposer is the leader for the proposed block's view
-	// TODO: handle model.ErrViewForUnknownEpoch when front-loading verification
 	leader, err := v.committee.LeaderForView(block.View)
 	if err != nil {
 		return fmt.Errorf("error determining leader for block %x: %w", block.BlockID, err)
@@ -219,8 +224,11 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 
 // ValidateVote validates the vote and returns the identity of the voter who signed
 // vote - the vote to be validated
+// During normal operations, the following error returns are expected:
+//  * model.InvalidVoteError for invalid votes
+//  * model.ErrViewForUnknownEpoch if the vote refers unknown epoch
+// Any other error should be threaded as exception
 func (v *Validator) ValidateVote(vote *model.Vote) (*flow.Identity, error) {
-	// TODO: handle model.ErrViewForUnknownEpoch when front-loading verification
 	voter, err := v.committee.IdentityByEpoch(vote.View, vote.SignerID)
 	if model.IsInvalidSignerError(err) {
 		return nil, newInvalidVoteError(vote, err)
