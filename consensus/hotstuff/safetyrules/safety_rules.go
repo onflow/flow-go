@@ -12,6 +12,15 @@ import (
 // votes and timeouts. It follows voting and timeout rules for creating votes and timeouts respectively.
 // Caller can be sure that created vote or timeout doesn't break safety and can be used in consensus process.
 // SafetyRules relies on hotstuff.Persister to store latest state of hotstuff.SafetyData.
+//
+// The voting rules implemented by SafetyRules are:
+// 1. Replicas vote strictly in increasing rounds
+// 2. Each block has to include a TC or a QC from the previous round.
+//   a. [Happy path] If the previous round resulted in a QC then new QC should extend it.
+//   b. [Recovery path] If the previous round did *not* result in a QC, the leader of the
+//   subsequent round *must* include a valid TC for the previous round in its block.
+//
+// NOT safe for concurrent use.
 type SafetyRules struct {
 	signer     hotstuff.Signer
 	persist    hotstuff.Persister
@@ -38,7 +47,9 @@ func New(
 
 // ProduceVote will make a decision on whether it will vote for the given proposal, the returned
 // error indicates whether to vote or not.
-// In order to ensure that only a safe node will be voted, SafetyRules will ask Forks whether a vote is a safe node or not.
+// In order to ensure that only safe proposals are being voted on, by checking if proposer is a valid committee member and
+// proposal complies with voting rules.
+// We expect that only well-formed proposals with valid signatures are submitted for voting.
 // The curView is taken as input to ensure SafetyRules will only vote for proposals at current view and prevent double voting.
 // Returns:
 //  * (vote, nil): On the _first_ block for the current view that is safe to vote for.
@@ -62,7 +73,9 @@ func (r *SafetyRules) ProduceVote(proposal *model.Proposal, curView uint64) (*mo
 	// we need to make sure that proposer is not ejected to decide to vote or not
 	_, err = r.committee.IdentityByBlock(block.BlockID, block.ProposerID)
 	if model.IsInvalidSignerError(err) {
-		return nil, model.NoVoteError{Msg: "not voting - proposer ejected"}
+		// the proposer must be ejected since the proposal has already been validated,
+		// which ensures that the proposer was a valid committee member at the start of the epoch
+		return nil, model.NewNoVoteErrorf("not voting - proposer ejected")
 	}
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve proposer Identity %x at block %x: %w", block.ProposerID, block.BlockID, err)
@@ -73,7 +86,7 @@ func (r *SafetyRules) ProduceVote(proposal *model.Proposal, curView uint64) (*mo
 	// have zero weight in the next epoch. Such vote can't be used to produce valid QCs.
 	_, err = r.committee.IdentityByBlock(block.BlockID, r.committee.Self())
 	if model.IsInvalidSignerError(err) {
-		return nil, model.NoVoteError{Msg: "not voting committee member for block"}
+		return nil, model.NewNoVoteErrorf("not voting committee member for block %x", block.BlockID)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("could not get self identity: %w", err)
@@ -105,19 +118,19 @@ func (r *SafetyRules) ProduceVote(proposal *model.Proposal, curView uint64) (*mo
 //  * (nil, model.NoTimeoutError): If the safety module decides that it is not safe to timeout under current conditions.
 //    This is a sentinel error and _expected_ during normal operation.
 // All other errors are unexpected and potential symptoms of uncovered edge cases or corrupted internal state (fatal).
-func (r *SafetyRules) ProduceTimeout(curView uint64, highestQC *flow.QuorumCertificate, highestTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
+func (r *SafetyRules) ProduceTimeout(curView uint64, highestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
 	lastTimeout := r.safetyData.LastTimeout
 	if lastTimeout != nil && lastTimeout.View == curView {
 		return lastTimeout, nil
 	}
 
-	if !r.IsSafeToTimeout(curView, highestQC, highestTC) {
-		return nil, model.NoTimeoutError{Msg: "not safe to time out under current conditions"}
+	if !r.IsSafeToTimeout(curView, highestQC, lastViewTC) {
+		return nil, model.NewNoTimeoutErrorf("not safe to time out under current conditions")
 	}
 
-	timeout, err := r.signer.CreateTimeout(curView, highestQC, highestTC)
+	timeout, err := r.signer.CreateTimeout(curView, highestQC, lastViewTC)
 	if err != nil {
-		return nil, fmt.Errorf("could not timeout at view %d: %w", curView, err)
+		return nil, fmt.Errorf("could not create timeout at view %d: %w", curView, err)
 	}
 
 	r.safetyData.HighestAcknowledgedView = curView
@@ -141,40 +154,50 @@ func (r *SafetyRules) IsSafeToVote(proposal *model.Proposal) error {
 		return fmt.Errorf("block's view %d must be larger than the view of the included QC %d", blockView, qcView)
 	}
 
+	// This check satisfies voting rule 1
+	// 1. Replicas vote strictly in increasing rounds,
 	// block's view must be greater than the view that we have voted for
-	if proposal.Block.View <= r.safetyData.HighestAcknowledgedView {
-		return model.NoVoteError{Msg: "not safe to vote, we have already voted for this view"}
+	if blockView <= r.safetyData.HighestAcknowledgedView {
+		return model.NewNoVoteErrorf("not safe to vote, we have already voted for this view: %d <= %d",
+			blockView, r.safetyData.HighestAcknowledgedView)
 	}
 
-	// This check satisfies voting rule 1 and 2a.
+	// This check satisfies voting rule 2a:
+	// 2a. [Happy path] If the previous round resulted in a QC then new QC should extend it.
 	if blockView == qcView+1 {
 		return nil
 	}
 
-	// This check satisfies voting rule 1 and 2b.
-	lastViewTC := proposal.LastViewTC
-	if lastViewTC != nil {
-		if blockView == lastViewTC.View+1 {
-			if qcView >= lastViewTC.TOHighestQC.View {
-				return nil
-			} else {
-				return fmt.Errorf("QC's view %d should be at least %d", qcView, lastViewTC.TOHighestQC.View)
-			}
-		} else {
-			return fmt.Errorf("last view TC %d is not sequential for block %d", lastViewTC.View, blockView)
-		}
-	}
+	return r.IsSafeToExtend(blockView, qcView, proposal.LastViewTC)
+}
 
-	return fmt.Errorf("block's view %d is not sequential %d, last view TC not included", blockView, qcView)
+// IsSafeToExtend performs safety checks if proposal can be extended in case of recovery path, we will call
+// this function only if previous round resulted in TC, to know if it's safe to extend such proposal.
+func (r *SafetyRules) IsSafeToExtend(blockView, qcView uint64, lastViewTC *flow.TimeoutCertificate) error {
+	// These checks satisfy voting rule 2b:
+	// [Recovery Path] If the previous round did *not* result in a QC, the leader of the
+	// subsequent round *must* include a valid TC for the previous round in its block.
+	if lastViewTC == nil {
+		return fmt.Errorf("block's view %d is not sequential with included QC view %d, last view TC not included", blockView, qcView)
+	}
+	if blockView != lastViewTC.View+1 {
+		return fmt.Errorf("last view TC %d is not sequential for block %d", lastViewTC.View, blockView)
+	}
+	if qcView < lastViewTC.TOHighestQC.View {
+		return fmt.Errorf("QC's view %d should be at least %d", qcView, lastViewTC.TOHighestQC.View)
+	}
+	return nil
 }
 
 // IsSafeToTimeout checks if it's safe to timeout with proposed data, if timing out won't break safety rules.
-func (r *SafetyRules) IsSafeToTimeout(curView uint64, highestQC *flow.QuorumCertificate, highestTC *flow.TimeoutCertificate) bool {
+// highestQC is the valid QC with the greatest view that we have observed.
+// lastViewTC is the TC for the previous view (might be nil)
+func (r *SafetyRules) IsSafeToTimeout(curView uint64, highestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) bool {
 	if highestQC.View < r.safetyData.LockedOneChainView ||
 		curView+1 <= r.safetyData.HighestAcknowledgedView ||
 		curView <= highestQC.View {
 		return false
 	}
 
-	return (curView == highestQC.View+1) || (curView == highestTC.View+1)
+	return (curView == highestQC.View+1) || (curView == lastViewTC.View+1)
 }
