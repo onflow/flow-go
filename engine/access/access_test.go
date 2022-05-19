@@ -806,7 +806,7 @@ func (suite *Suite) TestExecuteScript() {
 			// 	BlockId: id[:],
 			// 	Script:  script,
 			// }
-			// // actualResp, err := handler.ExecuteScriptAtBlockID(ctx, &req)
+			// actualResp, err := handler.ExecuteScriptAtBlockID(ctx, &req)
 			// assertResult(err, expectedResp, actualResp)
 		})
 
