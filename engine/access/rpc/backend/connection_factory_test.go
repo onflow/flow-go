@@ -35,7 +35,8 @@ func TestProxyAccessAPI(t *testing.T) {
 	// set the collection grpc port
 	connectionFactory.CollectionGRPCPort = cn.port
 	// set the connection pool cache size
-	cache, _ := lru.New(5)
+	cache, err := lru.New(5)
+	assert.NoError(t, err)
 	connectionFactory.ConnectionsCache = cache
 
 	proxyConnectionFactory := ProxyConnectionFactory{
@@ -71,7 +72,8 @@ func TestProxyExecutionAPI(t *testing.T) {
 	// set the execution grpc port
 	connectionFactory.ExecutionGRPCPort = en.port
 	// set the connection pool cache size
-	cache, _ := lru.New(5)
+	cache, err := lru.New(5)
+	assert.NoError(t, err)
 	connectionFactory.ConnectionsCache = cache
 
 	proxyConnectionFactory := ProxyConnectionFactory{
@@ -107,7 +109,8 @@ func TestProxyAccessAPIConnectionReuse(t *testing.T) {
 	// set the collection grpc port
 	connectionFactory.CollectionGRPCPort = cn.port
 	// set the connection pool cache size
-	cache, _ := lru.New(5)
+	cache, err := lru.New(5)
+	assert.NoError(t, err)
 	connectionFactory.ConnectionsCache = cache
 
 	proxyConnectionFactory := ProxyConnectionFactory{
@@ -150,7 +153,8 @@ func TestProxyExecutionAPIConnectionReuse(t *testing.T) {
 	// set the execution grpc port
 	connectionFactory.ExecutionGRPCPort = en.port
 	// set the connection pool cache size
-	cache, _ := lru.New(5)
+	cache, err := lru.New(5)
+	assert.NoError(t, err)
 	connectionFactory.ConnectionsCache = cache
 
 	proxyConnectionFactory := ProxyConnectionFactory{
@@ -200,7 +204,8 @@ func TestExecutionNodeClientTimeout(t *testing.T) {
 	// set the execution grpc client timeout
 	connectionFactory.ExecutionNodeGRPCTimeout = timeout
 	// set the connection pool cache size
-	cache, _ := lru.New(5)
+	cache, err := lru.New(5)
+	assert.NoError(t, err)
 	connectionFactory.ConnectionsCache = cache
 
 	// create the execution API client
@@ -238,7 +243,8 @@ func TestCollectionNodeClientTimeout(t *testing.T) {
 	// set the collection grpc client timeout
 	connectionFactory.CollectionNodeGRPCTimeout = timeout
 	// set the connection pool cache size
-	cache, _ := lru.New(5)
+	cache, err := lru.New(5)
+	assert.NoError(t, err)
 	connectionFactory.ConnectionsCache = cache
 
 	// create the collection API client
@@ -276,7 +282,8 @@ func TestConnectionPoolFull(t *testing.T) {
 	// set the collection grpc port
 	connectionFactory.CollectionGRPCPort = cn1.port
 	// set the connection pool cache size
-	cache, _ := lru.New(2)
+	cache, err := lru.New(2)
+	assert.NoError(t, err)
 	connectionFactory.ConnectionsCache = cache
 
 	cn1Address := "foo1:123"
@@ -330,7 +337,8 @@ func TestConnectionPoolStale(t *testing.T) {
 	// set the collection grpc port
 	connectionFactory.CollectionGRPCPort = cn.port
 	// set the connection pool cache size
-	cache, _ := lru.New(5)
+	cache, err := lru.New(5)
+	assert.NoError(t, err)
 	connectionFactory.ConnectionsCache = cache
 
 	proxyConnectionFactory := ProxyConnectionFactory{
