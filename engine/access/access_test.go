@@ -646,8 +646,8 @@ func (suite *Suite) TestGetSealedTransaction() {
 			err = ingestEng.Process(engine.ReceiveReceipts, enNodeIDs[0], r)
 			require.NoError(suite.T(), err)
 		}
-		
-		time.Sleep(time.Second*3)
+
+		time.Sleep(time.Second * 3)
 
 		// 5. Client requests a transaction
 		tx := collection.Transactions[0]
@@ -718,6 +718,11 @@ func (suite *Suite) TestExecuteScript() {
 			transactions, results, receipts, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, nil)
 		require.NoError(suite.T(), err)
 
+		irrecoverableCtx, _ := irrecoverable.WithSignaler(context.Background())
+		ingestEng.IsTest = true
+		ingestEng.Start(irrecoverableCtx)
+		<-ingestEng.Ready()
+
 		// create a block and a seal pointing to that block
 		lastBlock := unittest.BlockFixture()
 		lastBlock.Header.Height = 2
@@ -752,7 +757,7 @@ func (suite *Suite) TestExecuteScript() {
 		}
 
 		// wait for the receipt to be persisted
-		time.Sleep(time.Second*3)
+		time.Sleep(time.Second * 3)
 
 		ctx := context.Background()
 

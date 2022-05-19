@@ -187,6 +187,7 @@ func New(
 
 func (e *Engine) processBackground(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	if e.IsTest {
+		ready()
 		return
 	}
 
