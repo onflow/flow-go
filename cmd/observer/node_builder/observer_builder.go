@@ -88,15 +88,16 @@ type ObserverBuilder interface {
 // For a node running as a standalone process, the config fields will be populated from the command line params,
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
 type ObserverServiceConfig struct {
-	bootstrapNodeAddresses       []string
-	bootstrapNodePublicKeys      []string
-	observerNetworkingKeyPath    string
-	bootstrapIdentities          flow.IdentityList // the identity list of bootstrap peers the node uses to discover other nodes
-	apiRatelimits                map[string]int
-	apiBurstlimits               map[string]int
-	rpcConf                      rpc.Config
-	rpcMetricsEnabled            bool
-	baseOptions                  []cmd.Option
+	bootstrapNodeAddresses    []string
+	bootstrapNodePublicKeys   []string
+	observerNetworkingKeyPath string
+	bootstrapIdentities       flow.IdentityList // the identity list of bootstrap peers the node uses to discover other nodes
+	apiRatelimits             map[string]int
+	apiBurstlimits            map[string]int
+	rpcConf                   rpc.Config
+	rpcMetricsEnabled         bool
+	baseOptions               []cmd.Option
+	apiTimeout                time.Duration
 }
 
 // DefaultObserverServiceConfig defines all the default values for the ObserverServiceConfig
@@ -115,12 +116,13 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 			PreferredExecutionNodeIDs: nil,
 			FixedExecutionNodeIDs:     nil,
 		},
-		rpcMetricsEnabled:            false,
-		apiRatelimits:                nil,
-		apiBurstlimits:               nil,
-		bootstrapNodeAddresses:       []string{},
-		bootstrapNodePublicKeys:      []string{},
+		rpcMetricsEnabled:         false,
+		apiRatelimits:             nil,
+		apiBurstlimits:            nil,
+		bootstrapNodeAddresses:    []string{},
+		bootstrapNodePublicKeys:   []string{},
 		observerNetworkingKeyPath: cmd.NotSet,
+		apiTimeout:                3 * time.Second,
 	}
 }
 
@@ -131,16 +133,16 @@ type ObserverServiceBuilder struct {
 	*ObserverServiceConfig
 
 	// components
-	LibP2PNode                 *p2p.Node
-	FollowerState              protocol.MutableState
-	SyncCore                   *synchronization.Core
-	RpcEng                     *rpc.Engine
-	FinalizationDistributor    *pubsub.FinalizationDistributor
-	FinalizedHeader            *synceng.FinalizedHeaderCache
-	Committee                  hotstuff.Committee
-	Finalized                  *flow.Header
-	Pending                    []*flow.Header
-	FollowerCore               module.HotStuffFollower
+	LibP2PNode              *p2p.Node
+	FollowerState           protocol.MutableState
+	SyncCore                *synchronization.Core
+	RpcEng                  *rpc.Engine
+	FinalizationDistributor *pubsub.FinalizationDistributor
+	FinalizedHeader         *synceng.FinalizedHeaderCache
+	Committee               hotstuff.Committee
+	Finalized               *flow.Header
+	Pending                 []*flow.Header
+	FollowerCore            module.HotStuffFollower
 	// for the observer, the sync engine participants provider is the libp2p peer store which is not
 	// available until after the network has started. Hence, a factory function that needs to be called just before
 	// creating the sync engine
@@ -399,6 +401,7 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 		flags.StringSliceVar(&builder.bootstrapNodeAddresses, "bootstrap-node-addresses", defaultConfig.bootstrapNodeAddresses, "the network addresses of the bootstrap access node if this is an observer e.g. access-001.mainnet.flow.org:9653,access-002.mainnet.flow.org:9653")
 		flags.StringSliceVar(&builder.bootstrapNodePublicKeys, "bootstrap-node-public-keys", defaultConfig.bootstrapNodePublicKeys, "the networking public key of the bootstrap access node if this is an observer (in the same order as the bootstrap node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
 		flags.StringVar(&dummyString, "public-network-address", "", "deprecated - access node's public network bind address")
+		flags.DurationVar(&builder.apiTimeout, "flow-api-timeout", defaultConfig.apiTimeout, "tcp timeout for Flow API gRPC socket")
 	}).ValidateFlags(func() error {
 		return nil
 	})
@@ -763,34 +766,34 @@ func (builder *ObserverServiceBuilder) enqueueConnectWithStakedAN() {
 
 func (builder *ObserverServiceBuilder) attachRPCEngine() {
 	builder.Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-                proxy, err := apiservice.NewFlowAPIService(builder.bootstrapIdentities, builder.PeerUpdateInterval)
-                if err != nil {
-                        return nil, err
-                }
-                builder.RpcEng = rpc.New(
-                        node.Logger,
-                        node.State,
-                        builder.rpcConf,
-                        nil,
-                        nil,
-                        node.Storage.Blocks,
-                        node.Storage.Headers,
-                        node.Storage.Collections,
-                        node.Storage.Transactions,
-                        node.Storage.Receipts,
-                        node.Storage.Results,
-                        node.RootChainID,
-                        nil,
-                        0,
-                        0,
-                        false,
-                        builder.rpcMetricsEnabled,
-                        builder.apiRatelimits,
-                        builder.apiBurstlimits,
-                        proxy,
-                )
-                return builder.RpcEng, nil
-        })
+		proxy, err := apiservice.NewFlowAPIService(builder.bootstrapIdentities, builder.apiTimeout)
+		if err != nil {
+			return nil, err
+		}
+		builder.RpcEng = rpc.New(
+			node.Logger,
+			node.State,
+			builder.rpcConf,
+			nil,
+			nil,
+			node.Storage.Blocks,
+			node.Storage.Headers,
+			node.Storage.Collections,
+			node.Storage.Transactions,
+			node.Storage.Receipts,
+			node.Storage.Results,
+			node.RootChainID,
+			nil,
+			0,
+			0,
+			false,
+			builder.rpcMetricsEnabled,
+			builder.apiRatelimits,
+			builder.apiBurstlimits,
+			proxy,
+		)
+		return builder.RpcEng, nil
+	})
 }
 
 // initMiddleware creates the network.Middleware implementation with the libp2p factory function, metrics, peer update
