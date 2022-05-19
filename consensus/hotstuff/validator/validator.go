@@ -12,7 +12,9 @@ import (
 
 // Validator is responsible for validating QC, Block and Vote
 type Validator struct {
-	committee hotstuff.Committee
+	// TODO: change to hotstuff.Replicas when front-loading QC verification
+	// https://github.com/onflow/flow-go/pull/2328#discussion_r866494368
+	committee hotstuff.DynamicCommittee
 	forks     hotstuff.ForksReader
 	verifier  hotstuff.Verifier
 }
@@ -21,7 +23,7 @@ var _ hotstuff.Validator = (*Validator)(nil)
 
 // New creates a new Validator instance
 func New(
-	committee hotstuff.Committee,
+	committee hotstuff.DynamicCommittee,
 	forks hotstuff.ForksReader,
 	verifier hotstuff.Verifier,
 ) *Validator {
@@ -44,9 +46,13 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) e
 		return newInvalidBlockError(block, fmt.Errorf("qc's View %d doesn't match referenced block's View %d", qc.View, block.View))
 	}
 
-	// Retrieve full Identities of all legitimate consensus participants and the Identities of the qc's signers
-	// IdentityList returned by hotstuff.Committee contains only legitimate consensus participants for the specified block (must have positive weight)
-	allParticipants, err := v.committee.Identities(block.BlockID, filter.Any)
+	// Retrieve the initial identities of consensus participants for this epoch,
+	// and those that signed the QC. IdentitiesByEpoch contains all nodes that were
+	// authorized to sign during this epoch. Ejection and dynamic weight adjustments
+	// are not taken into account here. By using an epoch-static set of authorized
+	// signers, we can check QC validity without needing all ancestor blocks.
+	// TODO: handle model.ErrViewForUnknownEpoch when front-loading verification
+	allParticipants, err := v.committee.IdentitiesByEpoch(block.View, filter.Any)
 	if err != nil {
 		return fmt.Errorf("could not get consensus participants for block %s: %w", block.BlockID, err)
 	}
@@ -56,7 +62,11 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) e
 	}
 
 	// determine whether signers reach minimally required weight threshold for consensus
-	threshold := hotstuff.ComputeWeightThresholdForBuildingQC(allParticipants.TotalWeight()) // compute required weight threshold
+	// TODO: handle model.ErrViewForUnknownEpoch when front-loading verification
+	threshold, err := v.committee.WeightThresholdForView(block.View)
+	if err != nil {
+		return fmt.Errorf("could not get weight threshold for view %d: %w", block.View, err)
+	}
 	if signers.TotalWeight() < threshold {
 		return newInvalidBlockError(block, fmt.Errorf("qc signers have insufficient weight of %d (required=%d)", signers.TotalWeight(), threshold))
 	}
@@ -99,6 +109,7 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 	}
 
 	// check the proposer is the leader for the proposed block's view
+	// TODO: handle model.ErrViewForUnknownEpoch when front-loading verification
 	leader, err := v.committee.LeaderForView(block.View)
 	if err != nil {
 		return fmt.Errorf("error determining leader for block %x: %w", block.BlockID, err)
@@ -107,7 +118,18 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 		return newInvalidBlockError(block, fmt.Errorf("proposer %s is not leader (%s) for view %d", block.ProposerID, leader, block.View))
 	}
 
+	// check the proposer is a valid committee member at the most recent state on this fork
+	// TODO: move this check into SafetyRules when front-loading the verification
+	_, err = v.committee.IdentityByBlock(block.BlockID, block.ProposerID)
+	if model.IsInvalidSignerError(err) {
+		return newInvalidBlockError(block, fmt.Errorf("proposer %x is leader but is not a valid committee member", block.ProposerID))
+	}
+	if err != nil {
+		return fmt.Errorf("unexpected error checking proposer standing for block %x: %w", block.BlockID, err)
+	}
+
 	// check that we have the parent for the proposal
+	// TODO: remove this check when front-loading the verification
 	parent, found := v.forks.GetBlock(qc.BlockID)
 	if !found {
 		// Forks is _allowed_ to (but obliged to) prune blocks whose view is below the newest finalized block.
@@ -142,7 +164,8 @@ func (v *Validator) ValidateVote(vote *model.Vote, block *model.Block) (*flow.Id
 		return nil, newInvalidVoteError(vote, fmt.Errorf("vote's view %d is inconsistent with referenced block (view %d)", vote.View, block.View))
 	}
 
-	voter, err := v.committee.Identity(block.BlockID, vote.SignerID)
+	// TODO: handle model.ErrViewForUnknownEpoch when front-loading verification
+	voter, err := v.committee.IdentityByEpoch(block.View, vote.SignerID)
 	if model.IsInvalidSignerError(err) {
 		return nil, newInvalidVoteError(vote, err)
 	}

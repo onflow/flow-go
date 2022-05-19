@@ -115,7 +115,7 @@ func GenerateRootBlockVotes(block *flow.Block, participantData *ParticipantData)
 }
 
 // createValidator creates validator that can validate votes and QC
-func createValidator(committee hotstuff.Committee) (hotstuff.Validator, error) {
+func createValidator(committee hotstuff.DynamicCommittee) (hotstuff.Validator, error) {
 	packer := hotstuffSig.NewConsensusSigDataPacker(committee)
 	verifier := verification.NewCombinedVerifier(committee, packer)
 

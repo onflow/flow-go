@@ -152,7 +152,7 @@ func NewForks(final *flow.Header, headers storage.Headers, updater module.Finali
 }
 
 // NewValidator creates new instance of hotstuff validator needed for votes & proposal validation
-func NewValidator(metrics module.HotstuffMetrics, committee hotstuff.Committee, forks hotstuff.ForksReader) hotstuff.Validator {
+func NewValidator(metrics module.HotstuffMetrics, committee hotstuff.DynamicCommittee, forks hotstuff.ForksReader) hotstuff.Validator {
 	packer := signature.NewConsensusSigDataPacker(committee)
 	verifier := verification.NewCombinedVerifier(committee, packer)
 

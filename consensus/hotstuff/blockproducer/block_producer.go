@@ -12,13 +12,13 @@ import (
 // BlockProducer is responsible for producing new block proposals
 type BlockProducer struct {
 	signer    hotstuff.Signer
-	committee hotstuff.Committee
+	committee hotstuff.Replicas
 	builder   module.Builder
 }
 
 // New creates a new BlockProducer which wraps the chain compliance layer block builder
 // to provide hotstuff with block proposals.
-func New(signer hotstuff.Signer, committee hotstuff.Committee, builder module.Builder) (*BlockProducer, error) {
+func New(signer hotstuff.Signer, committee hotstuff.Replicas, builder module.Builder) (*BlockProducer, error) {
 	bp := &BlockProducer{
 		signer:    signer,
 		committee: committee,

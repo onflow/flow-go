@@ -30,7 +30,7 @@ import (
 // by `votecollector.VoteProcessorFactory` which adds the logic to verify
 // the proposer's vote (decorator pattern).
 type combinedVoteProcessorFactoryBaseV2 struct {
-	committee   hotstuff.Committee
+	committee   hotstuff.DynamicCommittee
 	onQCCreated hotstuff.OnQCCreated
 	packer      hotstuff.Packer
 }
@@ -38,7 +38,7 @@ type combinedVoteProcessorFactoryBaseV2 struct {
 // Create creates CombinedVoteProcessorV2 for processing votes for the given block.
 // Caller must treat all errors as exceptions
 func (f *combinedVoteProcessorFactoryBaseV2) Create(log zerolog.Logger, block *model.Block) (hotstuff.VerifyingVoteProcessor, error) {
-	allParticipants, err := f.committee.Identities(block.BlockID, filter.Any)
+	allParticipants, err := f.committee.IdentitiesByBlock(block.BlockID, filter.Any)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving consensus participants at block %v: %w", block.BlockID, err)
 	}
@@ -58,7 +58,7 @@ func (f *combinedVoteProcessorFactoryBaseV2) Create(log zerolog.Logger, block *m
 	}
 
 	publicKeyShares := make([]crypto.PublicKey, 0, len(allParticipants))
-	dkg, err := f.committee.DKG(block.BlockID)
+	dkg, err := f.committee.DKG(block.View)
 	if err != nil {
 		return nil, fmt.Errorf("could not get DKG info at block %v: %w", block.BlockID, err)
 	}
@@ -77,7 +77,10 @@ func (f *combinedVoteProcessorFactoryBaseV2) Create(log zerolog.Logger, block *m
 	}
 
 	rbRector := signature.NewRandomBeaconReconstructor(dkg, randomBeaconInspector)
-	minRequiredWeight := hotstuff.ComputeWeightThresholdForBuildingQC(allParticipants.TotalWeight())
+	minRequiredWeight, err := f.committee.WeightThresholdForView(block.View)
+	if err != nil {
+		return nil, fmt.Errorf("could not get weight threshold for view %d: %w", block.View, err)
+	}
 
 	return NewCombinedVoteProcessor(
 		log,
@@ -307,7 +310,7 @@ func buildQCWithPackerAndSigData(
 	block *model.Block,
 	blockSigData *hotstuff.BlockSignatureData,
 ) (*flow.QuorumCertificate, error) {
-	signerIDs, sigData, err := packer.Pack(block.BlockID, blockSigData)
+	signerIDs, sigData, err := packer.Pack(block.View, blockSigData)
 	if err != nil {
 		return nil, fmt.Errorf("could not pack the block sig data: %w", err)
 	}

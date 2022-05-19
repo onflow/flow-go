@@ -15,34 +15,6 @@ type SafetyRules struct {
 	mock.Mock
 }
 
-// IsSafeToTimeout provides a mock function with given fields: curView, highestQC, highestTC
-func (_m *SafetyRules) IsSafeToTimeout(curView uint64, highestQC *flow.QuorumCertificate, highestTC *flow.TimeoutCertificate) bool {
-	ret := _m.Called(curView, highestQC, highestTC)
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func(uint64, *flow.QuorumCertificate, *flow.TimeoutCertificate) bool); ok {
-		r0 = rf(curView, highestQC, highestTC)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	return r0
-}
-
-// IsSafeToVote provides a mock function with given fields: proposal
-func (_m *SafetyRules) IsSafeToVote(proposal *model.Proposal) bool {
-	ret := _m.Called(proposal)
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func(*model.Proposal) bool); ok {
-		r0 = rf(proposal)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	return r0
-}
-
 // ProduceTimeout provides a mock function with given fields: curView, highestQC, highestTC
 func (_m *SafetyRules) ProduceTimeout(curView uint64, highestQC *flow.QuorumCertificate, highestTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
 	ret := _m.Called(curView, highestQC, highestTC)

@@ -1,6 +1,7 @@
 package committees
 
 import (
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -105,22 +106,30 @@ func (suite *ClusterSuite) TestInvalidSigner() {
 
 	suite.Run("should return InvalidSignerError for non-existent signer", func() {
 		suite.Run("root block", func() {
-			_, err := suite.com.Identity(rootBlockID, fakeID)
+			_, err := suite.com.IdentityByBlock(rootBlockID, fakeID)
 			suite.Assert().True(model.IsInvalidSignerError(err))
 		})
 		suite.Run("non-root block", func() {
-			_, err := suite.com.Identity(nonRootBlockID, fakeID)
+			_, err := suite.com.IdentityByBlock(nonRootBlockID, fakeID)
+			suite.Assert().True(model.IsInvalidSignerError(err))
+		})
+		suite.Run("by epoch", func() {
+			_, err := suite.com.IdentityByEpoch(rand.Uint64(), fakeID)
 			suite.Assert().True(model.IsInvalidSignerError(err))
 		})
 	})
 
 	suite.Run("should return InvalidSignerError for existent non-cluster-member", func() {
 		suite.Run("root block", func() {
-			_, err := suite.com.Identity(rootBlockID, realNonClusterMember.NodeID)
+			_, err := suite.com.IdentityByBlock(rootBlockID, realNonClusterMember.NodeID)
 			suite.Assert().True(model.IsInvalidSignerError(err))
 		})
 		suite.Run("non-root block", func() {
-			_, err := suite.com.Identity(nonRootBlockID, realNonClusterMember.NodeID)
+			_, err := suite.com.IdentityByBlock(nonRootBlockID, realNonClusterMember.NodeID)
+			suite.Assert().True(model.IsInvalidSignerError(err))
+		})
+		suite.Run("by epoch", func() {
+			_, err := suite.com.IdentityByEpoch(rand.Uint64(), realNonClusterMember.NodeID)
 			suite.Assert().True(model.IsInvalidSignerError(err))
 		})
 	})
@@ -128,37 +137,52 @@ func (suite *ClusterSuite) TestInvalidSigner() {
 	suite.Run("should return ErrInvalidSigner for existent but ejected cluster member", func() {
 		// at the root block, the cluster member is not ejected yet
 		suite.Run("root block", func() {
-			actual, err := suite.com.Identity(rootBlockID, realEjectedClusterMember.NodeID)
+			actual, err := suite.com.IdentityByBlock(rootBlockID, realEjectedClusterMember.NodeID)
 			suite.Require().NoError(err)
 			suite.Assert().Equal(realEjectedClusterMember, actual)
 		})
 		suite.Run("non-root block", func() {
-			_, err := suite.com.Identity(nonRootBlockID, realEjectedClusterMember.NodeID)
+			_, err := suite.com.IdentityByBlock(nonRootBlockID, realEjectedClusterMember.NodeID)
 			suite.Assert().True(model.IsInvalidSignerError(err))
+		})
+		suite.Run("by epoch", func() {
+			actual, err := suite.com.IdentityByEpoch(rand.Uint64(), realEjectedClusterMember.NodeID)
+			suite.Assert().NoError(err)
+			suite.Assert().Equal(realEjectedClusterMember, actual)
 		})
 	})
 
 	suite.Run("should return ErrInvalidSigner for existent but zero-weight cluster member", func() {
 		// at the root block, the cluster member has its initial weight
 		suite.Run("root block", func() {
-			actual, err := suite.com.Identity(rootBlockID, realNoWeightClusterMember.NodeID)
+			actual, err := suite.com.IdentityByBlock(rootBlockID, realNoWeightClusterMember.NodeID)
 			suite.Require().NoError(err)
 			suite.Assert().Equal(realNoWeightClusterMember, actual)
 		})
 		suite.Run("non-root block", func() {
-			_, err := suite.com.Identity(nonRootBlockID, realNoWeightClusterMember.NodeID)
+			_, err := suite.com.IdentityByBlock(nonRootBlockID, realNoWeightClusterMember.NodeID)
 			suite.Assert().True(model.IsInvalidSignerError(err))
+		})
+		suite.Run("by epoch", func() {
+			actual, err := suite.com.IdentityByEpoch(rand.Uint64(), realNoWeightClusterMember.NodeID)
+			suite.Require().NoError(err)
+			suite.Assert().Equal(realNoWeightClusterMember, actual)
 		})
 	})
 
 	suite.Run("should return identity for existent cluster member", func() {
 		suite.Run("root block", func() {
-			actual, err := suite.com.Identity(rootBlockID, realClusterMember.NodeID)
+			actual, err := suite.com.IdentityByBlock(rootBlockID, realClusterMember.NodeID)
 			suite.Require().NoError(err)
 			suite.Assert().Equal(realClusterMember, actual)
 		})
 		suite.Run("non-root block", func() {
-			actual, err := suite.com.Identity(nonRootBlockID, realClusterMember.NodeID)
+			actual, err := suite.com.IdentityByBlock(nonRootBlockID, realClusterMember.NodeID)
+			suite.Require().NoError(err)
+			suite.Assert().Equal(realClusterMember, actual)
+		})
+		suite.Run("by epoch", func() {
+			actual, err := suite.com.IdentityByEpoch(rand.Uint64(), realClusterMember.NodeID)
 			suite.Require().NoError(err)
 			suite.Assert().Equal(realClusterMember, actual)
 		})

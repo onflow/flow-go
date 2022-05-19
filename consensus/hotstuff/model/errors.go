@@ -11,6 +11,11 @@ var (
 	ErrUnverifiableBlock = errors.New("block proposal can't be verified, because its view is above the finalized view, but its QC is below the finalized view")
 	ErrInvalidFormat     = errors.New("invalid signature format")
 	ErrInvalidSignature  = errors.New("invalid signature")
+	// ErrViewForUnknownEpoch is returned when Epoch information is queried for a view that is
+	// outside of all cached epochs. This can happen when a query is made for a view in the
+	// next epoch, if that epoch is not committed yet. This can also happen when an
+	// old epoch is queried (>3 in the past), even if that epoch does exist in storage.
+	ErrViewForUnknownEpoch = fmt.Errorf("by-view query for unknown epoch")
 )
 
 // NoVoteError contains the reason of why the voter didn't vote for a block proposal.

@@ -14,13 +14,13 @@ type Packer struct {
 	mock.Mock
 }
 
-// Pack provides a mock function with given fields: blockID, sig
-func (_m *Packer) Pack(blockID flow.Identifier, sig *hotstuff.BlockSignatureData) ([]flow.Identifier, []byte, error) {
-	ret := _m.Called(blockID, sig)
+// Pack provides a mock function with given fields: view, sig
+func (_m *Packer) Pack(view uint64, sig *hotstuff.BlockSignatureData) ([]flow.Identifier, []byte, error) {
+	ret := _m.Called(view, sig)
 
 	var r0 []flow.Identifier
-	if rf, ok := ret.Get(0).(func(flow.Identifier, *hotstuff.BlockSignatureData) []flow.Identifier); ok {
-		r0 = rf(blockID, sig)
+	if rf, ok := ret.Get(0).(func(uint64, *hotstuff.BlockSignatureData) []flow.Identifier); ok {
+		r0 = rf(view, sig)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]flow.Identifier)
@@ -28,8 +28,8 @@ func (_m *Packer) Pack(blockID flow.Identifier, sig *hotstuff.BlockSignatureData
 	}
 
 	var r1 []byte
-	if rf, ok := ret.Get(1).(func(flow.Identifier, *hotstuff.BlockSignatureData) []byte); ok {
-		r1 = rf(blockID, sig)
+	if rf, ok := ret.Get(1).(func(uint64, *hotstuff.BlockSignatureData) []byte); ok {
+		r1 = rf(view, sig)
 	} else {
 		if ret.Get(1) != nil {
 			r1 = ret.Get(1).([]byte)
@@ -37,8 +37,8 @@ func (_m *Packer) Pack(blockID flow.Identifier, sig *hotstuff.BlockSignatureData
 	}
 
 	var r2 error
-	if rf, ok := ret.Get(2).(func(flow.Identifier, *hotstuff.BlockSignatureData) error); ok {
-		r2 = rf(blockID, sig)
+	if rf, ok := ret.Get(2).(func(uint64, *hotstuff.BlockSignatureData) error); ok {
+		r2 = rf(view, sig)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -46,13 +46,13 @@ func (_m *Packer) Pack(blockID flow.Identifier, sig *hotstuff.BlockSignatureData
 	return r0, r1, r2
 }
 
-// Unpack provides a mock function with given fields: blockID, signerIDs, sigData
-func (_m *Packer) Unpack(blockID flow.Identifier, signerIDs []flow.Identifier, sigData []byte) (*hotstuff.BlockSignatureData, error) {
-	ret := _m.Called(blockID, signerIDs, sigData)
+// Unpack provides a mock function with given fields: view, signerIDs, sigData
+func (_m *Packer) Unpack(view uint64, signerIDs []flow.Identifier, sigData []byte) (*hotstuff.BlockSignatureData, error) {
+	ret := _m.Called(view, signerIDs, sigData)
 
 	var r0 *hotstuff.BlockSignatureData
-	if rf, ok := ret.Get(0).(func(flow.Identifier, []flow.Identifier, []byte) *hotstuff.BlockSignatureData); ok {
-		r0 = rf(blockID, signerIDs, sigData)
+	if rf, ok := ret.Get(0).(func(uint64, []flow.Identifier, []byte) *hotstuff.BlockSignatureData); ok {
+		r0 = rf(view, signerIDs, sigData)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*hotstuff.BlockSignatureData)
@@ -60,8 +60,8 @@ func (_m *Packer) Unpack(blockID flow.Identifier, signerIDs []flow.Identifier, s
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Identifier, []flow.Identifier, []byte) error); ok {
-		r1 = rf(blockID, signerIDs, sigData)
+	if rf, ok := ret.Get(1).(func(uint64, []flow.Identifier, []byte) error); ok {
+		r1 = rf(view, signerIDs, sigData)
 	} else {
 		r1 = ret.Error(1)
 	}

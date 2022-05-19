@@ -76,7 +76,7 @@ func (f *HotStuffFactory) CreateModules(
 
 	var (
 		err       error
-		committee hotstuff.Committee
+		committee hotstuff.DynamicCommittee
 	)
 	committee, err = committees.NewClusterCommittee(f.protoState, payloads, cluster, epoch, f.me.NodeID())
 	if err != nil {

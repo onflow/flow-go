@@ -158,17 +158,17 @@ type BlockSignatureData struct {
 // Packer packs aggregated signature data into raw bytes to be used in block header.
 type Packer interface {
 	// Pack serializes the provided BlockSignatureData into a precursor format of a QC.
-	// blockID is the block that the aggregated signature is for.
+	// view is the view of the block that the aggregated signature is for.
 	// sig is the aggregated signature data.
 	// Expected error returns during normal operations:
 	//  * none; all errors are symptoms of inconsistent input data or corrupted internal state.
-	Pack(blockID flow.Identifier, sig *BlockSignatureData) ([]flow.Identifier, []byte, error)
+	Pack(view uint64, sig *BlockSignatureData) ([]flow.Identifier, []byte, error)
 
 	// Unpack de-serializes the provided signature data.
-	// blockID is the block that the aggregated sig is signed for
+	// view is the view of the block that the aggregated signature is for.
 	// sig is the aggregated signature data
 	// It returns:
 	//  - (sigData, nil) if successfully unpacked the signature data
 	//  - (nil, model.ErrInvalidFormat) if failed to unpack the signature data
-	Unpack(blockID flow.Identifier, signerIDs []flow.Identifier, sigData []byte) (*BlockSignatureData, error)
+	Unpack(view uint64, signerIDs []flow.Identifier, sigData []byte) (*BlockSignatureData, error)
 }

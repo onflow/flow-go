@@ -45,25 +45,41 @@ func (_m *PaceMaker) CurView() uint64 {
 	return r0
 }
 
-// OnPartialTC provides a mock function with given fields: curView
-func (_m *PaceMaker) OnPartialTC(curView uint64) {
-	_m.Called(curView)
-}
-
-// OnTimeout provides a mock function with given fields:
-func (_m *PaceMaker) OnTimeout() *model.TimeoutObject {
+// HighestQC provides a mock function with given fields:
+func (_m *PaceMaker) HighestQC() *flow.QuorumCertificate {
 	ret := _m.Called()
 
-	var r0 *model.TimeoutObject
-	if rf, ok := ret.Get(0).(func() *model.TimeoutObject); ok {
+	var r0 *flow.QuorumCertificate
+	if rf, ok := ret.Get(0).(func() *flow.QuorumCertificate); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*model.TimeoutObject)
+			r0 = ret.Get(0).(*flow.QuorumCertificate)
 		}
 	}
 
 	return r0
+}
+
+// LastViewTC provides a mock function with given fields:
+func (_m *PaceMaker) LastViewTC() *flow.TimeoutCertificate {
+	ret := _m.Called()
+
+	var r0 *flow.TimeoutCertificate
+	if rf, ok := ret.Get(0).(func() *flow.TimeoutCertificate); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.TimeoutCertificate)
+		}
+	}
+
+	return r0
+}
+
+// OnPartialTC provides a mock function with given fields: curView
+func (_m *PaceMaker) OnPartialTC(curView uint64) {
+	_m.Called(curView)
 }
 
 // ProcessQC provides a mock function with given fields: qc

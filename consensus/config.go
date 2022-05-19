@@ -11,7 +11,7 @@ import (
 // a hotStuff participant.
 type HotstuffModules struct {
 	Notifier                hotstuff.Consumer               // observer for hotstuff events
-	Committee               hotstuff.Committee              // consensus committee
+	Committee               hotstuff.DynamicCommittee       // consensus committee
 	Signer                  hotstuff.Signer                 // signer of proposal & votes
 	Persist                 hotstuff.Persister              // last state of consensus participant
 	FinalizationDistributor *pubsub.FinalizationDistributor // observer for finalization events, used by compliance engine

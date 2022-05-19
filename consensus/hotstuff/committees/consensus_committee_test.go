@@ -3,6 +3,7 @@ package committees
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -17,10 +18,10 @@ import (
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
-// TestConsensus_InvalidSigner tests that the appropriate sentinel error is
-// returned by the hotstuff.Committee implementation for non-existent or
-// non-committee identities.
-func TestConsensus_InvalidSigner(t *testing.T) {
+// TestConsensus_IdentitiesByBlock tests retrieving committee members by block.
+// * should use up-to-block committee information
+// * should exclude non-committee members
+func TestConsensus_IdentitiesByBlock(t *testing.T) {
 
 	realIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
 	zeroWeightConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithWeight(0))
@@ -35,7 +36,7 @@ func TestConsensus_InvalidSigner(t *testing.T) {
 	// create a mock epoch for leader selection setup in constructor
 	currEpoch := newMockEpoch(
 		1,
-		unittest.IdentityListFixture(10),
+		unittest.IdentityListFixture(10), // static initial identities should not be used
 		1,
 		100,
 		unittest.SeedFixture(seed.RandomSourceLength),
@@ -56,37 +57,155 @@ func TestConsensus_InvalidSigner(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("non-existent identity should return InvalidSignerError", func(t *testing.T) {
-		_, err := com.Identity(blockID, fakeID)
+		_, err := com.IdentityByBlock(blockID, fakeID)
 		require.True(t, model.IsInvalidSignerError(err))
 	})
 
 	t.Run("existent but non-committee-member identity should return InvalidSignerError", func(t *testing.T) {
 		t.Run("zero-weight consensus node", func(t *testing.T) {
-			_, err := com.Identity(blockID, zeroWeightConsensusIdentity.NodeID)
+			_, err := com.IdentityByBlock(blockID, zeroWeightConsensusIdentity.NodeID)
 			require.True(t, model.IsInvalidSignerError(err))
 		})
 
 		t.Run("ejected consensus node", func(t *testing.T) {
-			_, err := com.Identity(blockID, ejectedConsensusIdentity.NodeID)
+			_, err := com.IdentityByBlock(blockID, ejectedConsensusIdentity.NodeID)
 			require.True(t, model.IsInvalidSignerError(err))
 		})
 
 		t.Run("otherwise valid non-consensus node", func(t *testing.T) {
-			_, err := com.Identity(blockID, validNonConsensusIdentity.NodeID)
+			_, err := com.IdentityByBlock(blockID, validNonConsensusIdentity.NodeID)
 			require.True(t, model.IsInvalidSignerError(err))
 		})
 	})
 
 	t.Run("should be able to retrieve real identity", func(t *testing.T) {
-		actual, err := com.Identity(blockID, realIdentity.NodeID)
+		actual, err := com.IdentityByBlock(blockID, realIdentity.NodeID)
 		require.NoError(t, err)
 		require.Equal(t, realIdentity, actual)
 	})
 }
 
-// test that LeaderForView returns a valid leader for the previous and current
-// epoch and that it returns the appropriate sentinel for the next epoch if it
-// is not yet ready
+// TestConsensus_IdentitiesByEpoch tests that identities can be queried by epoch.
+// * should use static epoch info (initial identities)
+// * should exclude non-committee members
+// * should correctly map views to epochs
+// * should return ErrViewForUnknownEpoch sentinel for unknown epochs
+func TestConsensus_IdentitiesByEpoch(t *testing.T) {
+
+	// epoch 1 identities with varying conditions which would disqualify them
+	// from committee participation
+	realIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
+	zeroWeightConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithWeight(0))
+	ejectedConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithEjected(true))
+	validNonConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+	epoch1Identities := flow.IdentityList{realIdentity, zeroWeightConsensusIdentity, ejectedConsensusIdentity, validNonConsensusIdentity}
+
+	// a single consensus node for epoch 2:
+	epoch2Identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
+	epoch2Identities := flow.IdentityList{epoch2Identity}
+
+	state := new(protocolmock.State)
+	snapshot := new(protocolmock.Snapshot)
+	state.On("Final").Return(snapshot)
+
+	// create a mock epoch for leader selection setup in constructor
+	epoch1 := newMockEpoch(
+		1,
+		epoch1Identities,
+		1,
+		100,
+		unittest.SeedFixture(seed.RandomSourceLength),
+	)
+	// initially epoch 2 is not committed
+	epoch2 := newMockEpoch(
+		2,
+		epoch2Identities,
+		101,
+		200,
+		unittest.SeedFixture(seed.RandomSourceLength),
+	)
+	epochs := mocks.NewEpochQuery(t, 1, epoch1)
+	snapshot.On("Epochs").Return(epochs)
+
+	com, err := NewConsensusCommittee(state, unittest.IdentifierFixture())
+	require.NoError(t, err)
+
+	t.Run("only epoch 1 committed", func(t *testing.T) {
+		t.Run("non-existent identity should return InvalidSignerError", func(t *testing.T) {
+			_, err := com.IdentityByEpoch(randUint64(1, 100), unittest.IdentifierFixture())
+			require.True(t, model.IsInvalidSignerError(err))
+		})
+
+		t.Run("existent but non-committee-member identity should return InvalidSignerError", func(t *testing.T) {
+			t.Run("zero-weight consensus node", func(t *testing.T) {
+				_, err := com.IdentityByEpoch(randUint64(1, 100), zeroWeightConsensusIdentity.NodeID)
+				require.True(t, model.IsInvalidSignerError(err))
+			})
+
+			t.Run("ejected consensus node", func(t *testing.T) {
+				_, err := com.IdentityByEpoch(randUint64(1, 100), ejectedConsensusIdentity.NodeID)
+				require.True(t, model.IsInvalidSignerError(err))
+			})
+
+			t.Run("otherwise valid non-consensus node", func(t *testing.T) {
+				_, err := com.IdentityByEpoch(randUint64(1, 100), validNonConsensusIdentity.NodeID)
+				require.True(t, model.IsInvalidSignerError(err))
+			})
+		})
+
+		t.Run("should be able to retrieve real identity", func(t *testing.T) {
+			actual, err := com.IdentityByEpoch(randUint64(1, 100), realIdentity.NodeID)
+			require.NoError(t, err)
+			require.Equal(t, realIdentity, actual)
+		})
+
+		t.Run("should return ErrViewForUnknownEpoch for view outside existing epoch", func(t *testing.T) {
+			_, err := com.IdentityByEpoch(randUint64(101, 1_000_000), epoch2Identity.NodeID)
+			require.Error(t, err)
+			require.True(t, errors.Is(err, model.ErrViewForUnknownEpoch))
+		})
+	})
+
+	// commit epoch 2
+	epochs.Add(epoch2)
+
+	t.Run("epoch 1 and 2 committed", func(t *testing.T) {
+		t.Run("should be able to retrieve epoch 1 identity in epoch 1", func(t *testing.T) {
+			actual, err := com.IdentityByEpoch(randUint64(1, 100), realIdentity.NodeID)
+			require.NoError(t, err)
+			require.Equal(t, realIdentity, actual)
+		})
+
+		t.Run("should be unable to retrieve epoch 1 identity in epoch 2", func(t *testing.T) {
+			_, err := com.IdentityByEpoch(randUint64(101, 200), realIdentity.NodeID)
+			require.Error(t, err)
+			fmt.Println(err)
+			require.True(t, model.IsInvalidSignerError(err))
+		})
+
+		t.Run("should be unable to retrieve epoch 2 identity in epoch 1", func(t *testing.T) {
+			_, err := com.IdentityByEpoch(randUint64(1, 100), epoch2Identity.NodeID)
+			require.Error(t, err)
+			require.True(t, model.IsInvalidSignerError(err))
+		})
+
+		t.Run("should be able to retrieve epoch 2 identity in epoch 2", func(t *testing.T) {
+			actual, err := com.IdentityByEpoch(randUint64(101, 200), epoch2Identity.NodeID)
+			require.NoError(t, err)
+			require.Equal(t, epoch2Identity, actual)
+		})
+
+		t.Run("should return ErrViewForUnknownEpoch for view outside existing epochs", func(t *testing.T) {
+			_, err := com.IdentityByEpoch(randUint64(201, 1_000_000), epoch2Identity.NodeID)
+			require.Error(t, err)
+			require.True(t, errors.Is(err, model.ErrViewForUnknownEpoch))
+		})
+	})
+}
+
+// TestConsensus_LeaderForView tests that LeaderForView returns a valid leader
+// for the previous and current epoch and that it returns the appropriate
+// sentinel for the next epoch if it is not yet ready
 func TestConsensus_LeaderForView(t *testing.T) {
 
 	identities := unittest.IdentityListFixture(10)
@@ -124,7 +243,7 @@ func TestConsensus_LeaderForView(t *testing.T) {
 	t.Run("next epoch not ready", func(t *testing.T) {
 		t.Run("previous epoch", func(t *testing.T) {
 			// get leader for view in previous epoch
-			leaderID, err := committee.LeaderForView(50)
+			leaderID, err := committee.LeaderForView(randUint64(1, 100))
 			require.Nil(t, err)
 			_, exists := identities.ByNodeID(leaderID)
 			assert.True(t, exists)
@@ -132,37 +251,17 @@ func TestConsensus_LeaderForView(t *testing.T) {
 
 		t.Run("current epoch", func(t *testing.T) {
 			// get leader for view in current epoch
-			leaderID, err := committee.LeaderForView(150)
+			leaderID, err := committee.LeaderForView(randUint64(101, 200))
 			require.Nil(t, err)
 			_, exists := identities.ByNodeID(leaderID)
 			assert.True(t, exists)
 		})
 
-		t.Run("after current epoch", func(t *testing.T) {
-			unittest.SkipUnless(t, unittest.TEST_TODO, "disabled as the current implementation uses a temporary fallback measure in this case (triggers EECC), rather than returning an error")
-			// REASON FOR SKIPPING TEST:
-			// We have a temporary fallback to continue with the current consensus committee, if the
-			// setup for the next epoch failed (aka emergency epoch chain continuation -- EECC).
-			// This test covers with behaviour _without_ EECC and is therefore skipped.
-			// The behaviour _with EECC_ is covered by the following test:
-			// "after current epoch - with emergency epoch chain continuation"
-			// TODO: for the mature implementation, remove EECC, enable this test, and remove the following test
-
+		t.Run("after current epoch - should return ErrViewForUnknownEpoch", func(t *testing.T) {
 			// get leader for view in next epoch when it is not set up yet
-			_, err := committee.LeaderForView(250)
+			_, err := committee.LeaderForView(randUint64(201, 300))
 			assert.Error(t, err)
-			assert.True(t, errors.Is(err, protocol.ErrNextEpochNotSetup))
-		})
-
-		t.Run("after current epoch - with emergency epoch chain continuation", func(t *testing.T) {
-			// This test covers the TEMPORARY emergency epoch chain continuation (EECC) fallback
-			// TODO: for the mature implementation, remove this test,
-			//       enable the previous test "after current epoch"
-
-			// get leader for view in next epoch when it is not set up yet
-			_, err := committee.LeaderForView(250)
-			// emergency epoch chain continuation should kick in and return a valid leader
-			assert.NoError(t, err)
+			assert.True(t, errors.Is(err, model.ErrViewForUnknownEpoch))
 		})
 	})
 
@@ -179,7 +278,7 @@ func TestConsensus_LeaderForView(t *testing.T) {
 	t.Run("next epoch ready", func(t *testing.T) {
 		t.Run("previous epoch", func(t *testing.T) {
 			// get leader for view in previous epoch
-			leaderID, err := committee.LeaderForView(50)
+			leaderID, err := committee.LeaderForView(randUint64(1, 100))
 			require.Nil(t, err)
 			_, exists := identities.ByNodeID(leaderID)
 			assert.True(t, exists)
@@ -187,7 +286,7 @@ func TestConsensus_LeaderForView(t *testing.T) {
 
 		t.Run("current epoch", func(t *testing.T) {
 			// get leader for view in current epoch
-			leaderID, err := committee.LeaderForView(150)
+			leaderID, err := committee.LeaderForView(randUint64(101, 200))
 			require.Nil(t, err)
 			_, exists := identities.ByNodeID(leaderID)
 			assert.True(t, exists)
@@ -195,14 +294,21 @@ func TestConsensus_LeaderForView(t *testing.T) {
 
 		t.Run("next epoch", func(t *testing.T) {
 			// get leader for view in next epoch after it has been set up
-			leaderID, err := committee.LeaderForView(250)
+			leaderID, err := committee.LeaderForView(randUint64(201, 300))
 			require.Nil(t, err)
 			_, exists := identities.ByNodeID(leaderID)
 			assert.True(t, exists)
 		})
+
+		t.Run("beyond known epochs", func(t *testing.T) {
+			_, err := committee.LeaderForView(randUint64(301, 1_000_000))
+			assert.Error(t, err)
+			assert.True(t, errors.Is(err, model.ErrViewForUnknownEpoch))
+		})
 	})
 }
 
+// TestRemoveOldEpochs tests that old epochs are pruned
 func TestRemoveOldEpochs(t *testing.T) {
 
 	identities := unittest.IdentityListFixture(10)
@@ -228,7 +334,7 @@ func TestRemoveOldEpochs(t *testing.T) {
 
 	// we should start with only current epoch (epoch 1) pre-computed
 	// since there is no previous epoch
-	assert.Equal(t, 1, len(committee.leaders))
+	assert.Equal(t, 1, len(committee.epochs))
 
 	// test for 10 epochs
 	for currentEpochCounter < 10 {
@@ -249,9 +355,9 @@ func TestRemoveOldEpochs(t *testing.T) {
 		t.Run(fmt.Sprintf("epoch %d", currentEpochCounter), func(t *testing.T) {
 			// check we have the right number of epochs stored
 			if currentEpochCounter <= 3 {
-				assert.Equal(t, int(currentEpochCounter), len(committee.leaders))
+				assert.Equal(t, int(currentEpochCounter), len(committee.epochs))
 			} else {
-				assert.Equal(t, 3, len(committee.leaders))
+				assert.Equal(t, 3, len(committee.epochs))
 			}
 
 			// check we have the correct epochs stored
@@ -260,11 +366,15 @@ func TestRemoveOldEpochs(t *testing.T) {
 				if counter < firstEpochCounter {
 					break
 				}
-				_, exists := committee.leaders[counter]
+				_, exists := committee.epochs[counter]
 				assert.True(t, exists, "missing epoch with counter %d max counter is %d", counter, currentEpochCounter)
 			}
 		})
 	}
+}
+
+func randUint64(min, max int) uint64 {
+	return uint64(min + rand.Intn(max+1-min))
 }
 
 func newMockEpoch(

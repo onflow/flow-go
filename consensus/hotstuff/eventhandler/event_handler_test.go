@@ -128,7 +128,7 @@ func (v *VoteAggregator) PruneByView(view uint64) {
 }
 
 type Committee struct {
-	mocks.Committee
+	mocks.DynamicCommittee
 	// to mock I'm the leader of a certain view, add the view into the keys of leaders field
 	leaders map[uint64]struct{}
 }

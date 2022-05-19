@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
@@ -46,7 +47,7 @@ func TestHotStuffFollower(t *testing.T) {
 type HotStuffFollowerSuite struct {
 	suite.Suite
 
-	committee  *mockhotstuff.Committee
+	committee  *mockhotstuff.DynamicCommittee
 	headers    *mockstorage.Headers
 	updater    *mockmodule.Finalizer
 	verifier   *mockhotstuff.Verifier
@@ -67,20 +68,22 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 	s.mockConsensus = &MockConsensus{identities: identities}
 
 	// mock consensus committee
-	s.committee = &mockhotstuff.Committee{}
-	s.committee.On("Identities", mock.Anything, mock.Anything).Return(
-		func(blockID flow.Identifier, selector flow.IdentityFilter) flow.IdentityList {
+	s.committee = &mockhotstuff.DynamicCommittee{}
+	s.committee.On("IdentitiesByEpoch", mock.Anything, mock.Anything).Return(
+		func(_ uint64, selector flow.IdentityFilter) flow.IdentityList {
 			return identities.Filter(selector)
 		},
 		nil,
 	)
 	for _, identity := range identities {
-		s.committee.On("Identity", mock.Anything, identity.NodeID).Return(identity, nil)
+		s.committee.On("IdentityByEpoch", mock.Anything, identity.NodeID).Return(identity, nil)
+		s.committee.On("IdentityByBlock", mock.Anything, identity.NodeID).Return(identity, nil)
 	}
 	s.committee.On("LeaderForView", mock.Anything).Return(
 		func(view uint64) flow.Identifier { return identities[int(view)%len(identities)].NodeID },
 		nil,
 	)
+	s.committee.On("WeightThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(identities.TotalWeight()), nil)
 
 	// mock storage headers
 	s.headers = &mockstorage.Headers{}

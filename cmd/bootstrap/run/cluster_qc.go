@@ -63,7 +63,7 @@ func GenerateClusterRootQC(signers []bootstrap.NodeInfo, allCommitteeMembers flo
 }
 
 // createClusterValidator creates validator for cluster consensus
-func createClusterValidator(committee hotstuff.Committee) (hotstuff.Validator, error) {
+func createClusterValidator(committee hotstuff.DynamicCommittee) (hotstuff.Validator, error) {
 	verifier := verification.NewStakingVerifier()
 
 	forks := &mocks.ForksReader{}
