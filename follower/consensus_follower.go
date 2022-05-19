@@ -149,7 +149,7 @@ func getBaseOptions(config *Config) []cmd.Option {
 
 func buildObserver(accessNodeOptions []FollowerOption) (*ObserverServiceBuilder, error) {
 	anb := FlowObserverService(accessNodeOptions...)
-	nodeBuilder := NewObserverServiceBuilder(anb)
+	nodeBuilder := WithSkipValidations(anb)
 
 	if err := nodeBuilder.Initialize(); err != nil {
 		return nil, err
