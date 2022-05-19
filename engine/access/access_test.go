@@ -664,163 +664,163 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 // TestExecuteScript tests the three execute Script related calls to make sure that the execution api is called with
 // the correct block id
-func (suite *Suite) TestExecuteScript() {
-	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-		headers, _, _, _, _, blocks, _, _, _, _ := util.StorageLayer(suite.T(), db)
-		transactions := storage.NewTransactions(suite.metrics, db)
-		collections := storage.NewCollections(db, transactions)
-		results := storage.NewExecutionResults(suite.metrics, db)
-		receipts := storage.NewExecutionReceipts(suite.metrics, db, results, storage.DefaultCacheSize)
+// func (suite *Suite) TestExecuteScript() {
+// 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
+// 		headers, _, _, _, _, blocks, _, _, _, _ := util.StorageLayer(suite.T(), db)
+// 		transactions := storage.NewTransactions(suite.metrics, db)
+// 		collections := storage.NewCollections(db, transactions)
+// 		results := storage.NewExecutionResults(suite.metrics, db)
+// 		receipts := storage.NewExecutionReceipts(suite.metrics, db, results, storage.DefaultCacheSize)
 
-		identities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
-		suite.snapshot.On("Identities", mock.Anything).Return(identities, nil)
+// 		identities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
+// 		suite.snapshot.On("Identities", mock.Anything).Return(identities, nil)
 
-		// create a mock connection factory
-		connFactory := new(factorymock.ConnectionFactory)
-		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+// 		// create a mock connection factory
+// 		connFactory := new(factorymock.ConnectionFactory)
+// 		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
-		suite.backend = backend.New(suite.state,
-			suite.collClient,
-			nil,
-			blocks,
-			headers,
-			collections,
-			transactions,
-			receipts,
-			results,
-			suite.chainID,
-			suite.metrics,
-			connFactory,
-			false,
-			backend.DefaultMaxHeightRange,
-			nil,
-			flow.IdentifierList(identities.NodeIDs()).Strings(),
-			suite.log,
-			backend.DefaultSnapshotHistoryLimit,
-		)
+// 		suite.backend = backend.New(suite.state,
+// 			suite.collClient,
+// 			nil,
+// 			blocks,
+// 			headers,
+// 			collections,
+// 			transactions,
+// 			receipts,
+// 			results,
+// 			suite.chainID,
+// 			suite.metrics,
+// 			connFactory,
+// 			false,
+// 			backend.DefaultMaxHeightRange,
+// 			nil,
+// 			flow.IdentifierList(identities.NodeIDs()).Strings(),
+// 			suite.log,
+// 			backend.DefaultSnapshotHistoryLimit,
+// 		)
 
-		handler := access.NewHandler(suite.backend, suite.chainID.Chain())
+// 		handler := access.NewHandler(suite.backend, suite.chainID.Chain())
 
-		// initialize metrics related storage
-		metrics := metrics.NewNoopCollector()
-		collectionsToMarkFinalized, err := stdmap.NewTimes(100)
-		require.NoError(suite.T(), err)
-		collectionsToMarkExecuted, err := stdmap.NewTimes(100)
-		require.NoError(suite.T(), err)
-		blocksToMarkExecuted, err := stdmap.NewTimes(100)
-		require.NoError(suite.T(), err)
+// 		// initialize metrics related storage
+// 		metrics := metrics.NewNoopCollector()
+// 		collectionsToMarkFinalized, err := stdmap.NewTimes(100)
+// 		require.NoError(suite.T(), err)
+// 		collectionsToMarkExecuted, err := stdmap.NewTimes(100)
+// 		require.NoError(suite.T(), err)
+// 		blocksToMarkExecuted, err := stdmap.NewTimes(100)
+// 		require.NoError(suite.T(), err)
 
-		conduit := new(mocknetwork.Conduit)
-		suite.net.On("Register", engine.ReceiveReceipts, mock.Anything).Return(conduit, nil).
-			Once()
-		// create the ingest engine
-		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, blocks, headers, collections,
-			transactions, results, receipts, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, nil)
-		require.NoError(suite.T(), err)
+// 		conduit := new(mocknetwork.Conduit)
+// 		suite.net.On("Register", engine.ReceiveReceipts, mock.Anything).Return(conduit, nil).
+// 			Once()
+// 		// create the ingest engine
+// 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, blocks, headers, collections,
+// 			transactions, results, receipts, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, nil)
+// 		require.NoError(suite.T(), err)
 
-		irrecoverableCtx, _ := irrecoverable.WithSignaler(context.Background())
-		ingestEng.IsTest = true
-		ingestEng.Start(irrecoverableCtx)
-		<-ingestEng.Ready()
+// 		irrecoverableCtx, _ := irrecoverable.WithSignaler(context.Background())
+// 		ingestEng.IsTest = true
+// 		ingestEng.Start(irrecoverableCtx)
+// 		<-ingestEng.Ready()
 
-		// create a block and a seal pointing to that block
-		lastBlock := unittest.BlockFixture()
-		lastBlock.Header.Height = 2
-		err = blocks.Store(&lastBlock)
-		require.NoError(suite.T(), err)
-		err = db.Update(operation.IndexBlockHeight(lastBlock.Header.Height, lastBlock.ID()))
-		require.NoError(suite.T(), err)
-		suite.snapshot.On("Head").Return(lastBlock.Header, nil).Once()
+// 		// create a block and a seal pointing to that block
+// 		lastBlock := unittest.BlockFixture()
+// 		lastBlock.Header.Height = 2
+// 		err = blocks.Store(&lastBlock)
+// 		require.NoError(suite.T(), err)
+// 		err = db.Update(operation.IndexBlockHeight(lastBlock.Header.Height, lastBlock.ID()))
+// 		require.NoError(suite.T(), err)
+// 		suite.snapshot.On("Head").Return(lastBlock.Header, nil).Once()
 
-		// create execution receipts for each of the execution node and the last block
-		executionReceipts := unittest.ReceiptsForBlockFixture(&lastBlock, identities.NodeIDs())
-		// notify the ingest engine about the receipts
-		for _, r := range executionReceipts {
-			err = ingestEng.ProcessLocal(r)
-			require.NoError(suite.T(), err)
-		}
+// 		// create execution receipts for each of the execution node and the last block
+// 		executionReceipts := unittest.ReceiptsForBlockFixture(&lastBlock, identities.NodeIDs())
+// 		// notify the ingest engine about the receipts
+// 		for _, r := range executionReceipts {
+// 			err = ingestEng.ProcessLocal(r)
+// 			require.NoError(suite.T(), err)
+// 		}
 
-		// create another block as a predecessor of the block created earlier
-		prevBlock := unittest.BlockFixture()
-		prevBlock.Header.Height = lastBlock.Header.Height - 1
-		err = blocks.Store(&prevBlock)
-		require.NoError(suite.T(), err)
-		err = db.Update(operation.IndexBlockHeight(prevBlock.Header.Height, prevBlock.ID()))
-		require.NoError(suite.T(), err)
+// 		// create another block as a predecessor of the block created earlier
+// 		prevBlock := unittest.BlockFixture()
+// 		prevBlock.Header.Height = lastBlock.Header.Height - 1
+// 		err = blocks.Store(&prevBlock)
+// 		require.NoError(suite.T(), err)
+// 		err = db.Update(operation.IndexBlockHeight(prevBlock.Header.Height, prevBlock.ID()))
+// 		require.NoError(suite.T(), err)
 
-		// create execution receipts for each of the execution node and the previous block
-		executionReceipts = unittest.ReceiptsForBlockFixture(&prevBlock, identities.NodeIDs())
-		// notify the ingest engine about the receipts
-		for _, r := range executionReceipts {
-			err = ingestEng.ProcessLocal(r)
-			require.NoError(suite.T(), err)
-		}
+// 		// create execution receipts for each of the execution node and the previous block
+// 		executionReceipts = unittest.ReceiptsForBlockFixture(&prevBlock, identities.NodeIDs())
+// 		// notify the ingest engine about the receipts
+// 		for _, r := range executionReceipts {
+// 			err = ingestEng.ProcessLocal(r)
+// 			require.NoError(suite.T(), err)
+// 		}
 
-		// wait for the receipt to be persisted
-		time.Sleep(time.Second * 3)
+// 		// wait for the receipt to be persisted
+// 		time.Sleep(time.Second * 3)
 
-		ctx := context.Background()
+// 		ctx := context.Background()
 
-		script := []byte("dummy script")
+// 		script := []byte("dummy script")
 
-		// setupExecClientMock sets up the mock the execution client and returns the access response to expect
-		setupExecClientMock := func(blockID flow.Identifier) *accessproto.ExecuteScriptResponse {
-			id := blockID[:]
-			executionReq := execproto.ExecuteScriptAtBlockIDRequest{
-				BlockId: id,
-				Script:  script,
-			}
-			executionResp := execproto.ExecuteScriptAtBlockIDResponse{
-				Value: []byte{9, 10, 11},
-			}
+// 		// setupExecClientMock sets up the mock the execution client and returns the access response to expect
+// 		setupExecClientMock := func(blockID flow.Identifier) *accessproto.ExecuteScriptResponse {
+// 			id := blockID[:]
+// 			executionReq := execproto.ExecuteScriptAtBlockIDRequest{
+// 				BlockId: id,
+// 				Script:  script,
+// 			}
+// 			executionResp := execproto.ExecuteScriptAtBlockIDResponse{
+// 				Value: []byte{9, 10, 11},
+// 			}
 
-			suite.execClient.On("ExecuteScriptAtBlockID", ctx, &executionReq).Return(&executionResp, nil).Once()
+// 			suite.execClient.On("ExecuteScriptAtBlockID", ctx, &executionReq).Return(&executionResp, nil).Once()
 
-			expectedResp := accessproto.ExecuteScriptResponse{
-				Value: executionResp.GetValue(),
-			}
-			return &expectedResp
-		}
+// 			expectedResp := accessproto.ExecuteScriptResponse{
+// 				Value: executionResp.GetValue(),
+// 			}
+// 			return &expectedResp
+// 		}
 
-		assertResult := func(err error, expected interface{}, actual interface{}) {
-			suite.Require().NoError(err)
-			suite.Require().Equal(expected, actual)
-			suite.execClient.AssertExpectations(suite.T())
-		}
+// 		assertResult := func(err error, expected interface{}, actual interface{}) {
+// 			suite.Require().NoError(err)
+// 			suite.Require().Equal(expected, actual)
+// 			suite.execClient.AssertExpectations(suite.T())
+// 		}
 
-		suite.Run("execute script at latest block", func() {
-			suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+// 		suite.Run("execute script at latest block", func() {
+// 			suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
-			expectedResp := setupExecClientMock(lastBlock.ID())
-			req := accessproto.ExecuteScriptAtLatestBlockRequest{
-				Script: script,
-			}
-			actualResp, err := handler.ExecuteScriptAtLatestBlock(ctx, &req)
-			assertResult(err, expectedResp, actualResp)
-		})
+// 			expectedResp := setupExecClientMock(lastBlock.ID())
+// 			req := accessproto.ExecuteScriptAtLatestBlockRequest{
+// 				Script: script,
+// 			}
+// 			actualResp, err := handler.ExecuteScriptAtLatestBlock(ctx, &req)
+// 			assertResult(err, expectedResp, actualResp)
+// 		})
 
-		suite.Run("execute script at block id", func() {
-			// expectedResp := setupExecClientMock(prevBlock.ID())
-			// id := prevBlock.ID()
-			// req := accessproto.ExecuteScriptAtBlockIDRequest{
-			// 	BlockId: id[:],
-			// 	Script:  script,
-			// }
-			// actualResp, err := handler.ExecuteScriptAtBlockID(ctx, &req)
-			// assertResult(err, expectedResp, actualResp)
-		})
+// 		suite.Run("execute script at block id", func() {
+// 			expectedResp := setupExecClientMock(prevBlock.ID())
+// 			id := prevBlock.ID()
+// 			req := accessproto.ExecuteScriptAtBlockIDRequest{
+// 				BlockId: id[:],
+// 				Script:  script,
+// 			}
+// 			actualResp, err := handler.ExecuteScriptAtBlockID(ctx, &req)
+// 			assertResult(err, expectedResp, actualResp)
+// 		})
 
-		suite.Run("execute script at block height", func() {
-			// expectedResp := setupExecClientMock(prevBlock.ID())
-			// req := accessproto.ExecuteScriptAtBlockHeightRequest{
-			// 	BlockHeight: prevBlock.Header.Height,
-			// 	Script:      script,
-			// }
-			// actualResp, err := handler.ExecuteScriptAtBlockHeight(ctx, &req)
-			// assertResult(err, expectedResp, actualResp)
-		})
-	})
-}
+// 		suite.Run("execute script at block height", func() {
+// 			expectedResp := setupExecClientMock(prevBlock.ID())
+// 			req := accessproto.ExecuteScriptAtBlockHeightRequest{
+// 				BlockHeight: prevBlock.Header.Height,
+// 				Script:      script,
+// 			}
+// 			actualResp, err := handler.ExecuteScriptAtBlockHeight(ctx, &req)
+// 			assertResult(err, expectedResp, actualResp)
+// 		})
+// 	})
+// }
 
 func (suite *Suite) createChain() (flow.Block, flow.Collection) {
 	collection := unittest.CollectionFixture(10)
