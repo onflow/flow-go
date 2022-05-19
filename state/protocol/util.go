@@ -72,6 +72,10 @@ func IsSporkRootSnapshot(snapshot Snapshot) (bool, error) {
 }
 
 // FindGuarantors decodes the signer indices from the guarantee, and finds the guarantor identifiers from protocol state
+// Expected Error returns during normal operations:
+//  * signature.ErrIncompatibleBitVectorLength indicates that `signerIndices` has the wrong length
+//  * signature.ErrIllegallyPaddedBitVector is the vector is padded with bits other than 0
+//  * signature.ErrInvalidChecksum if the input is shorter than the expected checksum contained in the guarantee.SignerIndices
 func FindGuarantors(state State, guarantee *flow.CollectionGuarantee) ([]flow.Identifier, error) {
 	snapshot := state.AtBlockID(guarantee.ReferenceBlockID)
 	epochs := snapshot.Epochs()
@@ -88,7 +92,7 @@ func FindGuarantors(state State, guarantee *flow.CollectionGuarantee) ([]flow.Id
 
 	guarantorIDs, err := signature.DecodeSignerIndicesToIdentifiers(cluster.Members().NodeIDs(), guarantee.SignerIndices)
 	if err != nil {
-		return nil, fmt.Errorf("could not decode guarantor indices: %w", err)
+		return nil, fmt.Errorf("could not decode signer indices for guarantee %v: %w", guarantee.ID(), err)
 	}
 
 	return guarantorIDs, nil

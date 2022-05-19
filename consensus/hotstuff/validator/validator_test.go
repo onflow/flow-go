@@ -124,7 +124,7 @@ func (ps *ProposalSuite) TestProposalSignatureError() {
 
 func (ps *ProposalSuite) TestProposalSignatureInvalidFormat() {
 
-	// change the verifier to fail signature validation with ErrInvalidFormat error
+	// change the verifier to fail signature validation with InvalidFormatError error
 	*ps.verifier = mocks.Verifier{}
 	ps.verifier.On("VerifyQC", ps.voters, ps.block.QC.SigData, ps.parent).Return(nil)
 	ps.verifier.On("VerifyVote", ps.voter, ps.vote.SigData, ps.block).Return(model.NewInvalidFormatErrorf(""))

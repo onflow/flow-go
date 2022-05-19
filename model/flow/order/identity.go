@@ -11,6 +11,8 @@ func Canonical(identity1 *flow.Identity, identity2 *flow.Identity) bool {
 	return IdentifierCanonical(identity1.NodeID, identity2.NodeID)
 }
 
+// ByReferenceOrder return a function for sorting identities based on the order
+// of the given nodeIDs
 func ByReferenceOrder(nodeIDs []flow.Identifier) func(*flow.Identity, *flow.Identity) bool {
 	indices := make(map[flow.Identifier]uint)
 	for index, nodeID := range nodeIDs {
@@ -25,6 +27,8 @@ func ByReferenceOrder(nodeIDs []flow.Identifier) func(*flow.Identity, *flow.Iden
 	}
 }
 
+// IdentityListCanonical takes a list of identities and
+// check if it's ordered in canonical order.
 func IdentityListCanonical(identities flow.IdentityList) bool {
 	if len(identities) == 0 {
 		return true

@@ -108,3 +108,10 @@ func IsInsufficientSignaturesError(err error) bool {
 	var e InsufficientSignaturesError
 	return errors.As(err, &e)
 }
+
+// IsDecodeSignerIndicesError returns whether err is about decoding signer indices
+func IsDecodeSignerIndicesError(err error) bool {
+	return errors.Is(err, ErrIllegallyPaddedBitVector) ||
+		errors.Is(err, ErrIncompatibleBitVectorLength) ||
+		errors.Is(err, ErrInvalidChecksum)
+}

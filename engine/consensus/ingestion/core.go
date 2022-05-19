@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/metrics"
@@ -158,12 +157,10 @@ func (e *Core) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
 		return engine.NewUnverifiableInputError(
 			"could not get clusters with chainID %v for unknown reference block (id=%x): %w", guarantee.ChainID, guarantee.ReferenceBlockID, err)
 	}
-
 	// cluster not found by the chain ID
 	if errors.Is(err, protocol.ErrClusterNotFound) {
 		return engine.NewInvalidInputErrorf("cluster not found by chain ID %v, %w", guarantee.ChainID, err)
 	}
-
 	if err != nil {
 		return fmt.Errorf("internal error retrieving collector clusters for guarantee (ReferenceBlockID: %v, ChainID: %v): %w",
 			guarantee.ReferenceBlockID, guarantee.ChainID, err)
@@ -172,14 +169,15 @@ func (e *Core) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
 	// ensure the guarantors are from the same cluster
 	clusterMembers := cluster.Members()
 
-	// TODO: validate checksum
 	// find guarantors by signer indices
-	guarantorIDs, err := signature.DecodeSignerIndicesToIdentifiers(clusterMembers.NodeIDs(), guarantee.SignerIndices)
+	guarantors, err := signature.DecodeSignerIndicesToIdentities(clusterMembers, guarantee.SignerIndices)
 	if err != nil {
-		return engine.NewInvalidInputErrorf("could not decode guarantor indices: %v", err)
+		if signature.IsDecodeSignerIndicesError(err) {
+			return engine.NewInvalidInputErrorf("could not decode guarantor indices: %v", err)
+		}
+		// unexpected error
+		return fmt.Errorf("unexpected internal error decoding signer indices: %w", err)
 	}
-
-	guarantors := clusterMembers.Filter(filter.HasNodeID(guarantorIDs...))
 
 	// determine whether signers reach minimally required stake threshold
 	threshold := hotstuff.ComputeWeightThresholdForBuildingQC(clusterMembers.TotalWeight()) // compute required stake threshold

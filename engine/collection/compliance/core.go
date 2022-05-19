@@ -270,7 +270,7 @@ func (c *Core) processBlockProposal(proposal *messages.ClusterBlockProposal) err
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
-		// Int("num_signers", len(header.ParentVoterIDs)).
+		Hex("parent_signer_indices", header.ParentVoterIndices).
 		Logger()
 	log.Info().Msg("processing block proposal")
 

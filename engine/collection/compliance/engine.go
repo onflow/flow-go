@@ -373,7 +373,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 		Hex("parent_id", header.ParentID[:]).
 		Hex("ref_block", payload.ReferenceBlockID[:]).
 		Int("transaction_count", payload.Collection.Len()).
-		Hex("signers", header.ParentVoterIndices).
+		Hex("parent_signer_indices", header.ParentVoterIndices).
 		Dur("delay", delay).
 		Logger()
 

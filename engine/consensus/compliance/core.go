@@ -120,7 +120,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
-		Hex("signers", header.ParentVoterIndices).
+		Hex("parent_signer_indices", header.ParentVoterIndices).
 		Str("traceID", traceID). // traceID is used to connect logs to traces
 		Logger()
 	log.Info().Msg("block proposal received")
@@ -312,7 +312,7 @@ func (c *Core) processBlockProposal(proposal *messages.BlockProposal) error {
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
-		// TODO: log parent signer count
+		Hex("parent_signer_indices", header.ParentVoterIndices).
 		Logger()
 	log.Info().Msg("processing block proposal")
 

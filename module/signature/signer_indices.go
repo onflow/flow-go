@@ -296,10 +296,8 @@ func validPadding(bitVector []byte, numUsedBits int) error {
 	// could have fewer bytes and still have enough room to store `numUsedBits`.
 
 	// Verify condition 2, i.e. that all padded bits are all 0:
-	// * The number of padded bits are: `numPaddedBits := 8*len(bitVector) - len(canonicalIdentifiers)`
-	// * We know that numPaddedBits < 8; as `bitVector` passed check 1. Therefore, all padded bits are
-	//   located in `bitVector`s _last byte_.
-	// * Let `lastByte` be the last byte of `bitVector`. The leading bits, specifically `(8 - numPaddedBits)`
+	// * As `bitVector` passed check 1, all padded bits are located in `bitVector`s _last byte_.
+	// * Let `lastByte` be the last byte of `bitVector`. The leading bits, specifically `numUsedBits & 7`,
 	//   belong to the used payload, which could have non-zero values. We remove these using left-bit-shifts.
 	//   The result contains exactly all padded bits (plus some auxiliary 0-bits included by the bit-shift
 	//   operator). Hence, condition 2 is satisfied if and only if the result is identical to zero.
