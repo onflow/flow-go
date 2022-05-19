@@ -3,7 +3,7 @@ package factories
 import (
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
+	badger "github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/module"
 	builder "github.com/onflow/flow-go/module/builder/collection"

@@ -1,11 +1,11 @@
 package transaction
 
 import (
-	dbbadger "github.com/dgraph-io/badger/v2"
+	badger "github.com/dgraph-io/badger/v2"
 )
 
 type Tx struct {
-	DBTxn     *dbbadger.Txn
+	DBTxn     *badger.Txn
 	callbacks []func()
 }
 
@@ -20,7 +20,7 @@ func (b *Tx) OnSucceed(callback func()) {
 // Update creates a badger transaction, passing it to a chain of functions,
 // if all succeed. Useful to use callback to update cache in order to ensure data
 // in badgerDB and cache are consistent.
-func Update(db *dbbadger.DB, f func(*Tx) error) error {
+func Update(db *badger.DB, f func(*Tx) error) error {
 	dbTxn := db.NewTransaction(true)
 	defer dbTxn.Discard()
 
@@ -42,7 +42,7 @@ func Update(db *dbbadger.DB, f func(*Tx) error) error {
 }
 
 // WithTx is useful when transaction is used without adding callback.
-func WithTx(f func(*dbbadger.Txn) error) func(*Tx) error {
+func WithTx(f func(*badger.Txn) error) func(*Tx) error {
 	return func(tx *Tx) error {
 		return f(tx.DBTxn)
 	}

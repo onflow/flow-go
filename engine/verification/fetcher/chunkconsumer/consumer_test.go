@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	badger "github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 

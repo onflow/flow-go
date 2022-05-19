@@ -3,7 +3,7 @@ package util
 import (
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	badger "github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 

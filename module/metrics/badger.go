@@ -1,7 +1,7 @@
 package metrics
 
 import (
-	// _ "github.com/dgraph-io/badger/v2" // TODO this might be needed for servers just testing metrics
+	// _ badger "github.com/dgraph-io/badger/v2" // TODO this might be needed for servers just testing metrics
 	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"

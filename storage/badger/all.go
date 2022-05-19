@@ -1,7 +1,7 @@
 package badger
 
 import (
-	"github.com/dgraph-io/badger/v2"
+	badger "github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/storage"

@@ -6,7 +6,7 @@ import (
 
 	"github.com/onflow/flow-go/storage/badger/operation"
 
-	"github.com/dgraph-io/badger/v2"
+	badger "github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/metrics"
