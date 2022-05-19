@@ -80,7 +80,7 @@ type Engine struct {
 	blocksToMarkExecuted       *stdmap.Times
 
 	rpcEngine *rpc.Engine
-	test      bool
+	IsTest    bool
 }
 
 // New creates a new access ingestion engine
@@ -132,7 +132,7 @@ func New(
 		},
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*flow.TransactionBody)
+				_, ok := msg.Payload.(*flow.ExecutionReceipt)
 				return ok
 			},
 			Store: executionReceiptsQueue,
@@ -166,7 +166,7 @@ func New(
 		finalizedBlockQueue:    finalizedBlocksQueue,
 
 		messageHandler: messageHandler,
-		test:           false,
+		IsTest:         false,
 	}
 
 	// Add workers
@@ -186,11 +186,13 @@ func New(
 }
 
 func (e *Engine) processBackground(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	if !e.test {
-		err := e.requestMissingCollections(ctx)
-		if err != nil {
-			e.log.Error().Err(err).Msg("requesting missing collections failed")
-		}
+	if e.IsTest {
+		return
+	}
+
+	err := e.requestMissingCollections(ctx)
+	if err != nil {
+		e.log.Error().Err(err).Msg("requesting missing collections failed")
 	}
 	ready()
 
@@ -294,7 +296,7 @@ func (e *Engine) Process(channel network.Channel, originID flow.Identifier, even
 
 // OnFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated
 func (e *Engine) OnFinalizedBlock(hb *model.Block) {
-	e.messageHandler.Process(hb.BlockID, hb)
+	_ = e.messageHandler.Process(hb.BlockID, hb)
 	e.finalizedBlockNotifier.Notify()
 }
 

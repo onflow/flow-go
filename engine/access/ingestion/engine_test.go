@@ -101,17 +101,8 @@ func (suite *Suite) SetupTest() {
 		blocksToMarkExecuted, rpcEng)
 	require.NoError(suite.T(), err)
 
-	eng.test = true
+	eng.IsTest = true
 	suite.eng = eng
-
-	// block := unittest.BlockFixture()
-	// block.SetPayload(unittest.PayloadFixture(
-	// 	unittest.WithGuarantees(unittest.CollectionGuaranteesFixture(4)...),
-	// ))
-	// block.Header.Height = 0
-
-	// suite.blocks.On("GetLastFullBlockHeight").Return(uint64(0), nil)
-	// suite.proto.snapshot.On("Head").Return(block.Header, nil)
 
 	ctx, _ := irrecoverable.WithSignaler(context.Background())
 	suite.eng.Start(ctx)

@@ -28,6 +28,7 @@ import (
 	factorymock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
@@ -618,6 +619,11 @@ func (suite *Suite) TestGetSealedTransaction() {
 			transactions, results, receipts, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, rpcEng)
 		require.NoError(suite.T(), err)
 
+		ctx, _ := irrecoverable.WithSignaler(context.Background())
+		ingestEng.IsTest = true
+		ingestEng.Start(ctx)
+		<-ingestEng.Ready()
+
 		// 1. Assume that follower engine updated the block storage and the protocol state. The block is reported as sealed
 		err = blocks.Store(&block)
 		require.NoError(suite.T(), err)
@@ -640,7 +646,8 @@ func (suite *Suite) TestGetSealedTransaction() {
 			err = ingestEng.Process(engine.ReceiveReceipts, enNodeIDs[0], r)
 			require.NoError(suite.T(), err)
 		}
-		unittest.AssertClosesBefore(suite.T(), ingestEng.Done(), 3*time.Second)
+		
+		time.Sleep(time.Second*3)
 
 		// 5. Client requests a transaction
 		tx := collection.Transactions[0]
@@ -745,7 +752,7 @@ func (suite *Suite) TestExecuteScript() {
 		}
 
 		// wait for the receipt to be persisted
-		unittest.AssertClosesBefore(suite.T(), ingestEng.Done(), 3*time.Second)
+		time.Sleep(time.Second*3)
 
 		ctx := context.Background()
 
