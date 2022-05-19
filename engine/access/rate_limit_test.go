@@ -109,10 +109,8 @@ func (suite *RateLimitTestSuite) SetupTest() {
 		"Ping": suite.rateLimit,
 	}
 
-	var err error
-	suite.rpcEng, err = rpc.New(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions,
+	suite.rpcEng, _ = rpc.New(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions,
 		nil, nil, suite.chainID, suite.metrics, 0, 0, false, false, apiRateLimt, apiBurstLimt)
-	assert.NoError(suite.T(), err)
 	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
 
 	// wait for the server to startup
@@ -121,6 +119,7 @@ func (suite *RateLimitTestSuite) SetupTest() {
 	}, 5*time.Second, 10*time.Millisecond)
 
 	// create the access api client
+	var err error
 	suite.client, suite.closer, err = accessAPIClient(suite.rpcEng.UnsecureGRPCAddress().String())
 	assert.NoError(suite.T(), err)
 }
