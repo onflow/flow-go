@@ -23,7 +23,8 @@ type TransactionCollector struct {
 	transactionSubmission      *prometheus.CounterVec
 	scriptExecutedDuration     *prometheus.HistogramVec
 	transactionResultDuration  *prometheus.HistogramVec
-	scriptSize                 *prometheus.HistogramVec
+	scriptSize                 prometheus.Histogram
+	transactionSize            prometheus.Histogram
 }
 
 func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log zerolog.Logger,
@@ -97,34 +98,42 @@ func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log 
 			Subsystem: subsystemTransactionSubmission,
 			Help:      "histogram for the duration in ms of the round trip time for getting a transaction result",
 			Buckets:   []float64{1, 100, 500, 1000, 2000, 5000},
-		}, []string{"script_size"}),
-		scriptSize: promauto.NewHistogramVec(prometheus.HistogramOpts{
+		}, []string{"transaction_size"}),
+		scriptSize: promauto.NewHistogram(prometheus.HistogramOpts{
 			Name:      "script_size",
 			Namespace: namespaceAccess,
 			Subsystem: subsystemTransactionSubmission,
-			Help:      "histogram for the script size in kb of scripts used in GetTransactionResult and ExecuteScript",
-		}, []string{"method"}),
+			Help:      "histogram for the script size in kb of scripts used in ExecuteScript",
+		}),
+		transactionSize: promauto.NewHistogram(prometheus.HistogramOpts{
+			Name:      "transaction_size",
+			Namespace: namespaceAccess,
+			Subsystem: subsystemTransactionSubmission,
+			Help:      "histogram for the transaction size in kb of scripts used in GetTransactionResult",
+		}),
 	}
 
 	return tc
 }
 
 func (tc *TransactionCollector) ScriptExecuted(dur time.Duration, size int) {
-	tc.scriptSizeHist(size, "ExecuteScript")
+	// record the execute script duration and script size
+	tc.scriptSize.Observe(float64(size / 1024))
 	tc.scriptExecutedDuration.With(prometheus.Labels{
-		"script_size": tc.scriptSizeLabel(size),
+		"script_size": tc.sizeLabel(size),
 	}).Observe(float64(dur.Milliseconds()))
 }
 
 func (tc *TransactionCollector) TransactionResultFetched(dur time.Duration, size int) {
-	tc.scriptSizeHist(size, "GetTransactionResult")
+	// record the transaction result duration and transaction script/payload size
+	tc.transactionSize.Observe(float64(size / 1024))
 	tc.transactionResultDuration.With(prometheus.Labels{
-		"script_size": tc.scriptSizeLabel(size),
+		"transaction_size": tc.sizeLabel(size),
 	}).Observe(float64(dur.Milliseconds()))
 }
 
-func (tc *TransactionCollector) scriptSizeLabel(size int) string {
-	// determine the script size label
+func (tc *TransactionCollector) sizeLabel(size int) string {
+	// determine the script size label using the size in bytes
 	sizeKb := size / 1024
 	sizeLabel := "100+kb" //"1kb,10kb,100kb, 100+kb" -> [0,1] [2,10] [11,100] [100, +inf]
 
@@ -136,13 +145,6 @@ func (tc *TransactionCollector) scriptSizeLabel(size int) string {
 		sizeLabel = "100kb"
 	}
 	return sizeLabel
-}
-
-func (tc *TransactionCollector) scriptSizeHist(size int, method string) {
-	// add the script size in kb to the histogram and the method used as a label
-	tc.scriptSize.With(prometheus.Labels{
-		"method": method,
-	}).Observe(float64(size / 1024))
 }
 
 func (tc *TransactionCollector) TransactionReceived(txID flow.Identifier, when time.Time) {
