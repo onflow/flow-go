@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"runtime/debug"
 	"sync"
 	"testing"
 	"time"
@@ -76,6 +77,7 @@ func Test_AsyncUploader(t *testing.T) {
 
 		uploader := &DummyUploader{
 			f: func() error {
+				// force an upload error to test that upload is retried 3 times
 				if callCount < 3 {
 					callCount++
 					return fmt.Errorf("artificial upload error")
@@ -95,35 +97,54 @@ func Test_AsyncUploader(t *testing.T) {
 		require.Equal(t, 3, callCount)
 	})
 
-	time.Sleep(1 * time.Second)
+	//time.Sleep(1 * time.Second)
 
+	// sequence of events:
+	// 1. call upload with error - to force retrying
+	// 2. close component to stop retrying
+	// 3. assert that upload called only once
 	t.Run("stopping component stops retrying", func(t *testing.T) {
 		testutils.SkipUnless(t, testutils.TEST_FLAKY, "flaky")
 
 		callCount := 0
-
+		t.Log("test started grID:", string(bytes.Fields(debug.Stack())[1]))
 		wg := sync.WaitGroup{}
 		wg.Add(1)
+		t.Log("added 1 to wait group grID:", string(bytes.Fields(debug.Stack())[1]))
 
 		uploader := &DummyUploader{
 			f: func() error {
-				defer func() {
-					callCount++
-				}()
+				t.Log("DummyUploader func() start - incrementing callCount grID:", string(bytes.Fields(debug.Stack())[1]))
+				callCount++
+				//func() {
+				//	callCount++
+				//}()
+				t.Log("DummyUpload func() about to wg.Wait() grID:", string(bytes.Fields(debug.Stack())[1]))
 				wg.Wait()
+				t.Log("DummyUploader func() about to return error grID:", string(bytes.Fields(debug.Stack())[1]))
 				return fmt.Errorf("this should return only once")
 			},
 		}
-
+		t.Log("about to create NewAsyncUploader grID:", string(bytes.Fields(debug.Stack())[1]))
 		async := NewAsyncUploader(uploader, 1*time.Nanosecond, 5, zerolog.Nop(), &metrics.NoopCollector{})
-
+		t.Log("about to call async.Upload() grID:", string(bytes.Fields(debug.Stack())[1]))
 		err := async.Upload(computationResult) // doesn't matter what we upload
 		require.NoError(t, err)
 
+		// stop component and check that it's fully stopped
+		t.Log("about to close async uploader grID:", string(bytes.Fields(debug.Stack())[1]))
+		// import unittest2 "github.com/onflow/flow-go/utils/unittest"
+		//unittest2.RequireCloseBefore(t, async.Done(), 5*time.Second, "async uploader not closed in time")
+		// stop component and check that it's fully stopped
 		c := async.Done()
+		t.Log("about to call wg.Done() grID:", string(bytes.Fields(debug.Stack())[1]))
 		wg.Done()
-		<-c
+		t.Log("about to read from async.Done() channel to see if it's closed grID:", string(bytes.Fields(debug.Stack())[1]))
+		_, ok := <-c
+		t.Log("about to check if async.Done() channel is closed grID:", string(bytes.Fields(debug.Stack())[1]))
+		require.False(t, ok, "component Done channel not closed")
 
+		t.Log("about to check if callCount is 1 grID:", string(bytes.Fields(debug.Stack())[1]))
 		require.Equal(t, 1, callCount)
 	})
 
