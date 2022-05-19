@@ -108,6 +108,13 @@ func Test_AsyncUploader(t *testing.T) {
 
 		callCount := 0
 		t.Log("test started grID:", string(bytes.Fields(debug.Stack())[1]))
+
+		// this wait group ensures that async uploader has a chance to start the upload before component is shut down
+		// otherwise, there's a race condition that can happen where the component can shut down before the async uploader
+		// has a chance to start (not finish) the upload
+		wgUploadStarted := sync.WaitGroup{}
+		wgUploadStarted.Add(1)
+
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 		t.Log("added 1 to wait group grID:", string(bytes.Fields(debug.Stack())[1]))
@@ -116,6 +123,9 @@ func Test_AsyncUploader(t *testing.T) {
 			f: func() error {
 				t.Log("DummyUploader func() start - incrementing callCount grID:", string(bytes.Fields(debug.Stack())[1]))
 				callCount++
+
+				// signal to main goroutine that upload started so it can initiate shutting down component
+				wgUploadStarted.Done()
 				//func() {
 				//	callCount++
 				//}()
@@ -133,6 +143,10 @@ func Test_AsyncUploader(t *testing.T) {
 
 		// stop component and check that it's fully stopped
 		t.Log("about to close async uploader grID:", string(bytes.Fields(debug.Stack())[1]))
+
+		// wait until upload has started before shutting down the component
+		wgUploadStarted.Wait()
+
 		// import unittest2 "github.com/onflow/flow-go/utils/unittest"
 		//unittest2.RequireCloseBefore(t, async.Done(), 5*time.Second, "async uploader not closed in time")
 		// stop component and check that it's fully stopped
