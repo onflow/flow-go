@@ -27,18 +27,18 @@ func Test_AsyncUploader(t *testing.T) {
 	computationResult := unittest.ComputationResultFixture(nil)
 
 	t.Run("uploads are run in parallel and emit metrics", func(t *testing.T) {
-		wgCalled := sync.WaitGroup{}
-		wgCalled.Add(3)
+		wgUploadStarted := sync.WaitGroup{}
+		wgUploadStarted.Add(3)
 
-		wgAllDone := sync.WaitGroup{}
-		wgAllDone.Add(1)
+		wgContinueUpload := sync.WaitGroup{}
+		wgContinueUpload.Add(1)
 
 		uploader := &DummyUploader{
 			f: func() error {
 				// this should be called 3 times
-				wgCalled.Done()
+				wgUploadStarted.Done()
 
-				wgAllDone.Wait()
+				wgContinueUpload.Wait()
 
 				return nil
 			},
@@ -56,12 +56,13 @@ func Test_AsyncUploader(t *testing.T) {
 		err = async.Upload(computationResult)
 		require.NoError(t, err)
 
-		wgCalled.Wait() // all three are in progress, check metrics
+		wgUploadStarted.Wait() // all three are in progress, check metrics
 
 		require.Equal(t, int64(3), metrics.Counter.Load())
 
-		wgAllDone.Done() //release all
+		wgContinueUpload.Done() //release all
 
+		// shut down component
 		<-async.Done()
 
 		require.Equal(t, int64(0), metrics.Counter.Load())
@@ -128,7 +129,8 @@ func Test_AsyncUploader(t *testing.T) {
 				t.Log("DummyUploader func() start - incrementing callCount grID:", string(bytes.Fields(debug.Stack())[1]))
 				callCount++
 
-				// signal to main goroutine that upload started so it can initiate shutting down component
+				t.Log("DummyUploader func() - about to call wgUploadStarted.Done() grID:", string(bytes.Fields(debug.Stack())[1]))
+				// signal to main goroutine that upload started, so it can initiate shutting down component
 				wgUploadStarted.Done()
 				//func() {
 				//	callCount++
