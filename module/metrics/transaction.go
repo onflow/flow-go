@@ -127,7 +127,7 @@ func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log 
 			Namespace: namespaceAccess,
 			Subsystem: subsystemConnectionAdded,
 			Help:      "counter for the number of connections in the pool against max number tne pool can hold",
-		}, []string{"connections", "pool_size"}),
+		}, []string{"result"}),
 	}
 
 	return tc
