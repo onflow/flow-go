@@ -612,3 +612,77 @@ func TestPassingThroughMiscellaneousEvents(t *testing.T) {
 		1*time.Second,
 		"orchestrator could not pass through miscellaneous event on time")
 }
+
+// TestPassingThrough_ResultApproval evaluates that wintermute attack orchestrator is passing through
+// incoming result approvals if they do not belong to original execution result.
+func TestPassingThrough_ResultApproval(t *testing.T) {
+	_, allIds, corruptedIds := bootstrapWintermuteFlowSystem(t)
+	wintermuteOrchestrator := NewOrchestrator(unittest.Logger(), corruptedIds, allIds)
+
+	originalResult := unittest.ExecutionResultFixture()
+	corruptedResult := unittest.ExecutionResultFixture(unittest.WithChunks(1))
+	wintermuteOrchestrator.state = &attackState{
+		originalResult:  originalResult,
+		corruptedResult: corruptedResult,
+	}
+
+	// generates a test result approval that does not belong to original result.
+	approval := unittest.ResultApprovalFixture()
+	require.NotEqual(t, wintermuteOrchestrator.state.originalResult.ID(), approval.ID())
+	require.NotEqual(t, wintermuteOrchestrator.state.corruptedResult.ID(), approval.ID())
+	approvalEvent := &insecure.Event{
+		CorruptedNodeId:   corruptedIds.Sample(1)[0],
+		Channel:           "test_channel",
+		Protocol:          insecure.Protocol_MULTICAST,
+		TargetNum:         3,
+		TargetIds:         unittest.IdentifierListFixture(10),
+		FlowProtocolEvent: approval,
+	}
+
+	approvalPassThrough := &sync.WaitGroup{}
+	approvalPassThrough.Add(1)
+
+	// mocks attack network to record and keep the output events of orchestrator
+	mockAttackNetwork := &mockinsecure.AttackNetwork{}
+	mockAttackNetwork.On("Send", mock.Anything).
+		Run(func(args mock.Arguments) {
+			// assert that args passed are correct
+			// extracts Event sent
+			event, ok := args[0].(*insecure.Event)
+			require.True(t, ok)
+
+			// passed through event must be a result approval
+			_, ok = event.FlowProtocolEvent.(*flow.ResultApproval)
+			require.True(t, ok)
+
+			// response must be a pass through
+			require.Equal(t, approvalEvent, event)
+
+			approvalPassThrough.Done()
+		}).Return(nil)
+
+	// registers mock network with orchestrator
+	wintermuteOrchestrator.WithAttackNetwork(mockAttackNetwork)
+
+	// sends responses to the orchestrator
+	resultApprovalPassThroughWG := &sync.WaitGroup{}
+	resultApprovalPassThroughWG.Add(1)
+	go func() {
+		err := wintermuteOrchestrator.HandleEventFromCorruptedNode(approvalEvent)
+		require.NoError(t, err)
+
+		resultApprovalPassThroughWG.Done()
+	}()
+
+	// waits till approval is sent to attack orchestrator
+	unittest.RequireReturnsBefore(t,
+		resultApprovalPassThroughWG.Wait,
+		1*time.Second,
+		"could not result approval event to orchestrator")
+
+	// waits till approval is passed through by attack orchestrator
+	unittest.RequireReturnsBefore(t,
+		approvalPassThrough.Wait,
+		1*time.Second,
+		"orchestrator could not pass through result approval on time")
+}
