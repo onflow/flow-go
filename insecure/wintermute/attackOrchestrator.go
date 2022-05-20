@@ -54,7 +54,8 @@ func (o *Orchestrator) WithAttackNetwork(network insecure.AttackNetwork) {
 // HandleEventFromCorruptedNode implements logic of processing the events received from a corrupted node.
 //
 // In Corruptible Conduit Framework for BFT testing, corrupted nodes relay their outgoing events to
-// the attack Orchestrator instead of dispatching them directly to the network. The Orchestrator completely determines what the corrupted conduit should send to the network.
+// the attack Orchestrator instead of dispatching them directly to the network.
+// The Orchestrator completely determines what the corrupted conduit should send to the network.
 func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error {
 	o.Lock()
 	defer o.Unlock()
@@ -77,12 +78,15 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error
 			return fmt.Errorf("could not handle chunk data pack response event: %w", err)
 		}
 	case *flow.ResultApproval:
-		if err := o.handleResultApproval(event); err != nil {
+		// orchestrator receives a result approval from corrupted VN. If it is an approval for the original result, it should
+		// be wintermuted, i.e., a corrupted VN must not approve any conflicting result with the corrupted result (otherwise, it
+		// causes a sealing halt at consensus nodes).
+		if err := o.handleResultApprovalEvent(event); err != nil {
 			return fmt.Errorf("could not handle result approval event: %w", err)
 		}
 
 	default:
-		// passing through event as it is.
+		// Any other event is just passed through the network as it is.
 		err := o.network.Send(event)
 		if err != nil {
 			return fmt.Errorf("could not send rpc on channel: %w", err)
@@ -295,7 +299,7 @@ func (o *Orchestrator) handleChunkDataPackResponseEvent(chunkDataPackReplyEvent 
 	return nil
 }
 
-func (o *Orchestrator) handleResultApproval(resultApprovalEvent *insecure.Event) error {
+func (o *Orchestrator) handleResultApprovalEvent(resultApprovalEvent *insecure.Event) error {
 	if o.state != nil {
 		approval := resultApprovalEvent.FlowProtocolEvent.(*flow.ResultApproval)
 
