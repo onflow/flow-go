@@ -546,3 +546,69 @@ func TestWintermuteChunkResponseForCorruptedChunks(t *testing.T) {
 		1*time.Second,
 		"could not send all chunk data pack responses on time")
 }
+
+// TestPassingThroughMiscellaneousEvents checks that any incoming event from corrupted nodes that
+// is not relevant to the context of wintermute attack will be passed through by the orchestrator.
+// The only events related to the context of wintermute attack are: execution receipt, result approval,
+// chunk data pack request, and chunk data pack response.
+func TestPassingThroughMiscellaneousEvents(t *testing.T) {
+	_, allIds, corruptedIds := bootstrapWintermuteFlowSystem(t)
+
+	// creates a block event fixture that is out of the context of
+	// the wintermute attack.
+	miscellaneousEvent := &insecure.Event{
+		CorruptedNodeId:   corruptedIds.Sample(1)[0],
+		Channel:           "test_channel",
+		Protocol:          insecure.Protocol_MULTICAST,
+		TargetNum:         3,
+		TargetIds:         unittest.IdentifierListFixture(10),
+		FlowProtocolEvent: unittest.BlockFixture(),
+	}
+
+	eventPassThrough := &sync.WaitGroup{}
+	eventPassThrough.Add(1)
+
+	// mocks attack network to record and keep the output events of orchestrator
+	mockAttackNetwork := &mockinsecure.AttackNetwork{}
+	mockAttackNetwork.On("Send", mock.Anything).
+		Run(func(args mock.Arguments) {
+			// assert that args passed are correct
+			// extracts Event sent
+			event, ok := args[0].(*insecure.Event)
+			require.True(t, ok)
+
+			_, ok = event.FlowProtocolEvent.(*flow.Block)
+			require.True(t, ok)
+
+			require.Equal(t, miscellaneousEvent, event)
+
+			eventPassThrough.Done()
+		}).Return(nil)
+
+	// creates orchestrator
+	wintermuteOrchestrator := NewOrchestrator(unittest.Logger(), corruptedIds, allIds)
+	wintermuteOrchestrator.WithAttackNetwork(mockAttackNetwork)
+
+	// sends miscellaneous event to orchestrator.
+	sendMiscellaneousEventWG := &sync.WaitGroup{}
+	sendMiscellaneousEventWG.Add(1)
+
+	go func() {
+		err := wintermuteOrchestrator.HandleEventFromCorruptedNode(miscellaneousEvent)
+		require.NoError(t, err)
+
+		sendMiscellaneousEventWG.Done()
+	}()
+
+	// waits till miscellaneous event is sent to orchestrator.
+	unittest.RequireReturnsBefore(t,
+		sendMiscellaneousEventWG.Wait,
+		1*time.Second,
+		"could not send miscellaneous event on time to orchestrator")
+
+	// waits till miscellaneous event is passed through by the orchestrator.
+	unittest.RequireReturnsBefore(t,
+		sendMiscellaneousEventWG.Wait,
+		1*time.Second,
+		"orchestrator could not pass through miscellaneous event on time")
+}
