@@ -74,21 +74,25 @@ func (r *ResultApprovalState) WaitForResultApproval(t *testing.T, verNodeID, res
 	return resultApproval
 }
 
+// WaitForTotalApprovalsFrom waits until "count" number of result approval for the given execution result id and
+// the chunk index is disseminated in the network from any subset of the given (verification) ids.
+// It returns the captured result approval.
 func (r *ResultApprovalState) WaitForTotalApprovalsFrom(
 	t *testing.T,
-	nodes flow.IdentifierList,
+	verificationIds flow.IdentifierList,
 	resultID flow.Identifier,
 	chunkIndex uint64,
-	count int) {
+	count int) []*flow.ResultApproval {
 
 	receivedApprovalIds := flow.IdentifierList{}
+	receivedApprovals := make([]*flow.ResultApproval, 0)
 
 	require.Eventually(t, func() bool {
 		r.RLock()
 		defer r.RUnlock()
 
-		for _, id := range nodes {
-			approvals, ok := r.resultApprovals[id]
+		for _, verificationId := range verificationIds {
+			approvals, ok := r.resultApprovals[verificationId]
 			if !ok {
 				return false
 			}
@@ -103,6 +107,7 @@ func (r *ResultApprovalState) WaitForTotalApprovalsFrom(
 				approvalId := approval.ID()
 				if !receivedApprovalIds.Contains(approvalId) {
 					receivedApprovalIds = append(receivedApprovalIds, approvalId)
+					receivedApprovals = append(receivedApprovals, approval)
 				}
 
 				if len(receivedApprovalIds) == count {
@@ -116,4 +121,6 @@ func (r *ResultApprovalState) WaitForTotalApprovalsFrom(
 		fmt.Sprintf("did not receive enough approval for chunk %d of result ID %x",
 			chunkIndex,
 			resultID))
+
+	return receivedApprovals
 }
