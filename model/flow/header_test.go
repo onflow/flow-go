@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/vmihailenco/msgpack/v4"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encoding/rlp"
 	"github.com/onflow/flow-go/model/flow"
@@ -31,6 +32,7 @@ func TestHeaderEncodingJSON(t *testing.T) {
 
 func TestHeaderFingerprint(t *testing.T) {
 	header := unittest.BlockHeaderFixture()
+	header.LastViewTC = helper.MakeTC()
 	headerID := header.ID()
 	data := header.Fingerprint()
 	var decoded struct {
@@ -43,6 +45,7 @@ func TestHeaderFingerprint(t *testing.T) {
 		ParentVoterIDs     []flow.Identifier
 		ParentVoterSigData crypto.Signature
 		ProposerID         flow.Identifier
+		LastViewTC         interface{}
 	}
 	rlp.NewMarshaler().MustUnmarshal(data, &decoded)
 	decHeader := flow.Header{
@@ -56,6 +59,7 @@ func TestHeaderFingerprint(t *testing.T) {
 		ParentVoterSigData: decoded.ParentVoterSigData,
 		ProposerID:         decoded.ProposerID,
 		ProposerSigData:    header.ProposerSigData, // since this field is not encoded/decoded, just set it to the original
+		LastViewTC:         header.LastViewTC,
 		// value to pass test
 	}
 	decodedID := decHeader.ID()
