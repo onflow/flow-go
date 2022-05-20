@@ -8,8 +8,10 @@ import (
 	"sync"
 
 	"github.com/onflow/atree"
+
 	fvmState "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
+
 	"github.com/rs/zerolog"
 	"github.com/schollz/progressbar/v3"
 )

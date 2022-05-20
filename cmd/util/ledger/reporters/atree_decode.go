@@ -233,24 +233,24 @@ const (
 
 const (
 	// Slab flags: 3 high bits
-	maskSlabRoot        byte = 0b100_00000
-	maskSlabHasPointers byte = 0b010_00000
-	maskSlabAnySize     byte = 0b001_00000
+	maskSlabRoot byte = 0b100_00000
+	// maskSlabHasPointers byte = 0b010_00000
+	// maskSlabAnySize     byte = 0b001_00000
 
 	// Array flags: 3 low bits (4th and 5th bits are 0)
-	maskArrayData byte = 0b000_00000
-	maskArrayMeta byte = 0b000_00001
+	// maskArrayData byte = 0b000_00000
+	// maskArrayMeta byte = 0b000_00001
 	// maskLargeImmutableArray byte = 0b000_00010 // not used for now
-	maskBasicArray byte = 0b000_00011 // used for benchmarking
+	// maskBasicArray byte = 0b000_00011 // used for benchmarking
 
 	// Map flags: 3 low bits (4th bit is 0, 5th bit is 1)
 	maskMapData byte = 0b000_01000
-	maskMapMeta byte = 0b000_01001
+	// maskMapMeta byte = 0b000_01001
 	// maskLargeMapEntry  byte = 0b000_01010 // not used for now
 	maskCollisionGroup byte = 0b000_01011
 
 	// Storable flags: 3 low bits (4th bit is 1, 5th bit is 1)
-	maskStorable byte = 0b000_11111
+	// maskStorable byte = 0b000_11111
 )
 
 func isRoot(f byte) bool {

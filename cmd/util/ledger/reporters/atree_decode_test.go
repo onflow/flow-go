@@ -165,7 +165,7 @@ func TestMapDataSlabCollisionCount(t *testing.T) {
 				// extra data (CBOR encoded array of 3 elements)
 				0x83,
 				// type info: "map"
-				//0x63, 0x6d, 0x61, 0x70,
+				// 0x63, 0x6d, 0x61, 0x70,
 				0x18, 0x2A,
 				// count: 8
 				0x08,
@@ -310,7 +310,7 @@ func TestMapDataSlabCollisionCount(t *testing.T) {
 				// extra data (CBOR encoded array of 3 elements)
 				0x83,
 				// type info: "map"
-				//0x63, 0x6d, 0x61, 0x70,
+				// 0x63, 0x6d, 0x61, 0x70,
 				0x18, 0x2A,
 				// count: 8
 				0x08,
@@ -505,7 +505,7 @@ func TestMapDataSlabCollisionCount(t *testing.T) {
 				// extra data (CBOR encoded array of 3 elements)
 				0x83,
 				// type info: "map"
-				//0x63, 0x6d, 0x61, 0x70,
+				// 0x63, 0x6d, 0x61, 0x70,
 				0x18, 0x2A,
 				// count: 10
 				0x14,
