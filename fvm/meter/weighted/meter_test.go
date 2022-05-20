@@ -351,13 +351,6 @@ func TestMemoryWeights(t *testing.T) {
 	for kind := common.MemoryKindUnknown + 1; kind < common.MemoryKindLast; kind++ {
 		weight, ok := weighted.DefaultMemoryWeights[kind]
 		assert.True(t, ok, fmt.Sprintf("missing weight for memory kind '%s'", kind.String()))
-
-		// CadenceDictionarySize memory kind currently have '0' weight.
-		// TODO: Add a proper weight
-		if kind == common.MemoryKindCadenceDictionarySize {
-			continue
-		}
-
 		assert.Greater(
 			t,
 			weight,
