@@ -133,6 +133,38 @@ func remove(key []byte) func(*badger.Txn) error {
 	}
 }
 
+// removeByPrefix removes all the entities if the prefix of the key matches the given prefix.
+// if no key matches, this is a no-op
+func removeByPrefix(prefix []byte) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.AllVersions = false
+		opts.PrefetchValues = false
+		it := tx.NewIterator(opts)
+		defer it.Close()
+
+		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+			key := it.Item().KeyCopy(nil)
+			err := tx.Delete(key)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+}
+
+func batchRemoveByPrefix(prefix []byte) func(writeBatch *badger.WriteBatch) error {
+	return func(writeBatch *badger.WriteBatch) error {
+		err := writeBatch.Delete(prefix)
+		if err != nil {
+			return fmt.Errorf("could not batch delete data: %w", err)
+		}
+		return nil
+	}
+}
+
 // retrieve will retrieve the binary data under the given key from the badger DB
 // and decode it into the given entity. The provided entity needs to be a
 // pointer to an initialized entity of the correct type.
