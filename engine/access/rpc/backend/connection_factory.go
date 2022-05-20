@@ -75,6 +75,9 @@ func (cf *ConnectionFactoryImpl) retrieveConnection(address string, grpcAddress 
 	var conn *grpc.ClientConn
 	if res, ok := cf.ConnectionsCache.Get(address); ok {
 		conn = res.(*grpc.ClientConn)
+		if cf.TransactionMetrics != nil {
+			cf.TransactionMetrics.ConnectionFromPoolRetrieved()
+		}
 	}
 	if conn == nil || conn.GetState() != connectivity.Ready {
 		var err error
