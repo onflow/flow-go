@@ -95,6 +95,7 @@ func (c *CombinedSigner) CreateVote(block *model.Block) (*model.Vote, error) {
 }
 
 // CreateTimeout will create a signed timeout object for the given view.
+// Timeout objects are only signed with the staking key (not beacon key).
 func (c *CombinedSigner) CreateTimeout(curView uint64, highestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
 	// create timeout object specific message
 	msg := MakeTimeoutMessage(curView, highestQC.View)
