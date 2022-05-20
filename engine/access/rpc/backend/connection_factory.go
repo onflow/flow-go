@@ -86,9 +86,6 @@ func (cf *ConnectionFactoryImpl) retrieveConnection(address string, grpcAddress 
 			return nil, err
 		}
 		cf.ConnectionsCache.Add(address, conn)
-		if cf.TransactionMetrics != nil {
-			cf.TransactionMetrics.TotalConnectionsInPool(uint(cf.ConnectionsCache.Len()), cf.CacheSize)
-		}
 	}
 	return conn, nil
 }
