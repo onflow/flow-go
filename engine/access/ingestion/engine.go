@@ -438,7 +438,7 @@ func (e *Engine) requestMissingCollections(ctx context.Context) error {
 		}
 
 		// request the missing collections
-		e.requestCollections(missingColls)
+		e.requestCollectionsInFinalizedBlock(missingColls)
 
 		// add them to the missing collection id map to track later
 		for _, cg := range missingColls {
@@ -583,7 +583,7 @@ func (e *Engine) updateLastFullBlockReceivedIndex() {
 			Int("threshold", defaultMissingCollsForBlkThreshold).
 			Uint64("last_full_blk_height", latestFullHeight).
 			Msg("re-requesting missing collections")
-		e.requestCollections(allMissingColls)
+		e.requestCollectionsInFinalizedBlock(allMissingColls)
 	}
 
 	e.log.Debug().Uint64("last_full_blk_height", latestFullHeight).Msg("updated LastFullBlockReceived index")
