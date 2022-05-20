@@ -1052,7 +1052,6 @@ func Test_SPOCKGeneration(t *testing.T) {
 }
 
 func TestUnauthorizedNodeDoesNotBroadcastReceipts(t *testing.T) {
-
 	runWithEngine(t, func(ctx testingContext) {
 
 		// create blocks with the following relations
