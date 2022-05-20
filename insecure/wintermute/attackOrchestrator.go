@@ -299,8 +299,12 @@ func (o *Orchestrator) handleChunkDataPackResponseEvent(chunkDataPackReplyEvent 
 	return nil
 }
 
+// handleResultApprovalEvent wintermutes the result approvals for the chunks of original result that are coming from
+// corrupted verification nodes. Otherwise it is passed through.
 func (o *Orchestrator) handleResultApprovalEvent(resultApprovalEvent *insecure.Event) error {
 	if o.state != nil {
+		// non-nil state means a result has been corrupted, hence checking whether the approval
+		// belongs to the chunks of the original (non-corrupted) result.
 		approval := resultApprovalEvent.FlowProtocolEvent.(*flow.ResultApproval)
 
 		lg := o.logger.With().
