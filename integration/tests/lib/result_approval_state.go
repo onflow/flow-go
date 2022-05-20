@@ -73,3 +73,47 @@ func (r *ResultApprovalState) WaitForResultApproval(t *testing.T, verNodeID, res
 
 	return resultApproval
 }
+
+func (r *ResultApprovalState) WaitForTotalApprovalsFrom(
+	t *testing.T,
+	nodes flow.IdentifierList,
+	resultID flow.Identifier,
+	chunkIndex uint64,
+	count int) {
+
+	receivedApprovalIds := flow.IdentifierList{}
+
+	require.Eventually(t, func() bool {
+		r.RLock()
+		defer r.RUnlock()
+
+		for _, id := range nodes {
+			approvals, ok := r.resultApprovals[id]
+			if !ok {
+				return false
+			}
+
+			for _, approval := range approvals {
+				if !bytes.Equal(approval.Body.ExecutionResultID[:], resultID[:]) {
+					continue // execution result IDs do not match
+				}
+				if chunkIndex != approval.Body.ChunkIndex {
+					continue // chunk indices do not match
+				}
+				approvalId := approval.ID()
+				if !receivedApprovalIds.Contains(approvalId) {
+					receivedApprovalIds = append(receivedApprovalIds, approvalId)
+				}
+
+				if len(receivedApprovalIds) == count {
+					return true
+				}
+			}
+		}
+
+		return false
+	}, resultApprovalTimeout, 100*time.Millisecond,
+		fmt.Sprintf("did not receive enough approval for chunk %d of result ID %x",
+			chunkIndex,
+			resultID))
+}
