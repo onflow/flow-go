@@ -9,7 +9,6 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
@@ -243,17 +242,15 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 			HighestAcknowledgedView: highest.Header.View,
 		}
 
-		parentView := highest.Header.View
-		if len(segment.Blocks) > 1 {
-			// meaning we are bootstrapping from segment
-			// in this case we are dealing with non-root QC
-			parentView = segment.Blocks[len(segment.Blocks)-2].Header.View
+		rootQC, err := root.QuorumCertificate()
+		if err != nil {
+			return fmt.Errorf("could not get root QC: %w", err)
 		}
 
 		livenessData := &hotstuff.LivenessData{
 			CurrentView: highest.Header.View + 1,
 			LastViewTC:  highest.Header.LastViewTC,
-			HighestQC:   model.BlockFromFlow(highest.Header, parentView).QC,
+			HighestQC:   rootQC,
 		}
 
 		// insert initial views for HotStuff

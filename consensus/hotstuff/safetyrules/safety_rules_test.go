@@ -24,7 +24,7 @@ func TestSafetyRules(t *testing.T) {
 // SafetyRulesTestSuite setups mocks for injected modules and creates hotstuff.SafetyData
 // based on next configuration:
 // R <- B[QC_R] <- P[QC_B]
-// B.View + 1 = S.View + 2
+// B.View = S.View + 1
 // B - bootstrapped block, we are creating SafetyRules at block B
 // Based on this HighestAcknowledgedView = B.View and
 type SafetyRulesTestSuite struct {
@@ -121,6 +121,44 @@ func (s *SafetyRulesTestSuite) TestProduceVote_ShouldVote() {
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), vote)
 	require.Equal(s.T(), expectedVote, vote)
+	s.signer.AssertExpectations(s.T())
+	s.persister.AssertCalled(s.T(), "PutSafetyData", expectedSafetyData)
+}
+
+// TestProduceVote_IncludedQCHigherThanTCsQC checks specific scenario where previous round resulted in TC and leader
+// knows about QC which is not part of TC and qc.View > tc.HighestQC.View. We want to allow this, leader
+func (s *SafetyRulesTestSuite) TestProduceVote_IncludedQCHigherThanTCsQC() {
+	lastViewTC := helper.MakeTC(
+		helper.WithTCView(s.proposal.Block.View+1),
+		helper.WithTCHighestQC(s.proposal.Block.QC))
+
+	// voting on proposal where last view ended with TC
+	proposalWithTC := helper.MakeProposal(
+		helper.WithBlock(
+			helper.MakeBlock(
+				helper.WithParentBlock(s.proposal.Block),
+				helper.WithBlockView(s.proposal.Block.View+2),
+				helper.WithBlockProposer(s.proposerIdentity.NodeID))),
+		helper.WithLastViewTC(lastViewTC))
+
+	expectedSafetyData := &hotstuff.SafetyData{
+		LockedOneChainView:      proposalWithTC.Block.QC.View,
+		HighestAcknowledgedView: proposalWithTC.Block.View,
+	}
+
+	require.Greater(s.T(), proposalWithTC.Block.QC.View, proposalWithTC.LastViewTC.TOHighestQC.View,
+		"for this test case we specifically require that qc.View > lastViewTC.HighestQC.View")
+
+	expectedVote := makeVote(proposalWithTC.Block)
+	s.signer.On("CreateVote", proposalWithTC.Block).Return(expectedVote, nil).Once()
+	s.persister.On("PutSafetyData", expectedSafetyData).Return(nil).Once()
+	s.committee.On("IdentityByBlock", proposalWithTC.Block.BlockID, proposalWithTC.Block.ProposerID).Return(s.proposerIdentity, nil).Maybe()
+
+	vote, err := s.safety.ProduceVote(proposalWithTC, proposalWithTC.Block.View)
+	require.NoError(s.T(), err)
+	require.NotNil(s.T(), vote)
+	require.Equal(s.T(), expectedVote, vote)
+	s.signer.AssertExpectations(s.T())
 	s.persister.AssertCalled(s.T(), "PutSafetyData", expectedSafetyData)
 }
 
@@ -144,6 +182,8 @@ func (s *SafetyRulesTestSuite) TestProduceVote_UpdateLockedOneChainView() {
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), vote)
 	require.Equal(s.T(), expectedVote, vote)
+	s.signer.AssertExpectations(s.T())
+	s.persister.AssertCalled(s.T(), "PutSafetyData", expectedSafetyData)
 }
 
 // TestProduceVote_InvalidCurrentView tests that no vote is created if proposal is for invalid view
@@ -173,7 +213,7 @@ func (s *SafetyRulesTestSuite) TestProduceVote_InvalidProposerIdentity() {
 
 	vote, err := s.safety.ProduceVote(s.proposal, s.proposal.Block.View)
 	require.Nil(s.T(), vote)
-	require.ErrorAs(s.T(), err, &exception)
+	require.ErrorIs(s.T(), err, exception)
 	s.persister.AssertNotCalled(s.T(), "PutSafetyData")
 }
 
@@ -200,7 +240,7 @@ func (s *SafetyRulesTestSuite) TestProduceVote_InvalidVoterIdentity() {
 
 	vote, err := s.safety.ProduceVote(s.proposal, s.proposal.Block.View)
 	require.Nil(s.T(), vote)
-	require.ErrorAs(s.T(), err, &exception)
+	require.ErrorIs(s.T(), err, exception)
 	s.persister.AssertNotCalled(s.T(), "PutSafetyData")
 }
 
@@ -210,7 +250,7 @@ func (s *SafetyRulesTestSuite) TestProduceVote_CreateVoteException() {
 	s.signer.On("CreateVote", s.proposal.Block).Return(nil, exception).Once()
 	vote, err := s.safety.ProduceVote(s.proposal, s.proposal.Block.View)
 	require.Nil(s.T(), vote)
-	require.ErrorAs(s.T(), err, &exception)
+	require.ErrorIs(s.T(), err, exception)
 	s.persister.AssertNotCalled(s.T(), "PutSafetyData")
 }
 
@@ -223,7 +263,7 @@ func (s *SafetyRulesTestSuite) TestProduceVote_PersistStateException() {
 	s.signer.On("CreateVote", s.proposal.Block).Return(vote, nil).Once()
 	vote, err := s.safety.ProduceVote(s.proposal, s.proposal.Block.View)
 	require.Nil(s.T(), vote)
-	require.ErrorAs(s.T(), err, &exception)
+	require.ErrorIs(s.T(), err, exception)
 }
 
 // TestProduceVote_VotingOnUnsafeProposal tests different scenarios where we try to vote on unsafe blocks
@@ -299,7 +339,7 @@ func (s *SafetyRulesTestSuite) TestProduceVote_VotingOnUnsafeProposal() {
 	})
 
 	s.signer.AssertNotCalled(s.T(), "CreateVote")
-	s.signer.AssertNotCalled(s.T(), "PutSafetyData")
+	s.persister.AssertNotCalled(s.T(), "PutSafetyData")
 }
 
 // TestProduceTimeout_ShouldTimeout tests that we can produce timeout in cases where
@@ -398,7 +438,7 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_CreateTimeoutException() {
 	s.signer.On("CreateTimeout", view, highestQC, (*flow.TimeoutCertificate)(nil)).Return(nil, exception).Once()
 	vote, err := s.safety.ProduceTimeout(view, highestQC, nil)
 	require.Nil(s.T(), vote)
-	require.ErrorAs(s.T(), err, &exception)
+	require.ErrorIs(s.T(), err, exception)
 	s.persister.AssertNotCalled(s.T(), "PutSafetyData")
 }
 
@@ -417,7 +457,7 @@ func (s *SafetyRulesTestSuite) TestCreateTimeout_PersistStateException() {
 	s.signer.On("CreateTimeout", view, highestQC, (*flow.TimeoutCertificate)(nil)).Return(expectedTimeout, nil).Once()
 	timeout, err := s.safety.ProduceTimeout(view, highestQC, nil)
 	require.Nil(s.T(), timeout)
-	require.ErrorAs(s.T(), err, &exception)
+	require.ErrorIs(s.T(), err, exception)
 }
 
 func makeVote(block *model.Block) *model.Vote {

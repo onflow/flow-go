@@ -38,13 +38,13 @@ func (_m *Signer) CreateProposal(block *model.Block) (*model.Proposal, error) {
 	return r0, r1
 }
 
-// CreateTimeout provides a mock function with given fields: curView, highestQC, highestTC
-func (_m *Signer) CreateTimeout(curView uint64, highestQC *flow.QuorumCertificate, highestTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
-	ret := _m.Called(curView, highestQC, highestTC)
+// CreateTimeout provides a mock function with given fields: curView, highestQC, lastViewTC
+func (_m *Signer) CreateTimeout(curView uint64, highestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
+	ret := _m.Called(curView, highestQC, lastViewTC)
 
 	var r0 *model.TimeoutObject
 	if rf, ok := ret.Get(0).(func(uint64, *flow.QuorumCertificate, *flow.TimeoutCertificate) *model.TimeoutObject); ok {
-		r0 = rf(curView, highestQC, highestTC)
+		r0 = rf(curView, highestQC, lastViewTC)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*model.TimeoutObject)
@@ -53,7 +53,7 @@ func (_m *Signer) CreateTimeout(curView uint64, highestQC *flow.QuorumCertificat
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(uint64, *flow.QuorumCertificate, *flow.TimeoutCertificate) error); ok {
-		r1 = rf(curView, highestQC, highestTC)
+		r1 = rf(curView, highestQC, lastViewTC)
 	} else {
 		r1 = ret.Error(1)
 	}

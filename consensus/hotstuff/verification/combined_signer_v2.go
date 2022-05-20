@@ -95,7 +95,7 @@ func (c *CombinedSigner) CreateVote(block *model.Block) (*model.Vote, error) {
 }
 
 // CreateTimeout will create a signed timeout object for the given view.
-func (c *CombinedSigner) CreateTimeout(curView uint64, highestQC *flow.QuorumCertificate, highestTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
+func (c *CombinedSigner) CreateTimeout(curView uint64, highestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
 	// create timeout object specific message
 	msg := MakeTimeoutMessage(curView, highestQC.View)
 	sigData, err := c.staking.Sign(msg, c.stakingHasher)
@@ -106,7 +106,7 @@ func (c *CombinedSigner) CreateTimeout(curView uint64, highestQC *flow.QuorumCer
 	timeout := &model.TimeoutObject{
 		View:       curView,
 		HighestQC:  highestQC,
-		LastViewTC: highestTC,
+		LastViewTC: lastViewTC,
 		SignerID:   c.staking.NodeID(),
 		SigData:    sigData,
 	}
