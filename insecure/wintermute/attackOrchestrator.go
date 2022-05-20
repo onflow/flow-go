@@ -300,7 +300,7 @@ func (o *Orchestrator) handleChunkDataPackResponseEvent(chunkDataPackReplyEvent 
 }
 
 // handleResultApprovalEvent wintermutes the result approvals for the chunks of original result that are coming from
-// corrupted verification nodes. Otherwise it is passed through.
+// corrupted verification nodes. Otherwise, it is passed through.
 func (o *Orchestrator) handleResultApprovalEvent(resultApprovalEvent *insecure.Event) error {
 	if o.state != nil {
 		// non-nil state means a result has been corrupted, hence checking whether the approval
