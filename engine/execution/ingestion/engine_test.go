@@ -1002,8 +1002,6 @@ func Test_SPOCKGeneration(t *testing.T) {
 }
 
 func TestUnauthorizedNodeDoesNotBroadcastReceipts(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky test")
-
 	runWithEngine(t, func(ctx testingContext) {
 
 		// create blocks with the following relations
