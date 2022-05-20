@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
@@ -44,6 +45,8 @@ type ConnectionFactoryImpl struct {
 	CollectionNodeGRPCTimeout time.Duration
 	ExecutionNodeGRPCTimeout  time.Duration
 	ConnectionsCache          *lru.Cache
+	CacheSize                 uint
+	TransactionMetrics        module.TransactionMetrics
 }
 
 // createConnection creates new gRPC connections to remote node

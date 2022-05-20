@@ -84,7 +84,7 @@ func New(log zerolog.Logger,
 	executionGRPCPort uint,
 	retryEnabled bool,
 	rpcMetricsEnabled bool,
-	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the Access API e.g. Ping->100, GetTransaction->300
+	apiRatelimits map[string]int,  // the api rate limit (max calls per second) for each of the Access API e.g. Ping->100, GetTransaction->300
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the Access API e.g. Ping->50, GetTransaction->10
 ) (*Engine, error) {
 
@@ -139,15 +139,14 @@ func New(log zerolog.Logger,
 		return nil, fmt.Errorf("could not initialize connection pool cache: %w", err)
 	}
 
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not initialize connection pool cache")
-	}
 	connectionFactory := &backend.ConnectionFactoryImpl{
 		CollectionGRPCPort:        collectionGRPCPort,
 		ExecutionGRPCPort:         executionGRPCPort,
 		CollectionNodeGRPCTimeout: config.CollectionClientTimeout,
 		ExecutionNodeGRPCTimeout:  config.ExecutionClientTimeout,
 		ConnectionsCache:          cache,
+		CacheSize:                 uint(cacheSize),
+		TransactionMetrics:        transactionMetrics,
 	}
 
 	backend := backend.New(state,
