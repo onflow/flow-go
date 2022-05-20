@@ -33,15 +33,13 @@ type Suite struct {
 	ghostID                 flow.Identifier      // represents id of ghost node
 
 	// execution nodes: 2 corrupted, one honest
-	exe1Id flow.Identifier // corrupted execution node 1
-	exe2Id flow.Identifier // corrupted execution node 2
-	exe3Id flow.Identifier // honest execution node
+	corruptedEN1Id flow.Identifier // corrupted execution node 1
+	corruptedEN2Id flow.Identifier // corrupted execution node 2
+	honestENId     flow.Identifier // honest execution node
 
 	// verification nodes: 3 corrupted, one honest
-	ver1Id flow.Identifier // corrupted verification node 1
-	ver2Id flow.Identifier // corrupted verification node 2
-	ver3Id flow.Identifier // corrupted verification node 3
-	ver4Id flow.Identifier // honest verification node
+	corruptedVnIds flow.IdentifierList
+	honestVN       flow.Identifier // honest verification node
 
 	PreferredUnicasts string // preferred unicast protocols between execution and verification nodes.
 	Orchestrator      *wintermute.Orchestrator
@@ -65,11 +63,16 @@ func (s *Suite) AccessClient() *testnet.Client {
 }
 
 // SetupSuite runs a bare minimum Flow network to function correctly with the following roles:
-// - Two collector nodes
-// - Four consensus nodes
-// - two corrupted execution node
-// - One corrupted verification node
-// - One ghost node (as an execution node)
+// - Two collector nodes.
+// - Four consensus nodes.
+// - Three execution nodes (two corrupted).
+// - Four verification nodes (three corrupted).
+// - One ghost node (as an execution node).
+//
+// Moreover, chunk alpha is set to 3, meaning each chunk is assigned to three-out-of-four verification nodes.
+// However, each chunk is sealed with two approvals.
+// This guarantees that each chunk is assigned to at least two corrupted verification nodes, and they are
+// enough to approve and seal the chunk.
 func (s *Suite) SetupSuite() {
 	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
 		Str("testfile", "suite.go").
@@ -78,6 +81,7 @@ func (s *Suite) SetupSuite() {
 	s.log = logger
 
 	blockRateFlag := "--block-rate-delay=1ms"
+	chunkAlpha := "--chunk-alpha=3" // each chunk is assigned to 3 VNs.
 
 	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)))
 
@@ -88,7 +92,9 @@ func (s *Suite) SetupSuite() {
 			testnet.WithID(nodeID),
 			testnet.WithLogLevel(zerolog.ErrorLevel),
 			testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
-			testnet.WithAdditionalFlag("--chunk-alpha=3"),
+			testnet.WithAdditionalFlag(chunkAlpha),
+
+			// two approvals needed to seal a chunk
 			testnet.WithAdditionalFlag("--required-verification-seal-approvals=2"),
 			testnet.WithAdditionalFlag("--required-construction-seal-approvals=2"),
 			testnet.WithAdditionalFlag(blockRateFlag),
@@ -97,56 +103,45 @@ func (s *Suite) SetupSuite() {
 	}
 
 	// generates four verification nodes: three corrupted, one honest
-	s.ver1Id = unittest.IdentifierFixture()
-	ver1Config := testnet.NewNodeConfig(flow.RoleVerification,
-		testnet.WithID(s.ver1Id),
-		testnet.WithAdditionalFlag("--chunk-alpha=3"),
-		testnet.WithLogLevel(zerolog.FatalLevel),
-		testnet.AsCorrupted())
-	s.nodeConfigs = append(s.nodeConfigs, ver1Config)
-
-	s.ver2Id = unittest.IdentifierFixture()
-	ver2Config := testnet.NewNodeConfig(flow.RoleVerification,
-		testnet.WithAdditionalFlag("--chunk-alpha=3"),
-		testnet.WithID(s.ver2Id),
-		testnet.WithLogLevel(zerolog.FatalLevel),
-		testnet.AsCorrupted())
-	s.nodeConfigs = append(s.nodeConfigs, ver2Config)
-
-	s.ver3Id = unittest.IdentifierFixture()
-	ver3Config := testnet.NewNodeConfig(flow.RoleVerification,
-		testnet.WithAdditionalFlag("--chunk-alpha=3"),
-		testnet.WithID(s.ver3Id),
-		testnet.WithLogLevel(zerolog.FatalLevel),
-		testnet.AsCorrupted())
-	s.nodeConfigs = append(s.nodeConfigs, ver3Config)
+	s.corruptedVnIds = unittest.IdentifierListFixture(3)
+	for _, nodeID := range s.corruptedVnIds {
+		verConfig := testnet.NewNodeConfig(flow.RoleVerification,
+			testnet.WithID(nodeID),
+			testnet.WithAdditionalFlag(chunkAlpha),
+			testnet.WithLogLevel(zerolog.FatalLevel),
+			testnet.AsCorrupted())
+		s.nodeConfigs = append(s.nodeConfigs, verConfig)
+	}
 
 	// honest verification node
-	s.ver4Id = unittest.IdentifierFixture()
+	s.honestVN = unittest.IdentifierFixture()
 	ver4Config := testnet.NewNodeConfig(flow.RoleVerification,
-		testnet.WithAdditionalFlag("--chunk-alpha=3"),
-		testnet.WithID(s.ver4Id),
+		testnet.WithAdditionalFlag(chunkAlpha),
+		testnet.WithID(s.honestVN),
 		testnet.WithLogLevel(zerolog.FatalLevel))
 	s.nodeConfigs = append(s.nodeConfigs, ver4Config)
 
 	// generates three execution nodes: two corrupted and one honest
-	s.exe1Id = unittest.IdentifierFixture()
+	// corrupted EN1
+	s.corruptedEN1Id = unittest.IdentifierFixture()
 	exe1Config := testnet.NewNodeConfig(flow.RoleExecution,
-		testnet.WithID(s.exe1Id),
+		testnet.WithID(s.corruptedEN1Id),
 		testnet.WithLogLevel(zerolog.ErrorLevel),
 		testnet.AsCorrupted())
 	s.nodeConfigs = append(s.nodeConfigs, exe1Config)
 
-	s.exe2Id = unittest.IdentifierFixture()
+	// corrupted EN2
+	s.corruptedEN2Id = unittest.IdentifierFixture()
 	exe2Config := testnet.NewNodeConfig(flow.RoleExecution,
-		testnet.WithID(s.exe2Id),
+		testnet.WithID(s.corruptedEN2Id),
 		testnet.WithLogLevel(zerolog.ErrorLevel),
 		testnet.AsCorrupted())
 	s.nodeConfigs = append(s.nodeConfigs, exe2Config)
 
-	s.exe3Id = unittest.IdentifierFixture()
+	// honest EN
+	s.honestENId = unittest.IdentifierFixture()
 	exe3Config := testnet.NewNodeConfig(flow.RoleExecution,
-		testnet.WithID(s.exe3Id),
+		testnet.WithID(s.honestENId),
 		testnet.WithLogLevel(zerolog.ErrorLevel))
 	s.nodeConfigs = append(s.nodeConfigs, exe3Config)
 
