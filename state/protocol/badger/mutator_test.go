@@ -1660,12 +1660,14 @@ func TestHeaderExtendHighestSeal(t *testing.T) {
 func TestExtendInvalidGuarantee(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+		// create a valid block
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 
 		cluster, err := unittest.SnapshotClusterByIndex(rootSnapshot, 0)
 		require.NoError(t, err)
 
+		// prepare for a valid guarantor signer indices to be used in the valid block
 		all := cluster.Members().NodeIDs()
 		validSignerIndices, err := signature.EncodeSignersToIndices(all, all)
 		require.NoError(t, err)
@@ -1680,17 +1682,23 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 			},
 		}
 
+		// now the valid block has a guarantee in the payload with valid signer indices.
 		block.SetPayload(payload)
+
+		// check Extend should accept this valid block
 		err = state.Extend(context.Background(), block)
 		require.NoError(t, err)
 
+		// now the guarantee has invalid signer indices: the checksum should have 4 bytes, but it only has 1
 		payload.Guarantees[0].SignerIndices = []byte{byte(1)}
 		err = state.Extend(context.Background(), block)
 		require.Error(t, err)
 		require.Contains(t, fmt.Sprintf("%s", err), "invalid guarantors")
-		require.Contains(t, fmt.Sprintf("%s", err), "split checksum")
+		require.Contains(t, fmt.Sprintf("%s", err), "split checksum") // check the error message should tell it's due to wrong checksum
 		require.True(t, st.IsInvalidExtensionError(err))
 
+		// let's test even if the checksum is correct, but signer indices is still wrong because the tailing are not 0,
+		// then the block should still be rejected.
 		invalidSignerIndices := validSignerIndices[:]
 		invalidSignerIndices[len(invalidSignerIndices)-1] = byte(255)
 
