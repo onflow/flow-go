@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/unittest"
 	"github.com/onflow/flow-go/module/metrics"
 	testutils "github.com/onflow/flow-go/utils/unittest"
+	unittest2 "github.com/onflow/flow-go/utils/unittest"
 )
 
 func Test_AsyncUploader(t *testing.T) {
@@ -158,17 +159,13 @@ func Test_AsyncUploader(t *testing.T) {
 		// wait until upload has started before shutting down the component
 		wgUploadStarted.Wait()
 
-		// import unittest2 "github.com/onflow/flow-go/utils/unittest"
-		//unittest2.RequireCloseBefore(t, async.Done(), 5*time.Second, "async uploader not closed in time")
 		// stop component and check that it's fully stopped
 		t.Log("about to initiate shutdown grID: ", string(bytes.Fields(debug.Stack())[1]))
 		c := async.Done()
 		t.Log("about to notify upload() that shutdown started and can continue uploading grID:", string(bytes.Fields(debug.Stack())[1]))
 		wgShutdownStarted.Done()
-		t.Log("about to read from async.Done() channel to see if it's closed grID:", string(bytes.Fields(debug.Stack())[1]))
-		_, ok := <-c
-		t.Log("about to check if async.Done() channel is closed grID:", string(bytes.Fields(debug.Stack())[1]))
-		require.False(t, ok, "component Done channel not closed")
+		t.Log("about to check async done channel is closed grID:", string(bytes.Fields(debug.Stack())[1]))
+		unittest2.RequireCloseBefore(t, c, 1*time.Second, "async uploader not closed in time")
 
 		t.Log("about to check if callCount is 1 grID:", string(bytes.Fields(debug.Stack())[1]))
 		require.Equal(t, 1, callCount)
