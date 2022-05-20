@@ -52,6 +52,10 @@ func RemoveServiceEventsByBlockID(blockID flow.Identifier) func(*badger.Txn) err
 	return removeByPrefix(makePrefix(codeServiceEvent, blockID))
 }
 
+func BatchRemoveServiceEventsByBlockID(blockID flow.Identifier) func(batch *badger.WriteBatch) error {
+	return batchRemoveByPrefix(makePrefix(codeServiceEvent, blockID))
+}
+
 func RemoveEventsByBlockID(blockID flow.Identifier) func(*badger.Txn) error {
 	return removeByPrefix(makePrefix(codeEvent, blockID))
 }
