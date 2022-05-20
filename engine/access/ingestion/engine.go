@@ -313,7 +313,7 @@ func (e *Engine) Process(channel network.Channel, originID flow.Identifier, even
 
 // OnFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated
 func (e *Engine) OnFinalizedBlock(hb *model.Block) {
-	e.process(hb.BlockID, hb)
+	_ = e.process(hb.BlockID, hb)
 }
 
 // processBlock handles an incoming finalized block.
