@@ -71,9 +71,9 @@ func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.D
 	return conn, nil
 }
 
-func (cf *ConnectionFactoryImpl) retrieveConnection(address string, grpcAddress string, timeout time.Duration) (*grpc.ClientConn, error) {
+func (cf *ConnectionFactoryImpl) retrieveConnection(grpcAddress string, timeout time.Duration) (*grpc.ClientConn, error) {
 	var conn *grpc.ClientConn
-	if res, ok := cf.ConnectionsCache.Get(address); ok {
+	if res, ok := cf.ConnectionsCache.Get(grpcAddress); ok {
 		conn = res.(*grpc.ClientConn)
 		if cf.TransactionMetrics != nil {
 			cf.TransactionMetrics.ConnectionFromPoolRetrieved()
@@ -85,7 +85,7 @@ func (cf *ConnectionFactoryImpl) retrieveConnection(address string, grpcAddress 
 		if err != nil {
 			return nil, err
 		}
-		cf.ConnectionsCache.Add(address, conn)
+		cf.ConnectionsCache.Add(grpcAddress, conn)
 		if cf.TransactionMetrics != nil {
 			cf.TransactionMetrics.TotalConnectionsInPool(uint(cf.ConnectionsCache.Len()), cf.CacheSize)
 		}
@@ -100,7 +100,7 @@ func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string) (access.Acce
 		return nil, nil, err
 	}
 
-	conn, err := cf.retrieveConnection(address, grpcAddress, cf.CollectionNodeGRPCTimeout)
+	conn, err := cf.retrieveConnection(grpcAddress, cf.CollectionNodeGRPCTimeout)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -117,7 +117,7 @@ func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (executio
 		return nil, nil, err
 	}
 
-	conn, err := cf.retrieveConnection(address, grpcAddress, cf.ExecutionNodeGRPCTimeout)
+	conn, err := cf.retrieveConnection(grpcAddress, cf.ExecutionNodeGRPCTimeout)
 	if err != nil {
 		return nil, nil, err
 	}
