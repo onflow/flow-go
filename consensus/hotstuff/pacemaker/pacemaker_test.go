@@ -32,13 +32,6 @@ func expectedTimerInfo(view uint64, mode model.TimeoutMode) interface{} {
 		})
 }
 
-func expectedTimeoutInfo(view uint64, mode model.TimeoutMode) interface{} {
-	return mock.MatchedBy(
-		func(timerInfo *model.TimerInfo) bool {
-			return timerInfo.View == view && timerInfo.Mode == mode
-		})
-}
-
 func TestActivePaceMaker(t *testing.T) {
 	suite.Run(t, new(ActivePaceMakerTestSuite))
 }
