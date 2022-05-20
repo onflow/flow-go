@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/base64"
 	"fmt"
 
 	"github.com/onflow/cadence"
@@ -11,8 +12,16 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+func mustDecodeBase64(s string) []byte {
+	b, err := base64.StdEncoding.DecodeString(s)
+	if err != nil {
+		panic(err)
+	}
+	return b
+}
+
 var (
-	faulty_tx_override = map[flow.Identifier]struct {
+	faultyTxOverride = map[flow.Identifier]struct {
 		eventIndex uint32
 		txIndex    uint32
 		payload    []byte
@@ -20,12 +29,12 @@ var (
 		flow.MustHexStringToIdentifier("016003ece13ccb9fce32d7d93c4408395856becbacc9e0587d667b594645fc0a"): {
 			eventIndex: 3,
 			txIndex:    0,
-			payload:    []byte("{\"type\":\"Event\",\"value\":{\"id\":\"A.912d5440f7e3769e.FlowFees.FeesDeducted\",\"fields\":[{\"name\":\"amount\",\"value\":{\"type\":\"UFix64\",\"value\":\"0.00001000\"}},{\"name\":\"inclusionEffort\",\"value\":{\"type\":\"UFix64\",\"value\":\"1.00000000\"}},{\"name\":\"executionEffort\",\"value\":{\"type\":\"UFix64\",\"value\":\"0.00000000\"}}]}}"),
+			payload:    mustDecodeBase64("eyJ0eXBlIjoiRXZlbnQiLCJ2YWx1ZSI6eyJpZCI6IkEuOTEyZDU0NDBmN2UzNzY5ZS5GbG93RmVlcy5GZWVzRGVkdWN0ZWQiLCJmaWVsZHMiOlt7Im5hbWUiOiJhbW91bnQiLCJ2YWx1ZSI6eyJ0eXBlIjoiVUZpeDY0IiwidmFsdWUiOiIwLjAwMDAxMDAwIn19LHsibmFtZSI6ImluY2x1c2lvbkVmZm9ydCIsInZhbHVlIjp7InR5cGUiOiJVRml4NjQiLCJ2YWx1ZSI6IjEuMDAwMDAwMDAifX0seyJuYW1lIjoiZXhlY3V0aW9uRWZmb3J0IiwidmFsdWUiOnsidHlwZSI6IlVGaXg2NCIsInZhbHVlIjoiMC4wMDAwMDAwMCJ9fV19fQo="),
 		},
 		flow.MustHexStringToIdentifier("358f50955d64b4e8cba98ac9d2b6042359def400405d318c209cca52e078e81b"): {
 			eventIndex: 3,
 			txIndex:    3,
-			payload:    []byte("{\"type\":\"Event\",\"value\":{\"id\":\"A.912d5440f7e3769e.FlowFees.FeesDeducted\",\"fields\":[{\"name\":\"amount\",\"value\":{\"type\":\"UFix64\",\"value\":\"0.00010000\"}},{\"name\":\"inclusionEffort\",\"value\":{\"type\":\"UFix64\",\"value\":\"1.00000000\"}},{\"name\":\"executionEffort\",\"value\":{\"type\":\"UFix64\",\"value\":\"0.00000000\"}}]}}"),
+			payload:    mustDecodeBase64("eyJ0eXBlIjoiRXZlbnQiLCJ2YWx1ZSI6eyJpZCI6IkEuOTEyZDU0NDBmN2UzNzY5ZS5GbG93RmVlcy5GZWVzRGVkdWN0ZWQiLCJmaWVsZHMiOlt7Im5hbWUiOiJhbW91bnQiLCJ2YWx1ZSI6eyJ0eXBlIjoiVUZpeDY0IiwidmFsdWUiOiIwLjAwMDEwMDAwIn19LHsibmFtZSI6ImluY2x1c2lvbkVmZm9ydCIsInZhbHVlIjp7InR5cGUiOiJVRml4NjQiLCJ2YWx1ZSI6IjEuMDAwMDAwMDAifX0seyJuYW1lIjoiZXhlY3V0aW9uRWZmb3J0IiwidmFsdWUiOnsidHlwZSI6IlVGaXg2NCIsInZhbHVlIjoiMC4wMDAwMDAwMCJ9fV19fQo="),
 		},
 	}
 )
@@ -67,9 +76,11 @@ func (h *EventHandler) EmitEvent(event cadence.Event,
 
 	var payload []byte
 
-	for faultyID, faultyData := range faulty_tx_override {
+	for faultyID, faultyData := range faultyTxOverride {
 		if txID == faultyID {
+			fmt.Printf("MAKS matching tx %x", txID)
 			if h.eventCollection.eventCounter == faultyData.eventIndex && txIndex == faultyData.txIndex {
+				fmt.Printf("MAKS matching indices %d %d setting payload to %x", h.eventCollection.eventCounter, txIndex, faultyData.payload)
 				payload = faultyData.payload
 			}
 		}
