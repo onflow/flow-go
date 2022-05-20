@@ -30,7 +30,7 @@ import (
 // by `votecollector.VoteProcessorFactory` which adds the logic to verify
 // the proposer's vote (decorator pattern).
 type combinedVoteProcessorFactoryBaseV2 struct {
-	committee   hotstuff.Replicas
+	committee   hotstuff.DynamicCommittee
 	onQCCreated hotstuff.OnQCCreated
 	packer      hotstuff.Packer
 }
@@ -38,7 +38,7 @@ type combinedVoteProcessorFactoryBaseV2 struct {
 // Create creates CombinedVoteProcessorV2 for processing votes for the given block.
 // Caller must treat all errors as exceptions
 func (f *combinedVoteProcessorFactoryBaseV2) Create(log zerolog.Logger, block *model.Block) (hotstuff.VerifyingVoteProcessor, error) {
-	allParticipants, err := f.committee.IdentitiesByEpoch(block.View, filter.Any)
+	allParticipants, err := f.committee.IdentitiesByBlock(block.BlockID, filter.Any)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving consensus participants at block %v: %w", block.BlockID, err)
 	}

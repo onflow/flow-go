@@ -1574,7 +1574,7 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 
 		num, err := strconv.ParseUint(tx.Logs[0], 10, 64)
 		require.NoError(t, err)
-		require.Equal(t, uint64(0xb9c618010e32a0fb), num)
+		require.Equal(t, uint64(0x6a758bbe44042d51), num)
 	})
 }
 
