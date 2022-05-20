@@ -84,7 +84,7 @@ func WithTimeoutHighestQC(highestQC *flow.QuorumCertificate) func(*hotstuff.Time
 	}
 }
 
-func WIthTimeoutLastViewTC(lastViewTC *flow.TimeoutCertificate) func(*hotstuff.TimeoutObject) {
+func WithTimeoutLastViewTC(lastViewTC *flow.TimeoutCertificate) func(*hotstuff.TimeoutObject) {
 	return func(timeout *hotstuff.TimeoutObject) {
 		timeout.LastViewTC = lastViewTC
 	}

@@ -5,6 +5,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/utils/unittest"
 	"golang.org/x/exp/rand"
 	"testing"
@@ -30,6 +31,8 @@ type TimeoutProcessorTestSuite struct {
 	committee               *mocks.Replicas
 	validator               *mocks.Validator
 	sigAggregator           *mocks.TimeoutSignatureAggregator
+	sigWeight               uint64
+	totalWeight             uint64
 	onTCCreatedState        mock.Mock
 	onPartialTCCreatedState mock.Mock
 	processor               *TimeoutProcessor
@@ -37,14 +40,26 @@ type TimeoutProcessorTestSuite struct {
 
 func (s *TimeoutProcessorTestSuite) SetupTest() {
 	var err error
+	s.sigWeight = 1000
 	s.committee = &mocks.Replicas{}
 	s.validator = &mocks.Validator{}
 	s.sigAggregator = &mocks.TimeoutSignatureAggregator{}
-	s.participants = unittest.IdentityListFixture(11)
+	s.participants = unittest.IdentityListFixture(11, unittest.WithWeight(s.sigWeight))
 	s.view = (uint64)(rand.Uint32() + 100)
+	s.totalWeight = 0
 
 	s.committee.On("WeightThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(s.participants.TotalWeight()), nil)
 	s.sigAggregator.On("View").Return(s.view).Maybe()
+	s.sigAggregator.On("VerifyAndAdd", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		s.totalWeight += s.sigWeight
+	}).Return(func(signerID flow.Identifier, sig crypto.Signature, highestQCView uint64) uint64 {
+		return s.totalWeight
+	}, func(signerID flow.Identifier, sig crypto.Signature, highestQCView uint64) error {
+		return nil
+	}).Maybe()
+	s.sigAggregator.On("TotalWeight").Return(func() uint64 {
+		return s.totalWeight
+	}).Maybe()
 
 	s.processor, err = NewTimeoutProcessor(s.committee,
 		s.validator,
@@ -102,7 +117,7 @@ func (s *TimeoutProcessorTestSuite) TestProcess_LastViewTCWrongView() {
 	err := s.processor.Process(helper.TimeoutObjectFixture(
 		helper.WithTimeoutObjectView(s.view),
 		helper.WithTimeoutHighestQC(helper.MakeQC(helper.WithQCView(s.view-10))),
-		helper.WIthTimeoutLastViewTC(helper.MakeTC(helper.WithTCView(s.view)))))
+		helper.WithTimeoutLastViewTC(helper.MakeTC(helper.WithTCView(s.view)))))
 	require.True(s.T(), model.IsInvalidTimeoutError(err))
 }
 
@@ -113,7 +128,7 @@ func (s *TimeoutProcessorTestSuite) TestProcess_LastViewHighestQCInvalidView() {
 	err := s.processor.Process(helper.TimeoutObjectFixture(
 		helper.WithTimeoutObjectView(s.view),
 		helper.WithTimeoutHighestQC(helper.MakeQC(helper.WithQCView(s.view-10))),
-		helper.WIthTimeoutLastViewTC(
+		helper.WithTimeoutLastViewTC(
 			helper.MakeTC(
 				helper.WithTCView(s.view-1),
 				helper.WithTCHighestQC(helper.MakeQC(helper.WithQCView(s.view-5)))))))
@@ -128,7 +143,7 @@ func (s *TimeoutProcessorTestSuite) TestProcess_LastViewTCRequiredButNotPresent(
 	err := s.processor.Process(helper.TimeoutObjectFixture(
 		helper.WithTimeoutObjectView(s.view),
 		helper.WithTimeoutHighestQC(helper.MakeQC(helper.WithQCView(s.view-10))),
-		helper.WIthTimeoutLastViewTC(nil)))
+		helper.WithTimeoutLastViewTC(nil)))
 	require.True(s.T(), model.IsInvalidTimeoutError(err))
 }
 
@@ -138,7 +153,7 @@ func (s *TimeoutProcessorTestSuite) TestProcess_IncludedQCInvalid() {
 	timeout := helper.TimeoutObjectFixture(
 		helper.WithTimeoutObjectView(s.view),
 		helper.WithTimeoutHighestQC(helper.MakeQC(helper.WithQCView(s.view-1))),
-		helper.WIthTimeoutLastViewTC(
+		helper.WithTimeoutLastViewTC(
 			helper.MakeTC(helper.WithTCView(s.view-1),
 				helper.WithTCHighestQC(helper.MakeQC(helper.WithQCView(s.view-1))))),
 	)
@@ -157,7 +172,7 @@ func (s *TimeoutProcessorTestSuite) TestProcess_IncludedTCInvalid() {
 	timeout := helper.TimeoutObjectFixture(
 		helper.WithTimeoutObjectView(s.view),
 		helper.WithTimeoutHighestQC(helper.MakeQC(helper.WithQCView(s.view-1))),
-		helper.WIthTimeoutLastViewTC(
+		helper.WithTimeoutLastViewTC(
 			helper.MakeTC(helper.WithTCView(s.view-1),
 				helper.WithTCHighestQC(helper.MakeQC(helper.WithQCView(s.view-1))))),
 	)
@@ -176,7 +191,7 @@ func (s *TimeoutProcessorTestSuite) TestProcess_ValidTimeout() {
 	timeout := helper.TimeoutObjectFixture(
 		helper.WithTimeoutObjectView(s.view),
 		helper.WithTimeoutHighestQC(helper.MakeQC(helper.WithQCView(s.view-1))),
-		helper.WIthTimeoutLastViewTC(
+		helper.WithTimeoutLastViewTC(
 			helper.MakeTC(helper.WithTCView(s.view-1),
 				helper.WithTCHighestQC(helper.MakeQC(helper.WithQCView(s.view-1))))),
 	)
@@ -190,4 +205,70 @@ func (s *TimeoutProcessorTestSuite) TestProcess_ValidTimeout() {
 	s.validator.AssertCalled(s.T(), "ValidateQC", timeout.HighestQC)
 	s.validator.AssertCalled(s.T(), "ValidateTC", timeout.LastViewTC)
 	s.sigAggregator.AssertCalled(s.T(), "VerifyAndAdd", timeout.SignerID, timeout.SigData, timeout.HighestQC.View)
+}
+
+// TestProcess_CreatingTC is a test for happy path single threaded signature aggregation and TC creation
+// Each replica commits unique timeout object, this object gets processed by TimeoutProcessor. After collecting
+// enough weight we expect a TC to be created. All further operations should be no-op, only one TC should be created.
+func (s *TimeoutProcessorTestSuite) TestProcess_CreatingTC() {
+	// each signer will commit a different QC
+	var highQCViews []uint64
+	signers := s.participants[1:]
+	for range signers {
+		highQCViews = append(highQCViews, s.view-1)
+	}
+	highestQC := helper.MakeQC(helper.WithQCView(highQCViews[0]))
+
+	// change tracker to require all except one signer to create TC
+	s.processor.tcTracker.minRequiredWeight = s.sigWeight * uint64(len(highQCViews))
+
+	expectedNodeIDs := signers.NodeIDs()
+	expectedSig := crypto.Signature(unittest.RandomBytes(128))
+	s.validator.On("ValidateQC", mock.Anything).Return(nil)
+	s.onPartialTCCreatedState.On("onPartialTCCreated", s.view).Return(nil).Once()
+	s.onTCCreatedState.On("onTCCreated", mock.Anything).Run(func(args mock.Arguments) {
+		tc := args.Get(0).(*flow.TimeoutCertificate)
+		// ensure that TC contains correct fields
+		expectedTC := &flow.TimeoutCertificate{
+			View:          s.view,
+			TOHighQCViews: highQCViews,
+			TOHighestQC:   highestQC,
+			SignerIDs:     expectedNodeIDs,
+			SigData:       expectedSig,
+		}
+		require.Equal(s.T(), expectedTC, tc)
+	}).Return(nil).Once()
+
+	s.sigAggregator.On("Aggregate").Return(expectedNodeIDs, highQCViews, expectedSig, nil)
+
+	for _, signer := range expectedNodeIDs {
+		timeout := helper.TimeoutObjectFixture(
+			helper.WithTimeoutObjectView(s.view),
+			helper.WithTimeoutHighestQC(highestQC),
+			helper.WithTimeoutObjectSignerID(signer),
+			helper.WithTimeoutLastViewTC(nil),
+		)
+		err := s.processor.Process(timeout)
+		require.NoError(s.T(), err)
+	}
+	s.onTCCreatedState.AssertExpectations(s.T())
+	s.sigAggregator.AssertExpectations(s.T())
+
+	// add extra timeout, make sure we don't create another TC
+	// should be no-op
+	timeout := helper.TimeoutObjectFixture(
+		helper.WithTimeoutObjectView(s.view),
+		helper.WithTimeoutHighestQC(highestQC),
+		helper.WithTimeoutObjectSignerID(s.participants[0].NodeID),
+		helper.WithTimeoutLastViewTC(nil),
+	)
+	err := s.processor.Process(timeout)
+	require.NoError(s.T(), err)
+
+	s.onTCCreatedState.AssertNumberOfCalls(s.T(), "onTCCreated", 1)
+	s.validator.AssertExpectations(s.T())
+}
+
+func (s *TimeoutProcessorTestSuite) TestProcess_ConcurrentCreatingTC() {
+
 }

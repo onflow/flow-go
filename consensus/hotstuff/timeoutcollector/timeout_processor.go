@@ -90,8 +90,7 @@ func NewTimeoutProcessor(committee hotstuff.Replicas,
 		validator: validator,
 		partialTCTracker: accumulatedWeightTracker{
 			// TODO(active-pacemaker): fix this, add weight for f+1
-			//minRequiredWeight: hotstuff.ComputeWeightThresholdForHonestMajority(totalWeight),
-			minRequiredWeight: 1,
+			minRequiredWeight: qcThreshold / 2,
 			done:              *atomic.NewBool(false),
 		},
 		tcTracker: accumulatedWeightTracker{
