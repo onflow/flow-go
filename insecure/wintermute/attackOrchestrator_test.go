@@ -664,7 +664,7 @@ func TestPassingThrough_ResultApproval(t *testing.T) {
 	// registers mock network with orchestrator
 	wintermuteOrchestrator.WithAttackNetwork(mockAttackNetwork)
 
-	// sends responses to the orchestrator
+	// sends approval to the orchestrator
 	resultApprovalPassThroughWG := &sync.WaitGroup{}
 	resultApprovalPassThroughWG.Add(1)
 	go func() {
@@ -685,4 +685,58 @@ func TestPassingThrough_ResultApproval(t *testing.T) {
 		approvalPassThrough.Wait,
 		1*time.Second,
 		"orchestrator could not pass through result approval on time")
+}
+
+// TestWintermute_ResultApproval evaluates that wintermute attack orchestrator is dropping (i.e., wintermuting)
+// incoming result approvals if they belong to original execution result (i.e., the conflicting result with one that is
+// corrupted).
+func TestWintermute_ResultApproval(t *testing.T) {
+	_, allIds, corruptedIds := bootstrapWintermuteFlowSystem(t)
+	wintermuteOrchestrator := NewOrchestrator(unittest.Logger(), corruptedIds, allIds)
+
+	originalResult := unittest.ExecutionResultFixture()
+	corruptedResult := unittest.ExecutionResultFixture(unittest.WithChunks(1))
+	wintermuteOrchestrator.state = &attackState{
+		originalResult:  originalResult,
+		corruptedResult: corruptedResult,
+	}
+
+	// generates a result approval event for one of the chunks of the original result.
+	approvalEvent := &insecure.Event{
+		CorruptedNodeId: corruptedIds.Sample(1)[0],
+		Channel:         "test_channel",
+		Protocol:        insecure.Protocol_MULTICAST,
+		TargetNum:       3,
+		TargetIds:       unittest.IdentifierListFixture(10),
+		FlowProtocolEvent: unittest.ResultApprovalFixture(
+			unittest.WithExecutionResultID(originalResult.ID()),
+			unittest.WithChunk(0)),
+	}
+
+	approvalPassThrough := &sync.WaitGroup{}
+	approvalPassThrough.Add(1)
+
+	// mocks attack network
+	mockAttackNetwork := &mockinsecure.AttackNetwork{}
+	wintermuteOrchestrator.WithAttackNetwork(mockAttackNetwork)
+
+	// sends approval to the orchestrator
+	resultSendWG := &sync.WaitGroup{}
+	resultSendWG.Add(1)
+	go func() {
+		err := wintermuteOrchestrator.HandleEventFromCorruptedNode(approvalEvent)
+		require.NoError(t, err)
+
+		resultSendWG.Done()
+	}()
+
+	// waits till approval is sent to attack orchestrator
+	unittest.RequireReturnsBefore(t,
+		resultSendWG.Wait,
+		1*time.Second,
+		"could not result approval event to orchestrator")
+
+	// orchestrator should drop (i.e., wintermute) any result approval belonging to the
+	// original result.
+	mockAttackNetwork.AssertNotCalled(t, "Send", mock.Anything)
 }
