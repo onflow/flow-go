@@ -6,13 +6,13 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/insecure"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/utils/logging"
 	"github.com/onflow/flow-go/utils/unittest"
-
-	"github.com/onflow/flow-go/insecure"
-	"github.com/onflow/flow-go/model/flow"
 )
 
 // Orchestrator encapsulates a stateful implementation of wintermute attack orchestrator logic.
@@ -76,6 +76,11 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error
 		if err := o.handleChunkDataPackResponseEvent(event); err != nil {
 			return fmt.Errorf("could not handle chunk data pack response event: %w", err)
 		}
+	case *flow.ResultApproval:
+		if err := o.handleResultApproval(event); err != nil {
+			return fmt.Errorf("could not handle result approval event: %w", err)
+		}
+
 	default:
 		// passing through event as it is.
 		err := o.network.Send(event)
@@ -90,14 +95,25 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error
 // corruptExecutionResult creates a corrupted version of the input receipt by tampering its content so that
 // the resulted corrupted version would not pass verification.
 func (o *Orchestrator) corruptExecutionResult(receipt *flow.ExecutionReceipt) *flow.ExecutionResult {
-	return &flow.ExecutionResult{
+	receiptStartState := receipt.ExecutionResult.Chunks[0].StartState
+	chunksNum := len(receipt.ExecutionResult.Chunks)
+
+	result := &flow.ExecutionResult{
 		PreviousResultID: receipt.ExecutionResult.PreviousResultID,
 		BlockID:          receipt.ExecutionResult.BlockID,
 		// replace all chunks with new ones to simulate chunk corruption
-		Chunks:          unittest.ChunkListFixture(uint(len(receipt.ExecutionResult.Chunks)), receipt.ExecutionResult.BlockID),
+		Chunks: flow.ChunkList{
+			unittest.ChunkFixture(receipt.ExecutionResult.BlockID, 0, unittest.WithChunkStartState(receiptStartState)),
+		},
 		ServiceEvents:   receipt.ExecutionResult.ServiceEvents,
 		ExecutionDataID: receipt.ExecutionResult.ExecutionDataID,
 	}
+
+	if chunksNum > 1 {
+		result.Chunks = append(result.Chunks, unittest.ChunkListFixture(uint(chunksNum-1), receipt.ExecutionResult.BlockID)...)
+	}
+
+	return result
 }
 
 // handleExecutionReceiptEvent processes incoming execution receipt event from a corrupted execution node.
@@ -279,6 +295,30 @@ func (o *Orchestrator) handleChunkDataPackResponseEvent(chunkDataPackReplyEvent 
 	return nil
 }
 
+func (o *Orchestrator) handleResultApproval(resultApprovalEvent *insecure.Event) error {
+	if o.state != nil {
+		approval := resultApprovalEvent.FlowProtocolEvent.(*flow.ResultApproval)
+
+		lg := o.logger.With().
+			Hex("result_id", logging.ID(approval.Body.ExecutionResultID)).
+			Uint64("chunk_index", approval.Body.ChunkIndex).
+			Hex("result_id", logging.ID(approval.Body.BlockID)).
+			Hex("sender_id", logging.ID(resultApprovalEvent.CorruptedNodeId)).
+			Str("target_ids", fmt.Sprintf("%v", resultApprovalEvent.TargetIds)).Logger()
+
+		if o.state.originalResult.ID() == approval.Body.ExecutionResultID {
+			lg.Info().Msg("wintermuting result approval for original execution result")
+			return nil
+		}
+	}
+
+	err := o.network.Send(resultApprovalEvent)
+	if err != nil {
+		return fmt.Errorf("could not passed through result approval event %w", err)
+	}
+	return nil
+}
+
 // replyWithAttestation sends an attestation for the given chunk data pack request if it belongs to
 // the corrupted result of orchestrator's state.
 func (o *Orchestrator) replyWithAttestation(chunkDataPackRequestEvent *insecure.Event) (bool, error) {
@@ -298,13 +338,14 @@ func (o *Orchestrator) replyWithAttestation(chunkDataPackRequestEvent *insecure.
 			ChunkIndex:        corruptedChunkIndex,
 		}
 
-		// sends an attestation for the corrupted chunk to corrupted verification node.
+		// sends an attestation on behalf of verification node to all consensus nodes
+		consensusIds := o.allNodeIds.Filter(filter.HasRole(flow.RoleConsensus)).NodeIDs()
 		err = o.network.Send(&insecure.Event{
 			CorruptedNodeId: chunkDataPackRequestEvent.CorruptedNodeId,
-			Channel:         chunkDataPackRequestEvent.Channel,
-			Protocol:        chunkDataPackRequestEvent.Protocol,
-			TargetNum:       chunkDataPackRequestEvent.TargetNum,
-			TargetIds:       chunkDataPackRequestEvent.TargetIds,
+			Channel:         engine.PushApprovals,
+			Protocol:        insecure.Protocol_PUBLISH,
+			TargetNum:       0,
+			TargetIds:       consensusIds,
 
 			// wrapping attestation in a result approval for sake of encoding and decoding.
 			FlowProtocolEvent: &flow.ResultApproval{Body: flow.ResultApprovalBody{Attestation: *attestation}},
