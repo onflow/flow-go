@@ -64,7 +64,7 @@ func (ps *ProposalSuite) SetupTest() {
 	ps.vote = ps.proposal.ProposerVote()
 	ps.voter = ps.leader
 
-	// set up the mocked hotstuff DynamicCommittee state
+	// set up the mocked hotstuff Replicas state
 	ps.committee = &mocks.Replicas{}
 	ps.committee.On("LeaderForView", ps.block.View).Return(ps.leader.NodeID, nil)
 	ps.committee.On("WeightThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(ps.participants.TotalWeight()), nil)
@@ -424,7 +424,7 @@ type VoteSuite struct {
 	vote      *model.Vote
 	forks     *mocks.Forks
 	verifier  *mocks.Verifier
-	committee *mocks.DynamicCommittee
+	committee *mocks.Replicas
 	validator *Validator
 }
 
@@ -453,7 +453,7 @@ func (vs *VoteSuite) SetupTest() {
 	vs.verifier.On("VerifyVote", vs.signer, vs.vote.SigData, vs.block.View, vs.block.BlockID).Return(nil)
 
 	// the leader for the block view is the correct one
-	vs.committee = &mocks.DynamicCommittee{}
+	vs.committee = &mocks.Replicas{}
 	vs.committee.On("IdentityByEpoch", mock.Anything, vs.signer.NodeID).Return(vs.signer, nil)
 
 	// set up the validator with the mocked dependencies
@@ -484,7 +484,7 @@ func (vs *VoteSuite) TestVoteSignatureError() {
 // which the Validator should recognize as a symptom for an invalid vote.
 // Hence, we expect the validator to return a `model.InvalidVoteError`.
 func (vs *VoteSuite) TestVoteInvalidSignerID() {
-	*vs.committee = mocks.DynamicCommittee{}
+	*vs.committee = mocks.Replicas{}
 	vs.committee.On("IdentityByEpoch", vs.block.View, vs.vote.SignerID).Return(nil, model.NewInvalidSignerErrorf(""))
 
 	// A `model.InvalidSignerError` from the committee should be interpreted as
@@ -520,7 +520,7 @@ type QCSuite struct {
 	signers      flow.IdentityList
 	block        *model.Block
 	qc           *flow.QuorumCertificate
-	committee    *mocks.DynamicCommittee
+	committee    *mocks.Replicas
 	verifier     *mocks.Verifier
 	validator    *Validator
 }
@@ -541,7 +541,7 @@ func (qs *QCSuite) SetupTest() {
 	qs.qc = helper.MakeQC(helper.WithQCBlock(qs.block), helper.WithQCSigners(qs.signers.NodeIDs()))
 
 	// return the correct participants and identities from view state
-	qs.committee = &mocks.DynamicCommittee{}
+	qs.committee = &mocks.Replicas{}
 	qs.committee.On("IdentitiesByEpoch", mock.Anything, mock.Anything).Return(
 		func(_ uint64, selector flow.IdentityFilter) flow.IdentityList {
 			return qs.participants.Filter(selector)
@@ -577,7 +577,7 @@ func (qs *QCSuite) TestQCInvalidSignersError() {
 // there is an error retrieving identities of consensus participants
 func (qs *QCSuite) TestQCRetrievingParticipantsError() {
 	// change the hotstuff.DynamicCommittee to fail on retrieving participants
-	*qs.committee = mocks.DynamicCommittee{}
+	*qs.committee = mocks.Replicas{}
 	qs.committee.On("IdentitiesByEpoch", mock.Anything, mock.Anything).Return(qs.participants, errors.New("FATAL internal error"))
 
 	// verifier should escalate unspecific internal error to surrounding logic, but NOT as ErrorInvalidQC
