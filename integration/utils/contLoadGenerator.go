@@ -288,7 +288,7 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 		AddAuthorizer(*lg.serviceAccount.address).
 		SetPayer(*lg.serviceAccount.address)
 
-	publicKey := bytesToCadenceArray(accountKey.Encode())
+	publicKey := bytesToCadenceArray(accountKey.PublicKey.Encode())
 	count := cadence.NewInt(num)
 
 	initialTokenAmount, err := cadence.NewUFix64FromParts(
