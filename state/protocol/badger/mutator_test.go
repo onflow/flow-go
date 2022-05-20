@@ -5,6 +5,7 @@ package badger_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/rand"
 	"sync"
 	"testing"
@@ -22,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/trace"
 	st "github.com/onflow/flow-go/state"
 	realprotocol "github.com/onflow/flow-go/state/protocol"
@@ -1650,6 +1652,52 @@ func TestHeaderExtendHighestSeal(t *testing.T) {
 		finalCommit, err := state.AtBlockID(block4.ID()).Commit()
 		require.NoError(t, err)
 		require.Equal(t, seal3.FinalState, finalCommit)
+	})
+}
+
+// TestExtendInvalidGuarantee checks if Extend method will reject invalid blocks that contain
+// guarantees with invalid guarantors
+func TestExtendInvalidGuarantee(t *testing.T) {
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+		head, err := rootSnapshot.Head()
+		require.NoError(t, err)
+
+		cluster, err := unittest.SnapshotClusterByIndex(rootSnapshot, 0)
+		require.NoError(t, err)
+
+		all := cluster.Members().NodeIDs()
+		validSignerIndices, err := signature.EncodeSignersToIndices(all, all)
+		require.NoError(t, err)
+
+		block := unittest.BlockWithParentFixture(head)
+		payload := flow.EmptyPayload()
+		payload.Guarantees = []*flow.CollectionGuarantee{
+			&flow.CollectionGuarantee{
+				ChainID:          cluster.ChainID(),
+				ReferenceBlockID: head.ID(),
+				SignerIndices:    validSignerIndices,
+			},
+		}
+
+		block.SetPayload(payload)
+		err = state.Extend(context.Background(), block)
+		require.NoError(t, err)
+
+		payload.Guarantees[0].SignerIndices = []byte{byte(1)}
+		err = state.Extend(context.Background(), block)
+		require.Error(t, err)
+		require.Contains(t, fmt.Sprintf("%s", err), "invalid guarantors")
+		require.Contains(t, fmt.Sprintf("%s", err), "split checksum")
+		require.True(t, st.IsInvalidExtensionError(err))
+
+		invalidSignerIndices := validSignerIndices[:]
+		invalidSignerIndices[len(invalidSignerIndices)-1] = byte(255)
+
+		payload.Guarantees[0].SignerIndices = invalidSignerIndices
+		err = state.Extend(context.Background(), block)
+		require.Error(t, err)
+		require.Contains(t, fmt.Sprintf("%s", err), "index vector padded with unexpected bit values")
 	})
 }
 

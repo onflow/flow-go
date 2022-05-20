@@ -322,6 +322,12 @@ func (m *MutableState) guaranteeExtend(ctx context.Context, candidate *flow.Bloc
 			return state.NewInvalidExtensionErrorf("payload includes expired guarantee (height: %d, limit: %d)",
 				ref.Height, limit)
 		}
+
+		// check the guarantors are correct
+		_, err = protocol.FindGuarantors(m, guarantee)
+		if err != nil {
+			return state.NewInvalidExtensionErrorf("guarantee %v contains invalid guarantors: %w", guarantee.ID(), err)
+		}
 	}
 
 	return nil

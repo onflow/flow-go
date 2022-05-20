@@ -28,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/mempool/entity"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/dsl"
 )
@@ -1865,6 +1866,16 @@ func RootSnapshotFixture(participants flow.IdentityList, opts ...func(*flow.Bloc
 		panic(err)
 	}
 	return root
+}
+
+func SnapshotClusterByIndex(snapshot *inmem.Snapshot, clusterIndex uint) (protocol.Cluster, error) {
+	epochs := snapshot.Epochs()
+	epoch := epochs.Current()
+	cluster, err := epoch.Cluster(clusterIndex)
+	if err != nil {
+		return nil, err
+	}
+	return cluster, nil
 }
 
 // ChainFixture creates a list of blocks that forms a chain
