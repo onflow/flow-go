@@ -23,6 +23,9 @@ import (
 //    for that corrupted chunk.
 // 4. If Orchestrator receives any chunk data pack response from a corrupted execution node to an honest verification node, it drops the response
 //    if it is for one of the corrupted chunks.
+// 5. If Orchestrator receives a result approval for the original result (i.e., conflicting result with corrupted result),
+//    from a corrupted VN, it drops it, hence no conflicting result with the corrupted result is getting approved by any
+//    corrupted VN.
 // 5. Any other incoming messages to the orchestrator are passed through, i.e., are sent as they are in the original Flow network without any tampering.
 type Orchestrator struct {
 	sync.Mutex
