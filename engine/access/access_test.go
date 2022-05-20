@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
@@ -620,7 +619,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		require.NoError(suite.T(), err)
 
 		ctx, _ := irrecoverable.WithSignaler(context.Background())
-		ingestEng.IsTest = true
+		ingestEng.DisableProcessBackground()
 		ingestEng.Start(ctx)
 		<-ingestEng.Ready()
 
@@ -646,8 +645,6 @@ func (suite *Suite) TestGetSealedTransaction() {
 			err = ingestEng.Process(engine.ReceiveReceipts, enNodeIDs[0], r)
 			require.NoError(suite.T(), err)
 		}
-
-		time.Sleep(time.Second * 1)
 
 		// 5. Client requests a transaction
 		tx := collection.Transactions[0]
@@ -750,9 +747,6 @@ func (suite *Suite) TestExecuteScript() {
 			err = ingestEng.ProcessLocal(r)
 			require.NoError(suite.T(), err)
 		}
-
-		// wait for the receipt to be persisted
-		time.Sleep(time.Second * 1)
 
 		ctx := context.Background()
 

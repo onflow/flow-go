@@ -58,6 +58,7 @@ type Engine struct {
 	executionReceiptsQueue    engine.MessageStore
 	finalizedBlockNotifier    engine.Notifier
 	finalizedBlockQueue       engine.MessageStore
+	processBackgroundDisabled bool
 
 	log     zerolog.Logger   // used to log relevant actions with context
 	state   protocol.State   // used to access the  protocol state
@@ -80,7 +81,6 @@ type Engine struct {
 	blocksToMarkExecuted       *stdmap.Times
 
 	rpcEngine *rpc.Engine
-	IsTest    bool
 }
 
 // New creates a new access ingestion engine
@@ -165,8 +165,8 @@ func New(
 		finalizedBlockNotifier: engine.NewNotifier(),
 		finalizedBlockQueue:    finalizedBlocksQueue,
 
-		messageHandler: messageHandler,
-		IsTest:         false,
+		messageHandler:            messageHandler,
+		processBackgroundDisabled: false,
 	}
 
 	// Add workers
@@ -185,8 +185,14 @@ func New(
 	return e, nil
 }
 
+func (e *Engine) DisableProcessBackground() {
+	// disable the processBackground worker from starting during testing to avoid calling mocks
+	e.processBackgroundDisabled = true
+}
+
 func (e *Engine) processBackground(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	if e.IsTest {
+	if e.processBackgroundDisabled {
+		// avoid triggering mocks
 		ready()
 		return
 	}
@@ -256,10 +262,20 @@ func (e *Engine) processFinalizedBlocks(ctx irrecoverable.SignalerContext, ready
 // to this function originate within the expulsion engine on the node with the
 // given origin ID.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
+	select {
+	case <-e.ComponentManager.ShutdownSignal():
+		return component.ErrComponentShutdown
+	default:
+	}
+
 	switch event.(type) {
 	case *flow.ExecutionReceipt:
 		err := e.messageHandler.Process(originID, event)
 		e.executionReceiptsNotifier.Notify()
+		return err
+	case *model.Block:
+		err := e.messageHandler.Process(originID, event)
+		e.finalizedBlockNotifier.Notify()
 		return err
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
@@ -297,8 +313,7 @@ func (e *Engine) Process(channel network.Channel, originID flow.Identifier, even
 
 // OnFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated
 func (e *Engine) OnFinalizedBlock(hb *model.Block) {
-	_ = e.messageHandler.Process(hb.BlockID, hb)
-	e.finalizedBlockNotifier.Notify()
+	e.process(hb.BlockID, hb)
 }
 
 // processBlock handles an incoming finalized block.

@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/mocknetwork"
 
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
@@ -49,7 +50,8 @@ type Suite struct {
 	receipts     *storage.ExecutionReceipts
 	results      *storage.ExecutionResults
 
-	eng *Engine
+	eng    *Engine
+	cancel context.CancelFunc
 }
 
 func TestIngestEngine(t *testing.T) {
@@ -101,12 +103,15 @@ func (suite *Suite) SetupTest() {
 		blocksToMarkExecuted, rpcEng)
 	require.NoError(suite.T(), err)
 
-	eng.IsTest = true
-	suite.eng = eng
+	// disable process background to avoid triggering mocks and create a context
+	eng.DisableProcessBackground()
+	ctx, cancel := context.WithCancel(context.Background())
+	irrecoverableCtx, _ := irrecoverable.WithSignaler(ctx)
+	eng.Start(irrecoverableCtx)
+	<-eng.Ready()
 
-	ctx, _ := irrecoverable.WithSignaler(context.Background())
-	suite.eng.Start(ctx)
-	<-suite.eng.Ready()
+	suite.eng = eng
+	suite.cancel = cancel
 }
 
 // TestOnFinalizedBlock checks that when a block is received, a request for each individual collection is made
@@ -576,4 +581,14 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 		// last full blk index is not advanced
 		suite.blocks.AssertExpectations(suite.T()) // not new call to UpdateLastFullBlockHeight should be made
 	})
+}
+
+func (suite *Suite) TestComponentShutdown() {
+	// start then shut down the engine
+	unittest.AssertClosesBefore(suite.T(), suite.eng.Ready(), 10*time.Millisecond)
+	suite.cancel()
+	unittest.AssertClosesBefore(suite.T(), suite.eng.Done(), 10*time.Millisecond)
+
+	err := suite.eng.ProcessLocal(&flow.ExecutionReceipt{})
+	suite.Assert().ErrorIs(err, component.ErrComponentShutdown)
 }
