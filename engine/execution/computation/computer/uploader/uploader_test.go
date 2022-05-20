@@ -105,7 +105,7 @@ func Test_AsyncUploader(t *testing.T) {
 	// sequence of events:
 	// 1. create async uploader and initiate upload with an error - to force retrying
 	// 2. shut down async uploader right after upload initiated (not completed)
-	// 3. assert that upload called only once
+	// 3. assert that upload called only once even when trying to use retry mechanism
 	t.Run("stopping component stops retrying", func(t *testing.T) {
 		testutils.SkipUnless(t, testutils.TEST_FLAKY, "flaky")
 
@@ -126,19 +126,24 @@ func Test_AsyncUploader(t *testing.T) {
 
 		uploader := &DummyUploader{
 			f: func() error {
-				t.Log("DummyUploader func() start - incrementing callCount grID:", string(bytes.Fields(debug.Stack())[1]))
-				callCount++
-
 				t.Log("DummyUploader func() - about to call wgUploadStarted.Done() grID:", string(bytes.Fields(debug.Stack())[1]))
 				// signal to main goroutine that upload started, so it can initiate shutting down component
 				wgUploadStarted.Done()
-				//func() {
-				//	callCount++
-				//}()
+
 				t.Log("DummyUpload func() waiting for component shutdown to start grID:", string(bytes.Fields(debug.Stack())[1]))
 				wgShutdownStarted.Wait()
 				t.Log("DummyUploader func() component shutdown started, about to return error grID:", string(bytes.Fields(debug.Stack())[1]))
-				return fmt.Errorf("this should return only once")
+
+				// force an upload error to test that upload is never retried (because component is shut down)
+				// normally, we would see retry mechanism kick in and the callCount would be > 1
+				// but since component has started shutting down, we expect callCount to be 1
+				if callCount < 5 {
+					t.Logf("DummyUploader func() incrementing callCount=%d grID: %s", callCount, string(bytes.Fields(debug.Stack())[1]))
+					callCount++
+					t.Logf("DummyUploader func() about to return error callCount=%d grID: %s", callCount, string(bytes.Fields(debug.Stack())[1]))
+					return fmt.Errorf("this should return only once")
+				}
+				return nil
 			},
 		}
 		t.Log("about to create NewAsyncUploader grID:", string(bytes.Fields(debug.Stack())[1]))
