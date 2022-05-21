@@ -86,15 +86,14 @@ func (ps *ProposalSuite) SetupTest() {
 
 	// set up the mocked verifier
 	ps.verifier = &mocks.Verifier{}
-	ps.verifier.On("VerifyQC", ps.voters, ps.block.QC.SigData, ps.parent.View, ps.parent.BlockID).Return(nil)
-	ps.verifier.On("VerifyVote", ps.voter, ps.vote.SigData, ps.block.View, ps.block.BlockID).Return(nil)
+	ps.verifier.On("VerifyQC", ps.voters, ps.block.QC.SigData, ps.parent.View, ps.parent.BlockID).Return(nil).Maybe()
+	ps.verifier.On("VerifyVote", ps.voter, ps.vote.SigData, ps.block.View, ps.block.BlockID).Return(nil).Maybe()
 
 	// set up the validator with the mocked dependencies
 	ps.validator = New(ps.committee, ps.forks, ps.verifier)
 }
 
 func (ps *ProposalSuite) TestProposalOK() {
-
 	err := ps.validator.ValidateProposal(ps.proposal)
 	assert.NoError(ps.T(), err, "a valid proposal should be accepted")
 }
@@ -410,6 +409,24 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 		require.True(ps.T(), model.IsInvalidBlockError(err) && model.IsInvalidTCError(err))
 		ps.verifier.AssertCalled(ps.T(), "VerifyTC", ps.voters, []byte(proposal.LastViewTC.SigData),
 			proposal.LastViewTC.View, proposal.LastViewTC.TOHighQCViews)
+	})
+	ps.Run("last-view-successful-but-includes-tc", func() {
+		proposal := helper.MakeProposal(
+			helper.WithBlock(helper.MakeBlock(
+				helper.WithBlockView(ps.finalized+1),
+				helper.WithBlockProposer(ps.leader.NodeID),
+				helper.WithParentSigners(ps.participants.NodeIDs()),
+				helper.WithParentBlock(ps.parent)),
+			),
+			helper.WithLastViewTC(helper.MakeTC()),
+		)
+		qc := proposal.Block.QC
+		ps.verifier.On("VerifyQC", ps.voters, qc.SigData,
+			qc.View, qc.BlockID).Return(nil).Once()
+		err := ps.validator.ValidateProposal(proposal)
+		require.True(ps.T(), model.IsInvalidBlockError(err))
+		ps.verifier.AssertNotCalled(ps.T(), "VerifyTC")
+		ps.verifier.AssertExpectations(ps.T())
 	})
 }
 

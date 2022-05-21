@@ -217,6 +217,9 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 		if err != nil {
 			return newInvalidBlockError(block, fmt.Errorf("proposals TC's is not valid: %w", err))
 		}
+	} else if proposal.LastViewTC != nil {
+		// last view ended with QC, including TC is a protocol violation
+		return newInvalidBlockError(block, fmt.Errorf("last view has ended with QC but proposal includes LastViewTC"))
 	}
 
 	return nil
