@@ -110,7 +110,7 @@ func TestMapToG1(t *testing.T) {
 // Hashing to G1 bench
 func BenchmarkHashToG1(b *testing.B) {
 	blsInstance.reInit()
-	input := make([]byte, minHashSizeBLSBLS12381)
+	input := make([]byte, expandMsgOutput)
 	for i := 0; i < len(input); i++ {
 		input[i] = byte(i)
 	}

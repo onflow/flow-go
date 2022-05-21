@@ -1,3 +1,4 @@
+//go:build relic
 // +build relic
 
 package crypto
@@ -213,10 +214,10 @@ func benchG1Test() {
 // It hashes `data` to a G1 point using the tag `dst` and returns the G1 point serialization.
 // The function uses xmd with SHA256 in the hash-to-field.
 func hashToG1Bytes(data, dst []byte) []byte {
-	hash := make([]byte, opSwUInputLenBLSBLS12381)
+	hash := make([]byte, expandMsgOutput)
 	// XMD using SHA256
 	C.xmd_sha256((*C.uchar)(&hash[0]),
-		(C.int)(opSwUInputLenBLSBLS12381),
+		(C.int)(expandMsgOutput),
 		(*C.uchar)(&data[0]), (C.int)(len(data)),
 		(*C.uchar)(&dst[0]), (C.int)(len(dst)))
 
