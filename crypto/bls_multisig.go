@@ -292,10 +292,10 @@ func VerifyBLSSignatureManyMessages(pks []PublicKey, s Signature,
 		if k == nil {
 			return false, invalidInputsErrorf("hasher at index %d is nil", i)
 		}
-		if k.Size() < minHashSizeBLSBLS12381 {
+		if k.Size() != expandMsgOutput {
 			return false, invalidInputsErrorf(
-				"Hasher with at least %d output byte size is required, current size is %d",
-				minHashSizeBLSBLS12381,
+				"Hasher with %d output byte size is required, current size is %d",
+				expandMsgOutput,
 				k.Size())
 		}
 		hashes = append(hashes, k.ComputeHash(messages[i]))
@@ -425,10 +425,10 @@ func BatchVerifyBLSSignaturesOneMessage(pks []PublicKey, sigs []Signature,
 		return verifBool, invalidInputsErrorf("verification requires a Hasher")
 	}
 
-	if kmac.Size() < opSwUInputLenBLSBLS12381 {
+	if kmac.Size() < expandMsgOutput {
 		return verifBool, invalidInputsErrorf(
 			"hasher with at least %d output byte size is required, current size is %d",
-			opSwUInputLenBLSBLS12381,
+			expandMsgOutput,
 			kmac.Size())
 	}
 

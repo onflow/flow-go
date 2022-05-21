@@ -80,7 +80,7 @@ func internalBLSKMAC(key string) hash.Hasher {
 	const blsKMACFunction = "H2C"
 	// the error is ignored as the parameter lengths are chosen to be in the correct range for kmac
 	// (tested by TestBLSBLS12381Hasher)
-	kmac, _ := hash.NewKMAC_128([]byte(key), []byte(blsKMACFunction), minHashSizeBLSBLS12381)
+	kmac, _ := hash.NewKMAC_128([]byte(key), []byte(blsKMACFunction), expandMsgOutput)
 	return kmac
 }
 
@@ -98,10 +98,10 @@ func (sk *PrKeyBLSBLS12381) Sign(data []byte, kmac hash.Hasher) (Signature, erro
 		return nil, invalidInputsErrorf("hasher is empty")
 	}
 	// check hasher output size
-	if kmac.Size() < minHashSizeBLSBLS12381 {
+	if kmac.Size() != expandMsgOutput {
 		return nil, invalidInputsErrorf(
-			"hasher with at least %d output byte size is required, got hasher with size %d",
-			minHashSizeBLSBLS12381,
+			"hasher with %d output byte size is required, got hasher with size %d",
+			expandMsgOutput,
 			kmac.Size())
 	}
 	// hash the input to 128 bytes
@@ -138,10 +138,10 @@ func (pk *PubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) 
 		return false, invalidInputsErrorf("hasher is empty")
 	}
 	// check hasher output size
-	if kmac.Size() < minHashSizeBLSBLS12381 {
+	if kmac.Size() != expandMsgOutput {
 		return false, invalidInputsErrorf(
 			"hasher with at least %d output byte size is required, got hasher with size %d",
-			minHashSizeBLSBLS12381,
+			expandMsgOutput,
 			kmac.Size())
 	}
 
@@ -449,10 +449,10 @@ func hashToG1(data []byte) *pointG1 {
 func (sk *PrKeyBLSBLS12381) signWithXMDSHA256(data []byte) Signature {
 
 	dst := []byte("BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_NUL_")
-	hash := make([]byte, opSwUInputLenBLSBLS12381)
+	hash := make([]byte, expandMsgOutput)
 	// XMD using SHA256
 	C.xmd_sha256((*C.uchar)(&hash[0]),
-		(C.int)(opSwUInputLenBLSBLS12381),
+		(C.int)(expandMsgOutput),
 		(*C.uchar)(&data[0]), (C.int)(len(data)),
 		(*C.uchar)(&dst[0]), (C.int)(len(dst)))
 
