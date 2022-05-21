@@ -9,17 +9,17 @@ package crypto
 // This implementation does not include any security against side-channel attacks.
 
 // existing features:
-//  - the implementation is optimized for shorter signatures (on G1)
-//  - public keys are longer (on G2)
+//  - the implementation variant is minimal-signature-size signatures:
+//    shorter signatures in G1, longer public keys in G2
 //  - serialization of points on G1 and G2 is compressed ([zcash]
 //     https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-)
-//  - hash to curve is using the optimized SWU map-to-curve
-//    (https://eprint.iacr.org/2019/403.pdf section 4)
-//  - expanding the message in hash-to-curve is using a cSHAKE-based KMAC128 with a domain separation tag.
-//    KMAC128 serves as the expand_message_xof function as per draft-irtf-cfrg-hash-to-curve.
-//  - the above results in the full ciphersuite BLS_SIG_BLS12381G1_XOF:KMAC128_SSWU_RO_POP_ for signatures
+//  - hashing to curve uses the Simplified SWU map-to-curve
+//    (https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-14#section-6.6.3)
+//  - expanding the message in hash-to-curve uses a cSHAKE-based KMAC128 with a domain separation tag.
+//    KMAC128 serves as an expand_message_xof function.
+//  - this results in the full ciphersuite BLS_SIG_BLS12381G1_XOF:KMAC128_SSWU_RO_POP_ for signatures
 //    and BLS_POP_BLS12381G1_XOF:KMAC128_SSWU_RO_POP_ for proofs of possession.
-//  - signature verification checks the membership of signature in G1
+//  - signature verification checks the membership of signature in G1.
 //  - the public key membership check in G2 is implemented separately from the signature verification.
 //  - membership check in G1 is implemented using fast Bowe's check (to be updated to Scott's check).
 //  - membership check in G2 is using a simple scalar multiplication with the group order (to be updated to Scott's check).
