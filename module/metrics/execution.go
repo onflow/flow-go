@@ -40,10 +40,16 @@ type ExecutionCollector struct {
 	readDurationPerValue             prometheus.Histogram
 	blockComputationUsed             prometheus.Histogram
 	blockExecutionTime               prometheus.Histogram
+	blockMemoryUsage                 prometheus.Histogram
+	blockMemoryEstimate              prometheus.Histogram
+	blockMemoryDifference            prometheus.Histogram
 	blockTransactionCounts           prometheus.Histogram
 	blockCollectionCounts            prometheus.Histogram
 	collectionComputationUsed        prometheus.Histogram
 	collectionExecutionTime          prometheus.Histogram
+	collectionMemoryUsage            prometheus.Histogram
+	collectionMemoryEstimate         prometheus.Histogram
+	collectionMemoryDifference       prometheus.Histogram
 	collectionTransactionCounts      prometheus.Histogram
 	collectionRequestSent            prometheus.Counter
 	collectionRequestRetried         prometheus.Counter
@@ -51,10 +57,16 @@ type ExecutionCollector struct {
 	transactionCheckTime             prometheus.Histogram
 	transactionInterpretTime         prometheus.Histogram
 	transactionExecutionTime         prometheus.Histogram
+	transactionMemoryUsage           prometheus.Histogram
+	transactionMemoryEstimate        prometheus.Histogram
+	transactionMemoryDifference      prometheus.Histogram
 	transactionComputationUsed       prometheus.Histogram
 	transactionEmittedEvents         prometheus.Histogram
 	scriptExecutionTime              prometheus.Histogram
 	scriptComputationUsed            prometheus.Histogram
+	scriptMemoryUsage                prometheus.Histogram
+	scriptMemoryEstimate             prometheus.Histogram
+	scriptMemoryDifference           prometheus.Histogram
 	numberOfAccounts                 prometheus.Gauge
 	totalChunkDataPackRequests       prometheus.Counter
 	stateSyncActive                  prometheus.Gauge
@@ -204,6 +216,30 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Buckets:   []float64{1000, 10000, 100000, 500000, 1000000, 5000000, 10000000},
 	})
 
+	blockMemoryUsage := promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "block_memory_usage",
+		Help:      "the total amount of memory allocated by a block",
+		Buckets:   []float64{10_000_000, 50_000_000, 100_000_000, 500_000_000, 1_000_000_000},
+	})
+
+	blockMemoryEstimate := promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "block_memory_estimate",
+		Help:      "the estimated memory used by a block",
+		Buckets:   []float64{10_000_000, 50_000_000, 100_000_000, 500_000_000, 1_000_000_000},
+	})
+
+	blockMemoryDifference := promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "block_memory_difference",
+		Help:      "the difference in actual memory usage and estimate for a block",
+		Buckets:   []float64{-1, 0, 10_000_000, 100_000_000, 1_000_000_000},
+	})
+
 	blockTransactionCounts := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
@@ -232,6 +268,30 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Name:      "collection_computation_used",
 		Help:      "the total amount of computation used by a collection",
 		Buckets:   []float64{1000, 10000, 50000, 100000, 500000, 1000000},
+	})
+
+	collectionMemoryUsage := promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "collection_memory_usage",
+		Help:      "the total amount of memory allocated by a collection",
+		Buckets:   []float64{10_000_000, 50_000_000, 100_000_000, 500_000_000, 1_000_000_000},
+	})
+
+	collectionMemoryEstimate := promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "collection_memory_estimate",
+		Help:      "the estimated memory used by a collection",
+		Buckets:   []float64{10_000_000, 50_000_000, 100_000_000, 500_000_000, 1_000_000_000},
+	})
+
+	collectionMemoryDifference := promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "collection_memory_difference",
+		Help:      "the difference in actual memory usage and estimate for a collection",
+		Buckets:   []float64{-1, 0, 10_000_000, 100_000_000, 1_000_000_000},
 	})
 
 	collectionTransactionCounts := promauto.NewHistogram(prometheus.HistogramOpts{
@@ -292,6 +352,30 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Buckets:   []float64{50, 100, 500, 1000, 5000, 10000},
 	})
 
+	transactionMemoryUsage := promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "transaction_memory_usage",
+		Help:      "the total amount of memory allocated by a transaction",
+		Buckets:   []float64{10_000_000, 50_000_000, 100_000_000, 500_000_000, 1_000_000_000},
+	})
+
+	transactionMemoryEstimate := promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "transaction_memory_estimate",
+		Help:      "the estimated memory used by a transaction",
+		Buckets:   []float64{10_000_000, 50_000_000, 100_000_000, 500_000_000, 1_000_000_000},
+	})
+
+	transactionMemoryDifference := promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "transaction_memory_difference",
+		Help:      "the difference in actual memory usage and estimate for a transaction",
+		Buckets:   []float64{-1, 0, 10_000_000, 100_000_000, 1_000_000_000},
+	})
+
 	transactionEmittedEvents := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
@@ -313,6 +397,30 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Name:      "script_computation_used",
 		Help:      "the total amount of computation used by an script",
 		Buckets:   []float64{50, 100, 500, 1000, 5000, 10000},
+	})
+
+	scriptMemoryUsage := promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "script_memory_usage",
+		Help:      "the total amount of memory allocated by a script",
+		Buckets:   []float64{10_000_000, 50_000_000, 100_000_000, 500_000_000, 1_000_000_000},
+	})
+
+	scriptMemoryEstimate := promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "script_memory_estimate",
+		Help:      "the estimated memory used by a script",
+		Buckets:   []float64{10_000_000, 50_000_000, 100_000_000, 500_000_000, 1_000_000_000},
+	})
+
+	scriptMemoryDifference := promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "script_memory_difference",
+		Help:      "the difference in actual memory usage and estimate for a script",
+		Buckets:   []float64{-1, 0, 10_000_000, 100_000_000, 1_000_000_000},
 	})
 
 	totalChunkDataPackRequests := promauto.NewCounter(prometheus.CounterOpts{
@@ -359,10 +467,16 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		readDurationPerValue:        readDurationPerValue,
 		blockExecutionTime:          blockExecutionTime,
 		blockComputationUsed:        blockComputationUsed,
+		blockMemoryUsage:            blockMemoryUsage,
+		blockMemoryEstimate:         blockMemoryEstimate,
+		blockMemoryDifference:       blockMemoryDifference,
 		blockTransactionCounts:      blockTransactionCounts,
 		blockCollectionCounts:       blockCollectionCounts,
 		collectionExecutionTime:     collectionExecutionTime,
 		collectionComputationUsed:   collectionComputationUsed,
+		collectionMemoryUsage:       collectionMemoryUsage,
+		collectionMemoryEstimate:    collectionMemoryEstimate,
+		collectionMemoryDifference:  collectionMemoryDifference,
 		collectionTransactionCounts: collectionTransactionCounts,
 		collectionRequestSent:       collectionRequestsSent,
 		collectionRequestRetried:    collectionRequestsRetries,
@@ -371,9 +485,15 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		transactionInterpretTime:    transactionInterpretTime,
 		transactionExecutionTime:    transactionExecutionTime,
 		transactionComputationUsed:  transactionComputationUsed,
+		transactionMemoryUsage:      transactionMemoryUsage,
+		transactionMemoryEstimate:   transactionMemoryEstimate,
+		transactionMemoryDifference: transactionMemoryDifference,
 		transactionEmittedEvents:    transactionEmittedEvents,
 		scriptExecutionTime:         scriptExecutionTime,
 		scriptComputationUsed:       scriptComputationUsed,
+		scriptMemoryUsage:           scriptMemoryUsage,
+		scriptMemoryEstimate:        scriptMemoryEstimate,
+		scriptMemoryDifference:      scriptMemoryDifference,
 		totalChunkDataPackRequests:  totalChunkDataPackRequests,
 		blockDataUploadsInProgress:  blockDataUploadsInProgress,
 		blockDataUploadsDuration:    blockDataUploadsDuration,
