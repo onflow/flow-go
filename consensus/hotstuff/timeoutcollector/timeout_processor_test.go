@@ -2,6 +2,8 @@ package timeoutcollector
 
 import (
 	"errors"
+	"github.com/onflow/flow-go/consensus/hotstuff/verification"
+	"github.com/onflow/flow-go/module/local"
 	"math/rand"
 	"sync"
 	"testing"
@@ -318,4 +320,34 @@ func (s *TimeoutProcessorTestSuite) TestProcess_ConcurrentCreatingTC() {
 	shutdownWg.Wait()
 
 	s.onTCCreatedState.AssertNumberOfCalls(s.T(), "onTCCreated", 1)
+}
+
+// TestTimeoutProcessor_BuildVerifyTC tests a complete path from creating timeouts to collecting timeouts and then
+// building & verifying TC.
+// We start with
+func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
+	// signers hold objects that are created with private key and can sign votes and proposals
+	signers := make(map[flow.Identifier]*verification.StakingSigner)
+	// prepare staking signers, each signer has its own private/public key pair
+	stakingSigners := unittest.IdentityListFixture(11, func(identity *flow.Identity) {
+		stakingPriv := unittest.StakingPrivKeyFixture()
+		identity.StakingPubKey = stakingPriv.PublicKey()
+
+		me, err := local.New(identity, stakingPriv)
+		require.NoError(t, err)
+
+		signers[identity.NodeID] = verification.NewStakingSigner(me)
+	})
+
+	view := uint64(rand.Uint32() + 100)
+
+	committee := &mocks.Replicas{}
+	committee.On("IdentitiesByEpoch", view, mock.Anything).Return(stakingSigners, nil)
+	committee.On("WeightThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(stakingSigners.TotalWeight()), nil)
+
+	timeouts := make([]*model.TimeoutObject, 0, len(stakingSigners))
+
+	for _, signer := range stakingSigners {
+		signers[signer.NodeID]
+	}
 }
