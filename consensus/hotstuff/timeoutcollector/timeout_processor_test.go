@@ -2,20 +2,21 @@ package timeoutcollector
 
 import (
 	"errors"
-	"github.com/onflow/flow-go/consensus/hotstuff/committees"
-	"github.com/onflow/flow-go/consensus/hotstuff/helper"
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/utils/unittest"
-	"golang.org/x/exp/rand"
+	"math/rand"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
+	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestTimeoutProcessor(t *testing.T) {
@@ -211,13 +212,29 @@ func (s *TimeoutProcessorTestSuite) TestProcess_ValidTimeout() {
 // Each replica commits unique timeout object, this object gets processed by TimeoutProcessor. After collecting
 // enough weight we expect a TC to be created. All further operations should be no-op, only one TC should be created.
 func (s *TimeoutProcessorTestSuite) TestProcess_CreatingTC() {
-	// each signer will commit a different QC
+	// consider next situation:
+	// last successful view was N, after this we weren't able to get a proposal with QC for
+	// len(participants) views, but in each view QC was created(but not distributed).
+	// In view N+len(participants) each replica contributes with unique highest QC.
+	lastSuccessfulQC := helper.MakeQC(helper.WithQCView(s.view - uint64(len(s.participants))))
+	lastViewTC := helper.MakeTC(helper.WithTCView(s.view-1),
+		helper.WithTCHighestQC(lastSuccessfulQC))
+
 	var highQCViews []uint64
+	var timeouts []*model.TimeoutObject
 	signers := s.participants[1:]
-	for range signers {
-		highQCViews = append(highQCViews, s.view-1)
+	for i, signer := range signers {
+		qc := helper.MakeQC(helper.WithQCView(lastSuccessfulQC.View + uint64(i+1)))
+		highQCViews = append(highQCViews, qc.View)
+
+		timeout := helper.TimeoutObjectFixture(
+			helper.WithTimeoutObjectView(s.view),
+			helper.WithTimeoutHighestQC(qc),
+			helper.WithTimeoutObjectSignerID(signer.NodeID),
+			helper.WithTimeoutLastViewTC(lastViewTC),
+		)
+		timeouts = append(timeouts, timeout)
 	}
-	highestQC := helper.MakeQC(helper.WithQCView(highQCViews[0]))
 
 	// change tracker to require all except one signer to create TC
 	s.processor.tcTracker.minRequiredWeight = s.sigWeight * uint64(len(highQCViews))
@@ -225,8 +242,10 @@ func (s *TimeoutProcessorTestSuite) TestProcess_CreatingTC() {
 	expectedNodeIDs := signers.NodeIDs()
 	expectedSig := crypto.Signature(unittest.RandomBytes(128))
 	s.validator.On("ValidateQC", mock.Anything).Return(nil)
+	s.validator.On("ValidateTC", mock.Anything).Return(nil)
 	s.onPartialTCCreatedState.On("onPartialTCCreated", s.view).Return(nil).Once()
 	s.onTCCreatedState.On("onTCCreated", mock.Anything).Run(func(args mock.Arguments) {
+		highestQC := timeouts[len(timeouts)-1].HighestQC
 		tc := args.Get(0).(*flow.TimeoutCertificate)
 		// ensure that TC contains correct fields
 		expectedTC := &flow.TimeoutCertificate{
@@ -241,13 +260,7 @@ func (s *TimeoutProcessorTestSuite) TestProcess_CreatingTC() {
 
 	s.sigAggregator.On("Aggregate").Return(expectedNodeIDs, highQCViews, expectedSig, nil)
 
-	for _, signer := range expectedNodeIDs {
-		timeout := helper.TimeoutObjectFixture(
-			helper.WithTimeoutObjectView(s.view),
-			helper.WithTimeoutHighestQC(highestQC),
-			helper.WithTimeoutObjectSignerID(signer),
-			helper.WithTimeoutLastViewTC(nil),
-		)
+	for _, timeout := range timeouts {
 		err := s.processor.Process(timeout)
 		require.NoError(s.T(), err)
 	}
@@ -258,17 +271,51 @@ func (s *TimeoutProcessorTestSuite) TestProcess_CreatingTC() {
 	// should be no-op
 	timeout := helper.TimeoutObjectFixture(
 		helper.WithTimeoutObjectView(s.view),
-		helper.WithTimeoutHighestQC(highestQC),
+		helper.WithTimeoutHighestQC(helper.MakeQC(helper.WithQCView(lastSuccessfulQC.View))),
 		helper.WithTimeoutObjectSignerID(s.participants[0].NodeID),
 		helper.WithTimeoutLastViewTC(nil),
 	)
 	err := s.processor.Process(timeout)
 	require.NoError(s.T(), err)
 
-	s.onTCCreatedState.AssertNumberOfCalls(s.T(), "onTCCreated", 1)
+	s.onTCCreatedState.AssertExpectations(s.T())
 	s.validator.AssertExpectations(s.T())
 }
 
+// TestProcess_ConcurrentCreatingTC tests a scenario where multiple goroutines process timeout at same time,
+// we expect only one TC created in this scenario.
 func (s *TimeoutProcessorTestSuite) TestProcess_ConcurrentCreatingTC() {
+	s.validator.On("ValidateQC", mock.Anything).Return(nil)
+	s.onPartialTCCreatedState.On("onPartialTCCreated", mock.Anything).Return(nil).Once()
+	s.onTCCreatedState.On("onTCCreated", mock.Anything).Return(nil).Once()
+	s.sigAggregator.On("Aggregate").Return(s.participants.NodeIDs(), []uint64{}, crypto.Signature{}, nil)
 
+	var startupWg, shutdownWg sync.WaitGroup
+
+	highestQC := helper.MakeQC(helper.WithQCView(s.view - 1))
+
+	startupWg.Add(1)
+	// prepare goroutines, so they are ready to submit a timeout at roughly same time
+	for i, signer := range s.participants {
+		shutdownWg.Add(1)
+		timeout := helper.TimeoutObjectFixture(
+			helper.WithTimeoutObjectView(s.view),
+			helper.WithTimeoutHighestQC(highestQC),
+			helper.WithTimeoutObjectSignerID(signer.NodeID),
+			helper.WithTimeoutLastViewTC(nil),
+		)
+		go func(i int, timeout *model.TimeoutObject) {
+			defer shutdownWg.Done()
+			startupWg.Wait()
+			err := s.processor.Process(timeout)
+			require.NoError(s.T(), err)
+		}(i, timeout)
+	}
+
+	startupWg.Done()
+
+	// wait for all routines to finish
+	shutdownWg.Wait()
+
+	s.onTCCreatedState.AssertNumberOfCalls(s.T(), "onTCCreated", 1)
 }

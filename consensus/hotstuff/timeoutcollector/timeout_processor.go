@@ -164,7 +164,8 @@ func (p *TimeoutProcessor) validateTimeout(timeout *model.TimeoutObject) error {
 	}
 
 	if timeout.View < timeout.HighestQC.View {
-		return model.NewInvalidTimeoutErrorf(timeout, "TO's QC cannot be newer than the TO's view")
+		return model.NewInvalidTimeoutErrorf(timeout, "TO's QC %d cannot be newer than the TO's view %d",
+			timeout.HighestQC.View, timeout.View)
 	}
 
 	// (b) If a TC is included, the TC must be for the past round, no matter whether a QC
