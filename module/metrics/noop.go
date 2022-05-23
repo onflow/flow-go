@@ -96,27 +96,27 @@ func (nc *NoopCollector) OnVerifiableChunkReceivedAtVerifierEngine()            
 func (nc *NoopCollector) OnResultApprovalDispatchedInNetworkByVerifier()                         {}
 func (nc *NoopCollector) SetMaxChunkDataPackAttemptsForNextUnsealedHeightAtRequester(attempts uint64) {
 }
-func (nc *NoopCollector) OnFinalizedBlockArrivedAtAssigner(height uint64)                      {}
-func (nc *NoopCollector) OnChunksAssignmentDoneAtAssigner(chunks int)                          {}
-func (nc *NoopCollector) OnAssignedChunkProcessedAtAssigner()                                  {}
-func (nc *NoopCollector) OnAssignedChunkReceivedAtFetcher()                                    {}
-func (nc *NoopCollector) OnChunkDataPackRequestDispatchedInNetworkByRequester()                {}
-func (nc *NoopCollector) OnChunkDataPackRequestSentByFetcher()                                 {}
-func (nc *NoopCollector) OnChunkDataPackRequestReceivedByRequester()                           {}
-func (nc *NoopCollector) OnChunkDataPackArrivedAtFetcher()                                     {}
-func (nc *NoopCollector) OnChunkDataPackSentToFetcher()                                        {}
-func (nc *NoopCollector) OnVerifiableChunkSentToVerifier()                                     {}
-func (nc *NoopCollector) OnBlockConsumerJobDone(uint64)                                        {}
-func (nc *NoopCollector) OnChunkConsumerJobDone(uint64)                                        {}
-func (nc *NoopCollector) OnChunkDataPackResponseReceivedFromNetworkByRequester()               {}
-func (nc *NoopCollector) StartBlockReceivedToExecuted(blockID flow.Identifier)                 {}
-func (nc *NoopCollector) FinishBlockReceivedToExecuted(blockID flow.Identifier)                {}
-func (nc *NoopCollector) ExecutionComputationUsedPerBlock(computation uint64)                  {}
-func (nc *NoopCollector) ExecutionStateReadsPerBlock(reads uint64)                             {}
-func (nc *NoopCollector) ExecutionStorageStateCommitment(bytes int64)                          {}
-func (nc *NoopCollector) ExecutionLastExecutedBlockHeight(height uint64)                       {}
-func (nc *NoopCollector) ExecutionBlockExecuted(_ time.Duration, _, _, _ uint64, _ int, _ int) {}
-func (nc *NoopCollector) ExecutionCollectionExecuted(_ time.Duration, _, _, _ uint64, _ int)   {}
+func (nc *NoopCollector) OnFinalizedBlockArrivedAtAssigner(height uint64)                {}
+func (nc *NoopCollector) OnChunksAssignmentDoneAtAssigner(chunks int)                    {}
+func (nc *NoopCollector) OnAssignedChunkProcessedAtAssigner()                            {}
+func (nc *NoopCollector) OnAssignedChunkReceivedAtFetcher()                              {}
+func (nc *NoopCollector) OnChunkDataPackRequestDispatchedInNetworkByRequester()          {}
+func (nc *NoopCollector) OnChunkDataPackRequestSentByFetcher()                           {}
+func (nc *NoopCollector) OnChunkDataPackRequestReceivedByRequester()                     {}
+func (nc *NoopCollector) OnChunkDataPackArrivedAtFetcher()                               {}
+func (nc *NoopCollector) OnChunkDataPackSentToFetcher()                                  {}
+func (nc *NoopCollector) OnVerifiableChunkSentToVerifier()                               {}
+func (nc *NoopCollector) OnBlockConsumerJobDone(uint64)                                  {}
+func (nc *NoopCollector) OnChunkConsumerJobDone(uint64)                                  {}
+func (nc *NoopCollector) OnChunkDataPackResponseReceivedFromNetworkByRequester()         {}
+func (nc *NoopCollector) StartBlockReceivedToExecuted(blockID flow.Identifier)           {}
+func (nc *NoopCollector) FinishBlockReceivedToExecuted(blockID flow.Identifier)          {}
+func (nc *NoopCollector) ExecutionComputationUsedPerBlock(computation uint64)            {}
+func (nc *NoopCollector) ExecutionStateReadsPerBlock(reads uint64)                       {}
+func (nc *NoopCollector) ExecutionStorageStateCommitment(bytes int64)                    {}
+func (nc *NoopCollector) ExecutionLastExecutedBlockHeight(height uint64)                 {}
+func (nc *NoopCollector) ExecutionBlockExecuted(_ time.Duration, _ uint64, _ int, _ int) {}
+func (nc *NoopCollector) ExecutionCollectionExecuted(_ time.Duration, _ uint64, _ int)   {}
 func (nc *NoopCollector) ExecutionTransactionExecuted(_ time.Duration, _, _, _ uint64, _ int, _ bool) {
 }
 func (nc *NoopCollector) ExecutionScriptExecuted(dur time.Duration, compUsed, _, _ uint64) {}
