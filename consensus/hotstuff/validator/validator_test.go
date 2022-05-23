@@ -37,7 +37,6 @@ type ProposalSuite struct {
 	vote         *model.Vote
 	voter        *flow.Identity
 	committee    *mocks.Replicas
-	forks        *mocks.Forks
 	verifier     *mocks.Verifier
 	validator    *Validator
 }
@@ -78,19 +77,13 @@ func (ps *ProposalSuite) SetupTest() {
 		ps.committee.On("IdentityByEpoch", mock.Anything, participant.NodeID).Return(participant, nil)
 	}
 
-	// the finalized view is the one of the parent of the
-	ps.forks = &mocks.Forks{}
-	ps.forks.On("FinalizedView").Return(ps.finalized)
-	ps.forks.On("GetBlock", ps.parent.BlockID).Return(ps.parent, true)
-	ps.forks.On("GetBlock", ps.block.BlockID).Return(ps.block, true)
-
 	// set up the mocked verifier
 	ps.verifier = &mocks.Verifier{}
 	ps.verifier.On("VerifyQC", ps.voters, ps.block.QC.SigData, ps.parent.View, ps.parent.BlockID).Return(nil).Maybe()
 	ps.verifier.On("VerifyVote", ps.voter, ps.vote.SigData, ps.block.View, ps.block.BlockID).Return(nil).Maybe()
 
 	// set up the validator with the mocked dependencies
-	ps.validator = New(ps.committee, ps.forks, ps.verifier)
+	ps.validator = New(ps.committee, ps.verifier)
 }
 
 func (ps *ProposalSuite) TestProposalOK() {
@@ -436,7 +429,6 @@ type VoteSuite struct {
 	signer    *flow.Identity
 	block     *model.Block
 	vote      *model.Vote
-	forks     *mocks.Forks
 	verifier  *mocks.Verifier
 	committee *mocks.Replicas
 	validator *Validator
@@ -458,10 +450,6 @@ func (vs *VoteSuite) SetupTest() {
 		SigData:  []byte{},
 	}
 
-	// set up the mocked forks
-	vs.forks = &mocks.Forks{}
-	vs.forks.On("GetBlock", vs.block.BlockID).Return(vs.block, true)
-
 	// set up the mocked verifier
 	vs.verifier = &mocks.Verifier{}
 	vs.verifier.On("VerifyVote", vs.signer, vs.vote.SigData, vs.block.View, vs.block.BlockID).Return(nil)
@@ -471,7 +459,7 @@ func (vs *VoteSuite) SetupTest() {
 	vs.committee.On("IdentityByEpoch", mock.Anything, vs.signer.NodeID).Return(vs.signer, nil)
 
 	// set up the validator with the mocked dependencies
-	vs.validator = New(vs.committee, vs.forks, vs.verifier)
+	vs.validator = New(vs.committee, vs.verifier)
 }
 
 // TestVoteOK checks the happy case, which is the default for the suite
@@ -569,7 +557,7 @@ func (qs *QCSuite) SetupTest() {
 	qs.verifier.On("VerifyQC", qs.signers, qs.qc.SigData, qs.qc.View, qs.qc.BlockID).Return(nil)
 
 	// set up the validator with the mocked dependencies
-	qs.validator = New(qs.committee, nil, qs.verifier)
+	qs.validator = New(qs.committee, qs.verifier)
 }
 
 func (qs *QCSuite) TestQCOK() {
@@ -713,7 +701,7 @@ func (s *TCSuite) SetupTest() {
 	s.verifier.On("VerifyQC", s.signers, s.block.QC.SigData, parent.View, parent.BlockID).Return(nil)
 
 	// set up the validator with the mocked dependencies
-	s.validator = New(s.committee, nil, s.verifier)
+	s.validator = New(s.committee, s.verifier)
 }
 
 // TestTCOk tests if happy-path returns correct result

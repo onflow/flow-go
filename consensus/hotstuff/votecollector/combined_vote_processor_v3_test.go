@@ -1006,9 +1006,8 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 
 		// create verifier that will do crypto checks of created QC
 		verifier := verification.NewCombinedVerifierV3(committee, packer)
-		forks := &mockhotstuff.Forks{}
 		// create validator which will do compliance and crypto checked of created QC
-		validator := hotstuffvalidator.New(committee, forks, verifier)
+		validator := hotstuffvalidator.New(committee, verifier)
 		// check if QC is valid against parent
 		err := validator.ValidateQC(qc)
 		require.NoError(t, err)

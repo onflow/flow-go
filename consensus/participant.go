@@ -54,15 +54,16 @@ func NewParticipant(
 		option(&cfg)
 	}
 
-	// get the last stored safety data
-	safetyData, err := modules.Persist.GetSafetyData()
+	// get the last view we started
+	started, err := modules.Persist.GetStarted()
 	if err != nil {
-		return nil, fmt.Errorf("could not recover safety data: %w", err)
+		return nil, fmt.Errorf("could not recover last started: %w", err)
 	}
 
-	livenessData, err := modules.Persist.GetLivenessData()
+	// get the last view we voted
+	voted, err := modules.Persist.GetVoted()
 	if err != nil {
-		return nil, fmt.Errorf("could not recover liveness data: %w", err)
+		return nil, fmt.Errorf("could not recover last voted: %w", err)
 	}
 
 	// prune vote aggregator to initial view
@@ -89,7 +90,7 @@ func NewParticipant(
 
 	// initialize the pacemaker
 	controller := timeout.NewController(timeoutConfig)
-	pacemaker, err := pacemaker.New(livenessData.CurrentView, controller, modules.Notifier)
+	pacemaker, err := pacemaker.New(started+1, controller, modules.Notifier)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize flow pacemaker: %w", err)
 	}
@@ -101,7 +102,7 @@ func NewParticipant(
 	}
 
 	// initialize the voter
-	voter := safetyrules.New(modules.Signer, modules.Persist, modules.Committee, safetyData)
+	voter := safetyrules.New(modules.Signer, modules.Forks, modules.Persist, modules.Committee, voted)
 
 	// initialize the event handler
 	eventHandler, err := eventhandler.NewEventHandler(
@@ -151,12 +152,12 @@ func NewForks(final *flow.Header, headers storage.Headers, updater module.Finali
 }
 
 // NewValidator creates new instance of hotstuff validator needed for votes & proposal validation
-func NewValidator(metrics module.HotstuffMetrics, committee hotstuff.DynamicCommittee, forks hotstuff.ForksReader) hotstuff.Validator {
+func NewValidator(metrics module.HotstuffMetrics, committee hotstuff.DynamicCommittee) hotstuff.Validator {
 	packer := signature.NewConsensusSigDataPacker(committee)
 	verifier := verification.NewCombinedVerifier(committee, packer)
 
 	// initialize the Validator
-	validator := validatorImpl.New(committee, forks, verifier)
+	validator := validatorImpl.New(committee, verifier)
 	return validatorImpl.NewMetricsWrapper(validator, metrics) // wrapper for measuring time spent in Validator component
 }
 

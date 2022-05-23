@@ -453,7 +453,7 @@ func createNode(
 	forks, err := consensus.NewForks(rootHeader, headersDB, final, notifier, rootHeader, rootQC)
 	require.NoError(t, err)
 
-	validator := consensus.NewValidator(metrics, committee, forks)
+	validator := consensus.NewValidator(metrics, committee)
 	require.NoError(t, err)
 
 	keys := &storagemock.SafeBeaconKeys{}
@@ -479,15 +479,15 @@ func createNode(
 
 	persist := persister.New(db, rootHeader.ChainID)
 
-	livenessData, err := persist.GetLivenessData()
+	started, err := persist.GetStarted()
 	require.NoError(t, err)
 
 	voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(committee, qcDistributor.OnQcConstructedFromVotes)
 
 	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, notifier, voteProcessorFactory.Create)
-	voteCollectors := voteaggregator.NewVoteCollectors(log, livenessData.CurrentView, workerpool.New(2), createCollectorFactoryMethod)
+	voteCollectors := voteaggregator.NewVoteCollectors(log, started, workerpool.New(2), createCollectorFactoryMethod)
 
-	aggregator, err := voteaggregator.NewVoteAggregator(log, notifier, livenessData.CurrentView, voteCollectors)
+	aggregator, err := voteaggregator.NewVoteAggregator(log, notifier, started, voteCollectors)
 	require.NoError(t, err)
 
 	hotstuffModules := &consensus.HotstuffModules{

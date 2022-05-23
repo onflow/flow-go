@@ -570,7 +570,7 @@ func main() {
 			}
 
 			qcDistributor := pubsub.NewQCCreatedDistributor()
-			validator := consensus.NewValidator(mainMetrics, committee, forks)
+			validator := consensus.NewValidator(mainMetrics, committee)
 			voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(committee, qcDistributor.OnQcConstructedFromVotes)
 			lowestViewForVoteProcessing := finalizedBlock.View + 1
 			aggregator, err := consensus.NewVoteAggregator(node.Logger,

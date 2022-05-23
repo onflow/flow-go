@@ -21,7 +21,7 @@ import (
 )
 
 func TestExecutionChunkDataPacks(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "active-pacemaker")
+	t.Skip("active-pacemaker, to be fixed")
 	suite.Run(t, new(ChunkDataPacksSuite))
 }
 
