@@ -182,15 +182,6 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 		return newInvalidBlockError(block, fmt.Errorf("proposer %s is not leader (%s) for view %d", block.ProposerID, leader, block.View))
 	}
 
-	// validate QC - keep the most expensive the last to check
-	err = v.ValidateQC(qc)
-	if err != nil {
-		if model.IsInvalidQCError(err) {
-			return newInvalidBlockError(block, fmt.Errorf("invalid qc included: %w", err))
-		}
-		return fmt.Errorf("unexpected error verifying qc: %w", err)
-	}
-
 	// The Block must contain a proof that the primary legitimately entered the respective view.
 	// Transitioning to proposal.Block.View is possible either by observing a QC or a TC for the
 	// previous round. If and only if the QC is _not_ for the previous round we require a TC for
@@ -211,15 +202,28 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 		if proposal.Block.QC.View < proposal.LastViewTC.TOHighestQC.View {
 			return newInvalidBlockError(block, fmt.Errorf("proposal's QC is lower than locked QC"))
 		}
+	} else if proposal.LastViewTC != nil {
+		// last view ended with QC, including TC is a protocol violation
+		return newInvalidBlockError(block, fmt.Errorf("last view has ended with QC but proposal includes LastViewTC"))
+	}
 
+	// Check signatures, keep the most expensive the last to check
+
+	// check if included QC is valid
+	err = v.ValidateQC(qc)
+	if err != nil {
+		if model.IsInvalidQCError(err) {
+			return newInvalidBlockError(block, fmt.Errorf("invalid qc included: %w", err))
+		}
+		return fmt.Errorf("unexpected error verifying qc: %w", err)
+	}
+
+	if !lastViewSuccessful {
 		// check if included TC is valid
 		err = v.ValidateTC(proposal.LastViewTC)
 		if err != nil {
 			return newInvalidBlockError(block, fmt.Errorf("proposals TC's is not valid: %w", err))
 		}
-	} else if proposal.LastViewTC != nil {
-		// last view ended with QC, including TC is a protocol violation
-		return newInvalidBlockError(block, fmt.Errorf("last view has ended with QC but proposal includes LastViewTC"))
 	}
 
 	return nil

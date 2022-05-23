@@ -420,9 +420,6 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 			),
 			helper.WithLastViewTC(helper.MakeTC()),
 		)
-		qc := proposal.Block.QC
-		ps.verifier.On("VerifyQC", ps.voters, qc.SigData,
-			qc.View, qc.BlockID).Return(nil).Once()
 		err := ps.validator.ValidateProposal(proposal)
 		require.True(ps.T(), model.IsInvalidBlockError(err))
 		ps.verifier.AssertNotCalled(ps.T(), "VerifyTC")
