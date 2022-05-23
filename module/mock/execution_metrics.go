@@ -59,9 +59,9 @@ func (_m *ExecutionMetrics) ExecutionLastExecutedBlockHeight(height uint64) {
 	_m.Called(height)
 }
 
-// ExecutionScriptExecuted provides a mock function with given fields: dur, compUsed
-func (_m *ExecutionMetrics) ExecutionScriptExecuted(dur time.Duration, compUsed uint64) {
-	_m.Called(dur, compUsed)
+// ExecutionScriptExecuted provides a mock function with given fields: dur, compUsed, memoryUsed, memoryEstimate
+func (_m *ExecutionMetrics) ExecutionScriptExecuted(dur time.Duration, compUsed uint64, memoryUsed uint64, memoryEstimate uint64) {
+	_m.Called(dur, compUsed, memoryUsed, memoryEstimate)
 }
 
 // ExecutionStateReadsPerBlock provides a mock function with given fields: reads
@@ -79,9 +79,9 @@ func (_m *ExecutionMetrics) ExecutionSync(syncing bool) {
 	_m.Called(syncing)
 }
 
-// ExecutionTransactionExecuted provides a mock function with given fields: dur, compUsed, eventCounts, failed
-func (_m *ExecutionMetrics) ExecutionTransactionExecuted(dur time.Duration, compUsed uint64, eventCounts int, failed bool) {
-	_m.Called(dur, compUsed, eventCounts, failed)
+// ExecutionTransactionExecuted provides a mock function with given fields: dur, compUsed, memoryUsed, memoryEstimate, eventCounts, failed
+func (_m *ExecutionMetrics) ExecutionTransactionExecuted(dur time.Duration, compUsed uint64, memoryUsed uint64, memoryEstimate uint64, eventCounts int, failed bool) {
+	_m.Called(dur, compUsed, memoryUsed, memoryEstimate, eventCounts, failed)
 }
 
 // FinishBlockReceivedToExecuted provides a mock function with given fields: blockID

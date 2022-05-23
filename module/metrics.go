@@ -380,11 +380,11 @@ type ExecutionMetrics interface {
 	// ExecutionCollectionExecuted reports the total time and computation spent on executing a collection
 	ExecutionCollectionExecuted(dur time.Duration, compUsed uint64, txCounts int)
 
-	// ExecutionTransactionExecuted reports the total time and computation spent on executing a single transaction
-	ExecutionTransactionExecuted(dur time.Duration, compUsed uint64, eventCounts int, failed bool)
+	// ExecutionTransactionExecuted reports the total time, computation and memory spent on executing a single transaction
+	ExecutionTransactionExecuted(dur time.Duration, compUsed, memoryUsed, memoryEstimate uint64, eventCounts int, failed bool)
 
-	// ExecutionScriptExecuted reports the time spent on executing an script
-	ExecutionScriptExecuted(dur time.Duration, compUsed uint64)
+	// ExecutionScriptExecuted reports the time and memory spent on executing an script
+	ExecutionScriptExecuted(dur time.Duration, compUsed, memoryUsed, memoryEstimate uint64)
 
 	// ExecutionCollectionRequestSent reports when a request for a collection is sent to a collection node
 	ExecutionCollectionRequestSent()

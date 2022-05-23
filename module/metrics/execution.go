@@ -40,16 +40,10 @@ type ExecutionCollector struct {
 	readDurationPerValue             prometheus.Histogram
 	blockComputationUsed             prometheus.Histogram
 	blockExecutionTime               prometheus.Histogram
-	blockMemoryUsage                 prometheus.Histogram
-	blockMemoryEstimate              prometheus.Histogram
-	blockMemoryDifference            prometheus.Histogram
 	blockTransactionCounts           prometheus.Histogram
 	blockCollectionCounts            prometheus.Histogram
 	collectionComputationUsed        prometheus.Histogram
 	collectionExecutionTime          prometheus.Histogram
-	collectionMemoryUsage            prometheus.Histogram
-	collectionMemoryEstimate         prometheus.Histogram
-	collectionMemoryDifference       prometheus.Histogram
 	collectionTransactionCounts      prometheus.Histogram
 	collectionRequestSent            prometheus.Counter
 	collectionRequestRetried         prometheus.Counter
@@ -216,30 +210,6 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Buckets:   []float64{1000, 10000, 100000, 500000, 1000000, 5000000, 10000000},
 	})
 
-	blockMemoryUsage := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
-		Name:      "block_memory_usage",
-		Help:      "the total amount of memory allocated by a block",
-		Buckets:   []float64{10_000_000, 50_000_000, 100_000_000, 500_000_000, 1_000_000_000},
-	})
-
-	blockMemoryEstimate := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
-		Name:      "block_memory_estimate",
-		Help:      "the estimated memory used by a block",
-		Buckets:   []float64{10_000_000, 50_000_000, 100_000_000, 500_000_000, 1_000_000_000},
-	})
-
-	blockMemoryDifference := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
-		Name:      "block_memory_difference",
-		Help:      "the difference in actual memory usage and estimate for a block",
-		Buckets:   []float64{-1, 0, 10_000_000, 100_000_000, 1_000_000_000},
-	})
-
 	blockTransactionCounts := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
@@ -268,30 +238,6 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Name:      "collection_computation_used",
 		Help:      "the total amount of computation used by a collection",
 		Buckets:   []float64{1000, 10000, 50000, 100000, 500000, 1000000},
-	})
-
-	collectionMemoryUsage := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
-		Name:      "collection_memory_usage",
-		Help:      "the total amount of memory allocated by a collection",
-		Buckets:   []float64{10_000_000, 50_000_000, 100_000_000, 500_000_000, 1_000_000_000},
-	})
-
-	collectionMemoryEstimate := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
-		Name:      "collection_memory_estimate",
-		Help:      "the estimated memory used by a collection",
-		Buckets:   []float64{10_000_000, 50_000_000, 100_000_000, 500_000_000, 1_000_000_000},
-	})
-
-	collectionMemoryDifference := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
-		Name:      "collection_memory_difference",
-		Help:      "the difference in actual memory usage and estimate for a collection",
-		Buckets:   []float64{-1, 0, 10_000_000, 100_000_000, 1_000_000_000},
 	})
 
 	collectionTransactionCounts := promauto.NewHistogram(prometheus.HistogramOpts{
@@ -467,16 +413,10 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		readDurationPerValue:        readDurationPerValue,
 		blockExecutionTime:          blockExecutionTime,
 		blockComputationUsed:        blockComputationUsed,
-		blockMemoryUsage:            blockMemoryUsage,
-		blockMemoryEstimate:         blockMemoryEstimate,
-		blockMemoryDifference:       blockMemoryDifference,
 		blockTransactionCounts:      blockTransactionCounts,
 		blockCollectionCounts:       blockCollectionCounts,
 		collectionExecutionTime:     collectionExecutionTime,
 		collectionComputationUsed:   collectionComputationUsed,
-		collectionMemoryUsage:       collectionMemoryUsage,
-		collectionMemoryEstimate:    collectionMemoryEstimate,
-		collectionMemoryDifference:  collectionMemoryDifference,
 		collectionTransactionCounts: collectionTransactionCounts,
 		collectionRequestSent:       collectionRequestsSent,
 		collectionRequestRetried:    collectionRequestsRetries,
@@ -615,10 +555,18 @@ func (ec *ExecutionCollector) ExecutionCollectionExecuted(dur time.Duration, com
 }
 
 // TransactionExecuted reports the time and computation spent executing a single transaction
-func (ec *ExecutionCollector) ExecutionTransactionExecuted(dur time.Duration, compUsed uint64, eventCounts int, failed bool) {
+func (ec *ExecutionCollector) ExecutionTransactionExecuted(
+	dur time.Duration,
+	compUsed, memoryUsed, memoryEstimated uint64,
+	eventCounts int,
+	failed bool,
+) {
 	ec.totalExecutedTransactionsCounter.Inc()
 	ec.transactionExecutionTime.Observe(float64(dur.Milliseconds()))
 	ec.transactionComputationUsed.Observe(float64(compUsed))
+	ec.transactionMemoryUsage.Observe(float64(memoryUsed))
+	ec.transactionMemoryEstimate.Observe(float64(memoryEstimated))
+	ec.transactionMemoryDifference.Observe(float64(memoryEstimated - memoryUsed))
 	ec.transactionEmittedEvents.Observe(float64(eventCounts))
 	if failed {
 		ec.totalFailedTransactionsCounter.Inc()
@@ -626,10 +574,13 @@ func (ec *ExecutionCollector) ExecutionTransactionExecuted(dur time.Duration, co
 }
 
 // ScriptExecuted reports the time spent executing a single script
-func (ec *ExecutionCollector) ExecutionScriptExecuted(dur time.Duration, compUsed uint64) {
+func (ec *ExecutionCollector) ExecutionScriptExecuted(dur time.Duration, compUsed, memoryUsed, memoryEstimated uint64) {
 	ec.totalExecutedScriptsCounter.Inc()
 	ec.scriptExecutionTime.Observe(float64(dur.Milliseconds()))
 	ec.scriptComputationUsed.Observe(float64(compUsed))
+	ec.scriptMemoryUsage.Observe(float64(memoryUsed))
+	ec.scriptMemoryEstimate.Observe(float64(memoryEstimated))
+	ec.scriptMemoryDifference.Observe(float64(memoryEstimated - memoryUsed))
 }
 
 // ExecutionStateReadsPerBlock reports number of state access/read operations per block
