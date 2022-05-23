@@ -7,7 +7,6 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
-	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
@@ -66,8 +65,7 @@ func GenerateClusterRootQC(signers []bootstrap.NodeInfo, allCommitteeMembers flo
 func createClusterValidator(committee hotstuff.DynamicCommittee) (hotstuff.Validator, error) {
 	verifier := verification.NewStakingVerifier()
 
-	forks := &mocks.ForksReader{}
-	hotstuffValidator := validator.New(committee, forks, verifier)
+	hotstuffValidator := validator.New(committee, verifier)
 	return hotstuffValidator, nil
 }
 

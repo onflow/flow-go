@@ -13,7 +13,6 @@ import (
 // Validator is responsible for validating QC, Block and Vote
 type Validator struct {
 	committee hotstuff.Replicas
-	forks     hotstuff.ForksReader
 	verifier  hotstuff.Verifier
 }
 
@@ -22,12 +21,10 @@ var _ hotstuff.Validator = (*Validator)(nil)
 // New creates a new Validator instance
 func New(
 	committee hotstuff.Replicas,
-	forks hotstuff.ForksReader,
 	verifier hotstuff.Verifier,
 ) *Validator {
 	return &Validator{
 		committee: committee,
-		forks:     forks,
 		verifier:  verifier,
 	}
 }

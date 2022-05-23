@@ -338,7 +338,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	in.forks = forks.New(forkalizer, choice)
 
 	// initialize the validator
-	in.validator = validator.New(in.committee, in.forks, in.verifier)
+	in.validator = validator.New(in.committee, in.verifier)
 
 	weight := uint64(1000)
 	stakingSigAggtor := helper.MakeWeightedSignatureAggregator(weight)

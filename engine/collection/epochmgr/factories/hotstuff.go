@@ -108,7 +108,7 @@ func (f *HotStuffFactory) CreateModules(
 	qcDistributor := pubsub.NewQCCreatedDistributor()
 
 	verifier := verification.NewStakingVerifier()
-	validator := validatorImpl.NewMetricsWrapper(validatorImpl.New(committee, forks, verifier), metrics)
+	validator := validatorImpl.NewMetricsWrapper(validatorImpl.New(committee, verifier), metrics)
 	voteProcessorFactory := votecollector.NewStakingVoteProcessorFactory(committee, qcDistributor.OnQcConstructedFromVotes)
 	aggregator, err := consensus.NewVoteAggregator(
 		f.log,
