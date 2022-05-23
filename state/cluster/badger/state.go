@@ -6,7 +6,6 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/cluster"
@@ -34,7 +33,6 @@ func Bootstrap(db *badger.DB, stateRoot *StateRoot) (*State, error) {
 	state := newState(db, stateRoot.ClusterID())
 
 	genesis := stateRoot.Block()
-	rootQC := stateRoot.QC()
 	// bootstrap cluster state
 	err = operation.RetryOnConflict(state.db.Update, func(tx *badger.Txn) error {
 		chainID := genesis.Header.ChainID
@@ -54,25 +52,14 @@ func Bootstrap(db *badger.DB, stateRoot *StateRoot) (*State, error) {
 		if err != nil {
 			return fmt.Errorf("could not insert genesis boundary: %w", err)
 		}
-
-		safetyData := &hotstuff.SafetyData{
-			LockedOneChainView:      genesis.Header.View,
-			HighestAcknowledgedView: genesis.Header.View,
-		}
-
-		livenessData := &hotstuff.LivenessData{
-			CurrentView: genesis.Header.View + 1,
-			HighestQC:   rootQC,
-		}
-		// insert safety data
-		err = operation.InsertSafetyData(chainID, safetyData)(tx)
+		err = operation.InsertStartedView(chainID, genesis.Header.View)(tx)
 		if err != nil {
-			return fmt.Errorf("could not insert safety data: %w", err)
+			return fmt.Errorf("could not insert started view: %w", err)
 		}
-		// insert liveness data
-		err = operation.InsertLivenessData(chainID, livenessData)(tx)
+		// insert voted view for hotstuff
+		err = operation.InsertVotedView(chainID, genesis.Header.View)(tx)
 		if err != nil {
-			return fmt.Errorf("could not insert liveness data: %w", err)
+			return fmt.Errorf("could not insert voted view: %w", err)
 		}
 
 		return nil

@@ -10,17 +10,15 @@ import (
 // StateRoot is the root information required to bootstrap the cluster state
 type StateRoot struct {
 	block *cluster.Block
-	qc    *flow.QuorumCertificate
 }
 
-func NewStateRoot(genesis *cluster.Block, qc *flow.QuorumCertificate) (*StateRoot, error) {
+func NewStateRoot(genesis *cluster.Block) (*StateRoot, error) {
 	err := validateClusterGenesis(genesis)
 	if err != nil {
 		return nil, fmt.Errorf("inconsistent state root: %w", err)
 	}
 	return &StateRoot{
 		block: genesis,
-		qc:    qc,
 	}, nil
 }
 
@@ -54,8 +52,4 @@ func (s StateRoot) ClusterID() flow.ChainID {
 
 func (s StateRoot) Block() *cluster.Block {
 	return s.block
-}
-
-func (s StateRoot) QC() *flow.QuorumCertificate {
-	return s.qc
 }

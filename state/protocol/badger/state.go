@@ -8,7 +8,6 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
@@ -237,30 +236,14 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 		highest := segment.Highest()
 		lowest := segment.Lowest()
 
-		safetyData := &hotstuff.SafetyData{
-			LockedOneChainView:      highest.Header.View,
-			HighestAcknowledgedView: highest.Header.View,
-		}
-
-		rootQC, err := root.QuorumCertificate()
-		if err != nil {
-			return fmt.Errorf("could not get root QC: %w", err)
-		}
-
-		livenessData := &hotstuff.LivenessData{
-			CurrentView: highest.Header.View + 1,
-			LastViewTC:  highest.Header.LastViewTC,
-			HighestQC:   rootQC,
-		}
-
 		// insert initial views for HotStuff
-		err = operation.InsertSafetyData(highest.Header.ChainID, safetyData)(tx)
+		err = operation.InsertStartedView(highest.Header.ChainID, highest.Header.View)(tx)
 		if err != nil {
-			return fmt.Errorf("could not insert safety data: %w", err)
+			return fmt.Errorf("could not insert started view: %w", err)
 		}
-		err = operation.InsertLivenessData(highest.Header.ChainID, livenessData)(tx)
+		err = operation.InsertVotedView(highest.Header.ChainID, highest.Header.View)(tx)
 		if err != nil {
-			return fmt.Errorf("could not insert liveness data: %w", err)
+			return fmt.Errorf("could not insert started view: %w", err)
 		}
 
 		// insert height pointers

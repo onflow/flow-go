@@ -191,8 +191,8 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	)
 
 	// check on stop condition, stop the tests as soon as entering a certain view
-	in.persist.On("PutSafetyData", mock.Anything).Return(nil)
-	in.persist.On("PutLivenessData", mock.Anything).Return(nil)
+	in.persist.On("PutStarted", mock.Anything).Return(nil)
+	in.persist.On("PutVoted", mock.Anything).Return(nil)
 
 	// program the hotstuff signer behaviour
 	in.signer.On("CreateProposal", mock.Anything).Return(
@@ -310,6 +310,11 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		Logger()
 	notifier := notifications.NewLogConsumer(log)
 
+	// initialize the pacemaker
+	controller := timeout.NewController(cfg.Timeouts)
+	in.pacemaker, err = pacemaker.New(DefaultStart(), controller, notifier)
+	require.NoError(t, err)
+
 	// initialize the block producer
 	in.producer, err = blockproducer.New(in.signer, in.committee, in.builder)
 	require.NoError(t, err)
@@ -322,17 +327,6 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		SignerIDs: in.participants.NodeIDs(),
 	}
 	rootBlockQC := &forks.BlockQC{Block: rootBlock, QC: rootQC}
-
-	livnessData := &hotstuff.LivenessData{
-		CurrentView: rootQC.View + 1,
-		HighestQC:   rootQC,
-	}
-
-	// initialize the pacemaker
-	controller := timeout.NewController(cfg.Timeouts)
-	in.pacemaker, err = pacemaker.New(livnessData.CurrentView, controller, notifier)
-	require.NoError(t, err)
-
 	forkalizer, err := finalizer.New(rootBlockQC, in.finalizer, notifier)
 	require.NoError(t, err)
 
@@ -380,13 +374,8 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	in.aggregator, err = voteaggregator.NewVoteAggregator(log, notifier, DefaultPruned(), voteCollectors)
 	require.NoError(t, err)
 
-	safetyData := &hotstuff.SafetyData{
-		LockedOneChainView:      rootBlock.View,
-		HighestAcknowledgedView: rootBlock.View,
-	}
-
-	// initialize the safety rules
-	in.voter = safetyrules.New(in.signer, in.persist, in.committee, safetyData)
+	// initialize the voter
+	in.voter = safetyrules.New(in.signer, in.forks, in.persist, in.committee, DefaultVoted())
 
 	// initialize the event handler
 	in.handler, err = eventhandler.NewEventHandler(log, in.pacemaker, in.producer, in.forks, in.persist, in.communicator, in.committee, in.aggregator, in.voter, in.validator, notifier)

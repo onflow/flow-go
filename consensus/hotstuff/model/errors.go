@@ -31,27 +31,6 @@ func IsNoVoteError(err error) bool {
 	return errors.As(err, &e)
 }
 
-func NewNoVoteErrorf(msg string, args ...interface{}) error {
-	return NoVoteError{Msg: fmt.Sprintf(msg, args...)}
-}
-
-// NoTimeoutError contains the reason of why the voter didn't time out for current view.
-type NoTimeoutError struct {
-	Msg string
-}
-
-func (e NoTimeoutError) Error() string { return e.Msg }
-
-// IsNoTimeoutError returns whether an error is NoTimeoutError
-func IsNoTimeoutError(err error) bool {
-	var e NoTimeoutError
-	return errors.As(err, &e)
-}
-
-func NewNoTimeoutErrorf(msg string, args ...interface{}) error {
-	return NoTimeoutError{Msg: fmt.Sprintf(msg, args...)}
-}
-
 // ConfigurationError indicates that a constructor or component was initialized with
 // invalid or inconsistent parameters.
 type ConfigurationError struct {

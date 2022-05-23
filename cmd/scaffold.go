@@ -193,12 +193,12 @@ func (fnb *FlowNodeBuilder) EnqueuePingService() {
 			persist := persister.New(node.DB, node.RootChainID)
 
 			pingInfoProvider.HotstuffViewFun = func() (uint64, error) {
-				livenessData, err := persist.GetLivenessData()
+				curView, err := persist.GetStarted()
 				if err != nil {
 					return 0, err
 				}
 
-				return livenessData.CurrentView, nil
+				return curView, nil
 			}
 		}
 
