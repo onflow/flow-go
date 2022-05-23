@@ -2,6 +2,7 @@ package timeoutcollector
 
 import (
 	"errors"
+	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/module/local"
 	"math/rand"
@@ -340,6 +341,9 @@ func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 	})
 
 	view := uint64(rand.Uint32() + 100)
+	highestQC := helper.MakeQC(helper.WithQCView(view - 2))
+	lastViewTC := helper.MakeTC(helper.WithTCView(view-1),
+		helper.WithTCHighestQC(highestQC))
 
 	committee := &mocks.Replicas{}
 	committee.On("IdentitiesByEpoch", view, mock.Anything).Return(stakingSigners, nil)
@@ -348,6 +352,14 @@ func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 	timeouts := make([]*model.TimeoutObject, 0, len(stakingSigners))
 
 	for _, signer := range stakingSigners {
-		signers[signer.NodeID]
+		timeout, err := signers[signer.NodeID].CreateTimeout(view, highestQC, lastViewTC)
+		require.NoError(t, err)
+		timeouts = append(timeouts, timeout)
+	}
+
+	tcCreated := false
+	onTCCreated := func(tc *flow.TimeoutCertificate) {
+		verifier := verification.NewStakingVerifier()
+		validator := hotstuffvalidator.New(committee. )
 	}
 }
