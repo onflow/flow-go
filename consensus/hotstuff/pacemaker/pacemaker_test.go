@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 const (
@@ -286,7 +287,7 @@ func Test_IgnoreOldQC(t *testing.T) {
 
 // Test_ReplicaTimeout tests that replica timeout fires as expected
 func Test_ReplicaTimeout(t *testing.T) {
-	t.Skip("active-pacemaker", "remove or update later")
+	unittest.SkipUnless(t, unittest.TEST_TODO, "active-pacemaker")
 	start := time.Now()
 	pm, notifier := initPaceMaker(t, 3) // initPaceMaker also calls Start() on PaceMaker
 

@@ -10,7 +10,7 @@ import (
 )
 
 func MakeBlock(options ...func(*model.Block)) *model.Block {
-	view := rand.Uint64()
+	view := 1 + rand.Uint64()
 	block := model.Block{
 		View:        view,
 		BlockID:     unittest.IdentifierFixture(),
