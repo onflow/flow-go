@@ -186,7 +186,7 @@ func verifyArguments(t *testing.T, expected []cadence.Value, actual []interface{
 		require.NoError(t, err)
 
 		// parse cadence value
-		decoded, err := jsoncdc.Decode(bz)
+		decoded, err := jsoncdc.Decode(nil, bz)
 		require.NoError(t, err)
 
 		assert.Equal(t, expected[index], decoded)

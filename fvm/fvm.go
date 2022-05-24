@@ -5,6 +5,7 @@ import (
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/blueprints"
@@ -102,15 +103,13 @@ func (vm *VirtualMachine) invokeMetaTransaction(parentCtx Context, tx *Transacti
 }
 
 // getExecutionWeights reads stored execution effort weights from the service account
-func getExecutionWeights(
+func getExecutionEffortWeights(
 	env Environment,
 	accounts state.Accounts,
 ) (
-	computationWeights,
-	memoryWeights weighted.ExecutionWeights, err error,
+	computationWeights weighted.ExecutionEffortWeights,
+	err error,
 ) {
-	memoryWeights = make(weighted.ExecutionWeights)
-
 	// the weights are stored in the service account
 	serviceAddress := env.Context().Chain.ServiceAddress()
 
@@ -120,11 +119,11 @@ func getExecutionWeights(
 
 	if err != nil {
 		// this might be fatal, return as is
-		return nil, nil, err
+		return nil, err
 	}
 	if !ok {
 		// if the service account does not exist, return an FVM error
-		return nil, nil, errors.NewCouldNotGetExecutionParameterFromStateError(
+		return nil, errors.NewCouldNotGetExecutionParameterFromStateError(
 			service.Hex(),
 			blueprints.TransactionFeesExecutionEffortWeightsPathDomain,
 			blueprints.TransactionFeesExecutionEffortWeightsPathIdentifier)
@@ -140,17 +139,95 @@ func getExecutionWeights(
 	)
 	if err != nil {
 		// this might be fatal, return as is
-		return nil, nil, err
+		return nil, err
 	}
 
-	computationWeights, ok = utils.CadenceValueToWeights(value)
+	computationWeightsRaw, ok := utils.CadenceValueToWeights(value)
 	if !ok {
 		// this is a non-fatal error. It is expected if the weights are not set up on the network yet.
-		return nil, nil, errors.NewCouldNotGetExecutionParameterFromStateError(
+		return nil, errors.NewCouldNotGetExecutionParameterFromStateError(
 			service.Hex(),
 			blueprints.TransactionFeesExecutionEffortWeightsPathDomain,
 			blueprints.TransactionFeesExecutionEffortWeightsPathIdentifier)
 	}
 
-	return computationWeights, memoryWeights, err
+	// Merge the default weights with the weights from the state.
+	// This allows for weights that are not set in the state, to be set by default.
+	// In case the network is stuck because of a transaction using an FVM feature that has 0 weight
+	// (or is not metered at all), the defaults can be changed and the network restarted
+	// instead of trying to change the weights with a transaction.
+	computationWeights = make(weighted.ExecutionEffortWeights)
+	for k, v := range weighted.DefaultComputationWeights {
+		computationWeights[k] = v
+	}
+	for k, v := range computationWeightsRaw {
+		computationWeights[common.ComputationKind(k)] = v
+	}
+
+	return computationWeights, nil
+}
+
+// getExecutionMemoryWeights reads stored execution memory weights from the service account
+func getExecutionMemoryWeights(
+	env Environment,
+	accounts state.Accounts,
+) (
+	memoryWeights weighted.ExecutionMemoryWeights,
+	err error,
+) {
+	// the weights are stored in the service account
+	serviceAddress := env.Context().Chain.ServiceAddress()
+
+	service := runtime.Address(serviceAddress)
+	// Check that the service account exists
+	ok, err := accounts.Exists(serviceAddress)
+
+	if err != nil {
+		// this might be fatal, return as is
+		return nil, err
+	}
+	if !ok {
+		// if the service account does not exist, return an FVM error
+		return nil, errors.NewCouldNotGetExecutionParameterFromStateError(
+			service.Hex(),
+			blueprints.TransactionFeesExecutionMemoryWeightsPathDomain,
+			blueprints.TransactionFeesExecutionMemoryWeightsPathIdentifier)
+	}
+
+	value, err := env.VM().Runtime.ReadStored(
+		service,
+		cadence.Path{
+			Domain:     blueprints.TransactionFeesExecutionMemoryWeightsPathDomain,
+			Identifier: blueprints.TransactionFeesExecutionMemoryWeightsPathIdentifier,
+		},
+		runtime.Context{Interface: env},
+	)
+	if err != nil {
+		// this might be fatal, return as is
+		return nil, err
+	}
+
+	memoryWeightsRaw, ok := utils.CadenceValueToWeights(value)
+	if !ok {
+		// this is a non-fatal error. It is expected if the weights are not set up on the network yet.
+		return nil, errors.NewCouldNotGetExecutionParameterFromStateError(
+			service.Hex(),
+			blueprints.TransactionFeesExecutionMemoryWeightsPathDomain,
+			blueprints.TransactionFeesExecutionMemoryWeightsPathIdentifier)
+	}
+
+	// Merge the default weights with the weights from the state.
+	// This allows for weights that are not set in the state, to be set by default.
+	// In case the network is stuck because of a transaction using an FVM feature that has 0 weight
+	// (or is not metered at all), the defaults can be changed and the network restarted
+	// instead of trying to change the weights with a transaction.
+	memoryWeights = make(weighted.ExecutionMemoryWeights)
+	for k, v := range weighted.DefaultMemoryWeights {
+		memoryWeights[k] = v
+	}
+	for k, v := range memoryWeightsRaw {
+		memoryWeights[common.MemoryKind(k)] = v
+	}
+
+	return memoryWeights, nil
 }
