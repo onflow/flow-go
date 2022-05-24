@@ -205,7 +205,7 @@ func TestExecuteScript(t *testing.T) {
 
 	vm := fvm.NewVirtualMachine(rt)
 
-	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
+	ledger := testutil.RootBootstrappedLedger(vm, execCtx, fvm.WithExecutionMemoryLimit(1_000_000_000))
 
 	view := delta.NewView(ledger.Get)
 

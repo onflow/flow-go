@@ -241,7 +241,7 @@ func TestPrograms(t *testing.T) {
 	)
 
 	t.Run("script execution programs are not committed",
-		newVMTest().run(
+		newVMTest().withBootstrapProcedureOptions(fvm.WithExecutionMemoryLimit(math.MaxUint64)).run(
 			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 
 				scriptCtx := fvm.NewContextFromParent(ctx)
@@ -1276,7 +1276,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 	t.Run("storage ID allocation", func(t *testing.T) {
 
-		ledger := testutil.RootBootstrappedLedger(vm, ctx)
+		ledger := testutil.RootBootstrappedLedger(vm, ctx, fvm.WithExecutionMemoryLimit(math.MaxUint64))
 
 		// Create an account private key.
 		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -2957,6 +2957,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		fvm.WithExecutionMemoryLimit(math.MaxUint64),
 	).run(
 		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 			ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
@@ -2999,6 +3000,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		fvm.WithExecutionMemoryLimit(math.MaxUint64),
 	).run(
 		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 			ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
@@ -3550,6 +3552,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("Transaction Fees %d: %s", i, tc.name), newVMTest().withBootstrapProcedureOptions(
 			fvm.WithTransactionFee(fvm.DefaultTransactionFees),
+			fvm.WithExecutionMemoryLimit(math.MaxUint64),
 		).withContextOptions(
 			fvm.WithTransactionFeesEnabled(true),
 		).run(
@@ -3563,6 +3566,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 			fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 			fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+			fvm.WithExecutionMemoryLimit(math.MaxUint64),
 		).withContextOptions(
 			fvm.WithTransactionFeesEnabled(true),
 			fvm.WithAccountStorageLimit(true),
@@ -3715,6 +3719,12 @@ func TestSettingExecutionWeights(t *testing.T) {
 		),
 	).run(
 		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+			require.NoError(t, err)
+
+			accounts, err := testutil.CreateAccounts(vm, view, programs, privateKeys, chain)
+			require.NoError(t, err)
+
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(`
 				transaction {
@@ -3741,12 +3751,9 @@ func TestSettingExecutionWeights(t *testing.T) {
 						while true {break};while true {break};while true {break};while true {break};while true {break};
 					}
 				}
-			`)).
-				SetProposalKey(chain.ServiceAddress(), 0, 0).
-				AddAuthorizer(chain.ServiceAddress()).
-				SetPayer(chain.ServiceAddress())
+			`))
 
-			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+			err = testutil.SignTransaction(txBody, accounts[0], privateKeys[0], 0)
 			require.NoError(t, err)
 
 			tx := fvm.Transaction(txBody, 0)
@@ -3754,10 +3761,12 @@ func TestSettingExecutionWeights(t *testing.T) {
 			require.NoError(t, err)
 			require.Greater(t, tx.MemoryUsed, uint64(100_000_000))
 
-			var foo *errors.MemoryLimitExceededError
-			assert.ErrorAs(t, tx.Err, &foo)
+			// TODO this fails if not run against https://github.com/onflow/cadence/pull/1660
+			var memoryLimitExceededError *errors.MemoryLimitExceededError
+			assert.ErrorAs(t, tx.Err, &memoryLimitExceededError)
 		},
 	))
+
 	t.Run("transaction should fail if create account weight is high", newVMTest().withBootstrapProcedureOptions(
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
