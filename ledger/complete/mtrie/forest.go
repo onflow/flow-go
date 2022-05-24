@@ -125,10 +125,10 @@ func (f *Forest) ValueSizes(r *ledger.TrieRead) ([]int, error) {
 
 // Read reads values for an slice of paths and returns values and error (if any)
 // TODO: can be optimized further if we don't care about changing the order of the input r.Paths
-func (f *Forest) Read(r *ledger.TrieRead) ([]*ledger.Payload, error) {
+func (f *Forest) Read(r *ledger.TrieRead) ([]ledger.Value, error) {
 
 	if len(r.Paths) == 0 {
-		return []*ledger.Payload{}, nil
+		return []ledger.Value{}, nil
 	}
 
 	// lookup the trie by rootHash
@@ -156,20 +156,20 @@ func (f *Forest) Read(r *ledger.TrieRead) ([]*ledger.Payload, error) {
 	payloads := trie.UnsafeRead(deduplicatedPaths) // this sorts deduplicatedPaths IN-PLACE
 
 	// reconstruct the payloads in the same key order that called the method
-	orderedPayloads := make([]*ledger.Payload, len(r.Paths))
+	orderedValues := make([]ledger.Value, len(r.Paths))
 	totalPayloadSize := 0
 	for i, p := range deduplicatedPaths {
 		payload := payloads[i]
 		indices := pathOrgIndex[p]
 		for _, j := range indices {
-			orderedPayloads[j] = payload.DeepCopy()
+			orderedValues[j] = payload.Value.DeepCopy()
 		}
 		totalPayloadSize += len(indices) * payload.Size()
 	}
 	// TODO rename the metrics
 	f.metrics.ReadValuesSize(uint64(totalPayloadSize))
 
-	return orderedPayloads, nil
+	return orderedValues, nil
 }
 
 // Update updates the Values for the registers and returns rootHash and error (if any).

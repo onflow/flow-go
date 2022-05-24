@@ -142,11 +142,7 @@ func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 		return nil, err
 	}
 	trieRead := &ledger.TrieRead{RootHash: ledger.RootHash(query.State()), Paths: paths}
-	payloads, err := l.forest.Read(trieRead)
-	if err != nil {
-		return nil, err
-	}
-	values, err = pathfinder.PayloadsToValues(payloads)
+	values, err = l.forest.Read(trieRead)
 	if err != nil {
 		return nil, err
 	}
