@@ -126,7 +126,7 @@ func (s *Suite) SetupSuite() {
 
 	// generates, initializes, and starts the Flow network
 	netConfig := testnet.NewNetworkConfig(
-		"wintermute_tests",
+		"bft_passthrough_test",
 		s.nodeConfigs,
 		// set long staking phase to avoid QC/DKG transactions during test run
 		testnet.WithViewsInStakingAuction(10_000),
