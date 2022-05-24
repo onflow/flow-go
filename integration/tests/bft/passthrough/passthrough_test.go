@@ -14,7 +14,7 @@ type PassThroughTestSuite struct {
 }
 
 func TestPassThrough(t *testing.T) {
-	suite.Run(t, new(PassThroughTestSuit))
+	suite.Run(t, new(PassThroughTestSuite))
 }
 
 // TestSealingAndVerificationPassThrough evaluates the health of Corruptible Conduit Framework (CCF) for BFT testing.
@@ -26,7 +26,7 @@ func TestPassThrough(t *testing.T) {
 // It also enables sealing based on result approvals and verifies whether the block of that specific multi-chunk execution result is sealed
 // affected by the emitted result approvals.
 // Finally, it evaluates whether critical sealing-and-verification-related events from corrupted nodes are passed through the orchestrator.
-func (p *PassThroughTestSuit) TestSealingAndVerificationPassThrough() {
+func (p *PassThroughTestSuite) TestSealingAndVerificationPassThrough() {
 	receipts, approvals := common.SealingAndVerificationHappyPathTest(
 		p.T(),
 		p.BlockState,
