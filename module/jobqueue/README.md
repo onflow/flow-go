@@ -37,8 +37,7 @@ Job consumer provides the `Check` method for users to notify new jobs available.
 
 Once called, job consumer will iterate through each height with the `AtIndex` method. It stops when one of the following condition is true:
 1. no job was found at a index
-2. no more workers to work on them
-3. max search ahead is reached (will explain later)
+2. no more workers to work on them, which is limitted by the config item `maxProcessing`
 
 `Check` method is concurrent safe, meaning even if job consumer is notified concurrently about new jobs available, job consumer will check at most once to find new jobs.
 
@@ -57,6 +56,14 @@ In the scenario of processing finalized blocks, implementing symmetric functions
 
 In order to report job completion, the worker needs to call job consumer's `NotifyJobIsDone` method.
 
+### Error handling
+Job queue doesn't allow job to fail, because job queue has to guarantee any job below the last processed job index has been finished successfully. Leaving a gap is not accpeted.
+
+Therefore, if a worker fails to process a job, it should retry by itself, or just crash.
+
+Note, Worker should not log the error and report the job is completed, because that would change the last processed job index, and will not have the chance to retry that job.
+
+
 ## Pipeline Pattern
 Multiple jobqueues can be combined to form a pipeline. This is useful in the scenario that the first job queue will process each finalized block and create jobs to process data depending on the block, and having the second job queue to process each job created by the worker of the first job queue.
 
@@ -68,3 +75,11 @@ For instance, verification node uses 2-jobqueue pipeline to find chunks from eac
 The jobqueue architecture is optimized for "pull" style processes, where the job producer simply notify the job consumer about new jobs without creating any job, and job consumer pulls jobs from a source when workers are available. All current implementations are using this pull style since it lends well to asynchronously processing jobs based on block heights.
 
 Some use cases might require "push" style jobs where there is a job producer that create new jobs, and a consumer that processes work from the producer. This is possible with the jobqueue, but requires the producer persist the jobs to a database, then implement the `Head` and `AtIndex` methods that allow accessing jobs by sequential `uint64` indexes.
+
+### TODOs
+1. Jobs at different index are processed in parallel, it's possible that there is a job takes a long time to work on, and causing too many completed jobs cached in memory before being used to update the the last processed job index.
+  `maxSearchAhead` will allow the job consumer to stop consume more blocks if too many jobs are completed, but the job at index lastProcesssed + 1 has not been unprocessed yet.
+  The difference between `maxSearchAhead` and `maxProcessing` is that: `maxProcessing` allows at most `maxProcessing` number of works to process jobs. However, even if there is worker available, it might not be assigned to a job, because the job at index lastProcesssed +1 has not been done, it won't work on an job with index higher than `lastProcesssed + maxSearchAhead`.
+2. accept callback to get notified when the consecutive job index is finished.
+3. implement ReadyDoneAware interface
+
