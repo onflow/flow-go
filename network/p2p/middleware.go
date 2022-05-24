@@ -226,7 +226,7 @@ func (m *Middleware) UpdateNodeAddresses() {
 	m.log.Info().Msg("Updating protocol state node addresses")
 
 	ids := m.ov.Identities()
-	newInfos, invalid := peerInfosFromIDs(ids)
+	newInfos, invalid := PeerInfosFromIDs(ids)
 
 	for id, err := range invalid {
 		m.log.Err(err).Str("node_id", id.String()).Msg("failed to extract peer info from identity")
@@ -499,7 +499,10 @@ func (m *Middleware) Subscribe(channel network.Channel) error {
 	var validators []psValidator.MessageValidator
 	if !engine.PublicChannels().Contains(channel) {
 		// for channels used by the staked nodes, add the topic validator to filter out messages from non-staked nodes
-		validators = append(validators, psValidator.StakedValidator(m.ov.Identity))
+		validators = append(validators,
+			// NOTE: The AuthorizedSenderValidator will assert the sender is a staked node
+			psValidator.AuthorizedSenderValidator(m.log, channel, m.ov.Identity),
+		)
 	}
 
 	s, err := m.libP2PNode.Subscribe(topic, validators...)

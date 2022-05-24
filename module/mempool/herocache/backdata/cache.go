@@ -6,6 +6,7 @@ import (
 	_ "unsafe" // for linking runtimeNano
 
 	"github.com/rs/zerolog"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -81,10 +82,10 @@ type Cache struct {
 	// towards an interaction. The interaction counter is set to zero whenever
 	// it reaches a predefined limit. Its purpose is to manage the speed at which
 	// telemetry logs are printed.
-	interactionCounter uint64
+	interactionCounter *atomic.Uint64
 	// lastTelemetryDump keeps track of the last time telemetry logs dumped.
 	// Its purpose is to manage the speed at which telemetry logs are printed.
-	lastTelemetryDump int64
+	lastTelemetryDump *atomic.Int64
 }
 
 // DefaultOversizeFactor determines the default oversizing factor of HeroCache.
@@ -128,6 +129,8 @@ func NewCache(sizeLimit uint32,
 		ejectionMode:           ejectionMode,
 		entities:               heropool.NewHeroPool(sizeLimit, ejectionMode),
 		availableSlotHistogram: make([]uint64, slotsPerBucket+1), // +1 is to account for empty buckets as well.
+		interactionCounter:     atomic.NewUint64(0),
+		lastTelemetryDump:      atomic.NewInt64(0),
 	}
 
 	return bd
@@ -245,8 +248,8 @@ func (c *Cache) Clear() {
 	c.buckets = make([]slotBucket, c.bucketNum)
 	c.entities = heropool.NewHeroPool(c.sizeLimit, c.ejectionMode)
 	c.availableSlotHistogram = make([]uint64, slotsPerBucket+1)
-	c.interactionCounter = 0
-	c.lastTelemetryDump = 0
+	c.interactionCounter = atomic.NewUint64(0)
+	c.lastTelemetryDump = atomic.NewInt64(0)
 	c.slotCount = 0
 }
 
@@ -428,19 +431,23 @@ func (c *Cache) linkedEntityOf(b bucketIndex, s slotIndex) (flow.Identifier, flo
 
 // logTelemetry prints telemetry logs depending on number of interactions and last time telemetry has been logged.
 func (c *Cache) logTelemetry() {
-	c.interactionCounter++
-	if c.interactionCounter < telemetryCounterInterval {
+	counter := c.interactionCounter.Inc()
+	if counter < telemetryCounterInterval {
 		// not enough interactions to log.
 		return
 	}
-	if time.Duration(runtimeNano()-c.lastTelemetryDump) < telemetryDurationInterval {
+	if time.Duration(runtimeNano()-c.lastTelemetryDump.Load()) < telemetryDurationInterval {
 		// not long elapsed since last log.
+		return
+	}
+	if !c.interactionCounter.CAS(counter, 0) {
+		// raced on CAS, hence, not logging.
 		return
 	}
 
 	lg := c.logger.With().
 		Uint64("total_slots_written", c.slotCount).
-		Uint64("total_interactions_since_last_log", c.interactionCounter).Logger()
+		Uint64("total_interactions_since_last_log", counter).Logger()
 
 	for i := range c.availableSlotHistogram {
 		lg = lg.With().
@@ -450,8 +457,7 @@ func (c *Cache) logTelemetry() {
 	}
 
 	lg.Info().Msg("logging telemetry")
-	c.interactionCounter = 0
-	c.lastTelemetryDump = runtimeNano()
+	c.lastTelemetryDump.Store(runtimeNano())
 }
 
 // unuseSlot marks slot as free so that it is ready to be re-used.

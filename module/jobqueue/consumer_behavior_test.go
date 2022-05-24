@@ -524,7 +524,7 @@ func newTestConsumer(cp storage.ConsumerProgress, jobs module.Jobs, worker jobqu
 
 // a Mock worker that stores all the jobs that it was asked to work on
 type mockWorker struct {
-	sync.Mutex
+	sync.RWMutex
 	log    zerolog.Logger
 	called []Job
 	fn     func(job Job)
@@ -553,11 +553,13 @@ func (w *mockWorker) Run(job Job) error {
 // return the IDs of the jobs
 func (w *mockWorker) AssertCalled(t *testing.T, expectCalled []int64) {
 	called := make([]int, 0)
+	w.RLock()
 	for _, c := range w.called {
 		jobID, err := strconv.Atoi(string(c.ID()))
 		require.NoError(t, err)
 		called = append(called, jobID)
 	}
+	w.RUnlock()
 	sort.Ints(called)
 
 	called64 := make([]int64, 0)

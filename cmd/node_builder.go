@@ -210,6 +210,10 @@ func DefaultBaseConfig() *BaseConfig {
 	homedir, _ := os.UserHomeDir()
 	datadir := filepath.Join(homedir, ".flow", "database")
 
+	// NOTE: if the codec used in the network component is ever changed any code relying on
+	// the message format specific to the codec must be updated. i.e: the AuthorizedSenderValidator.
+	codecFactory := func() network.Codec { return cbor.NewCodec() }
+
 	return &BaseConfig{
 		nodeIDHex:                       NotSet,
 		AdminAddr:                       NotSet,
@@ -240,7 +244,7 @@ func DefaultBaseConfig() *BaseConfig {
 		TopologyEdgeProbability:         topology.MaximumEdgeProbability,
 		HeroCacheMetricsEnable:          false,
 		SyncCoreConfig:                  synchronization.DefaultConfig(),
-		CodecFactory:                    func() network.Codec { return cbor.NewCodec() },
+		CodecFactory:                    codecFactory,
 		ComplianceConfig:                compliance.DefaultConfig(),
 	}
 }
