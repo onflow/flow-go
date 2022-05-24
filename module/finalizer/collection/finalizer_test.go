@@ -191,8 +191,9 @@ func TestFinalizer(t *testing.T) {
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID:     block.Payload.Collection.ID(),
 					ReferenceBlockID: refBlock.ID(),
-					SignerIDs:        block.Header.ParentVoterIDs,
-					Signature:        block.Header.ParentVoterSigData,
+					ChainID:          block.Header.ChainID,
+					SignerIndices:    block.Header.ParentVoterIndices,
+					Signature:        nil,
 				},
 			})
 		})
@@ -243,16 +244,18 @@ func TestFinalizer(t *testing.T) {
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID:     block1.Payload.Collection.ID(),
 					ReferenceBlockID: refBlock.ID(),
-					SignerIDs:        block1.Header.ParentVoterIDs,
-					Signature:        block1.Header.ParentVoterSigData,
+					ChainID:          block1.Header.ChainID,
+					SignerIndices:    block1.Header.ParentVoterIndices,
+					Signature:        nil,
 				},
 			})
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID:     block2.Payload.Collection.ID(),
 					ReferenceBlockID: refBlock.ID(),
-					SignerIDs:        block2.Header.ParentVoterIDs,
-					Signature:        block2.Header.ParentVoterSigData,
+					ChainID:          block2.Header.ChainID,
+					SignerIndices:    block2.Header.ParentVoterIndices,
+					Signature:        nil,
 				},
 			})
 		})
@@ -303,8 +306,9 @@ func TestFinalizer(t *testing.T) {
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID:     block1.Payload.Collection.ID(),
 					ReferenceBlockID: refBlock.ID(),
-					SignerIDs:        block1.Header.ParentVoterIDs,
-					Signature:        block1.Header.ParentVoterSigData,
+					ChainID:          block1.Header.ChainID,
+					SignerIndices:    block1.Header.ParentVoterIndices,
+					Signature:        nil,
 				},
 			})
 		})
@@ -356,8 +360,9 @@ func TestFinalizer(t *testing.T) {
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID:     block1.Payload.Collection.ID(),
 					ReferenceBlockID: refBlock.ID(),
-					SignerIDs:        block1.Header.ParentVoterIDs,
-					Signature:        block1.Header.ParentVoterSigData,
+					ChainID:          block1.Header.ChainID,
+					SignerIndices:    block1.Header.ParentVoterIndices,
+					Signature:        nil,
 				},
 			})
 		})
