@@ -1102,9 +1102,12 @@ func TestReadSinglePayload(t *testing.T) {
 
 	// Test reading payload in empty trie
 	t.Run("empty trie", func(t *testing.T) {
+		savedRootHash := emptyTrie.RootHash()
+
 		path := utils.PathByUint16LeftPadded(0)
 		payload := emptyTrie.ReadSinglePayload(path)
 		require.True(t, payload.IsEmpty())
+		require.Equal(t, savedRootHash, emptyTrie.RootHash())
 	})
 
 	// Test reading payload for existent/non-existent path
@@ -1120,14 +1123,18 @@ func TestReadSinglePayload(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, uint16(0), maxDepthTouched)
 
+		savedRootHash := newTrie.RootHash()
+
 		// Get payload for existent path path
 		retPayload := newTrie.ReadSinglePayload(path1)
 		require.Equal(t, payload1, retPayload)
+		require.Equal(t, savedRootHash, newTrie.RootHash())
 
 		// Get payload for non-existent path
 		path2 := utils.PathByUint16LeftPadded(1)
 		retPayload = newTrie.ReadSinglePayload(path2)
 		require.True(t, retPayload.IsEmpty())
+		require.Equal(t, savedRootHash, newTrie.RootHash())
 	})
 
 	// Test reading payload for existent/non-existent path in an unpruned trie.
@@ -1148,6 +1155,8 @@ func TestReadSinglePayload(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, uint16(3), maxDepthTouched)
 
+		savedRootHash := newTrie.RootHash()
+
 		//                  n5
 		//                 /
 		//                /
@@ -1166,6 +1175,7 @@ func TestReadSinglePayload(t *testing.T) {
 			path := utils.PathByUint16(uint16(i << 12))
 
 			retPayload := newTrie.ReadSinglePayload(path)
+			require.Equal(t, savedRootHash, newTrie.RootHash())
 			switch path {
 			case path1:
 				require.Equal(t, payload1, retPayload)
