@@ -34,7 +34,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var chain = flow.Mainnet.Chain()
+var chain = flow.Emulator.Chain()
+
+// In the following tests the system transaction is expected to fail, as the epoch related things are not set up properly.
+// This is not relevant to the test, as only the non-system transactions are tested.
 
 func Test_ExecutionMatchesVerification(t *testing.T) {
 	t.Run("empty block", func(t *testing.T) {
@@ -624,6 +627,7 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 	logger := zerolog.Nop()
 
 	opts = append(opts, fvm.WithChain(chain))
+	opts = append(opts, fvm.WithBlocks(&fvm.NoopBlockFinder{}))
 
 	fvmContext :=
 		fvm.NewContext(
@@ -657,7 +661,7 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 
 	view := delta.NewView(state.LedgerGetRegister(ledger, initialCommit))
 
-	executableBlock := unittest.ExecutableBlockFromTransactions(txs)
+	executableBlock := unittest.ExecutableBlockFromTransactions(chain.ChainID(), txs)
 	executableBlock.StartState = &initialCommit
 
 	computationResult, err := blockComputer.ExecuteBlock(context.Background(), executableBlock, view, programs.NewEmptyPrograms())

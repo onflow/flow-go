@@ -231,13 +231,14 @@ func (gs *TransactionsPerSecondSuite) CreateAccountAndTransfer(keyIndex int) (fl
 	mySigner := crypto.NewInMemorySigner(myPrivateKey, accountKey.HashAlgo)
 
 	// Generate the account creation transaction
-	createAccountTx := templates.CreateAccount([]*flowsdk.AccountKey{accountKey}, nil, gs.rootAcctAddr).
-		SetReferenceBlockID(gs.ref.ID).
+	createAccountTx, err := templates.CreateAccount([]*flowsdk.AccountKey{accountKey}, nil, gs.rootAcctAddr)
+	handle(err)
+	createAccountTx.SetReferenceBlockID(gs.ref.ID).
 		SetProposalKey(gs.rootAcctAddr, keyIndex, gs.sequenceNumbers[keyIndex]).
 		SetPayer(gs.rootAcctAddr)
 
 	gs.rootSignerLock.Lock()
-	err := createAccountTx.SignEnvelope(gs.rootAcctAddr, keyIndex, gs.rootSigner)
+	err = createAccountTx.SignEnvelope(gs.rootAcctAddr, keyIndex, gs.rootSigner)
 	handle(err)
 
 	gs.ref, err = gs.flowClient.GetLatestBlockHeader(context.Background(), false)
