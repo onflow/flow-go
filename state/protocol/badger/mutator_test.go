@@ -1693,8 +1693,8 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		payload.Guarantees[0].SignerIndices = []byte{byte(1)}
 		err = state.Extend(context.Background(), block)
 		require.Error(t, err)
-		require.Contains(t, fmt.Sprintf("%s", err), "invalid guarantors")
-		require.Contains(t, fmt.Sprintf("%s", err), "split checksum") // check the error message should tell it's due to wrong checksum
+		require.Contains(t, err.Error(), "invalid guarantors")
+		require.Contains(t, err.Error(), "split checksum") // check the error message should tell it's due to wrong checksum
 		require.True(t, st.IsInvalidExtensionError(err))
 
 		// let's test even if the checksum is correct, but signer indices is still wrong because the tailing are not 0,
@@ -1705,7 +1705,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		payload.Guarantees[0].SignerIndices = invalidSignerIndices
 		err = state.Extend(context.Background(), block)
 		require.Error(t, err)
-		require.Contains(t, fmt.Sprintf("%s", err), "index vector padded with unexpected bit values")
+		require.Contains(t, err.Error(), "index vector padded with unexpected bit values")
 	})
 }
 

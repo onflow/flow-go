@@ -998,7 +998,7 @@ func (e *Engine) matchOrRequestCollections(
 
 		guarantors, err := protocol.FindGuarantors(e.state, guarantee)
 		if err != nil {
-			// execution node executes incorporated blocks, which means there is a quorum of consensus nodes who
+			// execution node executes certified blocks, which means there is a quorum of consensus nodes who
 			// have validated the block payload. And that validation includes checking the guarantors are correct.
 			// based on that assumption, failed to find guarantors for guarantees contained in an incorporated block
 			// should be treated as fatal error
