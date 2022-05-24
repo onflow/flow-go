@@ -123,6 +123,18 @@ func (f *Forest) ValueSizes(r *ledger.TrieRead) ([]int, error) {
 	return orderedValueSizes, nil
 }
 
+// ReadSinglePayload reads value for a single path and returns value and error (if any)
+func (f *Forest) ReadSinglePayload(r *ledger.TrieReadSinglePayload) (*ledger.Payload, error) {
+	// lookup the trie by rootHash
+	trie, err := f.GetTrie(r.RootHash)
+	if err != nil {
+		return nil, err
+	}
+
+	payload := trie.ReadSinglePayload(r.Path)
+	return payload.DeepCopy(), nil
+}
+
 // Read reads values for an slice of paths and returns values and error (if any)
 // TODO: can be optimized further if we don't care about changing the order of the input r.Paths
 func (f *Forest) Read(r *ledger.TrieRead) ([]*ledger.Payload, error) {
@@ -135,6 +147,12 @@ func (f *Forest) Read(r *ledger.TrieRead) ([]*ledger.Payload, error) {
 	trie, err := f.GetTrie(r.RootHash)
 	if err != nil {
 		return nil, err
+	}
+
+	// call ReadSinglePayload if there is only one path
+	if len(r.Paths) == 1 {
+		payload := trie.ReadSinglePayload(r.Paths[0])
+		return []*ledger.Payload{payload.DeepCopy()}, nil
 	}
 
 	// deduplicate keys:

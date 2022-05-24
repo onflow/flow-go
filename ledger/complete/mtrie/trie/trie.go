@@ -195,6 +195,33 @@ func valueSizes(sizes []int, paths []ledger.Path, head *node.Node) {
 	}
 }
 
+// ReadSinglePayload reads and returns a payload for a single path.
+func (mt *MTrie) ReadSinglePayload(path ledger.Path) *ledger.Payload {
+	return readSinglePayload(path, mt.root)
+}
+
+// readSinglePayload reads and returns a payload for a single path in subtree with `head` as root node.
+func readSinglePayload(path ledger.Path, head *node.Node) *ledger.Payload {
+	pathBytes := path[:]
+
+	// Traverse nodes following the path until a leaf node or nil node is reached.
+	for !head.IsLeaf() {
+		depth := ledger.NodeMaxHeight - head.Height() // distance to the tree root
+		bit := bitutils.ReadBit(pathBytes, depth)
+		if bit == 0 {
+			head = head.LeftChild()
+		} else {
+			head = head.RightChild()
+		}
+	}
+
+	if head != nil && *head.Path() == path {
+		return head.Payload()
+	}
+
+	return ledger.EmptyPayload()
+}
+
 // UnsafeRead reads payloads for the given paths.
 // UNSAFE: requires _all_ paths to have a length of mt.Height bits.
 // CAUTION: while reading the payloads, `paths` is permuted IN-PLACE for optimized processing.
@@ -228,6 +255,7 @@ func read(payloads []*ledger.Payload, paths []ledger.Path, head *node.Node) {
 		}
 		return
 	}
+
 	// reached a leaf node
 	if head.IsLeaf() {
 		for i, p := range paths {
@@ -237,6 +265,13 @@ func read(payloads []*ledger.Payload, paths []ledger.Path, head *node.Node) {
 				payloads[i] = ledger.EmptyPayload()
 			}
 		}
+		return
+	}
+
+	// reached an interim node
+	if len(paths) == 1 {
+		// call readSinglePayload to skip partition and recursive calls when there is only one path
+		payloads[0] = readSinglePayload(paths[0], head)
 		return
 	}
 

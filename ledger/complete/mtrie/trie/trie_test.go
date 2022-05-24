@@ -1094,3 +1094,86 @@ func TestTrieAllocatedRegCountRegSizeWithMixedPruneFlag(t *testing.T) {
 	require.Equal(t, expectedAllocatedRegCount, updatedTrie.AllocatedRegCount())
 	require.Equal(t, expectedAllocatedRegSize, updatedTrie.AllocatedRegSize())
 }
+
+// TestReadSinglePayload tests reading a single payload of existent/non-existent path for trie of different layouts.
+func TestReadSinglePayload(t *testing.T) {
+
+	emptyTrie := trie.NewEmptyMTrie()
+
+	// Test reading payload in empty trie
+	t.Run("empty trie", func(t *testing.T) {
+		path := utils.PathByUint16LeftPadded(0)
+		payload := emptyTrie.ReadSinglePayload(path)
+		require.True(t, payload.IsEmpty())
+	})
+
+	// Test reading payload for existent/non-existent path
+	// in trie with compact leaf as root node.
+	t.Run("compact leaf as root", func(t *testing.T) {
+		path1 := utils.PathByUint16LeftPadded(0)
+		payload1 := utils.RandomPayload(1, 100)
+
+		paths := []ledger.Path{path1}
+		payloads := []ledger.Payload{*payload1}
+
+		newTrie, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
+		require.NoError(t, err)
+		require.Equal(t, uint16(0), maxDepthTouched)
+
+		// Get payload for existent path path
+		retPayload := newTrie.ReadSinglePayload(path1)
+		require.Equal(t, payload1, retPayload)
+
+		// Get payload for non-existent path
+		path2 := utils.PathByUint16LeftPadded(1)
+		retPayload = newTrie.ReadSinglePayload(path2)
+		require.True(t, retPayload.IsEmpty())
+	})
+
+	// Test reading payload for existent/non-existent path in an unpruned trie.
+	t.Run("trie", func(t *testing.T) {
+		path1 := utils.PathByUint16(1 << 12) // 000100...
+		path2 := utils.PathByUint16(1 << 13) // 001000...
+		path3 := utils.PathByUint16(1 << 14) // 010000...
+
+		payload1 := utils.RandomPayload(1, 100)
+		payload2 := utils.RandomPayload(1, 100)
+		payload3 := ledger.EmptyPayload()
+
+		paths := []ledger.Path{path1, path2, path3}
+		payloads := []ledger.Payload{*payload1, *payload2, *payload3}
+
+		// Create an unpruned trie with 3 leaf nodes (n1, n2, n3).
+		newTrie, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, false)
+		require.NoError(t, err)
+		require.Equal(t, uint16(3), maxDepthTouched)
+
+		//                  n5
+		//                 /
+		//                /
+		//              n4
+		//             /  \
+		//            /    \
+		//           n3      n3 (path3/
+		//        /     \        payload3)
+		//      /         \
+		//   n1 (path1/     n2 (path2/
+		//       payload1)      payload2)
+		//
+
+		// Test reading payload for all possible paths for the first 4 bits.
+		for i := 0; i < 16; i++ {
+			path := utils.PathByUint16(uint16(i << 12))
+
+			retPayload := newTrie.ReadSinglePayload(path)
+			switch path {
+			case path1:
+				require.Equal(t, payload1, retPayload)
+			case path2:
+				require.Equal(t, payload2, retPayload)
+			default:
+				require.True(t, retPayload.IsEmpty())
+			}
+		}
+	})
+}

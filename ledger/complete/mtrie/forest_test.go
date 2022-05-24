@@ -578,6 +578,66 @@ func TestReadNonExistingPath(t *testing.T) {
 	require.True(t, retPayloads[0].IsEmpty())
 }
 
+// TestReadSinglePayload tests reading a single payload of set/unset register.
+func TestReadSinglePayload(t *testing.T) {
+	forest, err := NewForest(5, &metrics.NoopCollector{}, nil)
+	require.NoError(t, err)
+
+	// path: 01111101...
+	path1 := pathByUint8s([]uint8{uint8(125), uint8(23)})
+	payload1 := payloadBySlices([]byte{'A'}, []byte{'A'})
+
+	// path: 10110010...
+	path2 := pathByUint8s([]uint8{uint8(178), uint8(152)})
+	payload2 := payloadBySlices([]byte{'B'}, []byte{'B'})
+
+	paths := []ledger.Path{path1, path2}
+	payloads := []*ledger.Payload{payload1, payload2}
+
+	update := &ledger.TrieUpdate{RootHash: forest.GetEmptyRootHash(), Paths: paths, Payloads: payloads}
+	baseRoot, err := forest.Update(update)
+	require.NoError(t, err)
+
+	// path: 01101110...
+	path3 := pathByUint8s([]uint8{uint8(110), uint8(48)})
+	payload3 := ledger.EmptyPayload()
+
+	// path: 00010111...
+	path4 := pathByUint8s([]uint8{uint8(23), uint8(82)})
+	payload4 := ledger.EmptyPayload()
+
+	expectedPayloads := make(map[ledger.Path]*ledger.Payload)
+	expectedPayloads[path1] = payload1
+	expectedPayloads[path2] = payload2
+	expectedPayloads[path3] = payload3
+	expectedPayloads[path4] = payload4
+
+	// Batch read one payload at a time (less efficient)
+	for path, payload := range expectedPayloads {
+		read := &ledger.TrieRead{RootHash: baseRoot, Paths: []ledger.Path{path}}
+		retPayloads, err := forest.Read(read)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(retPayloads))
+		if payload.IsEmpty() {
+			require.True(t, retPayloads[0].IsEmpty())
+		} else {
+			require.Equal(t, payload, retPayloads[0])
+		}
+	}
+
+	// Read single payload
+	for path, payload := range expectedPayloads {
+		read := &ledger.TrieReadSinglePayload{RootHash: baseRoot, Path: path}
+		retPayload, err := forest.ReadSinglePayload(read)
+		require.NoError(t, err)
+		if payload.IsEmpty() {
+			require.True(t, retPayload.IsEmpty())
+		} else {
+			require.Equal(t, payload, retPayload)
+		}
+	}
+}
+
 // TestForkingUpdates updates a base trie in two different ways. We expect
 // that for each update, a new trie is added to the forest preserving the
 // updated values independently of the other update.
