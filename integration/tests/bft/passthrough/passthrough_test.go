@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type PassThroughTestSuit struct {
+type PassThroughTestSuite struct {
 	Suite
 }
 
