@@ -483,6 +483,7 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 
 	block := unittest.BlockWithParentAndProposerFixture(genesis, conID.NodeID)
 	block.Header.View = 42
+	block.Header.LastViewTC.View = block.Header.View - 1
 	block.SetPayload(flow.Payload{})
 	proposal := unittest.ProposalFromBlock(&block)
 

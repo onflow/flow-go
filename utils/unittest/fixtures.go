@@ -325,6 +325,11 @@ func BlockWithParentAndProposerFixture(parent *flow.Header, proposer flow.Identi
 
 	block.Header.ProposerID = proposer
 	block.Header.ParentVoterIDs = []flow.Identifier{proposer}
+	if block.Header.LastViewTC != nil {
+		block.Header.LastViewTC.SignerIDs = []flow.Identifier{proposer}
+		block.Header.LastViewTC.TOHighQCViews = block.Header.LastViewTC.TOHighQCViews[:1]
+		block.Header.LastViewTC.TOHighestQC.SignerIDs = []flow.Identifier{proposer}
+	}
 
 	return *block
 }
@@ -422,6 +427,24 @@ func BlockHeaderFixtureOnChain(chainID flow.ChainID) flow.Header {
 func BlockHeaderWithParentFixture(parent *flow.Header) flow.Header {
 	height := parent.Height + 1
 	view := parent.View + 1 + uint64(rand.Intn(10)) // Intn returns [0, n)
+	var lastViewTC *flow.TimeoutCertificate
+	if view != parent.View+1 {
+		signers := IdentifierListFixture(4)
+		highestQC := QuorumCertificateFixture(func(qc *flow.QuorumCertificate) {
+			qc.View = parent.View
+		})
+		var highQCViews []uint64
+		for range signers {
+			highQCViews = append(highQCViews, highestQC.View)
+		}
+		lastViewTC = &flow.TimeoutCertificate{
+			View:          view - 1,
+			TOHighQCViews: highQCViews,
+			TOHighestQC:   highestQC,
+			SignerIDs:     signers,
+			SigData:       SignatureFixture(),
+		}
+	}
 	return flow.Header{
 		ChainID:            parent.ChainID,
 		ParentID:           parent.ID(),
@@ -433,6 +456,7 @@ func BlockHeaderWithParentFixture(parent *flow.Header) flow.Header {
 		ParentVoterSigData: QCSigDataFixture(),
 		ProposerID:         IdentifierFixture(),
 		ProposerSigData:    SignatureFixture(),
+		LastViewTC:         lastViewTC,
 	}
 }
 

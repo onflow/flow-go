@@ -341,5 +341,16 @@ func (mc *MockConsensus) extendBlock(blockView uint64, parent *flow.Header) *flo
 	nextBlock.View = blockView
 	nextBlock.ProposerID = mc.identities[int(blockView)%len(mc.identities)].NodeID
 	nextBlock.ParentVoterIDs = mc.identities.NodeIDs()
+	if nextBlock.View == parent.View+1 {
+		nextBlock.LastViewTC = nil
+	} else if nextBlock.LastViewTC != nil {
+		nextBlock.LastViewTC.View = blockView - 1
+		nextBlock.LastViewTC.SignerIDs = mc.identities.NodeIDs()
+		var highQCViews []uint64
+		for range nextBlock.LastViewTC.SignerIDs {
+			highQCViews = append(highQCViews, nextBlock.LastViewTC.TOHighestQC.View)
+		}
+		nextBlock.LastViewTC.TOHighQCViews = highQCViews
+	}
 	return &nextBlock
 }
