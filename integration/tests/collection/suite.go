@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	clusterstate "github.com/onflow/flow-go/state/cluster"
@@ -144,7 +145,7 @@ func (suite *CollectorSuite) Clusters() flow.ClusterList {
 	suite.Require().True(ok)
 
 	collectors := suite.net.Identities().Filter(filter.HasRole(flow.RoleCollection))
-	clusters, err := flow.NewClusterList(setup.Assignments, collectors)
+	clusters, err := factory.NewClusterList(setup.Assignments, collectors)
 	suite.Require().Nil(err)
 	return clusters
 }
