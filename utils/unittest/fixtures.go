@@ -831,6 +831,14 @@ func ResultApprovalFixture(opts ...func(*flow.ResultApproval)) *flow.ResultAppro
 	return &approval
 }
 
+func AttestationFixture() *flow.Attestation {
+	return &flow.Attestation{
+		BlockID:           IdentifierFixture(),
+		ExecutionResultID: IdentifierFixture(),
+		ChunkIndex:        uint64(0),
+	}
+}
+
 func StateCommitmentFixture() flow.StateCommitment {
 	var state flow.StateCommitment
 	_, _ = crand.Read(state[:])

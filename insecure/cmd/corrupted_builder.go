@@ -44,7 +44,7 @@ func (cnb *CorruptedNodeBuilder) enqueueCorruptibleConduitFactory() {
 		ccf := corruptible.NewCorruptibleConduitFactory(
 			cnb.FlowNodeBuilder.Logger,
 			cnb.FlowNodeBuilder.RootChainID,
-			cnb.FlowNodeBuilder.NodeID,
+			cnb.FlowNodeBuilder.Me,
 			cnb.FlowNodeBuilder.CodecFactory(), address)
 
 		cnb.FlowNodeBuilder.ConduitFactory = ccf
