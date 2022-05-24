@@ -604,7 +604,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 
 	t.Logf("BootstrapDir: %s \n", bootstrapDir)
 
-	bootstrapData, err := BootstrapNetwork(networkConf, bootstrapDir)
+	bootstrapData, err := BootstrapNetwork(networkConf, bootstrapDir, chainID)
 	require.Nil(t, err)
 
 	root := bootstrapData.Root
@@ -1055,8 +1055,7 @@ type BootstrapData struct {
 	ClusterRootBlocks []*cluster.Block
 }
 
-func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*BootstrapData, error) {
-	chainID := flow.Localnet
+func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID flow.ChainID) (*BootstrapData, error) {
 	chain := chainID.Chain()
 
 	// number of nodes
