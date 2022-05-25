@@ -24,7 +24,7 @@ ARG VERSION
 COPY . .
 
 RUN --mount=type=ssh \
-    --mount=type=cache,sharing=locked,target=/go/pkg/mod \
+RUN --mount=type=cache,sharing=locked,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     make crypto_setup_gopath
 
