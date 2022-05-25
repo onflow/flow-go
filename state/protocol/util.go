@@ -6,6 +6,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module/signature"
 )
 
 // IsNodeAuthorizedAt returns whether the node with the given ID is a valid
@@ -84,4 +85,31 @@ func IsEpochCommitted(epoch Epoch) (bool, error) {
 		return false, fmt.Errorf("unexpected error while checking epoch committed status: %w", err)
 	}
 	return true, nil
+}
+
+// FindGuarantors decodes the signer indices from the guarantee, and finds the guarantor identifiers from protocol state
+// Expected Error returns during normal operations:
+//  * signature.ErrIncompatibleBitVectorLength indicates that `signerIndices` has the wrong length
+//  * signature.ErrIllegallyPaddedBitVector is the vector is padded with bits other than 0
+//  * signature.ErrInvalidChecksum if the input is shorter than the expected checksum contained in the guarantee.SignerIndices
+func FindGuarantors(state State, guarantee *flow.CollectionGuarantee) ([]flow.Identifier, error) {
+	snapshot := state.AtBlockID(guarantee.ReferenceBlockID)
+	epochs := snapshot.Epochs()
+	epoch := epochs.Current()
+	cluster, err := epoch.ClusterByChainID(guarantee.ChainID)
+
+	if err != nil {
+		// protocol state must have validated the block that contains the guarantee, so the cluster
+		// must be found, otherwise, it's an internal error
+		return nil, fmt.Errorf(
+			"internal error retrieving collector clusters for guarantee (ReferenceBlockID: %v, ChainID: %v): %w",
+			guarantee.ReferenceBlockID, guarantee.ChainID, err)
+	}
+
+	guarantorIDs, err := signature.DecodeSignerIndicesToIdentifiers(cluster.Members().NodeIDs(), guarantee.SignerIndices)
+	if err != nil {
+		return nil, fmt.Errorf("could not decode signer indices for guarantee %v: %w", guarantee.ID(), err)
+	}
+
+	return guarantorIDs, nil
 }

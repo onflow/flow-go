@@ -27,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -40,8 +41,8 @@ func TestCombinedVoteProcessorV3(t *testing.T) {
 type CombinedVoteProcessorV3TestSuite struct {
 	VoteProcessorTestSuiteBase
 
-	thresholdTotalWeight uint64
-	rbSharesTotal        uint64
+	thresholdTotalWeight atomic.Uint64
+	rbSharesTotal        atomic.Uint64
 
 	packer *mockhotstuff.Packer
 
@@ -61,30 +62,30 @@ func (s *CombinedVoteProcessorV3TestSuite) SetupTest() {
 	s.proposal = helper.MakeProposal()
 
 	s.minRequiredShares = 9 // we require 9 RB shares to reconstruct signature
-	s.thresholdTotalWeight, s.rbSharesTotal = 0, 0
+	s.thresholdTotalWeight, s.rbSharesTotal = atomic.Uint64{}, atomic.Uint64{}
 
 	// setup threshold signature aggregator
 	s.rbSigAggregator.On("TrustedAdd", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		s.thresholdTotalWeight += s.sigWeight
+		s.thresholdTotalWeight.Add(s.sigWeight)
 	}).Return(func(signerID flow.Identifier, sig crypto.Signature) uint64 {
-		return s.thresholdTotalWeight
+		return s.thresholdTotalWeight.Load()
 	}, func(signerID flow.Identifier, sig crypto.Signature) error {
 		return nil
 	}).Maybe()
 	s.rbSigAggregator.On("TotalWeight").Return(func() uint64 {
-		return s.thresholdTotalWeight
+		return s.thresholdTotalWeight.Load()
 	}).Maybe()
 
 	// setup rb reconstructor
 	s.reconstructor.On("TrustedAdd", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		s.rbSharesTotal++
+		s.rbSharesTotal.Inc()
 	}).Return(func(signerID flow.Identifier, sig crypto.Signature) bool {
-		return s.rbSharesTotal >= s.minRequiredShares
+		return s.rbSharesTotal.Load() >= s.minRequiredShares
 	}, func(signerID flow.Identifier, sig crypto.Signature) error {
 		return nil
 	}).Maybe()
 	s.reconstructor.On("EnoughShares").Return(func() bool {
-		return s.rbSharesTotal >= s.minRequiredShares
+		return s.rbSharesTotal.Load() >= s.minRequiredShares
 	}).Maybe()
 
 	s.processor = &CombinedVoteProcessorV3{
@@ -132,7 +133,7 @@ func (s *CombinedVoteProcessorV3TestSuite) TestProcess_InvalidSignatureFormat() 
 	err := s.processor.Process(vote)
 	require.Error(s.T(), err)
 	require.True(s.T(), model.IsInvalidVoteError(err))
-	require.ErrorAs(s.T(), err, &model.ErrInvalidFormat)
+	require.True(s.T(), errors.Is(err, signature.ErrInvalidSignatureFormat), err)
 }
 
 // TestProcess_InvalidSignature tests that CombinedVoteProcessorV2 rejects invalid votes for the following scenarios:
@@ -398,7 +399,7 @@ func (s *CombinedVoteProcessorV3TestSuite) TestProcess_ConcurrentCreatingQC() {
 	s.reconstructor.On("EnoughShares").Return(true)
 
 	// at this point sending any vote should result in creating QC.
-	s.packer.On("Pack", s.proposal.Block.View, mock.Anything).Return(stakingSigners, unittest.RandomBytes(128), nil)
+	s.packer.On("Pack", s.proposal.Block.View, mock.Anything).Return(unittest.RandomBytes(100), unittest.RandomBytes(128), nil)
 	s.onQCCreatedState.On("onQCCreated", mock.Anything).Return(nil).Once()
 
 	var startupWg, shutdownWg sync.WaitGroup
@@ -512,8 +513,8 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 		// mock expected call to Packer
 		mergedSignerIDs := ([]flow.Identifier)(nil)
 		packedSigData := unittest.RandomBytes(128)
-		packer := &mockhotstuff.Packer{}
-		packer.On("Pack", block.View, mock.Anything).Run(func(args mock.Arguments) {
+		pcker := &mockhotstuff.Packer{}
+		pcker.On("Pack", block.View, mock.Anything).Run(func(args mock.Arguments) {
 			blockSigData := args.Get(1).(*hotstuff.BlockSignatureData)
 			// in the following, we check validity for each field of `blockSigData` individually
 
@@ -529,8 +530,13 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 			// check that aggregated signers are part of all votes signers
 			// due to concurrent processing it is possible that Aggregate will return less that we have actually aggregated
 			// but still enough to construct the QC
+			stakingAggregatorLock.Lock()
 			require.Subset(t, aggregatedStakingSigners, blockSigData.StakingSigners)
+			stakingAggregatorLock.Unlock()
+
+			beaconAggregatorLock.Lock()
 			require.Subset(t, aggregatedBeaconSigners, blockSigData.RandomBeaconSigners)
+			beaconAggregatorLock.Unlock()
 
 			// 2. CHECK: supermajority
 			// All participants have equal weights in this test. Per configuration, collecting `honestParticipants`
@@ -560,7 +566,10 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 			// fill merged signers with collected signers
 			mergedSignerIDs = append(blockSigData.StakingSigners, blockSigData.RandomBeaconSigners...)
 		}).Return(
-			func(uint64, *hotstuff.BlockSignatureData) []flow.Identifier { return mergedSignerIDs },
+			func(uint64, *hotstuff.BlockSignatureData) []byte {
+				signerIndices, _ := signature.EncodeSignersToIndices(mergedSignerIDs, mergedSignerIDs)
+				return signerIndices
+			},
 			func(uint64, *hotstuff.BlockSignatureData) []byte { return packedSigData },
 			func(uint64, *hotstuff.BlockSignatureData) error { return nil }).Once()
 
@@ -574,12 +583,15 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 				t.Fatalf("QC created more than once")
 			}
 
+			signerIndices, err := signature.EncodeSignersToIndices(mergedSignerIDs, mergedSignerIDs)
+			require.NoError(t, err)
+
 			// ensure that QC contains correct field
 			expectedQC := &flow.QuorumCertificate{
-				View:      block.View,
-				BlockID:   block.BlockID,
-				SignerIDs: mergedSignerIDs,
-				SigData:   packedSigData,
+				View:          block.View,
+				BlockID:       block.BlockID,
+				SignerIndices: signerIndices,
+				SigData:       packedSigData,
 			}
 			require.Equalf(t, expectedQC, qc, "QC should be equal to what we expect")
 		}
@@ -591,7 +603,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 			rbSigAggtor:       rbSigAggregator,
 			rbRector:          reconstructor,
 			onQCCreated:       onQCCreated,
-			packer:            packer,
+			packer:            pcker,
 			minRequiredWeight: minRequiredWeight,
 			done:              *atomic.NewBool(false),
 		}
@@ -721,7 +733,7 @@ func TestCombinedVoteProcessorV3_OnlyRandomBeaconSigners(testifyT *testing.T) {
 			require.Empty(testifyT, blockSigData.StakingSigners)
 			require.Empty(testifyT, blockSigData.AggregatedStakingSig)
 		}).
-		Return(unittest.IdentifierListFixture(11), unittest.RandomBytes(1017), nil).Once()
+		Return(unittest.RandomBytes(100), unittest.RandomBytes(1017), nil).Once()
 
 	err := processor.Process(vote)
 	require.NoError(testifyT, err)
@@ -802,14 +814,17 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCLiveness(testifyT *testing.T)
 				}
 				return nil
 			}).Maybe()
-		rbSigAggregator.On("Aggregate").Return(beaconSigners.NodeIDs(), []byte(combinedSigs[1]), nil).Once()
+		rbSigAggregator.On("Aggregate").Return([]flow.Identifier(beaconSigners.NodeIDs()), []byte(combinedSigs[1]), nil).Once()
 		reconstructor.On("Reconstruct").Return(combinedSigs[2], nil).Once()
 
 		// mock expected call to Packer
 		mergedSignerIDs := append(stakingSigners.NodeIDs(), beaconSigners.NodeIDs()...)
 		packedSigData := unittest.RandomBytes(128)
-		packer := &mockhotstuff.Packer{}
-		packer.On("Pack", block.View, mock.Anything).Return(mergedSignerIDs, packedSigData, nil)
+		pcker := &mockhotstuff.Packer{}
+
+		signerIndices, err := signature.EncodeSignersToIndices(mergedSignerIDs, mergedSignerIDs)
+		require.NoError(t, err)
+		pcker.On("Pack", block.View, mock.Anything).Return(signerIndices, packedSigData, nil)
 
 		// track if QC was created
 		qcCreated := atomic.NewBool(false)
@@ -829,7 +844,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCLiveness(testifyT *testing.T)
 			rbSigAggtor:       rbSigAggregator,
 			rbRector:          reconstructor,
 			onQCCreated:       onQCCreated,
-			packer:            packer,
+			packer:            pcker,
 			minRequiredWeight: minRequiredWeight,
 			done:              *atomic.NewBool(false),
 		}

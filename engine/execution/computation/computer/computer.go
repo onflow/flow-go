@@ -3,6 +3,7 @@ package computer
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"sync"
 	"time"
 
@@ -331,6 +332,12 @@ func (e *blockComputer) executeTransaction(
 	isSystemChunk bool,
 ) error {
 	startedAt := time.Now()
+
+	var memAllocBefore uint64
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	memAllocBefore = m.TotalAlloc
+
 	txID := txBody.ID()
 
 	// we capture two spans one for tx-based view and one for the current context (block-based) view
@@ -398,12 +405,19 @@ func (e *blockComputer) executeTransaction(
 	res.AddTransactionResult(&txResult)
 	res.AddComputationUsed(tx.ComputationUsed)
 
-	lg := e.log.With().
+	runtime.ReadMemStats(&m)
+	memAllocAfter := m.TotalAlloc
+
+	evt := e.log.With().
 		Hex("tx_id", txResult.TransactionID[:]).
 		Str("block_id", res.ExecutableBlock.ID().String()).
 		Str("traceID", traceID).
 		Uint64("computation_used", txResult.ComputationUsed).
-		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
+		Uint64("memory_used", tx.MemoryUsed).
+		Uint64("memAlloc", memAllocAfter-memAllocBefore).
+		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds())
+
+	lg := evt.
 		Logger()
 
 	if tx.Err != nil {

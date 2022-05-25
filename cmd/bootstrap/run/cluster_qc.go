@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/local"
 )
 
@@ -29,7 +30,8 @@ func GenerateClusterRootQC(signers []bootstrap.NodeInfo, allCommitteeMembers flo
 	}
 
 	// STEP 2: create VoteProcessor
-	committee, err := committees.NewStaticCommittee(allCommitteeMembers, flow.Identifier{}, nil, nil)
+	ordered := allCommitteeMembers.Sort(order.Canonical)
+	committee, err := committees.NewStaticCommittee(ordered, flow.Identifier{}, nil, nil)
 	if err != nil {
 		return nil, err
 	}

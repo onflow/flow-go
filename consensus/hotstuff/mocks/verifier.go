@@ -15,13 +15,13 @@ type Verifier struct {
 	mock.Mock
 }
 
-// VerifyQC provides a mock function with given fields: voters, sigData, block
-func (_m *Verifier) VerifyQC(voters flow.IdentityList, sigData []byte, block *model.Block) error {
-	ret := _m.Called(voters, sigData, block)
+// VerifyQC provides a mock function with given fields: signers, sigData, block
+func (_m *Verifier) VerifyQC(signers flow.IdentityList, sigData []byte, block *model.Block) error {
+	ret := _m.Called(signers, sigData, block)
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(flow.IdentityList, []byte, *model.Block) error); ok {
-		r0 = rf(voters, sigData, block)
+		r0 = rf(signers, sigData, block)
 	} else {
 		r0 = ret.Error(0)
 	}

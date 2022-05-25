@@ -8,7 +8,6 @@ import (
 )
 
 func TestVerifySystemChunk(t *testing.T) {
-	t.Skip("active-pacemaker, to be fixed")
 	suite.Run(t, new(VerifySystemChunkSuite))
 }
 

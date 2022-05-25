@@ -31,10 +31,8 @@ type Header struct {
 	Timestamp time.Time
 	// View number at which this block was proposed.
 	View uint64
-	// ParentVoterIDs is a list of voters who signed the parent block.
-	// A quorum certificate can be extracted from the header.
-	// This field is the SignerIDs field of the extracted quorum certificate.
-	ParentVoterIDs []Identifier
+	// ParentVoterIndices is a bitvector that represents all the voters for the parent block.
+	ParentVoterIndices []byte
 	// ParentVoterSigData is an aggregated signature over the parent block. Not a single cryptographic
 	// signature since the data represents cryptographic signatures serialized in some way (concatenation or other)
 	// A quorum certificate can be extracted from the header.
@@ -59,7 +57,7 @@ func (h Header) Body() interface{} {
 		PayloadHash        Identifier
 		Timestamp          uint64
 		View               uint64
-		ParentVoterIDs     []Identifier
+		ParentVoterIndices []byte
 		ParentVoterSigData []byte
 		ProposerID         Identifier
 		LastViewTC         interface{}
@@ -70,7 +68,7 @@ func (h Header) Body() interface{} {
 		PayloadHash:        h.PayloadHash,
 		Timestamp:          uint64(h.Timestamp.UnixNano()),
 		View:               h.View,
-		ParentVoterIDs:     h.ParentVoterIDs,
+		ParentVoterIndices: h.ParentVoterIndices,
 		ParentVoterSigData: h.ParentVoterSigData,
 		ProposerID:         h.ProposerID,
 		LastViewTC:         h.LastViewTC.Body(),
@@ -100,29 +98,21 @@ func (h Header) ID() Identifier {
 	defer mutexHeader.Unlock()
 
 	// compare these elements individually
-	if prevHeader.ParentVoterIDs != nil &&
+	if prevHeader.ParentVoterIndices != nil &&
 		prevHeader.ParentVoterSigData != nil &&
 		prevHeader.ProposerSigData != nil &&
-		len(h.ParentVoterIDs) == len(prevHeader.ParentVoterIDs) &&
+		len(h.ParentVoterIndices) == len(prevHeader.ParentVoterIndices) &&
 		len(h.ParentVoterSigData) == len(prevHeader.ParentVoterSigData) &&
 		len(h.ProposerSigData) == len(prevHeader.ProposerSigData) {
-		bNotEqual := false
 
-		for i, v := range h.ParentVoterIDs {
-			if v == prevHeader.ParentVoterIDs[i] {
-				continue
-			}
-			bNotEqual = true
-			break
-		}
-		if !bNotEqual &&
-			h.ChainID == prevHeader.ChainID &&
+		if h.ChainID == prevHeader.ChainID &&
 			h.Timestamp == prevHeader.Timestamp &&
 			h.Height == prevHeader.Height &&
 			h.ParentID == prevHeader.ParentID &&
 			h.View == prevHeader.View &&
 			h.PayloadHash == prevHeader.PayloadHash &&
 			bytes.Equal(h.ProposerSigData, prevHeader.ProposerSigData) &&
+			bytes.Equal(h.ParentVoterIndices, prevHeader.ParentVoterIndices) &&
 			bytes.Equal(h.ParentVoterSigData, prevHeader.ParentVoterSigData) &&
 			h.ProposerID == prevHeader.ProposerID &&
 			reflect.DeepEqual(h.LastViewTC, prevHeader.LastViewTC) {

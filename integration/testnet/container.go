@@ -44,6 +44,8 @@ func init() {
 // ContainerConfig represents configuration for a node container in the network.
 type ContainerConfig struct {
 	bootstrap.NodeInfo
+	// Corrupted indicates a container is running a binary implementing a malicious node
+	Corrupted             bool
 	ContainerName         string
 	LogLevel              zerolog.Level
 	Ghost                 bool
@@ -106,6 +108,7 @@ func NewContainerConfig(nodeName string, conf NodeConfig, networkKey, stakingKey
 		AdditionalFlags:       conf.AdditionalFlags,
 		Debug:                 conf.Debug,
 		SupportsUnstakedNodes: conf.SupportsUnstakedNodes,
+		Corrupted:             conf.Corrupted,
 	}
 
 	return containerConf
@@ -119,7 +122,10 @@ func (c *ContainerConfig) ImageName() string {
 	debugSuffix := ""
 	if c.Debug {
 		debugSuffix = "-debug"
+	} else if c.Corrupted {
+		debugSuffix = "-corrupted"
 	}
+
 	return fmt.Sprintf("%s/%s%s:latest", defaultRegistry, c.Role.String(), debugSuffix)
 }
 

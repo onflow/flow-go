@@ -266,7 +266,6 @@ func TestBootstrap_InvalidIdentities(t *testing.T) {
 	t.Run("missing role", func(t *testing.T) {
 		requiredRoles := []flow.Role{
 			flow.RoleConsensus,
-			flow.RoleCollection,
 			flow.RoleExecution,
 			flow.RoleVerification,
 		}
