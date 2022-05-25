@@ -75,7 +75,7 @@ func (r *SafetyRules) ProduceVote(proposal *model.Proposal, curView uint64) (*mo
 	if model.IsInvalidSignerError(err) {
 		// the proposer must be ejected since the proposal has already been validated,
 		// which ensures that the proposer was a valid committee member at the start of the epoch
-		return nil, model.NewNoVoteErrorf("not voting - proposer ejected: %w", err)
+		return nil, model.NewNoVoteErrorf("proposer ejected: %w", err)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("internal error retrieving Identity of proposer %x at block %x: %w", block.ProposerID, block.BlockID, err)
@@ -86,7 +86,7 @@ func (r *SafetyRules) ProduceVote(proposal *model.Proposal, curView uint64) (*mo
 	// have zero weight in the next epoch. Such vote can't be used to produce valid QCs.
 	_, err = r.committee.IdentityByBlock(block.BlockID, r.committee.Self())
 	if model.IsInvalidSignerError(err) {
-		return nil, model.NewNoVoteErrorf("not voting committee member for block %x: %w", block.BlockID, err)
+		return nil, model.NewNoVoteErrorf("committee member for block %x is invalid: %w", block.BlockID, err)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("could not get self identity: %w", err)

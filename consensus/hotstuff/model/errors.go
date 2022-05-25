@@ -20,10 +20,14 @@ var (
 
 // NoVoteError contains the reason of why hotstuff.SafetyRules refused to generate a `Vote` for the current view.
 type NoVoteError struct {
-	Msg string
+	Err error
 }
 
-func (e NoVoteError) Error() string { return e.Msg }
+func (e NoVoteError) Error() string { return fmt.Sprintf("not voting - %s", e.Err.Error()) }
+
+func (e NoVoteError) Unwrap() error {
+	return e.Err
+}
 
 // IsNoVoteError returns whether an error is NoVoteError
 func IsNoVoteError(err error) bool {
@@ -32,7 +36,7 @@ func IsNoVoteError(err error) bool {
 }
 
 func NewNoVoteErrorf(msg string, args ...interface{}) error {
-	return NoVoteError{Msg: fmt.Sprintf(msg, args...)}
+	return NoVoteError{Err: fmt.Errorf(msg, args...)}
 }
 
 // NoTimeoutError contains the reason of why hotstuff.SafetyRules refused to generate a `TimeoutObject` for the current view.

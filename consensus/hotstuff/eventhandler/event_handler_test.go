@@ -172,7 +172,7 @@ func NewVoter(t require.TestingT, lastVotedView uint64) *Voter {
 func (v *Voter) ProduceVote(block *model.Proposal, curView uint64) (*model.Vote, error) {
 	_, ok := v.votable[block.Block.BlockID]
 	if !ok {
-		return nil, model.NoVoteError{Msg: "block not found"}
+		return nil, model.NewNoVoteErrorf("block not found")
 	}
 	return createVote(block.Block), nil
 }
