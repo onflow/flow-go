@@ -29,7 +29,7 @@ func NewStakingSigner(
 
 	sc := &StakingSigner{
 		me:            me,
-		stakingHasher: crypto.NewBLSKMAC(encoding.CollectorVoteTag),
+		stakingHasher: crypto.NewBLSKMAC(signature.CollectorVoteTag),
 		signerID:      me.NodeID(),
 	}
 	return sc

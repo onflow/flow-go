@@ -1,4 +1,4 @@
-package encoding
+package signature
 
 // List of domain separation tags for protocol signatures.
 //
@@ -16,8 +16,8 @@ const protocolPrefix = "FLOW-"
 const version = "-V00-CS00-with-"
 
 // an example of domain tag output is :
-// FLOW-CERTAIN_DOMAIN-V00-CS00-with-
-// The
+// FLOW-CERTAIN_DOMAIN-V00-CS00-with-cipherSuite
+// cipherSuite is fixed by the crypto library
 func tag(domain string) string {
 	return protocolPrefix + domain + version
 }

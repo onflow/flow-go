@@ -9,6 +9,6 @@ import (
 // NewResultApprovalHasher generates and returns a hasher for signing
 // and verification of result approvals
 func NewResultApprovalHasher() hash.Hasher {
-	h := crypto.NewBLSKMAC(encoding.ResultApprovalTag)
+	h := crypto.NewBLSKMAC(signature.ResultApprovalTag)
 	return h
 }
