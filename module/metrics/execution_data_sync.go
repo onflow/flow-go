@@ -26,7 +26,7 @@ func NewExecutionDataRequesterCollector() *ExecutionDataRequesterCollector {
 			Name:      "fulfilled_height",
 			Namespace: namespaceExecutionDataSync,
 			Subsystem: subsystemExeDataRequester,
-			Help:      "the latest fulfilled height",
+			Help:      "the latest sealed height for which all execution data has been retrieved and stored locally",
 		}),
 		receiptsSkipped: promauto.NewCounter(prometheus.CounterOpts{
 			Name:      "receipts_skipped",
