@@ -67,7 +67,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(nil).
 			Times(2) // 1 collection + system collection
 
-		metrics.On("ExecutionTransactionExecuted", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		metrics.On("ExecutionTransactionExecuted", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).
 			Times(2 + 1) // 2 txs in collection + system chunk tx
 
@@ -377,7 +377,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		rt := &testRuntime{
 			executeTransaction: func(script runtime.Script, r runtime.Context) error {
 
-				program, err := r.Interface.GetProgram(contractLocation)
+				program, err := r.Interface.GetProgram(contractLocation) //nolint:staticcheck
 				require.NoError(t, err)
 				require.Nil(t, program)
 
@@ -442,7 +442,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 				// NOTE: set a program and revert all transactions but the system chunk transaction
 
-				program, err := r.Interface.GetProgram(contractLocation)
+				program, err := r.Interface.GetProgram(contractLocation) //nolint:staticcheck
 				require.NoError(t, err)
 
 				if executionCalls > collectionCount*transactionCount {
@@ -503,6 +503,10 @@ type testRuntime struct {
 }
 
 var _ runtime.Runtime = &testRuntime{}
+
+func (e *testRuntime) SetInvalidatedResourceValidationEnabled(_ bool) {
+	panic("SetInvalidatedResourceValidationEnabled not expected")
+}
 
 func (e *testRuntime) SetTracingEnabled(_ bool) {
 	panic("SetTracingEnabled not expected")
@@ -661,7 +665,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		Return(nil).
 		Times(1) // system collection
 
-	metrics.On("ExecutionTransactionExecuted", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+	metrics.On("ExecutionTransactionExecuted", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(nil).
 		Times(1) // system chunk tx
 
