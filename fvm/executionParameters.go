@@ -4,6 +4,7 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
+	"math"
 
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/errors"
@@ -127,7 +128,7 @@ func getExecutionMemoryLimit(
 	memoryLimitRaw, ok := value.(cadence.UInt64)
 	if value == nil || !ok {
 		// this is a non-fatal error. It is expected if the weights are not set up on the network yet.
-		return 0, errors.NewCouldNotGetExecutionParameterFromStateError(
+		return math.MaxUint64, errors.NewCouldNotGetExecutionParameterFromStateError(
 			service.Hex(),
 			blueprints.TransactionExecutionParametersPathDomain,
 			blueprints.TransactionFeesExecutionMemoryLimitPathIdentifier)
