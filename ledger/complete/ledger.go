@@ -140,8 +140,8 @@ func (l *Ledger) GetSingleValue(query *ledger.QuerySingleValue) (value ledger.Va
 	if err != nil {
 		return nil, err
 	}
-	trieRead := &ledger.TrieReadSinglePayload{RootHash: ledger.RootHash(query.State()), Path: path}
-	payload, err := l.forest.ReadSinglePayload(trieRead)
+	trieRead := &ledger.TrieReadSingleValue{RootHash: ledger.RootHash(query.State()), Path: path}
+	value, err = l.forest.ReadSingleValue(trieRead)
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +153,7 @@ func (l *Ledger) GetSingleValue(query *ledger.QuerySingleValue) (value ledger.Va
 	durationPerValue := time.Duration(readDuration.Nanoseconds()) * time.Nanosecond
 	l.metrics.ReadDurationPerItem(durationPerValue)
 
-	return payload.Value, nil
+	return value, nil
 }
 
 // Get read the values of the given keys at the given state

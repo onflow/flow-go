@@ -614,25 +614,25 @@ func TestReadSinglePayload(t *testing.T) {
 	// Batch read one payload at a time (less efficient)
 	for path, payload := range expectedPayloads {
 		read := &ledger.TrieRead{RootHash: baseRoot, Paths: []ledger.Path{path}}
-		retPayloads, err := forest.Read(read)
+		retValues, err := forest.Read(read)
 		require.NoError(t, err)
-		require.Equal(t, 1, len(retPayloads))
+		require.Equal(t, 1, len(retValues))
 		if payload.IsEmpty() {
-			require.True(t, retPayloads[0].IsEmpty())
+			require.Equal(t, 0, len(retValues[0]))
 		} else {
-			require.Equal(t, payload, retPayloads[0])
+			require.Equal(t, payload.Value, retValues[0])
 		}
 	}
 
-	// Read single payload
+	// Read single value
 	for path, payload := range expectedPayloads {
-		read := &ledger.TrieReadSinglePayload{RootHash: baseRoot, Path: path}
-		retPayload, err := forest.ReadSinglePayload(read)
+		read := &ledger.TrieReadSingleValue{RootHash: baseRoot, Path: path}
+		retValue, err := forest.ReadSingleValue(read)
 		require.NoError(t, err)
 		if payload.IsEmpty() {
-			require.True(t, retPayload.IsEmpty())
+			require.Equal(t, 0, len(retValue))
 		} else {
-			require.Equal(t, payload, retPayload)
+			require.Equal(t, payload.Value, retValue)
 		}
 	}
 }

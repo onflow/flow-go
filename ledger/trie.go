@@ -90,7 +90,7 @@ type TrieRead struct {
 }
 
 // TrieReadSinglePayload contains trie read query for a single payload
-type TrieReadSinglePayload struct {
+type TrieReadSingleValue struct {
 	RootHash RootHash
 	Path     Path
 }
