@@ -118,17 +118,17 @@ func (r *SafetyRules) ProduceVote(proposal *model.Proposal, curView uint64) (*mo
 //  * (nil, model.NoTimeoutError): If the safety module decides that it is not safe to timeout under current conditions.
 //    This is a sentinel error and _expected_ during normal operation.
 // All other errors are unexpected and potential symptoms of uncovered edge cases or corrupted internal state (fatal).
-func (r *SafetyRules) ProduceTimeout(curView uint64, highestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
+func (r *SafetyRules) ProduceTimeout(curView uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
 	lastTimeout := r.safetyData.LastTimeout
 	if lastTimeout != nil && lastTimeout.View == curView {
 		return lastTimeout, nil
 	}
 
-	if !r.IsSafeToTimeout(curView, highestQC, lastViewTC) {
+	if !r.IsSafeToTimeout(curView, newestQC, lastViewTC) {
 		return nil, model.NewNoTimeoutErrorf("not safe to time out under current conditions")
 	}
 
-	timeout, err := r.signer.CreateTimeout(curView, highestQC, lastViewTC)
+	timeout, err := r.signer.CreateTimeout(curView, newestQC, lastViewTC)
 	if err != nil {
 		return nil, fmt.Errorf("could not create timeout at view %d: %w", curView, err)
 	}
@@ -150,7 +150,7 @@ func (r *SafetyRules) IsSafeToVote(proposal *model.Proposal) error {
 	qcView := proposal.Block.QC.View
 
 	// Sanity check: block's view must be larger than the view of the included QC.
-	// As blocks should already be validated, failing this check is a symptom of an internal bug. 
+	// As blocks should already be validated, failing this check is a symptom of an internal bug.
 	if blockView <= qcView {
 		return fmt.Errorf("block's view %d must be larger than the view of the included QC %d", blockView, qcView)
 	}
@@ -174,7 +174,7 @@ func (r *SafetyRules) IsSafeToVote(proposal *model.Proposal) error {
 
 // IsSafeToExtend performs safety checks if proposal can be extended in case of recovery path, we will call
 // this function only if previous round resulted in TC, to know if it's safe to extend such proposal.
-// All checks here are validity conditions for the block. As we are expecting the blocks to be pre-validated, any failure here is a symptom of an internal bug. 
+// All checks here are validity conditions for the block. As we are expecting the blocks to be pre-validated, any failure here is a symptom of an internal bug.
 func (r *SafetyRules) IsSafeToExtend(blockView, qcView uint64, lastViewTC *flow.TimeoutCertificate) error {
 	// These checks satisfy voting rule 2b:
 	// [Recovery Path] If the previous round did *not* result in a QC, the leader of the
@@ -185,21 +185,21 @@ func (r *SafetyRules) IsSafeToExtend(blockView, qcView uint64, lastViewTC *flow.
 	if blockView != lastViewTC.View+1 {
 		return fmt.Errorf("last view TC %d is not sequential for block %d", lastViewTC.View, blockView)
 	}
-	if qcView < lastViewTC.TOHighestQC.View {
-		return fmt.Errorf("QC's view %d should be at least %d", qcView, lastViewTC.TOHighestQC.View)
+	if qcView < lastViewTC.TONewestQC.View {
+		return fmt.Errorf("QC's view %d should be at least %d", qcView, lastViewTC.TONewestQC.View)
 	}
 	return nil
 }
 
 // IsSafeToTimeout checks if it's safe to timeout with proposed data, i.e. timing out won't break safety.
-// highestQC is the valid QC with the greatest view that we have observed.
+// newestQC is the valid QC with the greatest view that we have observed.
 // lastViewTC is the TC for the previous view (might be nil)
-func (r *SafetyRules) IsSafeToTimeout(curView uint64, highestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) bool {
-	if highestQC.View < r.safetyData.LockedOneChainView ||
+func (r *SafetyRules) IsSafeToTimeout(curView uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) bool {
+	if newestQC.View < r.safetyData.LockedOneChainView ||
 		curView+1 <= r.safetyData.HighestAcknowledgedView ||
-		curView <= highestQC.View {
+		curView <= newestQC.View {
 		return false
 	}
 
-	return (curView == highestQC.View+1) || (curView == lastViewTC.View+1)
+	return (curView == newestQC.View+1) || (curView == lastViewTC.View+1)
 }

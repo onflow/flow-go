@@ -17,5 +17,5 @@ type Signer interface {
 
 	// CreateTimeout creates a timeout for given view. No errors return are
 	// expected during normal operations(incl presence of byz. actors).
-	CreateTimeout(curView uint64, highestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.TimeoutObject, error)
+	CreateTimeout(curView uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.TimeoutObject, error)
 }

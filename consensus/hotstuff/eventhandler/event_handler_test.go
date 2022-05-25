@@ -59,7 +59,7 @@ func (p *TestPaceMaker) OnPartialTC(curView uint64) {
 	panic("not yet implemented")
 }
 
-func (p *TestPaceMaker) HighestQC() *flow.QuorumCertificate {
+func (p *TestPaceMaker) NewestQC() *flow.QuorumCertificate {
 	panic("not yet implemented")
 }
 
@@ -177,7 +177,7 @@ func (v *Voter) ProduceVote(block *model.Proposal, curView uint64) (*model.Vote,
 	return createVote(block.Block), nil
 }
 
-func (v *Voter) ProduceTimeout(curView uint64, highestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
+func (v *Voter) ProduceTimeout(curView uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
 	panic("to be implemented")
 }
 
@@ -185,7 +185,7 @@ func (v *Voter) IsSafeToVote(proposal *model.Proposal) bool {
 	panic("to be implemented")
 }
 
-func (v *Voter) IsSafeToTimeout(curView uint64, highestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) bool {
+func (v *Voter) IsSafeToTimeout(curView uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) bool {
 	panic("to be implemented")
 }
 

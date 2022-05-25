@@ -18,7 +18,7 @@ var (
 	ErrViewForUnknownEpoch = fmt.Errorf("by-view query for unknown epoch")
 )
 
-// NoVoteError contains the reason of why the voter didn't vote for a block proposal.
+// NoVoteError contains the reason of why hotstuff.SafetyRules refused to generate a `Vote` for the current view.
 type NoVoteError struct {
 	Msg string
 }
@@ -35,7 +35,7 @@ func NewNoVoteErrorf(msg string, args ...interface{}) error {
 	return NoVoteError{Msg: fmt.Sprintf(msg, args...)}
 }
 
-// NoTimeoutError contains the reason of why the voter didn't time out for current view.
+// NoTimeoutError contains the reason of why hotstuff.SafetyRules refused to generate a `TimeoutObject` for the current view.
 type NoTimeoutError struct {
 	Msg string
 }

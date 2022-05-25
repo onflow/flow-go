@@ -8,10 +8,10 @@ import "github.com/onflow/flow-go/crypto"
 type TimeoutCertificate struct {
 	View uint64
 	// TOHighQCViews lists for each signer (in the same order) the view of the highest QC they supplied
-	// as part of their TimeoutObject message (specifically TimeoutObject.HighestQC.View).
+	// as part of their TimeoutObject message (specifically TimeoutObject.NewestQC.View).
 	TOHighQCViews []uint64
-	// TOHighestQC is the newest QC from all TimeoutObject that were aggregated for this certificate.
-	TOHighestQC *QuorumCertificate
+	// TONewestQC is the newest QC from all TimeoutObject that were aggregated for this certificate.
+	TONewestQC *QuorumCertificate
 	// SignerIDs holds the IDs of all HotStuff participants whose TimeoutObject was included in this certificate
 	SignerIDs []Identifier
 	// SigData is an aggregated signature from multiple TimeoutObjects, each from a different replica.
@@ -27,13 +27,13 @@ func (t *TimeoutCertificate) Body() interface{} {
 	return struct {
 		View        uint64
 		HighQCViews []uint64
-		HighestQC   QuorumCertificate
+		NewestQC    QuorumCertificate
 		SignerIDs   []Identifier
 		SigData     crypto.Signature
 	}{
 		View:        t.View,
 		HighQCViews: t.TOHighQCViews,
-		HighestQC:   *t.TOHighestQC,
+		NewestQC:    *t.TONewestQC,
 		SignerIDs:   t.SignerIDs,
 		SigData:     t.SigData,
 	}

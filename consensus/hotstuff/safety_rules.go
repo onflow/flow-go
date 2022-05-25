@@ -16,7 +16,7 @@ type SafetyData struct {
 	LockedOneChainView uint64
 	// HighestAcknowledgedView is the highest view where we have voted or triggered a timeout
 	HighestAcknowledgedView uint64
-	// LastTimeout is the last timeout that was produced by this node (may be nil if no timeout occurred yet) 
+	// LastTimeout is the last timeout that was produced by this node (may be nil if no timeout occurred yet)
 	LastTimeout *model.TimeoutObject
 }
 
@@ -36,9 +36,9 @@ type SafetyRules interface {
 	ProduceVote(proposal *model.Proposal, curView uint64) (*model.Vote, error)
 	// ProduceTimeout takes current view, highest locally known QC and last round TC (might be nil) and decides whether to produce timeout for current view.
 	// Returns:
-	//  * (timeout, nil): It is safe to timeout for current view using highestQC and lastViewTC.
+	//  * (timeout, nil): It is safe to timeout for current view using newestQC and lastViewTC.
 	//  * (nil, model.NoTimeoutError): If the safety module decides that it is not safe to timeout under current conditions.
 	//    This is a sentinel error and _expected_ during normal operation.
 	// All other errors are unexpected and potential symptoms of uncovered edge cases or corrupted internal state (fatal).
-	ProduceTimeout(curView uint64, highestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.TimeoutObject, error)
+	ProduceTimeout(curView uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.TimeoutObject, error)
 }

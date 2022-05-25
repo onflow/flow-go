@@ -325,7 +325,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 
 	livnessData := &hotstuff.LivenessData{
 		CurrentView: rootQC.View + 1,
-		HighestQC:   rootQC,
+		NewestQC:    rootQC,
 	}
 
 	// initialize the pacemaker

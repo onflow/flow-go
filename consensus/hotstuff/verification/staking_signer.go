@@ -82,9 +82,9 @@ func (c *StakingSigner) CreateVote(block *model.Block) (*model.Vote, error) {
 }
 
 // CreateTimeout will create a signed timeout object for the given view.
-func (c *StakingSigner) CreateTimeout(curView uint64, highestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
+func (c *StakingSigner) CreateTimeout(curView uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
 	// create timeout object specific message
-	msg := MakeTimeoutMessage(curView, highestQC.View)
+	msg := MakeTimeoutMessage(curView, newestQC.View)
 	sigData, err := c.me.Sign(msg, c.stakingHasher)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate signature for timeout object at view %d: %w", curView, err)
@@ -92,7 +92,7 @@ func (c *StakingSigner) CreateTimeout(curView uint64, highestQC *flow.QuorumCert
 
 	timeout := &model.TimeoutObject{
 		View:       curView,
-		HighestQC:  highestQC,
+		NewestQC:   newestQC,
 		LastViewTC: lastViewTC,
 		SignerID:   c.signerID,
 		SigData:    sigData,
