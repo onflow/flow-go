@@ -91,7 +91,7 @@ There are many ways to implement this interface, but one possible approach is as
 * Let `RangeStart` be equal to `LocalFinalizedHeight + 1`
 * Let `RangeEnd` be the smaller of `TargetFinalizedHeight` and `PendingStart + DefaultRangeSize`
 
-The reason we keep track of `PendingStart` is to ensure that `RangeEnd` eventually increases even if the local finalized height doesn't. This is needed to address the last item in [Potential Problems](#potential-problems). 
+The reason we keep track of `PendingStart` is to ensure that `RangeEnd` eventually increases even if the local finalized height doesn't. This is needed to address the second last item in [Potential Problems](#potential-problems). 
 
 The target finalized height represents the speculated finalized block height of the overall chain, and should reflect the Sync Height Responses that have been received while accounting for the possibility that some of these responses are malicious. Therefore, the Sync Height Response processing logic should incorporate some sort of expiration / filtering mechanism. The details of this logic can be abstracted with an interface:
 

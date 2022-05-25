@@ -1,6 +1,8 @@
 package fvm
 
 import (
+	"context"
+
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/programs"
@@ -23,7 +25,7 @@ func getAccount(
 	}
 
 	if ctx.ServiceAccountEnabled {
-		env := NewScriptEnvironment(ctx, vm, sth, programs)
+		env := NewScriptEnvironment(context.Background(), ctx, vm, sth, programs)
 		balance, err := env.GetAccountBalance(common.Address(address))
 		if err != nil {
 			return nil, err

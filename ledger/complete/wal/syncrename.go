@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/rs/zerolog"
 )
 
 type WriterSeekerCloser interface {
@@ -19,6 +21,7 @@ type WriterSeekerCloser interface {
 // to target one as the last step. This help avoid situation when writing is
 // interrupted  and unusable file but with target name exists.
 type SyncOnCloseRenameFile struct {
+	logger     *zerolog.Logger
 	file       *os.File
 	targetName string
 	savedError error // savedError is the first error returned from Write.  Close() renames temp file to target file only if savedError is nil.
@@ -48,6 +51,13 @@ func (s *SyncOnCloseRenameFile) Close() error {
 	err = s.file.Sync()
 	if err != nil {
 		return fmt.Errorf("cannot sync file %s: %w", s.file.Name(), err)
+	}
+
+	// s.file.Sync() was already called, so we pass fsync=false
+	err = evictFileFromLinuxPageCache(s.file, false, s.logger)
+	if err != nil {
+		s.logger.Warn().Msgf("failed to evict file %s from Linux page cache: %s", s.targetName, err)
+		// No need to return this error because we're only "advising" Linux to evict a file from cache.
 	}
 
 	err = s.file.Close()

@@ -357,6 +357,7 @@ func (bc *BaseChainSuite) SetupChain() {
 	// ~~~~~~~~~~~~~~~~~~~~~~~ SETUP RECEIPTS MEMPOOL ~~~~~~~~~~~~~~~~~~~~~~ //
 	bc.ReceiptsPL = &mempool.ExecutionTree{}
 	bc.ReceiptsPL.On("Size").Return(uint(0)).Maybe() // only for metrics
+	bc.ReceiptsPL.On("HasReceipt", mock.AnythingOfType("*flow.ExecutionReceipt")).Return(false)
 
 	bc.PendingReceipts = &mempool.PendingReceipts{}
 

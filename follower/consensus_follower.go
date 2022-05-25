@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/module/util"
 )
 
@@ -32,14 +33,15 @@ type ConsensusFollower interface {
 
 // Config contains the configurable fields for a `ConsensusFollower`.
 type Config struct {
-	networkPrivKey crypto.PrivateKey   // the network private key of this node
-	bootstrapNodes []BootstrapNodeInfo // the bootstrap nodes to use
-	bindAddr       string              // address to bind on
-	db             *badger.DB          // the badger DB storage to use for the protocol state
-	dataDir        string              // directory to store the protocol state (if the badger storage is not provided)
-	bootstrapDir   string              // path to the bootstrap directory
-	logLevel       string              // log level
-	exposeMetrics  bool                // whether to expose metrics
+	networkPrivKey crypto.PrivateKey       // the network private key of this node
+	bootstrapNodes []BootstrapNodeInfo     // the bootstrap nodes to use
+	bindAddr       string                  // address to bind on
+	db             *badger.DB              // the badger DB storage to use for the protocol state
+	dataDir        string                  // directory to store the protocol state (if the badger storage is not provided)
+	bootstrapDir   string                  // path to the bootstrap directory
+	logLevel       string                  // log level
+	exposeMetrics  bool                    // whether to expose metrics
+	syncConfig     *synchronization.Config // sync core configuration
 }
 
 type Option func(c *Config)
@@ -78,6 +80,12 @@ func WithDB(db *badger.DB) Option {
 func WithExposeMetrics(expose bool) Option {
 	return func(c *Config) {
 		c.exposeMetrics = expose
+	}
+}
+
+func WithSyncCoreConfig(config *synchronization.Config) Option {
+	return func(c *Config) {
+		c.syncConfig = config
 	}
 }
 
@@ -132,6 +140,9 @@ func getBaseOptions(config *Config) []cmd.Option {
 	}
 	if config.exposeMetrics {
 		options = append(options, cmd.WithMetricsEnabled(config.exposeMetrics))
+	}
+	if config.syncConfig != nil {
+		options = append(options, cmd.WithSyncCoreConfig(*config.syncConfig))
 	}
 
 	return options

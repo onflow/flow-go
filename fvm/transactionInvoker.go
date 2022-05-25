@@ -165,6 +165,11 @@ func (i *TransactionInvoker) Process(
 
 	// read computationUsed from the environment. This will be used to charge fees.
 	computationUsed := env.ComputationUsed()
+	memoryUsed := env.MemoryUsed()
+
+	// log te execution intensities here, so tha they do not contain data from storage limit checks and
+	// transaction deduction, because the payer is not charged for those.
+	i.logExecutionIntensities(sth, txIDStr)
 
 	// disable the limit checks on states
 	sth.DisableAllLimitEnforcements()
@@ -188,7 +193,12 @@ func (i *TransactionInvoker) Process(
 
 	// if there is still no error check if all account storage limits are ok
 	if txError == nil {
+		// disable the computation/memory limit checks on storage checks,
+		// so we don't error from computation/memory limits on this part.
+		// We cannot charge the user for this part, since fee deduction already happened.
+		sth.DisableAllLimitEnforcements()
 		txError = NewTransactionStorageLimiter().CheckLimits(env, sth.State().UpdatedAddresses())
+		sth.EnableAllLimitEnforcements()
 	}
 
 	// it there was any transaction error clear changes and try to deduct fees again
@@ -230,7 +240,6 @@ func (i *TransactionInvoker) Process(
 				Uint64("blockHeight", blockHeight).
 				Msg("transaction fee deduction executed with error")
 
-			i.logExecutionIntensities(sth, txIDStr)
 			return feesError
 		}
 	}
@@ -238,6 +247,7 @@ func (i *TransactionInvoker) Process(
 	// if tx failed this will only contain fee deduction logs
 	proc.Logs = append(proc.Logs, env.Logs()...)
 	proc.ComputationUsed = proc.ComputationUsed + computationUsed
+	proc.MemoryUsed = proc.MemoryUsed + memoryUsed
 
 	// based on the contract updates we decide how to clean up the programs
 	// for failed transactions we also do the same as
@@ -248,7 +258,6 @@ func (i *TransactionInvoker) Process(
 	proc.Events = append(proc.Events, env.Events()...)
 	proc.ServiceEvents = append(proc.ServiceEvents, env.ServiceEvents()...)
 
-	i.logExecutionIntensities(sth, txIDStr)
 	return txError
 }
 
@@ -307,7 +316,7 @@ func valueDeclarations(ctx *Context, env Environment) []runtime.ValueDeclaration
 			Kind:           common.DeclarationKindFunction,
 			IsConstant:     true,
 			ArgumentLabels: nil,
-			Value: interpreter.NewHostFunctionValue(
+			Value: interpreter.NewUnmeteredHostFunctionValue(
 				func(invocation interpreter.Invocation) interpreter.Value {
 					address, ok := invocation.Arguments[0].(interpreter.AddressValue)
 					if !ok {

@@ -212,3 +212,91 @@ func TestPostShutdown(t *testing.T) {
 		"shutdown 3",
 	}, logs)
 }
+
+func TestOverrideComponent(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+
+	nb := FlowNode("scaffold test")
+	nb.componentBuilder = component.NewComponentManagerBuilder()
+
+	logger := testLog{}
+
+	readyFn := func(name string) <-chan struct{} {
+		ready := make(chan struct{})
+		defer close(ready)
+		logger.Logf("%s ready", name)
+		return ready
+	}
+	doneFn := func(name string) <-chan struct{} {
+		done := make(chan struct{})
+		defer close(done)
+		logger.Logf("%s done", name)
+		return done
+	}
+
+	name1 := "component 1"
+	nb.Component(name1, func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		logger.Logf("%s initialized", name1)
+		return &testReadyDone{
+			name:    name1,
+			readyFn: readyFn,
+			doneFn:  doneFn,
+		}, nil
+	})
+
+	name2 := "component 2"
+	nb.Component(name2, func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		logger.Logf("%s initialized", name2)
+		return &testReadyDone{
+			name:    name2,
+			readyFn: readyFn,
+			doneFn:  doneFn,
+		}, nil
+	})
+
+	name3 := "component 3"
+	nb.Component(name3, func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		logger.Logf("%s initialized", name3)
+		return &testReadyDone{
+			name:    name3,
+			readyFn: readyFn,
+			doneFn:  doneFn,
+		}, nil
+	})
+
+	// Overrides second component
+	nb.OverrideComponent(name2, func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		logger.Logf("%s overridden", name2)
+		return &testReadyDone{
+			name:    name2,
+			readyFn: readyFn,
+			doneFn:  doneFn,
+		}, nil
+	})
+
+	err := nb.handleComponents()
+	assert.NoError(t, err)
+
+	cm := nb.componentBuilder.Build()
+
+	cm.Start(signalerCtx)
+	<-cm.Ready()
+
+	logs := logger.logs
+
+	assert.Len(t, logs, 6)
+
+	// components are initialized in a specific order, so check that the order is correct
+	assert.Equal(t, []string{
+		"component 1 initialized",
+		"component 1 ready",
+		"component 2 overridden", // overridden version of 2 should be initialized.
+		"component 2 ready",
+		"component 3 initialized",
+		"component 3 ready",
+	}, logs)
+
+	cancel()
+	<-cm.Done()
+}

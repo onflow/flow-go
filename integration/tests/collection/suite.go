@@ -13,9 +13,10 @@ import (
 	ghostclient "github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/convert"
 	"github.com/onflow/flow-go/integration/testnet"
-	"github.com/onflow/flow-go/integration/tests/common"
+	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	clusterstate "github.com/onflow/flow-go/state/cluster"
@@ -66,7 +67,7 @@ func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
 		Str("testcase", suite.T().Name()).
 		Logger()
 	suite.log = logger
-	suite.log.Info().Msgf("================> SetupTest")
+	suite.log.Info().Msg("================> SetupTest")
 
 	var (
 		conNode = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost())
@@ -103,7 +104,7 @@ func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
 	suite.net.Start(suite.ctx)
 
 	// create an account to use for sending transactions
-	suite.acct.addr, suite.acct.key, suite.acct.signer = common.GetAccount(suite.net.Root().Header.ChainID.Chain())
+	suite.acct.addr, suite.acct.key, suite.acct.signer = lib.GetAccount(suite.net.Root().Header.ChainID.Chain())
 	suite.serviceAccountIdx = 2
 
 	// subscribe to the ghost
@@ -120,16 +121,20 @@ func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
 }
 
 func (s *CollectorSuite) TearDownTest() {
-	s.log.Info().Msgf("================> Start TearDownTest")
-	s.net.Remove()
-	s.cancel()
-	s.log.Info().Msgf("================> Finish TearDownTest")
+	s.log.Info().Msg("================> Start TearDownTest")
+	if s.net != nil {
+		s.net.Remove()
+	}
+	if s.cancel != nil {
+		s.cancel()
+	}
+	s.log.Info().Msg("================> Finish TearDownTest")
 }
 
 // Ghost returns a client for the ghost node.
 func (suite *CollectorSuite) Ghost() *ghostclient.GhostClient {
 	ghost := suite.net.ContainerByID(suite.ghostID)
-	client, err := common.GetGhostClient(ghost)
+	client, err := lib.GetGhostClient(ghost)
 	require.NoError(suite.T(), err, "could not get ghost client")
 	return client
 }
@@ -140,7 +145,7 @@ func (suite *CollectorSuite) Clusters() flow.ClusterList {
 	suite.Require().True(ok)
 
 	collectors := suite.net.Identities().Filter(filter.HasRole(flow.RoleCollection))
-	clusters, err := flow.NewClusterList(setup.Assignments, collectors)
+	clusters, err := factory.NewClusterList(setup.Assignments, collectors)
 	suite.Require().Nil(err)
 	return clusters
 }

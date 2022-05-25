@@ -10,7 +10,7 @@ import (
 func TestGetBlock_InvalidParse(t *testing.T) {
 	var getBlock GetBlock
 
-	tooLong := make([]string, MaxAllowedHeights+1)
+	tooLong := make([]string, MaxBlockRequestHeightRange+1)
 	for i := range tooLong {
 		tooLong[i] = fmt.Sprintf("%d", i)
 	}

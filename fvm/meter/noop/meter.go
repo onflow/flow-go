@@ -22,7 +22,7 @@ func (m *Meter) NewChild() interfaceMeter.Meter {
 }
 
 // MergeMeter merges two noop meters
-func (m *Meter) MergeMeter(_ interfaceMeter.Meter) error {
+func (m *Meter) MergeMeter(child interfaceMeter.Meter, enforceLimits bool) error {
 	return nil
 }
 
@@ -32,7 +32,7 @@ func (m *Meter) MeterComputation(_ common.ComputationKind, _ uint) error {
 }
 
 // ComputationIntensities returns an empty map
-func (m *Meter) ComputationIntensities() interfaceMeter.MeteredIntensities {
+func (m *Meter) ComputationIntensities() interfaceMeter.MeteredComputationIntensities {
 	return map[common.ComputationKind]uint{}
 }
 
@@ -47,13 +47,13 @@ func (m *Meter) TotalComputationLimit() uint {
 }
 
 // MeterMemory is a noop
-func (m *Meter) MeterMemory(_ common.ComputationKind, _ uint) error {
+func (m *Meter) MeterMemory(_ common.MemoryKind, _ uint) error {
 	return nil
 }
 
 // MemoryIntensities returns an empty map
-func (m *Meter) MemoryIntensities() interfaceMeter.MeteredIntensities {
-	return map[common.ComputationKind]uint{}
+func (m *Meter) MemoryIntensities() interfaceMeter.MeteredMemoryIntensities {
+	return map[common.MemoryKind]uint{}
 }
 
 // TotalMemoryUsed always returns zero

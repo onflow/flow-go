@@ -1,6 +1,7 @@
 package fvm
 
 import (
+	"context"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -47,6 +48,7 @@ type ScriptEnv struct {
 	logs          []string
 	rng           *rand.Rand
 	traceSpan     opentracing.Span
+	reqContext    context.Context
 }
 
 func (e *ScriptEnv) Context() *Context {
@@ -58,7 +60,8 @@ func (e *ScriptEnv) VM() *VirtualMachine {
 }
 
 func NewScriptEnvironment(
-	ctx Context,
+	reqContext context.Context,
+	fvmContext Context,
 	vm *VirtualMachine,
 	sth *state.StateHolder,
 	programs *programs.Programs,
@@ -68,10 +71,10 @@ func NewScriptEnvironment(
 	uuidGenerator := state.NewUUIDGenerator(sth)
 	programsHandler := handler.NewProgramsHandler(programs, sth)
 	accountKeys := handler.NewAccountKeyHandler(accounts)
-	metrics := handler.NewMetricsHandler(ctx.Metrics)
+	metrics := handler.NewMetricsHandler(fvmContext.Metrics)
 
 	env := &ScriptEnv{
-		ctx:           ctx,
+		ctx:           fvmContext,
 		sth:           sth,
 		vm:            vm,
 		metrics:       metrics,
@@ -79,16 +82,20 @@ func NewScriptEnvironment(
 		accountKeys:   accountKeys,
 		uuidGenerator: uuidGenerator,
 		programs:      programsHandler,
+		reqContext:    reqContext,
 	}
 
 	env.contracts = handler.NewContractHandler(
 		accounts,
-		true,
+		func() bool {
+			return true
+		},
+		func() []common.Address { return []common.Address{} },
 		func() []common.Address { return []common.Address{} },
 		func(address runtime.Address, code []byte) (bool, error) { return false, nil })
 
-	if ctx.BlockHeader != nil {
-		env.seedRNG(ctx.BlockHeader)
+	if fvmContext.BlockHeader != nil {
+		env.seedRNG(fvmContext.BlockHeader)
 	}
 
 	env.setMeteringWeights()
@@ -104,21 +111,25 @@ func (e *ScriptEnv) setMeteringWeights() {
 		return
 	}
 
-	computationWeights, memoryWeights, err := getExecutionWeights(e, e.accounts)
-
+	computationWeights, err := getExecutionEffortWeights(e, e.accounts)
 	if err != nil {
 		e.ctx.Logger.
 			Info().
 			Err(err).
-			Msg("could not set execution weights. Using defaults")
-		return
+			Msg("could not set execution effort weights. Using defaults")
+	} else {
+		m.SetComputationWeights(computationWeights)
 	}
 
-	m.SetComputationWeights(computationWeights)
-	m.SetMemoryWeights(memoryWeights)
-}
-
-func (e *ScriptEnv) ResourceOwnerChanged(_ *interpreter.CompositeValue, _ common.Address, _ common.Address) {
+	memoryWeights, err := getExecutionMemoryWeights(e, e.accounts)
+	if err != nil {
+		e.ctx.Logger.
+			Info().
+			Err(err).
+			Msg("could not set execution memory weights. Using defaults")
+	} else {
+		m.SetMemoryWeights(memoryWeights)
+	}
 }
 
 func (e *ScriptEnv) seedRNG(header *flow.Header) {
@@ -518,7 +529,30 @@ func (e *ScriptEnv) GenerateUUID() (uint64, error) {
 	return uuid, err
 }
 
+func (e *ScriptEnv) checkContext() error {
+	// in the future this context check should be done inside the cadence
+	select {
+	case <-e.reqContext.Done():
+		err := e.reqContext.Err()
+		if errors.Is(err, context.DeadlineExceeded) {
+			return errors.NewScriptExecutionTimedOutError()
+		}
+		return errors.NewScriptExecutionCancelledError(err)
+	default:
+		return nil
+	}
+}
+
 func (e *ScriptEnv) meterComputation(kind common.ComputationKind, intensity uint) error {
+	// this method is called on every unit of operation, so
+	// checking the context here is the most likely would capture
+	// timeouts or cancellation as soon as they happen, though
+	// we might revisit this when optimizing script execution
+	// by only checking on specific kind of meterComputation calls.
+	if err := e.checkContext(); err != nil {
+		return err
+	}
+
 	if e.sth.EnforceComputationLimits {
 		return e.sth.State().MeterComputation(kind, intensity)
 	}
@@ -533,13 +567,28 @@ func (e *ScriptEnv) ComputationUsed() uint64 {
 	return uint64(e.sth.State().TotalComputationUsed())
 }
 
-func (e *ScriptEnv) DecodeArgument(b []byte, _ cadence.Type) (cadence.Value, error) {
+func (e *ScriptEnv) meterMemory(kind common.MemoryKind, intensity uint) error {
+	if e.sth.EnforceMemoryLimits() {
+		return e.sth.State().MeterMemory(kind, intensity)
+	}
+	return nil
+}
+
+func (e *ScriptEnv) MeterMemory(usage common.MemoryUsage) error {
+	return e.meterMemory(usage.Kind, uint(usage.Amount))
+}
+
+func (e *ScriptEnv) MemoryUsed() uint64 {
+	return uint64(e.sth.State().TotalMemoryUsed())
+}
+
+func (e *ScriptEnv) DecodeArgument(b []byte, t cadence.Type) (cadence.Value, error) {
 	if e.isTraceable() && e.ctx.ExtensiveTracing {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvDecodeArgument)
 		defer sp.Finish()
 	}
 
-	v, err := jsoncdc.Decode(b)
+	v, err := jsoncdc.Decode(e, b)
 	if err != nil {
 		err = errors.NewInvalidArgumentErrorf("argument is not json decodable: %w", err)
 		return nil, fmt.Errorf("decodeing argument failed: %w", err)
@@ -582,7 +631,6 @@ func (e *ScriptEnv) VerifySignature(
 	}
 
 	valid, err := crypto.VerifySignatureFromRuntime(
-		e.ctx.SignatureVerifier,
 		signature,
 		tag,
 		signedData,
@@ -832,4 +880,12 @@ func (e *ScriptEnv) BLSAggregateSignatures(sigs [][]byte) ([]byte, error) {
 
 func (e *ScriptEnv) BLSAggregatePublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
 	return crypto.AggregatePublicKeys(keys)
+}
+
+func (e *ScriptEnv) ResourceOwnerChanged(
+	*interpreter.Interpreter,
+	*interpreter.CompositeValue,
+	common.Address,
+	common.Address,
+) {
 }
