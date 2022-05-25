@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/fxamacker/cbor/v2"
+	cbor "github.com/fxamacker/cbor/v2"
 
 	"github.com/onflow/flow-go/model/encoding"
 )
