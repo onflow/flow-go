@@ -1,3 +1,4 @@
+//go:build linux || darwin
 /*
 	Package binstat implements file based code statistics in bins.
 
