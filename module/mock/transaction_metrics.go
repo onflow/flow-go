@@ -21,11 +21,6 @@ func (_m *TransactionMetrics) ScriptExecuted(dur time.Duration, size int) {
 	_m.Called(dur, size)
 }
 
-// TransactionResultFetched provides a mock function with given fields: dur, size
-func (_m *TransactionMetrics) TransactionResultFetched(dur time.Duration, size int) {
-	_m.Called(dur, size)
-}
-
 // TransactionExecuted provides a mock function with given fields: txID, when
 func (_m *TransactionMetrics) TransactionExecuted(txID flow.Identifier, when time.Time) {
 	_m.Called(txID, when)
@@ -44,6 +39,11 @@ func (_m *TransactionMetrics) TransactionFinalized(txID flow.Identifier, when ti
 // TransactionReceived provides a mock function with given fields: txID, when
 func (_m *TransactionMetrics) TransactionReceived(txID flow.Identifier, when time.Time) {
 	_m.Called(txID, when)
+}
+
+// TransactionResultFetched provides a mock function with given fields: dur, size
+func (_m *TransactionMetrics) TransactionResultFetched(dur time.Duration, size int) {
+	_m.Called(dur, size)
 }
 
 // TransactionSubmissionFailed provides a mock function with given fields:
