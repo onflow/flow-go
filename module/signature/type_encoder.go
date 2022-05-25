@@ -3,15 +3,14 @@ package signature
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/encoding"
 )
 
 const SigLen = crypto.SignatureLenBLSBLS12381
 
 // EncodeSingleSig encodes a single signature into signature data as required by the consensus design.
-func EncodeSingleSig(sigType hotstuff.SigType, sig crypto.Signature) []byte {
+func EncodeSingleSig(sigType encoding.SigType, sig crypto.Signature) []byte {
 	t := byte(sigType)
 	encoded := make([]byte, 0, len(sig)+1)
 	encoded = append(encoded, t)
@@ -22,16 +21,16 @@ func EncodeSingleSig(sigType hotstuff.SigType, sig crypto.Signature) []byte {
 // DecodeSingleSig decodes the signature data into a cryptographic signature and a type as required by
 // the consensus design. Cryptographic validity of signatures is _not_ checked.
 // It returns:
-//  - 0, nil, ErrInvalidFormat if the sig type is invalid (covers nil or empty sigData)
+//  - 0, nil, ErrInvalidSignatureFormat if the sig type is invalid (covers nil or empty sigData)
 //  - sigType, signature, nil if the sig type is valid and the decoding is done successfully.
-func DecodeSingleSig(sigData []byte) (hotstuff.SigType, crypto.Signature, error) {
+func DecodeSingleSig(sigData []byte) (encoding.SigType, crypto.Signature, error) {
 	if len(sigData) == 0 {
-		return 0, nil, fmt.Errorf("empty sig data: %w", model.ErrInvalidFormat)
+		return 0, nil, fmt.Errorf("empty sig data: %w", ErrInvalidSignatureFormat)
 	}
 
-	sigType := hotstuff.SigType(sigData[0])
+	sigType := encoding.SigType(sigData[0])
 	if !sigType.Valid() {
-		return 0, nil, fmt.Errorf("invalid sig type %v: %w", sigType, model.ErrInvalidFormat)
+		return 0, nil, fmt.Errorf("invalid sig type %v: %w", sigType, ErrInvalidSignatureFormat)
 	}
 
 	sig := crypto.Signature(sigData[1:])
@@ -59,7 +58,7 @@ func EncodeDoubleSig(stakingSig crypto.Signature, beaconSig crypto.Signature) []
 //    and the tailing half random beacon sig
 //  - staking signature, nil, nil:
 //    if sigData is the size of a BLS signature, we interpret sigData entirely as staking signature
-//  - nil, nil, ErrInvalidFormat if the sig type is invalid (covers nil or empty sigData)
+//  - nil, nil, ErrInvalidSignatureFormat if the sig type is invalid (covers nil or empty sigData)
 func DecodeDoubleSig(sigData []byte) (crypto.Signature, crypto.Signature, error) {
 	sigLength := len(sigData)
 	switch sigLength {
@@ -69,5 +68,5 @@ func DecodeDoubleSig(sigData []byte) (crypto.Signature, crypto.Signature, error)
 		return sigData[:SigLen], sigData[SigLen:], nil
 	}
 
-	return nil, nil, fmt.Errorf("invalid sig data length %d: %w", sigLength, model.ErrInvalidFormat)
+	return nil, nil, fmt.Errorf("invalid sig data length %d: %w", sigLength, ErrInvalidSignatureFormat)
 }

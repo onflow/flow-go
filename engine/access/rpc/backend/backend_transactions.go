@@ -184,6 +184,7 @@ func (b *backendTransactions) GetTransaction(ctx context.Context, txID flow.Iden
 	// look up transaction from storage
 	tx, err := b.transactions.ByID(txID)
 	txErr := convertStorageError(err)
+
 	if txErr != nil {
 		if status.Code(txErr) == codes.NotFound {
 			return b.getHistoricalTransaction(ctx, txID)
@@ -230,7 +231,9 @@ func (b *backendTransactions) GetTransactionResult(
 	txID flow.Identifier,
 ) (*access.TransactionResult, error) {
 	// look up transaction from storage
+	start := time.Now()
 	tx, err := b.transactions.ByID(txID)
+
 	txErr := convertStorageError(err)
 	if txErr != nil {
 		if status.Code(txErr) == codes.NotFound {
@@ -275,6 +278,8 @@ func (b *backendTransactions) GetTransactionResult(
 	if err != nil {
 		return nil, convertStorageError(err)
 	}
+
+	b.transactionMetrics.TransactionResultFetched(time.Since(start), len(tx.Script))
 
 	return &access.TransactionResult{
 		Status:        txStatus,
