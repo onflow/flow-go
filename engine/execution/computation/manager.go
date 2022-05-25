@@ -137,6 +137,49 @@ func (e *Manager) getChildProgramsOrEmpty(blockID flow.Identifier) *programs.Pro
 	return blockPrograms.ChildPrograms()
 }
 
+func (e *Manager) executeScriptHelper(
+	arguments [][]byte,
+	code []byte,
+	blockCtx fvm.Context,
+	script *fvm.ScriptProcedure,
+	programs *programs.Programs,
+	view state.View,
+) (err error) {
+	start := time.Now()
+
+	defer func() {
+		prepareLog := func() *zerolog.Event {
+
+			args := make([]string, 0)
+			for _, a := range arguments {
+				args = append(args, hex.EncodeToString(a))
+			}
+			return e.log.Error().
+				Hex("script_hex", code).
+				Str("args", strings.Join(args[:], ","))
+		}
+
+		elapsed := time.Since(start)
+
+		if r := recover(); r != nil {
+			prepareLog().
+				Interface("recovered", r).
+				Msg("script execution caused runtime panic")
+
+			err = fmt.Errorf("cadence runtime error: %s", r)
+			return
+		}
+
+		if elapsed >= e.scriptLogThreshold {
+			prepareLog().
+				Dur("duration", elapsed).
+				Msg("script execution exceeded threshold")
+		}
+	}()
+
+	return e.vm.Run(blockCtx, script, view, programs)
+}
+
 func (e *Manager) ExecuteScript(
 	ctx context.Context,
 	code []byte,
@@ -164,42 +207,15 @@ func (e *Manager) ExecuteScript(
 	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlockHeader(blockHeader))
 	programs := e.getChildProgramsOrEmpty(blockHeader.ID())
 
-	err := func() (err error) {
+	err := e.executeScriptHelper(
+		arguments,
+		code,
+		blockCtx,
+		script,
+		programs,
+		view,
+	)
 
-		start := time.Now()
-
-		defer func() {
-
-			prepareLog := func() *zerolog.Event {
-
-				args := make([]string, 0)
-				for _, a := range arguments {
-					args = append(args, hex.EncodeToString(a))
-				}
-				return e.log.Error().
-					Hex("script_hex", code).
-					Str("args", strings.Join(args[:], ","))
-			}
-
-			elapsed := time.Since(start)
-
-			if r := recover(); r != nil {
-				prepareLog().
-					Interface("recovered", r).
-					Msg("script execution caused runtime panic")
-
-				err = fmt.Errorf("cadence runtime error: %s", r)
-				return
-			}
-			if elapsed >= e.scriptLogThreshold {
-				prepareLog().
-					Dur("duration", elapsed).
-					Msg("script execution exceeded threshold")
-			}
-		}()
-
-		return e.vm.Run(blockCtx, script, view, programs)
-	}()
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute script (internal error): %w", err)
 	}
