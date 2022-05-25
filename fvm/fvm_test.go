@@ -3763,7 +3763,6 @@ func TestSettingExecutionWeights(t *testing.T) {
 			require.NoError(t, err)
 			require.Greater(t, tx.MemoryUsed, uint64(100_000_000))
 
-			// TODO this fails if not run against https://github.com/onflow/cadence/pull/1660
 			var memoryLimitExceededError *errors.MemoryLimitExceededError
 			assert.ErrorAs(t, tx.Err, &memoryLimitExceededError)
 		},
