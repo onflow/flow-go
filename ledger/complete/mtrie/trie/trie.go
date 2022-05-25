@@ -204,15 +204,21 @@ func (mt *MTrie) ReadSinglePayload(path ledger.Path) *ledger.Payload {
 func readSinglePayload(path ledger.Path, head *node.Node) *ledger.Payload {
 	pathBytes := path[:]
 
+	if head == nil {
+		return ledger.EmptyPayload()
+	}
+
+	depth := ledger.NodeMaxHeight - head.Height() // distance to the tree root
+
 	// Traverse nodes following the path until a leaf node or nil node is reached.
 	for !head.IsLeaf() {
-		depth := ledger.NodeMaxHeight - head.Height() // distance to the tree root
 		bit := bitutils.ReadBit(pathBytes, depth)
 		if bit == 0 {
 			head = head.LeftChild()
 		} else {
 			head = head.RightChild()
 		}
+		depth++
 	}
 
 	if head != nil && *head.Path() == path {
