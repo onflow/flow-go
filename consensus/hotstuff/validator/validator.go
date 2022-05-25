@@ -7,7 +7,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/signature"
 )
 
@@ -55,7 +54,7 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) e
 	// are not taken into account here. By using an epoch-static set of authorized
 	// signers, we can check QC validity without needing all ancestor blocks.
 	// TODO: handle model.ErrViewForUnknownEpoch when front-loading verification
-	allParticipants, err := v.committee.IdentitiesByEpoch(block.View, filter.Any)
+	allParticipants, err := v.committee.IdentitiesByEpoch(block.View)
 	if err != nil {
 		return fmt.Errorf("could not get consensus participants for block %s: %w", block.BlockID, err)
 	}

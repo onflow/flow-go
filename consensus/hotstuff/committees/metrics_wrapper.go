@@ -29,9 +29,9 @@ func NewMetricsWrapper(committee hotstuff.DynamicCommittee, metrics module.Hotst
 	}
 }
 
-func (w CommitteeMetricsWrapper) IdentitiesByBlock(blockID flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
+func (w CommitteeMetricsWrapper) IdentitiesByBlock(blockID flow.Identifier) (flow.IdentityList, error) {
 	processStart := time.Now()
-	identities, err := w.committee.IdentitiesByBlock(blockID, selector)
+	identities, err := w.committee.IdentitiesByBlock(blockID)
 	w.metrics.CommitteeProcessingDuration(time.Since(processStart))
 	return identities, err
 }
@@ -43,9 +43,9 @@ func (w CommitteeMetricsWrapper) IdentityByBlock(blockID flow.Identifier, partic
 	return identity, err
 }
 
-func (w CommitteeMetricsWrapper) IdentitiesByEpoch(view uint64, selector flow.IdentityFilter) (flow.IdentityList, error) {
+func (w CommitteeMetricsWrapper) IdentitiesByEpoch(view uint64) (flow.IdentityList, error) {
 	processStart := time.Now()
-	identities, err := w.committee.IdentitiesByEpoch(view, selector)
+	identities, err := w.committee.IdentitiesByEpoch(view)
 	w.metrics.CommitteeProcessingDuration(time.Since(processStart))
 	return identities, err
 }

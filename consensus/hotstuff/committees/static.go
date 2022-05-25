@@ -43,8 +43,8 @@ type Static struct {
 	dkg          protocol.DKG
 }
 
-func (s Static) IdentitiesByBlock(_ flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
-	return s.participants.Filter(selector), nil
+func (s Static) IdentitiesByBlock(_ flow.Identifier) (flow.IdentityList, error) {
+	return s.participants, nil
 }
 
 func (s Static) IdentityByBlock(_ flow.Identifier, participantID flow.Identifier) (*flow.Identity, error) {
@@ -55,8 +55,8 @@ func (s Static) IdentityByBlock(_ flow.Identifier, participantID flow.Identifier
 	return identity, nil
 }
 
-func (s Static) IdentitiesByEpoch(_ uint64, selector flow.IdentityFilter) (flow.IdentityList, error) {
-	return s.participants.Filter(selector), nil
+func (s Static) IdentitiesByEpoch(_ uint64) (flow.IdentityList, error) {
+	return s.participants, nil
 }
 
 func (s Static) IdentityByEpoch(_ uint64, participantID flow.Identifier) (*flow.Identity, error) {

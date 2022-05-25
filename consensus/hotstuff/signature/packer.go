@@ -7,7 +7,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/signature"
 )
 
@@ -33,7 +32,7 @@ func NewConsensusSigDataPacker(committees hotstuff.Replicas) *ConsensusSigDataPa
 //  * none; all errors are symptoms of inconsistent input data or corrupted internal state.
 func (p *ConsensusSigDataPacker) Pack(view uint64, sig *hotstuff.BlockSignatureData) ([]byte, []byte, error) {
 	// retrieve all authorized consensus participants at the given block
-	fullMembers, err := p.committees.IdentitiesByEpoch(view, filter.Any)
+	fullMembers, err := p.committees.IdentitiesByEpoch(view)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not find consensus committee for view %d: %w", view, err)
 	}

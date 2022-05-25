@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	msig "github.com/onflow/flow-go/module/signature"
 )
 
@@ -37,7 +36,7 @@ type stakingVoteProcessorFactoryBase struct {
 // Create creates StakingVoteProcessor for processing votes for the given block.
 // Caller must treat all errors as exceptions
 func (f *stakingVoteProcessorFactoryBase) Create(log zerolog.Logger, block *model.Block) (hotstuff.VerifyingVoteProcessor, error) {
-	allParticipants, err := f.committee.IdentitiesByBlock(block.BlockID, filter.Any)
+	allParticipants, err := f.committee.IdentitiesByBlock(block.BlockID)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving consensus participants: %w", err)
 	}

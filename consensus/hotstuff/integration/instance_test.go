@@ -139,9 +139,9 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	in.headers[cfg.Root.ID()] = cfg.Root
 
 	// program the hotstuff committee state
-	in.committee.On("IdentitiesByEpoch", mock.Anything, mock.Anything).Return(
-		func(_ uint64, selector flow.IdentityFilter) flow.IdentityList {
-			return in.participants.Filter(selector)
+	in.committee.On("IdentitiesByEpoch", mock.Anything).Return(
+		func(_ uint64) flow.IdentityList {
+			return in.participants
 		},
 		nil,
 	)

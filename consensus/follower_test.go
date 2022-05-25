@@ -71,9 +71,9 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 
 	// mock consensus committee
 	s.committee = &mockhotstuff.DynamicCommittee{}
-	s.committee.On("IdentitiesByEpoch", mock.Anything, mock.Anything).Return(
-		func(_ uint64, selector flow.IdentityFilter) flow.IdentityList {
-			return identities.Filter(selector)
+	s.committee.On("IdentitiesByEpoch", mock.Anything).Return(
+		func(_ uint64) flow.IdentityList {
+			return identities
 		},
 		nil,
 	)

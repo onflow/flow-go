@@ -78,9 +78,9 @@ func (ps *ProposalSuite) SetupTest() {
 	ps.committee = &mocks.DynamicCommittee{}
 	ps.committee.On("LeaderForView", ps.block.View).Return(ps.leader.NodeID, nil)
 	ps.committee.On("WeightThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(ps.participants.TotalWeight()), nil)
-	ps.committee.On("IdentitiesByEpoch", mock.Anything, mock.Anything).Return(
-		func(_ uint64, selector flow.IdentityFilter) flow.IdentityList {
-			return ps.participants.Filter(selector)
+	ps.committee.On("IdentitiesByEpoch", mock.Anything).Return(
+		func(_ uint64) flow.IdentityList {
+			return ps.participants
 		},
 		nil,
 	)
@@ -435,9 +435,9 @@ func (qs *QCSuite) SetupTest() {
 
 	// return the correct participants and identities from view state
 	qs.committee = &mocks.DynamicCommittee{}
-	qs.committee.On("IdentitiesByEpoch", mock.Anything, mock.Anything).Return(
-		func(_ uint64, selector flow.IdentityFilter) flow.IdentityList {
-			return qs.participants.Filter(selector)
+	qs.committee.On("IdentitiesByEpoch", mock.Anything).Return(
+		func(_ uint64) flow.IdentityList {
+			return qs.participants
 		},
 		nil,
 	)
@@ -462,7 +462,7 @@ func (qs *QCSuite) TestQCOK() {
 func (qs *QCSuite) TestQCRetrievingParticipantsError() {
 	// change the hotstuff.DynamicCommittee to fail on retrieving participants
 	*qs.committee = mocks.DynamicCommittee{}
-	qs.committee.On("IdentitiesByEpoch", mock.Anything, mock.Anything).Return(qs.participants, errors.New("FATAL internal error"))
+	qs.committee.On("IdentitiesByEpoch", mock.Anything).Return(qs.participants, errors.New("FATAL internal error"))
 
 	// verifier should escalate unspecific internal error to surrounding logic, but NOT as ErrorInvalidBlock
 	err := qs.validator.ValidateQC(qs.qc, qs.block)

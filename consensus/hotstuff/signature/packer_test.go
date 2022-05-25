@@ -19,9 +19,9 @@ import (
 func newPacker(identities flow.IdentityList) *ConsensusSigDataPacker {
 	// mock consensus committee
 	committee := &mocks.DynamicCommittee{}
-	committee.On("IdentitiesByEpoch", mock.Anything, mock.Anything).Return(
-		func(_ uint64, selector flow.IdentityFilter) flow.IdentityList {
-			return identities.Filter(selector)
+	committee.On("IdentitiesByEpoch", mock.Anything).Return(
+		func(_ uint64) flow.IdentityList {
+			return identities
 		},
 		nil,
 	)

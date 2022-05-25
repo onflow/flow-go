@@ -705,8 +705,8 @@ type RoundRobinLeaderSelection struct {
 var _ hotstuff.Replicas = (*RoundRobinLeaderSelection)(nil)
 var _ hotstuff.DynamicCommittee = (*RoundRobinLeaderSelection)(nil)
 
-func (s *RoundRobinLeaderSelection) IdentitiesByBlock(_ flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
-	return s.identities.Filter(selector), nil
+func (s *RoundRobinLeaderSelection) IdentitiesByBlock(_ flow.Identifier) (flow.IdentityList, error) {
+	return s.identities, nil
 }
 
 func (s *RoundRobinLeaderSelection) IdentityByBlock(_ flow.Identifier, participantID flow.Identifier) (*flow.Identity, error) {
@@ -718,8 +718,8 @@ func (s *RoundRobinLeaderSelection) IdentityByBlock(_ flow.Identifier, participa
 	return id, nil
 }
 
-func (s *RoundRobinLeaderSelection) IdentitiesByEpoch(_ uint64, selector flow.IdentityFilter) (flow.IdentityList, error) {
-	return s.identities.Filter(selector), nil
+func (s *RoundRobinLeaderSelection) IdentitiesByEpoch(_ uint64) (flow.IdentityList, error) {
+	return s.identities, nil
 }
 
 func (s *RoundRobinLeaderSelection) IdentityByEpoch(_ uint64, participantID flow.Identifier) (*flow.Identity, error) {
