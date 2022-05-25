@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"math"
 	"sync"
 	"testing"
 	"time"
@@ -205,7 +206,7 @@ func TestExecuteScript(t *testing.T) {
 
 	vm := fvm.NewVirtualMachine(rt)
 
-	ledger := testutil.RootBootstrappedLedger(vm, execCtx, fvm.WithExecutionMemoryLimit(1_000_000_000))
+	ledger := testutil.RootBootstrappedLedger(vm, execCtx, fvm.WithExecutionMemoryLimit(math.MaxUint64))
 
 	view := delta.NewView(ledger.Get)
 
