@@ -14,6 +14,9 @@ import (
 const TransactionFeesExecutionEffortWeightsPathDomain = "storage"
 const TransactionFeesExecutionEffortWeightsPathIdentifier = "executionEffortWeights"
 
+const TransactionFeesExecutionMemoryWeightsPathDomain = "storage"
+const TransactionFeesExecutionMemoryWeightsPathIdentifier = "executionMemoryWeights"
+
 const deployTxFeesTransactionTemplate = `
 transaction {
   prepare(flowFeesAccount: AuthAccount, serviceAccount: AuthAccount) {
@@ -195,6 +198,19 @@ func SetExecutionEffortWeightsTransaction(
 		weights,
 		TransactionFeesExecutionEffortWeightsPathDomain,
 		TransactionFeesExecutionEffortWeightsPathIdentifier,
+	)
+}
+
+// SetExecutionMemoryWeightsTransaction creates a transaction that sets up weights for the weighted Meter.
+func SetExecutionMemoryWeightsTransaction(
+	service flow.Address,
+	weights map[uint]uint64,
+) (*flow.TransactionBody, error) {
+	return setExecutionWeightsTransaction(
+		service,
+		weights,
+		TransactionFeesExecutionMemoryWeightsPathDomain,
+		TransactionFeesExecutionMemoryWeightsPathIdentifier,
 	)
 }
 

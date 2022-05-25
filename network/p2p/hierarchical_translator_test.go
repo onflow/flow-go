@@ -1,4 +1,4 @@
-package p2p
+package p2p_test
 
 import (
 	"testing"
@@ -9,24 +9,25 @@ import (
 	"gotest.tools/assert"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type HierarchicalTranslatorTestSuite struct {
 	suite.Suite
-	translator *HierarchicalIDTranslator
+	translator *p2p.HierarchicalIDTranslator
 	ids        flow.IdentityList
 }
 
 func (suite *HierarchicalTranslatorTestSuite) SetupTest() {
 	suite.ids = unittest.IdentityListFixture(2, unittest.WithKeys)
-	t1, err := NewFixedTableIdentityTranslator(suite.ids[:1])
+	t1, err := p2p.NewFixedTableIdentityTranslator(suite.ids[:1])
 	require.NoError(suite.T(), err)
-	t2, err := NewFixedTableIdentityTranslator(suite.ids[1:])
+	t2, err := p2p.NewFixedTableIdentityTranslator(suite.ids[1:])
 	require.NoError(suite.T(), err)
 
-	suite.translator = NewHierarchicalIDTranslator(t1, t2)
+	suite.translator = p2p.NewHierarchicalIDTranslator(t1, t2)
 }
 
 func TestHierarchicalTranslator(t *testing.T) {
