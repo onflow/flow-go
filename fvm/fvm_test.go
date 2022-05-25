@@ -3614,7 +3614,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 	for k, v := range weightedMeter.DefaultMemoryWeights {
 		memoryWeights[k] = v
 	}
-	memoryWeights[common.MemoryKindBool] = 20_000_000_000
+	memoryWeights[common.MemoryKindBoolValue] = 20_000_000_000
 
 	t.Run("normal transactions should fail with high memory weights", newVMTest().withBootstrapProcedureOptions(
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
