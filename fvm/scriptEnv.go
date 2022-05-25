@@ -109,21 +109,11 @@ func (e *ScriptEnv) setExecutionParameters() {
 	service := runtime.Address(serviceAddress)
 	ok, err := e.accounts.Exists(serviceAddress)
 	if err != nil {
-		_, fatal := errors.SplitErrorTypes(err)
-		if fatal != nil {
-			e.ctx.Logger.
-				Error().
-				Err(fatal).
-				Msgf("error reading execution parameters")
-			return
-		}
-		if err != nil {
-			e.ctx.Logger.
-				Debug().
-				Err(err).
-				Msgf("could not get service account to read execution parameters")
-			return
-		}
+		e.ctx.Logger.
+			Error().
+			Err(err).
+			Msgf("error reading execution parameters from service account")
+		return
 	}
 	if !ok {
 		return

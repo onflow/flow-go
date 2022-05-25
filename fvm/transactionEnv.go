@@ -127,21 +127,11 @@ func (e *TransactionEnv) setExecutionParameters() error {
 	service := runtime.Address(serviceAddress)
 	ok, err := e.accounts.Exists(serviceAddress)
 	if err != nil {
-		_, fatal := errors.SplitErrorTypes(err)
-		if fatal != nil {
-			e.ctx.Logger.
-				Error().
-				Err(fatal).
-				Msgf("error reading execution parameters")
-			return fatal
-		}
-		if err != nil {
-			e.ctx.Logger.
-				Info().
-				Err(err).
-				Msgf("could not get service account to read execution parameters")
-			return nil
-		}
+		e.ctx.Logger.
+			Error().
+			Err(err).
+			Msgf("error reading execution parameters from service account")
+		return err
 	}
 	if !ok {
 		return nil
