@@ -10,6 +10,5 @@ package models
 
 type BlockPayload struct {
 	CollectionGuarantees []CollectionGuarantee `json:"collection_guarantees"`
-
-	BlockSeals []BlockSeal `json:"block_seals"`
+	BlockSeals           []BlockSeal           `json:"block_seals"`
 }

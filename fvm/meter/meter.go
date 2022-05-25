@@ -38,22 +38,23 @@ const (
 	ComputationKindValueExists
 )
 
-type MeteredIntensities map[common.ComputationKind]uint
+type MeteredComputationIntensities map[common.ComputationKind]uint
+type MeteredMemoryIntensities map[common.MemoryKind]uint
 
 type Meter interface {
 	// merge child funcionality
 	NewChild() Meter
-	MergeMeter(child Meter) error
+	MergeMeter(child Meter, enforceLimits bool) error
 
 	// computation metering
 	MeterComputation(kind common.ComputationKind, intensity uint) error
-	ComputationIntensities() MeteredIntensities
+	ComputationIntensities() MeteredComputationIntensities
 	TotalComputationUsed() uint
 	TotalComputationLimit() uint
 
 	// memory metering
-	MeterMemory(kind common.ComputationKind, intensity uint) error
-	MemoryIntensities() MeteredIntensities
+	MeterMemory(kind common.MemoryKind, intensity uint) error
+	MemoryIntensities() MeteredMemoryIntensities
 	TotalMemoryUsed() uint
 	TotalMemoryLimit() uint
 

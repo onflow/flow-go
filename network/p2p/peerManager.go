@@ -143,3 +143,7 @@ func (pm *PeerManager) updatePeers() {
 	// ask the connector to connect to all peers in the list
 	pm.connector.UpdatePeers(pm.unit.Ctx(), peers)
 }
+
+func (pm *PeerManager) ForceUpdatePeers() {
+	pm.updatePeers()
+}

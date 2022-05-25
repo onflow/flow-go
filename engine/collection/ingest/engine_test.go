@@ -13,6 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -87,7 +88,7 @@ func (suite *Suite) SetupTest() {
 	})
 
 	assignments := unittest.ClusterAssignment(suite.N_CLUSTERS, collectors)
-	suite.clusters, err = flow.NewClusterList(assignments, collectors)
+	suite.clusters, err = factory.NewClusterList(assignments, collectors)
 	suite.Require().NoError(err)
 
 	suite.root = unittest.GenesisFixture()
@@ -238,7 +239,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 	suite.Run("invalid signature", func() {
 		// TODO cannot check signatures in MVP
-		unittest.SkipUnless(suite.T(), unittest.TEST_WIP, "skipping unimplemented test")
+		unittest.SkipUnless(suite.T(), unittest.TEST_TODO, "skipping unimplemented test")
 	})
 
 	suite.Run("invalid address", func() {
@@ -293,7 +294,7 @@ func (suite *Suite) TestComponentShutdown() {
 	suite.engine.Start(ctx)
 	unittest.AssertClosesBefore(suite.T(), suite.engine.Ready(), 10*time.Millisecond)
 	cancel()
-	unittest.AssertClosesBefore(suite.T(), suite.engine.Done(), 10*time.Millisecond)
+	unittest.AssertClosesBefore(suite.T(), suite.engine.ShutdownSignal(), 10*time.Millisecond)
 
 	err := suite.engine.ProcessTransaction(&tx)
 	suite.Assert().ErrorIs(err, component.ErrComponentShutdown)
@@ -490,7 +491,7 @@ func (suite *Suite) TestRouting_ClusterAssignmentRemoved() {
 		Filter(filter.Not(filter.HasNodeID(suite.me.NodeID()))).
 		Filter(filter.HasRole(flow.RoleCollection))
 	epoch2Assignment := unittest.ClusterAssignment(suite.N_CLUSTERS, withoutMe)
-	epoch2Clusters, err := flow.NewClusterList(epoch2Assignment, withoutMe)
+	epoch2Clusters, err := factory.NewClusterList(epoch2Assignment, withoutMe)
 	suite.Require().NoError(err)
 
 	epoch2 := new(protocol.Epoch)
@@ -529,7 +530,7 @@ func (suite *Suite) TestRouting_ClusterAssignmentAdded() {
 		Filter(filter.Not(filter.HasNodeID(suite.me.NodeID()))).
 		Filter(filter.HasRole(flow.RoleCollection))
 	epoch2Assignment := unittest.ClusterAssignment(suite.N_CLUSTERS, withoutMe)
-	epoch2Clusters, err := flow.NewClusterList(epoch2Assignment, withoutMe)
+	epoch2Clusters, err := factory.NewClusterList(epoch2Assignment, withoutMe)
 	suite.Require().NoError(err)
 
 	epoch2 := new(protocol.Epoch)
@@ -558,7 +559,7 @@ func (suite *Suite) TestRouting_ClusterAssignmentAdded() {
 	// include ourselves in cluster assignment
 	withMe := suite.identities.Filter(filter.HasRole(flow.RoleCollection))
 	epoch3Assignment := unittest.ClusterAssignment(suite.N_CLUSTERS, withMe)
-	epoch3Clusters, err := flow.NewClusterList(epoch3Assignment, withMe)
+	epoch3Clusters, err := factory.NewClusterList(epoch3Assignment, withMe)
 	suite.Require().NoError(err)
 
 	epoch3 := new(protocol.Epoch)

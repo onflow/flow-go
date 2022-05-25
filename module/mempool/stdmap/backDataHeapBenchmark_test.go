@@ -1,10 +1,8 @@
 package stdmap_test
 
 import (
-	"os"
 	"runtime"
 	"runtime/debug"
-	"strings"
 	"testing"
 	"time"
 
@@ -24,9 +22,8 @@ import (
 // hashicorp LRU cache with 50K capacity against writing 100M entities,
 // with Garbage Collection (GC) disabled.
 func BenchmarkBaselineLRU(b *testing.B) {
-	if !experiment() {
-		b.Skip("skips benchmarking baseline LRU, set environment variable to enable")
-	}
+	unittest.SkipBenchmarkUnless(b, unittest.BENCHMARK_EXPERIMENT, "skips benchmarking baseline LRU, set environment variable to enable")
+
 	defer debug.SetGCPercent(debug.SetGCPercent(-1)) // disable GC
 
 	limit := uint(50)
@@ -253,13 +250,4 @@ func (b *baselineLRU) Clear() {
 // Hash will use a merkle root hash to hash all items.
 func (b *baselineLRU) Hash() flow.Identifier {
 	return flow.MerkleRoot(flow.GetIDs(b.All())...)
-}
-
-// experiment looks up environment variable to enable/disable benchmarking experiments.
-func experiment() bool {
-	val, found := os.LookupEnv("experiment")
-	if !found {
-		return false
-	}
-	return strings.ToLower(strings.Trim(val, "")) == "on"
 }

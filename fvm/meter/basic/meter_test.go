@@ -65,19 +65,37 @@ func TestBasicComputationMetering(t *testing.T) {
 		err = child3.MeterComputation(compKind, 4)
 		require.NoError(t, err)
 
-		err = m.MergeMeter(child1)
+		err = m.MergeMeter(child1, true)
 		require.NoError(t, err)
 		require.Equal(t, uint(1+2), m.TotalComputationUsed())
 		require.Equal(t, uint(1+2), m.ComputationIntensities()[compKind])
 
-		err = m.MergeMeter(child2)
+		err = m.MergeMeter(child2, true)
 		require.NoError(t, err)
 		require.Equal(t, uint(1+2+3), m.TotalComputationUsed())
 		require.Equal(t, uint(1+2+3), m.ComputationIntensities()[compKind])
 
 		// error on merge (hitting limit)
-		err = m.MergeMeter(child3)
+		err = m.MergeMeter(child3, true)
 		require.Error(t, err)
 		require.True(t, errors.IsComputationLimitExceededError(err))
+	})
+
+	t.Run("merge meters - ignore limits", func(t *testing.T) {
+		compKind := common.ComputationKindStatement
+		m := basic.NewMeter(2, 0)
+
+		err := m.MeterComputation(compKind, 1)
+		require.NoError(t, err)
+
+		child := m.NewChild()
+		err = child.MeterComputation(compKind, 1)
+		require.NoError(t, err)
+
+		// hitting limit and ignoring it
+		err = m.MergeMeter(child, false)
+		require.NoError(t, err)
+		require.Equal(t, uint(1+1), m.TotalComputationUsed())
+		require.Equal(t, uint(1+1), m.ComputationIntensities()[compKind])
 	})
 }

@@ -12,7 +12,7 @@ type SigningAlgorithm string
 
 // List of SigningAlgorithm
 const (
-	BLSBLS12381     SigningAlgorithm = "BLSBLS12381"
-	ECDSAP256       SigningAlgorithm = "ECDSAP256"
-	ECDSA_SECP256K1 SigningAlgorithm = "ECDSASecp256k1"
+	BLSBLS12381_SigningAlgorithm     SigningAlgorithm = "BLSBLS12381"
+	ECDSAP256_SigningAlgorithm       SigningAlgorithm = "ECDSAP256"
+	ECDSA_SECP256K1_SigningAlgorithm SigningAlgorithm = "ECDSASecp256k1"
 )

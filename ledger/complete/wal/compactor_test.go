@@ -42,7 +42,6 @@ func (co *CompactorObserver) OnComplete() {
 }
 
 func Test_Compactor(t *testing.T) {
-
 	numInsPerStep := 2
 	pathByteSize := 32
 	minPayloadByteSize := 2 << 15

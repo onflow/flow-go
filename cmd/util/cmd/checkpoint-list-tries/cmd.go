@@ -28,7 +28,7 @@ func init() {
 
 func run(*cobra.Command, []string) {
 
-	tries, err := wal.LoadCheckpoint(flagCheckpoint)
+	tries, err := wal.LoadCheckpoint(flagCheckpoint, &log.Logger)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error while loading checkpoint")
 	}

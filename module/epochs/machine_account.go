@@ -30,11 +30,6 @@ var (
 	defaultHardMinBalanceSN cadence.UFix64
 )
 
-const (
-	checkMachineAccountRetryBase = time.Second * 5
-	checkMachineAccountRetryMax  = time.Minute * 10
-)
-
 func init() {
 	var err error
 	defaultSoftMinBalanceLN, err = cadence.NewUFix64("0.0025")
@@ -53,6 +48,24 @@ func init() {
 	if err != nil {
 		panic(fmt.Errorf("could not convert hard min balance for SN: %w", err))
 	}
+}
+
+const (
+	checkMachineAccountRetryBase      = time.Second * 5
+	checkMachineAccountRetryMax       = time.Minute * 10
+	checkMachineAccountRetryJitterPct = 5
+)
+
+// checkMachineAccountRetryBackoff returns the default backoff for checking
+// machine account configs.
+// * exponential backoff with base of 5s
+// * maximum inter-check wait of 10m
+// * 5% jitter
+func checkMachineAccountRetryBackoff() retry.Backoff {
+	backoff := retry.NewExponential(checkMachineAccountRetryBase)
+	backoff = retry.WithCappedDuration(checkMachineAccountRetryMax, backoff)
+	backoff = retry.WithJitterPercent(checkMachineAccountRetryJitterPct, backoff)
+	return backoff
 }
 
 // MachineAccountValidatorConfig defines configuration options for MachineAccountConfigValidator.
@@ -145,16 +158,9 @@ func (validator *MachineAccountConfigValidator) validateMachineAccountConfig(ctx
 
 	log := validator.log
 
-	backoff, err := retry.NewExponential(checkMachineAccountRetryBase)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to create machine account check retry")
-	}
-	backoff = retry.WithJitterPercent(
-		5, // 5% jitter
-		retry.WithCappedDuration(checkMachineAccountRetryMax, backoff),
-	)
+	backoff := checkMachineAccountRetryBackoff()
 
-	err = retry.Do(ctx, backoff, func(ctx context.Context) error {
+	err := retry.Do(ctx, backoff, func(ctx context.Context) error {
 		account, err := validator.client.GetAccount(ctx, validator.info.SDKAddress())
 		if err != nil {
 			// we cannot validate a correct configuration - log an error and try again

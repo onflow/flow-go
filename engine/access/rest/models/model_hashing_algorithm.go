@@ -12,9 +12,9 @@ type HashingAlgorithm string
 
 // List of HashingAlgorithm
 const (
-	SHA2_256 HashingAlgorithm = "SHA2_256"
-	SHA2_384 HashingAlgorithm = "SHA2_384"
-	SHA3_256 HashingAlgorithm = "SHA3_256"
-	SHA3_384 HashingAlgorithm = "SHA3_384"
-	KMAC128  HashingAlgorithm = "KMAC128"
+	SHA2_256_HashingAlgorithm HashingAlgorithm = "SHA2_256"
+	SHA2_384_HashingAlgorithm HashingAlgorithm = "SHA2_384"
+	SHA3_256_HashingAlgorithm HashingAlgorithm = "SHA3_256"
+	SHA3_384_HashingAlgorithm HashingAlgorithm = "SHA3_384"
+	KMAC128_HashingAlgorithm  HashingAlgorithm = "KMAC128"
 )
