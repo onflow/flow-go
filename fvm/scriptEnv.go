@@ -128,6 +128,7 @@ func (e *ScriptEnv) setExecutionParameters() {
 				Debug().
 				Err(err).
 				Msgf("could not set %s. Using defaults", prop)
+			return
 		}
 		// everything is ok. do the setting
 		setter()
