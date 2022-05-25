@@ -298,4 +298,4 @@ replace mellium.im/sasl => github.com/mellium/sasl v0.2.1
 
 replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.21.1-0.20220525172553-085b0fcef7e9
 
-replace github.com/onflow/atree => github.com/dapperlabs/atree-internal v0.3.1-0.20220513013557-e7aa83fbc4e9
+replace github.com/onflow/atree => github.com/dapperlabs/atree-internal v0.3.1-0.20220525190018-9e7903687c38
