@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"math/big"
 	"sync"
 	"testing"
 	"time"
@@ -548,10 +547,10 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 	`)
 
 	header := unittest.BlockHeaderFixture()
-	value, err := manager.ExecuteScript(context.Background(), script, [][]byte{jsoncdc.MustEncode(address)}, &header, noopView())
+	scriptView := view.NewChild()
+	_, err = manager.ExecuteScript(context.Background(), script, [][]byte{jsoncdc.MustEncode(address)}, &header, scriptView)
 
 	require.NoError(t, err)
-	require.Nil(t, value)
 
 	v, err := vm.Runtime.ReadStored(
 		commonAddress,
@@ -559,7 +558,7 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 		runtime.Context{Interface: env},
 	)
 
-	// the save should not update account storage
+	// the save should not update account storage by writing the delta from the child view back to the parent
 	require.NoError(t, err)
-	require.Equal(t, cadence.Int{Value: big.NewInt(4)}, v)
+	require.Equal(t, nil, v)
 }
