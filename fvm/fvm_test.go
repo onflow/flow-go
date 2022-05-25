@@ -22,6 +22,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
+
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
@@ -101,35 +102,35 @@ func transferTokensTx(chain flow.Chain) *flow.TransactionBody {
 							//
 							// The withdraw amount and the account from getAccount
 							// would be the parameters to the transaction
-							
+
 							import FungibleToken from 0x%s
 							import FlowToken from 0x%s
-							
+
 							transaction(amount: UFix64, to: Address) {
-							
+
 								// The Vault resource that holds the tokens that are being transferred
 								let sentVault: @FungibleToken.Vault
-							
+
 								prepare(signer: AuthAccount) {
-							
+
 									// Get a reference to the signer's stored vault
 									let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
 										?? panic("Could not borrow reference to the owner's Vault!")
-							
+
 									// Withdraw tokens from the signer's stored vault
 									self.sentVault <- vaultRef.withdraw(amount: amount)
 								}
-							
+
 								execute {
-							
+
 									// Get the recipient's public account object
 									let recipient = getAccount(to)
-							
+
 									// Get a reference to the recipient's Receiver
 									let receiverRef = recipient.getCapability(/public/flowTokenReceiver)
 										.borrow<&{FungibleToken.Receiver}>()
 										?? panic("Could not borrow receiver reference to the recipient's Vault")
-							
+
 									// Deposit the withdrawn tokens in the recipient's receiver
 									receiverRef.deposit(from: <-self.sentVault)
 								}
@@ -154,7 +155,7 @@ import FlowContractAudits from 0x%s
 
 transaction(deployAddress: Address, code: String) {
 	prepare(serviceAccount: AuthAccount) {
-		
+
 		let auditorAdmin = serviceAccount.borrow<&FlowContractAudits.Administrator>(from: FlowContractAudits.AdminStoragePath)
             ?? panic("Could not borrow a reference to the admin resource")
 
@@ -1026,7 +1027,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 							// deposit additional flow
 							let payment <- vaultRef.withdraw(amount: 10.0) as! @FlowToken.Vault
 
-							let receiver = signer.getCapability(/public/flowTokenReceiver)!.borrow<&{FungibleToken.Receiver}>() 
+							let receiver = signer.getCapability(/public/flowTokenReceiver)!.borrow<&{FungibleToken.Receiver}>()
 								?? panic("Could not borrow receiver reference to the recipient's Vault")
 							receiver.deposit(from: <-payment)
 						}
@@ -1658,7 +1659,7 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 
 		num, err := strconv.ParseUint(tx.Logs[0], 10, 64)
 		require.NoError(t, err)
-		require.Equal(t, uint64(0xb9c618010e32a0fb), num)
+		require.Equal(t, uint64(0x8872445cb397f6d2), num)
 	})
 }
 
@@ -2549,7 +2550,7 @@ func TestHashing(t *testing.T) {
 		return []byte(fmt.Sprintf(
 			`
 				import Crypto
-				
+
 				pub fun main(data: [UInt8]): [UInt8] {
 					return Crypto.hash(data, algorithm: HashAlgorithm.%s)
 				}
@@ -2559,7 +2560,7 @@ func TestHashing(t *testing.T) {
 		return []byte(fmt.Sprintf(
 			`
 				import Crypto
-				
+
 				pub fun main(data: [UInt8], tag: String): [UInt8] {
 					return Crypto.hashWithTag(data, tag: tag, algorithm: HashAlgorithm.%s)
 				}
@@ -2932,13 +2933,13 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		code := []byte(fmt.Sprintf(`
 					import FungibleToken from 0x%s
 					import FlowToken from 0x%s
-					
+
 					pub fun main(account: Address): UFix64 {
 						let acct = getAccount(account)
 						let vaultRef = acct.getCapability(/public/flowTokenBalance)
 							.borrow<&FlowToken.Vault{FungibleToken.Balance}>()
 							?? panic("Could not borrow Balance reference to the Vault")
-					
+
 						return vaultRef.balance
 					}
 				`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain)))
@@ -3166,13 +3167,13 @@ func TestTransactionFeeDeduction(t *testing.T) {
 		code := []byte(fmt.Sprintf(`
 					import FungibleToken from 0x%s
 					import FlowToken from 0x%s
-					
+
 					pub fun main(account: Address): UFix64 {
 						let acct = getAccount(account)
 						let vaultRef = acct.getCapability(/public/flowTokenBalance)
 							.borrow<&FlowToken.Vault{FungibleToken.Balance}>()
 							?? panic("Could not borrow Balance reference to the Vault")
-					
+
 						return vaultRef.balance
 					}
 				`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain)))
@@ -3570,6 +3571,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 }
 
 func TestSettingExecutionWeights(t *testing.T) {
+
 	t.Run("transaction should fail with high weights", newVMTest().withBootstrapProcedureOptions(
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
@@ -3607,12 +3609,58 @@ func TestSettingExecutionWeights(t *testing.T) {
 			assert.True(t, errors.IsComputationLimitExceededError(tx.Err))
 		},
 	))
+
 	memoryWeights := make(map[common.MemoryKind]uint64)
 	for k, v := range weightedMeter.DefaultMemoryWeights {
 		memoryWeights[k] = v
 	}
-	memoryWeights[common.MemoryKindBool] = 20_000_000_000
-	t.Run("transaction should fail with high memory weights", newVMTest().withBootstrapProcedureOptions(
+	memoryWeights[common.MemoryKindBoolValue] = 20_000_000_000
+
+	t.Run("normal transactions should fail with high memory weights", newVMTest().withBootstrapProcedureOptions(
+		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		fvm.WithExecutionMemoryWeights(
+			memoryWeights,
+		),
+	).withContextOptions(
+		fvm.WithMemoryLimit(10_000_000_000),
+	).run(
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+
+			// Create an account private key.
+			privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+			require.NoError(t, err)
+
+			// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+			accounts, err := testutil.CreateAccounts(vm, view, programs, privateKeys, chain)
+			require.NoError(t, err)
+
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(`
+				transaction {
+                  prepare(signer: AuthAccount) {
+					var a = false
+                  }
+                }
+			`)).
+				SetProposalKey(accounts[0], 0, 0).
+				AddAuthorizer(accounts[0]).
+				SetPayer(accounts[0])
+
+			err = testutil.SignTransaction(txBody, accounts[0], privateKeys[0], 0)
+			require.NoError(t, err)
+
+			tx := fvm.Transaction(txBody, 0)
+			err = vm.Run(ctx, tx, view, programs)
+			require.NoError(t, err)
+			require.Greater(t, tx.MemoryUsed, uint64(20_000_000_000))
+
+			assert.True(t, errors.IsMemoryLimitExceededError(tx.Err))
+		},
+	))
+
+	t.Run("service account transactions should not fail with high memory weights", newVMTest().withBootstrapProcedureOptions(
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
@@ -3642,11 +3690,12 @@ func TestSettingExecutionWeights(t *testing.T) {
 			tx := fvm.Transaction(txBody, 0)
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
-			require.Greater(t, tx.MemoryUsed, uint64(20_000_000_000))
+			require.Equal(t, uint64(0), tx.MemoryUsed)
 
-			assert.True(t, errors.IsMemoryLimitExceededError(tx.Err))
+			require.NoError(t, tx.Err)
 		},
 	))
+
 	t.Run("transaction should fail if create account weight is high", newVMTest().withBootstrapProcedureOptions(
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
@@ -3749,6 +3798,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			assert.True(t, errors.IsComputationLimitExceededError(tx.Err))
 		},
 	))
+
 	t.Run("transaction should not use up more computation that the transaction body itself", newVMTest().withBootstrapProcedureOptions(
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),

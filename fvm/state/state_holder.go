@@ -6,7 +6,7 @@ package state
 // the state it is recommended that such services wraps
 // a state manager instead of a state itself.
 type StateHolder struct {
-	EnforceMemoryLimits      bool
+	enforceMemoryLimits      bool
 	EnforceComputationLimits bool
 	enforceInteractionLimits bool
 	payerIsServiceAccount    bool
@@ -17,7 +17,7 @@ type StateHolder struct {
 // NewStateHolder constructs a new state manager
 func NewStateHolder(startState *State) *StateHolder {
 	return &StateHolder{
-		EnforceMemoryLimits:      true,
+		enforceMemoryLimits:      true,
 		EnforceComputationLimits: true,
 		enforceInteractionLimits: true,
 		startState:               startState,
@@ -35,7 +35,7 @@ func (s *StateHolder) SetActiveState(st *State) {
 	s.activeState = st
 }
 
-// SetActiveState sets active state
+// SetPayerIsServiceAccount sets if the payer is the service account
 func (s *StateHolder) SetPayerIsServiceAccount() {
 	s.payerIsServiceAccount = true
 }
@@ -45,23 +45,23 @@ func (s *StateHolder) SetPayerIsServiceAccount() {
 // this is basically a utility function for common
 // operations
 func (s *StateHolder) NewChild() *State {
-	new := s.activeState.NewChild()
-	s.activeState = new
+	child := s.activeState.NewChild()
+	s.activeState = child
 	return s.activeState
 }
 
-// EnableLimitEnforcement enables all the limits
+// EnableAllLimitEnforcements enables all the limits
 func (s *StateHolder) EnableAllLimitEnforcements() {
 	s.enforceInteractionLimits = true
 	s.EnforceComputationLimits = true
-	s.EnforceMemoryLimits = true
+	s.enforceMemoryLimits = true
 }
 
 // DisableAllLimitEnforcements disables all the limits
 func (s *StateHolder) DisableAllLimitEnforcements() {
 	s.enforceInteractionLimits = false
 	s.EnforceComputationLimits = false
-	s.EnforceMemoryLimits = false
+	s.enforceMemoryLimits = false
 }
 
 // EnforceInteractionLimits returns if the interaction limits should be enforced or not
@@ -70,4 +70,12 @@ func (s *StateHolder) EnforceInteractionLimits() bool {
 		return false
 	}
 	return s.enforceInteractionLimits
+}
+
+// EnforceMemoryLimits returns if the memory limits should be enforced or not
+func (s *StateHolder) EnforceMemoryLimits() bool {
+	if s.payerIsServiceAccount {
+		return false
+	}
+	return s.enforceMemoryLimits
 }
