@@ -690,7 +690,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T)
 
 		signerIndices, err := msig.EncodeSignersToIndices(mergedSignerIDs, mergedSignerIDs)
 		require.NoError(t, err)
-		pcker.On("Pack", block.BlockID, mock.Anything).Return(signerIndices, packedSigData, nil)
+		pcker.On("Pack", block.View, mock.Anything).Return(signerIndices, packedSigData, nil)
 
 		// track if QC was created
 		qcCreated := atomic.NewBool(false)
