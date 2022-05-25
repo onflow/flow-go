@@ -4,11 +4,15 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"math/big"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/onflow/cadence"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -494,4 +498,68 @@ func TestExecuteScriptCancelled(t *testing.T) {
 	wg.Wait()
 	require.Nil(t, value)
 	require.Contains(t, err.Error(), fvmErrors.ErrCodeScriptExecutionCancelledError.String())
+}
+
+func TestScriptStorageMutationsDiscarded(t *testing.T) {
+
+	timeout := 1 * time.Millisecond
+	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime())
+	chain := flow.Mainnet.Chain()
+	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain))
+	manager, _ := New(
+		zerolog.Nop(),
+		metrics.NewNoopCollector(),
+		nil,
+		nil,
+		nil,
+		vm,
+		ctx,
+		DefaultProgramsCacheSize,
+		committer.NewNoopViewCommitter(),
+		DefaultScriptLogThreshold,
+		timeout,
+		nil,
+		nil,
+		nil)
+	view := testutil.RootBootstrappedLedger(vm, ctx)
+	programs := programs.NewEmptyPrograms()
+	st := state.NewState(view)
+	sth := state.NewStateHolder(st)
+	env := fvm.NewScriptEnvironment(context.Background(), ctx, vm, sth, programs)
+
+	// Create an account private key.
+	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+	require.NoError(t, err)
+
+	// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+	accounts, err := testutil.CreateAccounts(vm, view, programs, privateKeys, chain)
+	require.NoError(t, err)
+	account := accounts[0]
+	address := cadence.NewAddress(account)
+	commonAddress, _ := common.HexToAddress(address.Hex())
+
+	require.NoError(t, err)
+
+	script := []byte(`
+	pub fun main(account: Address) {
+		let acc = getAuthAccount(account)
+		acc.save(3, to: /storage/x)
+	}
+	`)
+
+	header := unittest.BlockHeaderFixture()
+	value, err := manager.ExecuteScript(context.Background(), script, [][]byte{jsoncdc.MustEncode(address)}, &header, noopView())
+
+	require.NoError(t, err)
+	require.Nil(t, value)
+
+	v, err := vm.Runtime.ReadStored(
+		commonAddress,
+		cadence.NewPath("storage", "x"),
+		runtime.Context{Interface: env},
+	)
+
+	// the save should not update account storage
+	require.NoError(t, err)
+	require.Equal(t, cadence.Int{Value: big.NewInt(4)}, v)
 }
