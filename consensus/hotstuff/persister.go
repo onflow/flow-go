@@ -7,11 +7,13 @@ type Persister interface {
 	GetSafetyData() (*SafetyData, error)
 
 	// PutSafetyData persists the last safety data.
+	// This method blocks until `safetyData` was successfully persisted.    
 	PutSafetyData(safetyData *SafetyData) error
 
 	// GetLivenessData will retrieve last persisted liveness data.
 	GetLivenessData() (*LivenessData, error)
 
 	// PutLivenessData persists the last liveness data.
+	// This method blocks until `safetyData` was successfully persisted.	
 	PutLivenessData(livenessData *LivenessData) error
 }

@@ -16,7 +16,7 @@ type Persister struct {
 
 var _ hotstuff.Persister = (*Persister)(nil)
 
-// New creates a nev persister using the injected stores to persist
+// New creates a new Persister using the injected data base to persist
 // relevant hotstuff data.
 func New(db *badger.DB, chainID flow.ChainID) *Persister {
 	p := &Persister{

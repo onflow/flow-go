@@ -13,10 +13,10 @@ type SafetyData struct {
 	// 1-chain on top of B0. The replica updated LockedOneChainView to the max of the current value and
 	// QC_B0.View = B0.View. Thereby, the safety module guarantees that the replica will not sign
 	// a TimeoutObject that would allow a malicious leader to fork below the latest finalized block.
-	LockedOneChainView uint64 // highest preferred QC, replica updates this value when voting for block (equivalent to highestQCView from Safety rules algorithm)
+	LockedOneChainView uint64
 	// HighestAcknowledgedView is the highest view where we have voted or triggered a timeout
 	HighestAcknowledgedView uint64
-	// LastTimeout is the last timeout that was produced by this node
+	// LastTimeout is the last timeout that was produced by this node (may be nil if no timeout occurred yet) 
 	LastTimeout *model.TimeoutObject
 }
 

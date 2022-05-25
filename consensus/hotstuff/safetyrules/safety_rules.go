@@ -8,7 +8,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// SafetyRules is a dedicated module that is responsible for persisting chain safety by producing
+// SafetyRules is a dedicated module that enforces consensus safety. This component has the sole authority to generate
 // votes and timeouts. It follows voting and timeout rules for creating votes and timeouts respectively.
 // Caller can be sure that created vote or timeout doesn't break safety and can be used in consensus process.
 // SafetyRules relies on hotstuff.Persister to store latest state of hotstuff.SafetyData.
@@ -47,7 +47,7 @@ func New(
 
 // ProduceVote will make a decision on whether it will vote for the given proposal, the returned
 // error indicates whether to vote or not.
-// In order to ensure that only safe proposals are being voted on, by checking if proposer is a valid committee member and
+// To ensure that only safe proposals are being voted on, we check that the proposer is a valid committee member and that the
 // proposal complies with voting rules.
 // We expect that only well-formed proposals with valid signatures are submitted for voting.
 // The curView is taken as input to ensure SafetyRules will only vote for proposals at current view and prevent double voting.
@@ -78,7 +78,7 @@ func (r *SafetyRules) ProduceVote(proposal *model.Proposal, curView uint64) (*mo
 		return nil, model.NewNoVoteErrorf("not voting - proposer ejected")
 	}
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve proposer Identity %x at block %x: %w", block.ProposerID, block.BlockID, err)
+		return nil, fmt.Errorf("internal error retrieving Identity of proposer %x at block %x: %w", block.ProposerID, block.BlockID, err)
 	}
 
 	// Do not produce a vote for blocks where we are not a valid committee member.
@@ -149,7 +149,8 @@ func (r *SafetyRules) IsSafeToVote(proposal *model.Proposal) error {
 	blockView := proposal.Block.View
 	qcView := proposal.Block.QC.View
 
-	// block's view must be larger than the view of the included QC
+	// Sanity check: block's view must be larger than the view of the included QC.
+	// As blocks should already be validated, failing this check is a symptom of an internal bug. 
 	if blockView <= qcView {
 		return fmt.Errorf("block's view %d must be larger than the view of the included QC %d", blockView, qcView)
 	}
@@ -158,7 +159,7 @@ func (r *SafetyRules) IsSafeToVote(proposal *model.Proposal) error {
 	// 1. Replicas vote strictly in increasing rounds,
 	// block's view must be greater than the view that we have voted for
 	if blockView <= r.safetyData.HighestAcknowledgedView {
-		return model.NewNoVoteErrorf("not safe to vote, we have already voted for this view: %d <= %d",
+		return model.NewNoVoteErrorf("not safe to vote for this view (%d), because we already voted for view %d",
 			blockView, r.safetyData.HighestAcknowledgedView)
 	}
 
@@ -173,6 +174,7 @@ func (r *SafetyRules) IsSafeToVote(proposal *model.Proposal) error {
 
 // IsSafeToExtend performs safety checks if proposal can be extended in case of recovery path, we will call
 // this function only if previous round resulted in TC, to know if it's safe to extend such proposal.
+// All checks here are validity conditions for the block. As we are expecting the blocks to be pre-validated, any failure here is a symptom of an internal bug. 
 func (r *SafetyRules) IsSafeToExtend(blockView, qcView uint64, lastViewTC *flow.TimeoutCertificate) error {
 	// These checks satisfy voting rule 2b:
 	// [Recovery Path] If the previous round did *not* result in a QC, the leader of the
@@ -189,7 +191,7 @@ func (r *SafetyRules) IsSafeToExtend(blockView, qcView uint64, lastViewTC *flow.
 	return nil
 }
 
-// IsSafeToTimeout checks if it's safe to timeout with proposed data, if timing out won't break safety rules.
+// IsSafeToTimeout checks if it's safe to timeout with proposed data, i.e. timing out won't break safety.
 // highestQC is the valid QC with the greatest view that we have observed.
 // lastViewTC is the TC for the previous view (might be nil)
 func (r *SafetyRules) IsSafeToTimeout(curView uint64, highestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) bool {
