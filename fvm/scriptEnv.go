@@ -568,7 +568,7 @@ func (e *ScriptEnv) ComputationUsed() uint64 {
 }
 
 func (e *ScriptEnv) meterMemory(kind common.MemoryKind, intensity uint) error {
-	if e.sth.EnforceMemoryLimits {
+	if e.sth.EnforceMemoryLimits() {
 		return e.sth.State().MeterMemory(kind, intensity)
 	}
 	return nil

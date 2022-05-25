@@ -44,7 +44,7 @@ WORKDIR /app
 # Keep Go's build cache between builds.
 # https://github.com/golang/go/issues/27719#issuecomment-514747274
 # Also, allow ssh access
-RUN --mount=type=cache,target=/go/pkg/mod \
+RUN --mount=type=cache,sharing=locked,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=ssh \
     cd integration && \

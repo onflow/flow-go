@@ -7,7 +7,7 @@ import (
 
 // AssignmentList is a list of identifier lists. Each list of identifiers lists the
 // identities that are part of the given cluster.
-type AssignmentList [][]Identifier
+type AssignmentList []IdentifierList
 
 // ClusterList is a list of identity lists. Each `IdentityList` represents the
 // nodes assigned to a specific cluster.
