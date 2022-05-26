@@ -546,14 +546,19 @@ func (a *StatefulAccounts) ContractExists(contractName string, address flow.Addr
 }
 
 func (a *StatefulAccounts) GetContract(contractName string, address flow.Address) ([]byte, error) {
-	exists, err := a.ContractExists(contractName, address)
-	if err != nil {
-		return nil, err
+	// we optimized the happy case here, we look up for the content of the contract
+	// and if its not there we check if contract exists or if this is another problem.
+	code, err := a.getContract(contractName, address)
+	if err != nil || len(code) == 0 {
+		exists, err := a.ContractExists(contractName, address)
+		if err != nil {
+			return nil, err
+		}
+		if !exists {
+			return nil, nil
+		}
 	}
-	if !exists {
-		return nil, nil
-	}
-	return a.getContract(contractName, address)
+	return code, err
 }
 
 func (a *StatefulAccounts) SetContract(contractName string, address flow.Address, contract []byte) error {
