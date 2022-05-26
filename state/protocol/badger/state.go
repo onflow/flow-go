@@ -242,14 +242,29 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 			HighestAcknowledgedView: highest.Header.View,
 		}
 
+		// Per convention, all blocks in the sealing segment must be finalized. Therefore, a QC must
+		// exist for the `highest` block in the sealing segment. The QC for `highest` should be
+		// contained in the `root` Snapshot and returned by `root.QuorumCertificate()`. Otherwise,
+		// the Snapshot is incomplete, because consensus nodes require this QC. To reduce the chance of
+		// accidental misconfiguration undermining consensus liveness, we do the following sanity checks:
+		//  * `rootQC` should not be nil
+		//  * `rootQC` should be for `highest` block, i.e. its view and
 		rootQC, err := root.QuorumCertificate()
 		if err != nil {
 			return fmt.Errorf("could not get root QC: %w", err)
 		}
+		if rootQC == nil {
+			return fmt.Errorf("QC for highest (finalized) block in sealing segment cannot be nil")
+		}
+		if rootQC.View != highest.Header.View {
+			return fmt.Errorf("root QC's view %d does not match the highest block in sealing segment (view %d)", rootQC.View, highest.Header.View)
+		}
+		if rootQC.BlockID != highest.Header.ID() {
+			return fmt.Errorf("root QC is for block %v, which does not match the highest block %v in sealing segment", rootQC.BlockID, highest.Header.ID())
+		}	
 
 		livenessData := &hotstuff.LivenessData{
 			CurrentView: highest.Header.View + 1,
-			LastViewTC:  highest.Header.LastViewTC,
 			NewestQC:    rootQC,
 		}
 
