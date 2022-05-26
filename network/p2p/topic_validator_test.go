@@ -375,6 +375,72 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	require.Equalf(t, uint64(1), hookCalls, "expected 1 warning to be logged")
 }
 
+// TestAuthorizedSenderValidator_Ejected tests that the authorized sender validator correctly validates messages sent on cluster channels
+func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
+	sporkId := unittest.IdentifierFixture()
+	identity1, privateKey1 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleCollection))
+	sn1 := createNode(t, identity1.NodeID, privateKey1, sporkId)
+
+	identity2, privateKey2 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleCollection))
+	sn2 := createNode(t, identity2.NodeID, privateKey2, sporkId)
+
+	identity3, privateKey3 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleAccess))
+	an1 := createNode(t, identity3.NodeID, privateKey3, sporkId)
+
+	channel := engine.ChannelSyncCluster(flow.Testnet)
+	topic := engine.TopicFromChannel(channel, sporkId)
+
+	ids := flow.IdentityList{identity1, identity2}
+	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
+	require.NoError(t, err)
+
+	authorizedSenderValidator := validator.AuthorizedSenderValidator(zerolog.Nop(), channel, func(pid peer.ID) (*flow.Identity, bool) {
+		fid, err := translator.GetFlowID(pid)
+		if err != nil {
+			return &flow.Identity{}, false
+		}
+		return ids.ByNodeID(fid)
+	})
+
+	// node1 is connected to node2, and the an1 is connected to node1
+	// an1 <-> sn1 <-> sn2
+	require.NoError(t, sn1.AddPeer(context.TODO(), *host.InfoFromHost(sn2.Host())))
+	require.NoError(t, an1.AddPeer(context.TODO(), *host.InfoFromHost(sn1.Host())))
+
+	// sn1 subscribe to the topic with the topic validator, while sn2 will subscribe without the topic validator to allow sn2 to publish unauthorized messages
+	sub1, err := sn1.Subscribe(topic, authorizedSenderValidator)
+	require.NoError(t, err)
+	sub2, err := sn2.Subscribe(topic)
+	require.NoError(t, err)
+	sub3, err := an1.Subscribe(topic)
+	require.NoError(t, err)
+
+	// assert that the nodes are connected as expected
+	require.Eventually(t, func() bool {
+		return len(sn1.ListPeers(topic.String())) > 0 &&
+			len(sn2.ListPeers(topic.String())) > 0
+	}, 3*time.Second, 100*time.Millisecond)
+
+	timedCtx, cancel5s := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel5s()
+	// create a dummy block proposal to publish from our SN node
+	data := getMsgFixtureBz(t, &messages.SyncRequest{})
+
+	// sn2 publishes the block proposal, sn1 and an1 should receive the message because
+	// SN nodes are authorized to send block proposals
+	err = sn2.Publish(timedCtx, topic, data)
+	require.NoError(t, err)
+
+	// sn1 gets the message
+	checkReceive(timedCtx, t, data, sub1, nil, true)
+
+	// sn2 also gets the message (as part of the libp2p loopback of published topic messages)
+	checkReceive(timedCtx, t, data, sub2, nil, true)
+
+	// an1 also gets the message
+	checkReceive(timedCtx, t, data, sub3, nil, true)
+}
+
 // checkReceive checks that the subscription can receive the next message or not
 func checkReceive(ctx context.Context, t *testing.T, expectedData []byte, sub *pubsub.Subscription, wg *sync.WaitGroup, shouldReceive bool) {
 	if shouldReceive {
