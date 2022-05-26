@@ -16,6 +16,16 @@ import (
 	"github.com/onflow/flow-go/network/message"
 )
 
+const (
+	ErrReceiveOnly         = "rejecting message: sender is flagged as receive only and not authorized to send messages on this channel"
+	ErrUnauthorized        = "rejecting message: sender is not authorized to send this message type"
+	ErrSenderEjected       = "rejecting message: sender is an ejected node"
+	ErrInvalidMsgOnChannel = "invalid message type being sent on channel"
+	ErrIdentityUnverified  = "could not verify identity of sender"
+)
+
+type getIdentityFunc func(peer.ID) (*flow.Identity, bool)
+
 // AuthorizedSenderValidator using the getIdentity func will check if the role of the sender
 // is part of the authorized roles list for the channel being communicated on. A node is considered
 // to be authorized to send a message if all of the following are true.
@@ -23,7 +33,7 @@ import (
 // 2. The message type is a known message type (can be decoded with cbor codec).
 // 3. The authorized roles list for the channel contains the senders role.
 // 4. The node is not ejected
-func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, getIdentity func(peer.ID) (*flow.Identity, bool)) MessageValidator {
+func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, getIdentity getIdentityFunc) MessageValidator {
 	log = log.With().
 		Str("component", "authorized_sender_validator").
 		Str("network_channel", channel.String()).
@@ -36,17 +46,16 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, getI
 	return func(ctx context.Context, from peer.ID, msg *message.Message) pubsub.ValidationResult {
 		identity, ok := getIdentity(from)
 		if !ok {
-			log.Warn().Str("peer_id", from.String()).Msg("could not verify identity of sender")
+			log.Warn().Str("peer_id", from.String()).Msg(ErrIdentityUnverified)
 			return pubsub.ValidationReject
 		}
 
 		if identity.Ejected {
 			log.Warn().
-				Err(fmt.Errorf("sender %s is an ejected node", identity.NodeID)).
 				Str("peer_id", from.String()).
 				Str("role", identity.Role.String()).
 				Str("node_id", identity.NodeID.String()).
-				Msg("rejecting message")
+				Msg(ErrSenderEjected)
 			return pubsub.ValidationReject
 		}
 
@@ -54,22 +63,20 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, getI
 		code, what, err := codec.DecodeMsgType(msg.Payload)
 		if err != nil {
 			log.Warn().
-				Err(err).
 				Str("peer_id", from.String()).
 				Str("role", identity.Role.String()).
 				Str("node_id", identity.NodeID.String()).
-				Msg("rejecting message")
+				Msg(err.Error())
 			return pubsub.ValidationReject
 		}
 
 		if err := isAuthorizedSender(identity, channel, code); err != nil {
 			log.Warn().
-				Err(err).
 				Str("peer_id", from.String()).
 				Str("role", identity.Role.String()).
 				Str("node_id", identity.NodeID.String()).
 				Str("message_type", what).
-				Msg("sender is not authorized, rejecting message")
+				Msg(err.Error())
 
 			return pubsub.ValidationReject
 		}
@@ -80,49 +87,58 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, getI
 
 // isAuthorizedSender checks if node is an authorized role and is not ejected.
 func isAuthorizedSender(identity *flow.Identity, channel network.Channel, code uint8) error {
+
+	// cluster channels have a dynamic channel name
+	if code == cborcodec.CodeClusterBlockProposal || code == cborcodec.CodeClusterBlockVote || code == cborcodec.CodeClusterBlockResponse {
+		channels.ClusterChannelRoles(channel)
+	}
+
 	// get authorized roles list
-	roles, err := getRoles(channel, code)
+	authorizedRoles, receiveOnlyRoles, err := getRoles(channel, code)
 	if err != nil {
 		return err
 	}
 
-	if !roles.Contains(identity.Role) {
-		return fmt.Errorf("sender is not authorized to send this message type")
+	if !authorizedRoles.Contains(identity.Role) {
+		return fmt.Errorf(ErrUnauthorized)
+	}
+
+	if receiveOnlyRoles.Contains(identity.Role) {
+		// slashable offense: nodes should not send messages on channels they only need to receive on
+		return fmt.Errorf(ErrReceiveOnly)
 	}
 
 	return nil
 }
 
 // getRoles returns list of authorized roles for the channel associated with the message code provided
-func getRoles(channel network.Channel, msgTypeCode uint8) (flow.RoleList, error) {
+func getRoles(channel network.Channel, msgTypeCode uint8) (flow.RoleList, flow.RoleList, error) {
 	// echo messages can be sent by anyone
 	if msgTypeCode == cborcodec.CodeEcho {
-		return flow.Roles(), nil
-	}
-
-	// cluster channels have a dynamic channel name
-	if msgTypeCode == cborcodec.CodeClusterBlockProposal || msgTypeCode == cborcodec.CodeClusterBlockVote || msgTypeCode == cborcodec.CodeClusterBlockResponse {
-		return channels.ClusterChannelRoles(channel), nil
+		return flow.Roles(), flow.RoleList{}, nil
 	}
 
 	// get message type codes for all messages communicated on the channel
 	codes, ok := cborcodec.ChannelToMsgCodes[channel]
 	if !ok {
-		return nil, fmt.Errorf("could not get message codes for unknown channel: %s", channel)
+		return nil, nil, fmt.Errorf("could not get message codes for unknown channel: %s", channel)
 	}
 
 	// check if message type code is in list of codes corresponding to channel
 	if !containsCode(codes, msgTypeCode) {
-		return nil, fmt.Errorf("invalid message type being sent on channel")
+		return nil, nil, fmt.Errorf(ErrInvalidMsgOnChannel)
 	}
 
 	// get authorized list of roles for channel
-	roles, ok := channels.RolesByChannel(channel)
+	authorizedRoles, ok := channels.RolesByChannel(channel)
 	if !ok {
-		return nil, fmt.Errorf("could not get roles for channel")
+		return nil, nil, fmt.Errorf("could not get roles for channel")
 	}
 
-	return roles, nil
+	// get list of receive only roles for channel
+	receiveOnlyRoles := channels.ReceiveOnlyRolesByChannel(channel)
+
+	return authorizedRoles, receiveOnlyRoles, nil
 }
 
 func containsCode(codes []uint8, code uint8) bool {

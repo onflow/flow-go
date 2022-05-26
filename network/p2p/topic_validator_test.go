@@ -2,9 +2,7 @@ package p2p_test
 
 import (
 	"context"
-	"os"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -44,13 +42,11 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	require.NoError(t, err)
 
 	// setup hooked logger
-	var hookCalls uint64
-	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
-		if level == zerolog.WarnLevel {
-			atomic.AddUint64(&hookCalls, 1)
-		}
-	})
-	logger := zerolog.New(os.Stdout).Level(zerolog.WarnLevel).Hook(hook)
+	var (
+		hook   unittest.LoggerHook
+		logger zerolog.Logger
+	)
+	logger, hook = unittest.HookedLogger()
 
 	authorizedSenderValidator := validator.AuthorizedSenderValidator(logger, channel, func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translator.GetFlowID(pid)
@@ -128,8 +124,8 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "could not receive message on time")
 
-	// expecting 1 warn calls for each rejected message from unauthorized node
-	require.Equalf(t, uint64(1), hookCalls, "expected 1 warning to be logged")
+	// expecting ErrUnauthorized to be logged
+	require.Regexp(t, validator.ErrUnauthorized, hook.Logs())
 }
 
 // TestAuthorizedSenderValidator_Authorized tests that the authorized sender validator rejects messages being sent on the wrong channel
@@ -150,13 +146,11 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	require.NoError(t, err)
 
 	// setup hooked logger
-	var hookCalls uint64
-	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
-		if level == zerolog.WarnLevel {
-			atomic.AddUint64(&hookCalls, 1)
-		}
-	})
-	logger := zerolog.New(os.Stdout).Level(zerolog.WarnLevel).Hook(hook)
+	var (
+		hook   unittest.LoggerHook
+		logger zerolog.Logger
+	)
+	logger, hook = unittest.HookedLogger()
 
 	authorizedSenderValidator := validator.AuthorizedSenderValidator(logger, channel, func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translator.GetFlowID(pid)
@@ -201,8 +195,8 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "could not receive message on time")
 
-	// expecting 1 warn calls for each rejected message from ejected node
-	require.Equalf(t, uint64(1), hookCalls, "expected 1 warning to be logged")
+	// expecting ErrInvalidMsgOnChannel to be logged
+	require.Regexp(t, validator.ErrInvalidMsgOnChannel, hook.Logs())
 }
 
 // TestAuthorizedSenderValidator_Authorized tests that the authorized sender validator rejects messages from unstaked nodes
@@ -223,13 +217,11 @@ func TestAuthorizedSenderValidator_Unstaked(t *testing.T) {
 	require.NoError(t, err)
 
 	// setup hooked logger
-	var hookCalls uint64
-	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
-		if level == zerolog.WarnLevel {
-			atomic.AddUint64(&hookCalls, 1)
-		}
-	})
-	logger := zerolog.New(os.Stdout).Level(zerolog.WarnLevel).Hook(hook)
+	var (
+		hook   unittest.LoggerHook
+		logger zerolog.Logger
+	)
+	logger, hook = unittest.HookedLogger()
 
 	authorizedSenderValidator := validator.AuthorizedSenderValidator(logger, channel, func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translator.GetFlowID(pid)
@@ -274,8 +266,8 @@ func TestAuthorizedSenderValidator_Unstaked(t *testing.T) {
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "could not receive message on time")
 
-	// expecting 1 warn calls for each rejected message from ejected node
-	require.Equalf(t, uint64(1), hookCalls, "expected 1 warning to be logged")
+	// expecting ErrIdentityUnverified to be logged
+	require.Regexp(t, validator.ErrIdentityUnverified, hook.Logs())
 }
 
 // TestAuthorizedSenderValidator_Ejected tests that the authorized sender validator rejects messages from nodes that are ejected
@@ -298,13 +290,11 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	require.NoError(t, err)
 
 	// setup hooked logger
-	var hookCalls uint64
-	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
-		if level == zerolog.WarnLevel {
-			atomic.AddUint64(&hookCalls, 1)
-		}
-	})
-	logger := zerolog.New(os.Stdout).Level(zerolog.WarnLevel).Hook(hook)
+	var (
+		hook   unittest.LoggerHook
+		logger zerolog.Logger
+	)
+	logger, hook = unittest.HookedLogger()
 
 	authorizedSenderValidator := validator.AuthorizedSenderValidator(logger, channel, func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translator.GetFlowID(pid)
@@ -371,8 +361,73 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "could not receive message on time")
 
-	// expecting 1 warn calls for each rejected message from ejected node
-	require.Equalf(t, uint64(1), hookCalls, "expected 1 warning to be logged")
+	// expecting ErrSenderEjected to be logged
+	require.Regexp(t, validator.ErrSenderEjected, hook.Logs())
+}
+
+// TestAuthorizedSenderValidator_Ejected tests that the authorized sender validator rejects messages from nodes that should only receive on the channel
+func TestAuthorizedSenderValidator_ReceiveOnly(t *testing.T) {
+	sporkId := unittest.IdentifierFixture()
+	identity1, privateKey1 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
+	sn1 := createNode(t, identity1.NodeID, privateKey1, sporkId)
+
+	identity2, privateKey2 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleAccess))
+	an1 := createNode(t, identity2.NodeID, privateKey2, sporkId)
+
+	// AN's should not be able to send on the push blocks channel
+	channel := engine.PushBlocks
+	topic := engine.TopicFromChannel(channel, sporkId)
+
+	ids := flow.IdentityList{identity1, identity2}
+	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
+	require.NoError(t, err)
+
+	// setup hooked logger
+	var (
+		hook   unittest.LoggerHook
+		logger zerolog.Logger
+	)
+	logger, hook = unittest.HookedLogger()
+
+	authorizedSenderValidator := validator.AuthorizedSenderValidator(logger, channel, func(pid peer.ID) (*flow.Identity, bool) {
+		fid, err := translator.GetFlowID(pid)
+		if err != nil {
+			return &flow.Identity{}, false
+		}
+		return ids.ByNodeID(fid)
+	})
+
+	require.NoError(t, an1.AddPeer(context.TODO(), *host.InfoFromHost(sn1.Host())))
+
+	// sn1 subscribe to the topic with the topic validator, while an1 will subscribe without the topic validator to allow sn2 to publish unauthorized messages
+	sub1, err := sn1.Subscribe(topic, authorizedSenderValidator)
+	require.NoError(t, err)
+	_, err = an1.Subscribe(topic)
+	require.NoError(t, err)
+
+	// assert that the nodes are connected as expected
+	require.Eventually(t, func() bool {
+		return len(sn1.ListPeers(topic.String())) > 0 &&
+			len(an1.ListPeers(topic.String())) > 0
+	}, 3*time.Second, 100*time.Millisecond)
+
+	var wg sync.WaitGroup
+	header := unittest.BlockHeaderFixture()
+	data := getMsgFixtureBz(t, &messages.BlockProposal{Header: &header})
+	timedCtx, cancel2s := context.WithTimeout(context.Background(), time.Second)
+	defer cancel2s()
+	err = an1.Publish(timedCtx, topic, data)
+	require.NoError(t, err)
+
+	// sn1 should not receive rejected message from ejected sn2
+	timedCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	checkReceive(timedCtx, t, nil, sub1, &wg, false)
+
+	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "could not receive message on time")
+
+	// expecting ErrReceiveOnly to be logged
+	require.Regexp(t, validator.ErrReceiveOnly, hook.Logs())
 }
 
 // checkReceive checks that the subscription can receive the next message or not

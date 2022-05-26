@@ -19,6 +19,9 @@ func init() {
 // channelRoleMap keeps a map between channels and the list of flow roles involved in them.
 var channelRoleMap map[network.Channel]flow.RoleList
 
+// channelRoleReceiveOnlyMap keeps a map between channels and the list of flow roles that should be receiving messages only.
+var channelRoleReceiveOnlyMap map[network.Channel]flow.RoleList
+
 // clusterChannelPrefixRoleMap keeps a map between cluster channel prefixes and the list of flow roles involved in them.
 var clusterChannelPrefixRoleMap map[string]flow.RoleList
 
@@ -34,6 +37,20 @@ func RolesByChannel(channel network.Channel) (flow.RoleList, bool) {
 	}
 	roles, ok := channelRoleMap[channel]
 	return roles, ok
+}
+
+// ReceiveOnlyRolesByChannel returns list of flow roles involved in the channel that are only allowed to receive messages on the channel.
+func ReceiveOnlyRolesByChannel(channel network.Channel) flow.RoleList {
+	if IsClusterChannel(channel) || PublicChannels().Contains(channel) {
+		return flow.RoleList{}
+	}
+
+	roles, ok := channelRoleReceiveOnlyMap[channel]
+	if !ok {
+		return flow.RoleList{}
+	}
+
+	return roles
 }
 
 // Exists returns true if the channel exists.
@@ -161,6 +178,7 @@ const (
 // Note: Please update this map, if a new channel is defined or a the roles subscribing to a channel have changed
 func initializeChannelRoleMap() {
 	channelRoleMap = make(map[network.Channel]flow.RoleList)
+	channelRoleReceiveOnlyMap = make(map[network.Channel]flow.RoleList)
 
 	// Channels for test
 	channelRoleMap[TestNetwork] = flow.RoleList{flow.RoleCollection, flow.RoleConsensus, flow.RoleExecution,
@@ -181,10 +199,15 @@ func initializeChannelRoleMap() {
 	// Channels for actively pushing entities to subscribers
 	channelRoleMap[PushTransactions] = flow.RoleList{flow.RoleCollection}
 	channelRoleMap[PushGuarantees] = flow.RoleList{flow.RoleCollection, flow.RoleConsensus}
+
 	channelRoleMap[PushBlocks] = flow.RoleList{flow.RoleCollection, flow.RoleConsensus, flow.RoleExecution,
 		flow.RoleVerification, flow.RoleAccess}
+	channelRoleReceiveOnlyMap[PushBlocks] = flow.RoleList{flow.RoleAccess}
+
 	channelRoleMap[PushReceipts] = flow.RoleList{flow.RoleConsensus, flow.RoleExecution, flow.RoleVerification,
 		flow.RoleAccess}
+	channelRoleReceiveOnlyMap[PushReceipts] = flow.RoleList{flow.RoleAccess}
+
 	channelRoleMap[PushApprovals] = flow.RoleList{flow.RoleConsensus, flow.RoleVerification}
 
 	// Channels for actively requesting missing entities
@@ -197,8 +220,12 @@ func initializeChannelRoleMap() {
 	channelRoleMap[ReceiveGuarantees] = flow.RoleList{flow.RoleCollection, flow.RoleConsensus}
 	channelRoleMap[ReceiveBlocks] = flow.RoleList{flow.RoleCollection, flow.RoleConsensus, flow.RoleExecution,
 		flow.RoleVerification, flow.RoleAccess}
+	channelRoleReceiveOnlyMap[ReceiveBlocks] = flow.RoleList{flow.RoleAccess}
+
 	channelRoleMap[ReceiveReceipts] = flow.RoleList{flow.RoleConsensus, flow.RoleExecution, flow.RoleVerification,
 		flow.RoleAccess}
+	channelRoleReceiveOnlyMap[ReceiveReceipts] = flow.RoleList{flow.RoleAccess}
+
 	channelRoleMap[ReceiveApprovals] = flow.RoleList{flow.RoleConsensus, flow.RoleVerification}
 
 	channelRoleMap[ProvideCollections] = flow.RoleList{flow.RoleCollection, flow.RoleExecution, flow.RoleAccess}
