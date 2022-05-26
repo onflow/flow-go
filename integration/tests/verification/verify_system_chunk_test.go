@@ -5,10 +5,12 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestVerifySystemChunk(t *testing.T) {
-	t.Skip("active-pacemaker, to be fixed")
+	unittest.SkipUnless(t, unittest.TEST_TODO, "active-pacemaker")
 	suite.Run(t, new(VerifySystemChunkSuite))
 }
 

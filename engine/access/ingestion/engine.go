@@ -238,7 +238,7 @@ func (e *Engine) processFinalizedBlock(blockID flow.Identifier) error {
 	}
 
 	// queue requesting each of the collections from the collection node
-	e.requestCollections(block.Payload.Guarantees)
+	e.requestCollectionsInFinalizedBlock(block.Payload.Guarantees)
 
 	return nil
 }
@@ -438,7 +438,7 @@ func (e *Engine) requestMissingCollections(ctx context.Context) error {
 		}
 
 		// request the missing collections
-		e.requestCollections(missingColls)
+		e.requestCollectionsInFinalizedBlock(missingColls)
 
 		// add them to the missing collection id map to track later
 		for _, cg := range missingColls {
@@ -583,7 +583,7 @@ func (e *Engine) updateLastFullBlockReceivedIndex() {
 			Int("threshold", defaultMissingCollsForBlkThreshold).
 			Uint64("last_full_blk_height", latestFullHeight).
 			Msg("re-requesting missing collections")
-		e.requestCollections(allMissingColls)
+		e.requestCollectionsInFinalizedBlock(allMissingColls)
 	}
 
 	e.log.Debug().Uint64("last_full_blk_height", latestFullHeight).Msg("updated LastFullBlockReceived index")
@@ -623,9 +623,14 @@ func (e *Engine) lookupCollection(collId flow.Identifier) (bool, error) {
 	return false, fmt.Errorf("failed to retreive collection %s: %w", collId.String(), err)
 }
 
-// requestCollections registers collection requests with the requester engine
-func (e *Engine) requestCollections(missingColls []*flow.CollectionGuarantee) {
+// requestCollectionsInFinalizedBlock registers collection requests with the requester engine
+func (e *Engine) requestCollectionsInFinalizedBlock(missingColls []*flow.CollectionGuarantee) {
 	for _, cg := range missingColls {
-		e.request.EntityByID(cg.ID(), filter.HasNodeID(cg.SignerIDs...))
+		// TODO: move this query out of for loop?
+		guarantors, err := protocol.FindGuarantors(e.state, cg)
+		if err != nil {
+			e.log.Fatal().Err(err).Msgf("could not find guarantors for guarantee %v", cg.ID())
+		}
+		e.request.EntityByID(cg.ID(), filter.HasNodeID(guarantors...))
 	}
 }

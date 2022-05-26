@@ -1,7 +1,6 @@
 package list_tries
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -34,8 +33,10 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msg("error while getting tries")
 	}
 
-	for _, trie := range tries {
-		fmt.Printf("%x\n", trie.RootHash())
+	log.Info().Msgf("print root hash for %v tries", len(tries))
+
+	for i, trie := range tries {
+		log.Info().Msgf("%v-th trie hash: %s", i, trie.RootHash())
 	}
 
 	duration := time.Since(startTime)

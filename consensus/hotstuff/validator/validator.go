@@ -3,6 +3,7 @@ package validator
 import (
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/module/signature"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -62,7 +63,7 @@ func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 	}
 
 	// 1. Check if there is super-majority of votes
-	allParticipants, err := v.committee.IdentitiesByEpoch(tc.View, filter.Any)
+	allParticipants, err := v.committee.IdentitiesByEpoch(tc.View)
 	if err != nil {
 		return fmt.Errorf("could not get consensus participants at view %d: %w", tc.View, err)
 	}
@@ -91,7 +92,7 @@ func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 	err = v.verifier.VerifyTC(signers, tc.SigData, tc.View, tc.TOHighQCViews)
 	if err != nil {
 		switch {
-		case errors.Is(err, model.ErrInvalidFormat):
+		case model.IsInvalidFormatError(err):
 			return newInvalidTCError(tc, fmt.Errorf("TC's signature data has an invalid structure: %w", err))
 		case errors.Is(err, model.ErrInvalidSignature):
 			return newInvalidTCError(tc, fmt.Errorf("TC contains invalid signature(s): %w", err))
@@ -114,13 +115,18 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate) error {
 	// authorized to sign during this epoch. Ejection and dynamic weight adjustments
 	// are not taken into account here. By using an epoch-static set of authorized
 	// signers, we can check QC validity without needing all ancestor blocks.
-	allParticipants, err := v.committee.IdentitiesByEpoch(qc.View, filter.Any)
+	allParticipants, err := v.committee.IdentitiesByEpoch(qc.View)
 	if err != nil {
 		return fmt.Errorf("could not get consensus participants at view %d: %w", qc.View, err)
 	}
-	signers := allParticipants.Filter(filter.HasNodeID(qc.SignerIDs...)) // resulting IdentityList contains no duplicates
-	if len(signers) != len(qc.SignerIDs) {
-		return newInvalidQCError(qc, model.NewInvalidSignerErrorf("some qc signers are duplicated or invalid consensus participants at view %d", qc.View))
+
+	signers, err := signature.DecodeSignerIndicesToIdentities(allParticipants, qc.SignerIndices)
+	if err != nil {
+		if signature.IsDecodeSignerIndicesError(err) {
+			return newInvalidQCError(qc, fmt.Errorf("invalid signer indices: %w", err))
+		}
+		// unexpected error
+		return fmt.Errorf("unexpected internal error decoding signer indices: %w", err)
 	}
 
 	// determine whether signers reach minimally required weight threshold for consensus
@@ -141,7 +147,7 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate) error {
 		// TODO: if the random beacon committee is a strict subset of the HotStuff committee,
 		//       we expect `model.InvalidSignerError` here during normal operations.
 		switch {
-		case errors.Is(err, model.ErrInvalidFormat):
+		case model.IsInvalidFormatError(err):
 			return newInvalidQCError(qc, fmt.Errorf("QC's  signature data has an invalid structure: %w", err))
 		case errors.Is(err, model.ErrInvalidSignature):
 			return newInvalidQCError(qc, fmt.Errorf("QC contains invalid signature(s): %w", err))
@@ -254,7 +260,7 @@ func (v *Validator) ValidateVote(vote *model.Vote) (*flow.Identity, error) {
 		// the random beacon committee. Consequently, `InvalidSignerError` should not occur atm.
 		// TODO: if the random beacon committee is a strict subset of the HotStuff committee,
 		//       we expect `model.InvalidSignerError` here during normal operations.
-		if errors.Is(err, model.ErrInvalidFormat) || errors.Is(err, model.ErrInvalidSignature) {
+		if model.IsInvalidFormatError(err) || errors.Is(err, model.ErrInvalidSignature) {
 			return nil, newInvalidVoteError(vote, err)
 		}
 		return nil, fmt.Errorf("cannot verify signature for vote (%x): %w", vote.ID(), err)

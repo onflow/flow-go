@@ -14,6 +14,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+
 	"github.com/onflow/flow-go/crypto"
 
 	"github.com/onflow/flow-go/consensus"
@@ -68,6 +69,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/signature"
 	state_synchronization "github.com/onflow/flow-go/module/state_synchronization/mock"
 	chainsync "github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/module/trace"
@@ -523,7 +525,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.NoError(t, err)
 
 	execState := executionState.NewExecutionState(
-		ls, commitsStorage, node.Blocks, node.Headers, collectionsStorage, chunkDataPackStorage, results, receipts, myReceipts, eventsStorage, serviceEventsStorage, txResultStorage, node.PublicDB, node.Tracer,
+		ls, commitsStorage, node.Blocks, node.Headers, collectionsStorage, chunkDataPackStorage, results, myReceipts, eventsStorage, serviceEventsStorage, txResultStorage, node.PublicDB, node.Tracer,
 	)
 
 	requestEngine, err := requester.New(
@@ -682,12 +684,14 @@ func getRoot(t *testing.T, node *testmock.GenericNode) (*flow.Header, *flow.Quor
 	require.NoError(t, err)
 
 	signerIDs := signers.NodeIDs()
+	signerIndices, err := signature.EncodeSignersToIndices(signerIDs, signerIDs)
+	require.NoError(t, err)
 
 	rootQC := &flow.QuorumCertificate{
-		View:      rootHead.View,
-		BlockID:   rootHead.ID(),
-		SignerIDs: signerIDs,
-		SigData:   unittest.SignatureFixture(),
+		View:          rootHead.View,
+		BlockID:       rootHead.ID(),
+		SignerIndices: signerIndices,
+		SigData:       unittest.SignatureFixture(),
 	}
 
 	return rootHead, rootQC
@@ -701,8 +705,8 @@ type RoundRobinLeaderSelection struct {
 var _ hotstuff.Replicas = (*RoundRobinLeaderSelection)(nil)
 var _ hotstuff.DynamicCommittee = (*RoundRobinLeaderSelection)(nil)
 
-func (s *RoundRobinLeaderSelection) IdentitiesByBlock(_ flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
-	return s.identities.Filter(selector), nil
+func (s *RoundRobinLeaderSelection) IdentitiesByBlock(_ flow.Identifier) (flow.IdentityList, error) {
+	return s.identities, nil
 }
 
 func (s *RoundRobinLeaderSelection) IdentityByBlock(_ flow.Identifier, participantID flow.Identifier) (*flow.Identity, error) {
@@ -714,8 +718,8 @@ func (s *RoundRobinLeaderSelection) IdentityByBlock(_ flow.Identifier, participa
 	return id, nil
 }
 
-func (s *RoundRobinLeaderSelection) IdentitiesByEpoch(_ uint64, selector flow.IdentityFilter) (flow.IdentityList, error) {
-	return s.identities.Filter(selector), nil
+func (s *RoundRobinLeaderSelection) IdentitiesByEpoch(_ uint64) (flow.IdentityList, error) {
+	return s.identities, nil
 }
 
 func (s *RoundRobinLeaderSelection) IdentityByEpoch(_ uint64, participantID flow.Identifier) (*flow.Identity, error) {
