@@ -17,21 +17,20 @@ import (
 )
 
 const (
-	KeyExists             = "exists"
-	KeyCode               = "code"
-	KeyContractNames      = "contract_names"
-	KeyPublicKeyCount     = "public_key_count"
-	KeyStorageUsed        = "storage_used"
-	KeyAccountFrozen      = "frozen"
-	KeyStorageIndex       = "storage_index"
-	uint64StorageSize     = 8
-	AccountFrozenValue    = 1
-	AccountNotFrozenValue = 0
-)
+	KeyAccountStatus  = "account_state"
+	KeyPublicKeyCount = "public_key_count"
+	KeyCode           = "code"
+	KeyContractNames  = "contract_names"
+	KeyStorageUsed    = "storage_used"
+	KeyStorageIndex   = "storage_index"
+	uint64StorageSize = 8
 
-func keyPublicKey(index uint64) string {
-	return fmt.Sprintf("public_key_%d", index)
-}
+	// TODO remove depricated keys when migrations don't need them any more
+	// depricated, please use account status instead
+	KeyExists = "exists"
+	// depricated, please use account status instead
+	KeyAccountFrozen = "frozen"
+)
 
 type Accounts interface {
 	Exists(address flow.Address) (bool, error)
@@ -141,16 +140,17 @@ func (a *StatefulAccounts) Get(address flow.Address) (*flow.Account, error) {
 }
 
 func (a *StatefulAccounts) Exists(address flow.Address) (bool, error) {
-	exists, err := a.getValue(address, false, KeyExists)
+	accStatusBytes, err := a.getValue(address, false, KeyAccountStatus)
 	if err != nil {
 		return false, err
 	}
 
-	if len(exists) != 0 {
-		return true, nil
+	accStatus, err := AccountStatusFromBytes(accStatusBytes)
+	if err != nil {
+		return false, err
 	}
 
-	return false, nil
+	return accStatus.AccountExists(), nil
 }
 
 // Create account sets all required registers on an address.
@@ -170,7 +170,7 @@ func (a *StatefulAccounts) Create(publicKeys []flow.AccountPublicKey, newAddress
 	}
 
 	// mark that this account exists
-	err = a.setValue(newAddress, false, KeyExists, []byte{1})
+	err = a.setValue(newAddress, false, KeyAccountStatus, NewAccountStatus().ToBytes())
 	if err != nil {
 		return err
 	}
@@ -618,26 +618,28 @@ func readUint64(input []byte) (value uint64, rest []byte, err error) {
 }
 
 func (a *StatefulAccounts) GetAccountFrozen(address flow.Address) (bool, error) {
-	frozen, err := a.getValue(address, false, KeyAccountFrozen)
+	accStatusBytes, err := a.getValue(address, false, KeyAccountStatus)
 	if err != nil {
 		return false, err
 	}
-
-	if len(frozen) == 0 {
+	accStatus, err := AccountStatusFromBytes(accStatusBytes)
+	if err != nil {
 		return false, err
 	}
-
-	return frozen[0] != AccountNotFrozenValue, nil
+	return accStatus.IsAccountFrozen(), nil
 }
 
 func (a *StatefulAccounts) SetAccountFrozen(address flow.Address, frozen bool) error {
-
-	val := make([]byte, 1) //zero value for byte is 0
-	if frozen {
-		val[0] = AccountFrozenValue
+	accStatusBytes, err := a.getValue(address, false, KeyAccountStatus)
+	if err != nil {
+		return err
 	}
-
-	return a.setValue(address, false, KeyAccountFrozen, val)
+	accStatus, err := AccountStatusFromBytes(accStatusBytes)
+	if err != nil {
+		return err
+	}
+	accStatus = SetAccountStatusFrozenFlag(accStatus, frozen)
+	return a.setValue(address, false, KeyAccountStatus, accStatus.ToBytes())
 }
 
 // handy function to error out if account is frozen
@@ -677,4 +679,8 @@ func (l *contractNames) remove(contractName string) {
 		return
 	}
 	*l = append((*l)[:i], (*l)[i+1:]...)
+}
+
+func keyPublicKey(index uint64) string {
+	return fmt.Sprintf("public_key_%d", index)
 }
