@@ -9,7 +9,7 @@ import (
 
 // TestTxStatsTracker tests the TTF, TTE, TTS stats: Mean, Median, and Max.
 func TestTxStatsTracker(t *testing.T) {
-	st := NewTxStatsTracker(&StatsConfig{})
+	st := NewTxStatsTracker()
 	tx1 := &TxStats{
 		TTF:       0 * time.Second,
 		TTE:       1 * time.Second,
@@ -42,7 +42,7 @@ func TestTxStatsTracker(t *testing.T) {
 
 // TestTxStatsTrackerString tests the String() method.
 func TestTxStatsTrackerString(t *testing.T) {
-	st := NewTxStatsTracker(&StatsConfig{})
+	st := NewTxStatsTracker()
 	assert.Equal(t, "[]\n[]\n[]\n", st.String())
 
 	tx1 := &TxStats{
@@ -57,7 +57,7 @@ func TestTxStatsTrackerString(t *testing.T) {
 
 // TestTxStatsTrackerDigest tests the Digest() method.
 func TestTxStatsTrackerDigest(t *testing.T) {
-	st := NewTxStatsTracker(&StatsConfig{})
+	st := NewTxStatsTracker()
 	assert.Contains(t, st.Digest(), "NaN")
 
 	tx1 := &TxStats{

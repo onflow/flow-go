@@ -11,16 +11,6 @@ import (
 	"github.com/openhistogram/circonusllhist"
 )
 
-// StatsConfig captures configuration details of an experiment
-type StatsConfig struct {
-	numCollNodes    int // number of collection nodes
-	numConsNodes    int // number of consensus nodes
-	numExecNodes    int // number of execution nodes
-	numVerfNodes    int // number of verification nodes
-	numCollClusters int // number of collection clusters
-	txBatchSize     int // transaction batch size (tx sent at the same time)
-}
-
 // TxStats holds stats about execution of a transaction
 type TxStats struct {
 	// TTF is transaction time to finality
@@ -35,8 +25,6 @@ type TxStats struct {
 
 // TxStatsTracker keep track of TxStats
 type TxStatsTracker struct {
-	config *StatsConfig
-
 	TTF *circonusllhist.Histogram
 	TTE *circonusllhist.Histogram
 	TTS *circonusllhist.Histogram
@@ -46,10 +34,8 @@ type TxStatsTracker struct {
 }
 
 // NewTxStatsTracker returns a new instance of StatsTracker
-func NewTxStatsTracker(config *StatsConfig) *TxStatsTracker {
+func NewTxStatsTracker() *TxStatsTracker {
 	return &TxStatsTracker{
-		config: config,
-
 		TTF: circonusllhist.New(),
 		TTE: circonusllhist.New(),
 		TTS: circonusllhist.New(),
