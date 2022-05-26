@@ -111,7 +111,7 @@ func IsInsufficientSignaturesError(err error) bool {
 
 // IsDecodeSignerIndicesError returns whether err is about decoding signer indices
 func IsDecodeSignerIndicesError(err error) bool {
-	return errors.Is(err, ErrIllegallyPaddedBitVector) ||
-		errors.Is(err, ErrIncompatibleBitVectorLength) ||
-		errors.Is(err, ErrInvalidChecksum)
+	return errors.As(err, &ErrIllegallyPaddedBitVector) ||
+		errors.As(err, &ErrIncompatibleBitVectorLength) ||
+		errors.As(err, &ErrInvalidChecksum)
 }
