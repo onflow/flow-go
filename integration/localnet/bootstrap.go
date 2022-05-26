@@ -90,12 +90,12 @@ func init() {
 func generateBootstrapData(flowNetworkConf testnet.NetworkConfig) []testnet.ContainerConfig {
 	// Prepare localnet host folders, mapped to Docker container volumes upon `docker compose up`
 	prepareCommonHostFolders()
-	_, _, _, flowNodeContainerConfigs, _, err := testnet.BootstrapNetwork(flowNetworkConf, BootstrapDir)
+	bootstrapData, err := testnet.BootstrapNetwork(flowNetworkConf, BootstrapDir)
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println("Flow test network bootstrapping data generated...")
-	return flowNodeContainerConfigs
+	return bootstrapData.StakedConfs
 }
 
 // localnet/bootstrap.go generates a docker compose file with images configured for a

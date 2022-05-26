@@ -73,7 +73,7 @@ func TestBootstrapInvalidEpochCommit(t *testing.T) {
 		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 		commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
 		// add an extra QC to commit
-		extraQC := unittest.QuorumCertificateFixture()
+		extraQC := unittest.QuorumCertificateWithSignerIDsFixture()
 		commit.ClusterQCs = append(commit.ClusterQCs, flow.ClusterQCVoteDataFromQC(extraQC))
 
 		err := isValidEpochCommit(commit, setup)

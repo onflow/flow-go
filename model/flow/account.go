@@ -4,8 +4,7 @@ package flow
 
 import (
 	"encoding/json"
-
-	"github.com/pkg/errors"
+	"fmt"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
@@ -83,7 +82,7 @@ func (a *AccountPublicKey) UnmarshalJSON(data []byte) error {
 // - (TODO) It specifies a negative key weight
 func (a AccountPublicKey) Validate() error {
 	if !CompatibleAlgorithms(a.SignAlgo, a.HashAlgo) {
-		return errors.Errorf(
+		return fmt.Errorf(
 			"signing algorithm (%s) is incompatible with hashing algorithm (%s)",
 			a.SignAlgo,
 			a.HashAlgo,
