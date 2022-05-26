@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 
+	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 
@@ -12,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
-	jsoncodec "github.com/onflow/flow-go/network/codec/json"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
@@ -47,7 +47,7 @@ func New(net network.Network, log zerolog.Logger, me module.Local, state protoco
 	// create a channel to buffer messages in case the consumer is slow
 	messages := make(chan ghost.FlowMessage, 1000)
 
-	codec := jsoncodec.NewCodec()
+	codec := cborcodec.NewCodec()
 
 	if config.MaxMsgSize == 0 {
 		config.MaxMsgSize = grpcutils.DefaultMaxMsgSize

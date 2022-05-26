@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"io"
 
+	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"google.golang.org/grpc"
 
 	ghost "github.com/onflow/flow-go/engine/ghost/protobuf"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
-	jsoncodec "github.com/onflow/flow-go/network/codec/json"
 )
 
 // GhostClient is a client for the ghost node.
@@ -41,7 +41,7 @@ func NewGhostClient(addr string) (*GhostClient, error) {
 	return &GhostClient{
 		rpcClient: grpcClient,
 		close:     func() error { return conn.Close() },
-		codec:     jsoncodec.NewCodec(),
+		codec:     cborcodec.NewCodec(),
 	}, nil
 }
 
