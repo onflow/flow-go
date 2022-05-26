@@ -12,7 +12,7 @@ type TimeoutCertificate struct {
 	TOHighQCViews []uint64
 	// TOHighestQC is the newest QC from all TimeoutObject that were aggregated for this certificate.
 	TOHighestQC *QuorumCertificate
-	// SignerIndices encodes the HotStuff participants whose TimeoutObject is included in this TC.
+	// SignerIndices encodes the HotStuff participants whose TimeoutObjects are included in this TC.
 	// For `n` authorized consensus nodes, `SignerIndices` is an n-bit vector (padded with tailing
 	// zeros to reach full bytes). We list the nodes in their canonical order, as defined by the protocol.
 	SignerIndices []byte
