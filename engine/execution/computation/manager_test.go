@@ -537,8 +537,6 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 	address := cadence.NewAddress(account)
 	commonAddress, _ := common.HexToAddress(address.Hex())
 
-	require.NoError(t, err)
-
 	script := []byte(`
 	pub fun main(account: Address) {
 		let acc = getAuthAccount(account)

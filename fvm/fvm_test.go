@@ -4234,7 +4234,7 @@ func TestScriptAccountKeyMutationsFailure(t *testing.T) {
 				seed := make([]byte, crypto.KeyGenSeedMinLenECDSAP256)
 				_, _ = rand.Read(seed)
 
-				privateKey, err := crypto.GeneratePrivateKey(crypto.ECDSAP256, seed)
+				privateKey, _ := crypto.GeneratePrivateKey(crypto.ECDSAP256, seed)
 
 				script := fvm.Script([]byte(`
 					pub fun main(account: Address, k: [UInt8]) {
