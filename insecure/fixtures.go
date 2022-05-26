@@ -55,7 +55,7 @@ func MessageFixture(t *testing.T, codec network.Codec, protocol Protocol) (*Mess
 	// creates corresponding event of that message that
 	// is sent by attack network to orchestrator.
 	e := &Event{
-		CorruptedId:       originId,
+		CorruptedNodeId:   originId,
 		Channel:           channel,
 		FlowProtocolEvent: content,
 		Protocol:          protocol,

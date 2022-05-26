@@ -61,15 +61,23 @@ func addAccountKey(
 	view state.View,
 	programs *programs.Programs,
 	address flow.Address,
+	apiVersion accountKeyAPIVersion,
 ) flow.AccountPublicKey {
 
 	privateKey, err := unittest.AccountKeyDefaultFixture()
 	require.NoError(t, err)
 
-	publicKeyA, cadencePublicKey := newAccountKey(t, privateKey, addAccountKeyTransactionV2)
+	publicKeyA, cadencePublicKey := newAccountKey(t, privateKey, apiVersion)
+
+	var addAccountKeyTx accountKeyAPIVersion
+	if apiVersion == accountKeyAPIVersionV1 {
+		addAccountKeyTx = addAccountKeyTransaction
+	} else {
+		addAccountKeyTx = addAccountKeyTransactionV2
+	}
 
 	txBody := flow.NewTransactionBody().
-		SetScript([]byte(addAccountKeyTransactionV2)).
+		SetScript([]byte(addAccountKeyTx)).
 		AddArgument(cadencePublicKey).
 		AddAuthorizer(address)
 
@@ -155,6 +163,13 @@ transaction {
 }
 `
 
+const addAccountKeyTransaction = `
+transaction(key: [UInt8]) {
+  prepare(signer: AuthAccount) {
+    signer.addPublicKey(key)
+  }
+}
+`
 const addAccountKeyTransactionV2 = `
 transaction(key: [UInt8]) {
   prepare(signer: AuthAccount) {
@@ -167,6 +182,15 @@ transaction(key: [UInt8]) {
       hashAlgorithm: HashAlgorithm.SHA3_256,
       weight: 1000.0
     )
+  }
+}
+`
+
+const addMultipleAccountKeysTransaction = `
+transaction(key1: [UInt8], key2: [UInt8]) {
+  prepare(signer: AuthAccount) {
+    signer.addPublicKey(key1)
+    signer.addPublicKey(key2)
   }
 }
 `
@@ -189,10 +213,27 @@ transaction(key1: [UInt8], key2: [UInt8]) {
 }
 `
 
+const removeAccountKeyTransaction = `
+transaction(key: Int) {
+  prepare(signer: AuthAccount) {
+    signer.removePublicKey(key)
+  }
+}
+`
+
 const revokeAccountKeyTransaction = `
 transaction(keyIndex: Int) {
   prepare(signer: AuthAccount) {
     signer.keys.revoke(keyIndex: keyIndex)
+  }
+}
+`
+
+const removeMultipleAccountKeysTransaction = `
+transaction(key1: Int, key2: Int) {
+  prepare(signer: AuthAccount) {
+    signer.removePublicKey(key1)
+    signer.removePublicKey(key2)
   }
 }
 `
@@ -268,7 +309,7 @@ transaction(keyIndex1: Int, keyIndex2: Int) {
 `
 
 func newAccountKey(
-	t *testing.T,
+	tb testing.TB,
 	privateKey *flow.AccountPrivateKey,
 	apiVersion accountKeyAPIVersion,
 ) (
@@ -281,14 +322,14 @@ func newAccountKey(
 	if apiVersion == accountKeyAPIVersionV1 {
 		var err error
 		publicKeyBytes, err = flow.EncodeRuntimeAccountPublicKey(publicKey)
-		require.NoError(t, err)
+		require.NoError(tb, err)
 	} else {
 		publicKeyBytes = publicKey.PublicKey.Encode()
 	}
 
 	cadencePublicKey := testutil.BytesToCadenceArray(publicKeyBytes)
 	encodedCadencePublicKey, err := jsoncdc.Encode(cadencePublicKey)
-	require.NoError(t, err)
+	require.NoError(tb, err)
 
 	return publicKey, encodedCadencePublicKey
 }
@@ -490,6 +531,10 @@ func TestAddAccountKey(t *testing.T) {
 
 	singleKeyTests := []addKeyTest{
 		{
+			source:     addAccountKeyTransaction,
+			apiVersion: accountKeyAPIVersionV1,
+		},
+		{
 			source:     addAccountKeyTransactionV2,
 			apiVersion: accountKeyAPIVersionV2,
 		},
@@ -542,7 +587,7 @@ func TestAddAccountKey(t *testing.T) {
 				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 					address := createAccount(t, vm, chain, ctx, view, programs)
 
-					publicKey1 := addAccountKey(t, vm, ctx, view, programs, address)
+					publicKey1 := addAccountKey(t, vm, ctx, view, programs, address, test.apiVersion)
 
 					before, err := vm.GetAccount(ctx, address, view, programs)
 					require.NoError(t, err)
@@ -618,6 +663,10 @@ func TestAddAccountKey(t *testing.T) {
 	// Add multiple keys
 
 	multipleKeysTests := []addKeyTest{
+		{
+			source:     addMultipleAccountKeysTransaction,
+			apiVersion: accountKeyAPIVersionV1,
+		},
 		{
 			source:     addMultipleAccountKeysTransactionV2,
 			apiVersion: accountKeyAPIVersionV2,
@@ -747,6 +796,11 @@ func TestRemoveAccountKey(t *testing.T) {
 
 	singleKeyTests := []removeKeyTest{
 		{
+			source:      removeAccountKeyTransaction,
+			apiVersion:  accountKeyAPIVersionV1,
+			expectError: true,
+		},
+		{
 			source:      revokeAccountKeyTransaction,
 			apiVersion:  accountKeyAPIVersionV2,
 			expectError: false,
@@ -763,7 +817,7 @@ func TestRemoveAccountKey(t *testing.T) {
 					const keyCount = 2
 
 					for i := 0; i < keyCount; i++ {
-						_ = addAccountKey(t, vm, ctx, view, programs, address)
+						_ = addAccountKey(t, vm, ctx, view, programs, address, test.apiVersion)
 					}
 
 					before, err := vm.GetAccount(ctx, address, view, programs)
@@ -810,7 +864,7 @@ func TestRemoveAccountKey(t *testing.T) {
 					const keyIndex = keyCount - 1
 
 					for i := 0; i < keyCount; i++ {
-						_ = addAccountKey(t, vm, ctx, view, programs, address)
+						_ = addAccountKey(t, vm, ctx, view, programs, address, test.apiVersion)
 					}
 
 					before, err := vm.GetAccount(ctx, address, view, programs)
@@ -847,18 +901,21 @@ func TestRemoveAccountKey(t *testing.T) {
 		t.Run(fmt.Sprintf("Key added by a different api version %s", test.apiVersion),
 			newVMTest().withContextOptions(options...).
 				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
-					if test.apiVersion == accountKeyAPIVersionV2 {
-						t.Skip("Can no longer add keys with API v1")
-					}
-
 					address := createAccount(t, vm, chain, ctx, view, programs)
 
 					const keyCount = 2
 					const keyIndex = keyCount - 1
 
+					// Use one version of API to add the keys, and a different version of the API to revoke the keys.
+					var apiVersionForAdding accountKeyAPIVersion
+					if test.apiVersion == accountKeyAPIVersionV1 {
+						apiVersionForAdding = accountKeyAPIVersionV2
+					} else {
+						apiVersionForAdding = accountKeyAPIVersionV1
+					}
+
 					for i := 0; i < keyCount; i++ {
-						// always adds with version v2
-						_ = addAccountKey(t, vm, ctx, view, programs, address)
+						_ = addAccountKey(t, vm, ctx, view, programs, address, apiVersionForAdding)
 					}
 
 					before, err := vm.GetAccount(ctx, address, view, programs)
@@ -897,6 +954,10 @@ func TestRemoveAccountKey(t *testing.T) {
 
 	multipleKeysTests := []removeKeyTest{
 		{
+			source:     removeMultipleAccountKeysTransaction,
+			apiVersion: accountKeyAPIVersionV1,
+		},
+		{
 			source:     revokeMultipleAccountKeysTransaction,
 			apiVersion: accountKeyAPIVersionV2,
 		},
@@ -906,16 +967,12 @@ func TestRemoveAccountKey(t *testing.T) {
 		t.Run(fmt.Sprintf("Multiple keys %s", test.apiVersion),
 			newVMTest().withContextOptions(options...).
 				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
-					if test.apiVersion == accountKeyAPIVersionV1 {
-						t.Skip("Can no longer add keys with API v1")
-					}
-
 					address := createAccount(t, vm, chain, ctx, view, programs)
 
 					const keyCount = 2
 
 					for i := 0; i < keyCount; i++ {
-						_ = addAccountKey(t, vm, ctx, view, programs, address)
+						_ = addAccountKey(t, vm, ctx, view, programs, address, test.apiVersion)
 					}
 
 					before, err := vm.GetAccount(ctx, address, view, programs)
@@ -967,7 +1024,7 @@ func TestGetAccountKey(t *testing.T) {
 				const keyCount = 2
 
 				for i := 0; i < keyCount; i++ {
-					_ = addAccountKey(t, vm, ctx, view, programs, address)
+					_ = addAccountKey(t, vm, ctx, view, programs, address, accountKeyAPIVersionV2)
 				}
 
 				before, err := vm.GetAccount(ctx, address, view, programs)
@@ -1005,7 +1062,59 @@ func TestGetAccountKey(t *testing.T) {
 
 				keys := make([]flow.AccountPublicKey, keyCount)
 				for i := 0; i < keyCount; i++ {
-					keys[i] = addAccountKey(t, vm, ctx, view, programs, address)
+					keys[i] = addAccountKey(t, vm, ctx, view, programs, address, accountKeyAPIVersionV2)
+				}
+
+				before, err := vm.GetAccount(ctx, address, view, programs)
+				require.NoError(t, err)
+				assert.Len(t, before.Keys, keyCount)
+
+				keyIndexArg, err := jsoncdc.Encode(cadence.NewInt(keyIndex))
+				require.NoError(t, err)
+
+				txBody := flow.NewTransactionBody().
+					SetScript([]byte(getAccountKeyTransaction)).
+					AddArgument(keyIndexArg).
+					AddAuthorizer(address)
+
+				tx := fvm.Transaction(txBody, 0)
+
+				err = vm.Run(ctx, tx, view, programs)
+				require.NoError(t, err)
+				require.NoError(t, tx.Err)
+
+				require.Len(t, tx.Logs, 1)
+
+				key := keys[keyIndex]
+
+				expected := fmt.Sprintf(
+					"AccountKey("+
+						"keyIndex: %d, "+
+						"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1)), "+
+						"hashAlgorithm: HashAlgorithm(rawValue: 3), "+
+						"weight: 1000.00000000, "+
+						"isRevoked: false)",
+					keyIndex,
+					byteSliceToCadenceArrayLiteral(key.PublicKey.Encode()),
+				)
+
+				assert.Equal(t, expected, tx.Logs[0])
+			}),
+	)
+
+	t.Run("Key added by a different api version",
+		newVMTest().withContextOptions(options...).
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				address := createAccount(t, vm, chain, ctx, view, programs)
+
+				const keyCount = 2
+				const keyIndex = keyCount - 1
+
+				keys := make([]flow.AccountPublicKey, keyCount)
+				for i := 0; i < keyCount; i++ {
+
+					// Use the old version of API to add the key
+					keys[i] = addAccountKey(t, vm, ctx, view, programs, address, accountKeyAPIVersionV1)
 				}
 
 				before, err := vm.GetAccount(ctx, address, view, programs)
@@ -1055,7 +1164,7 @@ func TestGetAccountKey(t *testing.T) {
 				keys := make([]flow.AccountPublicKey, keyCount)
 				for i := 0; i < keyCount; i++ {
 
-					keys[i] = addAccountKey(t, vm, ctx, view, programs, address)
+					keys[i] = addAccountKey(t, vm, ctx, view, programs, address, accountKeyAPIVersionV2)
 				}
 
 				before, err := vm.GetAccount(ctx, address, view, programs)

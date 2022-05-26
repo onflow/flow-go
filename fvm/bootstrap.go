@@ -36,6 +36,11 @@ type BootstrapProcedure struct {
 	storagePerFlow                   cadence.UFix64
 	restrictedAccountCreationEnabled cadence.Bool
 
+	// TODO: restrictedContractDeployment should be a bool after RestrictedDeploymentEnabled is removed from the context
+	// restrictedContractDeployment of nil means that the contract deployment is taken from the fvm Context instead of from the state.
+	// This can be used to mimic behaviour on chain before the restrictedContractDeployment is set with a service account transaction.
+	restrictedContractDeployment *bool
+
 	transactionFees        BootstrapProcedureFeeParameters
 	executionEffortWeights weightedMeter.ExecutionEffortWeights
 	executionMemoryWeights weightedMeter.ExecutionMemoryWeights
@@ -181,6 +186,13 @@ func WithRestrictedAccountCreationEnabled(enabled cadence.Bool) BootstrapProcedu
 	}
 }
 
+func WithRestrictedContractDeployment(restricted *bool) BootstrapProcedureOption {
+	return func(bp *BootstrapProcedure) *BootstrapProcedure {
+		bp.restrictedContractDeployment = restricted
+		return bp
+	}
+}
+
 // Bootstrap returns a new BootstrapProcedure instance configured with the provided
 // genesis parameters.
 func Bootstrap(
@@ -242,6 +254,8 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 		b.transactionFees.InclusionEffortCost,
 		b.transactionFees.ExecutionEffortCost,
 	)
+
+	b.setContractDeploymentRestrictions(service, b.restrictedContractDeployment)
 
 	b.setupExecutionWeights(service)
 
@@ -778,6 +792,27 @@ func (b *BootstrapProcedure) deployStakingCollection(service flow.Address, fungi
 		b.ctx,
 		Transaction(
 			blueprints.DeployContractTransaction(service, contract, "FlowStakingCollection"),
+			0,
+		),
+		b.sth,
+		b.programs,
+	)
+	panicOnMetaInvokeErrf("failed to deploy FlowStakingCollection contract: %s", txError, err)
+}
+
+func (b *BootstrapProcedure) setContractDeploymentRestrictions(service flow.Address, deployment *bool) {
+	if deployment == nil {
+		return
+	}
+
+	txBody, err := blueprints.SetIsContractDeploymentRestrictedTransaction(service, *deployment)
+	if err != nil {
+		panic(err)
+	}
+	txError, err := b.vm.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			txBody,
 			0,
 		),
 		b.sth,

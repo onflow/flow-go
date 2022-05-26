@@ -87,7 +87,10 @@ func NewScriptEnvironment(
 
 	env.contracts = handler.NewContractHandler(
 		accounts,
-		true,
+		func() bool {
+			return true
+		},
+		func() []common.Address { return []common.Address{} },
 		func() []common.Address { return []common.Address{} },
 		func(address runtime.Address, code []byte) (bool, error) { return false, nil })
 
@@ -565,7 +568,7 @@ func (e *ScriptEnv) ComputationUsed() uint64 {
 }
 
 func (e *ScriptEnv) meterMemory(kind common.MemoryKind, intensity uint) error {
-	if e.sth.EnforceMemoryLimits {
+	if e.sth.EnforceMemoryLimits() {
 		return e.sth.State().MeterMemory(kind, intensity)
 	}
 	return nil
@@ -628,7 +631,6 @@ func (e *ScriptEnv) VerifySignature(
 	}
 
 	valid, err := crypto.VerifySignatureFromRuntime(
-		e.ctx.SignatureVerifier,
 		signature,
 		tag,
 		signedData,

@@ -16,6 +16,9 @@ import (
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 
+	flow2 "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go-sdk/templates"
+
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
@@ -195,7 +198,7 @@ func (b *BasicBlockExecutor) ServiceAccount(_ testing.TB) *TestBenchAccount {
 }
 
 func (b *BasicBlockExecutor) ExecuteCollections(tb testing.TB, collections [][]*flow.TransactionBody) *execution.ComputationResult {
-	executableBlock := unittest.ExecutableBlockFromTransactions(collections)
+	executableBlock := unittest.ExecutableBlockFromTransactions(b.chain.ChainID(), collections)
 	executableBlock.StartState = &b.activeStateCommitment
 
 	computationResult, err := b.blockComputer.ExecuteBlock(context.Background(), executableBlock, b.activeView, b.programCache)
@@ -212,45 +215,24 @@ func (b *BasicBlockExecutor) SetupAccounts(tb testing.TB, privateKeys []flow.Acc
 	accounts := make([]TestBenchAccount, 0)
 	serviceAddress := b.Chain(tb).ServiceAddress()
 
-	accountCreationScript := `
-        transaction(publicKey: [UInt8]) {
-            prepare(signer: AuthAccount) {
-				let acct = AuthAccount(payer: signer)
-                let publicKey2 = PublicKey(
-                    publicKey: publicKey,
-                    signatureAlgorithm: SignatureAlgorithm.%s
-                )
-                acct.keys.add(
-                    publicKey: publicKey2,
-                    hashAlgorithm: HashAlgorithm.%s,
-                    weight: %d.0
-                )
-            }
-        }`
-
 	for _, privateKey := range privateKeys {
-		accountKey := privateKey.PublicKey(fvm.AccountKeyWeightThreshold)
-		encAccountKey := accountKey.PublicKey.Encode()
-		cadAccountKey := testutil.BytesToCadenceArray(encAccountKey)
-		encCadAccountKey, _ := jsoncdc.Encode(cadAccountKey)
+		accountKey := flow2.NewAccountKey().
+			FromPrivateKey(privateKey.PrivateKey).
+			SetWeight(fvm.AccountKeyWeightThreshold).
+			SetHashAlgo(privateKey.HashAlgo).
+			SetSigAlgo(privateKey.SignAlgo)
 
-		script := []byte(
-			fmt.Sprintf(
-				accountCreationScript,
-				accountKey.SignAlgo.String(),
-				accountKey.HashAlgo.String(),
-				accountKey.Weight,
-			),
-		)
+		sdkTX, err := templates.CreateAccount([]*flow2.AccountKey{accountKey}, []templates.Contract{}, flow2.BytesToAddress(serviceAddress.Bytes()))
+		require.NoError(tb, err)
 
 		txBody := flow.NewTransactionBody().
-			SetScript(script).
-			AddArgument(encCadAccountKey).
+			SetScript(sdkTX.Script).
+			SetArguments(sdkTX.Arguments).
 			AddAuthorizer(serviceAddress).
 			SetProposalKey(serviceAddress, 0, b.ServiceAccount(tb).RetAndIncSeqNumber()).
 			SetPayer(serviceAddress)
 
-		err := testutil.SignEnvelope(txBody, b.Chain(tb).ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		err = testutil.SignEnvelope(txBody, b.Chain(tb).ServiceAddress(), unittest.ServiceAccountPrivateKey)
 		require.NoError(tb, err)
 
 		computationResult := b.ExecuteCollections(tb, [][]*flow.TransactionBody{{txBody}})
