@@ -11,11 +11,11 @@ import (
 func MakeTC(options ...func(*flow.TimeoutCertificate)) *flow.TimeoutCertificate {
 	qc := MakeQC()
 	tc := flow.TimeoutCertificate{
-		View:            rand.Uint64(),
-		TONewestQC:      qc,
-		TONewestQCViews: []uint64{qc.View},
-		SignerIDs:       unittest.IdentityListFixture(7).NodeIDs(),
-		SigData:         unittest.SignatureFixture(),
+		View:          rand.Uint64(),
+		NewestQC:      qc,
+		NewestQCViews: []uint64{qc.View},
+		SignerIDs:     unittest.IdentityListFixture(7).NodeIDs(),
+		SigData:       unittest.SignatureFixture(),
 	}
 	for _, option := range options {
 		option(&tc)
@@ -25,13 +25,13 @@ func MakeTC(options ...func(*flow.TimeoutCertificate)) *flow.TimeoutCertificate 
 
 func WithTCHighestQC(qc *flow.QuorumCertificate) func(*flow.TimeoutCertificate) {
 	return func(tc *flow.TimeoutCertificate) {
-		tc.TONewestQC = qc
-		for _, view := range tc.TONewestQCViews {
+		tc.NewestQC = qc
+		for _, view := range tc.NewestQCViews {
 			if view == qc.View {
 				return
 			}
 		}
-		tc.TONewestQCViews = append(tc.TONewestQCViews, qc.View)
+		tc.NewestQCViews = append(tc.NewestQCViews, qc.View)
 	}
 }
 

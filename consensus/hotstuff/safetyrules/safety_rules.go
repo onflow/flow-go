@@ -35,14 +35,19 @@ func New(
 	signer hotstuff.Signer,
 	persist hotstuff.Persister,
 	committee hotstuff.DynamicCommittee,
-	safetyData *hotstuff.SafetyData,
-) *SafetyRules {
+) (*SafetyRules, error) {
+	// get the last stored safety data
+	safetyData, err := persist.GetSafetyData()
+	if err != nil {
+		return nil, fmt.Errorf("could not recover safety data: %w", err)
+	}
+
 	return &SafetyRules{
 		signer:     signer,
 		persist:    persist,
 		committee:  committee,
 		safetyData: safetyData,
-	}
+	}, nil
 }
 
 // ProduceVote will make a decision on whether it will vote for the given proposal, the returned
@@ -185,8 +190,8 @@ func (r *SafetyRules) IsSafeToExtend(blockView, qcView uint64, lastViewTC *flow.
 	if blockView != lastViewTC.View+1 {
 		return fmt.Errorf("last view TC %d is not sequential for block %d", lastViewTC.View, blockView)
 	}
-	if qcView < lastViewTC.TONewestQC.View {
-		return fmt.Errorf("QC's view %d should be at least %d", qcView, lastViewTC.TONewestQC.View)
+	if qcView < lastViewTC.NewestQC.View {
+		return fmt.Errorf("QC's view %d should be at least %d", qcView, lastViewTC.NewestQC.View)
 	}
 	return nil
 }

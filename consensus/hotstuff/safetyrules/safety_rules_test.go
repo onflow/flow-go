@@ -67,7 +67,10 @@ func (s *SafetyRulesTestSuite) SetupTest() {
 		HighestAcknowledgedView: s.bootstrapBlock.View,
 	}
 
-	s.safety = New(s.signer, s.persister, s.committee, s.safetyData)
+	s.persister.On("GetSafetyData").Return(s.safetyData, nil).Once()
+	var err error
+	s.safety, err = New(s.signer, s.persister, s.committee)
+	require.NoError(s.T(), err)
 }
 
 // TestProduceVote_ShouldVote test basic happy path scenario where we vote for first block after bootstrap
@@ -146,7 +149,7 @@ func (s *SafetyRulesTestSuite) TestProduceVote_IncludedQCHigherThanTCsQC() {
 		HighestAcknowledgedView: proposalWithTC.Block.View,
 	}
 
-	require.Greater(s.T(), proposalWithTC.Block.QC.View, proposalWithTC.LastViewTC.TONewestQC.View,
+	require.Greater(s.T(), proposalWithTC.Block.QC.View, proposalWithTC.LastViewTC.NewestQC.View,
 		"for this test case we specifically require that qc.View > lastViewTC.NewestQC.View")
 
 	expectedVote := makeVote(proposalWithTC.Block)
@@ -320,7 +323,7 @@ func (s *SafetyRulesTestSuite) TestProduceVote_VotingOnUnsafeProposal() {
 	})
 	s.Run("last-view-tc-invalid-highest-qc", func() {
 		// create block where Block.View != Block.QC.View+1 and
-		// Block.View == LastViewTC.View+1 and Block.QC.View < LastViewTC.TONewestQC.View
+		// Block.View == LastViewTC.View+1 and Block.QC.View < LastViewTC.NewestQC.View
 		// in this case block is not safe to extend since proposal is built on top of QC, which is lower
 		// than QC presented in LastViewTC.
 		TONewestQC := helper.MakeQC(helper.WithQCView(s.bootstrapBlock.View + 1))

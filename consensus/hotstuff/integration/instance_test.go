@@ -384,9 +384,11 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		LockedOneChainView:      rootBlock.View,
 		HighestAcknowledgedView: rootBlock.View,
 	}
+	in.persist.On("GetSafetyData", mock.Anything).Return(safetyData, nil).Once()
 
 	// initialize the safety rules
-	in.voter = safetyrules.New(in.signer, in.persist, in.committee, safetyData)
+	in.voter, err = safetyrules.New(in.signer, in.persist, in.committee)
+	require.NoError(t, err)
 
 	// initialize the event handler
 	in.handler, err = eventhandler.NewEventHandler(log, in.pacemaker, in.producer, in.forks, in.persist, in.communicator, in.committee, in.aggregator, in.voter, in.validator, notifier)
