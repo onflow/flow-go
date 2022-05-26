@@ -133,11 +133,10 @@ func NewExecutionState(
 
 }
 
-func makeSingleValueQuery(commitment flow.StateCommitment, owner, controller, key string) (*ledger.Query, error) {
-	return ledger.NewQuery(ledger.State(commitment),
-		[]ledger.Key{
-			RegisterIDToKey(flow.NewRegisterID(owner, controller, key)),
-		})
+func makeSingleValueQuery(commitment flow.StateCommitment, owner, controller, key string) (*ledger.QuerySingleValue, error) {
+	return ledger.NewQuerySingleValue(ledger.State(commitment),
+		RegisterIDToKey(flow.NewRegisterID(owner, controller, key)),
+	)
 }
 
 func makeQuery(commitment flow.StateCommitment, ids []flow.RegisterID) (*ledger.Query, error) {
@@ -187,26 +186,21 @@ func LedgerGetRegister(ldg ledger.Ledger, commitment flow.StateCommitment) delta
 			return nil, fmt.Errorf("cannot create ledger query: %w", err)
 		}
 
-		values, err := ldg.Get(query)
+		value, err := ldg.GetSingleValue(query)
 
 		if err != nil {
 			return nil, fmt.Errorf("error getting register (%s) value at %x: %w", key, commitment, err)
 		}
 
-		// We expect 1 element in the returned slice of values because query is from makeSingleValueQuery()
-		if len(values) != 1 {
-			return nil, fmt.Errorf("error getting register (%s) value at %x: number of returned values (%d) != number of queried keys (%d)", key, commitment, len(values), len(query.Keys()))
-		}
-
 		// Prevent caching of value with len zero
-		if len(values[0]) == 0 {
+		if len(value) == 0 {
 			return nil, nil
 		}
 
 		// don't cache value with len zero
-		readCache[regID] = flow.RegisterEntry{Key: regID, Value: values[0]}
+		readCache[regID] = flow.RegisterEntry{Key: regID, Value: value}
 
-		return values[0], nil
+		return value, nil
 	}
 }
 
