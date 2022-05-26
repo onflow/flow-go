@@ -198,7 +198,7 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 			return newInvalidBlockError(block, fmt.Errorf("expected TC for view %d got %d", proposal.Block.View-1, proposal.LastViewTC.View))
 		}
 
-		// Check if proposal extends either the highest QC specified in the TC, or a higher QC
+		// Check if proposal extends either the newest QC specified in the TC, or a newer QC
 		// in edge cases a leader may construct a TC and QC concurrently such that TC contains
 		// an older QC - in these case we still want to build on the newest QC, so this case is allowed.
 		if proposal.Block.QC.View < proposal.LastViewTC.TOHighestQC.View {
