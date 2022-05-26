@@ -23,15 +23,12 @@ require (
 	github.com/onflow/flow-go-sdk v0.24.1-0.20220513205729-d1f58d47c4e3
 	github.com/onflow/flow-go/crypto v0.24.3
 	github.com/onflow/flow/protobuf/go/flow v0.3.1
+	github.com/openhistogram/circonusllhist v0.3.0
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/rs/zerolog v1.26.1
 	github.com/stretchr/testify v1.7.1
-	google.golang.org/grpc v1.45.0
-)
-
-require (
-	github.com/openhistogram/circonusllhist v0.3.0
 	go.uber.org/atomic v1.9.0
+	google.golang.org/grpc v1.45.0
 )
 
 require (
