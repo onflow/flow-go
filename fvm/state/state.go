@@ -363,12 +363,6 @@ func IsFVMStateKey(owner, controller, key string) bool {
 	}
 
 	if len(controller) == 0 {
-		if key == KeyExists {
-			return true
-		}
-		if key == KeyAccountFrozen {
-			return true
-		}
 		if key == KeyAccountStatus {
 			return true
 		}

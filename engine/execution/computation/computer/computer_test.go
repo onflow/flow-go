@@ -590,7 +590,7 @@ func (f *FixedAddressGenerator) AddressCount() uint64 {
 	panic("not implemented")
 }
 
-func Test_FreezeAccountChecksAreIncluded(t *testing.T) {
+func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 
 	address := flow.HexToAddress("1234")
 	fag := &FixedAddressGenerator{Address: address}
@@ -629,11 +629,11 @@ func Test_FreezeAccountChecksAreIncluded(t *testing.T) {
 
 	registerTouches := view.Interactions().RegisterTouches()
 
-	// make sure check for frozen account has been registered
+	// make sure check for account status has been registered
 	id := flow.RegisterID{
 		Owner:      string(address.Bytes()),
 		Controller: "",
-		Key:        state.KeyAccountFrozen,
+		Key:        state.KeyAccountStatus,
 	}
 
 	require.Contains(t, registerTouches, id.String())

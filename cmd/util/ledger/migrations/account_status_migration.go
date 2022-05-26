@@ -8,6 +8,11 @@ import (
 	"github.com/rs/zerolog"
 )
 
+const (
+	KeyExists        = "exists"
+	KeyAccountFrozen = "frozen"
+)
+
 // AccountStatusMigration migrates previous registers under
 // key of Exists which were used for checking existance of accounts.
 // the new register AccountStatus also captures frozen and all future states
@@ -26,14 +31,14 @@ func (as *AccountStatusMigration) Migrate(payload []ledger.Payload) ([]ledger.Pa
 		owner := p.Key.KeyParts[0].Value
 		controller := p.Key.KeyParts[1].Value
 		key := p.Key.KeyParts[2].Value
-		if len(controller) == 0 && string(key) == state.KeyExists {
+		if len(controller) == 0 && string(key) == KeyExists {
 			newPayload := p.DeepCopy()
 			newPayload.Key.KeyParts[2].Value = []byte(state.KeyAccountStatus)
 			newPayload.Value = state.NewAccountStatus().ToBytes()
 			newPayloads = append(newPayloads, *newPayload)
 			continue
 		}
-		if len(controller) == 0 && string(key) == state.KeyAccountFrozen {
+		if len(controller) == 0 && string(key) == KeyAccountFrozen {
 			as.Logger.Warn().Msgf("frozen account found: %s", hex.EncodeToString(owner))
 			continue
 		}

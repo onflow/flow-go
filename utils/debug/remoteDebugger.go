@@ -30,7 +30,6 @@ func NewRemoteDebugger(grpcAddress string,
 		fvm.WithTransactionProcessors(
 			fvm.NewTransactionAccountFrozenChecker(),
 			fvm.NewTransactionSequenceNumberChecker(),
-			fvm.NewTransactionAccountFrozenEnabler(),
 			fvm.NewTransactionInvoker(logger),
 		),
 	)

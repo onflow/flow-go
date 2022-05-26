@@ -35,8 +35,8 @@ func TestAccountStatusMigration(t *testing.T) {
 		{Key: createAccountPayloadKey(address1, state.KeyStorageUsed), Value: utils.Uint64ToBinary(1)},
 		{Key: createAccountPayloadKey(address1, "other registers"), Value: utils.Uint64ToBinary(2)},
 		{Key: createAccountPayloadKey(address2, "other registers2"), Value: utils.Uint64ToBinary(3)},
-		{Key: createAccountPayloadKey(address1, state.KeyExists), Value: []byte{1}},
-		{Key: createAccountPayloadKey(address1, state.KeyAccountFrozen), Value: []byte{1}},
+		{Key: createAccountPayloadKey(address1, KeyExists), Value: []byte{1}},
+		{Key: createAccountPayloadKey(address1, KeyAccountFrozen), Value: []byte{1}},
 	}
 
 	newPayloads, err := mig.Migrate(payloads)

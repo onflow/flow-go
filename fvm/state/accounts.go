@@ -24,12 +24,6 @@ const (
 	KeyStorageUsed    = "storage_used"
 	KeyStorageIndex   = "storage_index"
 	uint64StorageSize = 8
-
-	// TODO remove depricated keys when migrations don't need them any more
-	// depricated, please use account status instead
-	KeyExists = "exists"
-	// depricated, please use account status instead
-	KeyAccountFrozen = "frozen"
 )
 
 type Accounts interface {
