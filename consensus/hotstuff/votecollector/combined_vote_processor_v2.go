@@ -50,7 +50,7 @@ func (f *combinedVoteProcessorFactoryBaseV2) Create(log zerolog.Logger, block *m
 		stakingKeys = append(stakingKeys, participant.StakingPubKey)
 	}
 
-	stakingSigAggtor, err := signature.NewWeightedSignatureAggregator(allParticipants, stakingKeys, msg, signature.ConsensusVoteTag)
+	stakingSigAggtor, err := signature.NewWeightedSignatureAggregator(allParticipants, stakingKeys, msg, msig.ConsensusVoteTag)
 	if err != nil {
 		return nil, fmt.Errorf("could not create aggregator for staking signatures at block %v: %w", block.BlockID, err)
 	}

@@ -3,7 +3,7 @@ package dkg
 import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/module/signature"
 )
 
 // NewDKGMessageHasher returns a hasher for signing and verifying DKG broadcast
