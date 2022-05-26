@@ -89,6 +89,12 @@ type TrieRead struct {
 	Paths    []Path
 }
 
+// TrieReadSinglePayload contains trie read query for a single payload
+type TrieReadSingleValue struct {
+	RootHash RootHash
+	Path     Path
+}
+
 // TrieUpdate holds all data for a trie update
 type TrieUpdate struct {
 	RootHash RootHash
