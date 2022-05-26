@@ -20,8 +20,8 @@ type signerInfo struct {
 
 // sigInfo holds signature and high QC view submitted by some signer
 type sigInfo struct {
-	sig        crypto.Signature
-	highQCView uint64
+	sig          crypto.Signature
+	newestQCView uint64
 }
 
 // TimeoutSignatureAggregator implements consensus/hotstuff.TimeoutSignatureAggregator.
@@ -125,8 +125,8 @@ func (a *TimeoutSignatureAggregator) VerifyAndAdd(signerID flow.Identifier, sig 
 	}
 
 	a.idToSignature[signerID] = sigInfo{
-		sig:        sig,
-		highQCView: highestQCView,
+		sig:          sig,
+		newestQCView: highestQCView,
 	}
 	a.totalWeight += info.weight
 
@@ -165,11 +165,11 @@ func (a *TimeoutSignatureAggregator) Aggregate() ([]flow.Identifier, []uint64, c
 	}
 	signatures := make([]crypto.Signature, 0, sharesNum)
 	signers := make([]flow.Identifier, 0, sharesNum)
-	highQCViews := make([]uint64, 0, sharesNum)
+	newestQCViews := make([]uint64, 0, sharesNum)
 	for id, info := range a.idToSignature {
 		signatures = append(signatures, info.sig)
 		signers = append(signers, id)
-		highQCViews = append(highQCViews, info.highQCView)
+		newestQCViews = append(newestQCViews, info.newestQCView)
 	}
 
 	aggSignature, err := crypto.AggregateBLSSignatures(signatures)
@@ -181,5 +181,5 @@ func (a *TimeoutSignatureAggregator) Aggregate() ([]flow.Identifier, []uint64, c
 		return nil, nil, nil, fmt.Errorf("unexpected internal error during BLS signature aggregation: %w", err)
 	}
 
-	return signers, highQCViews, aggSignature, nil
+	return signers, newestQCViews, aggSignature, nil
 }
