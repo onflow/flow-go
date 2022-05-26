@@ -375,7 +375,7 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	require.Equalf(t, uint64(1), hookCalls, "expected 1 warning to be logged")
 }
 
-// TestAuthorizedSenderValidator_Ejected tests that the authorized sender validator correctly validates messages sent on cluster channels
+// TestAuthorizedSenderValidator_ClusterChannel tests that the authorized sender validator correctly validates messages sent on cluster channels
 func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
 	identity1, privateKey1 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleCollection))
