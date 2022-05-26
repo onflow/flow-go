@@ -311,7 +311,7 @@ func (h *handler) getChunkExecutionData(
 			return nil, 0, fmt.Errorf("failed to track blobs for level %d of blob tree: %w", i, err)
 		}
 
-		v, size, err := h.getBlobs(ctx, cids)
+		v, size, err := h.getBlobs(ctx, blobGetter, cids)
 		if err != nil {
 			return nil, 0, fmt.Errorf("failed to get level %d of blob tree: %w", i, err)
 		}
@@ -328,8 +328,8 @@ func (h *handler) getChunkExecutionData(
 }
 
 // getBlobs gets the given CIDs from the blobservice, reassembles the blobs, and deserializes the reassembled data into an object.
-func (h *handler) getBlobs(ctx context.Context, cids []cid.Cid) (interface{}, uint64, error) {
-	blobCh, resultCh := h.retrieveBlobs(ctx, cids)
+func (h *handler) getBlobs(ctx context.Context, blobGetter network.BlobGetter, cids []cid.Cid) (interface{}, uint64, error) {
+	blobCh, resultCh := h.retrieveBlobs(ctx, blobGetter, cids)
 	bcr := blobs.NewBlobChannelReader(blobCh)
 	v, deserializeErr := h.serializer.Deserialize(bcr)
 	result := <-resultCh
@@ -351,7 +351,7 @@ type retrieveBlobsResult struct {
 }
 
 // retrieveBlobs retrieves the blobs for the given CIDs from the blobservice.
-func (h *handler) retrieveBlobs(parent context.Context, cids []cid.Cid) (<-chan blobs.Blob, <-chan *retrieveBlobsResult) {
+func (h *handler) retrieveBlobs(parent context.Context, blobGetter network.BlobGetter, cids []cid.Cid) (<-chan blobs.Blob, <-chan *retrieveBlobsResult) {
 	blobsOut := make(chan blobs.Blob, len(cids))
 	resultCh := make(chan *retrieveBlobsResult, 1)
 
@@ -365,7 +365,7 @@ func (h *handler) retrieveBlobs(parent context.Context, cids []cid.Cid) (<-chan 
 			close(resultCh)
 		}()
 
-		blobChan := h.blobService.GetBlobs(ctx, cids) // initiate a batch request for the given CIDs
+		blobChan := blobGetter.GetBlobs(ctx, cids) // initiate a batch request for the given CIDs
 		cachedBlobs := make(map[cid.Cid]blobs.Blob)
 		cidCounts := make(map[cid.Cid]int) // used to account for duplicate CIDs
 
