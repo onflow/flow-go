@@ -620,6 +620,10 @@ func (a *StatefulAccounts) GetAccountFrozen(address flow.Address) (bool, error) 
 	if err != nil {
 		return false, err
 	}
+	// if account does not exist, frozen is not meaningful
+	if !accStatus.AccountExists() {
+		return false, errors.NewAccountNotFoundError(address)
+	}
 	return accStatus.IsAccountFrozen(), nil
 }
 
