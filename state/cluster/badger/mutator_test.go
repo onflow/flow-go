@@ -75,7 +75,7 @@ func (suite *MutatorSuite) SetupTest() {
 	// just bootstrap with a genesis block, we'll use this as reference
 	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 	genesis, result, seal := unittest.BootstrapFixture(participants)
-	qc := unittest.QuorumCertificateFixture(unittest.QCWithBlockID(genesis.ID()))
+	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(genesis.ID()))
 	// ensure we don't enter a new epoch for tests that build many blocks
 	result.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = genesis.Header.View + 100000
 	seal.ResultID = result.ID()

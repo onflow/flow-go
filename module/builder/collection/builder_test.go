@@ -90,7 +90,7 @@ func (suite *BuilderSuite) SetupTest() {
 	// just bootstrap with a genesis block, we'll use this as reference
 	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 	root, result, seal := unittest.BootstrapFixture(participants)
-	qc := unittest.QuorumCertificateFixture(unittest.QCWithBlockID(root.ID()))
+	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(root.ID()))
 	// ensure we don't enter a new epoch for tests that build many blocks
 	result.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = root.Header.View + 100000
 	seal.ResultID = result.ID()

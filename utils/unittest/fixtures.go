@@ -1654,6 +1654,13 @@ func QCWithSignerIndices(signerIndices []byte) func(*flow.QuorumCertificate) {
 	}
 }
 
+func QCWithRootBlockID(blockID flow.Identifier) func(*flow.QuorumCertificate) {
+	return func(qc *flow.QuorumCertificate) {
+		qc.BlockID = blockID
+		qc.View = 0
+	}
+}
+
 func VoteFixture(opts ...func(vote *hotstuff.Vote)) *hotstuff.Vote {
 	vote := &hotstuff.Vote{
 		View:     uint64(rand.Uint32()),
@@ -1867,7 +1874,7 @@ func BootstrapFixture(participants flow.IdentityList, opts ...func(*flow.Block))
 // example one as returned from BootstrapFixture.
 func RootSnapshotFixture(participants flow.IdentityList, opts ...func(*flow.Block)) *inmem.Snapshot {
 	block, result, seal := BootstrapFixture(participants.Sort(order.Canonical), opts...)
-	qc := QuorumCertificateFixture(QCWithBlockID(block.ID()))
+	qc := QuorumCertificateFixture(QCWithRootBlockID(block.ID()))
 	root, err := inmem.SnapshotFromBootstrapState(block, result, seal, qc)
 	if err != nil {
 		panic(err)
