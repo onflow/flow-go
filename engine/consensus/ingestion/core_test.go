@@ -253,6 +253,7 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeInvalidGuarantor() {
 	err := suite.core.OnGuarantee(suite.collID, guarantee)
 	suite.Assert().Error(err, "should error with invalid guarantor")
 	suite.Assert().True(engine.IsInvalidInputError(err))
+	suite.Assert().True(signature.IsDecodeSignerIndicesError(err))
 
 	// check that the guarantee has _not_ been added to the mempool
 	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee)
