@@ -1,4 +1,4 @@
-package p2p
+package p2p_test
 
 import (
 	"context"
@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -62,14 +63,14 @@ func TestFilterSubscribe(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
-		return len(node1.pubSub.ListPeers(badTopic.String())) > 0 &&
-			len(node2.pubSub.ListPeers(badTopic.String())) > 0 &&
-			len(unstakedNode.pubSub.ListPeers(badTopic.String())) > 0
+		return len(node1.ListPeers(badTopic.String())) > 0 &&
+			len(node2.ListPeers(badTopic.String())) > 0 &&
+			len(unstakedNode.ListPeers(badTopic.String())) > 0
 	}, 1*time.Second, 100*time.Millisecond)
 
 	// check that node1 and node2 don't accept unstakedNode as a peer
 	require.Never(t, func() bool {
-		for _, pid := range node1.pubSub.ListPeers(badTopic.String()) {
+		for _, pid := range node1.ListPeers(badTopic.String()) {
 			if pid == unstakedNode.Host().ID() {
 				return true
 			}
@@ -80,7 +81,7 @@ func TestFilterSubscribe(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	testPublish := func(wg *sync.WaitGroup, from *Node, sub *pubsub.Subscription) {
+	testPublish := func(wg *sync.WaitGroup, from *p2p.Node, sub *pubsub.Subscription) {
 		data := []byte("hello")
 
 		err := from.Publish(context.TODO(), badTopic, data)
@@ -129,7 +130,7 @@ func TestCanSubscribe(t *testing.T) {
 	}()
 
 	goodTopic := engine.TopicFromChannel(engine.ProvideCollections, sporkId)
-	_, err := collectionNode.pubSub.Join(goodTopic.String())
+	_, err := collectionNode.Subscribe(goodTopic)
 	require.NoError(t, err)
 
 	var badTopic network.Topic
@@ -143,15 +144,15 @@ func TestCanSubscribe(t *testing.T) {
 			break
 		}
 	}
-	_, err = collectionNode.pubSub.Join(badTopic.String())
+	_, err = collectionNode.Subscribe(badTopic)
 	require.Error(t, err)
 
 	clusterTopic := engine.TopicFromChannel(engine.ChannelSyncCluster(flow.Emulator), sporkId)
-	_, err = collectionNode.pubSub.Join(clusterTopic.String())
+	_, err = collectionNode.Subscribe(clusterTopic)
 	require.NoError(t, err)
 }
 
 func subscriptionFilter(self *flow.Identity, ids flow.IdentityList) pubsub.SubscriptionFilter {
 	idProvider := id.NewFixedIdentityProvider(ids)
-	return NewRoleBasedFilter(self.Role, idProvider)
+	return p2p.NewRoleBasedFilter(self.Role, idProvider)
 }

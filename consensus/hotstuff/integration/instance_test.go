@@ -25,7 +25,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/onflow/flow-go/consensus/hotstuff/safetyrules"
-	hsig "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/voteaggregator"
 	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
@@ -140,9 +139,9 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	in.headers[cfg.Root.ID()] = cfg.Root
 
 	// program the hotstuff committee state
-	in.committee.On("IdentitiesByEpoch", mock.Anything, mock.Anything).Return(
-		func(_ uint64, selector flow.IdentityFilter) flow.IdentityList {
-			return in.participants.Filter(selector)
+	in.committee.On("IdentitiesByEpoch", mock.Anything).Return(
+		func(_ uint64) flow.IdentityList {
+			return in.participants
 		},
 		nil,
 	)
@@ -211,7 +210,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 				View:     block.View,
 				BlockID:  block.BlockID,
 				SignerID: in.localID,
-				SigData:  unittest.RandomBytes(hsig.SigLen * 2), // double sig, one staking, one beacon
+				SigData:  unittest.RandomBytes(msig.SigLen * 2), // double sig, one staking, one beacon
 			}
 			return vote
 		},
@@ -219,15 +218,19 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	)
 	in.signer.On("CreateQC", mock.Anything).Return(
 		func(votes []*model.Vote) *flow.QuorumCertificate {
-			voterIDs := make([]flow.Identifier, 0, len(votes))
+			voterIDs := make(flow.IdentifierList, 0, len(votes))
 			for _, vote := range votes {
 				voterIDs = append(voterIDs, vote.SignerID)
 			}
+
+			signerIndices, err := msig.EncodeSignersToIndices(in.participants.NodeIDs(), voterIDs)
+			require.NoError(t, err, "could not encode signer indices")
+
 			qc := &flow.QuorumCertificate{
-				View:      votes[0].View,
-				BlockID:   votes[0].BlockID,
-				SignerIDs: voterIDs,
-				SigData:   nil,
+				View:          votes[0].View,
+				BlockID:       votes[0].BlockID,
+				SignerIndices: signerIndices,
+				SigData:       nil,
 			}
 			return qc
 		},
@@ -316,10 +319,14 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 
 	// initialize the finalizer
 	rootBlock := model.BlockFromFlow(cfg.Root, 0)
+
+	signerIndices, err := msig.EncodeSignersToIndices(in.participants.NodeIDs(), in.participants.NodeIDs())
+	require.NoError(t, err, "could not encode signer indices")
+
 	rootQC := &flow.QuorumCertificate{
-		View:      rootBlock.View,
-		BlockID:   rootBlock.BlockID,
-		SignerIDs: in.participants.NodeIDs(),
+		View:          rootBlock.View,
+		BlockID:       rootBlock.BlockID,
+		SignerIndices: signerIndices,
 	}
 	rootBlockQC := &forks.BlockQC{Block: rootBlock, QC: rootQC}
 
@@ -353,8 +360,11 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	rbRector := helper.MakeRandomBeaconReconstructor(msig.RandomBeaconThreshold(int(in.participants.Count())))
 	rbRector.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
 
+	indices, err := msig.EncodeSignersToIndices(in.participants.NodeIDs(), []flow.Identifier(in.participants.NodeIDs()))
+	require.NoError(t, err)
+
 	packer := &mocks.Packer{}
-	packer.On("Pack", mock.Anything, mock.Anything).Return(in.participants.NodeIDs(), unittest.RandomBytes(128), nil).Maybe()
+	packer.On("Pack", mock.Anything, mock.Anything).Return(indices, unittest.RandomBytes(128), nil).Maybe()
 
 	onQCCreated := func(qc *flow.QuorumCertificate) {
 		in.queue <- qc
@@ -384,9 +394,11 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		LockedOneChainView:      rootBlock.View,
 		HighestAcknowledgedView: rootBlock.View,
 	}
+	in.persist.On("GetSafetyData", mock.Anything).Return(safetyData, nil).Once()
 
 	// initialize the safety rules
-	in.voter = safetyrules.New(in.signer, in.persist, in.committee, safetyData)
+	in.voter, err = safetyrules.New(in.signer, in.persist, in.committee)
+	require.NoError(t, err)
 
 	// initialize the event handler
 	in.handler, err = eventhandler.NewEventHandler(log, in.pacemaker, in.producer, in.forks, in.persist, in.communicator, in.committee, in.aggregator, in.voter, in.validator, notifier)

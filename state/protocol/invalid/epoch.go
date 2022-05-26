@@ -46,6 +46,10 @@ func (u *Epoch) Cluster(uint) (protocol.Cluster, error) {
 	return nil, u.err
 }
 
+func (u Epoch) ClusterByChainID(chainID flow.ChainID) (protocol.Cluster, error) {
+	return nil, u.err
+}
+
 func (u *Epoch) DKG() (protocol.DKG, error) {
 	return nil, u.err
 }

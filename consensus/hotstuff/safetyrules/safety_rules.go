@@ -35,14 +35,19 @@ func New(
 	signer hotstuff.Signer,
 	persist hotstuff.Persister,
 	committee hotstuff.DynamicCommittee,
-	safetyData *hotstuff.SafetyData,
-) *SafetyRules {
+) (*SafetyRules, error) {
+	// get the last stored safety data
+	safetyData, err := persist.GetSafetyData()
+	if err != nil {
+		return nil, fmt.Errorf("could not recover safety data: %w", err)
+	}
+
 	return &SafetyRules{
 		signer:     signer,
 		persist:    persist,
 		committee:  committee,
 		safetyData: safetyData,
-	}
+	}, nil
 }
 
 // ProduceVote will make a decision on whether it will vote for the given proposal, the returned
@@ -249,8 +254,8 @@ func (r *SafetyRules) validateEvidenceForEnteringView(view uint64, newestQC *flo
 		// Hence, it suffices to error if `newestQC.View+1 > view`, which is identical to `newestQC.View >= view`
 		return fmt.Errorf("still at view %d, despite knowing a QC for view %d", view, newestQC.View)
 	}
-	if newestQC.View < lastViewTC.TONewestQC.View {
-		return fmt.Errorf("failed to update newest QC (still at view %d) despite a newer QC (view %d) being included in TC", newestQC.View, lastViewTC.TONewestQC.View)
+	if newestQC.View < lastViewTC.NewestQC.View {
+		return fmt.Errorf("failed to update newest QC (still at view %d) despite a newer QC (view %d) being included in TC", newestQC.View, lastViewTC.NewestQC.View)
 	}
 
 	return nil

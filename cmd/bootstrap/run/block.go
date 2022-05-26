@@ -19,7 +19,7 @@ func GenerateRootBlock(chainID flow.ChainID, parentID flow.Identifier, height ui
 		PayloadHash:        payload.Hash(),
 		Timestamp:          timestamp,
 		View:               0,
-		ParentVoterIDs:     nil,
+		ParentVoterIndices: nil,
 		ParentVoterSigData: nil,
 		ProposerID:         flow.ZeroID,
 		ProposerSigData:    nil,

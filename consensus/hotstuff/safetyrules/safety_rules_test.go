@@ -67,7 +67,10 @@ func (s *SafetyRulesTestSuite) SetupTest() {
 		HighestAcknowledgedView: s.bootstrapBlock.View,
 	}
 
-	s.safety = New(s.signer, s.persister, s.committee, s.safetyData)
+	s.persister.On("GetSafetyData").Return(s.safetyData, nil).Once()
+	var err error
+	s.safety, err = New(s.signer, s.persister, s.committee)
+	require.NoError(s.T(), err)
 }
 
 // TestProduceVote_ShouldVote test basic happy path scenario where we vote for first block after bootstrap
@@ -146,7 +149,7 @@ func (s *SafetyRulesTestSuite) TestProduceVote_IncludedQCHigherThanTCsQC() {
 		HighestAcknowledgedView: proposalWithTC.Block.View,
 	}
 
-	require.Greater(s.T(), proposalWithTC.Block.QC.View, proposalWithTC.LastViewTC.TONewestQC.View,
+	require.Greater(s.T(), proposalWithTC.Block.QC.View, proposalWithTC.LastViewTC.NewestQC.View,
 		"for this test case we specifically require that qc.View > lastViewTC.NewestQC.View")
 
 	expectedVote := makeVote(proposalWithTC.Block)
@@ -320,7 +323,7 @@ func (s *SafetyRulesTestSuite) TestProduceVote_VotingOnUnsafeProposal() {
 	})
 	s.Run("last-view-tc-invalid-highest-qc", func() {
 		// create block where Block.View != Block.QC.View+1 and
-		// Block.View == LastViewTC.View+1 and Block.QC.View < LastViewTC.TONewestQC.View
+		// Block.View == LastViewTC.View+1 and Block.QC.View < LastViewTC.NewestQC.View
 		// in this case block is not safe to extend since proposal is built on top of QC, which is lower
 		// than QC presented in LastViewTC.
 		TONewestQC := helper.MakeQC(helper.WithQCView(s.bootstrapBlock.View + 1))
@@ -371,7 +374,8 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_ShouldTimeout() {
 	require.Equal(s.T(), timeout, otherTimeout)
 
 	// to create new TO we need to provide a TC
-	lastViewTC := helper.MakeTC(helper.WithTCView(view))
+	lastViewTC := helper.MakeTC(helper.WithTCView(view),
+		helper.WithTCHighestQC(newestQC))
 
 	expectedTimeout = &model.TimeoutObject{
 		View:       view + 1,
@@ -393,7 +397,7 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_ShouldTimeout() {
 
 	// creating timeout for previous view(that was already cached) should result in error
 	timeout, err = s.safety.ProduceTimeout(view, newestQC, nil)
-	require.True(s.T(), model.IsNoTimeoutError(err))
+	require.Error(s.T(), err)
 	require.Nil(s.T(), timeout)
 }
 
@@ -405,7 +409,7 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_NotSafeToTimeout() {
 		newestQC := helper.MakeQC(helper.WithQCView(s.safetyData.LockedOneChainView - 1))
 
 		timeout, err := s.safety.ProduceTimeout(view, newestQC, nil)
-		require.True(s.T(), model.IsNoTimeoutError(err))
+		require.Error(s.T(), err)
 		require.Nil(s.T(), timeout)
 	})
 	s.Run("cur-view-below-highest-acknowledged-view", func() {
@@ -413,7 +417,7 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_NotSafeToTimeout() {
 		newestQC := helper.MakeQC(helper.WithQCView(s.safetyData.LockedOneChainView))
 
 		timeout, err := s.safety.ProduceTimeout(view-2, newestQC, nil)
-		require.True(s.T(), model.IsNoTimeoutError(err))
+		require.Error(s.T(), err)
 		require.Nil(s.T(), timeout)
 	})
 	s.Run("cur-view-below-highest-QC", func() {
@@ -421,7 +425,7 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_NotSafeToTimeout() {
 		view := newestQC.View
 
 		timeout, err := s.safety.ProduceTimeout(view, newestQC, nil)
-		require.True(s.T(), model.IsNoTimeoutError(err))
+		require.Error(s.T(), err)
 		require.Nil(s.T(), timeout)
 	})
 

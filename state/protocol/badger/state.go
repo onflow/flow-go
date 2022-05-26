@@ -265,7 +265,6 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 
 		livenessData := &hotstuff.LivenessData{
 			CurrentView: highest.Header.View + 1,
-			LastViewTC:  highest.Header.LastViewTC,
 			NewestQC:    rootQC,
 		}
 
