@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"math"
 	"math/rand"
 	"os"
 	"strconv"
@@ -165,7 +166,7 @@ func runTransactionsAndGetData(blocks int) *transactionDataCollector {
 	serviceAccount := blockExecutor.ServiceAccount()
 
 	// Create an account private key.
-	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+	privateKeys, err := testutil.GenerateAccountPrivateKeys(2)
 	if err != nil {
 		panic(err)
 	}
@@ -219,7 +220,12 @@ func runTransactionsAndGetData(blocks int) *transactionDataCollector {
 		panic(err)
 	}
 
-	err = accounts[0].MintTokens(blockExecutor, 100_0000_0000)
+	err = accounts[0].MintTokens(blockExecutor, 100_000_000_0000_0000) //100M FLOW
+	if err != nil {
+		panic(err)
+	}
+
+	err = accounts[1].MintTokens(blockExecutor, 100_000_000_0000_0000) //100M FLOW
 	if err != nil {
 		panic(err)
 	}
@@ -252,10 +258,15 @@ func runTransactionsAndGetData(blocks int) *transactionDataCollector {
 			txBody := gtx.Transaction.
 				AddAuthorizer(serviceAccount.Address).
 				SetProposalKey(serviceAccount.Address, 0, serviceAccount.RetAndIncSeqNumber()).
-				SetPayer(serviceAccount.Address).
+				SetPayer(accounts[1].Address).
 				SetGasLimit(100000000)
 
-			err = testutil.SignEnvelope(txBody, serviceAccount.Address, serviceAccount.PrivateKey)
+			err = testutil.SignPayload(txBody, serviceAccount.Address, serviceAccount.PrivateKey)
+			if err != nil {
+				panic(err)
+			}
+
+			err = testutil.SignEnvelope(txBody, accounts[1].Address, accounts[1].PrivateKey)
 			if err != nil {
 				panic(err)
 			}
@@ -460,6 +471,7 @@ func NewBasicBlockExecutor(chain flow.Chain, logger zerolog.Logger) (*BasicBlock
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithAccountStorageLimit(true),
 		fvm.WithMaxStateInteractionSize(2_000_000_000),
+		fvm.WithEventCollectionSizeLimit(math.MaxUint64),
 		fvm.WithGasLimit(20_000_000),
 		fvm.WithChain(chain),
 	}
