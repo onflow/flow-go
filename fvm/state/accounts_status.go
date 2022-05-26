@@ -11,7 +11,6 @@ type AccountStatus uint8
 const (
 	maskExist  byte = 0b0000_0001
 	maskFrozen byte = 0b1000_0000
-	maskOnHold byte = 0b0100_0000
 )
 
 // NewAccountStatus sets exist flag and return an AccountStatus
@@ -49,15 +48,4 @@ func SetAccountStatusFrozenFlag(inp AccountStatus, frozen bool) AccountStatus {
 		return AccountStatus(uint8(inp) | maskFrozen)
 	}
 	return AccountStatus(uint8(inp) & (0xFF - maskFrozen))
-}
-
-func (a AccountStatus) IsAccountOnHold() bool {
-	return uint8(a)&maskOnHold > 0
-}
-
-func SetAccountStatusOnHoldFlag(inp AccountStatus, onHold bool) AccountStatus {
-	if onHold {
-		return AccountStatus(uint8(inp) | maskOnHold)
-	}
-	return AccountStatus(uint8(inp) & (0xFF - maskOnHold))
 }
