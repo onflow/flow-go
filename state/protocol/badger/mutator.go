@@ -326,7 +326,10 @@ func (m *MutableState) guaranteeExtend(ctx context.Context, candidate *flow.Bloc
 		// check the guarantors are correct
 		_, err = protocol.FindGuarantors(m, guarantee)
 		if err != nil {
-			return state.NewInvalidExtensionErrorf("guarantee %v contains invalid guarantors: %w", guarantee.ID(), err)
+			if protocol.IsUnexpectedFindGuarantorsError(err) {
+				return state.NewInvalidExtensionErrorf("guarantee %v contains invalid guarantors: %w", guarantee.ID(), err)
+			}
+			return fmt.Errorf("could not find guarantor for guarantee %v: %w", guarantee.ID(), err)
 		}
 	}
 

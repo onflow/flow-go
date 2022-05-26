@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -76,6 +77,8 @@ func IsSporkRootSnapshot(snapshot Snapshot) (bool, error) {
 //  * signature.ErrIncompatibleBitVectorLength indicates that `signerIndices` has the wrong length
 //  * signature.ErrIllegallyPaddedBitVector is the vector is padded with bits other than 0
 //  * signature.ErrInvalidChecksum if the input is shorter than the expected checksum contained in the guarantee.SignerIndices
+//  * protocol.ErrEpochNotCommitted if epoch has not been committed yet
+//  * protocol.ErrClusterNotFound if cluster is not found by the given chainID
 func FindGuarantors(state State, guarantee *flow.CollectionGuarantee) ([]flow.Identifier, error) {
 	snapshot := state.AtBlockID(guarantee.ReferenceBlockID)
 	epochs := snapshot.Epochs()
@@ -96,4 +99,26 @@ func FindGuarantors(state State, guarantee *flow.CollectionGuarantee) ([]flow.Id
 	}
 
 	return guarantorIDs, nil
+}
+
+// IsUnexpectedFindGuarantorsError returns whether the given error
+// is an exception
+func IsUnexpectedFindGuarantorsError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	if signature.IsDecodeSignerIndicesError(err) {
+		return false
+	}
+
+	if errors.Is(err, ErrEpochNotCommitted) {
+		return false
+	}
+
+	if errors.Is(err, ErrClusterNotFound) {
+		return false
+	}
+
+	return true
 }
