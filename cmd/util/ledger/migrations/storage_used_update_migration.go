@@ -2,15 +2,12 @@ package migrations
 
 import (
 	"bufio"
-	"context"
 	"fmt"
 	"os"
 	"path"
 	"runtime"
 	"sync"
 	"time"
-
-	"golang.org/x/sync/errgroup"
 
 	fvm "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
@@ -75,27 +72,26 @@ func (m *StorageUsedUpdateMigration) Migrate(payload []ledger.Payload) ([]ledger
 
 	storageUsed := make(map[string]uint64)
 	storageUsedChan := make(chan accountPayloadSize, workerCount)
-	payloadChan := make(chan indexedPayload, workerCount)
+	payloadChan := make(chan indexedPayload)
 	storageUsedPayloadChan := make(chan accountStorageUsedPayload, workerCount)
 	storageUsedPayload := make(map[string]int)
 
-	inputEG, ctx := errgroup.WithContext(context.Background())
+	inputWG := &sync.WaitGroup{}
 	outputWG := &sync.WaitGroup{}
 
 	outputWG.Add(1)
 	go func() {
-		defer outputWG.Done()
 		for payloadSize := range storageUsedChan {
 			if _, ok := storageUsed[payloadSize.Address]; !ok {
 				storageUsed[payloadSize.Address] = 0
 			}
 			storageUsed[payloadSize.Address] = storageUsed[payloadSize.Address] + payloadSize.StorageUsed
 		}
+		outputWG.Done()
 	}()
 
 	outputWG.Add(1)
 	go func() {
-		defer outputWG.Done()
 		for su := range storageUsedPayloadChan {
 			if _, ok := storageUsedPayload[su.Address]; ok {
 				m.Log.Error().
@@ -104,15 +100,17 @@ func (m *StorageUsedUpdateMigration) Migrate(payload []ledger.Payload) ([]ledger
 			}
 			storageUsedPayload[su.Address] = su.Index
 		}
+		outputWG.Done()
 	}()
 
 	for i := 0; i < workerCount; i++ {
-		inputEG.Go(func() error {
+		inputWG.Add(1)
+		go func() {
 			for p := range payloadChan {
-				id, err := KeyToRegisterID(p.Payload.Key)
+				var id flow.RegisterID
+				id, err = KeyToRegisterID(p.Payload.Key)
 				if err != nil {
 					log.Error().Err(err).Msg("error converting key to register ID")
-					return err
 				}
 				if len([]byte(id.Owner)) != flow.AddressLength {
 					// not an address
@@ -129,21 +127,19 @@ func (m *StorageUsedUpdateMigration) Migrate(payload []ledger.Payload) ([]ledger
 					StorageUsed: uint64(registerSize(id, p.Payload)),
 				}
 			}
-			return nil
-		})
+			inputWG.Done()
+		}()
 	}
 
-Loop:
 	for i, p := range payload {
-		select {
-		case <-ctx.Done():
-			break Loop
-		case payloadChan <- indexedPayload{Index: i, Payload: p}:
+		payloadChan <- indexedPayload{
+			Index:   i,
+			Payload: p,
 		}
 	}
 
 	close(payloadChan)
-	err = inputEG.Wait()
+	inputWG.Wait()
 	close(storageUsedChan)
 	close(storageUsedPayloadChan)
 	outputWG.Wait()

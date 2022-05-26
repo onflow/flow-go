@@ -6,7 +6,6 @@ import (
 	"path"
 	"testing"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/utils/unittest"
@@ -29,12 +28,10 @@ func Test_RenameHappensAfterClosing(t *testing.T) {
 
 		writer := bufio.NewWriter(file)
 
-		logger := zerolog.Nop()
 		syncer := &SyncOnCloseRenameFile{
 			file:       file,
 			targetName: fullFileName,
 			Writer:     writer,
-			logger:     &logger,
 		}
 
 		sampleBytes := []byte{2, 1, 3, 7}

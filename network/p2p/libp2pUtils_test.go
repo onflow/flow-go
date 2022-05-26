@@ -1,4 +1,4 @@
-package p2p_test
+package p2p
 
 import (
 	"fmt"
@@ -12,7 +12,6 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -29,7 +28,7 @@ func TestLibP2PUtilsTestSuite(t *testing.T) {
 func (ts *LibP2PUtilsTestSuite) TestPeerInfoFromID() {
 	ids, exceptedPeerInfos := idsAndPeerInfos(ts.T())
 	for i, id := range ids {
-		actualAddrInfo, err := p2p.PeerAddressInfo(*id)
+		actualAddrInfo, err := PeerAddressInfo(*id)
 		assert.NoError(ts.T(), err)
 		assert.Equal(ts.T(), exceptedPeerInfos[i].String(), actualAddrInfo.String())
 	}
@@ -54,7 +53,7 @@ func idsAndPeerInfos(t *testing.T) (flow.IdentityList, []peer.AddrInfo) {
 		id.Address = fmt.Sprintf("%s:%s", ip, port)
 		ids[i] = id
 
-		// create a libp2p p2p.PeerAddressInfo
+		// create a libp2p PeerAddressInfo
 		libp2pKey, err := keyutils.LibP2PPublicKeyFromFlow(id.NetworkPubKey)
 		assert.NoError(t, err)
 		peerID, err := peer.IDFromPublicKey(libp2pKey)
@@ -83,6 +82,6 @@ func BenchmarkPeerInfoFromID(b *testing.B) {
 	id.Address = "1.1.1.1:3569"
 	b.StartTimer()
 	for n := 0; n < b.N; n++ {
-		_, _ = p2p.PeerAddressInfo(*id)
+		_, _ = PeerAddressInfo(*id)
 	}
 }

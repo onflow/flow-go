@@ -427,7 +427,6 @@ func (n *NetworkConfig) Swap(i, j int) {
 // to network creation.
 type NodeConfig struct {
 	Role                  flow.Role
-	Corrupted             bool
 	Weight                uint64
 	Identifier            flow.Identifier
 	LogLevel              zerolog.Level

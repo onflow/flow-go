@@ -96,18 +96,8 @@ func NewTransactionEnvironment(
 	}
 
 	env.contracts = handler.NewContractHandler(accounts,
-		func() bool {
-			enabled, defined := env.GetIsContractDeploymentRestricted()
-			if !defined {
-				// If the contract deployment bool is not set by the state
-				// fallback to the default value set by the configuration
-				// after the contract deployment bool is set by the state on all chains, this logic can be simplified
-				return ctx.RestrictedDeploymentEnabled
-			}
-			return enabled
-		},
-		env.GetAccountsAuthorizedForContractUpdate,
-		env.GetAccountsAuthorizedForContractRemoval,
+		ctx.RestrictedDeploymentEnabled,
+		env.GetAuthorizedAccountsForContractUpdates,
 		env.useContractAuditVoucher,
 	)
 
@@ -195,84 +185,35 @@ func (e *TransactionEnv) isTraceable() bool {
 	return e.ctx.Tracer != nil && e.traceSpan != nil
 }
 
-// GetAccountsAuthorizedForContractUpdate returns a list of addresses authorized to update/deploy contracts
-func (e *TransactionEnv) GetAccountsAuthorizedForContractUpdate() []common.Address {
-	return e.GetAuthorizedAccounts(
-		cadence.Path{
-			Domain:     blueprints.ContractDeploymentAuthorizedAddressesPathDomain,
-			Identifier: blueprints.ContractDeploymentAuthorizedAddressesPathIdentifier,
-		})
-}
-
-// GetAccountsAuthorizedForContractRemoval returns a list of addresses authorized to remove contracts
-func (e *TransactionEnv) GetAccountsAuthorizedForContractRemoval() []common.Address {
-	return e.GetAuthorizedAccounts(
-		cadence.Path{
-			Domain:     blueprints.ContractRemovalAuthorizedAddressesPathDomain,
-			Identifier: blueprints.ContractRemovalAuthorizedAddressesPathIdentifier,
-		})
-}
-
-// GetAuthorizedAccounts returns a list of addresses authorized by the service account.
-// Used to determine which accounts are permitted to deploy, update, or remove contracts.
+// GetAuthorizedAccountsForContractUpdates returns a list of addresses that
+// are authorized to update/deploy contracts
 //
 // It reads a storage path from service account and parse the addresses.
-// If any issue occurs on the process (missing registers, stored value properly not set),
-// it gracefully handles it and falls back to default behaviour (only service account be authorized).
-func (e *TransactionEnv) GetAuthorizedAccounts(path cadence.Path) []common.Address {
+// if any issue occurs on the process (missing registers, stored value properly not set)
+// it gracefully handle it and falls back to default behaviour (only service account be authorized)
+func (e *TransactionEnv) GetAuthorizedAccountsForContractUpdates() []common.Address {
 	// set default to service account only
 	service := runtime.Address(e.ctx.Chain.ServiceAddress())
 	defaultAccounts := []runtime.Address{service}
 
 	value, err := e.vm.Runtime.ReadStored(
 		service,
-		path,
-		runtime.Context{Interface: e},
-	)
-
-	const warningMsg = "failed to read contract authorized accounts from service account. using default behaviour instead."
-
-	if err != nil {
-		e.ctx.Logger.Warn().Msg(warningMsg)
-		return defaultAccounts
-	}
-	addresses, ok := utils.CadenceValueToAddressSlice(value)
-	if !ok {
-		e.ctx.Logger.Warn().Msg(warningMsg)
-		return defaultAccounts
-	}
-	return addresses
-}
-
-// GetIsContractDeploymentRestricted returns if contract deployment restriction is defined in the state and the value of it
-func (e *TransactionEnv) GetIsContractDeploymentRestricted() (restricted bool, defined bool) {
-	restricted, defined = false, false
-	service := runtime.Address(e.ctx.Chain.ServiceAddress())
-
-	value, err := e.vm.Runtime.ReadStored(
-		service,
 		cadence.Path{
-			Domain:     blueprints.IsContractDeploymentRestrictedPathDomain,
-			Identifier: blueprints.IsContractDeploymentRestrictedPathIdentifier,
+			Domain:     blueprints.ContractDeploymentAuthorizedAddressesPathDomain,
+			Identifier: blueprints.ContractDeploymentAuthorizedAddressesPathIdentifier,
 		},
 		runtime.Context{Interface: e},
 	)
 	if err != nil {
-		e.ctx.Logger.
-			Debug().
-			Msg("Failed to read IsContractDeploymentRestricted from the service account. Using value from context instead.")
-		return restricted, defined
+		e.ctx.Logger.Warn().Msg("failed to read contract deployment authorized accounts from service account. using default behaviour instead.")
+		return defaultAccounts
 	}
-	restrictedCadence, ok := value.(cadence.Bool)
+	addresses, ok := utils.CadenceValueToAddressSlice(value)
 	if !ok {
-		e.ctx.Logger.
-			Debug().
-			Msg("Failed to parse IsContractDeploymentRestricted from the service account. Using value from context instead.")
-		return restricted, defined
+		e.ctx.Logger.Warn().Msg("failed to parse contract deployment authorized accounts from service account. using default behaviour instead.")
+		return defaultAccounts
 	}
-	defined = true
-	restricted = restrictedCadence.ToGoValue().(bool)
-	return restricted, defined
+	return addresses
 }
 
 func (e *TransactionEnv) useContractAuditVoucher(address runtime.Address, code []byte) (bool, error) {
@@ -728,7 +669,7 @@ func (e *TransactionEnv) ComputationUsed() uint64 {
 }
 
 func (e *TransactionEnv) meterMemory(kind common.MemoryKind, intensity uint) error {
-	if e.sth.EnforceMemoryLimits() {
+	if e.sth.EnforceMemoryLimits {
 		return e.sth.State().MeterMemory(kind, intensity)
 	}
 	return nil
@@ -812,6 +753,7 @@ func (e *TransactionEnv) VerifySignature(
 	}
 
 	valid, err := crypto.VerifySignatureFromRuntime(
+		e.ctx.SignatureVerifier,
 		signature,
 		tag,
 		signedData,

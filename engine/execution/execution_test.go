@@ -2,7 +2,6 @@ package execution_test
 
 import (
 	"context"
-	"sync"
 	"testing"
 	"time"
 
@@ -10,7 +9,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/vmihailenco/msgpack"
-	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/engine"
 	execTestutil "github.com/onflow/flow-go/engine/execution/testutil"
@@ -149,7 +147,6 @@ func TestExecutionFlow(t *testing.T) {
 		Once().
 		Return(nil)
 
-	var lock sync.Mutex
 	var receipt *flow.ExecutionReceipt
 
 	// create verification engine that can create approvals and send to consensus nodes
@@ -158,8 +155,6 @@ func TestExecutionFlow(t *testing.T) {
 	_, _ = verificationNode.Net.Register(engine.ReceiveReceipts, verificationEngine)
 	verificationEngine.On("Process", mock.AnythingOfType("network.Channel"), exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
-			lock.Lock()
-			defer lock.Unlock()
 			receipt, _ = args[2].(*flow.ExecutionReceipt)
 
 			assert.Equal(t, block.ID(), receipt.ExecutionResult.BlockID)
@@ -173,9 +168,6 @@ func TestExecutionFlow(t *testing.T) {
 	_, _ = consensusNode.Net.Register(engine.ReceiveReceipts, consensusEngine)
 	consensusEngine.On("Process", mock.AnythingOfType("network.Channel"), exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
-			lock.Lock()
-			defer lock.Unlock()
-
 			receipt, _ = args[2].(*flow.ExecutionReceipt)
 
 			assert.Equal(t, block.ID(), receipt.ExecutionResult.BlockID)
@@ -201,9 +193,6 @@ func TestExecutionFlow(t *testing.T) {
 		// when sendBlock returned, ingestion engine might not have processed
 		// the block yet, because the process is async. we have to wait
 		hub.DeliverAll()
-
-		lock.Lock()
-		defer lock.Unlock()
 		return receipt != nil
 	}, time.Second*10, time.Millisecond*500)
 
@@ -360,13 +349,13 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 		[]*flow.Collection{col1, col2, col3},
 	)
 
-	receiptsReceived := atomic.Uint64{}
+	receiptsReceived := 0
 
 	consensusEngine := new(mocknetwork.Engine)
 	_, _ = consensusNode.Net.Register(engine.ReceiveReceipts, consensusEngine)
 	consensusEngine.On("Process", mock.AnythingOfType("network.Channel"), mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
-			receiptsReceived.Inc()
+			receiptsReceived++
 			originID := args[1].(flow.Identifier)
 			receipt := args[2].(*flow.ExecutionReceipt)
 			finalState, _ := receipt.ExecutionResult.FinalStateCommitment()
@@ -386,7 +375,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 
 	// ensure block 1 has been executed
 	hub.DeliverAllEventually(t, func() bool {
-		return receiptsReceived.Load() == 1
+		return receiptsReceived == 1
 	})
 	exe1Node.AssertHighestExecutedBlock(t, block1.Header)
 
@@ -406,7 +395,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 
 	// ensure block 1, 2 and 3 have been executed
 	hub.DeliverAllEventually(t, func() bool {
-		return receiptsReceived.Load() == 3
+		return receiptsReceived == 3
 	})
 
 	// ensure state has been synced across both nodes
@@ -499,16 +488,16 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 
 	child := unittest.BlockWithParentAndProposerFixture(block.Header, conID.NodeID)
 
-	actualCalls := atomic.Uint64{}
+	actualCalls := 0
+
+	var receipt *flow.ExecutionReceipt
 
 	verificationEngine := new(mocknetwork.Engine)
 	_, _ = verification1Node.Net.Register(engine.ReceiveReceipts, verificationEngine)
 	_, _ = verification2Node.Net.Register(engine.ReceiveReceipts, verificationEngine)
 	verificationEngine.On("Process", mock.AnythingOfType("network.Channel"), exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
-			actualCalls.Inc()
-
-			var receipt *flow.ExecutionReceipt
+			actualCalls++
 			receipt, _ = args[2].(*flow.ExecutionReceipt)
 
 			assert.Equal(t, block.ID(), receipt.ExecutionResult.BlockID)
@@ -522,7 +511,7 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 	require.NoError(t, err)
 
 	hub.DeliverAllEventually(t, func() bool {
-		return actualCalls.Load() == 2
+		return actualCalls == 2
 	})
 
 	verificationEngine.AssertExpectations(t)

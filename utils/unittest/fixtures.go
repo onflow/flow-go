@@ -408,21 +408,15 @@ func CidFixture() cid.Cid {
 	return blocks.NewBlock(data).Cid()
 }
 
-func BlockHeaderFixtureOnChain(chainID flow.ChainID, opts ...func(header *flow.Header)) flow.Header {
-	height := 1 + uint64(rand.Uint32()) // avoiding edge case of height = 0 (genesis block)
+func BlockHeaderFixtureOnChain(chainID flow.ChainID) flow.Header {
+	height := uint64(rand.Uint32())
 	view := height + uint64(rand.Intn(1000))
-	header := BlockHeaderWithParentFixture(&flow.Header{
+	return BlockHeaderWithParentFixture(&flow.Header{
 		ChainID:  chainID,
 		ParentID: IdentifierFixture(),
 		Height:   height,
 		View:     view,
 	})
-
-	for _, opt := range opts {
-		opt(&header)
-	}
-
-	return header
 }
 
 func BlockHeaderWithParentFixture(parent *flow.Header) flow.Header {
@@ -609,11 +603,10 @@ func ExecutableBlockFixtureWithParent(collectionsSignerIDs [][]flow.Identifier, 
 	return executableBlock
 }
 
-func ExecutableBlockFromTransactions(chain flow.ChainID, txss [][]*flow.TransactionBody) *entity.ExecutableBlock {
+func ExecutableBlockFromTransactions(txss [][]*flow.TransactionBody) *entity.ExecutableBlock {
 
 	completeCollections := make(map[flow.Identifier]*entity.CompleteCollection, len(txss))
-	blockHeader := BlockHeaderFixtureOnChain(chain)
-	block := *BlockWithParentFixture(&blockHeader)
+	block := BlockFixture()
 	block.Payload.Guarantees = nil
 
 	for _, txs := range txss {
@@ -1024,11 +1017,9 @@ func CompleteIdentitySet(identities ...*flow.Identity) flow.IdentityList {
 		flow.RoleExecution:    {},
 		flow.RoleVerification: {},
 	}
-	// don't add identities for roles that already exist
 	for _, identity := range identities {
 		delete(required, identity.Role)
 	}
-	// add identities for missing roles
 	for role := range required {
 		identities = append(identities, IdentityFixture(WithRole(role)))
 	}

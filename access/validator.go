@@ -267,16 +267,13 @@ func (v *TransactionValidator) checkAddresses(tx *flow.TransactionBody) error {
 
 // every key (account, key index combination) can only be used once for signing
 func (v *TransactionValidator) checkSignatureDuplications(tx *flow.TransactionBody) error {
-	type uniqueKey struct {
-		address flow.Address
-		index   uint64
-	}
-	observedSigs := make(map[uniqueKey]bool)
+	observedSigs := make(map[string]bool)
 	for _, sig := range append(tx.PayloadSignatures, tx.EnvelopeSignatures...) {
-		if observedSigs[uniqueKey{sig.Address, sig.KeyIndex}] {
+		keyStr := sig.UniqueKeyString()
+		if observedSigs[keyStr] {
 			return DuplicatedSignatureError{Address: sig.Address, KeyIndex: sig.KeyIndex}
 		}
-		observedSigs[uniqueKey{sig.Address, sig.KeyIndex}] = true
+		observedSigs[keyStr] = true
 	}
 	return nil
 }

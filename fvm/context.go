@@ -5,6 +5,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -13,21 +14,19 @@ import (
 
 // A Context defines a set of execution parameters used by the virtual machine.
 type Context struct {
-	Chain                        flow.Chain
-	Blocks                       Blocks
-	Metrics                      handler.MetricsReporter
-	Tracer                       module.Tracer
-	ComputationLimit             uint64
-	MemoryLimit                  uint64
-	MaxStateKeySize              uint64
-	MaxStateValueSize            uint64
-	MaxStateInteractionSize      uint64
-	EventCollectionByteSizeLimit uint64
-	MaxNumOfTxRetries            uint8
-	BlockHeader                  *flow.Header
-	ServiceAccountEnabled        bool
-	// Depricated: RestrictedDeploymentEnabled is deprecated use SetIsContractDeploymentRestrictedTransaction instead.
-	// Can be removed after all networks are migrated to SetIsContractDeploymentRestrictedTransaction
+	Chain                         flow.Chain
+	Blocks                        Blocks
+	Metrics                       handler.MetricsReporter
+	Tracer                        module.Tracer
+	ComputationLimit              uint64
+	MemoryLimit                   uint64
+	MaxStateKeySize               uint64
+	MaxStateValueSize             uint64
+	MaxStateInteractionSize       uint64
+	EventCollectionByteSizeLimit  uint64
+	MaxNumOfTxRetries             uint8
+	BlockHeader                   *flow.Header
+	ServiceAccountEnabled         bool
 	RestrictedDeploymentEnabled   bool
 	LimitAccountStorage           bool
 	TransactionFeesEnabled        bool
@@ -36,6 +35,7 @@ type Context struct {
 	ServiceEventCollectionEnabled bool
 	AccountFreezeAvailable        bool
 	ExtensiveTracing              bool
+	SignatureVerifier             crypto.SignatureVerifier
 	TransactionProcessors         []TransactionProcessor
 	ScriptProcessors              []ScriptProcessor
 	Logger                        zerolog.Logger
@@ -89,6 +89,7 @@ func defaultContext(logger zerolog.Logger) Context {
 		ServiceEventCollectionEnabled: false,
 		AccountFreezeAvailable:        false,
 		ExtensiveTracing:              false,
+		SignatureVerifier:             crypto.NewDefaultSignatureVerifier(),
 		TransactionProcessors: []TransactionProcessor{
 			NewTransactionAccountFrozenChecker(),
 			NewTransactionSignatureVerifier(AccountKeyWeightThreshold),

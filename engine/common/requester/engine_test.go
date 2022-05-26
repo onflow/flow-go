@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/vmihailenco/msgpack"
-	"go.uber.org/atomic"
 
 	module "github.com/onflow/flow-go/module/mock"
 
@@ -142,16 +141,11 @@ func TestDispatchRequestVarious(t *testing.T) {
 
 	con.AssertExpectations(t)
 
-	request.unit.Lock()
 	assert.Contains(t, request.requests, nonce)
-	request.unit.Unlock()
 
-	// TODO: racy/slow test
 	time.Sleep(2 * cfg.RetryInitial)
 
-	request.unit.Lock()
 	assert.NotContains(t, request.requests, nonce)
-	request.unit.Unlock()
 }
 
 func TestDispatchRequestBatchSize(t *testing.T) {
@@ -275,8 +269,7 @@ func TestOnEntityResponseValid(t *testing.T) {
 		EntityIDs: []flow.Identifier{wanted1.ID(), wanted2.ID(), unavailable.ID()},
 	}
 
-	done := make(chan struct{})
-	called := *atomic.NewUint64(0)
+	called := 0
 	request := Engine{
 		unit:     engine.NewUnit(),
 		metrics:  metrics.NewNoopCollector(),
@@ -285,11 +278,7 @@ func TestOnEntityResponseValid(t *testing.T) {
 		requests: make(map[uint64]*messages.EntityRequest),
 		selector: filter.HasNodeID(targetID),
 		create:   func() flow.Entity { return &flow.Collection{} },
-		handle: func(flow.Identifier, flow.Entity) {
-			if called.Inc() >= 2 {
-				close(done)
-			}
-		},
+		handle:   func(flow.Identifier, flow.Entity) { called++ },
 	}
 
 	request.items[iwanted1.EntityID] = iwanted1
@@ -311,8 +300,10 @@ func TestOnEntityResponseValid(t *testing.T) {
 	// check that the missing item is still there
 	assert.Contains(t, request.items, unavailable.ID())
 
+	time.Sleep(100 * time.Millisecond)
+
 	// make sure we processed two items
-	unittest.AssertClosesBefore(t, done, time.Second)
+	assert.Equal(t, called, 2)
 
 	// check that the missing items timestamp was reset
 	assert.Equal(t, iunavailable.LastRequested, time.Time{})
@@ -363,7 +354,7 @@ func TestOnEntityIntegrityCheck(t *testing.T) {
 		EntityIDs: []flow.Identifier{wanted.ID()},
 	}
 
-	called := make(chan struct{})
+	called := 0
 	request := Engine{
 		unit:     engine.NewUnit(),
 		metrics:  metrics.NewNoopCollector(),
@@ -372,7 +363,7 @@ func TestOnEntityIntegrityCheck(t *testing.T) {
 		requests: make(map[uint64]*messages.EntityRequest),
 		selector: filter.HasNodeID(targetID),
 		create:   func() flow.Entity { return &flow.Collection{} },
-		handle:   func(flow.Identifier, flow.Entity) { close(called) },
+		handle:   func(flow.Identifier, flow.Entity) { called++ },
 	}
 
 	request.items[iwanted.EntityID] = iwanted
@@ -388,6 +379,9 @@ func TestOnEntityIntegrityCheck(t *testing.T) {
 	// check that the provided item wasn't removed
 	assert.Contains(t, request.items, wanted.ID())
 
+	// make sure we didn't process items
+	assert.Equal(t, 0, called)
+
 	iwanted.checkIntegrity = false
 	request.items[iwanted.EntityID] = iwanted
 	request.requests[req.Nonce] = req
@@ -395,8 +389,10 @@ func TestOnEntityIntegrityCheck(t *testing.T) {
 	err = request.onEntityResponse(targetID, res)
 	assert.NoError(t, err)
 
+	time.Sleep(100 * time.Millisecond)
+
 	// make sure we process item without checking integrity
-	unittest.AssertClosesBefore(t, called, time.Second)
+	assert.Equal(t, 1, called)
 }
 
 // Verify that the origin should not be checked when ValidateStaking config is set to false
@@ -463,12 +459,12 @@ func TestOriginValidation(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	called := make(chan struct{})
+	called := false
 
 	e.WithHandle(func(origin flow.Identifier, _ flow.Entity) {
 		// we expect wrong origin to propagate here with validation disabled
 		assert.Equal(t, wrongID, origin)
-		close(called)
+		called = true
 	})
 
 	e.items[iwanted.EntityID] = iwanted
@@ -484,5 +480,5 @@ func TestOriginValidation(t *testing.T) {
 	assert.NoError(t, err)
 
 	// handler are called async, but this should be extremely quick
-	unittest.AssertClosesBefore(t, called, time.Second)
+	require.Eventually(t, func() bool { return called }, 100*time.Millisecond, 10*time.Millisecond)
 }

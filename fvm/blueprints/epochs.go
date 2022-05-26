@@ -222,14 +222,9 @@ func RegisterNodeTransaction(
 		Weight:    1000,
 	}
 
-	cadenceCryptoKey, err := sdktemplates.AccountKeyToCadenceCryptoKey(accountKey)
-	if err != nil {
-		panic(err)
-	}
-
 	cadencePublicKeys := cadence.NewArray(
 		[]cadence.Value{
-			cadenceCryptoKey,
+			sdktemplates.AccountKeyToCadenceCryptoKey(accountKey),
 		},
 	)
 

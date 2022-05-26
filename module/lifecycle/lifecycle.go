@@ -55,12 +55,11 @@ func (lm *LifecycleManager) OnStop(shutdownFns ...func()) {
 		return
 	}
 	lm.shutdownCommenced = true
-	waitForStartup := lm.startupCommenced
 	lm.stateTransition.Unlock()
 
 	close(lm.shutdownSignal)
 	go func() {
-		if waitForStartup {
+		if lm.startupCommenced {
 			<-lm.started
 			for _, fn := range shutdownFns {
 				fn()

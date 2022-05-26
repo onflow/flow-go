@@ -15,8 +15,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	mockery "github.com/stretchr/testify/mock"
 
-	channels "github.com/onflow/flow-go/engine"
-
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -34,7 +32,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-const testChannel = channels.PublicSyncCommittee
+const testChannel = "test-channel"
 
 // libp2p emits a call to `Protect` with a topic-specific tag upon establishing each peering connection in a GossipSUb mesh, see:
 // https://github.com/libp2p/go-libp2p-pubsub/blob/master/tag_tracer.go
@@ -122,12 +120,11 @@ func (m *MiddlewareTestSuite) SetupTest() {
 	var errChan <-chan error
 	m.mwCtx, errChan = irrecoverable.WithSignaler(ctx)
 
-	mwCtx := m.mwCtx
 	go func() {
 		select {
 		case err := <-errChan:
 			m.T().Error("middlewares encountered fatal error", err)
-		case <-mwCtx.Done():
+		case <-m.mwCtx.Done():
 			return
 		}
 	}()
@@ -428,7 +425,7 @@ func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 	require.NoError(m.Suite.T(), err)
 
 	// check message reception on target
-	unittest.RequireCloseBefore(m.T(), ch, 60*time.Second, "source node failed to send large message to target")
+	unittest.RequireCloseBefore(m.T(), ch, 15*time.Second, "source node failed to send large message to target")
 
 	m.ov[targetIndex].AssertExpectations(m.T())
 }
@@ -525,7 +522,7 @@ func createMessage(originID flow.Identifier, targetID flow.Identifier, msg ...st
 	}
 
 	return &message.Message{
-		ChannelID: testChannel.String(),
+		ChannelID: testChannel,
 		EventID:   []byte("1"),
 		OriginID:  originID[:],
 		TargetIDs: [][]byte{targetID[:]},

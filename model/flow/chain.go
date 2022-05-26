@@ -50,10 +50,8 @@ func (c ChainID) getChainCodeWord() uint64 {
 	switch c {
 	case Mainnet:
 		return 0
-	case Testnet:
+	case Testnet, Canary:
 		return invalidCodeTestNetwork
-	case Canary:
-		return invalidCodeCanaryNetwork
 	case Emulator, Localnet, Benchnet:
 		return invalidCodeTransientNetwork
 	default:

@@ -10,4 +10,5 @@ import (
 
 func TestDomainTags(t *testing.T) {
 	assert.Len(t, flow.TransactionDomainTag, flow.DomainTagLength)
+	assert.Len(t, flow.UserDomainTag, flow.DomainTagLength)
 }

@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/ledger"
@@ -19,8 +18,7 @@ func TestLoadCheckpointV1(t *testing.T) {
 		mustToHash("63df641430e5e0745c3d99ece6ac209467ccfdb77e362e7490a830db8e8803ae"),
 	}
 
-	logger := zerolog.Nop()
-	tries, err := LoadCheckpoint("test_data/checkpoint.v1", &logger)
+	tries, err := LoadCheckpoint("test_data/checkpoint.v1", nil)
 	require.NoError(t, err)
 	require.Equal(t, len(expectedRootHash), len(tries))
 
@@ -39,8 +37,7 @@ func TestLoadCheckpointV3(t *testing.T) {
 		mustToHash("63df641430e5e0745c3d99ece6ac209467ccfdb77e362e7490a830db8e8803ae"),
 	}
 
-	logger := zerolog.Nop()
-	tries, err := LoadCheckpoint("test_data/checkpoint.v3", &logger)
+	tries, err := LoadCheckpoint("test_data/checkpoint.v3", nil)
 	require.NoError(t, err)
 	require.Equal(t, len(expectedRootHash), len(tries))
 
@@ -59,8 +56,7 @@ func TestLoadCheckpointV4(t *testing.T) {
 		mustToHash("63df641430e5e0745c3d99ece6ac209467ccfdb77e362e7490a830db8e8803ae"),
 	}
 
-	logger := zerolog.Nop()
-	tries, err := LoadCheckpoint("test_data/checkpoint.v4", &logger)
+	tries, err := LoadCheckpoint("test_data/checkpoint.v4", nil)
 	require.NoError(t, err)
 	require.Equal(t, len(expectedRootHash), len(tries))
 

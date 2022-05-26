@@ -1,4 +1,3 @@
-//go:build relic
 // +build relic
 
 package crypto
@@ -286,7 +285,7 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 	}
 
 	phase := 0
-	if dkg == feldmanVSS { // jump to the last phase since there is only one phase for feldmanVSS
+	if dkg == feldmanVSS {
 		phase = 2
 	}
 
@@ -393,7 +392,6 @@ func dkgRunChan(proc *testDKGProcessor,
 			}
 		// if no message is received by the channel, call the DKG timeout
 		case <-time.After(phaseSwitchTimeout):
-			proc.startSync.Wait() // avoids racing when starting isn't over yet
 			switch phase {
 			case 0:
 				log.Infof("%d shares phase ended\n", proc.current)

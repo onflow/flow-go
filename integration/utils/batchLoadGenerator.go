@@ -229,14 +229,11 @@ func (lg *BatchLoadGenerator) createAccounts() error {
 
 		signer := crypto.NewInMemorySigner(privKey, accountKey.HashAlgo)
 
-		createAccountTx, err := templates.CreateAccount(
+		createAccountTx := templates.CreateAccount(
 			[]*flowsdk.AccountKey{accountKey},
 			nil,
 			*lg.serviceAccount.address,
 		)
-		if err != nil {
-			return err
-		}
 
 		// Generate an account creation script
 		createAccountTx.
