@@ -76,14 +76,14 @@ func TestAccountFreezing(t *testing.T) {
 		tx.AddAuthorizer(chain.ServiceAddress())
 		proc := fvm.Transaction(&tx, 0)
 
-		context := fvm.NewContext(log, fvm.WithAccountFreezeAvailable(false), fvm.WithChain(chain))
+		context := fvm.NewContext(log, fvm.WithAccountFreezeEnabled(false), fvm.WithChain(chain))
 
 		err = txInvoker.Process(vm, &context, proc, st, programsStorage)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "cannot find")
 		require.Contains(t, err.Error(), "setAccountFrozen")
 
-		context = fvm.NewContext(log, fvm.WithAccountFreezeAvailable(true), fvm.WithChain(chain))
+		context = fvm.NewContext(log, fvm.WithAccountFreezeEnabled(true), fvm.WithChain(chain))
 
 		err = txInvoker.Process(vm, &context, proc, st, programsStorage)
 		require.NoError(t, err)
@@ -193,7 +193,6 @@ func TestAccountFreezing(t *testing.T) {
 			fvm.WithCadenceLogging(true),
 			fvm.WithTransactionProcessors( // run with limited processor to test just core of freezing, but still inside FVM
 				fvm.NewTransactionAccountFrozenChecker(),
-				fvm.NewTransactionAccountFrozenEnabler(),
 				fvm.NewTransactionInvoker(zerolog.Nop())))
 
 		err := vm.Run(context, procFrozen, st.State().View(), programsStorage)
@@ -452,7 +451,6 @@ func TestAccountFreezing(t *testing.T) {
 			fvm.WithCadenceLogging(true),
 			fvm.WithTransactionProcessors( // run with limited processor to test just core of freezing, but still inside FVM
 				fvm.NewTransactionAccountFrozenChecker(),
-				fvm.NewTransactionAccountFrozenEnabler(),
 				fvm.NewTransactionInvoker(zerolog.Nop())))
 
 		err := accounts.SetAccountFrozen(frozenAddress, true)
