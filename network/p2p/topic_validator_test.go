@@ -379,13 +379,13 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
 	identity1, privateKey1 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleCollection))
-	sn1 := createNode(t, identity1.NodeID, privateKey1, sporkId)
+	ln1 := createNode(t, identity1.NodeID, privateKey1, sporkId)
 
 	identity2, privateKey2 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleCollection))
-	sn2 := createNode(t, identity2.NodeID, privateKey2, sporkId)
+	ln2 := createNode(t, identity2.NodeID, privateKey2, sporkId)
 
-	identity3, privateKey3 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleAccess))
-	an1 := createNode(t, identity3.NodeID, privateKey3, sporkId)
+	identity3, privateKey3 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleCollection))
+	ln3 := createNode(t, identity3.NodeID, privateKey3, sporkId)
 
 	channel := engine.ChannelSyncCluster(flow.Testnet)
 	topic := engine.TopicFromChannel(channel, sporkId)
@@ -402,23 +402,22 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 		return ids.ByNodeID(fid)
 	})
 
-	// node1 is connected to node2, and the an1 is connected to node1
-	// an1 <-> sn1 <-> sn2
-	require.NoError(t, sn1.AddPeer(context.TODO(), *host.InfoFromHost(sn2.Host())))
-	require.NoError(t, an1.AddPeer(context.TODO(), *host.InfoFromHost(sn1.Host())))
+	// ln3 <-> sn1 <-> sn2
+	require.NoError(t, ln1.AddPeer(context.TODO(), *host.InfoFromHost(ln2.Host())))
+	require.NoError(t, ln3.AddPeer(context.TODO(), *host.InfoFromHost(ln1.Host())))
 
-	// sn1 subscribe to the topic with the topic validator, while sn2 will subscribe without the topic validator to allow sn2 to publish unauthorized messages
-	sub1, err := sn1.Subscribe(topic, authorizedSenderValidator)
+	sub1, err := ln1.Subscribe(topic, authorizedSenderValidator)
 	require.NoError(t, err)
-	sub2, err := sn2.Subscribe(topic)
+	sub2, err := ln2.Subscribe(topic, authorizedSenderValidator)
 	require.NoError(t, err)
-	sub3, err := an1.Subscribe(topic)
+	sub3, err := ln3.Subscribe(topic, authorizedSenderValidator)
 	require.NoError(t, err)
 
 	// assert that the nodes are connected as expected
 	require.Eventually(t, func() bool {
-		return len(sn1.ListPeers(topic.String())) > 0 &&
-			len(sn2.ListPeers(topic.String())) > 0
+		return len(ln1.ListPeers(topic.String())) > 0 &&
+			len(ln2.ListPeers(topic.String())) > 0 &&
+			len(ln3.ListPeers(topic.String())) > 0
 	}, 3*time.Second, 100*time.Millisecond)
 
 	timedCtx, cancel5s := context.WithTimeout(context.Background(), 5*time.Second)
@@ -426,18 +425,17 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	// create a dummy block proposal to publish from our SN node
 	data := getMsgFixtureBz(t, &messages.SyncRequest{})
 
-	// sn2 publishes the block proposal, sn1 and an1 should receive the message because
-	// SN nodes are authorized to send block proposals
-	err = sn2.Publish(timedCtx, topic, data)
+	// ln2 publishes the sync request on the cluster channel
+	err = ln2.Publish(timedCtx, topic, data)
 	require.NoError(t, err)
 
-	// sn1 gets the message
+	// ln1 gets the message
 	checkReceive(timedCtx, t, data, sub1, nil, true)
 
-	// sn2 also gets the message (as part of the libp2p loopback of published topic messages)
+	// ln2 also gets the message (as part of the libp2p loopback of published topic messages)
 	checkReceive(timedCtx, t, data, sub2, nil, true)
 
-	// an1 also gets the message
+	// ln3 also gets the message
 	checkReceive(timedCtx, t, data, sub3, nil, true)
 }
 
