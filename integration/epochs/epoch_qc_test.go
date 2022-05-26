@@ -19,10 +19,10 @@ import (
 	hotstuffmodel "github.com/onflow/flow-go/consensus/hotstuff/model"
 	hotstuffver "github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
 	modulemock "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
 
 	clusterstate "github.com/onflow/flow-go/state/cluster"
