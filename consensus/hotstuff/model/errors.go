@@ -38,23 +38,6 @@ func NewNoVoteErrorf(msg string, args ...interface{}) error {
 	return NoVoteError{Err: fmt.Errorf(msg, args...)}
 }
 
-// NoTimeoutError contains the reason of why hotstuff.SafetyRules refused to generate a `TimeoutObject` for the current view.
-type NoTimeoutError struct {
-	Msg string
-}
-
-func (e NoTimeoutError) Error() string { return e.Msg }
-
-// IsNoTimeoutError returns whether an error is NoTimeoutError
-func IsNoTimeoutError(err error) bool {
-	var e NoTimeoutError
-	return errors.As(err, &e)
-}
-
-func NewNoTimeoutErrorf(msg string, args ...interface{}) error {
-	return NoTimeoutError{Msg: fmt.Sprintf(msg, args...)}
-}
-
 // InvalidFormatError indicates that some data has an incompatible format.
 type InvalidFormatError struct {
 	err error

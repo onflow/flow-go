@@ -117,20 +117,18 @@ func (r *SafetyRules) ProduceVote(proposal *model.Proposal, curView uint64) (*mo
 }
 
 // ProduceTimeout takes current view, highest locally known QC and TC and decides whether to produce timeout for current view.
-// Returns:
-//  * (timeout, nil): On the _first_ block for the current view that is safe to vote for.
-//    Subsequently, voter does _not_ vote for any other block with the same (or lower) view.
-//  * (nil, model.NoTimeoutError): If the safety module decides that it is not safe to timeout under current conditions.
-//    This is a sentinel error and _expected_ during normal operation.
-// All other errors are unexpected and potential symptoms of uncovered edge cases or corrupted internal state (fatal).
+//
+// When generating a timeout, the inputs are provided by node-internal components and should always result in a valid timeout.
+// We don't expect any errors during normal operations. All errors are symptoms of internal bugs or state corruption.
 func (r *SafetyRules) ProduceTimeout(curView uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
 	lastTimeout := r.safetyData.LastTimeout
 	if lastTimeout != nil && lastTimeout.View == curView {
 		return lastTimeout, nil
 	}
 
-	if !r.IsSafeToTimeout(curView, newestQC, lastViewTC) {
-		return nil, model.NewNoTimeoutErrorf("not safe to time out under current conditions")
+	err := r.IsSafeToTimeout(curView, newestQC, lastViewTC)
+	if err != nil {
+		return nil, fmt.Errorf("local, trusted inputs failed safety rules: %w", err)
 	}
 
 	timeout, err := r.signer.CreateTimeout(curView, newestQC, lastViewTC)
@@ -150,61 +148,115 @@ func (r *SafetyRules) ProduceTimeout(curView uint64, newestQC *flow.QuorumCertif
 }
 
 // IsSafeToVote checks if this proposal is valid in terms of voting rules, if voting for this proposal won't break safety rules.
+// Expected errors during normal operations:
+//  * NoVoteError if replica already acted during this view (either voted or generated timeout)
 func (r *SafetyRules) IsSafeToVote(proposal *model.Proposal) error {
 	blockView := proposal.Block.View
-	qcView := proposal.Block.QC.View
 
-	// Sanity check: block's view must be larger than the view of the included QC.
-	// As blocks should already be validated, failing this check is a symptom of an internal bug.
-	if blockView <= qcView {
-		return fmt.Errorf("block's view %d must be larger than the view of the included QC %d", blockView, qcView)
+	err := r.validateEvidenceForEnteringView(blockView, proposal.Block.QC, proposal.LastViewTC)
+	if err != nil {
+		// As we are expecting the blocks to be pre-validated, any failure here is a symptom of an internal bug.
+		return fmt.Errorf("proposal failed consensus validity check")
 	}
 
 	// This check satisfies voting rule 1
 	// 1. Replicas vote strictly in increasing rounds,
 	// block's view must be greater than the view that we have voted for
-	if blockView <= r.safetyData.HighestAcknowledgedView {
-		return model.NewNoVoteErrorf("not safe to vote for this view (%d), because we already voted for view %d",
-			blockView, r.safetyData.HighestAcknowledgedView)
+	acView := r.safetyData.HighestAcknowledgedView
+	if blockView == acView {
+		return model.NewNoVoteErrorf("already voted or generated timeout in view %d", blockView)
+	}
+	if blockView < acView {
+		return fmt.Errorf("already acted during view %d but got proposal for lower view %d", acView, blockView)
 	}
 
-	// This check satisfies voting rule 2a:
-	// 2a. [Happy path] If the previous round resulted in a QC then new QC should extend it.
-	if blockView == qcView+1 {
-		return nil
-	}
-
-	return r.IsSafeToExtend(blockView, qcView, proposal.LastViewTC)
-}
-
-// IsSafeToExtend performs safety checks if proposal can be extended in case of recovery path, we will call
-// this function only if previous round resulted in TC, to know if it's safe to extend such proposal.
-// All checks here are validity conditions for the block. As we are expecting the blocks to be pre-validated, any failure here is a symptom of an internal bug.
-func (r *SafetyRules) IsSafeToExtend(blockView, qcView uint64, lastViewTC *flow.TimeoutCertificate) error {
-	// These checks satisfy voting rule 2b:
-	// [Recovery Path] If the previous round did *not* result in a QC, the leader of the
-	// subsequent round *must* include a valid TC for the previous round in its block.
-	if lastViewTC == nil {
-		return fmt.Errorf("block's view %d is not sequential with included QC view %d, last view TC not included", blockView, qcView)
-	}
-	if blockView != lastViewTC.View+1 {
-		return fmt.Errorf("last view TC %d is not sequential for block %d", lastViewTC.View, blockView)
-	}
-	if qcView < lastViewTC.NewestQC.View {
-		return fmt.Errorf("QC's view %d should be at least %d", qcView, lastViewTC.NewestQC.View)
-	}
 	return nil
 }
 
 // IsSafeToTimeout checks if it's safe to timeout with proposed data, i.e. timing out won't break safety.
 // newestQC is the valid QC with the greatest view that we have observed.
-// lastViewTC is the TC for the previous view (might be nil)
-func (r *SafetyRules) IsSafeToTimeout(curView uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) bool {
-	if newestQC.View < r.safetyData.LockedOneChainView ||
-		curView+1 <= r.safetyData.HighestAcknowledgedView ||
-		curView <= newestQC.View {
-		return false
+// lastViewTC is the TC for the previous view (might be nil).
+//
+// When generating a timeout, the inputs are provided by node-internal components. Failure to comply with
+// the protocol is a symptom of an internal bug. We don't expect any errors during normal operations.
+func (r *SafetyRules) IsSafeToTimeout(curView uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) error {
+	err := r.validateEvidenceForEnteringView(curView, newestQC, lastViewTC)
+	if err != nil {
+		return fmt.Errorf("not safe to timeout: %w", err)
 	}
 
-	return (curView == newestQC.View+1) || (curView == lastViewTC.View+1)
+	if newestQC.View < r.safetyData.LockedOneChainView {
+		return fmt.Errorf("have already seen QC for view %d, but newest QC is reported to be for view %d", r.safetyData.LockedOneChainView, newestQC.View)
+	}
+	if curView+1 <= r.safetyData.HighestAcknowledgedView {
+		return fmt.Errorf("cannot generate timeout for past view %d", curView)
+	}
+	// the logic for rejecting inputs with `curView <= newestQC.View` is already contained
+	// in `validateEvidenceForEnteringView(..)`, because it only passes if
+	// * either `curView == newestQC.View + 1` (condition 2)
+	// * or `curView > newestQC.View` (condition 4)
+
+	return nil
+}
+
+// validateEvidenceForEnteringView performs the following check that is fundamental for consensus safety:
+// Whenever a replica acts within a view, it must prove that is has sufficient evidence to enter this view
+// Specifically:
+//  1. The replica must always provide a QC and optionally a TC.
+//  2. [Happy Path] If the previous round (i.e. `view -1`) resulted in a QC, the replica is allowed to transition to `view`.
+//     The QC from the previous round provides sufficient evidence. Furthermore, to prevent resource-exhaustion attacks,
+//     we require that no TC is included as part of the proof.
+//  3. Following the Happy Path has priority over following the Recovery Path (specified below).
+//  4. [Recovery Path] If the previous round (i.e. `view -1`) did *not* result in a QC, a TC from the previous round
+//     is required to transition to `view`. The following additional consistency requirements have to be satisfied:
+//     (a) newestQC.View + 1 < view
+//         Otherwise, the replica has violated condition 3 (in case newestQC.View + 1 = view); or the replica
+//         failed to apply condition 2 (in case newestQC.View + 1 > view).
+//     (b) newestQC.View ≥ lastViewTC.NewestQC.View
+//         Otherwise, the replica has violated condition 3.
+//
+// SafetyRules has the sole signing authority and enforces adherence to these conditions. In order to generate valid
+// consensus signatures, the replica must provide the respective evidence (required QC + optional TC) to its
+// internal SafetyRules component for each consensus action that the replica wants to take:
+//  * primary signing its own proposal
+//  * replica voting for a block
+//  * replica generating a timeout message
+//
+// During normal operations, no errors are expected:
+//  * As we are expecting the blocks to be pre-validated, any failure here is a symptom of an internal bug.
+//  * When generating a timeout, the inputs are provided by node-internal components. Failure to comply with
+//    the protocol is a symptom of an internal bug.
+func (r *SafetyRules) validateEvidenceForEnteringView(view uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) error {
+	// Condition 1:
+	if newestQC == nil {
+		return fmt.Errorf("missing the mandatory QC")
+	}
+
+	// Condition 2:
+	if newestQC.View+1 == view {
+		if lastViewTC != nil {
+			return fmt.Errorf("when QC is for prior round, no TC should be provided")
+		}
+		return nil
+	}
+	// Condition 3: if we reach the following lines, the happy path is not satisfied.
+
+	// Condition 4:
+	if lastViewTC == nil {
+		return fmt.Errorf("expecting TC because QC is not for prior view; but didn't get any TC")
+	}
+	if lastViewTC.View+1 != view {
+		return fmt.Errorf("neither QC (view %d) nor TC (view %d) allows to transition to view %d", newestQC.View, lastViewTC.View, view)
+	}
+	if newestQC.View >= view {
+		// Note: we need to enforce here that `newestQC.View + 1 < view`, i.e. we error for `newestQC.View+1 >= view`
+		// However, `newestQC.View+1 == view` is impossible, because otherwise we would have walked into condition 2.
+		// Hence, it suffices to error if `newestQC.View+1 > view`, which is identical to `newestQC.View >= view`
+		return fmt.Errorf("still at view %d, despite knowing a QC for view %d", view, newestQC.View)
+	}
+	if newestQC.View < lastViewTC.NewestQC.View {
+		return fmt.Errorf("failed to update newest QC (still at view %d) despite a newer QC (view %d) being included in TC", newestQC.View, lastViewTC.NewestQC.View)
+	}
+
+	return nil
 }

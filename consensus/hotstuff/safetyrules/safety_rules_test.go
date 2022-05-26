@@ -374,7 +374,8 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_ShouldTimeout() {
 	require.Equal(s.T(), timeout, otherTimeout)
 
 	// to create new TO we need to provide a TC
-	lastViewTC := helper.MakeTC(helper.WithTCView(view))
+	lastViewTC := helper.MakeTC(helper.WithTCView(view),
+		helper.WithTCHighestQC(newestQC))
 
 	expectedTimeout = &model.TimeoutObject{
 		View:       view + 1,
@@ -396,7 +397,7 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_ShouldTimeout() {
 
 	// creating timeout for previous view(that was already cached) should result in error
 	timeout, err = s.safety.ProduceTimeout(view, newestQC, nil)
-	require.True(s.T(), model.IsNoTimeoutError(err))
+	require.Error(s.T(), err)
 	require.Nil(s.T(), timeout)
 }
 
@@ -408,7 +409,7 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_NotSafeToTimeout() {
 		newestQC := helper.MakeQC(helper.WithQCView(s.safetyData.LockedOneChainView - 1))
 
 		timeout, err := s.safety.ProduceTimeout(view, newestQC, nil)
-		require.True(s.T(), model.IsNoTimeoutError(err))
+		require.Error(s.T(), err)
 		require.Nil(s.T(), timeout)
 	})
 	s.Run("cur-view-below-highest-acknowledged-view", func() {
@@ -416,7 +417,7 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_NotSafeToTimeout() {
 		newestQC := helper.MakeQC(helper.WithQCView(s.safetyData.LockedOneChainView))
 
 		timeout, err := s.safety.ProduceTimeout(view-2, newestQC, nil)
-		require.True(s.T(), model.IsNoTimeoutError(err))
+		require.Error(s.T(), err)
 		require.Nil(s.T(), timeout)
 	})
 	s.Run("cur-view-below-highest-QC", func() {
@@ -424,7 +425,7 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_NotSafeToTimeout() {
 		view := newestQC.View
 
 		timeout, err := s.safety.ProduceTimeout(view, newestQC, nil)
-		require.True(s.T(), model.IsNoTimeoutError(err))
+		require.Error(s.T(), err)
 		require.Nil(s.T(), timeout)
 	})
 
