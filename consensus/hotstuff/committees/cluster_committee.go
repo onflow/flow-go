@@ -65,7 +65,7 @@ func NewClusterCommittee(
 	return com, nil
 }
 
-func (c *Cluster) IdentitiesByBlock(blockID flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
+func (c *Cluster) IdentitiesByBlock(blockID flow.Identifier) (flow.IdentityList, error) {
 
 	// first retrieve the cluster block payload
 	payload, err := c.payloads.ByBlockID(blockID)
@@ -78,14 +78,11 @@ func (c *Cluster) IdentitiesByBlock(blockID flow.Identifier, selector flow.Ident
 
 	// use the initial cluster members for root block
 	if isRootBlock {
-		return c.initialClusterMembers.Filter(selector), nil
+		return c.initialClusterMembers, nil
 	}
 
 	// otherwise use the snapshot given by the reference block
-	identities, err := c.state.AtBlockID(payload.ReferenceBlockID).Identities(filter.And(
-		selector,
-		c.clusterMemberFilter,
-	))
+	identities, err := c.state.AtBlockID(payload.ReferenceBlockID).Identities(c.clusterMemberFilter)
 	return identities, err
 }
 
@@ -126,8 +123,8 @@ func (c *Cluster) IdentityByBlock(blockID flow.Identifier, nodeID flow.Identifie
 // IdentitiesByEpoch returns the initial cluster members for this epoch. The view
 // parameter is the view in the cluster consensus. Since clusters only exist for
 // one epoch, we don't need to check the view.
-func (c *Cluster) IdentitiesByEpoch(_ uint64, selector flow.IdentityFilter) (flow.IdentityList, error) {
-	return c.initialClusterMembers.Filter(selector), nil
+func (c *Cluster) IdentitiesByEpoch(_ uint64) (flow.IdentityList, error) {
+	return c.initialClusterMembers, nil
 }
 
 // IdentityByEpoch returns the node from the initial cluster members for this epoch.

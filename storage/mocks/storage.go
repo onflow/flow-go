@@ -704,6 +704,21 @@ func (mr *MockTransactionResultsMockRecorder) BatchStore(arg0, arg1, arg2 interf
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchStore", reflect.TypeOf((*MockTransactionResults)(nil).BatchStore), arg0, arg1, arg2)
 }
 
+// ByBlockID mocks base method
+func (m *MockTransactionResults) ByBlockID(arg0 flow.Identifier) ([]flow.TransactionResult, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ByBlockID", arg0)
+	ret0, _ := ret[0].([]flow.TransactionResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ByBlockID indicates an expected call of ByBlockID
+func (mr *MockTransactionResultsMockRecorder) ByBlockID(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByBlockID", reflect.TypeOf((*MockTransactionResults)(nil).ByBlockID), arg0)
+}
+
 // ByBlockIDTransactionID mocks base method
 func (m *MockTransactionResults) ByBlockIDTransactionID(arg0, arg1 flow.Identifier) (*flow.TransactionResult, error) {
 	m.ctrl.T.Helper()

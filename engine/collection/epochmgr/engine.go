@@ -208,10 +208,12 @@ func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done(func() {
 		// Stop components for all epochs. This is typically a single epoch
 		// but can be multiple near epoch boundaries
+		e.unit.Lock()
 		epochs := make([]module.ReadyDoneAware, 0, len(e.epochs))
 		for _, epoch := range e.epochs {
 			epochs = append(epochs, epoch)
 		}
+		e.unit.Unlock()
 		e.stopComponents() // stop all components using parent context
 		<-util.AllDone(epochs...)
 	})

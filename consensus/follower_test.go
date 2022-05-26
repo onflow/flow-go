@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/module/signature"
+
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -69,9 +71,9 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 
 	// mock consensus committee
 	s.committee = &mockhotstuff.DynamicCommittee{}
-	s.committee.On("IdentitiesByEpoch", mock.Anything, mock.Anything).Return(
-		func(_ uint64, selector flow.IdentityFilter) flow.IdentityList {
-			return identities.Filter(selector)
+	s.committee.On("IdentitiesByEpoch", mock.Anything).Return(
+		func(_ uint64) flow.IdentityList {
+			return identities
 		},
 		nil,
 	)
@@ -108,10 +110,13 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 		Height:    21053,
 		View:      52078,
 	}
+
+	signerIndices, err := signature.EncodeSignersToIndices(identities.NodeIDs(), identities.NodeIDs()[:3])
+	require.NoError(s.T(), err)
 	s.rootQC = &flow.QuorumCertificate{
-		View:      s.rootHeader.View,
-		BlockID:   s.rootHeader.ID(),
-		SignerIDs: identities.NodeIDs()[:3],
+		View:          s.rootHeader.View,
+		BlockID:       s.rootHeader.ID(),
+		SignerIndices: signerIndices,
 	}
 
 	// we start with the latest finalized block being the root block
@@ -338,6 +343,7 @@ func (mc *MockConsensus) extendBlock(blockView uint64, parent *flow.Header) *flo
 	nextBlock := unittest.BlockHeaderWithParentFixture(parent)
 	nextBlock.View = blockView
 	nextBlock.ProposerID = mc.identities[int(blockView)%len(mc.identities)].NodeID
-	nextBlock.ParentVoterIDs = mc.identities.NodeIDs()
+	signerIndices, _ := signature.EncodeSignersToIndices(mc.identities.NodeIDs(), mc.identities.NodeIDs())
+	nextBlock.ParentVoterIndices = signerIndices
 	return &nextBlock
 }

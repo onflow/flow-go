@@ -9,7 +9,6 @@ import (
 
 var (
 	ErrUnverifiableBlock = errors.New("block proposal can't be verified, because its view is above the finalized view, but its QC is below the finalized view")
-	ErrInvalidFormat     = errors.New("invalid signature format")
 	ErrInvalidSignature  = errors.New("invalid signature")
 	// ErrViewForUnknownEpoch is returned when Epoch information is queried for a view that is
 	// outside of all cached epochs. This can happen when a query is made for a view in the
@@ -54,6 +53,28 @@ func IsNoTimeoutError(err error) bool {
 
 func NewNoTimeoutErrorf(msg string, args ...interface{}) error {
 	return NoTimeoutError{Msg: fmt.Sprintf(msg, args...)}
+}
+
+// InvalidFormatError indicates that some data has an incompatible format.
+type InvalidFormatError struct {
+	err error
+}
+
+func NewInvalidFormatError(err error) error {
+	return InvalidFormatError{err}
+}
+
+func NewInvalidFormatErrorf(msg string, args ...interface{}) error {
+	return InvalidFormatError{fmt.Errorf(msg, args...)}
+}
+
+func (e InvalidFormatError) Error() string { return e.err.Error() }
+func (e InvalidFormatError) Unwrap() error { return e.err }
+
+// IsInvalidFormatError returns whether err is a InvalidFormatError
+func IsInvalidFormatError(err error) bool {
+	var e InvalidFormatError
+	return errors.As(err, &e)
 }
 
 // ConfigurationError indicates that a constructor or component was initialized with

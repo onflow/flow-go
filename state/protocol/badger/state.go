@@ -261,7 +261,7 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 		}
 		if rootQC.BlockID != highest.Header.ID() {
 			return fmt.Errorf("root QC is for block %v, which does not match the highest block %v in sealing segment", rootQC.BlockID, highest.Header.ID())
-		}	
+		}
 
 		livenessData := &hotstuff.LivenessData{
 			CurrentView: highest.Header.View + 1,

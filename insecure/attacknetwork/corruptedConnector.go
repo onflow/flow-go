@@ -14,15 +14,15 @@ import (
 )
 
 type CorruptedConnector struct {
-	attackerAddress string
-	corruptedIds    flow.IdentityList
-	ccfPort         int // conventional port for dialing remote corruptible conduit factories
+	attackerAddress  string
+	corruptedNodeIds flow.IdentityList
+	ccfPort          int // conventional port for dialing remote corruptible conduit factories
 }
 
-func NewCorruptedConnector(corruptedIds flow.IdentityList, ccfPort int) *CorruptedConnector {
+func NewCorruptedConnector(corruptedNodeIds flow.IdentityList, ccfPort int) *CorruptedConnector {
 	return &CorruptedConnector{
-		corruptedIds: corruptedIds,
-		ccfPort:      ccfPort,
+		corruptedNodeIds: corruptedNodeIds,
+		ccfPort:          ccfPort,
 	}
 }
 
@@ -66,7 +66,7 @@ func (c *CorruptedConnector) WithAttackerAddress(address string) {
 
 // corruptedConduitFactoryAddress generates and returns the gRPC interface address of corruptible conduit factory for given identity.
 func (c *CorruptedConnector) corruptedConduitFactoryAddress(id flow.Identifier) (string, error) {
-	identity, found := c.corruptedIds.ByNodeID(id)
+	identity, found := c.corruptedNodeIds.ByNodeID(id)
 	if !found {
 		return "", fmt.Errorf("could not find corrupted id for identifier: %x", id)
 	}
