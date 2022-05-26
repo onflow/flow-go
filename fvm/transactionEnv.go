@@ -744,6 +744,10 @@ func (e *TransactionEnv) MemoryUsed() uint64 {
 
 func (e *TransactionEnv) SetAccountFrozen(address common.Address, frozen bool) error {
 
+	if !e.ctx.AccountFreezeEnabled {
+		return errors.NewOperationNotSupportedError("SetAccountFrozen")
+	}
+
 	flowAddress := flow.Address(address)
 
 	if flowAddress == e.ctx.Chain.ServiceAddress() {
