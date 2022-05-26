@@ -6,13 +6,13 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/onflow/flow-go/network/codec"
 	"github.com/rs/zerolog"
 
 	channels "github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/network"
 
 	"github.com/onflow/flow-go/model/flow"
-	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/message"
 )
 
@@ -23,15 +23,11 @@ import (
 // 2. The message type is a known message type (can be decoded with cbor codec).
 // 3. The authorized roles list for the channel contains the senders role.
 // 4. The node is not ejected
-func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, getIdentity func(peer.ID) (*flow.Identity, bool)) MessageValidator {
+func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, codec network.Codec, getIdentity func(peer.ID) (*flow.Identity, bool)) MessageValidator {
 	log = log.With().
 		Str("component", "authorized_sender_validator").
 		Str("network_channel", channel.String()).
 		Logger()
-
-	// use cbor codec to add explicit dependency on cbor encoded messages adding the message type
-	// to the first byte of the message payload, this adds safety against changing codec without updating this validator
-	codec := cborcodec.NewCodec()
 
 	return func(ctx context.Context, from peer.ID, msg *message.Message) pubsub.ValidationResult {
 		identity, ok := getIdentity(from)
@@ -96,23 +92,23 @@ func isAuthorizedSender(identity *flow.Identity, channel network.Channel, code u
 // getRoles returns list of authorized roles for the channel associated with the message code provided
 func getRoles(channel network.Channel, msgTypeCode uint8) (flow.RoleList, error) {
 	// echo messages can be sent by anyone
-	if msgTypeCode == cborcodec.CodeEcho {
+	if msgTypeCode == codec.CodeEcho {
 		return flow.Roles(), nil
 	}
 
 	// cluster channels have a dynamic channel name
-	if msgTypeCode == cborcodec.CodeClusterBlockProposal || msgTypeCode == cborcodec.CodeClusterBlockVote || msgTypeCode == cborcodec.CodeClusterBlockResponse {
+	if msgTypeCode == codec.CodeClusterBlockProposal || msgTypeCode == codec.CodeClusterBlockVote || msgTypeCode == codec.CodeClusterBlockResponse {
 		return channels.ClusterChannelRoles(channel), nil
 	}
 
 	// get message type codes for all messages communicated on the channel
-	codes, ok := cborcodec.ChannelToMsgCodes[channel]
+	codes, ok := codec.MsgCodesByChannel(channel)
 	if !ok {
 		return nil, fmt.Errorf("could not get message codes for unknown channel: %s", channel)
 	}
 
 	// check if message type code is in list of codes corresponding to channel
-	if !containsCode(codes, msgTypeCode) {
+	if !codes.Contains(msgTypeCode) {
 		return nil, fmt.Errorf("invalid message type being sent on channel")
 	}
 

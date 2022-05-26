@@ -85,6 +85,7 @@ type Middleware struct {
 	unicastMessageTimeout      time.Duration
 	idTranslator               IDTranslator
 	previousProtocolStatePeers []peer.AddrInfo
+	codec                      network.Codec
 	component.Component
 }
 
@@ -125,6 +126,7 @@ func NewMiddleware(
 	rootBlockID flow.Identifier,
 	unicastMessageTimeout time.Duration,
 	idTranslator IDTranslator,
+	codec network.Codec,
 	opts ...MiddlewareOption,
 ) *Middleware {
 
@@ -144,6 +146,7 @@ func NewMiddleware(
 		unicastMessageTimeout: unicastMessageTimeout,
 		peerManagerFactory:    nil,
 		idTranslator:          idTranslator,
+		codec:                 codec,
 	}
 
 	for _, opt := range opts {
@@ -501,7 +504,7 @@ func (m *Middleware) Subscribe(channel network.Channel) error {
 		// for channels used by the staked nodes, add the topic validator to filter out messages from non-staked nodes
 		validators = append(validators,
 			// NOTE: The AuthorizedSenderValidator will assert the sender is a staked node
-			psValidator.AuthorizedSenderValidator(m.log, channel, m.ov.Identity),
+			psValidator.AuthorizedSenderValidator(m.log, channel, m.codec, m.ov.Identity),
 		)
 	}
 

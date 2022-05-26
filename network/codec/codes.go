@@ -1,6 +1,4 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
-package cbor
+package codec
 
 const (
 	CodeMin = iota + 1

@@ -13,6 +13,7 @@ import (
 
 	"github.com/ipfs/go-log"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -69,6 +70,7 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 		count,
 		logger,
 		nil,
+		cborcodec.NewCodec(),
 		WithIdentityOpts(unittest.WithAllRoles()),
 	)
 

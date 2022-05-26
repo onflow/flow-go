@@ -11,6 +11,7 @@ import (
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
+	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
@@ -86,6 +87,7 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 		suite.numNodes,
 		logger,
 		tops,
+		cborcodec.NewCodec(),
 		WithDHT("blob_service_test", p2p.AsServer()),
 		WithPeerManagerOpts(p2p.WithInterval(time.Second)),
 	)

@@ -3,6 +3,7 @@
 package cbor
 
 import (
+	"github.com/onflow/flow-go/network/codec"
 	"github.com/pkg/errors"
 
 	"github.com/onflow/flow-go/insecure"
@@ -18,75 +19,75 @@ func switchv2code(v interface{}) (uint8, error) {
 
 	// consensus
 	case *messages.BlockProposal:
-		code = CodeBlockProposal
+		code = codec.CodeBlockProposal
 	case *messages.BlockVote:
-		code = CodeBlockVote
+		code = codec.CodeBlockVote
 
 	// protocol state sync
 	case *messages.SyncRequest:
-		code = CodeSyncRequest
+		code = codec.CodeSyncRequest
 	case *messages.SyncResponse:
-		code = CodeSyncResponse
+		code = codec.CodeSyncResponse
 	case *messages.RangeRequest:
-		code = CodeRangeRequest
+		code = codec.CodeRangeRequest
 	case *messages.BatchRequest:
-		code = CodeBatchRequest
+		code = codec.CodeBatchRequest
 	case *messages.BlockResponse:
-		code = CodeBlockResponse
+		code = codec.CodeBlockResponse
 
 	// cluster consensus
 	case *messages.ClusterBlockProposal:
-		code = CodeClusterBlockProposal
+		code = codec.CodeClusterBlockProposal
 	case *messages.ClusterBlockVote:
-		code = CodeClusterBlockVote
+		code = codec.CodeClusterBlockVote
 	case *messages.ClusterBlockResponse:
-		code = CodeClusterBlockResponse
+		code = codec.CodeClusterBlockResponse
 
 	// collections, guarantees & transactions
 	case *flow.CollectionGuarantee:
-		code = CodeCollectionGuarantee
+		code = codec.CodeCollectionGuarantee
 	case *flow.TransactionBody:
-		code = CodeTransactionBody
+		code = codec.CodeTransactionBody
 	case *flow.Transaction:
-		code = CodeTransaction
+		code = codec.CodeTransaction
 
 	// core messages for execution & verification
 	case *flow.ExecutionReceipt:
-		code = CodeExecutionReceipt
+		code = codec.CodeExecutionReceipt
 	case *flow.ResultApproval:
-		code = CodeResultApproval
+		code = codec.CodeResultApproval
 
 	// execution state synchronization
 	case *messages.ExecutionStateSyncRequest:
-		code = CodeExecutionStateSyncRequest
+		code = codec.CodeExecutionStateSyncRequest
 	case *messages.ExecutionStateDelta:
-		code = CodeExecutionStateDelta
+		code = codec.CodeExecutionStateDelta
 
 	// data exchange for execution of blocks
 	case *messages.ChunkDataRequest:
-		code = CodeChunkDataRequest
+		code = codec.CodeChunkDataRequest
 	case *messages.ChunkDataResponse:
-		code = CodeChunkDataResponse
+		code = codec.CodeChunkDataResponse
 
 	// result approvals
 	case *messages.ApprovalRequest:
-		code = CodeApprovalRequest
+		code = codec.CodeApprovalRequest
 	case *messages.ApprovalResponse:
-		code = CodeApprovalResponse
+		code = codec.CodeApprovalResponse
 
 	// generic entity exchange engines
 	case *messages.EntityRequest:
-		code = CodeEntityRequest
+		code = codec.CodeEntityRequest
 	case *messages.EntityResponse:
-		code = CodeEntityResponse
+		code = codec.CodeEntityResponse
 
 	// testing
 	case *message.TestMessage:
-		code = CodeEcho
+		code = codec.CodeEcho
 
 	// dkg
 	case *messages.DKGMessage:
-		code = CodeDKGMessage
+		code = codec.CodeDKGMessage
 
 	default:
 		return 0, errors.Errorf("invalid encode type (%T)", v)

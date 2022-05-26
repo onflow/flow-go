@@ -3,6 +3,7 @@
 package cbor
 
 import (
+	"github.com/onflow/flow-go/network/codec"
 	"github.com/pkg/errors"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -16,74 +17,74 @@ func switchenv2v(code uint8) (interface{}, error) {
 	switch code {
 
 	// consensus
-	case CodeBlockProposal:
+	case codec.CodeBlockProposal:
 		v = &messages.BlockProposal{}
-	case CodeBlockVote:
+	case codec.CodeBlockVote:
 		v = &messages.BlockVote{}
 
 	// cluster consensus
-	case CodeClusterBlockProposal:
+	case codec.CodeClusterBlockProposal:
 		v = &messages.ClusterBlockProposal{}
-	case CodeClusterBlockVote:
+	case codec.CodeClusterBlockVote:
 		v = &messages.ClusterBlockVote{}
-	case CodeClusterBlockResponse:
+	case codec.CodeClusterBlockResponse:
 		v = &messages.ClusterBlockResponse{}
 
 	// protocol state sync
-	case CodeSyncRequest:
+	case codec.CodeSyncRequest:
 		v = &messages.SyncRequest{}
-	case CodeSyncResponse:
+	case codec.CodeSyncResponse:
 		v = &messages.SyncResponse{}
-	case CodeRangeRequest:
+	case codec.CodeRangeRequest:
 		v = &messages.RangeRequest{}
-	case CodeBatchRequest:
+	case codec.CodeBatchRequest:
 		v = &messages.BatchRequest{}
-	case CodeBlockResponse:
+	case codec.CodeBlockResponse:
 		v = &messages.BlockResponse{}
 
 	// collections, guarantees & transactions
-	case CodeCollectionGuarantee:
+	case codec.CodeCollectionGuarantee:
 		v = &flow.CollectionGuarantee{}
-	case CodeTransactionBody:
+	case codec.CodeTransactionBody:
 		v = &flow.TransactionBody{}
-	case CodeTransaction:
+	case codec.CodeTransaction:
 		v = &flow.Transaction{}
 
 	// core messages for execution & verification
-	case CodeExecutionReceipt:
+	case codec.CodeExecutionReceipt:
 		v = &flow.ExecutionReceipt{}
-	case CodeResultApproval:
+	case codec.CodeResultApproval:
 		v = &flow.ResultApproval{}
 
 	// execution state synchronization
-	case CodeExecutionStateSyncRequest:
+	case codec.CodeExecutionStateSyncRequest:
 		v = &messages.ExecutionStateSyncRequest{}
-	case CodeExecutionStateDelta:
+	case codec.CodeExecutionStateDelta:
 		v = &messages.ExecutionStateDelta{}
 
 	// data exchange for execution of blocks
-	case CodeChunkDataRequest:
+	case codec.CodeChunkDataRequest:
 		v = &messages.ChunkDataRequest{}
-	case CodeChunkDataResponse:
+	case codec.CodeChunkDataResponse:
 		v = &messages.ChunkDataResponse{}
 
-	case CodeApprovalRequest:
+	case codec.CodeApprovalRequest:
 		v = &messages.ApprovalRequest{}
-	case CodeApprovalResponse:
+	case codec.CodeApprovalResponse:
 		v = &messages.ApprovalResponse{}
 
 	// generic entity exchange engines
-	case CodeEntityRequest:
+	case codec.CodeEntityRequest:
 		v = &messages.EntityRequest{}
-	case CodeEntityResponse:
+	case codec.CodeEntityResponse:
 		v = &messages.EntityResponse{}
 
 	// testing
-	case CodeEcho:
+	case codec.CodeEcho:
 		v = &message.TestMessage{}
 
 	// dkg
-	case CodeDKGMessage:
+	case codec.CodeDKGMessage:
 		v = &messages.DKGMessage{}
 
 	default:
@@ -99,74 +100,74 @@ func switchenv2what(code uint8) (string, error) {
 	switch code {
 
 	// consensus
-	case CodeBlockProposal:
+	case codec.CodeBlockProposal:
 		what = "CodeBlockProposal"
-	case CodeBlockVote:
+	case codec.CodeBlockVote:
 		what = "CodeBlockVote"
 
 	// cluster consensus
-	case CodeClusterBlockProposal:
+	case codec.CodeClusterBlockProposal:
 		what = "CodeClusterBlockProposal"
-	case CodeClusterBlockVote:
+	case codec.CodeClusterBlockVote:
 		what = "CodeClusterBlockVote"
-	case CodeClusterBlockResponse:
+	case codec.CodeClusterBlockResponse:
 		what = "CodeClusterBlockResponse"
 
 	// protocol state sync
-	case CodeSyncRequest:
+	case codec.CodeSyncRequest:
 		what = "CodeSyncRequest"
-	case CodeSyncResponse:
+	case codec.CodeSyncResponse:
 		what = "CodeSyncResponse"
-	case CodeRangeRequest:
+	case codec.CodeRangeRequest:
 		what = "CodeRangeRequest"
-	case CodeBatchRequest:
+	case codec.CodeBatchRequest:
 		what = "CodeBatchRequest"
-	case CodeBlockResponse:
+	case codec.CodeBlockResponse:
 		what = "CodeBlockResponse"
 
 	// collections, guarantees & transactions
-	case CodeCollectionGuarantee:
+	case codec.CodeCollectionGuarantee:
 		what = "CodeCollectionGuarantee"
-	case CodeTransactionBody:
+	case codec.CodeTransactionBody:
 		what = "CodeTransactionBody"
-	case CodeTransaction:
+	case codec.CodeTransaction:
 		what = "CodeTransaction"
 
 	// core messages for execution & verification
-	case CodeExecutionReceipt:
+	case codec.CodeExecutionReceipt:
 		what = "CodeExecutionReceipt"
-	case CodeResultApproval:
+	case codec.CodeResultApproval:
 		what = "CodeResultApproval"
 
 	// execution state synchronization
-	case CodeExecutionStateSyncRequest:
+	case codec.CodeExecutionStateSyncRequest:
 		what = "CodeExecutionStateSyncRequest"
-	case CodeExecutionStateDelta:
+	case codec.CodeExecutionStateDelta:
 		what = "CodeExecutionStateDelta"
 
 	// data exchange for execution of blocks
-	case CodeChunkDataRequest:
+	case codec.CodeChunkDataRequest:
 		what = "CodeChunkDataRequest"
-	case CodeChunkDataResponse:
+	case codec.CodeChunkDataResponse:
 		what = "CodeChunkDataResponse"
 
-	case CodeApprovalRequest:
+	case codec.CodeApprovalRequest:
 		what = "CodeApprovalRequest"
-	case CodeApprovalResponse:
+	case codec.CodeApprovalResponse:
 		what = "CodeApprovalResponse"
 
 	// generic entity exchange engines
-	case CodeEntityRequest:
+	case codec.CodeEntityRequest:
 		what = "CodeEntityRequest"
-	case CodeEntityResponse:
+	case codec.CodeEntityResponse:
 		what = "CodeEntityResponse"
 
 	// testing
-	case CodeEcho:
+	case codec.CodeEcho:
 		what = "CodeEcho"
 
 	// dkg
-	case CodeDKGMessage:
+	case codec.CodeDKGMessage:
 		what = "CodeDKGMessage"
 
 	default:

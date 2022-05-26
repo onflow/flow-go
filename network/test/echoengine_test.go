@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ipfs/go-log"
+	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -54,6 +55,7 @@ func (suite *EchoEngineTestSuite) SetupTest() {
 		count,
 		logger,
 		nil,
+		cborcodec.NewCodec(),
 	)
 }
 

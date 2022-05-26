@@ -75,3 +75,20 @@ func (c *Codec) Decode(data []byte) (interface{}, error) {
 
 	return v, nil
 }
+
+// DecodeMsgType is a helper func that returns the underlying message of the message
+func (c *Codec) DecodeMsgType(data []byte) (byte, string, error) {
+	// decode the envelope
+	var env Envelope
+	err := json.Unmarshal(data, &env)
+	if err != nil {
+		return byte(0), "", fmt.Errorf("could not decode envelope: %w", err)
+	}
+
+	what, err := switchenv2what(env)
+	if err != nil {
+		return byte(0), "", fmt.Errorf("could not decode message type: %w", err)
+	}
+
+	return env.Code, what, nil
+}
