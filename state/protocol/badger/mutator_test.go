@@ -5,7 +5,6 @@ package badger_test
 import (
 	"context"
 	"errors"
-	"fmt"
 	"math/rand"
 	"sync"
 	"testing"
@@ -1693,19 +1692,45 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		payload.Guarantees[0].SignerIndices = []byte{byte(1)}
 		err = state.Extend(context.Background(), block)
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "invalid guarantors")
-		require.Contains(t, err.Error(), "split checksum") // check the error message should tell it's due to wrong checksum
-		require.True(t, st.IsInvalidExtensionError(err))
+		require.True(t, signature.IsDecodeSignerIndicesError(err), err)
+		require.True(t, errors.Is(err, signature.ErrInvalidChecksum), err)
+		require.True(t, st.IsInvalidExtensionError(err), err)
+
+		// now the guarantee has invalid signer indices: the checksum should have 4 bytes, but it only has 1
+		checksumMismatch := make([]byte, len(validSignerIndices))
+		copy(checksumMismatch, validSignerIndices)
+		checksumMismatch[0] = byte(1)
+		if checksumMismatch[0] == validSignerIndices[0] {
+			checksumMismatch[0] = byte(2)
+		}
+		payload.Guarantees[0].SignerIndices = checksumMismatch
+		err = state.Extend(context.Background(), block)
+		require.Error(t, err)
+		require.True(t, signature.IsDecodeSignerIndicesError(err), err)
+		require.True(t, errors.Is(err, signature.ErrInvalidChecksum), err)
+		require.True(t, st.IsInvalidExtensionError(err), err)
 
 		// let's test even if the checksum is correct, but signer indices is still wrong because the tailing are not 0,
 		// then the block should still be rejected.
-		invalidSignerIndices := validSignerIndices[:]
-		invalidSignerIndices[len(invalidSignerIndices)-1] = byte(255)
+		wrongTailing := make([]byte, len(validSignerIndices))
+		copy(wrongTailing, validSignerIndices)
+		wrongTailing[len(wrongTailing)-1] = byte(255)
 
-		payload.Guarantees[0].SignerIndices = invalidSignerIndices
+		payload.Guarantees[0].SignerIndices = wrongTailing
 		err = state.Extend(context.Background(), block)
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "index vector padded with unexpected bit values")
+		require.True(t, signature.IsDecodeSignerIndicesError(err), err)
+		require.True(t, errors.Is(err, signature.ErrIllegallyPaddedBitVector), err)
+		require.True(t, st.IsInvalidExtensionError(err), err)
+
+		// test imcompatible bit vector length
+		wrongbitVectorLength := validSignerIndices[0 : len(validSignerIndices)-1]
+		payload.Guarantees[0].SignerIndices = wrongbitVectorLength
+		err = state.Extend(context.Background(), block)
+		require.Error(t, err)
+		require.True(t, signature.IsDecodeSignerIndicesError(err), err)
+		require.True(t, errors.Is(err, signature.ErrIncompatibleBitVectorLength), err)
+		require.True(t, st.IsInvalidExtensionError(err), err)
 	})
 }
 
