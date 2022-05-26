@@ -1,42 +1,50 @@
 package utils
 
 import (
+	"context"
 	"time"
 )
+
+type workFunc func(workerID int)
 
 type Worker struct {
 	workerID int
 	interval time.Duration
-	work     func(workerID int)
+	work     workFunc
 	ticker   *time.Ticker
-	quit     chan struct{}
+
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
-func NewWorker(workerID int, interval time.Duration, work func(workerID int)) Worker {
+func NewWorker(workerID int, interval time.Duration, work workFunc) Worker {
+	ctx, cancel := context.WithCancel(context.Background())
 	return Worker{
 		workerID: workerID,
 		interval: interval,
 		work:     work,
+
+		ctx:    ctx,
+		cancel: cancel,
 	}
 }
 
 func (w *Worker) Start() {
 	w.ticker = time.NewTicker(w.interval)
-	w.quit = make(chan struct{})
+	defer w.ticker.Stop()
 
 	go func() {
-		for {
+		for ; ; <-w.ticker.C {
 			select {
-			case <-w.ticker.C:
-				go w.work(w.workerID)
-			case <-w.quit:
-				w.ticker.Stop()
+			case <-w.ctx.Done():
 				return
+			default:
 			}
+			go w.work(w.workerID)
 		}
 	}()
 }
 
 func (w *Worker) Stop() {
-	close(w.quit)
+	w.cancel()
 }
