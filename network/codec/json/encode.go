@@ -6,8 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/onflow/flow-go/network/codec"
 	"github.com/pkg/errors"
+
+	"github.com/onflow/flow-go/network/codec"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"

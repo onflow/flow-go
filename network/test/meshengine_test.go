@@ -13,11 +13,12 @@ import (
 
 	"github.com/ipfs/go-log"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+
+	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"

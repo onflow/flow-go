@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"io"
 
-	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"google.golang.org/grpc"
+
+	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 
 	ghost "github.com/onflow/flow-go/engine/ghost/protobuf"
 	"github.com/onflow/flow-go/model/flow"

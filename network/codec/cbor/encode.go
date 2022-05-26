@@ -3,8 +3,9 @@
 package cbor
 
 import (
-	"github.com/onflow/flow-go/network/codec"
 	"github.com/pkg/errors"
+
+	"github.com/onflow/flow-go/network/codec"
 
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/model/flow"

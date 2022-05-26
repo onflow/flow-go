@@ -6,8 +6,9 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	"github.com/onflow/flow-go/network/codec"
 	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/network/codec"
 
 	channels "github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/network"
@@ -119,14 +120,4 @@ func getRoles(channel network.Channel, msgTypeCode uint8) (flow.RoleList, error)
 	}
 
 	return roles, nil
-}
-
-func containsCode(codes []uint8, code uint8) bool {
-	for _, c := range codes {
-		if c == code {
-			return true
-		}
-	}
-
-	return false
 }

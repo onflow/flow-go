@@ -10,11 +10,12 @@ import (
 
 	"github.com/ipfs/go-log"
 	swarm "github.com/libp2p/go-libp2p-swarm"
-	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	mockery "github.com/stretchr/testify/mock"
+
+	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 
 	channels "github.com/onflow/flow-go/engine"
 
