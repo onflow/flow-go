@@ -75,7 +75,7 @@ func NewTxFollower(ctx context.Context, client *client.Client, opts ...followerO
 	}
 
 	if f.height == 0 {
-		hdr, err := client.GetLatestBlockHeader(newCtx, false)
+		hdr, err := client.GetLatestBlockHeader(newCtx, true)
 		if err != nil {
 			return nil, err
 		}
