@@ -90,12 +90,12 @@ func init() {
 func generateBootstrapData(flowNetworkConf testnet.NetworkConfig) []testnet.ContainerConfig {
 	// Prepare localnet host folders, mapped to Docker container volumes upon `docker compose up`
 	prepareCommonHostFolders()
-	_, _, _, flowNodeContainerConfigs, _, err := testnet.BootstrapNetwork(flowNetworkConf, BootstrapDir)
+	bootstrapData, err := testnet.BootstrapNetwork(flowNetworkConf, BootstrapDir)
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println("Flow test network bootstrapping data generated...")
-	return flowNodeContainerConfigs
+	return bootstrapData.StakedConfs
 }
 
 // localnet/bootstrap.go generates a docker compose file with images configured for a
@@ -363,7 +363,7 @@ func prepareService(container testnet.ContainerConfig, i int, n int) Service {
 			Context:    "../../",
 			Dockerfile: "cmd/Dockerfile",
 			Args: map[string]string{
-				"TARGET":  container.Role.String(),
+				"TARGET":  fmt.Sprintf("./cmd/%s", container.Role.String()),
 				"VERSION": build.Semver(),
 				"COMMIT":  build.Commit(),
 				"GOARCH":  runtime.GOARCH,
@@ -717,7 +717,7 @@ func prepareObserverService(i int, observerName string, agPublicKey string, prof
 			Context:    "../../",
 			Dockerfile: "cmd/Dockerfile",
 			Args: map[string]string{
-				"TARGET":  "access", // hardcoded to access for now until we make it a separate cmd
+				"TARGET":  "./cmd/access", // hardcoded to access for now until we make it a separate cmd
 				"VERSION": build.Semver(),
 				"COMMIT":  build.Commit(),
 				"GOARCH":  runtime.GOARCH,

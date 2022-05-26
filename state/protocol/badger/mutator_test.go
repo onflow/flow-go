@@ -512,7 +512,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// add a participant for the next epoch
 		epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-		epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.ByNodeIDAsc)
+		epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.Canonical)
 
 		// create the epoch setup event for the second epoch
 		epoch2Setup := unittest.EpochSetupFixture(
@@ -594,6 +594,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		epoch2Commit := unittest.EpochCommitFixture(
 			unittest.CommitWithCounter(epoch2Setup.Counter),
+			unittest.WithClusterQCsFromAssignments(epoch2Setup.Assignments),
 			unittest.WithDKGFromParticipants(epoch2Participants),
 		)
 
@@ -957,7 +958,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 
 		// add a participant for the next epoch
 		epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-		epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.ByNodeIDAsc)
+		epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.Canonical)
 
 		// this function will return a VALID setup event and seal, we will modify
 		// in different ways in each test case
@@ -1044,7 +1045,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 		epoch2Participants := append(
 			participants.Filter(filter.Not(filter.HasRole(flow.RoleConsensus))),
 			epoch2NewParticipant,
-		).Sort(order.ByNodeIDAsc)
+		).Sort(order.Canonical)
 
 		createSetup := func(block *flow.Block) (*flow.EpochSetup, *flow.ExecutionReceipt, *flow.Seal) {
 			setup := unittest.EpochSetupFixture(
@@ -1053,6 +1054,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 				unittest.WithFinalView(epoch1Setup.FinalView+1000),
 				unittest.WithFirstView(epoch1Setup.FinalView+1),
 			)
+
 			receipt, seal := unittest.ReceiptAndSealForBlock(block)
 			receipt.ExecutionResult.ServiceEvents = []flow.ServiceEvent{setup.ServiceEvent()}
 			seal.ResultID = receipt.ExecutionResult.ID()
@@ -1110,7 +1112,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 		// expect a commit event with wrong cluster QCs to trigger EECC without error
 		t.Run("inconsistent cluster QCs (EECC)", func(t *testing.T) {
 			_, receipt, seal := createCommit(block3, func(commit *flow.EpochCommit) {
-				commit.ClusterQCs = append(commit.ClusterQCs, flow.ClusterQCVoteDataFromQC(unittest.QuorumCertificateFixture()))
+				commit.ClusterQCs = append(commit.ClusterQCs, flow.ClusterQCVoteDataFromQC(unittest.QuorumCertificateWithSignerIDsFixture()))
 			})
 
 			sealingBlock := unittest.SealBlock(t, state, block3, receipt, seal)
@@ -1167,7 +1169,7 @@ func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
 
 		// add a participant for the next epoch
 		epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-		epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.ByNodeIDAsc)
+		epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.Canonical)
 
 		// create the epoch setup event for the second epoch
 		epoch2Setup := unittest.EpochSetupFixture(
@@ -1236,7 +1238,7 @@ func TestEmergencyEpochChainContinuation(t *testing.T) {
 
 			// add a participant for the next epoch
 			epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-			epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.ByNodeIDAsc)
+			epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.Canonical)
 
 			// create the epoch setup event for the second epoch
 			epoch2Setup := unittest.EpochSetupFixture(
@@ -1376,7 +1378,7 @@ func TestEmergencyEpochChainContinuation(t *testing.T) {
 
 			// add a participant for the next epoch
 			epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-			epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.ByNodeIDAsc)
+			epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.Canonical)
 
 			// create the epoch setup event for the second epoch
 			// this event is invalid because it used a non-contiguous first view

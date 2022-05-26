@@ -27,6 +27,15 @@ func (p *PSMT) RootHash() ledger.RootHash {
 	return ledger.RootHash(p.root.Hash())
 }
 
+// GetSinglePayload returns payload of a given path
+func (p *PSMT) GetSinglePayload(path ledger.Path) (*ledger.Payload, error) {
+	node, found := p.pathLookUp[path]
+	if !found {
+		return nil, &ErrMissingPath{Paths: []ledger.Path{path}}
+	}
+	return node.payload, nil
+}
+
 // Get returns an slice of payloads (same order), an slice of failed paths and errors (if any)
 // TODO return list of indecies instead of paths
 func (p *PSMT) Get(paths []ledger.Path) ([]*ledger.Payload, error) {

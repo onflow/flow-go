@@ -61,7 +61,7 @@ func TestSingleExecutionReceipt(t *testing.T) {
 // Orchestrator receives two receipts with distinct results from distinct corrupted execution nodes.
 // Each receipt has a distinct result.
 // The receipts are coming concurrently.
-// Orchestrator only corrupts one of them (whichever it receives first), while bouncing back the other.
+// Orchestrator only corrupts one of them (whichever it receives first), while passing through the other.
 // Orchestrator sends the corrupted one to both corrupted execution nodes.
 func TestTwoConcurrentExecutionReceipts_DistinctResult(t *testing.T) {
 	testConcurrentExecutionReceipts(
@@ -146,8 +146,8 @@ func testConcurrentExecutionReceipts(t *testing.T,
 	receiptTargetIds, err := rootStateFixture.State.Final().Identities(filter.HasRole(flow.RoleAccess, flow.RoleConsensus, flow.RoleVerification))
 	require.NoError(t, err)
 
-	eventMap := make(map[flow.Identifier]*insecure.Event)
-	receipts := make([]*flow.ExecutionReceipt, 0)
+	var eventMap map[flow.Identifier]*insecure.Event
+	var receipts []*flow.ExecutionReceipt
 
 	if sameResult {
 		eventMap, receipts = receiptsWithSameResultFixture(t, count, corruptedExecutionIds, receiptTargetIds.NodeIDs())
@@ -186,7 +186,7 @@ func testConcurrentExecutionReceipts(t *testing.T,
 		event := event // suppress loop variable
 
 		go func() {
-			err = wintermuteOrchestrator.HandleEventFromCorruptedNode(event)
+			err := wintermuteOrchestrator.HandleEventFromCorruptedNode(event)
 			require.NoError(t, err)
 
 			corruptedEnEventSendWG.Done()
@@ -249,7 +249,7 @@ func mockAttackNetworkForCorruptedExecutionResult(
 			// make sure message being sent on correct channel
 			require.Equal(t, engine.PushReceipts, event.Channel)
 
-			corruptedResult, ok := event.FlowProtocolEvent.(*flow.ExecutionResult)
+			corruptedResult, ok := event.FlowProtocolEvent.(*flow.ExecutionReceipt)
 			require.True(t, ok)
 
 			// make sure the original uncorrupted execution receipt is NOT sent to orchestrator
@@ -293,9 +293,10 @@ func TestRespondingWithCorruptedAttestation(t *testing.T) {
 			require.True(t, ok)
 
 			// output of orchestrator for a corrupted chunk request from a corrupted verification node
-			// should be an attestation.
-			attestation, ok := event.FlowProtocolEvent.(*flow.Attestation)
+			// should be a result approval containing a dictated attestation.
+			approval, ok := event.FlowProtocolEvent.(*flow.ResultApproval)
 			require.True(t, ok)
+			attestation := approval.Body.Attestation
 
 			// checking content of attestation
 			require.Equal(t, attestation.BlockID, wintermuteOrchestrator.state.corruptedResult.BlockID)
