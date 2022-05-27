@@ -41,4 +41,4 @@ require (
 
 replace github.com/onflow/flow-go => ../
 
-replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.23.3-patch.3
+replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.23.3-patch.4
