@@ -394,7 +394,7 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
-	authorizedSenderValidator := validator.AuthorizedSenderValidator(zerolog.Nop(), channel, func(pid peer.ID) (*flow.Identity, bool) {
+	authorizedSenderValidator := validator.AuthorizedSenderValidator(zerolog.Nop(), channel, cborcodec.NewCodec(), func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translator.GetFlowID(pid)
 		if err != nil {
 			return &flow.Identity{}, false
