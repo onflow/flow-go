@@ -38,7 +38,7 @@ init:
 # Creates a light version of the localnet with just 1 instance for each node type
 .PHONY: init-light
 init-light:
-	$(MAKE) -e COLLECTION=1 CONSENSUS=1 EXECUTION=1 VERIFICATION=1 ACCESS=1 NCLUSTERS=1 init
+	$(MAKE) -e COLLECTION=1 CONSENSUS=2 EXECUTION=1 VERIFICATION=1 ACCESS=1 NCLUSTERS=1 init
 
 # Creates a version of localnet configured with short epochs
 .PHONY: init-short-epochs
