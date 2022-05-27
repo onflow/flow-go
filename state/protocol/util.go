@@ -1,7 +1,6 @@
 package protocol
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -99,26 +98,4 @@ func FindGuarantors(state State, guarantee *flow.CollectionGuarantee) ([]flow.Id
 	}
 
 	return guarantorIDs, nil
-}
-
-// IsUnexpectedFindGuarantorsError returns whether the given error
-// is an exception
-func IsUnexpectedFindGuarantorsError(err error) bool {
-	if err == nil {
-		return false
-	}
-
-	if signature.IsDecodeSignerIndicesError(err) {
-		return false
-	}
-
-	if errors.Is(err, ErrEpochNotCommitted) {
-		return false
-	}
-
-	if errors.Is(err, ErrClusterNotFound) {
-		return false
-	}
-
-	return true
 }
