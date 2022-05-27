@@ -21,7 +21,7 @@ type TxFollower interface {
 	BlockID() flowsdk.Identifier
 
 	// Stop sends termination signal to the follower.
-	// It does not wait for the it to stop.
+	// It waits until the follower is stopped.
 	Stop()
 }
 
@@ -53,6 +53,8 @@ type txFollowerImpl struct {
 	blockID flowsdk.Identifier
 
 	txToChan sync.Map
+
+	stopped chan struct{}
 }
 
 type txInfo struct {
@@ -73,6 +75,7 @@ func NewTxFollower(ctx context.Context, client *client.Client, opts ...followerO
 		logger: zerolog.Nop(),
 		mu:     &sync.RWMutex{},
 
+		stopped:  make(chan struct{}),
 		interval: 500 * time.Millisecond,
 	}
 
@@ -97,6 +100,7 @@ func NewTxFollower(ctx context.Context, client *client.Client, opts ...followerO
 func (f *txFollowerImpl) follow() {
 	t := time.NewTicker(f.interval)
 	defer t.Stop()
+	defer close(f.stopped)
 
 Loop:
 	for lastBlockTime := time.Now(); ; <-t.C {
@@ -170,6 +174,19 @@ func (f *txFollowerImpl) BlockID() flowsdk.Identifier {
 
 func (f *txFollowerImpl) Stop() {
 	f.cancel()
+	<-f.stopped
+
+	var toDelete []string
+	f.txToChan.Range(
+		func(key, value interface{}) bool {
+			close(value.(txInfo).C)
+			toDelete = append(toDelete, key.(string))
+			return true
+		},
+	)
+	for _, val := range toDelete {
+		f.txToChan.Delete(val)
+	}
 }
 
 type nopTxFollower struct {
