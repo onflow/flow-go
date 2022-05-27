@@ -111,12 +111,14 @@ Loop:
 			continue
 		}
 
+		var totalTxs uint64
 		for _, guaranteed := range block.CollectionGuarantees[:] {
 			col, err := f.client.GetCollection(f.ctx, guaranteed.CollectionID)
 			if err != nil {
 				continue Loop
 			}
 			for _, tx := range col.TransactionIDs {
+				totalTxs++
 				if ch, loaded := f.txToChan.LoadAndDelete(tx.Hex()); loaded {
 					txi := ch.(txInfo)
 
@@ -135,6 +137,7 @@ Loop:
 			Uint64("height", block.Height).
 			Int("numCollections", len(block.CollectionGuarantees[:])).
 			Int("numSeals", len(block.Seals)).
+			Uint64("numTxs", totalTxs).
 			Msg("new block parsed")
 
 		f.mu.Lock()
