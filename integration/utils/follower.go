@@ -7,6 +7,7 @@ import (
 
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/client"
+	"go.uber.org/atomic"
 
 	"github.com/rs/zerolog"
 )
@@ -48,6 +49,8 @@ type txFollowerImpl struct {
 
 	interval time.Duration
 
+	inprogress *atomic.Int64
+
 	mu      *sync.RWMutex
 	height  uint64
 	blockID flowsdk.Identifier
@@ -74,6 +77,8 @@ func NewTxFollower(ctx context.Context, client *client.Client, opts ...followerO
 		cancel: cancel,
 		logger: zerolog.Nop(),
 		mu:     &sync.RWMutex{},
+
+		inprogress: atomic.NewInt64(0),
 
 		stopped:  make(chan struct{}),
 		interval: 500 * time.Millisecond,
@@ -132,6 +137,7 @@ Loop:
 						Hex("txID", tx.Bytes()).
 						Msg("returned tx to the pool")
 					close(txi.C)
+					f.inprogress.Dec()
 				}
 			}
 		}
@@ -144,6 +150,7 @@ Loop:
 			Int("numCollections", len(block.CollectionGuarantees[:])).
 			Int("numSeals", len(block.Seals)).
 			Uint64("numTxs", totalTxs).
+			Int64("txsInProgress", f.inprogress.Load()).
 			Msg("new block parsed")
 
 		f.mu.Lock()
@@ -156,7 +163,10 @@ Loop:
 }
 
 func (f *txFollowerImpl) CompleteChanByID(ID flowsdk.Identifier) <-chan struct{} {
-	txi, _ := f.txToChan.LoadOrStore(ID.Hex(), txInfo{submisionTime: time.Now(), C: make(chan struct{})})
+	txi, loaded := f.txToChan.LoadOrStore(ID.Hex(), txInfo{submisionTime: time.Now(), C: make(chan struct{})})
+	if !loaded {
+		f.inprogress.Inc()
+	}
 	return txi.(txInfo).C
 }
 
