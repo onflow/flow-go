@@ -81,7 +81,7 @@ func NewTxFollower(ctx context.Context, client *client.Client, opts ...followerO
 		inprogress: atomic.NewInt64(0),
 
 		stopped:  make(chan struct{}),
-		interval: 500 * time.Millisecond,
+		interval: 100 * time.Millisecond,
 	}
 
 	for _, opt := range opts {
