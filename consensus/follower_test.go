@@ -352,12 +352,7 @@ func (mc *MockConsensus) extendBlock(blockView uint64, parent *flow.Header) *flo
 	} else if nextBlock.LastViewTC != nil {
 		nextBlock.LastViewTC.View = blockView - 1
 		nextBlock.LastViewTC.SignerIndices = signerIndices
-		//nextBlock.LastViewTC.SignerIDs = mc.identities.NodeIDs()
-		//var highQCViews []uint64
-		//for range nextBlock.LastViewTC.SignerIDs {
-		//	highQCViews = append(highQCViews, nextBlock.LastViewTC.TOHighestQC.View)
-		//}
-		//nextBlock.LastViewTC.TOHighQCViews = highQCViews
+		nextBlock.LastViewTC.TOHighestQC.SignerIndices = signerIndices
 	}
 	return &nextBlock
 }
