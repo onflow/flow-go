@@ -122,13 +122,13 @@ func getRoles(channel network.Channel, msgTypeCode uint8) (flow.RoleList, flow.R
 	if msgTypeCode == cborcodec.CodeClusterBlockProposal ||
 		msgTypeCode == cborcodec.CodeClusterBlockVote ||
 		msgTypeCode == cborcodec.CodeClusterBlockResponse {
-		return channels.ClusterChannelRoles(channel), nil, nil
+		return channels.ClusterChannelRoles(channel), channels.ReceiveOnlyRolesByChannel(channel), nil
 	}
 
 	// check if msg is cluster sync request. The sync request message is used on
 	// sync-cluster prefixed channels as well as the SyncCommittee channel.
 	if msgTypeCode == cborcodec.CodeSyncRequest && channels.IsClusterChannel(channel) {
-		return channels.ClusterChannelRoles(channel), nil, nil
+		return channels.ClusterChannelRoles(channel), channels.ReceiveOnlyRolesByChannel(channel), nil
 	}
 
 	// get message type codes for all messages communicated on the channel
