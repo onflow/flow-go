@@ -156,3 +156,32 @@ func (f *txFollowerImpl) BlockID() flowsdk.Identifier {
 func (f *txFollowerImpl) Stop() {
 	f.cancel()
 }
+
+type nopTxFollower struct {
+	txFollowerImpl
+
+	closedCh chan struct{}
+}
+
+// NewNopTxFollower creates a new follower that tracks the current block height and ID but does not notify on transaction completion.
+func NewNopTxFollower(ctx context.Context, client *client.Client, opts ...followerOption) (TxFollower, error) {
+	f, err := NewTxFollower(ctx, client, opts...)
+	if err != nil {
+		return nil, err
+	}
+	impl, _ := f.(*txFollowerImpl)
+
+	closedCh := make(chan struct{})
+	close(closedCh)
+
+	nop := &nopTxFollower{
+		txFollowerImpl: *impl,
+		closedCh:       closedCh,
+	}
+	return nop, nil
+}
+
+// CompleteChanByID always returns a closed channel.
+func (nop *nopTxFollower) CompleteChanByID(ID flowsdk.Identifier) <-chan struct{} {
+	return nop.closedCh
+}

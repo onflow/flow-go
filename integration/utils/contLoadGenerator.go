@@ -51,6 +51,7 @@ type ContLoadGenerator struct {
 	stopped              bool
 	loadType             LoadType
 	follower             TxFollower
+	feedbackEnabled      bool
 }
 
 // NewContLoadGenerator returns a new ContLoadGenerator
@@ -66,9 +67,12 @@ func NewContLoadGenerator(
 	flowTokenAddress *flowsdk.Address,
 	trackTxs bool,
 	tps int,
+	accountMultiplier int,
 	loadType LoadType,
+	feedbackEnabled bool,
 ) (*ContLoadGenerator, error) {
-	numberOfAccounts := tps * 20 // 1 second per block, factor 20 for delays to prevent sequence number collisions
+	// Create "enough" accounts to prevent sequence number collisions.
+	numberOfAccounts := tps * accountMultiplier
 
 	servAcc, err := loadServiceAccount(flowClient, serviceAccountAddress, servAccPrivKeyHex)
 	if err != nil {
@@ -81,7 +85,12 @@ func NewContLoadGenerator(
 		return nil, err
 	}
 
-	follower, err := NewTxFollower(context.Background(), supervisorClient, WithLogger(log))
+	var follower TxFollower
+	if feedbackEnabled {
+		follower, err = NewTxFollower(context.TODO(), supervisorClient, WithLogger(log))
+	} else {
+		follower, err = NewNopTxFollower(context.TODO(), supervisorClient, WithLogger(log))
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -103,6 +112,7 @@ func NewContLoadGenerator(
 		workerStatsTracker:   NewWorkerStatsTracker(),
 		follower:             follower,
 		loadType:             loadType,
+		feedbackEnabled:      feedbackEnabled,
 	}
 
 	return lGen, nil

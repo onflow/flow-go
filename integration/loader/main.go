@@ -42,7 +42,8 @@ func main() {
 	pushgateway := flag.String("pushgateway", "127.0.0.1:9091", "host:port for pushgateway")
 	profilerEnabled := flag.Bool("profiler-enabled", false, "whether to enable the auto-profiler")
 	trackTxsFlag := flag.Bool("track-txs", false, "track individual transaction timings (adds significant overhead)")
-	_ = flag.Bool("feedback-enabled", true, "(deprecated) enabled by default")
+	accountMultiplierFlag := flag.Int("account-multiplier", 50, "number of accounts to create per load tps")
+	feedbackEnabled := flag.Bool("feedback-enabled", true, "wait for trannsaction execution before submitting new transaction")
 	flag.Parse()
 
 	chainID := flowsdk.ChainID([]byte(*chainIDStr))
@@ -155,7 +156,9 @@ func main() {
 					&flowTokenAddress,
 					*trackTxsFlag,
 					c.tps,
+					*accountMultiplierFlag,
 					utils.LoadType(*loadTypeFlag),
+					*feedbackEnabled,
 				)
 				if err != nil {
 					log.Fatal().Err(err).Msgf("unable to create new cont load generator")
