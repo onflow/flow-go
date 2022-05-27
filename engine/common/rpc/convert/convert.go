@@ -142,8 +142,6 @@ func BlockHeaderToMessage(h *flow.Header) (*entities.BlockHeader, error) {
 
 	t := timestamppb.New(h.Timestamp)
 
-	parentVoterIds := IdentifiersToMessages(h.ParentVoterIDs)
-
 	return &entities.BlockHeader{
 		Id:                 id[:],
 		ParentId:           h.ParentID[:],
@@ -151,7 +149,7 @@ func BlockHeaderToMessage(h *flow.Header) (*entities.BlockHeader, error) {
 		PayloadHash:        h.PayloadHash[:],
 		Timestamp:          t,
 		View:               h.View,
-		ParentVoterIds:     parentVoterIds,
+		ParentVoterIndices: h.ParentVoterIndices,
 		ParentVoterSigData: h.ParentVoterSigData,
 		ProposerId:         h.ProposerID[:],
 		ProposerSigData:    h.ProposerSigData,
@@ -160,7 +158,6 @@ func BlockHeaderToMessage(h *flow.Header) (*entities.BlockHeader, error) {
 }
 
 func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
-	parentVoterIds := MessagesToIdentifiers(m.ParentVoterIds)
 	chainId, err := MessageToChainId(m.ChainId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert ChainId: %w", err)
@@ -171,7 +168,7 @@ func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
 		PayloadHash:        MessageToIdentifier(m.PayloadHash),
 		Timestamp:          m.Timestamp.AsTime(),
 		View:               m.View,
-		ParentVoterIDs:     parentVoterIds,
+		ParentVoterIndices: m.ParentVoterIndices,
 		ParentVoterSigData: m.ParentVoterSigData,
 		ProposerID:         MessageToIdentifier(m.ProposerId),
 		ProposerSigData:    m.ProposerSigData,
@@ -369,7 +366,7 @@ func CollectionGuaranteeToMessage(g *flow.CollectionGuarantee) *entities.Collect
 		Signatures:       [][]byte{g.Signature},
 		ReferenceBlockId: IdentifierToMessage(g.ReferenceBlockID),
 		Signature:        g.Signature,
-		SignerIds:        IdentifiersToMessages(g.SignerIDs),
+		SignerIndices:    g.SignerIndices,
 	}
 }
 
@@ -377,7 +374,7 @@ func MessageToCollectionGuarantee(m *entities.CollectionGuarantee) *flow.Collect
 	return &flow.CollectionGuarantee{
 		CollectionID:     MessageToIdentifier(m.CollectionId),
 		ReferenceBlockID: MessageToIdentifier(m.ReferenceBlockId),
-		SignerIDs:        MessagesToIdentifiers(m.SignerIds),
+		SignerIndices:    m.SignerIndices,
 		Signature:        MessageToSignature(m.Signature),
 	}
 }

@@ -42,7 +42,6 @@ func (co *CompactorObserver) OnComplete() {
 }
 
 func Test_Compactor(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky")
 	numInsPerStep := 2
 	pathByteSize := 32
 	minPayloadByteSize := 2 << 15
@@ -195,15 +194,15 @@ func Test_Compactor(t *testing.T) {
 				}
 
 				read := &ledger.TrieRead{RootHash: rootHash, Paths: paths}
-				payloads, err := f.Read(read)
+				values, err := f.Read(read)
 				require.NoError(t, err)
 
-				payloads2, err := f2.Read(read)
+				values2, err := f2.Read(read)
 				require.NoError(t, err)
 
 				for i, path := range paths {
-					require.True(t, data[path].Equals(payloads[i]))
-					require.True(t, data[path].Equals(payloads2[i]))
+					require.Equal(t, data[path].Value, values[i])
+					require.Equal(t, data[path].Value, values2[i])
 				}
 			}
 

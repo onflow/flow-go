@@ -21,10 +21,10 @@ type Block struct {
 func BlockFromFlow(header *flow.Header, parentView uint64) *Block {
 
 	qc := flow.QuorumCertificate{
-		BlockID:   header.ParentID,
-		View:      parentView,
-		SignerIDs: header.ParentVoterIDs,
-		SigData:   header.ParentVoterSigData,
+		BlockID:       header.ParentID,
+		View:          parentView,
+		SignerIndices: header.ParentVoterIndices,
+		SigData:       header.ParentVoterSigData,
 	}
 
 	block := Block{
