@@ -525,7 +525,9 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
 		require.NoError(t, err)
 
-		assert.ErrorContains(t, tx.Err, "program too ambiguous")
+		var parsingCheckingError *runtime.ParsingCheckingError
+		assert.ErrorAs(t, tx.Err, &parsingCheckingError)
+		assert.ErrorContains(t, tx.Err, "program too ambiguous, local replay limit of 64 tokens exceeded")
 	})
 
 	t.Run("account update with set code fails if not signed by service account", func(t *testing.T) {
