@@ -41,3 +41,18 @@ func TestProtocolVersion_InsertRetrieve(t *testing.T) {
 		assert.Equal(t, version, actual)
 	})
 }
+
+func TestEpochCommitSafetyThreshold_InsertRetrieve(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		threshold := rand.Uint64()
+
+		err := db.Update(InsertEpochCommitSafetyThreshold(threshold))
+		require.NoError(t, err)
+
+		var actual uint64
+		err = db.View(RetrieveEpochCommitSafetyThreshold(&actual))
+		require.NoError(t, err)
+
+		assert.Equal(t, threshold, actual)
+	})
+}

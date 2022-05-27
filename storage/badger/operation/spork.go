@@ -30,3 +30,11 @@ func InsertProtocolVersion(version uint) func(*badger.Txn) error {
 func RetrieveProtocolVersion(version *uint) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeProtocolVersion), version)
 }
+
+func InsertEpochCommitSafetyThreshold(threshold uint64) func(*badger.Txn) error {
+	return insert(makePrefix(0), threshold)
+}
+
+func RetrieveEpochCommitSafetyThreshold(threshold *uint64) func(*badger.Txn) error {
+	return retrieve(makePrefix(0), threshold)
+}
