@@ -138,6 +138,9 @@ func Test_AsyncUploader(t *testing.T) {
 				// force an upload error to test that upload is never retried (because component is shut down)
 				// normally, we would see retry mechanism kick in and the callCount would be > 1
 				// but since component has started shutting down, we expect callCount to be 1
+				// In summary, callCount SHOULD be called only once - but we want the test to TRY and call it more than once to prove that it
+				// was only called it once. If we changed it to 'callCount < 1' that wouldn't prove that the test tried to call it more than once
+				// and wouldn't prove that stopping the component stopped the retry mechanism.
 				if callCount < 5 {
 					t.Logf("DummyUploader func() incrementing callCount=%d grID: %s", callCount, string(bytes.Fields(debug.Stack())[1]))
 					callCount++
