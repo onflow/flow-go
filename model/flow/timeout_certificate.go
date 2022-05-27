@@ -12,8 +12,10 @@ type TimeoutCertificate struct {
 	NewestQCViews []uint64
 	// NewestQC is the newest QC from all TimeoutObject that were aggregated for this certificate.
 	NewestQC *QuorumCertificate
-	// SignerIDs holds the IDs of all HotStuff participants whose TimeoutObject was included in this certificate
-	SignerIDs []Identifier
+	// SignerIndices encodes the HotStuff participants whose TimeoutObjects are included in this TC.
+	// For `n` authorized consensus nodes, `SignerIndices` is an n-bit vector (padded with tailing
+	// zeros to reach full bytes). We list the nodes in their canonical order, as defined by the protocol.
+	SignerIndices []byte
 	// SigData is an aggregated signature from multiple TimeoutObjects, each from a different replica.
 	// In their TimeoutObjects, replicas sign the pair (View, HighestQCView) with their staking keys.
 	SigData crypto.Signature
@@ -28,13 +30,13 @@ func (t *TimeoutCertificate) Body() interface{} {
 		View          uint64
 		NewestQCViews []uint64
 		NewestQC      QuorumCertificate
-		SignerIDs     []Identifier
+		SignerIndices []byte
 		SigData       crypto.Signature
 	}{
 		View:          t.View,
 		NewestQCViews: t.NewestQCViews,
 		NewestQC:      *t.NewestQC,
-		SignerIDs:     t.SignerIDs,
+		SignerIndices: t.SignerIndices,
 		SigData:       t.SigData,
 	}
 }
