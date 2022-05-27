@@ -352,7 +352,7 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 				helper.WithTCHighestQC(ps.block.QC),
 			)),
 		)
-		err := ps.validator.ValidateProposal(proposal)
+		err = ps.validator.ValidateProposal(proposal)
 		require.True(ps.T(), model.IsInvalidBlockError(err) && model.IsInvalidTCError(err))
 		ps.verifier.AssertNotCalled(ps.T(), "VerifyTC")
 	})
