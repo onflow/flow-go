@@ -525,7 +525,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
 		require.NoError(t, err)
 
-		assert.NoError(t, tx.Err)
+		assert.ErrorContains(t, tx.Err, "program too ambiguous")
 	})
 
 	t.Run("account update with set code fails if not signed by service account", func(t *testing.T) {
