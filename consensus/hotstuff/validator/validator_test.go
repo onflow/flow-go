@@ -336,6 +336,9 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 		ps.verifier.AssertNotCalled(ps.T(), "VerifyTC")
 	})
 	ps.Run("included-tc-threshold-not-reached", func() {
+		// TC is signed by only one signer - insufficient to reach weight threshold
+		insufficientSignerIndices, err := signature.EncodeSignersToIndices(ps.participants.NodeIDs(), ps.participants.NodeIDs()[:1])
+		require.NoError(ps.T(), err)
 		proposal := helper.MakeProposal(
 			helper.WithBlock(helper.MakeBlock(
 				helper.WithBlockView(ps.block.View+2),
@@ -344,7 +347,7 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 				helper.WithBlockQC(ps.block.QC)),
 			),
 			helper.WithLastViewTC(helper.MakeTC(
-				helper.WithTCSigners(ps.indices[:1]), // one signer is not enough to reach threshold
+				helper.WithTCSigners(insufficientSignerIndices), // one signer is not enough to reach threshold
 				helper.WithTCView(ps.block.View+1),
 				helper.WithTCHighestQC(ps.block.QC),
 			)),
