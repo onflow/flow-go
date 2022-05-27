@@ -307,7 +307,7 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 			helper.WithLastViewTC(helper.MakeTC(
 				helper.WithTCSigners(ps.indices),
 				helper.WithTCView(ps.block.View+1),
-				// proposal is not safe to extend because included QC.View is higher that Block.View
+				// proposal is not safe to extend because included QC.View is higher that Block.QC.View
 				helper.WithTCHighestQC(helper.MakeQC(helper.WithQCView(ps.block.View+1))))),
 		)
 		err := ps.validator.ValidateProposal(proposal)
@@ -354,6 +354,7 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 		ps.verifier.AssertNotCalled(ps.T(), "VerifyTC")
 	})
 	ps.Run("included-tc-highest-qc-invalid", func() {
+		// QC included in TC has view below QC included in proposal
 		qc := helper.MakeQC(
 			helper.WithQCView(ps.block.QC.View-1),
 			helper.WithQCSigners(ps.indices))
@@ -616,7 +617,7 @@ func (qs *QCSuite) TestQCSignatureInvalid() {
 	*qs.verifier = mocks.Verifier{}
 	qs.verifier.On("VerifyQC", qs.signers, qs.qc.SigData, qs.qc.View, qs.qc.BlockID).Return(fmt.Errorf("invalid qc: %w", model.ErrInvalidSignature))
 
-	// the QC should no longer be validation
+	// the QC should no longer pass validation
 	err := qs.validator.ValidateQC(qs.qc)
 	assert.True(qs.T(), model.IsInvalidQCError(err), "if the signature is invalid an ErrorInvalidQC error should be raised")
 }
@@ -629,7 +630,7 @@ func (qs *QCSuite) TestQCSignatureInvalidFormat() {
 	*qs.verifier = mocks.Verifier{}
 	qs.verifier.On("VerifyQC", qs.signers, qs.qc.SigData, qs.qc.View, qs.qc.BlockID).Return(model.NewInvalidFormatErrorf("invalid sigType"))
 
-	// the QC should no longer be validation
+	// the QC should no longer pass validation
 	err := qs.validator.ValidateQC(qs.qc)
 	assert.True(qs.T(), model.IsInvalidQCError(err), "if the signature has an invalid format, an ErrorInvalidQC error should be raised")
 }
@@ -729,17 +730,6 @@ func (s *TCSuite) TestTCOk() {
 	assert.NoError(s.T(), err, "a valid TC should be accepted")
 }
 
-// TestTCEmptySigners tests if correct error is returned when signers are empty
-func (s *TCSuite) TestTCEmptySigners() {
-	s.verifier.On("VerifyTC", mock.Anything, []byte(s.tc.SigData), s.tc.View, s.tc.TOHighQCViews).Return(
-		fmt.Errorf("%w", model.NewInsufficientSignaturesErrorf("")))
-
-	// the Validator should _not_ interpret this as an invalid TC, but as an internal error
-	err := s.validator.ValidateTC(s.tc)
-	assert.True(s.T(), model.IsInsufficientSignaturesError(err)) // unexpected error should be wrapped and propagated upwards
-	assert.False(s.T(), model.IsInvalidTCError(err), err, "should _not_ interpret this as a invalid TC, but as an internal error")
-}
-
 // TestTCHighestQCFromFuture tests if correct error is returned when included QC is higher than TC's view
 func (s *TCSuite) TestTCHighestQCFromFuture() {
 	// highest QC from future view
@@ -787,6 +777,16 @@ func (s *TCSuite) TestTCInvalidHighestQC() {
 
 // TestTCInvalidSignature tests a few scenarios when the signature is invalid or TC signers is malformed
 func (s *TCSuite) TestTCInvalidSignature() {
+	s.Run("insufficient-signatures", func() {
+		*s.verifier = mocks.Verifier{}
+		s.verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+		s.verifier.On("VerifyTC", mock.Anything, []byte(s.tc.SigData), s.tc.View, s.tc.TOHighQCViews).Return(model.NewInsufficientSignaturesErrorf("")).Once()
+
+		// the Validator should _not_ interpret this as an invalid TC, but as an internal error
+		err := s.validator.ValidateTC(s.tc)
+		assert.True(s.T(), model.IsInsufficientSignaturesError(err)) // unexpected error should be wrapped and propagated upwards
+		assert.False(s.T(), model.IsInvalidTCError(err), err, "should _not_ interpret this as a invalid TC, but as an internal error")
+	})
 	s.Run("invalid-format", func() {
 		*s.verifier = mocks.Verifier{}
 		s.verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()

@@ -33,7 +33,6 @@ func NewStakingVerifier() *StakingVerifier {
 // Usually this method is only used to verify the proposer's vote, which is
 // the vote included in a block proposal.
 // The implementation returns the following sentinel errors:
-// * model.InvalidFormatError if the signature has an incompatible format.
 // * model.ErrInvalidSignature is the signature is invalid
 // * unexpected errors should be treated as symptoms of bugs or uncovered
 //   edge cases in the logic (i.e. as fatal)
@@ -56,16 +55,15 @@ func (v *StakingVerifier) VerifyVote(signer *flow.Identity, sigData []byte, view
 
 // VerifyQC checks the cryptographic validity of the QC's `sigData` for the
 // given block. It is the responsibility of the calling code to ensure
-// that all `voters` are authorized, without duplicates. Return values:
+// that all `signers` are authorized, without duplicates. Return values:
 //  - nil if `sigData` is cryptographically valid
-//  - model.InvalidFormatError if `sigData` has an incompatible format
 //  - model.ErrInvalidSignature if a signature is invalid
 //  - unexpected errors should be treated as symptoms of bugs or uncovered
 //	  edge cases in the logic (i.e. as fatal)
 // In the single verification case, `sigData` represents a single signature (`crypto.Signature`).
 func (v *StakingVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, view uint64, blockID flow.Identifier) error {
 	if len(signers) == 0 {
-		return model.NewInvalidFormatErrorf("empty list of signers")
+		return model.NewInsufficientSignaturesErrorf("empty list of signers")
 	}
 	msg := MakeVoteMessage(view, blockID)
 
@@ -97,38 +95,40 @@ func (v *StakingVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, vi
 	return nil
 }
 
-// VerifyTC checks cryptographic validity of the TC's `sigData` for the given view.
-// It is the responsibility of the calling code to ensure
-// that all `voters` are authorized, without duplicates. Return values:
-//  - nil if `sigData` is cryptographically valid
-//  - model.ErrInvalidFormat if `sigData` has an incompatible format
-//  - model.ErrInvalidSignature if a signature is invalid
-//  - unexpected errors should be treated as symptoms of bugs or uncovered
+// VerifyTC checks cryptographic validity of the TC's `sigData` w.r.t. the
+// given view. It is the responsibility of the calling code to ensure
+// that all `signers` are authorized, without duplicates. Return values:
+//  * nil if `sigData` is cryptographically valid
+//  * model.InsufficientSignaturesError if `signers is empty.
+//  * model.InvalidFormatError if `signers`/`highQCViews` have differing lengths
+//  * model.ErrInvalidSignature if a signature is invalid
+//  * unexpected errors should be treated as symptoms of bugs or uncovered
 //	  edge cases in the logic (i.e. as fatal)
-func (v *StakingVerifier) VerifyTC(voters flow.IdentityList, sigData []byte, view uint64, highQCViews []uint64) error {
-	return verifyTC(voters, sigData, view, highQCViews, v.stakingHasher)
+func (v *StakingVerifier) VerifyTC(signers flow.IdentityList, sigData []byte, view uint64, highQCViews []uint64) error {
+	return verifyTC(signers, sigData, view, highQCViews, v.stakingHasher)
 }
 
-// verifyTC checks cryptographic validity of the TC's `sigData` for the given view.
-// It is the responsibility of the calling code to ensure
-// that all `voters` are authorized, without duplicates. Return values:
-//  - nil if `sigData` is cryptographically valid
-//  - model.ErrInvalidFormat if `sigData` has an incompatible format
-//  - model.ErrInvalidSignature if a signature is invalid
-//  - unexpected errors should be treated as symptoms of bugs or uncovered
+// verifyTC checks cryptographic validity of the TC's `sigData` w.r.t. the
+// given view. It is the responsibility of the calling code to ensure
+// that all `signers` are authorized, without duplicates. Return values:
+//  * nil if `sigData` is cryptographically valid
+//  * model.InsufficientSignaturesError if `signers is empty.
+//  * model.InvalidFormatError if `signers`/`highQCViews` have differing lengths
+//  * model.ErrInvalidSignature if a signature is invalid
+//  * unexpected errors should be treated as symptoms of bugs or uncovered
 //	  edge cases in the logic (i.e. as fatal)
-func verifyTC(voters flow.IdentityList, sigData []byte, view uint64, highQCViews []uint64, hasher hash.Hasher) error {
-	if len(voters) == 0 {
-		return model.NewInvalidFormatErrorf("empty list of signers")
+func verifyTC(signers flow.IdentityList, sigData []byte, view uint64, highQCViews []uint64, hasher hash.Hasher) error {
+	if len(signers) == 0 {
+		return model.NewInsufficientSignaturesErrorf("empty list of signers")
 	}
-	if len(voters) != len(highQCViews) {
+	if len(signers) != len(highQCViews) {
 		return model.NewInvalidFormatErrorf("signers and highQCViews mismatch")
 	}
 
-	pks := make([]crypto.PublicKey, 0, len(voters))
-	messages := make([][]byte, 0, len(voters))
-	hashers := make([]hash.Hasher, 0, len(voters))
-	for i, identity := range voters {
+	pks := make([]crypto.PublicKey, 0, len(signers))
+	messages := make([][]byte, 0, len(signers))
+	hashers := make([]hash.Hasher, 0, len(signers))
+	for i, identity := range signers {
 		pks = append(pks, identity.StakingPubKey)
 		messages = append(messages, MakeTimeoutMessage(view, highQCViews[i]))
 		hashers = append(hashers, hasher)
