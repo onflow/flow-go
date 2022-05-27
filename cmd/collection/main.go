@@ -91,6 +91,8 @@ func main() {
 		flowClientConfigs  []*common.FlowClientConfig
 		insecureAccessAPI  bool
 		accessNodeIDS      []string
+		apiRatelimits      map[string]int
+		apiBurstlimits     map[string]int
 	)
 
 	nodeBuilder := cmd.FlowNode(flow.RoleCollection.String())
@@ -149,6 +151,8 @@ func main() {
 		// epoch qc contract flags
 		flags.BoolVar(&insecureAccessAPI, "insecure-access-api", false, "required if insecure GRPC connection should be used")
 		flags.StringSliceVar(&accessNodeIDS, "access-node-ids", []string{}, fmt.Sprintf("array of access node IDs sorted in priority order where the first ID in this array will get the first connection attempt and each subsequent ID after serves as a fallback. Minimum length %d. Use '*' for all IDs in protocol state.", common.DefaultAccessNodeIDSMinimum))
+		flags.StringToIntVar(&apiRatelimits, "api-rate-limits", rpc.DefaultAPIRatelimits, "per second rate limits for GRPC API methods e.g. Ping=300,SendTransaction=500 etc.")
+		flags.StringToIntVar(&apiBurstlimits, "api-burst-limits", rpc.DefaultAPIBurstlimits, "burst limits for gRPC API methods e.g. Ping=100,SendTransaction=100 etc.")
 
 	}).ValidateFlags(func() error {
 		if startupTimeString != cmd.NotSet {
@@ -362,7 +366,14 @@ func main() {
 			return ing, err
 		}).
 		Component("transaction ingress rpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			server := rpc.New(rpcConf, ing, node.Logger, node.RootChainID)
+			server := rpc.New(
+				rpcConf,
+				ing,
+				node.Logger,
+				node.RootChainID,
+				apiRatelimits,
+				apiBurstlimits,
+			)
 			return server, nil
 		}).
 		Component("collection provider engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {

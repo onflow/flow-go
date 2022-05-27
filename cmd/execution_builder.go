@@ -99,6 +99,8 @@ type ExecutionConfig struct {
 	gcpBucketName               string
 	s3BucketName                string
 	edsDatastoreTTL             time.Duration
+	apiRatelimits               map[string]int
+	apiBurstlimits              map[string]int
 }
 
 type ExecutionNodeBuilder struct {
@@ -156,6 +158,8 @@ func (e *ExecutionNodeBuilder) LoadFlags() {
 			flags.StringVar(&e.exeConf.s3BucketName, "s3-bucket-name", "", "S3 Bucket name for block data uploader")
 			flags.DurationVar(&e.exeConf.edsDatastoreTTL, "execution-data-service-datastore-ttl", 0,
 				"TTL for new blobs added to the execution data service blobstore")
+			flags.StringToIntVar(&e.exeConf.apiRatelimits, "api-rate-limits", rpc.DefaultAPIRatelimits, "per second rate limits for GRPC API methods e.g. Ping=300,ExecuteScriptAtBlockID=500 etc.")
+			flags.StringToIntVar(&e.exeConf.apiBurstlimits, "api-burst-limits", rpc.DefaultAPIBurstlimits, "burst limits for gRPC API methods e.g. Ping=100,ExecuteScriptAtBlockID=100 etc.")
 		}).
 		ValidateFlags(func() error {
 			if e.exeConf.enableBlockDataUpload {
@@ -765,7 +769,20 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			return syncEngine, nil
 		}).
 		Component("grpc server", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-			rpcEng := rpc.New(node.Logger, e.exeConf.rpcConf, ingestionEng, node.Storage.Blocks, node.Storage.Headers, node.State, events, results, txResults, node.RootChainID)
+			rpcEng := rpc.New(
+				node.Logger,
+				e.exeConf.rpcConf,
+				ingestionEng,
+				node.Storage.Blocks,
+				node.Storage.Headers,
+				node.State,
+				events,
+				results,
+				txResults,
+				node.RootChainID,
+				e.exeConf.apiRatelimits,
+				e.exeConf.apiBurstlimits,
+			)
 			return rpcEng, nil
 		})
 }

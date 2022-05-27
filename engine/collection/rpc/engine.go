@@ -8,6 +8,7 @@ import (
 	"net"
 
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
@@ -19,6 +20,16 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
+
+var (
+	DefaultAPIRatelimits  map[string]int
+	DefaultAPIBurstlimits map[string]int
+)
+
+func init() {
+	DefaultAPIRatelimits = make(map[string]int)
+	DefaultAPIBurstlimits = make(map[string]int)
+}
 
 // Backend defines the core functionality required by the RPC API.
 type Backend interface {
@@ -45,7 +56,14 @@ type Engine struct {
 }
 
 // New returns a new ingress server.
-func New(config Config, backend Backend, log zerolog.Logger, chainID flow.ChainID) *Engine {
+func New(
+	config Config,
+	backend Backend,
+	log zerolog.Logger,
+	chainID flow.ChainID,
+	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the gRPC API e.g. Ping->100, ExecuteScriptAtBlockID->300
+	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the gRPC API e.g. Ping->50, ExecuteScriptAtBlockID->10
+) *Engine {
 	if config.MaxMsgSize == 0 {
 		config.MaxMsgSize = grpcutils.DefaultMaxMsgSize
 	}
@@ -56,10 +74,22 @@ func New(config Config, backend Backend, log zerolog.Logger, chainID flow.ChainI
 		grpc.MaxSendMsgSize(config.MaxMsgSize),
 	}
 
+	var interceptors []grpc.UnaryServerInterceptor // ordered list of interceptors
 	// if rpc metrics is enabled, add the grpc metrics interceptor as a server option
 	if config.RpcMetricsEnabled {
-		grpcOpts = append(grpcOpts, grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor))
+		interceptors = append(interceptors, grpc_prometheus.UnaryServerInterceptor)
 	}
+
+	if len(apiRatelimits) > 0 {
+		// create a rate limit interceptor
+		rateLimitInterceptor := rpc.NewRateLimiterInterceptor(log, apiRatelimits, apiBurstLimits).UnaryServerInterceptor
+		// append the rate limit interceptor to the list of interceptors
+		interceptors = append(interceptors, rateLimitInterceptor)
+	}
+
+	// create a chained unary interceptor
+	chainedInterceptors := grpc.ChainUnaryInterceptor(interceptors...)
+	grpcOpts = append(grpcOpts, chainedInterceptors)
 
 	server := grpc.NewServer(grpcOpts...)
 

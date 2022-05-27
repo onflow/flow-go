@@ -109,7 +109,7 @@ func New(log zerolog.Logger,
 
 	if len(apiRatelimits) > 0 {
 		// create a rate limit interceptor
-		rateLimitInterceptor := NewRateLimiterInterceptor(log, apiRatelimits, apiBurstLimits).unaryServerInterceptor
+		rateLimitInterceptor := NewRateLimiterInterceptor(log, apiRatelimits, apiBurstLimits).UnaryServerInterceptor
 		// append the rate limit interceptor to the list of interceptors
 		interceptors = append(interceptors, rateLimitInterceptor)
 	}

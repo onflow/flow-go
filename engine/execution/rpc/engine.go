@@ -10,6 +10,7 @@ import (
 	"unicode/utf8"
 
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -25,6 +26,16 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
+
+var (
+	DefaultAPIRatelimits  map[string]int
+	DefaultAPIBurstlimits map[string]int
+)
+
+func init() {
+	DefaultAPIRatelimits = make(map[string]int)
+	DefaultAPIBurstlimits = make(map[string]int)
+}
 
 // Config defines the configurable options for the gRPC server.
 type Config struct {
@@ -53,7 +64,10 @@ func New(
 	events storage.Events,
 	exeResults storage.ExecutionResults,
 	txResults storage.TransactionResults,
-	chainID flow.ChainID) *Engine {
+	chainID flow.ChainID,
+	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the gRPC API e.g. Ping->100, ExecuteScriptAtBlockID->300
+	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the gRPC API e.g. Ping->50, ExecuteScriptAtBlockID->10
+) *Engine {
 	log = log.With().Str("engine", "rpc").Logger()
 
 	if config.MaxMsgSize == 0 {
@@ -65,10 +79,22 @@ func New(
 		grpc.MaxSendMsgSize(config.MaxMsgSize),
 	}
 
+	var interceptors []grpc.UnaryServerInterceptor // ordered list of interceptors
 	// if rpc metrics is enabled, add the grpc metrics interceptor as a server option
 	if config.RpcMetricsEnabled {
-		serverOptions = append(serverOptions, grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor))
+		interceptors = append(interceptors, grpc_prometheus.UnaryServerInterceptor)
 	}
+
+	if len(apiRatelimits) > 0 {
+		// create a rate limit interceptor
+		rateLimitInterceptor := rpc.NewRateLimiterInterceptor(log, apiRatelimits, apiBurstLimits).UnaryServerInterceptor
+		// append the rate limit interceptor to the list of interceptors
+		interceptors = append(interceptors, rateLimitInterceptor)
+	}
+
+	// create a chained unary interceptor
+	chainedInterceptors := grpc.ChainUnaryInterceptor(interceptors...)
+	serverOptions = append(serverOptions, chainedInterceptors)
 
 	server := grpc.NewServer(serverOptions...)
 
