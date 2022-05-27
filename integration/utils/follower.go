@@ -110,6 +110,7 @@ Loop:
 		default:
 		}
 
+		blockResolutionStart := time.Now()
 		block, err := f.client.GetBlockByHeight(f.ctx, f.height+1)
 		if err != nil {
 			continue
@@ -137,7 +138,8 @@ Loop:
 
 		f.logger.Debug().
 			Hex("blockID", block.ID.Bytes()).
-			Dur("duration", time.Since(lastBlockTime)).
+			Dur("timeSinceLastBlock", time.Since(lastBlockTime)).
+			Dur("duration", time.Since(blockResolutionStart)).
 			Uint64("height", block.Height).
 			Int("numCollections", len(block.CollectionGuarantees[:])).
 			Int("numSeals", len(block.Seals)).
