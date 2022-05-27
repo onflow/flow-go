@@ -12,9 +12,13 @@ import (
 )
 
 // TestTxFollower creates new follower with a fixed block height and stops it.
-// TODO(rbtz): test against a mock client
 func TestTxFollower(t *testing.T) {
-	f, err := NewTxFollower(context.Background(),
+	// TODO(rbtz): test against a mock client, but for now we just expire
+	// the context so that the followere wont be able to progress.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	f, err := NewTxFollower(ctx,
 		&client.Client{},
 		WithBlockHeight(2),
 		WithInteval(1*time.Hour),
@@ -26,7 +30,12 @@ func TestTxFollower(t *testing.T) {
 // TestNopTxFollower creates a new follower with a fixed block height and
 // verifies that it does not block.
 func TestNopTxFollower(t *testing.T) {
-	f, err := NewNopTxFollower(context.Background(),
+	// TODO(rbtz): test against a mock client, but for now we just expire
+	// the context so that the followere wont be able to progress.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	f, err := NewNopTxFollower(ctx,
 		&client.Client{},
 		WithBlockHeight(1),
 		WithInteval(1*time.Hour),
