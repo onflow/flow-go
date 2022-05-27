@@ -26,6 +26,8 @@ const (
 	LedgerHeavyLoadType   LoadType = "ledger-heavy"
 )
 
+const slowTransactionThreshold = 30 * time.Second
+
 var accountCreationBatchSize = 250 // a higher number would hit max storage interaction limit
 const tokensPerTransfer = 0.01     // flow testnets only have 10e6 total supply, so we choose a small amount here
 
@@ -475,12 +477,21 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 		Hex("txID", transferTx.ID().Bytes()).
 		Msgf("transaction sent")
 
-	<-ch
-
-	log.Trace().
-		Hex("txID", transferTx.ID().Bytes()).
-		TimeDiff("duration", time.Now(), startTime).
-		Msgf("trarnsaction confirmed")
+	for {
+		select {
+		case <-ch:
+			log.Debug().
+				Hex("txID", transferTx.ID().Bytes()).
+				Dur("duration", time.Since(startTime)).
+				Msgf("trarnsaction confirmed")
+			return
+		case <-time.After(slowTransactionThreshold):
+			log.Warn().
+				Hex("txID", transferTx.ID().Bytes()).
+				Dur("duration", time.Since(startTime)).
+				Msgf("is taking too long")
+		}
+	}
 }
 
 // TODO update this to include loadtype
