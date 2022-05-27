@@ -55,6 +55,12 @@ type txFollowerImpl struct {
 	txToChan sync.Map
 }
 
+type txInfo struct {
+	submisionTime time.Time
+
+	C chan struct{}
+}
+
 // NewTxFollower creates a new follower that tracks the current block height
 // and can notify on transaction completion.
 func NewTxFollower(ctx context.Context, client *client.Client, opts ...followerOption) (TxFollower, error) {
@@ -93,7 +99,7 @@ func (f *txFollowerImpl) follow() {
 	defer t.Stop()
 
 Loop:
-	for ; ; <-t.C {
+	for lastBlockTime := time.Now(); ; <-t.C {
 		select {
 		case <-f.ctx.Done():
 			return
@@ -105,13 +111,6 @@ Loop:
 			continue
 		}
 
-		f.logger.Debug().
-			Hex("blockID", block.ID.Bytes()).
-			Uint64("height", block.Height).
-			Int("numCollections", len(block.CollectionGuarantees[:])).
-			Int("numSeals", len(block.Seals)).
-			Msg("new block found")
-
 		for _, guaranteed := range block.CollectionGuarantees[:] {
 			col, err := f.client.GetCollection(f.ctx, guaranteed.CollectionID)
 			if err != nil {
@@ -119,24 +118,37 @@ Loop:
 			}
 			for _, tx := range col.TransactionIDs {
 				if ch, loaded := f.txToChan.LoadAndDelete(tx.Hex()); loaded {
+					txi := ch.(txInfo)
+
 					f.logger.Trace().
+						Dur("duration", time.Since(txi.submisionTime)).
 						Hex("txID", tx.Bytes()).
-						Msg("returned tx")
-					close(ch.(chan struct{}))
+						Msg("returned tx to the pool")
+					close(txi.C)
 				}
 			}
 		}
+
+		f.logger.Debug().
+			Hex("blockID", block.ID.Bytes()).
+			Dur("duration", time.Since(lastBlockTime)).
+			Uint64("height", block.Height).
+			Int("numCollections", len(block.CollectionGuarantees[:])).
+			Int("numSeals", len(block.Seals)).
+			Msg("new block parsed")
 
 		f.mu.Lock()
 		f.height = block.Height
 		f.blockID = block.ID
 		f.mu.Unlock()
+
+		lastBlockTime = time.Now()
 	}
 }
 
 func (f *txFollowerImpl) CompleteChanByID(ID flowsdk.Identifier) <-chan struct{} {
-	ch, _ := f.txToChan.LoadOrStore(ID.Hex(), make(chan struct{}))
-	return ch.(chan struct{})
+	txi, _ := f.txToChan.LoadOrStore(ID.Hex(), txInfo{submisionTime: time.Now(), C: make(chan struct{})})
+	return txi.(txInfo).C
 }
 
 func (f *txFollowerImpl) Height() uint64 {
