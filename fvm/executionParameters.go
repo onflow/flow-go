@@ -46,7 +46,7 @@ func getExecutionEffortWeights(
 	// In case the network is stuck because of a transaction using an FVM feature that has 0 weight
 	// (or is not metered at all), the defaults can be changed and the network restarted
 	// instead of trying to change the weights with a transaction.
-	computationWeights = make(weighted.ExecutionEffortWeights)
+	computationWeights = make(weighted.ExecutionEffortWeights, len(weighted.DefaultComputationWeights))
 	for k, v := range weighted.DefaultComputationWeights {
 		computationWeights[k] = v
 	}
@@ -92,7 +92,7 @@ func getExecutionMemoryWeights(
 	// In case the network is stuck because of a transaction using an FVM feature that has 0 weight
 	// (or is not metered at all), the defaults can be changed and the network restarted
 	// instead of trying to change the weights with a transaction.
-	memoryWeights = make(weighted.ExecutionMemoryWeights)
+	memoryWeights = make(weighted.ExecutionMemoryWeights, len(weighted.DefaultMemoryWeights))
 	for k, v := range weighted.DefaultMemoryWeights {
 		memoryWeights[k] = v
 	}

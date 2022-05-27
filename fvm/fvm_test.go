@@ -241,7 +241,7 @@ func TestPrograms(t *testing.T) {
 	)
 
 	t.Run("script execution programs are not committed",
-		newVMTest().withBootstrapProcedureOptions(fvm.WithExecutionMemoryLimit(math.MaxUint64)).run(
+		newVMTest().withBootstrapProcedureOptions().run(
 			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 
 				scriptCtx := fvm.NewContextFromParent(ctx)
@@ -1278,7 +1278,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 	t.Run("storage ID allocation", func(t *testing.T) {
 
-		ledger := testutil.RootBootstrappedLedger(vm, ctx, fvm.WithExecutionMemoryLimit(math.MaxUint64))
+		ledger := testutil.RootBootstrappedLedger(vm, ctx)
 
 		// Create an account private key.
 		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -3727,6 +3727,9 @@ func TestSettingExecutionWeights(t *testing.T) {
 			accounts, err := testutil.CreateAccounts(vm, view, programs, privateKeys, chain)
 			require.NoError(t, err)
 
+			// This transaction is specially designed to use a lot of breaks
+			// as the weight for breaks is much higher than usual.
+			// putting a `while true {break}` in a loop does not use the same amount of memory.
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(`
 				transaction {
@@ -3761,6 +3764,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			tx := fvm.Transaction(txBody, 0)
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
+			// There are 100 breaks and each break uses 1_000_000 memory
 			require.Greater(t, tx.MemoryUsed, uint64(100_000_000))
 
 			var memoryLimitExceededError *errors.MemoryLimitExceededError
