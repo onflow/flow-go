@@ -3,12 +3,11 @@ package validator
 import (
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/module/signature"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module/signature"
 )
 
 // Validator is responsible for validating QC, Block and Vote
@@ -39,11 +38,6 @@ func New(
 func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 	highestQC := tc.TOHighestQC
 
-	// consistency checks
-	if len(tc.TOHighQCViews) != len(tc.SignerIDs) {
-		return newInvalidTCError(tc, fmt.Errorf("invalid TC structure expected %x messages, got %x", len(tc.SignerIDs), len(tc.TOHighQCViews)))
-	}
-
 	// there is no reason for a timeout certificate to include a QC for the same view
 	// (if you have a QC for the view, we can always use the QC directly)
 	// however, since QCs and TCs are processed/created asynchronously, we allow this case
@@ -68,9 +62,13 @@ func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 		return fmt.Errorf("could not get consensus participants at view %d: %w", tc.View, err)
 	}
 
-	signers := allParticipants.Filter(filter.HasNodeID(tc.SignerIDs...)) // resulting IdentityList contains no duplicates
-	if len(signers) != len(tc.SignerIDs) {
-		return newInvalidTCError(tc, model.NewInvalidSignerErrorf("some tc signers are duplicated or invalid consensus participants at view %d", tc.View))
+	signers, err := signature.DecodeSignerIndicesToIdentities(allParticipants, tc.SignerIndices)
+	if err != nil {
+		if signature.IsDecodeSignerIndicesError(err) {
+			return newInvalidTCError(tc, fmt.Errorf("invalid signer indices: %w", err))
+		}
+		// unexpected error
+		return fmt.Errorf("unexpected internal error decoding signer indices: %w", err)
 	}
 
 	// determine whether signers reach minimally required weight threshold for consensus

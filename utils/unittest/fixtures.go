@@ -28,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/mempool/entity"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/dsl"
 )
@@ -320,17 +321,17 @@ func StateInteractionsFixture() *delta.Snapshot {
 	return &delta.NewView(nil).Interactions().Snapshot
 }
 
-func BlockWithParentAndProposerFixture(parent *flow.Header, proposer flow.Identifier, participantCount int) flow.Block {
+func BlockWithParentAndProposerFixture(t *testing.T, parent *flow.Header, proposer flow.Identifier) flow.Block {
 	block := BlockWithParentFixture(parent)
 
+	indices, err := signature.EncodeSignersToIndices(
+		[]flow.Identifier{proposer}, []flow.Identifier{proposer})
+	require.NoError(t, err)
+
 	block.Header.ProposerID = proposer
-	indices := bitutils.MakeBitVector(10)
-	bitutils.SetBit(indices, 1)
 	block.Header.ParentVoterIndices = indices
 	if block.Header.LastViewTC != nil {
-		// TODO(active-pacemaker): update this when signer indices for TC are available
-		block.Header.LastViewTC.SignerIDs = []flow.Identifier{proposer}
-		block.Header.LastViewTC.TOHighQCViews = block.Header.LastViewTC.TOHighQCViews[:1]
+		block.Header.LastViewTC.SignerIndices = indices
 		block.Header.LastViewTC.TOHighestQC.SignerIndices = indices
 	}
 
@@ -438,19 +439,14 @@ func BlockHeaderWithParentFixture(parent *flow.Header) flow.Header {
 	view := parent.View + 1 + uint64(rand.Intn(10)) // Intn returns [0, n)
 	var lastViewTC *flow.TimeoutCertificate
 	if view != parent.View+1 {
-		signers := IdentifierListFixture(4)
 		highestQC := QuorumCertificateFixture(func(qc *flow.QuorumCertificate) {
 			qc.View = parent.View
 		})
-		var highQCViews []uint64
-		for range signers {
-			highQCViews = append(highQCViews, highestQC.View)
-		}
 		lastViewTC = &flow.TimeoutCertificate{
 			View:          view - 1,
-			TOHighQCViews: highQCViews,
+			TOHighQCViews: []uint64{highestQC.View},
 			TOHighestQC:   highestQC,
-			SignerIDs:     signers,
+			SignerIndices: SignerIndicesFixture(4),
 			SigData:       SignatureFixture(),
 		}
 	}

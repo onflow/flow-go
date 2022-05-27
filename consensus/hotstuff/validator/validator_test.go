@@ -254,7 +254,7 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 				helper.WithBlockQC(ps.block.QC)),
 			),
 			helper.WithLastViewTC(helper.MakeTC(
-				helper.WithTCSigners(ps.participants.NodeIDs()),
+				helper.WithTCSigners(ps.indices),
 				helper.WithTCView(ps.block.View+1),
 				helper.WithTCHighestQC(ps.block.QC))),
 		)
@@ -287,7 +287,7 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 				helper.WithBlockQC(ps.block.QC)),
 			),
 			helper.WithLastViewTC(helper.MakeTC(
-				helper.WithTCSigners(ps.participants.NodeIDs()),
+				helper.WithTCSigners(ps.indices),
 				helper.WithTCView(ps.block.View+10), // LastViewTC.View must be equal to Block.View-1
 				helper.WithTCHighestQC(ps.block.QC))),
 		)
@@ -305,7 +305,7 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 				helper.WithBlockQC(ps.block.QC)),
 			),
 			helper.WithLastViewTC(helper.MakeTC(
-				helper.WithTCSigners(ps.participants.NodeIDs()),
+				helper.WithTCSigners(ps.indices),
 				helper.WithTCView(ps.block.View+1),
 				// proposal is not safe to extend because included QC.View is higher that Block.View
 				helper.WithTCHighestQC(helper.MakeQC(helper.WithQCView(ps.block.View+1))))),
@@ -313,25 +313,6 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 		err := ps.validator.ValidateProposal(proposal)
 		require.True(ps.T(), model.IsInvalidBlockError(err))
 		ps.verifier.AssertNotCalled(ps.T(), "VerifyQC")
-		ps.verifier.AssertNotCalled(ps.T(), "VerifyTC")
-	})
-	ps.Run("included-tc-invalid-structure", func() {
-		proposal := helper.MakeProposal(
-			helper.WithBlock(helper.MakeBlock(
-				helper.WithBlockView(ps.block.View+2),
-				helper.WithBlockProposer(ps.leader.NodeID),
-				helper.WithParentSigners(ps.indices),
-				helper.WithBlockQC(ps.block.QC)),
-			),
-			helper.WithLastViewTC(helper.MakeTC(
-				helper.WithTCSigners(ps.participants.NodeIDs()),
-				helper.WithTCView(ps.block.View+1),
-				helper.WithTCHighestQC(ps.block.QC))),
-		)
-		// after this operation TC is invalid
-		proposal.LastViewTC.TOHighQCViews = proposal.LastViewTC.TOHighQCViews[1:]
-		err := ps.validator.ValidateProposal(proposal)
-		require.True(ps.T(), model.IsInvalidBlockError(err) && model.IsInvalidTCError(err))
 		ps.verifier.AssertNotCalled(ps.T(), "VerifyTC")
 	})
 	ps.Run("included-tc-highest-qc-not-highest", func() {
@@ -343,7 +324,7 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 				helper.WithBlockQC(ps.block.QC)),
 			),
 			helper.WithLastViewTC(helper.MakeTC(
-				helper.WithTCSigners(ps.participants.NodeIDs()),
+				helper.WithTCSigners(ps.indices),
 				helper.WithTCView(ps.block.View+1),
 				helper.WithTCHighestQC(ps.block.QC),
 			)),
@@ -363,7 +344,7 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 				helper.WithBlockQC(ps.block.QC)),
 			),
 			helper.WithLastViewTC(helper.MakeTC(
-				helper.WithTCSigners(ps.participants.NodeIDs()[:1]), // one signer is not enough to reach threshold
+				helper.WithTCSigners(ps.indices[:1]), // one signer is not enough to reach threshold
 				helper.WithTCView(ps.block.View+1),
 				helper.WithTCHighestQC(ps.block.QC),
 			)),
@@ -385,7 +366,7 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 				helper.WithBlockQC(ps.block.QC)),
 			),
 			helper.WithLastViewTC(helper.MakeTC(
-				helper.WithTCSigners(ps.participants.NodeIDs()),
+				helper.WithTCSigners(ps.indices),
 				helper.WithTCView(ps.block.View+1),
 				helper.WithTCHighestQC(qc))),
 		)
@@ -404,7 +385,7 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 				helper.WithBlockQC(ps.block.QC)),
 			),
 			helper.WithLastViewTC(helper.MakeTC(
-				helper.WithTCSigners(ps.participants.NodeIDs()),
+				helper.WithTCSigners(ps.indices),
 				helper.WithTCView(ps.block.View+1),
 				helper.WithTCHighestQC(ps.block.QC))),
 		)
@@ -653,6 +634,22 @@ func (qs *QCSuite) TestQCSignatureInvalidFormat() {
 	assert.True(qs.T(), model.IsInvalidQCError(err), "if the signature has an invalid format, an ErrorInvalidQC error should be raised")
 }
 
+// TestQCEmptySigners verifies that the Validator correctly handles the model.InsufficientSignaturesError:
+// In the validator, we previously checked the total weight of all signers meets the supermajority threshold,
+// which is a _positive_ number. Hence, there must be at least one signer. Hence, `Verifier.VerifyQC`
+// returning this error would be a symptom of a fatal internal bug. The Validator should _not_ interpret
+// this error as an invalid QC / invalid block, i.e. it should _not_ return an `InvalidBlockError`.
+func (qs *QCSuite) TestQCEmptySigners() {
+	*qs.verifier = mocks.Verifier{}
+	qs.verifier.On("VerifyQC", mock.Anything, qs.qc.SigData, qs.block.View, qs.block.BlockID).Return(
+		fmt.Errorf("%w", model.NewInsufficientSignaturesErrorf("")))
+
+	// the Validator should _not_ interpret this as a invalid QC, but as an internal error
+	err := qs.validator.ValidateQC(qs.qc)
+	assert.True(qs.T(), model.IsInsufficientSignaturesError(err)) // unexpected error should be wrapped and propagated upwards
+	assert.False(qs.T(), model.IsInvalidBlockError(err), err, "should _not_ interpret this as a invalid QC, but as an internal error")
+}
+
 func TestValidateTC(t *testing.T) {
 	suite.Run(t, new(TCSuite))
 }
@@ -703,7 +700,7 @@ func (s *TCSuite) SetupTest() {
 		helper.WithParentSigners(s.indices))
 	s.tc = helper.MakeTC(helper.WithTCHighestQC(s.block.QC),
 		helper.WithTCView(view+1),
-		helper.WithTCSigners(s.signers.NodeIDs()),
+		helper.WithTCSigners(s.indices),
 		helper.WithTCHighQCViews(highQCViews))
 
 	// return the correct participants and identities from view state
@@ -734,16 +731,13 @@ func (s *TCSuite) TestTCOk() {
 
 // TestTCEmptySigners tests if correct error is returned when signers are empty
 func (s *TCSuite) TestTCEmptySigners() {
-	s.tc.SignerIDs = []flow.Identifier{}
-	err := s.validator.ValidateTC(s.tc) // the QC should not be validated anymore
-	assert.True(s.T(), model.IsInvalidTCError(err), "tc must have at least one signer, an ErrorInvalidTC error should be raised")
-}
+	s.verifier.On("VerifyTC", mock.Anything, []byte(s.tc.SigData), s.tc.View, s.tc.TOHighQCViews).Return(
+		fmt.Errorf("%w", model.NewInsufficientSignaturesErrorf("")))
 
-// TestTCHighQCViews tests if correct error is returned when high qc views are invalid
-func (s *TCSuite) TestTCHighQCViews() {
-	s.tc.TOHighQCViews = s.tc.TOHighQCViews[1:]
-	err := s.validator.ValidateTC(s.tc) // the QC should not be validated anymore
-	assert.True(s.T(), model.IsInvalidTCError(err), "if highQCViews len is not equal to signers len, an ErrorInvalidTC error should be raised")
+	// the Validator should _not_ interpret this as an invalid TC, but as an internal error
+	err := s.validator.ValidateTC(s.tc)
+	assert.True(s.T(), model.IsInsufficientSignaturesError(err)) // unexpected error should be wrapped and propagated upwards
+	assert.False(s.T(), model.IsInvalidTCError(err), err, "should _not_ interpret this as a invalid TC, but as an internal error")
 }
 
 // TestTCHighestQCFromFuture tests if correct error is returned when included QC is higher than TC's view
@@ -771,13 +765,15 @@ func (s *TCSuite) TestTCInvalidSigners() {
 
 // TestTCThresholdNotReached tests if correct error is returned when TC's singers don't have enough weight
 func (s *TCSuite) TestTCThresholdNotReached() {
-	s.tc.SignerIDs = s.tc.SignerIDs[:1]
-	s.tc.TOHighQCViews = s.tc.TOHighQCViews[:1]
-	// make sure that there is the highest view
-	s.tc.TOHighQCViews[0] = s.tc.TOHighestQC.View
+	// signers only have weight 1 out of 10 total (NOT have a supermajority)
+	s.signers = s.participants[:1]
+	indices, err := signature.EncodeSignersToIndices(s.participants.NodeIDs(), s.signers.NodeIDs())
+	require.NoError(s.T(), err)
+
+	s.tc.SignerIndices = indices
 
 	// adjust signers to be less than total weight
-	err := s.validator.ValidateTC(s.tc) // the QC should not be validated anymore
+	err = s.validator.ValidateTC(s.tc) // the QC should not be validated anymore
 	assert.True(s.T(), model.IsInvalidTCError(err), "if signers don't have enough weight, an ErrorInvalidTC error should be raised")
 }
 
@@ -814,20 +810,4 @@ func (s *TCSuite) TestTCInvalidSignature() {
 		assert.ErrorAs(s.T(), err, &exception, "if included TC's signature is invalid, an exception should be propagated")
 		assert.False(s.T(), model.IsInvalidTCError(err))
 	})
-}
-
-// TestQCEmptySigners verifies that the Validator correctly handles the model.InsufficientSignaturesError:
-// In the validator, we previously checked the total weight of all signers meets the supermajority threshold,
-// which is a _positive_ number. Hence, there must be at least one signer. Hence, `Verifier.VerifyQC`
-// returning this error would be a symptom of a fatal internal bug. The Validator should _not_ interpret
-// this error as an invalid QC / invalid block, i.e. it should _not_ return an `InvalidBlockError`.
-func (qs *QCSuite) TestQCEmptySigners() {
-	*qs.verifier = mocks.Verifier{}
-	qs.verifier.On("VerifyQC", mock.Anything, qs.qc.SigData, qs.block.View, qs.block.BlockID).Return(
-		fmt.Errorf("%w", model.NewInsufficientSignaturesErrorf("")))
-
-	// the Validator should _not_ interpret this as a invalid QC, but as an internal error
-	err := qs.validator.ValidateQC(qs.qc)
-	assert.True(qs.T(), model.IsInsufficientSignaturesError(err)) // unexpected error should be wrapped and propagated upwards
-	assert.False(qs.T(), model.IsInvalidBlockError(err), err, "should _not_ interpret this as a invalid QC, but as an internal error")
 }

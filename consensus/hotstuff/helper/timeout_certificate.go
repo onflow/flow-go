@@ -31,7 +31,7 @@ func MakeTC(options ...func(*flow.TimeoutCertificate)) *flow.TimeoutCertificate 
 func WithTCHighestQC(qc *flow.QuorumCertificate) func(*flow.TimeoutCertificate) {
 	return func(tc *flow.TimeoutCertificate) {
 		tc.TOHighestQC = qc
-		tc.TOHighQCViews = append(tc.TOHighQCViews, qc.View)
+		tc.TOHighQCViews = []uint64{qc.View}
 	}
 }
 
