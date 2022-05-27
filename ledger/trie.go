@@ -247,6 +247,26 @@ func (p *Payload) Equals(other *Payload) bool {
 	return false
 }
 
+// ValueEquals compares this payload value to another payload value.
+// A nil payload is equivalent to an empty payload.
+// NOTE: prefer using this function over payload.Value.Equals()
+// when comparing payload values.  payload.ValueEquals() handles
+// nil payload, while payload.Value.Equals() panics on nil payload.
+func (p *Payload) ValueEquals(other *Payload) bool {
+	pEmpty := p.IsEmpty()
+	otherEmpty := other.IsEmpty()
+	if pEmpty != otherEmpty {
+		// Only one payload is empty
+		return false
+	}
+	if pEmpty {
+		// Both payloads are empty
+		return true
+	}
+	// Compare values since both payloads are not empty.
+	return p.Value.Equals(other.Value)
+}
+
 // DeepCopy returns a deep copy of the payload
 func (p *Payload) DeepCopy() *Payload {
 	if p == nil {

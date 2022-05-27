@@ -100,7 +100,15 @@ func getRoles(channel network.Channel, msgTypeCode uint8) (flow.RoleList, error)
 	}
 
 	// cluster channels have a dynamic channel name
-	if msgTypeCode == codec.CodeClusterBlockProposal || msgTypeCode == codec.CodeClusterBlockVote || msgTypeCode == codec.CodeClusterBlockResponse {
+	if msgTypeCode == cborcodec.CodeClusterBlockProposal ||
+		msgTypeCode == cborcodec.CodeClusterBlockVote ||
+		msgTypeCode == cborcodec.CodeClusterBlockResponse {
+		return channels.ClusterChannelRoles(channel), nil
+	}
+
+	// check if msg is cluster sync request. The sync request message is used on
+	// sync-cluster prefixed channels as well as the SyncCommittee channel.
+	if msgTypeCode == cborcodec.CodeSyncRequest && channels.IsClusterChannel(channel) {
 		return channels.ClusterChannelRoles(channel), nil
 	}
 
