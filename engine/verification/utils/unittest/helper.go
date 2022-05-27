@@ -464,9 +464,6 @@ func withConsumers(t *testing.T,
 	s, verID, participants := bootstrapSystem(t, tracer, authorized)
 	exeID := participants.Filter(filter.HasRole(flow.RoleExecution))[0]
 	conID := participants.Filter(filter.HasRole(flow.RoleConsensus))[0]
-	ops = append(ops, WithExecutorIDs(
-		participants.Filter(filter.HasRole(flow.RoleExecution)).NodeIDs()))
-
 	// generates a chain of blocks in the form of root <- R1 <- C1 <- R2 <- C2 <- ... where Rs are distinct reference
 	// blocks (i.e., containing guarantees), and Cs are container blocks for their preceding reference block,
 	// Container blocks only contain receipts of their preceding reference blocks. But they do not
@@ -474,6 +471,12 @@ func withConsumers(t *testing.T,
 	root, err := s.State.Final().Head()
 	require.NoError(t, err)
 	chainID := root.ChainID
+	ops = append(ops, WithExecutorIDs(
+		participants.Filter(filter.HasRole(flow.RoleExecution)).NodeIDs()), func(builder *CompleteExecutionReceiptBuilder) {
+		// needed for the guarantees to have the correct chainID and signer indices
+		builder.clusterCommittee = participants.Filter(filter.HasRole(flow.RoleCollection))
+	})
+
 	completeERs := CompleteExecutionReceiptChainFixture(t, root, blockCount, ops...)
 	blocks := ExtendStateWithFinalizedBlocks(t, completeERs, s.State)
 
