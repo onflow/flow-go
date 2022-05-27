@@ -46,6 +46,7 @@ var (
 	flagNumViewsInEpoch             uint64
 	flagNumViewsInStakingAuction    uint64
 	flagNumViewsInDKGPhase          uint64
+	flagEpochCommitSafetyThreshold  uint64
 
 	// this flag is used to seed the DKG, clustering and cluster QC generation
 	flagBootstrapRandomSeed []byte
@@ -98,6 +99,7 @@ func addFinalizeCmdFlags() {
 	finalizeCmd.Flags().Uint64Var(&flagNumViewsInEpoch, "epoch-length", 4000, "length of each epoch measured in views")
 	finalizeCmd.Flags().Uint64Var(&flagNumViewsInStakingAuction, "epoch-staking-phase-length", 100, "length of the epoch staking phase measured in views")
 	finalizeCmd.Flags().Uint64Var(&flagNumViewsInDKGPhase, "epoch-dkg-phase-length", 1000, "length of each DKG phase measured in views")
+	finalizeCmd.Flags().Uint64Var(&flagEpochCommitSafetyThreshold, "epoch-commit-safety-threshold", 500, "defines epoch commitment deadline")
 	finalizeCmd.Flags().BytesHexVar(&flagBootstrapRandomSeed, "random-seed", GenerateRandomSeed(flow.EpochSetupRandomSourceLength), "The seed used to for DKG, Clustering and Cluster QC generation")
 	finalizeCmd.Flags().UintVar(&flagProtocolVersion, "protocol-version", flow.DefaultProtocolVersion, "major software version used for the duration of this spork")
 
@@ -108,6 +110,7 @@ func addFinalizeCmdFlags() {
 	cmd.MarkFlagRequired(finalizeCmd, "epoch-length")
 	cmd.MarkFlagRequired(finalizeCmd, "epoch-staking-phase-length")
 	cmd.MarkFlagRequired(finalizeCmd, "epoch-dkg-phase-length")
+	cmd.MarkFlagRequired(finalizeCmd, "epoch-commit-safety-threshold")
 	cmd.MarkFlagRequired(finalizeCmd, "protocol-version")
 
 	// optional parameters to influence various aspects of identity generation
@@ -132,6 +135,9 @@ func finalize(cmd *cobra.Command, args []string) {
 			log.Fatal().Msg("cannot use both --partner-stakes and --partner-weights flags (use only --partner-weights)")
 		}
 	}
+
+	// validate epoch configs (halts on error)
+	validateEpochCommitmentDeadline()
 
 	if len(flagBootstrapRandomSeed) != flow.EpochSetupRandomSourceLength {
 		log.Error().Int("expected", flow.EpochSetupRandomSourceLength).Int("actual", len(flagBootstrapRandomSeed)).Msg("random seed provided length is not valid")
@@ -215,7 +221,7 @@ func finalize(cmd *cobra.Command, args []string) {
 
 	// construct serializable root protocol snapshot
 	log.Info().Msg("constructing root protocol snapshot")
-	snapshot, err := inmem.SnapshotFromBootstrapStateWithProtocolVersion(block, result, seal, rootQC, flagProtocolVersion)
+	snapshot, err := inmem.SnapshotFromBootstrapStateWithParams(block, result, seal, rootQC, flagProtocolVersion)
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to generate root protocol snapshot")
 	}
@@ -633,4 +639,13 @@ func generateEmptyExecutionState(
 	flagRootCommit = hex.EncodeToString(commit[:])
 	log.Info().Msg("")
 	return
+}
+
+// validateEpochCommitmentDeadline validates configuration of the epoch commitment deadline.
+func validateEpochCommitmentDeadline() {
+	dkgFinalView := flagNumViewsInStakingAuction + flagNumViewsInDKGPhase*3 // 3 DKG phases
+	epochCommitDeadline := flagNumViewsInEpoch - flagEpochCommitSafetyThreshold
+	// TODO sanity check the configs are in some reasonable range (higher on Mainnet eg.)
+	_ = dkgFinalView
+	_ = epochCommitDeadline
 }
