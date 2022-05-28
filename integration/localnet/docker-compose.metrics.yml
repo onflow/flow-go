@@ -1,12 +1,34 @@
 version: '3.7'
 services:
-  jaeger:
-    image: jaegertracing/all-in-one:latest
+  tempo:
+    image: grafana/tempo:latest
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    volumes:
+      - ./conf/tempo-local.yaml:/etc/tempo.yaml:z
+      - ./data/tempo:/tmp/tempo:z
     ports:
-      - "6831:6831/udp"
-      - "16686:16686"
+      - "14268"
+    logging:
+      driver: loki
+      options:
+        loki-url: 'http://localhost:3100/loki/api/v1/push'
 
-  prom:
+  loki:
+    image: grafana/loki:latest
+    command: [ "-config.file=/etc/loki/local-config.yaml" ]
+    ports:
+      - "3100:3100"
+    environment:
+      - JAEGER_AGENT_HOST=tempo
+      - JAEGER_ENDPOINT=http://tempo:14268/api/traces
+      - JAEGER_SAMPLER_TYPE=const
+      - JAEGER_SAMPLER_PARAM=1
+    logging:
+      driver: loki
+      options:
+        loki-url: 'http://localhost:3100/loki/api/v1/push'
+
+  prometheus:
     image: prom/prometheus:latest
     volumes:
       - ./conf/prometheus.yaml:/etc/prometheus/prometheus.yaml:z
@@ -14,14 +36,27 @@ services:
     command: "--config.file=/etc/prometheus/prometheus.yaml --storage.tsdb.path=/prometheus"
     ports:
       - 9090:9090
-    depends_on:
-      - exporter
-    environment:
-      - LOGSPOUT=ignore
+    logging:
+      driver: loki
+      options:
+        loki-url: 'http://localhost:3100/loki/api/v1/push'
 
   exporter:
     image: prom/node-exporter:latest
     ports:
       - "9100:9100"
+
+  grafana:
+    image: grafana/grafana:latest
+    volumes:
+      - ./conf/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:z
     environment:
-      - LOGSPOUT=ignore
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+    ports:
+      - "3000:3000"
+    logging:
+      driver: loki
+      options:
+        loki-url: 'http://localhost:3100/loki/api/v1/push'

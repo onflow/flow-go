@@ -269,6 +269,7 @@ type Service struct {
 	Environment []string `yaml:"environment,omitempty"`
 	Volumes     []string
 	Ports       []string `yaml:"ports,omitempty"`
+	Logging     Logging  `yaml:"logging"`
 }
 
 // Build ...
@@ -277,6 +278,16 @@ type Build struct {
 	Dockerfile string
 	Args       map[string]string
 	Target     string
+}
+
+type Logging struct {
+	Driver  string  `yaml:"driver"`
+	Options Options `yaml:"options"`
+}
+
+type Options struct {
+	LokiURL            string `yaml:"loki-url"`
+	LokiExternalLabels string `yaml:"loki-external-labels"`
 }
 
 func prepareFlowServices(services Services, containers []testnet.ContainerConfig) Services {
@@ -352,8 +363,8 @@ func prepareService(container testnet.ContainerConfig, i int, n int) Service {
 			fmt.Sprintf("%s:/data:z", dataDir),
 		},
 		Environment: []string{
-			"JAEGER_AGENT_HOST=jaeger",
-			"JAEGER_AGENT_PORT=6831",
+			"JAEGER_AGENT_HOST=tempo",
+			"JAEGER_ENDPOINT=http://tempo:14268/api/traces",
 			// NOTE: these env vars are not set by default, but can be set [1] to enable binstat logging:
 			// [1] https://docs.docker.com/compose/environment-variables/#pass-environment-variables-to-containers
 			"BINSTAT_ENABLE",
@@ -389,6 +400,14 @@ func prepareService(container testnet.ContainerConfig, i int, n int) Service {
 		service.DependsOn = []string{
 			fmt.Sprintf("%s_1", container.Role),
 		}
+	}
+
+	service.Logging = Logging{
+		Driver: "loki",
+		Options: Options{
+			LokiURL:            "http://localhost:3100/loki/api/v1/push",
+			LokiExternalLabels: fmt.Sprintf(`role=%s`, container.Role),
+		},
 	}
 
 	return service
@@ -713,8 +732,8 @@ func prepareObserverService(i int, observerName string, agPublicKey string, prof
 			fmt.Sprintf("%s:/data:z", dataDir),
 		},
 		Environment: []string{
-			"JAEGER_AGENT_HOST=jaeger",
-			"JAEGER_AGENT_PORT=6831",
+			"JAEGER_AGENT_HOST=tempo",
+			"JAEGER_ENDPOINT=http://tempo:14268/api/traces",
 			"BINSTAT_ENABLE",
 			"BINSTAT_LEN_WHAT",
 			"BINSTAT_DMP_NAME",
