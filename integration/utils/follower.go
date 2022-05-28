@@ -107,28 +107,32 @@ func (f *txFollowerImpl) follow() {
 	defer t.Stop()
 	defer close(f.stopped)
 
+	var totalTxs, totalUnknownTxs uint64
 Loop:
 	for lastBlockTime := time.Now(); ; <-t.C {
+		blockResolutionStart := time.Now()
+
 		select {
 		case <-f.ctx.Done():
 			return
 		default:
 		}
 
-		blockResolutionStart := time.Now()
+		GetBlockByHeightTime := time.Now()
 		block, err := f.client.GetBlockByHeight(f.ctx, f.height+1)
 		if err != nil {
 			continue
 		}
+		getBlockByHeightDuration := time.Since(GetBlockByHeightTime)
 
-		var totalTxs uint64
-		for _, guaranteed := range block.CollectionGuarantees[:] {
+		var blockTxs, blockUnknownTxs uint64
+		for _, guaranteed := range block.CollectionGuarantees {
 			col, err := f.client.GetCollection(f.ctx, guaranteed.CollectionID)
 			if err != nil {
 				continue Loop
 			}
 			for _, tx := range col.TransactionIDs {
-				totalTxs++
+				blockTxs++
 				if ch, loaded := f.txToChan.LoadAndDelete(tx.Hex()); loaded {
 					txi := ch.(txInfo)
 
@@ -138,18 +142,27 @@ Loop:
 						Msg("returned tx to the pool")
 					close(txi.C)
 					f.inprogress.Dec()
+				} else {
+					blockUnknownTxs++
 				}
 			}
 		}
+
+		totalTxs += blockTxs
+		totalUnknownTxs += blockUnknownTxs
 
 		f.logger.Debug().
 			Hex("blockID", block.ID.Bytes()).
 			Dur("timeSinceLastBlock", time.Since(lastBlockTime)).
 			Dur("duration", time.Since(blockResolutionStart)).
+			Dur("getBlockByHeightDuration", getBlockByHeightDuration).
 			Uint64("height", block.Height).
-			Int("numCollections", len(block.CollectionGuarantees[:])).
+			Int("numCollections", len(block.CollectionGuarantees)).
 			Int("numSeals", len(block.Seals)).
-			Uint64("numTxs", totalTxs).
+			Uint64("totalTxs", totalTxs).
+			Uint64("totalUnknowTxs", totalUnknownTxs).
+			Uint64("blockTxs", blockTxs).
+			Uint64("blockUnknowTxs", blockUnknownTxs).
 			Int64("txsInProgress", f.inprogress.Load()).
 			Msg("new block parsed")
 
