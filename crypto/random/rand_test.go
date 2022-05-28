@@ -149,7 +149,7 @@ func TestSubPermutation(t *testing.T) {
 		subsetSize := 20
 
 		// statictics parameters
-		sampleSize := 80000
+		sampleSize := 85000
 		tolerance := 0.05
 		// tests the subset sampling randomness
 		samplingDistribution := make([]float64, listSize)
