@@ -158,20 +158,26 @@ func (s *Suite) SetupSuite() {
 
 	s.Orchestrator = NewDummyOrchestrator(logger)
 
+	s.T().Logf("integration/tests/bft/passthrough/suite.go - created NewDummyOrchestrator")
 	// start attack network
-	const serverAddress = "localhost:0" // we let OS picking an available port for attack network
+	const serverAddress = "127.0.0.1" // we let OS picking an available port for attack network
 	codec := cbor.NewCodec()
+	s.T().Logf("integration/tests/bft/passthrough/suite.go - created NewCode")
 	connector := attacknetwork.NewCorruptedConnector(s.net.CorruptedIdentities(), s.net.CorruptedPortMapping)
+	s.T().Logf("integration/tests/bft/passthrough/suite.go - created NewCorruptedConnector")
 	attackNetwork, err := attacknetwork.NewAttackNetwork(s.log,
 		serverAddress,
 		codec,
 		s.Orchestrator,
 		connector,
 		s.net.CorruptedIdentities())
+	s.T().Logf("integration/tests/bft/passthrough/suite.go - created NewAttackNetwork")
 	require.NoError(s.T(), err)
+	s.T().Logf("integration/tests/bft/passthrough/suite.go - assigning attackNetwork")
 	s.attackNet = attackNetwork
-
+	s.T().Logf("integration/tests/bft/passthrough/suite.go - about to irrecoverable.WithSignaler")
 	attackCtx, errChan := irrecoverable.WithSignaler(ctx)
+	s.T().Logf("integration/tests/bft/passthrough/suite.go - about to go func()")
 	go func() {
 		select {
 		case err := <-errChan:
@@ -180,11 +186,13 @@ func (s *Suite) SetupSuite() {
 			return
 		}
 	}()
-
+	s.T().Logf("integration/tests/bft/passthrough/suite.go - about to attackNetwork.Start()")
 	attackNetwork.Start(attackCtx)
+	s.T().Logf("integration/tests/bft/passthrough/suite.go - about to unittest.RequireCloseBefore()")
 	unittest.RequireCloseBefore(s.T(), attackNetwork.Ready(), 1*time.Second, "could not start attack network on time")
 
 	// starts tracking blocks by the ghost node
+	s.T().Logf("integration/tests/bft/passthrough/suite.go - about to starts tracking blocks by the ghost node")
 	s.Track(s.T(), ctx, s.Ghost())
 }
 
