@@ -152,17 +152,17 @@ Loop:
 		totalUnknownTxs += blockUnknownTxs
 
 		f.logger.Debug().
+			Uint64("blockHeight", block.Height).
 			Hex("blockID", block.ID.Bytes()).
 			Dur("timeSinceLastBlock", time.Since(lastBlockTime)).
-			Dur("duration", time.Since(blockResolutionStart)).
-			Dur("getBlockByHeightDuration", getBlockByHeightDuration).
-			Uint64("height", block.Height).
+			Dur("timeToParseBlock", time.Since(blockResolutionStart)).
+			Dur("timeToGetBlockByHeight", getBlockByHeightDuration).
 			Int("numCollections", len(block.CollectionGuarantees)).
 			Int("numSeals", len(block.Seals)).
-			Uint64("totalTxs", totalTxs).
-			Uint64("totalUnknowTxs", totalUnknownTxs).
-			Uint64("blockTxs", blockTxs).
-			Uint64("blockUnknowTxs", blockUnknownTxs).
+			Uint64("txsTotal", totalTxs).
+			Uint64("txsTotalUnknown", totalUnknownTxs).
+			Uint64("txsInBlock", blockTxs).
+			Uint64("txsInBlockUnknown", blockUnknownTxs).
 			Int64("txsInProgress", f.inprogress.Load()).
 			Msg("new block parsed")
 
