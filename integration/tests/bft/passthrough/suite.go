@@ -146,6 +146,7 @@ func (s *Suite) SetupSuite() {
 
 	for key, val := range s.net.Containers {
 		s.T().Logf("Key: %s, Value: %s\n", key, val.Name())
+		val.AddFlag("network", "host")
 	}
 	//s.net.Containers["foo"].AddFlag("foo", "bar")
 	s.T().Logf("integration/tests/bft/passthrough/suite.go - finished iterating over container list")
