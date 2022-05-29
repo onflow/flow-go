@@ -78,7 +78,7 @@ func (s *Suite) SetupSuite() {
 			testnet.WithLogLevel(zerolog.ErrorLevel),
 			testnet.WithAdditionalFlag("--required-verification-seal-approvals=1"),
 			testnet.WithAdditionalFlag("--required-construction-seal-approvals=1"),
-			testnet.WithAdditionalFlag("--network=\"host\""),
+			//testnet.WithAdditionalFlag("--network=\"host\""),
 		)
 		s.nodeConfigs = append(s.nodeConfigs, nodeConfig)
 	}
@@ -88,8 +88,8 @@ func (s *Suite) SetupSuite() {
 	verConfig := testnet.NewNodeConfig(flow.RoleVerification,
 		testnet.WithID(s.verID),
 		testnet.WithLogLevel(zerolog.InfoLevel),
-		testnet.AsCorrupted(),
-		testnet.WithAdditionalFlag("--network=\"host\""))
+		testnet.AsCorrupted())
+	//testnet.WithAdditionalFlag("--network=\"host\""))
 	s.nodeConfigs = append(s.nodeConfigs, verConfig)
 
 	// generates two corrupted execution nodes
@@ -97,26 +97,26 @@ func (s *Suite) SetupSuite() {
 	exe1Config := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.exe1ID),
 		testnet.WithLogLevel(zerolog.InfoLevel),
-		testnet.AsCorrupted(),
-		testnet.WithAdditionalFlag("--network=\"host\""))
+		testnet.AsCorrupted())
+	//testnet.WithAdditionalFlag("--network=\"host\""))
 	s.nodeConfigs = append(s.nodeConfigs, exe1Config)
 
 	s.exe2ID = unittest.IdentifierFixture()
 	exe2Config := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.exe2ID),
 		testnet.WithLogLevel(zerolog.InfoLevel),
-		testnet.AsCorrupted(),
-		testnet.WithAdditionalFlag("--network=\"host\""))
+		testnet.AsCorrupted())
+	//testnet.WithAdditionalFlag("--network=\"host\""))
 	s.nodeConfigs = append(s.nodeConfigs, exe2Config)
 
 	// generates two collection node
 	coll1Config := testnet.NewNodeConfig(flow.RoleCollection,
 		testnet.WithLogLevel(zerolog.FatalLevel),
-		testnet.WithAdditionalFlag("--network=\"host\""),
+		//testnet.WithAdditionalFlag("--network=\"host\""),
 	)
 	coll2Config := testnet.NewNodeConfig(flow.RoleCollection,
 		testnet.WithLogLevel(zerolog.FatalLevel),
-		testnet.WithAdditionalFlag("--network=\"host\""),
+		//testnet.WithAdditionalFlag("--network=\"host\""),
 	)
 	s.nodeConfigs = append(s.nodeConfigs, coll1Config, coll2Config)
 
@@ -128,8 +128,8 @@ func (s *Suite) SetupSuite() {
 	ghostConfig := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.ghostID),
 		testnet.AsGhost(),
-		testnet.WithLogLevel(zerolog.FatalLevel),
-		testnet.WithAdditionalFlag("--network=\"host\""))
+		testnet.WithLogLevel(zerolog.FatalLevel))
+	//testnet.WithAdditionalFlag("--network=\"host\""))
 	s.nodeConfigs = append(s.nodeConfigs, ghostConfig)
 
 	// generates, initializes, and starts the Flow network
@@ -142,8 +142,13 @@ func (s *Suite) SetupSuite() {
 	)
 	s.T().Logf("integration/tests/bft/passthrough/suite.go - before testnet.PrepareFlowNetwork")
 	s.net = testnet.PrepareFlowNetwork(s.T(), netConfig, flow.BftTestnet)
-	s.T().Logf("integration/tests/bft/passthrough/suite.go - after testnet.PrepareFlowNetwork")
+	s.T().Logf("integration/tests/bft/passthrough/suite.go - after testnet.PrepareFlowNetwork - iterating over container list")
 
+	for key, val := range s.net.Containers {
+		fmt.Printf("Key: %s, Value: %s\n", key, val.Name())
+	}
+	//s.net.Containers["foo"].AddFlag("foo", "bar")
+	s.T().Logf("integration/tests/bft/passthrough/suite.go - finished iterating over container list")
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
 	s.T().Logf("integration/tests/bft/passthrough/suite.go - before s.net.Start(ctx)")
