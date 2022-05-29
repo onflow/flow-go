@@ -11,7 +11,6 @@ type Worker struct {
 	workerID int
 	interval time.Duration
 	work     workFunc
-	ticker   *time.Ticker
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -30,11 +29,10 @@ func NewWorker(workerID int, interval time.Duration, work workFunc) Worker {
 }
 
 func (w *Worker) Start() {
-	w.ticker = time.NewTicker(w.interval)
-	defer w.ticker.Stop()
-
 	go func() {
-		for ; ; <-w.ticker.C {
+		t := time.NewTicker(w.interval)
+		defer t.Stop()
+		for ; ; <-t.C {
 			select {
 			case <-w.ctx.Done():
 				return

@@ -5,14 +5,40 @@ import (
 	"time"
 
 	"github.com/onflow/flow-go/utils/unittest"
+	"go.uber.org/atomic"
 )
 
-// TestWorker creates a new worker and test that it runs once and stops.
-func TestWorker(t *testing.T) {
-	done := make(chan struct{})
-	w := NewWorker(0, time.Hour, func(workerID int) { close(done) })
-	w.Start()
+// TestWorkerImmediate tests that first job is executed immeediately.
+func TestWorkerImmediate(t *testing.T) {
+	t.Parallel()
+	t.Run("immediate", func(t *testing.T) {
+		done := make(chan struct{})
+		w := NewWorker(0, time.Hour, func(workerID int) { close(done) })
+		w.Start()
 
-	unittest.AssertClosesBefore(t, done, 5*time.Second)
-	w.Stop()
+		unittest.AssertClosesBefore(t, done, 5*time.Second)
+		w.Stop()
+	})
+}
+
+// TestWorker tests that jobs are executed more than once.
+func TestWorker(t *testing.T) {
+	t.Parallel()
+	t.Run("mulpiple runs", func(t *testing.T) {
+		i := atomic.NewInt64(0)
+		done := make(chan struct{})
+		w := NewWorker(
+			0,
+			time.Millisecond,
+			func(workerID int) {
+				if i.Inc() == 2 {
+					close(done)
+				}
+			},
+		)
+		w.Start()
+
+		unittest.AssertClosesBefore(t, done, 5*time.Second)
+		w.Stop()
+	})
 }
