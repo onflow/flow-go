@@ -160,7 +160,7 @@ func (s *Suite) SetupSuite() {
 
 	s.T().Logf("integration/tests/bft/passthrough/suite.go - created NewDummyOrchestrator")
 	// start attack network
-	const serverAddress = "127.0.0.1" // we let OS picking an available port for attack network
+	const serverAddress = "127.0.0.1:0" // we let OS picking an available port for attack network
 	codec := cbor.NewCodec()
 	s.T().Logf("integration/tests/bft/passthrough/suite.go - created NewCode")
 	connector := attacknetwork.NewCorruptedConnector(s.net.CorruptedIdentities(), s.net.CorruptedPortMapping)
