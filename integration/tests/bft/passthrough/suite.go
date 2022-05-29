@@ -145,7 +145,7 @@ func (s *Suite) SetupSuite() {
 	s.T().Logf("integration/tests/bft/passthrough/suite.go - after testnet.PrepareFlowNetwork - iterating over container list")
 
 	for key, val := range s.net.Containers {
-		fmt.Printf("Key: %s, Value: %s\n", key, val.Name())
+		s.T().Logf("Key: %s, Value: %s\n", key, val.Name())
 	}
 	//s.net.Containers["foo"].AddFlag("foo", "bar")
 	s.T().Logf("integration/tests/bft/passthrough/suite.go - finished iterating over container list")
