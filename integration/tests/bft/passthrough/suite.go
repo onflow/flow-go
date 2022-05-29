@@ -61,12 +61,13 @@ func (s *Suite) AccessClient() *testnet.Client {
 // - One corrupted verification node
 // - One ghost node (as an execution node)
 func (s *Suite) SetupSuite() {
+	s.T().Logf("integration/tests/bft/passthrough/suite.go 1")
 	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
 		Str("testfile", "suite.go").
 		Str("testcase", s.T().Name()).
 		Logger()
 	s.log = logger
-
+	s.T().Logf("integration/tests/bft/passthrough/suite.go 2")
 	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)))
 
 	// generate the four consensus identities
@@ -74,9 +75,10 @@ func (s *Suite) SetupSuite() {
 	for _, nodeID := range s.nodeIDs {
 		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus,
 			testnet.WithID(nodeID),
-			testnet.WithLogLevel(zerolog.FatalLevel),
+			testnet.WithLogLevel(zerolog.ErrorLevel),
 			testnet.WithAdditionalFlag("--required-verification-seal-approvals=1"),
 			testnet.WithAdditionalFlag("--required-construction-seal-approvals=1"),
+			testnet.WithAdditionalFlag("--network=\"host\""),
 		)
 		s.nodeConfigs = append(s.nodeConfigs, nodeConfig)
 	}
@@ -85,8 +87,9 @@ func (s *Suite) SetupSuite() {
 	s.verID = unittest.IdentifierFixture()
 	verConfig := testnet.NewNodeConfig(flow.RoleVerification,
 		testnet.WithID(s.verID),
-		testnet.WithLogLevel(zerolog.WarnLevel),
-		testnet.AsCorrupted())
+		testnet.WithLogLevel(zerolog.InfoLevel),
+		testnet.AsCorrupted(),
+		testnet.WithAdditionalFlag("--network=\"host\""))
 	s.nodeConfigs = append(s.nodeConfigs, verConfig)
 
 	// generates two corrupted execution nodes
@@ -94,22 +97,26 @@ func (s *Suite) SetupSuite() {
 	exe1Config := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.exe1ID),
 		testnet.WithLogLevel(zerolog.InfoLevel),
-		testnet.AsCorrupted())
+		testnet.AsCorrupted(),
+		testnet.WithAdditionalFlag("--network=\"host\""))
 	s.nodeConfigs = append(s.nodeConfigs, exe1Config)
 
 	s.exe2ID = unittest.IdentifierFixture()
 	exe2Config := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.exe2ID),
 		testnet.WithLogLevel(zerolog.InfoLevel),
-		testnet.AsCorrupted())
+		testnet.AsCorrupted(),
+		testnet.WithAdditionalFlag("--network=\"host\""))
 	s.nodeConfigs = append(s.nodeConfigs, exe2Config)
 
 	// generates two collection node
 	coll1Config := testnet.NewNodeConfig(flow.RoleCollection,
 		testnet.WithLogLevel(zerolog.FatalLevel),
+		testnet.WithAdditionalFlag("--network=\"host\""),
 	)
 	coll2Config := testnet.NewNodeConfig(flow.RoleCollection,
 		testnet.WithLogLevel(zerolog.FatalLevel),
+		testnet.WithAdditionalFlag("--network=\"host\""),
 	)
 	s.nodeConfigs = append(s.nodeConfigs, coll1Config, coll2Config)
 
@@ -121,7 +128,8 @@ func (s *Suite) SetupSuite() {
 	ghostConfig := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.ghostID),
 		testnet.AsGhost(),
-		testnet.WithLogLevel(zerolog.FatalLevel))
+		testnet.WithLogLevel(zerolog.FatalLevel),
+		testnet.WithAdditionalFlag("--network=\"host\""))
 	s.nodeConfigs = append(s.nodeConfigs, ghostConfig)
 
 	// generates, initializes, and starts the Flow network
@@ -132,12 +140,15 @@ func (s *Suite) SetupSuite() {
 		testnet.WithViewsInStakingAuction(10_000),
 		testnet.WithViewsInEpoch(100_000),
 	)
-
+	s.T().Logf("integration/tests/bft/passthrough/suite.go - before testnet.PrepareFlowNetwork")
 	s.net = testnet.PrepareFlowNetwork(s.T(), netConfig, flow.BftTestnet)
+	s.T().Logf("integration/tests/bft/passthrough/suite.go - after testnet.PrepareFlowNetwork")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
+	s.T().Logf("integration/tests/bft/passthrough/suite.go - before s.net.Start(ctx)")
 	s.net.Start(ctx)
+	s.T().Logf("integration/tests/bft/passthrough/suite.go - after s.net.Start(ctx)")
 
 	s.Orchestrator = NewDummyOrchestrator(logger)
 
