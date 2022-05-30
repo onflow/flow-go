@@ -99,7 +99,7 @@ func (s *SafetyRulesTestSuite) TestProduceVote_ShouldVote() {
 
 	lastViewTC := helper.MakeTC(
 		helper.WithTCView(s.proposal.Block.View+1),
-		helper.WithTCHighestQC(s.proposal.Block.QC))
+		helper.WithTCNewestQC(s.proposal.Block.QC))
 
 	// voting on proposal where last view ended with TC
 	proposalWithTC := helper.MakeProposal(
@@ -133,7 +133,7 @@ func (s *SafetyRulesTestSuite) TestProduceVote_ShouldVote() {
 func (s *SafetyRulesTestSuite) TestProduceVote_IncludedQCHigherThanTCsQC() {
 	lastViewTC := helper.MakeTC(
 		helper.WithTCView(s.proposal.Block.View+1),
-		helper.WithTCHighestQC(s.proposal.Block.QC))
+		helper.WithTCNewestQC(s.proposal.Block.QC))
 
 	// voting on proposal where last view ended with TC
 	proposalWithTC := helper.MakeProposal(
@@ -335,7 +335,7 @@ func (s *SafetyRulesTestSuite) TestProduceVote_VotingOnUnsafeProposal() {
 			helper.WithLastViewTC(
 				helper.MakeTC(
 					helper.WithTCView(s.bootstrapBlock.View+1),
-					helper.WithTCHighestQC(TONewestQC))))
+					helper.WithTCNewestQC(TONewestQC))))
 		vote, err := s.safety.ProduceVote(proposal, proposal.Block.View)
 		require.Error(s.T(), err)
 		require.Nil(s.T(), vote)
@@ -401,7 +401,7 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_ShouldTimeout() {
 
 	// to create new TO we need to provide a TC
 	lastViewTC := helper.MakeTC(helper.WithTCView(view),
-		helper.WithTCHighestQC(newestQC))
+		helper.WithTCNewestQC(newestQC))
 
 	expectedTimeout = &model.TimeoutObject{
 		View:       view + 1,

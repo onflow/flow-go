@@ -128,7 +128,7 @@ func (t *TelemetryConsumer) OnTcTriggeredViewChange(tc *flow.TimeoutCertificate,
 	t.pathHandler.NextStep().
 		Uint64("tc_block_view", tc.View).
 		Uint64("next_view", newView).
-		Uint64("tc_highest_qc_view", tc.TOHighestQC.View).
+		Uint64("tc_newest_qc_view", tc.NewestQC.View).
 		Msg("OnTcTriggeredViewChange")
 }
 

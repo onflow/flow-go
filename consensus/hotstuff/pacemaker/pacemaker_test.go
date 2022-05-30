@@ -61,7 +61,7 @@ func (s *ActivePaceMakerTestSuite) SetupTest() {
 	s.livenessData = &hotstuff.LivenessData{
 		CurrentView: 3,
 		LastViewTC:  nil,
-		HighestQC:   helper.MakeQC(helper.WithQCView(2)),
+		NewestQC:    helper.MakeQC(helper.WithQCView(2)),
 	}
 
 	s.paceMaker, err = New(s.livenessData, timeout.NewController(tc), s.notifier, s.persist)
@@ -80,7 +80,7 @@ func LivenessData(qc *flow.QuorumCertificate) *hotstuff.LivenessData {
 	return &hotstuff.LivenessData{
 		CurrentView: qc.View + 1,
 		LastViewTC:  nil,
-		HighestQC:   qc,
+		NewestQC:    qc,
 	}
 }
 
@@ -96,7 +96,7 @@ func (s *ActivePaceMakerTestSuite) TestProcessQC_SkipIncreaseViewThroughQC() {
 	s.notifier.AssertExpectations(s.T())
 	require.Equal(s.T(), uint64(4), s.paceMaker.CurView())
 	require.True(s.T(), nve.View == 4)
-	require.Equal(s.T(), qc, s.paceMaker.HighestQC())
+	require.Equal(s.T(), qc, s.paceMaker.NewestQC())
 	require.Nil(s.T(), s.paceMaker.LastViewTC())
 
 	qc = QC(12)
@@ -106,7 +106,7 @@ func (s *ActivePaceMakerTestSuite) TestProcessQC_SkipIncreaseViewThroughQC() {
 	nve, err = s.paceMaker.ProcessQC(qc)
 	require.NoError(s.T(), err)
 	require.True(s.T(), nve.View == 13)
-	require.Equal(s.T(), qc, s.paceMaker.HighestQC())
+	require.Equal(s.T(), qc, s.paceMaker.NewestQC())
 	require.Nil(s.T(), s.paceMaker.LastViewTC())
 
 	s.notifier.AssertExpectations(s.T())
@@ -117,11 +117,11 @@ func (s *ActivePaceMakerTestSuite) TestProcessQC_SkipIncreaseViewThroughQC() {
 // if applicable, by skipping views
 func (s *ActivePaceMakerTestSuite) TestProcessTC_SkipIncreaseViewThroughTC() {
 	tc := helper.MakeTC(helper.WithTCView(3),
-		helper.WithTCHighestQC(s.livenessData.HighestQC))
+		helper.WithTCNewestQC(s.livenessData.NewestQC))
 	expectedLivenessData := &hotstuff.LivenessData{
 		CurrentView: tc.View + 1,
 		LastViewTC:  tc,
-		HighestQC:   tc.TOHighestQC,
+		NewestQC:    tc.NewestQC,
 	}
 	s.persist.On("PutLivenessData", expectedLivenessData).Return(nil).Once()
 	s.notifier.On("OnStartingTimeout", expectedTimerInfo(4, model.ReplicaTimeout)).Return().Once()
@@ -134,12 +134,12 @@ func (s *ActivePaceMakerTestSuite) TestProcessTC_SkipIncreaseViewThroughTC() {
 	require.Equal(s.T(), tc, s.paceMaker.LastViewTC())
 
 	tc = helper.MakeTC(helper.WithTCView(12),
-		helper.WithTCHighestQC(s.livenessData.HighestQC),
-		helper.WithTCHighestQC(QC(3)))
+		helper.WithTCNewestQC(s.livenessData.NewestQC),
+		helper.WithTCNewestQC(QC(3)))
 	expectedLivenessData = &hotstuff.LivenessData{
 		CurrentView: tc.View + 1,
 		LastViewTC:  tc,
-		HighestQC:   tc.TOHighestQC,
+		NewestQC:    tc.NewestQC,
 	}
 	s.persist.On("PutLivenessData", expectedLivenessData).Return(nil).Once()
 	s.notifier.On("OnStartingTimeout", expectedTimerInfo(13, model.ReplicaTimeout)).Return().Once()
@@ -148,7 +148,7 @@ func (s *ActivePaceMakerTestSuite) TestProcessTC_SkipIncreaseViewThroughTC() {
 	require.NoError(s.T(), err)
 	require.True(s.T(), nve.View == 13)
 	require.Equal(s.T(), tc, s.paceMaker.LastViewTC())
-	require.Equal(s.T(), tc.TOHighestQC, s.paceMaker.HighestQC())
+	require.Equal(s.T(), tc.NewestQC, s.paceMaker.NewestQC())
 
 	s.notifier.AssertExpectations(s.T())
 	require.Equal(s.T(), uint64(13), s.paceMaker.CurView())
