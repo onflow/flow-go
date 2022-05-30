@@ -36,7 +36,7 @@ func (m TimeoutMode) String() string {
 type TimeoutObject struct {
 	// View is the view number which is replica is timing out
 	View uint64
-	// NewestQC is the highest QC known to the creator of this TimeoutObject
+	// NewestQC is the newest QC (by view) known to the creator of this TimeoutObject
 	NewestQC *flow.QuorumCertificate
 	// LastViewTC is the timeout certificate for previous view if NewestQC.View != View - 1, else nil
 	LastViewTC *flow.TimeoutCertificate
