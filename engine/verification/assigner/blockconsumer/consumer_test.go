@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/engine/verification/assigner/blockconsumer"
 	vertestutils "github.com/onflow/flow-go/engine/verification/utils/unittest"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
@@ -123,7 +124,9 @@ func withConsumer(
 		tracer := &trace.NoopTracer{}
 		participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
-		s := testutil.CompleteStateFixture(t, collector, tracer, rootSnapshot)
+		s := testutil.CompleteStateFixture(t, collector, tracer, rootSnapshot, func(builder *CompleteExecutionReceiptBuilder) {
+			builder.clusterCommittee = participants.Filter(filter.HasRole(flow.RoleCollection))
+		})
 
 		engine := &mockBlockProcessor{
 			process: process,
