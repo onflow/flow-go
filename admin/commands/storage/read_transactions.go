@@ -86,8 +86,8 @@ func (c *GetTransactionsCommand) Validator(req *admin.CommandRequest) error {
 		return err
 	}
 
-	if endHeight-startHeight > 99 {
-		return fmt.Errorf("getting transactions for more than 100 blocks at a time might have an impact to node's performance")
+	if endHeight-startHeight+1 > 1000 {
+		return fmt.Errorf("getting transactions for more than 1000 blocks at a time might have an impact to node's performance")
 	}
 
 	req.ValidatorData = &getTransactionsReqData{
