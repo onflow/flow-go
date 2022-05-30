@@ -73,9 +73,7 @@ func IsSporkRootSnapshot(snapshot Snapshot) (bool, error) {
 
 // FindGuarantors decodes the signer indices from the guarantee, and finds the guarantor identifiers from protocol state
 // Expected Error returns during normal operations:
-//  * signature.ErrIncompatibleBitVectorLength indicates that `signerIndices` has the wrong length
-//  * signature.ErrIllegallyPaddedBitVector is the vector is padded with bits other than 0
-//  * signature.ErrInvalidChecksum if the input is shorter than the expected checksum contained in the guarantee.SignerIndices
+//  * signature.InvalidSignerIndicesError is `signerIndices` does not encode a valid set of collection guarantors
 //  * storage.ErrNotFound if the guarantee's ReferenceBlockID is not found
 //  * protocol.ErrEpochNotCommitted if epoch has not been committed yet
 //  * protocol.ErrClusterNotFound if cluster is not found by the given chainID
