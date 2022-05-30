@@ -540,17 +540,17 @@ func BlockSealsFixture(n int) []*flow.Seal {
 	return seals
 }
 
-func CollectionListFixture(n int) []*flow.Collection {
+func CollectionListFixture(n int, options ...func(*flow.Collection)) []*flow.Collection {
 	collections := make([]*flow.Collection, n)
 	for i := 0; i < n; i++ {
-		collection := CollectionFixture(1)
+		collection := CollectionFixture(1, options...)
 		collections[i] = &collection
 	}
 
 	return collections
 }
 
-func CollectionFixture(n int) flow.Collection {
+func CollectionFixture(n int, options ...func(*flow.Collection)) flow.Collection {
 	transactions := make([]*flow.TransactionBody, 0, n)
 
 	for i := 0; i < n; i++ {
@@ -558,7 +558,11 @@ func CollectionFixture(n int) flow.Collection {
 		transactions = append(transactions, &tx.TransactionBody)
 	}
 
-	return flow.Collection{Transactions: transactions}
+	col := flow.Collection{Transactions: transactions}
+	for _, opt := range options {
+		opt(&col)
+	}
+	return col
 }
 
 func FixedReferenceBlockID() flow.Identifier {

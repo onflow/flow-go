@@ -380,7 +380,7 @@ func ExtendStateWithFinalizedBlocks(t *testing.T, completeExecutionReceipts Comp
 			}
 
 			err := state.Extend(context.Background(), receipt.ReferenceBlock)
-			require.NoError(t, err)
+			require.NoError(t, err, fmt.Errorf("can not extend block %v: %w", receipt.ReferenceBlock.ID(), err))
 			err = state.Finalize(context.Background(), refBlockID)
 			require.NoError(t, err)
 			blocks = append(blocks, receipt.ReferenceBlock)
@@ -474,7 +474,7 @@ func withConsumers(t *testing.T,
 	root, err := s.State.Final().Head()
 	require.NoError(t, err)
 	chainID := root.ChainID
-	completeERs := CompleteExecutionReceiptChainFixture(t, root, blockCount, ops...)
+	completeERs := CompleteExecutionReceiptChainFixture(t, root, blockCount, participants, ops...)
 	blocks := ExtendStateWithFinalizedBlocks(t, completeERs, s.State)
 
 	// chunk assignment

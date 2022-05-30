@@ -145,7 +145,7 @@ func withConsumer(
 		// hold any guarantees.
 		root, err := s.State.Params().Root()
 		require.NoError(t, err)
-		results := vertestutils.CompleteExecutionReceiptChainFixture(t, root, blockCount/2)
+		results := vertestutils.CompleteExecutionReceiptChainFixture(t, root, blockCount/2, participants)
 		blocks := vertestutils.ExtendStateWithFinalizedBlocks(t, results, s.State)
 		// makes sure that we generated a block chain of requested length.
 		require.Len(t, blocks, blockCount)
