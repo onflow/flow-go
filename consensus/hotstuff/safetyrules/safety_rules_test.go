@@ -345,6 +345,32 @@ func (s *SafetyRulesTestSuite) TestProduceVote_VotingOnUnsafeProposal() {
 	s.persister.AssertNotCalled(s.T(), "PutSafetyData")
 }
 
+// TestProduceVote_AfterTimeout tests a scenario where we first vote for view and then produce a timeout for
+// same view, this case is possible and should result in no error.
+func (s *SafetyRulesTestSuite) TestProduceVote_AfterTimeout() {
+	view := s.proposal.Block.View
+	newestQC := helper.MakeQC(helper.WithQCView(view - 1))
+	expectedTimeout := &model.TimeoutObject{
+		View:     view,
+		NewestQC: newestQC,
+	}
+	s.signer.On("CreateTimeout", view, newestQC, (*flow.TimeoutCertificate)(nil)).Return(expectedTimeout, nil).Once()
+	s.persister.On("PutSafetyData", mock.Anything).Return(nil).Once()
+
+	// first timeout, then try to vote
+	timeout, err := s.safety.ProduceTimeout(view, newestQC, nil)
+	require.NoError(s.T(), err)
+	require.NotNil(s.T(), timeout)
+
+	// voting in same view after producing timeout is not allowed
+	vote, err := s.safety.ProduceVote(s.proposal, view)
+	require.True(s.T(), model.IsNoVoteError(err))
+	require.Nil(s.T(), vote)
+
+	s.signer.AssertExpectations(s.T())
+	s.persister.AssertExpectations(s.T())
+}
+
 // TestProduceTimeout_ShouldTimeout tests that we can produce timeout in cases where
 // last view was successful or not. Also tests last timeout caching.
 func (s *SafetyRulesTestSuite) TestProduceTimeout_ShouldTimeout() {
@@ -446,8 +472,8 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_CreateTimeoutException() {
 	s.persister.AssertNotCalled(s.T(), "PutSafetyData")
 }
 
-// TestCreateTimeout_PersistStateException tests that no timeout is created if persisting state failed
-func (s *SafetyRulesTestSuite) TestCreateTimeout_PersistStateException() {
+// TestProduceTimeout_PersistStateException tests that no timeout is created if persisting state failed
+func (s *SafetyRulesTestSuite) TestProduceTimeout_PersistStateException() {
 	exception := errors.New("persister-exception")
 	s.persister.On("PutSafetyData", mock.Anything).Return(exception)
 
@@ -462,6 +488,39 @@ func (s *SafetyRulesTestSuite) TestCreateTimeout_PersistStateException() {
 	timeout, err := s.safety.ProduceTimeout(view, newestQC, nil)
 	require.Nil(s.T(), timeout)
 	require.ErrorIs(s.T(), err, exception)
+}
+
+// TestProduceTimeout_AfterVote tests a case where we first produce a timeout and then try to vote
+// for same view, this should result in error since producing a timeout means that we have given up on this view
+// and are in process of moving forward, no vote should be created.
+func (s *SafetyRulesTestSuite) TestProduceTimeout_AfterVote() {
+	expectedVote := makeVote(s.proposal.Block)
+	s.signer.On("CreateVote", s.proposal.Block).Return(expectedVote, nil).Once()
+	s.persister.On("PutSafetyData", mock.Anything).Return(nil).Times(2)
+
+	view := s.proposal.Block.View
+
+	// first produce vote, then try to timeout
+	vote, err := s.safety.ProduceVote(s.proposal, view)
+	require.NoError(s.T(), err)
+	require.NotNil(s.T(), vote)
+
+	newestQC := helper.MakeQC(helper.WithQCView(view - 1))
+
+	expectedTimeout := &model.TimeoutObject{
+		View:     view,
+		NewestQC: newestQC,
+	}
+
+	s.signer.On("CreateTimeout", view, newestQC, (*flow.TimeoutCertificate)(nil)).Return(expectedTimeout, nil).Once()
+
+	// timing out for same view should be possible
+	timeout, err := s.safety.ProduceTimeout(view, newestQC, nil)
+	require.NoError(s.T(), err)
+	require.NotNil(s.T(), timeout)
+
+	s.persister.AssertExpectations(s.T())
+	s.signer.AssertExpectations(s.T())
 }
 
 func makeVote(block *model.Block) *model.Vote {

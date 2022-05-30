@@ -9,6 +9,7 @@ import (
 )
 
 // Persister can persist relevant information for hotstuff.
+// Persister depends on protocol.State root snapshot bootstrapping to retrieve chainID.
 type Persister struct {
 	db      *badger.DB
 	chainID flow.ChainID
