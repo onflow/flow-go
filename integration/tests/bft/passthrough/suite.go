@@ -62,7 +62,7 @@ func (s *Suite) AccessClient() *testnet.Client {
 // - One ghost node (as an execution node)
 func (s *Suite) SetupSuite() {
 	s.T().Logf("integration/tests/bft/passthrough/suite.go 1")
-	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
+	logger := unittest.LoggerWithLevel(zerolog.DebugLevel).With().
 		Str("testfile", "suite.go").
 		Str("testcase", s.T().Name()).
 		Logger()
@@ -148,7 +148,6 @@ func (s *Suite) SetupSuite() {
 		s.T().Logf("Key: %s, Value: %s\n", key, val.Name())
 		val.AddFlag("network", "host")
 	}
-	//s.net.Containers["foo"].AddFlag("foo", "bar")
 	s.T().Logf("integration/tests/bft/passthrough/suite.go - finished iterating over container list")
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
