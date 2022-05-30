@@ -1693,7 +1693,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		err = state.Extend(context.Background(), block)
 		require.Error(t, err)
 		require.True(t, signature.IsDecodeSignerIndicesError(err), err)
-		require.True(t, errors.Is(err, signature.ErrInvalidChecksum), err)
+		require.True(t, errors.As(err, &signature.ErrInvalidChecksum), err)
 		require.True(t, st.IsInvalidExtensionError(err), err)
 
 		// now the guarantee has invalid signer indices: the checksum should have 4 bytes, but it only has 1
@@ -1707,7 +1707,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		err = state.Extend(context.Background(), block)
 		require.Error(t, err)
 		require.True(t, signature.IsDecodeSignerIndicesError(err), err)
-		require.True(t, errors.Is(err, signature.ErrInvalidChecksum), err)
+		require.True(t, errors.As(err, &signature.ErrInvalidChecksum), err)
 		require.True(t, st.IsInvalidExtensionError(err), err)
 
 		// let's test even if the checksum is correct, but signer indices is still wrong because the tailing are not 0,
@@ -1720,7 +1720,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		err = state.Extend(context.Background(), block)
 		require.Error(t, err)
 		require.True(t, signature.IsDecodeSignerIndicesError(err), err)
-		require.True(t, errors.Is(err, signature.ErrIllegallyPaddedBitVector), err)
+		require.True(t, errors.As(err, &signature.ErrIllegallyPaddedBitVector), err)
 		require.True(t, st.IsInvalidExtensionError(err), err)
 
 		// test imcompatible bit vector length
@@ -1729,7 +1729,25 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		err = state.Extend(context.Background(), block)
 		require.Error(t, err)
 		require.True(t, signature.IsDecodeSignerIndicesError(err), err)
-		require.True(t, errors.Is(err, signature.ErrIncompatibleBitVectorLength), err)
+		require.True(t, errors.As(err, &signature.ErrIncompatibleBitVectorLength), err)
+		require.True(t, st.IsInvalidExtensionError(err), err)
+
+		// revert back to good value
+		payload.Guarantees[0].SignerIndices = validSignerIndices
+
+		// TODO: test the guarantee has bad reference block ID that would return ErrEpochNotCommitted
+		// this case is not easy to create, since the test case has no such block yet.
+		// we need to refactor the MutableState to add a guaranteeValidator, so that we can mock it and
+		// return the ErrEpochNotCommitted for testing
+
+		// revert back to good value
+		payload.Guarantees[0].ReferenceBlockID = head.ID()
+
+		// test the guarantee has wrong chain ID, and should return ErrClusterNotFound
+		payload.Guarantees[0].ChainID = flow.ChainID("some_bad_chain_ID")
+		err = state.Extend(context.Background(), block)
+		require.Error(t, err)
+		require.True(t, errors.As(err, &realprotocol.ErrClusterNotFound), err)
 		require.True(t, st.IsInvalidExtensionError(err), err)
 	})
 }

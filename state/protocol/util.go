@@ -85,10 +85,8 @@ func FindGuarantors(state State, guarantee *flow.CollectionGuarantee) ([]flow.Id
 	cluster, err := epoch.ClusterByChainID(guarantee.ChainID)
 
 	if err != nil {
-		// protocol state must have validated the block that contains the guarantee, so the cluster
-		// must be found, otherwise, it's an internal error
 		return nil, fmt.Errorf(
-			"internal error retrieving collector clusters for guarantee (ReferenceBlockID: %v, ChainID: %v): %w",
+			"fail to retrieve collector clusters for guarantee (ReferenceBlockID: %v, ChainID: %v): %w",
 			guarantee.ReferenceBlockID, guarantee.ChainID, err)
 	}
 
