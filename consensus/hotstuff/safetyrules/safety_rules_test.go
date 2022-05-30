@@ -345,8 +345,9 @@ func (s *SafetyRulesTestSuite) TestProduceVote_VotingOnUnsafeProposal() {
 	s.persister.AssertNotCalled(s.T(), "PutSafetyData")
 }
 
-// TestProduceVote_AfterTimeout tests a scenario where we first vote for view and then produce a timeout for
-// same view, this case is possible and should result in no error.
+// TestProduceVote_AfterTimeout tests a scenario where we first timeout for view and then try to produce a vote for
+// same view, this should result in error since producing a timeout means that we have given up on this view
+// and are in process of moving forward, no vote should be created.
 func (s *SafetyRulesTestSuite) TestProduceVote_AfterTimeout() {
 	view := s.proposal.Block.View
 	newestQC := helper.MakeQC(helper.WithQCView(view - 1))
@@ -490,9 +491,8 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_PersistStateException() {
 	require.ErrorIs(s.T(), err, exception)
 }
 
-// TestProduceTimeout_AfterVote tests a case where we first produce a timeout and then try to vote
-// for same view, this should result in error since producing a timeout means that we have given up on this view
-// and are in process of moving forward, no vote should be created.
+// TestProduceTimeout_AfterVote tests a case where we first produce a vote and then try to timeout
+// for same view. This behavior is expected and should result in valid timeout without any errors.
 func (s *SafetyRulesTestSuite) TestProduceTimeout_AfterVote() {
 	expectedVote := makeVote(s.proposal.Block)
 	s.signer.On("CreateVote", s.proposal.Block).Return(expectedVote, nil).Once()
