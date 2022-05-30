@@ -30,7 +30,7 @@ func TestReset_LocalSnapshot(t *testing.T) {
 		unittest.RunWithTempDir(t, func(bootDir string) {
 
 			// create a root snapshot
-			rootSnapshot := unittest.RootSnapshotFixture(unittest.IdentityListFixture(10))
+			rootSnapshot := unittest.RootSnapshotFixture(unittest.IdentityListFixture(10, unittest.WithAllRoles()))
 
 			// write snapshot to correct path in bootDir
 			err := writeRootSnapshot(bootDir, rootSnapshot)
@@ -62,7 +62,7 @@ func TestReset_LocalSnapshot(t *testing.T) {
 		unittest.RunWithTempDir(t, func(bootDir string) {
 
 			// create a root snapshot
-			rootSnapshot := unittest.RootSnapshotFixture(unittest.IdentityListFixture(10))
+			rootSnapshot := unittest.RootSnapshotFixture(unittest.IdentityListFixture(10, unittest.WithAllRoles()))
 
 			// write snapshot to correct path in bootDir
 			err := writeRootSnapshot(bootDir, rootSnapshot)
@@ -186,7 +186,7 @@ func verifyArguments(t *testing.T, expected []cadence.Value, actual []interface{
 		require.NoError(t, err)
 
 		// parse cadence value
-		decoded, err := jsoncdc.Decode(bz)
+		decoded, err := jsoncdc.Decode(nil, bz)
 		require.NoError(t, err)
 
 		assert.Equal(t, expected[index], decoded)

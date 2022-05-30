@@ -9,7 +9,6 @@ import (
 
 var (
 	ErrUnverifiableBlock = errors.New("block proposal can't be verified, because its view is above the finalized view, but its QC is below the finalized view")
-	ErrInvalidFormat     = errors.New("invalid signature format")
 	ErrInvalidSignature  = errors.New("invalid signature")
 	// ErrViewForUnknownEpoch is returned when Epoch information is queried for a view that is
 	// outside of all cached epochs. This can happen when a query is made for a view in the
@@ -18,12 +17,16 @@ var (
 	ErrViewForUnknownEpoch = fmt.Errorf("by-view query for unknown epoch")
 )
 
-// NoVoteError contains the reason of why the voter didn't vote for a block proposal.
+// NoVoteError contains the reason of why hotstuff.SafetyRules refused to generate a `Vote` for the current view.
 type NoVoteError struct {
-	Msg string
+	Err error
 }
 
-func (e NoVoteError) Error() string { return e.Msg }
+func (e NoVoteError) Error() string { return fmt.Sprintf("not voting - %s", e.Err.Error()) }
+
+func (e NoVoteError) Unwrap() error {
+	return e.Err
+}
 
 // IsNoVoteError returns whether an error is NoVoteError
 func IsNoVoteError(err error) bool {
@@ -32,24 +35,29 @@ func IsNoVoteError(err error) bool {
 }
 
 func NewNoVoteErrorf(msg string, args ...interface{}) error {
-	return NoVoteError{Msg: fmt.Sprintf(msg, args...)}
+	return NoVoteError{Err: fmt.Errorf(msg, args...)}
 }
 
-// NoTimeoutError contains the reason of why the voter didn't time out for current view.
-type NoTimeoutError struct {
-	Msg string
+// InvalidFormatError indicates that some data has an incompatible format.
+type InvalidFormatError struct {
+	err error
 }
 
-func (e NoTimeoutError) Error() string { return e.Msg }
+func NewInvalidFormatError(err error) error {
+	return InvalidFormatError{err}
+}
 
-// IsNoTimeoutError returns whether an error is NoTimeoutError
-func IsNoTimeoutError(err error) bool {
-	var e NoTimeoutError
+func NewInvalidFormatErrorf(msg string, args ...interface{}) error {
+	return InvalidFormatError{fmt.Errorf(msg, args...)}
+}
+
+func (e InvalidFormatError) Error() string { return e.err.Error() }
+func (e InvalidFormatError) Unwrap() error { return e.err }
+
+// IsInvalidFormatError returns whether err is a InvalidFormatError
+func IsInvalidFormatError(err error) bool {
+	var e InvalidFormatError
 	return errors.As(err, &e)
-}
-
-func NewNoTimeoutErrorf(msg string, args ...interface{}) error {
-	return NoTimeoutError{Msg: fmt.Sprintf(msg, args...)}
 }
 
 // ConfigurationError indicates that a constructor or component was initialized with

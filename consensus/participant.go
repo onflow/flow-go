@@ -54,12 +54,6 @@ func NewParticipant(
 		option(&cfg)
 	}
 
-	// get the last stored safety data
-	safetyData, err := modules.Persist.GetSafetyData()
-	if err != nil {
-		return nil, fmt.Errorf("could not recover safety data: %w", err)
-	}
-
 	livenessData, err := modules.Persist.GetLivenessData()
 	if err != nil {
 		return nil, fmt.Errorf("could not recover liveness data: %w", err)
@@ -89,6 +83,8 @@ func NewParticipant(
 
 	// initialize the pacemaker
 	controller := timeout.NewController(timeoutConfig)
+
+	// TODO: pacemaker should retrieve the livenessData itself to reduce risk of inconsistent initialization
 	pacemaker, err := pacemaker.New(livenessData, controller, modules.Notifier, modules.Persist)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize flow pacemaker: %w", err)
@@ -101,7 +97,10 @@ func NewParticipant(
 	}
 
 	// initialize the voter
-	voter := safetyrules.New(modules.Signer, modules.Persist, modules.Committee, safetyData)
+	voter, err := safetyrules.New(modules.Signer, modules.Persist, modules.Committee)
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize safety rules: %w", err)
+	}
 
 	// initialize the event handler
 	eventHandler, err := eventhandler.NewEventHandler(

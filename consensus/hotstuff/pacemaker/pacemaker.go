@@ -62,8 +62,8 @@ func (p *ActivePaceMaker) updateLivenessData(newView uint64, qc *flow.QuorumCert
 	}
 
 	p.livenessData.CurrentView = newView
-	if p.livenessData.HighestQC.View < qc.View {
-		p.livenessData.HighestQC = qc
+	if p.livenessData.NewestQC.View < qc.View {
+		p.livenessData.NewestQC = qc
 	}
 	p.livenessData.LastViewTC = tc
 	err := p.persist.PutLivenessData(p.livenessData)
@@ -118,7 +118,7 @@ func (p *ActivePaceMaker) ProcessTC(tc *flow.TimeoutCertificate) (*model.NewView
 	}
 
 	newView := tc.View + 1
-	err := p.updateLivenessData(newView, tc.TOHighestQC, tc)
+	err := p.updateLivenessData(newView, tc.NewestQC, tc)
 	if err != nil {
 		return nil, err
 	}
@@ -133,9 +133,9 @@ func (p *ActivePaceMaker) OnPartialTC(newView uint64) {
 	}
 }
 
-// HighestQC returns QC with the highest view discovered by PaceMaker.
-func (p *ActivePaceMaker) HighestQC() *flow.QuorumCertificate {
-	return p.livenessData.HighestQC
+// NewestQC returns QC with the highest view discovered by PaceMaker.
+func (p *ActivePaceMaker) NewestQC() *flow.QuorumCertificate {
+	return p.livenessData.NewestQC
 }
 
 // LastViewTC returns TC for last view, this could be nil if previous round

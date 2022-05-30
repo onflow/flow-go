@@ -8,13 +8,13 @@ import (
 )
 
 type LivenessData struct {
-	// CurrentView is the current active view tracked by PaceMaker. It's updated whenever
-	// PaceMaker sees evidence(QC or TC) for advancing to next view.
+	// CurrentView is the currently active view tracked by the PaceMaker. It is updated
+	// whenever the PaceMaker sees evidence (QC or TC) for advancing to next view.
 	CurrentView uint64
-	// HighestQC is the highest QC(by view) observed by PaceMaker. QC can be observed on its own or as a part of TC.
-	HighestQC *flow.QuorumCertificate
-	// LastViewTC is the TC observed in last view(CurrentView-1), if previous round ended with QC, LastViewTC will be nil
-	// otherwise it has to be not nil.
+	// NewestQC is the newest QC (by view) observed by the PaceMaker. The QC can be observed on its own or as a part of TC.
+	NewestQC *flow.QuorumCertificate
+	// LastViewTC is the TC for the prior view (CurrentView-1), if this view timed out. If the previous round
+	// ended with a QC, this QC is stored in NewestQC and LastViewTC is nil.
 	LastViewTC *flow.TimeoutCertificate
 }
 
@@ -51,8 +51,8 @@ type PaceMaker interface {
 	// CurView returns the current view.
 	CurView() uint64
 
-	// HighestQC returns QC with the highest view discovered by PaceMaker.
-	HighestQC() *flow.QuorumCertificate
+	// NewestQC returns QC with the highest view discovered by PaceMaker.
+	NewestQC() *flow.QuorumCertificate
 
 	// LastViewTC returns TC for last view, this could be nil if previous round
 	// has entered with a QC.

@@ -13,10 +13,10 @@ type SafetyData struct {
 	// 1-chain on top of B0. The replica updated LockedOneChainView to the max of the current value and
 	// QC_B0.View = B0.View. Thereby, the safety module guarantees that the replica will not sign
 	// a TimeoutObject that would allow a malicious leader to fork below the latest finalized block.
-	LockedOneChainView uint64 // highest preferred QC, replica updates this value when voting for block (equivalent to highestQCView from Safety rules algorithm)
+	LockedOneChainView uint64
 	// HighestAcknowledgedView is the highest view where we have voted or triggered a timeout
 	HighestAcknowledgedView uint64
-	// LastTimeout is the last timeout that was produced by this node
+	// LastTimeout is the last timeout that was produced by this node (may be nil if no timeout occurred yet)
 	LastTimeout *model.TimeoutObject
 }
 
@@ -36,9 +36,9 @@ type SafetyRules interface {
 	ProduceVote(proposal *model.Proposal, curView uint64) (*model.Vote, error)
 	// ProduceTimeout takes current view, highest locally known QC and last round TC (might be nil) and decides whether to produce timeout for current view.
 	// Returns:
-	//  * (timeout, nil): It is safe to timeout for current view using highestQC and lastViewTC.
+	//  * (timeout, nil): It is safe to timeout for current view using newestQC and lastViewTC.
 	//  * (nil, model.NoTimeoutError): If the safety module decides that it is not safe to timeout under current conditions.
 	//    This is a sentinel error and _expected_ during normal operation.
 	// All other errors are unexpected and potential symptoms of uncovered edge cases or corrupted internal state (fatal).
-	ProduceTimeout(curView uint64, highestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.TimeoutObject, error)
+	ProduceTimeout(curView uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.TimeoutObject, error)
 }

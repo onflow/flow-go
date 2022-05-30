@@ -62,7 +62,7 @@ func Bootstrap(db *badger.DB, stateRoot *StateRoot) (*State, error) {
 
 		livenessData := &hotstuff.LivenessData{
 			CurrentView: genesis.Header.View + 1,
-			HighestQC:   rootQC,
+			NewestQC:    rootQC,
 		}
 		// insert safety data
 		err = operation.InsertSafetyData(chainID, safetyData)(tx)

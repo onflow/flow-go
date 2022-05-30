@@ -59,10 +59,10 @@ func (w SignerMetricsWrapper) CreateVote(block *model.Block) (*model.Vote, error
 }
 
 func (w SignerMetricsWrapper) CreateTimeout(curView uint64,
-	highestQC *flow.QuorumCertificate,
+	newestQC *flow.QuorumCertificate,
 	lastViewTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
 	processStart := time.Now()
-	timeout, err := w.signer.CreateTimeout(curView, highestQC, lastViewTC)
+	timeout, err := w.signer.CreateTimeout(curView, newestQC, lastViewTC)
 	w.metrics.SignerProcessingDuration(time.Since(processStart))
 	return timeout, err
 }

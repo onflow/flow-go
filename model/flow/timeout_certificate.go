@@ -7,13 +7,15 @@ import "github.com/onflow/flow-go/crypto"
 // their intent to leave the active view.
 type TimeoutCertificate struct {
 	View uint64
-	// TOHighQCViews lists for each signer (in the same order) the view of the highest QC they supplied
-	// as part of their TimeoutObject message (specifically TimeoutObject.HighestQC.View).
-	TOHighQCViews []uint64
-	// TOHighestQC is the newest QC from all TimeoutObject that were aggregated for this certificate.
-	TOHighestQC *QuorumCertificate
-	// SignerIDs holds the IDs of all HotStuff participants whose TimeoutObject was included in this certificate
-	SignerIDs []Identifier
+	// NewestQCViews lists for each signer (in the same order) the view of the newest QC they supplied
+	// as part of their TimeoutObject message (specifically TimeoutObject.NewestQC.View).
+	NewestQCViews []uint64
+	// NewestQC is the newest QC from all TimeoutObject that were aggregated for this certificate.
+	NewestQC *QuorumCertificate
+	// SignerIndices encodes the HotStuff participants whose TimeoutObjects are included in this TC.
+	// For `n` authorized consensus nodes, `SignerIndices` is an n-bit vector (padded with tailing
+	// zeros to reach full bytes). We list the nodes in their canonical order, as defined by the protocol.
+	SignerIndices []byte
 	// SigData is an aggregated signature from multiple TimeoutObjects, each from a different replica.
 	// In their TimeoutObjects, replicas sign the pair (View, HighestQCView) with their staking keys.
 	SigData crypto.Signature
@@ -25,16 +27,16 @@ func (t *TimeoutCertificate) Body() interface{} {
 	}
 
 	return struct {
-		View        uint64
-		HighQCViews []uint64
-		HighestQC   QuorumCertificate
-		SignerIDs   []Identifier
-		SigData     crypto.Signature
+		View          uint64
+		NewestQCViews []uint64
+		NewestQC      QuorumCertificate
+		SignerIndices []byte
+		SigData       crypto.Signature
 	}{
-		View:        t.View,
-		HighQCViews: t.TOHighQCViews,
-		HighestQC:   *t.TOHighestQC,
-		SignerIDs:   t.SignerIDs,
-		SigData:     t.SigData,
+		View:          t.View,
+		NewestQCViews: t.NewestQCViews,
+		NewestQC:      *t.NewestQC,
+		SignerIndices: t.SignerIndices,
+		SigData:       t.SigData,
 	}
 }

@@ -9,6 +9,7 @@ import (
 )
 
 // Persister can persist relevant information for hotstuff.
+// Persister depends on protocol.State root snapshot bootstrapping to retrieve chainID.
 type Persister struct {
 	db      *badger.DB
 	chainID flow.ChainID
@@ -16,7 +17,7 @@ type Persister struct {
 
 var _ hotstuff.Persister = (*Persister)(nil)
 
-// New creates a nev persister using the injected stores to persist
+// New creates a new Persister using the injected data base to persist
 // relevant hotstuff data.
 func New(db *badger.DB, chainID flow.ChainID) *Persister {
 	p := &Persister{
@@ -27,6 +28,7 @@ func New(db *badger.DB, chainID flow.ChainID) *Persister {
 }
 
 // GetSafetyData will retrieve last persisted safety data.
+// During normal operations, no errors are expected.
 func (p *Persister) GetSafetyData() (*hotstuff.SafetyData, error) {
 	var safetyData hotstuff.SafetyData
 	err := p.db.View(operation.RetrieveSafetyData(p.chainID, &safetyData))
@@ -34,6 +36,7 @@ func (p *Persister) GetSafetyData() (*hotstuff.SafetyData, error) {
 }
 
 // GetLivenessData will retrieve last persisted liveness data.
+// During normal operations, no errors are expected.
 func (p *Persister) GetLivenessData() (*hotstuff.LivenessData, error) {
 	var livenessData hotstuff.LivenessData
 	err := p.db.View(operation.RetrieveLivenessData(p.chainID, &livenessData))
@@ -41,11 +44,13 @@ func (p *Persister) GetLivenessData() (*hotstuff.LivenessData, error) {
 }
 
 // PutSafetyData persists the last safety data.
+// During normal operations, no errors are expected.
 func (p *Persister) PutSafetyData(safetyData *hotstuff.SafetyData) error {
 	return operation.RetryOnConflict(p.db.Update, operation.UpdateSafetyData(p.chainID, safetyData))
 }
 
 // PutLivenessData persists the last liveness data.
+// During normal operations, no errors are expected.
 func (p *Persister) PutLivenessData(livenessData *hotstuff.LivenessData) error {
 	return operation.RetryOnConflict(p.db.Update, operation.UpdateLivenessData(p.chainID, livenessData))
 }

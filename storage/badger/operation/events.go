@@ -17,7 +17,7 @@ func InsertEvent(blockID flow.Identifier, event flow.Event) func(*badger.Txn) er
 }
 
 func BatchInsertEvent(blockID flow.Identifier, event flow.Event) func(batch *badger.WriteBatch) error {
-	return batchInsert(eventPrefix(codeEvent, blockID, event), event)
+	return batchWrite(eventPrefix(codeEvent, blockID, event), event)
 }
 
 func InsertServiceEvent(blockID flow.Identifier, event flow.Event) func(*badger.Txn) error {
@@ -25,7 +25,7 @@ func InsertServiceEvent(blockID flow.Identifier, event flow.Event) func(*badger.
 }
 
 func BatchInsertServiceEvent(blockID flow.Identifier, event flow.Event) func(batch *badger.WriteBatch) error {
-	return batchInsert(eventPrefix(codeServiceEvent, blockID, event), event)
+	return batchWrite(eventPrefix(codeServiceEvent, blockID, event), event)
 }
 
 func RetrieveEvents(blockID flow.Identifier, transactionID flow.Identifier, events *[]flow.Event) func(*badger.Txn) error {
@@ -46,6 +46,14 @@ func LookupServiceEventsByBlockID(blockID flow.Identifier, events *[]flow.Event)
 func LookupEventsByBlockIDEventType(blockID flow.Identifier, eventType flow.EventType, events *[]flow.Event) func(*badger.Txn) error {
 	iterationFunc := eventFilterIterationFunc(events, eventType)
 	return traverse(makePrefix(codeEvent, blockID), iterationFunc)
+}
+
+func RemoveServiceEventsByBlockID(blockID flow.Identifier) func(*badger.Txn) error {
+	return removeByPrefix(makePrefix(codeServiceEvent, blockID))
+}
+
+func RemoveEventsByBlockID(blockID flow.Identifier) func(*badger.Txn) error {
+	return removeByPrefix(makePrefix(codeEvent, blockID))
 }
 
 // eventIterationFunc returns an in iteration function which returns all events found during traversal or iteration

@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/integration/tests/lib"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestExecutionFailingTxReverted(t *testing.T) {

@@ -5,7 +5,21 @@ import (
 	"fmt"
 )
 
-var ErrInsufficientShares = errors.New("insufficient threshold signature shares")
+var (
+	ErrInvalidSignatureFormat = errors.New("signature's binary format is invalid")
+
+	ErrInsufficientShares = errors.New("insufficient threshold signature shares")
+
+	// ErrIncompatibleBitVectorLength indicates that the bit vector's length is different than
+	// the expected length, based on the supplied node list.
+	ErrIncompatibleBitVectorLength = errors.New("bit vector has incompatible length")
+
+	// ErrIllegallyPaddedBitVector indicates that the index vector was padded with unexpected bit values.
+	ErrIllegallyPaddedBitVector = errors.New("index vector padded with unexpected bit values")
+
+	// ErrInvalidChecksum indicates that the index vector's checksum is invalid
+	ErrInvalidChecksum = errors.New("index vector's checksum is invalid")
+)
 
 /* ********************* InvalidSignatureIncludedError ********************* */
 
@@ -93,4 +107,11 @@ func (e InsufficientSignaturesError) Unwrap() error { return e.err }
 func IsInsufficientSignaturesError(err error) bool {
 	var e InsufficientSignaturesError
 	return errors.As(err, &e)
+}
+
+// IsDecodeSignerIndicesError returns whether err is about decoding signer indices
+func IsDecodeSignerIndicesError(err error) bool {
+	return errors.Is(err, ErrIllegallyPaddedBitVector) ||
+		errors.Is(err, ErrIncompatibleBitVectorLength) ||
+		errors.Is(err, ErrInvalidChecksum)
 }

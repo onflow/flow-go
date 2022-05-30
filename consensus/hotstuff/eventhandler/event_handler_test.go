@@ -68,8 +68,8 @@ func (p *TestPaceMaker) OnPartialTC(view uint64) {
 	log.Info().Msgf("pacemaker.OnPartialTC view: %v, current view: %v\n", view, p.CurView())
 }
 
-func (p *TestPaceMaker) HighestQC() *flow.QuorumCertificate {
-	return p.PaceMaker.HighestQC()
+func (p *TestPaceMaker) NewestQC() *flow.QuorumCertificate {
+	return p.PaceMaker.NewestQC()
 }
 
 func (p *TestPaceMaker) LastViewTC() *flow.TimeoutCertificate {
@@ -181,12 +181,12 @@ func NewVoter(t require.TestingT, lastVotedView uint64) *Voter {
 func (v *Voter) ProduceVote(block *model.Proposal, curView uint64) (*model.Vote, error) {
 	_, ok := v.votable[block.Block.BlockID]
 	if !ok {
-		return nil, model.NoVoteError{Msg: "block not found"}
+		return nil, model.NewNoVoteErrorf("block not found")
 	}
 	return createVote(block.Block), nil
 }
 
-func (v *Voter) ProduceTimeout(curView uint64, highestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
+func (v *Voter) ProduceTimeout(curView uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
 	panic("to be implemented")
 }
 
@@ -194,7 +194,7 @@ func (v *Voter) IsSafeToVote(proposal *model.Proposal) bool {
 	panic("to be implemented")
 }
 
-func (v *Voter) IsSafeToTimeout(curView uint64, highestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) bool {
+func (v *Voter) IsSafeToTimeout(curView uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) bool {
 	panic("to be implemented")
 }
 
@@ -367,7 +367,7 @@ func (es *EventHandlerSuite) SetupTest() {
 
 	livenessData := &hotstuff.LivenessData{
 		CurrentView: 6,
-		HighestQC:   helper.MakeQC(helper.WithQCView(5)),
+		NewestQC:    helper.MakeQC(helper.WithQCView(5)),
 	}
 
 	es.paceMaker = initPaceMaker(es.T(), livenessData)
@@ -405,10 +405,10 @@ func (es *EventHandlerSuite) SetupTest() {
 	// voting block is a block for the current view, which will trigger view change
 	es.votingBlock = createBlockWithQC(es.paceMaker.CurView(), es.paceMaker.CurView()-1)
 	es.qc = &flow.QuorumCertificate{
-		BlockID:   es.votingBlock.BlockID,
-		View:      es.votingBlock.View,
-		SignerIDs: nil,
-		SigData:   nil,
+		BlockID:       es.votingBlock.BlockID,
+		View:          es.votingBlock.View,
+		SignerIndices: nil,
+		SigData:       nil,
 	}
 	es.newview = &model.NewViewEvent{
 		View: es.votingBlock.View + 1, // the vote for the voting blocks will trigger a view change to the next view
@@ -889,10 +889,10 @@ func createBlockWithQC(view uint64, qcview uint64) *model.Block {
 
 func createQC(parent *model.Block) *flow.QuorumCertificate {
 	qc := &flow.QuorumCertificate{
-		BlockID:   parent.BlockID,
-		View:      parent.View,
-		SignerIDs: nil,
-		SigData:   nil,
+		BlockID:       parent.BlockID,
+		View:          parent.View,
+		SignerIndices: nil,
+		SigData:       nil,
 	}
 	return qc
 }
