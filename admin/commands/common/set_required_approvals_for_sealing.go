@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/module/updatable_configs"
-	"github.com/rs/zerolog/log"
 )
 
 var _ commands.AdminCommand = (*SetRequiredApprovalsForSealingCommand)(nil)

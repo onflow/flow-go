@@ -14,6 +14,8 @@ import (
 
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 	"github.com/onflow/flow-go-sdk/crypto"
+	"github.com/onflow/flow-go/admin/commands"
+	admincommon "github.com/onflow/flow-go/admin/commands/common"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/consensus"
@@ -198,8 +200,8 @@ func main() {
 
 			return nil
 		}).
-		AdminCommand("set-required-approvals-for-sealing", func(node *cmd.NodeConfig) error {
-			return &common.SetRequiredApprovalsForSealingCommand{}
+		AdminCommand("set-required-approvals-for-sealing", func(node *cmd.NodeConfig) commands.AdminCommand {
+			return &admincommon.SetRequiredApprovalsForSealingCommand{}
 		}).
 		Module("mutable follower state", func(node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
