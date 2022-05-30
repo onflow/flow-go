@@ -68,6 +68,7 @@ import (
 	state_synchronization "github.com/onflow/flow-go/module/state_synchronization/mock"
 	chainsync "github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/module/updatable_configs"
 	"github.com/onflow/flow-go/module/validation"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
@@ -403,7 +404,9 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Seals,
 		assigner,
 		seals,
-		sealingConfig)
+		sealingConfig,
+		unittest.NewRequiredApprovalsForSealConstructionInstance(updatable_configs.DefaultRequiredApprovalsForSealConstruction),
+	)
 	require.NoError(t, err)
 
 	matchingConfig := matching.DefaultConfig()

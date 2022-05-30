@@ -29,6 +29,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/mempool/entity"
+	"github.com/onflow/flow-go/module/updatable_configs"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/dsl"
@@ -2079,4 +2080,10 @@ func TransactionResultsFixture(n int) []flow.TransactionResult {
 		})
 	}
 	return results
+}
+
+func NewRequiredApprovalsForSealConstructionInstance(val uint) *updatable_configs.RequiredApprovalsForSealConstructionInstance {
+	instance := &updatable_configs.RequiredApprovalsForSealConstructionInstance{}
+	instance.SetValue(val)
+	return instance
 }

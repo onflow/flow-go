@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/engine/consensus/approvals/tracker"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
+	realmodule "github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
@@ -42,6 +43,7 @@ type ApprovalProcessingCoreTestSuite struct {
 	sealsDB    *storage.Seals
 	rootHeader *flow.Header
 	core       *Core
+	setter     realmodule.RequiredApprovalsForSealConstructionInstanceSetter
 }
 
 func (s *ApprovalProcessingCoreTestSuite) TearDownTest() {
@@ -66,14 +68,14 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 	tracer := trace.NewNoopTracer()
 
 	options := Config{
-		EmergencySealingActive:               false,
-		RequiredApprovalsForSealConstruction: uint(len(s.AuthorizedVerifiers)),
-		ApprovalRequestsThreshold:            2,
+		EmergencySealingActive:    false,
+		ApprovalRequestsThreshold: 2,
 	}
-
+	setter := unittest.NewRequiredApprovalsForSealConstructionInstance(uint(len(s.AuthorizedVerifiers)))
 	var err error
-	s.core, err = NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(), s.Headers, s.State, s.sealsDB, s.Assigner, s.SigHasher, s.SealsPL, s.Conduit, options)
+	s.core, err = NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(), s.Headers, s.State, s.sealsDB, s.Assigner, s.SigHasher, s.SealsPL, s.Conduit, options, setter)
 	require.NoError(s.T(), err)
+	s.setter = setter
 }
 
 // TestOnBlockFinalized_RejectOutdatedApprovals tests that approvals will be rejected as outdated
@@ -540,7 +542,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 	}
 
 	// the sealing Core requires approvals from both verifiers for each chunk
-	s.core.config.RequiredApprovalsForSealConstruction = 2
+	s.setter.SetValue(2)
 
 	// populate the incorporated-results tree with:
 	// - 50 that have collected two signatures per chunk
@@ -727,7 +729,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 	s.State.On("Final").Return(finalSnapShot)
 
 	core, err := NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(),
-		s.Headers, s.State, s.sealsDB, assigner, s.SigHasher, s.SealsPL, s.Conduit, s.core.config)
+		s.Headers, s.State, s.sealsDB, assigner, s.SigHasher, s.SealsPL, s.Conduit, s.core.config, s.setter)
 	require.NoError(s.T(), err)
 
 	err = core.RepopulateAssignmentCollectorTree(payloads)
@@ -807,7 +809,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_
 	s.State.On("Final").Return(finalSnapShot)
 
 	core, err := NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(),
-		s.Headers, s.State, s.sealsDB, assigner, s.SigHasher, s.SealsPL, s.Conduit, s.core.config)
+		s.Headers, s.State, s.sealsDB, assigner, s.SigHasher, s.SealsPL, s.Conduit, s.core.config, s.setter)
 	require.NoError(s.T(), err)
 
 	err = core.RepopulateAssignmentCollectorTree(payloads)

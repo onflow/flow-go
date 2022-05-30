@@ -32,7 +32,7 @@ func (s *SealValidationSuite) SetupTest() {
 
 	var err error
 	s.sealValidator, err = NewSealValidator(s.State, s.HeadersDB, s.IndexDB, s.ResultsDB, s.SealsDB,
-		s.Assigner, 2, 2, s.metrics)
+		s.Assigner, unittest.NewRequiredApprovalsForSealConstructionInstance(2), 2, s.metrics)
 	s.Require().NoError(err)
 }
 
@@ -40,7 +40,7 @@ func (s *SealValidationSuite) SetupTest() {
 // required number of approvals for seal construction is smaller than for seal verification
 func (s *SealValidationSuite) TestConsistencyCheckOnApprovals() {
 	_, err := NewSealValidator(s.State, s.HeadersDB, s.IndexDB, s.ResultsDB, s.SealsDB,
-		s.Assigner, 2, 3, s.metrics)
+		s.Assigner, unittest.NewRequiredApprovalsForSealConstructionInstance(2), 3, s.metrics)
 	s.Require().Error(err)
 }
 

@@ -74,7 +74,7 @@ func (s *SealingEngineSuite) SetupTest() {
 	// setup inbound queues for trusted inputs and message handler for untrusted inputs
 	err = s.engine.setupTrustedInboundQueues()
 	require.NoError(s.T(), err)
-	err = s.engine.setupMessageHandler(RequiredApprovalsForSealConstructionTestingValue)
+	err = s.engine.setupMessageHandler(unittest.NewRequiredApprovalsForSealConstructionInstance(RequiredApprovalsForSealConstructionTestingValue))
 	require.NoError(s.T(), err)
 
 	<-s.engine.Ready()
