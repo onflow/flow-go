@@ -177,7 +177,7 @@ func matchEventForMessage(t *testing.T, events []*insecure.Event, message *insec
 	require.Equal(t, corruptedId[:], message.OriginID[:])
 
 	for _, event := range events {
-		if event.CorruptedId == corruptedId {
+		if event.CorruptedNodeId == corruptedId {
 			require.Equal(t, event.Channel.String(), message.ChannelID)
 			require.Equal(t, event.Protocol, message.Protocol)
 			require.Equal(t, flow.IdsToBytes(event.TargetIds), message.TargetIDs)

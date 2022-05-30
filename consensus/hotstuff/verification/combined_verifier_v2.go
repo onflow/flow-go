@@ -4,15 +4,16 @@
 package verification
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
@@ -46,7 +47,7 @@ func NewCombinedVerifier(committee hotstuff.Replicas, packer hotstuff.Packer) *C
 // VerifyVote verifies the validity of a combined signature from a vote.
 // Usually this method is only used to verify the proposer's vote, which is
 // the vote included in a block proposal.
-// * model.ErrInvalidFormat if the signature has an incompatible format.
+// * model.InvalidFormatError if the signature has an incompatible format.
 // * model.ErrInvalidSignature is the signature is invalid
 // * model.InvalidSignerError if signer is _not_ part of the random beacon committee
 // * unexpected errors should be treated as symptoms of bugs or uncovered
@@ -59,7 +60,10 @@ func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, vie
 	// split the two signatures from the vote
 	stakingSig, beaconShare, err := signature.DecodeDoubleSig(sigData)
 	if err != nil {
-		return fmt.Errorf("could not split signature for block %v: %w", blockID, err)
+		if errors.Is(err, signature.ErrInvalidSignatureFormat) {
+			return model.NewInvalidFormatErrorf("could not split signature for block %v: %w", blockID, err)
+		}
+		return fmt.Errorf("unexpected internal error while splitting signature for block %v: %w", blockID, err)
 	}
 
 	dkg, err := c.committee.DKG(view)
@@ -106,14 +110,17 @@ func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, vie
 
 // VerifyQC checks the cryptographic validity of the QC's `sigData` for the
 // given block. It is the responsibility of the calling code to ensure
-// that all `voters` are authorized, without duplicates. Return values:
-//  - nil if `sigData` is cryptographically valid
-//  - model.ErrInvalidFormat if `sigData` has an incompatible format
-//  - model.ErrInvalidSignature if a signature is invalid
-//  - error if running into any unexpected exception (i.e. fatal error)
+// that all `signers` are authorized, without duplicates. Return values:
+//  * nil if `sigData` is cryptographically valid
+//  * model.InsufficientSignaturesError if `signers` is empty.
+//    Depending on the order of checks in the higher-level logic this error might
+//    be an indicator of an external byzantine input or an internal bug.
+//  * model.InvalidFormatError if `sigData` has an incompatible format
+//  * model.ErrInvalidSignature if a signature is invalid
+//  * error if running into any unexpected exception (i.e. fatal error)
 func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, view uint64, blockID flow.Identifier) error {
 	if len(signers) == 0 {
-		return fmt.Errorf("empty list of signers: %w", model.ErrInvalidFormat)
+		return model.NewInsufficientSignaturesErrorf("empty list of signers")
 	}
 	dkg, err := c.committee.DKG(view)
 	if err != nil {
@@ -121,7 +128,7 @@ func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, v
 	}
 
 	// unpack sig data using packer
-	blockSigData, err := c.packer.Unpack(view, signers.NodeIDs(), sigData)
+	blockSigData, err := c.packer.Unpack(signers, sigData)
 	if err != nil {
 		return fmt.Errorf("could not split signature: %w", err)
 	}
@@ -167,14 +174,15 @@ func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, v
 	return nil
 }
 
-// VerifyTC checks cryptographic validity of the TC's `sigData` for the given view.
-// It is the responsibility of the calling code to ensure
-// that all `voters` are authorized, without duplicates. Return values:
-//  - nil if `sigData` is cryptographically valid
-//  - model.ErrInvalidFormat if `sigData` has an incompatible format
-//  - model.ErrInvalidSignature if a signature is invalid
-//  - unexpected errors should be treated as symptoms of bugs or uncovered
+// VerifyTC checks cryptographic validity of the TC's `sigData` w.r.t. the
+// given view. It is the responsibility of the calling code to ensure
+// that all `signers` are authorized, without duplicates. Return values:
+//  * nil if `sigData` is cryptographically valid
+//  * model.InsufficientSignaturesError if `signers is empty.
+//  * model.InvalidFormatError if `signers`/`highQCViews` have differing lengths
+//  * model.ErrInvalidSignature if a signature is invalid
+//  * unexpected errors should be treated as symptoms of bugs or uncovered
 //	  edge cases in the logic (i.e. as fatal)
-func (c *CombinedVerifier) VerifyTC(voters flow.IdentityList, sigData []byte, view uint64, highQCViews []uint64) error {
-	return verifyTC(voters, sigData, view, highQCViews, c.stakingHasher)
+func (c *CombinedVerifier) VerifyTC(signers flow.IdentityList, sigData []byte, view uint64, highQCViews []uint64) error {
+	return verifyTC(signers, sigData, view, highQCViews, c.stakingHasher)
 }

@@ -7,7 +7,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module/signature"
 )
 
 // Validator is responsible for validating QC, Block and Vote
@@ -34,15 +34,13 @@ func New(
 // During normal operations, the following error returns are expected:
 //  * model.InvalidTCError if the TC is invalid
 //  * model.ErrViewForUnknownEpoch if the TC refers unknown epoch
-// Any other error should be threaded as exception
+// Any other error should be treated as exception
 func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 	highestQC := tc.TOHighestQC
 
-	// consistency checks
-	if len(tc.TOHighQCViews) != len(tc.SignerIDs) {
-		return newInvalidTCError(tc, fmt.Errorf("invalid TC structure expected %x messages, got %x", len(tc.SignerIDs), len(tc.TOHighQCViews)))
-	}
-
+	// there is no reason for a timeout certificate to include a QC for the same view
+	// (if you have a QC for the view, we can always use the QC directly)
+	// however, since QCs and TCs are processed/created asynchronously, we allow this case
 	if tc.View < highestQC.View {
 		return newInvalidTCError(tc, fmt.Errorf("TC's QC cannot be newer than the TC's view"))
 	}
@@ -55,18 +53,22 @@ func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 	}
 
 	if highestQCView != tc.TOHighestQC.View {
-		return newInvalidTCError(tc, fmt.Errorf("included QC should be equal to highest contributed view"))
+		return newInvalidTCError(tc, fmt.Errorf("included QC (view=%d) should be equal to highest contributed view: %d", tc.TOHighestQC.View, highestQCView))
 	}
 
 	// 1. Check if there is super-majority of votes
-	allParticipants, err := v.committee.IdentitiesByEpoch(tc.View, filter.Any)
+	allParticipants, err := v.committee.IdentitiesByEpoch(tc.View)
 	if err != nil {
 		return fmt.Errorf("could not get consensus participants at view %d: %w", tc.View, err)
 	}
 
-	signers := allParticipants.Filter(filter.HasNodeID(tc.SignerIDs...)) // resulting IdentityList contains no duplicates
-	if len(signers) != len(tc.SignerIDs) {
-		return newInvalidTCError(tc, model.NewInvalidSignerErrorf("some tc signers are duplicated or invalid consensus participants at view %x", tc.View))
+	signers, err := signature.DecodeSignerIndicesToIdentities(allParticipants, tc.SignerIndices)
+	if err != nil {
+		if signature.IsDecodeSignerIndicesError(err) {
+			return newInvalidTCError(tc, fmt.Errorf("invalid signer indices: %w", err))
+		}
+		// unexpected error
+		return fmt.Errorf("unexpected internal error decoding signer indices: %w", err)
 	}
 
 	// determine whether signers reach minimally required weight threshold for consensus
@@ -88,7 +90,7 @@ func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 	err = v.verifier.VerifyTC(signers, tc.SigData, tc.View, tc.TOHighQCViews)
 	if err != nil {
 		switch {
-		case errors.Is(err, model.ErrInvalidFormat):
+		case model.IsInvalidFormatError(err):
 			return newInvalidTCError(tc, fmt.Errorf("TC's signature data has an invalid structure: %w", err))
 		case errors.Is(err, model.ErrInvalidSignature):
 			return newInvalidTCError(tc, fmt.Errorf("TC contains invalid signature(s): %w", err))
@@ -104,20 +106,25 @@ func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 // During normal operations, the following error returns are expected:
 //  * model.InvalidQCError if the QC is invalid
 //  * model.ErrViewForUnknownEpoch if the QC refers unknown epoch
-// Any other error should be threaded as exception
+// Any other error should be treated as exception
 func (v *Validator) ValidateQC(qc *flow.QuorumCertificate) error {
 	// Retrieve the initial identities of consensus participants for this epoch,
 	// and those that signed the QC. IdentitiesByEpoch contains all nodes that were
 	// authorized to sign during this epoch. Ejection and dynamic weight adjustments
 	// are not taken into account here. By using an epoch-static set of authorized
 	// signers, we can check QC validity without needing all ancestor blocks.
-	allParticipants, err := v.committee.IdentitiesByEpoch(qc.View, filter.Any)
+	allParticipants, err := v.committee.IdentitiesByEpoch(qc.View)
 	if err != nil {
 		return fmt.Errorf("could not get consensus participants at view %d: %w", qc.View, err)
 	}
-	signers := allParticipants.Filter(filter.HasNodeID(qc.SignerIDs...)) // resulting IdentityList contains no duplicates
-	if len(signers) != len(qc.SignerIDs) {
-		return newInvalidQCError(qc, model.NewInvalidSignerErrorf("some qc signers are duplicated or invalid consensus participants at view %x", qc.View))
+
+	signers, err := signature.DecodeSignerIndicesToIdentities(allParticipants, qc.SignerIndices)
+	if err != nil {
+		if signature.IsDecodeSignerIndicesError(err) {
+			return newInvalidQCError(qc, fmt.Errorf("invalid signer indices: %w", err))
+		}
+		// unexpected error
+		return fmt.Errorf("unexpected internal error decoding signer indices: %w", err)
 	}
 
 	// determine whether signers reach minimally required weight threshold for consensus
@@ -129,7 +136,7 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate) error {
 		return newInvalidQCError(qc, fmt.Errorf("qc signers have insufficient weight of %d (required=%d)", signers.TotalWeight(), threshold))
 	}
 
-	// verify whether the signature bytes are valid for the QC in the context of the protocol state
+	// verify whether the signature bytes are valid for the QC
 	err = v.verifier.VerifyQC(signers, qc.SigData, qc.View, qc.BlockID)
 	if err != nil {
 		// Theoretically, `VerifyQC` could also return a `model.InvalidSignerError`. However,
@@ -138,7 +145,7 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate) error {
 		// TODO: if the random beacon committee is a strict subset of the HotStuff committee,
 		//       we expect `model.InvalidSignerError` here during normal operations.
 		switch {
-		case errors.Is(err, model.ErrInvalidFormat):
+		case model.IsInvalidFormatError(err):
 			return newInvalidQCError(qc, fmt.Errorf("QC's  signature data has an invalid structure: %w", err))
 		case errors.Is(err, model.ErrInvalidSignature):
 			return newInvalidQCError(qc, fmt.Errorf("QC contains invalid signature(s): %w", err))
@@ -156,7 +163,7 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate) error {
 // During normal operations, the following error returns are expected:
 //  * model.InvalidBlockError if the block is invalid
 //  * model.ErrViewForUnknownEpoch if the proposal refers unknown epoch
-// Any other error should be threaded as exception
+// Any other error should be treated as exception
 func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 	qc := proposal.Block.QC
 	block := proposal.Block
@@ -195,7 +202,9 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 			return newInvalidBlockError(block, fmt.Errorf("expected TC for view %d got %d", proposal.Block.View-1, proposal.LastViewTC.View))
 		}
 
-		// check if proposal extends the highest QC from TC.
+		// Check if proposal extends either the newest QC specified in the TC, or a newer QC
+		// in edge cases a leader may construct a TC and QC concurrently such that TC contains
+		// an older QC - in these case we still want to build on the newest QC, so this case is allowed.
 		if proposal.Block.QC.View < proposal.LastViewTC.TOHighestQC.View {
 			return newInvalidBlockError(block, fmt.Errorf("proposal's QC is lower than locked QC"))
 		}
@@ -231,14 +240,14 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 // During normal operations, the following error returns are expected:
 //  * model.InvalidVoteError for invalid votes
 //  * model.ErrViewForUnknownEpoch if the vote refers unknown epoch
-// Any other error should be threaded as exception
+// Any other error should be treated as exception
 func (v *Validator) ValidateVote(vote *model.Vote) (*flow.Identity, error) {
 	voter, err := v.committee.IdentityByEpoch(vote.View, vote.SignerID)
 	if model.IsInvalidSignerError(err) {
 		return nil, newInvalidVoteError(vote, err)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("error retrieving voter Identity at view %x: %w", vote.View, err)
+		return nil, fmt.Errorf("error retrieving voter Identity at view %d: %w", vote.View, err)
 	}
 
 	// check whether the signature data is valid for the vote in the hotstuff context
@@ -249,7 +258,7 @@ func (v *Validator) ValidateVote(vote *model.Vote) (*flow.Identity, error) {
 		// the random beacon committee. Consequently, `InvalidSignerError` should not occur atm.
 		// TODO: if the random beacon committee is a strict subset of the HotStuff committee,
 		//       we expect `model.InvalidSignerError` here during normal operations.
-		if errors.Is(err, model.ErrInvalidFormat) || errors.Is(err, model.ErrInvalidSignature) {
+		if model.IsInvalidFormatError(err) || errors.Is(err, model.ErrInvalidSignature) {
 			return nil, newInvalidVoteError(vote, err)
 		}
 		return nil, fmt.Errorf("cannot verify signature for vote (%x): %w", vote.ID(), err)

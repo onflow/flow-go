@@ -28,9 +28,12 @@ import (
 	factorymock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/factory"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storage "github.com/onflow/flow-go/storage/badger"
@@ -244,7 +247,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 		count := 2
 		collNodes := unittest.IdentityListFixture(count, unittest.WithRole(flow.RoleCollection))
 		assignments := unittest.ClusterAssignment(uint(count), collNodes)
-		clusters, err := flow.NewClusterList(assignments, collNodes)
+		clusters, err := factory.NewClusterList(assignments, collNodes)
 		suite.Require().Nil(err)
 		collNode1 := clusters[0][0]
 		collNode2 := clusters[1][0]
@@ -812,13 +815,32 @@ func (suite *Suite) TestExecuteScript() {
 
 func (suite *Suite) createChain() (flow.Block, flow.Collection) {
 	collection := unittest.CollectionFixture(10)
+	refBlockID := unittest.IdentifierFixture()
+	// prepare cluster committee members
+	clusterCommittee := unittest.IdentityListFixture(32 * 4).Filter(filter.HasRole(flow.RoleCollection))
+	// guarantee signers must be cluster committee members, so that access will fetch collection from
+	// the signers that are specified by guarantee.SignerIndices
+	indices, err := signature.EncodeSignersToIndices(clusterCommittee.NodeIDs(), clusterCommittee.NodeIDs())
+	require.NoError(suite.T(), err)
 	guarantee := &flow.CollectionGuarantee{
-		CollectionID: collection.ID(),
-		Signature:    crypto.Signature([]byte("signature A")),
+		CollectionID:     collection.ID(),
+		Signature:        crypto.Signature([]byte("signature A")),
+		ReferenceBlockID: refBlockID,
+		SignerIndices:    indices,
 	}
 	block := unittest.BlockFixture()
 	block.Payload.Guarantees = []*flow.CollectionGuarantee{guarantee}
 	block.Header.PayloadHash = block.Payload.Hash()
+
+	cluster := new(protocol.Cluster)
+	cluster.On("Members").Return(clusterCommittee, nil)
+	epoch := new(protocol.Epoch)
+	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
+	epochs := new(protocol.EpochQuery)
+	epochs.On("Current").Return(epoch)
+	snap := new(protocol.Snapshot)
+	snap.On("Epochs").Return(epochs)
+	suite.state.On("AtBlockID", refBlockID).Return(snap)
 
 	return block, collection
 }

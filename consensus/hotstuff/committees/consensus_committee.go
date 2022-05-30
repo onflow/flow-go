@@ -114,11 +114,8 @@ func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus
 	return com, nil
 }
 
-func (c *Consensus) IdentitiesByBlock(blockID flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
-	il, err := c.state.AtBlockID(blockID).Identities(filter.And(
-		filter.IsVotingConsensusCommitteeMember,
-		selector,
-	))
+func (c *Consensus) IdentitiesByBlock(blockID flow.Identifier) (flow.IdentityList, error) {
+	il, err := c.state.AtBlockID(blockID).Identities(filter.IsVotingConsensusCommitteeMember)
 	return il, err
 }
 
@@ -144,12 +141,12 @@ func (c *Consensus) IdentityByBlock(blockID flow.Identifier, nodeID flow.Identif
 //     This is an expected error and must be handled.
 //   * unspecific error in case of unexpected problems and bugs
 //
-func (c *Consensus) IdentitiesByEpoch(view uint64, selector flow.IdentityFilter) (flow.IdentityList, error) {
+func (c *Consensus) IdentitiesByEpoch(view uint64) (flow.IdentityList, error) {
 	epochInfo, err := c.staticEpochInfoByView(view)
 	if err != nil {
 		return nil, err
 	}
-	return epochInfo.initialCommittee.Filter(selector), nil
+	return epochInfo.initialCommittee, nil
 }
 
 // IdentityByEpoch returns the identity for the given node ID, in the epoch which

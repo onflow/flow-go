@@ -1,6 +1,8 @@
 package models
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -41,13 +43,8 @@ func (c *Collection) Build(
 }
 
 func (c *CollectionGuarantee) Build(guarantee *flow.CollectionGuarantee) {
-	signerIDs := make([]string, len(guarantee.SignerIDs))
-	for i, signerID := range guarantee.SignerIDs {
-		signerIDs[i] = signerID.String()
-	}
-
 	c.CollectionId = guarantee.CollectionID.String()
-	c.SignerIds = signerIDs
+	c.SignerIndices = fmt.Sprintf("%x", guarantee.SignerIndices)
 	c.Signature = util.ToBase64(guarantee.Signature.Bytes())
 }
 
