@@ -157,7 +157,7 @@ func (e *TransactionEnv) setMeteringWeights() error {
 	}
 	if err != nil {
 		e.ctx.Logger.
-			Info().
+			Debug().
 			Err(err).
 			Msg("could not set execution memory weights. Using defaults")
 	} else {

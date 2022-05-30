@@ -124,7 +124,7 @@ func (e *ScriptEnv) setMeteringWeights() {
 	memoryWeights, err := getExecutionMemoryWeights(e, e.accounts)
 	if err != nil {
 		e.ctx.Logger.
-			Info().
+			Debug().
 			Err(err).
 			Msg("could not set execution memory weights. Using defaults")
 	} else {
