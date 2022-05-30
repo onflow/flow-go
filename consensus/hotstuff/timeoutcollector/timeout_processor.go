@@ -5,6 +5,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
+	msig "github.com/onflow/flow-go/module/signature"
 	"go.uber.org/atomic"
 	"sync"
 )
@@ -218,11 +219,25 @@ func (p *TimeoutProcessor) buildTC() (*flow.TimeoutCertificate, error) {
 		return nil, fmt.Errorf("could not aggregate multi message signature: %w", err)
 	}
 
+	signerIndices, err := p.signerIndicesFromIdentities(signers)
+	if err != nil {
+		return nil, fmt.Errorf("could not encode signer indices: %w", err)
+	}
+
 	return &flow.TimeoutCertificate{
 		View:          p.view,
 		TOHighQCViews: highQCViews,
 		TOHighestQC:   p.highestQCTracker.HighestQC(),
-		SignerIDs:     signers,
+		SignerIndices: signerIndices,
 		SigData:       aggregatedSig,
 	}, nil
+}
+
+func (p *TimeoutProcessor) signerIndicesFromIdentities(signerIDs flow.IdentifierList) ([]byte, error) {
+	allIdentities, err := p.committee.IdentitiesByEpoch(p.view)
+	signerIndices, err := msig.EncodeSignersToIndices(allIdentities.NodeIDs(), signerIDs)
+	if err != nil {
+		return nil, fmt.Errorf("could not encode signer identifiers to indices: %w", err)
+	}
+	return signerIndices, nil
 }

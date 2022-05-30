@@ -2,9 +2,7 @@ package timeoutcollector
 
 import (
 	"errors"
-	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
-	"github.com/onflow/flow-go/consensus/hotstuff/verification"
-	"github.com/onflow/flow-go/module/local"
+	"github.com/onflow/flow-go/module/signature"
 	"math/rand"
 	"sync"
 	"testing"
@@ -30,16 +28,16 @@ func TestTimeoutProcessor(t *testing.T) {
 type TimeoutProcessorTestSuite struct {
 	suite.Suite
 
-	participants            flow.IdentityList
-	view                    uint64
-	committee               *mocks.Replicas
-	validator               *mocks.Validator
-	sigAggregator           *mocks.TimeoutSignatureAggregator
-	sigWeight               uint64
-	totalWeight             uint64
-	onTCCreatedState        mock.Mock
-	onPartialTCCreatedState mock.Mock
-	processor               *TimeoutProcessor
+	participants       flow.IdentityList
+	view               uint64
+	committee          *mocks.Replicas
+	validator          *mocks.Validator
+	sigAggregator      *mocks.TimeoutSignatureAggregator
+	sigWeight          uint64
+	totalWeight        uint64
+	onTCCreated        *mocks.OnTCCreated
+	onPartialTCCreated *mocks.OnPartialTCCreated
+	processor          *TimeoutProcessor
 }
 
 func (s *TimeoutProcessorTestSuite) SetupTest() {
@@ -48,6 +46,8 @@ func (s *TimeoutProcessorTestSuite) SetupTest() {
 	s.committee = &mocks.Replicas{}
 	s.validator = &mocks.Validator{}
 	s.sigAggregator = &mocks.TimeoutSignatureAggregator{}
+	s.onTCCreated = mocks.NewOnTCCreated(s.T())
+	s.onPartialTCCreated = mocks.NewOnPartialTCCreated(s.T())
 	s.participants = unittest.IdentityListFixture(11, unittest.WithWeight(s.sigWeight))
 	s.view = (uint64)(rand.Uint32() + 100)
 	s.totalWeight = 0
@@ -68,24 +68,10 @@ func (s *TimeoutProcessorTestSuite) SetupTest() {
 	s.processor, err = NewTimeoutProcessor(s.committee,
 		s.validator,
 		s.sigAggregator,
-		s.onPartialTCCreated,
-		s.onTCCreated,
+		s.onPartialTCCreated.Execute,
+		s.onTCCreated.Execute,
 	)
 	require.NoError(s.T(), err)
-}
-
-// onQCCreated is a special function that registers call in mocked state.
-// ATTENTION: don't change name of this function since the same name is used in:
-// s.onTCCreatedState.On("onTCCreated") statements
-func (s *TimeoutProcessorTestSuite) onTCCreated(tc *flow.TimeoutCertificate) {
-	s.onTCCreatedState.Called(tc)
-}
-
-// onQCCreated is a special function that registers call in mocked state.
-// ATTENTION: don't change name of this function since the same name is used in:
-// s.onPartialTCCreatedState.On("onPartialTCCreated") statements
-func (s *TimeoutProcessorTestSuite) onPartialTCCreated(view uint64) {
-	s.onPartialTCCreatedState.Called(view)
 }
 
 // TestProcess_TimeoutNotForView tests that TimeoutProcessor accepts only timeouts for the view it was initialized with
@@ -242,12 +228,13 @@ func (s *TimeoutProcessorTestSuite) TestProcess_CreatingTC() {
 	// change tracker to require all except one signer to create TC
 	s.processor.tcTracker.minRequiredWeight = s.sigWeight * uint64(len(highQCViews))
 
-	expectedNodeIDs := signers.NodeIDs()
+	signerIndices, err := signature.EncodeSignersToIndices(s.participants.NodeIDs(), signers.NodeIDs())
+	require.NoError(s.T(), err)
 	expectedSig := crypto.Signature(unittest.RandomBytes(128))
 	s.validator.On("ValidateQC", mock.Anything).Return(nil)
 	s.validator.On("ValidateTC", mock.Anything).Return(nil)
-	s.onPartialTCCreatedState.On("onPartialTCCreated", s.view).Return(nil).Once()
-	s.onTCCreatedState.On("onTCCreated", mock.Anything).Run(func(args mock.Arguments) {
+	s.onPartialTCCreated.On("Execute", s.view).Return(nil).Once()
+	s.onTCCreated.On("Execute", mock.Anything).Run(func(args mock.Arguments) {
 		highestQC := timeouts[len(timeouts)-1].HighestQC
 		tc := args.Get(0).(*flow.TimeoutCertificate)
 		// ensure that TC contains correct fields
@@ -255,19 +242,20 @@ func (s *TimeoutProcessorTestSuite) TestProcess_CreatingTC() {
 			View:          s.view,
 			TOHighQCViews: highQCViews,
 			TOHighestQC:   highestQC,
-			SignerIDs:     expectedNodeIDs,
+			SignerIndices: signerIndices,
 			SigData:       expectedSig,
 		}
 		require.Equal(s.T(), expectedTC, tc)
 	}).Return(nil).Once()
 
-	s.sigAggregator.On("Aggregate").Return(expectedNodeIDs, highQCViews, expectedSig, nil)
+	s.sigAggregator.On("Aggregate").Return([]flow.Identifier(signers.NodeIDs()), highQCViews, expectedSig, nil)
+	s.committee.On("IdentitiesByEpoch", s.view).Return(s.participants, nil)
 
 	for _, timeout := range timeouts {
 		err := s.processor.Process(timeout)
 		require.NoError(s.T(), err)
 	}
-	s.onTCCreatedState.AssertExpectations(s.T())
+	s.onTCCreated.AssertExpectations(s.T())
 	s.sigAggregator.AssertExpectations(s.T())
 
 	// add extra timeout, make sure we don't create another TC
@@ -278,10 +266,10 @@ func (s *TimeoutProcessorTestSuite) TestProcess_CreatingTC() {
 		helper.WithTimeoutObjectSignerID(s.participants[0].NodeID),
 		helper.WithTimeoutLastViewTC(nil),
 	)
-	err := s.processor.Process(timeout)
+	err = s.processor.Process(timeout)
 	require.NoError(s.T(), err)
 
-	s.onTCCreatedState.AssertExpectations(s.T())
+	s.onTCCreated.AssertExpectations(s.T())
 	s.validator.AssertExpectations(s.T())
 }
 
@@ -289,9 +277,10 @@ func (s *TimeoutProcessorTestSuite) TestProcess_CreatingTC() {
 // we expect only one TC created in this scenario.
 func (s *TimeoutProcessorTestSuite) TestProcess_ConcurrentCreatingTC() {
 	s.validator.On("ValidateQC", mock.Anything).Return(nil)
-	s.onPartialTCCreatedState.On("onPartialTCCreated", mock.Anything).Return(nil).Once()
-	s.onTCCreatedState.On("onTCCreated", mock.Anything).Return(nil).Once()
-	s.sigAggregator.On("Aggregate").Return(s.participants.NodeIDs(), []uint64{}, crypto.Signature{}, nil)
+	s.onPartialTCCreated.On("Execute", mock.Anything).Return(nil).Once()
+	s.onTCCreated.On("Execute", mock.Anything).Return(nil).Once()
+	s.sigAggregator.On("Aggregate").Return([]flow.Identifier(s.participants.NodeIDs()), []uint64{}, crypto.Signature{}, nil)
+	s.committee.On("IdentitiesByEpoch", mock.Anything).Return(s.participants, nil)
 
 	var startupWg, shutdownWg sync.WaitGroup
 
@@ -319,47 +308,45 @@ func (s *TimeoutProcessorTestSuite) TestProcess_ConcurrentCreatingTC() {
 
 	// wait for all routines to finish
 	shutdownWg.Wait()
-
-	s.onTCCreatedState.AssertNumberOfCalls(s.T(), "onTCCreated", 1)
 }
 
 // TestTimeoutProcessor_BuildVerifyTC tests a complete path from creating timeouts to collecting timeouts and then
 // building & verifying TC.
 // We start with
-func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
-	// signers hold objects that are created with private key and can sign votes and proposals
-	signers := make(map[flow.Identifier]*verification.StakingSigner)
-	// prepare staking signers, each signer has its own private/public key pair
-	stakingSigners := unittest.IdentityListFixture(11, func(identity *flow.Identity) {
-		stakingPriv := unittest.StakingPrivKeyFixture()
-		identity.StakingPubKey = stakingPriv.PublicKey()
-
-		me, err := local.New(identity, stakingPriv)
-		require.NoError(t, err)
-
-		signers[identity.NodeID] = verification.NewStakingSigner(me)
-	})
-
-	view := uint64(rand.Uint32() + 100)
-	highestQC := helper.MakeQC(helper.WithQCView(view - 2))
-	lastViewTC := helper.MakeTC(helper.WithTCView(view-1),
-		helper.WithTCHighestQC(highestQC))
-
-	committee := &mocks.Replicas{}
-	committee.On("IdentitiesByEpoch", view, mock.Anything).Return(stakingSigners, nil)
-	committee.On("WeightThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(stakingSigners.TotalWeight()), nil)
-
-	timeouts := make([]*model.TimeoutObject, 0, len(stakingSigners))
-
-	for _, signer := range stakingSigners {
-		timeout, err := signers[signer.NodeID].CreateTimeout(view, highestQC, lastViewTC)
-		require.NoError(t, err)
-		timeouts = append(timeouts, timeout)
-	}
-
-	tcCreated := false
-	onTCCreated := func(tc *flow.TimeoutCertificate) {
-		verifier := verification.NewStakingVerifier()
-		validator := hotstuffvalidator.New(committee. )
-	}
-}
+//func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
+//	// signers hold objects that are created with private key and can sign votes and proposals
+//	signers := make(map[flow.Identifier]*verification.StakingSigner)
+//	// prepare staking signers, each signer has its own private/public key pair
+//	stakingSigners := unittest.IdentityListFixture(11, func(identity *flow.Identity) {
+//		stakingPriv := unittest.StakingPrivKeyFixture()
+//		identity.StakingPubKey = stakingPriv.PublicKey()
+//
+//		me, err := local.New(identity, stakingPriv)
+//		require.NoError(t, err)
+//
+//		signers[identity.NodeID] = verification.NewStakingSigner(me)
+//	})
+//
+//	view := uint64(rand.Uint32() + 100)
+//	highestQC := helper.MakeQC(helper.WithQCView(view - 2))
+//	lastViewTC := helper.MakeTC(helper.WithTCView(view-1),
+//		helper.WithTCHighestQC(highestQC))
+//
+//	committee := &mocks.Replicas{}
+//	committee.On("IdentitiesByEpoch", view, mock.Anything).Return(stakingSigners, nil)
+//	committee.On("WeightThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(stakingSigners.TotalWeight()), nil)
+//
+//	timeouts := make([]*model.TimeoutObject, 0, len(stakingSigners))
+//
+//	for _, signer := range stakingSigners {
+//		timeout, err := signers[signer.NodeID].CreateTimeout(view, highestQC, lastViewTC)
+//		require.NoError(t, err)
+//		timeouts = append(timeouts, timeout)
+//	}
+//
+//	tcCreated := false
+//	onTCCreated := func(tc *flow.TimeoutCertificate) {
+//		verifier := verification.NewStakingVerifier()
+//		validator := hotstuffvalidator.New(committee. )
+//	}
+//}
