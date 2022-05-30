@@ -15,7 +15,7 @@ type RequiredApprovalsForSealConstructionInstance struct {
 // for subsequent inclusion in block.
 // when set to 1, it requires at least 1 approval to build a seal
 // when set to 0, it can build seal without any approval
-const DefaultRequiredApprovalsForSealConstruction = 1
+const DefaultRequiredApprovalsForSealConstruction = uint(1)
 
 var createRequiredApprovalsForSealConstructionOnce sync.Once
 var instanceRequiredApprovalsForSealConstruction *RequiredApprovalsForSealConstructionInstance
