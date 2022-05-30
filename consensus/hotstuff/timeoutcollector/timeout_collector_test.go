@@ -2,17 +2,19 @@ package timeoutcollector
 
 import (
 	"errors"
-	"github.com/onflow/flow-go/consensus/hotstuff/helper"
-	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 	"math/rand"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+
+	"github.com/onflow/flow-go/consensus/hotstuff/helper"
+	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func TestTimeoutCollector(t *testing.T) {

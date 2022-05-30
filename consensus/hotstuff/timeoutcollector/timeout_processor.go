@@ -2,12 +2,14 @@ package timeoutcollector
 
 import (
 	"fmt"
+	"sync"
+
+	"go.uber.org/atomic"
+
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
-	msig "github.com/onflow/flow-go/module/signature"
-	"go.uber.org/atomic"
-	"sync"
+	"github.com/onflow/flow-go/module/signature"
 )
 
 // accumulatedWeightTracker tracks one-time event of reaching required weight
@@ -235,7 +237,10 @@ func (p *TimeoutProcessor) buildTC() (*flow.TimeoutCertificate, error) {
 
 func (p *TimeoutProcessor) signerIndicesFromIdentities(signerIDs flow.IdentifierList) ([]byte, error) {
 	allIdentities, err := p.committee.IdentitiesByEpoch(p.view)
-	signerIndices, err := msig.EncodeSignersToIndices(allIdentities.NodeIDs(), signerIDs)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve identities for view %d: %w", p.view, err)
+	}
+	signerIndices, err := signature.EncodeSignersToIndices(allIdentities.NodeIDs(), signerIDs)
 	if err != nil {
 		return nil, fmt.Errorf("could not encode signer identifiers to indices: %w", err)
 	}
