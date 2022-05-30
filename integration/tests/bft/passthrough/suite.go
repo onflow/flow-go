@@ -61,21 +61,22 @@ func (s *Suite) AccessClient() *testnet.Client {
 // - One corrupted verification node
 // - One ghost node (as an execution node)
 func (s *Suite) SetupSuite() {
-	s.T().Logf("integration/tests/bft/passthrough/suite.go 1")
+	s.T().Logf("integration/tests/bft/passthrough/suite.go before unittest.LoggerWithLevel()")
 	logger := unittest.LoggerWithLevel(zerolog.DebugLevel).With().
 		Str("testfile", "suite.go").
 		Str("testcase", s.T().Name()).
 		Logger()
 	s.log = logger
-	s.T().Logf("integration/tests/bft/passthrough/suite.go 2")
-	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)))
+	s.T().Logf("integration/tests/bft/passthrough/suite.go before Access nodeConfig")
+	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.DebugLevel)))
 
 	// generate the four consensus identities
 	s.nodeIDs = unittest.IdentifierListFixture(4)
 	for _, nodeID := range s.nodeIDs {
+		s.T().Logf("integration/tests/bft/passthrough/suite.go - before consensus nodeConfig with nodeID{%s}", nodeID)
 		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus,
 			testnet.WithID(nodeID),
-			testnet.WithLogLevel(zerolog.ErrorLevel),
+			testnet.WithLogLevel(zerolog.DebugLevel),
 			testnet.WithAdditionalFlag("--required-verification-seal-approvals=1"),
 			testnet.WithAdditionalFlag("--required-construction-seal-approvals=1"),
 			//testnet.WithAdditionalFlag("--network=\"host\""),
@@ -85,37 +86,42 @@ func (s *Suite) SetupSuite() {
 
 	// generates one corrupted verification node
 	s.verID = unittest.IdentifierFixture()
+	s.T().Logf("integration/tests/bft/passthrough/suite.go - before verConfig")
 	verConfig := testnet.NewNodeConfig(flow.RoleVerification,
 		testnet.WithID(s.verID),
-		testnet.WithLogLevel(zerolog.InfoLevel),
+		testnet.WithLogLevel(zerolog.DebugLevel),
 		testnet.AsCorrupted())
 	//testnet.WithAdditionalFlag("--network=\"host\""))
 	s.nodeConfigs = append(s.nodeConfigs, verConfig)
 
 	// generates two corrupted execution nodes
 	s.exe1ID = unittest.IdentifierFixture()
+	s.T().Logf("integration/tests/bft/passthrough/suite.go - before exe1Config")
 	exe1Config := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.exe1ID),
-		testnet.WithLogLevel(zerolog.InfoLevel),
+		testnet.WithLogLevel(zerolog.DebugLevel),
 		testnet.AsCorrupted())
 	//testnet.WithAdditionalFlag("--network=\"host\""))
 	s.nodeConfigs = append(s.nodeConfigs, exe1Config)
 
 	s.exe2ID = unittest.IdentifierFixture()
+	s.T().Logf("integration/tests/bft/passthrough/suite.go - before exe2Config")
 	exe2Config := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.exe2ID),
-		testnet.WithLogLevel(zerolog.InfoLevel),
+		testnet.WithLogLevel(zerolog.DebugLevel),
 		testnet.AsCorrupted())
 	//testnet.WithAdditionalFlag("--network=\"host\""))
 	s.nodeConfigs = append(s.nodeConfigs, exe2Config)
 
 	// generates two collection node
+	s.T().Logf("integration/tests/bft/passthrough/suite.go - before coll1Config")
 	coll1Config := testnet.NewNodeConfig(flow.RoleCollection,
-		testnet.WithLogLevel(zerolog.FatalLevel),
+		testnet.WithLogLevel(zerolog.DebugLevel),
 		//testnet.WithAdditionalFlag("--network=\"host\""),
 	)
+	s.T().Logf("integration/tests/bft/passthrough/suite.go - before coll2Config")
 	coll2Config := testnet.NewNodeConfig(flow.RoleCollection,
-		testnet.WithLogLevel(zerolog.FatalLevel),
+		testnet.WithLogLevel(zerolog.DebugLevel),
 		//testnet.WithAdditionalFlag("--network=\"host\""),
 	)
 	s.nodeConfigs = append(s.nodeConfigs, coll1Config, coll2Config)
@@ -125,14 +131,16 @@ func (s *Suite) SetupSuite() {
 	// system and decide to terminate the test.
 	// By definition, ghost node is subscribed to all channels.
 	s.ghostID = unittest.IdentifierFixture()
+	s.T().Logf("integration/tests/bft/passthrough/suite.go - before ghostConfig")
 	ghostConfig := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.ghostID),
 		testnet.AsGhost(),
-		testnet.WithLogLevel(zerolog.FatalLevel))
+		testnet.WithLogLevel(zerolog.DebugLevel))
 	//testnet.WithAdditionalFlag("--network=\"host\""))
 	s.nodeConfigs = append(s.nodeConfigs, ghostConfig)
 
 	// generates, initializes, and starts the Flow network
+	s.T().Logf("integration/tests/bft/passthrough/suite.go - before testnet.NewNetworkConfig")
 	netConfig := testnet.NewNetworkConfig(
 		"bft_passthrough_test",
 		s.nodeConfigs,
