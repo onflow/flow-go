@@ -108,3 +108,30 @@ func ClusterBlocksByReferenceHeightIndexExists(exists *bool) func(*badger.Txn) e
 func BatchIndexClusterBlockByReferenceHeight(refHeight uint64, clusterBlockID flow.Identifier) func(*badger.WriteBatch) error {
 	return batchInsert(makePrefix(codeRefHeightToClusterBlock, refHeight, clusterBlockID), nil)
 }
+
+func DropClusterBlockByReferenceHeightIndex() func(*badger.Txn) error {
+	return removeByPrefix(makePrefix(codeRefHeightToClusterBlock))
+}
+
+// from https://github.com/onflow/flow-go/pull/2334/files#diff-7a506b5faa037c4ce231b617d70fd28e27fa65d7957cc924ff1674b43479e148
+// removeByPrefix removes all the entities if the prefix of the key matches the given prefix.
+// if no key matches, this is a no-op
+func removeByPrefix(prefix []byte) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.AllVersions = false
+		opts.PrefetchValues = false
+		it := tx.NewIterator(opts)
+		defer it.Close()
+
+		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+			key := it.Item().KeyCopy(nil)
+			err := tx.Delete(key)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+}

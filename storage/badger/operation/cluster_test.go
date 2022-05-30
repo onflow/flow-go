@@ -291,13 +291,24 @@ func TestClusterBlockByReferenceHeight(t *testing.T) {
 		})
 		t.Run("index should exist after adding any item", func(t *testing.T) {
 			// add something to the index
-			err := db.Update(operation.IndexClusterBlockByReferenceHeight(rand.Uint64(), unittest.IdentifierFixture()))
+			for i := 0; i < 1000; i++ {
+				err := db.Update(operation.IndexClusterBlockByReferenceHeight(rand.Uint64(), unittest.IdentifierFixture()))
+				assert.NoError(t, err)
+			}
+
+			var exists bool
+			err := db.View(operation.ClusterBlocksByReferenceHeightIndexExists(&exists))
+			assert.NoError(t, err)
+			assert.True(t, exists)
+		})
+		t.Run("can drop index", func(t *testing.T) {
+			err := db.Update(operation.DropClusterBlockByReferenceHeightIndex())
 			assert.NoError(t, err)
 
 			var exists bool
 			err = db.View(operation.ClusterBlocksByReferenceHeightIndexExists(&exists))
 			assert.NoError(t, err)
-			assert.True(t, exists)
+			assert.False(t, exists)
 		})
 	})
 }
