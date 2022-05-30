@@ -3,9 +3,10 @@ package migrations
 import (
 	"encoding/hex"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
-	"github.com/rs/zerolog"
 )
 
 const (
