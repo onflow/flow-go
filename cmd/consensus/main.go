@@ -198,6 +198,9 @@ func main() {
 
 			return nil
 		}).
+		AdminCommand("set-required-approvals-for-sealing", func(node *cmd.NodeConfig) error {
+			return &common.SetRequiredApprovalsForSealingCommand{}
+		}).
 		Module("mutable follower state", func(node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
