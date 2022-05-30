@@ -169,6 +169,12 @@ func WithExecutorIDs(executorIDs flow.IdentifierList) CompleteExecutionReceiptBu
 	}
 }
 
+func WithClusterCommittee(clusterCommittee flow.IdentityList) CompleteExecutionReceiptBuilderOpt {
+	return func(builder *CompleteExecutionReceiptBuilder) {
+		builder.clusterCommittee = clusterCommittee
+	}
+}
+
 // CompleteExecutionReceiptFixture returns complete execution receipt with an
 // execution receipt referencing the block collections.
 //

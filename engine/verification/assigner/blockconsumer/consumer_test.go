@@ -124,9 +124,7 @@ func withConsumer(
 		tracer := &trace.NoopTracer{}
 		participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
-		s := testutil.CompleteStateFixture(t, collector, tracer, rootSnapshot, func(builder *CompleteExecutionReceiptBuilder) {
-			builder.clusterCommittee = participants.Filter(filter.HasRole(flow.RoleCollection))
-		})
+		s := testutil.CompleteStateFixture(t, collector, tracer, rootSnapshot)
 
 		engine := &mockBlockProcessor{
 			process: process,
@@ -148,7 +146,8 @@ func withConsumer(
 		// hold any guarantees.
 		root, err := s.State.Params().Root()
 		require.NoError(t, err)
-		results := vertestutils.CompleteExecutionReceiptChainFixture(t, root, blockCount/2)
+		clusterCommittee := participants.Filter(filter.HasRole(flow.RoleCollection))
+		results := vertestutils.CompleteExecutionReceiptChainFixture(t, root, blockCount/2, vertestutils.WithClusterCommittee(clusterCommittee))
 		blocks := vertestutils.ExtendStateWithFinalizedBlocks(t, results, s.State)
 		// makes sure that we generated a block chain of requested length.
 		require.Len(t, blocks, blockCount)
