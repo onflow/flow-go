@@ -33,7 +33,7 @@ import (
 // for subsequent inclusion in block.
 // when set to 1, it requires at least 1 approval to build a seal
 // when set to 0, it can build seal without any approval
-const DefaultRequiredApprovalsForSealConstruction = 1
+// const DefaultRequiredApprovalsForSealConstruction = 1
 
 // DefaultEmergencySealingActive is a flag which indicates when emergency sealing is active, this is a temporary measure
 // to make fire fighting easier while seal & verification is under development.
@@ -41,16 +41,14 @@ const DefaultEmergencySealingActive = false
 
 // Config is a structure of values that configure behavior of sealing engine
 type Config struct {
-	EmergencySealingActive               bool   // flag which indicates if emergency sealing is active or not. NOTE: this is temporary while sealing & verification is under development
-	RequiredApprovalsForSealConstruction uint   // min number of approvals required for constructing a candidate seal
-	ApprovalRequestsThreshold            uint64 // threshold for re-requesting approvals: min height difference between the latest finalized block and the block incorporating a result
+	EmergencySealingActive    bool   // flag which indicates if emergency sealing is active or not. NOTE: this is temporary while sealing & verification is under development
+	ApprovalRequestsThreshold uint64 // threshold for re-requesting approvals: min height difference between the latest finalized block and the block incorporating a result
 }
 
 func DefaultConfig() Config {
 	return Config{
-		EmergencySealingActive:               DefaultEmergencySealingActive,
-		RequiredApprovalsForSealConstruction: DefaultRequiredApprovalsForSealConstruction,
-		ApprovalRequestsThreshold:            10,
+		EmergencySealingActive:    DefaultEmergencySealingActive,
+		ApprovalRequestsThreshold: 10,
 	}
 }
 
@@ -94,6 +92,7 @@ func NewCore(
 	sealsMempool mempool.IncorporatedResultSeals,
 	approvalConduit network.Conduit,
 	config Config,
+	getRequiredApprovalsForSealConstruction module.RequiredApprovalsForSealConstructionInstanceGetter,
 ) (*Core, error) {
 	lastSealed, err := state.Sealed().Head()
 	if err != nil {
@@ -119,9 +118,10 @@ func NewCore(
 	}
 
 	factoryMethod := func(result *flow.ExecutionResult) (approvals.AssignmentCollector, error) {
+		requiredApprovalsForSealConstruction := getRequiredApprovalsForSealConstruction.GetValue()
 		base, err := approvals.NewAssignmentCollectorBase(core.log, core.workerPool, result, core.state, core.headers,
 			assigner, sealsMempool, signatureHasher,
-			approvalConduit, core.requestTracker, config.RequiredApprovalsForSealConstruction)
+			approvalConduit, core.requestTracker, requiredApprovalsForSealConstruction)
 		if err != nil {
 			return nil, fmt.Errorf("could not create base collector: %w", err)
 		}

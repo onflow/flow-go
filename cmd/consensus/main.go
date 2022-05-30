@@ -54,6 +54,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/synchronization"
+	"github.com/onflow/flow-go/module/updatable_configs"
 	"github.com/onflow/flow-go/module/validation"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
@@ -68,28 +69,29 @@ import (
 func main() {
 
 	var (
-		guaranteeLimit                         uint
-		resultLimit                            uint
-		approvalLimit                          uint
-		sealLimit                              uint
-		pendingReceiptsLimit                   uint
-		minInterval                            time.Duration
-		maxInterval                            time.Duration
-		maxSealPerBlock                        uint
-		maxGuaranteePerBlock                   uint
-		hotstuffTimeout                        time.Duration
-		hotstuffMinTimeout                     time.Duration
-		hotstuffTimeoutIncreaseFactor          float64
-		hotstuffTimeoutDecreaseFactor          float64
-		hotstuffTimeoutVoteAggregationFraction float64
-		blockRateDelay                         time.Duration
-		chunkAlpha                             uint
-		requiredApprovalsForSealVerification   uint
-		requiredApprovalsForSealConstruction   uint
-		emergencySealing                       bool
-		dkgControllerConfig                    dkgmodule.ControllerConfig
-		startupTimeString                      string
-		startupTime                            time.Time
+		guaranteeLimit                             uint
+		resultLimit                                uint
+		approvalLimit                              uint
+		sealLimit                                  uint
+		pendingReceiptsLimit                       uint
+		minInterval                                time.Duration
+		maxInterval                                time.Duration
+		maxSealPerBlock                            uint
+		maxGuaranteePerBlock                       uint
+		hotstuffTimeout                            time.Duration
+		hotstuffMinTimeout                         time.Duration
+		hotstuffTimeoutIncreaseFactor              float64
+		hotstuffTimeoutDecreaseFactor              float64
+		hotstuffTimeoutVoteAggregationFraction     float64
+		blockRateDelay                             time.Duration
+		chunkAlpha                                 uint
+		requiredApprovalsForSealVerification       uint
+		requiredApprovalsForSealConstruction       uint
+		requiredApprovalsForSealConstructionSetter module.RequiredApprovalsForSealConstructionInstanceSetter
+		emergencySealing                           bool
+		dkgControllerConfig                        dkgmodule.ControllerConfig
+		startupTimeString                          string
+		startupTime                                time.Time
 
 		// DKG contract client
 		machineAccountInfo *bootstrap.NodeMachineAccountInfo
@@ -142,7 +144,7 @@ func main() {
 		flags.DurationVar(&blockRateDelay, "block-rate-delay", 500*time.Millisecond, "the delay to broadcast block proposal in order to control block production rate")
 		flags.UintVar(&chunkAlpha, "chunk-alpha", chmodule.DefaultChunkAssignmentAlpha, "number of verifiers that should be assigned to each chunk")
 		flags.UintVar(&requiredApprovalsForSealVerification, "required-verification-seal-approvals", validation.DefaultRequiredApprovalsForSealValidation, "minimum number of approvals that are required to verify a seal")
-		flags.UintVar(&requiredApprovalsForSealConstruction, "required-construction-seal-approvals", sealing.DefaultRequiredApprovalsForSealConstruction, "minimum number of approvals that are required to construct a seal")
+		flags.UintVar(&requiredApprovalsForSealConstruction, "required-construction-seal-approvals", updatable_configs.DefaultRequiredApprovalsForSealConstruction, "minimum number of approvals that are required to construct a seal")
 		flags.BoolVar(&emergencySealing, "emergency-sealing-active", sealing.DefaultEmergencySealingActive, "(de)activation of emergency sealing")
 		flags.BoolVar(&insecureAccessAPI, "insecure-access-api", false, "required if insecure GRPC connection should be used")
 		flags.StringSliceVar(&accessNodeIDS, "access-node-ids", []string{}, fmt.Sprintf("array of access node IDs sorted in priority order where the first ID in this array will get the first connection attempt and each subsequent ID after serves as a fallback. Minimum length %d. Use '*' for all IDs in protocol state.", common.DefaultAccessNodeIDSMinimum))
@@ -179,7 +181,22 @@ func main() {
 		}).
 		Module("beacon keys", func(node *cmd.NodeConfig) error {
 			safeBeaconKeys = bstorage.NewSafeBeaconPrivateKeys(dkgState)
-			return err
+			return nil
+		}).
+		Module("requiredApprovalsForSealConstruction setter", func(node *cmd.NodeConfig) error {
+			// We need to ensure `requiredApprovalsForSealVerification <= requiredApprovalsForSealConstruction <= chunkAlpha`
+			if requiredApprovalsForSealVerification > requiredApprovalsForSealConstruction {
+				return fmt.Errorf("invalid consensus parameters: requiredApprovalsForSealVerification > requiredApprovalsForSealConstruction")
+			}
+			if requiredApprovalsForSealConstruction > chunkAlpha {
+				return fmt.Errorf("invalid consensus parameters: requiredApprovalsForSealConstruction > chunkAlpha")
+			}
+
+			// create the singleton instance and set the value with the flag
+			requiredApprovalsForSealConstructionSetter = updatable_configs.AcquireRequiredApprovalsForSealConstructionSetter()
+			requiredApprovalsForSealConstructionSetter.SetValue(requiredApprovalsForSealConstruction)
+
+			return nil
 		}).
 		Module("mutable follower state", func(node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
@@ -187,14 +204,6 @@ func main() {
 			state, ok := node.State.(*badgerState.State)
 			if !ok {
 				return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
-			}
-
-			// We need to ensure `requiredApprovalsForSealVerification <= requiredApprovalsForSealConstruction <= chunkAlpha`
-			if requiredApprovalsForSealVerification > requiredApprovalsForSealConstruction {
-				return fmt.Errorf("invalid consensus parameters: requiredApprovalsForSealVerification > requiredApprovalsForSealConstruction")
-			}
-			if requiredApprovalsForSealConstruction > chunkAlpha {
-				return fmt.Errorf("invalid consensus parameters: requiredApprovalsForSealConstruction > chunkAlpha")
 			}
 
 			chunkAssigner, err = chmodule.NewChunkAssigner(chunkAlpha, node.State)
@@ -216,7 +225,7 @@ func main() {
 				node.Storage.Results,
 				node.Storage.Seals,
 				chunkAssigner,
-				requiredApprovalsForSealConstruction,
+				requiredApprovalsForSealConstructionSetter,
 				requiredApprovalsForSealVerification,
 				conMetrics)
 			if err != nil {
@@ -389,7 +398,6 @@ func main() {
 
 			config := sealing.DefaultConfig()
 			config.EmergencySealingActive = emergencySealing
-			config.RequiredApprovalsForSealConstruction = requiredApprovalsForSealConstruction
 
 			e, err := sealing.NewEngine(
 				node.Logger,
@@ -409,6 +417,7 @@ func main() {
 				chunkAssigner,
 				seals,
 				config,
+				requiredApprovalsForSealConstructionSetter,
 			)
 
 			// subscribe for finalization events from hotstuff

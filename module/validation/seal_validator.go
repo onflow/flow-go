@@ -25,16 +25,16 @@ const DefaultRequiredApprovalsForSealValidation = 0
 // sealValidator holds all needed context for checking seal
 // validity against current protocol state.
 type sealValidator struct {
-	state                                protocol.State
-	assigner                             module.ChunkAssigner
-	signatureHasher                      hash.Hasher
-	seals                                storage.Seals
-	headers                              storage.Headers
-	index                                storage.Index
-	results                              storage.ExecutionResults
-	requiredApprovalsForSealConstruction uint // number of required approvals per chunk to construct a seal
-	requiredApprovalsForSealVerification uint // number of required approvals per chunk for a seal to be valid
-	metrics                              module.ConsensusMetrics
+	state                                      protocol.State
+	assigner                                   module.ChunkAssigner
+	signatureHasher                            hash.Hasher
+	seals                                      storage.Seals
+	headers                                    storage.Headers
+	index                                      storage.Index
+	results                                    storage.ExecutionResults
+	requiredApprovalsForSealConstructionGetter module.RequiredApprovalsForSealConstructionInstanceGetter // number of required approvals per chunk to construct a seal
+	requiredApprovalsForSealVerification       uint                                                      // number of required approvals per chunk for a seal to be valid
+	metrics                                    module.ConsensusMetrics
 }
 
 func NewSealValidator(
@@ -44,26 +44,27 @@ func NewSealValidator(
 	results storage.ExecutionResults,
 	seals storage.Seals,
 	assigner module.ChunkAssigner,
-	requiredApprovalsForSealConstruction uint,
+	requiredApprovalsForSealConstructionGetter module.RequiredApprovalsForSealConstructionInstanceGetter,
 	requiredApprovalsForSealVerification uint,
 	metrics module.ConsensusMetrics,
 ) (*sealValidator, error) {
+	requiredApprovalsForSealConstruction := requiredApprovalsForSealConstructionGetter.GetValue()
 	if requiredApprovalsForSealConstruction < requiredApprovalsForSealVerification {
 		return nil, fmt.Errorf("required number of approvals for seal construction (%d) cannot be smaller than for seal verification (%d)",
 			requiredApprovalsForSealConstruction, requiredApprovalsForSealVerification)
 	}
 
 	return &sealValidator{
-		state:                                state,
-		assigner:                             assigner,
-		signatureHasher:                      crypto.NewBLSKMAC(encoding.ResultApprovalTag),
-		headers:                              headers,
-		results:                              results,
-		seals:                                seals,
-		index:                                index,
-		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
-		requiredApprovalsForSealVerification: requiredApprovalsForSealVerification,
-		metrics:                              metrics,
+		state:           state,
+		assigner:        assigner,
+		signatureHasher: crypto.NewBLSKMAC(encoding.ResultApprovalTag),
+		headers:         headers,
+		results:         results,
+		seals:           seals,
+		index:           index,
+		requiredApprovalsForSealConstructionGetter: requiredApprovalsForSealConstructionGetter,
+		requiredApprovalsForSealVerification:       requiredApprovalsForSealVerification,
+		metrics:                                    metrics,
 	}, nil
 }
 
@@ -289,7 +290,7 @@ func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.I
 
 		// the chunk must have been approved by at least the minimally
 		// required number of Verification Nodes
-		if uint(numberApprovers) < s.requiredApprovalsForSealConstruction {
+		if uint(numberApprovers) < s.requiredApprovalsForSealConstructionGetter.GetValue() {
 			if uint(numberApprovers) >= s.requiredApprovalsForSealVerification {
 				// Emergency sealing is a _temporary_ fallback to reduce the probability of
 				// sealing halts due to bugs in the verification nodes, where they don't
