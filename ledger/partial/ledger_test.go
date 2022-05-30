@@ -42,14 +42,47 @@ func TestFunctionalityWithCompleteTrie(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, pled.InitialState(), newState)
 
-	// test missing keys (get)
+	// test batch querying existent keys
+	query, err = ledger.NewQuery(newState, keys[0:2])
+	require.NoError(t, err)
+
+	retValues, err := pled.Get(query)
+	require.NoError(t, err)
+	require.Equal(t, 2, len(retValues))
+	for i := 0; i < len(retValues); i++ {
+		require.Equal(t, values[i], retValues[i])
+	}
+
+	// test querying single existent key
+	querySingleValue, err := ledger.NewQuerySingleValue(newState, keys[0])
+	require.NoError(t, err)
+
+	retValue, err := pled.GetSingleValue(querySingleValue)
+	require.NoError(t, err)
+	require.Equal(t, values[0], retValue)
+
+	// test batch getting missing keys
 	query, err = ledger.NewQuery(newState, keys[1:3])
 	require.NoError(t, err)
 
-	_, err = pled.Get(query)
+	retValues, err = pled.Get(query)
 	require.Error(t, err)
+	require.Nil(t, retValues)
 
 	e, ok := err.(*ledger.ErrMissingKeys)
+	require.True(t, ok)
+	assert.Equal(t, len(e.Keys), 1)
+	require.True(t, e.Keys[0].Equals(&keys[2]))
+
+	// test querying single non-existent key
+	querySingleValue, err = ledger.NewQuerySingleValue(newState, keys[2])
+	require.NoError(t, err)
+
+	retValue, err = pled.GetSingleValue(querySingleValue)
+	require.Error(t, err)
+	require.Nil(t, retValue)
+
+	e, ok = err.(*ledger.ErrMissingKeys)
 	require.True(t, ok)
 	assert.Equal(t, len(e.Keys), 1)
 	require.True(t, e.Keys[0].Equals(&keys[2]))

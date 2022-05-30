@@ -3,6 +3,7 @@ package util_test
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"strings"
 	"testing"
 	"time"
@@ -76,15 +77,12 @@ func testFilter(t *testing.T, inputJson, exepectedJson string, description strin
 	require.JSONEqf(t, exepectedJson, actualJson, description)
 }
 
-func ExampleSelectFilter() {
+func TestExampleSelectFilter(t *testing.T) {
 
 	blocks := make([]models.Block, 2)
 	for i := range blocks {
 		block, err := generateBlock()
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
+		require.NoError(t, err)
 		blocks[i] = block
 	}
 
@@ -92,101 +90,24 @@ func ExampleSelectFilter() {
 		"header.id",
 		"payload.collection_guarantees.signature",
 		"payload.block_seals.aggregated_approval_signatures.signer_ids",
-		"payload.collection_guarantees.signer_ids",
+		"payload.collection_guarantees.signer_indices",
 		"execution_result.events.event_index",
 		"something.nonexisting",
 	}
 
 	filteredBlock, err := util.SelectFilter(blocks, selectKeys)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
+	require.NoError(t, err)
 
 	marshalled, err := json.MarshalIndent(filteredBlock, "", "\t")
-	if err != nil {
-		panic(err.Error())
-	}
-	fmt.Println(string(marshalled))
-	// Output:
-	//[
-	//	{
-	//		"execution_result": {
-	//			"events": [
-	//				{
-	//					"event_index": "2"
-	//				},
-	//				{
-	//					"event_index": "3"
-	//				}
-	//			]
-	//		},
-	//		"header": {
-	//			"id": "abcd"
-	//		},
-	//		"payload": {
-	//			"block_seals": [
-	//				{
-	//					"aggregated_approval_signatures": [
-	//						{
-	//							"signer_ids": [
-	//								"abcdef0123456789",
-	//								"abcdef0123456789"
-	//							]
-	//						}
-	//					]
-	//				}
-	//			],
-	//			"collection_guarantees": [
-	//				{
-	//					"signature": "abcdef0123456789",
-	//					"signer_ids": [
-	//						"abcdef0123456789",
-	//						"abcdef0123456789"
-	//					]
-	//				}
-	//			]
-	//		}
-	//	},
-	//	{
-	//		"execution_result": {
-	//			"events": [
-	//				{
-	//					"event_index": "2"
-	//				},
-	//				{
-	//					"event_index": "3"
-	//				}
-	//			]
-	//		},
-	//		"header": {
-	//			"id": "abcd"
-	//		},
-	//		"payload": {
-	//			"block_seals": [
-	//				{
-	//					"aggregated_approval_signatures": [
-	//						{
-	//							"signer_ids": [
-	//								"abcdef0123456789",
-	//								"abcdef0123456789"
-	//							]
-	//						}
-	//					]
-	//				}
-	//			],
-	//			"collection_guarantees": [
-	//				{
-	//					"signature": "abcdef0123456789",
-	//					"signer_ids": [
-	//						"abcdef0123456789",
-	//						"abcdef0123456789"
-	//					]
-	//				}
-	//			]
-	//		}
-	//	}
-	//]
+	require.NoError(t, err)
+
+	// enable to update test case if there is change in the models.Block struct
+	// _ = ioutil.WriteFile("example_select_filter.json", marshalled, 0644)
+
+	byteValue, err := ioutil.ReadFile("example_select_filter.json")
+	require.NoError(t, err)
+
+	require.Equal(t, string(byteValue), string(marshalled))
 }
 
 func generateBlock() (models.Block, error) {
@@ -211,9 +132,9 @@ func generateBlock() (models.Block, error) {
 		Payload: &models.BlockPayload{
 			CollectionGuarantees: []models.CollectionGuarantee{
 				{
-					CollectionId: "abcdef0123456789",
-					SignerIds:    multipleDummySignatures,
-					Signature:    dummySignature,
+					CollectionId:  "abcdef0123456789",
+					SignerIndices: fmt.Sprintf("%x", []byte{1}),
+					Signature:     dummySignature,
 				},
 			},
 			BlockSeals: []models.BlockSeal{

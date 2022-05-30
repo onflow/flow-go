@@ -387,7 +387,7 @@ func (il IdentityList) Sorted(less IdentityOrder) bool {
 }
 
 // NodeIDs returns the NodeIDs of the nodes in the list.
-func (il IdentityList) NodeIDs() []Identifier {
+func (il IdentityList) NodeIDs() IdentifierList {
 	nodeIDs := make([]Identifier, 0, len(il))
 	for _, id := range il {
 		nodeIDs = append(nodeIDs, id.NodeID)
