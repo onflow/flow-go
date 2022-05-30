@@ -315,6 +315,9 @@ func (m *MutableState) guaranteeExtend(ctx context.Context, candidate *flow.Bloc
 		// get the reference block to check expiry
 		ref, err := m.headers.ByBlockID(guarantee.ReferenceBlockID)
 		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				return state.NewInvalidExtensionErrorf("could not get reference block %x: %w", guarantee.ReferenceBlockID, err)
+			}
 			return fmt.Errorf("could not get reference block (%x): %w", guarantee.ReferenceBlockID, err)
 		}
 

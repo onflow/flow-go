@@ -1735,13 +1735,20 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		// revert back to good value
 		payload.Guarantees[0].SignerIndices = validSignerIndices
 
+		// test the ReferenceBlockID is not found
+		payload.Guarantees[0].ReferenceBlockID = flow.ZeroID
+		err = state.Extend(context.Background(), block)
+		require.Error(t, err)
+		require.True(t, errors.As(err, &storage.ErrNotFound), err)
+		require.True(t, st.IsInvalidExtensionError(err), err)
+
+		// revert back to good value
+		payload.Guarantees[0].ReferenceBlockID = head.ID()
+
 		// TODO: test the guarantee has bad reference block ID that would return ErrEpochNotCommitted
 		// this case is not easy to create, since the test case has no such block yet.
 		// we need to refactor the MutableState to add a guaranteeValidator, so that we can mock it and
 		// return the ErrEpochNotCommitted for testing
-
-		// revert back to good value
-		payload.Guarantees[0].ReferenceBlockID = head.ID()
 
 		// test the guarantee has wrong chain ID, and should return ErrClusterNotFound
 		payload.Guarantees[0].ChainID = flow.ChainID("some_bad_chain_ID")
