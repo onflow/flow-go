@@ -288,6 +288,7 @@ func (b *backendTransactions) GetTransactionResult(
 		ErrorMessage:  txError,
 		BlockID:       blockID,
 		TransactionID: txID,
+		BlockHeight:   block.Header.Height,
 	}, nil
 }
 
@@ -353,6 +354,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 				BlockID:       blockID,
 				TransactionID: txID,
 				CollectionID:  guarantee.CollectionID,
+				BlockHeight:   block.Header.Height,
 			})
 
 			i++
