@@ -273,6 +273,8 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 
 			collection := flow.Collection{Transactions: []*flow.TransactionBody{tx}}
 			guarantee := unittest.CollectionGuaranteeFixture(unittest.WithCollection(&collection), unittest.WithCollRef(refBlkHeader.ParentID))
+			guarantee.ChainID = cluster.CanonicalClusterID(1, clusterCommittee)
+			guarantee.SignerIndices = indices
 			collections = append(collections, &collection)
 			guarantees = append(guarantees, guarantee)
 
