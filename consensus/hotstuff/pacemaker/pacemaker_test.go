@@ -64,7 +64,9 @@ func (s *ActivePaceMakerTestSuite) SetupTest() {
 		NewestQC:    helper.MakeQC(helper.WithQCView(2)),
 	}
 
-	s.paceMaker, err = New(s.livenessData, timeout.NewController(tc), s.notifier, s.persist)
+	s.persist.On("GetLivenessData").Return(s.livenessData, nil).Once()
+
+	s.paceMaker, err = New(timeout.NewController(tc), s.notifier, s.persist)
 	require.NoError(s.T(), err)
 
 	s.notifier.On("OnStartingTimeout", expectedTimerInfo(s.livenessData.CurrentView, model.ReplicaTimeout)).Return().Once()

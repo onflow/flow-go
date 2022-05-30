@@ -39,10 +39,10 @@ type TestPaceMaker struct {
 
 var _ hotstuff.PaceMaker = (*TestPaceMaker)(nil)
 
-func NewTestPaceMaker(t require.TestingT, livenessData *hotstuff.LivenessData, timeoutController *timeout.Controller,
+func NewTestPaceMaker(t require.TestingT, timeoutController *timeout.Controller,
 	notifier hotstuff.Consumer,
 	persist hotstuff.Persister) *TestPaceMaker {
-	p, err := pacemaker.New(livenessData, timeoutController, notifier, persist)
+	p, err := pacemaker.New(timeoutController, notifier, persist)
 	if err != nil {
 		panic(err)
 	}
@@ -89,7 +89,8 @@ func initPaceMaker(t require.TestingT, livenessData *hotstuff.LivenessData) hots
 	require.NoError(t, err)
 	persist := &mocks.Persister{}
 	persist.On("PutLivenessData", mock.Anything).Return(nil).Maybe()
-	pm := NewTestPaceMaker(t, livenessData, timeout.NewController(tc), notifier, persist)
+	persist.On("GetLivenessData").Return(livenessData, nil).Once()
+	pm := NewTestPaceMaker(t, timeout.NewController(tc), notifier, persist)
 	notifier.On("OnStartingTimeout", mock.Anything).Return()
 	notifier.On("OnQcTriggeredViewChange", mock.Anything, mock.Anything).Return()
 	notifier.On("OnReachedTimeout", mock.Anything).Return()

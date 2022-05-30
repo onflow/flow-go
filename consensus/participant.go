@@ -54,16 +54,11 @@ func NewParticipant(
 		option(&cfg)
 	}
 
-	livenessData, err := modules.Persist.GetLivenessData()
-	if err != nil {
-		return nil, fmt.Errorf("could not recover liveness data: %w", err)
-	}
-
 	// prune vote aggregator to initial view
 	modules.Aggregator.PruneUpToView(finalized.View)
 
 	// recover the hotstuff state, mainly to recover all pending blocks in Forks
-	err = recovery.Participant(log, modules.Forks, modules.Aggregator, modules.Validator, finalized, pending)
+	err := recovery.Participant(log, modules.Forks, modules.Aggregator, modules.Validator, finalized, pending)
 	if err != nil {
 		return nil, fmt.Errorf("could not recover hotstuff state: %w", err)
 	}
@@ -84,8 +79,7 @@ func NewParticipant(
 	// initialize the pacemaker
 	controller := timeout.NewController(timeoutConfig)
 
-	// TODO: pacemaker should retrieve the livenessData itself to reduce risk of inconsistent initialization
-	pacemaker, err := pacemaker.New(livenessData, controller, modules.Notifier, modules.Persist)
+	pacemaker, err := pacemaker.New(controller, modules.Notifier, modules.Persist)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize flow pacemaker: %w", err)
 	}

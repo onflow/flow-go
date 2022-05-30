@@ -30,12 +30,16 @@ var _ hotstuff.PaceMaker = (*ActivePaceMaker)(nil)
 // startView is the view for the pacemaker to start from
 // timeoutController controls the timeout trigger.
 // notifier provides callbacks for pacemaker events.
-func New(livenessData *hotstuff.LivenessData,
-	timeoutController *timeout.Controller,
+func New(timeoutController *timeout.Controller,
 	notifier hotstuff.Consumer,
 	persist hotstuff.Persister) (*ActivePaceMaker, error) {
+	livenessData, err := persist.GetLivenessData()
+	if err != nil {
+		return nil, fmt.Errorf("could not recover liveness data: %w", err)
+	}
+
 	if livenessData.CurrentView < 1 {
-		return nil, model.NewConfigurationErrorf("Please start PaceMaker with view > 0. (View 0 is reserved for genesis block, which has no proposer)")
+		return nil, model.NewConfigurationErrorf("invalid configuration of PaceMaker with view > 0. (View 0 is reserved for genesis block, which has no proposer)")
 	}
 	pm := ActivePaceMaker{
 		livenessData:   livenessData,
