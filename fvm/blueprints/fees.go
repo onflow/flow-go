@@ -286,10 +286,10 @@ func SetExecutionMemoryLimitTransaction(
 }
 
 const setExecutionMemoryLimit = `
-	transaction(newWeights: UInt64, path: StoragePath) {
+	transaction(newLimit: UInt64, path: StoragePath) {
 		prepare(signer: AuthAccount) {
 			signer.load<UInt64>(from: path)
-			signer.save(newWeights, to: path)
+			signer.save(newLimit, to: path)
 		}
 	}
 `
