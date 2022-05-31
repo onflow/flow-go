@@ -1000,7 +1000,7 @@ func (e *Engine) matchOrRequestCollections(
 		if err != nil {
 			// execution node executes certified blocks, which means there is a quorum of consensus nodes who
 			// have validated the block payload. And that validation includes checking the guarantors are correct.
-			// based on that assumption, failed to find guarantors for guarantees contained in an incorporated block
+			// Based on that assumption, failing to find guarantors for guarantees contained in an incorporated block
 			// should be treated as fatal error
 			e.log.Fatal().Err(err).Msgf("failed to find guarantors for guarantee %v at block %v, height %v",
 				guarantee.ID(),

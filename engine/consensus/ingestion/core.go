@@ -172,7 +172,7 @@ func (e *Core) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
 	// find guarantors by signer indices
 	guarantors, err := signature.DecodeSignerIndicesToIdentities(clusterMembers, guarantee.SignerIndices)
 	if err != nil {
-		if signature.IsDecodeSignerIndicesError(err) {
+		if signature.IsInvalidSignerIndicesError(err) {
 			return engine.NewInvalidInputErrorf("could not decode guarantor indices: %v", err)
 		}
 		// unexpected error

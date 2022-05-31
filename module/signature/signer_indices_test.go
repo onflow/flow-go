@@ -5,16 +5,14 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"pgregory.net/rapid"
 
 	"github.com/onflow/flow-go/ledger/common/bitutils"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/filter/id"
 	"github.com/onflow/flow-go/model/flow/order"
-
-	"github.com/stretchr/testify/require"
-
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -45,6 +43,39 @@ func TestEncodeDecodeIdentities(t *testing.T) {
 			require.Equal(t, signers, decodedIdentities)
 		}
 	}
+}
+
+func TestEncodeDecodeIdentitiesFail(t *testing.T) {
+	canonicalIdentities := unittest.IdentityListFixture(20)
+	canonicalIdentifiers := canonicalIdentities.NodeIDs()
+	signers := canonicalIdentities[3:19]
+	validIndices, err := signature.EncodeSignersToIndices(canonicalIdentities.NodeIDs(), signers.NodeIDs())
+
+	_, err = signature.DecodeSignerIndicesToIdentifiers(canonicalIdentifiers, validIndices)
+	require.NoError(t, err)
+
+	invalidSum := make([]byte, len(validIndices))
+	copy(invalidSum, validIndices)
+	if invalidSum[0] == byte(0) {
+		invalidSum[0] = byte(1)
+	} else {
+		invalidSum[0] = byte(0)
+	}
+	_, err = signature.DecodeSignerIndicesToIdentifiers(canonicalIdentifiers, invalidSum)
+	require.True(t, signature.IsInvalidSignerIndicesError(err), err)
+	require.ErrorIs(t, err, signature.ErrInvalidChecksum, err)
+
+	incompatibleLength := append(validIndices, byte(0))
+	_, err = signature.DecodeSignerIndicesToIdentifiers(canonicalIdentifiers, incompatibleLength)
+	require.True(t, signature.IsInvalidSignerIndicesError(err), err)
+	require.ErrorIs(t, err, signature.ErrIncompatibleBitVectorLength, err)
+
+	illegallyPadded := make([]byte, len(validIndices))
+	copy(illegallyPadded, validIndices)
+	illegallyPadded[len(illegallyPadded)-1]++
+	_, err = signature.DecodeSignerIndicesToIdentifiers(canonicalIdentifiers, illegallyPadded)
+	require.True(t, signature.IsInvalidSignerIndicesError(err), err)
+	require.ErrorIs(t, err, signature.ErrIllegallyPaddedBitVector, err)
 }
 
 func TestEncodeIdentity(t *testing.T) {
@@ -160,13 +191,13 @@ func Test_ValidPaddingErrIncompatibleBitVectorLength(t *testing.T) {
 
 	// 1 byte less
 	_, _, err = signature.DecodeSigTypeToStakingAndBeaconSigners(signers, []byte{byte(255)})
-	require.Error(t, err)
-	require.ErrorAs(t, err, &signature.ErrIncompatibleBitVectorLength)
+	require.True(t, signature.IsInvalidSigTypesError(err), "API-level error should be InvalidSigTypesError")
+	require.ErrorIs(t, err, signature.ErrIncompatibleBitVectorLength, "low-level error representing the failure should be ErrIncompatibleBitVectorLength")
 
 	// 1 byte more
 	_, _, err = signature.DecodeSigTypeToStakingAndBeaconSigners(signers, []byte{})
-	require.Error(t, err)
-	require.ErrorAs(t, err, &signature.ErrIncompatibleBitVectorLength)
+	require.True(t, signature.IsInvalidSigTypesError(err), "API-level error should be InvalidSigTypesError")
+	require.ErrorIs(t, err, signature.ErrIncompatibleBitVectorLength, "low-level error representing the failure should be ErrIncompatibleBitVectorLength")
 
 	// if bits is not multiply of 8, then padding is needed
 	signers = unittest.IdentityListFixture(15)
@@ -175,32 +206,32 @@ func Test_ValidPaddingErrIncompatibleBitVectorLength(t *testing.T) {
 
 	// 1 byte more
 	_, _, err = signature.DecodeSigTypeToStakingAndBeaconSigners(signers, []byte{byte(255), byte(255), byte(254)})
-	require.Error(t, err)
-	require.ErrorAs(t, err, &signature.ErrIncompatibleBitVectorLength)
+	require.True(t, signature.IsInvalidSigTypesError(err), "API-level error should be InvalidSigTypesError")
+	require.ErrorIs(t, err, signature.ErrIncompatibleBitVectorLength, "low-level error representing the failure should be ErrIncompatibleBitVectorLength")
 
 	// 1 byte less
 	_, _, err = signature.DecodeSigTypeToStakingAndBeaconSigners(signers, []byte{byte(254)})
-	require.Error(t, err)
-	require.ErrorAs(t, err, &signature.ErrIncompatibleBitVectorLength)
+	require.True(t, signature.IsInvalidSigTypesError(err), "API-level error should be InvalidSigTypesError")
+	require.ErrorIs(t, err, signature.ErrIncompatibleBitVectorLength, "low-level error representing the failure should be ErrIncompatibleBitVectorLength")
 
 	// if bits is not multiply of 8,
 	// 1 byte more
 	signers = unittest.IdentityListFixture(0)
 	_, _, err = signature.DecodeSigTypeToStakingAndBeaconSigners(signers, []byte{byte(255)})
-	require.Error(t, err)
-	require.ErrorAs(t, err, &signature.ErrIncompatibleBitVectorLength)
+	require.True(t, signature.IsInvalidSigTypesError(err), "API-level error should be InvalidSigTypesError")
+	require.ErrorIs(t, err, signature.ErrIncompatibleBitVectorLength, "low-level error representing the failure should be ErrIncompatibleBitVectorLength")
 
 	// 1 byte more
 	signers = unittest.IdentityListFixture(1)
 	_, _, err = signature.DecodeSigTypeToStakingAndBeaconSigners(signers, []byte{byte(0), byte(0)})
-	require.Error(t, err)
-	require.ErrorAs(t, err, &signature.ErrIncompatibleBitVectorLength)
+	require.True(t, signature.IsInvalidSigTypesError(err), "API-level error should be InvalidSigTypesError")
+	require.ErrorIs(t, err, signature.ErrIncompatibleBitVectorLength, "low-level error representing the failure should be ErrIncompatibleBitVectorLength")
 
 	// 1 byte less
 	signers = unittest.IdentityListFixture(7)
 	_, _, err = signature.DecodeSigTypeToStakingAndBeaconSigners(signers, []byte{})
-	require.Error(t, err)
-	require.ErrorAs(t, err, &signature.ErrIncompatibleBitVectorLength)
+	require.True(t, signature.IsInvalidSigTypesError(err), "API-level error should be InvalidSigTypesError")
+	require.ErrorIs(t, err, signature.ErrIncompatibleBitVectorLength, "low-level error representing the failure should be ErrIncompatibleBitVectorLength")
 }
 
 func TestValidPaddingErrIllegallyPaddedBitVector(t *testing.T) {
@@ -210,23 +241,23 @@ func TestValidPaddingErrIllegallyPaddedBitVector(t *testing.T) {
 	for count := 1; count < 8; count++ {
 		signers = unittest.IdentityListFixture(count)
 		_, _, err = signature.DecodeSigTypeToStakingAndBeaconSigners(signers, []byte{byte(255)}) // last bit should be 0, but 1
-		require.Error(t, err)
-		require.ErrorAs(t, err, &signature.ErrIllegallyPaddedBitVector)
+		require.True(t, signature.IsInvalidSigTypesError(err), "API-level error should be InvalidSigTypesError")
+		require.ErrorIs(t, err, signature.ErrIllegallyPaddedBitVector, "low-level error representing the failure should be ErrIllegallyPaddedBitVector")
 
 		_, _, err = signature.DecodeSigTypeToStakingAndBeaconSigners(signers, []byte{byte(1)}) // last bit should be 0, but 1
-		require.Error(t, err)
-		require.ErrorAs(t, err, &signature.ErrIllegallyPaddedBitVector)
+		require.True(t, signature.IsInvalidSigTypesError(err), "API-level error should be InvalidSigTypesError")
+		require.ErrorIs(t, err, signature.ErrIllegallyPaddedBitVector, "low-level error representing the failure should be ErrIllegallyPaddedBitVector")
 	}
 
 	for count := 9; count < 16; count++ {
 		signers = unittest.IdentityListFixture(count)
 		_, _, err = signature.DecodeSigTypeToStakingAndBeaconSigners(signers, []byte{byte(255), byte(255)}) // last bit should be 0, but 1
-		require.Error(t, err)
-		require.ErrorAs(t, err, &signature.ErrIllegallyPaddedBitVector)
+		require.True(t, signature.IsInvalidSigTypesError(err), "API-level error should be InvalidSigTypesError")
+		require.ErrorIs(t, err, signature.ErrIllegallyPaddedBitVector, "low-level error representing the failure should be ErrIllegallyPaddedBitVector")
 
 		_, _, err = signature.DecodeSigTypeToStakingAndBeaconSigners(signers, []byte{byte(1), byte(1)}) // last bit should be 0, but 1
-		require.Error(t, err)
-		require.ErrorAs(t, err, &signature.ErrIllegallyPaddedBitVector)
+		require.True(t, signature.IsInvalidSigTypesError(err), "API-level error should be InvalidSigTypesError")
+		require.ErrorIs(t, err, signature.ErrIllegallyPaddedBitVector, "low-level error representing the failure should be ErrIllegallyPaddedBitVector")
 	}
 }
 

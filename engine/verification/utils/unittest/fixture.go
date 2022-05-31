@@ -130,12 +130,12 @@ func (c CompleteExecutionReceiptList) resultOf(t *testing.T, chunkID flow.Identi
 
 // CompleteExecutionReceiptBuilder is a test helper struct that specifies the parameters to build a CompleteExecutionReceipt.
 type CompleteExecutionReceiptBuilder struct {
-	resultsCount  int // number of execution results in the container block.
-	executorCount int // number of times each execution result is copied in a block (by different receipts).
-	chunksCount   int // number of chunks in each execution result.
-	chain         flow.Chain
-	executorIDs   flow.IdentifierList // identifier of execution nodes in the test.
-	participants  flow.IdentityList   // identity of all nodes
+	resultsCount     int // number of execution results in the container block.
+	executorCount    int // number of times each execution result is copied in a block (by different receipts).
+	chunksCount      int // number of chunks in each execution result.
+	chain            flow.Chain
+	executorIDs      flow.IdentifierList // identifier of execution nodes in the test.
+	clusterCommittee flow.IdentityList
 }
 
 type CompleteExecutionReceiptBuilderOpt func(builder *CompleteExecutionReceiptBuilder)
@@ -170,9 +170,26 @@ func WithExecutorIDs(executorIDs flow.IdentifierList) CompleteExecutionReceiptBu
 	}
 }
 
+func WithClusterCommittee(clusterCommittee flow.IdentityList) CompleteExecutionReceiptBuilderOpt {
+	return func(builder *CompleteExecutionReceiptBuilder) {
+		builder.clusterCommittee = clusterCommittee
+	}
+}
+
+// CompleteExecutionReceiptFixture returns complete execution receipt with an
+// execution receipt referencing the block collections.
+//
+// chunks determines the number of chunks inside each receipt.
+// The output is an execution result with chunks+1 chunks, where the last chunk accounts
+// for the system chunk.
+// TODO: remove this function once new verification architecture is in place.
+func CompleteExecutionReceiptFixture(t *testing.T, chunks int, chain flow.Chain, root *flow.Header) *CompleteExecutionReceipt {
+	return CompleteExecutionReceiptChainFixture(t, root, 1, WithChunksCount(chunks), WithChain(chain))[0]
+}
+
 // ExecutionResultFixture is a test helper that returns an execution result for the reference block header as well as the execution receipt data
 // for that result.
-func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, participants flow.IdentityList, refBlkHeader *flow.Header) (*flow.ExecutionResult,
+func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refBlkHeader *flow.Header, clusterCommittee flow.IdentityList) (*flow.ExecutionResult,
 	*ExecutionReceiptData) {
 
 	// setups up the first collection of block consists of three transactions
@@ -436,7 +453,7 @@ func ExecutionReceiptsFromParentBlockFixture(t *testing.T, parent *flow.Header, 
 func ExecutionResultFromParentBlockFixture(t *testing.T, parent *flow.Header, builder *CompleteExecutionReceiptBuilder) (*flow.ExecutionResult,
 	*ExecutionReceiptData) {
 	refBlkHeader := unittest.BlockHeaderWithParentFixture(parent)
-	return ExecutionResultFixture(t, builder.chunksCount, builder.chain, builder.participants, &refBlkHeader)
+	return ExecutionResultFixture(t, builder.chunksCount, builder.chain, &refBlkHeader, builder.clusterCommittee)
 }
 
 // ContainerBlockFixture builds and returns a block that contains input execution receipts.

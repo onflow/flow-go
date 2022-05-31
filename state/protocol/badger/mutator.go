@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
@@ -314,6 +315,9 @@ func (m *MutableState) guaranteeExtend(ctx context.Context, candidate *flow.Bloc
 		// get the reference block to check expiry
 		ref, err := m.headers.ByBlockID(guarantee.ReferenceBlockID)
 		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				return state.NewInvalidExtensionErrorf("could not get reference block %x: %w", guarantee.ReferenceBlockID, err)
+			}
 			return fmt.Errorf("could not get reference block (%x): %w", guarantee.ReferenceBlockID, err)
 		}
 
@@ -326,10 +330,12 @@ func (m *MutableState) guaranteeExtend(ctx context.Context, candidate *flow.Bloc
 		// check the guarantors are correct
 		_, err = protocol.FindGuarantors(m, guarantee)
 		if err != nil {
-			if protocol.IsUnexpectedFindGuarantorsError(err) {
-				return fmt.Errorf("could not find guarantor for guarantee %v: %w", guarantee.ID(), err)
+			if signature.IsInvalidSignerIndicesError(err) ||
+				errors.Is(err, protocol.ErrEpochNotCommitted) ||
+				errors.Is(err, protocol.ErrClusterNotFound) {
+				return state.NewInvalidExtensionErrorf("guarantee %v contains invalid guarantors: %w", guarantee.ID(), err)
 			}
-			return state.NewInvalidExtensionErrorf("guarantee %v contains invalid guarantors: %w", guarantee.ID(), err)
+			return fmt.Errorf("could not find guarantor for guarantee %v: %w", guarantee.ID(), err)
 		}
 	}
 
