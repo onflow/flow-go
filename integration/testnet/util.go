@@ -23,7 +23,7 @@ import (
 // service exposed at the given port.
 func healthcheckAccessGRPC(apiPort string) func() error {
 	return func() error {
-		fmt.Println("healthchecking...")
+		fmt.Println("healthchecking (healthcheckAccessGRPC) for port ", apiPort)
 		c, err := client.NewAccessClient(fmt.Sprintf(":%s", apiPort))
 		if err != nil {
 			return err
@@ -37,7 +37,7 @@ func healthcheckAccessGRPC(apiPort string) func() error {
 // service exposed at the given port.
 func healthcheckExecutionGRPC(apiPort string) func() error {
 	return func() error {
-		fmt.Println("healthchecking...")
+		fmt.Println("healthchecking (healthcheckExecutionGRPC) for port ", apiPort)
 		c, err := client.NewExecutionClient(fmt.Sprintf(":%s", apiPort))
 		if err != nil {
 			return err

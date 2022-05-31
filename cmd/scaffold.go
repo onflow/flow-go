@@ -111,6 +111,7 @@ type FlowNodeBuilder struct {
 }
 
 func (fnb *FlowNodeBuilder) BaseFlags() {
+	fmt.Println("FlowNodeBuilder>BaseFlags>start")
 	defaultConfig := DefaultBaseConfig()
 
 	// bind configuration parameters
@@ -169,6 +170,8 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.MaxRequests, "sync-max-requests", defaultConfig.SyncCoreConfig.MaxRequests, "the maximum number of requests we send during each scanning period")
 
 	fnb.flags.Uint64Var(&fnb.BaseConfig.ComplianceConfig.SkipNewProposalsThreshold, "compliance-skip-proposals-threshold", defaultConfig.ComplianceConfig.SkipNewProposalsThreshold, "threshold at which new proposals are discarded rather than cached, if their height is this much above local finalized height")
+	fnb.flags.StringVar(&fnb.BaseConfig.hostNetworking, "network", "host", "enable host networking when container starts")
+	fmt.Println("FlowNodeBuilder>BaseFlags>end")
 }
 
 func (fnb *FlowNodeBuilder) EnqueuePingService() {
@@ -408,18 +411,22 @@ func (fnb *FlowNodeBuilder) EnqueueTracer() {
 }
 
 func (fnb *FlowNodeBuilder) ParseAndPrintFlags() error {
+	fmt.Println("scaffold>ParseAndPrintFlags>start")
 	// parse configuration parameters
 	pflag.Parse()
+	fmt.Println("scaffold>ParseAndPrintFlags>2")
 
 	// print all flags
 	log := fnb.Logger.Info()
 
 	pflag.VisitAll(func(flag *pflag.Flag) {
+		fmt.Println("scaffold>ParseAndPrintFlags>3")
 		log = log.Str(flag.Name, flag.Value.String())
+		fmt.Println("scaffold>ParseAndPrintFlags>4")
 	})
 
 	log.Msg("flags loaded")
-
+	fmt.Println("scaffold>ParseAndPrintFlags>end")
 	return fnb.extraFlagsValidation()
 }
 
@@ -429,7 +436,7 @@ func (fnb *FlowNodeBuilder) ValidateFlags(f func() error) NodeBuilder {
 }
 
 func (fnb *FlowNodeBuilder) PrintBuildVersionDetails() {
-	fnb.Logger.Info().Str("version", build.Semver()).Str("commit", build.Commit()).Msg("build details")
+	fnb.Logger.Info().Str("version", build.Semver()).Str("commit", build.Commit()).Msg("build details (PrintBuildVersionDetails333)")
 }
 
 func (fnb *FlowNodeBuilder) initNodeInfo() {
@@ -970,7 +977,9 @@ func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc, parentReady <-
 
 // ExtraFlags enables binding additional flags beyond those defined in BaseConfig.
 func (fnb *FlowNodeBuilder) ExtraFlags(f func(*pflag.FlagSet)) NodeBuilder {
+	fmt.Println("FlowNodeBuilder>ExtraFlags>start")
 	f(fnb.flags)
+	fmt.Println("FlowNodeBuilder>ExtraFlags>end")
 	return fnb
 }
 
@@ -1124,16 +1133,20 @@ func FlowNode(role string, opts ...Option) *FlowNodeBuilder {
 }
 
 func (fnb *FlowNodeBuilder) Initialize() error {
+	fmt.Println("scaffold>Initialize()>1")
 	fnb.PrintBuildVersionDetails()
+	fmt.Println("scaffold>Initialize()>2")
 
 	fnb.BaseFlags()
+	fmt.Println("scaffold>Initialize()>3")
 
 	if err := fnb.ParseAndPrintFlags(); err != nil {
 		return err
 	}
-
+	fmt.Println("scaffold>Initialize()>4")
 	// ID providers must be initialized before the network
 	fnb.InitIDProviders()
+	fmt.Println("scaffold>Initialize()>5")
 
 	fnb.EnqueueResolver()
 
@@ -1149,7 +1162,7 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 	}
 
 	fnb.EnqueueTracer()
-
+	fmt.Println("scaffold>Initialize()>end")
 	return nil
 }
 
