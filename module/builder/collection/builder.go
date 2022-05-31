@@ -413,6 +413,8 @@ func (b *Builder) populateFinalizedAncestryLookup(minRefHeight, maxRefHeight uin
 		}
 	}
 
+	fmt.Printf("builder - checking ref height range [%d,%d], %d cluster blocks\n", minRefHeight, maxRefHeight, len(clusterBlockIDs))
+
 	return nil
 }
 

@@ -148,6 +148,7 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 				maxRefHeight = refBlock.Height
 			}
 		}
+		log.Info().Msgf("%d transactions in proposed collection have minRefHeight: %d, maxRefHeight: %d (maxUInt64: %d)", minRefHeight, maxRefHeight, uint64(math.MaxUint64))
 
 		// a valid collection must reference the oldest reference block among
 		// its constituent transactions
