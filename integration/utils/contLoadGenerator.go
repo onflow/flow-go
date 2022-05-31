@@ -307,6 +307,7 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 		lg.serviceAccount.signer,
 	)
 	if err != nil {
+		lg.serviceAccount.signerLock.Unlock()
 		return err
 	}
 	lg.serviceAccount.accountKey.SequenceNumber++
