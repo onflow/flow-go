@@ -28,8 +28,14 @@ var (
 )
 
 func init() {
-	DefaultAPIRatelimits = make(map[string]int)
-	DefaultAPIBurstlimits = make(map[string]int)
+	DefaultAPIRatelimits = map[string]int{
+		"Ping":            100,
+		"SendTransaction": 100,
+	}
+	DefaultAPIBurstlimits = map[string]int{
+		"Ping":            100,
+		"SendTransaction": 100,
+	}
 }
 
 // Backend defines the core functionality required by the RPC API.

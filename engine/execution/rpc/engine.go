@@ -34,8 +34,30 @@ var (
 )
 
 func init() {
-	DefaultAPIRatelimits = make(map[string]int)
-	DefaultAPIBurstlimits = make(map[string]int)
+	DefaultAPIRatelimits = map[string]int{
+		"Ping":                           100,
+		"ExecuteScriptAtBlockID":         400,
+		"GetRegisterAtBlockID":           100,
+		"GetEventsForBlockIDs":           1000,
+		"GetTransactionResult":           3000,
+		"GetTransactionResultByIndex":    100,
+		"GetTransactionResultsByBlockID": 200,
+		"GetAccountAtBlockID":            800,
+		"GetLatestBlockHeader":           100,
+		"GetBlockHeaderByID":             100,
+	}
+	DefaultAPIBurstlimits = map[string]int{
+		"Ping":                           100,
+		"ExecuteScriptAtBlockID":         50,
+		"GetRegisterAtBlockID":           100,
+		"GetEventsForBlockIDs":           100,
+		"GetTransactionResult":           200,
+		"GetTransactionResultByIndex":    100,
+		"GetTransactionResultsByBlockID": 100,
+		"GetAccountAtBlockID":            100,
+		"GetLatestBlockHeader":           100,
+		"GetBlockHeaderByID":             100,
+	}
 }
 
 // Config defines the configurable options for the gRPC server.
