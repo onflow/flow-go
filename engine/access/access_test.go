@@ -617,8 +617,11 @@ func (suite *Suite) TestGetSealedTransaction() {
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, blocks, headers, collections,
 			transactions, results, receipts, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, rpcEng)
 		require.NoError(suite.T(), err)
+		
+		background, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
-		ctx, _ := irrecoverable.WithSignaler(context.Background())
+		ctx, _ := irrecoverable.WithSignaler(background)
 		ingestEng.DisableProcessBackground()
 		ingestEng.Start(ctx)
 		<-ingestEng.Ready()
