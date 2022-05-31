@@ -7,7 +7,6 @@ import (
 	"math"
 
 	"github.com/dgraph-io/badger/v2"
-
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -120,6 +119,11 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 		checkTxsSpan, _ := m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendCheckTransactionsValid)
 		defer checkTxsSpan.Finish()
 
+		// for empty collections no further validation is necessary
+		if payload.Collection.Len() == 0 {
+			return nil
+		}
+
 		// check that all transactions within the collection are valid
 		minRefID := flow.ZeroID
 		minRefHeight := uint64(math.MaxUint64)
@@ -145,7 +149,7 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 
 		// a valid collection must reference the oldest reference block among
 		// its constituent transactions
-		if payload.Collection.Len() > 0 && minRefID != payload.ReferenceBlockID {
+		if minRefID != payload.ReferenceBlockID {
 			return state.NewInvalidExtensionErrorf(
 				"reference block (id=%x) must match oldest transaction's reference block (id=%x)",
 				payload.ReferenceBlockID, minRefID,
