@@ -1,6 +1,8 @@
 package fvm
 
 import (
+	"math"
+
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/handler"
@@ -11,19 +13,21 @@ import (
 
 // A Context defines a set of execution parameters used by the virtual machine.
 type Context struct {
-	Chain                         flow.Chain
-	Blocks                        Blocks
-	Metrics                       handler.MetricsReporter
-	Tracer                        module.Tracer
-	ComputationLimit              uint64
-	MemoryLimit                   uint64
-	MaxStateKeySize               uint64
-	MaxStateValueSize             uint64
-	MaxStateInteractionSize       uint64
-	EventCollectionByteSizeLimit  uint64
-	MaxNumOfTxRetries             uint8
-	BlockHeader                   *flow.Header
-	ServiceAccountEnabled         bool
+	Chain                        flow.Chain
+	Blocks                       Blocks
+	Metrics                      handler.MetricsReporter
+	Tracer                       module.Tracer
+	ComputationLimit             uint64
+	MemoryLimit                  uint64
+	MaxStateKeySize              uint64
+	MaxStateValueSize            uint64
+	MaxStateInteractionSize      uint64
+	EventCollectionByteSizeLimit uint64
+	MaxNumOfTxRetries            uint8
+	BlockHeader                  *flow.Header
+	ServiceAccountEnabled        bool
+	// Depricated: RestrictedDeploymentEnabled is deprecated use SetIsContractDeploymentRestrictedTransaction instead.
+	// Can be removed after all networks are migrated to SetIsContractDeploymentRestrictedTransaction
 	RestrictedDeploymentEnabled   bool
 	LimitAccountStorage           bool
 	TransactionFeesEnabled        bool
@@ -58,9 +62,9 @@ func newContext(ctx Context, opts ...Option) Context {
 const AccountKeyWeightThreshold = 1000
 
 const (
-	DefaultComputationLimit             = 100_000   // 100K
-	DefaultMemoryLimit                  = 2_000_000 // 2G
-	DefaultEventCollectionByteSizeLimit = 256_000   // 256KB
+	DefaultComputationLimit             = 100_000        // 100K
+	DefaultMemoryLimit                  = math.MaxUint64 //
+	DefaultEventCollectionByteSizeLimit = 256_000        // 256KB
 	DefaultMaxNumOfTxRetries            = 3
 )
 

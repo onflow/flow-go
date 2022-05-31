@@ -3,6 +3,7 @@ package flow
 import (
 	"bytes"
 	"math/rand"
+	"sort"
 
 	"github.com/rs/zerolog/log"
 )
@@ -114,4 +115,24 @@ IDLoop:
 		dup = append(dup, identifier)
 	}
 	return dup
+}
+
+func (il IdentifierList) Sort(less IdentifierOrder) IdentifierList {
+	dup := il.Copy()
+	sort.Slice(dup, func(i int, j int) bool {
+		return less(dup[i], dup[j])
+	})
+	return dup
+}
+
+// Sorted returns whether the list is sorted by the input ordering.
+func (il IdentifierList) Sorted(less IdentifierOrder) bool {
+	for i := 0; i < len(il)-1; i++ {
+		a := il[i]
+		b := il[i+1]
+		if !less(a, b) {
+			return false
+		}
+	}
+	return true
 }

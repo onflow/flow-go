@@ -20,6 +20,7 @@ import (
 	read_protocol_state "github.com/onflow/flow-go/cmd/util/cmd/read-protocol-state/cmd"
 	index_er "github.com/onflow/flow-go/cmd/util/cmd/reindex/cmd"
 	rollback_executed_height "github.com/onflow/flow-go/cmd/util/cmd/rollback-executed-height/cmd"
+	"github.com/onflow/flow-go/cmd/util/cmd/snapshot"
 	truncate_database "github.com/onflow/flow-go/cmd/util/cmd/truncate-database"
 )
 
@@ -68,6 +69,7 @@ func addCommands() {
 	rootCmd.AddCommand(index_er.RootCmd)
 	rootCmd.AddCommand(rollback_executed_height.Cmd)
 	rootCmd.AddCommand(read_execution_state.Cmd)
+	rootCmd.AddCommand(snapshot.Cmd)
 }
 
 func initConfig() {

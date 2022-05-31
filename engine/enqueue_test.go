@@ -229,10 +229,12 @@ func TestProcessMessageSameType(t *testing.T) {
 		require.NoError(t, eng.Process(id2, m4))
 
 		require.Eventuallyf(t, func() bool {
-			return len(eng.messages) == 4
+			return eng.MessageCount() == 4
 		}, 2*time.Second, 10*time.Millisecond, "expect %v messages, but go %v messages",
-			4, eng.messages)
+			4, eng.MessageCount())
 
+		eng.mu.Lock()
+		defer eng.mu.Unlock()
 		require.Equal(t, m1, eng.messages[0])
 		require.Equal(t, m2, eng.messages[1])
 		require.Equal(t, m3, eng.messages[2])
@@ -256,10 +258,12 @@ func TestProcessMessageDifferentType(t *testing.T) {
 		require.NoError(t, eng.Process(id2, m4))
 
 		require.Eventuallyf(t, func() bool {
-			return len(eng.messages) == 4
+			return eng.MessageCount() == 4
 		}, 2*time.Second, 10*time.Millisecond, "expect %v messages, but go %v messages",
-			4, eng.messages)
+			4, eng.MessageCount())
 
+		eng.mu.Lock()
+		defer eng.mu.Unlock()
 		require.Equal(t, m1, eng.messages[0])
 		require.Equal(t, m2, eng.messages[1])
 		require.Equal(t, &messageC{s: "c-3"}, eng.messages[2])
@@ -286,9 +290,11 @@ func TestProcessMessageInterval(t *testing.T) {
 		require.NoError(t, eng.Process(id2, m4))
 
 		require.Eventuallyf(t, func() bool {
-			return len(eng.messages) == 4
+			return eng.MessageCount() == 4
 		}, 2*time.Second, 10*time.Millisecond, "expect %v messages, but go %v messages",
-			4, eng.messages)
+			4, eng.MessageCount())
+		eng.mu.Lock()
+		defer eng.mu.Unlock()
 
 		require.Equal(t, m1, eng.messages[0])
 		require.Equal(t, m2, eng.messages[1])
