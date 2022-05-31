@@ -270,6 +270,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		node.PublicDB,
 		node.Metrics,
 		node.Tracer,
+		node.Log,
 	)
 	require.NoError(t, err)
 

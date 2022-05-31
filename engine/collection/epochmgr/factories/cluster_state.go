@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
 	clusterkv "github.com/onflow/flow-go/state/cluster/badger"
@@ -14,17 +15,20 @@ type ClusterStateFactory struct {
 	db      *badger.DB
 	metrics module.CacheMetrics
 	tracer  module.Tracer
+	log     zerolog.Logger
 }
 
 func NewClusterStateFactory(
 	db *badger.DB,
 	metrics module.CacheMetrics,
 	tracer module.Tracer,
+	log zerolog.Logger,
 ) (*ClusterStateFactory, error) {
 	factory := &ClusterStateFactory{
 		db:      db,
 		metrics: metrics,
 		tracer:  tracer,
+		log:     log,
 	}
 	return factory, nil
 }
@@ -58,7 +62,7 @@ func (f *ClusterStateFactory) Create(stateRoot *clusterkv.StateRoot) (
 		}
 	}
 
-	mutableState, err := clusterkv.NewMutableState(clusterState, f.tracer, headers, payloads)
+	mutableState, err := clusterkv.NewMutableState(clusterState, f.tracer, headers, payloads, f.log)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("could create mutable cluster state: %w", err)
 	}

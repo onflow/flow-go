@@ -62,7 +62,7 @@ func (suite *SnapshotSuite) SetupTest() {
 	suite.Assert().Nil(err)
 	clusterState, err := Bootstrap(suite.db, clusterStateRoot)
 	suite.Assert().Nil(err)
-	suite.state, err = NewMutableState(clusterState, tracer, headers, colPayloads)
+	suite.state, err = NewMutableState(clusterState, tracer, headers, colPayloads, unittest.Logger())
 	suite.Assert().Nil(err)
 
 	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())

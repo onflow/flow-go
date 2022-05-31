@@ -70,12 +70,13 @@ const (
 	COLBuildOnDBInsert          SpanName = "col.builder.dbInsert"
 
 	// Cluster State
-	COLClusterStateMutatorExtend                       SpanName = "col.state.mutator.extend"
-	COLClusterStateMutatorExtendSetup                  SpanName = "col.state.mutator.extend.setup"
-	COLClusterStateMutatorExtendCheckAncestry          SpanName = "col.state.mutator.extend.ancestry"
-	COLClusterStateMutatorExtendCheckTransactionsValid SpanName = "col.state.mutator.extend.transactions.validity"
-	COLClusterStateMutatorExtendCheckTransactionsDupes SpanName = "col.state.mutator.extend.transactions.dupes"
-	COLClusterStateMutatorExtendDBInsert               SpanName = "col.state.mutator.extend.dbInsert"
+	COLClusterStateMutatorExtend                                  SpanName = "col.state.mutator.extend"
+	COLClusterStateMutatorExtendSetup                             SpanName = "col.state.mutator.extend.setup"
+	COLClusterStateMutatorExtendCheckAncestry                     SpanName = "col.state.mutator.extend.ancestry"
+	COLClusterStateMutatorExtendCheckTransactionsValid            SpanName = "col.state.mutator.extend.transactions.validity"
+	COLClusterStateMutatorExtendCheckTransactionsUnfinalizedDupes SpanName = "col.state.mutator.extend.transactions.unfinalizedDupes"
+	COLClusterStateMutatorExtendCheckTransactionsFinalizedDupes   SpanName = "col.state.mutator.extend.transactions.finalizedDupes"
+	COLClusterStateMutatorExtendDBInsert                          SpanName = "col.state.mutator.extend.dbInsert"
 
 	// Execution Node
 	//

@@ -84,7 +84,7 @@ func (suite *BuilderSuite) SetupTest() {
 	clusterState, err := clusterkv.Bootstrap(suite.db, clusterStateRoot)
 	suite.Require().NoError(err)
 
-	suite.state, err = clusterkv.NewMutableState(clusterState, tracer, suite.headers, suite.payloads)
+	suite.state, err = clusterkv.NewMutableState(clusterState, tracer, suite.headers, suite.payloads, unittest.Logger())
 	suite.Require().NoError(err)
 
 	// just bootstrap with a genesis block, we'll use this as reference
@@ -948,7 +948,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		state, err := clusterkv.Bootstrap(suite.db, stateRoot)
 		assert.NoError(b, err)
 
-		suite.state, err = clusterkv.NewMutableState(state, tracer, suite.headers, suite.payloads)
+		suite.state, err = clusterkv.NewMutableState(state, tracer, suite.headers, suite.payloads, unittest.Logger())
 		assert.NoError(b, err)
 
 		// add some transactions to transaction pool
