@@ -632,7 +632,7 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 		// NOTE: we could abstract all of this away into an interface{} field,
 		// but that would be over the top as we will probably always use hotstuff
 		View:               0,
-		ParentVoterIDs:     nil,
+		ParentVoterIndices: nil,
 		ParentVoterSigData: nil,
 		ProposerID:         flow.ZeroID,
 		ProposerSigData:    nil,

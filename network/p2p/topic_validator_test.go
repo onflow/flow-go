@@ -1,13 +1,12 @@
-package p2p
+package p2p_test
 
 import (
 	"context"
 	"os"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
-
-	"sync/atomic"
 
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -15,12 +14,12 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/model/messages"
-	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
-
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
+	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/message"
+	"github.com/onflow/flow-go/network/p2p"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -41,7 +40,7 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	topic := engine.TopicFromChannel(channel, sporkId)
 
 	ids := flow.IdentityList{identity1, identity2, identity3}
-	translator, err := NewFixedTableIdentityTranslator(ids)
+	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
 	// setup hooked logger
@@ -64,8 +63,8 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 
 	// node1 is connected to node2, and the an1 is connected to node1
 	// an1 <-> sn1 <-> sn2
-	require.NoError(t, sn1.AddPeer(context.TODO(), *host.InfoFromHost(sn2.host)))
-	require.NoError(t, an1.AddPeer(context.TODO(), *host.InfoFromHost(sn1.host)))
+	require.NoError(t, sn1.AddPeer(context.TODO(), *host.InfoFromHost(sn2.Host())))
+	require.NoError(t, an1.AddPeer(context.TODO(), *host.InfoFromHost(sn1.Host())))
 
 	// sn1 and sn2 subscribe to the topic with the topic validator
 	sub1, err := sn1.Subscribe(topic, authorizedSenderValidator)
@@ -77,9 +76,9 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 
 	// assert that the nodes are connected as expected
 	require.Eventually(t, func() bool {
-		return len(sn1.pubSub.ListPeers(topic.String())) > 0 &&
-			len(sn2.pubSub.ListPeers(topic.String())) > 0 &&
-			len(an1.pubSub.ListPeers(topic.String())) > 0
+		return len(sn1.ListPeers(topic.String())) > 0 &&
+			len(sn2.ListPeers(topic.String())) > 0 &&
+			len(an1.ListPeers(topic.String())) > 0
 	}, 3*time.Second, 100*time.Millisecond)
 
 	timedCtx, cancel5s := context.WithTimeout(context.Background(), 5*time.Second)
@@ -147,7 +146,7 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	topic := engine.TopicFromChannel(channel, sporkId)
 
 	ids := flow.IdentityList{identity1, identity2}
-	translator, err := NewFixedTableIdentityTranslator(ids)
+	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
 	// setup hooked logger
@@ -169,7 +168,7 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 
 	// node1 is connected to node2
 	// sn1 <-> sn2
-	require.NoError(t, sn1.AddPeer(context.TODO(), *host.InfoFromHost(sn2.host)))
+	require.NoError(t, sn1.AddPeer(context.TODO(), *host.InfoFromHost(sn2.Host())))
 
 	// sn1 subscribe to the topic with the topic validator, while sn2 will subscribe without the topic validator to allow sn2 to publish unauthorized messages
 	sub1, err := sn1.Subscribe(topic, authorizedSenderValidator)
@@ -179,8 +178,8 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 
 	// assert that the nodes are connected as expected
 	require.Eventually(t, func() bool {
-		return len(sn1.pubSub.ListPeers(topic.String())) > 0 &&
-			len(sn2.pubSub.ListPeers(topic.String())) > 0
+		return len(sn1.ListPeers(topic.String())) > 0 &&
+			len(sn2.ListPeers(topic.String())) > 0
 	}, 3*time.Second, 100*time.Millisecond)
 
 	timedCtx, cancel5s := context.WithTimeout(context.Background(), 5*time.Second)
@@ -220,7 +219,7 @@ func TestAuthorizedSenderValidator_Unstaked(t *testing.T) {
 
 	//NOTE: identity2 is not in the ids list simulating an un-staked node
 	ids := flow.IdentityList{identity1}
-	translator, err := NewFixedTableIdentityTranslator(ids)
+	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
 	// setup hooked logger
@@ -242,7 +241,7 @@ func TestAuthorizedSenderValidator_Unstaked(t *testing.T) {
 
 	// node1 is connected to node2
 	// sn1 <-> sn2
-	require.NoError(t, sn1.AddPeer(context.TODO(), *host.InfoFromHost(sn2.host)))
+	require.NoError(t, sn1.AddPeer(context.TODO(), *host.InfoFromHost(sn2.Host())))
 
 	// sn1 subscribe to the topic with the topic validator, while sn2 will subscribe without the topic validator to allow sn2 to publish unauthorized messages
 	sub1, err := sn1.Subscribe(topic, authorizedSenderValidator)
@@ -252,8 +251,8 @@ func TestAuthorizedSenderValidator_Unstaked(t *testing.T) {
 
 	// assert that the nodes are connected as expected
 	require.Eventually(t, func() bool {
-		return len(sn1.pubSub.ListPeers(topic.String())) > 0 &&
-			len(sn2.pubSub.ListPeers(topic.String())) > 0
+		return len(sn1.ListPeers(topic.String())) > 0 &&
+			len(sn2.ListPeers(topic.String())) > 0
 	}, 3*time.Second, 100*time.Millisecond)
 
 	timedCtx, cancel5s := context.WithTimeout(context.Background(), 5*time.Second)
@@ -295,7 +294,7 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	topic := engine.TopicFromChannel(channel, sporkId)
 
 	ids := flow.IdentityList{identity1, identity2, identity3}
-	translator, err := NewFixedTableIdentityTranslator(ids)
+	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
 	// setup hooked logger
@@ -317,8 +316,8 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 
 	// node1 is connected to node2, and the an1 is connected to node1
 	// an1 <-> sn1 <-> sn2
-	require.NoError(t, sn1.AddPeer(context.TODO(), *host.InfoFromHost(sn2.host)))
-	require.NoError(t, an1.AddPeer(context.TODO(), *host.InfoFromHost(sn1.host)))
+	require.NoError(t, sn1.AddPeer(context.TODO(), *host.InfoFromHost(sn2.Host())))
+	require.NoError(t, an1.AddPeer(context.TODO(), *host.InfoFromHost(sn1.Host())))
 
 	// sn1 subscribe to the topic with the topic validator, while sn2 will subscribe without the topic validator to allow sn2 to publish unauthorized messages
 	sub1, err := sn1.Subscribe(topic, authorizedSenderValidator)
@@ -330,9 +329,9 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 
 	// assert that the nodes are connected as expected
 	require.Eventually(t, func() bool {
-		return len(sn1.pubSub.ListPeers(topic.String())) > 0 &&
-			len(sn2.pubSub.ListPeers(topic.String())) > 0 &&
-			len(an1.pubSub.ListPeers(topic.String())) > 0
+		return len(sn1.ListPeers(topic.String())) > 0 &&
+			len(sn2.ListPeers(topic.String())) > 0 &&
+			len(an1.ListPeers(topic.String())) > 0
 	}, 3*time.Second, 100*time.Millisecond)
 
 	timedCtx, cancel5s := context.WithTimeout(context.Background(), 5*time.Second)
@@ -374,6 +373,70 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 
 	// expecting 1 warn calls for each rejected message from ejected node
 	require.Equalf(t, uint64(1), hookCalls, "expected 1 warning to be logged")
+}
+
+// TestAuthorizedSenderValidator_ClusterChannel tests that the authorized sender validator correctly validates messages sent on cluster channels
+func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
+	sporkId := unittest.IdentifierFixture()
+	identity1, privateKey1 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleCollection))
+	ln1 := createNode(t, identity1.NodeID, privateKey1, sporkId)
+
+	identity2, privateKey2 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleCollection))
+	ln2 := createNode(t, identity2.NodeID, privateKey2, sporkId)
+
+	identity3, privateKey3 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleCollection))
+	ln3 := createNode(t, identity3.NodeID, privateKey3, sporkId)
+
+	channel := engine.ChannelSyncCluster(flow.Testnet)
+	topic := engine.TopicFromChannel(channel, sporkId)
+
+	ids := flow.IdentityList{identity1, identity2}
+	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
+	require.NoError(t, err)
+
+	authorizedSenderValidator := validator.AuthorizedSenderValidator(zerolog.Nop(), channel, func(pid peer.ID) (*flow.Identity, bool) {
+		fid, err := translator.GetFlowID(pid)
+		if err != nil {
+			return &flow.Identity{}, false
+		}
+		return ids.ByNodeID(fid)
+	})
+
+	// ln3 <-> sn1 <-> sn2
+	require.NoError(t, ln1.AddPeer(context.TODO(), *host.InfoFromHost(ln2.Host())))
+	require.NoError(t, ln3.AddPeer(context.TODO(), *host.InfoFromHost(ln1.Host())))
+
+	sub1, err := ln1.Subscribe(topic, authorizedSenderValidator)
+	require.NoError(t, err)
+	sub2, err := ln2.Subscribe(topic, authorizedSenderValidator)
+	require.NoError(t, err)
+	sub3, err := ln3.Subscribe(topic, authorizedSenderValidator)
+	require.NoError(t, err)
+
+	// assert that the nodes are connected as expected
+	require.Eventually(t, func() bool {
+		return len(ln1.ListPeers(topic.String())) > 0 &&
+			len(ln2.ListPeers(topic.String())) > 0 &&
+			len(ln3.ListPeers(topic.String())) > 0
+	}, 3*time.Second, 100*time.Millisecond)
+
+	timedCtx, cancel5s := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel5s()
+	// create a dummy sync request to publish from our LN node
+	data := getMsgFixtureBz(t, &messages.SyncRequest{})
+
+	// ln2 publishes the sync request on the cluster channel
+	err = ln2.Publish(timedCtx, topic, data)
+	require.NoError(t, err)
+
+	// ln1 gets the message
+	checkReceive(timedCtx, t, data, sub1, nil, true)
+
+	// ln2 also gets the message (as part of the libp2p loopback of published topic messages)
+	checkReceive(timedCtx, t, data, sub2, nil, true)
+
+	// ln3 also gets the message
+	checkReceive(timedCtx, t, data, sub3, nil, true)
 }
 
 // checkReceive checks that the subscription can receive the next message or not

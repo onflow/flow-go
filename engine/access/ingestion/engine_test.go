@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/network/mocknetwork"
 
 	"github.com/onflow/flow-go/module/component"
@@ -24,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/signature"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/mock"
@@ -125,6 +127,19 @@ func (suite *Suite) TestOnFinalizedBlock() {
 		unittest.WithGuarantees(unittest.CollectionGuaranteesFixture(4)...),
 		unittest.WithExecutionResults(unittest.ExecutionResultFixture()),
 	))
+
+	// prepare cluster committee members
+	clusterCommittee := unittest.IdentityListFixture(32 * 4).Filter(filter.HasRole(flow.RoleCollection))
+	refBlockID := unittest.IdentifierFixture()
+	for _, guarantee := range block.Payload.Guarantees {
+		guarantee.ReferenceBlockID = refBlockID
+		// guarantee signers must be cluster committee members, so that access will fetch collection from
+		// the signers that are specified by guarantee.SignerIndices
+		indices, err := signature.EncodeSignersToIndices(clusterCommittee.NodeIDs(), clusterCommittee.NodeIDs())
+		require.NoError(suite.T(), err)
+		guarantee.SignerIndices = indices
+	}
+
 	hotstuffBlock := hotmodel.Block{
 		BlockID: block.ID(),
 	}
@@ -140,6 +155,15 @@ func (suite *Suite) TestOnFinalizedBlock() {
 	// expect that the block storage is indexed with each of the collection guarantee
 	suite.blocks.On("IndexBlockForCollections", block.ID(), flow.GetIDs(block.Payload.Guarantees)).Return(nil).Once()
 
+	cluster := new(protocol.Cluster)
+	cluster.On("Members").Return(clusterCommittee, nil)
+	epoch := new(protocol.Epoch)
+	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
+	epochs := new(protocol.EpochQuery)
+	epochs.On("Current").Return(epoch)
+	snap := new(protocol.Snapshot)
+	snap.On("Epochs").Return(epochs)
+	suite.proto.state.On("AtBlockID", refBlockID).Return(snap)
 	suite.results.On("Index", mock.Anything, mock.Anything).Return(nil)
 
 	// for each of the guarantees, we should request the corresponding collection once
@@ -286,12 +310,17 @@ func (suite *Suite) TestRequestMissingCollections() {
 	blocks := make([]flow.Block, blkCnt)
 	heightMap := make(map[uint64]*flow.Block, blkCnt)
 
+	// prepare cluster committee members
+	clusterCommittee := unittest.IdentityListFixture(32 * 4).Filter(filter.HasRole(flow.RoleCollection))
+
 	// generate the test blocks and collections
 	var collIDs []flow.Identifier
+	refBlockID := unittest.IdentifierFixture()
 	for i := 0; i < blkCnt; i++ {
 		block := unittest.BlockFixture()
 		block.SetPayload(unittest.PayloadFixture(
-			unittest.WithGuarantees(unittest.CollectionGuaranteesFixture(4)...),
+			unittest.WithGuarantees(
+				unittest.CollectionGuaranteesFixture(4, unittest.WithCollRef(refBlockID))...),
 		))
 		// some blocks may not be present hence add a gap
 		height := startHeight + uint64(i)
@@ -300,6 +329,13 @@ func (suite *Suite) TestRequestMissingCollections() {
 		heightMap[height] = &block
 		for _, c := range block.Payload.Guarantees {
 			collIDs = append(collIDs, c.CollectionID)
+			c.ReferenceBlockID = refBlockID
+
+			// guarantee signers must be cluster committee members, so that access will fetch collection from
+			// the signers that are specified by guarantee.SignerIndices
+			indices, err := signature.EncodeSignersToIndices(clusterCommittee.NodeIDs(), clusterCommittee.NodeIDs())
+			require.NoError(suite.T(), err)
+			c.SignerIndices = indices
 		}
 	}
 
@@ -354,6 +390,16 @@ func (suite *Suite) TestRequestMissingCollections() {
 	// force should be called once
 	suite.request.On("Force").Return()
 
+	cluster := new(protocol.Cluster)
+	cluster.On("Members").Return(clusterCommittee, nil)
+	epoch := new(protocol.Epoch)
+	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
+	epochs := new(protocol.EpochQuery)
+	epochs.On("Current").Return(epoch)
+	snap := new(protocol.Snapshot)
+	snap.On("Epochs").Return(epochs)
+	suite.proto.state.On("AtBlockID", refBlockID).Return(snap)
+
 	assertExpectations := func() {
 		suite.request.AssertExpectations(suite.T())
 		suite.collections.AssertExpectations(suite.T())
@@ -406,6 +452,10 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 	heightMap := make(map[uint64]*flow.Block, blkCnt)
 	collMap := make(map[flow.Identifier]*flow.LightCollection, blkCnt*collPerBlk)
 
+	// prepare cluster committee members
+	clusterCommittee := unittest.IdentityListFixture(32 * 4).Filter(filter.HasRole(flow.RoleCollection))
+
+	refBlockID := unittest.IdentifierFixture()
 	// generate the test blocks, cgs and collections
 	for i := 0; i < blkCnt; i++ {
 		guarantees := make([]*flow.CollectionGuarantee, collPerBlk)
@@ -414,7 +464,14 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 			collMap[coll.ID()] = &coll
 			cg := unittest.CollectionGuaranteeFixture(func(cg *flow.CollectionGuarantee) {
 				cg.CollectionID = coll.ID()
+				cg.ReferenceBlockID = refBlockID
 			})
+
+			// guarantee signers must be cluster committee members, so that access will fetch collection from
+			// the signers that are specified by guarantee.SignerIndices
+			indices, err := signature.EncodeSignersToIndices(clusterCommittee.NodeIDs(), clusterCommittee.NodeIDs())
+			require.NoError(suite.T(), err)
+			cg.SignerIndices = indices
 			guarantees[j] = cg
 		}
 		block := unittest.BlockFixture()
@@ -444,6 +501,16 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 			}
 			return storerr.ErrNotFound
 		})
+
+	cluster := new(protocol.Cluster)
+	cluster.On("Members").Return(clusterCommittee, nil)
+	epoch := new(protocol.Epoch)
+	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
+	epochs := new(protocol.EpochQuery)
+	epochs.On("Current").Return(epoch)
+	snap := new(protocol.Snapshot)
+	snap.On("Epochs").Return(epochs)
+	suite.proto.state.On("AtBlockID", refBlockID).Return(snap)
 
 	// blkMissingColl controls which collections are reported as missing by the collections storage mock
 	blkMissingColl := make([]bool, blkCnt)

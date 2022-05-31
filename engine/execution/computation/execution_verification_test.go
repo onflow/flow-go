@@ -218,12 +218,24 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 
 		require.NoError(t, err)
 
-		cr := executeBlockAndVerify(t, [][]*flow.TransactionBody{
+		cr := executeBlockAndVerifyWithParameters(t, [][]*flow.TransactionBody{
 			{
 				createAccountTx,
 				spamTx,
 			},
-		}, fvm.DefaultTransactionFees, fvm.DefaultMinimumStorageReservation)
+		},
+			[]fvm.Option{
+				fvm.WithTransactionFeesEnabled(true),
+				fvm.WithAccountStorageLimit(true),
+				// make sure we don't run out of memory first.
+				fvm.WithMemoryLimit(20_000_000_000),
+			}, []fvm.BootstrapProcedureOption{
+				fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
+				fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+				fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+				fvm.WithTransactionFee(fvm.DefaultTransactionFees),
+				fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+			})
 
 		// no error
 		assert.Equal(t, cr.TransactionResults[0].ErrorMessage, "")
@@ -261,8 +273,8 @@ func TestTransactionFeeDeduction(t *testing.T) {
 		checkResult   func(t *testing.T, cr *execution.ComputationResult)
 	}
 
-	txFees := uint64(1_0000)
-	fundingAmount := uint64(1_0000_0000)
+	txFees := uint64(1_000)
+	fundingAmount := uint64(100_000_000)
 	transferAmount := uint64(123_456)
 
 	testCases := []testCase{
