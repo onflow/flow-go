@@ -106,6 +106,7 @@ func New(
 			connFactory:       connFactory,
 			state:             state,
 			log:               log,
+			metrics:           transactionMetrics,
 			seenScripts: &scriptMap{
 				scripts: make(map[[md5.Size]byte]time.Time),
 				lock:    sync.RWMutex{},

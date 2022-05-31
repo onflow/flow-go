@@ -1149,7 +1149,13 @@ func (e *Engine) saveExecutionResults(
 			Msg("service event emitted")
 	}
 
-	executionReceipt, err := e.generateExecutionReceipt(ctx, executionResult, result.StateSnapshots)
+	executionReceipt, err := GenerateExecutionReceipt(
+		e.me,
+		e.receiptHasher,
+		e.spockHasher,
+		executionResult,
+		result.StateSnapshots)
+
 	if err != nil {
 		return nil, fmt.Errorf("could not generate execution receipt: %w", err)
 	}
@@ -1205,16 +1211,16 @@ func (e *Engine) logExecutableBlock(eb *entity.ExecutableBlock) {
 	}
 }
 
-func (e *Engine) generateExecutionReceipt(
-	ctx context.Context,
+func GenerateExecutionReceipt(
+	me module.Local,
+	receiptHasher hash.Hasher,
+	spockHasher hash.Hasher,
 	result *flow.ExecutionResult,
-	stateInteractions []*delta.SpockSnapshot,
-) (*flow.ExecutionReceipt, error) {
-
+	stateInteractions []*delta.SpockSnapshot) (*flow.ExecutionReceipt, error) {
 	spocks := make([]crypto.Signature, len(stateInteractions))
 
 	for i, stateInteraction := range stateInteractions {
-		spock, err := e.me.SignFunc(stateInteraction.SpockSecret, e.spockHasher, crypto.SPOCKProve)
+		spock, err := me.SignFunc(stateInteraction.SpockSecret, spockHasher, crypto.SPOCKProve)
 
 		if err != nil {
 			return nil, fmt.Errorf("error while generating SPoCK: %w", err)
@@ -1226,12 +1232,12 @@ func (e *Engine) generateExecutionReceipt(
 		ExecutionResult:   *result,
 		Spocks:            spocks,
 		ExecutorSignature: crypto.Signature{},
-		ExecutorID:        e.me.NodeID(),
+		ExecutorID:        me.NodeID(),
 	}
 
 	// generates a signature over the execution result
 	id := receipt.ID()
-	sig, err := e.me.Sign(id[:], e.receiptHasher)
+	sig, err := me.Sign(id[:], receiptHasher)
 	if err != nil {
 		return nil, fmt.Errorf("could not sign execution result: %w", err)
 	}

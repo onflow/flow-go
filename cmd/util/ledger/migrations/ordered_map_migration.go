@@ -136,6 +136,10 @@ func (v RawStorable) RecursiveString(_ interpreter.SeenReferences) string {
 	panic("unreachable")
 }
 
+func (v RawStorable) MeteredString(common.MemoryGauge, interpreter.SeenReferences) string {
+	panic("unreachable")
+}
+
 func (v RawStorable) Equal(_ *interpreter.Interpreter, _ func() interpreter.LocationRange, other interpreter.Value) bool {
 	panic("unreachable")
 }

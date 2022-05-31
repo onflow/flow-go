@@ -1029,8 +1029,10 @@ func Test_SPOCKGeneration(t *testing.T) {
 			},
 		}
 
-		executionReceipt, err := ctx.engine.generateExecutionReceipt(
-			context.Background(),
+		executionReceipt, err := GenerateExecutionReceipt(
+			ctx.engine.me,
+			ctx.engine.receiptHasher,
+			ctx.engine.spockHasher,
 			&flow.ExecutionResult{},
 			snapshots,
 		)
