@@ -231,10 +231,7 @@ func (e *Engine) processExecutionReceipts(ctx irrecoverable.SignalerContext, rea
 		case <-ctx.Done():
 			return
 		case <-notifier:
-			msg, _ := e.executionReceiptsQueue.Get()
-			receipt := msg.Payload.(*flow.ExecutionReceipt)
-
-			err := e.handleExecutionReceipt(msg.OriginID, receipt)
+			err := e.processAvailableExecutionReceipts(ctx)
 			if err != nil {
 				// if an error reaches this point, it is unexpected
 				ctx.Throw(err)
@@ -242,6 +239,27 @@ func (e *Engine) processExecutionReceipts(ctx irrecoverable.SignalerContext, rea
 			}
 		}
 	}
+}
+
+func (e *Engine) processAvailableExecutionReceipts(ctx context.Context) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
+		msg, ok := e.executionReceiptsQueue.Get()
+		if !ok {
+			return nil
+		}
+
+		receipt := msg.Payload.(*flow.ExecutionReceipt)
+
+		if err := e.handleExecutionReceipt(msg.OriginID, receipt); err != nil {
+			return err
+		}
+	}
+
 }
 
 func (e *Engine) processFinalizedBlocks(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
@@ -253,17 +271,33 @@ func (e *Engine) processFinalizedBlocks(ctx irrecoverable.SignalerContext, ready
 		case <-ctx.Done():
 			return
 		case <-notifier:
-			msg, _ := e.finalizedBlockQueue.Get()
-			hb := msg.Payload.(*model.Block)
-			blockID := hb.BlockID
-
-			err := e.processFinalizedBlock(blockID)
-			if err != nil {
-				e.log.Error().Err(err).Hex("block_id", blockID[:]).Msg("failed to process block")
-				return
-			}
-			e.trackFinalizedMetricForBlock(hb)
+			e.processAvailableFinalizedBlocks(ctx)
 		}
+	}
+}
+
+func (e *Engine) processAvailableFinalizedBlocks(ctx context.Context) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
+
+		msg, ok := e.finalizedBlockQueue.Get()
+		if !ok {
+			return nil
+		}
+
+		hb := msg.Payload.(*model.Block)
+		blockID := hb.BlockID
+
+		if err := e.processFinalizedBlock(blockID); err != nil {
+			e.log.Error().Err(err).Hex("block_id", blockID[:]).Msg("failed to process block")
+			return err
+		}
+
+		e.trackFinalizedMetricForBlock(hb)
 	}
 }
 
