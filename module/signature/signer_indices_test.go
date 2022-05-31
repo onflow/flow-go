@@ -45,6 +45,39 @@ func TestEncodeDecodeIdentities(t *testing.T) {
 	}
 }
 
+func TestEncodeDecodeIdentitiesFail(t *testing.T) {
+	canonicalIdentities := unittest.IdentityListFixture(20)
+	canonicalIdentifiers := canonicalIdentities.NodeIDs()
+	signers := canonicalIdentities[3:19]
+	validIndices, err := signature.EncodeSignersToIndices(canonicalIdentities.NodeIDs(), signers.NodeIDs())
+
+	_, err = signature.DecodeSignerIndicesToIdentifiers(canonicalIdentifiers, validIndices)
+	require.NoError(t, err)
+
+	invalidSum := make([]byte, len(validIndices))
+	copy(invalidSum, validIndices)
+	if invalidSum[0] == byte(0) {
+		invalidSum[0] = byte(1)
+	} else {
+		invalidSum[0] = byte(0)
+	}
+	_, err = signature.DecodeSignerIndicesToIdentifiers(canonicalIdentifiers, invalidSum)
+	require.True(t, signature.IsInvalidSignerIndicesError(err), err)
+	require.ErrorIs(t, err, signature.ErrInvalidChecksum, err)
+
+	incompatibleLength := append(validIndices, byte(0))
+	_, err = signature.DecodeSignerIndicesToIdentifiers(canonicalIdentifiers, incompatibleLength)
+	require.True(t, signature.IsInvalidSignerIndicesError(err), err)
+	require.ErrorIs(t, err, signature.ErrIncompatibleBitVectorLength, err)
+
+	illegallyPadded := make([]byte, len(validIndices))
+	copy(illegallyPadded, validIndices)
+	illegallyPadded[len(illegallyPadded)-1]++
+	_, err = signature.DecodeSignerIndicesToIdentifiers(canonicalIdentifiers, illegallyPadded)
+	require.True(t, signature.IsInvalidSignerIndicesError(err), err)
+	require.ErrorIs(t, err, signature.ErrIllegallyPaddedBitVector, err)
+}
+
 func TestEncodeIdentity(t *testing.T) {
 	only := unittest.IdentifierListFixture(1)
 	indices, err := signature.EncodeSignersToIndices(only, only)

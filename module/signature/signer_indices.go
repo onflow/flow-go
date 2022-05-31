@@ -235,7 +235,7 @@ func DecodeSignerIndicesToIdentifiers(
 	err = validPadding(signerIndices, numberCanonicalNodes)
 	if err != nil {
 		if errors.Is(err, ErrIncompatibleBitVectorLength) || errors.Is(err, ErrIllegallyPaddedBitVector) {
-			return nil, NewInvalidSigTypesErrorf("invalid padding of signerIndices: %w", err)
+			return nil, NewInvalidSignerIndicesErrorf("invalid padding of signerIndices: %w", err)
 		}
 		return nil, fmt.Errorf("unexpected exception while checking padding of signer indices: %w", err)
 	}
@@ -304,7 +304,6 @@ func validPadding(bitVector []byte, numUsedBits int) error {
 	if l != bitutils.MinimalByteSliceLength(numUsedBits) {
 		e := fmt.Errorf("the bit vector contains a payload of %d used bits, so it should have %d bytes but has %d bytes: %w",
 			numUsedBits, bitutils.MinimalByteSliceLength(numUsedBits), l, ErrIncompatibleBitVectorLength)
-		fmt.Println(errors.Is(e, ErrIncompatibleBitVectorLength))
 		return e
 	}
 	// Condition 1 implies that the number of padded bits must be strictly smaller than 8. Otherwise, the vector
