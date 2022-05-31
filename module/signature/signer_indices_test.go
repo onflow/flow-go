@@ -69,6 +69,7 @@ func TestEncodeDecodeIdentitiesFail(t *testing.T) {
 	incompatibleLength := append(validIndices, byte(0))
 	_, err = signature.DecodeSignerIndicesToIdentifiers(canonicalIdentifiers, incompatibleLength)
 	require.True(t, signature.IsInvalidSignerIndicesError(err), err)
+	require.False(t, signature.IsInvalidSignerIndicesError(signature.NewInvalidSigTypesErrorf("sdf")))
 	require.ErrorIs(t, err, signature.ErrIncompatibleBitVectorLength, err)
 
 	illegallyPadded := make([]byte, len(validIndices))

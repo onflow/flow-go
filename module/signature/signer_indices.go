@@ -219,6 +219,22 @@ func DecodeSignerIndicesToIdentifiers(
 	canonicalIdentifiers flow.IdentifierList,
 	prefixed []byte,
 ) (flow.IdentifierList, error) {
+	indices, err := decodeSignerIndices(canonicalIdentifiers, prefixed)
+	if err != nil {
+		return nil, err
+	}
+
+	signerIDs := make(flow.IdentifierList, 0, len(indices))
+	for _, index := range indices {
+		signerIDs = append(signerIDs, canonicalIdentifiers[index])
+	}
+	return signerIDs, nil
+}
+
+func decodeSignerIndices(
+	canonicalIdentifiers flow.IdentifierList,
+	prefixed []byte,
+) ([]int, error) {
 	// the prefixed contains the checksum of the canonicalIdentifiers that the signerIndices
 	// creator saw.
 	// extract the checksum and compare with the canonicalIdentifiers to see if both
@@ -241,13 +257,13 @@ func DecodeSignerIndicesToIdentifiers(
 	}
 
 	// decode bits to Identifiers
-	signerIDs := make(flow.IdentifierList, 0, numberCanonicalNodes)
+	indices := make([]int, 0, numberCanonicalNodes)
 	for i := 0; i < numberCanonicalNodes; i++ {
 		if bitutils.ReadBit(signerIndices, i) == 1 {
-			signerIDs = append(signerIDs, canonicalIdentifiers[i])
+			indices = append(indices, i)
 		}
 	}
-	return signerIDs, nil
+	return indices, nil
 }
 
 // DecodeSignerIndicesToIdentities decodes the given compacted bit vector into node Identities.
@@ -260,34 +276,16 @@ func DecodeSignerIndicesToIdentities(
 	canonicalIdentities flow.IdentityList,
 	prefixed []byte,
 ) (flow.IdentityList, error) {
-	// the prefixed contains the checksum of the canonicalIdentifiers that the signerIndices
-	// creator saw.
-	// extract the checksum and compare with the canonicalIdentifiers to see if both
-	// the signerIndices creator and validator see the same list.
-	signerIndices, err := CompareAndExtract(canonicalIdentities.NodeIDs(), prefixed)
+	indices, err := decodeSignerIndices(canonicalIdentities.NodeIDs(), prefixed)
 	if err != nil {
-		if errors.Is(err, ErrInvalidChecksum) {
-			return nil, NewInvalidSignerIndicesErrorf("signer indices' checkum is invalid: %w", err)
-		}
-		return nil, fmt.Errorf("unexpected exception while checking signer indices: %w", err)
+		return nil, err
 	}
 
-	numberCanonicalNodes := len(canonicalIdentities)
-	if e := validPadding(signerIndices, numberCanonicalNodes); e != nil {
-		if errors.Is(err, ErrIncompatibleBitVectorLength) || errors.Is(err, ErrIllegallyPaddedBitVector) {
-			return nil, NewInvalidSignerIndicesErrorf("invalid padding of signerIndices: %w", err)
-		}
-		return nil, fmt.Errorf("unexpected exception while checking padding of signer indices: %w", err)
+	signers := make(flow.IdentityList, 0, len(indices))
+	for _, index := range indices {
+		signers = append(signers, canonicalIdentities[index])
 	}
-
-	// decode bits to Identities
-	signerIdentities := make(flow.IdentityList, 0, numberCanonicalNodes)
-	for i := 0; i < numberCanonicalNodes; i++ {
-		if bitutils.ReadBit(signerIndices, i) == 1 {
-			signerIdentities = append(signerIdentities, canonicalIdentities[i])
-		}
-	}
-	return signerIdentities, nil
+	return signers, nil
 }
 
 // validPadding verifies that `bitVector` satisfies the following criteria
