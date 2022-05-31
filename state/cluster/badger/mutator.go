@@ -120,7 +120,7 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 		checkTxsSpan, _ := m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendCheckTransactionsValid)
 		defer checkTxsSpan.Finish()
 
-		// no validation of transactions is necessary for empty transactions
+		// no validation of transactions is necessary for empty collections
 		if payload.Collection.Len() == 0 {
 			return nil
 		}
