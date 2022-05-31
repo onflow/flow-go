@@ -275,7 +275,7 @@ func DecodeSignerIndicesToIdentities(
 	numberCanonicalNodes := len(canonicalIdentities)
 	if e := validPadding(signerIndices, numberCanonicalNodes); e != nil {
 		if errors.Is(err, ErrIncompatibleBitVectorLength) || errors.Is(err, ErrIllegallyPaddedBitVector) {
-			return nil, NewInvalidSigTypesErrorf("invalid padding of signerIndices: %w", err)
+			return nil, NewInvalidSignerIndicesErrorf("invalid padding of signerIndices: %w", err)
 		}
 		return nil, fmt.Errorf("unexpected exception while checking padding of signer indices: %w", err)
 	}

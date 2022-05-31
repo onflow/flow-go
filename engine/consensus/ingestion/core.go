@@ -159,7 +159,7 @@ func (e *Core) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
 	}
 	// cluster not found by the chain ID
 	if errors.Is(err, protocol.ErrClusterNotFound) {
-		return engine.NewInvalidInputErrorf("cluster not found by chain ID %v, %w", guarantee.ChainID, err)
+		return engine.NewInvalidInputErrorf("cluster not found by chain ID %v: %w", guarantee.ChainID, err)
 	}
 	if err != nil {
 		return fmt.Errorf("internal error retrieving collector clusters for guarantee (ReferenceBlockID: %v, ChainID: %v): %w",
@@ -173,7 +173,7 @@ func (e *Core) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
 	guarantors, err := signature.DecodeSignerIndicesToIdentities(clusterMembers, guarantee.SignerIndices)
 	if err != nil {
 		if signature.IsInvalidSignerIndicesError(err) {
-			return engine.NewInvalidInputErrorf("could not decode guarantor indices: %v", err)
+			return engine.NewInvalidInputErrorf("could not decode guarantor indices: %w", err)
 		}
 		// unexpected error
 		return fmt.Errorf("unexpected internal error decoding signer indices: %w", err)
