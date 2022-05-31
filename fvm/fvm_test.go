@@ -242,7 +242,7 @@ func TestPrograms(t *testing.T) {
 	)
 
 	t.Run("script execution programs are not committed",
-		newVMTest().run(
+		newVMTest().withBootstrapProcedureOptions().run(
 			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 
 				scriptCtx := fvm.NewContextFromParent(ctx)
@@ -2952,6 +2952,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 
 		err := vm.Run(ctx, script, view, programs.NewEmptyPrograms())
 		require.NoError(t, err)
+		require.NoError(t, script.Err)
 		return script.Value.ToGoValue().(uint64)
 	}
 
@@ -2959,6 +2960,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		fvm.WithExecutionMemoryLimit(math.MaxUint64),
 	).run(
 		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 			ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
@@ -3001,6 +3003,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		fvm.WithExecutionMemoryLimit(math.MaxUint64),
 	).run(
 		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 			ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
@@ -3186,6 +3189,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 
 		err := vm.Run(ctx, script, view, programs.NewEmptyPrograms())
 		require.NoError(t, err)
+		require.NoError(t, script.Err)
 		return script.Value.ToGoValue().(uint64)
 	}
 
@@ -3551,6 +3555,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("Transaction Fees %d: %s", i, tc.name), newVMTest().withBootstrapProcedureOptions(
 			fvm.WithTransactionFee(fvm.DefaultTransactionFees),
+			fvm.WithExecutionMemoryLimit(math.MaxUint64),
 		).withContextOptions(
 			fvm.WithTransactionFeesEnabled(true),
 		).run(
@@ -3564,6 +3569,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 			fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 			fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+			fvm.WithExecutionMemoryLimit(math.MaxUint64),
 		).withContextOptions(
 			fvm.WithTransactionFeesEnabled(true),
 			fvm.WithAccountStorageLimit(true),
@@ -3696,6 +3702,74 @@ func TestSettingExecutionWeights(t *testing.T) {
 			require.Equal(t, uint64(0), tx.MemoryUsed)
 
 			require.NoError(t, tx.Err)
+		},
+	))
+
+	memoryWeights = make(map[common.MemoryKind]uint64)
+	for k, v := range weightedMeter.DefaultMemoryWeights {
+		memoryWeights[k] = v
+	}
+	memoryWeights[common.MemoryKindBreakStatement] = 1_000_000
+	t.Run("transaction should fail with low memory limit (set in the state)", newVMTest().withBootstrapProcedureOptions(
+		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		fvm.WithExecutionMemoryLimit(
+			100_000_000,
+		),
+		fvm.WithExecutionMemoryWeights(
+			memoryWeights,
+		),
+	).run(
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+			require.NoError(t, err)
+
+			accounts, err := testutil.CreateAccounts(vm, view, programs, privateKeys, chain)
+			require.NoError(t, err)
+
+			// This transaction is specially designed to use a lot of breaks
+			// as the weight for breaks is much higher than usual.
+			// putting a `while true {break}` in a loop does not use the same amount of memory.
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(`
+				transaction {
+					prepare(signer: AuthAccount) {
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+					}
+				}
+			`))
+
+			err = testutil.SignTransaction(txBody, accounts[0], privateKeys[0], 0)
+			require.NoError(t, err)
+
+			tx := fvm.Transaction(txBody, 0)
+			err = vm.Run(ctx, tx, view, programs)
+			require.NoError(t, err)
+			// There are 100 breaks and each break uses 1_000_000 memory
+			require.Greater(t, tx.MemoryUsed, uint64(100_000_000))
+
+			var memoryLimitExceededError *errors.MemoryLimitExceededError
+			assert.ErrorAs(t, tx.Err, &memoryLimitExceededError)
 		},
 	))
 

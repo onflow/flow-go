@@ -334,6 +334,7 @@ func (s *ClientSuite) executeScript(script []byte, arguments [][]byte) cadence.V
 	// execute script
 	result, err := s.blockchain.ExecuteScript(script, arguments)
 	require.NoError(s.T(), err)
+	require.NoError(s.T(), result.Error)
 	require.True(s.T(), result.Succeeded())
 
 	return result.Value
