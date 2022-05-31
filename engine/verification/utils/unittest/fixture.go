@@ -20,7 +20,6 @@ import (
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/convert"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/signature"
@@ -176,17 +175,6 @@ func WithClusterCommittee(clusterCommittee flow.IdentityList) CompleteExecutionR
 	}
 }
 
-// CompleteExecutionReceiptFixture returns complete execution receipt with an
-// execution receipt referencing the block collections.
-//
-// chunks determines the number of chunks inside each receipt.
-// The output is an execution result with chunks+1 chunks, where the last chunk accounts
-// for the system chunk.
-// TODO: remove this function once new verification architecture is in place.
-func CompleteExecutionReceiptFixture(t *testing.T, chunks int, chain flow.Chain, root *flow.Header) *CompleteExecutionReceipt {
-	return CompleteExecutionReceiptChainFixture(t, root, 1, WithChunksCount(chunks), WithChain(chain))[0]
-}
-
 // ExecutionResultFixture is a test helper that returns an execution result for the reference block header as well as the execution receipt data
 // for that result.
 func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refBlkHeader *flow.Header, clusterCommittee flow.IdentityList) (*flow.ExecutionResult,
@@ -206,7 +194,6 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 	transactions := []*flow.TransactionBody{tx1, tx2, tx3}
 	collection := flow.Collection{Transactions: transactions}
 	collections := []*flow.Collection{&collection}
-	clusterCommittee := participants.Filter(filter.HasRole(flow.RoleCollection))
 	clusterChainID := cluster.CanonicalClusterID(1, clusterCommittee)
 
 	guarantee := unittest.CollectionGuaranteeFixture(unittest.WithCollection(&collection), unittest.WithCollRef(refBlkHeader.ParentID))
@@ -379,7 +366,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 // For sake of simplicity and test, container blocks (i.e., C) do not contain any guarantee.
 //
 // It returns a slice of complete execution receipt fixtures that contains a container block as well as all data to verify its contained receipts.
-func CompleteExecutionReceiptChainFixture(t *testing.T, root *flow.Header, count int, participants flow.IdentityList, opts ...CompleteExecutionReceiptBuilderOpt) []*CompleteExecutionReceipt {
+func CompleteExecutionReceiptChainFixture(t *testing.T, root *flow.Header, count int, opts ...CompleteExecutionReceiptBuilderOpt) []*CompleteExecutionReceipt {
 	completeERs := make([]*CompleteExecutionReceipt, 0, count)
 	parent := root
 
@@ -388,7 +375,6 @@ func CompleteExecutionReceiptChainFixture(t *testing.T, root *flow.Header, count
 		executorCount: 1,
 		chunksCount:   1,
 		chain:         root.ChainID.Chain(),
-		participants:  participants,
 	}
 
 	for _, apply := range opts {

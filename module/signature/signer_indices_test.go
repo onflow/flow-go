@@ -50,6 +50,7 @@ func TestEncodeDecodeIdentitiesFail(t *testing.T) {
 	canonicalIdentifiers := canonicalIdentities.NodeIDs()
 	signers := canonicalIdentities[3:19]
 	validIndices, err := signature.EncodeSignersToIndices(canonicalIdentities.NodeIDs(), signers.NodeIDs())
+	require.NoError(t, err)
 
 	_, err = signature.DecodeSignerIndicesToIdentifiers(canonicalIdentifiers, validIndices)
 	require.NoError(t, err)

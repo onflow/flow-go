@@ -1692,7 +1692,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		payload.Guarantees[0].SignerIndices = []byte{byte(1)}
 		err = state.Extend(context.Background(), block)
 		require.Error(t, err)
-		require.True(t, signature.IsDecodeSignerIndicesError(err), err)
+		require.True(t, signature.IsInvalidSignerIndicesError(err), err)
 		require.True(t, errors.As(err, &signature.ErrInvalidChecksum), err)
 		require.True(t, st.IsInvalidExtensionError(err), err)
 
@@ -1706,7 +1706,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		payload.Guarantees[0].SignerIndices = checksumMismatch
 		err = state.Extend(context.Background(), block)
 		require.Error(t, err)
-		require.True(t, signature.IsDecodeSignerIndicesError(err), err)
+		require.True(t, signature.IsInvalidSignerIndicesError(err), err)
 		require.True(t, errors.As(err, &signature.ErrInvalidChecksum), err)
 		require.True(t, st.IsInvalidExtensionError(err), err)
 
@@ -1719,7 +1719,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		payload.Guarantees[0].SignerIndices = wrongTailing
 		err = state.Extend(context.Background(), block)
 		require.Error(t, err)
-		require.True(t, signature.IsDecodeSignerIndicesError(err), err)
+		require.True(t, signature.IsInvalidSignerIndicesError(err), err)
 		require.True(t, errors.As(err, &signature.ErrIllegallyPaddedBitVector), err)
 		require.True(t, st.IsInvalidExtensionError(err), err)
 
@@ -1728,7 +1728,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		payload.Guarantees[0].SignerIndices = wrongbitVectorLength
 		err = state.Extend(context.Background(), block)
 		require.Error(t, err)
-		require.True(t, signature.IsDecodeSignerIndicesError(err), err)
+		require.True(t, signature.IsInvalidSignerIndicesError(err), err)
 		require.True(t, errors.As(err, &signature.ErrIncompatibleBitVectorLength), err)
 		require.True(t, st.IsInvalidExtensionError(err), err)
 
