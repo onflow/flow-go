@@ -58,6 +58,10 @@ func TestIngestEngine(t *testing.T) {
 	suite.Run(t, new(Suite))
 }
 
+func (suite *Suite) TearDownTest() {
+	suite.cancel()
+}
+
 func (suite *Suite) SetupTest() {
 	log := zerolog.New(os.Stderr)
 
