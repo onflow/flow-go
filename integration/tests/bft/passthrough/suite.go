@@ -117,12 +117,12 @@ func (s *Suite) SetupSuite() {
 	s.T().Logf("integration/tests/bft/passthrough/suite.go - before coll1Config")
 	coll1Config := testnet.NewNodeConfig(flow.RoleCollection,
 		testnet.WithLogLevel(zerolog.DebugLevel),
-		//testnet.WithAdditionalFlag("--network=\"host\""),
+		//testnet.WithAdditionalFlag("--network=host"),
 	)
 	s.T().Logf("integration/tests/bft/passthrough/suite.go - before coll2Config")
 	coll2Config := testnet.NewNodeConfig(flow.RoleCollection,
 		testnet.WithLogLevel(zerolog.DebugLevel),
-		//testnet.WithAdditionalFlag("--network=\"host\""),
+		//testnet.WithAdditionalFlag("--network=host"),
 	)
 	s.nodeConfigs = append(s.nodeConfigs, coll1Config, coll2Config)
 
@@ -168,7 +168,7 @@ func (s *Suite) SetupSuite() {
 	s.T().Logf("integration/tests/bft/passthrough/suite.go - created NewDummyOrchestrator")
 	// start attack network
 	//const serverAddress = "127.0.0.1:0" // we let OS picking an available port for attack network
-	const serverAddress = "host.docker.internal:0" // we let OS picking an available port for attack network
+	const serverAddress = "172.17.0.1:0" // we let OS picking an available port for attack network
 	codec := cbor.NewCodec()
 	s.T().Logf("integration/tests/bft/passthrough/suite.go - created NewCode")
 	connector := attacknetwork.NewCorruptedConnector(s.net.CorruptedIdentities(), s.net.CorruptedPortMapping)
