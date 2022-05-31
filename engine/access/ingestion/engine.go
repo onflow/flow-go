@@ -271,7 +271,7 @@ func (e *Engine) processFinalizedBlocks(ctx irrecoverable.SignalerContext, ready
 		case <-ctx.Done():
 			return
 		case <-notifier:
-			e.processAvailableFinalizedBlocks(ctx)
+			_ = e.processAvailableFinalizedBlocks(ctx)
 		}
 	}
 }
@@ -294,7 +294,7 @@ func (e *Engine) processAvailableFinalizedBlocks(ctx context.Context) error {
 
 		if err := e.processFinalizedBlock(blockID); err != nil {
 			e.log.Error().Err(err).Hex("block_id", blockID[:]).Msg("failed to process block")
-			return err
+			continue
 		}
 
 		e.trackFinalizedMetricForBlock(hb)
