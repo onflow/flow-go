@@ -264,10 +264,12 @@ func (b *backendTransactions) GetTransactionResult(
 	var events []flow.Event
 	var txError string
 	var statusCode uint32
+	var blockHeight uint64
 	// access node may not have the block if it hasn't yet been finalized, hence block can be nil at this point
 	if block != nil {
 		blockID = block.ID()
 		transactionWasExecuted, events, statusCode, txError, err = b.lookupTransactionResult(ctx, txID, blockID)
+		blockHeight = block.Header.Height
 		if err != nil {
 			return nil, convertStorageError(err)
 		}
@@ -288,7 +290,7 @@ func (b *backendTransactions) GetTransactionResult(
 		ErrorMessage:  txError,
 		BlockID:       blockID,
 		TransactionID: txID,
-		BlockHeight:   block.Header.Height,
+		BlockHeight:   blockHeight,
 	}, nil
 }
 
