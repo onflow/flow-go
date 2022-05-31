@@ -1403,8 +1403,8 @@ github.com/onflow/cadence v0.20.1/go.mod h1:7mzUvPZUIJztIbr9eTvs+fQjWWHTF8veC+yk
 github.com/onflow/cadence v0.21.3-0.20220419065337-d5202c162010/go.mod h1:vNIxF13e1Ty50KnkQSm6LVwvxGGLTQ4kpldvTL+2S6s=
 github.com/onflow/cadence v0.21.3-0.20220511225809-808fe14141df/go.mod h1:vNIxF13e1Ty50KnkQSm6LVwvxGGLTQ4kpldvTL+2S6s=
 github.com/onflow/cadence v0.21.3-0.20220513161637-08b93d4bb7b9/go.mod h1:vNIxF13e1Ty50KnkQSm6LVwvxGGLTQ4kpldvTL+2S6s=
-github.com/onflow/cadence v0.21.3-0.20220524232221-b4a37c41632f h1:QDuneQdHDebIwvHOlfFgUc/QR6kv3QUPjBFvXvOcD80=
-github.com/onflow/cadence v0.21.3-0.20220524232221-b4a37c41632f/go.mod h1:MfEvTq9dvGhnoyqUqsKBsZBM5V4SytllHMqHM+6Lki0=
+github.com/onflow/cadence v0.21.3-0.20220527221159-7bf6d8d5c3f6 h1:IxaYQyCf0TMddRAM+FjwwhTJVe0y+DgMEpx/PSttXuE=
+github.com/onflow/cadence v0.21.3-0.20220527221159-7bf6d8d5c3f6/go.mod h1:MfEvTq9dvGhnoyqUqsKBsZBM5V4SytllHMqHM+6Lki0=
 github.com/onflow/flow v0.2.4/go.mod h1:lzyAYmbu1HfkZ9cfnL5/sjrrsnJiUU8fRL26CqLP7+c=
 github.com/onflow/flow v0.2.5/go.mod h1:lzyAYmbu1HfkZ9cfnL5/sjrrsnJiUU8fRL26CqLP7+c=
 github.com/onflow/flow v0.3.0 h1:qDKHFXh5HVZRxw+MpHdENXrqA2gVhmCq0CRW7X3ObLA=
