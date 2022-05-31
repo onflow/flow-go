@@ -170,7 +170,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.MaxRequests, "sync-max-requests", defaultConfig.SyncCoreConfig.MaxRequests, "the maximum number of requests we send during each scanning period")
 
 	fnb.flags.Uint64Var(&fnb.BaseConfig.ComplianceConfig.SkipNewProposalsThreshold, "compliance-skip-proposals-threshold", defaultConfig.ComplianceConfig.SkipNewProposalsThreshold, "threshold at which new proposals are discarded rather than cached, if their height is this much above local finalized height")
-	fnb.flags.StringVar(&fnb.BaseConfig.hostNetworking, "network", "host", "enable host networking when container starts")
+	//fnb.flags.StringVar(&fnb.BaseConfig.hostNetworking, "network", "host", "enable host networking when container starts")
 	fmt.Println("FlowNodeBuilder>BaseFlags>end")
 }
 
@@ -436,7 +436,7 @@ func (fnb *FlowNodeBuilder) ValidateFlags(f func() error) NodeBuilder {
 }
 
 func (fnb *FlowNodeBuilder) PrintBuildVersionDetails() {
-	fnb.Logger.Info().Str("version", build.Semver()).Str("commit", build.Commit()).Msg("build details (PrintBuildVersionDetails333)")
+	fnb.Logger.Info().Str("version", build.Semver()).Str("commit", build.Commit()).Msg("build details (PrintBuildVersionDetails)")
 }
 
 func (fnb *FlowNodeBuilder) initNodeInfo() {

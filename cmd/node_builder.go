@@ -158,7 +158,7 @@ type BaseConfig struct {
 	// ComplianceConfig configures either the compliance engine (consensus nodes)
 	// or the follower engine (all other node roles)
 	ComplianceConfig compliance.Config
-	hostNetworking   string //start container using host networking: https://docs.docker.com/network/host/
+	//hostNetworking   string //start container using host networking: https://docs.docker.com/network/host/
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
