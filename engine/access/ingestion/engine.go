@@ -43,6 +43,9 @@ const missingCollsForBlkThreshold = 100
 // this is to ensure that if a collection is missing for a long time (in terms of block height) it is eventually re-requested
 const missingCollsForAgeThreshold = 100
 
+// de
+const defaultQueueCapacity = 10_000
+
 var defaultCollectionCatchupTimeout = collectionCatchupTimeout
 var defaultCollectionCatchupDBPollInterval = collectionCatchupDBPollInterval
 var defaultFullBlockUpdateInterval = fullBlockUpdateInterval
@@ -103,7 +106,7 @@ func New(
 	rpcEngine *rpc.Engine,
 ) (*Engine, error) {
 	executionReceiptsRawQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(10_000),
+		fifoqueue.WithCapacity(defaultQueueCapacity),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create execution receipts queue: %w", err)
@@ -112,7 +115,7 @@ func New(
 	executionReceiptsQueue := &engine.FifoMessageStore{FifoQueue: executionReceiptsRawQueue}
 
 	finalizedBlocksRawQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(10_000),
+		fifoqueue.WithCapacity(defaultQueueCapacity),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create finalized block queue: %w", err)
@@ -197,7 +200,12 @@ func (e *Engine) processBackground(ctx irrecoverable.SignalerContext, ready comp
 		return
 	}
 
-	err := e.requestMissingCollections(ctx)
+	// context with timeout
+	requestCtx, cancel := context.WithTimeout(ctx, defaultCollectionCatchupTimeout)
+	defer cancel()
+
+	// request missing collections
+	err := e.requestMissingCollections(requestCtx)
 	if err != nil {
 		e.log.Error().Err(err).Msg("requesting missing collections failed")
 	}
@@ -224,7 +232,7 @@ func (e *Engine) processExecutionReceipts(ctx irrecoverable.SignalerContext, rea
 			return
 		case <-notifier:
 			msg, _ := e.executionReceiptsQueue.Get()
-			receipt, _ := msg.Payload.(*flow.ExecutionReceipt)
+			receipt := msg.Payload.(*flow.ExecutionReceipt)
 
 			err := e.handleExecutionReceipt(msg.OriginID, receipt)
 			if err != nil {
@@ -246,8 +254,9 @@ func (e *Engine) processFinalizedBlocks(ctx irrecoverable.SignalerContext, ready
 			return
 		case <-notifier:
 			msg, _ := e.finalizedBlockQueue.Get()
-			hb, _ := msg.Payload.(*model.Block)
+			hb := msg.Payload.(*model.Block)
 			blockID := hb.BlockID
+
 			err := e.processFinalizedBlock(blockID)
 			if err != nil {
 				e.log.Error().Err(err).Hex("block_id", blockID[:]).Msg("failed to process block")
@@ -313,7 +322,7 @@ func (e *Engine) Process(channel network.Channel, originID flow.Identifier, even
 
 // OnFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated
 func (e *Engine) OnFinalizedBlock(hb *model.Block) {
-	_ = e.process(hb.BlockID, hb)
+	_ = e.ProcessLocal(hb)
 }
 
 // processBlock handles an incoming finalized block.
