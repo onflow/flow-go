@@ -7,7 +7,6 @@ import (
 	"math"
 
 	"github.com/dgraph-io/badger/v2"
-
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -120,7 +119,14 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 		checkTxsSpan, _ := m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendCheckTransactionsValid)
 		defer checkTxsSpan.Finish()
 
+		// no validation of transactions is necessary for empty transactions
+		if payload.Collection.Len() == 0 {
+			return nil
+		}
+
 		// check that all transactions within the collection are valid
+		// keep track of the min/max reference blocks - the collection must be non-empty
+		// at this point so these are guaranteed to be set correctly
 		minRefID := flow.ZeroID
 		minRefHeight := uint64(math.MaxUint64)
 		maxRefHeight := uint64(0)
@@ -145,19 +151,17 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 
 		// a valid collection must reference the oldest reference block among
 		// its constituent transactions
-		if payload.Collection.Len() > 0 && minRefID != payload.ReferenceBlockID {
+		if minRefID != payload.ReferenceBlockID {
 			return state.NewInvalidExtensionErrorf(
 				"reference block (id=%x) must match oldest transaction's reference block (id=%x)",
 				payload.ReferenceBlockID, minRefID,
 			)
 		}
 		// a valid collection must contain only transactions within its expiry window
-		if payload.Collection.Len() > 0 {
-			if maxRefHeight-minRefHeight >= flow.DefaultTransactionExpiry {
-				return state.NewInvalidExtensionErrorf(
-					"collection contains reference height range [%d,%d] exceeding expiry window size: %d",
-					minRefHeight, maxRefHeight, flow.DefaultTransactionExpiry)
-			}
+		if maxRefHeight-minRefHeight >= flow.DefaultTransactionExpiry {
+			return state.NewInvalidExtensionErrorf(
+				"collection contains reference height range [%d,%d] exceeding expiry window size: %d",
+				minRefHeight, maxRefHeight, flow.DefaultTransactionExpiry)
 		}
 
 		// a valid collection must reference a valid reference block
