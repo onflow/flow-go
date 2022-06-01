@@ -194,7 +194,7 @@ func main() {
 			}
 
 			// create the singleton instance and set the value with the flag
-			err := updatable_configs.AcquireRequiredApprovalsForSealConstructionSetter().SetValue(requiredApprovalsForSealConstruction)
+			_, err := updatable_configs.AcquireRequiredApprovalsForSealConstructionSetter().SetValue(requiredApprovalsForSealConstruction)
 			if err != nil {
 				return err
 			}
