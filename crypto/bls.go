@@ -1,3 +1,4 @@
+//go:build relic
 // +build relic
 
 package crypto
@@ -276,7 +277,7 @@ func (sk *PrKeyBLSBLS12381) Size() int {
 func (sk *PrKeyBLSBLS12381) computePublicKey() {
 	var newPk PubKeyBLSBLS12381
 	// compute public key pk = g2^sk
-	genScalarMultG2(&(newPk.point), &(sk.scalar))
+	generatorScalarMultG2(&(newPk.point), &(sk.scalar))
 	sk.pk = &newPk
 }
 

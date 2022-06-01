@@ -133,17 +133,15 @@ void ep_mult(ep_t res, const ep_t p, const bn_t expo) {
 }
 
 // Exponentiation of generator g1 in G1
-// This function is not called by BLS but is here for DEBUG/TESTs purposes
-void ep_mult_gen(ep_t res, const bn_t expo) {
-#define GENERIC_POINT 0
-#define FIXED_MULT    (GENERIC_POINT^1)
-
-#if GENERIC_POINT
-    ep_mult(res, &core_get()->ep_g, expo);
-#elif FIXED_MULT
+// These two function are here for bench purposes only
+void ep_mult_gen_bench(ep_t res, const bn_t expo) {
     // Using precomputed table of size 4
     ep_mul_gen(res, (bn_st *)expo);
-#endif
+}
+
+void ep_mult_generic_bench(ep_t res, const bn_t expo) {
+    // generic point multiplication
+    ep_mult(res, &core_get()->ep_g, expo);
 }
 
 // Exponentiation of a generic point p in G2

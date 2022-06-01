@@ -1,3 +1,4 @@
+//go:build relic
 // +build relic
 
 package crypto
@@ -55,22 +56,32 @@ func BenchmarkScalarMult(b *testing.B) {
 	var expo scalar
 	randZr(&expo)
 
-	// G1 bench
-	b.Run("G1", func(b *testing.B) {
+	// G1 generator multiplication
+	b.Run("G1 gen", func(b *testing.B) {
 		var res pointG1
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			genScalarMultG1(&res, &expo)
+			generatorScalarMultG1(&res, &expo)
 		}
 		b.StopTimer()
 	})
 
-	// G2 bench
-	b.Run("G2", func(b *testing.B) {
+	// G1 base point multiplication
+	b.Run("G1 generic", func(b *testing.B) {
+		var res pointG1
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			genericScalarMultG1(&res, &expo)
+		}
+		b.StopTimer()
+	})
+
+	// G2 base point multiplication
+	b.Run("G2 gen", func(b *testing.B) {
 		var res pointG2
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			genScalarMultG2(&res, &expo)
+			generatorScalarMultG2(&res, &expo)
 		}
 		b.StopTimer()
 	})

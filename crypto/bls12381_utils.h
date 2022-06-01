@@ -96,7 +96,8 @@ int      ep2_read_bin_compact(ep2_t, const byte *,  const int);
 void     ep2_write_bin_compact(byte *, const ep2_t,  const int);
 int      bn_read_Zr_bin(bn_t, const uint8_t *, int );
 
-void     ep_mult_gen(ep_t, const bn_t);
+void     ep_mult_gen_bench(ep_t, const bn_t);
+void     ep_mult_generic_bench(ep_t, const bn_t);
 void     ep_mult(ep_t, const ep_t, const bn_t);
 void     ep2_mult_gen(ep2_t, const bn_t);
 
