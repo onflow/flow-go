@@ -6,6 +6,7 @@ type RequiredApprovalsForSealConstructionInstanceGetter interface {
 
 type RequiredApprovalsForSealConstructionInstanceSetter interface {
 	RequiredApprovalsForSealConstructionInstanceGetter
-	// SetValue takes a new value and returns the old value
-	SetValue(newVal uint) uint
+	// SetValue takes a new value and returns the old value if the new value is valid.
+	// otherwise returns an error
+	SetValue(newVal uint) (uint, error)
 }

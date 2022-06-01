@@ -4,11 +4,13 @@ import (
 	"sync"
 
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/validation"
 )
 
+// min number of approvals required for constructing a candidate seal
 type RequiredApprovalsForSealConstructionInstance struct {
 	sync.RWMutex
-	requiredApprovalsForSealConstruction uint // min number of approvals required for constructing a candidate seal
+	requiredApprovalsForSealConstruction uint
 }
 
 // DefaultRequiredApprovalsForSealConstruction is the default number of approvals required to construct a candidate seal
@@ -42,13 +44,20 @@ func AcquireRequiredApprovalsForSealConstructionGetter() module.RequiredApproval
 }
 
 // SetValue updates the requiredApprovalsForSealConstruction and return the old value
-func (r *RequiredApprovalsForSealConstructionInstance) SetValue(requiredApprovalsForSealConstruction uint) uint {
+// This assume the caller has validated the new value
+func (r *RequiredApprovalsForSealConstructionInstance) SetValue(requiredApprovalsForSealConstruction uint) (uint, error) {
 	r.Lock()
 	defer r.Unlock()
 
+	err := validation.ValidateRequireApprovals(requiredApprovalsForSealConstruction)
+	if err != nil {
+		return 0, err
+	}
+
 	from := r.requiredApprovalsForSealConstruction
 	r.requiredApprovalsForSealConstruction = requiredApprovalsForSealConstruction
-	return from
+
+	return from, nil
 }
 
 // GetValue gets the requiredApprovalsForSealConstruction
