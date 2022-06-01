@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -26,7 +27,7 @@ func MockStateForCollectionNodes(t *testing.T, collectorIds flow.IdentityList, c
 	epochQuery := new(mockprotocol.EpochQuery)
 	epoch := new(mockprotocol.Epoch)
 	assignments := unittest.ClusterAssignment(clusterNum, collectorIds)
-	clusters, err := flow.NewClusterList(assignments, collectorIds)
+	clusters, err := factory.NewClusterList(assignments, collectorIds)
 	require.NoError(t, err)
 
 	epoch.On("Clustering").Return(clusters, nil)

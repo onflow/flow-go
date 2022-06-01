@@ -87,7 +87,10 @@ func NewScriptEnvironment(
 
 	env.contracts = handler.NewContractHandler(
 		accounts,
-		true,
+		func() bool {
+			return true
+		},
+		func() []common.Address { return []common.Address{} },
 		func() []common.Address { return []common.Address{} },
 		func(address runtime.Address, code []byte) (bool, error) { return false, nil })
 
@@ -95,34 +98,76 @@ func NewScriptEnvironment(
 		env.seedRNG(fvmContext.BlockHeader)
 	}
 
-	env.setMeteringWeights()
+	env.setExecutionParameters()
 
 	return env
 }
 
-func (e *ScriptEnv) setMeteringWeights() {
-	var m *weighted.Meter
+func (e *ScriptEnv) setExecutionParameters() {
+	// Check that the service account exists because all the settings are stored in it
+	serviceAddress := e.Context().Chain.ServiceAddress()
+	service := runtime.Address(serviceAddress)
+
+	// set the property if no error, but if the error is a fatal error then return it
+	setIfOk := func(prop string, err error, setter func()) (fatal error) {
+		err, fatal = errors.SplitErrorTypes(err)
+		if fatal != nil {
+			// this is a fatal error. return it
+			e.ctx.Logger.
+				Error().
+				Err(fatal).
+				Msgf("error getting %s", prop)
+			return fatal
+		}
+		if err != nil {
+			// this is a general error.
+			// could be that no setting was present in the state,
+			// or that the setting was not parseable,
+			// or some other deterministic thing.
+			e.ctx.Logger.
+				Debug().
+				Err(err).
+				Msgf("could not set %s. Using defaults", prop)
+			return
+		}
+		// everything is ok. do the setting
+		setter()
+		return nil
+	}
+
 	var ok bool
+	var m *weighted.Meter
 	// only set the weights if the meter is a weighted.Meter
 	if m, ok = e.sth.State().Meter().(*weighted.Meter); !ok {
 		return
 	}
 
-	computationWeights, memoryWeights, err := getExecutionWeights(e, e.accounts)
-
+	computationWeights, err := getExecutionEffortWeights(e, service)
+	err = setIfOk(
+		"execution effort weights",
+		err,
+		func() { m.SetComputationWeights(computationWeights) })
 	if err != nil {
-		e.ctx.Logger.
-			Info().
-			Err(err).
-			Msg("could not set execution weights. Using defaults")
 		return
 	}
 
-	m.SetComputationWeights(computationWeights)
-	m.SetMemoryWeights(memoryWeights)
-}
+	memoryWeights, err := getExecutionMemoryWeights(e, service)
+	err = setIfOk(
+		"execution memory weights",
+		err,
+		func() { m.SetMemoryWeights(memoryWeights) })
+	if err != nil {
+		return
+	}
 
-func (e *ScriptEnv) ResourceOwnerChanged(_ *interpreter.CompositeValue, _ common.Address, _ common.Address) {
+	memoryLimit, err := getExecutionMemoryLimit(e, service)
+	err = setIfOk(
+		"execution memory limit",
+		err,
+		func() { m.SetTotalMemoryLimit(memoryLimit) })
+	if err != nil {
+		return
+	}
 }
 
 func (e *ScriptEnv) seedRNG(header *flow.Header) {
@@ -560,13 +605,28 @@ func (e *ScriptEnv) ComputationUsed() uint64 {
 	return uint64(e.sth.State().TotalComputationUsed())
 }
 
-func (e *ScriptEnv) DecodeArgument(b []byte, _ cadence.Type) (cadence.Value, error) {
+func (e *ScriptEnv) meterMemory(kind common.MemoryKind, intensity uint) error {
+	if e.sth.EnforceMemoryLimits() {
+		return e.sth.State().MeterMemory(kind, intensity)
+	}
+	return nil
+}
+
+func (e *ScriptEnv) MeterMemory(usage common.MemoryUsage) error {
+	return e.meterMemory(usage.Kind, uint(usage.Amount))
+}
+
+func (e *ScriptEnv) MemoryUsed() uint64 {
+	return uint64(e.sth.State().TotalMemoryUsed())
+}
+
+func (e *ScriptEnv) DecodeArgument(b []byte, t cadence.Type) (cadence.Value, error) {
 	if e.isTraceable() && e.ctx.ExtensiveTracing {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvDecodeArgument)
 		defer sp.Finish()
 	}
 
-	v, err := jsoncdc.Decode(b)
+	v, err := jsoncdc.Decode(e, b)
 	if err != nil {
 		err = errors.NewInvalidArgumentErrorf("argument is not json decodable: %w", err)
 		return nil, fmt.Errorf("decodeing argument failed: %w", err)
@@ -609,7 +669,6 @@ func (e *ScriptEnv) VerifySignature(
 	}
 
 	valid, err := crypto.VerifySignatureFromRuntime(
-		e.ctx.SignatureVerifier,
 		signature,
 		tag,
 		signedData,
@@ -859,4 +918,12 @@ func (e *ScriptEnv) BLSAggregateSignatures(sigs [][]byte) ([]byte, error) {
 
 func (e *ScriptEnv) BLSAggregatePublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
 	return crypto.AggregatePublicKeys(keys)
+}
+
+func (e *ScriptEnv) ResourceOwnerChanged(
+	*interpreter.Interpreter,
+	*interpreter.CompositeValue,
+	common.Address,
+	common.Address,
+) {
 }
