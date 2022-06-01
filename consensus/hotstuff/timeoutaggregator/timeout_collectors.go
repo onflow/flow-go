@@ -7,7 +7,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/mempool"
 )
 
@@ -18,8 +17,8 @@ type NewCollectorFactoryMethod = func(view uint64) (hotstuff.TimeoutCollector, e
 // Implements hotstuff.TimeoutCollectors interface. Creating a TimeoutCollector for a
 // particular view is lazy (instances are created on demand).
 // This structure is concurrently safe.
+// TODO: once VoteCollectors gets updated to stop managing worker pool we can merge VoteCollectors and TimeoutCollectors using generics
 type TimeoutCollectors struct {
-	*component.ComponentManager
 	log                zerolog.Logger
 	lock               sync.RWMutex
 	lowestRetainedView uint64                               // lowest view, for which we still retain a VoteCollector and process votes

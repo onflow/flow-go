@@ -1,15 +1,10 @@
 package hotstuff
 
-import "github.com/onflow/flow-go/module"
-
 // TimeoutCollectors is an interface which allows TimeoutCollector to interact with collectors structured by
 // view and blockID.
 // Implementations of this interface are responsible for state transitions of `TimeoutCollector`s and pruning of
 // stale and outdated collectors by view.
 type TimeoutCollectors interface {
-	module.ReadyDoneAware
-	module.Startable
-
 	// GetOrCreateCollector retrieves the hotstuff.TimeoutCollector for the specified
 	// view or creates one if none exists.
 	// When creating a timeout collector, the view will be used to get epoch by view, then create the staking
