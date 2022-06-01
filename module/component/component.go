@@ -32,7 +32,7 @@ type ComponentFactory func() (Component, error)
 // Before returning, it could also:
 // - panic (in canary / benchmark)
 // - log in various Error channels and / or send telemetry ...
-type OnError = func(err error) ErrorHandlingResult
+type OnError = func(error) ErrorHandlingResult
 
 type ErrorHandlingResult int
 

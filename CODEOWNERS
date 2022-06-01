@@ -35,3 +35,9 @@
 
 # Bootstrap and transit scripts
 /cmd/bootstrap/** @vishalchangrani
+
+# Performance Stream
+/integration/localnet/** @SaveTheRbtz @simonhf @Kay-Zee @zhangchiqing
+/integration/loader/** @SaveTheRbtz @simonhf @Kay-Zee
+/integration/benchmark/** @SaveTheRbtz @simonhf @Kay-Zee
+/integration/utils/** @SaveTheRbtz @simonhf @Kay-Zee
