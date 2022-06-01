@@ -10,8 +10,8 @@ require (
 	github.com/go-yaml/yaml v2.1.0+incompatible
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/onflow/cadence v0.21.3-0.20220601002855-8b113c539a2c
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220601181637-450d5563fa7d
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220601181637-450d5563fa7d
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220601212727-0bb6b1f83a9c
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220601212727-0bb6b1f83a9c
 	github.com/onflow/flow-emulator v0.31.2-0.20220513151845-ef7513cb1cd0
 	github.com/onflow/flow-ft/lib/go/templates v0.2.0
 	github.com/onflow/flow-go v0.25.13-0.20220513151142-7858f76e703b // replaced by version on-disk
