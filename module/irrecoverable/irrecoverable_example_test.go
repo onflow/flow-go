@@ -42,7 +42,6 @@ func Example() {
 			// depending on the circumstances
 			return component.ErrorHandlingStop
 		}
-
 	}
 
 	// run the component. this is a blocking call, and will return with an error if the

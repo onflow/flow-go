@@ -53,6 +53,29 @@ func (_m *Ledger) Get(query *ledger.Query) ([]ledger.Value, error) {
 	return r0, r1
 }
 
+// GetSingleValue provides a mock function with given fields: query
+func (_m *Ledger) GetSingleValue(query *ledger.QuerySingleValue) (ledger.Value, error) {
+	ret := _m.Called(query)
+
+	var r0 ledger.Value
+	if rf, ok := ret.Get(0).(func(*ledger.QuerySingleValue) ledger.Value); ok {
+		r0 = rf(query)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(ledger.Value)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(*ledger.QuerySingleValue) error); ok {
+		r1 = rf(query)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // InitialState provides a mock function with given fields:
 func (_m *Ledger) InitialState() ledger.State {
 	ret := _m.Called()

@@ -166,3 +166,7 @@ func (nc *NoopCollector) OnEntityEjectionDueToEmergency()                       
 func (nc *NoopCollector) OnKeyPutFailure()                                                 {}
 func (nc *NoopCollector) OnKeyGetSuccess()                                                 {}
 func (nc *NoopCollector) OnKeyGetFailure()                                                 {}
+func (nc *NoopCollector) ExecutionDataFetchStarted()                                       {}
+func (nc *NoopCollector) ExecutionDataFetchFinished(_ time.Duration, _ bool, _ uint64)     {}
+func (nc *NoopCollector) NotificationSent(height uint64)                                   {}
+func (nc *NoopCollector) FetchRetried()                                                    {}
