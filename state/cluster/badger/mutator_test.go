@@ -315,8 +315,10 @@ func (suite *MutatorSuite) TestExtend_WithEmptyCollection() {
 // an unknown reference block is invalid
 func (suite *MutatorSuite) TestExtend_WithNonExistentReferenceBlock() {
 	block := suite.Block()
+	tx := suite.Tx()
+	payload := suite.Payload(&tx)
 	// set a random reference block ID
-	payload := model.EmptyPayload(unittest.IdentifierFixture())
+	payload.ReferenceBlockID = unittest.IdentifierFixture()
 	block.SetPayload(payload)
 	err := suite.state.Extend(&block)
 	suite.Assert().Error(err)
