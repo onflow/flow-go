@@ -45,7 +45,7 @@ require (
 	github.com/libp2p/go-libp2p-discovery v0.6.0
 	github.com/libp2p/go-libp2p-kad-dht v0.15.0
 	github.com/libp2p/go-libp2p-kbucket v0.4.7
-	github.com/libp2p/go-libp2p-pubsub v0.6.0
+	github.com/libp2p/go-libp2p-pubsub v0.6.2-0.20220530164708-06b5ba47636c
 	github.com/libp2p/go-libp2p-swarm v0.10.2
 	github.com/libp2p/go-libp2p-tls v0.4.1
 	github.com/libp2p/go-tcp-transport v0.5.1
@@ -53,15 +53,15 @@ require (
 	github.com/multiformats/go-multiaddr v0.5.0
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/multiformats/go-multihash v0.1.0
-	github.com/onflow/atree v0.3.0
-	github.com/onflow/cadence v0.21.3-0.20220513161637-08b93d4bb7b9
-	github.com/onflow/flow v0.2.5
+	github.com/onflow/atree v0.3.1-0.20220519142403-b0077ba343ec
+	github.com/onflow/cadence v0.21.3-0.20220527221159-7bf6d8d5c3f6
+	github.com/onflow/flow v0.3.0
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220513155751-c4c1f8d59f83
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220513155751-c4c1f8d59f83
 	github.com/onflow/flow-emulator v0.31.2-0.20220513151845-ef7513cb1cd0
 	github.com/onflow/flow-go-sdk v0.24.1-0.20220513205729-d1f58d47c4e3
 	github.com/onflow/flow-go/crypto v0.24.3
-	github.com/onflow/flow/protobuf/go/flow v0.2.5
+	github.com/onflow/flow/protobuf/go/flow v0.3.0
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pierrec/lz4 v2.6.1+incompatible
 	github.com/pkg/errors v0.9.1
@@ -74,7 +74,7 @@ require (
 	github.com/spf13/cobra v1.3.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.10.1
-	github.com/stretchr/testify v1.7.1-0.20210824115523-ab6dc3262822
+	github.com/stretchr/testify v1.7.1
 	github.com/uber/jaeger-client-go v2.29.1+incompatible
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/vmihailenco/msgpack/v4 v4.3.11
@@ -275,7 +275,7 @@ require (
 	github.com/whyrusleeping/timecache v0.0.0-20160911033111-cfcb2f1abfee // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
-	github.com/zeebo/blake3 v0.2.2 // indirect
+	github.com/zeebo/blake3 v0.2.3 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	go.uber.org/zap v1.21.0 // indirect
 	golang.org/x/image v0.0.0-20190802002840-cff245a6509b // indirect
