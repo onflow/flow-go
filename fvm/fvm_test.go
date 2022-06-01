@@ -15,6 +15,7 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -102,35 +103,35 @@ func transferTokensTx(chain flow.Chain) *flow.TransactionBody {
 							//
 							// The withdraw amount and the account from getAccount
 							// would be the parameters to the transaction
-							
+
 							import FungibleToken from 0x%s
 							import FlowToken from 0x%s
-							
+
 							transaction(amount: UFix64, to: Address) {
-							
+
 								// The Vault resource that holds the tokens that are being transferred
 								let sentVault: @FungibleToken.Vault
-							
+
 								prepare(signer: AuthAccount) {
-							
+
 									// Get a reference to the signer's stored vault
 									let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
 										?? panic("Could not borrow reference to the owner's Vault!")
-							
+
 									// Withdraw tokens from the signer's stored vault
 									self.sentVault <- vaultRef.withdraw(amount: amount)
 								}
-							
+
 								execute {
-							
+
 									// Get the recipient's public account object
 									let recipient = getAccount(to)
-							
+
 									// Get a reference to the recipient's Receiver
 									let receiverRef = recipient.getCapability(/public/flowTokenReceiver)
 										.borrow<&{FungibleToken.Receiver}>()
 										?? panic("Could not borrow receiver reference to the recipient's Vault")
-							
+
 									// Deposit the withdrawn tokens in the recipient's receiver
 									receiverRef.deposit(from: <-self.sentVault)
 								}
@@ -155,7 +156,7 @@ import FlowContractAudits from 0x%s
 
 transaction(deployAddress: Address, code: String) {
 	prepare(serviceAccount: AuthAccount) {
-		
+
 		let auditorAdmin = serviceAccount.borrow<&FlowContractAudits.Administrator>(from: FlowContractAudits.AdminStoragePath)
             ?? panic("Could not borrow a reference to the admin resource")
 
@@ -241,7 +242,7 @@ func TestPrograms(t *testing.T) {
 	)
 
 	t.Run("script execution programs are not committed",
-		newVMTest().run(
+		newVMTest().withBootstrapProcedureOptions().run(
 			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 
 				scriptCtx := fvm.NewContextFromParent(ctx)
@@ -524,7 +525,9 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
 		require.NoError(t, err)
 
-		assert.NoError(t, tx.Err)
+		var parsingCheckingError *runtime.ParsingCheckingError
+		assert.ErrorAs(t, tx.Err, &parsingCheckingError)
+		assert.ErrorContains(t, tx.Err, "program too ambiguous, local replay limit of 64 tokens exceeded")
 	})
 
 	t.Run("account update with set code fails if not signed by service account", func(t *testing.T) {
@@ -1027,7 +1030,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 							// deposit additional flow
 							let payment <- vaultRef.withdraw(amount: 10.0) as! @FlowToken.Vault
 
-							let receiver = signer.getCapability(/public/flowTokenReceiver)!.borrow<&{FungibleToken.Receiver}>() 
+							let receiver = signer.getCapability(/public/flowTokenReceiver)!.borrow<&{FungibleToken.Receiver}>()
 								?? panic("Could not borrow receiver reference to the recipient's Vault")
 							receiver.deposit(from: <-payment)
 						}
@@ -1659,7 +1662,7 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 
 		num, err := strconv.ParseUint(tx.Logs[0], 10, 64)
 		require.NoError(t, err)
-		require.Equal(t, uint64(0xb9c618010e32a0fb), num)
+		require.Equal(t, uint64(0x8872445cb397f6d2), num)
 	})
 }
 
@@ -2550,7 +2553,7 @@ func TestHashing(t *testing.T) {
 		return []byte(fmt.Sprintf(
 			`
 				import Crypto
-				
+
 				pub fun main(data: [UInt8]): [UInt8] {
 					return Crypto.hash(data, algorithm: HashAlgorithm.%s)
 				}
@@ -2560,7 +2563,7 @@ func TestHashing(t *testing.T) {
 		return []byte(fmt.Sprintf(
 			`
 				import Crypto
-				
+
 				pub fun main(data: [UInt8], tag: String): [UInt8] {
 					return Crypto.hashWithTag(data, tag: tag, algorithm: HashAlgorithm.%s)
 				}
@@ -2933,13 +2936,13 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		code := []byte(fmt.Sprintf(`
 					import FungibleToken from 0x%s
 					import FlowToken from 0x%s
-					
+
 					pub fun main(account: Address): UFix64 {
 						let acct = getAccount(account)
 						let vaultRef = acct.getCapability(/public/flowTokenBalance)
 							.borrow<&FlowToken.Vault{FungibleToken.Balance}>()
 							?? panic("Could not borrow Balance reference to the Vault")
-					
+
 						return vaultRef.balance
 					}
 				`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain)))
@@ -2949,6 +2952,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 
 		err := vm.Run(ctx, script, view, programs.NewEmptyPrograms())
 		require.NoError(t, err)
+		require.NoError(t, script.Err)
 		return script.Value.ToGoValue().(uint64)
 	}
 
@@ -2956,6 +2960,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		fvm.WithExecutionMemoryLimit(math.MaxUint64),
 	).run(
 		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 			ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
@@ -2998,6 +3003,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		fvm.WithExecutionMemoryLimit(math.MaxUint64),
 	).run(
 		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 			ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
@@ -3167,13 +3173,13 @@ func TestTransactionFeeDeduction(t *testing.T) {
 		code := []byte(fmt.Sprintf(`
 					import FungibleToken from 0x%s
 					import FlowToken from 0x%s
-					
+
 					pub fun main(account: Address): UFix64 {
 						let acct = getAccount(account)
 						let vaultRef = acct.getCapability(/public/flowTokenBalance)
 							.borrow<&FlowToken.Vault{FungibleToken.Balance}>()
 							?? panic("Could not borrow Balance reference to the Vault")
-					
+
 						return vaultRef.balance
 					}
 				`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain)))
@@ -3183,6 +3189,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 
 		err := vm.Run(ctx, script, view, programs.NewEmptyPrograms())
 		require.NoError(t, err)
+		require.NoError(t, script.Err)
 		return script.Value.ToGoValue().(uint64)
 	}
 
@@ -3548,6 +3555,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("Transaction Fees %d: %s", i, tc.name), newVMTest().withBootstrapProcedureOptions(
 			fvm.WithTransactionFee(fvm.DefaultTransactionFees),
+			fvm.WithExecutionMemoryLimit(math.MaxUint64),
 		).withContextOptions(
 			fvm.WithTransactionFeesEnabled(true),
 		).run(
@@ -3561,6 +3569,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 			fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 			fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+			fvm.WithExecutionMemoryLimit(math.MaxUint64),
 		).withContextOptions(
 			fvm.WithTransactionFeesEnabled(true),
 			fvm.WithAccountStorageLimit(true),
@@ -3614,7 +3623,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 	for k, v := range weightedMeter.DefaultMemoryWeights {
 		memoryWeights[k] = v
 	}
-	memoryWeights[common.MemoryKindBool] = 20_000_000_000
+	memoryWeights[common.MemoryKindBoolValue] = 20_000_000_000
 
 	t.Run("normal transactions should fail with high memory weights", newVMTest().withBootstrapProcedureOptions(
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
@@ -3693,6 +3702,74 @@ func TestSettingExecutionWeights(t *testing.T) {
 			require.Equal(t, uint64(0), tx.MemoryUsed)
 
 			require.NoError(t, tx.Err)
+		},
+	))
+
+	memoryWeights = make(map[common.MemoryKind]uint64)
+	for k, v := range weightedMeter.DefaultMemoryWeights {
+		memoryWeights[k] = v
+	}
+	memoryWeights[common.MemoryKindBreakStatement] = 1_000_000
+	t.Run("transaction should fail with low memory limit (set in the state)", newVMTest().withBootstrapProcedureOptions(
+		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		fvm.WithExecutionMemoryLimit(
+			100_000_000,
+		),
+		fvm.WithExecutionMemoryWeights(
+			memoryWeights,
+		),
+	).run(
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+			require.NoError(t, err)
+
+			accounts, err := testutil.CreateAccounts(vm, view, programs, privateKeys, chain)
+			require.NoError(t, err)
+
+			// This transaction is specially designed to use a lot of breaks
+			// as the weight for breaks is much higher than usual.
+			// putting a `while true {break}` in a loop does not use the same amount of memory.
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(`
+				transaction {
+					prepare(signer: AuthAccount) {
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+					}
+				}
+			`))
+
+			err = testutil.SignTransaction(txBody, accounts[0], privateKeys[0], 0)
+			require.NoError(t, err)
+
+			tx := fvm.Transaction(txBody, 0)
+			err = vm.Run(ctx, tx, view, programs)
+			require.NoError(t, err)
+			// There are 100 breaks and each break uses 1_000_000 memory
+			require.Greater(t, tx.MemoryUsed, uint64(100_000_000))
+
+			var memoryLimitExceededError *errors.MemoryLimitExceededError
+			assert.ErrorAs(t, tx.Err, &memoryLimitExceededError)
 		},
 	))
 
@@ -4050,4 +4127,247 @@ func TestEnforcingComputationLimit(t *testing.T) {
 
 		})
 	}
+}
+
+func TestScriptContractMutationsFailure(t *testing.T) {
+	t.Parallel()
+
+	t.Run("contract additions are not committed",
+		newVMTest().run(
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+
+				// Create an account private key.
+				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+				require.NoError(t, err)
+
+				// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+				accounts, err := testutil.CreateAccounts(vm, view, programs, privateKeys, chain)
+				require.NoError(t, err)
+				account := accounts[0]
+				address := cadence.NewAddress(account)
+
+				scriptCtx := fvm.NewContextFromParent(ctx)
+
+				contract := "pub contract Foo {}"
+
+				script := fvm.Script([]byte(fmt.Sprintf(`
+				pub fun main(account: Address) {
+					let acc = getAuthAccount(account)
+					acc.contracts.add(name: "Foo", code: "%s".decodeHex())
+				}`, hex.EncodeToString([]byte(contract))),
+				)).WithArguments(
+					jsoncdc.MustEncode(address),
+				)
+
+				err = vm.Run(scriptCtx, script, view, programs)
+				require.NoError(t, err)
+				require.Error(t, script.Err)
+				require.IsType(t, &errors.CadenceRuntimeError{}, script.Err)
+				// modifications to contracts are not supported in scripts
+				require.IsType(t, &errors.OperationNotSupportedError{},
+					script.Err.(*errors.CadenceRuntimeError).Unwrap().(*runtime.Error).Err.(interpreter.Error).Err.(interpreter.PositionedError).Err)
+			},
+		),
+	)
+
+	t.Run("contract removals are not committed",
+		newVMTest().run(
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+
+				// Create an account private key.
+				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+				privateKey := privateKeys[0]
+				require.NoError(t, err)
+
+				// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+				accounts, err := testutil.CreateAccounts(vm, view, programs, privateKeys, chain)
+				require.NoError(t, err)
+				account := accounts[0]
+				address := cadence.NewAddress(account)
+
+				subCtx := fvm.NewContextFromParent(ctx)
+
+				contract := "pub contract Foo {}"
+
+				txBody := flow.NewTransactionBody().SetScript([]byte(fmt.Sprintf(`
+					transaction {
+						prepare(signer: AuthAccount, service: AuthAccount) {
+							signer.contracts.add(name: "Foo", code: "%s".decodeHex())
+						}
+					}
+				`, hex.EncodeToString([]byte(contract))))).
+					AddAuthorizer(account).
+					AddAuthorizer(chain.ServiceAddress()).
+					SetPayer(chain.ServiceAddress()).
+					SetProposalKey(chain.ServiceAddress(), 0, 0)
+
+				_ = testutil.SignPayload(txBody, account, privateKey)
+				_ = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+				tx := fvm.Transaction(txBody, 0)
+				err = vm.Run(subCtx, tx, view, programs)
+				require.NoError(t, err)
+				require.NoError(t, tx.Err)
+
+				script := fvm.Script([]byte(`
+				pub fun main(account: Address) {
+					let acc = getAuthAccount(account)
+					let n = acc.contracts.names[0]
+					acc.contracts.remove(name: n)
+				}`,
+				)).WithArguments(
+					jsoncdc.MustEncode(address),
+				)
+
+				err = vm.Run(subCtx, script, view, programs)
+				require.NoError(t, err)
+				require.Error(t, script.Err)
+				require.IsType(t, &errors.CadenceRuntimeError{}, script.Err)
+				// modifications to contracts are not supported in scripts
+				require.IsType(t, &errors.OperationNotSupportedError{},
+					script.Err.(*errors.CadenceRuntimeError).Unwrap().(*runtime.Error).Err.(interpreter.Error).Err.(interpreter.PositionedError).Err)
+			},
+		),
+	)
+
+	t.Run("contract updates are not committed",
+		newVMTest().run(
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+
+				// Create an account private key.
+				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+				privateKey := privateKeys[0]
+				require.NoError(t, err)
+
+				// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+				accounts, err := testutil.CreateAccounts(vm, view, programs, privateKeys, chain)
+				require.NoError(t, err)
+				account := accounts[0]
+				address := cadence.NewAddress(account)
+
+				subCtx := fvm.NewContextFromParent(ctx)
+
+				contract := "pub contract Foo {}"
+
+				txBody := flow.NewTransactionBody().SetScript([]byte(fmt.Sprintf(`
+					transaction {
+						prepare(signer: AuthAccount, service: AuthAccount) {
+							signer.contracts.add(name: "Foo", code: "%s".decodeHex())
+						}
+					}
+				`, hex.EncodeToString([]byte(contract))))).
+					AddAuthorizer(account).
+					AddAuthorizer(chain.ServiceAddress()).
+					SetPayer(chain.ServiceAddress()).
+					SetProposalKey(chain.ServiceAddress(), 0, 0)
+
+				_ = testutil.SignPayload(txBody, account, privateKey)
+				_ = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+				tx := fvm.Transaction(txBody, 0)
+				err = vm.Run(subCtx, tx, view, programs)
+				require.NoError(t, err)
+				require.NoError(t, tx.Err)
+
+				script := fvm.Script([]byte(fmt.Sprintf(`
+				pub fun main(account: Address) {
+					let acc = getAuthAccount(account)
+					let n = acc.contracts.names[0]
+					acc.contracts.update__experimental(name: n, code: "%s".decodeHex())
+				}`, hex.EncodeToString([]byte(contract))))).WithArguments(
+					jsoncdc.MustEncode(address),
+				)
+
+				err = vm.Run(subCtx, script, view, programs)
+				require.NoError(t, err)
+				require.Error(t, script.Err)
+				require.IsType(t, &errors.CadenceRuntimeError{}, script.Err)
+				// modifications to contracts are not supported in scripts
+				require.IsType(t, &errors.OperationNotSupportedError{},
+					script.Err.(*errors.CadenceRuntimeError).Unwrap().(*runtime.Error).Err.(interpreter.Error).Err.(interpreter.PositionedError).Err)
+			},
+		),
+	)
+}
+
+func TestScriptAccountKeyMutationsFailure(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Account key additions are not committed",
+		newVMTest().run(
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+
+				// Create an account private key.
+				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+				require.NoError(t, err)
+
+				// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+				accounts, err := testutil.CreateAccounts(vm, view, programs, privateKeys, chain)
+				require.NoError(t, err)
+				account := accounts[0]
+				address := cadence.NewAddress(account)
+
+				scriptCtx := fvm.NewContextFromParent(ctx)
+
+				seed := make([]byte, crypto.KeyGenSeedMinLenECDSAP256)
+				_, _ = rand.Read(seed)
+
+				privateKey, _ := crypto.GeneratePrivateKey(crypto.ECDSAP256, seed)
+
+				script := fvm.Script([]byte(`
+					pub fun main(account: Address, k: [UInt8]) {
+						let acc = getAuthAccount(account)
+						acc.addPublicKey(k)
+					}`,
+				)).WithArguments(
+					jsoncdc.MustEncode(address),
+					jsoncdc.MustEncode(testutil.BytesToCadenceArray(
+						privateKey.PublicKey().Encode(),
+					)),
+				)
+
+				err = vm.Run(scriptCtx, script, view, programs)
+				require.NoError(t, err)
+				require.Error(t, script.Err)
+				require.IsType(t, &errors.CadenceRuntimeError{}, script.Err)
+				// modifications to public keys are not supported in scripts
+				require.IsType(t, &errors.OperationNotSupportedError{},
+					script.Err.(*errors.CadenceRuntimeError).Unwrap().(*runtime.Error).Err.(interpreter.Error).Err.(interpreter.PositionedError).Err)
+			},
+		),
+	)
+
+	t.Run("Account key removals are not committed",
+		newVMTest().run(
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+
+				// Create an account private key.
+				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+				require.NoError(t, err)
+
+				// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+				accounts, err := testutil.CreateAccounts(vm, view, programs, privateKeys, chain)
+				require.NoError(t, err)
+				account := accounts[0]
+				address := cadence.NewAddress(account)
+
+				scriptCtx := fvm.NewContextFromParent(ctx)
+
+				script := fvm.Script([]byte(`
+				pub fun main(account: Address) {
+					let acc = getAuthAccount(account)
+					acc.removePublicKey(0)
+				}`,
+				)).WithArguments(
+					jsoncdc.MustEncode(address),
+				)
+
+				err = vm.Run(scriptCtx, script, view, programs)
+				require.NoError(t, err)
+				require.Error(t, script.Err)
+				require.IsType(t, &errors.CadenceRuntimeError{}, script.Err)
+				// modifications to public keys are not supported in scripts
+				require.IsType(t, &errors.OperationNotSupportedError{},
+					script.Err.(*errors.CadenceRuntimeError).Unwrap().(*runtime.Error).Err.(interpreter.Error).Err.(interpreter.PositionedError).Err)
+			},
+		),
+	)
 }
