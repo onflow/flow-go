@@ -77,9 +77,9 @@ func (p *ConsensusSigDataPacker) Unpack(signerIdentities flow.IdentityList, sigD
 	stakingSigners, randomBeaconSigners, err := signature.DecodeSigTypeToStakingAndBeaconSigners(signerIdentities, data.SigType)
 	if err != nil {
 		if signature.IsInvalidSigTypesError(err) {
-			return nil, model.NewInvalidFormatErrorf("invalid signer indices: %w", err)
+			return nil, model.NewInvalidFormatErrorf("invalid signer type data.SigType %v: %w", data.SigType, err)
 		}
-		return nil, fmt.Errorf("unexpected exception decoding signer data: %w", err)
+		return nil, fmt.Errorf("unexpected exception unpacking signer data data.SigType %v: %w", data.SigType, err)
 	}
 
 	return &hotstuff.BlockSignatureData{
