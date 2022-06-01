@@ -18,12 +18,12 @@ func ValidateRequireApprovals(requiredApprovalsForSealConstruction uint) error {
 func validateRequireApprovals(requiredApprovalsForSealConstruction uint, requiredApprovalsForSealVerification uint, chunkAlpha uint) error {
 	// We need to ensure `requiredApprovalsForSealVerification <= requiredApprovalsForSealConstruction <= chunkAlpha`
 	if requiredApprovalsForSealVerification > requiredApprovalsForSealConstruction {
-		return fmt.Errorf("invalid consensus parameters, expect requiredApprovalsForSealVerification (%v)  > requiredApprovalsForSealConstruction (%v)",
+		return fmt.Errorf("invalid consensus parameters, requiredApprovalsForSealVerification (%v)  > requiredApprovalsForSealConstruction (%v)",
 			requiredApprovalsForSealVerification, requiredApprovalsForSealConstruction)
 	}
 
 	if requiredApprovalsForSealConstruction > chunkAlpha {
-		return fmt.Errorf("invalid consensus parameters: expect requiredApprovalsForSealConstruction (%v) > chunkAlpha (%v)",
+		return fmt.Errorf("invalid consensus parameters: requiredApprovalsForSealConstruction (%v) > chunkAlpha (%v)",
 			requiredApprovalsForSealConstruction, chunkAlpha)
 	}
 

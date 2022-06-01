@@ -1,23 +1,26 @@
-package updatable_configs
+package updatable_configs_test
 
 import (
 	"testing"
 
+	"github.com/onflow/flow-go/module/chunks"
+	"github.com/onflow/flow-go/module/updatable_configs"
 	"github.com/stretchr/testify/require"
 )
 
 func TestRequiredApprovalsForSealingContruction(t *testing.T) {
-	instance := AcquireRequiredApprovalsForSealConstructionSetter()
+	instance := updatable_configs.AcquireRequiredApprovalsForSealConstructionSetter()
 	// a second copy of the same instance
-	instance2 := AcquireRequiredApprovalsForSealConstructionSetter()
+	instance2 := updatable_configs.AcquireRequiredApprovalsForSealConstructionSetter()
 	require.Equal(t, instance, instance2)
 
 	// should get the default value
 	val := instance.GetValue()
-	require.Equal(t, DefaultRequiredApprovalsForSealConstruction, val)
+	require.Equal(t, updatable_configs.DefaultRequiredApprovalsForSealConstruction, val)
 
 	// SetValue should return the old value
-	old := instance.SetValue(0)
+	old, err := instance.SetValue(0)
+	require.NoError(t, err)
 	require.Equal(t, val, old)
 
 	// value should be updated by SetValue
@@ -28,15 +31,19 @@ func TestRequiredApprovalsForSealingContruction(t *testing.T) {
 	require.Equal(t, uint(0), instance2.GetValue())
 
 	// a newly created instance should get the same value
-	require.Equal(t, uint(0), AcquireRequiredApprovalsForSealConstructionGetter().GetValue())
+	require.Equal(t, uint(0), updatable_configs.AcquireRequiredApprovalsForSealConstructionGetter().GetValue())
 
 	// test updating 10 times
-	for i := 1; i <= 10; i++ {
-		old := instance.SetValue(uint(i))
+	for i := 1; i <= chunks.DefaultChunkAssignmentAlpha; i++ {
+		old, err := instance.SetValue(uint(i))
+		require.NoError(t, err, err)
 		require.Equal(t, uint(i-1), old)
 		require.Equal(t, uint(i), instance.GetValue())
-		require.Equal(t, uint(i), AcquireRequiredApprovalsForSealConstructionGetter().GetValue())
+		require.Equal(t, uint(i), updatable_configs.AcquireRequiredApprovalsForSealConstructionGetter().GetValue())
 	}
+
+	_, err = instance.SetValue(chunks.DefaultChunkAssignmentAlpha + 1)
+	require.Error(t, err)
 }
 
 func TestRequiredApprovalsForSealingContructionConcurrent(t *testing.T) {

@@ -71,29 +71,28 @@ import (
 func main() {
 
 	var (
-		guaranteeLimit                             uint
-		resultLimit                                uint
-		approvalLimit                              uint
-		sealLimit                                  uint
-		pendingReceiptsLimit                       uint
-		minInterval                                time.Duration
-		maxInterval                                time.Duration
-		maxSealPerBlock                            uint
-		maxGuaranteePerBlock                       uint
-		hotstuffTimeout                            time.Duration
-		hotstuffMinTimeout                         time.Duration
-		hotstuffTimeoutIncreaseFactor              float64
-		hotstuffTimeoutDecreaseFactor              float64
-		hotstuffTimeoutVoteAggregationFraction     float64
-		blockRateDelay                             time.Duration
-		chunkAlpha                                 uint
-		requiredApprovalsForSealVerification       uint
-		requiredApprovalsForSealConstruction       uint
-		requiredApprovalsForSealConstructionSetter module.RequiredApprovalsForSealConstructionInstanceSetter
-		emergencySealing                           bool
-		dkgControllerConfig                        dkgmodule.ControllerConfig
-		startupTimeString                          string
-		startupTime                                time.Time
+		guaranteeLimit                         uint
+		resultLimit                            uint
+		approvalLimit                          uint
+		sealLimit                              uint
+		pendingReceiptsLimit                   uint
+		minInterval                            time.Duration
+		maxInterval                            time.Duration
+		maxSealPerBlock                        uint
+		maxGuaranteePerBlock                   uint
+		hotstuffTimeout                        time.Duration
+		hotstuffMinTimeout                     time.Duration
+		hotstuffTimeoutIncreaseFactor          float64
+		hotstuffTimeoutDecreaseFactor          float64
+		hotstuffTimeoutVoteAggregationFraction float64
+		blockRateDelay                         time.Duration
+		chunkAlpha                             uint
+		requiredApprovalsForSealVerification   uint
+		requiredApprovalsForSealConstruction   uint
+		emergencySealing                       bool
+		dkgControllerConfig                    dkgmodule.ControllerConfig
+		startupTimeString                      string
+		startupTime                            time.Time
 
 		// DKG contract client
 		machineAccountInfo *bootstrap.NodeMachineAccountInfo
@@ -195,8 +194,10 @@ func main() {
 			}
 
 			// create the singleton instance and set the value with the flag
-			requiredApprovalsForSealConstructionSetter = updatable_configs.AcquireRequiredApprovalsForSealConstructionSetter()
-			requiredApprovalsForSealConstructionSetter.SetValue(requiredApprovalsForSealConstruction)
+			err := updatable_configs.AcquireRequiredApprovalsForSealConstructionSetter().SetValue(requiredApprovalsForSealConstruction)
+			if err != nil {
+				return err
+			}
 
 			return nil
 		}).
@@ -230,7 +231,7 @@ func main() {
 				node.Storage.Results,
 				node.Storage.Seals,
 				chunkAssigner,
-				requiredApprovalsForSealConstructionSetter,
+				updatable_configs.AcquireRequiredApprovalsForSealConstructionGetter(),
 				requiredApprovalsForSealVerification,
 				conMetrics)
 			if err != nil {
@@ -422,7 +423,7 @@ func main() {
 				chunkAssigner,
 				seals,
 				config,
-				requiredApprovalsForSealConstructionSetter,
+				updatable_configs.AcquireRequiredApprovalsForSealConstructionGetter(),
 			)
 
 			// subscribe for finalization events from hotstuff
