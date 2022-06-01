@@ -9,7 +9,7 @@ require (
 	github.com/docker/go-connections v0.4.0
 	github.com/go-yaml/yaml v2.1.0+incompatible
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
-	github.com/onflow/cadence v0.21.3-0.20220520204606-7b9689d79a2d
+	github.com/onflow/cadence v0.21.3-0.20220601002855-8b113c539a2c
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220513155751-c4c1f8d59f83
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220513155751-c4c1f8d59f83
 	github.com/onflow/flow-emulator v0.31.2-0.20220513151845-ef7513cb1cd0
@@ -76,7 +76,7 @@ require (
 	github.com/flynn/noise v1.0.0 // indirect
 	github.com/francoispqt/gojay v1.2.13 // indirect
 	github.com/fsnotify/fsnotify v1.5.1 // indirect
-	github.com/fxamacker/cbor/v2 v2.4.1-0.20220314011055-12f5cb4b5eb0 // indirect
+	github.com/fxamacker/cbor/v2 v2.4.1-0.20220515183430-ad2eae63303f // indirect
 	github.com/fxamacker/circlehash v0.3.0 // indirect
 	github.com/gammazero/deque v0.1.0 // indirect
 	github.com/gammazero/workerpool v1.1.2 // indirect
@@ -210,7 +210,7 @@ require (
 	github.com/multiformats/go-varint v0.0.6 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
-	github.com/onflow/atree v0.3.1-0.20220519142403-b0077ba343ec // indirect
+	github.com/onflow/atree v0.3.1-0.20220531231935-525fbc26f40a // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v0.5.0 // indirect
 	github.com/onflow/sdks v0.4.2 // indirect
 	github.com/onsi/ginkgo v1.16.5 // indirect
@@ -296,6 +296,6 @@ require (
 
 replace github.com/onflow/flow-go => ../
 
-replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.21.1-0.20220525172553-085b0fcef7e9
+replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.21.1-0.20220601005416-e974acd91285
 
-replace github.com/onflow/atree => github.com/dapperlabs/atree-internal v0.3.1-0.20220525190018-9e7903687c38
+replace github.com/onflow/atree => github.com/dapperlabs/atree-internal v0.3.1-0.20220531232335-32d7f2ac0ce1
