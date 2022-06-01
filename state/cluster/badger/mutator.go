@@ -7,6 +7,7 @@ import (
 	"math"
 
 	"github.com/dgraph-io/badger/v2"
+
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -119,7 +120,18 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 		checkTxsSpan, _ := m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendCheckTransactionsValid)
 		defer checkTxsSpan.Finish()
 
-		// no validation of transactions is necessary for empty transactions
+		// a valid collection must reference a valid reference block
+		// NOTE: it is valid for a collection to be expired at this point,
+		// otherwise we would compromise liveness of the cluster.
+		refBlock, err := m.headers.ByBlockID(payload.ReferenceBlockID)
+		if errors.Is(err, storage.ErrNotFound) {
+			return state.NewInvalidExtensionErrorf("unknown reference block (id=%x)", payload.ReferenceBlockID)
+		}
+		if err != nil {
+			return fmt.Errorf("could not check reference block: %w", err)
+		}
+
+		// no validation of transactions is necessary for empty collections
 		if payload.Collection.Len() == 0 {
 			return nil
 		}
@@ -162,17 +174,6 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 			return state.NewInvalidExtensionErrorf(
 				"collection contains reference height range [%d,%d] exceeding expiry window size: %d",
 				minRefHeight, maxRefHeight, flow.DefaultTransactionExpiry)
-		}
-
-		// a valid collection must reference a valid reference block
-		// NOTE: it is valid for a collection to be expired at this point,
-		// otherwise we would compromise liveness of the cluster.
-		refBlock, err := m.headers.ByBlockID(payload.ReferenceBlockID)
-		if errors.Is(err, storage.ErrNotFound) {
-			return state.NewInvalidExtensionErrorf("unknown reference block (id=%x)", payload.ReferenceBlockID)
-		}
-		if err != nil {
-			return fmt.Errorf("could not check reference block: %w", err)
 		}
 
 		// TODO ensure the reference block is part of the main chain
