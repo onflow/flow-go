@@ -8,6 +8,11 @@ require (
 	github.com/docker/docker v1.4.2-0.20190513124817-8c8457b0f2f8
 	github.com/docker/go-connections v0.4.0
 	github.com/go-yaml/yaml v2.1.0+incompatible
+	github.com/ipfs/go-blockservice v0.2.0
+	github.com/ipfs/go-cid v0.1.0
+	github.com/ipfs/go-datastore v0.5.1
+	github.com/ipfs/go-ds-badger2 v0.1.3
+	github.com/ipfs/go-ipfs-blockstore v0.2.0
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/onflow/cadence v0.21.3-0.20220601002855-8b113c539a2c
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220513155751-c4c1f8d59f83
@@ -115,13 +120,8 @@ require (
 	github.com/ipfs/bbloom v0.0.4 // indirect
 	github.com/ipfs/go-bitswap v0.5.0 // indirect
 	github.com/ipfs/go-block-format v0.0.3 // indirect
-	github.com/ipfs/go-blockservice v0.2.0 // indirect
-	github.com/ipfs/go-cid v0.1.0 // indirect
 	github.com/ipfs/go-cidutil v0.0.2 // indirect
-	github.com/ipfs/go-datastore v0.5.1 // indirect
-	github.com/ipfs/go-ds-badger2 v0.1.3 // indirect
 	github.com/ipfs/go-fetcher v1.5.0 // indirect
-	github.com/ipfs/go-ipfs-blockstore v0.2.0 // indirect
 	github.com/ipfs/go-ipfs-delay v0.0.1 // indirect
 	github.com/ipfs/go-ipfs-ds-help v1.1.0 // indirect
 	github.com/ipfs/go-ipfs-exchange-interface v0.1.0 // indirect
@@ -160,7 +160,7 @@ require (
 	github.com/libp2p/go-libp2p-noise v0.4.0 // indirect
 	github.com/libp2p/go-libp2p-peerstore v0.6.0 // indirect
 	github.com/libp2p/go-libp2p-pnet v0.2.0 // indirect
-	github.com/libp2p/go-libp2p-pubsub v0.6.0 // indirect
+	github.com/libp2p/go-libp2p-pubsub v0.6.2-0.20220530164708-06b5ba47636c // indirect
 	github.com/libp2p/go-libp2p-quic-transport v0.17.0 // indirect
 	github.com/libp2p/go-libp2p-record v0.1.3 // indirect
 	github.com/libp2p/go-libp2p-resource-manager v0.2.1 // indirect

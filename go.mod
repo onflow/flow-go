@@ -45,7 +45,7 @@ require (
 	github.com/libp2p/go-libp2p-discovery v0.6.0
 	github.com/libp2p/go-libp2p-kad-dht v0.15.0
 	github.com/libp2p/go-libp2p-kbucket v0.4.7
-	github.com/libp2p/go-libp2p-pubsub v0.6.0
+	github.com/libp2p/go-libp2p-pubsub v0.6.2-0.20220530164708-06b5ba47636c
 	github.com/libp2p/go-libp2p-swarm v0.10.2
 	github.com/libp2p/go-libp2p-tls v0.4.1
 	github.com/libp2p/go-tcp-transport v0.5.1
