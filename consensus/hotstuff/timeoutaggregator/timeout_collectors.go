@@ -21,7 +21,7 @@ type NewCollectorFactoryMethod = func(view uint64) (hotstuff.TimeoutCollector, e
 type TimeoutCollectors struct {
 	log                zerolog.Logger
 	lock               sync.RWMutex
-	lowestRetainedView uint64                               // lowest view, for which we still retain a VoteCollector and process votes
+	lowestRetainedView uint64                               // lowest view, for which we still retain a TimeoutCollector and process timeouts
 	collectors         map[uint64]hotstuff.TimeoutCollector // view -> TimeoutCollector
 	createCollector    NewCollectorFactoryMethod            // factory method for creating collectors
 }
@@ -32,7 +32,7 @@ var _ hotstuff.TimeoutCollectors = (*TimeoutCollectors)(nil)
 // view or creates one if none exists.
 //  -  (collector, true, nil) if no collector can be found by the view, and a new collector was created.
 //  -  (collector, false, nil) if the collector can be found by the view
-//  -  (nil, false, error) if running into any exception creating the vote collector state machine
+//  -  (nil, false, error) if running into any exception creating the timeout collector state machine
 // Expected error returns during normal operations:
 //  * mempool.DecreasingPruningHeightError - in case view is lower than lowestRetainedView
 func (t *TimeoutCollectors) GetOrCreateCollector(view uint64) (hotstuff.TimeoutCollector, bool, error) {
@@ -47,7 +47,7 @@ func (t *TimeoutCollectors) GetOrCreateCollector(view uint64) (hotstuff.TimeoutC
 
 	collector, err := t.createCollector(view)
 	if err != nil {
-		return nil, false, fmt.Errorf("could not create vote collector for view %d: %w", view, err)
+		return nil, false, fmt.Errorf("could not create timeout collector for view %d: %w", view, err)
 	}
 
 	// Initial check showed that there was no collector. However, it's possible that after the

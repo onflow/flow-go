@@ -3,16 +3,18 @@ package timeoutaggregator
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/common/fifoqueue"
-	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
-	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/mempool"
+
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/common/fifoqueue"
+	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/mempool"
 )
 
 // defaultTimeoutAggregatorWorkers number of workers to dispatch events for timeout aggregators
@@ -23,12 +25,14 @@ const defaultTimeoutQueueCapacity = 1000
 
 type TimeoutAggregator struct {
 	*component.ComponentManager
-	log                    zerolog.Logger
-	notifier               hotstuff.Consumer
-	lowestRetainedView     counters.StrictMonotonousCounter // lowest view, for which we still process timeouts
-	collectors             hotstuff.TimeoutCollectors
-	queuedTimeoutsNotifier engine.Notifier
-	queuedTimeouts         *fifoqueue.FifoQueue
+	log                        zerolog.Logger
+	notifier                   hotstuff.Consumer
+	lowestRetainedView         counters.StrictMonotonousCounter // lowest view, for which we still process timeouts
+	activeView                 counters.StrictMonotonousCounter // cache the last view that we have entered to queue up the pruning work, and unblock the caller who's delivering the finalization event.
+	collectors                 hotstuff.TimeoutCollectors
+	queuedTimeoutsNotifier     engine.Notifier
+	enteringViewEventsNotifier engine.Notifier
+	queuedTimeouts             *fifoqueue.FifoQueue
 }
 
 var _ hotstuff.TimeoutAggregator = (*TimeoutAggregator)(nil)
@@ -46,12 +50,14 @@ func NewTimeoutAggregator(log zerolog.Logger,
 	}
 
 	aggregator := &TimeoutAggregator{
-		log:                    log,
-		notifier:               notifier,
-		lowestRetainedView:     counters.NewMonotonousCounter(lowestRetainedView),
-		collectors:             collectors,
-		queuedTimeoutsNotifier: engine.NewNotifier(),
-		queuedTimeouts:         queuedTimeouts,
+		log:                        log,
+		notifier:                   notifier,
+		lowestRetainedView:         counters.NewMonotonousCounter(lowestRetainedView),
+		activeView:                 counters.NewMonotonousCounter(lowestRetainedView),
+		collectors:                 collectors,
+		queuedTimeoutsNotifier:     engine.NewNotifier(),
+		enteringViewEventsNotifier: engine.NewNotifier(),
+		queuedTimeouts:             queuedTimeouts,
 	}
 
 	componentBuilder := component.NewComponentManagerBuilder()
@@ -62,6 +68,10 @@ func NewTimeoutAggregator(log zerolog.Logger,
 			aggregator.queuedTimeoutsProcessingLoop(ctx)
 		})
 	}
+	componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		ready()
+		aggregator.enteringViewProcessingLoop(ctx)
+	})
 
 	aggregator.ComponentManager = componentBuilder.Build()
 	return aggregator, nil
@@ -173,5 +183,28 @@ func (t *TimeoutAggregator) AddTimeout(timeoutObject *model.TimeoutObject) {
 func (t *TimeoutAggregator) PruneUpToView(lowestRetainedView uint64) {
 	if t.lowestRetainedView.Set(lowestRetainedView) {
 		t.collectors.PruneUpToView(lowestRetainedView)
+	}
+}
+
+// OnEnteringView implements the `OnEnteringView` callback from the `hotstuff.FinalizationConsumer`
+//  (1) Informs sealing.Core about entering view.
+// CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
+// from external nodes cannot be considered as inputs to this function
+func (t *TimeoutAggregator) OnEnteringView(viewNumber uint64, _ flow.Identifier) {
+	if t.activeView.Set(viewNumber) {
+		t.enteringViewEventsNotifier.Notify()
+	}
+}
+
+// enteringViewProcessingLoop is a separate goroutine that performs processing of entering view events
+func (t *TimeoutAggregator) enteringViewProcessingLoop(ctx context.Context) {
+	notifier := t.enteringViewEventsNotifier.Channel()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-notifier:
+			t.PruneUpToView(t.activeView.Value())
+		}
 	}
 }

@@ -2,18 +2,20 @@ package timeoutaggregator
 
 import (
 	"context"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+	"go.uber.org/atomic"
+
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
-	"go.uber.org/atomic"
-	"sync"
-	"testing"
-	"time"
 )
 
 func TestTimeoutAggregator(t *testing.T) {
@@ -105,4 +107,16 @@ func (s *TimeoutAggregatorTestSuite) TestPruneUpToView() {
 
 	s.collectors.On("PruneUpToView", s.lowestRetainedView+1).Once()
 	s.aggregator.PruneUpToView(s.lowestRetainedView + 1)
+}
+
+// TestOnEnteringView tests if entering view event gets processed when send through `TimeoutAggregator`.
+// Tests the whole processing pipeline.
+func (s *TimeoutAggregatorTestSuite) TestOnEnteringView() {
+	view := s.lowestRetainedView + 1
+	s.collectors.On("PruneUpToView", view).Once()
+	s.aggregator.OnEnteringView(view, unittest.IdentifierFixture())
+	require.Eventually(s.T(),
+		func() bool {
+			return s.collectors.AssertCalled(s.T(), "PruneUpToView", view)
+		}, time.Second, time.Millisecond*20)
 }
