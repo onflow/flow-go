@@ -4,8 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	lru "github.com/hashicorp/golang-lru"
 	"time"
+
+	lru "github.com/hashicorp/golang-lru"
 
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"

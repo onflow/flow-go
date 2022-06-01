@@ -3,8 +3,9 @@ package backend
 import (
 	"context"
 	"crypto/md5" //nolint:gosec
-	lru "github.com/hashicorp/golang-lru"
 	"time"
+
+	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/hashicorp/go-multierror"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
