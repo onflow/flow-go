@@ -218,11 +218,6 @@ func (h *Handler) GetTransactionResult(
 		return nil, err
 	}
 
-	block, _ := h.api.GetBlockByID(ctx, id)
-	if block != nil && block.Header != nil {
-		result.BlockHeight = block.Header.Height
-	}
-
 	return TransactionResultToMessage(result), nil
 }
 
