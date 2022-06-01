@@ -15,7 +15,7 @@ require (
 	github.com/dgraph-io/badger/v2 v2.2007.4
 	github.com/ef-ds/deque v1.0.4
 	github.com/ethereum/go-ethereum v1.9.13
-	github.com/fxamacker/cbor/v2 v2.4.1-0.20220314011055-12f5cb4b5eb0
+	github.com/fxamacker/cbor/v2 v2.4.1-0.20220515183430-ad2eae63303f
 	github.com/gammazero/workerpool v1.1.2
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/mock v1.6.0
@@ -53,8 +53,8 @@ require (
 	github.com/multiformats/go-multiaddr v0.5.0
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/multiformats/go-multihash v0.1.0
-	github.com/onflow/atree v0.3.1-0.20220519142403-b0077ba343ec
-	github.com/onflow/cadence v0.21.3-0.20220520204606-7b9689d79a2d
+	github.com/onflow/atree v0.3.1-0.20220531231935-525fbc26f40a
+	github.com/onflow/cadence v0.21.3-0.20220601002855-8b113c539a2c
 	github.com/onflow/flow v0.3.0
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220513155751-c4c1f8d59f83
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220513155751-c4c1f8d59f83
@@ -296,6 +296,6 @@ require (
 
 replace mellium.im/sasl => github.com/mellium/sasl v0.2.1
 
-replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.21.1-0.20220525172553-085b0fcef7e9
+replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.21.1-0.20220601005416-e974acd91285
 
-replace github.com/onflow/atree => github.com/dapperlabs/atree-internal v0.3.1-0.20220525190018-9e7903687c38
+replace github.com/onflow/atree => github.com/dapperlabs/atree-internal v0.3.1-0.20220531232335-32d7f2ac0ce1
