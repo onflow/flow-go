@@ -239,6 +239,79 @@ func BenchmarkTrieRead(b *testing.B) {
 	b.StopTimer()
 }
 
+func BenchmarkLedgerGetOneValue(b *testing.B) {
+	// key updates per iteration
+	numInsPerStep := 10000
+	keyNumberOfParts := 10
+	keyPartMinByteSize := 1
+	keyPartMaxByteSize := 100
+	valueMaxByteSize := 32
+	rand.Seed(1)
+
+	dir, err := os.MkdirTemp("", "test-mtrie-")
+	defer os.RemoveAll(dir)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, 101, pathfinder.PathByteSize, wal.SegmentSize)
+	require.NoError(b, err)
+	defer func() {
+		<-diskWal.Done()
+	}()
+
+	led, err := complete.NewLedger(diskWal, 101, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+	defer led.Done()
+	if err != nil {
+		b.Fatal("can't create a new complete ledger")
+	}
+
+	state := led.InitialState()
+
+	keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+	values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+
+	update, err := ledger.NewUpdate(state, keys, values)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	newState, _, err := led.Set(update)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.Run("batch get", func(b *testing.B) {
+		query, err := ledger.NewQuery(newState, []ledger.Key{keys[0]})
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_, err = led.Get(query)
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+
+	b.Run("single get", func(b *testing.B) {
+		query, err := ledger.NewQuerySingleValue(newState, keys[0])
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_, err = led.GetSingleValue(query)
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+}
+
 // BenchmarkTrieUpdate benchmarks the performance of a trie prove
 func BenchmarkTrieProve(b *testing.B) {
 	// key updates per iteration

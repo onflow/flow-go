@@ -429,7 +429,14 @@ func (e *blockComputer) executeTransaction(
 		lg.Info().Msg("transaction executed successfully")
 	}
 
-	e.metrics.ExecutionTransactionExecuted(time.Since(startedAt), tx.ComputationUsed, len(tx.Events), tx.Err != nil)
+	e.metrics.ExecutionTransactionExecuted(
+		time.Since(startedAt),
+		tx.ComputationUsed,
+		memAllocAfter-memAllocBefore,
+		tx.MemoryUsed,
+		len(tx.Events),
+		tx.Err != nil,
+	)
 	return nil
 }
 

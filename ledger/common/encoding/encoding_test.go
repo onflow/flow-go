@@ -40,19 +40,19 @@ func TestKeyPartSerialization(t *testing.T) {
 		// decode key part encoded in version 0
 		decodedkp, err := encoding.DecodeKeyPart(encodedV0)
 		require.NoError(t, err)
-		require.True(t, kp.Equals(decodedkp))
+		require.Equal(t, kp, *decodedkp)
 
 		// decode key part encoded in version 1
 		decodedkp, err = encoding.DecodeKeyPart(encodedV1)
 		require.NoError(t, err)
-		require.True(t, kp.Equals(decodedkp))
+		require.Equal(t, kp, *decodedkp)
 	})
 
 	t.Run("roundtrip", func(t *testing.T) {
 		encoded := encoding.EncodeKeyPart(&kp)
 		newkp, err := encoding.DecodeKeyPart(encoded)
 		require.NoError(t, err)
-		require.True(t, kp.Equals(newkp))
+		require.Equal(t, kp, *newkp)
 
 		// wrong type decoding
 		_, err = encoding.DecodeKey(encoded)
@@ -104,19 +104,19 @@ func TestKeySerialization(t *testing.T) {
 		// decode key encoded in version 0
 		decodedk, err := encoding.DecodeKey(encodedV0)
 		require.NoError(t, err)
-		require.True(t, decodedk.Equals(&k))
+		require.Equal(t, k, *decodedk)
 
 		// decode key encoded in version 1
 		decodedk, err = encoding.DecodeKey(encodedV1)
 		require.NoError(t, err)
-		require.True(t, decodedk.Equals(&k))
+		require.Equal(t, k, *decodedk)
 	})
 
 	t.Run("roundtrip", func(t *testing.T) {
 		encoded := encoding.EncodeKey(&k)
 		newk, err := encoding.DecodeKey(encoded)
 		require.NoError(t, err)
-		require.True(t, newk.Equals(&k))
+		require.Equal(t, k, *newk)
 	})
 }
 
@@ -208,19 +208,19 @@ func TestPayloadSerialization(t *testing.T) {
 		// decode payload encoded in version 0
 		decodedp, err := encoding.DecodePayload(encodedV0)
 		require.NoError(t, err)
-		require.True(t, decodedp.Equals(p))
+		require.Equal(t, p, decodedp)
 
 		// decode payload encoded in version 1
 		decodedp, err = encoding.DecodePayload(encodedV1)
 		require.NoError(t, err)
-		require.True(t, decodedp.Equals(p))
+		require.Equal(t, p, decodedp)
 	})
 
 	t.Run("roundtrip", func(t *testing.T) {
 		encoded := encoding.EncodePayload(p)
 		newp, err := encoding.DecodePayload(encoded)
 		require.NoError(t, err)
-		require.True(t, newp.Equals(p))
+		require.Equal(t, p, newp)
 	})
 }
 
@@ -366,7 +366,7 @@ func TestPayloadWithoutPrefixSerialization(t *testing.T) {
 			// Decode payload (excluding prefix)
 			decodedp, err := encoding.DecodePayloadWithoutPrefix(encoded[bufPrefixLen:], tc.zeroCopy, encoding.PayloadVersion)
 			require.NoError(t, err)
-			require.True(t, decodedp.Equals(p))
+			require.Equal(t, p, decodedp)
 
 			// Reset encoded payload
 			for i := 0; i < len(encoded); i++ {
@@ -376,10 +376,10 @@ func TestPayloadWithoutPrefixSerialization(t *testing.T) {
 			if tc.zeroCopy {
 				// Test if decoded payload is changed after source data is modified
 				// because data is shared.
-				require.False(t, decodedp.Equals(p))
+				require.NotEqual(t, p, decodedp)
 			} else {
 				// Test if decoded payload is unchanged after source data is modified.
-				require.True(t, decodedp.Equals(p))
+				require.Equal(t, p, decodedp)
 			}
 		})
 	}

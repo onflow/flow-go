@@ -380,11 +380,11 @@ type ExecutionMetrics interface {
 	// ExecutionCollectionExecuted reports the total time and computation spent on executing a collection
 	ExecutionCollectionExecuted(dur time.Duration, compUsed uint64, txCounts int)
 
-	// ExecutionTransactionExecuted reports the total time and computation spent on executing a single transaction
-	ExecutionTransactionExecuted(dur time.Duration, compUsed uint64, eventCounts int, failed bool)
+	// ExecutionTransactionExecuted reports the total time, computation and memory spent on executing a single transaction
+	ExecutionTransactionExecuted(dur time.Duration, compUsed, memoryUsed, memoryEstimate uint64, eventCounts int, failed bool)
 
-	// ExecutionScriptExecuted reports the time spent on executing an script
-	ExecutionScriptExecuted(dur time.Duration, compUsed uint64)
+	// ExecutionScriptExecuted reports the time and memory spent on executing an script
+	ExecutionScriptExecuted(dur time.Duration, compUsed, memoryUsed, memoryEstimate uint64)
 
 	// ExecutionCollectionRequestSent reports when a request for a collection is sent to a collection node
 	ExecutionCollectionRequestSent()
@@ -400,7 +400,17 @@ type ExecutionMetrics interface {
 	ExecutionBlockDataUploadFinished(dur time.Duration)
 }
 
+type BackendScriptsMetrics interface {
+	// Record the round trip time while executing a script
+	ScriptExecuted(dur time.Duration, size int)
+}
+
 type TransactionMetrics interface {
+	BackendScriptsMetrics
+
+	// Record the round trip time while getting a transaction result
+	TransactionResultFetched(dur time.Duration, size int)
+
 	// TransactionReceived starts tracking of transaction execution/finalization/sealing
 	TransactionReceived(txID flow.Identifier, when time.Time)
 
