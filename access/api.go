@@ -95,6 +95,7 @@ func MessageToTransactionResult(message *access.TransactionResultResponse) *Tran
 		BlockID:       flow.HashToID(message.BlockId),
 		TransactionID: flow.HashToID(message.TransactionId),
 		CollectionID:  flow.HashToID(message.CollectionId),
+		BlockHeight:   message.BlockHeight,
 	}
 }
 
