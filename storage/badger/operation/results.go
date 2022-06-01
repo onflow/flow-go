@@ -45,3 +45,8 @@ func LookupExecutionResult(blockID flow.Identifier, resultID *flow.Identifier) f
 func RemoveExecutionResultIndex(blockID flow.Identifier) func(*badger.Txn) error {
 	return remove(makePrefix(codeIndexExecutionResultByBlock, blockID))
 }
+
+// BatchRemoveExecutionResultIndex removes execution result indexed by the given blockID
+func BatchRemoveExecutionResultIndex(blockID flow.Identifier) func(*badger.WriteBatch) error {
+	return batchRemove(makePrefix(codeIndexExecutionResultByBlock, blockID))
+}

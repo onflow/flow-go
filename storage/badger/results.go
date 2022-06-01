@@ -158,3 +158,8 @@ func (r *ExecutionResults) ByBlockID(blockID flow.Identifier) (*flow.ExecutionRe
 func (r *ExecutionResults) RemoveIndexByBlockID(blockID flow.Identifier) error {
 	return r.db.Update(operation.SkipNonExist(operation.RemoveExecutionResultIndex(blockID)))
 }
+
+func (r *ExecutionResults) BatchRemoveIndexByBlockID(blockID flow.Identifier, batch storage.BatchStorage) error {
+	writeBatch := batch.GetWriter()
+	return operation.BatchRemoveExecutionResultIndex(blockID)(writeBatch)
+}

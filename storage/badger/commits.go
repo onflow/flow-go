@@ -79,3 +79,8 @@ func (c *Commits) ByBlockID(blockID flow.Identifier) (flow.StateCommitment, erro
 func (c *Commits) RemoveByBlockID(blockID flow.Identifier) error {
 	return c.db.Update(operation.SkipNonExist(operation.RemoveStateCommitment(blockID)))
 }
+
+func (c *Commits) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.BatchStorage) error {
+	writeBatch := batch.GetWriter()
+	return operation.BatchRemoveStateCommitment(blockID)(writeBatch)
+}

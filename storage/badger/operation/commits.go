@@ -33,3 +33,8 @@ func LookupStateCommitment(blockID flow.Identifier, commit *flow.StateCommitment
 func RemoveStateCommitment(blockID flow.Identifier) func(*badger.Txn) error {
 	return remove(makePrefix(codeCommit, blockID))
 }
+
+// BatchRemoveStateCommitment batch removes the state commitment by block ID
+func BatchRemoveStateCommitment(blockID flow.Identifier) func(batch *badger.WriteBatch) error {
+	return batchRemove(makePrefix(codeCommit, blockID))
+}
