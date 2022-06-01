@@ -387,6 +387,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 		ErrorMessage:  systemTxResult.GetErrorMessage(),
 		BlockID:       blockID,
 		TransactionID: systemTx.ID(),
+		BlockHeight:   block.Header.Height,
 	})
 
 	return results, nil
@@ -440,6 +441,7 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 		Events:       convert.MessagesToEvents(resp.GetEvents()),
 		ErrorMessage: resp.GetErrorMessage(),
 		BlockID:      blockID,
+		BlockHeight:  block.Header.Height,
 	}, nil
 }
 
