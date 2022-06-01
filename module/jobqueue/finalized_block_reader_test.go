@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/engine/testutil"
 	vertestutils "github.com/onflow/flow-go/engine/verification/utils/unittest"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/jobqueue"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
@@ -62,7 +63,8 @@ func withReader(
 		// hold any guarantees.
 		root, err := s.State.Params().Root()
 		require.NoError(t, err)
-		results := vertestutils.CompleteExecutionReceiptChainFixture(t, root, blockCount/2)
+		clusterCommittee := participants.Filter(filter.HasRole(flow.RoleCollection))
+		results := vertestutils.CompleteExecutionReceiptChainFixture(t, root, blockCount/2, vertestutils.WithClusterCommittee(clusterCommittee))
 		blocks := vertestutils.ExtendStateWithFinalizedBlocks(t, results, s.State)
 
 		withBlockReader(reader, blocks)
