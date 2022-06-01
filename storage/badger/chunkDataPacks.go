@@ -79,6 +79,14 @@ func (ch *ChunkDataPacks) BatchStore(c *flow.ChunkDataPack, batch storage.BatchS
 	return operation.BatchInsertChunkDataPack(sc)(writeBatch)
 }
 
+func (ch *ChunkDataPacks) BatchRemove(chunkID flow.Identifier, batch storage.BatchStorage) error {
+	writeBatch := batch.GetWriter()
+	batch.OnSucceed(func() {
+		ch.byChunkIDCache.Remove(chunkID)
+	})
+	return operation.BatchRemoveChunkDataPack(chunkID)(writeBatch)
+}
+
 func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
 	schdp, err := ch.byChunkID(chunkID)
 	if err != nil {

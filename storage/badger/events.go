@@ -124,6 +124,17 @@ func (e *Events) ByBlockIDEventType(blockID flow.Identifier, eventType flow.Even
 	return matched, nil
 }
 
+// RemoveByBlockID removes events by block ID
+func (e *Events) RemoveByBlockID(blockID flow.Identifier) error {
+	return e.db.Update(operation.RemoveEventsByBlockID(blockID))
+}
+
+// BatchRemoveByBlockID removes events by block ID
+func (e *Events) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.BatchStorage) error {
+	writeBatch := batch.GetWriter()
+	return e.db.View(operation.BatchRemoveEventsByBlockID(blockID, writeBatch))
+}
+
 type ServiceEvents struct {
 	db    *badger.DB
 	cache *Cache
@@ -172,4 +183,15 @@ func (e *ServiceEvents) ByBlockID(blockID flow.Identifier) ([]flow.Event, error)
 		return nil, err
 	}
 	return val.([]flow.Event), nil
+}
+
+// RemoveByBlockID removes service events by block ID
+func (e *ServiceEvents) RemoveByBlockID(blockID flow.Identifier) error {
+	return e.db.Update(operation.RemoveServiceEventsByBlockID(blockID))
+}
+
+// BatchRemoveByBlockID removes service events by block ID
+func (e *ServiceEvents) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.BatchStorage) error {
+	writeBatch := batch.GetWriter()
+	return e.db.View(operation.BatchRemoveServiceEventsByBlockID(blockID, writeBatch))
 }

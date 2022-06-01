@@ -36,6 +36,16 @@ func LookupOwnExecutionReceipt(blockID flow.Identifier, receiptID *flow.Identifi
 	return retrieve(makePrefix(codeOwnBlockReceipt, blockID), receiptID)
 }
 
+// RemoveOwnExecutionReceipt removes own execution receipt index by blockID
+func RemoveOwnExecutionReceipt(blockID flow.Identifier) func(*badger.Txn) error {
+	return remove(makePrefix(codeOwnBlockReceipt, blockID))
+}
+
+// BatchRemoveOwnExecutionReceipt batch removes own execution receipt index by blockID
+func BatchRemoveOwnExecutionReceipt(blockID flow.Identifier) func(batch *badger.WriteBatch) error {
+	return batchRemove(makePrefix(codeOwnBlockReceipt, blockID))
+}
+
 // IndexExecutionReceipts inserts an execution receipt ID keyed by block ID and receipt ID.
 // one block could have multiple receipts, even if they are from the same executor
 func IndexExecutionReceipts(blockID, receiptID flow.Identifier) func(*badger.Txn) error {

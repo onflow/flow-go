@@ -17,6 +17,11 @@ func BatchInsertChunkDataPack(c *badgermodel.StoredChunkDataPack) func(batch *ba
 	return batchInsert(makePrefix(codeChunkDataPack, c.ChunkID), c)
 }
 
+// BatchRemoveChunkDataPack removes a chunk data pack keyed by chunk ID in a batch
+func BatchRemoveChunkDataPack(chunkID flow.Identifier) func(batch *badger.WriteBatch) error {
+	return batchRemove(makePrefix(codeChunkDataPack, chunkID))
+}
+
 // RetrieveChunkDataPack retrieves a chunk data pack by chunk ID.
 func RetrieveChunkDataPack(chunkID flow.Identifier, c *badgermodel.StoredChunkDataPack) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeChunkDataPack, chunkID), c)

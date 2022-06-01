@@ -144,3 +144,12 @@ func (m *MyExecutionReceipts) MyReceipt(blockID flow.Identifier) (*flow.Executio
 	defer tx.Discard()
 	return m.myReceipt(blockID)(tx)
 }
+
+func (m *MyExecutionReceipts) RemoveIndexByBlockID(blockID flow.Identifier) error {
+	return m.db.Update(operation.SkipNonExist(operation.RemoveOwnExecutionReceipt(blockID)))
+}
+
+func (m *MyExecutionReceipts) BatchRemoveIndexByBlockID(blockID flow.Identifier, batch storage.BatchStorage) error {
+	writeBatch := batch.GetWriter()
+	return operation.BatchRemoveOwnExecutionReceipt(blockID)(writeBatch)
+}

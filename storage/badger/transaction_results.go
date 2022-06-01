@@ -232,3 +232,14 @@ func (tr *TransactionResults) ByBlockID(blockID flow.Identifier) ([]flow.Transac
 	}
 	return transactionResults, nil
 }
+
+// RemoveByBlockID removes transaction results by block ID
+func (tr *TransactionResults) RemoveByBlockID(blockID flow.Identifier) error {
+	return tr.db.Update(operation.RemoveTransactionResultsByBlockID(blockID))
+}
+
+// BatchRemoveByBlockID batch removes transaction results by block ID
+func (tr *TransactionResults) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.BatchStorage) error {
+	writeBatch := batch.GetWriter()
+	return tr.db.View(operation.BatchRemoveTransactionResultsByBlockID(blockID, writeBatch))
+}
