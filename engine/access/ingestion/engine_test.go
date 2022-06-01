@@ -2,6 +2,7 @@ package ingestion
 
 import (
 	"context"
+	"errors"
 	"math/rand"
 	"os"
 	"sync"
@@ -109,8 +110,9 @@ func (suite *Suite) SetupTest() {
 		blocksToMarkExecuted, rpcEng)
 	require.NoError(suite.T(), err)
 
-	// disable process background to avoid triggering mocks and create a context
-	eng.DisableProcessBackground()
+	// stops requestMissingCollections from executing in processBackground worker
+	suite.blocks.On("GetLastFullBlockHeight").Once().Return(uint64(0), errors.New("do nothing"))
+
 	ctx, cancel := context.WithCancel(context.Background())
 	irrecoverableCtx, _ := irrecoverable.WithSignaler(ctx)
 	eng.Start(irrecoverableCtx)

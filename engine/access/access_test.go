@@ -625,7 +625,6 @@ func (suite *Suite) TestGetSealedTransaction() {
 		defer cancel()
 
 		ctx, _ := irrecoverable.WithSignaler(background)
-		ingestEng.DisableProcessBackground()
 		ingestEng.Start(ctx)
 		<-ingestEng.Ready()
 

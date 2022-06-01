@@ -43,7 +43,7 @@ const missingCollsForBlkThreshold = 100
 // this is to ensure that if a collection is missing for a long time (in terms of block height) it is eventually re-requested
 const missingCollsForAgeThreshold = 100
 
-// de
+// default queue capacity
 const defaultQueueCapacity = 10_000
 
 var defaultCollectionCatchupTimeout = collectionCatchupTimeout
@@ -61,7 +61,6 @@ type Engine struct {
 	executionReceiptsQueue    engine.MessageStore
 	finalizedBlockNotifier    engine.Notifier
 	finalizedBlockQueue       engine.MessageStore
-	processBackgroundDisabled bool
 
 	log     zerolog.Logger   // used to log relevant actions with context
 	state   protocol.State   // used to access the  protocol state
@@ -168,8 +167,7 @@ func New(
 		finalizedBlockNotifier: engine.NewNotifier(),
 		finalizedBlockQueue:    finalizedBlocksQueue,
 
-		messageHandler:            messageHandler,
-		processBackgroundDisabled: false,
+		messageHandler: messageHandler,
 	}
 
 	// Add workers
@@ -188,18 +186,7 @@ func New(
 	return e, nil
 }
 
-func (e *Engine) DisableProcessBackground() {
-	// disable the processBackground worker from starting during testing to avoid calling mocks
-	e.processBackgroundDisabled = true
-}
-
 func (e *Engine) processBackground(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	if e.processBackgroundDisabled {
-		// avoid triggering mocks
-		ready()
-		return
-	}
-
 	// context with timeout
 	requestCtx, cancel := context.WithTimeout(ctx, defaultCollectionCatchupTimeout)
 	defer cancel()
@@ -671,6 +658,7 @@ func (e *Engine) updateLastFullBlockReceivedIndex() {
 		}
 		lastFullHeight = header.Height
 	}
+
 	e.log.Debug().Uint64("last_full_block_height", lastFullHeight).Msg("updating LastFullBlockReceived index...")
 
 	finalBlk, err := e.state.Final().Head()
