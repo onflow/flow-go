@@ -2,8 +2,6 @@ package validation
 
 import (
 	"fmt"
-
-	"github.com/onflow/flow-go/module/chunks"
 )
 
 // ValidateRequireApprovals validates the given value against the default of other values.
@@ -14,7 +12,7 @@ func ValidateRequireApprovals(requiredApprovalsForSealConstruction uint) error {
 	return validateRequireApprovals(
 		requiredApprovalsForSealConstruction,
 		DefaultRequiredApprovalsForSealValidation,
-		chunks.DefaultChunkAssignmentAlpha,
+		3,
 	)
 }
 
