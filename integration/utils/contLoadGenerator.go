@@ -428,7 +428,10 @@ func (lg *ContLoadGenerator) sendAddKeyTx(workerID int) {
 func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 	log := lg.log.With().Int("workerID", workerID).Logger()
 
-	log.Trace().Msgf("getting next available account from channel with %d elements", len(lg.availableAccounts))
+	log.Trace().
+		Int("availableAccounts", len(lg.availableAccounts)).
+		Msgf("getting next available account")
+
 	var acc *flowAccount
 	select {
 	case acc = <-lg.availableAccounts:
@@ -437,11 +440,16 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 		return
 	}
 	defer func() { lg.availableAccounts <- acc }()
-
-	log.Trace().Msgf("getting next account")
 	nextAcc := lg.accounts[(acc.i+1)%len(lg.accounts)]
 
-	log.Trace().Msgf("creating transfer script for tokensPerTransfer %f from address %x to %x account %d to %d", tokensPerTransfer, acc.address.Bytes(), nextAcc.address.Bytes(), acc.i, nextAcc.i)
+	log.Trace().
+		Float64("tokens", tokensPerTransfer).
+		Hex("srcAddress", acc.address.Bytes()).
+		Hex("dstAddress", nextAcc.address.Bytes()).
+		Int("srcAccount", acc.i).
+		Int("dstAccount", nextAcc.i).
+		Msgf("creating transfer script")
+
 	transferTx, err := TokenTransferTransaction(
 		lg.fungibleTokenAddress,
 		lg.flowTokenAddress,
@@ -489,6 +497,7 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 			log.Warn().
 				Hex("txID", transferTx.ID().Bytes()).
 				Dur("duration", time.Since(startTime)).
+				Int("availableAccounts", len(lg.availableAccounts)).
 				Msgf("is taking too long")
 		}
 	}
