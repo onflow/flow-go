@@ -122,6 +122,96 @@ func TestLedger_Get(t *testing.T) {
 	})
 }
 
+// TestLedger_GetSingleValue tests reading value from a single path.
+func TestLedger_GetSingleValue(t *testing.T) {
+
+	wal := &fixtures.NoopWAL{}
+	led, err := complete.NewLedger(
+		wal,
+		100,
+		&metrics.NoopCollector{},
+		zerolog.Logger{},
+		complete.DefaultPathFinderVersion,
+	)
+	require.NoError(t, err)
+
+	state := led.InitialState()
+
+	t.Run("non-existent key", func(t *testing.T) {
+
+		keys := utils.RandomUniqueKeys(10, 2, 1, 10)
+
+		for _, k := range keys {
+			qs, err := ledger.NewQuerySingleValue(state, k)
+			require.NoError(t, err)
+
+			retValue, err := led.GetSingleValue(qs)
+			require.NoError(t, err)
+			assert.Equal(t, 0, len(retValue))
+		}
+	})
+
+	t.Run("existent key", func(t *testing.T) {
+
+		u := utils.UpdateFixture()
+		u.SetState(state)
+
+		newState, _, err := led.Set(u)
+		require.NoError(t, err)
+		assert.NotEqual(t, state, newState)
+
+		for i, k := range u.Keys() {
+			q, err := ledger.NewQuerySingleValue(newState, k)
+			require.NoError(t, err)
+
+			retValue, err := led.GetSingleValue(q)
+			require.NoError(t, err)
+			assert.Equal(t, u.Values()[i], retValue)
+		}
+	})
+
+	t.Run("mix of existent and non-existent keys", func(t *testing.T) {
+
+		u := utils.UpdateFixture()
+		u.SetState(state)
+
+		newState, _, err := led.Set(u)
+		require.NoError(t, err)
+		assert.NotEqual(t, state, newState)
+
+		// Save expected values for existent keys
+		expectedValues := make(map[string]ledger.Value)
+		for i, key := range u.Keys() {
+			encKey := encoding.EncodeKey(&key)
+			expectedValues[string(encKey)] = u.Values()[i]
+		}
+
+		// Create a randomly ordered mix of existent and non-existent keys
+		var queryKeys []ledger.Key
+		queryKeys = append(queryKeys, u.Keys()...)
+		queryKeys = append(queryKeys, utils.RandomUniqueKeys(10, 2, 1, 10)...)
+
+		rand.Shuffle(len(queryKeys), func(i, j int) {
+			queryKeys[i], queryKeys[j] = queryKeys[j], queryKeys[i]
+		})
+
+		for _, k := range queryKeys {
+			qs, err := ledger.NewQuerySingleValue(newState, k)
+			require.NoError(t, err)
+
+			retValue, err := led.GetSingleValue(qs)
+			require.NoError(t, err)
+
+			encKey := encoding.EncodeKey(&k)
+			if value, ok := expectedValues[string(encKey)]; ok {
+				require.Equal(t, value, retValue)
+			} else {
+				require.Equal(t, 0, len(retValue))
+			}
+		}
+	})
+}
+
 func TestLedgerValueSizes(t *testing.T) {
 	t.Run("empty query", func(t *testing.T) {
 
@@ -534,7 +624,7 @@ func Test_ExportCheckpointAt(t *testing.T) {
 				state, _, err = led.Set(u)
 				require.NoError(t, err)
 
-				newState, err := led.ExportCheckpointAt(state, []ledger.Migration{noOpMigration}, []ledger.Reporter{}, complete.DefaultPathFinderVersion, dir2, "root.checkpoint")
+				newState, err := led.ExportCheckpointAt(state, []ledger.Migration{noOpMigration}, map[string]ledger.Reporter{}, "fakeExtractionReport", complete.DefaultPathFinderVersion, dir2, "root.checkpoint")
 				require.NoError(t, err)
 				assert.Equal(t, newState, state)
 
@@ -578,7 +668,7 @@ func Test_ExportCheckpointAt(t *testing.T) {
 				state, _, err = led.Set(u)
 				require.NoError(t, err)
 
-				newState, err := led.ExportCheckpointAt(state, []ledger.Migration{migrationByValue}, []ledger.Reporter{}, complete.DefaultPathFinderVersion, dir2, "root.checkpoint")
+				newState, err := led.ExportCheckpointAt(state, []ledger.Migration{migrationByValue}, map[string]ledger.Reporter{}, "fakeExtractionReport", complete.DefaultPathFinderVersion, dir2, "root.checkpoint")
 				require.NoError(t, err)
 
 				diskWal2, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir2, 100, pathfinder.PathByteSize, wal.SegmentSize)
@@ -620,7 +710,7 @@ func Test_ExportCheckpointAt(t *testing.T) {
 				state, _, err = led.Set(u)
 				require.NoError(t, err)
 
-				newState, err := led.ExportCheckpointAt(state, []ledger.Migration{migrationByKey}, []ledger.Reporter{}, complete.DefaultPathFinderVersion, dir2, "root.checkpoint")
+				newState, err := led.ExportCheckpointAt(state, []ledger.Migration{migrationByKey}, map[string]ledger.Reporter{}, "fakeExtractionReport", complete.DefaultPathFinderVersion, dir2, "root.checkpoint")
 				require.NoError(t, err)
 
 				diskWal2, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir2, 100, pathfinder.PathByteSize, wal.SegmentSize)

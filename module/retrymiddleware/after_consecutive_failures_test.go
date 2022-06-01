@@ -39,16 +39,13 @@ func TestAfterConsecutiveFailures(t *testing.T) {
 	// every 2 failures we will update our dkgContractClient
 	maxConsecutiveRetries := 2
 
-	expRetry, err := retry.NewConstant(1000 * time.Millisecond)
-	if err != nil {
-		require.NoError(t, err, "failed to create constant retry mechanism")
-	}
-	maxedExpRetry := retry.WithMaxRetries(5, expRetry)
+	backoff := retry.NewConstant(1000 * time.Millisecond)
+	backoff = retry.WithMaxRetries(5, backoff)
 
 	// after 2 consecutive failures fallback to next DKGContractClient
 	clientIndex := 0
 	dkgContractClient := clients[clientIndex]
-	afterConsecutiveFailures := AfterConsecutiveFailures(maxConsecutiveRetries, maxedExpRetry, func(totalAttempts int) {
+	afterConsecutiveFailures := AfterConsecutiveFailures(maxConsecutiveRetries, backoff, func(totalAttempts int) {
 		if clientIndex == len(clients)-1 {
 			clientIndex = 0
 		} else {
@@ -57,7 +54,7 @@ func TestAfterConsecutiveFailures(t *testing.T) {
 		dkgContractClient = clients[clientIndex]
 	})
 
-	err = retry.Do(context.Background(), afterConsecutiveFailures, func(ctx context.Context) error {
+	err := retry.Do(context.Background(), afterConsecutiveFailures, func(ctx context.Context) error {
 		err := dkgContractClient.Broadcast(msg)
 		if err != nil {
 			fmt.Printf("error: %s\n", err)

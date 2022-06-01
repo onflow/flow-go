@@ -10,7 +10,7 @@ import (
 	"github.com/onflow/flow-go/fvm/meter/basic"
 )
 
-func TestComputationMetering(t *testing.T) {
+func TestBasicComputationMetering(t *testing.T) {
 
 	t.Run("get limits", func(t *testing.T) {
 		m := basic.NewMeter(1, 2)
@@ -21,15 +21,15 @@ func TestComputationMetering(t *testing.T) {
 	t.Run("meter computation and memory", func(t *testing.T) {
 		m := basic.NewMeter(10, 10)
 
-		err := m.MeterComputation(uint(common.ComputationKindStatement), 1)
+		err := m.MeterComputation(common.ComputationKindStatement, 1)
 		require.NoError(t, err)
 		require.Equal(t, uint(1), m.TotalComputationUsed())
 
-		err = m.MeterComputation(uint(common.ComputationKindStatement), 2)
+		err = m.MeterComputation(common.ComputationKindStatement, 2)
 		require.NoError(t, err)
 		require.Equal(t, uint(1+2), m.TotalComputationUsed())
 
-		err = m.MeterComputation(uint(common.ComputationKindFunctionInvocation), 8)
+		err = m.MeterComputation(common.ComputationKindFunctionInvocation, 8)
 		require.Error(t, err)
 		require.True(t, errors.IsComputationLimitExceededError(err))
 
@@ -47,7 +47,7 @@ func TestComputationMetering(t *testing.T) {
 	})
 
 	t.Run("merge meters", func(t *testing.T) {
-		compKind := uint(common.ComputationKindStatement)
+		compKind := common.ComputationKindStatement
 		m := basic.NewMeter(9, 0)
 
 		err := m.MeterComputation(compKind, 1)
@@ -65,17 +65,37 @@ func TestComputationMetering(t *testing.T) {
 		err = child3.MeterComputation(compKind, 4)
 		require.NoError(t, err)
 
-		err = m.MergeMeter(child1)
+		err = m.MergeMeter(child1, true)
 		require.NoError(t, err)
 		require.Equal(t, uint(1+2), m.TotalComputationUsed())
+		require.Equal(t, uint(1+2), m.ComputationIntensities()[compKind])
 
-		err = m.MergeMeter(child2)
+		err = m.MergeMeter(child2, true)
 		require.NoError(t, err)
 		require.Equal(t, uint(1+2+3), m.TotalComputationUsed())
+		require.Equal(t, uint(1+2+3), m.ComputationIntensities()[compKind])
 
 		// error on merge (hitting limit)
-		err = m.MergeMeter(child3)
+		err = m.MergeMeter(child3, true)
 		require.Error(t, err)
 		require.True(t, errors.IsComputationLimitExceededError(err))
+	})
+
+	t.Run("merge meters - ignore limits", func(t *testing.T) {
+		compKind := common.ComputationKindStatement
+		m := basic.NewMeter(2, 0)
+
+		err := m.MeterComputation(compKind, 1)
+		require.NoError(t, err)
+
+		child := m.NewChild()
+		err = child.MeterComputation(compKind, 1)
+		require.NoError(t, err)
+
+		// hitting limit and ignoring it
+		err = m.MergeMeter(child, false)
+		require.NoError(t, err)
+		require.Equal(t, uint(1+1), m.TotalComputationUsed())
+		require.Equal(t, uint(1+1), m.ComputationIntensities()[compKind])
 	})
 }

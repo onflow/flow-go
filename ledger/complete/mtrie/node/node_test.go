@@ -92,31 +92,6 @@ func Test_InterimNodeWithBothChildren(t *testing.T) {
 	require.Equal(t, expectedRootHashHex, hashToString(n.Hash()))
 }
 
-func Test_MaxDepth(t *testing.T) {
-	path := utils.PathByUint16(1)
-	payload := utils.LightPayload(2, 3)
-
-	n1 := node.NewLeaf(path, payload, 0)
-	n2 := node.NewLeaf(path, payload, 0)
-	n3 := node.NewLeaf(path, payload, 1)
-
-	n4 := node.NewInterimNode(1, n1, n2)
-	n5 := node.NewInterimNode(2, n4, n3)
-	require.Equal(t, uint16(2), n5.MaxDepth())
-}
-
-func Test_RegCount(t *testing.T) {
-	path := utils.PathByUint16(1)
-	payload := utils.LightPayload(2, 3)
-	n1 := node.NewLeaf(path, payload, 0)
-	n2 := node.NewLeaf(path, payload, 0)
-	n3 := node.NewLeaf(path, payload, 1)
-
-	n4 := node.NewInterimNode(1, n1, n2)
-	n5 := node.NewInterimNode(2, n4, n3)
-	require.Equal(t, uint64(3), n5.RegCount())
-}
-
 func Test_AllPayloads(t *testing.T) {
 	path := utils.PathByUint16(1)
 	payload := utils.LightPayload(2, 3)
@@ -239,8 +214,6 @@ func Test_Compactify_EmptyChild(t *testing.T) {
 		require.Nil(t, nn5.RightChild())
 		require.True(t, nn5.VerifyCachedHash())
 		require.Equal(t, n5.Hash(), nn5.Hash())
-		require.Equal(t, uint16(2), nn5.MaxDepth())
-		require.Equal(t, uint64(2), nn5.RegCount())
 	})
 
 	t.Run("left child empty", func(t *testing.T) {
@@ -263,8 +236,6 @@ func Test_Compactify_EmptyChild(t *testing.T) {
 		require.Equal(t, n4, nn5.RightChild())
 		require.True(t, nn5.VerifyCachedHash())
 		require.Equal(t, n5.Hash(), nn5.Hash())
-		require.Equal(t, uint16(2), nn5.MaxDepth())
-		require.Equal(t, uint64(2), nn5.RegCount())
 	})
 
 }
@@ -297,16 +268,12 @@ func Test_Compactify_BothChildrenPopulated(t *testing.T) {
 	require.Equal(t, n2, nn3.RightChild())
 	require.True(t, nn3.VerifyCachedHash())
 	require.Equal(t, n3.Hash(), nn3.Hash())
-	require.Equal(t, uint16(1), nn3.MaxDepth())
-	require.Equal(t, uint64(2), nn3.RegCount())
 
 	nn5 := node.NewInterimCompactifiedNode(6, nn3, n4)
 	require.Equal(t, nn3, nn5.LeftChild())
 	require.Equal(t, n4, nn5.RightChild())
 	require.True(t, nn5.VerifyCachedHash())
 	require.Equal(t, n5.Hash(), nn5.Hash())
-	require.Equal(t, uint16(2), nn5.MaxDepth())
-	require.Equal(t, uint64(3), nn5.RegCount())
 }
 
 func hashToString(hash hash.Hash) string {
@@ -324,8 +291,6 @@ func hashToString(hash hash.Hash) string {
 func requireIsLeafWithHash(t *testing.T, node *node.Node, expectedHash hash.Hash) {
 	require.Nil(t, node.LeftChild())
 	require.Nil(t, node.RightChild())
-	require.Equal(t, uint16(0), node.MaxDepth())
-	require.Equal(t, uint64(1), node.RegCount())
 	require.Equal(t, expectedHash, node.Hash())
 	require.True(t, node.VerifyCachedHash())
 	require.True(t, node.IsLeaf())

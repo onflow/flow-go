@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/engine/collection/compliance"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
+	modulecompliance "github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
@@ -24,6 +25,7 @@ type ProposalEngineFactory struct {
 	mempoolMetrics module.MempoolMetrics
 	protoState     protocol.State
 	transactions   storage.Transactions
+	complianceOpts []modulecompliance.Opt
 }
 
 // NewFactory returns a new collection proposal engine factory.
@@ -36,6 +38,7 @@ func NewProposalEngineFactory(
 	mempoolMetrics module.MempoolMetrics,
 	protoState protocol.State,
 	transactions storage.Transactions,
+	complianceOpts ...modulecompliance.Opt,
 ) (*ProposalEngineFactory, error) {
 
 	factory := &ProposalEngineFactory{
@@ -47,6 +50,7 @@ func NewProposalEngineFactory(
 		mempoolMetrics: mempoolMetrics,
 		protoState:     protoState,
 		transactions:   transactions,
+		complianceOpts: complianceOpts,
 	}
 	return factory, nil
 }
@@ -68,6 +72,7 @@ func (f *ProposalEngineFactory) Create(
 		clusterState,
 		cache,
 		voteAggregator,
+		f.complianceOpts...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could create cluster compliance core: %w", err)

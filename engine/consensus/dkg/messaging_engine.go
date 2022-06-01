@@ -161,15 +161,12 @@ func (e *MessagingEngine) forwardOutgoingMessages() {
 // DKG message to a single other DKG participant, on a best effort basis.
 func (e *MessagingEngine) forwardOutboundMessageAsync(message msg.PrivDKGMessageOut) {
 	e.unit.Launch(func() {
-		backoff, err := retry.NewExponential(retryBaseWait)
-		if err != nil {
-			e.log.Fatal().Err(err).Msg("failed to create retry mechanism")
-		}
+		backoff := retry.NewExponential(retryBaseWait)
 		backoff = retry.WithMaxRetries(retryMax, backoff)
 		backoff = retry.WithJitterPercent(retryJitterPct, backoff)
 
 		attempts := 1
-		err = retry.Do(e.unit.Ctx(), backoff, func(ctx context.Context) error {
+		err := retry.Do(e.unit.Ctx(), backoff, func(ctx context.Context) error {
 			err := e.conduit.Unicast(&message.DKGMessage, message.DestID)
 			if err != nil {
 				e.log.Warn().Err(err).Msgf("error sending dkg message retrying (%d)", attempts)

@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/mempool/herocache"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/network"
 )
@@ -19,7 +20,7 @@ func TestDNSCache_Concurrent(t *testing.T) {
 	ipFixtures := network.IpLookupFixture(total)
 	txtFixtures := network.TxtLookupFixture(total)
 
-	cache := herocache.NewDNSCache(sizeLimit, unittest.Logger())
+	cache := herocache.NewDNSCache(sizeLimit, unittest.Logger(), metrics.NewNoopCollector(), metrics.NewNoopCollector())
 
 	// cache must be initially empty
 	ips, txts := cache.Size()
@@ -46,7 +47,7 @@ func TestDNSCache_LRU(t *testing.T) {
 	ipFixtures := network.IpLookupListFixture(total)
 	txtFixtures := network.TxtLookupListFixture(total)
 
-	cache := herocache.NewDNSCache(sizeLimit, unittest.Logger())
+	cache := herocache.NewDNSCache(sizeLimit, unittest.Logger(), metrics.NewNoopCollector(), metrics.NewNoopCollector())
 
 	// cache must be initially empty
 	ips, txts := cache.Size()
@@ -123,7 +124,7 @@ func TestDNSCache_Rem(t *testing.T) {
 	ipFixtures := network.IpLookupListFixture(total)
 	txtFixtures := network.TxtLookupListFixture(total)
 
-	cache := herocache.NewDNSCache(sizeLimit, unittest.Logger())
+	cache := herocache.NewDNSCache(sizeLimit, unittest.Logger(), metrics.NewNoopCollector(), metrics.NewNoopCollector())
 
 	// cache must be initially empty
 	ips, txts := cache.Size()

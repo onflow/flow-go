@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	realbuffer "github.com/onflow/flow-go/module/buffer"
+	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	clusterint "github.com/onflow/flow-go/state/cluster"
@@ -195,6 +196,22 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalValidParent() {
 
 	// we should submit the proposal to hotstuff
 	cs.hotstuff.AssertExpectations(cs.T())
+}
+
+func (cs *ComplianceCoreSuite) TestOnBlockProposalSkipProposalThreshold() {
+
+	// create a proposal which is far enough ahead to be dropped
+	originID := unittest.IdentifierFixture()
+	block := unittest.ClusterBlockFixture()
+	block.Header.Height = cs.head.Header.Height + compliance.DefaultConfig().SkipNewProposalsThreshold + 1
+	proposal := unittest.ClusterProposalFromBlock(&block)
+
+	err := cs.core.OnBlockProposal(originID, proposal)
+	require.NoError(cs.T(), err)
+
+	// block should be dropped - not added to state or cache
+	cs.state.AssertNotCalled(cs.T(), "Extend", mock.Anything)
+	cs.pending.AssertNotCalled(cs.T(), "Add", originID, mock.Anything)
 }
 
 func (cs *ComplianceCoreSuite) TestOnBlockProposalValidAncestor() {

@@ -23,7 +23,7 @@ service Attacker {
 message Message {
   string ChannelID = 1;
   bytes OriginID = 2;
-  uint32 Targets = 3;
+  uint32 TargetNum = 3;
   repeated bytes TargetIDs = 4;
   bytes Payload = 5;
   Protocol protocol = 6;

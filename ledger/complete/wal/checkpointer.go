@@ -8,9 +8,12 @@ import (
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
@@ -34,6 +37,13 @@ const VersionV3 uint16 = 0x03
 // Version 4 contains a footer with node count and trie count (previously in the header).
 // Version 4 also reduces checkpoint data size.  See EncodeNode() and EncodeTrie() for more details.
 const VersionV4 uint16 = 0x04
+
+// Version 5 includes these changes:
+// - remove regCount and maxDepth from serialized nodes
+// - add allocated register count and size to serialized tries
+// - reduce number of bytes used to encode payload value size from 8 bytes to 4 bytes.
+// See EncodeNode() and EncodeTrie() for more details.
+const VersionV5 uint16 = 0x05
 
 const (
 	encMagicSize     = 2
@@ -236,15 +246,11 @@ func NumberToFilename(n int) string {
 }
 
 func (c *Checkpointer) CheckpointWriter(to int) (io.WriteCloser, error) {
-	return CreateCheckpointWriter(c.dir, to)
-}
-
-func CreateCheckpointWriter(dir string, fileNo int) (io.WriteCloser, error) {
-	return CreateCheckpointWriterForFile(dir, NumberToFilename(fileNo))
+	return CreateCheckpointWriterForFile(c.dir, NumberToFilename(to), &c.wal.log)
 }
 
 // CreateCheckpointWriterForFile returns a file writer that will write to a temporary file and then move it to the checkpoint folder by renaming it.
-func CreateCheckpointWriterForFile(dir, filename string) (io.WriteCloser, error) {
+func CreateCheckpointWriterForFile(dir, filename string, logger *zerolog.Logger) (io.WriteCloser, error) {
 
 	fullname := path.Join(dir, filename)
 
@@ -259,6 +265,7 @@ func CreateCheckpointWriterForFile(dir, filename string) (io.WriteCloser, error)
 
 	writer := bufio.NewWriterSize(tmpFile, defaultBufioWriteSize)
 	return &SyncOnCloseRenameFile{
+		logger:     logger,
 		file:       tmpFile,
 		targetName: fullname,
 		Writer:     writer,
@@ -293,7 +300,7 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 	// Write header: magic (2 bytes) + version (2 bytes)
 	header := scratch[:headerSize]
 	binary.BigEndian.PutUint16(header, MagicBytes)
-	binary.BigEndian.PutUint16(header[encMagicSize:], VersionV4)
+	binary.BigEndian.PutUint16(header[encMagicSize:], VersionV5)
 
 	_, err := crc32Writer.Write(header)
 	if err != nil {
@@ -306,11 +313,9 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 	allNodes := make(map[*node.Node]uint64)
 	allNodes[nil] = 0
 
-	allRootNodes := make([]*node.Node, len(tries))
-
 	// Serialize all unique nodes
 	nodeCounter := uint64(1) // start from 1, as 0 marks nil node
-	for i, t := range tries {
+	for _, t := range tries {
 
 		// Traverse all unique nodes for trie t.
 		for itr := flattener.NewUniqueNodeIterator(t, allNodes); itr.Next(); {
@@ -344,26 +349,20 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 				return fmt.Errorf("cannot serialize node: %w", err)
 			}
 		}
-
-		// Save trie root for serialization later.
-		allRootNodes[i] = t.RootNode()
 	}
 
 	// Serialize trie root nodes
-	for _, rootNode := range allRootNodes {
+	for _, t := range tries {
+		rootNode := t.RootNode()
+
 		// Get root node index
 		rootIndex, found := allNodes[rootNode]
 		if !found {
-			var rootHash ledger.RootHash
-			if rootNode == nil {
-				rootHash = trie.EmptyTrieRootHash()
-			} else {
-				rootHash = ledger.RootHash(rootNode.Hash())
-			}
+			rootHash := t.RootHash()
 			return fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(rootHash[:]))
 		}
 
-		encTrie := flattener.EncodeTrie(rootNode, rootIndex, scratch)
+		encTrie := flattener.EncodeTrie(t, rootIndex, scratch)
 		_, err = crc32Writer.Write(encTrie)
 		if err != nil {
 			return fmt.Errorf("cannot serialize trie: %w", err)
@@ -373,7 +372,7 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 	// Write footer with nodes count and tries count
 	footer := scratch[:encNodeCountSize+encTrieCountSize]
 	binary.BigEndian.PutUint64(footer, uint64(len(allNodes)-1)) // -1 to account for 0 node meaning nil
-	binary.BigEndian.PutUint16(footer[encNodeCountSize:], uint16(len(allRootNodes)))
+	binary.BigEndian.PutUint16(footer[encNodeCountSize:], uint16(len(tries)))
 
 	_, err = crc32Writer.Write(footer)
 	if err != nil {
@@ -394,12 +393,12 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 
 func (c *Checkpointer) LoadCheckpoint(checkpoint int) ([]*trie.MTrie, error) {
 	filepath := path.Join(c.dir, NumberToFilename(checkpoint))
-	return LoadCheckpoint(filepath)
+	return LoadCheckpoint(filepath, &c.wal.log)
 }
 
 func (c *Checkpointer) LoadRootCheckpoint() ([]*trie.MTrie, error) {
 	filepath := path.Join(c.dir, bootstrap.FilenameWALRootCheckpoint)
-	return LoadCheckpoint(filepath)
+	return LoadCheckpoint(filepath, &c.wal.log)
 }
 
 func (c *Checkpointer) HasRootCheckpoint() (bool, error) {
@@ -416,12 +415,18 @@ func (c *Checkpointer) RemoveCheckpoint(checkpoint int) error {
 	return os.Remove(path.Join(c.dir, NumberToFilename(checkpoint)))
 }
 
-func LoadCheckpoint(filepath string) ([]*trie.MTrie, error) {
+func LoadCheckpoint(filepath string, logger *zerolog.Logger) ([]*trie.MTrie, error) {
 	file, err := os.Open(filepath)
 	if err != nil {
 		return nil, fmt.Errorf("cannot open checkpoint file %s: %w", filepath, err)
 	}
 	defer func() {
+		evictErr := evictFileFromLinuxPageCache(file, false, logger)
+		if evictErr != nil {
+			logger.Warn().Msgf("failed to evict file %s from Linux page cache: %s", filepath, evictErr)
+			// No need to return this error because it's possible to continue normal operations.
+		}
+
 		_ = file.Close()
 	}()
 
@@ -456,9 +461,17 @@ func readCheckpoint(f *os.File) ([]*trie.MTrie, error) {
 		return readCheckpointV3AndEarlier(f, version)
 	case VersionV4:
 		return readCheckpointV4(f)
+	case VersionV5:
+		return readCheckpointV5(f)
 	default:
 		return nil, fmt.Errorf("unsupported file version %x", version)
 	}
+}
+
+type nodeWithRegMetrics struct {
+	n        *node.Node
+	regCount uint64
+	regSize  uint64
 }
 
 // readCheckpointV3AndEarlier deserializes checkpoint file (version 3 and earlier) and returns a list of tries.
@@ -491,28 +504,32 @@ func readCheckpointV3AndEarlier(f *os.File, version uint16) ([]*trie.MTrie, erro
 	nodesCount := binary.BigEndian.Uint64(header[headerSize:])
 	triesCount := binary.BigEndian.Uint16(header[headerSize+encNodeCountSize:])
 
-	nodes := make([]*node.Node, nodesCount+1) //+1 for 0 index meaning nil
+	nodes := make([]nodeWithRegMetrics, nodesCount+1) //+1 for 0 index meaning nil
 	tries := make([]*trie.MTrie, triesCount)
 
 	for i := uint64(1); i <= nodesCount; i++ {
-		n, err := flattener.ReadNodeFromCheckpointV3AndEarlier(reader, func(nodeIndex uint64) (*node.Node, error) {
+		n, regCount, regSize, err := flattener.ReadNodeFromCheckpointV3AndEarlier(reader, func(nodeIndex uint64) (*node.Node, uint64, uint64, error) {
 			if nodeIndex >= uint64(i) {
-				return nil, fmt.Errorf("sequence of stored nodes does not satisfy Descendents-First-Relationship")
+				return nil, 0, 0, fmt.Errorf("sequence of stored nodes does not satisfy Descendents-First-Relationship")
 			}
-			return nodes[nodeIndex], nil
+			nm := nodes[nodeIndex]
+			return nm.n, nm.regCount, nm.regSize, nil
 		})
 		if err != nil {
 			return nil, fmt.Errorf("cannot read node %d: %w", i, err)
 		}
-		nodes[i] = n
+		nodes[i].n = n
+		nodes[i].regCount = regCount
+		nodes[i].regSize = regSize
 	}
 
 	for i := uint16(0); i < triesCount; i++ {
-		trie, err := flattener.ReadTrieFromCheckpointV3AndEarlier(reader, func(nodeIndex uint64) (*node.Node, error) {
+		trie, err := flattener.ReadTrieFromCheckpointV3AndEarlier(reader, func(nodeIndex uint64) (*node.Node, uint64, uint64, error) {
 			if nodeIndex >= uint64(len(nodes)) {
-				return nil, fmt.Errorf("sequence of stored nodes doesn't contain node")
+				return nil, 0, 0, fmt.Errorf("sequence of stored nodes doesn't contain node")
 			}
-			return nodes[nodeIndex], nil
+			nm := nodes[nodeIndex]
+			return nm.n, nm.regCount, nm.regSize, nil
 		})
 		if err != nil {
 			return nil, fmt.Errorf("cannot read trie %d: %w", i, err)
@@ -540,9 +557,121 @@ func readCheckpointV3AndEarlier(f *os.File, version uint16) ([]*trie.MTrie, erro
 	return tries, nil
 }
 
-// readCheckpointV4 deserializes checkpoint file (version 4) and returns a list of tries.
-// Checkpoint file header (magic and version) are verified by the caller.
+// readCheckpointV4 decodes checkpoint file (version 4) and returns a list of tries.
+// Header (magic and version) is verified by the caller.
+// This function is for backwards compatibility.
 func readCheckpointV4(f *os.File) ([]*trie.MTrie, error) {
+
+	// Scratch buffer is used as temporary buffer that reader can read into.
+	// Raw data in scratch buffer should be copied or converted into desired
+	// objects before next Read operation.  If the scratch buffer isn't large
+	// enough, a new buffer will be allocated.  However, 4096 bytes will
+	// be large enough to handle almost all payloads and 100% of interim nodes.
+	scratch := make([]byte, 1024*4) // must not be less than 1024
+
+	// Read footer to get node count and trie count
+
+	// footer offset: nodes count (8 bytes) + tries count (2 bytes) + CRC32 sum (4 bytes)
+	const footerOffset = encNodeCountSize + encTrieCountSize + crc32SumSize
+	const footerSize = encNodeCountSize + encTrieCountSize // footer doesn't include crc32 sum
+
+	// Seek to footer
+	_, err := f.Seek(-footerOffset, io.SeekEnd)
+	if err != nil {
+		return nil, fmt.Errorf("cannot seek to footer: %w", err)
+	}
+
+	footer := scratch[:footerSize]
+
+	_, err = io.ReadFull(f, footer)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read footer: %w", err)
+	}
+
+	// Decode node count and trie count
+	nodesCount := binary.BigEndian.Uint64(footer)
+	triesCount := binary.BigEndian.Uint16(footer[encNodeCountSize:])
+
+	// Seek to the start of file
+	_, err = f.Seek(0, io.SeekStart)
+	if err != nil {
+		return nil, fmt.Errorf("cannot seek to start of file: %w", err)
+	}
+
+	var bufReader io.Reader = bufio.NewReaderSize(f, defaultBufioReadSize)
+	crcReader := NewCRC32Reader(bufReader)
+	var reader io.Reader = crcReader
+
+	// Read header: magic (2 bytes) + version (2 bytes)
+	// No action is needed for header because it is verified by the caller.
+
+	_, err = io.ReadFull(reader, scratch[:headerSize])
+	if err != nil {
+		return nil, fmt.Errorf("cannot read header: %w", err)
+	}
+
+	// nodes's element at index 0 is a special, meaning nil .
+	nodes := make([]nodeWithRegMetrics, nodesCount+1) //+1 for 0 index meaning nil
+	tries := make([]*trie.MTrie, triesCount)
+
+	for i := uint64(1); i <= nodesCount; i++ {
+		n, regCount, regSize, err := flattener.ReadNodeFromCheckpointV4(reader, scratch, func(nodeIndex uint64) (*node.Node, uint64, uint64, error) {
+			if nodeIndex >= uint64(i) {
+				return nil, 0, 0, fmt.Errorf("sequence of stored nodes does not satisfy Descendents-First-Relationship")
+			}
+			nm := nodes[nodeIndex]
+			return nm.n, nm.regCount, nm.regSize, nil
+		})
+		if err != nil {
+			return nil, fmt.Errorf("cannot read node %d: %w", i, err)
+		}
+		nodes[i].n = n
+		nodes[i].regCount = regCount
+		nodes[i].regSize = regSize
+	}
+
+	for i := uint16(0); i < triesCount; i++ {
+		trie, err := flattener.ReadTrieFromCheckpointV4(reader, scratch, func(nodeIndex uint64) (*node.Node, uint64, uint64, error) {
+			if nodeIndex >= uint64(len(nodes)) {
+				return nil, 0, 0, fmt.Errorf("sequence of stored nodes doesn't contain node")
+			}
+			nm := nodes[nodeIndex]
+			return nm.n, nm.regCount, nm.regSize, nil
+		})
+		if err != nil {
+			return nil, fmt.Errorf("cannot read trie %d: %w", i, err)
+		}
+		tries[i] = trie
+	}
+
+	// Read footer again for crc32 computation
+	// No action is needed.
+	_, err = io.ReadFull(reader, footer)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read footer: %w", err)
+	}
+
+	// Read CRC32
+	crc32buf := scratch[:crc32SumSize]
+	_, err = io.ReadFull(bufReader, crc32buf)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read CRC32: %w", err)
+	}
+
+	readCrc32 := binary.BigEndian.Uint32(crc32buf)
+
+	calculatedCrc32 := crcReader.Crc32()
+
+	if calculatedCrc32 != readCrc32 {
+		return nil, fmt.Errorf("checkpoint checksum failed! File contains %x but calculated crc32 is %x", readCrc32, calculatedCrc32)
+	}
+
+	return tries, nil
+}
+
+// readCheckpointV5 decodes checkpoint file (version 5) and returns a list of tries.
+// Checkpoint file header (magic and version) are verified by the caller.
+func readCheckpointV5(f *os.File) ([]*trie.MTrie, error) {
 
 	// Scratch buffer is used as temporary buffer that reader can read into.
 	// Raw data in scratch buffer should be copied or converted into desired
@@ -645,4 +774,73 @@ func readCheckpointV4(f *os.File) ([]*trie.MTrie, error) {
 	}
 
 	return tries, nil
+}
+
+// EvictAllCheckpointsFromLinuxPageCache advises Linux to evict all checkpoint files
+// in dir from Linux page cache.  It returns list of files that Linux was
+// successfully advised to evict and first error encountered (if any).
+// Even after error advising eviction, it continues to advise eviction of remaining files.
+func EvictAllCheckpointsFromLinuxPageCache(dir string, logger *zerolog.Logger) ([]string, error) {
+	var err error
+	matches, err := filepath.Glob(filepath.Join(dir, checkpointFilenamePrefix+"*"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to enumerate checkpoints: %w", err)
+	}
+	evictedFileNames := make([]string, 0, len(matches))
+	for _, fn := range matches {
+		base := filepath.Base(fn)
+		if !strings.HasPrefix(base, checkpointFilenamePrefix) {
+			continue
+		}
+		justNumber := base[len(checkpointFilenamePrefix):]
+		_, err := strconv.Atoi(justNumber)
+		if err != nil {
+			continue
+		}
+		evictErr := evictFileFromLinuxPageCacheByName(fn, false, logger)
+		if evictErr != nil {
+			if err == nil {
+				err = evictErr // Save first evict error encountered
+			}
+			logger.Warn().Msgf("failed to evict file %s from Linux page cache: %s", fn, err)
+			continue
+		}
+		evictedFileNames = append(evictedFileNames, fn)
+	}
+	// return the first error encountered
+	return evictedFileNames, err
+}
+
+// evictFileFromLinuxPageCacheByName advises Linux to evict the file from Linux page cache.
+func evictFileFromLinuxPageCacheByName(fileName string, fsync bool, logger *zerolog.Logger) error {
+	f, err := os.Open(fileName)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	return evictFileFromLinuxPageCache(f, fsync, logger)
+}
+
+// evictFileFromLinuxPageCache advises Linux to evict a file from Linux page cache.
+// A use case is when a new checkpoint is loaded or created, Linux may cache big
+// checkpoint files in memory until evictFileFromLinuxPageCache causes them to be
+// evicted from the Linux page cache.  Not calling eviceFileFromLinuxPageCache()
+// causes two checkpoint files to be cached for each checkpointing, eventually
+// caching hundreds of GB.
+// CAUTION: no-op when GOOS != linux.
+func evictFileFromLinuxPageCache(f *os.File, fsync bool, logger *zerolog.Logger) error {
+	err := fadviseNoLinuxPageCache(f.Fd(), fsync)
+	if err != nil {
+		return err
+	}
+
+	fstat, err := f.Stat()
+	if err == nil {
+		fsize := fstat.Size()
+		logger.Info().Msgf("advised Linux to evict file %s (%d MiB) from page cache", f.Name(), fsize/1024/1024)
+	} else {
+		logger.Info().Msgf("advised Linux to evict file %s from page cache", f.Name())
+	}
+	return nil
 }

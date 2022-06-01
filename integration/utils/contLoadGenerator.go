@@ -42,7 +42,6 @@ type ContLoadGenerator struct {
 	numberOfAccounts     int
 	trackTxs             bool
 	flowClient           *client.Client
-	supervisorClient     *client.Client
 	serviceAccount       *flowAccount
 	flowTokenAddress     *flowsdk.Address
 	fungibleTokenAddress *flowsdk.Address
@@ -51,7 +50,6 @@ type ContLoadGenerator struct {
 	availableAccounts    chan *flowAccount                             // queue with accounts available for   workers
 	happeningAccounts    chan func() (*flowAccount, string, time.Time) // queue with accounts happening after worker processing
 	txTracker            *TxTracker
-	txStatsTracker       *TxStatsTracker
 	workerStatsTracker   *WorkerStatsTracker
 	workers              []*Worker
 	blockRef             BlockRef
@@ -104,7 +102,6 @@ func NewContLoadGenerator(
 		numberOfAccounts:     numberOfAccounts,
 		trackTxs:             false,
 		flowClient:           flowClient,
-		supervisorClient:     supervisorClient,
 		serviceAccount:       servAcc,
 		fungibleTokenAddress: fungibleTokenAddress,
 		flowTokenAddress:     flowTokenAddress,
@@ -112,7 +109,6 @@ func NewContLoadGenerator(
 		availableAccounts:    make(chan *flowAccount, numberOfAccounts),
 		happeningAccounts:    make(chan func() (*flowAccount, string, time.Time), numberOfAccounts),
 		txTracker:            txTracker,
-		txStatsTracker:       txStatsTracker,
 		workerStatsTracker:   NewWorkerStatsTracker(),
 		blockRef:             NewBlockRef(supervisorClient),
 		loadType:             loadType,
@@ -288,7 +284,7 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 		AddAuthorizer(*lg.serviceAccount.address).
 		SetPayer(*lg.serviceAccount.address)
 
-	publicKey := bytesToCadenceArray(accountKey.Encode())
+	publicKey := bytesToCadenceArray(accountKey.PublicKey.Encode())
 	count := cadence.NewInt(num)
 
 	initialTokenAmount, err := cadence.NewUFix64FromParts(

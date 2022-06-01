@@ -33,13 +33,17 @@ type Client struct {
 func NewClient(
 	log zerolog.Logger,
 	flowClient module.SDKClientWrapper,
+	flowClientANID flow.Identifier,
 	signer sdkcrypto.Signer,
 	dkgContractAddress,
 	accountAddress string,
 	accountKeyIndex uint,
 ) *Client {
 
-	log = log.With().Str("component", "dkg_contract_client").Logger()
+	log = log.With().
+		Str("component", "dkg_contract_client").
+		Str("flow_client_an_id", flowClientANID.String()).
+		Logger()
 	base := epochs.NewBaseClient(log, flowClient, accountAddress, accountKeyIndex, signer, dkgContractAddress)
 
 	env := templates.Environment{DkgAddress: dkgContractAddress}
@@ -69,6 +73,15 @@ func (c *Client) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) (
 	// unpack return from contract to `model.DKGMessage`
 	messages := make([]model.BroadcastDKGMessage, 0, len(values))
 	for _, val := range values {
+		id, err := strconv.Unquote(val.(cadence.Struct).Fields[0].String())
+		if err != nil {
+			return nil, fmt.Errorf("could not unquote nodeID cadence string (%s): %w", id, err)
+		}
+
+		nodeID, err := flow.HexStringToIdentifier(id)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse nodeID (%v): %w", val, err)
+		}
 
 		content := val.(cadence.Struct).Fields[1]
 		jsonString, err := strconv.Unquote(content.String())
@@ -81,6 +94,7 @@ func (c *Client) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) (
 		if err != nil {
 			return nil, fmt.Errorf("could not unmarshal dkg message: %w", err)
 		}
+		flowMsg.NodeID = nodeID
 		messages = append(messages, flowMsg)
 	}
 

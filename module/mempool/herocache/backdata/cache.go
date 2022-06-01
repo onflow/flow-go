@@ -6,9 +6,12 @@ import (
 	_ "unsafe" // for linking runtimeNano
 
 	"github.com/rs/zerolog"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 //go:linkname runtimeNano runtime.nanotime
@@ -24,7 +27,7 @@ const (
 	// this back data prior to printing any log. This is done as a slow-down mechanism
 	// to avoid spamming logs upon read/write heavy operations. An interaction can be
 	// a read or write.
-	telemetryCounterInterval = uint64(1000)
+	telemetryCounterInterval = uint64(10_000)
 
 	// telemetryDurationInterval is the required elapsed duration interval
 	// prior to printing any log. This is done as a slow-down mechanism
@@ -57,7 +60,8 @@ type slotBucket struct {
 
 // Cache implements an array-based generic memory pool backed by a fixed total array.
 type Cache struct {
-	logger zerolog.Logger
+	logger    zerolog.Logger
+	collector module.HeroCacheMetrics
 	// NOTE: as a BackData implementation, Cache must be non-blocking.
 	// Concurrency management is done by overlay Backend.
 	sizeLimit    uint32
@@ -68,7 +72,6 @@ type Cache struct {
 	buckets []slotBucket
 	// entities keeps the values (i.e., entity) of the (entityId, entity) pairs that are maintained in this BackData.
 	entities *heropool.Pool
-
 	// telemetry
 	//
 	// availableSlotHistogram[i] represents number of buckets with i
@@ -79,10 +82,10 @@ type Cache struct {
 	// towards an interaction. The interaction counter is set to zero whenever
 	// it reaches a predefined limit. Its purpose is to manage the speed at which
 	// telemetry logs are printed.
-	interactionCounter uint64
+	interactionCounter *atomic.Uint64
 	// lastTelemetryDump keeps track of the last time telemetry logs dumped.
 	// Its purpose is to manage the speed at which telemetry logs are printed.
-	lastTelemetryDump int64
+	lastTelemetryDump *atomic.Int64
 }
 
 // DefaultOversizeFactor determines the default oversizing factor of HeroCache.
@@ -103,7 +106,12 @@ type Cache struct {
 // The default overSizeFactor factor is different in the package code because slotsPerBucket is > 3.
 const DefaultOversizeFactor = uint32(8)
 
-func NewCache(sizeLimit uint32, oversizeFactor uint32, ejectionMode heropool.EjectionMode, logger zerolog.Logger) *Cache {
+func NewCache(sizeLimit uint32,
+	oversizeFactor uint32,
+	ejectionMode heropool.EjectionMode,
+	logger zerolog.Logger,
+	collector module.HeroCacheMetrics) *Cache {
+
 	// total buckets.
 	capacity := uint64(sizeLimit * oversizeFactor)
 	bucketNum := capacity / slotsPerBucket
@@ -114,12 +122,15 @@ func NewCache(sizeLimit uint32, oversizeFactor uint32, ejectionMode heropool.Eje
 
 	bd := &Cache{
 		logger:                 logger,
+		collector:              collector,
 		bucketNum:              bucketNum,
 		sizeLimit:              sizeLimit,
 		buckets:                make([]slotBucket, bucketNum),
 		ejectionMode:           ejectionMode,
 		entities:               heropool.NewHeroPool(sizeLimit, ejectionMode),
 		availableSlotHistogram: make([]uint64, slotsPerBucket+1), // +1 is to account for empty buckets as well.
+		interactionCounter:     atomic.NewUint64(0),
+		lastTelemetryDump:      atomic.NewInt64(0),
 	}
 
 	return bd
@@ -193,6 +204,7 @@ func (c Cache) Size() uint {
 // All returns all entities stored in the backdata.
 func (c Cache) All() map[flow.Identifier]flow.Entity {
 	defer c.logTelemetry()
+
 	entitiesList := c.entities.All()
 	all := make(map[flow.Identifier]flow.Entity, len(c.entities.All()))
 
@@ -207,6 +219,8 @@ func (c Cache) All() map[flow.Identifier]flow.Entity {
 
 // Identifiers returns the list of identifiers of entities stored in the backdata.
 func (c Cache) Identifiers() flow.IdentifierList {
+	defer c.logTelemetry()
+
 	ids := make(flow.IdentifierList, c.entities.Size())
 	for i, p := range c.entities.All() {
 		ids[i] = p.Id()
@@ -217,6 +231,8 @@ func (c Cache) Identifiers() flow.IdentifierList {
 
 // Entities returns the list of entities stored in the backdata.
 func (c Cache) Entities() []flow.Entity {
+	defer c.logTelemetry()
+
 	entities := make([]flow.Entity, c.entities.Size())
 	for i, p := range c.entities.All() {
 		entities[i] = p.Entity()
@@ -232,8 +248,8 @@ func (c *Cache) Clear() {
 	c.buckets = make([]slotBucket, c.bucketNum)
 	c.entities = heropool.NewHeroPool(c.sizeLimit, c.ejectionMode)
 	c.availableSlotHistogram = make([]uint64, slotsPerBucket+1)
-	c.interactionCounter = 0
-	c.lastTelemetryDump = 0
+	c.interactionCounter = atomic.NewUint64(0)
+	c.lastTelemetryDump = atomic.NewInt64(0)
 	c.slotCount = 0
 }
 
@@ -252,20 +268,32 @@ func (c *Cache) put(entityId flow.Identifier, entity flow.Entity) bool {
 	slotToUse, unique := c.slotIndexInBucket(b, entityId32of256, entityId)
 	if !unique {
 		// entityId already exists
+		c.collector.OnKeyPutFailure()
 		return false
 	}
 
-	if _, _, ok := c.linkedEntityOf(b, slotToUse); ok {
-		// we are replacing an already linked (but old) slot that has a valid value, hence
+	if linkedId, _, ok := c.linkedEntityOf(b, slotToUse); ok {
+		// bucket is full, and we are replacing an already linked (but old) slot that has a valid value, hence
 		// we should remove its value from underlying entities list.
 		c.invalidateEntity(b, slotToUse)
+		c.collector.OnEntityEjectionDueToEmergency()
+		c.logger.Warn().
+			Hex("replaced_entity_id", logging.ID(linkedId)).
+			Hex("added_entity_id", logging.ID(entityId)).
+			Msg("emergency ejection, adding entity to cache resulted in replacing a valid key, potential collision")
 	}
 
 	c.slotCount++
-	entityIndex := c.entities.Add(entityId, entity, c.ownerIndexOf(b, slotToUse))
+	entityIndex, ejection := c.entities.Add(entityId, entity, c.ownerIndexOf(b, slotToUse))
+	if ejection {
+		// cache is at its full size and ejection happened to make room for this new entity.
+		c.collector.OnEntityEjectionDueToFullCapacity()
+	}
+
 	c.buckets[b].slots[slotToUse].slotAge = c.slotCount
 	c.buckets[b].slots[slotToUse].entityIndex = entityIndex
 	c.buckets[b].slots[slotToUse].entityId32of256 = entityId32of256
+	c.collector.OnKeyPutSuccess()
 	return true
 }
 
@@ -281,6 +309,7 @@ func (c *Cache) get(entityID flow.Identifier) (flow.Entity, bucketIndex, slotInd
 		id, entity, linked := c.linkedEntityOf(b, s)
 		if !linked {
 			// no linked entity for this (bucketIndex, slotIndex) pair.
+			c.collector.OnKeyGetFailure()
 			return nil, 0, 0, false
 		}
 
@@ -289,9 +318,11 @@ func (c *Cache) get(entityID flow.Identifier) (flow.Entity, bucketIndex, slotInd
 			continue
 		}
 
+		c.collector.OnKeyGetSuccess()
 		return entity, b, s, true
 	}
 
+	c.collector.OnKeyGetFailure()
 	return nil, 0, 0, false
 }
 
@@ -361,11 +392,11 @@ func (c *Cache) slotIndexInBucket(b bucketIndex, slotId sha32of256, entityId flo
 		}
 
 		// entity ID already exists in the bucket
-		c.availableSlotHistogram[availableSlotCount]++
 		return 0, false
 	}
 
 	c.availableSlotHistogram[availableSlotCount]++
+	c.collector.BucketAvailableSlots(availableSlotCount, slotsPerBucket)
 	return slotToUse, true
 }
 
@@ -400,19 +431,23 @@ func (c *Cache) linkedEntityOf(b bucketIndex, s slotIndex) (flow.Identifier, flo
 
 // logTelemetry prints telemetry logs depending on number of interactions and last time telemetry has been logged.
 func (c *Cache) logTelemetry() {
-	c.interactionCounter++
-	if c.interactionCounter < telemetryCounterInterval {
+	counter := c.interactionCounter.Inc()
+	if counter < telemetryCounterInterval {
 		// not enough interactions to log.
 		return
 	}
-	if time.Duration(runtimeNano()-c.lastTelemetryDump) < telemetryDurationInterval {
+	if time.Duration(runtimeNano()-c.lastTelemetryDump.Load()) < telemetryDurationInterval {
 		// not long elapsed since last log.
+		return
+	}
+	if !c.interactionCounter.CAS(counter, 0) {
+		// raced on CAS, hence, not logging.
 		return
 	}
 
 	lg := c.logger.With().
 		Uint64("total_slots_written", c.slotCount).
-		Uint64("total_interactions_since_last_log", c.interactionCounter).Logger()
+		Uint64("total_interactions_since_last_log", counter).Logger()
 
 	for i := range c.availableSlotHistogram {
 		lg = lg.With().
@@ -421,9 +456,8 @@ func (c *Cache) logTelemetry() {
 			Logger()
 	}
 
-	lg.Debug().Msg("logging telemetry")
-	c.interactionCounter = 0
-	c.lastTelemetryDump = runtimeNano()
+	lg.Info().Msg("logging telemetry")
+	c.lastTelemetryDump.Store(runtimeNano())
 }
 
 // unuseSlot marks slot as free so that it is ready to be re-used.
