@@ -38,9 +38,11 @@ func init() {
 
 	Cmd.Flags().Uint64Var(&flagStartHeight, "start-height", 0,
 		"Start height of the block range")
+	_ = Cmd.MarkFlagRequired("start-height")
 
 	Cmd.Flags().Uint64Var(&flagEndHeight, "end-height", 0,
 		"End height of the block range")
+	_ = Cmd.MarkFlagRequired("end-height")
 }
 
 func run(*cobra.Command, []string) {
@@ -49,7 +51,7 @@ func run(*cobra.Command, []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot get export transactions")
 	}
-	log.Info().Msg("transaction exported")
+	log.Info().Msg("transactions exported")
 }
 
 func writeJSONTo(writer io.Writer, jsonData []byte) error {

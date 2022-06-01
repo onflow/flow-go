@@ -3,6 +3,8 @@ package protocol
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/module/signature"
+
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -66,14 +68,26 @@ func ToEpochCommit(epoch Epoch) (*flow.EpochCommit, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get epoch clustering: %w", err)
 	}
-	qcs := make([]*flow.QuorumCertificate, 0, len(clustering))
+	qcs := make([]*flow.QuorumCertificateWithSignerIDs, 0, len(clustering))
 	for i := range clustering {
 		cluster, err := epoch.Cluster(uint(i))
 		if err != nil {
 			return nil, fmt.Errorf("could not get epoch cluster (index=%d): %w", i, err)
 		}
-		qcs = append(qcs, cluster.RootQC())
+		qc := cluster.RootQC()
+		// TODO: double check cluster.Members returns canonical order
+		signerIDs, err := signature.DecodeSignerIndicesToIdentifiers(cluster.Members().NodeIDs(), qc.SignerIndices)
+		if err != nil {
+			return nil, fmt.Errorf("could not encode signer indices: %w", err)
+		}
+		qcs = append(qcs, &flow.QuorumCertificateWithSignerIDs{
+			View:      qc.View,
+			BlockID:   qc.BlockID,
+			SignerIDs: signerIDs,
+			SigData:   qc.SigData,
+		})
 	}
+
 	participants, err := epoch.InitialIdentities()
 	if err != nil {
 		return nil, fmt.Errorf("could not get epoch participants: %w", err)

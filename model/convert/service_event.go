@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/assignment"
 	"github.com/onflow/flow-go/model/flow/order"
 )
 
@@ -181,7 +182,7 @@ func convertClusterAssignments(cdcClusters []cadence.Value) (flow.AssignmentList
 	indices := make(map[uint]struct{})
 
 	// parse cluster assignments to Go types
-	assignments := make(flow.AssignmentList, len(cdcClusters))
+	identifierLists := make([]flow.IdentifierList, len(cdcClusters))
 	for _, value := range cdcClusters {
 
 		cdcCluster, ok := value.(cadence.Struct)
@@ -223,9 +224,13 @@ func convertClusterAssignments(cdcClusters []cadence.Value) (flow.AssignmentList
 			if err != nil {
 				return nil, fmt.Errorf("could not convert hex string to identifer: %w", err)
 			}
-			assignments[clusterIndex] = append(assignments[clusterIndex], nodeID)
+
+			identifierLists[clusterIndex] = append(identifierLists[clusterIndex], nodeID)
 		}
 	}
+
+	// sort identifier lists in Canonical order
+	assignments := assignment.FromIdentifierLists(identifierLists)
 
 	return assignments, nil
 }

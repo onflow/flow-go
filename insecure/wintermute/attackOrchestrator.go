@@ -161,12 +161,14 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Event)
 		// sets executor id of the result as the same corrupted execution node id that
 		// is meant to send this message to the flow network.
 		err := o.network.Send(&insecure.Event{
-			CorruptedNodeId:   corruptedExecutionId,
-			Channel:           receiptEvent.Channel,
-			Protocol:          receiptEvent.Protocol,
-			TargetNum:         receiptEvent.TargetNum,
-			TargetIds:         receiptEvent.TargetIds,
-			FlowProtocolEvent: corruptedResult,
+			CorruptedNodeId: corruptedExecutionId,
+			Channel:         receiptEvent.Channel,
+			Protocol:        receiptEvent.Protocol,
+			TargetNum:       receiptEvent.TargetNum,
+			TargetIds:       receiptEvent.TargetIds,
+
+			// wrapping execution result in an execution receipt for sake of encoding and decoding.
+			FlowProtocolEvent: &flow.ExecutionReceipt{ExecutionResult: *corruptedResult},
 		})
 		if err != nil {
 			return fmt.Errorf("could not send rpc on channel: %w", err)
@@ -294,12 +296,14 @@ func (o *Orchestrator) replyWithAttestation(chunkDataPackRequestEvent *insecure.
 
 		// sends an attestation for the corrupted chunk to corrupted verification node.
 		err = o.network.Send(&insecure.Event{
-			CorruptedNodeId:   chunkDataPackRequestEvent.CorruptedNodeId,
-			Channel:           chunkDataPackRequestEvent.Channel,
-			Protocol:          chunkDataPackRequestEvent.Protocol,
-			TargetNum:         chunkDataPackRequestEvent.TargetNum,
-			TargetIds:         chunkDataPackRequestEvent.TargetIds,
-			FlowProtocolEvent: attestation,
+			CorruptedNodeId: chunkDataPackRequestEvent.CorruptedNodeId,
+			Channel:         chunkDataPackRequestEvent.Channel,
+			Protocol:        chunkDataPackRequestEvent.Protocol,
+			TargetNum:       chunkDataPackRequestEvent.TargetNum,
+			TargetIds:       chunkDataPackRequestEvent.TargetIds,
+
+			// wrapping attestation in a result approval for sake of encoding and decoding.
+			FlowProtocolEvent: &flow.ResultApproval{Body: flow.ResultApprovalBody{Attestation: *attestation}},
 		})
 		if err != nil {
 			return false, fmt.Errorf("could not send attestation for corrupted chunk: %w", err)

@@ -195,7 +195,6 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
-		Int("num_signers", len(header.ParentVoterIDs)).
 		Logger()
 
 	log.Info().Msg("block proposal received")
@@ -329,7 +328,6 @@ func (e *Engine) processBlockProposal(ctx context.Context, proposal *messages.Bl
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
-		Int("num_signers", len(header.ParentVoterIDs)).
 		Logger()
 
 	log.Info().Msg("processing block proposal")
