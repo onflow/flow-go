@@ -28,7 +28,7 @@ func (s *SetRequiredApprovalsForSealingCommand) Handler(ctx context.Context, req
 func (s *SetRequiredApprovalsForSealingCommand) Validator(req *admin.CommandRequest) error {
 	val, ok := req.Data.(uint)
 	if !ok {
-		return errors.New("the data field must be a bool, either true or false")
+		return errors.New("the data field must be a uint")
 	}
 
 	req.ValidatorData = val
