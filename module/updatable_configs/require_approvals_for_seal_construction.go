@@ -4,7 +4,8 @@ import (
 	"sync"
 
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/validation"
+	"github.com/onflow/flow-go/module/defaults"
+	"github.com/onflow/flow-go/module/updatable_configs/validation"
 )
 
 // min number of approvals required for constructing a candidate seal
@@ -13,19 +14,13 @@ type RequiredApprovalsForSealConstructionInstance struct {
 	requiredApprovalsForSealConstruction uint
 }
 
-// DefaultRequiredApprovalsForSealConstruction is the default number of approvals required to construct a candidate seal
-// for subsequent inclusion in block.
-// when set to 1, it requires at least 1 approval to build a seal
-// when set to 0, it can build seal without any approval
-const DefaultRequiredApprovalsForSealConstruction = uint(1)
-
 var createRequiredApprovalsForSealConstructionOnce sync.Once
 var instanceRequiredApprovalsForSealConstruction *RequiredApprovalsForSealConstructionInstance
 
 func createRequiredApprovalsForSealConstruction() *RequiredApprovalsForSealConstructionInstance {
 	createRequiredApprovalsForSealConstructionOnce.Do(func() {
 		instanceRequiredApprovalsForSealConstruction = &RequiredApprovalsForSealConstructionInstance{
-			requiredApprovalsForSealConstruction: DefaultRequiredApprovalsForSealConstruction,
+			requiredApprovalsForSealConstruction: defaults.DefaultRequiredApprovalsForSealConstruction,
 		}
 	})
 	return instanceRequiredApprovalsForSealConstruction

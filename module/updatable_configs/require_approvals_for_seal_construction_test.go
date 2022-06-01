@@ -3,9 +3,10 @@ package updatable_configs_test
 import (
 	"testing"
 
-	"github.com/onflow/flow-go/module/chunks"
-	"github.com/onflow/flow-go/module/updatable_configs"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/module/defaults"
+	"github.com/onflow/flow-go/module/updatable_configs"
 )
 
 func TestRequiredApprovalsForSealingContruction(t *testing.T) {
@@ -16,7 +17,7 @@ func TestRequiredApprovalsForSealingContruction(t *testing.T) {
 
 	// should get the default value
 	val := instance.GetValue()
-	require.Equal(t, updatable_configs.DefaultRequiredApprovalsForSealConstruction, val)
+	require.Equal(t, defaults.DefaultRequiredApprovalsForSealConstruction, val)
 
 	// SetValue should return the old value
 	old, err := instance.SetValue(0)
@@ -34,7 +35,7 @@ func TestRequiredApprovalsForSealingContruction(t *testing.T) {
 	require.Equal(t, uint(0), updatable_configs.AcquireRequiredApprovalsForSealConstructionGetter().GetValue())
 
 	// test updating 10 times
-	for i := 1; i <= chunks.DefaultChunkAssignmentAlpha; i++ {
+	for i := 1; i <= defaults.DefaultChunkAssignmentAlpha; i++ {
 		old, err := instance.SetValue(uint(i))
 		require.NoError(t, err, err)
 		require.Equal(t, uint(i-1), old)
@@ -42,7 +43,7 @@ func TestRequiredApprovalsForSealingContruction(t *testing.T) {
 		require.Equal(t, uint(i), updatable_configs.AcquireRequiredApprovalsForSealConstructionGetter().GetValue())
 	}
 
-	_, err = instance.SetValue(chunks.DefaultChunkAssignmentAlpha + 1)
+	_, err = instance.SetValue(defaults.DefaultChunkAssignmentAlpha + 1)
 	require.Error(t, err)
 }
 

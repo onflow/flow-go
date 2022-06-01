@@ -2,6 +2,8 @@ package validation
 
 import (
 	"fmt"
+
+	"github.com/onflow/flow-go/module/defaults"
 )
 
 // ValidateRequireApprovals validates the given value against the default of other values.
@@ -11,7 +13,8 @@ func ValidateRequireApprovals(requiredApprovalsForSealConstruction uint) error {
 	// the flag, which will most likely done by updating a new image with a new default value.
 	return validateRequireApprovals(
 		requiredApprovalsForSealConstruction,
-		DefaultRequiredApprovalsForSealValidation,
+		defaults.DefaultRequiredApprovalsForSealValidation,
+		// chunks.DefaultChunkAssignmentAlpha,
 		3,
 	)
 }

@@ -542,7 +542,8 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 	}
 
 	// the sealing Core requires approvals from both verifiers for each chunk
-	s.setter.SetValue(2)
+	_, err := s.setter.SetValue(2)
+	require.NoError(s.T(), err)
 
 	// populate the incorporated-results tree with:
 	// - 50 that have collected two signatures per chunk
@@ -629,7 +630,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 	// process next block
 	finalized := unsealedFinalizedBlocks[lastProcessedIndex].Header
 	s.MarkFinalized(finalized)
-	err := s.core.ProcessFinalizedBlock(finalized.ID())
+	err = s.core.ProcessFinalizedBlock(finalized.ID())
 	require.NoError(s.T(), err)
 
 	// now 2 results should be pending

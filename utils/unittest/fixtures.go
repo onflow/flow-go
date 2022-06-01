@@ -2084,6 +2084,9 @@ func TransactionResultsFixture(n int) []flow.TransactionResult {
 
 func NewRequiredApprovalsForSealConstructionInstance(val uint) *updatable_configs.RequiredApprovalsForSealConstructionInstance {
 	instance := &updatable_configs.RequiredApprovalsForSealConstructionInstance{}
-	instance.SetValue(val)
+	_, err := instance.SetValue(val)
+	if err != nil {
+		panic(err)
+	}
 	return instance
 }

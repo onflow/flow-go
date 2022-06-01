@@ -14,14 +14,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// DefaultRequiredApprovalsForSealValidation is the default number of approvals that should be
-// present and valid for each chunk. Setting this to 0 will disable counting of chunk approvals
-// this can be used temporarily to ease the migration to new chunk based sealing.
-// TODO:
-//   * This value is for the happy path (requires just one approval per chunk).
-//   * Full protocol should be +2/3 of all currently authorized verifiers.
-const DefaultRequiredApprovalsForSealValidation = 0
-
 // sealValidator holds all needed context for checking seal
 // validity against current protocol state.
 type sealValidator struct {

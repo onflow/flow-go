@@ -10,7 +10,7 @@ import (
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/module/updatable_configs"
-	"github.com/onflow/flow-go/module/validation"
+	"github.com/onflow/flow-go/module/updatable_configs/validation"
 )
 
 var _ commands.AdminCommand = (*SetRequiredApprovalsForSealingCommand)(nil)
