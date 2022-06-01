@@ -15,6 +15,9 @@ import (
 
 var _ commands.AdminCommand = (*GetTransactionsCommand)(nil)
 
+// max number of block height to query transactions from
+var MAX_HEIGHT_RANGE = uint64(1000)
+
 type getTransactionsReqData struct {
 	startHeight uint64
 	endHeight   uint64
@@ -86,8 +89,12 @@ func (c *GetTransactionsCommand) Validator(req *admin.CommandRequest) error {
 		return err
 	}
 
-	if endHeight-startHeight+1 > 1000 {
-		return fmt.Errorf("getting transactions for more than 1000 blocks at a time might have an impact to node's performance")
+	if endHeight < startHeight {
+		return fmt.Errorf("endHeight %v should not be smaller than startHeight %v", endHeight, startHeight)
+	}
+
+	if endHeight-startHeight+1 > MAX_HEIGHT_RANGE {
+		return fmt.Errorf("getting transactions for more than %v blocks at a time might have an impact to node's performance", MAX_HEIGHT_RANGE)
 	}
 
 	req.ValidatorData = &getTransactionsReqData{
