@@ -30,6 +30,29 @@ func (_m *Ledger) Done() <-chan struct{} {
 	return r0
 }
 
+// GetSingleValue provides a mock function with given fields: query
+func (_m *Ledger) GetSingleValue(query *ledger.QuerySingleValue) (ledger.Value, error) {
+	ret := _m.Called(query)
+
+	var r0 ledger.Value
+	if rf, ok := ret.Get(0).(func(*ledger.QuerySingleValue) ledger.Value); ok {
+		r0 = rf(query)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(ledger.Value)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(*ledger.QuerySingleValue) error); ok {
+		r1 = rf(query)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Get provides a mock function with given fields: query
 func (_m *Ledger) Get(query *ledger.Query) ([]ledger.Value, error) {
 	ret := _m.Called(query)
