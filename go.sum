@@ -1447,8 +1447,8 @@ github.com/onflow/flow/protobuf/go/flow v0.2.0/go.mod h1:kRugbzZjwQqvevJhrnnCFMJ
 github.com/onflow/flow/protobuf/go/flow v0.2.2/go.mod h1:gQxYqCfkI8lpnKsmIjwtN2mV/N2PIwc1I+RUK4HPIc8=
 github.com/onflow/flow/protobuf/go/flow v0.2.4/go.mod h1:gQxYqCfkI8lpnKsmIjwtN2mV/N2PIwc1I+RUK4HPIc8=
 github.com/onflow/flow/protobuf/go/flow v0.2.5/go.mod h1:gQxYqCfkI8lpnKsmIjwtN2mV/N2PIwc1I+RUK4HPIc8=
-github.com/onflow/flow/protobuf/go/flow v0.3.0 h1:DSnThQkS7Hbl1X99vUaXYdVKYfNWd5ZU5R8kl+SAPFM=
-github.com/onflow/flow/protobuf/go/flow v0.3.0/go.mod h1:gQxYqCfkI8lpnKsmIjwtN2mV/N2PIwc1I+RUK4HPIc8=
+github.com/onflow/flow/protobuf/go/flow v0.3.1-0.20220530160533-3b69b48f781b h1:UBgGVwdOd/orZqDLaOKLyjqilkZwqHwEG+KOXgkzG2U=
+github.com/onflow/flow/protobuf/go/flow v0.3.1-0.20220530160533-3b69b48f781b/go.mod h1:gQxYqCfkI8lpnKsmIjwtN2mV/N2PIwc1I+RUK4HPIc8=
 github.com/onflow/fusd/lib/go/contracts v0.0.0-20211021081023-ae9de8fb2c7e/go.mod h1:CRX9eXtc9zHaRVTW1Xh4Cf5pZgKkQuu1NuSEVyHXr/0=
 github.com/onflow/sdks v0.4.2 h1:UdnXOdcIPIdD02n2SxQVGTJBAxGqJBgOkThxI3/IDnk=
 github.com/onflow/sdks v0.4.2/go.mod h1:F0dj0EyHC55kknLkeD10js4mo14yTdMotnWMslPirrU=
