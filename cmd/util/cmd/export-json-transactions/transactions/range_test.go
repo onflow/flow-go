@@ -1,6 +1,7 @@
 package transactions
 
 import (
+	"fmt"
 	"testing"
 
 	badger "github.com/dgraph-io/badger/v2"
@@ -9,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -89,5 +91,22 @@ func TestFindBlockTransactions(t *testing.T) {
 			col1.Collection.Transactions[0].ID().String(),
 		)
 
+		// unhappy path: endHeight is lower than startHeight
+		_, err = f.GetByHeightRange(5, 4)
+		require.Error(t, err)
+		require.Contains(t, fmt.Sprintf("%v", err), "must be smaller")
+
+		// unhapp path: range not exist
+		snapNotFound := &mock.Snapshot{}
+		snapNotFound.On("Head").Return(nil, storage.ErrNotFound)
+		state.On("AtHeight", uint64(99998)).Return(snapNotFound, nil)
+		_, err = f.GetByHeightRange(99998, 99999)
+		require.Error(t, err)
+		require.Contains(t, fmt.Sprintf("%v", err), "could not find header by height 99998")
+
+		// unhapp path: must not start from 0
+		_, err = f.GetByHeightRange(0, 3)
+		require.Error(t, err)
+		require.Contains(t, fmt.Sprintf("%v", err), "start-height must not be 0")
 	})
 }
