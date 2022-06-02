@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/onflow/flow-go/network/codec"
 
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
@@ -27,9 +28,12 @@ func (d *Decoder) Decode() (interface{}, error) {
 		return nil, fmt.Errorf("could not decode envelope; len(data)=%d: %w", len(data), err)
 	}
 
-	code := data[0] // only first byte
+	code, err := codec.MessageCodeFromByte(data[0]) // only first byte
+	if err != nil {
+		return nil, fmt.Errorf("could not get message code from byte: %w", err)
+	}
 
-	what, v, err := envelopeCode2v(code)
+	what, v, err := code.Message()
 	if err != nil {
 		return nil, fmt.Errorf("could not determine interface from code: %w", err)
 	}

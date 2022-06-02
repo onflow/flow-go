@@ -8,6 +8,7 @@ import (
 	"io"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/onflow/flow-go/network/codec"
 
 	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/network"
@@ -46,9 +47,14 @@ func (c *Codec) NewDecoder(r io.Reader) network.Decoder {
 func (c *Codec) Encode(v interface{}) ([]byte, error) {
 
 	// encode the value
-	what, code, err := v2envelopeCode(v)
+	code, err := codec.MessageCodeFromV(v)
 	if err != nil {
 		return nil, fmt.Errorf("could not determine envelope code: %w", err)
+	}
+
+	what, err := code.String()
+	if err != nil {
+		return nil, fmt.Errorf("could not determine envelope code string: %w", err)
 	}
 
 	// NOTE: benchmarking shows that prepending the code and then using
@@ -57,7 +63,7 @@ func (c *Codec) Encode(v interface{}) ([]byte, error) {
 	// encode / append the envelope code
 	//bs1 := binstat.EnterTime(binstat.BinNet + ":wire<1(cbor)envelope2payload")
 	var data bytes.Buffer
-	data.WriteByte(code)
+	data.WriteByte(code.Byte())
 	//binstat.LeaveVal(bs1, int64(data.Len()))
 
 	// encode the payload
@@ -85,10 +91,15 @@ func (c *Codec) Decode(data []byte) (interface{}, error) {
 
 	// decode the envelope
 	//bs1 := binstat.EnterTime(binstat.BinNet + ":wire>3(cbor)payload2envelope")
-	code := data[0] // only first byte
+
+	code, err := codec.MessageCodeFromByte(data[0]) // only first byte
+	if err != nil {
+		return nil, fmt.Errorf("could not get message code from byte: %w", err)
+	}
+
 	//binstat.LeaveVal(bs1, int64(len(data)))
 
-	what, v, err := envelopeCode2v(code)
+	what, v, err := code.Message()
 	if err != nil {
 		return nil, fmt.Errorf("could not determine interface from code: %w", err)
 	}
@@ -104,16 +115,18 @@ func (c *Codec) Decode(data []byte) (interface{}, error) {
 	return v, nil
 }
 
-// DecodeMsgType is a helper func that returns the first byte of cbor encoded data which
-// corresponds to the message type. This allows users of the codec to have an explicit dependency
-// on this specific property of encoding with the cbor codec. You should not directly interpret
-// the message type in code. i:e msgType := data[0], instead use this func.
+// DecodeMsgType handles decoding of the message code byte from data. This codec
+// encodes the message code byte as the first byte in the message data.
 func (c *Codec) DecodeMsgType(data []byte) (byte, string, error) {
-	code := data[0]
-	what, err := switchenv2what(code)
+	code, err := codec.MessageCodeFromByte(data[0])
 	if err != nil {
 		return byte(0), "", fmt.Errorf("could not decode message type check encoding: %w", err)
 	}
 
-	return code, what, nil
+	what, err := code.String()
+	if err != nil {
+		return byte(0), "", fmt.Errorf("could not decode message type check encoding: %w", err)
+	}
+
+	return code.Byte(), what, nil
 }

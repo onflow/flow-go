@@ -8,6 +8,7 @@ import (
 	"io"
 
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/codec"
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
@@ -85,10 +86,15 @@ func (c *Codec) DecodeMsgType(data []byte) (byte, string, error) {
 		return byte(0), "", fmt.Errorf("could not decode envelope: %w", err)
 	}
 
-	what, err := switchenv2what(env)
+	code, err := codec.MessageCodeFromByte(env.Code)
 	if err != nil {
-		return byte(0), "", fmt.Errorf("could not decode message type: %w", err)
+		return 0, "", fmt.Errorf("could not determine envelope code: %w", err)
 	}
 
-	return env.Code, what, nil
+	what, err := code.String()
+	if err != nil {
+		return 0, "", fmt.Errorf("could not determine envelope code string: %w", err)
+	}
+
+	return code.Byte(), what, nil
 }

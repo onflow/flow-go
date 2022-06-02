@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/onflow/flow-go/network/codec"
 
 	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
 	_ "github.com/onflow/flow-go/utils/binstat"
@@ -22,15 +23,20 @@ type Encoder struct {
 func (e *Encoder) Encode(v interface{}) error {
 
 	// encode the value
-	what, code, err := v2envelopeCode(v)
+	code, err := codec.MessageCodeFromV(v)
 	if err != nil {
 		return fmt.Errorf("could not determine envelope code: %w", err)
+	}
+
+	what, err := code.String()
+	if err != nil {
+		return fmt.Errorf("could not determine envelope code string: %w", err)
 	}
 
 	// encode the payload
 	//bs1 := binstat.EnterTime(fmt.Sprintf("%s%s%s:%d", binstat.BinNet, ":strm<1(cbor)", what, code)) // e.g. ~3net::strm<1(cbor)CodeEntityRequest:23
 	var data bytes.Buffer
-	data.WriteByte(code)
+	data.WriteByte(code.Byte())
 	encoder := cborcodec.EncMode.NewEncoder(&data)
 	err = encoder.Encode(v)
 	//binstat.LeaveVal(bs1, int64(data.Len()))

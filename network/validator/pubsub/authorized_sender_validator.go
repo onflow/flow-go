@@ -26,7 +26,7 @@ import (
 // 2. The message type is a known message type (can be decoded with cbor codec).
 // 3. The authorized roles list for the channel contains the senders role.
 // 4. The node is not ejected
-func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, codec network.Codec, getIdentity func(peer.ID) (*flow.Identity, bool)) MessageValidator {
+func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, c network.Codec, getIdentity func(peer.ID) (*flow.Identity, bool)) MessageValidator {
 	log = log.With().
 		Str("component", "authorized_sender_validator").
 		Str("network_channel", channel.String()).
@@ -50,7 +50,7 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, code
 		}
 
 		// attempt to decode the flow message type from encoded payload
-		code, what, err := codec.DecodeMsgType(msg.Payload)
+		code, what, err := c.DecodeMsgType(msg.Payload)
 		if err != nil {
 			log.Warn().
 				Err(err).
@@ -61,7 +61,7 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, code
 			return pubsub.ValidationReject
 		}
 
-		if err := isAuthorizedSender(identity, channel, code); err != nil {
+		if err := isAuthorizedSender(identity, channel, codec.MessageCode(code)); err != nil {
 			log.Warn().
 				Err(err).
 				Str("peer_id", from.String()).
@@ -78,7 +78,7 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, code
 }
 
 // isAuthorizedSender checks if node is an authorized role and is not ejected.
-func isAuthorizedSender(identity *flow.Identity, channel network.Channel, code uint8) error {
+func isAuthorizedSender(identity *flow.Identity, channel network.Channel, code codec.MessageCode) error {
 	// get authorized roles list
 	roles, err := getRoles(channel, code)
 	if err != nil {
@@ -93,7 +93,7 @@ func isAuthorizedSender(identity *flow.Identity, channel network.Channel, code u
 }
 
 // getRoles returns list of authorized roles for the channel associated with the message code provided
-func getRoles(channel network.Channel, msgTypeCode uint8) (flow.RoleList, error) {
+func getRoles(channel network.Channel, msgTypeCode codec.MessageCode) (flow.RoleList, error) {
 	// echo messages can be sent by anyone
 	if msgTypeCode == codec.CodeEcho {
 		return flow.Roles(), nil
