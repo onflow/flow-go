@@ -1491,7 +1491,7 @@ github.com/onflow/cadence v0.21.3-0.20220511225809-808fe14141df/go.mod h1:vNIxF1
 github.com/onflow/cadence v0.21.3-0.20220513161637-08b93d4bb7b9/go.mod h1:vNIxF13e1Ty50KnkQSm6LVwvxGGLTQ4kpldvTL+2S6s=
 github.com/onflow/cadence v0.21.3-0.20220601002855-8b113c539a2c h1:l2Oc/aZ1FbzJBU5bbsBm6jjYe7aHLOp++ymLL2dTHRQ=
 github.com/onflow/cadence v0.21.3-0.20220601002855-8b113c539a2c/go.mod h1:FliGP1FZLEuSemnSf8pKItDzW7E2cvPukx/SsE1+oCo=
-github.com/onflow/flow v0.3.0/go.mod h1:lzyAYmbu1HfkZ9cfnL5/sjrrsnJiUU8fRL26CqLP7+c=
+github.com/onflow/flow v0.3.1/go.mod h1:lzyAYmbu1HfkZ9cfnL5/sjrrsnJiUU8fRL26CqLP7+c=
 github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220513155751-c4c1f8d59f83 h1:mpJirFu/JWMLV0IhKDZleVrVdN5B8QERV4gSXDef5bA=
 github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220513155751-c4c1f8d59f83/go.mod h1:T6yhM+kWrFxiP6F3hh8lh9DcocHfmv48P4ITnjLhKSk=
 github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220513155751-c4c1f8d59f83 h1:w4uXFTvjQmLtA/X50H4YXVlzbdsoL3vDI3Y86jtJOMM=
@@ -1515,9 +1515,8 @@ github.com/onflow/flow/protobuf/go/flow v0.1.8/go.mod h1:kRugbzZjwQqvevJhrnnCFMJ
 github.com/onflow/flow/protobuf/go/flow v0.1.9/go.mod h1:kRugbzZjwQqvevJhrnnCFMJZNmoSJmxlKt6hTGXZojM=
 github.com/onflow/flow/protobuf/go/flow v0.2.2/go.mod h1:gQxYqCfkI8lpnKsmIjwtN2mV/N2PIwc1I+RUK4HPIc8=
 github.com/onflow/flow/protobuf/go/flow v0.2.5/go.mod h1:gQxYqCfkI8lpnKsmIjwtN2mV/N2PIwc1I+RUK4HPIc8=
-github.com/onflow/flow/protobuf/go/flow v0.3.1-0.20220530160533-3b69b48f781b/go.mod h1:gQxYqCfkI8lpnKsmIjwtN2mV/N2PIwc1I+RUK4HPIc8=
-github.com/onflow/flow/protobuf/go/flow v0.3.1-0.20220531193911-8d46cfcf54ba h1:4qUi7rdaMiCaq3RqCOz/h/i/aIqtbvExfj7cnPjIlkg=
-github.com/onflow/flow/protobuf/go/flow v0.3.1-0.20220531193911-8d46cfcf54ba/go.mod h1:gQxYqCfkI8lpnKsmIjwtN2mV/N2PIwc1I+RUK4HPIc8=
+github.com/onflow/flow/protobuf/go/flow v0.3.1 h1:4I8ykG6naR3n8Or6eXrZDaGVaoztb3gP2KJ6XKyDufg=
+github.com/onflow/flow/protobuf/go/flow v0.3.1/go.mod h1:gQxYqCfkI8lpnKsmIjwtN2mV/N2PIwc1I+RUK4HPIc8=
 github.com/onflow/fusd/lib/go/contracts v0.0.0-20211021081023-ae9de8fb2c7e/go.mod h1:CRX9eXtc9zHaRVTW1Xh4Cf5pZgKkQuu1NuSEVyHXr/0=
 github.com/onflow/sdks v0.4.2 h1:UdnXOdcIPIdD02n2SxQVGTJBAxGqJBgOkThxI3/IDnk=
 github.com/onflow/sdks v0.4.2/go.mod h1:F0dj0EyHC55kknLkeD10js4mo14yTdMotnWMslPirrU=
