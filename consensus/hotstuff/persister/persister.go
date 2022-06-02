@@ -9,7 +9,8 @@ import (
 )
 
 // Persister can persist relevant information for hotstuff.
-// Persister depends on protocol.State root snapshot bootstrapping to retrieve chainID.
+// Persister depends on protocol.State root snapshot bootstrapping to set initial values for
+// SafetyData and LivenessData. These values must be initialized before first use of Persister.
 type Persister struct {
 	db      *badger.DB
 	chainID flow.ChainID

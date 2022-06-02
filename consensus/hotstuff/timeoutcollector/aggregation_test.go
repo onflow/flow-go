@@ -182,7 +182,7 @@ func TestTimeoutSignatureAggregator_VerifyAndAdd(t *testing.T) {
 				weight, err = aggregator.VerifyAndAdd(ids[(i+1)%signersNum].NodeID, sigs[(i+1)%signersNum], newestQCViews[(i+1)%signersNum]) // different signature for same index
 				// weight should not change
 				require.Equal(t, expectedWeight, weight)
-				require.ErrorAs(t, err, &model.ErrInvalidSignature)
+				require.True(t, model.IsDuplicatedSignerError(err))
 			}(i, sig)
 		}
 		wg.Wait()

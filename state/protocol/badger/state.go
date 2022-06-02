@@ -248,7 +248,7 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 		// the Snapshot is incomplete, because consensus nodes require this QC. To reduce the chance of
 		// accidental misconfiguration undermining consensus liveness, we do the following sanity checks:
 		//  * `rootQC` should not be nil
-		//  * `rootQC` should be for `highest` block, i.e. its view and
+		//  * `rootQC` should be for `highest` block, i.e. its view and blockID should match
 		rootQC, err := root.QuorumCertificate()
 		if err != nil {
 			return fmt.Errorf("could not get root QC: %w", err)

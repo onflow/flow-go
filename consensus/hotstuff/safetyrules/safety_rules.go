@@ -91,7 +91,7 @@ func (r *SafetyRules) ProduceVote(proposal *model.Proposal, curView uint64) (*mo
 	// have zero weight in the next epoch. Such vote can't be used to produce valid QCs.
 	_, err = r.committee.IdentityByBlock(block.BlockID, r.committee.Self())
 	if model.IsInvalidSignerError(err) {
-		return nil, model.NewNoVoteErrorf("committee member for block %x is invalid: %w", block.BlockID, err)
+		return nil, model.NewNoVoteErrorf("I am not authorized to vote for block %x: %w", block.BlockID, err)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("could not get self identity: %w", err)
