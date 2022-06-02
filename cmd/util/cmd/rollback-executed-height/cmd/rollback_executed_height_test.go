@@ -95,8 +95,11 @@ func TestReExecuteBlock(t *testing.T) {
 
 		require.NoError(t, err)
 
+		batch := bstorage.NewBatch(db)
+
 		// remove execution results
 		err = removeForBlockID(
+			batch,
 			headers,
 			commits,
 			txResults,
@@ -108,7 +111,10 @@ func TestReExecuteBlock(t *testing.T) {
 			header.ID(),
 		)
 
+		err2 := batch.Flush()
+
 		require.NoError(t, err)
+		require.NoError(t, err2)
 
 		// re execute result
 		err = es.SaveExecutionResults(
@@ -205,8 +211,11 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 
 		require.NoError(t, err)
 
+		batch := bstorage.NewBatch(db)
+
 		// remove execution results
 		err = removeForBlockID(
+			batch,
 			headers,
 			commits,
 			txResults,
@@ -218,7 +227,10 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 			header.ID(),
 		)
 
+		err2 := batch.Flush()
+
 		require.NoError(t, err)
+		require.NoError(t, err2)
 
 		executionReceipt2 := unittest.ExecutionReceiptFixture()
 		executionReceipt2.ExecutionResult.BlockID = header.ID()
