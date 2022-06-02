@@ -252,7 +252,8 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeInvalidGuarantor() {
 	// submit the guarantee as if it was sent by a collection node
 	err := suite.core.OnGuarantee(suite.collID, guarantee)
 	suite.Assert().Error(err, "should error with invalid guarantor")
-	suite.Assert().True(engine.IsInvalidInputError(err))
+	suite.Assert().True(engine.IsInvalidInputError(err), err)
+	suite.Assert().True(signature.IsInvalidSignerIndicesError(err), err)
 
 	// check that the guarantee has _not_ been added to the mempool
 	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee)
