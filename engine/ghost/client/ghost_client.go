@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/onflow/flow-go/utils/unittest"
 	"google.golang.org/grpc"
+
+	"github.com/onflow/flow-go/utils/unittest"
 
 	ghost "github.com/onflow/flow-go/engine/ghost/protobuf"
 	"github.com/onflow/flow-go/model/flow"

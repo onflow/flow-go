@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
+
+	"github.com/onflow/flow-go/utils/unittest"
 
 	"github.com/onflow/flow-go/engine"
 	ghost "github.com/onflow/flow-go/engine/ghost/protobuf"
