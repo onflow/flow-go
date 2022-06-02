@@ -29,8 +29,7 @@ func New(
 	}
 }
 
-// ValidateTC validates the TC
-// tc - the tc to be validated
+// ValidateTC validates the TimeoutCertificate `tc`.
 // During normal operations, the following error returns are expected:
 //  * model.InvalidTCError if the TC is invalid
 //  * model.ErrViewForUnknownEpoch if the TC refers unknown epoch
@@ -38,20 +37,21 @@ func New(
 func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 	highestQC := tc.TOHighestQC
 
-	// there is no reason for a timeout certificate to include a QC for the same view
-	// (if you have a QC for the view, we can always use the QC directly)
-	// however, since QCs and TCs are processed/created asynchronously, we allow this case
+	// The TC's view cannot be smaller than the view of the QC it contains. 
+	// Note: we specifically allow for the TC to have the same view as the highest QC. 
+	// This is useful as a fallback, because it allows replicas other than the designated
+	// leader to also collect votes and generate a QC. 
 	if tc.View < highestQC.View {
 		return newInvalidTCError(tc, fmt.Errorf("TC's QC cannot be newer than the TC's view"))
 	}
 
+	// verifying that tc.TOHighestQC is the QC with the highest view
 	highestQCView := tc.TOHighQCViews[0]
 	for _, view := range tc.TOHighQCViews {
 		if highestQCView < view {
 			highestQCView = view
 		}
 	}
-
 	if highestQCView != tc.TOHighestQC.View {
 		return newInvalidTCError(tc, fmt.Errorf("included QC (view=%d) should be equal to highest contributed view: %d", tc.TOHighestQC.View, highestQCView))
 	}
@@ -61,7 +61,6 @@ func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 	if err != nil {
 		return fmt.Errorf("could not get consensus participants at view %d: %w", tc.View, err)
 	}
-
 	signers, err := signature.DecodeSignerIndicesToIdentities(allParticipants, tc.SignerIndices)
 	if err != nil {
 		if signature.IsDecodeSignerIndicesError(err) {
@@ -83,7 +82,10 @@ func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 	// Validate QC
 	err = v.ValidateQC(highestQC)
 	if err != nil {
-		return newInvalidTCError(tc, fmt.Errorf("invalid QC included in TC: %w", err))
+		if model.IsInvalidQCError(err) {
+			return newInvalidTCError(tc, fmt.Errorf("invalid QC included in TC: %w", err))
+		}
+		fmt.Errorf("unexpected internal error while verifying the QC included in the TC: %w", err)
 	}
 
 	// Verify multi-message BLS sig of TC, by far the most expensive check
@@ -101,8 +103,7 @@ func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 	return nil
 }
 
-// ValidateQC validates the QC
-// qc - the qc to be validated
+// ValidateQC validates the Quorum Certificate `qc`.
 // During normal operations, the following error returns are expected:
 //  * model.InvalidQCError if the QC is invalid
 //  * model.ErrViewForUnknownEpoch if the QC refers unknown epoch
@@ -194,19 +195,19 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 	if !lastViewSuccessful {
 		// check if proposal is correctly structured
 		if proposal.LastViewTC == nil {
-			return newInvalidBlockError(block, fmt.Errorf("last view has ended with timeout but proposal doesn't include LastViewTC"))
+			return newInvalidBlockError(block, fmt.Errorf("QC in block is not for previous view, so expecting a TC but none is included in block"))
 		}
 
 		// check if included TC is for previous view
 		if proposal.Block.View != proposal.LastViewTC.View+1 {
-			return newInvalidBlockError(block, fmt.Errorf("expected TC for view %d got %d", proposal.Block.View-1, proposal.LastViewTC.View))
+			return newInvalidBlockError(block, fmt.Errorf("QC in block is not for previous view, so expecting a TC for view %d but got TC for view %d", proposal.Block.View-1, proposal.LastViewTC.View))
 		}
 
 		// Check if proposal extends either the newest QC specified in the TC, or a newer QC
 		// in edge cases a leader may construct a TC and QC concurrently such that TC contains
 		// an older QC - in these case we still want to build on the newest QC, so this case is allowed.
 		if proposal.Block.QC.View < proposal.LastViewTC.TOHighestQC.View {
-			return newInvalidBlockError(block, fmt.Errorf("proposal's QC is lower than locked QC"))
+			return newInvalidBlockError(block, fmt.Errorf("TC in block contains a newer QC than the block itself, which is a protocol violation"))
 		}
 	} else if proposal.LastViewTC != nil {
 		// last view ended with QC, including TC is a protocol violation
@@ -228,7 +229,10 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 		// check if included TC is valid
 		err = v.ValidateTC(proposal.LastViewTC)
 		if err != nil {
+		if model.IsInvalidTCError(err) {
 			return newInvalidBlockError(block, fmt.Errorf("proposals TC's is not valid: %w", err))
+		}
+		fmt.Errorf("unexpected internal error while verifying the TC included in block: %w", err)
 		}
 	}
 
