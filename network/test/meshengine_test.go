@@ -18,8 +18,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
-
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -71,7 +69,7 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 		count,
 		logger,
 		nil,
-		cborcodec.NewCodec(),
+		unittest.NetworkCodec(),
 		WithIdentityOpts(unittest.WithAllRoles()),
 	)
 

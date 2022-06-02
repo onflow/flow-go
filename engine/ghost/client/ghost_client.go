@@ -6,9 +6,8 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/onflow/flow-go/utils/unittest"
 	"google.golang.org/grpc"
-
-	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 
 	ghost "github.com/onflow/flow-go/engine/ghost/protobuf"
 	"github.com/onflow/flow-go/model/flow"
@@ -42,7 +41,7 @@ func NewGhostClient(addr string) (*GhostClient, error) {
 	return &GhostClient{
 		rpcClient: grpcClient,
 		close:     func() error { return conn.Close() },
-		codec:     cborcodec.NewCodec(),
+		codec:     unittest.NetworkCodec(),
 	}, nil
 }
 

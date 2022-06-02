@@ -18,8 +18,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/libp2p/message"
@@ -185,7 +183,7 @@ func (suite *MutableIdentityTableSuite) addNodes(count int) {
 		count,
 		suite.logger,
 		nil,
-		cborcodec.NewCodec(),
+		unittest.NetworkCodec(),
 	)
 	suite.cancels = append(suite.cancels, cancel)
 
