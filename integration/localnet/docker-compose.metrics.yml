@@ -8,10 +8,6 @@ services:
       - ./data/tempo:/tmp/tempo:z
     ports:
       - "14268"
-    logging:
-      driver: loki
-      options:
-        loki-url: 'http://localhost:3100/loki/api/v1/push'
 
   loki:
     image: grafana/loki:latest
@@ -23,10 +19,6 @@ services:
       - JAEGER_ENDPOINT=http://tempo:14268/api/traces
       - JAEGER_SAMPLER_TYPE=const
       - JAEGER_SAMPLER_PARAM=1
-    logging:
-      driver: loki
-      options:
-        loki-url: 'http://localhost:3100/loki/api/v1/push'
 
   prometheus:
     image: prom/prometheus:latest
@@ -36,10 +28,6 @@ services:
     command: "--config.file=/etc/prometheus/prometheus.yaml --storage.tsdb.path=/prometheus"
     ports:
       - 9090:9090
-    logging:
-      driver: loki
-      options:
-        loki-url: 'http://localhost:3100/loki/api/v1/push'
 
   exporter:
     image: prom/node-exporter:latest
@@ -56,7 +44,3 @@ services:
       - GF_AUTH_DISABLE_LOGIN_FORM=true
     ports:
       - "3000:3000"
-    logging:
-      driver: loki
-      options:
-        loki-url: 'http://localhost:3100/loki/api/v1/push'
