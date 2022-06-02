@@ -367,8 +367,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		execCtx := fvm.NewContext(zerolog.Nop())
 
+		address := common.Address{0x1}
 		contractLocation := common.AddressLocation{
-			Address: common.Address{0x1},
+			Address: address,
 			Name:    "Test",
 		}
 
@@ -407,6 +408,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
+		view.Set(string(address.Bytes()), "", state.KeyAccountStatus, []byte{1})
+
 		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, collectionCount+1) // +1 system chunk
@@ -423,8 +426,10 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			),
 		)
 
+		address := common.Address{0x1}
+
 		contractLocation := common.AddressLocation{
-			Address: common.Address{0x1},
+			Address: address,
 			Name:    "Test",
 		}
 
@@ -476,6 +481,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
+
+		view.Set(string(address.Bytes()), "", state.KeyAccountStatus, []byte{1})
 
 		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
 		require.NoError(t, err)

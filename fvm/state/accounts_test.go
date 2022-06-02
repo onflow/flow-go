@@ -270,7 +270,7 @@ func TestAccount_StorageUsed(t *testing.T) {
 
 		storageUsed, err := accounts.GetStorageUsed(address)
 		require.NoError(t, err)
-		require.Equal(t, uint64(55), storageUsed)
+		require.Equal(t, uint64(62), storageUsed)
 	})
 
 	t.Run("Storage used on register set increases", func(t *testing.T) {
@@ -287,7 +287,7 @@ func TestAccount_StorageUsed(t *testing.T) {
 
 		storageUsed, err := accounts.GetStorageUsed(address)
 		require.NoError(t, err)
-		require.Equal(t, uint64(55+34), storageUsed)
+		require.Equal(t, uint64(62+34), storageUsed)
 	})
 
 	t.Run("Storage used, set twice on same register to same value, stays the same", func(t *testing.T) {
@@ -306,7 +306,7 @@ func TestAccount_StorageUsed(t *testing.T) {
 
 		storageUsed, err := accounts.GetStorageUsed(address)
 		require.NoError(t, err)
-		require.Equal(t, uint64(55+34), storageUsed)
+		require.Equal(t, uint64(62+34), storageUsed)
 	})
 
 	t.Run("Storage used, set twice on same register to larger value, increases", func(t *testing.T) {
@@ -325,7 +325,7 @@ func TestAccount_StorageUsed(t *testing.T) {
 
 		storageUsed, err := accounts.GetStorageUsed(address)
 		require.NoError(t, err)
-		require.Equal(t, uint64(55+35), storageUsed)
+		require.Equal(t, uint64(62+35), storageUsed)
 	})
 
 	t.Run("Storage used, set twice on same register to smaller value, decreases", func(t *testing.T) {
@@ -344,7 +344,7 @@ func TestAccount_StorageUsed(t *testing.T) {
 
 		storageUsed, err := accounts.GetStorageUsed(address)
 		require.NoError(t, err)
-		require.Equal(t, uint64(55+33), storageUsed)
+		require.Equal(t, uint64(62+33), storageUsed)
 	})
 
 	t.Run("Storage used, after register deleted, decreases", func(t *testing.T) {
@@ -363,7 +363,7 @@ func TestAccount_StorageUsed(t *testing.T) {
 
 		storageUsed, err := accounts.GetStorageUsed(address)
 		require.NoError(t, err)
-		require.Equal(t, uint64(55+0), storageUsed)
+		require.Equal(t, uint64(62+0), storageUsed)
 	})
 
 	t.Run("Storage used on a complex scenario has correct value", func(t *testing.T) {
@@ -392,7 +392,7 @@ func TestAccount_StorageUsed(t *testing.T) {
 
 		storageUsed, err := accounts.GetStorageUsed(address)
 		require.NoError(t, err)
-		require.Equal(t, uint64(55+33+46), storageUsed)
+		require.Equal(t, uint64(62+33+46), storageUsed)
 	})
 }
 
