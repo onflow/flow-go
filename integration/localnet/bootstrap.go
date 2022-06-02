@@ -42,6 +42,9 @@ const (
 	DefaultObserverCount     = 0
 	DefaultNClusters         = 1
 	DefaultProfiler          = false
+	DefaultTracing           = true
+	DefaultCadenceTracing    = false
+	DefaultExtensiveTracing  = false
 	DefaultConsensusDelay    = 800 * time.Millisecond
 	DefaultCollectionDelay   = 950 * time.Millisecond
 	AccessAPIPort            = 3569
@@ -67,6 +70,9 @@ var (
 	numViewsInDKGPhase     uint64
 	numViewsEpoch          uint64
 	profiler               bool
+	tracing                bool
+	cadenceTracing         bool
+	extesiveTracing        bool
 	consensusDelay         time.Duration
 	collectionDelay        time.Duration
 )
@@ -83,6 +89,9 @@ func init() {
 	flag.Uint64Var(&numViewsInStakingPhase, "epoch-staking-phase-length", 2000, "number of views in epoch staking phase")
 	flag.Uint64Var(&numViewsInDKGPhase, "epoch-dkg-phase-length", 2000, "number of views in epoch dkg phase")
 	flag.BoolVar(&profiler, "profiler", DefaultProfiler, "whether to enable the auto-profiler")
+	flag.BoolVar(&tracing, "tracing", DefaultTracing, "whether to enable low-overhead tracing in flow")
+	flag.BoolVar(&cadenceTracing, "cadence-tracing", DefaultCadenceTracing, "whether to enable the tracing in cadance")
+	flag.BoolVar(&extesiveTracing, "extensive-tracing", DefaultExtensiveTracing, "enables high-overhead tracing in fvm")
 	flag.DurationVar(&consensusDelay, "consensus-delay", DefaultConsensusDelay, "delay on consensus node block proposals")
 	flag.DurationVar(&collectionDelay, "collection-delay", DefaultCollectionDelay, "delay on collection node block proposals")
 }
@@ -333,8 +342,7 @@ func prepareService(container testnet.ContainerConfig, i int, n int) Service {
 			"--secretsdir=/data/secret",
 			"--loglevel=DEBUG",
 			fmt.Sprintf("--profiler-enabled=%t", profiler),
-			// TODO change it to flag
-			fmt.Sprintf("--tracer-enabled=%t", true),
+			fmt.Sprintf("--tracer-enabled=%t", tracing),
 			"--profiler-dir=/profiler",
 			"--profiler-interval=2m",
 		},
@@ -467,6 +475,8 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 		service.Command,
 		"--triedir=/trie",
 		fmt.Sprintf("--rpc-addr=%s:%d", container.ContainerName, RPCPort),
+		fmt.Sprintf("--cadence-tracing=%t", cadenceTracing),
+		fmt.Sprintf("--extensive-tracing=%t", extesiveTracing),
 	)
 
 	service.Volumes = append(
@@ -486,7 +496,7 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 func prepareAccessService(container testnet.ContainerConfig, i int, n int) Service {
 	service := prepareService(container, i, n)
 
-	service.Command = append(service.Command, []string{
+	service.Command = append(service.Command,
 		fmt.Sprintf("--rpc-addr=%s:%d", container.ContainerName, RPCPort),
 		fmt.Sprintf("--secure-rpc-addr=%s:%d", container.ContainerName, SecuredRPCPort),
 		fmt.Sprintf("--http-addr=%s:%d", container.ContainerName, HTTPPort),
@@ -496,7 +506,7 @@ func prepareAccessService(container testnet.ContainerConfig, i int, n int) Servi
 		"--log-tx-time-to-finalized",
 		"--log-tx-time-to-executed",
 		"--log-tx-time-to-finalized-executed",
-	}...)
+	)
 
 	service.Ports = []string{
 		fmt.Sprintf("%d:%d", AccessPubNetworkPort+i, AccessPubNetworkPort),
@@ -692,8 +702,8 @@ func prepareObserverService(i int, observerName string, agPublicKey string, prof
 			"--datadir=/data/protocol",
 			"--secretsdir=/data/secret",
 			"--loglevel=DEBUG",
-			fmt.Sprintf("--profiler-enabled=%t", true),
-			fmt.Sprintf("--tracer-enabled=%t", false),
+			fmt.Sprintf("--profiler-enabled=%t", profiler),
+			fmt.Sprintf("--tracer-enabled=%t", tracing),
 			"--profiler-dir=/profiler",
 			"--profiler-interval=2m",
 		},
