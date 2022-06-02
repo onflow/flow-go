@@ -45,22 +45,6 @@ func (_m *PaceMaker) CurView() uint64 {
 	return r0
 }
 
-// HighestQC provides a mock function with given fields:
-func (_m *PaceMaker) HighestQC() *flow.QuorumCertificate {
-	ret := _m.Called()
-
-	var r0 *flow.QuorumCertificate
-	if rf, ok := ret.Get(0).(func() *flow.QuorumCertificate); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.QuorumCertificate)
-		}
-	}
-
-	return r0
-}
-
 // LastViewTC provides a mock function with given fields:
 func (_m *PaceMaker) LastViewTC() *flow.TimeoutCertificate {
 	ret := _m.Called()
@@ -71,6 +55,22 @@ func (_m *PaceMaker) LastViewTC() *flow.TimeoutCertificate {
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.TimeoutCertificate)
+		}
+	}
+
+	return r0
+}
+
+// NewestQC provides a mock function with given fields:
+func (_m *PaceMaker) NewestQC() *flow.QuorumCertificate {
+	ret := _m.Called()
+
+	var r0 *flow.QuorumCertificate
+	if rf, ok := ret.Get(0).(func() *flow.QuorumCertificate); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.QuorumCertificate)
 		}
 	}
 

@@ -17,8 +17,8 @@ func MakeTC(options ...func(*flow.TimeoutCertificate)) *flow.TimeoutCertificate 
 	}
 	tc := flow.TimeoutCertificate{
 		View:          rand.Uint64(),
-		TOHighestQC:   qc,
-		TOHighQCViews: []uint64{qc.View},
+		NewestQC:      qc,
+		NewestQCViews: []uint64{qc.View},
 		SignerIndices: signerIndices,
 		SigData:       unittest.SignatureFixture(),
 	}
@@ -30,8 +30,8 @@ func MakeTC(options ...func(*flow.TimeoutCertificate)) *flow.TimeoutCertificate 
 
 func WithTCHighestQC(qc *flow.QuorumCertificate) func(*flow.TimeoutCertificate) {
 	return func(tc *flow.TimeoutCertificate) {
-		tc.TOHighestQC = qc
-		tc.TOHighQCViews = []uint64{qc.View}
+		tc.NewestQC = qc
+		tc.NewestQCViews = []uint64{qc.View}
 	}
 }
 
@@ -49,14 +49,14 @@ func WithTCView(view uint64) func(*flow.TimeoutCertificate) {
 
 func WithTCHighQCViews(highQCViews []uint64) func(*flow.TimeoutCertificate) {
 	return func(tc *flow.TimeoutCertificate) {
-		tc.TOHighQCViews = highQCViews
+		tc.NewestQCViews = highQCViews
 	}
 }
 
 func TimeoutObjectFixture(opts ...func(TimeoutObject *hotstuff.TimeoutObject)) *hotstuff.TimeoutObject {
 	timeout := &hotstuff.TimeoutObject{
 		View:       uint64(rand.Uint32()),
-		HighestQC:  MakeQC(),
+		NewestQC:   MakeQC(),
 		LastViewTC: MakeTC(),
 		SignerID:   unittest.IdentifierFixture(),
 		SigData:    unittest.RandomBytes(128),

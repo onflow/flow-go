@@ -143,10 +143,10 @@ func BlockHeaderToMessage(h *flow.Header) (*entities.BlockHeader, error) {
 	t := timestamppb.New(h.Timestamp)
 	var lastViewTC *entities.TimeoutCertificate
 	if h.LastViewTC != nil {
-		newestQC := h.LastViewTC.TOHighestQC
+		newestQC := h.LastViewTC.NewestQC
 		lastViewTC = &entities.TimeoutCertificate{
 			View:          h.LastViewTC.View,
-			HighQcViews:   h.LastViewTC.TOHighQCViews,
+			HighQcViews:   h.LastViewTC.NewestQCViews,
 			SignerIndices: h.LastViewTC.SignerIndices,
 			SigData:       h.LastViewTC.SigData,
 			HighestQc: &entities.QuorumCertificate{
@@ -188,10 +188,10 @@ func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
 		}
 		lastViewTC = &flow.TimeoutCertificate{
 			View:          m.LastViewTc.View,
-			TOHighQCViews: m.LastViewTc.HighQcViews,
+			NewestQCViews: m.LastViewTc.HighQcViews,
 			SignerIndices: m.LastViewTc.SignerIndices,
 			SigData:       m.LastViewTc.SigData,
-			TOHighestQC: &flow.QuorumCertificate{
+			NewestQC: &flow.QuorumCertificate{
 				View:          newestQC.View,
 				BlockID:       MessageToIdentifier(newestQC.BlockId),
 				SignerIndices: newestQC.SignerIndices,

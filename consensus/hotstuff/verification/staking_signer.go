@@ -3,6 +3,7 @@ package verification
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
@@ -20,6 +21,8 @@ type StakingSigner struct {
 	stakingHasher hash.Hasher
 	signerID      flow.Identifier
 }
+
+var _ hotstuff.Signer = (*StakingSigner)(nil)
 
 // NewStakingSigner instantiates a StakingSigner, which signs votes and
 // proposals with the staking key.  The generated signatures are aggregatable.
@@ -76,6 +79,25 @@ func (c *StakingSigner) CreateVote(block *model.Block) (*model.Vote, error) {
 	}
 
 	return vote, nil
+}
+
+// CreateTimeout will create a signed timeout object for the given view.
+func (c *StakingSigner) CreateTimeout(curView uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
+	// create timeout object specific message
+	msg := MakeTimeoutMessage(curView, newestQC.View)
+	sigData, err := c.me.Sign(msg, c.stakingHasher)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate signature for timeout object at view %d: %w", curView, err)
+	}
+
+	timeout := &model.TimeoutObject{
+		View:       curView,
+		NewestQC:   newestQC,
+		LastViewTC: lastViewTC,
+		SignerID:   c.signerID,
+		SigData:    sigData,
+	}
+	return timeout, nil
 }
 
 // genSigData generates the signature data for our local node for the given block.

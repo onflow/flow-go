@@ -127,7 +127,7 @@ type TimeoutSignatureAggregator interface {
 	// Caller can be sure that resulting signature is valid.
 	// Expected errors during normal operations:
 	//  - model.InsufficientSignaturesError if no signatures have been added yet
-	Aggregate() (signers []flow.Identifier, highQCViews []uint64, aggregatedSig crypto.Signature, exception error)
+	Aggregate() (signers []flow.Identifier, newestQCViews []uint64, aggregatedSig crypto.Signature, exception error)
 }
 
 // BlockSignatureData is an intermediate struct for Packer to pack the
