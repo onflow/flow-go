@@ -353,7 +353,7 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	require.Regexp(t, validator.ErrSenderEjected, hook.Logs())
 }
 
-// TestAuthorizedSenderValidator_Ejected tests that the authorized sender validator rejects messages from nodes that should only receive on the channel
+// TestAuthorizedSenderValidator_ReceiveOnly tests that the authorized sender validator rejects messages from nodes that should only receive on the channel
 func TestAuthorizedSenderValidator_ReceiveOnly(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
 	identity1, privateKey1 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
