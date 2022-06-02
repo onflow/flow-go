@@ -31,14 +31,16 @@ func (s *SetRequiredApprovalsForSealingCommand) Handler(ctx context.Context, req
 }
 
 func (s *SetRequiredApprovalsForSealingCommand) Validator(req *admin.CommandRequest) error {
-	val, ok := req.Data.(uint)
+	value, ok := req.Data.(float64)
 	if !ok {
 		return errors.New("the data field must be a uint")
 	}
 
+	val := uint(value)
+
 	err := validation.ValidateRequireApprovals(val)
 	if err != nil {
-		return fmt.Errorf("the data field contains invalid value: %w", err)
+		return fmt.Errorf("the data field contains invalid value %v: %w", val, err)
 	}
 
 	req.ValidatorData = val
