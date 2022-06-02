@@ -213,11 +213,7 @@ func TestAuthorizedSenderValidator_Unstaked(t *testing.T) {
 	require.NoError(t, err)
 
 	// setup hooked logger
-	var (
-		hook   unittest.LoggerHook
-		logger zerolog.Logger
-	)
-	logger, hook = unittest.HookedLogger()
+	logger, hook := unittest.HookedLogger()
 
 	authorizedSenderValidator := validator.AuthorizedSenderValidator(logger, channel, func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translator.GetFlowID(pid)
