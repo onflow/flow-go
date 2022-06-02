@@ -22,19 +22,21 @@ type stackEntry struct {
 // naturally, making cleanup method essentially no-op. But if something goes wrong, all nested
 // views must be merged in order to make sure they are recorded
 type ProgramsHandler struct {
-	masterState  *state.StateHolder
-	viewsStack   []stackEntry
-	Programs     *programs.Programs
-	initialState *state.State
+	masterState    *state.StateHolder
+	viewsStack     []stackEntry
+	Programs       *programs.Programs
+	LoadedPrograms map[common.LocationID]interface{}
+	initialState   *state.State
 }
 
 // NewProgramsHandler construts a new ProgramHandler
-func NewProgramsHandler(programs *programs.Programs, stateHolder *state.StateHolder) *ProgramsHandler {
+func NewProgramsHandler(progs *programs.Programs, stateHolder *state.StateHolder) *ProgramsHandler {
 	return &ProgramsHandler{
-		masterState:  stateHolder,
-		viewsStack:   nil,
-		Programs:     programs,
-		initialState: stateHolder.State(),
+		masterState:    stateHolder,
+		viewsStack:     nil,
+		Programs:       progs,
+		LoadedPrograms: make(map[common.LocationID]interface{}),
+		initialState:   stateHolder.State(),
 	}
 }
 
@@ -63,6 +65,7 @@ func (h *ProgramsHandler) Set(location common.Location, program *interpreter.Pro
 	}
 
 	h.Programs.Set(location, program, last.state)
+	h.LoadedPrograms[location.ID()] = true
 
 	err := h.mergeState(last.state, h.masterState.EnforceInteractionLimits())
 
@@ -87,8 +90,9 @@ func (h *ProgramsHandler) Get(location common.Location) (*interpreter.Program, b
 	}
 
 	program, view, has := h.Programs.Get(location)
+	_, cached := h.LoadedPrograms[location.ID()]
 	if has {
-		if view != nil { // handle view not set (ie. for non-address locations
+		if view != nil && !cached { // handle view not set (ie. for non-address locations
 			// don't enforce limits while merging a cached view
 			enforceLimits := false
 			err := h.mergeState(view, enforceLimits)

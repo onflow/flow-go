@@ -514,6 +514,7 @@ func (e *ScriptEnv) SetProgram(location common.Location, program *interpreter.Pr
 		return fmt.Errorf("set program failed: %w", err)
 	}
 
+	// this will only be called once per program per environment
 	err = e.programs.Set(location, program)
 	if err != nil {
 		return fmt.Errorf("set program failed: %w", err)
