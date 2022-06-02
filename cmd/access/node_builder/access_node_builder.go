@@ -16,8 +16,6 @@ import (
 
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
