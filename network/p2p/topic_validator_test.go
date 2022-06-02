@@ -384,7 +384,7 @@ func TestAuthorizedSenderValidator_ReceiveOnly(t *testing.T) {
 	authorizedSenderValidator := validator.AuthorizedSenderValidator(logger, channel, func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translator.GetFlowID(pid)
 		if err != nil {
-			return &flow.Identity{}, false
+			return nil, false
 		}
 		return ids.ByNodeID(fid)
 	})
