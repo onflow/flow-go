@@ -25,6 +25,7 @@ services:
     volumes:
       - ./conf/prometheus.yaml:/etc/prometheus/prometheus.yaml:z
       - ./targets.nodes.json:/etc/prometheus/targets.nodes.json:z
+      - ./data/prometheus:/prometheus:z
     command: "--config.file=/etc/prometheus/prometheus.yaml --storage.tsdb.path=/prometheus"
     ports:
       - 9090:9090
