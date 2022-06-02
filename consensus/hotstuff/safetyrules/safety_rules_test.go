@@ -129,7 +129,8 @@ func (s *SafetyRulesTestSuite) TestProduceVote_ShouldVote() {
 }
 
 // TestProduceVote_IncludedQCHigherThanTCsQC checks specific scenario where previous round resulted in TC and leader
-// knows about QC which is not part of TC and qc.View > tc.NewestQC.View. We want to allow this, leader
+// knows about QC which is not part of TC and qc.View > tc.NewestQC.View. We want to allow this, in this case leader
+// includes his QC into proposal satisfies next condition: Block.QC.View > lastViewTC.NewestQC.View
 func (s *SafetyRulesTestSuite) TestProduceVote_IncludedQCHigherThanTCsQC() {
 	lastViewTC := helper.MakeTC(
 		helper.WithTCView(s.proposal.Block.View+1),
@@ -190,7 +191,9 @@ func (s *SafetyRulesTestSuite) TestProduceVote_UpdateLockedOneChainView() {
 	s.persister.AssertCalled(s.T(), "PutSafetyData", expectedSafetyData)
 }
 
-// TestProduceVote_InvalidCurrentView tests that no vote is created if proposal is for invalid view
+// TestProduceVote_InvalidCurrentView tests that no vote is created if proposal is for invalid view.
+// We expect that only fully validated blocks are feed into ProduceVote.
+// Blocks for other views are considered a symptom of an internal bug,  and therefore should not result in an NoVoteError.
 func (s *SafetyRulesTestSuite) TestProduceVote_InvalidCurrentView() {
 	vote, err := s.safety.ProduceVote(s.proposal, s.proposal.Block.View+1)
 	require.Nil(s.T(), vote)
@@ -211,6 +214,8 @@ func (s *SafetyRulesTestSuite) TestProduceVote_ProposerEjected() {
 }
 
 // TestProduceVote_InvalidProposerIdentity tests that no vote is created if there was an exception retrieving proposer identity
+// We are specifically testing that unexpected errors are handled correctly, i.e.
+// that SafetyRules does not erroneously wrap unexpected exceptions into the expected NoVoteError.
 func (s *SafetyRulesTestSuite) TestProduceVote_InvalidProposerIdentity() {
 	*s.committee = mocks.DynamicCommittee{}
 	exception := errors.New("invalid-signer-identity")
@@ -223,9 +228,9 @@ func (s *SafetyRulesTestSuite) TestProduceVote_InvalidProposerIdentity() {
 	s.persister.AssertNotCalled(s.T(), "PutSafetyData")
 }
 
-// TestProduceVote_NodeNotAuthorizedToVote tests that no vote is created if the voter is not authorized to vote. 
-// Nodes have zero weight in the grace periods around the epochs where they are authorized to participate. 
-// We don't want zero-weight nodes to vote in the first place, to avoid unnecessary traffic. 
+// TestProduceVote_NodeNotAuthorizedToVote tests that no vote is created if the voter is not authorized to vote.
+// Nodes have zero weight in the grace periods around the epochs where they are authorized to participate.
+// We don't want zero-weight nodes to vote in the first place, to avoid unnecessary traffic.
 // Note: this also covers ejected nodes. In both cases, the committee will return an `InvalidSignerError`.
 func (s *SafetyRulesTestSuite) TestProduceVote_NodeEjected() {
 	*s.committee = mocks.DynamicCommittee{}
@@ -240,6 +245,8 @@ func (s *SafetyRulesTestSuite) TestProduceVote_NodeEjected() {
 }
 
 // TestProduceVote_InvalidVoterIdentity tests that no vote is created if there was an exception retrieving voter identity
+// We are specifically testing that unexpected errors are handled correctly, i.e.
+// that SafetyRules does not erroneously wrap unexpected exceptions into the expected NoVoteError.
 func (s *SafetyRulesTestSuite) TestProduceVote_InvalidVoterIdentity() {
 	*s.committee = mocks.DynamicCommittee{}
 	s.committee.On("Self").Return(s.ourIdentity.NodeID)
@@ -433,12 +440,6 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_ShouldTimeout() {
 	otherTimeout, err = s.safety.ProduceTimeout(view+1, newestQC, lastViewTC)
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), otherTimeout)
-
-	// creating timeout for previous view(that was already cached) should result in error
-	timeout, err = s.safety.ProduceTimeout(view, newestQC, nil)
-	require.Error(s.T(), err)
-	require.False(s.T(), model.IsNoVoteError(err))
-	require.Nil(s.T(), timeout)
 }
 
 // TestProduceTimeout_NotSafeToTimeout tests that we don't produce a timeout when it's not safe
@@ -452,6 +453,7 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_NotSafeToTimeout() {
 
 		timeout, err := s.safety.ProduceTimeout(view, newestQC, nil)
 		require.Error(s.T(), err)
+		require.False(s.T(), model.IsNoVoteError(err))
 		require.Nil(s.T(), timeout)
 	})
 	s.Run("cur-view-below-highest-acknowledged-view", func() {
@@ -460,6 +462,7 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_NotSafeToTimeout() {
 
 		timeout, err := s.safety.ProduceTimeout(view-2, newestQC, nil)
 		require.Error(s.T(), err)
+		require.False(s.T(), model.IsNoVoteError(err))
 		require.Nil(s.T(), timeout)
 	})
 	s.Run("cur-view-below-highest-QC", func() {
@@ -468,6 +471,7 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_NotSafeToTimeout() {
 
 		timeout, err := s.safety.ProduceTimeout(view, newestQC, nil)
 		require.Error(s.T(), err)
+		require.False(s.T(), model.IsNoVoteError(err))
 		require.Nil(s.T(), timeout)
 	})
 
