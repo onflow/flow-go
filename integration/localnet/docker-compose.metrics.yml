@@ -8,6 +8,7 @@ services:
       - ./data/tempo:/tmp/tempo:z
     ports:
       - "14268"
+
   loki:
     image: grafana/loki:main-f52fc9d
     command: [ "-config.file=/etc/loki/local-config.yaml" ]
@@ -15,11 +16,6 @@ services:
       - ./data/loki:/loki:z
     ports:
       - "3100:3100"
-    environment:
-      - JAEGER_AGENT_HOST=tempo
-      - JAEGER_ENDPOINT=http://tempo:14268/api/traces
-      - JAEGER_SAMPLER_TYPE=const
-      - JAEGER_SAMPLER_PARAM=1
 
   prometheus:
     image: prom/prometheus:v2.36.0
@@ -42,6 +38,7 @@ services:
       - ./conf/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:z
       - ./conf/grafana-dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml:z
       - ./conf/grafana-localnet.json:/etc/grafana/provisioning/dashboards/localnet.json:z
+      - ./conf/grafana.ini:/etc/grafana/grafana.ini
     environment:
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
