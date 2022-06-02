@@ -7,10 +7,11 @@ import (
 	"strings"
 	"time"
 
-	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
+
+	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/module/compliance"
