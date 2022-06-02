@@ -5,7 +5,7 @@
 
 extern prec_st* bls_prec;
 
-#if (hashToPoint==OPSWU)
+#if (hashToPoint==SSWU)
 
 const uint64_t p_3div4_data[Fp_DIGITS] = {
     0xEE7FBFFFFFFFEAAA, 0x07AAFFFFAC54FFFF, 0xD9CC34A83DAC3D89,
@@ -353,7 +353,7 @@ static void clear_cofactor(ep_t out, const ep_t in) {
 // evaluate the optimized SWU map twice, add resulting points, apply isogeny map, clear cofactor
 // the result is stored in p
 // msg is the input message to hash, must be at least 2*(FP_BYTES+16) = 128 bytes
-static void map_to_G1_opswu(ep_t p, const uint8_t *msg, int len) {
+static void map_to_G1_sswu(ep_t p, const uint8_t *msg, int len) {
     RLC_TRY {
         if (len < 2*(Fp_BYTES+16)) {
             RLC_THROW(ERR_NO_BUFFER);
@@ -376,10 +376,11 @@ static void map_to_G1_opswu(ep_t p, const uint8_t *msg, int len) {
         // second mapping
         map_to_E1_swu(p, t2); // map to E1
         eval_iso11(p, p); // map to E
-        // sum and clear the cofactor
+        // sum 
         // TODO: implement point addition in E1 and apply the isogeny map
         // only once.
         ep_add_jacob(p, p, p_temp);
+        // clear the cofactor
         clear_cofactor(p, p_temp); // map to G1
         ep_free(p_temp);
     }
@@ -392,11 +393,11 @@ static void map_to_G1_opswu(ep_t p, const uint8_t *msg, int len) {
 // computes a hash of input data to G1
 // construction 2 from section 5 in https://eprint.iacr.org/2019/403.pdf
 void map_to_G1(ep_t h, const byte* data, const int len) {
-    #if hashToPoint==OPSWU
-    // implementation using different mapping parameters than the IRTF draft
-    map_to_G1_opswu(h, data, len);
-    #elif hashToPoint==RELIC_OPSWU
-    // relic implementation compliant the IRTF draft
+    #if hashToPoint==SSWU
+    // implementation using different mapping parameters than the IETF draft
+    map_to_G1_sswu(h, data, len);
+    #elif hashToPoint==RELIC_SSWU
+    // relic implementation compliant with the IETF draft
     ep_map_from_field(h, data, len);
     #endif
 }
