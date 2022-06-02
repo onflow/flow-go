@@ -124,7 +124,7 @@ func (c *Core) HandleHeight(final *flow.Header, height uint64) {
 	}
 }
 
-func (c *Core) RequestBlock(blockID flow.Identifier) {
+func (c *Core) RequestBlock(blockID flow.Identifier, height uint64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -135,7 +135,7 @@ func (c *Core) RequestBlock(blockID flow.Identifier) {
 		delete(c.heights, status.Header.Height)
 	}
 
-	c.queueByBlockID(blockID)
+	c.queueByBlockID(blockID, height)
 }
 
 func (c *Core) RequestHeight(height uint64) {
@@ -206,7 +206,7 @@ func (c *Core) queueByHeight(height uint64) {
 
 // queueByBlockID queues a request for a block by block ID, only if no
 // equivalent request has been queued before.
-func (c *Core) queueByBlockID(blockID flow.Identifier) {
+func (c *Core) queueByBlockID(blockID flow.Identifier, height uint64) {
 
 	// only queue the request if have never queued it before
 	if c.blockIDs[blockID].WasQueued() {
@@ -214,7 +214,12 @@ func (c *Core) queueByBlockID(blockID flow.Identifier) {
 	}
 
 	// queue the request
-	c.blockIDs[blockID] = NewQueuedStatus()
+	status := NewQueuedStatus()
+	status.Header = &flow.Header{
+		Height: height,
+	}
+
+	c.blockIDs[blockID] = status
 }
 
 // getRequestStatus retrieves a request status for a block, regardless of
@@ -250,13 +255,11 @@ func (c *Core) prune(final *flow.Header) {
 	}
 
 	for blockID, status := range c.blockIDs {
-		if status.WasReceived() {
-			header := status.Header
+		header := status.Header
 
-			if header.Height <= final.Height {
-				delete(c.blockIDs, blockID)
-				continue
-			}
+		if header.Height <= final.Height {
+			delete(c.blockIDs, blockID)
+			continue
 		}
 	}
 
