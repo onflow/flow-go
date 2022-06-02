@@ -54,16 +54,9 @@ func NewParticipant(
 		option(&cfg)
 	}
 
-	// get the last view we started
-	started, err := modules.Persist.GetStarted()
+	livenessData, err := modules.Persist.GetLivenessData()
 	if err != nil {
-		return nil, fmt.Errorf("could not recover last started: %w", err)
-	}
-
-	// get the last view we voted
-	voted, err := modules.Persist.GetVoted()
-	if err != nil {
-		return nil, fmt.Errorf("could not recover last voted: %w", err)
+		return nil, fmt.Errorf("could not recover liveness data: %w", err)
 	}
 
 	// prune vote aggregator to initial view
@@ -90,7 +83,9 @@ func NewParticipant(
 
 	// initialize the pacemaker
 	controller := timeout.NewController(timeoutConfig)
-	pacemaker, err := pacemaker.New(started+1, controller, modules.Notifier)
+
+	// TODO: pacemaker should retrieve the livenessData itself to reduce risk of inconsistent initialization
+	pacemaker, err := pacemaker.New(livenessData.CurrentView, controller, modules.Notifier)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize flow pacemaker: %w", err)
 	}
@@ -102,7 +97,10 @@ func NewParticipant(
 	}
 
 	// initialize the voter
-	voter := safetyrules.New(modules.Signer, modules.Forks, modules.Persist, modules.Committee, voted)
+	voter, err := safetyrules.New(modules.Signer, modules.Persist, modules.Committee)
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize safety rules: %w", err)
+	}
 
 	// initialize the event handler
 	eventHandler, err := eventhandler.NewEventHandler(

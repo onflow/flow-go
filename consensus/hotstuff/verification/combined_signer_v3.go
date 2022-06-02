@@ -4,10 +4,12 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/signature"
 )
@@ -28,6 +30,8 @@ type CombinedSignerV3 struct {
 	beaconKeyStore module.RandomBeaconKeyStore
 	beaconHasher   hash.Hasher
 }
+
+var _ hotstuff.Signer = (*CombinedSignerV3)(nil)
 
 // NewCombinedSignerV3 creates a new combined signer with the given dependencies:
 // - the staking signer is used to create and verify aggregatable signatures for Hotstuff
@@ -88,6 +92,26 @@ func (c *CombinedSignerV3) CreateVote(block *model.Block) (*model.Vote, error) {
 	}
 
 	return vote, nil
+}
+
+// CreateTimeout will create a signed timeout object for the given view.
+// Timeout objects are only signed with the staking key (not beacon key).
+func (c *CombinedSignerV3) CreateTimeout(curView uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
+	// create timeout object specific message
+	msg := MakeTimeoutMessage(curView, newestQC.View)
+	sigData, err := c.staking.Sign(msg, c.stakingHasher)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate signature for timeout object at view %d: %w", curView, err)
+	}
+
+	timeout := &model.TimeoutObject{
+		View:       curView,
+		NewestQC:   newestQC,
+		LastViewTC: lastViewTC,
+		SignerID:   c.staking.NodeID(),
+		SigData:    sigData,
+	}
+	return timeout, nil
 }
 
 // genSigData generates the signature data for our local node for the given block.

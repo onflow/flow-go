@@ -35,7 +35,7 @@ func New(
 //  * model.ErrViewForUnknownEpoch if the TC refers unknown epoch
 // Any other error should be treated as exception
 func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
-	highestQC := tc.TOHighestQC
+	highestQC := tc.NewestQC
 
 	// The TC's view cannot be smaller than the view of the QC it contains.
 	// Note: we specifically allow for the TC to have the same view as the highest QC.
@@ -45,15 +45,15 @@ func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 		return newInvalidTCError(tc, fmt.Errorf("TC's QC cannot be newer than the TC's view"))
 	}
 
-	// verifying that tc.TOHighestQC is the QC with the highest view
-	highestQCView := tc.TOHighQCViews[0]
-	for _, view := range tc.TOHighQCViews {
+	// verifying that tc.NewestQC is the QC with the highest view
+	highestQCView := tc.NewestQCViews[0]
+	for _, view := range tc.NewestQCViews {
 		if highestQCView < view {
 			highestQCView = view
 		}
 	}
-	if highestQCView != tc.TOHighestQC.View {
-		return newInvalidTCError(tc, fmt.Errorf("included QC (view=%d) should be equal to highest contributed view: %d", tc.TOHighestQC.View, highestQCView))
+	if highestQCView != tc.NewestQC.View {
+		return newInvalidTCError(tc, fmt.Errorf("included QC (view=%d) should be equal to highest contributed view: %d", tc.NewestQC.View, highestQCView))
 	}
 
 	// 1. Check if there is super-majority of votes
@@ -89,7 +89,7 @@ func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 	}
 
 	// Verify multi-message BLS sig of TC, by far the most expensive check
-	err = v.verifier.VerifyTC(signers, tc.SigData, tc.View, tc.TOHighQCViews)
+	err = v.verifier.VerifyTC(signers, tc.SigData, tc.View, tc.NewestQCViews)
 	if err != nil {
 		switch {
 		case model.IsInvalidFormatError(err):
@@ -206,7 +206,7 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 		// Check if proposal extends either the newest QC specified in the TC, or a newer QC
 		// in edge cases a leader may construct a TC and QC concurrently such that TC contains
 		// an older QC - in these case we still want to build on the newest QC, so this case is allowed.
-		if proposal.Block.QC.View < proposal.LastViewTC.TOHighestQC.View {
+		if proposal.Block.QC.View < proposal.LastViewTC.NewestQC.View {
 			return newInvalidBlockError(block, fmt.Errorf("TC in block contains a newer QC than the block itself, which is a protocol violation"))
 		}
 	} else if proposal.LastViewTC != nil {

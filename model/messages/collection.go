@@ -44,7 +44,7 @@ type ClusterBlockVote struct {
 // timing out in given round.
 type ClusterTimeoutObject struct {
 	View       uint64
-	HighestQC  *flow.QuorumCertificate
+	NewestQC   *flow.QuorumCertificate
 	LastViewTC *flow.TimeoutCertificate
 	SigData    []byte
 }

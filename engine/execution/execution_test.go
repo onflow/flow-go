@@ -13,6 +13,7 @@ import (
 	"github.com/vmihailenco/msgpack"
 	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/engine"
 	execTestutil "github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/engine/testutil"
@@ -514,7 +515,13 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 
 	block := unittest.BlockWithParentAndProposerFixture(t, genesis, conID.NodeID)
 	block.Header.View = 42
-	block.Header.LastViewTC.View = block.Header.View - 1
+	block.Header.LastViewTC = helper.MakeTC(
+		helper.WithTCView(block.Header.View-1),
+		helper.WithTCSigners(block.Header.ParentVoterIndices),
+		helper.WithTCHighestQC(
+			helper.MakeQC(
+				helper.WithQCView(genesis.View),
+				helper.WithQCSigners(block.Header.ParentVoterIndices))))
 	block.SetPayload(flow.Payload{})
 	proposal := unittest.ProposalFromBlock(&block)
 

@@ -352,7 +352,7 @@ func (mc *MockConsensus) extendBlock(blockView uint64, parent *flow.Header) *flo
 	} else if nextBlock.LastViewTC != nil {
 		nextBlock.LastViewTC.View = blockView - 1
 		nextBlock.LastViewTC.SignerIndices = signerIndices
-		nextBlock.LastViewTC.TOHighestQC.SignerIndices = signerIndices
+		nextBlock.LastViewTC.NewestQC.SignerIndices = signerIndices
 	}
 	return &nextBlock
 }
