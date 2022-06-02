@@ -91,12 +91,19 @@ func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 	// Verify multi-message BLS sig of TC, by far the most expensive check
 	err = v.verifier.VerifyTC(signers, tc.SigData, tc.View, tc.NewestQCViews)
 	if err != nil {
+		// Considerations about other errors that `VerifyTC` could return:
+		// * model.InsufficientSignaturesError: we previously checked the total weight of all signers
+		//   meets the supermajority threshold, which is a _positive_ number. Hence, there must be at
+		//   least one signer. Hence, receiving this error would be a symptom of a fatal internal bug.
 		switch {
 		case model.IsInvalidFormatError(err):
 			return newInvalidTCError(tc, fmt.Errorf("TC's signature data has an invalid structure: %w", err))
 		case errors.Is(err, model.ErrInvalidSignature):
 			return newInvalidTCError(tc, fmt.Errorf("TC contains invalid signature(s): %w", err))
 		default:
+			// `VerifyTC` might return model.InsufficientSignaturesError, we previously checked the total weight of all signers
+			//   meets the super-majority threshold, which is a _positive_ number. Hence, there must be at
+			//   least one signer. Hence, receiving this error would be a symptom of a fatal internal bug.
 			return fmt.Errorf("cannot verify tc's aggregated signature (tc.View: %d): %w", tc.View, err)
 		}
 	}
@@ -140,11 +147,15 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate) error {
 	// verify whether the signature bytes are valid for the QC
 	err = v.verifier.VerifyQC(signers, qc.SigData, qc.View, qc.BlockID)
 	if err != nil {
-		// Theoretically, `VerifyQC` could also return a `model.InvalidSignerError`. However,
-		// for the time being, we assume that _every_ HotStuff participant is also a member of
-		// the random beacon committee. Consequently, `InvalidSignerError` should not occur atm.
-		// TODO: if the random beacon committee is a strict subset of the HotStuff committee,
-		//       we expect `model.InvalidSignerError` here during normal operations.
+		// Considerations about other errors that `VerifyQC` could return:
+		//  * model.InvalidSignerError: for the time being, we assume that _every_ HotStuff participant
+		//    is also a member of the random beacon committee. Consequently, `InvalidSignerError` should
+		//    not occur atm.
+		//    TODO: if the random beacon committee is a strict subset of the HotStuff committee,
+		//          we expect `model.InvalidSignerError` here during normal operations.
+		// * model.InsufficientSignaturesError: we previously checked the total weight of all signers
+		//   meets the supermajority threshold, which is a _positive_ number. Hence, there must be at
+		//   least one signer. Hence, receiving this error would be a symptom of a fatal internal bug.
 		switch {
 		case model.IsInvalidFormatError(err):
 			return newInvalidQCError(qc, fmt.Errorf("QC's  signature data has an invalid structure: %w", err))
