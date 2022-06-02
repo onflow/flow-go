@@ -53,13 +53,14 @@ init-light:
 init-short-epochs:
 	$(MAKE) -e EPOCHLEN=200 STAKINGLEN=10 DKGLEN=50 init
 
-# XXX: don't like this... should likely replace with a promtail
+# Installs logging plugin
 .PHONY: install-docker-plugin
 install-docker-plugin:
-	docker plugin install grafana/loki-docker-driver:latest --alias loki --grant-all-permissions
+	docker plugin inspect loki || \
+		docker plugin install grafana/loki-docker-driver:latest --alias loki --grant-all-permissions
 
 .PHONY: start
-start:
+start: install-docker-plugin
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.metrics.yml up -d --remove-orphans
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml build
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml up -d
@@ -71,4 +72,3 @@ stop:
 .PHONY: load
 load:
 	go run --tags relic ../loader -log-level info -tps 1,0,10,0,100 -tps-durations 30s,10s,30s,10s
-
