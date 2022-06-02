@@ -281,13 +281,13 @@ func (suite *ComponentConsumerSuite) runTest(
 	go irrecoverableNotExpected(suite.T(), testCtx, errChan)
 
 	consumer.Start(signalCtx)
-	unittest.RequireCloseBefore(suite.T(), consumer.Ready(), 100*time.Millisecond, "timeout waiting for consumer to be ready")
+	unittest.RequireCloseBefore(suite.T(), consumer.Ready(), 100*time.Millisecond, "timeout waiting for the consumer to be ready")
 
 	sendJobs()
 
 	// shutdown
 	cancel()
-	unittest.RequireCloseBefore(suite.T(), consumer.Done(), 100*time.Millisecond, "timeout waiting for consumer to be done")
+	unittest.RequireCloseBefore(suite.T(), consumer.Done(), 100*time.Millisecond, "timeout waiting for the consumer to be done")
 }
 
 func irrecoverableNotExpected(t *testing.T, ctx context.Context, errChan <-chan error) {
