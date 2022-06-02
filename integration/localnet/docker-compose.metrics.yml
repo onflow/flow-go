@@ -8,10 +8,11 @@ services:
       - ./data/tempo:/tmp/tempo:z
     ports:
       - "14268"
-
   loki:
     image: grafana/loki:main-f52fc9d
     command: [ "-config.file=/etc/loki/local-config.yaml" ]
+    volumes:
+      - ./data/loki:/loki:z
     ports:
       - "3100:3100"
     environment:
