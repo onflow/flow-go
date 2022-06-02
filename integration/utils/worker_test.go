@@ -13,7 +13,7 @@ func TestWorkerImmediate(t *testing.T) {
 	t.Parallel()
 	t.Run("immediate", func(t *testing.T) {
 		done := make(chan struct{})
-		w := NewWorker(0, time.Hour, func(workerID int) { close(done) })
+		w := NewWorker(0, time.Millisecond, func(workerID int) { close(done) })
 		w.Start()
 
 		unittest.AssertClosesBefore(t, done, 5*time.Second)

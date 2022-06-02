@@ -2,6 +2,7 @@ package utils
 
 import (
 	"context"
+	"sync"
 	"time"
 )
 
@@ -14,10 +15,16 @@ type Worker struct {
 
 	ctx    context.Context
 	cancel context.CancelFunc
+
+	wg *sync.WaitGroup
 }
 
 func NewWorker(workerID int, interval time.Duration, work workFunc) Worker {
 	ctx, cancel := context.WithCancel(context.Background())
+
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+
 	return Worker{
 		workerID: workerID,
 		interval: interval,
@@ -25,11 +32,15 @@ func NewWorker(workerID int, interval time.Duration, work workFunc) Worker {
 
 		ctx:    ctx,
 		cancel: cancel,
+
+		wg: wg,
 	}
 }
 
 func (w *Worker) Start() {
 	go func() {
+		defer w.wg.Done()
+
 		t := time.NewTicker(w.interval)
 		defer t.Stop()
 		for ; ; <-t.C {
@@ -38,11 +49,18 @@ func (w *Worker) Start() {
 				return
 			default:
 			}
-			go w.work(w.workerID)
+
+			w.wg.Add(1)
+			go func() {
+				defer w.wg.Done()
+				w.work(w.workerID)
+			}()
 		}
 	}()
 }
 
 func (w *Worker) Stop() {
 	w.cancel()
+	// After this no new workers will be spawn and last worker have finished
+	w.wg.Wait()
 }
