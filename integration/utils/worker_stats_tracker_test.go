@@ -16,8 +16,10 @@ func TestWorkerStatsTracker(t *testing.T) {
 
 	st.AddWorker()
 
-	assert.Equal(t, st.AvgTPSBetween(time.Now().Add(-time.Hour), time.Now()), 0.)
+	startTime := time.Now()
+	endTime := startTime.Add(time.Second)
+	assert.Equal(t, 0., st.AvgTPSBetween(startTime, endTime))
 	st.AddTxSent()
 	st.AddTxSent()
-	assert.Greater(t, st.AvgTPSBetween(time.Now().Add(-time.Hour), time.Now()), 0.)
+	assert.Equal(t, 2., st.AvgTPSBetween(startTime, endTime))
 }
