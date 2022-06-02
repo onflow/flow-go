@@ -1,7 +1,7 @@
 version: '3.7'
 services:
   tempo:
-    image: grafana/tempo:latest
+    image: grafana/tempo:main-4d7e191
     command: [ "-config.file=/etc/tempo.yaml" ]
     volumes:
       - ./conf/tempo-local.yaml:/etc/tempo.yaml:z
@@ -10,7 +10,7 @@ services:
       - "14268"
 
   loki:
-    image: grafana/loki:latest
+    image: grafana/loki:main-f52fc9d
     command: [ "-config.file=/etc/loki/local-config.yaml" ]
     ports:
       - "3100:3100"
@@ -21,7 +21,7 @@ services:
       - JAEGER_SAMPLER_PARAM=1
 
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v2.36.0
     volumes:
       - ./conf/prometheus.yaml:/etc/prometheus/prometheus.yaml:z
       - ./targets.nodes.json:/etc/prometheus/targets.nodes.json:z
@@ -30,12 +30,12 @@ services:
       - 9090:9090
 
   exporter:
-    image: prom/node-exporter:latest
+    image: prom/node-exporter:v1.3.1
     ports:
       - "9100:9100"
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:9.0.0-beta2
     volumes:
       - ./conf/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:z
     environment:
