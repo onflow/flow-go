@@ -17,7 +17,7 @@ var (
 	ErrViewForUnknownEpoch = fmt.Errorf("by-view query for unknown epoch")
 )
 
-// NoVoteError contains the reason of why hotstuff.SafetyRules refused to generate a `Vote` for the current view.
+// NoVoteError contains the reason why hotstuff.SafetyRules refused to generate a `Vote` for the current view.
 type NoVoteError struct {
 	Err error
 }
