@@ -574,8 +574,9 @@ func newPrometheusTargetList(role flow.Role) PrometheusTargetList {
 	return PrometheusTargetList{
 		Targets: make([]string, 0),
 		Labels: map[string]string{
-			"job":  "flow",
-			"role": role.String(),
+			"job":     "flow",
+			"role":    role.String(),
+			"network": "localnet",
 		},
 	}
 }

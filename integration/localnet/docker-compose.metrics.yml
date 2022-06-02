@@ -38,6 +38,8 @@ services:
     image: grafana/grafana:9.0.0-beta2
     volumes:
       - ./conf/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:z
+      - ./conf/grafana-dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml:z
+      - ./conf/grafana-localnet.json:/etc/grafana/provisioning/dashboards/localnet.json:z
     environment:
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
