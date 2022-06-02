@@ -22,22 +22,6 @@ import (
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
-var (
-	DefaultAPIRatelimits  map[string]int
-	DefaultAPIBurstlimits map[string]int
-)
-
-func init() {
-	DefaultAPIRatelimits = map[string]int{
-		"Ping":            100,
-		"SendTransaction": 100,
-	}
-	DefaultAPIBurstlimits = map[string]int{
-		"Ping":            100,
-		"SendTransaction": 100,
-	}
-}
-
 // Backend defines the core functionality required by the RPC API.
 type Backend interface {
 	// ProcessTransaction handles validating and ingesting a new transaction,
