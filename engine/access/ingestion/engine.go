@@ -768,6 +768,7 @@ func (e *Engine) requestCollectionsInFinalizedBlock(missingColls []*flow.Collect
 		// TODO: move this query out of for loop?
 		guarantors, err := protocol.FindGuarantors(e.state, cg)
 		if err != nil {
+			// failed to find guarantors for guarantees contained in a finalized block is fatal error
 			e.log.Fatal().Err(err).Msgf("could not find guarantors for guarantee %v", cg.ID())
 		}
 		e.request.EntityByID(cg.ID(), filter.HasNodeID(guarantors...))
