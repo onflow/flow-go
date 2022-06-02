@@ -37,10 +37,10 @@ func New(
 func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 	highestQC := tc.TOHighestQC
 
-	// The TC's view cannot be smaller than the view of the QC it contains. 
-	// Note: we specifically allow for the TC to have the same view as the highest QC. 
+	// The TC's view cannot be smaller than the view of the QC it contains.
+	// Note: we specifically allow for the TC to have the same view as the highest QC.
 	// This is useful as a fallback, because it allows replicas other than the designated
-	// leader to also collect votes and generate a QC. 
+	// leader to also collect votes and generate a QC.
 	if tc.View < highestQC.View {
 		return newInvalidTCError(tc, fmt.Errorf("TC's QC cannot be newer than the TC's view"))
 	}
@@ -85,7 +85,7 @@ func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 		if model.IsInvalidQCError(err) {
 			return newInvalidTCError(tc, fmt.Errorf("invalid QC included in TC: %w", err))
 		}
-		fmt.Errorf("unexpected internal error while verifying the QC included in the TC: %w", err)
+		return fmt.Errorf("unexpected internal error while verifying the QC included in the TC: %w", err)
 	}
 
 	// Verify multi-message BLS sig of TC, by far the most expensive check
@@ -229,10 +229,10 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 		// check if included TC is valid
 		err = v.ValidateTC(proposal.LastViewTC)
 		if err != nil {
-		if model.IsInvalidTCError(err) {
-			return newInvalidBlockError(block, fmt.Errorf("proposals TC's is not valid: %w", err))
-		}
-		fmt.Errorf("unexpected internal error while verifying the TC included in block: %w", err)
+			if model.IsInvalidTCError(err) {
+				return newInvalidBlockError(block, fmt.Errorf("proposals TC's is not valid: %w", err))
+			}
+			return fmt.Errorf("unexpected internal error while verifying the TC included in block: %w", err)
 		}
 	}
 
