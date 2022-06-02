@@ -387,7 +387,7 @@ func TestAuthorizedSenderValidator_ReceiveOnly(t *testing.T) {
 
 	require.NoError(t, an1.AddPeer(context.TODO(), *host.InfoFromHost(sn1.Host())))
 
-	// sn1 subscribe to the topic with the topic validator, while an1 will subscribe without the topic validator to allow sn2 to publish unauthorized messages
+	// sn1 subscribe to the topic with the topic validator, while an1 will subscribe without the topic validator to allow an1 to publish unauthorized messages
 	sub1, err := sn1.Subscribe(topic, authorizedSenderValidator)
 	require.NoError(t, err)
 	_, err = an1.Subscribe(topic)
