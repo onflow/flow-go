@@ -43,6 +43,7 @@ type nodeFixtureParameters struct {
 	address     string
 	dhtOptions  []dht.Option
 	peerFilter  p2p.PeerFilter
+	role        flow.Role
 }
 
 type nodeFixtureParameterOption func(*nodeFixtureParameters)
@@ -83,6 +84,12 @@ func withPeerFilter(filter p2p.PeerFilter) nodeFixtureParameterOption {
 	}
 }
 
+func withRole(role flow.Role) nodeFixtureParameterOption {
+	return func(p *nodeFixtureParameters) {
+		p.role = role
+	}
+}
+
 // nodeFixture is a test fixture that creates a single libp2p node with the given key, spork id, and options.
 // It returns the node and its identity.
 func nodeFixture(
@@ -108,7 +115,7 @@ func nodeFixture(
 
 	identity := unittest.IdentityFixture(
 		unittest.WithNetworkingKey(parameters.key.PublicKey()),
-		unittest.WithAddress(parameters.address))
+		unittest.WithAddress(parameters.address), unittest.WithRole(parameters.role))
 
 	noopMetrics := metrics.NewNoopCollector()
 	connManager := p2p.NewConnManager(logger, noopMetrics)
