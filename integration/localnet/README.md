@@ -91,13 +91,9 @@ make logs
 
 ## Metrics
 
-You can view realtime metrics while the network is running:
+You can view realtime metrics, logs, and traces while the network is running:
 
-- Prometheus: http://localhost:9090/
-- Traces (Jaeger): http://localhost:16686/
 - Grafana: http://localhost:3000/
-  - Username: `admin`
-  - Password: `admin`
 
 Here's an example of a Prometheus query that filters by the `consensus` role:
 
