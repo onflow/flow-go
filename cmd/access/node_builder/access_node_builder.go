@@ -7,11 +7,10 @@ import (
 	"strings"
 	"time"
 
+	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
-
-	"github.com/onflow/flow-go/utils/unittest"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/module/compliance"
@@ -479,7 +478,7 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 	receiveCache *netcache.ReceiveCache,
 ) (*p2p.Network, error) {
 
-	codec := unittest.NetworkCodec()
+	codec := cborcodec.NewCodec()
 
 	// creates network instance
 	net, err := p2p.NewNetwork(
