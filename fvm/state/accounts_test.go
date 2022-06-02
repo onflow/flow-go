@@ -270,7 +270,7 @@ func TestAccount_StorageUsed(t *testing.T) {
 
 		storageUsed, err := accounts.GetStorageUsed(address)
 		require.NoError(t, err)
-		require.Equal(t, uint64(62), storageUsed)
+		require.Equal(t, uint64(52), storageUsed)
 	})
 
 	t.Run("Storage used on register set increases", func(t *testing.T) {

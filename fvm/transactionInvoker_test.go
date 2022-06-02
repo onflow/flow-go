@@ -67,11 +67,20 @@ func TestSafetyCheck(t *testing.T) {
 
 			err = view.Set(
 				string(contractAddress.Bytes()),
+				"",
+				state.KeyAccountStatus,
+				[]byte{1},
+			)
+			require.NoError(t, err)
+
+			err = view.Set(
+				string(contractAddress.Bytes()),
 				string(contractAddress.Bytes()),
 				"contract_names",
 				encodedName,
 			)
 			require.NoError(t, err)
+
 			err = view.Set(
 				string(contractAddress.Bytes()),
 				string(contractAddress.Bytes()),
@@ -135,6 +144,13 @@ func TestSafetyCheck(t *testing.T) {
 		encodedName, err := encodeContractNames([]string{"TestContract"})
 		require.NoError(t, err)
 
+		err = view.Set(
+			string(contractAddress.Bytes()),
+			"",
+			state.KeyAccountStatus,
+			[]byte{1},
+		)
+		require.NoError(t, err)
 		err = view.Set(
 			string(contractAddress.Bytes()),
 			string(contractAddress.Bytes()),

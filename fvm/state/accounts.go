@@ -17,7 +17,8 @@ import (
 )
 
 const (
-	KeyAccountStatus  = "account_status"
+	AccountKeyPrefix  = "a."
+	KeyAccountStatus  = AccountKeyPrefix + "s"
 	KeyPublicKeyCount = "public_key_count"
 	KeyCode           = "code"
 	KeyContractNames  = "contract_names"
