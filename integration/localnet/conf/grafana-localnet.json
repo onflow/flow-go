@@ -24,7 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "iteration": 1654149690328,
+  "iteration": 1654154424318,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -3109,110 +3109,118 @@
       "type": "logs"
     },
     {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
       "datasource": {
-        "type": "loki",
-        "uid": "loki"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
-      "description": "",
-      "fill": 1,
-      "fillGradient": 0,
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
       "gridPos": {
-        "h": 8,
-        "w": 12,
+        "h": 7,
+        "w": 6,
         "x": 0,
         "y": 74
       },
-      "hiddenSeries": false,
-      "id": 82,
-      "legend": {
-        "alignAsTable": true,
-        "avg": true,
-        "current": false,
-        "max": false,
-        "min": false,
-        "rightSide": true,
-        "show": true,
-        "sort": "avg",
-        "sortDesc": true,
-        "total": false,
-        "values": true
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
+      "id": 139,
       "options": {
-        "alertThreshold": true
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "last"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
       },
-      "percentage": false,
       "pluginVersion": "9.0.0-beta2",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
       "targets": [
         {
-          "datasource": {
-            "type": "loki",
-            "uid": "loki"
-          },
-          "editorMode": "code",
-          "expr": "count_over_time({role=\"execution\"} |= \"transaction executed successfully\" [2m]) / 120",
-          "hide": false,
-          "legendFormat": "{{compose_service}}-success",
-          "queryType": "range",
-          "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "loki",
-            "uid": "loki"
-          },
-          "editorMode": "code",
-          "expr": "count_over_time({role=\"execution\"} |= \"transaction executed with error\" [2m]) / 120",
-          "hide": false,
-          "legendFormat": "{{compose_service}}-errors",
-          "queryType": "range",
-          "refId": "C"
+          "expr": "execution_runtime_last_executed_block_height{network=\"$network\"}",
+          "interval": "",
+          "legendFormat": "{{role}}-{{num}}",
+          "refId": "A"
         }
       ],
-      "thresholds": [],
-      "timeRegions": [],
-      "title": "Transaction Execution Rate",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
+      "title": "Last Executed Height",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
       },
-      "type": "graph",
-      "xaxis": {
-        "mode": "time",
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "$$hashKey": "object:240",
-          "format": "short",
-          "logBase": 1,
-          "show": true
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
         },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 6,
+        "x": 6,
+        "y": 74
+      },
+      "id": 141,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "last"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "9.0.0-beta2",
+      "targets": [
         {
-          "$$hashKey": "object:241",
-          "format": "short",
-          "logBase": 1,
-          "show": true
+          "expr": "consensus_compliance_finalized_height{role=\"execution\",network=\"$network\"}",
+          "interval": "",
+          "legendFormat": "{{role}}-{{num}}",
+          "refId": "A"
         }
       ],
-      "yaxis": {
-        "align": false
-      }
+      "title": "Execution Node Finalized Height",
+      "type": "stat"
     },
     {
       "datasource": {
@@ -3300,120 +3308,6 @@
       "type": "stat"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 6,
-        "x": 0,
-        "y": 82
-      },
-      "id": 139,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "last"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "text": {},
-        "textMode": "auto"
-      },
-      "pluginVersion": "9.0.0-beta2",
-      "targets": [
-        {
-          "expr": "execution_runtime_last_executed_block_height{network=\"$network\"}",
-          "interval": "",
-          "legendFormat": "{{role}}-{{num}}",
-          "refId": "A"
-        }
-      ],
-      "title": "Last Executed Height",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 6,
-        "x": 6,
-        "y": 82
-      },
-      "id": 141,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "last"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "text": {},
-        "textMode": "auto"
-      },
-      "pluginVersion": "9.0.0-beta2",
-      "targets": [
-        {
-          "expr": "consensus_compliance_finalized_height{role=\"execution\",network=\"$network\"}",
-          "interval": "",
-          "legendFormat": "{{role}}-{{num}}",
-          "refId": "A"
-        }
-      ],
-      "title": "Execution Node Finalized Height",
-      "type": "stat"
-    },
-    {
       "aliasColors": {},
       "bars": false,
       "dashLength": 10,
@@ -3434,7 +3328,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 89
+        "y": 81
       },
       "hiddenSeries": false,
       "id": 66,
@@ -3561,7 +3455,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 98
+        "y": 90
       },
       "id": 16,
       "options": {
@@ -3654,7 +3548,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 98
+        "y": 90
       },
       "id": 18,
       "options": {
@@ -3690,7 +3584,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 106
+        "y": 98
       },
       "id": 88,
       "panels": [],
@@ -3743,8 +3637,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -3760,7 +3653,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 107
+        "y": 99
       },
       "id": 86,
       "options": {
@@ -3833,8 +3726,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -3850,7 +3742,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 107
+        "y": 99
       },
       "id": 90,
       "options": {
@@ -3923,8 +3815,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -3940,7 +3831,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 115
+        "y": 107
       },
       "id": 92,
       "options": {
@@ -4021,8 +3912,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -4038,7 +3928,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 115
+        "y": 107
       },
       "id": 94,
       "options": {
@@ -4111,8 +4001,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -4128,7 +4017,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 123
+        "y": 115
       },
       "id": 98,
       "options": {
@@ -4179,8 +4068,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           }
@@ -4191,7 +4079,7 @@
         "h": 4,
         "w": 12,
         "x": 12,
-        "y": 123
+        "y": 115
       },
       "id": 96,
       "options": {
@@ -4247,7 +4135,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 131
+        "y": 123
       },
       "id": 110,
       "panels": [
