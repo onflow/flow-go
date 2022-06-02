@@ -161,14 +161,14 @@ func (s *TimeoutCollectorTestSuite) TestAddTimeout_TONotifications() {
 		qc := helper.MakeQC(helper.WithQCView(uint64(i)))
 		timeout := helper.TimeoutObjectFixture(func(timeout *model.TimeoutObject) {
 			timeout.View = s.view
-			timeout.HighestQC = qc
+			timeout.NewestQC = qc
 			timeout.LastViewTC = lastViewTC
 		})
 		timeouts = append(timeouts, timeout)
 		s.processor.On("Process", timeout).Return(nil).Once()
 	}
 
-	expectedHighestQC := timeouts[len(timeouts)-1].HighestQC
+	expectedHighestQC := timeouts[len(timeouts)-1].NewestQC
 
 	// shuffle timeouts in random order
 	rand.Seed(time.Now().UnixNano())

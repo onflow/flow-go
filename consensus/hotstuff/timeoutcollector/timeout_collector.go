@@ -84,8 +84,8 @@ func (c *TimeoutCollector) processTimeout(timeout *model.TimeoutObject) error {
 		return fmt.Errorf("internal error while processing timeout: %w", err)
 	}
 
-	if c.highestReportedQC.Set(timeout.HighestQC.View) {
-		c.onNewQCDiscovered(timeout.HighestQC)
+	if c.highestReportedQC.Set(timeout.NewestQC.View) {
+		c.onNewQCDiscovered(timeout.NewestQC)
 	}
 
 	if c.highestReportedTC.Set(timeout.LastViewTC.View) {

@@ -56,5 +56,5 @@ func (t *TimeoutObject) ID() flow.Identifier {
 }
 
 func (t *TimeoutObject) String() string {
-	return fmt.Sprintf("View: %d, HighestQC.View: %d, LastViewTC: %v", t.View, t.HighestQC.View, t.LastViewTC)
+	return fmt.Sprintf("View: %d, HighestQC.View: %d, LastViewTC: %v", t.View, t.NewestQC.View, t.LastViewTC)
 }
