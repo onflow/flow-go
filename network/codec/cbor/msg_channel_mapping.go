@@ -55,4 +55,8 @@ func initializeChannelToMsgCodesMap() {
 
 	// dkg
 	ChannelToMsgCodes[channels.DKGCommittee] = []uint8{CodeDKGMessage}
+
+	// cluster based channels
+	ChannelToMsgCodes[channels.SyncClusterPrefix] = []uint8{CodeSyncRequest, CodeSyncResponse, CodeRangeRequest, CodeBatchRequest, CodeBlockResponse}
+	ChannelToMsgCodes[channels.ConsensusClusterPrefix] = []uint8{CodeClusterBlockProposal, CodeClusterBlockVote, CodeClusterBlockResponse}
 }
