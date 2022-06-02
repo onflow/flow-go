@@ -17,17 +17,25 @@ var (
 	ErrViewForUnknownEpoch = fmt.Errorf("by-view query for unknown epoch")
 )
 
-// NoVoteError contains the reason of why the voter didn't vote for a block proposal.
+// NoVoteError contains the reason why hotstuff.SafetyRules refused to generate a `Vote` for the current view.
 type NoVoteError struct {
-	Msg string
+	Err error
 }
 
-func (e NoVoteError) Error() string { return e.Msg }
+func (e NoVoteError) Error() string { return fmt.Sprintf("not voting - %s", e.Err.Error()) }
+
+func (e NoVoteError) Unwrap() error {
+	return e.Err
+}
 
 // IsNoVoteError returns whether an error is NoVoteError
 func IsNoVoteError(err error) bool {
 	var e NoVoteError
 	return errors.As(err, &e)
+}
+
+func NewNoVoteErrorf(msg string, args ...interface{}) error {
+	return NoVoteError{Err: fmt.Errorf(msg, args...)}
 }
 
 // InvalidFormatError indicates that some data has an incompatible format.

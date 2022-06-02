@@ -45,8 +45,8 @@ func (_m *PaceMaker) CurView() uint64 {
 	return r0
 }
 
-// HighestQC provides a mock function with given fields:
-func (_m *PaceMaker) HighestQC() *flow.QuorumCertificate {
+// NewestQC provides a mock function with given fields:
+func (_m *PaceMaker) NewestQC() *flow.QuorumCertificate {
 	ret := _m.Called()
 
 	var r0 *flow.QuorumCertificate

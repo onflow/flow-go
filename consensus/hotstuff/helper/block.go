@@ -10,7 +10,7 @@ import (
 )
 
 func MakeBlock(options ...func(*model.Block)) *model.Block {
-	view := rand.Uint64()
+	view := 1 + rand.Uint64()
 	block := model.Block{
 		View:        view,
 		BlockID:     unittest.IdentifierFixture(),
@@ -70,5 +70,11 @@ func WithBlock(block *model.Block) func(*model.Proposal) {
 func WithSigData(sigData []byte) func(*model.Proposal) {
 	return func(proposal *model.Proposal) {
 		proposal.SigData = sigData
+	}
+}
+
+func WithLastViewTC(tc *flow.TimeoutCertificate) func(*model.Proposal) {
+	return func(proposal *model.Proposal) {
+		proposal.LastViewTC = tc
 	}
 }
