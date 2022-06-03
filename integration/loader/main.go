@@ -39,6 +39,7 @@ func main() {
 	logLvl := flag.String("log-level", "info", "set log level")
 	metricport := flag.Uint("metricport", 8080, "port for /metrics endpoint")
 	profilerEnabled := flag.Bool("profiler-enabled", false, "whether to enable the auto-profiler")
+	trackTxsFlag := flag.Bool("track-txs", false, "track individual transaction timings (adds significant overhead)")
 	feedbackEnabled := flag.Bool("feedback-enabled", false, "whether to enable feedback / transaction tracking before account reuse (to avoid sequence number mismatch errors during transaction execution)")
 	flag.Parse()
 
@@ -127,6 +128,7 @@ func main() {
 					&serviceAccountAddress,
 					&fungibleTokenAddress,
 					&flowTokenAddress,
+					*trackTxsFlag,
 					c.tps,
 					utils.LoadType(*loadTypeFlag),
 					*feedbackEnabled,
