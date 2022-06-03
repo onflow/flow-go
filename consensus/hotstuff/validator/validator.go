@@ -81,9 +81,6 @@ func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 		case errors.Is(err, model.ErrInvalidSignature):
 			return newInvalidTCError(tc, fmt.Errorf("TC contains invalid signature(s): %w", err))
 		default:
-			// `VerifyTC` might return model.InsufficientSignaturesError, we previously checked the total weight of all signers
-			//   meets the super-majority threshold, which is a _positive_ number. Hence, there must be at
-			//   least one signer. Hence, receiving this error would be a symptom of a fatal internal bug.
 			return fmt.Errorf("cannot verify tc's aggregated signature (tc.View: %d): %w", tc.View, err)
 		}
 	}
@@ -104,6 +101,15 @@ func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 	if err != nil {
 		if model.IsInvalidQCError(err) {
 			return newInvalidTCError(tc, fmt.Errorf("invalid QC included in TC: %w", err))
+		}
+		if errors.Is(err, model.ErrViewForUnknownEpoch) {
+			// We require each replica to be bootstrapped with a QC pointing to a finalized block. Consensus safety rules guarantee that
+			// a QC at least as new as the root QC must be contained in any TC. This is because the TC must include signatures from a
+			// supermajority of replicas, including at least one honest replica, which attest to their locally highest known QC. Hence,
+			// any QC included in a TC must be the root QC or newer. Therefore, we should know the Epoch for any QC we encounter.
+			// receiving a `model.ErrViewForUnknownEpoch` is conceptually impossible, i.e. a symptom of an internal bug or invalid
+			// bootstrapping information.
+			return fmt.Errorf("no Epoch information availalbe for QC that was included in TC; symptom of internal bug or invalid bootstrapping information: %s", err.Error())
 		}
 		return fmt.Errorf("unexpected internal error while verifying the QC included in the TC: %w", err)
 	}
@@ -249,6 +255,12 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 		if err != nil {
 			if model.IsInvalidTCError(err) {
 				return newInvalidBlockError(block, fmt.Errorf("proposals TC's is not valid: %w", err))
+			}
+			if errors.Is(err, model.ErrViewForUnknownEpoch) {
+				// We require each replica to be bootstrapped with a QC pointing to a finalized block. Therefore, we should know the
+				// Epoch for any QC.View and TC.View we encounter. Receiving a `model.ErrViewForUnknownEpoch` is conceptually impossible,
+				// i.e. a symptom of an internal bug or invalid bootstrapping information.
+				return fmt.Errorf("no Epoch information availalbe for QC that was included in TC; symptom of internal bug or invalid bootstrapping information: %s", err.Error())
 			}
 			return fmt.Errorf("unexpected internal error while verifying the TC included in block: %w", err)
 		}
