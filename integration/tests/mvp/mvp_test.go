@@ -32,7 +32,7 @@ func TestMVP_Network(t *testing.T) {
 		Str("testcase", t.Name()).
 		Logger()
 	logger.Info().Msgf("================> START TESTING")
-	flowNetwork := testnet.PrepareFlowNetwork(t, buildMVPNetConfig())
+	flowNetwork := testnet.PrepareFlowNetwork(t, buildMVPNetConfig(), flow.Localnet)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -57,7 +57,7 @@ func TestMVP_Bootstrap(t *testing.T) {
 
 	testingdock.Verbose = false
 
-	flowNetwork := testnet.PrepareFlowNetwork(t, buildMVPNetConfig())
+	flowNetwork := testnet.PrepareFlowNetwork(t, buildMVPNetConfig(), flow.Localnet)
 	defer func() {
 		logger.Info().Msg("================> Start TearDownTest")
 		flowNetwork.Remove()
