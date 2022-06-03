@@ -97,7 +97,7 @@ func (ss *SyncSuite) TestQueueByBlockID() {
 
 	// add all of them to engine
 	for _, blockID := range blockIDs {
-		ss.core.queueByBlockID(blockID)
+		ss.core.queueByBlockID(blockID, 0)
 	}
 
 	// check they are all in the map now
@@ -110,7 +110,7 @@ func (ss *SyncSuite) TestQueueByBlockID() {
 	// get current count and add all again
 	count := len(ss.core.blockIDs)
 	for _, blockID := range blockIDs {
-		ss.core.queueByBlockID(blockID)
+		ss.core.queueByBlockID(blockID, 0)
 	}
 
 	// check that operation was idempotent (size still the same)
@@ -128,15 +128,15 @@ func (ss *SyncSuite) TestRequestBlock() {
 	ss.core.blockIDs[received.ID()] = ss.RequestedStatus()
 
 	// queued status should stay the same
-	ss.core.RequestBlock(queuedID)
+	ss.core.RequestBlock(queuedID, 0)
 	assert.True(ss.T(), ss.core.blockIDs[queuedID].WasQueued())
 
 	// requested status should stay the same
-	ss.core.RequestBlock(requestedID)
+	ss.core.RequestBlock(requestedID, 0)
 	assert.True(ss.T(), ss.core.blockIDs[requestedID].WasRequested())
 
 	// received status should be re-queued by ID
-	ss.core.RequestBlock(received.ID())
+	ss.core.RequestBlock(received.ID(), 0)
 	assert.True(ss.T(), ss.core.blockIDs[received.ID()].WasQueued())
 	assert.False(ss.T(), ss.core.blockIDs[received.ID()].WasReceived())
 	assert.False(ss.T(), ss.core.heights[received.Height].WasQueued())
