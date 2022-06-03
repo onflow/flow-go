@@ -100,13 +100,8 @@ func getRoles(channel network.Channel, msgTypeCode uint8) (flow.RoleList, error)
 		return flow.Roles(), nil
 	}
 
-	// cluster channels have a dynamic channel name
-	if msgTypeCode == cborcodec.CodeClusterBlockProposal || msgTypeCode == cborcodec.CodeClusterBlockVote || msgTypeCode == cborcodec.CodeClusterBlockResponse {
-		return channels.ClusterChannelRoles(channel), nil
-	}
-
 	// get message type codes for all messages communicated on the channel
-	codes, ok := cborcodec.ChannelToMsgCodes[channel]
+	codes, ok := getCodes(channel)
 	if !ok {
 		return nil, fmt.Errorf("could not get message codes for unknown channel: %s", channel)
 	}
@@ -123,6 +118,17 @@ func getRoles(channel network.Channel, msgTypeCode uint8) (flow.RoleList, error)
 	}
 
 	return roles, nil
+}
+
+// getCodes checks if channel is a cluster prefixed channel before returning msg codes
+func getCodes(channel network.Channel) ([]uint8, bool) {
+	if prefix, ok := channels.ClusterChannelPrefix(channel); ok {
+		codes, ok := cborcodec.ChannelToMsgCodes[network.Channel(prefix)]
+		return codes, ok
+	}
+
+	codes, ok := cborcodec.ChannelToMsgCodes[channel]
+	return codes, ok
 }
 
 func containsCode(codes []uint8, code uint8) bool {

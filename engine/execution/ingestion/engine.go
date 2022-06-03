@@ -391,7 +391,7 @@ func (e *Engine) reloadBlock(
 	err = e.enqueueBlockAndCheckExecutable(blockByCollection, executionQueues, block, false)
 
 	if err != nil {
-		return fmt.Errorf("could not enqueue block on reloading: %w", err)
+		return fmt.Errorf("could not enqueue block %x on reloading: %w", blockID, err)
 	}
 
 	return nil
@@ -456,7 +456,7 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 	})
 
 	if err != nil {
-		return fmt.Errorf("could not enqueue block: %w", err)
+		return fmt.Errorf("could not enqueue block %v: %w", blockID, err)
 	}
 
 	return nil
@@ -997,8 +997,21 @@ func (e *Engine) matchOrRequestCollections(
 			Hex("collection_id", logging.ID(guarantee.ID())).
 			Msg("requesting collection")
 
+		guarantors, err := protocol.FindGuarantors(e.state, guarantee)
+		if err != nil {
+			// execution node executes certified blocks, which means there is a quorum of consensus nodes who
+			// have validated the block payload. And that validation includes checking the guarantors are correct.
+			// Based on that assumption, failing to find guarantors for guarantees contained in an incorporated block
+			// should be treated as fatal error
+			e.log.Fatal().Err(err).Msgf("failed to find guarantors for guarantee %v at block %v, height %v",
+				guarantee.ID(),
+				executableBlock.ID(),
+				executableBlock.Height(),
+			)
+			return fmt.Errorf("could not find guarantors: %w", err)
+		}
 		// queue the collection to be requested from one of the guarantors
-		e.request.EntityByID(guarantee.ID(), filter.HasNodeID(guarantee.SignerIDs...))
+		e.request.EntityByID(guarantee.ID(), filter.HasNodeID(guarantors...))
 		actualRequested++
 	}
 

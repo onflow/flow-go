@@ -67,8 +67,6 @@ func (s *Suite) SetupSuite() {
 		Logger()
 	s.log = logger
 
-	blockRateFlag := "--block-rate-delay=1ms"
-
 	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)))
 
 	// generate the four consensus identities
@@ -77,10 +75,8 @@ func (s *Suite) SetupSuite() {
 		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus,
 			testnet.WithID(nodeID),
 			testnet.WithLogLevel(zerolog.FatalLevel),
-			testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 			testnet.WithAdditionalFlag("--required-verification-seal-approvals=1"),
 			testnet.WithAdditionalFlag("--required-construction-seal-approvals=1"),
-			testnet.WithAdditionalFlag(blockRateFlag),
 		)
 		s.nodeConfigs = append(s.nodeConfigs, nodeConfig)
 	}
@@ -111,11 +107,9 @@ func (s *Suite) SetupSuite() {
 	// generates two collection node
 	coll1Config := testnet.NewNodeConfig(flow.RoleCollection,
 		testnet.WithLogLevel(zerolog.FatalLevel),
-		testnet.WithAdditionalFlag(blockRateFlag),
 	)
 	coll2Config := testnet.NewNodeConfig(flow.RoleCollection,
 		testnet.WithLogLevel(zerolog.FatalLevel),
-		testnet.WithAdditionalFlag(blockRateFlag),
 	)
 	s.nodeConfigs = append(s.nodeConfigs, coll1Config, coll2Config)
 
@@ -132,7 +126,7 @@ func (s *Suite) SetupSuite() {
 
 	// generates, initializes, and starts the Flow network
 	netConfig := testnet.NewNetworkConfig(
-		"wintermute_tests",
+		"bft_passthrough_test",
 		s.nodeConfigs,
 		// set long staking phase to avoid QC/DKG transactions during test run
 		testnet.WithViewsInStakingAuction(10_000),
@@ -177,8 +171,7 @@ func (s *Suite) SetupSuite() {
 	s.Track(s.T(), ctx, s.Ghost())
 }
 
-// TearDownSuite tears down the test network of Flow as w
-//+6ell as the BFT testing attack network.
+// TearDownSuite tears down the test network of Flow as well as the BFT testing attack network.
 func (s *Suite) TearDownSuite() {
 	s.net.Remove()
 	s.cancel()

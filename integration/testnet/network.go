@@ -33,15 +33,19 @@ import (
 	consensus_follower "github.com/onflow/flow-go/follower"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/cluster"
 	dkgmod "github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/epochs"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	clusterstate "github.com/onflow/flow-go/state/cluster"
+	"github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/io"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -143,6 +147,7 @@ type FlowNetwork struct {
 	seal                        *flow.Seal
 	BootstrapDir                string
 	BootstrapSnapshot           *inmem.Snapshot
+	BootstrapData               *BootstrapData
 }
 
 // CorruptedIdentities returns the identities of corrupted nodes in testnet (for BFT testing).
@@ -599,8 +604,14 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 
 	t.Logf("BootstrapDir: %s \n", bootstrapDir)
 
-	root, result, seal, confs, bootstrapSnapshot, err := BootstrapNetwork(networkConf, bootstrapDir, chainID)
+	bootstrapData, err := BootstrapNetwork(networkConf, bootstrapDir, chainID)
 	require.Nil(t, err)
+
+	root := bootstrapData.Root
+	result := bootstrapData.Result
+	seal := bootstrapData.Seal
+	confs := bootstrapData.StakedConfs
+	bootstrapSnapshot := bootstrapData.Snapshot
 
 	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
 		Str("module", "flownetwork").
@@ -625,6 +636,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 		result:                      result,
 		BootstrapDir:                bootstrapDir,
 		BootstrapSnapshot:           bootstrapSnapshot,
+		BootstrapData:               bootstrapData,
 	}
 
 	// check that at-least 2 full access nodes must be configured in your test suite
@@ -785,9 +797,13 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	err = os.Mkdir(flowDataDir, 0700)
 	require.NoError(t, err)
 
-	flowProfilerDir := filepath.Join(tmpdir, profilerDir)
-	err = os.Mkdir(flowProfilerDir, 0755)
-	require.NoError(t, err)
+	// create the profiler dir for the node
+	flowProfilerDir := filepath.Join(flowDataDir, "./profiler")
+	t.Logf("create profiler dir: %v", flowProfilerDir)
+	err = os.MkdirAll(flowProfilerDir, 0755)
+	if err != nil && !os.IsExist(err) {
+		panic(err)
+	}
 
 	// create a directory for the bootstrap files
 	// we create a node-specific bootstrap directory to enable testing nodes
@@ -1034,20 +1050,22 @@ func followerNodeInfos(confs []ConsensusFollowerConfig) ([]bootstrap.NodeInfo, e
 	return nodeInfos, nil
 }
 
-func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID flow.ChainID) (
-	*flow.Block,
-	*flow.ExecutionResult,
-	*flow.Seal,
-	[]ContainerConfig,
-	*inmem.Snapshot,
-	error) {
+type BootstrapData struct {
+	Root              *flow.Block
+	Result            *flow.ExecutionResult
+	Seal              *flow.Seal
+	StakedConfs       []ContainerConfig
+	Snapshot          *inmem.Snapshot
+	ClusterRootBlocks []*cluster.Block
+}
 
+func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID flow.ChainID) (*BootstrapData, error) {
 	chain := chainID.Chain()
 
 	// number of nodes
 	nNodes := len(networkConf.Nodes)
 	if nNodes == 0 {
-		return nil, nil, nil, nil, nil, fmt.Errorf("must specify at least one node")
+		return nil, fmt.Errorf("must specify at least one node")
 	}
 
 	// Sort so that access nodes start up last
@@ -1056,13 +1074,13 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	// generate staking and networking keys for each configured node
 	stakedConfs, err := setupKeys(networkConf)
 	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("failed to setup keys: %w", err)
+		return nil, fmt.Errorf("failed to setup keys: %w", err)
 	}
 
 	// generate the follower node keys (follower nodes do not run as docker containers)
 	followerInfos, err := followerNodeInfos(networkConf.ConsensusFollowers)
 	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("failed to generate node info for consensus followers: %w", err)
+		return nil, fmt.Errorf("failed to generate node info for consensus followers: %w", err)
 	}
 
 	allNodeInfos := append(toNodeInfos(stakedConfs), followerInfos...)
@@ -1073,7 +1091,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 
 	dkg, err := runDKG(stakedConfs)
 	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("failed to run DKG: %w", err)
+		return nil, fmt.Errorf("failed to run DKG: %w", err)
 	}
 
 	// write private key files for each DKG participant
@@ -1084,7 +1102,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		path := fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID)
 		err = WriteJSON(filepath.Join(bootstrapDir, path), sk)
 		if err != nil {
-			return nil, nil, nil, nil, nil, err
+			return nil, err
 		}
 	}
 
@@ -1097,17 +1115,17 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	}
 	err = utils.WriteStakingNetworkingKeyFiles(allNodeInfos, writeJSONFile)
 	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("failed to write private key files: %w", err)
+		return nil, fmt.Errorf("failed to write private key files: %w", err)
 	}
 
 	err = utils.WriteSecretsDBEncryptionKeyFiles(allNodeInfos, writeFile)
 	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("failed to write secrets db key files: %w", err)
+		return nil, fmt.Errorf("failed to write secrets db key files: %w", err)
 	}
 
 	err = utils.WriteMachineAccountFiles(chainID, stakedNodeInfos, writeJSONFile)
 	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("failed to write machine account files: %w", err)
+		return nil, fmt.Errorf("failed to write machine account files: %w", err)
 	}
 
 	// define root block parameters
@@ -1123,27 +1141,43 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	// generate QC
 	signerData, err := run.GenerateQCParticipantData(consensusNodes, consensusNodes, dkg)
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, err
 	}
 	votes, err := run.GenerateRootBlockVotes(root, signerData)
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, err
 	}
 	qc, err := run.GenerateRootQC(root, votes, signerData, signerData.Identities())
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, err
 	}
 
 	// generate root blocks for each collector cluster
-	clusterAssignments, clusterQCs, err := setupClusterGenesisBlockQCs(networkConf.NClusters, epochCounter, stakedConfs)
+	clusterRootBlocks, clusterAssignments, clusterQCs, err := setupClusterGenesisBlockQCs(networkConf.NClusters, epochCounter, stakedConfs)
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, err
+	}
+
+	// TODO: extract to func to be reused with `constructRootResultAndSeal`
+	qcsWithSignerIDs := make([]*flow.QuorumCertificateWithSignerIDs, 0, len(clusterQCs))
+	for i, clusterQC := range clusterQCs {
+		members := clusterAssignments[i]
+		signerIDs, err := signature.DecodeSignerIndicesToIdentifiers(members, clusterQC.SignerIndices)
+		if err != nil {
+			return nil, fmt.Errorf("could not decode cluster QC signer indices: %w", err)
+		}
+		qcsWithSignerIDs = append(qcsWithSignerIDs, &flow.QuorumCertificateWithSignerIDs{
+			View:      clusterQC.View,
+			BlockID:   clusterQC.BlockID,
+			SignerIDs: signerIDs,
+			SigData:   clusterQC.SigData,
+		})
 	}
 
 	randomSource := make([]byte, flow.EpochSetupRandomSourceLength)
 	_, err = rand.Read(randomSource)
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, err
 	}
 
 	dkgOffsetView := root.Header.View + networkConf.ViewsInStakingAuction - 1
@@ -1163,14 +1197,14 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 
 	epochCommit := &flow.EpochCommit{
 		Counter:            epochCounter,
-		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(clusterQCs),
+		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(qcsWithSignerIDs),
 		DKGGroupKey:        dkg.PubGroupKey,
 		DKGParticipantKeys: dkg.PubKeyShares,
 	}
 
 	cdcRandomSource, err := cadence.NewString(hex.EncodeToString(randomSource))
 	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("could not convert random source: %w", err)
+		return nil, fmt.Errorf("could not convert random source: %w", err)
 	}
 	epochConfig := epochs.EpochConfig{
 		RewardCut:                    cadence.UFix64(0),
@@ -1201,27 +1235,39 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		fvm.WithIdentities(participants),
 	)
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, err
 	}
 
 	// generate execution result and block seal
 	result := run.GenerateRootResult(root, commit, epochSetup, epochCommit)
 	seal, err := run.GenerateRootSeal(result)
 	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("generating root seal failed: %w", err)
+		return nil, fmt.Errorf("generating root seal failed: %w", err)
 	}
 
 	snapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)
 	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("could not create bootstrap state snapshot: %w", err)
+		return nil, fmt.Errorf("could not create bootstrap state snapshot: %w", err)
+	}
+
+	err = badger.IsValidRootSnapshotQCs(snapshot)
+	if err != nil {
+		return nil, fmt.Errorf("invalid root snapshot qcs: %w", err)
 	}
 
 	err = WriteJSON(filepath.Join(bootstrapDir, bootstrap.PathRootProtocolStateSnapshot), snapshot.Encodable())
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, err
 	}
 
-	return root, result, seal, stakedConfs, snapshot, nil
+	return &BootstrapData{
+		Root:              root,
+		Result:            result,
+		Seal:              seal,
+		StakedConfs:       stakedConfs,
+		Snapshot:          snapshot,
+		ClusterRootBlocks: clusterRootBlocks,
+	}, nil
 }
 
 // setupKeys generates private staking and networking keys for each configured
@@ -1312,16 +1358,18 @@ func runDKG(confs []ContainerConfig) (dkgmod.DKGData, error) {
 // setupClusterGenesisBlockQCs generates bootstrapping resources necessary for each collector cluster:
 //   * a cluster-specific root block
 //   * a cluster-specific root QC
-func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []ContainerConfig) (flow.AssignmentList, []*flow.QuorumCertificate, error) {
+func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []ContainerConfig) ([]*cluster.Block, flow.AssignmentList, []*flow.QuorumCertificate, error) {
 
-	participants := toParticipants(confs)
+	participantsUnsorted := toParticipants(confs)
+	participants := participantsUnsorted.Sort(order.Canonical)
 	collectors := participants.Filter(filter.HasRole(flow.RoleCollection))
 	assignments := unittest.ClusterAssignment(nClusters, collectors)
-	clusters, err := flow.NewClusterList(assignments, collectors)
+	clusters, err := factory.NewClusterList(assignments, collectors)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not create cluster list: %w", err)
+		return nil, nil, nil, fmt.Errorf("could not create cluster list: %w", err)
 	}
 
+	rootBlocks := make([]*cluster.Block, 0, nClusters)
 	qcs := make([]*flow.QuorumCertificate, 0, nClusters)
 
 	for _, cluster := range clusters {
@@ -1334,28 +1382,31 @@ func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []Co
 		}
 
 		// gather cluster participants
-		participants := make([]bootstrap.NodeInfo, 0, len(cluster))
+		clusterNodeInfos := make([]bootstrap.NodeInfo, 0, len(cluster))
 		for _, conf := range confs {
 			_, exists := lookup[conf.NodeID]
 			if exists {
-				participants = append(participants, conf.NodeInfo)
+				clusterNodeInfos = append(clusterNodeInfos, conf.NodeInfo)
 			}
 		}
-		if len(cluster) != len(participants) { // sanity check
-			return nil, nil, fmt.Errorf("requiring a node info for each cluster participant")
+		if len(cluster) != len(clusterNodeInfos) { // sanity check
+			return nil, nil, nil, fmt.Errorf("requiring a node info for each cluster participant")
 		}
 
-		// generate qc for root cluster block
-		qc, err := run.GenerateClusterRootQC(participants, bootstrap.ToIdentityList(participants), block)
+		// must order in canonical ordering otherwise decoding signer indices from cluster QC would fail
+		clusterCommittee := bootstrap.ToIdentityList(clusterNodeInfos).Sort(order.Canonical)
+		qc, err := run.GenerateClusterRootQC(clusterNodeInfos, clusterCommittee, block)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, fmt.Errorf("fail to generate cluster root QC with clusterNodeInfos %v, %w",
+				clusterNodeInfos, err)
 		}
 
 		// add block and qc to list
 		qcs = append(qcs, qc)
+		rootBlocks = append(rootBlocks, block)
 	}
 
-	return assignments, qcs, nil
+	return rootBlocks, assignments, qcs, nil
 }
 
 // writePrivateKeyFiles writes the staking and machine account private key files.
