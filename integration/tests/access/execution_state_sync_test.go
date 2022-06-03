@@ -122,7 +122,7 @@ func (s *ExecutionStateSyncSuite) buildNetworkConfig() {
 	}
 
 	conf := testnet.NewNetworkConfig("execution state sync test", net)
-	s.net = testnet.PrepareFlowNetwork(s.T(), conf)
+	s.net = testnet.PrepareFlowNetwork(s.T(), conf, flow.Localnet)
 }
 
 // TestHappyPath tests that Execution Nodes generate execution data, and Access Nodes are able to
