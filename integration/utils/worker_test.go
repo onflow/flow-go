@@ -42,3 +42,17 @@ func TestWorker(t *testing.T) {
 		w.Stop()
 	})
 }
+
+// TestWorkerStartStop tests that worker can be started and stopped.
+func TestWorkerStartStop(t *testing.T) {
+	t.Parallel()
+	t.Run("stop w/o start", func(t *testing.T) {
+		w := NewWorker(0, time.Second, func(workerID int) {})
+		w.Stop()
+	})
+	t.Run("stop and start", func(t *testing.T) {
+		w := NewWorker(0, time.Second, func(workerID int) {})
+		w.Start()
+		w.Stop()
+	})
+}

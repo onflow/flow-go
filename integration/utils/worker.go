@@ -22,9 +22,6 @@ type Worker struct {
 func NewWorker(workerID int, interval time.Duration, work workFunc) Worker {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	wg := &sync.WaitGroup{}
-	wg.Add(1)
-
 	return Worker{
 		workerID: workerID,
 		interval: interval,
@@ -33,11 +30,13 @@ func NewWorker(workerID int, interval time.Duration, work workFunc) Worker {
 		ctx:    ctx,
 		cancel: cancel,
 
-		wg: wg,
+		wg: &sync.WaitGroup{},
 	}
 }
 
 func (w *Worker) Start() {
+	w.wg.Add(1)
+
 	go func() {
 		defer w.wg.Done()
 
