@@ -45,17 +45,6 @@ func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 		return newInvalidTCError(tc, fmt.Errorf("TC's QC cannot be newer than the TC's view"))
 	}
 
-	// verifying that tc.NewestQC is the QC with the highest view
-	highestQCView := tc.NewestQCViews[0]
-	for _, view := range tc.NewestQCViews {
-		if highestQCView < view {
-			highestQCView = view
-		}
-	}
-	if highestQCView != tc.NewestQC.View {
-		return newInvalidTCError(tc, fmt.Errorf("included QC (view=%d) should be equal to highest contributed view: %d", tc.NewestQC.View, highestQCView))
-	}
-
 	// 1. Check if there is super-majority of votes
 	allParticipants, err := v.committee.IdentitiesByEpoch(tc.View)
 	if err != nil {
@@ -79,15 +68,6 @@ func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 		return newInvalidTCError(tc, fmt.Errorf("tc signers have insufficient weight of %d (required=%d)", signers.TotalWeight(), threshold))
 	}
 
-	// Validate QC
-	err = v.ValidateQC(highestQC)
-	if err != nil {
-		if model.IsInvalidQCError(err) {
-			return newInvalidTCError(tc, fmt.Errorf("invalid QC included in TC: %w", err))
-		}
-		return fmt.Errorf("unexpected internal error while verifying the QC included in the TC: %w", err)
-	}
-
 	// Verify multi-message BLS sig of TC, by far the most expensive check
 	err = v.verifier.VerifyTC(signers, tc.SigData, tc.View, tc.NewestQCViews)
 	if err != nil {
@@ -107,6 +87,27 @@ func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 			return fmt.Errorf("cannot verify tc's aggregated signature (tc.View: %d): %w", tc.View, err)
 		}
 	}
+
+	// verifying that tc.NewestQC is the QC with the highest view
+	highestQCView := tc.NewestQCViews[0]
+	for _, view := range tc.NewestQCViews {
+		if highestQCView < view {
+			highestQCView = view
+		}
+	}
+	if highestQCView != tc.NewestQC.View {
+		return newInvalidTCError(tc, fmt.Errorf("included QC (view=%d) should be equal to highest contributed view: %d", tc.NewestQC.View, highestQCView))
+	}
+
+	// Validate QC
+	err = v.ValidateQC(highestQC)
+	if err != nil {
+		if model.IsInvalidQCError(err) {
+			return newInvalidTCError(tc, fmt.Errorf("invalid QC included in TC: %w", err))
+		}
+		return fmt.Errorf("unexpected internal error while verifying the QC included in the TC: %w", err)
+	}
+
 	return nil
 }
 
@@ -165,7 +166,7 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate) error {
 			// We have earlier queried the Identities for the QC's view, which must have returned proper values,
 			// otherwise, we wouldn't reach this code. Therefore, it should be impossible for `verifier.VerifyQC`
 			// to return ErrViewForUnknownEpoch. To avoid confusion with expected sentinel errors, we only preserve
-			// the error messages here, but not the error types.  
+			// the error messages here, but not the error types.
 			return fmt.Errorf("internal error, as querying identities for view %d succeeded earlier but now the view supposedly belongs to an unknown epoch: %s", qc.View, err.Error())
 		default:
 			return fmt.Errorf("cannot verify qc's aggregated signature (qc.BlockID: %x): %w", qc.BlockID, err)

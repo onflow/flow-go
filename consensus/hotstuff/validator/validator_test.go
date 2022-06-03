@@ -329,6 +329,9 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 				helper.WithTCHighestQC(ps.block.QC),
 			)),
 		)
+		ps.verifier.On("VerifyTC", ps.voters, []byte(proposal.LastViewTC.SigData),
+			proposal.LastViewTC.View, mock.Anything).Return(nil).Once()
+
 		// this is considered an invalid TC, because highest QC's view is not equal to max{NewestQCViews}
 		proposal.LastViewTC.NewestQCViews[0] = proposal.LastViewTC.NewestQC.View + 1
 		err := ps.validator.ValidateProposal(proposal)
@@ -374,11 +377,12 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 				helper.WithTCView(ps.block.View+1),
 				helper.WithTCHighestQC(qc))),
 		)
+		ps.verifier.On("VerifyTC", ps.voters, []byte(proposal.LastViewTC.SigData),
+			proposal.LastViewTC.View, proposal.LastViewTC.NewestQCViews).Return(nil).Once()
 		ps.verifier.On("VerifyQC", ps.voters, qc.SigData,
 			qc.View, qc.BlockID).Return(model.ErrInvalidSignature).Once()
 		err := ps.validator.ValidateProposal(proposal)
 		require.True(ps.T(), model.IsInvalidBlockError(err) && model.IsInvalidTCError(err))
-		ps.verifier.AssertNotCalled(ps.T(), "VerifyTC")
 	})
 	ps.Run("included-tc-invalid-sig", func() {
 		proposal := helper.MakeProposal(
@@ -743,6 +747,9 @@ func (s *TCSuite) TestTCHighestQCFromFuture() {
 
 // TestTCHighestQCIsNotHighest tests if correct error is returned when included QC is not highest
 func (s *TCSuite) TestTCHighestQCIsNotHighest() {
+	s.verifier.On("VerifyTC", s.signers, []byte(s.tc.SigData),
+		s.tc.View, s.tc.NewestQCViews).Return(nil).Once()
+
 	// highest QC view is not equal to max(TOHighestQCViews)
 	s.tc.NewestQCViews[0] = s.tc.NewestQC.View + 1
 	err := s.validator.ValidateTC(s.tc) // the QC should not be validated anymore
@@ -773,6 +780,7 @@ func (s *TCSuite) TestTCThresholdNotReached() {
 // TestTCInvalidHighestQC tests if correct error is returned when included highest QC is invalid
 func (s *TCSuite) TestTCInvalidHighestQC() {
 	*s.verifier = mocks.Verifier{}
+	s.verifier.On("VerifyTC", s.signers, []byte(s.tc.SigData), s.tc.View, s.tc.NewestQCViews).Return(nil).Once()
 	s.verifier.On("VerifyQC", s.signers, s.tc.NewestQC.SigData, s.tc.NewestQC.View, s.tc.NewestQC.BlockID).Return(model.NewInvalidFormatErrorf("invalid qc")).Once()
 	err := s.validator.ValidateTC(s.tc) // the QC should not be validated anymore
 	assert.True(s.T(), model.IsInvalidTCError(err), "if included QC is invalid, an ErrorInvalidTC error should be raised")
