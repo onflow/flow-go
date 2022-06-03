@@ -28,6 +28,7 @@ type BlobTree [][]cid.Cid
 
 // ExecutionDataService handles adding/getting execution data to/from a blobservice
 type ExecutionDataService interface {
+	module.ReadyDoneAware
 	// Add constructs a blob tree for the given ExecutionData and
 	// adds it to the blobservice, and then returns the root CID
 	// and list of all CIDs.
@@ -348,7 +349,7 @@ func (s *executionDataServiceImpl) getBlobs(ctx context.Context, cids []cid.Cid,
 		return nil, 0, &MalformedDataError{deserializeErr}
 	}
 
-	// TODO: deserialization succeeds even if the blob channel reader has still has unconsumed data, meaning that a malicious actor
+	// TODO: deserialization succeeds even if the blob channel reader still has unconsumed data, meaning that a malicious actor
 	// could fill the blob tree with lots of unnecessary data by appending it at the end of the serialized data for each level.
 	// It's possible that we could detect this and fail deserialization using something like the following:
 	// https://github.com/onflow/flow-go/blob/bd5320719266b045ae2cac954f6a56e1e79560eb/engine/access/rest/handlers.go#L189-L193
@@ -358,9 +359,13 @@ func (s *executionDataServiceImpl) getBlobs(ctx context.Context, cids []cid.Cid,
 }
 
 // Get gets the ExecutionData for the given root CID from the blobservice.
+// It blocks until all blobs are retrieved and the ExecutionData is reconstructed, or an error occurs.
+// If a bitswap enabled blobservice is used and the requested ExecutionData is not already in the
+// local blobstore, the ExecutionData will be retrieved from the network and stored in the blobstore.
 // The returned error will be:
 // - MalformedDataError if some level of the blob tree cannot be properly deserialized
 // - BlobSizeLimitExceededError if any blob in the blob tree exceeds the maximum blob size
+// - ErrBlobTreeDepthExceeded if the blob tree exceeds the maximum depth
 // - BlobNotFoundError if some CID in the blob tree could not be found from the blobservice
 func (s *executionDataServiceImpl) Get(ctx context.Context, rootID flow.Identifier) (*ExecutionData, error) {
 	rootCid := flow.IdToCid(rootID)
