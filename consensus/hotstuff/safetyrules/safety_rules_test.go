@@ -359,6 +359,19 @@ func (s *SafetyRulesTestSuite) TestProduceVote_VotingOnUnsafeProposal() {
 		require.False(s.T(), model.IsNoVoteError(err))
 		require.Nil(s.T(), vote)
 	})
+	s.Run("happy-path-includes-last-view-tc", func() {
+		proposal := helper.MakeProposal(
+			helper.WithBlock(
+				helper.MakeBlock(
+					helper.WithParentBlock(s.bootstrapBlock),
+					helper.WithBlockView(s.bootstrapBlock.View+1))),
+			helper.WithLastViewTC(helper.MakeTC()))
+		s.committee.On("IdentityByBlock", proposal.Block.BlockID, proposal.Block.ProposerID).Return(s.proposerIdentity, nil).Maybe()
+		vote, err := s.safety.ProduceVote(proposal, proposal.Block.View)
+		require.Error(s.T(), err)
+		require.False(s.T(), model.IsNoVoteError(err))
+		require.Nil(s.T(), vote)
+	})
 
 	s.signer.AssertNotCalled(s.T(), "CreateVote")
 	s.persister.AssertNotCalled(s.T(), "PutSafetyData")
@@ -447,29 +460,62 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_ShouldTimeout() {
 // Hence, the cases tested here would be symptoms of an internal bugs, and therefore should not result in an NoVoteError.
 func (s *SafetyRulesTestSuite) TestProduceTimeout_NotSafeToTimeout() {
 
+	s.Run("newest-qc-nil", func() {
+		// newestQC cannot be nil
+		timeout, err := s.safety.ProduceTimeout(s.safetyData.LockedOneChainView, nil, nil)
+		require.Error(s.T(), err)
+		require.False(s.T(), model.IsNoVoteError(err))
+		require.Nil(s.T(), timeout)
+	})
+	s.Run("happy-path-includes-last-view-tc", func() {
+		newestQC := helper.MakeQC(helper.WithQCView(s.safetyData.LockedOneChainView))
+
+		// tc not needed but included
+		timeout, err := s.safety.ProduceTimeout(newestQC.View+1, newestQC, helper.MakeTC())
+		require.Error(s.T(), err)
+		require.False(s.T(), model.IsNoVoteError(err))
+		require.Nil(s.T(), timeout)
+	})
+	s.Run("last-view-tc-nil", func() {
+		newestQC := helper.MakeQC(helper.WithQCView(s.safetyData.LockedOneChainView))
+
+		// tc needed but not included
+		timeout, err := s.safety.ProduceTimeout(newestQC.View+2, newestQC, nil)
+		require.Error(s.T(), err)
+		require.False(s.T(), model.IsNoVoteError(err))
+		require.Nil(s.T(), timeout)
+	})
+	s.Run("last-view-tc-for-wrong-view", func() {
+		newestQC := helper.MakeQC(helper.WithQCView(s.safetyData.LockedOneChainView))
+		// lastViewTC should be for newestQC.View+1
+		lastViewTC := helper.MakeTC(helper.WithTCView(newestQC.View))
+
+		timeout, err := s.safety.ProduceTimeout(newestQC.View+2, newestQC, lastViewTC)
+		require.Error(s.T(), err)
+		require.False(s.T(), model.IsNoVoteError(err))
+		require.Nil(s.T(), timeout)
+	})
 	s.Run("highest-qc-below-locked-round", func() {
-		view := s.proposal.Block.View
 		newestQC := helper.MakeQC(helper.WithQCView(s.safetyData.LockedOneChainView - 1))
 
-		timeout, err := s.safety.ProduceTimeout(view, newestQC, nil)
+		timeout, err := s.safety.ProduceTimeout(newestQC.View+1, newestQC, nil)
 		require.Error(s.T(), err)
 		require.False(s.T(), model.IsNoVoteError(err))
 		require.Nil(s.T(), timeout)
 	})
 	s.Run("cur-view-below-highest-acknowledged-view", func() {
-		view := s.safetyData.HighestAcknowledgedView
 		newestQC := helper.MakeQC(helper.WithQCView(s.safetyData.LockedOneChainView))
+		s.safetyData.HighestAcknowledgedView = newestQC.View + 10
 
-		timeout, err := s.safety.ProduceTimeout(view-2, newestQC, nil)
+		timeout, err := s.safety.ProduceTimeout(newestQC.View+1, newestQC, nil)
 		require.Error(s.T(), err)
 		require.False(s.T(), model.IsNoVoteError(err))
 		require.Nil(s.T(), timeout)
 	})
 	s.Run("cur-view-below-highest-QC", func() {
 		newestQC := helper.MakeQC(helper.WithQCView(s.safetyData.LockedOneChainView))
-		view := newestQC.View
 
-		timeout, err := s.safety.ProduceTimeout(view, newestQC, nil)
+		timeout, err := s.safety.ProduceTimeout(newestQC.View+1, newestQC, nil)
 		require.Error(s.T(), err)
 		require.False(s.T(), model.IsNoVoteError(err))
 		require.Nil(s.T(), timeout)
