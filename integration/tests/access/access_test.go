@@ -77,7 +77,7 @@ func (suite *AccessSuite) SetupTest() {
 	}
 
 	conf := testnet.NewNetworkConfig("access_api_test", nodeConfigs)
-	suite.net = testnet.PrepareFlowNetwork(suite.T(), conf)
+	suite.net = testnet.PrepareFlowNetwork(suite.T(), conf, flow.Localnet)
 
 	// start the network
 	suite.T().Logf("starting flow network with docker containers")
