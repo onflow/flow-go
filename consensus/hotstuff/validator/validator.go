@@ -161,6 +161,12 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate) error {
 			return newInvalidQCError(qc, fmt.Errorf("QC's  signature data has an invalid structure: %w", err))
 		case errors.Is(err, model.ErrInvalidSignature):
 			return newInvalidQCError(qc, fmt.Errorf("QC contains invalid signature(s): %w", err))
+		case errors.Is(err, model.ErrViewForUnknownEpoch):
+			// We have earlier queried the Identities for the QC's view, which must have returned proper values,
+			// otherwise, we wouldn't reach this code. Therefore, it should be impossible for `verifier.VerifyQC`
+			// to return ErrViewForUnknownEpoch. To avoid confusion with expected sentinel errors, we only preserve
+			// the error messages here, but not the error types.  
+			return fmt.Errorf("internal error, as querying identities for view %d succeeded earlier but now the view supposedly belongs to an unknown epoch: %s", qc.View, err.Error())
 		default:
 			return fmt.Errorf("cannot verify qc's aggregated signature (qc.BlockID: %x): %w", qc.BlockID, err)
 		}
