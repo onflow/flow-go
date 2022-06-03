@@ -15,7 +15,8 @@ func (fc FailureCode) String() string {
 }
 
 const (
-	FailureCodeUnknownFailure         FailureCode = 2000
+	FailureCodeUnknownFailure FailureCode = 2000
+	// Deprecated:
 	FailureCodeEncodingFailure        FailureCode = 2001
 	FailureCodeLedgerFailure          FailureCode = 2002
 	FailureCodeStateMergeFailure      FailureCode = 2003
@@ -62,8 +63,9 @@ const (
 	ErrCodeComputationLimitExceededError             ErrorCode = 1110
 	ErrCodeMemoryLimitExceededError                  ErrorCode = 1111
 	ErrCodeCouldNotDecodeExecutionParameterFromState ErrorCode = 1112
-	ErrCodeScriptExecutionCancelledError             ErrorCode = 1114
 	ErrCodeScriptExecutionTimedOutError              ErrorCode = 1113
+	ErrCodeScriptExecutionCancelledError             ErrorCode = 1114
+	ErrCodeEventEncodingError                        ErrorCode = 1115
 
 	// accounts errors 1200 - 1250
 	// ErrCodeAccountError              ErrorCode = 1200 - reserved
