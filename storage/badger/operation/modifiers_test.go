@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/vmihailenco/msgpack/v4"
 
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -89,6 +90,38 @@ func TestRetryOnConflict(t *testing.T) {
 
 			err := RetryOnConflict(db.Update, failOp)
 			require.Equal(t, otherError, err)
+		})
+	})
+}
+
+func TestSkipNonExists(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		t.Run("not found", func(t *testing.T) {
+			op := func(*badger.Txn) error {
+				return badger.ErrKeyNotFound
+			}
+
+			err := db.Update(SkipNonExist(op))
+			require.NoError(t, err)
+		})
+
+		t.Run("not exist", func(t *testing.T) {
+			op := func(*badger.Txn) error {
+				return storage.ErrNotFound
+			}
+
+			err := db.Update(SkipNonExist(op))
+			require.NoError(t, err)
+		})
+
+		t.Run("general error", func(t *testing.T) {
+			expectError := fmt.Errorf("random error")
+			op := func(*badger.Txn) error {
+				return expectError
+			}
+
+			err := db.Update(SkipNonExist(op))
+			require.Equal(t, expectError, err)
 		})
 	})
 }

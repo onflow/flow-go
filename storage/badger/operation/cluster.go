@@ -100,11 +100,3 @@ func ClusterBlocksByReferenceHeightIndexExists(exists *bool) func(*badger.Txn) e
 		return nil
 	}
 }
-
-// BatchIndexClusterBlockByReferenceHeight is IndexReferenceBlockByClusterBlock
-// for use in a write batch.
-//
-// TODO this method should not be included in the master branch.
-func BatchIndexClusterBlockByReferenceHeight(refHeight uint64, clusterBlockID flow.Identifier) func(*badger.WriteBatch) error {
-	return batchInsert(makePrefix(codeRefHeightToClusterBlock, refHeight, clusterBlockID), nil)
-}
