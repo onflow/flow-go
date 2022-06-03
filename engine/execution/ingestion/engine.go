@@ -228,6 +228,7 @@ func (e *Engine) finalizedUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.
 		}
 	}
 
+	lastExecuted = uint64(30954208)
 	firstUnexecuted := lastExecuted + 1
 
 	e.log.Info().Msgf("last finalized and executed height: %v", lastExecuted)
