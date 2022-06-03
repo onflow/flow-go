@@ -131,11 +131,11 @@ const (
 
 	// Channels for consensus protocols
 	ConsensusCommittee     = network.Channel("consensus-committee")
-	consensusClusterPrefix = "consensus-cluster" // dynamic channel, use ChannelConsensusCluster function
+	ConsensusClusterPrefix = "consensus-cluster" // dynamic channel, use ChannelConsensusCluster function
 
 	// Channels for protocols actively synchronizing state across nodes
 	SyncCommittee     = network.Channel("sync-committee")
-	syncClusterPrefix = "sync-cluster" // dynamic channel, use ChannelSyncCluster function
+	SyncClusterPrefix = "sync-cluster" // dynamic channel, use ChannelSyncCluster function
 	SyncExecution     = network.Channel("sync-execution")
 
 	// Channels for dkg communication
@@ -235,20 +235,21 @@ func initializeChannelRoleMap() {
 
 	clusterChannelPrefixRoleMap = make(map[string]flow.RoleList)
 
-	clusterChannelPrefixRoleMap[syncClusterPrefix] = flow.RoleList{flow.RoleCollection}
-	clusterChannelPrefixRoleMap[consensusClusterPrefix] = flow.RoleList{flow.RoleCollection}
+	clusterChannelPrefixRoleMap[SyncClusterPrefix] = flow.RoleList{flow.RoleCollection}
+	clusterChannelPrefixRoleMap[ConsensusClusterPrefix] = flow.RoleList{flow.RoleCollection}
 }
 
 // ClusterChannelRoles returns the list of roles that are involved in the given cluster-based channel.
 func ClusterChannelRoles(clusterChannel network.Channel) flow.RoleList {
-	if prefix, ok := clusterChannelPrefix(clusterChannel); ok {
+	if prefix, ok := ClusterChannelPrefix(clusterChannel); ok {
 		return clusterChannelPrefixRoleMap[prefix]
 	}
 
 	return flow.RoleList{}
 }
 
-func clusterChannelPrefix(clusterChannel network.Channel) (string, bool) {
+// ClusterChannelPrefix returns the cluster channel prefix and true if clusterChannel exists inclusterChannelPrefixRoleMap
+func ClusterChannelPrefix(clusterChannel network.Channel) (string, bool) {
 	for prefix := range clusterChannelPrefixRoleMap {
 		if strings.HasPrefix(clusterChannel.String(), prefix) {
 			return prefix, true
@@ -261,7 +262,7 @@ func clusterChannelPrefix(clusterChannel network.Channel) (string, bool) {
 // IsClusterChannel returns true if channel is cluster-based.
 // Currently, only collection nodes are involved in a cluster-based channels.
 func IsClusterChannel(channel network.Channel) bool {
-	_, ok := clusterChannelPrefix(channel)
+	_, ok := ClusterChannelPrefix(channel)
 	return ok
 }
 
@@ -292,11 +293,11 @@ func ChannelFromTopic(topic network.Topic) (network.Channel, bool) {
 // ChannelConsensusCluster returns a dynamic cluster consensus channel based on
 // the chain ID of the cluster in question.
 func ChannelConsensusCluster(clusterID flow.ChainID) network.Channel {
-	return network.Channel(fmt.Sprintf("%s-%s", consensusClusterPrefix, clusterID))
+	return network.Channel(fmt.Sprintf("%s-%s", ConsensusClusterPrefix, clusterID))
 }
 
 // ChannelSyncCluster returns a dynamic cluster sync channel based on the chain
 // ID of the cluster in question.
 func ChannelSyncCluster(clusterID flow.ChainID) network.Channel {
-	return network.Channel(fmt.Sprintf("%s-%s", syncClusterPrefix, clusterID))
+	return network.Channel(fmt.Sprintf("%s-%s", SyncClusterPrefix, clusterID))
 }

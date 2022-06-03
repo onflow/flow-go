@@ -52,7 +52,7 @@ func TestGhostNodeExample_Send(t *testing.T) {
 	nodes := append([]testnet.NodeConfig{realCollNode, ghostCollNode, conNode1, conNode2, conNode3, realExeNode, verNode, accessNode})
 	conf := testnet.NewNetworkConfig("ghost_example_send", nodes)
 
-	net := testnet.PrepareFlowNetwork(t, conf)
+	net := testnet.PrepareFlowNetwork(t, conf, flow.Localnet)
 
 	ctx := context.Background()
 
@@ -108,7 +108,7 @@ func TestGhostNodeExample_Subscribe(t *testing.T) {
 	nodes := append([]testnet.NodeConfig{collNode, conNode1, conNode2, conNode3, realExeNode, verNode, ghostExeNode, accessNode})
 	conf := testnet.NewNetworkConfig("ghost_example_subscribe", nodes)
 
-	net := testnet.PrepareFlowNetwork(t, conf)
+	net := testnet.PrepareFlowNetwork(t, conf, flow.Localnet)
 
 	ctx := context.Background()
 

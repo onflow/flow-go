@@ -448,7 +448,7 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	timedCtx, cancel5s := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel5s()
 	// create a dummy sync request to publish from our LN node
-	data := getMsgFixtureBz(t, &messages.SyncRequest{})
+	data := getMsgFixtureBz(t, &messages.RangeRequest{})
 
 	// ln2 publishes the sync request on the cluster channel
 	err = ln2.Publish(timedCtx, topic, data)

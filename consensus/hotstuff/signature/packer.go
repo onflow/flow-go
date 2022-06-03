@@ -1,7 +1,6 @@
 package signature
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -77,10 +76,10 @@ func (p *ConsensusSigDataPacker) Unpack(signerIdentities flow.IdentityList, sigD
 
 	stakingSigners, randomBeaconSigners, err := signature.DecodeSigTypeToStakingAndBeaconSigners(signerIdentities, data.SigType)
 	if err != nil {
-		if errors.Is(err, signature.ErrIllegallyPaddedBitVector) || errors.Is(err, signature.ErrIncompatibleBitVectorLength) {
-			return nil, model.NewInvalidFormatErrorf("invalid SigType vector: %w", err)
+		if signature.IsInvalidSigTypesError(err) {
+			return nil, model.NewInvalidFormatErrorf("invalid signer type data.SigType %v: %w", data.SigType, err)
 		}
-		return nil, fmt.Errorf("could not decode signer indices and sig type: %w", err)
+		return nil, fmt.Errorf("unexpected exception unpacking signer data data.SigType %v: %w", data.SigType, err)
 	}
 
 	return &hotstuff.BlockSignatureData{

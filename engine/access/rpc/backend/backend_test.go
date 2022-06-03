@@ -658,6 +658,7 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 
 	result, err := backend.GetTransactionResultByIndex(ctx, blockId, index)
 	suite.checkResponse(result, err)
+	suite.Assert().Equal(result.BlockHeight, block.Header.Height)
 
 	suite.assertAllExpectations()
 }

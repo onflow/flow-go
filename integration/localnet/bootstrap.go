@@ -18,7 +18,7 @@ import (
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/crypto"
-	testnet "github.com/onflow/flow-go/integration/testnet"
+	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -90,7 +90,7 @@ func init() {
 func generateBootstrapData(flowNetworkConf testnet.NetworkConfig) []testnet.ContainerConfig {
 	// Prepare localnet host folders, mapped to Docker container volumes upon `docker compose up`
 	prepareCommonHostFolders()
-	bootstrapData, err := testnet.BootstrapNetwork(flowNetworkConf, BootstrapDir)
+	bootstrapData, err := testnet.BootstrapNetwork(flowNetworkConf, BootstrapDir, flow.Localnet)
 	if err != nil {
 		panic(err)
 	}
