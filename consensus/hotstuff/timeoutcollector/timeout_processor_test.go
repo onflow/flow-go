@@ -317,7 +317,13 @@ func (s *TimeoutProcessorTestSuite) TestProcess_ConcurrentCreatingTC() {
 
 // TestTimeoutProcessor_BuildVerifyTC tests a complete path from creating timeouts to collecting timeouts and then
 // building & verifying TC.
-// We start with
+// We start with building valid newest QC that will be included in every TimeoutObject. We need to have a valid QC
+// since TimeoutProcessor performs complete validation of TimeoutObject. Then we create a valid cryptographically signed
+// timeout for each signer. Created timeouts are feed to TimeoutProcessor which eventually creates a TC after seeing processing
+// enough objects. After we verify if TC was correctly constructed and if it doesn't violate protocol rules.
+// After obtaining valid TC we will repeat this test case to make sure that TimeoutObject(and TC eventually) with LastViewTC is
+// correctly built
+//
 func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 	// signers hold objects that are created with private key and can sign votes and proposals
 	signers := make(map[flow.Identifier]*verification.StakingSigner)
@@ -331,6 +337,17 @@ func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 
 		signers[identity.NodeID] = verification.NewStakingSigner(me)
 	})
+
+	// utility function which generates a valid timeout for every signer
+	createTimeouts := func(view uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) []*model.TimeoutObject {
+		timeouts := make([]*model.TimeoutObject, 0, len(stakingSigners))
+		for _, signer := range stakingSigners {
+			timeout, err := signers[signer.NodeID].CreateTimeout(view, newestQC, lastViewTC)
+			require.NoError(t, err)
+			timeouts = append(timeouts, timeout)
+		}
+		return timeouts
+	}
 
 	leader := stakingSigners[0]
 
@@ -364,54 +381,51 @@ func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 
 	require.NotNil(t, newestQC, "vote processor must create a valid QC at this point")
 
-	timeouts := make([]*model.TimeoutObject, 0, len(stakingSigners))
-	for _, signer := range stakingSigners {
-		timeout, err := signers[signer.NodeID].CreateTimeout(view, newestQC, nil)
-		require.NoError(t, err)
-		timeouts = append(timeouts, timeout)
-	}
-
 	// create verifier that will do crypto checks of created TC
 	verifier := verification.NewStakingVerifier()
 	// create validator which will do compliance and crypto checked of created TC
 	validator := hotstuffvalidator.New(committee, verifier)
 
-	tcCreated := false
 	var lastViewTC *flow.TimeoutCertificate
-	onTCCreated := func(tc *flow.TimeoutCertificate) {
+	onTCCreated := mocks.NewOnTCCreated(t)
+	onTCCreated.On("Execute", mock.Anything).Run(func(args mock.Arguments) {
+		tc := args.Get(0).(*flow.TimeoutCertificate)
 		// check if resulted TC is valid
 		err := validator.ValidateTC(tc)
 		require.NoError(t, err)
-
 		lastViewTC = tc
-		tcCreated = true
-	}
+	}).Times(2) // should be called twice
 
 	aggregator, err := NewTimeoutSignatureAggregator(view, stakingSigners, encoding.CollectorVoteTag)
 	require.NoError(t, err)
 
 	onPartialTCCreated := mocks.NewOnPartialTCCreated(t)
 	onPartialTCCreated.On("Execute", view).Once()
-	processor, err := NewTimeoutProcessor(committee, validator, aggregator, onPartialTCCreated.Execute, onTCCreated)
+	processor, err := NewTimeoutProcessor(committee, validator, aggregator, onPartialTCCreated.Execute, onTCCreated.Execute)
 	require.NoError(t, err)
 
+	// last view was successful, no lastViewTC in this case
+	timeouts := createTimeouts(view, newestQC, nil)
 	for _, timeout := range timeouts {
 		err := processor.Process(timeout)
 		require.NoError(t, err)
 	}
 
-	require.True(t, tcCreated)
-
-	// check if processing of timeout with last view TC finishes without errors
-	timeout, err := signers[leader.NodeID].CreateTimeout(view+1, newestQC, lastViewTC)
-	require.NoError(t, err)
+	onTCCreated.AssertNumberOfCalls(t, "Execute", 1)
 
 	aggregator, err = NewTimeoutSignatureAggregator(view+1, stakingSigners, encoding.CollectorVoteTag)
 	require.NoError(t, err)
 
-	processor, err = NewTimeoutProcessor(committee, validator, aggregator, onPartialTCCreated.Execute, onTCCreated)
+	onPartialTCCreated.On("Execute", view+1).Once()
+	processor, err = NewTimeoutProcessor(committee, validator, aggregator, onPartialTCCreated.Execute, onTCCreated.Execute)
 	require.NoError(t, err)
 
-	err = processor.Process(timeout)
-	require.NoError(t, err)
+	// last view ended with TC, need to include lastViewTC
+	timeouts = createTimeouts(view+1, newestQC, lastViewTC)
+	for _, timeout := range timeouts {
+		err := processor.Process(timeout)
+		require.NoError(t, err)
+	}
+
+	onTCCreated.AssertNumberOfCalls(t, "Execute", 2)
 }
