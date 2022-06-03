@@ -184,6 +184,8 @@ func (txt *TxTracker) statusWorker(ctx context.Context, workerID int, fclient *c
 					}
 					tx.lastStatus = flowsdk.TransactionStatusExecuted
 					tx.stat.TTE = time.Since(tx.createdAt)
+				case flowsdk.TransactionStatusUnknown:
+					log.Trace().Msg("got into an unknown status, retrying")
 				case flowsdk.TransactionStatusSealed:
 					log.Trace().Msg("tx has been sealed")
 					// sometimes we miss the executed call and just get sealed directly
@@ -200,8 +202,6 @@ func (txt *TxTracker) statusWorker(ctx context.Context, workerID int, fclient *c
 					txt.stats.AddTxStats(tx.stat)
 					close(tx.wait)
 					continue
-				case flowsdk.TransactionStatusUnknown:
-					log.Warn().Msg("got into an unknown status, retrying")
 				case flowsdk.TransactionStatusExpired:
 					log.Warn().Msg("tx has been expired")
 					if tx.onExpired != nil {
