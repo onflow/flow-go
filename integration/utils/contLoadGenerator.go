@@ -200,10 +200,6 @@ func (lg *ContLoadGenerator) SetupFavContract() error {
 				lg.log.Error().Msg("fav contract deployment transaction has timed out")
 				err = fmt.Errorf("fav contract deployment transaction has timed out")
 			},
-			onError: func(_ flowsdk.Identifier, terr error) {
-				lg.log.Error().Err(terr).Msg("fav contract deployment transaction has encountered an error")
-				err = terr
-			},
 		},
 		120*time.Second)
 
@@ -367,9 +363,6 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 			},
 			onTimeout: func(_ flowsdk.Identifier) {
 				log.Error().Msg("setup transaction (account creation) has timed out")
-			},
-			onError: func(_ flowsdk.Identifier, err error) {
-				log.Error().Err(err).Msg("setup transaction (account creation) encountered an error")
 			},
 		},
 		120*time.Second,
@@ -626,9 +619,6 @@ func (lg *ContLoadGenerator) sendTx(workerID int, tx *flowsdk.Transaction) {
 				},
 				onTimeout: func(_ flowsdk.Identifier) {
 					lg.log.Warn().Str("tx_id", tx.ID().String()).Msgf("workerID=%d tx timed out", workerID)
-				},
-				onError: func(_ flowsdk.Identifier, err error) {
-					lg.log.Error().Err(err).Str("tx_id", tx.ID().String()).Msgf("workerID=%d tx error", workerID)
 				},
 			},
 			60*time.Second)

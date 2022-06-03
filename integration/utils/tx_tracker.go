@@ -30,7 +30,6 @@ type txCallbacks struct {
 	onFinalized func(flowsdk.Identifier, *flowsdk.TransactionResult)
 	onSealed    func(flowsdk.Identifier, *flowsdk.TransactionResult)
 	onExpired   func(flowsdk.Identifier)
-	onError     func(flowsdk.Identifier, error)
 	onTimeout   func(flowsdk.Identifier)
 }
 
@@ -202,14 +201,7 @@ func (txt *TxTracker) statusWorker(ctx context.Context, workerID int, fclient *c
 					close(tx.wait)
 					continue
 				case flowsdk.TransactionStatusUnknown:
-					log.Warn().Msg("got into an unknown status")
-					if tx.onError != nil {
-						go tx.onError(tx.txID, err)
-					}
-					tx.stat.isExpired = true
-					txt.stats.AddTxStats(tx.stat)
-					close(tx.wait)
-					continue
+					log.Warn().Msg("got into an unknown status, retrying")
 				case flowsdk.TransactionStatusExpired:
 					log.Warn().Msg("tx has been expired")
 					if tx.onExpired != nil {
