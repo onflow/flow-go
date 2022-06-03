@@ -30,6 +30,8 @@ type Verifier interface {
 	//    where special signing authority is only given to a _subset_ of consensus
 	//    participants (e.g. random beacon). In case a participant signed despite not
 	//    being authorized, an InvalidSignerError is returned.
+	//  * model.ErrViewForUnknownEpoch is only relevant for extended signature schemes,
+	//    where querying of DKG might fail if no epoch containing the given view is known.
 	//  * unexpected errors should be treated as symptoms of bugs or uncovered
 	//    edge cases in the logic (i.e. as fatal)
 	VerifyVote(voter *flow.Identity, sigData []byte, view uint64, blockID flow.Identifier) error
@@ -48,6 +50,8 @@ type Verifier interface {
 	//    where special signing authority is only given to a _subset_ of consensus
 	//    participants (e.g. random beacon). In case a participant signed despite not
 	//    being authorized, an InvalidSignerError is returned.
+	//  * model.ErrViewForUnknownEpoch is only relevant for extended signature schemes,
+	//    where querying of DKG might fail if no epoch containing the given view is known.
 	//  * unexpected errors should be treated as symptoms of bugs or uncovered
 	//	  edge cases in the logic (i.e. as fatal)
 	VerifyQC(signers flow.IdentityList, sigData []byte, view uint64, blockID flow.Identifier) error

@@ -50,6 +50,7 @@ func NewCombinedVerifier(committee hotstuff.Replicas, packer hotstuff.Packer) *C
 // * model.InvalidFormatError if the signature has an incompatible format.
 // * model.ErrInvalidSignature is the signature is invalid
 // * model.InvalidSignerError if signer is _not_ part of the random beacon committee
+// * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
 // * unexpected errors should be treated as symptoms of bugs or uncovered
 //   edge cases in the logic (i.e. as fatal)
 func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, view uint64, blockID flow.Identifier) error {
@@ -117,6 +118,7 @@ func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, vie
 //    be an indicator of an external byzantine input or an internal bug.
 //  * model.InvalidFormatError if `sigData` has an incompatible format
 //  * model.ErrInvalidSignature if a signature is invalid
+//  * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
 //  * error if running into any unexpected exception (i.e. fatal error)
 func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, view uint64, blockID flow.Identifier) error {
 	if len(signers) == 0 {
