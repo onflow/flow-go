@@ -124,10 +124,10 @@ func TestExtendValid(t *testing.T) {
 }
 
 func TestSealedIndex(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		metrics := metrics.NewNoopCollector()
-		tracer := trace.NewNoopTracer()
-		headers, _, seals, index, payloads, blocks, setups, commits, statuses, results := storeutil.StorageLayer(t, db)
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+		rootHeader, err := rootSnapshot.Head()
+		require.NoError(t, err)
 
 		// build a chain:
 		// G <- B1 <- B2 (resultB1) <- B3 <- B4 (resultB2, resultB3) <- B5 (sealB1) <- B6 (sealB2, sealB3) <- B7
@@ -135,14 +135,8 @@ func TestSealedIndex(t *testing.T) {
 		// 					 when B5 is finalized, can find seal for B1
 		//					 when B7 is finalized, can find seals for B2, B3
 
-		// genesis block
-		rootBlock, result, rootSeal := unittest.BootstrapFixture(participants)
-		qc := unittest.QuorumCertificateFixture(unittest.QCWithBlockID(rootBlock.ID()))
-		rootSnapshot, err := inmem.SnapshotFromBootstrapState(rootBlock, result, rootSeal, qc)
-		require.NoError(t, err)
-
 		// block 1
-		b1 := unittest.BlockWithParentFixture(rootBlock)
+		b1 := unittest.BlockWithParentFixture(rootHeader)
 		b1.SetPayload(flow.EmptyPayload())
 		err = state.Extend(context.Background(), b1)
 		require.NoError(t, err)
@@ -158,7 +152,7 @@ func TestSealedIndex(t *testing.T) {
 		require.NoError(t, err)
 
 		// block 3
-		b3 := unittest.BlockWithParentFixture(b2)
+		b3 := unittest.BlockWithParentFixture(b2.Header)
 		b3.SetPayload(flow.EmptyPayload())
 		err = state.Extend(context.Background(), b3)
 		require.NoError(t, err)
@@ -169,7 +163,7 @@ func TestSealedIndex(t *testing.T) {
 		b4 := unittest.BlockWithParentFixture(b3.Header)
 		b4.SetPayload(flow.Payload{
 			Receipts: []*flow.ExecutionReceiptMeta{b2Receipt.Meta(), b3Receipt.Meta()},
-			Results:  []*flow.ExecutionResult{&b2Receipt.ExecutionResult, b3Receipt.Meta()},
+			Results:  []*flow.ExecutionResult{&b2Receipt.ExecutionResult, &b3Receipt.ExecutionResult},
 		})
 		err = state.Extend(context.Background(), b4)
 		require.NoError(t, err)
@@ -194,43 +188,44 @@ func TestSealedIndex(t *testing.T) {
 		require.NoError(t, err)
 
 		// block 7
-		b7 := unittest.BlockWithParentFixture(b6)
+		b7 := unittest.BlockWithParentFixture(b6.Header)
 		b7.SetPayload(flow.EmptyPayload())
 		err = state.Extend(context.Background(), b7)
 		require.NoError(t, err)
 
 		// when B4 is finalized, can only find seal for G
-		err = state.Finalize(context.Background(), b4.BlockID())
+		err = state.Finalize(context.Background(), b4.ID())
 		require.NoError(t, err)
 
 		// can only find seal for G
-		rSeal, err = seals.BySealedBlockID(rootBlock.ID())
+		_, err = state.AtBlockID(rootHeader.ID()).Seal()
 		require.NoError(t, err)
-		require.Equal(t, rootSeal, rSeal)
 
-		_, err = seals.BySealedBlockID(b1.ID())
+		_, err = state.AtBlockID(b1.ID()).Seal()
 		require.Error(t, err)
+		require.ErrorIs(t, err, realprotocol.ErrBlockNotSealed)
 
 		// when B5 is finalized, can find seal for B1
-		err = state.Finalize(context.Background(), b5.BlockID())
+		err = state.Finalize(context.Background(), b5.ID())
 		require.NoError(t, err)
 
-		s1, err = seals.BySealedBlockID(b1.ID())
+		s1, err := state.AtBlockID(b1.ID()).Seal()
 		require.NoError(t, err)
 		require.Equal(t, b1Seal, s1)
 
-		_, err = seals.BySealedBlockID(b2.ID())
+		_, err = state.AtBlockID(b2.ID()).Seal()
 		require.Error(t, err)
+		require.ErrorIs(t, err, realprotocol.ErrBlockNotSealed)
 
 		// when B7 is finalized, can find seals for B2, B3
-		err = state.Finalize(context.Background(), b7.BlockID())
+		err = state.Finalize(context.Background(), b7.ID())
 		require.NoError(t, err)
 
-		s2, err = seals.BySealedBlockID(b2.ID())
+		s2, err := state.AtBlockID(b2.ID()).Seal()
 		require.NoError(t, err)
 		require.Equal(t, b2Seal, s2)
 
-		s3, err = seals.BySealedBlockID(b3.ID())
+		s3, err := state.AtBlockID(b3.ID()).Seal()
 		require.NoError(t, err)
 		require.Equal(t, b3Seal, s3)
 	})

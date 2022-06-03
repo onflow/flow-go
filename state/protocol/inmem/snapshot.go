@@ -49,6 +49,11 @@ func (s Snapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
 	return s.enc.LatestResult, s.enc.LatestSeal, nil
 }
 
+func (s Snapshot) Seal() (*flow.Seal, error) {
+	// canonical snapshots don't have seal
+	return nil, nil
+}
+
 func (s Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	return s.enc.SealingSegment, nil
 }
