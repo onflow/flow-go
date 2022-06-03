@@ -80,7 +80,6 @@ func (s *Suite) SetupSuite() {
 		Logger()
 	s.log = logger
 
-	blockRateFlag := "--block-rate-delay=1ms"
 	chunkAlpha := "--chunk-alpha=3" // each chunk is assigned to 3 VNs.
 
 	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)))
@@ -91,13 +90,11 @@ func (s *Suite) SetupSuite() {
 		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus,
 			testnet.WithID(nodeID),
 			testnet.WithLogLevel(zerolog.ErrorLevel),
-			testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 			testnet.WithAdditionalFlag(chunkAlpha),
 
 			// two approvals needed to seal a chunk
 			testnet.WithAdditionalFlag("--required-verification-seal-approvals=2"),
 			testnet.WithAdditionalFlag("--required-construction-seal-approvals=2"),
-			testnet.WithAdditionalFlag(blockRateFlag),
 		)
 		s.nodeConfigs = append(s.nodeConfigs, nodeConfig)
 	}
@@ -148,11 +145,9 @@ func (s *Suite) SetupSuite() {
 	// generates two collection node
 	coll1Config := testnet.NewNodeConfig(flow.RoleCollection,
 		testnet.WithLogLevel(zerolog.FatalLevel),
-		testnet.WithAdditionalFlag(blockRateFlag),
 	)
 	coll2Config := testnet.NewNodeConfig(flow.RoleCollection,
 		testnet.WithLogLevel(zerolog.FatalLevel),
-		testnet.WithAdditionalFlag(blockRateFlag),
 	)
 	s.nodeConfigs = append(s.nodeConfigs, coll1Config, coll2Config)
 
