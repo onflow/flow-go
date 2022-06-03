@@ -29,29 +29,29 @@ func (e UnknownFailure) Unwrap() error {
 	return e.err
 }
 
-// EncodingFailure captures an fatal error sourced from encoding issues
-type EncodingFailure struct {
+// EncodingError captures an error sourced from encoding issues
+type EncodingError struct {
 	err error
 }
 
-// NewEncodingFailuref formats and returns a new EncodingFailure
-func NewEncodingFailuref(msg string, err error) *EncodingFailure {
-	return &EncodingFailure{
+// NewEncodingErrorf formats and returns a new EncodingError
+func NewEncodingErrorf(msg string, err error) *EncodingError {
+	return &EncodingError{
 		err: fmt.Errorf(msg, err),
 	}
 }
 
-func (e *EncodingFailure) Error() string {
-	return fmt.Sprintf("%s encoding failed: %s", e.FailureCode().String(), e.err.Error())
+func (e *EncodingError) Error() string {
+	return fmt.Sprintf("%s encoding failed: %s", e.ErrorCode().String(), e.err.Error())
 }
 
-// FailureCode returns the failure code
-func (e *EncodingFailure) FailureCode() FailureCode {
-	return FailureCodeEncodingFailure
+// ErrorCode returns the error code
+func (e *EncodingError) ErrorCode() ErrorCode {
+	return ErrCodeEventEncodingError
 }
 
 // Unwrap unwraps the error
-func (e EncodingFailure) Unwrap() error {
+func (e EncodingError) Unwrap() error {
 	return e.err
 }
 
