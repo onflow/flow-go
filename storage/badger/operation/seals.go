@@ -38,12 +38,24 @@ func LookupPayloadResults(blockID flow.Identifier, resultIDs *[]flow.Identifier)
 	return retrieve(makePrefix(codePayloadResults, blockID), resultIDs)
 }
 
+// IndexBlockSeal index the id of the last seal included in the given block's payload
 func IndexBlockSeal(blockID flow.Identifier, sealID flow.Identifier) func(*badger.Txn) error {
 	return insert(makePrefix(codeBlockToSeal, blockID), sealID)
 }
 
+// LookupBlockSeal finds the last seal included in the given block's payload
 func LookupBlockSeal(blockID flow.Identifier, sealID *flow.Identifier) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeBlockToSeal, blockID), &sealID)
+}
+
+// IndexBySealedBlockID index a seal by the sealed block ID.
+func IndexBySealedBlockID(sealID flow.Identifier, sealedBlockID flow.Identifier) func(*badger.Txn) error {
+	return insert(makePrefix(codeFinalizedSeal, sealedBlockID), sealID)
+}
+
+// LookupBySealedBlockID finds the seal for the given sealed block ID.
+func LookupBySealedBlockID(blockID flow.Identifier, sealID *flow.Identifier) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeFinalizedSeal, blockID), &sealID)
 }
 
 func InsertExecutionForkEvidence(conflictingSeals []*flow.IncorporatedResultSeal) func(*badger.Txn) error {

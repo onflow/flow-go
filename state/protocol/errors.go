@@ -28,6 +28,9 @@ var (
 
 	// ErrClusterNotFound is a sentinel error returns for queries for a cluster
 	ErrClusterNotFound = fmt.Errorf("could not find cluster")
+
+	// ErrBlockNotSealed is a sentinel error returns for queries for a seal from a non sealed block
+	ErrBlockNotSealed = fmt.Errorf("block is not sealed")
 )
 
 type IdentityNotFoundError struct {

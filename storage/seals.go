@@ -18,4 +18,7 @@ type Seals interface {
 
 	// ByBlockID retrieves the last seal in the chain of seals for the block.
 	ByBlockID(sealedID flow.Identifier) (*flow.Seal, error)
+
+	// BySealedBlockID finds the seal for the sealed block ID.
+	BySealedBlockID(blockID flow.Identifier) (*flow.Seal, error)
 }

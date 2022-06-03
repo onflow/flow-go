@@ -79,3 +79,12 @@ func (s *Seals) ByBlockID(blockID flow.Identifier) (*flow.Seal, error) {
 	}
 	return s.ByID(sealID)
 }
+
+func (s *Seals) BySealedBlockID(blockID flow.Identifier) (*flow.Seal, error) {
+	var sealID flow.Identifier
+	err := s.db.View(operation.LookupBySealedBlockID(blockID, &sealID))
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve seal for fork with head %x: %w", blockID, err)
+	}
+	return s.ByID(sealID)
+}

@@ -648,6 +648,16 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 			return fmt.Errorf("could not update sealed height: %w", err)
 		}
 
+		// when a block is finalized, each seal in it is the seal for its sealed block.
+		// indexing each seal for its sealed block so that they can be used to find the seal result
+		// by sealed height.
+		for _, seal := range block.Payload.Seals {
+			err = operation.IndexBySealedBlockID(seal.ID(), seal.BlockID)(tx)
+			if err != nil {
+				return fmt.Errorf("could not index the seal as the seal of the sealed block: %w", err)
+			}
+		}
+
 		// emit protocol events within the scope of the Badger transaction to
 		// guarantee at-least-once delivery
 		m.consumer.BlockFinalized(header)

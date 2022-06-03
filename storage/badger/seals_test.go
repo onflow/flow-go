@@ -72,3 +72,28 @@ func TestSealIndexAndRetrieve(t *testing.T) {
 		require.Equal(t, expectedSeal, seal)
 	})
 }
+
+// TestSealedBlockIndexAndRetrieve checks after indexing a seal by a sealed block ID, it can be
+// retrieved by the sealed block ID
+func TestSealedBlockIndexAndRetrieve(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		metrics := metrics.NewNoopCollector()
+		store := badgerstorage.NewSeals(metrics, db)
+
+		expectedSeal := unittest.Seal.Fixture()
+		blockID := unittest.IdentifierFixture()
+
+		// store the seal first
+		err := store.Store(expectedSeal)
+		require.NoError(t, err)
+
+		// index the seal ID for the heighest sealed block in this fork
+		err = operation.RetryOnConflict(db.Update, operation.IndexBySealedBlockID(expectedSeal.ID(), expectedSeal.BlockID))
+		require.NoError(t, err)
+
+		// retrieve latest seal
+		seal, err := store.BySealedBlockID(blockID)
+		require.NoError(t, err)
+		require.Equal(t, expectedSeal, seal)
+	})
+}
