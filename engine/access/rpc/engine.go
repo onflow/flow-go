@@ -171,12 +171,12 @@ func New(log zerolog.Logger,
 
 	accessproto.RegisterAccessAPIServer(
 		eng.unsecureGrpcServer,
-		access.NewHandler(backend, chainID.Chain()),
+		access.NewHandler(backend, backend.GetProtocolState(), chainID.Chain()),
 	)
 
 	accessproto.RegisterAccessAPIServer(
 		eng.secureGrpcServer,
-		access.NewHandler(backend, chainID.Chain()),
+		access.NewHandler(backend, backend.GetProtocolState(), chainID.Chain()),
 	)
 
 	if rpcMetricsEnabled {
@@ -189,11 +189,11 @@ func New(log zerolog.Logger,
 	// Register legacy gRPC handlers for backwards compatibility, to be removed at a later date
 	legacyaccessproto.RegisterAccessAPIServer(
 		eng.unsecureGrpcServer,
-		legacyaccess.NewHandler(backend, chainID.Chain()),
+		legacyaccess.NewHandler(backend, backend.GetProtocolState(), chainID.Chain()),
 	)
 	legacyaccessproto.RegisterAccessAPIServer(
 		eng.secureGrpcServer,
-		legacyaccess.NewHandler(backend, chainID.Chain()),
+		legacyaccess.NewHandler(backend, backend.GetProtocolState(), chainID.Chain()),
 	)
 
 	return eng
@@ -345,7 +345,7 @@ func (e *Engine) serveREST() {
 
 	e.log.Info().Str("rest_api_address", e.config.RESTListenAddr).Msg("starting REST server on address")
 
-	r, err := rest.NewServer(e.backend, e.config.RESTListenAddr, e.log, e.chain)
+	r, err := rest.NewServer(e.backend, e.backend.GetProtocolState(), e.config.RESTListenAddr, e.log, e.chain)
 	if err != nil {
 		e.log.Err(err).Msg("failed to initialize the REST server")
 		return

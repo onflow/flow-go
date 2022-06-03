@@ -13,7 +13,7 @@ const blockQueryParam = "block_ids"
 const eventTypeQuery = "type"
 
 // GetEvents for the provided block range or list of block IDs filtered by type.
-func GetEvents(r *request.Request, backend access.API, _ models.LinkGenerator) (interface{}, error) {
+func GetEvents(r *request.Request, backend access.API, psapi access.PROTOCOL_STATE_API, _ models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetEventsRequest()
 	if err != nil {
 		return nil, NewBadRequestError(err)
@@ -33,7 +33,7 @@ func GetEvents(r *request.Request, backend access.API, _ models.LinkGenerator) (
 
 	// if end height is provided with special values then load the height
 	if req.EndHeight == request.FinalHeight || req.EndHeight == request.SealedHeight {
-		latest, err := backend.GetLatestBlockHeader(r.Context(), req.EndHeight == request.SealedHeight)
+		latest, err := psapi.GetLatestBlockHeader(r.Context(), req.EndHeight == request.SealedHeight)
 		if err != nil {
 			return nil, err
 		}

@@ -26,6 +26,7 @@ const MaxRequestSize = 2 << 20 // 2MB
 type ApiHandlerFunc func(
 	r *request.Request,
 	backend access.API,
+	psapi access.PROTOCOL_STATE_API,
 	generator models.LinkGenerator,
 ) (interface{}, error)
 
@@ -35,6 +36,7 @@ type ApiHandlerFunc func(
 type Handler struct {
 	logger         zerolog.Logger
 	backend        access.API
+	psapi          access.PROTOCOL_STATE_API
 	linkGenerator  models.LinkGenerator
 	apiHandlerFunc ApiHandlerFunc
 	chain          flow.Chain
@@ -43,6 +45,7 @@ type Handler struct {
 func NewHandler(
 	logger zerolog.Logger,
 	backend access.API,
+	psapi access.PROTOCOL_STATE_API,
 	handlerFunc ApiHandlerFunc,
 	generator models.LinkGenerator,
 	chain flow.Chain,
@@ -50,6 +53,7 @@ func NewHandler(
 	return &Handler{
 		logger:         logger,
 		backend:        backend,
+		psapi:          psapi,
 		apiHandlerFunc: handlerFunc,
 		linkGenerator:  generator,
 		chain:          chain,
@@ -74,7 +78,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	decoratedRequest := request.Decorate(r, h.chain)
 
 	// execute handler function and check for error
-	response, err := h.apiHandlerFunc(decoratedRequest, h.backend, h.linkGenerator)
+	response, err := h.apiHandlerFunc(decoratedRequest, h.backend, h.psapi, h.linkGenerator)
 	if err != nil {
 		h.errorHandler(w, err, errLog)
 		return

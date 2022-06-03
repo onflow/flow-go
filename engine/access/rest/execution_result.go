@@ -9,7 +9,7 @@ import (
 )
 
 // GetExecutionResultsByBlockIDs gets Execution Result payload by block IDs.
-func GetExecutionResultsByBlockIDs(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
+func GetExecutionResultsByBlockIDs(r *request.Request, backend access.API, psapi access.PROTOCOL_STATE_API, link models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetExecutionResultByBlockIDsRequest()
 	if err != nil {
 		return nil, NewBadRequestError(err)
@@ -35,7 +35,7 @@ func GetExecutionResultsByBlockIDs(r *request.Request, backend access.API, link 
 }
 
 // GetExecutionResultByID gets execution result by the ID.
-func GetExecutionResultByID(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
+func GetExecutionResultByID(r *request.Request, backend access.API, psapi access.PROTOCOL_STATE_API, link models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetExecutionResultRequest()
 	if err != nil {
 		return nil, NewBadRequestError(err)

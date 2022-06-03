@@ -8,7 +8,7 @@ import (
 )
 
 // GetCollectionByID retrieves a collection by ID and builds a response
-func GetCollectionByID(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
+func GetCollectionByID(r *request.Request, backend access.API, psapi access.PROTOCOL_STATE_API, link models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetCollectionRequest()
 	if err != nil {
 		return nil, NewBadRequestError(err)

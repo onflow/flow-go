@@ -7,7 +7,7 @@ import (
 )
 
 // GetAccount handler retrieves account by address and returns the response
-func GetAccount(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
+func GetAccount(r *request.Request, backend access.API, psapi access.PROTOCOL_STATE_API, link models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetAccountRequest()
 	if err != nil {
 		return nil, NewBadRequestError(err)
@@ -15,7 +15,7 @@ func GetAccount(r *request.Request, backend access.API, link models.LinkGenerato
 
 	// in case we receive special height values 'final' and 'sealed', fetch that height and overwrite request with it
 	if req.Height == request.FinalHeight || req.Height == request.SealedHeight {
-		header, err := backend.GetLatestBlockHeader(r.Context(), req.Height == request.SealedHeight)
+		header, err := psapi.GetLatestBlockHeader(r.Context(), req.Height == request.SealedHeight)
 		if err != nil {
 			return nil, err
 		}

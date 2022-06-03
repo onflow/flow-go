@@ -12,9 +12,9 @@ import (
 )
 
 // NewServer returns an HTTP server initialized with the REST API handler
-func NewServer(backend access.API, listenAddress string, logger zerolog.Logger, chain flow.Chain) (*http.Server, error) {
+func NewServer(backend access.API, psapi access.PROTOCOL_STATE_API, listenAddress string, logger zerolog.Logger, chain flow.Chain) (*http.Server, error) {
 
-	router, err := newRouter(backend, logger, chain)
+	router, err := newRouter(backend, psapi, logger, chain)
 	if err != nil {
 		return nil, err
 	}

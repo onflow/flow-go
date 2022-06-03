@@ -15,12 +15,14 @@ import (
 
 type Handler struct {
 	api   access.API
+	psapi access.PROTOCOL_STATE_API
 	chain flow.Chain
 }
 
-func NewHandler(api access.API, chain flow.Chain) *Handler {
+func NewHandler(api access.API, psapi access.PROTOCOL_STATE_API, chain flow.Chain) *Handler {
 	return &Handler{
 		api:   api,
+		psapi: psapi,
 		chain: chain,
 	}
 }
@@ -66,7 +68,7 @@ func (h *Handler) GetLatestBlockHeader(
 	ctx context.Context,
 	req *accessproto.GetLatestBlockHeaderRequest,
 ) (*accessproto.BlockHeaderResponse, error) {
-	header, err := h.api.GetLatestBlockHeader(ctx, req.GetIsSealed())
+	header, err := h.psapi.GetLatestBlockHeader(ctx, req.GetIsSealed())
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +81,7 @@ func (h *Handler) GetBlockHeaderByHeight(
 	ctx context.Context,
 	req *accessproto.GetBlockHeaderByHeightRequest,
 ) (*accessproto.BlockHeaderResponse, error) {
-	header, err := h.api.GetBlockHeaderByHeight(ctx, req.GetHeight())
+	header, err := h.psapi.GetBlockHeaderByHeight(ctx, req.GetHeight())
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +96,7 @@ func (h *Handler) GetBlockHeaderByID(
 ) (*accessproto.BlockHeaderResponse, error) {
 	blockID := convert.MessageToIdentifier(req.GetId())
 
-	header, err := h.api.GetBlockHeaderByID(ctx, blockID)
+	header, err := h.psapi.GetBlockHeaderByID(ctx, blockID)
 	if err != nil {
 		return nil, err
 	}

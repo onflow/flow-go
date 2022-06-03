@@ -7,7 +7,7 @@ import (
 )
 
 // GetTransactionByID gets a transaction by requested ID.
-func GetTransactionByID(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
+func GetTransactionByID(r *request.Request, backend access.API, psapi access.PROTOCOL_STATE_API, link models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetTransactionRequest()
 	if err != nil {
 		return nil, NewBadRequestError(err)
@@ -33,7 +33,7 @@ func GetTransactionByID(r *request.Request, backend access.API, link models.Link
 }
 
 // GetTransactionResultByID retrieves transaction result by the transaction ID.
-func GetTransactionResultByID(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
+func GetTransactionResultByID(r *request.Request, backend access.API, psapi access.PROTOCOL_STATE_API, link models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetTransactionResultRequest()
 	if err != nil {
 		return nil, NewBadRequestError(err)
@@ -50,7 +50,7 @@ func GetTransactionResultByID(r *request.Request, backend access.API, link model
 }
 
 // CreateTransaction creates a new transaction from provided payload.
-func CreateTransaction(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
+func CreateTransaction(r *request.Request, backend access.API, psapi access.PROTOCOL_STATE_API, link models.LinkGenerator) (interface{}, error) {
 	req, err := r.CreateTransactionRequest()
 	if err != nil {
 		return nil, NewBadRequestError(err)

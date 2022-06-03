@@ -3,17 +3,16 @@ package backend
 import (
 	"context"
 	"crypto/md5" //nolint:gosec
-	"errors"
 	"fmt"
 	"sync"
 	"time"
 
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/access/rpc/backend/protocol_state"
+	"github.com/onflow/flow-go/engine/common"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -59,17 +58,43 @@ type Backend struct {
 	backendScripts
 	backendTransactions
 	backendEvents
-	backendBlockHeaders
 	backendBlockDetails
 	backendAccounts
 	backendExecutionResults
 
+	protocolState        protocol_state.ProtocolState
 	state                protocol.State
 	chainID              flow.ChainID
 	collections          storage.Collections
 	executionReceipts    storage.ExecutionReceipts
 	connFactory          ConnectionFactory
 	snapshotHistoryLimit int
+}
+
+func NewProtocolState(
+	state protocol.State,
+	headers storage.Headers,
+	chainID flow.ChainID,
+	retryEnabled bool,
+	maxHeightRange uint,
+	log zerolog.Logger,
+) *protocol_state.ProtocolState {
+	retry := NewRetry()
+	if retryEnabled {
+		retry.Activate()
+	}
+
+	b := &protocol_state.ProtocolState{
+		BlockHeaders: protocol_state.BlockHeaders{},
+		State:        state,
+		ChainID:      chainID,
+		Log:          log,
+	}
+
+	b.SetBlockHeader(headers, state)
+
+	retry.SetProtocolState(b)
+	return b
 }
 
 func New(
@@ -92,13 +117,22 @@ func New(
 	log zerolog.Logger,
 	snapshotHistoryLimit int,
 ) *Backend {
-	retry := newRetry()
+	retry := NewRetry()
 	if retryEnabled {
 		retry.Activate()
 	}
 
+	ps := NewProtocolState(
+		state,
+		headers,
+		chainID,
+		retryEnabled,
+		maxHeightRange,
+		log)
+
 	b := &Backend{
-		state: state,
+		protocolState: *ps,
+		state:         state,
 		// create the sub-backends
 		backendScripts: backendScripts{
 			headers:           headers,
@@ -134,10 +168,6 @@ func New(
 			connFactory:       connFactory,
 			log:               log,
 			maxHeightRange:    maxHeightRange,
-		},
-		backendBlockHeaders: backendBlockHeaders{
-			headers: headers,
-			state:   state,
 		},
 		backendBlockDetails: backendBlockDetails{
 			blocks: blocks,
@@ -205,6 +235,10 @@ func configureTransactionValidator(state protocol.State, chainID flow.ChainID) *
 	)
 }
 
+func (b *Backend) GetProtocolState() *protocol_state.ProtocolState {
+	return &b.protocolState
+}
+
 // Ping responds to requests when the server is up.
 func (b *Backend) Ping(ctx context.Context) error {
 
@@ -227,7 +261,7 @@ func (b *Backend) GetCollectionByID(_ context.Context, colID flow.Identifier) (*
 		// it is possible for a client to request a finalized block from us
 		// containing some collection, then get a not found error when requesting
 		// that collection. These clients should retry.
-		err = convertStorageError(fmt.Errorf("please retry for collection in finalized block: %w", err))
+		err = common.ConvertStorageError(fmt.Errorf("please retry for collection in finalized block: %w", err))
 		return nil, err
 	}
 
@@ -324,21 +358,6 @@ func (b *Backend) getCounterAndPhase(height uint64) (uint64, flow.EpochPhase, er
 
 func (b *Backend) isEpochOrPhaseDifferent(counter1, counter2 uint64, phase1, phase2 flow.EpochPhase) bool {
 	return counter1 != counter2 || phase1 != phase2
-}
-
-func convertStorageError(err error) error {
-	if err == nil {
-		return nil
-	}
-	if status.Code(err) == codes.NotFound {
-		// Already converted
-		return err
-	}
-	if errors.Is(err, storage.ErrNotFound) {
-		return status.Errorf(codes.NotFound, "not found: %v", err)
-	}
-
-	return status.Errorf(codes.Internal, "failed to find: %v", err)
 }
 
 // executionNodesForBlockID returns upto maxExecutionNodesCnt number of randomly chosen execution node identities
@@ -520,4 +539,18 @@ func chooseExecutionNodes(state protocol.State, executorIDs flow.IdentifierList)
 
 	// If no preferred or fixed ENs have been specified, then return all executor IDs i.e. no preference at all
 	return allENs.Filter(filter.HasNodeID(executorIDs...)), nil
+}
+
+func (b *Backend) GetLatestBlockHeader(ctx context.Context, isSealed bool) (*flow.Header, error) {
+
+	return b.protocolState.BlockHeaders.GetLatestBlockHeader(ctx, isSealed)
+}
+
+func (b *Backend) GetBlockHeaderByID(ctx context.Context, id flow.Identifier) (*flow.Header, error) {
+
+	return b.protocolState.BlockHeaders.GetBlockHeaderByID(ctx, id)
+}
+
+func (b *Backend) GetBlockHeaderByHeight(ctx context.Context, height uint64) (*flow.Header, error) {
+	return b.protocolState.BlockHeaders.GetBlockHeaderByHeight(ctx, height)
 }

@@ -114,46 +114,6 @@ func (suite *Suite) TestPing() {
 	suite.Require().NoError(err)
 }
 
-func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
-	// setup the mocks
-	block := unittest.BlockHeaderFixture()
-	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
-	suite.snapshot.On("Head").Return(&block, nil).Once()
-
-	backend := New(
-		suite.state,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		suite.chainID,
-		metrics.NewNoopCollector(),
-		nil,
-		false,
-		DefaultMaxHeightRange,
-		nil,
-		nil,
-		suite.log,
-		DefaultSnapshotHistoryLimit,
-	)
-
-	// query the handler for the latest finalized block
-	header, err := backend.GetLatestBlockHeader(context.Background(), false)
-	suite.checkResponse(header, err)
-
-	// make sure we got the latest block
-	suite.Require().Equal(block.ID(), header.ID())
-	suite.Require().Equal(block.Height, header.Height)
-	suite.Require().Equal(block.ParentID, header.ParentID)
-
-	suite.assertAllExpectations()
-
-}
-
 // TestGetLatestProtocolStateSnapshot_NoTransitionSpan tests our GetLatestProtocolStateSnapshot RPC endpoint
 // where the sealing segment for the state requested at latest finalized  block does not contain any blocks that
 // spans an epoch or epoch phase transition.
@@ -477,46 +437,6 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_HistoryLimit() {
 		_, err := backend.GetLatestProtocolStateSnapshot(context.Background())
 		suite.Require().ErrorIs(err, SnapshotHistoryLimitErr)
 	})
-}
-
-func (suite *Suite) TestGetLatestSealedBlockHeader() {
-	// setup the mocks
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
-
-	block := unittest.BlockHeaderFixture()
-	suite.snapshot.On("Head").Return(&block, nil).Once()
-
-	backend := New(
-		suite.state,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		suite.chainID,
-		metrics.NewNoopCollector(),
-		nil,
-		false,
-		DefaultMaxHeightRange,
-		nil,
-		nil,
-		suite.log,
-		DefaultSnapshotHistoryLimit,
-	)
-
-	// query the handler for the latest sealed block
-	header, err := backend.GetLatestBlockHeader(context.Background(), true)
-	suite.checkResponse(header, err)
-
-	// make sure we got the latest sealed block
-	suite.Require().Equal(block.ID(), header.ID())
-	suite.Require().Equal(block.Height, header.Height)
-	suite.Require().Equal(block.ParentID, header.ParentID)
-
-	suite.assertAllExpectations()
 }
 
 func (suite *Suite) TestGetTransaction() {

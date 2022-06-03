@@ -1,19 +1,20 @@
-package backend
+package protocol_state
 
 import (
 	"context"
 
+	"github.com/onflow/flow-go/engine/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
 
-type backendBlockHeaders struct {
+type BlockHeaders struct {
 	headers storage.Headers
 	state   protocol.State
 }
 
-func (b *backendBlockHeaders) GetLatestBlockHeader(_ context.Context, isSealed bool) (*flow.Header, error) {
+func (b *BlockHeaders) GetLatestBlockHeader(_ context.Context, isSealed bool) (*flow.Header, error) {
 	var header *flow.Header
 	var err error
 
@@ -26,27 +27,27 @@ func (b *backendBlockHeaders) GetLatestBlockHeader(_ context.Context, isSealed b
 	}
 
 	if err != nil {
-		err = convertStorageError(err)
+		err = common.ConvertStorageError(err)
 		return nil, err
 	}
 
 	return header, nil
 }
 
-func (b *backendBlockHeaders) GetBlockHeaderByID(_ context.Context, id flow.Identifier) (*flow.Header, error) {
+func (b *BlockHeaders) GetBlockHeaderByID(_ context.Context, id flow.Identifier) (*flow.Header, error) {
 	header, err := b.headers.ByBlockID(id)
 	if err != nil {
-		err = convertStorageError(err)
+		err = common.ConvertStorageError(err)
 		return nil, err
 	}
 
 	return header, nil
 }
 
-func (b *backendBlockHeaders) GetBlockHeaderByHeight(_ context.Context, height uint64) (*flow.Header, error) {
+func (b *BlockHeaders) GetBlockHeaderByHeight(_ context.Context, height uint64) (*flow.Header, error) {
 	header, err := b.headers.ByHeight(height)
 	if err != nil {
-		err = convertStorageError(err)
+		err = common.ConvertStorageError(err)
 		return nil, err
 	}
 

@@ -17,7 +17,7 @@ import (
 )
 
 // GetBlocksByIDs gets blocks by provided ID or list of IDs.
-func GetBlocksByIDs(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
+func GetBlocksByIDs(r *request.Request, backend access.API, psapi access.PROTOCOL_STATE_API, link models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetBlockByIDsRequest()
 	if err != nil {
 		return nil, NewBadRequestError(err)
@@ -25,7 +25,7 @@ func GetBlocksByIDs(r *request.Request, backend access.API, link models.LinkGene
 
 	blocks := make([]*models.Block, len(req.IDs))
 	for i, id := range req.IDs {
-		block, err := getBlock(forID(&id), r, backend, link)
+		block, err := getBlock(forID(&id), r, backend, psapi, link)
 		if err != nil {
 			return nil, err
 		}
@@ -35,14 +35,14 @@ func GetBlocksByIDs(r *request.Request, backend access.API, link models.LinkGene
 	return blocks, nil
 }
 
-func GetBlocksByHeight(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
+func GetBlocksByHeight(r *request.Request, backend access.API, psapi access.PROTOCOL_STATE_API, link models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetBlockRequest()
 	if err != nil {
 		return nil, NewBadRequestError(err)
 	}
 
 	if req.FinalHeight || req.SealedHeight {
-		block, err := getBlock(forFinalized(req.Heights[0]), r, backend, link)
+		block, err := getBlock(forFinalized(req.Heights[0]), r, backend, psapi, link)
 		if err != nil {
 			return nil, err
 		}
@@ -54,7 +54,7 @@ func GetBlocksByHeight(r *request.Request, backend access.API, link models.LinkG
 	if req.HasHeights() {
 		blocks := make([]*models.Block, len(req.Heights))
 		for i, h := range req.Heights {
-			block, err := getBlock(forHeight(h), r, backend, link)
+			block, err := getBlock(forHeight(h), r, backend, psapi, link)
 			if err != nil {
 				return nil, err
 			}
@@ -81,7 +81,7 @@ func GetBlocksByHeight(r *request.Request, backend access.API, link models.LinkG
 	blocks := make([]*models.Block, 0)
 	// start and end height inclusive
 	for i := req.StartHeight; i <= req.EndHeight; i++ {
-		block, err := getBlock(forHeight(i), r, backend, link)
+		block, err := getBlock(forHeight(i), r, backend, psapi, link)
 		if err != nil {
 			return nil, err
 		}
@@ -92,7 +92,7 @@ func GetBlocksByHeight(r *request.Request, backend access.API, link models.LinkG
 }
 
 // GetBlockPayloadByID gets block payload by ID
-func GetBlockPayloadByID(r *request.Request, backend access.API, _ models.LinkGenerator) (interface{}, error) {
+func GetBlockPayloadByID(r *request.Request, backend access.API, psapi access.PROTOCOL_STATE_API, _ models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetBlockPayloadRequest()
 	if err != nil {
 		return nil, NewBadRequestError(err)
@@ -113,7 +113,7 @@ func GetBlockPayloadByID(r *request.Request, backend access.API, _ models.LinkGe
 	return payload, nil
 }
 
-func getBlock(option blockProviderOption, req *request.Request, backend access.API, link models.LinkGenerator) (*models.Block, error) {
+func getBlock(option blockProviderOption, req *request.Request, backend access.API, psapi access.PROTOCOL_STATE_API, link models.LinkGenerator) (*models.Block, error) {
 	// lookup block
 	blkProvider := NewBlockProvider(backend, option)
 	blk, err := blkProvider.getBlock(req.Context())

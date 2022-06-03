@@ -5,6 +5,7 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/onflow/flow-go/engine/access/rpc/backend/protocol_state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
@@ -18,10 +19,11 @@ type Retry struct {
 	// pending transactions
 	transactionByReferencBlockHeight map[uint64]map[flow.Identifier]*flow.TransactionBody
 	backend                          *Backend
+	protocolstate                    *protocol_state.ProtocolState
 	active                           bool
 }
 
-func newRetry() *Retry {
+func NewRetry() *Retry {
 	return &Retry{
 		transactionByReferencBlockHeight: map[uint64]map[flow.Identifier]*flow.TransactionBody{},
 	}
@@ -34,6 +36,11 @@ func (r *Retry) Activate() *Retry {
 
 func (r *Retry) IsActive() bool {
 	return r.active
+}
+
+func (r *Retry) SetProtocolState(p *protocol_state.ProtocolState) *Retry {
+	r.protocolstate = p
+	return r
 }
 
 func (r *Retry) SetBackend(b *Backend) *Retry {

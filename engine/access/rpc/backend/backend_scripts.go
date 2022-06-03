@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/engine/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
@@ -86,7 +87,7 @@ func (b *backendScripts) ExecuteScriptAtBlockHeight(
 	// get header at given height
 	header, err := b.headers.ByHeight(blockHeight)
 	if err != nil {
-		err = convertStorageError(err)
+		err = common.ConvertStorageError(err)
 		return nil, err
 	}
 

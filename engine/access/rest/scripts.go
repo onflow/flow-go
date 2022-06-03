@@ -9,7 +9,7 @@ import (
 )
 
 // ExecuteScript handler sends the script from the request to be executed.
-func ExecuteScript(r *request.Request, backend access.API, _ models.LinkGenerator) (interface{}, error) {
+func ExecuteScript(r *request.Request, backend access.API, psapi access.PROTOCOL_STATE_API, _ models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetScriptRequest()
 	if err != nil {
 		return nil, NewBadRequestError(err)
@@ -25,7 +25,7 @@ func ExecuteScript(r *request.Request, backend access.API, _ models.LinkGenerato
 	}
 
 	if req.BlockHeight == request.FinalHeight {
-		finalBlock, err := backend.GetLatestBlockHeader(r.Context(), false)
+		finalBlock, err := psapi.GetLatestBlockHeader(r.Context(), false)
 		if err != nil {
 			return nil, err
 		}
