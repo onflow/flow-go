@@ -9,7 +9,6 @@ import (
 	"sync"
 
 	"github.com/golang/protobuf/ptypes/empty"
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	grpcinsecure "google.golang.org/grpc/credentials/insecure"
