@@ -1,0 +1,72 @@
+name: BFT Tests
+
+# BFT integration tests
+# run them on every push to a BFT feature branch
+
+on:
+  push:
+    branches:
+      - '**/*bft*'
+      - '**/*6221*'
+
+env:
+  GO_VERSION: 1.17
+
+jobs:
+  golangci:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Checkout repo
+        uses: actions/checkout@v2
+      - name: Build relic
+        run: make crypto_setup_gopath
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v2
+        with:
+          # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
+          version: v1.45
+          args: -v --build-tags relic
+          # https://github.com/golangci/golangci-lint-action/issues/244
+          skip-pkg-cache: true
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: './crypto'
+          ignore: 'relic'
+
+  integration-test:
+    name: Integration Tests
+    strategy:
+      fail-fast: false
+      matrix:
+        test-category:
+          - integration-bft
+    env:
+      TEST_CATEGORY: ${{ matrix.test-category }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Checkout repo
+        uses: actions/checkout@v2
+      - name: Build relic
+        run: make crypto_setup_gopath
+      - name: Docker build
+        run: make docker-build-flow-corrupted
+      - name: Run tests
+        if: github.actor != 'bors[bot]'
+        run: ./tools/test_monitor/run-tests.sh
+      - name: Run tests (Bors)
+        if: github.actor == 'bors[bot]'
+        uses: nick-invision/retry@v2
+        with:
+          timeout_minutes: 15
+          max_attempts: 2
+          command: ./tools/test_monitor/run-tests.sh
