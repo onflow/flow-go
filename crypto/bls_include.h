@@ -24,8 +24,8 @@
 #define MEMBERSHIP_CHECK 1
 
 // algorithm choice for the hashing to G1 
-#define RELIC_SSWU 1  // relic library implementation (compliant with the BLS IRTF draft)
-#define SSWU 2        // local flow implementation using different parameters than the IRTF draft 
+#define RELIC_SSWU 1  // relic library implementation (compliant with the BLS IETF draft)
+#define SSWU 2        // local flow implementation using different parameters than the IETF draft 
 #define hashToPoint SSWU
 
 // bls core (functions in bls_core.c)

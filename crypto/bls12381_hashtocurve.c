@@ -53,6 +53,10 @@ static int quotient_sqrt(fp_t out, const fp_t u, const fp_t v) {
     return res;
 }
 
+static int sign_0(const fp_t in) {
+    return !fp_is_even(in);
+}
+
 
 // These constants are taken from https://github.com/kwantam/bls12-381_hash 
 // and converted to the Mongtomery domain. 
@@ -176,58 +180,70 @@ const uint64_t iso_Dy_data[ELLP_Dy_LEN][Fp_DIGITS] = {
 };
 
 // Maps the field element t to a point p in E1(Fp) where E1: y^2 = g(x) = x^3 + a1*x + b1 
-// using optimized non-constant-time SWU impl
+// using simplified non-constant-time SWU impl
 // p point is in Jacobian coordinates
-static inline void map_to_E1_swu(ep_t p, const fp_t t) {
+static inline void map_to_E1_sswu(ep_t p, const fp_t t) {
     const int tmp_len = 6;
     fp_t* fp_tmp = (fp_t*) malloc(tmp_len*sizeof(fp_t));
     for (int i=0; i<tmp_len; i++) fp_new(&fp_tmp[i]);
 
+    fp_t z;
+    fp_new(&z);
+    // TODO : hardcode Montg(11)
+    fp_set_dig(z, 11);
+    //fp_neg(z,z);
+
     // compute numerator and denominator of X0(t) = N / D
-    fp_sqr(fp_tmp[0], t);                      // t^2
-    fp_sqr(fp_tmp[1], fp_tmp[0]);             // t^4
-    fp_sub(fp_tmp[1], fp_tmp[0], fp_tmp[1]);  // t^2 - t^4
-    fp_set_dig(fp_tmp[3], 1);
-    fp_sub(fp_tmp[2], fp_tmp[3], fp_tmp[1]);        // t^4 - t^2 + 1
-    fp_mul(fp_tmp[2], fp_tmp[2], bls_prec->b1);     // N = b * (t^4 - t^2 + 1)                
-    fp_mul(fp_tmp[1], fp_tmp[1], bls_prec->a1);     // D = a * (t^2 - t^4)                    
-    if (fp_cmp_dig(fp_tmp[1], 0) == RLC_EQ) {
-        // t was 0, -1, 1, so num is b and den is 0; set den to -a, because -b/a is square in Fp
-        fp_neg_basic(fp_tmp[1], bls_prec->a1);
+    fp_sqr(fp_tmp[1], t);                      // t^2
+    fp_mul(fp_tmp[1], fp_tmp[1], z);           // z * t^2
+    fp_sqr(fp_tmp[2], fp_tmp[1]);             // t^4
+    fp_add(fp_tmp[2], fp_tmp[2], fp_tmp[1]);  // t^2 + z * t^4
+    // TODO : hardcode Montg(1)
+    fp_set_dig(fp_tmp[0], 1); 
+    fp_add(fp_tmp[3], fp_tmp[2], fp_tmp[0]);        // z * t^4 + t^2 + 1
+    fp_mul(fp_tmp[3], fp_tmp[3], bls_prec->b1);     // N = b * (z * t^4 + t^2 + 1)
+    if (fp_cmp_dig(fp_tmp[2], 0) == RLC_EQ) { 
+        fp_mul(fp_tmp[4], z, bls_prec->a1);     // D = a * z
+    } else {
+        fp_neg(fp_tmp[4],fp_tmp[2]);
+        fp_mul(fp_tmp[4], fp_tmp[4], bls_prec->a1);     // D = - a * (t^2 + z * t^4) 
     }
 
     // compute numerator and denominator of g(X0(t)) = U / V 
-    // U = N^3 + a1 * N * D^2 + b1 D^3
+    // U = N^3 + a1 * N * D^2 + b1 * D^3
     // V = D^3
-    fp_sqr(fp_tmp[3], fp_tmp[1]);              // D^2
-    fp_mul(fp_tmp[4], fp_tmp[2], fp_tmp[3]);  // N * D^2
-    fp_mul(fp_tmp[4], fp_tmp[4], bls_prec->a1);      // a * N * D^2
-                                                   
-    fp_mul(fp_tmp[3], fp_tmp[3], fp_tmp[1]);  // V = D^3
-    fp_mul(fp_tmp[5], fp_tmp[3], bls_prec->b1);      // b1 * D^3
-    fp_add(fp_tmp[4], fp_tmp[4], fp_tmp[5]);   // a1 * N * D^2 + b1 * D^3
-                                                   
-    fp_sqr(fp_tmp[5], fp_tmp[2]);              // N^2
-    fp_mul(fp_tmp[5], fp_tmp[5], fp_tmp[2]);  // N^3
-    fp_add(fp_tmp[4], fp_tmp[4], fp_tmp[5]);   // U
+    fp_sqr(fp_tmp[2], fp_tmp[3]);                        // N^2
+    fp_sqr(fp_tmp[6], fp_tmp[4]);                        // D^2
+    fp_mul(fp_tmp[5], bls_prec->a1, fp_tmp[6]);          // a * D^2
+    fp_add(fp_tmp[2], fp_tmp[5], fp_tmp[2]);             // N^2 + a * D^2
+    fp_mul(fp_tmp[2], fp_tmp[3], fp_tmp[2]);             // N^3 + a * N * D^2
+    fp_mul(fp_tmp[6], fp_tmp[6], fp_tmp[4]);             // V  =  D^3
+    fp_mul(fp_tmp[5], bls_prec->b1, fp_tmp[6]);          // b * D^3
+    fp_add(fp_tmp[2], fp_tmp[5], fp_tmp[2]);             // U
 
+    fp_t *x,*y;
     // compute sqrt(U/V)
-    if (!quotient_sqrt(fp_tmp[5], fp_tmp[4], fp_tmp[3])) {
-        // g(X0(t)) was nonsquare, so convert to g(X1(t))
-        fp_mul(fp_tmp[5], fp_tmp[5], fp_tmp[0]);  // t^2 * sqrtCand
-        fp_mul(fp_tmp[5], fp_tmp[5], t);           // t^3 * sqrtCand
-        fp_mul(fp_tmp[2], fp_tmp[2], fp_tmp[0]);  // b * t^2 * (t^4 - t^2 + 1)
-        fp_neg_basic(fp_tmp[2], fp_tmp[2]);        // N = - b * t^2 * (t^4 - t^2 + 1)
-    } else if (dv_cmp(bls_prec->fp_p_1div2, t, Fp_DIGITS) ==  RLC_LT) {
-        // g(X0(t)) was square and t is negative, so negate y
-        fp_neg_basic(fp_tmp[5], fp_tmp[5]);  // negate y because t is negative
+    if (quotient_sqrt(fp_tmp[5], fp_tmp[2], fp_tmp[6])) {
+        x = &fp_tmp[3];       // x = N
+        y = &fp_tmp[5];       // y = sqrt(U/V)
+    } else {
+        fp_mul(fp_tmp[0], fp_tmp[1], fp_tmp[3]);          // x = z * t^2 * N
+        fp_mul(fp_tmp[1], fp_tmp[1], t);                    // z * t^3
+        fp_mul(fp_tmp[1], fp_tmp[1], fp_tmp[5]);            // y = z * t^3 * sqrtCand
+        x = &fp_tmp[0];
+        y = &fp_tmp[1];
     }
 
-    // convert (x,y)=(N/D, y) into (X,Y,Z) where Z=D
-    // Z = D, X = x*D^2 = N.D , Y = y*D^3
-    fp_mul(p->x, fp_tmp[2], fp_tmp[1]);  // X = N*D
-    fp_mul(p->y, fp_tmp[5], fp_tmp[3]);  // Y = y*D^3
-    fp_copy(p->z, fp_tmp[1]);
+    // negate y to be opposite sign of t
+    if (sign_0(t) == sign_0(*y)) {
+            fp_neg(*y, *y);
+    }
+
+    // convert (x/D, y) into Jacobian (X,Y,Z) where Z=D
+    // Z = D, X = x*D = N.D , Y = y*D^3  // TODO : check
+    fp_mul(p->x, *x, fp_tmp[4]);             // X = N*D
+    fp_mul(p->y, *y, fp_tmp[6]);  // Y = y*D^3
+    fp_copy(p->z, fp_tmp[4]);
     p->coord = JACOB;
     
     for (int i=0; i<tmp_len; i++) fp_free(&fp_tmp[i]);
@@ -371,10 +387,10 @@ static void map_to_G1_sswu(ep_t p, const uint8_t *msg, int len) {
         ep_t p_temp;
         ep_new(p_temp);
         // first mapping
-        map_to_E1_swu(p_temp, t1); // map to E1
+        map_to_E1_sswu(p_temp, t1); // map to E1
         eval_iso11(p_temp, p_temp); // map to E
         // second mapping
-        map_to_E1_swu(p, t2); // map to E1
+        map_to_E1_sswu(p, t2); // map to E1
         eval_iso11(p, p); // map to E
         // sum 
         // TODO: implement point addition in E1 and apply the isogeny map
