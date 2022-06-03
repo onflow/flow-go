@@ -123,6 +123,120 @@ func TestExtendValid(t *testing.T) {
 	})
 }
 
+func TestSealedIndex(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		metrics := metrics.NewNoopCollector()
+		tracer := trace.NewNoopTracer()
+		headers, _, seals, index, payloads, blocks, setups, commits, statuses, results := storeutil.StorageLayer(t, db)
+
+		// build a chain:
+		// G <- B1 <- B2 (resultB1) <- B3 <- B4 (resultB2, resultB3) <- B5 (sealB1) <- B6 (sealB2, sealB3) <- B7
+		// test that when B4 is finalized, can only find seal for G
+		// 					 when B5 is finalized, can find seal for B1
+		//					 when B7 is finalized, can find seals for B2, B3
+
+		// genesis block
+		rootBlock, result, rootSeal := unittest.BootstrapFixture(participants)
+		qc := unittest.QuorumCertificateFixture(unittest.QCWithBlockID(rootBlock.ID()))
+		rootSnapshot, err := inmem.SnapshotFromBootstrapState(rootBlock, result, rootSeal, qc)
+		require.NoError(t, err)
+
+		// block 1
+		b1 := unittest.BlockWithParentFixture(rootBlock)
+		b1.SetPayload(flow.EmptyPayload())
+		err = state.Extend(context.Background(), b1)
+		require.NoError(t, err)
+
+		// block 2(result B1)
+		b1Receipt := unittest.ReceiptForBlockFixture(b1)
+		b2 := unittest.BlockWithParentFixture(b1.Header)
+		b2.SetPayload(flow.Payload{
+			Receipts: []*flow.ExecutionReceiptMeta{b1Receipt.Meta()},
+			Results:  []*flow.ExecutionResult{&b1Receipt.ExecutionResult},
+		})
+		err = state.Extend(context.Background(), b2)
+		require.NoError(t, err)
+
+		// block 3
+		b3 := unittest.BlockWithParentFixture(b2)
+		b3.SetPayload(flow.EmptyPayload())
+		err = state.Extend(context.Background(), b3)
+		require.NoError(t, err)
+
+		// block 4 (resultB2, resultB3)
+		b2Receipt := unittest.ReceiptForBlockFixture(b2)
+		b3Receipt := unittest.ReceiptForBlockFixture(b3)
+		b4 := unittest.BlockWithParentFixture(b3.Header)
+		b4.SetPayload(flow.Payload{
+			Receipts: []*flow.ExecutionReceiptMeta{b2Receipt.Meta(), b3Receipt.Meta()},
+			Results:  []*flow.ExecutionResult{&b2Receipt.ExecutionResult, b3Receipt.Meta()},
+		})
+		err = state.Extend(context.Background(), b4)
+		require.NoError(t, err)
+
+		// block 5 (sealB1)
+		b1Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(&b1Receipt.ExecutionResult))
+		b5 := unittest.BlockWithParentFixture(b4.Header)
+		b5.SetPayload(flow.Payload{
+			Seals: []*flow.Seal{b1Seal},
+		})
+		err = state.Extend(context.Background(), b5)
+		require.NoError(t, err)
+
+		// block 6 (sealB2, sealB3)
+		b2Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(&b2Receipt.ExecutionResult))
+		b3Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(&b3Receipt.ExecutionResult))
+		b6 := unittest.BlockWithParentFixture(b5.Header)
+		b6.SetPayload(flow.Payload{
+			Seals: []*flow.Seal{b2Seal, b3Seal},
+		})
+		err = state.Extend(context.Background(), b6)
+		require.NoError(t, err)
+
+		// block 7
+		b7 := unittest.BlockWithParentFixture(b6)
+		b7.SetPayload(flow.EmptyPayload())
+		err = state.Extend(context.Background(), b7)
+		require.NoError(t, err)
+
+		// when B4 is finalized, can only find seal for G
+		err = state.Finalize(context.Background(), b4.BlockID())
+		require.NoError(t, err)
+
+		// can only find seal for G
+		rSeal, err = seals.BySealedBlockID(rootBlock.ID())
+		require.NoError(t, err)
+		require.Equal(t, rootSeal, rSeal)
+
+		_, err = seals.BySealedBlockID(b1.ID())
+		require.Error(t, err)
+
+		// when B5 is finalized, can find seal for B1
+		err = state.Finalize(context.Background(), b5.BlockID())
+		require.NoError(t, err)
+
+		s1, err = seals.BySealedBlockID(b1.ID())
+		require.NoError(t, err)
+		require.Equal(t, b1Seal, s1)
+
+		_, err = seals.BySealedBlockID(b2.ID())
+		require.Error(t, err)
+
+		// when B7 is finalized, can find seals for B2, B3
+		err = state.Finalize(context.Background(), b7.BlockID())
+		require.NoError(t, err)
+
+		s2, err = seals.BySealedBlockID(b2.ID())
+		require.NoError(t, err)
+		require.Equal(t, b2Seal, s2)
+
+		s3, err = seals.BySealedBlockID(b3.ID())
+		require.NoError(t, err)
+		require.Equal(t, b3Seal, s3)
+	})
+
+}
+
 func TestExtendSealedBoundary(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
