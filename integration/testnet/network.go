@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/dkg"
+	"github.com/onflow/flow-go/insecure/cmd"
 
 	"github.com/dapperlabs/testingdock"
 	"github.com/docker/docker/api/types"
@@ -137,6 +138,7 @@ type FlowNetwork struct {
 	network                     *testingdock.Network
 	Containers                  map[string]*Container
 	ConsensusFollowers          map[flow.Identifier]consensus_follower.ConsensusFollower
+	CorruptedPortMapping        map[flow.Identifier]string // port binding for corrupted containers.
 	AccessPorts                 map[string]string
 	AccessPortsByContainerName  map[string]string
 	MetricsPortsByContainerName map[string]string
@@ -146,6 +148,26 @@ type FlowNetwork struct {
 	BootstrapDir                string
 	BootstrapSnapshot           *inmem.Snapshot
 	BootstrapData               *BootstrapData
+}
+
+// CorruptedIdentities returns the identities of corrupted nodes in testnet (for BFT testing).
+func (net *FlowNetwork) CorruptedIdentities() flow.IdentityList {
+	// lists up the corrupted identifiers
+	corruptedIdentifiers := flow.IdentifierList{}
+	for _, c := range net.config.Nodes {
+		if c.Corrupted {
+			corruptedIdentifiers = append(corruptedIdentifiers, c.Identifier)
+		}
+	}
+
+	// extracts corrupted identities to corrupted identifiers
+	corruptedIdentities := flow.IdentityList{}
+	for _, c := range net.Containers {
+		if corruptedIdentifiers.Contains(c.Config.Identity().NodeID) {
+			corruptedIdentities = append(corruptedIdentities, c.Config.Identity())
+		}
+	}
+	return corruptedIdentities
 }
 
 // Identities returns a list of identities, one for each node in the network.
@@ -509,10 +531,26 @@ func WithDebugImage(debug bool) func(config *NodeConfig) {
 	}
 }
 
+// AsCorrupted sets the configuration of a node as corrupted, hence the node is pulling
+// the corrupted image of its role at the build time.
+// A corrupted image is running with Corruptible Conduit Factory hence enabling BFT testing
+// on the node.
+func AsCorrupted() func(config *NodeConfig) {
+	return func(config *NodeConfig) {
+		if config.Ghost {
+			panic("a node cannot be both corrupted and ghost at the same time")
+		}
+		config.Corrupted = true
+	}
+}
+
 func AsGhost() func(config *NodeConfig) {
 	return func(config *NodeConfig) {
+		if config.Corrupted {
+			panic("a node cannot be both corrupted and ghost at the same time")
+		}
 		config.Ghost = true
-		// using the fully-connectred topology to ensure a ghost node is always connected to all other nodes in the network,
+		// using the fully-connected topology to ensure a ghost node is always connected to all other nodes in the network,
 		config.AdditionalFlags = append(config.AdditionalFlags, "--topology=fully-connected")
 	}
 }
@@ -535,7 +573,7 @@ func integrationBootstrapDir() (string, error) {
 	return ioutil.TempDir(TmpRoot, integrationBootstrap)
 }
 
-func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
+func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.ChainID) *FlowNetwork {
 	// number of nodes
 	nNodes := len(networkConf.Nodes)
 
@@ -566,7 +604,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 
 	t.Logf("BootstrapDir: %s \n", bootstrapDir)
 
-	bootstrapData, err := BootstrapNetwork(networkConf, bootstrapDir)
+	bootstrapData, err := BootstrapNetwork(networkConf, bootstrapDir, chainID)
 	require.Nil(t, err)
 
 	root := bootstrapData.Root
@@ -592,6 +630,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		AccessPorts:                 make(map[string]string),
 		AccessPortsByContainerName:  make(map[string]string),
 		MetricsPortsByContainerName: make(map[string]string),
+		CorruptedPortMapping:        make(map[flow.Identifier]string),
 		root:                        root,
 		seal:                        seal,
 		result:                      result,
@@ -600,7 +639,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		BootstrapData:               bootstrapData,
 	}
 
-	// check that at-least 2 full access nodes must be configure in your test suite
+	// check that at-least 2 full access nodes must be configured in your test suite
 	// in order to provide a secure GRPC connection for LN & SN nodes
 	accessNodeIDS := make([]string, 0)
 	for _, n := range confs {
@@ -944,6 +983,14 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 		nodeContainer.bindPort(hostPort, containerPort)
 	}
 
+	if nodeConf.Corrupted {
+		// corrupted nodes are running with a Corrupted Conduit Factory (CCF), hence need to bind their
+		// CCF port to local host so they can be accessible by the attack network.
+		hostPort := testingdock.RandomPort(t)
+		nodeContainer.bindPort(hostPort, strconv.Itoa(cmd.CorruptibleConduitFactoryPort))
+		net.CorruptedPortMapping[nodeConf.NodeID] = hostPort
+	}
+
 	suiteContainer := net.suite.Container(*opts)
 	nodeContainer.Container = suiteContainer
 	net.Containers[nodeContainer.Name()] = nodeContainer
@@ -1008,8 +1055,7 @@ type BootstrapData struct {
 	ClusterRootBlocks []*cluster.Block
 }
 
-func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*BootstrapData, error) {
-	chainID := flow.Localnet
+func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID flow.ChainID) (*BootstrapData, error) {
 	chain := chainID.Chain()
 
 	// number of nodes
@@ -1263,6 +1309,7 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 			AdditionalFlags:       conf.AdditionalFlags,
 			Debug:                 conf.Debug,
 			SupportsUnstakedNodes: conf.SupportsUnstakedNodes,
+			Corrupted:             conf.Corrupted,
 		}
 
 		confs = append(confs, containerConf)
