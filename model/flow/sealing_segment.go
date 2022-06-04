@@ -264,6 +264,12 @@ func (builder *SealingSegmentBuilder) isValidHeight(block *Block) bool {
 // hasValidSeal returns true if the latest seal as of highest is for lowest.
 // NOTE: only applicable for non-root sealing segments containing multiple blocks,
 // root sealing segments are checked by isValidRootSegment.
+// A <- B <- C <- D(seal_A) 							==> valid
+// A <- B <- C <- D(seal_A) <- E() 				==> valid
+// A <- B <- C <- D(seal_A,seal_B) 				==> invalid, because latest seal is B, but lowest block is A
+// A <- B <- C <- D(seal_X,seal_A) 				==> valid, because it's OK for block X to be unknown
+// A <- B <- C <- D(seal_A) <- E(seal_B) 	==> invalid, because latest seal is B, but lowest block is A
+// A(seal_A) 															==> invalid, because this is impossible for non-root sealing segments
 func (builder *SealingSegmentBuilder) hasValidSeal() (*Seal, bool) {
 	lowestID := builder.lowest().ID()
 	highestID := builder.highest().ID()
@@ -281,9 +287,8 @@ func (builder *SealingSegmentBuilder) hasValidSeal() (*Seal, bool) {
 			if seal.ID() == latestSealID {
 				if seal.BlockID == lowestID {
 					return seal, true
-				} else {
-					return nil, false
 				}
+				return nil, false
 			}
 		}
 
@@ -301,11 +306,11 @@ func (builder *SealingSegmentBuilder) hasValidSeal() (*Seal, bool) {
 func (builder *SealingSegmentBuilder) isValidRootSegment() bool {
 	return len(builder.blocks) == rootSegmentBlocksLen &&
 		builder.highest().Header.View == rootSegmentBlockView &&
-		len(builder.results) == rootSegmentBlocksLen &&
-		builder.firstSeal != nil &&
-		builder.results[0].BlockID == builder.blocks[0].ID() && // result matches the block
-		builder.results[0].ID() == builder.firstSeal.ResultID && // seal matches the result
-		builder.results[0].BlockID == builder.firstSeal.BlockID // seal seals the block
+		len(builder.results) == rootSegmentBlocksLen && // root segment has only 1 result
+		builder.firstSeal != nil && // first seal is the root seal itself and must exist
+		builder.results[0].BlockID == builder.blocks[0].ID() && // root result matches the root block
+		builder.results[0].ID() == builder.firstSeal.ResultID && // root seal matches the root result
+		builder.results[0].BlockID == builder.firstSeal.BlockID // root seal seals the root block
 }
 
 // validateSegment will validate if builder satisfies conditions for a valid sealing segment.
