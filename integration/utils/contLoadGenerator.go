@@ -70,6 +70,7 @@ func NewContLoadGenerator(
 	serviceAccountAddress *flowsdk.Address,
 	fungibleTokenAddress *flowsdk.Address,
 	flowTokenAddress *flowsdk.Address,
+	trackTxs bool,
 	tps int,
 	loadType LoadType,
 	feedbackEnabled bool,
@@ -87,8 +88,7 @@ func NewContLoadGenerator(
 		return nil, fmt.Errorf("error loading service account %w", err)
 	}
 
-	// TODO get these params hooked to the top level
-	txStatsTracker := NewTxStatsTracker(&StatsConfig{1, 1, 1, 1, 1, numberOfAccounts})
+	txStatsTracker := NewTxStatsTracker()
 	txTracker, err := NewTxTracker(log, 5000, 100, loadedAccessAddr, time.Second, txStatsTracker)
 	if err != nil {
 		return nil, err
@@ -100,7 +100,7 @@ func NewContLoadGenerator(
 		initialized:          false,
 		tps:                  tps,
 		numberOfAccounts:     numberOfAccounts,
-		trackTxs:             false,
+		trackTxs:             trackTxs,
 		flowClient:           flowClient,
 		serviceAccount:       servAcc,
 		fungibleTokenAddress: fungibleTokenAddress,

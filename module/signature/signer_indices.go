@@ -1,6 +1,7 @@
 package signature
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/ledger/common/bitutils"
@@ -118,20 +119,22 @@ func EncodeSignerToIndicesAndSigType(
 //  * The input `signers` must be the set of signers in their canonical order.
 //
 // Expected Error returns during normal operations:
-//  * ErrIncompatibleBitVectorLength indicates that `signerIndices` has the wrong length
-//  * ErrIllegallyPaddedBitVector is the vector is padded with bits other than 0
+//  * signature.IsInvalidSigTypesError if the given `sigType` does not encode a valid sequence of signature types
 func DecodeSigTypeToStakingAndBeaconSigners(
 	signers flow.IdentityList,
 	sigType []byte,
-) (stakingSigners flow.IdentityList, beaconSigners flow.IdentityList, err error) {
+) (flow.IdentityList, flow.IdentityList, error) {
 	numberSigners := len(signers)
-	if e := validPadding(sigType, numberSigners); e != nil {
-		return nil, nil, fmt.Errorf("sigType is invalid: %w", e)
+	if err := validPadding(sigType, numberSigners); err != nil {
+		if errors.Is(err, ErrIncompatibleBitVectorLength) || errors.Is(err, ErrIllegallyPaddedBitVector) {
+			return nil, nil, NewInvalidSigTypesErrorf("invalid padding of sigTypes: %w", err)
+		}
+		return nil, nil, fmt.Errorf("unexpected exception while checking padding of sigTypes: %w", err)
 	}
 
 	// decode bits to Identities
-	stakingSigners = make(flow.IdentityList, 0, numberSigners)
-	beaconSigners = make(flow.IdentityList, 0, numberSigners)
+	stakingSigners := make(flow.IdentityList, 0, numberSigners)
+	beaconSigners := make(flow.IdentityList, 0, numberSigners)
 	for i, signer := range signers {
 		if bitutils.ReadBit(sigType, i) == 0 {
 			stakingSigners = append(stakingSigners, signer)
@@ -211,36 +214,56 @@ func EncodeSignersToIndices(
 //  * The input `canonicalIdentifiers` must exhaustively list the set of authorized signers in their canonical order.
 //
 // Expected Error returns during normal operations:
-//  * ErrIncompatibleBitVectorLength indicates that `signerIndices` has the wrong length
-//  * ErrIllegallyPaddedBitVector is the vector is padded with bits other than 0
-//  * ErrInvalidChecksum if the input is shorter than the expected checksum contained therein
+// * signature.InvalidSignerIndicesError if the given index vector `prefixed` does not encode a valid set of signers
 func DecodeSignerIndicesToIdentifiers(
 	canonicalIdentifiers flow.IdentifierList,
 	prefixed []byte,
 ) (flow.IdentifierList, error) {
+	indices, err := decodeSignerIndices(canonicalIdentifiers, prefixed)
+	if err != nil {
+		return nil, err
+	}
+
+	signerIDs := make(flow.IdentifierList, 0, len(indices))
+	for _, index := range indices {
+		signerIDs = append(signerIDs, canonicalIdentifiers[index])
+	}
+	return signerIDs, nil
+}
+
+func decodeSignerIndices(
+	canonicalIdentifiers flow.IdentifierList,
+	prefixed []byte,
+) ([]int, error) {
 	// the prefixed contains the checksum of the canonicalIdentifiers that the signerIndices
 	// creator saw.
 	// extract the checksum and compare with the canonicalIdentifiers to see if both
 	// the signerIndices creator and validator see the same list.
 	signerIndices, err := CompareAndExtract(canonicalIdentifiers, prefixed)
 	if err != nil {
-		return nil, fmt.Errorf("could not extract signer indices from prefixed data: %w", err)
+		if errors.Is(err, ErrInvalidChecksum) {
+			return nil, NewInvalidSignerIndicesErrorf("signer indices' checkum is invalid: %w", err)
+		}
+		return nil, fmt.Errorf("unexpected exception while checking signer indices: %w", err)
 	}
 
 	numberCanonicalNodes := len(canonicalIdentifiers)
 	err = validPadding(signerIndices, numberCanonicalNodes)
 	if err != nil {
-		return nil, fmt.Errorf("signerIndices are invalid: %w", err)
+		if errors.Is(err, ErrIncompatibleBitVectorLength) || errors.Is(err, ErrIllegallyPaddedBitVector) {
+			return nil, NewInvalidSignerIndicesErrorf("invalid padding of signerIndices: %w", err)
+		}
+		return nil, fmt.Errorf("unexpected exception while checking padding of signer indices: %w", err)
 	}
 
 	// decode bits to Identifiers
-	signerIDs := make(flow.IdentifierList, 0, numberCanonicalNodes)
+	indices := make([]int, 0, numberCanonicalNodes)
 	for i := 0; i < numberCanonicalNodes; i++ {
 		if bitutils.ReadBit(signerIndices, i) == 1 {
-			signerIDs = append(signerIDs, canonicalIdentifiers[i])
+			indices = append(indices, i)
 		}
 	}
-	return signerIDs, nil
+	return indices, nil
 }
 
 // DecodeSignerIndicesToIdentities decodes the given compacted bit vector into node Identities.
@@ -248,35 +271,21 @@ func DecodeSignerIndicesToIdentifiers(
 //  * The input `canonicalIdentifiers` must exhaustively list the set of authorized signers in their canonical order.
 //
 // Expected Error returns during normal operations:
-//  * ErrIncompatibleBitVectorLength indicates that `signerIndices` has the wrong length
-//  * ErrIllegallyPaddedBitVector is the vector is padded with bits other than 0
-//  * ErrInvalidChecksum if the input is shorter than the expected checksum contained therein
+// * signature.InvalidSignerIndicesError if the given index vector `prefixed` does not encode a valid set of signers
 func DecodeSignerIndicesToIdentities(
 	canonicalIdentities flow.IdentityList,
 	prefixed []byte,
 ) (flow.IdentityList, error) {
-	// the prefixed contains the checksum of the canonicalIdentifiers that the signerIndices
-	// creator saw.
-	// extract the checksum and compare with the canonicalIdentifiers to see if both
-	// the signerIndices creator and validator see the same list.
-	signerIndices, err := CompareAndExtract(canonicalIdentities.NodeIDs(), prefixed)
+	indices, err := decodeSignerIndices(canonicalIdentities.NodeIDs(), prefixed)
 	if err != nil {
-		return nil, fmt.Errorf("could not extract signer indices from prefixed data: %w", err)
+		return nil, err
 	}
 
-	numberCanonicalNodes := len(canonicalIdentities)
-	if e := validPadding(signerIndices, numberCanonicalNodes); e != nil {
-		return nil, fmt.Errorf("signerIndices padding are invalid: %w", e)
+	signers := make(flow.IdentityList, 0, len(indices))
+	for _, index := range indices {
+		signers = append(signers, canonicalIdentities[index])
 	}
-
-	// decode bits to Identities
-	signerIdentities := make(flow.IdentityList, 0, numberCanonicalNodes)
-	for i := 0; i < numberCanonicalNodes; i++ {
-		if bitutils.ReadBit(signerIndices, i) == 1 {
-			signerIdentities = append(signerIdentities, canonicalIdentities[i])
-		}
-	}
-	return signerIdentities, nil
+	return signers, nil
 }
 
 // validPadding verifies that `bitVector` satisfies the following criteria
@@ -284,7 +293,9 @@ func DecodeSignerIndicesToIdentities(
 //    `numUsedBits` number of bits. Otherwise, we return an `ErrIncompatibleBitVectorLength`.
 //  2. If `numUsedBits` is _not_ an integer-multiple of 8, `bitVector` is padded with tailing bits. Per
 //     convention, these bits must be zero. Otherwise, we return an `ErrIllegallyPaddedBitVector`.
-// All errors represent expected failure cases for byzantine inputs. There are _no unexpected_ error returns.
+// Expected Error returns during normal operations:
+//  * ErrIncompatibleBitVectorLength if the vector has the wrong length
+//  * ErrIllegallyPaddedBitVector if the vector is padded with bits other than 0
 func validPadding(bitVector []byte, numUsedBits int) error {
 	// Verify condition 1:
 	l := len(bitVector)
