@@ -82,6 +82,7 @@ func TestSealedBlockIndexAndRetrieve(t *testing.T) {
 
 		expectedSeal := unittest.Seal.Fixture()
 		blockID := unittest.IdentifierFixture()
+		expectedSeal.BlockID = blockID
 
 		// store the seal first
 		err := store.Store(expectedSeal)
