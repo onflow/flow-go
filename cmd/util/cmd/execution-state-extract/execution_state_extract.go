@@ -63,12 +63,18 @@ func extractExecutionState(
 	newState := ledger.State(targetHash)
 
 	if migrate {
+		storageUsedUpdateMigration := mgr.StorageUsedUpdateMigration{
+			Log:       log,
+			OutputDir: outputDir,
+		}
+
 		accountStatusMigration := mgr.AccountStatusMigration{
 			Logger: log,
 		}
 
 		migrations = []ledger.Migration{
 			accountStatusMigration.Migrate,
+			storageUsedUpdateMigration.Migrate,
 			mgr.PruneMigration,
 		}
 
