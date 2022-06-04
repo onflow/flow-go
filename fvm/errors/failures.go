@@ -29,29 +29,56 @@ func (e UnknownFailure) Unwrap() error {
 	return e.err
 }
 
-// EncodingError captures an error sourced from encoding issues
-type EncodingError struct {
+// EventEncodingError captures an error sourced from encoding issues
+type EventEncodingError struct {
 	err error
 }
 
-// NewEncodingErrorf formats and returns a new EncodingError
-func NewEncodingErrorf(msg string, err error) *EncodingError {
-	return &EncodingError{
+// NewEventEncodingErrorf formats and returns a new EventEncodingError
+func NewEventEncodingErrorf(msg string, err error) *EventEncodingError {
+	return &EventEncodingError{
 		err: fmt.Errorf(msg, err),
 	}
 }
 
-func (e *EncodingError) Error() string {
+func (e *EventEncodingError) Error() string {
+	//return fmt.Sprintf("%s encoding failed: %s", e.ErrorCode().String(), e.err.Error())
 	return fmt.Sprintf("%s encoding failed: %s", e.ErrorCode().String(), e.err.Error())
 }
 
 // ErrorCode returns the error code
-func (e *EncodingError) ErrorCode() ErrorCode {
+func (e *EventEncodingError) ErrorCode() ErrorCode {
 	return ErrCodeEventEncodingError
 }
 
 // Unwrap unwraps the error
-func (e EncodingError) Unwrap() error {
+func (e EventEncodingError) Unwrap() error {
+	return e.err
+}
+
+// EncodingFailure captures an fatal error sourced from encoding issues
+type EncodingFailure struct {
+	err error
+}
+
+// NewEncodingFailuref formats and returns a new EncodingFailure
+func NewEncodingFailuref(msg string, err error) *EncodingFailure {
+	return &EncodingFailure{
+		err: fmt.Errorf(msg, err),
+	}
+}
+
+func (e *EncodingFailure) Error() string {
+	return fmt.Sprintf("%s encoding failed: %s", e.FailureCode().String(), e.err.Error())
+}
+
+// FailureCode returns the failure code
+func (e *EncodingFailure) FailureCode() FailureCode {
+	return FailureCodeEncodingFailure
+}
+
+// Unwrap unwraps the error
+func (e EncodingFailure) Unwrap() error {
 	return e.err
 }
 

@@ -372,7 +372,7 @@ func (a *StatefulAccounts) setContractNames(contractNames contractNames, address
 	err = cborEncoder.Encode(contractNames)
 	if err != nil {
 		msg := fmt.Sprintf("cannot encode contract names: %s", contractNames)
-		return errors.NewEncodingErrorf(msg, err)
+		return errors.NewEncodingFailuref(msg, err)
 	}
 	newContractNames := buf.Bytes()
 

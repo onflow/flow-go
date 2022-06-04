@@ -44,7 +44,7 @@ type TransactionEnv struct {
 	contracts        *handler.ContractHandler
 	accountKeys      *handler.AccountKeyHandler
 	metrics          *handler.MetricsHandler
-	eventHandler     *handler.EventHandler
+	eventHandler     handler.EventHandler
 	addressGenerator flow.AddressGenerator
 	rng              *rand.Rand
 	logs             []string
@@ -63,6 +63,7 @@ func NewTransactionEnvironment(
 	tx *flow.TransactionBody,
 	txIndex uint32,
 	traceSpan opentracing.Span,
+	eventHandlerOptions ...handler.FlowEventHandlerOption,
 ) (*TransactionEnv, error) {
 
 	accounts := state.NewAccounts(sth)
@@ -70,10 +71,11 @@ func NewTransactionEnvironment(
 	uuidGenerator := state.NewUUIDGenerator(sth)
 	programsHandler := handler.NewProgramsHandler(programs, sth)
 	// TODO set the flags on context
-	eventHandler := handler.NewEventHandler(ctx.Chain,
+	eventHandler := handler.NewFlowEventHandler(ctx.Chain,
 		ctx.EventCollectionEnabled,
 		ctx.ServiceEventCollectionEnabled,
 		ctx.EventCollectionByteSizeLimit,
+		eventHandlerOptions...,
 	)
 	accountKeys := handler.NewAccountKeyHandler(accounts)
 	metrics := handler.NewMetricsHandler(ctx.Metrics)
