@@ -50,8 +50,7 @@ func (s Snapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
 }
 
 func (s Snapshot) Seal() (*flow.Seal, error) {
-	// canonical snapshots don't have seal
-	return nil, nil
+	return s.enc.SealingSegment.Seal, nil
 }
 
 func (s Snapshot) SealingSegment() (*flow.SealingSegment, error) {
