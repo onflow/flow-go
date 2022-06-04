@@ -3633,7 +3633,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			memoryWeights,
 		),
 	).withContextOptions(
-		fvm.WithMemoryLimit(10_000_000_000),
+		fvm.WithMemoryLimit(20_000_000_000),
 	).run(
 		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 

@@ -501,6 +501,11 @@ type testRuntime struct {
 	readStored         func(common.Address, cadence.Path, runtime.Context) (cadence.Value, error)
 }
 
+func (e *testRuntime) SetDebugger(debugger *interpreter.Debugger) {
+	//TODO implement me
+	panic("implement me")
+}
+
 var _ runtime.Runtime = &testRuntime{}
 
 func (e *testRuntime) SetInvalidatedResourceValidationEnabled(_ bool) {
