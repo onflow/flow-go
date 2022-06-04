@@ -681,8 +681,6 @@ func (e *testingEventEncoder) Encode(event cadence.Event) ([]byte, error) {
 		e.calls++
 	}()
 
-	fmt.Printf("%s\n", event)
-
 	if e.calls == 1 {
 		return nil, fmt.Errorf("I failed encoding")
 	}
