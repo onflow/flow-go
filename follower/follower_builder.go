@@ -7,11 +7,15 @@ import (
 	"fmt"
 	"strings"
 
+	upstream "github.com/onflow/flow-go/module/upstream"
+
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/routing"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	p2ppubsub "github.com/libp2p/go-libp2p-pubsub"
+
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/module/local"
@@ -19,9 +23,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
-	upstream "github.com/onflow/flow-go/upstream"
-
-	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/module/compliance"
@@ -73,14 +74,10 @@ import (
 //  | observer 3             |<--------------------------|
 //  +------------------------+
 
-type FlowBuilder interface {
-	cmd.NodeBuilder
-}
-
-// ObserverServiceConfig defines all the user defined parameters required to bootstrap an access node
+// FollowerServiceConfig defines all the user defined parameters required to bootstrap an access node
 // For a node running as a standalone process, the config fields will be populated from the command line params,
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
-type ObserverServiceConfig struct {
+type FollowerServiceConfig struct {
 	bootstrapNodeAddresses  []string
 	bootstrapNodePublicKeys []string
 	bootstrapIdentities     flow.IdentityList // the identity list of bootstrap peers the node uses to discover other nodes
@@ -88,20 +85,20 @@ type ObserverServiceConfig struct {
 	baseOptions             []cmd.Option
 }
 
-// DefaultObserverServiceConfig defines all the default values for the ObserverServiceConfig
-func DefaultObserverServiceConfig() *ObserverServiceConfig {
-	return &ObserverServiceConfig{
+// DefaultFollowerServiceConfig defines all the default values for the FollowerServiceConfig
+func DefaultFollowerServiceConfig() *FollowerServiceConfig {
+	return &FollowerServiceConfig{
 		bootstrapNodeAddresses:  []string{},
 		bootstrapNodePublicKeys: []string{},
 	}
 }
 
 // ObserverServiceBuilder provides the common functionality needed to bootstrap a Flow staked and observer
-// It is composed of the FlowNodeBuilder, the ObserverServiceConfig and contains all the components and modules needed for the
+// It is composed of the FlowNodeBuilder, the FollowerServiceConfig and contains all the components and modules needed for the
 // staked and observers
-type ObserverServiceBuilder struct {
+type FollowerServiceBuilder struct {
 	*cmd.FlowNodeBuilder
-	*ObserverServiceConfig
+	*FollowerServiceConfig
 
 	// components
 	LibP2PNode              *p2p.Node
@@ -127,7 +124,7 @@ type ObserverServiceBuilder struct {
 
 // deriveBootstrapPeerIdentities derives the Flow Identity of the bootstrap peers from the parameters.
 // These are the identities of the staked and observers also acting as the DHT bootstrap server
-func (builder *ObserverServiceBuilder) deriveBootstrapPeerIdentities() error {
+func (builder *FollowerServiceBuilder) deriveBootstrapPeerIdentities() error {
 	// if bootstrap identities already provided (as part of alternate initialization as a library the skip reading command
 	// line params)
 	if builder.bootstrapIdentities != nil {
@@ -144,7 +141,7 @@ func (builder *ObserverServiceBuilder) deriveBootstrapPeerIdentities() error {
 	return nil
 }
 
-func (builder *ObserverServiceBuilder) buildFollowerState() *ObserverServiceBuilder {
+func (builder *FollowerServiceBuilder) buildFollowerState() *FollowerServiceBuilder {
 	builder.Module("mutable follower state", func(node *cmd.NodeConfig) error {
 		// For now, we only support state implementations from package badger.
 		// If we ever support different implementations, the following can be replaced by a type-aware factory
@@ -169,7 +166,7 @@ func (builder *ObserverServiceBuilder) buildFollowerState() *ObserverServiceBuil
 	return builder
 }
 
-func (builder *ObserverServiceBuilder) buildSyncCore() *ObserverServiceBuilder {
+func (builder *FollowerServiceBuilder) buildSyncCore() *FollowerServiceBuilder {
 	builder.Module("sync core", func(node *cmd.NodeConfig) error {
 		syncCore, err := synchronization.New(node.Logger, node.SyncCoreConfig)
 		builder.SyncCore = syncCore
@@ -180,7 +177,7 @@ func (builder *ObserverServiceBuilder) buildSyncCore() *ObserverServiceBuilder {
 	return builder
 }
 
-func (builder *ObserverServiceBuilder) buildCommittee() *ObserverServiceBuilder {
+func (builder *FollowerServiceBuilder) buildCommittee() *FollowerServiceBuilder {
 	builder.Module("committee", func(node *cmd.NodeConfig) error {
 		// initialize consensus committee's membership state
 		// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
@@ -194,7 +191,7 @@ func (builder *ObserverServiceBuilder) buildCommittee() *ObserverServiceBuilder 
 	return builder
 }
 
-func (builder *ObserverServiceBuilder) buildLatestHeader() *ObserverServiceBuilder {
+func (builder *FollowerServiceBuilder) buildLatestHeader() *FollowerServiceBuilder {
 	builder.Module("latest header", func(node *cmd.NodeConfig) error {
 		finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 		builder.Finalized, builder.Pending = finalized, pending
@@ -205,7 +202,7 @@ func (builder *ObserverServiceBuilder) buildLatestHeader() *ObserverServiceBuild
 	return builder
 }
 
-func (builder *ObserverServiceBuilder) buildFollowerCore() *ObserverServiceBuilder {
+func (builder *FollowerServiceBuilder) buildFollowerCore() *FollowerServiceBuilder {
 	builder.Component("follower core", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		// create a finalizer that will handle updating the protocol
 		// state when the follower detects newly finalized blocks
@@ -228,7 +225,7 @@ func (builder *ObserverServiceBuilder) buildFollowerCore() *ObserverServiceBuild
 	return builder
 }
 
-func (builder *ObserverServiceBuilder) buildFollowerEngine() *ObserverServiceBuilder {
+func (builder *FollowerServiceBuilder) buildFollowerEngine() *FollowerServiceBuilder {
 	builder.Component("follower engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		// initialize cleaner for DB
 		cleaner := storage.NewCleaner(node.Logger, node.DB, builder.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
@@ -261,7 +258,7 @@ func (builder *ObserverServiceBuilder) buildFollowerEngine() *ObserverServiceBui
 	return builder
 }
 
-func (builder *ObserverServiceBuilder) buildFinalizedHeader() *ObserverServiceBuilder {
+func (builder *FollowerServiceBuilder) buildFinalizedHeader() *FollowerServiceBuilder {
 	builder.Component("finalized snapshot", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		finalizedHeader, err := synceng.NewFinalizedHeaderCache(node.Logger, node.State, builder.FinalizationDistributor)
 		if err != nil {
@@ -275,7 +272,7 @@ func (builder *ObserverServiceBuilder) buildFinalizedHeader() *ObserverServiceBu
 	return builder
 }
 
-func (builder *ObserverServiceBuilder) buildSyncEngine() *ObserverServiceBuilder {
+func (builder *FollowerServiceBuilder) buildSyncEngine() *FollowerServiceBuilder {
 	builder.Component("sync engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		sync, err := synceng.New(
 			node.Logger,
@@ -299,7 +296,7 @@ func (builder *ObserverServiceBuilder) buildSyncEngine() *ObserverServiceBuilder
 	return builder
 }
 
-func (builder *ObserverServiceBuilder) BuildConsensusFollower() FlowBuilder {
+func (builder *FollowerServiceBuilder) BuildConsensusFollower() cmd.NodeBuilder {
 	builder.
 		buildFollowerState().
 		buildSyncCore().
@@ -313,44 +310,47 @@ func (builder *ObserverServiceBuilder) BuildConsensusFollower() FlowBuilder {
 	return builder
 }
 
-type FollowerOption func(*ObserverServiceConfig)
+type FollowerOption func(*FollowerServiceConfig)
 
 func WithBootStrapPeers(bootstrapNodes ...*flow.Identity) FollowerOption {
-	return func(config *ObserverServiceConfig) {
+	return func(config *FollowerServiceConfig) {
 		config.bootstrapIdentities = bootstrapNodes
 	}
 }
 
 func WithNetworkKey(key crypto.PrivateKey) FollowerOption {
-	return func(config *ObserverServiceConfig) {
+	return func(config *FollowerServiceConfig) {
 		config.NetworkKey = key
 	}
 }
 
 func WithBaseOptions(baseOptions []cmd.Option) FollowerOption {
-	return func(config *ObserverServiceConfig) {
+	return func(config *FollowerServiceConfig) {
 		config.baseOptions = baseOptions
 	}
 }
 
-func FlowObserverService(opts ...FollowerOption) *ObserverServiceBuilder {
-	config := DefaultObserverServiceConfig()
+func FlowConsensusFollowerService(opts ...FollowerOption) *FollowerServiceBuilder {
+	config := DefaultFollowerServiceConfig()
 	for _, opt := range opts {
 		opt(config)
 	}
-
-	return &ObserverServiceBuilder{
-		ObserverServiceConfig: config,
+	ret := &FollowerServiceBuilder{
+		FollowerServiceConfig: config,
 		// TODO: using RoleAccess here for now. This should be refactored eventually to have its own role type
 		FlowNodeBuilder:         cmd.FlowNode(flow.RoleAccess.String(), config.baseOptions...),
 		FinalizationDistributor: pubsub.NewFinalizationDistributor(),
 	}
+	// the observer gets a version of the root snapshot file that does not contain any node addresses
+	// hence skip all the root snapshot validations that involved an identity address
+	ret.FlowNodeBuilder.SkipNwAddressBasedValidations = true
+	return ret
 }
 
 // initNetwork creates the network.Network implementation with the given metrics, middleware, initial list of network
 // participants and topology used to choose peers from the list of participants. The list of participants can later be
 // updated by calling network.SetIDs.
-func (builder *ObserverServiceBuilder) initNetwork(nodeID module.Local,
+func (builder *FollowerServiceBuilder) initNetwork(nodeID module.Local,
 	networkMetrics module.NetworkMetrics,
 	middleware network.Middleware,
 	topology network.Topology,
@@ -430,16 +430,9 @@ func BootstrapIdentities(addresses []string, keys []string) (flow.IdentityList, 
 	return ids, nil
 }
 
-func WithSkipValidations(builder *ObserverServiceBuilder) *ObserverServiceBuilder {
-	// the observer gets a version of the root snapshot file that does not contain any node addresses
-	// hence skip all the root snapshot validations that involved an identity address
-	builder.SkipNwAddressBasedValidations = true
-	return builder
-}
-
-func (builder *ObserverServiceBuilder) initNodeInfo() error {
+func (builder *FollowerServiceBuilder) initNodeInfo() error {
 	// use the networking key that has been passed in the config, or load from the configured file
-	networkingKey := builder.ObserverServiceConfig.NetworkKey
+	networkingKey := builder.FollowerServiceConfig.NetworkKey
 
 	pubKey, err := keyutils.LibP2PPublicKeyFromFlow(networkingKey.PublicKey())
 	if err != nil {
@@ -462,7 +455,7 @@ func (builder *ObserverServiceBuilder) initNodeInfo() error {
 	return nil
 }
 
-func (builder *ObserverServiceBuilder) InitIDProviders() {
+func (builder *FollowerServiceBuilder) InitIDProviders() {
 	builder.Module("id providers", func(node *cmd.NodeConfig) error {
 		idCache, err := p2p.NewProtocolStateIDCache(node.Logger, node.State, builder.ProtocolEvents)
 		if err != nil {
@@ -501,7 +494,7 @@ func (builder *ObserverServiceBuilder) InitIDProviders() {
 	})
 }
 
-func (builder *ObserverServiceBuilder) Initialize() error {
+func (builder *FollowerServiceBuilder) Initialize() error {
 	if err := builder.deriveBootstrapPeerIdentities(); err != nil {
 		return err
 	}
@@ -534,11 +527,11 @@ func (builder *ObserverServiceBuilder) Initialize() error {
 	return nil
 }
 
-func (builder *ObserverServiceBuilder) validateParams() error {
+func (builder *FollowerServiceBuilder) validateParams() error {
 	if builder.BaseConfig.BindAddr == cmd.NotSet || builder.BaseConfig.BindAddr == "" {
 		return errors.New("bind address not specified")
 	}
-	if builder.ObserverServiceConfig.NetworkKey == nil {
+	if builder.FollowerServiceConfig.NetworkKey == nil {
 		return errors.New("networking key not provided")
 	}
 	if len(builder.bootstrapIdentities) > 0 {
@@ -562,7 +555,7 @@ func (builder *ObserverServiceBuilder) validateParams() error {
 //		No connection gater
 // 		No connection manager
 // 		Default libp2p pubsub options
-func (builder *ObserverServiceBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2p.LibP2PFactoryFunc {
+func (builder *FollowerServiceBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2p.LibP2PFactoryFunc {
 	return func(ctx context.Context) (*p2p.Node, error) {
 		var pis []peer.AddrInfo
 
@@ -604,7 +597,7 @@ func (builder *ObserverServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 // initObserverLocal initializes the observer's ID, network key and network address
 // Currently, it reads a node-info.priv.json like any other node.
 // TODO: read the node ID from the special bootstrap files
-func (builder *ObserverServiceBuilder) initObserverLocal() func(node *cmd.NodeConfig) error {
+func (builder *FollowerServiceBuilder) initObserverLocal() func(node *cmd.NodeConfig) error {
 	return func(node *cmd.NodeConfig) error {
 		// for an observer, set the identity here explicitly since it will not be found in the protocol state
 		self := &flow.Identity{
@@ -626,7 +619,7 @@ func (builder *ObserverServiceBuilder) initObserverLocal() func(node *cmd.NodeCo
 
 // enqueueMiddleware enqueues the creation of the network middleware
 // this needs to be done before sync engine participants module
-func (builder *ObserverServiceBuilder) enqueueMiddleware() {
+func (builder *FollowerServiceBuilder) enqueueMiddleware() {
 	builder.
 		Module("network middleware", func(node *cmd.NodeConfig) error {
 
@@ -648,13 +641,13 @@ func (builder *ObserverServiceBuilder) enqueueMiddleware() {
 
 // Build enqueues the sync engine and the follower engine for the observer.
 // Currently, the observer only runs the follower engine.
-func (builder *ObserverServiceBuilder) Build() (cmd.Node, error) {
+func (builder *FollowerServiceBuilder) Build() (cmd.Node, error) {
 	builder.BuildConsensusFollower()
 	return builder.FlowNodeBuilder.Build()
 }
 
 // enqueuePublicNetworkInit enqueues the observer network component initialized for the observer
-func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
+func (builder *FollowerServiceBuilder) enqueuePublicNetworkInit() {
 
 	builder.Component("unstaked network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
@@ -693,7 +686,7 @@ func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
 // (https://github.com/libp2p/go-libp2p-pubsub/issues/442). This means that an observer could end up not being
 // discovered by other observers if it subscribes to a topic before connecting to the staked AN. Hence, the need
 // of an explicit connect to the staked AN before the node attempts to subscribe to topics.
-func (builder *ObserverServiceBuilder) enqueueConnectWithStakedAN() {
+func (builder *FollowerServiceBuilder) enqueueConnectWithStakedAN() {
 	builder.Component("upstream connector", func(_ *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		return upstream.NewUpstreamConnector(builder.bootstrapIdentities, builder.LibP2PNode, builder.Logger), nil
 	})
@@ -701,7 +694,7 @@ func (builder *ObserverServiceBuilder) enqueueConnectWithStakedAN() {
 
 // initMiddleware creates the network.Middleware implementation with the libp2p factory function, metrics, peer update
 // interval, and validators. The network.Middleware is then passed into the initNetwork function.
-func (builder *ObserverServiceBuilder) initMiddleware(nodeID flow.Identifier,
+func (builder *FollowerServiceBuilder) initMiddleware(nodeID flow.Identifier,
 	networkMetrics module.NetworkMetrics,
 	factoryFunc p2p.LibP2PFactoryFunc,
 	validators ...network.MessageValidator) network.Middleware {

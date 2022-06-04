@@ -686,7 +686,6 @@ func prepareObserverService(i int, observerName string, agPublicKey string, prof
 	observerService := Service{
 		Image: fmt.Sprintf("localnet-%s", DefaultObserverName),
 		Command: []string{
-			fmt.Sprintf("--staked=false"),
 			fmt.Sprintf("--bootstrap-node-addresses=%s:%d", DefaultAccessGatewayName, AccessPubNetworkPort),
 			fmt.Sprintf("--bootstrap-node-public-keys=%s", agPublicKey),
 			fmt.Sprintf("--observer-networking-key-path=/bootstrap/private-root-information/%s_key", observerName),
@@ -694,10 +693,6 @@ func prepareObserverService(i int, observerName string, agPublicKey string, prof
 			fmt.Sprintf("--rpc-addr=%s:%d", observerName, RPCPort),
 			fmt.Sprintf("--secure-rpc-addr=%s:%d", observerName, SecuredRPCPort),
 			fmt.Sprintf("--http-addr=%s:%d", observerName, HTTPPort),
-			fmt.Sprintf("--collection-ingress-port=%d", RPCPort),
-			"--log-tx-time-to-finalized",
-			"--log-tx-time-to-executed",
-			"--log-tx-time-to-finalized-executed",
 			"--bootstrapdir=/bootstrap",
 			"--datadir=/data/protocol",
 			"--secretsdir=/data/secret",

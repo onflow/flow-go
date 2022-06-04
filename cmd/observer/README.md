@@ -1,15 +1,17 @@
 # Observer Service
 
-The observer service provides a read-only point of contact to interact with the Flow network. It implements a subset of the [Access API](https://docs.onflow.org/access-api/). Users who need to change the state of the network should opt for running an Access node.
-
-It is a gRPC scalable server which connects to a staked access node via libp2p, and forwards execute requests via gRPC.
+The observer service provides read-only access to the Flow network. It implements a subset of the [Access API](https://docs.onflow.org/access-api/) which is served from a local copy of the protocol data. It can be configured to proxy the remaining endpoints to an upstream staked Access Node.
 
 At a high level it does the following:
 
-1. Forwards all read-only Script related calls (`ExecuteScriptAtLatestBlock`, `ExecuteScriptAtBlockID` and `ExecuteScriptAtBlockHeight`) to one of the access nodes that forwards it to one of the execution services.
-2. Follows updates to the blockchain and locally caches transactions, collections, and sealed blocks.
-3. Replies to client API calls for information such as `GetBlockByID`, `GetCollectionByID`, `GetTransaction` etc.
+1. Follows updates to the Flow network's protocol state, and maintains a local copy.
 
+2. Runs a gRPC server which implements a subset of the Access API
+
+    1. Responds to API calls for information such as `GetBlockByID`, `GetCollectionByID`, `GetTransaction` etc using its local data
+
+    2. Forwards requests for execution state (`ExecuteScriptAt*`, `GetEvents*`, `TransactionResult`, etc) to a configured upstream staked Access Node.
 
 ***NOTE**: The Observer service does not participate in the Flow protocol*
+
 

@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	consensus_follower "github.com/onflow/flow-go/module/upstream"
+
 	badger "github.com/ipfs/go-ds-badger2"
 
 	"github.com/onflow/flow-go/model/encoding/cbor"
@@ -71,7 +73,6 @@ import (
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/storage"
-	consensus_follower "github.com/onflow/flow-go/upstream"
 )
 
 // ObserverBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node
@@ -89,10 +90,6 @@ import (
 //  +------------------------+                           ^
 //  | observer 3             |<--------------------------|
 //  +------------------------+
-
-type ObserverBuilder interface {
-	cmd.NodeBuilder
-}
 
 // ObserverServiceConfig defines all the user defined parameters required to bootstrap an access node
 // For a node running as a standalone process, the config fields will be populated from the command line params,
@@ -390,7 +387,7 @@ func (builder *ObserverServiceBuilder) buildSyncEngine() *ObserverServiceBuilder
 	return builder
 }
 
-func (builder *ObserverServiceBuilder) BuildConsensusFollower() ObserverBuilder {
+func (builder *ObserverServiceBuilder) BuildConsensusFollower() cmd.NodeBuilder {
 	builder.
 		buildFollowerState().
 		buildSyncCore().
@@ -534,41 +531,22 @@ func (builder *ObserverServiceBuilder) ParseFlags() error {
 }
 
 func (builder *ObserverServiceBuilder) extraFlags() {
-	var dummyString string
-	var dummyBool bool
-	var dummyUint uint
 	builder.ExtraFlags(func(flags *pflag.FlagSet) {
 		defaultConfig := DefaultObserverServiceConfig()
 
-		flags.UintVar(&dummyUint, "collection-ingress-port", 0, "deprecated - the grpc ingress port for all collection nodes")
-		flags.UintVar(&dummyUint, "execution-ingress-port", 0, "deprecated - the grpc ingress port for all execution nodes")
 		flags.StringVarP(&builder.rpcConf.UnsecureGRPCListenAddr, "rpc-addr", "r", defaultConfig.rpcConf.UnsecureGRPCListenAddr, "the address the unsecured gRPC server listens on")
 		flags.StringVar(&builder.rpcConf.SecureGRPCListenAddr, "secure-rpc-addr", defaultConfig.rpcConf.SecureGRPCListenAddr, "the address the secure gRPC server listens on")
 		flags.StringVarP(&builder.rpcConf.HTTPListenAddr, "http-addr", "h", defaultConfig.rpcConf.HTTPListenAddr, "the address the http proxy server listens on")
 		flags.StringVar(&builder.rpcConf.RESTListenAddr, "rest-addr", defaultConfig.rpcConf.RESTListenAddr, "the address the REST server listens on (if empty the REST server will not be started)")
-		flags.StringVarP(&builder.rpcConf.CollectionAddr, "static-collection-ingress-addr", "", defaultConfig.rpcConf.CollectionAddr, "the address (of the collection node) to send transactions to")
-		flags.StringVarP(&dummyString, "script-addr", "", "", "deprecated - the address (of the execution node) forward the script to")
-		flags.StringVarP(&dummyString, "historical-access-addr", "", "", "deprecated - comma separated rpc addresses for historical access nodes")
-		flags.DurationVar(&builder.rpcConf.CollectionClientTimeout, "collection-client-timeout", defaultConfig.rpcConf.CollectionClientTimeout, "grpc client timeout for a collection node")
-		flags.DurationVar(&builder.rpcConf.ExecutionClientTimeout, "execution-client-timeout", defaultConfig.rpcConf.ExecutionClientTimeout, "grpc client timeout for an execution node")
 		flags.UintVar(&builder.rpcConf.MaxHeightRange, "rpc-max-height-range", defaultConfig.rpcConf.MaxHeightRange, "maximum size for height range requests")
-		flags.StringSliceVar(&builder.rpcConf.PreferredExecutionNodeIDs, "preferred-execution-node-ids", defaultConfig.rpcConf.PreferredExecutionNodeIDs, "comma separated list of execution nodes ids to choose from when making an upstream call e.g. b4a4dbdcd443d...,fb386a6a... etc.")
-		flags.StringSliceVar(&builder.rpcConf.FixedExecutionNodeIDs, "fixed-execution-node-ids", defaultConfig.rpcConf.FixedExecutionNodeIDs, "comma separated list of execution nodes ids to choose from when making an upstream call if no matching preferred execution id is found e.g. b4a4dbdcd443d...,fb386a6a... etc.")
-		flags.BoolVar(&dummyBool, "log-tx-time-to-finalized", false, "deprecated - log transaction time to finalized")
-		flags.BoolVar(&dummyBool, "log-tx-time-to-executed", false, "deprecated - log transaction time to executed")
-		flags.BoolVar(&dummyBool, "log-tx-time-to-finalized-executed", false, "deprecated - log transaction time to finalized and executed")
-		flags.BoolVar(&dummyBool, "retry-enabled", false, "deprecated - whether to enable the retry mechanism at the access node level")
-		flags.BoolVar(&dummyBool, "rpc-metrics-enabled", false, "deprecated - whether to enable the rpc metrics")
 		flags.StringToIntVar(&builder.apiRatelimits, "api-rate-limits", defaultConfig.apiRatelimits, "per second rate limits for Access API methods e.g. Ping=300,GetTransaction=500 etc.")
 		flags.StringToIntVar(&builder.apiBurstlimits, "api-burst-limits", defaultConfig.apiBurstlimits, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
-		flags.BoolVar(&dummyBool, "staked", false, "deprecated - whether this node is a staked access node or not")
 		flags.StringVar(&builder.observerNetworkingKeyPath, "observer-networking-key-path", defaultConfig.observerNetworkingKeyPath, "path to the networking key for observer")
 		flags.StringSliceVar(&builder.bootstrapNodeAddresses, "bootstrap-node-addresses", defaultConfig.bootstrapNodeAddresses, "the network addresses of the bootstrap access node if this is an observer e.g. access-001.mainnet.flow.org:9653,access-002.mainnet.flow.org:9653")
 		flags.StringSliceVar(&builder.bootstrapNodePublicKeys, "bootstrap-node-public-keys", defaultConfig.bootstrapNodePublicKeys, "the networking public key of the bootstrap access node if this is an observer (in the same order as the bootstrap node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
-		flags.StringVar(&dummyString, "public-network-address", "", "deprecated - access node's public network bind address")
 		flags.DurationVar(&builder.apiTimeout, "flow-api-timeout", defaultConfig.apiTimeout, "tcp timeout for Flow API gRPC socket")
-		flags.StringSliceVar(&builder.upstreamNodeAddresses, "upstream-node-addresses", defaultConfig.bootstrapNodeAddresses, "the network addresses of the bootstrap access node if this is an observer e.g. access-001.mainnet.flow.org:9653,access-002.mainnet.flow.org:9653")
-		flags.StringSliceVar(&builder.upstreamNodePublicKeys, "upstream-node-public-keys", defaultConfig.bootstrapNodePublicKeys, "the networking public key of the bootstrap access node if this is an observer (in the same order as the bootstrap node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
+		flags.StringSliceVar(&builder.upstreamNodeAddresses, "upstream-node-addresses", defaultConfig.upstreamNodeAddresses, "the gRPC network addresses of the upstream access node. e.g. access-001.mainnet.flow.org:9000,access-002.mainnet.flow.org:9000")
+		flags.StringSliceVar(&builder.upstreamNodePublicKeys, "upstream-node-public-keys", defaultConfig.upstreamNodePublicKeys, "the networking public key of the upstream access node (in the same order as the upstream node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
 		// ExecutionDataRequester config
 		flags.BoolVar(&builder.executionDataSyncEnabled, "execution-data-sync-enabled", defaultConfig.executionDataSyncEnabled, "whether to enable the execution data sync protocol")
 		flags.StringVar(&builder.executionDataDir, "execution-data-dir", defaultConfig.executionDataDir, "directory to use for Execution Data database")
@@ -661,19 +639,20 @@ func BootstrapIdentities(addresses []string, keys []string) (flow.IdentityList, 
 		if !strings.HasPrefix(key, "\"") {
 			key = fmt.Sprintf("\"%s\"", key)
 		}
-		// networking public key
-		var networkKey encodable.NetworkPubKey
-		err := json.Unmarshal([]byte(key), &networkKey)
-		if err != nil {
-			return nil, err
-		}
 
 		// create the identity of the peer by setting only the relevant fields
 		ids[i] = &flow.Identity{
 			NodeID:        flow.ZeroID, // the NodeID is the hash of the staking key and for the public network it does not apply
 			Address:       address,
 			Role:          flow.RoleAccess, // the upstream node has to be an access node
-			NetworkPubKey: networkKey,
+			NetworkPubKey: nil,
+		}
+
+		// networking public key
+		var networkKey encodable.NetworkPubKey
+		err := json.Unmarshal([]byte(key), &networkKey)
+		if err == nil {
+			ids[i].NetworkPubKey = networkKey
 		}
 	}
 	return ids, nil
@@ -808,8 +787,8 @@ func (builder *ObserverServiceBuilder) validateParams() error {
 	if len(builder.bootstrapNodeAddresses) != len(builder.bootstrapNodePublicKeys) {
 		return errors.New("number of bootstrap node addresses and public keys should match")
 	}
-	if len(builder.upstreamNodeAddresses) != len(builder.upstreamIdentities) {
-		return errors.New("number of upstream node addresses and public keys should match")
+	if len(builder.upstreamNodePublicKeys) > 0 && len(builder.upstreamNodeAddresses) != len(builder.upstreamNodePublicKeys) {
+		return errors.New("number of upstream node addresses and public keys must match if public keys given")
 	}
 	return nil
 }
@@ -966,9 +945,6 @@ func (builder *ObserverServiceBuilder) enqueueConnectWithStakedAN() {
 func (builder *ObserverServiceBuilder) attachRPCEngine() {
 	builder.Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		ids := builder.upstreamIdentities
-		if len(ids) == 0 {
-			ids = builder.bootstrapIdentities
-		}
 		proxy, err := apiservice.NewFlowAPIService(ids, builder.apiTimeout)
 		if err != nil {
 			return nil, err
