@@ -204,10 +204,9 @@ func TestSealedIndex(t *testing.T) {
 		err = state.Finalize(context.Background(), b4.ID())
 		require.NoError(t, err)
 
-		// TODO: add tests
 		// can only find seal for G
-		// _, err = state.AtBlockID(rootHeader.ID()).Seal()
-		// require.NoError(t, err)
+		_, err = state.AtBlockID(rootHeader.ID()).Seal()
+		require.NoError(t, err)
 
 		_, err = state.AtBlockID(b1.ID()).Seal()
 		require.Error(t, err)

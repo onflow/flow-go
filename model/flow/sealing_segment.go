@@ -63,6 +63,9 @@ type SealingSegment struct {
 	// sealed state, when the first block contains no seal.
 	// If the first block in the segment contains seal, then this field is `nil`
 	FirstSeal *Seal
+
+	// Seal is the seal for the first block (the lowest height) in the segment
+	Seal *Seal
 }
 
 func (segment *SealingSegment) Highest() *Block {
@@ -235,7 +238,8 @@ func (builder *SealingSegmentBuilder) addExecutionResult(result *ExecutionResult
 // SealingSegment completes building the sealing segment, validating the segment
 // constructed so far, and returning it as a SealingSegment if it is valid.
 func (builder *SealingSegmentBuilder) SealingSegment() (*SealingSegment, error) {
-	if err := builder.validateSegment(); err != nil {
+	seal, err := builder.validateSegment()
+	if err != nil {
 		return nil, fmt.Errorf("failed to validate sealing segment: %w", err)
 	}
 
@@ -244,6 +248,7 @@ func (builder *SealingSegmentBuilder) SealingSegment() (*SealingSegment, error) 
 		ExecutionResults: builder.results,
 		LatestSeals:      builder.latestSeals,
 		FirstSeal:        builder.firstSeal,
+		Seal:             seal,
 	}, nil
 }
 
@@ -259,7 +264,7 @@ func (builder *SealingSegmentBuilder) isValidHeight(block *Block) bool {
 // hasValidSeal returns true if the latest seal as of highest is for lowest.
 // NOTE: only applicable for non-root sealing segments containing multiple blocks,
 // root sealing segments are checked by isValidRootSegment.
-func (builder *SealingSegmentBuilder) hasValidSeal() bool {
+func (builder *SealingSegmentBuilder) hasValidSeal() (*Seal, bool) {
 	lowestID := builder.lowest().ID()
 	highestID := builder.highest().ID()
 
@@ -274,7 +279,11 @@ func (builder *SealingSegmentBuilder) hasValidSeal() bool {
 		for _, seal := range block.Payload.Seals {
 			// if we found the latest seal, confirm it seals lowest
 			if seal.ID() == latestSealID {
-				return seal.BlockID == lowestID
+				if seal.BlockID == lowestID {
+					return seal, true
+				} else {
+					return nil, false
+				}
 			}
 		}
 
@@ -282,38 +291,45 @@ func (builder *SealingSegmentBuilder) hasValidSeal() bool {
 		// backwards from higher height to lower height.
 		// otherwise, the sealing segment is invalid
 		if len(block.Payload.Seals) > 0 {
-			return false
+			return nil, false
 		}
 	}
-	return false
+	return nil, false
 }
 
 // isValidRootSegment will check that the block in the root segment has a view of 0.
 func (builder *SealingSegmentBuilder) isValidRootSegment() bool {
-	return len(builder.blocks) == rootSegmentBlocksLen && builder.highest().Header.View == rootSegmentBlockView
+	return len(builder.blocks) == rootSegmentBlocksLen &&
+		builder.highest().Header.View == rootSegmentBlockView &&
+		len(builder.results) == rootSegmentBlocksLen &&
+		builder.firstSeal != nil &&
+		builder.results[0].BlockID == builder.blocks[0].ID() && // result matches the block
+		builder.results[0].ID() == builder.firstSeal.ResultID && // seal matches the result
+		builder.results[0].BlockID == builder.firstSeal.BlockID // seal seals the block
 }
 
 // validateSegment will validate if builder satisfies conditions for a valid sealing segment.
-func (builder *SealingSegmentBuilder) validateSegment() error {
+func (builder *SealingSegmentBuilder) validateSegment() (*Seal, error) {
 	// sealing cannot be empty
 	if len(builder.blocks) < 1 {
-		return fmt.Errorf("expect at least 2 blocks in a sealing segment or 1 block in the case of root segments, but actually got %v: %w", len(builder.blocks), ErrSegmentBlocksWrongLen)
+		return nil, fmt.Errorf("expect at least 2 blocks in a sealing segment or 1 block in the case of root segments, but actually got %v: %w", len(builder.blocks), ErrSegmentBlocksWrongLen)
 	}
 
 	// if root sealing segment skip seal sanity check
 	if len(builder.blocks) == 1 {
 		if !builder.isValidRootSegment() {
-			return fmt.Errorf("root sealing segment block has the wrong view got (%d) expected (%d): %w", builder.highest().Header.View, rootSegmentBlockView, ErrSegmentInvalidRootView)
+			return nil, fmt.Errorf("root sealing segment block has the wrong view got (%d) expected (%d): %w", builder.highest().Header.View, rootSegmentBlockView, ErrSegmentInvalidRootView)
 		}
 
-		return nil
+		return builder.firstSeal, nil
 	}
 
-	if !builder.hasValidSeal() {
-		return fmt.Errorf("sealing segment missing seal lowest (%x) highest (%x): %w", builder.lowest().ID(), builder.highest().ID(), ErrSegmentMissingSeal)
+	seal, valid := builder.hasValidSeal()
+	if !valid {
+		return nil, fmt.Errorf("sealing segment missing seal lowest (%x) highest (%x): %w", builder.lowest().ID(), builder.highest().ID(), ErrSegmentMissingSeal)
 	}
 
-	return nil
+	return seal, nil
 }
 
 // highest returns the highest block in segment.

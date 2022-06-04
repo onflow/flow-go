@@ -259,8 +259,10 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 		if err != nil {
 			return fmt.Errorf("could not insert sealed height: %w", err)
 		}
-		// TODO: index seal of the block
-		// err = operation.IndexBySealedBlockID(
+		err = operation.IndexBySealedBlockID(segment.Seal.ID(), segment.Seal.BlockID)(tx)
+		if err != nil {
+			return fmt.Errorf("could not index sealed block: %w", err)
+		}
 
 		return nil
 	}
