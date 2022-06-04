@@ -85,6 +85,8 @@ type namedModuleFunc struct {
 type namedComponentFunc struct {
 	fn   ReadyDoneFactory
 	name string
+
+	errorHandler component.OnError
 }
 
 // FlowNodeBuilder is the default builder struct used for all flow nodes
@@ -885,13 +887,21 @@ func (fnb *FlowNodeBuilder) handleComponents() error {
 	parent := make(chan struct{})
 	close(parent)
 
+	var err error
 	// Run all components
 	for _, f := range fnb.components {
 		started := make(chan struct{})
-		err := fnb.handleComponent(f, parent, func() { close(started) })
+
+		if f.errorHandler != nil {
+			err = fnb.handleRestartableComponent(f, parent, func() { close(started) })
+		} else {
+			err = fnb.handleComponent(f, parent, func() { close(started) })
+		}
+
 		if err != nil {
 			return err
 		}
+
 		parent = started
 	}
 	return nil
@@ -906,9 +916,9 @@ func (fnb *FlowNodeBuilder) handleComponents() error {
 // to close before starting, and then call the started callback after they are ready(). The started
 // callback closes the parentReady channel of the next component, and so on.
 //
-// TODO: Instead of this serial startup, components should wait for their depenedencies to be ready
+// TODO: Instead of this serial startup, components should wait for their dependencies to be ready
 // using their ReadyDoneAware interface. After components are updated to use the idempotent
-// ReadyDoneAware interface and explicilty wait for their dependencies to be ready, we can remove
+// ReadyDoneAware interface and explicitly wait for their dependencies to be ready, we can remove
 // this channel chaining.
 func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc, parentReady <-chan struct{}, started func()) error {
 	// Add a closure that starts the component when the node is started, and then waits for it to exit
@@ -962,6 +972,63 @@ func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc, parentReady <-
 		// Finally, wait until component has finished shutting down.
 		<-readyAware.Done()
 		logger.Info().Msg("component shutdown complete")
+	})
+
+	return nil
+}
+
+// handleRestartableComponent constructs a component using the provided ReadyDoneFactory, and
+// registers a worker with the ComponentManager to be run when the node is started.
+//
+// Restartable Components are components that can be restarted after successfully handling
+// an irrecoverable error.
+//
+// Any irrecoverable errors thrown by the component will be passed to the provided error handler.
+func (fnb *FlowNodeBuilder) handleRestartableComponent(v namedComponentFunc, parentReady <-chan struct{}, started func()) error {
+	fnb.componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		// wait for the previous component to be ready before starting
+		if err := util.WaitClosed(ctx, parentReady); err != nil {
+			return
+		}
+
+		// Note: we're marking the worker routine ready before we even attempt to start the
+		// component. the idea behind a restartable component is that the node should not depend
+		// on it for safe operation, so the node does not need to wait for it to be ready.
+		ready()
+
+		// do not block serial startup. started can only be called once, so it cannot be called
+		// from within the componentFactory
+		started()
+
+		log := fnb.Logger.With().Str("component", v.name).Logger()
+
+		// This may be called multiple times if the component is restarted
+		componentFactory := func() (component.Component, error) {
+			c, err := v.fn(fnb.NodeConfig)
+			if err != nil {
+				return nil, err
+			}
+			log.Info().Msg("component initialization complete")
+
+			go func() {
+				if err := util.WaitClosed(ctx, c.Ready()); err != nil {
+					log.Info().Msg("component startup aborted")
+				} else {
+					log.Info().Msg("component startup complete")
+				}
+
+				<-ctx.Done()
+				log.Info().Msg("component shutdown started")
+			}()
+			return c.(component.Component), nil
+		}
+
+		err := component.RunComponent(ctx, componentFactory, v.errorHandler)
+		if err != nil && !errors.Is(err, ctx.Err()) {
+			ctx.Throw(fmt.Errorf("component %s encountered an unhandled irrecoverable error: %w", v.name, err))
+		}
+
+		log.Info().Msg("component shutdown complete")
 	})
 
 	return nil
@@ -1035,6 +1102,28 @@ func (fnb *FlowNodeBuilder) OverrideComponent(name string, f ReadyDoneFactory) N
 
 	// no component found with the same name, hence just adding it.
 	return fnb.Component(name, f)
+}
+
+// RestartableComponent adds a new component to the node that conforms to the ReadyDoneAware
+// interface, and calls the provided error handler when an irrecoverable error is encountered.
+// Use RestartableComponent if the component is not critical to the node's safe operation and
+// can/should be independently restarted when an irrecoverable error is encountered.
+//
+// IMPORTANT: Since a RestartableComponent can be restarted independently of the node, the node and
+// other components must not rely on it for safe operation, and failures must be handled gracefully.
+// As such, RestartableComponents do not block the node from becoming ready, and do not block
+// subsequent components from starting serially. They do start in serial order.
+//
+// Note: The ReadyDoneFactory method may be called multiple times if the component is restarted.
+//
+// Any irrecoverable errors thrown by the component will be passed to the provided error handler.
+func (fnb *FlowNodeBuilder) RestartableComponent(name string, f ReadyDoneFactory, errorHandler component.OnError) NodeBuilder {
+	fnb.components = append(fnb.components, namedComponentFunc{
+		fn:           f,
+		name:         name,
+		errorHandler: errorHandler,
+	})
+	return fnb
 }
 
 func (fnb *FlowNodeBuilder) PreInit(f BuilderFunc) NodeBuilder {

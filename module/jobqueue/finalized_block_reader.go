@@ -1,4 +1,4 @@
-package blockconsumer
+package jobqueue
 
 import (
 	"fmt"

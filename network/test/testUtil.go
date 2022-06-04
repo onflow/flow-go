@@ -111,7 +111,13 @@ func GenerateIDs(
 		opt(o)
 	}
 
-	identities := unittest.IdentityListFixture(n, o.idOpts...)
+	identities := unittest.IdentityListFixture(n, unittest.WithAllRoles())
+
+	for _, identity := range identities {
+		for _, idOpt := range o.idOpts {
+			idOpt(identity)
+		}
+	}
 
 	idProvider := id.NewFixedIdentityProvider(identities)
 

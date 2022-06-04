@@ -212,8 +212,23 @@ func (c *Container) DB() (*badger.DB, error) {
 	return db, err
 }
 
+// DB returns the node's execution data database.
+func (c *Container) ExecutionDataDB() (*badger.DB, error) {
+	opts := badger.
+		DefaultOptions(c.ExecutionDataDBPath()).
+		WithKeepL0InMemory(true).
+		WithLogger(nil)
+
+	db, err := badger.Open(opts)
+	return db, err
+}
+
 func (c *Container) DBPath() string {
 	return filepath.Join(c.datadir, DefaultFlowDBDir)
+}
+
+func (c *Container) ExecutionDataDBPath() string {
+	return filepath.Join(c.datadir, DefaultExecutionDataServiceDir)
 }
 
 func (c *Container) BootstrapPath() string {

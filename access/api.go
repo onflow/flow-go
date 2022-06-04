@@ -58,6 +58,7 @@ type TransactionResult struct {
 	BlockID       flow.Identifier
 	TransactionID flow.Identifier
 	CollectionID  flow.Identifier
+	BlockHeight   uint64
 }
 
 func TransactionResultToMessage(result *TransactionResult) *access.TransactionResultResponse {
@@ -69,6 +70,7 @@ func TransactionResultToMessage(result *TransactionResult) *access.TransactionRe
 		BlockId:       result.BlockID[:],
 		TransactionId: result.TransactionID[:],
 		CollectionId:  result.CollectionID[:],
+		BlockHeight:   uint64(result.BlockHeight),
 	}
 }
 
@@ -93,6 +95,7 @@ func MessageToTransactionResult(message *access.TransactionResultResponse) *Tran
 		BlockID:       flow.HashToID(message.BlockId),
 		TransactionID: flow.HashToID(message.TransactionId),
 		CollectionID:  flow.HashToID(message.CollectionId),
+		BlockHeight:   message.BlockHeight,
 	}
 }
 

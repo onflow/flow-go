@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/order"
 )
@@ -51,7 +52,7 @@ func ClusterAssignment(n uint, nodes flow.IdentityList) flow.AssignmentList {
 
 	// order, so the same list results in the same
 	sort.Slice(collectors, func(i, j int) bool {
-		return order.ByNodeIDAsc(collectors[i], collectors[j])
+		return order.Canonical(collectors[i], collectors[j])
 	})
 
 	assignments := make(flow.AssignmentList, n)
@@ -65,7 +66,7 @@ func ClusterAssignment(n uint, nodes flow.IdentityList) flow.AssignmentList {
 
 func ClusterList(n uint, nodes flow.IdentityList) flow.ClusterList {
 	assignments := ClusterAssignment(n, nodes)
-	clusters, err := flow.NewClusterList(assignments, nodes.Filter(filter.HasRole(flow.RoleCollection)))
+	clusters, err := factory.NewClusterList(assignments, nodes.Filter(filter.HasRole(flow.RoleCollection)))
 	if err != nil {
 		panic(err)
 	}
