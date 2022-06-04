@@ -1,11 +1,11 @@
 package main
 
 import (
-	nodebuilder "github.com/onflow/flow-go/cmd/access/node_builder"
+	nodebuilder "github.com/onflow/flow-go/cmd/observer/node_builder"
 )
 
 func main() {
-	anb := nodebuilder.FlowAccessNode() // use the generic Access Node builder till it is determined if this is a staked AN or an unstaked AN
+	anb := nodebuilder.NewFlowObserverServiceBuilder()
 
 	anb.PrintBuildVersionDetails()
 
@@ -14,8 +14,7 @@ func main() {
 		anb.Logger.Fatal().Err(err).Send()
 	}
 
-	// Please use an observer for unstaked workloads going forward
-	builder := nodebuilder.NewStakedAccessNodeBuilder(anb)
+	builder := nodebuilder.NewObserverServiceBuilder(anb)
 
 	if err := builder.Initialize(); err != nil {
 		anb.Logger.Fatal().Err(err).Send()

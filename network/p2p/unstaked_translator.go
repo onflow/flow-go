@@ -20,6 +20,7 @@ import (
 // and any peer ID's which don't follow these conventions are considered invalid.
 type UnstakedNetworkIDTranslator struct{}
 
+// TODO Rename this one to NewPublicNetworkIDTranslator once observer changes are merged
 func NewUnstakedNetworkIDTranslator() *UnstakedNetworkIDTranslator {
 	return &UnstakedNetworkIDTranslator{}
 }

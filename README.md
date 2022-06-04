@@ -37,18 +37,19 @@ documentation for the stream, as well as links to documentation for relevant com
 
 The following table lists all work streams and links to their home directory and documentation:
 
-| Work Stream       | Home directory                             |
-| ----------------- | ------------------------------------------ |
-| Access Node       | [/cmd/access](/cmd/access)                 |
-| Collection Node   | [/cmd/collection](/cmd/collection)      |
-| Consensus Node    | [/cmd/consensus](/cmd/consensus)        |
-| Execution Node    | [/cmd/execution](/cmd/execution)     |
-| Verification Node | [/cmd/verification](/cmd/verification)     |
-| HotStuff          | [/consensus/hotstuff](/consensus/hotstuff) |
-| Storage           | [/storage](/storage)                       |
-| Ledger            | [/ledger](/ledger)                         |
-| Networking        | [/network](/network/)                      |
-| Cryptography      | [/crypto](/crypto)                         |
+| Work Stream      | Home directory                             |
+|------------------|--------------------------------------------|
+| Access Node      | [/cmd/access](/cmd/access)                 |
+| Collection Node  | [/cmd/collection](/cmd/collection)         |
+| Consensus Node   | [/cmd/consensus](/cmd/consensus)           |
+| Execution Node   | [/cmd/execution](/cmd/execution)           |
+| Verification Node | [/cmd/verification](/cmd/verification)    |
+| Observer Service | [/cmd/observer](/cmd/observer)             |
+| HotStuff         | [/consensus/hotstuff](/consensus/hotstuff) |
+| Storage          | [/storage](/storage)                       |
+| Ledger           | [/ledger](/ledger)                         |
+| Networking       | [/network](/network/)                      |
+| Cryptography     | [/crypto](/crypto)                         |
 
 ## Installation
 
