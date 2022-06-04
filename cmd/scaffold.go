@@ -482,7 +482,10 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 
 	fnb.Tracer = trace.NewNoopTracer()
 	if fnb.BaseConfig.tracerEnabled {
-		serviceName := fnb.BaseConfig.NodeRole + "-" + fnb.BaseConfig.nodeIDHex[:8]
+		serviceName := fnb.BaseConfig.NodeRole + "-" + fnb.BaseConfig.nodeIDHex[:7]
+		if len(fnb.BaseConfig.nodeIDHex) > 7 {
+			serviceName = fnb.BaseConfig.NodeRole + "-" + fnb.BaseConfig.nodeIDHex[:8]
+		}
 		tracer, err := trace.NewTracer(fnb.Logger,
 			serviceName,
 			fnb.RootChainID.String(),
