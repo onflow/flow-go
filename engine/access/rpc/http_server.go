@@ -25,6 +25,10 @@ var defaultHTTPHeaders = []HTTPHeader{
 		Key:   "Access-Control-Allow-Headers",
 		Value: "*",
 	},
+	{
+		Key:   "Access-Control-Expose-Headers",
+		Value: "*",
+	},
 }
 
 // NewHTTPServer creates and intializes a new HTTP GRPC proxy server
