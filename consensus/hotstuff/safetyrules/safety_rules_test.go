@@ -286,29 +286,18 @@ func (s *SafetyRulesTestSuite) TestProduceVote_PersistStateException() {
 
 // TestProduceVote_VotingOnUnsafeProposal tests different scenarios where we try to vote on unsafe blocks
 func (s *SafetyRulesTestSuite) TestProduceVote_VotingOnUnsafeProposal() {
-	s.Run("invalid-block-view", func() {
-		// create block with block.View == block.QC.View
+
+	s.Run("happy-path-includes-last-view-tc", func() {
 		proposal := helper.MakeProposal(
 			helper.WithBlock(
 				helper.MakeBlock(
 					helper.WithParentBlock(s.bootstrapBlock),
-					helper.WithBlockView(s.bootstrapBlock.View))))
+					helper.WithBlockView(s.bootstrapBlock.View+1))),
+			helper.WithLastViewTC(helper.MakeTC()))
+		s.committee.On("IdentityByBlock", proposal.Block.BlockID, proposal.Block.ProposerID).Return(s.proposerIdentity, nil).Maybe()
 		vote, err := s.safety.ProduceVote(proposal, proposal.Block.View)
 		require.Error(s.T(), err)
 		require.False(s.T(), model.IsNoVoteError(err))
-		require.Nil(s.T(), vote)
-	})
-	s.Run("view-already-acknowledged", func() {
-		// create block with view <= HighestAcknowledgedView
-		proposal := helper.MakeProposal(
-			helper.WithBlock(
-				helper.MakeBlock(
-					func(block *model.Block) {
-						block.QC = helper.MakeQC(helper.WithQCView(s.safetyData.HighestAcknowledgedView - 1))
-					},
-					helper.WithBlockView(s.safetyData.HighestAcknowledgedView))))
-		vote, err := s.safety.ProduceVote(proposal, proposal.Block.View)
-		require.True(s.T(), model.IsNoVoteError(err))
 		require.Nil(s.T(), vote)
 	})
 	s.Run("no-last-view-tc", func() {
@@ -339,6 +328,26 @@ func (s *SafetyRulesTestSuite) TestProduceVote_VotingOnUnsafeProposal() {
 		require.False(s.T(), model.IsNoVoteError(err))
 		require.Nil(s.T(), vote)
 	})
+	s.Run("proposal-includes-QC-for-higher-view", func() {
+		// create block where Block.View != Block.QC.View+1 and
+		// Block.View == LastViewTC.View+1 and Block.QC.View >= Block.View
+		// in this case block is not safe to extend since proposal includes QC which is newer than the proposal itself.
+		proposal := helper.MakeProposal(
+			helper.WithBlock(
+				helper.MakeBlock(
+					helper.WithParentBlock(s.bootstrapBlock),
+					helper.WithBlockView(s.bootstrapBlock.View+2),
+					func(block *model.Block) {
+						block.QC = helper.MakeQC(helper.WithQCView(s.bootstrapBlock.View + 10))
+					})),
+			helper.WithLastViewTC(
+				helper.MakeTC(
+					helper.WithTCView(s.bootstrapBlock.View+1))))
+		vote, err := s.safety.ProduceVote(proposal, proposal.Block.View)
+		require.Error(s.T(), err)
+		require.False(s.T(), model.IsNoVoteError(err))
+		require.Nil(s.T(), vote)
+	})
 	s.Run("last-view-tc-invalid-highest-qc", func() {
 		// create block where Block.View != Block.QC.View+1 and
 		// Block.View == LastViewTC.View+1 and Block.QC.View < LastViewTC.NewestQC.View
@@ -359,14 +368,28 @@ func (s *SafetyRulesTestSuite) TestProduceVote_VotingOnUnsafeProposal() {
 		require.False(s.T(), model.IsNoVoteError(err))
 		require.Nil(s.T(), vote)
 	})
-	s.Run("happy-path-includes-last-view-tc", func() {
+	s.Run("view-already-acknowledged", func() {
+		// create block with view == HighestAcknowledgedView
 		proposal := helper.MakeProposal(
 			helper.WithBlock(
 				helper.MakeBlock(
-					helper.WithParentBlock(s.bootstrapBlock),
-					helper.WithBlockView(s.bootstrapBlock.View+1))),
-			helper.WithLastViewTC(helper.MakeTC()))
-		s.committee.On("IdentityByBlock", proposal.Block.BlockID, proposal.Block.ProposerID).Return(s.proposerIdentity, nil).Maybe()
+					func(block *model.Block) {
+						block.QC = helper.MakeQC(helper.WithQCView(s.safetyData.HighestAcknowledgedView - 1))
+					},
+					helper.WithBlockView(s.safetyData.HighestAcknowledgedView))))
+		vote, err := s.safety.ProduceVote(proposal, proposal.Block.View)
+		require.True(s.T(), model.IsNoVoteError(err))
+		require.Nil(s.T(), vote)
+	})
+	s.Run("view-below-acknowledged", func() {
+		// create block with view < HighestAcknowledgedView
+		proposal := helper.MakeProposal(
+			helper.WithBlock(
+				helper.MakeBlock(
+					func(block *model.Block) {
+						block.QC = helper.MakeQC(helper.WithQCView(s.safetyData.HighestAcknowledgedView - 2))
+					},
+					helper.WithBlockView(s.safetyData.HighestAcknowledgedView-1))))
 		vote, err := s.safety.ProduceVote(proposal, proposal.Block.View)
 		require.Error(s.T(), err)
 		require.False(s.T(), model.IsNoVoteError(err))
