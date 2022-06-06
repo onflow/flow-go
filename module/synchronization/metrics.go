@@ -4,8 +4,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type SynchronizationMetrics interface {
