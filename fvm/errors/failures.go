@@ -42,7 +42,6 @@ func NewEventEncodingErrorf(msg string, err error) *EventEncodingError {
 }
 
 func (e *EventEncodingError) Error() string {
-	//return fmt.Sprintf("%s encoding failed: %s", e.ErrorCode().String(), e.err.Error())
 	return fmt.Sprintf("%s encoding failed: %s", e.ErrorCode().String(), e.err.Error())
 }
 
