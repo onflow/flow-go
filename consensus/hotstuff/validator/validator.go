@@ -246,6 +246,12 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 		if model.IsInvalidQCError(err) {
 			return newInvalidBlockError(block, fmt.Errorf("invalid qc included: %w", err))
 		}
+		if errors.Is(err, model.ErrViewForUnknownEpoch) {
+			// We require each replica to be bootstrapped with a QC pointing to a finalized block. Therefore, we should know the
+			// Epoch for any QC.View and TC.View we encounter. Receiving a `model.ErrViewForUnknownEpoch` is conceptually impossible,
+			// i.e. a symptom of an internal bug or invalid bootstrapping information.
+			return fmt.Errorf("no Epoch information availalbe for QC that was included in proposal; symptom of internal bug or invalid bootstrapping information: %s", err.Error())
+		}
 		return fmt.Errorf("unexpected error verifying qc: %w", err)
 	}
 
@@ -294,6 +300,9 @@ func (v *Validator) ValidateVote(vote *model.Vote) (*flow.Identity, error) {
 		//       we expect `model.InvalidSignerError` here during normal operations.
 		if model.IsInvalidFormatError(err) || errors.Is(err, model.ErrInvalidSignature) {
 			return nil, newInvalidVoteError(vote, err)
+		}
+		if errors.Is(err, model.ErrViewForUnknownEpoch) {
+			return nil, fmt.Errorf("no Epoch information availalbe for vote; symptom of internal bug or invalid bootstrapping information: %s", err.Error())
 		}
 		return nil, fmt.Errorf("cannot verify signature for vote (%x): %w", vote.ID(), err)
 	}
