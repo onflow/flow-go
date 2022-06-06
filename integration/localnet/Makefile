@@ -59,6 +59,13 @@ install-docker-plugin:
 	docker plugin inspect loki || \
 		docker plugin install grafana/loki-docker-driver:latest --alias loki --grant-all-permissions
 
+# Update docker plugin
+.PHONY: update-docker-plugin
+update-docker-plugin:
+	docker plugin disable loki
+	docker plugin upgrade --grant-all-permissions loki
+	docker plugin enable loki
+
 .PHONY: start
 start: install-docker-plugin
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.metrics.yml up -d --remove-orphans
