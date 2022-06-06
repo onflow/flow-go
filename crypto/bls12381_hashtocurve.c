@@ -5,7 +5,7 @@
 
 extern prec_st* bls_prec;
 
-#if (hashToPoint==SSWU)
+#if (hashToPoint== LOCAL_SSWU)
 
 const uint64_t p_3div4_data[Fp_DIGITS] = {
     0xEE7FBFFFFFFFEAAA, 0x07AAFFFFAC54FFFF, 0xD9CC34A83DAC3D89,
@@ -545,11 +545,9 @@ static void map_to_G1_local(ep_t p, const uint8_t *msg, int len) {
 // computes a hash of input data to G1
 // construction 2 from section 5 in https://eprint.iacr.org/2019/403.pdf
 void map_to_G1(ep_t h, const byte* data, const int len) {
-    #if hashToPoint==SSWU
-    // implementation using different mapping parameters than the IETF draft
+    #if hashToPoint==LOCAL_SSWU
     map_to_G1_local(h, data, len);
     #elif hashToPoint==RELIC_SSWU
-    // relic implementation compliant with the IETF draft
     ep_map_from_field(h, data, len);
     #endif
 }

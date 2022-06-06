@@ -221,10 +221,16 @@ func benchG1Test() {
 // The function uses xmd with SHA256 in the hash-to-field.
 func hashToG1Bytes(data, dst []byte) []byte {
 	hash := make([]byte, opSwUInputLenBLSBLS12381)
+
+	inputLength := len(data)
+	if len(data) == 0 {
+		data = make([]byte, 1)
+	}
+
 	// XMD using SHA256
 	C.xmd_sha256((*C.uchar)(&hash[0]),
 		(C.int)(opSwUInputLenBLSBLS12381),
-		(*C.uchar)(&data[0]), (C.int)(len(data)),
+		(*C.uchar)(&data[0]), (C.int)(inputLength),
 		(*C.uchar)(&dst[0]), (C.int)(len(dst)))
 
 	// map the hash to G1

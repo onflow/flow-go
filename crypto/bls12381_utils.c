@@ -27,7 +27,7 @@ prec_st bls_prec_st;
 prec_st* bls_prec = NULL;
 
 // required constants for the optimized SWU hash to curve
-#if (hashToPoint == SSWU)
+#if (hashToPoint == LOCAL_SSWU)
 extern const uint64_t p_3div4_data[Fp_DIGITS];
 extern const uint64_t fp_p_1div2_data[Fp_DIGITS];
 extern const uint64_t a1_data[Fp_DIGITS];
@@ -62,7 +62,7 @@ void precomputed_data_set(const prec_st* p) {
 prec_st* init_precomputed_data_BLS12_381() {
     bls_prec = &bls_prec_st;
 
-    #if (hashToPoint == SSWU)
+    #if (hashToPoint == LOCAL_SSWU)
     // isogenous curve constants used in optimized SWU
     fp_read_raw(bls_prec->a1, a1_data);
     fp_read_raw(bls_prec->b1, b1_data);
