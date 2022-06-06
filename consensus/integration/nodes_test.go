@@ -445,7 +445,7 @@ func createNode(
 	prov := &mocknetwork.Engine{}
 	prov.On("SubmitLocal", mock.Anything).Return(nil)
 
-	syncCore, err := synccore.New(log, synccore.DefaultConfig())
+	syncCore, err := synccore.New(log, synccore.DefaultConfig(), &synccore.NoopMetrics{})
 	require.NoError(t, err)
 
 	qcDistributor := pubsub.NewQCCreatedDistributor()
