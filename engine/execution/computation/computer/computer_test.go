@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/stdlib"
-
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -500,6 +499,10 @@ type testRuntime struct {
 	executeScript      func(runtime.Script, runtime.Context) (cadence.Value, error)
 	executeTransaction func(runtime.Script, runtime.Context) error
 	readStored         func(common.Address, cadence.Path, runtime.Context) (cadence.Value, error)
+}
+
+func (e *testRuntime) SetDebugger(debugger *interpreter.Debugger) {
+	panic("SetDebugger not expected")
 }
 
 var _ runtime.Runtime = &testRuntime{}

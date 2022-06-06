@@ -284,6 +284,10 @@ type ErrorReturningRuntime struct {
 	TxErrors []error
 }
 
+func (e *ErrorReturningRuntime) SetDebugger(debugger *interpreter.Debugger) {
+	panic("SetDebugger not expected")
+}
+
 func (e *ErrorReturningRuntime) SetInvalidatedResourceValidationEnabled(_ bool) {
 	panic("SetInvalidatedResourceValidationEnabled not expected")
 }

@@ -16,6 +16,8 @@ import (
 	traceLog "github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/fvm/handler"
+
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/extralog"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -24,14 +26,30 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 )
 
-type TransactionInvoker struct {
-	logger zerolog.Logger
+type TransactionInvokerOption func(invoker *TransactionInvoker)
+
+func WithFlowEventHandleOptions(feho ...handler.FlowEventHandlerOption) func(inv *TransactionInvoker) {
+	return func(inv *TransactionInvoker) {
+		inv.feho = feho
+	}
+
 }
 
-func NewTransactionInvoker(logger zerolog.Logger) *TransactionInvoker {
-	return &TransactionInvoker{
+type TransactionInvoker struct {
+	logger zerolog.Logger
+	feho   []handler.FlowEventHandlerOption
+}
+
+func NewTransactionInvoker(logger zerolog.Logger, options ...TransactionInvokerOption) *TransactionInvoker {
+	invoker := &TransactionInvoker{
 		logger: logger,
 	}
+
+	for _, o := range options {
+		o(invoker)
+	}
+
+	return invoker
 }
 
 func (i *TransactionInvoker) Process(
@@ -88,7 +106,7 @@ func (i *TransactionInvoker) Process(
 		sth.SetActiveState(parentState)
 	}()
 
-	env, err := NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
+	env, err := NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span, i.feho...)
 	if err != nil {
 		return fmt.Errorf("error creating new environment: %w", err)
 	}

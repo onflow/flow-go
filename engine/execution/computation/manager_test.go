@@ -18,6 +18,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/fvm/handler"
+
 	"github.com/onflow/flow-go/engine/execution"
 	state2 "github.com/onflow/flow-go/engine/execution/state"
 	unittest2 "github.com/onflow/flow-go/engine/execution/state/unittest"
@@ -498,6 +500,132 @@ func TestExecuteScriptCancelled(t *testing.T) {
 	wg.Wait()
 	require.Nil(t, value)
 	require.Contains(t, err.Error(), fvmErrors.ErrCodeScriptExecutionCancelledError.String())
+}
+
+func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
+	rt := fvm.NewInterpreterRuntime()
+	chain := flow.Mainnet.Chain()
+	vm := fvm.NewVirtualMachine(rt)
+
+	eventEncoder := &testingEventEncoder{
+		CadenceEventEncoder: *handler.NewCadenceEventEncoder(),
+	}
+
+	execCtx := fvm.NewContext(zerolog.Nop(),
+		fvm.WithChain(chain),
+		fvm.WithTransactionProcessors(
+			fvm.NewTransactionInvoker(zerolog.Nop(),
+				fvm.WithFlowEventHandleOptions(handler.WithEncoder(eventEncoder)))))
+
+	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+	require.NoError(t, err)
+	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
+	accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
+	require.NoError(t, err)
+
+	// setup transactions
+	account := accounts[0]
+	privKey := privateKeys[0]
+	// tx1 deploys contract version 1
+	tx1 := testutil.DeployEventContractTransaction(account, chain, 1)
+	prepareTx(t, tx1, account, privKey, 0, chain)
+
+	// tx2 emits event which will fail encoding
+	tx2 := testutil.CreateEmitEventTransaction(account, account)
+	prepareTx(t, tx2, account, privKey, 1, chain)
+
+	// tx3 emits event that will work fine
+	tx3 := testutil.CreateEmitEventTransaction(account, account)
+	prepareTx(t, tx3, account, privKey, 2, chain)
+
+	transactions := []*flow.TransactionBody{tx1, tx2, tx3}
+
+	col := flow.Collection{Transactions: transactions}
+
+	guarantee := flow.CollectionGuarantee{
+		CollectionID: col.ID(),
+		Signature:    nil,
+	}
+
+	block := flow.Block{
+		Header: &flow.Header{
+			View: 26,
+		},
+		Payload: &flow.Payload{
+			Guarantees: []*flow.CollectionGuarantee{&guarantee},
+		},
+	}
+
+	executableBlock := &entity.ExecutableBlock{
+		Block: &block,
+		CompleteCollections: map[flow.Identifier]*entity.CompleteCollection{
+			guarantee.ID(): {
+				Guarantee:    &guarantee,
+				Transactions: transactions,
+			},
+		},
+		StartState: unittest.StateCommitmentPointerFixture(),
+	}
+
+	me := new(module.Local)
+	me.On("NodeID").Return(flow.ZeroID)
+
+	blockComputer, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
+	require.NoError(t, err)
+
+	programsCache, err := NewProgramsCache(10)
+	require.NoError(t, err)
+
+	eds := new(state_synchronization.ExecutionDataService)
+	eds.On("Add", mock.Anything, mock.Anything).Return(flow.ZeroID, nil, nil)
+
+	edCache := new(state_synchronization.ExecutionDataCIDCache)
+	edCache.On("Insert", mock.AnythingOfType("*flow.Header"), mock.AnythingOfType("BlobTree"))
+
+	engine := &Manager{
+		blockComputer: blockComputer,
+		me:            me,
+		programsCache: programsCache,
+		eds:           eds,
+		edCache:       edCache,
+	}
+
+	view := delta.NewView(ledger.Get)
+	blockView := view.NewChild()
+
+	returnedComputationResult, err := engine.ComputeBlock(context.Background(), executableBlock, blockView)
+	require.NoError(t, err)
+
+	require.Len(t, returnedComputationResult.Events, 2)             // 1 collection + 1 system chunk
+	require.Len(t, returnedComputationResult.TransactionResults, 4) // 2 txs + 1 system tx
+
+	require.Empty(t, returnedComputationResult.TransactionResults[0].ErrorMessage)
+	require.Contains(t, returnedComputationResult.TransactionResults[1].ErrorMessage, "I failed encoding")
+	require.Empty(t, returnedComputationResult.TransactionResults[2].ErrorMessage)
+
+	// first event should be contract deployed
+	assert.EqualValues(t, "flow.AccountContractAdded", returnedComputationResult.Events[0][0].Type)
+
+	// second event should come from tx3 (index 2)  as tx2 (index 1) should fail encoding
+	hasValidEventValue(t, returnedComputationResult.Events[0][1], 1)
+	assert.Equal(t, returnedComputationResult.Events[0][1].TransactionIndex, uint32(2))
+}
+
+type testingEventEncoder struct {
+	handler.CadenceEventEncoder
+	calls int
+}
+
+func (e *testingEventEncoder) Encode(event cadence.Event) ([]byte, error) {
+	defer func() {
+		e.calls++
+	}()
+
+	if e.calls == 1 {
+		return nil, fmt.Errorf("I failed encoding")
+	}
+	return e.CadenceEventEncoder.Encode(event)
+
 }
 
 func TestScriptStorageMutationsDiscarded(t *testing.T) {

@@ -296,6 +296,6 @@ require (
 
 replace mellium.im/sasl => github.com/mellium/sasl v0.2.1
 
-replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.21.1-0.20220601005416-e974acd91285
+replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.21.1-0.20220603213842-25e190e4ce6b
 
 replace github.com/onflow/atree => github.com/dapperlabs/atree-internal v0.3.1-0.20220531232335-32d7f2ac0ce1
