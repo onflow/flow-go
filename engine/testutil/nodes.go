@@ -581,7 +581,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		Manager: computationEngine,
 	}
 
-	syncCore, err := chainsync.New(node.Log, chainsync.DefaultConfig())
+	syncCore, err := chainsync.New(node.Log, chainsync.DefaultConfig(), chainsync.NewMetricsCollector())
 	require.NoError(t, err)
 
 	deltas, err := ingestion.NewDeltas(1000)

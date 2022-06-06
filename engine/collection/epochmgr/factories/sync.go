@@ -45,7 +45,7 @@ func (f *SyncEngineFactory) Create(
 	comp network.Engine,
 ) (*chainsync.Core, *syncengine.Engine, error) {
 
-	core, err := chainsync.New(f.log, f.conf)
+	core, err := chainsync.New(f.log, f.conf, chainsync.NewMetricsCollector())
 	if err != nil {
 		return nil, nil, err
 	}
