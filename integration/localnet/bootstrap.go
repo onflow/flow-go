@@ -365,7 +365,6 @@ func prepareService(container testnet.ContainerConfig, i int, n int) Service {
 			fmt.Sprintf("%s:/data:z", dataDir),
 		},
 		Environment: []string{
-			"JAEGER_AGENT_HOST=tempo",
 			"JAEGER_ENDPOINT=http://tempo:14268/api/traces",
 			// NOTE: these env vars are not set by default, but can be set [1] to enable binstat logging:
 			// [1] https://docs.docker.com/compose/environment-variables/#pass-environment-variables-to-containers
@@ -737,7 +736,6 @@ func prepareObserverService(i int, observerName string, agPublicKey string, prof
 			fmt.Sprintf("%s:/data:z", dataDir),
 		},
 		Environment: []string{
-			"JAEGER_AGENT_HOST=tempo",
 			"JAEGER_ENDPOINT=http://tempo:14268/api/traces",
 			"BINSTAT_ENABLE",
 			"BINSTAT_LEN_WHAT",
