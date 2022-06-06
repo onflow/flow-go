@@ -495,6 +495,26 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_NotSafeToTimeout() {
 		require.False(s.T(), model.IsNoVoteError(err))
 		require.Nil(s.T(), timeout)
 	})
+	s.Run("cur-view-below-highest-QC", func() {
+		newestQC := helper.MakeQC(helper.WithQCView(s.safetyData.LockedOneChainView))
+		lastViewTC := helper.MakeTC(helper.WithTCView(newestQC.View - 2))
+
+		timeout, err := s.safety.ProduceTimeout(newestQC.View-1, newestQC, lastViewTC)
+		require.Error(s.T(), err)
+		require.False(s.T(), model.IsNoVoteError(err))
+		require.Nil(s.T(), timeout)
+	})
+	s.Run("last-view-tc-is-newer", func() {
+		newestQC := helper.MakeQC(helper.WithQCView(s.safetyData.LockedOneChainView))
+		// newest QC included in TC cannot be higher than the newest QC known to replica
+		lastViewTC := helper.MakeTC(helper.WithTCView(newestQC.View+1),
+			helper.WithTCHighestQC(helper.MakeQC(helper.WithQCView(newestQC.View+1))))
+
+		timeout, err := s.safety.ProduceTimeout(newestQC.View+2, newestQC, lastViewTC)
+		require.Error(s.T(), err)
+		require.False(s.T(), model.IsNoVoteError(err))
+		require.Nil(s.T(), timeout)
+	})
 	s.Run("highest-qc-below-locked-round", func() {
 		newestQC := helper.MakeQC(helper.WithQCView(s.safetyData.LockedOneChainView - 1))
 
@@ -505,15 +525,8 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_NotSafeToTimeout() {
 	})
 	s.Run("cur-view-below-highest-acknowledged-view", func() {
 		newestQC := helper.MakeQC(helper.WithQCView(s.safetyData.LockedOneChainView))
+		// modify highest acknowledged view in a way that it's definitely bigger than the newest QC view
 		s.safetyData.HighestAcknowledgedView = newestQC.View + 10
-
-		timeout, err := s.safety.ProduceTimeout(newestQC.View+1, newestQC, nil)
-		require.Error(s.T(), err)
-		require.False(s.T(), model.IsNoVoteError(err))
-		require.Nil(s.T(), timeout)
-	})
-	s.Run("cur-view-below-highest-QC", func() {
-		newestQC := helper.MakeQC(helper.WithQCView(s.safetyData.LockedOneChainView))
 
 		timeout, err := s.safety.ProduceTimeout(newestQC.View+1, newestQC, nil)
 		require.Error(s.T(), err)
