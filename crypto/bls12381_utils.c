@@ -30,6 +30,7 @@ prec_st* bls_prec = NULL;
 #if (hashToPoint == LOCAL_SSWU)
 extern const uint64_t p_3div4_data[Fp_DIGITS];
 extern const uint64_t fp_p_1div2_data[Fp_DIGITS];
+extern const uint64_t sqrt_z_data[Fp_DIGITS];
 extern const uint64_t a1_data[Fp_DIGITS];
 extern const uint64_t b1_data[Fp_DIGITS];
 extern const uint64_t iso_Nx_data[ELLP_Nx_LEN][Fp_DIGITS];
@@ -71,6 +72,9 @@ prec_st* init_precomputed_data_BLS12_381() {
     bn_read_raw(&bls_prec->p_3div4, p_3div4_data, Fp_DIGITS);
     // (p-1)/2
     fp_read_raw(bls_prec->fp_p_1div2, fp_p_1div2_data);
+    // sqrt(-Z)
+    fp_read_raw(bls_prec->sqrt_z, sqrt_z_data);
+    
     for (int i=0; i<ELLP_Dx_LEN; i++)  
         fp_read_raw(bls_prec->iso_Dx[i], iso_Dx_data[i]);
     for (int i=0; i<ELLP_Nx_LEN; i++)  

@@ -56,8 +56,10 @@ typedef uint8_t byte;
 // Structure of precomputed data
 typedef struct prec_ {
     #if (hashToPoint == LOCAL_SSWU)
+    // coefficients needed in optimized SSWU
     bn_st p_3div4;
     fp_st fp_p_1div2; 
+    fp_st sqrt_z;
     // coefficients of E1(Fp)
     fp_st a1;
     fp_st b1; 

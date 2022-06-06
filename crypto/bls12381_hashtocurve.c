@@ -12,6 +12,12 @@ const uint64_t p_3div4_data[Fp_DIGITS] = {
     0xD91DD2E13CE144AF, 0x92C6E9ED90D2EB35, 0x0680447A8E5FF9A6,
 };
 
+const uint64_t sqrt_z_data[Fp_DIGITS] = {
+    0xF37B0CED8FB71E24, 0xF02DC8A4535A8779, 0x732ED835F7EB14EA,
+    0x524CA41ECB2BCE0D, 0x095E3801E90B5FC1, 0x0252AD055472A90E,
+};
+
+
 // (p-1)/2 converted to Montgomery form
 const uint64_t fp_p_1div2_data[Fp_DIGITS] = {
     0xa1fafffffffe5557, 0x995bfff976a3fffe, 0x03f41d24d174ceb4,
@@ -160,13 +166,7 @@ const uint64_t iso_Dy_data[ELLP_Dy_LEN][Fp_DIGITS] = {
 // if 1 is returned, out contains sqrt(U/V)
 // out should not be the same as U, or V
 static int sqrt_ratio_3mod4(fp_t out, const fp_t u, const fp_t v) {
-    fp_t sqr_z;
-    fp_new(sqr_z);
-    fp_set_dig(sqr_z, 11); 
-    fp_neg(sqr_z, sqr_z);
-    fp_srt(sqr_z, sqr_z); // TODO : hardcode sqrt(-11)
-
-    /*const int tmp_len = 4;
+    const int tmp_len = 3;
     fp_t* fp_tmp = (fp_t*) malloc(tmp_len*sizeof(fp_t));
     for (int i=0; i<tmp_len; i++) fp_new(fp_tmp[i]);
 
@@ -175,58 +175,18 @@ static int sqrt_ratio_3mod4(fp_t out, const fp_t u, const fp_t v) {
     fp_mul(fp_tmp[1], fp_tmp[1], fp_tmp[2]);            // UV^3
     fp_exp(out, fp_tmp[1], &bls_prec->p_3div4);         // (UV^3)^((p-3)/4)
     fp_mul(out, out, fp_tmp[2]);                        // UV(UV^3)^((p-3)/4)
-    fp_mul(fp_tmp[0], out, sqr_z);                      // sqr(-z)*UV(UV^3)^((p-3)/4) // TODO: can be moved below
 
-    fp_sqr(fp_tmp[3], out);     // out^2
-    fp_mul(fp_tmp[3], fp_tmp[3], v);  // out^2 * V
+    fp_sqr(fp_tmp[0], out);     // out^2
+    fp_mul(fp_tmp[0], fp_tmp[0], v);  // out^2 * V
 
-    int res;
-    if (fp_cmp(fp_tmp[3], u) != RLC_EQ) { // TODO: optimize
-        printf("sqr cmp != eq \n");
-        fp_copy(out, fp_tmp[0]);
-        res = 1;
-    } else {
-        //fp_copy(out, fp_tmp[0]);
+    int res = 1;
+    if (fp_cmp(fp_tmp[0], u) != RLC_EQ) {
+        fp_mul(out, out, bls_prec->sqrt_z);      // sqr(-z)*UV(UV^3)^((p-3)/4) // TODO: can be moved below
         res = 0;
     }
     
     for (int i=0; i<tmp_len; i++) fp_free(fp_tmp[i]);
     free(fp_tmp);
-    fp_free(sqr_z); fp_free(m_z);
-    return res;*/
-
-    const int tmp_len = 5;
-    fp_t* fp_tmp = (fp_t*) malloc(tmp_len*sizeof(fp_t));
-    for (int i=0; i<tmp_len; i++) fp_new(fp_tmp[i]);
-    fp_t *t1 , *t2, *t3, *y1, *y2;
-    t1 = &fp_tmp[0];
-    t2 = &fp_tmp[1];
-    t3 = &fp_tmp[2];
-    y1 = &fp_tmp[3];
-    y2 = &fp_tmp[4];
-
-    fp_sqr(*t1, v);                               // V^2
-    fp_mul(*t2, u, v);                            // UV
-    fp_mul(*t1, *t1, *t2);            // UV^3
-    fp_exp(*y1, *t1, &bls_prec->p_3div4);         // (UV^3)^((p-3)/4)
-    fp_mul(*y1, *y1, *t2);                        // UV(UV^3)^((p-3)/4)
-    fp_mul(*y2, *y1, sqr_z);                      // sqr(-z)*UV(UV^3)^((p-3)/4) // TODO: can be moved below
-
-    fp_sqr(*t3, *y1);     // out^2
-    fp_mul(*t3, *t3, v);  // out^2 * V
-
-    int res;
-    if (!(fp_cmp(*t3, u) == RLC_EQ)) { // TODO: optimize
-        fp_copy(out, *y2);
-        res = 0;
-    } else {
-        fp_copy(out, *y1);
-        res = 1;
-    }
-    
-    for (int i=0; i<tmp_len; i++) fp_free(fp_tmp[i]);
-    free(fp_tmp);
-    fp_free(sqr_z); fp_free(m_z);
     return res;
 }
 
