@@ -237,7 +237,7 @@ func (v *TransactionValidator) checkCanBeParsed(tx *flow.TransactionBody) error 
 func (v *TransactionValidator) checkAddresses(tx *flow.TransactionBody) error {
 
 	for _, address := range append(tx.Authorizers, tx.Payer) {
-		// first we check objective validity - whether this is a valid output of the address generator
+		// we check whether this is a valid output of the address generator
 		if !v.chain.IsValid(address) {
 			return InvalidAddressError{Address: address}
 		}
