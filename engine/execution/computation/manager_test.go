@@ -13,11 +13,12 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/fvm/handler"
 
 	"github.com/onflow/flow-go/engine/execution"
 	state2 "github.com/onflow/flow-go/engine/execution/state"
