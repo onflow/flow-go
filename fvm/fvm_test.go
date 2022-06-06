@@ -4464,7 +4464,7 @@ func TestContractImportInteractionCounting(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, script.Err)
 				// we should meter computation for 3 GetPrograms, one for each contract
-				assert.Equal(t, int(script.GasUsed), 900)
+				assert.Equal(t, int(script.GasUsed), 300)
 			},
 		),
 	)

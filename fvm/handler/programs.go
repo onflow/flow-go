@@ -83,10 +83,10 @@ func (h *ProgramsHandler) mergeState(state *state.State, enforceLimits bool) err
 	return h.masterState.State().MergeState(state, enforceLimits)
 }
 
-func (h *ProgramsHandler) Get(location common.Location) (*interpreter.Program, bool) {
+func (h *ProgramsHandler) Get(location common.Location) (*interpreter.Program, bool, bool) {
 	// ignore empty locations
 	if location == nil {
-		return nil, false
+		return nil, true, false
 	}
 
 	program, view, has := h.Programs.Get(location)
@@ -100,12 +100,12 @@ func (h *ProgramsHandler) Get(location common.Location) (*interpreter.Program, b
 				panic(fmt.Sprintf("merge error while getting program, panic: %s", err))
 			}
 		}
-		return program, true
+		return program, cached, true
 	}
 
 	// we track only for AddressLocation
 	if _, is := location.(common.AddressLocation); !is {
-		return nil, false
+		return nil, cached, false
 	}
 
 	parentState := h.masterState.State()
@@ -122,7 +122,7 @@ func (h *ProgramsHandler) Get(location common.Location) (*interpreter.Program, b
 
 	h.masterState.SetActiveState(childState)
 
-	return nil, false
+	return nil, cached, false
 }
 
 func (h *ProgramsHandler) Cleanup() error {

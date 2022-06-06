@@ -634,11 +634,6 @@ func (e *TransactionEnv) GetProgram(location common.Location) (*interpreter.Prog
 		defer sp.Finish()
 	}
 
-	err := e.meterComputation(meter.ComputationKindGetProgram, 1)
-	if err != nil {
-		return nil, fmt.Errorf("get program failed: %w", err)
-	}
-
 	if addressLocation, ok := location.(common.AddressLocation); ok {
 		address := flow.Address(addressLocation.Address)
 
@@ -648,7 +643,15 @@ func (e *TransactionEnv) GetProgram(location common.Location) (*interpreter.Prog
 		}
 	}
 
-	program, has := e.programs.Get(location)
+	program, cached, has := e.programs.Get(location)
+
+	if !cached {
+		err := e.meterComputation(meter.ComputationKindGetProgram, 1)
+		if err != nil {
+			return nil, fmt.Errorf("get program failed: %w", err)
+		}
+	}
+
 	if has {
 		return program, nil
 	}
