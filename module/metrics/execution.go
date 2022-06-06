@@ -566,7 +566,7 @@ func (ec *ExecutionCollector) ExecutionTransactionExecuted(
 	ec.transactionComputationUsed.Observe(float64(compUsed))
 	ec.transactionMemoryUsage.Observe(float64(memoryUsed))
 	ec.transactionMemoryEstimate.Observe(float64(memoryEstimated))
-	ec.transactionMemoryDifference.Observe(float64(memoryEstimated - memoryUsed))
+	ec.transactionMemoryDifference.Observe(float64(memoryEstimated) - float64(memoryUsed))
 	ec.transactionEmittedEvents.Observe(float64(eventCounts))
 	if failed {
 		ec.totalFailedTransactionsCounter.Inc()
@@ -580,7 +580,7 @@ func (ec *ExecutionCollector) ExecutionScriptExecuted(dur time.Duration, compUse
 	ec.scriptComputationUsed.Observe(float64(compUsed))
 	ec.scriptMemoryUsage.Observe(float64(memoryUsed))
 	ec.scriptMemoryEstimate.Observe(float64(memoryEstimated))
-	ec.scriptMemoryDifference.Observe(float64(memoryEstimated - memoryUsed))
+	ec.scriptMemoryDifference.Observe(float64(memoryEstimated) - float64(memoryUsed))
 }
 
 // ExecutionStateReadsPerBlock reports number of state access/read operations per block
