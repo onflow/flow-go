@@ -51,20 +51,23 @@ func DefaultConfig() Config {
 //
 // Core is safe for concurrent use by multiple goroutines.
 type Core struct {
-	log      zerolog.Logger
-	Config   Config
-	mu       sync.Mutex
-	heights  map[uint64]*Status
-	blockIDs map[flow.Identifier]*Status
-	metrics  SynchronizationMetrics
+	log                  zerolog.Logger
+	Config               Config
+	mu                   sync.Mutex
+	heights              map[uint64]*Status
+	blockIDs             map[flow.Identifier]*Status
+	metrics              SynchronizationMetrics
+	localFinalizedHeight int
 }
 
 func New(log zerolog.Logger, config Config, metrics SynchronizationMetrics) (*Core, error) {
 	core := &Core{
-		log:      log.With().Str("module", "synchronization").Logger(),
-		Config:   config,
-		heights:  make(map[uint64]*Status),
-		blockIDs: make(map[flow.Identifier]*Status),
+		log:                  log.With().Str("module", "synchronization").Logger(),
+		Config:               config,
+		heights:              make(map[uint64]*Status),
+		blockIDs:             make(map[flow.Identifier]*Status),
+		metrics:              metrics,
+		localFinalizedHeight: -1, // used in ScanPending
 	}
 	return core, nil
 }
@@ -166,8 +169,11 @@ func (c *Core) ScanPending(final *flow.Header) ([]flow.Range, []flow.Batch) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// prune before doing any work
-	c.prune(final)
+	// prune if the current height is less than the new height
+	if c.localFinalizedHeight < int(final.Height) {
+		c.prune(final)
+		c.localFinalizedHeight = int(final.Height)
+	}
 
 	// get all items that are eligible for initial or re-requesting
 	heights, blockIDs := c.getRequestableItems()
@@ -240,7 +246,6 @@ func (c *Core) getRequestStatus(height uint64, blockID flow.Identifier) *Status 
 // prune removes any pending requests which we have received and which is below
 // the finalized height, or which we received sufficiently long ago.
 func (c *Core) prune(final *flow.Header) {
-
 	// track how many statuses we are pruning
 	initialHeights := len(c.heights)
 	initialBlockIDs := len(c.blockIDs)
