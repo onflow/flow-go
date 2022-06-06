@@ -21,41 +21,17 @@ const uint64_t fp_p_1div2_data[Fp_DIGITS] = {
 // Isogeny map constants taken from https://eprint.iacr.org/2019/403.pdf (section 4.3)
 // and converted to the Mongtomery domain.
 const uint64_t a1_data[Fp_DIGITS] = { 
+    // TODO: replace by ctx->ep_a? or	ctx->ep_map_c[3]?
     0x2f65aa0e9af5aa51, 0x86464c2d1e8416c3, 0xb85ce591b7bd31e2,
     0x27e11c91b5f24e7c, 0x28376eda6bfc1835, 0x155455c3e5071d85,
 };
 
 
 const uint64_t b1_data[Fp_DIGITS] = {  
+    // TODO: replace by ctx->ep_b? 	or	ctx->ep_map_c[3]?
     0xfb996971fe22a1e0, 0x9aa93eb35b742d6f, 0x8c476013de99c5c4,
     0x873e27c3a221e571, 0xca72b5e45a52d888, 0x06824061418a386b,
 };
-
-// check if (U/V) is a square, return 1 if yes, 0 otherwise 
-// if 1 is returned, out contains sqrt(U/V)
-// out should not be the same as U, or V
-static int quotient_sqrt(fp_t out, const fp_t u, const fp_t v) {
-    fp_st tmp;
-    fp_new(&tmp);
-
-    fp_sqr(out, v);                  // V^2
-    fp_mul(tmp, u, v);               // UV
-    fp_mul(out, out, tmp);           // UV^3
-    fp_exp(out, out, &bls_prec->p_3div4);        // (UV^3)^((p-3)/4)
-    fp_mul(out, out, tmp);           // UV(UV^3)^((p-3)/4)
-
-    fp_sqr(tmp, out);     // out^2
-    fp_mul(tmp, tmp, v);  // out^2 * V
-    fp_sub(tmp, tmp, u);   // out^2 * V - U
-
-    int res = fp_cmp_dig(tmp, 0)==RLC_EQ;
-    fp_free(&tmp);
-    return res;
-}
-
-static int sign_0(const fp_t in) {
-    return !fp_is_even(in);
-}
 
 
 // These constants are taken from https://github.com/kwantam/bls12-381_hash 
@@ -179,34 +155,122 @@ const uint64_t iso_Dy_data[ELLP_Dy_LEN][Fp_DIGITS] = {
      0xfd04e3dfc6086467, 0xfb95832e7d78742e, 0x0ef9c24eccaf5e0e,},
 };
 
-// Maps the field element t to a point p in E1(Fp) where E1: y^2 = g(x) = x^3 + a1*x + b1 
-// using simplified non-constant-time SWU impl
-// p point is in Jacobian coordinates
-static inline void map_to_E1_sswu(ep_t p, const fp_t t) {
-    const int tmp_len = 6;
+// sqrt_ration optimized for p mod 4 = 3.
+// check if (U/V) is a square, return 1 if yes, 0 otherwise 
+// if 1 is returned, out contains sqrt(U/V)
+// out should not be the same as U, or V
+static int sqrt_ratio_3mod4(fp_t out, const fp_t u, const fp_t v) {
+    fp_t sqr_z;
+    fp_new(sqr_z);
+    fp_set_dig(sqr_z, 11); 
+    fp_neg(sqr_z, sqr_z);
+    fp_srt(sqr_z, sqr_z); // TODO : hardcode sqrt(-11)
+
+    /*const int tmp_len = 4;
     fp_t* fp_tmp = (fp_t*) malloc(tmp_len*sizeof(fp_t));
-    for (int i=0; i<tmp_len; i++) fp_new(&fp_tmp[i]);
+    for (int i=0; i<tmp_len; i++) fp_new(fp_tmp[i]);
+
+    fp_sqr(fp_tmp[1], v);                               // V^2
+    fp_mul(fp_tmp[2], u, v);                            // UV
+    fp_mul(fp_tmp[1], fp_tmp[1], fp_tmp[2]);            // UV^3
+    fp_exp(out, fp_tmp[1], &bls_prec->p_3div4);         // (UV^3)^((p-3)/4)
+    fp_mul(out, out, fp_tmp[2]);                        // UV(UV^3)^((p-3)/4)
+    fp_mul(fp_tmp[0], out, sqr_z);                      // sqr(-z)*UV(UV^3)^((p-3)/4) // TODO: can be moved below
+
+    fp_sqr(fp_tmp[3], out);     // out^2
+    fp_mul(fp_tmp[3], fp_tmp[3], v);  // out^2 * V
+
+    int res;
+    if (fp_cmp(fp_tmp[3], u) != RLC_EQ) { // TODO: optimize
+        printf("sqr cmp != eq \n");
+        fp_copy(out, fp_tmp[0]);
+        res = 1;
+    } else {
+        //fp_copy(out, fp_tmp[0]);
+        res = 0;
+    }
+    
+    for (int i=0; i<tmp_len; i++) fp_free(fp_tmp[i]);
+    free(fp_tmp);
+    fp_free(sqr_z); fp_free(m_z);
+    return res;*/
+
+    const int tmp_len = 5;
+    fp_t* fp_tmp = (fp_t*) malloc(tmp_len*sizeof(fp_t));
+    for (int i=0; i<tmp_len; i++) fp_new(fp_tmp[i]);
+    fp_t *t1 , *t2, *t3, *y1, *y2;
+    t1 = &fp_tmp[0];
+    t2 = &fp_tmp[1];
+    t3 = &fp_tmp[2];
+    y1 = &fp_tmp[3];
+    y2 = &fp_tmp[4];
+
+    fp_sqr(*t1, v);                               // V^2
+    fp_mul(*t2, u, v);                            // UV
+    fp_mul(*t1, *t1, *t2);            // UV^3
+    fp_exp(*y1, *t1, &bls_prec->p_3div4);         // (UV^3)^((p-3)/4)
+    fp_mul(*y1, *y1, *t2);                        // UV(UV^3)^((p-3)/4)
+    fp_mul(*y2, *y1, sqr_z);                      // sqr(-z)*UV(UV^3)^((p-3)/4) // TODO: can be moved below
+
+    fp_sqr(*t3, *y1);     // out^2
+    fp_mul(*t3, *t3, v);  // out^2 * V
+
+    int res;
+    if (!(fp_cmp(*t3, u) == RLC_EQ)) { // TODO: optimize
+        fp_copy(out, *y2);
+        res = 0;
+    } else {
+        fp_copy(out, *y1);
+        res = 1;
+    }
+    
+    for (int i=0; i<tmp_len; i++) fp_free(fp_tmp[i]);
+    free(fp_tmp);
+    fp_free(sqr_z); fp_free(m_z);
+    return res;
+}
+
+// returns 1 if input is odd and 0 if input is even
+static int sign_0(const fp_t in) {
+#if FP_RDC == MONTY
+    bn_t tmp;
+    fp_prime_back(tmp, in); // TODO: entire reduction may not be needed to get the parity
+    return bn_is_even(tmp);
+#endif
+    return in[0]&1;
+}
+
+// Maps the field element t to a point p in E1(Fp) where E1: y^2 = g(x) = x^3 + a1*x + b1 
+// using optimized non-constant-time Simplified SWU implementation (A.B = 0)
+// Outout point p is in Jacobian coordinates to avoid extra inversions.
+static inline void map_to_E1_osswu(ep_t p, const fp_t t) {
+    /*const int tmp_len = 6;
+    fp_t* fp_tmp = (fp_t*) malloc(tmp_len*sizeof(fp_t));
+    for (int i=0; i<tmp_len; i++) fp_new(fp_tmp[i]);
 
     fp_t z;
-    fp_new(&z);
-    // TODO : hardcode Montg(11)
+    fp_new(z);
+    // TODO : hardcode Montg(11) or replace by ctx->ep_map_u
     fp_set_dig(z, 11);
     //fp_neg(z,z);
 
     // compute numerator and denominator of X0(t) = N / D
     fp_sqr(fp_tmp[1], t);                      // t^2
     fp_mul(fp_tmp[1], fp_tmp[1], z);           // z * t^2
-    fp_sqr(fp_tmp[2], fp_tmp[1]);             // t^4
-    fp_add(fp_tmp[2], fp_tmp[2], fp_tmp[1]);  // t^2 + z * t^4
+    fp_sqr(fp_tmp[2], fp_tmp[1]);             // z^2 * t^4
+    fp_add(fp_tmp[2], fp_tmp[2], fp_tmp[1]);  // z * t^2 + z^2 * t^4  printed#1
     // TODO : hardcode Montg(1)
     fp_set_dig(fp_tmp[0], 1); 
-    fp_add(fp_tmp[3], fp_tmp[2], fp_tmp[0]);        // z * t^4 + t^2 + 1
-    fp_mul(fp_tmp[3], fp_tmp[3], bls_prec->b1);     // N = b * (z * t^4 + t^2 + 1)
+    fp_add(fp_tmp[3], fp_tmp[2], fp_tmp[0]);        // z * t^2 + z^2 * t^4 + 1
+    fp_mul(fp_tmp[3], fp_tmp[3], bls_prec->b1);     // N = b * (z * t^2 + z^2 * t^4 + 1)
+
     if (fp_cmp_dig(fp_tmp[2], 0) == RLC_EQ) { 
+        printf("cmp == eq\n");
         fp_mul(fp_tmp[4], z, bls_prec->a1);     // D = a * z
     } else {
+        printf("cmp != eq\n");
         fp_neg(fp_tmp[4],fp_tmp[2]);
-        fp_mul(fp_tmp[4], fp_tmp[4], bls_prec->a1);     // D = - a * (t^2 + z * t^4) 
+        fp_mul(fp_tmp[4], fp_tmp[4], bls_prec->a1);     // D = - a * (z * t^2 + z^2 * t^4) 
     }
 
     // compute numerator and denominator of g(X0(t)) = U / V 
@@ -223,11 +287,13 @@ static inline void map_to_E1_sswu(ep_t p, const fp_t t) {
 
     fp_t *x,*y;
     // compute sqrt(U/V)
-    if (quotient_sqrt(fp_tmp[5], fp_tmp[2], fp_tmp[6])) {
+    if (sqrt_ratio_3mod4(fp_tmp[5], fp_tmp[2], fp_tmp[6])) {
+        printf("sqrt\n");
         x = &fp_tmp[3];       // x = N
         y = &fp_tmp[5];       // y = sqrt(U/V)
     } else {
-        fp_mul(fp_tmp[0], fp_tmp[1], fp_tmp[3]);          // x = z * t^2 * N
+        printf("!sqrt\n");
+        fp_mul(fp_tmp[0], fp_tmp[1], fp_tmp[3]);            // x = z * t^2 * N
         fp_mul(fp_tmp[1], fp_tmp[1], t);                    // z * t^3
         fp_mul(fp_tmp[1], fp_tmp[1], fp_tmp[5]);            // y = z * t^3 * sqrtCand
         x = &fp_tmp[0];
@@ -236,18 +302,87 @@ static inline void map_to_E1_sswu(ep_t p, const fp_t t) {
 
     // negate y to be opposite sign of t
     if (sign_0(t) == sign_0(*y)) {
+            printf("sign == sign\n");
             fp_neg(*y, *y);
     }
 
     // convert (x/D, y) into Jacobian (X,Y,Z) where Z=D
-    // Z = D, X = x*D = N.D , Y = y*D^3  // TODO : check
+    // Z = D, X = x/D * D^2 = x*D , Y = y*D^3  // TODO : check
     fp_mul(p->x, *x, fp_tmp[4]);             // X = N*D
-    fp_mul(p->y, *y, fp_tmp[6]);  // Y = y*D^3
+    fp_mul(p->y, *y, fp_tmp[6]);            // Y = y*D^3
+    fp_copy(p->z, fp_tmp[4]);
+    p->coord = JACOB;*/
+
+    const int tmp_len = 7;
+    fp_t* fp_tmp = (fp_t*) malloc(tmp_len*sizeof(fp_t));
+    for (int i=0; i<tmp_len; i++) fp_new(fp_tmp[i]);
+
+    fp_t *y1;
+    y1 = &fp_tmp[0];
+
+    fp_t z;
+    fp_new(z);
+    // TODO : hardcode Montg(11) or replace by ctx->ep_map_u
+    fp_set_dig(z, 11);
+
+    // compute numerator and denominator of X0(t) = N / D
+    fp_sqr(fp_tmp[1], t);                      // t^2
+    fp_mul(fp_tmp[1], fp_tmp[1], z);           // z * t^2
+    fp_sqr(fp_tmp[2], fp_tmp[1]);             // z^2 * t^4
+    fp_add(fp_tmp[2], fp_tmp[2], fp_tmp[1]);  // z * t^2 + z^2 * t^4  printed#1
+    // TODO : hardcode Montg(1)
+    fp_set_dig(fp_tmp[0], 1);  
+    fp_add(fp_tmp[3], fp_tmp[2], fp_tmp[0]);        // z * t^2 + z^2 * t^4 + 1
+    fp_mul(fp_tmp[3], fp_tmp[3], bls_prec->b1);     // N = b * (z * t^2 + z^2 * t^4 + 1)
+
+    if (!(fp_cmp_dig(fp_tmp[2], 0) != RLC_EQ)) { 
+        fp_copy(fp_tmp[4], z);
+    } else {
+        fp_neg(fp_tmp[4],fp_tmp[2]);  // TODO: haardcode -a ?
+    }
+    fp_mul(fp_tmp[4], fp_tmp[4], bls_prec->a1);     // D = a * z
+
+    // compute numerator and denominator of g(X0(t)) = U / V 
+    // U = N^3 + a1 * N * D^2 + b1 * D^3
+    // V = D^3
+    fp_sqr(fp_tmp[2], fp_tmp[3]);                        // N^2
+    fp_sqr(fp_tmp[6], fp_tmp[4]);                        // D^2
+    fp_mul(fp_tmp[5], bls_prec->a1, fp_tmp[6]);          // a * D^2
+    fp_add(fp_tmp[2], fp_tmp[5], fp_tmp[2]);             // N^2 + a * D^2
+    fp_mul(fp_tmp[2], fp_tmp[3], fp_tmp[2]);             // N^3 + a * N * D^2
+    fp_mul(fp_tmp[6], fp_tmp[6], fp_tmp[4]);             // V  =  D^3
+    fp_mul(fp_tmp[5], bls_prec->b1, fp_tmp[6]);          // b * D^3
+    fp_add(fp_tmp[2], fp_tmp[5], fp_tmp[2]);             // U
+
+    fp_mul(p->x, fp_tmp[1], fp_tmp[3]);
+    // compute sqrt(U/V)
+    
+    int is_sqr = sqrt_ratio_3mod4(*y1, fp_tmp[2], fp_tmp[6]);
+    fp_mul(p->y, fp_tmp[1], t); 
+    fp_mul(p->y, p->y, *y1); 
+
+    if (!is_sqr) {
+    } else {
+        fp_copy(p->x, fp_tmp[3]);
+        fp_copy(p->y, *y1);
+    }
+
+    // negate y to be opposite sign of t
+    if (!(sign_0(t) == sign_0(p->y))) {
+        fp_neg(p->y, p->y);
+    }
+
+    // convert (x/D, y) into Jacobian (X,Y,Z) where Z=D
+    // Z = D, X = x/D * D^2 = x*D , Y = y*D^3  // TODO : check
+    fp_mul(p->x, p->x, fp_tmp[4]);             // X = N*D
+    fp_mul(p->y, p->y, fp_tmp[6]);            // Y = y*D^3
     fp_copy(p->z, fp_tmp[4]);
     p->coord = JACOB;
+
     
-    for (int i=0; i<tmp_len; i++) fp_free(&fp_tmp[i]);
-    free(fp_tmp);
+    for (int i=0; i<tmp_len; i++) fp_free(fp_tmp[i]);
+    fp_free(fp_tmp);
+    fp_free(z);
 }
 
 // This code is taken from https://github.com/kwantam/bls12-381_hash 
@@ -359,17 +494,17 @@ static void clear_cofactor(ep_t out, const ep_t in) {
     bn_new(z);
     fp_prime_get_par(z);
     // compute 1-z 
-    bn_neg(z, z);  // keep -z in only 64 bits
+    bn_neg(z, z); 
     bn_add_dig(z, z, 1);
-    ep_mul_dig(out, in, z[0].dp[0]);
+    ep_mul_dig(out, in, z->dp[0]); // z fits in 64 bits
     bn_free(z);
 }
 
 // construction 2 section 5 in in https://eprint.iacr.org/2019/403.pdf
-// evaluate the optimized SWU map twice, add resulting points, apply isogeny map, clear cofactor
+// evaluate the optimized SSWU map twice, add resulting points, apply isogeny map, clear cofactor
 // the result is stored in p
 // msg is the input message to hash, must be at least 2*(FP_BYTES+16) = 128 bytes
-static void map_to_G1_sswu(ep_t p, const uint8_t *msg, int len) {
+static void map_to_G1_local(ep_t p, const uint8_t *msg, int len) {
     RLC_TRY {
         if (len < 2*(Fp_BYTES+16)) {
             RLC_THROW(ERR_NO_BUFFER);
@@ -387,17 +522,18 @@ static void map_to_G1_sswu(ep_t p, const uint8_t *msg, int len) {
         ep_t p_temp;
         ep_new(p_temp);
         // first mapping
-        map_to_E1_sswu(p_temp, t1); // map to E1
+        map_to_E1_osswu(p_temp, t1); // map to E1
         eval_iso11(p_temp, p_temp); // map to E
+
         // second mapping
-        map_to_E1_sswu(p, t2); // map to E1
+        map_to_E1_osswu(p, t2); // map to E1
         eval_iso11(p, p); // map to E
         // sum 
-        // TODO: implement point addition in E1 and apply the isogeny map
-        // only once.
+        // TODO: implement point addition in E1 and apply the isogeny map only once.
         ep_add_jacob(p, p, p_temp);
+        
         // clear the cofactor
-        clear_cofactor(p, p_temp); // map to G1
+        clear_cofactor(p, p); // map to G1
         ep_free(p_temp);
     }
     RLC_CATCH_ANY {
@@ -411,7 +547,7 @@ static void map_to_G1_sswu(ep_t p, const uint8_t *msg, int len) {
 void map_to_G1(ep_t h, const byte* data, const int len) {
     #if hashToPoint==SSWU
     // implementation using different mapping parameters than the IETF draft
-    map_to_G1_sswu(h, data, len);
+    map_to_G1_local(h, data, len);
     #elif hashToPoint==RELIC_SSWU
     // relic implementation compliant with the IETF draft
     ep_map_from_field(h, data, len);
