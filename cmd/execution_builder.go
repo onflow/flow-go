@@ -99,6 +99,7 @@ type ExecutionConfig struct {
 	gcpBucketName               string
 	s3BucketName                string
 	edsDatastoreTTL             time.Duration
+	//hostNetworking              string //start container using host networking: https://docs.docker.com/network/host/
 }
 
 type ExecutionNodeBuilder struct {
@@ -114,11 +115,14 @@ func NewExecutionNodeBuilder(nodeBuilder *FlowNodeBuilder) *ExecutionNodeBuilder
 }
 
 func (e *ExecutionNodeBuilder) LoadFlags() {
+	fmt.Println("ExecutionNodeBuilder>LoadFlags>start")
 	e.FlowNodeBuilder.
 		ExtraFlags(func(flags *pflag.FlagSet) {
+			fmt.Println("ExecutionNodeBuilder>LoadFlags>ExtraFlags>1")
 			homedir, _ := os.UserHomeDir()
+			fmt.Println("ExecutionNodeBuilder>LoadFlags>ExtraFlags>2")
 			datadir := filepath.Join(homedir, ".flow", "execution")
-
+			fmt.Println("ExecutionNodeBuilder>LoadFlags>ExtraFlags>3")
 			flags.StringVarP(&e.exeConf.rpcConf.ListenAddr, "rpc-addr", "i", "localhost:9000", "the address the gRPC server listens on")
 			flags.BoolVar(&e.exeConf.rpcConf.RpcMetricsEnabled, "rpc-metrics-enabled", false, "whether to enable the rpc metrics")
 			flags.StringVar(&e.exeConf.triedir, "triedir", datadir, "directory to store the execution State")
@@ -156,6 +160,9 @@ func (e *ExecutionNodeBuilder) LoadFlags() {
 			flags.StringVar(&e.exeConf.s3BucketName, "s3-bucket-name", "", "S3 Bucket name for block data uploader")
 			flags.DurationVar(&e.exeConf.edsDatastoreTTL, "execution-data-service-datastore-ttl", 0,
 				"TTL for new blobs added to the execution data service blobstore")
+			//fmt.Println("ExecutionNodeBuilder>LoadFlags>ExtraFlags>adding host networking")
+			//flags.StringVar(&e.exeConf.hostNetworking, "network", "host", "enable host networking when container starts")
+			fmt.Println("ExecutionNodeBuilder>LoadFlags>ExtraFlags>end")
 		}).
 		ValidateFlags(func() error {
 			if e.exeConf.enableBlockDataUpload {
@@ -165,6 +172,7 @@ func (e *ExecutionNodeBuilder) LoadFlags() {
 			}
 			return nil
 		})
+	fmt.Println("ExecutionNodeBuilder>LoadFlags>end")
 }
 
 func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {

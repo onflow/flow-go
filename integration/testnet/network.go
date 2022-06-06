@@ -604,7 +604,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 	bootstrapDir, err := integrationBootstrapDir()
 	require.Nil(t, err)
 
-	t.Logf("BootstrapDir: %s \n", bootstrapDir)
+	t.Logf("about to BootstrapNetwork(); BootstrapDir: %s \n", bootstrapDir)
 
 	bootstrapData, err := BootstrapNetwork(networkConf, bootstrapDir, chainID)
 	require.Nil(t, err)
