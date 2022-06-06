@@ -35,13 +35,13 @@ func New(
 //  * model.ErrViewForUnknownEpoch if the TC refers unknown epoch
 // Any other error should be treated as exception
 func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
-	highestQC := tc.NewestQC
+	newestQC := tc.NewestQC
 
 	// The TC's view cannot be smaller than the view of the QC it contains.
 	// Note: we specifically allow for the TC to have the same view as the highest QC.
 	// This is useful as a fallback, because it allows replicas other than the designated
 	// leader to also collect votes and generate a QC.
-	if tc.View < highestQC.View {
+	if tc.View < newestQC.View {
 		return newInvalidTCError(tc, fmt.Errorf("TC's QC cannot be newer than the TC's view"))
 	}
 
@@ -86,18 +86,18 @@ func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 	}
 
 	// verifying that tc.NewestQC is the QC with the highest view
-	highestQCView := tc.NewestQCViews[0]
+	newestQCView := tc.NewestQCViews[0]
 	for _, view := range tc.NewestQCViews {
-		if highestQCView < view {
-			highestQCView = view
+		if newestQCView < view {
+			newestQCView = view
 		}
 	}
-	if highestQCView != tc.NewestQC.View {
-		return newInvalidTCError(tc, fmt.Errorf("included QC (view=%d) should be equal to highest contributed view: %d", tc.NewestQC.View, highestQCView))
+	if newestQCView != tc.NewestQC.View {
+		return newInvalidTCError(tc, fmt.Errorf("included QC (view=%d) should be equal to highest contributed view: %d", tc.NewestQC.View, newestQCView))
 	}
 
 	// Validate QC
-	err = v.ValidateQC(highestQC)
+	err = v.ValidateQC(newestQC)
 	if err != nil {
 		if model.IsInvalidQCError(err) {
 			return newInvalidTCError(tc, fmt.Errorf("invalid QC included in TC: %w", err))

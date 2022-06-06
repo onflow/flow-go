@@ -28,7 +28,7 @@ func MakeTC(options ...func(*flow.TimeoutCertificate)) *flow.TimeoutCertificate 
 	return &tc
 }
 
-func WithTCHighestQC(qc *flow.QuorumCertificate) func(*flow.TimeoutCertificate) {
+func WithTCNewestQC(qc *flow.QuorumCertificate) func(*flow.TimeoutCertificate) {
 	return func(tc *flow.TimeoutCertificate) {
 		tc.NewestQC = qc
 		tc.NewestQCViews = []uint64{qc.View}

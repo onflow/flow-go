@@ -439,13 +439,13 @@ func BlockHeaderWithParentFixture(parent *flow.Header) flow.Header {
 	view := parent.View + 1 + uint64(rand.Intn(10)) // Intn returns [0, n)
 	var lastViewTC *flow.TimeoutCertificate
 	if view != parent.View+1 {
-		highestQC := QuorumCertificateFixture(func(qc *flow.QuorumCertificate) {
+		newestQC := QuorumCertificateFixture(func(qc *flow.QuorumCertificate) {
 			qc.View = parent.View
 		})
 		lastViewTC = &flow.TimeoutCertificate{
 			View:          view - 1,
-			NewestQCViews: []uint64{highestQC.View},
-			NewestQC:      highestQC,
+			NewestQCViews: []uint64{newestQC.View},
+			NewestQC:      newestQC,
 			SignerIndices: SignerIndicesFixture(4),
 			SigData:       SignatureFixture(),
 		}

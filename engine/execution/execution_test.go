@@ -518,7 +518,7 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 	block.Header.LastViewTC = helper.MakeTC(
 		helper.WithTCView(block.Header.View-1),
 		helper.WithTCSigners(block.Header.ParentVoterIndices),
-		helper.WithTCHighestQC(
+		helper.WithTCNewestQC(
 			helper.MakeQC(
 				helper.WithQCView(genesis.View),
 				helper.WithQCSigners(block.Header.ParentVoterIndices))))
