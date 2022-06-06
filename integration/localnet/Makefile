@@ -8,9 +8,14 @@ NCLUSTERS=1
 EPOCHLEN=10000   # 0 means use default
 STAKINGLEN=2000 # 0 means use default
 DKGLEN=2000     # 0 means use default
-PROFILER=false
 CONSENSUS_DELAY=800ms
 COLLECTION_DELAY=950ms
+
+PROFILER=false
+TRACING=true
+EXTENSIVE_TRACING=false
+CADENCE_TRACING=false
+
 # The Git commit hash
 COMMIT=$(shell git rev-parse HEAD)
 VERSION=localnetbuild
@@ -32,13 +37,16 @@ init:
 		-epoch-staking-phase-length=$(STAKINGLEN) \
 		-epoch-dkg-phase-length=$(DKGLEN) \
 		-profiler=$(PROFILER) \
+		-tracing=$(TRACING) \
+		-cadence-tracing=$(CADENCE_TRACING) \
+		-extensive-tracing=$(EXTENSIVE_TRACING) \
 		-consensus-delay=$(CONSENSUS_DELAY) \
 		-collection-delay=$(COLLECTION_DELAY)
 
 # Creates a light version of the localnet with just 1 instance for each node type
 .PHONY: init-light
 init-light:
-	$(MAKE) -e COLLECTION=1 CONSENSUS=1 EXECUTION=1 VERIFICATION=1 ACCESS=1 NCLUSTERS=1 init
+	$(MAKE) -e COLLECTION=1 CONSENSUS=2 EXECUTION=1 VERIFICATION=1 ACCESS=1 NCLUSTERS=1 init
 
 # Creates a version of localnet configured with short epochs
 .PHONY: init-short-epochs

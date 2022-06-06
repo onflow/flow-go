@@ -42,7 +42,6 @@ type ContLoadGenerator struct {
 	numberOfAccounts     int
 	trackTxs             bool
 	flowClient           *client.Client
-	supervisorClient     *client.Client
 	serviceAccount       *flowAccount
 	flowTokenAddress     *flowsdk.Address
 	fungibleTokenAddress *flowsdk.Address
@@ -51,7 +50,6 @@ type ContLoadGenerator struct {
 	availableAccounts    chan *flowAccount                             // queue with accounts available for   workers
 	happeningAccounts    chan func() (*flowAccount, string, time.Time) // queue with accounts happening after worker processing
 	txTracker            *TxTracker
-	txStatsTracker       *TxStatsTracker
 	workerStatsTracker   *WorkerStatsTracker
 	workers              []*Worker
 	blockRef             BlockRef
@@ -72,6 +70,7 @@ func NewContLoadGenerator(
 	serviceAccountAddress *flowsdk.Address,
 	fungibleTokenAddress *flowsdk.Address,
 	flowTokenAddress *flowsdk.Address,
+	trackTxs bool,
 	tps int,
 	loadType LoadType,
 	feedbackEnabled bool,
@@ -89,8 +88,7 @@ func NewContLoadGenerator(
 		return nil, fmt.Errorf("error loading service account %w", err)
 	}
 
-	// TODO get these params hooked to the top level
-	txStatsTracker := NewTxStatsTracker(&StatsConfig{1, 1, 1, 1, 1, numberOfAccounts})
+	txStatsTracker := NewTxStatsTracker()
 	txTracker, err := NewTxTracker(log, 5000, 100, loadedAccessAddr, time.Second, txStatsTracker)
 	if err != nil {
 		return nil, err
@@ -102,9 +100,8 @@ func NewContLoadGenerator(
 		initialized:          false,
 		tps:                  tps,
 		numberOfAccounts:     numberOfAccounts,
-		trackTxs:             false,
+		trackTxs:             trackTxs,
 		flowClient:           flowClient,
-		supervisorClient:     supervisorClient,
 		serviceAccount:       servAcc,
 		fungibleTokenAddress: fungibleTokenAddress,
 		flowTokenAddress:     flowTokenAddress,
@@ -112,7 +109,6 @@ func NewContLoadGenerator(
 		availableAccounts:    make(chan *flowAccount, numberOfAccounts),
 		happeningAccounts:    make(chan func() (*flowAccount, string, time.Time), numberOfAccounts),
 		txTracker:            txTracker,
-		txStatsTracker:       txStatsTracker,
 		workerStatsTracker:   NewWorkerStatsTracker(),
 		blockRef:             NewBlockRef(supervisorClient),
 		loadType:             loadType,
