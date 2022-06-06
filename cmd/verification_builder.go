@@ -186,7 +186,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 		Module("sync core", func(node *NodeConfig) error {
 			var err error
 
-			syncCore, err = synchronization.New(node.Logger, node.SyncCoreConfig)
+			syncCore, err = synchronization.New(node.Logger, node.SyncCoreConfig, synchronization.NewMetricsCollector())
 			return err
 		}).
 		Component("verifier engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {

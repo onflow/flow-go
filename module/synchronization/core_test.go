@@ -28,7 +28,7 @@ type SyncSuite struct {
 func (ss *SyncSuite) SetupTest() {
 	var err error
 
-	ss.core, err = New(zerolog.New(ioutil.Discard), DefaultConfig())
+	ss.core, err = New(zerolog.New(ioutil.Discard), DefaultConfig(), &NoopMetrics{})
 	ss.Require().Nil(err)
 }
 

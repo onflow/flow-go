@@ -56,9 +56,10 @@ type Core struct {
 	mu       sync.Mutex
 	heights  map[uint64]*Status
 	blockIDs map[flow.Identifier]*Status
+	metrics  SynchronizationMetrics
 }
 
-func New(log zerolog.Logger, config Config) (*Core, error) {
+func New(log zerolog.Logger, config Config, metrics SynchronizationMetrics) (*Core, error) {
 	core := &Core{
 		log:      log.With().Str("module", "synchronization").Logger(),
 		Config:   config,

@@ -41,7 +41,7 @@ type rapidSync struct {
 func (r *rapidSync) Init(t *rapid.T) {
 	var err error
 
-	r.core, err = New(zerolog.New(ioutil.Discard), DefaultConfig())
+	r.core, err = New(zerolog.New(ioutil.Discard), DefaultConfig(), &NoopMetrics{})
 	require.NoError(t, err)
 
 	r.store = populatedBlockStore(t)
