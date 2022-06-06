@@ -245,9 +245,10 @@ func (c *Core) prune(final *flow.Header) {
 	initialHeights := len(c.heights)
 	initialBlockIDs := len(c.blockIDs)
 
-	for height := range c.heights {
+	for height, status := range c.heights {
 		if height <= final.Height {
 			delete(c.heights, height)
+			c.metrics.PrunedBlockByHeight(status)
 			continue
 		}
 	}
@@ -257,12 +258,18 @@ func (c *Core) prune(final *flow.Header) {
 
 		if header.Height <= final.Height {
 			delete(c.blockIDs, blockID)
+			c.metrics.PrunedBlockById(status)
 			continue
 		}
 	}
 
-	prunedHeights := initialHeights - len(c.heights)
-	prunedBlockIDs := initialBlockIDs - len(c.blockIDs)
+	currentHeights := len(c.heights)
+	currentBlockIDs := len(c.blockIDs)
+
+	prunedHeights := initialHeights - currentHeights
+	prunedBlockIDs := initialBlockIDs - currentBlockIDs
+
+	c.metrics.PrunedBlocks(prunedHeights, prunedBlockIDs, currentHeights, currentBlockIDs)
 
 	c.log.Debug().
 		Uint64("final_height", final.Height).
@@ -342,6 +349,7 @@ func (c *Core) getRequestableItems() ([]uint64, []flow.Identifier) {
 // RangeRequested updates status state for a range of block heights that has
 // been successfully requested. Must be called when a range request is submitted.
 func (c *Core) RangeRequested(ran flow.Range) {
+	c.metrics.RangeRequested(ran)
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -358,6 +366,7 @@ func (c *Core) RangeRequested(ran flow.Range) {
 // BatchRequested updates status state for a batch of block IDs that has been
 // successfully requested. Must be called when a batch request is submitted.
 func (c *Core) BatchRequested(batch flow.Batch) {
+	c.metrics.BatchRequested(batch)
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
