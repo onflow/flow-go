@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/state_synchronization"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -22,8 +23,8 @@ type BlockEntry struct {
 // ExecutionDataReader provides an abstraction for consumers to read blocks as job.
 type ExecutionDataReader struct {
 	eds     state_synchronization.ExecutionDataService
-	headers storage.Headers
 	results storage.ExecutionResults
+	state   protocol.State
 
 	fetchTimeout           time.Duration
 	highestAvailableHeight func() uint64
@@ -36,14 +37,14 @@ type ExecutionDataReader struct {
 // NewExecutionDataReader creates and returns a ExecutionDataReader.
 func NewExecutionDataReader(
 	eds state_synchronization.ExecutionDataService,
-	headers storage.Headers,
+	state protocol.State,
 	results storage.ExecutionResults,
 	fetchTimeout time.Duration,
 	highestAvailableHeight func() uint64,
 ) *ExecutionDataReader {
 	return &ExecutionDataReader{
 		eds:                    eds,
-		headers:                headers,
+		state:                  state,
 		results:                results,
 		fetchTimeout:           fetchTimeout,
 		highestAvailableHeight: highestAvailableHeight,
@@ -89,14 +90,14 @@ func (r *ExecutionDataReader) Head() (uint64, error) {
 // getExecutionData returns the ExecutionData for the given block height.
 // This is used by the execution data reader to get the ExecutionData for a block.
 func (r *ExecutionDataReader) getExecutionData(signalCtx irrecoverable.SignalerContext, height uint64) (*state_synchronization.ExecutionData, error) {
-	header, err := r.headers.ByHeight(height)
+	seal, err := r.state.AtHeight(height).Seal()
 	if err != nil {
-		return nil, fmt.Errorf("failed to lookup header for height %d: %w", height, err)
+		return nil, fmt.Errorf("failed to lookup seal for height %d: %w", height, err)
 	}
 
-	result, err := r.results.ByBlockID(header.ID())
+	result, err := r.results.ByID(seal.ResultID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to lookup execution result for block %s: %w", header.ID(), err)
+		return nil, fmt.Errorf("failed to lookup execution result for block %s: %w", seal.BlockID, err)
 	}
 
 	ctx, cancel := context.WithTimeout(signalCtx, r.fetchTimeout)
@@ -105,7 +106,7 @@ func (r *ExecutionDataReader) getExecutionData(signalCtx irrecoverable.SignalerC
 	executionData, err := r.eds.Get(ctx, result.ExecutionDataID)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to get execution data for block %s: %w", header.ID(), err)
+		return nil, fmt.Errorf("failed to get execution data for block %s: %w", seal.BlockID, err)
 	}
 
 	return executionData, nil

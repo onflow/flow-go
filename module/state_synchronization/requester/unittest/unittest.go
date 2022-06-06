@@ -15,6 +15,8 @@ import (
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/network/mocknetwork"
+	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/invalid"
 	statemock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -104,6 +106,12 @@ func WithHead(head *flow.Header) SnapshotMockOptions {
 	}
 }
 
+func WithSeal(seal *flow.Seal) SnapshotMockOptions {
+	return func(snapshot *statemock.Snapshot) {
+		snapshot.On("Seal").Return(seal, nil)
+	}
+}
+
 func MockProtocolStateSnapshot(opts ...SnapshotMockOptions) *statemock.Snapshot {
 	snapshot := new(statemock.Snapshot)
 
@@ -116,9 +124,22 @@ func MockProtocolStateSnapshot(opts ...SnapshotMockOptions) *statemock.Snapshot 
 
 type StateMockOptions func(*statemock.State)
 
-func WithSnapshot(snapshot *statemock.Snapshot) StateMockOptions {
+func WithSealed(snapshot *statemock.Snapshot) StateMockOptions {
 	return func(state *statemock.State) {
 		state.On("Sealed").Return(snapshot)
+	}
+}
+
+func WithAtHeight(snapshots map[uint64]*statemock.Snapshot) StateMockOptions {
+	return func(state *statemock.State) {
+		state.On("AtHeight", mock.AnythingOfType("uint64")).Return(
+			func(height uint64) protocol.Snapshot {
+				if snapshot, ok := snapshots[height]; ok {
+					return snapshot
+				}
+				return invalid.NewSnapshot(fmt.Errorf("snapshot not found: %w", storage.ErrNotFound))
+			},
+		)
 	}
 }
 
@@ -196,6 +217,25 @@ func WithByBlockID(resultsByID map[flow.Identifier]*flow.ExecutionResult) Result
 			func(blockID flow.Identifier) error {
 				if _, has := resultsByID[blockID]; !has {
 					return fmt.Errorf("result %s not found: %w", blockID, storage.ErrNotFound)
+				}
+				return nil
+			},
+		)
+	}
+}
+
+func WithByResultID(resultsByID map[flow.Identifier]*flow.ExecutionResult) ResultsMockOptions {
+	return func(results *storagemock.ExecutionResults) {
+		results.On("ByID", mock.AnythingOfType("flow.Identifier")).Return(
+			func(resultID flow.Identifier) *flow.ExecutionResult {
+				if _, has := resultsByID[resultID]; !has {
+					return nil
+				}
+				return resultsByID[resultID]
+			},
+			func(resultID flow.Identifier) error {
+				if _, has := resultsByID[resultID]; !has {
+					return fmt.Errorf("result %s not found: %w", resultID, storage.ErrNotFound)
 				}
 				return nil
 			},

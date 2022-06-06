@@ -3,7 +3,6 @@ package jobqueue
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -11,26 +10,19 @@ import (
 
 // SealedBlockHeaderReader provides an abstraction for consumers to read blocks as job.
 type SealedBlockHeaderReader struct {
-	state   protocol.State
-	headers storage.Headers
+	state protocol.State
 }
 
 // NewSealedBlockHeaderReader creates and returns a SealedBlockHeaderReader.
-func NewSealedBlockHeaderReader(state protocol.State, headers storage.Headers) *SealedBlockHeaderReader {
+func NewSealedBlockHeaderReader(state protocol.State) *SealedBlockHeaderReader {
 	return &SealedBlockHeaderReader{
-		state:   state,
-		headers: headers,
+		state: state,
 	}
 }
 
 // AtIndex returns the block header job at the given index.
 // The block header job at an index is just the finalized block header at that index (i.e., height).
 func (r SealedBlockHeaderReader) AtIndex(index uint64) (module.Job, error) {
-	header, err := r.blockByHeight(index)
-	if err != nil {
-		return nil, fmt.Errorf("could not get block by index %v: %w", index, err)
-	}
-
 	sealed, err := r.Head()
 	if err != nil {
 		return nil, fmt.Errorf("could not get last sealed block height: %w", err)
@@ -41,18 +33,13 @@ func (r SealedBlockHeaderReader) AtIndex(index uint64) (module.Job, error) {
 		return nil, fmt.Errorf("block at index %v is not sealed: %w", index, storage.ErrNotFound)
 	}
 
-	// the block at height index is sealed
-	return BlockHeaderToJob(header), nil
-}
-
-// blockByHeight returns the block at the given height.
-func (r SealedBlockHeaderReader) blockByHeight(height uint64) (*flow.Header, error) {
-	block, err := r.headers.ByHeight(height)
+	header, err := r.state.AtHeight(index).Head()
 	if err != nil {
-		return nil, fmt.Errorf("could not get block by height %d: %w", height, err)
+		return nil, fmt.Errorf("could not get header by height %d: %w", index, err)
 	}
 
-	return block, nil
+	// the block at height index is sealed
+	return BlockHeaderToJob(header), nil
 }
 
 // Head returns the last sealed height as job index.

@@ -114,8 +114,8 @@ type executionDataRequester struct {
 	log     zerolog.Logger
 
 	// Local db objects
-	headers storage.Headers
 	results storage.ExecutionResults
+	state   protocol.State
 
 	executionDataReader *jobs.ExecutionDataReader
 
@@ -142,7 +142,6 @@ func New(
 	processedHeight storage.ConsumerProgress,
 	processedNotifications storage.ConsumerProgress,
 	state protocol.State,
-	headers storage.Headers,
 	results storage.ExecutionResults,
 	cfg ExecutionDataConfig,
 ) state_synchronization.ExecutionDataRequester {
@@ -150,7 +149,7 @@ func New(
 		log:                  log.With().Str("component", "execution_data_requester").Logger(),
 		eds:                  eds,
 		metrics:              edrMetrics,
-		headers:              headers,
+		state:                state,
 		results:              results,
 		config:               cfg,
 		finalizationNotifier: engine.NewNotifier(),
@@ -160,7 +159,7 @@ func New(
 
 	// jobqueue Jobs object that tracks sealed blocks by height. This is used by the blockConsumer
 	// to get a sequential list of sealed blocks.
-	sealedBlockReader := jobqueue.NewSealedBlockHeaderReader(state, headers)
+	sealedBlockReader := jobqueue.NewSealedBlockHeaderReader(state)
 
 	// blockConsumer ensures every sealed block's execution data is downloaded.
 	// It listens to block finalization events from `finalizationNotifier`, then checks if there
@@ -193,7 +192,7 @@ func New(
 	// notificationConsumer to get downloaded execution data from storage.
 	e.executionDataReader = jobs.NewExecutionDataReader(
 		e.eds,
-		e.headers,
+		e.state,
 		e.results,
 		e.config.FetchTimeout,
 		// method to get highest consecutive height that has downloaded execution data. it is used
@@ -350,14 +349,12 @@ func (e *executionDataRequester) processFetchRequest(ctx irrecoverable.SignalerC
 
 	logger.Debug().Msg("processing fetch request")
 
-	result, err := e.results.ByBlockID(blockID)
-
-	// The ExecutionResult may not have been downloaded yet. This error should be retried
-	if errors.Is(err, storage.ErrNotFound) {
-		logger.Debug().Msg("execution result not found")
-		return err
+	seal, err := e.state.AtBlockID(blockID).Seal()
+	if err != nil {
+		ctx.Throw(fmt.Errorf("failed to get seal for block %s: %w", blockID, err))
 	}
 
+	result, err := e.results.ByID(seal.ResultID)
 	if err != nil {
 		ctx.Throw(fmt.Errorf("failed to lookup execution result for block %s: %w", blockID, err))
 	}

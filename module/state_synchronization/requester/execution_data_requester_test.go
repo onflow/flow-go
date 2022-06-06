@@ -33,8 +33,10 @@ import (
 	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/invalid"
 	statemock "github.com/onflow/flow-go/state/protocol/mock"
-	storage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage"
+	bstorage "github.com/onflow/flow-go/storage/badger"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -45,9 +47,7 @@ type ExecutionDataRequesterSuite struct {
 	blobservice *mocknetwork.BlobService
 	datastore   datastore.Batching
 	db          *badger.DB
-	headers     *storagemock.Headers
-
-	eds *syncmock.ExecutionDataService
+	eds         *syncmock.ExecutionDataService
 
 	run edTestRun
 
@@ -142,13 +142,54 @@ func mockExecutionDataService(edStore map[flow.Identifier]*testExecutionDataServ
 	return eds
 }
 
-func (suite *ExecutionDataRequesterSuite) mockProtocolState(blocksByHeight map[uint64]*flow.Block) *statemock.State {
+func (suite *ExecutionDataRequesterSuite) mockProtocolState(blocksByHeight map[uint64]*flow.Block, results *storagemock.ExecutionResults) *statemock.State {
 	state := new(statemock.State)
 
 	suite.mockSnapshot = new(mockSnapshot)
 	suite.mockSnapshot.set(blocksByHeight[0].Header, nil) // genesis block
 
 	state.On("Sealed").Return(suite.mockSnapshot).Maybe()
+
+	snapshotsByHeight := make(map[uint64]*statemock.Snapshot, len(blocksByHeight))
+	snapshotsByBlockID := make(map[flow.Identifier]*statemock.Snapshot, len(blocksByHeight))
+	for height, block := range blocksByHeight {
+		result, err := results.ByBlockID(block.ID())
+		assert.NoError(suite.T(), err)
+
+		seal := unittest.Seal.Fixture(
+			unittest.Seal.WithBlockID(block.ID()),
+			unittest.Seal.WithResult(result),
+		)
+
+		snapshotsByHeight[height] = synctest.MockProtocolStateSnapshot(
+			synctest.WithHead(block.Header),
+			synctest.WithSeal(seal),
+		)
+
+		snapshotsByBlockID[block.ID()] = synctest.MockProtocolStateSnapshot(
+			synctest.WithHead(block.Header),
+			synctest.WithSeal(seal),
+		)
+	}
+
+	state.On("AtHeight", mock.AnythingOfType("uint64")).Return(
+		func(height uint64) protocol.Snapshot {
+			if snapshot, ok := snapshotsByHeight[height]; ok {
+				return snapshot
+			}
+			return invalid.NewSnapshot(fmt.Errorf("snapshot not found: %w", storage.ErrNotFound))
+		},
+	).Maybe()
+
+	state.On("AtBlockID", mock.AnythingOfType("flow.Identifier")).Return(
+		func(blockID flow.Identifier) protocol.Snapshot {
+			if snapshot, ok := snapshotsByBlockID[blockID]; ok {
+				return snapshot
+			}
+			return invalid.NewSnapshot(fmt.Errorf("snapshot not found: %w", storage.ErrNotFound))
+		},
+	).Maybe()
+
 	return state
 }
 
@@ -395,15 +436,17 @@ func generatePauseResume(pauseHeight uint64) (specialBlockGenerator, func()) {
 }
 
 func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun) (state_synchronization.ExecutionDataRequester, *pubsub.FinalizationDistributor) {
-	suite.headers = synctest.MockBlockHeaderStorage(synctest.WithByID(cfg.blocksByID), synctest.WithByHeight(cfg.blocksByHeight))
-	results := synctest.MockResultsStorage(synctest.WithByBlockID(cfg.resultsByID))
-	state := suite.mockProtocolState(cfg.blocksByHeight)
+	results := synctest.MockResultsStorage(
+		synctest.WithByBlockID(cfg.resultsByBlockID),
+		synctest.WithByResultID(cfg.resultsByID),
+	)
+	state := suite.mockProtocolState(cfg.blocksByHeight, results)
 
 	suite.eds = mockExecutionDataService(cfg.executionDataEntries)
 
 	finalizationDistributor := pubsub.NewFinalizationDistributor()
-	processedHeight := storage.NewConsumerProgress(suite.db, module.ConsumeProgressExecutionDataRequesterBlockHeight)
-	processedNotification := storage.NewConsumerProgress(suite.db, module.ConsumeProgressExecutionDataRequesterNotification)
+	processedHeight := bstorage.NewConsumerProgress(suite.db, module.ConsumeProgressExecutionDataRequesterBlockHeight)
+	processedNotification := bstorage.NewConsumerProgress(suite.db, module.ConsumeProgressExecutionDataRequesterNotification)
 
 	edr := requester.New(
 		zerolog.New(os.Stdout).With().Timestamp().Logger(),
@@ -412,7 +455,6 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 		processedHeight,
 		processedNotification,
 		state,
-		suite.headers,
 		results,
 		requester.ExecutionDataConfig{
 			InitialBlockHeight: cfg.startHeight - 1,
@@ -573,6 +615,7 @@ type fetchTestRun struct {
 	blocksByHeight           map[uint64]*flow.Block
 	blocksByID               map[flow.Identifier]*flow.Block
 	resultsByID              map[flow.Identifier]*flow.ExecutionResult
+	resultsByBlockID         map[flow.Identifier]*flow.ExecutionResult
 	executionDataByID        map[flow.Identifier]*state_synchronization.ExecutionData
 	executionDataEntries     map[flow.Identifier]*testExecutionDataServiceEntry
 	executionDataIDByBlockID map[flow.Identifier]flow.Identifier
@@ -622,6 +665,7 @@ func (suite *ExecutionDataRequesterSuite) generateTestData(blockCount int, speci
 	blocksByHeight := map[uint64]*flow.Block{}
 	blocksByID := map[flow.Identifier]*flow.Block{}
 	resultsByID := map[flow.Identifier]*flow.ExecutionResult{}
+	resultsByBlockID := map[flow.Identifier]*flow.ExecutionResult{}
 	executionDataByID := map[flow.Identifier]*state_synchronization.ExecutionData{}
 	executionDataIDByBlockID := map[flow.Identifier]flow.Identifier{}
 
@@ -665,7 +709,8 @@ func (suite *ExecutionDataRequesterSuite) generateTestData(blockCount int, speci
 
 		blocksByHeight[height] = block
 		blocksByID[block.ID()] = block
-		resultsByID[block.ID()] = result
+		resultsByBlockID[block.ID()] = result
+		resultsByID[result.ID()] = result
 
 		// ignore all the data we don't need to verify the test
 		if i > 0 && i <= sealedCount {
@@ -688,6 +733,7 @@ func (suite *ExecutionDataRequesterSuite) generateTestData(blockCount int, speci
 		endHeight:                endHeight,
 		blocksByHeight:           blocksByHeight,
 		blocksByID:               blocksByID,
+		resultsByBlockID:         resultsByBlockID,
 		resultsByID:              resultsByID,
 		executionDataByID:        executionDataByID,
 		executionDataEntries:     edsEntries,
