@@ -112,7 +112,7 @@ func defaultLokiLoggingOptions(role string) Logging {
 		Driver: "loki",
 		Options: Options{
 			LokiURL:            "http://127.0.0.1:3100/loki/api/v1/push",
-			LokiRetries:        1,
+			LokiRetries:        "1",
 			LokiMaxBackoff:     time.Second.String(),
 			LokiExternalLabels: fmt.Sprintf(`role=%s`, role),
 		},
@@ -300,7 +300,7 @@ type Logging struct {
 type Options struct {
 	LokiURL            string `yaml:"loki-url"`
 	LokiMaxBackoff     string `yaml:"loki-max-backoff,omitempty"`
-	LokiRetries        int    `yaml:"loki-retries,omitempty"`
+	LokiRetries        string `yaml:"loki-retries,omitempty"`
 	LokiExternalLabels string `yaml:"loki-external-labels,omitempty"`
 }
 
