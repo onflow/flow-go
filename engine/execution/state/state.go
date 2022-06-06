@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
@@ -133,39 +134,41 @@ func NewExecutionState(
 
 }
 
-func makeSingleValueQuery(commitment flow.StateCommitment, owner, controller, key string) (*ledger.QuerySingleValue, error) {
-	return ledger.NewQuerySingleValue(ledger.State(commitment),
-		RegisterIDToKey(flow.NewRegisterID(owner, controller, key)),
-	)
+func MakeQuery(commitment flow.StateCommitment, ids []flow.RegisterID, pathFinderVersion uint8) (*ledger.TrieRead, error) {
+	paths, err := RegisterIDsToLedgerPath(ids, pathFinderVersion)
+	if err != nil {
+		return nil, err
+	}
+	return ledger.NewTrieRead(ledger.State(commitment), paths), nil
 }
 
-func makeQuery(commitment flow.StateCommitment, ids []flow.RegisterID) (*ledger.Query, error) {
-
-	keys := make([]ledger.Key, len(ids))
+func RegisterIDsToLedgerPath(ids []flow.RegisterID, pathFinderVersion uint8) ([]ledger.Path, error) {
+	paths := make([]ledger.Path, len(ids))
 	for i, id := range ids {
-		keys[i] = RegisterIDToKey(id)
+		path, err := pathfinder.KeyIDToPath(ledger.KeyID(id), pathFinderVersion)
+		if err != nil {
+			return nil, err
+		}
+		paths[i] = path
 	}
-
-	return ledger.NewQuery(ledger.State(commitment), keys)
+	return paths, nil
 }
 
-func RegisterIDSToKeys(ids []flow.RegisterID) []ledger.Key {
-	keys := make([]ledger.Key, len(ids))
-	for i, id := range ids {
-		keys[i] = RegisterIDToKey(id)
+func RegistersToLedgerPayload(ids []flow.RegisterID, values []flow.RegisterValue) ([]*ledger.Payload, error) {
+	if len(ids) != len(values) {
+		return nil, fmt.Errorf("length mismatch: ids have %d elements, but values have %d elements", len(ids), len(values))
 	}
-	return keys
-}
 
-func RegisterValuesToValues(values []flow.RegisterValue) []ledger.Value {
-	vals := make([]ledger.Value, len(values))
-	for i, value := range values {
-		vals[i] = value
+	payloads := make([]*ledger.Payload, len(ids))
+	for i := 0; i < len(ids); i++ {
+		payloads[i] = ledger.NewPayload(RegisterIDToKey(ids[i]), values[i])
 	}
-	return vals
+	return payloads, nil
 }
 
 func LedgerGetRegister(ldg ledger.Ledger, commitment flow.StateCommitment) delta.GetRegisterFunc {
+
+	pathFinderVersion := ldg.PathFinderVersion()
 
 	readCache := make(map[flow.RegisterID]flow.RegisterEntry)
 
@@ -180,14 +183,14 @@ func LedgerGetRegister(ldg ledger.Ledger, commitment flow.StateCommitment) delta
 			return value.Value, nil
 		}
 
-		query, err := makeSingleValueQuery(commitment, owner, controller, key)
-
+		path, err := pathfinder.KeyIDToPath(ledger.KeyID(regID), pathFinderVersion)
 		if err != nil {
-			return nil, fmt.Errorf("cannot create ledger query: %w", err)
+			return nil, fmt.Errorf("cannot create ledger path: %w", err)
 		}
 
-		value, err := ldg.GetSingleValue(query)
+		query := ledger.NewTrieReadSingleValue(ledger.State(commitment), path)
 
+		value, err := ldg.GetSingleValue(query)
 		if err != nil {
 			return nil, fmt.Errorf("error getting register (%s) value at %x: %w", key, commitment, err)
 		}
@@ -215,17 +218,22 @@ type RegisterUpdatesHolder interface {
 func CommitDelta(ldg ledger.Ledger, ruh RegisterUpdatesHolder, baseState flow.StateCommitment) (flow.StateCommitment, *ledger.TrieUpdate, error) {
 	ids, values := ruh.RegisterUpdates()
 
-	update, err := ledger.NewUpdate(
-		ledger.State(baseState),
-		RegisterIDSToKeys(ids),
-		RegisterValuesToValues(values),
-	)
+	paths, err := RegisterIDsToLedgerPath(ids, ldg.PathFinderVersion())
+	if err != nil {
+		return flow.DummyStateCommitment, nil, fmt.Errorf("cannot create ledger path: %w", err)
+	}
 
+	payloads, err := RegistersToLedgerPayload(ids, values)
+	if err != nil {
+		return flow.DummyStateCommitment, nil, fmt.Errorf("cannot create ledger payload: %w", err)
+	}
+
+	trieUpdate, err := ledger.NewTrieUpdate(ledger.State(baseState), paths, payloads)
 	if err != nil {
 		return flow.DummyStateCommitment, nil, fmt.Errorf("cannot create ledger update: %w", err)
 	}
 
-	commit, trieUpdate, err := ldg.Set(update)
+	commit, err := ldg.Set(trieUpdate)
 	if err != nil {
 		return flow.DummyStateCommitment, nil, err
 	}
@@ -240,20 +248,20 @@ func CommitDelta(ldg ledger.Ledger, ruh RegisterUpdatesHolder, baseState flow.St
 //	return CommitDelta(s.ls, delta, baseState)
 //}
 
-func (s *state) getRegisters(commit flow.StateCommitment, registerIDs []flow.RegisterID) (*ledger.Query, []ledger.Value, error) {
+func (s *state) getRegisters(commit flow.StateCommitment, registerIDs []flow.RegisterID) ([]ledger.Value, error) {
 
-	query, err := makeQuery(commit, registerIDs)
+	query, err := MakeQuery(commit, registerIDs, s.ls.PathFinderVersion())
 
 	if err != nil {
-		return nil, nil, fmt.Errorf("cannot create ledger query: %w", err)
+		return nil, fmt.Errorf("cannot create ledger query: %w", err)
 	}
 
 	values, err := s.ls.Get(query)
 	if err != nil {
-		return nil, nil, fmt.Errorf("cannot query ledger: %w", err)
+		return nil, fmt.Errorf("cannot query ledger: %w", err)
 	}
 
-	return query, values, err
+	return values, err
 }
 
 func (s *state) GetRegisters(
@@ -264,7 +272,7 @@ func (s *state) GetRegisters(
 	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEGetRegisters)
 	defer span.Finish()
 
-	_, values, err := s.getRegisters(commit, registerIDs)
+	values, err := s.getRegisters(commit, registerIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -286,7 +294,7 @@ func (s *state) GetProof(
 	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEGetRegistersWithProofs)
 	defer span.Finish()
 
-	query, err := makeQuery(commit, registerIDs)
+	query, err := MakeQuery(commit, registerIDs, s.ls.PathFinderVersion())
 
 	if err != nil {
 		return nil, fmt.Errorf("cannot create ledger query: %w", err)

@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
+	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -43,61 +44,55 @@ func Test_ComputationResultToBlockDataConversion(t *testing.T) {
 }
 
 func generateComputationResult(t *testing.T) *execution.ComputationResult {
+	keys := []ledger.Key{
+		ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(3, []byte{33})}),
+		ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(1, []byte{11})}),
+		ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(2, []byte{1, 1}), ledger.NewKeyPart(3, []byte{2, 5})}),
+	}
+	values := []ledger.Value{
+		[]byte{21, 37},
+		nil,
+		[]byte{3, 3, 3, 3, 3},
+	}
+	payloads := utils.KeyValuesToPayloads(keys, values)
+	paths, err := pathfinder.KeysToPaths(keys, complete.DefaultPathFinderVersion)
+	require.NoError(t, err)
 
-	update1, err := ledger.NewUpdate(
+	trieUpdate1, err := ledger.NewTrieUpdate(
 		ledger.State(unittest.StateCommitmentFixture()),
-		[]ledger.Key{
-			ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(3, []byte{33})}),
-			ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(1, []byte{11})}),
-			ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(2, []byte{1, 1}), ledger.NewKeyPart(3, []byte{2, 5})}),
+		paths,
+		payloads,
+	)
+	require.NoError(t, err)
+
+	trieUpdate2 := ledger.NewEmptyTrieUpdate(
+		ledger.State(unittest.StateCommitmentFixture()),
+	)
+
+	key := ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(9, []byte{6})})
+	value := ledger.Value([]byte{21, 37})
+	path, err := pathfinder.KeyToPath(key, complete.DefaultPathFinderVersion)
+	require.NoError(t, err)
+	trieUpdate3, err := ledger.NewTrieUpdate(
+		ledger.State(unittest.StateCommitmentFixture()),
+		[]ledger.Path{
+			path,
 		},
-		[]ledger.Value{
-			[]byte{21, 37},
-			nil,
-			[]byte{3, 3, 3, 3, 3},
+		[]*ledger.Payload{
+			ledger.NewPayload(key, value),
 		},
 	)
 	require.NoError(t, err)
 
-	trieUpdate1, err := pathfinder.UpdateToTrieUpdate(update1, complete.DefaultPathFinderVersion)
-	require.NoError(t, err)
-
-	update2, err := ledger.NewUpdate(
+	trieUpdate4, err := ledger.NewTrieUpdate(
 		ledger.State(unittest.StateCommitmentFixture()),
-		[]ledger.Key{},
-		[]ledger.Value{},
-	)
-	require.NoError(t, err)
-
-	trieUpdate2, err := pathfinder.UpdateToTrieUpdate(update2, complete.DefaultPathFinderVersion)
-	require.NoError(t, err)
-
-	update3, err := ledger.NewUpdate(
-		ledger.State(unittest.StateCommitmentFixture()),
-		[]ledger.Key{
-			ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(9, []byte{6})}),
+		[]ledger.Path{
+			path,
 		},
-		[]ledger.Value{
-			[]byte{21, 37},
+		[]*ledger.Payload{
+			ledger.NewPayload(key, value),
 		},
 	)
-	require.NoError(t, err)
-
-	trieUpdate3, err := pathfinder.UpdateToTrieUpdate(update3, complete.DefaultPathFinderVersion)
-	require.NoError(t, err)
-
-	update4, err := ledger.NewUpdate(
-		ledger.State(unittest.StateCommitmentFixture()),
-		[]ledger.Key{
-			ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(9, []byte{6})}),
-		},
-		[]ledger.Value{
-			[]byte{21, 37},
-		},
-	)
-	require.NoError(t, err)
-
-	trieUpdate4, err := pathfinder.UpdateToTrieUpdate(update4, complete.DefaultPathFinderVersion)
 	require.NoError(t, err)
 
 	return &execution.ComputationResult{

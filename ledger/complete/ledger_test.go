@@ -45,10 +45,9 @@ func TestLedger_Update(t *testing.T) {
 
 		// create empty update
 		currentState := l.InitialState()
-		up, err := ledger.NewEmptyUpdate(currentState)
-		require.NoError(t, err)
+		u := ledger.NewEmptyTrieUpdate(currentState)
 
-		newState, _, err := l.Set(up)
+		newState, err := l.Set(u)
 		require.NoError(t, err)
 
 		// state shouldn't change
@@ -64,21 +63,19 @@ func TestLedger_Update(t *testing.T) {
 
 		curSC := led.InitialState()
 
-		u := utils.UpdateFixture()
-		u.SetState(curSC)
+		u := utils.UpdateFixture(curSC, led.PathFinderVersion())
 
-		newSc, _, err := led.Set(u)
+		newSc, err := led.Set(u)
 		require.NoError(t, err)
 		assert.NotEqual(t, curSC, newSc)
 
-		q, err := ledger.NewQuery(newSc, u.Keys())
+		trieRead := ledger.NewTrieRead(newSc, u.Paths)
+
+		retValues, err := led.Get(trieRead)
 		require.NoError(t, err)
 
-		retValues, err := led.Get(q)
-		require.NoError(t, err)
-
-		for i, v := range u.Values() {
-			assert.Equal(t, v, retValues[i])
+		for i, p := range u.Payloads {
+			assert.Equal(t, p.Value, retValues[i])
 		}
 	})
 }
@@ -92,8 +89,7 @@ func TestLedger_Get(t *testing.T) {
 		require.NoError(t, err)
 
 		curSC := led.InitialState()
-		q, err := ledger.NewEmptyQuery(curSC)
-		require.NoError(t, err)
+		q := ledger.NewEmptyTrieRead(curSC)
 
 		retValues, err := led.Get(q)
 		require.NoError(t, err)
@@ -109,8 +105,7 @@ func TestLedger_Get(t *testing.T) {
 
 		curS := led.InitialState()
 
-		q := utils.QueryFixture()
-		q.SetState(curS)
+		q := utils.QueryFixture(curS, led.PathFinderVersion())
 
 		retValues, err := led.Get(q)
 		require.NoError(t, err)
@@ -142,10 +137,12 @@ func TestLedger_GetSingleValue(t *testing.T) {
 		keys := utils.RandomUniqueKeys(10, 2, 1, 10)
 
 		for _, k := range keys {
-			qs, err := ledger.NewQuerySingleValue(state, k)
+			path, err := pathfinder.KeyToPath(k, led.PathFinderVersion())
 			require.NoError(t, err)
 
-			retValue, err := led.GetSingleValue(qs)
+			trieRead := ledger.NewTrieReadSingleValue(state, path)
+
+			retValue, err := led.GetSingleValue(trieRead)
 			require.NoError(t, err)
 			assert.Equal(t, 0, len(retValue))
 		}
@@ -153,42 +150,41 @@ func TestLedger_GetSingleValue(t *testing.T) {
 
 	t.Run("existent key", func(t *testing.T) {
 
-		u := utils.UpdateFixture()
-		u.SetState(state)
+		u := utils.UpdateFixture(state, led.PathFinderVersion())
 
-		newState, _, err := led.Set(u)
+		newState, err := led.Set(u)
 		require.NoError(t, err)
 		assert.NotEqual(t, state, newState)
 
-		for i, k := range u.Keys() {
-			q, err := ledger.NewQuerySingleValue(newState, k)
-			require.NoError(t, err)
+		for i, path := range u.Paths {
+			trieRead := ledger.NewTrieReadSingleValue(newState, path)
 
-			retValue, err := led.GetSingleValue(q)
+			retValue, err := led.GetSingleValue(trieRead)
 			require.NoError(t, err)
-			assert.Equal(t, u.Values()[i], retValue)
+			assert.Equal(t, u.Payloads[i].Value, retValue)
 		}
 	})
 
 	t.Run("mix of existent and non-existent keys", func(t *testing.T) {
 
-		u := utils.UpdateFixture()
-		u.SetState(state)
+		u := utils.UpdateFixture(state, led.PathFinderVersion())
 
-		newState, _, err := led.Set(u)
+		newState, err := led.Set(u)
 		require.NoError(t, err)
 		assert.NotEqual(t, state, newState)
 
 		// Save expected values for existent keys
 		expectedValues := make(map[string]ledger.Value)
-		for i, key := range u.Keys() {
-			encKey := encoding.EncodeKey(&key)
-			expectedValues[string(encKey)] = u.Values()[i]
+		for _, p := range u.Payloads {
+			encKey := encoding.EncodeKey(&p.Key)
+			expectedValues[string(encKey)] = p.Value
 		}
 
 		// Create a randomly ordered mix of existent and non-existent keys
 		var queryKeys []ledger.Key
-		queryKeys = append(queryKeys, u.Keys()...)
+		for _, p := range u.Payloads {
+			queryKeys = append(queryKeys, p.Key)
+		}
 		queryKeys = append(queryKeys, utils.RandomUniqueKeys(10, 2, 1, 10)...)
 
 		rand.Shuffle(len(queryKeys), func(i, j int) {
@@ -196,10 +192,12 @@ func TestLedger_GetSingleValue(t *testing.T) {
 		})
 
 		for _, k := range queryKeys {
-			qs, err := ledger.NewQuerySingleValue(newState, k)
+			path, err := pathfinder.KeyToPath(k, led.PathFinderVersion())
 			require.NoError(t, err)
 
-			retValue, err := led.GetSingleValue(qs)
+			trieRead := ledger.NewTrieReadSingleValue(newState, path)
+
+			retValue, err := led.GetSingleValue(trieRead)
 			require.NoError(t, err)
 
 			encKey := encoding.EncodeKey(&k)
@@ -226,10 +224,9 @@ func TestLedgerValueSizes(t *testing.T) {
 		require.NoError(t, err)
 
 		curState := led.InitialState()
-		q, err := ledger.NewEmptyQuery(curState)
-		require.NoError(t, err)
+		trieRead := ledger.NewEmptyTrieRead(curState)
 
-		retSizes, err := led.ValueSizes(q)
+		retSizes, err := led.ValueSizes(trieRead)
 		require.NoError(t, err)
 		require.Equal(t, 0, len(retSizes))
 	})
@@ -247,12 +244,11 @@ func TestLedgerValueSizes(t *testing.T) {
 		require.NoError(t, err)
 
 		curState := led.InitialState()
-		q := utils.QueryFixture()
-		q.SetState(curState)
+		q := utils.QueryFixture(curState, led.PathFinderVersion())
 
 		retSizes, err := led.ValueSizes(q)
 		require.NoError(t, err)
-		require.Equal(t, len(q.Keys()), len(retSizes))
+		require.Equal(t, q.Size(), len(retSizes))
 		for _, size := range retSizes {
 			assert.Equal(t, 0, size)
 		}
@@ -271,21 +267,19 @@ func TestLedgerValueSizes(t *testing.T) {
 		require.NoError(t, err)
 
 		curState := led.InitialState()
-		u := utils.UpdateFixture()
-		u.SetState(curState)
+		u := utils.UpdateFixture(curState, led.PathFinderVersion())
 
-		newState, _, err := led.Set(u)
+		newState, err := led.Set(u)
 		require.NoError(t, err)
 		assert.NotEqual(t, curState, newState)
 
-		q, err := ledger.NewQuery(newState, u.Keys())
-		require.NoError(t, err)
+		trieRead := ledger.NewTrieRead(newState, u.Paths)
 
-		retSizes, err := led.ValueSizes(q)
+		retSizes, err := led.ValueSizes(trieRead)
 		require.NoError(t, err)
-		require.Equal(t, len(q.Keys()), len(retSizes))
+		require.Equal(t, trieRead.Size(), len(retSizes))
 		for i, size := range retSizes {
-			assert.Equal(t, u.Values()[i].Size(), size)
+			assert.Equal(t, u.Payloads[i].Value.Size(), size)
 		}
 	})
 
@@ -302,36 +296,39 @@ func TestLedgerValueSizes(t *testing.T) {
 		require.NoError(t, err)
 
 		curState := led.InitialState()
-		u := utils.UpdateFixture()
-		u.SetState(curState)
+		u := utils.UpdateFixture(curState, led.PathFinderVersion())
 
-		newState, _, err := led.Set(u)
+		newState, err := led.Set(u)
 		require.NoError(t, err)
 		assert.NotEqual(t, curState, newState)
 
 		// Save expected value sizes for existent keys
 		expectedValueSizes := make(map[string]int)
-		for i, key := range u.Keys() {
-			encKey := encoding.EncodeKey(&key)
-			expectedValueSizes[string(encKey)] = len(u.Values()[i])
+		for _, p := range u.Payloads {
+			encKey := encoding.EncodeKey(&p.Key)
+			expectedValueSizes[string(encKey)] = p.Value.Size()
 		}
 
 		// Create a randomly ordered mix of existent and non-existent keys
 		var queryKeys []ledger.Key
-		queryKeys = append(queryKeys, u.Keys()...)
+		for _, p := range u.Payloads {
+			queryKeys = append(queryKeys, p.Key)
+		}
 		queryKeys = append(queryKeys, utils.RandomUniqueKeys(10, 2, 1, 10)...)
 
 		rand.Shuffle(len(queryKeys), func(i, j int) {
 			queryKeys[i], queryKeys[j] = queryKeys[j], queryKeys[i]
 		})
 
-		q, err := ledger.NewQuery(newState, queryKeys)
+		paths, err := pathfinder.KeysToPaths(queryKeys, led.PathFinderVersion())
 		require.NoError(t, err)
 
-		retSizes, err := led.ValueSizes(q)
+		trieRead := ledger.NewTrieRead(newState, paths)
+
+		retSizes, err := led.ValueSizes(trieRead)
 		require.NoError(t, err)
-		require.Equal(t, len(q.Keys()), len(retSizes))
-		for i, key := range q.Keys() {
+		require.Equal(t, trieRead.Size(), len(retSizes))
+		for i, key := range queryKeys {
 			encKey := encoding.EncodeKey(&key)
 			assert.Equal(t, expectedValueSizes[string(encKey)], retSizes[i])
 		}
@@ -346,8 +343,7 @@ func TestLedger_Proof(t *testing.T) {
 		require.NoError(t, err)
 
 		curSC := led.InitialState()
-		q, err := ledger.NewEmptyQuery(curSC)
-		require.NoError(t, err)
+		q := ledger.NewEmptyTrieRead(curSC)
 
 		retProof, err := led.Prove(q)
 		require.NoError(t, err)
@@ -365,9 +361,7 @@ func TestLedger_Proof(t *testing.T) {
 		require.NoError(t, err)
 
 		curS := led.InitialState()
-		q := utils.QueryFixture()
-		q.SetState(curS)
-		require.NoError(t, err)
+		q := utils.QueryFixture(curS, led.PathFinderVersion())
 
 		retProof, err := led.Prove(q)
 		require.NoError(t, err)
@@ -387,17 +381,15 @@ func TestLedger_Proof(t *testing.T) {
 
 		curS := led.InitialState()
 
-		u := utils.UpdateFixture()
-		u.SetState(curS)
+		u := utils.UpdateFixture(curS, led.PathFinderVersion())
 
-		newSc, _, err := led.Set(u)
+		newSc, err := led.Set(u)
 		require.NoError(t, err)
 		assert.NotEqual(t, curS, newSc)
 
-		q, err := ledger.NewQuery(newSc, u.Keys())
-		require.NoError(t, err)
+		trieRead := ledger.NewTrieRead(newSc, u.Paths)
 
-		retProof, err := led.Prove(q)
+		retProof, err := led.Prove(trieRead)
 		require.NoError(t, err)
 
 		trieProof, err := encoding.DecodeTrieBatchProof(retProof)
@@ -435,11 +427,13 @@ func Test_WAL(t *testing.T) {
 
 			keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
 			values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
-			update, err := ledger.NewUpdate(state, keys, values)
-			assert.NoError(t, err)
-			state, _, err = led.Set(update)
+			payloads := utils.KeyValuesToPayloads(keys, values)
+			paths, err := pathfinder.KeysToPaths(keys, led.PathFinderVersion())
 			require.NoError(t, err)
-			fmt.Printf("Updated with %x\n", state)
+			update, err := ledger.NewTrieUpdate(state, paths, payloads)
+			assert.NoError(t, err)
+			state, err = led.Set(update)
+			require.NoError(t, err)
 
 			data := make(map[string]ledger.Value, len(keys))
 			for j, key := range keys {
@@ -469,11 +463,14 @@ func Test_WAL(t *testing.T) {
 				keys = append(keys, *key)
 			}
 
+			paths, err := pathfinder.KeysToPaths(keys, led.PathFinderVersion())
+			require.NoError(t, err)
+
 			var ledgerState ledger.State
 			copy(ledgerState[:], state)
-			query, err := ledger.NewQuery(ledgerState, keys)
-			assert.NoError(t, err)
-			registerValues, err := led2.Get(query)
+
+			trieRead := ledger.NewTrieRead(ledgerState, paths)
+			registerValues, err := led2.Get(trieRead)
 			require.NoError(t, err)
 
 			for i, key := range keys {
@@ -522,9 +519,12 @@ func TestLedgerFunctionality(t *testing.T) {
 				// TODO update some of the existing keys and shuffle them
 				keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
 				values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
-				update, err := ledger.NewUpdate(state, keys, values)
+				payloads := utils.KeyValuesToPayloads(keys, values)
+				paths, err := pathfinder.KeysToPaths(keys, led.PathFinderVersion())
+				require.NoError(t, err)
+				update, err := ledger.NewTrieUpdate(state, paths, payloads)
 				assert.NoError(t, err)
-				newState, _, err := led.Set(update)
+				newState, err := led.Set(update)
 				assert.NoError(t, err)
 
 				// capture new values for future query
@@ -535,23 +535,22 @@ func TestLedgerFunctionality(t *testing.T) {
 				}
 
 				// read values and compare values
-				query, err := ledger.NewQuery(newState, keys)
-				assert.NoError(t, err)
-				retValues, err := led.Get(query)
+				trieRead := ledger.NewTrieRead(newState, paths)
+				retValues, err := led.Get(trieRead)
 				assert.NoError(t, err)
 				// byte{} is returned as nil
 				assert.True(t, valuesMatches(values, retValues))
 
 				// get value sizes and compare them
-				retSizes, err := led.ValueSizes(query)
+				retSizes, err := led.ValueSizes(trieRead)
 				assert.NoError(t, err)
-				assert.Equal(t, len(query.Keys()), len(retSizes))
+				assert.Equal(t, trieRead.Size(), len(retSizes))
 				for i, size := range retSizes {
 					assert.Equal(t, values[i].Size(), size)
 				}
 
 				// validate proofs (check individual proof and batch proof)
-				proofs, err := led.Prove(query)
+				proofs, err := led.Prove(trieRead)
 				assert.NoError(t, err)
 
 				bProof, err := encoding.DecodeTrieBatchProof(proofs)
@@ -569,9 +568,12 @@ func TestLedgerFunctionality(t *testing.T) {
 				for ek, v := range latestValue {
 					k, err := encoding.DecodeKey([]byte(ek))
 					assert.NoError(t, err)
-					query, err := ledger.NewQuery(newState, []ledger.Key{*k})
-					assert.NoError(t, err)
-					rv, err := led.Get(query)
+
+					paths, err := pathfinder.KeysToPaths([]ledger.Key{*k}, led.PathFinderVersion())
+					require.NoError(t, err)
+
+					trieRead := ledger.NewTrieRead(newState, paths)
+					rv, err := led.Get(trieRead)
 					assert.NoError(t, err)
 					assert.True(t, v.Equals(rv[0]))
 				}
@@ -585,9 +587,12 @@ func TestLedgerFunctionality(t *testing.T) {
 					enk := []byte(s[stateComSize:])
 					key, err := encoding.DecodeKey(enk)
 					assert.NoError(t, err)
-					query, err := ledger.NewQuery(state, []ledger.Key{*key})
-					assert.NoError(t, err)
-					rv, err := led.Get(query)
+
+					paths, err := pathfinder.KeysToPaths([]ledger.Key{*key}, led.PathFinderVersion())
+					require.NoError(t, err)
+
+					trieRead := ledger.NewTrieRead(state, paths)
+					rv, err := led.Get(trieRead)
 					assert.NoError(t, err)
 					assert.True(t, value.Equals(rv[0]))
 					j++
@@ -618,10 +623,9 @@ func Test_ExportCheckpointAt(t *testing.T) {
 				require.NoError(t, err)
 
 				state := led.InitialState()
-				u := utils.UpdateFixture()
-				u.SetState(state)
+				u := utils.UpdateFixture(state, led.PathFinderVersion())
 
-				state, _, err = led.Set(u)
+				state, err = led.Set(u)
 				require.NoError(t, err)
 
 				newState, err := led.ExportCheckpointAt(state, []ledger.Migration{noOpMigration}, map[string]ledger.Reporter{}, "fakeExtractionReport", complete.DefaultPathFinderVersion, dir2, "root.checkpoint")
@@ -633,14 +637,13 @@ func Test_ExportCheckpointAt(t *testing.T) {
 				led2, err := complete.NewLedger(diskWal2, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 				require.NoError(t, err)
 
-				q, err := ledger.NewQuery(state, u.Keys())
+				trieRead := ledger.NewTrieRead(state, u.Paths)
+
+				retValues, err := led2.Get(trieRead)
 				require.NoError(t, err)
 
-				retValues, err := led2.Get(q)
-				require.NoError(t, err)
-
-				for i, v := range u.Values() {
-					assert.Equal(t, v, retValues[i])
+				for i, p := range u.Payloads {
+					assert.Equal(t, p.Value, retValues[i])
 				}
 
 				<-diskWal.Done()
@@ -662,10 +665,9 @@ func Test_ExportCheckpointAt(t *testing.T) {
 				require.NoError(t, err)
 
 				state := led.InitialState()
-				u := utils.UpdateFixture()
-				u.SetState(state)
+				u := utils.UpdateFixture(state, led.PathFinderVersion())
 
-				state, _, err = led.Set(u)
+				state, err = led.Set(u)
 				require.NoError(t, err)
 
 				newState, err := led.ExportCheckpointAt(state, []ledger.Migration{migrationByValue}, map[string]ledger.Reporter{}, "fakeExtractionReport", complete.DefaultPathFinderVersion, dir2, "root.checkpoint")
@@ -676,10 +678,9 @@ func Test_ExportCheckpointAt(t *testing.T) {
 				led2, err := complete.NewLedger(diskWal2, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 				require.NoError(t, err)
 
-				q, err := ledger.NewQuery(newState, u.Keys())
-				require.NoError(t, err)
+				trieRead := ledger.NewTrieRead(newState, u.Paths)
 
-				retValues, err := led2.Get(q)
+				retValues, err := led2.Get(trieRead)
 				require.NoError(t, err)
 
 				assert.Equal(t, retValues[0], ledger.Value([]byte{'C'}))
@@ -704,10 +705,9 @@ func Test_ExportCheckpointAt(t *testing.T) {
 				require.NoError(t, err)
 
 				state := led.InitialState()
-				u := utils.UpdateFixture()
-				u.SetState(state)
+				u := utils.UpdateFixture(state, led.PathFinderVersion())
 
-				state, _, err = led.Set(u)
+				state, err = led.Set(u)
 				require.NoError(t, err)
 
 				newState, err := led.ExportCheckpointAt(state, []ledger.Migration{migrationByKey}, map[string]ledger.Reporter{}, "fakeExtractionReport", complete.DefaultPathFinderVersion, dir2, "root.checkpoint")
@@ -718,10 +718,9 @@ func Test_ExportCheckpointAt(t *testing.T) {
 				led2, err := complete.NewLedger(diskWal2, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 				require.NoError(t, err)
 
-				q, err := ledger.NewQuery(newState, u.Keys())
-				require.NoError(t, err)
+				trieRead := ledger.NewTrieRead(newState, u.Paths)
 
-				retValues, err := led2.Get(q)
+				retValues, err := led2.Get(trieRead)
 				require.NoError(t, err)
 
 				assert.Equal(t, retValues[0], ledger.Value([]byte{'D'}))
@@ -755,9 +754,14 @@ func TestWALUpdateIsRunInParallel(t *testing.T) {
 	require.NoError(t, err)
 
 	key := ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(0, []byte{1, 2, 3})})
-
+	keys := []ledger.Key{key}
 	values := []ledger.Value{[]byte{1, 2, 3}}
-	update, err := ledger.NewUpdate(led.InitialState(), []ledger.Key{key}, values)
+	payloads := utils.KeyValuesToPayloads(keys, values)
+
+	paths, err := pathfinder.KeysToPaths(keys, led.PathFinderVersion())
+	require.NoError(t, err)
+
+	update, err := ledger.NewTrieUpdate(led.InitialState(), paths, payloads)
 	require.NoError(t, err)
 
 	// this state should correspond to fresh state with given update
@@ -766,17 +770,16 @@ func TestWALUpdateIsRunInParallel(t *testing.T) {
 	copy(expectedState[:], decoded)
 	require.NoError(t, err)
 
-	query, err := ledger.NewQuery(expectedState, []ledger.Key{key})
-	require.NoError(t, err)
+	trieRead := ledger.NewTrieRead(expectedState, paths)
 
 	go func() {
-		newState, _, err := led.Set(update)
+		newState, err := led.Set(update)
 		require.NoError(t, err)
 		require.Equal(t, newState, expectedState)
 	}()
 
 	require.Eventually(t, func() bool {
-		retrievedValues, err := led.Get(query)
+		retrievedValues, err := led.Get(trieRead)
 		if err != nil {
 			return false
 		}
@@ -804,12 +807,17 @@ func TestWALUpdateFailuresBubbleUp(t *testing.T) {
 	require.NoError(t, err)
 
 	key := ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(0, []byte{1, 2, 3})})
-
+	keys := []ledger.Key{key}
 	values := []ledger.Value{[]byte{1, 2, 3}}
-	update, err := ledger.NewUpdate(led.InitialState(), []ledger.Key{key}, values)
+	payloads := utils.KeyValuesToPayloads(keys, values)
+
+	paths, err := pathfinder.KeysToPaths(keys, led.PathFinderVersion())
 	require.NoError(t, err)
 
-	_, _, err = led.Set(update)
+	update, err := ledger.NewTrieUpdate(led.InitialState(), paths, payloads)
+	require.NoError(t, err)
+
+	_, err = led.Set(update)
 	require.Error(t, err)
 	require.True(t, errors.Is(err, theError))
 }

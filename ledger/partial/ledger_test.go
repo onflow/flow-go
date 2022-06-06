@@ -10,6 +10,7 @@ import (
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
@@ -27,14 +28,17 @@ func TestFunctionalityWithCompleteTrie(t *testing.T) {
 	state := l.InitialState()
 	keys := utils.RandomUniqueKeys(3, 2, 2, 4)
 	values := utils.RandomValues(3, 1, 32)
-	update, err := ledger.NewUpdate(state, keys[0:2], values[0:2])
+	payloads := utils.KeyValuesToPayloads(keys, values)
+	paths, err := pathfinder.KeysToPaths(keys, l.PathFinderVersion())
 	require.NoError(t, err)
 
-	newState, _, err := l.Set(update)
+	update, err := ledger.NewTrieUpdate(state, paths[0:2], payloads[0:2])
 	require.NoError(t, err)
 
-	query, err := ledger.NewQuery(newState, keys[0:2])
+	newState, err := l.Set(update)
 	require.NoError(t, err)
+
+	query := ledger.NewTrieRead(newState, []ledger.Path{paths[0], paths[1]})
 	proof, err := l.Prove(query)
 	require.NoError(t, err)
 
@@ -43,8 +47,7 @@ func TestFunctionalityWithCompleteTrie(t *testing.T) {
 	assert.Equal(t, pled.InitialState(), newState)
 
 	// test batch querying existent keys
-	query, err = ledger.NewQuery(newState, keys[0:2])
-	require.NoError(t, err)
+	query = ledger.NewTrieRead(newState, paths[0:2])
 
 	retValues, err := pled.Get(query)
 	require.NoError(t, err)
@@ -54,50 +57,47 @@ func TestFunctionalityWithCompleteTrie(t *testing.T) {
 	}
 
 	// test querying single existent key
-	querySingleValue, err := ledger.NewQuerySingleValue(newState, keys[0])
-	require.NoError(t, err)
+	querySingleValue := ledger.NewTrieReadSingleValue(newState, paths[0])
 
 	retValue, err := pled.GetSingleValue(querySingleValue)
 	require.NoError(t, err)
 	require.Equal(t, values[0], retValue)
 
 	// test batch getting missing keys
-	query, err = ledger.NewQuery(newState, keys[1:3])
-	require.NoError(t, err)
+	query = ledger.NewTrieRead(newState, paths[1:3])
 
 	retValues, err = pled.Get(query)
 	require.Error(t, err)
 	require.Nil(t, retValues)
 
-	e, ok := err.(*ledger.ErrMissingKeys)
+	e, ok := err.(*ledger.ErrMissingPaths)
 	require.True(t, ok)
-	assert.Equal(t, len(e.Keys), 1)
-	require.True(t, e.Keys[0].Equals(&keys[2]))
+	assert.Equal(t, len(e.Paths), 1)
+	require.True(t, e.Paths[0].Equals(paths[2]))
 
 	// test querying single non-existent key
-	querySingleValue, err = ledger.NewQuerySingleValue(newState, keys[2])
-	require.NoError(t, err)
+	querySingleValue = ledger.NewTrieReadSingleValue(newState, paths[2])
 
 	retValue, err = pled.GetSingleValue(querySingleValue)
 	require.Error(t, err)
 	require.Nil(t, retValue)
 
-	e, ok = err.(*ledger.ErrMissingKeys)
+	e, ok = err.(*ledger.ErrMissingPaths)
 	require.True(t, ok)
-	assert.Equal(t, len(e.Keys), 1)
-	require.True(t, e.Keys[0].Equals(&keys[2]))
+	assert.Equal(t, len(e.Paths), 1)
+	require.True(t, e.Paths[0].Equals(paths[2]))
 
 	// test missing keys (set)
-	update, err = ledger.NewUpdate(state, keys[1:3], values[1:3])
+	update, err = ledger.NewTrieUpdate(state, paths[1:3], payloads[1:3])
 	require.NoError(t, err)
 
-	_, _, err = pled.Set(update)
+	_, err = pled.Set(update)
 	require.Error(t, err)
 
-	e, ok = err.(*ledger.ErrMissingKeys)
+	e, ok = err.(*ledger.ErrMissingPaths)
 	require.True(t, ok)
-	assert.Equal(t, len(e.Keys), 1)
-	require.True(t, e.Keys[0].Equals(&keys[2]))
+	assert.Equal(t, len(e.Paths), 1)
+	require.True(t, e.Paths[0].Equals(paths[2]))
 
 }
 
@@ -117,20 +117,25 @@ func TestProofsForEmptyRegisters(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, v)
 
-	ids, values := view.Delta().RegisterUpdates()
-	updated, err := ledger.NewUpdate(
+	registerIDs, values := view.Delta().RegisterUpdates()
+	payloads, err := executionState.RegistersToLedgerPayload(registerIDs, values)
+	require.NoError(t, err)
+	paths, err := executionState.RegisterIDsToLedgerPath(registerIDs, l.PathFinderVersion())
+	require.NoError(t, err)
+
+	updated, err := ledger.NewTrieUpdate(
 		emptyState,
-		executionState.RegisterIDSToKeys(ids),
-		executionState.RegisterValuesToValues(values),
+		paths,
+		payloads,
 	)
 	require.NoError(t, err)
 
 	allRegisters := view.Interactions().AllRegisters()
-	allKeys := executionState.RegisterIDSToKeys(allRegisters)
+	allPaths, err := executionState.RegisterIDsToLedgerPath(allRegisters, l.PathFinderVersion())
+	require.NoError(t, err)
 	newState := updated.State()
 
-	proofQuery, err := ledger.NewQuery(newState, allKeys)
-	require.NoError(t, err)
+	proofQuery := ledger.NewTrieRead(newState, allPaths)
 
 	proof, err := l.Prove(proofQuery)
 	require.NoError(t, err)
@@ -139,8 +144,11 @@ func TestProofsForEmptyRegisters(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, pled.InitialState(), emptyState)
 
-	query, err := ledger.NewQuery(newState, []ledger.Key{executionState.RegisterIDToKey(registerID)})
+	keyID := ledger.KeyID(registerID)
+	path, err := pathfinder.KeyIDToPath(keyID, pled.PathFinderVersion())
 	require.NoError(t, err)
+
+	query := ledger.NewTrieRead(newState, []ledger.Path{path})
 
 	results, err := pled.Get(query)
 	require.NoError(t, err)

@@ -20,23 +20,23 @@ func NewErrLedgerConstruction(err error) *ErrLedgerConstruction {
 	return &ErrLedgerConstruction{err}
 }
 
-// ErrMissingKeys is returned when some keys are not found in the ledger
+// ErrMissingPaths is returned when some paths are not found in the ledger
 // this is mostly used when dealing with partial ledger
-type ErrMissingKeys struct {
-	Keys []Key
+type ErrMissingPaths struct {
+	Paths []Path
 }
 
-func (e ErrMissingKeys) Error() string {
-	str := "keys are missing: \n"
-	for _, k := range e.Keys {
-		str += "\t" + k.String() + "\n"
+func (e ErrMissingPaths) Error() string {
+	str := "paths are missing: \n"
+	for _, p := range e.Paths {
+		str += "\t" + p.String() + "\n"
 	}
 	return str
 }
 
 // Is returns true if the type of errors are the same
-func (e ErrMissingKeys) Is(other error) bool {
-	_, ok := other.(ErrMissingKeys)
+func (e ErrMissingPaths) Is(other error) bool {
+	_, ok := other.(ErrMissingPaths)
 	return ok
 }
 

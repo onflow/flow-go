@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/partial"
 	chmodels "github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
@@ -131,18 +132,18 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 		// check if register has been provided in the chunk data pack
 		registerID := flow.NewRegisterID(owner, controller, key)
 
-		registerKey := executionState.RegisterIDToKey(registerID)
-
-		query, err := ledger.NewQuerySingleValue(ledger.State(chunkDataPack.StartState), registerKey)
-
+		path, err := pathfinder.KeyIDToPath(ledger.KeyID(registerID), psmt.PathFinderVersion())
 		if err != nil {
-			return nil, fmt.Errorf("cannot create query: %w", err)
+			return nil, fmt.Errorf("cannot create path: %w", err)
 		}
+
+		query := ledger.NewTrieReadSingleValue(ledger.State(chunkDataPack.StartState), path)
 
 		value, err := psmt.GetSingleValue(query)
 		if err != nil {
-			if errors.Is(err, ledger.ErrMissingKeys{}) {
+			if errors.Is(err, ledger.ErrMissingPaths{}) {
 
+				registerKey := executionState.RegisterIDToKey(registerID)
 				unknownRegTouch[registerID.String()] = &registerKey
 
 				// don't send error just return empty byte slice
@@ -249,22 +250,34 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 	// register keys that was not provided by the chunk data package (err).
 	regs, values := chunkView.Delta().RegisterUpdates()
 
-	update, err := ledger.NewUpdate(
-		ledger.State(chunkDataPack.StartState),
-		executionState.RegisterIDSToKeys(regs),
-		executionState.RegisterValuesToValues(values),
-	)
+	payloads, err := executionState.RegistersToLedgerPayload(regs, values)
 	if err != nil {
-		return nil, nil, fmt.Errorf("cannot create ledger update: %w", err)
+		return nil, nil, fmt.Errorf("cannot create ledger payload: %w", err)
 	}
 
-	expEndStateComm, _, err := psmt.Set(update)
+	paths, err := executionState.RegisterIDsToLedgerPath(regs, psmt.PathFinderVersion())
+	if err != nil {
+		return nil, nil, fmt.Errorf("cannot create ledger path: %w", err)
+	}
+
+	update, err := ledger.NewTrieUpdate(ledger.State(chunkDataPack.StartState), paths, payloads)
+	if err != nil {
+		return nil, nil, fmt.Errorf("cannot create trie update: %w", err)
+	}
+
+	expEndStateComm, err := psmt.Set(update)
 
 	if err != nil {
-		if errors.Is(err, ledger.ErrMissingKeys{}) {
-			keys := err.(*ledger.ErrMissingKeys).Keys
-			stringKeys := make([]string, len(keys))
-			for i, key := range keys {
+		if errors.Is(err, ledger.ErrMissingPaths{}) {
+			pathKeys := make(map[ledger.Path]ledger.Key)
+			for i := 0; i < len(update.Paths); i++ {
+				pathKeys[update.Paths[i]] = update.Payloads[i].Key
+			}
+
+			paths := err.(*ledger.ErrMissingPaths).Paths
+			stringKeys := make([]string, len(paths))
+			for i, path := range paths {
+				key := pathKeys[path]
 				stringKeys[i] = key.String()
 			}
 			return nil, chmodels.NewCFMissingRegisterTouch(stringKeys, chIndex, execResID, problematicTx), nil

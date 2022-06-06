@@ -44,6 +44,10 @@ func NewLedger(proof ledger.Proof, s ledger.State, pathFinderVer uint8) (*Ledger
 	return &Ledger{ptrie: psmt, proof: proof, state: s, pathFinderVersion: pathFinderVer}, nil
 }
 
+func (l *Ledger) PathFinderVersion() uint8 {
+	return l.pathFinderVersion
+}
+
 // Ready implements interface module.ReadyDoneAware
 func (l *Ledger) Ready() <-chan struct{} {
 	ready := make(chan struct{})
@@ -64,16 +68,9 @@ func (l *Ledger) InitialState() ledger.State {
 }
 
 // GetSingleValue reads value of a given key at the given state
-func (l *Ledger) GetSingleValue(query *ledger.QuerySingleValue) (value ledger.Value, err error) {
-	path, err := pathfinder.KeyToPath(query.Key(), l.pathFinderVersion)
+func (l *Ledger) GetSingleValue(trieRead *ledger.TrieReadSingleValue) (value ledger.Value, err error) {
+	payload, err := l.ptrie.GetSinglePayload(trieRead.Path)
 	if err != nil {
-		return nil, err
-	}
-	payload, err := l.ptrie.GetSinglePayload(path)
-	if err != nil {
-		if _, ok := err.(*ptrie.ErrMissingPath); ok {
-			return nil, &ledger.ErrMissingKeys{Keys: []ledger.Key{query.Key()}}
-		}
 		return nil, err
 	}
 	return payload.Value, err
@@ -81,29 +78,10 @@ func (l *Ledger) GetSingleValue(query *ledger.QuerySingleValue) (value ledger.Va
 
 // Get read the values of the given keys at the given state
 // it returns the values in the same order as given registerIDs and errors (if any)
-func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
+func (l *Ledger) Get(trieRead *ledger.TrieRead) (values []ledger.Value, err error) {
 	// TODO compare query.State() to the ledger sc
-	paths, err := pathfinder.KeysToPaths(query.Keys(), l.pathFinderVersion)
+	payloads, err := l.ptrie.Get(trieRead.Paths)
 	if err != nil {
-		return nil, err
-	}
-	payloads, err := l.ptrie.Get(paths)
-	if err != nil {
-		if pErr, ok := err.(*ptrie.ErrMissingPath); ok {
-			//store mappings and restore keys from missing paths
-			pathToKey := make(map[ledger.Path]ledger.Key)
-
-			for i, key := range query.Keys() {
-				path := paths[i]
-				pathToKey[path] = key
-			}
-
-			keys := make([]ledger.Key, len(pErr.Paths))
-			for i, path := range pErr.Paths {
-				keys[i] = pathToKey[path]
-			}
-			return nil, &ledger.ErrMissingKeys{Keys: keys}
-		}
 		return nil, err
 	}
 	values, err = pathfinder.PayloadsToValues(payloads)
@@ -115,30 +93,24 @@ func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 
 // Set updates the ledger given an update
 // it returns the state after update and errors (if any)
-func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *ledger.TrieUpdate, err error) {
+func (l *Ledger) Set(trieUpdate *ledger.TrieUpdate) (newState ledger.State, err error) {
 	// TODO: add test case
-	if update.Size() == 0 {
+	if trieUpdate.Size() == 0 {
 		// return current state root unchanged
-		return update.State(), nil, nil
+		return trieUpdate.State(), nil
 	}
-
-	trieUpdate, err = pathfinder.UpdateToTrieUpdate(update, l.pathFinderVersion)
-	if err != nil {
-		return ledger.DummyState, nil, err
-	}
-
 	newRootHash, err := l.ptrie.Update(trieUpdate.Paths, trieUpdate.Payloads)
 	if err != nil {
 		// Returned error type is ledger.ErrMissingKeys
-		return ledger.DummyState, nil, err
+		return ledger.DummyState, err
 	}
 
 	// TODO log info state
-	return ledger.State(newRootHash), trieUpdate, nil
+	return ledger.State(newRootHash), nil
 }
 
 // Prove provides proofs for a ledger query and errors (if any)
 // TODO implement this by iterating over initial proofs to find the ones for the query
-func (l *Ledger) Prove(query *ledger.Query) (proof ledger.Proof, err error) {
+func (l *Ledger) Prove(trieRead *ledger.TrieRead) (proof ledger.Proof, err error) {
 	return nil, err
 }

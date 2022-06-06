@@ -271,20 +271,24 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 
 	f, _ := completeLedger.NewLedger(&fixtures.NoopWAL{}, 1000, metricsCollector, zerolog.Nop(), completeLedger.DefaultPathFinderVersion)
 
-	keys := executionState.RegisterIDSToKeys(ids)
-	update, err := ledger.NewUpdate(
+	payloads, err := executionState.RegistersToLedgerPayload(ids, values)
+	require.NoError(t, err)
+
+	paths, err := executionState.RegisterIDsToLedgerPath(ids, f.PathFinderVersion())
+	require.NoError(t, err)
+
+	update, err := ledger.NewTrieUpdate(
 		f.InitialState(),
-		keys,
-		executionState.RegisterValuesToValues(values),
+		paths,
+		payloads,
 	)
 
 	require.NoError(t, err)
 
-	startState, _, err := f.Set(update)
+	startState, err := f.Set(update)
 	require.NoError(t, err)
 
-	query, err := ledger.NewQuery(startState, keys)
-	require.NoError(t, err)
+	query := ledger.NewTrieRead(startState, paths)
 
 	proof, err := f.Prove(query)
 	require.NoError(t, err)
@@ -292,15 +296,20 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 	ids = []flow.RegisterID{id2}
 	values = [][]byte{UpdatedValue2}
 
-	keys = executionState.RegisterIDSToKeys(ids)
-	update, err = ledger.NewUpdate(
+	payloads, err = executionState.RegistersToLedgerPayload(ids, values)
+	require.NoError(t, err)
+
+	paths, err = executionState.RegisterIDsToLedgerPath(ids, f.PathFinderVersion())
+	require.NoError(t, err)
+
+	update, err = ledger.NewTrieUpdate(
 		startState,
-		keys,
-		executionState.RegisterValuesToValues(values),
+		paths,
+		payloads,
 	)
 	require.NoError(t, err)
 
-	endState, _, err := f.Set(update)
+	endState, err := f.Set(update)
 	require.NoError(t, err)
 
 	// events

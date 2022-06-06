@@ -64,16 +64,21 @@ func benchmarkStorage(steps int, b *testing.B) {
 
 		keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
 		values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
-
-		totalRegOperation += len(keys)
-
-		start := time.Now()
-		update, err := ledger.NewUpdate(state, keys, values)
+		payloads := utils.KeyValuesToPayloads(keys, values)
+		paths, err := pathfinder.KeysToPaths(keys, led.PathFinderVersion())
 		if err != nil {
 			b.Fatal(err)
 		}
 
-		newState, _, err := led.Set(update)
+		totalRegOperation += len(keys)
+
+		start := time.Now()
+		update, err := ledger.NewTrieUpdate(state, paths, payloads)
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		newState, err := led.Set(update)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -83,11 +88,9 @@ func benchmarkStorage(steps int, b *testing.B) {
 
 		// read values and compare values
 		start = time.Now()
-		query, err := ledger.NewQuery(newState, keys)
-		if err != nil {
-			b.Fatal(err)
-		}
-		_, err = led.Get(query)
+
+		trieRead := ledger.NewTrieRead(newState, paths)
+		_, err = led.Get(trieRead)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -96,7 +99,7 @@ func benchmarkStorage(steps int, b *testing.B) {
 
 		start = time.Now()
 		// validate proofs (check individual proof and batch proof)
-		proof, err := led.Prove(query)
+		proof, err := led.Prove(trieRead)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -165,15 +168,20 @@ func BenchmarkTrieUpdate(b *testing.B) {
 
 	keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
 	values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+	payloads := utils.KeyValuesToPayloads(keys, values)
+	paths, err := pathfinder.KeysToPaths(keys, led.PathFinderVersion())
+	if err != nil {
+		b.Fatal(err)
+	}
 
-	update, err := ledger.NewUpdate(state, keys, values)
+	update, err := ledger.NewTrieUpdate(state, paths, payloads)
 	if err != nil {
 		b.Fatal(err)
 	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _, err := led.Set(update)
+		_, err := led.Set(update)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -213,25 +221,28 @@ func BenchmarkTrieRead(b *testing.B) {
 
 	keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
 	values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
-
-	update, err := ledger.NewUpdate(state, keys, values)
+	payloads := utils.KeyValuesToPayloads(keys, values)
+	paths, err := pathfinder.KeysToPaths(keys, led.PathFinderVersion())
 	if err != nil {
 		b.Fatal(err)
 	}
 
-	newState, _, err := led.Set(update)
+	update, err := ledger.NewTrieUpdate(state, paths, payloads)
 	if err != nil {
 		b.Fatal(err)
 	}
 
-	query, err := ledger.NewQuery(newState, keys)
+	newState, err := led.Set(update)
 	if err != nil {
 		b.Fatal(err)
 	}
+
+	trieRead := ledger.NewTrieRead(newState, paths)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err = led.Get(query)
+
+		_, err = led.Get(trieRead)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -270,19 +281,25 @@ func BenchmarkLedgerGetOneValue(b *testing.B) {
 
 	keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
 	values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+	payloads := utils.KeyValuesToPayloads(keys, values)
 
-	update, err := ledger.NewUpdate(state, keys, values)
+	paths, err := pathfinder.KeysToPaths(keys, led.PathFinderVersion())
 	if err != nil {
 		b.Fatal(err)
 	}
 
-	newState, _, err := led.Set(update)
+	update, err := ledger.NewTrieUpdate(state, paths, payloads)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	newState, err := led.Set(update)
 	if err != nil {
 		b.Fatal(err)
 	}
 
 	b.Run("batch get", func(b *testing.B) {
-		query, err := ledger.NewQuery(newState, []ledger.Key{keys[0]})
+		query := ledger.NewTrieRead(newState, []ledger.Path{paths[0]})
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -297,7 +314,7 @@ func BenchmarkLedgerGetOneValue(b *testing.B) {
 	})
 
 	b.Run("single get", func(b *testing.B) {
-		query, err := ledger.NewQuerySingleValue(newState, keys[0])
+		query := ledger.NewTrieReadSingleValue(newState, paths[0])
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -344,25 +361,27 @@ func BenchmarkTrieProve(b *testing.B) {
 
 	keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
 	values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
-
-	update, err := ledger.NewUpdate(state, keys, values)
+	payloads := utils.KeyValuesToPayloads(keys, values)
+	paths, err := pathfinder.KeysToPaths(keys, led.PathFinderVersion())
 	if err != nil {
 		b.Fatal(err)
 	}
 
-	newState, _, err := led.Set(update)
+	update, err := ledger.NewTrieUpdate(state, paths, payloads)
 	if err != nil {
 		b.Fatal(err)
 	}
 
-	query, err := ledger.NewQuery(newState, keys)
+	newState, err := led.Set(update)
 	if err != nil {
 		b.Fatal(err)
 	}
+
+	trieRead := ledger.NewTrieRead(newState, paths)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := led.Prove(query)
+		_, err := led.Prove(trieRead)
 		if err != nil {
 			b.Fatal(err)
 		}

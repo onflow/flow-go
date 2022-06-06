@@ -357,13 +357,19 @@ func updateLedgerWithRandomData(
 	for i := 0; i < updateCount; i++ {
 		keys := utils.RandomUniqueKeys(kvBatchCount, kvOpts.keyNumberOfParts, kvOpts.keyPartMinByteSize, kvOpts.keyPartMaxByteSize)
 		values := utils.RandomValues(kvBatchCount, kvOpts.valueMinByteSize, kvOpts.valueMaxByteSize)
+		payloads := utils.KeyValuesToPayloads(keys, values)
 
-		update, err := ledger.NewUpdate(state, keys, values)
+		paths, err := pathfinder.KeysToPaths(keys, led.PathFinderVersion())
+		if err != nil {
+			return ledger.DummyState, nil
+		}
+
+		update, err := ledger.NewTrieUpdate(state, paths, payloads)
 		if err != nil {
 			return ledger.State(hash.DummyHash), err
 		}
 
-		newState, _, err := led.Set(update)
+		newState, err := led.Set(update)
 		if err != nil {
 			return ledger.State(hash.DummyHash), err
 		}

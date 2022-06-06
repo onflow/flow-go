@@ -86,6 +86,11 @@ func NewLedger(
 	return storage, nil
 }
 
+// PathFinderVersion returns pathfinder version for the ledger.
+func (l *Ledger) PathFinderVersion() uint8 {
+	return l.pathFinderVersion
+}
+
 // Ready implements interface module.ReadyDoneAware
 // it starts the EventLoop's internal processing loop.
 func (l *Ledger) Ready() <-chan struct{} {
@@ -109,24 +114,20 @@ func (l *Ledger) InitialState() ledger.State {
 
 // ValueSizes read the values of the given keys at the given state.
 // It returns value sizes in the same order as given registerIDs and errors (if any)
-func (l *Ledger) ValueSizes(query *ledger.Query) (valueSizes []int, err error) {
+func (l *Ledger) ValueSizes(trieRead *ledger.TrieRead) (valueSizes []int, err error) {
 	start := time.Now()
-	paths, err := pathfinder.KeysToPaths(query.Keys(), l.pathFinderVersion)
-	if err != nil {
-		return nil, err
-	}
-	trieRead := &ledger.TrieRead{RootHash: ledger.RootHash(query.State()), Paths: paths}
+
 	valueSizes, err = l.forest.ValueSizes(trieRead)
 	if err != nil {
 		return nil, err
 	}
 
-	l.metrics.ReadValuesNumber(uint64(len(paths)))
+	l.metrics.ReadValuesNumber(uint64(trieRead.Size()))
 	readDuration := time.Since(start)
 	l.metrics.ReadDuration(readDuration)
 
-	if len(paths) > 0 {
-		durationPerValue := time.Duration(readDuration.Nanoseconds()/int64(len(paths))) * time.Nanosecond
+	if trieRead.Size() > 0 {
+		durationPerValue := time.Duration(readDuration.Nanoseconds()/int64(trieRead.Size())) * time.Nanosecond
 		l.metrics.ReadDurationPerItem(durationPerValue)
 	}
 
@@ -134,13 +135,9 @@ func (l *Ledger) ValueSizes(query *ledger.Query) (valueSizes []int, err error) {
 }
 
 // GetSingleValue reads value of a single given key at the given state.
-func (l *Ledger) GetSingleValue(query *ledger.QuerySingleValue) (value ledger.Value, err error) {
+func (l *Ledger) GetSingleValue(trieRead *ledger.TrieReadSingleValue) (value ledger.Value, err error) {
 	start := time.Now()
-	path, err := pathfinder.KeyToPath(query.Key(), l.pathFinderVersion)
-	if err != nil {
-		return nil, err
-	}
-	trieRead := &ledger.TrieReadSingleValue{RootHash: ledger.RootHash(query.State()), Path: path}
+
 	value, err = l.forest.ReadSingleValue(trieRead)
 	if err != nil {
 		return nil, err
@@ -158,24 +155,20 @@ func (l *Ledger) GetSingleValue(query *ledger.QuerySingleValue) (value ledger.Va
 
 // Get read the values of the given keys at the given state
 // it returns the values in the same order as given registerIDs and errors (if any)
-func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
+func (l *Ledger) Get(trieRead *ledger.TrieRead) (values []ledger.Value, err error) {
 	start := time.Now()
-	paths, err := pathfinder.KeysToPaths(query.Keys(), l.pathFinderVersion)
-	if err != nil {
-		return nil, err
-	}
-	trieRead := &ledger.TrieRead{RootHash: ledger.RootHash(query.State()), Paths: paths}
+
 	values, err = l.forest.Read(trieRead)
 	if err != nil {
 		return nil, err
 	}
 
-	l.metrics.ReadValuesNumber(uint64(len(paths)))
+	l.metrics.ReadValuesNumber(uint64(trieRead.Size()))
 	readDuration := time.Since(start)
 	l.metrics.ReadDuration(readDuration)
 
-	if len(paths) > 0 {
-		durationPerValue := time.Duration(readDuration.Nanoseconds()/int64(len(paths))) * time.Nanosecond
+	if trieRead.Size() > 0 {
+		durationPerValue := time.Duration(readDuration.Nanoseconds()/int64(trieRead.Size())) * time.Nanosecond
 		l.metrics.ReadDurationPerItem(durationPerValue)
 	}
 
@@ -184,18 +177,13 @@ func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 
 // Set updates the ledger given an update
 // it returns the state after update and errors (if any)
-func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *ledger.TrieUpdate, err error) {
+func (l *Ledger) Set(trieUpdate *ledger.TrieUpdate) (newState ledger.State, err error) {
 	start := time.Now()
 
 	// TODO: add test case
-	if update.Size() == 0 {
+	if trieUpdate.Size() == 0 {
 		// return current state root unchanged
-		return update.State(), nil, nil
-	}
-
-	trieUpdate, err = pathfinder.UpdateToTrieUpdate(update, l.pathFinderVersion)
-	if err != nil {
-		return ledger.State(hash.DummyHash), nil, err
+		return trieUpdate.State(), nil
 	}
 
 	l.metrics.UpdateCount()
@@ -210,10 +198,10 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *
 	walError := <-walChan
 
 	if err != nil {
-		return ledger.State(hash.DummyHash), nil, fmt.Errorf("cannot update state: %w", err)
+		return ledger.State(hash.DummyHash), fmt.Errorf("cannot update state: %w", err)
 	}
 	if walError != nil {
-		return ledger.State(hash.DummyHash), nil, fmt.Errorf("error while writing LedgerWAL: %w", walError)
+		return ledger.State(hash.DummyHash), fmt.Errorf("error while writing LedgerWAL: %w", walError)
 	}
 
 	// TODO update to proper value once https://github.com/onflow/flow-go/pull/3720 is merged
@@ -222,17 +210,17 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *
 	elapsed := time.Since(start)
 	l.metrics.UpdateDuration(elapsed)
 
-	if len(trieUpdate.Paths) > 0 {
-		durationPerValue := time.Duration(elapsed.Nanoseconds()/int64(len(trieUpdate.Paths))) * time.Nanosecond
+	if trieUpdate.Size() > 0 {
+		durationPerValue := time.Duration(elapsed.Nanoseconds()/int64(trieUpdate.Size())) * time.Nanosecond
 		l.metrics.UpdateDurationPerItem(durationPerValue)
 	}
 
-	state := update.State()
+	state := trieUpdate.State()
 	l.logger.Info().Hex("from", state[:]).
 		Hex("to", newRootHash[:]).
-		Int("update_size", update.Size()).
+		Int("update_size", trieUpdate.Size()).
 		Msg("ledger updated")
-	return ledger.State(newRootHash), trieUpdate, nil
+	return ledger.State(newRootHash), nil
 }
 
 // Prove provides proofs for a ledger query and errors (if any).
@@ -240,14 +228,7 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *
 // Proves are generally _not_ provided in the register order of the query.
 // In the current implementation, proofs are sorted in a deterministic order specified by the
 // forest and mtrie implementation.
-func (l *Ledger) Prove(query *ledger.Query) (proof ledger.Proof, err error) {
-
-	paths, err := pathfinder.KeysToPaths(query.Keys(), l.pathFinderVersion)
-	if err != nil {
-		return nil, err
-	}
-
-	trieRead := &ledger.TrieRead{RootHash: ledger.RootHash(query.State()), Paths: paths}
+func (l *Ledger) Prove(trieRead *ledger.TrieRead) (proof ledger.Proof, err error) {
 	batchProof, err := l.forest.Proofs(trieRead)
 	if err != nil {
 		return nil, fmt.Errorf("could not get proofs: %w", err)
@@ -255,8 +236,8 @@ func (l *Ledger) Prove(query *ledger.Query) (proof ledger.Proof, err error) {
 
 	proofToGo := encoding.EncodeTrieBatchProof(batchProof)
 
-	if len(paths) > 0 {
-		l.metrics.ProofSize(uint32(len(proofToGo) / len(paths)))
+	if trieRead.Size() > 0 {
+		l.metrics.ProofSize(uint32(len(proofToGo) / trieRead.Size()))
 	}
 
 	return proofToGo, err

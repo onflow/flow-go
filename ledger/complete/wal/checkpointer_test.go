@@ -65,12 +65,14 @@ func Test_WAL(t *testing.T) {
 
 			keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
 			values := utils.RandomValues(numInsPerStep, valueMaxByteSize/2, valueMaxByteSize)
-			update, err := ledger.NewUpdate(state, keys, values)
-			require.NoError(t, err)
-			state, _, err = led.Set(update)
+			payloads := utils.KeyValuesToPayloads(keys, values)
+			paths, err := pathfinder.KeysToPaths(keys, led.PathFinderVersion())
 			require.NoError(t, err)
 
-			fmt.Printf("Updated with %x\n", state)
+			update, err := ledger.NewTrieUpdate(state, paths, payloads)
+			require.NoError(t, err)
+			state, err = led.Set(update)
+			require.NoError(t, err)
 
 			data := make(map[string]ledger.Value, len(keys))
 			for j, key := range keys {
@@ -98,11 +100,13 @@ func Test_WAL(t *testing.T) {
 				keys = append(keys, *key)
 			}
 
-			fmt.Printf("Querying with %x\n", state)
-
 			var ledgerState ledger.State
 			copy(ledgerState[:], state)
-			query, err := ledger.NewQuery(ledgerState, keys)
+
+			paths, err := pathfinder.KeysToPaths(keys, led2.PathFinderVersion())
+			require.NoError(t, err)
+
+			query := ledger.NewTrieRead(ledgerState, paths)
 			require.NoError(t, err)
 			values, err := led2.Get(query)
 			require.NoError(t, err)
@@ -142,21 +146,19 @@ func Test_Checkpointing(t *testing.T) {
 
 				keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, 1600, 1600)
 				values := utils.RandomValues(numInsPerStep, valueMaxByteSize/2, valueMaxByteSize)
-				update, err := ledger.NewUpdate(ledger.State(rootHash), keys, values)
+				payloads := utils.KeyValuesToPayloads(keys, values)
+				paths, err := pathfinder.KeysToPaths(keys, pathFinderVersion)
 				require.NoError(t, err)
 
-				trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, pathFinderVersion)
+				trieUpdate, err := ledger.NewTrieUpdate(ledger.State(rootHash), paths, payloads)
 				require.NoError(t, err)
-
 				err = wal.RecordUpdate(trieUpdate)
 				require.NoError(t, err)
 
 				rootHash, err := f.Update(trieUpdate)
 				require.NoError(t, err)
 
-				fmt.Printf("Updated with %x\n", rootHash)
-
-				data := make(map[ledger.Path]*ledger.Payload, len(trieUpdate.Paths))
+				data := make(map[ledger.Path]*ledger.Payload, trieUpdate.Size())
 				for j, path := range trieUpdate.Paths {
 					data[path] = trieUpdate.Payloads[j]
 				}
@@ -242,13 +244,13 @@ func Test_Checkpointing(t *testing.T) {
 					paths = append(paths, path)
 				}
 
-				values1, err := f.Read(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
+				values1, err := f.Read(ledger.NewTrieRead(ledger.State(rootHash), paths))
 				require.NoError(t, err)
 
-				values2, err := f2.Read(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
+				values2, err := f2.Read(ledger.NewTrieRead(ledger.State(rootHash), paths))
 				require.NoError(t, err)
 
-				values3, err := f3.Read(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
+				values3, err := f3.Read(ledger.NewTrieRead(ledger.State(rootHash), paths))
 				require.NoError(t, err)
 
 				for i, path := range paths {
@@ -271,12 +273,13 @@ func Test_Checkpointing(t *testing.T) {
 			wal4, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, segmentSize)
 			require.NoError(t, err)
 
-			update, err := ledger.NewUpdate(ledger.State(rootHash), keys2, values2)
+			payloads2 := utils.KeyValuesToPayloads(keys2, values2)
+
+			paths, err := pathfinder.KeysToPaths(keys2, pathFinderVersion)
 			require.NoError(t, err)
 
-			trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, pathFinderVersion)
+			trieUpdate, err := ledger.NewTrieUpdate(ledger.State(rootHash), paths, payloads2)
 			require.NoError(t, err)
-
 			err = wal4.RecordUpdate(trieUpdate)
 			require.NoError(t, err)
 
@@ -320,11 +323,9 @@ func Test_Checkpointing(t *testing.T) {
 
 		t.Run("extra updates were applied correctly", func(t *testing.T) {
 
-			query, err := ledger.NewQuery(ledger.State(rootHash), keys2)
+			paths, err := pathfinder.KeysToPaths(keys2, pathFinderVersion)
 			require.NoError(t, err)
-			trieRead, err := pathfinder.QueryToTrieRead(query, pathFinderVersion)
-			require.NoError(t, err)
-
+			trieRead := ledger.NewTrieRead(ledger.State(rootHash), paths)
 			values, err := f.Read(trieRead)
 			require.NoError(t, err)
 
@@ -409,11 +410,11 @@ func Test_Checkpointing(t *testing.T) {
 
 			<-wal6.Done()
 
+			paths, err := pathfinder.KeysToPaths(keys2, pathFinderVersion)
+			require.NoError(t, err)
+
 			// check if the latest data is still there
-			query, err := ledger.NewQuery(ledger.State(rootHash), keys2)
-			require.NoError(t, err)
-			trieRead, err := pathfinder.QueryToTrieRead(query, pathFinderVersion)
-			require.NoError(t, err)
+			trieRead := ledger.NewTrieRead(ledger.State(rootHash), paths)
 
 			values, err := f.Read(trieRead)
 			require.NoError(t, err)
@@ -442,12 +443,12 @@ func TestCheckpointFileError(t *testing.T) {
 
 		keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, 1600, 1600)
 		values := utils.RandomValues(numInsPerStep, valueMaxByteSize/2, valueMaxByteSize)
-		update, err := ledger.NewUpdate(ledger.State(trie.EmptyTrieRootHash()), keys, values)
+		payloads := utils.KeyValuesToPayloads(keys, values)
+		paths, err := pathfinder.KeysToPaths(keys, pathFinderVersion)
 		require.NoError(t, err)
 
-		trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, pathFinderVersion)
+		trieUpdate, err := ledger.NewTrieUpdate(ledger.State(trie.EmptyTrieRootHash()), paths, payloads)
 		require.NoError(t, err)
-
 		err = wal.RecordUpdate(trieUpdate)
 		require.NoError(t, err)
 

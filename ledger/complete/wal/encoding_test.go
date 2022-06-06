@@ -22,7 +22,8 @@ func TestUpdate(t *testing.T) {
 	v1 := utils.LightPayload8(1, 2)
 	v2 := utils.LightPayload(2, 3)
 	payloads := []*ledger.Payload{v1, v2}
-	update := &ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads}
+	update, err := ledger.NewTrieUpdate(ledger.State(rootHash), paths, payloads)
+	require.NoError(t, err)
 
 	expected := []byte{
 		1, //update flag,

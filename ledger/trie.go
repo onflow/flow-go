@@ -83,16 +83,36 @@ func ComputeCompactValue(path hash.Hash, value []byte, nodeHeight int) hash.Hash
 	return out
 }
 
-// TrieRead captures a trie read query
+// TrieRead captures a trie read query.
 type TrieRead struct {
 	RootHash RootHash
 	Paths    []Path
 }
 
-// TrieReadSinglePayload contains trie read query for a single payload
+// NewEmptyTrieRead returns a new ledger TrieRead.
+func NewEmptyTrieRead(sc State) *TrieRead {
+	return &TrieRead{RootHash: RootHash(sc)}
+}
+
+// NewTrieRead returns a new ledger TrieRead.
+func NewTrieRead(sc State, paths []Path) *TrieRead {
+	return &TrieRead{RootHash: RootHash(sc), Paths: paths}
+}
+
+// Size returns number of paths in the TrieRead
+func (q *TrieRead) Size() int {
+	return len(q.Paths)
+}
+
+// TrieReadSingleValue contains trie read query for a single value
 type TrieReadSingleValue struct {
 	RootHash RootHash
 	Path     Path
+}
+
+// NewTrieReadSingleValue constructs a new ledger query for a single value
+func NewTrieReadSingleValue(sc State, path Path) *TrieReadSingleValue {
+	return &TrieReadSingleValue{RootHash: RootHash(sc), Path: path}
 }
 
 // TrieUpdate holds all data for a trie update
@@ -102,12 +122,33 @@ type TrieUpdate struct {
 	Payloads []*Payload
 }
 
+func NewEmptyTrieUpdate(sc State) *TrieUpdate {
+	return &TrieUpdate{RootHash: RootHash(sc)}
+}
+
+// NewTrieUpdate returns a new TrieUpdate.
+func NewTrieUpdate(sc State, paths []Path, payloads []*Payload) (*TrieUpdate, error) {
+	if len(paths) != len(payloads) {
+		return nil, fmt.Errorf("length mismatch: paths have %d elements, but payloads have %d elements", len(paths), len(payloads))
+	}
+	return &TrieUpdate{
+		RootHash: RootHash(sc),
+		Paths:    paths,
+		Payloads: payloads,
+	}, nil
+}
+
+// State returns the state of the trie update
+func (u *TrieUpdate) State() State {
+	return State(u.RootHash)
+}
+
 // Size returns number of paths in the trie update
 func (u *TrieUpdate) Size() int {
 	return len(u.Paths)
 }
 
-// IsEmpty returns true if key or value is not empty
+// IsEmpty returns true if update is not empty
 func (u *TrieUpdate) IsEmpty() bool {
 	return u.Size() == 0
 }

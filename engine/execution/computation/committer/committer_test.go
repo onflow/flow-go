@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	fvmUtils "github.com/onflow/flow-go/fvm/utils"
 	led "github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/complete"
 	ledgermock "github.com/onflow/flow-go/ledger/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -21,6 +22,9 @@ func TestLedgerViewCommitter(t *testing.T) {
 
 		ledger := new(ledgermock.Ledger)
 		com := committer.NewLedgerViewCommitter(ledger, trace.NewNoopTracer())
+
+		ledger.On("PathFinderVersion", mock.Anything).
+			Return(uint8(complete.DefaultPathFinderVersion))
 
 		var expectedStateCommitment led.State
 		copy(expectedStateCommitment[:], []byte{1, 2, 3})

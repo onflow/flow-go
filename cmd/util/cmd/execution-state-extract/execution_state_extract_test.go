@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
+	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/flow"
@@ -95,10 +96,15 @@ func TestExtractExecutionState(t *testing.T) {
 			for i := 0; i < size; i++ {
 				keys, values := getSampleKeyValues(i)
 
-				update, err := ledger.NewUpdate(stateCommitment, keys, values)
+				payloads := utils.KeyValuesToPayloads(keys, values)
+
+				paths, err := pathfinder.KeysToPaths(keys, f.PathFinderVersion())
 				require.NoError(t, err)
 
-				stateCommitment, _, err = f.Set(update)
+				update, err := ledger.NewTrieUpdate(stateCommitment, paths, payloads)
+				require.NoError(t, err)
+
+				stateCommitment, err = f.Set(update)
 				//stateCommitment, err = f.UpdateRegisters(keys, values, stateCommitment)
 				require.NoError(t, err)
 
@@ -159,8 +165,10 @@ func TestExtractExecutionState(t *testing.T) {
 						keys = append(keys, v.key)
 					}
 
-					query, err := ledger.NewQuery(stateCommitment, keys)
+					paths, err := pathfinder.KeysToPaths(keys, storage.PathFinderVersion())
 					require.NoError(t, err)
+
+					query := ledger.NewTrieRead(stateCommitment, paths)
 
 					registerValues, err := storage.Get(query)
 					//registerValues, err := mForest.Read([]byte(stateCommitment), keys)
@@ -175,7 +183,7 @@ func TestExtractExecutionState(t *testing.T) {
 					// ie - extraction stops after hitting right hash
 					for j := i + 1; j < len(blocksInOrder); j++ {
 
-						query.SetState(commitsByBlocks[blocksInOrder[j]])
+						query.RootHash = ledger.RootHash(commitsByBlocks[blocksInOrder[j]])
 						_, err := storage.Get(query)
 						//_, err := storage.GetRegisters(keys, commitsByBlocks[blocksInOrder[j]])
 						require.Error(t, err)

@@ -24,120 +24,85 @@ type Ledger interface {
 	// InitialState returns the initial state of the ledger
 	InitialState() State
 
+	// PathFinderVersion returns the pathfinder version of the ledger
+	PathFinderVersion() uint8
+
 	// GetSingleValue returns value for a given key at specific state
-	GetSingleValue(query *QuerySingleValue) (value Value, err error)
+	GetSingleValue(query *TrieReadSingleValue) (value Value, err error)
 
 	// Get returns values for the given slice of keys at specific state
-	Get(query *Query) (values []Value, err error)
+	Get(query *TrieRead) (values []Value, err error)
 
 	// Update updates a list of keys with new values at specific state (update) and returns a new state
-	Set(update *Update) (newState State, trieUpdate *TrieUpdate, err error)
+	Set(update *TrieUpdate) (newState State, err error)
 
 	// Prove returns proofs for the given keys at specific state
-	Prove(query *Query) (proof Proof, err error)
+	Prove(query *TrieRead) (proof Proof, err error)
 }
 
-// Query holds all data needed for a ledger read or ledger proof
-type Query struct {
-	state State
-	keys  []Key
+const (
+	keyPartOwner      = uint16(0)
+	keyPartController = uint16(1)
+	keyPartKey        = uint16(2)
+)
+
+// KeyID represents a ledger key consisting of owner, controller, and key.
+// KeyID is a simplified ledger key that requires fewer heap allocations
+// than ledger.Key.
+type KeyID struct {
+	Owner      string
+	Controller string
+	Key        string
 }
 
-// NewEmptyQuery returns an empty ledger query
-func NewEmptyQuery(sc State) (*Query, error) {
-	return &Query{state: sc}, nil
-}
-
-// NewQuery constructs a new ledger query
-func NewQuery(sc State, keys []Key) (*Query, error) {
-	return &Query{state: sc, keys: keys}, nil
-}
-
-// Keys returns keys of the query
-func (q *Query) Keys() []Key {
-	return q.keys
-}
-
-// Size returns number of keys in the query
-func (q *Query) Size() int {
-	return len(q.keys)
-}
-
-// State returns the state part of the query
-func (q *Query) State() State {
-	return q.state
-}
-
-// SetState sets the state part of the query
-func (q *Query) SetState(s State) {
-	q.state = s
-}
-
-// QuerySingleValue contains ledger query for a single value
-type QuerySingleValue struct {
-	state State
-	key   Key
-}
-
-// NewQuerySingleValue constructs a new ledger query for a single value
-func NewQuerySingleValue(sc State, key Key) (*QuerySingleValue, error) {
-	return &QuerySingleValue{state: sc, key: key}, nil
-}
-
-// Key returns key of the query
-func (q *QuerySingleValue) Key() Key {
-	return q.key
-}
-
-// State returns the state part of the query
-func (q *QuerySingleValue) State() State {
-	return q.state
-}
-
-// Update holds all data needed for a ledger update
-type Update struct {
-	state  State
-	keys   []Key
-	values []Value
-}
-
-// Size returns number of keys in the ledger update
-func (u *Update) Size() int {
-	return len(u.keys)
-}
-
-// Keys returns keys of the update
-func (u *Update) Keys() []Key {
-	return u.keys
-}
-
-// Values returns value of the update
-func (u *Update) Values() []Value {
-	return u.values
-}
-
-// State returns the state part of this update
-func (u *Update) State() State {
-	return u.state
-}
-
-// SetState sets the state part of the update
-func (u *Update) SetState(sc State) {
-	u.state = sc
-}
-
-// NewEmptyUpdate returns an empty ledger update
-func NewEmptyUpdate(sc State) (*Update, error) {
-	return &Update{state: sc}, nil
-}
-
-// NewUpdate returns an ledger update
-func NewUpdate(sc State, keys []Key, values []Value) (*Update, error) {
-	if len(keys) != len(values) {
-		return nil, fmt.Errorf("length mismatch: keys have %d elements, but values have %d elements", len(keys), len(values))
+// NewKeyID returns a new key ID.
+func NewKeyID(owner, controller, key string) KeyID {
+	return KeyID{
+		Owner:      owner,
+		Controller: controller,
+		Key:        key,
 	}
-	return &Update{state: sc, keys: keys, values: values}, nil
+}
 
+// CanonicalForm returns a byte slice describing the key ID.
+// WARNING:
+// - KeyID.CanonicalForm() and KeyIDToKey(k).CanonicalForm() must
+//   produce the same result. Changes to these functions must be in sync.
+// - Changing this function impacts how leaf hashes are computed.
+// - Don't use this to reconstruct the key later.
+func (k *KeyID) CanonicalForm() []byte {
+	const (
+		keyPartCount         = 3
+		encodedKeyPartLength = 3
+		encodedKeyLength     = keyPartCount * encodedKeyPartLength
+	)
+
+	length := len(k.Owner) + len(k.Controller) + len(k.Key) + encodedKeyLength
+
+	b := make([]byte, 0, length)
+
+	// encode owner
+	b = append(b, byte('/'), 0x30, byte('/')) // 0x30 = strconv.Itoa(keyPartOwner)
+	b = append(b, k.Owner...)
+
+	// encode controller
+	b = append(b, byte('/'), 0x31, byte('/')) // 0x31 = strconv.Itoa(keyPartController)
+	b = append(b, k.Controller...)
+
+	// encode key
+	b = append(b, byte('/'), 0x32, byte('/')) // 0x32 = strconv.Itoa(keyPartKey)
+	b = append(b, k.Key...)
+
+	return b
+}
+
+// KeyIDToKey returns ledger.Key from ledger.KeyID.
+func KeyIDToKey(reg KeyID) Key {
+	return NewKey([]KeyPart{
+		NewKeyPart(keyPartOwner, []byte(reg.Owner)),
+		NewKeyPart(keyPartController, []byte(reg.Controller)),
+		NewKeyPart(keyPartKey, []byte(reg.Key)),
+	})
 }
 
 // State captures an state of the ledger
@@ -209,8 +174,11 @@ func (k *Key) Size() int {
 }
 
 // CanonicalForm returns a byte slice describing the key
-// Warning: Changing this has an impact on how leaf hashes are computed!
-// don't use this to reconstruct the key later
+// WARNING:
+// - KeyID.CanonicalForm() and KeyIDToKey(k).CanonicalForm() must
+//   produce the same result. Changes to these functions must be in sync.
+// - Changing this function impacts how leaf hashes are computed.
+// - Don't use this to reconstruct the key later.
 func (k *Key) CanonicalForm() []byte {
 	// calculate the size of the byte array
 

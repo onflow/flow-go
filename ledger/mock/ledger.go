@@ -30,35 +30,27 @@ func (_m *Ledger) Done() <-chan struct{} {
 	return r0
 }
 
-// Get provides a mock function with given fields: query
-func (_m *Ledger) Get(query *ledger.Query) ([]ledger.Value, error) {
-	ret := _m.Called(query)
+func (_m *Ledger) PathFinderVersion() uint8 {
+	ret := _m.Called()
 
-	var r0 []ledger.Value
-	if rf, ok := ret.Get(0).(func(*ledger.Query) []ledger.Value); ok {
-		r0 = rf(query)
+	var r0 uint8
+	if rf, ok := ret.Get(0).(func() uint8); ok {
+		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]ledger.Value)
+			r0 = ret.Get(0).(uint8)
 		}
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(*ledger.Query) error); ok {
-		r1 = rf(query)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
 
 // GetSingleValue provides a mock function with given fields: query
-func (_m *Ledger) GetSingleValue(query *ledger.QuerySingleValue) (ledger.Value, error) {
+func (_m *Ledger) GetSingleValue(query *ledger.TrieReadSingleValue) (ledger.Value, error) {
 	ret := _m.Called(query)
 
 	var r0 ledger.Value
-	if rf, ok := ret.Get(0).(func(*ledger.QuerySingleValue) ledger.Value); ok {
+	if rf, ok := ret.Get(0).(func(*ledger.TrieReadSingleValue) ledger.Value); ok {
 		r0 = rf(query)
 	} else {
 		if ret.Get(0) != nil {
@@ -67,7 +59,30 @@ func (_m *Ledger) GetSingleValue(query *ledger.QuerySingleValue) (ledger.Value, 
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(*ledger.QuerySingleValue) error); ok {
+	if rf, ok := ret.Get(1).(func(*ledger.TrieReadSingleValue) error); ok {
+		r1 = rf(query)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// Get provides a mock function with given fields: query
+func (_m *Ledger) Get(query *ledger.TrieRead) ([]ledger.Value, error) {
+	ret := _m.Called(query)
+
+	var r0 []ledger.Value
+	if rf, ok := ret.Get(0).(func(*ledger.TrieRead) []ledger.Value); ok {
+		r0 = rf(query)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]ledger.Value)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(*ledger.TrieRead) error); ok {
 		r1 = rf(query)
 	} else {
 		r1 = ret.Error(1)
@@ -93,11 +108,11 @@ func (_m *Ledger) InitialState() ledger.State {
 }
 
 // Prove provides a mock function with given fields: query
-func (_m *Ledger) Prove(query *ledger.Query) (ledger.Proof, error) {
+func (_m *Ledger) Prove(query *ledger.TrieRead) (ledger.Proof, error) {
 	ret := _m.Called(query)
 
 	var r0 ledger.Proof
-	if rf, ok := ret.Get(0).(func(*ledger.Query) ledger.Proof); ok {
+	if rf, ok := ret.Get(0).(func(*ledger.TrieRead) ledger.Proof); ok {
 		r0 = rf(query)
 	} else {
 		if ret.Get(0) != nil {
@@ -106,7 +121,7 @@ func (_m *Ledger) Prove(query *ledger.Query) (ledger.Proof, error) {
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(*ledger.Query) error); ok {
+	if rf, ok := ret.Get(1).(func(*ledger.TrieRead) error); ok {
 		r1 = rf(query)
 	} else {
 		r1 = ret.Error(1)
@@ -132,11 +147,11 @@ func (_m *Ledger) Ready() <-chan struct{} {
 }
 
 // Set provides a mock function with given fields: update
-func (_m *Ledger) Set(update *ledger.Update) (ledger.State, *ledger.TrieUpdate, error) {
+func (_m *Ledger) Set(update *ledger.TrieUpdate) (ledger.State, error) {
 	ret := _m.Called(update)
 
 	var r0 ledger.State
-	if rf, ok := ret.Get(0).(func(*ledger.Update) ledger.State); ok {
+	if rf, ok := ret.Get(0).(func(*ledger.TrieUpdate) ledger.State); ok {
 		r0 = rf(update)
 	} else {
 		if ret.Get(0) != nil {
@@ -144,23 +159,14 @@ func (_m *Ledger) Set(update *ledger.Update) (ledger.State, *ledger.TrieUpdate, 
 		}
 	}
 
-	var r1 *ledger.TrieUpdate
-	if rf, ok := ret.Get(1).(func(*ledger.Update) *ledger.TrieUpdate); ok {
+	var r1 error
+	if rf, ok := ret.Get(1).(func(*ledger.TrieUpdate) error); ok {
 		r1 = rf(update)
 	} else {
-		if ret.Get(1) != nil {
-			r1 = ret.Get(1).(*ledger.TrieUpdate)
-		}
+		r1 = ret.Error(1)
 	}
 
-	var r2 error
-	if rf, ok := ret.Get(2).(func(*ledger.Update) error); ok {
-		r2 = rf(update)
-	} else {
-		r2 = ret.Error(2)
-	}
-
-	return r0, r1, r2
+	return r0, r1 
 }
 
 // NewLedger creates a new instance of Ledger. It also registers the testing.TB interface on the mock and a cleanup function to assert the mocks expectations.

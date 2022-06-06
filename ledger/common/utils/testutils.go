@@ -8,8 +8,10 @@ import (
 	"math"
 	"math/rand"
 
+	"github.com/onflow/flow-go/ledger"
 	l "github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
+	"github.com/onflow/flow-go/ledger/common/pathfinder"
 )
 
 // MaxUint16 returns the max value of two uint16
@@ -185,18 +187,22 @@ func ReadFromBuffer(reader io.Reader, length int) ([]byte, error) {
 
 // TrieUpdateFixture returns a trie update fixture
 func TrieUpdateFixture(n int, minPayloadByteSize int, maxPayloadByteSize int) *l.TrieUpdate {
-	return &l.TrieUpdate{
-		RootHash: RootHashFixture(),
-		Paths:    RandomPaths(n),
-		Payloads: RandomPayloads(n, minPayloadByteSize, maxPayloadByteSize),
+	keys := RandomUniqueKeys(1, n, minPayloadByteSize, maxPayloadByteSize)
+	values := RandomValues(n, minPayloadByteSize, maxPayloadByteSize)
+	payloads := KeyValuesToPayloads(keys, values)
+	update, err := l.NewTrieUpdate(
+		ledger.State(RootHashFixture()),
+		RandomPaths(n),
+		payloads,
+	)
+	if err != nil {
+		panic(err)
 	}
+	return update
 }
 
 // QueryFixture returns a query fixture
-func QueryFixture() *l.Query {
-	scBytes, _ := hex.DecodeString("6a7a565add94fb36069d79e8725c221cd1e5740742501ef014ea6db999fd98ad")
-	var sc l.State
-	copy(sc[:], scBytes)
+func QueryFixture(sc l.State, pathFinderVersion uint8) *l.TrieRead {
 	k1p1 := l.NewKeyPart(uint16(1), []byte("1"))
 	k1p2 := l.NewKeyPart(uint16(22), []byte("2"))
 	k1 := l.NewKey([]l.KeyPart{k1p1, k1p2})
@@ -205,8 +211,17 @@ func QueryFixture() *l.Query {
 	k2p2 := l.NewKeyPart(uint16(22), []byte("4"))
 	k2 := l.NewKey([]l.KeyPart{k2p1, k2p2})
 
-	u, _ := l.NewQuery(sc, []l.Key{k1, k2})
-	return u
+	p1, err := pathfinder.KeyToPath(k1, pathFinderVersion)
+	if err != nil {
+		panic(err)
+	}
+
+	p2, err := pathfinder.KeyToPath(k2, pathFinderVersion)
+	if err != nil {
+		panic(err)
+	}
+
+	return l.NewTrieRead(sc, []l.Path{p1, p2})
 }
 
 // LightPayload returns a payload with 2 byte key and 2 byte value
@@ -252,10 +267,7 @@ func KeyPartFixture(typ uint16, val string) l.KeyPart {
 }
 
 // UpdateFixture returns an update fixture
-func UpdateFixture() *l.Update {
-	scBytes, _ := hex.DecodeString("6a7a565add94fb36069d79e8725c221cd1e5740742501ef014ea6db999fd98ad")
-	var sc l.State
-	copy(sc[:], scBytes)
+func UpdateFixture(sc l.State, pathFinderVersion uint8) *l.TrieUpdate {
 	k1p1 := l.NewKeyPart(uint16(1), []byte("1"))
 	k1p2 := l.NewKeyPart(uint16(22), []byte("2"))
 	k1 := l.NewKey([]l.KeyPart{k1p1, k1p2})
@@ -266,7 +278,17 @@ func UpdateFixture() *l.Update {
 	k2 := l.NewKey([]l.KeyPart{k2p1, k2p2})
 	v2 := l.Value([]byte{'B'})
 
-	u, _ := l.NewUpdate(sc, []l.Key{k1, k2}, []l.Value{v1, v2})
+	payloads := []*l.Payload{ledger.NewPayload(k1, v1), ledger.NewPayload(k2, v2)}
+
+	paths, err := pathfinder.KeysToPaths([]l.Key{k1, k2}, pathFinderVersion)
+	if err != nil {
+		panic(err)
+	}
+
+	u, err := l.NewTrieUpdate(sc, paths, payloads)
+	if err != nil {
+		panic(err)
+	}
 	return u
 }
 
@@ -405,4 +427,15 @@ func RandomUniqueKeys(n, m, minByteSize, maxByteSize int) []l.Key {
 		}
 	}
 	return keys
+}
+
+func KeyValuesToPayloads(keys []l.Key, values []l.Value) []*ledger.Payload {
+	if len(keys) != len(values) {
+		panic(fmt.Sprintf("length mismatch: can't create payload with %d keys and %d values", len(keys), len(values)))
+	}
+	payloads := make([]*ledger.Payload, len(keys))
+	for i := 0; i < len(keys); i++ {
+		payloads[i] = ledger.NewPayload(keys[i], values[i])
+	}
+	return payloads
 }

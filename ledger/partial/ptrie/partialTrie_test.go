@@ -103,7 +103,7 @@ func TestPartialTrieGet(t *testing.T) {
 			retPayloads, err := psmt.Get(nonExistentPaths)
 			require.Nil(t, retPayloads)
 
-			e, ok := err.(*ErrMissingPath)
+			e, ok := err.(*ledger.ErrMissingPaths)
 			require.True(t, ok)
 			assert.Equal(t, 2, len(e.Paths))
 			require.Equal(t, path3, e.Paths[0])
@@ -125,7 +125,7 @@ func TestPartialTrieGet(t *testing.T) {
 			retPayloads, err := psmt.Get([]ledger.Path{path1, path2, path3, path4})
 			require.Nil(t, retPayloads)
 
-			e, ok := err.(*ErrMissingPath)
+			e, ok := err.(*ledger.ErrMissingPaths)
 			require.True(t, ok)
 			assert.Equal(t, 2, len(e.Paths))
 			require.Equal(t, path3, e.Paths[0])
@@ -174,9 +174,9 @@ func TestPartialTrieGetSinglePayload(t *testing.T) {
 		retPayload, err = psmt.GetSinglePayload(path3)
 		require.Nil(t, retPayload)
 
-		var errMissingPath *ErrMissingPath
+		var errMissingPath *ledger.ErrMissingPaths
 		require.ErrorAs(t, err, &errMissingPath)
-		missingPath := err.(*ErrMissingPath)
+		missingPath := err.(*ledger.ErrMissingPaths)
 		require.Equal(t, 1, len(missingPath.Paths))
 		require.Equal(t, path3, missingPath.Paths[0])
 	})

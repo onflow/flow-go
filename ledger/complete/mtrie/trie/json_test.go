@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
+	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
@@ -53,10 +54,13 @@ func Test_DumpJSONNonEmpty(t *testing.T) {
 		ledger.NewKeyPart(5, []byte("dolor")),
 	})
 
-	update, err := ledger.NewUpdate(ledger.State(emptyRootHash), []ledger.Key{key1, key2, key3}, []ledger.Value{{1}, {2}, {3}})
+	keys := []ledger.Key{key1, key2, key3}
+	values := []ledger.Value{{1}, {2}, {3}}
+	payloads := utils.KeyValuesToPayloads(keys, values)
+	paths, err := pathfinder.KeysToPaths(keys, 0)
 	require.NoError(t, err)
 
-	trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, 0)
+	trieUpdate, err := ledger.NewTrieUpdate(ledger.State(emptyRootHash), paths, payloads)
 	require.NoError(t, err)
 
 	newHash, err := forest.Update(trieUpdate)

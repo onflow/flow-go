@@ -50,12 +50,8 @@ func (s *LedgerViewCommitter) commitView(view state.View, baseState flow.StateCo
 func (s *LedgerViewCommitter) collectProofs(view state.View, baseState flow.StateCommitment) (proof []byte, err error) {
 	// get all deduplicated register IDs
 	allIds := view.AllRegisters()
-	keys := make([]ledger.Key, 0, len(allIds))
-	for _, id := range allIds {
-		keys = append(keys, execState.RegisterIDToKey(id))
-	}
 
-	query, err := ledger.NewQuery(ledger.State(baseState), keys)
+	query, err := execState.MakeQuery(baseState, allIds, s.ldg.PathFinderVersion())
 	if err != nil {
 		return nil, fmt.Errorf("cannot create ledger query: %w", err)
 	}

@@ -31,7 +31,7 @@ func (p *PSMT) RootHash() ledger.RootHash {
 func (p *PSMT) GetSinglePayload(path ledger.Path) (*ledger.Payload, error) {
 	node, found := p.pathLookUp[path]
 	if !found {
-		return nil, &ErrMissingPath{Paths: []ledger.Path{path}}
+		return nil, &ledger.ErrMissingPaths{Paths: []ledger.Path{path}}
 	}
 	return node.payload, nil
 }
@@ -51,7 +51,7 @@ func (p *PSMT) Get(paths []ledger.Path) ([]*ledger.Payload, error) {
 		payloads[i] = node.payload
 	}
 	if len(failedPaths) > 0 {
-		return nil, &ErrMissingPath{Paths: failedPaths}
+		return nil, &ledger.ErrMissingPaths{Paths: failedPaths}
 	}
 	return payloads, nil
 }
@@ -59,19 +59,19 @@ func (p *PSMT) Get(paths []ledger.Path) ([]*ledger.Payload, error) {
 // Update updates registers and returns rootValue after updates
 // in case of error, it returns a list of keys for which update failed
 func (p *PSMT) Update(paths []ledger.Path, payloads []*ledger.Payload) (ledger.RootHash, error) {
-	var failedKeys []ledger.Key
+	var failedPaths []ledger.Path
 	for i, path := range paths {
 		payload := payloads[i]
 		// lookup the path and update the value
 		node, found := p.pathLookUp[path]
 		if !found {
-			failedKeys = append(failedKeys, payload.Key)
+			failedPaths = append(failedPaths, path)
 			continue
 		}
 		node.hashValue = ledger.ComputeCompactValue(hash.Hash(path), payload.Value, node.height)
 	}
-	if len(failedKeys) > 0 {
-		return ledger.RootHash(hash.DummyHash), &ledger.ErrMissingKeys{Keys: failedKeys}
+	if len(failedPaths) > 0 {
+		return ledger.RootHash(hash.DummyHash), &ledger.ErrMissingPaths{Paths: failedPaths}
 	}
 	// after updating all the nodes, compute the value recursively only once
 	return ledger.RootHash(p.root.forceComputeHash()), nil
