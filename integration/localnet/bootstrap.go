@@ -269,7 +269,7 @@ type Service struct {
 	Environment []string `yaml:"environment,omitempty"`
 	Volumes     []string
 	Ports       []string `yaml:"ports,omitempty"`
-	Logging     Logging  `yaml:"logging"`
+	Logging     Logging  `yaml:"logging,omitempty"`
 }
 
 // Build ...
@@ -287,9 +287,9 @@ type Logging struct {
 
 type Options struct {
 	LokiURL            string `yaml:"loki-url"`
-	LokiMaxBackoff     string `yaml:"loki-max-backoff"`
-	LokiRetries        int    `yaml:"loki-retries"`
-	LokiExternalLabels string `yaml:"loki-external-labels"`
+	LokiMaxBackoff     string `yaml:"loki-max-backoff,omitempty"`
+	LokiRetries        int    `yaml:"loki-retries,omitempty"`
+	LokiExternalLabels string `yaml:"loki-external-labels,omitempty"`
 }
 
 func prepareFlowServices(services Services, containers []testnet.ContainerConfig) Services {
