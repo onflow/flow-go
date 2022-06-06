@@ -107,6 +107,18 @@ func generateBootstrapData(flowNetworkConf testnet.NetworkConfig) []testnet.Cont
 	return bootstrapData.StakedConfs
 }
 
+func defaultLokiLoggingOptions(role string) Logging {
+	return Logging{
+		Driver: "loki",
+		Options: Options{
+			LokiURL:            "http://127.0.0.1:3100/loki/api/v1/push",
+			LokiRetries:        1,
+			LokiMaxBackoff:     time.Second.String(),
+			LokiExternalLabels: fmt.Sprintf(`role=%s`, role),
+		},
+	}
+}
+
 // localnet/bootstrap.go generates a docker compose file with images configured for a
 // self-contained Flow network, and other peripheral services, such as Observer services.
 // Private/Public keys and data are removed and re-created for the self-contained localnet
@@ -403,15 +415,7 @@ func prepareService(container testnet.ContainerConfig, i int, n int) Service {
 		}
 	}
 
-	service.Logging = Logging{
-		Driver: "loki",
-		Options: Options{
-			LokiURL:            "http://127.0.0.1:3100/loki/api/v1/push",
-			LokiRetries:        1,
-			LokiMaxBackoff:     time.Second.String(),
-			LokiExternalLabels: fmt.Sprintf(`role=%s`, container.Role),
-		},
-	}
+	service.Logging = defaultLokiLoggingOptions(container.Role.String())
 
 	return service
 }
@@ -770,6 +774,9 @@ func prepareObserverService(i int, observerName string, agPublicKey string, prof
 		fmt.Sprintf("%d:%d", (accessCount*2)+AccessAPIPort+(2*i), RPCPort),
 		fmt.Sprintf("%d:%d", (accessCount*2)+AccessAPIPort+(2*i)+1, SecuredRPCPort),
 	}
+
+	observerService.Logging = defaultLokiLoggingOptions("observer")
+
 	return observerService
 }
 
