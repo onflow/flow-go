@@ -57,6 +57,10 @@ func initializeChannelToMsgCodesMap() {
 
 	// dkg
 	channelToMsgCodes[channels.DKGCommittee] = []MessageCode{CodeDKGMessage}
+
+	// cluster based channels
+	channelToMsgCodes[channels.SyncClusterPrefix] = []MessageCode{CodeSyncRequest, CodeSyncResponse, CodeRangeRequest, CodeBatchRequest, CodeBlockResponse}
+	channelToMsgCodes[channels.ConsensusClusterPrefix] = []MessageCode{CodeClusterBlockProposal, CodeClusterBlockVote, CodeClusterBlockResponse}
 }
 
 func MsgCodesByChannel(channel network.Channel) (MsgCodeList, bool) {
