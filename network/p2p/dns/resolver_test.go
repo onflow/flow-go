@@ -63,6 +63,7 @@ func TestResolver_HappyPath(t *testing.T) {
 }
 
 // TestResolver_CacheExpiry evaluates that cached dns entries get expired and underlying resolver gets called after their time-to-live is passed.
+// Test is currently setting timeout @ln 83 to 5s and sleep at ln 103 to 6.  Originally 1 and 2.
 func TestResolver_CacheExpiry(t *testing.T) {
 	// unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky test")
 	basicResolver := mocknetwork.BasicResolver{}
@@ -87,6 +88,7 @@ func TestResolver_CacheExpiry(t *testing.T) {
 	resolver.Start(ctx)
 	unittest.RequireCloseBefore(t, resolver.Ready(), 100*time.Millisecond, "could not start dns resolver on time")
 
+	// potentially consider reducing the test case count to reduce complexity
 	size := 10 // we have 10 txt and 10 ip lookup test cases
 	times := 5 // each domain is queried for resolution 5 times
 	txtTestCases := testnetwork.TxtLookupFixture(size)
@@ -95,12 +97,14 @@ func TestResolver_CacheExpiry(t *testing.T) {
 	// each domain gets resolved through underlying resolver twice: once initially, and once after expiry.
 	resolverWG := mockBasicResolverForDomains(t, &basicResolver, ipTestCase, txtTestCases, happyPath, 2)
 
+	// queries 20 cases * 5 = 100 queries.
 	queryWG := syncThenAsyncQuery(t, times, resolver, txtTestCases, ipTestCase, happyPath)
 	unittest.RequireReturnsBefore(t, queryWG.Wait, 1*time.Second, "could not perform all queries on time")
 
 	time.Sleep(6 * time.Second) // waits enough for cache to get invalidated
-	log.Printf("LOGLOGLOGLOGLOG SLEEPTIME")
+	log.Printf("LOGLOGLOGLOGLOG SLEEP FOR 2 SECONDS")
 
+	// Querying each test case 5 times, but we should set the times to query to 1 for just testing that the cache has expire and we will hit the resolver
 	queryWG = syncThenAsyncQuery(t, times, resolver, txtTestCases, ipTestCase, happyPath)
 
 	unittest.RequireReturnsBefore(t, resolverWG.Wait, 60*time.Second, "could not resolve all expected domains")
