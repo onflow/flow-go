@@ -417,7 +417,7 @@ func prepareService(container testnet.ContainerConfig, i int, n int) Service {
 		}
 	}
 
-	service.Logging = defaultLokiLoggingOptions(container.Role.String(), i)
+	service.Logging = defaultLokiLoggingOptions(container.Role.String(), i+1)
 
 	return service
 }
@@ -580,6 +580,7 @@ func prepareServiceDiscovery(containers []testnet.ContainerConfig) PrometheusSer
 
 	sd := PrometheusServiceDiscovery{}
 	for _, container := range containers {
+		counters[container.Role]++
 		pt := PrometheusTarget{
 			Targets: []string{net.JoinHostPort(container.ContainerName, strconv.Itoa(MetricsPort))},
 			Labels: map[string]string{
@@ -589,7 +590,6 @@ func prepareServiceDiscovery(containers []testnet.ContainerConfig) PrometheusSer
 				"num":     fmt.Sprintf("%03d", counters[container.Role]),
 			},
 		}
-		counters[container.Role]++
 		sd = append(sd, pt)
 	}
 
