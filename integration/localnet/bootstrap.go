@@ -569,7 +569,7 @@ func writeDockerComposeConfig(services Services) error {
 // PrometheusServiceDiscovery is a list of prometheus targets
 type PrometheusServiceDiscovery []PrometheusTarget
 
-// PrometheusTargetList is a set
+// PrometheusTargetList defines addresses and labels for a prometheus target
 type PrometheusTarget struct {
 	Targets []string          `json:"targets"`
 	Labels  map[string]string `json:"labels"`
