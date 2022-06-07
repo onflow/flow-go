@@ -110,7 +110,7 @@ func (a *AttackNetwork) start(ctx irrecoverable.SignalerContext, address string)
 	}
 	a.server = s
 	a.address = ln.Addr().String()
-	fmt.Printf("attackNetwork>start>a.address=%s\n", a.address)
+	fmt.Printf("attackNetwork>start>a.address (before dockerRuntime check)=%s\n", a.address)
 	if a.rt == dockerRuntime {
 		fmt.Printf("attackNetwork>start>a.rt == dockerRuntime\n")
 		// since corrupted nodes are running on docker, attacker registers itself
@@ -121,8 +121,8 @@ func (a *AttackNetwork) start(ctx irrecoverable.SignalerContext, address string)
 		if err != nil {
 			return fmt.Errorf("could not split host and port for address: %s", a.address)
 		}
-		a.address = fmt.Sprintf("%s:%s", dockerLocalHost, port)
-		fmt.Printf("attackNetwork>start>a.address=%s\n", a.address)
+		//a.address = fmt.Sprintf("%s:%s", dockerLocalHost, port)
+		fmt.Printf("attackNetwork>start>a.address (within dockerRuntime check)=%s\n", a.address)
 	}
 
 	fmt.Printf("attackNetwork>start>about to a.corruptedConnector.WithAttackerAddress(%s)\n", a.address)
