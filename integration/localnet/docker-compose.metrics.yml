@@ -27,6 +27,11 @@ services:
     ports:
       - 9090:9090
 
+  pushgateway:
+    image: prom/pushgateway:v1.4.3
+    ports:
+      - 9091:9091
+
   exporter:
     image: prom/node-exporter:v1.3.1
     ports:
