@@ -68,12 +68,12 @@ prec_st* init_precomputed_data_BLS12_381() {
     // (p-1)/2
     fp_read_raw(bls_prec->fp_p_1div2, fp_p_1div2_data);
     // Z
-    fp_set_dig(bls_prec->z, z_data);
+    fp_copy(bls_prec->z, ctx->ep_map_u);
     // sqrt(-Z)
     fp_read_raw(bls_prec->sqrt_z, sqrt_z_data);
     // -a1 and a1*z
     fp_neg(bls_prec->minus_a1, ctx->ep_iso.a);
-    fp_neg(bls_prec->a1z, ctx->ep_iso.a);
+    fp_mul(bls_prec->a1z, ctx->ep_iso.a, ctx->ep_map_u);
     
     for (int i=0; i<ELLP_Nx_LEN; i++)  
         fp_read_raw(bls_prec->iso_Nx[i], iso_Nx_data[i]);

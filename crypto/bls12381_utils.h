@@ -59,7 +59,6 @@ typedef struct prec_ {
     // constants needed in optimized SSWU
     bn_st p_3div4;
     fp_st fp_p_1div2; 
-    fp_st z;
     fp_st sqrt_z;
     // related hardcoded constants for faster access,
     // where a1 is the coefficient of isogenous curve E1

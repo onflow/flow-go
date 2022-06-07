@@ -12,8 +12,6 @@ const uint64_t p_3div4_data[Fp_DIGITS] = {
     0xD91DD2E13CE144AF, 0x92C6E9ED90D2EB35, 0x0680447A8E5FF9A6,
 };
 
-const uint64_t z_data = 11;
-
 const uint64_t sqrt_z_data[Fp_DIGITS] = {
     0xF37B0CED8FB71E24, 0xF02DC8A4535A8779, 0x732ED835F7EB14EA,
     0x524CA41ECB2BCE0D, 0x095E3801E90B5FC1, 0x0252AD055472A90E,
@@ -141,12 +139,13 @@ static inline void map_to_E1_osswu(ep_t p, const fp_t t) {
 
     // get the isogeny map coefficients
     ctx_t* ctx = core_get();
-    fp_t *a1 = &(ctx->ep_iso.a);
-    fp_t *b1 = &(ctx->ep_iso.b);
+    fp_t *a1 = &ctx->ep_iso.a;
+    fp_t *b1 = &ctx->ep_iso.b;
+    fp_t *z = &ctx->ep_map_u;
 
     // compute numerator and denominator of X0(t) = N / D
     fp_sqr(fp_tmp[1], t);                            // t^2
-    fp_mul(fp_tmp[1], fp_tmp[1], bls_prec->z);       // z * t^2
+    fp_mul(fp_tmp[1], fp_tmp[1], *z);                // z * t^2
     fp_sqr(fp_tmp[2], fp_tmp[1]);                    // z^2 * t^4
     fp_add(fp_tmp[2], fp_tmp[2], fp_tmp[1]);         // z * t^2 + z^2 * t^4   
     fp_add(fp_tmp[3], fp_tmp[2], bls_prec->r);       // z * t^2 + z^2 * t^4 + 1
@@ -259,16 +258,14 @@ static inline void eval_iso11(ep_t r, const ep_t  p) {
     fp_mul(fp_tmp[17], fp_tmp[18], fp_tmp[31]);     // Z^30
 
     // 
-    ctx_t* ctx = core_get();
-    const int deg_dy = ctx->ep_iso.deg_yd;
-    const int deg_dx = ctx->ep_iso.deg_xd;
-    //const int deg_ny = ctx->ep_iso.deg_yn;
-    //const int deg_nx = ctx->ep_iso.deg_xn;
+    iso_t iso = ep_curve_get_iso();
+    const int deg_dy = iso->deg_yd;
+    const int deg_dx = iso->deg_xd;
 
 
     // y = Ny/Dy
     // compute Dy
-    compute_map_zvals(ctx->ep_iso.yd, fp_tmp + 17, deg_dy, fp_tmp);     // k_(15-i) Z^(2i)
+    compute_map_zvals(iso->yd, fp_tmp + 17, deg_dy, fp_tmp);     // k_(15-i) Z^(2i)
     fp_add(fp_tmp[16], p->x, fp_tmp[deg_dy - 1]);        // X + k_14 Z^2 
     hornerPolynomial(fp_tmp[16], p->x, deg_dy - 2, fp_tmp);    // Horner for the rest
     fp_mul(fp_tmp[15], fp_tmp[16], fp_tmp[31]);                    // Dy * Z^2
@@ -283,7 +280,7 @@ static inline void eval_iso11(ep_t r, const ep_t  p) {
     
     // x = Nx/Dx
     // compute Dx
-    compute_map_zvals(ctx->ep_iso.xd, fp_tmp + 22, deg_dx, fp_tmp);         // k_(10-i) Z^(2i)
+    compute_map_zvals(iso->xd, fp_tmp + 22, deg_dx, fp_tmp);         // k_(10-i) Z^(2i)
     fp_add(fp_tmp[14], p->x, fp_tmp[deg_dx - 1]);  // X + k_9 Z^2 
     hornerPolynomial(fp_tmp[14], p->x, deg_dx - 2, fp_tmp);    // Horner for the rest
     fp_mul(fp_tmp[14], fp_tmp[14], fp_tmp[31]);                    // Dx * Z^2
