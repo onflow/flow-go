@@ -153,22 +153,27 @@ func (c *Container) Addr(portName string) string {
 // bindPort exposes the given container port and binds it to the given host port.
 // If no protocol is specified, assumes TCP.
 func (c *Container) bindPort(hostPort, containerPort string) {
-
+	fmt.Printf("container>bindPort>hostPort=%s, containerPort=%s", hostPort, containerPort)
 	// use TCP protocol if none specified
 	containerNATPort := nat.Port(containerPort)
+	fmt.Printf("container>bindPort>(before if) containerNATPort=%s", containerNATPort)
 	if containerNATPort.Proto() == "" {
 		containerNATPort = nat.Port(fmt.Sprintf("%s/tcp", containerPort))
+		fmt.Printf("container>bindPort>(inside if) containerNATPort=%s", containerNATPort)
 	}
 
 	if c.opts.Config.ExposedPorts == nil {
+		fmt.Printf("container>bindPort>opts.Config.ExposedPorts == nil")
 		c.opts.Config.ExposedPorts = nat.PortSet{
 			containerNATPort: {},
 		}
 	} else {
+		fmt.Printf("container>bindPort>c.opts.Config.ExposedPorts != nil")
 		c.opts.Config.ExposedPorts[containerNATPort] = struct{}{}
 	}
 
 	if c.opts.HostConfig.PortBindings == nil {
+		fmt.Printf("container>bindPort>c.opts.HostConfig.PortBindings == nil")
 		c.opts.HostConfig.PortBindings = nat.PortMap{
 			containerNATPort: []nat.PortBinding{
 				{
@@ -178,6 +183,7 @@ func (c *Container) bindPort(hostPort, containerPort string) {
 			},
 		}
 	} else {
+		fmt.Printf("container>bindPort>c.opts.HostConfig.PortBindings != nil")
 		c.opts.HostConfig.PortBindings[containerNATPort] = []nat.PortBinding{
 			{
 				HostIP:   "0.0.0.0",
@@ -185,7 +191,6 @@ func (c *Container) bindPort(hostPort, containerPort string) {
 			},
 		}
 	}
-
 }
 
 // AddFlag adds a command line flag to the container's startup command.
