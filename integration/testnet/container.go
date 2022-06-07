@@ -178,7 +178,7 @@ func (c *Container) bindPort(hostPort, containerPort string) {
 			containerNATPort: []nat.PortBinding{
 				{
 					//HostIP:   "0.0.0.0",
-					HostIP:   "172.17.0.1",
+					HostIP:   "172.18.0.1",
 					HostPort: hostPort,
 				},
 			},
@@ -188,7 +188,7 @@ func (c *Container) bindPort(hostPort, containerPort string) {
 		c.opts.HostConfig.PortBindings[containerNATPort] = []nat.PortBinding{
 			{
 				//HostIP:   "0.0.0.0",
-				HostIP:   "172.17.0.1",
+				HostIP:   "172.18.0.1",
 				HostPort: hostPort,
 			},
 		}
