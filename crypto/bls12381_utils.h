@@ -56,13 +56,17 @@ typedef uint8_t byte;
 // Structure of precomputed data
 typedef struct prec_ {
     #if (hashToPoint == LOCAL_SSWU)
-    // coefficients needed in optimized SSWU
+    // constants needed in optimized SSWU
     bn_st p_3div4;
     fp_st fp_p_1div2; 
+    fp_st z;
     fp_st sqrt_z;
     // coefficients of E1(Fp)
     fp_st a1;
-    fp_st b1; 
+    fp_st b1;
+    // related hardcoded constants for faster access
+    fp_st minus_a1;
+    fp_st a1z;
     // coefficients of the isogeny map
     fp_st iso_Nx[ELLP_Nx_LEN];
     fp_st iso_Dx[ELLP_Dx_LEN];
@@ -73,7 +77,9 @@ typedef struct prec_ {
     bn_st beta;
     bn_st z2_1_by3;
     #endif
+    // other field-related constants
     bn_st p_1div2;
+    fp_t r;   // Montgomery multiplication constant
 } prec_st;
 
 // BLS based SPoCK

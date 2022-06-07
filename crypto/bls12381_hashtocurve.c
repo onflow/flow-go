@@ -12,6 +12,8 @@ const uint64_t p_3div4_data[Fp_DIGITS] = {
     0xD91DD2E13CE144AF, 0x92C6E9ED90D2EB35, 0x0680447A8E5FF9A6,
 };
 
+const uint64_t z_data = 11;
+
 const uint64_t sqrt_z_data[Fp_DIGITS] = {
     0xF37B0CED8FB71E24, 0xF02DC8A4535A8779, 0x732ED835F7EB14EA,
     0x524CA41ECB2BCE0D, 0x095E3801E90B5FC1, 0x0252AD055472A90E,
@@ -204,145 +206,60 @@ static int sign_0(const fp_t in) {
 // using optimized non-constant-time Simplified SWU implementation (A.B = 0)
 // Outout point p is in Jacobian coordinates to avoid extra inversions.
 static inline void map_to_E1_osswu(ep_t p, const fp_t t) {
-    /*const int tmp_len = 6;
+    const int tmp_len = 5;
     fp_t* fp_tmp = (fp_t*) malloc(tmp_len*sizeof(fp_t));
     for (int i=0; i<tmp_len; i++) fp_new(fp_tmp[i]);
 
-    fp_t z;
-    fp_new(z);
-    // TODO : hardcode Montg(11) or replace by ctx->ep_map_u
-    fp_set_dig(z, 11);
-    //fp_neg(z,z);
-
     // compute numerator and denominator of X0(t) = N / D
-    fp_sqr(fp_tmp[1], t);                      // t^2
-    fp_mul(fp_tmp[1], fp_tmp[1], z);           // z * t^2
-    fp_sqr(fp_tmp[2], fp_tmp[1]);             // z^2 * t^4
-    fp_add(fp_tmp[2], fp_tmp[2], fp_tmp[1]);  // z * t^2 + z^2 * t^4  printed#1
-    // TODO : hardcode Montg(1)
-    fp_set_dig(fp_tmp[0], 1); 
-    fp_add(fp_tmp[3], fp_tmp[2], fp_tmp[0]);        // z * t^2 + z^2 * t^4 + 1
-    fp_mul(fp_tmp[3], fp_tmp[3], bls_prec->b1);     // N = b * (z * t^2 + z^2 * t^4 + 1)
+    fp_sqr(fp_tmp[1], t);                            // t^2
+    fp_mul(fp_tmp[1], fp_tmp[1], bls_prec->z);       // z * t^2
+    fp_sqr(fp_tmp[2], fp_tmp[1]);                    // z^2 * t^4
+    fp_add(fp_tmp[2], fp_tmp[2], fp_tmp[1]);         // z * t^2 + z^2 * t^4   
+    fp_add(fp_tmp[3], fp_tmp[2], bls_prec->r);       // z * t^2 + z^2 * t^4 + 1
+    fp_mul(fp_tmp[3], fp_tmp[3], bls_prec->b1);      // N = b * (z * t^2 + z^2 * t^4 + 1)
 
     if (fp_cmp_dig(fp_tmp[2], 0) == RLC_EQ) { 
-        printf("cmp == eq\n");
-        fp_mul(fp_tmp[4], z, bls_prec->a1);     // D = a * z
+        fp_copy(p->z, bls_prec->a1z);                // D = a * z
     } else {
-        printf("cmp != eq\n");
-        fp_neg(fp_tmp[4],fp_tmp[2]);
-        fp_mul(fp_tmp[4], fp_tmp[4], bls_prec->a1);     // D = - a * (z * t^2 + z^2 * t^4) 
+        fp_mul(p->z, fp_tmp[2], bls_prec->minus_a1); // D = - a * (z * t^2 + z^2 * t^4)
     }
 
     // compute numerator and denominator of g(X0(t)) = U / V 
     // U = N^3 + a1 * N * D^2 + b1 * D^3
     // V = D^3
     fp_sqr(fp_tmp[2], fp_tmp[3]);                        // N^2
-    fp_sqr(fp_tmp[6], fp_tmp[4]);                        // D^2
-    fp_mul(fp_tmp[5], bls_prec->a1, fp_tmp[6]);          // a * D^2
-    fp_add(fp_tmp[2], fp_tmp[5], fp_tmp[2]);             // N^2 + a * D^2
+    fp_sqr(fp_tmp[0], p->z);                             // D^2
+    fp_mul(fp_tmp[4], bls_prec->a1, fp_tmp[0]);          // a * D^2
+    fp_add(fp_tmp[2], fp_tmp[4], fp_tmp[2]);             // N^2 + a * D^2
     fp_mul(fp_tmp[2], fp_tmp[3], fp_tmp[2]);             // N^3 + a * N * D^2
-    fp_mul(fp_tmp[6], fp_tmp[6], fp_tmp[4]);             // V  =  D^3
-    fp_mul(fp_tmp[5], bls_prec->b1, fp_tmp[6]);          // b * D^3
-    fp_add(fp_tmp[2], fp_tmp[5], fp_tmp[2]);             // U
+    fp_mul(fp_tmp[0], fp_tmp[0], p->z);                  // V  =  D^3
+    fp_mul(fp_tmp[4], bls_prec->b1, fp_tmp[0]);          // b * D^3
+    fp_add(fp_tmp[2], fp_tmp[4], fp_tmp[2]);             // U
 
-    fp_t *x,*y;
     // compute sqrt(U/V)
-    if (sqrt_ratio_3mod4(fp_tmp[5], fp_tmp[2], fp_tmp[6])) {
-        printf("sqrt\n");
-        x = &fp_tmp[3];       // x = N
-        y = &fp_tmp[5];       // y = sqrt(U/V)
-    } else {
-        printf("!sqrt\n");
-        fp_mul(fp_tmp[0], fp_tmp[1], fp_tmp[3]);            // x = z * t^2 * N
-        fp_mul(fp_tmp[1], fp_tmp[1], t);                    // z * t^3
-        fp_mul(fp_tmp[1], fp_tmp[1], fp_tmp[5]);            // y = z * t^3 * sqrtCand
-        x = &fp_tmp[0];
-        y = &fp_tmp[1];
-    }
-
-    // negate y to be opposite sign of t
-    if (sign_0(t) == sign_0(*y)) {
-            printf("sign == sign\n");
-            fp_neg(*y, *y);
-    }
-
-    // convert (x/D, y) into Jacobian (X,Y,Z) where Z=D
-    // Z = D, X = x/D * D^2 = x*D , Y = y*D^3  // TODO : check
-    fp_mul(p->x, *x, fp_tmp[4]);             // X = N*D
-    fp_mul(p->y, *y, fp_tmp[6]);            // Y = y*D^3
-    fp_copy(p->z, fp_tmp[4]);
-    p->coord = JACOB;*/
-
-    const int tmp_len = 7;
-    fp_t* fp_tmp = (fp_t*) malloc(tmp_len*sizeof(fp_t));
-    for (int i=0; i<tmp_len; i++) fp_new(fp_tmp[i]);
-
-    fp_t *y1;
-    y1 = &fp_tmp[0];
-
-    fp_t z;
-    fp_new(z);
-    // TODO : hardcode Montg(11) or replace by ctx->ep_map_u
-    fp_set_dig(z, 11);
-
-    // compute numerator and denominator of X0(t) = N / D
-    fp_sqr(fp_tmp[1], t);                      // t^2
-    fp_mul(fp_tmp[1], fp_tmp[1], z);           // z * t^2
-    fp_sqr(fp_tmp[2], fp_tmp[1]);             // z^2 * t^4
-    fp_add(fp_tmp[2], fp_tmp[2], fp_tmp[1]);  // z * t^2 + z^2 * t^4  printed#1
-    // TODO : hardcode Montg(1)
-    fp_set_dig(fp_tmp[0], 1);  
-    fp_add(fp_tmp[3], fp_tmp[2], fp_tmp[0]);        // z * t^2 + z^2 * t^4 + 1
-    fp_mul(fp_tmp[3], fp_tmp[3], bls_prec->b1);     // N = b * (z * t^2 + z^2 * t^4 + 1)
-
-    if (!(fp_cmp_dig(fp_tmp[2], 0) != RLC_EQ)) { 
-        fp_copy(fp_tmp[4], z);
-    } else {
-        fp_neg(fp_tmp[4],fp_tmp[2]);  // TODO: haardcode -a ?
-    }
-    fp_mul(fp_tmp[4], fp_tmp[4], bls_prec->a1);     // D = a * z
-
-    // compute numerator and denominator of g(X0(t)) = U / V 
-    // U = N^3 + a1 * N * D^2 + b1 * D^3
-    // V = D^3
-    fp_sqr(fp_tmp[2], fp_tmp[3]);                        // N^2
-    fp_sqr(fp_tmp[6], fp_tmp[4]);                        // D^2
-    fp_mul(fp_tmp[5], bls_prec->a1, fp_tmp[6]);          // a * D^2
-    fp_add(fp_tmp[2], fp_tmp[5], fp_tmp[2]);             // N^2 + a * D^2
-    fp_mul(fp_tmp[2], fp_tmp[3], fp_tmp[2]);             // N^3 + a * N * D^2
-    fp_mul(fp_tmp[6], fp_tmp[6], fp_tmp[4]);             // V  =  D^3
-    fp_mul(fp_tmp[5], bls_prec->b1, fp_tmp[6]);          // b * D^3
-    fp_add(fp_tmp[2], fp_tmp[5], fp_tmp[2]);             // U
-
-    fp_mul(p->x, fp_tmp[1], fp_tmp[3]);
-    // compute sqrt(U/V)
-    
-    int is_sqr = sqrt_ratio_3mod4(*y1, fp_tmp[2], fp_tmp[6]);
-    fp_mul(p->y, fp_tmp[1], t); 
-    fp_mul(p->y, p->y, *y1); 
-
-    if (!is_sqr) {
-    } else {
+    int is_sqr = sqrt_ratio_3mod4(p->y, fp_tmp[2], fp_tmp[0]);
+    if (is_sqr) {
         fp_copy(p->x, fp_tmp[3]);
-        fp_copy(p->y, *y1);
+    } else {
+        fp_mul(p->x, fp_tmp[1], fp_tmp[3]);
+        fp_mul(fp_tmp[1], fp_tmp[1], t); 
+        fp_mul(p->y, p->y, fp_tmp[1]);
     }
 
-    // negate y to be opposite sign of t
-    if (!(sign_0(t) == sign_0(p->y))) {
+    // negate y to be the same sign of t
+    if (sign_0(t) != sign_0(p->y)) {
         fp_neg(p->y, p->y);
     }
 
-    // convert (x/D, y) into Jacobian (X,Y,Z) where Z=D
-    // Z = D, X = x/D * D^2 = x*D , Y = y*D^3  // TODO : check
-    fp_mul(p->x, p->x, fp_tmp[4]);             // X = N*D
-    fp_mul(p->y, p->y, fp_tmp[6]);            // Y = y*D^3
-    fp_copy(p->z, fp_tmp[4]);
+    // convert (x/D, y) into Jacobian (X,Y,Z) where Z=D to avoid inversion.
+    // Z = D, X = x/D * D^2 = x*D , Y = y*D^3  
+    fp_mul(p->x, p->x, p->z);             // X = N*D
+    fp_mul(p->y, p->y, fp_tmp[0]);        // Y = y*D^3
+    // p->z is already equal to D 
     p->coord = JACOB;
 
-    
     for (int i=0; i<tmp_len; i++) fp_free(fp_tmp[i]);
     fp_free(fp_tmp);
-    fp_free(z);
 }
 
 // This code is taken from https://github.com/kwantam/bls12-381_hash 
