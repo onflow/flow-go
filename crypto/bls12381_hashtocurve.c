@@ -26,21 +26,6 @@ const uint64_t fp_p_1div2_data[Fp_DIGITS] = {
     0xf6547998c1995dbd, 0x778a468f507a6034, 0x020559931f7f8103,
 };
 
-// Isogeny map constants taken from https://eprint.iacr.org/2019/403.pdf (section 4.3)
-// and converted to the Mongtomery domain.
-const uint64_t a1_data[Fp_DIGITS] = { 
-    // TODO: replace by ctx->ep_a? or	ctx->ep_map_c[3]?
-    0x2f65aa0e9af5aa51, 0x86464c2d1e8416c3, 0xb85ce591b7bd31e2,
-    0x27e11c91b5f24e7c, 0x28376eda6bfc1835, 0x155455c3e5071d85,
-};
-
-
-const uint64_t b1_data[Fp_DIGITS] = {  
-    // TODO: replace by ctx->ep_b? 	or	ctx->ep_map_c[3]?
-    0xfb996971fe22a1e0, 0x9aa93eb35b742d6f, 0x8c476013de99c5c4,
-    0x873e27c3a221e571, 0xca72b5e45a52d888, 0x06824061418a386b,
-};
-
 
 // These constants are taken from https://github.com/kwantam/bls12-381_hash 
 // and converted to the Mongtomery domain. 
@@ -70,29 +55,6 @@ const uint64_t iso_Nx_data[ELLP_Nx_LEN][Fp_DIGITS] = {
      0xe4efd1ad3f767ceb, 0x4a51d8667f0fe1cf, 0x054fdf4bbf1d821c,},
     {0x72db2a50658d767b, 0x8abf91faa257b3d5, 0xe969d6833764ab47,
      0x464170142a1009eb, 0xb14f01aadb30be2f, 0x18ae6a856f40715d,},
-};
-
-const uint64_t iso_Dx_data[ELLP_Dx_LEN][Fp_DIGITS] = {
-    {0xb962a077fdb0f945, 0xa6a9740fefda13a0, 0xc14d568c3ed6c544,
-     0xb43fc37b908b133e, 0x9c0b3ac929599016, 0x0165aa6c93ad115f,},
-    {0x23279a3ba506c1d9, 0x92cfca0a9465176a, 0x3b294ab13755f0ff,
-     0x116dda1c5070ae93, 0xed4530924cec2045, 0x083383d6ed81f1ce,},
-    {0x9885c2a6449fecfc, 0x4a2b54ccd37733f0, 0x17da9ffd8738c142,
-     0xa0fba72732b3fafd, 0xff364f36e54b6812, 0x0f29c13c660523e2,},
-    {0xe349cc118278f041, 0xd487228f2f3204fb, 0xc9d325849ade5150,
-     0x43a92bd69c15c2df, 0x1c2c7844bc417be4, 0x12025184f407440c,},
-    {0x587f65ae6acb057b, 0x1444ef325140201f, 0xfbf995e71270da49,
-     0xccda066072436a42, 0x7408904f0f186bb2, 0x13b93c63edf6c015,},
-    {0xfb918622cd141920, 0x4a4c64423ecaddb4, 0x0beb232927f7fb26,
-     0x30f94df6f83a3dc2, 0xaeedd424d780f388, 0x06cc402dd594bbeb,},
-    {0xd41f761151b23f8f, 0x32a92465435719b3, 0x64f436e888c62cb9,
-     0xdf70a9a1f757c6e4, 0x6933a38d5b594c81, 0x0c6f7f7237b46606,},
-    {0x693c08747876c8f7, 0x22c9850bf9cf80f0, 0x8e9071dab950c124,
-     0x89bc62d61c7baf23, 0xbc6be2d8dad57c23, 0x17916987aa14a122,},
-    {0x1be3ff439c1316fd, 0x9965243a7571dfa7, 0xc7f7f62962f5cd81,
-     0x32c6aa9af394361c, 0xbbc2ee18e1c227f4, 0x0c102cbac531bb34,},
-    {0x997614c97bacbf07, 0x61f86372b99192c0, 0x5b8c95fc14353fc3,
-     0xca2b066c2a87492f, 0x16178f5bbf698711, 0x12a6dcd7f0f4e0e8,},
 };
 
 const uint64_t iso_Ny_data[ELLP_Ny_LEN][Fp_DIGITS] = {
@@ -128,39 +90,6 @@ const uint64_t iso_Ny_data[ELLP_Ny_LEN][Fp_DIGITS] = {
      0xa06731f1d2bbe1ee, 0x07f897e267a33f1b, 0x1017290919210e5f,},
     {0x872aa6c17d985097, 0xeecc53161264562a, 0x07afe37afff55002,
      0x54759078e5be6838, 0xc4b92d15db8acca8, 0x106d87d1b51d13b9,},
-};
-
-const uint64_t iso_Dy_data[ELLP_Dy_LEN][Fp_DIGITS] = {
-    {0xeb6c359d47e52b1c, 0x18ef5f8a10634d60, 0xddfa71a0889d5b7e,
-     0x723e71dcc5fc1323, 0x52f45700b70d5c69, 0x0a8b981ee47691f1,},
-    {0x616a3c4f5535b9fb, 0x6f5f037395dbd911, 0xf25f4cc5e35c65da,
-     0x3e50dffea3c62658, 0x6a33dca523560776, 0x0fadeff77b6bfe3e,},
-    {0x2be9b66df470059c, 0x24a2c159a3d36742, 0x115dbe7ad10c2a37,
-     0xb6634a652ee5884d, 0x04fe8bb2b8d81af4, 0x01c2a7a256fe9c41,},
-    {0xf27bf8ef3b75a386, 0x898b367476c9073f, 0x24482e6b8c2f4e5f,
-     0xc8e0bbd6fe110806, 0x59b0c17f7631448a, 0x11037cd58b3dbfbd,},
-    {0x31c7912ea267eec6, 0x1dbf6f1c5fcdb700, 0xd30d4fe3ba86fdb1,
-     0x3cae528fbee9a2a4, 0xb1cce69b6aa9ad9a, 0x044393bb632d94fb,},
-    {0xc66ef6efeeb5c7e8, 0x9824c289dd72bb55, 0x71b1a4d2f119981d,
-     0x104fc1aafb0919cc, 0x0e49df01d942a628, 0x096c3a09773272d4,},
-    {0x9abc11eb5fadeff4, 0x32dca50a885728f0, 0xfb1fa3721569734c,
-     0xc4b76271ea6506b3, 0xd466a75599ce728e, 0x0c81d4645f4cb6ed,},
-    {0x4199f10e5b8be45b, 0xda64e495b1e87930, 0xcb353efe9b33e4ff,
-     0x9e9efb24aa6424c6, 0xf08d33680a237465, 0x0d3378023e4c7406,},
-    {0x7eb4ae92ec74d3a5, 0xc341b4aa9fac3497, 0x5be603899e907687,
-     0x03bfd9cca75cbdeb, 0x564c2935a96bfa93, 0x0ef3c33371e2fdb5,},
-    {0x7ee91fd449f6ac2e, 0xe5d5bd5cb9357a30, 0x773a8ca5196b1380,
-     0xd0fda172174ed023, 0x6cb95e0fa776aead, 0x0d22d5a40cec7cff,},
-    {0xf727e09285fd8519, 0xdc9d55a83017897b, 0x7549d8bd057894ae,
-     0x178419613d90d8f8, 0xfce95ebdeb5b490a, 0x0467ffaef23fc49e,},
-    {0xc1769e6a7c385f1b, 0x79bc930deac01c03, 0x5461c75a23ede3b5,
-     0x6e20829e5c230c45, 0x828e0f1e772a53cd, 0x116aefa749127bff,},
-    {0x101c10bf2744c10a, 0xbbf18d053a6a3154, 0xa0ecf39ef026f602,
-     0xfc009d4996dc5153, 0xb9000209d5bd08d3, 0x189e5fe4470cd73c,},
-    {0x7ebd546ca1575ed2, 0xe47d5a981d081b55, 0x57b2b625b6d4ca21,
-     0xb0a1ba04228520cc, 0x98738983c2107ff3, 0x13dddbc4799d81d6,},
-    {0x09319f2e39834935, 0x039e952cbdb05c21, 0x55ba77a9a2f76493,
-     0xfd04e3dfc6086467, 0xfb95832e7d78742e, 0x0ef9c24eccaf5e0e,},
 };
 
 // sqrt_ration optimized for p mod 4 = 3.
@@ -210,15 +139,20 @@ static inline void map_to_E1_osswu(ep_t p, const fp_t t) {
     fp_t* fp_tmp = (fp_t*) malloc(tmp_len*sizeof(fp_t));
     for (int i=0; i<tmp_len; i++) fp_new(fp_tmp[i]);
 
+    // get the isogeny map coefficients
+    ctx_t* ctx = core_get();
+    fp_t *a1 = &(ctx->ep_iso.a);
+    fp_t *b1 = &(ctx->ep_iso.b);
+
     // compute numerator and denominator of X0(t) = N / D
     fp_sqr(fp_tmp[1], t);                            // t^2
     fp_mul(fp_tmp[1], fp_tmp[1], bls_prec->z);       // z * t^2
     fp_sqr(fp_tmp[2], fp_tmp[1]);                    // z^2 * t^4
     fp_add(fp_tmp[2], fp_tmp[2], fp_tmp[1]);         // z * t^2 + z^2 * t^4   
     fp_add(fp_tmp[3], fp_tmp[2], bls_prec->r);       // z * t^2 + z^2 * t^4 + 1
-    fp_mul(fp_tmp[3], fp_tmp[3], bls_prec->b1);      // N = b * (z * t^2 + z^2 * t^4 + 1)
-
-    if (fp_cmp_dig(fp_tmp[2], 0) == RLC_EQ) { 
+    fp_mul(fp_tmp[3], fp_tmp[3], *b1);      // N = b * (z * t^2 + z^2 * t^4 + 1)
+ 
+    if (fp_is_zero(fp_tmp[2])) {
         fp_copy(p->z, bls_prec->a1z);                // D = a * z
     } else {
         fp_mul(p->z, fp_tmp[2], bls_prec->minus_a1); // D = - a * (z * t^2 + z^2 * t^4)
@@ -229,11 +163,11 @@ static inline void map_to_E1_osswu(ep_t p, const fp_t t) {
     // V = D^3
     fp_sqr(fp_tmp[2], fp_tmp[3]);                        // N^2
     fp_sqr(fp_tmp[0], p->z);                             // D^2
-    fp_mul(fp_tmp[4], bls_prec->a1, fp_tmp[0]);          // a * D^2
+    fp_mul(fp_tmp[4], *a1, fp_tmp[0]);          // a * D^2
     fp_add(fp_tmp[2], fp_tmp[4], fp_tmp[2]);             // N^2 + a * D^2
     fp_mul(fp_tmp[2], fp_tmp[3], fp_tmp[2]);             // N^3 + a * N * D^2
     fp_mul(fp_tmp[0], fp_tmp[0], p->z);                  // V  =  D^3
-    fp_mul(fp_tmp[4], bls_prec->b1, fp_tmp[0]);          // b * D^3
+    fp_mul(fp_tmp[4], *b1, fp_tmp[0]);          // b * D^3
     fp_add(fp_tmp[2], fp_tmp[4], fp_tmp[2]);             // U
 
     // compute sqrt(U/V)
@@ -324,11 +258,19 @@ static inline void eval_iso11(ep_t r, const ep_t  p) {
     fp_sqr(fp_tmp[18], fp_tmp[25]);                 // Z^28
     fp_mul(fp_tmp[17], fp_tmp[18], fp_tmp[31]);     // Z^30
 
+    // 
+    ctx_t* ctx = core_get();
+    const int deg_dy = ctx->ep_iso.deg_yd;
+    const int deg_dx = ctx->ep_iso.deg_xd;
+    //const int deg_ny = ctx->ep_iso.deg_yn;
+    //const int deg_nx = ctx->ep_iso.deg_xn;
+
+
     // y = Ny/Dy
     // compute Dy
-    compute_map_zvals(bls_prec->iso_Dy, fp_tmp + 17, ELLP_Dy_LEN, fp_tmp);     // k_(15-i) Z^(2i)
-    fp_add(fp_tmp[16], p->x, fp_tmp[ELLP_Dy_LEN - 1]);        // X + k_14 Z^2 
-    hornerPolynomial(fp_tmp[16], p->x, ELLP_Dy_LEN - 2, fp_tmp);    // Horner for the rest
+    compute_map_zvals(ctx->ep_iso.yd, fp_tmp + 17, deg_dy, fp_tmp);     // k_(15-i) Z^(2i)
+    fp_add(fp_tmp[16], p->x, fp_tmp[deg_dy - 1]);        // X + k_14 Z^2 
+    hornerPolynomial(fp_tmp[16], p->x, deg_dy - 2, fp_tmp);    // Horner for the rest
     fp_mul(fp_tmp[15], fp_tmp[16], fp_tmp[31]);                    // Dy * Z^2
     fp_mul(fp_tmp[15], fp_tmp[15], p->z);                           // Dy * Z^3
 
@@ -341,9 +283,9 @@ static inline void eval_iso11(ep_t r, const ep_t  p) {
     
     // x = Nx/Dx
     // compute Dx
-    compute_map_zvals(bls_prec->iso_Dx, fp_tmp + 22, ELLP_Dx_LEN, fp_tmp);         // k_(10-i) Z^(2i)
-    fp_add(fp_tmp[14], p->x, fp_tmp[ELLP_Dx_LEN - 1]);  // X + k_9 Z^2 
-    hornerPolynomial(fp_tmp[14], p->x, ELLP_Dx_LEN - 2, fp_tmp);    // Horner for the rest
+    compute_map_zvals(ctx->ep_iso.xd, fp_tmp + 22, deg_dx, fp_tmp);         // k_(10-i) Z^(2i)
+    fp_add(fp_tmp[14], p->x, fp_tmp[deg_dx - 1]);  // X + k_9 Z^2 
+    hornerPolynomial(fp_tmp[14], p->x, deg_dx - 2, fp_tmp);    // Horner for the rest
     fp_mul(fp_tmp[14], fp_tmp[14], fp_tmp[31]);                    // Dx * Z^2
 
     // compute Nx

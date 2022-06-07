@@ -61,17 +61,13 @@ typedef struct prec_ {
     fp_st fp_p_1div2; 
     fp_st z;
     fp_st sqrt_z;
-    // coefficients of E1(Fp)
-    fp_st a1;
-    fp_st b1;
-    // related hardcoded constants for faster access
+    // related hardcoded constants for faster access,
+    // where a1 is the coefficient of isogenous curve E1
     fp_st minus_a1;
     fp_st a1z;
     // coefficients of the isogeny map
     fp_st iso_Nx[ELLP_Nx_LEN];
-    fp_st iso_Dx[ELLP_Dx_LEN];
     fp_st iso_Ny[ELLP_Ny_LEN];
-    fp_st iso_Dy[ELLP_Dy_LEN];
     #endif
     #if  (MEMBERSHIP_CHECK_G1 == BOWE)
     bn_st beta;
