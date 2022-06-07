@@ -27,17 +27,17 @@ func NewSealedBlockHeaderReader(state protocol.State, headers storage.Headers) *
 func (r SealedBlockHeaderReader) AtIndex(index uint64) (module.Job, error) {
 	sealed, err := r.Head()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get last sealed block height: %w", err)
+		return nil, fmt.Errorf("could not get last sealed block height: %w", err)
 	}
 
 	if index > sealed {
 		// return not found error to indicate there is no job available at this height
-		return nil, fmt.Errorf("block at index %v is not sealed: %w", index, storage.ErrNotFound)
+		return nil, fmt.Errorf("block at index %d is not sealed: %w", index, storage.ErrNotFound)
 	}
 
 	header, err := r.headers.ByHeight(index)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get block by height %v: %w", index, err)
+		return nil, fmt.Errorf("could not get block by height %d: %w", index, err)
 	}
 
 	// the block at height index is sealed
@@ -48,7 +48,7 @@ func (r SealedBlockHeaderReader) AtIndex(index uint64) (module.Job, error) {
 func (r SealedBlockHeaderReader) Head() (uint64, error) {
 	header, err := r.state.Sealed().Head()
 	if err != nil {
-		return 0, fmt.Errorf("failed to get header of last sealed block: %w", err)
+		return 0, fmt.Errorf("could not get header of last sealed block: %w", err)
 	}
 
 	return header.Height, nil
