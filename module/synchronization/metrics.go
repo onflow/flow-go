@@ -54,12 +54,14 @@ func NewMetricsCollector() *MetricsCollector {
 			Namespace: namespaceSynchronization,
 			Subsystem: subsystemSyncCore,
 			Help:      "the time between queueing and pruning a block in milliseconds",
+			Buckets:   []float64{100, 250, 500, 1000, 2500, 5000, 7500, 10000, 20000},
 		}, []string{"status", "requested_by"}),
 		timeToReceived: prometheus.NewHistogramVec(prometheus.HistogramOpts{
 			Name:      "time_to_received",
 			Namespace: namespaceSynchronization,
 			Subsystem: subsystemSyncCore,
 			Help:      "the time between queueing and receiving a block in milliseconds",
+			Buckets:   []float64{100, 250, 500, 1000, 2500, 5000, 7500, 10000, 20000},
 		}, []string{"requested_by"}),
 		totalPruned: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name:      "total_blocks_pruned",
