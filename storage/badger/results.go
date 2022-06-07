@@ -20,6 +20,8 @@ type ExecutionResults struct {
 	cache *Cache
 }
 
+var _ storage.ExecutionResults = (*ExecutionResults)(nil)
+
 func NewExecutionResults(collector module.CacheMetrics, db *badger.DB) *ExecutionResults {
 
 	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
