@@ -53,16 +53,16 @@ func NewMetricsCollector() *MetricsCollector {
 			Name:      "time_to_pruned",
 			Namespace: namespaceSynchronization,
 			Subsystem: subsystemSyncCore,
-			Help:      "the time between queueing and pruning a block in seconds",
+			Help:      "the time between queueing and pruning a block in milliseconds",
 		}, []string{"status", "requested_by"}),
 		timeToReceived: prometheus.NewHistogramVec(prometheus.HistogramOpts{
 			Name:      "time_to_received",
 			Namespace: namespaceSynchronization,
 			Subsystem: subsystemSyncCore,
-			Help:      "the time between queueing and receiving a block in seconds",
+			Help:      "the time between queueing and receiving a block in milliseconds",
 		}, []string{"requested_by"}),
 		totalPruned: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Name:      "total_pruned",
+			Name:      "total_blocks_pruned",
 			Namespace: namespaceSynchronization,
 			Subsystem: subsystemSyncCore,
 			Help:      "the total number of blocks pruned by 'id' or 'height'",
@@ -83,7 +83,7 @@ func NewMetricsCollector() *MetricsCollector {
 			Name:      "total_heights_requested",
 			Namespace: namespaceSynchronization,
 			Subsystem: subsystemSyncCore,
-			Help:      "the total number of blocks requested by height",
+			Help:      "the total number of blocks requested by height. range of 0-10 would increase the counter by 10",
 		}),
 		totalIdsRequested: prometheus.NewCounter(prometheus.CounterOpts{
 			Name:      "total_ids_requested",
@@ -106,12 +106,12 @@ func (s *MetricsCollector) prunedBlock(status *Status, requestedBy string) {
 	str := strings.ToLower(status.StatusString())
 
 	// measure the time-to-pruned
-	pruned := time.Since(status.Queued).Seconds()
+	pruned := float64(time.Since(status.Queued).Milliseconds())
 	s.timeToPruned.With(prometheus.Labels{"status": str, "requested_by": requestedBy}).Observe(pruned)
 
 	if status.WasReceived() {
 		// measure the time-to-received
-		received := status.Received.Sub(status.Queued).Seconds()
+		received := float64(status.Received.Sub(status.Queued).Milliseconds())
 		s.timeToReceived.With(prometheus.Labels{"requested_by": requestedBy}).Observe(received)
 	}
 }
