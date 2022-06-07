@@ -2,6 +2,7 @@ package dns
 
 import (
 	"context"
+	"log"
 	"net"
 	"sync"
 	"time"
@@ -169,6 +170,8 @@ func (r *Resolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAdd
 func (r *Resolver) lookupIPAddr(ctx context.Context, domain string) ([]net.IPAddr, error) {
 	addr, exists, fresh := r.c.resolveIPCache(domain)
 
+	log.Printf("Cache Status domain: %s exists: %t fresh: %t", domain, exists, fresh)
+
 	if !exists {
 		r.collector.OnDNSCacheMiss()
 		return r.lookupResolverForIPAddr(ctx, domain)
@@ -217,6 +220,7 @@ func (r *Resolver) LookupTXT(ctx context.Context, txt string) ([]string, error) 
 // lookupIPAddr encapsulates the logic of resolving a txt through cache.
 func (r *Resolver) lookupTXT(ctx context.Context, txt string) ([]string, error) {
 	addr, exists, fresh := r.c.resolveTXTCache(txt)
+	log.Printf("Cache Status txt: %s exists: %t fresh: %t", txt, exists, fresh)
 
 	if !exists {
 		r.collector.OnDNSCacheMiss()
