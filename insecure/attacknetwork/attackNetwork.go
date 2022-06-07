@@ -101,51 +101,69 @@ func (a *AttackNetwork) start(ctx irrecoverable.SignalerContext, address string)
 	// starts up gRPC server of attack network at given address.
 	s := grpc.NewServer()
 	insecure.RegisterAttackerServer(s, a)
+	fmt.Printf("attackNetwork>start>about to net.Listen on address: %s\n", address)
 	ln, err := net.Listen(networkingProtocolTCP, address)
+	fmt.Printf("attackNetwork>start>called net.Listen()\n")
 	if err != nil {
+		fmt.Printf("attackNetwork>start>err != nil")
 		ctx.Throw(fmt.Errorf("could not listen on specified address: %w", err))
 	}
 	a.server = s
 	a.address = ln.Addr().String()
-
+	fmt.Printf("attackNetwork>start>a.address=%s\n", a.address)
 	if a.rt == dockerRuntime {
+		fmt.Printf("attackNetwork>start>a.rt == dockerRuntime\n")
 		// since corrupted nodes are running on docker, attacker registers itself
 		// with a docker local host address, hence being reachable from internal docker
 		// network.
 		_, port, err := net.SplitHostPort(a.address)
+		fmt.Printf("attackNetwork>start>port=%s\n", port)
 		if err != nil {
 			return fmt.Errorf("could not split host and port for address: %s", a.address)
 		}
 		a.address = fmt.Sprintf("%s:%s", dockerLocalHost, port)
+		fmt.Printf("attackNetwork>start>a.address=%s\n", a.address)
 	}
 
+	fmt.Printf("attackNetwork>start>about to a.corruptedConnector.WithAttackerAddress(%s)\n", a.address)
 	a.corruptedConnector.WithAttackerAddress(a.address)
 
+	fmt.Printf("attackNetwork>start>about to create wait group\n")
 	wg := sync.WaitGroup{}
+	fmt.Printf("attackNetwork>start>about to wg.Add(1)\n")
 	wg.Add(1)
+	fmt.Printf("attackNetwork>start>about to call goroutine\n")
 	go func() {
+		fmt.Printf("attackNetwork>start>go func()>about to wg.Done()\n")
 		wg.Done()
+		fmt.Printf("attackNetwork>start>go func()>about to s.Serve(ln) - blocking call\n")
 		if err = s.Serve(ln); err != nil { // blocking call
 			ctx.Throw(fmt.Errorf("could not bind attackNetwork to the tcp listener: %w", err))
 		}
+		fmt.Printf("attackNetwork>start>go func()>about return from s.Server(ln)\n")
 	}()
 
+	fmt.Printf("attackNetwork>start>about to wg.Wait()\n")
 	// waits till gRPC server starts serving.
 	wg.Wait()
 
+	fmt.Printf("attackNetwork>start>finished wg.Wait()\n")
 	// creates a connection to all corrupted nodes in the attack network.
 	for _, corruptedNodeId := range a.corruptedNodeIds {
+		fmt.Printf("attackNetwork>start>connecting to corrupted node ID %s\n", corruptedNodeId.NodeID.String())
 		connection, err := a.corruptedConnector.Connect(ctx, corruptedNodeId.NodeID)
 		if err != nil {
 			return fmt.Errorf("could not establish corruptible connection to node %x: %w", corruptedNodeId.NodeID, err)
 		}
+		fmt.Printf("attackNetwork>start>adding connection to map; corruptedNodeId.NodeID=%s\n", corruptedNodeId.NodeID.String())
 		a.corruptedConnections[corruptedNodeId.NodeID] = connection
 		a.logger.Info().Hex("node_id", logging.ID(corruptedNodeId.NodeID)).Msg("attacker successfully registered on corrupted node")
 	}
 
+	fmt.Printf("attackNetwork>start>about to a.orchestrator.WithAttackNetwork(a)\n")
 	// registers attack network for orchestrator.
 	a.orchestrator.WithAttackNetwork(a)
-
+	fmt.Printf("attackNetwork>start>just did to a.orchestrator.WithAttackNetwork(a)\n")
 	return nil
 }
 
