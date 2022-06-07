@@ -227,7 +227,7 @@ func (ps *ProposalSuite) TestProposalQCInvalid() {
 		ps.verifier.On("VerifyQC", ps.voters, ps.block.QC.SigData, ps.parent.View, ps.parent.BlockID).Return(model.ErrViewForUnknownEpoch)
 		ps.verifier.On("VerifyVote", ps.voter, ps.vote.SigData, ps.block.View, ps.block.BlockID).Return(nil)
 
-		// check that validation fails and the failure case is recognized as an invalid block
+		// check that validation fails and the failure is considered internal exception and NOT an InvalidBlock error
 		err := ps.validator.ValidateProposal(ps.proposal)
 		assert.Error(ps.T(), err)
 		assert.NotErrorIs(ps.T(), err, model.ErrViewForUnknownEpoch)
@@ -397,7 +397,6 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 		require.True(ps.T(), model.IsInvalidBlockError(err) && model.IsInvalidTCError(err))
 	})
 	ps.Run("verify-qc-err-view-for-unknown-epoch", func() {
-		// QC included in TC has view below QC included in proposal
 		newestQC := helper.MakeQC(
 			helper.WithQCView(ps.block.QC.View-2),
 			helper.WithQCSigners(ps.indices))
