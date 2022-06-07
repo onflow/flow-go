@@ -2,37 +2,32 @@ package timeoutaggregator
 
 import (
 	"fmt"
-	"sync"
-
-	"github.com/rs/zerolog"
-
-	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/module/mempool"
+	"github.com/rs/zerolog"
+	"sync"
 )
 
-// NewCollectorFactoryMethod is a factory method to generate a TimeoutCollector for concrete view
-type NewCollectorFactoryMethod = func(view uint64) (hotstuff.TimeoutCollector, error)
-
-// TimeoutCollectors implements management of multiple timeout collectors indexed by view.
-// Implements hotstuff.TimeoutCollectors interface. Creating a TimeoutCollector for a
-// particular view is lazy (instances are created on demand).
-// This structure is concurrently safe.
-// TODO: once VoteCollectors gets updated to stop managing worker pool we can merge VoteCollectors and TimeoutCollectors using generics
-type TimeoutCollectors struct {
-	log                zerolog.Logger
-	lock               sync.RWMutex
-	lowestRetainedView uint64                               // lowest view, for which we still retain a TimeoutCollector and process timeouts
-	collectors         map[uint64]hotstuff.TimeoutCollector // view -> TimeoutCollector
-	createCollector    NewCollectorFactoryMethod            // factory method for creating collectors
+type Collector interface {
+	View() uint64
 }
 
-var _ hotstuff.TimeoutCollectors = (*TimeoutCollectors)(nil)
+type GenericCollectors[T Collector] interface {
+	GetOrCreateCollector(view uint64) (T, bool, error)
+}
 
-func NewTimeoutCollectors(log zerolog.Logger, lowestRetainedView uint64, createCollector NewCollectorFactoryMethod) *TimeoutCollectors {
-	return &TimeoutCollectors{
+type GenericCollectorsImpl[T Collector] struct {
+	log                zerolog.Logger
+	lock               sync.RWMutex
+	lowestRetainedView uint64
+	collectors         map[uint64]T
+	createCollector    func(uint64) (T, error)
+}
+
+func NewGenericCollectorsImpl[T Collector](log zerolog.Logger, lowestRetainedView uint64, createCollector func(uint64) (T, error)) *GenericCollectorsImpl[T] {
+	return &GenericCollectorsImpl[T]{
 		log:                log,
 		lowestRetainedView: lowestRetainedView,
-		collectors:         make(map[uint64]hotstuff.TimeoutCollector),
+		collectors:         make(map[uint64]T),
 		createCollector:    createCollector,
 	}
 }
@@ -44,10 +39,11 @@ func NewTimeoutCollectors(log zerolog.Logger, lowestRetainedView uint64, createC
 //  -  (nil, false, error) if running into any exception creating the timeout collector state machine
 // Expected error returns during normal operations:
 //  * mempool.DecreasingPruningHeightError - in case view is lower than lowestRetainedView
-func (t *TimeoutCollectors) GetOrCreateCollector(view uint64) (hotstuff.TimeoutCollector, bool, error) {
+func (t *GenericCollectorsImpl[T]) GetOrCreateCollector(view uint64) (T, bool, error) {
 	cachedCollector, hasCachedCollector, err := t.getCollector(view)
 	if err != nil {
-		return nil, false, err
+		var res T
+		return res, false, err
 	}
 
 	if hasCachedCollector {
@@ -56,7 +52,8 @@ func (t *TimeoutCollectors) GetOrCreateCollector(view uint64) (hotstuff.TimeoutC
 
 	collector, err := t.createCollector(view)
 	if err != nil {
-		return nil, false, fmt.Errorf("could not create timeout collector for view %d: %w", view, err)
+		var res T
+		return res, false, fmt.Errorf("could not create timeout collector for view %d: %w", view, err)
 	}
 
 	// Initial check showed that there was no collector. However, it's possible that after the
@@ -78,11 +75,12 @@ func (t *TimeoutCollectors) GetOrCreateCollector(view uint64) (hotstuff.TimeoutC
 // Performs check for lowestRetainedView.
 // Expected error returns during normal operations:
 //  * mempool.DecreasingPruningHeightError - in case view is lower than lowestRetainedView
-func (t *TimeoutCollectors) getCollector(view uint64) (hotstuff.TimeoutCollector, bool, error) {
+func (t *GenericCollectorsImpl[T]) getCollector(view uint64) (T, bool, error) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 	if view < t.lowestRetainedView {
-		return nil, false, mempool.NewDecreasingPruningHeightErrorf("cannot retrieve collector for pruned view %d (lowest retained view %d)", view, t.lowestRetainedView)
+		var res T
+		return res, false, mempool.NewDecreasingPruningHeightErrorf("cannot retrieve collector for pruned view %d (lowest retained view %d)", view, t.lowestRetainedView)
 	}
 
 	clr, found := t.collectors[view]
@@ -94,7 +92,7 @@ func (t *TimeoutCollectors) getCollector(view uint64) (hotstuff.TimeoutCollector
 // we only retain and process whose view is equal or larger than `lowestRetainedView`.
 // If `lowestRetainedView` is smaller than the previous value, the previous value is
 // kept and the method call is a NoOp.
-func (t *TimeoutCollectors) PruneUpToView(lowestRetainedView uint64) {
+func (t *GenericCollectorsImpl[T]) PruneUpToView(lowestRetainedView uint64) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	if t.lowestRetainedView >= lowestRetainedView {
