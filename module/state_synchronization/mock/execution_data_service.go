@@ -50,6 +50,22 @@ func (_m *ExecutionDataService) Add(ctx context.Context, sd *state_synchronizati
 	return r0, r1, r2
 }
 
+// Done provides a mock function with given fields:
+func (_m *ExecutionDataService) Done() <-chan struct{} {
+	ret := _m.Called()
+
+	var r0 <-chan struct{}
+	if rf, ok := ret.Get(0).(func() <-chan struct{}); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan struct{})
+		}
+	}
+
+	return r0
+}
+
 // Get provides a mock function with given fields: ctx, rootID
 func (_m *ExecutionDataService) Get(ctx context.Context, rootID flow.Identifier) (*state_synchronization.ExecutionData, error) {
 	ret := _m.Called(ctx, rootID)
@@ -71,6 +87,22 @@ func (_m *ExecutionDataService) Get(ctx context.Context, rootID flow.Identifier)
 	}
 
 	return r0, r1
+}
+
+// Ready provides a mock function with given fields:
+func (_m *ExecutionDataService) Ready() <-chan struct{} {
+	ret := _m.Called()
+
+	var r0 <-chan struct{}
+	if rf, ok := ret.Get(0).(func() <-chan struct{}); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan struct{})
+		}
+	}
+
+	return r0
 }
 
 // NewExecutionDataService creates a new instance of ExecutionDataService. It also registers the testing.TB interface on the mock and a cleanup function to assert the mocks expectations.
