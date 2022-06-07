@@ -23,9 +23,9 @@ type runtime string
 
 const (
 	networkingProtocolTCP = "tcp"
-	dockerLocalHost       = "host.docker.internal"
-	dockerRuntime         = runtime("docker")
-	localhostRuntime      = runtime("localhost")
+	//dockerLocalHost       = "host.docker.internal"
+	dockerRuntime    = runtime("docker")
+	localhostRuntime = runtime("localhost")
 )
 
 // AttackNetwork implements a middleware for mounting an attack orchestrator and empowering it to communicate with the corrupted nodes.
