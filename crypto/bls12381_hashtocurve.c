@@ -7,24 +7,6 @@ extern prec_st* bls_prec;
 
 #if (hashToPoint== LOCAL_SSWU)
 
-const uint64_t p_3div4_data[Fp_DIGITS] = {
-    0xEE7FBFFFFFFFEAAA, 0x07AAFFFFAC54FFFF, 0xD9CC34A83DAC3D89,
-    0xD91DD2E13CE144AF, 0x92C6E9ED90D2EB35, 0x0680447A8E5FF9A6,
-};
-
-const uint64_t sqrt_z_data[Fp_DIGITS] = {
-    0xF37B0CED8FB71E24, 0xF02DC8A4535A8779, 0x732ED835F7EB14EA,
-    0x524CA41ECB2BCE0D, 0x095E3801E90B5FC1, 0x0252AD055472A90E,
-};
-
-
-// (p-1)/2 converted to Montgomery form
-const uint64_t fp_p_1div2_data[Fp_DIGITS] = {
-    0xa1fafffffffe5557, 0x995bfff976a3fffe, 0x03f41d24d174ceb4,
-    0xf6547998c1995dbd, 0x778a468f507a6034, 0x020559931f7f8103,
-};
-
-
 // These constants are taken from https://github.com/kwantam/bls12-381_hash 
 // and converted to the Mongtomery domain. 
 // Copyright 2019 Riad S. Wahby
@@ -110,7 +92,7 @@ static int sqrt_ratio_3mod4(fp_t out, const fp_t u, const fp_t v) {
 
     int res = 1;
     if (fp_cmp(fp_tmp[0], u) != RLC_EQ) {
-        fp_mul(out, out, bls_prec->sqrt_z);      // sqr(-z)*UV(UV^3)^((p-3)/4) // TODO: can be moved below
+        fp_mul(out, out, bls_prec->sqrt_z);      // sqr(-z)*UV(UV^3)^((p-3)/4)
         res = 0;
     }
     

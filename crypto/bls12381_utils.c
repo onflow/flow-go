@@ -28,10 +28,6 @@ prec_st* bls_prec = NULL;
 
 // required constants for the optimized SWU hash to curve
 #if (hashToPoint == LOCAL_SSWU)
-extern const uint64_t p_3div4_data[Fp_DIGITS];
-extern const uint64_t fp_p_1div2_data[Fp_DIGITS];
-extern const uint64_t z_data;
-extern const uint64_t sqrt_z_data[Fp_DIGITS];
 extern const uint64_t iso_Nx_data[ELLP_Nx_LEN][Fp_DIGITS];
 extern const uint64_t iso_Ny_data[ELLP_Ny_LEN][Fp_DIGITS];
 #endif
@@ -40,12 +36,6 @@ extern const uint64_t iso_Ny_data[ELLP_Ny_LEN][Fp_DIGITS];
 extern const uint64_t beta_data[Fp_DIGITS];
 extern const uint64_t z2_1_by3_data[2];
 #endif
-
-const uint64_t p_1div2_data[Fp_DIGITS] = {
-   0xdcff7fffffffd555, 0x0f55ffff58a9ffff, 0xb39869507b587b12, 
-   0xb23ba5c279c2895f, 0x258dd3db21a5d66b, 0x0d0088f51cbff34d,
-};
-
 
 // sets the global variable to input
 void precomputed_data_set(const prec_st* p) {
@@ -62,15 +52,14 @@ prec_st* init_precomputed_data_BLS12_381() {
     ctx_t* ctx = core_get();
 
     #if (hashToPoint == LOCAL_SSWU)
-    // (p-3)/4
-    bn_new(&bls_prec->p_3div4);
-    bn_read_raw(&bls_prec->p_3div4, p_3div4_data, Fp_DIGITS);
     // (p-1)/2
-    fp_read_raw(bls_prec->fp_p_1div2, fp_p_1div2_data);
-    // Z
-    fp_copy(bls_prec->z, ctx->ep_map_u);
-    // sqrt(-Z)
-    fp_read_raw(bls_prec->sqrt_z, sqrt_z_data);
+    bn_div_dig(&bls_prec->p_3div4, &ctx->prime, 2);
+    fp_prime_conv(bls_prec->fp_p_1div2, &bls_prec->p_3div4);
+    // (p-3)/4
+    bn_div_dig(&bls_prec->p_3div4, &bls_prec->p_3div4, 2);
+    // sqrt(-z)
+    fp_neg(bls_prec->sqrt_z, ctx->ep_map_u);
+    fp_srt(bls_prec->sqrt_z, bls_prec->sqrt_z);
     // -a1 and a1*z
     fp_neg(bls_prec->minus_a1, ctx->ep_iso.a);
     fp_mul(bls_prec->a1z, ctx->ep_iso.a, ctx->ep_map_u);
@@ -88,8 +77,6 @@ prec_st* init_precomputed_data_BLS12_381() {
     bn_read_raw(&bls_prec->z2_1_by3, z2_1_by3_data, 2);
     #endif
 
-    bn_new(&bls_prec->p_1div2);
-    bn_read_raw(&bls_prec->p_1div2, p_1div2_data, Fp_DIGITS);
     // Montgomery constant R
     fp_set_dig(bls_prec->r, 1);
     return bls_prec;
