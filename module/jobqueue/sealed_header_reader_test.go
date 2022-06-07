@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/jobqueue"
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
-	statemock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -60,7 +59,6 @@ func RunWithReader(
 
 		blocks := make([]*flow.Block, blockCount)
 		blocksByHeight := make(map[uint64]*flow.Block, blockCount)
-		snapshotsByHeight := make(map[uint64]*statemock.Snapshot, blockCount)
 
 		var seals []*flow.Header
 		parent := unittest.GenesisFixture().Header
@@ -71,18 +69,14 @@ func RunWithReader(
 			blocks[i] = unittest.BlockWithParentAndSeals(parent, seals)
 			blocksByHeight[height] = blocks[i]
 
-			snapshotsByHeight[height] = synctest.MockProtocolStateSnapshot(synctest.WithHead(blocks[i].Header))
-
 			parent = blocks[i].Header
 		}
 
 		snapshot := synctest.MockProtocolStateSnapshot(synctest.WithHead(seals[0]))
-		state := synctest.MockProtocolState(
-			synctest.WithSealed(snapshot),
-			synctest.WithAtHeight(snapshotsByHeight),
-		)
+		state := synctest.MockProtocolState(synctest.WithSealed(snapshot))
+		headerStorage := synctest.MockBlockHeaderStorage(synctest.WithByHeight(blocksByHeight))
 
-		reader := jobqueue.NewSealedBlockHeaderReader(state)
+		reader := jobqueue.NewSealedBlockHeaderReader(state, headerStorage)
 
 		withBlockReader(reader, blocks)
 	})

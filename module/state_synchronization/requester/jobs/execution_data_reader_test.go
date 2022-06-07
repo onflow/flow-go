@@ -17,8 +17,8 @@ import (
 	"github.com/onflow/flow-go/module/state_synchronization"
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
-	statemock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
+	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -27,13 +27,16 @@ type ExecutionDataReaderSuite struct {
 
 	reader       *ExecutionDataReader
 	eds          *syncmock.ExecutionDataService
+	headers      *storagemock.Headers
+	results      *storagemock.ExecutionResults
+	seals        *storagemock.Seals
 	fetchTimeout time.Duration
 
 	executionDataID flow.Identifier
 	executionData   *state_synchronization.ExecutionData
 	block           *flow.Block
+	blocksByHeight  map[uint64]*flow.Block
 
-	snapshotsByHeight      map[uint64]*statemock.Snapshot
 	highestAvailableHeight func() uint64
 }
 
@@ -49,6 +52,9 @@ func (suite *ExecutionDataReaderSuite) SetupTest() {
 
 	parent := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(1))
 	suite.block = unittest.BlockWithParentFixture(&parent)
+	suite.blocksByHeight = map[uint64]*flow.Block{
+		suite.block.Header.Height: suite.block,
+	}
 
 	suite.executionData = synctest.ExecutionDataFixture(suite.block.ID())
 
@@ -63,26 +69,29 @@ func (suite *ExecutionDataReaderSuite) reset() {
 		unittest.WithExecutionDataID(suite.executionDataID),
 	)
 
-	results := synctest.MockResultsStorage(synctest.WithByResultID(map[flow.Identifier]*flow.ExecutionResult{
-		result.ID(): result,
-	}))
-
 	seal := unittest.Seal.Fixture(
 		unittest.Seal.WithBlockID(suite.block.ID()),
 		unittest.Seal.WithResult(result),
 	)
 
-	suite.snapshotsByHeight = map[uint64]*statemock.Snapshot{
-		suite.block.Header.Height: synctest.MockProtocolStateSnapshot(synctest.WithSeal(seal)),
-	}
-
-	state := synctest.MockProtocolState(synctest.WithAtHeight(suite.snapshotsByHeight))
+	suite.headers = synctest.MockBlockHeaderStorage(synctest.WithByHeight(suite.blocksByHeight))
+	suite.results = synctest.MockResultsStorage(
+		synctest.WithByResultID(map[flow.Identifier]*flow.ExecutionResult{
+			result.ID(): result,
+		}),
+	)
+	suite.seals = synctest.MockSealsStorage(
+		synctest.WithBySealedBlockID(map[flow.Identifier]*flow.Seal{
+			suite.block.ID(): seal,
+		}),
+	)
 
 	suite.eds = new(syncmock.ExecutionDataService)
 	suite.reader = NewExecutionDataReader(
 		suite.eds,
-		state,
-		results,
+		suite.headers,
+		suite.results,
+		suite.seals,
 		suite.fetchTimeout,
 		func() uint64 {
 			return suite.highestAvailableHeight()
@@ -138,12 +147,12 @@ func (suite *ExecutionDataReaderSuite) TestAtIndex() {
 		suite.reset()
 		suite.runTest(func() {
 			// return an error while getting the execution data
-			expecteErr := errors.New("expected error: get failed")
-			setExecutionDataGet(nil, expecteErr)
+			expectedErr := errors.New("expected error: get failed")
+			setExecutionDataGet(nil, expectedErr)
 
 			job, err := suite.reader.AtIndex(suite.block.Header.Height)
 			assert.Nil(suite.T(), job, "job should be nil")
-			assert.ErrorIs(suite.T(), err, expecteErr)
+			assert.ErrorIs(suite.T(), err, expectedErr)
 		})
 	})
 
@@ -162,18 +171,7 @@ func (suite *ExecutionDataReaderSuite) TestAtIndex() {
 		suite.runTest(func() {
 			// add a new block without an execution result
 			newBlock := unittest.BlockWithParentFixture(suite.block.Header)
-
-			result := unittest.ExecutionResultFixture(
-				unittest.WithBlock(newBlock),
-				unittest.WithExecutionDataID(unittest.IdentifierFixture()),
-			)
-
-			seal := unittest.Seal.Fixture(
-				unittest.Seal.WithBlockID(newBlock.ID()),
-				unittest.Seal.WithResult(result),
-			)
-
-			suite.snapshotsByHeight[newBlock.Header.Height] = synctest.MockProtocolStateSnapshot(synctest.WithSeal(seal))
+			suite.blocksByHeight[newBlock.Header.Height] = newBlock
 
 			job, err := suite.reader.AtIndex(newBlock.Header.Height)
 			assert.Nil(suite.T(), job, "job should be nil")

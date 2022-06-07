@@ -114,8 +114,9 @@ type executionDataRequester struct {
 	log     zerolog.Logger
 
 	// Local db objects
+	headers storage.Headers
 	results storage.ExecutionResults
-	state   protocol.State
+	seals   storage.Seals
 
 	executionDataReader *jobs.ExecutionDataReader
 
@@ -142,15 +143,18 @@ func New(
 	processedHeight storage.ConsumerProgress,
 	processedNotifications storage.ConsumerProgress,
 	state protocol.State,
+	headers storage.Headers,
 	results storage.ExecutionResults,
+	seals storage.Seals,
 	cfg ExecutionDataConfig,
 ) state_synchronization.ExecutionDataRequester {
 	e := &executionDataRequester{
 		log:                  log.With().Str("component", "execution_data_requester").Logger(),
 		eds:                  eds,
 		metrics:              edrMetrics,
-		state:                state,
+		headers:              headers,
 		results:              results,
+		seals:                seals,
 		config:               cfg,
 		finalizationNotifier: engine.NewNotifier(),
 	}
@@ -159,7 +163,7 @@ func New(
 
 	// jobqueue Jobs object that tracks sealed blocks by height. This is used by the blockConsumer
 	// to get a sequential list of sealed blocks.
-	sealedBlockReader := jobqueue.NewSealedBlockHeaderReader(state)
+	sealedBlockReader := jobqueue.NewSealedBlockHeaderReader(state, headers)
 
 	// blockConsumer ensures every sealed block's execution data is downloaded.
 	// It listens to block finalization events from `finalizationNotifier`, then checks if there
@@ -192,8 +196,9 @@ func New(
 	// notificationConsumer to get downloaded execution data from storage.
 	e.executionDataReader = jobs.NewExecutionDataReader(
 		e.eds,
-		e.state,
+		e.headers,
 		e.results,
+		e.seals,
 		e.config.FetchTimeout,
 		// method to get highest consecutive height that has downloaded execution data. it is used
 		// here by the notification job consumer to discover new jobs.
@@ -349,7 +354,7 @@ func (e *executionDataRequester) processFetchRequest(ctx irrecoverable.SignalerC
 
 	logger.Debug().Msg("processing fetch request")
 
-	seal, err := e.state.AtBlockID(blockID).Seal()
+	seal, err := e.seals.BySealedBlockID(blockID)
 	if err != nil {
 		ctx.Throw(fmt.Errorf("failed to get seal for block %s: %w", blockID, err))
 	}
@@ -392,7 +397,7 @@ func (e *executionDataRequester) processFetchRequest(ctx irrecoverable.SignalerC
 		ctx.Throw(err)
 	}
 
-	logger.Debug().Msg("Fetched execution data")
+	logger.Info().Msg("execution data fetched")
 
 	return nil
 }

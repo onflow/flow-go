@@ -33,11 +33,8 @@ import (
 	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/state/protocol/invalid"
 	statemock "github.com/onflow/flow-go/state/protocol/mock"
-	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
-	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -142,54 +139,13 @@ func mockExecutionDataService(edStore map[flow.Identifier]*testExecutionDataServ
 	return eds
 }
 
-func (suite *ExecutionDataRequesterSuite) mockProtocolState(blocksByHeight map[uint64]*flow.Block, results *storagemock.ExecutionResults) *statemock.State {
+func (suite *ExecutionDataRequesterSuite) mockProtocolState(blocksByHeight map[uint64]*flow.Block) *statemock.State {
 	state := new(statemock.State)
 
 	suite.mockSnapshot = new(mockSnapshot)
 	suite.mockSnapshot.set(blocksByHeight[0].Header, nil) // genesis block
 
 	state.On("Sealed").Return(suite.mockSnapshot).Maybe()
-
-	snapshotsByHeight := make(map[uint64]*statemock.Snapshot, len(blocksByHeight))
-	snapshotsByBlockID := make(map[flow.Identifier]*statemock.Snapshot, len(blocksByHeight))
-	for height, block := range blocksByHeight {
-		result, err := results.ByBlockID(block.ID())
-		assert.NoError(suite.T(), err)
-
-		seal := unittest.Seal.Fixture(
-			unittest.Seal.WithBlockID(block.ID()),
-			unittest.Seal.WithResult(result),
-		)
-
-		snapshotsByHeight[height] = synctest.MockProtocolStateSnapshot(
-			synctest.WithHead(block.Header),
-			synctest.WithSeal(seal),
-		)
-
-		snapshotsByBlockID[block.ID()] = synctest.MockProtocolStateSnapshot(
-			synctest.WithHead(block.Header),
-			synctest.WithSeal(seal),
-		)
-	}
-
-	state.On("AtHeight", mock.AnythingOfType("uint64")).Return(
-		func(height uint64) protocol.Snapshot {
-			if snapshot, ok := snapshotsByHeight[height]; ok {
-				return snapshot
-			}
-			return invalid.NewSnapshot(fmt.Errorf("snapshot not found: %w", storage.ErrNotFound))
-		},
-	).Maybe()
-
-	state.On("AtBlockID", mock.AnythingOfType("flow.Identifier")).Return(
-		func(blockID flow.Identifier) protocol.Snapshot {
-			if snapshot, ok := snapshotsByBlockID[blockID]; ok {
-				return snapshot
-			}
-			return invalid.NewSnapshot(fmt.Errorf("snapshot not found: %w", storage.ErrNotFound))
-		},
-	).Maybe()
-
 	return state
 }
 
@@ -337,7 +293,7 @@ func (suite *ExecutionDataRequesterSuite) TestRequesterPausesAndResumes() {
 	})
 }
 
-// TestRequesterHalts tests that the requester handles halting correctly when it encouters an
+// TestRequesterHalts tests that the requester handles halting correctly when it encounters an
 // invalid block
 func (suite *ExecutionDataRequesterSuite) TestRequesterHalts() {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
@@ -436,11 +392,17 @@ func generatePauseResume(pauseHeight uint64) (specialBlockGenerator, func()) {
 }
 
 func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun) (state_synchronization.ExecutionDataRequester, *pubsub.FinalizationDistributor) {
+	headers := synctest.MockBlockHeaderStorage(
+		synctest.WithByID(cfg.blocksByID),
+		synctest.WithByHeight(cfg.blocksByHeight),
+	)
 	results := synctest.MockResultsStorage(
-		synctest.WithByBlockID(cfg.resultsByBlockID),
 		synctest.WithByResultID(cfg.resultsByID),
 	)
-	state := suite.mockProtocolState(cfg.blocksByHeight, results)
+	seals := synctest.MockSealsStorage(
+		synctest.WithBySealedBlockID(cfg.sealsByBlockID),
+	)
+	state := suite.mockProtocolState(cfg.blocksByHeight)
 
 	suite.eds = mockExecutionDataService(cfg.executionDataEntries)
 
@@ -455,7 +417,9 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 		processedHeight,
 		processedNotification,
 		state,
+		headers,
 		results,
+		seals,
 		requester.ExecutionDataConfig{
 			InitialBlockHeight: cfg.startHeight - 1,
 			MaxSearchAhead:     cfg.maxSearchAhead,
@@ -616,6 +580,7 @@ type fetchTestRun struct {
 	blocksByID               map[flow.Identifier]*flow.Block
 	resultsByID              map[flow.Identifier]*flow.ExecutionResult
 	resultsByBlockID         map[flow.Identifier]*flow.ExecutionResult
+	sealsByBlockID           map[flow.Identifier]*flow.Seal
 	executionDataByID        map[flow.Identifier]*state_synchronization.ExecutionData
 	executionDataEntries     map[flow.Identifier]*testExecutionDataServiceEntry
 	executionDataIDByBlockID map[flow.Identifier]flow.Identifier
@@ -666,6 +631,7 @@ func (suite *ExecutionDataRequesterSuite) generateTestData(blockCount int, speci
 	blocksByID := map[flow.Identifier]*flow.Block{}
 	resultsByID := map[flow.Identifier]*flow.ExecutionResult{}
 	resultsByBlockID := map[flow.Identifier]*flow.ExecutionResult{}
+	sealsByBlockID := map[flow.Identifier]*flow.Seal{}
 	executionDataByID := map[flow.Identifier]*state_synchronization.ExecutionData{}
 	executionDataIDByBlockID := map[flow.Identifier]flow.Identifier{}
 
@@ -691,9 +657,16 @@ func (suite *ExecutionDataRequesterSuite) generateTestData(blockCount int, speci
 		var seals []*flow.Header
 
 		if i >= firstSeal {
+			sealedBlock := blocksByHeight[uint64(i-firstSeal+1)]
 			seals = []*flow.Header{
-				blocksByHeight[uint64(i-firstSeal+1)].Header, // block 0 doesn't get sealed (it's pre-sealed in the genesis state)
+				sealedBlock.Header, // block 0 doesn't get sealed (it's pre-sealed in the genesis state)
 			}
+
+			sealsByBlockID[sealedBlock.ID()] = unittest.Seal.Fixture(
+				unittest.Seal.WithBlockID(sealedBlock.ID()),
+				unittest.Seal.WithResult(resultsByBlockID[sealedBlock.ID()]),
+			)
+
 			suite.T().Logf("block %d has seals for %d", i, seals[0].Height)
 		}
 
@@ -735,6 +708,7 @@ func (suite *ExecutionDataRequesterSuite) generateTestData(blockCount int, speci
 		blocksByID:               blocksByID,
 		resultsByBlockID:         resultsByBlockID,
 		resultsByID:              resultsByID,
+		sealsByBlockID:           sealsByBlockID,
 		executionDataByID:        executionDataByID,
 		executionDataEntries:     edsEntries,
 		executionDataIDByBlockID: executionDataIDByBlockID,

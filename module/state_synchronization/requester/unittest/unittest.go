@@ -253,6 +253,37 @@ func MockResultsStorage(opts ...ResultsMockOptions) *storagemock.ExecutionResult
 	return results
 }
 
+type SealsMockOptions func(*storagemock.Seals)
+
+func WithBySealedBlockID(sealsByBlockID map[flow.Identifier]*flow.Seal) SealsMockOptions {
+	return func(seals *storagemock.Seals) {
+		seals.On("BySealedBlockID", mock.AnythingOfType("flow.Identifier")).Return(
+			func(blockID flow.Identifier) *flow.Seal {
+				if _, has := sealsByBlockID[blockID]; !has {
+					return nil
+				}
+				return sealsByBlockID[blockID]
+			},
+			func(blockID flow.Identifier) error {
+				if _, has := sealsByBlockID[blockID]; !has {
+					return fmt.Errorf("seal for block %s not found: %w", blockID, storage.ErrNotFound)
+				}
+				return nil
+			},
+		)
+	}
+}
+
+func MockSealsStorage(opts ...SealsMockOptions) *storagemock.Seals {
+	seals := new(storagemock.Seals)
+
+	for _, opt := range opts {
+		opt(seals)
+	}
+
+	return seals
+}
+
 func RemoveExpectedCall(method string, expectedCalls []*mock.Call) []*mock.Call {
 	for i, call := range expectedCalls {
 		if call.Method == method {
