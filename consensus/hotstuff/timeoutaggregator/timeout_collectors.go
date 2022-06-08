@@ -28,6 +28,15 @@ type TimeoutCollectors struct {
 
 var _ hotstuff.TimeoutCollectors = (*TimeoutCollectors)(nil)
 
+func NewTimeoutCollectors(log zerolog.Logger, lowestRetainedView uint64, createCollector NewCollectorFactoryMethod) *TimeoutCollectors {
+	return &TimeoutCollectors{
+		log:                log,
+		lowestRetainedView: lowestRetainedView,
+		collectors:         make(map[uint64]hotstuff.TimeoutCollector),
+		createCollector:    createCollector,
+	}
+}
+
 // GetOrCreateCollector retrieves the hotstuff.TimeoutCollector for the specified
 // view or creates one if none exists.
 //  -  (collector, true, nil) if no collector can be found by the view, and a new collector was created.
