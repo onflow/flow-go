@@ -28,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/mempool/entity"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/dsl"
 )
@@ -320,13 +321,19 @@ func StateInteractionsFixture() *delta.Snapshot {
 	return &delta.NewView(nil).Interactions().Snapshot
 }
 
-func BlockWithParentAndProposerFixture(parent *flow.Header, proposer flow.Identifier, participantCount int) flow.Block {
+func BlockWithParentAndProposerFixture(t *testing.T, parent *flow.Header, proposer flow.Identifier) flow.Block {
 	block := BlockWithParentFixture(parent)
 
+	indices, err := signature.EncodeSignersToIndices(
+		[]flow.Identifier{proposer}, []flow.Identifier{proposer})
+	require.NoError(t, err)
+
 	block.Header.ProposerID = proposer
-	indices := bitutils.MakeBitVector(10)
-	bitutils.SetBit(indices, 1)
 	block.Header.ParentVoterIndices = indices
+	if block.Header.LastViewTC != nil {
+		block.Header.LastViewTC.SignerIndices = indices
+		block.Header.LastViewTC.NewestQC.SignerIndices = indices
+	}
 
 	return *block
 }
@@ -430,6 +437,19 @@ func BlockHeaderFixtureOnChain(chainID flow.ChainID, opts ...func(header *flow.H
 func BlockHeaderWithParentFixture(parent *flow.Header) flow.Header {
 	height := parent.Height + 1
 	view := parent.View + 1 + uint64(rand.Intn(10)) // Intn returns [0, n)
+	var lastViewTC *flow.TimeoutCertificate
+	if view != parent.View+1 {
+		newestQC := QuorumCertificateFixture(func(qc *flow.QuorumCertificate) {
+			qc.View = parent.View
+		})
+		lastViewTC = &flow.TimeoutCertificate{
+			View:          view - 1,
+			NewestQCViews: []uint64{newestQC.View},
+			NewestQC:      newestQC,
+			SignerIndices: SignerIndicesFixture(4),
+			SigData:       SignatureFixture(),
+		}
+	}
 	return flow.Header{
 		ChainID:            parent.ChainID,
 		ParentID:           parent.ID(),
@@ -441,6 +461,7 @@ func BlockHeaderWithParentFixture(parent *flow.Header) flow.Header {
 		ParentVoterSigData: QCSigDataFixture(),
 		ProposerID:         IdentifierFixture(),
 		ProposerSigData:    SignatureFixture(),
+		LastViewTC:         lastViewTC,
 	}
 }
 

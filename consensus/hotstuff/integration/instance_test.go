@@ -238,8 +238,8 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	)
 
 	// program the hotstuff verifier behaviour
-	in.verifier.On("VerifyVote", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	in.verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	in.verifier.On("VerifyVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	in.verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	// program the hotstuff communicator behaviour
 	in.communicator.On("BroadcastProposalWithDelay", mock.Anything, mock.Anything).Return(
@@ -353,7 +353,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	in.forks = forks.New(forkalizer, choice)
 
 	// initialize the validator
-	in.validator = validator.New(in.committee, in.forks, in.verifier)
+	in.validator = validator.New(in.committee, in.verifier)
 
 	weight := uint64(1000)
 	stakingSigAggtor := helper.MakeWeightedSignatureAggregator(weight)

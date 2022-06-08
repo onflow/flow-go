@@ -453,7 +453,7 @@ func createNode(
 	forks, err := consensus.NewForks(rootHeader, headersDB, final, notifier, rootHeader, rootQC)
 	require.NoError(t, err)
 
-	validator := consensus.NewValidator(metrics, committee, forks)
+	validator := consensus.NewValidator(metrics, committee)
 	require.NoError(t, err)
 
 	keys := &storagemock.SafeBeaconKeys{}

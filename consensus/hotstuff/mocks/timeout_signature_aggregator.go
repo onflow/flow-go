@@ -69,20 +69,20 @@ func (_m *TimeoutSignatureAggregator) TotalWeight() uint64 {
 	return r0
 }
 
-// VerifyAndAdd provides a mock function with given fields: signerID, sig, highestQCView
-func (_m *TimeoutSignatureAggregator) VerifyAndAdd(signerID flow.Identifier, sig crypto.Signature, highestQCView uint64) (uint64, error) {
-	ret := _m.Called(signerID, sig, highestQCView)
+// VerifyAndAdd provides a mock function with given fields: signerID, sig, newestQCView
+func (_m *TimeoutSignatureAggregator) VerifyAndAdd(signerID flow.Identifier, sig crypto.Signature, newestQCView uint64) (uint64, error) {
+	ret := _m.Called(signerID, sig, newestQCView)
 
 	var r0 uint64
 	if rf, ok := ret.Get(0).(func(flow.Identifier, crypto.Signature, uint64) uint64); ok {
-		r0 = rf(signerID, sig, highestQCView)
+		r0 = rf(signerID, sig, newestQCView)
 	} else {
 		r0 = ret.Get(0).(uint64)
 	}
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(flow.Identifier, crypto.Signature, uint64) error); ok {
-		r1 = rf(signerID, sig, highestQCView)
+		r1 = rf(signerID, sig, newestQCView)
 	} else {
 		r1 = ret.Error(1)
 	}

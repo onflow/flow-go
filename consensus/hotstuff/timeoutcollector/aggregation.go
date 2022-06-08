@@ -27,7 +27,7 @@ type sigInfo struct {
 // TimeoutSignatureAggregator implements consensus/hotstuff.TimeoutSignatureAggregator.
 // It performs timeout specific BLS aggregation over multiple distinct messages.
 // We perform timeout signature aggregation for some concrete view, utilizing the protocol specification
-// that timeouts sign the message: hash(view, highestQCView), where highestQCView can have different values
+// that timeouts sign the message: hash(view, newestQCView), where newestQCView can have different values
 // for different replicas.
 // View and the identities of all authorized replicas are
 // specified when the TimeoutSignatureAggregator is instantiated.
@@ -97,7 +97,7 @@ func NewTimeoutSignatureAggregator(
 //  - model.DuplicatedSignerError if the signer has been already added
 //  - model.ErrInvalidSignature if signerID is valid but signature is cryptographically invalid
 // The function is thread-safe.
-func (a *TimeoutSignatureAggregator) VerifyAndAdd(signerID flow.Identifier, sig crypto.Signature, highestQCView uint64) (totalWeight uint64, exception error) {
+func (a *TimeoutSignatureAggregator) VerifyAndAdd(signerID flow.Identifier, sig crypto.Signature, newestQCView uint64) (totalWeight uint64, exception error) {
 	info, ok := a.idToInfo[signerID]
 	if !ok {
 		return a.TotalWeight(), model.NewInvalidSignerErrorf("%v is not an authorized signer", signerID)
@@ -108,7 +108,7 @@ func (a *TimeoutSignatureAggregator) VerifyAndAdd(signerID flow.Identifier, sig 
 		return a.TotalWeight(), model.NewDuplicatedSignerErrorf("signature from %v was already added", signerID)
 	}
 
-	msg := verification.MakeTimeoutMessage(a.view, highestQCView)
+	msg := verification.MakeTimeoutMessage(a.view, newestQCView)
 	valid, err := info.pk.Verify(sig, msg, a.hasher)
 	if err != nil {
 		return a.TotalWeight(), fmt.Errorf("couldn't verify signature from %s: %w", signerID, err)
@@ -126,7 +126,7 @@ func (a *TimeoutSignatureAggregator) VerifyAndAdd(signerID flow.Identifier, sig 
 
 	a.idToSignature[signerID] = sigInfo{
 		sig:          sig,
-		newestQCView: highestQCView,
+		newestQCView: newestQCView,
 	}
 	a.totalWeight += info.weight
 
