@@ -35,24 +35,25 @@ var _ runtime.Interface = &TransactionEnv{}
 
 // TransactionEnv is a read-write environment used for executing flow transactions.
 type TransactionEnv struct {
-	vm               *VirtualMachine
-	ctx              Context
-	sth              *state.StateHolder
-	programs         *handler.ProgramsHandler
-	accounts         state.Accounts
-	uuidGenerator    *state.UUIDGenerator
-	contracts        *handler.ContractHandler
-	accountKeys      *handler.AccountKeyHandler
-	metrics          *handler.MetricsHandler
-	eventHandler     *handler.EventHandler
-	addressGenerator flow.AddressGenerator
-	rng              *rand.Rand
-	logs             []string
-	tx               *flow.TransactionBody
-	txIndex          uint32
-	txID             flow.Identifier
-	traceSpan        opentracing.Span
-	authorizers      []runtime.Address
+	vm                *VirtualMachine
+	ctx               Context
+	sth               *state.StateHolder
+	programs          *handler.ProgramsHandler
+	localProgramCache map[common.LocationID]*interpreter.Program
+	accounts          state.Accounts
+	uuidGenerator     *state.UUIDGenerator
+	contracts         *handler.ContractHandler
+	accountKeys       *handler.AccountKeyHandler
+	metrics           *handler.MetricsHandler
+	eventHandler      *handler.EventHandler
+	addressGenerator  flow.AddressGenerator
+	rng               *rand.Rand
+	logs              []string
+	tx                *flow.TransactionBody
+	txIndex           uint32
+	txID              flow.Identifier
+	traceSpan         opentracing.Span
+	authorizers       []runtime.Address
 }
 
 func NewTransactionEnvironment(
@@ -79,20 +80,21 @@ func NewTransactionEnvironment(
 	metrics := handler.NewMetricsHandler(ctx.Metrics)
 
 	env := &TransactionEnv{
-		vm:               vm,
-		ctx:              ctx,
-		sth:              sth,
-		metrics:          metrics,
-		programs:         programsHandler,
-		accounts:         accounts,
-		accountKeys:      accountKeys,
-		addressGenerator: generator,
-		uuidGenerator:    uuidGenerator,
-		eventHandler:     eventHandler,
-		tx:               tx,
-		txIndex:          txIndex,
-		txID:             tx.ID(),
-		traceSpan:        traceSpan,
+		vm:                vm,
+		ctx:               ctx,
+		sth:               sth,
+		metrics:           metrics,
+		localProgramCache: make(map[common.LocationID]*interpreter.Program),
+		programs:          programsHandler,
+		accounts:          accounts,
+		accountKeys:       accountKeys,
+		addressGenerator:  generator,
+		uuidGenerator:     uuidGenerator,
+		eventHandler:      eventHandler,
+		tx:                tx,
+		txIndex:           txIndex,
+		txID:              tx.ID(),
+		traceSpan:         traceSpan,
 	}
 
 	env.contracts = handler.NewContractHandler(accounts,
@@ -634,6 +636,15 @@ func (e *TransactionEnv) GetProgram(location common.Location) (*interpreter.Prog
 		defer sp.Finish()
 	}
 
+	if program, ok := e.localProgramCache[location.ID()]; ok {
+		return program, nil
+	}
+
+	err := e.meterComputation(meter.ComputationKindGetProgram, 1)
+	if err != nil {
+		return nil, fmt.Errorf("get program failed: %w", err)
+	}
+
 	if addressLocation, ok := location.(common.AddressLocation); ok {
 		address := flow.Address(addressLocation.Address)
 
@@ -643,16 +654,10 @@ func (e *TransactionEnv) GetProgram(location common.Location) (*interpreter.Prog
 		}
 	}
 
-	program, cached, has := e.programs.Get(location)
-
-	if !cached {
-		err := e.meterComputation(meter.ComputationKindGetProgram, 1)
-		if err != nil {
-			return nil, fmt.Errorf("get program failed: %w", err)
-		}
-	}
+	program, has := e.programs.Get(location)
 
 	if has {
+		e.localProgramCache[location.ID()] = program
 		return program, nil
 	}
 
@@ -671,6 +676,8 @@ func (e *TransactionEnv) SetProgram(location common.Location, program *interpret
 	}
 
 	err = e.programs.Set(location, program)
+	e.localProgramCache[location.ID()] = program
+
 	if err != nil {
 		return fmt.Errorf("set program failed: %w", err)
 	}

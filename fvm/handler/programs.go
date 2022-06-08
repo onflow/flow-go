@@ -22,21 +22,19 @@ type stackEntry struct {
 // naturally, making cleanup method essentially no-op. But if something goes wrong, all nested
 // views must be merged in order to make sure they are recorded
 type ProgramsHandler struct {
-	masterState    *state.StateHolder
-	viewsStack     []stackEntry
-	Programs       *programs.Programs
-	LoadedPrograms map[common.LocationID]interface{}
-	initialState   *state.State
+	masterState  *state.StateHolder
+	viewsStack   []stackEntry
+	Programs     *programs.Programs
+	initialState *state.State
 }
 
 // NewProgramsHandler construts a new ProgramHandler
 func NewProgramsHandler(progs *programs.Programs, stateHolder *state.StateHolder) *ProgramsHandler {
 	return &ProgramsHandler{
-		masterState:    stateHolder,
-		viewsStack:     nil,
-		Programs:       progs,
-		LoadedPrograms: make(map[common.LocationID]interface{}),
-		initialState:   stateHolder.State(),
+		masterState:  stateHolder,
+		viewsStack:   nil,
+		Programs:     progs,
+		initialState: stateHolder.State(),
 	}
 }
 
@@ -65,7 +63,6 @@ func (h *ProgramsHandler) Set(location common.Location, program *interpreter.Pro
 	}
 
 	h.Programs.Set(location, program, last.state)
-	h.LoadedPrograms[location.ID()] = true
 
 	err := h.mergeState(last.state, h.masterState.EnforceInteractionLimits())
 
@@ -83,16 +80,15 @@ func (h *ProgramsHandler) mergeState(state *state.State, enforceLimits bool) err
 	return h.masterState.State().MergeState(state, enforceLimits)
 }
 
-func (h *ProgramsHandler) Get(location common.Location) (*interpreter.Program, bool, bool) {
+func (h *ProgramsHandler) Get(location common.Location) (*interpreter.Program, bool) {
 	// ignore empty locations
 	if location == nil {
-		return nil, true, false
+		return nil, false
 	}
 
 	program, view, has := h.Programs.Get(location)
-	_, cached := h.LoadedPrograms[location.ID()]
 	if has {
-		if view != nil && !cached { // handle view not set (ie. for non-address locations
+		if view != nil { // handle view not set (ie. for non-address locations
 			// don't enforce limits while merging a cached view
 			enforceLimits := false
 			err := h.mergeState(view, enforceLimits)
@@ -100,12 +96,12 @@ func (h *ProgramsHandler) Get(location common.Location) (*interpreter.Program, b
 				panic(fmt.Sprintf("merge error while getting program, panic: %s", err))
 			}
 		}
-		return program, cached, true
+		return program, true
 	}
 
 	// we track only for AddressLocation
 	if _, is := location.(common.AddressLocation); !is {
-		return nil, cached, false
+		return nil, false
 	}
 
 	parentState := h.masterState.State()
@@ -122,7 +118,7 @@ func (h *ProgramsHandler) Get(location common.Location) (*interpreter.Program, b
 
 	h.masterState.SetActiveState(childState)
 
-	return nil, cached, false
+	return nil, false
 }
 
 func (h *ProgramsHandler) Cleanup() error {

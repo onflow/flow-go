@@ -4379,7 +4379,6 @@ func TestContractImportInteractionCounting(t *testing.T) {
 		newVMTest().withBootstrapProcedureOptions(
 			fvm.WithExecutionEffortWeights(
 				weightedMeter.ExecutionEffortWeights{
-					// we want at most 4 GetProgram calls, once for each contract
 					meter.ComputationKindGetProgram: 100 << weightedMeter.MeterExecutionInternalPrecisionBytes,
 				},
 			),
@@ -4464,7 +4463,7 @@ func TestContractImportInteractionCounting(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, script.Err)
 				// we should meter computation for 3 GetPrograms, one for each contract
-				assert.Equal(t, int(script.GasUsed), 300)
+				assert.Equal(t, 300, int(script.GasUsed))
 			},
 		),
 	)

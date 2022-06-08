@@ -36,19 +36,20 @@ var _ Environment = &ScriptEnv{}
 
 // ScriptEnv is a read-only mostly used for executing scripts.
 type ScriptEnv struct {
-	ctx           Context
-	sth           *state.StateHolder
-	vm            *VirtualMachine
-	accounts      state.Accounts
-	contracts     *handler.ContractHandler
-	programs      *handler.ProgramsHandler
-	accountKeys   *handler.AccountKeyHandler
-	metrics       *handler.MetricsHandler
-	uuidGenerator *state.UUIDGenerator
-	logs          []string
-	rng           *rand.Rand
-	traceSpan     opentracing.Span
-	reqContext    context.Context
+	ctx               Context
+	sth               *state.StateHolder
+	vm                *VirtualMachine
+	accounts          state.Accounts
+	contracts         *handler.ContractHandler
+	programs          *handler.ProgramsHandler
+	localProgramCache map[common.LocationID]*interpreter.Program
+	accountKeys       *handler.AccountKeyHandler
+	metrics           *handler.MetricsHandler
+	uuidGenerator     *state.UUIDGenerator
+	logs              []string
+	rng               *rand.Rand
+	traceSpan         opentracing.Span
+	reqContext        context.Context
 }
 
 func (e *ScriptEnv) Context() *Context {
@@ -74,15 +75,16 @@ func NewScriptEnvironment(
 	metrics := handler.NewMetricsHandler(fvmContext.Metrics)
 
 	env := &ScriptEnv{
-		ctx:           fvmContext,
-		sth:           sth,
-		vm:            vm,
-		metrics:       metrics,
-		accounts:      accounts,
-		accountKeys:   accountKeys,
-		uuidGenerator: uuidGenerator,
-		programs:      programsHandler,
-		reqContext:    reqContext,
+		ctx:               fvmContext,
+		sth:               sth,
+		vm:                vm,
+		metrics:           metrics,
+		accounts:          accounts,
+		accountKeys:       accountKeys,
+		uuidGenerator:     uuidGenerator,
+		programs:          programsHandler,
+		localProgramCache: make(map[common.LocationID]*interpreter.Program),
+		reqContext:        reqContext,
 	}
 
 	env.contracts = handler.NewContractHandler(
@@ -481,6 +483,15 @@ func (e *ScriptEnv) GetProgram(location common.Location) (*interpreter.Program, 
 		defer sp.Finish()
 	}
 
+	if program, ok := e.localProgramCache[location.ID()]; ok {
+		return program, nil
+	}
+
+	err := e.meterComputation(meter.ComputationKindGetProgram, 1)
+	if err != nil {
+		return nil, fmt.Errorf("get program failed: %w", err)
+	}
+
 	if addressLocation, ok := location.(common.AddressLocation); ok {
 		address := flow.Address(addressLocation.Address)
 
@@ -490,16 +501,10 @@ func (e *ScriptEnv) GetProgram(location common.Location) (*interpreter.Program, 
 		}
 	}
 
-	program, cached, has := e.programs.Get(location)
-
-	if !cached {
-		err := e.meterComputation(meter.ComputationKindGetProgram, 1)
-		if err != nil {
-			return nil, fmt.Errorf("get program failed: %w", err)
-		}
-	}
+	program, has := e.programs.Get(location)
 
 	if has {
+		e.localProgramCache[location.ID()] = program
 		return program, nil
 	}
 
@@ -518,6 +523,8 @@ func (e *ScriptEnv) SetProgram(location common.Location, program *interpreter.Pr
 	}
 
 	err = e.programs.Set(location, program)
+	e.localProgramCache[location.ID()] = program
+
 	if err != nil {
 		return fmt.Errorf("set program failed: %w", err)
 	}
