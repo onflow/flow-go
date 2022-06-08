@@ -174,7 +174,7 @@ static inline void map_to_E1_osswu(ep_t p, const fp_t t) {
     p->coord = JACOB;
 
     for (int i=0; i<tmp_len; i++) fp_free(fp_tmp[i]);
-    fp_free(fp_tmp);
+    free(fp_tmp);
 }
 
 // This code is taken from https://github.com/kwantam/bls12-381_hash 
@@ -239,11 +239,11 @@ static inline void eval_iso11(ep_t r, const ep_t  p) {
     fp_sqr(fp_tmp[18], fp_tmp[25]);                 // Z^28
     fp_mul(fp_tmp[17], fp_tmp[18], fp_tmp[31]);     // Z^30
 
-    // 
+    // get isogeny map coefficients
     iso_t iso = ep_curve_get_iso();
     const int deg_dy = iso->deg_yd;
     const int deg_dx = iso->deg_xd;
-
+    // TODO: get N coefficient from Relic and update N computations
 
     // y = Ny/Dy
     // compute Dy
