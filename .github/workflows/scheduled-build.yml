@@ -7,7 +7,8 @@ on:
 
 env:
   BUCKET_NAME: 'flow-internal-tooling-bucket'
-  DEFAULT_BRANCH: master
+  # Make sure to change this to master before merging
+  DEFAULT_BRANCH: spb/add-workflows
   GO_VERSION: '1.17'
 
 jobs:
