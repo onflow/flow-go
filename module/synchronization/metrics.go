@@ -56,11 +56,11 @@ func NewMetricsCollector() *MetricsCollector {
 			Buckets:   []float64{.1, .25, .5, 1, 2.5, 5, 7.5, 10, 20},
 		}, []string{"status", "requested_by"}),
 		timeToReceived: prometheus.NewHistogramVec(prometheus.HistogramOpts{
-			Name:      "time_to_received",
+			Name:      "time_to_received_seconds",
 			Namespace: namespaceSynchronization,
 			Subsystem: subsystemSyncCore,
-			Help:      "the time between queueing and receiving a block in milliseconds",
-			Buckets:   []float64{100, 250, 500, 1000, 2500, 5000, 7500, 10000, 20000},
+			Help:      "the time between queueing and receiving a block in seconds",
+			Buckets:   []float64{.1, .25, .5, 1, 2.5, 5, 7.5, 10, 20},
 		}, []string{"requested_by"}),
 		totalPruned: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name:      "blocks_pruned_total",
@@ -69,19 +69,19 @@ func NewMetricsCollector() *MetricsCollector {
 			Help:      "the total number of blocks pruned by 'id' or 'height'",
 		}, []string{"requested_by"}),
 		storedBlocks: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Name:      "blocks_stored",
+			Name:      "blocks_stored_total",
 			Namespace: namespaceSynchronization,
 			Subsystem: subsystemSyncCore,
-			Help:      "the number of blocks currently stored",
+			Help:      "the total number of blocks currently stored by 'id' or 'height'",
 		}, []string{"requested_by"}),
 		totalHeightsRequested: prometheus.NewCounter(prometheus.CounterOpts{
-			Name:      "total_heights_requested",
+			Name:      "block_heights_requested_total",
 			Namespace: namespaceSynchronization,
 			Subsystem: subsystemSyncCore,
 			Help:      "the total number of blocks requested by height, including retried requests for the same heights. Eg: a range of 1-10 would increase the counter by 10",
 		}),
 		totalIdsRequested: prometheus.NewCounter(prometheus.CounterOpts{
-			Name:      "total_ids_requested",
+			Name:      "block_ids_requested_total",
 			Namespace: namespaceSynchronization,
 			Subsystem: subsystemSyncCore,
 			Help:      "the total number of blocks requested by id",
