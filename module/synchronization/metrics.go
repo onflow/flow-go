@@ -85,7 +85,7 @@ func NewMetricsCollector() *MetricsCollector {
 			Name:      "total_heights_requested",
 			Namespace: namespaceSynchronization,
 			Subsystem: subsystemSyncCore,
-			Help:      "the total number of blocks requested by height. range of 0-10 would increase the counter by 10",
+			Help:      "the total number of blocks requested by height, including retried requests for the same heights. Eg: a range of 1-10 would increase the counter by 10",
 		}),
 		totalIdsRequested: prometheus.NewCounter(prometheus.CounterOpts{
 			Name:      "total_ids_requested",
