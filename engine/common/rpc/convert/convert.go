@@ -141,6 +141,22 @@ func BlockHeaderToMessage(h *flow.Header) (*entities.BlockHeader, error) {
 	id := h.ID()
 
 	t := timestamppb.New(h.Timestamp)
+	var lastViewTC *entities.TimeoutCertificate
+	if h.LastViewTC != nil {
+		newestQC := h.LastViewTC.NewestQC
+		lastViewTC = &entities.TimeoutCertificate{
+			View:          h.LastViewTC.View,
+			HighQcViews:   h.LastViewTC.NewestQCViews,
+			SignerIndices: h.LastViewTC.SignerIndices,
+			SigData:       h.LastViewTC.SigData,
+			HighestQc: &entities.QuorumCertificate{
+				View:          newestQC.View,
+				BlockId:       newestQC.BlockID[:],
+				SignerIndices: newestQC.SignerIndices,
+				SigData:       newestQC.SigData,
+			},
+		}
+	}
 
 	return &entities.BlockHeader{
 		Id:                 id[:],
@@ -154,6 +170,7 @@ func BlockHeaderToMessage(h *flow.Header) (*entities.BlockHeader, error) {
 		ProposerId:         h.ProposerID[:],
 		ProposerSigData:    h.ProposerSigData,
 		ChainId:            h.ChainID.String(),
+		LastViewTc:         lastViewTC,
 	}, nil
 }
 
@@ -162,6 +179,27 @@ func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert ChainId: %w", err)
 	}
+
+	var lastViewTC *flow.TimeoutCertificate
+	if m.LastViewTc != nil {
+		newestQC := m.LastViewTc.HighestQc
+		if newestQC == nil {
+			return nil, fmt.Errorf("invalid structure newest QC should be present")
+		}
+		lastViewTC = &flow.TimeoutCertificate{
+			View:          m.LastViewTc.View,
+			NewestQCViews: m.LastViewTc.HighQcViews,
+			SignerIndices: m.LastViewTc.SignerIndices,
+			SigData:       m.LastViewTc.SigData,
+			NewestQC: &flow.QuorumCertificate{
+				View:          newestQC.View,
+				BlockID:       MessageToIdentifier(newestQC.BlockId),
+				SignerIndices: newestQC.SignerIndices,
+				SigData:       newestQC.SigData,
+			},
+		}
+	}
+
 	return &flow.Header{
 		ParentID:           MessageToIdentifier(m.ParentId),
 		Height:             m.Height,
@@ -173,6 +211,7 @@ func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
 		ProposerID:         MessageToIdentifier(m.ProposerId),
 		ProposerSigData:    m.ProposerSigData,
 		ChainID:            *chainId,
+		LastViewTC:         lastViewTC,
 	}, nil
 }
 

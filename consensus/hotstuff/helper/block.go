@@ -10,7 +10,7 @@ import (
 )
 
 func MakeBlock(options ...func(*model.Block)) *model.Block {
-	view := 1 + rand.Uint64()
+	view := rand.Uint64()
 	block := model.Block{
 		View:        view,
 		BlockID:     unittest.IdentifierFixture(),
@@ -50,6 +50,12 @@ func WithParentSigners(signerIndices []byte) func(*model.Block) {
 	}
 }
 
+func WithBlockQC(qc *flow.QuorumCertificate) func(*model.Block) {
+	return func(block *model.Block) {
+		block.QC = qc
+	}
+}
+
 func MakeProposal(options ...func(*model.Proposal)) *model.Proposal {
 	proposal := &model.Proposal{
 		Block:   MakeBlock(),
@@ -73,8 +79,8 @@ func WithSigData(sigData []byte) func(*model.Proposal) {
 	}
 }
 
-func WithLastViewTC(tc *flow.TimeoutCertificate) func(*model.Proposal) {
+func WithLastViewTC(lastViewTC *flow.TimeoutCertificate) func(*model.Proposal) {
 	return func(proposal *model.Proposal) {
-		proposal.LastViewTC = tc
+		proposal.LastViewTC = lastViewTC
 	}
 }

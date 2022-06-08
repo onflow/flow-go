@@ -99,7 +99,7 @@ func (s *SafetyRulesTestSuite) TestProduceVote_ShouldVote() {
 
 	lastViewTC := helper.MakeTC(
 		helper.WithTCView(s.proposal.Block.View+1),
-		helper.WithTCHighestQC(s.proposal.Block.QC))
+		helper.WithTCNewestQC(s.proposal.Block.QC))
 
 	// voting on proposal where last view ended with TC
 	proposalWithTC := helper.MakeProposal(
@@ -134,7 +134,7 @@ func (s *SafetyRulesTestSuite) TestProduceVote_ShouldVote() {
 func (s *SafetyRulesTestSuite) TestProduceVote_IncludedQCHigherThanTCsQC() {
 	lastViewTC := helper.MakeTC(
 		helper.WithTCView(s.proposal.Block.View+1),
-		helper.WithTCHighestQC(s.proposal.Block.QC))
+		helper.WithTCNewestQC(s.proposal.Block.QC))
 
 	// voting on proposal where last view ended with TC
 	proposalWithTC := helper.MakeProposal(
@@ -394,7 +394,7 @@ func (s *SafetyRulesTestSuite) TestProduceVote_VotingOnInvalidProposals() {
 			helper.WithLastViewTC(
 				helper.MakeTC(
 					helper.WithTCView(s.bootstrapBlock.View+1),
-					helper.WithTCHighestQC(TONewestQC))))
+					helper.WithTCNewestQC(TONewestQC))))
 		vote, err := s.safety.ProduceVote(proposal, proposal.Block.View)
 		require.Error(s.T(), err)
 		require.False(s.T(), model.IsNoVoteError(err))
@@ -492,7 +492,7 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_ShouldTimeout() {
 
 	// to create new TO we need to provide a TC
 	lastViewTC := helper.MakeTC(helper.WithTCView(view),
-		helper.WithTCHighestQC(newestQC))
+		helper.WithTCNewestQC(newestQC))
 
 	expectedTimeout = &model.TimeoutObject{
 		View:       view + 1,
@@ -570,7 +570,7 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_NotSafeToTimeout() {
 		newestQC := helper.MakeQC(helper.WithQCView(s.safetyData.LockedOneChainView))
 		// newest QC included in TC cannot be higher than the newest QC known to replica
 		lastViewTC := helper.MakeTC(helper.WithTCView(newestQC.View+1),
-			helper.WithTCHighestQC(helper.MakeQC(helper.WithQCView(newestQC.View+1))))
+			helper.WithTCNewestQC(helper.MakeQC(helper.WithQCView(newestQC.View+1))))
 
 		timeout, err := s.safety.ProduceTimeout(newestQC.View+2, newestQC, lastViewTC)
 		require.Error(s.T(), err)

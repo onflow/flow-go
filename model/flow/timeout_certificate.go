@@ -17,7 +17,7 @@ type TimeoutCertificate struct {
 	// zeros to reach full bytes). We list the nodes in their canonical order, as defined by the protocol.
 	SignerIndices []byte
 	// SigData is an aggregated signature from multiple TimeoutObjects, each from a different replica.
-	// In their TimeoutObjects, replicas sign the pair (View, HighestQCView) with their staking keys.
+	// In their TimeoutObjects, replicas sign the pair (View, NewestQCView) with their staking keys.
 	SigData crypto.Signature
 }
 
