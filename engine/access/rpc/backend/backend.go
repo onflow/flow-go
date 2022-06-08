@@ -117,6 +117,7 @@ func New(
 			connFactory:       connFactory,
 			state:             state,
 			log:               log,
+			metrics:           transactionMetrics,
 			loggedScripts:     loggedScripts,
 		},
 		backendTransactions: backendTransactions{
