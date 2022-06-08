@@ -206,7 +206,7 @@ func (c *Core) queueByHeight(height uint64) {
 	}
 
 	// queue the request
-	c.heights[height] = NewQueuedStatus()
+	c.heights[height] = NewQueuedStatus(height)
 }
 
 // queueByBlockID queues a request for a block by block ID, only if no
@@ -219,9 +219,7 @@ func (c *Core) queueByBlockID(blockID flow.Identifier, height uint64) {
 	}
 
 	// queue the request
-	status := NewQueuedStatus()
-	status.Header = &flow.Header{Height: height}
-	c.blockIDs[blockID] = status
+	c.blockIDs[blockID] = NewQueuedStatus(height)
 }
 
 // getRequestStatus retrieves a request status for a block, regardless of
@@ -263,9 +261,7 @@ func (c *Core) prune(final *flow.Header) {
 	}
 
 	for blockID, status := range c.blockIDs {
-		header := status.Header
-
-		if header.Height <= final.Height {
+		if status.BlockHeight <= final.Height {
 			delete(c.blockIDs, blockID)
 			c.metrics.PrunedBlockById(status)
 			continue

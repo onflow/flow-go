@@ -48,11 +48,12 @@ func (ss *SyncSuite) RequestedStatus() *Status {
 
 func (ss *SyncSuite) ReceivedStatus(header *flow.Header) *Status {
 	return &Status{
-		Queued:    time.Now().Add(-time.Second * 2),
-		Requested: time.Now().Add(-time.Second),
-		Attempts:  1,
-		Header:    header,
-		Received:  time.Now(),
+		BlockHeight: header.Height,
+		Queued:      time.Now().Add(-time.Second * 2),
+		Requested:   time.Now().Add(-time.Second),
+		Attempts:    1,
+		Header:      header,
+		Received:    time.Now(),
 	}
 }
 
