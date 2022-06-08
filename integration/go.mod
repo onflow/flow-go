@@ -14,13 +14,13 @@ require (
 	github.com/ipfs/go-ds-badger2 v0.1.3
 	github.com/ipfs/go-ipfs-blockstore v0.2.0
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
-	github.com/onflow/cadence v0.21.3-0.20220601002855-8b113c539a2c
+	github.com/onflow/cadence v0.24.0
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220513155751-c4c1f8d59f83
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220513155751-c4c1f8d59f83
 	github.com/onflow/flow-emulator v0.31.2-0.20220513151845-ef7513cb1cd0
 	github.com/onflow/flow-ft/lib/go/templates v0.2.0
 	github.com/onflow/flow-go v0.25.13-0.20220513151142-7858f76e703b // replaced by version on-disk
-	github.com/onflow/flow-go-sdk v0.24.1-0.20220513205729-d1f58d47c4e3
+	github.com/onflow/flow-go-sdk v0.26.0
 	github.com/onflow/flow-go/crypto v0.24.3
 	github.com/onflow/flow/protobuf/go/flow v0.3.1
 	github.com/plus3it/gorecurcopy v0.0.1
@@ -212,7 +212,7 @@ require (
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/onflow/atree v0.3.1-0.20220531231935-525fbc26f40a // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v0.5.0 // indirect
-	github.com/onflow/sdks v0.4.2 // indirect
+	github.com/onflow/sdks v0.4.4 // indirect
 	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/opencontainers/go-digest v1.0.0-rc1 // indirect
 	github.com/opencontainers/image-spec v1.0.1 // indirect
@@ -296,6 +296,6 @@ require (
 
 replace github.com/onflow/flow-go => ../
 
-replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.21.1-0.20220603213842-25e190e4ce6b
+replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.24.0-patch.1
 
 replace github.com/onflow/atree => github.com/dapperlabs/atree-internal v0.3.1-0.20220531232335-32d7f2ac0ce1
