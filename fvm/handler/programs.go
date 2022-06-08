@@ -29,11 +29,11 @@ type ProgramsHandler struct {
 }
 
 // NewProgramsHandler construts a new ProgramHandler
-func NewProgramsHandler(progs *programs.Programs, stateHolder *state.StateHolder) *ProgramsHandler {
+func NewProgramsHandler(programs *programs.Programs, stateHolder *state.StateHolder) *ProgramsHandler {
 	return &ProgramsHandler{
 		masterState:  stateHolder,
 		viewsStack:   nil,
-		Programs:     progs,
+		Programs:     programs,
 		initialState: stateHolder.State(),
 	}
 }
