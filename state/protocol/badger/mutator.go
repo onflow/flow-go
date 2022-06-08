@@ -648,13 +648,13 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 			return fmt.Errorf("could not update sealed height: %w", err)
 		}
 
-		// when a block is finalized, each seal in it is the seal for its sealed block.
-		// indexing each seal for its sealed block so that they can be used to find the seal result
-		// by sealed height.
+		// When a block is finalized, we commit the result for each seal it contains. The sealing logic
+		// guarantees that only as single, continuous execution fork is sealed. Here, we index for
+		// each block ID the ID of its _finalized_ seal.
 		for _, seal := range block.Payload.Seals {
 			err = operation.IndexBySealedBlockID(seal.ID(), seal.BlockID)(tx)
 			if err != nil {
-				return fmt.Errorf("could not index the seal as the seal of the sealed block: %w", err)
+				return fmt.Errorf("could not index the seal by the sealed block ID: %w", err)
 			}
 		}
 
