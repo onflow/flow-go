@@ -129,6 +129,7 @@ func (c *Core) HandleHeight(final *flow.Header, height uint64) {
 }
 
 func (c *Core) RequestBlock(blockID flow.Identifier, height uint64) {
+	// requesting a block by its ID storing the height to prune more efficiently
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
