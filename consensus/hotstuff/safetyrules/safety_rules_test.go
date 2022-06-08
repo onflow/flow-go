@@ -284,10 +284,21 @@ func (s *SafetyRulesTestSuite) TestProduceVote_PersistStateException() {
 	require.ErrorIs(s.T(), err, exception)
 }
 
-// TestProduceVote_VotingOnUnsafeProposal tests different scenarios where we try to vote on unsafe blocks
-func (s *SafetyRulesTestSuite) TestProduceVote_VotingOnUnsafeProposal() {
+// TestProduceVote_VotingOnInvalidProposals tests different scenarios where we try to vote on unsafe blocks
+// SafetyRules contain a variety of checks to confirm that QC and TC have the desired relationship to each other.
+// In particular, we test:
+//    (i) A TC should be included in a proposal, if and only of the QC is not the prior view.
+//   (ii) When the proposal includes a TC (i.e. the QC not being for the prior view), the TC must be for the prior view.
+//  (iii) The QC in the block must have a smaller view than the block.
+//   (iv) If the block contains a TC, the TC cannot contain a newer QC than the block itself.
+// Conditions (i) - (iv) are validity requirements for the block and all blocks that SafetyRules processes
+// are supposed to be pre-validated. Hence, failing any of those conditions means we have an internal bug.
+// Consequently, we expect SafetyRules to return exceptions but _not_ `NoVoteError`, because the latter 
+// indicates that the input block was valid but we didn't want to vote. 
+func (s *SafetyRulesTestSuite) TestProduceVote_VotingOnInvalidProposals() {
 
-	s.Run("happy-path-includes-last-view-tc", func() {
+	// a proposal which includes a QC for the previous round should not contain a TC
+	s.Run("proposal-includes-last-view-qc-and-tc", func() {
 		proposal := helper.MakeProposal(
 			helper.WithBlock(
 				helper.MakeBlock(
@@ -487,16 +498,15 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_NotSafeToTimeout() {
 		// newestQC cannot be nil
 		timeout, err := s.safety.ProduceTimeout(s.safetyData.LockedOneChainView, nil, nil)
 		require.Error(s.T(), err)
-		require.False(s.T(), model.IsNoVoteError(err))
 		require.Nil(s.T(), timeout)
 	})
-	s.Run("happy-path-includes-last-view-tc", func() {
+	// if a QC for the previous view is provided, a last view TC is unnecessary and must not be provided
+	s.Run("includes-last-view-qc-and-tc", func() {
 		newestQC := helper.MakeQC(helper.WithQCView(s.safetyData.LockedOneChainView))
 
 		// tc not needed but included
 		timeout, err := s.safety.ProduceTimeout(newestQC.View+1, newestQC, helper.MakeTC())
 		require.Error(s.T(), err)
-		require.False(s.T(), model.IsNoVoteError(err))
 		require.Nil(s.T(), timeout)
 	})
 	s.Run("last-view-tc-nil", func() {
@@ -505,7 +515,6 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_NotSafeToTimeout() {
 		// tc needed but not included
 		timeout, err := s.safety.ProduceTimeout(newestQC.View+2, newestQC, nil)
 		require.Error(s.T(), err)
-		require.False(s.T(), model.IsNoVoteError(err))
 		require.Nil(s.T(), timeout)
 	})
 	s.Run("last-view-tc-for-wrong-view", func() {
@@ -515,7 +524,6 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_NotSafeToTimeout() {
 
 		timeout, err := s.safety.ProduceTimeout(newestQC.View+2, newestQC, lastViewTC)
 		require.Error(s.T(), err)
-		require.False(s.T(), model.IsNoVoteError(err))
 		require.Nil(s.T(), timeout)
 	})
 	s.Run("cur-view-below-highest-QC", func() {
@@ -524,7 +532,6 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_NotSafeToTimeout() {
 
 		timeout, err := s.safety.ProduceTimeout(newestQC.View-1, newestQC, lastViewTC)
 		require.Error(s.T(), err)
-		require.False(s.T(), model.IsNoVoteError(err))
 		require.Nil(s.T(), timeout)
 	})
 	s.Run("last-view-tc-is-newer", func() {
@@ -535,7 +542,6 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_NotSafeToTimeout() {
 
 		timeout, err := s.safety.ProduceTimeout(newestQC.View+2, newestQC, lastViewTC)
 		require.Error(s.T(), err)
-		require.False(s.T(), model.IsNoVoteError(err))
 		require.Nil(s.T(), timeout)
 	})
 	s.Run("highest-qc-below-locked-round", func() {
@@ -543,7 +549,6 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_NotSafeToTimeout() {
 
 		timeout, err := s.safety.ProduceTimeout(newestQC.View+1, newestQC, nil)
 		require.Error(s.T(), err)
-		require.False(s.T(), model.IsNoVoteError(err))
 		require.Nil(s.T(), timeout)
 	})
 	s.Run("cur-view-below-highest-acknowledged-view", func() {
@@ -553,7 +558,6 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_NotSafeToTimeout() {
 
 		timeout, err := s.safety.ProduceTimeout(newestQC.View+1, newestQC, nil)
 		require.Error(s.T(), err)
-		require.False(s.T(), model.IsNoVoteError(err))
 		require.Nil(s.T(), timeout)
 	})
 
