@@ -41,8 +41,7 @@ type MetricsCollector struct {
 	timeToPruned          *prometheus.HistogramVec
 	timeToReceived        *prometheus.HistogramVec
 	totalPruned           *prometheus.CounterVec
-	storedByHeight        prometheus.Gauge
-	storedById            prometheus.Gauge
+	storedBlocks          *prometheus.GaugeVec
 	totalHeightsRequested prometheus.Counter
 	totalIdsRequested     prometheus.Counter
 }
@@ -69,18 +68,12 @@ func NewMetricsCollector() *MetricsCollector {
 			Subsystem: subsystemSyncCore,
 			Help:      "the total number of blocks pruned by 'id' or 'height'",
 		}, []string{"requested_by"}),
-		storedByHeight: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name:      "blocks_stored_by_height",
+		storedBlocks: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name:      "blocks_stored",
 			Namespace: namespaceSynchronization,
 			Subsystem: subsystemSyncCore,
-			Help:      "the number of blocks currently stored by height",
-		}),
-		storedById: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name:      "blocks_stored_by_id",
-			Namespace: namespaceSynchronization,
-			Subsystem: subsystemSyncCore,
-			Help:      "the number of blocks currently stored by id",
-		}),
+			Help:      "the number of blocks currently stored",
+		}, []string{"requested_by"}),
 		totalHeightsRequested: prometheus.NewCounter(prometheus.CounterOpts{
 			Name:      "total_heights_requested",
 			Namespace: namespaceSynchronization,
@@ -124,13 +117,12 @@ func (s *MetricsCollector) PrunedBlocks(totalByHeight, totalById, storedByHeight
 	s.totalPruned.With(prometheus.Labels{"requested_by": "height"}).Add(float64(totalByHeight))
 
 	// update gauges
-	s.storedById.Set(float64(storedById))
-	s.storedByHeight.Set(float64(storedByHeight))
-
+	s.storedBlocks.With(prometheus.Labels{"requested_by": "id"}).Set(float64(storedById))
+	s.storedBlocks.With(prometheus.Labels{"requested_by": "height"}).Set(float64(storedByHeight))
 }
 
 func (s *MetricsCollector) RangeRequested(ran flow.Range) {
-	s.totalHeightsRequested.Add(float64(ran.To - ran.From+1))
+	s.totalHeightsRequested.Add(float64(ran.To - ran.From + 1))
 }
 
 func (s *MetricsCollector) BatchRequested(batch flow.Batch) {
