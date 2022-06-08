@@ -32,6 +32,11 @@ func (_m *AttackNetwork) Done() <-chan struct{} {
 	return r0
 }
 
+// Observe provides a mock function with given fields: _a0
+func (_m *AttackNetwork) Observe(_a0 *insecure.Message) {
+	_m.Called(_a0)
+}
+
 // Ready provides a mock function with given fields:
 func (_m *AttackNetwork) Ready() <-chan struct{} {
 	ret := _m.Called()

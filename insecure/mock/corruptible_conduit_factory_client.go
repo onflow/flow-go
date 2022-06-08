@@ -6,7 +6,6 @@ import (
 	context "context"
 
 	grpc "google.golang.org/grpc"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
 
 	insecure "github.com/onflow/flow-go/insecure"
 
@@ -51,7 +50,7 @@ func (_m *CorruptibleConduitFactoryClient) ProcessAttackerMessage(ctx context.Co
 }
 
 // RegisterAttacker provides a mock function with given fields: ctx, in, opts
-func (_m *CorruptibleConduitFactoryClient) RegisterAttacker(ctx context.Context, in *insecure.AttackerRegisterMessage, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (_m *CorruptibleConduitFactoryClient) RegisterAttacker(ctx context.Context, in *insecure.AttackerRegisterMessage, opts ...grpc.CallOption) (insecure.CorruptibleConduitFactory_RegisterAttackerClient, error) {
 	_va := make([]interface{}, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
@@ -61,12 +60,12 @@ func (_m *CorruptibleConduitFactoryClient) RegisterAttacker(ctx context.Context,
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
-	var r0 *emptypb.Empty
-	if rf, ok := ret.Get(0).(func(context.Context, *insecure.AttackerRegisterMessage, ...grpc.CallOption) *emptypb.Empty); ok {
+	var r0 insecure.CorruptibleConduitFactory_RegisterAttackerClient
+	if rf, ok := ret.Get(0).(func(context.Context, *insecure.AttackerRegisterMessage, ...grpc.CallOption) insecure.CorruptibleConduitFactory_RegisterAttackerClient); ok {
 		r0 = rf(ctx, in, opts...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*emptypb.Empty)
+			r0 = ret.Get(0).(insecure.CorruptibleConduitFactory_RegisterAttackerClient)
 		}
 	}
 
