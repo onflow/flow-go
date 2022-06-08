@@ -6,13 +6,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/network"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/vmihailenco/msgpack"
 	"go.uber.org/atomic"
+
+	"github.com/onflow/flow-go/network"
 
 	execTestutil "github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/engine/testutil"

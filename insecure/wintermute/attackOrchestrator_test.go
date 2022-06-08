@@ -5,9 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/network"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/network"
 
 	"github.com/onflow/flow-go/insecure"
 	mockinsecure "github.com/onflow/flow-go/insecure/mock"

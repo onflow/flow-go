@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onflow/flow-go/network"
 	"github.com/spf13/pflag"
+
+	"github.com/onflow/flow-go/network"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/bootstrap"

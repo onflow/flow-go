@@ -10,8 +10,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/onflow/flow-go/network"
 	"github.com/spf13/pflag"
+
+	"github.com/onflow/flow-go/network"
 
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go-sdk/crypto"

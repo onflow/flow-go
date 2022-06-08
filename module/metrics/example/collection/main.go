@@ -4,8 +4,9 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/onflow/flow-go/network"
 	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/network"
 
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/metrics/example"

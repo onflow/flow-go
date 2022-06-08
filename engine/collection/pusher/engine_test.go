@@ -4,10 +4,11 @@ import (
 	"io/ioutil"
 	"testing"
 
-	"github.com/onflow/flow-go/network"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/onflow/flow-go/network"
 
 	"github.com/onflow/flow-go/engine/collection/pusher"
 	"github.com/onflow/flow-go/model/flow"

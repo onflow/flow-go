@@ -5,9 +5,10 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/onflow/flow-go/network"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/network"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"

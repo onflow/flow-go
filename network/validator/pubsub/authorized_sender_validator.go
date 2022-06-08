@@ -86,7 +86,7 @@ func isAuthorizedSender(identity *flow.Identity, channel network.Channel, code n
 		return nil
 	}
 
-	authorizedRolesByChannel := flow.RoleList{}
+	var authorizedRolesByChannel flow.RoleList
 
 	// handle cluster prefixed channels and check and get authorized roles list
 	if prefix, ok := network.ClusterChannelPrefix(channel); ok {

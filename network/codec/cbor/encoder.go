@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/fxamacker/cbor/v2"
+
 	"github.com/onflow/flow-go/network"
 
 	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
