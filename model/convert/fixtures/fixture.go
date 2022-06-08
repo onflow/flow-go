@@ -1,4 +1,4 @@
-package convert
+package fixtures
 
 import (
 	"github.com/onflow/flow-go/crypto"
@@ -10,9 +10,9 @@ import (
 // This file contains service event fixtures for testing purposes.
 // The Cadence form is represented by JSON-CDC-encoded string variables.
 
-// EpochSetupFixture returns an EpochSetup service event as a Cadence event
+// EpochSetupFixtureByChainID returns an EpochSetup service event as a Cadence event
 // representation and as a protocol model representation.
-func EpochSetupFixture(chain flow.ChainID) (flow.Event, *flow.EpochSetup) {
+func EpochSetupFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochSetup) {
 	events, err := systemcontracts.ServiceEventsForChain(chain)
 	if err != nil {
 		panic(err)
@@ -110,7 +110,7 @@ func EpochSetupFixture(chain flow.ChainID) (flow.Event, *flow.EpochSetup) {
 
 // EpochCommitFixture returns an EpochCommit service event as a Cadence event
 // representation and as a protocol model representation.
-func EpochCommitFixture(chain flow.ChainID) (flow.Event, *flow.EpochCommit) {
+func EpochCommitFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochCommit) {
 
 	events, err := systemcontracts.ServiceEventsForChain(chain)
 	if err != nil {
