@@ -178,7 +178,8 @@ func (s *DKGSuite) createAndFundAccount(netID *flow.Identity) *nodeAccount {
 		SetHashAlgo(sdkcrypto.SHA3_256).
 		SetWeight(sdk.AccountKeyWeightThreshold)
 	accountID := netID.NodeID.String()
-	accountSigner := sdkcrypto.NewInMemorySigner(accountPrivateKey, accountKey.HashAlgo)
+	accountSigner, err := sdkcrypto.NewInMemorySigner(accountPrivateKey, accountKey.HashAlgo)
+	require.NoError(s.T(), err)
 
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	create Flow account

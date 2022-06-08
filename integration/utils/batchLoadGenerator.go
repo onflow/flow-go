@@ -58,7 +58,10 @@ func loadServiceAccount(flowClient *client.Client,
 		return nil, fmt.Errorf("error while decoding serice account private key hex %w", err)
 	}
 
-	signer := crypto.NewInMemorySigner(privateKey, accountKey.HashAlgo)
+	signer, err := crypto.NewInMemorySigner(privateKey, accountKey.HashAlgo)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create signer: %w", err)
+	}
 
 	return &flowAccount{
 		address:    servAccAddress,
