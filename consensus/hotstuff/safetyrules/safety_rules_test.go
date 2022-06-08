@@ -570,7 +570,7 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_NotSafeToTimeout() {
 		newestQC := helper.MakeQC(helper.WithQCView(s.safetyData.LockedOneChainView))
 		// newest QC included in TC cannot be higher than the newest QC known to replica
 		lastViewTC := helper.MakeTC(helper.WithTCView(newestQC.View+1),
-			helper.WithTCHighestQC(helper.MakeQC(helper.WithQCView(newestQC.View+1))))
+			helper.WithTCNewestQC(helper.MakeQC(helper.WithQCView(newestQC.View+1))))
 
 		timeout, err := s.safety.ProduceTimeout(newestQC.View+2, newestQC, lastViewTC)
 		require.Error(s.T(), err)
