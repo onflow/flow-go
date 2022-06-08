@@ -64,7 +64,7 @@ func NewMetricsCollector() *MetricsCollector {
 			Buckets:   []float64{100, 250, 500, 1000, 2500, 5000, 7500, 10000, 20000},
 		}, []string{"requested_by"}),
 		totalPruned: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Name:      "total_blocks_pruned",
+			Name:      "blocks_pruned_total",
 			Namespace: namespaceSynchronization,
 			Subsystem: subsystemSyncCore,
 			Help:      "the total number of blocks pruned by 'id' or 'height'",
