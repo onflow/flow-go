@@ -283,8 +283,7 @@ func BenchmarkComputeHash(b *testing.B) {
 
 	// KMAC128 with 128 bytes output
 	b.Run("KMAC128_128", func(b *testing.B) {
-		alg, _ := NewKMAC_128([]byte("bench_key________"), []byte("bench_custommizer"), 128
-	)
+		alg, _ := NewKMAC_128([]byte("bench_key________"), []byte("bench_custommizer"), 128)
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			_ = alg.ComputeHash(m)
