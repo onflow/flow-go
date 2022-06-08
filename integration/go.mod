@@ -215,7 +215,7 @@ require (
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/onflow/atree v0.3.1-0.20220531231935-525fbc26f40a // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v0.5.0 // indirect
-	github.com/onflow/sdks v0.4.2 // indirect
+	github.com/onflow/sdks v0.4.4 // indirect
 	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/opencontainers/go-digest v1.0.0-rc1 // indirect
 	github.com/opencontainers/image-spec v1.0.1 // indirect
