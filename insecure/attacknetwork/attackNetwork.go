@@ -23,9 +23,9 @@ type runtime string
 
 const (
 	networkingProtocolTCP = "tcp"
-	//dockerLocalHost       = "host.docker.internal"
-	dockerRuntime    = runtime("docker")
-	localhostRuntime = runtime("localhost")
+	dockerLocalHost       = "host.docker.internal"
+	dockerRuntime         = runtime("docker")
+	localhostRuntime      = runtime("localhost")
 )
 
 // AttackNetwork implements a middleware for mounting an attack orchestrator and empowering it to communicate with the corrupted nodes.
@@ -121,7 +121,7 @@ func (a *AttackNetwork) start(ctx irrecoverable.SignalerContext, address string)
 		if err != nil {
 			return fmt.Errorf("could not split host and port for address: %s", a.address)
 		}
-		//a.address = fmt.Sprintf("%s:%s", dockerLocalHost, port)
+		a.address = fmt.Sprintf("%s:%s", dockerLocalHost, port)
 		fmt.Printf("attackNetwork>start>a.address (within dockerRuntime check)=%s\n", a.address)
 	}
 

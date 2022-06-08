@@ -150,10 +150,12 @@ func (c *Container) Addr(portName string) string {
 	return fmt.Sprintf(":%s", port)
 }
 
-// bindPort exposes the given container port and binds it to the given host port.
+// bindPort exposes the given container port and binds it to the given localhost (not docker host) port.
 // If no protocol is specified, assumes TCP.
-func (c *Container) bindPort(hostPort, containerPort string) {
-	fmt.Printf("container>bindPort>hostPort=%s, containerPort=%s\n", hostPort, containerPort)
+// Example: bindPort(8000, 9000) will connect port 8000 of the local host to port 9000 of the container, so
+// reading or writing to and from localhost:8000 is equivalent to reading or writing to and from container:9000
+func (c *Container) bindPort(localhostPort, containerPort string) {
+	fmt.Printf("container>bindPort>localhostPort=%s, containerPort=%s\n", localhostPort, containerPort)
 	// use TCP protocol if none specified
 	containerNATPort := nat.Port(containerPort)
 	fmt.Printf("container>bindPort>(before if) containerNATPort=%s\n", containerNATPort)
@@ -178,8 +180,8 @@ func (c *Container) bindPort(hostPort, containerPort string) {
 			containerNATPort: []nat.PortBinding{
 				{
 					//HostIP:   "0.0.0.0",
-					HostIP:   "172.18.0.1",
-					HostPort: hostPort,
+					HostIP:   "host.docker.internal",
+					HostPort: localhostPort,
 				},
 			},
 		}
@@ -188,8 +190,8 @@ func (c *Container) bindPort(hostPort, containerPort string) {
 		c.opts.HostConfig.PortBindings[containerNATPort] = []nat.PortBinding{
 			{
 				//HostIP:   "0.0.0.0",
-				HostIP:   "172.18.0.1",
-				HostPort: hostPort,
+				HostIP:   "host.docker.internal",
+				HostPort: localhostPort,
 			},
 		}
 	}

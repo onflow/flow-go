@@ -167,6 +167,7 @@ type BaseConfig struct {
 	// ComplianceConfig configures either the compliance engine (consensus nodes)
 	// or the follower engine (all other node roles)
 	ComplianceConfig compliance.Config
+	addHost          string // for resolving host.docker.internal on Linux / Github; see https://stackoverflow.com/a/62431165/5719544
 	//hostNetworking   string //start container using host networking: https://docs.docker.com/network/host/
 }
 

@@ -172,6 +172,8 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.MaxRequests, "sync-max-requests", defaultConfig.SyncCoreConfig.MaxRequests, "the maximum number of requests we send during each scanning period")
 
 	fnb.flags.Uint64Var(&fnb.BaseConfig.ComplianceConfig.SkipNewProposalsThreshold, "compliance-skip-proposals-threshold", defaultConfig.ComplianceConfig.SkipNewProposalsThreshold, "threshold at which new proposals are discarded rather than cached, if their height is this much above local finalized height")
+
+	fnb.flags.StringVar(&fnb.BaseConfig.addHost, "add-host", "host.docker.internal:host-gateway", "for resolving host.docker.internal on Linux")
 	//fnb.flags.StringVar(&fnb.BaseConfig.hostNetworking, "network", "host", "enable host networking when container starts")
 	fmt.Println("FlowNodeBuilder>BaseFlags>end")
 }
@@ -422,9 +424,9 @@ func (fnb *FlowNodeBuilder) ParseAndPrintFlags() error {
 	log := fnb.Logger.Info()
 
 	pflag.VisitAll(func(flag *pflag.Flag) {
-		fmt.Println("scaffold>ParseAndPrintFlags>3")
+		fmt.Println("scaffold>ParseAndPrintFlags>about to visit flag>(flag.Name, flag.Value)=(", flag.Name, ", ", flag.Value, ")")
 		log = log.Str(flag.Name, flag.Value.String())
-		fmt.Println("scaffold>ParseAndPrintFlags>4")
+		fmt.Println("scaffold>ParseAndPrintFlags>just visited flag")
 	})
 
 	log.Msg("flags loaded")
