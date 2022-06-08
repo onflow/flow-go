@@ -121,7 +121,7 @@ func TestMapToG1(t *testing.T) {
 }
 
 // Hashing to G1 bench
-func BenchmarkHashToG1(b *testing.B) {
+func BenchmarkMapToG1(b *testing.B) {
 	blsInstance.reInit()
 	input := make([]byte, minHashSizeBLSBLS12381)
 	for i := 0; i < len(input); i++ {
@@ -129,7 +129,7 @@ func BenchmarkHashToG1(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		hashToG1(input)
+		mapToG1(input)
 	}
 	b.StopTimer()
 	return

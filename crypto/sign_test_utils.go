@@ -100,7 +100,7 @@ func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
 	seedMinLength := 48
 
 	t.Run("happy path tests", func(t *testing.T) {
-		loops := 50
+		loops := 1
 		for j := 0; j < loops; j++ {
 			// generate a private key
 			seed := make([]byte, seedMinLength)

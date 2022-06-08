@@ -328,6 +328,7 @@ static void map_to_G1_local(ep_t p, const uint8_t *msg, int len) {
         eval_iso11(p, p); // map to E
         // sum 
         // TODO: implement point addition in E1 and apply the isogeny map only once.
+        // Gives 4% improvement for map-to-curve overall
         ep_add_jacob(p, p, p_temp);
         
         // clear the cofactor

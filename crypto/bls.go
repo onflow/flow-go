@@ -427,7 +427,7 @@ func (pk *pointG2) checkValidPublicKeyPoint() bool {
 
 // This is only a TEST/DEBUG/BENCH function.
 // It returns the hash to G1 point from a slice of 128 bytes
-func hashToG1(data []byte) *pointG1 {
+func mapToG1(data []byte) *pointG1 {
 	l := len(data)
 	var h pointG1
 	C.map_to_G1((*C.ep_st)(&h), (*C.uchar)(&data[0]), (C.int)(l))
