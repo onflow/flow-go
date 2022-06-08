@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/network"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -121,7 +122,7 @@ func (s *MatchingEngineSuite) TestMultipleProcessingItems() {
 	go func() {
 		defer wg.Done()
 		for _, receipt := range receipts {
-			err := s.engine.Process(engine.ReceiveReceipts, originID, receipt)
+			err := s.engine.Process(network.ReceiveReceipts, originID, receipt)
 			s.Require().NoError(err, "should add receipt and result to mempool if valid")
 		}
 	}()

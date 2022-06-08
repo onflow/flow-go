@@ -54,7 +54,7 @@ func New(
 	}
 
 	// register the engine with the network layer and store the conduit
-	con, err := net.Register(engine.PushBlocks, e)
+	con, err := net.Register(network.PushBlocks, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}

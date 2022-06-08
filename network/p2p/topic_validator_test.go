@@ -11,10 +11,10 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/onflow/flow-go/network"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network/message"
@@ -35,8 +35,8 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	identity3, privateKey3 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleAccess))
 	an1 := createNode(t, identity3.NodeID, privateKey3, sporkId)
 
-	channel := engine.ConsensusCommittee
-	topic := engine.TopicFromChannel(channel, sporkId)
+	channel := network.ConsensusCommittee
+	topic := network.TopicFromChannel(channel, sporkId)
 
 	ids := flow.IdentityList{identity1, identity2, identity3}
 	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
@@ -141,8 +141,8 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	sn2 := createNode(t, identity2.NodeID, privateKey2, sporkId)
 
 	// try to publish BlockProposal on invalid SyncCommittee channel
-	channel := engine.SyncCommittee
-	topic := engine.TopicFromChannel(channel, sporkId)
+	channel := network.SyncCommittee
+	topic := network.TopicFromChannel(channel, sporkId)
 
 	ids := flow.IdentityList{identity1, identity2}
 	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
@@ -213,8 +213,8 @@ func TestAuthorizedSenderValidator_Unstaked(t *testing.T) {
 	identity2, privateKey2 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
 	sn2 := createNode(t, identity2.NodeID, privateKey2, sporkId)
 
-	channel := engine.ConsensusCommittee
-	topic := engine.TopicFromChannel(channel, sporkId)
+	channel := network.ConsensusCommittee
+	topic := network.TopicFromChannel(channel, sporkId)
 
 	//NOTE: identity2 is not in the ids list simulating an un-staked node
 	ids := flow.IdentityList{identity1}
@@ -289,8 +289,8 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	identity3, privateKey3 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleAccess))
 	an1 := createNode(t, identity3.NodeID, privateKey3, sporkId)
 
-	channel := engine.ConsensusCommittee
-	topic := engine.TopicFromChannel(channel, sporkId)
+	channel := network.ConsensusCommittee
+	topic := network.TopicFromChannel(channel, sporkId)
 
 	ids := flow.IdentityList{identity1, identity2, identity3}
 	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
@@ -386,8 +386,8 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	identity3, privateKey3 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleCollection))
 	ln3 := createNode(t, identity3.NodeID, privateKey3, sporkId)
 
-	channel := engine.ChannelSyncCluster(flow.Testnet)
-	topic := engine.TopicFromChannel(channel, sporkId)
+	channel := network.ChannelSyncCluster(flow.Testnet)
+	topic := network.TopicFromChannel(channel, sporkId)
 
 	ids := flow.IdentityList{identity1, identity2}
 	translator, err := p2p.NewFixedTableIdentityTranslator(ids)

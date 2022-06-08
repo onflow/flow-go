@@ -21,7 +21,6 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/libp2p/message"
@@ -320,7 +319,7 @@ func GenerateEngines(t *testing.T, nets []network.Network) []*MeshEngine {
 	count := len(nets)
 	engs := make([]*MeshEngine, count)
 	for i, n := range nets {
-		eng := NewMeshEngine(t, n, 100, engine.TestNetwork)
+		eng := NewMeshEngine(t, n, 100, network.TestNetwork)
 		engs[i] = eng
 	}
 	return engs

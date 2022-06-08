@@ -4,9 +4,9 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/onflow/flow-go/network"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/metrics/example"
 	"github.com/onflow/flow-go/module/trace"
@@ -30,8 +30,8 @@ func main() {
 			NetworkCollector:    metrics.NewNetworkCollector(),
 		}
 
-		topic1 := engine.TestNetwork.String()
-		topic2 := engine.TestMetrics.String()
+		topic1 := network.TestNetwork.String()
+		topic2 := network.TestMetrics.String()
 		message1 := "CollectionRequest"
 		message2 := "ClusterBlockProposal"
 

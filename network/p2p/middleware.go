@@ -19,7 +19,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
@@ -497,10 +496,10 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 // Subscribe subscribes the middleware to a channel.
 func (m *Middleware) Subscribe(channel network.Channel) error {
 
-	topic := engine.TopicFromChannel(channel, m.rootBlockID)
+	topic := network.TopicFromChannel(channel, m.rootBlockID)
 
 	var validators []psValidator.MessageValidator
-	if !engine.PublicChannels().Contains(channel) {
+	if !network.PublicChannels().Contains(channel) {
 		// for channels used by the staked nodes, add the topic validator to filter out messages from non-staked nodes
 		validators = append(validators,
 			// NOTE: The AuthorizedSenderValidator will assert the sender is a staked node
@@ -528,7 +527,7 @@ func (m *Middleware) Subscribe(channel network.Channel) error {
 
 // Unsubscribe unsubscribes the middleware from a channel.
 func (m *Middleware) Unsubscribe(channel network.Channel) error {
-	topic := engine.TopicFromChannel(channel, m.rootBlockID)
+	topic := network.TopicFromChannel(channel, m.rootBlockID)
 	err := m.libP2PNode.UnSubscribe(topic)
 	if err != nil {
 		return fmt.Errorf("failed to unsubscribe from channel %s: %w", channel, err)
@@ -602,7 +601,7 @@ func (m *Middleware) Publish(msg *message.Message, channel network.Channel) erro
 		return fmt.Errorf("message size %d exceeds configured max message size %d", msgSize, DefaultMaxPubSubMsgSize)
 	}
 
-	topic := engine.TopicFromChannel(channel, m.rootBlockID)
+	topic := network.TopicFromChannel(channel, m.rootBlockID)
 
 	// publish the bytes on the topic
 	err = m.libP2PNode.Publish(m.ctx, topic, data)

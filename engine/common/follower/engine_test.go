@@ -3,13 +3,13 @@ package follower_test
 import (
 	"testing"
 
+	"github.com/onflow/flow-go/network"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/compliance"
@@ -109,7 +109,7 @@ func (suite *Suite) TestHandlePendingBlock() {
 
 	// submit the block
 	proposal := unittest.ProposalFromBlock(&block)
-	err := suite.engine.Process(engine.ReceiveBlocks, originID, proposal)
+	err := suite.engine.Process(network.ReceiveBlocks, originID, proposal)
 	assert.Nil(suite.T(), err)
 
 	suite.follower.AssertNotCalled(suite.T(), "SubmitProposal", mock.Anything)
@@ -145,7 +145,7 @@ func (suite *Suite) TestHandleProposal() {
 
 	// submit the block
 	proposal := unittest.ProposalFromBlock(&block)
-	err := suite.engine.Process(engine.ReceiveBlocks, originID, proposal)
+	err := suite.engine.Process(network.ReceiveBlocks, originID, proposal)
 	assert.Nil(suite.T(), err)
 
 	suite.follower.AssertExpectations(suite.T())
@@ -168,7 +168,7 @@ func (suite *Suite) TestHandleProposalSkipProposalThreshold() {
 
 	// submit the block
 	proposal := unittest.ProposalFromBlock(&block)
-	err := suite.engine.Process(engine.ReceiveBlocks, originID, proposal)
+	err := suite.engine.Process(network.ReceiveBlocks, originID, proposal)
 	assert.NoError(suite.T(), err)
 
 	// block should be dropped - not added to state or cache
@@ -224,7 +224,7 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 
 	// submit the block proposal
 	proposal := unittest.ProposalFromBlock(&block)
-	err := suite.engine.Process(engine.ReceiveBlocks, originID, proposal)
+	err := suite.engine.Process(network.ReceiveBlocks, originID, proposal)
 	assert.Nil(suite.T(), err)
 
 	suite.follower.AssertExpectations(suite.T())

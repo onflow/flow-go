@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onflow/flow-go/network"
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
@@ -22,7 +23,6 @@ import (
 	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/collection/epochmgr"
 	"github.com/onflow/flow-go/engine/collection/epochmgr/factories"
 	"github.com/onflow/flow-go/engine/collection/ingest"
@@ -371,7 +371,7 @@ func main() {
 				return coll, err
 			}
 			return provider.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
-				engine.ProvideCollections,
+				network.ProvideCollections,
 				filter.HasRole(flow.RoleAccess, flow.RoleExecution),
 				retrieve,
 			)

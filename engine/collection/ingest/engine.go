@@ -117,7 +117,7 @@ func New(
 		AddWorker(e.processQueuedTransactions).
 		Build()
 
-	conduit, err := net.Register(engine.PushTransactions, e)
+	conduit, err := net.Register(network.PushTransactions, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/network"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -165,7 +166,7 @@ func (s *SealingEngineSuite) TestMultipleProcessingItems() {
 	go func() {
 		defer wg.Done()
 		for _, approval := range approvals {
-			err := s.engine.Process(engine.ReceiveApprovals, approverID, approval)
+			err := s.engine.Process(network.ReceiveApprovals, approverID, approval)
 			s.Require().NoError(err, "should process approval")
 		}
 	}()
@@ -173,7 +174,7 @@ func (s *SealingEngineSuite) TestMultipleProcessingItems() {
 	go func() {
 		defer wg.Done()
 		for _, approval := range responseApprovals {
-			err := s.engine.Process(engine.ReceiveApprovals, approverID, approval)
+			err := s.engine.Process(network.ReceiveApprovals, approverID, approval)
 			s.Require().NoError(err, "should process approval")
 		}
 	}()
@@ -192,7 +193,7 @@ func (s *SealingEngineSuite) TestApprovalInvalidOrigin() {
 	originID := unittest.IdentifierFixture()
 	approval := unittest.ResultApprovalFixture() // with random ApproverID
 
-	err := s.engine.Process(engine.ReceiveApprovals, originID, approval)
+	err := s.engine.Process(network.ReceiveApprovals, originID, approval)
 	s.Require().NoError(err, "approval from unknown verifier should be dropped but not error")
 
 	// sealing engine has at least 100ms ticks for processing events

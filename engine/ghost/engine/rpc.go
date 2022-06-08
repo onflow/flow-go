@@ -85,16 +85,16 @@ func registerConduits(net network.Network, state protocol.State, eng network.Eng
 
 	// create a list of all channels that don't change over time
 	channels := network.ChannelList{
-		engine.ConsensusCommittee,
-		engine.SyncCommittee,
-		engine.SyncExecution,
-		engine.PushTransactions,
-		engine.PushGuarantees,
-		engine.PushBlocks,
-		engine.PushReceipts,
-		engine.PushApprovals,
-		engine.RequestCollections,
-		engine.RequestChunks,
+		network.ConsensusCommittee,
+		network.SyncCommittee,
+		network.SyncExecution,
+		network.PushTransactions,
+		network.PushGuarantees,
+		network.PushBlocks,
+		network.PushReceipts,
+		network.PushApprovals,
+		network.RequestCollections,
+		network.RequestChunks,
 	}
 
 	// add channels that are dependent on protocol state and change over time
@@ -116,8 +116,8 @@ func registerConduits(net network.Network, state protocol.State, eng network.Eng
 		// add the dynamic channels for the cluster
 		channels = append(
 			channels,
-			engine.ChannelConsensusCluster(clusterID),
-			engine.ChannelSyncCluster(clusterID),
+			network.ChannelConsensusCluster(clusterID),
+			network.ChannelSyncCluster(clusterID),
 		)
 	}
 

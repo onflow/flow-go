@@ -178,7 +178,7 @@ func New(
 		Build()
 
 	// register engine with the execution receipt provider
-	_, err = net.Register(engine.ReceiveReceipts, e)
+	_, err = net.Register(network.ReceiveReceipts, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register for results: %w", err)
 	}

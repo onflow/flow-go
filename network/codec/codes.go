@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	CodeMin MessageCode = iota + 1
+	CodeMin Code = iota + 1
 
 	// consensus
 	CodeBlockProposal
@@ -63,10 +63,10 @@ const (
 	CodeMax
 )
 
-type MessageCode uint8
+type Code uint8
 
-// String returns the string name of the message type the MessageCode belongs to.
-func (code MessageCode) String() (string, error) {
+// String returns the string name of the message type the Code belongs to.
+func (code Code) String() (string, error) {
 	var s string
 
 	switch code {
@@ -149,8 +149,8 @@ func (code MessageCode) String() (string, error) {
 	return s, nil
 }
 
-// Interface returns an interface{} where it's underlying type is the flow message the MessageCode belongs to.
-func (code MessageCode) Interface() (interface{}, error) {
+// Interface returns an interface{} where it's underlying type is the flow message the Code belongs to.
+func (code Code) Interface() (interface{}, error) {
 	var v interface{}
 
 	switch code {
@@ -233,13 +233,13 @@ func (code MessageCode) Interface() (interface{}, error) {
 	return v, nil
 }
 
-// Byte is a helper func that returns the MessageCode as a byte type.
-func (code MessageCode) Byte() byte {
+// Byte is a helper func that returns the Code as a byte type.
+func (code Code) Byte() byte {
 	return byte(code)
 }
 
 // Message is wrapper that calls both String and Interface
-func (code MessageCode) Message() (string, interface{}, error) {
+func (code Code) Message() (string, interface{}, error) {
 	what, err := code.String()
 	if err != nil {
 		return "", nil, err
@@ -251,101 +251,4 @@ func (code MessageCode) Message() (string, interface{}, error) {
 	}
 
 	return what, v, nil
-}
-
-// MessageCodeFromV returns the correct MessageCode based on the underlying type of message v
-func MessageCodeFromV(v interface{}) (MessageCode, error) {
-	var code MessageCode
-
-	switch v.(type) {
-	// consensus
-	case *messages.BlockProposal:
-		code = CodeBlockProposal
-	case *messages.BlockVote:
-		code = CodeBlockVote
-
-	// protocol state sync
-	case *messages.SyncRequest:
-		code = CodeSyncRequest
-	case *messages.SyncResponse:
-		code = CodeSyncResponse
-	case *messages.RangeRequest:
-		code = CodeRangeRequest
-	case *messages.BatchRequest:
-		code = CodeBatchRequest
-	case *messages.BlockResponse:
-		code = CodeBlockResponse
-
-	// cluster consensus
-	case *messages.ClusterBlockProposal:
-		code = CodeClusterBlockProposal
-	case *messages.ClusterBlockVote:
-		code = CodeClusterBlockVote
-	case *messages.ClusterBlockResponse:
-		code = CodeClusterBlockResponse
-
-	// collections, guarantees & transactions
-	case *flow.CollectionGuarantee:
-		code = CodeCollectionGuarantee
-	case *flow.TransactionBody:
-		code = CodeTransactionBody
-	case *flow.Transaction:
-		code = CodeTransaction
-
-	// core messages for execution & verification
-	case *flow.ExecutionReceipt:
-		code = CodeExecutionReceipt
-	case *flow.ResultApproval:
-		code = CodeResultApproval
-
-	// execution state synchronization
-	case *messages.ExecutionStateSyncRequest:
-		code = CodeExecutionStateSyncRequest
-	case *messages.ExecutionStateDelta:
-		code = CodeExecutionStateDelta
-
-	// data exchange for execution of blocks
-	case *messages.ChunkDataRequest:
-		code = CodeChunkDataRequest
-	case *messages.ChunkDataResponse:
-		code = CodeChunkDataResponse
-
-	// result approvals
-	case *messages.ApprovalRequest:
-		code = CodeApprovalRequest
-	case *messages.ApprovalResponse:
-		code = CodeApprovalResponse
-
-	// generic entity exchange engines
-	case *messages.EntityRequest:
-		code = CodeEntityRequest
-	case *messages.EntityResponse:
-		code = CodeEntityResponse
-
-	// testing
-	case *message.TestMessage:
-		code = CodeEcho
-
-	// dkg
-	case *messages.DKGMessage:
-		code = CodeDKGMessage
-
-	default:
-		return 0, fmt.Errorf("invalid encode type (%T)", v)
-	}
-
-	return code, nil
-}
-
-// MessageCodeFromByte helper func that performs a sanity check before returning a byte b as a MessageCode
-func MessageCodeFromByte(b byte) (MessageCode, error) {
-	c := MessageCode(b)
-
-	// sanity check
-	_, err := c.Interface()
-	if err != nil {
-		return MessageCode(0), err
-	}
-
-	return c, err
 }

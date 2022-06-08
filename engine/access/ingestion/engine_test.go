@@ -9,13 +9,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/network"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	hotmodel "github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -83,7 +83,7 @@ func (suite *Suite) SetupTest() {
 
 	net := new(mocknetwork.Network)
 	conduit := new(mocknetwork.Conduit)
-	net.On("Register", engine.ReceiveReceipts, mock.Anything).
+	net.On("Register", network.ReceiveReceipts, mock.Anything).
 		Return(conduit, nil).
 		Once()
 	suite.request = new(module.Requester)

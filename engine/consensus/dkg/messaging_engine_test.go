@@ -4,11 +4,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/network"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine"
 	msg "github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/dkg"
 	module "github.com/onflow/flow-go/module/mock"
@@ -93,7 +93,7 @@ func TestForwardIncomingMessages(t *testing.T) {
 		close(doneCh)
 	}()
 
-	err := e.Process(engine.DKGCommittee, originID, &expectedMsg.DKGMessage)
+	err := e.Process(network.DKGCommittee, originID, &expectedMsg.DKGMessage)
 	require.NoError(t, err)
 
 	unittest.RequireCloseBefore(t, doneCh, time.Second, "message not received")

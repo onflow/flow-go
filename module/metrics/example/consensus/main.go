@@ -5,10 +5,10 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/onflow/flow-go/network"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/metrics/example"
@@ -63,8 +63,8 @@ func main() {
 				collector.FinishBlockToSeal(flow.HashToID(entityID))
 			}
 
-			collProvider := engine.TestNetwork.String()
-			collIngest := engine.TestMetrics.String()
+			collProvider := network.TestNetwork.String()
+			collIngest := network.TestMetrics.String()
 			message1 := "CollectionRequest"
 			message2 := "ClusterBlockProposal"
 

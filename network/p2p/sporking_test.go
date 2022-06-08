@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
@@ -161,7 +160,7 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 	require.NoError(t, err)
 
 	// spork topic is derived by suffixing the channel with the root block ID
-	topicBeforeSpork := engine.TopicFromChannel(engine.TestNetwork, previousSporkId)
+	topicBeforeSpork := network.TopicFromChannel(network.TestNetwork, previousSporkId)
 
 	// both nodes are initially on the same spork and subscribed to the same topic
 	_, err = node1.Subscribe(topicBeforeSpork)
@@ -183,7 +182,7 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 	rootIDAfterSpork := unittest.IdentifierFixture()
 
 	// topic after the spork
-	topicAfterSpork := engine.TopicFromChannel(engine.TestNetwork, rootIDAfterSpork)
+	topicAfterSpork := network.TopicFromChannel(network.TestNetwork, rootIDAfterSpork)
 
 	// mimic that node1 now is now part of the new spork while node2 remains on the old spork
 	// by unsubscribing node1 from 'topicBeforeSpork' and subscribing it to 'topicAfterSpork'

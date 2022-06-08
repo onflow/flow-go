@@ -14,7 +14,6 @@ import (
 
 	"github.com/onflow/flow-go/crypto/hash"
 
-	channels "github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -220,7 +219,7 @@ func (n *Network) runMiddleware(ctx irrecoverable.SignalerContext, ready compone
 }
 
 func (n *Network) handleRegisterEngineRequest(parent irrecoverable.SignalerContext, channel network.Channel, engine network.MessageProcessor) (network.Conduit, error) {
-	if !channels.Exists(channel) {
+	if !network.Exists(channel) {
 		return nil, fmt.Errorf("unknown channel: %s, should be registered in topic map", channel)
 	}
 

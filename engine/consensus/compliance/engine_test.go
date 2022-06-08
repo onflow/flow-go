@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/network"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -172,7 +173,7 @@ func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
 				SigData:  vote.SigData,
 			}).Return().Once()
 			// execute the vote submission
-			_ = cs.engine.Process(engine.ConsensusCommittee, originID, &vote)
+			_ = cs.engine.Process(network.ConsensusCommittee, originID, &vote)
 		}
 		wg.Done()
 	}()
@@ -186,7 +187,7 @@ func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
 		// store the data for retrieval
 		cs.headerDB[block.Header.ParentID] = cs.head
 		cs.hotstuff.On("SubmitProposal", block.Header, cs.head.View).Return()
-		_ = cs.engine.Process(engine.ConsensusCommittee, originID, proposal)
+		_ = cs.engine.Process(network.ConsensusCommittee, originID, proposal)
 		wg.Done()
 	}()
 

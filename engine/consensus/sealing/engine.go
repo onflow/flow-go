@@ -124,13 +124,13 @@ func NewEngine(log zerolog.Logger,
 	}
 
 	// register engine with the approval provider
-	_, err = net.Register(engine.ReceiveApprovals, e)
+	_, err = net.Register(network.ReceiveApprovals, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register for approvals: %w", err)
 	}
 
 	// register engine to the channel for requesting missing approvals
-	approvalConduit, err := net.Register(engine.RequestApprovalsByChunk, e)
+	approvalConduit, err := net.Register(network.RequestApprovalsByChunk, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register for requesting approvals: %w", err)
 	}

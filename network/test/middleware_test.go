@@ -15,8 +15,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	mockery "github.com/stretchr/testify/mock"
 
-	channels "github.com/onflow/flow-go/engine"
-
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -34,7 +32,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-const testChannel = channels.PublicSyncCommittee
+const testChannel = network.PublicSyncCommittee
 
 // libp2p emits a call to `Protect` with a topic-specific tag upon establishing each peering connection in a GossipSUb mesh, see:
 // https://github.com/libp2p/go-libp2p-pubsub/blob/master/tag_tracer.go

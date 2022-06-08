@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/onflow/flow-go/network"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	testifymock "github.com/stretchr/testify/mock"
@@ -14,7 +15,6 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/testutil/mocklocal"
 	"github.com/onflow/flow-go/engine/verification/utils"
 	"github.com/onflow/flow-go/engine/verification/verifier"
@@ -65,11 +65,11 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 	suite.approvals.On("Store", mock.Anything).Return(nil)
 	suite.approvals.On("Index", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
-	suite.net.On("Register", engine.PushApprovals, testifymock.Anything).
+	suite.net.On("Register", network.PushApprovals, testifymock.Anything).
 		Return(suite.pushCon, nil).
 		Once()
 
-	suite.net.On("Register", engine.ProvideApprovalsByChunk, testifymock.Anything).
+	suite.net.On("Register", network.ProvideApprovalsByChunk, testifymock.Anything).
 		Return(suite.pullCon, nil).
 		Once()
 

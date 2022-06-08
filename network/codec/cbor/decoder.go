@@ -6,8 +6,7 @@ import (
 	"fmt"
 
 	"github.com/fxamacker/cbor/v2"
-
-	"github.com/onflow/flow-go/network/codec"
+	"github.com/onflow/flow-go/network"
 
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
@@ -29,12 +28,12 @@ func (d *Decoder) Decode() (interface{}, error) {
 		return nil, fmt.Errorf("could not decode envelope; len(data)=%d: %w", len(data), err)
 	}
 
-	code, err := codec.MessageCodeFromByte(data[0]) // only first byte
+	code, err := network.MessageCodeFromByte(data[0]) // only first byte
 	if err != nil {
 		return nil, fmt.Errorf("could not get message code from byte: %w", err)
 	}
 
-	what, v, err := code.Message()
+	what, v, err := code.Code.Message()
 	if err != nil {
 		return nil, fmt.Errorf("could not determine interface from code: %w", err)
 	}
@@ -44,7 +43,7 @@ func (d *Decoder) Decode() (interface{}, error) {
 	err = cbor.Unmarshal(data[1:], v) // all but first byte
 	//binstat.Leave(bs2)
 	if err != nil {
-		return nil, fmt.Errorf("could not decode CBOR payload with envelop code %d AKA %s: %w", code, what, err) // e.g. 2, "CodeBlockProposal", <CBOR error>
+		return nil, fmt.Errorf("could not decode CBOR payload with envelop code %d AKA %s: %w", code.Code, what, err) // e.g. 2, "CodeBlockProposal", <CBOR error>
 	}
 
 	return v, nil
