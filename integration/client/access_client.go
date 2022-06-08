@@ -6,9 +6,6 @@ package client
 import (
 	"context"
 
-	//sdk "github.com/onflow/flow-go-sdk"
-	//sdkConvert "github.com/onflow/flow-go-sdk/client/convert"
-
 	"google.golang.org/grpc"
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
