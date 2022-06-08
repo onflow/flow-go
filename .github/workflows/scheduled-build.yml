@@ -9,7 +9,7 @@ env:
   BUCKET_NAME: 'flow-internal-tooling-bucket'
   # Make sure to change this to master before merging
   DEFAULT_BRANCH: spb/add-workflows
-  GO_VERSION: '1.17'
+  GO_VERSION: '1.18'
 
 jobs:
   tag-version:
