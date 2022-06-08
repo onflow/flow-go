@@ -20,6 +20,10 @@ jobs:
         with:
           ref: ${{ env.DEFAULT_BRANCH }}
 
+      - name: Get Short Commit
+        run: echo "::set-output name=SHORT_COMMIT::$(make short_commit)"
+        id: short_commit
+
       - name: Bump version and push tag
         id: tag_version
         uses: mathieudutour/github-tag-action@v6.0
@@ -31,10 +35,6 @@ jobs:
         uses: actions/checkout@v3
         with:
           ref: ${{ env.DEFAULT_BRANCH }}
-
-      - name: Get Short Commit
-        run: echo "::set-output name=SHORT_COMMIT::$(make short_commit)"
-        id: short_commit
 
       - name: Setup Go
         uses: actions/setup-go@v2
