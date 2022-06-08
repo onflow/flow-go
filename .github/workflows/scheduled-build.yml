@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
+        with:
+          ref: ${{ env.DEFAULT_BRANCH }}
 
       - name: Get Short Commit
         run: echo "::set-output name=SHORT_COMMIT::daily-$(make short_commit)"
