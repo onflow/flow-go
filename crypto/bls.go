@@ -13,9 +13,9 @@ package crypto
 //  - public keys are longer (on G2)
 //  - serialization of points on G1 and G2 is compressed ([zcash]
 //     https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-)
-//  - hash to curve is using the optimized SWU map
+//  - hash to curve is using the optimized SWU map-to-curve
 //    (https://eprint.iacr.org/2019/403.pdf section 4)
-//  - expanding the message is using a cSHAKE-based KMAC128 with a domain separation tag.
+//  - expanding the message in hash-to-curve is using a cSHAKE-based KMAC128 with a domain separation tag.
 //    KMAC128 serves as the expand_message_xof function as per draft-irtf-cfrg-hash-to-curve.
 //  - signature verification checks the membership of signature in G1
 //  - the public key membership check in G2 is implemented separately from the signature verification.
