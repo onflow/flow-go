@@ -17,12 +17,11 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
-        with:
-          ref: ${{ env.DEFAULT_BRANCH }}
 
       - name: Get Short Commit
         run: echo "::set-output name=SHORT_COMMIT::$(make short_commit)"
         id: short_commit
+        working-directory: ./flow-go
 
       - name: Bump version and push tag
         id: tag_version
@@ -30,11 +29,6 @@ jobs:
         with:
           custom_tag: daily-${{ steps.version.outputs.SHORT_COMMIT }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-  
-      - name: Checkout repo
-        uses: actions/checkout@v3
-        with:
-          ref: ${{ env.DEFAULT_BRANCH }}
 
       - name: Setup Go
         uses: actions/setup-go@v2
@@ -66,11 +60,6 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GO_VERSION }}
-
-      - name: Checkout Created Tag
-        uses: actions/checkout@v3
-        with:
-          ref: daily-${{ steps.version.outputs.SHORT_COMMIT }}
 
       - name: Build tools
         run: |
