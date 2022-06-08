@@ -12,6 +12,9 @@ echo "test category (run-tests):" $TEST_CATEGORY>&2
 echo "docker version (run-tests):"
 docker -v>&2
 
+echo "docker host-gateway test (run-tests):"
+docker run --rm --add-host=host.docker.internal:host-gateway ubuntu:18.04 cat /etc/hosts>&2
+
 # run tests and process results
 
 if [[ $TEST_CATEGORY =~ integration-(bft|ghost|mvp|network|epochs|access|collection|consensus|execution|verification)$ ]]
