@@ -49,18 +49,18 @@ jobs:
       - name: Build relic
         run: make crypto_setup_gopath
 
-      - name: Docker login
-        uses: docker/login-action@v1
-        with:
-          registry: gcr.io
-          username: _json_key
-          password: ${{ secrets.GCR_SERVICE_KEY }}
+      # - name: Docker login
+      #   uses: docker/login-action@v1
+      #   with:
+      #     registry: gcr.io
+      #     username: _json_key
+      #     password: ${{ secrets.GCR_SERVICE_KEY }}
 
-      - name: Docker build
-        run: make docker-build-flow
+      # - name: Docker build
+      #   run: make docker-build-flow
 
-      - name: Docker push
-        run: make docker-push-flow
+      # - name: Docker push
+      #   run: make docker-push-flow
 
       - name: Setup Go
         uses: actions/setup-go@v3
@@ -72,24 +72,26 @@ jobs:
           make tool-util
           make tool-bootstrap
           make tool-transit
-  
+
+      - id: 'auth'
+        uses: 'google-github-actions/auth@v0'
+        with:
+          credentials_json: '$${{ secrets.GCP_CD_CREDS }}'
+
       - id: 'upload-util'
         uses: 'google-github-actions/upload-cloud-storage@v0'
         with:
-          credentials_json: '${{ secrets.GCP_CD_CREDS }}'
-          destination: $BUCKET_NAME/daily/${{ steps.version.outputs.SHORT_COMMIT }}/util
+          destination: $BUCKET_NAME/daily/${{ steps.version.outputs.SHORT_COMMIT }}/
           path: './util'
 
       - id: 'upload-bootstrap'
         uses: 'google-github-actions/upload-cloud-storage@v0'
         with:
-          credentials_json: '${{ secrets.GCP_CD_CREDS }}'
-          destination: $BUCKET_NAME/daily/${{ steps.version.outputs.SHORT_COMMIT }}/bootstrap
+          destination: $BUCKET_NAME/daily/${{ steps.version.outputs.SHORT_COMMIT }}/
           path: './boostrap'
 
       - id: 'upload-transit'
         uses: 'google-github-actions/upload-cloud-storage@v0'
         with:
-          credentials_json: '${{ secrets.GCP_CD_CREDS }}'
-          destination: ${{ env.BUCKET_NAME }}/daily/${{ steps.version.outputs.SHORT_COMMIT }}/transit
+          destination: ${{ env.BUCKET_NAME }}/daily/${{ steps.version.outputs.SHORT_COMMIT }}/
           path: './util'
