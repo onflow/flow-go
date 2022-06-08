@@ -81,13 +81,13 @@ jobs:
       - id: 'upload-util'
         uses: 'google-github-actions/upload-cloud-storage@v0'
         with:
-          destination: $BUCKET_NAME/daily/${{ steps.version.outputs.SHORT_COMMIT }}/
+          destination: ${{ env.BUCKET_NAME }}/daily/${{ steps.version.outputs.SHORT_COMMIT }}/
           path: './util'
 
       - id: 'upload-bootstrap'
         uses: 'google-github-actions/upload-cloud-storage@v0'
         with:
-          destination: $BUCKET_NAME/daily/${{ steps.version.outputs.SHORT_COMMIT }}/
+          destination: ${{ env.BUCKET_NAME }}daily/${{ steps.version.outputs.SHORT_COMMIT }}/
           path: './boostrap'
 
       - id: 'upload-transit'
