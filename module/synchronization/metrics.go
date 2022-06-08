@@ -130,7 +130,7 @@ func (s *MetricsCollector) PrunedBlocks(totalByHeight, totalById, storedByHeight
 }
 
 func (s *MetricsCollector) RangeRequested(ran flow.Range) {
-	s.totalHeightsRequested.Add(float64(ran.To - ran.From))
+	s.totalHeightsRequested.Add(float64(ran.To - ran.From+1))
 }
 
 func (s *MetricsCollector) BatchRequested(batch flow.Batch) {
