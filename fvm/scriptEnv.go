@@ -481,11 +481,13 @@ func (e *ScriptEnv) GetProgram(location common.Location) (*interpreter.Program, 
 		defer sp.Finish()
 	}
 
-	err := e.meterComputation(meter.ComputationKindGetProgram, 1)
-	if err != nil {
-		return nil, fmt.Errorf("get program failed: %w", err)
+	// this is a short term solution to prevents double metering the same location
+	if !e.sth.LocationIsMetered(location.ID()) {
+		err := e.meterComputation(meter.ComputationKindGetProgram, 1)
+		if err != nil {
+			return nil, fmt.Errorf("get program failed: %w", err)
+		}
 	}
-
 	if addressLocation, ok := location.(common.AddressLocation); ok {
 		address := flow.Address(addressLocation.Address)
 

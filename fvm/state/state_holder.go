@@ -1,5 +1,7 @@
 package state
 
+import "github.com/onflow/cadence/runtime/common"
+
 // StateHolder provides active states
 // and facilitates common state management operations
 // in order to make services such as accounts not worry about
@@ -10,6 +12,7 @@ type StateHolder struct {
 	EnforceComputationLimits bool
 	enforceInteractionLimits bool
 	payerIsServiceAccount    bool
+	meteredLocations         map[common.LocationID]interface{}
 	startState               *State
 	activeState              *State
 }
@@ -20,6 +23,7 @@ func NewStateHolder(startState *State) *StateHolder {
 		enforceMemoryLimits:      true,
 		EnforceComputationLimits: true,
 		enforceInteractionLimits: true,
+		meteredLocations:         make(map[common.LocationID]interface{}),
 		startState:               startState,
 		activeState:              startState,
 	}
@@ -78,4 +82,14 @@ func (s *StateHolder) EnforceMemoryLimits() bool {
 		return false
 	}
 	return s.enforceMemoryLimits
+}
+
+// LocationIsMetered returns true if location has already been metered and
+// flags the location as metered
+func (s *StateHolder) LocationIsMetered(loc common.LocationID) bool {
+	if _, found := s.meteredLocations[loc]; found {
+		return true
+	}
+	s.meteredLocations[loc] = true
+	return false
 }

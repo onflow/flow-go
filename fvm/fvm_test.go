@@ -4371,3 +4371,101 @@ func TestScriptAccountKeyMutationsFailure(t *testing.T) {
 		),
 	)
 }
+
+func TestContractImportInteractionCounting(t *testing.T) {
+	t.Parallel()
+
+	t.Run("imports are not double counted",
+		newVMTest().withBootstrapProcedureOptions(
+			fvm.WithExecutionEffortWeights(
+				weightedMeter.ExecutionEffortWeights{
+					// we want at most 4 GetProgram calls, once for each contract
+					meter.ComputationKindGetProgram: 100 << weightedMeter.MeterExecutionInternalPrecisionBytes,
+				},
+			),
+		).run(
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, ps *programs.Programs) {
+
+				// Create an account private key.
+				privateKeys, err := testutil.GenerateAccountPrivateKeys(3)
+				require.NoError(t, err)
+
+				// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+				accounts, err := testutil.CreateAccounts(vm, view, ps, privateKeys, chain)
+				require.NoError(t, err)
+				account1 := accounts[0]
+				account2 := accounts[1]
+				account3 := accounts[2]
+
+				contractA := "pub contract A {}"
+				contractB := fmt.Sprintf(`
+					import A from 0x%s 
+					pub contract B {}
+				`, account1.String())
+				contractC := fmt.Sprintf(`
+					import A from 0x%s 
+					import B from 0x%s 
+					pub contract C {}
+				`, account1.String(), account2.String())
+
+				txBodyA := testutil.CreateContractDeploymentTransaction("A", contractA, account1, chain)
+				txBodyB := testutil.CreateContractDeploymentTransaction("B", contractB, account2, chain)
+				txBodyC := testutil.CreateContractDeploymentTransaction("C", contractC, account3, chain)
+				txBodyA.SetProposalKey(chain.ServiceAddress(), 0, 0)
+				txBodyA.SetPayer(chain.ServiceAddress())
+				txBodyB.SetProposalKey(chain.ServiceAddress(), 0, 1)
+				txBodyB.SetPayer(chain.ServiceAddress())
+				txBodyC.SetProposalKey(chain.ServiceAddress(), 0, 2)
+				txBodyC.SetPayer(chain.ServiceAddress())
+
+				err = testutil.SignPayload(txBodyA, account1, privateKeys[0])
+				require.NoError(t, err)
+
+				err = testutil.SignEnvelope(txBodyA, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBodyA, 0)
+				err = vm.Run(ctx, tx, view, programs.NewEmptyPrograms())
+				require.NoError(t, err)
+				require.NoError(t, tx.Err)
+
+				err = testutil.SignPayload(txBodyB, account2, privateKeys[1])
+				require.NoError(t, err)
+
+				err = testutil.SignEnvelope(txBodyB, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+				require.NoError(t, err)
+
+				tx = fvm.Transaction(txBodyB, 0)
+				err = vm.Run(ctx, tx, view, programs.NewEmptyPrograms())
+				require.NoError(t, err)
+				require.NoError(t, tx.Err)
+
+				err = testutil.SignPayload(txBodyC, account3, privateKeys[2])
+				require.NoError(t, err)
+
+				err = testutil.SignEnvelope(txBodyC, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+				require.NoError(t, err)
+
+				tx = fvm.Transaction(txBodyC, 0)
+				err = vm.Run(ctx, tx, view, programs.NewEmptyPrograms())
+				require.NoError(t, err)
+				require.NoError(t, tx.Err)
+
+				script := fvm.Script([]byte(fmt.Sprintf(`
+					import A from 0x%s
+					import B from 0x%s
+					import C from 0x%s
+					pub fun main() {}
+				`, account1.String(), account2.String(), account3.String())))
+
+				scriptCtx := fvm.NewContextFromParent(ctx)
+
+				err = vm.Run(scriptCtx, script, view, ps)
+				require.NoError(t, err)
+				require.NoError(t, script.Err)
+				// we should meter computation for 3 GetPrograms, one for each contract
+				assert.Equal(t, int(script.GasUsed), 300)
+			},
+		),
+	)
+}
