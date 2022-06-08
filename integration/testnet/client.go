@@ -50,7 +50,10 @@ func NewClientWithKey(accessAddr string, accountAddr sdk.Address, key sdkcrypto.
 	}
 	accountKey := acc.Keys[0]
 
-	mySigner := crypto.NewInMemorySigner(key, accountKey.HashAlgo)
+	mySigner, err := crypto.NewInMemorySigner(key, accountKey.HashAlgo)
+	if err != nil {
+		return nil, err
+	}
 
 	tc := &Client{
 		client:         flowClient,
