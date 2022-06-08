@@ -78,9 +78,8 @@ func NewRequestHandlerEngine(
 
 // SubmitLocal submits an event originating on the local node.
 func (r *RequestHandlerEngine) SubmitLocal(event interface{}) {
-	err := r.process(r.me.NodeID(), event)
+	err := r.ProcessLocal(event)
 	if err != nil {
-		// receiving an input of incompatible type from a trusted internal component is fatal
 		r.log.Fatal().Err(err).Msg("internal error processing event")
 	}
 }
@@ -89,18 +88,9 @@ func (r *RequestHandlerEngine) SubmitLocal(event interface{}) {
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
 func (r *RequestHandlerEngine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
-	err := r.process(originID, event)
+	err := r.Process(channel, originID, event)
 	if err != nil {
-		lg := r.log.With().
-			Err(err).
-			Str("channel", channel.String()).
-			Str("origin", originID.String()).
-			Logger()
-		if errors.Is(err, engine.IncompatibleInputTypeError) {
-			lg.Error().Msg("received message with incompatible type")
-			return
-		}
-		lg.Fatal().Msg("internal error processing message")
+		r.log.Fatal().Err(err).Msg("internal error processing event")
 	}
 }
 
@@ -112,7 +102,15 @@ func (r *RequestHandlerEngine) ProcessLocal(event interface{}) error {
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
 func (r *RequestHandlerEngine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
-	return r.process(originID, event)
+	err := r.process(originID, event)
+	if err != nil {
+		if engine.IsIncompatibleInputTypeError(err) {
+			r.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, event, channel)
+			return nil
+		}
+		return fmt.Errorf("unexpected error while processing engine message: %w", err)
+	}
+	return nil
 }
 
 // process processes events for the synchronization request handler engine.
@@ -120,12 +118,7 @@ func (r *RequestHandlerEngine) Process(channel network.Channel, originID flow.Id
 //  * IncompatibleInputTypeError if input has unexpected type
 //  * All other errors are potential symptoms of internal state corruption or bugs (fatal).
 func (r *RequestHandlerEngine) process(originID flow.Identifier, event interface{}) error {
-	switch event.(type) {
-	case *messages.RangeRequest, *messages.BatchRequest, *messages.SyncRequest:
-		return r.requestMessageHandler.Process(originID, event)
-	default:
-		return fmt.Errorf("received input with type %T from %x: %w", event, originID[:], engine.IncompatibleInputTypeError)
-	}
+	return r.requestMessageHandler.Process(originID, event)
 }
 
 // setupRequestMessageHandler initializes the inbound queues and the MessageHandler for UNTRUSTED requests.

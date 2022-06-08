@@ -2,18 +2,17 @@ package proxy
 
 import (
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
 )
 
 type ProxyNetwork struct {
-	module.Network
+	network.Network
 	targetNodeID flow.Identifier
 }
 
 // NewProxyNetwork creates a new proxy network. All messages sent on this network are
 // sent only to the node identified by the given target ID.
-func NewProxyNetwork(net module.Network, targetNodeID flow.Identifier) *ProxyNetwork {
+func NewProxyNetwork(net network.Network, targetNodeID flow.Identifier) *ProxyNetwork {
 	return &ProxyNetwork{
 		net,
 		targetNodeID,

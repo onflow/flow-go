@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"os"
@@ -32,9 +33,10 @@ import (
 type MeshEngineTestSuite struct {
 	suite.Suite
 	ConduitWrapper                   // used as a wrapper around conduit methods
-	nets           []*p2p.Network    // used to keep track of the networks
+	nets           []network.Network // used to keep track of the networks
 	ids            flow.IdentityList // used to keep track of the identifiers associated with networks
 	obs            chan string       // used to keep track of Protect events tagged by pubsub messages
+	cancel         context.CancelFunc
 }
 
 // TestMeshNetTestSuite runs all tests in this test suit
@@ -58,7 +60,17 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 		log:  logger,
 	}
 
-	suite.ids, _, suite.nets, obs = GenerateIDsMiddlewaresNetworks(suite.T(), count, logger, 100, nil, !DryRun, unittest.WithAllRoles())
+	ctx, cancel := context.WithCancel(context.Background())
+	suite.cancel = cancel
+
+	suite.ids, _, suite.nets, obs = GenerateIDsMiddlewaresNetworks(
+		ctx,
+		suite.T(),
+		count,
+		logger,
+		nil,
+		WithIdentityOpts(unittest.WithAllRoles()),
+	)
 
 	for _, observableConnMgr := range obs {
 		observableConnMgr.Subscribe(&ob)
@@ -68,6 +80,7 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 
 // TearDownTest closes the networks within a specified timeout
 func (suite *MeshEngineTestSuite) TearDownTest() {
+	suite.cancel()
 	stopNetworks(suite.T(), suite.nets, 3*time.Second)
 }
 
@@ -169,7 +182,7 @@ func (suite *MeshEngineTestSuite) allToAllScenario(send ConduitSendWrapperFunc) 
 	for i := 0; i < pubsub.GossipSubD*count; i++ {
 		select {
 		case <-suite.obs:
-		case <-time.After(2 * time.Second):
+		case <-time.After(8 * time.Second):
 			assert.FailNow(suite.T(), "could not receive pubsub tag indicating mesh formed")
 		}
 	}
@@ -308,7 +321,7 @@ func (suite *MeshEngineTestSuite) messageSizeScenario(send ConduitSendWrapperFun
 	for i := 0; i < pubsub.GossipSubD*count; i++ {
 		select {
 		case <-suite.obs:
-		case <-time.After(2 * time.Second):
+		case <-time.After(8 * time.Second):
 			assert.FailNow(suite.T(), "could not receive pubsub tag indicating mesh formed")
 		}
 	}

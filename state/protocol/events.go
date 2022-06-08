@@ -6,10 +6,19 @@ import (
 
 // Consumer defines a set of events that occur within the protocol state, that
 // can be propagated to other components via an implementation of this interface.
-// Consumer implementations must be non-blocking.
+// Collectively, these are referred to as "Protocol Events".
+//
+// Protocol events are guaranteed to be delivered at least once. Subscribers must
+// handle multiple deliveries.
+//
+// CAUTION: Protocol event subscriber callbacks are invoked synchronously in the
+// critical path of protocol state mutations. Most subscribers should immediately
+// spawn a goroutine to handle the notification to avoid blocking protocol state
+// progression, especially for frequent protocol events (eg. BlockFinalized).
 //
 // NOTE: the epoch-related callbacks are only called once the fork containing
 // the relevant event has been finalized.
+//
 type Consumer interface {
 
 	// BlockFinalized is called when a block is finalized.

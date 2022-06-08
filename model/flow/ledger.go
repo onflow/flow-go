@@ -1,6 +1,8 @@
 package flow
 
 import (
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 
 	"github.com/onflow/flow-go/ledger/common/hash"
@@ -13,8 +15,27 @@ type RegisterID struct {
 	Key        string
 }
 
+// this function returns a string format of a RegisterID in the form '%x/%x/%x'
+// it has been optimized to avoid the memory allocations inside Sprintf
 func (r *RegisterID) String() string {
-	return fmt.Sprintf("%x/%x/%x", r.Owner, r.Controller, r.Key)
+	ownerLen := len(r.Owner)
+	controllerLen := len(r.Controller)
+
+	requiredLen := ((ownerLen + controllerLen + len(r.Key)) * 2) + 2
+
+	arr := make([]byte, requiredLen)
+
+	hex.Encode(arr, []byte(r.Owner))
+
+	arr[2*ownerLen] = byte('/')
+
+	hex.Encode(arr[(2*ownerLen)+1:], []byte(r.Controller))
+
+	arr[2*(ownerLen+controllerLen)+1] = byte('/')
+
+	hex.Encode(arr[2*(ownerLen+controllerLen+1):], []byte(r.Key))
+
+	return string(arr)
 }
 
 // Bytes returns a bytes representation of the RegisterID.
@@ -96,4 +117,44 @@ func ToStateCommitment(stateBytes []byte) (StateCommitment, error) {
 	}
 	copy(state[:], stateBytes)
 	return state, nil
+}
+
+func (s StateCommitment) MarshalJSON() ([]byte, error) {
+	return json.Marshal(hex.EncodeToString(s[:]))
+}
+
+func (s *StateCommitment) UnmarshalJSON(data []byte) error {
+	// first, attempt to unmarshal assuming data is a hex string representation
+	err := s.unmarshalJSONHexString(data)
+	if err == nil {
+		return nil
+	}
+	// fallback to unmarshalling as [32]byte
+	return s.unmarshalJSONByteArr(data)
+}
+
+func (s *StateCommitment) unmarshalJSONHexString(data []byte) error {
+	var stateCommitmentHex string
+	if err := json.Unmarshal(data, &stateCommitmentHex); err != nil {
+		return err
+	}
+	b, err := hex.DecodeString(stateCommitmentHex)
+	if err != nil {
+		return err
+	}
+	h, err := hash.ToHash(b)
+	if err != nil {
+		return err
+	}
+	*s = StateCommitment(h)
+	return nil
+}
+
+func (s *StateCommitment) unmarshalJSONByteArr(data []byte) error {
+	var stateCommitment [32]byte
+	if err := json.Unmarshal(data, &stateCommitment); err != nil {
+		return err
+	}
+	*s = stateCommitment
+	return nil
 }

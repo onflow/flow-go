@@ -136,7 +136,7 @@ func (e ValueError) Unwrap() error {
 }
 
 // OperationAuthorizationError indicates not enough authorization
-// to performe an operations like account creation or smart contract deployment.
+// to perform an operations like account creation or smart contract deployment.
 type OperationAuthorizationError struct {
 	operation string
 	err       error
@@ -162,7 +162,7 @@ func (e OperationAuthorizationError) Error() string {
 
 // Code returns the error code for this error type
 func (e OperationAuthorizationError) Code() ErrorCode {
-	return ErrCodeAccountAuthorizationError
+	return ErrCodeOperationAuthorizationError
 }
 
 // Unwrap unwraps the error

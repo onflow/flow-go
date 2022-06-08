@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/bootstrap/gcs"
 )
 
@@ -21,8 +22,8 @@ var (
 // buckets for a specific --network.
 var pullCmd = &cobra.Command{
 	Use:   "pull",
-	Short: "Pull parnter node details for a specific network",
-	Long:  `Pull parnter node details for a specific network from the FLOW Google bucket.`,
+	Short: "Pull partner node details for a specific network",
+	Long:  `Pull partner node details for a specific network from the FLOW Google bucket.`,
 	Run:   pull,
 }
 
@@ -33,7 +34,7 @@ func init() {
 
 func addPullCmdFlags() {
 	pullCmd.Flags().StringVar(&flagNetwork, "network", "", "network name to pull partner node information")
-	_ = pullCmd.MarkFlagRequired("network")
+	cmd.MarkFlagRequired(pullCmd, "network")
 
 	pullCmd.Flags().StringVar(&flagBucketName, "bucket", "flow-genesis-bootstrap", "google bucket name")
 }

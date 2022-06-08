@@ -71,7 +71,7 @@ func (r *Role) UnmarshalText(text []byte) error {
 	return err
 }
 
-func Roles() []Role {
+func Roles() RoleList {
 	return []Role{RoleCollection, RoleConsensus, RoleExecution, RoleVerification, RoleAccess}
 }
 

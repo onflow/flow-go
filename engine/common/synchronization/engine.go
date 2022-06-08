@@ -3,7 +3,6 @@
 package synchronization
 
 import (
-	"errors"
 	"fmt"
 	"math/rand"
 	"time"
@@ -48,7 +47,7 @@ type Engine struct {
 	participantsProvider identifier.IdentifierProvider
 	finalizedHeader      *FinalizedHeaderCache
 
-	requestHandler *RequestHandlerEngine // component responsible for handling requests
+	requestHandler *RequestHandler // component responsible for handling requests
 
 	pendingSyncResponses   engine.MessageStore    // message store for *message.SyncResponse
 	pendingBlockResponses  engine.MessageStore    // message store for *message.BlockResponse
@@ -59,7 +58,7 @@ type Engine struct {
 func New(
 	log zerolog.Logger,
 	metrics module.EngineMetrics,
-	net module.Network,
+	net network.Network,
 	me module.Local,
 	blocks storage.Blocks,
 	comp network.Engine,
@@ -106,7 +105,7 @@ func New(
 	}
 	e.con = con
 
-	e.requestHandler = NewRequestHandlerEngine(log, metrics, con, me, blocks, core, finalizedHeader, true)
+	e.requestHandler = NewRequestHandler(log, metrics, NewResponseSender(con), me, blocks, core, finalizedHeader, true)
 
 	return e, nil
 }
@@ -201,18 +200,9 @@ func (e *Engine) SubmitLocal(event interface{}) {
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
 func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
-	err := e.process(originID, event)
+	err := e.Process(channel, originID, event)
 	if err != nil {
-		lg := e.log.With().
-			Err(err).
-			Str("channel", channel.String()).
-			Str("origin", originID.String()).
-			Logger()
-		if errors.Is(err, engine.IncompatibleInputTypeError) {
-			lg.Error().Msg("received message with incompatible type")
-			return
-		}
-		lg.Fatal().Msg("internal error processing message")
+		e.log.Fatal().Err(err).Msg("internal error processing event")
 	}
 }
 
@@ -224,7 +214,15 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
 func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
-	return e.process(originID, event)
+	err := e.process(originID, event)
+	if err != nil {
+		if engine.IsIncompatibleInputTypeError(err) {
+			e.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, event, channel)
+			return nil
+		}
+		return fmt.Errorf("unexpected error while processing engine message: %w", err)
+	}
+	return nil
 }
 
 // process processes events for the synchronization engine.
@@ -293,16 +291,28 @@ func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResp
 
 // onBlockResponse processes a response containing a specifically requested block.
 func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockResponse) {
-	e.log.Debug().Str("origin_id", originID.String()).Msg("received block response")
 	// process the blocks one by one
+	if len(res.Blocks) == 0 {
+		e.log.Debug().Msg("received empty block response")
+		return
+	}
+
+	first := res.Blocks[0].Header.Height
+	last := res.Blocks[len(res.Blocks)-1].Header.Height
+	e.log.Debug().Uint64("first", first).Uint64("last", last).Msg("received block response")
+
 	for _, block := range res.Blocks {
 		if !e.core.HandleBlock(block.Header) {
+			e.log.Debug().Uint64("height", block.Header.Height).Msg("block handler rejected")
 			continue
 		}
 		synced := &events.SyncedBlock{
 			OriginID: originID,
 			Block:    block,
 		}
+		// tempfix: to help nodes falling far behind to catch up.
+		// it avoids the race condition in compliance engine and hotstuff to validate blocks
+		time.Sleep(150 * time.Millisecond)
 		e.comp.SubmitLocal(synced)
 	}
 }
@@ -380,7 +390,7 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []flow.Ra
 			errs = multierror.Append(errs, fmt.Errorf("could not submit range request: %w", err))
 			continue
 		}
-		e.log.Debug().
+		e.log.Info().
 			Uint64("range_from", req.FromHeight).
 			Uint64("range_to", req.ToHeight).
 			Uint64("range_nonce", req.Nonce).

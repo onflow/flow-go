@@ -8,8 +8,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type OnBlockFinalizedConsumer = func(finalizedBlockID flow.Identifier)
-type OnBlockIncorporatedConsumer = func(incorporatedBlockID flow.Identifier)
+type OnBlockFinalizedConsumer = func(block *model.Block)
+type OnBlockIncorporatedConsumer = func(block *model.Block)
 
 // FinalizationDistributor subscribes for finalization events from hotstuff and distributes it to subscribers
 type FinalizationDistributor struct {
@@ -18,6 +18,8 @@ type FinalizationDistributor struct {
 	hotStuffFinalizationConsumers []hotstuff.FinalizationConsumer
 	lock                          sync.RWMutex
 }
+
+var _ hotstuff.Consumer = (*FinalizationDistributor)(nil)
 
 func NewFinalizationDistributor() *FinalizationDistributor {
 	return &FinalizationDistributor{
@@ -51,7 +53,7 @@ func (p *FinalizationDistributor) OnBlockIncorporated(block *model.Block) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, consumer := range p.blockIncorporatedConsumers {
-		consumer(block.BlockID)
+		consumer(block)
 	}
 	for _, consumer := range p.hotStuffFinalizationConsumers {
 		consumer.OnBlockIncorporated(block)
@@ -62,7 +64,7 @@ func (p *FinalizationDistributor) OnFinalizedBlock(block *model.Block) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, consumer := range p.blockFinalizedConsumers {
-		consumer(block.BlockID)
+		consumer(block)
 	}
 	for _, consumer := range p.hotStuffFinalizationConsumers {
 		consumer.OnFinalizedBlock(block)
@@ -89,7 +91,8 @@ func (p *FinalizationDistributor) OnProposingBlock(*model.Proposal) {}
 
 func (p *FinalizationDistributor) OnVoting(*model.Vote) {}
 
-func (p *FinalizationDistributor) OnQcConstructedFromVotes(*flow.QuorumCertificate) {}
+func (p *FinalizationDistributor) OnQcConstructedFromVotes(curView uint64, qc *flow.QuorumCertificate) {
+}
 
 func (p *FinalizationDistributor) OnStartingTimeout(*model.TimerInfo) {}
 
@@ -102,3 +105,5 @@ func (p *FinalizationDistributor) OnForkChoiceGenerated(uint64, *flow.QuorumCert
 func (p *FinalizationDistributor) OnDoubleVotingDetected(*model.Vote, *model.Vote) {}
 
 func (p *FinalizationDistributor) OnInvalidVoteDetected(*model.Vote) {}
+
+func (p *FinalizationDistributor) OnVoteForInvalidBlockDetected(*model.Vote, *model.Proposal) {}

@@ -6,7 +6,6 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"github.com/onflow/flow-go/model/flow"
-	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
 )
@@ -32,24 +31,24 @@ func (c *Conduit) Publish(event interface{}, targetIDs ...flow.Identifier) error
 
 // Network represents a mock network. The implementation is not concurrency-safe.
 type Network struct {
-	mockmodule.ReadyDoneAwareNetwork
+	mocknetwork.Network
 	conduits    map[network.Channel]*Conduit
-	engines     map[network.Channel]network.Engine
+	engines     map[network.Channel]network.MessageProcessor
 	publishFunc NetworkPublishFunc
 }
 
 // NewNetwork returns a new mock network.
 func NewNetwork() *Network {
 	return &Network{
-		ReadyDoneAwareNetwork: mockmodule.ReadyDoneAwareNetwork{},
-		conduits:              make(map[network.Channel]*Conduit),
-		engines:               make(map[network.Channel]network.Engine),
+		Network:  mocknetwork.Network{},
+		conduits: make(map[network.Channel]*Conduit),
+		engines:  make(map[network.Channel]network.MessageProcessor),
 	}
 }
 
 // Register registers an engine with this mock network. If an engine is already registered on the
 // given channel, this will return an error.
-func (n *Network) Register(channel network.Channel, engine network.Engine) (network.Conduit, error) {
+func (n *Network) Register(channel network.Channel, engine network.MessageProcessor) (network.Conduit, error) {
 	_, ok := n.engines[channel]
 	if ok {
 		return nil, fmt.Errorf("channel already registered: %s", channel)
@@ -80,13 +79,13 @@ func (n *Network) OnPublish(publishFunc NetworkPublishFunc) *Network {
 
 // Engine represents a mock engine. The implementation is not concurrency-safe.
 type Engine struct {
-	mockmodule.Engine
+	mocknetwork.Engine
 }
 
 // NewEngine returns a new mock engine.
 func NewEngine() *Engine {
 	return &Engine{
-		mockmodule.Engine{},
+		mocknetwork.Engine{},
 	}
 }
 

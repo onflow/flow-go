@@ -1,20 +1,121 @@
 package unittest
 
 import (
+	"encoding/json"
 	"io/ioutil"
+	"math"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/lifecycle"
+	"github.com/onflow/flow-go/module/util"
 )
+
+type SkipReason int
+
+const (
+	TEST_FLAKY               SkipReason = iota + 1 // flaky
+	TEST_TODO                                      // not fully implemented or broken and needs to be fixed
+	TEST_REQUIRES_GCP_ACCESS                       // requires the environment to be configured with GCP credentials
+	TEST_DEPRECATED                                // uses code that has been deprecated / disabled
+	TEST_LONG_RUNNING                              // long running
+	TEST_RESOURCE_INTENSIVE                        // resource intensive test
+)
+
+func (s SkipReason) String() string {
+	switch s {
+	case TEST_FLAKY:
+		return "TEST_FLAKY"
+	case TEST_TODO:
+		return "TEST_TODO"
+	case TEST_REQUIRES_GCP_ACCESS:
+		return "TEST_REQUIRES_GCP_ACCESS"
+	case TEST_DEPRECATED:
+		return "TEST_DEPRECATED"
+	case TEST_LONG_RUNNING:
+		return "TEST_LONG_RUNNING"
+	case TEST_RESOURCE_INTENSIVE:
+		return "TEST_RESOURCE_INTENSIVE"
+	}
+	return "UNKNOWN"
+}
+
+func (s SkipReason) MarshalJSON() ([]byte, error) {
+	return json.Marshal(s.String())
+}
+
+func parseSkipReason(reason string) SkipReason {
+	switch reason {
+	case "TEST_FLAKY":
+		return TEST_FLAKY
+	case "TEST_TODO":
+		return TEST_TODO
+	case "TEST_REQUIRES_GCP_ACCESS":
+		return TEST_REQUIRES_GCP_ACCESS
+	case "TEST_DEPRECATED":
+		return TEST_DEPRECATED
+	case "TEST_LONG_RUNNING":
+		return TEST_LONG_RUNNING
+	case "TEST_RESOURCE_INTENSIVE":
+		return TEST_RESOURCE_INTENSIVE
+	default:
+		return 0
+	}
+}
+
+func ParseSkipReason(output string) (SkipReason, bool) {
+	// match output like:
+	// "    test_file.go:123: SKIP [TEST_REASON]: message\n"
+	r := regexp.MustCompile(`(?s)^\s+[a-zA-Z0-9_\-]+\.go:[0-9]+: SKIP \[([A-Z_]+)]: .*$`)
+	matches := r.FindStringSubmatch(output)
+
+	if len(matches) == 2 {
+		skipReason := parseSkipReason(matches[1])
+		if skipReason != 0 {
+			return skipReason, true
+		}
+	}
+
+	return 0, false
+}
+
+func SkipUnless(t *testing.T, reason SkipReason, message string) {
+	t.Helper()
+	if os.Getenv(reason.String()) == "" {
+		t.Skipf("SKIP [%s]: %s", reason.String(), message)
+	}
+}
+
+type SkipBenchmarkReason int
+
+const (
+	BENCHMARK_EXPERIMENT SkipBenchmarkReason = iota + 1
+)
+
+func (s SkipBenchmarkReason) String() string {
+	switch s {
+	case BENCHMARK_EXPERIMENT:
+		return "BENCHMARK_EXPERIMENT"
+	}
+	return "UNKNOWN"
+}
+
+func SkipBenchmarkUnless(b *testing.B, reason SkipBenchmarkReason, message string) {
+	b.Helper()
+	if os.Getenv(reason.String()) == "" {
+		b.Skip(message)
+	}
+}
 
 func ExpectPanic(expectedMsg string, t *testing.T) {
 	if r := recover(); r != nil {
@@ -29,7 +130,7 @@ func ExpectPanic(expectedMsg string, t *testing.T) {
 
 // AssertReturnsBefore asserts that the given function returns before the
 // duration expires.
-func AssertReturnsBefore(t *testing.T, f func(), duration time.Duration) {
+func AssertReturnsBefore(t *testing.T, f func(), duration time.Duration, msgAndArgs ...interface{}) {
 	done := make(chan struct{})
 
 	go func() {
@@ -40,7 +141,7 @@ func AssertReturnsBefore(t *testing.T, f func(), duration time.Duration) {
 	select {
 	case <-time.After(duration):
 		t.Log("function did not return in time")
-		t.Fail()
+		assert.Fail(t, "function did not close in time", msgAndArgs...)
 	case <-done:
 		return
 	}
@@ -48,12 +149,29 @@ func AssertReturnsBefore(t *testing.T, f func(), duration time.Duration) {
 
 // AssertClosesBefore asserts that the given channel closes before the
 // duration expires.
-func AssertClosesBefore(t *testing.T, done <-chan struct{}, duration time.Duration) {
+func AssertClosesBefore(t assert.TestingT, done <-chan struct{}, duration time.Duration, msgAndArgs ...interface{}) {
 	select {
 	case <-time.After(duration):
-		assert.Fail(t, "channel did not return in time")
+		assert.Fail(t, "channel did not return in time", msgAndArgs...)
 	case <-done:
 		return
+	}
+}
+
+func AssertFloatEqual(t *testing.T, expected, actual float64, message string) {
+	tolerance := .00001
+	if !(math.Abs(expected-actual) < tolerance) {
+		assert.Equal(t, expected, actual, message)
+	}
+}
+
+// AssertNotClosesBefore asserts that the given channel does not close before the duration expires.
+func AssertNotClosesBefore(t assert.TestingT, done <-chan struct{}, duration time.Duration, msgAndArgs ...interface{}) {
+	select {
+	case <-time.After(duration):
+		return
+	case <-done:
+		assert.Fail(t, "channel closed before timeout", msgAndArgs...)
 	}
 }
 
@@ -73,14 +191,14 @@ func RequireReturnsBefore(t testing.TB, f func(), duration time.Duration, messag
 // RequireComponentsDoneBefore invokes the done method of each of the input components concurrently, and
 // fails the test if any components shutdown takes longer than the specified duration.
 func RequireComponentsDoneBefore(t testing.TB, duration time.Duration, components ...module.ReadyDoneAware) {
-	done := lifecycle.AllDone(components...)
+	done := util.AllDone(components...)
 	RequireCloseBefore(t, done, duration, "failed to shutdown all components on time")
 }
 
 // RequireComponentsReadyBefore invokes the ready method of each of the input components concurrently, and
 // fails the test if any components startup takes longer than the specified duration.
 func RequireComponentsReadyBefore(t testing.TB, duration time.Duration, components ...module.ReadyDoneAware) {
-	ready := lifecycle.AllReady(components...)
+	ready := util.AllReady(components...)
 	RequireCloseBefore(t, ready, duration, "failed to start all components on time")
 }
 
@@ -189,24 +307,51 @@ func TempDir(t testing.TB) string {
 
 func RunWithTempDir(t testing.TB, f func(string)) {
 	dbDir := TempDir(t)
-	defer os.RemoveAll(dbDir)
+	defer func() {
+		require.NoError(t, os.RemoveAll(dbDir))
+	}()
 	f(dbDir)
 }
 
-func BadgerDB(t testing.TB, dir string) *badger.DB {
+func badgerDB(t testing.TB, dir string, create func(badger.Options) (*badger.DB, error)) *badger.DB {
 	opts := badger.
 		DefaultOptions(dir).
 		WithKeepL0InMemory(true).
 		WithLogger(nil)
-	db, err := badger.Open(opts)
+	db, err := create(opts)
 	require.NoError(t, err)
 	return db
+}
+
+func BadgerDB(t testing.TB, dir string) *badger.DB {
+	return badgerDB(t, dir, badger.Open)
+}
+
+func TypedBadgerDB(t testing.TB, dir string, create func(badger.Options) (*badger.DB, error)) *badger.DB {
+	return badgerDB(t, dir, create)
 }
 
 func RunWithBadgerDB(t testing.TB, f func(*badger.DB)) {
 	RunWithTempDir(t, func(dir string) {
 		db := BadgerDB(t, dir)
-		defer db.Close()
+		defer func() {
+			assert.NoError(t, db.Close())
+		}()
+		f(db)
+	})
+}
+
+// RunWithTypedBadgerDB creates a Badger DB that is passed to f and closed
+// after f returns. The extra create parameter allows passing in a database
+// constructor function which instantiates a database with a particular type
+// marker, for testing storage modules which require a backed with a particular
+// type.
+func RunWithTypedBadgerDB(t testing.TB, create func(badger.Options) (*badger.DB, error), f func(*badger.DB)) {
+	RunWithTempDir(t, func(dir string) {
+		db := badgerDB(t, dir, create)
+		defer func() {
+			assert.NoError(t, db.Close())
+		}()
 		f(db)
 	})
 }
@@ -227,4 +372,9 @@ func Concurrently(n int, f func(int)) {
 		}(i)
 	}
 	wg.Wait()
+}
+
+// AssertEqualBlocksLenAndOrder asserts that both a segment of blocks have the same len and blocks are in the same order
+func AssertEqualBlocksLenAndOrder(t *testing.T, expectedBlocks, actualSegmentBlocks []*flow.Block) {
+	assert.Equal(t, flow.GetIDs(expectedBlocks), flow.GetIDs(actualSegmentBlocks))
 }

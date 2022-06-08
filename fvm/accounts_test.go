@@ -2,11 +2,12 @@ package fvm_test
 
 import (
 	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/onflow/cadence/runtime/format"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -22,7 +23,7 @@ import (
 func createAccount(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) flow.Address {
 	ctx = fvm.NewContextFromParent(
 		ctx,
-		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())),
 	)
 
 	txBody := flow.NewTransactionBody().
@@ -39,7 +40,7 @@ func createAccount(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx f
 
 	require.Len(t, accountCreatedEvents, 1)
 
-	data, err := jsoncdc.Decode(accountCreatedEvents[0].Payload)
+	data, err := jsoncdc.Decode(nil, accountCreatedEvents[0].Payload)
 	require.NoError(t, err)
 	address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
 
@@ -308,7 +309,7 @@ transaction(keyIndex1: Int, keyIndex2: Int) {
 `
 
 func newAccountKey(
-	t *testing.T,
+	tb testing.TB,
 	privateKey *flow.AccountPrivateKey,
 	apiVersion accountKeyAPIVersion,
 ) (
@@ -321,14 +322,14 @@ func newAccountKey(
 	if apiVersion == accountKeyAPIVersionV1 {
 		var err error
 		publicKeyBytes, err = flow.EncodeRuntimeAccountPublicKey(publicKey)
-		require.NoError(t, err)
+		require.NoError(tb, err)
 	} else {
 		publicKeyBytes = publicKey.PublicKey.Encode()
 	}
 
 	cadencePublicKey := testutil.BytesToCadenceArray(publicKeyBytes)
 	encodedCadencePublicKey, err := jsoncdc.Encode(cadencePublicKey)
-	require.NoError(t, err)
+	require.NoError(tb, err)
 
 	return publicKey, encodedCadencePublicKey
 }
@@ -336,7 +337,7 @@ func newAccountKey(
 func TestCreateAccount(t *testing.T) {
 
 	options := []fvm.Option{
-		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())),
 	}
 
 	t.Run("Single account",
@@ -358,7 +359,7 @@ func TestCreateAccount(t *testing.T) {
 				accountCreatedEvents := filterAccountCreatedEvents(tx.Events)
 				require.Len(t, accountCreatedEvents, 1)
 
-				data, err := jsoncdc.Decode(accountCreatedEvents[0].Payload)
+				data, err := jsoncdc.Decode(nil, accountCreatedEvents[0].Payload)
 				require.NoError(t, err)
 				address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
 
@@ -393,7 +394,7 @@ func TestCreateAccount(t *testing.T) {
 					}
 					accountCreatedEventCount += 1
 
-					data, err := jsoncdc.Decode(tx.Events[i].Payload)
+					data, err := jsoncdc.Decode(nil, tx.Events[i].Payload)
 					require.NoError(t, err)
 					address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
 
@@ -409,7 +410,7 @@ func TestCreateAccount(t *testing.T) {
 func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 
 	options := []fvm.Option{
-		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())),
 	}
 
 	t.Run("Unauthorized account payer",
@@ -518,7 +519,7 @@ func TestUpdateAccountCode(t *testing.T) {
 func TestAddAccountKey(t *testing.T) {
 
 	options := []fvm.Option{
-		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())),
 	}
 
 	type addKeyTest struct {
@@ -782,7 +783,7 @@ func TestAddAccountKey(t *testing.T) {
 func TestRemoveAccountKey(t *testing.T) {
 
 	options := []fvm.Option{
-		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())),
 	}
 
 	type removeKeyTest struct {
@@ -1011,7 +1012,7 @@ func TestRemoveAccountKey(t *testing.T) {
 func TestGetAccountKey(t *testing.T) {
 
 	options := []fvm.Option{
-		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())),
 		fvm.WithCadenceLogging(true),
 	}
 
@@ -1089,12 +1090,12 @@ func TestGetAccountKey(t *testing.T) {
 				expected := fmt.Sprintf(
 					"AccountKey("+
 						"keyIndex: %d, "+
-						"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1), isValid: true), "+
+						"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1)), "+
 						"hashAlgorithm: HashAlgorithm(rawValue: 3), "+
 						"weight: 1000.00000000, "+
 						"isRevoked: false)",
 					keyIndex,
-					interpreter.ByteSliceToByteArrayValue(key.PublicKey.Encode()).String(),
+					byteSliceToCadenceArrayLiteral(key.PublicKey.Encode()),
 				)
 
 				assert.Equal(t, expected, tx.Logs[0])
@@ -1141,12 +1142,12 @@ func TestGetAccountKey(t *testing.T) {
 				expected := fmt.Sprintf(
 					"AccountKey("+
 						"keyIndex: %d, "+
-						"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1), isValid: true), "+
+						"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1)), "+
 						"hashAlgorithm: HashAlgorithm(rawValue: 3), "+
 						"weight: 1000.00000000, "+
 						"isRevoked: false)",
 					keyIndex,
-					interpreter.ByteSliceToByteArrayValue(key.PublicKey.Encode()).String(),
+					byteSliceToCadenceArrayLiteral(key.PublicKey.Encode()),
 				)
 
 				assert.Equal(t, expected, tx.Logs[0])
@@ -1193,12 +1194,12 @@ func TestGetAccountKey(t *testing.T) {
 					expected := fmt.Sprintf(
 						"AccountKey("+
 							"keyIndex: %d, "+
-							"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1), isValid: true), "+
+							"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1)), "+
 							"hashAlgorithm: HashAlgorithm(rawValue: 3), "+
 							"weight: 1000.00000000, "+
 							"isRevoked: false)",
 						i,
-						interpreter.ByteSliceToByteArrayValue(keys[i].PublicKey.Encode()).String(),
+						byteSliceToCadenceArrayLiteral(keys[i].PublicKey.Encode()),
 					)
 
 					assert.Equal(t, expected, tx.Logs[i])
@@ -1207,10 +1208,20 @@ func TestGetAccountKey(t *testing.T) {
 	)
 }
 
+func byteSliceToCadenceArrayLiteral(bytes []byte) string {
+	elements := make([]string, 0, len(bytes))
+
+	for _, b := range bytes {
+		elements = append(elements, strconv.Itoa(int(b)))
+	}
+
+	return format.Array(elements)
+}
+
 func TestAccountBalanceFields(t *testing.T) {
 	t.Run("Get balance works",
 		newVMTest().withContextOptions(
-			fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
+			fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())),
 			fvm.WithCadenceLogging(true),
 		).
 			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
@@ -1218,7 +1229,7 @@ func TestAccountBalanceFields(t *testing.T) {
 
 				txBody := transferTokensTx(chain).
 					AddArgument(jsoncdc.MustEncode(cadence.UFix64(1_0000_0000))).
-					AddArgument(jsoncdc.MustEncode(cadence.BytesToAddress(account.Bytes()))).
+					AddArgument(jsoncdc.MustEncode(cadence.Address(account))).
 					AddAuthorizer(chain.ServiceAddress())
 
 				tx := fvm.Transaction(txBody, 0)
@@ -1243,7 +1254,7 @@ func TestAccountBalanceFields(t *testing.T) {
 
 	t.Run("Get available balance works",
 		newVMTest().withContextOptions(
-			fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
+			fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())),
 			fvm.WithCadenceLogging(true),
 			fvm.WithAccountStorageLimit(false),
 		).withBootstrapProcedureOptions(
@@ -1254,7 +1265,7 @@ func TestAccountBalanceFields(t *testing.T) {
 
 				txBody := transferTokensTx(chain).
 					AddArgument(jsoncdc.MustEncode(cadence.UFix64(1_0000_0000))).
-					AddArgument(jsoncdc.MustEncode(cadence.BytesToAddress(account.Bytes()))).
+					AddArgument(jsoncdc.MustEncode(cadence.Address(account))).
 					AddAuthorizer(chain.ServiceAddress())
 
 				tx := fvm.Transaction(txBody, 0)
@@ -1273,14 +1284,13 @@ func TestAccountBalanceFields(t *testing.T) {
 
 				assert.NoError(t, err)
 				assert.NoError(t, script.Err)
-
-				assert.Equal(t, cadence.UFix64(9999_5070), script.Value)
+				assert.Equal(t, cadence.UFix64(9999_2520), script.Value)
 			}),
 	)
 
 	t.Run("Get available balance works with minimum balance",
 		newVMTest().withContextOptions(
-			fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
+			fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())),
 			fvm.WithCadenceLogging(true),
 			fvm.WithAccountStorageLimit(false),
 		).withBootstrapProcedureOptions(
@@ -1293,7 +1303,7 @@ func TestAccountBalanceFields(t *testing.T) {
 
 				txBody := transferTokensTx(chain).
 					AddArgument(jsoncdc.MustEncode(cadence.UFix64(1_0000_0000))).
-					AddArgument(jsoncdc.MustEncode(cadence.BytesToAddress(account.Bytes()))).
+					AddArgument(jsoncdc.MustEncode(cadence.Address(account))).
 					AddAuthorizer(chain.ServiceAddress())
 
 				tx := fvm.Transaction(txBody, 0)

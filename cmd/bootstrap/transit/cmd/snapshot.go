@@ -53,7 +53,7 @@ func snapshot(cmd *cobra.Command, args []string) {
 	}
 
 	// create a flow client with given access address
-	flowClient, err := client.New(flagAccessAddress, grpc.WithInsecure())
+	flowClient, err := client.New(flagAccessAddress, grpc.WithInsecure()) //nolint:staticcheck
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not create flow client")
 	}

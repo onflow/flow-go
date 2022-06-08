@@ -32,18 +32,15 @@ func TestGenerateClusterRootQC(t *testing.T) {
 	payload := cluster.EmptyPayload(flow.ZeroID)
 	clusterBlock.SetPayload(payload)
 
-	_, err := GenerateClusterRootQC(participants, &clusterBlock)
+	_, err := GenerateClusterRootQC(participants, model.ToIdentityList(participants), &clusterBlock)
 	require.NoError(t, err)
 }
 
 func createClusterParticipants(t *testing.T, n int) []model.NodeInfo {
 	ids := unittest.IdentityListFixture(n, unittest.WithRole(flow.RoleCollection))
 
-	networkKeys, err := unittest.NetworkingKeys(n)
-	require.NoError(t, err)
-
-	stakingKeys, err := unittest.StakingKeys(n)
-	require.NoError(t, err)
+	networkKeys := unittest.NetworkingKeys(n)
+	stakingKeys := unittest.StakingKeys(n)
 
 	participants := make([]model.NodeInfo, n)
 	for i, id := range ids {
@@ -51,7 +48,7 @@ func createClusterParticipants(t *testing.T, n int) []model.NodeInfo {
 			id.NodeID,
 			id.Role,
 			id.Address,
-			id.Stake,
+			id.Weight,
 			networkKeys[i],
 			stakingKeys[i],
 		)

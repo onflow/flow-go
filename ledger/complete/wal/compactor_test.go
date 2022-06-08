@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
-	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/module/metrics"
@@ -43,7 +42,6 @@ func (co *CompactorObserver) OnComplete() {
 }
 
 func Test_Compactor(t *testing.T) {
-
 	numInsPerStep := 2
 	pathByteSize := 32
 	minPayloadByteSize := 2 << 15
@@ -54,7 +52,7 @@ func Test_Compactor(t *testing.T) {
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
-		f, err := mtrie.NewForest(size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f, err := mtrie.NewForest(size*10, metricsCollector, nil)
 		require.NoError(t, err)
 
 		var rootHash = f.GetEmptyRootHash()
@@ -73,7 +71,7 @@ func Test_Compactor(t *testing.T) {
 			checkpointer, err := wal.NewCheckpointer()
 			require.NoError(t, err)
 
-			compactor := NewCompactor(checkpointer, 100*time.Millisecond, checkpointDistance, 1) //keep only latest checkpoint
+			compactor := NewCompactor(checkpointer, 100*time.Millisecond, checkpointDistance, 1, zerolog.Nop()) //keep only latest checkpoint
 			co := CompactorObserver{fromBound: 9, done: make(chan struct{})}
 			compactor.Subscribe(&co)
 
@@ -113,7 +111,7 @@ func Test_Compactor(t *testing.T) {
 			select {
 			case <-co.done:
 				// continue
-			case <-time.After(20 * time.Second):
+			case <-time.After(60 * time.Second):
 				assert.FailNow(t, "timed out")
 			}
 
@@ -138,6 +136,8 @@ func Test_Compactor(t *testing.T) {
 			require.NoError(t, err)
 		})
 
+		time.Sleep(2 * time.Second)
+
 		t.Run("remove unnecessary files", func(t *testing.T) {
 			// Remove all files apart from target checkpoint and WAL segments ahead of it
 			// We know their names, so just hardcode them
@@ -156,16 +156,18 @@ func Test_Compactor(t *testing.T) {
 			}
 		})
 
-		f2, err := mtrie.NewForest(size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f2, err := mtrie.NewForest(size*10, metricsCollector, nil)
 		require.NoError(t, err)
+
+		time.Sleep(2 * time.Second)
 
 		t.Run("load data from checkpoint and WAL", func(t *testing.T) {
 			wal2, err := NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, 32*1024)
 			require.NoError(t, err)
 
 			err = wal2.Replay(
-				func(forestSequencing *flattener.FlattenedForest) error {
-					return loadIntoForest(f2, forestSequencing)
+				func(tries []*trie.MTrie) error {
+					return f2.AddTries(tries)
 				},
 				func(update *ledger.TrieUpdate) error {
 					_, err := f2.Update(update)
@@ -192,15 +194,15 @@ func Test_Compactor(t *testing.T) {
 				}
 
 				read := &ledger.TrieRead{RootHash: rootHash, Paths: paths}
-				payloads, err := f.Read(read)
+				values, err := f.Read(read)
 				require.NoError(t, err)
 
-				payloads2, err := f2.Read(read)
+				values2, err := f2.Read(read)
 				require.NoError(t, err)
 
 				for i, path := range paths {
-					require.True(t, data[path].Equals(payloads[i]))
-					require.True(t, data[path].Equals(payloads2[i]))
+					require.Equal(t, data[path].Value, values[i])
+					require.Equal(t, data[path].Value, values2[i])
 				}
 			}
 
@@ -230,7 +232,7 @@ func Test_Compactor_checkpointInterval(t *testing.T) {
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
-		f, err := mtrie.NewForest(size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f, err := mtrie.NewForest(size*10, metricsCollector, nil)
 		require.NoError(t, err)
 
 		var rootHash = f.GetEmptyRootHash()
@@ -245,7 +247,7 @@ func Test_Compactor_checkpointInterval(t *testing.T) {
 			checkpointer, err := wal.NewCheckpointer()
 			require.NoError(t, err)
 
-			compactor := NewCompactor(checkpointer, 100*time.Millisecond, checkpointDistance, 2)
+			compactor := NewCompactor(checkpointer, 100*time.Millisecond, checkpointDistance, 2, zerolog.Nop())
 
 			// Generate the tree and create WAL
 			for i := 0; i < size; i++ {
@@ -325,18 +327,4 @@ func Test_Compactor_checkpointInterval(t *testing.T) {
 			require.NoError(t, err)
 		})
 	})
-}
-
-func loadIntoForest(forest *mtrie.Forest, forestSequencing *flattener.FlattenedForest) error {
-	tries, err := flattener.RebuildTries(forestSequencing)
-	if err != nil {
-		return err
-	}
-	for _, t := range tries {
-		err := forest.AddTrie(t)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }

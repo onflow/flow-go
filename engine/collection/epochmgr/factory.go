@@ -1,7 +1,9 @@
 package epochmgr
 
 import (
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
 )
@@ -15,12 +17,13 @@ type EpochComponentsFactory interface {
 	// for an epoch that will start soon. It is safe to call multiple times for
 	// a given epoch counter.
 	//
-	// Must return ErrUnstakedForEpoch if this node is not staked in the epoch.
+	// Must return ErrNotAuthorizedForEpoch if this node is not authorized in the epoch.
 	Create(epoch protocol.Epoch) (
 		state cluster.State,
-		proposal module.Engine,
-		sync module.Engine,
+		proposal network.Engine,
+		sync network.Engine,
 		hotstuff module.HotStuff,
+		voteAggregator hotstuff.VoteAggregator,
 		err error,
 	)
 }

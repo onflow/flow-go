@@ -17,8 +17,7 @@ const year = 365 * 24 * time.Hour
 // TestCertificateGeneration tests the X509Certificate certificate generation
 func TestCertificateGeneration(t *testing.T) {
 	// test key
-	key, err := unittest.NetworkingKey()
-	require.NoError(t, err)
+	key := unittest.NetworkingPrivKeyFixture()
 
 	// generate the certificate from the key
 	certs, err := X509Certificate(key)
@@ -43,17 +42,21 @@ func TestCertificateGeneration(t *testing.T) {
 	// assert that the public key in the cert matches the test public key
 	require.True(t, expectedKey.Equals(pubKey))
 
-	// assert that the the cert is valid for at least an year starting from now
+	// assert that the cert is valid for at least an year starting from now
 	now := time.Now()
 	require.True(t, now.After(cert.NotBefore))
 	require.True(t, cert.NotAfter.After(now.Add(year)))
+
+	// assert that the cert's subject and issuer fields are set and match (self-signed)
+	require.NotEmpty(t, cert.Subject)
+	require.NotEmpty(t, cert.Issuer)
+	require.Equal(t, cert.Subject, cert.Issuer)
 }
 
 // TestPeerCertificateVerification tests that the verifyPeerCertificate function correctly verifies a server cert
 func TestPeerCertificateVerification(t *testing.T) {
 	// test key
-	key, err := unittest.NetworkingKey()
-	require.NoError(t, err)
+	key := unittest.NetworkingPrivKeyFixture()
 
 	// generate the certificate from the key
 	certs, err := X509Certificate(key)
@@ -71,8 +74,7 @@ func TestPeerCertificateVerification(t *testing.T) {
 
 	t.Run("certificate validation fails for a different public key", func(t *testing.T) {
 		// generate another key and certificate
-		key2, err := unittest.NetworkingKey()
-		require.NoError(t, err)
+		key2 := unittest.NetworkingPrivKeyFixture()
 		certs2, err := X509Certificate(key2)
 		require.NoError(t, err)
 

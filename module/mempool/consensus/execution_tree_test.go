@@ -386,8 +386,7 @@ func makeBlockWithHeight(height uint64) *flow.Block {
 }
 
 func makeChildBlock(parent *flow.Block) *flow.Block {
-	block := unittest.BlockWithParentFixture(parent.Header)
-	return &block
+	return unittest.BlockWithParentFixture(parent.Header)
 }
 
 func (et *ExecutionTreeTestSuite) receiptSet(selected []*flow.ExecutionReceipt, receipts map[string]*flow.ExecutionReceipt) map[string]struct{} {

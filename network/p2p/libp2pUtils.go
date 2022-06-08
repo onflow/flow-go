@@ -12,13 +12,12 @@ import (
 	"github.com/libp2p/go-libp2p-core/network"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/protocol"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
+	"github.com/onflow/flow-go/network/p2p/unicast"
 )
 
 var directionLookUp = map[network.Direction]string{
@@ -99,8 +98,8 @@ func filterStream(host host.Host, targetID peer.ID, protocol core.ProtocolID, di
 	return filteredStreams
 }
 
-// networkingInfo returns ip, port, libp2p public key of the identity.
-func networkingInfo(identity flow.Identity) (string, string, crypto.PubKey, error) {
+// NetworkingInfo returns ip, port, libp2p public key of the identity.
+func NetworkingInfo(identity flow.Identity) (string, string, crypto.PubKey, error) {
 	// split the node address into ip and port
 	ip, port, err := net.SplitHostPort(identity.Address)
 	if err != nil {
@@ -163,23 +162,15 @@ func IPPortFromMultiAddress(addrs ...multiaddr.Multiaddr) (string, string, error
 	return "", "", fmt.Errorf("ip address or hostname not found")
 }
 
-func generateFlowProtocolID(rootBlockID string) protocol.ID {
-	return protocol.ID(FlowLibP2POneToOneProtocolIDPrefix + rootBlockID)
-}
-
-func generatePingProtcolID(rootBlockID string) protocol.ID {
-	return protocol.ID(FlowLibP2PPingProtocolPrefix + rootBlockID)
-}
-
 // PeerAddressInfo generates the libp2p peer.AddrInfo for the given Flow.Identity.
 // A node in flow is defined by a flow.Identity while it is defined by a peer.AddrInfo in libp2p.
 // flow.Identity           ---> peer.AddrInfo
 //    |-- Address          --->   |-- []multiaddr.Multiaddr
 //    |-- NetworkPublicKey --->   |-- ID
 func PeerAddressInfo(identity flow.Identity) (peer.AddrInfo, error) {
-	ip, port, key, err := networkingInfo(identity)
+	ip, port, key, err := NetworkingInfo(identity)
 	if err != nil {
-		return peer.AddrInfo{}, fmt.Errorf("could not get translate identity to networking info %s: %w", identity.NodeID.String(), err)
+		return peer.AddrInfo{}, fmt.Errorf("could not translate identity to networking info %s: %w", identity.NodeID.String(), err)
 	}
 
 	addr := MultiAddressStr(ip, port)
@@ -196,10 +187,10 @@ func PeerAddressInfo(identity flow.Identity) (peer.AddrInfo, error) {
 	return pInfo, err
 }
 
-// peerInfosFromIDs converts the given flow.Identities to peer.AddrInfo.
+// PeerInfosFromIDs converts the given flow.Identities to peer.AddrInfo.
 // For each identity, if the conversion succeeds, the peer.AddrInfo is included in the result else it is
 // included in the error map with the corresponding error
-func peerInfosFromIDs(ids flow.IdentityList) ([]peer.AddrInfo, map[flow.Identifier]error) {
+func PeerInfosFromIDs(ids flow.IdentityList) ([]peer.AddrInfo, map[flow.Identifier]error) {
 	validIDs := make([]peer.AddrInfo, 0, len(ids))
 	invalidIDs := make(map[flow.Identifier]error)
 	for _, id := range ids {
@@ -227,48 +218,9 @@ func streamLogger(log zerolog.Logger, stream libp2pnetwork.Stream) zerolog.Logge
 // flowStream returns the Flow protocol Stream in the connection if one exist, else it returns nil
 func flowStream(conn network.Conn) network.Stream {
 	for _, s := range conn.GetStreams() {
-		if isFlowProtocolStream(s) {
+		if unicast.IsFlowProtocolStream(s) {
 			return s
 		}
 	}
 	return nil
-}
-
-// messagePubKey extracts the public key of the envelope signer from a libp2p message.
-// The location of that key depends on the type of the key, see:
-// https://github.com/libp2p/specs/blob/master/peer-ids/peer-ids.md
-// This reproduces the exact logic of the private function doing the same decoding in libp2p:
-// https://github.com/libp2p/go-libp2p-pubsub/blob/ba28f8ecfc551d4d916beb748d3384951bce3ed0/sign.go#L77
-func messageSigningID(m *pubsub.Message) (peer.ID, error) {
-	var pubk crypto.PubKey
-
-	// m.From is the original sender of the message (versus `m.ReceivedFrom` which is the last hop which sent us this message)
-	pid, err := peer.IDFromBytes(m.From)
-	if err != nil {
-		return "", err
-	}
-
-	if m.Key == nil {
-		// no attached key, it must be extractable from the source ID
-		pubk, err = pid.ExtractPublicKey()
-		if err != nil {
-			return "", fmt.Errorf("cannot extract signing key: %s", err.Error())
-		}
-		if pubk == nil {
-			return "", fmt.Errorf("cannot extract signing key")
-		}
-	} else {
-		pubk, err = crypto.UnmarshalPublicKey(m.Key)
-		if err != nil {
-			return "", fmt.Errorf("cannot unmarshal signing key: %s", err.Error())
-		}
-
-		// verify that the source ID matches the attached key
-		if !pid.MatchesPublicKey(pubk) {
-			return "", fmt.Errorf("bad signing key; source ID %s doesn't match key", pid)
-		}
-	}
-
-	// the pid either contains or matches the signing pubKey
-	return pid, nil
 }

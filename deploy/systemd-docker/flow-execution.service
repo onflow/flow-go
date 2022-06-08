@@ -30,6 +30,7 @@ ExecStart=docker run --rm \
 	--nodeid ${FLOW_GO_NODE_ID} \
 	--bootstrapdir /bootstrap \
 	--datadir /data/protocol \
+	--secretsdir /data/secrets \
 	--triedir /data/execution \
 	--rpc-addr 0.0.0.0:9000 \
 	--bind 0.0.0.0:3569 \

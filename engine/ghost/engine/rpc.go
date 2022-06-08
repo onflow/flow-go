@@ -40,7 +40,7 @@ type RPC struct {
 }
 
 // New returns a new RPC engine.
-func New(net module.Network, log zerolog.Logger, me module.Local, state protocol.State, config Config) (*RPC, error) {
+func New(net network.Network, log zerolog.Logger, me module.Local, state protocol.State, config Config) (*RPC, error) {
 
 	log = log.With().Str("engine", "rpc").Logger()
 
@@ -80,7 +80,7 @@ func New(net module.Network, log zerolog.Logger, me module.Local, state protocol
 }
 
 // registerConduits registers for ALL channels and returns a map of engine id to conduit
-func registerConduits(net module.Network, state protocol.State, eng network.Engine) (map[network.Channel]network.Conduit, error) {
+func registerConduits(net network.Network, state protocol.State, eng network.Engine) (map[network.Channel]network.Conduit, error) {
 
 	// create a list of all channels that don't change over time
 	channels := network.ChannelList{

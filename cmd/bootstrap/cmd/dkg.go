@@ -3,10 +3,12 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/cmd/bootstrap/run"
+	bootstrapDKG "github.com/onflow/flow-go/cmd/bootstrap/dkg"
+	"github.com/onflow/flow-go/crypto"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/encodable"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 )
 
 func runDKG(nodes []model.NodeInfo) dkg.DKGData {
@@ -18,27 +20,38 @@ func runDKG(nodes []model.NodeInfo) dkg.DKGData {
 	var dkgData dkg.DKGData
 	var err error
 	if flagFastKG {
-		dkgData, err = run.RunFastKG(n, flagBootstrapRandomSeed)
+		dkgData, err = bootstrapDKG.RunFastKG(n, flagBootstrapRandomSeed)
 	} else {
-		dkgData, err = run.RunDKG(n, GenerateRandomSeeds(n))
+		dkgData, err = bootstrapDKG.RunDKG(n, GenerateRandomSeeds(n, crypto.SeedMinLenDKG))
 	}
 	if err != nil {
 		log.Fatal().Err(err).Msg("error running DKG")
 	}
 	log.Info().Msgf("finished running DKG")
 
+	pubKeyShares := make([]encodable.RandomBeaconPubKey, 0, len(dkgData.PubKeyShares))
+	for _, pubKey := range dkgData.PubKeyShares {
+		pubKeyShares = append(pubKeyShares, encodable.RandomBeaconPubKey{PublicKey: pubKey})
+	}
+
+	privKeyShares := make([]encodable.RandomBeaconPrivKey, 0, len(dkgData.PrivKeyShares))
 	for i, privKey := range dkgData.PrivKeyShares {
 		nodeID := nodes[i].NodeID
 
 		encKey := encodable.RandomBeaconPrivKey{PrivateKey: privKey}
-		privParticpant := dkg.DKGParticipantPriv{
-			NodeID:              nodeID,
-			RandomBeaconPrivKey: encKey,
-			GroupIndex:          i,
-		}
+		privKeyShares = append(privKeyShares, encKey)
 
-		writeJSON(fmt.Sprintf(model.PathRandomBeaconPriv, nodeID), privParticpant)
+		writeJSON(fmt.Sprintf(model.PathRandomBeaconPriv, nodeID), encKey)
 	}
+
+	// write full DKG info that will be used to construct QC
+	writeJSON(model.PathRootDKGData, inmem.EncodableFullDKG{
+		GroupKey: encodable.RandomBeaconPubKey{
+			PublicKey: dkgData.PubGroupKey,
+		},
+		PubKeyShares:  pubKeyShares,
+		PrivKeyShares: privKeyShares,
+	})
 
 	return dkgData
 }

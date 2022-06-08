@@ -10,13 +10,6 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
-// Execution spans.
-const (
-	// executionBlockReceivedToExecuted is a duration metric
-	// from a block being received by an execution node to being executed
-	executionBlockReceivedToExecuted = "execution_block_received_to_executed"
-)
-
 type ExecutionCollector struct {
 	tracer                           module.Tracer
 	stateReadsPerBlock               prometheus.Histogram
@@ -32,8 +25,9 @@ type ExecutionCollector struct {
 	forestNumberOfTrees              prometheus.Gauge
 	latestTrieRegCount               prometheus.Gauge
 	latestTrieRegCountDiff           prometheus.Gauge
-	latestTrieMaxDepth               prometheus.Gauge
-	latestTrieMaxDepthDiff           prometheus.Gauge
+	latestTrieRegSize                prometheus.Gauge
+	latestTrieRegSizeDiff            prometheus.Gauge
+	latestTrieMaxDepthTouched        prometheus.Gauge
 	updated                          prometheus.Counter
 	proofSize                        prometheus.Gauge
 	updatedValuesNumber              prometheus.Counter
@@ -57,10 +51,16 @@ type ExecutionCollector struct {
 	transactionCheckTime             prometheus.Histogram
 	transactionInterpretTime         prometheus.Histogram
 	transactionExecutionTime         prometheus.Histogram
+	transactionMemoryUsage           prometheus.Histogram
+	transactionMemoryEstimate        prometheus.Histogram
+	transactionMemoryDifference      prometheus.Histogram
 	transactionComputationUsed       prometheus.Histogram
 	transactionEmittedEvents         prometheus.Histogram
 	scriptExecutionTime              prometheus.Histogram
 	scriptComputationUsed            prometheus.Histogram
+	scriptMemoryUsage                prometheus.Histogram
+	scriptMemoryEstimate             prometheus.Histogram
+	scriptMemoryDifference           prometheus.Histogram
 	numberOfAccounts                 prometheus.Gauge
 	totalChunkDataPackRequests       prometheus.Counter
 	stateSyncActive                  prometheus.Gauge
@@ -69,79 +69,86 @@ type ExecutionCollector struct {
 	blockDataUploadsDuration         prometheus.Histogram
 }
 
-func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registerer) *ExecutionCollector {
+func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 
-	forestApproxMemorySize := prometheus.NewGauge(prometheus.GaugeOpts{
+	forestApproxMemorySize := promauto.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
 		Name:      "forest_approx_memory_size",
 		Help:      "an approximate size of in-memory forest in bytes",
 	})
 
-	forestNumberOfTrees := prometheus.NewGauge(prometheus.GaugeOpts{
+	forestNumberOfTrees := promauto.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
 		Name:      "forest_number_of_trees",
 		Help:      "the number of trees in memory",
 	})
 
-	latestTrieRegCount := prometheus.NewGauge(prometheus.GaugeOpts{
+	latestTrieRegCount := promauto.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
 		Name:      "latest_trie_reg_count",
 		Help:      "the number of allocated registers (latest created trie)",
 	})
 
-	latestTrieRegCountDiff := prometheus.NewGauge(prometheus.GaugeOpts{
+	latestTrieRegCountDiff := promauto.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
 		Name:      "latest_trie_reg_count_diff",
 		Help:      "the difference between number of unique register allocated of the latest created trie and parent trie",
 	})
 
-	latestTrieMaxDepth := prometheus.NewGauge(prometheus.GaugeOpts{
+	latestTrieRegSize := promauto.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
-		Name:      "latest_trie_max_depth",
-		Help:      "the maximum depth of the latest created trie",
+		Name:      "latest_trie_reg_size",
+		Help:      "the size of allocated registers (latest created trie)",
 	})
 
-	latestTrieMaxDepthDiff := prometheus.NewGauge(prometheus.GaugeOpts{
+	latestTrieRegSizeDiff := promauto.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
-		Name:      "latest_trie_max_depth_diff",
-		Help:      "the the difference between the max depth of the latest created trie and parent trie",
+		Name:      "latest_trie_reg_size_diff",
+		Help:      "the difference between size of unique register allocated of the latest created trie and parent trie",
 	})
 
-	updatedCount := prometheus.NewCounter(prometheus.CounterOpts{
+	latestTrieMaxDepthTouched := promauto.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemMTrie,
+		Name:      "latest_trie_max_depth_touched",
+		Help:      "the maximum depth touched of the latest created trie",
+	})
+
+	updatedCount := promauto.NewCounter(prometheus.CounterOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
 		Name:      "updates_counted",
 		Help:      "the number of updates",
 	})
 
-	proofSize := prometheus.NewGauge(prometheus.GaugeOpts{
+	proofSize := promauto.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
 		Name:      "average_proof_size",
 		Help:      "the average size of a single generated proof in bytes",
 	})
 
-	updatedValuesNumber := prometheus.NewCounter(prometheus.CounterOpts{
+	updatedValuesNumber := promauto.NewCounter(prometheus.CounterOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
 		Name:      "update_values_number",
 		Help:      "the total number of values updated",
 	})
 
-	updatedValuesSize := prometheus.NewGauge(prometheus.GaugeOpts{
+	updatedValuesSize := promauto.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
 		Name:      "update_values_size",
 		Help:      "the total size of values for single update in bytes",
 	})
 
-	updatedDuration := prometheus.NewHistogram(prometheus.HistogramOpts{
+	updatedDuration := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
 		Name:      "update_duration",
@@ -149,7 +156,7 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 		Buckets:   []float64{0.05, 0.2, 0.5, 1, 2, 5},
 	})
 
-	updatedDurationPerValue := prometheus.NewHistogram(prometheus.HistogramOpts{
+	updatedDurationPerValue := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
 		Name:      "update_duration_per_Value",
@@ -157,21 +164,21 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 		Buckets:   []float64{0.05, 0.2, 0.5, 1, 2, 5},
 	})
 
-	readValuesNumber := prometheus.NewCounter(prometheus.CounterOpts{
+	readValuesNumber := promauto.NewCounter(prometheus.CounterOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
 		Name:      "read_values_number",
 		Help:      "the total number of values read",
 	})
 
-	readValuesSize := prometheus.NewGauge(prometheus.GaugeOpts{
+	readValuesSize := promauto.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
 		Name:      "read_values_size",
 		Help:      "the total size of values for single read in bytes",
 	})
 
-	readDuration := prometheus.NewHistogram(prometheus.HistogramOpts{
+	readDuration := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
 		Name:      "read_duration",
@@ -179,7 +186,7 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 		Buckets:   []float64{0.05, 0.2, 0.5, 1, 2, 5},
 	})
 
-	readDurationPerValue := prometheus.NewHistogram(prometheus.HistogramOpts{
+	readDurationPerValue := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
 		Name:      "read_duration_per_value",
@@ -187,7 +194,7 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 		Buckets:   []float64{0.05, 0.2, 0.5, 1, 2, 5},
 	})
 
-	blockExecutionTime := prometheus.NewHistogram(prometheus.HistogramOpts{
+	blockExecutionTime := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
 		Name:      "block_execution_time_milliseconds",
@@ -195,7 +202,7 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 		Buckets:   []float64{100, 500, 1000, 1500, 2000, 2500, 3000, 6000},
 	})
 
-	blockComputationUsed := prometheus.NewHistogram(prometheus.HistogramOpts{
+	blockComputationUsed := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
 		Name:      "block_computation_used",
@@ -203,21 +210,21 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 		Buckets:   []float64{1000, 10000, 100000, 500000, 1000000, 5000000, 10000000},
 	})
 
-	blockTransactionCounts := prometheus.NewHistogram(prometheus.HistogramOpts{
+	blockTransactionCounts := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
 		Name:      "block_transaction_counts",
 		Help:      "the total number of transactions per block",
 	})
 
-	blockCollectionCounts := prometheus.NewHistogram(prometheus.HistogramOpts{
+	blockCollectionCounts := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
 		Name:      "block_collection_counts",
 		Help:      "the total number of collections per block",
 	})
 
-	collectionExecutionTime := prometheus.NewHistogram(prometheus.HistogramOpts{
+	collectionExecutionTime := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
 		Name:      "collection_execution_time_milliseconds",
@@ -225,7 +232,7 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 		Buckets:   []float64{100, 200, 500, 1000, 1500, 2000},
 	})
 
-	collectionComputationUsed := prometheus.NewHistogram(prometheus.HistogramOpts{
+	collectionComputationUsed := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
 		Name:      "collection_computation_used",
@@ -233,49 +240,49 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 		Buckets:   []float64{1000, 10000, 50000, 100000, 500000, 1000000},
 	})
 
-	collectionTransactionCounts := prometheus.NewHistogram(prometheus.HistogramOpts{
+	collectionTransactionCounts := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
 		Name:      "collection_transaction_counts",
 		Help:      "the total number of transactions per collection",
 	})
 
-	collectionRequestsSent := prometheus.NewCounter(prometheus.CounterOpts{
+	collectionRequestsSent := promauto.NewCounter(prometheus.CounterOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemIngestion,
 		Name:      "collection_requests_sent",
 		Help:      "the number of collection requests sent",
 	})
 
-	collectionRequestsRetries := prometheus.NewCounter(prometheus.CounterOpts{
+	collectionRequestsRetries := promauto.NewCounter(prometheus.CounterOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemIngestion,
 		Name:      "collection_requests_retries",
 		Help:      "the number of collection requests retried",
 	})
 
-	transactionParseTime := prometheus.NewHistogram(prometheus.HistogramOpts{
+	transactionParseTime := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
 		Name:      "transaction_parse_time_nanoseconds",
 		Help:      "the parse time for a transaction in nanoseconds",
 	})
 
-	transactionCheckTime := prometheus.NewHistogram(prometheus.HistogramOpts{
+	transactionCheckTime := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
 		Name:      "transaction_check_time_nanoseconds",
 		Help:      "the checking time for a transaction in nanoseconds",
 	})
 
-	transactionInterpretTime := prometheus.NewHistogram(prometheus.HistogramOpts{
+	transactionInterpretTime := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
 		Name:      "transaction_interpret_time_nanoseconds",
 		Help:      "the interpretation time for a transaction in nanoseconds",
 	})
 
-	transactionExecutionTime := prometheus.NewHistogram(prometheus.HistogramOpts{
+	transactionExecutionTime := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
 		Name:      "transaction_execution_time_milliseconds",
@@ -283,7 +290,7 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 		Buckets:   []float64{2, 4, 8, 16, 32, 64, 100, 250, 500},
 	})
 
-	transactionComputationUsed := prometheus.NewHistogram(prometheus.HistogramOpts{
+	transactionComputationUsed := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
 		Name:      "transaction_computation_used",
@@ -291,14 +298,38 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 		Buckets:   []float64{50, 100, 500, 1000, 5000, 10000},
 	})
 
-	transactionEmittedEvents := prometheus.NewHistogram(prometheus.HistogramOpts{
+	transactionMemoryUsage := promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "transaction_memory_usage",
+		Help:      "the total amount of memory allocated by a transaction",
+		Buckets:   []float64{100_000, 1_000_000, 10_000_000, 50_000_000, 100_000_000, 500_000_000, 1_000_000_000},
+	})
+
+	transactionMemoryEstimate := promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "transaction_memory_estimate",
+		Help:      "the estimated memory used by a transaction",
+		Buckets:   []float64{100_000, 1_000_000, 10_000_000, 50_000_000, 100_000_000, 500_000_000, 1_000_000_000},
+	})
+
+	transactionMemoryDifference := promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "transaction_memory_difference",
+		Help:      "the difference in actual memory usage and estimate for a transaction",
+		Buckets:   []float64{-1, 0, 10_000_000, 100_000_000, 1_000_000_000},
+	})
+
+	transactionEmittedEvents := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
 		Name:      "transaction_emitted_events",
 		Help:      "the total number of events emitted by a transaction",
 	})
 
-	scriptExecutionTime := prometheus.NewHistogram(prometheus.HistogramOpts{
+	scriptExecutionTime := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
 		Name:      "script_execution_time_milliseconds",
@@ -306,7 +337,7 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 		Buckets:   []float64{2, 4, 8, 16, 32, 64, 100, 250, 500},
 	})
 
-	scriptComputationUsed := prometheus.NewHistogram(prometheus.HistogramOpts{
+	scriptComputationUsed := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
 		Name:      "script_computation_used",
@@ -314,64 +345,51 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 		Buckets:   []float64{50, 100, 500, 1000, 5000, 10000},
 	})
 
-	totalChunkDataPackRequests := prometheus.NewCounter(prometheus.CounterOpts{
+	scriptMemoryUsage := promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "script_memory_usage",
+		Help:      "the total amount of memory allocated by a script",
+		Buckets:   []float64{100_000, 1_000_000, 10_000_000, 50_000_000, 100_000_000, 500_000_000, 1_000_000_000},
+	})
+
+	scriptMemoryEstimate := promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "script_memory_estimate",
+		Help:      "the estimated memory used by a script",
+		Buckets:   []float64{100_000, 1_000_000, 10_000_000, 50_000_000, 100_000_000, 500_000_000, 1_000_000_000},
+	})
+
+	scriptMemoryDifference := promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "script_memory_difference",
+		Help:      "the difference in actual memory usage and estimate for a script",
+		Buckets:   []float64{-1, 0, 10_000_000, 100_000_000, 1_000_000_000},
+	})
+
+	totalChunkDataPackRequests := promauto.NewCounter(prometheus.CounterOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemProvider,
 		Name:      "chunk_data_packs_requested_total",
 		Help:      "the total number of chunk data pack requests provider engine received",
 	})
 
-	blockDataUploadsInProgress := prometheus.NewGauge(prometheus.GaugeOpts{
+	blockDataUploadsInProgress := promauto.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemBlockDataUploader,
 		Name:      "block_data_upload_in_progress",
 		Help:      "number of concurrently running Block Data upload operations",
 	})
 
-	blockDataUploadsDuration := prometheus.NewHistogram(prometheus.HistogramOpts{
+	blockDataUploadsDuration := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemBlockDataUploader,
 		Name:      "block_data_upload_duration_ms",
 		Help:      "the duration of update upload operation",
 		Buckets:   []float64{1, 100, 500, 1000, 2000},
 	})
-
-	registerer.MustRegister(forestApproxMemorySize)
-	registerer.MustRegister(forestNumberOfTrees)
-	registerer.MustRegister(latestTrieRegCount)
-	registerer.MustRegister(latestTrieRegCountDiff)
-	registerer.MustRegister(latestTrieMaxDepth)
-	registerer.MustRegister(latestTrieMaxDepthDiff)
-	registerer.MustRegister(updatedCount)
-	registerer.MustRegister(proofSize)
-	registerer.MustRegister(updatedValuesNumber)
-	registerer.MustRegister(updatedValuesSize)
-	registerer.MustRegister(updatedDuration)
-	registerer.MustRegister(updatedDurationPerValue)
-	registerer.MustRegister(readValuesNumber)
-	registerer.MustRegister(readValuesSize)
-	registerer.MustRegister(readDuration)
-	registerer.MustRegister(readDurationPerValue)
-	registerer.MustRegister(blockExecutionTime)
-	registerer.MustRegister(blockComputationUsed)
-	registerer.MustRegister(blockTransactionCounts)
-	registerer.MustRegister(blockCollectionCounts)
-	registerer.MustRegister(collectionExecutionTime)
-	registerer.MustRegister(collectionComputationUsed)
-	registerer.MustRegister(collectionTransactionCounts)
-	registerer.MustRegister(collectionRequestsSent)
-	registerer.MustRegister(collectionRequestsRetries)
-	registerer.MustRegister(transactionParseTime)
-	registerer.MustRegister(transactionCheckTime)
-	registerer.MustRegister(transactionInterpretTime)
-	registerer.MustRegister(transactionExecutionTime)
-	registerer.MustRegister(transactionComputationUsed)
-	registerer.MustRegister(transactionEmittedEvents)
-	registerer.MustRegister(scriptExecutionTime)
-	registerer.MustRegister(scriptComputationUsed)
-	registerer.MustRegister(totalChunkDataPackRequests)
-	registerer.MustRegister(blockDataUploadsInProgress)
-	registerer.MustRegister(blockDataUploadsDuration)
 
 	ec := &ExecutionCollector{
 		tracer: tracer,
@@ -380,8 +398,9 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 		forestNumberOfTrees:         forestNumberOfTrees,
 		latestTrieRegCount:          latestTrieRegCount,
 		latestTrieRegCountDiff:      latestTrieRegCountDiff,
-		latestTrieMaxDepth:          latestTrieMaxDepth,
-		latestTrieMaxDepthDiff:      latestTrieMaxDepthDiff,
+		latestTrieRegSize:           latestTrieRegSize,
+		latestTrieRegSizeDiff:       latestTrieRegSizeDiff,
+		latestTrieMaxDepthTouched:   latestTrieMaxDepthTouched,
 		updated:                     updatedCount,
 		proofSize:                   proofSize,
 		updatedValuesNumber:         updatedValuesNumber,
@@ -406,9 +425,15 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 		transactionInterpretTime:    transactionInterpretTime,
 		transactionExecutionTime:    transactionExecutionTime,
 		transactionComputationUsed:  transactionComputationUsed,
+		transactionMemoryUsage:      transactionMemoryUsage,
+		transactionMemoryEstimate:   transactionMemoryEstimate,
+		transactionMemoryDifference: transactionMemoryDifference,
 		transactionEmittedEvents:    transactionEmittedEvents,
 		scriptExecutionTime:         scriptExecutionTime,
 		scriptComputationUsed:       scriptComputationUsed,
+		scriptMemoryUsage:           scriptMemoryUsage,
+		scriptMemoryEstimate:        scriptMemoryEstimate,
+		scriptMemoryDifference:      scriptMemoryDifference,
 		totalChunkDataPackRequests:  totalChunkDataPackRequests,
 		blockDataUploadsInProgress:  blockDataUploadsInProgress,
 		blockDataUploadsDuration:    blockDataUploadsDuration,
@@ -505,13 +530,11 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 // StartBlockReceivedToExecuted starts a span to trace the duration of a block
 // from being received for execution to execution being finished
 func (ec *ExecutionCollector) StartBlockReceivedToExecuted(blockID flow.Identifier) {
-	ec.tracer.StartSpan(blockID, executionBlockReceivedToExecuted).SetTag("block_id", blockID.String)
 }
 
 // FinishBlockReceivedToExecuted finishes a span to trace the duration of a block
 // from being received for execution to execution being finished
 func (ec *ExecutionCollector) FinishBlockReceivedToExecuted(blockID flow.Identifier) {
-	ec.tracer.FinishSpan(blockID, executionBlockReceivedToExecuted)
 }
 
 // ExecutionBlockExecuted reports computation and total time spent on a block computation
@@ -532,10 +555,18 @@ func (ec *ExecutionCollector) ExecutionCollectionExecuted(dur time.Duration, com
 }
 
 // TransactionExecuted reports the time and computation spent executing a single transaction
-func (ec *ExecutionCollector) ExecutionTransactionExecuted(dur time.Duration, compUsed uint64, eventCounts int, failed bool) {
+func (ec *ExecutionCollector) ExecutionTransactionExecuted(
+	dur time.Duration,
+	compUsed, memoryUsed, memoryEstimated uint64,
+	eventCounts int,
+	failed bool,
+) {
 	ec.totalExecutedTransactionsCounter.Inc()
 	ec.transactionExecutionTime.Observe(float64(dur.Milliseconds()))
 	ec.transactionComputationUsed.Observe(float64(compUsed))
+	ec.transactionMemoryUsage.Observe(float64(memoryUsed))
+	ec.transactionMemoryEstimate.Observe(float64(memoryEstimated))
+	ec.transactionMemoryDifference.Observe(float64(memoryEstimated) - float64(memoryUsed))
 	ec.transactionEmittedEvents.Observe(float64(eventCounts))
 	if failed {
 		ec.totalFailedTransactionsCounter.Inc()
@@ -543,10 +574,13 @@ func (ec *ExecutionCollector) ExecutionTransactionExecuted(dur time.Duration, co
 }
 
 // ScriptExecuted reports the time spent executing a single script
-func (ec *ExecutionCollector) ExecutionScriptExecuted(dur time.Duration, compUsed uint64) {
+func (ec *ExecutionCollector) ExecutionScriptExecuted(dur time.Duration, compUsed, memoryUsed, memoryEstimated uint64) {
 	ec.totalExecutedScriptsCounter.Inc()
 	ec.scriptExecutionTime.Observe(float64(dur.Milliseconds()))
 	ec.scriptComputationUsed.Observe(float64(compUsed))
+	ec.scriptMemoryUsage.Observe(float64(memoryUsed))
+	ec.scriptMemoryEstimate.Observe(float64(memoryEstimated))
+	ec.scriptMemoryDifference.Observe(float64(memoryEstimated) - float64(memoryUsed))
 }
 
 // ExecutionStateReadsPerBlock reports number of state access/read operations per block
@@ -585,18 +619,23 @@ func (ec *ExecutionCollector) LatestTrieRegCount(number uint64) {
 }
 
 // LatestTrieRegCountDiff records the difference between the number of unique register allocated of the latest created trie and parent trie
-func (ec *ExecutionCollector) LatestTrieRegCountDiff(number uint64) {
+func (ec *ExecutionCollector) LatestTrieRegCountDiff(number int64) {
 	ec.latestTrieRegCountDiff.Set(float64(number))
 }
 
-// LatestTrieMaxDepth records the maximum depth of the last created trie
-func (ec *ExecutionCollector) LatestTrieMaxDepth(number uint64) {
-	ec.latestTrieMaxDepth.Set(float64(number))
+// LatestTrieRegSize records the size of unique register allocated (the lastest created trie)
+func (ec *ExecutionCollector) LatestTrieRegSize(size uint64) {
+	ec.latestTrieRegSize.Set(float64(size))
 }
 
-// LatestTrieMaxDepthDiff records the difference between the max depth of the latest created trie and parent trie
-func (ec *ExecutionCollector) LatestTrieMaxDepthDiff(number uint64) {
-	ec.latestTrieMaxDepthDiff.Set(float64(number))
+// LatestTrieRegSizeDiff records the difference between the size of unique register allocated of the latest created trie and parent trie
+func (ec *ExecutionCollector) LatestTrieRegSizeDiff(size int64) {
+	ec.latestTrieRegSizeDiff.Set(float64(size))
+}
+
+// LatestTrieMaxDepthTouched records the maximum depth touched of the last created trie
+func (ec *ExecutionCollector) LatestTrieMaxDepthTouched(maxDepth uint16) {
+	ec.latestTrieMaxDepthTouched.Set(float64(maxDepth))
 }
 
 // UpdateCount increase a counter of performed updates

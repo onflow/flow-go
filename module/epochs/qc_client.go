@@ -6,10 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
+	"github.com/rs/zerolog"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
@@ -40,15 +39,21 @@ type QCContractClient struct {
 }
 
 // NewQCContractClient returns a new client to the Quorum Certificate contract
-func NewQCContractClient(log zerolog.Logger,
+func NewQCContractClient(
+	log zerolog.Logger,
 	flowClient module.SDKClientWrapper,
+	flowClientANID flow.Identifier,
 	nodeID flow.Identifier,
 	accountAddress string,
 	accountKeyIndex uint,
 	qcContractAddress string,
-	signer sdkcrypto.Signer) *QCContractClient {
+	signer sdkcrypto.Signer,
+) *QCContractClient {
 
-	log = log.With().Str("component", "qc_contract_client").Logger()
+	log = log.With().
+		Str("component", "qc_contract_client").
+		Str("flow_client_an_id", flowClientANID.String()).
+		Logger()
 	base := NewBaseClient(log, flowClient, accountAddress, accountKeyIndex, signer, qcContractAddress)
 
 	// set QCContractAddress to the contract address given
@@ -80,8 +85,8 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 		return fmt.Errorf("could not get account: %w", err)
 	}
 
-	// get latest sealed block to execute transaction
-	latestBlock, err := c.FlowClient.GetLatestBlock(ctx, true)
+	// get latest finalized block to execute transaction
+	latestBlock, err := c.FlowClient.GetLatestBlock(ctx, false)
 	if err != nil {
 		return fmt.Errorf("could not get latest block from node: %w", err)
 	}
@@ -124,6 +129,7 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 	}
 
 	// submit signed transaction to node
+	c.Log.Info().Str("tx_id", tx.ID().Hex()).Msg("sending SubmitResult transaction")
 	txID, err := c.SendTransaction(ctx, tx)
 	if err != nil {
 		return fmt.Errorf("failed to submit transaction: %w", err)

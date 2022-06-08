@@ -6,7 +6,7 @@ package engine
 // updates of the same internal state.
 type Notifier struct {
 	// Illustrative description of the Notifier:
-	// * When the gate is activate, it will let a _single_  person step through the gate.
+	// * When the gate is activated, it will let a _single_  person step through the gate.
 	// * When somebody steps through the gate, it deactivates (atomic operation) and
 	//   prevents subsequent people from passing (until it is activated again).
 	// * The gate has a memory and remembers whether it is activated. I.e. the gate

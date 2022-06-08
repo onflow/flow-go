@@ -44,7 +44,7 @@ type SyncSuite struct {
 	head         *flow.Header
 	heights      map[uint64]*flow.Block
 	blockIDs     map[flow.Identifier]*flow.Block
-	net          *module.Network
+	net          *mocknetwork.Network
 	con          *mocknetwork.Conduit
 	me           *module.Local
 	state        *protocol.State
@@ -61,8 +61,7 @@ func (ss *SyncSuite) SetupTest() {
 
 	// generate own ID
 	ss.participants = unittest.IdentityListFixture(3, unittest.WithRole(flow.RoleConsensus))
-	keys, err := unittest.NetworkingKeys(len(ss.participants))
-	require.NoError(ss.T(), err)
+	keys := unittest.NetworkingKeys(len(ss.participants))
 
 	for i, p := range ss.participants {
 		p.NetworkPubKey = keys[i].PublicKey()
@@ -78,9 +77,9 @@ func (ss *SyncSuite) SetupTest() {
 	ss.blockIDs = make(map[flow.Identifier]*flow.Block)
 
 	// set up the network module mock
-	ss.net = &module.Network{}
+	ss.net = &mocknetwork.Network{}
 	ss.net.On("Register", mock.Anything, mock.Anything).Return(
-		func(channel netint.Channel, engine netint.Engine) netint.Conduit {
+		func(channel netint.Channel, engine netint.MessageProcessor) netint.Conduit {
 			return ss.con
 		},
 		nil,
@@ -173,7 +172,7 @@ func (ss *SyncSuite) SetupTest() {
 	idCache, err := p2p.NewProtocolStateIDCache(log, ss.state, protocolEvents.NewDistributor())
 	require.NoError(ss.T(), err, "could not create protocol state identity cache")
 	e, err := New(log, metrics, ss.net, ss.me, ss.blocks, ss.comp, ss.core, finalizedHeader,
-		id.NewFilteredIdentifierProvider(
+		id.NewIdentityFilterIdentifierProvider(
 			filter.And(
 				filter.HasRole(flow.RoleConsensus),
 				filter.Not(filter.HasNodeID(ss.me.NodeID())),
@@ -322,6 +321,21 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 	)
 	err = ss.e.requestHandler.onRangeRequest(originID, req)
 	require.NoError(ss.T(), err, "valid range request should pass")
+
+	// a request for a range larger than MaxSize should be clamped
+	req.FromHeight = ref - uint64(synccore.DefaultConfig().MaxSize) - 1
+	req.ToHeight = ref
+	ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Once().Run(
+		func(args mock.Arguments) {
+			res := args.Get(0).(*messages.BlockResponse)
+			assert.Len(ss.T(), res.Blocks, int(synccore.DefaultConfig().MaxSize))
+			assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
+			recipientID := args.Get(1).(flow.Identifier)
+			assert.Equal(ss.T(), originID, recipientID, "should send response to original requester")
+		},
+	)
+	err = ss.e.requestHandler.onRangeRequest(originID, req)
+	require.NoError(ss.T(), err, "valid range request exceeding max size should still pass")
 }
 
 func (ss *SyncSuite) TestOnBatchRequest() {
@@ -358,9 +372,28 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 			recipientID := args.Get(1).(flow.Identifier)
 			assert.Equal(ss.T(), originID, recipientID, "response should be send to original requester")
 		},
-	)
+	).Once()
 	err = ss.e.requestHandler.onBatchRequest(originID, req)
 	require.NoError(ss.T(), err, "should pass request with valid block")
+
+	// a request for too many blocks should be clamped
+	for i := 0; i < int(synccore.DefaultConfig().MaxSize); i++ {
+		block := unittest.BlockFixture()
+		block.Header.Height = ss.head.Height - 2 - uint64(i)
+		req.BlockIDs = append(req.BlockIDs, block.ID())
+		ss.blockIDs[block.ID()] = &block
+	}
+	ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Run(
+		func(args mock.Arguments) {
+			res := args.Get(0).(*messages.BlockResponse)
+			assert.Len(ss.T(), res.Blocks, int(synccore.DefaultConfig().MaxSize))
+			assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
+			recipientID := args.Get(1).(flow.Identifier)
+			assert.Equal(ss.T(), originID, recipientID, "response should be send to original requester")
+		},
+	)
+	err = ss.e.requestHandler.onBatchRequest(originID, req)
+	require.NoError(ss.T(), err, "valid batch request exceeding max size should still pass")
 }
 
 func (ss *SyncSuite) TestOnBlockResponse() {
@@ -492,4 +525,21 @@ func (ss *SyncSuite) TestOnFinalizedBlock() {
 	actualHeader := ss.e.finalizedHeader.Get()
 	require.ElementsMatch(ss.T(), ss.e.participantsProvider.Identifiers(), ss.participants[1:].NodeIDs())
 	require.Equal(ss.T(), actualHeader, &finalizedBlock)
+}
+
+// TestProcessUnsupportedMessageType tests that Process and ProcessLocal correctly handle a case where invalid message type
+// was submitted from network layer.
+func (ss *SyncSuite) TestProcessUnsupportedMessageType() {
+	invalidEvent := uint64(42)
+	engines := []netint.MessageProcessor{ss.e, ss.e.requestHandler}
+	for _, e := range engines {
+		err := e.Process("ch", unittest.IdentifierFixture(), invalidEvent)
+		// shouldn't result in error since byzantine inputs are expected
+		require.NoError(ss.T(), err)
+	}
+
+	// in case of local processing error cannot be consumed since all inputs are trusted
+	err := ss.e.ProcessLocal(invalidEvent)
+	require.Error(ss.T(), err)
+	require.True(ss.T(), engine.IsIncompatibleInputTypeError(err))
 }

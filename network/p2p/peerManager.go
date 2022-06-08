@@ -3,6 +3,7 @@ package p2p
 import (
 	"context"
 	"fmt"
+	mrand "math/rand"
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/host"
@@ -15,10 +16,10 @@ import (
 // Connector connects to peer and disconnects from peer using the underlying networking library
 type Connector interface {
 
-	// UpdatePeers connects to the given peer.IDs and returns a map of peers which failed. It also
-	// disconnects from any other peers with which it may have previously established connection.
+	// UpdatePeers connects to the given peer.IDs. It also disconnects from any other peers with which it may have
+	// previously established connection.
 	// UpdatePeers implementation should be idempotent such that multiple calls to connect to the same peer should not
-	// return an error or create multiple connections
+	// create multiple connections
 	UpdatePeers(ctx context.Context, peerIDs peer.IDSlice)
 }
 
@@ -83,14 +84,17 @@ func PeerManagerFactory(peerManagerOptions []Option, connectorOptions ...Connect
 
 // Ready kicks off the ambient periodic connection updates.
 func (pm *PeerManager) Ready() <-chan struct{} {
-	// makes sure that peer update request is invoked
-	// once before returning
+	pm.unit.Launch(pm.updateLoop)
+
+	// makes sure that peer update request is invoked once before returning
 	pm.RequestPeerUpdate()
 
 	// also starts running it periodically
-	pm.unit.LaunchPeriodically(pm.RequestPeerUpdate, pm.peerUpdateInterval, time.Duration(0))
-
-	pm.unit.Launch(pm.updateLoop)
+	//
+	// add a random delay to initial launch to avoid synchronizing this
+	// potentially expensive operation across the network
+	delay := time.Duration(mrand.Int63n(pm.peerUpdateInterval.Nanoseconds()))
+	pm.unit.LaunchPeriodically(pm.RequestPeerUpdate, pm.peerUpdateInterval, delay)
 
 	return pm.unit.Ready()
 }
@@ -138,4 +142,8 @@ func (pm *PeerManager) updatePeers() {
 
 	// ask the connector to connect to all peers in the list
 	pm.connector.UpdatePeers(pm.unit.Ctx(), peers)
+}
+
+func (pm *PeerManager) ForceUpdatePeers() {
+	pm.updatePeers()
 }

@@ -5,6 +5,8 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/onflow/flow-go/module"
+
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -60,8 +62,7 @@ func (s *Suite) TestEpochQuorumCertificate() {
 	// create cluster nodes with voter resource
 	for _, node := range nodes {
 		nodeID := node.NodeID
-		stakingPrivKey, err := unittest.StakingKey()
-		s.Require().NoError(err)
+		stakingPrivKey := unittest.StakingPrivKeyFixture()
 
 		// find cluster and create root block
 		cluster, _, _ := clustering.ByNodeID(node.NodeID)
@@ -73,7 +74,7 @@ func (s *Suite) TestEpochQuorumCertificate() {
 		address, err := s.blockchain.CreateAccount([]*sdk.AccountKey{key}, []sdktemplates.Contract{})
 		s.Require().NoError(err)
 
-		client := epochs.NewQCContractClient(zerolog.Nop(), s.emulatorClient, nodeID, address.String(), 0, s.qcAddress.String(), signer)
+		client := epochs.NewQCContractClient(zerolog.Nop(), s.emulatorClient, flow.ZeroID, nodeID, address.String(), 0, s.qcAddress.String(), signer)
 		s.Require().NoError(err)
 
 		local := &modulemock.Local{}
@@ -96,7 +97,7 @@ func (s *Suite) TestEpochQuorumCertificate() {
 		state.On("Final").Return(snapshot)
 
 		// create QC voter object to be used for voting for the root QC contract
-		voter := epochs.NewRootQCVoter(zerolog.Logger{}, local, hotSigner, state, client)
+		voter := epochs.NewRootQCVoter(zerolog.Logger{}, local, hotSigner, state, []module.QCContractClient{client})
 
 		// create voter resource
 		s.CreateVoterResource(address, nodeID, stakingPrivKey.PublicKey(), signer)
@@ -107,12 +108,12 @@ func (s *Suite) TestEpochQuorumCertificate() {
 		s.Require().NoError(err)
 	}
 
-	// stop voting
-	s.StopVoting()
-
 	// check if each node has voted
 	for _, node := range nodes {
 		hasVoted := s.NodeHasVoted(node.NodeID)
 		s.Assert().True(hasVoted)
 	}
+
+	// stop voting
+	s.StopVoting()
 }

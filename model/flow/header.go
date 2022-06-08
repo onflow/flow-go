@@ -1,7 +1,9 @@
 package flow
 
 import (
+	"bytes"
 	"encoding/json"
+	"sync"
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
@@ -26,11 +28,9 @@ type Header struct {
 	Timestamp time.Time // Timestamp is the time at which this block was proposed.
 	// The proposer can choose any time, so this should not be trusted as accurate.
 
-	View uint64 // View is the view number at which this block was proposed.
+	View uint64 // View number at which this block was proposed.
 
-	ParentVoterIDs []Identifier // List of voters who signed the parent block.
-	// A quorum certificate can be extrated from the header.
-	// This field is the SignerIDs field of the extracted quorum certificate.
+	ParentVoterIndices []byte // a bitvector that represents all the voters for the parent block.
 
 	ParentVoterSigData []byte // aggregated signature over the parent block. Not a single cryptographic
 	// signature since the data represents cryptographic signatures serialized in some way (concatenation or other)
@@ -52,7 +52,7 @@ func (h Header) Body() interface{} {
 		PayloadHash        Identifier
 		Timestamp          uint64
 		View               uint64
-		ParentVoterIDs     []Identifier
+		ParentVoterIndices []byte
 		ParentVoterSigData []byte
 		ProposerID         Identifier
 	}{
@@ -62,7 +62,7 @@ func (h Header) Body() interface{} {
 		PayloadHash:        h.PayloadHash,
 		Timestamp:          uint64(h.Timestamp.UnixNano()),
 		View:               h.View,
-		ParentVoterIDs:     h.ParentVoterIDs,
+		ParentVoterIndices: h.ParentVoterIndices,
 		ParentVoterSigData: h.ParentVoterSigData,
 		ProposerID:         h.ProposerID,
 	}
@@ -72,6 +72,10 @@ func (h Header) Fingerprint() []byte {
 	return fingerprint.Fingerprint(h.Body())
 }
 
+var mutexHeader sync.Mutex
+var previdHeader Identifier
+var prevHeader Header
+
 // ID returns a unique ID to singularly identify the header and its block
 // within the flow system.
 func (h Header) ID() Identifier {
@@ -80,7 +84,42 @@ func (h Header) ID() Identifier {
 	if h.Timestamp.Location() != time.UTC {
 		h.Timestamp = h.Timestamp.UTC()
 	}
-	return MakeID(h)
+
+	mutexHeader.Lock()
+
+	// unlock at the return
+	defer mutexHeader.Unlock()
+
+	// compare these elements individually
+	if prevHeader.ParentVoterIndices != nil &&
+		prevHeader.ParentVoterSigData != nil &&
+		prevHeader.ProposerSigData != nil &&
+		len(h.ParentVoterIndices) == len(prevHeader.ParentVoterIndices) &&
+		len(h.ParentVoterSigData) == len(prevHeader.ParentVoterSigData) &&
+		len(h.ProposerSigData) == len(prevHeader.ProposerSigData) {
+
+		if h.ChainID == prevHeader.ChainID &&
+			h.Timestamp == prevHeader.Timestamp &&
+			h.Height == prevHeader.Height &&
+			h.ParentID == prevHeader.ParentID &&
+			h.View == prevHeader.View &&
+			h.PayloadHash == prevHeader.PayloadHash &&
+			bytes.Equal(h.ProposerSigData, prevHeader.ProposerSigData) &&
+			bytes.Equal(h.ParentVoterIndices, prevHeader.ParentVoterIndices) &&
+			bytes.Equal(h.ParentVoterSigData, prevHeader.ParentVoterSigData) &&
+			h.ProposerID == prevHeader.ProposerID {
+
+			// cache hit, return the previous identifier
+			return previdHeader
+		}
+	}
+
+	previdHeader = MakeID(h)
+
+	// store a reference to the Header entity data
+	prevHeader = h
+
+	return previdHeader
 }
 
 // Checksum returns the checksum of the header.
@@ -100,7 +139,13 @@ func (h Header) MarshalJSON() ([]byte, error) {
 	// we use an alias to avoid endless recursion; the alias will not have the
 	// marshal function and encode like a raw header
 	type Encodable Header
-	return json.Marshal(Encodable(h))
+	return json.Marshal(struct {
+		Encodable
+		ID string
+	}{
+		Encodable: Encodable(h),
+		ID:        h.ID().String(),
+	})
 }
 
 // UnmarshalJSON makes sure the timestamp is decoded in UTC.

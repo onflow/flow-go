@@ -11,8 +11,9 @@ import (
 
 // TestApprovalsCache_Get_Put_All tests common use cases for approvals cache.
 func TestApprovalsCache_Get_Put_All(t *testing.T) {
-	cache := NewApprovalsCache(10)
-	approvals := make([]*flow.ResultApproval, 0, 10)
+	numElements := uint(10)
+	cache := NewApprovalsCache(numElements)
+	approvals := make([]*flow.ResultApproval, numElements)
 	for i := range approvals {
 		approval := unittest.ResultApprovalFixture()
 		approvals[i] = approval
@@ -20,12 +21,14 @@ func TestApprovalsCache_Get_Put_All(t *testing.T) {
 		require.Equal(t, approval, cache.Get(approval.Body.PartialID()))
 	}
 	require.ElementsMatch(t, approvals, cache.All())
+	require.Len(t, cache.All(), int(numElements))
 }
 
 // TestIncorporatedResultsCache_Get_Put_All tests common use cases for incorporated results cache.
 func TestIncorporatedResultsCache_Get_Put_All(t *testing.T) {
-	cache := NewIncorporatedResultsCache(10)
-	results := make([]*flow.IncorporatedResult, 0, 10)
+	numElements := uint(10)
+	cache := NewIncorporatedResultsCache(numElements)
+	results := make([]*flow.IncorporatedResult, numElements)
 	for i := range results {
 		result := unittest.IncorporatedResult.Fixture()
 		results[i] = result
@@ -33,4 +36,5 @@ func TestIncorporatedResultsCache_Get_Put_All(t *testing.T) {
 		require.Equal(t, result, cache.Get(result.ID()))
 	}
 	require.ElementsMatch(t, results, cache.All())
+	require.Equal(t, int(numElements), len(cache.All()))
 }

@@ -7,6 +7,13 @@ import (
 	"path/filepath"
 	"time"
 
+	sdk "github.com/onflow/flow-go-sdk"
+
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/encodable"
+	"github.com/onflow/flow-go/model/flow"
+
 	"github.com/dgraph-io/badger/v2"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/go-connections/nat"
@@ -38,13 +45,74 @@ func init() {
 // ContainerConfig represents configuration for a node container in the network.
 type ContainerConfig struct {
 	bootstrap.NodeInfo
+	// Corrupted indicates a container is running a binary implementing a malicious node
+	Corrupted             bool
 	ContainerName         string
 	LogLevel              zerolog.Level
 	Ghost                 bool
 	AdditionalFlags       []string
 	Debug                 bool
-	Unstaked              bool
 	SupportsUnstakedNodes bool
+}
+
+func (c ContainerConfig) WriteKeyFiles(bootstrapDir string, machineAccountAddr sdk.Address, machineAccountKey encodable.MachineAccountPrivKey, role flow.Role) error {
+	// write staking and machine account private key files
+	writeJSONFile := func(relativePath string, val interface{}) error {
+		return WriteJSON(filepath.Join(bootstrapDir, relativePath), val)
+	}
+
+	writeFile := func(relativePath string, data []byte) error {
+		return WriteFile(filepath.Join(bootstrapDir, relativePath), data)
+	}
+
+	nodeInfos := []bootstrap.NodeInfo{c.NodeInfo}
+	err := utils.WriteStakingNetworkingKeyFiles(nodeInfos, writeJSONFile)
+	if err != nil {
+		return fmt.Errorf("failed to write private key file: %w", err)
+	}
+
+	err = utils.WriteSecretsDBEncryptionKeyFiles(nodeInfos, writeFile)
+	if err != nil {
+		return fmt.Errorf("failed to write secrets db key file: %w", err)
+	}
+
+	if role == flow.RoleConsensus || role == flow.RoleCollection {
+		err = utils.WriteMachineAccountFile(c.NodeID, machineAccountAddr, machineAccountKey, writeJSONFile)
+		if err != nil {
+			return fmt.Errorf("failed to write machine account file: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// GetPrivateNodeInfoAddress returns the node's address <name>:<port>
+func GetPrivateNodeInfoAddress(nodeName string) string {
+	return fmt.Sprintf("%s:%d", nodeName, DefaultFlowPort)
+}
+
+func NewContainerConfig(nodeName string, conf NodeConfig, networkKey, stakingKey crypto.PrivateKey) ContainerConfig {
+	info := bootstrap.NewPrivateNodeInfo(
+		conf.Identifier,
+		conf.Role,
+		GetPrivateNodeInfoAddress(nodeName),
+		conf.Weight,
+		networkKey,
+		stakingKey,
+	)
+
+	containerConf := ContainerConfig{
+		NodeInfo:              info,
+		ContainerName:         nodeName,
+		LogLevel:              conf.LogLevel,
+		Ghost:                 conf.Ghost,
+		AdditionalFlags:       conf.AdditionalFlags,
+		Debug:                 conf.Debug,
+		SupportsUnstakedNodes: conf.SupportsUnstakedNodes,
+		Corrupted:             conf.Corrupted,
+	}
+
+	return containerConf
 }
 
 // ImageName returns the Docker image name for the given config.
@@ -55,7 +123,10 @@ func (c *ContainerConfig) ImageName() string {
 	debugSuffix := ""
 	if c.Debug {
 		debugSuffix = "-debug"
+	} else if c.Corrupted {
+		debugSuffix = "-corrupted"
 	}
+
 	return fmt.Sprintf("%s/%s%s:latest", defaultRegistry, c.Role.String(), debugSuffix)
 }
 
@@ -117,8 +188,8 @@ func (c *Container) bindPort(hostPort, containerPort string) {
 
 }
 
-// addFlag adds a command line flag to the container's startup command.
-func (c *Container) addFlag(flag, val string) {
+// AddFlag adds a command line flag to the container's startup command.
+func (c *Container) AddFlag(flag, val string) {
 	c.opts.Config.Cmd = append(
 		c.opts.Config.Cmd,
 		fmt.Sprintf("--%s=%s", flag, val),
@@ -142,8 +213,23 @@ func (c *Container) DB() (*badger.DB, error) {
 	return db, err
 }
 
+// DB returns the node's execution data database.
+func (c *Container) ExecutionDataDB() (*badger.DB, error) {
+	opts := badger.
+		DefaultOptions(c.ExecutionDataDBPath()).
+		WithKeepL0InMemory(true).
+		WithLogger(nil)
+
+	db, err := badger.Open(opts)
+	return db, err
+}
+
 func (c *Container) DBPath() string {
 	return filepath.Join(c.datadir, DefaultFlowDBDir)
+}
+
+func (c *Container) ExecutionDataDBPath() string {
+	return filepath.Join(c.datadir, DefaultExecutionDataServiceDir)
 }
 
 func (c *Container) BootstrapPath() string {
@@ -175,7 +261,7 @@ func (c *Container) Pause() error {
 
 	err := c.net.cli.ContainerStop(ctx, c.ID, &checkContainerTimeout)
 	if err != nil {
-		return fmt.Errorf("could not stop container: %w", err)
+		return fmt.Errorf("could not stop container with ID (%s): %w", c.ID, err)
 	}
 
 	err = c.waitForCondition(ctx, containerStopped)

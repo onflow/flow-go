@@ -44,7 +44,7 @@ func Recover(log zerolog.Logger, finalized *flow.Header, pending []*flow.Header,
 				Hex("block_id", logging.ID(proposal.Block.BlockID)).
 				Err(err).
 				Msg("invalid proposal")
-			return nil
+			continue
 		}
 		if errors.Is(err, model.ErrUnverifiableBlock) {
 			log.Warn().

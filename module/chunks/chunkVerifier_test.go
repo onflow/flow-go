@@ -11,8 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/model/convert"
-
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
@@ -22,6 +20,8 @@ import (
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	chunksmodels "github.com/onflow/flow-go/model/chunks"
+	"github.com/onflow/flow-go/model/convert"
+	convertfixtures "github.com/onflow/flow-go/model/convert/fixtures"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/chunks"
@@ -48,8 +48,8 @@ var eventsList = flow.EventsList{
 
 // the chain we use for this test suite
 var testChain = flow.Emulator
-var epochSetupEvent, _ = convert.EpochSetupFixture(testChain)
-var epochCommitEvent, _ = convert.EpochCommitFixture(testChain)
+var epochSetupEvent, _ = convertfixtures.EpochSetupFixtureByChainID(testChain)
+var epochCommitEvent, _ = convertfixtures.EpochCommitFixtureByChainID(testChain)
 
 var epochSetupServiceEvent, _ = convert.ServiceEvent(testChain, epochSetupEvent)
 
@@ -99,7 +99,7 @@ func (s *ChunkVerifierTestSuite) TestHappyPath() {
 
 // TestMissingRegisterTouchForUpdate tests verification given a chunkdatapack missing a register touch (update)
 func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForUpdate() {
-	s.T().Skip("Check new partial ledger for missing keys")
+	unittest.SkipUnless(s.T(), unittest.TEST_DEPRECATED, "Check new partial ledger for missing keys")
 
 	vch := GetBaselineVerifiableChunk(s.T(), "", false)
 	assert.NotNil(s.T(), vch)
@@ -115,7 +115,8 @@ func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForUpdate() {
 
 // TestMissingRegisterTouchForRead tests verification given a chunkdatapack missing a register touch (read)
 func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForRead() {
-	s.T().Skip("Check new partial ledger for missing keys")
+	unittest.SkipUnless(s.T(), unittest.TEST_DEPRECATED, "Check new partial ledger for missing keys")
+
 	vch := GetBaselineVerifiableChunk(s.T(), "", false)
 	assert.NotNil(s.T(), vch)
 	// remove the second register touch
@@ -214,7 +215,7 @@ func (s *ChunkVerifierTestSuite) TestEmptyCollection() {
 	col := unittest.CollectionFixture(0)
 	vch.ChunkDataPack.Collection = &col
 	vch.EndState = vch.ChunkDataPack.StartState
-	emptyListHash, err := flow.EventsListHash(flow.EventsList{})
+	emptyListHash, err := flow.EventsMerkleRootHash(flow.EventsList{})
 	assert.NoError(s.T(), err)
 	vch.Chunk.EventCollection = emptyListHash //empty collection emits no events
 	spockSecret, chFaults, err := s.verifier.Verify(vch)
@@ -322,7 +323,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 		}
 	}
 
-	eventsListHash, err := flow.EventsListHash(chunkEvents)
+	EventsMerkleRootHash, err := flow.EventsMerkleRootHash(chunkEvents)
 	require.NoError(t, err)
 
 	// Chunk setup
@@ -331,7 +332,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 			CollectionIndex: 0,
 			StartState:      flow.StateCommitment(startState),
 			BlockID:         blockID,
-			EventCollection: eventsListHash,
+			EventCollection: EventsMerkleRootHash,
 		},
 		Index: 0,
 	}

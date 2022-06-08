@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events"
 )
 
-// ProtocolStateIDCache implements an IdentityProvider and IDTranslator for the set of staked
+// ProtocolStateIDCache implements an IdentityProvider and IDTranslator for the set of authorized
 // Flow network participants as according to the given `protocol.State`.
 type ProtocolStateIDCache struct {
 	events.Noop

@@ -14,7 +14,8 @@ type Transactions struct {
 	*Backend
 }
 
-// NewTransactions creates a new memory pool for transctions.
+// NewTransactions creates a new memory pool for transactions.
+// Deprecated: use herocache.Transactions instead.
 func NewTransactions(limit uint) *Transactions {
 	t := &Transactions{
 		Backend: NewBackend(WithLimit(limit)),

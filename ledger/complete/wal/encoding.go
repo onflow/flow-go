@@ -18,12 +18,13 @@ The LedgerWAL update record uses two operations so far - an update which must in
 which only needs a root tree state commitment.
 Updates need to be atomic, hence we prepare binary representation of whole changeset.
 Since keys, values and state commitments date types are variable length, we have to store it as well.
-Every record has:
+If OP = WALDelete, record has:
 
 1 byte Operation Type | 2 bytes Big Endian uint16 length of state commitment | state commitment data
 
-If OP = WALUpdate, then it follow with:
+If OP = WALUpdate, record has:
 
+1 byte Operation Type | 2 bytes version | 1 byte TypeTrieUpdate | 2 bytes Big Endian uint16 length of state commitment | state commitment data |
 4 bytes Big Endian uint32 - total number of key/value pairs | 2 bytes Big Endian uint16 - length of key (keys are the same length)
 
 and for every pair after
@@ -35,17 +36,17 @@ The code here is deliberately simple, for performance.
 
 func EncodeUpdate(update *ledger.TrieUpdate) []byte {
 	encUpdate := encoding.EncodeTrieUpdate(update)
-	buf := make([]byte, 0, len(encUpdate)+1)
+	buf := make([]byte, len(encUpdate)+1)
 	// set WAL type
-	buf = append(buf, byte(WALUpdate))
+	buf[0] = byte(WALUpdate)
 	// TODO use 2 bytes for encoding length
 	// the rest is encoded update
-	buf = append(buf, encUpdate...)
+	copy(buf[1:], encUpdate)
 	return buf
 }
 
 func EncodeDelete(rootHash ledger.RootHash) []byte {
-	buf := make([]byte, 0)
+	buf := make([]byte, 0, 1+2+len(rootHash))
 	buf = append(buf, byte(WALDelete))
 	buf = utils.AppendShortData(buf, rootHash[:])
 	return buf

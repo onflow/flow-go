@@ -27,8 +27,9 @@ const (
 const (
 	// tx validation errors 1000 - 1049
 	// ErrCodeTxValidationError         ErrorCode = 1000 - reserved
-	ErrCodeInvalidTxByteSizeError        ErrorCode = 1001
-	ErrCodeInvalidReferenceBlockError    ErrorCode = 1002
+	ErrCodeInvalidTxByteSizeError     ErrorCode = 1001
+	ErrCodeInvalidReferenceBlockError ErrorCode = 1002
+	// Deprecated: ErrCodeExpiredTransactionError
 	ErrCodeExpiredTransactionError       ErrorCode = 1003
 	ErrCodeInvalidScriptError            ErrorCode = 1004
 	ErrCodeInvalidGasLimitError          ErrorCode = 1005
@@ -49,22 +50,28 @@ const (
 
 	// execution errors 1100 - 1200
 	// ErrCodeExecutionError                 ErrorCode = 1100 - reserved
-	ErrCodeCadenceRunTimeError                ErrorCode = 1101
-	ErrCodeEncodingUnsupportedValue           ErrorCode = 1102
-	ErrCodeStorageCapacityExceeded            ErrorCode = 1103
-	ErrCodeGasLimitExceededError              ErrorCode = 1104
-	ErrCodeEventLimitExceededError            ErrorCode = 1105
-	ErrCodeLedgerIntractionLimitExceededError ErrorCode = 1106
-	ErrCodeStateKeySizeLimitError             ErrorCode = 1107
-	ErrCodeStateValueSizeLimitError           ErrorCode = 1108
-	ErrCodeTransactionFeeDeductionFailedError ErrorCode = 1109
+	ErrCodeCadenceRunTimeError      ErrorCode = 1101
+	ErrCodeEncodingUnsupportedValue ErrorCode = 1102
+	ErrCodeStorageCapacityExceeded  ErrorCode = 1103
+	//  Deprecated: ErrCodeGasLimitExceededError  ErrorCode = 1104
+	ErrCodeEventLimitExceededError                   ErrorCode = 1105
+	ErrCodeLedgerIntractionLimitExceededError        ErrorCode = 1106
+	ErrCodeStateKeySizeLimitError                    ErrorCode = 1107
+	ErrCodeStateValueSizeLimitError                  ErrorCode = 1108
+	ErrCodeTransactionFeeDeductionFailedError        ErrorCode = 1109
+	ErrCodeComputationLimitExceededError             ErrorCode = 1110
+	ErrCodeMemoryLimitExceededError                  ErrorCode = 1111
+	ErrCodeCouldNotDecodeExecutionParameterFromState ErrorCode = 1112
+	ErrCodeScriptExecutionCancelledError             ErrorCode = 1114
+	ErrCodeScriptExecutionTimedOutError              ErrorCode = 1113
 
 	// accounts errors 1200 - 1250
 	// ErrCodeAccountError              ErrorCode = 1200 - reserved
-	ErrCodeAccountNotFoundError          ErrorCode = 1201
-	ErrCodeAccountPublicKeyNotFoundError ErrorCode = 1202
-	ErrCodeAccountAlreadyExistsError     ErrorCode = 1203
-	ErrCodeFrozenAccountError            ErrorCode = 1204
+	ErrCodeAccountNotFoundError              ErrorCode = 1201
+	ErrCodeAccountPublicKeyNotFoundError     ErrorCode = 1202
+	ErrCodeAccountAlreadyExistsError         ErrorCode = 1203
+	ErrCodeFrozenAccountError                ErrorCode = 1204
+	ErrCodeAccountStorageNotInitializedError ErrorCode = 1205
 
 	// contract errors 1250 - 1300
 	// ErrCodeContractError          ErrorCode = 1250 - reserved

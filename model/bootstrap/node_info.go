@@ -2,9 +2,12 @@
 package bootstrap
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
 
+	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
 	"github.com/onflow/flow-go/crypto"
@@ -21,11 +24,17 @@ const (
 	NodeInfoTypePrivate
 )
 
+const (
+	DefaultMachineAccountSignAlgo      = sdkcrypto.ECDSA_P256
+	DefaultMachineAccountHashAlgo      = sdkcrypto.SHA3_256
+	DefaultMachineAccountKeyIndex uint = 0
+)
+
 // ErrMissingPrivateInfo is returned when a method is called on NodeInfo
 // that is only valid on instances containing private info.
 var ErrMissingPrivateInfo = fmt.Errorf("can not access private information for a public node type")
 
-// NodeMachineAccountPriv contains the private configration need to construct a
+// NodeMachineAccountKey contains the private configration need to construct a
 // NodeMachineAccountInfo object. This is used as an intemediary by the bootstrap scripts
 // for storing the private key before generating a NodeMachineAccountInfo.
 type NodeMachineAccountKey struct {
@@ -56,6 +65,38 @@ type NodeMachineAccountInfo struct {
 	HashAlgorithm sdkcrypto.HashAlgorithm
 }
 
+func (info NodeMachineAccountInfo) FlowAddress() flow.Address {
+	// trim 0x-prefix if present
+	addr := info.Address
+	if strings.ToLower(addr[:2]) == "0x" {
+		addr = addr[2:]
+	}
+	return flow.HexToAddress(addr)
+}
+
+func (info NodeMachineAccountInfo) SDKAddress() sdk.Address {
+	flowAddr := info.FlowAddress()
+	var sdkAddr sdk.Address
+	copy(sdkAddr[:], flowAddr[:])
+	return sdkAddr
+}
+
+func (info NodeMachineAccountInfo) PrivateKey() (crypto.PrivateKey, error) {
+	sk, err := crypto.DecodePrivateKey(info.SigningAlgorithm, info.EncodedPrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("could not decode machine account private key: %w", err)
+	}
+	return sk, nil
+}
+
+func (info NodeMachineAccountInfo) MustPrivateKey() crypto.PrivateKey {
+	sk, err := info.PrivateKey()
+	if err != nil {
+		panic(err)
+	}
+	return sk
+}
+
 // NodeConfig contains configuration information used as input to the
 // bootstrap process.
 type NodeConfig struct {
@@ -67,11 +108,40 @@ type NodeConfig struct {
 	// machine account.
 	Address string
 
-	// Stake is the stake of the node
+	// Weight is the weight of the node
+	Weight uint64
+}
+
+// decodableNodeConfig provides backward-compatible decoding of old models
+// which use the Stake field in place of Weight.
+type decodableNodeConfig struct {
+	Role    flow.Role
+	Address string
+	Weight  uint64
+	// Stake previously was used in place of the Weight field.
 	Stake uint64
 }
 
-// Defines the canonical structure for encoding private node info.
+func (conf *NodeConfig) UnmarshalJSON(b []byte) error {
+	var decodable decodableNodeConfig
+	err := json.Unmarshal(b, &decodable)
+	if err != nil {
+		return fmt.Errorf("could not decode json: %w", err)
+	}
+	// compat: translate Stake fields to Weight
+	if decodable.Stake != 0 {
+		if decodable.Weight != 0 {
+			return fmt.Errorf("invalid NodeConfig with both Stake and Weight fields")
+		}
+		decodable.Weight = decodable.Stake
+	}
+	conf.Role = decodable.Role
+	conf.Address = decodable.Address
+	conf.Weight = decodable.Weight
+	return nil
+}
+
+// NodeInfoPriv defines the canonical structure for encoding private node info.
 type NodeInfoPriv struct {
 	Role           flow.Role
 	Address        string
@@ -80,14 +150,50 @@ type NodeInfoPriv struct {
 	StakingPrivKey encodable.StakingPrivKey
 }
 
-// Defines the canonical structure for encoding public node info.
+// NodeInfoPub defines the canonical structure for encoding public node info.
 type NodeInfoPub struct {
 	Role          flow.Role
 	Address       string
 	NodeID        flow.Identifier
-	Stake         uint64
+	Weight        uint64
 	NetworkPubKey encodable.NetworkPubKey
 	StakingPubKey encodable.StakingPubKey
+}
+
+// decodableNodeInfoPub provides backward-compatible decoding of old models
+// which use the Stake field in place of Weight.
+type decodableNodeInfoPub struct {
+	Role          flow.Role
+	Address       string
+	NodeID        flow.Identifier
+	Weight        uint64
+	NetworkPubKey encodable.NetworkPubKey
+	StakingPubKey encodable.StakingPubKey
+	// Stake previously was used in place of the Weight field.
+	// Deprecated: supported in decoding for backward-compatibility
+	Stake uint64
+}
+
+func (info *NodeInfoPub) UnmarshalJSON(b []byte) error {
+	var decodable decodableNodeInfoPub
+	err := json.Unmarshal(b, &decodable)
+	if err != nil {
+		return fmt.Errorf("could not decode json: %w", err)
+	}
+	// compat: translate Stake fields to Weight
+	if decodable.Stake != 0 {
+		if decodable.Weight != 0 {
+			return fmt.Errorf("invalid NodeInfoPub with both Stake and Weight fields")
+		}
+		decodable.Weight = decodable.Stake
+	}
+	info.Role = decodable.Role
+	info.Address = decodable.Address
+	info.NodeID = decodable.NodeID
+	info.Weight = decodable.Weight
+	info.NetworkPubKey = decodable.NetworkPubKey
+	info.StakingPubKey = decodable.StakingPubKey
+	return nil
 }
 
 // NodePrivateKeys is a wrapper for the private keys for a node, comprising all
@@ -117,8 +223,8 @@ type NodeInfo struct {
 	// machine account.
 	Address string
 
-	// Stake is the stake of the node
-	Stake uint64
+	// Weight is the weight of the node
+	Weight uint64
 
 	// key information is private
 	networkPubKey  crypto.PublicKey
@@ -131,7 +237,7 @@ func NewPublicNodeInfo(
 	nodeID flow.Identifier,
 	role flow.Role,
 	addr string,
-	stake uint64,
+	weight uint64,
 	networkKey crypto.PublicKey,
 	stakingKey crypto.PublicKey,
 ) NodeInfo {
@@ -139,7 +245,7 @@ func NewPublicNodeInfo(
 		NodeID:        nodeID,
 		Role:          role,
 		Address:       addr,
-		Stake:         stake,
+		Weight:        weight,
 		networkPubKey: networkKey,
 		stakingPubKey: stakingKey,
 	}
@@ -149,7 +255,7 @@ func NewPrivateNodeInfo(
 	nodeID flow.Identifier,
 	role flow.Role,
 	addr string,
-	stake uint64,
+	weight uint64,
 	networkKey crypto.PrivateKey,
 	stakingKey crypto.PrivateKey,
 ) NodeInfo {
@@ -157,9 +263,11 @@ func NewPrivateNodeInfo(
 		NodeID:         nodeID,
 		Role:           role,
 		Address:        addr,
-		Stake:          stake,
+		Weight:         weight,
 		networkPrivKey: networkKey,
 		stakingPrivKey: stakingKey,
+		networkPubKey:  networkKey.PublicKey(),
+		stakingPubKey:  stakingKey.PublicKey(),
 	}
 }
 
@@ -219,7 +327,7 @@ func (node NodeInfo) Public() NodeInfoPub {
 		Role:          node.Role,
 		Address:       node.Address,
 		NodeID:        node.NodeID,
-		Stake:         node.Stake,
+		Weight:        node.Weight,
 		NetworkPubKey: encodable.NetworkPubKey{PublicKey: node.NetworkPubKey()},
 		StakingPubKey: encodable.StakingPubKey{PublicKey: node.StakingPubKey()},
 	}
@@ -242,7 +350,7 @@ func (node NodeInfo) Identity() *flow.Identity {
 		NodeID:        node.NodeID,
 		Address:       node.Address,
 		Role:          node.Role,
-		Stake:         node.Stake,
+		Weight:        node.Weight,
 		StakingPubKey: node.StakingPubKey(),
 		NetworkPubKey: node.NetworkPubKey(),
 	}
@@ -255,7 +363,7 @@ func NodeInfoFromIdentity(identity *flow.Identity) NodeInfo {
 		identity.NodeID,
 		identity.Role,
 		identity.Address,
-		identity.Stake,
+		identity.Weight,
 		identity.NetworkPubKey,
 		identity.StakingPubKey)
 }
@@ -265,7 +373,7 @@ func PrivateNodeInfoFromIdentity(identity *flow.Identity, networkKey, stakingKey
 		identity.NodeID,
 		identity.Role,
 		identity.Address,
-		identity.Stake,
+		identity.Weight,
 		networkKey,
 		stakingKey,
 	)

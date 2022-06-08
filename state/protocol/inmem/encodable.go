@@ -12,10 +12,11 @@ type EncodableSnapshot struct {
 	Identities        flow.IdentityList
 	LatestSeal        *flow.Seal
 	LatestResult      *flow.ExecutionResult
-	SealingSegment    []*flow.Block
+	SealingSegment    *flow.SealingSegment
 	QuorumCertificate *flow.QuorumCertificate
 	Phase             flow.EpochPhase
 	Epochs            EncodableEpochs
+	Params            EncodableParams
 }
 
 // EncodableEpochs is the encoding format for protocol.EpochQuery
@@ -46,6 +47,12 @@ type EncodableDKG struct {
 	Participants map[flow.Identifier]flow.DKGParticipant
 }
 
+type EncodableFullDKG struct {
+	GroupKey      encodable.RandomBeaconPubKey
+	PrivKeyShares []encodable.RandomBeaconPrivKey
+	PubKeyShares  []encodable.RandomBeaconPubKey
+}
+
 // EncodableCluster is the encoding format for protocol.Cluster
 type EncodableCluster struct {
 	Index     uint
@@ -53,4 +60,11 @@ type EncodableCluster struct {
 	Members   flow.IdentityList
 	RootBlock *cluster.Block
 	RootQC    *flow.QuorumCertificate
+}
+
+// EncodableParams is the encoding format for protocol.GlobalParams
+type EncodableParams struct {
+	ChainID         flow.ChainID
+	SporkID         flow.Identifier
+	ProtocolVersion uint
 }

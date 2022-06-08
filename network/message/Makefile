@@ -1,4 +1,17 @@
-# go get github.com/gogo/protobuf/protoc-gen-gofast
+# To re-generate the the protobuf go code, install tools first:
+# ```
+# cd flow-go
+# make install-tools
+# ```
+# Install protoc:
+# https://grpc.io/docs/protoc-installation/
+#
+# Then run:
+# ```
+# cd network/message
+# make generate
+# ```
+
 
 .PHONY: generate
 generate:

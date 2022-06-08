@@ -64,7 +64,7 @@ type ExecutionState interface {
 
 	UpdateHighestExecutedBlockIfHigher(context.Context, *flow.Header) error
 
-	PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment,
+	SaveExecutionResults(ctx context.Context, header *flow.Header, endState flow.StateCommitment,
 		chunkDataPacks []*flow.ChunkDataPack,
 		executionReceipt *flow.ExecutionReceipt, events []flow.EventsList, serviceEvents flow.EventsList, results []flow.TransactionResult) error
 }
@@ -84,7 +84,6 @@ type state struct {
 	collections        storage.Collections
 	chunkDataPacks     storage.ChunkDataPacks
 	results            storage.ExecutionResults
-	receipts           storage.ExecutionReceipts
 	myReceipts         storage.MyExecutionReceipts
 	events             storage.Events
 	serviceEvents      storage.ServiceEvents
@@ -109,7 +108,6 @@ func NewExecutionState(
 	collections storage.Collections,
 	chunkDataPacks storage.ChunkDataPacks,
 	results storage.ExecutionResults,
-	receipts storage.ExecutionReceipts,
 	myReceipts storage.MyExecutionReceipts,
 	events storage.Events,
 	serviceEvents storage.ServiceEvents,
@@ -126,7 +124,6 @@ func NewExecutionState(
 		collections:        collections,
 		chunkDataPacks:     chunkDataPacks,
 		results:            results,
-		receipts:           receipts,
 		myReceipts:         myReceipts,
 		events:             events,
 		serviceEvents:      serviceEvents,
@@ -136,11 +133,10 @@ func NewExecutionState(
 
 }
 
-func makeSingleValueQuery(commitment flow.StateCommitment, owner, controller, key string) (*ledger.Query, error) {
-	return ledger.NewQuery(ledger.State(commitment),
-		[]ledger.Key{
-			RegisterIDToKey(flow.NewRegisterID(owner, controller, key)),
-		})
+func makeSingleValueQuery(commitment flow.StateCommitment, owner, controller, key string) (*ledger.QuerySingleValue, error) {
+	return ledger.NewQuerySingleValue(ledger.State(commitment),
+		RegisterIDToKey(flow.NewRegisterID(owner, controller, key)),
+	)
 }
 
 func makeQuery(commitment flow.StateCommitment, ids []flow.RegisterID) (*ledger.Query, error) {
@@ -190,20 +186,21 @@ func LedgerGetRegister(ldg ledger.Ledger, commitment flow.StateCommitment) delta
 			return nil, fmt.Errorf("cannot create ledger query: %w", err)
 		}
 
-		values, err := ldg.Get(query)
+		value, err := ldg.GetSingleValue(query)
 
 		if err != nil {
 			return nil, fmt.Errorf("error getting register (%s) value at %x: %w", key, commitment, err)
 		}
 
-		if len(values) == 0 {
+		// Prevent caching of value with len zero
+		if len(value) == 0 {
 			return nil, nil
 		}
 
 		// don't cache value with len zero
-		readCache[regID] = flow.RegisterEntry{Key: regID, Value: values[0]}
+		readCache[regID] = flow.RegisterEntry{Key: regID, Value: value}
 
-		return values[0], nil
+		return value, nil
 	}
 }
 
@@ -327,14 +324,20 @@ func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifie
 	return result.ID(), nil
 }
 
-func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment,
+func (s *state) SaveExecutionResults(ctx context.Context, header *flow.Header, endState flow.StateCommitment,
+	chunkDataPacks []*flow.ChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.EventsList, serviceEvents flow.EventsList,
+	results []flow.TransactionResult) error {
+	return s.saveExecutionResults(ctx, header, endState, chunkDataPacks, executionReceipt, events, serviceEvents, results)
+}
+
+func (s *state) saveExecutionResults(ctx context.Context, header *flow.Header, endState flow.StateCommitment,
 	chunkDataPacks []*flow.ChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.EventsList, serviceEvents flow.EventsList,
 	results []flow.TransactionResult) error {
 
 	spew.Config.DisableMethods = true
 	spew.Config.DisablePointerMethods = true
 
-	span, childCtx := s.tracer.StartSpanFromContext(ctx, trace.EXESaveExecutionResults)
+	span, childCtx := s.tracer.StartSpanFromContext(ctx, trace.EXEStateSaveExecutionResults)
 	defer span.Finish()
 
 	blockID := header.ID()
@@ -342,11 +345,10 @@ func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, 
 	// Write Batch is BadgerDB feature designed for handling lots of writes
 	// in efficient and automatic manner, hence pushing all the updates we can
 	// as tightly as possible to let Badger manage it.
-	// Note, that it does not guarantee atomicity as transactions has size limit
-	// but it's the closes thing to atomicity we could have
+	// Note, that it does not guarantee atomicity as transactions has size limit,
+	// but it's the closest thing to atomicity we could have
 	batch := badgerstorage.NewBatch(s.db)
 
-	sp, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEPersistChunkDataPack)
 	for _, chunkDataPack := range chunkDataPacks {
 		err := s.chunkDataPacks.BatchStore(chunkDataPack, batch)
 		if err != nil {
@@ -358,19 +360,13 @@ func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, 
 			return fmt.Errorf("cannot index chunk data pack by blockID: %w", err)
 		}
 	}
-	sp.Finish()
 
-	sp, _ = s.tracer.StartSpanFromContext(ctx, trace.EXEPersistStateCommitment)
 	err := s.commits.BatchStore(blockID, endState, batch)
 	if err != nil {
 		return fmt.Errorf("cannot store state commitment: %w", err)
 	}
-	sp.Finish()
-
-	sp, _ = s.tracer.StartSpanFromContext(ctx, trace.EXEPersistEvents)
 
 	err = s.events.BatchStore(blockID, events, batch)
-
 	if err != nil {
 		return fmt.Errorf("cannot store events: %w", err)
 	}
@@ -379,21 +375,18 @@ func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, 
 	if err != nil {
 		return fmt.Errorf("cannot store service events: %w", err)
 	}
-	sp.Finish()
-
-	executionResult := &executionReceipt.ExecutionResult
 
 	err = s.transactionResults.BatchStore(blockID, results, batch)
 	if err != nil {
 		return fmt.Errorf("cannot store transaction result: %w", err)
 	}
 
+	executionResult := &executionReceipt.ExecutionResult
 	err = s.results.BatchStore(executionResult, batch)
 	if err != nil {
 		return fmt.Errorf("cannot store execution result: %w", err)
 	}
 
-	// it overwrites the index if exists already
 	err = s.results.BatchIndex(blockID, executionResult.ID(), batch)
 	if err != nil {
 		return fmt.Errorf("cannot index execution result: %w", err)
@@ -539,11 +532,11 @@ func (s *state) GetHighestExecutedBlockID(ctx context.Context) (uint64, flow.Ide
 	err := s.db.View(func(tx *badger.Txn) error {
 		err := operation.RetrieveExecutedBlock(&blockID)(tx)
 		if err != nil {
-			return fmt.Errorf("could not lookup executed block: %w", err)
+			return fmt.Errorf("could not lookup executed block %v: %w", blockID, err)
 		}
 		err = operation.RetrieveHeader(blockID, &highest)(tx)
 		if err != nil {
-			return fmt.Errorf("could not retrieve executed header: %w", err)
+			return fmt.Errorf("could not retrieve executed header %v: %w", blockID, err)
 		}
 		return nil
 	})

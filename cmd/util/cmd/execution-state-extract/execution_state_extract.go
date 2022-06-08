@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog"
 
 	mgr "github.com/onflow/flow-go/cmd/util/ledger/migrations"
+	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
@@ -25,9 +26,9 @@ func extractExecutionState(
 	targetHash flow.StateCommitment,
 	outputDir string,
 	log zerolog.Logger,
+	chain flow.Chain,
 	migrate bool,
 	report bool,
-	cleanupStorage bool,
 ) error {
 
 	diskWal, err := wal.NewDiskWAL(
@@ -56,43 +57,61 @@ func extractExecutionState(
 		return fmt.Errorf("cannot create ledger from write-a-head logs and checkpoints: %w", err)
 	}
 
-	migrations := []ledger.Migration{}
-	reporters := []ledger.Reporter{}
+	var migrations []ledger.Migration
+	var rs map[string]ledger.Reporter
+	extractionReportName := "extractionReport"
+	newState := ledger.State(targetHash)
 
 	if migrate {
-		storageFormatV5Migration := mgr.StorageFormatV5Migration{
-			Log:            log,
-			OutputDir:      outputDir,
-			CleanupStorage: cleanupStorage,
-		}
-
 		storageUsedUpdateMigration := mgr.StorageUsedUpdateMigration{
 			Log:       log,
 			OutputDir: outputDir,
 		}
 
+		orderedMapMigration := mgr.OrderedMapMigration{
+			Log:       log,
+			OutputDir: dir,
+		}
+
 		migrations = []ledger.Migration{
-			mgr.PruneMigration,
-			storageFormatV5Migration.Migrate,
+			orderedMapMigration.Migrate,
 			storageUsedUpdateMigration.Migrate,
+			mgr.PruneMigration,
 		}
+
 	}
+	// generating reports at the end, so that the checkpoint file can be used
+	// for sporking as soon as it's generated.
 	if report {
-		reporters = []ledger.Reporter{
-			mgr.ContractReporter{
-				Log:       log,
-				OutputDir: outputDir,
+		log.Info().Msgf("preparing reporter files")
+		reportFileWriterFactory := reporters.NewReportFileWriterFactory(outputDir, log)
+
+		rs = map[string]ledger.Reporter{
+			// The ExportReporter needs to be run first so that it can be used
+			// immediately after execution
+			extractionReportName: reporters.NewExportReporter(log,
+				chain,
+				func() flow.StateCommitment { return targetHash },
+				func() flow.StateCommitment { return flow.StateCommitment(newState) },
+			),
+			"account": &reporters.AccountReporter{
+				Log:   log,
+				Chain: chain,
+				RWF:   reportFileWriterFactory,
 			},
-			mgr.StorageReporter{
-				Log:       log,
-				OutputDir: outputDir,
+			"newFungibleTokenTracker": reporters.NewFungibleTokenTracker(log, reportFileWriterFactory, chain, []string{reporters.FlowTokenTypeID(chain)}),
+			"atree": &reporters.AtreeReporter{
+				Log: log,
+				RWF: reportFileWriterFactory,
 			},
 		}
 	}
-	newState, err := led.ExportCheckpointAt(
-		ledger.State(targetHash),
+
+	newState, err = led.ExportCheckpointAt(
+		newState,
 		migrations,
-		reporters,
+		rs,
+		extractionReportName,
 		complete.DefaultPathFinderVersion,
 		outputDir,
 		bootstrap.FilenameWALRootCheckpoint,

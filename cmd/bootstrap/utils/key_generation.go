@@ -1,10 +1,15 @@
 package utils
 
 import (
+	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
 	gohash "hash"
 	"io"
+
+	sdk "github.com/onflow/flow-go-sdk"
+
+	"github.com/onflow/flow-go/model/encodable"
 
 	"golang.org/x/crypto/hkdf"
 
@@ -27,6 +32,21 @@ func GenerateMachineAccountKey(seed []byte) (crypto.PrivateKey, error) {
 		return nil, err
 	}
 	return keys[0], nil
+}
+
+// GenerateSecretsDBEncryptionKey generates an encryption key for encrypting a
+// Badger database.
+func GenerateSecretsDBEncryptionKey() ([]byte, error) {
+	// 32-byte key to use AES-256
+	// https://pkg.go.dev/github.com/dgraph-io/badger/v2#Options.WithEncryptionKey
+	const keyLen = 32
+
+	key := make([]byte, keyLen)
+	_, err := rand.Read(key)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate key: %w", err)
+	}
+	return key, nil
 }
 
 // The unstaked nodes have special networking keys, in two aspects:
@@ -133,10 +153,14 @@ func GenerateKeys(algo crypto.SigningAlgorithm, n int, seeds [][]byte) ([]crypto
 // the result to the given path.
 type WriteJSONFileFunc func(relativePath string, value interface{}) error
 
+// WriteFileFunc is the same as WriteJSONFileFunc, but it writes the bytes directly
+// rather than marshalling a structure to json.
+type WriteFileFunc func(relativePath string, data []byte) error
+
 // WriteMachineAccountFiles writes machine account key files for a set of nodeInfos.
 // Assumes that machine accounts have been created using the default execution state
 // bootstrapping. Further assumes that the order of nodeInfos is the same order that
-// nodes were staked during execution state bootstrapping.
+// nodes were registered during execution state bootstrapping.
 //
 // Only applicable for transient test networks.
 func WriteMachineAccountFiles(chainID flow.ChainID, nodeInfos []bootstrap.NodeInfo, write WriteJSONFileFunc) error {
@@ -205,6 +229,50 @@ func WriteMachineAccountFiles(chainID flow.ChainID, nodeInfos []bootstrap.NodeIn
 		}
 	}
 
+	return nil
+}
+
+func WriteMachineAccountFile(
+	nodeID flow.Identifier,
+	accountAddress sdk.Address,
+	accountKey encodable.MachineAccountPrivKey,
+	write WriteJSONFileFunc) error {
+
+	info := bootstrap.NodeMachineAccountInfo{
+		Address:           fmt.Sprintf("0x%s", accountAddress.Hex()),
+		EncodedPrivateKey: accountKey.Encode(),
+		KeyIndex:          0,
+		SigningAlgorithm:  accountKey.Algorithm(),
+		HashAlgorithm:     sdkcrypto.SHA3_256,
+	}
+
+	path := fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, nodeID)
+	err := write(path, info)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// WriteSecretsDBEncryptionKeyFiles writes secret db encryption keys to private
+// node info directory.
+func WriteSecretsDBEncryptionKeyFiles(nodeInfos []bootstrap.NodeInfo, write WriteFileFunc) error {
+
+	for _, nodeInfo := range nodeInfos {
+
+		// generate an encryption key for the node
+		encryptionKey, err := GenerateSecretsDBEncryptionKey()
+		if err != nil {
+			return err
+		}
+
+		path := fmt.Sprintf(bootstrap.PathSecretsEncryptionKey, nodeInfo.NodeID)
+		err = write(path, encryptionKey)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

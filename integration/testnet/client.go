@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onflow/flow-go-sdk/templates"
+
 	"google.golang.org/grpc"
 
 	"github.com/onflow/cadence"
@@ -24,18 +26,20 @@ import (
 // NOTE: we use integration/client rather than sdk/client as a stopgap until
 // the SDK client is updated with the latest protobuf definitions.
 type Client struct {
-	client *client.Client
-	key    *sdk.AccountKey
-	signer sdkcrypto.InMemorySigner
-	seqNo  uint64
-	Chain  flow.Chain
+	client         *client.Client
+	accountKey     *sdk.AccountKey
+	accountKeyPriv sdkcrypto.PrivateKey
+	signer         sdkcrypto.InMemorySigner
+	seqNo          uint64
+	Chain          flow.Chain
+	account        *sdk.Account
 }
 
 // NewClientWithKey returns a new client to an Access API listening at the given
 // address, using the given account key for signing transactions.
 func NewClientWithKey(accessAddr string, accountAddr sdk.Address, key sdkcrypto.PrivateKey, chain flow.Chain) (*Client, error) {
 
-	flowClient, err := client.New(accessAddr, grpc.WithInsecure())
+	flowClient, err := client.New(accessAddr, grpc.WithInsecure()) //nolint:staticcheck
 	if err != nil {
 		return nil, err
 	}
@@ -49,11 +53,13 @@ func NewClientWithKey(accessAddr string, accountAddr sdk.Address, key sdkcrypto.
 	mySigner := crypto.NewInMemorySigner(key, accountKey.HashAlgo)
 
 	tc := &Client{
-		client: flowClient,
-		key:    accountKey,
-		signer: mySigner,
-		Chain:  chain,
-		seqNo:  accountKey.SequenceNumber,
+		client:         flowClient,
+		accountKey:     accountKey,
+		accountKeyPriv: key,
+		signer:         mySigner,
+		Chain:          chain,
+		seqNo:          accountKey.SequenceNumber,
+		account:        acc,
 	}
 	return tc, nil
 }
@@ -82,6 +88,11 @@ func NewClient(addr string, chain flow.Chain) (*Client, error) {
 	//fmt.Printf("and public key: \n%s\n", publicJson)
 
 	return NewClientWithKey(addr, sdk.Address(chain.ServiceAddress()), privateKey, chain)
+}
+
+// AccountKeyPriv returns the private used to create the in memory signer for the account
+func (c *Client) AccountKeyPriv() sdkcrypto.PrivateKey {
+	return c.accountKeyPriv
 }
 
 func (c *Client) GetSeqNumber() uint64 {
@@ -159,8 +170,26 @@ func (c *Client) ExecuteScript(ctx context.Context, script dsl.Main) (cadence.Va
 	return res, nil
 }
 
+func (c *Client) ExecuteScriptBytes(ctx context.Context, script []byte, args []cadence.Value) (cadence.Value, error) {
+	res, err := c.client.ExecuteScriptAtLatestBlock(ctx, script, args)
+	if err != nil {
+		return nil, fmt.Errorf("could not execute script: %w", err)
+	}
+
+	return res, nil
+}
+
 func (c *Client) SDKServiceAddress() sdk.Address {
 	return sdk.Address(c.Chain.ServiceAddress())
+}
+
+// AccountKey returns the flow account key for the client
+func (c *Client) AccountKey() *sdk.AccountKey {
+	return c.accountKey
+}
+
+func (c *Client) Account() *sdk.Account {
+	return c.account
 }
 
 func (c *Client) WaitForSealed(ctx context.Context, id sdk.Identifier) (*sdk.TransactionResult, error) {
@@ -188,7 +217,7 @@ func (c *Client) WaitForSealed(ctx context.Context, id sdk.Identifier) (*sdk.Tra
 	}
 
 	fmt.Println()
-	fmt.Printf("Transaction %s sealed\n", id)
+	fmt.Printf("(Wait for Seal) Transaction %s sealed\n", id)
 
 	return result, err
 }
@@ -208,13 +237,109 @@ func (c *Client) GetLatestProtocolSnapshot(ctx context.Context) (*inmem.Snapshot
 	return snapshot, nil
 }
 
+// GetLatestBlockID returns block ID of the latest sealed block
 func (c *Client) GetLatestBlockID(ctx context.Context) (flow.Identifier, error) {
 	header, err := c.client.GetLatestBlockHeader(ctx, true)
 	if err != nil {
-		return flow.ZeroID, fmt.Errorf("could not get latest block header: %w", err)
+		return flow.ZeroID, fmt.Errorf("could not get latest sealed block header: %w", err)
 	}
 
 	var id flow.Identifier
 	copy(id[:], header.ID[:])
 	return id, nil
+}
+
+// GetLatestSealedBlockHeader returns full block header for the latest sealed block
+func (c *Client) GetLatestSealedBlockHeader(ctx context.Context) (*sdk.BlockHeader, error) {
+	header, err := c.client.GetLatestBlockHeader(ctx, true)
+	if err != nil {
+		return nil, fmt.Errorf("could not get latest sealed block header: %w", err)
+	}
+
+	return header, nil
+}
+
+func (c *Client) UserAddress(txResp *sdk.TransactionResult) (sdk.Address, bool) {
+	var (
+		address sdk.Address
+		found   bool
+	)
+
+	// For account creation transactions that create multiple accounts, assume the last
+	// created account is the user account. This is specifically the case for the
+	// locked token shared account creation transactions.
+	for _, event := range txResp.Events {
+		if event.Type == sdk.EventAccountCreated {
+			accountCreatedEvent := sdk.AccountCreatedEvent(event)
+			address = accountCreatedEvent.Address()
+			found = true
+		}
+	}
+
+	return address, found
+}
+
+func (c *Client) TokenAmountByRole(role flow.Role) (string, float64, error) {
+	if role == flow.RoleCollection {
+		return "250000.0", 250000.0, nil
+	}
+	if role == flow.RoleConsensus {
+		return "500000.0", 500000.0, nil
+	}
+	if role == flow.RoleExecution {
+		return "1250000.0", 1250000.0, nil
+	}
+	if role == flow.RoleVerification {
+		return "135000.0", 135000.0, nil
+	}
+	if role == flow.RoleAccess {
+		return "0.0", 0.0, nil
+	}
+
+	return "", 0, fmt.Errorf("could not get token amount by role: %v", role)
+}
+
+func (c *Client) GetAccount(accountAddress sdk.Address) (*sdk.Account, error) {
+	ctx := context.Background()
+	account, err := c.client.GetAccount(ctx, accountAddress)
+	if err != nil {
+		return nil, fmt.Errorf("could not get account: %w", err)
+	}
+
+	return account, nil
+}
+
+func (c *Client) CreateAccount(
+	ctx context.Context,
+	accountKey *sdk.AccountKey,
+	payerAccount *sdk.Account,
+	payer sdk.Address,
+	latestBlockID sdk.Identifier,
+) (sdk.Address, error) {
+
+	payerKey := payerAccount.Keys[0]
+	tx, err := templates.CreateAccount([]*sdk.AccountKey{accountKey}, nil, payer)
+	if err != nil {
+		return sdk.Address{}, fmt.Errorf("failed cusnctruct create account transaction %w", err)
+	}
+	tx.SetGasLimit(1000).
+		SetReferenceBlockID(latestBlockID).
+		SetProposalKey(payer, 0, payerKey.SequenceNumber).
+		SetPayer(payer)
+
+	err = c.SignAndSendTransaction(ctx, tx)
+	if err != nil {
+		return sdk.Address{}, fmt.Errorf("failed to sign and send create account transaction %w", err)
+	}
+
+	result, err := c.WaitForSealed(ctx, tx.ID())
+	if err != nil {
+		return sdk.Address{}, fmt.Errorf("failed to wait for create account transaction to seal %w", err)
+	}
+
+	if address, ok := c.UserAddress(result); ok {
+		return address, nil
+	}
+
+	return sdk.Address{}, fmt.Errorf("failed to get account address of the created flow account")
 }

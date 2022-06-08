@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/order"
+	"github.com/onflow/flow-go/module/signature"
 )
 
 func constructRootResultAndSeal(
@@ -40,12 +41,27 @@ func constructRootResultAndSeal(
 		DKGPhase3FinalView: firstView + flagNumViewsInStakingAuction + flagNumViewsInDKGPhase*3 - 1,
 		Participants:       participants.Sort(order.Canonical),
 		Assignments:        assignments,
-		RandomSource:       getRandomSource(flagBootstrapRandomSeed),
+		RandomSource:       flagBootstrapRandomSeed,
+	}
+
+	qcsWithSignerIDs := make([]*flow.QuorumCertificateWithSignerIDs, 0, len(clusterQCs))
+	for i, clusterQC := range clusterQCs {
+		members := assignments[i]
+		signerIDs, err := signature.DecodeSignerIndicesToIdentifiers(members, clusterQC.SignerIndices)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("could not decode signer IDs from clusterQC at index %v", i)
+		}
+		qcsWithSignerIDs = append(qcsWithSignerIDs, &flow.QuorumCertificateWithSignerIDs{
+			View:      clusterQC.View,
+			BlockID:   clusterQC.BlockID,
+			SignerIDs: signerIDs,
+			SigData:   clusterQC.SigData,
+		})
 	}
 
 	epochCommit := &flow.EpochCommit{
 		Counter:            flagEpochCounter,
-		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(clusterQCs),
+		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(qcsWithSignerIDs),
 		DKGGroupKey:        dkgData.PubGroupKey,
 		DKGParticipantKeys: dkgData.PubKeyShares,
 	}
@@ -61,20 +77,4 @@ func constructRootResultAndSeal(
 	}
 
 	return result, seal
-}
-
-// getRandomSource produces the random source which is included in the root
-// EpochSetup event and is used for leader selection. The random source is
-// generated deterministically based on the seed, so that the
-// bootstrapping files are deterministic across runs for the same inputs.
-func getRandomSource(seed []byte) []byte {
-
-	if len(seed) < flow.EpochSetupRandomSourceLength {
-		log.Fatal().Msgf("seed length is smaller than required random source length (%d < %d)", len(seed), flow.EpochSetupRandomSourceLength)
-	}
-
-	randomSource := make([]byte, flow.EpochSetupRandomSourceLength)
-	copy(randomSource, seed)
-
-	return randomSource
 }

@@ -36,7 +36,7 @@ func (c *Codec) NewDecoder(r io.Reader) network.Decoder {
 	return &Decoder{dec: dec}
 }
 
-// Given a Golang interface 'v', return a []byte 'envelope'.
+// Encode will, given a Golang interface 'v', return a []byte 'envelope'.
 // Return an error if packing the envelope fails.
 // NOTE: 'v' is the network message payload in unserialized form.
 // NOTE: 'code' is the message type.
@@ -74,9 +74,9 @@ func (c *Codec) Encode(v interface{}) ([]byte, error) {
 	return dataBytes, nil
 }
 
-// Given a []byte 'envelope', eturn a Golang interface 'v'.
+// Decode will, given a []byte 'envelope', return a Golang interface 'v'.
 // Return an error if unpacking the envelope fails.
-// NOTE: 'v' is the network message payload in unserialized form.
+// NOTE: 'v' is the network message payload in un-serialized form.
 // NOTE: 'code' is the message type.
 // NOTE: 'what' is the 'code' name for debugging / instrumentation.
 // NOTE: 'envelope' contains 'code' & serialized / encoded 'v'.
@@ -102,4 +102,18 @@ func (c *Codec) Decode(data []byte) (interface{}, error) {
 	}
 
 	return v, nil
+}
+
+// DecodeMsgType is a helper func that returns the first byte of cbor encoded data which
+// corresponds to the message type. This allows users of the codec to have an explicit dependency
+// on this specific property of encoding with the cbor codec. You should not directly interpret
+// the message type in code. i:e msgType := data[0], instead use this func.
+func (c *Codec) DecodeMsgType(data []byte) (byte, string, error) {
+	code := data[0]
+	what, err := switchenv2what(code)
+	if err != nil {
+		return byte(0), "", fmt.Errorf("could not decode message type check encoding: %w", err)
+	}
+
+	return code, what, nil
 }

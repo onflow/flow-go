@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -18,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -28,12 +28,12 @@ import (
 type EchoEngineTestSuite struct {
 	suite.Suite
 	ConduitWrapper                   // used as a wrapper around conduit methods
-	nets           []*p2p.Network    // used to keep track of the networks
+	nets           []network.Network // used to keep track of the networks
 	ids            flow.IdentityList // used to keep track of the identifiers associated with networks
+	cancel         context.CancelFunc
 }
 
-// Some tests are skipped to speedup the build.
-// However, they can be enabled if the environment variable "AllNetworkTest" is set with any value
+// Some tests are skipped in short mode to speedup the build.
 
 // TestStubEngineTestSuite runs all the test methods in this test suit
 func TestStubEngineTestSuite(t *testing.T) {
@@ -44,12 +44,22 @@ func (suite *EchoEngineTestSuite) SetupTest() {
 	const count = 2
 	logger := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 	log.SetAllLoggers(log.LevelError)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	suite.cancel = cancel
 	// both nodes should be of the same role to get connected on epidemic dissemination
-	suite.ids, _, suite.nets, _ = GenerateIDsMiddlewaresNetworks(suite.T(), count, logger, 100, nil, !DryRun)
+	suite.ids, _, suite.nets, _ = GenerateIDsMiddlewaresNetworks(
+		ctx,
+		suite.T(),
+		count,
+		logger,
+		nil,
+	)
 }
 
 // TearDownTest closes the networks within a specified timeout
 func (suite *EchoEngineTestSuite) TearDownTest() {
+	suite.cancel()
 	stopNetworks(suite.T(), suite.nets, 3*time.Second)
 }
 
@@ -83,131 +93,6 @@ func (suite *EchoEngineTestSuite) TestDuplicateChannel() {
 	require.Error(suite.T(), err)
 }
 
-// TestSingleMessage_Publish tests sending a single message from sender to receiver using
-// the Publish method of Conduit.
-func (suite *EchoEngineTestSuite) TestSingleMessage_Publish() {
-	suite.skipTest("covered by TestEchoMultiMsgAsync_Publish")
-	// set to false for no echo expectation
-	suite.singleMessage(false, suite.Publish)
-}
-
-// TestSingleMessage_Unicast tests sending a single message from sender to receiver using
-// the Unicast method of Conduit.
-func (suite *EchoEngineTestSuite) TestSingleMessage_Unicast() {
-	suite.skipTest("covered by TestEchoMultiMsgAsync_Unicast")
-	// set to false for no echo expectation
-	suite.singleMessage(false, suite.Unicast)
-}
-
-// TestSingleMessage_Multicast tests sending a single message from sender to receiver using
-// the Multicast method of Conduit.
-func (suite *EchoEngineTestSuite) TestSingleMessage_Multicast() {
-	suite.skipTest("covered by TestEchoMultiMsgAsync_Multicast")
-	// set to false for no echo expectation
-	suite.singleMessage(false, suite.Multicast)
-}
-
-// TestSingleEcho_Publish tests sending a single message from sender to receiver using
-// the Publish method of its Conduit.
-// It also evaluates the correct reception of an echo message back.
-func (suite *EchoEngineTestSuite) TestSingleEcho_Publish() {
-	suite.skipTest("covered by TestEchoMultiMsgAsync_Publish")
-	// set to true for an echo expectation
-	suite.singleMessage(true, suite.Publish)
-}
-
-// TestSingleEcho_Unicast tests sending a single message from sender to receiver using
-// the Unicast method of its Conduit.
-// It also evaluates the correct reception of an echo message back.
-func (suite *EchoEngineTestSuite) TestSingleEcho_Unicast() {
-	suite.skipTest("covered by TestEchoMultiMsgAsync_Unicast")
-	// set to true for an echo expectation
-	suite.singleMessage(true, suite.Unicast)
-}
-
-// TestSingleEcho_Multicast tests sending a single message from sender to receiver using
-// the Multicast method of its Conduit.
-// It also evaluates the correct reception of an echo message back.
-func (suite *EchoEngineTestSuite) TestSingleEcho_Multicast() {
-	suite.skipTest("covered by TestEchoMultiMsgAsync_Multicast")
-	// set to true for an echo expectation
-	suite.singleMessage(true, suite.Multicast)
-}
-
-// TestMultiMsgSync_Publish tests sending multiple messages from sender to receiver
-// using the Publish method of its Conduit.
-// Sender and receiver are synced over reception.
-func (suite *EchoEngineTestSuite) TestMultiMsgSync_Publish() {
-	suite.skipTest("covered by TestEchoMultiMsgAsync_Publish")
-	// set to false for no echo expectation
-	suite.multiMessageSync(false, 10, suite.Publish)
-}
-
-// TestMultiMsgSync_Unicast tests sending multiple messages from sender to receiver
-// using the Unicast method of its Conduit.
-// Sender and receiver are synced over reception.
-func (suite *EchoEngineTestSuite) TestMultiMsgSync_Unicast() {
-	suite.skipTest("covered by TestEchoMultiMsgAsync_Unicast")
-	// set to false for no echo expectation
-	suite.multiMessageSync(false, 10, suite.Unicast)
-}
-
-// TestMultiMsgSync_Multicast tests sending multiple messages from sender to receiver
-// using the Multicast method of its Conduit.
-// Sender and receiver are synced over reception.
-func (suite *EchoEngineTestSuite) TestMultiMsgSync_Multicast() {
-	suite.skipTest("covered by TestEchoMultiMsgAsync_Multicast")
-	// set to false for no echo expectation
-	suite.multiMessageSync(false, 10, suite.Multicast)
-}
-
-// TestEchoMultiMsgSync_Publish tests sending multiple messages from sender to receiver
-// using the Publish method of its Conduit.
-// It also evaluates the correct reception of an echo message back for each send
-// sender and receiver are synced over reception.
-func (suite *EchoEngineTestSuite) TestEchoMultiMsgSync_Publish() {
-	suite.skipTest("covered by TestEchoMultiMsgAsync_Publish")
-	// set to true for an echo expectation
-	suite.multiMessageSync(true, 10, suite.Publish)
-}
-
-// TestEchoMultiMsgSync_Multicast tests sending multiple messages from sender to receiver
-// using the Multicast method of its Conduit.
-// It also evaluates the correct reception of an echo message back for each send
-// sender and receiver are synced over reception.
-func (suite *EchoEngineTestSuite) TestEchoMultiMsgSync_Multicast() {
-	suite.skipTest("covered by TestEchoMultiMsgAsync_Multicast")
-	// set to true for an echo expectation
-	suite.multiMessageSync(true, 10, suite.Multicast)
-}
-
-// TestMultiMsgAsync_Publish tests sending multiple messages from sender to receiver
-// using the Publish method of their Conduit.
-// Sender and receiver are not synchronized
-func (suite *EchoEngineTestSuite) TestMultiMsgAsync_Publish() {
-	suite.skipTest("covered by TestEchoMultiMsgAsync_Publish")
-	// set to false for no echo expectation
-	suite.multiMessageAsync(false, 10, suite.Publish)
-}
-
-// TestMultiMsgAsync_Unicast tests sending multiple messages from sender to receiver
-// using the Unicast method of their Conduit.
-// Sender and receiver are not synchronized
-func (suite *EchoEngineTestSuite) TestMultiMsgAsync_Unicast() {
-	suite.skipTest("covered by TestEchoMultiMsgAsync_Unicast")
-	// set to false for no echo expectation
-	suite.multiMessageAsync(false, 10, suite.Unicast)
-}
-
-// TestMultiMsgAsync_Multicast tests sending multiple messages from sender to receiver
-// using the Multicast method of their Conduit.
-// Sender and receiver are not synchronized.
-func (suite *EchoEngineTestSuite) TestMultiMsgAsync_Multicast() {
-	suite.skipTest("covered by TestEchoMultiMsgAsync_Multicast")
-	// set to false for no echo expectation
-	suite.multiMessageAsync(false, 10, suite.Multicast)
-}
-
 // TestEchoMultiMsgAsync_Publish tests sending multiple messages from sender to receiver
 // using the Publish method of their Conduit.
 // It also evaluates the correct reception of an echo message back for each send.
@@ -239,7 +124,7 @@ func (suite *EchoEngineTestSuite) TestEchoMultiMsgAsync_Multicast() {
 // the received messages over Publish method of nodes' Conduits.
 // Messages are delivered to the receiver in a sequential manner.
 func (suite *EchoEngineTestSuite) TestDuplicateMessageSequential_Publish() {
-	suite.skipTest("covered by TestDuplicateMessageParallel_Publish")
+	unittest.SkipUnless(suite.T(), unittest.TEST_LONG_RUNNING, "covered by TestDuplicateMessageParallel_Publish")
 	suite.duplicateMessageSequential(suite.Publish)
 }
 
@@ -247,7 +132,7 @@ func (suite *EchoEngineTestSuite) TestDuplicateMessageSequential_Publish() {
 // the received messages over Unicast method of nodes' Conduits.
 // Messages are delivered to the receiver in a sequential manner.
 func (suite *EchoEngineTestSuite) TestDuplicateMessageSequential_Unicast() {
-	suite.skipTest("covered by TestDuplicateMessageParallel_Unicast")
+	unittest.SkipUnless(suite.T(), unittest.TEST_LONG_RUNNING, "covered by TestDuplicateMessageParallel_Unicast")
 	suite.duplicateMessageSequential(suite.Unicast)
 }
 
@@ -255,7 +140,7 @@ func (suite *EchoEngineTestSuite) TestDuplicateMessageSequential_Unicast() {
 // the received messages over Multicast method of nodes' Conduits.
 // Messages are delivered to the receiver in a sequential manner.
 func (suite *EchoEngineTestSuite) TestDuplicateMessageSequential_Multicast() {
-	suite.skipTest("covered by TestDuplicateMessageParallel_Multicast")
+	unittest.SkipUnless(suite.T(), unittest.TEST_LONG_RUNNING, "covered by TestDuplicateMessageParallel_Multicast")
 	suite.duplicateMessageSequential(suite.Multicast)
 }
 
@@ -364,11 +249,11 @@ func (suite *EchoEngineTestSuite) duplicateMessageParallel(send ConduitSendWrapp
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
 		go func() {
-			defer wg.Done()
 			require.NoError(suite.Suite.T(), send(event, sender.con, suite.ids[rcvID].NodeID))
+			wg.Done()
 		}()
 	}
-	wg.Wait()
+	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 1*time.Second, "could not send message on time")
 	time.Sleep(1 * time.Second)
 
 	// receiver should only see the message once, and the rest should be dropped due to
@@ -427,7 +312,7 @@ func (suite *EchoEngineTestSuite) duplicateMessageDifferentChan(send ConduitSend
 			require.NoError(suite.Suite.T(), send(event, sender2.con, suite.ids[rcvNode].NodeID))
 		}()
 	}
-	wg.Wait()
+	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 1*time.Second, "could not handle sending unicasts on time")
 	time.Sleep(1 * time.Second)
 
 	// each receiver should only see the message once, and the rest should be dropped due to
@@ -683,12 +568,6 @@ func (suite *EchoEngineTestSuite) multiMessageAsync(echo bool, count int, send C
 				assert.Fail(suite.Suite.T(), "receiver failed to send an echo message back to sender")
 			}
 		}
-	}
-}
-
-func (suite *EchoEngineTestSuite) skipTest(reason string) {
-	if _, found := os.LookupEnv("AllNetworkTest"); !found {
-		suite.T().Skip(reason)
 	}
 }
 

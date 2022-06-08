@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
@@ -18,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/access"
 	legacyaccess "github.com/onflow/flow-go/access/legacy"
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -34,6 +36,7 @@ type Config struct {
 	SecureGRPCListenAddr      string                           // the secure GRPC server address as ip:port
 	TransportCredentials      credentials.TransportCredentials // the secure GRPC credentials
 	HTTPListenAddr            string                           // the HTTP web proxy address as ip:port
+	RESTListenAddr            string                           // the REST server address as ip:port (if empty the REST server will not be started)
 	CollectionAddr            string                           // the address of the upstream collection node
 	HistoricalAccessAddrs     string                           // the list of all access nodes from previous spork
 	MaxMsgSize                int                              // GRPC max message size
@@ -48,15 +51,20 @@ type Config struct {
 // An unsecured GRPC server (default port 9000), a secure GRPC server (default port 9001) and an HTTP Web proxy (default
 // port 8000) are brought up.
 type Engine struct {
-	unit                *engine.Unit
-	log                 zerolog.Logger
-	backend             *backend.Backend // the gRPC service implementation
-	unsecureGrpcServer  *grpc.Server     // the unsecure gRPC server
-	secureGrpcServer    *grpc.Server     // the secure gRPC server
-	httpServer          *http.Server
-	config              Config
+	unit               *engine.Unit
+	log                zerolog.Logger
+	backend            *backend.Backend // the gRPC service implementation
+	unsecureGrpcServer *grpc.Server     // the unsecure gRPC server
+	secureGrpcServer   *grpc.Server     // the secure gRPC server
+	httpServer         *http.Server
+	restServer         *http.Server
+	config             Config
+	chain              flow.Chain
+
+	addrLock            sync.RWMutex
 	unsecureGrpcAddress net.Addr
 	secureGrpcAddress   net.Addr
+	restAPIAddress      net.Addr
 }
 
 // New returns a new RPC engine.
@@ -99,9 +107,6 @@ func New(log zerolog.Logger,
 		interceptors = append(interceptors, grpc_prometheus.UnaryServerInterceptor)
 	}
 
-	// add the logging interceptor
-	interceptors = append(interceptors, loggingInterceptor(log)...)
-
 	if len(apiRatelimits) > 0 {
 		// create a rate limit interceptor
 		rateLimitInterceptor := NewRateLimiterInterceptor(log, apiRatelimits, apiBurstLimits).unaryServerInterceptor
@@ -109,11 +114,12 @@ func New(log zerolog.Logger,
 		interceptors = append(interceptors, rateLimitInterceptor)
 	}
 
-	if len(interceptors) > 0 {
-		// create a chained unary interceptor
-		chainedInterceptors := grpc.ChainUnaryInterceptor(interceptors...)
-		grpcOpts = append(grpcOpts, chainedInterceptors)
-	}
+	// add the logging interceptor, ensure it is innermost wrapper
+	interceptors = append(interceptors, loggingInterceptor(log)...)
+
+	// create a chained unary interceptor
+	chainedInterceptors := grpc.ChainUnaryInterceptor(interceptors...)
+	grpcOpts = append(grpcOpts, chainedInterceptors)
 
 	// create an unsecured grpc server
 	unsecureGrpcServer := grpc.NewServer(grpcOpts...)
@@ -132,8 +138,7 @@ func New(log zerolog.Logger,
 		ExecutionNodeGRPCTimeout:  config.ExecutionClientTimeout,
 	}
 
-	backend := backend.New(
-		state,
+	backend := backend.New(state,
 		collectionRPC,
 		historicalAccessNodes,
 		blocks,
@@ -150,6 +155,7 @@ func New(log zerolog.Logger,
 		config.PreferredExecutionNodeIDs,
 		config.FixedExecutionNodeIDs,
 		log,
+		backend.DefaultSnapshotHistoryLimit,
 	)
 
 	eng := &Engine{
@@ -160,6 +166,7 @@ func New(log zerolog.Logger,
 		secureGrpcServer:   secureGrpcServer,
 		httpServer:         httpServer,
 		config:             config,
+		chain:              chainID.Chain(),
 	}
 
 	accessproto.RegisterAccessAPIServer(
@@ -199,6 +206,9 @@ func (e *Engine) Ready() <-chan struct{} {
 	e.unit.Launch(e.serveUnsecureGRPC)
 	e.unit.Launch(e.serveSecureGRPC)
 	e.unit.Launch(e.serveGRPCWebProxy)
+	if e.config.RESTListenAddr != "" {
+		e.unit.Launch(e.serveREST)
+	}
 	return e.unit.Ready()
 }
 
@@ -212,6 +222,14 @@ func (e *Engine) Done() <-chan struct{} {
 			err := e.httpServer.Shutdown(context.Background())
 			if err != nil {
 				e.log.Error().Err(err).Msg("error stopping http server")
+			}
+		},
+		func() {
+			if e.restServer != nil {
+				err := e.restServer.Shutdown(context.Background())
+				if err != nil {
+					e.log.Error().Err(err).Msg("error stopping http REST server")
+				}
 			}
 		})
 }
@@ -227,11 +245,21 @@ func (e *Engine) SubmitLocal(event interface{}) {
 }
 
 func (e *Engine) UnsecureGRPCAddress() net.Addr {
+	e.addrLock.RLock()
+	defer e.addrLock.RUnlock()
 	return e.unsecureGrpcAddress
 }
 
 func (e *Engine) SecureGRPCAddress() net.Addr {
+	e.addrLock.RLock()
+	defer e.addrLock.RUnlock()
 	return e.secureGrpcAddress
+}
+
+func (e *Engine) RestApiAddress() net.Addr {
+	e.addrLock.RLock()
+	defer e.addrLock.RUnlock()
+	return e.restAPIAddress
 }
 
 // process processes the given ingestion engine event. Events that are given
@@ -261,7 +289,9 @@ func (e *Engine) serveUnsecureGRPC() {
 
 	// save the actual address on which we are listening (may be different from e.config.UnsecureGRPCListenAddr if not port
 	// was specified)
+	e.addrLock.Lock()
 	e.unsecureGrpcAddress = l.Addr()
+	e.addrLock.Unlock()
 
 	e.log.Debug().Str("unsecure_grpc_address", e.unsecureGrpcAddress.String()).Msg("listening on port")
 
@@ -283,7 +313,9 @@ func (e *Engine) serveSecureGRPC() {
 		return
 	}
 
+	e.addrLock.Lock()
 	e.secureGrpcAddress = l.Addr()
+	e.addrLock.Unlock()
 
 	e.log.Debug().Str("secure_grpc_address", e.secureGrpcAddress.String()).Msg("listening on port")
 
@@ -305,5 +337,38 @@ func (e *Engine) serveGRPCWebProxy() {
 	}
 	if err != nil {
 		e.log.Err(err).Msg("failed to start the http proxy server")
+	}
+}
+
+// serveREST starts the HTTP REST server
+func (e *Engine) serveREST() {
+
+	e.log.Info().Str("rest_api_address", e.config.RESTListenAddr).Msg("starting REST server on address")
+
+	r, err := rest.NewServer(e.backend, e.config.RESTListenAddr, e.log, e.chain)
+	if err != nil {
+		e.log.Err(err).Msg("failed to initialize the REST server")
+		return
+	}
+	e.restServer = r
+
+	l, err := net.Listen("tcp", e.config.RESTListenAddr)
+	if err != nil {
+		e.log.Err(err).Msg("failed to start the REST server")
+		return
+	}
+
+	e.addrLock.Lock()
+	e.restAPIAddress = l.Addr()
+	e.addrLock.Unlock()
+
+	e.log.Debug().Str("rest_api_address", e.restAPIAddress.String()).Msg("listening on port")
+
+	err = e.restServer.Serve(l) // blocking call
+	if err != nil {
+		if errors.Is(err, http.ErrServerClosed) {
+			return
+		}
+		e.log.Error().Err(err).Msg("fatal error in REST server")
 	}
 }

@@ -10,8 +10,8 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/assignment"
 	"github.com/onflow/flow-go/model/flow/order"
-	"github.com/onflow/flow-go/module/signature"
 )
 
 // ServiceEvent converts a service event encoded as the generic flow.Event
@@ -40,7 +40,7 @@ func ServiceEvent(chainID flow.ChainID, event flow.Event) (*flow.ServiceEvent, e
 func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error) {
 
 	// decode bytes using jsoncdc
-	payload, err := json.Decode(event.Payload)
+	payload, err := json.Decode(nil, event.Payload)
 	if err != nil {
 		return nil, fmt.Errorf("could not unmarshal event payload: %w", err)
 	}
@@ -136,7 +136,7 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 func convertServiceEventEpochCommit(event flow.Event) (*flow.ServiceEvent, error) {
 
 	// decode bytes using jsoncdc
-	payload, err := json.Decode(event.Payload)
+	payload, err := json.Decode(nil, event.Payload)
 	if err != nil {
 		return nil, fmt.Errorf("could not unmarshal event payload: %w", err)
 	}
@@ -182,7 +182,7 @@ func convertClusterAssignments(cdcClusters []cadence.Value) (flow.AssignmentList
 	indices := make(map[uint]struct{})
 
 	// parse cluster assignments to Go types
-	assignments := make(flow.AssignmentList, len(cdcClusters))
+	identifierLists := make([]flow.IdentifierList, len(cdcClusters))
 	for _, value := range cdcClusters {
 
 		cdcCluster, ok := value.(cadence.Struct)
@@ -224,9 +224,13 @@ func convertClusterAssignments(cdcClusters []cadence.Value) (flow.AssignmentList
 			if err != nil {
 				return nil, fmt.Errorf("could not convert hex string to identifer: %w", err)
 			}
-			assignments[clusterIndex] = append(assignments[clusterIndex], nodeID)
+
+			identifierLists[clusterIndex] = append(identifierLists[clusterIndex], nodeID)
 		}
 	}
+
+	// sort identifier lists in Canonical order
+	assignments := assignment.FromIdentifierLists(identifierLists)
 
 	return assignments, nil
 }
@@ -268,13 +272,11 @@ func convertParticipants(cdcParticipants []cadence.Value) (flow.IdentityList, er
 		}
 		identity.Address = string(address)
 
-		// CAUTION: Identity.Stake refers to weight - this is an outdated name -
-		// see note in flow.Identity
-		stake, ok := cdcNodeInfoFields[13].(cadence.UInt64)
+		initialWeight, ok := cdcNodeInfoFields[13].(cadence.UInt64)
 		if !ok {
-			return nil, invalidCadenceTypeError("nodeInfo.stake", cdcNodeInfoFields[13], cadence.UInt64(0))
+			return nil, invalidCadenceTypeError("nodeInfo.initialWeight", cdcNodeInfoFields[13], cadence.UInt64(0))
 		}
-		identity.Stake = uint64(stake)
+		identity.Weight = uint64(initialWeight)
 
 		// convert nodeID string into identifier
 		nodeIDHex, ok := cdcNodeInfoFields[0].(cadence.String)
@@ -333,10 +335,6 @@ func convertClusterQCVotes(cdcClusterQCs []cadence.Value) ([]flow.ClusterQCVoteD
 	// CAUTION: Votes are not validated prior to aggregation. This means a single
 	// invalid vote submission will result in a fully invalid QC for that cluster.
 	// Votes must be validated by the ClusterQC smart contract.
-	//
-	// NOTE: Aggregation doesn't require a tag or local, but is only accessible
-	// through the broader Provider API, hence the empty arguments.
-	aggregator := signature.NewAggregationProvider("", nil)
 
 	for _, cdcClusterQC := range cdcClusterQCs {
 		cdcClusterQCStruct, ok := cdcClusterQC.(cadence.Struct)
@@ -394,7 +392,8 @@ func convertClusterQCVotes(cdcClusterQCs []cadence.Value) ([]flow.ClusterQCVoteD
 			}
 			signatures = append(signatures, rawVoteBytes)
 		}
-		aggregatedSignature, err := aggregator.Aggregate(signatures)
+		// Aggregate BLS signatures
+		aggregatedSignature, err := crypto.AggregateBLSSignatures(signatures)
 		if err != nil {
 			return nil, fmt.Errorf("cluster qc vote aggregation failed: %w", err)
 		}

@@ -49,8 +49,8 @@ type Snapshot interface {
 	// as of this block. It represents the sealed state.
 	Commit() (flow.StateCommitment, error)
 
-	// SealingSegment returns the chain segment such that the head (greatest
-	// height) is this snapshot's reference block and the tail (least height)
+	// SealingSegment returns the chain segment such that the highest block
+	// is this snapshot's reference block and the lowest block
 	// is the most recently sealed block as of this snapshot (ie. the block
 	// referenced by LatestSeal). The segment is in ascending height order.
 	//
@@ -64,7 +64,11 @@ type Snapshot interface {
 	// the sealing segment has exactly one block (the root block for the spork).
 	// For all other snapshots, the sealing segment contains at least 2 blocks.
 	//
-	SealingSegment() ([]*flow.Block, error)
+	// NOTE 3: It is often the case that a block inside the segment will contain
+	// an execution receipt in it's payload that references an execution result
+	// missing from the payload. These missing execution results are stored on the
+	// flow.SealingSegment.ExecutionResults field.
+	SealingSegment() (*flow.SealingSegment, error)
 
 	// Descendants returns the IDs of all descendants of the Head block. The IDs
 	// are ordered such that parents are included before their children. These
@@ -76,16 +80,14 @@ type Snapshot interface {
 	// only blocks that have been validated by HotStuff.
 	ValidDescendants() ([]flow.Identifier, error)
 
-	// Seed returns a deterministic seed for a pseudo random number generator.
-	// The seed is derived from the source of randomness for the Head block.
-	// In order to deterministically derive task specific seeds, indices must
-	// be specified. Refer to module/indices/rand.go for different indices.
+	// RandomSource returns the source of randomness derived from the
+	// Head block.
 	// NOTE: not to be confused with the epoch source of randomness!
 	// error returns:
 	//  * NoValidChildBlockError indicates that no valid child block is known
 	//    (which contains the block's source of randomness)
 	//  * unexpected errors should be considered symptoms of internal bugs
-	Seed(indices ...uint32) ([]byte, error)
+	RandomSource() ([]byte, error)
 
 	// Phase returns the epoch phase for the current epoch, as of the Head block.
 	Phase() (flow.EpochPhase, error)
@@ -97,4 +99,7 @@ type Snapshot interface {
 	// methods may return errors, since the Epoch Preparation Protocol may be
 	// in-progress and incomplete for the epoch.
 	Epochs() EpochQuery
+
+	// Params returns global parameters of the state this snapshot is taken from.
+	Params() GlobalParams
 }

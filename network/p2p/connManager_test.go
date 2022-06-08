@@ -1,4 +1,4 @@
-package p2p
+package p2p_test
 
 import (
 	"fmt"
@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -47,13 +48,13 @@ func TestConnectionManagerProtection(t *testing.T) {
 
 	log := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 	noopMetrics := metrics.NewNoopCollector()
-	connManager := NewConnManager(log, noopMetrics)
+	connManager := p2p.NewConnManager(log, noopMetrics)
 
 	testCases := [][]fun{
 		// single stream created on a connection
 		{protect, isProtected, unprotect, isNotProtected},
 		// two streams created on a connection at the same time
-		{protect, protect, unprotect, isProtected, unprotect, isNotProtected},
+		{protect, protect, unprotect, isNotProtected, unprotect, isNotProtected},
 		// two streams created on a connection one after another
 		{protect, unprotect, isNotProtected, protect, unprotect, isNotProtected},
 	}
@@ -63,14 +64,14 @@ func TestConnectionManagerProtection(t *testing.T) {
 	}
 }
 
-func testSequence(t *testing.T, sequence []fun, connMgr *ConnManager) {
+func testSequence(t *testing.T, sequence []fun, connMgr *p2p.ConnManager) {
 	pID := generatePeerInfo(t)
 	for _, s := range sequence {
 		switch s.funName {
 		case protectF:
-			connMgr.ProtectPeer(pID)
+			connMgr.Protect(pID, "global")
 		case unprotectF:
-			connMgr.UnprotectPeer(pID)
+			connMgr.Unprotect(pID, "global")
 		case isProtectedF:
 			require.Equal(t, connMgr.IsProtected(pID, ""), s.expectation, fmt.Sprintf("failed sequence: %v", sequence))
 		}
@@ -80,7 +81,7 @@ func testSequence(t *testing.T, sequence []fun, connMgr *ConnManager) {
 func generatePeerInfo(t *testing.T) peer.ID {
 	key := generateNetworkingKey(t)
 	identity := unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress("1.1.1.1:0"))
-	pInfo, err := PeerAddressInfo(*identity)
+	pInfo, err := p2p.PeerAddressInfo(*identity)
 	require.NoError(t, err)
 	return pInfo.ID
 }

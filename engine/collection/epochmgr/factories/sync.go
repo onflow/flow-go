@@ -14,7 +14,7 @@ import (
 
 type SyncEngineFactory struct {
 	log     zerolog.Logger
-	net     module.Network
+	net     network.Network
 	me      module.Local
 	metrics module.EngineMetrics
 	conf    chainsync.Config
@@ -23,7 +23,7 @@ type SyncEngineFactory struct {
 func NewSyncEngineFactory(
 	log zerolog.Logger,
 	metrics module.EngineMetrics,
-	net module.Network,
+	net network.Network,
 	me module.Local,
 	conf chainsync.Config,
 ) (*SyncEngineFactory, error) {

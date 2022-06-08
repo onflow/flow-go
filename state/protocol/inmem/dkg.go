@@ -13,6 +13,8 @@ type DKG struct {
 func (d DKG) Size() uint                 { return uint(len(d.enc.Participants)) }
 func (d DKG) GroupKey() crypto.PublicKey { return d.enc.GroupKey.PublicKey }
 
+// Index returns the index for the given node. Error Returns:
+// protocol.IdentityNotFoundError if nodeID is not a valid DKG participant.
 func (d DKG) Index(nodeID flow.Identifier) (uint, error) {
 	part, exists := d.enc.Participants[nodeID]
 	if !exists {
@@ -21,6 +23,8 @@ func (d DKG) Index(nodeID flow.Identifier) (uint, error) {
 	return part.Index, nil
 }
 
+// KeyShare returns the public key share for the given node. Error Returns:
+// protocol.IdentityNotFoundError if nodeID is not a valid DKG participant.
 func (d DKG) KeyShare(nodeID flow.Identifier) (crypto.PublicKey, error) {
 	part, exists := d.enc.Participants[nodeID]
 	if !exists {

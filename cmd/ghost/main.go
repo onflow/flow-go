@@ -15,12 +15,17 @@ func main() {
 		rpcConf engine.Config
 	)
 
-	cmd.FlowNode("ghost").
-		ExtraFlags(func(flags *pflag.FlagSet) {
-			flags.StringVarP(&rpcConf.ListenAddr, "rpc-addr", "r", "localhost:9000", "the address the GRPC server listens on")
-		}).
-		Initialize().
-		Module("message validators", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+	nodeBuilder := cmd.FlowNode("ghost")
+	nodeBuilder.ExtraFlags(func(flags *pflag.FlagSet) {
+		flags.StringVarP(&rpcConf.ListenAddr, "rpc-addr", "r", "localhost:9000", "the address the GRPC server listens on")
+	})
+
+	if err := nodeBuilder.Initialize(); err != nil {
+		nodeBuilder.Logger.Fatal().Err(err).Send()
+	}
+
+	nodeBuilder.
+		Module("message validators", func(node *cmd.NodeConfig) error {
 			validators := []network.MessageValidator{
 				// filter out messages sent by this node itself
 				validator.ValidateNotSender(node.Me.NodeID()),
@@ -29,9 +34,14 @@ func main() {
 			node.MsgValidators = validators
 			return nil
 		}).
-		Component("RPC engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			rpcEng, err := engine.New(node.Network, node.Logger, node.Me, node.State, rpcConf)
 			return rpcEng, err
-		}).
-		Run()
+		})
+
+	node, err := nodeBuilder.Build()
+	if err != nil {
+		nodeBuilder.Logger.Fatal().Err(err).Send()
+	}
+	node.Run()
 }

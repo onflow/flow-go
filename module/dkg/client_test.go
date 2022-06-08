@@ -1,6 +1,7 @@
 package dkg
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -56,7 +57,7 @@ func (s *ClientSuite) SetupTest() {
 	// deploy contract
 	s.deployDKGContract()
 
-	s.contractClient = NewClient(zerolog.Nop(), s.emulatorClient, s.dkgSigner, s.dkgAddress.String(), s.dkgAddress.String(), 0)
+	s.contractClient = NewClient(zerolog.Nop(), s.emulatorClient, flow.ZeroID, s.dkgSigner, s.dkgAddress.String(), s.dkgAddress.String(), 0)
 }
 
 func (s *ClientSuite) deployDKGContract() {
@@ -131,7 +132,6 @@ func (s *ClientSuite) TestBroadcastReadSingle() {
 	broadcastedMsg := messages[0]
 	assert.Equal(s.T(), msg.DKGInstanceID, broadcastedMsg.DKGInstanceID)
 	assert.Equal(s.T(), msg.Data, broadcastedMsg.Data)
-	assert.Equal(s.T(), msg.Orig, broadcastedMsg.Orig)
 	assert.Equal(s.T(), msg.Signature, broadcastedMsg.Signature)
 }
 
@@ -218,7 +218,7 @@ func (s *ClientSuite) prepareDKG(participants []flow.Identifier) []*Client {
 	// create clients for each participant
 	clients := make([]*Client, len(participants))
 	for index := range participants {
-		clients[index] = NewClient(zerolog.Nop(), s.emulatorClient, signers[index], s.dkgAddress.String(), addresses[index].String(), 0)
+		clients[index] = NewClient(zerolog.Nop(), s.emulatorClient, flow.ZeroID, signers[index], s.dkgAddress.String(), addresses[index].String(), 0)
 	}
 
 	return clients
@@ -269,7 +269,11 @@ func (s *ClientSuite) startDKGWithParticipants(nodeIDs []flow.Identifier) {
 
 	// sanity check: verify that DKG was started with correct node IDs
 	result := s.executeScript(templates.GenerateGetConsensusNodesScript(s.env), nil)
-	assert.Equal(s.T(), cadence.NewArray(valueNodeIDs), result)
+	resultArray := result.(cadence.Array).Values
+	sort.Slice(valueNodeIDs, func(i, j int) bool { return valueNodeIDs[i].(cadence.String) < valueNodeIDs[j].(cadence.String) })
+	sort.Slice(resultArray, func(i, j int) bool { return resultArray[i].(cadence.String) < resultArray[j].(cadence.String) })
+
+	assert.Equal(s.T(), valueNodeIDs, resultArray)
 }
 
 func (s *ClientSuite) createParticipant(nodeID flow.Identifier, authoriser sdk.Address, signer sdkcrypto.Signer) {
@@ -330,6 +334,7 @@ func (s *ClientSuite) executeScript(script []byte, arguments [][]byte) cadence.V
 	// execute script
 	result, err := s.blockchain.ExecuteScript(script, arguments)
 	require.NoError(s.T(), err)
+	require.NoError(s.T(), result.Error)
 	require.True(s.T(), result.Succeeded())
 
 	return result.Value

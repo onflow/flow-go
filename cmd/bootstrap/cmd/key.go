@@ -5,6 +5,7 @@ import (
 	"net"
 	"strconv"
 
+	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 
 	"github.com/multiformats/go-multiaddr"
@@ -38,13 +39,25 @@ func init() {
 
 	// required flags
 	keyCmd.Flags().StringVar(&flagRole, "role", "", "node role (can be \"collection\", \"consensus\", \"execution\", \"verification\" or \"access\")")
-	_ = keyCmd.MarkFlagRequired("role")
+	cmd.MarkFlagRequired(keyCmd, "role")
 	keyCmd.Flags().StringVar(&flagAddress, "address", "", "network address")
-	_ = keyCmd.MarkFlagRequired("address")
+	cmd.MarkFlagRequired(keyCmd, "address")
 
-	keyCmd.Flags().BytesHexVar(&flagNetworkSeed, "networking-seed", []byte{}, fmt.Sprintf("hex encoded networking seed (min %d bytes)", minSeedBytes))
-	keyCmd.Flags().BytesHexVar(&flagStakingSeed, "staking-seed", []byte{}, fmt.Sprintf("hex encoded staking seed (min %d bytes)", minSeedBytes))
-	keyCmd.Flags().BytesHexVar(&flagMachineSeed, "machine-seed", []byte{}, fmt.Sprintf("hex encoded machine account seed (min %d bytes)", minSeedBytes))
+	keyCmd.Flags().BytesHexVar(
+		&flagNetworkSeed,
+		"networking-seed",
+		[]byte{},
+		fmt.Sprintf("hex encoded networking seed (min %d bytes)", crypto.KeyGenSeedMinLenECDSAP256))
+	keyCmd.Flags().BytesHexVar(
+		&flagStakingSeed,
+		"staking-seed",
+		[]byte{},
+		fmt.Sprintf("hex encoded staking seed (min %d bytes)", crypto.KeyGenSeedMinLenBLSBLS12381))
+	keyCmd.Flags().BytesHexVar(
+		&flagMachineSeed,
+		"machine-seed",
+		[]byte{},
+		fmt.Sprintf("hex encoded machine account seed (min %d bytes)", crypto.KeyGenSeedMinLenECDSAP256))
 }
 
 // keyCmdRun generate the node staking key, networking key and node information
@@ -52,13 +65,13 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 
 	// generate private key seeds if not specified via flag
 	if len(flagNetworkSeed) == 0 {
-		flagNetworkSeed = GenerateRandomSeed()
+		flagNetworkSeed = GenerateRandomSeed(crypto.KeyGenSeedMinLenECDSAP256)
 	}
 	if len(flagStakingSeed) == 0 {
-		flagStakingSeed = GenerateRandomSeed()
+		flagStakingSeed = GenerateRandomSeed(crypto.KeyGenSeedMinLenBLSBLS12381)
 	}
 	if len(flagMachineSeed) == 0 {
-		flagMachineSeed = GenerateRandomSeed()
+		flagMachineSeed = GenerateRandomSeed(crypto.KeyGenSeedMinLenECDSAP256)
 	}
 
 	// validate inputs
@@ -66,7 +79,7 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 	validateAddressFormat(flagAddress)
 
 	// generate staking and network keys
-	networkKey, stakingKey, err := generateKeys()
+	networkKey, stakingKey, secretsDBKey, err := generateKeys()
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not generate staking or network keys")
 	}
@@ -75,7 +88,7 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 	conf := model.NodeConfig{
 		Role:    role,
 		Address: flagAddress,
-		Stake:   0,
+		Weight:  0,
 	}
 	nodeInfo := assembleNodeInfo(conf, networkKey, stakingKey)
 
@@ -87,6 +100,7 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 	// write files
 	writeText(model.PathNodeID, []byte(nodeInfo.NodeID.String()))
 	writeJSON(fmt.Sprintf(model.PathNodeInfoPriv, nodeInfo.NodeID), private)
+	writeText(fmt.Sprintf(model.PathSecretsEncryptionKey, nodeInfo.NodeID), secretsDBKey)
 	writeJSON(fmt.Sprintf(model.PathNodeInfoPub, nodeInfo.NodeID), nodeInfo.Public())
 
 	// write machine account info
@@ -105,32 +119,36 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 	}
 }
 
-func generateKeys() (crypto.PrivateKey, crypto.PrivateKey, error) {
+func generateKeys() (crypto.PrivateKey, crypto.PrivateKey, []byte, error) {
 
 	log.Debug().Msg("will generate networking key")
-	networkSeed := validateSeed(flagNetworkSeed)
-	networkKey, err := utils.GenerateNetworkingKey(networkSeed)
+	networkKey, err := utils.GenerateNetworkingKey(flagNetworkSeed)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not generate networking key: %w", err)
+		return nil, nil, nil, fmt.Errorf("could not generate networking key: %w", err)
 	}
 	log.Info().Msg("generated networking key")
 
 	log.Debug().Msg("will generate staking key")
-	stakingSeed := validateSeed(flagStakingSeed)
-	stakingKey, err := utils.GenerateStakingKey(stakingSeed)
+	stakingKey, err := utils.GenerateStakingKey(flagStakingSeed)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not generate staking key: %w", err)
+		return nil, nil, nil, fmt.Errorf("could not generate staking key: %w", err)
 	}
 	log.Info().Msg("generated staking key")
 
-	return networkKey, stakingKey, nil
+	log.Debug().Msg("will generate db encryption key")
+	secretsDBKey, err := utils.GenerateSecretsDBEncryptionKey()
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("could not generate secrets db encryption key: %w", err)
+	}
+	log.Info().Msg("generated db encryption key")
+
+	return networkKey, stakingKey, secretsDBKey, nil
 }
 
 func generateMachineAccountKey() (crypto.PrivateKey, error) {
 
 	log.Debug().Msg("will generate machine account key")
-	machineSeed := validateSeed(flagMachineSeed)
-	machineKey, err := utils.GenerateMachineAccountKey(machineSeed)
+	machineKey, err := utils.GenerateMachineAccountKey(flagMachineSeed)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate machine key: %w", err)
 	}
@@ -146,13 +164,6 @@ func validateRole(role string) flow.Role {
 			"\"verification\" or \"access\"")
 	}
 	return parsed
-}
-
-func validateSeed(seed []byte) []byte {
-	if len(seed) < minSeedBytes {
-		log.Fatal().Int("len(seed)", len(seed)).Msgf("seed too short, needs to be at least %v bytes long", minSeedBytes)
-	}
-	return seed
 }
 
 // validateAddressFormat validates the address provided by pretty much doing what the network layer would do before

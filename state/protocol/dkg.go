@@ -15,9 +15,11 @@ type DKG interface {
 	// GroupKey is the group public key.
 	GroupKey() crypto.PublicKey
 
-	// Index returns the index for the given node.
+	// Index returns the index for the given node. Error Returns:
+	// protocol.IdentityNotFoundError if nodeID is not a valid DKG participant.
 	Index(nodeID flow.Identifier) (uint, error)
 
-	// KeyShare returns the public key share for the given node.
+	// KeyShare returns the public key share for the given node. Error Returns:
+	// protocol.IdentityNotFoundError if nodeID is not a valid DKG participant.
 	KeyShare(nodeID flow.Identifier) (crypto.PublicKey, error)
 }

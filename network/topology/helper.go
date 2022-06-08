@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -26,7 +27,7 @@ func MockStateForCollectionNodes(t *testing.T, collectorIds flow.IdentityList, c
 	epochQuery := new(mockprotocol.EpochQuery)
 	epoch := new(mockprotocol.Epoch)
 	assignments := unittest.ClusterAssignment(clusterNum, collectorIds)
-	clusters, err := flow.NewClusterList(assignments, collectorIds)
+	clusters, err := factory.NewClusterList(assignments, collectorIds)
 	require.NoError(t, err)
 
 	epoch.On("Clustering").Return(clusters, nil)
@@ -95,14 +96,6 @@ func CheckMembership(t *testing.T, top flow.IdentityList, all flow.IdentityList)
 	}
 }
 
-// TODO: fix this test after we have fanout optimized.
-// CheckTopologySize evaluates that overall topology size of a node is bound by the fanout of system.
-func CheckTopologySize(t *testing.T, total int, top flow.IdentityList) {
-	t.Skip("this test requires optimizing the fanout per topic")
-	fanout := (total + 1) / 2
-	require.True(t, len(top) <= fanout)
-}
-
 // ClusterNum is a test helper determines the number of clusters of specific `size`.
 func ClusterNum(t *testing.T, ids flow.IdentityList, size int) int {
 	collectors := ids.Filter(filter.HasRole(flow.RoleCollection))
@@ -146,22 +139,6 @@ func uniquenessCheck(t *testing.T, ids flow.IdentityList) {
 		// marks id as seen
 		seen[*id] = struct{}{}
 	}
-}
-
-// clusterChannels is a test helper method that returns all cluster-based channel.
-func clusterChannels(t *testing.T) network.ChannelList {
-	channels := make(network.ChannelList, 0)
-	for _, channel := range engine.Channels() {
-		if _, ok := engine.ClusterChannel(channel); !ok {
-			// skips non-cluster channels
-			continue
-		}
-
-		channels = append(channels, channel)
-	}
-
-	require.NotEmpty(t, channels, "empty cluster-based channels")
-	return channels
 }
 
 // connectedByCluster is a test helper that checks `all` nodes belong to a cluster are connected.

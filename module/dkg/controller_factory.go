@@ -17,10 +17,11 @@ import (
 // MessagingEngine, and the same client to communicate with the DKG
 // smart-contract.
 type ControllerFactory struct {
-	log               zerolog.Logger
-	me                module.Local
-	dkgContractClient module.DKGContractClient
-	tunnel            *BrokerTunnel
+	log                zerolog.Logger
+	me                 module.Local
+	dkgContractClients []module.DKGContractClient
+	tunnel             *BrokerTunnel
+	config             ControllerConfig
 }
 
 // NewControllerFactory creates a new factory that generates Controllers with
@@ -28,14 +29,16 @@ type ControllerFactory struct {
 func NewControllerFactory(
 	log zerolog.Logger,
 	me module.Local,
-	dkgContractClient module.DKGContractClient,
-	tunnel *BrokerTunnel) *ControllerFactory {
+	dkgContractClients []module.DKGContractClient,
+	tunnel *BrokerTunnel,
+	config ControllerConfig) *ControllerFactory {
 
 	return &ControllerFactory{
-		log:               log,
-		me:                me,
-		dkgContractClient: dkgContractClient,
-		tunnel:            tunnel,
+		log:                log,
+		me:                 me,
+		dkgContractClients: dkgContractClients,
+		tunnel:             tunnel,
+		config:             config,
 	}
 }
 
@@ -46,15 +49,9 @@ func (f *ControllerFactory) Create(
 	participants flow.IdentityList,
 	seed []byte) (module.DKGController, error) {
 
-	myIndex := -1
-	for i, id := range participants.NodeIDs() {
-		if id == f.me.NodeID() {
-			myIndex = i
-			break
-		}
-	}
-	if myIndex < 0 {
-		return nil, fmt.Errorf("node does not belong to dkg committee")
+	myIndex, ok := participants.GetIndex(f.me.NodeID())
+	if !ok {
+		return nil, fmt.Errorf("failed to create controller factory, node %s is not part of DKG committee", f.me.NodeID().String())
 	}
 
 	broker := NewBroker(
@@ -62,14 +59,14 @@ func (f *ControllerFactory) Create(
 		dkgInstanceID,
 		participants,
 		f.me,
-		myIndex,
-		f.dkgContractClient,
+		int(myIndex),
+		f.dkgContractClients,
 		f.tunnel,
 	)
 
 	n := len(participants)
 	threshold := signature.RandomBeaconThreshold(n)
-	dkg, err := crypto.NewJointFeldman(n, threshold, myIndex, broker)
+	dkg, err := crypto.NewJointFeldman(n, threshold, int(myIndex), broker)
 	if err != nil {
 		return nil, err
 	}
@@ -80,6 +77,7 @@ func (f *ControllerFactory) Create(
 		dkg,
 		seed,
 		broker,
+		f.config,
 	)
 
 	return controller, nil

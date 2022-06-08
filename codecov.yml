@@ -1,0 +1,3 @@
+ignore:
+  - "fvm/mock/**/*"
+  - "fvm/utils/test"

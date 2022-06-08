@@ -4,9 +4,9 @@ import (
 	"github.com/onflow/cadence/runtime"
 )
 
-// Enviornment accepts a context and a virtual machine instance and provides
+// Environment accepts a context and a virtual machine instance and provides
 // cadence runtime interface methods to the runtime.
-type Enviornment interface {
+type Environment interface {
 	Context() *Context
 	VM() *VirtualMachine
 	runtime.Interface

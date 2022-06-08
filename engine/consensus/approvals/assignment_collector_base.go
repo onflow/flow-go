@@ -4,6 +4,7 @@ import (
 	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
@@ -24,7 +25,7 @@ type AssignmentCollectorBase struct {
 	assigner                             module.ChunkAssigner            // component for computing chunk assignments
 	state                                protocol.State                  // protocol state
 	headers                              storage.Headers                 // used to query headers from storage
-	verifier                             module.Verifier                 // used to validate result approvals
+	sigHasher                            hash.Hasher                     // used to verify result approval signatures
 	seals                                mempool.IncorporatedResultSeals // holds candidate seals for incorporated results that have acquired sufficient approvals; candidate seals are constructed  without consideration of the sealability of parent results
 	approvalConduit                      network.Conduit                 // used to request missing approvals from verification nodes
 	requestTracker                       *RequestTracker                 // used to keep track of number of approval requests, and blackout periods, by chunk
@@ -42,7 +43,7 @@ func NewAssignmentCollectorBase(logger zerolog.Logger,
 	headers storage.Headers,
 	assigner module.ChunkAssigner,
 	seals mempool.IncorporatedResultSeals,
-	sigVerifier module.Verifier,
+	sigHasher hash.Hasher,
 	approvalConduit network.Conduit,
 	requestTracker *RequestTracker,
 	requiredApprovalsForSealConstruction uint,
@@ -58,7 +59,7 @@ func NewAssignmentCollectorBase(logger zerolog.Logger,
 		assigner:                             assigner,
 		state:                                state,
 		headers:                              headers,
-		verifier:                             sigVerifier,
+		sigHasher:                            sigHasher,
 		seals:                                seals,
 		approvalConduit:                      approvalConduit,
 		requestTracker:                       requestTracker,

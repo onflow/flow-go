@@ -39,37 +39,37 @@ import (
 type Engine struct {
 	psEvents.Noop // satisfy protocol events consumer interface
 
-	unit               *engine.Unit
-	log                zerolog.Logger
-	me                 module.Local
-	request            module.Requester // used to request collections
-	state              protocol.State
-	receiptHasher      hash.Hasher // used as hasher to sign the execution receipt
-	blocks             storage.Blocks
-	collections        storage.Collections
-	events             storage.Events
-	serviceEvents      storage.ServiceEvents
-	transactionResults storage.TransactionResults
-	computationManager computation.ComputationManager
-	providerEngine     provider.ProviderEngine
-	mempool            *Mempool
-	execState          state.ExecutionState
-	metrics            module.ExecutionMetrics
-	tracer             module.Tracer
-	extensiveLogging   bool
-	spockHasher        hash.Hasher
-	syncThreshold      int                 // the threshold for how many sealed unexecuted blocks to trigger state syncing.
-	syncFilter         flow.IdentityFilter // specify the filter to sync state from
-	syncConduit        network.Conduit     // sending state syncing requests
-	syncDeltas         mempool.Deltas      // storing the synced state deltas
-	syncFast           bool                // sync fast allows execution node to skip fetching collection during state syncing, and rely on state syncing to catch up
-	checkStakedAtBlock func(blockID flow.Identifier) (bool, error)
-	pauseExecution     bool
+	unit                   *engine.Unit
+	log                    zerolog.Logger
+	me                     module.Local
+	request                module.Requester // used to request collections
+	state                  protocol.State
+	receiptHasher          hash.Hasher // used as hasher to sign the execution receipt
+	blocks                 storage.Blocks
+	collections            storage.Collections
+	events                 storage.Events
+	serviceEvents          storage.ServiceEvents
+	transactionResults     storage.TransactionResults
+	computationManager     computation.ComputationManager
+	providerEngine         provider.ProviderEngine
+	mempool                *Mempool
+	execState              state.ExecutionState
+	metrics                module.ExecutionMetrics
+	tracer                 module.Tracer
+	extensiveLogging       bool
+	spockHasher            hash.Hasher
+	syncThreshold          int                 // the threshold for how many sealed unexecuted blocks to trigger state syncing.
+	syncFilter             flow.IdentityFilter // specify the filter to sync state from
+	syncConduit            network.Conduit     // sending state syncing requests
+	syncDeltas             mempool.Deltas      // storing the synced state deltas
+	syncFast               bool                // sync fast allows execution node to skip fetching collection during state syncing, and rely on state syncing to catch up
+	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
+	pauseExecution         bool
 }
 
 func New(
 	logger zerolog.Logger,
-	net module.Network,
+	net network.Network,
 	me module.Local,
 	request module.Requester,
 	state protocol.State,
@@ -88,7 +88,7 @@ func New(
 	syncDeltas mempool.Deltas,
 	syncThreshold int,
 	syncFast bool,
-	checkStakedAtBlock func(blockID flow.Identifier) (bool, error),
+	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error),
 	pauseExecution bool,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "ingestion").Logger()
@@ -96,31 +96,31 @@ func New(
 	mempool := newMempool()
 
 	eng := Engine{
-		unit:               engine.NewUnit(),
-		log:                log,
-		me:                 me,
-		request:            request,
-		state:              state,
-		receiptHasher:      utils.NewExecutionReceiptHasher(),
-		spockHasher:        utils.NewSPOCKHasher(),
-		blocks:             blocks,
-		collections:        collections,
-		events:             events,
-		serviceEvents:      serviceEvents,
-		transactionResults: transactionResults,
-		computationManager: executionEngine,
-		providerEngine:     providerEngine,
-		mempool:            mempool,
-		execState:          execState,
-		metrics:            metrics,
-		tracer:             tracer,
-		extensiveLogging:   extLog,
-		syncFilter:         syncFilter,
-		syncThreshold:      syncThreshold,
-		syncDeltas:         syncDeltas,
-		syncFast:           syncFast,
-		checkStakedAtBlock: checkStakedAtBlock,
-		pauseExecution:     pauseExecution,
+		unit:                   engine.NewUnit(),
+		log:                    log,
+		me:                     me,
+		request:                request,
+		state:                  state,
+		receiptHasher:          utils.NewExecutionReceiptHasher(),
+		spockHasher:            utils.NewSPOCKHasher(),
+		blocks:                 blocks,
+		collections:            collections,
+		events:                 events,
+		serviceEvents:          serviceEvents,
+		transactionResults:     transactionResults,
+		computationManager:     executionEngine,
+		providerEngine:         providerEngine,
+		mempool:                mempool,
+		execState:              execState,
+		metrics:                metrics,
+		tracer:                 tracer,
+		extensiveLogging:       extLog,
+		syncFilter:             syncFilter,
+		syncThreshold:          syncThreshold,
+		syncDeltas:             syncDeltas,
+		syncFast:               syncFast,
+		checkAuthorizedAtBlock: checkAuthorizedAtBlock,
+		pauseExecution:         pauseExecution,
 	}
 
 	// move to state syncing engine
@@ -249,7 +249,7 @@ func (e *Engine) finalizedUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.
 }
 
 func (e *Engine) pendingUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.Identifier, error) {
-	pendings, err := finalized.Descendants()
+	pendings, err := finalized.ValidDescendants()
 	if err != nil {
 		return nil, fmt.Errorf("could not get pending blocks: %w", err)
 	}
@@ -390,7 +390,7 @@ func (e *Engine) reloadBlock(
 	err = e.enqueueBlockAndCheckExecutable(blockByCollection, executionQueues, block, false)
 
 	if err != nil {
-		return fmt.Errorf("could not enqueue block on reloading: %w", err)
+		return fmt.Errorf("could not enqueue block %x on reloading: %w", blockID, err)
 	}
 
 	return nil
@@ -428,8 +428,12 @@ func (e *Engine) BlockProcessable(b *flow.Header) {
 // handle block will process the incoming block.
 // the block has passed the consensus validation.
 func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
+
 	blockID := block.ID()
 	log := e.log.With().Hex("block_id", blockID[:]).Logger()
+
+	span, _, _ := e.tracer.StartBlockSpan(ctx, blockID, trace.EXEHandleBlock)
+	defer span.Finish()
 
 	executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, blockID)
 	if err != nil {
@@ -442,8 +446,6 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 	}
 
 	// unexecuted block
-	e.metrics.StartBlockReceivedToExecuted(blockID)
-
 	// acquiring the lock so that there is only one process modifying the queue
 	err = e.mempool.Run(func(
 		blockByCollection *stdmap.BlockByCollectionBackdata,
@@ -453,7 +455,7 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 	})
 
 	if err != nil {
-		return fmt.Errorf("could not enqueue block: %w", err)
+		return fmt.Errorf("could not enqueue block %v: %w", blockID, err)
 	}
 
 	return nil
@@ -557,6 +559,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 
 	e.log.Info().
 		Hex("block_id", logging.Entity(executableBlock)).
+		Uint64("height", executableBlock.Block.Header.Height).
 		Msg("executing block")
 
 	startedAt := time.Now()
@@ -574,7 +577,8 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		return
 	}
 
-	e.metrics.FinishBlockReceivedToExecuted(executableBlock.ID())
+	// TODO: Ramtin - comment out for now
+	// e.metrics.FinishBlockReceivedToExecuted(executableBlock.ID())
 	e.metrics.ExecutionStateReadsPerBlock(computationResult.StateReads)
 
 	finalState, receipt, err := e.handleComputationResult(ctx, computationResult, *executableBlock.StartState)
@@ -599,11 +603,11 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 	broadcasted := false
 
 	if !isExecutedBlockSealed {
-		stakedAtBlock, err := e.checkStakedAtBlock(executableBlock.ID())
+		authorizedAtBlock, err := e.checkAuthorizedAtBlock(executableBlock.ID())
 		if err != nil {
 			e.log.Fatal().Err(err).Msg("could not check staking status")
 		}
-		if stakedAtBlock {
+		if authorizedAtBlock {
 			err = e.providerEngine.BroadcastExecutionReceipt(ctx, receipt)
 			if err != nil {
 				e.log.Err(err).Msg("critical: failed to broadcast the receipt")
@@ -622,6 +626,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		Hex("final_state", finalState[:]).
 		Hex("receipt_id", logging.Entity(receipt)).
 		Hex("result_id", logging.Entity(receipt.ExecutionResult)).
+		Hex("execution_data_id", receipt.ExecutionResult.ExecutionDataID[:]).
 		Bool("sealed", isExecutedBlockSealed).
 		Bool("broadcasted", broadcasted).
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
@@ -801,8 +806,10 @@ func (e *Engine) OnCollection(originID flow.Identifier, entity flow.Entity) {
 // check if any of these block becomes executable and execute it if
 // is.
 func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Collection) error {
-
 	collID := collection.ID()
+
+	span, _, _ := e.tracer.StartCollectionSpan(context.Background(), collID, trace.EXEHandleCollection)
+	defer span.Finish()
 
 	lg := e.log.With().Hex("collection_id", collID[:]).Logger()
 
@@ -989,8 +996,21 @@ func (e *Engine) matchOrRequestCollections(
 			Hex("collection_id", logging.ID(guarantee.ID())).
 			Msg("requesting collection")
 
+		guarantors, err := protocol.FindGuarantors(e.state, guarantee)
+		if err != nil {
+			// execution node executes certified blocks, which means there is a quorum of consensus nodes who
+			// have validated the block payload. And that validation includes checking the guarantors are correct.
+			// Based on that assumption, failing to find guarantors for guarantees contained in an incorporated block
+			// should be treated as fatal error
+			e.log.Fatal().Err(err).Msgf("failed to find guarantors for guarantee %v at block %v, height %v",
+				guarantee.ID(),
+				executableBlock.ID(),
+				executableBlock.Height(),
+			)
+			return fmt.Errorf("could not find guarantors: %w", err)
+		}
 		// queue the collection to be requested from one of the guarantors
-		e.request.EntityByID(guarantee.ID(), filter.HasNodeID(guarantee.SignerIDs...))
+		e.request.EntityByID(guarantee.ID(), filter.HasNodeID(guarantors...))
 		actualRequested++
 	}
 
@@ -1031,7 +1051,24 @@ func (e *Engine) ExecuteScriptAtBlockID(ctx context.Context, script []byte, argu
 			Str("args", strings.Join(args[:], ",")).
 			Msg("extensive log: executed script content")
 	}
-	return e.computationManager.ExecuteScript(script, arguments, block, blockView)
+	return e.computationManager.ExecuteScript(ctx, script, arguments, block, blockView)
+}
+
+func (e *Engine) GetRegisterAtBlockID(ctx context.Context, owner, controller, key []byte, blockID flow.Identifier) ([]byte, error) {
+
+	stateCommit, err := e.execState.StateCommitmentByBlockID(ctx, blockID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get state commitment for block (%s): %w", blockID, err)
+	}
+
+	blockView := e.execState.NewView(stateCommit)
+
+	data, err := blockView.Get(string(owner), string(controller), string(key))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get the register (owner : %s, controller: %s, key: %s): %w", hex.EncodeToString(owner), hex.EncodeToString(owner), string(key), err)
+	}
+
+	return data, nil
 }
 
 func (e *Engine) GetAccount(ctx context.Context, addr flow.Address, blockID flow.Identifier) (*flow.Account, error) {
@@ -1056,6 +1093,9 @@ func (e *Engine) handleComputationResult(
 	startState flow.StateCommitment,
 ) (flow.StateCommitment, *flow.ExecutionReceipt, error) {
 
+	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.EXEHandleComputationResult)
+	defer span.Finish()
+
 	e.log.Debug().
 		Hex("block_id", logging.Entity(result.ExecutableBlock)).
 		Msg("received computation result")
@@ -1070,7 +1110,7 @@ func (e *Engine) handleComputationResult(
 	}
 
 	finalState, err := receipt.ExecutionResult.FinalStateCommitment()
-	if errors.Is(err, flow.NoChunksError) {
+	if errors.Is(err, flow.ErrNoChunks) {
 		finalState = startState
 	} else if err != nil {
 		return flow.DummyStateCommitment, nil, fmt.Errorf("unexpected error accessing result's final state commitment: %w", err)
@@ -1109,12 +1149,18 @@ func (e *Engine) saveExecutionResults(
 			Msg("service event emitted")
 	}
 
-	executionReceipt, err := e.generateExecutionReceipt(ctx, executionResult, result.StateSnapshots)
+	executionReceipt, err := GenerateExecutionReceipt(
+		e.me,
+		e.receiptHasher,
+		e.spockHasher,
+		executionResult,
+		result.StateSnapshots)
+
 	if err != nil {
 		return nil, fmt.Errorf("could not generate execution receipt: %w", err)
 	}
 
-	err = e.execState.PersistExecutionState(childCtx,
+	err = e.execState.SaveExecutionResults(childCtx,
 		block.Header,
 		endState,
 		chdps,
@@ -1165,16 +1211,16 @@ func (e *Engine) logExecutableBlock(eb *entity.ExecutableBlock) {
 	}
 }
 
-func (e *Engine) generateExecutionReceipt(
-	ctx context.Context,
+func GenerateExecutionReceipt(
+	me module.Local,
+	receiptHasher hash.Hasher,
+	spockHasher hash.Hasher,
 	result *flow.ExecutionResult,
-	stateInteractions []*delta.SpockSnapshot,
-) (*flow.ExecutionReceipt, error) {
-
+	stateInteractions []*delta.SpockSnapshot) (*flow.ExecutionReceipt, error) {
 	spocks := make([]crypto.Signature, len(stateInteractions))
 
 	for i, stateInteraction := range stateInteractions {
-		spock, err := e.me.SignFunc(stateInteraction.SpockSecret, e.spockHasher, crypto.SPOCKProve)
+		spock, err := me.SignFunc(stateInteraction.SpockSecret, spockHasher, crypto.SPOCKProve)
 
 		if err != nil {
 			return nil, fmt.Errorf("error while generating SPoCK: %w", err)
@@ -1186,12 +1232,12 @@ func (e *Engine) generateExecutionReceipt(
 		ExecutionResult:   *result,
 		Spocks:            spocks,
 		ExecutorSignature: crypto.Signature{},
-		ExecutorID:        e.me.NodeID(),
+		ExecutorID:        me.NodeID(),
 	}
 
 	// generates a signature over the execution result
 	id := receipt.ID()
-	sig, err := e.me.Sign(id[:], e.receiptHasher)
+	sig, err := me.Sign(id[:], receiptHasher)
 	if err != nil {
 		return nil, fmt.Errorf("could not sign execution result: %w", err)
 	}

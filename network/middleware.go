@@ -3,11 +3,12 @@
 package network
 
 import (
-	"time"
-
+	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/protocol"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/network/message"
 )
 
@@ -23,13 +24,12 @@ func (t Topic) String() string {
 // our direct neighbours on the network. It handles the creation & teardown of
 // connections, as well as reading & writing to/from the connections.
 type Middleware interface {
-	// Start will start the middleware.
-	Start(overlay Overlay) error
+	component.Component
 
-	// Stop will end the execution of the middleware and wait for it to end.
-	Stop()
+	// SetOverlay sets the overlay used by the middleware. This must be called before the middleware can be Started.
+	SetOverlay(Overlay)
 
-	// Dispatch sends msg on a 1-1 direct connection to the target ID. It models a guaranteed delivery asynchronous
+	// SendDirect sends msg on a 1-1 direct connection to the target ID. It models a guaranteed delivery asynchronous
 	// direct one-to-one connection on the underlying network. No intermediate node on the overlay is utilized
 	// as the router.
 	//
@@ -48,16 +48,17 @@ type Middleware interface {
 	// Unsubscribe unsubscribes the middleware from a channel.
 	Unsubscribe(channel Channel) error
 
-	// Ping pings the target node and returns the ping RTT or an error
-	Ping(targetID flow.Identifier) (message.PingResponse, time.Duration, error)
-
-	// UpdateAllowList fetches the most recent identity of the nodes from overlay
-	// and updates the underlying libp2p node.
-	UpdateAllowList()
-
-	// UpdateNodeAddresses fetches and updates the addresses of all the staked participants
+	// UpdateNodeAddresses fetches and updates the addresses of all the authorized participants
 	// in the Flow protocol.
 	UpdateNodeAddresses()
+
+	// NewBlobService creates a new BlobService for the given channel.
+	NewBlobService(channel Channel, store datastore.Batching, opts ...BlobServiceOption) BlobService
+
+	// NewPingService creates a new PingService for the given ping protocol ID.
+	NewPingService(pingProtocol protocol.ID, provider PingInfoProvider) PingService
+
+	IsConnected(nodeID flow.Identifier) (bool, error)
 }
 
 // Overlay represents the interface that middleware uses to interact with the

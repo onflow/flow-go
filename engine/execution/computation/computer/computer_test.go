@@ -67,7 +67,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(nil).
 			Times(2) // 1 collection + system collection
 
-		metrics.On("ExecutionTransactionExecuted", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		metrics.On("ExecutionTransactionExecuted", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).
 			Times(2 + 1) // 2 txs in collection + system chunk tx
 
@@ -84,6 +84,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1+1) // +1 system chunk
+		assert.Len(t, result.TrieUpdates, 1+1)    // +1 system chunk
 
 		assertEventHashesMatch(t, 1+1, result)
 
@@ -121,6 +122,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		result, err := exe.ExecuteBlock(context.Background(), block, view, programs)
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1)
+		assert.Len(t, result.TrieUpdates, 1)
 		assert.Len(t, result.TransactionResults, 1)
 
 		assertEventHashesMatch(t, 1, result)
@@ -183,6 +185,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		result, err := exe.ExecuteBlock(context.Background(), block, view, progs)
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1)
+		assert.Len(t, result.TrieUpdates, 1)
 		assert.Len(t, result.TransactionResults, 1)
 
 		assert.Empty(t, result.TransactionResults[0].ErrorMessage)
@@ -276,7 +279,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	t.Run("service events are emitted", func(t *testing.T) {
 		execCtx := fvm.NewContext(zerolog.Nop(), fvm.WithServiceEventCollectionEnabled(), fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvocator(zerolog.Nop()), //we don't need to check signatures or sequence numbers
+			fvm.NewTransactionInvoker(zerolog.Nop()), //we don't need to check signatures or sequence numbers
 		))
 
 		collectionCount := 2
@@ -300,7 +303,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		serviceEventA := cadence.Event{
 			EventType: &cadence.EventType{
 				Location: common.AddressLocation{
-					Address: common.BytesToAddress(serviceEvents.EpochSetup.Address.Bytes()),
+					Address: common.Address(serviceEvents.EpochSetup.Address),
 				},
 				QualifiedIdentifier: serviceEvents.EpochSetup.QualifiedIdentifier(),
 			},
@@ -308,7 +311,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		serviceEventB := cadence.Event{
 			EventType: &cadence.EventType{
 				Location: common.AddressLocation{
-					Address: common.BytesToAddress(serviceEvents.EpochCommit.Address.Bytes()),
+					Address: common.Address(serviceEvents.EpochCommit.Address),
 				},
 				QualifiedIdentifier: serviceEvents.EpochCommit.QualifiedIdentifier(),
 			},
@@ -332,6 +335,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				}
 				events = events[1:]
 				return nil
+			},
+			readStored: func(address common.Address, path cadence.Path, r runtime.Context) (cadence.Value, error) {
+				return nil, nil
 			},
 		}
 
@@ -371,7 +377,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		rt := &testRuntime{
 			executeTransaction: func(script runtime.Script, r runtime.Context) error {
 
-				program, err := r.Interface.GetProgram(contractLocation)
+				program, err := r.Interface.GetProgram(contractLocation) //nolint:staticcheck
 				require.NoError(t, err)
 				require.Nil(t, program)
 
@@ -382,6 +388,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				require.NoError(t, err)
 
 				return nil
+			},
+			readStored: func(address common.Address, path cadence.Path, r runtime.Context) (cadence.Value, error) {
+				return nil, nil
 			},
 		}
 
@@ -410,7 +419,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		execCtx := fvm.NewContext(
 			logger,
 			fvm.WithTransactionProcessors(
-				fvm.NewTransactionInvocator(logger),
+				fvm.NewTransactionInvoker(logger),
 			),
 		)
 
@@ -433,7 +442,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 				// NOTE: set a program and revert all transactions but the system chunk transaction
 
-				program, err := r.Interface.GetProgram(contractLocation)
+				program, err := r.Interface.GetProgram(contractLocation) //nolint:staticcheck
 				require.NoError(t, err)
 
 				if executionCalls > collectionCount*transactionCount {
@@ -451,6 +460,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				return runtime.Error{
 					Err: fmt.Errorf("TX reverted"),
 				}
+			},
+			readStored: func(address common.Address, path cadence.Path, r runtime.Context) (cadence.Value, error) {
+				return nil, nil
 			},
 		}
 
@@ -477,7 +489,7 @@ func assertEventHashesMatch(t *testing.T, expectedNoOfChunks int, result *execut
 	require.Len(t, result.EventsHashes, expectedNoOfChunks)
 
 	for i := 0; i < expectedNoOfChunks; i++ {
-		calculatedHash, err := flow.EventsListHash(result.Events[i])
+		calculatedHash, err := flow.EventsMerkleRootHash(result.Events[i])
 		require.NoError(t, err)
 
 		require.Equal(t, calculatedHash, result.EventsHashes[i])
@@ -487,9 +499,22 @@ func assertEventHashesMatch(t *testing.T, expectedNoOfChunks int, result *execut
 type testRuntime struct {
 	executeScript      func(runtime.Script, runtime.Context) (cadence.Value, error)
 	executeTransaction func(runtime.Script, runtime.Context) error
+	readStored         func(common.Address, cadence.Path, runtime.Context) (cadence.Value, error)
 }
 
 var _ runtime.Runtime = &testRuntime{}
+
+func (e *testRuntime) SetInvalidatedResourceValidationEnabled(_ bool) {
+	panic("SetInvalidatedResourceValidationEnabled not expected")
+}
+
+func (e *testRuntime) SetTracingEnabled(_ bool) {
+	panic("SetTracingEnabled not expected")
+}
+
+func (e *testRuntime) SetResourceOwnerChangeHandlerEnabled(_ bool) {
+	panic("SetResourceOwnerChangeHandlerEnabled not expected")
+}
 
 func (e *testRuntime) InvokeContractFunction(_ common.AddressLocation, _ string, _ []interpreter.Value, _ []sema.Type, _ runtime.Context) (cadence.Value, error) {
 	panic("InvokeContractFunction not expected")
@@ -515,8 +540,12 @@ func (*testRuntime) SetContractUpdateValidationEnabled(_ bool) {
 	panic("SetContractUpdateValidationEnabled not expected")
 }
 
-func (*testRuntime) ReadStored(_ common.Address, _ cadence.Path, _ runtime.Context) (cadence.Value, error) {
-	panic("ReadStored not expected")
+func (*testRuntime) SetAtreeValidationEnabled(_ bool) {
+	panic("SetAtreeValidationEnabled not expected")
+}
+
+func (e *testRuntime) ReadStored(a common.Address, p cadence.Path, c runtime.Context) (cadence.Value, error) {
+	return e.readStored(a, p, c)
 }
 
 func (*testRuntime) ReadLinked(_ common.Address, _ cadence.Path, _ runtime.Context) (cadence.Value, error) {
@@ -636,7 +665,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		Return(nil).
 		Times(1) // system collection
 
-	metrics.On("ExecutionTransactionExecuted", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+	metrics.On("ExecutionTransactionExecuted", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(nil).
 		Times(1) // system chunk tx
 

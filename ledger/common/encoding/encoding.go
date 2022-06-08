@@ -10,12 +10,18 @@ import (
 	"github.com/onflow/flow-go/ledger/common/utils"
 )
 
-// Version captures the maximum version of encoding that this code supports
-// in other words this code encodes the data with the latest version and
-// can only decode data with version smaller or equal to this value
-// bumping this number prevents older versions of the code to deal with the newer version of data
-// codes should be updated with backward compatibility if needed
-const Version = uint16(0)
+// Versions capture the maximum version of encoding this code supports.
+// I.e. this code encodes data with the latest version and only decodes
+// data with version smaller or equal to these versions.
+// Bumping a version number prevents older versions of code from handling
+// the newer version of data. New code handling new data version
+// should be updated to also support backward compatibility if needed.
+const (
+	PayloadVersion        = uint16(1)
+	TrieUpdateVersion     = uint16(0) // Use payload version 0 encoding
+	TrieProofVersion      = uint16(0) // Use payload version 0 encoding
+	TrieBatchProofVersion = uint16(0) // Use payload version 0 encoding
+)
 
 // Type capture the type of encoded entity (e.g. State, Key, Value, Path)
 type Type uint8
@@ -56,21 +62,21 @@ func (e Type) String() string {
 
 // CheckVersion extracts encoding bytes from a raw encoded message
 // checks it against the supported versions and returns the rest of rawInput (excluding encDecVersion bytes)
-func CheckVersion(rawInput []byte) (rest []byte, version uint16, err error) {
+func CheckVersion(rawInput []byte, maxVersion uint16) (rest []byte, version uint16, err error) {
 	version, rest, err = utils.ReadUint16(rawInput)
 	if err != nil {
 		return rest, version, fmt.Errorf("error checking the encoding decoding version: %w", err)
 	}
 	// error on versions coming from future till a time-machine is invented
-	if version > Version {
-		return rest, version, fmt.Errorf("incompatible encoding decoding version (%d > %d): %w", version, Version, err)
+	if version > maxVersion {
+		return rest, version, fmt.Errorf("incompatible encoding decoding version (%d > %d): %w", version, maxVersion, err)
 	}
 	// return the rest of bytes
 	return rest, version, nil
 }
 
 // CheckType extracts encoding byte from a raw encoded message
-// checks it against the supported versions and returns the rest of rawInput (excluding encDecVersion bytes)
+// checks it against expected type and returns the rest of rawInput (excluding type byte)
 func CheckType(rawInput []byte, expectedType uint8) (rest []byte, err error) {
 	t, r, err := utils.ReadUint8(rawInput)
 	if err != nil {
@@ -96,33 +102,40 @@ func EncodeKeyPart(kp *ledger.KeyPart) []byte {
 	if kp == nil {
 		return []byte{}
 	}
-	// EncodingDecodingType
-	buffer := utils.AppendUint16([]byte{}, Version)
+	// encode version
+	buffer := utils.AppendUint16([]byte{}, PayloadVersion)
 
 	// encode key part entity type
 	buffer = utils.AppendUint8(buffer, TypeKeyPart)
 
 	// encode the key part content
-	buffer = append(buffer, encodeKeyPart(kp)...)
+	buffer = append(buffer, encodeKeyPart(kp, PayloadVersion)...)
 	return buffer
 }
 
-func encodeKeyPart(kp *ledger.KeyPart) []byte {
-	buffer := make([]byte, 0)
+func encodeKeyPart(kp *ledger.KeyPart, version uint16) []byte {
+	buffer := make([]byte, 0, encodedKeyPartLength(kp, version))
+	return encodeAndAppendKeyPart(buffer, kp, version)
+}
 
+func encodeAndAppendKeyPart(buffer []byte, kp *ledger.KeyPart, _ uint16) []byte {
 	// encode "Type" field of the key part
 	buffer = utils.AppendUint16(buffer, kp.Type)
 
 	// encode "Value" field of the key part
 	buffer = append(buffer, kp.Value...)
+
 	return buffer
+}
+
+func encodedKeyPartLength(kp *ledger.KeyPart, _ uint16) int {
+	// Key part is encoded as: type (2 bytes) + value
+	return 2 + len(kp.Value)
 }
 
 // DecodeKeyPart constructs a key part from an encoded key part
 func DecodeKeyPart(encodedKeyPart []byte) (*ledger.KeyPart, error) {
-	// currently we ignore the version but in the future we
-	// can do switch case based on the version if needed
-	rest, _, err := CheckVersion(encodedKeyPart)
+	rest, version, err := CheckVersion(encodedKeyPart, PayloadVersion)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding key part: %w", err)
 	}
@@ -133,8 +146,8 @@ func DecodeKeyPart(encodedKeyPart []byte) (*ledger.KeyPart, error) {
 		return nil, fmt.Errorf("error decoding key part: %w", err)
 	}
 
-	// decode the key part content
-	key, err := decodeKeyPart(rest)
+	// decode the key part content (zerocopy)
+	key, err := decodeKeyPart(rest, true, version)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding key part: %w", err)
 	}
@@ -142,13 +155,20 @@ func DecodeKeyPart(encodedKeyPart []byte) (*ledger.KeyPart, error) {
 	return key, nil
 }
 
-func decodeKeyPart(inp []byte) (*ledger.KeyPart, error) {
+// decodeKeyPart decodes inp into KeyPart. If zeroCopy is true, KeyPart
+// references data in inp.  Otherwise, it is copied.
+func decodeKeyPart(inp []byte, zeroCopy bool, _ uint16) (*ledger.KeyPart, error) {
 	// read key part type and the rest is the key item part
 	kpt, kpv, err := utils.ReadUint16(inp)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding key part (content): %w", err)
 	}
-	return &ledger.KeyPart{Type: kpt, Value: kpv}, nil
+	if zeroCopy {
+		return &ledger.KeyPart{Type: kpt, Value: kpv}, nil
+	}
+	v := make([]byte, len(kpv))
+	copy(v, kpv)
+	return &ledger.KeyPart{Type: kpt, Value: v}, nil
 }
 
 // EncodeKey encodes a key into a byte slice
@@ -157,36 +177,51 @@ func EncodeKey(k *ledger.Key) []byte {
 		return []byte{}
 	}
 	// encode EncodingDecodingType
-	buffer := utils.AppendUint16([]byte{}, Version)
+	buffer := utils.AppendUint16([]byte{}, PayloadVersion)
 	// encode key entity type
 	buffer = utils.AppendUint8(buffer, TypeKey)
 	// encode key content
-	buffer = append(buffer, encodeKey(k)...)
+	buffer = append(buffer, encodeKey(k, PayloadVersion)...)
 
 	return buffer
 }
 
 // encodeKey encodes a key into a byte slice
-func encodeKey(k *ledger.Key) []byte {
-	buffer := make([]byte, 0)
+func encodeKey(k *ledger.Key, version uint16) []byte {
+	buffer := make([]byte, 0, encodedKeyLength(k, version))
+	return encodeAndAppendKey(buffer, k, version)
+}
+
+func encodeAndAppendKey(buffer []byte, k *ledger.Key, version uint16) []byte {
 	// encode number of key parts
 	buffer = utils.AppendUint16(buffer, uint16(len(k.KeyParts)))
+
 	// iterate over key parts
 	for _, kp := range k.KeyParts {
-		// encode the key part
-		encKP := encodeKeyPart(&kp)
 		// encode the len of the encoded key part
-		buffer = utils.AppendUint32(buffer, uint32(len(encKP)))
-		// append the encoded key part
-		buffer = append(buffer, encKP...)
+		buffer = utils.AppendUint32(buffer, uint32(encodedKeyPartLength(&kp, version)))
+
+		// encode the key part
+		buffer = encodeAndAppendKeyPart(buffer, &kp, version)
 	}
+
 	return buffer
+}
+
+func encodedKeyLength(k *ledger.Key, version uint16) int {
+	// Key is encoded as: number of key parts (2 bytes) and for each key part,
+	// the key part size (4 bytes) + encoded key part (n bytes).
+	size := 2 + 4*len(k.KeyParts)
+	for _, kp := range k.KeyParts {
+		size += encodedKeyPartLength(&kp, version)
+	}
+	return size
 }
 
 // DecodeKey constructs a key from an encoded key part
 func DecodeKey(encodedKey []byte) (*ledger.Key, error) {
 	// check the enc dec version
-	rest, _, err := CheckVersion(encodedKey)
+	rest, version, err := CheckVersion(encodedKey, PayloadVersion)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding key: %w", err)
 	}
@@ -196,20 +231,29 @@ func DecodeKey(encodedKey []byte) (*ledger.Key, error) {
 		return nil, fmt.Errorf("error decoding key: %w", err)
 	}
 
-	// decode the key content
-	key, err := decodeKey(rest)
+	// decode the key content (zerocopy)
+	key, err := decodeKey(rest, true, version)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding key: %w", err)
 	}
 	return key, nil
 }
 
-func decodeKey(inp []byte) (*ledger.Key, error) {
+// decodeKey decodes inp into Key. If zeroCopy is true, returned key
+// references data in inp.  Otherwise, it is copied.
+func decodeKey(inp []byte, zeroCopy bool, version uint16) (*ledger.Key, error) {
 	key := &ledger.Key{}
+
 	numOfParts, rest, err := utils.ReadUint16(inp)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding key (content): %w", err)
 	}
+
+	if numOfParts == 0 {
+		return key, nil
+	}
+
+	key.KeyParts = make([]ledger.KeyPart, numOfParts)
 
 	for i := 0; i < int(numOfParts); i++ {
 		var kpEncSize uint32
@@ -227,11 +271,12 @@ func decodeKey(inp []byte) (*ledger.Key, error) {
 		}
 
 		// decode encoded key part
-		kp, err := decodeKeyPart(kpEnc)
+		kp, err := decodeKeyPart(kpEnc, zeroCopy, version)
 		if err != nil {
 			return nil, fmt.Errorf("error decoding key (content): %w", err)
 		}
-		key.KeyParts = append(key.KeyParts, *kp)
+
+		key.KeyParts[i] = *kp
 	}
 	return key, nil
 }
@@ -239,25 +284,33 @@ func decodeKey(inp []byte) (*ledger.Key, error) {
 // EncodeValue encodes a value into a byte slice
 func EncodeValue(v ledger.Value) []byte {
 	// encode EncodingDecodingType
-	buffer := utils.AppendUint16([]byte{}, Version)
+	buffer := utils.AppendUint16([]byte{}, PayloadVersion)
 
 	// encode key entity type
 	buffer = utils.AppendUint8(buffer, TypeValue)
 
 	// encode value
-	buffer = append(buffer, encodeValue(v)...)
+	buffer = append(buffer, encodeValue(v, PayloadVersion)...)
 
 	return buffer
 }
 
-func encodeValue(v ledger.Value) []byte {
+func encodeValue(v ledger.Value, _ uint16) []byte {
 	return v
+}
+
+func encodeAndAppendValue(buffer []byte, v ledger.Value, _ uint16) []byte {
+	return append(buffer, v...)
+}
+
+func encodedValueLength(v ledger.Value, _ uint16) int {
+	return len(v)
 }
 
 // DecodeValue constructs a ledger value using an encoded byte slice
 func DecodeValue(encodedValue []byte) (ledger.Value, error) {
 	// check enc dec version
-	rest, _, err := CheckVersion(encodedValue)
+	rest, _, err := CheckVersion(encodedValue, PayloadVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -271,84 +324,83 @@ func DecodeValue(encodedValue []byte) (ledger.Value, error) {
 	return rest, nil
 }
 
-// EncodePath encodes a path into a byte slice
-func EncodePath(p ledger.Path) []byte {
-	// encode EncodingDecodingType
-	buffer := utils.AppendUint16([]byte{}, Version)
-
-	// encode key entity type
-	buffer = utils.AppendUint8(buffer, TypePath)
-
-	// encode path
-	buffer = append(buffer, p[:]...)
-
-	return buffer
-}
-
-// DecodePath constructs a path value using an encoded byte slice
-func DecodePath(encodedPath []byte) (ledger.Path, error) {
-	// check enc dec version
-	rest, _, err := CheckVersion(encodedPath)
-	if err != nil {
-		return ledger.DummyPath, err
-	}
-
-	// check the encoding type
-	rest, err = CheckType(rest, TypePath)
-	if err != nil {
-		return ledger.DummyPath, err
-	}
-
-	return decodePath(rest)
-}
-
-func decodePath(inp []byte) (ledger.Path, error) {
-	path, err := ledger.ToPath(inp)
-	if err != nil {
-		return path, fmt.Errorf("decode path failed: %w", err)
-	}
-	return path, nil
-}
-
 // EncodePayload encodes a ledger payload
 func EncodePayload(p *ledger.Payload) []byte {
 	if p == nil {
 		return []byte{}
 	}
 	// encode EncodingDecodingType
-	buffer := utils.AppendUint16([]byte{}, Version)
+	buffer := utils.AppendUint16([]byte{}, PayloadVersion)
 
 	// encode key entity type
 	buffer = utils.AppendUint8(buffer, TypePayload)
 
 	// append encoded payload content
-	buffer = append(buffer, encodePayload(p)...)
+	buffer = append(buffer, encodePayload(p, PayloadVersion)...)
 
 	return buffer
 }
 
-func encodePayload(p *ledger.Payload) []byte {
-	buffer := make([]byte, 0)
+// EncodeAndAppendPayloadWithoutPrefix encodes a ledger payload
+// without prefix (version and type) and appends to buffer.
+// If payload is nil, unmodified buffer is returned.
+func EncodeAndAppendPayloadWithoutPrefix(buffer []byte, p *ledger.Payload, version uint16) []byte {
+	if p == nil {
+		return buffer
+	}
+	return encodeAndAppendPayload(buffer, p, version)
+}
 
-	// encode key
-	encK := encodeKey(&p.Key)
+func EncodedPayloadLengthWithoutPrefix(p *ledger.Payload, version uint16) int {
+	return encodedPayloadLength(p, version)
+}
+
+func encodePayload(p *ledger.Payload, version uint16) []byte {
+	buffer := make([]byte, 0, encodedPayloadLength(p, version))
+	return encodeAndAppendPayload(buffer, p, version)
+}
+
+func encodeAndAppendPayload(buffer []byte, p *ledger.Payload, version uint16) []byte {
 
 	// encode encoded key size
-	buffer = utils.AppendUint32(buffer, uint32(len(encK)))
+	buffer = utils.AppendUint32(buffer, uint32(encodedKeyLength(&p.Key, version)))
 
-	// append encoded key content
-	buffer = append(buffer, encK...)
-
-	// encode value
-	encV := encodeValue(p.Value)
+	// encode key
+	buffer = encodeAndAppendKey(buffer, &p.Key, version)
 
 	// encode encoded value size
-	buffer = utils.AppendUint64(buffer, uint64(len(encV)))
+	encodedValueLen := encodedValueLength(p.Value, version)
+	switch version {
+	case 0:
+		// In version 0, encoded value length is encoded as 8 bytes.
+		buffer = utils.AppendUint64(buffer, uint64(encodedValueLen))
+	default:
+		// In version 1 and later, encoded value length is encoded as 4 bytes.
+		buffer = utils.AppendUint32(buffer, uint32(encodedValueLen))
+	}
 
-	// append encoded key content
-	buffer = append(buffer, encV...)
+	// encode value
+	buffer = encodeAndAppendValue(buffer, p.Value, version)
 
 	return buffer
+}
+
+func encodedPayloadLength(p *ledger.Payload, version uint16) int {
+	if p == nil {
+		return 0
+	}
+	switch version {
+	case 0:
+		// In version 0, payload is encoded as:
+		//   encode key length (4 bytes) + encoded key +
+		//   encoded value length (8 bytes) + encode value
+		return 4 + encodedKeyLength(&p.Key, version) + 8 + encodedValueLength(p.Value, version)
+	default:
+		// In version 1 and later, payload is encoded as:
+		//   encode key length (4 bytes) + encoded key +
+		//   encoded value length (4 bytes) + encode value
+		return 4 + encodedKeyLength(&p.Key, version) + 4 + encodedValueLength(p.Value, version)
+	}
 }
 
 // DecodePayload construct a payload from an encoded byte slice
@@ -358,7 +410,7 @@ func DecodePayload(encodedPayload []byte) (*ledger.Payload, error) {
 		return nil, nil
 	}
 	// check the enc dec version
-	rest, _, err := CheckVersion(encodedPayload)
+	rest, version, err := CheckVersion(encodedPayload, PayloadVersion)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding payload: %w", err)
 	}
@@ -367,10 +419,24 @@ func DecodePayload(encodedPayload []byte) (*ledger.Payload, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error decoding payload: %w", err)
 	}
-	return decodePayload(rest)
+	// decode payload (zerocopy)
+	return decodePayload(rest, true, version)
 }
 
-func decodePayload(inp []byte) (*ledger.Payload, error) {
+// DecodePayloadWithoutPrefix constructs a payload from encoded byte slice
+// without prefix (version and type). If zeroCopy is true, returned payload
+// references data in encodedPayload. Otherwise, it is copied.
+func DecodePayloadWithoutPrefix(encodedPayload []byte, zeroCopy bool, version uint16) (*ledger.Payload, error) {
+	// if empty don't decode
+	if len(encodedPayload) == 0 {
+		return nil, nil
+	}
+	return decodePayload(encodedPayload, zeroCopy, version)
+}
+
+// decodePayload decodes inp into payload.  If zeroCopy is true,
+// returned payload references data in inp.  Otherwise, it is copied.
+func decodePayload(inp []byte, zeroCopy bool, version uint16) (*ledger.Payload, error) {
 
 	// read encoded key size
 	encKeySize, rest, err := utils.ReadUint32(inp)
@@ -385,24 +451,41 @@ func decodePayload(inp []byte) (*ledger.Payload, error) {
 	}
 
 	// decode the key
-	key, err := decodeKey(encKey)
+	key, err := decodeKey(encKey, zeroCopy, version)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding payload: %w", err)
 	}
 
 	// read encoded value size
-	encValeSize, rest, err := utils.ReadUint64(rest)
+	var encValueSize int
+	switch version {
+	case 0:
+		var size uint64
+		size, rest, err = utils.ReadUint64(rest)
+		encValueSize = int(size)
+	default:
+		var size uint32
+		size, rest, err = utils.ReadUint32(rest)
+		encValueSize = int(size)
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("error decoding payload: %w", err)
 	}
 
 	// read encoded value
-	encValue, _, err := utils.ReadSlice(rest, int(encValeSize))
+	encValue, _, err := utils.ReadSlice(rest, encValueSize)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding payload: %w", err)
 	}
 
-	return &ledger.Payload{Key: *key, Value: encValue}, nil
+	if zeroCopy {
+		return &ledger.Payload{Key: *key, Value: encValue}, nil
+	}
+
+	v := make([]byte, len(encValue))
+	copy(v, encValue)
+	return &ledger.Payload{Key: *key, Value: v}, nil
 }
 
 // EncodeTrieUpdate encodes a trie update struct
@@ -411,18 +494,18 @@ func EncodeTrieUpdate(t *ledger.TrieUpdate) []byte {
 		return []byte{}
 	}
 	// encode EncodingDecodingType
-	buffer := utils.AppendUint16([]byte{}, Version)
+	buffer := utils.AppendUint16([]byte{}, TrieUpdateVersion)
 
 	// encode key entity type
 	buffer = utils.AppendUint8(buffer, TypeTrieUpdate)
 
 	// append encoded payload content
-	buffer = append(buffer, encodeTrieUpdate(t)...)
+	buffer = append(buffer, encodeTrieUpdate(t, TrieUpdateVersion)...)
 
 	return buffer
 }
 
-func encodeTrieUpdate(t *ledger.TrieUpdate) []byte {
+func encodeTrieUpdate(t *ledger.TrieUpdate, version uint16) []byte {
 	buffer := make([]byte, 0)
 
 	// encode root hash (size and data)
@@ -446,7 +529,7 @@ func encodeTrieUpdate(t *ledger.TrieUpdate) []byte {
 	// we assume same number of payloads
 	// encode payloads
 	for _, pl := range t.Payloads {
-		encPl := encodePayload(pl)
+		encPl := encodePayload(pl, version)
 		buffer = utils.AppendUint32(buffer, uint32(len(encPl)))
 		buffer = append(buffer, encPl...)
 	}
@@ -461,7 +544,7 @@ func DecodeTrieUpdate(encodedTrieUpdate []byte) (*ledger.TrieUpdate, error) {
 		return nil, nil
 	}
 	// check the enc dec version
-	rest, _, err := CheckVersion(encodedTrieUpdate)
+	rest, version, err := CheckVersion(encodedTrieUpdate, TrieUpdateVersion)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding trie update: %w", err)
 	}
@@ -470,13 +553,10 @@ func DecodeTrieUpdate(encodedTrieUpdate []byte) (*ledger.TrieUpdate, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error decoding trie update: %w", err)
 	}
-	return decodeTrieUpdate(rest)
+	return decodeTrieUpdate(rest, version)
 }
 
-func decodeTrieUpdate(inp []byte) (*ledger.TrieUpdate, error) {
-
-	paths := make([]ledger.Path, 0)
-	payloads := make([]*ledger.Payload, 0)
+func decodeTrieUpdate(inp []byte, version uint16) (*ledger.TrieUpdate, error) {
 
 	// decode root hash
 	rhSize, rest, err := utils.ReadUint16(inp)
@@ -505,6 +585,9 @@ func decodeTrieUpdate(inp []byte) (*ledger.TrieUpdate, error) {
 		return nil, fmt.Errorf("error decoding trie update: %w", err)
 	}
 
+	paths := make([]ledger.Path, numOfPaths)
+	payloads := make([]*ledger.Payload, numOfPaths)
+
 	var path ledger.Path
 	var encPath []byte
 	for i := 0; i < int(numOfPaths); i++ {
@@ -512,11 +595,11 @@ func decodeTrieUpdate(inp []byte) (*ledger.TrieUpdate, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error decoding trie update: %w", err)
 		}
-		path, err = decodePath(encPath)
+		path, err = ledger.ToPath(encPath)
 		if err != nil {
 			return nil, fmt.Errorf("error decoding trie update: %w", err)
 		}
-		paths = append(paths, path)
+		paths[i] = path
 	}
 
 	var payloadSize uint32
@@ -532,11 +615,12 @@ func decodeTrieUpdate(inp []byte) (*ledger.TrieUpdate, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error decoding trie update: %w", err)
 		}
-		payload, err = decodePayload(encPayload)
+		// Decode payload (zerocopy)
+		payload, err = decodePayload(encPayload, true, version)
 		if err != nil {
 			return nil, fmt.Errorf("error decoding trie update: %w", err)
 		}
-		payloads = append(payloads, payload)
+		payloads[i] = payload
 	}
 	return &ledger.TrieUpdate{RootHash: rh, Paths: paths, Payloads: payloads}, nil
 }
@@ -547,19 +631,19 @@ func EncodeTrieProof(p *ledger.TrieProof) []byte {
 		return []byte{}
 	}
 	// encode version
-	buffer := utils.AppendUint16([]byte{}, Version)
+	buffer := utils.AppendUint16([]byte{}, TrieProofVersion)
 
 	// encode proof entity type
 	buffer = utils.AppendUint8(buffer, TypeProof)
 
 	// append encoded proof content
-	proof := encodeTrieProof(p)
-	buffer = append(buffer, proof[:]...)
+	proof := encodeTrieProof(p, TrieProofVersion)
+	buffer = append(buffer, proof...)
 
 	return buffer
 }
 
-func encodeTrieProof(p *ledger.TrieProof) []byte {
+func encodeTrieProof(p *ledger.TrieProof, version uint16) []byte {
 	// first byte is reserved for inclusion flag
 	buffer := make([]byte, 1)
 	if p.Inclusion {
@@ -579,7 +663,7 @@ func encodeTrieProof(p *ledger.TrieProof) []byte {
 	buffer = append(buffer, p.Path[:]...)
 
 	// include encoded payload size and content
-	encPayload := encodePayload(p.Payload)
+	encPayload := encodePayload(p.Payload, version)
 	buffer = utils.AppendUint64(buffer, uint64(len(encPayload)))
 	buffer = append(buffer, encPayload...)
 
@@ -597,7 +681,7 @@ func encodeTrieProof(p *ledger.TrieProof) []byte {
 // DecodeTrieProof construct a proof from an encoded byte slice
 func DecodeTrieProof(encodedProof []byte) (*ledger.TrieProof, error) {
 	// check the enc dec version
-	rest, _, err := CheckVersion(encodedProof)
+	rest, version, err := CheckVersion(encodedProof, TrieProofVersion)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding proof: %w", err)
 	}
@@ -606,10 +690,10 @@ func DecodeTrieProof(encodedProof []byte) (*ledger.TrieProof, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error decoding proof: %w", err)
 	}
-	return decodeTrieProof(rest)
+	return decodeTrieProof(rest, version)
 }
 
-func decodeTrieProof(inp []byte) (*ledger.TrieProof, error) {
+func decodeTrieProof(inp []byte, version uint16) (*ledger.TrieProof, error) {
 	pInst := ledger.NewTrieProof()
 
 	// Inclusion flag
@@ -617,7 +701,7 @@ func decodeTrieProof(inp []byte) (*ledger.TrieProof, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error decoding proof: %w", err)
 	}
-	pInst.Inclusion = bitutils.Bit(byteInclusion, 0) == 1
+	pInst.Inclusion = bitutils.ReadBit(byteInclusion, 0) == 1
 
 	// read steps
 	steps, rest, err := utils.ReadUint8(rest)
@@ -660,7 +744,8 @@ func decodeTrieProof(inp []byte) (*ledger.TrieProof, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error decoding proof: %w", err)
 	}
-	payload, err := decodePayload(encPayload)
+	// Decode payload (zerocopy)
+	payload, err := decodePayload(encPayload, true, version)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding proof: %w", err)
 	}
@@ -671,7 +756,8 @@ func decodeTrieProof(inp []byte) (*ledger.TrieProof, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error decoding proof: %w", err)
 	}
-	interims := make([]hash.Hash, 0)
+
+	interims := make([]hash.Hash, interimsLen)
 
 	var interimSize uint16
 	var interim hash.Hash
@@ -692,7 +778,7 @@ func decodeTrieProof(inp []byte) (*ledger.TrieProof, error) {
 			return nil, fmt.Errorf("error decoding proof: %w", err)
 		}
 
-		interims = append(interims, interim)
+		interims[i] = interim
 	}
 	pInst.Interims = interims
 
@@ -705,25 +791,25 @@ func EncodeTrieBatchProof(bp *ledger.TrieBatchProof) []byte {
 		return []byte{}
 	}
 	// encode version
-	buffer := utils.AppendUint16([]byte{}, Version)
+	buffer := utils.AppendUint16([]byte{}, TrieBatchProofVersion)
 
 	// encode batch proof entity type
 	buffer = utils.AppendUint8(buffer, TypeBatchProof)
 	// encode batch proof content
-	buffer = append(buffer, encodeTrieBatchProof(bp)...)
+	buffer = append(buffer, encodeTrieBatchProof(bp, TrieBatchProofVersion)...)
 
 	return buffer
 }
 
 // encodeBatchProof encodes a batch proof into a byte slice
-func encodeTrieBatchProof(bp *ledger.TrieBatchProof) []byte {
+func encodeTrieBatchProof(bp *ledger.TrieBatchProof, version uint16) []byte {
 	buffer := make([]byte, 0)
 	// encode number of proofs
 	buffer = utils.AppendUint32(buffer, uint32(len(bp.Proofs)))
 	// iterate over proofs
 	for _, p := range bp.Proofs {
 		// encode the proof
-		encP := encodeTrieProof(p)
+		encP := encodeTrieProof(p, version)
 		// encode the len of the encoded proof
 		buffer = utils.AppendUint64(buffer, uint64(len(encP)))
 		// append the encoded proof
@@ -735,7 +821,7 @@ func encodeTrieBatchProof(bp *ledger.TrieBatchProof) []byte {
 // DecodeTrieBatchProof constructs a batch proof from an encoded byte slice
 func DecodeTrieBatchProof(encodedBatchProof []byte) (*ledger.TrieBatchProof, error) {
 	// check the enc dec version
-	rest, _, err := CheckVersion(encodedBatchProof)
+	rest, version, err := CheckVersion(encodedBatchProof, TrieBatchProofVersion)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding batch proof: %w", err)
 	}
@@ -746,14 +832,14 @@ func DecodeTrieBatchProof(encodedBatchProof []byte) (*ledger.TrieBatchProof, err
 	}
 
 	// decode the batch proof content
-	bp, err := decodeTrieBatchProof(rest)
+	bp, err := decodeTrieBatchProof(rest, version)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding batch proof: %w", err)
 	}
 	return bp, nil
 }
 
-func decodeTrieBatchProof(inp []byte) (*ledger.TrieBatchProof, error) {
+func decodeTrieBatchProof(inp []byte, version uint16) (*ledger.TrieBatchProof, error) {
 	bp := ledger.NewTrieBatchProof()
 	// number of proofs
 	numOfProofs, rest, err := utils.ReadUint32(inp)
@@ -777,7 +863,7 @@ func decodeTrieBatchProof(inp []byte) (*ledger.TrieBatchProof, error) {
 		}
 
 		// decode encoded proof
-		proof, err := decodeTrieProof(encProof)
+		proof, err := decodeTrieProof(encProof, version)
 		if err != nil {
 			return nil, fmt.Errorf("error decoding batch proof (content): %w", err)
 		}

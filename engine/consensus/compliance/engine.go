@@ -1,20 +1,25 @@
 package compliance
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
+	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -30,26 +35,30 @@ const defaultVoteQueueCapacity = 1000
 // Engine is a wrapper struct for `Core` which implements consensus algorithm.
 // Engine is responsible for handling incoming messages, queueing for processing, broadcasting proposals.
 type Engine struct {
-	unit           *engine.Unit
-	log            zerolog.Logger
-	mempool        module.MempoolMetrics
-	metrics        module.EngineMetrics
-	me             module.Local
-	headers        storage.Headers
-	payloads       storage.Payloads
-	tracer         module.Tracer
-	state          protocol.State
-	prov           network.Engine
-	core           *Core
-	pendingBlocks  engine.MessageStore
-	pendingVotes   engine.MessageStore
-	messageHandler *engine.MessageHandler
-	con            network.Conduit
+	unit                       *engine.Unit
+	lm                         *lifecycle.LifecycleManager
+	log                        zerolog.Logger
+	mempool                    module.MempoolMetrics
+	metrics                    module.EngineMetrics
+	me                         module.Local
+	headers                    storage.Headers
+	payloads                   storage.Payloads
+	tracer                     module.Tracer
+	state                      protocol.State
+	prov                       network.Engine
+	core                       *Core
+	pendingBlocks              engine.MessageStore
+	pendingVotes               engine.MessageStore
+	messageHandler             *engine.MessageHandler
+	finalizedView              counters.StrictMonotonousCounter
+	finalizationEventsNotifier engine.Notifier
+	con                        network.Conduit
+	stopHotstuff               context.CancelFunc
 }
 
 func NewEngine(
 	log zerolog.Logger,
-	net module.Network,
+	net network.Network,
 	me module.Local,
 	prov network.Engine,
 	core *Core) (*Engine, error) {
@@ -124,20 +133,22 @@ func NewEngine(
 	)
 
 	eng := &Engine{
-		unit:           engine.NewUnit(),
-		log:            log.With().Str("compliance", "engine").Logger(),
-		me:             me,
-		mempool:        core.mempool,
-		metrics:        core.metrics,
-		headers:        core.headers,
-		payloads:       core.payloads,
-		pendingBlocks:  pendingBlocks,
-		pendingVotes:   pendingVotes,
-		state:          core.state,
-		tracer:         core.tracer,
-		prov:           prov,
-		core:           core,
-		messageHandler: handler,
+		unit:                       engine.NewUnit(),
+		lm:                         lifecycle.NewLifecycleManager(),
+		log:                        log.With().Str("compliance", "engine").Logger(),
+		me:                         me,
+		mempool:                    core.mempool,
+		metrics:                    core.metrics,
+		headers:                    core.headers,
+		payloads:                   core.payloads,
+		pendingBlocks:              pendingBlocks,
+		pendingVotes:               pendingVotes,
+		state:                      core.state,
+		tracer:                     core.tracer,
+		prov:                       prov,
+		core:                       core,
+		messageHandler:             handler,
+		finalizationEventsNotifier: engine.NewNotifier(),
 	}
 
 	// register the core with the network layer and store the conduit
@@ -163,20 +174,39 @@ func (e *Engine) Ready() <-chan struct{} {
 	if e.core.hotstuff == nil {
 		panic("must initialize compliance engine with hotstuff engine")
 	}
-	e.unit.Launch(e.loop)
-	return e.unit.Ready(func() {
+	e.lm.OnStart(func() {
+		e.unit.Launch(e.loop)
+		e.unit.Launch(e.finalizationProcessingLoop)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		signalerCtx, hotstuffErrChan := irrecoverable.WithSignaler(ctx)
+		e.stopHotstuff = cancel
+
+		// TODO: this workaround for handling fatal HotStuff errors is required only
+		//  because this engine and epochmgr do not use the Component pattern yet
+		e.unit.Launch(func() {
+			e.handleHotStuffError(hotstuffErrChan)
+		})
+
+		e.core.hotstuff.Start(signalerCtx)
+		// wait for request handler to startup
+
 		<-e.core.hotstuff.Ready()
 	})
+	return e.lm.Started()
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
 // For the consensus engine, we wait for hotstuff to finish.
 func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done(func() {
-		e.log.Debug().Msg("shutting down hotstuff eventloop")
+	e.lm.OnStop(func() {
+		e.log.Info().Msg("shutting down hotstuff eventloop")
+		e.stopHotstuff()
 		<-e.core.hotstuff.Done()
-		e.log.Debug().Msg("all components have been shut down")
+		e.log.Info().Msg("all components have been shut down")
+		<-e.unit.Done()
 	})
+	return e.lm.Stopped()
 }
 
 // SubmitLocal submits an event originating on the local node.
@@ -204,8 +234,16 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(_ network.Channel, originID flow.Identifier, event interface{}) error {
-	return e.messageHandler.Process(originID, event)
+func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+	err := e.messageHandler.Process(originID, event)
+	if err != nil {
+		if engine.IsIncompatibleInputTypeError(err) {
+			e.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, event, channel)
+			return nil
+		}
+		return fmt.Errorf("unexpected error while processing engine message: %w", err)
+	}
+	return nil
 }
 
 func (e *Engine) loop() {
@@ -320,19 +358,11 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 		Int("seals_count", len(payload.Seals)).
 		Int("receipts_count", len(payload.Receipts)).
 		Time("timestamp", header.Timestamp).
-		Hex("proposer", header.ProposerID[:]).
-		Int("num_signers", len(header.ParentVoterIDs)).
+		Hex("signers", header.ParentVoterIndices).
 		Dur("delay", delay).
 		Logger()
 
 	log.Debug().Msg("processing proposal broadcast request from hotstuff")
-
-	for _, g := range payload.Guarantees {
-		if span, ok := e.tracer.GetSpan(g.CollectionID, trace.CONProcessCollection); ok {
-			childSpan := e.tracer.StartSpanFromParent(span, trace.CONCompBroadcastProposalWithDelay)
-			defer childSpan.Finish()
-		}
-	}
 
 	// retrieve all consensus nodes without our ID
 	recipients, err := e.state.AtBlockID(header.ParentID).Identities(filter.And(
@@ -357,6 +387,9 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 
 		// broadcast the proposal to consensus nodes
 		err = e.con.Publish(proposal, recipients.NodeIDs()...)
+		if errors.Is(err, network.EmptyTargetList) {
+			return
+		}
 		if err != nil {
 			log.Error().Err(err).Msg("could not send proposal message")
 		}
@@ -377,4 +410,45 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 // Note the header has incomplete fields, because it was converted from a hotstuff.
 func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	return e.BroadcastProposalWithDelay(header, 0)
+}
+
+// OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
+//  (1) Informs sealing.Core about finalization of respective block.
+// CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
+// from external nodes cannot be considered as inputs to this function
+func (e *Engine) OnFinalizedBlock(block *model.Block) {
+	if e.finalizedView.Set(block.View) {
+		e.finalizationEventsNotifier.Notify()
+	}
+}
+
+// finalizationProcessingLoop is a separate goroutine that performs processing of finalization events
+func (e *Engine) finalizationProcessingLoop() {
+	finalizationNotifier := e.finalizationEventsNotifier.Channel()
+	for {
+		select {
+		case <-e.unit.Quit():
+			return
+		case <-finalizationNotifier:
+			e.core.ProcessFinalizedView(e.finalizedView.Value())
+		}
+	}
+}
+
+// handleHotStuffError accepts the error channel from the HotStuff component and
+// crashes the node if any error is detected.
+// TODO: this function should be removed in favour of refactoring this engine and
+//  the epochmgr engine to use the Component pattern, so that irrecoverable errors
+//  can be bubbled all the way to the node scaffold
+func (e *Engine) handleHotStuffError(hotstuffErrs <-chan error) {
+	for {
+		select {
+		case <-e.unit.Quit():
+			return
+		case err := <-hotstuffErrs:
+			if err != nil {
+				e.log.Fatal().Err(err).Msg("encountered fatal error in HotStuff")
+			}
+		}
+	}
 }

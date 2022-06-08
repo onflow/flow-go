@@ -2,9 +2,27 @@ package consensus
 
 import (
 	"time"
+
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 )
 
+// HotstuffModules is a helper structure to encapsulate dependencies to create
+// a hotStuff participant.
+type HotstuffModules struct {
+	Notifier                hotstuff.Consumer               // observer for hotstuff events
+	Committee               hotstuff.Committee              // consensus committee
+	Signer                  hotstuff.Signer                 // signer of proposal & votes
+	Persist                 hotstuff.Persister              // last state of consensus participant
+	FinalizationDistributor *pubsub.FinalizationDistributor // observer for finalization events, used by compliance engine
+	QCCreatedDistributor    *pubsub.QCCreatedDistributor    // observer for qc created event, used by leader
+	Forks                   hotstuff.Forks                  // information about multiple forks
+	Validator               hotstuff.Validator              // validator of proposals & votes
+	Aggregator              hotstuff.VoteAggregator         // aggregator of votes, used by leader
+}
+
 type ParticipantConfig struct {
+	StartupTime                time.Time     // the time when consensus participant enters first view
 	TimeoutInitial             time.Duration // the initial timeout for the pacemaker
 	TimeoutMinimum             time.Duration // the minimum timeout for the pacemaker
 	TimeoutAggregationFraction float64       // the percentage part of the timeout period reserved for vote aggregation
@@ -14,6 +32,12 @@ type ParticipantConfig struct {
 }
 
 type Option func(*ParticipantConfig)
+
+func WithStartupTime(time time.Time) Option {
+	return func(cfg *ParticipantConfig) {
+		cfg.StartupTime = time
+	}
+}
 
 func WithInitialTimeout(timeout time.Duration) Option {
 	return func(cfg *ParticipantConfig) {

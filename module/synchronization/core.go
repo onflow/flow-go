@@ -18,6 +18,10 @@ const (
 	// DefaultBlockRequestNodes is the default number of nodes we request a
 	// block resource from.
 	DefaultBlockRequestNodes uint = 3
+
+	// DefaultQueuedHeightMultiplicity limits the number of heights we queue
+	// above the current finalized height.
+	DefaultQueuedHeightMultiplicity uint = 4
 )
 
 type Config struct {
@@ -105,8 +109,17 @@ func (c *Core) HandleHeight(final *flow.Header, height uint64) {
 	if height > final.Height {
 		c.mu.Lock()
 		defer c.mu.Unlock()
+
+		// limit to request up to DefaultQueuedHeightMultiplicity*MaxRequests*MaxSize blocks from the peer.
+		// without this limit, then if we are falling far behind,
+		// we would queue up too many heights.
+		heightLimit := final.Height + uint64(DefaultQueuedHeightMultiplicity*c.Config.MaxRequests*c.Config.MaxSize)
+		if height > heightLimit {
+			height = heightLimit
+		}
+
 		for h := final.Height + 1; h <= height; h++ {
-			c.queueByHeight(h)
+			c.requeueHeight(h)
 		}
 	}
 }
@@ -129,6 +142,12 @@ func (c *Core) RequestHeight(height uint64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	c.requeueHeight(height)
+}
+
+// requeueHeight queues the given height, ignoring any previously received
+// blocks at that height
+func (c *Core) requeueHeight(height uint64) {
 	// if we already received this block, reset the status so we can re-queue
 	status := c.heights[height]
 	if status.WasReceived() {
@@ -204,12 +223,14 @@ func (c *Core) getRequestStatus(height uint64, blockID flow.Identifier) *Status 
 	heightStatus := c.heights[height]
 	idStatus := c.blockIDs[blockID]
 
-	if heightStatus.WasQueued() {
-		return heightStatus
-	}
 	if idStatus.WasQueued() {
 		return idStatus
 	}
+	// Only return the height status if there is no matching status for the ID
+	if heightStatus.WasQueued() {
+		return heightStatus
+	}
+
 	return nil
 }
 

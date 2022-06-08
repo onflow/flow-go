@@ -34,13 +34,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var chain = flow.Mainnet.Chain()
+var chain = flow.Emulator.Chain()
+
+// In the following tests the system transaction is expected to fail, as the epoch related things are not set up properly.
+// This is not relevant to the test, as only the non-system transactions are tested.
 
 func Test_ExecutionMatchesVerification(t *testing.T) {
-
-	noTxFee, err := cadence.NewUFix64("0.0")
-	require.NoError(t, err)
-
 	t.Run("empty block", func(t *testing.T) {
 		executeBlockAndVerify(t,
 			[][]*flow.TransactionBody{},
@@ -80,7 +79,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			{
 				deployTx, emitTx,
 			},
-		}, noTxFee, fvm.DefaultMinimumStorageReservation)
+		}, fvm.BootstrapProcedureFeeParameters{}, fvm.DefaultMinimumStorageReservation)
 
 		// ensure event is emitted
 		require.Empty(t, cr.TransactionResults[0].ErrorMessage)
@@ -135,7 +134,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			{
 				&emitTx3,
 			},
-		}, noTxFee, fvm.DefaultMinimumStorageReservation)
+		}, fvm.BootstrapProcedureFeeParameters{}, fvm.DefaultMinimumStorageReservation)
 
 		// ensure event is emitted
 		require.Empty(t, cr.TransactionResults[0].ErrorMessage)
@@ -161,7 +160,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		err = testutil.SignTransaction(addKeyTx, accountAddress, accountPrivKey, 0)
 		require.NoError(t, err)
 
-		minimumStorage, err := cadence.NewUFix64("0.00007761")
+		minimumStorage, err := cadence.NewUFix64("0.00008164")
 		require.NoError(t, err)
 
 		cr := executeBlockAndVerify(t, [][]*flow.TransactionBody{
@@ -217,15 +216,26 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		err = testutil.SignTransaction(spamTx, accountAddress, accountPrivKey, 0)
 		require.NoError(t, err)
 
-		txFee, err := cadence.NewUFix64("0.01")
 		require.NoError(t, err)
 
-		cr := executeBlockAndVerify(t, [][]*flow.TransactionBody{
+		cr := executeBlockAndVerifyWithParameters(t, [][]*flow.TransactionBody{
 			{
 				createAccountTx,
 				spamTx,
 			},
-		}, txFee, fvm.DefaultMinimumStorageReservation)
+		},
+			[]fvm.Option{
+				fvm.WithTransactionFeesEnabled(true),
+				fvm.WithAccountStorageLimit(true),
+				// make sure we don't run out of memory first.
+				fvm.WithMemoryLimit(20_000_000_000),
+			}, []fvm.BootstrapProcedureOption{
+				fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
+				fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+				fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+				fvm.WithTransactionFee(fvm.DefaultTransactionFees),
+				fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+			})
 
 		// no error
 		assert.Equal(t, cr.TransactionResults[0].ErrorMessage, "")
@@ -263,8 +273,8 @@ func TestTransactionFeeDeduction(t *testing.T) {
 		checkResult   func(t *testing.T, cr *execution.ComputationResult)
 	}
 
-	txFees := fvm.DefaultTransactionFees.ToGoValue().(uint64)
-	fundingAmount := uint64(1_0000_0000)
+	txFees := uint64(1_000)
+	fundingAmount := uint64(100_000_000)
 	transferAmount := uint64(123_456)
 
 	testCases := []testCase{
@@ -617,6 +627,7 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 	logger := zerolog.Nop()
 
 	opts = append(opts, fvm.WithChain(chain))
+	opts = append(opts, fvm.WithBlocks(&fvm.NoopBlockFinder{}))
 
 	fvmContext :=
 		fvm.NewContext(
@@ -650,7 +661,7 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 
 	view := delta.NewView(state.LedgerGetRegister(ledger, initialCommit))
 
-	executableBlock := unittest.ExecutableBlockFromTransactions(txs)
+	executableBlock := unittest.ExecutableBlockFromTransactions(chain.ChainID(), txs)
 	executableBlock.StartState = &initialCommit
 
 	computationResult, err := blockComputer.ExecuteBlock(context.Background(), executableBlock, view, programs.NewEmptyPrograms())
@@ -699,7 +710,7 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 
 func executeBlockAndVerify(t *testing.T,
 	txs [][]*flow.TransactionBody,
-	txFees cadence.UFix64,
+	txFees fvm.BootstrapProcedureFeeParameters,
 	minStorageBalance cadence.UFix64) *execution.ComputationResult {
 	return executeBlockAndVerifyWithParameters(t,
 		txs,

@@ -55,7 +55,7 @@ func GenerateExecutionResultAndChunkDataPacks(
 		startState = endState
 	}
 
-	executionResult, err = GenerateExecutionResultForBlock(prevResultId, block, chunks, result.ServiceEvents)
+	executionResult, err = GenerateExecutionResultForBlock(prevResultId, block, chunks, result.ServiceEvents, result.ExecutionDataID)
 	if err != nil {
 		return flow.DummyStateCommitment, nil, nil, fmt.Errorf("could not generate execution result: %w", err)
 	}
@@ -70,6 +70,7 @@ func GenerateExecutionResultForBlock(
 	block *flow.Block,
 	chunks []*flow.Chunk,
 	serviceEvents []flow.Event,
+	executionDataID flow.Identifier,
 ) (*flow.ExecutionResult, error) {
 
 	// convert Cadence service event representation to flow-go representation
@@ -87,6 +88,7 @@ func GenerateExecutionResultForBlock(
 		BlockID:          block.ID(),
 		Chunks:           chunks,
 		ServiceEvents:    convertedServiceEvents,
+		ExecutionDataID:  executionDataID,
 	}
 
 	return er, nil

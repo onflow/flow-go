@@ -54,7 +54,7 @@ func (ir *IncorporatedResultSeals) removeFromIndex(id flow.Identifier, height ui
 
 func (ir *IncorporatedResultSeals) removeByHeight(height uint64) {
 	for sealID := range ir.byHeight[height] {
-		ir.Backdata.Rem(sealID)
+		ir.backData.Rem(sealID)
 	}
 	delete(ir.byHeight, height)
 }
@@ -63,13 +63,13 @@ func (ir *IncorporatedResultSeals) removeByHeight(height uint64) {
 func (ir *IncorporatedResultSeals) Add(seal *flow.IncorporatedResultSeal) (bool, error) {
 	added := false
 	sealID := seal.ID()
-	err := ir.Backend.Run(func(entities map[flow.Identifier]flow.Entity) error {
+	err := ir.Backend.Run(func(_ mempool.BackData) error {
 		// skip elements below the pruned
 		if seal.Header.Height < ir.lowestHeight {
 			return nil
 		}
 
-		added = ir.Backdata.Add(sealID, seal)
+		added = ir.backData.Add(sealID, seal)
 		if !added {
 			return nil
 		}
@@ -95,7 +95,7 @@ func (ir *IncorporatedResultSeals) Size() uint {
 // All returns all the items in the mempool
 func (ir *IncorporatedResultSeals) All() []*flow.IncorporatedResultSeal {
 	entities := ir.Backend.All()
-	res := make([]*flow.IncorporatedResultSeal, 0, len(ir.entities))
+	res := make([]*flow.IncorporatedResultSeal, 0, ir.backData.Size())
 	for _, entity := range entities {
 		// uncaught type assertion; should never panic as the mempool only stores IncorporatedResultSeal:
 		res = append(res, entity.(*flow.IncorporatedResultSeal))
@@ -116,9 +116,9 @@ func (ir *IncorporatedResultSeals) ByID(id flow.Identifier) (*flow.IncorporatedR
 // Rem removes an IncorporatedResultSeal from the mempool
 func (ir *IncorporatedResultSeals) Rem(id flow.Identifier) bool {
 	removed := false
-	err := ir.Backend.Run(func(entities map[flow.Identifier]flow.Entity) error {
+	err := ir.Backend.Run(func(_ mempool.BackData) error {
 		var entity flow.Entity
-		entity, removed = ir.Backdata.Rem(id)
+		entity, removed = ir.backData.Rem(id)
 		if !removed {
 			return nil
 		}
@@ -133,8 +133,8 @@ func (ir *IncorporatedResultSeals) Rem(id flow.Identifier) bool {
 }
 
 func (ir *IncorporatedResultSeals) Clear() {
-	err := ir.Backend.Run(func(_ map[flow.Identifier]flow.Entity) error {
-		ir.Backdata.Clear()
+	err := ir.Backend.Run(func(_ mempool.BackData) error {
+		ir.backData.Clear()
 		ir.byHeight = make(map[uint64]sealSet)
 		return nil
 	})
@@ -152,13 +152,13 @@ func (ir *IncorporatedResultSeals) Clear() {
 // If `height` is smaller than the previous value, the previous value is kept
 // and the sentinel mempool.DecreasingPruningHeightError is returned.
 func (ir *IncorporatedResultSeals) PruneUpToHeight(height uint64) error {
-	return ir.Backend.Run(func(entities map[flow.Identifier]flow.Entity) error {
+	return ir.Backend.Run(func(backData mempool.BackData) error {
 		if height < ir.lowestHeight {
 			return mempool.NewDecreasingPruningHeightErrorf(
 				"pruning height: %d, existing height: %d", height, ir.lowestHeight)
 		}
 
-		if len(entities) == 0 {
+		if backData.Size() == 0 {
 			ir.lowestHeight = height
 			return nil
 		}

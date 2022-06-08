@@ -3,8 +3,12 @@ package epochs
 import (
 	"context"
 	"fmt"
-	"math/rand"
+	"sync"
 	"time"
+
+	"github.com/onflow/flow-go/module/retrymiddleware"
+
+	"github.com/sethvargo/go-retry"
 
 	"github.com/rs/zerolog"
 
@@ -16,16 +20,32 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
+const (
+	// retryDuration is the initial duration to wait between retries for all retryable
+	// requests - increases exponentially for subsequent retries
+	retryDuration = time.Second
+
+	// update qc contract client after 2 consecutive failures
+	retryMaxConsecutiveFailures = 2
+
+	// retryDurationMax is the maximum duration to wait between two consecutive requests
+	retryDurationMax = 10 * time.Minute
+
+	// retryJitterPercent is the percentage jitter to introduce to each retry interval
+	retryJitterPercent = 25 // 25%
+)
+
 // RootQCVoter is responsible for generating and submitting votes for the
 // root quorum certificate of the upcoming epoch for this node's cluster.
 type RootQCVoter struct {
-	log    zerolog.Logger
-	me     module.Local
-	signer hotstuff.Signer
-	state  protocol.State
-	client module.QCContractClient // client to the QC aggregator smart contract
-
-	wait time.Duration // how long to sleep in between vote attempts
+	log                       zerolog.Logger
+	me                        module.Local
+	signer                    hotstuff.Signer
+	state                     protocol.State
+	qcContractClients         []module.QCContractClient // priority ordered array of client to the QC aggregator smart contract
+	lastSuccessfulClientIndex int                       // index of the contract client that was last successful during retries
+	wait                      time.Duration             // how long to sleep in between vote attempts
+	mu                        sync.Mutex
 }
 
 // NewRootQCVoter returns a new root QC voter, configured for a particular epoch.
@@ -34,16 +54,17 @@ func NewRootQCVoter(
 	me module.Local,
 	signer hotstuff.Signer,
 	state protocol.State,
-	client module.QCContractClient,
+	contractClients []module.QCContractClient,
 ) *RootQCVoter {
 
 	voter := &RootQCVoter{
-		log:    log.With().Str("module", "root_qc_voter").Logger(),
-		me:     me,
-		signer: signer,
-		state:  state,
-		client: client,
-		wait:   time.Second * 10,
+		log:               log.With().Str("module", "root_qc_voter").Logger(),
+		me:                me,
+		signer:            signer,
+		state:             state,
+		qcContractClients: contractClients,
+		wait:              time.Second * 10,
+		mu:                sync.Mutex{},
 	}
 	return voter
 }
@@ -86,24 +107,20 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 		return fmt.Errorf("could not create vote for cluster root qc: %w", err)
 	}
 
-	attempts := 0
-	for {
-		attempts++
-		log := log.With().Int("attempt", attempts).Logger()
+	// this backoff configuration will never terminate on its own, but the
+	// request logic will exit when we exit the EpochSetup phase
+	backoff := retry.NewExponential(retryDuration)
+	backoff = retry.WithCappedDuration(retryDurationMax, backoff)
+	backoff = retry.WithJitterPercent(retryJitterPercent, backoff)
 
-		// for all attempts after the first, wait before re-trying
-		if attempts > 1 {
-			wait := voter.getWaitInterval(attempts - 2) // -2 so that we wait the base interval in the first Sleep
-			log.Info().Msgf("waiting for %s before retry", wait.String())
+	clientIndex, qcContractClient := voter.getInitialContractClient()
+	onMaxConsecutiveRetries := func(totalAttempts int) {
+		voter.updateContractClient(clientIndex)
+		log.Warn().Msgf("retrying on attempt (%d) with fallback access node at index (%d)", totalAttempts, clientIndex)
+	}
+	backoff = retrymiddleware.AfterConsecutiveFailures(retryMaxConsecutiveFailures, backoff, onMaxConsecutiveRetries)
 
-			select {
-			case <-ctx.Done():
-				return fmt.Errorf("context cancelled: %w", ctx.Err())
-			case <-time.After(wait):
-				// proceed and re-submit vote
-			}
-		}
-
+	err = retry.Do(ctx, backoff, func(ctx context.Context) error {
 		// check that we're still in the setup phase, if we're not we can't
 		// submit a vote anyway and must exit this process
 		phase, err := voter.state.Final().Phase()
@@ -114,35 +131,65 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 		}
 
 		// check whether we've already voted, if we have we can exit early
-		voted, err := voter.client.Voted(ctx)
+		voted, err := qcContractClient.Voted(ctx)
 		if err != nil {
 			log.Error().Err(err).Msg("could not check vote status")
-			continue
+			return retry.RetryableError(err)
 		} else if voted {
 			log.Info().Msg("already voted - exiting QC vote process...")
+			// update our last successful client index for future calls
+			voter.updateLastSuccessfulClient(clientIndex)
 			return nil
 		}
 
 		// submit the vote - this call will block until the transaction has
 		// either succeeded or we are able to retry
 		log.Info().Msg("submitting vote...")
-		err = voter.client.SubmitVote(ctx, vote)
+		err = qcContractClient.SubmitVote(ctx, vote)
 		if err != nil {
 			log.Error().Err(err).Msg("could not submit vote - retrying...")
-			continue
+			return retry.RetryableError(err)
 		}
 
 		log.Info().Msg("successfully submitted vote - exiting QC vote process...")
+
+		// update our last successful client index for future calls
+		voter.updateLastSuccessfulClient(clientIndex)
 		return nil
-	}
+	})
+
+	return err
 }
 
-// getWaitInterval returns an interval to wait after the given number of attempts.
-// The interval includes some jitter to avoid synchronization of requests from
-// all collection nodes.
-func (voter *RootQCVoter) getWaitInterval(attempts int) time.Duration {
-	base := voter.wait << attempts                // base wait period on a geometric backoff
-	jitter := float64(base) * rand.Float64() * .1 // add 10% jitter to avoid synchronization across cluster
+// updateContractClient will return the last successful client index by default for all initial operations or else
+// it will return the appropriate client index with respect to last successful and number of client.
+func (voter *RootQCVoter) updateContractClient(clientIndex int) (int, module.QCContractClient) {
+	voter.mu.Lock()
+	defer voter.mu.Unlock()
+	if clientIndex == voter.lastSuccessfulClientIndex {
+		if clientIndex == len(voter.qcContractClients)-1 {
+			clientIndex = 0
+		} else {
+			clientIndex++
+		}
+	} else {
+		clientIndex = voter.lastSuccessfulClientIndex
+	}
 
-	return time.Duration(base) + time.Duration(jitter)
+	return clientIndex, voter.qcContractClients[clientIndex]
+}
+
+// getInitialContractClient will return the last successful contract client or the initial
+func (voter *RootQCVoter) getInitialContractClient() (int, module.QCContractClient) {
+	voter.mu.Lock()
+	defer voter.mu.Unlock()
+	return voter.lastSuccessfulClientIndex, voter.qcContractClients[voter.lastSuccessfulClientIndex]
+}
+
+// updateLastSuccessfulClient set lastSuccessfulClientIndex in concurrency safe way
+func (voter *RootQCVoter) updateLastSuccessfulClient(clientIndex int) {
+	voter.mu.Lock()
+	defer voter.mu.Unlock()
+
+	voter.lastSuccessfulClientIndex = clientIndex
 }

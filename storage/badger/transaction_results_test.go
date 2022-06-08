@@ -1,13 +1,14 @@
 package badger_test
 
 import (
-	"errors"
 	"fmt"
+	mathRand "math/rand"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/rand"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -41,7 +42,7 @@ func TestBatchStoringTransactionResults(t *testing.T) {
 
 		for _, txResult := range txResults {
 			actual, err := store.ByBlockIDTransactionID(blockID, txResult.TransactionID)
-			require.Nil(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, txResult, *actual)
 		}
 
@@ -49,8 +50,19 @@ func TestBatchStoringTransactionResults(t *testing.T) {
 		newStore := bstorage.NewTransactionResults(metrics, db, 1000)
 		for _, txResult := range txResults {
 			actual, err := newStore.ByBlockIDTransactionID(blockID, txResult.TransactionID)
-			require.Nil(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, txResult, *actual)
+		}
+
+		// check retrieving by index from both cache and db
+		for i := len(txResults) - 1; i >= 0; i-- {
+			actual, err := store.ByBlockIDTransactionIndex(blockID, uint32(i))
+			require.NoError(t, err)
+			assert.Equal(t, txResults[i], *actual)
+
+			actual, err = newStore.ByBlockIDTransactionIndex(blockID, uint32(i))
+			require.NoError(t, err)
+			assert.Equal(t, txResults[i], *actual)
 		}
 	})
 }
@@ -62,9 +74,13 @@ func TestReadingNotStoreTransaction(t *testing.T) {
 
 		blockID := unittest.IdentifierFixture()
 		txID := unittest.IdentifierFixture()
+		txIndex := rand.Uint32()
 
 		_, err := store.ByBlockIDTransactionID(blockID, txID)
-		assert.True(t, errors.Is(err, storage.ErrNotFound))
+		assert.ErrorIs(t, err, storage.ErrNotFound)
+
+		_, err = store.ByBlockIDTransactionIndex(blockID, txIndex)
+		assert.ErrorIs(t, err, storage.ErrNotFound)
 	})
 }
 
@@ -76,4 +92,14 @@ func TestKeyConversion(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, blockID, bID)
 	require.Equal(t, txID, tID)
+}
+
+func TestIndexKeyConversion(t *testing.T) {
+	blockID := unittest.IdentifierFixture()
+	txIndex := mathRand.Uint32()
+	key := bstorage.KeyFromBlockIDIndex(blockID, txIndex)
+	bID, tID, err := bstorage.KeyToBlockIDIndex(key)
+	require.NoError(t, err)
+	require.Equal(t, blockID, bID)
+	require.Equal(t, txIndex, tID)
 }

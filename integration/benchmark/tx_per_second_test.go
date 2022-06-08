@@ -25,8 +25,8 @@ import (
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
 
-	"github.com/onflow/flow-go/integration/tests/common"
 	"github.com/onflow/flow-go/integration/tests/execution"
+	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -110,8 +110,12 @@ func (gs *TransactionsPerSecondSuite) privateKey() string {
 		panic("error while hex decoding hardcoded root key")
 	}
 
-	// RLP decode the key
-	ServiceAccountPrivateKey, err := flow.DecodeAccountPrivateKey(serviceAccountPrivateKeyBytes)
+	ServiceAccountPrivateKey := flow.AccountPrivateKey{
+		SignAlgo: unittest.ServiceAccountPrivateKeySignAlgo,
+		HashAlgo: unittest.ServiceAccountPrivateKeyHashAlgo,
+	}
+	ServiceAccountPrivateKey.PrivateKey, err = crypto.DecodePrivateKey(
+		ServiceAccountPrivateKey.SignAlgo, serviceAccountPrivateKeyBytes)
 	if err != nil {
 		panic("error while decoding hardcoded root key bytes")
 	}
@@ -137,7 +141,7 @@ func (gs *TransactionsPerSecondSuite) TestTransactionsPerSecond() {
 	gs.signers = map[flowsdk.Address]crypto.InMemorySigner{}
 
 	// Setup the client, not using the suite to generate client since we may want to call external testnets
-	flowClient, err := client.New(gs.accessAddr, grpc.WithInsecure())
+	flowClient, err := client.New(gs.accessAddr, grpc.WithInsecure()) //nolint:staticcheck
 	require.NoError(gs.T(), err, "could not get client")
 	gs.flowClient = flowClient
 
@@ -219,7 +223,7 @@ func (gs *TransactionsPerSecondSuite) SetTokenAddresses() {
 func (gs *TransactionsPerSecondSuite) CreateAccountAndTransfer(keyIndex int) (flowsdk.Address, *flowsdk.AccountKey) {
 	ctx := context.Background()
 
-	myPrivateKey := common.RandomPrivateKey()
+	myPrivateKey := lib.RandomPrivateKey()
 	accountKey := flowsdk.NewAccountKey().
 		FromPrivateKey(myPrivateKey).
 		SetHashAlgo(crypto.SHA3_256).
@@ -227,13 +231,14 @@ func (gs *TransactionsPerSecondSuite) CreateAccountAndTransfer(keyIndex int) (fl
 	mySigner := crypto.NewInMemorySigner(myPrivateKey, accountKey.HashAlgo)
 
 	// Generate the account creation transaction
-	createAccountTx := templates.CreateAccount([]*flowsdk.AccountKey{accountKey}, nil, gs.rootAcctAddr).
-		SetReferenceBlockID(gs.ref.ID).
+	createAccountTx, err := templates.CreateAccount([]*flowsdk.AccountKey{accountKey}, nil, gs.rootAcctAddr)
+	handle(err)
+	createAccountTx.SetReferenceBlockID(gs.ref.ID).
 		SetProposalKey(gs.rootAcctAddr, keyIndex, gs.sequenceNumbers[keyIndex]).
 		SetPayer(gs.rootAcctAddr)
 
 	gs.rootSignerLock.Lock()
-	err := createAccountTx.SignEnvelope(gs.rootAcctAddr, keyIndex, gs.rootSigner)
+	err = createAccountTx.SignEnvelope(gs.rootAcctAddr, keyIndex, gs.rootSigner)
 	handle(err)
 
 	gs.ref, err = gs.flowClient.GetLatestBlockHeader(context.Background(), false)
@@ -440,19 +445,30 @@ func (gs *TransactionsPerSecondSuite) AddKeys(flowClient *client.Client) {
 	ctx := context.Background()
 
 	gs.sequenceNumbers = make([]uint64, TotalAccounts)
-	publicKeysStr := strings.Builder{}
-	accountKeyBytes := gs.rootAcctKey.Encode()
+	publicKeyBytes := gs.rootAcctKey.PublicKey.Encode()
 
-	for i := 0; i < TotalAccounts; i++ {
-		publicKeysStr.WriteString("signer.addPublicKey(publicKey)\n")
-	}
 	script := fmt.Sprintf(`
-	transaction(publicKey: [UInt8]) {
-		prepare(signer: AuthAccount) {
-			%s
-		}
-	}
-`, publicKeysStr.String())
+      transaction(counts: Int, key: [UInt8]) {
+        prepare(signer: AuthAccount) {
+          var i = 0
+          while i < counts {
+            i = i + 1
+            let acct = AuthAccount(payer: signer)
+            let publicKey = PublicKey(
+              publicKey: key,
+              signatureAlgorithm: SignatureAlgorithm.%s
+            )
+            signer.keys.add(
+              publicKey: publicKey,
+              hashAlgorithm: HashAlgorithm.%s,
+              weight: 1000.0
+            )
+	      }
+        }
+      }
+	}`,
+		gs.rootAcctKey.SigAlgo.String(),
+		gs.rootAcctKey.HashAlgo.String())
 
 	addKeysTx := flowsdk.NewTransaction().
 		SetReferenceBlockID(gs.ref.ID).
@@ -461,7 +477,10 @@ func (gs *TransactionsPerSecondSuite) AddKeys(flowClient *client.Client) {
 		SetPayer(gs.rootAcctAddr).
 		AddAuthorizer(gs.rootAcctAddr)
 
-	err := addKeysTx.AddArgument(bytesToCadenceArray(accountKeyBytes))
+	err := addKeysTx.AddArgument(cadence.NewInt(TotalAccounts))
+	handle(err)
+
+	err = addKeysTx.AddArgument(bytesToCadenceArray(publicKeyBytes))
 	handle(err)
 
 	err = addKeysTx.SignEnvelope(gs.rootAcctAddr, gs.rootAcctKey.Index, gs.rootSigner)

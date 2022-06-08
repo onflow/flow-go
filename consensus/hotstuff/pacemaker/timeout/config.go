@@ -1,7 +1,6 @@
 package timeout
 
 import (
-	"fmt"
 	"math"
 	"time"
 
@@ -80,25 +79,23 @@ func NewConfig(
 	blockRateDelay time.Duration,
 ) (Config, error) {
 	if startReplicaTimeout < minReplicaTimeout {
-		msg := fmt.Sprintf(
-			"startReplicaTimeout (%dms) cannot be smaller than minReplicaTimeout (%dms)",
+		return Config{}, model.NewConfigurationErrorf("startReplicaTimeout (%dms) cannot be smaller than minReplicaTimeout (%dms)",
 			startReplicaTimeout.Milliseconds(), minReplicaTimeout.Milliseconds())
-		return Config{}, model.ConfigurationError{Msg: msg}
 	}
 	if minReplicaTimeout < 0 {
-		return Config{}, model.ConfigurationError{Msg: "minReplicaTimeout must non-negative"}
+		return Config{}, model.NewConfigurationErrorf("minReplicaTimeout must non-negative")
 	}
 	if voteAggregationTimeoutFraction <= 0 || 1 < voteAggregationTimeoutFraction {
-		return Config{}, model.ConfigurationError{Msg: "VoteAggregationTimeoutFraction must be in range (0,1]"}
+		return Config{}, model.NewConfigurationErrorf("VoteAggregationTimeoutFraction must be in range (0,1]")
 	}
 	if timeoutIncrease <= 1 {
-		return Config{}, model.ConfigurationError{Msg: "TimeoutIncrease must be strictly bigger than 1"}
+		return Config{}, model.NewConfigurationErrorf("TimeoutIncrease must be strictly bigger than 1")
 	}
 	if timeoutDecrease <= 0 || 1 <= timeoutDecrease {
-		return Config{}, model.ConfigurationError{Msg: "timeoutDecrease must be in range (0,1)"}
+		return Config{}, model.NewConfigurationErrorf("timeoutDecrease must be in range (0,1)")
 	}
 	if blockRateDelay < 0 {
-		return Config{}, model.ConfigurationError{Msg: "blockRateDelay must be must be non-negative"}
+		return Config{}, model.NewConfigurationErrorf("blockRateDelay must be must be non-negative")
 	}
 
 	tc := Config{

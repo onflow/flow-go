@@ -2,20 +2,23 @@ package state
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"sort"
 
+	"github.com/onflow/cadence/runtime/common"
+
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/meter"
+	"github.com/onflow/flow-go/fvm/meter/noop"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// TODO we started with high numbers here and we might
-// tune (reduce) them when we have more data
 const (
-	DefaultMaxKeySize         = 16_000        // ~16KB
-	DefaultMaxValueSize       = 256_000_000   // ~256MB
-	DefaultMaxInteractionSize = 2_000_000_000 // ~2GB
+	DefaultMaxKeySize         = 16_000      // ~16KB
+	DefaultMaxValueSize       = 256_000_000 // ~256MB
+	DefaultMaxInteractionSize = 20_000_000  // ~20MB
 )
 
 type mapKey struct {
@@ -27,6 +30,7 @@ type mapKey struct {
 // all register touches
 type State struct {
 	view                  View
+	meter                 meter.Meter
 	updatedAddresses      map[flow.Address]struct{}
 	updateSize            map[mapKey]uint64
 	maxKeySizeAllowed     uint64
@@ -41,6 +45,7 @@ type State struct {
 func defaultState(view View) *State {
 	return &State{
 		view:                  view,
+		meter:                 noop.NewMeter(),
 		updatedAddresses:      make(map[flow.Address]struct{}),
 		updateSize:            make(map[mapKey]uint64),
 		maxKeySizeAllowed:     DefaultMaxKeySize,
@@ -51,6 +56,10 @@ func defaultState(view View) *State {
 
 func (s *State) View() View {
 	return s.view
+}
+
+func (s *State) Meter() meter.Meter {
+	return s.meter
 }
 
 type StateOption func(st *State) *State
@@ -88,25 +97,35 @@ func WithMaxInteractionSizeAllowed(limit uint64) func(st *State) *State {
 	}
 }
 
+// WithMeter sets the meter
+func WithMeter(m meter.Meter) func(st *State) *State {
+	return func(st *State) *State {
+		st.meter = m
+		return st
+	}
+}
+
 // InteractionUsed returns the amount of ledger interaction (total ledger byte read + total ledger byte written)
 func (s *State) InteractionUsed() uint64 {
 	return s.TotalBytesRead + s.TotalBytesWritten
 }
 
 // Get returns a register value given owner, controller and key
-func (s *State) Get(owner, controller, key string) (flow.RegisterValue, error) {
+func (s *State) Get(owner, controller, key string, enforceLimit bool) (flow.RegisterValue, error) {
 	var value []byte
 	var err error
 
-	if err = s.checkSize(owner, controller, key, []byte{}); err != nil {
-		return nil, err
+	if enforceLimit {
+		if err = s.checkSize(owner, controller, key, []byte{}); err != nil {
+			return nil, err
+		}
 	}
 
 	if value, err = s.view.Get(owner, controller, key); err != nil {
 		// wrap error into a fatal error
 		getError := errors.NewLedgerFailure(err)
 		// wrap with more info
-		return nil, fmt.Errorf("failed to read key %s on account %s: %w", key, hex.EncodeToString([]byte(owner)), getError)
+		return nil, fmt.Errorf("failed to read key %s on account %s: %w", PrintableKey(key), hex.EncodeToString([]byte(owner)), getError)
 	}
 
 	// if not part of recent updates count them as read
@@ -116,24 +135,32 @@ func (s *State) Get(owner, controller, key string) (flow.RegisterValue, error) {
 			len(controller) + len(key) + len(value))
 	}
 
-	return value, s.checkMaxInteraction()
+	if enforceLimit {
+		return value, s.checkMaxInteraction()
+	}
+
+	return value, nil
 }
 
 // Set updates state delta with a register update
-func (s *State) Set(owner, controller, key string, value flow.RegisterValue) error {
-	if err := s.checkSize(owner, controller, key, value); err != nil {
-		return err
+func (s *State) Set(owner, controller, key string, value flow.RegisterValue, enforceLimit bool) error {
+	if enforceLimit {
+		if err := s.checkSize(owner, controller, key, value); err != nil {
+			return err
+		}
 	}
 
 	if err := s.view.Set(owner, controller, key, value); err != nil {
 		// wrap error into a fatal error
 		setError := errors.NewLedgerFailure(err)
 		// wrap with more info
-		return fmt.Errorf("failed to update key %s on account %s: %w", key, hex.EncodeToString([]byte(owner)), setError)
+		return fmt.Errorf("failed to update key %s on account %s: %w", PrintableKey(key), hex.EncodeToString([]byte(owner)), setError)
 	}
 
-	if err := s.checkMaxInteraction(); err != nil {
-		return err
+	if enforceLimit {
+		if err := s.checkMaxInteraction(); err != nil {
+			return err
+		}
 	}
 
 	if address, isAddress := addressFromOwner(owner); isAddress {
@@ -154,18 +181,60 @@ func (s *State) Set(owner, controller, key string, value flow.RegisterValue) err
 	return nil
 }
 
-func (s *State) Delete(owner, controller, key string) error {
-	return s.Set(owner, controller, key, nil)
+// Delete deletes a register
+func (s *State) Delete(owner, controller, key string, enforceLimit bool) error {
+	return s.Set(owner, controller, key, nil, enforceLimit)
 }
 
-// We don't need this later, it should be invisible to the cadence
+// Touch touches a register
 func (s *State) Touch(owner, controller, key string) error {
 	return s.view.Touch(owner, controller, key)
+}
+
+// MeterComputation meters computation usage
+func (s *State) MeterComputation(kind common.ComputationKind, intensity uint) error {
+	return s.meter.MeterComputation(kind, intensity)
+}
+
+// TotalComputationUsed returns total computation used
+func (s *State) TotalComputationUsed() uint {
+	return s.meter.TotalComputationUsed()
+}
+
+// ComputationIntensities returns computation intensities
+func (s *State) ComputationIntensities() meter.MeteredComputationIntensities {
+	return s.meter.ComputationIntensities()
+}
+
+// TotalComputationLimit returns total computation limit
+func (s *State) TotalComputationLimit() uint {
+	return s.meter.TotalComputationLimit()
+}
+
+// MeterMemory meters memory usage
+func (s *State) MeterMemory(kind common.MemoryKind, intensity uint) error {
+	return s.meter.MeterMemory(kind, intensity)
+}
+
+// MemoryIntensities returns computation intensities
+func (s *State) MemoryIntensities() meter.MeteredMemoryIntensities {
+	return s.meter.MemoryIntensities()
+}
+
+// TotalMemoryUsed returns total memory used
+func (s *State) TotalMemoryUsed() uint {
+	return s.meter.TotalMemoryUsed()
+}
+
+// TotalMemoryLimit returns total memory limit
+func (s *State) TotalMemoryLimit() uint {
+	return s.meter.TotalMemoryLimit()
 }
 
 // NewChild generates a new child state
 func (s *State) NewChild() *State {
 	return NewState(s.view.NewChild(),
+		WithMeter(s.meter.NewChild()),
 		WithMaxKeySizeAllowed(s.maxKeySizeAllowed),
 		WithMaxValueSizeAllowed(s.maxValueSizeAllowed),
 		WithMaxInteractionSizeAllowed(s.maxInteractionAllowed),
@@ -173,10 +242,15 @@ func (s *State) NewChild() *State {
 }
 
 // MergeState applies the changes from a the given view to this view.
-func (s *State) MergeState(other *State) error {
+func (s *State) MergeState(other *State, enforceLimit bool) error {
 	err := s.view.MergeView(other.view)
 	if err != nil {
 		return errors.NewStateMergeFailure(err)
+	}
+
+	err = s.meter.MergeMeter(other.meter, enforceLimit)
+	if err != nil {
+		return err
 	}
 
 	// apply address updates
@@ -196,7 +270,10 @@ func (s *State) MergeState(other *State) error {
 	s.TotalBytesWritten += other.TotalBytesWritten
 
 	// check max interaction as last step
-	return s.checkMaxInteraction()
+	if enforceLimit {
+		return s.checkMaxInteraction()
+	}
+	return nil
 }
 
 type sortedAddresses []flow.Address
@@ -292,10 +369,23 @@ func IsFVMStateKey(owner, controller, key string) bool {
 		if key == KeyStorageUsed {
 			return true
 		}
+		if key == KeyStorageIndex {
+			return true
+		}
 		if key == KeyAccountFrozen {
 			return true
 		}
 	}
 
 	return false
+}
+
+// PrintableKey formats slabs properly and avoids invalid utf8s
+func PrintableKey(key string) string {
+	// slab
+	if key[0] == '$' && len(key) == 9 {
+		i := uint64(binary.BigEndian.Uint64([]byte(key[1:])))
+		return fmt.Sprintf("$%d", i)
+	}
+	return fmt.Sprintf("#%x", []byte(key))
 }

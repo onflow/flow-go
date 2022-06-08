@@ -19,6 +19,8 @@ type CommitteeMetricsWrapper struct {
 	metrics   module.HotstuffMetrics
 }
 
+var _ hotstuff.Committee = (*CommitteeMetricsWrapper)(nil)
+
 func NewMetricsWrapper(committee hotstuff.Committee, metrics module.HotstuffMetrics) *CommitteeMetricsWrapper {
 	return &CommitteeMetricsWrapper{
 		committee: committee,
@@ -26,9 +28,9 @@ func NewMetricsWrapper(committee hotstuff.Committee, metrics module.HotstuffMetr
 	}
 }
 
-func (w CommitteeMetricsWrapper) Identities(blockID flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
+func (w CommitteeMetricsWrapper) Identities(blockID flow.Identifier) (flow.IdentityList, error) {
 	processStart := time.Now()
-	identities, err := w.committee.Identities(blockID, selector)
+	identities, err := w.committee.Identities(blockID)
 	w.metrics.CommitteeProcessingDuration(time.Since(processStart))
 	return identities, err
 }

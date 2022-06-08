@@ -12,7 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/message"
-	_ "github.com/onflow/flow-go/utils/binstat"
+	validator "github.com/onflow/flow-go/network/validator/pubsub"
 )
 
 // readSubscription reads the messages coming in on the subscription and calls the given callback until
@@ -79,26 +79,18 @@ func (r *readSubscription) receiveLoop(wg *sync.WaitGroup) {
 			return
 		}
 
-		pid, err := messageSigningID(rawMsg)
-		if err != nil {
-			r.log.Err(err).Msg("failed to validate peer ID of incoming message")
+		validatorData, ok := rawMsg.ValidatorData.(validator.ValidatorData)
+		if !ok {
+			r.log.Error().Str("raw_msg", rawMsg.String()).Msg("[BUG] validator data missing!")
 			return
 		}
 
-		var msg message.Message
-		// convert the incoming raw message payload to Message type
-		//bs := binstat.EnterTimeVal(binstat.BinNet+":wire>1protobuf2message", int64(len(rawMsg.Data)))
-		err = msg.Unmarshal(rawMsg.Data)
-		//binstat.Leave(bs)
-		if err != nil {
-			r.log.Err(err).Str("topic_message", msg.String()).Msg("failed to unmarshal message")
-			return
-		}
+		msg := validatorData.Message
 
 		// log metrics
 		r.metrics.NetworkMessageReceived(msg.Size(), msg.ChannelID, msg.Type)
 
 		// call the callback
-		r.callback(&msg, pid)
+		r.callback(msg, validatorData.From)
 	}
 }

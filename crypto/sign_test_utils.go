@@ -72,8 +72,6 @@ func testGenSignVerify(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 	}
 }
 
-var expectedError = newInvalidInputsError("")
-
 func testKeyGenSeed(t *testing.T, salg SigningAlgorithm, minLen int, maxLen int) {
 	// valid seed lengths
 	seed := make([]byte, minLen)
@@ -86,11 +84,11 @@ func testKeyGenSeed(t *testing.T, salg SigningAlgorithm, minLen int, maxLen int)
 	seed = make([]byte, minLen-1)
 	_, err = GeneratePrivateKey(salg, seed)
 	assert.Error(t, err)
-	assert.IsType(t, expectedError, err)
+	assert.True(t, IsInvalidInputsError(err))
 	seed = make([]byte, maxLen+1)
 	_, err = GeneratePrivateKey(salg, seed)
 	assert.Error(t, err)
-	assert.IsType(t, expectedError, err)
+	assert.True(t, IsInvalidInputsError(err))
 }
 
 func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
@@ -101,67 +99,100 @@ func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
 	// make sure the length is larger than minimum lengths of all the signaure algos
 	seedMinLength := 48
 
-	loops := 50
-	for j := 0; j < loops; j++ {
-		// generate a private key
-		seed := make([]byte, seedMinLength)
-		read, err := mrand.Read(seed)
-		require.Equal(t, read, seedMinLength)
-		require.NoError(t, err)
-		sk, err := GeneratePrivateKey(salg, seed)
-		assert.Nil(t, err, "the key generation has failed")
-		seed[0] ^= 1 // alter the seed to get a new private key
-		distinctSk, err := GeneratePrivateKey(salg, seed)
-		require.NoError(t, err)
+	t.Run("happy path tests", func(t *testing.T) {
+		loops := 50
+		for j := 0; j < loops; j++ {
+			// generate a private key
+			seed := make([]byte, seedMinLength)
+			read, err := mrand.Read(seed)
+			require.Equal(t, read, seedMinLength)
+			require.NoError(t, err)
+			sk, err := GeneratePrivateKey(salg, seed)
+			assert.Nil(t, err, "the key generation failed")
+			seed[0] ^= 1 // alter the seed to get a new private key
+			distinctSk, err := GeneratePrivateKey(salg, seed)
+			require.NoError(t, err)
 
-		// check private key encoding
-		skBytes := sk.Encode()
-		skCheck, err := DecodePrivateKey(salg, skBytes)
-		require.Nil(t, err, "the key decoding has failed")
-		assert.True(t, sk.Equals(skCheck), "key equality check failed")
-		skCheckBytes := skCheck.Encode()
-		assert.Equal(t, skBytes, skCheckBytes, "keys should be equal")
-		distinctSkBytes := distinctSk.Encode()
-		assert.NotEqual(t, skBytes, distinctSkBytes, "keys should be different")
+			// check private key encoding
+			skBytes := sk.Encode()
+			skCheck, err := DecodePrivateKey(salg, skBytes)
+			require.Nil(t, err, "the key decoding failed")
+			assert.True(t, sk.Equals(skCheck), "key equality check failed")
+			skCheckBytes := skCheck.Encode()
+			assert.Equal(t, skBytes, skCheckBytes, "keys should be equal")
+			distinctSkBytes := distinctSk.Encode()
+			assert.NotEqual(t, skBytes, distinctSkBytes, "keys should be different")
 
-		// check public key encoding
-		pk := sk.PublicKey()
-		pkBytes := pk.Encode()
-		pkCheck, err := DecodePublicKey(salg, pkBytes)
-		require.Nil(t, err, "the key decoding has failed")
-		assert.True(t, pk.Equals(pkCheck), "key equality check failed")
-		pkCheckBytes := pkCheck.Encode()
-		assert.Equal(t, pkBytes, pkCheckBytes, "keys should be equal")
-		distinctPkBytes := distinctSk.PublicKey().Encode()
-		assert.NotEqual(t, pkBytes, distinctPkBytes, "keys should be different")
+			// check public key encoding
+			pk := sk.PublicKey()
+			pkBytes := pk.Encode()
+			pkCheck, err := DecodePublicKey(salg, pkBytes)
+			require.Nil(t, err, "the key decoding failed")
+			assert.True(t, pk.Equals(pkCheck), "key equality check failed")
+			pkCheckBytes := pkCheck.Encode()
+			assert.Equal(t, pkBytes, pkCheckBytes, "keys should be equal")
+			distinctPkBytes := distinctSk.PublicKey().Encode()
+			assert.NotEqual(t, pkBytes, distinctPkBytes, "keys should be different")
 
-		// same for the compressed encoding
-		pkComprBytes := pk.EncodeCompressed()
-		pkComprCheck, err := DecodePublicKeyCompressed(salg, pkComprBytes)
-		require.Nil(t, err, "the key decoding has failed")
-		assert.True(t, pk.Equals(pkComprCheck), "key equality check failed")
-		pkCheckComprBytes := pkComprCheck.EncodeCompressed()
-		assert.Equal(t, pkComprBytes, pkCheckComprBytes, "keys should be equal")
-		distinctPkComprBytes := distinctSk.PublicKey().EncodeCompressed()
-		assert.NotEqual(t, pkComprBytes, distinctPkComprBytes, "keys should be different")
-	}
+			// same for the compressed encoding
+			pkComprBytes := pk.EncodeCompressed()
+			pkComprCheck, err := DecodePublicKeyCompressed(salg, pkComprBytes)
+			require.Nil(t, err, "the key decoding failed")
+			assert.True(t, pk.Equals(pkComprCheck), "key equality check failed")
+			pkCheckComprBytes := pkComprCheck.EncodeCompressed()
+			assert.Equal(t, pkComprBytes, pkCheckComprBytes, "keys should be equal")
+			distinctPkComprBytes := distinctSk.PublicKey().EncodeCompressed()
+			assert.NotEqual(t, pkComprBytes, distinctPkComprBytes, "keys should be different")
+		}
+	})
 
 	// test invalid private keys (equal to the curve group order)
-	groupOrder := make(map[SigningAlgorithm][]byte)
-	groupOrder[ECDSAP256] = []byte{255, 255, 255, 255, 0, 0, 0, 0, 255, 255, 255,
-		255, 255, 255, 255, 255, 188, 230, 250, 173, 167,
-		23, 158, 132, 243, 185, 202, 194, 252, 99, 37, 81}
+	t.Run("private keys equal to the group order", func(t *testing.T) {
+		groupOrder := make(map[SigningAlgorithm][]byte)
+		groupOrder[ECDSAP256] = []byte{255, 255, 255, 255, 0, 0, 0, 0, 255, 255, 255,
+			255, 255, 255, 255, 255, 188, 230, 250, 173, 167,
+			23, 158, 132, 243, 185, 202, 194, 252, 99, 37, 81}
 
-	groupOrder[ECDSASecp256k1] = []byte{255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-		255, 255, 255, 255, 255, 254, 186, 174, 220, 230,
-		175, 72, 160, 59, 191, 210, 94, 140, 208, 54, 65, 65}
+		groupOrder[ECDSASecp256k1] = []byte{255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+			255, 255, 255, 255, 255, 254, 186, 174, 220, 230,
+			175, 72, 160, 59, 191, 210, 94, 140, 208, 54, 65, 65}
 
-	groupOrder[BLSBLS12381] = []byte{0x73, 0xED, 0xA7, 0x53, 0x29, 0x9D, 0x7D, 0x48, 0x33, 0x39,
-		0xD8, 0x08, 0x09, 0xA1, 0xD8, 0x05, 0x53, 0xBD, 0xA4, 0x02, 0xFF, 0xFE,
-		0x5B, 0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x01}
-	_, err := DecodePrivateKey(salg, groupOrder[salg])
-	require.Error(t, err, "the key decoding should fail - private key value is too large")
-	assert.IsType(t, newInvalidInputsError(""), err)
+		groupOrder[BLSBLS12381] = []byte{0x73, 0xED, 0xA7, 0x53, 0x29, 0x9D, 0x7D, 0x48, 0x33, 0x39,
+			0xD8, 0x08, 0x09, 0xA1, 0xD8, 0x05, 0x53, 0xBD, 0xA4, 0x02, 0xFF, 0xFE,
+			0x5B, 0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x01}
+
+		sk, err := DecodePrivateKey(salg, groupOrder[salg])
+		require.Error(t, err, "the key decoding should fail - private key value is too large")
+		assert.True(t, IsInvalidInputsError(err))
+		assert.Nil(t, sk)
+	})
+
+	// test invalid private keys (equal to the curve group order)
+	t.Run("invalid key length", func(t *testing.T) {
+		// private key
+		skLens := make(map[SigningAlgorithm]int)
+		skLens[ECDSAP256] = PrKeyLenECDSAP256
+		skLens[ECDSASecp256k1] = PrKeyLenECDSASecp256k1
+		skLens[BLSBLS12381] = PrKeyLenBLSBLS12381
+
+		bytes := make([]byte, skLens[salg]+1)
+		sk, err := DecodePrivateKey(salg, bytes)
+		require.Error(t, err)
+		assert.True(t, IsInvalidInputsError(err))
+		assert.Nil(t, sk)
+
+		// public key
+		pkLens := make(map[SigningAlgorithm]int)
+		pkLens[ECDSAP256] = PubKeyLenECDSAP256
+		pkLens[ECDSASecp256k1] = PubKeyLenECDSASecp256k1
+		pkLens[BLSBLS12381] = PubKeyLenBLSBLS12381
+
+		bytes = make([]byte, pkLens[salg]+1)
+		pk, err := DecodePublicKey(salg, bytes)
+		require.Error(t, err)
+		assert.True(t, IsInvalidInputsError(err))
+		assert.Nil(t, pk)
+	})
 }
 
 func testEquals(t *testing.T, salg SigningAlgorithm, otherSigAlgo SigningAlgorithm) {

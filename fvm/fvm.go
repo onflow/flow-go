@@ -4,10 +4,10 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 
 	errors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/meter/weighted"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -16,11 +16,18 @@ import (
 // An Procedure is an operation (or set of operations) that reads or writes ledger state.
 type Procedure interface {
 	Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error
+	ComputationLimit(ctx Context) uint64
+	MemoryLimit(ctx Context) uint64
 }
 
-func NewInterpreterRuntime() runtime.Runtime {
-	return runtime.NewInterpreterRuntime(
+func NewInterpreterRuntime(options ...runtime.Option) runtime.Runtime {
+
+	defaultOptions := []runtime.Option{
 		runtime.WithContractUpdateValidationEnabled(true),
+	}
+
+	return runtime.NewInterpreterRuntime(
+		append(defaultOptions, options...)...,
 	)
 }
 
@@ -38,27 +45,14 @@ func NewVirtualMachine(rt runtime.Runtime) *VirtualMachine {
 
 // Run runs a procedure against a ledger in the given context.
 func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, programs *programs.Programs) (err error) {
-
 	st := state.NewState(v,
+		state.WithMeter(weighted.NewMeter(
+			uint(proc.ComputationLimit(ctx)),
+			uint(proc.MemoryLimit(ctx)))),
 		state.WithMaxKeySizeAllowed(ctx.MaxStateKeySize),
 		state.WithMaxValueSizeAllowed(ctx.MaxStateValueSize),
 		state.WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize))
 	sth := state.NewStateHolder(st)
-
-	defer func() {
-		if r := recover(); r != nil {
-
-			// Cadence may fail to encode certain values.
-			// Return an error for now, which will cause transactions to revert.
-			//
-			if encodingErr, ok := r.(interpreter.EncodingUnsupportedValueError); ok {
-				err = errors.NewEncodingUnsupportedValueError(encodingErr.Value, encodingErr.Path)
-				return
-			}
-
-			panic(r)
-		}
-	}()
 
 	err = proc.Run(vm, ctx, sth, programs)
 	if err != nil {
@@ -91,7 +85,7 @@ func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.
 // Errors that occur in a meta transaction are propagated as a single error that can be
 // captured by the Cadence runtime and eventually disambiguated by the parent context.
 func (vm *VirtualMachine) invokeMetaTransaction(parentCtx Context, tx *TransactionProcedure, sth *state.StateHolder, programs *programs.Programs) (errors.Error, error) {
-	invocator := NewTransactionInvocator(zerolog.Nop())
+	invoker := NewTransactionInvoker(zerolog.Nop())
 
 	// do not deduct fees or check storage in meta transactions
 	ctx := NewContextFromParent(parentCtx,
@@ -99,7 +93,7 @@ func (vm *VirtualMachine) invokeMetaTransaction(parentCtx Context, tx *Transacti
 		WithTransactionFeesEnabled(false),
 	)
 
-	err := invocator.Process(vm, &ctx, tx, sth, programs)
+	err := invoker.Process(vm, &ctx, tx, sth, programs)
 	txErr, fatalErr := errors.SplitErrorTypes(err)
 	return txErr, fatalErr
 }

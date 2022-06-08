@@ -6,13 +6,13 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/crypto/random"
 	chunkmodels "github.com/onflow/flow-go/model/chunks"
-	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/model/encoding/json"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/indices"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/seed"
 )
 
 // DefaultChunkAssignmentAlpha is the default number of verifiers that should be
@@ -56,7 +56,7 @@ func (p *ChunkAssigner) Size() uint {
 //    (which contains the block's source of randomness)
 //  * unexpected errors should be considered symptoms of internal bugs
 func (p *ChunkAssigner) Assign(result *flow.ExecutionResult, blockID flow.Identifier) (*chunkmodels.Assignment, error) {
-	// computes a finger print for blockID||resultID||alpha
+	// computes a fingerprint for blockID||resultID||alpha
 	hash, err := fingerPrint(blockID, result.ID(), p.alpha)
 	if err != nil {
 		return nil, fmt.Errorf("could not compute hash of identifiers: %w", err)
@@ -71,7 +71,7 @@ func (p *ChunkAssigner) Assign(result *flow.ExecutionResult, blockID flow.Identi
 
 	// Get a list of verifiers at block that is being sealed
 	verifiers, err := p.protocolState.AtBlockID(result.BlockID).Identities(filter.And(filter.HasRole(flow.RoleVerification),
-		filter.HasStake(true),
+		filter.HasWeight(true),
 		filter.Not(filter.Ejected)))
 	if err != nil {
 		return nil, fmt.Errorf("could not get verifiers: %w", err)
@@ -96,16 +96,15 @@ func (p *ChunkAssigner) Assign(result *flow.ExecutionResult, blockID flow.Identi
 }
 
 func (p *ChunkAssigner) rngByBlockID(stateSnapshot protocol.Snapshot) (random.Rand, error) {
-	// TODO: rng could be cached to optimize performance
-
-	seed, err := stateSnapshot.Seed(indices.ProtocolVerificationChunkAssignment...) // potentially returns NoValidChildBlockError
+	// TODO: seed could be cached to optimize performance
+	randomSource, err := stateSnapshot.RandomSource() // potentially returns NoValidChildBlockError
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to retrieve source of randomness: %w", err)
 	}
 
-	rng, err := random.NewRand(seed)
+	rng, err := seed.PRGFromRandomSource(randomSource, seed.ProtocolVerificationChunkAssignment)
 	if err != nil {
-		return nil, fmt.Errorf("could not generate random generator: %w", err)
+		return nil, fmt.Errorf("failed to instantiate random number generator: %w", err)
 	}
 
 	return rng, nil
@@ -168,8 +167,8 @@ func chunkAssignment(ids flow.IdentifierList, chunks flow.ChunkList, rng random.
 func fingerPrint(blockID flow.Identifier, resultID flow.Identifier, alpha int) (hash.Hash, error) {
 	hasher := hash.NewSHA3_256()
 
-	// encodes alpha parameteer
-	encAlpha, err := encoding.DefaultEncoder.Encode(alpha)
+	// encodes alpha parameter
+	encAlpha, err := json.NewMarshaler().Marshal(alpha)
 	if err != nil {
 		return nil, fmt.Errorf("could not encode alpha: %w", err)
 	}

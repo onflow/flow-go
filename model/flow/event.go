@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/model/encoding/json"
 	"github.com/onflow/flow-go/model/fingerprint"
+	"github.com/onflow/flow-go/storage/merkle"
 )
 
 // List of built-in event types.
@@ -51,7 +51,7 @@ func (e Event) Checksum() Identifier {
 // Encode returns the canonical encoding of this event, containing only the fields necessary to uniquely identify it.
 func (e Event) Encode() []byte {
 	w := wrapEventID(e)
-	return encoding.DefaultEncoder.MustEncode(w)
+	return json.NewMarshaler().MustMarshal(w)
 }
 
 func (e Event) Fingerprint() []byte {
@@ -99,18 +99,26 @@ type BlockEvents struct {
 
 type EventsList []Event
 
-// EventsListHash calculates a hash of events list,
-// by simply hashing byte representation of events in the lists
-func EventsListHash(el EventsList) (Identifier, error) {
-
-	hasher := hash.NewSHA3_256()
+// EventsMerkleRootHash calculates the root hash of events inserted into a
+// merkle trie with the hash of event as the key and encoded event as value
+func EventsMerkleRootHash(el EventsList) (Identifier, error) {
+	tree, err := merkle.NewTree(IdentifierLen)
+	if err != nil {
+		return ZeroID, fmt.Errorf("instantiating payload trie for key length of %d bytes failed: %w", IdentifierLen, err)
+	}
 
 	for _, event := range el {
-		_, err := hasher.Write(event.Fingerprint())
+		// event fingerprint is the rlp encoding of the wrapperevent
+		// eventID is the standard sha3 hash of the event fingerprint
+		fingerPrint := event.Fingerprint()
+		eventID := MakeID(fingerPrint)
+		_, err = tree.Put(eventID[:], fingerPrint)
 		if err != nil {
-			return ZeroID, fmt.Errorf("cannot write to hasher: %w", err)
+			return ZeroID, err
 		}
 	}
 
-	return HashToID(hasher.SumHash()), nil
+	var root Identifier
+	copy(root[:], tree.Hash())
+	return root, nil
 }

@@ -3,9 +3,8 @@ package cmd
 import (
 	"encoding/hex"
 	"os"
-	"regexp"
-
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -14,26 +13,24 @@ import (
 
 	utils "github.com/onflow/flow-go/cmd/bootstrap/utils"
 	model "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 const finalizeHappyPathLogs = "^deterministic bootstrapping random seed" +
 	"collecting partner network and staking keys" +
 	`read \d+ partner node configuration files` +
-	`read \d+ stakes for partner nodes` +
+	`read \d+ weights for partner nodes` +
 	"generating internal private networking and staking keys" +
 	`read \d+ internal private node-info files` +
 	`read internal node configurations` +
-	`read \d+ stakes for internal nodes` +
+	`read \d+ weights for internal nodes` +
 	`checking constraints on consensus/cluster nodes` +
 	`assembling network and staking keys` +
-	`wrote file \S+/node-infos.pub.json` +
-	`running DKG for consensus nodes` +
-	`read \d+ node infos for DKG` +
-	`will run DKG` +
-	`finished running DKG` +
-	`.+/random-beacon.priv.json` +
-	`constructing root block` +
+	`reading root block data` +
+	`reading root block votes` +
+	`read vote .*` +
+	`reading dkg data` +
 	`constructing root QC` +
 	`computing collection node clusters` +
 	`constructing root blocks for collection node clusters` +
@@ -42,6 +39,7 @@ const finalizeHappyPathLogs = "^deterministic bootstrapping random seed" +
 	`constructing root protocol snapshot` +
 	`wrote file \S+/root-protocol-state-snapshot.json` +
 	`saved result and seal are matching` +
+	`saved root snapshot is valid` +
 	`attempting to copy private key files` +
 	`skipping copy of private keys to output dir` +
 	`created keys for \d+ consensus nodes` +
@@ -54,32 +52,38 @@ const finalizeHappyPathLogs = "^deterministic bootstrapping random seed" +
 var finalizeHappyPathRegex = regexp.MustCompile(finalizeHappyPathLogs)
 
 func TestFinalize_HappyPath(t *testing.T) {
-	deterministicSeed := GenerateRandomSeed()
+	deterministicSeed := GenerateRandomSeed(flow.EpochSetupRandomSourceLength)
 	rootCommit := unittest.StateCommitmentFixture()
 	rootParent := unittest.StateCommitmentFixture()
 	chainName := "main"
 	rootHeight := uint64(12332)
 	epochCounter := uint64(2)
 
-	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerStakes, internalPrivDir, configPath string) {
+	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerWeights, internalPrivDir, configPath string) {
 
 		flagOutdir = bootDir
 
 		flagConfig = configPath
 		flagPartnerNodeInfoDir = partnerDir
-		flagPartnerStakes = partnerStakes
+		flagPartnerWeights = partnerWeights
 		flagInternalNodePrivInfoDir = internalPrivDir
 
 		flagFastKG = true
-
-		flagRootCommit = hex.EncodeToString(rootCommit[:])
-		flagRootParent = hex.EncodeToString(rootParent[:])
 		flagRootChain = chainName
+		flagRootParent = hex.EncodeToString(rootParent[:])
 		flagRootHeight = rootHeight
-		flagEpochCounter = epochCounter
 
 		// set deterministic bootstrapping seed
 		flagBootstrapRandomSeed = deterministicSeed
+
+		// rootBlock will generate DKG and place it into bootDir/public-root-information
+		rootBlock(nil, nil)
+
+		flagRootCommit = hex.EncodeToString(rootCommit[:])
+		flagEpochCounter = epochCounter
+		flagRootBlock = filepath.Join(bootDir, model.PathRootBlockData)
+		flagDKGDataPath = filepath.Join(bootDir, model.PathRootDKGData)
+		flagRootBlockVotesDir = filepath.Join(bootDir, model.DirnameRootBlockVotes)
 
 		hook := zeroLoggerHook{logs: &strings.Builder{}}
 		log = log.Hook(hook)
@@ -95,20 +99,20 @@ func TestFinalize_HappyPath(t *testing.T) {
 }
 
 func TestFinalize_Deterministic(t *testing.T) {
-	deterministicSeed := GenerateRandomSeed()
+	deterministicSeed := GenerateRandomSeed(flow.EpochSetupRandomSourceLength)
 	rootCommit := unittest.StateCommitmentFixture()
 	rootParent := unittest.StateCommitmentFixture()
 	chainName := "main"
 	rootHeight := uint64(1000)
 	epochCounter := uint64(0)
 
-	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerStakes, internalPrivDir, configPath string) {
+	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerWeights, internalPrivDir, configPath string) {
 
 		flagOutdir = bootDir
 
 		flagConfig = configPath
 		flagPartnerNodeInfoDir = partnerDir
-		flagPartnerStakes = partnerStakes
+		flagPartnerWeights = partnerWeights
 		flagInternalNodePrivInfoDir = internalPrivDir
 
 		flagFastKG = true
@@ -122,6 +126,13 @@ func TestFinalize_Deterministic(t *testing.T) {
 		// set deterministic bootstrapping seed
 		flagBootstrapRandomSeed = deterministicSeed
 
+		// rootBlock will generate DKG and place it into model.PathRootDKGData
+		rootBlock(nil, nil)
+
+		flagRootBlock = filepath.Join(bootDir, model.PathRootBlockData)
+		flagDKGDataPath = filepath.Join(bootDir, model.PathRootDKGData)
+		flagRootBlockVotesDir = filepath.Join(bootDir, model.DirnameRootBlockVotes)
+
 		hook := zeroLoggerHook{logs: &strings.Builder{}}
 		log = log.Hook(hook)
 
@@ -134,7 +145,7 @@ func TestFinalize_Deterministic(t *testing.T) {
 		assert.FileExists(t, snapshotPath)
 
 		// read snapshot
-		firstSnapshot, err := utils.ReadRootProtocolSnapshot(bootDir)
+		_, err := utils.ReadRootProtocolSnapshot(bootDir)
 		require.NoError(t, err)
 
 		// delete snapshot file
@@ -149,28 +160,34 @@ func TestFinalize_Deterministic(t *testing.T) {
 		assert.FileExists(t, snapshotPath)
 
 		// read snapshot
-		secondSnapshot, err := utils.ReadRootProtocolSnapshot(bootDir)
+		_, err = utils.ReadRootProtocolSnapshot(bootDir)
 		require.NoError(t, err)
 
-		assert.Equal(t, firstSnapshot, secondSnapshot)
+		// ATTENTION: we can't use next statement because QC generation is not deterministic
+		// assert.Equal(t, firstSnapshot, secondSnapshot)
+		// Meaning we don't have a guarantee that with same input arguments we will get same QC.
+		// This doesn't mean that QC is invalid, but it will result in different structures,
+		// different QC => different service events => different result => different seal
+		// We need to use a different mechanism for comparing.
+		// ToDo: Revisit if this test case is valid at all.
 	})
 }
 
 func TestFinalize_SameSeedDifferentStateCommits(t *testing.T) {
-	deterministicSeed := GenerateRandomSeed()
+	deterministicSeed := GenerateRandomSeed(flow.EpochSetupRandomSourceLength)
 	rootCommit := unittest.StateCommitmentFixture()
 	rootParent := unittest.StateCommitmentFixture()
 	chainName := "main"
 	rootHeight := uint64(1000)
 	epochCounter := uint64(0)
 
-	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerStakes, internalPrivDir, configPath string) {
+	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerWeights, internalPrivDir, configPath string) {
 
 		flagOutdir = bootDir
 
 		flagConfig = configPath
 		flagPartnerNodeInfoDir = partnerDir
-		flagPartnerStakes = partnerStakes
+		flagPartnerWeights = partnerWeights
 		flagInternalNodePrivInfoDir = internalPrivDir
 
 		flagFastKG = true
@@ -183,6 +200,13 @@ func TestFinalize_SameSeedDifferentStateCommits(t *testing.T) {
 
 		// set deterministic bootstrapping seed
 		flagBootstrapRandomSeed = deterministicSeed
+
+		// rootBlock will generate DKG and place it into bootDir/public-root-information
+		rootBlock(nil, nil)
+
+		flagRootBlock = filepath.Join(bootDir, model.PathRootBlockData)
+		flagDKGDataPath = filepath.Join(bootDir, model.PathRootDKGData)
+		flagRootBlockVotesDir = filepath.Join(bootDir, model.DirnameRootBlockVotes)
 
 		hook := zeroLoggerHook{logs: &strings.Builder{}}
 		log = log.Hook(hook)
@@ -244,7 +268,8 @@ func TestFinalize_SameSeedDifferentStateCommits(t *testing.T) {
 		randomSource2, err := currentEpoch2.RandomSource()
 		require.NoError(t, err)
 		assert.Equal(t, randomSource1, randomSource2)
-		assert.Equal(t, randomSource1, getRandomSource(deterministicSeed))
+		assert.Equal(t, randomSource1, deterministicSeed)
+		assert.Equal(t, flow.EpochSetupRandomSourceLength, len(randomSource1))
 	})
 }
 
@@ -262,13 +287,13 @@ func TestFinalize_InvalidRandomSeedLength(t *testing.T) {
 	// invalid length execution logs
 	expectedLogs := regexp.MustCompile("random seed provided length is not valid")
 
-	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerStakes, internalPrivDir, configPath string) {
+	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerWeights, internalPrivDir, configPath string) {
 
 		flagOutdir = bootDir
 
 		flagConfig = configPath
 		flagPartnerNodeInfoDir = partnerDir
-		flagPartnerStakes = partnerStakes
+		flagPartnerWeights = partnerWeights
 		flagInternalNodePrivInfoDir = internalPrivDir
 
 		flagFastKG = true

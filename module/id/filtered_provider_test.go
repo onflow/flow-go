@@ -30,7 +30,7 @@ func TestFilteredIdentitiesProvider(t *testing.T) {
 	}
 
 	ip := NewFixedIdentityProvider(identities)
-	fp := NewFilteredIdentifierProvider(filter.In(oddIdentities), ip)
+	fp := NewIdentityFilterIdentifierProvider(filter.In(oddIdentities), ip)
 
 	assert.ElementsMatch(t, fp.Identifiers(),
 		(flow.IdentityList)(oddIdentities).NodeIDs())

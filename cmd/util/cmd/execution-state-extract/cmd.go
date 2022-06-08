@@ -1,7 +1,9 @@
 package extract
 
 import (
+	"encoding/binary"
 	"encoding/hex"
+	"fmt"
 	"os"
 	"path"
 
@@ -10,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/ledger/common/hash"
+	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -22,10 +25,20 @@ var (
 	flagBlockHash         string
 	flagStateCommitment   string
 	flagDatadir           string
+	flagChain             string
 	flagNoMigration       bool
 	flagNoReport          bool
-	flagCleanupStorage    bool
 )
+
+func getChain(chainName string) (chain flow.Chain, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("invalid chain: %s", r)
+		}
+	}()
+	chain = flow.ChainID(chainName).Chain()
+	return
+}
 
 var Cmd = &cobra.Command{
 	Use:   "execution-state-extract",
@@ -42,6 +55,9 @@ func init() {
 		"Directory to write new Execution State to")
 	_ = Cmd.MarkFlagRequired("output-dir")
 
+	Cmd.Flags().StringVar(&flagChain, "chain", "", "Chain name")
+	_ = Cmd.MarkFlagRequired("chain")
+
 	Cmd.Flags().StringVar(&flagStateCommitment, "state-commitment", "",
 		"state commitment (hex-encoded, 64 characters)")
 
@@ -56,9 +72,6 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagNoReport, "no-report", false,
 		"don't report the state")
-
-	Cmd.Flags().BoolVar(&flagCleanupStorage, "cleanup-storage", false,
-		"cleanup storage by removing broken contracts")
 }
 
 func run(*cobra.Command, []string) {
@@ -97,20 +110,52 @@ func run(*cobra.Command, []string) {
 		if err != nil {
 			log.Fatal().Err(err).Msg("invalid state commitment length")
 		}
-	} else if !flagNoMigration {
+	}
+
+	if len(flagBlockHash) == 0 && len(flagStateCommitment) == 0 {
 		// read state commitment from root checkpoint
 
 		f, err := os.Open(path.Join(flagExecutionStateDir, bootstrap.FilenameWALRootCheckpoint))
 		if err != nil {
 			log.Fatal().Err(err).Msg("invalid root checkpoint")
 		}
-		const crcLength = 4
-		_, err = f.Seek(-(hash.HashLen + crcLength), 2 /* relative from end */)
-		if err != nil {
-			log.Fatal().Err(err).Msg("invalid root checkpoint")
+
+		const (
+			encMagicSize     = 2
+			encVersionSize   = 2
+			crcLength        = 4
+			encNodeCountSize = 8
+			encTrieCountSize = 2
+			headerSize       = encMagicSize + encVersionSize
+		)
+
+		// read checkpoint version
+		header := make([]byte, headerSize)
+		n, err := f.Read(header)
+		if err != nil || n != headerSize {
+			log.Fatal().Err(err).Msg("failed to read version from root checkpoint")
 		}
 
-		n, err := f.Read(stateCommitment[:])
+		magic := binary.BigEndian.Uint16(header)
+		version := binary.BigEndian.Uint16(header[encMagicSize:])
+
+		if magic != wal.MagicBytes {
+			log.Fatal().Err(err).Msg("invalid magic bytes in root checkpoint")
+		}
+
+		if version <= 3 {
+			_, err = f.Seek(-(hash.HashLen + crcLength), 2 /* relative from end */)
+			if err != nil {
+				log.Fatal().Err(err).Msg("invalid root checkpoint")
+			}
+		} else {
+			_, err = f.Seek(-(hash.HashLen + encNodeCountSize + encTrieCountSize + crcLength), 2 /* relative from end */)
+			if err != nil {
+				log.Fatal().Err(err).Msg("invalid root checkpoint")
+			}
+		}
+
+		n, err = f.Read(stateCommitment[:])
 		if err != nil || n != hash.HashLen {
 			log.Fatal().Err(err).Msg("failed to read state commitment from root checkpoint")
 		}
@@ -118,15 +163,21 @@ func run(*cobra.Command, []string) {
 
 	log.Info().Msgf("Block state commitment: %s", hex.EncodeToString(stateCommitment[:]))
 
-	err := extractExecutionState(
+	chain, err := getChain(flagChain)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("invalid chain name")
+	}
+
+	err = extractExecutionState(
 		flagExecutionStateDir,
 		stateCommitment,
 		flagOutputDir,
 		log.Logger,
+		chain,
 		!flagNoMigration,
 		!flagNoReport,
-		flagCleanupStorage,
 	)
+
 	if err != nil {
 		log.Fatal().Err(err).Msgf("error extracting the execution state: %s", err.Error())
 	}

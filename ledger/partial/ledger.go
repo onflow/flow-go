@@ -63,6 +63,22 @@ func (l *Ledger) InitialState() ledger.State {
 	return l.state
 }
 
+// GetSingleValue reads value of a given key at the given state
+func (l *Ledger) GetSingleValue(query *ledger.QuerySingleValue) (value ledger.Value, err error) {
+	path, err := pathfinder.KeyToPath(query.Key(), l.pathFinderVersion)
+	if err != nil {
+		return nil, err
+	}
+	payload, err := l.ptrie.GetSinglePayload(path)
+	if err != nil {
+		if _, ok := err.(*ptrie.ErrMissingPath); ok {
+			return nil, &ledger.ErrMissingKeys{Keys: []ledger.Key{query.Key()}}
+		}
+		return nil, err
+	}
+	return payload.Value, err
+}
+
 // Get read the values of the given keys at the given state
 // it returns the values in the same order as given registerIDs and errors (if any)
 func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
@@ -82,9 +98,9 @@ func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 				pathToKey[path] = key
 			}
 
-			keys := make([]ledger.Key, 0, len(pErr.Paths))
-			for _, path := range pErr.Paths {
-				keys = append(keys, pathToKey[path])
+			keys := make([]ledger.Key, len(pErr.Paths))
+			for i, path := range pErr.Paths {
+				keys[i] = pathToKey[path]
 			}
 			return nil, &ledger.ErrMissingKeys{Keys: keys}
 		}
@@ -113,27 +129,7 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *
 
 	newRootHash, err := l.ptrie.Update(trieUpdate.Paths, trieUpdate.Payloads)
 	if err != nil {
-		if pErr, ok := err.(*ptrie.ErrMissingPath); ok {
-
-			paths, err := pathfinder.KeysToPaths(update.Keys(), l.pathFinderVersion)
-			if err != nil {
-				return ledger.DummyState, nil, err
-			}
-
-			//store mappings and restore keys from missing paths
-			pathToKey := make(map[ledger.Path]ledger.Key)
-
-			for i, key := range update.Keys() {
-				path := paths[i]
-				pathToKey[path] = key
-			}
-
-			keys := make([]ledger.Key, 0, len(pErr.Paths))
-			for _, path := range pErr.Paths {
-				keys = append(keys, pathToKey[path])
-			}
-			return ledger.DummyState, nil, &ledger.ErrMissingKeys{Keys: keys}
-		}
+		// Returned error type is ledger.ErrMissingKeys
 		return ledger.DummyState, nil, err
 	}
 

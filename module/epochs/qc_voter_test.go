@@ -13,6 +13,8 @@ import (
 
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/factory"
+	flowmodule "github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/epochs"
 	module "github.com/onflow/flow-go/module/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -75,14 +77,14 @@ func (suite *Suite) SetupTest() {
 
 	var err error
 	assignments := unittest.ClusterAssignment(2, suite.nodes)
-	suite.clustering, err = flow.NewClusterList(assignments, suite.nodes)
+	suite.clustering, err = factory.NewClusterList(assignments, suite.nodes)
 	suite.Require().Nil(err)
 
 	suite.epoch.On("Counter").Return(suite.counter, nil)
 	suite.epoch.On("Clustering").Return(suite.clustering, nil)
 	suite.signer.On("CreateVote", mock.Anything).Return(unittest.VoteFixture(), nil)
 
-	suite.voter = epochs.NewRootQCVoter(log, suite.local, suite.signer, suite.state, suite.client)
+	suite.voter = epochs.NewRootQCVoter(log, suite.local, suite.signer, suite.state, []flowmodule.QCContractClient{suite.client})
 }
 
 func TestRootQCVoter(t *testing.T) {

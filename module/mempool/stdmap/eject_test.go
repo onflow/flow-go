@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestLRUEjector_Track evaluates that tracking a new item adds the item to the ejector table.
@@ -178,27 +179,24 @@ func TestLRUEjector_UntrackEject(t *testing.T) {
 
 	// creates and tracks 100 items
 	size := 100
-	var bkend Backend
+	backEnd := NewBackend()
 
 	items := make([]flow.Identifier, size)
-	entities := make(map[flow.Identifier]flow.Entity)
 
 	for i := 0; i < size; i++ {
-		var id flow.Identifier
-		_, _ = crand.Read(id[:])
-		ejector.Track(id)
+		mockEntity := unittest.MockEntityFixture()
+		require.True(t, backEnd.Add(mockEntity))
 
-		entities[id] = MockEntity{}
+		id := mockEntity.ID()
+		ejector.Track(id)
 		items[i] = id
 	}
 
 	// untracks the oldest item
 	ejector.Untrack(items[0])
 
-	bkend.entities = entities
-
 	// next ejectable item should be the second oldest item
-	id, _, _ := ejector.Eject(&bkend)
+	id, _, _ := ejector.Eject(backEnd)
 	assert.Equal(t, id, items[1])
 }
 
@@ -209,35 +207,24 @@ func TestLRUEjector_EjectAll(t *testing.T) {
 
 	// creates and tracks 100 items
 	size := 100
-	var bkend Backend
+	backEnd := NewBackend()
 
 	items := make([]flow.Identifier, size)
-	entities := make(map[flow.Identifier]flow.Entity)
-	for i := 0; i < size; i++ {
-		var id flow.Identifier
-		_, _ = crand.Read(id[:])
-		ejector.Track(id)
 
-		entities[id] = MockEntity{}
+	for i := 0; i < size; i++ {
+		mockEntity := unittest.MockEntityFixture()
+		require.True(t, backEnd.Add(mockEntity))
+
+		id := mockEntity.ID()
+		ejector.Track(id)
 		items[i] = id
 	}
 
-	bkend.entities = entities
+	require.Equal(t, uint(size), backEnd.Size())
 
 	// ejects one by one
 	for i := 0; i < size; i++ {
-		id, _, _ := ejector.Eject(&bkend)
+		id, _, _ := ejector.Eject(backEnd)
 		require.Equal(t, id, items[i])
 	}
-}
-
-// MockEntity is a mocked entity type used in internal testing of ejectors.
-type MockEntity struct{}
-
-func (m MockEntity) ID() flow.Identifier {
-	return flow.Identifier{}
-}
-
-func (m MockEntity) Checksum() flow.Identifier {
-	return flow.Identifier{}
 }

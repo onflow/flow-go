@@ -10,6 +10,7 @@ const (
 	namespaceVerification = "verification"
 	namespaceExecution    = "execution"
 	namespaceLoader       = "loader"
+	namespaceStateSync    = "state_synchronization"
 )
 
 // Network subsystems represent the various layers of networking.
@@ -63,6 +64,12 @@ const (
 	subsystemVerifierEngine  = "verifier"
 	subsystemBlockConsumer   = "block_consumer"
 	subsystemChunkConsumer   = "chunk_consumer"
+)
+
+// State Synchronization Subsystems
+const (
+	subsystemExecutionDataService   = "execution_data_service"
+	subsystemExecutionDataRequester = "execution_data_requester"
 )
 
 // METRIC NAMING GUIDELINES

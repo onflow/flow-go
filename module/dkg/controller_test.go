@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
@@ -89,15 +90,18 @@ func (n *node) run() error {
 // private and public messages through a shared set of channels.
 type broker struct {
 	id                int
-	privateChannels   []chan msg.DKGMessage
-	broadcastChannels []chan msg.DKGMessage
+	privateChannels   []chan msg.PrivDKGMessageIn
+	broadcastChannels []chan msg.BroadcastDKGMessage
 	logger            zerolog.Logger
 	dkgInstanceID     string
 }
 
 // PrivateSend implements the crypto.DKGProcessor interface.
 func (b *broker) PrivateSend(dest int, data []byte) {
-	b.privateChannels[dest] <- msg.NewDKGMessage(b.id, data, b.dkgInstanceID)
+	b.privateChannels[dest] <- msg.PrivDKGMessageIn{
+		DKGMessage:           msg.NewDKGMessage(data, b.dkgInstanceID),
+		CommitteeMemberIndex: uint64(b.id),
+	}
 }
 
 // Broadcast implements the crypto.DKGProcessor interface.
@@ -113,7 +117,10 @@ func (b *broker) Broadcast(data []byte) {
 			continue
 		}
 		// epoch and phase are not relevant at the controller level
-		b.broadcastChannels[i] <- msg.NewDKGMessage(b.id, data, b.dkgInstanceID)
+		b.broadcastChannels[i] <- msg.BroadcastDKGMessage{
+			DKGMessage:           msg.NewDKGMessage(data, b.dkgInstanceID),
+			CommitteeMemberIndex: uint64(b.id),
+		}
 	}
 }
 
@@ -133,12 +140,12 @@ func (b *broker) GetIndex() int {
 }
 
 // GetPrivateMsgCh implements the DKGBroker interface.
-func (b *broker) GetPrivateMsgCh() <-chan msg.DKGMessage {
+func (b *broker) GetPrivateMsgCh() <-chan msg.PrivDKGMessageIn {
 	return b.privateChannels[b.id]
 }
 
 // GetBroadcastMsgCh implements the DKGBroker interface.
-func (b *broker) GetBroadcastMsgCh() <-chan msg.DKGMessage {
+func (b *broker) GetBroadcastMsgCh() <-chan msg.BroadcastDKGMessage {
 	return b.broadcastChannels[b.id]
 }
 
@@ -221,11 +228,11 @@ func testDKG(t *testing.T, totalNodes int, goodNodes int, phase1Duration, phase2
 // Initialise nodes and communication channels.
 func initNodes(t *testing.T, n int, phase1Duration, phase2Duration, phase3Duration time.Duration) []*node {
 	// Create the channels through which the nodes will communicate
-	privateChannels := make([]chan msg.DKGMessage, 0, n)
-	broadcastChannels := make([]chan msg.DKGMessage, 0, n)
+	privateChannels := make([]chan msg.PrivDKGMessageIn, 0, n)
+	broadcastChannels := make([]chan msg.BroadcastDKGMessage, 0, n)
 	for i := 0; i < n; i++ {
-		privateChannels = append(privateChannels, make(chan msg.DKGMessage, 5*n*n))
-		broadcastChannels = append(broadcastChannels, make(chan msg.DKGMessage, 5*n*n))
+		privateChannels = append(privateChannels, make(chan msg.PrivDKGMessageIn, 5*n*n))
+		broadcastChannels = append(broadcastChannels, make(chan msg.BroadcastDKGMessage, 5*n*n))
 	}
 
 	nodes := make([]*node, 0, n)
@@ -246,12 +253,21 @@ func initNodes(t *testing.T, n int, phase1Duration, phase2Duration, phase3Durati
 		dkg, err := crypto.NewJointFeldman(n, signature.RandomBeaconThreshold(n), i, broker)
 		require.NoError(t, err)
 
+		// create a config with no delays for tests
+		config := ControllerConfig{
+			BaseStartDelay:                 0,
+			BaseHandleFirstBroadcastDelay:  0,
+			HandleSubsequentBroadcastDelay: 0,
+		}
+
 		controller := NewController(
 			logger,
 			"dkg_test",
 			dkg,
 			seed,
-			broker)
+			broker,
+			config,
+		)
 		require.NoError(t, err)
 
 		node := newNode(i, controller, phase1Duration, phase2Duration, phase3Duration)
@@ -312,4 +328,55 @@ func checkArtifacts(t *testing.T, nodes []*node, totalNodes int) {
 			}
 		}
 	}
+}
+
+func TestDelay(t *testing.T) {
+
+	t.Run("should return 0 delay for <=0 inputs", func(t *testing.T) {
+		delay := computePreprocessingDelay(0, 100)
+		assert.Equal(t, delay, time.Duration(0))
+		delay = computePreprocessingDelay(time.Hour, 0)
+		assert.Equal(t, delay, time.Duration(0))
+		delay = computePreprocessingDelay(time.Millisecond, -1)
+		assert.Equal(t, delay, time.Duration(0))
+		delay = computePreprocessingDelay(-time.Millisecond, 100)
+		assert.Equal(t, delay, time.Duration(0))
+	})
+
+	// NOTE: this is a probabilistic test. It will (extremely infrequently) fail.
+	t.Run("should return different values for same inputs", func(t *testing.T) {
+		d1 := computePreprocessingDelay(time.Hour, 100)
+		d2 := computePreprocessingDelay(time.Hour, 100)
+		assert.NotEqual(t, d1, d2)
+	})
+
+	t.Run("should return values in expected range", func(t *testing.T) {
+		baseDelay := time.Second
+		dkgSize := 100
+		minDelay := time.Duration(0)
+		// m=b*n^2
+		expectedMaxDelay := time.Duration(int64(baseDelay) * int64(dkgSize) * int64(dkgSize))
+
+		maxDelay := computePreprocessingDelayMax(baseDelay, dkgSize)
+		assert.Equal(t, expectedMaxDelay, maxDelay)
+
+		delay := computePreprocessingDelay(baseDelay, dkgSize)
+		assert.LessOrEqual(t, minDelay, delay)
+		assert.GreaterOrEqual(t, expectedMaxDelay, delay)
+	})
+
+	t.Run("should return values in expected range for defaults", func(t *testing.T) {
+		baseDelay := DefaultBaseHandleFirstBroadcastDelay
+		dkgSize := 150
+		minDelay := time.Duration(0)
+		// m=b*n^2
+		expectedMaxDelay := time.Duration(int64(baseDelay) * int64(dkgSize) * int64(dkgSize))
+
+		maxDelay := computePreprocessingDelayMax(baseDelay, dkgSize)
+		assert.Equal(t, expectedMaxDelay, maxDelay)
+
+		delay := computePreprocessingDelay(baseDelay, dkgSize)
+		assert.LessOrEqual(t, minDelay, delay)
+		assert.GreaterOrEqual(t, expectedMaxDelay, delay)
+	})
 }

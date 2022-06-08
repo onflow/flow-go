@@ -40,11 +40,11 @@ func TestHeaderFingerprint(t *testing.T) {
 		PayloadHash        flow.Identifier
 		Timestamp          uint64
 		View               uint64
-		ParentVoterIDs     []flow.Identifier
+		ParentVoterIndices []byte
 		ParentVoterSigData crypto.Signature
 		ProposerID         flow.Identifier
 	}
-	rlp.NewEncoder().MustDecode(data, &decoded)
+	rlp.NewMarshaler().MustUnmarshal(data, &decoded)
 	decHeader := flow.Header{
 		ChainID:            decoded.ChainID,
 		ParentID:           decoded.ParentID,
@@ -52,7 +52,7 @@ func TestHeaderFingerprint(t *testing.T) {
 		PayloadHash:        decoded.PayloadHash,
 		Timestamp:          time.Unix(0, int64(decoded.Timestamp)).UTC(),
 		View:               decoded.View,
-		ParentVoterIDs:     decoded.ParentVoterIDs,
+		ParentVoterIndices: decoded.ParentVoterIndices,
 		ParentVoterSigData: decoded.ParentVoterSigData,
 		ProposerID:         decoded.ProposerID,
 		ProposerSigData:    header.ProposerSigData, // since this field is not encoded/decoded, just set it to the original

@@ -6,17 +6,30 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/order"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 // NewStaticCommittee returns a new committee with a static participant set.
 func NewStaticCommittee(participants flow.IdentityList, myID flow.Identifier, dkgParticipants map[flow.Identifier]flow.DKGParticipant, dkgGroupKey crypto.PublicKey) (*Static, error) {
+
+	return NewStaticCommitteeWithDKG(participants, myID, staticDKG{
+		dkgParticipants: dkgParticipants,
+		dkgGroupKey:     dkgGroupKey,
+	})
+}
+
+// NewStaticCommitteeWithDKG returns a new committee with a static participant set.
+func NewStaticCommitteeWithDKG(participants flow.IdentityList, myID flow.Identifier, dkg protocol.DKG) (*Static, error) {
+	valid := order.IdentityListCanonical(participants)
+	if !valid {
+		return nil, fmt.Errorf("participants %v is not in Canonical order", participants)
+	}
+
 	static := &Static{
 		participants: participants,
 		myID:         myID,
-		dkg: staticDKG{
-			dkgParticipants: dkgParticipants,
-			dkgGroupKey:     dkgGroupKey,
-		},
+		dkg:          dkg,
 	}
 	return static, nil
 }
@@ -26,11 +39,11 @@ func NewStaticCommittee(participants flow.IdentityList, myID flow.Identifier, dk
 type Static struct {
 	participants flow.IdentityList
 	myID         flow.Identifier
-	dkg          staticDKG
+	dkg          protocol.DKG
 }
 
-func (s Static) Identities(_ flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
-	return s.participants.Filter(selector), nil
+func (s Static) Identities(_ flow.Identifier) (flow.IdentityList, error) {
+	return s.participants, nil
 }
 
 func (s Static) Identity(_ flow.Identifier, participantID flow.Identifier) (*flow.Identity, error) {
@@ -66,18 +79,22 @@ func (s staticDKG) GroupKey() crypto.PublicKey {
 	return s.dkgGroupKey
 }
 
+// Index returns the index for the given node. Error Returns:
+// protocol.IdentityNotFoundError if nodeID is not a valid DKG participant.
 func (s staticDKG) Index(nodeID flow.Identifier) (uint, error) {
 	participant, ok := s.dkgParticipants[nodeID]
 	if !ok {
-		return 0, fmt.Errorf("could not get participant")
+		return 0, protocol.IdentityNotFoundError{NodeID: nodeID}
 	}
 	return participant.Index, nil
 }
 
+// KeyShare returns the public key share for the given node. Error Returns:
+// protocol.IdentityNotFoundError if nodeID is not a valid DKG participant.
 func (s staticDKG) KeyShare(nodeID flow.Identifier) (crypto.PublicKey, error) {
 	participant, ok := s.dkgParticipants[nodeID]
 	if !ok {
-		return nil, fmt.Errorf("could not get participant")
+		return nil, protocol.IdentityNotFoundError{NodeID: nodeID}
 	}
 	return participant.KeyShare, nil
 }

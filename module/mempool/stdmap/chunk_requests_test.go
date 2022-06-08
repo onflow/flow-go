@@ -9,7 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/verification/requester"
+	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -117,19 +119,19 @@ func withUpdaterScenario(t *testing.T, chunks int, times int, updater mempool.Ch
 	wg.Add(times * chunks)
 	for _, request := range chunkReqs {
 		for i := 0; i < times; i++ {
-			go func(requestID flow.Identifier) {
-				_, _, _, ok := requests.UpdateRequestHistory(requestID, updater)
+			go func(chunkID flow.Identifier) {
+				_, _, _, ok := requests.UpdateRequestHistory(chunkID, updater)
 				require.True(t, ok)
 
 				wg.Done()
-			}(request.ID())
+			}(request.ChunkID)
 		}
 	}
 	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not finish updating requests on time")
 
 	// performs custom validation of test.
-	for _, chunk := range chunkReqs {
-		attempts, lastTried, retryAfter, ok := requests.RequestHistory(chunk.ID())
+	for _, request := range chunkReqs {
+		attempts, lastTried, retryAfter, ok := requests.RequestHistory(request.ChunkID)
 		require.True(t, ok)
 		validate(t, attempts, lastTried, retryAfter)
 	}
@@ -151,13 +153,13 @@ func TestFailingUpdater(t *testing.T) {
 	wg.Add(10)
 	updater := mempool.IncrementalAttemptUpdater()
 	for _, request := range chunkReqs {
-		go func(requestID flow.Identifier) {
-			attempts, _, _, ok := requests.UpdateRequestHistory(requestID, updater)
+		go func(chunkID flow.Identifier) {
+			attempts, _, _, ok := requests.UpdateRequestHistory(chunkID, updater)
 			require.True(t, ok)
 			require.Equal(t, uint64(1), attempts)
 
 			wg.Done()
-		}(request.ID())
+		}(request.ChunkID)
 	}
 	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not finish updating requests on time")
 
@@ -168,23 +170,90 @@ func TestFailingUpdater(t *testing.T) {
 	}
 	wg.Add(10)
 	for _, request := range chunkReqs {
-		go func(requestID flow.Identifier) {
+		go func(chunkID flow.Identifier) {
 			// takes request history before update
-			exAttempts, exLastTried, exRetryAfter, ok := requests.RequestHistory(requestID)
+			exAttempts, exLastTried, exRetryAfter, ok := requests.RequestHistory(chunkID)
 			require.True(t, ok)
 
 			// failing an update should not change request history
-			_, _, _, result := requests.UpdateRequestHistory(requestID, failingUpdater)
+			_, _, _, result := requests.UpdateRequestHistory(chunkID, failingUpdater)
 			require.False(t, result)
 
-			acAttempts, acLastTried, acRetryAfter, ok := requests.RequestHistory(requestID)
+			acAttempts, acLastTried, acRetryAfter, ok := requests.RequestHistory(chunkID)
 			require.True(t, ok)
 			require.Equal(t, exAttempts, acAttempts)
 			require.Equal(t, exLastTried, acLastTried)
 			require.Equal(t, exRetryAfter, acRetryAfter)
 
 			wg.Done()
-		}(request.ID())
+		}(request.ChunkID)
 	}
 	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not finish updating requests on time")
+}
+
+// TestAddingDuplicateChunkIDs evaluates adding duplicate chunk ID requests
+// that belong to an execution fork, i.e., same chunk ID appearing on two conflicting
+// execution results.
+func TestAddingDuplicateChunkIDs(t *testing.T) {
+	// initializations: creating mempool and populating it.
+	requests := stdmap.NewChunkRequests(10)
+
+	thisReq := unittest.ChunkDataPackRequestFixture()
+	require.True(t, requests.Add(thisReq))
+
+	// adding another request for the same tuple of (chunkID, resultID, chunkIndex)
+	// is deduplicated.
+	require.False(t, requests.Add(&verification.ChunkDataPackRequest{
+		Locator: chunks.Locator{
+			ResultID: thisReq.ResultID,
+			Index:    thisReq.Index,
+		},
+		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
+			ChunkID: thisReq.ChunkID,
+		},
+	}))
+
+	// adding another request for the same chunk ID but different result ID is stored.
+	otherReq := &verification.ChunkDataPackRequest{
+		Locator: chunks.Locator{
+			ResultID: unittest.IdentifierFixture(),
+			Index:    thisReq.Index,
+		},
+		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
+			ChunkID:   thisReq.ChunkID,
+			Agrees:    unittest.IdentifierListFixture(2),
+			Disagrees: unittest.IdentifierListFixture(2),
+		},
+	}
+	require.True(t, requests.Add(otherReq))
+
+	// mempool size is based on unique chunk ids, and we only store one
+	// chunk id.
+	require.Equal(t, requests.Size(), uint(1))
+
+	// All method must return request info, which is also bound by chunk id.
+	reqInfoList := requests.All()
+	require.Len(t, reqInfoList, 1)
+	require.Equal(t, thisReq.ChunkID, reqInfoList[0].ChunkID)
+	// agrees, disagrees, and targets must be union of all requests for that chunk ID.
+	require.ElementsMatch(t, thisReq.Agrees.Union(otherReq.Agrees), reqInfoList[0].Agrees)
+	require.ElementsMatch(t, thisReq.Disagrees.Union(otherReq.Disagrees), reqInfoList[0].Disagrees)
+
+	var thisTargets flow.IdentifierList = thisReq.Targets.NodeIDs()
+	var otherTargets flow.IdentifierList = otherReq.Targets.NodeIDs()
+	require.ElementsMatch(t, thisTargets.Union(otherTargets), reqInfoList[0].Targets.NodeIDs())
+
+	locators, ok := requests.PopAll(thisReq.ChunkID)
+	require.True(t, ok)
+	require.NotNil(t, locators[thisReq.Locator.ID()])
+	require.NotNil(t, locators[otherReq.Locator.ID()])
+
+	// after poping all, mempool must be empty (since the requests for the only
+	// chunk id have been poped).
+	require.Equal(t, requests.Size(), uint(0))
+
+	// PopAll on a non-existing chunk ID must return false
+	locators, ok = requests.PopAll(thisReq.ChunkID)
+	require.False(t, ok)
+	require.Nil(t, locators)
 }

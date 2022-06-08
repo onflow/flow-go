@@ -1,4 +1,4 @@
-package vertestutils
+package verificationtest
 
 import (
 	"context"
@@ -22,6 +22,8 @@ import (
 	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/epochs"
+	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/state/cluster"
 
 	fvmMock "github.com/onflow/flow-go/fvm/mock"
 	"github.com/onflow/flow-go/model/flow"
@@ -127,11 +129,12 @@ func (c CompleteExecutionReceiptList) resultOf(t *testing.T, chunkID flow.Identi
 
 // CompleteExecutionReceiptBuilder is a test helper struct that specifies the parameters to build a CompleteExecutionReceipt.
 type CompleteExecutionReceiptBuilder struct {
-	resultsCount int // number of execution results in the container block.
-	copyCount    int // number of times each execution result is copied in a block (by different receipts).
-	chunksCount  int // number of chunks in each execution result.
-	chain        flow.Chain
-	executorIDs  flow.IdentifierList // identifier of execution nodes in the test.
+	resultsCount     int // number of execution results in the container block.
+	executorCount    int // number of times each execution result is copied in a block (by different receipts).
+	chunksCount      int // number of chunks in each execution result.
+	chain            flow.Chain
+	executorIDs      flow.IdentifierList // identifier of execution nodes in the test.
+	clusterCommittee flow.IdentityList
 }
 
 type CompleteExecutionReceiptBuilderOpt func(builder *CompleteExecutionReceiptBuilder)
@@ -150,7 +153,7 @@ func WithChunksCount(count int) CompleteExecutionReceiptBuilderOpt {
 
 func WithCopies(count int) CompleteExecutionReceiptBuilderOpt {
 	return func(builder *CompleteExecutionReceiptBuilder) {
-		builder.copyCount = count
+		builder.executorCount = count
 	}
 }
 
@@ -166,20 +169,15 @@ func WithExecutorIDs(executorIDs flow.IdentifierList) CompleteExecutionReceiptBu
 	}
 }
 
-// CompleteExecutionReceiptFixture returns complete execution receipt with an
-// execution receipt referencing the block collections.
-//
-// chunks determines the number of chunks inside each receipt.
-// The output is an execution result with chunks+1 chunks, where the last chunk accounts
-// for the system chunk.
-// TODO: remove this function once new verification architecture is in place.
-func CompleteExecutionReceiptFixture(t *testing.T, chunks int, chain flow.Chain, root *flow.Header) *CompleteExecutionReceipt {
-	return CompleteExecutionReceiptChainFixture(t, root, 1, WithChunksCount(chunks), WithChain(chain))[0]
+func WithClusterCommittee(clusterCommittee flow.IdentityList) CompleteExecutionReceiptBuilderOpt {
+	return func(builder *CompleteExecutionReceiptBuilder) {
+		builder.clusterCommittee = clusterCommittee
+	}
 }
 
 // ExecutionResultFixture is a test helper that returns an execution result for the reference block header as well as the execution receipt data
 // for that result.
-func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refBlkHeader *flow.Header) (*flow.ExecutionResult,
+func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refBlkHeader *flow.Header, clusterCommittee flow.IdentityList) (*flow.ExecutionResult,
 	*ExecutionReceiptData) {
 
 	// setups up the first collection of block consists of three transactions
@@ -196,7 +194,13 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 	transactions := []*flow.TransactionBody{tx1, tx2, tx3}
 	collection := flow.Collection{Transactions: transactions}
 	collections := []*flow.Collection{&collection}
+	clusterChainID := cluster.CanonicalClusterID(1, clusterCommittee)
+
 	guarantee := unittest.CollectionGuaranteeFixture(unittest.WithCollection(&collection), unittest.WithCollRef(refBlkHeader.ParentID))
+	guarantee.ChainID = clusterChainID
+	indices, err := signature.EncodeSignersToIndices(clusterCommittee.NodeIDs(), clusterCommittee.NodeIDs())
+	require.NoError(t, err)
+	guarantee.SignerIndices = indices
 	guarantees := []*flow.CollectionGuarantee{guarantee}
 
 	metricsCollector := &metrics.NoopCollector{}
@@ -265,6 +269,9 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 
 			collection := flow.Collection{Transactions: []*flow.TransactionBody{tx}}
 			guarantee := unittest.CollectionGuaranteeFixture(unittest.WithCollection(&collection), unittest.WithCollRef(refBlkHeader.ParentID))
+			guarantee.SignerIndices = indices
+			guarantee.ChainID = clusterChainID
+
 			collections = append(collections, &collection)
 			guarantees = append(guarantees, guarantee)
 
@@ -310,14 +317,14 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 				completeCollection := executableBlock.CompleteCollections[collectionGuarantee.ID()]
 				collection := completeCollection.Collection()
 
-				eventsHash, err := flow.EventsListHash(computationResult.Events[i])
+				eventsHash, err := flow.EventsMerkleRootHash(computationResult.Events[i])
 				require.NoError(t, err)
 
 				chunk = execution.GenerateChunk(i, startState, endState, executableBlock.ID(), eventsHash, uint64(len(completeCollection.Transactions)))
 				chunkDataPack = execution.GenerateChunkDataPack(chunk.ID(), chunk.StartState, &collection, computationResult.Proofs[i])
 			} else {
 				// generates chunk data pack fixture for system chunk
-				eventsHash, err := flow.EventsListHash(computationResult.Events[i])
+				eventsHash, err := flow.EventsMerkleRootHash(computationResult.Events[i])
 				require.NoError(t, err)
 
 				chunk = execution.GenerateChunk(i, startState, endState, executableBlock.ID(), eventsHash, uint64(1))
@@ -355,7 +362,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 // The chain is in the form of root <- R1,1 <- R1,2 <- ... <- C1 <- R2,1 <- R2,2 <- ... <- C2 <- ...
 // In this chain R refers to reference blocks that contain guarantees.
 // C refers to a container block that contains an execution receipt for its preceding reference blocks.
-// e.g., C1 contains an execution receipt for R1,1, R1,2, etc, and C2 contains a receipt for R2,1, R2,2, etc.
+// e.g., C1 contains an execution receipt for R1,1, R1,2, etc., and C2 contains a receipt for R2,1, R2,2, etc.
 // For sake of simplicity and test, container blocks (i.e., C) do not contain any guarantee.
 //
 // It returns a slice of complete execution receipt fixtures that contains a container block as well as all data to verify its contained receipts.
@@ -364,10 +371,10 @@ func CompleteExecutionReceiptChainFixture(t *testing.T, root *flow.Header, count
 	parent := root
 
 	builder := &CompleteExecutionReceiptBuilder{
-		resultsCount: 1,
-		copyCount:    1,
-		chunksCount:  1,
-		chain:        root.ChainID.Chain(),
+		resultsCount:  1,
+		executorCount: 1,
+		chunksCount:   1,
+		chain:         root.ChainID.Chain(),
 	}
 
 	for _, apply := range opts {
@@ -375,10 +382,10 @@ func CompleteExecutionReceiptChainFixture(t *testing.T, root *flow.Header, count
 	}
 
 	if len(builder.executorIDs) == 0 {
-		builder.executorIDs = unittest.IdentifierListFixture(builder.copyCount)
+		builder.executorIDs = unittest.IdentifierListFixture(builder.executorCount)
 	}
 
-	require.GreaterOrEqual(t, len(builder.executorIDs), builder.copyCount,
+	require.GreaterOrEqual(t, len(builder.executorIDs), builder.executorCount,
 		"number of executors in the tests should be greater than or equal to the number of receipts per block")
 
 	for i := 0; i < count; i++ {
@@ -407,14 +414,14 @@ func ExecutionReceiptsFromParentBlockFixture(t *testing.T, parent *flow.Header, 
 	[]*flow.ExecutionReceipt,
 	[]*ExecutionReceiptData, *flow.Header) {
 
-	allData := make([]*ExecutionReceiptData, 0, builder.resultsCount*builder.copyCount)
-	allReceipts := make([]*flow.ExecutionReceipt, 0, builder.resultsCount*builder.copyCount)
+	allData := make([]*ExecutionReceiptData, 0, builder.resultsCount*builder.executorCount)
+	allReceipts := make([]*flow.ExecutionReceipt, 0, builder.resultsCount*builder.executorCount)
 
 	for i := 0; i < builder.resultsCount; i++ {
 		result, data := ExecutionResultFromParentBlockFixture(t, parent, builder)
 
 		// makes several copies of the same result
-		for cp := 0; cp < builder.copyCount; cp++ {
+		for cp := 0; cp < builder.executorCount; cp++ {
 			allReceipts = append(allReceipts, &flow.ExecutionReceipt{
 				ExecutorID:      builder.executorIDs[cp],
 				ExecutionResult: *result,
@@ -432,7 +439,7 @@ func ExecutionReceiptsFromParentBlockFixture(t *testing.T, parent *flow.Header, 
 func ExecutionResultFromParentBlockFixture(t *testing.T, parent *flow.Header, builder *CompleteExecutionReceiptBuilder) (*flow.ExecutionResult,
 	*ExecutionReceiptData) {
 	refBlkHeader := unittest.BlockHeaderWithParentFixture(parent)
-	return ExecutionResultFixture(t, builder.chunksCount, builder.chain, &refBlkHeader)
+	return ExecutionResultFixture(t, builder.chunksCount, builder.chain, &refBlkHeader, builder.clusterCommittee)
 }
 
 // ContainerBlockFixture builds and returns a block that contains input execution receipts.
@@ -441,5 +448,35 @@ func ContainerBlockFixture(parent *flow.Header, receipts []*flow.ExecutionReceip
 	containerBlock := unittest.BlockWithParentFixture(parent)
 	containerBlock.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipts...)))
 
-	return &containerBlock
+	return containerBlock
+}
+
+// ExecutionResultForkFixture creates two conflicting execution results out of the same block ID.
+// Each execution result has two chunks.
+// First chunks of both results are the same, i.e., have same ID.
+// It returns both results, their shared block, and collection corresponding to their first chunk.
+func ExecutionResultForkFixture(t *testing.T) (*flow.ExecutionResult, *flow.ExecutionResult, *flow.Collection, *flow.Block) {
+	// collection and block
+	collections := unittest.CollectionListFixture(1)
+	block := unittest.BlockWithGuaranteesFixture(
+		unittest.CollectionGuaranteesWithCollectionIDFixture(collections),
+	)
+
+	// execution fork at block with resultA and resultB that share first chunk
+	resultA := unittest.ExecutionResultFixture(
+		unittest.WithBlock(block),
+		unittest.WithChunks(2))
+	resultB := &flow.ExecutionResult{
+		PreviousResultID: resultA.PreviousResultID,
+		BlockID:          resultA.BlockID,
+		Chunks:           append(flow.ChunkList{resultA.Chunks[0]}, unittest.ChunkListFixture(1, resultA.BlockID)...),
+		ServiceEvents:    nil,
+	}
+
+	// to be a valid fixture, results A and B must share first chunk.
+	require.Equal(t, resultA.Chunks[0].ID(), resultB.Chunks[0].ID())
+	// and they must represent a fork
+	require.NotEqual(t, resultA.ID(), resultB.ID())
+
+	return resultA, resultB, collections[0], block
 }

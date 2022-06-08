@@ -9,8 +9,6 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -41,20 +39,6 @@ func CreateContractDeploymentTransaction(contractName string, contract string, a
 		AddAuthorizer(authorizer).
 		AddAuthorizer(chain.ServiceAddress())
 
-	// to synthetically generate event using Cadence code we would need a lot of
-	// copying, so its easier to just hardcode the json string
-	// TODO - extract parts of Cadence to make exporting events easy without interpreter
-
-	interpreterHash := runtime.CodeToHashValue(script)
-	hashElements := interpreterHash.Elements()
-
-	valueStrings := make([]string, len(hashElements))
-
-	for i, value := range hashElements {
-		uint8 := value.(interpreter.UInt8Value)
-		valueStrings[i] = fmt.Sprintf("{\"type\":\"UInt8\",\"value\":\"%d\"}", uint8)
-	}
-
 	return txBody
 }
 
@@ -70,6 +54,19 @@ func UpdateContractDeploymentTransaction(contractName string, contract string, a
 		).
 		AddAuthorizer(authorizer).
 		AddAuthorizer(chain.ServiceAddress())
+}
+
+func UpdateContractUnathorizedDeploymentTransaction(contractName string, contract string, authorizer flow.Address) *flow.TransactionBody {
+	encoded := hex.EncodeToString([]byte(contract))
+
+	return flow.NewTransactionBody().
+		SetScript([]byte(fmt.Sprintf(`transaction {
+              prepare(signer: AuthAccount) {
+                signer.contracts.update__experimental(name: "%s", code: "%s".decodeHex())
+              }
+            }`, contractName, encoded)),
+		).
+		AddAuthorizer(authorizer)
 }
 
 func CreateUnauthorizedContractDeploymentTransaction(contractName string, contract string, authorizer flow.Address) *flow.TransactionBody {
@@ -189,32 +186,48 @@ func CreateAccountsWithSimpleAddresses(
 		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvocator(zerolog.Nop()),
+			fvm.NewTransactionInvoker(zerolog.Nop()),
 		),
 	)
 
 	var accounts []flow.Address
 
-	script := []byte(`
-	  transaction(publicKey: [UInt8]) {
-	    prepare(signer: AuthAccount) {
-	  	  let acct = AuthAccount(payer: signer)
-	  	  acct.addPublicKey(publicKey)
-	    }
-	  }
-	`)
+	scriptTemplate := `
+        transaction(publicKey: [UInt8]) {
+            prepare(signer: AuthAccount) {
+                let acct = AuthAccount(payer: signer)
+                let publicKey2 = PublicKey(
+                    publicKey: publicKey,
+                    signatureAlgorithm: SignatureAlgorithm.%s
+                )
+                acct.keys.add(
+                    publicKey: publicKey2,
+                    hashAlgorithm: HashAlgorithm.%s,
+                    weight: %d.0
+                )
+            }
+	    }`
 
 	serviceAddress := chain.ServiceAddress()
 
 	for i, privateKey := range privateKeys {
 		accountKey := privateKey.PublicKey(fvm.AccountKeyWeightThreshold)
-		encAccountKey, _ := flow.EncodeRuntimeAccountPublicKey(accountKey)
-		cadAccountKey := BytesToCadenceArray(encAccountKey)
-		encCadAccountKey, _ := jsoncdc.Encode(cadAccountKey)
+		encPublicKey := accountKey.PublicKey.Encode()
+		cadPublicKey := BytesToCadenceArray(encPublicKey)
+		encCadPublicKey, _ := jsoncdc.Encode(cadPublicKey)
+
+		script := []byte(
+			fmt.Sprintf(
+				scriptTemplate,
+				accountKey.SignAlgo.String(),
+				accountKey.HashAlgo.String(),
+				accountKey.Weight,
+			),
+		)
 
 		txBody := flow.NewTransactionBody().
 			SetScript(script).
-			AddArgument(encCadAccountKey).
+			AddArgument(encCadPublicKey).
 			AddAuthorizer(serviceAddress)
 
 		tx := fvm.Transaction(txBody, uint32(i))
@@ -231,7 +244,7 @@ func CreateAccountsWithSimpleAddresses(
 
 		for _, event := range tx.Events {
 			if event.Type == flow.EventAccountCreated {
-				data, err := jsoncdc.Decode(event.Payload)
+				data, err := jsoncdc.Decode(nil, event.Payload)
 				if err != nil {
 					return nil, errors.New("error decoding events")
 				}
@@ -248,17 +261,24 @@ func CreateAccountsWithSimpleAddresses(
 	return accounts, nil
 }
 
-func RootBootstrappedLedger(vm *fvm.VirtualMachine, ctx fvm.Context) state.View {
+func RootBootstrappedLedger(vm *fvm.VirtualMachine, ctx fvm.Context, additionalOptions ...fvm.BootstrapProcedureOption) state.View {
 	view := fvmUtils.NewSimpleView()
 	programs := programs.NewEmptyPrograms()
 
 	// set 0 clusters to pass n_collectors >= n_clusters check
 	epochConfig := epochs.DefaultEpochConfig()
 	epochConfig.NumCollectorClusters = 0
-	bootstrap := fvm.Bootstrap(
-		unittest.ServiceAccountPublicKey,
+
+	options := []fvm.BootstrapProcedureOption{
 		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
 		fvm.WithEpochConfig(epochConfig),
+	}
+
+	options = append(options, additionalOptions...)
+
+	bootstrap := fvm.Bootstrap(
+		unittest.ServiceAccountPublicKey,
+		options...,
 	)
 
 	_ = vm.Run(
@@ -286,23 +306,80 @@ func BytesToCadenceArray(l []byte) cadence.Array {
 func CreateAccountCreationTransaction(t *testing.T, chain flow.Chain) (flow.AccountPrivateKey, *flow.TransactionBody) {
 	accountKey, err := GenerateAccountPrivateKey()
 	require.NoError(t, err)
-
-	keyBytes, err := flow.EncodeRuntimeAccountPublicKey(accountKey.PublicKey(1000))
+	encPublicKey := accountKey.PublicKey(1000).PublicKey.Encode()
+	cadPublicKey := BytesToCadenceArray(encPublicKey)
+	encCadPublicKey, err := jsoncdc.Encode(cadPublicKey)
 	require.NoError(t, err)
 
 	// define the cadence script
 	script := fmt.Sprintf(`
-		transaction {
-		  prepare(signer: AuthAccount) {
-			let acct = AuthAccount(payer: signer)
-			acct.addPublicKey("%s".decodeHex())
-		  }
-		}
-	`, hex.EncodeToString(keyBytes))
+        transaction(publicKey: [UInt8]) {
+            prepare(signer: AuthAccount) {
+				let acct = AuthAccount(payer: signer)
+                let publicKey2 = PublicKey(
+                    publicKey: publicKey,
+                    signatureAlgorithm: SignatureAlgorithm.%s
+                )
+                acct.keys.add(
+                    publicKey: publicKey2,
+                    hashAlgorithm: HashAlgorithm.%s,
+                    weight: 1000.0
+                )
+            }
+	    }`,
+		accountKey.SignAlgo.String(),
+		accountKey.HashAlgo.String(),
+	)
 
 	// create the transaction to create the account
 	tx := flow.NewTransactionBody().
 		SetScript([]byte(script)).
+		AddArgument(encCadPublicKey).
+		AddAuthorizer(chain.ServiceAddress())
+
+	return accountKey, tx
+}
+
+// CreateMultiAccountCreationTransaction creates a transaction which will create many (n) new account.
+//
+// This function returns a randomly generated private key and the transaction.
+func CreateMultiAccountCreationTransaction(t *testing.T, chain flow.Chain, n int) (flow.AccountPrivateKey, *flow.TransactionBody) {
+	accountKey, err := GenerateAccountPrivateKey()
+	require.NoError(t, err)
+	encPublicKey := accountKey.PublicKey(1000).PublicKey.Encode()
+	cadPublicKey := BytesToCadenceArray(encPublicKey)
+	encCadPublicKey, err := jsoncdc.Encode(cadPublicKey)
+	require.NoError(t, err)
+
+	// define the cadence script
+	script := fmt.Sprintf(`
+        transaction(publicKey: [UInt8]) {
+            prepare(signer: AuthAccount) {
+                var i = 0
+                while i < %d {
+                    let account = AuthAccount(payer: signer)
+                    let publicKey2 = PublicKey(
+                        publicKey: publicKey,
+                        signatureAlgorithm: SignatureAlgorithm.%s
+                    )
+                    account.keys.add(
+                        publicKey: publicKey2,
+                        hashAlgorithm: HashAlgorithm.%s,
+                        weight: 1000.0
+                    )
+                    i = i + 1
+                }
+            }
+	    }`,
+		n,
+		accountKey.SignAlgo.String(),
+		accountKey.HashAlgo.String(),
+	)
+
+	// create the transaction to create the account
+	tx := flow.NewTransactionBody().
+		SetScript([]byte(script)).
+		AddArgument(encCadPublicKey).
 		AddAuthorizer(chain.ServiceAddress())
 
 	return accountKey, tx
@@ -311,29 +388,36 @@ func CreateAccountCreationTransaction(t *testing.T, chain flow.Chain) (flow.Acco
 // CreateAddAnAccountKeyMultipleTimesTransaction generates a tx that adds a key several times to an account.
 // this can be used to exhaust an account's storage.
 func CreateAddAnAccountKeyMultipleTimesTransaction(t *testing.T, accountKey *flow.AccountPrivateKey, counts int) *flow.TransactionBody {
-	keyBytes, err := flow.EncodeRuntimeAccountPublicKey(accountKey.PublicKey(1000))
-	require.NoError(t, err)
-
-	script := []byte(`
-        transaction(counts: Int, key: [UInt8]) {
-          prepare(signer: AuthAccount) {
-			var i = 0
-			while i < counts {
-				i = i + 1
-				signer.addPublicKey(key)
-			}
-          }
+	script := []byte(fmt.Sprintf(`
+      transaction(counts: Int, key: [UInt8]) {
+        prepare(signer: AuthAccount) {
+          var i = 0
+          while i < counts {
+            i = i + 1
+            let publicKey2 = PublicKey(
+              publicKey: key,
+              signatureAlgorithm: SignatureAlgorithm.%s
+            )
+            signer.keys.add(
+              publicKey: publicKey2,
+              hashAlgorithm: HashAlgorithm.%s,
+              weight: 1000.0
+            )
+	      }
         }
-   	`)
+      }
+   	`, accountKey.SignAlgo.String(), accountKey.HashAlgo.String()))
 
 	arg1, err := jsoncdc.Encode(cadence.NewInt(counts))
 	require.NoError(t, err)
 
-	arg2, err := jsoncdc.Encode(bytesToCadenceArray(keyBytes))
+	encPublicKey := accountKey.PublicKey(1000).PublicKey.Encode()
+	cadPublicKey := BytesToCadenceArray(encPublicKey)
+	arg2, err := jsoncdc.Encode(cadPublicKey)
 	require.NoError(t, err)
 
 	addKeysTx := &flow.TransactionBody{
-		Script: []byte(script),
+		Script: script,
 	}
 	addKeysTx = addKeysTx.AddArgument(arg1).AddArgument(arg2)
 	return addKeysTx
@@ -341,13 +425,21 @@ func CreateAddAnAccountKeyMultipleTimesTransaction(t *testing.T, accountKey *flo
 
 // CreateAddAccountKeyTransaction generates a tx that adds a key to an account.
 func CreateAddAccountKeyTransaction(t *testing.T, accountKey *flow.AccountPrivateKey) *flow.TransactionBody {
-	keyBytes, err := flow.EncodeRuntimeAccountPublicKey(accountKey.PublicKey(1000))
-	require.NoError(t, err)
+	keyBytes := accountKey.PublicKey(1000).PublicKey.Encode()
 
 	script := []byte(`
         transaction(key: [UInt8]) {
           prepare(signer: AuthAccount) {
-            signer.addPublicKey(key)
+            let acct = AuthAccount(payer: signer)
+            let publicKey2 = PublicKey(
+              publicKey: key,
+              signatureAlgorithm: SignatureAlgorithm.%s
+            )
+            signer.keys.add(
+              publicKey: publicKey2,
+              hashAlgorithm: HashAlgorithm.%s,
+              weight: %d.0
+            )
           }
         }
    	`)
@@ -356,7 +448,7 @@ func CreateAddAccountKeyTransaction(t *testing.T, accountKey *flow.AccountPrivat
 	require.NoError(t, err)
 
 	addKeysTx := &flow.TransactionBody{
-		Script: []byte(script),
+		Script: script,
 	}
 	addKeysTx = addKeysTx.AddArgument(arg)
 
@@ -370,19 +462,4 @@ func bytesToCadenceArray(l []byte) cadence.Array {
 	}
 
 	return cadence.NewArray(values)
-}
-
-// CreateRemoveAccountKeyTransaction generates a tx that removes a key from an account.
-func CreateRemoveAccountKeyTransaction(index int) *flow.TransactionBody {
-	script := fmt.Sprintf(`
-		transaction {
-		  prepare(signer: AuthAccount) {
-	    	signer.removePublicKey(%d)
-		  }
-		}
-	`, index)
-
-	return &flow.TransactionBody{
-		Script: []byte(script),
-	}
 }

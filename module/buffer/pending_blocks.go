@@ -3,11 +3,14 @@ package buffer
 import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module"
 )
 
 type PendingBlocks struct {
 	backend *backend
 }
+
+var _ module.PendingBlockBuffer = (*PendingBlocks)(nil)
 
 func NewPendingBlocks() *PendingBlocks {
 	b := &PendingBlocks{backend: newBackend()}
@@ -56,10 +59,11 @@ func (b *PendingBlocks) DropForParent(parentID flow.Identifier) {
 	b.backend.dropForParent(parentID)
 }
 
-func (b *PendingBlocks) PruneByHeight(height uint64) {
-	b.backend.pruneByHeight(height)
+// PruneByView prunes any pending blocks with views less or equal to the given view.
+func (b *PendingBlocks) PruneByView(view uint64) {
+	b.backend.pruneByView(view)
 }
 
 func (b *PendingBlocks) Size() uint {
-	return uint(len(b.backend.blocksByID))
+	return b.backend.size()
 }

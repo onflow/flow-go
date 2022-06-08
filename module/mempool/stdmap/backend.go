@@ -8,99 +8,14 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/mempool/stdmap/backdata"
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
-
-// Backdata implements a generic memory pool backed by a Go map.
-type Backdata struct {
-	entities map[flow.Identifier]flow.Entity
-}
-
-func NewBackdata() Backdata {
-	bd := Backdata{
-		entities: make(map[flow.Identifier]flow.Entity),
-	}
-	return bd
-}
-
-// Has checks if we already contain the item with the given hash.
-func (b *Backdata) Has(entityID flow.Identifier) bool {
-	_, exists := b.entities[entityID]
-	return exists
-}
-
-// Add adds the given item to the pool.
-func (b *Backdata) Add(entityID flow.Identifier, entity flow.Entity) bool {
-	_, exists := b.entities[entityID]
-	if exists {
-		return false
-	}
-	b.entities[entityID] = entity
-	return true
-}
-
-// Rem will remove the item with the given hash.
-func (b *Backdata) Rem(entityID flow.Identifier) (flow.Entity, bool) {
-	entity, exists := b.entities[entityID]
-	if !exists {
-		return nil, false
-	}
-	delete(b.entities, entityID)
-	return entity, true
-}
-
-// Adjust will adjust the value item using the given function if the given key can be found.
-// Returns a bool which indicates whether the value was updated as well as the updated value
-func (b *Backdata) Adjust(entityID flow.Identifier, f func(flow.Entity) flow.Entity) (flow.Entity, bool) {
-	entity, ok := b.entities[entityID]
-	if !ok {
-		return nil, false
-	}
-	newentity := f(entity)
-	newentityID := newentity.ID()
-
-	delete(b.entities, entityID)
-	b.entities[newentityID] = newentity
-	return newentity, true
-}
-
-// ByID returns the given item from the pool.
-func (b *Backdata) ByID(entityID flow.Identifier) (flow.Entity, bool) {
-	entity, exists := b.entities[entityID]
-	if !exists {
-		return nil, false
-	}
-	return entity, true
-}
-
-// Size will return the size of the backend.
-func (b *Backdata) Size() uint {
-	return uint(len(b.entities))
-}
-
-// All returns all entities from the pool.
-func (b *Backdata) All() []flow.Entity {
-	entities := make([]flow.Entity, 0, len(b.entities))
-	for _, item := range b.entities {
-		entities = append(entities, item)
-	}
-	return entities
-}
-
-// Clear removes all entities from the pool.
-func (b *Backdata) Clear() {
-	b.entities = make(map[flow.Identifier]flow.Entity)
-}
-
-// Hash will use a merkle root hash to hash all items.
-func (b *Backdata) Hash() flow.Identifier {
-	return flow.MerkleRoot(flow.GetIDs(b.All())...)
-}
 
 // Backend provides synchronized access to a backdata
 type Backend struct {
 	sync.RWMutex
-	Backdata
+	backData           mempool.BackData
 	guaranteedCapacity uint
 	batchEject         BatchEjectFunc
 	eject              EjectFunc
@@ -111,7 +26,7 @@ type Backend struct {
 // This is using EjectTrueRandomFast()
 func NewBackend(options ...OptionFunc) *Backend {
 	b := Backend{
-		Backdata:           NewBackdata(),
+		backData:           backdata.NewMapBackData(),
 		guaranteedCapacity: uint(math.MaxUint32),
 		batchEject:         EjectTrueRandomFast,
 		eject:              nil,
@@ -132,7 +47,7 @@ func (b *Backend) Has(entityID flow.Identifier) bool {
 	//bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)Has")
 	//defer binstat.Leave(bs2)
 	defer b.RUnlock()
-	has := b.Backdata.Has(entityID)
+	has := b.backData.Has(entityID)
 	return has
 }
 
@@ -149,7 +64,7 @@ func (b *Backend) Add(entity flow.Entity) bool {
 	//bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)Add")
 	//defer binstat.Leave(bs2)
 	defer b.Unlock()
-	added := b.Backdata.Add(entityID, entity)
+	added := b.backData.Add(entityID, entity)
 	b.reduce()
 	return added
 }
@@ -163,7 +78,7 @@ func (b *Backend) Rem(entityID flow.Identifier) bool {
 	//bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)Rem")
 	//defer binstat.Leave(bs2)
 	defer b.Unlock()
-	_, removed := b.Backdata.Rem(entityID)
+	_, removed := b.backData.Rem(entityID)
 	return removed
 }
 
@@ -177,7 +92,7 @@ func (b *Backend) Adjust(entityID flow.Identifier, f func(flow.Entity) flow.Enti
 	//bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)Adjust")
 	//defer binstat.Leave(bs2)
 	defer b.Unlock()
-	entity, wasUpdated := b.Backdata.Adjust(entityID, f)
+	entity, wasUpdated := b.backData.Adjust(entityID, f)
 	return entity, wasUpdated
 }
 
@@ -190,12 +105,12 @@ func (b *Backend) ByID(entityID flow.Identifier) (flow.Entity, bool) {
 	//bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)ByID")
 	//defer binstat.Leave(bs2)
 	defer b.RUnlock()
-	entity, exists := b.Backdata.ByID(entityID)
+	entity, exists := b.backData.ByID(entityID)
 	return entity, exists
 }
 
 // Run executes a function giving it exclusive access to the backdata
-func (b *Backend) Run(f func(backdata map[flow.Identifier]flow.Entity) error) error {
+func (b *Backend) Run(f func(backdata mempool.BackData) error) error {
 	//bs1 := binstat.EnterTime(binstat.BinStdmap + ".w_lock.(Backend)Run")
 	b.Lock()
 	//binstat.Leave(bs1)
@@ -203,7 +118,7 @@ func (b *Backend) Run(f func(backdata map[flow.Identifier]flow.Entity) error) er
 	//bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)Run")
 	//defer binstat.Leave(bs2)
 	defer b.Unlock()
-	err := f(b.Backdata.entities)
+	err := f(b.backData)
 	b.reduce()
 	return err
 }
@@ -217,7 +132,7 @@ func (b *Backend) Size() uint {
 	//bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)Size")
 	//defer binstat.Leave(bs2)
 	defer b.RUnlock()
-	size := b.Backdata.Size()
+	size := b.backData.Size()
 	return size
 }
 
@@ -235,7 +150,8 @@ func (b *Backend) All() []flow.Entity {
 	//bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)All")
 	//defer binstat.Leave(bs2)
 	defer b.RUnlock()
-	return b.Backdata.All()
+
+	return b.backData.Entities()
 }
 
 // Clear removes all entities from the pool.
@@ -247,7 +163,7 @@ func (b *Backend) Clear() {
 	//bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)Clear")
 	//defer binstat.Leave(bs2)
 	defer b.Unlock()
-	b.Backdata.Clear()
+	b.backData.Clear()
 }
 
 // Hash will use a merkle root hash to hash all items.
@@ -259,7 +175,7 @@ func (b *Backend) Hash() flow.Identifier {
 	//bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)Hash")
 	//defer binstat.Leave(bs2)
 	defer b.RUnlock()
-	identifier := b.Backdata.Hash()
+	identifier := b.backData.Hash()
 	return identifier
 }
 
@@ -285,7 +201,7 @@ func (b *Backend) reduce() {
 	// this was a loop, but the loop is now in EjectTrueRandomFast()
 	// the ejections are batched, so this call to eject() may not actually
 	// do anything until the batch threshold is reached (currently 128)
-	if len(b.entities) > int(b.guaranteedCapacity) {
+	if b.backData.Size() > b.guaranteedCapacity {
 		// get the key from the eject function
 		// we don't do anything if there is an error
 		if b.batchEject != nil {

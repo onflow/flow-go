@@ -24,7 +24,9 @@ func NewServer(log zerolog.Logger, port uint, enableProfilerEndpoint bool) *Serv
 	addr := ":" + strconv.Itoa(int(port))
 
 	mux := http.NewServeMux()
-	mux.Handle("/metrics", promhttp.Handler())
+	endpoint := "/metrics"
+	mux.Handle(endpoint, promhttp.Handler())
+	log.Info().Str("address", addr).Str("endpoint", endpoint).Msg("metrics server started")
 	if enableProfilerEndpoint {
 		mux.Handle("/debug/pprof/", http.DefaultServeMux)
 	}

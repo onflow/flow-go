@@ -21,6 +21,19 @@ func SkipDuplicates(op func(*badger.Txn) error) func(tx *badger.Txn) error {
 	}
 }
 
+func SkipNonExist(op func(*badger.Txn) error) func(tx *badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		err := op(tx)
+		if errors.Is(err, badger.ErrKeyNotFound) {
+			return nil
+		}
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil
+		}
+		return err
+	}
+}
+
 func RetryOnConflict(action func(func(*badger.Txn) error) error, op func(tx *badger.Txn) error) error {
 	for {
 		err := action(op)

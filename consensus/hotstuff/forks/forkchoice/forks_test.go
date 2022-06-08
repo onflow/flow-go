@@ -19,12 +19,6 @@ import (
 	mockfinalizer "github.com/onflow/flow-go/module/mock"
 )
 
-// TestForks_ImplementsInterface tests that forks.Forks implements hotstuff.Forks
-// (compile-time test)
-func TestForks_ImplementsInterface(t *testing.T) {
-	var _ hotstuff.Forks = &forks.Forks{}
-}
-
 // TestForks_Initialization tests that Forks correctly reports trusted Root
 func TestForks_Initialization(t *testing.T) {
 	forks, _, _, root := initForks(t, 1)
@@ -196,10 +190,8 @@ func computeID(view uint64, qc *flow.QuorumCertificate, payloadHash flow.Identif
 
 	id = append(id, payloadHash[:]...)
 
-	hasher := hash.NewSHA3_256()
-	hash := hasher.ComputeHash(id)
+	var h [hash.HashLenSHA3_256]byte
+	hash.ComputeSHA3_256(&h, id)
 
-	var identifier flow.Identifier
-	copy(identifier[:], hash)
-	return identifier
+	return flow.HashToID(h[:])
 }
