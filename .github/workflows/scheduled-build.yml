@@ -19,15 +19,19 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Get Short Commit
-        run: echo "::set-output name=SHORT_COMMIT::$(make short_commit)"
+        run: echo "::set-output name=SHORT_COMMIT::daily-$(make short_commit)"
         id: version
 
-      - name: Bump version and push tag
-        id: tag_version
-        uses: mathieudutour/github-tag-action@v6.0
+      - name: Create tag
+        uses: actions/github-script@v5
         with:
-          custom_tag: daily-${{ steps.version.outputs.SHORT_COMMIT }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            github.rest.git.createRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'refs/tags/${{ steps.version.outputs.SHORT_COMMIT }}',
+              sha: context.sha
+            })
 
       - name: Setup Go
         uses: actions/setup-go@v2
@@ -37,7 +41,7 @@ jobs:
       - name: Checkout Created Tag
         uses: actions/checkout@v3
         with:
-          ref: daily-${{ steps.version.outputs.SHORT_COMMIT }}
+          ref: ${{ steps.version.outputs.SHORT_COMMIT }}
         
       - name: Build relic
         run: make crypto_setup_gopath
