@@ -71,7 +71,11 @@ func (s *Seals) ByID(sealID flow.Identifier) (*flow.Seal, error) {
 	return s.retrieveTx(sealID)(tx)
 }
 
-func (s *Seals) ByBlockID(blockID flow.Identifier) (*flow.Seal, error) {
+// HighestInFork retrieves the highest seal that was included in the
+// fork up to (and including) blockID. This method should return a seal
+// for any block known to the node. Returns storage.ErrNotFound if
+// blockID is unknown.
+func (s *Seals) HighestInFork(blockID flow.Identifier) (*flow.Seal, error) {
 	var sealID flow.Identifier
 	err := s.db.View(operation.LookupBlockSeal(blockID, &sealID))
 	if err != nil {

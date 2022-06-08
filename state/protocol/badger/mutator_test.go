@@ -1591,13 +1591,13 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 				if candidate.ID() == block3.ID() {
 					return nil
 				}
-				seal, _ := seals.ByBlockID(candidate.Header.ParentID)
+				seal, _ := seals.HighestInFork(candidate.Header.ParentID)
 				return seal
 			}, func(candidate *flow.Block) error {
 				if candidate.ID() == block3.ID() {
 					return engine.NewInvalidInputError("")
 				}
-				_, err := seals.ByBlockID(candidate.Header.ParentID)
+				_, err := seals.HighestInFork(candidate.Header.ParentID)
 				return err
 			}).
 			Times(3)

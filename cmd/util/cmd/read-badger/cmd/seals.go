@@ -57,7 +57,7 @@ var sealsCmd = &cobra.Command{
 			}
 
 			log.Info().Msgf("getting seal by block id: %v", blockID)
-			seal, err := storages.Seals.ByBlockID(blockID)
+			seal, err := storages.Seals.HighestInFork(blockID)
 			if err != nil {
 				log.Error().Err(err).Msgf("could not get seal for block id: %v", blockID)
 				return

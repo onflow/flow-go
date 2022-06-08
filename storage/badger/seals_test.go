@@ -23,7 +23,7 @@ func TestRetrieveWithoutStore(t *testing.T) {
 		_, err := store.ByID(unittest.IdentifierFixture())
 		require.True(t, errors.Is(err, storage.ErrNotFound))
 
-		_, err = store.ByBlockID(unittest.IdentifierFixture())
+		_, err = store.HighestInFork(unittest.IdentifierFixture())
 		require.True(t, errors.Is(err, storage.ErrNotFound))
 	})
 }
@@ -67,7 +67,7 @@ func TestSealIndexAndRetrieve(t *testing.T) {
 		require.NoError(t, err)
 
 		// retrieve latest seal
-		seal, err := store.ByBlockID(blockID)
+		seal, err := store.HighestInFork(blockID)
 		require.NoError(t, err)
 		require.Equal(t, expectedSeal, seal)
 	})
