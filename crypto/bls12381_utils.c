@@ -51,12 +51,11 @@ prec_st* init_precomputed_data_BLS12_381() {
     bls_prec = &bls_prec_st;
     ctx_t* ctx = core_get();
 
-    #if (hashToPoint == LOCAL_SSWU)
     // (p-1)/2
-    bn_div_dig(&bls_prec->p_3div4, &ctx->prime, 2);
-    fp_prime_conv(bls_prec->fp_p_1div2, &bls_prec->p_3div4);
+    bn_div_dig(&bls_prec->p_1div2, &ctx->prime, 2);
+    #if (hashToPoint == LOCAL_SSWU)
     // (p-3)/4
-    bn_div_dig(&bls_prec->p_3div4, &bls_prec->p_3div4, 2);
+    bn_div_dig(&bls_prec->p_3div4, &bls_prec->p_1div2, 2);
     // sqrt(-z)
     fp_neg(bls_prec->sqrt_z, ctx->ep_map_u);
     fp_srt(bls_prec->sqrt_z, bls_prec->sqrt_z);
