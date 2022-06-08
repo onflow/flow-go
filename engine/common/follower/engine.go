@@ -284,7 +284,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 
 		log.Debug().Msg("requesting missing parent for proposal")
 
-		e.sync.RequestBlock(header.ParentID, header.Height)
+		e.sync.RequestBlock(header.ParentID, header.Height-1)
 
 		return nil
 	}
