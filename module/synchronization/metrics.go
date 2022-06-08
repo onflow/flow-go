@@ -50,11 +50,11 @@ type MetricsCollector struct {
 func NewMetricsCollector() *MetricsCollector {
 	return &MetricsCollector{
 		timeToPruned: prometheus.NewHistogramVec(prometheus.HistogramOpts{
-			Name:      "time_to_pruned",
+			Name:      "time_to_pruned_seconds",
 			Namespace: namespaceSynchronization,
 			Subsystem: subsystemSyncCore,
-			Help:      "the time between queueing and pruning a block in milliseconds",
-			Buckets:   []float64{100, 250, 500, 1000, 2500, 5000, 7500, 10000, 20000},
+			Help:      "the time between queueing and pruning a block in seconds",
+			Buckets:   []float64{.1, .25, .5, 1, 2.5, 5, 7.5, 10, 20},
 		}, []string{"status", "requested_by"}),
 		timeToReceived: prometheus.NewHistogramVec(prometheus.HistogramOpts{
 			Name:      "time_to_received",
