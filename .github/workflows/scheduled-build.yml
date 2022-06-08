@@ -20,7 +20,7 @@ jobs:
 
       - name: Get Short Commit
         run: echo "::set-output name=SHORT_COMMIT::$(make short_commit)"
-        id: short_commit
+        id: version
 
       - name: Bump version and push tag
         id: tag_version
