@@ -68,13 +68,7 @@ func extractExecutionState(
 			OutputDir: outputDir,
 		}
 
-		orderedMapMigration := mgr.OrderedMapMigration{
-			Log:       log,
-			OutputDir: dir,
-		}
-
 		migrations = []ledger.Migration{
-			orderedMapMigration.Migrate,
 			storageUsedUpdateMigration.Migrate,
 			mgr.PruneMigration,
 		}
