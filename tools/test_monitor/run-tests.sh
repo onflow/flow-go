@@ -9,6 +9,9 @@ shopt -s extglob
 
 echo "test category (run-tests):" $TEST_CATEGORY>&2
 
+echo "docker version (run-tests):"
+docker -v>&2
+
 # run tests and process results
 
 if [[ $TEST_CATEGORY =~ integration-(bft|ghost|mvp|network|epochs|access|collection|consensus|execution|verification)$ ]]
