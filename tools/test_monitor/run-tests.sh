@@ -13,7 +13,7 @@ echo "docker version (run-tests):"
 docker -v>&2
 
 echo "docker host-gateway test (run-tests):"
-docker run --rm --add-host=host.docker.internal:host-gateway ubuntu:18.04 cat /etc/hosts>&2
+docker run --rm ubuntu:18.04 cat /etc/hosts>&2
 
 # run tests and process results
 
