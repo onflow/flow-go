@@ -105,7 +105,7 @@ func (suite *Suite) TestHandlePendingBlock() {
 	suite.headers.On("ByBlockID", block.Header.ParentID).Return(nil, realstorage.ErrNotFound).Once()
 
 	suite.cache.On("Add", mock.Anything, mock.Anything).Return(true).Once()
-	suite.sync.On("RequestBlock", block.Header.ParentID, block.Header.Height).Return().Once()
+	suite.sync.On("RequestBlock", block.Header.ParentID, block.Header.Height-1).Return().Once()
 
 	// submit the block
 	proposal := unittest.ProposalFromBlock(&block)
