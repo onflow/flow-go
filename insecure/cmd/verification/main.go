@@ -7,19 +7,19 @@ import (
 )
 
 func main() {
-	verificationBuilder := cmd.NewVerificationNodeBuilder(
-		insecmd.NewCorruptedNodeBuilder(flow.RoleVerification.String()).FlowNodeBuilder)
-	verificationBuilder.LoadFlags()
+	corruptedBuilder := insecmd.NewCorruptedNodeBuilder(flow.RoleVerification.String())
+	corruptedVerificationBuilder := cmd.NewVerificationNodeBuilder(corruptedBuilder.FlowNodeBuilder)
+	corruptedVerificationBuilder.LoadFlags()
 
-	if err := verificationBuilder.FlowNodeBuilder.Initialize(); err != nil {
-		verificationBuilder.FlowNodeBuilder.Logger.Fatal().Err(err).Send()
+	if err := corruptedBuilder.Initialize(); err != nil {
+		corruptedVerificationBuilder.FlowNodeBuilder.Logger.Fatal().Err(err).Send()
 	}
 
-	verificationBuilder.LoadComponentsAndModules()
+	corruptedVerificationBuilder.LoadComponentsAndModules()
 
-	node, err := verificationBuilder.FlowNodeBuilder.Build()
+	node, err := corruptedVerificationBuilder.FlowNodeBuilder.Build()
 	if err != nil {
-		verificationBuilder.FlowNodeBuilder.Logger.Fatal().Err(err).Send()
+		corruptedVerificationBuilder.FlowNodeBuilder.Logger.Fatal().Err(err).Send()
 	}
 	node.Run()
 }

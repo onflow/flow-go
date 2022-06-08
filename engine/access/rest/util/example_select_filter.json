@@ -1,0 +1,72 @@
+[
+	{
+		"execution_result": {
+			"events": [
+				{
+					"event_index": "2"
+				},
+				{
+					"event_index": "3"
+				}
+			]
+		},
+		"header": {
+			"id": "abcd"
+		},
+		"payload": {
+			"block_seals": [
+				{
+					"aggregated_approval_signatures": [
+						{
+							"signer_ids": [
+								"abcdef0123456789",
+								"abcdef0123456789"
+							]
+						}
+					]
+				}
+			],
+			"collection_guarantees": [
+				{
+					"signature": "abcdef0123456789",
+					"signer_indices": "01"
+				}
+			]
+		}
+	},
+	{
+		"execution_result": {
+			"events": [
+				{
+					"event_index": "2"
+				},
+				{
+					"event_index": "3"
+				}
+			]
+		},
+		"header": {
+			"id": "abcd"
+		},
+		"payload": {
+			"block_seals": [
+				{
+					"aggregated_approval_signatures": [
+						{
+							"signer_ids": [
+								"abcdef0123456789",
+								"abcdef0123456789"
+							]
+						}
+					]
+				}
+			],
+			"collection_guarantees": [
+				{
+					"signature": "abcdef0123456789",
+					"signer_indices": "01"
+				}
+			]
+		}
+	}
+]

@@ -242,19 +242,19 @@ func Test_Checkpointing(t *testing.T) {
 					paths = append(paths, path)
 				}
 
-				payloads1, err := f.Read(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
+				values1, err := f.Read(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
 				require.NoError(t, err)
 
-				payloads2, err := f2.Read(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
+				values2, err := f2.Read(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
 				require.NoError(t, err)
 
-				payloads3, err := f3.Read(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
+				values3, err := f3.Read(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
 				require.NoError(t, err)
 
 				for i, path := range paths {
-					require.True(t, data[path].Equals(payloads1[i]))
-					require.True(t, data[path].Equals(payloads2[i]))
-					require.True(t, data[path].Equals(payloads3[i]))
+					require.Equal(t, data[path].Value, values1[i])
+					require.Equal(t, data[path].Value, values2[i])
+					require.Equal(t, data[path].Value, values3[i])
 				}
 			}
 		})
@@ -325,15 +325,15 @@ func Test_Checkpointing(t *testing.T) {
 			trieRead, err := pathfinder.QueryToTrieRead(query, pathFinderVersion)
 			require.NoError(t, err)
 
-			payloads, err := f.Read(trieRead)
+			values, err := f.Read(trieRead)
 			require.NoError(t, err)
 
-			payloads5, err := f5.Read(trieRead)
+			values5, err := f5.Read(trieRead)
 			require.NoError(t, err)
 
 			for i := range keys2 {
-				require.Equal(t, values2[i], payloads[i].Value)
-				require.Equal(t, values2[i], payloads5[i].Value)
+				require.Equal(t, values2[i], values[i])
+				require.Equal(t, values2[i], values5[i])
 			}
 		})
 
@@ -415,15 +415,15 @@ func Test_Checkpointing(t *testing.T) {
 			trieRead, err := pathfinder.QueryToTrieRead(query, pathFinderVersion)
 			require.NoError(t, err)
 
-			payloads, err := f.Read(trieRead)
+			values, err := f.Read(trieRead)
 			require.NoError(t, err)
 
-			payloads6, err := f6.Read(trieRead)
+			values6, err := f6.Read(trieRead)
 			require.NoError(t, err)
 
 			for i := range keys2 {
-				require.Equal(t, values2[i], payloads[i].Value)
-				require.Equal(t, values2[i], payloads6[i].Value)
+				require.Equal(t, values2[i], values[i])
+				require.Equal(t, values2[i], values6[i])
 			}
 
 		})
