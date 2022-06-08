@@ -37,7 +37,7 @@ func TestNetworkSetupBasic(t *testing.T) {
 	}
 	conf := testnet.NewNetworkConfig("meta_test_basic", nodes)
 
-	flowNetwork := testnet.PrepareFlowNetwork(t, conf)
+	flowNetwork := testnet.PrepareFlowNetwork(t, conf, flow.Localnet)
 	defer flowNetwork.Cleanup()
 
 	assert.Len(t, flowNetwork.Containers, len(nodes))
@@ -74,7 +74,7 @@ func TestNetworkSetupMultipleNodes(t *testing.T) {
 	}
 	conf := testnet.NewNetworkConfig("meta_test_multinodes", nodes)
 
-	flowNetwork := testnet.PrepareFlowNetwork(t, conf)
+	flowNetwork := testnet.PrepareFlowNetwork(t, conf, flow.Localnet)
 	defer flowNetwork.Cleanup()
 
 	assert.Len(t, flowNetwork.Containers, len(nodes))

@@ -10,11 +10,12 @@ import (
 
 // WorkerStatsTracker keeps track of worker stats
 type WorkerStatsTracker struct {
+	mux              sync.Mutex
 	workers          int
 	txsSent          int
 	txsSentPerSecond map[int64]int // tracks txs sent at the timestamp in seconds
-	mux              sync.Mutex
-	printer          *Worker
+
+	printer *Worker
 }
 
 // NewWorkerStatsTracker returns a new instance of WorkerStatsTracker
@@ -40,35 +41,36 @@ func (st *WorkerStatsTracker) AddWorker() {
 	st.mux.Lock()
 	defer st.mux.Unlock()
 
-	st.workers += 1
+	st.workers++
 }
 
 func (st *WorkerStatsTracker) AddTxSent() {
+	now := time.Now().Unix()
+
 	st.mux.Lock()
 	defer st.mux.Unlock()
 
-	st.txsSent += 1
-
-	now := time.Now().Unix()
-	if c, ok := st.txsSentPerSecond[now]; ok {
-		st.txsSentPerSecond[now] = c + 1
-		return
-	}
-	st.txsSentPerSecond[now] = 1
+	st.txsSent++
+	st.txsSentPerSecond[now]++
 }
 
 // AvgTPSBetween returns the average transactions per second TPS between the two time points
 func (st *WorkerStatsTracker) AvgTPSBetween(start, stop time.Time) float64 {
+	sum := 0
+	toDelete := make([]int64, 0)
+
 	st.mux.Lock()
 	defer st.mux.Unlock()
-
-	sum := 0
-
 	for timestamp, count := range st.txsSentPerSecond {
-		if time.Unix(timestamp, 0).Before(start) {
+		if timestamp < start.Unix() {
+			toDelete = append(toDelete, timestamp)
 			continue
 		}
 		sum += count
+	}
+
+	for _, timestamp := range toDelete {
+		delete(st.txsSentPerSecond, timestamp)
 	}
 
 	diff := stop.Sub(start)

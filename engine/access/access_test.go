@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
@@ -30,6 +29,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
@@ -621,6 +621,13 @@ func (suite *Suite) TestGetSealedTransaction() {
 			transactions, results, receipts, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, rpcEng)
 		require.NoError(suite.T(), err)
 
+		background, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		ctx, _ := irrecoverable.WithSignaler(background)
+		ingestEng.Start(ctx)
+		<-ingestEng.Ready()
+
 		// 1. Assume that follower engine updated the block storage and the protocol state. The block is reported as sealed
 		err = blocks.Store(&block)
 		require.NoError(suite.T(), err)
@@ -643,7 +650,6 @@ func (suite *Suite) TestGetSealedTransaction() {
 			err = ingestEng.Process(engine.ReceiveReceipts, enNodeIDs[0], r)
 			require.NoError(suite.T(), err)
 		}
-		unittest.AssertClosesBefore(suite.T(), ingestEng.Done(), 3*time.Second)
 
 		// 5. Client requests a transaction
 		tx := collection.Transactions[0]
@@ -747,9 +753,6 @@ func (suite *Suite) TestExecuteScript() {
 			require.NoError(suite.T(), err)
 		}
 
-		// wait for the receipt to be persisted
-		unittest.AssertClosesBefore(suite.T(), ingestEng.Done(), 3*time.Second)
-
 		ctx := context.Background()
 
 		script := []byte("dummy script")
@@ -781,6 +784,9 @@ func (suite *Suite) TestExecuteScript() {
 
 		suite.Run("execute script at latest block", func() {
 			suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+			suite.state.
+				On("AtBlockID", lastBlock.ID()).
+				Return(suite.snapshot, nil)
 
 			expectedResp := setupExecClientMock(lastBlock.ID())
 			req := accessproto.ExecuteScriptAtLatestBlockRequest{
@@ -791,6 +797,10 @@ func (suite *Suite) TestExecuteScript() {
 		})
 
 		suite.Run("execute script at block id", func() {
+			suite.state.
+				On("AtBlockID", prevBlock.ID()).
+				Return(suite.snapshot, nil)
+
 			expectedResp := setupExecClientMock(prevBlock.ID())
 			id := prevBlock.ID()
 			req := accessproto.ExecuteScriptAtBlockIDRequest{
@@ -802,6 +812,10 @@ func (suite *Suite) TestExecuteScript() {
 		})
 
 		suite.Run("execute script at block height", func() {
+			suite.state.
+				On("AtBlockID", prevBlock.ID()).
+				Return(suite.snapshot, nil)
+
 			expectedResp := setupExecClientMock(prevBlock.ID())
 			req := accessproto.ExecuteScriptAtBlockHeightRequest{
 				BlockHeight: prevBlock.Header.Height,
