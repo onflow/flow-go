@@ -254,22 +254,6 @@ func (s *Snapshot) Commit() (flow.StateCommitment, error) {
 	return seal.FinalState, nil
 }
 
-// Seal returns the seal for this sealed block.
-// If the block is not sealed, then it returns a sentinel error: protocolErrBlockNotSealed
-func (s *Snapshot) Seal() (*flow.Seal, error) {
-	// find the seal by sealed block ID
-	seal, err := s.state.seals.BySealedBlockID(s.blockID)
-	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			return nil, fmt.Errorf("block %v is not sealed: %w", s.blockID, protocol.ErrBlockNotSealed)
-		}
-
-		return nil, fmt.Errorf("could not find seal by the block ID (please ensure this block is sealed): %w", err)
-	}
-
-	return seal, nil
-}
-
 func (s *Snapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
 	seal, err := s.state.seals.ByBlockID(s.blockID)
 	if err != nil {

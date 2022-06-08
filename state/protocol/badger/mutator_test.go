@@ -31,8 +31,9 @@ import (
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/state/protocol/util"
+	"github.com/onflow/flow-go/storage"
 	stoerr "github.com/onflow/flow-go/storage"
-	storage "github.com/onflow/flow-go/storage"
+	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	storeutil "github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -204,25 +205,28 @@ func TestSealedIndex(t *testing.T) {
 		err = state.Finalize(context.Background(), b4.ID())
 		require.NoError(t, err)
 
+		metrics := metrics.NewNoopCollector()
+		seals := bstorage.NewSeals(metrics, db)
+
 		// can only find seal for G
-		_, err = state.AtBlockID(rootHeader.ID()).Seal()
+		_, err = seals.BySealedBlockID(rootHeader.ID())
 		require.NoError(t, err)
 
-		_, err = state.AtBlockID(b1.ID()).Seal()
+		_, err = seals.BySealedBlockID(b1.ID())
 		require.Error(t, err)
-		require.ErrorIs(t, err, realprotocol.ErrBlockNotSealed)
+		require.ErrorIs(t, err, storage.ErrNotFound)
 
 		// when B5 is finalized, can find seal for B1
 		err = state.Finalize(context.Background(), b5.ID())
 		require.NoError(t, err)
 
-		s1, err := state.AtBlockID(b1.ID()).Seal()
+		s1, err := seals.BySealedBlockID(b1.ID())
 		require.NoError(t, err)
 		require.Equal(t, b1Seal, s1)
 
-		_, err = state.AtBlockID(b2.ID()).Seal()
+		_, err = seals.BySealedBlockID(b2.ID())
 		require.Error(t, err)
-		require.ErrorIs(t, err, realprotocol.ErrBlockNotSealed)
+		require.ErrorIs(t, err, storage.ErrNotFound)
 
 		// when B7 is finalized, can find seals for B2, B3
 		err = state.Finalize(context.Background(), b6.ID())
@@ -231,11 +235,11 @@ func TestSealedIndex(t *testing.T) {
 		err = state.Finalize(context.Background(), b7.ID())
 		require.NoError(t, err)
 
-		s2, err := state.AtBlockID(b2.ID()).Seal()
+		s2, err := seals.BySealedBlockID(b2.ID())
 		require.NoError(t, err)
 		require.Equal(t, b2Seal, s2)
 
-		s3, err := state.AtBlockID(b3.ID()).Seal()
+		s3, err := seals.BySealedBlockID(b3.ID())
 		require.NoError(t, err)
 		require.Equal(t, b3Seal, s3)
 	})

@@ -45,10 +45,6 @@ type Snapshot interface {
 	// seals, this returns the seal for the block with the greatest height.
 	SealedResult() (*flow.ExecutionResult, *flow.Seal, error)
 
-	// Seal returns the seal for this sealed block.
-	// If the block is not sealed, then it returns BlockNotSealedError
-	Seal() (*flow.Seal, error)
-
 	// Commit returns the state commitment of the most recently included seal
 	// as of this block. It represents the sealed state.
 	Commit() (flow.StateCommitment, error)
