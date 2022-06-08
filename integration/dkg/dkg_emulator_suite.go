@@ -162,9 +162,11 @@ func (s *DKGSuite) setupDKGAdmin() {
 			s.blockchain.ServiceKey().SequenceNumber).
 		SetPayer(s.blockchain.ServiceKey().Address).
 		AddAuthorizer(s.dkgAddress)
-	_, err := s.prepareAndSubmit(setUpAdminTx,
+	signer, err := s.blockchain.ServiceKey().Signer()
+	require.NoError(s.T(), err)
+	_, err = s.prepareAndSubmit(setUpAdminTx,
 		[]sdk.Address{s.blockchain.ServiceKey().Address, s.dkgAddress},
-		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), s.dkgSigner},
+		[]sdkcrypto.Signer{signer, s.dkgSigner},
 	)
 	require.NoError(s.T(), err)
 }
@@ -232,10 +234,11 @@ func (s *DKGSuite) createAndFundAccount(netID *flow.Identity) *nodeAccount {
 	require.NoError(s.T(), err)
 	err = fundAccountTx.AddArgument(cadence.NewAddress(newAccountAddress))
 	require.NoError(s.T(), err)
-
+	signer, err := s.blockchain.ServiceKey().Signer()
+	require.NoError(s.T(), err)
 	_, err = s.prepareAndSubmit(fundAccountTx,
 		[]sdk.Address{s.blockchain.ServiceKey().Address},
-		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer()},
+		[]sdkcrypto.Signer{signer},
 	)
 	require.NoError(s.T(), err)
 
@@ -304,10 +307,11 @@ func (s *DKGSuite) startDKGWithParticipants(accounts []*nodeAccount) {
 
 	err := startDKGTx.AddArgument(cadence.NewArray(valueNodeIDs))
 	require.NoError(s.T(), err)
-
+	signer, err := s.blockchain.ServiceKey().Signer()
+	require.NoError(s.T(), err)
 	_, err = s.prepareAndSubmit(startDKGTx,
 		[]sdk.Address{s.blockchain.ServiceKey().Address, s.dkgAddress},
-		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), s.dkgSigner},
+		[]sdkcrypto.Signer{signer, s.dkgSigner},
 	)
 	require.NoError(s.T(), err)
 
@@ -335,10 +339,11 @@ func (s *DKGSuite) claimDKGParticipant(node *node) {
 	require.NoError(s.T(), err)
 	err = createParticipantTx.AddArgument(nodeID)
 	require.NoError(s.T(), err)
-
+	signer, err := s.blockchain.ServiceKey().Signer()
+	require.NoError(s.T(), err)
 	_, err = s.prepareAndSubmit(createParticipantTx,
 		[]sdk.Address{node.account.accountAddress, s.blockchain.ServiceKey().Address, s.dkgAddress},
-		[]sdkcrypto.Signer{node.account.accountSigner, s.blockchain.ServiceKey().Signer(), s.dkgSigner},
+		[]sdkcrypto.Signer{node.account.accountSigner, signer, s.dkgSigner},
 	)
 	require.NoError(s.T(), err)
 
@@ -369,9 +374,11 @@ func (s *DKGSuite) sendDummyTx() (*flow.Block, error) {
 			s.blockchain.ServiceKey().SequenceNumber).
 		SetPayer(s.blockchain.ServiceKey().Address)
 
+	signer, err := s.blockchain.ServiceKey().Signer()
+	require.NoError(s.T(), err)
 	block, err := s.prepareAndSubmit(createAccountTx,
 		[]sdk.Address{s.blockchain.ServiceKey().Address},
-		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer()},
+		[]sdkcrypto.Signer{signer},
 	)
 	return block, err
 }
