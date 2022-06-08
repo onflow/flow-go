@@ -199,6 +199,11 @@ func (c *Core) WithinTolerance(final *flow.Header, height uint64) bool {
 // queueByHeight queues a request for the finalized block at the given height,
 // only if no equivalent request has been queued before.
 func (c *Core) queueByHeight(height uint64) {
+	// do not queue the block if the height is lower or the same as the local finalized height
+	// the check != 0 is necessary or we will never queue blocks at height 0
+	if height <= c.localFinalizedHeight && c.localFinalizedHeight != 0 {
+		return
+	}
 
 	// only queue the request if have never queued it before
 	if c.heights[height].WasQueued() {
@@ -212,6 +217,11 @@ func (c *Core) queueByHeight(height uint64) {
 // queueByBlockID queues a request for a block by block ID, only if no
 // equivalent request has been queued before.
 func (c *Core) queueByBlockID(blockID flow.Identifier, height uint64) {
+	// do not queue the block if the height is lower or the same as the local finalized height
+	// the check != 0 is necessary or we will never queue blocks at height 0
+	if height <= c.localFinalizedHeight && c.localFinalizedHeight != 0 {
+		return
+	}
 
 	// only queue the request if have never queued it before
 	if c.blockIDs[blockID].WasQueued() {
