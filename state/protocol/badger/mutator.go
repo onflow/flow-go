@@ -652,7 +652,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		// guarantees that only as single, continuous execution fork is sealed. Here, we index for
 		// each block ID the ID of its _finalized_ seal.
 		for _, seal := range block.Payload.Seals {
-			err = operation.IndexBySealedBlockID(seal.ID(), seal.BlockID)(tx)
+			err = operation.IndexFinalizedSealByBlockID(seal.BlockID, seal.ID())(tx)
 			if err != nil {
 				return fmt.Errorf("could not index the seal by the sealed block ID: %w", err)
 			}

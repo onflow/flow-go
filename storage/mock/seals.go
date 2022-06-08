@@ -60,8 +60,8 @@ func (_m *Seals) ByID(sealID flow.Identifier) (*flow.Seal, error) {
 	return r0, r1
 }
 
-// BySealedBlockID provides a mock function with given fields: blockID
-func (_m *Seals) BySealedBlockID(blockID flow.Identifier) (*flow.Seal, error) {
+// FinalizedSealForBlock provides a mock function with given fields: blockID
+func (_m *Seals) FinalizedSealForBlock(blockID flow.Identifier) (*flow.Seal, error) {
 	ret := _m.Called(blockID)
 
 	var r0 *flow.Seal

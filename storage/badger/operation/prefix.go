@@ -50,7 +50,7 @@ const (
 	codeClusterBlockToRefBlock  = 42 // index cluster block ID to reference block ID
 	codeBlockValidity           = 43 // validity of block per HotStuff
 	codeRefHeightToClusterBlock = 44 // index reference block height to cluster block IDs
-	codeSealedBlockIDIndex      = 45 // index seal by sealed block ID
+	codeBlockIDToFinalizedSeal  = 45 // index _finalized_ seal by sealed block ID
 
 	// codes for indexing multiple identifiers by identifier
 	// NOTE: 51 was used for identity indexes before epochs

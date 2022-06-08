@@ -209,10 +209,10 @@ func TestSealedIndex(t *testing.T) {
 		seals := bstorage.NewSeals(metrics, db)
 
 		// can only find seal for G
-		_, err = seals.BySealedBlockID(rootHeader.ID())
+		_, err = seals.FinalizedSealForBlock(rootHeader.ID())
 		require.NoError(t, err)
 
-		_, err = seals.BySealedBlockID(b1.ID())
+		_, err = seals.FinalizedSealForBlock(b1.ID())
 		require.Error(t, err)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 
@@ -220,11 +220,11 @@ func TestSealedIndex(t *testing.T) {
 		err = state.Finalize(context.Background(), b5.ID())
 		require.NoError(t, err)
 
-		s1, err := seals.BySealedBlockID(b1.ID())
+		s1, err := seals.FinalizedSealForBlock(b1.ID())
 		require.NoError(t, err)
 		require.Equal(t, b1Seal, s1)
 
-		_, err = seals.BySealedBlockID(b2.ID())
+		_, err = seals.FinalizedSealForBlock(b2.ID())
 		require.Error(t, err)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 
@@ -235,11 +235,11 @@ func TestSealedIndex(t *testing.T) {
 		err = state.Finalize(context.Background(), b7.ID())
 		require.NoError(t, err)
 
-		s2, err := seals.BySealedBlockID(b2.ID())
+		s2, err := seals.FinalizedSealForBlock(b2.ID())
 		require.NoError(t, err)
 		require.Equal(t, b2Seal, s2)
 
-		s3, err := seals.BySealedBlockID(b3.ID())
+		s3, err := seals.FinalizedSealForBlock(b3.ID())
 		require.NoError(t, err)
 		require.Equal(t, b3Seal, s3)
 	})

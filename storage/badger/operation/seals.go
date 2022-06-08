@@ -52,14 +52,14 @@ func LookupBlockSeal(blockID flow.Identifier, sealID *flow.Identifier) func(*bad
 	return retrieve(makePrefix(codeBlockToSeal, blockID), &sealID)
 }
 
-// IndexBySealedBlockID index a seal by the sealed block ID.
-func IndexBySealedBlockID(sealID flow.Identifier, sealedBlockID flow.Identifier) func(*badger.Txn) error {
-	return insert(makePrefix(codeSealedBlockIDIndex, sealedBlockID), sealID)
+// IndexFinalizedSealByBlockID index a the _finalized_ seal by the sealed block ID.
+func IndexFinalizedSealByBlockID(sealedBlockID flow.Identifier, sealID flow.Identifier) func(*badger.Txn) error {
+	return insert(makePrefix(codeBlockIDToFinalizedSeal, sealedBlockID), sealID)
 }
 
 // LookupBySealedBlockID finds the seal for the given sealed block ID.
-func LookupBySealedBlockID(blockID flow.Identifier, sealID *flow.Identifier) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeSealedBlockIDIndex, blockID), &sealID)
+func LookupBySealedBlockID(sealedBlockID flow.Identifier, sealID *flow.Identifier) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeBlockIDToFinalizedSeal, sealedBlockID), &sealID)
 }
 
 func InsertExecutionForkEvidence(conflictingSeals []*flow.IncorporatedResultSeal) func(*badger.Txn) error {

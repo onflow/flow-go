@@ -89,11 +89,11 @@ func TestSealedBlockIndexAndRetrieve(t *testing.T) {
 		require.NoError(t, err)
 
 		// index the seal ID for the heighest sealed block in this fork
-		err = operation.RetryOnConflict(db.Update, operation.IndexBySealedBlockID(expectedSeal.ID(), expectedSeal.BlockID))
+		err = operation.RetryOnConflict(db.Update, operation.IndexFinalizedSealByBlockID(expectedSeal.BlockID, expectedSeal.ID()))
 		require.NoError(t, err)
 
 		// retrieve latest seal
-		seal, err := store.BySealedBlockID(blockID)
+		seal, err := store.FinalizedSealForBlock(blockID)
 		require.NoError(t, err)
 		require.Equal(t, expectedSeal, seal)
 	})

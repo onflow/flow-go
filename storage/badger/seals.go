@@ -80,7 +80,7 @@ func (s *Seals) ByBlockID(blockID flow.Identifier) (*flow.Seal, error) {
 	return s.ByID(sealID)
 }
 
-func (s *Seals) BySealedBlockID(blockID flow.Identifier) (*flow.Seal, error) {
+func (s *Seals) FinalizedSealForBlock(blockID flow.Identifier) (*flow.Seal, error) {
 	var sealID flow.Identifier
 	err := s.db.View(operation.LookupBySealedBlockID(blockID, &sealID))
 	if err != nil {
