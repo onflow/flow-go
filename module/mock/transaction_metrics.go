@@ -16,16 +16,6 @@ type TransactionMetrics struct {
 	mock.Mock
 }
 
-// ConnectionFromPoolRetrieved provides a mock function with given fields:
-func (_m *TransactionMetrics) ConnectionFromPoolRetrieved() {
-	_m.Called()
-}
-
-// TotalConnectionsInPool provides a mock function with given fields: connectionCount, connectionPoolSize
-func (_m *TransactionMetrics) TotalConnectionsInPool(connectionCount uint, connectionPoolSize uint) {
-	_m.Called(connectionCount, connectionPoolSize)
-}
-
 // TransactionExecuted provides a mock function with given fields: txID, when
 func (_m *TransactionMetrics) TransactionExecuted(txID flow.Identifier, when time.Time) {
 	_m.Called(txID, when)
