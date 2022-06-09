@@ -15,9 +15,9 @@ import (
 // ActivePaceMaker implements the hotstuff.PaceMaker
 // This implements the active Pacemaker described in DiemBFT v4
 // To enter a new view `v`, the Pacemaker must observe a valid QC or TC for view `v-1`.
-// The Pacemaker also defines when a node should locally time out for a given view. 
+// The Pacemaker also defines when a node should locally time out for a given view.
 // In contrast to the passive Pacemaker (previous implementation), locally timing a view
-// does not cause a view change. 
+// does not cause a view change.
 // A local timeout for a view `v` causes a node to:
 // * never produce a vote for any proposal with view `v`, after the timeout
 // * produce and broadcast a timeout object, which can form a part of the TC for the timed out view
@@ -124,9 +124,9 @@ func (p *ActivePaceMaker) ProcessQC(qc *flow.QuorumCertificate) (*model.NewViewE
 	return &model.NewViewEvent{View: newView}, nil
 }
 
-// ProcessTC notifies the Pacemaker of a new timeout certificate, which may allow 
-// Pacemaker to fast-forward its current view. 
-// A nil TC is an expected valid input, so that callers may pass in e.g. `Proposal.LastViewTC`, 
+// ProcessTC notifies the Pacemaker of a new timeout certificate, which may allow
+// Pacemaker to fast-forward its current view.
+// A nil TC is an expected valid input, so that callers may pass in e.g. `Proposal.LastViewTC`,
 // which may or may not have a value.
 // No errors are expected, any error should be treated as exception
 func (p *ActivePaceMaker) ProcessTC(tc *flow.TimeoutCertificate) (*model.NewViewEvent, error) {
