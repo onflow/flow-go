@@ -55,14 +55,10 @@ func (connector *upstreamConnector) Ready() <-chan struct{} {
 				defer wg.Done()
 				lg := connector.logger.With().Str("bootstrap_node", id.NodeID.String()).Logger()
 
-				fibRetry, err := retry.NewFibonacci(connector.retryInitialTimeout)
-				if err != nil {
-					lg.Err(err).Msg("cannot create retry mechanism")
-					return
-				}
-				cappedFibRetry := retry.WithMaxRetries(connector.maxRetries, fibRetry)
+				backoff := retry.NewFibonacci(connector.retryInitialTimeout)
+				backoff = retry.WithMaxRetries(connector.maxRetries, backoff)
 
-				if err = retry.Do(workerCtx, cappedFibRetry, func(ctx context.Context) error {
+				if err := retry.Do(workerCtx, backoff, func(ctx context.Context) error {
 					return retry.RetryableError(connector.connect(ctx, id))
 				}); err != nil {
 					lg.Err(err).Msg("failed to connect")

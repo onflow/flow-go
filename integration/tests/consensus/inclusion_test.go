@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -84,7 +85,7 @@ func (is *InclusionSuite) SetupTest() {
 	netConfig := testnet.NewNetworkConfig("consensus_collection_guarantee_inclusion", nodeConfigs)
 
 	// initialize the network
-	is.net = testnet.PrepareFlowNetwork(is.T(), netConfig)
+	is.net = testnet.PrepareFlowNetwork(is.T(), netConfig, flow.Localnet)
 
 	// start the network
 	ctx, cancel := context.WithCancel(context.Background())
@@ -120,8 +121,13 @@ func (is *InclusionSuite) TestCollectionGuaranteeIncluded() {
 
 	// generate a sentinel collection guarantee
 	sentinel := unittest.CollectionGuaranteeFixture()
-	sentinel.SignerIDs = []flow.Identifier{is.collID}
+	// there is only one collection node in the cluster
+	clusterCommittee := flow.IdentifierList{is.collID}
+	signerIndices, err := signature.EncodeSignersToIndices(clusterCommittee, clusterCommittee)
+	require.NoError(t, err)
+	sentinel.SignerIndices = signerIndices
 	sentinel.ReferenceBlockID = is.net.Root().ID()
+	sentinel.ChainID = is.net.BootstrapData.ClusterRootBlocks[0].Header.ChainID
 	colID := sentinel.CollectionID
 
 	is.waitUntilSeenProposal(deadline)

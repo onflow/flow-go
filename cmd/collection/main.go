@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/bootstrap"
+	modulecompliance "github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 
 	"github.com/onflow/flow-go-sdk/client"
@@ -68,9 +69,10 @@ func main() {
 		startupTimeString                      string
 		startupTime                            time.Time
 
-		followerState protocol.MutableState
-		ingestConf    = ingest.DefaultConfig()
-		rpcConf       rpc.Config
+		followerState           protocol.MutableState
+		ingestConf              = ingest.DefaultConfig()
+		rpcConf                 rpc.Config
+		clusterComplianceConfig modulecompliance.Config
 
 		pools                   *epochpool.TransactionPools // epoch-scoped transaction pools
 		followerBuffer          *buffer.PendingBlocks       // pending block cache for follower
@@ -111,8 +113,6 @@ func main() {
 			"expiry buffer for inbound transactions")
 		flags.UintVar(&ingestConf.PropagationRedundancy, "ingest-tx-propagation-redundancy", 10,
 			"how many additional cluster members we propagate transactions to")
-		flags.Uint64Var(&ingestConf.MaxAddressIndex, "ingest-max-address-index", flow.DefaultMaxAddressIndex,
-			"the maximum address index allowed in transactions")
 		flags.UintVar(&builderExpiryBuffer, "builder-expiry-buffer", builder.DefaultExpiryBuffer,
 			"expiry buffer for transactions in proposed collections")
 		flags.Float64Var(&builderPayerRateLimit, "builder-rate-limit", builder.DefaultMaxPayerTransactionRate, // no rate limiting
@@ -140,6 +140,8 @@ func main() {
 			"additional fraction of replica timeout that the primary will wait for votes")
 		flags.DurationVar(&blockRateDelay, "block-rate-delay", 250*time.Millisecond,
 			"the delay to broadcast block proposal in order to control block production rate")
+		flags.Uint64Var(&clusterComplianceConfig.SkipNewProposalsThreshold,
+			"cluster-compliance-skip-proposals-threshold", modulecompliance.DefaultConfig().SkipNewProposalsThreshold, "threshold at which new proposals are discarded rather than cached, if their height is this much above local finalized height (cluster compliance engine)")
 		flags.StringVar(&startupTimeString, "hotstuff-startup-time", cmd.NotSet, "specifies date and time (in ISO 8601 format) after which the consensus participant may enter the first view (e.g (e.g 1996-04-24T15:04:05-07:00))")
 
 		// epoch qc contract flags
@@ -306,6 +308,7 @@ func main() {
 				followerCore,
 				mainChainSyncCore,
 				node.Tracer,
+				modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
@@ -425,6 +428,7 @@ func main() {
 				node.Metrics.Mempool,
 				node.State,
 				node.Storage.Transactions,
+				modulecompliance.WithSkipNewProposalsThreshold(clusterComplianceConfig.SkipNewProposalsThreshold),
 			)
 			if err != nil {
 				return nil, err
@@ -526,7 +530,7 @@ func main() {
 }
 
 // createQCContractClient creates QC contract client
-func createQCContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap.NodeMachineAccountInfo, flowClient *client.Client) (module.QCContractClient, error) {
+func createQCContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap.NodeMachineAccountInfo, flowClient *client.Client, anID flow.Identifier) (module.QCContractClient, error) {
 
 	var qcContractClient module.QCContractClient
 
@@ -544,7 +548,7 @@ func createQCContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap.
 	txSigner := sdkcrypto.NewInMemorySigner(sk, machineAccountInfo.HashAlgorithm)
 
 	// create actual qc contract client, all flags and machine account info file found
-	qcContractClient = epochs.NewQCContractClient(node.Logger, flowClient, node.Me.NodeID(), machineAccountInfo.Address, machineAccountInfo.KeyIndex, qcContractAddress, txSigner)
+	qcContractClient = epochs.NewQCContractClient(node.Logger, flowClient, anID, node.Me.NodeID(), machineAccountInfo.Address, machineAccountInfo.KeyIndex, qcContractAddress, txSigner)
 
 	return qcContractClient, nil
 }
@@ -559,7 +563,7 @@ func createQCContractClients(node *cmd.NodeConfig, machineAccountInfo *bootstrap
 			return nil, fmt.Errorf("failed to create flow client for qc contract client with options: %s %w", flowClientOpts, err)
 		}
 
-		qcClient, err := createQCContractClient(node, machineAccountInfo, flowClient)
+		qcClient, err := createQCContractClient(node, machineAccountInfo, flowClient, opt.AccessNodeID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create qc contract client with flow client options: %s %w", flowClientOpts, err)
 		}

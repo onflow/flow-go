@@ -15,13 +15,17 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 
+	"github.com/onflow/flow-go/module/compliance"
+
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/state/protocol"
@@ -54,13 +58,13 @@ type NodeBuilder interface {
 	// InitIDProviders initializes the ID providers needed by various components
 	InitIDProviders()
 
-	// EnqueueNetworkInit enqueues the default network component with the given context
+	// EnqueueNetworkInit enqueues the default networking layer.
 	EnqueueNetworkInit()
 
-	// EnqueueMetricsServerInit enqueues the metrics component
+	// EnqueueMetricsServerInit enqueues the metrics component.
 	EnqueueMetricsServerInit()
 
-	// Enqueues the Tracer component
+	// EnqueueTracer enqueues the Tracer component.
 	EnqueueTracer()
 
 	// Module enables setting up dependencies of the engine with the builder context
@@ -73,6 +77,14 @@ type NodeBuilder interface {
 	// In both cases, the object is started according to its interface when the node is run,
 	// and the node will wait for the component to exit gracefully.
 	Component(name string, f ReadyDoneFactory) NodeBuilder
+
+	// RestartableComponent adds a new component to the node that conforms to the ReadyDoneAware
+	// interface, and calls the provided error handler when an irrecoverable error is encountered.
+	// Use RestartableComponent if the component is not critical to the node's safe operation and
+	// can/should be independently restarted when an irrecoverable error is encountered.
+	//
+	// Any irrecoverable errors thrown by the component will be passed to the provided error handler.
+	RestartableComponent(name string, f ReadyDoneFactory, errorHandler component.OnError) NodeBuilder
 
 	// ShutdownFunc adds a callback function that is called after all components have exited.
 	// All shutdown functions are called regardless of errors returned by previous callbacks. Any
@@ -147,10 +159,14 @@ type BaseConfig struct {
 	db                              *badger.DB
 	PreferredUnicastProtocols       []string
 	NetworkReceivedMessageCacheSize uint32
-	topologyProtocolName            string
-	topologyEdgeProbability         float64
+	TopologyProtocolName            string
+	TopologyEdgeProbability         float64
 	HeroCacheMetricsEnable          bool
 	SyncCoreConfig                  synchronization.Config
+	CodecFactory                    func() network.Codec
+	// ComplianceConfig configures either the compliance engine (consensus nodes)
+	// or the follower engine (all other node roles)
+	ComplianceConfig compliance.Config
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
@@ -173,6 +189,7 @@ type NodeConfig struct {
 	Resolver          madns.BasicResolver
 	Middleware        network.Middleware
 	Network           network.Network
+	ConduitFactory    network.ConduitFactory
 	PingService       network.PingService
 	MsgValidators     []network.MessageValidator
 	FvmOptions        []fvm.Option
@@ -202,6 +219,10 @@ func DefaultBaseConfig() *BaseConfig {
 	homedir, _ := os.UserHomeDir()
 	datadir := filepath.Join(homedir, ".flow", "database")
 
+	// NOTE: if the codec used in the network component is ever changed any code relying on
+	// the message format specific to the codec must be updated. i.e: the AuthorizedSenderValidator.
+	codecFactory := func() network.Codec { return cbor.NewCodec() }
+
 	return &BaseConfig{
 		nodeIDHex:                       NotSet,
 		AdminAddr:                       NotSet,
@@ -228,9 +249,11 @@ func DefaultBaseConfig() *BaseConfig {
 		receiptsCacheSize:               bstorage.DefaultCacheSize,
 		guaranteesCacheSize:             bstorage.DefaultCacheSize,
 		NetworkReceivedMessageCacheSize: p2p.DefaultReceiveCacheSize,
-		topologyProtocolName:            string(topology.TopicBased),
-		topologyEdgeProbability:         topology.MaximumEdgeProbability,
+		TopologyProtocolName:            string(topology.TopicBased),
+		TopologyEdgeProbability:         topology.MaximumEdgeProbability,
 		HeroCacheMetricsEnable:          false,
 		SyncCoreConfig:                  synchronization.DefaultConfig(),
+		CodecFactory:                    codecFactory,
+		ComplianceConfig:                compliance.DefaultConfig(),
 	}
 }

@@ -7,15 +7,13 @@ import (
 
 // DKGMessage is the type of message exchanged between DKG nodes.
 type DKGMessage struct {
-	Orig          uint64
 	Data          []byte
 	DKGInstanceID string
 }
 
 // NewDKGMessage creates a new DKGMessage.
-func NewDKGMessage(orig int, data []byte, dkgInstanceID string) DKGMessage {
+func NewDKGMessage(data []byte, dkgInstanceID string) DKGMessage {
 	return DKGMessage{
-		Orig:          uint64(orig),
 		Data:          data,
 		DKGInstanceID: dkgInstanceID,
 	}
@@ -25,7 +23,8 @@ func NewDKGMessage(orig int, data []byte, dkgInstanceID string) DKGMessage {
 // of the sender.
 type PrivDKGMessageIn struct {
 	DKGMessage
-	OriginID flow.Identifier
+	CommitteeMemberIndex uint64 // CommitteeMemberIndex field is set when the message arrives at the Broker
+	OriginID             flow.Identifier
 }
 
 // PrivDKGMessageOut is a wrapper around a DKGMessage containing the network ID of
@@ -37,8 +36,11 @@ type PrivDKGMessageOut struct {
 
 // BroadcastDKGMessage is a wrapper around a DKGMessage intended for broadcasting.
 // It contains a signature of the DKGMessage signed with the staking key of the
-// sender.
+// sender. When the DKG contract receives BroadcastDKGMessage' it will attach the
+// NodeID of the sender, we then add this field to the BroadcastDKGMessage when reading broadcast messages.
 type BroadcastDKGMessage struct {
 	DKGMessage
-	Signature crypto.Signature
+	CommitteeMemberIndex uint64          `json:"-"` // CommitteeMemberIndex field is set when reading broadcast messages using the NodeID to find the index of the sender in the DKG committee
+	NodeID               flow.Identifier `json:"-"` // NodeID field is added when reading broadcast messages from the DKG contract, this field is ignored when sending broadcast messages
+	Signature            crypto.Signature
 }

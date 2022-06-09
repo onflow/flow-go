@@ -47,6 +47,7 @@ import (
 	"github.com/onflow/flow-go/module/buffer"
 	builder "github.com/onflow/flow-go/module/builder/consensus"
 	chmodule "github.com/onflow/flow-go/module/chunks"
+	modulecompliance "github.com/onflow/flow-go/module/compliance"
 	dkgmodule "github.com/onflow/flow-go/module/dkg"
 	"github.com/onflow/flow-go/module/epochs"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
@@ -657,13 +658,21 @@ func main() {
 				mutableState,
 				proposals,
 				syncCore,
-				hotstuffModules.Aggregator)
+				hotstuffModules.Aggregator,
+				modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),
+			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance core: %w", err)
 			}
 
 			// initialize the compliance engine
-			comp, err = compliance.NewEngine(node.Logger, node.Network, node.Me, prov, complianceCore)
+			comp, err = compliance.NewEngine(
+				node.Logger,
+				node.Network,
+				node.Me,
+				prov,
+				complianceCore,
+			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
 			}
@@ -795,7 +804,7 @@ func loadBeaconPrivateKey(dir string, myID flow.Identifier) (*encodable.RandomBe
 }
 
 // createDKGContractClient creates an dkgContractClient
-func createDKGContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap.NodeMachineAccountInfo, flowClient *client.Client) (module.DKGContractClient, error) {
+func createDKGContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap.NodeMachineAccountInfo, flowClient *client.Client, anID flow.Identifier) (module.DKGContractClient, error) {
 	var dkgClient module.DKGContractClient
 
 	contracts, err := systemcontracts.SystemContractsForChain(node.RootChainID)
@@ -815,6 +824,7 @@ func createDKGContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap
 	dkgClient = dkgmodule.NewClient(
 		node.Logger,
 		flowClient,
+		anID,
 		txSigner,
 		dkgContractAddress,
 		machineAccountInfo.Address,
@@ -835,7 +845,7 @@ func createDKGContractClients(node *cmd.NodeConfig, machineAccountInfo *bootstra
 		}
 
 		node.Logger.Info().Msgf("created dkg contract client with opts: %s", opt.String())
-		dkgClient, err := createDKGContractClient(node, machineAccountInfo, flowClient)
+		dkgClient, err := createDKGContractClient(node, machineAccountInfo, flowClient, opt.AccessNodeID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create dkg contract client with flow client options: %s %w", flowClientOpts, err)
 		}

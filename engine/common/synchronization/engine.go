@@ -310,6 +310,9 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 			OriginID: originID,
 			Block:    block,
 		}
+		// tempfix: to help nodes falling far behind to catch up.
+		// it avoids the race condition in compliance engine and hotstuff to validate blocks
+		time.Sleep(150 * time.Millisecond)
 		e.comp.SubmitLocal(synced)
 	}
 }

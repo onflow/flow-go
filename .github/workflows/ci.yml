@@ -16,7 +16,7 @@ on:
       - 'v[0-9]+.[0-9]+'
 
 env:
-  GO_VERSION: 1.17
+  GO_VERSION: 1.18
 
 jobs:
   golangci:
@@ -35,7 +35,7 @@ jobs:
       uses: golangci/golangci-lint-action@v2
       with:
         # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
-        version: v1.41
+        version: v1.45
         args: -v --build-tags relic
         # https://github.com/golangci/golangci-lint-action/issues/244
         skip-pkg-cache: true
@@ -65,7 +65,7 @@ jobs:
         max_attempts: 3
         command: make ci
     - name: Upload coverage report
-      uses: codecov/codecov-action@v1
+      uses: codecov/codecov-action@v2
       with:
         file: ./coverage.txt
         flags: unittests

@@ -84,7 +84,6 @@ type state struct {
 	collections        storage.Collections
 	chunkDataPacks     storage.ChunkDataPacks
 	results            storage.ExecutionResults
-	receipts           storage.ExecutionReceipts
 	myReceipts         storage.MyExecutionReceipts
 	events             storage.Events
 	serviceEvents      storage.ServiceEvents
@@ -109,7 +108,6 @@ func NewExecutionState(
 	collections storage.Collections,
 	chunkDataPacks storage.ChunkDataPacks,
 	results storage.ExecutionResults,
-	receipts storage.ExecutionReceipts,
 	myReceipts storage.MyExecutionReceipts,
 	events storage.Events,
 	serviceEvents storage.ServiceEvents,
@@ -126,7 +124,6 @@ func NewExecutionState(
 		collections:        collections,
 		chunkDataPacks:     chunkDataPacks,
 		results:            results,
-		receipts:           receipts,
 		myReceipts:         myReceipts,
 		events:             events,
 		serviceEvents:      serviceEvents,
@@ -136,11 +133,10 @@ func NewExecutionState(
 
 }
 
-func makeSingleValueQuery(commitment flow.StateCommitment, owner, controller, key string) (*ledger.Query, error) {
-	return ledger.NewQuery(ledger.State(commitment),
-		[]ledger.Key{
-			RegisterIDToKey(flow.NewRegisterID(owner, controller, key)),
-		})
+func makeSingleValueQuery(commitment flow.StateCommitment, owner, controller, key string) (*ledger.QuerySingleValue, error) {
+	return ledger.NewQuerySingleValue(ledger.State(commitment),
+		RegisterIDToKey(flow.NewRegisterID(owner, controller, key)),
+	)
 }
 
 func makeQuery(commitment flow.StateCommitment, ids []flow.RegisterID) (*ledger.Query, error) {
@@ -190,26 +186,21 @@ func LedgerGetRegister(ldg ledger.Ledger, commitment flow.StateCommitment) delta
 			return nil, fmt.Errorf("cannot create ledger query: %w", err)
 		}
 
-		values, err := ldg.Get(query)
+		value, err := ldg.GetSingleValue(query)
 
 		if err != nil {
 			return nil, fmt.Errorf("error getting register (%s) value at %x: %w", key, commitment, err)
 		}
 
-		// We expect 1 element in the returned slice of values because query is from makeSingleValueQuery()
-		if len(values) != 1 {
-			return nil, fmt.Errorf("error getting register (%s) value at %x: number of returned values (%d) != number of queried keys (%d)", key, commitment, len(values), len(query.Keys()))
-		}
-
 		// Prevent caching of value with len zero
-		if len(values[0]) == 0 {
+		if len(value) == 0 {
 			return nil, nil
 		}
 
 		// don't cache value with len zero
-		readCache[regID] = flow.RegisterEntry{Key: regID, Value: values[0]}
+		readCache[regID] = flow.RegisterEntry{Key: regID, Value: value}
 
-		return values[0], nil
+		return value, nil
 	}
 }
 
@@ -336,6 +327,12 @@ func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifie
 func (s *state) SaveExecutionResults(ctx context.Context, header *flow.Header, endState flow.StateCommitment,
 	chunkDataPacks []*flow.ChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.EventsList, serviceEvents flow.EventsList,
 	results []flow.TransactionResult) error {
+	return s.saveExecutionResults(ctx, header, endState, chunkDataPacks, executionReceipt, events, serviceEvents, results)
+}
+
+func (s *state) saveExecutionResults(ctx context.Context, header *flow.Header, endState flow.StateCommitment,
+	chunkDataPacks []*flow.ChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.EventsList, serviceEvents flow.EventsList,
+	results []flow.TransactionResult) error {
 
 	spew.Config.DisableMethods = true
 	spew.Config.DisablePointerMethods = true
@@ -390,7 +387,6 @@ func (s *state) SaveExecutionResults(ctx context.Context, header *flow.Header, e
 		return fmt.Errorf("cannot store execution result: %w", err)
 	}
 
-	// it overwrites the index if exists already
 	err = s.results.BatchIndex(blockID, executionResult.ID(), batch)
 	if err != nil {
 		return fmt.Errorf("cannot index execution result: %w", err)
@@ -536,11 +532,11 @@ func (s *state) GetHighestExecutedBlockID(ctx context.Context) (uint64, flow.Ide
 	err := s.db.View(func(tx *badger.Txn) error {
 		err := operation.RetrieveExecutedBlock(&blockID)(tx)
 		if err != nil {
-			return fmt.Errorf("could not lookup executed block: %w", err)
+			return fmt.Errorf("could not lookup executed block %v: %w", blockID, err)
 		}
 		err = operation.RetrieveHeader(blockID, &highest)(tx)
 		if err != nil {
-			return fmt.Errorf("could not retrieve executed header: %w", err)
+			return fmt.Errorf("could not retrieve executed header %v: %w", blockID, err)
 		}
 		return nil
 	})

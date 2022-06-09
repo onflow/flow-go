@@ -18,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/ledger/partial"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestExecutionChunkDataPacks(t *testing.T) {
@@ -30,8 +29,6 @@ type ChunkDataPacksSuite struct {
 }
 
 func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
-	unittest.SkipUnless(gs.Suite.T(), unittest.TEST_FLAKY, "flaky test")
-
 	// wait for next height finalized (potentially first height), called blockA
 	blockA := gs.BlockState.WaitForHighestFinalizedProgress(gs.T())
 	gs.T().Logf("got blockA height %v ID %v", blockA.Header.Height, blockA.Header.ID())
