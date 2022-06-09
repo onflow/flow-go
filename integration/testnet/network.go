@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/dkg"
+	"github.com/onflow/flow-go/state/protocol"
 
 	"github.com/dapperlabs/testingdock"
 	"github.com/docker/docker/api/types"
@@ -333,49 +334,57 @@ func NewConsensusFollowerConfig(t *testing.T, networkingPrivKey crypto.PrivateKe
 
 // NetworkConfig is the config for the network.
 type NetworkConfig struct {
-	Nodes                 []NodeConfig
-	ConsensusFollowers    []ConsensusFollowerConfig
-	Name                  string
-	NClusters             uint
-	ViewsInDKGPhase       uint64
-	ViewsInStakingAuction uint64
-	ViewsInEpoch          uint64
+	Nodes                      []NodeConfig
+	ConsensusFollowers         []ConsensusFollowerConfig
+	Name                       string
+	NClusters                  uint
+	ViewsInDKGPhase            uint64
+	ViewsInStakingAuction      uint64
+	ViewsInEpoch               uint64
+	EpochCommitSafetyThreshold uint64
 }
 
 type NetworkConfigOpt func(*NetworkConfig)
 
 func NewNetworkConfig(name string, nodes []NodeConfig, opts ...NetworkConfigOpt) NetworkConfig {
+	threshold, err := protocol.DefaultEpochCommitSafetyThreshold(flow.Localnet)
+	if err != nil {
+		panic(err) // should never happen, because localnet has a default safety threshold
+	}
 	c := NetworkConfig{
-		Nodes:                 nodes,
-		Name:                  name,
-		NClusters:             1, // default to 1 cluster
-		ViewsInStakingAuction: DefaultViewsInStakingAuction,
-		ViewsInDKGPhase:       DefaultViewsInDKGPhase,
-		ViewsInEpoch:          DefaultViewsInEpoch,
+		Nodes:                      nodes,
+		Name:                       name,
+		NClusters:                  1, // default to 1 cluster
+		ViewsInStakingAuction:      DefaultViewsInStakingAuction,
+		ViewsInDKGPhase:            DefaultViewsInDKGPhase,
+		ViewsInEpoch:               DefaultViewsInEpoch,
+		EpochCommitSafetyThreshold: threshold,
 	}
 
 	for _, apply := range opts {
 		apply(&c)
+	}
+
+	// sanity check: the difference between DKG end and safety threshold is >= the default safety threshold
+	if c.ViewsInEpoch-c.EpochCommitSafetyThreshold < c.ViewsInStakingAuction+3*c.ViewsInDKGPhase+threshold {
+		panic(fmt.Sprintf("potentially unsafe epoch config: dkg_final_view=%d, epoch_final_view=%d, safety_threshold=%d",
+			c.ViewsInStakingAuction+3*c.ViewsInDKGPhase, c.ViewsInEpoch, threshold))
 	}
 
 	return c
 }
 
 func NewNetworkConfigWithEpochConfig(name string, nodes []NodeConfig, viewsInStakingAuction, viewsInDKGPhase, viewsInEpoch uint64, opts ...NetworkConfigOpt) NetworkConfig {
-	c := NetworkConfig{
-		Nodes:                 nodes,
-		Name:                  name,
-		NClusters:             1, // default to 1 cluster
-		ViewsInStakingAuction: viewsInStakingAuction,
-		ViewsInDKGPhase:       viewsInDKGPhase,
-		ViewsInEpoch:          viewsInEpoch,
-	}
-
-	for _, apply := range opts {
-		apply(&c)
-	}
-
-	return c
+	return NewNetworkConfig(
+		name,
+		nodes,
+		append(
+			opts,
+			WithViewsInStakingAuction(viewsInStakingAuction),
+			WithViewsInDKGPhase(viewsInDKGPhase),
+			WithViewsInEpoch(viewsInEpoch),
+		)...,
+	)
 }
 
 func WithViewsInStakingAuction(views uint64) func(*NetworkConfig) {
