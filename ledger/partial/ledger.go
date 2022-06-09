@@ -63,6 +63,22 @@ func (l *Ledger) InitialState() ledger.State {
 	return l.state
 }
 
+// GetSingleValue reads value of a given key at the given state
+func (l *Ledger) GetSingleValue(query *ledger.QuerySingleValue) (value ledger.Value, err error) {
+	path, err := pathfinder.KeyToPath(query.Key(), l.pathFinderVersion)
+	if err != nil {
+		return nil, err
+	}
+	payload, err := l.ptrie.GetSinglePayload(path)
+	if err != nil {
+		if _, ok := err.(*ptrie.ErrMissingPath); ok {
+			return nil, &ledger.ErrMissingKeys{Keys: []ledger.Key{query.Key()}}
+		}
+		return nil, err
+	}
+	return payload.Value, err
+}
+
 // Get read the values of the given keys at the given state
 // it returns the values in the same order as given registerIDs and errors (if any)
 func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
