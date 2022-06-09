@@ -34,14 +34,14 @@ func (e *BlobSizeLimitExceededError) Error() string {
 	return fmt.Sprintf("blob %v exceeds maximum blob size", e.cid.String())
 }
 
-// mismatchedBlockIDError is returned when the block ID of the execution data does not
+// MismatchedBlockIDError is returned when the block ID of the execution data does not
 // match what was requested.
-type mismatchedBlockIDError struct {
+type MismatchedBlockIDError struct {
 	expected flow.Identifier
 	actual   flow.Identifier
 }
 
-func (e *mismatchedBlockIDError) Error() string {
+func (e *MismatchedBlockIDError) Error() string {
 	return fmt.Sprintf("execution data block ID %v does not match expected block ID %v", e.actual, e.expected)
 }
 
@@ -190,7 +190,7 @@ func (h *handler) handle(parentCtx irrecoverable.SignalerContext, j *job) {
 		h.metrics.RequestSucceeded(j.blockHeight, duration, size, attempts)
 
 		if executionData.BlockID != j.blockID {
-			err := &mismatchedBlockIDError{
+			err := &MismatchedBlockIDError{
 				expected: j.blockID,
 				actual:   executionData.BlockID,
 			}
