@@ -523,7 +523,6 @@ func (e *ScriptEnv) SetProgram(location common.Location, program *interpreter.Pr
 	}
 
 	err = e.programs.Set(location, program)
-	e.localProgramCache[location.ID()] = program
 
 	if err != nil {
 		return fmt.Errorf("set program failed: %w", err)

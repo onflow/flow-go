@@ -676,7 +676,6 @@ func (e *TransactionEnv) SetProgram(location common.Location, program *interpret
 	}
 
 	err = e.programs.Set(location, program)
-	e.localProgramCache[location.ID()] = program
 
 	if err != nil {
 		return fmt.Errorf("set program failed: %w", err)

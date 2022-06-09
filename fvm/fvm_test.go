@@ -4463,7 +4463,72 @@ func TestContractImportInteractionCounting(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, script.Err)
 				// we should meter computation for 3 GetPrograms, one for each contract
-				assert.Equal(t, 300, int(script.GasUsed))
+				assert.Equal(t, 900, int(script.GasUsed))
+			},
+		),
+	)
+
+	t.Run("uses are not double counted",
+		newVMTest().withBootstrapProcedureOptions(
+			fvm.WithExecutionEffortWeights(
+				weightedMeter.ExecutionEffortWeights{
+					meter.ComputationKindGetProgram: 100 << weightedMeter.MeterExecutionInternalPrecisionBytes,
+					common.ComputationKindLoop: 0, 
+					common.ComputationKindStatement: 0, 
+					common.ComputationKindFunctionInvocation: 0, 
+				},
+			),
+		).run(
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, ps *programs.Programs) {
+
+				// Create an account private key.
+				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+				require.NoError(t, err)
+
+				// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+				accounts, err := testutil.CreateAccounts(vm, view, ps, privateKeys, chain)
+				require.NoError(t, err)
+				account1 := accounts[0]
+
+				contractA := `pub contract A {
+					pub fun foo() {}
+				}`
+
+				txBodyA := testutil.CreateContractDeploymentTransaction("A", contractA, account1, chain)
+
+				txBodyA.SetProposalKey(chain.ServiceAddress(), 0, 0)
+				txBodyA.SetPayer(chain.ServiceAddress())
+
+				err = testutil.SignPayload(txBodyA, account1, privateKeys[0])
+				require.NoError(t, err)
+
+				err = testutil.SignEnvelope(txBodyA, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBodyA, 0)
+				err = vm.Run(ctx, tx, view, programs.NewEmptyPrograms())
+				require.NoError(t, err)
+				require.NoError(t, tx.Err)
+
+				script := fvm.Script([]byte(fmt.Sprintf(`
+					import A from 0x%s
+
+					pub fun main() {
+						var i = 0
+						while i < 100 {
+							i = i + 1
+							A.foo()
+						}
+					}
+				`, account1.String())))
+
+				scriptCtx := fvm.NewContextFromParent(ctx)
+
+				err = vm.Run(scriptCtx, script, view, ps)
+				require.NoError(t, err)
+				require.NoError(t, script.Err)
+				// we should meter computation for 2 GetPrograms
+				assert.Equal(t, 200, int(script.GasUsed))
 			},
 		),
 	)
