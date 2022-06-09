@@ -92,6 +92,6 @@ func isAuthorizedSender(identity *flow.Identity, channel network.Channel, code n
 	if !authorizedRolesByChannel.Contains(identity.Role) {
 		return fmt.Errorf("sender role is not authorized to send this message type on channel")
 	}
-	
+
 	return nil
 }
