@@ -190,11 +190,6 @@ func (e *blockComputer) executeBlock(
 		wg.Done()
 	}()
 
-	executionData := &execution_data.BlockExecutionData{
-		BlockID:             block.ID(),
-		ChunkExecutionDatas: make([]*execution_data.ChunkExecutionData, 0, len(collections)+1),
-	}
-
 	collectionIndex := 0
 
 	for i, collection := range collections {
@@ -209,12 +204,6 @@ func (e *blockComputer) executeBlock(
 		if err != nil {
 			return nil, fmt.Errorf("cannot merge view: %w", err)
 		}
-
-		col := collection.Collection()
-		executionData.ChunkExecutionDatas = append(executionData.ChunkExecutionDatas, &execution_data.ChunkExecutionData{
-			Collection: &col,
-			Events:     res.Events[i],
-		})
 
 		collectionIndex++
 	}
@@ -233,11 +222,6 @@ func (e *blockComputer) executeBlock(
 		return nil, fmt.Errorf("cannot merge view: %w", err)
 	}
 
-	executionData.ChunkExecutionDatas = append(executionData.ChunkExecutionDatas, &execution_data.ChunkExecutionData{
-		Collection: systemCol,
-		Events:     res.Events[len(res.Events)-1],
-	})
-
 	// close the views and wait for all views to be committed
 	close(bc.views)
 	close(eh.data)
@@ -247,9 +231,7 @@ func (e *blockComputer) executeBlock(
 	res.Proofs = proofs
 	res.TrieUpdates = trieUpdates
 
-	for i, trieUpdate := range trieUpdates {
-		executionData.ChunkExecutionDatas[i].TrieUpdate = trieUpdate
-	}
+	executionData := generateExecutionData(res, collections, systemCol)
 
 	executionDataID, err := e.executionDataProvider.Provide(ctx, block.Height(), executionData)
 	if err != nil {
@@ -259,6 +241,34 @@ func (e *blockComputer) executeBlock(
 	res.ExecutionDataID = executionDataID
 
 	return res, nil
+}
+
+func generateExecutionData(
+	res *execution.ComputationResult,
+	collections []*entity.CompleteCollection,
+	systemCol *flow.Collection,
+) *execution_data.BlockExecutionData {
+	executionData := &execution_data.BlockExecutionData{
+		BlockID:             res.ExecutableBlock.ID(),
+		ChunkExecutionDatas: make([]*execution_data.ChunkExecutionData, 0, len(collections)+1),
+	}
+
+	for i, collection := range collections {
+		col := collection.Collection()
+		executionData.ChunkExecutionDatas = append(executionData.ChunkExecutionDatas, &execution_data.ChunkExecutionData{
+			Collection: &col,
+			Events:     res.Events[i],
+			TrieUpdate: res.TrieUpdates[i],
+		})
+	}
+
+	executionData.ChunkExecutionDatas = append(executionData.ChunkExecutionDatas, &execution_data.ChunkExecutionData{
+		Collection: systemCol,
+		Events:     res.Events[len(res.Events)-1],
+		TrieUpdate: res.TrieUpdates[len(res.TrieUpdates)-1],
+	})
+
+	return executionData
 }
 
 func (e *blockComputer) executeSystemCollection(
