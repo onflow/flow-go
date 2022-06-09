@@ -3,7 +3,6 @@ package backend
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/module/metrics"
 	"net"
 	"strconv"
 	"strings"
@@ -20,6 +19,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/access/mock"
+	"github.com/onflow/flow-go/module/metrics"
 )
 
 func TestProxyAccessAPI(t *testing.T) {
