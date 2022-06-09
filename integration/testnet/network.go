@@ -1204,7 +1204,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*Bootstra
 		return nil, fmt.Errorf("generating root seal failed: %w", err)
 	}
 
-	snapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)
+	snapshot, err := inmem.SnapshotFromBootstrapStateWithParams(root, result, seal, qc, flow.DefaultProtocolVersion, networkConf.EpochCommitSafetyThreshold)
 	if err != nil {
 		return nil, fmt.Errorf("could not create bootstrap state snapshot: %w", err)
 	}
