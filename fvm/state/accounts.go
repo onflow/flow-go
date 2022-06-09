@@ -173,7 +173,7 @@ func (a *StatefulAccounts) Create(publicKeys []flow.AccountPublicKey, newAddress
 }
 
 func (a *StatefulAccounts) GetPublicKey(address flow.Address, keyIndex uint64) (flow.AccountPublicKey, error) {
-	publicKey, err := a.getValue(address, true, keyPublicKey(keyIndex))
+	publicKey, err := a.getValue(address, true, KeyPublicKey(keyIndex))
 	if err != nil {
 		return flow.AccountPublicKey{}, err
 	}
@@ -249,7 +249,7 @@ func (a *StatefulAccounts) SetPublicKey(
 		return nil, errors.NewValueErrorf(string(encoded), "invalid public key value: %w", err)
 	}
 
-	err = a.setValue(address, true, keyPublicKey(keyIndex), encodedPublicKey)
+	err = a.setValue(address, true, KeyPublicKey(keyIndex), encodedPublicKey)
 
 	return encodedPublicKey, err
 }
@@ -685,6 +685,6 @@ func (l *contractNames) remove(contractName string) {
 	*l = append((*l)[:i], (*l)[i+1:]...)
 }
 
-func keyPublicKey(index uint64) string {
+func KeyPublicKey(index uint64) string {
 	return fmt.Sprintf("public_key_%d", index)
 }
