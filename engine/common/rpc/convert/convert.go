@@ -84,6 +84,14 @@ func MessageToTransaction(m *entities.Transaction, chain flow.Chain) (flow.Trans
 	return *t, nil
 }
 
+func TransactionsToMessages(transactions []*flow.TransactionBody) []*entities.Transaction {
+	transactionMessages := make([]*entities.Transaction, len(transactions))
+	for i, t := range transactions {
+		transactionMessages[i] = TransactionToMessage(*t)
+	}
+	return transactionMessages
+}
+
 func TransactionToMessage(tb flow.TransactionBody) *entities.Transaction {
 	proposalKeyMessage := &entities.Transaction_ProposalKey{
 		Address:        tb.ProposalKey.Address.Bytes(),
@@ -133,8 +141,22 @@ func BlockHeaderToMessage(h *flow.Header) (*entities.BlockHeader, error) {
 	id := h.ID()
 
 	t := timestamppb.New(h.Timestamp)
-
-	parentVoterIds := IdentifiersToMessages(h.ParentVoterIDs)
+	var lastViewTC *entities.TimeoutCertificate
+	if h.LastViewTC != nil {
+		newestQC := h.LastViewTC.NewestQC
+		lastViewTC = &entities.TimeoutCertificate{
+			View:          h.LastViewTC.View,
+			HighQcViews:   h.LastViewTC.NewestQCViews,
+			SignerIndices: h.LastViewTC.SignerIndices,
+			SigData:       h.LastViewTC.SigData,
+			HighestQc: &entities.QuorumCertificate{
+				View:          newestQC.View,
+				BlockId:       newestQC.BlockID[:],
+				SignerIndices: newestQC.SignerIndices,
+				SigData:       newestQC.SigData,
+			},
+		}
+	}
 
 	return &entities.BlockHeader{
 		Id:                 id[:],
@@ -143,31 +165,53 @@ func BlockHeaderToMessage(h *flow.Header) (*entities.BlockHeader, error) {
 		PayloadHash:        h.PayloadHash[:],
 		Timestamp:          t,
 		View:               h.View,
-		ParentVoterIds:     parentVoterIds,
+		ParentVoterIndices: h.ParentVoterIndices,
 		ParentVoterSigData: h.ParentVoterSigData,
 		ProposerId:         h.ProposerID[:],
 		ProposerSigData:    h.ProposerSigData,
 		ChainId:            h.ChainID.String(),
+		LastViewTc:         lastViewTC,
 	}, nil
 }
 
 func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
-	parentVoterIds := MessagesToIdentifiers(m.ParentVoterIds)
 	chainId, err := MessageToChainId(m.ChainId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert ChainId: %w", err)
 	}
+
+	var lastViewTC *flow.TimeoutCertificate
+	if m.LastViewTc != nil {
+		newestQC := m.LastViewTc.HighestQc
+		if newestQC == nil {
+			return nil, fmt.Errorf("invalid structure newest QC should be present")
+		}
+		lastViewTC = &flow.TimeoutCertificate{
+			View:          m.LastViewTc.View,
+			NewestQCViews: m.LastViewTc.HighQcViews,
+			SignerIndices: m.LastViewTc.SignerIndices,
+			SigData:       m.LastViewTc.SigData,
+			NewestQC: &flow.QuorumCertificate{
+				View:          newestQC.View,
+				BlockID:       MessageToIdentifier(newestQC.BlockId),
+				SignerIndices: newestQC.SignerIndices,
+				SigData:       newestQC.SigData,
+			},
+		}
+	}
+
 	return &flow.Header{
 		ParentID:           MessageToIdentifier(m.ParentId),
 		Height:             m.Height,
 		PayloadHash:        MessageToIdentifier(m.PayloadHash),
 		Timestamp:          m.Timestamp.AsTime(),
 		View:               m.View,
-		ParentVoterIDs:     parentVoterIds,
+		ParentVoterIndices: m.ParentVoterIndices,
 		ParentVoterSigData: m.ParentVoterSigData,
 		ProposerID:         MessageToIdentifier(m.ProposerId),
 		ProposerSigData:    m.ProposerSigData,
 		ChainID:            *chainId,
+		LastViewTC:         lastViewTC,
 	}, nil
 }
 
@@ -361,7 +405,7 @@ func CollectionGuaranteeToMessage(g *flow.CollectionGuarantee) *entities.Collect
 		Signatures:       [][]byte{g.Signature},
 		ReferenceBlockId: IdentifierToMessage(g.ReferenceBlockID),
 		Signature:        g.Signature,
-		SignerIds:        IdentifiersToMessages(g.SignerIDs),
+		SignerIndices:    g.SignerIndices,
 	}
 }
 
@@ -369,7 +413,7 @@ func MessageToCollectionGuarantee(m *entities.CollectionGuarantee) *flow.Collect
 	return &flow.CollectionGuarantee{
 		CollectionID:     MessageToIdentifier(m.CollectionId),
 		ReferenceBlockID: MessageToIdentifier(m.ReferenceBlockId),
-		SignerIDs:        MessagesToIdentifiers(m.SignerIds),
+		SignerIndices:    m.SignerIndices,
 		Signature:        MessageToSignature(m.Signature),
 	}
 }

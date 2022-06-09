@@ -21,9 +21,9 @@ func MakeVoteMessage(view uint64, blockID flow.Identifier) []byte {
 // MakeTimeoutMessage generates the message we have to sign in order to be able
 // to contribute to Active Pacemaker protocol. Each replica signs with the highest QC view
 // known to that replica.
-func MakeTimeoutMessage(view uint64, highQCView uint64) []byte {
+func MakeTimeoutMessage(view uint64, newestQCView uint64) []byte {
 	msg := make([]byte, 16)
 	binary.BigEndian.PutUint64(msg[:8], view)
-	binary.BigEndian.PutUint64(msg[8:], highQCView)
+	binary.BigEndian.PutUint64(msg[8:], newestQCView)
 	return msg
 }

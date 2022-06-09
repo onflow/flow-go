@@ -60,6 +60,8 @@ type Replicas interface {
 	Self() flow.Identifier
 
 	// DKG returns the DKG info for epoch given by the input view.
+	// Returns the following expected errors for invalid inputs:
+	//   * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
 	DKG(view uint64) (DKG, error)
 
 	// IdentitiesByEpoch returns a list of the legitimate HotStuff participants for the epoch
@@ -77,7 +79,7 @@ type Replicas interface {
 	//   * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
 	//
 	// TODO: should return identity skeleton https://github.com/dapperlabs/flow-go/issues/6232
-	IdentitiesByEpoch(view uint64, selector flow.IdentityFilter) (flow.IdentityList, error)
+	IdentitiesByEpoch(view uint64) (flow.IdentityList, error)
 
 	// IdentityByEpoch returns the full Identity for specified HotStuff participant.
 	// The node must be a legitimate HotStuff participant with NON-ZERO WEIGHT at the specified block.
@@ -112,7 +114,7 @@ type DynamicCommittee interface {
 	// The list of all legitimate HotStuff participants for the given epoch can be obtained by using `filter.Any`
 	//
 	// TODO - do we need this, if we are only checking a single proposer ID?
-	IdentitiesByBlock(blockID flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error)
+	IdentitiesByBlock(blockID flow.Identifier) (flow.IdentityList, error)
 
 	// IdentityByBlock returns the full Identity for specified HotStuff participant.
 	// The node must be a legitimate HotStuff participant with NON-ZERO WEIGHT at the specified block.

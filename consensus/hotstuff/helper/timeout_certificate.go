@@ -10,11 +10,16 @@ import (
 
 func MakeTC(options ...func(*flow.TimeoutCertificate)) *flow.TimeoutCertificate {
 	qc := MakeQC()
+	signerIndices := unittest.SignerIndicesFixture(3)
+	highQCViews := make([]uint64, 3)
+	for i := range highQCViews {
+		highQCViews[i] = qc.View
+	}
 	tc := flow.TimeoutCertificate{
 		View:          rand.Uint64(),
-		TOHighestQC:   qc,
-		TOHighQCViews: []uint64{qc.View},
-		SignerIDs:     unittest.IdentityListFixture(7).NodeIDs(),
+		NewestQC:      qc,
+		NewestQCViews: []uint64{qc.View},
+		SignerIndices: signerIndices,
 		SigData:       unittest.SignatureFixture(),
 	}
 	for _, option := range options {
@@ -23,21 +28,16 @@ func MakeTC(options ...func(*flow.TimeoutCertificate)) *flow.TimeoutCertificate 
 	return &tc
 }
 
-func WithTCHighestQC(qc *flow.QuorumCertificate) func(*flow.TimeoutCertificate) {
+func WithTCNewestQC(qc *flow.QuorumCertificate) func(*flow.TimeoutCertificate) {
 	return func(tc *flow.TimeoutCertificate) {
-		tc.TOHighestQC = qc
-		for _, view := range tc.TOHighQCViews {
-			if view == qc.View {
-				return
-			}
-		}
-		tc.TOHighQCViews = append(tc.TOHighQCViews, qc.View)
+		tc.NewestQC = qc
+		tc.NewestQCViews = []uint64{qc.View}
 	}
 }
 
-func WithTCSigners(signerIDs []flow.Identifier) func(*flow.TimeoutCertificate) {
+func WithTCSigners(signerIndices []byte) func(*flow.TimeoutCertificate) {
 	return func(tc *flow.TimeoutCertificate) {
-		tc.SignerIDs = signerIDs
+		tc.SignerIndices = signerIndices
 	}
 }
 
@@ -47,10 +47,16 @@ func WithTCView(view uint64) func(*flow.TimeoutCertificate) {
 	}
 }
 
+func WithTCHighQCViews(highQCViews []uint64) func(*flow.TimeoutCertificate) {
+	return func(tc *flow.TimeoutCertificate) {
+		tc.NewestQCViews = highQCViews
+	}
+}
+
 func TimeoutObjectFixture(opts ...func(TimeoutObject *hotstuff.TimeoutObject)) *hotstuff.TimeoutObject {
 	timeout := &hotstuff.TimeoutObject{
 		View:       uint64(rand.Uint32()),
-		HighestQC:  MakeQC(),
+		NewestQC:   MakeQC(),
 		LastViewTC: MakeTC(),
 		SignerID:   unittest.IdentifierFixture(),
 		SigData:    unittest.RandomBytes(128),

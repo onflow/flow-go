@@ -96,8 +96,8 @@ func (p *NitroPaceMaker) OnPartialTC(curView uint64) {
 	panic("not yet implemented")
 }
 
-// HighestQC returns QC with the highest view discovered by PaceMaker.
-func (p *NitroPaceMaker) HighestQC() *flow.QuorumCertificate {
+// NewestQC returns QC with the highest view discovered by PaceMaker.
+func (p *NitroPaceMaker) NewestQC() *flow.QuorumCertificate {
 	panic("not yet implemented")
 }
 

@@ -60,7 +60,7 @@ func IndexBlockIDByChunkID(chunkID, blockID flow.Identifier) func(*badger.Txn) e
 
 // BatchIndexBlockByChunkID indexes blockID by chunkID into a batch
 func BatchIndexBlockByChunkID(blockID, chunkID flow.Identifier) func(batch *badger.WriteBatch) error {
-	return batchInsert(makePrefix(codeIndexBlockByChunkID, chunkID), blockID)
+	return batchWrite(makePrefix(codeIndexBlockByChunkID, chunkID), blockID)
 }
 
 // LookupCollectionBlock looks up a block by a collection within that block.
@@ -71,6 +71,11 @@ func LookupCollectionBlock(collID flow.Identifier, blockID *flow.Identifier) fun
 // LookupBlockIDByChunkID looks up a block by a collection within that block.
 func LookupBlockIDByChunkID(chunkID flow.Identifier, blockID *flow.Identifier) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeIndexBlockByChunkID, chunkID), blockID)
+}
+
+// RemoveBlockIDByChunkID removes chunkID-blockID index by chunkID
+func RemoveBlockIDByChunkID(chunkID flow.Identifier) func(*badger.Txn) error {
+	return remove(makePrefix(codeIndexBlockByChunkID, chunkID))
 }
 
 // FindHeaders iterates through all headers, calling `filter` on each, and adding

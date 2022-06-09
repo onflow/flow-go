@@ -231,11 +231,6 @@ func (e *EventHandler) startNewView() error {
 
 	curView := e.paceMaker.CurView()
 
-	err := e.persist.PutStarted(curView)
-	if err != nil {
-		return fmt.Errorf("could not persist current view: %w", err)
-	}
-
 	currentLeader, err := e.committee.LeaderForView(curView)
 	if err != nil {
 		return fmt.Errorf("failed to determine primary for new view %d: %w", curView, err)
@@ -416,7 +411,6 @@ func (e *EventHandler) processQC(qc *flow.QuorumCertificate) error {
 	log := e.log.With().
 		Uint64("block_view", qc.View).
 		Hex("block_id", qc.BlockID[:]).
-		Int("signers", len(qc.SignerIDs)).
 		Logger()
 
 	err := e.forks.AddQC(qc)

@@ -3,6 +3,7 @@ package flow
 import (
 	"bytes"
 	"encoding/json"
+	"reflect"
 	"sync"
 	"time"
 
@@ -17,32 +18,34 @@ import (
 // the combined payload of the entire block. It is what consensus nodes agree
 // on after validating the contents against the payload hash.
 type Header struct {
-	ChainID ChainID // ChainID is a chain-specific value to prevent replay attacks.
-
-	ParentID Identifier // ParentID is the ID of this block's parent.
-
-	Height uint64 // Height is the height of the parent + 1
-
-	PayloadHash Identifier // PayloadHash is a hash of the payload of this block.
-
-	Timestamp time.Time // Timestamp is the time at which this block was proposed.
+	// ChainID is a chain-specific value to prevent replay attacks.
+	ChainID ChainID
+	// ParentID is the ID of this block's parent.
+	ParentID Identifier
+	// Height is the height of the parent + 1
+	Height uint64
+	// PayloadHash is a hash of the payload of this block.
+	PayloadHash Identifier
+	// Timestamp is the time at which this block was proposed.
 	// The proposer can choose any time, so this should not be trusted as accurate.
-
-	View uint64 // View number at which this block was proposed.
-
-	ParentVoterIDs []Identifier // List of voters who signed the parent block.
-	// A quorum certificate can be extrated from the header.
-	// This field is the SignerIDs field of the extracted quorum certificate.
-
-	ParentVoterSigData []byte // aggregated signature over the parent block. Not a single cryptographic
+	Timestamp time.Time
+	// View number at which this block was proposed.
+	View uint64
+	// ParentVoterIndices is a bitvector that represents all the voters for the parent block.
+	ParentVoterIndices []byte
+	// ParentVoterSigData is an aggregated signature over the parent block. Not a single cryptographic
 	// signature since the data represents cryptographic signatures serialized in some way (concatenation or other)
 	// A quorum certificate can be extracted from the header.
 	// This field is the SigData field of the extracted quorum certificate.
-
-	ProposerID Identifier // proposer identifier for the block
-
-	ProposerSigData []byte // signature of the proposer over the new block. Not a single cryptographic
+	ParentVoterSigData []byte
+	// ProposerID is a proposer identifier for the block
+	ProposerID Identifier
+	// ProposerSigData is a signature of the proposer over the new block. Not a single cryptographic
 	// signature since the data represents cryptographic signatures serialized in some way (concatenation or other)
+	ProposerSigData []byte
+	// LastViewTC is a timeout certificate for previous view, it can be nil
+	// it has to be present if previous round ended with timeout.
+	LastViewTC *TimeoutCertificate
 }
 
 // Body returns the immutable part of the block header.
@@ -54,9 +57,10 @@ func (h Header) Body() interface{} {
 		PayloadHash        Identifier
 		Timestamp          uint64
 		View               uint64
-		ParentVoterIDs     []Identifier
+		ParentVoterIndices []byte
 		ParentVoterSigData []byte
 		ProposerID         Identifier
+		LastViewTC         interface{}
 	}{
 		ChainID:            h.ChainID,
 		ParentID:           h.ParentID,
@@ -64,9 +68,10 @@ func (h Header) Body() interface{} {
 		PayloadHash:        h.PayloadHash,
 		Timestamp:          uint64(h.Timestamp.UnixNano()),
 		View:               h.View,
-		ParentVoterIDs:     h.ParentVoterIDs,
+		ParentVoterIndices: h.ParentVoterIndices,
 		ParentVoterSigData: h.ParentVoterSigData,
 		ProposerID:         h.ProposerID,
+		LastViewTC:         h.LastViewTC.Body(),
 	}
 }
 
@@ -93,31 +98,24 @@ func (h Header) ID() Identifier {
 	defer mutexHeader.Unlock()
 
 	// compare these elements individually
-	if prevHeader.ParentVoterIDs != nil &&
+	if prevHeader.ParentVoterIndices != nil &&
 		prevHeader.ParentVoterSigData != nil &&
 		prevHeader.ProposerSigData != nil &&
-		len(h.ParentVoterIDs) == len(prevHeader.ParentVoterIDs) &&
+		len(h.ParentVoterIndices) == len(prevHeader.ParentVoterIndices) &&
 		len(h.ParentVoterSigData) == len(prevHeader.ParentVoterSigData) &&
 		len(h.ProposerSigData) == len(prevHeader.ProposerSigData) {
-		bNotEqual := false
 
-		for i, v := range h.ParentVoterIDs {
-			if v == prevHeader.ParentVoterIDs[i] {
-				continue
-			}
-			bNotEqual = true
-			break
-		}
-		if !bNotEqual &&
-			h.ChainID == prevHeader.ChainID &&
+		if h.ChainID == prevHeader.ChainID &&
 			h.Timestamp == prevHeader.Timestamp &&
 			h.Height == prevHeader.Height &&
 			h.ParentID == prevHeader.ParentID &&
 			h.View == prevHeader.View &&
 			h.PayloadHash == prevHeader.PayloadHash &&
 			bytes.Equal(h.ProposerSigData, prevHeader.ProposerSigData) &&
+			bytes.Equal(h.ParentVoterIndices, prevHeader.ParentVoterIndices) &&
 			bytes.Equal(h.ParentVoterSigData, prevHeader.ParentVoterSigData) &&
-			h.ProposerID == prevHeader.ProposerID {
+			h.ProposerID == prevHeader.ProposerID &&
+			reflect.DeepEqual(h.LastViewTC, prevHeader.LastViewTC) {
 
 			// cache hit, return the previous identifier
 			return previdHeader

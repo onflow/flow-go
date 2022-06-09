@@ -26,7 +26,7 @@ func NewFollower(log zerolog.Logger, committee hotstuff.DynamicCommittee, header
 	}
 
 	// initialize the Validator
-	validator := validator.New(committee, finalizer, verifier)
+	validator := validator.New(committee, verifier)
 
 	// recover the hotstuff state as a follower
 	err = recovery.Follower(log, finalizer, validator, finalized, pending)

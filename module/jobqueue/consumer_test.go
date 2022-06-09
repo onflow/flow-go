@@ -149,10 +149,14 @@ func TestProcessedIndexDeletion(t *testing.T) {
 		require.NoError(t, c.Start(0))
 
 		require.Eventually(t, func() bool {
+			c.mu.Lock()
+			defer c.mu.Unlock()
 			return c.processedIndex == uint64(10)
 		}, 2*time.Second, 10*time.Millisecond)
 
 		// should have no processing after all jobs are processed
+		c.mu.Lock()
+		defer c.mu.Unlock()
 		require.Len(t, c.processings, 0)
 		require.Len(t, c.processingsIndex, 0)
 	})

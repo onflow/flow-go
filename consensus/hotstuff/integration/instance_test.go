@@ -25,7 +25,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/onflow/flow-go/consensus/hotstuff/safetyrules"
-	hsig "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/voteaggregator"
 	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
@@ -140,9 +139,9 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	in.headers[cfg.Root.ID()] = cfg.Root
 
 	// program the hotstuff committee state
-	in.committee.On("IdentitiesByEpoch", mock.Anything, mock.Anything).Return(
-		func(_ uint64, selector flow.IdentityFilter) flow.IdentityList {
-			return in.participants.Filter(selector)
+	in.committee.On("IdentitiesByEpoch", mock.Anything).Return(
+		func(_ uint64) flow.IdentityList {
+			return in.participants
 		},
 		nil,
 	)
@@ -191,8 +190,8 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	)
 
 	// check on stop condition, stop the tests as soon as entering a certain view
-	in.persist.On("PutStarted", mock.Anything).Return(nil)
-	in.persist.On("PutVoted", mock.Anything).Return(nil)
+	in.persist.On("PutSafetyData", mock.Anything).Return(nil)
+	in.persist.On("PutLivenessData", mock.Anything).Return(nil)
 
 	// program the hotstuff signer behaviour
 	in.signer.On("CreateProposal", mock.Anything).Return(
@@ -211,7 +210,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 				View:     block.View,
 				BlockID:  block.BlockID,
 				SignerID: in.localID,
-				SigData:  unittest.RandomBytes(hsig.SigLen * 2), // double sig, one staking, one beacon
+				SigData:  unittest.RandomBytes(msig.SigLen * 2), // double sig, one staking, one beacon
 			}
 			return vote
 		},
@@ -219,15 +218,19 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	)
 	in.signer.On("CreateQC", mock.Anything).Return(
 		func(votes []*model.Vote) *flow.QuorumCertificate {
-			voterIDs := make([]flow.Identifier, 0, len(votes))
+			voterIDs := make(flow.IdentifierList, 0, len(votes))
 			for _, vote := range votes {
 				voterIDs = append(voterIDs, vote.SignerID)
 			}
+
+			signerIndices, err := msig.EncodeSignersToIndices(in.participants.NodeIDs(), voterIDs)
+			require.NoError(t, err, "could not encode signer indices")
+
 			qc := &flow.QuorumCertificate{
-				View:      votes[0].View,
-				BlockID:   votes[0].BlockID,
-				SignerIDs: voterIDs,
-				SigData:   nil,
+				View:          votes[0].View,
+				BlockID:       votes[0].BlockID,
+				SignerIndices: signerIndices,
+				SigData:       nil,
 			}
 			return qc
 		},
@@ -235,8 +238,8 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	)
 
 	// program the hotstuff verifier behaviour
-	in.verifier.On("VerifyVote", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	in.verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	in.verifier.On("VerifyVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	in.verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	// program the hotstuff communicator behaviour
 	in.communicator.On("BroadcastProposalWithDelay", mock.Anything, mock.Anything).Return(
@@ -310,23 +313,33 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		Logger()
 	notifier := notifications.NewLogConsumer(log)
 
-	// initialize the pacemaker
-	controller := timeout.NewController(cfg.Timeouts)
-	in.pacemaker, err = pacemaker.New(DefaultStart(), controller, notifier)
-	require.NoError(t, err)
-
 	// initialize the block producer
 	in.producer, err = blockproducer.New(in.signer, in.committee, in.builder)
 	require.NoError(t, err)
 
 	// initialize the finalizer
 	rootBlock := model.BlockFromFlow(cfg.Root, 0)
+
+	signerIndices, err := msig.EncodeSignersToIndices(in.participants.NodeIDs(), in.participants.NodeIDs())
+	require.NoError(t, err, "could not encode signer indices")
+
 	rootQC := &flow.QuorumCertificate{
-		View:      rootBlock.View,
-		BlockID:   rootBlock.BlockID,
-		SignerIDs: in.participants.NodeIDs(),
+		View:          rootBlock.View,
+		BlockID:       rootBlock.BlockID,
+		SignerIndices: signerIndices,
 	}
 	rootBlockQC := &forks.BlockQC{Block: rootBlock, QC: rootQC}
+
+	livnessData := &hotstuff.LivenessData{
+		CurrentView: rootQC.View + 1,
+		NewestQC:    rootQC,
+	}
+
+	// initialize the pacemaker
+	controller := timeout.NewController(cfg.Timeouts)
+	in.pacemaker, err = pacemaker.New(livnessData.CurrentView, controller, notifier)
+	require.NoError(t, err)
+
 	forkalizer, err := finalizer.New(rootBlockQC, in.finalizer, notifier)
 	require.NoError(t, err)
 
@@ -338,7 +351,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	in.forks = forks.New(forkalizer, choice)
 
 	// initialize the validator
-	in.validator = validator.New(in.committee, in.forks, in.verifier)
+	in.validator = validator.New(in.committee, in.verifier)
 
 	weight := uint64(1000)
 	stakingSigAggtor := helper.MakeWeightedSignatureAggregator(weight)
@@ -347,8 +360,11 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	rbRector := helper.MakeRandomBeaconReconstructor(msig.RandomBeaconThreshold(int(in.participants.Count())))
 	rbRector.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
 
+	indices, err := msig.EncodeSignersToIndices(in.participants.NodeIDs(), []flow.Identifier(in.participants.NodeIDs()))
+	require.NoError(t, err)
+
 	packer := &mocks.Packer{}
-	packer.On("Pack", mock.Anything, mock.Anything).Return(in.participants.NodeIDs(), unittest.RandomBytes(128), nil).Maybe()
+	packer.On("Pack", mock.Anything, mock.Anything).Return(indices, unittest.RandomBytes(128), nil).Maybe()
 
 	onQCCreated := func(qc *flow.QuorumCertificate) {
 		in.queue <- qc
@@ -374,8 +390,15 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	in.aggregator, err = voteaggregator.NewVoteAggregator(log, notifier, DefaultPruned(), voteCollectors)
 	require.NoError(t, err)
 
-	// initialize the voter
-	in.voter = safetyrules.New(in.signer, in.forks, in.persist, in.committee, DefaultVoted())
+	safetyData := &hotstuff.SafetyData{
+		LockedOneChainView:      rootBlock.View,
+		HighestAcknowledgedView: rootBlock.View,
+	}
+	in.persist.On("GetSafetyData", mock.Anything).Return(safetyData, nil).Once()
+
+	// initialize the safety rules
+	in.voter, err = safetyrules.New(in.signer, in.persist, in.committee)
+	require.NoError(t, err)
 
 	// initialize the event handler
 	in.handler, err = eventhandler.NewEventHandler(log, in.pacemaker, in.producer, in.forks, in.persist, in.communicator, in.committee, in.aggregator, in.voter, in.validator, notifier)

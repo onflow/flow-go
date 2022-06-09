@@ -16,8 +16,8 @@ const (
 	codeDBType = 2 // specifies a database type
 
 	// codes for views with special meaning
-	codeStartedView = 10 // latest view hotstuff started
-	codeVotedView   = 11 // latest view hotstuff voted on
+	codeSafetyData   = 10 // safety data for hotstuff state
+	codeLivenessData = 11 // liveness data for hotstuff state
 
 	// codes for fields associated with the root state
 	codeRootQuorumCertificate = 12
@@ -44,11 +44,12 @@ const (
 	codeResultApproval       = 37
 	codeChunk                = 38
 
-	// codes for indexing single identifier by identifier
-	codeHeightToBlock       = 40 // index mapping height to block ID
-	codeBlockToSeal         = 41 // index mapping a block its last payload seal
-	codeCollectionReference = 42 // index reference block ID for collection
-	codeBlockValidity       = 43 // validity of block per HotStuff
+	// codes for indexing single identifier by identifier/integeter
+	codeHeightToBlock           = 40 // index mapping height to block ID
+	codeBlockToSeal             = 41 // index mapping a block its last payload seal
+	codeClusterBlockToRefBlock  = 42 // index cluster block ID to reference block ID
+	codeBlockValidity           = 43 // validity of block per HotStuff
+	codeRefHeightToClusterBlock = 44 // index reference block height to cluster block IDs
 
 	// codes for indexing multiple identifiers by identifier
 	// NOTE: 51 was used for identity indexes before epochs

@@ -7,7 +7,6 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
-	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
@@ -15,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/local"
 )
 
@@ -29,7 +29,8 @@ func GenerateClusterRootQC(signers []bootstrap.NodeInfo, allCommitteeMembers flo
 	}
 
 	// STEP 2: create VoteProcessor
-	committee, err := committees.NewStaticCommittee(allCommitteeMembers, flow.Identifier{}, nil, nil)
+	ordered := allCommitteeMembers.Sort(order.Canonical)
+	committee, err := committees.NewStaticCommittee(ordered, flow.Identifier{}, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +58,7 @@ func GenerateClusterRootQC(signers []bootstrap.NodeInfo, allCommitteeMembers flo
 	if err != nil {
 		return nil, fmt.Errorf("could not create cluster validator: %w", err)
 	}
-	err = val.ValidateQC(createdQC, clusterRootBlock)
+	err = val.ValidateQC(createdQC)
 
 	return createdQC, err
 }
@@ -66,8 +67,7 @@ func GenerateClusterRootQC(signers []bootstrap.NodeInfo, allCommitteeMembers flo
 func createClusterValidator(committee hotstuff.DynamicCommittee) (hotstuff.Validator, error) {
 	verifier := verification.NewStakingVerifier()
 
-	forks := &mocks.ForksReader{}
-	hotstuffValidator := validator.New(committee, forks, verifier)
+	hotstuffValidator := validator.New(committee, verifier)
 	return hotstuffValidator, nil
 }
 

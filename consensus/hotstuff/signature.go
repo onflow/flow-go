@@ -53,24 +53,6 @@ type RandomBeaconReconstructor interface {
 	Reconstruct() (crypto.Signature, error)
 }
 
-// SigType is the aggregable signature type.
-type SigType uint8
-
-// SigType specifies the role of the signature in the protocol.
-// Both types are aggregatable cryptographic signatures.
-//  * SigTypeRandomBeacon type is for random beacon signatures.
-//  * SigTypeStaking is for Hotstuff signatures.
-const (
-	SigTypeStaking SigType = iota
-	SigTypeRandomBeacon
-)
-
-// Valid returns true if the signature is either SigTypeStaking or SigTypeRandomBeacon
-// else return false
-func (t SigType) Valid() bool {
-	return t == SigTypeStaking || t == SigTypeRandomBeacon
-}
-
 // WeightedSignatureAggregator aggregates signatures of the same signature scheme and the
 // same message from different signers. The public keys and message are agreed upon upfront.
 // It is also recommended to only aggregate signatures generated with keys representing
@@ -113,8 +95,8 @@ type WeightedSignatureAggregator interface {
 //  * For each replicas that is authorized to send a timeout at this particular view:
 //    the node ID, public staking keys, and weight
 // Timeouts for other views or from non-authorized replicas are rejected.
-// In their TimeoutObjects, replicas include a signature over the pair (view, highestQCView),
-// where `view` is the view number the timeout is for and `highestQCView` is the view of
+// In their TimeoutObjects, replicas include a signature over the pair (view, newestQCView),
+// where `view` is the view number the timeout is for and `newestQCView` is the view of
 // the newest QC known to the replica. TimeoutSignatureAggregator collects these signatures,
 // internally tracks the total weight of all collected signatures. Note that in general the
 // signed messages are different, which makes the aggregation a comparatively expensive operation.
@@ -132,7 +114,7 @@ type TimeoutSignatureAggregator interface {
 	//  - model.InvalidSignerError if signerID is invalid (not a consensus participant)
 	//  - model.DuplicatedSignerError if the signer has been already added
 	//  - model.ErrInvalidSignature if signerID is valid but signature is cryptographically invalid
-	VerifyAndAdd(signerID flow.Identifier, sig crypto.Signature, highestQCView uint64) (totalWeight uint64, exception error)
+	VerifyAndAdd(signerID flow.Identifier, sig crypto.Signature, newestQCView uint64) (totalWeight uint64, exception error)
 
 	// TotalWeight returns the total weight presented by the collected signatures.
 	TotalWeight() uint64
@@ -142,7 +124,7 @@ type TimeoutSignatureAggregator interface {
 	// Caller can be sure that resulting signature is valid.
 	// Expected errors during normal operations:
 	//  - model.InsufficientSignaturesError if no signatures have been added yet
-	Aggregate() (signers []flow.Identifier, highQCViews []uint64, aggregatedSig crypto.Signature, exception error)
+	Aggregate() (signers []flow.Identifier, newestQCViews []uint64, aggregatedSig crypto.Signature, exception error)
 }
 
 // BlockSignatureData is an intermediate struct for Packer to pack the
@@ -162,13 +144,12 @@ type Packer interface {
 	// sig is the aggregated signature data.
 	// Expected error returns during normal operations:
 	//  * none; all errors are symptoms of inconsistent input data or corrupted internal state.
-	Pack(view uint64, sig *BlockSignatureData) ([]flow.Identifier, []byte, error)
+	Pack(view uint64, sig *BlockSignatureData) (signerIndices []byte, sigData []byte, err error)
 
 	// Unpack de-serializes the provided signature data.
-	// view is the view of the block that the aggregated signature is for.
 	// sig is the aggregated signature data
 	// It returns:
 	//  - (sigData, nil) if successfully unpacked the signature data
-	//  - (nil, model.ErrInvalidFormat) if failed to unpack the signature data
-	Unpack(view uint64, signerIDs []flow.Identifier, sigData []byte) (*BlockSignatureData, error)
+	//  - (nil, model.InvalidFormatError) if failed to unpack the signature data
+	Unpack(signerIdentities flow.IdentityList, sigData []byte) (*BlockSignatureData, error)
 }

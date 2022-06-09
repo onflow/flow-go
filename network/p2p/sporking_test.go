@@ -1,4 +1,4 @@
-package p2p
+package p2p_test
 
 import (
 	"context"
@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -45,7 +46,7 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 	)
 	defer stopNode(t, node1)
 	t.Logf(" %s node started on %s", id1.NodeID.String(), id1.Address)
-	t.Logf("libp2p ID for %s: %s", id1.NodeID.String(), node1.host.ID())
+	t.Logf("libp2p ID for %s: %s", id1.NodeID.String(), node1.Host().ID())
 
 	// create and start node 2 on localhost and random port
 	node2key := generateNetworkingKey(t)
@@ -55,7 +56,7 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 		"test_crosstalk_prevention_on_network_key_change",
 		withNetworkingPrivateKey(node2key),
 	)
-	peerInfo2, err := PeerAddressInfo(id2)
+	peerInfo2, err := p2p.PeerAddressInfo(id2)
 	require.NoError(t, err)
 
 	// create stream from node 1 to node 2
@@ -99,7 +100,7 @@ func TestOneToOneCrosstalkPrevention(t *testing.T) {
 	node1, id1 := nodeFixture(t, ctx, sporkId1, "test_one_to_one_crosstalk_prevention")
 
 	defer stopNode(t, node1)
-	peerInfo1, err := PeerAddressInfo(id1)
+	peerInfo1, err := p2p.PeerAddressInfo(id1)
 	require.NoError(t, err)
 
 	// create and start node 2 on localhost and random port
@@ -155,7 +156,7 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 		"test_one_to_k_crosstalk_prevention",
 	)
 
-	pInfo2, err := PeerAddressInfo(id2)
+	pInfo2, err := p2p.PeerAddressInfo(id2)
 	defer stopNode(t, node2)
 	require.NoError(t, err)
 
@@ -196,18 +197,18 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 	testOneToKMessagingFails(ctx, t, node1, sub2, topicAfterSpork)
 }
 
-func testOneToOneMessagingSucceeds(t *testing.T, sourceNode *Node, peerInfo peer.AddrInfo) {
+func testOneToOneMessagingSucceeds(t *testing.T, sourceNode *p2p.Node, peerInfo peer.AddrInfo) {
 	// create stream from node 1 to node 2
-	sourceNode.host.Peerstore().AddAddrs(peerInfo.ID, peerInfo.Addrs, peerstore.AddressTTL)
+	sourceNode.Host().Peerstore().AddAddrs(peerInfo.ID, peerInfo.Addrs, peerstore.AddressTTL)
 	s, err := sourceNode.CreateStream(context.Background(), peerInfo.ID)
 	// assert that stream creation succeeded
 	require.NoError(t, err)
 	assert.NotNil(t, s)
 }
 
-func testOneToOneMessagingFails(t *testing.T, sourceNode *Node, peerInfo peer.AddrInfo) {
+func testOneToOneMessagingFails(t *testing.T, sourceNode *p2p.Node, peerInfo peer.AddrInfo) {
 	// create stream from source node to destination address
-	sourceNode.host.Peerstore().AddAddrs(peerInfo.ID, peerInfo.Addrs, peerstore.AddressTTL)
+	sourceNode.Host().Peerstore().AddAddrs(peerInfo.ID, peerInfo.Addrs, peerstore.AddressTTL)
 	_, err := sourceNode.CreateStream(context.Background(), peerInfo.ID)
 	// assert that stream creation failed
 	assert.Error(t, err)
@@ -217,7 +218,7 @@ func testOneToOneMessagingFails(t *testing.T, sourceNode *Node, peerInfo peer.Ad
 
 func testOneToKMessagingSucceeds(ctx context.Context,
 	t *testing.T,
-	sourceNode *Node,
+	sourceNode *p2p.Node,
 	dstnSub *pubsub.Subscription,
 	topic network.Topic) {
 	msg := &message.Message{
@@ -242,7 +243,7 @@ func testOneToKMessagingSucceeds(ctx context.Context,
 
 func testOneToKMessagingFails(ctx context.Context,
 	t *testing.T,
-	sourceNode *Node,
+	sourceNode *p2p.Node,
 	dstnSub *pubsub.Subscription,
 	topic network.Topic) {
 	msg := &message.Message{

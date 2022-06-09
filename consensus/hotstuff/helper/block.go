@@ -44,9 +44,15 @@ func WithParentBlock(parent *model.Block) func(*model.Block) {
 	}
 }
 
-func WithParentSigners(signerIDs []flow.Identifier) func(*model.Block) {
+func WithParentSigners(signerIndices []byte) func(*model.Block) {
 	return func(block *model.Block) {
-		block.QC.SignerIDs = signerIDs
+		block.QC.SignerIndices = signerIndices
+	}
+}
+
+func WithBlockQC(qc *flow.QuorumCertificate) func(*model.Block) {
+	return func(block *model.Block) {
+		block.QC = qc
 	}
 }
 
@@ -70,5 +76,11 @@ func WithBlock(block *model.Block) func(*model.Proposal) {
 func WithSigData(sigData []byte) func(*model.Proposal) {
 	return func(proposal *model.Proposal) {
 		proposal.SigData = sigData
+	}
+}
+
+func WithLastViewTC(lastViewTC *flow.TimeoutCertificate) func(*model.Proposal) {
+	return func(proposal *model.Proposal) {
+		proposal.LastViewTC = lastViewTC
 	}
 }

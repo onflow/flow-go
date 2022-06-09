@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 const (
@@ -58,7 +59,7 @@ func (p *TestPaceMaker) OnPartialTC(curView uint64) {
 	panic("not yet implemented")
 }
 
-func (p *TestPaceMaker) HighestQC() *flow.QuorumCertificate {
+func (p *TestPaceMaker) NewestQC() *flow.QuorumCertificate {
 	panic("not yet implemented")
 }
 
@@ -171,12 +172,12 @@ func NewVoter(t require.TestingT, lastVotedView uint64) *Voter {
 func (v *Voter) ProduceVote(block *model.Proposal, curView uint64) (*model.Vote, error) {
 	_, ok := v.votable[block.Block.BlockID]
 	if !ok {
-		return nil, model.NoVoteError{Msg: "block not found"}
+		return nil, model.NewNoVoteErrorf("block not found")
 	}
 	return createVote(block.Block), nil
 }
 
-func (v *Voter) ProduceTimeout(curView uint64, highestQC *flow.QuorumCertificate, highestTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
+func (v *Voter) ProduceTimeout(curView uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
 	panic("to be implemented")
 }
 
@@ -184,7 +185,7 @@ func (v *Voter) IsSafeToVote(proposal *model.Proposal) bool {
 	panic("to be implemented")
 }
 
-func (v *Voter) IsSafeToTimeout(curView uint64, highestQC *flow.QuorumCertificate, highestTC *flow.TimeoutCertificate) bool {
+func (v *Voter) IsSafeToTimeout(curView uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) bool {
 	panic("to be implemented")
 }
 
@@ -390,10 +391,10 @@ func (es *EventHandlerSuite) SetupTest() {
 	// voting block is a block for the current view, which will trigger view change
 	es.votingBlock = createBlockWithQC(es.paceMaker.CurView(), es.paceMaker.CurView()-1)
 	es.qc = &flow.QuorumCertificate{
-		BlockID:   es.votingBlock.BlockID,
-		View:      es.votingBlock.View,
-		SignerIDs: nil,
-		SigData:   nil,
+		BlockID:       es.votingBlock.BlockID,
+		View:          es.votingBlock.View,
+		SignerIndices: nil,
+		SigData:       nil,
 	}
 	es.newview = &model.NewViewEvent{
 		View: es.votingBlock.View + 1, // the vote for the voting blocks will trigger a view change to the next view
@@ -576,7 +577,7 @@ func (es *EventHandlerSuite) TestInNewView_NotLeader_HasBlock_NotSafeNode_IsNext
 // in the newview, I'm not the leader, and I have the cur block,
 // and the block is not a safe node to vote, and I'm not the next leader
 func (es *EventHandlerSuite) TestInNewView_NotLeader_HasBlock_NotSafeNode_NotNextLeader() {
-	es.T().Skip("active-pacemaker, to be fixed")
+	unittest.SkipUnless(es.T(), unittest.TEST_TODO, "active-pacemaker")
 	// voting block exists
 	es.forks.blocks[es.votingBlock.BlockID] = es.votingBlock
 	// a qc is built
@@ -645,7 +646,7 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_OlderThanCurView_CanBuildQCFr
 // received a valid proposal that has newer view, and cannot build qc from votes for this block,
 // the proposal's QC triggered view change
 func (es *EventHandlerSuite) TestOnReceiveProposal_NewerThanCurView_CannotBuildQCFromVotes_ViewChange() {
-	es.T().Skip("active-pacemaker, to be fixed")
+	unittest.SkipUnless(es.T(), unittest.TEST_TODO, "active-pacemaker")
 	proposal := createProposal(es.initView+1, es.initView)
 	es.voteAggregator.On("AddBlock", proposal).Return(nil).Once()
 
@@ -664,7 +665,7 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_NewerThanCurView_CannotBuildQ
 // received a valid proposal that has newer view, and can build qc from votes for this block,
 // the proposal's QC triggered view change
 func (es *EventHandlerSuite) TestOnReceiveProposal_NewerThanCurView_CanBuildQCFromVotes_ViewChange() {
-	es.T().Skip("active-pacemaker, to be fixed")
+	unittest.SkipUnless(es.T(), unittest.TEST_TODO, "active-pacemaker")
 	proposal := createProposal(es.initView+1, es.initView)
 	es.voteAggregator.On("AddBlock", proposal).Return(nil).Once()
 
@@ -684,7 +685,7 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_NewerThanCurView_CanBuildQCFr
 // received a valid proposal whose QC that has newer view, and cannot build qc from votes for this block,
 // the proposal's QC triggered view change
 func (es *EventHandlerSuite) TestOnReceiveProposal_QCNewerThanCurView_CannotBuildQCFromVotes_ViewChanged() {
-	es.T().Skip("active-pacemaker, to be fixed")
+	unittest.SkipUnless(es.T(), unittest.TEST_TODO, "active-pacemaker")
 	proposal := createProposal(es.initView+2, es.initView+1)
 	es.voteAggregator.On("AddBlock", proposal).Return(nil).Once()
 
@@ -765,7 +766,7 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_Unverifiable() {
 }
 
 func (es *EventHandlerSuite) TestOnTimeout() {
-	es.T().Skip("active-pacemaker, to be fixed")
+	unittest.SkipUnless(es.T(), unittest.TEST_TODO, "active-pacemaker")
 	err := es.eventhandler.OnLocalTimeout()
 	// timeout will trigger viewchange
 	es.endView++
@@ -774,7 +775,7 @@ func (es *EventHandlerSuite) TestOnTimeout() {
 }
 
 func (es *EventHandlerSuite) Test100Timeout() {
-	es.T().Skip("active-pacemaker, to be fixed")
+	unittest.SkipUnless(es.T(), unittest.TEST_TODO, "active-pacemaker")
 	for i := 0; i < 100; i++ {
 		err := es.eventhandler.OnLocalTimeout()
 		es.endView++
@@ -823,7 +824,7 @@ func (es *EventHandlerSuite) TestLeaderBuild100Blocks() {
 
 // a follower receives 100 blocks
 func (es *EventHandlerSuite) TestFollowerFollows100Blocks() {
-	es.T().Skip("active-pacemaker, to be fixed")
+	unittest.SkipUnless(es.T(), unittest.TEST_TODO, "active-pacemaker")
 	for i := 0; i < 100; i++ {
 		// create each proposal as if they are created by some leader
 		proposal := createProposal(es.initView+uint64(i), es.initView+uint64(i)-1)
@@ -874,10 +875,10 @@ func createBlockWithQC(view uint64, qcview uint64) *model.Block {
 
 func createQC(parent *model.Block) *flow.QuorumCertificate {
 	qc := &flow.QuorumCertificate{
-		BlockID:   parent.BlockID,
-		View:      parent.View,
-		SignerIDs: nil,
-		SigData:   nil,
+		BlockID:       parent.BlockID,
+		View:          parent.View,
+		SignerIndices: nil,
+		SigData:       nil,
 	}
 	return qc
 }

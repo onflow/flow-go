@@ -7,7 +7,6 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
-	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	hotstuffSig "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/validator"
@@ -73,12 +72,17 @@ func GenerateRootQC(block *flow.Block, votes []*model.Vote, participantData *Par
 		}
 	}
 
+	if createdQC == nil {
+		return nil, fmt.Errorf("QC is not created, total number of votes %v, expect to have 2/3 votes of %v participants",
+			len(votes), len(identities))
+	}
+
 	// STEP 3: validate constructed QC
 	val, err := createValidator(committee)
 	if err != nil {
 		return nil, err
 	}
-	err = val.ValidateQC(createdQC, hotBlock)
+	err = val.ValidateQC(createdQC)
 
 	return createdQC, err
 }
@@ -119,8 +123,7 @@ func createValidator(committee hotstuff.DynamicCommittee) (hotstuff.Validator, e
 	packer := hotstuffSig.NewConsensusSigDataPacker(committee)
 	verifier := verification.NewCombinedVerifier(committee, packer)
 
-	forks := &mocks.ForksReader{}
-	hotstuffValidator := validator.New(committee, forks, verifier)
+	hotstuffValidator := validator.New(committee, verifier)
 	return hotstuffValidator, nil
 }
 

@@ -121,7 +121,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
-		Int("num_signers", len(header.ParentVoterIDs)).
+		Hex("parent_signer_indices", header.ParentVoterIndices).
 		Str("traceID", traceID). // traceID is used to connect logs to traces
 		Logger()
 	log.Info().Msg("block proposal received")
@@ -313,7 +313,7 @@ func (c *Core) processBlockProposal(proposal *messages.BlockProposal) error {
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
-		Int("num_signers", len(header.ParentVoterIDs)).
+		Hex("parent_signer_indices", header.ParentVoterIndices).
 		Logger()
 	log.Info().Msg("processing block proposal")
 
@@ -381,7 +381,7 @@ func (c *Core) OnBlockVote(originID flow.Identifier, vote *messages.BlockVote) e
 func (c *Core) OnTimeoutObject(originID flow.Identifier, timeout *messages.TimeoutObject) error {
 	t := &model.TimeoutObject{
 		View:       timeout.View,
-		HighestQC:  timeout.HighestQC,
+		NewestQC:   timeout.NewestQC,
 		LastViewTC: timeout.LastViewTC,
 		SignerID:   originID,
 		SigData:    timeout.SigData,
