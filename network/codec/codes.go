@@ -216,7 +216,7 @@ func InterfaceFromMessageCode(code uint8) (interface{}, string, error) {
 	// test messages
 	case CodeEcho:
 		return &message.TestMessage{}, "TestMessage", nil
-	
+
 	default:
 		return nil, "", fmt.Errorf("invalid message code (%d)", code)
 	}
