@@ -96,19 +96,22 @@ func (nc *NoopCollector) OnVerifiableChunkReceivedAtVerifierEngine()            
 func (nc *NoopCollector) OnResultApprovalDispatchedInNetworkByVerifier()                         {}
 func (nc *NoopCollector) SetMaxChunkDataPackAttemptsForNextUnsealedHeightAtRequester(attempts uint64) {
 }
-func (nc *NoopCollector) OnFinalizedBlockArrivedAtAssigner(height uint64)                {}
-func (nc *NoopCollector) OnChunksAssignmentDoneAtAssigner(chunks int)                    {}
-func (nc *NoopCollector) OnAssignedChunkProcessedAtAssigner()                            {}
-func (nc *NoopCollector) OnAssignedChunkReceivedAtFetcher()                              {}
-func (nc *NoopCollector) OnChunkDataPackRequestDispatchedInNetworkByRequester()          {}
-func (nc *NoopCollector) OnChunkDataPackRequestSentByFetcher()                           {}
-func (nc *NoopCollector) OnChunkDataPackRequestReceivedByRequester()                     {}
-func (nc *NoopCollector) OnChunkDataPackArrivedAtFetcher()                               {}
-func (nc *NoopCollector) OnChunkDataPackSentToFetcher()                                  {}
-func (nc *NoopCollector) OnVerifiableChunkSentToVerifier()                               {}
-func (nc *NoopCollector) OnBlockConsumerJobDone(uint64)                                  {}
-func (nc *NoopCollector) OnChunkConsumerJobDone(uint64)                                  {}
-func (nc *NoopCollector) OnChunkDataPackResponseReceivedFromNetworkByRequester()         {}
+func (nc *NoopCollector) OnFinalizedBlockArrivedAtAssigner(height uint64)        {}
+func (nc *NoopCollector) OnChunksAssignmentDoneAtAssigner(chunks int)            {}
+func (nc *NoopCollector) OnAssignedChunkProcessedAtAssigner()                    {}
+func (nc *NoopCollector) OnAssignedChunkReceivedAtFetcher()                      {}
+func (nc *NoopCollector) OnChunkDataPackRequestDispatchedInNetworkByRequester()  {}
+func (nc *NoopCollector) OnChunkDataPackRequestSentByFetcher()                   {}
+func (nc *NoopCollector) OnChunkDataPackRequestReceivedByRequester()             {}
+func (nc *NoopCollector) OnChunkDataPackArrivedAtFetcher()                       {}
+func (nc *NoopCollector) OnChunkDataPackSentToFetcher()                          {}
+func (nc *NoopCollector) OnVerifiableChunkSentToVerifier()                       {}
+func (nc *NoopCollector) OnBlockConsumerJobDone(uint64)                          {}
+func (nc *NoopCollector) OnChunkConsumerJobDone(uint64)                          {}
+func (nc *NoopCollector) OnChunkDataPackResponseReceivedFromNetworkByRequester() {}
+func (nc *NoopCollector) TotalConnectionsInPool(connectionCount uint, connectionPoolSize uint) {
+}
+func (nc *NoopCollector) ConnectionFromPoolRetrieved()                                   {}
 func (nc *NoopCollector) StartBlockReceivedToExecuted(blockID flow.Identifier)           {}
 func (nc *NoopCollector) FinishBlockReceivedToExecuted(blockID flow.Identifier)          {}
 func (nc *NoopCollector) ExecutionComputationUsedPerBlock(computation uint64)            {}
@@ -149,29 +152,26 @@ func (nc *NoopCollector) TransactionReceived(txID flow.Identifier, when time.Tim
 func (nc *NoopCollector) TransactionFinalized(txID flow.Identifier, when time.Time)        {}
 func (nc *NoopCollector) TransactionExecuted(txID flow.Identifier, when time.Time)         {}
 func (nc *NoopCollector) TransactionExpired(txID flow.Identifier)                          {}
-func (nc *NoopCollector) TotalConnectionsInPool(connectionCount uint, connectionPoolSize uint) {
-}
-func (nc *NoopCollector) ConnectionFromPoolRetrieved()                                 {}
-func (nc *NoopCollector) TransactionSubmissionFailed()                                 {}
-func (nc *NoopCollector) ChunkDataPackRequested()                                      {}
-func (nc *NoopCollector) ExecutionSync(syncing bool)                                   {}
-func (nc *NoopCollector) DiskSize(uint64)                                              {}
-func (nc *NoopCollector) ExecutionBlockDataUploadStarted()                             {}
-func (nc *NoopCollector) ExecutionBlockDataUploadFinished(dur time.Duration)           {}
-func (nc *NoopCollector) ExecutionDataAddStarted()                                     {}
-func (nc *NoopCollector) ExecutionDataAddFinished(time.Duration, bool, uint64)         {}
-func (nc *NoopCollector) ExecutionDataGetStarted()                                     {}
-func (nc *NoopCollector) ExecutionDataGetFinished(time.Duration, bool, uint64)         {}
-func (nc *NoopCollector) BucketAvailableSlots(uint64, uint64)                          {}
-func (nc *NoopCollector) OnKeyPutSuccess()                                             {}
-func (nc *NoopCollector) OnEntityEjectionDueToFullCapacity()                           {}
-func (nc *NoopCollector) OnEntityEjectionDueToEmergency()                              {}
-func (nc *NoopCollector) OnKeyPutFailure()                                             {}
-func (nc *NoopCollector) OnKeyGetSuccess()                                             {}
-func (nc *NoopCollector) OnKeyGetFailure()                                             {}
-func (nc *NoopCollector) ExecutionDataFetchStarted()                                   {}
-func (nc *NoopCollector) ExecutionDataFetchFinished(_ time.Duration, _ bool, _ uint64) {}
-func (nc *NoopCollector) NotificationSent(height uint64)                               {}
-func (nc *NoopCollector) FetchRetried()                                                {}
-func (nc *NoopCollector) RoutingTablePeerAdded()                                       {}
-func (nc *NoopCollector) RoutingTablePeerRemoved()                                     {}
+func (nc *NoopCollector) TransactionSubmissionFailed()                                     {}
+func (nc *NoopCollector) ChunkDataPackRequested()                                          {}
+func (nc *NoopCollector) ExecutionSync(syncing bool)                                       {}
+func (nc *NoopCollector) DiskSize(uint64)                                                  {}
+func (nc *NoopCollector) ExecutionBlockDataUploadStarted()                                 {}
+func (nc *NoopCollector) ExecutionBlockDataUploadFinished(dur time.Duration)               {}
+func (nc *NoopCollector) ExecutionDataAddStarted()                                         {}
+func (nc *NoopCollector) ExecutionDataAddFinished(time.Duration, bool, uint64)             {}
+func (nc *NoopCollector) ExecutionDataGetStarted()                                         {}
+func (nc *NoopCollector) ExecutionDataGetFinished(time.Duration, bool, uint64)             {}
+func (nc *NoopCollector) BucketAvailableSlots(uint64, uint64)                              {}
+func (nc *NoopCollector) OnKeyPutSuccess()                                                 {}
+func (nc *NoopCollector) OnEntityEjectionDueToFullCapacity()                               {}
+func (nc *NoopCollector) OnEntityEjectionDueToEmergency()                                  {}
+func (nc *NoopCollector) OnKeyPutFailure()                                                 {}
+func (nc *NoopCollector) OnKeyGetSuccess()                                                 {}
+func (nc *NoopCollector) OnKeyGetFailure()                                                 {}
+func (nc *NoopCollector) ExecutionDataFetchStarted()                                       {}
+func (nc *NoopCollector) ExecutionDataFetchFinished(_ time.Duration, _ bool, _ uint64)     {}
+func (nc *NoopCollector) NotificationSent(height uint64)                                   {}
+func (nc *NoopCollector) FetchRetried()                                                    {}
+func (nc *NoopCollector) RoutingTablePeerAdded()                                           {}
+func (nc *NoopCollector) RoutingTablePeerRemoved()                                         {}
