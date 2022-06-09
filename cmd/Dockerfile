@@ -9,6 +9,10 @@ RUN apt-get -y install cmake zip
 ## (2) Build the app binary
 FROM build-setup AS build-env
 
+# add the pubkey of github.com to knownhosts, so ssh-agent doesn't bark
+RUN mkdir -p /root/.ssh && ssh-keyscan -t rsa github.com >> /root/.ssh/known_hosts
+RUN git config --global 'url.ssh://git@github.com/.insteadof' https://github.com/
+
 # Build the app binary in /app
 RUN mkdir /app
 WORKDIR /app
@@ -19,7 +23,8 @@ ARG VERSION
 
 COPY . .
 
-RUN --mount=type=cache,target=/go/pkg/mod \
+RUN --mount=type=ssh \
+    --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     make crypto/relic/build
 
