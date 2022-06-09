@@ -148,7 +148,7 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 
 	// Get the latest sealed block on this fork, ie the highest block for which
 	// there is a seal in this fork.
-	latestSeal, err := c.seals.ByBlockID(finalizedID)
+	latestSeal, err := c.seals.HighestInFork(finalizedID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve parent seal (%x): %w", finalizedID, err)
 	}
@@ -520,7 +520,7 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 	// retrieve latest seal in the fork with head finalizedBlock and update last
 	// sealed height; we do _not_ bail, because we want to re-request approvals
 	// especially, when sealing is stuck, i.e. last sealed height does not increase
-	seal, err := c.seals.ByBlockID(finalizedBlockID)
+	seal, err := c.seals.HighestInFork(finalizedBlockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve seal for finalized block %s", finalizedBlockID)
 	}
