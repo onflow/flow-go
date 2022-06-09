@@ -135,7 +135,7 @@ func NewEngine(log zerolog.Logger,
 		return nil, fmt.Errorf("could not register for requesting approvals: %w", err)
 	}
 
-	signatureHasher := crypto.NewBLSKMAC(encoding.ResultApprovalTag)
+	signatureHasher := crypto.NewBLSKMAC(signature.ResultApprovalTag)
 	core, err := NewCore(log, e.workerPool, tracer, conMetrics, sealingTracker, unit, headers, state, sealsDB, assigner, signatureHasher, sealsMempool, approvalConduit, options)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init sealing engine: %w", err)

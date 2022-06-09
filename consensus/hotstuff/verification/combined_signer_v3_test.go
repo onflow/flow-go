@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
@@ -74,7 +73,7 @@ func TestCombinedSignWithDKGKeyV3(t *testing.T) {
 	// check that a created proposal's signature is a combined staking sig and random beacon sig
 	msg := MakeVoteMessage(block.View, block.BlockID)
 
-	beaconSig, err := dkgKey.Sign(msg, crypto.NewBLSKMAC(encoding.RandomBeaconTag))
+	beaconSig, err := dkgKey.Sign(msg, crypto.NewBLSKMAC(signature.RandomBeaconTag))
 	require.NoError(t, err)
 
 	expectedSig := msig.EncodeSingleSig(encoding.SigTypeRandomBeacon, beaconSig)
@@ -143,7 +142,7 @@ func TestCombinedSignWithNoDKGKeyV3(t *testing.T) {
 
 	// check that a created proposal's signature is a combined staking sig and random beacon sig
 	msg := MakeVoteMessage(block.View, block.BlockID)
-	stakingSig, err := stakingPriv.Sign(msg, crypto.NewBLSKMAC(encoding.ConsensusVoteTag))
+	stakingSig, err := stakingPriv.Sign(msg, crypto.NewBLSKMAC(signature.ConsensusVoteTag))
 	require.NoError(t, err)
 
 	expectedSig := msig.EncodeSingleSig(encoding.SigTypeStaking, stakingSig)
@@ -159,7 +158,7 @@ func Test_VerifyQCV3(t *testing.T) {
 	msg := MakeVoteMessage(block.View, block.BlockID)
 
 	// generate some BLS key as a stub of the random beacon group key and use it to generate a reconstructed beacon sig
-	privGroupKey, beaconSig := generateSignature(t, msg, encoding.RandomBeaconTag)
+	privGroupKey, beaconSig := generateSignature(t, msg, signature.RandomBeaconTag)
 	dkg := &mocks.DKG{}
 	dkg.On("GroupKey").Return(privGroupKey.PublicKey(), nil)
 	dkg.On("Size").Return(uint(20))
@@ -167,9 +166,9 @@ func Test_VerifyQCV3(t *testing.T) {
 	committee.On("DKG", mock.Anything).Return(dkg, nil)
 
 	// generate 17 BLS keys as stubs for staking keys and use them to generate an aggregated staking sig
-	privStakingKeys, aggStakingSig := generateAggregatedSignature(t, 17, msg, encoding.ConsensusVoteTag)
+	privStakingKeys, aggStakingSig := generateAggregatedSignature(t, 17, msg, signature.ConsensusVoteTag)
 	// generate 11 BLS keys as stubs for individual random beacon key shares and use them to generate an aggregated rand beacon sig
-	privRbKeyShares, aggRbSig := generateAggregatedSignature(t, 11, msg, encoding.RandomBeaconTag)
+	privRbKeyShares, aggRbSig := generateAggregatedSignature(t, 11, msg, signature.RandomBeaconTag)
 
 	stakingSigners := generateIdentitiesForPrivateKeys(t, privStakingKeys)
 	rbSigners := generateIdentitiesForPrivateKeys(t, privRbKeyShares)
@@ -247,7 +246,7 @@ func Test_VerifyQCV3(t *testing.T) {
 		// beacon sig shares. But we only supply 5 aggregated key shares.
 		sd := unpackedSigData // copy correct QC
 		sd.RandomBeaconSigners = rbSigners[:5].NodeIDs()
-		sd.AggregatedRandomBeaconSig = aggregatedSignature(t, privRbKeyShares[:5], msg, encoding.RandomBeaconTag)
+		sd.AggregatedRandomBeaconSig = aggregatedSignature(t, privRbKeyShares[:5], msg, signature.RandomBeaconTag)
 
 		packer := &mocks.Packer{}
 		packer.On("Unpack", mock.Anything, packedSigData).Return(&sd, nil)

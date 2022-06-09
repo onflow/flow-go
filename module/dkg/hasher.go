@@ -9,5 +9,5 @@ import (
 // NewDKGMessageHasher returns a hasher for signing and verifying DKG broadcast
 // messages.
 func NewDKGMessageHasher() hash.Hasher {
-	return crypto.NewBLSKMAC(encoding.DKGMessageTag)
+	return crypto.NewBLSKMAC(signature.DKGMessageTag)
 }

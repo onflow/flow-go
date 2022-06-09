@@ -40,9 +40,9 @@ func NewCombinedSignerV3(
 
 	sc := &CombinedSignerV3{
 		staking:        staking,
-		stakingHasher:  crypto.NewBLSKMAC(encoding.ConsensusVoteTag),
+		stakingHasher:  crypto.NewBLSKMAC(signature.ConsensusVoteTag),
 		beaconKeyStore: beaconKeyStore,
-		beaconHasher:   crypto.NewBLSKMAC(encoding.RandomBeaconTag),
+		beaconHasher:   crypto.NewBLSKMAC(signature.RandomBeaconTag),
 	}
 	return sc
 }

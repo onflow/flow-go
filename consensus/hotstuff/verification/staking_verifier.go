@@ -25,7 +25,7 @@ var _ hotstuff.Verifier = (*StakingVerifier)(nil)
 // NewStakingVerifier creates a new single verifier with the given dependencies.
 func NewStakingVerifier() *StakingVerifier {
 	return &StakingVerifier{
-		stakingHasher: crypto.NewBLSKMAC(encoding.CollectorVoteTag),
+		stakingHasher: crypto.NewBLSKMAC(signature.CollectorVoteTag),
 	}
 }
 

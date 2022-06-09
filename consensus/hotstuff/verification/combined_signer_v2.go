@@ -7,7 +7,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/signature"
 )
@@ -40,9 +39,9 @@ func NewCombinedSigner(
 
 	sc := &CombinedSigner{
 		staking:        staking,
-		stakingHasher:  crypto.NewBLSKMAC(encoding.ConsensusVoteTag),
+		stakingHasher:  crypto.NewBLSKMAC(signature.ConsensusVoteTag),
 		beaconKeyStore: beaconKeyStore,
-		beaconHasher:   crypto.NewBLSKMAC(encoding.RandomBeaconTag),
+		beaconHasher:   crypto.NewBLSKMAC(signature.RandomBeaconTag),
 	}
 	return sc
 }

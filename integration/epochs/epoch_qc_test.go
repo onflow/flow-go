@@ -81,7 +81,7 @@ func (s *Suite) TestEpochQuorumCertificate() {
 		local.On("NodeID").Return(nodeID)
 
 		// create valid signature
-		hasher := crypto.NewBLSKMAC(encoding.CollectorVoteTag)
+		hasher := crypto.NewBLSKMAC(signature.CollectorVoteTag)
 		signature, err := stakingPrivKey.Sign(voteMessage, hasher)
 		s.Require().NoError(err)
 
