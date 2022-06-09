@@ -3,6 +3,7 @@ package metrics
 import (
 	"time"
 
+	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -170,3 +171,9 @@ func (nc *NoopCollector) ExecutionDataFetchStarted()                            
 func (nc *NoopCollector) ExecutionDataFetchFinished(_ time.Duration, _ bool, _ uint64)     {}
 func (nc *NoopCollector) NotificationSent(height uint64)                                   {}
 func (nc *NoopCollector) FetchRetried()                                                    {}
+
+func (nc *NoopCollector) PrunedBlockById(status *chainsync.Status)                              {}
+func (nc *NoopCollector) PrunedBlockByHeight(status *chainsync.Status)                          {}
+func (nc *NoopCollector) PrunedBlocks(totalByHeight, totalById, storedByHeight, storedById int) {}
+func (nc *NoopCollector) RangeRequested(ran flow.Range)                                         {}
+func (nc *NoopCollector) BatchRequested(batch flow.Batch)                                       {}

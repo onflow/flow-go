@@ -11,6 +11,7 @@ import (
 	"pgregory.net/rapid"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -41,7 +42,7 @@ type rapidSync struct {
 func (r *rapidSync) Init(t *rapid.T) {
 	var err error
 
-	r.core, err = New(zerolog.New(ioutil.Discard), DefaultConfig(), &NoopMetrics{})
+	r.core, err = New(zerolog.New(ioutil.Discard), DefaultConfig(), metrics.NewNoopCollector())
 	require.NoError(t, err)
 
 	r.store = populatedBlockStore(t)

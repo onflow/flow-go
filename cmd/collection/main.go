@@ -209,7 +209,7 @@ func main() {
 			return nil
 		}).
 		Module("main chain sync core", func(node *cmd.NodeConfig) error {
-			mainChainSyncCore, err = synchronization.New(node.Logger, node.SyncCoreConfig, synchronization.NewMetricsCollector())
+			mainChainSyncCore, err = synchronization.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector())
 			return err
 		}).
 		Module("machine account config", func(node *cmd.NodeConfig) error {

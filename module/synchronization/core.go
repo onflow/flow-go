@@ -7,7 +7,9 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 )
 
 const (
@@ -54,18 +56,18 @@ type Core struct {
 	log                  zerolog.Logger
 	Config               Config
 	mu                   sync.Mutex
-	heights              map[uint64]*Status
-	blockIDs             map[flow.Identifier]*Status
-	metrics              SynchronizationMetrics
+	heights              map[uint64]*chainsync.Status
+	blockIDs             map[flow.Identifier]*chainsync.Status
+	metrics              module.ChainSyncMetrics
 	localFinalizedHeight uint64
 }
 
-func New(log zerolog.Logger, config Config, metrics SynchronizationMetrics) (*Core, error) {
+func New(log zerolog.Logger, config Config, metrics module.ChainSyncMetrics) (*Core, error) {
 	core := &Core{
 		log:                  log.With().Str("module", "synchronization").Logger(),
 		Config:               config,
-		heights:              make(map[uint64]*Status),
-		blockIDs:             make(map[flow.Identifier]*Status),
+		heights:              make(map[uint64]*chainsync.Status),
+		blockIDs:             make(map[flow.Identifier]*chainsync.Status),
 		metrics:              metrics,
 		localFinalizedHeight: 0,
 	}
@@ -211,7 +213,7 @@ func (c *Core) queueByHeight(height uint64) {
 	}
 
 	// queue the request
-	c.heights[height] = NewQueuedStatus(height)
+	c.heights[height] = chainsync.NewQueuedStatus(height)
 }
 
 // queueByBlockID queues a request for a block by block ID, only if no
@@ -229,12 +231,12 @@ func (c *Core) queueByBlockID(blockID flow.Identifier, height uint64) {
 	}
 
 	// queue the request
-	c.blockIDs[blockID] = NewQueuedStatus(height)
+	c.blockIDs[blockID] = chainsync.NewQueuedStatus(height)
 }
 
 // getRequestStatus retrieves a request status for a block, regardless of
 // whether it was queued by height or by block ID.
-func (c *Core) getRequestStatus(height uint64, blockID flow.Identifier) *Status {
+func (c *Core) getRequestStatus(height uint64, blockID flow.Identifier) *chainsync.Status {
 	heightStatus := c.heights[height]
 	idStatus := c.blockIDs[blockID]
 

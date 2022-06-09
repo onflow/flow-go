@@ -12,7 +12,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -28,26 +30,26 @@ type SyncSuite struct {
 func (ss *SyncSuite) SetupTest() {
 	var err error
 
-	ss.core, err = New(zerolog.New(ioutil.Discard), DefaultConfig(), &NoopMetrics{})
+	ss.core, err = New(zerolog.New(ioutil.Discard), DefaultConfig(), metrics.NewNoopCollector())
 	ss.Require().Nil(err)
 }
 
-func (ss *SyncSuite) QueuedStatus() *Status {
-	return &Status{
+func (ss *SyncSuite) QueuedStatus() *chainsync.Status {
+	return &chainsync.Status{
 		Queued: time.Now(),
 	}
 }
 
-func (ss *SyncSuite) RequestedStatus() *Status {
-	return &Status{
+func (ss *SyncSuite) RequestedStatus() *chainsync.Status {
+	return &chainsync.Status{
 		Queued:    time.Now().Add(-time.Second),
 		Requested: time.Now(),
 		Attempts:  1,
 	}
 }
 
-func (ss *SyncSuite) ReceivedStatus(header *flow.Header) *Status {
-	return &Status{
+func (ss *SyncSuite) ReceivedStatus(header *flow.Header) *chainsync.Status {
+	return &chainsync.Status{
 		BlockHeight: header.Height,
 		Queued:      time.Now().Add(-time.Second * 2),
 		Requested:   time.Now().Add(-time.Second),
@@ -210,7 +212,7 @@ func (ss *SyncSuite) TestGetRequestableItems() {
 
 	// fill in a height status that should be skipped
 	skipHeight := uint64(rand.Uint64())
-	ss.core.heights[skipHeight] = &Status{
+	ss.core.heights[skipHeight] = &chainsync.Status{
 		Queued:    now,
 		Requested: now,
 		Attempts:  0,
@@ -218,7 +220,7 @@ func (ss *SyncSuite) TestGetRequestableItems() {
 
 	// fill in a height status that should be deleted
 	dropHeight := uint64(rand.Uint64())
-	ss.core.heights[dropHeight] = &Status{
+	ss.core.heights[dropHeight] = &chainsync.Status{
 		Queued:    now,
 		Requested: zero,
 		Attempts:  ss.core.Config.MaxAttempts,
@@ -226,7 +228,7 @@ func (ss *SyncSuite) TestGetRequestableItems() {
 
 	// fill in a height status that should be requested
 	reqHeight := uint64(rand.Uint64())
-	ss.core.heights[reqHeight] = &Status{
+	ss.core.heights[reqHeight] = &chainsync.Status{
 		Queued:    now,
 		Requested: zero,
 		Attempts:  0,
@@ -234,7 +236,7 @@ func (ss *SyncSuite) TestGetRequestableItems() {
 
 	// fill in a block ID that should be skipped
 	skipBlockID := unittest.IdentifierFixture()
-	ss.core.blockIDs[skipBlockID] = &Status{
+	ss.core.blockIDs[skipBlockID] = &chainsync.Status{
 		Queued:    now,
 		Requested: now,
 		Attempts:  0,
@@ -242,7 +244,7 @@ func (ss *SyncSuite) TestGetRequestableItems() {
 
 	// fill in a block ID that should be deleted
 	dropBlockID := unittest.IdentifierFixture()
-	ss.core.blockIDs[dropBlockID] = &Status{
+	ss.core.blockIDs[dropBlockID] = &chainsync.Status{
 		Queued:    now,
 		Requested: zero,
 		Attempts:  ss.core.Config.MaxAttempts,
@@ -250,7 +252,7 @@ func (ss *SyncSuite) TestGetRequestableItems() {
 
 	// fill in a block ID that should be requested
 	reqBlockID := unittest.IdentifierFixture()
-	ss.core.blockIDs[reqBlockID] = &Status{
+	ss.core.blockIDs[reqBlockID] = &chainsync.Status{
 		Queued:    now,
 		Requested: zero,
 		Attempts:  0,

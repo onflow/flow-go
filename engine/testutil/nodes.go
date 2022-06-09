@@ -534,9 +534,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	)
 	require.NoError(t, err)
 
-	metrics := metrics.NewNoopCollector()
 	pusherEngine, err := executionprovider.New(
-		node.Log, node.Tracer, node.Net, node.State, node.Me, execState, metrics, checkAuthorizedAtBlock, 10, 10,
+		node.Log, node.Tracer, node.Net, node.State, node.Me, execState, metricsCollector, checkAuthorizedAtBlock, 10, 10,
 	)
 	require.NoError(t, err)
 
@@ -581,7 +580,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		Manager: computationEngine,
 	}
 
-	syncCore, err := chainsync.New(node.Log, chainsync.DefaultConfig(), chainsync.NewMetricsCollector())
+	syncCore, err := chainsync.New(node.Log, chainsync.DefaultConfig(), metrics.NewChainSyncCollector())
 	require.NoError(t, err)
 
 	deltas, err := ingestion.NewDeltas(1000)
