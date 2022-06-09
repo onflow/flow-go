@@ -397,10 +397,10 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 		synctest.WithByHeight(cfg.blocksByHeight),
 	)
 	results := synctest.MockResultsStorage(
-		synctest.WithByResultID(cfg.resultsByID),
+		synctest.WithResultByID(cfg.resultsByID),
 	)
 	seals := synctest.MockSealsStorage(
-		synctest.WithBySealedBlockID(cfg.sealsByBlockID),
+		synctest.WithSealsByBlockID(cfg.sealsByBlockID),
 	)
 	state := suite.mockProtocolState(cfg.blocksByHeight)
 

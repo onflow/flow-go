@@ -76,12 +76,12 @@ func (suite *ExecutionDataReaderSuite) reset() {
 
 	suite.headers = synctest.MockBlockHeaderStorage(synctest.WithByHeight(suite.blocksByHeight))
 	suite.results = synctest.MockResultsStorage(
-		synctest.WithByResultID(map[flow.Identifier]*flow.ExecutionResult{
+		synctest.WithResultByID(map[flow.Identifier]*flow.ExecutionResult{
 			result.ID(): result,
 		}),
 	)
 	suite.seals = synctest.MockSealsStorage(
-		synctest.WithBySealedBlockID(map[flow.Identifier]*flow.Seal{
+		synctest.WithSealsByBlockID(map[flow.Identifier]*flow.Seal{
 			suite.block.ID(): seal,
 		}),
 	)
