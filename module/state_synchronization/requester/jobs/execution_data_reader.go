@@ -98,7 +98,7 @@ func (r *ExecutionDataReader) getExecutionData(signalCtx irrecoverable.SignalerC
 	}
 
 	// get the ExecutionResultID for the block from the block's seal
-	seal, err := r.seals.BySealedBlockID(header.ID())
+	seal, err := r.seals.FinalizedSealForBlock(header.ID())
 	if err != nil {
 		return nil, fmt.Errorf("failed to lookup seal for block %s: %w", header.ID(), err)
 	}

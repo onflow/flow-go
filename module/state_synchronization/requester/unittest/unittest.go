@@ -242,7 +242,7 @@ type SealsMockOptions func(*storagemock.Seals)
 
 func WithSealsByBlockID(sealsByBlockID map[flow.Identifier]*flow.Seal) SealsMockOptions {
 	return func(seals *storagemock.Seals) {
-		seals.On("BySealedBlockID", mock.AnythingOfType("flow.Identifier")).Return(
+		seals.On("FinalizedSealForBlock", mock.AnythingOfType("flow.Identifier")).Return(
 			func(blockID flow.Identifier) *flow.Seal {
 				if _, has := sealsByBlockID[blockID]; !has {
 					return nil

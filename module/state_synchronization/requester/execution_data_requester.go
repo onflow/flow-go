@@ -354,7 +354,7 @@ func (e *executionDataRequester) processFetchRequest(ctx irrecoverable.SignalerC
 
 	logger.Debug().Msg("processing fetch request")
 
-	seal, err := e.seals.BySealedBlockID(blockID)
+	seal, err := e.seals.FinalizedSealForBlock(blockID)
 	if err != nil {
 		ctx.Throw(fmt.Errorf("failed to get seal for block %s: %w", blockID, err))
 	}
