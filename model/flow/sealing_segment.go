@@ -94,7 +94,7 @@ func findFinalizedSeal(segment *SealingSegment) (*Seal, error) {
 		return segment.FirstSeal, nil
 	}
 
-	return hasValidSeal(segment.Lowest().ID(), segment.Highest().ID(), segment.LatestSeals, segment.Blocks)
+	return findLatestSealForLowestBlock(segment.Lowest().ID(), segment.Highest().ID(), segment.LatestSeals, segment.Blocks)
 }
 
 func isRootSegment(segment *SealingSegment) bool {
@@ -284,7 +284,7 @@ func (builder *SealingSegmentBuilder) isValidHeight(block *Block) bool {
 	return block.Header.Height == builder.highest().Header.Height+1
 }
 
-// hasValidSeal checks if the latest seal as of highest block is for lowest block
+// findLatestSealForLowestBlock finds the latest seal as of the highest block for the lowest block
 // it returns the latest seal and no error if found
 // it returns nil and error if not found
 // NOTE: only applicable for non-root sealing segments containing multiple blocks,
@@ -295,12 +295,12 @@ func (builder *SealingSegmentBuilder) isValidHeight(block *Block) bool {
 // A <- B <- C <- D(seal_X,seal_A)        ==> valid, because it's OK for block X to be unknown
 // A <- B <- C <- D(seal_A) <- E(seal_B)  ==> invalid, because latest seal is B, but lowest block is A
 // A(seal_A)                              ==> invalid, because this is impossible for non-root sealing segments
-func (builder *SealingSegmentBuilder) hasValidSeal() error {
-	_, err := hasValidSeal(builder.lowest().ID(), builder.highest().ID(), builder.latestSeals, builder.blocks)
+func (builder *SealingSegmentBuilder) findLatestSealForLowestBlock() error {
+	_, err := findLatestSealForLowestBlock(builder.lowest().ID(), builder.highest().ID(), builder.latestSeals, builder.blocks)
 	return err
 }
 
-func hasValidSeal(lowestID, highestID Identifier, latestSeals map[Identifier]Identifier, blocks []*Block) (*Seal, error) {
+func findLatestSealForLowestBlock(lowestID, highestID Identifier, latestSeals map[Identifier]Identifier, blocks []*Block) (*Seal, error) {
 	// get the ID of the latest seal for highest block
 	latestSealID := latestSeals[highestID]
 
@@ -359,7 +359,8 @@ func (builder *SealingSegmentBuilder) validateSegment() error {
 		return nil
 	}
 
-	err := builder.hasValidSeal()
+	// validate the latest seal is for the lowest block
+	err := builder.findLatestSealForLowestBlock()
 	if err != nil {
 		return fmt.Errorf("sealing segment missing seal lowest (%x) highest (%x) %v: %w", builder.lowest().ID(), builder.highest().ID(), err, ErrSegmentMissingSeal)
 	}
