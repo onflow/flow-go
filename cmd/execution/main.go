@@ -79,63 +79,65 @@ import (
 func main() {
 
 	var (
-		followerState                 protocol.MutableState
-		ledgerStorage                 *ledger.Ledger
-		events                        *storage.Events
-		serviceEvents                 *storage.ServiceEvents
-		txResults                     *storage.TransactionResults
-		results                       *storage.ExecutionResults
-		myReceipts                    *storage.MyExecutionReceipts
-		providerEngine                *exeprovider.Engine
-		checkerEng                    *checker.Engine
-		syncCore                      *chainsync.Core
-		pendingBlocks                 *buffer.PendingBlocks // used in follower engine
-		deltas                        *ingestion.Deltas
-		syncEngine                    *synchronization.Engine
-		followerEng                   *followereng.Engine // to sync blocks from consensus nodes
-		computationManager            *computation.Manager
-		collectionRequester           *requester.Engine
-		ingestionEng                  *ingestion.Engine
-		finalizationDistributor       *pubsub.FinalizationDistributor
-		finalizedHeader               *synchronization.FinalizedHeaderCache
-		rpcConf                       rpc.Config
-		err                           error
-		executionState                state.ExecutionState
-		triedir                       string
-		executionDataDir              string
-		collector                     module.ExecutionMetrics
-		mTrieCacheSize                uint32
-		transactionResultsCacheSize   uint
-		checkpointDistance            uint
-		checkpointsToKeep             uint
-		stateDeltasLimit              uint
-		cadenceExecutionCache         uint
-		cadenceTracing                bool
-		chdpCacheSize                 uint
-		requestInterval               time.Duration
-		preferredExeNodeIDStr         string
-		syncByBlocks                  bool
-		syncFast                      bool
-		syncThreshold                 int
-		extensiveLog                  bool
-		pauseExecution                bool
-		checkAuthorizedAtBlock        func(blockID flow.Identifier) (bool, error)
-		diskWAL                       *wal.DiskWAL
-		scriptLogThreshold            time.Duration
-		scriptExecutionTimeLimit      time.Duration
-		chdpQueryTimeout              uint
-		chdpDeliveryTimeout           uint
-		enableBlockDataUpload         bool
-		gcpBucketName                 string
-		s3BucketName                  string
-		blockDataUploaders            []uploader.Uploader
-		blockDataUploaderMaxRetry     uint64 = 5
-		blockdataUploaderRetryTimeout        = 1 * time.Second
-		executionDataStore            execution_data.ExecutionDataStore
-		executionDataDatastore        datastore.Batching
-		executionDataPruner           *pruner.Pruner
-		executionDataBlobstore        blobs.Blobstore
-		executionDataTracker          tracker.Storage
+		followerState                        protocol.MutableState
+		ledgerStorage                        *ledger.Ledger
+		events                               *storage.Events
+		serviceEvents                        *storage.ServiceEvents
+		txResults                            *storage.TransactionResults
+		results                              *storage.ExecutionResults
+		myReceipts                           *storage.MyExecutionReceipts
+		providerEngine                       *exeprovider.Engine
+		checkerEng                           *checker.Engine
+		syncCore                             *chainsync.Core
+		pendingBlocks                        *buffer.PendingBlocks // used in follower engine
+		deltas                               *ingestion.Deltas
+		syncEngine                           *synchronization.Engine
+		followerEng                          *followereng.Engine // to sync blocks from consensus nodes
+		computationManager                   *computation.Manager
+		collectionRequester                  *requester.Engine
+		ingestionEng                         *ingestion.Engine
+		finalizationDistributor              *pubsub.FinalizationDistributor
+		finalizedHeader                      *synchronization.FinalizedHeaderCache
+		rpcConf                              rpc.Config
+		err                                  error
+		executionState                       state.ExecutionState
+		triedir                              string
+		executionDataDir                     string
+		collector                            module.ExecutionMetrics
+		mTrieCacheSize                       uint32
+		transactionResultsCacheSize          uint
+		checkpointDistance                   uint
+		checkpointsToKeep                    uint
+		stateDeltasLimit                     uint
+		cadenceExecutionCache                uint
+		cadenceTracing                       bool
+		chdpCacheSize                        uint
+		requestInterval                      time.Duration
+		preferredExeNodeIDStr                string
+		syncByBlocks                         bool
+		syncFast                             bool
+		syncThreshold                        int
+		extensiveLog                         bool
+		pauseExecution                       bool
+		checkAuthorizedAtBlock               func(blockID flow.Identifier) (bool, error)
+		diskWAL                              *wal.DiskWAL
+		scriptLogThreshold                   time.Duration
+		scriptExecutionTimeLimit             time.Duration
+		chdpQueryTimeout                     uint
+		chdpDeliveryTimeout                  uint
+		enableBlockDataUpload                bool
+		gcpBucketName                        string
+		s3BucketName                         string
+		blockDataUploaders                   []uploader.Uploader
+		blockDataUploaderMaxRetry            uint64 = 5
+		blockdataUploaderRetryTimeout               = 1 * time.Second
+		executionDataStore                   execution_data.ExecutionDataStore
+		executionDataDatastore               datastore.Batching
+		executionDataPruner                  *pruner.Pruner
+		executionDataBlobstore               blobs.Blobstore
+		executionDataTracker                 tracker.Storage
+		executionDataPrunerHeightRangeTarget uint64
+		executionDataPrunerThreshold         uint64
 	)
 
 	nodeBuilder := cmd.FlowNode(flow.RoleExecution.String())
@@ -170,6 +172,8 @@ func main() {
 			flags.BoolVar(&enableBlockDataUpload, "enable-blockdata-upload", false, "enable uploading block data to Cloud Bucket")
 			flags.StringVar(&gcpBucketName, "gcp-bucket-name", "", "GCP Bucket name for block data uploader")
 			flags.StringVar(&s3BucketName, "s3-bucket-name", "", "S3 Bucket name for block data uploader")
+			flags.Uint64Var(&executionDataPrunerHeightRangeTarget, "execution-data-height-range-target", 65000, "target height range size used to limit the amount of Execution Data kept on disk")
+			flags.Uint64Var(&executionDataPrunerThreshold, "execution-data-height-range-threshold", 65000, "height threshold used to trigger Execution Data pruning")
 		}).
 		ValidateFlags(func() error {
 			if enableBlockDataUpload {
@@ -417,8 +421,8 @@ func main() {
 				node.Logger,
 				prunerMetrics,
 				executionDataTracker,
-				pruner.WithHeightRangeTarget(65000),
-				pruner.WithThreshold(65000),
+				pruner.WithHeightRangeTarget(executionDataPrunerHeightRangeTarget),
+				pruner.WithThreshold(executionDataPrunerThreshold),
 			)
 			return executionDataPruner, err
 		}).

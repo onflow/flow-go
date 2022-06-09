@@ -112,6 +112,9 @@ type AccessNodeConfig struct {
 	baseOptions                  []cmd.Option
 	executionDataDir             string
 
+	executionDataPrunerHeightRangeTarget uint64
+	executionDataPrunerThreshold         uint64
+
 	PublicNetworkConfig PublicNetworkConfig
 }
 
@@ -458,8 +461,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				node.Logger,
 				prunerMetrics,
 				trackerStorage,
-				pruner.WithHeightRangeTarget(65000),
-				pruner.WithThreshold(65000),
+				pruner.WithHeightRangeTarget(builder.executionDataPrunerHeightRangeTarget),
+				pruner.WithThreshold(builder.executionDataPrunerThreshold),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create execution data pruner: %w", err)
@@ -564,6 +567,9 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.BoolVar(&builder.supportsUnstakedFollower, "supports-unstaked-node", defaultConfig.supportsUnstakedFollower, "true if this staked access node supports unstaked node")
 		flags.StringVar(&builder.PublicNetworkConfig.BindAddress, "public-network-address", defaultConfig.PublicNetworkConfig.BindAddress, "staked access node's public network bind address")
 		flags.StringVar(&builder.executionDataDir, "execution-data-dir", filepath.Join(homedir, ".flow", "execution_data"), "directory to use for storing Execution Data")
+		flags.Uint64Var(&builder.executionDataPrunerHeightRangeTarget, "execution-data-height-range-target", 65000, "target height range size used to limit the amount of Execution Data kept on disk")
+		flags.Uint64Var(&builder.executionDataPrunerThreshold, "execution-data-height-range-threshold", 65000, "height threshold used to trigger Execution Data pruning")
+
 	}).ValidateFlags(func() error {
 		if builder.supportsUnstakedFollower && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-unstaked-node is true")

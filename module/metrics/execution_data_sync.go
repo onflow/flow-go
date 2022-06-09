@@ -17,7 +17,7 @@ type ExecutionDataRequesterCollector struct {
 	requestAttempts               prometheus.Histogram
 	requestsFailed                *prometheus.CounterVec
 	requestsCancelled             prometheus.Counter
-	resultsDropped                prometheus.Counter
+	responsesDropped              prometheus.Counter
 }
 
 func NewExecutionDataRequesterCollector() *ExecutionDataRequesterCollector {
@@ -89,8 +89,8 @@ func NewExecutionDataRequesterCollector() *ExecutionDataRequesterCollector {
 			Subsystem: subsystemExeDataRequester,
 			Help:      "the number of cancelled requests",
 		}),
-		resultsDropped: promauto.NewCounter(prometheus.CounterOpts{
-			Name:      "results_dropped",
+		responsesDropped: promauto.NewCounter(prometheus.CounterOpts{
+			Name:      "responses_dropped",
 			Namespace: namespaceExecutionDataSync,
 			Subsystem: subsystemExeDataRequester,
 			Help:      "the number of dropped responses",
@@ -122,8 +122,8 @@ func (c *ExecutionDataRequesterCollector) RequestCanceled() {
 	c.requestsCancelled.Inc()
 }
 
-func (c *ExecutionDataRequesterCollector) ResultDropped() {
-	c.resultsDropped.Inc()
+func (c *ExecutionDataRequesterCollector) ResponseDropped() {
+	c.responsesDropped.Inc()
 }
 
 type ExecutionDataProviderCollector struct {

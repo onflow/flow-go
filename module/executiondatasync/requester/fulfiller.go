@@ -117,7 +117,7 @@ func (f *fulfiller) handleJobResult(ctx irrecoverable.SignalerContext, j *jobRes
 				Str("result_id", j.resultID.String()).
 				Uint64("block_height", j.blockHeight).
 				Msg("dropping job result")
-			f.metrics.ResultDropped()
+			f.metrics.ResponseDropped()
 			return
 		}
 
@@ -172,7 +172,7 @@ func (f *fulfiller) handleSealedResult(ctx irrecoverable.SignalerContext, sealed
 					Str("block_id", j.executionData.BlockID.String()).
 					Uint64("block_height", j.blockHeight).
 					Msg("discarding job result")
-				f.metrics.ResultDropped()
+				f.metrics.ResponseDropped()
 			}
 		}
 	}

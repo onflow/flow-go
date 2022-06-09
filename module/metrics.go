@@ -353,7 +353,7 @@ type ExecutionDataRequesterMetrics interface {
 	RequestSucceeded(blockHeight uint64, duration time.Duration, totalSize uint64, numberOfAttempts int)
 	RequestFailed(duration time.Duration, retryable bool)
 	RequestCanceled()
-	ResultDropped()
+	ResponseDropped()
 }
 
 type ExecutionDataPrunerMetrics interface {
