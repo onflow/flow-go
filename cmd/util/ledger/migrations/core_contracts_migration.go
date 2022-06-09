@@ -1,6 +1,7 @@
 package migrations
 
 import (
+	"encoding/hex"
 	"fmt"
 	"strings"
 
@@ -225,13 +226,13 @@ func (m *CoreContractsMigration) Migrate(payloads []ledger.Payload) ([]ledger.Pa
 	addresses := coreContractAddresses(m.Chain)
 	codes := coreContractCodes(addresses)
 
-	for _, payload := range payloads {
+	for i, payload := range payloads {
 		key := string(payload.Key.KeyParts[2].Value)
 		if !strings.HasPrefix(key, codeKeyPrefix) {
 			continue
 		}
 
-		owner := string(payload.Key.KeyParts[0].Value)
+		owner := hex.EncodeToString(payload.Key.KeyParts[0].Value)
 
 		addressCodes, ok := codes[owner]
 		if !ok {
@@ -246,7 +247,7 @@ func (m *CoreContractsMigration) Migrate(payloads []ledger.Payload) ([]ledger.Pa
 			continue
 		}
 
-		payload.Value = newCode
+		payloads[i].Value = newCode
 
 		m.Log.Info().Msgf("Updated core contract: %s.%s", owner, contractName)
 
