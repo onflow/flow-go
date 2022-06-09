@@ -83,11 +83,6 @@ func coreContractCodes(addresses networkAddresses) map[string]map[string][]byte 
 	}
 
 	addCode(
-		addresses.contractAudits,
-		"FlowContractAudits",
-		coreContracts.FlowContractAudits(),
-	)
-	addCode(
 		addresses.serviceAccount,
 		"FlowServiceAccount",
 		coreContracts.FlowServiceAccount(
@@ -102,54 +97,6 @@ func coreContractCodes(addresses networkAddresses) map[string]map[string][]byte 
 		),
 	)
 	addCode(
-		addresses.storageFees,
-		"FlowStorageFees",
-		coreContracts.FlowStorageFees(
-			// fungibleTokenAddress:
-			addresses.fungibleToken,
-			// flowTokenAddress:
-			addresses.flowToken,
-		),
-	)
-	addCode(
-		addresses.fees,
-		"FlowFees",
-		coreContracts.FlowFees(
-			// fungibleTokenAddress:
-			addresses.fungibleToken,
-			// flowTokenAddress:
-			addresses.flowToken,
-		),
-	)
-	addCode(
-		addresses.qc,
-		"FlowClusterQC",
-		coreContracts.FlowQC(),
-	)
-	addCode(
-		addresses.dkg,
-		"FlowDKG",
-		coreContracts.FlowDKG(),
-	)
-	addCode(
-		addresses.epoch,
-		"FlowEpoch",
-		coreContracts.FlowEpoch(
-			// fungibleTokenAddress:
-			addresses.fungibleToken,
-			// flowTokenAddress:
-			addresses.flowToken,
-			// idTableAddress:
-			addresses.stakingTable,
-			// qcAddress:
-			addresses.qc,
-			// dkgAddress:
-			addresses.dkg,
-			// flowFeesAddress:
-			addresses.fees,
-		),
-	)
-	addCode(
 		addresses.stakingTable,
 		"FlowIDTableStaking",
 		coreContracts.FlowIDTableStaking(
@@ -161,22 +108,6 @@ func coreContractCodes(addresses networkAddresses) map[string]map[string][]byte 
 			addresses.fees,
 			// latest:
 			true,
-		),
-	)
-	addCode(
-		addresses.lockedTokens,
-		"LockedTokens",
-		coreContracts.FlowLockedTokens(
-			// fungibleTokenAddress:
-			addresses.fungibleToken,
-			// flowTokenAddress:
-			addresses.flowToken,
-			// idTableAddress:
-			addresses.stakingTable,
-			// stakingProxyAddress:
-			addresses.stakingProxy,
-			// storageFeesAddress:
-			addresses.storageFees,
 		),
 	)
 	addCode(
@@ -204,18 +135,91 @@ func coreContractCodes(addresses networkAddresses) map[string]map[string][]byte 
 		),
 	)
 	addCode(
-		addresses.flowToken,
-		"FlowToken",
-		coreContracts.FlowToken(
+		addresses.storageFees,
+		"FlowStorageFees",
+		coreContracts.FlowStorageFees(
 			// fungibleTokenAddress:
 			addresses.fungibleToken,
+			// flowTokenAddress:
+			addresses.flowToken,
 		),
 	)
 	addCode(
-		addresses.stakingProxy,
-		"StakingProxy",
-		coreContracts.FlowStakingProxy(),
+		addresses.qc,
+		"FlowClusterQC",
+		coreContracts.FlowQC(),
 	)
+
+	//// Other contracts which were not updated:
+
+	//addCode(
+	//	addresses.contractAudits,
+	//	"FlowContractAudits",
+	//	coreContracts.FlowContractAudits(),
+	//)
+	//addCode(
+	//	addresses.fees,
+	//	"FlowFees",
+	//	coreContracts.FlowFees(
+	//		// fungibleTokenAddress:
+	//		addresses.fungibleToken,
+	//		// flowTokenAddress:
+	//		addresses.flowToken,
+	//	),
+	//)
+	//addCode(
+	//	addresses.dkg,
+	//	"FlowDKG",
+	//	coreContracts.FlowDKG(),
+	//)
+	//addCode(
+	//	addresses.epoch,
+	//	"FlowEpoch",
+	//	coreContracts.FlowEpoch(
+	//		// fungibleTokenAddress:
+	//		addresses.fungibleToken,
+	//		// flowTokenAddress:
+	//		addresses.flowToken,
+	//		// idTableAddress:
+	//		addresses.stakingTable,
+	//		// qcAddress:
+	//		addresses.qc,
+	//		// dkgAddress:
+	//		addresses.dkg,
+	//		// flowFeesAddress:
+	//		addresses.fees,
+	//	),
+	//)
+	//addCode(
+	//	addresses.lockedTokens,
+	//	"LockedTokens",
+	//	coreContracts.FlowLockedTokens(
+	//		// fungibleTokenAddress:
+	//		addresses.fungibleToken,
+	//		// flowTokenAddress:
+	//		addresses.flowToken,
+	//		// idTableAddress:
+	//		addresses.stakingTable,
+	//		// stakingProxyAddress:
+	//		addresses.stakingProxy,
+	//		// storageFeesAddress:
+	//		addresses.storageFees,
+	//	),
+	//)
+	//
+	//addCode(
+	//	addresses.flowToken,
+	//	"FlowToken",
+	//	coreContracts.FlowToken(
+	//		// fungibleTokenAddress:
+	//		addresses.fungibleToken,
+	//	),
+	//)
+	//addCode(
+	//	addresses.stakingProxy,
+	//	"StakingProxy",
+	//	coreContracts.FlowStakingProxy(),
+	//)
 
 	return codes
 }
