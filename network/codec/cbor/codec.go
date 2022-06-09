@@ -8,6 +8,7 @@ import (
 	"io"
 
 	"github.com/fxamacker/cbor/v2"
+
 	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec"

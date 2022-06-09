@@ -149,6 +149,7 @@ func InterfaceFromMessageCode(code uint8) (interface{}, string, error) {
 		return &messages.BlockProposal{}, "BlockProposal", nil
 	case CodeBlockVote:
 		return &messages.BlockVote{}, "BlockVote", nil
+
 	// cluster consensus
 	case CodeClusterBlockProposal:
 		return &messages.ClusterBlockProposal{}, "ClusterBlockProposal", nil
@@ -156,6 +157,7 @@ func InterfaceFromMessageCode(code uint8) (interface{}, string, error) {
 		return &messages.ClusterBlockVote{}, "ClusterBlockVote", nil
 	case CodeClusterBlockResponse:
 		return &messages.ClusterBlockResponse{}, "ClusterBlockResponse", nil
+
 	// protocol state sync
 	case CodeSyncRequest:
 		return &messages.SyncRequest{}, "SyncRequest", nil
@@ -167,6 +169,7 @@ func InterfaceFromMessageCode(code uint8) (interface{}, string, error) {
 		return &messages.BatchRequest{}, "BatchRequest", nil
 	case CodeBlockResponse:
 		return &messages.BlockResponse{}, "BlockResponse", nil
+
 	// collections, guarantees & transactions
 	case CodeCollectionGuarantee:
 		return &flow.CollectionGuarantee{}, "CollectionGuarantee", nil
@@ -174,16 +177,19 @@ func InterfaceFromMessageCode(code uint8) (interface{}, string, error) {
 		return &flow.TransactionBody{}, "TransactionBody", nil
 	case CodeTransaction:
 		return &flow.Transaction{}, "Transaction", nil
+
 	// core messages for execution & verification
 	case CodeExecutionReceipt:
 		return &flow.ExecutionReceipt{}, "ExecutionReceipt", nil
 	case CodeResultApproval:
 		return &flow.ResultApproval{}, "ResultApproval", nil
+
 	// execution state synchronization
 	case CodeExecutionStateSyncRequest:
 		return &messages.ExecutionStateSyncRequest{}, "ExecutionStateSyncRequest", nil
 	case CodeExecutionStateDelta:
 		return &messages.ExecutionStateDelta{}, "ExecutionStateDelta", nil
+
 	// data exchange for execution of blocks
 	case CodeChunkDataRequest:
 		return &messages.ChunkDataRequest{}, "ChunkDataRequest", nil
@@ -193,6 +199,7 @@ func InterfaceFromMessageCode(code uint8) (interface{}, string, error) {
 		return &messages.ApprovalRequest{}, "ApprovalRequest", nil
 	case CodeApprovalResponse:
 		return &messages.ApprovalResponse{}, "ApprovalResponse", nil
+		
 	default:
 		return nil, "", fmt.Errorf("invalid message code (%d)", code)
 	}
