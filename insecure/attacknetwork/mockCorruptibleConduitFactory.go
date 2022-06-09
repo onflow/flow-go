@@ -16,6 +16,8 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
+const networkingProtocolTCP = "tcp"
+
 // mockCorruptibleConduitFactory is a mock corruptible conduit factory (ccf) that implements only the side that interacts with the attack network,
 // i.e., running a gRPC server, and accepting gRPC streams from attack network. However,
 // instead of dispatching incoming messages to the networking layer, the
@@ -24,17 +26,17 @@ import (
 type mockCorruptibleConduitFactory struct {
 	component.Component
 	cm                    *component.ComponentManager
-	attackerObserveClient insecure.Attacker_ObserveClient
-	server                *grpc.Server                           // touch point of attack network to this factory.
-	address               net.Addr                               // address of gRPC endpoint for this mock ccf
-	attackerRegMsg        chan *insecure.AttackerRegisterMessage // channel keeping the last registration message coming from an attacker.
-	attackerMsg           chan *insecure.Message                 // channel  keeping the last incoming (insecure) message from an attacker.
+	server                *grpc.Server           // touch point of attack network to this factory.
+	address               net.Addr               // address of gRPC endpoint for this mock ccf
+	attackerRegMsg        chan interface{}       // channel keeping the last registration message coming from an attacker.
+	attackerMsg           chan *insecure.Message // channel  keeping the last incoming (insecure) message from an attacker.
+	attackerObserveStream insecure.CorruptibleConduitFactory_RegisterAttackerServer
 }
 
 func newMockCorruptibleConduitFactory() *mockCorruptibleConduitFactory {
 
 	factory := &mockCorruptibleConduitFactory{
-		attackerRegMsg: make(chan *insecure.AttackerRegisterMessage),
+		attackerRegMsg: make(chan interface{}),
 		attackerMsg:    make(chan *insecure.Message),
 	}
 
@@ -45,7 +47,6 @@ func newMockCorruptibleConduitFactory() *mockCorruptibleConduitFactory {
 			ready()
 
 			<-ctx.Done()
-
 			factory.stop()
 		}).Build()
 
@@ -92,12 +93,6 @@ func (c *mockCorruptibleConduitFactory) ProcessAttackerMessage(stream insecure.C
 	for {
 		select {
 		case <-c.cm.ShutdownSignal():
-			if c.attackerObserveClient != nil {
-				_, err := c.attackerObserveClient.CloseAndRecv()
-				if err != nil {
-					return err
-				}
-			}
 			return nil
 		default:
 			msg, err := stream.Recv()
@@ -114,12 +109,24 @@ func (c *mockCorruptibleConduitFactory) ProcessAttackerMessage(stream insecure.C
 
 // RegisterAttacker is a gRPC end-point of this mock corruptible conduit factory, that accepts attacker registration messages from the attack network.
 // It puts the incoming message into a channel to be read by test procedure.
-func (c *mockCorruptibleConduitFactory) RegisterAttacker(_ context.Context, in *insecure.AttackerRegisterMessage) (*empty.Empty, error) {
+func (c *mockCorruptibleConduitFactory) RegisterAttacker(_ *empty.Empty, stream insecure.CorruptibleConduitFactory_RegisterAttackerServer) error {
 	select {
 	case <-c.cm.ShutdownSignal():
-		return nil, fmt.Errorf("conduit factory has been shut down")
+		return nil
+
 	default:
-		c.attackerRegMsg <- in
-		return &empty.Empty{}, nil
+		c.attackerObserveStream = stream
+		close(c.attackerRegMsg)
 	}
+
+	for {
+		select {
+		case <-c.cm.ShutdownSignal():
+			return nil
+		default:
+
+		}
+	}
+
+	return nil
 }
