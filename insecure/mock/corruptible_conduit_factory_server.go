@@ -4,6 +4,8 @@ package mockinsecure
 
 import (
 	insecure "github.com/onflow/flow-go/insecure"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
+
 	mock "github.com/stretchr/testify/mock"
 
 	testing "testing"
@@ -29,11 +31,11 @@ func (_m *CorruptibleConduitFactoryServer) ProcessAttackerMessage(_a0 insecure.C
 }
 
 // RegisterAttacker provides a mock function with given fields: _a0, _a1
-func (_m *CorruptibleConduitFactoryServer) RegisterAttacker(_a0 *insecure.AttackerRegisterMessage, _a1 insecure.CorruptibleConduitFactory_RegisterAttackerServer) error {
+func (_m *CorruptibleConduitFactoryServer) RegisterAttacker(_a0 *emptypb.Empty, _a1 insecure.CorruptibleConduitFactory_RegisterAttackerServer) error {
 	ret := _m.Called(_a0, _a1)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*insecure.AttackerRegisterMessage, insecure.CorruptibleConduitFactory_RegisterAttackerServer) error); ok {
+	if rf, ok := ret.Get(0).(func(*emptypb.Empty, insecure.CorruptibleConduitFactory_RegisterAttackerServer) error); ok {
 		r0 = rf(_a0, _a1)
 	} else {
 		r0 = ret.Error(0)
