@@ -17,6 +17,8 @@ docker run --rm ubuntu:18.04 cat /etc/hosts>&2
 
 # run tests and process results
 
+export GODEBUG=netdns=2
+
 if [[ $TEST_CATEGORY =~ integration-(bft|ghost|mvp|network|epochs|access|collection|consensus|execution|verification)$ ]]
 then
   echo "killing and removing orphaned containers from previous run">&2
