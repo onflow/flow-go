@@ -8,9 +8,8 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/flow-go/network"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/message"
@@ -38,6 +37,7 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, c ne
 			return pubsub.ValidationReject
 		}
 
+		// redundant check if the node is ejected so that we can fail fast before decoding
 		if identity.Ejected {
 			log.Warn().
 				Err(fmt.Errorf("sender %s is an ejected node", identity.NodeID)).
@@ -48,20 +48,17 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, c ne
 			return pubsub.ValidationReject
 		}
 
-		// attempt to decode the flow message type from encoded payload
-		code, err := c.DecodeMsgType(msg.Payload)
+		v, err := c.Decode(msg.Payload)
 		if err != nil {
 			log.Warn().
 				Err(err).
 				Str("peer_id", from.String()).
 				Str("role", identity.Role.String()).
 				Str("node_id", identity.NodeID.String()).
-				Msg("rejecting message")
-			return pubsub.ValidationReject
+				Msg("could not decode message with codec")
 		}
 
-		if err := isAuthorizedSender(identity, channel, code); err != nil {
-			what, _ := code.Code.String()
+		if what, err := IsAuthorizedSender(identity, channel, v); err != nil {
 			log.Warn().
 				Err(err).
 				Str("peer_id", from.String()).
@@ -77,21 +74,26 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, c ne
 	}
 }
 
-// isAuthorizedSender checks if node is an authorized role.
-func isAuthorizedSender(identity *flow.Identity, channel network.Channel, code network.MessageCode) error {
-	var authorizedRolesByChannel flow.RoleList
+// IsAuthorizedSender checks if node is an authorized role.
+func IsAuthorizedSender(identity *flow.Identity, channel network.Channel, msg interface{}) (string, error) {
+	if identity.Ejected {
+		return "", fmt.Errorf("sender %s is an ejected node", identity.NodeID)
+	}
 
-	// handle cluster prefixed channels and check and get authorized roles list
+	// get message code configuration
+	conf, err := network.GetMessageAuthConfig(msg)
+	if err != nil {
+		return "", fmt.Errorf("failed to get message auth config: %w", err)
+	}
+
+	// handle special case for cluster prefixed channels
 	if prefix, ok := network.ClusterChannelPrefix(channel); ok {
-		authorizedRolesByChannel = code.AuthorizedRolesByChannel(network.Channel(prefix))
-	} else {
-		authorizedRolesByChannel = code.AuthorizedRolesByChannel(channel)
+		channel = network.Channel(prefix)
 	}
 
-	// check if role is authorized to send message on channel
-	if !authorizedRolesByChannel.Contains(identity.Role) {
-		return fmt.Errorf("sender role is not authorized to send this message type on channel")
+	if err := conf.IsAuthorized(identity.Role, channel); err != nil {
+		return conf.String, err
 	}
 
-	return nil
+	return conf.String, nil
 }
