@@ -20,14 +20,14 @@ type signerInfo struct {
 
 // sigInfo holds signature and high QC view submitted by some signer
 type sigInfo struct {
-	sig        crypto.Signature
-	highQCView uint64
+	sig          crypto.Signature
+	newestQCView uint64
 }
 
 // TimeoutSignatureAggregator implements consensus/hotstuff.TimeoutSignatureAggregator.
 // It performs timeout specific BLS aggregation over multiple distinct messages.
 // We perform timeout signature aggregation for some concrete view, utilizing the protocol specification
-// that timeouts sign the message: hash(view, highestQCView), where highestQCView can have different values
+// that timeouts sign the message: hash(view, newestQCView), where newestQCView can have different values
 // for different replicas.
 // View and the identities of all authorized replicas are
 // specified when the TimeoutSignatureAggregator is instantiated.
@@ -97,7 +97,7 @@ func NewTimeoutSignatureAggregator(
 //  - model.DuplicatedSignerError if the signer has been already added
 //  - model.ErrInvalidSignature if signerID is valid but signature is cryptographically invalid
 // The function is thread-safe.
-func (a *TimeoutSignatureAggregator) VerifyAndAdd(signerID flow.Identifier, sig crypto.Signature, highestQCView uint64) (totalWeight uint64, exception error) {
+func (a *TimeoutSignatureAggregator) VerifyAndAdd(signerID flow.Identifier, sig crypto.Signature, newestQCView uint64) (totalWeight uint64, exception error) {
 	info, ok := a.idToInfo[signerID]
 	if !ok {
 		return a.TotalWeight(), model.NewInvalidSignerErrorf("%v is not an authorized signer", signerID)
@@ -108,7 +108,7 @@ func (a *TimeoutSignatureAggregator) VerifyAndAdd(signerID flow.Identifier, sig 
 		return a.TotalWeight(), model.NewDuplicatedSignerErrorf("signature from %v was already added", signerID)
 	}
 
-	msg := verification.MakeTimeoutMessage(a.view, highestQCView)
+	msg := verification.MakeTimeoutMessage(a.view, newestQCView)
 	valid, err := info.pk.Verify(sig, msg, a.hasher)
 	if err != nil {
 		return a.TotalWeight(), fmt.Errorf("couldn't verify signature from %s: %w", signerID, err)
@@ -125,8 +125,8 @@ func (a *TimeoutSignatureAggregator) VerifyAndAdd(signerID flow.Identifier, sig 
 	}
 
 	a.idToSignature[signerID] = sigInfo{
-		sig:        sig,
-		highQCView: highestQCView,
+		sig:          sig,
+		newestQCView: newestQCView,
 	}
 	a.totalWeight += info.weight
 
@@ -171,11 +171,11 @@ func (a *TimeoutSignatureAggregator) Aggregate() ([]flow.Identifier, []uint64, c
 	}
 	signatures := make([]crypto.Signature, 0, sharesNum)
 	signers := make([]flow.Identifier, 0, sharesNum)
-	highQCViews := make([]uint64, 0, sharesNum)
+	newestQCViews := make([]uint64, 0, sharesNum)
 	for id, info := range a.idToSignature {
 		signatures = append(signatures, info.sig)
 		signers = append(signers, id)
-		highQCViews = append(highQCViews, info.highQCView)
+		newestQCViews = append(newestQCViews, info.newestQCView)
 	}
 
 	aggSignature, err := crypto.AggregateBLSSignatures(signatures)
@@ -187,5 +187,5 @@ func (a *TimeoutSignatureAggregator) Aggregate() ([]flow.Identifier, []uint64, c
 		return nil, nil, nil, fmt.Errorf("unexpected internal error during BLS signature aggregation: %w", err)
 	}
 
-	return signers, highQCViews, aggSignature, nil
+	return signers, newestQCViews, aggSignature, nil
 }

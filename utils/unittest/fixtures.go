@@ -332,7 +332,7 @@ func BlockWithParentAndProposerFixture(t *testing.T, parent *flow.Header, propos
 	block.Header.ParentVoterIndices = indices
 	if block.Header.LastViewTC != nil {
 		block.Header.LastViewTC.SignerIndices = indices
-		block.Header.LastViewTC.TOHighestQC.SignerIndices = indices
+		block.Header.LastViewTC.NewestQC.SignerIndices = indices
 	}
 
 	return *block
@@ -439,13 +439,13 @@ func BlockHeaderWithParentFixture(parent *flow.Header) flow.Header {
 	view := parent.View + 1 + uint64(rand.Intn(10)) // Intn returns [0, n)
 	var lastViewTC *flow.TimeoutCertificate
 	if view != parent.View+1 {
-		highestQC := QuorumCertificateFixture(func(qc *flow.QuorumCertificate) {
+		newestQC := QuorumCertificateFixture(func(qc *flow.QuorumCertificate) {
 			qc.View = parent.View
 		})
 		lastViewTC = &flow.TimeoutCertificate{
 			View:          view - 1,
-			TOHighQCViews: []uint64{highestQC.View},
-			TOHighestQC:   highestQC,
+			NewestQCViews: []uint64{newestQC.View},
+			NewestQC:      newestQC,
 			SignerIndices: SignerIndicesFixture(4),
 			SigData:       SignatureFixture(),
 		}
@@ -1675,6 +1675,13 @@ func QCWithSignerIndices(signerIndices []byte) func(*flow.QuorumCertificate) {
 	}
 }
 
+func QCWithRootBlockID(blockID flow.Identifier) func(*flow.QuorumCertificate) {
+	return func(qc *flow.QuorumCertificate) {
+		qc.BlockID = blockID
+		qc.View = 0
+	}
+}
+
 func VoteFixture(opts ...func(vote *hotstuff.Vote)) *hotstuff.Vote {
 	vote := &hotstuff.Vote{
 		View:     uint64(rand.Uint32()),
@@ -1888,7 +1895,7 @@ func BootstrapFixture(participants flow.IdentityList, opts ...func(*flow.Block))
 // example one as returned from BootstrapFixture.
 func RootSnapshotFixture(participants flow.IdentityList, opts ...func(*flow.Block)) *inmem.Snapshot {
 	block, result, seal := BootstrapFixture(participants.Sort(order.Canonical), opts...)
-	qc := QuorumCertificateFixture(QCWithBlockID(block.ID()))
+	qc := QuorumCertificateFixture(QCWithRootBlockID(block.ID()))
 	root, err := inmem.SnapshotFromBootstrapState(block, result, seal, qc)
 	if err != nil {
 		panic(err)

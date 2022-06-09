@@ -35,33 +35,41 @@ func (t *accumulatedWeightTracker) Track(weight uint64) bool {
 	return false
 }
 
-// highestQCTracker is a helper structure which keeps track of the highest QC(by view)
+// NewestQCTracker is a helper structure which keeps track of the highest QC(by view)
 // in concurrency safe way.
-type highestQCTracker struct {
-	lock      sync.RWMutex
-	highestQC *flow.QuorumCertificate
+type NewestQCTracker struct {
+	lock     sync.RWMutex
+	newestQC *flow.QuorumCertificate
 }
 
-// Track updates local state of highestQC if the provided instance is higher(by view)
-func (t *highestQCTracker) Track(qc *flow.QuorumCertificate) {
-	highestQC := t.HighestQC()
-	if highestQC != nil && highestQC.View >= qc.View {
+// Track updates local state of NewestQC if the provided instance is newer(by view)
+// Concurrently safe
+func (t *NewestQCTracker) Track(qc *flow.QuorumCertificate) {
+	NewestQC := t.NewestQC()
+	if NewestQC != nil && NewestQC.View >= qc.View {
 		return
 	}
 
 	t.lock.Lock()
 	defer t.lock.Unlock()
-	if t.highestQC == nil || t.highestQC.View < qc.View {
-		t.highestQC = qc
+	if t.newestQC == nil || t.newestQC.View < qc.View {
+		t.newestQC = qc
 	}
 }
 
-func (t *highestQCTracker) HighestQC() *flow.QuorumCertificate {
+// NewestQC returns the newest QC(by view) tracked.
+// Concurrently safe
+func (t *NewestQCTracker) NewestQC() *flow.QuorumCertificate {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
-	return t.highestQC
+	return t.newestQC
 }
 
+// TimeoutProcessor implements the hotstuff.TimeoutProcessor interface.
+// It processes timeout objects broadcast by other replicas of consensus committee.
+// TimeoutProcessor collects TOs for one view, eventually when enough timeout objects are contributed
+// TimeoutProcessor will create a timeout certificate which can be used to advance round.
+// Concurrency safe.
 type TimeoutProcessor struct {
 	view               uint64
 	validator          hotstuff.Validator
@@ -71,11 +79,14 @@ type TimeoutProcessor struct {
 	onTCCreated        hotstuff.OnTCCreated
 	partialTCTracker   accumulatedWeightTracker
 	tcTracker          accumulatedWeightTracker
-	highestQCTracker   highestQCTracker
+	NewestQCTracker    NewestQCTracker
 }
 
 var _ hotstuff.TimeoutProcessor = (*TimeoutProcessor)(nil)
 
+// NewTimeoutProcessor creates new instance of TimeoutProcessor
+// Returns the following expected errors for invalid inputs:
+//   * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
 func NewTimeoutProcessor(committee hotstuff.Replicas,
 	validator hotstuff.Validator,
 	sigAggregator hotstuff.TimeoutSignatureAggregator,
@@ -129,12 +140,12 @@ func (p *TimeoutProcessor) Process(timeout *model.TimeoutObject) error {
 		return fmt.Errorf("received invalid timeout: %w", err)
 	}
 
-	totalWeight, err := p.sigAggregator.VerifyAndAdd(timeout.SignerID, timeout.SigData, timeout.HighestQC.View)
+	totalWeight, err := p.sigAggregator.VerifyAndAdd(timeout.SignerID, timeout.SigData, timeout.NewestQC.View)
 	if err != nil {
 		return fmt.Errorf("could not process invalid signature: %w", err)
 	}
 
-	p.highestQCTracker.Track(timeout.HighestQC)
+	p.NewestQCTracker.Track(timeout.NewestQC)
 
 	if p.partialTCTracker.Track(totalWeight) {
 		p.onPartialTCCreated(p.view)
@@ -162,13 +173,13 @@ func (p *TimeoutProcessor) Process(timeout *model.TimeoutObject) error {
 func (p *TimeoutProcessor) validateTimeout(timeout *model.TimeoutObject) error {
 	// 1. check if it's correctly structured
 	// (a) Every TO must contain a QC
-	if timeout.HighestQC == nil {
+	if timeout.NewestQC == nil {
 		return model.NewInvalidTimeoutErrorf(timeout, "TimeoutObject without QC is invalid")
 	}
 
-	if timeout.View < timeout.HighestQC.View {
+	if timeout.View < timeout.NewestQC.View {
 		return model.NewInvalidTimeoutErrorf(timeout, "TO's QC %d cannot be newer than the TO's view %d",
-			timeout.HighestQC.View, timeout.View)
+			timeout.NewestQC.View, timeout.View)
 	}
 
 	// (b) If a TC is included, the TC must be for the past round, no matter whether a QC
@@ -178,15 +189,15 @@ func (p *TimeoutProcessor) validateTimeout(timeout *model.TimeoutObject) error {
 		if timeout.View != timeout.LastViewTC.View+1 {
 			return model.NewInvalidTimeoutErrorf(timeout, "invalid TC for previous round")
 		}
-		if timeout.HighestQC.View < timeout.LastViewTC.TOHighestQC.View {
-			return model.NewInvalidTimeoutErrorf(timeout, "timeout.HighestQC has older view that the QC in timeout.LastViewTC")
+		if timeout.NewestQC.View < timeout.LastViewTC.NewestQC.View {
+			return model.NewInvalidTimeoutErrorf(timeout, "timeout.NewestQC has older view that the QC in timeout.LastViewTC")
 		}
 	}
 	// (c) The TO must contain a proof that sender legitimately entered timeout.View. Transitioning
 	//     to round timeout.View is possible either by observing a QC or a TC for the previous round.
 	//     If no QC is included, we require a TC to be present, which by check (1b) must be for
 	//     the previous round.
-	lastViewSuccessful := timeout.View == timeout.HighestQC.View+1
+	lastViewSuccessful := timeout.View == timeout.NewestQC.View+1
 	if !lastViewSuccessful {
 		// The TO's sender did _not_ observe a QC for round timeout.View-1. Hence, it should
 		// include a TC for the previous round. Otherwise, the TO is invalid.
@@ -196,7 +207,7 @@ func (p *TimeoutProcessor) validateTimeout(timeout *model.TimeoutObject) error {
 	}
 
 	// 2. Check if QC is valid
-	err := p.validator.ValidateQC(timeout.HighestQC)
+	err := p.validator.ValidateQC(timeout.NewestQC)
 	if err != nil {
 		return model.NewInvalidTimeoutErrorf(timeout, "included QC is invalid: %w", err)
 	}
@@ -228,8 +239,8 @@ func (p *TimeoutProcessor) buildTC() (*flow.TimeoutCertificate, error) {
 
 	return &flow.TimeoutCertificate{
 		View:          p.view,
-		TOHighQCViews: highQCViews,
-		TOHighestQC:   p.highestQCTracker.HighestQC(),
+		NewestQCViews: highQCViews,
+		NewestQC:      p.NewestQCTracker.NewestQC(),
 		SignerIndices: signerIndices,
 		SigData:       aggregatedSig,
 	}, nil

@@ -172,7 +172,7 @@ func (ps *ProposalSuite) TestProposalWrongLeader() {
 // In contrast, unexpected exceptions and `model.InvalidSignerError` should _not_ be
 // interpreted as a sign of an invalid QC.
 func (ps *ProposalSuite) TestProposalQCInvalid() {
-	ps.Run("invalid signature", func() {
+	ps.Run("invalid-signature", func() {
 		*ps.verifier = mocks.Verifier{}
 		ps.verifier.On("VerifyQC", ps.voters, ps.block.QC.SigData, ps.parent.View, ps.parent.BlockID).Return(
 			fmt.Errorf("invalid qc: %w", model.ErrInvalidSignature))
@@ -183,7 +183,7 @@ func (ps *ProposalSuite) TestProposalQCInvalid() {
 		assert.True(ps.T(), model.IsInvalidBlockError(err), "if the block's QC signature is invalid, an ErrorInvalidBlock error should be raised")
 	})
 
-	ps.Run("invalid format", func() {
+	ps.Run("invalid-format", func() {
 		*ps.verifier = mocks.Verifier{}
 		ps.verifier.On("VerifyQC", ps.voters, ps.block.QC.SigData, ps.parent.View, ps.parent.BlockID).Return(model.NewInvalidFormatErrorf("invalid qc"))
 		ps.verifier.On("VerifyVote", ps.voter, ps.vote.SigData, ps.block.View, ps.block.BlockID).Return(nil)
@@ -198,7 +198,7 @@ func (ps *ProposalSuite) TestProposalQCInvalid() {
 	// the random beacon committee. Consequently, `InvalidSignerError` should not occur atm.
 	// TODO: if the random beacon committee is a strict subset of the HotStuff committee,
 	//       we expect `model.InvalidSignerError` here during normal operations.
-	ps.Run("invalid signer", func() {
+	ps.Run("invalid-signer", func() {
 		*ps.verifier = mocks.Verifier{}
 		ps.verifier.On("VerifyQC", ps.voters, ps.block.QC.SigData, ps.parent.View, ps.parent.BlockID).Return(
 			fmt.Errorf("invalid qc: %w", model.NewInvalidSignerErrorf("")))
@@ -210,7 +210,7 @@ func (ps *ProposalSuite) TestProposalQCInvalid() {
 		assert.False(ps.T(), model.IsInvalidBlockError(err))
 	})
 
-	ps.Run("unknown exception", func() {
+	ps.Run("unknown-exception", func() {
 		exception := errors.New("exception")
 		*ps.verifier = mocks.Verifier{}
 		ps.verifier.On("VerifyQC", ps.voters, ps.block.QC.SigData, ps.parent.View, ps.parent.BlockID).Return(exception)
@@ -219,6 +219,18 @@ func (ps *ProposalSuite) TestProposalQCInvalid() {
 		// check that validation fails and the failure case is recognized as an invalid block
 		err := ps.validator.ValidateProposal(ps.proposal)
 		assert.ErrorIs(ps.T(), err, exception)
+		assert.False(ps.T(), model.IsInvalidBlockError(err))
+	})
+
+	ps.Run("verify-qc-err-view-for-unknown-epoch", func() {
+		*ps.verifier = mocks.Verifier{}
+		ps.verifier.On("VerifyQC", ps.voters, ps.block.QC.SigData, ps.parent.View, ps.parent.BlockID).Return(model.ErrViewForUnknownEpoch)
+		ps.verifier.On("VerifyVote", ps.voter, ps.vote.SigData, ps.block.View, ps.block.BlockID).Return(nil)
+
+		// check that validation fails and the failure is considered internal exception and NOT an InvalidBlock error
+		err := ps.validator.ValidateProposal(ps.proposal)
+		assert.Error(ps.T(), err)
+		assert.NotErrorIs(ps.T(), err, model.ErrViewForUnknownEpoch)
 		assert.False(ps.T(), model.IsInvalidBlockError(err))
 	})
 }
@@ -256,10 +268,10 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 			helper.WithLastViewTC(helper.MakeTC(
 				helper.WithTCSigners(ps.indices),
 				helper.WithTCView(ps.block.View+1),
-				helper.WithTCHighestQC(ps.block.QC))),
+				helper.WithTCNewestQC(ps.block.QC))),
 		)
 		ps.verifier.On("VerifyTC", ps.voters, []byte(proposal.LastViewTC.SigData),
-			proposal.LastViewTC.View, proposal.LastViewTC.TOHighQCViews).Return(nil).Once()
+			proposal.LastViewTC.View, proposal.LastViewTC.NewestQCViews).Return(nil).Once()
 		err := ps.validator.ValidateProposal(proposal)
 		require.NoError(ps.T(), err)
 	})
@@ -289,7 +301,7 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 			helper.WithLastViewTC(helper.MakeTC(
 				helper.WithTCSigners(ps.indices),
 				helper.WithTCView(ps.block.View+10), // LastViewTC.View must be equal to Block.View-1
-				helper.WithTCHighestQC(ps.block.QC))),
+				helper.WithTCNewestQC(ps.block.QC))),
 		)
 		err := ps.validator.ValidateProposal(proposal)
 		require.True(ps.T(), model.IsInvalidBlockError(err))
@@ -308,7 +320,7 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 				helper.WithTCSigners(ps.indices),
 				helper.WithTCView(ps.block.View+1),
 				// proposal is not safe to extend because included QC.View is higher that Block.QC.View
-				helper.WithTCHighestQC(helper.MakeQC(helper.WithQCView(ps.block.View+1))))),
+				helper.WithTCNewestQC(helper.MakeQC(helper.WithQCView(ps.block.View+1))))),
 		)
 		err := ps.validator.ValidateProposal(proposal)
 		require.True(ps.T(), model.IsInvalidBlockError(err))
@@ -326,11 +338,14 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 			helper.WithLastViewTC(helper.MakeTC(
 				helper.WithTCSigners(ps.indices),
 				helper.WithTCView(ps.block.View+1),
-				helper.WithTCHighestQC(ps.block.QC),
+				helper.WithTCNewestQC(ps.block.QC),
 			)),
 		)
-		// this is considered an invalid TC, because highest QC's view is not equal to max{TOHighQCViews}
-		proposal.LastViewTC.TOHighQCViews[0] = proposal.LastViewTC.TOHighestQC.View + 1
+		ps.verifier.On("VerifyTC", ps.voters, []byte(proposal.LastViewTC.SigData),
+			proposal.LastViewTC.View, mock.Anything).Return(nil).Once()
+
+		// this is considered an invalid TC, because highest QC's view is not equal to max{NewestQCViews}
+		proposal.LastViewTC.NewestQCViews[0] = proposal.LastViewTC.NewestQC.View + 1
 		err := ps.validator.ValidateProposal(proposal)
 		require.True(ps.T(), model.IsInvalidBlockError(err) && model.IsInvalidTCError(err))
 		ps.verifier.AssertNotCalled(ps.T(), "VerifyTC")
@@ -349,7 +364,7 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 			helper.WithLastViewTC(helper.MakeTC(
 				helper.WithTCSigners(insufficientSignerIndices), // one signer is not enough to reach threshold
 				helper.WithTCView(ps.block.View+1),
-				helper.WithTCHighestQC(ps.block.QC),
+				helper.WithTCNewestQC(ps.block.QC),
 			)),
 		)
 		err = ps.validator.ValidateProposal(proposal)
@@ -372,13 +387,42 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 			helper.WithLastViewTC(helper.MakeTC(
 				helper.WithTCSigners(ps.indices),
 				helper.WithTCView(ps.block.View+1),
-				helper.WithTCHighestQC(qc))),
+				helper.WithTCNewestQC(qc))),
 		)
+		ps.verifier.On("VerifyTC", ps.voters, []byte(proposal.LastViewTC.SigData),
+			proposal.LastViewTC.View, proposal.LastViewTC.NewestQCViews).Return(nil).Once()
 		ps.verifier.On("VerifyQC", ps.voters, qc.SigData,
 			qc.View, qc.BlockID).Return(model.ErrInvalidSignature).Once()
 		err := ps.validator.ValidateProposal(proposal)
 		require.True(ps.T(), model.IsInvalidBlockError(err) && model.IsInvalidTCError(err))
-		ps.verifier.AssertNotCalled(ps.T(), "VerifyTC")
+	})
+	ps.Run("verify-qc-err-view-for-unknown-epoch", func() {
+		newestQC := helper.MakeQC(
+			helper.WithQCView(ps.block.QC.View-2),
+			helper.WithQCSigners(ps.indices))
+
+		proposal := helper.MakeProposal(
+			helper.WithBlock(helper.MakeBlock(
+				helper.WithBlockView(ps.block.View+2),
+				helper.WithBlockProposer(ps.leader.NodeID),
+				helper.WithParentSigners(ps.indices),
+				helper.WithBlockQC(ps.block.QC)),
+			),
+			helper.WithLastViewTC(helper.MakeTC(
+				helper.WithTCSigners(ps.indices),
+				helper.WithTCView(ps.block.View+1),
+				helper.WithTCNewestQC(newestQC))),
+		)
+		ps.verifier.On("VerifyTC", ps.voters, []byte(proposal.LastViewTC.SigData),
+			proposal.LastViewTC.View, proposal.LastViewTC.NewestQCViews).Return(nil).Once()
+		// Validating QC included in TC returns ErrViewForUnknownEpoch
+		ps.verifier.On("VerifyQC", ps.voters, newestQC.SigData,
+			newestQC.View, newestQC.BlockID).Return(model.ErrViewForUnknownEpoch).Once()
+		err := ps.validator.ValidateProposal(proposal)
+		require.Error(ps.T(), err)
+		require.False(ps.T(), model.IsInvalidBlockError(err))
+		require.False(ps.T(), model.IsInvalidTCError(err))
+		require.NotErrorIs(ps.T(), err, model.ErrViewForUnknownEpoch)
 	})
 	ps.Run("included-tc-invalid-sig", func() {
 		proposal := helper.MakeProposal(
@@ -391,14 +435,14 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 			helper.WithLastViewTC(helper.MakeTC(
 				helper.WithTCSigners(ps.indices),
 				helper.WithTCView(ps.block.View+1),
-				helper.WithTCHighestQC(ps.block.QC))),
+				helper.WithTCNewestQC(ps.block.QC))),
 		)
 		ps.verifier.On("VerifyTC", ps.voters, []byte(proposal.LastViewTC.SigData),
-			proposal.LastViewTC.View, proposal.LastViewTC.TOHighQCViews).Return(model.ErrInvalidSignature).Once()
+			proposal.LastViewTC.View, proposal.LastViewTC.NewestQCViews).Return(model.ErrInvalidSignature).Once()
 		err := ps.validator.ValidateProposal(proposal)
 		require.True(ps.T(), model.IsInvalidBlockError(err) && model.IsInvalidTCError(err))
 		ps.verifier.AssertCalled(ps.T(), "VerifyTC", ps.voters, []byte(proposal.LastViewTC.SigData),
-			proposal.LastViewTC.View, proposal.LastViewTC.TOHighQCViews)
+			proposal.LastViewTC.View, proposal.LastViewTC.NewestQCViews)
 	})
 	ps.Run("last-view-successful-but-includes-tc", func() {
 		proposal := helper.MakeProposal(
@@ -413,8 +457,8 @@ func (ps *ProposalSuite) TestProposalWithLastViewTC() {
 		err := ps.validator.ValidateProposal(proposal)
 		require.True(ps.T(), model.IsInvalidBlockError(err))
 		ps.verifier.AssertNotCalled(ps.T(), "VerifyTC")
-		ps.verifier.AssertExpectations(ps.T())
 	})
+	ps.verifier.AssertExpectations(ps.T())
 }
 
 func TestValidateVote(t *testing.T) {
@@ -475,6 +519,19 @@ func (vs *VoteSuite) TestVoteSignatureError() {
 	_, err := vs.validator.ValidateVote(vs.vote)
 	assert.Error(vs.T(), err, "a vote with error on signature validation should be rejected")
 	assert.False(vs.T(), model.IsInvalidVoteError(err), "internal exception should not be interpreted as invalid vote")
+}
+
+// TestVoteVerifyVote_ErrViewForUnknownEpoch tests if ValidateVote correctly handles VerifyVote's ErrViewForUnknownEpoch sentinel error
+// Validator shouldn't return a sentinel error here because this behavior is a symptom of internal bug, this behavior is not expected.
+func (vs *VoteSuite) TestVoteVerifyVote_ErrViewForUnknownEpoch() {
+	*vs.verifier = mocks.Verifier{}
+	vs.verifier.On("VerifyVote", vs.signer, vs.vote.SigData, vs.block.View, vs.block.BlockID).Return(model.ErrViewForUnknownEpoch)
+
+	// check that the vote is no longer validated
+	_, err := vs.validator.ValidateVote(vs.vote)
+	assert.Error(vs.T(), err)
+	assert.False(vs.T(), model.IsInvalidVoteError(err), "internal exception should not be interpreted as invalid vote")
+	assert.NotErrorIs(vs.T(), err, model.ErrViewForUnknownEpoch, "we don't expect a sentinel error here")
 }
 
 // TestVoteInvalidSignerID checks that the Validator correctly handles a vote
@@ -625,6 +682,17 @@ func (qs *QCSuite) TestQCSignatureInvalid() {
 	assert.True(qs.T(), model.IsInvalidQCError(err), "if the signature is invalid an ErrorInvalidQC error should be raised")
 }
 
+// TestQCVerifyQC_ErrViewForUnknownEpoch tests if ValidateQC correctly handles VerifyQC's ErrViewForUnknownEpoch sentinel error
+// Validator shouldn't return a sentinel error here because this behavior is a symptom of internal bug, this behavior is not expected.
+func (qs *QCSuite) TestQCVerifyQC_ErrViewForUnknownEpoch() {
+	*qs.verifier = mocks.Verifier{}
+	qs.verifier.On("VerifyQC", qs.signers, qs.qc.SigData, qs.qc.View, qs.qc.BlockID).Return(model.ErrViewForUnknownEpoch)
+	err := qs.validator.ValidateQC(qs.qc)
+	assert.Error(qs.T(), err)
+	assert.False(qs.T(), model.IsInvalidQCError(err), "we don't expect a sentinel error here")
+	assert.NotErrorIs(qs.T(), err, model.ErrViewForUnknownEpoch, "we don't expect a sentinel error here")
+}
+
 // TestQCSignatureInvalidFormat verifies that the Validator correctly handles the model.InvalidFormatError.
 // This error return from `Verifier.VerifyQC` is an expected failure case in case of a byzantine input, where
 // some binary vector (e.g. `sigData`) is broken. Hence, the Validator should wrap it as InvalidBlockError.
@@ -702,7 +770,7 @@ func (s *TCSuite) SetupTest() {
 	s.block = helper.MakeBlock(helper.WithBlockView(view),
 		helper.WithParentBlock(parent),
 		helper.WithParentSigners(s.indices))
-	s.tc = helper.MakeTC(helper.WithTCHighestQC(s.block.QC),
+	s.tc = helper.MakeTC(helper.WithTCNewestQC(s.block.QC),
 		helper.WithTCView(view+1),
 		helper.WithTCSigners(s.indices),
 		helper.WithTCHighQCViews(highQCViews))
@@ -726,27 +794,30 @@ func (s *TCSuite) SetupTest() {
 
 // TestTCOk tests if happy-path returns correct result
 func (s *TCSuite) TestTCOk() {
-	s.verifier.On("VerifyTC", s.signers, []byte(s.tc.SigData), s.tc.View, s.tc.TOHighQCViews).Return(nil).Once()
+	s.verifier.On("VerifyTC", s.signers, []byte(s.tc.SigData), s.tc.View, s.tc.NewestQCViews).Return(nil).Once()
 
 	// check the default happy case passes
 	err := s.validator.ValidateTC(s.tc)
 	assert.NoError(s.T(), err, "a valid TC should be accepted")
 }
 
-// TestTCHighestQCFromFuture tests if correct error is returned when included QC is higher than TC's view
-func (s *TCSuite) TestTCHighestQCFromFuture() {
+// TestTCNewestQCFromFuture tests if correct error is returned when included QC is higher than TC's view
+func (s *TCSuite) TestTCNewestQCFromFuture() {
 	// highest QC from future view
-	s.tc.TOHighestQC.View = s.tc.View + 1
+	s.tc.NewestQC.View = s.tc.View + 1
 	err := s.validator.ValidateTC(s.tc) // the QC should not be validated anymore
-	assert.True(s.T(), model.IsInvalidTCError(err), "if TOHighestQC.View > TC.View, an ErrorInvalidTC error should be raised")
+	assert.True(s.T(), model.IsInvalidTCError(err), "if NewestQC.View > TC.View, an ErrorInvalidTC error should be raised")
 }
 
-// TestTCHighestQCIsNotHighest tests if correct error is returned when included QC is not highest
-func (s *TCSuite) TestTCHighestQCIsNotHighest() {
-	// highest QC view is not equal to max(TOHighestQCViews)
-	s.tc.TOHighQCViews[0] = s.tc.TOHighestQC.View + 1
+// TestTCNewestQCIsNotHighest tests if correct error is returned when included QC is not highest
+func (s *TCSuite) TestTCNewestQCIsNotHighest() {
+	s.verifier.On("VerifyTC", s.signers, []byte(s.tc.SigData),
+		s.tc.View, s.tc.NewestQCViews).Return(nil).Once()
+
+	// highest QC view is not equal to max(TONewestQCViews)
+	s.tc.NewestQCViews[0] = s.tc.NewestQC.View + 1
 	err := s.validator.ValidateTC(s.tc) // the QC should not be validated anymore
-	assert.True(s.T(), model.IsInvalidTCError(err), "if max(highQCViews) != TOHighestQC.View, an ErrorInvalidTC error should be raised")
+	assert.True(s.T(), model.IsInvalidTCError(err), "if max(highQCViews) != NewestQC.View, an ErrorInvalidTC error should be raised")
 }
 
 // TestTCInvalidSigners tests if correct error is returned when signers are invalid
@@ -770,12 +841,25 @@ func (s *TCSuite) TestTCThresholdNotReached() {
 	assert.True(s.T(), model.IsInvalidTCError(err), "if signers don't have enough weight, an ErrorInvalidTC error should be raised")
 }
 
-// TestTCInvalidHighestQC tests if correct error is returned when included highest QC is invalid
-func (s *TCSuite) TestTCInvalidHighestQC() {
+// TestTCInvalidNewestQC tests if correct error is returned when included highest QC is invalid
+func (s *TCSuite) TestTCInvalidNewestQC() {
 	*s.verifier = mocks.Verifier{}
-	s.verifier.On("VerifyQC", s.signers, s.tc.TOHighestQC.SigData, s.tc.TOHighestQC.View, s.tc.TOHighestQC.BlockID).Return(model.NewInvalidFormatErrorf("invalid qc")).Once()
+	s.verifier.On("VerifyTC", s.signers, []byte(s.tc.SigData), s.tc.View, s.tc.NewestQCViews).Return(nil).Once()
+	s.verifier.On("VerifyQC", s.signers, s.tc.NewestQC.SigData, s.tc.NewestQC.View, s.tc.NewestQC.BlockID).Return(model.NewInvalidFormatErrorf("invalid qc")).Once()
 	err := s.validator.ValidateTC(s.tc) // the QC should not be validated anymore
 	assert.True(s.T(), model.IsInvalidTCError(err), "if included QC is invalid, an ErrorInvalidTC error should be raised")
+}
+
+// TestTCVerifyQC_ErrViewForUnknownEpoch tests if ValidateTC correctly handles VerifyQC's ErrViewForUnknownEpoch sentinel error
+// Validator shouldn't return a sentinel error here because this behavior is a symptom of internal bug, this behavior is not expected.
+func (s *TCSuite) TestTCVerifyQC_ErrViewForUnknownEpoch() {
+	*s.verifier = mocks.Verifier{}
+	s.verifier.On("VerifyTC", s.signers, []byte(s.tc.SigData), s.tc.View, s.tc.NewestQCViews).Return(nil).Once()
+	s.verifier.On("VerifyQC", s.signers, s.tc.NewestQC.SigData, s.tc.NewestQC.View, s.tc.NewestQC.BlockID).Return(model.ErrViewForUnknownEpoch).Once()
+	err := s.validator.ValidateTC(s.tc) // the QC should not be validated anymore
+	assert.Error(s.T(), err)
+	assert.False(s.T(), model.IsInvalidTCError(err), "we don't expect a sentinel error here")
+	assert.NotErrorIs(s.T(), err, model.ErrViewForUnknownEpoch, "we don't expect a sentinel error here")
 }
 
 // TestTCInvalidSignature tests a few scenarios when the signature is invalid or TC signers is malformed
@@ -783,7 +867,7 @@ func (s *TCSuite) TestTCInvalidSignature() {
 	s.Run("insufficient-signatures", func() {
 		*s.verifier = mocks.Verifier{}
 		s.verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-		s.verifier.On("VerifyTC", mock.Anything, []byte(s.tc.SigData), s.tc.View, s.tc.TOHighQCViews).Return(model.NewInsufficientSignaturesErrorf("")).Once()
+		s.verifier.On("VerifyTC", mock.Anything, []byte(s.tc.SigData), s.tc.View, s.tc.NewestQCViews).Return(model.NewInsufficientSignaturesErrorf("")).Once()
 
 		// the Validator should _not_ interpret this as an invalid TC, but as an internal error
 		err := s.validator.ValidateTC(s.tc)
@@ -793,14 +877,14 @@ func (s *TCSuite) TestTCInvalidSignature() {
 	s.Run("invalid-format", func() {
 		*s.verifier = mocks.Verifier{}
 		s.verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-		s.verifier.On("VerifyTC", s.signers, []byte(s.tc.SigData), s.tc.View, s.tc.TOHighQCViews).Return(model.NewInvalidFormatErrorf("")).Once()
+		s.verifier.On("VerifyTC", s.signers, []byte(s.tc.SigData), s.tc.View, s.tc.NewestQCViews).Return(model.NewInvalidFormatErrorf("")).Once()
 		err := s.validator.ValidateTC(s.tc)
 		assert.True(s.T(), model.IsInvalidTCError(err), "if included TC's inputs are invalid, an ErrorInvalidTC error should be raised")
 	})
 	s.Run("invalid-signature", func() {
 		*s.verifier = mocks.Verifier{}
 		s.verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-		s.verifier.On("VerifyTC", s.signers, []byte(s.tc.SigData), s.tc.View, s.tc.TOHighQCViews).Return(model.ErrInvalidSignature).Once()
+		s.verifier.On("VerifyTC", s.signers, []byte(s.tc.SigData), s.tc.View, s.tc.NewestQCViews).Return(model.ErrInvalidSignature).Once()
 		err := s.validator.ValidateTC(s.tc)
 		assert.True(s.T(), model.IsInvalidTCError(err), "if included TC's signature is invalid, an ErrorInvalidTC error should be raised")
 	})
@@ -808,7 +892,7 @@ func (s *TCSuite) TestTCInvalidSignature() {
 		exception := errors.New("verify-sig-exception")
 		*s.verifier = mocks.Verifier{}
 		s.verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-		s.verifier.On("VerifyTC", s.signers, []byte(s.tc.SigData), s.tc.View, s.tc.TOHighQCViews).Return(exception).Once()
+		s.verifier.On("VerifyTC", s.signers, []byte(s.tc.SigData), s.tc.View, s.tc.NewestQCViews).Return(exception).Once()
 		err := s.validator.ValidateTC(s.tc)
 		assert.ErrorAs(s.T(), err, &exception, "if included TC's signature is invalid, an exception should be propagated")
 		assert.False(s.T(), model.IsInvalidTCError(err))

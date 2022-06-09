@@ -354,7 +354,7 @@ func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstateim
 	db, err := node.DB()
 	require.Nil(suite.T(), err, "could not get node db")
 
-	clusterStateRoot, err := clusterstateimpl.NewStateRoot(rootBlock)
+	clusterStateRoot, err := clusterstateimpl.NewStateRoot(rootBlock, unittest.QuorumCertificateFixture())
 	suite.NoError(err)
 	clusterState, err := clusterstateimpl.OpenState(db, nil, nil, nil, clusterStateRoot.ClusterID())
 	require.NoError(suite.T(), err, "could not get cluster state")

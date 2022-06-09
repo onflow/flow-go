@@ -15,13 +15,13 @@ type SafetyRules struct {
 	mock.Mock
 }
 
-// ProduceTimeout provides a mock function with given fields: curView, highestQC, highestTC
-func (_m *SafetyRules) ProduceTimeout(curView uint64, highestQC *flow.QuorumCertificate, highestTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
-	ret := _m.Called(curView, highestQC, highestTC)
+// ProduceTimeout provides a mock function with given fields: curView, newestQC, lastViewTC
+func (_m *SafetyRules) ProduceTimeout(curView uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
+	ret := _m.Called(curView, newestQC, lastViewTC)
 
 	var r0 *model.TimeoutObject
 	if rf, ok := ret.Get(0).(func(uint64, *flow.QuorumCertificate, *flow.TimeoutCertificate) *model.TimeoutObject); ok {
-		r0 = rf(curView, highestQC, highestTC)
+		r0 = rf(curView, newestQC, lastViewTC)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*model.TimeoutObject)
@@ -30,7 +30,7 @@ func (_m *SafetyRules) ProduceTimeout(curView uint64, highestQC *flow.QuorumCert
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(uint64, *flow.QuorumCertificate, *flow.TimeoutCertificate) error); ok {
-		r1 = rf(curView, highestQC, highestTC)
+		r1 = rf(curView, newestQC, lastViewTC)
 	} else {
 		r1 = ret.Error(1)
 	}

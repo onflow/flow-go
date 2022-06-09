@@ -49,6 +49,7 @@ func NewCombinedVerifierV3(committee hotstuff.Replicas, packer hotstuff.Packer) 
 // * model.InvalidFormatError if the signature has an incompatible format.
 // * model.ErrInvalidSignature is the signature is invalid
 // * model.InvalidSignerError if signer is _not_ part of the random beacon committee
+// * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
 // * unexpected errors should be treated as symptoms of bugs or uncovered
 //   edge cases in the logic (i.e. as fatal)
 // This implementation already support the cases, where the DKG committee is a
@@ -116,6 +117,7 @@ func (c *CombinedVerifierV3) VerifyVote(signer *flow.Identity, sigData []byte, v
 //  * model.InvalidFormatError if `sigData` has an incompatible format
 //  * model.ErrInvalidSignature if a signature is invalid
 //  * model.InvalidSignerError if a signer is _not_ part of the random beacon committee
+//  * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
 //  * error if running into any unexpected exception (i.e. fatal error)
 // This implementation already support the cases, where the DKG committee is a
 // _strict subset_ of the full consensus committee.

@@ -37,15 +37,15 @@ func (m TimeoutMode) String() string {
 type TimeoutObject struct {
 	// View is the view number which is replica is timing out
 	View uint64
-	// HighestQC is the highest QC known to the creator of this TimeoutObject
-	HighestQC *flow.QuorumCertificate
-	// LastViewTC is the timeout certificate for previous view if HighestQC.View != View - 1, else nil
+	// NewestQC is the newest QC (by view) known to the creator of this TimeoutObject
+	NewestQC *flow.QuorumCertificate
+	// LastViewTC is the timeout certificate for previous view if NewestQC.View != View - 1, else nil
 	LastViewTC *flow.TimeoutCertificate
 	// SignerID is the identifier of replica that has signed this TimeoutObject
 	// SignerID must be the origin ID from networking layer, which cryptographically
 	//  authenticates the message's sender.
 	SignerID flow.Identifier
-	// SigData is a BLS signature created by staking key signing View + HighestQC.View
+	// SigData is a BLS signature created by staking key signing View + NewestQC.View
 	// This signature is further aggregated in TimeoutCertificate.
 	SigData crypto.Signature
 }
@@ -56,5 +56,5 @@ func (t *TimeoutObject) ID() flow.Identifier {
 }
 
 func (t *TimeoutObject) String() string {
-	return fmt.Sprintf("View: %d, HighestQC.View: %d, LastViewTC: %v", t.View, t.HighestQC.View, t.LastViewTC)
+	return fmt.Sprintf("View: %d, HighestQC.View: %d, LastViewTC: %v", t.View, t.NewestQC.View, t.LastViewTC)
 }

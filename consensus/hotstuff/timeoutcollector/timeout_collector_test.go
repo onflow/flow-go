@@ -112,7 +112,7 @@ func (s *TimeoutCollectorTestSuite) TestAddTimeout_TimeoutCacheException() {
 	// incompatible view is an exception and not handled by timeout collector
 	timeout := helper.TimeoutObjectFixture(helper.WithTimeoutObjectView(s.view + 1))
 	err := s.collector.AddTimeout(timeout)
-	require.ErrorAs(s.T(), err, &ErrTimeoutForIncompatibleView)
+	require.ErrorIs(s.T(), err, ErrTimeoutForIncompatibleView)
 	s.processor.AssertNotCalled(s.T(), "Process")
 }
 
@@ -131,7 +131,7 @@ func (s *TimeoutCollectorTestSuite) TestAddTimeout_InvalidTimeout() {
 		timeout := helper.TimeoutObjectFixture(helper.WithTimeoutObjectView(s.view))
 		s.processor.On("Process", timeout).Return(exception).Once()
 		err := s.collector.AddTimeout(timeout)
-		require.ErrorAs(s.T(), err, &exception)
+		require.ErrorIs(s.T(), err, exception)
 	})
 }
 
@@ -161,14 +161,14 @@ func (s *TimeoutCollectorTestSuite) TestAddTimeout_TONotifications() {
 		qc := helper.MakeQC(helper.WithQCView(uint64(i)))
 		timeout := helper.TimeoutObjectFixture(func(timeout *model.TimeoutObject) {
 			timeout.View = s.view
-			timeout.HighestQC = qc
+			timeout.NewestQC = qc
 			timeout.LastViewTC = lastViewTC
 		})
 		timeouts = append(timeouts, timeout)
 		s.processor.On("Process", timeout).Return(nil).Once()
 	}
 
-	expectedHighestQC := timeouts[len(timeouts)-1].HighestQC
+	expectedHighestQC := timeouts[len(timeouts)-1].NewestQC
 
 	// shuffle timeouts in random order
 	rand.Seed(time.Now().UnixNano())
