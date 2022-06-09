@@ -1067,8 +1067,14 @@ var (
 		flow.MustHexStringToIdentifier("4d580e5547b5a5c86cc201e54a656fd49db50ea399d093ae1f60567b680cefec"): {
 			eventIndex: 2,
 			txIndex:    18,
-			// {"type":"Event","value":{"id":"A.912d5440f7e3769e.FlowFees.FeesDeducted","fields":[{"name":"amount","value":{"type":"UFix64","value":"0.00010000"}},{"name":"inclusionEffort","value":{"type":"UFix64","value":"1.00000000"}},{"name":"executionEffort","value":{"type":"UFix64","value":"0.00000000"}}]}}
+			// {"type":"Event","value":{"id":"A.912d5440f7e3769e.FlowFees.FeesDeducted","fields":[{"name":"amount","value":{"type":"UFix64","value":"0.00010000"}},{"name":"inclusionEffort","value":{"type":"UFix64","value":"1.00000000"}},{"name":"executionEffort","value":{"type":"UFix64","value":"0.00000055"}}]}}
 			payload: mustDecodeBase64("eyJ0eXBlIjoiRXZlbnQiLCJ2YWx1ZSI6eyJpZCI6IkEuOTEyZDU0NDBmN2UzNzY5ZS5GbG93RmVlcy5GZWVzRGVkdWN0ZWQiLCJmaWVsZHMiOlt7Im5hbWUiOiJhbW91bnQiLCJ2YWx1ZSI6eyJ0eXBlIjoiVUZpeDY0IiwidmFsdWUiOiIwLjAwMDEwMDAwIn19LHsibmFtZSI6ImluY2x1c2lvbkVmZm9ydCIsInZhbHVlIjp7InR5cGUiOiJVRml4NjQiLCJ2YWx1ZSI6IjEuMDAwMDAwMDAifX0seyJuYW1lIjoiZXhlY3V0aW9uRWZmb3J0IiwidmFsdWUiOnsidHlwZSI6IlVGaXg2NCIsInZhbHVlIjoiMC4wMDAwMDA1NSJ9fV19fQo="),
+		},
+		flow.MustHexStringToIdentifier("6991856b98cc14ecabe9e06c8ca7d3980cf211950c6556cb070a9d674c61a9f9"): {
+			eventIndex: 2,
+			txIndex:    27,
+			// {"type":"Event","value":{"id":"A.912d5440f7e3769e.FlowFees.FeesDeducted","fields":[{"name":"amount","value":{"type":"UFix64","value":"0.00010000"}},{"name":"inclusionEffort","value":{"type":"UFix64","value":"1.00000000"}},{"name":"executionEffort","value":{"type":"UFix64","value":"0.00000000"}}]}}
+			payload: mustDecodeBase64("eyJ0eXBlIjoiRXZlbnQiLCJ2YWx1ZSI6eyJpZCI6IkEuOTEyZDU0NDBmN2UzNzY5ZS5GbG93RmVlcy5GZWVzRGVkdWN0ZWQiLCJmaWVsZHMiOlt7Im5hbWUiOiJhbW91bnQiLCJ2YWx1ZSI6eyJ0eXBlIjoiVUZpeDY0IiwidmFsdWUiOiIwLjAwMDEwMDAwIn19LHsibmFtZSI6ImluY2x1c2lvbkVmZm9ydCIsInZhbHVlIjp7InR5cGUiOiJVRml4NjQiLCJ2YWx1ZSI6IjEuMDAwMDAwMDAifX0seyJuYW1lIjoiZXhlY3V0aW9uRWZmb3J0IiwidmFsdWUiOnsidHlwZSI6IlVGaXg2NCIsInZhbHVlIjoiMC4wMDAwMDAwMCJ9fV19fQo="),
 		},
 	}
 )
