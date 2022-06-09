@@ -344,7 +344,10 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 							Hex("address", accountAddress.Bytes()).
 							Msg("new account created")
 
-						signer := crypto.NewInMemorySigner(privKey, accountKey.HashAlgo)
+						signer, err := crypto.NewInMemorySigner(privKey, accountKey.HashAlgo)
+						if err != nil {
+							panic(err)
+						}
 
 						newAcc := newFlowAccount(i, &accountAddress, accountKey, signer)
 						i++
