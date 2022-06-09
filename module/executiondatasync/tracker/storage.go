@@ -90,9 +90,20 @@ type PruneCallback func(cid.Cid) error
 
 type Storage interface {
 	Update(UpdateFn) error
+
 	GetFulfilledHeight() (uint64, error)
+
+	// SetFulfilledHeight updates the fulfilled height value.
+	// It is up to the caller to ensure that this is never
+	// called with a value lower than the pruned height.
 	SetFulfilledHeight(height uint64) error
+
 	GetPrunedHeight() (uint64, error)
+
+	// Prune will remove all data from storage corresponding
+	// to block heights up to and including the given height.
+	// It is up to the caller to ensure that this is never
+	// called with a value higher than the fulfilled height.
 	Prune(height uint64) error
 }
 
