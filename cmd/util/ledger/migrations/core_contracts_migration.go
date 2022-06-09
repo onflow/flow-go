@@ -259,6 +259,20 @@ func (m *CoreContractsMigration) Migrate(payloads []ledger.Payload) ([]ledger.Pa
 		m.Updates[location] = struct{}{}
 	}
 
+	// Validate all contracts were updated
+
+	for address, addressCodes := range codes {
+		for contractName := range addressCodes {
+			location := ContractLocation{
+				address:      address,
+				contractName: contractName,
+			}
+			if _, ok := m.Updates[location]; !ok {
+				m.Log.Warn().Msgf("Core Contract was not found and not updated: %s.%s", address, contractName)
+			}
+		}
+	}
+
 	m.Log.Info().Msg("Core Contracts update complete.")
 
 	return payloads, nil
