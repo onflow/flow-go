@@ -14,21 +14,18 @@ import (
 // This module is safe to use in concurrent environment.
 type TimeoutCollector struct {
 	notifier      hotstuff.Consumer
-	timeoutsCache *TimeoutObjectsCache // to track double timeout and timeout equivocation
+	timeoutsCache *TimeoutObjectsCache // cache for tracking double timeout and timeout equivocation
 	processor     hotstuff.TimeoutProcessor
 
-	// a callback that will be used to notify PaceMaker
-	// about timeout for higher view that we are aware of
-	onNewQCDiscovered hotstuff.OnNewQCDiscovered
-	onNewTCDiscovered hotstuff.OnNewTCDiscovered
-	// highest QC that was reported
-	highestReportedQC counters.StrictMonotonousCounter
-	// highest TC that was reported
-	highestReportedTC counters.StrictMonotonousCounter
+	onNewQCDiscovered hotstuff.OnNewQCDiscovered       // a callback that will be used to notify PaceMaker about new validated QC discovered
+	onNewTCDiscovered hotstuff.OnNewTCDiscovered       // a callback that will be used to notify PaceMaker about new validated TC discovered
+	newestReportedQC  counters.StrictMonotonousCounter // newest QC that was reported
+	newestReportedTC  counters.StrictMonotonousCounter // newest TC that was reported
 }
 
 var _ hotstuff.TimeoutCollector = (*TimeoutCollector)(nil)
 
+// NewTimeoutCollector creates new instance of TimeoutCollector
 func NewTimeoutCollector(view uint64,
 	notifier hotstuff.Consumer,
 	processor hotstuff.TimeoutProcessor,
@@ -41,15 +38,15 @@ func NewTimeoutCollector(view uint64,
 		processor:         processor,
 		onNewQCDiscovered: onNewQCDiscovered,
 		onNewTCDiscovered: onNewTCDiscovered,
-		highestReportedQC: counters.NewMonotonousCounter(0),
-		highestReportedTC: counters.NewMonotonousCounter(0),
+		newestReportedQC:  counters.NewMonotonousCounter(0),
+		newestReportedTC:  counters.NewMonotonousCounter(0),
 	}
 }
 
 // AddTimeout adds a timeout object to the collector
 // When f+1 TOs will be collected then callback for partial TC will be triggered,
 // after collecting 2f+1 TOs a TC will be created and passed to the EventLoop.
-// All errors propagated to caller are exceptions.
+// No errors are expected during normal flow of operations.
 func (c *TimeoutCollector) AddTimeout(timeout *model.TimeoutObject) error {
 	// cache timeout
 	err := c.timeoutsCache.AddTimeoutObject(timeout)
@@ -84,11 +81,11 @@ func (c *TimeoutCollector) processTimeout(timeout *model.TimeoutObject) error {
 		return fmt.Errorf("internal error while processing timeout: %w", err)
 	}
 
-	if c.highestReportedQC.Set(timeout.NewestQC.View) {
+	if c.newestReportedQC.Set(timeout.NewestQC.View) {
 		c.onNewQCDiscovered(timeout.NewestQC)
 	}
 
-	if c.highestReportedTC.Set(timeout.LastViewTC.View) {
+	if c.newestReportedTC.Set(timeout.LastViewTC.View) {
 		c.onNewTCDiscovered(timeout.LastViewTC)
 	}
 

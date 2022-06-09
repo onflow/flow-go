@@ -42,7 +42,8 @@ type NewestQCTracker struct {
 	newestQC *flow.QuorumCertificate
 }
 
-// Track updates local state of NewestQC if the provided instance is higher(by view)
+// Track updates local state of NewestQC if the provided instance is newer(by view)
+// Concurrently safe
 func (t *NewestQCTracker) Track(qc *flow.QuorumCertificate) {
 	NewestQC := t.NewestQC()
 	if NewestQC != nil && NewestQC.View >= qc.View {
@@ -56,12 +57,19 @@ func (t *NewestQCTracker) Track(qc *flow.QuorumCertificate) {
 	}
 }
 
+// NewestQC returns the newest QC(by view) tracked.
+// Concurrently safe
 func (t *NewestQCTracker) NewestQC() *flow.QuorumCertificate {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 	return t.newestQC
 }
 
+// TimeoutProcessor implements the hotstuff.TimeoutProcessor interface.
+// It processes timeout objects broadcast by other replicas of consensus committee.
+// TimeoutProcessor collects TOs for one view, eventually when enough timeout objects are contributed
+// TimeoutProcessor will create a timeout certificate which can be used to advance round.
+// Concurrency safe.
 type TimeoutProcessor struct {
 	view               uint64
 	validator          hotstuff.Validator
@@ -76,6 +84,9 @@ type TimeoutProcessor struct {
 
 var _ hotstuff.TimeoutProcessor = (*TimeoutProcessor)(nil)
 
+// NewTimeoutProcessor creates new instance of TimeoutProcessor
+// Returns the following expected errors for invalid inputs:
+//   * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
 func NewTimeoutProcessor(committee hotstuff.Replicas,
 	validator hotstuff.Validator,
 	sigAggregator hotstuff.TimeoutSignatureAggregator,
