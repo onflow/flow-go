@@ -23,7 +23,7 @@ type ContractLocation struct {
 
 type CoreContractsMigration struct {
 	Log       zerolog.Logger
-	Chain     flow.ChainID
+	Chain     flow.Chain
 	OutputDir string
 	Updates   map[ContractLocation]struct{}
 }
@@ -44,8 +44,8 @@ type networkAddresses struct {
 	stakingCollection string
 }
 
-func coreContractAddresses(chain flow.ChainID) networkAddresses {
-	switch chain {
+func coreContractAddresses(chain flow.Chain) networkAddresses {
+	switch chain.ChainID() {
 	case flow.Testnet:
 		return networkAddresses{
 			fungibleToken:     "9a0766d93b6608b7",
