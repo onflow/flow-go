@@ -92,17 +92,6 @@ func isAuthorizedSender(identity *flow.Identity, channel network.Channel, code n
 	if !authorizedRolesByChannel.Contains(identity.Role) {
 		return fmt.Errorf("sender role is not authorized to send this message type on channel")
 	}
-
-	// check if sender is authorized to participate on the channel
-	// get authorized list of roles for channel
-	roles, ok := network.RolesByChannel(channel)
-	if !ok {
-		return fmt.Errorf("could not get authorized roles for channel")
-	}
-
-	if !roles.Contains(identity.Role) {
-		return fmt.Errorf("sender role is not authorized to participate on channel")
-	}
-
+	
 	return nil
 }
