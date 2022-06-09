@@ -17,16 +17,8 @@ type MessageCode struct {
 	// Code is the underlying message code byte
 	Code codec.Code
 
-	// authorizedChannels full list of network.Channel this message is authorized to be sent on including channel aliases
-	authorizedChannels ChannelList
-
 	// authorizedChannelsMap is a mapping of channels to authorized roles allowed to send MessageCode on the channel
 	authorizedChannelsMap map[Channel]flow.RoleList
-}
-
-// IsAuthorizedChannel returns true if channel is in the authorizedChannels list for the message code
-func (mc MessageCode) IsAuthorizedChannel(channel Channel) bool {
-	return mc.authorizedChannels.Contains(channel)
 }
 
 // AuthorizedRolesByChannel returns the list of roles authorized to send this message code on the channel
@@ -39,11 +31,9 @@ var messageCodeMap codeToMessageCodes
 // initializeMessageCodeMap initializes the messageCodeMap
 func initializeMessageCodeMap() {
 	messageCodeMap = make(codeToMessageCodes)
-
 	// consensus
 	messageCodeMap[codec.CodeBlockProposal] = MessageCode{
-		Code:               codec.CodeBlockProposal,
-		authorizedChannels: ChannelList{ConsensusCommittee, PushBlocks, ReceiveBlocks},
+		Code: codec.CodeBlockProposal,
 		authorizedChannelsMap: map[Channel]flow.RoleList{
 			ConsensusCommittee: {flow.RoleConsensus},
 			PushBlocks:         {flow.RoleConsensus}, // channel alias ReceiveBlocks = PushBlocks
@@ -51,8 +41,7 @@ func initializeMessageCodeMap() {
 	}
 
 	messageCodeMap[codec.CodeBlockVote] = MessageCode{
-		Code:               codec.CodeBlockVote,
-		authorizedChannels: ChannelList{ConsensusCommittee},
+		Code: codec.CodeBlockVote,
 		authorizedChannelsMap: map[Channel]flow.RoleList{
 			ConsensusCommittee: {flow.RoleConsensus},
 		},
@@ -60,40 +49,35 @@ func initializeMessageCodeMap() {
 
 	// protocol state sync
 	messageCodeMap[codec.CodeSyncRequest] = MessageCode{
-		Code:               codec.CodeSyncRequest,
-		authorizedChannels: ChannelList{SyncCommittee, SyncClusterPrefix},
+		Code: codec.CodeSyncRequest,
 		authorizedChannelsMap: map[Channel]flow.RoleList{
 			SyncCommittee:     flow.Roles(),
 			SyncClusterPrefix: flow.Roles(),
 		},
 	}
 	messageCodeMap[codec.CodeSyncResponse] = MessageCode{
-		Code:               codec.CodeSyncResponse,
-		authorizedChannels: ChannelList{SyncCommittee, SyncClusterPrefix},
+		Code: codec.CodeSyncResponse,
 		authorizedChannelsMap: map[Channel]flow.RoleList{
 			SyncCommittee:     flow.Roles(),
 			SyncClusterPrefix: flow.Roles(),
 		},
 	}
 	messageCodeMap[codec.CodeRangeRequest] = MessageCode{
-		Code:               codec.CodeRangeRequest,
-		authorizedChannels: ChannelList{SyncCommittee, SyncClusterPrefix},
+		Code: codec.CodeRangeRequest,
 		authorizedChannelsMap: map[Channel]flow.RoleList{
 			SyncCommittee:     flow.Roles(),
 			SyncClusterPrefix: flow.Roles(),
 		},
 	}
 	messageCodeMap[codec.CodeBatchRequest] = MessageCode{
-		Code:               codec.CodeBatchRequest,
-		authorizedChannels: ChannelList{SyncCommittee, SyncClusterPrefix},
+		Code: codec.CodeBatchRequest,
 		authorizedChannelsMap: map[Channel]flow.RoleList{
 			SyncCommittee:     flow.Roles(),
 			SyncClusterPrefix: flow.Roles(),
 		},
 	}
 	messageCodeMap[codec.CodeBlockResponse] = MessageCode{
-		Code:               codec.CodeBlockResponse,
-		authorizedChannels: ChannelList{SyncCommittee, SyncClusterPrefix},
+		Code: codec.CodeBlockResponse,
 		authorizedChannelsMap: map[Channel]flow.RoleList{
 			SyncCommittee:     flow.Roles(),
 			SyncClusterPrefix: flow.Roles(),
@@ -102,22 +86,19 @@ func initializeMessageCodeMap() {
 
 	// cluster consensus
 	messageCodeMap[codec.CodeClusterBlockProposal] = MessageCode{
-		Code:               codec.CodeClusterBlockProposal,
-		authorizedChannels: ChannelList{ConsensusClusterPrefix},
+		Code: codec.CodeClusterBlockProposal,
 		authorizedChannelsMap: map[Channel]flow.RoleList{
 			ConsensusClusterPrefix: {flow.RoleCollection},
 		},
 	}
 	messageCodeMap[codec.CodeClusterBlockVote] = MessageCode{
-		Code:               codec.CodeClusterBlockVote,
-		authorizedChannels: ChannelList{ConsensusClusterPrefix},
+		Code: codec.CodeClusterBlockVote,
 		authorizedChannelsMap: map[Channel]flow.RoleList{
 			ConsensusClusterPrefix: {flow.RoleCollection},
 		},
 	}
 	messageCodeMap[codec.CodeClusterBlockResponse] = MessageCode{
-		Code:               codec.CodeClusterBlockResponse,
-		authorizedChannels: ChannelList{ConsensusClusterPrefix},
+		Code: codec.CodeClusterBlockResponse,
 		authorizedChannelsMap: map[Channel]flow.RoleList{
 			ConsensusClusterPrefix: {flow.RoleCollection},
 		},
@@ -125,22 +106,19 @@ func initializeMessageCodeMap() {
 
 	// collections, guarantees & transactions
 	messageCodeMap[codec.CodeCollectionGuarantee] = MessageCode{
-		Code:               codec.CodeCollectionGuarantee,
-		authorizedChannels: ChannelList{PushGuarantees, ReceiveGuarantees},
+		Code: codec.CodeCollectionGuarantee,
 		authorizedChannelsMap: map[Channel]flow.RoleList{
 			PushGuarantees: {flow.RoleCollection}, // channel alias ReceiveGuarantees = PushGuarantees
 		},
 	}
 	messageCodeMap[codec.CodeTransactionBody] = MessageCode{
-		Code:               codec.CodeTransactionBody,
-		authorizedChannels: ChannelList{PushTransactions, ReceiveTransactions},
+		Code: codec.CodeTransactionBody,
 		authorizedChannelsMap: map[Channel]flow.RoleList{
 			PushTransactions: {flow.RoleCollection}, // channel alias ReceiveTransactions = PushTransactions
 		},
 	}
 	messageCodeMap[codec.CodeTransaction] = MessageCode{
-		Code:               codec.CodeTransaction,
-		authorizedChannels: ChannelList{PushTransactions, ReceiveTransactions},
+		Code: codec.CodeTransaction,
 		authorizedChannelsMap: map[Channel]flow.RoleList{
 			PushTransactions: {flow.RoleCollection}, // channel alias ReceiveTransactions = PushTransactions
 		},
@@ -148,15 +126,13 @@ func initializeMessageCodeMap() {
 
 	// core messages for execution & verification
 	messageCodeMap[codec.CodeExecutionReceipt] = MessageCode{
-		Code:               codec.CodeExecutionReceipt,
-		authorizedChannels: ChannelList{PushReceipts, ReceiveReceipts},
+		Code: codec.CodeExecutionReceipt,
 		authorizedChannelsMap: map[Channel]flow.RoleList{
 			PushReceipts: {flow.RoleExecution}, // channel alias ReceiveReceipts = PushReceipts
 		},
 	}
 	messageCodeMap[codec.CodeResultApproval] = MessageCode{
-		Code:               codec.CodeResultApproval,
-		authorizedChannels: ChannelList{PushApprovals, ReceiveApprovals},
+		Code: codec.CodeResultApproval,
 		authorizedChannelsMap: map[Channel]flow.RoleList{
 			PushApprovals: {flow.RoleVerification}, // channel alias ReceiveApprovals = PushApprovals
 		},
@@ -166,19 +142,16 @@ func initializeMessageCodeMap() {
 	// NOTE: these messages have been deprecated
 	messageCodeMap[codec.CodeExecutionStateSyncRequest] = MessageCode{
 		Code:                  codec.CodeExecutionStateSyncRequest,
-		authorizedChannels:    ChannelList{},
 		authorizedChannelsMap: map[Channel]flow.RoleList{},
 	}
 	messageCodeMap[codec.CodeExecutionStateDelta] = MessageCode{
 		Code:                  codec.CodeExecutionStateDelta,
-		authorizedChannels:    ChannelList{},
 		authorizedChannelsMap: map[Channel]flow.RoleList{},
 	}
 
 	// data exchange for execution of blocks
 	messageCodeMap[codec.CodeChunkDataRequest] = MessageCode{
-		Code:               codec.CodeChunkDataRequest,
-		authorizedChannels: ChannelList{ProvideChunks, RequestChunks, RequestCollections, RequestApprovalsByChunk, RequestReceiptsByBlockID},
+		Code: codec.CodeChunkDataRequest,
 		authorizedChannelsMap: map[Channel]flow.RoleList{
 			ProvideChunks:            {flow.RoleVerification}, // channel alias RequestChunks = ProvideChunks
 			RequestCollections:       {flow.RoleVerification},
@@ -187,8 +160,7 @@ func initializeMessageCodeMap() {
 		},
 	}
 	messageCodeMap[codec.CodeChunkDataResponse] = MessageCode{
-		Code:               codec.CodeChunkDataResponse,
-		authorizedChannels: ChannelList{ProvideChunks, RequestChunks, RequestCollections, RequestApprovalsByChunk, RequestReceiptsByBlockID},
+		Code: codec.CodeChunkDataResponse,
 		authorizedChannelsMap: map[Channel]flow.RoleList{
 			ProvideChunks:            {flow.RoleExecution}, // channel alias RequestChunks = ProvideChunks
 			RequestCollections:       {flow.RoleExecution},
@@ -199,15 +171,13 @@ func initializeMessageCodeMap() {
 
 	// result approvals
 	messageCodeMap[codec.CodeApprovalRequest] = MessageCode{
-		Code:               codec.CodeApprovalRequest,
-		authorizedChannels: ChannelList{ProvideApprovalsByChunk},
+		Code: codec.CodeApprovalRequest,
 		authorizedChannelsMap: map[Channel]flow.RoleList{
 			ProvideApprovalsByChunk: {flow.RoleConsensus},
 		},
 	}
 	messageCodeMap[codec.CodeApprovalResponse] = MessageCode{
-		Code:               codec.CodeApprovalResponse,
-		authorizedChannels: ChannelList{ProvideApprovalsByChunk},
+		Code: codec.CodeApprovalResponse,
 		authorizedChannelsMap: map[Channel]flow.RoleList{
 			ProvideApprovalsByChunk: {flow.RoleVerification},
 		},
@@ -215,8 +185,7 @@ func initializeMessageCodeMap() {
 
 	// generic entity exchange engines
 	messageCodeMap[codec.CodeEntityRequest] = MessageCode{
-		Code:               codec.CodeEntityRequest,
-		authorizedChannels: ChannelList{RequestChunks, RequestCollections, RequestApprovalsByChunk, RequestReceiptsByBlockID},
+		Code: codec.CodeEntityRequest,
 		authorizedChannelsMap: map[Channel]flow.RoleList{
 			RequestChunks:            {flow.RoleAccess, flow.RoleConsensus, flow.RoleCollection},
 			RequestCollections:       {flow.RoleAccess, flow.RoleConsensus, flow.RoleCollection},
@@ -226,8 +195,7 @@ func initializeMessageCodeMap() {
 	}
 
 	messageCodeMap[codec.CodeEntityResponse] = MessageCode{
-		Code:               codec.CodeEntityResponse,
-		authorizedChannels: ChannelList{RequestChunks, RequestCollections, RequestApprovalsByChunk, RequestReceiptsByBlockID},
+		Code: codec.CodeEntityResponse,
 		authorizedChannelsMap: map[Channel]flow.RoleList{
 			RequestChunks:            {flow.RoleCollection, flow.RoleExecution},
 			RequestCollections:       {flow.RoleCollection, flow.RoleExecution},
@@ -239,14 +207,12 @@ func initializeMessageCodeMap() {
 	// testing
 	messageCodeMap[codec.CodeEcho] = MessageCode{
 		Code:                  codec.CodeEcho,
-		authorizedChannels:    ChannelList{},
 		authorizedChannelsMap: map[Channel]flow.RoleList{},
 	}
 
 	// dkg
 	messageCodeMap[codec.CodeDKGMessage] = MessageCode{
-		Code:               codec.CodeDKGMessage,
-		authorizedChannels: ChannelList{DKGCommittee},
+		Code: codec.CodeDKGMessage,
 		authorizedChannelsMap: map[Channel]flow.RoleList{
 			DKGCommittee: {flow.RoleConsensus},
 		},
