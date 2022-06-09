@@ -69,7 +69,8 @@ const (
 
 // State Synchronization Subsystems
 const (
-	subsystemExecutionDataService = "execution_data_service"
+	subsystemExecutionDataService   = "execution_data_service"
+	subsystemExecutionDataRequester = "execution_data_requester"
 )
 
 // METRIC NAMING GUIDELINES
