@@ -103,7 +103,7 @@ func New(
 
 	var err error
 
-	loggedScripts, err := lru.New(DefaultLoggedScriptsCacheSize)
+	loggedScripts, _ := lru.New(DefaultLoggedScriptsCacheSize)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to initialize script logging cache")
 	}

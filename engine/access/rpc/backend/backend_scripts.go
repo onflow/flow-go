@@ -109,6 +109,7 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 	var errors *multierror.Error
 	// try to execute the script on one of the execution nodes
 	for _, execNode := range execNodes {
+		execStartTime := time.Now() // record start time
 		result, err := b.tryExecuteScript(ctx, execNode, execReq)
 		if err == nil {
 			if b.log.GetLevel() == zerolog.DebugLevel {
@@ -126,6 +127,13 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 					b.loggedScripts.Add(insecureScriptHash, executionTime)
 				}
 			}
+
+			// log execution time
+			b.metrics.ScriptExecuted(
+				time.Since(execStartTime),
+				len(script),
+			)
+
 			return result, nil
 		}
 		// return if it's just a script failure as opposed to an EN failure and skip trying other ENs
