@@ -187,8 +187,8 @@ func (s *ActivePaceMakerTestSuite) TestProcessQC_IgnoreOldQC() {
 	require.Equal(s.T(), uint64(3), s.paceMaker.CurView())
 }
 
-// TestOnPartialTC_TriggersTimeout tests that ActivePaceMaker ignores partial TCs and triggers
-// timeout for active view
+// TestOnPartialTC_TriggersTimeout tests that ActivePaceMaker ignores partial TCs for previous
+// views and triggers an immediate timeout upon observing a partial TC for the active view.
 func (s *ActivePaceMakerTestSuite) TestOnPartialTC_TriggersTimeout() {
 	// report previously known view
 	s.paceMaker.OnPartialTC(s.livenessData.CurrentView - 1)
