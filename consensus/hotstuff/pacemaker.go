@@ -60,10 +60,12 @@ type PaceMaker interface {
 
 	// ProcessQC will check if the given QC will allow PaceMaker to fast-forward to QC.view+1.
 	// If PaceMaker incremented the current View, a NewViewEvent will be returned.
+	// No errors are expected during normal operation.
 	ProcessQC(qc *flow.QuorumCertificate) (*model.NewViewEvent, error)
 
 	// ProcessTC will check if the given TC will allow PaceMaker to fast-forward to TC.view+1.
 	// If PaceMaker incremented the current View, a NewViewEvent will be returned.
+	// No errors are expected during normal operation.
 	ProcessTC(tc *flow.TimeoutCertificate) (*model.NewViewEvent, error)
 
 	// TimeoutChannel returns the timeout channel for the CURRENTLY ACTIVE timeout.
