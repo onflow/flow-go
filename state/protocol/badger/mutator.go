@@ -453,7 +453,7 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 		}
 
 		// index the latest sealed block in this fork
-		err = transaction.WithTx(operation.IndexBlockSeal(blockID, last.ID()))(tx)
+		err = transaction.WithTx(operation.IndexLatestSealAtBlock(blockID, last.ID()))(tx)
 		if err != nil {
 			return fmt.Errorf("could not index candidate seal: %w", err)
 		}

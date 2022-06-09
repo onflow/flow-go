@@ -201,7 +201,7 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 			if err != nil {
 				return fmt.Errorf("could not verify latest seal for block (id=%x) exists: %w", blockID, err)
 			}
-			err = transaction.WithTx(operation.IndexBlockSeal(blockID, latestSealID))(tx)
+			err = transaction.WithTx(operation.IndexLatestSealAtBlock(blockID, latestSealID))(tx)
 			if err != nil {
 				return fmt.Errorf("could not index block seal: %w", err)
 			}

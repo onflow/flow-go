@@ -38,17 +38,17 @@ func LookupPayloadResults(blockID flow.Identifier, resultIDs *[]flow.Identifier)
 	return retrieve(makePrefix(codePayloadResults, blockID), resultIDs)
 }
 
-// IndexBlockSeal persists the highest seal that was included in the fork up to (and including) blockID.
+// IndexLatestSealAtBlock persists the highest seal that was included in the fork up to (and including) blockID.
 // In most cases, it is the highest seal included in this block's payload. However, if there are no
 // seals in this block, sealID should reference the highest seal in blockID's ancestor.
-func IndexBlockSeal(blockID flow.Identifier, sealID flow.Identifier) func(*badger.Txn) error {
+func IndexLatestSealAtBlock(blockID flow.Identifier, sealID flow.Identifier) func(*badger.Txn) error {
 	return insert(makePrefix(codeBlockToSeal, blockID), sealID)
 }
 
-// LookupBlockSeal finds the highest seal that was included in the fork up to (and including) blockID.
+// LookupLatestSealAtBlock finds the highest seal that was included in the fork up to (and including) blockID.
 // In most cases, it is the highest seal included in this block's payload. However, if there are no
 // seals in this block, sealID should reference the highest seal in blockID's ancestor.
-func LookupBlockSeal(blockID flow.Identifier, sealID *flow.Identifier) func(*badger.Txn) error {
+func LookupLatestSealAtBlock(blockID flow.Identifier, sealID *flow.Identifier) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeBlockToSeal, blockID), &sealID)
 }
 

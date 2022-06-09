@@ -65,7 +65,7 @@ func TestBootstrapValid(t *testing.T) {
 		require.NoError(t, err)
 
 		var sealID flow.Identifier
-		err = db.View(operation.LookupBlockSeal(genesisID, &sealID))
+		err = db.View(operation.LookupLatestSealAtBlock(genesisID, &sealID))
 		require.NoError(t, err)
 
 		_, seal, err := rootSnapshot.SealedResult()
@@ -326,7 +326,7 @@ func TestExtendMissingParent(t *testing.T) {
 
 		// verify seal not indexed
 		var sealID flow.Identifier
-		err = db.View(operation.LookupBlockSeal(extend.ID(), &sealID))
+		err = db.View(operation.LookupLatestSealAtBlock(extend.ID(), &sealID))
 		require.Error(t, err)
 		require.True(t, errors.Is(err, stoerr.ErrNotFound), err)
 	})
@@ -357,7 +357,7 @@ func TestExtendHeightTooSmall(t *testing.T) {
 
 		// verify seal not indexed
 		var sealID flow.Identifier
-		err = db.View(operation.LookupBlockSeal(extend.ID(), &sealID))
+		err = db.View(operation.LookupLatestSealAtBlock(extend.ID(), &sealID))
 		require.Error(t, err)
 		require.True(t, errors.Is(err, stoerr.ErrNotFound), err)
 	})
@@ -406,7 +406,7 @@ func TestExtendBlockNotConnected(t *testing.T) {
 
 		// verify seal not indexed
 		var sealID flow.Identifier
-		err = db.View(operation.LookupBlockSeal(extend.ID(), &sealID))
+		err = db.View(operation.LookupLatestSealAtBlock(extend.ID(), &sealID))
 		require.Error(t, err)
 		require.True(t, errors.Is(err, stoerr.ErrNotFound), err)
 	})
@@ -1655,7 +1655,7 @@ func TestHeaderExtendMissingParent(t *testing.T) {
 
 		// verify seal not indexed
 		var sealID flow.Identifier
-		err = db.View(operation.LookupBlockSeal(extend.ID(), &sealID))
+		err = db.View(operation.LookupLatestSealAtBlock(extend.ID(), &sealID))
 		require.Error(t, err)
 		require.True(t, errors.Is(err, stoerr.ErrNotFound), err)
 	})
@@ -1683,7 +1683,7 @@ func TestHeaderExtendHeightTooSmall(t *testing.T) {
 
 		// verify seal not indexed
 		var sealID flow.Identifier
-		err = db.View(operation.LookupBlockSeal(block2.ID(), &sealID))
+		err = db.View(operation.LookupLatestSealAtBlock(block2.ID(), &sealID))
 		require.Error(t, err)
 		require.True(t, errors.Is(err, stoerr.ErrNotFound), err)
 	})
@@ -1730,7 +1730,7 @@ func TestHeaderExtendBlockNotConnected(t *testing.T) {
 
 		// verify seal not indexed
 		var sealID flow.Identifier
-		err = db.View(operation.LookupBlockSeal(block2.ID(), &sealID))
+		err = db.View(operation.LookupLatestSealAtBlock(block2.ID(), &sealID))
 		require.Error(t, err)
 		require.True(t, errors.Is(err, stoerr.ErrNotFound), err)
 	})

@@ -77,7 +77,7 @@ func (s *Seals) ByID(sealID flow.Identifier) (*flow.Seal, error) {
 // blockID is unknown.
 func (s *Seals) HighestInFork(blockID flow.Identifier) (*flow.Seal, error) {
 	var sealID flow.Identifier
-	err := s.db.View(operation.LookupBlockSeal(blockID, &sealID))
+	err := s.db.View(operation.LookupLatestSealAtBlock(blockID, &sealID))
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve seal for fork with head %x: %w", blockID, err)
 	}
