@@ -168,7 +168,7 @@ func (c *Core) requeueHeight(height uint64) {
 // ScanPending scans all pending block statuses for blocks that should be
 // requested. It apportions requestable items into range and batch requests
 // according to configured maximums, giving precedence to range requests.
-func (c *Core) ScanPending(final *flow.Header) ([]flow.Range, []flow.Batch) {
+func (c *Core) ScanPending(final *flow.Header) ([]chainsync.Range, []chainsync.Batch) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -365,7 +365,7 @@ func (c *Core) getRequestableItems() ([]uint64, []flow.Identifier) {
 
 // RangeRequested updates status state for a range of block heights that has
 // been successfully requested. Must be called when a range request is submitted.
-func (c *Core) RangeRequested(ran flow.Range) {
+func (c *Core) RangeRequested(ran chainsync.Range) {
 	c.metrics.RangeRequested(ran)
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -382,7 +382,7 @@ func (c *Core) RangeRequested(ran flow.Range) {
 
 // BatchRequested updates status state for a batch of block IDs that has been
 // successfully requested. Must be called when a batch request is submitted.
-func (c *Core) BatchRequested(batch flow.Batch) {
+func (c *Core) BatchRequested(batch chainsync.Batch) {
 	c.metrics.BatchRequested(batch)
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -399,7 +399,7 @@ func (c *Core) BatchRequested(batch flow.Batch) {
 
 // getRanges returns a set of ranges of heights that can be used as range
 // requests.
-func (c *Core) getRanges(heights []uint64) []flow.Range {
+func (c *Core) getRanges(heights []uint64) []chainsync.Range {
 
 	// sort the heights so we can build contiguous ranges more easily
 	sort.Slice(heights, func(i int, j int) bool {
@@ -409,7 +409,7 @@ func (c *Core) getRanges(heights []uint64) []flow.Range {
 	// build contiguous height ranges with maximum batch size
 	start := uint64(0)
 	end := uint64(0)
-	var ranges []flow.Range
+	var ranges []chainsync.Range
 	for index, height := range heights {
 
 		// on the first iteration, we set the start pointer, so we don't need to
@@ -423,7 +423,7 @@ func (c *Core) getRanges(heights []uint64) []flow.Range {
 
 		// if we have the end of the loop, we always create one final range
 		if index >= len(heights)-1 {
-			r := flow.Range{From: start, To: end}
+			r := chainsync.Range{From: start, To: end}
 			ranges = append(ranges, r)
 			break
 		}
@@ -435,7 +435,7 @@ func (c *Core) getRanges(heights []uint64) []flow.Range {
 		// and forward the start pointer to the next height
 		rangeSize := end - start + 1
 		if rangeSize >= uint64(c.Config.MaxSize) {
-			r := flow.Range{From: start, To: end}
+			r := chainsync.Range{From: start, To: end}
 			ranges = append(ranges, r)
 			start = nextHeight
 			continue
@@ -444,7 +444,7 @@ func (c *Core) getRanges(heights []uint64) []flow.Range {
 		// if end is more than one smaller than the next height, we have a gap
 		// next, so we create a range and forward the start pointer
 		if nextHeight > end+1 {
-			r := flow.Range{From: start, To: end}
+			r := chainsync.Range{From: start, To: end}
 			ranges = append(ranges, r)
 			start = nextHeight
 			continue
@@ -455,9 +455,9 @@ func (c *Core) getRanges(heights []uint64) []flow.Range {
 }
 
 // getBatches returns a set of batches that can be used in batch requests.
-func (c *Core) getBatches(blockIDs []flow.Identifier) []flow.Batch {
+func (c *Core) getBatches(blockIDs []flow.Identifier) []chainsync.Batch {
 
-	var batches []flow.Batch
+	var batches []chainsync.Batch
 	// split the block IDs into maximum sized requests
 	for from := 0; from < len(blockIDs); from += int(c.Config.MaxSize) {
 
@@ -469,7 +469,7 @@ func (c *Core) getBatches(blockIDs []flow.Identifier) []flow.Batch {
 
 		// create the block IDs slice
 		requestIDs := blockIDs[from:to]
-		batch := flow.Batch{
+		batch := chainsync.Batch{
 			BlockIDs: requestIDs,
 		}
 		batches = append(batches, batch)
@@ -481,7 +481,7 @@ func (c *Core) getBatches(blockIDs []flow.Identifier) []flow.Batch {
 // selectRequests selects which requests should be submitted, given a set of
 // candidate range and batch requests. Range requests are given precedence and
 // the total number of requests does not exceed the configured request maximum.
-func (c *Core) selectRequests(ranges []flow.Range, batches []flow.Batch) ([]flow.Range, []flow.Batch) {
+func (c *Core) selectRequests(ranges []chainsync.Range, batches []chainsync.Batch) ([]chainsync.Range, []chainsync.Batch) {
 	max := int(c.Config.MaxRequests)
 
 	if len(ranges) >= max {

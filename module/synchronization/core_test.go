@@ -289,21 +289,21 @@ func (ss *SyncSuite) TestGetRanges() {
 
 	ss.Run("contiguous", func() {
 		input := []uint64{1, 2, 3, 4, 5, 6, 7, 8}
-		expected := []flow.Range{{From: 1, To: 4}, {From: 5, To: 8}}
+		expected := []chainsync.Range{{From: 1, To: 4}, {From: 5, To: 8}}
 		ranges := ss.core.getRanges(input)
 		ss.Assert().Equal(expected, ranges)
 	})
 
 	ss.Run("non-contiguous", func() {
 		input := []uint64{1, 3}
-		expected := []flow.Range{{From: 1, To: 1}, {From: 3, To: 3}}
+		expected := []chainsync.Range{{From: 1, To: 1}, {From: 3, To: 3}}
 		ranges := ss.core.getRanges(input)
 		ss.Assert().Equal(expected, ranges)
 	})
 
 	ss.Run("with dupes", func() {
 		input := []uint64{1, 2, 2, 3, 3, 4}
-		expected := []flow.Range{{From: 1, To: 4}}
+		expected := []chainsync.Range{{From: 1, To: 4}}
 		ranges := ss.core.getRanges(input)
 		ss.Assert().Equal(expected, ranges)
 	})
@@ -316,14 +316,14 @@ func (ss *SyncSuite) TestGetBatches() {
 
 	ss.Run("less than max size", func() {
 		input := unittest.IdentifierListFixture(2)
-		expected := []flow.Batch{{BlockIDs: input}}
+		expected := []chainsync.Batch{{BlockIDs: input}}
 		batches := ss.core.getBatches(input)
 		ss.Assert().Equal(expected, batches)
 	})
 
 	ss.Run("greater than max size", func() {
 		input := unittest.IdentifierListFixture(6)
-		expected := []flow.Batch{{BlockIDs: input[:4]}, {BlockIDs: input[4:]}}
+		expected := []chainsync.Batch{{BlockIDs: input[:4]}, {BlockIDs: input[4:]}}
 		batches := ss.core.getBatches(input)
 		ss.Assert().Equal(expected, batches)
 	})

@@ -498,7 +498,7 @@ type ChainSyncMetrics interface {
 	// storedByHeight and storedById are the number of blocks still stored by height and id
 	PrunedBlocks(totalByHeight, totalById, storedByHeight, storedById int)
 
-	RangeRequested(ran flow.Range)
+	RangeRequested(ran chainsync.Range)
 
-	BatchRequested(batch flow.Batch)
+	BatchRequested(batch chainsync.Batch)
 }

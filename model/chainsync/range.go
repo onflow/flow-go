@@ -1,6 +1,8 @@
 // (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
 
-package flow
+package chainsync
+
+import "github.com/onflow/flow-go/model/flow"
 
 // Range is a height range for which we want to request blocks.
 type Range struct {
@@ -10,5 +12,5 @@ type Range struct {
 
 // Batch is a set of block IDs we want to request.
 type Batch struct {
-	BlockIDs []Identifier
+	BlockIDs []flow.Identifier
 }

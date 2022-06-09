@@ -7,7 +7,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/onflow/flow-go/model/chainsync"
-	"github.com/onflow/flow-go/model/flow"
 )
 
 type ChainSyncCollector struct {
@@ -94,10 +93,10 @@ func (c *ChainSyncCollector) PrunedBlocks(totalByHeight, totalById, storedByHeig
 	c.storedBlocks.With(prometheus.Labels{"requested_by": "height"}).Set(float64(storedByHeight))
 }
 
-func (c *ChainSyncCollector) RangeRequested(ran flow.Range) {
+func (c *ChainSyncCollector) RangeRequested(ran chainsync.Range) {
 	c.totalHeightsRequested.Add(float64(ran.To - ran.From + 1))
 }
 
-func (c *ChainSyncCollector) BatchRequested(batch flow.Batch) {
+func (c *ChainSyncCollector) BatchRequested(batch chainsync.Batch) {
 	c.totalIdsRequested.Add(float64(len(batch.BlockIDs)))
 }

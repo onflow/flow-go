@@ -3,6 +3,7 @@
 package module
 
 import (
+	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -34,15 +35,15 @@ type SyncCore interface {
 	// ScanPending scans all pending block statuses for blocks that should be
 	// requested. It apportions requestable items into range and batch requests
 	// according to configured maximums, giving precedence to range requests.
-	ScanPending(final *flow.Header) ([]flow.Range, []flow.Batch)
+	ScanPending(final *flow.Header) ([]chainsync.Range, []chainsync.Batch)
 
 	// WithinTolerance returns whether or not the given height is within configured
 	// height tolerance, wrt the given local finalized header.
 	WithinTolerance(final *flow.Header, height uint64) bool
 
 	// RangeRequested updates sync state after a range is requested.
-	RangeRequested(ran flow.Range)
+	RangeRequested(ran chainsync.Range)
 
 	// BatchRequested updates sync state after a batch is requested.
-	BatchRequested(batch flow.Batch)
+	BatchRequested(batch chainsync.Batch)
 }

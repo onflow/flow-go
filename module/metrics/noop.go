@@ -175,5 +175,5 @@ func (nc *NoopCollector) FetchRetried()                                         
 func (nc *NoopCollector) PrunedBlockById(status *chainsync.Status)                              {}
 func (nc *NoopCollector) PrunedBlockByHeight(status *chainsync.Status)                          {}
 func (nc *NoopCollector) PrunedBlocks(totalByHeight, totalById, storedByHeight, storedById int) {}
-func (nc *NoopCollector) RangeRequested(ran flow.Range)                                         {}
-func (nc *NoopCollector) BatchRequested(batch flow.Batch)                                       {}
+func (nc *NoopCollector) RangeRequested(ran chainsync.Range)                                    {}
+func (nc *NoopCollector) BatchRequested(batch chainsync.Batch)                                  {}
