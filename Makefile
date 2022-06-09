@@ -3,7 +3,7 @@ SHORT_COMMIT := $(shell git rev-parse --short HEAD)
 # The Git commit hash
 COMMIT := $(shell git rev-parse HEAD)
 # The tag of the current commit, otherwise empty
-VERSION := $(shell git describe --tags --abbrev=2 --match "v*" 2>/dev/null)
+VERSION := $(shell git describe --tags --abbrev=2 --match "v*" --match "secure-cadence*" 2>/dev/null)
 
 # Image tag: if image tag is not set, set it with version (or short commit if empty)
 ifeq (${IMAGE_TAG},)
@@ -65,7 +65,7 @@ install-mock-generators:
 
 .PHONY: install-tools
 install-tools: crypto_setup_tests crypto_setup_gopath check-go-version install-mock-generators
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.45.2; \
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.46.2; \
 	cd ${GOPATH}; \
 	GO111MODULE=on go install github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
 	GO111MODULE=on go install github.com/uber/prototool/cmd/prototool@v1.9.0; \
@@ -127,7 +127,7 @@ generate-mocks:
 	GO111MODULE=on mockgen -destination=module/mocks/network.go -package=mocks github.com/onflow/flow-go/module Local,Requester
 	GO111MODULE=on mockgen -destination=network/mocknetwork/engine.go -package=mocknetwork github.com/onflow/flow-go/network Engine
 	GO111MODULE=on mockgen -destination=network/mocknetwork/mock_network.go -package=mocknetwork github.com/onflow/flow-go/network Network
-	GO111MODULE=on mockery --name '(ExecutionDataService|ExecutionDataCIDCache)' --dir=module/state_synchronization --case=underscore --output="./module/state_synchronization/mock" --outpkg="state_synchronization"
+	GO111MODULE=on mockery --name '(ExecutionDataService|ExecutionDataCIDCache|ExecutionDataRequester)' --dir=module/state_synchronization --case=underscore --output="./module/state_synchronization/mock" --outpkg="state_synchronization"
 	GO111MODULE=on mockery --name 'ExecutionState' --dir=engine/execution/state --case=underscore --output="engine/execution/state/mock" --outpkg="mock"
 	GO111MODULE=on mockery --name 'BlockComputer' --dir=engine/execution/computation/computer --case=underscore --output="engine/execution/computation/computer/mock" --outpkg="mock"
 	GO111MODULE=on mockery --name 'ComputationManager' --dir=engine/execution/computation --case=underscore --output="engine/execution/computation/mock" --outpkg="mock"
