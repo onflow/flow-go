@@ -71,6 +71,15 @@ func MessageCodeFromV(v interface{}) (uint8, string, error) {
 		return CodeBlockProposal, "CodeBlockProposal", nil
 	case *messages.BlockVote:
 		return CodeBlockVote, "CodeBlockVote", nil
+
+	// cluster consensus
+	case *messages.ClusterBlockProposal:
+		return CodeClusterBlockProposal, "CodeClusterBlockProposal", nil
+	case *messages.ClusterBlockVote:
+		return CodeClusterBlockVote, "CodeClusterBlockVote", nil
+	case *messages.ClusterBlockResponse:
+		return CodeClusterBlockResponse, "CodeClusterBlockResponse", nil
+
 	// protocol state sync
 	case *messages.SyncRequest:
 		return CodeSyncRequest, "CodeSyncRequest", nil
@@ -82,14 +91,6 @@ func MessageCodeFromV(v interface{}) (uint8, string, error) {
 		return CodeBatchRequest, "CodeBatchRequest", nil
 	case *messages.BlockResponse:
 		return CodeBlockResponse, "CodeBlockResponse", nil
-
-	// cluster consensus
-	case *messages.ClusterBlockProposal:
-		return CodeClusterBlockProposal, "CodeClusterBlockProposal", nil
-	case *messages.ClusterBlockVote:
-		return CodeClusterBlockVote, "CodeClusterBlockVote", nil
-	case *messages.ClusterBlockResponse:
-		return CodeClusterBlockResponse, "CodeClusterBlockResponse", nil
 
 	// collections, guarantees & transactions
 	case *flow.CollectionGuarantee:
@@ -195,11 +196,27 @@ func InterfaceFromMessageCode(code uint8) (interface{}, string, error) {
 		return &messages.ChunkDataRequest{}, "ChunkDataRequest", nil
 	case CodeChunkDataResponse:
 		return &messages.ChunkDataResponse{}, "ChunkDataResponse", nil
+
+	// result approvals
 	case CodeApprovalRequest:
 		return &messages.ApprovalRequest{}, "ApprovalRequest", nil
 	case CodeApprovalResponse:
 		return &messages.ApprovalResponse{}, "ApprovalResponse", nil
-		
+
+	// generic entity exchange engines
+	case CodeEntityRequest:
+		return &messages.EntityRequest{}, "EntityRequest", nil
+	case CodeEntityResponse:
+		return &messages.EntityResponse{}, "EntityResponse", nil
+
+	// dkg
+	case CodeDKGMessage:
+		return &messages.DKGMessage{}, "DKGMessage", nil
+
+	// test messages
+	case CodeEcho:
+		return &message.TestMessage{}, "TestMessage", nil
+	
 	default:
 		return nil, "", fmt.Errorf("invalid message code (%d)", code)
 	}
