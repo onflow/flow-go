@@ -552,6 +552,10 @@ func (*testRuntime) ReadLinked(_ common.Address, _ cadence.Path, _ runtime.Conte
 	panic("ReadLinked not expected")
 }
 
+func (*testRuntime) SetDebugger(_ *interpreter.Debugger) {
+	panic("SetDebugger not expected")
+}
+
 type RandomAddressGenerator struct{}
 
 func (r *RandomAddressGenerator) NextAddress() (flow.Address, error) {
