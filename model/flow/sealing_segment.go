@@ -285,7 +285,7 @@ func (builder *SealingSegmentBuilder) isValidHeight(block *Block) bool {
 }
 
 // hasValidSeal checks if the latest seal as of highest block is for lowest block
-// it returns the latest seal and nil if found
+// it returns the latest seal and no error if found
 // it returns nil and error if not found
 // NOTE: only applicable for non-root sealing segments containing multiple blocks,
 // root sealing segments are checked by isValidRootSegment.

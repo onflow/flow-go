@@ -53,6 +53,8 @@ func LookupLatestSealAtBlock(blockID flow.Identifier, sealID *flow.Identifier) f
 }
 
 // IndexFinalizedSealByBlockID index a the _finalized_ seal by the sealed block ID.
+// A <- B <- C(SealA)
+// Example: when block C is finalized, we create the index `A.ID->SealA.ID`
 func IndexFinalizedSealByBlockID(sealedBlockID flow.Identifier, sealID flow.Identifier) func(*badger.Txn) error {
 	return insert(makePrefix(codeBlockIDToFinalizedSeal, sealedBlockID), sealID)
 }

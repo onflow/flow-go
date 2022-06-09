@@ -145,10 +145,7 @@ func TestSealedIndex(t *testing.T) {
 		// block 2(result B1)
 		b1Receipt := unittest.ReceiptForBlockFixture(b1)
 		b2 := unittest.BlockWithParentFixture(b1.Header)
-		b2.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceiptMeta{b1Receipt.Meta()},
-			Results:  []*flow.ExecutionResult{&b1Receipt.ExecutionResult},
-		})
+		b2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(b1Receipt)))
 		err = state.Extend(context.Background(), b2)
 		require.NoError(t, err)
 
@@ -194,7 +191,7 @@ func TestSealedIndex(t *testing.T) {
 		err = state.Extend(context.Background(), b7)
 		require.NoError(t, err)
 
-		// finalizing b1 - b3
+		// finalizing b1 - b4
 		// when B4 is finalized, can only find seal for G
 		err = state.Finalize(context.Background(), b1.ID())
 		require.NoError(t, err)

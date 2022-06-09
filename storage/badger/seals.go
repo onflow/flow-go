@@ -84,6 +84,9 @@ func (s *Seals) HighestInFork(blockID flow.Identifier) (*flow.Seal, error) {
 	return s.ByID(sealID)
 }
 
+// FinalizedSealForBlock returns the seal for the given block, only if that seal
+// has been included in a finalized block.
+// Returns storage.ErrNotFound if the block is unknown or unsealed.
 func (s *Seals) FinalizedSealForBlock(blockID flow.Identifier) (*flow.Seal, error) {
 	var sealID flow.Identifier
 	err := s.db.View(operation.LookupBySealedBlockID(blockID, &sealID))

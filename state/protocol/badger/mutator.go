@@ -649,7 +649,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		}
 
 		// When a block is finalized, we commit the result for each seal it contains. The sealing logic
-		// guarantees that only as single, continuous execution fork is sealed. Here, we index for
+		// guarantees that only a single, continuous execution fork is sealed. Here, we index for
 		// each block ID the ID of its _finalized_ seal.
 		for _, seal := range block.Payload.Seals {
 			err = operation.IndexFinalizedSealByBlockID(seal.BlockID, seal.ID())(tx)

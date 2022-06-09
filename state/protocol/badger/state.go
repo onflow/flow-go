@@ -235,7 +235,7 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 		}
 		highest := segment.Highest()
 		lowest := segment.Lowest()
-		// find the finalize seal that seals the lowest block, meaning seal.BlockID == lowest.ID()
+		// find the finalized seal that seals the lowest block, meaning seal.BlockID == lowest.ID()
 		seal, err := segment.FinalizedSeal()
 		if err != nil {
 			return fmt.Errorf("could not get finalized seal from sealing segment: %w", err)
