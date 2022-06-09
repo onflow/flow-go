@@ -251,12 +251,12 @@ func (e *blockComputer) executeBlock(
 		executionData.ChunkExecutionDatas[i].TrieUpdate = trieUpdate
 	}
 
-	executionDataProvideJob, err := e.executionDataProvider.Provide(ctx, block.Height(), executionData)
+	executionDataID, err := e.executionDataProvider.Provide(ctx, block.Height(), executionData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to provide execution data: %w", err)
 	}
 
-	res.ExecutionDataProvideJob = executionDataProvideJob
+	res.ExecutionDataID = executionDataID
 
 	return res, nil
 }

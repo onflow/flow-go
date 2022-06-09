@@ -643,14 +643,6 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		e.log.Err(err).Msg("failed in process block's children")
 	}
 
-	err, ok := <-computationResult.ExecutionDataProvideJob.Done
-	if ok {
-		e.log.Err(err).
-			Hex("block_id", logging.Entity(executableBlock)).
-			Str("execution_data_id", receipt.ExecutionResult.ExecutionDataID.String()).
-			Msg("failed to provide execution data blobs")
-	}
-
 	e.executionDataPruner.NotifyFulfilledHeight(executableBlock.Height())
 }
 

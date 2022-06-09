@@ -34,11 +34,6 @@ type Provider struct {
 	storage     tracker.Storage
 }
 
-type ProvideJob struct {
-	ExecutionDataID flow.Identifier
-	Done            <-chan error
-}
-
 func NewProvider(
 	logger zerolog.Logger,
 	metrics module.ExecutionDataProviderMetrics,
@@ -112,7 +107,7 @@ func (p *Provider) storeBlobs(parent context.Context, blockHeight uint64, blobCh
 	return ch
 }
 
-func (p *Provider) Provide(ctx context.Context, blockHeight uint64, executionData *execution_data.BlockExecutionData) (*ProvideJob, error) {
+func (p *Provider) Provide(ctx context.Context, blockHeight uint64, executionData *execution_data.BlockExecutionData) (flow.Identifier, error) {
 	logger := p.logger.With().Uint64("height", blockHeight).Str("block_id", executionData.BlockID.String()).Logger()
 	logger.Debug().Msg("providing execution data")
 
@@ -143,7 +138,7 @@ func (p *Provider) Provide(ctx context.Context, blockHeight uint64, executionDat
 	}
 
 	if err := g.Wait(); err != nil {
-		return nil, err
+		return flow.ZeroID, err
 	}
 
 	edRoot := &execution_data.BlockExecutionDataRoot{
@@ -152,14 +147,19 @@ func (p *Provider) Provide(ctx context.Context, blockHeight uint64, executionDat
 	}
 	rootID, err := p.addExecutionDataRoot(ctx, edRoot, blobCh)
 	if err != nil {
-		return nil, fmt.Errorf("failed to add execution data root: %w", err)
+		return flow.ZeroID, fmt.Errorf("failed to add execution data root: %w", err)
 	}
 	logger.Debug().Str("root_id", rootID.String()).Msg("root ID computed")
 
 	duration := time.Since(start)
 	p.metrics.RootIDComputed(duration, len(executionData.ChunkExecutionDatas))
 
-	return &ProvideJob{rootID, errCh}, nil
+	err, ok := <-errCh
+	if ok {
+		return flow.ZeroID, err
+	} else {
+		return rootID, nil
+	}
 }
 
 func (p *Provider) addExecutionDataRoot(

@@ -19,13 +19,13 @@ type requestData struct {
 }
 
 type ReadExecutionDataCommand struct {
-	executionDataGetter execution_data.ExecutionDataGetter
+	executionDataStore execution_data.ExecutionDataStore
 }
 
 func (r *ReadExecutionDataCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 	data := req.ValidatorData.(*requestData)
 
-	ed, err := r.executionDataGetter.GetExecutionData(ctx, data.rootID)
+	ed, err := r.executionDataStore.GetExecutionData(ctx, data.rootID)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get execution data: %w", err)
@@ -69,8 +69,8 @@ func (r *ReadExecutionDataCommand) Validator(req *admin.CommandRequest) error {
 	return nil
 }
 
-func NewReadExecutionDataCommand(getter execution_data.ExecutionDataGetter) commands.AdminCommand {
+func NewReadExecutionDataCommand(store execution_data.ExecutionDataStore) commands.AdminCommand {
 	return &ReadExecutionDataCommand{
-		getter,
+		store,
 	}
 }

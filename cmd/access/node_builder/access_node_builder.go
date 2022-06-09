@@ -193,10 +193,11 @@ type FlowAccessNodeBuilder struct {
 	SyncEngineParticipantsProviderFactory func() id.IdentifierProvider
 
 	// engines
-	IngestEng   *ingestion.Engine
-	RequestEng  *requester.Engine
-	FollowerEng *followereng.Engine
-	SyncEng     *synceng.Engine
+	IngestEng              *ingestion.Engine
+	RequestEng             *requester.Engine
+	FollowerEng            *followereng.Engine
+	SyncEng                *synceng.Engine
+	ExecutionDataRequester *exedatarequester.Requester
 }
 
 // deriveBootstrapPeerIdentities derives the Flow Identity of the bootstrap peers from the parameters.
@@ -389,8 +390,7 @@ func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() *FlowAccessNodeBu
 
 func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessNodeBuilder {
 	var executionDataDatastore datastore.Batching
-	var trackerStorage *tracker.Storage
-	var requester *exedatarequester.Requester
+	var trackerStorage tracker.Storage
 
 	builder.Module("execution data datastore", func(node *cmd.NodeConfig) error {
 		datastoreDir := filepath.Join(builder.executionDataDir, "blobstore")
@@ -435,7 +435,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				requesterMetrics = metrics.NewExecutionDataRequesterCollector()
 			}
 
-			requester, err = exedatarequester.NewRequester(
+			builder.ExecutionDataRequester, err = exedatarequester.NewRequester(
 				sealed.Height,
 				trackerStorage,
 				node.Storage.Blocks,
@@ -446,7 +446,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				node.Logger,
 				requesterMetrics,
 			)
-			return requester, err
+			return builder.ExecutionDataRequester, err
 		}).
 		Component("execution data pruner", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			var prunerMetrics module.ExecutionDataPrunerMetrics = metrics.NewNoopCollector()
@@ -465,7 +465,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				return nil, fmt.Errorf("could not create execution data pruner: %w", err)
 			}
 
-			_, err = requester.AddConsumer(func(blockHeight uint64, executionData *execution_data.BlockExecutionData) {
+			_, err = builder.ExecutionDataRequester.AddConsumer(func(blockHeight uint64, executionData *execution_data.BlockExecutionData) {
 				executionDataPruner.NotifyFulfilledHeight(blockHeight)
 			})
 			if err != nil {
