@@ -79,6 +79,7 @@ func (s *Suite) SetupSuite() {
 			testnet.WithLogLevel(zerolog.DebugLevel),
 			testnet.WithAdditionalFlag("--required-verification-seal-approvals=1"),
 			testnet.WithAdditionalFlag("--required-construction-seal-approvals=1"),
+			testnet.WithAdditionalFlag("--add-host=host.docker.internal:host-gateway"),
 			//testnet.WithAdditionalFlag("--network=\"host\""),
 		)
 		s.nodeConfigs = append(s.nodeConfigs, nodeConfig)
@@ -91,7 +92,8 @@ func (s *Suite) SetupSuite() {
 		testnet.WithID(s.verID),
 		testnet.WithLogLevel(zerolog.DebugLevel),
 		testnet.AsCorrupted(),
-		testnet.WithAdditionalFlag("--add-host=host.docker.internal:host-gateway"))
+		testnet.WithAdditionalFlag("--add-host=host.docker.internal:host-gateway"),
+	)
 	//testnet.WithAdditionalFlag("--network=\"host\""))
 	s.nodeConfigs = append(s.nodeConfigs, verConfig)
 
@@ -102,8 +104,9 @@ func (s *Suite) SetupSuite() {
 		testnet.WithID(s.exe1ID),
 		testnet.WithLogLevel(zerolog.DebugLevel),
 		testnet.AsCorrupted(),
-		testnet.WithAdditionalFlag("--add-host=host.docker.internal:host-gateway"))
-	//testnet.WithAdditionalFlag("--network=\"host\""))
+		testnet.WithAdditionalFlag("--add-host=host.docker.internal:host-gateway"),
+		//testnet.WithAdditionalFlag("--network=\"host\"")
+	)
 	s.nodeConfigs = append(s.nodeConfigs, exe1Config)
 
 	s.exe2ID = unittest.IdentifierFixture()
@@ -112,7 +115,8 @@ func (s *Suite) SetupSuite() {
 		testnet.WithID(s.exe2ID),
 		testnet.WithLogLevel(zerolog.DebugLevel),
 		testnet.AsCorrupted(),
-		testnet.WithAdditionalFlag("--add-host=host.docker.internal:host-gateway"))
+		testnet.WithAdditionalFlag("--add-host=host.docker.internal:host-gateway"),
+	)
 	//testnet.WithAdditionalFlag("--network=\"host\""))
 	s.nodeConfigs = append(s.nodeConfigs, exe2Config)
 
@@ -120,11 +124,13 @@ func (s *Suite) SetupSuite() {
 	s.T().Logf("integration/tests/bft/passthrough/suite.go - before coll1Config")
 	coll1Config := testnet.NewNodeConfig(flow.RoleCollection,
 		testnet.WithLogLevel(zerolog.DebugLevel),
+		testnet.WithAdditionalFlag("--add-host=host.docker.internal:host-gateway"),
 		//testnet.WithAdditionalFlag("--network=host"),
 	)
 	s.T().Logf("integration/tests/bft/passthrough/suite.go - before coll2Config")
 	coll2Config := testnet.NewNodeConfig(flow.RoleCollection,
 		testnet.WithLogLevel(zerolog.DebugLevel),
+		testnet.WithAdditionalFlag("--add-host=host.docker.internal:host-gateway"),
 		//testnet.WithAdditionalFlag("--network=host"),
 	)
 	s.nodeConfigs = append(s.nodeConfigs, coll1Config, coll2Config)
@@ -138,7 +144,9 @@ func (s *Suite) SetupSuite() {
 	ghostConfig := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.ghostID),
 		testnet.AsGhost(),
-		testnet.WithLogLevel(zerolog.DebugLevel))
+		testnet.WithLogLevel(zerolog.DebugLevel),
+		testnet.WithAdditionalFlag("--add-host=host.docker.internal:host-gateway"),
+	)
 	//testnet.WithAdditionalFlag("--network=\"host\""))
 	s.nodeConfigs = append(s.nodeConfigs, ghostConfig)
 

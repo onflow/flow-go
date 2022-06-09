@@ -179,8 +179,8 @@ func (c *Container) bindPort(localhostPort, containerPort string) {
 		c.opts.HostConfig.PortBindings = nat.PortMap{
 			containerNATPort: []nat.PortBinding{
 				{
-					//HostIP:   "0.0.0.0",
-					HostIP:   "host.docker.internal",
+					HostIP: "0.0.0.0",
+					//HostIP:   "host.docker.internal",
 					HostPort: localhostPort,
 				},
 			},
@@ -189,8 +189,8 @@ func (c *Container) bindPort(localhostPort, containerPort string) {
 		fmt.Printf("container>bindPort>c.opts.HostConfig.PortBindings != nil\n")
 		c.opts.HostConfig.PortBindings[containerNATPort] = []nat.PortBinding{
 			{
-				//HostIP:   "0.0.0.0",
-				HostIP:   "host.docker.internal",
+				HostIP: "0.0.0.0",
+				//HostIP:   "host.docker.internal",
 				HostPort: localhostPort,
 			},
 		}
