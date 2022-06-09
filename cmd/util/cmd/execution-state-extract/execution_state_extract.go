@@ -68,7 +68,14 @@ func extractExecutionState(
 			OutputDir: outputDir,
 		}
 
+		coreContractMigration := mgr.CoreContractsMigration{
+			Log:       log,
+			Chain:     chain,
+			OutputDir: outputDir,
+		}
+
 		migrations = []ledger.Migration{
+			coreContractMigration.Migrate,
 			storageUsedUpdateMigration.Migrate,
 			mgr.PruneMigration,
 		}
