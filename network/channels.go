@@ -35,8 +35,8 @@ func RolesByChannel(channel Channel) (flow.RoleList, bool) {
 	return roles, ok
 }
 
-// Exists returns true if the channel exists.
-func Exists(channel Channel) bool {
+// ChannelExists returns true if the channel exists.
+func ChannelExists(channel Channel) bool {
 	if _, ok := RolesByChannel(channel); ok {
 		return true
 	}

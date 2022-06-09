@@ -219,7 +219,7 @@ func (n *Network) runMiddleware(ctx irrecoverable.SignalerContext, ready compone
 }
 
 func (n *Network) handleRegisterEngineRequest(parent irrecoverable.SignalerContext, channel network.Channel, engine network.MessageProcessor) (network.Conduit, error) {
-	if !network.Exists(channel) {
+	if !network.ChannelExists(channel) {
 		return nil, fmt.Errorf("unknown channel: %s, should be registered in topic map", channel)
 	}
 
