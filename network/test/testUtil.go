@@ -319,7 +319,7 @@ func GenerateEngines(t *testing.T, nets []network.Network) []*MeshEngine {
 	count := len(nets)
 	engs := make([]*MeshEngine, count)
 	for i, n := range nets {
-		eng := NewMeshEngine(t, n, 100, network.TestNetwork)
+		eng := NewMeshEngine(t, n, 100, network.TestNetworkChannel)
 		engs[i] = eng
 	}
 	return engs

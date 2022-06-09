@@ -127,7 +127,7 @@ func (suite *RandomizedTopologyTestSuite) TestUniqueness() {
 // TestConnectedness_NonClusterChannel checks whether graph components corresponding to a
 // non-cluster channel are individually connected.
 func (suite *RandomizedTopologyTestSuite) TestConnectedness_NonClusterChannel() {
-	channel := network.TestNetwork
+	channel := network.TestNetworkChannel
 	// adjacency map keeps graph component of a single channel
 	channelAdjMap := make(map[flow.Identifier]flow.IdentityList)
 

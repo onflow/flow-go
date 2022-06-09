@@ -160,7 +160,7 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 	require.NoError(t, err)
 
 	// spork topic is derived by suffixing the channel with the root block ID
-	topicBeforeSpork := network.TopicFromChannel(network.TestNetwork, previousSporkId)
+	topicBeforeSpork := network.TopicFromChannel(network.TestNetworkChannel, previousSporkId)
 
 	// both nodes are initially on the same spork and subscribed to the same topic
 	_, err = node1.Subscribe(topicBeforeSpork)
@@ -182,7 +182,7 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 	rootIDAfterSpork := unittest.IdentifierFixture()
 
 	// topic after the spork
-	topicAfterSpork := network.TopicFromChannel(network.TestNetwork, rootIDAfterSpork)
+	topicAfterSpork := network.TopicFromChannel(network.TestNetworkChannel, rootIDAfterSpork)
 
 	// mimic that node1 now is now part of the new spork while node2 remains on the old spork
 	// by unsubscribing node1 from 'topicBeforeSpork' and subscribing it to 'topicAfterSpork'

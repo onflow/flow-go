@@ -31,8 +31,8 @@ func main() {
 			NetworkCollector:    metrics.NewNetworkCollector(),
 		}
 
-		topic1 := network.TestNetwork.String()
-		topic2 := network.TestMetrics.String()
+		topic1 := network.TestNetworkChannel.String()
+		topic2 := network.TestMetricsChannel.String()
 		message1 := "CollectionRequest"
 		message2 := "ClusterBlockProposal"
 

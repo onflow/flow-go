@@ -108,8 +108,8 @@ func PublicChannels() ChannelList {
 const (
 
 	// Channels used for testing
-	TestNetwork = Channel("test-network")
-	TestMetrics = Channel("test-metrics")
+	TestNetworkChannel = Channel("test-network")
+	TestMetricsChannel = Channel("test-metrics")
 
 	// Channels for consensus protocols
 	ConsensusCommittee     = Channel("consensus-committee")
@@ -162,9 +162,9 @@ func initializeChannelRoleMap() {
 	channelRoleMap = make(map[Channel]flow.RoleList)
 
 	// Channels for test
-	channelRoleMap[TestNetwork] = flow.RoleList{flow.RoleCollection, flow.RoleConsensus, flow.RoleExecution,
+	channelRoleMap[TestNetworkChannel] = flow.RoleList{flow.RoleCollection, flow.RoleConsensus, flow.RoleExecution,
 		flow.RoleVerification, flow.RoleAccess}
-	channelRoleMap[TestMetrics] = flow.RoleList{flow.RoleCollection, flow.RoleConsensus, flow.RoleExecution,
+	channelRoleMap[TestMetricsChannel] = flow.RoleList{flow.RoleCollection, flow.RoleConsensus, flow.RoleExecution,
 		flow.RoleVerification, flow.RoleAccess}
 
 	// Channels for consensus protocols
