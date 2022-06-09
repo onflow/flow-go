@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/epochs"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/io"
@@ -137,7 +138,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	}
 
 	// validate epoch configs (halts on error)
-	validateEpochCommitmentDeadline()
+	validateEpochConfig()
 
 	if len(flagBootstrapRandomSeed) != flow.EpochSetupRandomSourceLength {
 		log.Error().Int("expected", flow.EpochSetupRandomSourceLength).Int("actual", len(flagBootstrapRandomSeed)).Msg("random seed provided length is not valid")
@@ -221,7 +222,7 @@ func finalize(cmd *cobra.Command, args []string) {
 
 	// construct serializable root protocol snapshot
 	log.Info().Msg("constructing root protocol snapshot")
-	snapshot, err := inmem.SnapshotFromBootstrapStateWithParams(block, result, seal, rootQC, flagProtocolVersion)
+	snapshot, err := inmem.SnapshotFromBootstrapStateWithParams(block, result, seal, rootQC, flagProtocolVersion, flagEpochCommitSafetyThreshold)
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to generate root protocol snapshot")
 	}
@@ -641,11 +642,27 @@ func generateEmptyExecutionState(
 	return
 }
 
-// validateEpochCommitmentDeadline validates configuration of the epoch commitment deadline.
-func validateEpochCommitmentDeadline() {
+// validateEpochConfig validates configuration of the epoch commitment deadline.
+func validateEpochConfig() {
+	chainID := parseChainID(flagRootChain)
 	dkgFinalView := flagNumViewsInStakingAuction + flagNumViewsInDKGPhase*3 // 3 DKG phases
 	epochCommitDeadline := flagNumViewsInEpoch - flagEpochCommitSafetyThreshold
-	// TODO sanity check the configs are in some reasonable range (higher on Mainnet eg.)
-	_ = dkgFinalView
-	_ = epochCommitDeadline
+
+	defaultSafetyThreshold, err := protocol.DefaultEpochCommitSafetyThreshold(chainID)
+	if err != nil {
+		log.Fatal().Err(err).Msg("unable to validate epoch config")
+	}
+
+	// sanity check 1: the safety threshold is >= the default for the chain
+	if flagEpochCommitSafetyThreshold < defaultSafetyThreshold {
+		log.Fatal().Msgf("potentially unsafe epoch config: epoch commit safety threshold smaller than expected (%d < %d)", flagEpochCommitSafetyThreshold, defaultSafetyThreshold)
+	}
+	// sanity check 2: the difference between DKG end and safety threshold is also >= the default safety threshold
+	if epochCommitDeadline <= dkgFinalView {
+		log.Fatal().Msgf("invalid epoch config: the epoch commitment deadline (%d) is before the DKG final view (%d)", epochCommitDeadline, dkgFinalView)
+	}
+	if epochCommitDeadline-dkgFinalView < defaultSafetyThreshold {
+		log.Fatal().Msgf("potentially unsafe epoch config: time between DKG end and epoch commitment deadline is smaller than expected (%d-%d < %d)",
+			epochCommitDeadline, dkgFinalView, defaultSafetyThreshold)
+	}
 }
