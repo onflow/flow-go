@@ -206,8 +206,11 @@ func initializeMessageCodeMap() {
 
 	// testing
 	messageCodeMap[codec.CodeEcho] = MessageCode{
-		Code:                  codec.CodeEcho,
-		authorizedChannelsMap: map[Channel]flow.RoleList{},
+		Code: codec.CodeEcho,
+		authorizedChannelsMap: map[Channel]flow.RoleList{
+			TestNetworkChannel: flow.Roles(),
+			TestMetricsChannel: flow.Roles(),
+		},
 	}
 
 	// dkg

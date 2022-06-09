@@ -10,8 +10,6 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/network/codec"
-
 	"github.com/onflow/flow-go/network"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -81,11 +79,6 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, c ne
 
 // isAuthorizedSender checks if node is an authorized role.
 func isAuthorizedSender(identity *flow.Identity, channel network.Channel, code network.MessageCode) error {
-	// echo messages can be sent by anyone
-	if code.Code == codec.CodeEcho {
-		return nil
-	}
-
 	var authorizedRolesByChannel flow.RoleList
 
 	// handle cluster prefixed channels and check and get authorized roles list
