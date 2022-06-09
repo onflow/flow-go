@@ -12,7 +12,6 @@ type Codec interface {
 	NewDecoder(r io.Reader) Decoder
 	Encode(v interface{}) ([]byte, error)
 	Decode(data []byte) (interface{}, error)
-	DecodeMsgType(data []byte) (MessageCode, error)
 }
 
 // Encoder encodes the given message into the underlying writer.

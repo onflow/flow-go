@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/codec"
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
@@ -14,12 +14,7 @@ import (
 func env2vDecode(env Envelope, via string) (interface{}, error) {
 
 	// create the desired message
-	code, err := network.MessageCodeFromByte(env.Code)
-	if err != nil {
-		return nil, fmt.Errorf("could not determine envelope code: %w", err)
-	}
-
-	what, v, err := code.Code.Message()
+	v, what, err := codec.InterfaceFromMessageCode(env.Code)
 	if err != nil {
 		return nil, fmt.Errorf("could not determine envelope code string: %w", err)
 	}

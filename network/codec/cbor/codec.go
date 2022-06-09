@@ -8,9 +8,9 @@ import (
 	"io"
 
 	"github.com/fxamacker/cbor/v2"
-
 	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/codec"
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
@@ -46,14 +46,9 @@ func (c *Codec) NewDecoder(r io.Reader) network.Decoder {
 func (c *Codec) Encode(v interface{}) ([]byte, error) {
 
 	// encode the value
-	code, err := network.MessageCodeFromV(v)
+	code, what, err := codec.MessageCodeFromV(v)
 	if err != nil {
 		return nil, fmt.Errorf("could not determine envelope code: %w", err)
-	}
-
-	what, err := code.Code.String()
-	if err != nil {
-		return nil, fmt.Errorf("could not determine envelope code string: %w", err)
 	}
 
 	// NOTE: benchmarking shows that prepending the code and then using
@@ -62,7 +57,7 @@ func (c *Codec) Encode(v interface{}) ([]byte, error) {
 	// encode / append the envelope code
 	//bs1 := binstat.EnterTime(binstat.BinNet + ":wire<1(cbor)envelope2payload")
 	var data bytes.Buffer
-	data.WriteByte(code.Code.Byte())
+	data.WriteByte(code)
 	//binstat.LeaveVal(bs1, int64(data.Len()))
 
 	// encode the payload
@@ -71,7 +66,7 @@ func (c *Codec) Encode(v interface{}) ([]byte, error) {
 	err = encoder.Encode(v)
 	//binstat.LeaveVal(bs2, int64(data.Len()))
 	if err != nil {
-		return nil, fmt.Errorf("could not encode CBOR payload with envelope code %d AKA %s: %w", code.Code, what, err) // e.g. 2, "CodeBlockProposal", <CBOR error>
+		return nil, fmt.Errorf("could not encode CBOR payload with envelope code %d AKA %s: %w", code, what, err) // e.g. 2, "CodeBlockProposal", <CBOR error>
 	}
 
 	dataBytes := data.Bytes()
@@ -91,14 +86,9 @@ func (c *Codec) Decode(data []byte) (interface{}, error) {
 	// decode the envelope
 	//bs1 := binstat.EnterTime(binstat.BinNet + ":wire>3(cbor)payload2envelope")
 
-	code, err := network.MessageCodeFromByte(data[0]) // only first byte
-	if err != nil {
-		return nil, fmt.Errorf("could not get message code from byte: %w", err)
-	}
-
 	//binstat.LeaveVal(bs1, int64(len(data)))
 
-	what, v, err := code.Code.Message()
+	v, what, err := codec.InterfaceFromMessageCode(data[0])
 	if err != nil {
 		return nil, fmt.Errorf("could not determine interface from code: %w", err)
 	}
@@ -108,19 +98,8 @@ func (c *Codec) Decode(data []byte) (interface{}, error) {
 	err = cbor.Unmarshal(data[1:], v) // all but first byte
 	//binstat.Leave(bs2)
 	if err != nil {
-		return nil, fmt.Errorf("could not decode CBOR payload with envelope code %d AKA %s: %w", code.Code, what, err) // e.g. 2, "CodeBlockProposal", <CBOR error>
+		return nil, fmt.Errorf("could not decode CBOR payload with envelope code %d AKA %s: %w", data[0], what, err) // e.g. 2, "CodeBlockProposal", <CBOR error>
 	}
 
 	return v, nil
-}
-
-// DecodeMsgType handles decoding of the message code byte from data. This codec
-// encodes the message code byte as the first byte in the message data.
-func (c *Codec) DecodeMsgType(data []byte) (network.MessageCode, error) {
-	code, err := network.MessageCodeFromByte(data[0])
-	if err != nil {
-		return network.MessageCode{}, fmt.Errorf("could not decode message type check encoding: %w", err)
-	}
-
-	return code, nil
 }

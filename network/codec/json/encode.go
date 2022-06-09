@@ -6,19 +6,14 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/codec"
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
 func v2envEncode(v interface{}, via string) (*Envelope, error) {
 
 	// determine the message type
-	code, err := network.MessageCodeFromV(v)
-	if err != nil {
-		return nil, fmt.Errorf("could not determine envelope code: %w", err)
-	}
-
-	what, err := code.Code.String()
+	code, what, err := codec.MessageCodeFromV(v)
 	if err != nil {
 		return nil, fmt.Errorf("could not determine envelope code string: %w", err)
 	}
@@ -32,7 +27,7 @@ func v2envEncode(v interface{}, via string) (*Envelope, error) {
 	}
 
 	env := Envelope{
-		Code: code.Code.Byte(),
+		Code: code,
 		Data: data,
 	}
 
