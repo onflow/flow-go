@@ -39,6 +39,7 @@ var _ hotstuff.TimeoutAggregator = (*TimeoutAggregator)(nil)
 var _ component.Component = (*TimeoutAggregator)(nil)
 
 // NewTimeoutAggregator creates an instance of timeout aggregator
+// No errors are expected during normal operations.
 func NewTimeoutAggregator(log zerolog.Logger,
 	notifier hotstuff.Consumer,
 	lowestRetainedView uint64,
@@ -61,7 +62,6 @@ func NewTimeoutAggregator(log zerolog.Logger,
 	}
 
 	componentBuilder := component.NewComponentManagerBuilder()
-
 	for i := 0; i < defaultTimeoutAggregatorWorkers; i++ { // manager for worker routines that process inbound events
 		componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
@@ -77,6 +77,9 @@ func NewTimeoutAggregator(log zerolog.Logger,
 	return aggregator, nil
 }
 
+// queuedTimeoutsProcessingLoop is the event loop which waits for notification about pending work
+// and as soon as there is some it triggers processing.
+// All errors are propagated to SignalerContext
 func (t *TimeoutAggregator) queuedTimeoutsProcessingLoop(ctx irrecoverable.SignalerContext) {
 	notifier := t.queuedTimeoutsNotifier.Channel()
 	for {
@@ -93,6 +96,9 @@ func (t *TimeoutAggregator) queuedTimeoutsProcessingLoop(ctx irrecoverable.Signa
 	}
 }
 
+// processQueuedTimeoutEvents is a function which dispatches previously queued timeouts on worker thread
+// This function is called whenever we have queued timeouts ready to be dispatched.
+// No errors are expected during normal operations.
 func (t *TimeoutAggregator) processQueuedTimeoutEvents(ctx context.Context) error {
 	for {
 		select {
