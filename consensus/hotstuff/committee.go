@@ -52,6 +52,8 @@ type Replicas interface {
 	Self() flow.Identifier
 
 	// DKG returns the DKG info for epoch given by the input view.
+	// Returns the following expected errors for invalid inputs:
+	//   * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
 	DKG(view uint64) (DKG, error)
 
 	// IdentitiesByEpoch returns a list of the legitimate HotStuff participants for the epoch

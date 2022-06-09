@@ -381,7 +381,7 @@ func (c *Core) OnBlockVote(originID flow.Identifier, vote *messages.BlockVote) e
 func (c *Core) OnTimeoutObject(originID flow.Identifier, timeout *messages.TimeoutObject) error {
 	t := &model.TimeoutObject{
 		View:       timeout.View,
-		HighestQC:  timeout.HighestQC,
+		NewestQC:   timeout.NewestQC,
 		LastViewTC: timeout.LastViewTC,
 		SignerID:   originID,
 		SigData:    timeout.SigData,

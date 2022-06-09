@@ -95,8 +95,8 @@ type WeightedSignatureAggregator interface {
 //  * For each replicas that is authorized to send a timeout at this particular view:
 //    the node ID, public staking keys, and weight
 // Timeouts for other views or from non-authorized replicas are rejected.
-// In their TimeoutObjects, replicas include a signature over the pair (view, highestQCView),
-// where `view` is the view number the timeout is for and `highestQCView` is the view of
+// In their TimeoutObjects, replicas include a signature over the pair (view, newestQCView),
+// where `view` is the view number the timeout is for and `newestQCView` is the view of
 // the newest QC known to the replica. TimeoutSignatureAggregator collects these signatures,
 // internally tracks the total weight of all collected signatures. Note that in general the
 // signed messages are different, which makes the aggregation a comparatively expensive operation.
@@ -114,7 +114,7 @@ type TimeoutSignatureAggregator interface {
 	//  - model.InvalidSignerError if signerID is invalid (not a consensus participant)
 	//  - model.DuplicatedSignerError if the signer has been already added
 	//  - model.ErrInvalidSignature if signerID is valid but signature is cryptographically invalid
-	VerifyAndAdd(signerID flow.Identifier, sig crypto.Signature, highestQCView uint64) (totalWeight uint64, exception error)
+	VerifyAndAdd(signerID flow.Identifier, sig crypto.Signature, newestQCView uint64) (totalWeight uint64, exception error)
 
 	// TotalWeight returns the total weight presented by the collected signatures.
 	TotalWeight() uint64
@@ -124,7 +124,7 @@ type TimeoutSignatureAggregator interface {
 	// Caller can be sure that resulting signature is valid.
 	// Expected errors during normal operations:
 	//  - model.InsufficientSignaturesError if no signatures have been added yet
-	Aggregate() (signers []flow.Identifier, highQCViews []uint64, aggregatedSig crypto.Signature, exception error)
+	Aggregate() (signers []flow.Identifier, newestQCViews []uint64, aggregatedSig crypto.Signature, exception error)
 }
 
 // BlockSignatureData is an intermediate struct for Packer to pack the

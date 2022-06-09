@@ -17,17 +17,25 @@ var (
 	ErrViewForUnknownEpoch = fmt.Errorf("by-view query for unknown epoch")
 )
 
-// NoVoteError contains the reason of why the voter didn't vote for a block proposal.
+// NoVoteError contains the reason why hotstuff.SafetyRules refused to generate a `Vote` for the current view.
 type NoVoteError struct {
-	Msg string
+	Err error
 }
 
-func (e NoVoteError) Error() string { return e.Msg }
+func (e NoVoteError) Error() string { return fmt.Sprintf("not voting - %s", e.Err.Error()) }
+
+func (e NoVoteError) Unwrap() error {
+	return e.Err
+}
 
 // IsNoVoteError returns whether an error is NoVoteError
 func IsNoVoteError(err error) bool {
 	var e NoVoteError
 	return errors.As(err, &e)
+}
+
+func NewNoVoteErrorf(msg string, args ...interface{}) error {
+	return NoVoteError{Err: fmt.Errorf(msg, args...)}
 }
 
 // InvalidFormatError indicates that some data has an incompatible format.
@@ -89,6 +97,47 @@ func (e MissingBlockError) Error() string {
 func IsMissingBlockError(err error) bool {
 	var e MissingBlockError
 	return errors.As(err, &e)
+}
+
+// InvalidQCError indicates that the QC for block identified by `BlockID` and `View` is invalid
+type InvalidQCError struct {
+	BlockID flow.Identifier
+	View    uint64
+	Err     error
+}
+
+func (e InvalidQCError) Error() string {
+	return fmt.Sprintf("invalid QC for block %x at view %d: %s", e.BlockID, e.View, e.Err.Error())
+}
+
+// IsInvalidQCError returns whether an error is InvalidQCError
+func IsInvalidQCError(err error) bool {
+	var e InvalidQCError
+	return errors.As(err, &e)
+}
+
+func (e InvalidQCError) Unwrap() error {
+	return e.Err
+}
+
+// InvalidTCError indicates that the TC for view identified by `View` is invalid
+type InvalidTCError struct {
+	View uint64
+	Err  error
+}
+
+func (e InvalidTCError) Error() string {
+	return fmt.Sprintf("invalid TC at view %d: %s", e.View, e.Err.Error())
+}
+
+// IsInvalidTCError returns whether an error is InvalidQCError
+func IsInvalidTCError(err error) bool {
+	var e InvalidTCError
+	return errors.As(err, &e)
+}
+
+func (e InvalidTCError) Unwrap() error {
+	return e.Err
 }
 
 // InvalidBlockError indicates that the block with identifier `BlockID` is invalid

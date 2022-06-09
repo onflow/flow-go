@@ -55,13 +55,13 @@ require (
 	github.com/multiformats/go-multihash v0.1.0
 	github.com/onflow/atree v0.3.1-0.20220519142403-b0077ba343ec
 	github.com/onflow/cadence v0.21.3-0.20220520204606-7b9689d79a2d
-	github.com/onflow/flow v0.3.0
+	github.com/onflow/flow v0.3.1-0.20220527132941-7b518332fd68
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220513155751-c4c1f8d59f83
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220513155751-c4c1f8d59f83
 	github.com/onflow/flow-emulator v0.31.2-0.20220513151845-ef7513cb1cd0
 	github.com/onflow/flow-go-sdk v0.24.1-0.20220513205729-d1f58d47c4e3
 	github.com/onflow/flow-go/crypto v0.24.3
-	github.com/onflow/flow/protobuf/go/flow v0.3.0
+	github.com/onflow/flow/protobuf/go/flow v0.3.1-0.20220527145234-e4692b146576
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pierrec/lz4 v2.6.1+incompatible
 	github.com/pkg/errors v0.9.1

@@ -8,6 +8,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
@@ -236,14 +237,45 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 		highest := segment.Highest()
 		lowest := segment.Lowest()
 
-		// insert initial views for HotStuff
-		err = operation.InsertStartedView(highest.Header.ChainID, highest.Header.View)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert started view: %w", err)
+		safetyData := &hotstuff.SafetyData{
+			LockedOneChainView:      highest.Header.View,
+			HighestAcknowledgedView: highest.Header.View,
 		}
-		err = operation.InsertVotedView(highest.Header.ChainID, highest.Header.View)(tx)
+
+		// Per convention, all blocks in the sealing segment must be finalized. Therefore, a QC must
+		// exist for the `highest` block in the sealing segment. The QC for `highest` should be
+		// contained in the `root` Snapshot and returned by `root.QuorumCertificate()`. Otherwise,
+		// the Snapshot is incomplete, because consensus nodes require this QC. To reduce the chance of
+		// accidental misconfiguration undermining consensus liveness, we do the following sanity checks:
+		//  * `rootQC` should not be nil
+		//  * `rootQC` should be for `highest` block, i.e. its view and blockID should match
+		rootQC, err := root.QuorumCertificate()
 		if err != nil {
-			return fmt.Errorf("could not insert started view: %w", err)
+			return fmt.Errorf("could not get root QC: %w", err)
+		}
+		if rootQC == nil {
+			return fmt.Errorf("QC for highest (finalized) block in sealing segment cannot be nil")
+		}
+		if rootQC.View != highest.Header.View {
+			return fmt.Errorf("root QC's view %d does not match the highest block in sealing segment (view %d)", rootQC.View, highest.Header.View)
+		}
+		if rootQC.BlockID != highest.Header.ID() {
+			return fmt.Errorf("root QC is for block %v, which does not match the highest block %v in sealing segment", rootQC.BlockID, highest.Header.ID())
+		}
+
+		livenessData := &hotstuff.LivenessData{
+			CurrentView: highest.Header.View + 1,
+			NewestQC:    rootQC,
+		}
+
+		// insert initial views for HotStuff
+		err = operation.InsertSafetyData(highest.Header.ChainID, safetyData)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert safety data: %w", err)
+		}
+		err = operation.InsertLivenessData(highest.Header.ChainID, livenessData)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert liveness data: %w", err)
 		}
 
 		// insert height pointers

@@ -209,7 +209,7 @@ func TestClusters(t *testing.T) {
 	identities := append(unittest.IdentityListFixture(4, unittest.WithAllRolesExcept(flow.RoleCollection)), collectors...)
 
 	root, result, seal := unittest.BootstrapFixture(identities)
-	qc := unittest.QuorumCertificateFixture(unittest.QCWithBlockID(root.ID()))
+	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(root.ID()))
 	setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 	commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
 	setup.Assignments = unittest.ClusterAssignment(uint(nClusters), collectors)
@@ -1013,7 +1013,7 @@ func TestSnapshot_PostSporkIdentities(t *testing.T) {
 	root, result, seal := unittest.BootstrapFixture(expected, func(block *flow.Block) {
 		block.Header.ParentID = unittest.IdentifierFixture()
 	})
-	qc := unittest.QuorumCertificateFixture(unittest.QCWithBlockID(root.ID()))
+	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(root.ID()))
 
 	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)
 	require.NoError(t, err)
