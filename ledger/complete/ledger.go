@@ -358,8 +358,8 @@ func (l *Ledger) ExportCheckpointAt(
 
 	l.logger.Info().Msgf("running pre-checkpoint reporters")
 	// run post migration reporters
-	for _, reporter := range preCheckpointReporters {
-		l.logger.Info().Msgf("running a pre-checkpoint generation reporter: %s", reporter.Name())
+	for i, reporter := range preCheckpointReporters {
+		l.logger.Info().Msgf("running a pre-checkpoint generation reporter: %s, (%v/%v)", reporter.Name(), i, len(preCheckpointReporters))
 		err := runReport(reporter, payloads, l.logger)
 		if err != nil {
 			return ledger.State(hash.DummyHash), err
