@@ -83,7 +83,7 @@ func (s *TimeoutProcessorTestSuite) SetupTest() {
 // We expect dedicated sentinel errors for timeouts for different views (`ErrTimeoutForIncompatibleView`).
 func (s *TimeoutProcessorTestSuite) TestProcess_TimeoutNotForView() {
 	err := s.processor.Process(helper.TimeoutObjectFixture(helper.WithTimeoutObjectView(s.view + 1)))
-	require.ErrorAs(s.T(), err, &ErrTimeoutForIncompatibleView)
+	require.ErrorIs(s.T(), err, ErrTimeoutForIncompatibleView)
 	require.False(s.T(), model.IsInvalidTimeoutError(err))
 
 	s.sigAggregator.AssertNotCalled(s.T(), "Verify")
@@ -158,7 +158,7 @@ func (s *TimeoutProcessorTestSuite) TestProcess_IncludedQCInvalid() {
 
 	err := s.processor.Process(timeout)
 	require.True(s.T(), model.IsInvalidTimeoutError(err))
-	require.ErrorAs(s.T(), err, &exception)
+	require.ErrorIs(s.T(), err, exception)
 }
 
 // TestProcess_IncludedTCInvalid tests that TimeoutProcessor fails with model.InvalidTimeoutError if
@@ -178,7 +178,7 @@ func (s *TimeoutProcessorTestSuite) TestProcess_IncludedTCInvalid() {
 
 	err := s.processor.Process(timeout)
 	require.True(s.T(), model.IsInvalidTimeoutError(err))
-	require.ErrorAs(s.T(), err, &exception)
+	require.ErrorIs(s.T(), err, exception)
 }
 
 // TestProcess_ValidTimeout tests that processing a valid timeout succeeds without error
