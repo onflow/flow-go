@@ -3,6 +3,7 @@ package attacknetwork
 import (
 	"context"
 	"fmt"
+	"net"
 	"sync"
 	"testing"
 	"time"
@@ -207,12 +208,10 @@ func withCorruptedConnections(t *testing.T,
 
 	attackNetwork, err := NewAttackNetwork(
 		unittest.Logger(),
-		serverAddress,
 		codec,
 		orchestrator,
 		connector,
-		corruptedIds,
-		WithLocalHostRuntime)
+		corruptedIds)
 	require.NoError(t, err)
 	connector.On("WithAttackerAddress", mock.Anything).Return().Once()
 
@@ -292,4 +291,56 @@ func mockConnectorForConnect(t *testing.T, connector *mockinsecure.CorruptedNode
 			})
 
 	return connections
+}
+
+// withMockCorruptibleConduitFactories creates and starts mock Corruptible Conduit Factories (CCF)s.
+// These mock CCFs only run the gRPC part of an actual CCF. Once all CCFs are up and running, the injected "run" function is executed.
+func withMockCorruptibleConduitFactories(
+	t *testing.T,
+	count int,
+	run func(flow.IdentityList, irrecoverable.SignalerContext,
+		[]*mockCorruptibleConduitFactory,
+		map[flow.Identifier]string)) {
+
+	// life-cycle management of corruptible conduit factory.
+	ctx, cancel := context.WithCancel(context.Background())
+	ccfCtx, errChan := irrecoverable.WithSignaler(ctx)
+	go func() {
+		select {
+		case err := <-errChan:
+			t.Error("mock corruptible conduit factory startup encountered fatal error", err)
+		case <-ctx.Done():
+			return
+		}
+	}()
+
+	ccfs := make([]*mockCorruptibleConduitFactory, count)
+	ccfPorts := make(map[flow.Identifier]string)
+	ccfIds := make([]*flow.Identity, count)
+	for i := 0; i < count; i++ {
+		// identity
+		ccfId := unittest.IdentityFixture(unittest.WithAddress("localhost:0"))
+		ccfIds[i] = ccfId
+
+		// factory
+		ccf := newMockCorruptibleConduitFactory()
+		ccf.Start(ccfCtx)
+		unittest.RequireCloseBefore(t, ccf.Ready(), 1*time.Second, "could not start corruptible conduit factory on time")
+		ccfs[i] = ccf
+
+		// port mapping
+		_, ccfPortStr, err := net.SplitHostPort(ccf.ServerAddress())
+		require.NoError(t, err)
+		ccfPorts[ccfId.NodeID] = ccfPortStr
+	}
+
+	run(ccfIds, ccfCtx, ccfs, ccfPorts)
+
+	// terminates attackNetwork
+	cancel()
+
+	// stop all ccfs
+	for i := 0; i < count; i++ {
+		unittest.RequireCloseBefore(t, ccfs[i].Done(), 1*time.Second, "could not stop corruptible conduit factory on time")
+	}
 }
