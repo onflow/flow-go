@@ -16,9 +16,12 @@ func TestCoreContractsMigration(t *testing.T) {
 
 	t.Run("other payloads are not modified", func(t *testing.T) {
 
+		dir := t.TempDir()
+
 		migration := migrations.CoreContractsMigration{
-			Log:   zerolog.Logger{},
-			Chain: flow.Testnet,
+			Log:       zerolog.Logger{},
+			Chain:     flow.Testnet,
+			OutputDir: dir,
 		}
 
 		input := []ledger.Payload{
@@ -43,9 +46,11 @@ func TestCoreContractsMigration(t *testing.T) {
 
 	t.Run("DKG contract is migrated", func(t *testing.T) {
 
+		dir := t.TempDir()
 		migration := migrations.CoreContractsMigration{
-			Log:   zerolog.Logger{},
-			Chain: flow.Testnet,
+			Log:       zerolog.Logger{},
+			Chain:     flow.Testnet,
+			OutputDir: dir,
 		}
 
 		dkgAddress := flow.HexToAddress("0x9eca2b38b18b5dfe")

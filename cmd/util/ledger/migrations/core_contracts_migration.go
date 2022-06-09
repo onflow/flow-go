@@ -1,9 +1,13 @@
 package migrations
 
 import (
+	"encoding/csv"
 	"encoding/hex"
 	"fmt"
+	"os"
+	"path"
 	"strings"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -18,9 +22,10 @@ type ContractLocation struct {
 }
 
 type CoreContractsMigration struct {
-	Log     zerolog.Logger
-	Chain   flow.ChainID
-	Updates map[ContractLocation]struct{}
+	Log       zerolog.Logger
+	Chain     flow.ChainID
+	OutputDir string
+	Updates   map[ContractLocation]struct{}
 }
 
 type networkAddresses struct {
@@ -217,11 +222,41 @@ func coreContractCodes(addresses networkAddresses) map[string]map[string][]byte 
 
 const codeKeyPrefix = "code."
 
+func (m *CoreContractsMigration) path() string {
+	filename := fmt.Sprintf(
+		"core_contracts_migration_%d.csv",
+		int32(time.Now().Unix()),
+	)
+	return path.Join(m.OutputDir, filename)
+}
+
 func (m *CoreContractsMigration) Migrate(payloads []ledger.Payload) ([]ledger.Payload, error) {
 
 	m.Updates = map[ContractLocation]struct{}{}
 
-	m.Log.Info().Msgf("Running Core Contracts migration")
+	csvPath := m.path()
+
+	m.Log.Info().Msgf("Running Core Contracts migration. Saving output to %s.", csvPath)
+
+	f, err := os.Create(csvPath)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		err = f.Close()
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	csvWriter := csv.NewWriter(f)
+	defer csvWriter.Flush()
+
+	err = csvWriter.Write([]string{"address", "contractName", "old", "new"})
+	if err != nil {
+		panic(err)
+	}
 
 	addresses := coreContractAddresses(m.Chain)
 	codes := coreContractCodes(addresses)
@@ -247,9 +282,20 @@ func (m *CoreContractsMigration) Migrate(payloads []ledger.Payload) ([]ledger.Pa
 			continue
 		}
 
+		oldCode := payload.Value
 		payloads[i].Value = newCode
 
 		m.Log.Info().Msgf("Updated core contract: %s.%s", owner, contractName)
+
+		err = csvWriter.Write([]string{
+			owner,
+			contractName,
+			string(oldCode),
+			string(newCode),
+		})
+		if err != nil {
+			panic(err)
+		}
 
 		location := ContractLocation{
 			address:      owner,
