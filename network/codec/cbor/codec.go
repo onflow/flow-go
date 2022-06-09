@@ -47,7 +47,7 @@ func (c *Codec) NewDecoder(r io.Reader) network.Decoder {
 func (c *Codec) Encode(v interface{}) ([]byte, error) {
 
 	// encode the value
-	code, what, err := codec.MessageCodeFromV(v)
+	code, what, err := codec.MessageCodeFromInteface(v)
 	if err != nil {
 		return nil, fmt.Errorf("could not determine envelope code: %w", err)
 	}

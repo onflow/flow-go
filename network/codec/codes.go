@@ -63,8 +63,8 @@ const (
 	CodeMax
 )
 
-// MessageCodeFromV returns the correct Code based on the underlying type of message v
-func MessageCodeFromV(v interface{}) (uint8, string, error) {
+// MessageCodeFromInteface returns the correct Code based on the underlying type of message v.
+func MessageCodeFromInteface(v interface{}) (uint8, string, error) {
 	switch v.(type) {
 	// consensus
 	case *messages.BlockProposal:
@@ -143,6 +143,8 @@ func MessageCodeFromV(v interface{}) (uint8, string, error) {
 	}
 }
 
+// InterfaceFromMessageCode returns an interface with the correct underlying go type
+// of the message code represents.
 func InterfaceFromMessageCode(code uint8) (interface{}, string, error) {
 	switch code {
 	// consensus

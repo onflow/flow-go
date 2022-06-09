@@ -13,7 +13,7 @@ import (
 func v2envEncode(v interface{}, via string) (*Envelope, error) {
 
 	// determine the message type
-	code, what, err := codec.MessageCodeFromV(v)
+	code, what, err := codec.MessageCodeFromInteface(v)
 	if err != nil {
 		return nil, fmt.Errorf("could not determine envelope code string: %w", err)
 	}
