@@ -108,8 +108,6 @@ func New(
 		log.Fatal().Err(err).Msg("failed to initialize script logging cache")
 	}
 
-	log.Info().Msg("Initializing backend...")
-
 	b := &Backend{
 		state: state,
 		// create the sub-backends

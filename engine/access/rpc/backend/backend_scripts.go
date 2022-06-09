@@ -113,11 +113,10 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 		if err == nil {
 			if b.log.GetLevel() == zerolog.DebugLevel {
 				executionTime := time.Now()
-				_, seen := b.loggedScripts.Get(insecureScriptHash)
-				// timestamp := rawTimestamp.(time.Time)
+				rawTimestamp, seen := b.loggedScripts.Get(insecureScriptHash)
+				timestamp := rawTimestamp.(time.Time)
 				// log if the script is unique in the time window
-				if !seen {
-					//|| executionTime.Sub(timestamp) >= uniqueScriptLoggingTimeWindow {
+				if !seen || executionTime.Sub(timestamp) >= uniqueScriptLoggingTimeWindow {
 					b.log.Debug().
 						Str("execution_node", execNode.String()).
 						Hex("block_id", blockID[:]).
