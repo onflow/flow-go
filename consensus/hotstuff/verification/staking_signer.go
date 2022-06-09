@@ -6,9 +6,9 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	msig "github.com/onflow/flow-go/module/signature"
 )
 
 // StakingSigner creates votes for the collector clusters consensus.
@@ -29,7 +29,7 @@ func NewStakingSigner(
 
 	sc := &StakingSigner{
 		me:            me,
-		stakingHasher: crypto.NewBLSKMAC(signature.CollectorVoteTag),
+		stakingHasher: crypto.NewBLSKMAC(msig.CollectorVoteTag),
 		signerID:      me.NodeID(),
 	}
 	return sc

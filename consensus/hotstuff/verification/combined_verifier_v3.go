@@ -37,8 +37,8 @@ var _ hotstuff.Verifier = (*CombinedVerifierV3)(nil)
 func NewCombinedVerifierV3(committee hotstuff.Committee, packer hotstuff.Packer) *CombinedVerifierV3 {
 	return &CombinedVerifierV3{
 		committee:     committee,
-		stakingHasher: crypto.NewBLSKMAC(signature.ConsensusVoteTag),
-		beaconHasher:  crypto.NewBLSKMAC(signature.RandomBeaconTag),
+		stakingHasher: crypto.NewBLSKMAC(msig.ConsensusVoteTag),
+		beaconHasher:  crypto.NewBLSKMAC(msig.RandomBeaconTag),
 		packer:        packer,
 	}
 }
