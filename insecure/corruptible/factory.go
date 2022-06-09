@@ -11,7 +11,6 @@ import (
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
-	grpcinsecure "google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
@@ -41,13 +40,14 @@ type ConduitFactory struct {
 	codec                 network.Codec
 	me                    module.Local
 	adapter               network.Adapter
-	attackerObserveClient insecure.Attacker_ObserveClient
 	server                *grpc.Server // touch point of attack network to this factory.
 	address               net.Addr
 	ctx                   context.Context
 	receiptHasher         hash.Hasher
 	spockHasher           hash.Hasher
 	approvalHasher        hash.Hasher
+	attackerInboundStream insecure.CorruptibleConduitFactory_RegisterAttackerServer // inbound stream to attacker
+	incomingMessageChan   chan *insecure.Message
 }
 
 func NewCorruptibleConduitFactory(
@@ -158,13 +158,6 @@ func (c *ConduitFactory) ProcessAttackerMessage(stream insecure.CorruptibleCondu
 	for {
 		select {
 		case <-c.cm.ShutdownSignal():
-			if c.attackerObserveClient != nil {
-				_, err := c.attackerObserveClient.CloseAndRecv()
-				if err != nil {
-					c.logger.Fatal().Err(err).Msg("could not close processing stream from attacker")
-					return err
-				}
-			}
 			return nil
 		default:
 			msg, err := stream.Recv()
@@ -231,34 +224,25 @@ func (c *ConduitFactory) processAttackerMessage(msg *insecure.Message) error {
 // RegisterAttacker is a gRPC end-point for this conduit factory that lets an attacker register itself to it, so that the attacker can
 // control it.
 // Registering an attacker on a conduit is an exactly-once immutable operation, any second attempt after a successful registration returns an error.
-func (c *ConduitFactory) RegisterAttacker(_ context.Context, in *insecure.AttackerRegisterMessage) (*empty.Empty, error) {
-	select {
-	case <-c.cm.ShutdownSignal():
-		return nil, fmt.Errorf("conduit factory has been shut down")
-	default:
-		return &empty.Empty{}, c.registerAttacker(in.Address)
-	}
-}
+func (c *ConduitFactory) RegisterAttacker(_ *empty.Empty, stream insecure.CorruptibleConduitFactory_RegisterAttackerServer) error {
 
-func (c *ConduitFactory) registerAttacker(address string) error {
-	if c.attackerObserveClient != nil {
-		c.logger.Error().Str("address", address).Msg("attacker double-register detected")
-		return fmt.Errorf("illegal state: trying to register an attacker (%s) while one already exists", address)
+	if c.attackerInboundStream != nil {
+		return fmt.Errorf("could not register a new network adapter, one already exists")
 	}
+	c.attackerInboundStream = stream
 
-	clientConn, err := grpc.Dial(address,
-		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
-	if err != nil {
-		return fmt.Errorf("could not establish a client connection to attacker: %w", err)
+	for {
+		select {
+		case <-c.cm.ShutdownSignal():
+			return nil
+
+		case msg := <-c.incomingMessageChan:
+			err := c.attackerInboundStream.Send(msg)
+			if err != nil {
+				return fmt.Errorf("could not send message to attacker to observe: %w", err)
+			}
+		}
 	}
-
-	attackerClient := insecure.NewAttackerClient(clientConn)
-	c.attackerObserveClient, err = attackerClient.Observe(c.ctx)
-	if err != nil {
-		return fmt.Errorf("could not establish an observe stream to the attacker: %w", err)
-	}
-
-	c.logger.Info().Str("address", address).Msg("attacker registered successfully")
 
 	return nil
 }
@@ -274,7 +258,7 @@ func (c *ConduitFactory) HandleIncomingEvent(
 	num uint32,
 	targetIds ...flow.Identifier) error {
 
-	if c.attackerObserveClient == nil {
+	if c.attackerInboundStream == nil {
 		// no attacker yet registered, hence sending message on the network following the
 		// correct expected behavior.
 		return c.sendOnNetwork(event, channel, protocol, uint(num), targetIds...)
@@ -285,10 +269,7 @@ func (c *ConduitFactory) HandleIncomingEvent(
 		return fmt.Errorf("could not convert event to message: %w", err)
 	}
 
-	err = c.attackerObserveClient.Send(msg)
-	if err != nil {
-		return fmt.Errorf("could not send message to attacker to observe: %w", err)
-	}
+	c.incomingMessageChan <- msg
 
 	return nil
 }
