@@ -46,7 +46,7 @@ type ConnectionFactoryImpl struct {
 	ExecutionNodeGRPCTimeout  time.Duration
 	ConnectionsCache          *lru.Cache
 	CacheSize                 uint
-	TransactionMetrics        module.TransactionMetrics
+	AccessMetrics             module.AccessMetrics
 }
 
 // createConnection creates new gRPC connections to remote node
@@ -75,8 +75,8 @@ func (cf *ConnectionFactoryImpl) retrieveConnection(grpcAddress string, timeout 
 	var conn *grpc.ClientConn
 	if res, ok := cf.ConnectionsCache.Get(grpcAddress); ok {
 		conn = res.(*grpc.ClientConn)
-		if cf.TransactionMetrics != nil {
-			cf.TransactionMetrics.ConnectionFromPoolRetrieved()
+		if cf.AccessMetrics != nil {
+			cf.AccessMetrics.ConnectionFromPoolRetrieved()
 		}
 	}
 	if conn == nil || conn.GetState() != connectivity.Ready {
@@ -86,8 +86,8 @@ func (cf *ConnectionFactoryImpl) retrieveConnection(grpcAddress string, timeout 
 			return nil, err
 		}
 		cf.ConnectionsCache.Add(grpcAddress, conn)
-		if cf.TransactionMetrics != nil {
-			cf.TransactionMetrics.TotalConnectionsInPool(uint(cf.ConnectionsCache.Len()), cf.CacheSize)
+		if cf.AccessMetrics != nil {
+			cf.AccessMetrics.TotalConnectionsInPool(uint(cf.ConnectionsCache.Len()), cf.CacheSize)
 		}
 	}
 	return conn, nil
