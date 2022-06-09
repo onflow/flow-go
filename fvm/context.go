@@ -28,17 +28,18 @@ type Context struct {
 	ServiceAccountEnabled        bool
 	// Depricated: RestrictedDeploymentEnabled is deprecated use SetIsContractDeploymentRestrictedTransaction instead.
 	// Can be removed after all networks are migrated to SetIsContractDeploymentRestrictedTransaction
-	RestrictedDeploymentEnabled   bool
-	LimitAccountStorage           bool
-	TransactionFeesEnabled        bool
-	CadenceLoggingEnabled         bool
-	EventCollectionEnabled        bool
-	ServiceEventCollectionEnabled bool
-	AccountFreezeAvailable        bool
-	ExtensiveTracing              bool
-	TransactionProcessors         []TransactionProcessor
-	ScriptProcessors              []ScriptProcessor
-	Logger                        zerolog.Logger
+	RestrictedDeploymentEnabled      bool
+	RestrictedContractRemovalEnabled bool
+	LimitAccountStorage              bool
+	TransactionFeesEnabled           bool
+	CadenceLoggingEnabled            bool
+	EventCollectionEnabled           bool
+	ServiceEventCollectionEnabled    bool
+	AccountFreezeAvailable           bool
+	ExtensiveTracing                 bool
+	TransactionProcessors            []TransactionProcessor
+	ScriptProcessors                 []ScriptProcessor
+	Logger                           zerolog.Logger
 }
 
 // NewContext initializes a new execution context with the provided options.
@@ -70,25 +71,26 @@ const (
 
 func defaultContext(logger zerolog.Logger) Context {
 	return Context{
-		Chain:                         flow.Mainnet.Chain(),
-		Blocks:                        nil,
-		Metrics:                       &handler.NoopMetricsReporter{},
-		Tracer:                        nil,
-		ComputationLimit:              DefaultComputationLimit,
-		MemoryLimit:                   DefaultMemoryLimit,
-		MaxStateKeySize:               state.DefaultMaxKeySize,
-		MaxStateValueSize:             state.DefaultMaxValueSize,
-		MaxStateInteractionSize:       state.DefaultMaxInteractionSize,
-		EventCollectionByteSizeLimit:  DefaultEventCollectionByteSizeLimit,
-		MaxNumOfTxRetries:             DefaultMaxNumOfTxRetries,
-		BlockHeader:                   nil,
-		ServiceAccountEnabled:         true,
-		RestrictedDeploymentEnabled:   true,
-		CadenceLoggingEnabled:         false,
-		EventCollectionEnabled:        true,
-		ServiceEventCollectionEnabled: false,
-		AccountFreezeAvailable:        false,
-		ExtensiveTracing:              false,
+		Chain:                            flow.Mainnet.Chain(),
+		Blocks:                           nil,
+		Metrics:                          &handler.NoopMetricsReporter{},
+		Tracer:                           nil,
+		ComputationLimit:                 DefaultComputationLimit,
+		MemoryLimit:                      DefaultMemoryLimit,
+		MaxStateKeySize:                  state.DefaultMaxKeySize,
+		MaxStateValueSize:                state.DefaultMaxValueSize,
+		MaxStateInteractionSize:          state.DefaultMaxInteractionSize,
+		EventCollectionByteSizeLimit:     DefaultEventCollectionByteSizeLimit,
+		MaxNumOfTxRetries:                DefaultMaxNumOfTxRetries,
+		BlockHeader:                      nil,
+		ServiceAccountEnabled:            true,
+		RestrictedDeploymentEnabled:      true,
+		RestrictedContractRemovalEnabled: true,
+		CadenceLoggingEnabled:            false,
+		EventCollectionEnabled:           true,
+		ServiceEventCollectionEnabled:    false,
+		AccountFreezeAvailable:           false,
+		ExtensiveTracing:                 false,
 		TransactionProcessors: []TransactionProcessor{
 			NewTransactionAccountFrozenChecker(),
 			NewTransactionSignatureVerifier(AccountKeyWeightThreshold),
@@ -258,10 +260,20 @@ func WithServiceAccount(enabled bool) Option {
 }
 
 // WithRestrictedDeployment enables or disables restricted contract deployment for a
-// virtual machine context.
+// virtual machine context. Warning! this would be overridden with the flag stored on chain.
+// this is just a fallback value
 func WithRestrictedDeployment(enabled bool) Option {
 	return func(ctx Context) Context {
 		ctx.RestrictedDeploymentEnabled = enabled
+		return ctx
+	}
+}
+
+// WithRestrictedContractRemovalEnabled enables or disables restricted contract removal for a
+// virtual machine context.
+func WithRestrictedContractRemovalEnabled(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.RestrictedContractRemovalEnabled = enabled
 		return ctx
 	}
 }
