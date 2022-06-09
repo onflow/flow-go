@@ -108,6 +108,11 @@ func NewTransactionEnvironment(
 			}
 			return enabled
 		},
+		func() bool {
+			// TODO read this from the chain similar to the contract deployment
+			// but for now we would honor the fallback context flag
+			return ctx.RestrictedContractRemovalEnabled
+		},
 		env.GetAccountsAuthorizedForContractUpdate,
 		env.GetAccountsAuthorizedForContractRemoval,
 		env.useContractAuditVoucher,
