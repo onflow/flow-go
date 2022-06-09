@@ -21,12 +21,15 @@ type TransactionCollector struct {
 	timeToExecuted             prometheus.Summary
 	timeToFinalizedExecuted    prometheus.Summary
 	transactionSubmission      *prometheus.CounterVec
+<<<<<<< HEAD
 	scriptExecutedDuration     *prometheus.HistogramVec
 	transactionResultDuration  *prometheus.HistogramVec
 	scriptSize                 prometheus.Histogram
 	transactionSize            prometheus.Histogram
 	connectionReused           prometheus.Counter
 	connectionAddedToPool      *prometheus.GaugeVec
+=======
+>>>>>>> 189f714d2c (add access metrics)
 }
 
 func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log zerolog.Logger,
@@ -281,13 +284,4 @@ func (tc *TransactionCollector) TransactionExpired(txID flow.Identifier) {
 	}
 	tc.transactionSubmission.WithLabelValues("expired").Inc()
 	tc.transactionTimings.Rem(txID)
-}
-
-func (tc *TransactionCollector) ConnectionFromPoolRetrieved() {
-	tc.connectionReused.Inc()
-}
-
-func (tc *TransactionCollector) TotalConnectionsInPool(connectionCount uint, connectionPoolSize uint) {
-	tc.connectionAddedToPool.WithLabelValues("connections").Set(float64(connectionCount))
-	tc.connectionAddedToPool.WithLabelValues("pool_size").Set(float64(connectionPoolSize))
 }

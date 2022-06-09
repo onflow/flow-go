@@ -43,7 +43,7 @@ type Config struct {
 	MaxMsgSize                int                              // GRPC max message size
 	ExecutionClientTimeout    time.Duration                    // execution API GRPC client timeout
 	CollectionClientTimeout   time.Duration                    // collection API GRPC client timeout
-	ConnectionPoolSize        int                              // size of the cache for storing collection and execution connections
+	ConnectionPoolSize        uint                             // size of the cache for storing collection and execution connections
 	MaxHeightRange            uint                             // max size of height range requests
 	PreferredExecutionNodeIDs []string                         // preferred list of upstream execution node IDs
 	FixedExecutionNodeIDs     []string                         // fixed list of execution node IDs to choose from if no node node ID can be chosen from the PreferredExecutionNodeIDs
@@ -83,6 +83,7 @@ func New(log zerolog.Logger,
 	executionResults storage.ExecutionResults,
 	chainID flow.ChainID,
 	transactionMetrics module.TransactionMetrics,
+	accessMetrics module.AccessMetrics,
 	collectionGRPCPort uint,
 	executionGRPCPort uint,
 	retryEnabled bool,
@@ -137,7 +138,7 @@ func New(log zerolog.Logger,
 	if cacheSize == 0 {
 		cacheSize = backend.DefaultConnectionPoolSize
 	}
-	cache, err := lru.New(cacheSize)
+	cache, err := lru.New(int(cacheSize))
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize connection pool cache: %w", err)
 	}
@@ -148,8 +149,8 @@ func New(log zerolog.Logger,
 		CollectionNodeGRPCTimeout: config.CollectionClientTimeout,
 		ExecutionNodeGRPCTimeout:  config.ExecutionClientTimeout,
 		ConnectionsCache:          cache,
-		CacheSize:                 uint(cacheSize),
-		TransactionMetrics:        transactionMetrics,
+		CacheSize:                 cacheSize,
+		AccessMetrics:             accessMetrics,
 	}
 
 	backend := backend.New(state,

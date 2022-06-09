@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/module/metrics"
 	"net"
 	"strconv"
 	"strings"
@@ -19,7 +20,6 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/access/mock"
-	modulemock "github.com/onflow/flow-go/module/mock"
 )
 
 func TestProxyAccessAPI(t *testing.T) {
@@ -40,10 +40,7 @@ func TestProxyAccessAPI(t *testing.T) {
 	cache, _ := lru.New(5)
 	connectionFactory.ConnectionsCache = cache
 	// set metrics reporting
-	metrics := new(modulemock.TransactionMetrics)
-	metrics.On("ConnectionFromPoolRetrieved").Return(nil)
-	metrics.On("TotalConnectionsInPool", testifymock.Anything, testifymock.Anything).Return(nil)
-	connectionFactory.TransactionMetrics = metrics
+	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 
 	proxyConnectionFactory := ProxyConnectionFactory{
 		ConnectionFactory: connectionFactory,
@@ -81,10 +78,7 @@ func TestProxyExecutionAPI(t *testing.T) {
 	cache, _ := lru.New(5)
 	connectionFactory.ConnectionsCache = cache
 	// set metrics reporting
-	metrics := new(modulemock.TransactionMetrics)
-	metrics.On("ConnectionFromPoolRetrieved").Return(nil)
-	metrics.On("TotalConnectionsInPool", testifymock.Anything, testifymock.Anything).Return(nil)
-	connectionFactory.TransactionMetrics = metrics
+	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 
 	proxyConnectionFactory := ProxyConnectionFactory{
 		ConnectionFactory: connectionFactory,
@@ -122,10 +116,7 @@ func TestProxyAccessAPIConnectionReuse(t *testing.T) {
 	cache, _ := lru.New(5)
 	connectionFactory.ConnectionsCache = cache
 	// set metrics reporting
-	metrics := new(modulemock.TransactionMetrics)
-	metrics.On("ConnectionFromPoolRetrieved").Return(nil)
-	metrics.On("TotalConnectionsInPool", testifymock.Anything, testifymock.Anything).Return(nil)
-	connectionFactory.TransactionMetrics = metrics
+	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 
 	proxyConnectionFactory := ProxyConnectionFactory{
 		ConnectionFactory: connectionFactory,
@@ -170,10 +161,7 @@ func TestProxyExecutionAPIConnectionReuse(t *testing.T) {
 	cache, _ := lru.New(5)
 	connectionFactory.ConnectionsCache = cache
 	// set metrics reporting
-	metrics := new(modulemock.TransactionMetrics)
-	metrics.On("ConnectionFromPoolRetrieved").Return(nil)
-	metrics.On("TotalConnectionsInPool", testifymock.Anything, testifymock.Anything).Return(nil)
-	connectionFactory.TransactionMetrics = metrics
+	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 
 	proxyConnectionFactory := ProxyConnectionFactory{
 		ConnectionFactory: connectionFactory,
@@ -225,10 +213,7 @@ func TestExecutionNodeClientTimeout(t *testing.T) {
 	cache, _ := lru.New(5)
 	connectionFactory.ConnectionsCache = cache
 	// set metrics reporting
-	metrics := new(modulemock.TransactionMetrics)
-	metrics.On("ConnectionFromPoolRetrieved").Return(nil)
-	metrics.On("TotalConnectionsInPool", testifymock.Anything, testifymock.Anything).Return(nil)
-	connectionFactory.TransactionMetrics = metrics
+	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 
 	// create the execution API client
 	client, closer, err := connectionFactory.GetExecutionAPIClient(en.listener.Addr().String())
@@ -268,10 +253,7 @@ func TestCollectionNodeClientTimeout(t *testing.T) {
 	cache, _ := lru.New(5)
 	connectionFactory.ConnectionsCache = cache
 	// set metrics reporting
-	metrics := new(modulemock.TransactionMetrics)
-	metrics.On("ConnectionFromPoolRetrieved").Return(nil)
-	metrics.On("TotalConnectionsInPool", testifymock.Anything, testifymock.Anything).Return(nil)
-	connectionFactory.TransactionMetrics = metrics
+	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 
 	// create the collection API client
 	client, closer, err := connectionFactory.GetAccessAPIClient(cn.listener.Addr().String())
@@ -311,10 +293,7 @@ func TestConnectionPoolFull(t *testing.T) {
 	cache, _ := lru.New(2)
 	connectionFactory.ConnectionsCache = cache
 	// set metrics reporting
-	metrics := new(modulemock.TransactionMetrics)
-	metrics.On("ConnectionFromPoolRetrieved").Return(nil)
-	metrics.On("TotalConnectionsInPool", testifymock.Anything, testifymock.Anything).Return(nil)
-	connectionFactory.TransactionMetrics = metrics
+	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 
 	cn1Address := "foo1:123"
 	cn2Address := "foo2:123"
@@ -381,10 +360,7 @@ func TestConnectionPoolStale(t *testing.T) {
 	cache, _ := lru.New(5)
 	connectionFactory.ConnectionsCache = cache
 	// set metrics reporting
-	metrics := new(modulemock.TransactionMetrics)
-	metrics.On("ConnectionFromPoolRetrieved").Return(nil)
-	metrics.On("TotalConnectionsInPool", testifymock.Anything, testifymock.Anything).Return(nil)
-	connectionFactory.TransactionMetrics = metrics
+	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 
 	proxyConnectionFactory := ProxyConnectionFactory{
 		ConnectionFactory: connectionFactory,
