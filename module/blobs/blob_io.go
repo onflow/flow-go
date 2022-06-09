@@ -194,5 +194,5 @@ func (br *BlobChannelReader) ReadByte() (byte, error) {
 }
 
 func NewBlobChannelReader(blobChan <-chan Blob) *BlobChannelReader {
-	return &BlobChannelReader{blobs: blobChan}
+	return &BlobChannelReader{blobs: blobChan, buf: new(bytes.Buffer)}
 }

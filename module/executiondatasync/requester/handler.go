@@ -25,12 +25,12 @@ import (
 	"github.com/onflow/flow-go/network"
 )
 
-// blobSizeLimitExceededError is returned when a blob exceeds the maximum size allowed.
-type blobSizeLimitExceededError struct {
+// BlobSizeLimitExceededError is returned when a blob exceeds the maximum size allowed.
+type BlobSizeLimitExceededError struct {
 	cid cid.Cid
 }
 
-func (e *blobSizeLimitExceededError) Error() string {
+func (e *BlobSizeLimitExceededError) Error() string {
 	return fmt.Sprintf("blob %v exceeds maximum blob size", e.cid.String())
 }
 
@@ -43,6 +43,16 @@ type mismatchedBlockIDError struct {
 
 func (e *mismatchedBlockIDError) Error() string {
 	return fmt.Sprintf("execution data block ID %v does not match expected block ID %v", e.actual, e.expected)
+}
+
+func isRetryable(err error) bool {
+	var malformedDataErr *execution_data.MalformedDataError
+	if errors.As(err, &malformedDataErr) {
+		return false
+	}
+
+	var blobSizeLimitExceededErr *BlobSizeLimitExceededError
+	return !errors.As(err, &blobSizeLimitExceededErr)
 }
 
 type job struct {
@@ -131,16 +141,6 @@ func (h *handler) loop(ctx irrecoverable.SignalerContext, ready component.ReadyF
 	}
 }
 
-func (h *handler) isRetryable(err error) bool {
-	var malformedDataErr *execution_data.MalformedDataError
-	if errors.As(err, &malformedDataErr) {
-		return false
-	}
-
-	var blobSizeLimitExceededErr *blobSizeLimitExceededError
-	return !errors.As(err, &blobSizeLimitExceededErr)
-}
-
 func (h *handler) handle(parentCtx irrecoverable.SignalerContext, j *job) {
 	getCtx, cancel := onecontext.Merge(parentCtx, j.ctx)
 	defer cancel()
@@ -174,7 +174,7 @@ func (h *handler) handle(parentCtx irrecoverable.SignalerContext, j *job) {
 				return ctx.Err()
 			}
 
-			retryable := h.isRetryable(err)
+			retryable := isRetryable(err)
 			h.metrics.RequestFailed(duration, retryable)
 
 			if retryable {
@@ -282,6 +282,12 @@ func (h *handler) getExecutionDataRoot(
 		}
 
 		return nil, fmt.Errorf("failed to get root blob: %w", err)
+	}
+
+	blobSize := len(blob.RawData())
+
+	if blobSize > h.maxBlobSize {
+		return nil, &BlobSizeLimitExceededError{blob.Cid()}
 	}
 
 	v, err := h.serializer.Deserialize(bytes.NewBuffer(blob.RawData()))
@@ -420,7 +426,7 @@ func (h *handler) findBlob(
 		blobSize := len(blob.RawData())
 
 		if blobSize > h.maxBlobSize {
-			return nil, &blobSizeLimitExceededError{blob.Cid()}
+			return nil, &BlobSizeLimitExceededError{blob.Cid()}
 		}
 
 		cache[blob.Cid()] = blob

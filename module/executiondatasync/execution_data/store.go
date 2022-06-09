@@ -24,18 +24,32 @@ type ExecutionDataStore interface {
 	AddExecutionData(ctx context.Context, executionData *BlockExecutionData) (flow.Identifier, error)
 }
 
+type ExecutionDataStoreOption func(*store)
+
+func WithMaxBlobSize(size int) ExecutionDataStoreOption {
+	return func(s *store) {
+		s.maxBlobSize = size
+	}
+}
+
 type store struct {
 	blobstore   blobs.Blobstore
 	serializer  Serializer
 	maxBlobSize int
 }
 
-func NewExecutionDataStore(blobstore blobs.Blobstore, serializer Serializer) *store {
-	return &store{
+func NewExecutionDataStore(blobstore blobs.Blobstore, serializer Serializer, opts ...ExecutionDataStoreOption) *store {
+	s := &store{
 		blobstore:   blobstore,
 		serializer:  serializer,
-		maxBlobSize: DefaultMaxBlobSize, // TODO: make this configurable
+		maxBlobSize: DefaultMaxBlobSize,
 	}
+
+	for _, opt := range opts {
+		opt(s)
+	}
+
+	return s
 }
 
 func (s *store) AddExecutionData(ctx context.Context, executionData *BlockExecutionData) (flow.Identifier, error) {

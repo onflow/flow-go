@@ -115,7 +115,6 @@ func (f *fulfiller) handleJobResult(ctx irrecoverable.SignalerContext, j *jobRes
 		if j.resultID != f.sealedResults[j.blockHeight] {
 			f.logger.Debug().
 				Str("result_id", j.resultID.String()).
-				Str("block_id", j.executionData.BlockID.String()).
 				Uint64("block_height", j.blockHeight).
 				Msg("dropping job result")
 			f.metrics.ResultDropped()

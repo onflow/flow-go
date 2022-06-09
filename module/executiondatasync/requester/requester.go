@@ -23,6 +23,12 @@ type BlockExecutionDataConsumer func(blockHeight uint64, executionData *executio
 
 type RequesterOption func(*RequesterConfig)
 
+func WithMaxBlobSize(size int) RequesterOption {
+	return func(rc *RequesterConfig) {
+		rc.MaxBlobSize = size
+	}
+}
+
 type RequesterConfig struct {
 	MaxBlobSize          int
 	RetryBaseDelay       time.Duration
