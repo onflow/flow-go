@@ -11,6 +11,10 @@ import (
 func MakeTC(options ...func(*flow.TimeoutCertificate)) *flow.TimeoutCertificate {
 	qc := MakeQC()
 	signerIndices := unittest.SignerIndicesFixture(3)
+	highQCViews := make([]uint64, 3)
+	for i := range highQCViews {
+		highQCViews[i] = qc.View
+	}
 	tc := flow.TimeoutCertificate{
 		View:          rand.Uint64(),
 		NewestQC:      qc,
@@ -24,7 +28,7 @@ func MakeTC(options ...func(*flow.TimeoutCertificate)) *flow.TimeoutCertificate 
 	return &tc
 }
 
-func WithTCHighestQC(qc *flow.QuorumCertificate) func(*flow.TimeoutCertificate) {
+func WithTCNewestQC(qc *flow.QuorumCertificate) func(*flow.TimeoutCertificate) {
 	return func(tc *flow.TimeoutCertificate) {
 		tc.NewestQC = qc
 		tc.NewestQCViews = []uint64{qc.View}
@@ -71,7 +75,7 @@ func WithTimeoutObjectSignerID(signerID flow.Identifier) func(*hotstuff.TimeoutO
 	}
 }
 
-func WithTimeoutHighestQC(newestQC *flow.QuorumCertificate) func(*hotstuff.TimeoutObject) {
+func WithTimeoutNewestQC(newestQC *flow.QuorumCertificate) func(*hotstuff.TimeoutObject) {
 	return func(timeout *hotstuff.TimeoutObject) {
 		timeout.NewestQC = newestQC
 	}

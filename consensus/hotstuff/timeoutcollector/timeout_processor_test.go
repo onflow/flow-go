@@ -61,9 +61,9 @@ func (s *TimeoutProcessorTestSuite) SetupTest() {
 	s.sigAggregator.On("View").Return(s.view).Maybe()
 	s.sigAggregator.On("VerifyAndAdd", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		s.totalWeight += s.sigWeight
-	}).Return(func(signerID flow.Identifier, sig crypto.Signature, highestQCView uint64) uint64 {
+	}).Return(func(signerID flow.Identifier, sig crypto.Signature, newestQCView uint64) uint64 {
 		return s.totalWeight
-	}, func(signerID flow.Identifier, sig crypto.Signature, highestQCView uint64) error {
+	}, func(signerID flow.Identifier, sig crypto.Signature, newestQCView uint64) error {
 		return nil
 	}).Maybe()
 	s.sigAggregator.On("TotalWeight").Return(func() uint64 {
@@ -93,7 +93,7 @@ func (s *TimeoutProcessorTestSuite) TestProcess_TimeoutNotForView() {
 // timeout doesn't contain QC.
 func (s *TimeoutProcessorTestSuite) TestProcess_TimeoutWithoutQC() {
 	err := s.processor.Process(helper.TimeoutObjectFixture(helper.WithTimeoutObjectView(s.view),
-		helper.WithTimeoutHighestQC(nil)))
+		helper.WithTimeoutNewestQC(nil)))
 	require.True(s.T(), model.IsInvalidTimeoutError(err))
 }
 
@@ -101,7 +101,7 @@ func (s *TimeoutProcessorTestSuite) TestProcess_TimeoutWithoutQC() {
 // timeout contains a QC with QC.View > timeout.View, QC can be only with lower view than timeout.
 func (s *TimeoutProcessorTestSuite) TestProcess_TimeoutNewerHighestQC() {
 	err := s.processor.Process(helper.TimeoutObjectFixture(helper.WithTimeoutObjectView(s.view),
-		helper.WithTimeoutHighestQC(helper.MakeQC(helper.WithQCView(s.view)))))
+		helper.WithTimeoutNewestQC(helper.MakeQC(helper.WithQCView(s.view)))))
 	require.True(s.T(), model.IsInvalidTimeoutError(err))
 }
 
@@ -111,7 +111,7 @@ func (s *TimeoutProcessorTestSuite) TestProcess_LastViewTCWrongView() {
 	// if TC is included it must have timeout.View == timeout.LastViewTC.View+1
 	err := s.processor.Process(helper.TimeoutObjectFixture(
 		helper.WithTimeoutObjectView(s.view),
-		helper.WithTimeoutHighestQC(helper.MakeQC(helper.WithQCView(s.view-10))),
+		helper.WithTimeoutNewestQC(helper.MakeQC(helper.WithQCView(s.view-10))),
 		helper.WithTimeoutLastViewTC(helper.MakeTC(helper.WithTCView(s.view)))))
 	require.True(s.T(), model.IsInvalidTimeoutError(err))
 }
@@ -122,11 +122,11 @@ func (s *TimeoutProcessorTestSuite) TestProcess_LastViewTCWrongView() {
 func (s *TimeoutProcessorTestSuite) TestProcess_LastViewHighestQCInvalidView() {
 	err := s.processor.Process(helper.TimeoutObjectFixture(
 		helper.WithTimeoutObjectView(s.view),
-		helper.WithTimeoutHighestQC(helper.MakeQC(helper.WithQCView(s.view-10))),
+		helper.WithTimeoutNewestQC(helper.MakeQC(helper.WithQCView(s.view-10))),
 		helper.WithTimeoutLastViewTC(
 			helper.MakeTC(
 				helper.WithTCView(s.view-1),
-				helper.WithTCHighestQC(helper.MakeQC(helper.WithQCView(s.view-5)))))))
+				helper.WithTCNewestQC(helper.MakeQC(helper.WithQCView(s.view-5)))))))
 	require.True(s.T(), model.IsInvalidTimeoutError(err))
 }
 
@@ -137,7 +137,7 @@ func (s *TimeoutProcessorTestSuite) TestProcess_LastViewTCRequiredButNotPresent(
 	// timeout must contain valid timeout.LastViewTC
 	err := s.processor.Process(helper.TimeoutObjectFixture(
 		helper.WithTimeoutObjectView(s.view),
-		helper.WithTimeoutHighestQC(helper.MakeQC(helper.WithQCView(s.view-10))),
+		helper.WithTimeoutNewestQC(helper.MakeQC(helper.WithQCView(s.view-10))),
 		helper.WithTimeoutLastViewTC(nil)))
 	require.True(s.T(), model.IsInvalidTimeoutError(err))
 }
@@ -147,10 +147,10 @@ func (s *TimeoutProcessorTestSuite) TestProcess_LastViewTCRequiredButNotPresent(
 func (s *TimeoutProcessorTestSuite) TestProcess_IncludedQCInvalid() {
 	timeout := helper.TimeoutObjectFixture(
 		helper.WithTimeoutObjectView(s.view),
-		helper.WithTimeoutHighestQC(helper.MakeQC(helper.WithQCView(s.view-1))),
+		helper.WithTimeoutNewestQC(helper.MakeQC(helper.WithQCView(s.view-1))),
 		helper.WithTimeoutLastViewTC(
 			helper.MakeTC(helper.WithTCView(s.view-1),
-				helper.WithTCHighestQC(helper.MakeQC(helper.WithQCView(s.view-1))))),
+				helper.WithTCNewestQC(helper.MakeQC(helper.WithQCView(s.view-1))))),
 	)
 
 	exception := errors.New("validate-qc-failed")
@@ -166,10 +166,10 @@ func (s *TimeoutProcessorTestSuite) TestProcess_IncludedQCInvalid() {
 func (s *TimeoutProcessorTestSuite) TestProcess_IncludedTCInvalid() {
 	timeout := helper.TimeoutObjectFixture(
 		helper.WithTimeoutObjectView(s.view),
-		helper.WithTimeoutHighestQC(helper.MakeQC(helper.WithQCView(s.view-1))),
+		helper.WithTimeoutNewestQC(helper.MakeQC(helper.WithQCView(s.view-1))),
 		helper.WithTimeoutLastViewTC(
 			helper.MakeTC(helper.WithTCView(s.view-1),
-				helper.WithTCHighestQC(helper.MakeQC(helper.WithQCView(s.view-1))))),
+				helper.WithTCNewestQC(helper.MakeQC(helper.WithQCView(s.view-1))))),
 	)
 
 	exception := errors.New("validate-qc-failed")
@@ -185,10 +185,10 @@ func (s *TimeoutProcessorTestSuite) TestProcess_IncludedTCInvalid() {
 func (s *TimeoutProcessorTestSuite) TestProcess_ValidTimeout() {
 	timeout := helper.TimeoutObjectFixture(
 		helper.WithTimeoutObjectView(s.view),
-		helper.WithTimeoutHighestQC(helper.MakeQC(helper.WithQCView(s.view-1))),
+		helper.WithTimeoutNewestQC(helper.MakeQC(helper.WithQCView(s.view-1))),
 		helper.WithTimeoutLastViewTC(
 			helper.MakeTC(helper.WithTCView(s.view-1),
-				helper.WithTCHighestQC(helper.MakeQC(helper.WithQCView(s.view-1))))),
+				helper.WithTCNewestQC(helper.MakeQC(helper.WithQCView(s.view-1))))),
 	)
 
 	s.validator.On("ValidateQC", timeout.NewestQC).Return(nil)
@@ -212,7 +212,7 @@ func (s *TimeoutProcessorTestSuite) TestProcess_CreatingTC() {
 	// In view N+len(participants) each replica contributes with unique highest QC.
 	lastSuccessfulQC := helper.MakeQC(helper.WithQCView(s.view - uint64(len(s.participants))))
 	lastViewTC := helper.MakeTC(helper.WithTCView(s.view-1),
-		helper.WithTCHighestQC(lastSuccessfulQC))
+		helper.WithTCNewestQC(lastSuccessfulQC))
 
 	var highQCViews []uint64
 	var timeouts []*model.TimeoutObject
@@ -223,7 +223,7 @@ func (s *TimeoutProcessorTestSuite) TestProcess_CreatingTC() {
 
 		timeout := helper.TimeoutObjectFixture(
 			helper.WithTimeoutObjectView(s.view),
-			helper.WithTimeoutHighestQC(qc),
+			helper.WithTimeoutNewestQC(qc),
 			helper.WithTimeoutObjectSignerID(signer.NodeID),
 			helper.WithTimeoutLastViewTC(lastViewTC),
 		)
@@ -240,13 +240,13 @@ func (s *TimeoutProcessorTestSuite) TestProcess_CreatingTC() {
 	s.validator.On("ValidateTC", mock.Anything).Return(nil)
 	s.onPartialTCCreated.On("Execute", s.view).Return(nil).Once()
 	s.onTCCreated.On("Execute", mock.Anything).Run(func(args mock.Arguments) {
-		highestQC := timeouts[len(timeouts)-1].NewestQC
+		newestQC := timeouts[len(timeouts)-1].NewestQC
 		tc := args.Get(0).(*flow.TimeoutCertificate)
 		// ensure that TC contains correct fields
 		expectedTC := &flow.TimeoutCertificate{
 			View:          s.view,
 			NewestQCViews: highQCViews,
-			NewestQC:      highestQC,
+			NewestQC:      newestQC,
 			SignerIndices: signerIndices,
 			SigData:       expectedSig,
 		}
@@ -267,7 +267,7 @@ func (s *TimeoutProcessorTestSuite) TestProcess_CreatingTC() {
 	// should be no-op
 	timeout := helper.TimeoutObjectFixture(
 		helper.WithTimeoutObjectView(s.view),
-		helper.WithTimeoutHighestQC(helper.MakeQC(helper.WithQCView(lastSuccessfulQC.View))),
+		helper.WithTimeoutNewestQC(helper.MakeQC(helper.WithQCView(lastSuccessfulQC.View))),
 		helper.WithTimeoutObjectSignerID(s.participants[0].NodeID),
 		helper.WithTimeoutLastViewTC(nil),
 	)
@@ -289,7 +289,7 @@ func (s *TimeoutProcessorTestSuite) TestProcess_ConcurrentCreatingTC() {
 
 	var startupWg, shutdownWg sync.WaitGroup
 
-	highestQC := helper.MakeQC(helper.WithQCView(s.view - 1))
+	newestQC := helper.MakeQC(helper.WithQCView(s.view - 1))
 
 	startupWg.Add(1)
 	// prepare goroutines, so they are ready to submit a timeout at roughly same time
@@ -297,7 +297,7 @@ func (s *TimeoutProcessorTestSuite) TestProcess_ConcurrentCreatingTC() {
 		shutdownWg.Add(1)
 		timeout := helper.TimeoutObjectFixture(
 			helper.WithTimeoutObjectView(s.view),
-			helper.WithTimeoutHighestQC(highestQC),
+			helper.WithTimeoutNewestQC(newestQC),
 			helper.WithTimeoutObjectSignerID(signer.NodeID),
 			helper.WithTimeoutLastViewTC(nil),
 		)

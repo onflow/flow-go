@@ -35,25 +35,14 @@ func New(
 //  * model.ErrViewForUnknownEpoch if the TC refers unknown epoch
 // Any other error should be treated as exception
 func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
-	highestQC := tc.NewestQC
+	newestQC := tc.NewestQC
 
 	// The TC's view cannot be smaller than the view of the QC it contains.
 	// Note: we specifically allow for the TC to have the same view as the highest QC.
 	// This is useful as a fallback, because it allows replicas other than the designated
 	// leader to also collect votes and generate a QC.
-	if tc.View < highestQC.View {
+	if tc.View < newestQC.View {
 		return newInvalidTCError(tc, fmt.Errorf("TC's QC cannot be newer than the TC's view"))
-	}
-
-	// verifying that tc.NewestQC is the QC with the highest view
-	highestQCView := tc.NewestQCViews[0]
-	for _, view := range tc.NewestQCViews {
-		if highestQCView < view {
-			highestQCView = view
-		}
-	}
-	if highestQCView != tc.NewestQC.View {
-		return newInvalidTCError(tc, fmt.Errorf("included QC (view=%d) should be equal to highest contributed view: %d", tc.NewestQC.View, highestQCView))
 	}
 
 	// 1. Check if there is super-majority of votes
@@ -79,15 +68,6 @@ func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 		return newInvalidTCError(tc, fmt.Errorf("tc signers have insufficient weight of %d (required=%d)", signers.TotalWeight(), threshold))
 	}
 
-	// Validate QC
-	err = v.ValidateQC(highestQC)
-	if err != nil {
-		if model.IsInvalidQCError(err) {
-			return newInvalidTCError(tc, fmt.Errorf("invalid QC included in TC: %w", err))
-		}
-		return fmt.Errorf("unexpected internal error while verifying the QC included in the TC: %w", err)
-	}
-
 	// Verify multi-message BLS sig of TC, by far the most expensive check
 	err = v.verifier.VerifyTC(signers, tc.SigData, tc.View, tc.NewestQCViews)
 	if err != nil {
@@ -101,12 +81,39 @@ func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 		case errors.Is(err, model.ErrInvalidSignature):
 			return newInvalidTCError(tc, fmt.Errorf("TC contains invalid signature(s): %w", err))
 		default:
-			// `VerifyTC` might return model.InsufficientSignaturesError, we previously checked the total weight of all signers
-			//   meets the super-majority threshold, which is a _positive_ number. Hence, there must be at
-			//   least one signer. Hence, receiving this error would be a symptom of a fatal internal bug.
 			return fmt.Errorf("cannot verify tc's aggregated signature (tc.View: %d): %w", tc.View, err)
 		}
 	}
+
+	// verifying that tc.NewestQC is the QC with the highest view
+	newestQCView := tc.NewestQCViews[0]
+	for _, view := range tc.NewestQCViews {
+		if newestQCView < view {
+			newestQCView = view
+		}
+	}
+	if newestQCView != tc.NewestQC.View {
+		return newInvalidTCError(tc, fmt.Errorf("included QC (view=%d) should be equal to highest contributed view: %d", tc.NewestQC.View, newestQCView))
+	}
+
+	// Validate QC
+	err = v.ValidateQC(newestQC)
+	if err != nil {
+		if model.IsInvalidQCError(err) {
+			return newInvalidTCError(tc, fmt.Errorf("invalid QC included in TC: %w", err))
+		}
+		if errors.Is(err, model.ErrViewForUnknownEpoch) {
+			// We require each replica to be bootstrapped with a QC pointing to a finalized block. Consensus safety rules guarantee that
+			// a QC at least as new as the root QC must be contained in any TC. This is because the TC must include signatures from a
+			// supermajority of replicas, including at least one honest replica, which attest to their locally highest known QC. Hence,
+			// any QC included in a TC must be the root QC or newer. Therefore, we should know the Epoch for any QC we encounter.
+			// receiving a `model.ErrViewForUnknownEpoch` is conceptually impossible, i.e. a symptom of an internal bug or invalid
+			// bootstrapping information.
+			return fmt.Errorf("no Epoch information availalbe for QC that was included in TC; symptom of internal bug or invalid bootstrapping information: %s", err.Error())
+		}
+		return fmt.Errorf("unexpected internal error while verifying the QC included in the TC: %w", err)
+	}
+
 	return nil
 }
 
@@ -161,6 +168,12 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate) error {
 			return newInvalidQCError(qc, fmt.Errorf("QC's  signature data has an invalid structure: %w", err))
 		case errors.Is(err, model.ErrInvalidSignature):
 			return newInvalidQCError(qc, fmt.Errorf("QC contains invalid signature(s): %w", err))
+		case errors.Is(err, model.ErrViewForUnknownEpoch):
+			// We have earlier queried the Identities for the QC's view, which must have returned proper values,
+			// otherwise, we wouldn't reach this code. Therefore, it should be impossible for `verifier.VerifyQC`
+			// to return ErrViewForUnknownEpoch. To avoid confusion with expected sentinel errors, we only preserve
+			// the error messages here, but not the error types.
+			return fmt.Errorf("internal error, as querying identities for view %d succeeded earlier but now the view supposedly belongs to an unknown epoch: %s", qc.View, err.Error())
 		default:
 			return fmt.Errorf("cannot verify qc's aggregated signature (qc.BlockID: %x): %w", qc.BlockID, err)
 		}
@@ -233,6 +246,12 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 		if model.IsInvalidQCError(err) {
 			return newInvalidBlockError(block, fmt.Errorf("invalid qc included: %w", err))
 		}
+		if errors.Is(err, model.ErrViewForUnknownEpoch) {
+			// We require each replica to be bootstrapped with a QC pointing to a finalized block. Therefore, we should know the
+			// Epoch for any QC.View and TC.View we encounter. Receiving a `model.ErrViewForUnknownEpoch` is conceptually impossible,
+			// i.e. a symptom of an internal bug or invalid bootstrapping information.
+			return fmt.Errorf("no Epoch information availalbe for QC that was included in proposal; symptom of internal bug or invalid bootstrapping information: %s", err.Error())
+		}
 		return fmt.Errorf("unexpected error verifying qc: %w", err)
 	}
 
@@ -242,6 +261,12 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 		if err != nil {
 			if model.IsInvalidTCError(err) {
 				return newInvalidBlockError(block, fmt.Errorf("proposals TC's is not valid: %w", err))
+			}
+			if errors.Is(err, model.ErrViewForUnknownEpoch) {
+				// We require each replica to be bootstrapped with a QC pointing to a finalized block. Therefore, we should know the
+				// Epoch for any QC.View and TC.View we encounter. Receiving a `model.ErrViewForUnknownEpoch` is conceptually impossible,
+				// i.e. a symptom of an internal bug or invalid bootstrapping information.
+				return fmt.Errorf("no Epoch information availalbe for QC that was included in TC; symptom of internal bug or invalid bootstrapping information: %s", err.Error())
 			}
 			return fmt.Errorf("unexpected internal error while verifying the TC included in block: %w", err)
 		}
@@ -275,6 +300,9 @@ func (v *Validator) ValidateVote(vote *model.Vote) (*flow.Identity, error) {
 		//       we expect `model.InvalidSignerError` here during normal operations.
 		if model.IsInvalidFormatError(err) || errors.Is(err, model.ErrInvalidSignature) {
 			return nil, newInvalidVoteError(vote, err)
+		}
+		if errors.Is(err, model.ErrViewForUnknownEpoch) {
+			return nil, fmt.Errorf("no Epoch information availalbe for vote; symptom of internal bug or invalid bootstrapping information: %s", err.Error())
 		}
 		return nil, fmt.Errorf("cannot verify signature for vote (%x): %w", vote.ID(), err)
 	}

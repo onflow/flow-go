@@ -99,7 +99,7 @@ func (s *SafetyRulesTestSuite) TestProduceVote_ShouldVote() {
 
 	lastViewTC := helper.MakeTC(
 		helper.WithTCView(s.proposal.Block.View+1),
-		helper.WithTCHighestQC(s.proposal.Block.QC))
+		helper.WithTCNewestQC(s.proposal.Block.QC))
 
 	// voting on proposal where last view ended with TC
 	proposalWithTC := helper.MakeProposal(
@@ -134,7 +134,7 @@ func (s *SafetyRulesTestSuite) TestProduceVote_ShouldVote() {
 func (s *SafetyRulesTestSuite) TestProduceVote_IncludedQCHigherThanTCsQC() {
 	lastViewTC := helper.MakeTC(
 		helper.WithTCView(s.proposal.Block.View+1),
-		helper.WithTCHighestQC(s.proposal.Block.QC))
+		helper.WithTCNewestQC(s.proposal.Block.QC))
 
 	// voting on proposal where last view ended with TC
 	proposalWithTC := helper.MakeProposal(
@@ -191,14 +191,35 @@ func (s *SafetyRulesTestSuite) TestProduceVote_UpdateLockedOneChainView() {
 	s.persister.AssertCalled(s.T(), "PutSafetyData", expectedSafetyData)
 }
 
-// TestProduceVote_InvalidCurrentView tests that no vote is created if proposal is for invalid view.
-// We expect that only fully validated blocks are feed into ProduceVote.
-// Blocks for other views are considered a symptom of an internal bug,  and therefore should not result in an NoVoteError.
+// TestProduceVote_InvalidCurrentView tests that no vote is created if `curView` has invalid values.
+// In particular, `SafetyRules` requires that:
+//  * the block's view matches `curView`
+//  * that values for `curView` are monotonously increasing
+// Failing any of these conditions is a symptom of an internal bug; hence `SafetyRules` should
+// _not_ return a `NoVoteError`.
 func (s *SafetyRulesTestSuite) TestProduceVote_InvalidCurrentView() {
-	vote, err := s.safety.ProduceVote(s.proposal, s.proposal.Block.View+1)
-	require.Nil(s.T(), vote)
-	require.Error(s.T(), err)
-	require.False(s.T(), model.IsNoVoteError(err))
+
+	s.Run("block-view-does-not-match", func() {
+		vote, err := s.safety.ProduceVote(s.proposal, s.proposal.Block.View+1)
+		require.Nil(s.T(), vote)
+		require.Error(s.T(), err)
+		require.False(s.T(), model.IsNoVoteError(err))
+	})
+	s.Run("view-not-monotonously-increasing", func() {
+		// create block with view < HighestAcknowledgedView
+		proposal := helper.MakeProposal(
+			helper.WithBlock(
+				helper.MakeBlock(
+					func(block *model.Block) {
+						block.QC = helper.MakeQC(helper.WithQCView(s.safetyData.HighestAcknowledgedView - 2))
+					},
+					helper.WithBlockView(s.safetyData.HighestAcknowledgedView-1))))
+		vote, err := s.safety.ProduceVote(proposal, proposal.Block.View)
+		require.Nil(s.T(), vote)
+		require.Error(s.T(), err)
+		require.False(s.T(), model.IsNoVoteError(err))
+	})
+
 	s.persister.AssertNotCalled(s.T(), "PutSafetyData")
 }
 
@@ -284,31 +305,31 @@ func (s *SafetyRulesTestSuite) TestProduceVote_PersistStateException() {
 	require.ErrorIs(s.T(), err, exception)
 }
 
-// TestProduceVote_VotingOnUnsafeProposal tests different scenarios where we try to vote on unsafe blocks
-func (s *SafetyRulesTestSuite) TestProduceVote_VotingOnUnsafeProposal() {
-	s.Run("invalid-block-view", func() {
-		// create block with block.View == block.QC.View
+// TestProduceVote_VotingOnInvalidProposals tests different scenarios where we try to vote on unsafe blocks
+// SafetyRules contain a variety of checks to confirm that QC and TC have the desired relationship to each other.
+// In particular, we test:
+//    (i) A TC should be included in a proposal, if and only of the QC is not the prior view.
+//   (ii) When the proposal includes a TC (i.e. the QC not being for the prior view), the TC must be for the prior view.
+//  (iii) The QC in the block must have a smaller view than the block.
+//   (iv) If the block contains a TC, the TC cannot contain a newer QC than the block itself.
+// Conditions (i) - (iv) are validity requirements for the block and all blocks that SafetyRules processes
+// are supposed to be pre-validated. Hence, failing any of those conditions means we have an internal bug.
+// Consequently, we expect SafetyRules to return exceptions but _not_ `NoVoteError`, because the latter
+// indicates that the input block was valid, but we didn't want to vote.
+func (s *SafetyRulesTestSuite) TestProduceVote_VotingOnInvalidProposals() {
+
+	// a proposal which includes a QC for the previous round should not contain a TC
+	s.Run("proposal-includes-last-view-qc-and-tc", func() {
 		proposal := helper.MakeProposal(
 			helper.WithBlock(
 				helper.MakeBlock(
 					helper.WithParentBlock(s.bootstrapBlock),
-					helper.WithBlockView(s.bootstrapBlock.View))))
+					helper.WithBlockView(s.bootstrapBlock.View+1))),
+			helper.WithLastViewTC(helper.MakeTC()))
+		s.committee.On("IdentityByBlock", proposal.Block.BlockID, proposal.Block.ProposerID).Return(s.proposerIdentity, nil).Maybe()
 		vote, err := s.safety.ProduceVote(proposal, proposal.Block.View)
 		require.Error(s.T(), err)
 		require.False(s.T(), model.IsNoVoteError(err))
-		require.Nil(s.T(), vote)
-	})
-	s.Run("view-already-acknowledged", func() {
-		// create block with view <= HighestAcknowledgedView
-		proposal := helper.MakeProposal(
-			helper.WithBlock(
-				helper.MakeBlock(
-					func(block *model.Block) {
-						block.QC = helper.MakeQC(helper.WithQCView(s.safetyData.HighestAcknowledgedView - 1))
-					},
-					helper.WithBlockView(s.safetyData.HighestAcknowledgedView))))
-		vote, err := s.safety.ProduceVote(proposal, proposal.Block.View)
-		require.True(s.T(), model.IsNoVoteError(err))
 		require.Nil(s.T(), vote)
 	})
 	s.Run("no-last-view-tc", func() {
@@ -339,6 +360,26 @@ func (s *SafetyRulesTestSuite) TestProduceVote_VotingOnUnsafeProposal() {
 		require.False(s.T(), model.IsNoVoteError(err))
 		require.Nil(s.T(), vote)
 	})
+	s.Run("proposal-includes-QC-for-higher-view", func() {
+		// create block where Block.View != Block.QC.View+1 and
+		// Block.View == LastViewTC.View+1 and Block.QC.View >= Block.View
+		// in this case block is not safe to extend since proposal includes QC which is newer than the proposal itself.
+		proposal := helper.MakeProposal(
+			helper.WithBlock(
+				helper.MakeBlock(
+					helper.WithParentBlock(s.bootstrapBlock),
+					helper.WithBlockView(s.bootstrapBlock.View+2),
+					func(block *model.Block) {
+						block.QC = helper.MakeQC(helper.WithQCView(s.bootstrapBlock.View + 10))
+					})),
+			helper.WithLastViewTC(
+				helper.MakeTC(
+					helper.WithTCView(s.bootstrapBlock.View+1))))
+		vote, err := s.safety.ProduceVote(proposal, proposal.Block.View)
+		require.Error(s.T(), err)
+		require.False(s.T(), model.IsNoVoteError(err))
+		require.Nil(s.T(), vote)
+	})
 	s.Run("last-view-tc-invalid-highest-qc", func() {
 		// create block where Block.View != Block.QC.View+1 and
 		// Block.View == LastViewTC.View+1 and Block.QC.View < LastViewTC.NewestQC.View
@@ -353,7 +394,7 @@ func (s *SafetyRulesTestSuite) TestProduceVote_VotingOnUnsafeProposal() {
 			helper.WithLastViewTC(
 				helper.MakeTC(
 					helper.WithTCView(s.bootstrapBlock.View+1),
-					helper.WithTCHighestQC(TONewestQC))))
+					helper.WithTCNewestQC(TONewestQC))))
 		vote, err := s.safety.ProduceVote(proposal, proposal.Block.View)
 		require.Error(s.T(), err)
 		require.False(s.T(), model.IsNoVoteError(err))
@@ -362,6 +403,36 @@ func (s *SafetyRulesTestSuite) TestProduceVote_VotingOnUnsafeProposal() {
 
 	s.signer.AssertNotCalled(s.T(), "CreateVote")
 	s.persister.AssertNotCalled(s.T(), "PutSafetyData")
+}
+
+// TestProduceVote_VoteEquivocation tests scenario when we try to vote twice in same view. We require that replica
+// follows next rules:
+//  * replica votes once per view
+//  * replica votes in monotonously increasing views
+// Voting twice per round on equivocating proposals is considered a byzantine behavior.
+// Expect a `model.NoVoteError` sentinel in such scenario.
+func (s *SafetyRulesTestSuite) TestProduceVote_VoteEquivocation() {
+	expectedVote := makeVote(s.proposal.Block)
+	s.signer.On("CreateVote", s.proposal.Block).Return(expectedVote, nil).Once()
+	s.persister.On("PutSafetyData", mock.Anything).Return(nil).Once()
+
+	vote, err := s.safety.ProduceVote(s.proposal, s.proposal.Block.View)
+	require.NoError(s.T(), err)
+	require.NotNil(s.T(), vote)
+	require.Equal(s.T(), expectedVote, vote)
+
+	equivocatingProposal := helper.MakeProposal(
+		helper.WithBlock(
+			helper.MakeBlock(
+				helper.WithParentBlock(s.bootstrapBlock),
+				helper.WithBlockView(s.bootstrapBlock.View+1),
+				helper.WithBlockProposer(s.proposerIdentity.NodeID)),
+		))
+
+	// voting at same view(event different proposal) should result in NoVoteError
+	vote, err = s.safety.ProduceVote(equivocatingProposal, s.proposal.Block.View)
+	require.True(s.T(), model.IsNoVoteError(err))
+	require.Nil(s.T(), vote)
 }
 
 // TestProduceVote_AfterTimeout tests a scenario where we first timeout for view and then try to produce a vote for
@@ -421,7 +492,7 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_ShouldTimeout() {
 
 	// to create new TO we need to provide a TC
 	lastViewTC := helper.MakeTC(helper.WithTCView(view),
-		helper.WithTCHighestQC(newestQC))
+		helper.WithTCNewestQC(newestQC))
 
 	expectedTimeout = &model.TimeoutObject{
 		View:       view + 1,
@@ -447,31 +518,78 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_ShouldTimeout() {
 // Hence, the cases tested here would be symptoms of an internal bugs, and therefore should not result in an NoVoteError.
 func (s *SafetyRulesTestSuite) TestProduceTimeout_NotSafeToTimeout() {
 
-	s.Run("highest-qc-below-locked-round", func() {
-		view := s.proposal.Block.View
-		newestQC := helper.MakeQC(helper.WithQCView(s.safetyData.LockedOneChainView - 1))
-
-		timeout, err := s.safety.ProduceTimeout(view, newestQC, nil)
+	s.Run("newest-qc-nil", func() {
+		// newestQC cannot be nil
+		timeout, err := s.safety.ProduceTimeout(s.safetyData.LockedOneChainView, nil, nil)
 		require.Error(s.T(), err)
-		require.False(s.T(), model.IsNoVoteError(err))
 		require.Nil(s.T(), timeout)
 	})
-	s.Run("cur-view-below-highest-acknowledged-view", func() {
-		view := s.safetyData.HighestAcknowledgedView
+	// if a QC for the previous view is provided, a last view TC is unnecessary and must not be provided
+	s.Run("includes-last-view-qc-and-tc", func() {
 		newestQC := helper.MakeQC(helper.WithQCView(s.safetyData.LockedOneChainView))
 
-		timeout, err := s.safety.ProduceTimeout(view-2, newestQC, nil)
+		// tc not needed but included
+		timeout, err := s.safety.ProduceTimeout(newestQC.View+1, newestQC, helper.MakeTC())
 		require.Error(s.T(), err)
-		require.False(s.T(), model.IsNoVoteError(err))
+		require.Nil(s.T(), timeout)
+	})
+	s.Run("last-view-tc-nil", func() {
+		newestQC := helper.MakeQC(helper.WithQCView(s.safetyData.LockedOneChainView))
+
+		// tc needed but not included
+		timeout, err := s.safety.ProduceTimeout(newestQC.View+2, newestQC, nil)
+		require.Error(s.T(), err)
+		require.Nil(s.T(), timeout)
+	})
+	s.Run("last-view-tc-for-wrong-view", func() {
+		newestQC := helper.MakeQC(helper.WithQCView(s.safetyData.LockedOneChainView))
+		// lastViewTC should be for newestQC.View+1
+		lastViewTC := helper.MakeTC(helper.WithTCView(newestQC.View))
+
+		timeout, err := s.safety.ProduceTimeout(newestQC.View+2, newestQC, lastViewTC)
+		require.Error(s.T(), err)
+		require.Nil(s.T(), timeout)
+	})
+	s.Run("cur-view-equal-to-highest-QC", func() {
+		newestQC := helper.MakeQC(helper.WithQCView(s.safetyData.LockedOneChainView))
+		lastViewTC := helper.MakeTC(helper.WithTCView(s.safetyData.LockedOneChainView - 1))
+
+		timeout, err := s.safety.ProduceTimeout(s.safetyData.LockedOneChainView, newestQC, lastViewTC)
+		require.Error(s.T(), err)
 		require.Nil(s.T(), timeout)
 	})
 	s.Run("cur-view-below-highest-QC", func() {
 		newestQC := helper.MakeQC(helper.WithQCView(s.safetyData.LockedOneChainView))
-		view := newestQC.View
+		lastViewTC := helper.MakeTC(helper.WithTCView(newestQC.View - 2))
 
-		timeout, err := s.safety.ProduceTimeout(view, newestQC, nil)
+		timeout, err := s.safety.ProduceTimeout(newestQC.View-1, newestQC, lastViewTC)
 		require.Error(s.T(), err)
-		require.False(s.T(), model.IsNoVoteError(err))
+		require.Nil(s.T(), timeout)
+	})
+	s.Run("last-view-tc-is-newer", func() {
+		newestQC := helper.MakeQC(helper.WithQCView(s.safetyData.LockedOneChainView))
+		// newest QC included in TC cannot be higher than the newest QC known to replica
+		lastViewTC := helper.MakeTC(helper.WithTCView(newestQC.View+1),
+			helper.WithTCNewestQC(helper.MakeQC(helper.WithQCView(newestQC.View+1))))
+
+		timeout, err := s.safety.ProduceTimeout(newestQC.View+2, newestQC, lastViewTC)
+		require.Error(s.T(), err)
+		require.Nil(s.T(), timeout)
+	})
+	s.Run("highest-qc-below-locked-round", func() {
+		newestQC := helper.MakeQC(helper.WithQCView(s.safetyData.LockedOneChainView - 1))
+
+		timeout, err := s.safety.ProduceTimeout(newestQC.View+1, newestQC, nil)
+		require.Error(s.T(), err)
+		require.Nil(s.T(), timeout)
+	})
+	s.Run("cur-view-below-highest-acknowledged-view", func() {
+		newestQC := helper.MakeQC(helper.WithQCView(s.safetyData.LockedOneChainView))
+		// modify highest acknowledged view in a way that it's definitely bigger than the newest QC view
+		s.safetyData.HighestAcknowledgedView = newestQC.View + 10
+
+		timeout, err := s.safety.ProduceTimeout(newestQC.View+1, newestQC, nil)
+		require.Error(s.T(), err)
 		require.Nil(s.T(), timeout)
 	})
 
