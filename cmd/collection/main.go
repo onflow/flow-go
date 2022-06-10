@@ -113,8 +113,6 @@ func main() {
 			"expiry buffer for inbound transactions")
 		flags.UintVar(&ingestConf.PropagationRedundancy, "ingest-tx-propagation-redundancy", 10,
 			"how many additional cluster members we propagate transactions to")
-		flags.Uint64Var(&ingestConf.MaxAddressIndex, "ingest-max-address-index", flow.DefaultMaxAddressIndex,
-			"the maximum address index allowed in transactions")
 		flags.UintVar(&builderExpiryBuffer, "builder-expiry-buffer", builder.DefaultExpiryBuffer,
 			"expiry buffer for transactions in proposed collections")
 		flags.Float64Var(&builderPayerRateLimit, "builder-rate-limit", builder.DefaultMaxPayerTransactionRate, // no rate limiting
@@ -547,7 +545,11 @@ func createQCContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap.
 	if err != nil {
 		return nil, fmt.Errorf("could not decode private key from hex: %w", err)
 	}
-	txSigner := sdkcrypto.NewInMemorySigner(sk, machineAccountInfo.HashAlgorithm)
+
+	txSigner, err := sdkcrypto.NewInMemorySigner(sk, machineAccountInfo.HashAlgorithm)
+	if err != nil {
+		return nil, fmt.Errorf("could not create in-memory signer: %w", err)
+	}
 
 	// create actual qc contract client, all flags and machine account info file found
 	qcContractClient = epochs.NewQCContractClient(node.Logger, flowClient, anID, node.Me.NodeID(), machineAccountInfo.Address, machineAccountInfo.KeyIndex, qcContractAddress, txSigner)

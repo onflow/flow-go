@@ -65,7 +65,6 @@ func New(
 			Expiry:                 flow.DefaultTransactionExpiry,
 			ExpiryBuffer:           config.ExpiryBuffer,
 			MaxGasLimit:            config.MaxGasLimit,
-			MaxAddressIndex:        config.MaxAddressIndex,
 			CheckScriptsParse:      config.CheckScriptsParse,
 			MaxTransactionByteSize: config.MaxTransactionByteSize,
 			MaxCollectionByteSize:  config.MaxCollectionByteSize,

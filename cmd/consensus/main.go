@@ -818,7 +818,11 @@ func createDKGContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap
 	if err != nil {
 		return nil, fmt.Errorf("could not decode private key from hex: %w", err)
 	}
-	txSigner := crypto.NewInMemorySigner(sk, machineAccountInfo.HashAlgorithm)
+
+	txSigner, err := crypto.NewInMemorySigner(sk, machineAccountInfo.HashAlgorithm)
+	if err != nil {
+		return nil, fmt.Errorf("could not create in-memory signer: %w", err)
+	}
 
 	// create actual dkg contract client, all flags and machine account info file found
 	dkgClient = dkgmodule.NewClient(
