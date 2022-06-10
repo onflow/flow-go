@@ -38,7 +38,7 @@ func (d *Decoder) Decode() (interface{}, error) {
 	err = cbor.Unmarshal(data[1:], v) // all but first byte
 	//binstat.Leave(bs2)
 	if err != nil {
-		return nil, fmt.Errorf("could not decode CBOR payload with envelop code %d AKA %s: %w", data[0], what, err) // e.g. 2, "CodeBlockProposal", <CBOR error>
+		return nil, fmt.Errorf("could not decode CBOR payload with message code %d AKA %s: %w", data[0], what, err) // e.g. 2, "CodeBlockProposal", <CBOR error>
 	}
 
 	return v, nil
