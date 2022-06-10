@@ -17,7 +17,7 @@ import (
 // badger key prefixes
 const (
 	prefixGlobalState  byte = iota + 1 // global state variables
-	prefixLatestHeight                 // tracks the latest height containing each blob
+	prefixLatestHeight                 // tracks, for each blob, the latest height at which there exists a block whose execution data contains the blob
 	prefixBlobRecord                   // tracks the set of blobs at each height
 )
 
@@ -84,31 +84,74 @@ func getBatchItemCountLimit(db *badger.DB, writeCountPerItem int64, writeSizePer
 	}
 }
 
-type TrackBlobsFn func(uint64, ...cid.Cid) error
+// TrackBlobsFun is passed to the UpdateFn provided to Storage.Update,
+// and can be called to track a list of cids at a given block height.
+// It returns an error if the update failed.
+type TrackBlobsFn func(blockHeight uint64, cids ...cid.Cid) error
+
+// UpdateFn is implemented by the user and passed to Storage.Update,
+// which ensures that it will never be run concurrently with any call
+// to Storage.Prune.
+// Any returned error will be returned from the surrounding call to Storage.Update.
+// The function must never make any calls to the Storage interface itself,
+// and should instead only modify the storage via the provided TrackBlobsFn.
 type UpdateFn func(TrackBlobsFn) error
+
+// PruneCallback is a function which can be provided by the user which
+// is called for each CID when the last height at which that CID appears
+// is pruned.
+// Any returned error will be returned from the surrounding call to Storage.Prune.
+// The prune callback can be used to delete the corresponding
+// blob data from the blob store.
 type PruneCallback func(cid.Cid) error
 
 type Storage interface {
+	// Update is used to track new blob CIDs.
+	// It can be used to track blobs for both sealed and unsealed
+	// heights, and the same blob may be added multiple times for
+	// different heights.
+	// The same blob may also be added multiple times for the same
+	// height, but it will only be tracked once per height.
 	Update(UpdateFn) error
 
 	GetFulfilledHeight() (uint64, error)
 
-	// SetFulfilledHeight updates the fulfilled height value.
+	// SetFulfilledHeight updates the fulfilled height value,
+	// which is the highest block height `h` such that all
+	// heights <= `h` are sealed and the sealed execution data
+	// has been downloaded.
 	// It is up to the caller to ensure that this is never
 	// called with a value lower than the pruned height.
 	SetFulfilledHeight(height uint64) error
 
 	GetPrunedHeight() (uint64, error)
 
-	// Prune will remove all data from storage corresponding
-	// to block heights up to and including the given height.
+	// Prune removes all data from storage corresponding to
+	// block heights up to and including the given height,
+	// and updates the latest pruned height value.
+	// It locks the Storage and ensures that no other writes
+	// can occur during the pruning.
 	// It is up to the caller to ensure that this is never
 	// called with a value higher than the fulfilled height.
 	Prune(height uint64) error
 }
 
+// The storage component tracks the following information:
+// * the latest pruned height
+// * the latest fulfilled height
+// * the set of CIDs of the execution data blobs we know about at each height, so that
+//   once we prune a fulfilled height we can remove the blob data from local storage
+// * for each CID, the most recent height that it was observed at, so that when pruning
+//   a fulfilled height we don't remove any blob data that is still needed at higher heights
+// The storage component calls the given prune callback for a CID when the last height
+// at which that CID appears is pruned. The prune callback can be used to delete the
+// corresponding blob data from the blob store.
 type storage struct {
-	mu            sync.RWMutex
+	// ensures that pruning operations are not run concurrently with any other db writes
+	// we acquire the read lock when we want to perform a non-prune WRITE
+	// we acquire the write lock when we want to perform a prune WRITE
+	mu sync.RWMutex
+
 	db            *badger.DB
 	pruneCallback PruneCallback
 	logger        zerolog.Logger
@@ -338,7 +381,9 @@ func (s *storage) Prune(height uint64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.setPrunedHeight(height)
+	if err := s.setPrunedHeight(height); err != nil {
+		return err
+	}
 
 	if err := s.db.View(func(txn *badger.Txn) error {
 		it := txn.NewIterator(badger.IteratorOptions{
