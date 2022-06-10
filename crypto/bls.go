@@ -64,13 +64,18 @@ var blsInstance *blsBLS12381Algo
 // KMAC128 is used as the underligned extendable-output function (xof)
 // as required by https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-14#section-5.4.4.
 //
+// `domainTag` is a domain separation tag that defines the protocol and its subdomain. Such tag should be of the
+// format: <protocol>-V<xx>-CS<yy>-with- where <protocol> is the name of the protocol, <xx> the protocol
+// version number and <yy> the index of the ciphersuite in the protocol.
+// The function suffixes the given `domainTag` by the BLS ciphersuite supported by the library.
+//
 // The returned instance is a `Hasher` and can be used to generate BLS signatures
 // with the `Sign` method.
-func NewExpandMsgXOFKMAC128(tag string) hash.Hasher {
+func NewExpandMsgXOFKMAC128(domainTag string) hash.Hasher {
 	// application tag is guaranteed to be different than the tag used
 	// to generate proofs of possession
 	// postfix the domain tag with the BLS ciphersuite
-	key := tag + blsSigCipherSuite
+	key := domainTag + blsSigCipherSuite
 	return internalExpandMsgXOFKMAC128(key)
 }
 
