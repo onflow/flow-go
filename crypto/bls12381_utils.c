@@ -364,12 +364,12 @@ void ep2_write_bin_compact(byte *bin, const ep2_t a, const int len) {
     RLC_TRY {
         ep2_new(t);
         ep2_norm(t, (ep2_st *)a);
-        fp2_write_bin(bin, 2*Fp_BYTES, t->x, 0);
+        fp2_write_bin(bin, Fp2_BYTES, t->x, 0);
 
         if (G2_SERIALIZATION == COMPRESSED) {
             bin[0] |= (fp2_get_sign(t->y) << 5);
         } else {
-            fp2_write_bin(bin + 2*Fp_BYTES, 2*Fp_BYTES, t->y, 0);
+            fp2_write_bin(bin + Fp2_BYTES, Fp2_BYTES, t->y, 0);
         }
     } RLC_CATCH_ANY {
         RLC_THROW(ERR_CAUGHT);
@@ -421,14 +421,14 @@ int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
 	a->coord = BASIC;
 	fp_set_dig(a->z[0], 1);
 	fp_zero(a->z[1]);
-    byte temp[Fp_BYTES2];
-    memcpy(temp, bin, Fp_BYTES2);
+    byte temp[Fp2_BYTES];
+    memcpy(temp, bin, Fp2_BYTES);
     // clear the header bits
     temp[0] &= 0x1F;
-    fp2_read_bin(a->x, temp, Fp_BYTES2);
+    fp2_read_bin(a->x, temp, Fp2_BYTES);
 
     if (G2_SERIALIZATION == UNCOMPRESSED) {
-        fp2_read_bin(a->y, bin + Fp_BYTES2, Fp_BYTES2);
+        fp2_read_bin(a->y, bin + Fp2_BYTES, Fp2_BYTES);
         return RLC_OK;
     }
     
