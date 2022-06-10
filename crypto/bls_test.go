@@ -17,7 +17,7 @@ import (
 
 // BLS tests
 func TestBLSBLS12381(t *testing.T) {
-	halg := NewBLSKMAC("test tag")
+	halg := NewXOFKMAC128("test tag")
 	// test the key generation seed lengths
 	testKeyGenSeed(t, BLSBLS12381, KeyGenSeedMinLenBLSBLS12381, KeyGenSeedMaxLenBLSBLS12381)
 	// test the consistency with different inputs
@@ -26,13 +26,13 @@ func TestBLSBLS12381(t *testing.T) {
 
 // Signing bench
 func BenchmarkBLSBLS12381Sign(b *testing.B) {
-	halg := NewBLSKMAC("bench tag")
+	halg := NewXOFKMAC128("bench tag")
 	benchSign(b, BLSBLS12381, halg)
 }
 
 // Verifying bench
 func BenchmarkBLSBLS12381Verify(b *testing.B) {
-	halg := NewBLSKMAC("bench tag")
+	halg := NewXOFKMAC128("bench tag")
 	benchVerify(b, BLSBLS12381, halg)
 }
 
@@ -87,16 +87,16 @@ func TestBLSBLS12381Hasher(t *testing.T) {
 		assert.False(t, valid)
 	})
 
-	t.Run("NewBLSKMAC sanity check", func(t *testing.T) {
-		// test the parameter lengths of NewBLSKMAC are in the correct range
+	t.Run("NewXOFKMAC128 sanity check", func(t *testing.T) {
+		// test the parameter lengths of NewXOFKMAC128 are in the correct range
 		// h would be nil if the kmac inputs are invalid
-		h := internalBLSKMAC(blsSigCipherSuite)
+		h := internalXOFKMAC128(blsSigCipherSuite)
 		assert.NotNil(t, h)
 	})
 
 	t.Run("constants sanity check", func(t *testing.T) {
 		// test that the ciphersuites exceed 16 bytes as per draft-irtf-cfrg-hash-to-curve
-		// The tags used by internalBLSKMAC are at least len(ciphersuite) long
+		// The tags used by internalXOFKMAC128 are at least len(ciphersuite) long
 		assert.GreaterOrEqual(t, len(blsSigCipherSuite), 16)
 		assert.GreaterOrEqual(t, len(blsPOPCipherSuite), 16)
 	})
@@ -104,7 +104,7 @@ func TestBLSBLS12381Hasher(t *testing.T) {
 	t.Run("orthogonal PoP and signature hashing", func(t *testing.T) {
 		data := []byte("random_data")
 		// empty tag hasher
-		sigKmac := NewBLSKMAC("")
+		sigKmac := NewXOFKMAC128("")
 		h1 := sigKmac.ComputeHash(data)
 
 		// PoP hasher
@@ -227,7 +227,7 @@ func TestAggregateSignatures(t *testing.T) {
 	_, err := rand.Read(input)
 	require.NoError(t, err)
 	// hasher
-	kmac := NewBLSKMAC("test tag")
+	kmac := NewXOFKMAC128("test tag")
 	// number of signatures to aggregate
 	r := time.Now().UnixNano()
 	mrand.Seed(r)
@@ -540,7 +540,7 @@ func TestBatchVerify(t *testing.T) {
 	_, err := mrand.Read(input)
 	require.NoError(t, err)
 	// hasher
-	kmac := NewBLSKMAC("test tag")
+	kmac := NewXOFKMAC128("test tag")
 	// number of signatures to aggregate
 	sigsNum := mrand.Intn(100) + 2
 	sigs := make([]Signature, 0, sigsNum)
@@ -683,7 +683,7 @@ func BenchmarkBatchVerify(b *testing.B) {
 	input := make([]byte, 100)
 	_, _ = mrand.Read(input)
 	// hasher
-	kmac := NewBLSKMAC("bench tag")
+	kmac := NewXOFKMAC128("bench tag")
 	sigsNum := 100
 	sigs := make([]Signature, 0, sigsNum)
 	pks := make([]PublicKey, 0, sigsNum)
@@ -771,7 +771,7 @@ func TestAggregateSignaturesManyMessages(t *testing.T) {
 
 	// create the signatures
 	for i := 0; i < sigsNum; i++ {
-		kmac := NewBLSKMAC("test tag")
+		kmac := NewXOFKMAC128("test tag")
 		// pick a key randomly from the list
 		skRand := mrand.Intn(keysNum)
 		sk := sks[skRand]
@@ -873,7 +873,7 @@ func BenchmarkVerifySignatureManyMessages(b *testing.B) {
 	pks := make([]PublicKey, 0, sigsNum)
 	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
 	inputMsgs := make([][]byte, 0, sigsNum)
-	kmac := NewBLSKMAC("bench tag")
+	kmac := NewXOFKMAC128("bench tag")
 
 	// create the signatures
 	for i := 0; i < sigsNum; i++ {
@@ -904,7 +904,7 @@ func BenchmarkAggregate(b *testing.B) {
 	input := make([]byte, 100)
 	_, _ = mrand.Read(input)
 	// hasher
-	kmac := NewBLSKMAC("bench tag")
+	kmac := NewXOFKMAC128("bench tag")
 	sigsNum := 1000
 	sigs := make([]Signature, 0, sigsNum)
 	sks := make([]PrivateKey, 0, sigsNum)

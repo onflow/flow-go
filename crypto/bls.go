@@ -54,24 +54,30 @@ type blsBLS12381Algo struct {
 //  BLS context on the BLS 12-381 curve
 var blsInstance *blsBLS12381Algo
 
-// NewBLSKMAC returns a new KMAC128 instance with the right parameters
-// chosen for BLS hashing to curve (the expand_message_xof step).
-//
-// It expands the message into 1024 bits (required for the optimal SwU hash to curve).
-// tag is the domain separation tag, it is recommended to use a different tag for each signature domain.
-// The returned KMAC is customized by the tag and is guaranteed to be different than the KMAC used
+// NewXOFKMAC128 returns a new expand_message_xof instance for
+// the hash-to-curve function, hashing data to G1 on BLS12 381.
+// This instance must only be used to generate signatures (and not PoP),
+// because the internal ciphersuite is customized for signatures. It
+// is guaranteed to be different than the expand_message_xof instance used
 // to generate proofs of possession.
-func NewBLSKMAC(tag string) hash.Hasher {
+//
+// KMAC128 is used as the underligned extendable-output function (xof)
+// as required by https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-14#section-5.4.4.
+//
+// The returned instance is a `Hasher` and can be used to generate BLS signatures
+// with the `Sign` method.
+func NewXOFKMAC128(tag string) hash.Hasher {
 	// application tag is guaranteed to be different than the tag used
 	// to generate proofs of possession
 	// postfix the domain tag with the BLS ciphersuite
 	key := tag + blsSigCipherSuite
-	return internalBLSKMAC(key)
+	return internalXOFKMAC128(key)
 }
 
-// returns a customized KMAC instance for BLS, given a key.
-// The key is used a customizer rather than a MAC key.
-func internalBLSKMAC(key string) hash.Hasher {
+// returns an expand_message_xof instance for
+// the hash-to-curve function, hashing data to G1 on BLS12 381.
+// The key is used as a customizer rather than a MAC key.
+func internalXOFKMAC128(key string) hash.Hasher {
 	// UTF-8 is used by Go to convert strings into bytes.
 	// UTF-8 is a non-ambiguous encoding as required by draft-irtf-cfrg-hash-to-curve
 	// (similarly to the recommended ASCII).
@@ -90,7 +96,7 @@ func internalBLSKMAC(key string) hash.Hasher {
 // https://github.com/zkcrypto/pairing/blob/master/src/bls12_381/README.md#serialization
 // The private key is read only.
 // If the hasher used is KMAC128, the hasher is read only.
-// It is recommended to use Sign with the hasher from NewBLSKMAC. If not, the hasher used
+// It is recommended to use Sign with the hasher from NewXOFKMAC128. If not, the hasher used
 // must expand the message to 1024 bits. It is also recommended to use a hasher
 // with a domain separation tag.
 func (sk *PrKeyBLSBLS12381) Sign(data []byte, kmac hash.Hasher) (Signature, error) {
