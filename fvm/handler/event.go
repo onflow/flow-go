@@ -1071,8 +1071,68 @@ var (
 			payload: mustDecodeBase64("eyJ0eXBlIjoiRXZlbnQiLCJ2YWx1ZSI6eyJpZCI6IkEuOTEyZDU0NDBmN2UzNzY5ZS5GbG93RmVlcy5GZWVzRGVkdWN0ZWQiLCJmaWVsZHMiOlt7Im5hbWUiOiJhbW91bnQiLCJ2YWx1ZSI6eyJ0eXBlIjoiVUZpeDY0IiwidmFsdWUiOiIwLjAwMDEwMDAwIn19LHsibmFtZSI6ImluY2x1c2lvbkVmZm9ydCIsInZhbHVlIjp7InR5cGUiOiJVRml4NjQiLCJ2YWx1ZSI6IjEuMDAwMDAwMDAifX0seyJuYW1lIjoiZXhlY3V0aW9uRWZmb3J0IiwidmFsdWUiOnsidHlwZSI6IlVGaXg2NCIsInZhbHVlIjoiMC4wMDAwMDA1NSJ9fV19fQo="),
 		},
 		flow.MustHexStringToIdentifier("6991856b98cc14ecabe9e06c8ca7d3980cf211950c6556cb070a9d674c61a9f9"): {
-			eventIndex: 2,
+			eventIndex: 3,
 			txIndex:    27,
+			// {"type":"Event","value":{"id":"A.912d5440f7e3769e.FlowFees.FeesDeducted","fields":[{"name":"amount","value":{"type":"UFix64","value":"0.00010000"}},{"name":"inclusionEffort","value":{"type":"UFix64","value":"1.00000000"}},{"name":"executionEffort","value":{"type":"UFix64","value":"0.00000000"}}]}}
+			payload: mustDecodeBase64("eyJ0eXBlIjoiRXZlbnQiLCJ2YWx1ZSI6eyJpZCI6IkEuOTEyZDU0NDBmN2UzNzY5ZS5GbG93RmVlcy5GZWVzRGVkdWN0ZWQiLCJmaWVsZHMiOlt7Im5hbWUiOiJhbW91bnQiLCJ2YWx1ZSI6eyJ0eXBlIjoiVUZpeDY0IiwidmFsdWUiOiIwLjAwMDEwMDAwIn19LHsibmFtZSI6ImluY2x1c2lvbkVmZm9ydCIsInZhbHVlIjp7InR5cGUiOiJVRml4NjQiLCJ2YWx1ZSI6IjEuMDAwMDAwMDAifX0seyJuYW1lIjoiZXhlY3V0aW9uRWZmb3J0IiwidmFsdWUiOnsidHlwZSI6IlVGaXg2NCIsInZhbHVlIjoiMC4wMDAwMDAwMCJ9fV19fQo="),
+		},
+		flow.MustHexStringToIdentifier("de5fb7411d96392b5d2e20fc158dbfa93689c2814cd40dc933b2357e769d3139"): {
+			eventIndex: 3,
+			txIndex:    15,
+			// {"type":"Event","value":{"id":"A.912d5440f7e3769e.FlowFees.FeesDeducted","fields":[{"name":"amount","value":{"type":"UFix64","value":"0.00010000"}},{"name":"inclusionEffort","value":{"type":"UFix64","value":"1.00000000"}},{"name":"executionEffort","value":{"type":"UFix64","value":"0.00000000"}}]}}
+			payload: mustDecodeBase64("eyJ0eXBlIjoiRXZlbnQiLCJ2YWx1ZSI6eyJpZCI6IkEuOTEyZDU0NDBmN2UzNzY5ZS5GbG93RmVlcy5GZWVzRGVkdWN0ZWQiLCJmaWVsZHMiOlt7Im5hbWUiOiJhbW91bnQiLCJ2YWx1ZSI6eyJ0eXBlIjoiVUZpeDY0IiwidmFsdWUiOiIwLjAwMDEwMDAwIn19LHsibmFtZSI6ImluY2x1c2lvbkVmZm9ydCIsInZhbHVlIjp7InR5cGUiOiJVRml4NjQiLCJ2YWx1ZSI6IjEuMDAwMDAwMDAifX0seyJuYW1lIjoiZXhlY3V0aW9uRWZmb3J0IiwidmFsdWUiOnsidHlwZSI6IlVGaXg2NCIsInZhbHVlIjoiMC4wMDAwMDAwMCJ9fV19fQo="),
+		},
+		flow.MustHexStringToIdentifier("6dff02b17ca8240c8c06a5630d931527cd972675fcb05950ffe0f3a099fde2ea"): {
+			eventIndex: 3,
+			txIndex:    1,
+			// {"type":"Event","value":{"id":"A.912d5440f7e3769e.FlowFees.FeesDeducted","fields":[{"name":"amount","value":{"type":"UFix64","value":"0.00010000"}},{"name":"inclusionEffort","value":{"type":"UFix64","value":"1.00000000"}},{"name":"executionEffort","value":{"type":"UFix64","value":"0.00000000"}}]}}
+			payload: mustDecodeBase64("eyJ0eXBlIjoiRXZlbnQiLCJ2YWx1ZSI6eyJpZCI6IkEuOTEyZDU0NDBmN2UzNzY5ZS5GbG93RmVlcy5GZWVzRGVkdWN0ZWQiLCJmaWVsZHMiOlt7Im5hbWUiOiJhbW91bnQiLCJ2YWx1ZSI6eyJ0eXBlIjoiVUZpeDY0IiwidmFsdWUiOiIwLjAwMDEwMDAwIn19LHsibmFtZSI6ImluY2x1c2lvbkVmZm9ydCIsInZhbHVlIjp7InR5cGUiOiJVRml4NjQiLCJ2YWx1ZSI6IjEuMDAwMDAwMDAifX0seyJuYW1lIjoiZXhlY3V0aW9uRWZmb3J0IiwidmFsdWUiOnsidHlwZSI6IlVGaXg2NCIsInZhbHVlIjoiMC4wMDAwMDAwMCJ9fV19fQo="),
+		},
+		flow.MustHexStringToIdentifier("a900173428c3d6096f2b9f610cd556234e53b2655531b7350340b6476cfc5bb6"): {
+			eventIndex: 3,
+			txIndex:    1,
+			// {"type":"Event","value":{"id":"A.912d5440f7e3769e.FlowFees.FeesDeducted","fields":[{"name":"amount","value":{"type":"UFix64","value":"0.00010000"}},{"name":"inclusionEffort","value":{"type":"UFix64","value":"1.00000000"}},{"name":"executionEffort","value":{"type":"UFix64","value":"0.00000000"}}]}}
+			payload: mustDecodeBase64("eyJ0eXBlIjoiRXZlbnQiLCJ2YWx1ZSI6eyJpZCI6IkEuOTEyZDU0NDBmN2UzNzY5ZS5GbG93RmVlcy5GZWVzRGVkdWN0ZWQiLCJmaWVsZHMiOlt7Im5hbWUiOiJhbW91bnQiLCJ2YWx1ZSI6eyJ0eXBlIjoiVUZpeDY0IiwidmFsdWUiOiIwLjAwMDEwMDAwIn19LHsibmFtZSI6ImluY2x1c2lvbkVmZm9ydCIsInZhbHVlIjp7InR5cGUiOiJVRml4NjQiLCJ2YWx1ZSI6IjEuMDAwMDAwMDAifX0seyJuYW1lIjoiZXhlY3V0aW9uRWZmb3J0IiwidmFsdWUiOnsidHlwZSI6IlVGaXg2NCIsInZhbHVlIjoiMC4wMDAwMDAwMCJ9fV19fQo="),
+		},
+		flow.MustHexStringToIdentifier("3fda350c2520da4130ac63cb2d68bcfb5e62707297da2b7c12691307d3e3f546"): {
+			eventIndex: 3,
+			txIndex:    0,
+			// {"type":"Event","value":{"id":"A.912d5440f7e3769e.FlowFees.FeesDeducted","fields":[{"name":"amount","value":{"type":"UFix64","value":"0.00010000"}},{"name":"inclusionEffort","value":{"type":"UFix64","value":"1.00000000"}},{"name":"executionEffort","value":{"type":"UFix64","value":"0.00000000"}}]}}
+			payload: mustDecodeBase64("eyJ0eXBlIjoiRXZlbnQiLCJ2YWx1ZSI6eyJpZCI6IkEuOTEyZDU0NDBmN2UzNzY5ZS5GbG93RmVlcy5GZWVzRGVkdWN0ZWQiLCJmaWVsZHMiOlt7Im5hbWUiOiJhbW91bnQiLCJ2YWx1ZSI6eyJ0eXBlIjoiVUZpeDY0IiwidmFsdWUiOiIwLjAwMDEwMDAwIn19LHsibmFtZSI6ImluY2x1c2lvbkVmZm9ydCIsInZhbHVlIjp7InR5cGUiOiJVRml4NjQiLCJ2YWx1ZSI6IjEuMDAwMDAwMDAifX0seyJuYW1lIjoiZXhlY3V0aW9uRWZmb3J0IiwidmFsdWUiOnsidHlwZSI6IlVGaXg2NCIsInZhbHVlIjoiMC4wMDAwMDAwMCJ9fV19fQo="),
+		},
+		flow.MustHexStringToIdentifier("441630e1f5af54eaf9929f8b54db3757a229d3e3292bd6c01a8c20780ec53e9b"): {
+			eventIndex: 3,
+			txIndex:    2,
+			// {"type":"Event","value":{"id":"A.912d5440f7e3769e.FlowFees.FeesDeducted","fields":[{"name":"amount","value":{"type":"UFix64","value":"0.00010000"}},{"name":"inclusionEffort","value":{"type":"UFix64","value":"1.00000000"}},{"name":"executionEffort","value":{"type":"UFix64","value":"0.00000000"}}]}}
+			payload: mustDecodeBase64("eyJ0eXBlIjoiRXZlbnQiLCJ2YWx1ZSI6eyJpZCI6IkEuOTEyZDU0NDBmN2UzNzY5ZS5GbG93RmVlcy5GZWVzRGVkdWN0ZWQiLCJmaWVsZHMiOlt7Im5hbWUiOiJhbW91bnQiLCJ2YWx1ZSI6eyJ0eXBlIjoiVUZpeDY0IiwidmFsdWUiOiIwLjAwMDEwMDAwIn19LHsibmFtZSI6ImluY2x1c2lvbkVmZm9ydCIsInZhbHVlIjp7InR5cGUiOiJVRml4NjQiLCJ2YWx1ZSI6IjEuMDAwMDAwMDAifX0seyJuYW1lIjoiZXhlY3V0aW9uRWZmb3J0IiwidmFsdWUiOnsidHlwZSI6IlVGaXg2NCIsInZhbHVlIjoiMC4wMDAwMDAwMCJ9fV19fQo="),
+		},
+		flow.MustHexStringToIdentifier("e778c6712a8bc50cc9d3a7faf7f72d79b84aba26f4d62fc6ef7f471ad4046764"): {
+			eventIndex: 3,
+			txIndex:    2,
+			// {"type":"Event","value":{"id":"A.912d5440f7e3769e.FlowFees.FeesDeducted","fields":[{"name":"amount","value":{"type":"UFix64","value":"0.00010000"}},{"name":"inclusionEffort","value":{"type":"UFix64","value":"1.00000000"}},{"name":"executionEffort","value":{"type":"UFix64","value":"0.00000000"}}]}}
+			payload: mustDecodeBase64("eyJ0eXBlIjoiRXZlbnQiLCJ2YWx1ZSI6eyJpZCI6IkEuOTEyZDU0NDBmN2UzNzY5ZS5GbG93RmVlcy5GZWVzRGVkdWN0ZWQiLCJmaWVsZHMiOlt7Im5hbWUiOiJhbW91bnQiLCJ2YWx1ZSI6eyJ0eXBlIjoiVUZpeDY0IiwidmFsdWUiOiIwLjAwMDEwMDAwIn19LHsibmFtZSI6ImluY2x1c2lvbkVmZm9ydCIsInZhbHVlIjp7InR5cGUiOiJVRml4NjQiLCJ2YWx1ZSI6IjEuMDAwMDAwMDAifX0seyJuYW1lIjoiZXhlY3V0aW9uRWZmb3J0IiwidmFsdWUiOnsidHlwZSI6IlVGaXg2NCIsInZhbHVlIjoiMC4wMDAwMDAwMCJ9fV19fQo="),
+		},
+		flow.MustHexStringToIdentifier("7aa898f891dd800fd8dc2ce8b08954117ede9c31fd6425f23ca1450be00d05a4"): {
+			eventIndex: 3,
+			txIndex:    2,
+			// {"type":"Event","value":{"id":"A.912d5440f7e3769e.FlowFees.FeesDeducted","fields":[{"name":"amount","value":{"type":"UFix64","value":"0.00010000"}},{"name":"inclusionEffort","value":{"type":"UFix64","value":"1.00000000"}},{"name":"executionEffort","value":{"type":"UFix64","value":"0.00000000"}}]}}
+			payload: mustDecodeBase64("eyJ0eXBlIjoiRXZlbnQiLCJ2YWx1ZSI6eyJpZCI6IkEuOTEyZDU0NDBmN2UzNzY5ZS5GbG93RmVlcy5GZWVzRGVkdWN0ZWQiLCJmaWVsZHMiOlt7Im5hbWUiOiJhbW91bnQiLCJ2YWx1ZSI6eyJ0eXBlIjoiVUZpeDY0IiwidmFsdWUiOiIwLjAwMDEwMDAwIn19LHsibmFtZSI6ImluY2x1c2lvbkVmZm9ydCIsInZhbHVlIjp7InR5cGUiOiJVRml4NjQiLCJ2YWx1ZSI6IjEuMDAwMDAwMDAifX0seyJuYW1lIjoiZXhlY3V0aW9uRWZmb3J0IiwidmFsdWUiOnsidHlwZSI6IlVGaXg2NCIsInZhbHVlIjoiMC4wMDAwMDAwMCJ9fV19fQo="),
+		},
+		flow.MustHexStringToIdentifier("652faf65e0d17b44baf207372279bfb44691b131f8d7e41d7df65322f13c0e20"): {
+			eventIndex: 3,
+			txIndex:    0,
+			// {"type":"Event","value":{"id":"A.912d5440f7e3769e.FlowFees.FeesDeducted","fields":[{"name":"amount","value":{"type":"UFix64","value":"0.00010000"}},{"name":"inclusionEffort","value":{"type":"UFix64","value":"1.00000000"}},{"name":"executionEffort","value":{"type":"UFix64","value":"0.00000000"}}]}}
+			payload: mustDecodeBase64("eyJ0eXBlIjoiRXZlbnQiLCJ2YWx1ZSI6eyJpZCI6IkEuOTEyZDU0NDBmN2UzNzY5ZS5GbG93RmVlcy5GZWVzRGVkdWN0ZWQiLCJmaWVsZHMiOlt7Im5hbWUiOiJhbW91bnQiLCJ2YWx1ZSI6eyJ0eXBlIjoiVUZpeDY0IiwidmFsdWUiOiIwLjAwMDEwMDAwIn19LHsibmFtZSI6ImluY2x1c2lvbkVmZm9ydCIsInZhbHVlIjp7InR5cGUiOiJVRml4NjQiLCJ2YWx1ZSI6IjEuMDAwMDAwMDAifX0seyJuYW1lIjoiZXhlY3V0aW9uRWZmb3J0IiwidmFsdWUiOnsidHlwZSI6IlVGaXg2NCIsInZhbHVlIjoiMC4wMDAwMDAwMCJ9fV19fQo="),
+		},
+		flow.MustHexStringToIdentifier("c85a5ab319c162fb2acace8ea5ad53af642f43471f41e198f83ef0f402072085"): {
+			eventIndex: 3,
+			txIndex:    71,
+			// {"type":"Event","value":{"id":"A.912d5440f7e3769e.FlowFees.FeesDeducted","fields":[{"name":"amount","value":{"type":"UFix64","value":"0.00010000"}},{"name":"inclusionEffort","value":{"type":"UFix64","value":"1.00000000"}},{"name":"executionEffort","value":{"type":"UFix64","value":"0.00000000"}}]}}
+			payload: mustDecodeBase64("eyJ0eXBlIjoiRXZlbnQiLCJ2YWx1ZSI6eyJpZCI6IkEuOTEyZDU0NDBmN2UzNzY5ZS5GbG93RmVlcy5GZWVzRGVkdWN0ZWQiLCJmaWVsZHMiOlt7Im5hbWUiOiJhbW91bnQiLCJ2YWx1ZSI6eyJ0eXBlIjoiVUZpeDY0IiwidmFsdWUiOiIwLjAwMDEwMDAwIn19LHsibmFtZSI6ImluY2x1c2lvbkVmZm9ydCIsInZhbHVlIjp7InR5cGUiOiJVRml4NjQiLCJ2YWx1ZSI6IjEuMDAwMDAwMDAifX0seyJuYW1lIjoiZXhlY3V0aW9uRWZmb3J0IiwidmFsdWUiOnsidHlwZSI6IlVGaXg2NCIsInZhbHVlIjoiMC4wMDAwMDAwMCJ9fV19fQo="),
+		},
+		flow.MustHexStringToIdentifier("80dbef878600fb84e1d47983b4cc62d9b8394c320a1db684b5ab16a078a7e56b"): {
+			eventIndex: 3,
+			txIndex:    36,
 			// {"type":"Event","value":{"id":"A.912d5440f7e3769e.FlowFees.FeesDeducted","fields":[{"name":"amount","value":{"type":"UFix64","value":"0.00010000"}},{"name":"inclusionEffort","value":{"type":"UFix64","value":"1.00000000"}},{"name":"executionEffort","value":{"type":"UFix64","value":"0.00000000"}}]}}
 			payload: mustDecodeBase64("eyJ0eXBlIjoiRXZlbnQiLCJ2YWx1ZSI6eyJpZCI6IkEuOTEyZDU0NDBmN2UzNzY5ZS5GbG93RmVlcy5GZWVzRGVkdWN0ZWQiLCJmaWVsZHMiOlt7Im5hbWUiOiJhbW91bnQiLCJ2YWx1ZSI6eyJ0eXBlIjoiVUZpeDY0IiwidmFsdWUiOiIwLjAwMDEwMDAwIn19LHsibmFtZSI6ImluY2x1c2lvbkVmZm9ydCIsInZhbHVlIjp7InR5cGUiOiJVRml4NjQiLCJ2YWx1ZSI6IjEuMDAwMDAwMDAifX0seyJuYW1lIjoiZXhlY3V0aW9uRWZmb3J0IiwidmFsdWUiOnsidHlwZSI6IlVGaXg2NCIsInZhbHVlIjoiMC4wMDAwMDAwMCJ9fV19fQo="),
 		},
