@@ -27,12 +27,10 @@ type CorruptedConnector struct {
 
 func NewCorruptedConnector(
 	logger zerolog.Logger,
-	inboundHandler func(*insecure.Message),
 	corruptedNodeIds flow.IdentityList,
 	corruptedPortMapping map[flow.Identifier]string) *CorruptedConnector {
 	return &CorruptedConnector{
 		logger:               logger.With().Str("component", "corrupted-connector").Logger(),
-		inboundHandler:       inboundHandler,
 		corruptedNodeIds:     corruptedNodeIds,
 		corruptedPortMapping: corruptedPortMapping,
 	}
@@ -40,6 +38,10 @@ func NewCorruptedConnector(
 
 // Connect creates a connection the corruptible conduit factory of the given corrupted identity.
 func (c *CorruptedConnector) Connect(ctx irrecoverable.SignalerContext, targetId flow.Identifier) (insecure.CorruptedNodeConnection, error) {
+	if c.inboundHandler == nil {
+		return nil, fmt.Errorf("inbound handler has not set")
+	}
+
 	port, ok := c.corruptedPortMapping[targetId]
 	if !ok {
 		return nil, fmt.Errorf("could not find port mapping for corrupted id: %x", targetId)
@@ -81,4 +83,9 @@ func (c *CorruptedConnector) Connect(ctx irrecoverable.SignalerContext, targetId
 		Msg("corrupted connection started and established")
 
 	return connection, nil
+}
+
+// WithIncomingMessageHandler sets the handler for the incoming messages from remote corrupted nodes.
+func (c *CorruptedConnector) WithIncomingMessageHandler(handler func(*insecure.Message)) {
+	c.inboundHandler = handler
 }

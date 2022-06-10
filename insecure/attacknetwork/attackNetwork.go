@@ -43,6 +43,8 @@ func NewAttackNetwork(
 		corruptedConnections: make(map[flow.Identifier]insecure.CorruptedNodeConnection),
 	}
 
+	connector.WithIncomingMessageHandler(attackNetwork.Observe)
+
 	// setting lifecycle management module.
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
