@@ -268,7 +268,6 @@ func (c *Core) prune(final *flow.Header) {
 		if height <= final.Height {
 			delete(c.heights, height)
 			c.metrics.PrunedBlockByHeight(status)
-			continue
 		}
 	}
 
@@ -276,7 +275,6 @@ func (c *Core) prune(final *flow.Header) {
 		if status.BlockHeight <= final.Height {
 			delete(c.blockIDs, blockID)
 			c.metrics.PrunedBlockById(status)
-			continue
 		}
 	}
 
