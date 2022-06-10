@@ -22,7 +22,7 @@ type Encoder struct {
 // underlying encoder, followed by a new line.
 func (e *Encoder) Encode(v interface{}) error {
 	// encode the value
-	code, what, err := codec.MessageCodeFromInteface(v)
+	code, what, err := codec.MessageCodeFromInterface(v)
 	if err != nil {
 		return fmt.Errorf("could not determine envelope code string: %w", err)
 	}

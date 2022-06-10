@@ -63,8 +63,8 @@ const (
 	CodeMax
 )
 
-// MessageCodeFromInteface returns the correct Code based on the underlying type of message v.
-func MessageCodeFromInteface(v interface{}) (uint8, string, error) {
+// MessageCodeFromInterface returns the correct Code based on the underlying type of message v.
+func MessageCodeFromInterface(v interface{}) (uint8, string, error) {
 	switch v.(type) {
 	// consensus
 	case *messages.BlockProposal:
