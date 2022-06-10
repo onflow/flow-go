@@ -25,7 +25,7 @@ const cipherSuiteIndex = "CS00-"
 // (only one ciphersuite is provided for BLS signatures by the crypto library
 //	and therefore it's not possible to choose one)
 func tag(domain string) string {
-	return protocolPrefix + protocolVersion + domain + cipherSuiteIndex
+	return protocolPrefix + domain + protocolVersion + cipherSuiteIndex + "-with-"
 }
 
 var (
