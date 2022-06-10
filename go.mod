@@ -45,7 +45,7 @@ require (
 	github.com/libp2p/go-libp2p-discovery v0.6.0
 	github.com/libp2p/go-libp2p-kad-dht v0.15.0
 	github.com/libp2p/go-libp2p-kbucket v0.4.7
-	github.com/libp2p/go-libp2p-pubsub v0.6.2-0.20220530164708-06b5ba47636c
+	github.com/libp2p/go-libp2p-pubsub v0.6.0
 	github.com/libp2p/go-libp2p-swarm v0.10.2
 	github.com/libp2p/go-libp2p-tls v0.4.1
 	github.com/libp2p/go-tcp-transport v0.5.1
@@ -58,7 +58,7 @@ require (
 	github.com/onflow/flow v0.3.1
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220513155751-c4c1f8d59f83
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220513155751-c4c1f8d59f83
-	github.com/onflow/flow-emulator v0.32.1-0.20220608200416-af3f5ba3f673
+	github.com/onflow/flow-emulator v0.32.0-beta1
 	github.com/onflow/flow-go-sdk v0.26.0
 	github.com/onflow/flow-go/crypto v0.24.3
 	github.com/onflow/flow/protobuf/go/flow v0.3.1
