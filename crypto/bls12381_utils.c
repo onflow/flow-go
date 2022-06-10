@@ -27,27 +27,15 @@ prec_st bls_prec_st;
 prec_st* bls_prec = NULL;
 
 // required constants for the optimized SWU hash to curve
-#if (hashToPoint == OPSWU)
-extern const uint64_t p_3div4_data[Fp_DIGITS];
-extern const uint64_t fp_p_1div2_data[Fp_DIGITS];
-extern const uint64_t a1_data[Fp_DIGITS];
-extern const uint64_t b1_data[Fp_DIGITS];
+#if (hashToPoint == LOCAL_SSWU)
 extern const uint64_t iso_Nx_data[ELLP_Nx_LEN][Fp_DIGITS];
-extern const uint64_t iso_Dx_data[ELLP_Dx_LEN][Fp_DIGITS];
 extern const uint64_t iso_Ny_data[ELLP_Ny_LEN][Fp_DIGITS];
-extern const uint64_t iso_Dy_data[ELLP_Dy_LEN][Fp_DIGITS];
 #endif
 
 #if (MEMBERSHIP_CHECK_G1 == BOWE)
 extern const uint64_t beta_data[Fp_DIGITS];
 extern const uint64_t z2_1_by3_data[2];
 #endif
-
-const uint64_t p_1div2_data[Fp_DIGITS] = {
-   0xdcff7fffffffd555, 0x0f55ffff58a9ffff, 0xb39869507b587b12, 
-   0xb23ba5c279c2895f, 0x258dd3db21a5d66b, 0x0d0088f51cbff34d,
-};
-
 
 // sets the global variable to input
 void precomputed_data_set(const prec_st* p) {
@@ -61,22 +49,22 @@ void precomputed_data_set(const prec_st* p) {
 // pre-compute some data required for curve BLS12-381
 prec_st* init_precomputed_data_BLS12_381() {
     bls_prec = &bls_prec_st;
+    ctx_t* ctx = core_get();
 
-    #if (hashToPoint == OPSWU)
-    // isogenous curve constants used in optimized SWU
-    fp_read_raw(bls_prec->a1, a1_data);
-    fp_read_raw(bls_prec->b1, b1_data);
-    // (p-3)/4
-    bn_new(&bls_prec->p_3div4);
-    bn_read_raw(&bls_prec->p_3div4, p_3div4_data, Fp_DIGITS);
     // (p-1)/2
-    fp_read_raw(bls_prec->fp_p_1div2, fp_p_1div2_data);
-    for (int i=0; i<ELLP_Dx_LEN; i++)  
-        fp_read_raw(bls_prec->iso_Dx[i], iso_Dx_data[i]);
+    bn_div_dig(&bls_prec->p_1div2, &ctx->prime, 2);
+    #if (hashToPoint == LOCAL_SSWU)
+    // (p-3)/4
+    bn_div_dig(&bls_prec->p_3div4, &bls_prec->p_1div2, 2);
+    // sqrt(-z)
+    fp_neg(bls_prec->sqrt_z, ctx->ep_map_u);
+    fp_srt(bls_prec->sqrt_z, bls_prec->sqrt_z);
+    // -a1 and a1*z
+    fp_neg(bls_prec->minus_a1, ctx->ep_iso.a);
+    fp_mul(bls_prec->a1z, ctx->ep_iso.a, ctx->ep_map_u);
+    
     for (int i=0; i<ELLP_Nx_LEN; i++)  
         fp_read_raw(bls_prec->iso_Nx[i], iso_Nx_data[i]);
-    for (int i=0; i<ELLP_Dy_LEN; i++)  
-        fp_read_raw(bls_prec->iso_Dy[i], iso_Dy_data[i]);
     for (int i=0; i<ELLP_Ny_LEN; i++)  
         fp_read_raw(bls_prec->iso_Ny[i], iso_Ny_data[i]);
     #endif
@@ -88,8 +76,8 @@ prec_st* init_precomputed_data_BLS12_381() {
     bn_read_raw(&bls_prec->z2_1_by3, z2_1_by3_data, 2);
     #endif
 
-    bn_new(&bls_prec->p_1div2);
-    bn_read_raw(&bls_prec->p_1div2, p_1div2_data, Fp_DIGITS);
+    // Montgomery constant R
+    fp_set_dig(bls_prec->r, 1);
     return bls_prec;
 }
 
@@ -133,17 +121,15 @@ void ep_mult(ep_t res, const ep_t p, const bn_t expo) {
 }
 
 // Exponentiation of generator g1 in G1
-// This function is not called by BLS but is here for DEBUG/TESTs purposes
-void ep_mult_gen(ep_t res, const bn_t expo) {
-#define GENERIC_POINT 0
-#define FIXED_MULT    (GENERIC_POINT^1)
-
-#if GENERIC_POINT
-    ep_mult(res, &core_get()->ep_g, expo);
-#elif FIXED_MULT
+// These two function are here for bench purposes only
+void ep_mult_gen_bench(ep_t res, const bn_t expo) {
     // Using precomputed table of size 4
     ep_mul_gen(res, (bn_st *)expo);
-#endif
+}
+
+void ep_mult_generic_bench(ep_t res, const bn_t expo) {
+    // generic point multiplication
+    ep_mult(res, &core_get()->ep_g, expo);
 }
 
 // Exponentiation of a generic point p in G2

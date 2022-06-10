@@ -246,7 +246,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		}).
 		Module("sync core", func(node *NodeConfig) error {
 			var err error
-			syncCore, err = chainsync.New(node.Logger, node.SyncCoreConfig)
+			syncCore, err = chainsync.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector())
 			return err
 		}).
 		Module("execution receipts storage", func(node *NodeConfig) error {
