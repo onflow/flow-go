@@ -131,7 +131,7 @@ func (txt *TxTracker) Stop() {
 
 func (txt *TxTracker) statusWorker(ctx context.Context, workerID int, fclient *client.Client, sleepAfterOp time.Duration) {
 	log := txt.log.With().Int("worker_id", workerID).Logger()
-	log.Debug().Msg("worker started")
+	log.Trace().Msg("worker started")
 
 	defer txt.wg.Done()
 
