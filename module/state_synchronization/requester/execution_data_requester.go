@@ -116,6 +116,7 @@ type executionDataRequester struct {
 	// Local db objects
 	headers storage.Headers
 	results storage.ExecutionResults
+	seals   storage.Seals
 
 	executionDataReader *jobs.ExecutionDataReader
 
@@ -144,6 +145,7 @@ func New(
 	state protocol.State,
 	headers storage.Headers,
 	results storage.ExecutionResults,
+	seals storage.Seals,
 	cfg ExecutionDataConfig,
 ) state_synchronization.ExecutionDataRequester {
 	e := &executionDataRequester{
@@ -152,6 +154,7 @@ func New(
 		metrics:              edrMetrics,
 		headers:              headers,
 		results:              results,
+		seals:                seals,
 		config:               cfg,
 		finalizationNotifier: engine.NewNotifier(),
 	}
@@ -195,6 +198,7 @@ func New(
 		e.eds,
 		e.headers,
 		e.results,
+		e.seals,
 		e.config.FetchTimeout,
 		// method to get highest consecutive height that has downloaded execution data. it is used
 		// here by the notification job consumer to discover new jobs.
@@ -350,14 +354,12 @@ func (e *executionDataRequester) processFetchRequest(ctx irrecoverable.SignalerC
 
 	logger.Debug().Msg("processing fetch request")
 
-	result, err := e.results.ByBlockID(blockID)
-
-	// The ExecutionResult may not have been downloaded yet. This error should be retried
-	if errors.Is(err, storage.ErrNotFound) {
-		logger.Debug().Msg("execution result not found")
-		return err
+	seal, err := e.seals.FinalizedSealForBlock(blockID)
+	if err != nil {
+		ctx.Throw(fmt.Errorf("failed to get seal for block %s: %w", blockID, err))
 	}
 
+	result, err := e.results.ByID(seal.ResultID)
 	if err != nil {
 		ctx.Throw(fmt.Errorf("failed to lookup execution result for block %s: %w", blockID, err))
 	}
@@ -395,7 +397,7 @@ func (e *executionDataRequester) processFetchRequest(ctx irrecoverable.SignalerC
 		ctx.Throw(err)
 	}
 
-	logger.Debug().Msg("Fetched execution data")
+	logger.Info().Msg("execution data fetched")
 
 	return nil
 }
