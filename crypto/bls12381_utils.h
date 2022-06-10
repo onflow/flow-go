@@ -25,6 +25,7 @@ typedef uint8_t byte;
 #define Fp_BITS   381
 #define Fr_BITS   255
 #define Fp_BYTES  BITS_TO_BYTES(Fp_BITS)
+#define Fp_BYTES2 BITS_TO_BYTES(Fp_BITS)*2
 #define Fp_DIGITS BITS_TO_DIGITS(Fp_BITS)
 #define Fr_BYTES  BITS_TO_BYTES(Fr_BITS)
 

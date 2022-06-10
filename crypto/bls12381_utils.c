@@ -181,7 +181,7 @@ void ep2_print_(char* s, ep2_st* p) {
 void bn_randZr_star(bn_t x) {
     // reduce the modular reduction bias
     int seed_len = BITS_TO_BYTES(Fr_BITS + SEC_BITS);
-    byte* seed = (byte*) malloc(seed_len);
+    byte seed[seed_len];
     rand_bytes(seed, seed_len);
     bn_map_to_Zr_star(x, seed, seed_len);
 }
@@ -312,15 +312,10 @@ int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
 
 	a->coord = BASIC;
 	fp_set_dig(a->z, 1);
-    byte* temp = (byte*)malloc(Fp_BYTES);
-    if (!temp) {
-        RLC_THROW(ERR_NO_MEMORY);
-        return UNDEFINED;
-    }
+    byte temp[Fp_BYTES];
     memcpy(temp, bin, Fp_BYTES);
     temp[0] &= 0x1F;
 	fp_read_bin(a->x, temp, Fp_BYTES);
-    free(temp);
 
     if (G1_SERIALIZATION == UNCOMPRESSED) {
         fp_read_bin(a->y, bin + Fp_BYTES, Fp_BYTES);
@@ -426,19 +421,14 @@ int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
 	a->coord = BASIC;
 	fp_set_dig(a->z[0], 1);
 	fp_zero(a->z[1]);
-    byte* temp = (byte*)malloc(2*Fp_BYTES);
-    if (!temp) {
-        RLC_THROW(ERR_NO_MEMORY);
-        return UNDEFINED;
-    }
-    memcpy(temp, bin, 2*Fp_BYTES);
+    byte temp[Fp_BYTES2];
+    memcpy(temp, bin, Fp_BYTES2);
     // clear the header bits
     temp[0] &= 0x1F;
-    fp2_read_bin(a->x, temp, 2*Fp_BYTES);
-    free(temp);
+    fp2_read_bin(a->x, temp, Fp_BYTES2);
 
     if (G2_SERIALIZATION == UNCOMPRESSED) {
-        fp2_read_bin(a->y, bin + 2*Fp_BYTES, 2*Fp_BYTES);
+        fp2_read_bin(a->y, bin + Fp_BYTES2, Fp_BYTES2);
         return RLC_OK;
     }
     
@@ -587,15 +577,18 @@ int ep_sum_vector_byte(byte* dest, const byte* sigs_bytes, const int len) {
     ep_t acc;        
     ep_new(acc);
     ep_set_infty(acc);
-    ep_st* sigs = (ep_st*) malloc(len * sizeof(ep_st));
+    ep_st* sigs = (ep_st*) calloc(len, sizeof(ep_st));
 
     // import the points from the array
     for (int i=0; i < len; i++) {
         ep_new(sigs[i]);
         // deserialize each point from the input array
         int read_ret = ep_read_bin_compact(&sigs[i], &sigs_bytes[SIGNATURE_LEN*i], SIGNATURE_LEN);
-        if (read_ret != RLC_OK)
+        if (read_ret != RLC_OK) {
+            for (int j=0; j < i; j++) ep_free(sigs[j]);
+            free(sigs);
             return read_ret;
+        }
     }
     // sum the points
     ep_sum_vector(acc, sigs, len);
@@ -604,7 +597,7 @@ int ep_sum_vector_byte(byte* dest, const byte* sigs_bytes, const int len) {
 
     // free the temp memory
     ep_free(acc);
-    for (int i=0; i < len; i++) ep_free(sig[i]);
+    for (int i=0; i < len; i++) ep_free(sigs[i]);
     free(sigs);
     return VALID;
 }
