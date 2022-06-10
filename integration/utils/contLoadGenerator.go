@@ -54,6 +54,7 @@ type ContLoadGenerator struct {
 	loadType             LoadType
 	follower             TxFollower
 	feedbackEnabled      bool
+	availableAccountsLo  int
 }
 
 // NewContLoadGenerator returns a new ContLoadGenerator
@@ -115,6 +116,7 @@ func NewContLoadGenerator(
 		follower:             follower,
 		loadType:             loadType,
 		feedbackEnabled:      feedbackEnabled,
+		availableAccountsLo:  numberOfAccounts,
 	}
 
 	return lGen, nil
@@ -431,6 +433,14 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 	log.Trace().
 		Int("availableAccounts", len(lg.availableAccounts)).
 		Msgf("getting next available account")
+
+	if workerID == 0 {
+		l := len(lg.availableAccounts)
+		if l < lg.availableAccountsLo {
+			lg.availableAccountsLo = l
+			log.Debug().Int("availableAccountsLo", l).Int("numberOfAccounts", lg.numberOfAccounts).Msg("discovered new account low")
+		}
+	}
 
 	var acc *flowAccount
 	select {
