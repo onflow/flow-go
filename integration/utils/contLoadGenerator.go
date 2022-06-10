@@ -349,7 +349,7 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 						lg.accounts = append(lg.accounts, newAcc)
 						lg.availableAccounts <- newAcc
 
-						log.Debug().
+						log.Trace().
 							Hex("address", accountAddress.Bytes()).
 							Msg("new account added")
 					}
