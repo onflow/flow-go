@@ -573,21 +573,21 @@ void ep_sum_vector(ep_t jointx, ep_st* x, const int len) {
 // and store the sum bytes in dest.
 // The function assumes sigs is correctly allocated with regards to len.
 int ep_sum_vector_byte(byte* dest, const byte* sigs_bytes, const int len) {
+    int error;
+
     // temp variables
     ep_t acc;        
     ep_new(acc);
     ep_set_infty(acc);
     ep_st* sigs = (ep_st*) calloc(len, sizeof(ep_st));
+    for (int i=0; i < len; i++) ep_new(sigs[i]);
 
     // import the points from the array
     for (int i=0; i < len; i++) {
-        ep_new(sigs[i]);
         // deserialize each point from the input array
-        int read_ret = ep_read_bin_compact(&sigs[i], &sigs_bytes[SIGNATURE_LEN*i], SIGNATURE_LEN);
-        if (read_ret != RLC_OK) {
-            for (int j=0; j < i; j++) ep_free(sigs[j]);
-            free(sigs);
-            return read_ret;
+        error = ep_read_bin_compact(&sigs[i], &sigs_bytes[SIGNATURE_LEN*i], SIGNATURE_LEN);
+        if (error != RLC_OK) {
+            goto out;
         }
     }
     // sum the points
@@ -595,11 +595,13 @@ int ep_sum_vector_byte(byte* dest, const byte* sigs_bytes, const int len) {
     // export the result
     ep_write_bin_compact(dest, acc, SIGNATURE_LEN);
 
+    error = VALID;
+out:
     // free the temp memory
     ep_free(acc);
     for (int i=0; i < len; i++) ep_free(sigs[i]);
     free(sigs);
-    return VALID;
+    return error;
 }
 
 // uses a simple scalar multiplication by G1's order
