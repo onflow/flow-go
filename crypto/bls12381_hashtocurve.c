@@ -73,31 +73,28 @@ const uint64_t iso_Ny_data[ELLP_Ny_LEN][Fp_DIGITS] = {
 };
 
 // sqrt_ration optimized for p mod 4 = 3.
-// check if (U/V) is a square, return 1 if yes, 0 otherwise 
-// if 1 is returned, out contains sqrt(U/V)
+// Check if (U/V) is a square, return 1 if yes, 0 otherwise 
+// If 1 is returned, out contains sqrt(U/V),
+// otherwise out is sqrt(z*U/V)
 // out should not be the same as U, or V
 static int sqrt_ratio_3mod4(fp_t out, const fp_t u, const fp_t v) {
-    const int tmp_len = 3;
-    fp_t* fp_tmp = (fp_t*) malloc(tmp_len*sizeof(fp_t));
-    for (int i=0; i<tmp_len; i++) fp_new(fp_tmp[i]);
+    fp_t t0, t1, t2;
 
-    fp_sqr(fp_tmp[1], v);                               // V^2
-    fp_mul(fp_tmp[2], u, v);                            // UV
-    fp_mul(fp_tmp[1], fp_tmp[1], fp_tmp[2]);            // UV^3
-    fp_exp(out, fp_tmp[1], &bls_prec->p_3div4);         // (UV^3)^((p-3)/4)
-    fp_mul(out, out, fp_tmp[2]);                        // UV(UV^3)^((p-3)/4)
+    fp_sqr(t1, v);                               // V^2
+    fp_mul(t2, u, v);                            // U*V
+    fp_mul(t1, t1, t2);                          // U*V^3
+    fp_exp(out, t1, &bls_prec->p_3div4);         // (U*V^3)^((p-3)/4)
+    fp_mul(out, out, t2);                        // (U*V)*(U*V^3)^((p-3)/4) = U^((p+1)/4) * V^(3p-5)/4 
 
-    fp_sqr(fp_tmp[0], out);     // out^2
-    fp_mul(fp_tmp[0], fp_tmp[0], v);  // out^2 * V
+    fp_sqr(t0, out);     // out^2
+    fp_mul(t0, t0, v);   // out^2 * V
 
     int res = 1;
-    if (fp_cmp(fp_tmp[0], u) != RLC_EQ) {
-        fp_mul(out, out, bls_prec->sqrt_z);      // sqr(-z)*UV(UV^3)^((p-3)/4)
+    if (fp_cmp(t0, u) != RLC_EQ) {               // check whether U/V is a quadratic residue
+        fp_mul(out, out, bls_prec->sqrt_z);      // sqrt(-z)*U*V(UV^3)^((p-3)/4)
         res = 0;
     }
     
-    for (int i=0; i<tmp_len; i++) fp_free(fp_tmp[i]);
-    free(fp_tmp);
     return res;
 }
 
@@ -115,9 +112,7 @@ static int sign_0(const fp_t in) {
 // using optimized non-constant-time Simplified SWU implementation (A.B = 0)
 // Outout point p is in Jacobian coordinates to avoid extra inversions.
 static inline void map_to_E1_osswu(ep_t p, const fp_t t) {
-    const int tmp_len = 5;
-    fp_t* fp_tmp = (fp_t*) malloc(tmp_len*sizeof(fp_t));
-    for (int i=0; i<tmp_len; i++) fp_new(fp_tmp[i]);
+    fp_t t0, t1, t2, t3, t4;
 
     // get the isogeny map coefficients
     ctx_t* ctx = core_get();
@@ -126,55 +121,52 @@ static inline void map_to_E1_osswu(ep_t p, const fp_t t) {
     fp_t *z = &ctx->ep_map_u;
 
     // compute numerator and denominator of X0(t) = N / D
-    fp_sqr(fp_tmp[1], t);                            // t^2
-    fp_mul(fp_tmp[1], fp_tmp[1], *z);                // z * t^2
-    fp_sqr(fp_tmp[2], fp_tmp[1]);                    // z^2 * t^4
-    fp_add(fp_tmp[2], fp_tmp[2], fp_tmp[1]);         // z * t^2 + z^2 * t^4   
-    fp_add(fp_tmp[3], fp_tmp[2], bls_prec->r);       // z * t^2 + z^2 * t^4 + 1
-    fp_mul(fp_tmp[3], fp_tmp[3], *b1);      // N = b * (z * t^2 + z^2 * t^4 + 1)
+    fp_sqr(t1, t);                            // t^2
+    fp_mul(t1, t1, *z);                       // z * t^2
+    fp_sqr(t2, t1);                           // z^2 * t^4
+    fp_add(t2, t2, t1);                       // z * t^2 + z^2 * t^4   
+    fp_add(t3, t2, bls_prec->r);              // z * t^2 + z^2 * t^4 + 1
+    fp_mul(t3, t3, *b1);                      // N = b * (z * t^2 + z^2 * t^4 + 1)
  
-    if (fp_is_zero(fp_tmp[2])) {
-        fp_copy(p->z, bls_prec->a1z);                // D = a * z
+    if (fp_is_zero(t2)) {
+        fp_copy(p->z, bls_prec->a1z);         // D = a * z
     } else {
-        fp_mul(p->z, fp_tmp[2], bls_prec->minus_a1); // D = - a * (z * t^2 + z^2 * t^4)
+        fp_mul(p->z, t2, bls_prec->minus_a1); // D = - a * (z * t^2 + z^2 * t^4)
     }
 
     // compute numerator and denominator of g(X0(t)) = U / V 
     // U = N^3 + a1 * N * D^2 + b1 * D^3
     // V = D^3
-    fp_sqr(fp_tmp[2], fp_tmp[3]);                        // N^2
-    fp_sqr(fp_tmp[0], p->z);                             // D^2
-    fp_mul(fp_tmp[4], *a1, fp_tmp[0]);          // a * D^2
-    fp_add(fp_tmp[2], fp_tmp[4], fp_tmp[2]);             // N^2 + a * D^2
-    fp_mul(fp_tmp[2], fp_tmp[3], fp_tmp[2]);             // N^3 + a * N * D^2
-    fp_mul(fp_tmp[0], fp_tmp[0], p->z);                  // V  =  D^3
-    fp_mul(fp_tmp[4], *b1, fp_tmp[0]);          // b * D^3
-    fp_add(fp_tmp[2], fp_tmp[4], fp_tmp[2]);             // U
+    fp_sqr(t2, t3);                        // N^2
+    fp_sqr(t0, p->z);                      // D^2
+    fp_mul(t4, *a1, t0);                   // a * D^2
+    fp_add(t2, t4, t2);                    // N^2 + a * D^2
+    fp_mul(t2, t3, t2);                    // N^3 + a * N * D^2
+    fp_mul(t0, t0, p->z);                  // V  =  D^3
+    fp_mul(t4, *b1, t0);                   // b * V = b * D^3
+    fp_add(t2, t4, t2);                    // U = N^3 + a1 * N * D^2 + b1 * D^3
 
     // compute sqrt(U/V)
-    int is_sqr = sqrt_ratio_3mod4(p->y, fp_tmp[2], fp_tmp[0]);
+    int is_sqr = sqrt_ratio_3mod4(p->y, t2, t0);
     if (is_sqr) {
-        fp_copy(p->x, fp_tmp[3]);
+        fp_copy(p->x, t3);      // x = N
     } else {
-        fp_mul(p->x, fp_tmp[1], fp_tmp[3]);
-        fp_mul(fp_tmp[1], fp_tmp[1], t); 
-        fp_mul(p->y, p->y, fp_tmp[1]);
+        fp_mul(p->x, t1, t3);   // x = N * z * t^2
+        fp_mul(t1, t1, t);      // z * t^3
+        fp_mul(p->y, p->y, t1); // y = z * t^3 * sqrt(r * U/V) where r is 1 or map coefficient z
     }
 
     // negate y to be the same sign of t
     if (sign_0(t) != sign_0(p->y)) {
-        fp_neg(p->y, p->y);
+        fp_neg(p->y, p->y);   // -y
     }
 
     // convert (x/D, y) into Jacobian (X,Y,Z) where Z=D to avoid inversion.
     // Z = D, X = x/D * D^2 = x*D , Y = y*D^3  
     fp_mul(p->x, p->x, p->z);             // X = N*D
-    fp_mul(p->y, p->y, fp_tmp[0]);        // Y = y*D^3
+    fp_mul(p->y, p->y, t0);               // Y = y*D^3
     // p->z is already equal to D 
     p->coord = JACOB;
-
-    for (int i=0; i<tmp_len; i++) fp_free(fp_tmp[i]);
-    free(fp_tmp);
 }
 
 // This code is taken from https://github.com/kwantam/bls12-381_hash 
@@ -220,7 +212,6 @@ static inline void compute_map_zvals(const fp_t inv[], fp_t zv[],
 static inline void eval_iso11(ep_t r, const ep_t  p) {
     const int tmp_len = 32;
     fp_t* fp_tmp = (fp_t*) malloc(tmp_len*sizeof(fp_t));
-    for (int i=0; i<tmp_len; i++) fp_new(&fp_tmp[i]);
 
     // precompute even powers of Z up to Z^30 in fp_tmp[31]..fp_tmp[17]
     fp_sqr(fp_tmp[31], p->z);                       // Z^2
@@ -282,7 +273,6 @@ static inline void eval_iso11(ep_t r, const ep_t  p) {
     fp_mul(r->y, r->y, fp_tmp[12]);   // Yo = Ny Dx Zo^2
     r->coord = JACOB;
     
-    for (int i=0; i<tmp_len; i++) fp_free(&fp_tmp[i]);
     free(fp_tmp);
 }
 
