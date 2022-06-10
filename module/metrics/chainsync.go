@@ -94,7 +94,7 @@ func (c *ChainSyncCollector) PrunedBlocks(totalByHeight, totalById, storedByHeig
 }
 
 func (c *ChainSyncCollector) RangeRequested(ran chainsync.Range) {
-	c.totalHeightsRequested.Add(float64(ran.To - ran.From + 1))
+	c.totalHeightsRequested.Add(float64(ran.Len()))
 }
 
 func (c *ChainSyncCollector) BatchRequested(batch chainsync.Batch) {

@@ -366,9 +366,9 @@ func (c *Core) getRequestableItems() ([]uint64, []flow.Identifier) {
 // RangeRequested updates status state for a range of block heights that has
 // been successfully requested. Must be called when a range request is submitted.
 func (c *Core) RangeRequested(ran chainsync.Range) {
-	c.metrics.RangeRequested(ran)
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.metrics.RangeRequested(ran)
 
 	for height := ran.From; height <= ran.To; height++ {
 		status, exists := c.heights[height]
@@ -383,9 +383,9 @@ func (c *Core) RangeRequested(ran chainsync.Range) {
 // BatchRequested updates status state for a batch of block IDs that has been
 // successfully requested. Must be called when a batch request is submitted.
 func (c *Core) BatchRequested(batch chainsync.Batch) {
-	c.metrics.BatchRequested(batch)
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.metrics.BatchRequested(batch)
 
 	for _, blockID := range batch.BlockIDs {
 		status, exists := c.blockIDs[blockID]
