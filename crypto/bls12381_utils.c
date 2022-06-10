@@ -180,10 +180,9 @@ void ep2_print_(char* s, ep2_st* p) {
 // generates a random number less than the order r
 void bn_randZr_star(bn_t x) {
     // reduce the modular reduction bias
-    int seed_len = BITS_TO_BYTES(Fr_BITS + SEC_BITS);
-    byte seed[seed_len];
-    rand_bytes(seed, seed_len);
-    bn_map_to_Zr_star(x, seed, seed_len);
+    byte seed[SEED_BYTES];
+    rand_bytes(seed, SEED_BYTES);
+    bn_map_to_Zr_star(x, seed, SEED_BYTES);
 }
 
 // generates a random number less than the order r
@@ -421,14 +420,14 @@ int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
 	a->coord = BASIC;
 	fp_set_dig(a->z[0], 1);
 	fp_zero(a->z[1]);
-    byte temp[Fp_BYTES2];
-    memcpy(temp, bin, Fp_BYTES2);
+    byte temp[Fp2_BYTES];
+    memcpy(temp, bin, Fp2_BYTES);
     // clear the header bits
     temp[0] &= 0x1F;
-    fp2_read_bin(a->x, temp, Fp_BYTES2);
+    fp2_read_bin(a->x, temp, Fp2_BYTES);
 
     if (G2_SERIALIZATION == UNCOMPRESSED) {
-        fp2_read_bin(a->y, bin + Fp_BYTES2, Fp_BYTES2);
+        fp2_read_bin(a->y, bin + Fp2_BYTES, Fp2_BYTES);
         return RLC_OK;
     }
     
