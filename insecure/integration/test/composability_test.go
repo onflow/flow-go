@@ -140,16 +140,14 @@ func withAttackOrchestrator(t *testing.T, corruptedIds flow.IdentityList, corrup
 	run func(t *testing.T)) {
 	codec := cbor.NewCodec()
 	o := &mockOrchestrator{eventCorrupter: corrupter}
-	connector := attacknetwork.NewCorruptedConnector(corruptedIds, corruptedPortMap)
+	connector := attacknetwork.NewCorruptedConnector(unittest.Logger(), corruptedIds, corruptedPortMap)
 
 	attackNetwork, err := attacknetwork.NewAttackNetwork(
 		unittest.Logger(),
-		"localhost:0",
 		codec,
 		o,
 		connector,
-		corruptedIds,
-		attacknetwork.WithLocalHostRuntime)
+		corruptedIds)
 	require.NoError(t, err)
 
 	// life-cycle management of attackNetwork.
