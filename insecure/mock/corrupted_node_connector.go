@@ -41,6 +41,11 @@ func (_m *CorruptedNodeConnector) Connect(_a0 irrecoverable.SignalerContext, _a1
 	return r0, r1
 }
 
+// WithIncomingMessageHandler provides a mock function with given fields: _a0
+func (_m *CorruptedNodeConnector) WithIncomingMessageHandler(_a0 func(*insecure.Message)) {
+	_m.Called(_a0)
+}
+
 // NewCorruptedNodeConnector creates a new instance of CorruptedNodeConnector. It also registers the testing.TB interface on the mock and a cleanup function to assert the mocks expectations.
 func NewCorruptedNodeConnector(t testing.TB) *CorruptedNodeConnector {
 	mock := &CorruptedNodeConnector{}
