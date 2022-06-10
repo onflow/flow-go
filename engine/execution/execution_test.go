@@ -13,8 +13,6 @@ import (
 	"github.com/vmihailenco/msgpack"
 	"go.uber.org/atomic"
 
-	"github.com/onflow/flow-go/network"
-
 	execTestutil "github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/engine/testutil"
 	testmock "github.com/onflow/flow-go/engine/testutil/mock"
@@ -22,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/cluster"

@@ -6,15 +6,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/network"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
-
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 )
 
 // Tests to check if the Ghost node works as expected

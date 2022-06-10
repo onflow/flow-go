@@ -22,8 +22,6 @@ import (
 	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/spf13/pflag"
 
-	"github.com/onflow/flow-go/network"
-
 	"github.com/onflow/flow-go/admin/commands"
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
 	uploaderCommands "github.com/onflow/flow-go/admin/commands/uploader"
@@ -65,6 +63,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	chainsync "github.com/onflow/flow-go/module/synchronization"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/state/protocol"
