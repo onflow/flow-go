@@ -180,7 +180,7 @@ void ep2_print_(char* s, ep2_st* p) {
 // generates a random number less than the order r
 void bn_randZr_star(bn_t x) {
     // reduce the modular reduction bias
-    int seed_len = BITS_TO_BYTES(Fr_BITS + SEC_BITS);
+    const int seed_len = BITS_TO_BYTES(Fr_BITS + SEC_BITS);
     byte seed[seed_len];
     rand_bytes(seed, seed_len);
     bn_map_to_Zr_star(x, seed, seed_len);
@@ -570,7 +570,7 @@ void ep_sum_vector(ep_t jointx, ep_st* x, const int len) {
 }
 
 // Computes the sum of the signatures (G1 elements) flattened in a single sigs array
-// and store the sum bytes in dest.
+// and writes the sum (G1 element) as bytes in dest.
 // The function assumes sigs is correctly allocated with regards to len.
 int ep_sum_vector_byte(byte* dest, const byte* sigs_bytes, const int len) {
     int error;
