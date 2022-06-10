@@ -40,7 +40,7 @@ func testAttackNetworkObserve(t *testing.T, concurrencyDegree int) {
 	withAttackNetworkClient(
 		t,
 		identities,
-		func(t *testing.T, orchestrator *mockinsecure.AttackOrchestrator, client insecure.Attacker_ObserveClient) {
+		func(t *testing.T, orchestrator *mockinsecure.AttackOrchestrator, ccfs []*mockCorruptibleConduitFactory) {
 			// mocks orchestrator to receive each event exactly once.
 			orchestratorWG := mockOrchestratorHandlingEvent(t, orchestrator, events)
 
@@ -49,11 +49,12 @@ func testAttackNetworkObserve(t *testing.T, concurrencyDegree int) {
 			attackNetworkSendWG := sync.WaitGroup{}
 			attackNetworkSendWG.Add(concurrencyDegree)
 
-			for _, msg := range messages {
+			for i, msg := range messages {
 				msg := msg
+				ccf := ccfs[i]
 
 				go func() {
-					err := client.Send(msg)
+					err := ccf.attackerObserveStream.Send(msg) // pretends the ith ccf is sending message to attacker for observe
 					require.NoError(t, err)
 					attackNetworkSendWG.Done()
 				}()
@@ -79,6 +80,21 @@ func withAttackNetworkClient(
 			_ map[flow.Identifier]*mockinsecure.CorruptedNodeConnection,
 			orchestrator *mockinsecure.AttackOrchestrator) {
 
+			withMockCorruptibleConduitFactories(
+				t,
+				corruptedIds.NodeIDs(),
+				func(signalerContext irrecoverable.SignalerContext,
+					ccfs []*mockCorruptibleConduitFactory,
+					ccfPorts map[flow.Identifier]string) {
+
+					connector := NewCorruptedConnector(unittest.Logger(),
+						func(receivedMsg *insecure.Message) {
+							attackNetwork.Observe(receivedMsg)
+						},
+						corruptedIds,
+						ccfPorts)
+
+				})
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
@@ -297,10 +313,12 @@ func mockConnectorForConnect(t *testing.T, connector *mockinsecure.CorruptedNode
 // These mock CCFs only run the gRPC part of an actual CCF. Once all CCFs are up and running, the injected "run" function is executed.
 func withMockCorruptibleConduitFactories(
 	t *testing.T,
-	count int,
-	run func(flow.IdentityList, irrecoverable.SignalerContext,
+	corruptedIds flow.IdentifierList,
+	run func(irrecoverable.SignalerContext,
 		[]*mockCorruptibleConduitFactory,
 		map[flow.Identifier]string)) {
+
+	count := len(corruptedIds)
 
 	// life-cycle management of corruptible conduit factory.
 	ctx, cancel := context.WithCancel(context.Background())
@@ -316,12 +334,7 @@ func withMockCorruptibleConduitFactories(
 
 	ccfs := make([]*mockCorruptibleConduitFactory, count)
 	ccfPorts := make(map[flow.Identifier]string)
-	ccfIds := make([]*flow.Identity, count)
 	for i := 0; i < count; i++ {
-		// identity
-		ccfId := unittest.IdentityFixture(unittest.WithAddress("localhost:0"))
-		ccfIds[i] = ccfId
-
 		// factory
 		ccf := newMockCorruptibleConduitFactory()
 		ccf.Start(ccfCtx)
@@ -331,10 +344,12 @@ func withMockCorruptibleConduitFactories(
 		// port mapping
 		_, ccfPortStr, err := net.SplitHostPort(ccf.ServerAddress())
 		require.NoError(t, err)
-		ccfPorts[ccfId.NodeID] = ccfPortStr
+
+		ccfId := corruptedIds[i]
+		ccfPorts[ccfId] = ccfPortStr
 	}
 
-	run(ccfIds, ccfCtx, ccfs, ccfPorts)
+	run(ccfCtx, ccfs, ccfPorts)
 
 	// terminates attackNetwork
 	cancel()
