@@ -83,10 +83,6 @@ import (
 //  | Observer             3 |<--------------------------|
 //  +------------------------+
 
-type AccessNodeBuilder interface {
-	cmd.NodeBuilder
-}
-
 // AccessNodeConfig defines all the user defined parameters required to bootstrap an access node
 // For a node running as a standalone process, the config fields will be populated from the command line params,
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
@@ -196,7 +192,7 @@ type FlowAccessNodeBuilder struct {
 	FollowerCore               module.HotStuffFollower
 	ExecutionDataService       state_synchronization.ExecutionDataService
 	ExecutionDataRequester     state_synchronization.ExecutionDataRequester
-	// The sync engine participants provider is the libp2p peer store for the observer
+	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
 	// Hence, a factory function that needs to be called just before creating the sync engine
 	SyncEngineParticipantsProviderFactory func() id.IdentifierProvider
@@ -373,7 +369,7 @@ func (builder *FlowAccessNodeBuilder) buildSyncEngine() *FlowAccessNodeBuilder {
 	return builder
 }
 
-func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() AccessNodeBuilder {
+func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() cmd.NodeBuilder {
 	builder.
 		buildFollowerState().
 		buildSyncCore().

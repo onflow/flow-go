@@ -1,4 +1,4 @@
-package follower
+package upstream
 
 import (
 	"context"

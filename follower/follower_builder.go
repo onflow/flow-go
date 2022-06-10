@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	upstream "github.com/onflow/flow-go/module/upstream"
+	"github.com/onflow/flow-go/module/upstream"
 
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
