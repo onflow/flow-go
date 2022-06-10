@@ -98,46 +98,6 @@ func initPaceMaker(t require.TestingT, livenessData *hotstuff.LivenessData) hots
 	return pm
 }
 
-// VoteAggregator is a mock for testing eventhandler
-type VoteAggregator struct {
-	// if a blockID exists in qcs field, then a vote can be made into a QC
-	qcs map[flow.Identifier]*flow.QuorumCertificate
-	t   require.TestingT
-}
-
-func NewVoteAggregator(t require.TestingT) *VoteAggregator {
-	return &VoteAggregator{
-		qcs: make(map[flow.Identifier]*flow.QuorumCertificate),
-		t:   t,
-	}
-}
-
-func (v *VoteAggregator) StoreVoteAndBuildQC(vote *model.Vote, block *model.Block) (*flow.QuorumCertificate, bool, error) {
-	qc, ok := v.qcs[block.BlockID]
-	log.Info().Msgf("voteaggregator.StoreVoteAndBuildQC, qc built: %v, for view: %x, blockID: %v\n", ok, block.View, block.BlockID)
-
-	return qc, ok, nil
-}
-
-func (v *VoteAggregator) StorePendingVote(vote *model.Vote) (bool, error) {
-	return false, nil
-}
-
-func (v *VoteAggregator) StoreProposerVote(vote *model.Vote) bool {
-	return true
-}
-
-func (v *VoteAggregator) BuildQCOnReceivedBlock(block *model.Block) (*flow.QuorumCertificate, bool, error) {
-	qc, ok := v.qcs[block.BlockID]
-	log.Info().Msgf("voteaggregator.BuildQCOnReceivedBlock, qc built: %v, for view: %x, blockID: %v\n", ok, block.View, block.BlockID)
-
-	return qc, ok, nil
-}
-
-func (v *VoteAggregator) PruneByView(view uint64) {
-	log.Info().Msgf("pruned at view:%v\n", view)
-}
-
 type Committee struct {
 	mocks.DynamicCommittee
 	// to mock I'm the leader of a certain view, add the view into the keys of leaders field
@@ -292,47 +252,8 @@ func (f *Forks) MakeForkChoice(curView uint64) (*flow.QuorumCertificate, *model.
 // BlockProducer mock will always make a valid block
 type BlockProducer struct{}
 
-func (b *BlockProducer) MakeBlockProposal(qc *flow.QuorumCertificate, view uint64) (*model.Proposal, error) {
+func (b *BlockProducer) MakeBlockProposal(qc *flow.QuorumCertificate, view uint64, lastViewTC *flow.TimeoutCertificate) (*model.Proposal, error) {
 	return createProposal(view, qc.View), nil
-}
-
-// BlacklistValidator is Validator mock that consider all proposals are valid unless the proposal's BlockID exists
-// in the invalidProposals key or unverifiable key
-type BlacklistValidator struct {
-	mocks.Validator
-	invalidProposals map[flow.Identifier]struct{}
-	unverifiable     map[flow.Identifier]struct{}
-	t                require.TestingT
-}
-
-func NewBlacklistValidator(t require.TestingT) *BlacklistValidator {
-	return &BlacklistValidator{
-		invalidProposals: make(map[flow.Identifier]struct{}),
-		unverifiable:     make(map[flow.Identifier]struct{}),
-		t:                t,
-	}
-}
-
-func (v *BlacklistValidator) ValidateProposal(proposal *model.Proposal) error {
-	// check if is invalid
-	_, ok := v.invalidProposals[proposal.Block.BlockID]
-	if ok {
-		log.Info().Msgf("invalid proposal: %v\n", proposal.Block.View)
-		return model.InvalidBlockError{
-			BlockID: proposal.Block.BlockID,
-			View:    proposal.Block.View,
-			Err:     fmt.Errorf("some error"),
-		}
-	}
-
-	// check if is unverifiable
-	_, ok = v.unverifiable[proposal.Block.BlockID]
-	if ok {
-		log.Info().Msgf("unverifiable proposal: %v\n", proposal.Block.View)
-		return model.ErrUnverifiableBlock
-	}
-
-	return nil
 }
 
 func TestEventHandler(t *testing.T) {
@@ -353,7 +274,6 @@ type EventHandlerSuite struct {
 	committee      *Committee
 	voteAggregator *mocks.VoteAggregator
 	voter          *Voter
-	validator      *BlacklistValidator
 	notifier       hotstuff.Consumer
 
 	initView    uint64
@@ -382,7 +302,6 @@ func (es *EventHandlerSuite) SetupTest() {
 	es.committee = NewCommittee()
 	es.voteAggregator = &mocks.VoteAggregator{}
 	es.voter = NewVoter(es.T(), finalized)
-	es.validator = NewBlacklistValidator(es.T())
 	es.notifier = &notifications.NoopConsumer{}
 
 	eventhandler, err := NewEventHandler(
@@ -395,7 +314,6 @@ func (es *EventHandlerSuite) SetupTest() {
 		es.committee,
 		es.voteAggregator,
 		es.voter,
-		es.validator,
 		es.notifier)
 	require.NoError(es.T(), err)
 
@@ -414,10 +332,6 @@ func (es *EventHandlerSuite) SetupTest() {
 	es.newview = &model.NewViewEvent{
 		View: es.votingBlock.View + 1, // the vote for the voting blocks will trigger a view change to the next view
 	}
-}
-
-func (es *EventHandlerSuite) markInvalidProposal(blockID flow.Identifier) {
-	es.validator.invalidProposals[blockID] = struct{}{}
 }
 
 // a QC for current view triggered view change
@@ -619,18 +533,6 @@ func (es *EventHandlerSuite) TestInNewView_NotLeader_HasBlock_NotSafeNode_NotNex
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
 }
 
-// receiving an invalid proposal should not trigger view change
-func (es *EventHandlerSuite) TestOnReceiveProposal_InvalidProposal_NoViewChange() {
-	proposal := createProposal(es.initView, es.initView-1)
-	// invalid proposal
-	es.markInvalidProposal(proposal.Block.BlockID)
-	es.voteAggregator.On("InvalidBlock", proposal).Return(nil).Once()
-
-	err := es.eventhandler.OnReceiveProposal(proposal)
-	require.NoError(es.T(), err)
-	require.Equal(es.T(), es.initView, es.paceMaker.CurView(), "incorrect view change")
-}
-
 // received a valid proposal that has older view, and cannot build qc from votes for this block,
 // the proposal's QC didn't trigger view change
 func (es *EventHandlerSuite) TestOnReceiveProposal_OlderThanCurView_CannotBuildQCFromVotes_NoViewChange() {
@@ -764,22 +666,6 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_ForCurView_NoVote_IsNextLeade
 	es.voteAggregator.AssertCalled(es.T(), "AddBlock", proposal)
 }
 
-// received a unverifiable proposal for future view, no view change
-func (es *EventHandlerSuite) TestOnReceiveProposal_Unverifiable() {
-	// qc.View is below the finalized view
-	proposal := createProposal(es.forks.finalized+2, es.forks.finalized-1)
-
-	es.voteAggregator.On("AddBlock", proposal).Return(nil).Once()
-
-	// proposal is unverifiable
-	es.validator.unverifiable[proposal.Block.BlockID] = struct{}{}
-
-	err := es.eventhandler.OnReceiveProposal(proposal)
-	require.NoError(es.T(), err)
-	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
-	es.voteAggregator.AssertCalled(es.T(), "AddBlock", proposal)
-}
-
 func (es *EventHandlerSuite) TestOnTimeout() {
 	unittest.SkipUnless(es.T(), unittest.TEST_TODO, "active-pacemaker")
 	err := es.eventhandler.OnLocalTimeout()
@@ -860,7 +746,7 @@ func (es *EventHandlerSuite) TestFollowerReceives100Forks() {
 		// create each proposal as if they are created by some leader
 		proposal := createProposal(es.initView+uint64(i)+1, es.initView-1)
 		es.voteAggregator.On("AddBlock", proposal).Return(nil).Once()
-		// as a follower, I receive these propsals
+		// as a follower, I receive these proposals
 		err := es.eventhandler.OnReceiveProposal(proposal)
 		require.NoError(es.T(), err)
 	}
@@ -910,7 +796,8 @@ func createVote(block *model.Block) *model.Vote {
 func createProposal(view uint64, qcview uint64) *model.Proposal {
 	block := createBlockWithQC(view, qcview)
 	return &model.Proposal{
-		Block:   block,
-		SigData: nil,
+		Block:      block,
+		SigData:    nil,
+		LastViewTC: nil,
 	}
 }
