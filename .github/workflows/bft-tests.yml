@@ -65,6 +65,7 @@ jobs:
         run: ./tools/test_monitor/run-tests.sh
       - name: Setup tmate session
         uses: mxschmitt/action-tmate@v3
+        if: success() || failure()
       - name: Run tests (Bors)
         if: github.actor == 'bors[bot]'
         uses: nick-invision/retry@v2
