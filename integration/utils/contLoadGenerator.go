@@ -124,7 +124,7 @@ func NewContLoadGenerator(
 
 func (lg *ContLoadGenerator) Init() error {
 	for i := 0; i < lg.numberOfAccounts; i += accountCreationBatchSize {
-		if lg.stopped == true {
+		if lg.stopped {
 			return nil
 		}
 
@@ -132,6 +132,8 @@ func (lg *ContLoadGenerator) Init() error {
 		if num > accountCreationBatchSize {
 			num = accountCreationBatchSize
 		}
+
+		lg.log.Info().Int("cumulative", i).Int("num", num).Int("numberOfAccounts", lg.numberOfAccounts).Msg("creating accounts")
 		err := lg.createAccounts(num)
 		if err != nil {
 			return err
@@ -243,8 +245,6 @@ func (lg *ContLoadGenerator) Stop() {
 }
 
 func (lg *ContLoadGenerator) createAccounts(num int) error {
-	lg.log.Info().Msgf("creating and funding %d accounts...", num)
-
 	privKey := randomPrivateKey()
 	accountKey := flowsdk.NewAccountKey().
 		FromPrivateKey(privKey).
