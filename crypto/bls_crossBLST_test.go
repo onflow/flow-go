@@ -44,7 +44,7 @@ func validSignatureBytesFlow(t *rapid.T) []byte {
 	seed := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLenBLSBLS12381, KeyGenSeedMaxLenBLSBLS12381).Draw(t, "seed").([]byte)
 	sk, err := GeneratePrivateKey(BLSBLS12381, seed)
 	require.NoError(t, err)
-	hasher := NewXOFKMAC128("random_tag")
+	hasher := NewExpandMsgXOFKMAC128("random_tag")
 	message := rapid.SliceOfN(rapid.Byte(), 1, 1000).Draw(t, "msg").([]byte)
 	signature, err := sk.Sign(message, hasher)
 	require.NoError(t, err)

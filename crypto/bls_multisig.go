@@ -35,7 +35,7 @@ import "C"
 // The key is based on blsPOPCipherSuite which guarantees
 // that hash_to_field of PoP is orthogonal to all hash_to_field functions
 // used for signatures.
-var popKMAC = internalXOFKMAC128(blsPOPCipherSuite)
+var popKMAC = internalExpandMsgXOFKMAC128(blsPOPCipherSuite)
 
 // BLSGeneratePOP returns a proof of possession (PoP) for the receiver private key.
 //

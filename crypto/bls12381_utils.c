@@ -675,7 +675,6 @@ int bowe_subgroup_check_G1(const ep_t p){
     if (ep_is_infty(p) == 1) 
         return VALID;
     fp_t b;
-    fp_new(b);
     dv_copy(b, beta_data, Fp_DIGITS); 
     ep_t sigma, sigma2, p_inv;
     ep_new(sigma);
