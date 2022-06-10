@@ -232,18 +232,7 @@ func (c *ConduitFactory) RegisterAttacker(_ *empty.Empty, stream insecure.Corrup
 	}
 	c.attackerInboundStream = stream
 
-	for {
-		select {
-		case <-c.cm.ShutdownSignal():
-			return nil
-
-		case msg := <-c.incomingMessageChan:
-			err := c.attackerInboundStream.Send(msg)
-			if err != nil {
-				return fmt.Errorf("could not send message to attacker to observe: %w", err)
-			}
-		}
-	}
+	<-c.cm.ShutdownSignal()
 
 	return nil
 }
@@ -270,7 +259,10 @@ func (c *ConduitFactory) HandleIncomingEvent(
 		return fmt.Errorf("could not convert event to message: %w", err)
 	}
 
-	c.incomingMessageChan <- msg
+	err = c.attackerInboundStream.Send(msg)
+	if err != nil {
+		return fmt.Errorf("could not send message to attacker to observe: %w", err)
+	}
 
 	return nil
 }
