@@ -12,14 +12,20 @@ package signature
 // Flow protocol prefix
 const protocolPrefix = "FLOW-"
 
-// version and ciphersuite index
-const version = "-V00-CS00-with-"
+// Flow protocol version
+const protocolVersion = "V00-"
+
+// Ciphersuite index
+// Only one ciphersuite is used in Flow protocol
+const cipherSuiteIndex = "CS00-"
 
 // an example of domain tag output is :
-// FLOW-CERTAIN_DOMAIN-V00-CS00-with-cipherSuite
-// cipherSuite is fixed by the crypto library
+// FLOW-V00-CS00-CERTAIN_DOMAIN-with-cipherSuite
+// where cipherSuite is fixed by the Flow crypto library
+// (only one ciphersuite is provided for BLS signatures by the crypto library
+//	and therefore it's not possible to choose one)
 func tag(domain string) string {
-	return protocolPrefix + domain + version
+	return protocolPrefix + protocolVersion + domain + cipherSuiteIndex
 }
 
 var (
