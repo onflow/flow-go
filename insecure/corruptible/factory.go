@@ -62,12 +62,13 @@ func NewCorruptibleConduitFactory(
 	}
 
 	factory := &ConduitFactory{
-		me:             me,
-		codec:          codec,
-		logger:         logger.With().Str("module", "corruptible-conduit-factory").Logger(),
-		receiptHasher:  utils.NewExecutionReceiptHasher(),
-		spockHasher:    utils.NewSPOCKHasher(),
-		approvalHasher: verutils.NewResultApprovalHasher(),
+		me:                  me,
+		codec:               codec,
+		logger:              logger.With().Str("module", "corruptible-conduit-factory").Logger(),
+		receiptHasher:       utils.NewExecutionReceiptHasher(),
+		spockHasher:         utils.NewSPOCKHasher(),
+		approvalHasher:      verutils.NewResultApprovalHasher(),
+		incomingMessageChan: make(chan *insecure.Message),
 	}
 
 	cm := component.NewComponentManagerBuilder().
