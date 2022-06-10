@@ -13,9 +13,12 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/rpc"
+	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
@@ -40,6 +43,9 @@ const missingCollsForBlkThreshold = 100
 // this is to ensure that if a collection is missing for a long time (in terms of block height) it is eventually re-requested
 const missingCollsForAgeThreshold = 100
 
+// default queue capacity
+const defaultQueueCapacity = 10_000
+
 var defaultCollectionCatchupTimeout = collectionCatchupTimeout
 var defaultCollectionCatchupDBPollInterval = collectionCatchupDBPollInterval
 var defaultFullBlockUpdateInterval = fullBlockUpdateInterval
@@ -49,7 +55,13 @@ var defaultMissingCollsForAgeThreshold = missingCollsForAgeThreshold
 // Engine represents the ingestion engine, used to funnel data from other nodes
 // to a centralized location that can be queried by a user
 type Engine struct {
-	unit    *engine.Unit     // used to manage concurrency & shutdown
+	*component.ComponentManager
+	messageHandler            *engine.MessageHandler
+	executionReceiptsNotifier engine.Notifier
+	executionReceiptsQueue    engine.MessageStore
+	finalizedBlockNotifier    engine.Notifier
+	finalizedBlockQueue       engine.MessageStore
+
 	log     zerolog.Logger   // used to log relevant actions with context
 	state   protocol.State   // used to access the  protocol state
 	me      module.Local     // used to access local node information
@@ -92,10 +104,45 @@ func New(
 	blocksToMarkExecuted *stdmap.Times,
 	rpcEngine *rpc.Engine,
 ) (*Engine, error) {
+	executionReceiptsRawQueue, err := fifoqueue.NewFifoQueue(
+		fifoqueue.WithCapacity(defaultQueueCapacity),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not create execution receipts queue: %w", err)
+	}
+
+	executionReceiptsQueue := &engine.FifoMessageStore{FifoQueue: executionReceiptsRawQueue}
+
+	finalizedBlocksRawQueue, err := fifoqueue.NewFifoQueue(
+		fifoqueue.WithCapacity(defaultQueueCapacity),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not create finalized block queue: %w", err)
+	}
+
+	finalizedBlocksQueue := &engine.FifoMessageStore{FifoQueue: finalizedBlocksRawQueue}
+
+	messageHandler := engine.NewMessageHandler(
+		log,
+		engine.NewNotifier(),
+		engine.Pattern{
+			Match: func(msg *engine.Message) bool {
+				_, ok := msg.Payload.(*model.Block)
+				return ok
+			},
+			Store: finalizedBlocksQueue,
+		},
+		engine.Pattern{
+			Match: func(msg *engine.Message) bool {
+				_, ok := msg.Payload.(*flow.ExecutionReceipt)
+				return ok
+			},
+			Store: executionReceiptsQueue,
+		},
+	)
 
 	// initialize the propagation engine with its dependencies
-	eng := &Engine{
-		unit:                       engine.NewUnit(),
+	e := &Engine{
 		log:                        log.With().Str("engine", "ingestion").Logger(),
 		state:                      state,
 		me:                         me,
@@ -111,100 +158,192 @@ func New(
 		collectionsToMarkExecuted:  collectionsToMarkExecuted,
 		blocksToMarkExecuted:       blocksToMarkExecuted,
 		rpcEngine:                  rpcEngine,
+
+		// queue / notifier for execution receipts
+		executionReceiptsNotifier: engine.NewNotifier(),
+		executionReceiptsQueue:    executionReceiptsQueue,
+
+		// queue / notifier for finalized blocks
+		finalizedBlockNotifier: engine.NewNotifier(),
+		finalizedBlockQueue:    finalizedBlocksQueue,
+
+		messageHandler: messageHandler,
 	}
 
+	// Add workers
+	e.ComponentManager = component.NewComponentManagerBuilder().
+		AddWorker(e.processBackground).
+		AddWorker(e.processExecutionReceipts).
+		AddWorker(e.processFinalizedBlocks).
+		Build()
+
 	// register engine with the execution receipt provider
-	_, err := net.Register(engine.ReceiveReceipts, eng)
+	_, err = net.Register(engine.ReceiveReceipts, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register for results: %w", err)
 	}
 
-	return eng, nil
+	return e, nil
 }
 
-// Ready returns a ready channel that is closed once the engine has fully
-// started. For the ingestion engine, we consider the engine up and running
-// upon syncing all the missing collections
-func (e *Engine) Ready() <-chan struct{} {
-	// request all the missing collection upfront
-	readyChan := e.unit.Ready(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), defaultCollectionCatchupTimeout)
-		defer cancel()
-		err := e.requestMissingCollections(ctx)
-		if err != nil {
-			e.log.Error().Err(err).Msg("requesting missing collections failed")
+func (e *Engine) processBackground(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	// context with timeout
+	requestCtx, cancel := context.WithTimeout(ctx, defaultCollectionCatchupTimeout)
+	defer cancel()
+
+	// request missing collections
+	err := e.requestMissingCollections(requestCtx)
+	if err != nil {
+		e.log.Error().Err(err).Msg("requesting missing collections failed")
+	}
+	ready()
+
+	ticker := time.NewTicker(defaultFullBlockUpdateInterval)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			e.updateLastFullBlockReceivedIndex()
 		}
-	})
-	e.unit.LaunchPeriodically(e.updateLastFullBlockReceivedIndex, defaultFullBlockUpdateInterval, time.Duration(0))
-	return readyChan
+	}
 }
 
-// Done returns a done channel that is closed once the engine has fully stopped.
-// For the ingestion engine, it only waits for all submit goroutines to end.
-func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done()
-}
+func (e *Engine) processExecutionReceipts(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+	notifier := e.executionReceiptsNotifier.Channel()
 
-// SubmitLocal submits an event originating on the local node.
-func (e *Engine) SubmitLocal(event interface{}) {
-	e.unit.Launch(func() {
-		err := e.process(e.me.NodeID(), event)
-		if err != nil {
-			engine.LogError(e.log, err)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-notifier:
+			err := e.processAvailableExecutionReceipts(ctx)
+			if err != nil {
+				// if an error reaches this point, it is unexpected
+				ctx.Throw(err)
+				return
+			}
 		}
-	})
+	}
 }
 
-// Submit submits the given event from the node with the given origin ID
-// for processing in a non-blocking manner. It returns instantly and logs
-// a potential processing error internally when done.
-func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
-	e.unit.Launch(func() {
-		err := e.process(originID, event)
-		if err != nil {
-			engine.LogError(e.log, err)
+func (e *Engine) processAvailableExecutionReceipts(ctx context.Context) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
 		}
-	})
+		msg, ok := e.executionReceiptsQueue.Get()
+		if !ok {
+			return nil
+		}
+
+		receipt := msg.Payload.(*flow.ExecutionReceipt)
+
+		if err := e.handleExecutionReceipt(msg.OriginID, receipt); err != nil {
+			return err
+		}
+	}
+
 }
 
-// ProcessLocal processes an event originating on the local node.
-func (e *Engine) ProcessLocal(event interface{}) error {
-	return e.unit.Do(func() error {
-		return e.process(e.me.NodeID(), event)
-	})
+func (e *Engine) processFinalizedBlocks(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+	notifier := e.finalizedBlockNotifier.Channel()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-notifier:
+			_ = e.processAvailableFinalizedBlocks(ctx)
+		}
+	}
 }
 
-// Process processes the given event from the node with the given origin ID in
-// a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
-	return e.unit.Do(func() error {
-		return e.process(originID, event)
-	})
+func (e *Engine) processAvailableFinalizedBlocks(ctx context.Context) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
+
+		msg, ok := e.finalizedBlockQueue.Get()
+		if !ok {
+			return nil
+		}
+
+		hb := msg.Payload.(*model.Block)
+		blockID := hb.BlockID
+
+		if err := e.processFinalizedBlock(blockID); err != nil {
+			e.log.Error().Err(err).Hex("block_id", blockID[:]).Msg("failed to process block")
+			continue
+		}
+
+		e.trackFinalizedMetricForBlock(hb)
+	}
 }
 
 // process processes the given ingestion engine event. Events that are given
 // to this function originate within the expulsion engine on the node with the
 // given origin ID.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	switch entity := event.(type) {
+	select {
+	case <-e.ComponentManager.ShutdownSignal():
+		return component.ErrComponentShutdown
+	default:
+	}
+
+	switch event.(type) {
 	case *flow.ExecutionReceipt:
-		return e.handleExecutionReceipt(originID, entity)
+		err := e.messageHandler.Process(originID, event)
+		e.executionReceiptsNotifier.Notify()
+		return err
+	case *model.Block:
+		err := e.messageHandler.Process(originID, event)
+		e.finalizedBlockNotifier.Notify()
+		return err
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
 }
 
+// SubmitLocal submits an event originating on the local node.
+func (e *Engine) SubmitLocal(event interface{}) {
+	err := e.process(e.me.NodeID(), event)
+	if err != nil {
+		engine.LogError(e.log, err)
+	}
+}
+
+// Submit submits the given event from the node with the given origin ID
+// for processing in a non-blocking manner. It returns instantly and logs
+// a potential processing error internally when done.
+func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
+	err := e.process(originID, event)
+	if err != nil {
+		engine.LogError(e.log, err)
+	}
+}
+
+// ProcessLocal processes an event originating on the local node.
+func (e *Engine) ProcessLocal(event interface{}) error {
+	return e.process(e.me.NodeID(), event)
+}
+
+// Process processes the given event from the node with the given origin ID in
+// a blocking manner. It returns the potential processing error when done.
+func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+	return e.process(originID, event)
+}
+
 // OnFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated
 func (e *Engine) OnFinalizedBlock(hb *model.Block) {
-	e.unit.Launch(func() {
-		blockID := hb.BlockID
-		err := e.processFinalizedBlock(blockID)
-		if err != nil {
-			e.log.Error().Err(err).Hex("block_id", blockID[:]).Msg("failed to process block")
-			return
-		}
-		e.trackFinalizedMetricForBlock(hb)
-	})
+	_ = e.ProcessLocal(hb)
 }
 
 // processBlock handles an incoming finalized block.
@@ -306,7 +445,6 @@ func (e *Engine) trackExecutedMetricForReceipt(r *flow.ExecutionReceipt) {
 }
 
 func (e *Engine) trackExecutedMetricForBlock(block *flow.Block, ti time.Time) {
-
 	// mark all transactions as executed
 	// TODO: sample to reduce performance overhead
 	for _, g := range block.Payload.Guarantees {
@@ -520,6 +658,7 @@ func (e *Engine) updateLastFullBlockReceivedIndex() {
 		}
 		lastFullHeight = header.Height
 	}
+
 	e.log.Debug().Uint64("last_full_block_height", lastFullHeight).Msg("updating LastFullBlockReceived index...")
 
 	finalBlk, err := e.state.Final().Head()
@@ -629,6 +768,7 @@ func (e *Engine) requestCollectionsInFinalizedBlock(missingColls []*flow.Collect
 		// TODO: move this query out of for loop?
 		guarantors, err := protocol.FindGuarantors(e.state, cg)
 		if err != nil {
+			// failed to find guarantors for guarantees contained in a finalized block is fatal error
 			e.log.Fatal().Err(err).Msgf("could not find guarantors for guarantee %v", cg.ID())
 		}
 		e.request.EntityByID(cg.ID(), filter.HasNodeID(guarantors...))

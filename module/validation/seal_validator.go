@@ -127,7 +127,7 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 	// attached to the main chain, we store the latest seal in the fork that ends with B.
 	// Therefore, _not_ finding the latest sealed block of the parent constitutes
 	// a fatal internal error.
-	lastSealUpToParent, err := s.seals.ByBlockID(parentID)
+	lastSealUpToParent, err := s.seals.HighestInFork(parentID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve parent seal (%x): %w", parentID, err)
 	}

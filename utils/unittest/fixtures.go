@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/ledger/common/bitutils"
 	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/encoding"
@@ -28,6 +29,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/mempool/entity"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/dsl"
 )
@@ -331,18 +333,18 @@ func BlockWithParentAndProposerFixture(parent *flow.Header, proposer flow.Identi
 	return *block
 }
 
-func BlockWithParentAndSeal(
-	parent *flow.Header, sealed *flow.Header) *flow.Block {
+func BlockWithParentAndSeals(parent *flow.Header, seals []*flow.Header) *flow.Block {
 	block := BlockWithParentFixture(parent)
 	payload := flow.Payload{
 		Guarantees: nil,
 	}
 
-	if sealed != nil {
-		payload.Seals = []*flow.Seal{
-			Seal.Fixture(
-				Seal.WithBlockID(sealed.ID()),
-			),
+	if len(seals) > 0 {
+		payload.Seals = make([]*flow.Seal, len(seals))
+		for i, seal := range seals {
+			payload.Seals[i] = Seal.Fixture(
+				Seal.WithBlockID(seal.ID()),
+			)
 		}
 	}
 
@@ -539,17 +541,17 @@ func BlockSealsFixture(n int) []*flow.Seal {
 	return seals
 }
 
-func CollectionListFixture(n int) []*flow.Collection {
+func CollectionListFixture(n int, options ...func(*flow.Collection)) []*flow.Collection {
 	collections := make([]*flow.Collection, n)
 	for i := 0; i < n; i++ {
-		collection := CollectionFixture(1)
+		collection := CollectionFixture(1, options...)
 		collections[i] = &collection
 	}
 
 	return collections
 }
 
-func CollectionFixture(n int) flow.Collection {
+func CollectionFixture(n int, options ...func(*flow.Collection)) flow.Collection {
 	transactions := make([]*flow.TransactionBody, 0, n)
 
 	for i := 0; i < n; i++ {
@@ -557,7 +559,11 @@ func CollectionFixture(n int) flow.Collection {
 		transactions = append(transactions, &tx.TransactionBody)
 	}
 
-	return flow.Collection{Transactions: transactions}
+	col := flow.Collection{Transactions: transactions}
+	for _, opt := range options {
+		opt(&col)
+	}
+	return col
 }
 
 func FixedReferenceBlockID() flow.Identifier {
@@ -743,6 +749,12 @@ func WithExecutionResultBlockID(blockID flow.Identifier) func(*flow.ExecutionRes
 func WithServiceEvents(n int) func(result *flow.ExecutionResult) {
 	return func(result *flow.ExecutionResult) {
 		result.ServiceEvents = ServiceEventsFixture(n)
+	}
+}
+
+func WithExecutionDataID(id flow.Identifier) func(result *flow.ExecutionResult) {
+	return func(result *flow.ExecutionResult) {
+		result.ExecutionDataID = id
 	}
 }
 
@@ -1521,35 +1533,35 @@ func NoopTxScript() []byte {
 	return []byte("transaction {}")
 }
 
-func RangeFixture() flow.Range {
-	return flow.Range{
+func RangeFixture() chainsync.Range {
+	return chainsync.Range{
 		From: rand.Uint64(),
 		To:   rand.Uint64(),
 	}
 }
 
-func BatchFixture() flow.Batch {
-	return flow.Batch{
+func BatchFixture() chainsync.Batch {
+	return chainsync.Batch{
 		BlockIDs: IdentifierListFixture(10),
 	}
 }
 
-func RangeListFixture(n int) []flow.Range {
+func RangeListFixture(n int) []chainsync.Range {
 	if n <= 0 {
 		return nil
 	}
-	ranges := make([]flow.Range, n)
+	ranges := make([]chainsync.Range, n)
 	for i := range ranges {
 		ranges[i] = RangeFixture()
 	}
 	return ranges
 }
 
-func BatchListFixture(n int) []flow.Batch {
+func BatchListFixture(n int) []chainsync.Batch {
 	if n <= 0 {
 		return nil
 	}
-	batches := make([]flow.Batch, n)
+	batches := make([]chainsync.Batch, n)
 	for i := range batches {
 		batches[i] = BatchFixture()
 	}
@@ -1873,6 +1885,16 @@ func RootSnapshotFixture(participants flow.IdentityList, opts ...func(*flow.Bloc
 		panic(err)
 	}
 	return root
+}
+
+func SnapshotClusterByIndex(snapshot *inmem.Snapshot, clusterIndex uint) (protocol.Cluster, error) {
+	epochs := snapshot.Epochs()
+	epoch := epochs.Current()
+	cluster, err := epoch.Cluster(clusterIndex)
+	if err != nil {
+		return nil, err
+	}
+	return cluster, nil
 }
 
 // ChainFixture creates a list of blocks that forms a chain

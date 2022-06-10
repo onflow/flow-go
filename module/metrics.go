@@ -3,6 +3,7 @@ package module
 import (
 	"time"
 
+	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -331,6 +332,20 @@ type ExecutionDataServiceMetrics interface {
 	ExecutionDataGetFinished(duration time.Duration, success bool, blobTreeSize uint64)
 }
 
+type ExecutionDataRequesterMetrics interface {
+	// ExecutionDataFetchStarted records an in-progress download
+	ExecutionDataFetchStarted()
+
+	// ExecutionDataFetchFinished records a completed download
+	ExecutionDataFetchFinished(duration time.Duration, success bool, height uint64)
+
+	// NotificationSent reports that ExecutionData received notifications were sent for a block height
+	NotificationSent(height uint64)
+
+	// FetchRetried reports that a download retry was processed
+	FetchRetried()
+}
+
 type RuntimeMetrics interface {
 	// TransactionParsed reports the time spent parsing a single transaction
 	RuntimeTransactionParsed(dur time.Duration)
@@ -471,4 +486,19 @@ type HeroCacheMetrics interface {
 	// Hence, adding a new key to that bucket will replace the oldest valid key inside that bucket.
 	// Note: in context of HeroCache, the key corresponds to the identifier of its entity.
 	OnEntityEjectionDueToEmergency()
+}
+
+type ChainSyncMetrics interface {
+	// record pruned blocks. requested and received times might be zero values
+	PrunedBlockById(status *chainsync.Status)
+
+	PrunedBlockByHeight(status *chainsync.Status)
+
+	// totalByHeight and totalById are the number of blocks pruned for blocks requested by height and by id
+	// storedByHeight and storedById are the number of blocks still stored by height and id
+	PrunedBlocks(totalByHeight, totalById, storedByHeight, storedById int)
+
+	RangeRequested(ran chainsync.Range)
+
+	BatchRequested(batch chainsync.Batch)
 }

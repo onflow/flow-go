@@ -3,6 +3,7 @@
 package mock
 
 import (
+	"github.com/onflow/flow-go/model/chainsync"
 	flow "github.com/onflow/flow-go/model/flow"
 	mock "github.com/stretchr/testify/mock"
 
@@ -15,7 +16,7 @@ type SyncCore struct {
 }
 
 // BatchRequested provides a mock function with given fields: batch
-func (_m *SyncCore) BatchRequested(batch flow.Batch) {
+func (_m *SyncCore) BatchRequested(batch chainsync.Batch) {
 	_m.Called(batch)
 }
 
@@ -39,29 +40,29 @@ func (_m *SyncCore) HandleHeight(final *flow.Header, height uint64) {
 }
 
 // RangeRequested provides a mock function with given fields: ran
-func (_m *SyncCore) RangeRequested(ran flow.Range) {
+func (_m *SyncCore) RangeRequested(ran chainsync.Range) {
 	_m.Called(ran)
 }
 
 // ScanPending provides a mock function with given fields: final
-func (_m *SyncCore) ScanPending(final *flow.Header) ([]flow.Range, []flow.Batch) {
+func (_m *SyncCore) ScanPending(final *flow.Header) ([]chainsync.Range, []chainsync.Batch) {
 	ret := _m.Called(final)
 
-	var r0 []flow.Range
-	if rf, ok := ret.Get(0).(func(*flow.Header) []flow.Range); ok {
+	var r0 []chainsync.Range
+	if rf, ok := ret.Get(0).(func(*flow.Header) []chainsync.Range); ok {
 		r0 = rf(final)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]flow.Range)
+			r0 = ret.Get(0).([]chainsync.Range)
 		}
 	}
 
-	var r1 []flow.Batch
-	if rf, ok := ret.Get(1).(func(*flow.Header) []flow.Batch); ok {
+	var r1 []chainsync.Batch
+	if rf, ok := ret.Get(1).(func(*flow.Header) []chainsync.Batch); ok {
 		r1 = rf(final)
 	} else {
 		if ret.Get(1) != nil {
-			r1 = ret.Get(1).([]flow.Batch)
+			r1 = ret.Get(1).([]chainsync.Batch)
 		}
 	}
 
