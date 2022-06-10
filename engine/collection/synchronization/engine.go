@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	commonsync "github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -370,7 +371,7 @@ func (e *Engine) pollHeight() {
 }
 
 // sendRequests sends a request for each range and batch using consensus participants from last finalized snapshot.
-func (e *Engine) sendRequests(ranges []flow.Range, batches []flow.Batch) {
+func (e *Engine) sendRequests(ranges []chainsync.Range, batches []chainsync.Batch) {
 	var errs *multierror.Error
 
 	for _, ran := range ranges {
