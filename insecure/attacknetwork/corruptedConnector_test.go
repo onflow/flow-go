@@ -27,9 +27,10 @@ func TestConnectorHappyPath_Send(t *testing.T) {
 		require.NoError(t, err)
 
 		connector := NewCorruptedConnector(unittest.Logger(),
-			func(i *insecure.Message) {}, // empty incoming handler, as this test does not evaluate receive path.
 			flow.IdentityList{&corruptedId},
 			map[flow.Identifier]string{corruptedId.NodeID: ccfPortStr})
+		// empty incoming handler, as this test does not evaluate receive path
+		connector.WithIncomingMessageHandler(func(i *insecure.Message) {})
 
 		// goroutine checks the mock ccf for receiving the attacker registration from connector.
 		// the attacker registration arrives as the connector attempts a connection on to the ccf.
@@ -91,6 +92,9 @@ func TestConnectorHappyPath_Receive(t *testing.T) {
 
 		sentMsgReceived := make(chan struct{})
 		connector := NewCorruptedConnector(unittest.Logger(),
+			flow.IdentityList{&corruptedId},
+			map[flow.Identifier]string{corruptedId.NodeID: ccfPortStr})
+		connector.WithIncomingMessageHandler(
 			func(receivedMsg *insecure.Message) {
 				// received message by attacker should have an exact match on the relevant fields as sent by ccf.
 				// Note: only fields filled by test fixtures are checked, as some others
@@ -103,9 +107,7 @@ func TestConnectorHappyPath_Receive(t *testing.T) {
 				require.Equal(t, receivedMsg.ChannelID, msg.ChannelID)
 
 				close(sentMsgReceived)
-			},
-			flow.IdentityList{&corruptedId},
-			map[flow.Identifier]string{corruptedId.NodeID: ccfPortStr})
+			})
 
 		// goroutine checks the mock ccf for receiving the register message from connector.
 		// the register message arrives as the connector attempts a connection on to the ccf.
