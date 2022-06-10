@@ -207,7 +207,7 @@ func main() {
 			return nil
 		}).
 		Module("main chain sync core", func(node *cmd.NodeConfig) error {
-			mainChainSyncCore, err = synchronization.New(node.Logger, node.SyncCoreConfig)
+			mainChainSyncCore, err = synchronization.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector())
 			return err
 		}).
 		Module("machine account config", func(node *cmd.NodeConfig) error {
@@ -545,7 +545,11 @@ func createQCContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap.
 	if err != nil {
 		return nil, fmt.Errorf("could not decode private key from hex: %w", err)
 	}
-	txSigner := sdkcrypto.NewInMemorySigner(sk, machineAccountInfo.HashAlgorithm)
+
+	txSigner, err := sdkcrypto.NewInMemorySigner(sk, machineAccountInfo.HashAlgorithm)
+	if err != nil {
+		return nil, fmt.Errorf("could not create in-memory signer: %w", err)
+	}
 
 	// create actual qc contract client, all flags and machine account info file found
 	qcContractClient = epochs.NewQCContractClient(node.Logger, flowClient, anID, node.Me.NodeID(), machineAccountInfo.Address, machineAccountInfo.KeyIndex, qcContractAddress, txSigner)
