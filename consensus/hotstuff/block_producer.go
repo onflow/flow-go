@@ -11,5 +11,5 @@ import (
 type BlockProducer interface {
 	// MakeBlockProposal builds a new HotStuff block proposal using the given view and
 	// the given quorum certificate for its parent.
-	MakeBlockProposal(qc *flow.QuorumCertificate, view uint64) (*model.Proposal, error)
+	MakeBlockProposal(qc *flow.QuorumCertificate, view uint64, lastViewTC *flow.TimeoutCertificate) (*model.Proposal, error)
 }

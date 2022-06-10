@@ -15,13 +15,13 @@ type BlockProducer struct {
 	mock.Mock
 }
 
-// MakeBlockProposal provides a mock function with given fields: qc, view
-func (_m *BlockProducer) MakeBlockProposal(qc *flow.QuorumCertificate, view uint64) (*model.Proposal, error) {
-	ret := _m.Called(qc, view)
+// MakeBlockProposal provides a mock function with given fields: qc, view, lastViewTC
+func (_m *BlockProducer) MakeBlockProposal(qc *flow.QuorumCertificate, view uint64, lastViewTC *flow.TimeoutCertificate) (*model.Proposal, error) {
+	ret := _m.Called(qc, view, lastViewTC)
 
 	var r0 *model.Proposal
-	if rf, ok := ret.Get(0).(func(*flow.QuorumCertificate, uint64) *model.Proposal); ok {
-		r0 = rf(qc, view)
+	if rf, ok := ret.Get(0).(func(*flow.QuorumCertificate, uint64, *flow.TimeoutCertificate) *model.Proposal); ok {
+		r0 = rf(qc, view, lastViewTC)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*model.Proposal)
@@ -29,8 +29,8 @@ func (_m *BlockProducer) MakeBlockProposal(qc *flow.QuorumCertificate, view uint
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(*flow.QuorumCertificate, uint64) error); ok {
-		r1 = rf(qc, view)
+	if rf, ok := ret.Get(1).(func(*flow.QuorumCertificate, uint64, *flow.TimeoutCertificate) error); ok {
+		r1 = rf(qc, view, lastViewTC)
 	} else {
 		r1 = ret.Error(1)
 	}
