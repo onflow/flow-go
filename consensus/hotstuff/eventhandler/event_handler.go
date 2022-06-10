@@ -1,7 +1,6 @@
 package eventhandler
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
@@ -26,7 +25,6 @@ type EventHandler struct {
 	committee      hotstuff.Replicas
 	voteAggregator hotstuff.VoteAggregator
 	voter          hotstuff.SafetyRules
-	validator      hotstuff.Validator
 	notifier       hotstuff.Consumer
 	ownProposal    flow.Identifier
 }
@@ -44,7 +42,6 @@ func NewEventHandler(
 	committee hotstuff.Replicas,
 	voteAggregator hotstuff.VoteAggregator,
 	voter hotstuff.SafetyRules,
-	validator hotstuff.Validator,
 	notifier hotstuff.Consumer,
 ) (*EventHandler, error) {
 	e := &EventHandler{
@@ -55,7 +52,6 @@ func NewEventHandler(
 		persist:        persist,
 		communicator:   communicator,
 		voter:          voter,
-		validator:      validator,
 		committee:      committee,
 		voteAggregator: voteAggregator,
 		notifier:       notifier,
@@ -119,63 +115,43 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 		return nil
 	}
 
-	// we skip validation for our last own proposal
-	if proposal.Block.BlockID != e.ownProposal {
+	// store the block.
+	err := e.forks.AddBlock(block)
+	if err != nil {
+		return fmt.Errorf("cannot add block to fork (%x): %w", block.BlockID, err)
+	}
 
-		// validate the block. exit if the proposal is invalid
-		err := e.validator.ValidateProposal(proposal)
-		if model.IsInvalidBlockError(err) {
-			perr := e.voteAggregator.InvalidBlock(proposal)
-			if mempool.IsDecreasingPruningHeightError(perr) {
-				log.Warn().Err(err).Msgf("invalid block proposal, but vote aggregator has pruned this height: %v", perr)
-				return nil
-			}
+	nve, err := e.paceMaker.ProcessQC(proposal.Block.QC)
+	if err != nil {
+		return fmt.Errorf("could not process QC for block %x: %w", block.BlockID, err)
+	}
+	viewChanged := nve != nil
 
-			if perr != nil {
-				return fmt.Errorf("vote aggregator could not process invalid block proposal %v, err %v: %w",
-					block.BlockID, err, perr)
-			}
-
-			log.Warn().Err(err).Msg("invalid block proposal")
-			return nil
-		}
-
-		if errors.Is(err, model.ErrUnverifiableBlock) {
-			log.Warn().Err(err).Msg("unverifiable block proposal")
-
-			// even if the block is unverifiable because the QC has been
-			// pruned, it still needs to be added to the forks, otherwise,
-			// a new block with a QC to this block will fail to be added
-			// to forks and crash the event loop.
-		} else if err != nil {
-			return fmt.Errorf("cannot validate proposal (%x): %w", block.BlockID, err)
-		}
+	nve, err = e.paceMaker.ProcessTC(proposal.LastViewTC)
+	if err != nil {
+		return fmt.Errorf("could not process TC for block %x: %w", block.BlockID, err)
+	}
+	if !viewChanged {
+		viewChanged = nve != nil
 	}
 
 	// notify vote aggregator about a new block, so that it can start verifying
 	// votes for it.
-	err := e.voteAggregator.AddBlock(proposal)
+	err = e.voteAggregator.AddBlock(proposal)
 	if err != nil {
 		if !mempool.IsDecreasingPruningHeightError(err) {
 			return fmt.Errorf("could not add block (%v) to vote aggregator: %w", block.BlockID, err)
 		}
 	}
 
-	// store the block.
-	err = e.forks.AddBlock(block)
-	if err != nil {
-		return fmt.Errorf("cannot add block to fork (%x): %w", block.BlockID, err)
-	}
+	if viewChanged {
+		// if the block is for the current view, then check whether to vote for this block
+		err = e.processBlockForCurrentView(proposal)
+		if err != nil {
+			return fmt.Errorf("failed processing current block: %w", err)
+		}
 
-	// if the block is not for the current view, then process the QC
-	if block.View != curView {
-		return e.processQC(block.QC)
-	}
-
-	// if the block is for the current view, then check whether to vote for this block
-	err = e.processBlockForCurrentView(block)
-	if err != nil {
-		return fmt.Errorf("failed processing current block: %w", err)
+		return e.startNewView()
 	}
 
 	return nil
@@ -249,12 +225,10 @@ func (e *EventHandler) startNewView() error {
 
 		// as the leader of the current view,
 		// build the block proposal for the current view
-		qc, _, err := e.forks.MakeForkChoice(curView)
-		if err != nil {
-			return fmt.Errorf("can not make fork choice for view %v: %w", curView, err)
-		}
+		qc := e.paceMaker.NewestQC()
+		lastViewTC := e.paceMaker.LastViewTC()
 
-		proposal, err := e.blockProducer.MakeBlockProposal(qc, curView)
+		proposal, err := e.blockProducer.MakeBlockProposal(qc, curView, lastViewTC)
 		if err != nil {
 			return fmt.Errorf("can not make block proposal for curView %v: %w", curView, err)
 		}
@@ -304,30 +278,35 @@ func (e *EventHandler) startNewView() error {
 		return nil
 	}
 
+	// TODO(active-pacemaker): add processing of cached proposals
+	return nil
+
 	// when there are multiple block proposals, we will just pick the first one.
 	// forks is responsible for slashing double proposal behavior, and
 	// event handler is aware of double proposals, but picking any should work and
 	// won't hurt safety
-	block := blocks[0]
-
-	log.Debug().
-		Uint64("block_view", block.View).
-		Hex("block_id", block.BlockID[:]).
-		Uint64("parent_view", block.QC.View).
-		Hex("parent_id", block.QC.BlockID[:]).
-		Hex("signer", block.ProposerID[:]).
-		Msg("processing cached proposal from leader")
-
-	return e.processBlockForCurrentView(block)
+	//block := blocks[0]
+	//
+	//log.Debug().
+	//	Uint64("block_view", block.View).
+	//	Hex("block_id", block.BlockID[:]).
+	//	Uint64("parent_view", block.QC.View).
+	//	Hex("parent_id", block.QC.BlockID[:]).
+	//	Hex("signer", block.ProposerID[:]).
+	//	Msg("processing cached proposal from leader")
+	//
+	//
+	//return e.processBlockForCurrentView(block)
 }
 
 // processBlockForCurrentView processes the block for the current view.
 // It is called AFTER the block has been stored or found in Forks
 // It checks whether to vote for this block.
 // It might trigger a view change to go to a different view, which might re-enter this function.
-func (e *EventHandler) processBlockForCurrentView(block *model.Block) error {
+func (e *EventHandler) processBlockForCurrentView(proposal *model.Proposal) error {
 	// sanity check that block is really for the current view:
 	curView := e.paceMaker.CurView()
+	block := proposal.Block
 	if block.View != curView {
 		return fmt.Errorf("sanity check fails: block proposal's view does not match with curView, (blockView: %v, curView: %v)",
 			block.View, curView)
@@ -339,7 +318,7 @@ func (e *EventHandler) processBlockForCurrentView(block *model.Block) error {
 	}
 
 	// voter performs all the checks to decide whether to vote for this block or not.
-	err = e.ownVote(block, curView, nextLeader)
+	err = e.ownVote(proposal, curView, nextLeader)
 	if err != nil {
 		return fmt.Errorf("unexpected error in voting logic: %w", err)
 	}
@@ -365,7 +344,8 @@ func (e *EventHandler) processBlockForCurrentView(block *model.Block) error {
 
 // ownVote generates and forwards the own vote, if we decide to vote.
 // Any errors are potential symptoms of uncovered edge cases or corrupted internal state (fatal).
-func (e *EventHandler) ownVote(block *model.Block, curView uint64, nextLeader flow.Identifier) error {
+func (e *EventHandler) ownVote(proposal *model.Proposal, curView uint64, nextLeader flow.Identifier) error {
+	block := proposal.Block
 	log := e.log.With().
 		Uint64("block_view", block.View).
 		Hex("block_id", block.BlockID[:]).
@@ -375,11 +355,7 @@ func (e *EventHandler) ownVote(block *model.Block, curView uint64, nextLeader fl
 		Logger()
 
 	// voter performs all the checks to decide whether to vote for this block or not.
-	// TODO(active-pacemaker): fix proposal SigData, for now it is nil.
-	ownVote, err := e.voter.ProduceVote(&model.Proposal{
-		Block:   block,
-		SigData: nil,
-	}, curView)
+	ownVote, err := e.voter.ProduceVote(proposal, curView)
 	if err != nil {
 		if !model.IsNoVoteError(err) {
 			// unknown error, exit the event loop
