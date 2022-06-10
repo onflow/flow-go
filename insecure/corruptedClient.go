@@ -18,4 +18,7 @@ type CorruptedNodeConnection interface {
 type CorruptedNodeConnector interface {
 	// Connect creates a connection the corruptible conduit factory of the given corrupted identity.
 	Connect(irrecoverable.SignalerContext, flow.Identifier) (CorruptedNodeConnection, error)
+
+	// WithIncomingMessageHandler sets the handler for the incoming messages from remote corrupted nodes.
+	WithIncomingMessageHandler(func(*Message))
 }
