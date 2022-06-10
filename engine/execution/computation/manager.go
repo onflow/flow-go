@@ -232,7 +232,7 @@ func (e *Manager) ExecuteScript(
 	runtime.ReadMemStats(&m)
 	memAllocAfter := m.TotalAlloc
 
-	e.metrics.ExecutionScriptExecuted(time.Since(startedAt), script.GasUsed, script.MemoryUsed, memAllocBefore-memAllocAfter)
+	e.metrics.ExecutionScriptExecuted(time.Since(startedAt), script.GasUsed, memAllocAfter-memAllocBefore, script.MemoryUsed)
 
 	return encodedValue, nil
 }
