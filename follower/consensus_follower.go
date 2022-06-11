@@ -147,8 +147,8 @@ func getBaseOptions(config *Config) []cmd.Option {
 	return options
 }
 
-func buildConsensusFollower(accessNodeOptions []FollowerOption) (*FollowerServiceBuilder, error) {
-	nodeBuilder := FlowConsensusFollowerService(accessNodeOptions...)
+func buildConsensusFollower(opts []FollowerOption) (*FollowerServiceBuilder, error) {
+	nodeBuilder := FlowConsensusFollowerService(opts...)
 
 	if err := nodeBuilder.Initialize(); err != nil {
 		return nil, err
