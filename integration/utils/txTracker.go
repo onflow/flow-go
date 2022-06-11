@@ -4,10 +4,11 @@ import (
 	"context"
 	"time"
 
-	flowsdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go-sdk/client"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
+
+	flowsdk "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go-sdk/client"
 )
 
 type txInFlight struct {

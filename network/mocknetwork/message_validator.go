@@ -3,8 +3,9 @@
 package mocknetwork
 
 import (
-	message "github.com/onflow/flow-go/network/message"
 	mock "github.com/stretchr/testify/mock"
+
+	message "github.com/onflow/flow-go/network/message"
 
 	testing "testing"
 )

@@ -7,8 +7,9 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
+
+	"github.com/spf13/pflag"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/client"

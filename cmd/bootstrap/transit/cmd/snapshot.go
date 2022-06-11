@@ -5,8 +5,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
+
+	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go-sdk/client"
 
