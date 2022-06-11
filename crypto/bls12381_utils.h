@@ -29,10 +29,8 @@ typedef uint8_t byte;
 #define Fp_DIGITS BITS_TO_DIGITS(Fp_BITS)
 #define Fr_BYTES  BITS_TO_BYTES(Fr_BITS)
 
-#define SEED_BYTES BITS_TO_BYTES(Fr_BITS + SEC_BITS)
-
 #define G1_BYTES (2*Fp_BYTES)
-#define G2_BYTES (4*Fp_BYTES)
+#define G2_BYTES (2*Fp2_BYTES)
 
 // Compressed and uncompressed points
 #define COMPRESSED      1

@@ -180,9 +180,10 @@ void ep2_print_(char* s, ep2_st* p) {
 // generates a random number less than the order r
 void bn_randZr_star(bn_t x) {
     // reduce the modular reduction bias
-    byte seed[SEED_BYTES];
-    rand_bytes(seed, SEED_BYTES);
-    bn_map_to_Zr_star(x, seed, SEED_BYTES);
+    const int seed_len = BITS_TO_BYTES(Fr_BITS + SEC_BITS);
+    byte seed[seed_len];
+    rand_bytes(seed, seed_len);
+    bn_map_to_Zr_star(x, seed, seed_len);
 }
 
 // generates a random number less than the order r
@@ -363,12 +364,12 @@ void ep2_write_bin_compact(byte *bin, const ep2_t a, const int len) {
     RLC_TRY {
         ep2_new(t);
         ep2_norm(t, (ep2_st *)a);
-        fp2_write_bin(bin, 2*Fp_BYTES, t->x, 0);
+        fp2_write_bin(bin, Fp2_BYTES, t->x, 0);
 
         if (G2_SERIALIZATION == COMPRESSED) {
             bin[0] |= (fp2_get_sign(t->y) << 5);
         } else {
-            fp2_write_bin(bin + 2*Fp_BYTES, 2*Fp_BYTES, t->y, 0);
+            fp2_write_bin(bin + Fp2_BYTES, Fp2_BYTES, t->y, 0);
         }
     } RLC_CATCH_ANY {
         RLC_THROW(ERR_CAUGHT);
@@ -569,7 +570,7 @@ void ep_sum_vector(ep_t jointx, ep_st* x, const int len) {
 }
 
 // Computes the sum of the signatures (G1 elements) flattened in a single sigs array
-// and store the sum bytes in dest.
+// and writes the sum (G1 element) as bytes in dest.
 // The function assumes sigs is correctly allocated with regards to len.
 int ep_sum_vector_byte(byte* dest, const byte* sigs_bytes, const int len) {
     int error;
