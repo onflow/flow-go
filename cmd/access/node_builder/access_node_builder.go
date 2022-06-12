@@ -193,6 +193,7 @@ type FlowAccessNodeBuilder struct {
 	FollowerCore               module.HotStuffFollower
 	ExecutionDataService       state_synchronization.ExecutionDataService
 	ExecutionDataRequester     state_synchronization.ExecutionDataRequester
+
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
 	// Hence, a factory function that needs to be called just before creating the sync engine

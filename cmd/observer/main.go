@@ -14,13 +14,13 @@ func main() {
 		anb.Logger.Fatal().Err(err).Send()
 	}
 
-	builder := nodebuilder.NewObserverServiceBuilder(anb)
+	anb.WithNewObserverServiceBuilder()
 
-	if err := builder.Initialize(); err != nil {
+	if err := anb.Initialize(); err != nil {
 		anb.Logger.Fatal().Err(err).Send()
 	}
 
-	node, err := builder.Build()
+	node, err := anb.Build()
 	if err != nil {
 		anb.Logger.Fatal().Err(err).Send()
 	}
