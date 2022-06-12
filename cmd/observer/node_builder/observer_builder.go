@@ -200,16 +200,47 @@ func (builder *ObserverServiceBuilder) deriveBootstrapPeerIdentities() error {
 
 // deriveBootstrapPeerIdentities derives the Flow Identity of the bootstrap peers from the parameters.
 // These are the identities of the observers also acting as the DHT bootstrap server
-func (builder *ObserverServiceBuilder) deriveUpstreamPeerIdentities() error {
+func (builder *ObserverServiceBuilder) deriveUpstreamIdentities() error {
 	// if bootstrap identities already provided (as part of alternate initialization as a library the skip reading command
 	// line params)
 	if builder.upstreamIdentities != nil {
 		return nil
 	}
 
-	ids, err := BootstrapIdentities(builder.upstreamNodeAddresses, builder.upstreamNodePublicKeys)
-	if err != nil {
-		return fmt.Errorf("failed to derive upstream peer identities: %w", err)
+	// BootstrapIdentities converts the bootstrap node addresses and keys to a Flow Identity list where
+	// each Flow Identity is initialized with the passed address, the networking key
+	// and the Node ID set to ZeroID, role set to Access, 0 stake and no staking key.
+	addresses := builder.upstreamNodeAddresses
+	keys := builder.upstreamNodePublicKeys
+	if len(addresses) != len(keys) {
+		return fmt.Errorf("number of addresses and keys provided for the boostrap nodes don't match")
+	}
+
+	ids := make([]*flow.Identity, len(addresses))
+	for i, address := range addresses {
+		key := keys[i]
+
+		// json unmarshaller needs a quotes before and after the string
+		// the pflags.StringSliceVar does not retain quotes for the command line arg even if escaped with \"
+		// hence this additional check to ensure the key is indeed quoted
+		if !strings.HasPrefix(key, "\"") {
+			key = fmt.Sprintf("\"%s\"", key)
+		}
+
+		// create the identity of the peer by setting only the relevant fields
+		ids[i] = &flow.Identity{
+			NodeID:        flow.ZeroID, // the NodeID is the hash of the staking key and for the public network it does not apply
+			Address:       address,
+			Role:          flow.RoleAccess, // the upstream node has to be an access node
+			NetworkPubKey: nil,
+		}
+
+		// networking public key
+		var networkKey encodable.NetworkPubKey
+		err := json.Unmarshal([]byte(key), &networkKey)
+		if err == nil {
+			ids[i].NetworkPubKey = networkKey
+		}
 	}
 
 	builder.upstreamIdentities = ids
@@ -635,19 +666,20 @@ func BootstrapIdentities(addresses []string, keys []string) (flow.IdentityList, 
 			key = fmt.Sprintf("\"%s\"", key)
 		}
 
+		// networking public key
+		var networkKey encodable.NetworkPubKey
+		err := json.Unmarshal([]byte(key), &networkKey)
+		if err != nil {
+			// it's not safe to ignore the error here since bootstrap peers must have a valid key.
+			return nil, err
+		}
+
 		// create the identity of the peer by setting only the relevant fields
 		ids[i] = &flow.Identity{
 			NodeID:        flow.ZeroID, // the NodeID is the hash of the staking key and for the public network it does not apply
 			Address:       address,
 			Role:          flow.RoleAccess, // the upstream node has to be an access node
-			NetworkPubKey: nil,
-		}
-
-		// networking public key
-		var networkKey encodable.NetworkPubKey
-		err := json.Unmarshal([]byte(key), &networkKey)
-		if err == nil {
-			ids[i].NetworkPubKey = networkKey
+			NetworkPubKey: networkKey,
 		}
 	}
 	return ids, nil
@@ -731,7 +763,7 @@ func (builder *ObserverServiceBuilder) Initialize() error {
 		return err
 	}
 
-	if err := builder.deriveUpstreamPeerIdentities(); err != nil {
+	if err := builder.deriveUpstreamIdentities(); err != nil {
 		return err
 	}
 
