@@ -547,10 +547,11 @@ int bls_spock_verify(const ep2_t pk1, const byte* sig1, const ep2_t pk2, const b
     ep2_free(elemsG2[0]);
     ep2_free(elemsG2[1]);
     
-    if (res == RLC_EQ && core_get()->code == RLC_OK) 
-        return VALID;
-    else 
+    if (core_get()->code == RLC_OK) {
+        if (res == RLC_EQ) return VALID;
         return INVALID;
+    }
+    return UNDEFINED;
 }
 
 // Subtracts the sum of a G2 array elements y from an element x and writes the 
