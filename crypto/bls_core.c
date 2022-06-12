@@ -255,6 +255,7 @@ int bls_verifyPerDistinctKey(const byte* sig,
         ep_new(elemsG1[i]);
         ep2_new(elemsG2[i]);
     }
+    ep_st* h_array = NULL;
 
     // elemsG1[0] = s
     ret = ep_read_bin_compact(elemsG1[0], sig, SIGNATURE_LEN);
@@ -279,7 +280,7 @@ int bls_verifyPerDistinctKey(const byte* sig,
     int index_offset = 0;
     for (int i=1; i < nb_pks+1; i++) {
         // array for all the hashes under the same key
-        ep_st* h_array = (ep_st*)malloc(hashes_per_pk[i-1] * sizeof(ep_st));
+        h_array = (ep_st*)realloc(h_array, hashes_per_pk[i-1] * sizeof(ep_st));
         for (int j=0; j < hashes_per_pk[i-1]; j++) {
             ep_new(&h_array[j]);
             // map the hash to G1
@@ -290,9 +291,8 @@ int bls_verifyPerDistinctKey(const byte* sig,
         // aggregate all the points of the array 
         ep_sum_vector(elemsG1[i], h_array, hashes_per_pk[i-1]);
 
-        // free the array
+        // free the array points
         for (int j=0; j < hashes_per_pk[i-1]; j++) ep_free(h_array[j]);
-        free(h_array);
     }
 
     fp12_t pair;
@@ -313,6 +313,7 @@ out:
     }
     free(elemsG1);
     free(elemsG2);
+    free(h_array);
 
     return ret;
 }
