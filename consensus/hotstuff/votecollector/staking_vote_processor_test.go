@@ -274,7 +274,7 @@ func TestStakingVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	committee := &mockhotstuff.DynamicCommittee{}
 	committee.On("IdentitiesByEpoch", block.View).Return(stakingSigners, nil)
 	committee.On("IdentitiesByBlock", block.BlockID).Return(stakingSigners, nil)
-	committee.On("WeightThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(stakingSigners.TotalWeight()), nil)
+	committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(stakingSigners.TotalWeight()), nil)
 
 	votes := make([]*model.Vote, 0, len(stakingSigners))
 
