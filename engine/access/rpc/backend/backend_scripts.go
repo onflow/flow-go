@@ -114,10 +114,7 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 		if err == nil {
 			if b.log.GetLevel() == zerolog.DebugLevel {
 				executionTime := time.Now()
-				rawTimestamp, seen := b.loggedScripts.Get(insecureScriptHash)
-				timestamp := rawTimestamp.(time.Time)
-				// log if the script is unique in the time window
-				if !seen || executionTime.Sub(timestamp) >= uniqueScriptLoggingTimeWindow {
+				if b.shouldLogScript(executionTime, insecureScriptHash) {
 					b.log.Debug().
 						Str("execution_node", execNode.String()).
 						Hex("block_id", blockID[:]).
@@ -153,6 +150,18 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 		b.log.Error().Err(err).Msg("script execution failed for execution node internal reasons")
 	}
 	return nil, errToReturn
+}
+
+// shouldLogScript checks if the script hash is unique in the time window
+func (b *backendScripts) shouldLogScript(execTime time.Time, scriptHash [16]byte) bool {
+	rawTimestamp, seen := b.loggedScripts.Get(scriptHash)
+	if !seen || rawTimestamp == nil {
+		return true
+	} else {
+		// safe cast
+		timestamp := rawTimestamp.(time.Time)
+		return execTime.Sub(timestamp) >= uniqueScriptLoggingTimeWindow
+	}
 }
 
 func (b *backendScripts) tryExecuteScript(ctx context.Context, execNode *flow.Identity, req execproto.ExecuteScriptAtBlockIDRequest) ([]byte, error) {
