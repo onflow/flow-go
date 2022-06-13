@@ -2,11 +2,11 @@ package backend
 
 import (
 	"context"
-	"crypto/md5" //nolint:gosec
 	"errors"
 	"fmt"
-	"sync"
 	"time"
+
+	lru "github.com/hashicorp/golang-lru"
 
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
@@ -37,6 +37,10 @@ const DefaultMaxHeightRange = 250
 // DefaultSnapshotHistoryLimit the amount of blocks to look back in state
 // when recursively searching for a valid snapshot
 const DefaultSnapshotHistoryLimit = 50
+
+// DefaultLoggedScriptsCacheSize is the default size of the lookup cache used to dedupe logs of scripts sent to ENs
+// limiting cache size to 16MB and does not affect script execution, only for keeping logs tidy
+const DefaultLoggedScriptsCacheSize = 1_000_000
 
 // DefaultConnectionPoolSize is the default size for the connection pool to collection and execution nodes
 const DefaultConnectionPoolSize = 10
@@ -100,6 +104,13 @@ func New(
 		retry.Activate()
 	}
 
+	var err error
+
+	loggedScripts, _ := lru.New(DefaultLoggedScriptsCacheSize)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to initialize script logging cache")
+	}
+
 	b := &Backend{
 		state: state,
 		// create the sub-backends
@@ -110,10 +121,7 @@ func New(
 			state:             state,
 			log:               log,
 			metrics:           transactionMetrics,
-			seenScripts: &scriptMap{
-				scripts: make(map[[md5.Size]byte]time.Time),
-				lock:    sync.RWMutex{},
-			},
+			loggedScripts:     loggedScripts,
 		},
 		backendTransactions: backendTransactions{
 			staticCollectionRPC:  collectionRPC,
@@ -165,7 +173,6 @@ func New(
 
 	retry.SetBackend(b)
 
-	var err error
 	preferredENIdentifiers, err = identifierList(preferredExecutionNodeIDs)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to convert node id string to Flow Identifier for preferred EN map")
