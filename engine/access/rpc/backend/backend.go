@@ -42,6 +42,9 @@ const DefaultSnapshotHistoryLimit = 50
 // limiting cache size to 16MB and does not affect script execution, only for keeping logs tidy
 const DefaultLoggedScriptsCacheSize = 1_000_000
 
+// DefaultConnectionPoolSize is the default size for the connection pool to collection and execution nodes
+const DefaultConnectionPoolSize = 10
+
 var preferredENIdentifiers flow.IdentifierList
 var fixedENIdentifiers flow.IdentifierList
 

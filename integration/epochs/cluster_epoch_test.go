@@ -16,6 +16,7 @@ import (
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
+
 	emulatormod "github.com/onflow/flow-go/module/emulator"
 
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
@@ -110,9 +111,12 @@ func (s *Suite) PublishVoter() {
 		SetPayer(s.blockchain.ServiceKey().Address).
 		AddAuthorizer(s.qcAddress)
 
+	signer, err := s.blockchain.ServiceKey().Signer()
+	require.NoError(s.T(), err)
+
 	s.SignAndSubmit(publishVoterTx,
 		[]sdk.Address{s.blockchain.ServiceKey().Address, s.qcAddress},
-		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), s.qcSigner})
+		[]sdkcrypto.Signer{signer, s.qcSigner})
 }
 
 // StartVoting starts the voting in the EpochQCContract with the admin resource
@@ -164,9 +168,12 @@ func (s *Suite) StartVoting(clustering flow.ClusterList, clusterCount, nodesPerC
 	err = startVotingTx.AddArgument(cadence.NewArray(clusterNodeWeights))
 	require.NoError(s.T(), err)
 
+	signer, err := s.blockchain.ServiceKey().Signer()
+	require.NoError(s.T(), err)
+
 	s.SignAndSubmit(startVotingTx,
 		[]sdk.Address{s.blockchain.ServiceKey().Address, s.qcAddress},
-		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), s.qcSigner})
+		[]sdkcrypto.Signer{signer, s.qcSigner})
 }
 
 // CreateVoterResource creates the Voter resource in cadence for a cluster node
@@ -193,9 +200,12 @@ func (s *Suite) CreateVoterResource(address sdk.Address, nodeID flow.Identifier,
 	err = registerVoterTx.AddArgument(cdcStakingPubKey)
 	require.NoError(s.T(), err)
 
+	signer, err := s.blockchain.ServiceKey().Signer()
+	require.NoError(s.T(), err)
+
 	s.SignAndSubmit(registerVoterTx,
 		[]sdk.Address{s.blockchain.ServiceKey().Address, address},
-		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), nodeSigner})
+		[]sdkcrypto.Signer{signer, nodeSigner})
 }
 
 func (s *Suite) StopVoting() {
@@ -207,9 +217,12 @@ func (s *Suite) StopVoting() {
 		SetPayer(s.blockchain.ServiceKey().Address).
 		AddAuthorizer(s.qcAddress)
 
+	signer, err := s.blockchain.ServiceKey().Signer()
+	require.NoError(s.T(), err)
+
 	s.SignAndSubmit(tx,
 		[]sdk.Address{s.blockchain.ServiceKey().Address, s.qcAddress},
-		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), s.qcSigner})
+		[]sdkcrypto.Signer{signer, s.qcSigner})
 }
 
 func (s *Suite) NodeHasVoted(nodeID flow.Identifier) bool {
