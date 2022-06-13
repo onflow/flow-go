@@ -144,12 +144,10 @@ func (b *backendTransactions) sendTransactionToCollector(ctx context.Context,
 	tx *flow.TransactionBody,
 	collectionNodeAddr string) error {
 
-	// TODO: Use a connection pool to cache connections
-	collectionRPC, conn, err := b.connFactory.GetAccessAPIClient(collectionNodeAddr)
+	collectionRPC, _, err := b.connFactory.GetAccessAPIClient(collectionNodeAddr)
 	if err != nil {
 		return fmt.Errorf("failed to connect to collection node at %s: %w", collectionNodeAddr, err)
 	}
-	defer conn.Close()
 
 	err = b.grpcTxSend(ctx, collectionRPC, tx)
 	if err != nil {
