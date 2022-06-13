@@ -23,11 +23,10 @@ func TestComputeQCWeightThreshold(t *testing.T) {
 // for producing a TO.
 func TestComputeTOWeightThreshold(t *testing.T) {
 	// testing lowest values
-	for i := 1; i <= 302; i++ {
-		threshold := WeightThresholdToTimeout(uint64(i))
+	for totalWeight := uint64(1); totalWeight <= 302; totalWeight++ {
+		threshold := WeightThresholdToTimeout(totalWeight)
 
-		boundaryValue := float64(i) * 1.0 / 3.0
-		assert.True(t, boundaryValue < float64(threshold))
-		assert.False(t, boundaryValue < float64(threshold-1))
+		assert.Greater(t, threshold*3, totalWeight)         // 3*threshold > totalWeight
+		assert.LessOrEqual(t, (threshold-1)*3, totalWeight) // 3*(threshold-1) <= totalWeight
 	}
 }
