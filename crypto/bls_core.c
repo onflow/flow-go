@@ -264,7 +264,6 @@ int bls_verifyPerDistinctKey(const byte* sig,
         ep_new(elemsG1[i]);
         ep2_new(elemsG2[i]);
     }
-    ep_st* h_array = NULL;
 
     // elemsG1[0] = s
     ret = ep_read_bin_compact(elemsG1[0], sig, SIGNATURE_LEN);
@@ -283,28 +282,35 @@ int bls_verifyPerDistinctKey(const byte* sig,
     }
 
     // map all hashes to G1 and aggregate the ones with the same public key
+    
+    // tmp_hashes is a temporary array of all hashes under a same key mapped to a G1 point.
+    // tmp_hashes size is set to the maximum possible size to minimize malloc calls.
+    int tmp_hashes_size = hashes_per_pk[0];
+    for (int i=1; i<nb_pks; i++) 
+        if (hashes_per_pk[i] > tmp_hashes_size) 
+            tmp_hashes_size = hashes_per_pk[i];
+    ep_st* tmp_hashes = (ep_st*)malloc(tmp_hashes_size * sizeof(ep_st));
+    if (!tmp_hashes) {
+        ret = UNDEFINED;
+        goto out;
+    }
+
+    // sum hashes under the same key
+    for (int i=0; i<tmp_hashes_size; i++) ep_new(&tmp_hashes[i]);
     int data_offset = 0;
     int index_offset = 0;
     for (int i=1; i < nb_pks+1; i++) {
-        // array for all the hashes under the same key
-        h_array = (ep_st*)realloc(h_array, hashes_per_pk[i-1] * sizeof(ep_st));
-        if (!h_array) {
-            ret = UNDEFINED;
-            goto out;
-        }
         for (int j=0; j < hashes_per_pk[i-1]; j++) {
-            ep_new(&h_array[j]);
             // map the hash to G1
-            map_to_G1(&h_array[j], &hashes[data_offset], len_hashes[index_offset]); 
+            map_to_G1(&tmp_hashes[j], &hashes[data_offset], len_hashes[index_offset]); 
             data_offset += len_hashes[index_offset];
             index_offset++; 
         }
         // aggregate all the points of the array 
-        ep_sum_vector(elemsG1[i], h_array, hashes_per_pk[i-1]);
-
-        // free the array points
-        for (int j=0; j < hashes_per_pk[i-1]; j++) ep_free(h_array[j]);
+        ep_sum_vector(elemsG1[i], tmp_hashes, hashes_per_pk[i-1]);
     }
+    for (int i=0; i<tmp_hashes_size; i++) ep_free(&tmp_hashes[i]);
+    free(tmp_hashes);
 
     fp12_t pair;
     fp12_new(&pair);
@@ -326,7 +332,6 @@ out:
         ep_free(elemsG1[i]);
         ep2_free(elemsG2[i]);
     }
-    free(h_array);
     free(elemsG2);
 outG2:
     free(elemsG1);
