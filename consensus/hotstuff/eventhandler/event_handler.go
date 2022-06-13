@@ -86,7 +86,14 @@ func (e *EventHandler) OnQCConstructed(qc *flow.QuorumCertificate) error {
 
 // OnTCConstructed processes a valid tc constructed by internal vote aggregator.
 func (e *EventHandler) OnTCConstructed(tc *flow.TimeoutCertificate) error {
-	panic("to be implemented")
+	nve, err := e.paceMaker.ProcessTC(tc)
+	if err != nil {
+		return fmt.Errorf("could not process constructed TC for view %d: %w", tc.View, err)
+	}
+	if nve == nil {
+		return nil
+	}
+	return e.startNewView()
 }
 
 // OnReceiveProposal processes the block when a block proposal is received.

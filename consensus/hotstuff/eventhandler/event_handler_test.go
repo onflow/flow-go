@@ -93,6 +93,7 @@ func initPaceMaker(t require.TestingT, livenessData *hotstuff.LivenessData) hots
 	pm := NewTestPaceMaker(t, timeout.NewController(tc), notifier, persist)
 	notifier.On("OnStartingTimeout", mock.Anything).Return()
 	notifier.On("OnQcTriggeredViewChange", mock.Anything, mock.Anything).Return()
+	notifier.On("OnTcTriggeredViewChange", mock.Anything, mock.Anything).Return()
 	notifier.On("OnReachedTimeout", mock.Anything).Return()
 	pm.Start()
 	return pm
@@ -319,10 +320,10 @@ func (es *EventHandlerSuite) SetupTest() {
 
 	es.eventhandler = eventhandler
 
-	es.initView = livenessData.CurrentView + 1
-	es.endView = livenessData.CurrentView + 1
+	es.initView = livenessData.CurrentView
+	es.endView = livenessData.CurrentView
 	// voting block is a block for the current view, which will trigger view change
-	es.votingBlock = createBlockWithQC(es.paceMaker.CurView(), es.paceMaker.CurView()-1)
+	es.votingBlock = createBlockWithQC(es.paceMaker.CurView()+1, es.paceMaker.CurView())
 	es.qc = &flow.QuorumCertificate{
 		BlockID:       es.votingBlock.BlockID,
 		View:          es.votingBlock.View,
@@ -347,7 +348,7 @@ func (es *EventHandlerSuite) TestQCBuiltViewChanged() {
 	// I'm not the next leader
 	// haven't received block for next view
 	// goes to the new view
-	es.endView++
+	es.endView += 2
 	// not the leader of the newview
 	// don't have block for the newview
 	// over
@@ -547,7 +548,7 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_OlderThanCurView_CannotBuildQ
 	es.voteAggregator.AssertCalled(es.T(), "AddBlock", proposal)
 }
 
-// received a valid proposal that has older view, and can built a qc from votes for this block,
+// received a valid proposal that has older view, and can build a qc from votes for this block,
 // the proposal's QC didn't trigger view change
 func (es *EventHandlerSuite) TestOnReceiveProposal_OlderThanCurView_CanBuildQCFromVotes_NoViewChange() {
 	proposal := createProposal(es.initView-1, es.initView-2)
@@ -676,9 +677,9 @@ func (es *EventHandlerSuite) TestOnTimeout() {
 }
 
 func (es *EventHandlerSuite) Test100Timeout() {
-	unittest.SkipUnless(es.T(), unittest.TEST_TODO, "active-pacemaker")
 	for i := 0; i < 100; i++ {
-		err := es.eventhandler.OnLocalTimeout()
+		tc := helper.MakeTC(helper.WithTCView(es.initView + uint64(i)))
+		err := es.eventhandler.OnTCConstructed(tc)
 		es.endView++
 		require.NoError(es.T(), err)
 	}
@@ -725,12 +726,11 @@ func (es *EventHandlerSuite) TestLeaderBuild100Blocks() {
 
 // a follower receives 100 blocks
 func (es *EventHandlerSuite) TestFollowerFollows100Blocks() {
-	unittest.SkipUnless(es.T(), unittest.TEST_TODO, "active-pacemaker")
 	for i := 0; i < 100; i++ {
 		// create each proposal as if they are created by some leader
-		proposal := createProposal(es.initView+uint64(i), es.initView+uint64(i)-1)
+		proposal := createProposal(es.initView+uint64(i)+1, es.initView+uint64(i))
 		es.voteAggregator.On("AddBlock", proposal).Return(nil).Once()
-		// as a follower, I receive these propsals
+		// as a follower, I receive these proposals
 		err := es.eventhandler.OnReceiveProposal(proposal)
 		require.NoError(es.T(), err)
 		es.endView++
