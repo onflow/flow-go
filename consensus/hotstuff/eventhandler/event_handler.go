@@ -121,18 +121,14 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 		return fmt.Errorf("cannot add block to fork (%x): %w", block.BlockID, err)
 	}
 
-	nve, err := e.paceMaker.ProcessQC(proposal.Block.QC)
+	_, err = e.paceMaker.ProcessQC(proposal.Block.QC)
 	if err != nil {
 		return fmt.Errorf("could not process QC for block %x: %w", block.BlockID, err)
 	}
-	viewChanged := nve != nil
 
-	nve, err = e.paceMaker.ProcessTC(proposal.LastViewTC)
+	_, err = e.paceMaker.ProcessTC(proposal.LastViewTC)
 	if err != nil {
 		return fmt.Errorf("could not process TC for block %x: %w", block.BlockID, err)
-	}
-	if !viewChanged {
-		viewChanged = nve != nil
 	}
 
 	// notify vote aggregator about a new block, so that it can start verifying
@@ -144,14 +140,10 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 		}
 	}
 
-	if viewChanged {
-		// if the block is for the current view, then check whether to vote for this block
-		err = e.processBlockForCurrentView(proposal)
-		if err != nil {
-			return fmt.Errorf("failed processing current block: %w", err)
-		}
-
-		return e.startNewView()
+	// if the block is for the current view, then try voting for this block
+	err = e.processBlockForCurrentView(proposal)
+	if err != nil {
+		return fmt.Errorf("failed processing current block: %w", err)
 	}
 
 	return nil
@@ -308,8 +300,8 @@ func (e *EventHandler) processBlockForCurrentView(proposal *model.Proposal) erro
 	curView := e.paceMaker.CurView()
 	block := proposal.Block
 	if block.View != curView {
-		return fmt.Errorf("sanity check fails: block proposal's view does not match with curView, (blockView: %v, curView: %v)",
-			block.View, curView)
+		// ignore outdated proposals in case we have moved forward
+		return nil
 	}
 	// leader (node ID) for next view
 	nextLeader, err := e.committee.LeaderForView(curView + 1)

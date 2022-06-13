@@ -319,8 +319,8 @@ func (es *EventHandlerSuite) SetupTest() {
 
 	es.eventhandler = eventhandler
 
-	es.initView = livenessData.CurrentView
-	es.endView = livenessData.CurrentView
+	es.initView = livenessData.CurrentView + 1
+	es.endView = livenessData.CurrentView + 1
 	// voting block is a block for the current view, which will trigger view change
 	es.votingBlock = createBlockWithQC(es.paceMaker.CurView(), es.paceMaker.CurView()-1)
 	es.qc = &flow.QuorumCertificate{
