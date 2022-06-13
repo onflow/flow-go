@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	defaultHeightRangeTarget = uint64(400000)
-	defaultThreshold         = uint64(100000)
+	defaultHeightRangeTarget = uint64(400_000)
+	defaultThreshold         = uint64(100_000)
 )
 
 type Pruner struct {
