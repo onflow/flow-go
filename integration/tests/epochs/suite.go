@@ -105,7 +105,7 @@ func (s *Suite) SetupTest() {
 	netConf := testnet.NewNetworkConfigWithEpochConfig("epochs-tests", confs, s.StakingAuctionLen, s.DKGPhaseLen, s.EpochLen)
 
 	// initialize the network
-	s.net = testnet.PrepareFlowNetwork(s.T(), netConf)
+	s.net = testnet.PrepareFlowNetwork(s.T(), netConf, flow.Localnet)
 
 	// start the network
 
@@ -325,7 +325,8 @@ func (s *Suite) createStakingCollection(ctx context.Context, env templates.Envir
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
 
-	signer := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA2_256)
+	signer, err := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA2_256)
+	require.NoError(s.T(), err)
 
 	createStakingCollectionTx, err := utils.MakeCreateStakingCollectionTx(
 		env,
@@ -363,7 +364,8 @@ func (s *Suite) SubmitStakingCollectionRegisterNodeTx(
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
 
-	signer := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA2_256)
+	signer, err := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA2_256)
+	require.NoError(s.T(), err)
 
 	registerNodeTx, err := utils.MakeStakingCollectionRegisterNodeTx(
 		env,
@@ -417,7 +419,8 @@ func (s *Suite) SubmitStakingCollectionCloseStakeTx(
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
 
-	signer := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA2_256)
+	signer, err := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA2_256)
+	require.NoError(s.T(), err)
 
 	closeStakeTx, err := utils.MakeStakingCollectionCloseStakeTx(
 		env,

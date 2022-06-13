@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
@@ -314,6 +315,9 @@ func (m *MutableState) guaranteeExtend(ctx context.Context, candidate *flow.Bloc
 		// get the reference block to check expiry
 		ref, err := m.headers.ByBlockID(guarantee.ReferenceBlockID)
 		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				return state.NewInvalidExtensionErrorf("could not get reference block %x: %w", guarantee.ReferenceBlockID, err)
+			}
 			return fmt.Errorf("could not get reference block (%x): %w", guarantee.ReferenceBlockID, err)
 		}
 
@@ -321,6 +325,17 @@ func (m *MutableState) guaranteeExtend(ctx context.Context, candidate *flow.Bloc
 		if ref.Height < limit {
 			return state.NewInvalidExtensionErrorf("payload includes expired guarantee (height: %d, limit: %d)",
 				ref.Height, limit)
+		}
+
+		// check the guarantors are correct
+		_, err = protocol.FindGuarantors(m, guarantee)
+		if err != nil {
+			if signature.IsInvalidSignerIndicesError(err) ||
+				errors.Is(err, protocol.ErrEpochNotCommitted) ||
+				errors.Is(err, protocol.ErrClusterNotFound) {
+				return state.NewInvalidExtensionErrorf("guarantee %v contains invalid guarantors: %w", guarantee.ID(), err)
+			}
+			return fmt.Errorf("could not find guarantor for guarantee %v: %w", guarantee.ID(), err)
 		}
 	}
 
@@ -379,7 +394,7 @@ func (m *FollowerState) lastSealed(candidate *flow.Block) (*flow.Seal, error) {
 	payload := candidate.Payload
 
 	// getting the last sealed block
-	last, err := m.seals.ByBlockID(header.ParentID)
+	last, err := m.seals.HighestInFork(header.ParentID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve parent seal (%x): %w", header.ParentID, err)
 	}
@@ -438,7 +453,7 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 		}
 
 		// index the latest sealed block in this fork
-		err = transaction.WithTx(operation.IndexBlockSeal(blockID, last.ID()))(tx)
+		err = transaction.WithTx(operation.IndexLatestSealAtBlock(blockID, last.ID()))(tx)
 		if err != nil {
 			return fmt.Errorf("could not index candidate seal: %w", err)
 		}
@@ -499,7 +514,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 
 	// SECOND: We also want to update the last sealed height. Retrieve the block
 	// seal indexed for the block and retrieve the block that was sealed by it.
-	last, err := m.seals.ByBlockID(blockID)
+	last, err := m.seals.HighestInFork(blockID)
 	if err != nil {
 		return fmt.Errorf("could not look up sealed header: %w", err)
 	}
@@ -631,6 +646,16 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		err = operation.UpdateSealedHeight(sealed.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not update sealed height: %w", err)
+		}
+
+		// When a block is finalized, we commit the result for each seal it contains. The sealing logic
+		// guarantees that only a single, continuous execution fork is sealed. Here, we index for
+		// each block ID the ID of its _finalized_ seal.
+		for _, seal := range block.Payload.Seals {
+			err = operation.IndexFinalizedSealByBlockID(seal.BlockID, seal.ID())(tx)
+			if err != nil {
+				return fmt.Errorf("could not index the seal by the sealed block ID: %w", err)
+			}
 		}
 
 		// emit protocol events within the scope of the Badger transaction to

@@ -86,7 +86,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOutdatedApp
 	require.NoError(s.T(), err)
 
 	seal := unittest.Seal.Fixture(unittest.Seal.WithBlock(&s.Block))
-	s.sealsDB.On("ByBlockID", mock.Anything).Return(seal, nil).Once()
+	s.sealsDB.On("HighestInFork", mock.Anything).Return(seal, nil).Once()
 
 	err = s.core.ProcessFinalizedBlock(s.Block.ID())
 	require.NoError(s.T(), err)
@@ -100,7 +100,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOutdatedApp
 // if the block which is targeted by execution result is already sealed.
 func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOutdatedExecutionResult() {
 	seal := unittest.Seal.Fixture(unittest.Seal.WithBlock(&s.Block))
-	s.sealsDB.On("ByBlockID", mock.Anything).Return(seal, nil).Once()
+	s.sealsDB.On("HighestInFork", mock.Anything).Return(seal, nil).Once()
 
 	err := s.core.ProcessFinalizedBlock(s.Block.ID())
 	require.NoError(s.T(), err)
@@ -149,7 +149,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOrphanIncor
 	s.MarkFinalized(&blockB1)
 
 	seal := unittest.Seal.Fixture(unittest.Seal.WithBlock(&s.ParentBlock))
-	s.sealsDB.On("ByBlockID", mock.Anything).Return(seal, nil).Once()
+	s.sealsDB.On("HighestInFork", mock.Anything).Return(seal, nil).Once()
 
 	// blockB1 becomes finalized
 	err := s.core.ProcessFinalizedBlock(blockB1.ID())
@@ -172,7 +172,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOldFinalize
 
 	seal := unittest.Seal.Fixture(unittest.Seal.WithBlock(&s.Block))
 	// should only call it once
-	s.sealsDB.On("ByBlockID", mock.Anything).Return(seal, nil).Once()
+	s.sealsDB.On("HighestInFork", mock.Anything).Return(seal, nil).Once()
 	s.MarkFinalized(&blockB1)
 	s.MarkFinalized(&blockB2)
 
@@ -211,7 +211,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessFinalizedBlock_CollectorsCl
 	// candidate becomes new sealed and finalized block, it means that
 	// we will need to cleanup our tree till new height, removing all outdated collectors
 	seal := unittest.Seal.Fixture(unittest.Seal.WithBlock(&candidate))
-	s.sealsDB.On("ByBlockID", mock.Anything).Return(seal, nil).Once()
+	s.sealsDB.On("HighestInFork", mock.Anything).Return(seal, nil).Once()
 
 	s.MarkFinalized(&candidate)
 	err := s.core.ProcessFinalizedBlock(candidate.ID())
@@ -326,7 +326,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_EmergencySealing(
 	).Return(true, nil).Once()
 
 	seal := unittest.Seal.Fixture(unittest.Seal.WithBlock(&s.ParentBlock))
-	s.sealsDB.On("ByBlockID", mock.Anything).Return(seal, nil).Times(approvals.DefaultEmergencySealingThreshold)
+	s.sealsDB.On("HighestInFork", mock.Anything).Return(seal, nil).Times(approvals.DefaultEmergencySealingThreshold)
 	s.State.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(&s.ParentBlock, nil))
 
 	err := s.core.ProcessIncorporatedResult(s.IncorporatedResult)
@@ -386,7 +386,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ProcessingOrphanA
 
 	// same block sealed
 	seal := unittest.Seal.Fixture(unittest.Seal.WithBlock(&s.ParentBlock))
-	s.sealsDB.On("ByBlockID", mock.Anything).Return(seal, nil).Once()
+	s.sealsDB.On("HighestInFork", mock.Anything).Return(seal, nil).Once()
 
 	// block B_1 becomes finalized
 	finalized := forks[0][0].Header
@@ -436,7 +436,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ExtendingUnproces
 
 	s.MarkFinalized(finalized)
 	seal := unittest.Seal.Fixture(unittest.Seal.WithBlock(&s.ParentBlock))
-	s.sealsDB.On("ByBlockID", mock.Anything).Return(seal, nil).Once()
+	s.sealsDB.On("HighestInFork", mock.Anything).Return(seal, nil).Once()
 
 	// finalize block B
 	err := s.core.ProcessFinalizedBlock(finalized.ID())
@@ -475,7 +475,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ExtendingUnproces
 // TestOnBlockFinalized_ExtendingSealedResult tests if assignment collector tree accepts collector which extends sealed result
 func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ExtendingSealedResult() {
 	seal := unittest.Seal.Fixture(unittest.Seal.WithBlock(&s.Block))
-	s.sealsDB.On("ByBlockID", mock.Anything).Return(seal, nil).Once()
+	s.sealsDB.On("HighestInFork", mock.Anything).Return(seal, nil).Once()
 
 	unsealedBlock := unittest.BlockHeaderWithParentFixture(&s.Block)
 	s.Blocks[unsealedBlock.ID()] = &unsealedBlock
@@ -590,7 +590,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 
 	// sealed block doesn't change
 	seal := unittest.Seal.Fixture(unittest.Seal.WithBlock(&s.ParentBlock))
-	s.sealsDB.On("ByBlockID", mock.Anything).Return(seal, nil)
+	s.sealsDB.On("HighestInFork", mock.Anything).Return(seal, nil)
 
 	s.State.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(&s.ParentBlock, nil))
 
@@ -663,7 +663,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 			}},
 		}, nil)
 
-	s.sealsDB.On("ByBlockID", s.IncorporatedBlock.ID()).Return(
+	s.sealsDB.On("HighestInFork", s.IncorporatedBlock.ID()).Return(
 		unittest.Seal.Fixture(
 			unittest.Seal.WithBlock(&s.ParentBlock)), nil)
 
@@ -761,7 +761,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_
 	s.rootHeader = &s.IncorporatedBlock
 	expectedResults := []*flow.IncorporatedResult{s.IncorporatedResult}
 
-	s.sealsDB.On("ByBlockID", s.IncorporatedBlock.ID()).Return(
+	s.sealsDB.On("HighestInFork", s.IncorporatedBlock.ID()).Return(
 		unittest.Seal.Fixture(
 			unittest.Seal.WithBlock(&s.ParentBlock)), nil)
 
