@@ -31,7 +31,7 @@ func init() {
 
 func run(*cobra.Command, []string) {
 
-	log.Info().Msg("Opening database with truncate")
+	log.Info().Msgf("Opening database with truncate, flatten = %t", flagFlatten)
 
 	db := common.InitStorageWithTruncate(flagDatadir, true)
 	defer db.Close()
