@@ -38,8 +38,8 @@ type Replicas interface {
 	//   * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
 	LeaderForView(view uint64) (flow.Identifier, error)
 
-	// QuorumThresholdForView returns the minimum total weight of votes required to form a QC
-	// for the given view. This weight threshold is computed using the total weight
+	// QuorumThresholdForView returns the minimum total weight for a supermajority 
+	// at the given view. This weight threshold is computed using the total weight
 	// of the initial committee and is static over the course of an epoch.
 	// Returns the following expected errors for invalid inputs:
 	//   * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
