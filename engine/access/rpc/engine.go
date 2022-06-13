@@ -138,7 +138,9 @@ func New(log zerolog.Logger,
 	if cacheSize == 0 {
 		cacheSize = backend.DefaultConnectionPoolSize
 	}
-	cache, err := lru.New(int(cacheSize))
+	cache, err := lru.NewWithEvict(int(cacheSize), func(_, evictedValue interface{}) {
+		evictedValue.(*grpc.ClientConn).Close()
+	})
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize connection pool cache: %w", err)
 	}
