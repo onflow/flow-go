@@ -69,6 +69,17 @@ func (suite *ClusterSuite) SetupTest() {
 	suite.Require().NoError(err)
 }
 
+// TestThresholds tests that the correct thresholds are returned.
+func (suite *ClusterSuite) TestThresholds() {
+	threshold, err := suite.com.QuorumThresholdForView(rand.Uint64())
+	suite.Require().NoError(err)
+	suite.Assert().Equal(WeightThresholdToBuildQC(suite.members.TotalWeight()), threshold)
+
+	threshold, err = suite.com.TimeoutThresholdForView(rand.Uint64())
+	suite.Require().NoError(err)
+	suite.Assert().Equal(WeightThresholdToTimeout(suite.members.TotalWeight()), threshold)
+}
+
 // TestInvalidSigner tests that the InvalidSignerError sentinel is
 // returned under the appropriate conditions.
 func (suite *ClusterSuite) TestInvalidSigner() {
