@@ -80,7 +80,7 @@ func TestResolver_CacheExpiry(t *testing.T) {
 		metrics.NewNoopCollector(),
 		dnsCache,
 		WithBasicResolver(&basicResolver),
-		WithTTL(5*time.Second)) // cache timeout set to 1 seconds for this test
+		WithTTL(1*time.Second)) // cache timeout set to 1 seconds for this test
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -97,18 +97,20 @@ func TestResolver_CacheExpiry(t *testing.T) {
 	// each domain gets resolved through underlying resolver twice: once initially, and once after expiry.
 	resolverWG := mockBasicResolverForDomains(t, &basicResolver, ipTestCase, txtTestCases, happyPath, 2)
 
-	// queries 20 cases * 5 = 100 queries.
-	queryWG := syncThenAsyncQuery(t, times, resolver, txtTestCases, ipTestCase, happyPath)
-	unittest.RequireReturnsBefore(t, queryWG.Wait, 1*time.Second, "could not perform all queries on time")
+	// // queries 20 cases * 5 = 100 queries.
+	// queryWG := syncThenAsyncQuery(t, times, resolver, txtTestCases, ipTestCase, happyPath)
+	// unittest.RequireReturnsBefore(t, queryWG.Wait, 1*time.Second, "could not perform all queries on time")
+	querySeq(t, times, resolver, txtTestCases, ipTestCase)
 
-	time.Sleep(6 * time.Second) // waits enough for cache to get invalidated
+	time.Sleep(1500 * time.Millisecond) // waits enough for cache to get invalidated
 	log.Printf("LOGLOGLOGLOGLOG SLEEP FOR 2 SECONDS")
 
 	// Querying each test case 5 times, but we should set the times to query to 1 for just testing that the cache has expire and we will hit the resolver
-	queryWG = syncThenAsyncQuery(t, times, resolver, txtTestCases, ipTestCase, happyPath)
+	// queryWG = syncThenAsyncQuery(t, times, resolver, txtTestCases, ipTestCase, happyPath)
+	querySeq(t, times, resolver, txtTestCases, ipTestCase)
 
-	unittest.RequireReturnsBefore(t, resolverWG.Wait, 60*time.Second, "could not resolve all expected domains")
-	unittest.RequireReturnsBefore(t, queryWG.Wait, 1*time.Second, "could not perform all queries on time")
+	unittest.RequireReturnsBefore(t, resolverWG.Wait, 2*time.Second, "could not resolve all expected domains")
+	// unittest.RequireReturnsBefore(t, queryWG.Wait, 1*time.Second, "could not perform all queries on time")
 	cancel()
 	unittest.RequireCloseBefore(t, resolver.Done(), 100*time.Millisecond, "could not stop dns resolver on time")
 }
@@ -237,6 +239,27 @@ func syncThenAsyncQuery(t *testing.T,
 	return wg
 }
 
+func querySeq(t *testing.T,
+	times int,
+	resolver *Resolver,
+	txtTestCases map[string]*testnetwork.TxtLookupTestCase,
+	ipTestCases map[string]*testnetwork.IpLookupTestCase) {
+
+	for i := 0; i < times; i++ {
+		for _, txt := range txtTestCases {
+			ctx := context.Background()
+			resolver.LookupTXT(ctx, txt.Txt)
+			log.Printf("%d times of %s", i, txt.Txt)
+		}
+
+		for _, ip := range ipTestCases {
+			ctx := context.Background()
+			resolver.LookupIPAddr(ctx, ip.Domain)
+			log.Printf("%d times of %s", i, ip.Domain)
+		}
+	}
+}
+
 // cacheAndQuery makes a dns query for each of domains first so that the result gets cache, and then it performs
 // concurrent queries for each test case for the specified number of times. The wait group is released when all
 // queries resolved.
@@ -295,8 +318,8 @@ func mockBasicResolverForDomains(t *testing.T,
 
 	wg := &sync.WaitGroup{}
 	log.Printf("Expected number of times %d", times*(len(ipLookupTestCases)+len(txtLookupTestCases)))
-	// wg.Add(times * (len(ipLookupTestCases) + len(txtLookupTestCases)))
-	wg.Add(120)
+	wg.Add(times * (len(ipLookupTestCases) + len(txtLookupTestCases)))
+	// wg.Add()
 
 	mu := sync.Mutex{}
 	resolver.On("LookupIPAddr", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
