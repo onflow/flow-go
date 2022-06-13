@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 const networkingProtocolTCP = "tcp"
@@ -185,6 +186,13 @@ func (c *ConduitFactory) processAttackerMessage(msg *insecure.Message) error {
 		return fmt.Errorf("could not decode message: %w", err)
 	}
 
+	lg := c.logger.With().
+		Hex("corrupted_id", logging.ID(c.me.NodeID())).
+		Str("channel", string(msg.ChannelID)).
+		Str("protocol", msg.Protocol.String()).
+		Uint32("target_num", msg.TargetNum).
+		Str("flow_protocol_event", fmt.Sprintf("%T", event)).Logger()
+
 	switch e := event.(type) {
 	case *flow.ExecutionReceipt:
 		if len(e.ExecutorSignature) == 0 {
@@ -214,10 +222,13 @@ func (c *ConduitFactory) processAttackerMessage(msg *insecure.Message) error {
 		return fmt.Errorf("could not convert target ids from byte to identifiers: %w", err)
 	}
 
+	lg = lg.With().Str("target_ids", fmt.Sprintf("%v", msg.TargetIDs)).Logger()
 	err = c.sendOnNetwork(event, network.Channel(msg.ChannelID), msg.Protocol, uint(msg.TargetNum), targetIds...)
 	if err != nil {
 		return fmt.Errorf("could not send attacker message to the network: %w", err)
 	}
+
+	lg.Info().Msg("incoming attacker's message dispatched on flow network")
 
 	return nil
 }
@@ -232,6 +243,7 @@ func (c *ConduitFactory) RegisterAttacker(_ *empty.Empty, stream insecure.Corrup
 	}
 	c.attackerInboundStream = stream
 
+	c.logger.Info().Msg("attacker registered successfully")
 	<-c.cm.ShutdownSignal()
 
 	return nil
@@ -248,9 +260,18 @@ func (c *ConduitFactory) HandleIncomingEvent(
 	num uint32,
 	targetIds ...flow.Identifier) error {
 
+	lg := c.logger.With().
+		Hex("corrupted_id", logging.ID(c.me.NodeID())).
+		Str("channel", string(channel)).
+		Str("protocol", protocol.String()).
+		Uint32("target_num", num).
+		Str("target_ids", fmt.Sprintf("%v", targetIds)).
+		Str("flow_protocol_event", fmt.Sprintf("%T", event)).Logger()
+
 	if c.attackerInboundStream == nil {
 		// no attacker yet registered, hence sending message on the network following the
 		// correct expected behavior.
+		lg.Info().Msg("no attacker registered, passing through event")
 		return c.sendOnNetwork(event, channel, protocol, uint(num), targetIds...)
 	}
 
@@ -264,6 +285,7 @@ func (c *ConduitFactory) HandleIncomingEvent(
 		return fmt.Errorf("could not send message to attacker to observe: %w", err)
 	}
 
+	lg.Info().Msg("event sent to attacker")
 	return nil
 }
 
