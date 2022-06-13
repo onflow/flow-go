@@ -116,9 +116,9 @@ func main() {
 			"how many additional cluster members we propagate transactions to")
 		flags.UintVar(&builderExpiryBuffer, "builder-expiry-buffer", builder.DefaultExpiryBuffer,
 			"expiry buffer for transactions in proposed collections")
-		flags.BoolVar(&builderPayerRateLimitDryRun, "builder-rate-limit-dry-run", false,
+		flags.BoolVar(&builderPayerRateLimitDryRun, "builder-rate-limit-dry-run", true, // dry-run rate limiting
 			"determines whether rate limit configuration should be enforced (false), or only logged (true)")
-		flags.Float64Var(&builderPayerRateLimit, "builder-rate-limit", builder.DefaultMaxPayerTransactionRate, // no rate limiting
+		flags.Float64Var(&builderPayerRateLimit, "builder-rate-limit", 1.0, // 1 tx/collection
 			"rate limit for each payer (transactions/collection)")
 		flags.StringSliceVar(&builderUnlimitedPayers, "builder-unlimited-payers", []string{}, // no unlimited payers
 			"set of payer addresses which are omitted from rate limiting")
