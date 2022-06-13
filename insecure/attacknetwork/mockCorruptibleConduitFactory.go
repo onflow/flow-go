@@ -119,14 +119,7 @@ func (c *mockCorruptibleConduitFactory) RegisterAttacker(_ *empty.Empty, stream 
 		close(c.attackerRegMsg)
 	}
 
-	for {
-		select {
-		case <-c.cm.ShutdownSignal():
-			return nil
-		default:
-
-		}
-	}
+	<-c.cm.ShutdownSignal()
 
 	return nil
 }
