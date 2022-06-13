@@ -10,6 +10,7 @@ import (
 
 var (
 	flagDatadir string
+	flagFlatten bool
 )
 
 var Cmd = &cobra.Command{
@@ -24,6 +25,8 @@ func init() {
 		"directory that stores the protocol state")
 	_ = Cmd.MarkFlagRequired("datadir")
 
+	Cmd.Flags().BoolVar(&flagFlatten, "flatten", false, "flatten the database")
+
 }
 
 func run(*cobra.Command, []string) {
@@ -32,6 +35,14 @@ func run(*cobra.Command, []string) {
 
 	db := common.InitStorageWithTruncate(flagDatadir, true)
 	defer db.Close()
+
+	if flagFlatten {
+		err := db.Flatten(8)
+		if err != nil {
+			log.Error().Err(err).Msg("Error while flattening DB")
+			return
+		}
+	}
 
 	log.Info().Msg("Truncated")
 }
