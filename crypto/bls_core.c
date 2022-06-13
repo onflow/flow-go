@@ -367,42 +367,25 @@ typedef struct st_node {
 
 static node* new_node(const ep2_st* pk, const ep_st* sig){
     node* t = (node*) malloc(sizeof(node));
-    t->pk = (ep2_st*)pk;
-    t->sig = (ep_st*)sig;
-    t->right = t->left = NULL;
-    return t;
-}
-
-// builds a binary tree of aggregation of signatures and public keys recursively.
-static node* build_tree(const int len, const ep2_st* pks, const ep_st* sigs) {
-    // check if a leaf is reached
-    if (len == 1) {
-        return new_node(pks, sigs);  // use the first element of the arrays
+    if (t) {
+        t->pk = (ep2_st*)pk;
+        t->sig = (ep_st*)sig;
+        t->right = t->left = NULL;
     }
-
-    // a leaf is not reached yet, 
-    int right_len = len/2;
-    int left_len = len - right_len;
-
-    // create a new node with new points
-    node* t = new_node((ep2_st*)malloc(sizeof(ep2_st)), (ep_st*)malloc(sizeof(ep_st)));
-    ep_new(t->sig);
-    ep_new(t->pk);
-    // build the tree in a top-down way
-    t->left = build_tree(left_len, &pks[0], &sigs[0]);
-    t->right = build_tree(right_len, &pks[left_len], &sigs[left_len]);
-    // sum the children
-    ep_add_jacob(t->sig, t->left->sig, t->right->sig);
-    ep2_add_projc(t->pk, t->left->pk, t->right->pk); 
     return t;
 }
 
 static void free_tree(node* root) {
-    // relic free
-    ep_free(root->sig);
-    ep2_free(root->pk);
-    if (root->left) {
-        // only free non-leaves, leaves are allocated as an entire array
+    if (!root) return;
+
+    // only free pks and sigs of non-leafs, data of leafs are allocated 
+    // as an entire array in `bls_batchVerify`.
+    if (root->left) {   // no need to check the right child for the leaf check because
+                        //  the recursive build starts with the left side first
+        // relic free 
+        if (root->sig) ep_free(root->sig);
+        if (root->pk) ep2_free(root->pk);
+        // pointer free
         free(root->sig);
         free(root->pk);
         // free the children nodes
@@ -410,6 +393,40 @@ static void free_tree(node* root) {
         free_tree(root->right);
     }
     free(root);
+}
+
+// builds a binary tree of aggregation of signatures and public keys recursively.
+static node* build_tree(const int len, const ep2_st* pks, const ep_st* sigs) {
+    // check if a leaf is reached
+    if (len == 1) {
+        return new_node(&pks[0], &sigs[0]);  // use the first element of the arrays
+    }
+
+    // a leaf is not reached yet, 
+    int right_len = len/2;
+    int left_len = len - right_len;
+
+    // create a new node with new points
+    ep2_st* new_pk = (ep2_st*)malloc(sizeof(ep2_st));
+    if (!new_pk) return NULL;
+    ep_st* new_sig = (ep_st*)malloc(sizeof(ep_st));
+    if (!new_sig) { free(new_pk); return NULL; }
+
+    node* t = new_node(new_pk, new_sig);
+    if (!t) { free(new_sig); free(new_pk); return NULL; }
+    ep_new(t->sig);
+    ep2_new(t->pk);
+
+    // build the tree in a top-down way
+    t->left = build_tree(left_len, &pks[0], &sigs[0]);
+    if (!t->left) { free_tree(t); return NULL; }
+
+    t->right = build_tree(right_len, &pks[left_len], &sigs[left_len]);
+    if (!t->right) { free_tree(t); return NULL; }
+    // sum the children
+    ep_add_jacob(t->sig, t->left->sig, t->right->sig);
+    ep2_add_projc(t->pk, t->left->pk, t->right->pk); 
+    return t;
 }
 
 // verify the binary tree and fill the results using recursive batch verifications.
@@ -491,15 +508,19 @@ void bls_batchVerify(const int sigs_len, byte* results, const ep2_st* pks_input,
 
     // build a binary tree of aggreagtions
     node* root = build_tree(sigs_len, &pks[0], &sigs[0]);
+    if (!root) goto out;
 
     // verify the binary tree and fill the results using batch verification
     bls_batchVerify_tree(root, sigs_len, &results[0], data, data_len);
-
-    // free the allocated memory 
-    free_tree(root); // (relic free is called in free_tree)
+    // free the allocated tree 
+    free_tree(root);
 
 out:
     bn_free(r);  
+    for (int i=0; i < sigs_len; i++) {
+        ep_free(sigs[i]);
+        ep2_free(pks[i]);
+    }
     free(sigs); 
 out_sigs:
     free(pks);
