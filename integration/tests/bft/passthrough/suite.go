@@ -67,14 +67,14 @@ func (s *Suite) SetupSuite() {
 		Logger()
 	s.log = logger
 
-	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)))
+	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.ErrorLevel)))
 
 	// generate the four consensus identities
 	s.nodeIDs = unittest.IdentifierListFixture(4)
 	for _, nodeID := range s.nodeIDs {
 		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus,
 			testnet.WithID(nodeID),
-			testnet.WithLogLevel(zerolog.FatalLevel),
+			testnet.WithLogLevel(zerolog.DebugLevel),
 			testnet.WithAdditionalFlag("--required-verification-seal-approvals=1"),
 			testnet.WithAdditionalFlag("--required-construction-seal-approvals=1"),
 		)
@@ -106,10 +106,10 @@ func (s *Suite) SetupSuite() {
 
 	// generates two collection node
 	coll1Config := testnet.NewNodeConfig(flow.RoleCollection,
-		testnet.WithLogLevel(zerolog.FatalLevel),
+		testnet.WithLogLevel(zerolog.DebugLevel),
 	)
 	coll2Config := testnet.NewNodeConfig(flow.RoleCollection,
-		testnet.WithLogLevel(zerolog.FatalLevel),
+		testnet.WithLogLevel(zerolog.DebugLevel),
 	)
 	s.nodeConfigs = append(s.nodeConfigs, coll1Config, coll2Config)
 
