@@ -53,21 +53,14 @@ init-light:
 init-short-epochs:
 	$(MAKE) -e EPOCHLEN=200 STAKINGLEN=10 DKGLEN=50 init
 
-# Installs logging plugin
-.PHONY: install-docker-plugin
-install-docker-plugin:
-	docker plugin inspect loki || \
-		docker plugin install grafana/loki-docker-driver:latest --alias loki --grant-all-permissions
-
-# Update docker plugin
-.PHONY: update-docker-plugin
-update-docker-plugin:
-	docker plugin disable loki
-	docker plugin upgrade --grant-all-permissions loki
-	docker plugin enable loki
+# Uninstall logging plugin
+.PHONY: uninstall-docker-plugin
+uninstall-docker-plugin:
+	$(shell docker plugin inspect loki >/dev/null 2>&1 && \
+		(docker plugin disable loki; docker plugin rm loki))
 
 .PHONY: start
-start: install-docker-plugin
+start: uninstall-docker-plugin
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.metrics.yml up -d --remove-orphans
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml build
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml up -d
