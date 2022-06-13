@@ -579,7 +579,7 @@ int ep_sum_vector_byte(byte* dest, const byte* sigs_bytes, const int len) {
     ep_t acc;        
     ep_new(acc);
     ep_set_infty(acc);
-    ep_st* sigs = (ep_st*) calloc(len, sizeof(ep_st));
+    ep_st* sigs = (ep_st*) malloc(len * sizeof(ep_st));
     for (int i=0; i < len; i++) ep_new(sigs[i]);
 
     // import the points from the array
