@@ -109,18 +109,6 @@ func generateBootstrapData(flowNetworkConf testnet.NetworkConfig) []testnet.Cont
 	return bootstrapData.StakedConfs
 }
 
-func defaultLokiLoggingOptions(role string, num int) Logging {
-	return Logging{
-		Driver: "loki",
-		Options: Options{
-			LokiURL:            "http://127.0.0.1:3100/loki/api/v1/push",
-			LokiRetries:        "1",
-			LokiMaxBackoff:     time.Second.String(),
-			LokiExternalLabels: fmt.Sprintf(`container_name={{.Name}},role=%s,num=%03d`, role, num),
-		},
-	}
-}
-
 // localnet/bootstrap.go generates a docker compose file with images configured for a
 // self-contained Flow network, and other peripheral services, such as Observer services.
 // Private/Public keys and data are removed and re-created for the self-contained localnet
@@ -283,7 +271,7 @@ type Service struct {
 	Environment []string `yaml:"environment,omitempty"`
 	Volumes     []string
 	Ports       []string `yaml:"ports,omitempty"`
-	Logging     Logging  `yaml:"logging,omitempty"`
+	Labels      map[string]string
 }
 
 // Build ...
@@ -292,18 +280,6 @@ type Build struct {
 	Dockerfile string
 	Args       map[string]string
 	Target     string
-}
-
-type Logging struct {
-	Driver  string  `yaml:"driver"`
-	Options Options `yaml:"options"`
-}
-
-type Options struct {
-	LokiURL            string `yaml:"loki-url"`
-	LokiMaxBackoff     string `yaml:"loki-max-backoff,omitempty"`
-	LokiRetries        string `yaml:"loki-retries,omitempty"`
-	LokiExternalLabels string `yaml:"loki-external-labels,omitempty"`
 }
 
 func prepareFlowServices(services Services, containers []testnet.ContainerConfig) Services {
@@ -387,6 +363,10 @@ func prepareService(container testnet.ContainerConfig, i int, n int) Service {
 			"BINSTAT_DMP_NAME",
 			"BINSTAT_DMP_PATH",
 		},
+		Labels: map[string]string{
+			"com.dapperlabs.role": container.Role.String(),
+			"com.dapperlabs.num":  fmt.Sprintf("%03d", i+1),
+		},
 	}
 
 	service.Command = append(service.Command, fmt.Sprintf("--admin-addr=:%v", AdminToolPort))
@@ -416,8 +396,6 @@ func prepareService(container testnet.ContainerConfig, i int, n int) Service {
 			fmt.Sprintf("%s_1", container.Role),
 		}
 	}
-
-	service.Logging = defaultLokiLoggingOptions(container.Role.String(), i+1)
 
 	return service
 }
@@ -761,8 +739,6 @@ func prepareObserverService(i int, observerName string, agPublicKey string, prof
 		fmt.Sprintf("%d:%d", (accessCount*2)+AccessAPIPort+(2*i), RPCPort),
 		fmt.Sprintf("%d:%d", (accessCount*2)+AccessAPIPort+(2*i)+1, SecuredRPCPort),
 	}
-
-	observerService.Logging = defaultLokiLoggingOptions("observer", i)
 
 	return observerService
 }
