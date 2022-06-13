@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/ledger/common/bitutils"
 	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/encoding"
@@ -1532,35 +1533,35 @@ func NoopTxScript() []byte {
 	return []byte("transaction {}")
 }
 
-func RangeFixture() flow.Range {
-	return flow.Range{
+func RangeFixture() chainsync.Range {
+	return chainsync.Range{
 		From: rand.Uint64(),
 		To:   rand.Uint64(),
 	}
 }
 
-func BatchFixture() flow.Batch {
-	return flow.Batch{
+func BatchFixture() chainsync.Batch {
+	return chainsync.Batch{
 		BlockIDs: IdentifierListFixture(10),
 	}
 }
 
-func RangeListFixture(n int) []flow.Range {
+func RangeListFixture(n int) []chainsync.Range {
 	if n <= 0 {
 		return nil
 	}
-	ranges := make([]flow.Range, n)
+	ranges := make([]chainsync.Range, n)
 	for i := range ranges {
 		ranges[i] = RangeFixture()
 	}
 	return ranges
 }
 
-func BatchListFixture(n int) []flow.Batch {
+func BatchListFixture(n int) []chainsync.Batch {
 	if n <= 0 {
 		return nil
 	}
-	batches := make([]flow.Batch, n)
+	batches := make([]chainsync.Batch, n)
 	for i := range batches {
 		batches[i] = BatchFixture()
 	}
