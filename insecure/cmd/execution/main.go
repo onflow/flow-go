@@ -18,12 +18,13 @@ func main() {
 	}
 	fmt.Println("insecure/cmd/execution/main.go>6")
 	corruptedExecutionBuilder.LoadComponentsAndModules()
-
-	corruptedExecutionBuilder.LoadComponentsAndModules()
-
+	fmt.Println("insecure/cmd/execution/main.go>7")
 	node, err := corruptedExecutionBuilder.FlowNodeBuilder.Build()
+	fmt.Println("insecure/cmd/execution/main.go>8")
 	if err != nil {
+		fmt.Println("insecure/cmd/execution/main.go>9")
 		corruptedExecutionBuilder.FlowNodeBuilder.Logger.Fatal().Err(err).Send()
+		fmt.Println("insecure/cmd/execution/main.go>9.1")
 	}
 	fmt.Println("insecure/cmd/execution/main.go>10")
 	node.Run()
