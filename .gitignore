@@ -62,3 +62,6 @@ remove-execution-fork
 # go workspace
 go.work
 go.work.sum
+
+# Ledger checkpoint status files
+**/checkpoint_status.json
