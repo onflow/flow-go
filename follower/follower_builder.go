@@ -12,7 +12,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/routing"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	p2ppubsub "github.com/libp2p/go-libp2p-pubsub"
-
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"

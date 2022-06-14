@@ -3,9 +3,8 @@
 package mock
 
 import (
-	mock "github.com/stretchr/testify/mock"
-
 	ledger "github.com/onflow/flow-go/ledger"
+	mock "github.com/stretchr/testify/mock"
 
 	testing "testing"
 )

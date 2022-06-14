@@ -4,7 +4,6 @@ package mock
 
 import (
 	badger "github.com/dgraph-io/badger/v2"
-
 	flow "github.com/onflow/flow-go/model/flow"
 
 	mock "github.com/stretchr/testify/mock"

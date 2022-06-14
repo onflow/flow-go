@@ -5,13 +5,12 @@ import (
 	"testing"
 	"time"
 
+	sdk "github.com/onflow/flow-go-sdk"
+	sdkclient "github.com/onflow/flow-go-sdk/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
-
-	sdk "github.com/onflow/flow-go-sdk"
-	sdkclient "github.com/onflow/flow-go-sdk/client"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/integration/convert"

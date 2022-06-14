@@ -3,9 +3,8 @@
 package mock
 
 import (
-	mock "github.com/stretchr/testify/mock"
-
 	state "github.com/onflow/flow-go/fvm/state"
+	mock "github.com/stretchr/testify/mock"
 
 	testing "testing"
 )
