@@ -77,12 +77,9 @@ func (t *TelemetryConsumer) OnEventProcessed() {
 }
 
 func (t *TelemetryConsumer) OnStartingTimeout(info *model.TimerInfo) {
-	if info.Mode == model.ReplicaTimeout {
-		// the PaceMarker starts a new ReplicaTimeout if and only if it transitions to a higher view
-		t.pathHandler.StartNextPath(info.View)
-	}
+	// the PaceMarker starts a new ReplicaTimeout if and only if it transitions to a higher view
+	t.pathHandler.StartNextPath(info.View)
 	t.pathHandler.NextStep().
-		Str("timeout_mode", info.Mode.String()).
 		Float64("timeout_duration_seconds", info.Duration.Seconds()).
 		Time("timeout_cutoff", info.StartTime.Add(info.Duration)).
 		Msg("OnStartingTimeout")
@@ -98,7 +95,6 @@ func (t *TelemetryConsumer) OnEnteringView(viewNumber uint64, leader flow.Identi
 func (t *TelemetryConsumer) OnReachedTimeout(info *model.TimerInfo) {
 	t.pathHandler.StartNextPath(info.View)
 	t.pathHandler.NextStep().
-		Str("timeout_mode", info.Mode.String()).
 		Time("timeout_start_time", info.StartTime).
 		Float64("timeout_duration_seconds", info.Duration.Seconds()).
 		Msg("OnReachedTimeout")

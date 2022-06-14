@@ -53,15 +53,15 @@ func (t *Controller) TimerInfo() *model.TimerInfo { return t.timerInfo }
 func (t *Controller) Channel() <-chan time.Time { return t.timeoutChannel }
 
 // StartTimeout starts the timeout of the specified type and returns the
-func (t *Controller) StartTimeout(mode model.TimeoutMode, view uint64) *model.TimerInfo {
+func (t *Controller) StartTimeout(view uint64) *model.TimerInfo {
 	if t.timer != nil { // stop old timer
 		t.timer.Stop()
 	}
-	duration := t.computeTimeoutDuration(mode)
+	duration := t.ReplicaTimeout()
 
 	startTime := time.Now().UTC()
 	timer := time.NewTimer(duration)
-	timerInfo := model.TimerInfo{Mode: mode, View: view, StartTime: startTime, Duration: duration}
+	timerInfo := model.TimerInfo{View: view, StartTime: startTime, Duration: duration}
 	t.timer = timer
 	t.timeoutChannel = t.timer.C
 	t.timerInfo = &timerInfo
@@ -76,32 +76,9 @@ func (t *Controller) TriggerTimeout() {
 	}
 }
 
-func (t *Controller) computeTimeoutDuration(mode model.TimeoutMode) time.Duration {
-	var duration time.Duration
-	switch mode {
-	case model.VoteCollectionTimeout:
-		duration = t.VoteCollectionTimeout()
-	case model.ReplicaTimeout:
-		duration = t.ReplicaTimeout()
-	default:
-		// This should never happen; Only protects code from future inconsistent modifications.
-		// There are only the two timeout modes explicitly handled above. Unless the enum
-		// containing the timeout mode is extended, the default case will never be reached.
-		panic("unknown timeout mode")
-	}
-	return duration
-}
-
 // ReplicaTimeout returns the duration of the current view before we time out
 func (t *Controller) ReplicaTimeout() time.Duration {
 	return time.Duration(t.cfg.ReplicaTimeout * 1e6)
-}
-
-// VoteCollectionTimeout returns the duration of Vote aggregation _after_ receiving a block
-// during which the primary tries to aggregate votes for the view where it is leader
-func (t *Controller) VoteCollectionTimeout() time.Duration {
-	// time.Duration expects an int64 as input which specifies the duration in units of nanoseconds (1E-9)
-	return time.Duration(t.cfg.ReplicaTimeout * 1e6 * t.cfg.VoteAggregationTimeoutFraction)
 }
 
 // OnTimeout indicates to the Controller that the timeout was reached

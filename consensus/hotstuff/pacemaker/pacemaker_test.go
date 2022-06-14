@@ -20,15 +20,14 @@ import (
 const (
 	startRepTimeout        float64 = 400.0 // Milliseconds
 	minRepTimeout          float64 = 100.0 // Milliseconds
-	voteTimeoutFraction    float64 = 0.5   // multiplicative factor
 	multiplicativeIncrease float64 = 1.5   // multiplicative factor
 	multiplicativeDecrease float64 = 0.85  // multiplicative factor
 )
 
-func expectedTimerInfo(view uint64, mode model.TimeoutMode) interface{} {
+func expectedTimerInfo(view uint64) interface{} {
 	return mock.MatchedBy(
 		func(timerInfo *model.TimerInfo) bool {
-			return timerInfo.View == view && timerInfo.Mode == mode
+			return timerInfo.View == view
 		})
 }
 
@@ -52,7 +51,6 @@ func (s *ActivePaceMakerTestSuite) SetupTest() {
 	tc, err := timeout.NewConfig(
 		time.Duration(startRepTimeout*1e6),
 		time.Duration(minRepTimeout*1e6),
-		voteTimeoutFraction,
 		multiplicativeIncrease,
 		multiplicativeDecrease,
 		0)
@@ -69,7 +67,7 @@ func (s *ActivePaceMakerTestSuite) SetupTest() {
 	s.paceMaker, err = New(timeout.NewController(tc), s.notifier, s.persist)
 	require.NoError(s.T(), err)
 
-	s.notifier.On("OnStartingTimeout", expectedTimerInfo(s.livenessData.CurrentView, model.ReplicaTimeout)).Return().Once()
+	s.notifier.On("OnStartingTimeout", expectedTimerInfo(s.livenessData.CurrentView)).Return().Once()
 
 	s.paceMaker.Start()
 }
@@ -91,7 +89,7 @@ func LivenessData(qc *flow.QuorumCertificate) *hotstuff.LivenessData {
 func (s *ActivePaceMakerTestSuite) TestProcessQC_SkipIncreaseViewThroughQC() {
 	qc := QC(s.livenessData.CurrentView)
 	s.persist.On("PutLivenessData", LivenessData(qc)).Return(nil).Once()
-	s.notifier.On("OnStartingTimeout", expectedTimerInfo(4, model.ReplicaTimeout)).Return().Once()
+	s.notifier.On("OnStartingTimeout", expectedTimerInfo(4)).Return().Once()
 	s.notifier.On("OnQcTriggeredViewChange", qc, uint64(4)).Return().Once()
 	nve, err := s.paceMaker.ProcessQC(qc)
 	require.NoError(s.T(), err)
@@ -103,7 +101,7 @@ func (s *ActivePaceMakerTestSuite) TestProcessQC_SkipIncreaseViewThroughQC() {
 	// skip 10 views
 	qc = QC(s.livenessData.CurrentView + 10)
 	s.persist.On("PutLivenessData", LivenessData(qc)).Return(nil).Once()
-	s.notifier.On("OnStartingTimeout", expectedTimerInfo(qc.View+1, model.ReplicaTimeout)).Return().Once()
+	s.notifier.On("OnStartingTimeout", expectedTimerInfo(qc.View+1)).Return().Once()
 	s.notifier.On("OnQcTriggeredViewChange", qc, qc.View+1).Return().Once()
 	nve, err = s.paceMaker.ProcessQC(qc)
 	require.NoError(s.T(), err)
@@ -125,7 +123,7 @@ func (s *ActivePaceMakerTestSuite) TestProcessTC_SkipIncreaseViewThroughTC() {
 		NewestQC:    tc.NewestQC,
 	}
 	s.persist.On("PutLivenessData", expectedLivenessData).Return(nil).Once()
-	s.notifier.On("OnStartingTimeout", expectedTimerInfo(tc.View+1, model.ReplicaTimeout)).Return().Once()
+	s.notifier.On("OnStartingTimeout", expectedTimerInfo(tc.View+1)).Return().Once()
 	s.notifier.On("OnTcTriggeredViewChange", tc, tc.View+1).Return().Once()
 	nve, err := s.paceMaker.ProcessTC(tc)
 	require.NoError(s.T(), err)
@@ -143,7 +141,7 @@ func (s *ActivePaceMakerTestSuite) TestProcessTC_SkipIncreaseViewThroughTC() {
 		NewestQC:    tc.NewestQC,
 	}
 	s.persist.On("PutLivenessData", expectedLivenessData).Return(nil).Once()
-	s.notifier.On("OnStartingTimeout", expectedTimerInfo(tc.View+1, model.ReplicaTimeout)).Return().Once()
+	s.notifier.On("OnStartingTimeout", expectedTimerInfo(tc.View+1)).Return().Once()
 	s.notifier.On("OnTcTriggeredViewChange", tc, tc.View+1).Return().Once()
 	nve, err = s.paceMaker.ProcessTC(tc)
 	require.NoError(s.T(), err)
@@ -235,7 +233,7 @@ func (s *ActivePaceMakerTestSuite) TestOnPartialTC_TriggersTimeout() {
 	qc := helper.MakeQC(helper.WithQCView(s.livenessData.CurrentView + 1))
 
 	s.persist.On("PutLivenessData", mock.Anything).Return(nil).Once()
-	s.notifier.On("OnStartingTimeout", expectedTimerInfo(qc.View+1, model.ReplicaTimeout)).Return().Once()
+	s.notifier.On("OnStartingTimeout", expectedTimerInfo(qc.View+1)).Return().Once()
 	s.notifier.On("OnQcTriggeredViewChange", qc, qc.View+1).Return().Once()
 	nve, err := s.paceMaker.ProcessQC(qc)
 	require.NoError(s.T(), err)

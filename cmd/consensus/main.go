@@ -69,28 +69,27 @@ import (
 func main() {
 
 	var (
-		guaranteeLimit                         uint
-		resultLimit                            uint
-		approvalLimit                          uint
-		sealLimit                              uint
-		pendingReceiptsLimit                   uint
-		minInterval                            time.Duration
-		maxInterval                            time.Duration
-		maxSealPerBlock                        uint
-		maxGuaranteePerBlock                   uint
-		hotstuffTimeout                        time.Duration
-		hotstuffMinTimeout                     time.Duration
-		hotstuffTimeoutIncreaseFactor          float64
-		hotstuffTimeoutDecreaseFactor          float64
-		hotstuffTimeoutVoteAggregationFraction float64
-		blockRateDelay                         time.Duration
-		chunkAlpha                             uint
-		requiredApprovalsForSealVerification   uint
-		requiredApprovalsForSealConstruction   uint
-		emergencySealing                       bool
-		dkgControllerConfig                    dkgmodule.ControllerConfig
-		startupTimeString                      string
-		startupTime                            time.Time
+		guaranteeLimit                       uint
+		resultLimit                          uint
+		approvalLimit                        uint
+		sealLimit                            uint
+		pendingReceiptsLimit                 uint
+		minInterval                          time.Duration
+		maxInterval                          time.Duration
+		maxSealPerBlock                      uint
+		maxGuaranteePerBlock                 uint
+		hotstuffTimeout                      time.Duration
+		hotstuffMinTimeout                   time.Duration
+		hotstuffTimeoutIncreaseFactor        float64
+		hotstuffTimeoutDecreaseFactor        float64
+		blockRateDelay                       time.Duration
+		chunkAlpha                           uint
+		requiredApprovalsForSealVerification uint
+		requiredApprovalsForSealConstruction uint
+		emergencySealing                     bool
+		dkgControllerConfig                  dkgmodule.ControllerConfig
+		startupTimeString                    string
+		startupTime                          time.Time
 
 		// DKG contract client
 		machineAccountInfo *bootstrap.NodeMachineAccountInfo
@@ -139,7 +138,6 @@ func main() {
 		flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 2500*time.Millisecond, "the lower timeout bound for the hotstuff pacemaker")
 		flags.Float64Var(&hotstuffTimeoutIncreaseFactor, "hotstuff-timeout-increase-factor", timeout.DefaultConfig.TimeoutIncrease, "multiplicative increase of timeout value in case of time out event")
 		flags.Float64Var(&hotstuffTimeoutDecreaseFactor, "hotstuff-timeout-decrease-factor", timeout.DefaultConfig.TimeoutDecrease, "multiplicative decrease of timeout value in case of progress")
-		flags.Float64Var(&hotstuffTimeoutVoteAggregationFraction, "hotstuff-timeout-vote-aggregation-fraction", 0.6, "additional fraction of replica timeout that the primary will wait for votes")
 		flags.DurationVar(&blockRateDelay, "block-rate-delay", 500*time.Millisecond, "the delay to broadcast block proposal in order to control block production rate")
 		flags.UintVar(&chunkAlpha, "chunk-alpha", chmodule.DefaultChunkAssignmentAlpha, "number of verifiers that should be assigned to each chunk")
 		flags.UintVar(&requiredApprovalsForSealVerification, "required-verification-seal-approvals", validation.DefaultRequiredApprovalsForSealValidation, "minimum number of approvals that are required to verify a seal")
@@ -626,7 +624,6 @@ func main() {
 			opts := []consensus.Option{
 				consensus.WithInitialTimeout(hotstuffTimeout),
 				consensus.WithMinTimeout(hotstuffMinTimeout),
-				consensus.WithVoteAggregationTimeoutFraction(hotstuffTimeoutVoteAggregationFraction),
 				consensus.WithTimeoutIncreaseFactor(hotstuffTimeoutIncreaseFactor),
 				consensus.WithTimeoutDecreaseFactor(hotstuffTimeoutDecreaseFactor),
 				consensus.WithBlockRateDelay(blockRateDelay),

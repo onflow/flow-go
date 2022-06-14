@@ -2,9 +2,8 @@ package pacemaker
 
 import (
 	"fmt"
+	"sync"
 	"time"
-
-	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -26,7 +25,7 @@ type ActivePaceMaker struct {
 	notifier       hotstuff.Consumer
 	persist        hotstuff.Persister
 	livenessData   *hotstuff.LivenessData
-	started        *atomic.Bool
+	started        sync.Once
 }
 
 var _ hotstuff.PaceMaker = (*ActivePaceMaker)(nil)
@@ -54,7 +53,6 @@ func New(timeoutController *timeout.Controller,
 		timeoutControl: timeoutController,
 		notifier:       notifier,
 		persist:        persist,
-		started:        atomic.NewBool(false),
 	}
 	return &pm, nil
 }
@@ -83,7 +81,7 @@ func (p *ActivePaceMaker) updateLivenessData(newView uint64, qc *flow.QuorumCert
 		return fmt.Errorf("could not persist liveness data: %w", err)
 	}
 
-	timerInfo := p.timeoutControl.StartTimeout(model.ReplicaTimeout, newView)
+	timerInfo := p.timeoutControl.StartTimeout(newView)
 	p.notifier.OnStartingTimeout(timerInfo)
 	return nil
 }
@@ -165,11 +163,10 @@ func (p *ActivePaceMaker) LastViewTC() *flow.TimeoutCertificate {
 // Start starts the pacemaker by starting the initial timer for the current view.
 // Start should only be called once - subsequent calls are a no-op.
 func (p *ActivePaceMaker) Start() {
-	if p.started.Swap(true) {
-		return
-	}
-	timerInfo := p.timeoutControl.StartTimeout(model.ReplicaTimeout, p.CurView())
-	p.notifier.OnStartingTimeout(timerInfo)
+	p.started.Do(func() {
+		timerInfo := p.timeoutControl.StartTimeout(p.CurView())
+		p.notifier.OnStartingTimeout(timerInfo)
+	})
 }
 
 // BlockRateDelay returns the delay for broadcasting its own proposals.

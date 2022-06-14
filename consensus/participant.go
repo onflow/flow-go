@@ -41,12 +41,11 @@ func NewParticipant(
 	// initialize the default configuration
 	defTimeout := timeout.DefaultConfig
 	cfg := ParticipantConfig{
-		TimeoutInitial:             time.Duration(defTimeout.ReplicaTimeout) * time.Millisecond,
-		TimeoutMinimum:             time.Duration(defTimeout.MinReplicaTimeout) * time.Millisecond,
-		TimeoutAggregationFraction: defTimeout.VoteAggregationTimeoutFraction,
-		TimeoutIncreaseFactor:      defTimeout.TimeoutIncrease,
-		TimeoutDecreaseFactor:      defTimeout.TimeoutDecrease,
-		BlockRateDelay:             time.Duration(defTimeout.BlockRateDelayMS) * time.Millisecond,
+		TimeoutInitial:        time.Duration(defTimeout.ReplicaTimeout) * time.Millisecond,
+		TimeoutMinimum:        time.Duration(defTimeout.MinReplicaTimeout) * time.Millisecond,
+		TimeoutIncreaseFactor: defTimeout.TimeoutIncrease,
+		TimeoutDecreaseFactor: defTimeout.TimeoutDecrease,
+		BlockRateDelay:        time.Duration(defTimeout.BlockRateDelayMS) * time.Millisecond,
 	}
 
 	// apply the configuration options
@@ -67,7 +66,6 @@ func NewParticipant(
 	timeoutConfig, err := timeout.NewConfig(
 		cfg.TimeoutInitial,
 		cfg.TimeoutMinimum,
-		cfg.TimeoutAggregationFraction,
 		cfg.TimeoutIncreaseFactor,
 		cfg.TimeoutDecreaseFactor,
 		cfg.BlockRateDelay,

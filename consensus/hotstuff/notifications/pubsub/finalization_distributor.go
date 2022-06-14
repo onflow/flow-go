@@ -48,8 +48,6 @@ func (p *FinalizationDistributor) AddConsumer(consumer hotstuff.FinalizationCons
 	p.hotStuffFinalizationConsumers = append(p.hotStuffFinalizationConsumers, consumer)
 }
 
-func (p *FinalizationDistributor) OnEventProcessed() {}
-
 func (p *FinalizationDistributor) OnBlockIncorporated(block *model.Block) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
