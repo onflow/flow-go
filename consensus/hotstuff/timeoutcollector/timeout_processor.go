@@ -130,6 +130,7 @@ func NewTimeoutProcessor(committee hotstuff.Replicas,
 // Expected error returns during normal operations:
 // * ErrTimeoutForIncompatibleView - submitted timeout for incompatible view
 // * model.InvalidTimeoutError - submitted invalid timeout(invalid structure or invalid signature)
+// * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
 // All other errors should be treated as exceptions.
 func (p *TimeoutProcessor) Process(timeout *model.TimeoutObject) error {
 	if p.view != timeout.View {
@@ -177,6 +178,7 @@ func (p *TimeoutProcessor) Process(timeout *model.TimeoutObject) error {
 // ATTENTION: this function doesn't check if timeout signature is valid, this check happens in signature aggregator
 // Expected error returns during normal operations:
 // * model.InvalidTimeoutError - submitted invalid timeout(invalid structure or invalid signature)
+// * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
 // All other errors should be treated as exceptions.
 func (p *TimeoutProcessor) validateTimeout(timeout *model.TimeoutObject) error {
 	// 1. check if it's correctly structured
