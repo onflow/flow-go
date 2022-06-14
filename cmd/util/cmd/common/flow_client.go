@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"strings"
 
+	"google.golang.org/grpc"
+
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/grpcutils"
-	"google.golang.org/grpc"
 )
 
 const (
