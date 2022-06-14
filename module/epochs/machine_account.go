@@ -7,15 +7,14 @@ import (
 	"time"
 
 	"github.com/onflow/cadence"
-	"github.com/rs/zerolog"
-	"github.com/sethvargo/go-retry"
-
 	sdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go-sdk/client"
+	client "github.com/onflow/flow-go-sdk/access/grpc"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/rs/zerolog"
+	"github.com/sethvargo/go-retry"
 )
 
 var (
