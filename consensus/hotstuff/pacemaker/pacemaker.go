@@ -12,7 +12,10 @@ import (
 )
 
 // ActivePaceMaker implements the hotstuff.PaceMaker
-// This implements the active Pacemaker described in DiemBFT v4
+// Conceptually, we use the Pacemaker algorithm first proposed in [1] (specifically Jolteon) and described in more detail in [2].
+// [1] https://arxiv.org/abs/2106.10362
+// [2] https://developers.diem.com/papers/diem-consensus-state-machine-replication-in-the-diem-blockchain/2021-08-17.pdf (aka DiemBFT v4)
+//
 // To enter a new view `v`, the Pacemaker must observe a valid QC or TC for view `v-1`.
 // The Pacemaker also controls when a node should locally time out for a given view.
 // In contrast to the passive Pacemaker (previous implementation), locally timing a view
@@ -67,8 +70,8 @@ func (p *ActivePaceMaker) updateLivenessData(newView uint64, qc *flow.QuorumCert
 		// newView is _always_ larger than currentView. This check is to protect the code from
 		// future modifications that violate the necessary condition for
 		// STRICTLY monotonously increasing view numbers.
-		panic(fmt.Sprintf("cannot move from view %d to %d: currentView must be strictly monotonously increasing",
-			p.livenessData.CurrentView, newView))
+		return fmt.Errorf("cannot move from view %d to %d: currentView must be strictly monotonously increasing",
+			p.livenessData.CurrentView, newView)
 	}
 
 	p.livenessData.CurrentView = newView
@@ -81,8 +84,6 @@ func (p *ActivePaceMaker) updateLivenessData(newView uint64, qc *flow.QuorumCert
 		return fmt.Errorf("could not persist liveness data: %w", err)
 	}
 
-	timerInfo := p.timeoutControl.StartTimeout(newView)
-	p.notifier.OnStartingTimeout(timerInfo)
 	return nil
 }
 
@@ -117,6 +118,10 @@ func (p *ActivePaceMaker) ProcessQC(qc *flow.QuorumCertificate) (*model.NewViewE
 	}
 
 	p.notifier.OnQcTriggeredViewChange(qc, newView)
+
+	timerInfo := p.timeoutControl.StartTimeout(newView)
+	p.notifier.OnStartingTimeout(timerInfo)
+
 	return &model.NewViewEvent{View: newView}, nil
 }
 
@@ -130,6 +135,8 @@ func (p *ActivePaceMaker) ProcessTC(tc *flow.TimeoutCertificate) (*model.NewView
 		return nil, nil
 	}
 
+	p.timeoutControl.OnTimeout()
+
 	// supermajority of replicas have already reached their timeout for view `tc.View`, hence it is safe to proceed to subsequent view
 	newView := tc.View + 1
 	err := p.updateLivenessData(newView, tc.NewestQC, tc)
@@ -138,15 +145,11 @@ func (p *ActivePaceMaker) ProcessTC(tc *flow.TimeoutCertificate) (*model.NewView
 	}
 
 	p.notifier.OnTcTriggeredViewChange(tc, newView)
-	return &model.NewViewEvent{View: newView}, nil
-}
 
-// OnPartialTC is called when TimeoutAggregator has collected f+1 timeouts. This implements Bracha style timeouts,
-// which times out current view after receiving partial TC.
-func (p *ActivePaceMaker) OnPartialTC(newView uint64) {
-	if p.CurView() == newView {
-		p.timeoutControl.TriggerTimeout()
-	}
+	timerInfo := p.timeoutControl.StartTimeout(newView)
+	p.notifier.OnStartingTimeout(timerInfo)
+
+	return &model.NewViewEvent{View: newView}, nil
 }
 
 // NewestQC returns QC with the highest view discovered by PaceMaker.

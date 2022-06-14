@@ -63,11 +63,6 @@ func (p *TestPaceMaker) ProcessTC(tc *flow.TimeoutCertificate) (*model.NewViewEv
 	return newView, err
 }
 
-func (p *TestPaceMaker) OnPartialTC(view uint64) {
-	p.PaceMaker.OnPartialTC(view)
-	log.Info().Msgf("pacemaker.OnPartialTC view: %v, current view: %v\n", view, p.CurView())
-}
-
 func (p *TestPaceMaker) NewestQC() *flow.QuorumCertificate {
 	return p.PaceMaker.NewestQC()
 }

@@ -69,13 +69,6 @@ func (t *Controller) StartTimeout(view uint64) *model.TimerInfo {
 	return &timerInfo
 }
 
-// TriggerTimeout triggers current active timeout, does nothing if timer has already expired
-func (t *Controller) TriggerTimeout() {
-	if t.timer != nil && t.timer.Stop() {
-		t.timer.Reset(0)
-	}
-}
-
 // ReplicaTimeout returns the duration of the current view before we time out
 func (t *Controller) ReplicaTimeout() time.Duration {
 	return time.Duration(t.cfg.ReplicaTimeout * 1e6)
