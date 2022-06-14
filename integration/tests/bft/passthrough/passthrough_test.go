@@ -14,6 +14,7 @@ type PassThroughTestSuite struct {
 }
 
 func TestPassThrough(t *testing.T) {
+	t.Skip("skipping the test")
 	suite.Run(t, new(PassThroughTestSuite))
 }
 
@@ -27,7 +28,6 @@ func TestPassThrough(t *testing.T) {
 // affected by the emitted result approvals.
 // Finally, it evaluates whether critical sealing-and-verification-related events from corrupted nodes are passed through the orchestrator.
 func (p *PassThroughTestSuite) TestSealingAndVerificationPassThrough() {
-	p.T().Skip("skipping the test")
 
 	receipts, approvals := common.SealingAndVerificationHappyPathTest(
 		p.T(),
