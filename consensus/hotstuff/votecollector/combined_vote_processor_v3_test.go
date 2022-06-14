@@ -998,7 +998,7 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 	committee := &mockhotstuff.DynamicCommittee{}
 	committee.On("IdentitiesByBlock", block.BlockID).Return(allIdentities, nil)
 	committee.On("IdentitiesByEpoch", block.View).Return(allIdentities, nil)
-	committee.On("WeightThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(allIdentities.TotalWeight()), nil)
+	committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(allIdentities.TotalWeight()), nil)
 	committee.On("DKG", block.View).Return(inmemDKG, nil)
 
 	votes := make([]*model.Vote, 0, len(allIdentities))
