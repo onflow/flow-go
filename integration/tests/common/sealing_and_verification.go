@@ -4,8 +4,9 @@ import (
 	"context"
 	"testing"
 
-	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/stretchr/testify/require"
+
+	sdk "github.com/onflow/flow-go-sdk"
 
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"

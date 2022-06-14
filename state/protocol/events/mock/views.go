@@ -3,8 +3,9 @@
 package mock
 
 import (
-	events "github.com/onflow/flow-go/state/protocol/events"
 	mock "github.com/stretchr/testify/mock"
+
+	events "github.com/onflow/flow-go/state/protocol/events"
 
 	testing "testing"
 )

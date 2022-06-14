@@ -993,7 +993,7 @@ func (builder *ObserverServiceBuilder) attachRPCEngine() {
 			builder.apiBurstlimits,
 			proxy,
 		)
-                if err != nil {
+		if err != nil {
 			return nil, err
 		}
 		return builder.RpcEng, nil

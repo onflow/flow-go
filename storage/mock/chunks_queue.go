@@ -3,8 +3,9 @@
 package mock
 
 import (
-	chunks "github.com/onflow/flow-go/model/chunks"
 	mock "github.com/stretchr/testify/mock"
+
+	chunks "github.com/onflow/flow-go/model/chunks"
 
 	testing "testing"
 )
