@@ -308,6 +308,8 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 		return err
 	}
 
+	executed := make(chan struct{})
+
 	var i int
 	log := lg.log.With().Str("tx_id", createAccountTx.ID().String()).Logger()
 	wait := lg.txTracker.AddTx(
@@ -354,6 +356,7 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 							Msg("new account added")
 					}
 				}
+				close(executed)
 			},
 			onExpired: func(_ flowsdk.Identifier) {
 				log.Error().Msg("setup transaction (account creation) has expired")
@@ -365,7 +368,10 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 		120*time.Second,
 	)
 
-	<-wait
+	select {
+	case <-wait:
+	case <-executed:
+	}
 
 	return nil
 }
