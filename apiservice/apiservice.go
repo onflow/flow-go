@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"google.golang.org/grpc/connectivity"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
@@ -19,8 +21,46 @@ import (
 )
 
 func NewFlowAPIService(accessNodeAddressAndPort flow.IdentityList, timeout time.Duration) (*FlowAPIService, error) {
-	accessClients := make([]access.AccessAPIClient, accessNodeAddressAndPort.Count())
+	ret := &FlowAPIService{}
+	ret.timeout = timeout
+	ret.upstream = make([]access.AccessAPIClient, accessNodeAddressAndPort.Count())
+	ret.connections = make([]*grpc.ClientConn, accessNodeAddressAndPort.Count())
 	for i, identity := range accessNodeAddressAndPort {
+		// Store the client setup parameters such as address, public, key and timeout, so that
+		// we can refresh the API on connection loss
+		ret.ids[i] = identity
+
+		// We fail on any single error on startup, so that
+		// we identify bootstrapping errors early
+		err := ret.updateClient(i)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	ret.roundRobin = 0
+	return ret, nil
+}
+
+type FlowAPIService struct {
+	access.AccessAPIServer
+	lock        sync.Mutex
+	roundRobin  int
+	ids         flow.IdentityList
+	upstream    []access.AccessAPIClient
+	connections []*grpc.ClientConn
+	timeout     time.Duration
+}
+
+func (h *FlowAPIService) SetLocalAPI(local access.AccessAPIServer) {
+	h.AccessAPIServer = local
+}
+
+func (h *FlowAPIService) updateClient(i int) error {
+	timeout := h.timeout
+
+	if h.connections[i] == nil || h.connections[i].GetState() != connectivity.Ready {
+		identity := h.ids[i]
 		if identity.NetworkPubKey == nil {
 			clientRPCConnection, err := grpc.Dial(
 				identity.Address,
@@ -28,14 +68,15 @@ func NewFlowAPIService(accessNodeAddressAndPort flow.IdentityList, timeout time.
 				grpc.WithInsecure(), //nolint:staticcheck
 				backend.WithClientUnaryInterceptor(timeout))
 			if err != nil {
-				return nil, err
+				return err
 			}
 
-			accessClients[i] = access.NewAccessAPIClient(clientRPCConnection)
+			h.connections[i] = clientRPCConnection
+			h.upstream[i] = access.NewAccessAPIClient(clientRPCConnection)
 		} else {
 			tlsConfig, err := grpcutils.DefaultClientTLSConfig(identity.NetworkPubKey)
 			if err != nil {
-				return nil, fmt.Errorf("failed to get default TLS client config using public flow networking key %s %w", identity.NetworkPubKey.String(), err)
+				return fmt.Errorf("failed to get default TLS client config using public flow networking key %s %w", identity.NetworkPubKey.String(), err)
 			}
 
 			clientRPCConnection, err := grpc.Dial(
@@ -44,28 +85,15 @@ func NewFlowAPIService(accessNodeAddressAndPort flow.IdentityList, timeout time.
 				grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
 				backend.WithClientUnaryInterceptor(timeout))
 			if err != nil {
-				return nil, err
+				return err
 			}
 
-			accessClients[i] = access.NewAccessAPIClient(clientRPCConnection)
+			h.connections[i] = clientRPCConnection
+			h.upstream[i] = access.NewAccessAPIClient(clientRPCConnection)
 		}
 	}
 
-	ret := &FlowAPIService{}
-	ret.upstream = accessClients
-	ret.roundRobin = 0
-	return ret, nil
-}
-
-type FlowAPIService struct {
-	access.AccessAPIServer
-	lock       sync.Mutex
-	roundRobin int
-	upstream   []access.AccessAPIClient
-}
-
-func (h *FlowAPIService) SetLocalAPI(local access.AccessAPIServer) {
-	h.AccessAPIServer = local
+	return nil
 }
 
 func (h *FlowAPIService) client() (access.AccessAPIClient, error) {
@@ -76,11 +104,17 @@ func (h *FlowAPIService) client() (access.AccessAPIClient, error) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
-	h.roundRobin++
-	h.roundRobin = h.roundRobin % len(h.upstream)
-	ret := h.upstream[h.roundRobin]
+	var err error
+	for i := 0; i < 3; i++ {
+		h.roundRobin++
+		h.roundRobin = h.roundRobin % len(h.upstream)
+		err = h.updateClient(h.roundRobin)
+		if err == nil {
+			return h.upstream[h.roundRobin], nil
+		}
+	}
 
-	return ret, nil
+	return nil, err
 }
 
 func (h *FlowAPIService) Ping(context context.Context, req *access.PingRequest) (*access.PingResponse, error) {
