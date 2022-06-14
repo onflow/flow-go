@@ -350,5 +350,5 @@ type Reporter interface {
 	// Name returns the name of the reporter. Only used for logging.
 	Name() string
 	// Report accepts slice ledger payloads and reports the state of the ledger
-	Report(payloads []Payload) error
+	Report(payloads []Payload, statecommitment State) error
 }
