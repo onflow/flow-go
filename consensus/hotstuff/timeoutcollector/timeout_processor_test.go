@@ -34,12 +34,13 @@ type TimeoutProcessorTestSuite struct {
 	suite.Suite
 
 	participants       flow.IdentityList
+	signer             *flow.Identity
 	view               uint64
+	sigWeight          uint64
+	totalWeight        uint64
 	committee          *mocks.Replicas
 	validator          *mocks.Validator
 	sigAggregator      *mocks.TimeoutSignatureAggregator
-	sigWeight          uint64
-	totalWeight        uint64
 	onTCCreated        *mocks.OnTCCreated
 	onPartialTCCreated *mocks.OnPartialTCCreated
 	processor          *TimeoutProcessor
@@ -48,17 +49,19 @@ type TimeoutProcessorTestSuite struct {
 func (s *TimeoutProcessorTestSuite) SetupTest() {
 	var err error
 	s.sigWeight = 1000
-	s.committee = &mocks.Replicas{}
-	s.validator = &mocks.Validator{}
-	s.sigAggregator = &mocks.TimeoutSignatureAggregator{}
+	s.committee = mocks.NewReplicas(s.T())
+	s.validator = mocks.NewValidator(s.T())
+	s.sigAggregator = mocks.NewTimeoutSignatureAggregator(s.T())
 	s.onTCCreated = mocks.NewOnTCCreated(s.T())
 	s.onPartialTCCreated = mocks.NewOnPartialTCCreated(s.T())
 	s.participants = unittest.IdentityListFixture(11, unittest.WithWeight(s.sigWeight))
+	s.signer = s.participants[0]
 	s.view = (uint64)(rand.Uint32() + 100)
 	s.totalWeight = 0
 
-	s.committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(s.participants.TotalWeight()), nil)
-	s.committee.On("TimeoutThresholdForView", mock.Anything).Return(committees.WeightThresholdToTimeout(s.participants.TotalWeight()), nil)
+	s.committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(s.participants.TotalWeight()), nil).Maybe()
+	s.committee.On("TimeoutThresholdForView", mock.Anything).Return(committees.WeightThresholdToTimeout(s.participants.TotalWeight()), nil).Maybe()
+	s.committee.On("IdentityByEpoch", mock.Anything, mock.Anything).Return(s.signer, nil).Maybe()
 	s.sigAggregator.On("View").Return(s.view).Maybe()
 	s.sigAggregator.On("VerifyAndAdd", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		s.totalWeight += s.sigWeight
@@ -143,7 +146,34 @@ func (s *TimeoutProcessorTestSuite) TestProcess_LastViewTCRequiredButNotPresent(
 	require.True(s.T(), model.IsInvalidTimeoutError(err))
 }
 
-// TestProcess_IncludedQCInvalid tests that TimeoutProcessor fails with model.InvalidTimeoutError if
+// TestProcess_InvalidSigner tests that TimeoutProcessor correctly handles errors when timeout was created
+// by invalid signer.
+func (s *TimeoutProcessorTestSuite) TestProcess_InvalidSigner() {
+	timeout := helper.TimeoutObjectFixture(
+		helper.WithTimeoutObjectView(s.view),
+		helper.WithTimeoutNewestQC(helper.MakeQC(helper.WithQCView(s.view-1))),
+		helper.WithTimeoutLastViewTC(
+			helper.MakeTC(helper.WithTCView(s.view-1),
+				helper.WithTCNewestQC(helper.MakeQC(helper.WithQCView(s.view-1))))),
+	)
+
+	s.Run("invalid-signer", func() {
+		*s.committee = *mocks.NewReplicas(s.T())
+		s.committee.On("IdentityByEpoch", mock.Anything, mock.Anything).Return(nil, model.NewInvalidSignerError(errors.New(""))).Once()
+		err := s.processor.Process(timeout)
+		require.True(s.T(), model.IsInvalidTimeoutError(err))
+	})
+	s.Run("identity-by-epoch-exception", func() {
+		*s.committee = *mocks.NewReplicas(s.T())
+		exception := errors.New("identity-by-epoch-exception")
+		s.committee.On("IdentityByEpoch", mock.Anything, mock.Anything).Return(nil, exception).Once()
+		err := s.processor.Process(timeout)
+		require.ErrorIs(s.T(), err, exception)
+		require.False(s.T(), model.IsInvalidTimeoutError(err))
+	})
+}
+
+// TestProcess_IncludedQCInvalid tests that TimeoutProcessor correctly handles validation errors if
 // timeout is well-formed but included QC is invalid
 func (s *TimeoutProcessorTestSuite) TestProcess_IncludedQCInvalid() {
 	timeout := helper.TimeoutObjectFixture(
@@ -154,15 +184,33 @@ func (s *TimeoutProcessorTestSuite) TestProcess_IncludedQCInvalid() {
 				helper.WithTCNewestQC(helper.MakeQC(helper.WithQCView(s.view-1))))),
 	)
 
-	exception := errors.New("validate-qc-failed")
-	s.validator.On("ValidateQC", timeout.NewestQC).Return(exception)
+	s.Run("invalid-qc-sentinel", func() {
+		*s.validator = *mocks.NewValidator(s.T())
+		s.validator.On("ValidateQC", timeout.NewestQC).Return(model.InvalidQCError{}).Once()
 
-	err := s.processor.Process(timeout)
-	require.True(s.T(), model.IsInvalidTimeoutError(err))
-	require.ErrorIs(s.T(), err, exception)
+		err := s.processor.Process(timeout)
+		require.True(s.T(), model.IsInvalidTimeoutError(err))
+	})
+	s.Run("invalid-qc-exception", func() {
+		exception := errors.New("validate-qc-failed")
+		*s.validator = *mocks.NewValidator(s.T())
+		s.validator.On("ValidateQC", timeout.NewestQC).Return(exception).Once()
+
+		err := s.processor.Process(timeout)
+		require.ErrorIs(s.T(), err, exception)
+		require.False(s.T(), model.IsInvalidTimeoutError(err))
+	})
+	s.Run("invalid-qc-err-view-for-unknown-epoch", func() {
+		*s.validator = *mocks.NewValidator(s.T())
+		s.validator.On("ValidateQC", timeout.NewestQC).Return(model.ErrViewForUnknownEpoch).Once()
+
+		err := s.processor.Process(timeout)
+		require.False(s.T(), model.IsInvalidTimeoutError(err))
+		require.NotErrorIs(s.T(), err, model.ErrViewForUnknownEpoch)
+	})
 }
 
-// TestProcess_IncludedTCInvalid tests that TimeoutProcessor fails with model.InvalidTimeoutError if
+// TestProcess_IncludedTCInvalid tests that TimeoutProcessor correctly handles validation errors if
 // timeout is well-formed but included TC is invalid
 func (s *TimeoutProcessorTestSuite) TestProcess_IncludedTCInvalid() {
 	timeout := helper.TimeoutObjectFixture(
@@ -173,13 +221,33 @@ func (s *TimeoutProcessorTestSuite) TestProcess_IncludedTCInvalid() {
 				helper.WithTCNewestQC(helper.MakeQC(helper.WithQCView(s.view-1))))),
 	)
 
-	exception := errors.New("validate-qc-failed")
-	s.validator.On("ValidateQC", timeout.NewestQC).Return(nil)
-	s.validator.On("ValidateTC", timeout.LastViewTC).Return(exception)
+	s.Run("invalid-tc-sentinel", func() {
+		*s.validator = *mocks.NewValidator(s.T())
+		s.validator.On("ValidateQC", timeout.NewestQC).Return(nil)
+		s.validator.On("ValidateTC", timeout.LastViewTC).Return(model.InvalidTCError{})
 
-	err := s.processor.Process(timeout)
-	require.True(s.T(), model.IsInvalidTimeoutError(err))
-	require.ErrorIs(s.T(), err, exception)
+		err := s.processor.Process(timeout)
+		require.True(s.T(), model.IsInvalidTimeoutError(err))
+	})
+	s.Run("invalid-tc-exception", func() {
+		exception := errors.New("validate-tc-failed")
+		*s.validator = *mocks.NewValidator(s.T())
+		s.validator.On("ValidateQC", timeout.NewestQC).Return(nil)
+		s.validator.On("ValidateTC", timeout.LastViewTC).Return(exception).Once()
+
+		err := s.processor.Process(timeout)
+		require.ErrorIs(s.T(), err, exception)
+		require.False(s.T(), model.IsInvalidTimeoutError(err))
+	})
+	s.Run("invalid-tc-err-view-for-unknown-epoch", func() {
+		*s.validator = *mocks.NewValidator(s.T())
+		s.validator.On("ValidateQC", timeout.NewestQC).Return(nil)
+		s.validator.On("ValidateTC", timeout.LastViewTC).Return(model.ErrViewForUnknownEpoch).Once()
+
+		err := s.processor.Process(timeout)
+		require.False(s.T(), model.IsInvalidTimeoutError(err))
+		require.NotErrorIs(s.T(), err, model.ErrViewForUnknownEpoch)
+	})
 }
 
 // TestProcess_ValidTimeout tests that processing a valid timeout succeeds without error
@@ -287,6 +355,7 @@ func (s *TimeoutProcessorTestSuite) TestProcess_ConcurrentCreatingTC() {
 	s.onTCCreated.On("Execute", mock.Anything).Return(nil).Once()
 	s.sigAggregator.On("Aggregate").Return([]flow.Identifier(s.participants.NodeIDs()), []uint64{}, crypto.Signature{}, nil)
 	s.committee.On("IdentitiesByEpoch", mock.Anything).Return(s.participants, nil)
+	s.committee.On("IdentityByEpoch", mock.Anything, mock.Anything).Return(s.signer, nil)
 
 	var startupWg, shutdownWg sync.WaitGroup
 
@@ -358,6 +427,7 @@ func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 
 	committee := mocks.NewDynamicCommittee(t)
 	committee.On("IdentitiesByEpoch", mock.Anything).Return(stakingSigners, nil)
+	committee.On("IdentityByEpoch", mock.Anything, mock.Anything).Return(leader, nil)
 	committee.On("IdentitiesByBlock", mock.Anything).Return(stakingSigners, nil)
 	committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(stakingSigners.TotalWeight()), nil)
 	committee.On("TimeoutThresholdForView", mock.Anything).Return(committees.WeightThresholdToTimeout(stakingSigners.TotalWeight()), nil)

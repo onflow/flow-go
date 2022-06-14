@@ -36,8 +36,8 @@ type TimeoutCollectorTestSuite struct {
 
 func (s *TimeoutCollectorTestSuite) SetupTest() {
 	s.view = 1000
-	s.notifier = &mocks.Consumer{}
-	s.processor = &mocks.TimeoutProcessor{}
+	s.notifier = mocks.NewConsumer(s.T())
+	s.processor = mocks.NewTimeoutProcessor(s.T())
 	s.onNewQCDiscovered = mocks.NewOnNewQCDiscovered(s.T())
 	s.onNewTCDiscovered = mocks.NewOnNewTCDiscovered(s.T())
 
