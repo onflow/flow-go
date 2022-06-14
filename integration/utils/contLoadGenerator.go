@@ -314,7 +314,7 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 		createAccountTx.ID(),
 		txCallbacks{
 			onExecuted: func(txID flowsdk.Identifier, res *flowsdk.TransactionResult) {
-				log.Debug().
+				log.Trace().
 					Str("status", res.Status.String()).
 					Msg("account creation tx executed")
 
@@ -498,10 +498,10 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 	for {
 		select {
 		case <-ch:
-			log.Debug().
+			log.Trace().
 				Hex("txID", transferTx.ID().Bytes()).
 				Dur("duration", time.Since(startTime)).
-				Msgf("trarnsaction confirmed")
+				Msgf("transaction confirmed")
 			return
 		case <-time.After(slowTransactionThreshold):
 			log.Warn().
