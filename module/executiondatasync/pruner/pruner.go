@@ -1,6 +1,7 @@
 package pruner
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -20,18 +21,19 @@ const (
 // Pruner is a component responsible for pruning data from
 // execution data storage. It is configured with the following
 // parameters:
-// * Height range target: The target number of most recent blocks 
-//   to store data for. This controls the total amount of data 
+// * Height range target: The target number of most recent blocks
+//   to store data for. This controls the total amount of data
 //   stored on disk.
-// * Threshold: The number of block heights that we can exceed 
+// * Threshold: The number of block heights that we can exceed
 //   the height range target by before pruning is triggered. This
 //   controls the frequency of pruning.
 // The Pruner consumes a stream of fulfilled height notifications,
 // and triggers pruning once the difference between the fulfilled
 // height and the last pruned height reaches the height range
-// target + threshold. 
+// target + threshold.
 type Pruner struct {
-	storage tracker.Storage
+	storage       tracker.Storage
+	pruneCallback func(ctx context.Context) error
 
 	// channels used to send new fulfilled heights and config changes to the worker thread
 	// fulfilledHeights uses an unbounded channel to ensure NotifyFulfilledHeight is not blocking
@@ -46,12 +48,12 @@ type Pruner struct {
 	// the height range is the range of heights between the last pruned and last fulfilled
 	// heightRangeTarget is the target minimum value for this range, so that after pruning
 	// the height range is equal to the target.
-	heightRangeTarget   uint64
+	heightRangeTarget uint64
 
 	// threshold defines the maximum height range and how frequently pruning is performed.
 	// once the height range reaches `heightRangeTarget+threshold`, `threshold` many blocks
 	// are pruned
-	threshold           uint64
+	threshold uint64
 
 	logger  zerolog.Logger
 	metrics module.ExecutionDataPrunerMetrics
@@ -62,7 +64,7 @@ type Pruner struct {
 
 type PrunerOption func(*Pruner)
 
-// WithHeightRangeTarget is used to configure the pruner with a custom 
+// WithHeightRangeTarget is used to configure the pruner with a custom
 // height range target.
 func WithHeightRangeTarget(heightRangeTarget uint64) PrunerOption {
 	return func(p *Pruner) {
@@ -74,6 +76,12 @@ func WithHeightRangeTarget(heightRangeTarget uint64) PrunerOption {
 func WithThreshold(threshold uint64) PrunerOption {
 	return func(p *Pruner) {
 		p.threshold = threshold
+	}
+}
+
+func WithPruneCallback(callback func(context.Context) error) PrunerOption {
+	return func(p *Pruner) {
+		p.pruneCallback = callback
 	}
 }
 
@@ -95,6 +103,7 @@ func NewPruner(logger zerolog.Logger, metrics module.ExecutionDataPrunerMetrics,
 	p := &Pruner{
 		logger:                logger.With().Str("component", "execution_data_pruner").Logger(),
 		storage:               storage,
+		pruneCallback:         func(ctx context.Context) error { return nil },
 		fulfilledHeightsIn:    fulfilledHeightsIn,
 		fulfilledHeightsOut:   fulfilledHeightsOut,
 		thresholdChan:         make(chan uint64),
@@ -180,6 +189,10 @@ func (p *Pruner) checkPrune(ctx irrecoverable.SignalerContext) {
 
 		if err := p.storage.Prune(pruneHeight); err != nil {
 			ctx.Throw(fmt.Errorf("failed to prune: %w", err))
+		}
+
+		if err := p.pruneCallback(ctx); err != nil {
+			ctx.Throw(err)
 		}
 
 		duration := time.Since(start)

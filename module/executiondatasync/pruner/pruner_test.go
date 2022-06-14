@@ -3,6 +3,7 @@ package pruner_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
