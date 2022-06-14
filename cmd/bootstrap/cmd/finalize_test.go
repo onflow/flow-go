@@ -81,6 +81,10 @@ func TestFinalize_HappyPath(t *testing.T) {
 
 		flagRootCommit = hex.EncodeToString(rootCommit[:])
 		flagEpochCounter = epochCounter
+		flagNumViewsInEpoch = 100_000
+		flagNumViewsInStakingAuction = 50_000
+		flagNumViewsInDKGPhase = 2_000
+		flagEpochCommitSafetyThreshold = 1_000
 		flagRootBlock = filepath.Join(bootDir, model.PathRootBlockData)
 		flagDKGDataPath = filepath.Join(bootDir, model.PathRootDKGData)
 		flagRootBlockVotesDir = filepath.Join(bootDir, model.DirnameRootBlockVotes)
@@ -122,6 +126,10 @@ func TestFinalize_Deterministic(t *testing.T) {
 		flagRootChain = chainName
 		flagRootHeight = rootHeight
 		flagEpochCounter = epochCounter
+		flagNumViewsInEpoch = 100_000
+		flagNumViewsInStakingAuction = 50_000
+		flagNumViewsInDKGPhase = 2_000
+		flagEpochCommitSafetyThreshold = 1_000
 
 		// set deterministic bootstrapping seed
 		flagBootstrapRandomSeed = deterministicSeed
@@ -197,6 +205,10 @@ func TestFinalize_SameSeedDifferentStateCommits(t *testing.T) {
 		flagRootChain = chainName
 		flagRootHeight = rootHeight
 		flagEpochCounter = epochCounter
+		flagNumViewsInEpoch = 100_000
+		flagNumViewsInStakingAuction = 50_000
+		flagNumViewsInDKGPhase = 2_000
+		flagEpochCommitSafetyThreshold = 1_000
 
 		// set deterministic bootstrapping seed
 		flagBootstrapRandomSeed = deterministicSeed
@@ -303,6 +315,10 @@ func TestFinalize_InvalidRandomSeedLength(t *testing.T) {
 		flagRootChain = chainName
 		flagRootHeight = rootHeight
 		flagEpochCounter = epochCounter
+		flagNumViewsInEpoch = 100_000
+		flagNumViewsInStakingAuction = 50_000
+		flagNumViewsInDKGPhase = 2_000
+		flagEpochCommitSafetyThreshold = 1_000
 
 		// set deterministic bootstrapping seed
 		flagBootstrapRandomSeed = deterministicSeed

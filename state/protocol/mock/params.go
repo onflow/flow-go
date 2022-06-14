@@ -33,6 +33,27 @@ func (_m *Params) ChainID() (flow.ChainID, error) {
 	return r0, r1
 }
 
+// EpochCommitSafetyThreshold provides a mock function with given fields:
+func (_m *Params) EpochCommitSafetyThreshold() (uint64, error) {
+	ret := _m.Called()
+
+	var r0 uint64
+	if rf, ok := ret.Get(0).(func() uint64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ProtocolVersion provides a mock function with given fields:
 func (_m *Params) ProtocolVersion() (uint, error) {
 	ret := _m.Called()
