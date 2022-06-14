@@ -239,7 +239,7 @@ func (c *ConduitFactory) processAttackerMessage(msg *insecure.Message) error {
 // Registering an attacker on a conduit is an exactly-once immutable operation, any second attempt after a successful registration returns an error.
 func (c *ConduitFactory) RegisterAttacker(_ *empty.Empty, stream insecure.CorruptibleConduitFactory_RegisterAttackerServer) error {
 	c.mu.Lock()
-
+	c.logger.Info().Msg("attacker registration called arrived, locked")
 	if c.attackerInboundStream != nil {
 		c.mu.Unlock()
 		return fmt.Errorf("could not register a new network adapter, one already exists")
@@ -247,7 +247,7 @@ func (c *ConduitFactory) RegisterAttacker(_ *empty.Empty, stream insecure.Corrup
 	c.attackerInboundStream = stream
 
 	c.mu.Unlock()
-	c.logger.Info().Msg("attacker registered successfully")
+	c.logger.Info().Msg("attacker registered successfully, unlocked")
 
 	// blocking call
 	<-c.cm.ShutdownSignal()
