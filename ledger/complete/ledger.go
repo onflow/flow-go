@@ -378,7 +378,7 @@ func (l *Ledger) ExportCheckpointAt(
 	// If defined, run extraction report BEFORE writing checkpoint file
 	// This is used to optmize the spork process
 	if extractionReport, ok := reporters[extractionReportName]; ok {
-		err := runReport(extractionReport, payloads, l.logger)
+		err := runReport(extractionReport, payloads, statecommitment, l.logger)
 		if err != nil {
 			return ledger.State(hash.DummyHash), err
 		}
@@ -413,7 +413,7 @@ func (l *Ledger) ExportCheckpointAt(
 
 	// run reporters
 	for _, reporter := range reporters {
-		err := runReport(reporter, payloads, l.logger)
+		err := runReport(reporter, payloads, statecommitment, l.logger)
 		if err != nil {
 			return ledger.State(hash.DummyHash), err
 		}
@@ -461,13 +461,13 @@ func (l *Ledger) keepOnlyOneTrie(state ledger.State) error {
 	return nil
 }
 
-func runReport(r ledger.Reporter, p []ledger.Payload, l zerolog.Logger) error {
+func runReport(r ledger.Reporter, p []ledger.Payload, commit ledger.State, l zerolog.Logger) error {
 	l.Info().
 		Str("name", r.Name()).
 		Msg("starting reporter")
 
 	start := time.Now()
-	err := r.Report(p)
+	err := r.Report(p, commit)
 	elapsed := time.Since(start)
 
 	l.Info().
