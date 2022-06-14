@@ -57,7 +57,8 @@ func (s *TimeoutProcessorTestSuite) SetupTest() {
 	s.view = (uint64)(rand.Uint32() + 100)
 	s.totalWeight = 0
 
-	s.committee.On("WeightThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(s.participants.TotalWeight()), nil)
+	s.committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(s.participants.TotalWeight()), nil)
+	s.committee.On("TimeoutThresholdForView", mock.Anything).Return(committees.WeightThresholdToTimeout(s.participants.TotalWeight()), nil)
 	s.sigAggregator.On("View").Return(s.view).Maybe()
 	s.sigAggregator.On("VerifyAndAdd", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		s.totalWeight += s.sigWeight
@@ -358,7 +359,8 @@ func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 	committee := mocks.NewDynamicCommittee(t)
 	committee.On("IdentitiesByEpoch", mock.Anything).Return(stakingSigners, nil)
 	committee.On("IdentitiesByBlock", mock.Anything).Return(stakingSigners, nil)
-	committee.On("WeightThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(stakingSigners.TotalWeight()), nil)
+	committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(stakingSigners.TotalWeight()), nil)
+	committee.On("TimeoutThresholdForView", mock.Anything).Return(committees.WeightThresholdToTimeout(stakingSigners.TotalWeight()), nil)
 
 	proposal, err := signers[leader.NodeID].CreateProposal(block)
 	require.NoError(t, err)

@@ -94,17 +94,20 @@ func NewTimeoutProcessor(committee hotstuff.Replicas,
 	onTCCreated hotstuff.OnTCCreated,
 ) (*TimeoutProcessor, error) {
 	view := sigAggregator.View()
-	qcThreshold, err := committee.WeightThresholdForView(view)
+	qcThreshold, err := committee.QuorumThresholdForView(view)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve weight threshold for view %d: %w", view, err)
+		return nil, fmt.Errorf("could not retrieve QC weight threshold for view %d: %w", view, err)
+	}
+	timeoutThreshold, err := committee.TimeoutThresholdForView(view)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve timeout weight threshold for view %d: %w", view, err)
 	}
 	return &TimeoutProcessor{
 		view:      view,
 		committee: committee,
 		validator: validator,
 		partialTCTracker: accumulatedWeightTracker{
-			// TODO(active-pacemaker): fix this, add weight for f+1
-			minRequiredWeight: qcThreshold / 2,
+			minRequiredWeight: timeoutThreshold,
 			done:              *atomic.NewBool(false),
 		},
 		tcTracker: accumulatedWeightTracker{
@@ -128,7 +131,7 @@ func NewTimeoutProcessor(committee hotstuff.Replicas,
 // All other errors should be treated as exceptions.
 func (p *TimeoutProcessor) Process(timeout *model.TimeoutObject) error {
 	if p.view != timeout.View {
-		return fmt.Errorf("received incompatible timeout, expected %d got %d", p.view, timeout.View)
+		return fmt.Errorf("received incompatible timeout, expected %d got %d: %w", p.view, timeout.View, ErrTimeoutForIncompatibleView)
 	}
 
 	if p.tcTracker.Done() {
