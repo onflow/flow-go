@@ -36,6 +36,7 @@ const networkingProtocolTCP = "tcp"
 // The attacker can asynchronously dictate the conduit factory to send messages on behalf of the node this factory resides on.
 type ConduitFactory struct {
 	component.Component
+	mu                    sync.Mutex
 	cm                    *component.ComponentManager
 	logger                zerolog.Logger
 	codec                 network.Codec
@@ -91,7 +92,7 @@ func NewCorruptibleConduitFactory(
 }
 
 // ServerAddress returns address of the gRPC server that is running by this corrupted conduit factory.
-func (c ConduitFactory) ServerAddress() string {
+func (c *ConduitFactory) ServerAddress() string {
 	return c.address.String()
 }
 
@@ -237,15 +238,19 @@ func (c *ConduitFactory) processAttackerMessage(msg *insecure.Message) error {
 // control it.
 // Registering an attacker on a conduit is an exactly-once immutable operation, any second attempt after a successful registration returns an error.
 func (c *ConduitFactory) RegisterAttacker(_ *empty.Empty, stream insecure.CorruptibleConduitFactory_RegisterAttackerServer) error {
+	c.mu.Lock()
 
 	if c.attackerInboundStream != nil {
+		c.mu.Unlock()
 		return fmt.Errorf("could not register a new network adapter, one already exists")
 	}
 	c.attackerInboundStream = stream
 
+	c.mu.Unlock()
 	c.logger.Info().Msg("attacker registered successfully")
-	<-c.cm.ShutdownSignal()
 
+	// blocking call
+	<-c.cm.ShutdownSignal()
 	return nil
 }
 
@@ -268,7 +273,7 @@ func (c *ConduitFactory) HandleIncomingEvent(
 		Str("target_ids", fmt.Sprintf("%v", targetIds)).
 		Str("flow_protocol_event", fmt.Sprintf("%T", event)).Logger()
 
-	if c.attackerInboundStream == nil {
+	if !c.attackerRegistered() {
 		// no attacker yet registered, hence sending message on the network following the
 		// correct expected behavior.
 		lg.Info().Msg("no attacker registered, passing through event")
@@ -349,4 +354,11 @@ func (c *ConduitFactory) generateExecutionReceipt(result *flow.ExecutionResult) 
 func (c *ConduitFactory) generateResultApproval(attestation *flow.Attestation) (*flow.ResultApproval, error) {
 	// TODO: fill spock secret with dictated spock data from attacker.
 	return verifier.GenerateResultApproval(c.me, c.approvalHasher, c.spockHasher, attestation, []byte{})
+}
+
+func (c *ConduitFactory) attackerRegistered() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return c.attackerInboundStream != nil
 }
