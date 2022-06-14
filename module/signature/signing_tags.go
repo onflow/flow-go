@@ -20,7 +20,7 @@ const protocolVersion = "V00-"
 const cipherSuiteIndex = "CS00-"
 
 // an example of domain tag output is :
-// FLOW-V00-CS00-CERTAIN_DOMAIN-with-cipherSuite
+// FLOW-CERTAIN_DOMAIN-V00-CS00-with-cipherSuite
 // where cipherSuite is fixed by the Flow crypto library
 // (only one ciphersuite is provided for BLS signatures by the crypto library
 //	and therefore it's not possible to choose one)
