@@ -413,25 +413,32 @@ static node* build_tree(const int len, const ep2_st* pks, const ep_st* sigs) {
 
     // create a new node with new points
     ep2_st* new_pk = (ep2_st*)malloc(sizeof(ep2_st));
-    if (!new_pk) return NULL;
+    if (!new_pk) goto error;
     ep_st* new_sig = (ep_st*)malloc(sizeof(ep_st));
-    if (!new_sig) { free(new_pk); return NULL; }
+    if (!new_sig) goto error_sig;
 
     node* t = new_node(new_pk, new_sig);
-    if (!t) { free(new_sig); free(new_pk); return NULL; }
+    if (!t) goto error_node;
     ep_new(t->sig);
     ep2_new(t->pk);
 
     // build the tree in a top-down way
     t->left = build_tree(left_len, &pks[0], &sigs[0]);
-    if (!t->left) { free_tree(t); return NULL; }
+    if (!t->left) { free_tree(t); goto error; }
 
     t->right = build_tree(right_len, &pks[left_len], &sigs[left_len]);
-    if (!t->right) { free_tree(t); return NULL; }
+    if (!t->right) { free_tree(t); goto error; }
     // sum the children
     ep_add_jacob(t->sig, t->left->sig, t->right->sig);
     ep2_add_projc(t->pk, t->left->pk, t->right->pk); 
     return t;
+
+error_node:
+    free(new_sig);
+error_sig:
+    free(new_pk);
+error:
+    return NULL;
 }
 
 // verify the binary tree and fill the results using recursive batch verifications.
