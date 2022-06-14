@@ -18,6 +18,7 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	p2ppubsub "github.com/libp2p/go-libp2p-pubsub"
 
+	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/apiservice"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
@@ -657,21 +658,14 @@ func BootstrapIdentities(addresses []string, keys []string) (flow.IdentityList, 
 
 	ids := make([]*flow.Identity, len(addresses))
 	for i, address := range addresses {
-		key := keys[i]
-
-		// json unmarshaller needs a quotes before and after the string
-		// the pflags.StringSliceVar does not retain quotes for the command line arg even if escaped with \"
-		// hence this additional check to ensure the key is indeed quoted
-		if !strings.HasPrefix(key, "\"") {
-			key = fmt.Sprintf("\"%s\"", key)
+		bytes, err := hex.DecodeString(keys[i])
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode secured GRPC server public key hex %w", err)
 		}
 
-		// networking public key
-		var networkKey encodable.NetworkPubKey
-		err := json.Unmarshal([]byte(key), &networkKey)
+		publicFlowNetworkingKey, err := crypto.DecodePublicKey(sdkcrypto.ECDSA_P256, bytes)
 		if err != nil {
-			// it's not safe to ignore the error here since bootstrap peers must have a valid key.
-			return nil, err
+			return nil, fmt.Errorf("failed to get public flow networking key could not decode public key bytes %w", err)
 		}
 
 		// create the identity of the peer by setting only the relevant fields
@@ -679,7 +673,7 @@ func BootstrapIdentities(addresses []string, keys []string) (flow.IdentityList, 
 			NodeID:        flow.ZeroID, // the NodeID is the hash of the staking key and for the public network it does not apply
 			Address:       address,
 			Role:          flow.RoleAccess, // the upstream node has to be an access node
-			NetworkPubKey: networkKey,
+			NetworkPubKey: publicFlowNetworkingKey,
 		}
 	}
 	return ids, nil

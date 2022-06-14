@@ -2,6 +2,7 @@ package apiservice
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -34,7 +35,7 @@ func NewFlowAPIService(accessNodeAddressAndPort flow.IdentityList, timeout time.
 		} else {
 			tlsConfig, err := grpcutils.DefaultClientTLSConfig(identity.NetworkPubKey)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to get default TLS client config using public flow networking key %s %w", identity.NetworkPubKey.String(), err)
 			}
 
 			clientRPCConnection, err := grpc.Dial(
