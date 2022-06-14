@@ -1,6 +1,7 @@
 package timeoutcollector
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 
@@ -87,6 +88,7 @@ var _ hotstuff.TimeoutProcessor = (*TimeoutProcessor)(nil)
 // NewTimeoutProcessor creates new instance of TimeoutProcessor
 // Returns the following expected errors for invalid inputs:
 //   * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
+// All other errors should be treated as exceptions.
 func NewTimeoutProcessor(committee hotstuff.Replicas,
 	validator hotstuff.Validator,
 	sigAggregator hotstuff.TimeoutSignatureAggregator,
@@ -126,7 +128,7 @@ func NewTimeoutProcessor(committee hotstuff.Replicas,
 // to create a TC or a partial TC we will immediately do this and submit it
 // via callback for further processing.
 // Expected error returns during normal operations:
-// * hotstuff.TimeoutForIncompatibleViewError - submitted timeout for incompatible view
+// * ErrTimeoutForIncompatibleView - submitted timeout for incompatible view
 // * model.InvalidTimeoutError - submitted invalid timeout(invalid structure or invalid signature)
 // All other errors should be treated as exceptions.
 func (p *TimeoutProcessor) Process(timeout *model.TimeoutObject) error {
@@ -173,6 +175,9 @@ func (p *TimeoutProcessor) Process(timeout *model.TimeoutObject) error {
 // validateTimeout performs validation of timeout object, verifies if timeout is correctly structured
 // and included QC and TC is correctly structured and signed.
 // ATTENTION: this function doesn't check if timeout signature is valid, this check happens in signature aggregator
+// Expected error returns during normal operations:
+// * model.InvalidTimeoutError - submitted invalid timeout(invalid structure or invalid signature)
+// All other errors should be treated as exceptions.
 func (p *TimeoutProcessor) validateTimeout(timeout *model.TimeoutObject) error {
 	// 1. check if it's correctly structured
 	// (a) Every TO must contain a QC
@@ -209,17 +214,44 @@ func (p *TimeoutProcessor) validateTimeout(timeout *model.TimeoutObject) error {
 		}
 	}
 
-	// 2. Check if QC is valid
-	err := p.validator.ValidateQC(timeout.NewestQC)
+	// 2. Check fi signer identity is valid
+	_, err := p.committee.IdentityByEpoch(timeout.View, timeout.SignerID)
+	if model.IsInvalidSignerError(err) {
+		return model.NewInvalidTimeoutErrorf(timeout, "invalid signer for timeout: %w", err)
+	}
 	if err != nil {
-		return model.NewInvalidTimeoutErrorf(timeout, "included QC is invalid: %w", err)
+		return fmt.Errorf("error retrieving signer Identity at view %d: %w", timeout.View, err)
 	}
 
-	// 3. If TC is included, it must be valid
+	// 3. Check if QC is valid
+	err = p.validator.ValidateQC(timeout.NewestQC)
+	if err != nil {
+		if model.IsInvalidQCError(err) {
+			return model.NewInvalidTimeoutErrorf(timeout, "included QC is invalid: %w", err)
+		}
+		if errors.Is(err, model.ErrViewForUnknownEpoch) {
+			// We require each replica to be bootstrapped with a QC pointing to a finalized block. Therefore, we should know the
+			// Epoch for any QC.View and TC.View we encounter. Receiving a `model.ErrViewForUnknownEpoch` is conceptually impossible,
+			// i.e. a symptom of an internal bug or invalid bootstrapping information.
+			return fmt.Errorf("no Epoch information availalbe for QC that was included in TO; symptom of internal bug or invalid bootstrapping information: %s", err.Error())
+		}
+		return fmt.Errorf("unexpected error when validating QC: %w", err)
+	}
+
+	// 4. If TC is included, it must be valid
 	if timeout.LastViewTC != nil {
 		err = p.validator.ValidateTC(timeout.LastViewTC)
 		if err != nil {
-			return model.NewInvalidTimeoutErrorf(timeout, "included TC is invalid: %w", err)
+			if model.IsInvalidTCError(err) {
+				return model.NewInvalidTimeoutErrorf(timeout, "included TC is invalid: %w", err)
+			}
+			if errors.Is(err, model.ErrViewForUnknownEpoch) {
+				// We require each replica to be bootstrapped with a QC pointing to a finalized block. Therefore, we should know the
+				// Epoch for any QC.View and TC.View we encounter. Receiving a `model.ErrViewForUnknownEpoch` is conceptually impossible,
+				// i.e. a symptom of an internal bug or invalid bootstrapping information.
+				return fmt.Errorf("no Epoch information availalbe for TC that was included in TO; symptom of internal bug or invalid bootstrapping information: %s", err.Error())
+			}
+			return fmt.Errorf("unexpected error when validating TC: %w", err)
 		}
 	}
 	return nil
@@ -249,6 +281,8 @@ func (p *TimeoutProcessor) buildTC() (*flow.TimeoutCertificate, error) {
 	}, nil
 }
 
+// signerIndicesFromIdentities encodes identities into signer indices.
+// Any error should be treated as exception.
 func (p *TimeoutProcessor) signerIndicesFromIdentities(signerIDs flow.IdentifierList) ([]byte, error) {
 	allIdentities, err := p.committee.IdentitiesByEpoch(p.view)
 	if err != nil {

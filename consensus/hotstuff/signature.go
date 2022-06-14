@@ -119,7 +119,7 @@ type TimeoutSignatureAggregator interface {
 	// TotalWeight returns the total weight presented by the collected signatures.
 	TotalWeight() uint64
 
-	// View returns view for which signature aggregator happens
+	// View returns the view that this instance is aggregating signatures for.
 	View() uint64
 
 	// Aggregate aggregates the signatures and returns with additional data.

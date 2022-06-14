@@ -1,27 +1,25 @@
 package hotstuff
 
 import (
-	"errors"
-
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-var (
-	TimeoutForIncompatibleViewError = errors.New("timeout for incompatible view")
-)
-
-// OnTCCreated is a callback which will be used by TimeoutCollector to submit a TC when it's able to create it
+// OnTCCreated is a callback which will be used by TimeoutCollector to submit a TC when it's able to create it.
+// This callback is called from processing logic.
 type OnTCCreated func(tc *flow.TimeoutCertificate)
 
 // OnPartialTCCreated is a callback which will be used by TimeoutCollector to notify about collecting f+1 timeouts for
-// some view
+// some view.
+// This callback is called from processing logic.
 type OnPartialTCCreated func(view uint64)
 
-// OnNewQCDiscovered is a callback which will be called to notify about new validated QC
+// OnNewQCDiscovered is a callback which will be called to notify about new validated QC.
+// This callback is called from processing logic.
 type OnNewQCDiscovered func(*flow.QuorumCertificate)
 
-// OnNewTCDiscovered is a callback which will be called to notify about new validated TC
+// OnNewTCDiscovered is a callback which will be called to notify about new validated TC.
+// This callback is called from processing logic.
 type OnNewTCDiscovered func(*flow.TimeoutCertificate)
 
 // TimeoutCollector collects all timeout objects for a specified view. On the happy path, it
