@@ -6,9 +6,11 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"time"
 
 	"github.com/go-yaml/yaml"
@@ -269,6 +271,7 @@ type Service struct {
 	Environment []string `yaml:"environment,omitempty"`
 	Volumes     []string
 	Ports       []string `yaml:"ports,omitempty"`
+	Labels      map[string]string
 }
 
 // Build ...
@@ -352,14 +355,17 @@ func prepareService(container testnet.ContainerConfig, i int, n int) Service {
 			fmt.Sprintf("%s:/data:z", dataDir),
 		},
 		Environment: []string{
-			"JAEGER_AGENT_HOST=jaeger",
-			"JAEGER_AGENT_PORT=6831",
+			"JAEGER_ENDPOINT=http://tempo:14268/api/traces",
 			// NOTE: these env vars are not set by default, but can be set [1] to enable binstat logging:
 			// [1] https://docs.docker.com/compose/environment-variables/#pass-environment-variables-to-containers
 			"BINSTAT_ENABLE",
 			"BINSTAT_LEN_WHAT",
 			"BINSTAT_DMP_NAME",
 			"BINSTAT_DMP_PATH",
+		},
+		Labels: map[string]string{
+			"com.dapperlabs.role": container.Role.String(),
+			"com.dapperlabs.num":  fmt.Sprintf("%03d", i+1),
 		},
 	}
 
@@ -538,48 +544,34 @@ func writeDockerComposeConfig(services Services) error {
 	return nil
 }
 
-// PrometheusServiceDiscovery ...
-type PrometheusServiceDiscovery []PrometheusTargetList
+// PrometheusServiceDiscovery is a list of prometheus targets
+type PrometheusServiceDiscovery []PrometheusTarget
 
-// PrometheusTargetList ...
-type PrometheusTargetList struct {
+// PrometheusTargetList defines addresses and labels for a prometheus target
+type PrometheusTarget struct {
 	Targets []string          `json:"targets"`
 	Labels  map[string]string `json:"labels"`
 }
 
-func newPrometheusTargetList(role flow.Role) PrometheusTargetList {
-	return PrometheusTargetList{
-		Targets: make([]string, 0),
-		Labels: map[string]string{
-			"job":  "flow",
-			"role": role.String(),
-		},
-	}
-}
-
 func prepareServiceDiscovery(containers []testnet.ContainerConfig) PrometheusServiceDiscovery {
-	targets := map[flow.Role]PrometheusTargetList{
-		flow.RoleCollection:   newPrometheusTargetList(flow.RoleCollection),
-		flow.RoleConsensus:    newPrometheusTargetList(flow.RoleConsensus),
-		flow.RoleExecution:    newPrometheusTargetList(flow.RoleExecution),
-		flow.RoleVerification: newPrometheusTargetList(flow.RoleVerification),
-		flow.RoleAccess:       newPrometheusTargetList(flow.RoleAccess),
-	}
+	counters := map[flow.Role]int{}
 
+	sd := PrometheusServiceDiscovery{}
 	for _, container := range containers {
-		containerAddr := fmt.Sprintf("%s:%d", container.ContainerName, MetricsPort)
-		containerTargets := targets[container.Role]
-		containerTargets.Targets = append(containerTargets.Targets, containerAddr)
-		targets[container.Role] = containerTargets
+		counters[container.Role]++
+		pt := PrometheusTarget{
+			Targets: []string{net.JoinHostPort(container.ContainerName, strconv.Itoa(MetricsPort))},
+			Labels: map[string]string{
+				"job":     "flow",
+				"role":    container.Role.String(),
+				"network": "localnet",
+				"num":     fmt.Sprintf("%03d", counters[container.Role]),
+			},
+		}
+		sd = append(sd, pt)
 	}
 
-	return PrometheusServiceDiscovery{
-		targets[flow.RoleCollection],
-		targets[flow.RoleConsensus],
-		targets[flow.RoleExecution],
-		targets[flow.RoleVerification],
-		targets[flow.RoleAccess],
-	}
+	return sd
 }
 
 func writePrometheusConfig(serviceDisc PrometheusServiceDiscovery) error {
@@ -713,8 +705,7 @@ func prepareObserverService(i int, observerName string, agPublicKey string, prof
 			fmt.Sprintf("%s:/data:z", dataDir),
 		},
 		Environment: []string{
-			"JAEGER_AGENT_HOST=jaeger",
-			"JAEGER_AGENT_PORT=6831",
+			"JAEGER_ENDPOINT=http://tempo:14268/api/traces",
 			"BINSTAT_ENABLE",
 			"BINSTAT_LEN_WHAT",
 			"BINSTAT_DMP_NAME",
@@ -748,6 +739,7 @@ func prepareObserverService(i int, observerName string, agPublicKey string, prof
 		fmt.Sprintf("%d:%d", (accessCount*2)+AccessAPIPort+(2*i), RPCPort),
 		fmt.Sprintf("%d:%d", (accessCount*2)+AccessAPIPort+(2*i)+1, SecuredRPCPort),
 	}
+
 	return observerService
 }
 

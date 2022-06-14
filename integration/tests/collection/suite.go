@@ -104,7 +104,9 @@ func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
 	suite.net.Start(suite.ctx)
 
 	// create an account to use for sending transactions
-	suite.acct.addr, suite.acct.key, suite.acct.signer = lib.GetAccount(suite.net.Root().Header.ChainID.Chain())
+	var err error
+	suite.acct.addr, suite.acct.key, suite.acct.signer, err = lib.GetAccount(suite.net.Root().Header.ChainID.Chain())
+	require.NoError(suite.T(), err)
 	suite.serviceAccountIdx = 2
 
 	// subscribe to the ghost

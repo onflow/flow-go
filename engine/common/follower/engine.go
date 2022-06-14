@@ -269,7 +269,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 			Hex("ancestor_id", ancestorID[:]).
 			Msg("requesting missing ancestor for proposal")
 
-		e.sync.RequestBlock(ancestorID)
+		e.sync.RequestBlock(ancestorID, ancestorHeight)
 
 		return nil
 	}
@@ -284,7 +284,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 
 		log.Debug().Msg("requesting missing parent for proposal")
 
-		e.sync.RequestBlock(header.ParentID)
+		e.sync.RequestBlock(header.ParentID, header.Height-1)
 
 		return nil
 	}

@@ -1,0 +1,26 @@
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+server:
+  log_level: info
+
+positions:
+  filename: /tmp/positions.yaml
+
+scrape_configs:
+- job_name: containers
+  docker_sd_configs:
+    - host: unix:///var/run/docker.sock
+      refresh_interval: 5s
+      # Only keep containers that have a `com.dapperlabs.role` label.
+      filters:
+        - name: "label"
+          values:
+            - 'com.dapperlabs.role'
+  relabel_configs:
+    - regex: "__meta_docker_container_label_com_dapperlabs_(.+)"
+      action: labelmap
+      replacement: "$1"
+    - source_labels: ['__meta_docker_container_name']
+      regex: "/(.*)"
+      target_label: "container_name"
