@@ -89,18 +89,18 @@ func (c *Codec) Decode(data []byte) (interface{}, error) {
 
 	//binstat.LeaveVal(bs1, int64(len(data)))
 
-	v, what, err := codec.InterfaceFromMessageCode(data[0])
+	msgInterface, what, err := codec.InterfaceFromMessageCode(data[0])
 	if err != nil {
 		return nil, fmt.Errorf("could not determine interface from code: %w", err)
 	}
 
 	// unmarshal the payload
 	//bs2 := binstat.EnterTimeVal(fmt.Sprintf("%s%s%s:%d", binstat.BinNet, ":wire>4(cbor)", what, code), int64(len(data))) // e.g. ~3net:wire>4(cbor)CodeEntityRequest:23
-	err = cbor.Unmarshal(data[1:], v) // all but first byte
+	err = cbor.Unmarshal(data[1:], msgInterface) // all but first byte
 	//binstat.Leave(bs2)
 	if err != nil {
-		return nil, fmt.Errorf("could not decode CBOR payload with envelope code %d AKA %s: %w", data[0], what, err) // e.g. 2, "CodeBlockProposal", <CBOR error>
+		return nil, fmt.Errorf("could not decode cbor payload with message code %d aka %s: %w", data[0], what, err) // e.g. 2, "CodeBlockProposal", <CBOR error>
 	}
 
-	return v, nil
+	return msgInterface, nil
 }
