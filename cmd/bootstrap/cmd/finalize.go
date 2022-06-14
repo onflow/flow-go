@@ -137,8 +137,11 @@ func finalize(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	// validate epoch configs (halts on error)
-	validateEpochConfig()
+	// validate epoch configs
+	err := validateEpochConfig()
+	if err != nil {
+		log.Fatal().Err(err).Msg("invalid or unsafe epoch commit threshold config")
+	}
 
 	if len(flagBootstrapRandomSeed) != flow.EpochSetupRandomSourceLength {
 		log.Error().Int("expected", flow.EpochSetupRandomSourceLength).Int("actual", len(flagBootstrapRandomSeed)).Msg("random seed provided length is not valid")
@@ -643,26 +646,28 @@ func generateEmptyExecutionState(
 }
 
 // validateEpochConfig validates configuration of the epoch commitment deadline.
-func validateEpochConfig() {
+func validateEpochConfig() error {
 	chainID := parseChainID(flagRootChain)
 	dkgFinalView := flagNumViewsInStakingAuction + flagNumViewsInDKGPhase*3 // 3 DKG phases
 	epochCommitDeadline := flagNumViewsInEpoch - flagEpochCommitSafetyThreshold
 
 	defaultSafetyThreshold, err := protocol.DefaultEpochCommitSafetyThreshold(chainID)
 	if err != nil {
-		log.Fatal().Err(err).Msg("unable to validate epoch config")
+		return fmt.Errorf("could not get default epoch commit safety threshold: %w", err)
 	}
 
-	// sanity check 1: the safety threshold is >= the default for the chain
+	// sanity check: the safety threshold is >= the default for the chain
 	if flagEpochCommitSafetyThreshold < defaultSafetyThreshold {
-		log.Fatal().Msgf("potentially unsafe epoch config: epoch commit safety threshold smaller than expected (%d < %d)", flagEpochCommitSafetyThreshold, defaultSafetyThreshold)
+		return fmt.Errorf("potentially unsafe epoch config: epoch commit safety threshold smaller than expected (%d < %d)", flagEpochCommitSafetyThreshold, defaultSafetyThreshold)
 	}
-	// sanity check 2: the difference between DKG end and safety threshold is also >= the default safety threshold
+	// sanity check: epoch commitment deadline cannot be before the DKG end
 	if epochCommitDeadline <= dkgFinalView {
-		log.Fatal().Msgf("invalid epoch config: the epoch commitment deadline (%d) is before the DKG final view (%d)", epochCommitDeadline, dkgFinalView)
+		return fmt.Errorf("invalid epoch config: the epoch commitment deadline (%d) is before the DKG final view (%d)", epochCommitDeadline, dkgFinalView)
 	}
+	// sanity check: the difference between DKG end and safety threshold is also >= the default safety threshold
 	if epochCommitDeadline-dkgFinalView < defaultSafetyThreshold {
-		log.Fatal().Msgf("potentially unsafe epoch config: time between DKG end and epoch commitment deadline is smaller than expected (%d-%d < %d)",
+		return fmt.Errorf("potentially unsafe epoch config: time between DKG end and epoch commitment deadline is smaller than expected (%d-%d < %d)",
 			epochCommitDeadline, dkgFinalView, defaultSafetyThreshold)
 	}
+	return nil
 }
