@@ -15,11 +15,11 @@ import (
 // ActivePaceMaker implements the hotstuff.PaceMaker
 // This implements the active Pacemaker described in DiemBFT v4
 // To enter a new view `v`, the Pacemaker must observe a valid QC or TC for view `v-1`.
-// The Pacemaker also defines when a node should locally time out for a given view.
+// The Pacemaker also controls when a node should locally time out for a given view.
 // In contrast to the passive Pacemaker (previous implementation), locally timing a view
 // does not cause a view change.
 // A local timeout for a view `v` causes a node to:
-// * never produce a vote for any proposal with view `v`, after the timeout
+// * never produce a vote for any proposal with view ≤ `v`, after the timeout
 // * produce and broadcast a timeout object, which can form a part of the TC for the timed out view
 type ActivePaceMaker struct {
 	timeoutControl *timeout.Controller
@@ -32,21 +32,22 @@ type ActivePaceMaker struct {
 var _ hotstuff.PaceMaker = (*ActivePaceMaker)(nil)
 
 // New creates a new ActivePaceMaker instance
-// startView is the view for the pacemaker to start from
-// timeoutController controls the timeout trigger.
-// notifier provides callbacks for pacemaker events.
+//  * startView is the view for the pacemaker to start with.
+//  * timeoutController controls the timeout trigger.
+//  * notifier provides callbacks for pacemaker events.
 // Expected error conditions:
 // * model.ConfigurationError if initial LivenessData is invalid
 func New(timeoutController *timeout.Controller,
 	notifier hotstuff.Consumer,
-	persist hotstuff.Persister) (*ActivePaceMaker, error) {
+	persist hotstuff.Persister,
+) (*ActivePaceMaker, error) {
 	livenessData, err := persist.GetLivenessData()
 	if err != nil {
 		return nil, fmt.Errorf("could not recover liveness data: %w", err)
 	}
 
 	if livenessData.CurrentView < 1 {
-		return nil, model.NewConfigurationErrorf("invalid configuration of PaceMaker with view > 0. (View 0 is reserved for genesis block, which has no proposer)")
+		return nil, model.NewConfigurationErrorf("PaceMaker cannot start in view 0 (view zero is reserved for genesis block, which has no proposer)")
 	}
 	pm := ActivePaceMaker{
 		livenessData:   livenessData,
@@ -110,10 +111,7 @@ func (p *ActivePaceMaker) ProcessQC(qc *flow.QuorumCertificate) (*model.NewViewE
 
 	p.timeoutControl.OnProgressBeforeTimeout()
 
-	// qc.view = p.currentView + k for k ≥ 0
-	// 2/3 of replicas have already voted for round p.currentView + k, hence proceeded past currentView
-	// => 2/3 of replicas are at least in view qc.view + 1.
-	// => replica can skip ahead to view qc.view + 1
+	// supermajority of replicas have already voted during round `qc.view`, hence it is safe to proceed to subsequent view
 	newView := qc.View + 1
 	err := p.updateLivenessData(newView, qc, nil)
 	if err != nil {
@@ -134,6 +132,7 @@ func (p *ActivePaceMaker) ProcessTC(tc *flow.TimeoutCertificate) (*model.NewView
 		return nil, nil
 	}
 
+	// supermajority of replicas have already reached their timeout for view `tc.View`, hence it is safe to proceed to subsequent view
 	newView := tc.View + 1
 	err := p.updateLivenessData(newView, tc.NewestQC, tc)
 	if err != nil {
@@ -144,6 +143,8 @@ func (p *ActivePaceMaker) ProcessTC(tc *flow.TimeoutCertificate) (*model.NewView
 	return &model.NewViewEvent{View: newView}, nil
 }
 
+// OnPartialTC is called when TimeoutAggregator has collected f+1 timeouts. This implements Bracha style timeouts,
+// which times out current view after receiving partial TC.
 func (p *ActivePaceMaker) OnPartialTC(newView uint64) {
 	if p.CurView() == newView {
 		p.timeoutControl.TriggerTimeout()

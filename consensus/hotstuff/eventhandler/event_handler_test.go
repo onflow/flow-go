@@ -41,7 +41,8 @@ var _ hotstuff.PaceMaker = (*TestPaceMaker)(nil)
 
 func NewTestPaceMaker(t require.TestingT, timeoutController *timeout.Controller,
 	notifier hotstuff.Consumer,
-	persist hotstuff.Persister) *TestPaceMaker {
+	persist hotstuff.Persister,
+) *TestPaceMaker {
 	p, err := pacemaker.New(timeoutController, notifier, persist)
 	if err != nil {
 		panic(err)
