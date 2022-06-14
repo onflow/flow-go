@@ -14,9 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/cmd/bootstrap/dkg"
-	"github.com/onflow/flow-go/state/protocol"
-
 	"github.com/dapperlabs/testingdock"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -25,6 +22,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/cmd/bootstrap/dkg"
 
 	"github.com/onflow/flow-go-sdk/crypto"
 
@@ -109,9 +108,10 @@ const (
 	// AccessNodePublicNetworkPort is the port used by access nodes for the public libp2p network
 	AccessNodePublicNetworkPort = 9876
 
-	DefaultViewsInStakingAuction uint64 = 5
-	DefaultViewsInDKGPhase       uint64 = 50
-	DefaultViewsInEpoch          uint64 = 180
+	DefaultViewsInStakingAuction      uint64 = 1
+	DefaultViewsInDKGPhase            uint64 = 50
+	DefaultViewsInEpoch               uint64 = 200
+	DefaultEpochCommitSafetyThreshold uint64 = 20
 
 	integrationBootstrap = "flow-integration-bootstrap"
 
@@ -347,10 +347,6 @@ type NetworkConfig struct {
 type NetworkConfigOpt func(*NetworkConfig)
 
 func NewNetworkConfig(name string, nodes []NodeConfig, opts ...NetworkConfigOpt) NetworkConfig {
-	threshold, err := protocol.DefaultEpochCommitSafetyThreshold(flow.Localnet)
-	if err != nil {
-		panic(err) // should never happen, because localnet has a default safety threshold
-	}
 	c := NetworkConfig{
 		Nodes:                      nodes,
 		Name:                       name,
@@ -358,7 +354,7 @@ func NewNetworkConfig(name string, nodes []NodeConfig, opts ...NetworkConfigOpt)
 		ViewsInStakingAuction:      DefaultViewsInStakingAuction,
 		ViewsInDKGPhase:            DefaultViewsInDKGPhase,
 		ViewsInEpoch:               DefaultViewsInEpoch,
-		EpochCommitSafetyThreshold: threshold,
+		EpochCommitSafetyThreshold: DefaultEpochCommitSafetyThreshold,
 	}
 
 	for _, apply := range opts {
@@ -366,9 +362,9 @@ func NewNetworkConfig(name string, nodes []NodeConfig, opts ...NetworkConfigOpt)
 	}
 
 	// sanity check: the difference between DKG end and safety threshold is >= the default safety threshold
-	if c.ViewsInEpoch-c.EpochCommitSafetyThreshold < c.ViewsInStakingAuction+3*c.ViewsInDKGPhase+threshold {
+	if c.ViewsInEpoch-c.EpochCommitSafetyThreshold < c.ViewsInStakingAuction+3*c.ViewsInDKGPhase+c.EpochCommitSafetyThreshold {
 		panic(fmt.Sprintf("potentially unsafe epoch config: dkg_final_view=%d, epoch_final_view=%d, safety_threshold=%d",
-			c.ViewsInStakingAuction+3*c.ViewsInDKGPhase, c.ViewsInEpoch, threshold))
+			c.ViewsInStakingAuction+3*c.ViewsInDKGPhase, c.ViewsInEpoch, c.EpochCommitSafetyThreshold))
 	}
 
 	return c
@@ -402,6 +398,12 @@ func WithViewsInEpoch(views uint64) func(*NetworkConfig) {
 func WithViewsInDKGPhase(views uint64) func(*NetworkConfig) {
 	return func(config *NetworkConfig) {
 		config.ViewsInDKGPhase = views
+	}
+}
+
+func WithEpochCommitSafetyThreshold(views uint64) func(*NetworkConfig) {
+	return func(config *NetworkConfig) {
+		config.EpochCommitSafetyThreshold = views
 	}
 }
 
