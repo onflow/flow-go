@@ -78,9 +78,6 @@ func (c *TimeoutCollector) processTimeout(timeout *model.TimeoutObject) error {
 			c.notifier.OnInvalidTimeoutDetected(timeout)
 			return nil
 		}
-		if errors.Is(err, model.ErrViewForUnknownEpoch) {
-			return nil
-		}
 		return fmt.Errorf("internal error while processing timeout: %w", err)
 	}
 
