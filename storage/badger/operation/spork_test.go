@@ -42,6 +42,8 @@ func TestProtocolVersion_InsertRetrieve(t *testing.T) {
 	})
 }
 
+// TestEpochCommitSafetyThreshold_InsertRetrieve tests that we can insert and
+// retrieve epoch commit safety threshold values.
 func TestEpochCommitSafetyThreshold_InsertRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		threshold := rand.Uint64()
