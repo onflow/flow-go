@@ -574,13 +574,14 @@ void ep_sum_vector(ep_t jointx, ep_st* x, const int len) {
 // and writes the sum (G1 element) as bytes in dest.
 // The function assumes sigs is correctly allocated with regards to len.
 int ep_sum_vector_byte(byte* dest, const byte* sigs_bytes, const int len) {
-    int error;
+    int error = UNDEFINED;
 
     // temp variables
     ep_t acc;        
     ep_new(acc);
     ep_set_infty(acc);
-    ep_st* sigs = (ep_st*) calloc(len, sizeof(ep_st));
+    ep_st* sigs = (ep_st*) malloc(len * sizeof(ep_st));
+    if (!sigs) goto mem_error;
     for (int i=0; i < len; i++) ep_new(sigs[i]);
 
     // import the points from the array
@@ -602,6 +603,7 @@ out:
     ep_free(acc);
     for (int i=0; i < len; i++) ep_free(sigs[i]);
     free(sigs);
+mem_error:
     return error;
 }
 
