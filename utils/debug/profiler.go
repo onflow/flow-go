@@ -117,7 +117,7 @@ func newProfileFunc(name string) profileFunc {
 }
 
 func (p *AutoProfiler) pprofBlock(w io.Writer) error {
-	runtime.SetBlockProfileRate(10)
+	runtime.SetBlockProfileRate(100)
 	defer runtime.SetBlockProfileRate(0)
 
 	select {
@@ -129,7 +129,7 @@ func (p *AutoProfiler) pprofBlock(w io.Writer) error {
 }
 
 func (p *AutoProfiler) pprofMutex(w io.Writer) error {
-	runtime.SetMutexProfileFraction(1)
+	runtime.SetMutexProfileFraction(10)
 	defer runtime.SetMutexProfileFraction(0)
 
 	select {
