@@ -273,7 +273,7 @@ func (c *ConduitFactory) HandleIncomingEvent(
 		Str("target_ids", fmt.Sprintf("%v", targetIds)).
 		Str("flow_protocol_event", fmt.Sprintf("%T", event)).Logger()
 
-	if !c.attackerRegistered() {
+	if !c.AttackerRegistered() {
 		// no attacker yet registered, hence sending message on the network following the
 		// correct expected behavior.
 		lg.Info().Msg("no attacker registered, passing through event")
@@ -356,7 +356,7 @@ func (c *ConduitFactory) generateResultApproval(attestation *flow.Attestation) (
 	return verifier.GenerateResultApproval(c.me, c.approvalHasher, c.spockHasher, attestation, []byte{})
 }
 
-func (c *ConduitFactory) attackerRegistered() bool {
+func (c *ConduitFactory) AttackerRegistered() bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
