@@ -48,6 +48,11 @@ func TestCorruptibleConduitFrameworkHappyPath(t *testing.T) {
 				// implementing the corruption functionality of the orchestrator.
 				event.FlowProtocolEvent = corruptedEvent
 			}, func(t *testing.T) {
+
+				require.Eventually(t, func() bool {
+					return ccf.AttackerRegistered() // attacker's registration must be done on CCF prior to sending any messages.
+				}, 2*time.Second, 100*time.Millisecond, "registration of attacker on CCF could not be done one time")
+
 				hub := stub.NewNetworkHub()
 				originalEvent := &message.TestMessage{Text: "this is a test message"}
 				testChannel := flownet.Channel("test-channel")
