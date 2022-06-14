@@ -51,7 +51,7 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	})
 	logger := zerolog.New(os.Stdout).Level(zerolog.WarnLevel).Hook(hook)
 
-	authorizedSenderValidator := validator.AuthorizedSenderValidator(logger, channel, unittest.NetworkCodec(), func(pid peer.ID) (*flow.Identity, bool) {
+	authorizedSenderValidator := validator.AuthorizedSenderValidator(logger, channel, func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translator.GetFlowID(pid)
 		if err != nil {
 			return &flow.Identity{}, false
@@ -66,11 +66,11 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	require.NoError(t, an1.AddPeer(context.TODO(), *host.InfoFromHost(sn1.Host())))
 
 	// sn1 and sn2 subscribe to the topic with the topic validator
-	sub1, err := sn1.Subscribe(topic, authorizedSenderValidator)
+	sub1, err := sn1.Subscribe(topic, unittest.NetworkCodec(), authorizedSenderValidator)
 	require.NoError(t, err)
-	sub2, err := sn2.Subscribe(topic, authorizedSenderValidator)
+	sub2, err := sn2.Subscribe(topic, unittest.NetworkCodec(), authorizedSenderValidator)
 	require.NoError(t, err)
-	sub3, err := an1.Subscribe(topic)
+	sub3, err := an1.Subscribe(topic, unittest.NetworkCodec())
 	require.NoError(t, err)
 
 	// assert that the nodes are connected as expected
@@ -157,7 +157,7 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	})
 	logger := zerolog.New(os.Stdout).Level(zerolog.WarnLevel).Hook(hook)
 
-	authorizedSenderValidator := validator.AuthorizedSenderValidator(logger, channel, unittest.NetworkCodec(), func(pid peer.ID) (*flow.Identity, bool) {
+	authorizedSenderValidator := validator.AuthorizedSenderValidator(logger, channel, func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translator.GetFlowID(pid)
 		if err != nil {
 			return &flow.Identity{}, false
@@ -170,9 +170,9 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	require.NoError(t, sn1.AddPeer(context.TODO(), *host.InfoFromHost(sn2.Host())))
 
 	// sn1 subscribe to the topic with the topic validator, while sn2 will subscribe without the topic validator to allow sn2 to publish unauthorized messages
-	sub1, err := sn1.Subscribe(topic, authorizedSenderValidator)
+	sub1, err := sn1.Subscribe(topic, unittest.NetworkCodec(), authorizedSenderValidator)
 	require.NoError(t, err)
-	_, err = sn2.Subscribe(topic)
+	_, err = sn2.Subscribe(topic, unittest.NetworkCodec())
 	require.NoError(t, err)
 
 	// assert that the nodes are connected as expected
@@ -230,7 +230,7 @@ func TestAuthorizedSenderValidator_Unstaked(t *testing.T) {
 	})
 	logger := zerolog.New(os.Stdout).Level(zerolog.WarnLevel).Hook(hook)
 
-	authorizedSenderValidator := validator.AuthorizedSenderValidator(logger, channel, unittest.NetworkCodec(), func(pid peer.ID) (*flow.Identity, bool) {
+	authorizedSenderValidator := validator.AuthorizedSenderValidator(logger, channel, func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translator.GetFlowID(pid)
 		if err != nil {
 			return &flow.Identity{}, false
@@ -243,9 +243,9 @@ func TestAuthorizedSenderValidator_Unstaked(t *testing.T) {
 	require.NoError(t, sn1.AddPeer(context.TODO(), *host.InfoFromHost(sn2.Host())))
 
 	// sn1 subscribe to the topic with the topic validator, while sn2 will subscribe without the topic validator to allow sn2 to publish unauthorized messages
-	sub1, err := sn1.Subscribe(topic, authorizedSenderValidator)
+	sub1, err := sn1.Subscribe(topic, unittest.NetworkCodec(), authorizedSenderValidator)
 	require.NoError(t, err)
-	_, err = sn2.Subscribe(topic)
+	_, err = sn2.Subscribe(topic, unittest.NetworkCodec())
 	require.NoError(t, err)
 
 	// assert that the nodes are connected as expected
@@ -305,7 +305,7 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	})
 	logger := zerolog.New(os.Stdout).Level(zerolog.WarnLevel).Hook(hook)
 
-	authorizedSenderValidator := validator.AuthorizedSenderValidator(logger, channel, unittest.NetworkCodec(), func(pid peer.ID) (*flow.Identity, bool) {
+	authorizedSenderValidator := validator.AuthorizedSenderValidator(logger, channel, func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translator.GetFlowID(pid)
 		if err != nil {
 			return &flow.Identity{}, false
@@ -319,11 +319,11 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	require.NoError(t, an1.AddPeer(context.TODO(), *host.InfoFromHost(sn1.Host())))
 
 	// sn1 subscribe to the topic with the topic validator, while sn2 will subscribe without the topic validator to allow sn2 to publish unauthorized messages
-	sub1, err := sn1.Subscribe(topic, authorizedSenderValidator)
+	sub1, err := sn1.Subscribe(topic, unittest.NetworkCodec(), authorizedSenderValidator)
 	require.NoError(t, err)
-	sub2, err := sn2.Subscribe(topic)
+	sub2, err := sn2.Subscribe(topic, unittest.NetworkCodec())
 	require.NoError(t, err)
-	sub3, err := an1.Subscribe(topic)
+	sub3, err := an1.Subscribe(topic, unittest.NetworkCodec())
 	require.NoError(t, err)
 
 	// assert that the nodes are connected as expected
@@ -393,7 +393,7 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
-	authorizedSenderValidator := validator.AuthorizedSenderValidator(zerolog.Nop(), channel, unittest.NetworkCodec(), func(pid peer.ID) (*flow.Identity, bool) {
+	authorizedSenderValidator := validator.AuthorizedSenderValidator(zerolog.Nop(), channel, func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translator.GetFlowID(pid)
 		if err != nil {
 			return &flow.Identity{}, false
@@ -405,11 +405,11 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	require.NoError(t, ln1.AddPeer(context.TODO(), *host.InfoFromHost(ln2.Host())))
 	require.NoError(t, ln3.AddPeer(context.TODO(), *host.InfoFromHost(ln1.Host())))
 
-	sub1, err := ln1.Subscribe(topic, authorizedSenderValidator)
+	sub1, err := ln1.Subscribe(topic, unittest.NetworkCodec(), authorizedSenderValidator)
 	require.NoError(t, err)
-	sub2, err := ln2.Subscribe(topic, authorizedSenderValidator)
+	sub2, err := ln2.Subscribe(topic, unittest.NetworkCodec(), authorizedSenderValidator)
 	require.NoError(t, err)
-	sub3, err := ln3.Subscribe(topic, authorizedSenderValidator)
+	sub3, err := ln3.Subscribe(topic, unittest.NetworkCodec(), authorizedSenderValidator)
 	require.NoError(t, err)
 
 	// assert that the nodes are connected as expected

@@ -483,10 +483,19 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 		m.wg.Add(1)
 		go func(msg *message.Message) {
 			defer m.wg.Done()
-
-			// log metrics with the channel name as OneToOne
-			m.metrics.NetworkMessageReceived(msg.Size(), metrics.ChannelOneToOne, msg.Type)
-			m.processAuthenticatedMessage(msg, s.Conn().RemotePeer())
+			if decodedMsgPayload, err := m.codec.Decode(msg.Payload); err != nil {
+				m.log.
+					Warn().
+					Err(fmt.Errorf("could not decode message: %w", err)).
+					Hex("sender", msg.OriginID).
+					Hex("event_id", msg.EventID).
+					Str("event_type", msg.Type).
+					Str("channel", msg.ChannelID)
+			} else {
+				// log metrics with the channel name as OneToOne
+				m.metrics.NetworkMessageReceived(msg.Size(), metrics.ChannelOneToOne, msg.Type)
+				m.processAuthenticatedMessage(msg, decodedMsgPayload, s.Conn().RemotePeer())
+			}
 		}(&msg)
 	}
 
@@ -503,11 +512,11 @@ func (m *Middleware) Subscribe(channel network.Channel) error {
 		// for channels used by the staked nodes, add the topic validator to filter out messages from non-staked nodes
 		validators = append(validators,
 			// NOTE: The AuthorizedSenderValidator will assert the sender is a staked node
-			psValidator.AuthorizedSenderValidator(m.log, channel, m.codec, m.ov.Identity),
+			psValidator.AuthorizedSenderValidator(m.log, channel, m.ov.Identity),
 		)
 	}
 
-	s, err := m.libP2PNode.Subscribe(topic, validators...)
+	s, err := m.libP2PNode.Subscribe(topic, m.codec, validators...)
 	if err != nil {
 		return fmt.Errorf("failed to subscribe for channel %s: %w", channel, err)
 	}
@@ -543,7 +552,7 @@ func (m *Middleware) Unsubscribe(channel network.Channel) error {
 // In particular, it populates the `OriginID` field of the message with a Flow ID translated from this source.
 // The assumption is that the message has been authenticated at the network level (libp2p) to originate from the peer with ID `peerID`
 // this requirement is fulfilled by e.g. the output of readConnection and readSubscription
-func (m *Middleware) processAuthenticatedMessage(msg *message.Message, peerID peer.ID) {
+func (m *Middleware) processAuthenticatedMessage(msg *message.Message, decodedMsgPayload interface{}, peerID peer.ID) {
 	flowID, err := m.idTranslator.GetFlowID(peerID)
 	if err != nil {
 		m.log.Warn().Err(err).Msgf("received message from unknown peer %v, and was dropped", peerID.String())
@@ -552,11 +561,11 @@ func (m *Middleware) processAuthenticatedMessage(msg *message.Message, peerID pe
 
 	msg.OriginID = flowID[:]
 
-	m.processMessage(msg)
+	m.processMessage(msg, decodedMsgPayload)
 }
 
 // processMessage processes a message and eventually passes it to the overlay
-func (m *Middleware) processMessage(msg *message.Message) {
+func (m *Middleware) processMessage(msg *message.Message, decodedMsgPayload interface{}) {
 	originID := flow.HashToID(msg.OriginID)
 
 	m.log.Debug().
@@ -574,7 +583,7 @@ func (m *Middleware) processMessage(msg *message.Message) {
 	}
 
 	// if validation passed, send the message to the overlay
-	err := m.ov.Receive(originID, msg)
+	err := m.ov.Receive(originID, msg, decodedMsgPayload)
 	if err != nil {
 		m.log.Error().Err(err).Msg("could not deliver payload")
 	}

@@ -52,13 +52,13 @@ func TestFilterSubscribe(t *testing.T) {
 
 	badTopic := network.TopicFromChannel(network.SyncCommittee, sporkId)
 
-	sub1, err := node1.Subscribe(badTopic)
+	sub1, err := node1.Subscribe(badTopic, unittest.NetworkCodec())
 	require.NoError(t, err)
 
-	sub2, err := node2.Subscribe(badTopic)
+	sub2, err := node2.Subscribe(badTopic, unittest.NetworkCodec())
 	require.NoError(t, err)
 
-	unstakedSub, err := unstakedNode.Subscribe(badTopic)
+	unstakedSub, err := unstakedNode.Subscribe(badTopic, unittest.NetworkCodec())
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
@@ -129,7 +129,7 @@ func TestCanSubscribe(t *testing.T) {
 	}()
 
 	goodTopic := network.TopicFromChannel(network.ProvideCollections, sporkId)
-	_, err := collectionNode.Subscribe(goodTopic)
+	_, err := collectionNode.Subscribe(goodTopic, unittest.NetworkCodec())
 	require.NoError(t, err)
 
 	var badTopic network.Topic
@@ -143,11 +143,11 @@ func TestCanSubscribe(t *testing.T) {
 			break
 		}
 	}
-	_, err = collectionNode.Subscribe(badTopic)
+	_, err = collectionNode.Subscribe(badTopic, unittest.NetworkCodec())
 	require.Error(t, err)
 
 	clusterTopic := network.TopicFromChannel(network.ChannelSyncCluster(flow.Emulator), sporkId)
-	_, err = collectionNode.Subscribe(clusterTopic)
+	_, err = collectionNode.Subscribe(clusterTopic, unittest.NetworkCodec())
 	require.NoError(t, err)
 }
 

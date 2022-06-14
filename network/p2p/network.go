@@ -338,15 +338,15 @@ func (n *Network) Topology() (flow.IdentityList, error) {
 	return top, nil
 }
 
-func (n *Network) Receive(nodeID flow.Identifier, msg *message.Message) error {
-	err := n.processNetworkMessage(nodeID, msg)
+func (n *Network) Receive(nodeID flow.Identifier, msg *message.Message, decodedMsgPayload interface{}) error {
+	err := n.processNetworkMessage(nodeID, msg, decodedMsgPayload)
 	if err != nil {
 		return fmt.Errorf("could not process message: %w", err)
 	}
 	return nil
 }
 
-func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message) error {
+func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message, decodedMsgPayload interface{}) error {
 	// checks the cache for deduplication and adds the message if not already present
 	if !n.receiveCache.Add(message.EventID) {
 		log := n.logger.With().
@@ -364,22 +364,16 @@ func (n *Network) processNetworkMessage(senderID flow.Identifier, message *messa
 		return nil
 	}
 
-	// Convert message payload to a known message type
-	decodedMessage, err := n.codec.Decode(message.Payload)
-	if err != nil {
-		return fmt.Errorf("could not decode event: %w", err)
-	}
-
 	// create queue message
 	qm := queue.QMessage{
-		Payload:  decodedMessage,
+		Payload:  decodedMsgPayload,
 		Size:     message.Size(),
 		Target:   network.Channel(message.ChannelID),
 		SenderID: senderID,
 	}
 
 	// insert the message in the queue
-	err = n.queue.Insert(qm)
+	err := n.queue.Insert(qm)
 	if err != nil {
 		return fmt.Errorf("failed to insert message in queue: %w", err)
 	}

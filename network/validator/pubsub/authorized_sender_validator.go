@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/network"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/message"
 )
 
 // AuthorizedSenderValidator using the getIdentity func will check if the role of the sender
@@ -25,13 +24,13 @@ import (
 // 4. The message is authorized to be sent on channel.
 // 4. The sender role is authorized to send message channel.
 // 5. The sender role is authorized to participate on channel.
-func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, c network.Codec, getIdentity func(peer.ID) (*flow.Identity, bool)) MessageValidator {
+func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, getIdentity func(peer.ID) (*flow.Identity, bool)) MessageValidator {
 	log = log.With().
 		Str("component", "authorized_sender_validator").
 		Str("network_channel", channel.String()).
 		Logger()
 
-	return func(ctx context.Context, from peer.ID, msg *message.Message) pubsub.ValidationResult {
+	return func(ctx context.Context, from peer.ID, msg interface{}) pubsub.ValidationResult {
 		identity, ok := getIdentity(from)
 		if !ok {
 			log.Warn().Str("peer_id", from.String()).Msg("could not verify identity of sender")
@@ -49,17 +48,7 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, c ne
 			return pubsub.ValidationReject
 		}
 
-		v, err := c.Decode(msg.Payload)
-		if err != nil {
-			log.Warn().
-				Err(err).
-				Str("peer_id", from.String()).
-				Str("role", identity.Role.String()).
-				Str("node_id", identity.NodeID.String()).
-				Msg("could not decode message with codec")
-		}
-
-		if what, err := IsAuthorizedSender(identity, channel, v); err != nil {
+		if what, err := IsAuthorizedSender(identity, channel, msg); err != nil {
 			log.Warn().
 				Err(err).
 				Str("peer_id", from.String()).
