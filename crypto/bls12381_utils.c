@@ -88,6 +88,7 @@ ctx_t* relic_init_BLS12_381() {
 
     // initialize relic core with a new context
     ctx_t* bls_ctx = (ctx_t*) calloc(1, sizeof(ctx_t));
+    if (!bls_ctx) return NULL;
     core_set(bls_ctx);
     if (core_init() != RLC_OK) return NULL;
 
