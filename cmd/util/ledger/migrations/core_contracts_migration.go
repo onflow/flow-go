@@ -63,8 +63,21 @@ func coreContractAddresses(chain flow.Chain) networkAddresses {
 			stakingProxy:      "7aad92e5a0715d21",
 		}
 	case flow.Mainnet:
-		// TODO:
-		panic("TODO")
+		return networkAddresses{
+			fungibleToken:     "f233dcee88fe0abe",
+			flowToken:         "1654653399040a61",
+			contractAudits:    "e467b9dd11fa00df",
+			serviceAccount:    "e467b9dd11fa00df",
+			storageFees:       "e467b9dd11fa00df",
+			fees:              "f919ee77447b7497",
+			qc:                "8624b52f9ddcd04a",
+			epoch:             "8624b52f9ddcd04a",
+			dkg:               "8624b52f9ddcd04a",
+			stakingTable:      "8624b52f9ddcd04a",
+			lockedTokens:      "8d0e87b65159ae63",
+			stakingCollection: "8d0e87b65159ae63",
+			stakingProxy:      "62430cf28c26d095",
+		}
 	default:
 		panic(fmt.Errorf("unsupported chain: %s", chain))
 	}
