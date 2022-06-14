@@ -165,7 +165,7 @@ func (builder *FollowerServiceBuilder) buildFollowerState() *FollowerServiceBuil
 
 func (builder *FollowerServiceBuilder) buildSyncCore() *FollowerServiceBuilder {
 	builder.Module("sync core", func(node *cmd.NodeConfig) error {
-		syncCore, err := synchronization.New(node.Logger, node.SyncCoreConfig)
+		syncCore, err := synchronization.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector())
 		builder.SyncCore = syncCore
 
 		return err

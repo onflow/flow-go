@@ -9,6 +9,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/onflow/flow-go/admin/commands"
+	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
+	"github.com/onflow/flow-go/crypto"
+
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/routing"
@@ -27,7 +31,6 @@ import (
 	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
@@ -185,6 +188,7 @@ type FlowAccessNodeBuilder struct {
 	CollectionsToMarkExecuted  *stdmap.Times
 	BlocksToMarkExecuted       *stdmap.Times
 	TransactionMetrics         module.TransactionMetrics
+	AccessMetrics              module.AccessMetrics
 	PingMetrics                module.PingMetrics
 	Committee                  hotstuff.Committee
 	Finalized                  *flow.Header
@@ -232,7 +236,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilde
 
 func (builder *FlowAccessNodeBuilder) buildSyncCore() *FlowAccessNodeBuilder {
 	builder.Module("sync core", func(node *cmd.NodeConfig) error {
-		syncCore, err := synchronization.New(node.Logger, node.SyncCoreConfig)
+		syncCore, err := synchronization.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector())
 		builder.SyncCore = syncCore
 
 		return err
@@ -478,6 +482,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				builder.State,
 				builder.Storage.Headers,
 				builder.Storage.Results,
+				builder.Storage.Seals,
 				builder.executionDataConfig,
 			)
 
@@ -655,6 +660,10 @@ func (builder *FlowAccessNodeBuilder) Initialize() error {
 	// enqueue the regular network
 	builder.EnqueueNetworkInit()
 
+	builder.AdminCommand("get-transactions", func(conf *cmd.NodeConfig) commands.AdminCommand {
+		return storageCommands.NewGetTransactionsCommand(conf.State, conf.Storage.Payloads, conf.Storage.Collections)
+	})
+
 	// if this is an access node that supports unstaked followers, enqueue the unstaked network
 	if builder.supportsObserverAndFollower {
 		builder.enqueueUnstakedNetworkInit()
@@ -756,6 +765,10 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.logTxTimeToExecuted, builder.logTxTimeToFinalizedExecuted)
 			return nil
 		}).
+		Module("access metrics", func(node *cmd.NodeConfig) error {
+			builder.AccessMetrics = metrics.NewAccessCollector()
+			return nil
+		}).
 		Module("ping metrics", func(node *cmd.NodeConfig) error {
 			builder.PingMetrics = metrics.NewPingCollector()
 			return nil
@@ -771,7 +784,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			builder.RpcEng = rpc.New(
+			var err error
+			builder.RpcEng, err = rpc.New(
 				node.Logger,
 				node.State,
 				builder.rpcConf,
@@ -785,6 +799,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Storage.Results,
 				node.RootChainID,
 				builder.TransactionMetrics,
+				builder.AccessMetrics,
 				builder.collectionGRPCPort,
 				builder.executionGRPCPort,
 				builder.retryEnabled,
@@ -793,6 +808,9 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.apiBurstlimits,
 				nil,
 			)
+			if err != nil {
+				return nil, err
+			}
 			return builder.RpcEng, nil
 		}).
 		Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {

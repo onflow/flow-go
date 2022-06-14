@@ -276,7 +276,7 @@ func (builder *ObserverServiceBuilder) buildFollowerState() *ObserverServiceBuil
 
 func (builder *ObserverServiceBuilder) buildSyncCore() *ObserverServiceBuilder {
 	builder.Module("sync core", func(node *cmd.NodeConfig) error {
-		syncCore, err := synchronization.New(node.Logger, node.SyncCoreConfig)
+		syncCore, err := synchronization.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector())
 		builder.SyncCore = syncCore
 
 		return err
@@ -522,6 +522,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionDataRequester() *ObserverSe
 				builder.State,
 				builder.Storage.Headers,
 				builder.Storage.Results,
+				builder.Storage.Seals,
 				builder.executionDataConfig,
 			)
 
@@ -969,7 +970,7 @@ func (builder *ObserverServiceBuilder) attachRPCEngine() {
 		if err != nil {
 			return nil, err
 		}
-		builder.RpcEng = rpc.New(
+		builder.RpcEng, err = rpc.New(
 			node.Logger,
 			node.State,
 			builder.rpcConf,
@@ -983,6 +984,7 @@ func (builder *ObserverServiceBuilder) attachRPCEngine() {
 			node.Storage.Results,
 			node.RootChainID,
 			nil,
+			nil,
 			0,
 			0,
 			false,
@@ -991,6 +993,9 @@ func (builder *ObserverServiceBuilder) attachRPCEngine() {
 			builder.apiBurstlimits,
 			proxy,
 		)
+                if err != nil {
+			return nil, err
+		}
 		return builder.RpcEng, nil
 	})
 }

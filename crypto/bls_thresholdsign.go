@@ -563,7 +563,7 @@ func BLSThresholdKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 		)
 	}
 	// group public key
-	genScalarMultG2(&X0, &a[0])
+	generatorScalarMultG2(&X0, &a[0])
 	// export the keys
 	skShares := make([]PrivateKey, size)
 	pkShares := make([]PublicKey, size)
