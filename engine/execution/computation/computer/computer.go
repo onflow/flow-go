@@ -413,7 +413,7 @@ func (e *blockComputer) executeTransaction(
 		Str("block_id", res.ExecutableBlock.ID().String()).
 		Str("traceID", traceID).
 		Uint64("computation_used", txResult.ComputationUsed).
-		Uint64("memory_used", tx.MemoryUsed).
+		Uint64("memory_used", tx.MemoryEstimate).
 		Uint64("memAlloc", memAllocAfter-memAllocBefore).
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds())
 
@@ -433,7 +433,7 @@ func (e *blockComputer) executeTransaction(
 		time.Since(startedAt),
 		tx.ComputationUsed,
 		memAllocAfter-memAllocBefore,
-		tx.MemoryUsed,
+		tx.MemoryEstimate,
 		len(tx.Events),
 		tx.Err != nil,
 	)

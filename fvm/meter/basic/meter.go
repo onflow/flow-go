@@ -15,7 +15,7 @@ var _ interfaceMeter.Meter = &Meter{}
 type Meter struct {
 	computationUsed  uint
 	computationLimit uint
-	memoryUsed       uint
+	memoryEstimate   uint
 	memoryLimit      uint
 
 	computationIntensities interfaceMeter.MeteredComputationIntensities
@@ -52,8 +52,8 @@ func (m *Meter) MergeMeter(child interfaceMeter.Meter, enforceLimits bool) error
 		m.computationIntensities[key] += intensity
 	}
 
-	m.memoryUsed = m.memoryUsed + child.TotalMemoryUsed()
-	if enforceLimits && m.memoryUsed > m.memoryLimit {
+	m.memoryEstimate = m.memoryEstimate + child.TotalMemoryEstimate()
+	if enforceLimits && m.memoryEstimate > m.memoryLimit {
 		return errors.NewMemoryLimitExceededError(uint64(m.memoryLimit))
 	}
 	for key, intensity := range child.MemoryIntensities() {
@@ -100,8 +100,8 @@ func (m *Meter) TotalComputationLimit() uint {
 // MeterMemory captures memory usage and returns an error if it goes beyond the limit
 func (m *Meter) MeterMemory(kind common.MemoryKind, intensity uint) error {
 	m.memoryIntensities[kind] += intensity
-	m.memoryUsed += intensity
-	if m.memoryUsed > m.memoryLimit {
+	m.memoryEstimate += intensity
+	if m.memoryEstimate > m.memoryLimit {
 		return errors.NewMemoryLimitExceededError(uint64(m.memoryLimit))
 	}
 	return nil
@@ -112,9 +112,9 @@ func (m *Meter) MemoryIntensities() interfaceMeter.MeteredMemoryIntensities {
 	return m.memoryIntensities
 }
 
-// TotalMemoryUsed returns the total memory used
-func (m *Meter) TotalMemoryUsed() uint {
-	return m.memoryUsed
+// TotalMemoryEstimate returns the total memory estimated
+func (m *Meter) TotalMemoryEstimate() uint {
+	return m.memoryEstimate
 }
 
 // TotalMemoryLimit returns the total memory limit

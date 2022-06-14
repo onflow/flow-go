@@ -3663,7 +3663,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			tx := fvm.Transaction(txBody, 0)
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
-			require.Greater(t, tx.MemoryUsed, uint64(20_000_000_000))
+			require.Greater(t, tx.MemoryEstimate, uint64(20_000_000_000))
 
 			assert.True(t, errors.IsMemoryLimitExceededError(tx.Err))
 		},
@@ -3699,7 +3699,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			tx := fvm.Transaction(txBody, 0)
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
-			require.Equal(t, uint64(0), tx.MemoryUsed)
+			require.Equal(t, uint64(0), tx.MemoryEstimate)
 
 			require.NoError(t, tx.Err)
 		},
@@ -3766,7 +3766,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
 			// There are 100 breaks and each break uses 1_000_000 memory
-			require.Greater(t, tx.MemoryUsed, uint64(100_000_000))
+			require.Greater(t, tx.MemoryEstimate, uint64(100_000_000))
 
 			var memoryLimitExceededError *errors.MemoryLimitExceededError
 			assert.ErrorAs(t, tx.Err, &memoryLimitExceededError)
