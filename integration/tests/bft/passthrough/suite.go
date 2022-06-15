@@ -3,7 +3,6 @@ package passthrough
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -14,8 +13,6 @@ import (
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -150,34 +147,34 @@ func (s *Suite) SetupSuite() {
 
 	s.Orchestrator = NewDummyOrchestrator(logger)
 
-	// start attack network
-	codec := cbor.NewCodec()
-	connector := attacknetwork.NewCorruptedConnector(s.log, s.net.CorruptedIdentities(), s.net.CorruptedPortMapping)
-	attackNetwork, err := attacknetwork.NewAttackNetwork(s.log,
-		codec,
-		s.Orchestrator,
-		connector,
-		s.net.CorruptedIdentities())
-	require.NoError(s.T(), err)
-	s.attackNet = attackNetwork
-
-	attackCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go func() {
-		select {
-		case err := <-errChan:
-			s.T().Error("attackNetwork startup encountered fatal error", err)
-		case <-ctx.Done():
-			return
-		}
-	}()
-
-	attackNetwork.Start(attackCtx)
-	unittest.RequireCloseBefore(s.T(), attackNetwork.Ready(), 1*time.Second, "could not start attack network on time")
+	//// start attack network
+	//codec := cbor.NewCodec()
+	//connector := attacknetwork.NewCorruptedConnector(s.log, s.net.CorruptedIdentities(), s.net.CorruptedPortMapping)
+	//attackNetwork, err := attacknetwork.NewAttackNetwork(s.log,
+	//	codec,
+	//	s.Orchestrator,
+	//	connector,
+	//	s.net.CorruptedIdentities())
+	//require.NoError(s.T(), err)
+	//s.attackNet = attackNetwork
+	//
+	//attackCtx, errChan := irrecoverable.WithSignaler(ctx)
+	//go func() {
+	//	select {
+	//	case err := <-errChan:
+	//		s.T().Error("attackNetwork startup encountered fatal error", err)
+	//	case <-ctx.Done():
+	//		return
+	//	}
+	//}()
+	//
+	//attackNetwork.Start(attackCtx)
+	//unittest.RequireCloseBefore(s.T(), attackNetwork.Ready(), 1*time.Second, "could not start attack network on time")
 }
 
 // TearDownSuite tears down the test network of Flow as well as the BFT testing attack network.
 func (s *Suite) TearDownSuite() {
 	s.net.Remove()
 	s.cancel()
-	unittest.RequireCloseBefore(s.T(), s.attackNet.Done(), 1*time.Second, "could not stop attack network on time")
+	// unittest.RequireCloseBefore(s.T(), s.attackNet.Done(), 1*time.Second, "could not stop attack network on time")
 }
