@@ -15,6 +15,13 @@ type TimerInfo struct {
 	Duration  time.Duration
 }
 
+// NewViewEvent indicates that a new view has started. While it has the same
+// data model as `TimerInfo`, their semantics are different (hence we use
+// different types): `TimerInfo` represents a continuous time interval. In
+// contrast, NewViewEvent marks the specific point in time, when the timer
+// is started.
+type NewViewEvent TimerInfo
+
 // TimeoutObject represents intent of replica to leave its current view with a timeout. This concept is very similar to
 // HotStuff vote. Valid TimeoutObject is signed by staking key.
 type TimeoutObject struct {

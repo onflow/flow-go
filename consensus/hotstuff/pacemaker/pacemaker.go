@@ -101,7 +101,7 @@ func (p *ActivePaceMaker) TimeoutChannel() <-chan time.Time {
 }
 
 // ProcessQC notifies the pacemaker with a new QC, which might allow pacemaker to
-// fast-forward its view. In contrast to `ProcessTC`, this function does _not_ handle `nil` inputs. 
+// fast-forward its view. In contrast to `ProcessTC`, this function does _not_ handle `nil` inputs.
 // No errors are expected, any error should be treated as exception
 func (p *ActivePaceMaker) ProcessQC(qc *flow.QuorumCertificate) (*model.NewViewEvent, error) {
 	if qc.View < p.CurView() {
@@ -122,7 +122,11 @@ func (p *ActivePaceMaker) ProcessQC(qc *flow.QuorumCertificate) (*model.NewViewE
 	timerInfo := p.timeoutControl.StartTimeout(newView)
 	p.notifier.OnStartingTimeout(timerInfo)
 
-	return &model.NewViewEvent{View: newView}, nil
+	return &model.NewViewEvent{
+		View:      timerInfo.View,
+		StartTime: timerInfo.StartTime,
+		Duration:  timerInfo.Duration,
+	}, nil
 }
 
 // ProcessTC notifies the Pacemaker of a new timeout certificate, which may allow
