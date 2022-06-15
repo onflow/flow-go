@@ -41,7 +41,7 @@ func main() {
 	metricport := flag.Uint("metricport", 8080, "port for /metrics endpoint")
 	pushgateway := flag.String("pushgateway", "127.0.0.1:9091", "host:port for pushgateway")
 	profilerEnabled := flag.Bool("profiler-enabled", false, "whether to enable the auto-profiler")
-	trackTxsFlag := flag.Bool("track-txs", false, "track individual transaction timings (adds significant overhead)")
+	_ = flag.Bool("track-txs", false, "deprecated")
 	accountMultiplierFlag := flag.Int("account-multiplier", 50, "number of accounts to create per load tps")
 	feedbackEnabled := flag.Bool("feedback-enabled", true, "wait for trannsaction execution before submitting new transaction")
 	flag.Parse()
@@ -154,7 +154,6 @@ func main() {
 					&serviceAccountAddress,
 					&fungibleTokenAddress,
 					&flowTokenAddress,
-					*trackTxsFlag,
 					c.tps,
 					*accountMultiplierFlag,
 					utils.LoadType(*loadTypeFlag),

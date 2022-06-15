@@ -40,15 +40,13 @@ type ContLoadGenerator struct {
 	initialized          bool
 	tps                  int
 	numberOfAccounts     int
-	trackTxs             bool
 	flowClient           *client.Client
 	serviceAccount       *flowAccount
 	flowTokenAddress     *flowsdk.Address
 	fungibleTokenAddress *flowsdk.Address
 	favContractAddress   *flowsdk.Address
 	accounts             []*flowAccount
-	availableAccounts    chan *flowAccount // queue with accounts available for   workers
-	txTracker            *TxTracker
+	availableAccounts    chan *flowAccount // queue with accounts available for workers
 	workerStatsTracker   *WorkerStatsTracker
 	workers              []*Worker
 	stopped              bool
@@ -69,7 +67,6 @@ func NewContLoadGenerator(
 	serviceAccountAddress *flowsdk.Address,
 	fungibleTokenAddress *flowsdk.Address,
 	flowTokenAddress *flowsdk.Address,
-	trackTxs bool,
 	tps int,
 	accountMultiplier int,
 	loadType LoadType,
@@ -83,17 +80,11 @@ func NewContLoadGenerator(
 		return nil, fmt.Errorf("error loading service account %w", err)
 	}
 
-	txStatsTracker := NewTxStatsTracker()
-	txTracker, err := NewTxTracker(log, 5000, 100, loadedAccessAddr, time.Second, txStatsTracker)
-	if err != nil {
-		return nil, err
-	}
-
 	var follower TxFollower
 	if feedbackEnabled {
-		follower, err = NewTxFollower(context.TODO(), supervisorClient, WithLogger(log))
+		follower, err = NewTxFollower(context.TODO(), supervisorClient, WithLogger(log), WithMetrics(loaderMetrics))
 	} else {
-		follower, err = NewNopTxFollower(context.TODO(), supervisorClient, WithLogger(log))
+		follower, err = NewNopTxFollower(context.TODO(), supervisorClient)
 	}
 	if err != nil {
 		return nil, err
@@ -105,14 +96,12 @@ func NewContLoadGenerator(
 		initialized:          false,
 		tps:                  tps,
 		numberOfAccounts:     numberOfAccounts,
-		trackTxs:             trackTxs,
 		flowClient:           flowClient,
 		serviceAccount:       servAcc,
 		fungibleTokenAddress: fungibleTokenAddress,
 		flowTokenAddress:     flowTokenAddress,
 		accounts:             make([]*flowAccount, 0),
 		availableAccounts:    make(chan *flowAccount, numberOfAccounts),
-		txTracker:            txTracker,
 		workerStatsTracker:   NewWorkerStatsTracker(),
 		follower:             follower,
 		loadType:             loadType,
@@ -176,39 +165,14 @@ func (lg *ContLoadGenerator) SetupFavContract() error {
 		return err
 	}
 
-	lg.sendTx(-1, deploymentTx)
-
-	wait := lg.txTracker.AddTx(
-		deploymentTx.ID(),
-		txCallbacks{
-			onExecuted: func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
-				lg.log.Debug().
-					Str("status", res.Status.String()).
-					Msg("fav contract deployment tx executed")
-
-				if res.Error != nil {
-					lg.log.Error().
-						Err(res.Error).
-						Msg("fav contract deployment tx failed")
-					err = res.Error
-				}
-			},
-			onExpired: func(_ flowsdk.Identifier) {
-				lg.log.Error().Msg("fav contract deployment transaction has expired")
-				err = fmt.Errorf("fav contract deployment transaction has expired")
-			},
-			onTimeout: func(_ flowsdk.Identifier) {
-				lg.log.Error().Msg("fav contract deployment transaction has timed out")
-				err = fmt.Errorf("fav contract deployment transaction has timed out")
-			},
-		},
-		120*time.Second)
-
-	<-wait
+	ch, err := lg.sendTx(-1, deploymentTx)
+	if err != nil {
+		return err
+	}
+	<-ch
 
 	lg.favContractAddress = acc.address
-
-	return err
+	return nil
 }
 
 func (lg *ContLoadGenerator) Start() {
@@ -240,7 +204,6 @@ func (lg *ContLoadGenerator) Stop() {
 	for _, w := range lg.workers {
 		w.Stop()
 	}
-	lg.txTracker.Stop()
 	lg.workerStatsTracker.StopPrinting()
 	lg.follower.Stop()
 }
@@ -304,76 +267,47 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 	lg.serviceAccount.accountKey.SequenceNumber++
 	lg.serviceAccount.signerLock.Unlock()
 
-	err = lg.flowClient.SendTransaction(context.Background(), *createAccountTx)
+	var i int
+	ch, err := lg.sendTx(-1, createAccountTx)
 	if err != nil {
 		return err
 	}
+	<-ch
 
-	executed := make(chan struct{})
-
-	var i int
 	log := lg.log.With().Str("tx_id", createAccountTx.ID().String()).Logger()
-	wait := lg.txTracker.AddTx(
-		createAccountTx.ID(),
-		txCallbacks{
-			onExecuted: func(txID flowsdk.Identifier, res *flowsdk.TransactionResult) {
-				log.Trace().
-					Str("status", res.Status.String()).
-					Msg("account creation tx executed")
-
-				if res.Error != nil {
-					log.Error().
-						Err(res.Error).
-						Msg("account creation tx failed")
-				}
-
-				for _, event := range res.Events {
-					log.Trace().
-						Str("event_type", event.Type).
-						Str("event", event.String()).
-						Msg("account creation tx event")
-
-					if event.Type == flowsdk.EventAccountCreated {
-						accountCreatedEvent := flowsdk.AccountCreatedEvent(event)
-						accountAddress := accountCreatedEvent.Address()
-
-						log.Trace().
-							Hex("address", accountAddress.Bytes()).
-							Msg("new account created")
-
-						signer, err := crypto.NewInMemorySigner(privKey, accountKey.HashAlgo)
-						if err != nil {
-							panic(err)
-						}
-
-						newAcc := newFlowAccount(i, &accountAddress, accountKey, signer)
-						i++
-
-						lg.accounts = append(lg.accounts, newAcc)
-						lg.availableAccounts <- newAcc
-
-						log.Trace().
-							Hex("address", accountAddress.Bytes()).
-							Msg("new account added")
-					}
-				}
-				close(executed)
-			},
-			onExpired: func(_ flowsdk.Identifier) {
-				log.Error().Msg("setup transaction (account creation) has expired")
-			},
-			onTimeout: func(_ flowsdk.Identifier) {
-				log.Error().Msg("setup transaction (account creation) has timed out")
-			},
-		},
-		120*time.Second,
-	)
-
-	select {
-	case <-wait:
-	case <-executed:
+	result, err := lg.flowClient.GetTransactionResult(context.Background(), createAccountTx.ID())
+	if err != nil {
+		return fmt.Errorf("failed to get transactions result: %w", err)
 	}
 
+	log.Trace().Str("status", result.Status.String()).Msg("account creation tx executed")
+	if result.Error != nil {
+		log.Error().Err(result.Error).Msg("account creation tx failed")
+	}
+
+	for _, event := range result.Events {
+		log.Trace().Str("event_type", event.Type).Str("event", event.String()).Msg("account creation tx event")
+
+		if event.Type == flowsdk.EventAccountCreated {
+			accountCreatedEvent := flowsdk.AccountCreatedEvent(event)
+			accountAddress := accountCreatedEvent.Address()
+
+			log.Trace().Hex("address", accountAddress.Bytes()).Msg("new account created")
+
+			signer, err := crypto.NewInMemorySigner(privKey, accountKey.HashAlgo)
+			if err != nil {
+				panic(err)
+			}
+
+			newAcc := newFlowAccount(i, &accountAddress, accountKey, signer)
+			i++
+
+			lg.accounts = append(lg.accounts, newAcc)
+			lg.availableAccounts <- newAcc
+
+			log.Trace().Hex("address", accountAddress.Bytes()).Msg("new account added")
+		}
+	}
 	return nil
 }
 
@@ -419,21 +353,25 @@ func (lg *ContLoadGenerator) sendAddKeyTx(workerID int) {
 		return
 	}
 
-	log.Trace().Msg("workerID=%d creating transaction")
+	log.Trace().Msg("creating transaction")
 
 	addKeysTx.SetReferenceBlockID(lg.follower.BlockID()).
 		SetProposalKey(*acc.address, 0, acc.seqNumber).
 		SetPayer(*acc.address).
 		AddAuthorizer(*acc.address)
 
-	log.Trace().Msg("workerID=%d signing transaction")
+	log.Trace().Msg("signing transaction")
 	err = acc.signTx(addKeysTx, 0)
 	if err != nil {
 		log.Error().Err(err).Msg("error signing transaction")
 		return
 	}
 
-	lg.sendTx(workerID, addKeysTx)
+	ch, err := lg.sendTx(workerID, addKeysTx)
+	if err != nil {
+		return
+	}
+	<-ch
 }
 
 func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
@@ -494,15 +432,13 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 		return
 	}
 
-	// Wait for completion before sending next transaction to avoid race condition
-	ch := lg.follower.CompleteChanByID(transferTx.ID())
-
 	startTime := time.Now()
-	lg.sendTx(workerID, transferTx)
+	ch, err := lg.sendTx(workerID, transferTx)
+	if err != nil {
+		return
+	}
 
-	log.Trace().
-		Hex("txID", transferTx.ID().Bytes()).
-		Msg("transaction sent")
+	log.Trace().Hex("txID", transferTx.ID().Bytes()).Msg("transaction sent")
 
 	for {
 		select {
@@ -556,40 +492,27 @@ func (lg *ContLoadGenerator) sendFavContractTx(workerID int) {
 		return
 	}
 
-	lg.sendTx(workerID, tx)
+	ch, err := lg.sendTx(workerID, tx)
+	if err != nil {
+		return
+	}
+	<-ch
 }
 
-func (lg *ContLoadGenerator) sendTx(workerID int, tx *flowsdk.Transaction) {
+func (lg *ContLoadGenerator) sendTx(workerID int, tx *flowsdk.Transaction) (<-chan struct{}, error) {
 	log := lg.log.With().Int("workerID", workerID).Str("tx_id", tx.ID().String()).Logger()
 	log.Trace().Msg("sending transaction")
+
+	// Add watcher before sending the transaction to avoid race condition
+	ch := lg.follower.CompleteChanByID(tx.ID())
 
 	err := lg.flowClient.SendTransaction(context.Background(), *tx)
 	if err != nil {
 		log.Error().Err(err).Msg("error sending transaction")
-		return
+		return nil, err
 	}
 
 	lg.workerStatsTracker.AddTxSent()
 	lg.loaderMetrics.TransactionSent()
-
-	if lg.trackTxs {
-		wait := lg.txTracker.AddTx(
-			tx.ID(),
-			txCallbacks{
-				onFinalized: func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
-					log.Trace().Str("tx_id", tx.ID().String()).Msg("finalized tx")
-				},
-				onSealed: func(_ flowsdk.Identifier, _ *flowsdk.TransactionResult) {
-					log.Trace().Str("tx_id", tx.ID().String()).Msg("sealed tx")
-				},
-				onExpired: func(_ flowsdk.Identifier) {
-					log.Warn().Str("tx_id", tx.ID().String()).Msg("tx expired")
-				},
-				onTimeout: func(_ flowsdk.Identifier) {
-					log.Warn().Str("tx_id", tx.ID().String()).Msg("tx timed out")
-				},
-			},
-			60*time.Second)
-		<-wait
-	}
+	return ch, err
 }
