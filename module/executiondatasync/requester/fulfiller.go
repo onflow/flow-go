@@ -17,14 +17,35 @@ import (
 type jobResult struct {
 	executionData *execution_data.BlockExecutionData
 	resultID      flow.Identifier
-	blockHeight   uint64
-	err           error
+	blockHeight   uint64 // height of the executed block
+	err           error  // err is set when a critical, non-retryable error was encountered while downloading execution data for this result
 }
 
+type sealedResult struct {
+	resultID    flow.Identifier
+	blockHeight uint64
+}
+
+// The fulfiller consumes sealed results from the dispatcher and
+// completed execution data download jobs from the handler.
+// A block is "fulfilled" when it has been sealed and we have
+// downloaded the sealed execution data for that block.
+// The job of the fulfiller is to detect when a new block has been
+// fulfilled, and:
+// * notify subscribers via the notifier
+// * update the fulfilled height in the execution state download tracker
 type fulfiller struct {
-	jobResults    map[uint64]map[flow.Identifier]*jobResult
+	// jobResults tracks all completed jobs for unsealed heights, including potentially for
+	// invalid results which will never be sealed
+	// height -> resultID -> jobResult
+	jobResults map[uint64]map[flow.Identifier]*jobResult
+
+	// sealedResults tracks the result ID which is sealed at each height
 	sealedResults map[uint64]flow.Identifier
-	fulfilled     map[uint64]*jobResult
+
+	// fulfilled tracks the completed, successful job for the most recent sealed heights
+	// used to trigger notifications
+	fulfilled map[uint64]*jobResult
 
 	fulfilledHeight uint64
 	sealedHeight    uint64
@@ -82,19 +103,24 @@ func (f *fulfiller) submitJobResult(j *jobResult) {
 	f.jobsIn <- j
 }
 
-func (f *fulfiller) submitSealedResult(resultID flow.Identifier) {
-	f.resultsIn <- resultID
+// submitSealedResult notifies the fulfiller of a new sealed result ID.
+// This function MUST be called exactly once for each block height, and
+// in the correct order.
+func (f *fulfiller) submitSealedResult(resultID flow.Identifier, blockHeight uint64) {
+	f.resultsIn <- sealedResult{resultID, blockHeight}
 }
 
 func (f *fulfiller) fulfill() error {
-loop:
-	if j, ok := f.fulfilled[f.fulfilledHeight+1]; ok {
+	for {
+		j, ok := f.fulfilled[f.fulfilledHeight+1]
+		if !ok {
+			break
+		}
+
 		f.fulfilledHeight++
 		delete(f.fulfilled, f.fulfilledHeight)
 		delete(f.sealedResults, f.fulfilledHeight)
 		f.notifier.notify(j.blockHeight, j.executionData)
-
-		goto loop
 	}
 
 	f.logger.Debug().Uint64("height", f.fulfilledHeight).Msg("updating fulfilled height")
@@ -144,16 +170,16 @@ func (f *fulfiller) handleJobResult(ctx irrecoverable.SignalerContext, j *jobRes
 	}
 }
 
-func (f *fulfiller) handleSealedResult(ctx irrecoverable.SignalerContext, sealedResultID flow.Identifier) {
-	f.sealedHeight++
-	f.sealedResults[f.sealedHeight] = sealedResultID
+func (f *fulfiller) handleSealedResult(ctx irrecoverable.SignalerContext, sr sealedResult) {
+	f.sealedHeight = sr.blockHeight
+	f.sealedResults[f.sealedHeight] = sr.resultID
 
 	if completedJobs, ok := f.jobResults[f.sealedHeight]; ok {
 		// once we know the sealed result ID, we can discard all unneeded job results
 		delete(f.jobResults, f.sealedHeight)
 
 		for resultID, j := range completedJobs {
-			if resultID == sealedResultID {
+			if resultID == sr.resultID {
 				if j.err != nil {
 					// sealed execution data failed with non-retryable error
 					ctx.Throw(fmt.Errorf("failed to get sealed execution data for block height %d: %w", j.blockHeight, j.err))
@@ -192,7 +218,7 @@ func (f *fulfiller) loop(ctx irrecoverable.SignalerContext, ready component.Read
 		case j := <-f.jobsOut:
 			f.handleJobResult(ctx, j.(*jobResult))
 		case sealedResultID := <-f.resultsOut:
-			f.handleSealedResult(ctx, sealedResultID.(flow.Identifier))
+			f.handleSealedResult(ctx, sealedResultID.(sealedResult))
 		}
 	}
 }

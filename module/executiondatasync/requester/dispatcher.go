@@ -17,15 +17,26 @@ import (
 
 type resultInfo struct {
 	resultID        flow.Identifier
-	blockID         flow.Identifier
-	blockHeight     uint64
+	blockID         flow.Identifier // the ID of the executed block
+	blockHeight     uint64          // the height of the executed block
 	executionDataID flow.Identifier
 	sealed          bool
 }
 
+// The purpose of this component is:
+// * Dispatch requests to download execution data for sealed and unsealed execution results
+// * Cancel requests to download execution data for unsealed execution results once a conflicting sealed execution result has been observed
+// * Notifies fulfiller about sealed results so that it knows when a height can be fulfilled
+// The component consumes broadcasted unsealed receipts and receipts included in finalized blocks
 type dispatcher struct {
+	// sealedHeight and jobs must be accessed only by the processResults goroutine
 	sealedHeight uint64
-	jobs         map[uint64]map[flow.Identifier]context.CancelFunc
+
+	// jobs tracks results for which we have dispatched a request to download the corresponding
+	// execution data. This is used to avoid dispatching the same request twice and to cancel
+	// requests for unsealed results at a particular height once that height has been sealed.
+	// blockHeight -> resultID -> cancel
+	jobs map[uint64]map[flow.Identifier]context.CancelFunc
 
 	receiptsIn         chan<- interface{}
 	receiptsOut        <-chan interface{}
@@ -163,7 +174,7 @@ func (d *dispatcher) processFinalizedBlocks(ctx irrecoverable.SignalerContext, r
 			sort.Slice(rinfos, func(i, j int) bool { return rinfos[i].blockHeight < rinfos[j].blockHeight })
 
 			for _, rinfo := range rinfos {
-				d.fulfiller.submitSealedResult(rinfo.resultID)
+				d.fulfiller.submitSealedResult(rinfo.resultID, rinfo.blockHeight)
 				d.resultInfosIn <- rinfo
 			}
 		}
@@ -186,7 +197,7 @@ func (d *dispatcher) processResults(ctx irrecoverable.SignalerContext, ready com
 			if rInfo.sealed {
 				d.handleSealedResult(ctx, rInfo)
 			} else {
-				d.handleResult(ctx, rInfo)
+				d.handleUnsealedResult(ctx, rInfo)
 			}
 		}
 	}
@@ -214,7 +225,9 @@ func (d *dispatcher) dispatchJob(ctx irrecoverable.SignalerContext, resultID, ex
 }
 
 func (d *dispatcher) handleSealedResult(ctx irrecoverable.SignalerContext, rinfo *resultInfo) {
-	d.sealedHeight = rinfo.blockHeight
+	if rinfo.blockHeight > d.sealedHeight {
+		d.sealedHeight = rinfo.blockHeight
+	}
 
 	hmap, ok := d.jobs[rinfo.blockHeight]
 	if ok {
@@ -243,7 +256,7 @@ func (d *dispatcher) handleSealedResult(ctx irrecoverable.SignalerContext, rinfo
 	d.dispatchJob(ctx, rinfo.resultID, rinfo.executionDataID, rinfo.blockID, rinfo.blockHeight)
 }
 
-func (d *dispatcher) handleResult(ctx irrecoverable.SignalerContext, rinfo *resultInfo) {
+func (d *dispatcher) handleUnsealedResult(ctx irrecoverable.SignalerContext, rinfo *resultInfo) {
 	if d.sealedHeight >= rinfo.blockHeight {
 		// skip processing heights that are already sealed
 		return
