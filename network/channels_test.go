@@ -1,4 +1,4 @@
-package engine
+package network
 
 import (
 	"testing"
@@ -55,7 +55,7 @@ func TestGetChannelByRole(t *testing.T) {
 	// - PushApprovals
 	// - ProvideApprovalsByChunk
 	// - ProvideChunks
-	// - TestNetwork
+	// - TestNetworkChannel
 	// - TestMetric
 	// the roles list should contain collection and consensus roles
 	topics := ChannelsByRole(flow.RoleVerification)
@@ -65,8 +65,8 @@ func TestGetChannelByRole(t *testing.T) {
 	assert.Contains(t, topics, PushApprovals)
 	assert.Contains(t, topics, ProvideApprovalsByChunk)
 	assert.Contains(t, topics, RequestChunks)
-	assert.Contains(t, topics, TestMetrics)
-	assert.Contains(t, topics, TestNetwork)
+	assert.Contains(t, topics, TestMetricsChannel)
+	assert.Contains(t, topics, TestNetworkChannel)
 	assert.Contains(t, topics, SyncCommittee)
 }
 
