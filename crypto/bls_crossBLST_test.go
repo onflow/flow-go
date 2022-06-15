@@ -1,10 +1,11 @@
+//go:build relic
 // +build relic
 
 package crypto
 
 // This file contains tests against the library BLST (https://github.com/supranational/blst).
 // The purpose of these tests is to detect differences with a different implementation of BLS on the BLS12-381
-// curve since the BLS IRTF draft (https://datatracker.ietf.org/doc/draft-irtf-cfrg-bls-signature/) doesn't
+// curve since the BLS IETF draft (https://datatracker.ietf.org/doc/draft-irtf-cfrg-bls-signature/) doesn't
 // provide extensive test vectors.
 // A detected difference with BLST library doesn't necessary mean a bug or a non-standard implementation since
 // both libraries might have made different choices. It is nevertheless a good flag for possible bugs or deviations
@@ -166,7 +167,7 @@ func testEncodeDecodeSignatureCrossBLST(t *rapid.T) {
 // - hash-to-field : use XMD_SHA256 in both signatures
 // - map to curve : Flow and BLST use an SWU mapping consistent with the test vector in
 // https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-11#appendix-J.9.1
-// (Flow map to curve is tested agaisnt the IRTF draft in TestMapToG1, BLST map to curve is not
+// (Flow map to curve is tested agaisnt the IETF draft in TestMapToG1, BLST map to curve is not
 // tested in this repo)
 //
 // The test also assumes Flow signature serialization is identical to the one in BLST.

@@ -247,7 +247,7 @@ func (s *Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
 // commitment represents the execution state as currently finalized.
 func (s *Snapshot) Commit() (flow.StateCommitment, error) {
 	// get the ID of the sealed block
-	seal, err := s.state.seals.ByBlockID(s.blockID)
+	seal, err := s.state.seals.HighestInFork(s.blockID)
 	if err != nil {
 		return flow.DummyStateCommitment, fmt.Errorf("could not retrieve sealed state commit: %w", err)
 	}
@@ -255,7 +255,7 @@ func (s *Snapshot) Commit() (flow.StateCommitment, error) {
 }
 
 func (s *Snapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
-	seal, err := s.state.seals.ByBlockID(s.blockID)
+	seal, err := s.state.seals.HighestInFork(s.blockID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not look up latest seal: %w", err)
 	}
@@ -284,14 +284,14 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 		return nil, protocol.ErrSealingSegmentBelowRootBlock
 	}
 
-	seal, err := s.state.seals.ByBlockID(s.blockID)
+	seal, err := s.state.seals.HighestInFork(s.blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get seal for sealing segment: %w", err)
 	}
 
 	// walk through the chain backward until we reach the block referenced by
 	// the latest seal - the returned segment includes this block
-	builder := flow.NewSealingSegmentBuilder(s.state.results.ByID, s.state.seals.ByBlockID)
+	builder := flow.NewSealingSegmentBuilder(s.state.results.ByID, s.state.seals.HighestInFork)
 	scraper := func(header *flow.Header) error {
 		blockID := header.ID()
 		block, err := s.state.blocks.ByID(blockID)
