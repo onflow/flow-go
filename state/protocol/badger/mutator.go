@@ -120,8 +120,14 @@ func (m *FollowerState) Extend(ctx context.Context, candidate *flow.Block) error
 		return fmt.Errorf("seal in parent block does not compliance the chain state: %w", err)
 	}
 
+	// apply any state changes from service events sealed by this block's parent
+	dbUpdates, err := m.handleEpochServiceEvents(candidate)
+	if err != nil {
+		return fmt.Errorf("could not process service events: %w", err)
+	}
+
 	// insert the block and index the last seal for the block
-	err = m.insert(ctx, candidate, last)
+	err = m.insert(ctx, candidate, last, dbUpdates)
 	if err != nil {
 		return fmt.Errorf("failed to insert the block: %w", err)
 	}
@@ -161,7 +167,7 @@ func (m *MutableState) Extend(ctx context.Context, candidate *flow.Block) error 
 	}
 
 	// apply any state changes from service events sealed by this block's parent
-	dbUpdates, err := m.handleServiceEvents(candidate, epochStatus)
+	dbUpdates, err := m.handleEpochServiceEvents(candidate)
 	if err != nil {
 		return fmt.Errorf("could not process service events: %w", err)
 	}
@@ -405,7 +411,7 @@ func (m *FollowerState) lastSealed(candidate *flow.Block) (*flow.Seal, error) {
 	return last, nil
 }
 
-// insert stores the candidate block in the data base. The
+// insert stores the candidate block in the database. The
 // `candidate` block _must be valid_ (otherwise, the state will be corrupted).
 func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last *flow.Seal, dbUpdates []func(*transaction.Tx) error) error {
 
@@ -414,16 +420,10 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 
 	blockID := candidate.ID()
 
-	epochStatus, err := m.epochStatus(candidate.Header)
-	if err != nil {
-		return fmt.Errorf("could not retrieve epoch status: %w", err)
-	}
-
-	// FINALLY: Both the header itself and its payload are in compliance with the
-	// protocol state. We can now store the candidate block, as well as adding
-	// its final seal to the seal index and initializing its children index.
-
-	err = operation.RetryOnConflictTx(m.db, transaction.Update, func(tx *transaction.Tx) error {
+	// Both the header itself and its payload are in compliance with the protocol state.
+	// We can now store the candidate block, as well as adding its final seal
+	// to the seal index and initializing its children index.
+	err := operation.RetryOnConflictTx(m.db, transaction.Update, func(tx *transaction.Tx) error {
 		// insert the block into the database AND cache
 		err := m.blocks.StoreTx(candidate)(tx)
 		if err != nil {
@@ -440,12 +440,6 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 		err = transaction.WithTx(procedure.IndexNewBlock(blockID, candidate.Header.ParentID))(tx)
 		if err != nil {
 			return fmt.Errorf("could not index new block: %w", err)
-		}
-
-		// insert the block's epoch status
-		err = m.epoch.statuses.StoreTx(blockID, epochStatus)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert epoch status: %w", err)
 		}
 
 		// apply any optional DB operations from service events
@@ -637,7 +631,7 @@ func (m *FollowerState) epochTransitionMetricsAndEventsOnBlockFinalized(block *f
 	}
 
 	if block.View > parentEpochFinalView {
-		events = append(events, func() { m.consumer.EpochTransition(currentEpochSetup.Counter, header) })
+		events = append(events, func() { m.consumer.EpochTransition(currentEpochSetup.Counter, block) })
 
 		// set current epoch counter corresponding to new epoch
 		metrics = append(metrics, func() { m.metrics.CurrentEpochCounter(currentEpochSetup.Counter) })
@@ -692,12 +686,12 @@ func (m *FollowerState) epochPhaseMetricsAndEventsOnBlockFinalized(block *flow.H
 				// update current epoch phase
 				events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseSetup) })
 				// track epoch phase transition (staking->setup)
-				events = append(events, func() { m.consumer.EpochSetupPhaseStarted(ev.Counter-1, header) })
+				events = append(events, func() { m.consumer.EpochSetupPhaseStarted(ev.Counter-1, block) })
 			case *flow.EpochCommit:
 				// update current epoch phase
 				events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseCommitted) })
 				// track epoch phase transition (setup->committed)
-				events = append(events, func() { m.consumer.EpochCommittedPhaseStarted(ev.Counter-1, header) })
+				events = append(events, func() { m.consumer.EpochCommittedPhaseStarted(ev.Counter-1, block) })
 				// track final view of committed epoch
 				nextEpochSetup, err := m.epoch.setups.ByID(epochStatus.NextEpoch.SetupID)
 				if err != nil {
@@ -789,7 +783,7 @@ func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, erro
 	return currentStatus, err
 }
 
-// handleServiceEvents handles applying state changes which occur as a result
+// handleEpochServiceEvents handles applying state changes which occur as a result
 // of service events being included in a block payload.
 //
 // Consider a chain where a service event is emitted during execution of block A.
@@ -815,8 +809,10 @@ func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, erro
 // includes an operation to index the epoch status for every block, and
 // operations to insert service events for blocks that include them.
 //
+// TODO - document that storing epoch status is this responsibility
+//
 // No errors are expected during normal operation.
-func (m *FollowerState) handleServiceEvents(candidate *flow.Block) ([]func(*transaction.Tx) error, error) {
+func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) ([]func(*transaction.Tx) error, error) {
 
 	var dbUpdates []func(*transaction.Tx) error
 	blockID := candidate.ID()
