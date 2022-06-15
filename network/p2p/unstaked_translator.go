@@ -21,7 +21,7 @@ import (
 type UnstakedNetworkIDTranslator struct{}
 
 // TODO Rename this one to NewPublicNetworkIDTranslator once observer changes are merged
-func NewUnstakedNetworkIDTranslator() *UnstakedNetworkIDTranslator {
+func NewPublicNetworkIDTranslator() *UnstakedNetworkIDTranslator {
 	return &UnstakedNetworkIDTranslator{}
 }
 

@@ -646,7 +646,7 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 			)
 		}
 
-		builder.IDTranslator = p2p.NewHierarchicalIDTranslator(idCache, p2p.NewUnstakedNetworkIDTranslator())
+		builder.IDTranslator = p2p.NewHierarchicalIDTranslator(idCache, p2p.NewPublicNetworkIDTranslator())
 
 		return nil
 	})
@@ -664,7 +664,7 @@ func (builder *FlowAccessNodeBuilder) Initialize() error {
 		return storageCommands.NewGetTransactionsCommand(conf.State, conf.Storage.Payloads, conf.Storage.Collections)
 	})
 
-	// if this is an access node that supports unstaked followers, enqueue the unstaked network
+	// if this is an access node that supports public followers, enqueue the public network
 	if builder.supportsObserver {
 		builder.enqueuePublicNetworkInit()
 		builder.enqueueRelayNetwork()
@@ -864,9 +864,9 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 		})
 
 	if builder.supportsObserver {
-		builder.Component("unstaked sync request handler", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		builder.Component("public sync request handler", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			syncRequestHandler, err := synceng.NewRequestHandlerEngine(
-				node.Logger.With().Bool("unstaked", true).Logger(),
+				node.Logger.With().Bool("public", true).Logger(),
 				unstaked.NewUnstakedEngineCollector(node.Metrics.Engine),
 				builder.AccessNodeConfig.PublicNetworkConfig.Network,
 				node.Me,
@@ -876,7 +876,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			)
 
 			if err != nil {
-				return nil, fmt.Errorf("could not create unstaked sync request handler: %w", err)
+				return nil, fmt.Errorf("could not create public sync request handler: %w", err)
 			}
 
 			return syncRequestHandler, nil
@@ -912,11 +912,11 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 // enqueuePublicNetworkInit enqueues the public network component initialized for the staked node
 func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 	builder.Component("public network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		builder.PublicNetworkConfig.Metrics = metrics.NewNetworkCollector(metrics.WithNetworkPrefix("unstaked"))
+		builder.PublicNetworkConfig.Metrics = metrics.NewNetworkCollector(metrics.WithNetworkPrefix("public"))
 
 		libP2PFactory := builder.initLibP2PFactory(builder.NodeConfig.NetworkKey)
 
-		msgValidators := publicNetworkMsgValidators(node.Logger.With().Bool("unstaked", true).Logger(), node.IdentityProvider, builder.NodeID)
+		msgValidators := publicNetworkMsgValidators(node.Logger.With().Bool("public", true).Logger(), node.IdentityProvider, builder.NodeID)
 
 		middleware := builder.initMiddleware(builder.NodeID, builder.PublicNetworkConfig.Metrics, libP2PFactory, msgValidators...)
 
@@ -991,7 +991,7 @@ func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 	factoryFunc p2p.LibP2PFactoryFunc,
 	validators ...network.MessageValidator) network.Middleware {
 
-	// disable connection pruning for the staked AN which supports the unstaked AN
+	// disable connection pruning for the access node which supports the observer
 	peerManagerFactory := p2p.PeerManagerFactory([]p2p.Option{p2p.WithInterval(builder.PeerUpdateInterval)}, p2p.WithConnectionPruning(false))
 
 	builder.Middleware = p2p.NewMiddleware(

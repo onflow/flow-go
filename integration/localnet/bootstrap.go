@@ -708,7 +708,7 @@ func writeObserverPrivateKey(observerName string) {
 	// make the observer private key for named observer
 	// only used for localnet, not for use with production
 	networkSeed := cmd.GenerateRandomSeed(crypto.KeyGenSeedMinLenECDSASecp256k1)
-	networkKey, err := utils.GenerateUnstakedNetworkingKey(networkSeed)
+	networkKey, err := utils.GeneratePublicNetworkingKey(networkSeed)
 	if err != nil {
 		panic(err)
 	}
