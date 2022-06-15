@@ -32,7 +32,8 @@ type InstanceParams interface {
 	// EECC is a permanent, spork-scoped state which is triggered when the next
 	// epoch fails to be committed in the allocated time. Once EECC is triggered,
 	// it will remain in effect until the next spork.
-	EpochFallbackTriggered() (bool, error)
+	// TODO necessary?
+	//EpochFallbackTriggered() (bool, error)
 }
 
 // GlobalParams represents protocol state parameters that do not vary between instances.
