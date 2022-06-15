@@ -14,7 +14,6 @@ type PassThroughTestSuite struct {
 }
 
 func TestPassThrough(t *testing.T) {
-	t.Skip("skipping the test")
 	suite.Run(t, new(PassThroughTestSuite))
 }
 
