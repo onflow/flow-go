@@ -784,18 +784,6 @@ func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, erro
 		return nil, fmt.Errorf("could not retrieve epoch fallback status: %w", err)
 	}
 
-	// TODO move this somehwere else
-	//epochCommitSafetyThreshold, err := m.Params().EpochCommitSafetyThreshold()
-	//if err != nil {
-	//	return nil, fmt.Errorf("could not get epoch commit threshold: %w", err)
-	//}
-	//epochCommitDeadline := parentSetup.FinalView - epochCommitSafetyThreshold
-	//
-	//// Check whether the newly
-	//if block.View >= epochCommitSafetyThreshold {
-	//
-	//}
-
 	// if epoch fallback mode is triggered, we continue with our parent's epoch status
 	if epochFallbackTriggered {
 		return parentStatus.Copy(), nil
