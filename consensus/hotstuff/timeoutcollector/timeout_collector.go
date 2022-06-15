@@ -71,6 +71,7 @@ func (c *TimeoutCollector) AddTimeout(timeout *model.TimeoutObject) error {
 // processTimeout delegates TO processing to TimeoutProcessor, handles sentinel errors
 // expected errors are handled and reported to notifier. Notifies listeners about validates
 // QCs and TCs.
+// No errors are expected during normal flow of operations.
 func (c *TimeoutCollector) processTimeout(timeout *model.TimeoutObject) error {
 	err := c.processor.Process(timeout)
 	if err != nil {
