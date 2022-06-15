@@ -76,7 +76,6 @@ func NewParticipant(
 
 	// initialize the pacemaker
 	controller := timeout.NewController(timeoutConfig)
-
 	pacemaker, err := pacemaker.New(controller, modules.Notifier, modules.Persist)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize flow pacemaker: %w", err)

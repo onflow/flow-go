@@ -18,9 +18,11 @@ type Config struct {
 	ReplicaTimeout float64
 	// MinReplicaTimeout is the minimum the timeout can decrease to [MILLISECONDS]
 	MinReplicaTimeout float64
-	// TimeoutDecrease: MULTIPLICATIVE factor for increasing timeout on timeout
+	// TimeoutIncrease: MULTIPLICATIVE factor for increasing timeout when view
+	// change was triggered by a TC (unhappy path).
 	TimeoutIncrease float64
-	// TimeoutDecrease: MULTIPLICATIVE factor for decreasing timeout on progress
+	// TimeoutDecrease: MULTIPLICATIVE factor for decreasing timeout when view
+	// change was triggered by observing a QC from the previous view (happy path).
 	TimeoutDecrease float64
 	// BlockRateDelayMS is a delay to broadcast the proposal in order to control block production rate [MILLISECONDS]
 	BlockRateDelayMS float64

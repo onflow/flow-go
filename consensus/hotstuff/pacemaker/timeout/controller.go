@@ -74,7 +74,7 @@ func (t *Controller) ReplicaTimeout() time.Duration {
 	return time.Duration(t.cfg.ReplicaTimeout * 1e6)
 }
 
-// OnTimeout indicates to the Controller that the timeout was reached
+// OnTimeout indicates to the Controller that a view change was triggered by a TC (unhappy path).
 func (t *Controller) OnTimeout() {
 	t.cfg.ReplicaTimeout = math.Min(t.cfg.ReplicaTimeout*t.cfg.TimeoutIncrease, timeoutCap)
 }
