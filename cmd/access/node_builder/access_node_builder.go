@@ -193,6 +193,7 @@ type FlowAccessNodeBuilder struct {
 	CollectionsToMarkExecuted  *stdmap.Times
 	BlocksToMarkExecuted       *stdmap.Times
 	TransactionMetrics         module.TransactionMetrics
+	AccessMetrics              module.AccessMetrics
 	PingMetrics                module.PingMetrics
 	Committee                  hotstuff.Committee
 	Finalized                  *flow.Header
@@ -258,7 +259,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilde
 
 func (builder *FlowAccessNodeBuilder) buildSyncCore() *FlowAccessNodeBuilder {
 	builder.Module("sync core", func(node *cmd.NodeConfig) error {
-		syncCore, err := synchronization.New(node.Logger, node.SyncCoreConfig)
+		syncCore, err := synchronization.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector())
 		builder.SyncCore = syncCore
 
 		return err
@@ -504,6 +505,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				builder.State,
 				builder.Storage.Headers,
 				builder.Storage.Results,
+				builder.Storage.Seals,
 				builder.executionDataConfig,
 			)
 
