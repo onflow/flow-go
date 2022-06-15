@@ -58,7 +58,9 @@ func extractExecutionState(
 	}
 
 	var migrations []ledger.Migration
-	var rs []ledger.Reporter
+	var rs map[string]ledger.Reporter
+	extractionReportName := "extractionReport"
+	newState := ledger.State(targetHash)
 
 	if migrate {
 		storageUsedUpdateMigration := mgr.StorageUsedUpdateMigration{
@@ -72,35 +74,37 @@ func extractExecutionState(
 		}
 
 	}
-
 	// generating reports at the end, so that the checkpoint file can be used
 	// for sporking as soon as it's generated.
 	if report {
 		log.Info().Msgf("preparing reporter files")
 		reportFileWriterFactory := reporters.NewReportFileWriterFactory(outputDir, log)
 
-		rs = []ledger.Reporter{
-			&reporters.EpochCounterReporter{
-				Log:   log,
-				Chain: chain,
-			},
-			&reporters.AccountReporter{
-				Log:   log,
-				Chain: chain,
-				RWF:   reportFileWriterFactory,
-			},
-			&reporters.BalanceReporter{
+		rs = map[string]ledger.Reporter{
+			// The ExportReporter needs to be run first so that it can be used
+			// immediately after execution
+			extractionReportName: reporters.NewExportReporter(log,
+				chain,
+				func() flow.StateCommitment { return targetHash },
+			),
+			"account": &reporters.AccountReporter{
 				Log:   log,
 				Chain: chain,
 				RWF:   reportFileWriterFactory,
+			},
+			"newFungibleTokenTracker": reporters.NewFungibleTokenTracker(log, reportFileWriterFactory, chain, []string{reporters.FlowTokenTypeID(chain)}),
+			"atree": &reporters.AtreeReporter{
+				Log: log,
+				RWF: reportFileWriterFactory,
 			},
 		}
 	}
 
-	newState, err := led.ExportCheckpointAt(
-		ledger.State(targetHash),
+	migratedState, err := led.ExportCheckpointAt(
+		newState,
 		migrations,
 		rs,
+		extractionReportName,
 		complete.DefaultPathFinderVersion,
 		outputDir,
 		bootstrap.FilenameWALRootCheckpoint,
@@ -111,8 +115,8 @@ func extractExecutionState(
 
 	log.Info().Msgf(
 		"New state commitment for the exported state is: %s (base64: %s)",
-		newState.String(),
-		newState.Base64(),
+		migratedState.String(),
+		migratedState.Base64(),
 	)
 
 	return nil

@@ -124,8 +124,8 @@ func referenceMerkleRoot(t *testing.T, ids ...flow.Identifier) flow.Identifier {
 // the conversion is correct.
 func TestCIDConversion(t *testing.T) {
 	id := unittest.IdentifierFixture()
-	cid := flow.FlowIDToCid(id)
-	id2, err := flow.CidToFlowID(cid)
+	cid := flow.IdToCid(id)
+	id2, err := flow.CidToId(cid)
 	assert.NoError(t, err)
 	assert.Equal(t, id, id2)
 
@@ -134,8 +134,20 @@ func TestCIDConversion(t *testing.T) {
 	rand.Read(data)
 	cid = blocks.NewBlock(data).Cid()
 
-	id, err = flow.CidToFlowID(cid)
-	cid2 := flow.FlowIDToCid(id)
+	id, err = flow.CidToId(cid)
+	cid2 := flow.IdToCid(id)
 	assert.NoError(t, err)
 	assert.Equal(t, cid, cid2)
+}
+
+// TestByteConversionRoundTrip evaluates the round trip of conversion of identifiers to bytes, and back.
+// The original identifiers must be recovered from the converted bytes.
+func TestByteConversionRoundTrip(t *testing.T) {
+	ids := unittest.IdentifierListFixture(10)
+
+	converted, err := flow.ByteSlicesToIds(flow.IdsToBytes(ids))
+	require.NoError(t, err)
+
+	require.Equal(t, len(ids), len(converted))
+	require.ElementsMatch(t, ids, converted)
 }

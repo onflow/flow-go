@@ -6,19 +6,9 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
-	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 )
-
-func NewProgramsHandler(programs programs.Programs, stateHolder *state.StateHolder) *ProgramsHandler {
-	return &ProgramsHandler{
-		masterState:  stateHolder,
-		viewsStack:   nil,
-		Programs:     programs,
-		initialState: stateHolder.State(),
-	}
-}
 
 type stackEntry struct {
 	state    *state.State
@@ -36,6 +26,16 @@ type ProgramsHandler struct {
 	viewsStack   []stackEntry
 	Programs     programs.Programs
 	initialState *state.State
+}
+
+// NewProgramsHandler construts a new ProgramHandler
+func NewProgramsHandler(programs programs.Programs, stateHolder *state.StateHolder) *ProgramsHandler {
+	return &ProgramsHandler{
+		masterState:  stateHolder,
+		viewsStack:   nil,
+		Programs:     programs,
+		initialState: stateHolder.State(),
+	}
 }
 
 func (h *ProgramsHandler) Set(location common.Location, program *interpreter.Program) error {
@@ -64,12 +64,12 @@ func (h *ProgramsHandler) Set(location common.Location, program *interpreter.Pro
 
 	h.Programs.Set(location, program, last.state)
 
-	err := h.mergeState(last.state)
+	err := h.mergeState(last.state, h.masterState.EnforceInteractionLimits())
 
 	return err
 }
 
-func (h *ProgramsHandler) mergeState(state *state.State) error {
+func (h *ProgramsHandler) mergeState(state *state.State, enforceLimits bool) error {
 	if len(h.viewsStack) == 0 {
 		// if this was last item, merge to the master state
 		h.masterState.SetActiveState(h.initialState)
@@ -77,7 +77,7 @@ func (h *ProgramsHandler) mergeState(state *state.State) error {
 		h.masterState.SetActiveState(h.viewsStack[len(h.viewsStack)-1].state)
 	}
 
-	return h.masterState.State().MergeState(state, h.masterState.EnforceInteractionLimits())
+	return h.masterState.State().MergeState(state, enforceLimits)
 }
 
 func (h *ProgramsHandler) Get(location common.Location) (*interpreter.Program, bool) {
@@ -89,13 +89,11 @@ func (h *ProgramsHandler) Get(location common.Location) (*interpreter.Program, b
 	program, view, has := h.Programs.Get(location)
 	if has {
 		if view != nil { // handle view not set (ie. for non-address locations
-			err := h.mergeState(view)
+			// don't enforce limits while merging a cached view
+			enforceLimits := false
+			err := h.mergeState(view, enforceLimits)
 			if err != nil {
-				// ignore LedgerIntractionLimitExceededError errors
-				var interactionLimiExceededErr *errors.LedgerIntractionLimitExceededError
-				if !errors.As(err, &interactionLimiExceededErr) {
-					panic(fmt.Sprintf("merge error while getting program, panic: %s", err))
-				}
+				panic(fmt.Sprintf("merge error while getting program, panic: %s", err))
 			}
 		}
 		return program, true

@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
@@ -18,6 +19,8 @@ type SetLogLevelCommand struct{}
 func (s *SetLogLevelCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 	level := req.ValidatorData.(zerolog.Level)
 	zerolog.SetGlobalLevel(level)
+
+	log.Info().Msgf("changed log level to %v", level)
 	return "ok", nil
 }
 

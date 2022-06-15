@@ -1,3 +1,4 @@
+//go:build relic
 // +build relic
 
 package module
@@ -19,11 +20,11 @@ type DKGBroker interface {
 
 	// GetPrivateMsgCh returns the channel through which a user can receive
 	// incoming private DKGMessages.
-	GetPrivateMsgCh() <-chan messages.DKGMessage
+	GetPrivateMsgCh() <-chan messages.PrivDKGMessageIn
 
 	// GetBroadcastMsgCh returns the channel through which a user can receive
 	// incoming broadcast DKGMessages.
-	GetBroadcastMsgCh() <-chan messages.DKGMessage
+	GetBroadcastMsgCh() <-chan messages.BroadcastDKGMessage
 
 	// Poll instructs the broker to actively fetch broadcast messages (ex. read
 	// from DKG smart contract). The messages will be forwarded through the

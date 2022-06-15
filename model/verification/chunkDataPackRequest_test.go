@@ -1,11 +1,14 @@
 package verification_test
 
 import (
+	"bytes"
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -43,6 +46,18 @@ func TestChunkDataPackRequestList_UniqueRequestInfo(t *testing.T) {
 	// since thisReq1 and thisReq2 share the same chunk ID, the request info must have union of their
 	// agrees, disagrees, and targets.
 	thisChunkIDReqInfo := reqInfoMap[thisChunkID]
+
+	// pre-sorting these because the call to 'Union' will sort them, and the 'Equal' test requires
+	// that the order be the same
+	sort.Slice(thisChunkIDReqInfo.Agrees, func(p, q int) bool {
+		return bytes.Compare(thisChunkIDReqInfo.Agrees[p][:], thisChunkIDReqInfo.Agrees[q][:]) < 0
+	})
+	sort.Slice(thisChunkIDReqInfo.Disagrees, func(p, q int) bool {
+		return bytes.Compare(thisChunkIDReqInfo.Disagrees[p][:], thisChunkIDReqInfo.Disagrees[q][:]) < 0
+	})
+
+	thisChunkIDReqInfo.Targets = thisChunkIDReqInfo.Targets.Sort(order.Canonical)
+
 	require.Equal(t, thisChunkIDReqInfo.Agrees, thisReq1.Agrees.Union(thisReq2.Agrees))
 	require.Equal(t, thisChunkIDReqInfo.Disagrees, thisReq1.Disagrees.Union(thisReq2.Disagrees))
 	require.Equal(t, thisChunkIDReqInfo.Targets, thisReq1.Targets.Union(thisReq2.Targets))

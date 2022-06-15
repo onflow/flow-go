@@ -229,9 +229,9 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult() {
 // by one or another reason
 func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIdentity() {
 
-	s.Run("verifier-not-staked", func() {
+	s.Run("verifier zero-weight", func() {
 		identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-		identity.Stake = 0 // invalid stake
+		identity.Weight = 0 // zero weight
 
 		state := &protocol.State{}
 		state.On("AtBlockID", mock.Anything).Return(

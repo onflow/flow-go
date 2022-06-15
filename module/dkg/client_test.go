@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go-sdk/test"
 
 	"github.com/onflow/flow-go/crypto"
+
 	"github.com/onflow/flow-go/model/flow"
 	emulatormod "github.com/onflow/flow-go/module/emulator"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -57,7 +58,7 @@ func (s *ClientSuite) SetupTest() {
 	// deploy contract
 	s.deployDKGContract()
 
-	s.contractClient = NewClient(zerolog.Nop(), s.emulatorClient, s.dkgSigner, s.dkgAddress.String(), s.dkgAddress.String(), 0)
+	s.contractClient = NewClient(zerolog.Nop(), s.emulatorClient, flow.ZeroID, s.dkgSigner, s.dkgAddress.String(), s.dkgAddress.String(), 0)
 }
 
 func (s *ClientSuite) deployDKGContract() {
@@ -132,7 +133,6 @@ func (s *ClientSuite) TestBroadcastReadSingle() {
 	broadcastedMsg := messages[0]
 	assert.Equal(s.T(), msg.DKGInstanceID, broadcastedMsg.DKGInstanceID)
 	assert.Equal(s.T(), msg.Data, broadcastedMsg.Data)
-	assert.Equal(s.T(), msg.Orig, broadcastedMsg.Orig)
 	assert.Equal(s.T(), msg.Signature, broadcastedMsg.Signature)
 }
 
@@ -219,7 +219,7 @@ func (s *ClientSuite) prepareDKG(participants []flow.Identifier) []*Client {
 	// create clients for each participant
 	clients := make([]*Client, len(participants))
 	for index := range participants {
-		clients[index] = NewClient(zerolog.Nop(), s.emulatorClient, signers[index], s.dkgAddress.String(), addresses[index].String(), 0)
+		clients[index] = NewClient(zerolog.Nop(), s.emulatorClient, flow.ZeroID, signers[index], s.dkgAddress.String(), addresses[index].String(), 0)
 	}
 
 	return clients
@@ -235,9 +235,13 @@ func (s *ClientSuite) setUpAdmin() {
 			s.blockchain.ServiceKey().SequenceNumber).
 		SetPayer(s.blockchain.ServiceKey().Address).
 		AddAuthorizer(s.dkgAddress)
+
+	signer, err := s.blockchain.ServiceKey().Signer()
+	require.NoError(s.T(), err)
+
 	s.signAndSubmit(setUpAdminTx,
 		[]sdk.Address{s.blockchain.ServiceKey().Address, s.dkgAddress},
-		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), s.dkgSigner},
+		[]sdkcrypto.Signer{signer, s.dkgSigner},
 	)
 }
 
@@ -263,9 +267,12 @@ func (s *ClientSuite) startDKGWithParticipants(nodeIDs []flow.Identifier) {
 	err := startDKGTx.AddArgument(cadence.NewArray(valueNodeIDs))
 	require.NoError(s.T(), err)
 
+	signer, err := s.blockchain.ServiceKey().Signer()
+	require.NoError(s.T(), err)
+
 	s.signAndSubmit(startDKGTx,
 		[]sdk.Address{s.blockchain.ServiceKey().Address, s.dkgAddress},
-		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), s.dkgSigner},
+		[]sdkcrypto.Signer{signer, s.dkgSigner},
 	)
 
 	// sanity check: verify that DKG was started with correct node IDs
@@ -296,9 +303,12 @@ func (s *ClientSuite) createParticipant(nodeID flow.Identifier, authoriser sdk.A
 	err = createParticipantTx.AddArgument(cdcNodeID)
 	require.NoError(s.T(), err)
 
+	s2, err := s.blockchain.ServiceKey().Signer()
+	require.NoError(s.T(), err)
+
 	s.signAndSubmit(createParticipantTx,
 		[]sdk.Address{s.blockchain.ServiceKey().Address, authoriser},
-		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), signer},
+		[]sdkcrypto.Signer{s2, signer},
 	)
 
 	// verify that nodeID was registered
@@ -335,6 +345,7 @@ func (s *ClientSuite) executeScript(script []byte, arguments [][]byte) cadence.V
 	// execute script
 	result, err := s.blockchain.ExecuteScript(script, arguments)
 	require.NoError(s.T(), err)
+	require.NoError(s.T(), result.Error)
 	require.True(s.T(), result.Succeeded())
 
 	return result.Value

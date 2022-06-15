@@ -11,8 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/model/convert"
-
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
@@ -22,6 +20,8 @@ import (
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	chunksmodels "github.com/onflow/flow-go/model/chunks"
+	"github.com/onflow/flow-go/model/convert"
+	convertfixtures "github.com/onflow/flow-go/model/convert/fixtures"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/chunks"
@@ -48,8 +48,8 @@ var eventsList = flow.EventsList{
 
 // the chain we use for this test suite
 var testChain = flow.Emulator
-var epochSetupEvent, _ = convert.EpochSetupFixture(testChain)
-var epochCommitEvent, _ = convert.EpochCommitFixture(testChain)
+var epochSetupEvent, _ = convertfixtures.EpochSetupFixtureByChainID(testChain)
+var epochCommitEvent, _ = convertfixtures.EpochCommitFixtureByChainID(testChain)
 
 var epochSetupServiceEvent, _ = convert.ServiceEvent(testChain, epochSetupEvent)
 

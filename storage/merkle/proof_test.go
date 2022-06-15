@@ -69,19 +69,19 @@ func TestValidateFormat(t *testing.T) {
 	proof.Key = make([]byte, 0)
 	err = proof.validateFormat()
 	assert.True(t, IsMalformedProofError(err))
-	require.Equal(t, err.Error(), "malformed proof, key is empty")
+	assert.Equal(t, err.Error(), "malformed proof, key length in bytes must be in interval [1, 8191], but is 0")
 
 	// invalid key size (too large)
 	proof.Key = make([]byte, maxKeyLength+1)
 	err = proof.validateFormat()
 	assert.True(t, IsMalformedProofError(err))
-	require.Equal(t, err.Error(), "malformed proof, key length is larger than max key length allowed (8193 > 8192)")
+	assert.Equal(t, err.Error(), "malformed proof, key length in bytes must be in interval [1, 8191], but is 8192")
 
 	// issue with the key size not matching the rest of the proof
 	proof.Key = make([]byte, 64)
 	err = proof.validateFormat()
 	assert.True(t, IsMalformedProofError(err))
-	require.Equal(t, err.Error(), "malformed proof, key length doesn't match the length of ShortPathLengths and SiblingHashes")
+	assert.Equal(t, err.Error(), "malformed proof, key length in bits (512) doesn't match the length of ShortPathLengths and SiblingHashes (248)")
 
 	// reset the key back to its original value
 	proof.Key = key
@@ -91,19 +91,19 @@ func TestValidateFormat(t *testing.T) {
 	proof.InterimNodeTypes = make([]byte, 0)
 	err = proof.validateFormat()
 	assert.True(t, IsMalformedProofError(err))
-	require.Equal(t, err.Error(), "malformed proof, InterimNodeTypes is empty")
+	assert.Equal(t, err.Error(), "malformed proof, the length of InterimNodeTypes doesn't match the length of ShortPathLengths and SiblingHashes")
 
 	// too many interim nodes
 	proof.InterimNodeTypes = make([]byte, maxKeyLength+1)
 	err = proof.validateFormat()
 	assert.True(t, IsMalformedProofError(err))
-	require.Equal(t, err.Error(), "malformed proof, InterimNodeTypes is larger than max key length allowed (8193 > 8192)")
+	assert.Equal(t, err.Error(), "malformed proof, InterimNodeTypes is larger than max key length allowed (8192 > 8191)")
 
 	// issue with the size of InterimNodeTypes
 	proof.InterimNodeTypes = append(InterimNodeTypesBackup, byte(0))
 	err = proof.validateFormat()
 	assert.True(t, IsMalformedProofError(err))
-	require.Equal(t, err.Error(), "malformed proof, the length of InterimNodeTypes doesn't match the length of ShortPathLengths and SiblingHashes")
+	assert.Equal(t, err.Error(), "malformed proof, the length of InterimNodeTypes doesn't match the length of ShortPathLengths and SiblingHashes")
 
 	proof.InterimNodeTypes = InterimNodeTypesBackup
 
@@ -112,14 +112,19 @@ func TestValidateFormat(t *testing.T) {
 	proof.ShortPathLengths[0] = uint16(10)
 	err = proof.validateFormat()
 	assert.True(t, IsMalformedProofError(err))
-	require.Equal(t, err.Error(), "malformed proof, key length doesn't match the length of ShortPathLengths and SiblingHashes")
+	assert.Equal(t, err.Error(), "malformed proof, key length in bits (248) doesn't match the length of ShortPathLengths and SiblingHashes (251)")
+
+	proof.ShortPathLengths[0] = uint16(0)
+	err = proof.validateFormat()
+	assert.True(t, IsMalformedProofError(err))
+	assert.Equal(t, err.Error(), "malformed proof, short path length cannot be zero")
 
 	// drop a shortpathlength - index out of bound
 	proof.ShortPathLengths = proof.ShortPathLengths[:1]
 	proof.ShortPathLengths[0] = uint16(247)
 	err = proof.validateFormat()
 	assert.True(t, IsMalformedProofError(err))
-	require.Equal(t, err.Error(), "malformed proof, len(ShortPathLengths) (1) does not match number of set bits in InterimNodeTypes (2)")
+	assert.Equal(t, err.Error(), "malformed proof, len(ShortPathLengths) (1) does not match number of set bits in InterimNodeTypes (2)")
 	proof.ShortPathLengths = backupShortPathLengths
 
 	// construct a new proof
@@ -130,7 +135,7 @@ func TestValidateFormat(t *testing.T) {
 	proof.InterimNodeTypes[len(proof.InterimNodeTypes)-1] = byte(129)
 	err = proof.validateFormat()
 	assert.True(t, IsMalformedProofError(err))
-	require.Equal(t, err.Error(), "malformed proof, tailing auxiliary bits in InterimNodeTypes should all be zero")
+	assert.Equal(t, err.Error(), "malformed proof, tailing auxiliary bits in InterimNodeTypes should all be zero")
 }
 
 // TestProofsWithRandomKeys tests proof generation and verification

@@ -11,7 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
-	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
+	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/utils/io"
 )
@@ -105,12 +105,8 @@ func (w *DiskWAL) RecordDelete(rootHash ledger.RootHash) error {
 
 func (w *DiskWAL) ReplayOnForest(forest *mtrie.Forest) error {
 	return w.Replay(
-		func(forestSequencing *flattener.FlattenedForest) error {
-			rebuiltTries, err := flattener.RebuildTries(forestSequencing)
-			if err != nil {
-				return fmt.Errorf("rebuilding forest from sequenced nodes failed: %w", err)
-			}
-			err = forest.AddTries(rebuiltTries)
+		func(tries []*trie.MTrie) error {
+			err := forest.AddTries(tries)
 			if err != nil {
 				return fmt.Errorf("adding rebuilt tries to forest failed: %w", err)
 			}
@@ -132,7 +128,7 @@ func (w *DiskWAL) Segments() (first, last int, err error) {
 }
 
 func (w *DiskWAL) Replay(
-	checkpointFn func(forestSequencing *flattener.FlattenedForest) error,
+	checkpointFn func(tries []*trie.MTrie) error,
 	updateFn func(update *ledger.TrieUpdate) error,
 	deleteFn func(ledger.RootHash) error,
 ) error {
@@ -144,7 +140,7 @@ func (w *DiskWAL) Replay(
 }
 
 func (w *DiskWAL) ReplayLogsOnly(
-	checkpointFn func(forestSequencing *flattener.FlattenedForest) error,
+	checkpointFn func(tries []*trie.MTrie) error,
 	updateFn func(update *ledger.TrieUpdate) error,
 	deleteFn func(rootHash ledger.RootHash) error,
 ) error {
@@ -157,7 +153,7 @@ func (w *DiskWAL) ReplayLogsOnly(
 
 func (w *DiskWAL) replay(
 	from, to int,
-	checkpointFn func(forestSequencing *flattener.FlattenedForest) error,
+	checkpointFn func(tries []*trie.MTrie) error,
 	updateFn func(update *ledger.TrieUpdate) error,
 	deleteFn func(rootHash ledger.RootHash) error,
 	useCheckpoints bool,
@@ -196,6 +192,8 @@ func (w *DiskWAL) replay(
 			// it allows us to load less segments.
 			latestCheckpoint := availableCheckpoints[len(availableCheckpoints)-1]
 
+			w.log.Info().Int("checkpoint", latestCheckpoint).Msg("loading checkpoint")
+
 			forestSequencing, err := checkpointer.LoadCheckpoint(latestCheckpoint)
 			if err != nil {
 				w.log.Warn().Int("checkpoint", latestCheckpoint).Err(err).
@@ -204,8 +202,9 @@ func (w *DiskWAL) replay(
 				availableCheckpoints = availableCheckpoints[:len(availableCheckpoints)-1]
 				continue
 			}
-			w.log.Info().Int("checkpoint", latestCheckpoint).
-				Msg("checkpoint loaded")
+
+			w.log.Info().Int("checkpoint", latestCheckpoint).Msg("checkpoint loaded")
+
 			err = checkpointFn(forestSequencing)
 			if err != nil {
 				return fmt.Errorf("error while handling checkpoint: %w", err)
@@ -240,7 +239,7 @@ func (w *DiskWAL) replay(
 		}
 	}
 
-	w.log.Debug().Msgf("replying segments from %d to %d", startSegment, to)
+	w.log.Info().Msgf("replaying segments from %d to %d", startSegment, to)
 
 	sr, err := prometheusWAL.NewSegmentsRangeReader(prometheusWAL.SegmentRange{
 		Dir:   w.wal.Dir(),
@@ -343,12 +342,12 @@ type LedgerWAL interface {
 	ReplayOnForest(forest *mtrie.Forest) error
 	Segments() (first, last int, err error)
 	Replay(
-		checkpointFn func(forestSequencing *flattener.FlattenedForest) error,
+		checkpointFn func(tries []*trie.MTrie) error,
 		updateFn func(update *ledger.TrieUpdate) error,
 		deleteFn func(ledger.RootHash) error,
 	) error
 	ReplayLogsOnly(
-		checkpointFn func(forestSequencing *flattener.FlattenedForest) error,
+		checkpointFn func(tries []*trie.MTrie) error,
 		updateFn func(update *ledger.TrieUpdate) error,
 		deleteFn func(rootHash ledger.RootHash) error,
 	) error

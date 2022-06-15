@@ -28,6 +28,10 @@ func NewWhiteboardClient(nodeID flow.Identifier, whiteboard *whiteboard) *Whiteb
 // Broadcast implements the DKGContractClient interface. It adds a message to
 // the whiteboard.
 func (wc *WhiteboardClient) Broadcast(msg messages.BroadcastDKGMessage) error {
+	// due to the fact that we are bypassing the DKG smart contract and using a white board client
+	// directly we must attach the NodeID to the BroadcastDKGMessage, in practice this is done by
+	// the DKG contract its self when messages are posted to the whiteboard via SC
+	msg.NodeID = wc.nodeID
 	wc.whiteboard.post(msg)
 	return nil
 }

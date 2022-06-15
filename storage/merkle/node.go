@@ -28,7 +28,7 @@ var (
 	shortNodeTag = []byte{2}
 )
 
-/* ******************************* Short Node ******************************* */
+// Short Node
 // Per convention a Short node has always _one child_, which is either
 // a full node or a leaf.
 
@@ -53,35 +53,8 @@ func (n *short) Hash() []byte {
 	return computeShortHash(n.count, n.path, n.child.Hash())
 }
 
-// CountAsUint16Encoding encodes the short count as uint16,
-// it uses similar techniques to serializedPathSegmentLength,
-// to effiently utilize zero for encoding 65536.
-// (see serializedPathSegmentLength for more details)
-func (n *short) CountAsUint16Encoding() uint16 {
-	if n.count > 65536 {
-		panic("count does not fit a uint16")
-	}
-	if n.count == 65536 {
-		return 0
-	}
-	return uint16(n.count)
-}
-
-// CountUint16EncodingToInt is the reverse method to CountAsUint16Encoding
-// see `CountAsUint16Encoding` for more details.
-func CountUint16EncodingToInt(inp uint16) int {
-	if inp == 0 {
-		return 65536
-	}
-	return int(inp)
-}
-
-// serializedPathSegmentLength serializes the bitCount into two bytes using the following optimization:
-// A short node with zero path length is not part of our storage model. Therefore, we use the convention:
-//  * for path length l with 1 ≤ l ≤ 65535: we represent l as unsigned int with big-endian encoding
-//  * for l = 65536: we represent l as binary 00000000 00000000
-// This convention organically utilizes the natural occurring overflow and is therefore extremely
-// efficient. In summary, we are able to represent key length of up to 65536 bits, i.e. 8192 bytes.
+// serializedPathSegmentLength serializes the bitCount into two bytes.
+// We are able to represent key length of up to 65528 bits
 func serializedPathSegmentLength(bitCount int) [2]byte {
 	var byteCount [2]byte
 	byteCount[0] = byte(bitCount >> 8)
@@ -89,7 +62,7 @@ func serializedPathSegmentLength(bitCount int) [2]byte {
 	return byteCount
 }
 
-/* ******************************** Full Node ******************************* */
+//Full Node
 // Per convention a Full Node has always _two children_. Nil values not allowed.
 
 type full struct {
@@ -110,7 +83,7 @@ func (n *full) Hash() []byte {
 	return computeFullHash(n.left.Hash(), n.right.Hash())
 }
 
-/* ******************************** Leaf Node ******************************* */
+// Leaf Node
 // Leaf represents a key-value pair. We only store the value, because the
 // key is implicitly stored as the merkle path through the tree.
 
@@ -130,7 +103,7 @@ func (n *leaf) Hash() []byte {
 	return computeLeafHash(n.val)
 }
 
-/* ******************************** Dummy Node ******************************* */
+// Dummy Node
 // Dummy node type as substitute for `nil`. Not used in the trie, but as zero
 // value for auxiliary variables during trie update operations. This reduces
 // complexity of the business logic, as we can then also apply the convention of

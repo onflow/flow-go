@@ -12,8 +12,8 @@ type IdentifierProvider interface {
 	Identifiers() flow.IdentifierList
 }
 
-// IdentifierProvider provides an interface to get a list of Identities representing
-// the set of staked participants in the Flow protocol.
+// IdentityProvider provides an interface to get a list of Identities representing
+// the set of non-ejected participants in the Flow protocol.
 type IdentityProvider interface {
 	Identities(flow.IdentityFilter) flow.IdentityList
 	ByNodeID(flow.Identifier) (*flow.Identity, bool)

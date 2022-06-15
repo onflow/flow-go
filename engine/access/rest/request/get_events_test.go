@@ -24,7 +24,7 @@ func TestGetEvents_InvalidParse(t *testing.T) {
 		{"foo", "5", "10", nil, "invalid event type format"},
 		{"A.123.Foo.Bar", "5", "10", nil, "invalid event type format"},
 		{"A.f8d6e0586b0a20c7.Foo.Bar", "20", "10", nil, "start height must be less than or equal to end height"},
-		{"A.f8d6e0586b0a20c7.Foo.Bar", "0", "500", nil, "height range 500 exceeds maximum allowed of 50"},
+		{"A.f8d6e0586b0a20c7.Foo.Bar", "0", "500", nil, "height range 500 exceeds maximum allowed of 250"},
 		{"A.f8d6e0586b0a20c7.Foo.Bar", "0", "", make([]string, 100), "at most 50 IDs can be requested at a time"},
 	}
 

@@ -3,9 +3,8 @@ package cmd
 import (
 	"encoding/hex"
 	"os"
-	"regexp"
-
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -14,21 +13,23 @@ import (
 
 	utils "github.com/onflow/flow-go/cmd/bootstrap/utils"
 	model "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 const finalizeHappyPathLogs = "^deterministic bootstrapping random seed" +
 	"collecting partner network and staking keys" +
 	`read \d+ partner node configuration files` +
-	`read \d+ stakes for partner nodes` +
+	`read \d+ weights for partner nodes` +
 	"generating internal private networking and staking keys" +
 	`read \d+ internal private node-info files` +
 	`read internal node configurations` +
-	`read \d+ stakes for internal nodes` +
+	`read \d+ weights for internal nodes` +
 	`checking constraints on consensus/cluster nodes` +
 	`assembling network and staking keys` +
 	`reading root block data` +
 	`reading root block votes` +
+	`read vote .*` +
 	`reading dkg data` +
 	`constructing root QC` +
 	`computing collection node clusters` +
@@ -51,20 +52,20 @@ const finalizeHappyPathLogs = "^deterministic bootstrapping random seed" +
 var finalizeHappyPathRegex = regexp.MustCompile(finalizeHappyPathLogs)
 
 func TestFinalize_HappyPath(t *testing.T) {
-	deterministicSeed := GenerateRandomSeed()
+	deterministicSeed := GenerateRandomSeed(flow.EpochSetupRandomSourceLength)
 	rootCommit := unittest.StateCommitmentFixture()
 	rootParent := unittest.StateCommitmentFixture()
 	chainName := "main"
 	rootHeight := uint64(12332)
 	epochCounter := uint64(2)
 
-	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerStakes, internalPrivDir, configPath string) {
+	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerWeights, internalPrivDir, configPath string) {
 
 		flagOutdir = bootDir
 
 		flagConfig = configPath
 		flagPartnerNodeInfoDir = partnerDir
-		flagPartnerStakes = partnerStakes
+		flagPartnerWeights = partnerWeights
 		flagInternalNodePrivInfoDir = internalPrivDir
 
 		flagFastKG = true
@@ -98,20 +99,20 @@ func TestFinalize_HappyPath(t *testing.T) {
 }
 
 func TestFinalize_Deterministic(t *testing.T) {
-	deterministicSeed := GenerateRandomSeed()
+	deterministicSeed := GenerateRandomSeed(flow.EpochSetupRandomSourceLength)
 	rootCommit := unittest.StateCommitmentFixture()
 	rootParent := unittest.StateCommitmentFixture()
 	chainName := "main"
 	rootHeight := uint64(1000)
 	epochCounter := uint64(0)
 
-	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerStakes, internalPrivDir, configPath string) {
+	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerWeights, internalPrivDir, configPath string) {
 
 		flagOutdir = bootDir
 
 		flagConfig = configPath
 		flagPartnerNodeInfoDir = partnerDir
-		flagPartnerStakes = partnerStakes
+		flagPartnerWeights = partnerWeights
 		flagInternalNodePrivInfoDir = internalPrivDir
 
 		flagFastKG = true
@@ -173,20 +174,20 @@ func TestFinalize_Deterministic(t *testing.T) {
 }
 
 func TestFinalize_SameSeedDifferentStateCommits(t *testing.T) {
-	deterministicSeed := GenerateRandomSeed()
+	deterministicSeed := GenerateRandomSeed(flow.EpochSetupRandomSourceLength)
 	rootCommit := unittest.StateCommitmentFixture()
 	rootParent := unittest.StateCommitmentFixture()
 	chainName := "main"
 	rootHeight := uint64(1000)
 	epochCounter := uint64(0)
 
-	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerStakes, internalPrivDir, configPath string) {
+	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerWeights, internalPrivDir, configPath string) {
 
 		flagOutdir = bootDir
 
 		flagConfig = configPath
 		flagPartnerNodeInfoDir = partnerDir
-		flagPartnerStakes = partnerStakes
+		flagPartnerWeights = partnerWeights
 		flagInternalNodePrivInfoDir = internalPrivDir
 
 		flagFastKG = true
@@ -267,7 +268,8 @@ func TestFinalize_SameSeedDifferentStateCommits(t *testing.T) {
 		randomSource2, err := currentEpoch2.RandomSource()
 		require.NoError(t, err)
 		assert.Equal(t, randomSource1, randomSource2)
-		assert.Equal(t, randomSource1, getRandomSource(deterministicSeed))
+		assert.Equal(t, randomSource1, deterministicSeed)
+		assert.Equal(t, flow.EpochSetupRandomSourceLength, len(randomSource1))
 	})
 }
 
@@ -285,13 +287,13 @@ func TestFinalize_InvalidRandomSeedLength(t *testing.T) {
 	// invalid length execution logs
 	expectedLogs := regexp.MustCompile("random seed provided length is not valid")
 
-	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerStakes, internalPrivDir, configPath string) {
+	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerWeights, internalPrivDir, configPath string) {
 
 		flagOutdir = bootDir
 
 		flagConfig = configPath
 		flagPartnerNodeInfoDir = partnerDir
-		flagPartnerStakes = partnerStakes
+		flagPartnerWeights = partnerWeights
 		flagInternalNodePrivInfoDir = internalPrivDir
 
 		flagFastKG = true

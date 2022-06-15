@@ -11,6 +11,7 @@ const (
 	namespaceExecution    = "execution"
 	namespaceLoader       = "loader"
 	namespaceStateSync    = "state_synchronization"
+	namespaceChainsync    = "chainsync"
 )
 
 // Network subsystems represent the various layers of networking.
@@ -32,6 +33,7 @@ const (
 const (
 	subsystemTransactionTiming     = "transaction_timing"
 	subsystemTransactionSubmission = "transaction_submission"
+	subsystemConnectionPool        = "connection_pool"
 )
 
 // Collection subsystem
@@ -68,7 +70,13 @@ const (
 
 // State Synchronization Subsystems
 const (
-	subsystemExecutionDataService = "execution_data_service"
+	subsystemExecutionDataService   = "execution_data_service"
+	subsystemExecutionDataRequester = "execution_data_requester"
+)
+
+// module/synchronization core
+const (
+	subsystemSyncCore = "sync_core"
 )
 
 // METRIC NAMING GUIDELINES

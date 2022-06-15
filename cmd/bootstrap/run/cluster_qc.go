@@ -15,19 +15,13 @@ import (
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/local"
 )
 
 // GenerateClusterRootQC creates votes and generates a QC based on participant data
 func GenerateClusterRootQC(signers []bootstrap.NodeInfo, allCommitteeMembers flow.IdentityList, clusterBlock *cluster.Block) (*flow.QuorumCertificate, error) {
-	clusterRootBlock := &model.Block{
-		BlockID:     clusterBlock.ID(),
-		View:        clusterBlock.Header.View,
-		ProposerID:  clusterBlock.Header.ProposerID,
-		QC:          nil,
-		PayloadHash: clusterBlock.Header.PayloadHash,
-		Timestamp:   clusterBlock.Header.Timestamp,
-	}
+	clusterRootBlock := model.GenesisBlockFromFlow(clusterBlock.Header)
 
 	// STEP 1: create votes for cluster root block
 	votes, err := createRootBlockVotes(signers, clusterRootBlock)
@@ -36,7 +30,8 @@ func GenerateClusterRootQC(signers []bootstrap.NodeInfo, allCommitteeMembers flo
 	}
 
 	// STEP 2: create VoteProcessor
-	committee, err := committees.NewStaticCommittee(allCommitteeMembers, flow.Identifier{}, nil, nil)
+	ordered := allCommitteeMembers.Sort(order.Canonical)
+	committee, err := committees.NewStaticCommittee(ordered, flow.Identifier{}, nil, nil)
 	if err != nil {
 		return nil, err
 	}

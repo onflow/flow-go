@@ -5,29 +5,30 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module/signature"
 )
 
-// IsNodeStakedAt returns whether the node with the given ID is a valid
-// staked, un-ejected node as of the given state snapshot.
-func IsNodeStakedAt(snapshot Snapshot, id flow.Identifier) (bool, error) {
+// IsNodeAuthorizedAt returns whether the node with the given ID is a valid
+// un-ejected network participant as of the given state snapshot.
+func IsNodeAuthorizedAt(snapshot Snapshot, id flow.Identifier) (bool, error) {
 	return CheckNodeStatusAt(
 		snapshot,
 		id,
-		filter.HasStake(true),
+		filter.HasWeight(true),
 		filter.Not(filter.Ejected),
 	)
 }
 
-// IsNodeStakedWithRoleAt returns whether the node with the given ID is a valid
-// staked, un-ejected node with the specified role as of the given state snapshot.
+// IsNodeAuthorizedWithRoleAt returns whether the node with the given ID is a valid
+// un-ejected network participant with the specified role as of the given state snapshot.
 // Expected errors during normal operations:
 //  * storage.ErrNotFound if snapshot references an unknown block
 // All other errors are unexpected and potential symptoms of internal state corruption.
-func IsNodeStakedWithRoleAt(snapshot Snapshot, id flow.Identifier, role flow.Role) (bool, error) {
+func IsNodeAuthorizedWithRoleAt(snapshot Snapshot, id flow.Identifier, role flow.Role) (bool, error) {
 	return CheckNodeStatusAt(
 		snapshot,
 		id,
-		filter.HasStake(true),
+		filter.HasWeight(true),
 		filter.Not(filter.Ejected),
 		filter.HasRole(role),
 	)
@@ -68,4 +69,30 @@ func IsSporkRootSnapshot(snapshot Snapshot) (bool, error) {
 		return false, nil
 	}
 	return true, nil
+}
+
+// FindGuarantors decodes the signer indices from the guarantee, and finds the guarantor identifiers from protocol state
+// Expected Error returns during normal operations:
+//  * signature.InvalidSignerIndicesError if `signerIndices` does not encode a valid set of collection guarantors
+//  * storage.ErrNotFound if the guarantee's ReferenceBlockID is not found
+//  * protocol.ErrEpochNotCommitted if epoch has not been committed yet
+//  * protocol.ErrClusterNotFound if cluster is not found by the given chainID
+func FindGuarantors(state State, guarantee *flow.CollectionGuarantee) ([]flow.Identifier, error) {
+	snapshot := state.AtBlockID(guarantee.ReferenceBlockID)
+	epochs := snapshot.Epochs()
+	epoch := epochs.Current()
+	cluster, err := epoch.ClusterByChainID(guarantee.ChainID)
+
+	if err != nil {
+		return nil, fmt.Errorf(
+			"fail to retrieve collector clusters for guarantee (ReferenceBlockID: %v, ChainID: %v): %w",
+			guarantee.ReferenceBlockID, guarantee.ChainID, err)
+	}
+
+	guarantorIDs, err := signature.DecodeSignerIndicesToIdentifiers(cluster.Members().NodeIDs(), guarantee.SignerIndices)
+	if err != nil {
+		return nil, fmt.Errorf("could not decode signer indices for guarantee %v: %w", guarantee.ID(), err)
+	}
+
+	return guarantorIDs, nil
 }

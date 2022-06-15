@@ -2,41 +2,41 @@
   {
     "Role": "collection",
     "Address": "10.138.0.6:3569",
-    "Stake": 1000
+    "Weight": 1000
   },
   {
     "Role": "collection",
     "Address": "10.138.0.7:3569",
-    "Stake": 1000
+    "Weight": 1000
   },
   {
     "Role": "consensus",
     "Address": "10.138.0.2:3569",
-    "Stake": 1000
+    "Weight": 1000
   },
   {
     "Role": "consensus",
     "Address": "10.138.0.8:3569",
-    "Stake": 1000
+    "Weight": 1000
   },
   {
     "Role": "consensus",
     "Address": "10.138.0.9:3569",
-    "Stake": 1000
+    "Weight": 1000
   },
   {
     "Role": "execution",
     "Address": "10.138.0.3:3569",
-    "Stake": 1000
+    "Weight": 1000
   },
   {
     "Role": "verification",
     "Address": "10.138.0.4:3569",
-    "Stake": 1000
+    "Weight": 1000
   },
   {
     "Role": "access",
     "Address": "10.138.0.5:3569",
-    "Stake": 1000
+    "Weight": 1000
   }
 ]

@@ -3,9 +3,9 @@ package validation
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -19,7 +19,7 @@ import (
 // this can be used temporarily to ease the migration to new chunk based sealing.
 // TODO:
 //   * This value is for the happy path (requires just one approval per chunk).
-//   * Full protocol should be +2/3 of all currently staked verifiers.
+//   * Full protocol should be +2/3 of all currently authorized verifiers.
 const DefaultRequiredApprovalsForSealValidation = 0
 
 // sealValidator holds all needed context for checking seal
@@ -127,7 +127,7 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 	// attached to the main chain, we store the latest seal in the fork that ends with B.
 	// Therefore, _not_ finding the latest sealed block of the parent constitutes
 	// a fatal internal error.
-	lastSealUpToParent, err := s.seals.ByBlockID(parentID)
+	lastSealUpToParent, err := s.seals.HighestInFork(parentID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve parent seal (%x): %w", parentID, err)
 	}

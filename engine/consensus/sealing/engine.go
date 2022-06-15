@@ -6,6 +6,7 @@ import (
 	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
@@ -160,12 +161,12 @@ func (e *Engine) setupTrustedInboundQueues() error {
 	var err error
 	e.pendingIncorporatedResults, err = fifoqueue.NewFifoQueue()
 	if err != nil {
-		return fmt.Errorf("failed to create queue for incorproated results: %w", err)
+		return fmt.Errorf("failed to create queue for incorporated results: %w", err)
 	}
 	e.pendingIncorporatedBlocks, err = fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultIncorporatedBlockQueueCapacity))
 	if err != nil {
-		return fmt.Errorf("failed to create queue for incorproated blocks: %w", err)
+		return fmt.Errorf("failed to create queue for incorporated blocks: %w", err)
 	}
 	return nil
 }
@@ -424,7 +425,7 @@ func (e *Engine) Done() <-chan struct{} {
 //  (1) Informs sealing.Core about finalization of respective block.
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
-func (e *Engine) OnFinalizedBlock(flow.Identifier) {
+func (e *Engine) OnFinalizedBlock(*model.Block) {
 	e.finalizationEventsNotifier.Notify()
 }
 
@@ -432,8 +433,8 @@ func (e *Engine) OnFinalizedBlock(flow.Identifier) {
 //  (1) Processes all execution results that were incorporated in parent block payload.
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
-func (e *Engine) OnBlockIncorporated(incorporatedBlockID flow.Identifier) {
-	e.pendingIncorporatedBlocks.Push(incorporatedBlockID)
+func (e *Engine) OnBlockIncorporated(incorporatedBlock *model.Block) {
+	e.pendingIncorporatedBlocks.Push(incorporatedBlock.BlockID)
 	e.blockIncorporatedNotifier.Notify()
 }
 

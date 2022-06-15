@@ -7,9 +7,8 @@ import (
 
 // ExecutionData represents the execution data of a block
 type ExecutionData struct {
-	BlockID            flow.Identifier
-	Collections        []*flow.Collection
-	Events             []flow.EventsList
-	TrieUpdates        []*ledger.TrieUpdate
-	TransactionResults []flow.TransactionResult
+	BlockID     flow.Identifier
+	Collections []*flow.Collection
+	Events      []flow.EventsList
+	TrieUpdates []*ledger.TrieUpdate
 }

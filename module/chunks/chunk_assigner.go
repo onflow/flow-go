@@ -9,10 +9,10 @@ import (
 	"github.com/onflow/flow-go/model/encoding/json"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/indices"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/seed"
 )
 
 // DefaultChunkAssignmentAlpha is the default number of verifiers that should be
@@ -71,7 +71,7 @@ func (p *ChunkAssigner) Assign(result *flow.ExecutionResult, blockID flow.Identi
 
 	// Get a list of verifiers at block that is being sealed
 	verifiers, err := p.protocolState.AtBlockID(result.BlockID).Identities(filter.And(filter.HasRole(flow.RoleVerification),
-		filter.HasStake(true),
+		filter.HasWeight(true),
 		filter.Not(filter.Ejected)))
 	if err != nil {
 		return nil, fmt.Errorf("could not get verifiers: %w", err)
@@ -97,12 +97,12 @@ func (p *ChunkAssigner) Assign(result *flow.ExecutionResult, blockID flow.Identi
 
 func (p *ChunkAssigner) rngByBlockID(stateSnapshot protocol.Snapshot) (random.Rand, error) {
 	// TODO: seed could be cached to optimize performance
-	seed, err := stateSnapshot.Seed(indices.ProtocolVerificationChunkAssignment...) // potentially returns NoValidChildBlockError
+	randomSource, err := stateSnapshot.RandomSource() // potentially returns NoValidChildBlockError
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve source of randomness: %w", err)
 	}
 
-	rng, err := random.NewChacha20PRG(seed, indices.ChunkAssignmentCustomizer)
+	rng, err := seed.PRGFromRandomSource(randomSource, seed.ProtocolVerificationChunkAssignment)
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate random number generator: %w", err)
 	}

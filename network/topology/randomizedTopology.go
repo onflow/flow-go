@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/seed"
 )
 
 const Randomized = Name("randomized")
@@ -42,13 +43,13 @@ func NewRandomizedTopology(nodeID flow.Identifier, logger zerolog.Logger, edgePr
 	}
 
 	// generates a random number generator seed
-	seed, err := byteSeedFromID(nodeID)
+	randomSeed, err := byteSeedFromID(nodeID)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate seed from id:%w", err)
 	}
 	// generates a pseudo-random number generator.
 	// the customizer doen't need to be a protocol-wide constant.
-	rng, err := random.NewChacha20PRG(seed, []byte("net_topology"))
+	rng, err := seed.PRGFromRandomSource(randomSeed, []byte("net_topology"))
 	if err != nil {
 		return nil, fmt.Errorf("could not generate random number generator: %w", err)
 	}

@@ -133,13 +133,13 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 
 		registerKey := executionState.RegisterIDToKey(registerID)
 
-		query, err := ledger.NewQuery(ledger.State(chunkDataPack.StartState), []ledger.Key{registerKey})
+		query, err := ledger.NewQuerySingleValue(ledger.State(chunkDataPack.StartState), registerKey)
 
 		if err != nil {
 			return nil, fmt.Errorf("cannot create query: %w", err)
 		}
 
-		values, err := psmt.Get(query)
+		value, err := psmt.GetSingleValue(query)
 		if err != nil {
 			if errors.Is(err, ledger.ErrMissingKeys{}) {
 
@@ -158,7 +158,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 			return nil, fmt.Errorf("cannot query register: %w", err)
 		}
 
-		return values[0], nil
+		return value, nil
 	}
 
 	chunkView := delta.NewView(getRegister)

@@ -25,8 +25,9 @@ type ExecutionCollector struct {
 	forestNumberOfTrees              prometheus.Gauge
 	latestTrieRegCount               prometheus.Gauge
 	latestTrieRegCountDiff           prometheus.Gauge
-	latestTrieMaxDepth               prometheus.Gauge
-	latestTrieMaxDepthDiff           prometheus.Gauge
+	latestTrieRegSize                prometheus.Gauge
+	latestTrieRegSizeDiff            prometheus.Gauge
+	latestTrieMaxDepthTouched        prometheus.Gauge
 	updated                          prometheus.Counter
 	proofSize                        prometheus.Gauge
 	updatedValuesNumber              prometheus.Counter
@@ -50,10 +51,16 @@ type ExecutionCollector struct {
 	transactionCheckTime             prometheus.Histogram
 	transactionInterpretTime         prometheus.Histogram
 	transactionExecutionTime         prometheus.Histogram
+	transactionMemoryUsage           prometheus.Histogram
+	transactionMemoryEstimate        prometheus.Histogram
+	transactionMemoryDifference      prometheus.Histogram
 	transactionComputationUsed       prometheus.Histogram
 	transactionEmittedEvents         prometheus.Histogram
 	scriptExecutionTime              prometheus.Histogram
 	scriptComputationUsed            prometheus.Histogram
+	scriptMemoryUsage                prometheus.Histogram
+	scriptMemoryEstimate             prometheus.Histogram
+	scriptMemoryDifference           prometheus.Histogram
 	numberOfAccounts                 prometheus.Gauge
 	totalChunkDataPackRequests       prometheus.Counter
 	stateSyncActive                  prometheus.Gauge
@@ -92,18 +99,25 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Help:      "the difference between number of unique register allocated of the latest created trie and parent trie",
 	})
 
-	latestTrieMaxDepth := promauto.NewGauge(prometheus.GaugeOpts{
+	latestTrieRegSize := promauto.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
-		Name:      "latest_trie_max_depth",
-		Help:      "the maximum depth of the latest created trie",
+		Name:      "latest_trie_reg_size",
+		Help:      "the size of allocated registers (latest created trie)",
 	})
 
-	latestTrieMaxDepthDiff := promauto.NewGauge(prometheus.GaugeOpts{
+	latestTrieRegSizeDiff := promauto.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
-		Name:      "latest_trie_max_depth_diff",
-		Help:      "the the difference between the max depth of the latest created trie and parent trie",
+		Name:      "latest_trie_reg_size_diff",
+		Help:      "the difference between size of unique register allocated of the latest created trie and parent trie",
+	})
+
+	latestTrieMaxDepthTouched := promauto.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemMTrie,
+		Name:      "latest_trie_max_depth_touched",
+		Help:      "the maximum depth touched of the latest created trie",
 	})
 
 	updatedCount := promauto.NewCounter(prometheus.CounterOpts{
@@ -284,6 +298,30 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Buckets:   []float64{50, 100, 500, 1000, 5000, 10000},
 	})
 
+	transactionMemoryUsage := promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "transaction_memory_usage",
+		Help:      "the total amount of memory allocated by a transaction",
+		Buckets:   []float64{100_000, 1_000_000, 10_000_000, 50_000_000, 100_000_000, 500_000_000, 1_000_000_000},
+	})
+
+	transactionMemoryEstimate := promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "transaction_memory_estimate",
+		Help:      "the estimated memory used by a transaction",
+		Buckets:   []float64{100_000, 1_000_000, 10_000_000, 50_000_000, 100_000_000, 500_000_000, 1_000_000_000},
+	})
+
+	transactionMemoryDifference := promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "transaction_memory_difference",
+		Help:      "the difference in actual memory usage and estimate for a transaction",
+		Buckets:   []float64{-1, 0, 10_000_000, 100_000_000, 1_000_000_000},
+	})
+
 	transactionEmittedEvents := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
@@ -305,6 +343,30 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Name:      "script_computation_used",
 		Help:      "the total amount of computation used by an script",
 		Buckets:   []float64{50, 100, 500, 1000, 5000, 10000},
+	})
+
+	scriptMemoryUsage := promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "script_memory_usage",
+		Help:      "the total amount of memory allocated by a script",
+		Buckets:   []float64{100_000, 1_000_000, 10_000_000, 50_000_000, 100_000_000, 500_000_000, 1_000_000_000},
+	})
+
+	scriptMemoryEstimate := promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "script_memory_estimate",
+		Help:      "the estimated memory used by a script",
+		Buckets:   []float64{100_000, 1_000_000, 10_000_000, 50_000_000, 100_000_000, 500_000_000, 1_000_000_000},
+	})
+
+	scriptMemoryDifference := promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "script_memory_difference",
+		Help:      "the difference in actual memory usage and estimate for a script",
+		Buckets:   []float64{-1, 0, 10_000_000, 100_000_000, 1_000_000_000},
 	})
 
 	totalChunkDataPackRequests := promauto.NewCounter(prometheus.CounterOpts{
@@ -336,8 +398,9 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		forestNumberOfTrees:         forestNumberOfTrees,
 		latestTrieRegCount:          latestTrieRegCount,
 		latestTrieRegCountDiff:      latestTrieRegCountDiff,
-		latestTrieMaxDepth:          latestTrieMaxDepth,
-		latestTrieMaxDepthDiff:      latestTrieMaxDepthDiff,
+		latestTrieRegSize:           latestTrieRegSize,
+		latestTrieRegSizeDiff:       latestTrieRegSizeDiff,
+		latestTrieMaxDepthTouched:   latestTrieMaxDepthTouched,
 		updated:                     updatedCount,
 		proofSize:                   proofSize,
 		updatedValuesNumber:         updatedValuesNumber,
@@ -362,9 +425,15 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		transactionInterpretTime:    transactionInterpretTime,
 		transactionExecutionTime:    transactionExecutionTime,
 		transactionComputationUsed:  transactionComputationUsed,
+		transactionMemoryUsage:      transactionMemoryUsage,
+		transactionMemoryEstimate:   transactionMemoryEstimate,
+		transactionMemoryDifference: transactionMemoryDifference,
 		transactionEmittedEvents:    transactionEmittedEvents,
 		scriptExecutionTime:         scriptExecutionTime,
 		scriptComputationUsed:       scriptComputationUsed,
+		scriptMemoryUsage:           scriptMemoryUsage,
+		scriptMemoryEstimate:        scriptMemoryEstimate,
+		scriptMemoryDifference:      scriptMemoryDifference,
 		totalChunkDataPackRequests:  totalChunkDataPackRequests,
 		blockDataUploadsInProgress:  blockDataUploadsInProgress,
 		blockDataUploadsDuration:    blockDataUploadsDuration,
@@ -486,10 +555,18 @@ func (ec *ExecutionCollector) ExecutionCollectionExecuted(dur time.Duration, com
 }
 
 // TransactionExecuted reports the time and computation spent executing a single transaction
-func (ec *ExecutionCollector) ExecutionTransactionExecuted(dur time.Duration, compUsed uint64, eventCounts int, failed bool) {
+func (ec *ExecutionCollector) ExecutionTransactionExecuted(
+	dur time.Duration,
+	compUsed, memoryUsed, memoryEstimated uint64,
+	eventCounts int,
+	failed bool,
+) {
 	ec.totalExecutedTransactionsCounter.Inc()
 	ec.transactionExecutionTime.Observe(float64(dur.Milliseconds()))
 	ec.transactionComputationUsed.Observe(float64(compUsed))
+	ec.transactionMemoryUsage.Observe(float64(memoryUsed))
+	ec.transactionMemoryEstimate.Observe(float64(memoryEstimated))
+	ec.transactionMemoryDifference.Observe(float64(memoryEstimated) - float64(memoryUsed))
 	ec.transactionEmittedEvents.Observe(float64(eventCounts))
 	if failed {
 		ec.totalFailedTransactionsCounter.Inc()
@@ -497,10 +574,13 @@ func (ec *ExecutionCollector) ExecutionTransactionExecuted(dur time.Duration, co
 }
 
 // ScriptExecuted reports the time spent executing a single script
-func (ec *ExecutionCollector) ExecutionScriptExecuted(dur time.Duration, compUsed uint64) {
+func (ec *ExecutionCollector) ExecutionScriptExecuted(dur time.Duration, compUsed, memoryUsed, memoryEstimated uint64) {
 	ec.totalExecutedScriptsCounter.Inc()
 	ec.scriptExecutionTime.Observe(float64(dur.Milliseconds()))
 	ec.scriptComputationUsed.Observe(float64(compUsed))
+	ec.scriptMemoryUsage.Observe(float64(memoryUsed))
+	ec.scriptMemoryEstimate.Observe(float64(memoryEstimated))
+	ec.scriptMemoryDifference.Observe(float64(memoryEstimated) - float64(memoryUsed))
 }
 
 // ExecutionStateReadsPerBlock reports number of state access/read operations per block
@@ -539,18 +619,23 @@ func (ec *ExecutionCollector) LatestTrieRegCount(number uint64) {
 }
 
 // LatestTrieRegCountDiff records the difference between the number of unique register allocated of the latest created trie and parent trie
-func (ec *ExecutionCollector) LatestTrieRegCountDiff(number uint64) {
+func (ec *ExecutionCollector) LatestTrieRegCountDiff(number int64) {
 	ec.latestTrieRegCountDiff.Set(float64(number))
 }
 
-// LatestTrieMaxDepth records the maximum depth of the last created trie
-func (ec *ExecutionCollector) LatestTrieMaxDepth(number uint64) {
-	ec.latestTrieMaxDepth.Set(float64(number))
+// LatestTrieRegSize records the size of unique register allocated (the lastest created trie)
+func (ec *ExecutionCollector) LatestTrieRegSize(size uint64) {
+	ec.latestTrieRegSize.Set(float64(size))
 }
 
-// LatestTrieMaxDepthDiff records the difference between the max depth of the latest created trie and parent trie
-func (ec *ExecutionCollector) LatestTrieMaxDepthDiff(number uint64) {
-	ec.latestTrieMaxDepthDiff.Set(float64(number))
+// LatestTrieRegSizeDiff records the difference between the size of unique register allocated of the latest created trie and parent trie
+func (ec *ExecutionCollector) LatestTrieRegSizeDiff(size int64) {
+	ec.latestTrieRegSizeDiff.Set(float64(size))
+}
+
+// LatestTrieMaxDepthTouched records the maximum depth touched of the last created trie
+func (ec *ExecutionCollector) LatestTrieMaxDepthTouched(maxDepth uint16) {
+	ec.latestTrieMaxDepthTouched.Set(float64(maxDepth))
 }
 
 // UpdateCount increase a counter of performed updates

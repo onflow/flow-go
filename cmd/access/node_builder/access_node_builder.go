@@ -4,9 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
+	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
@@ -20,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
@@ -28,23 +32,30 @@ import (
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/encodable"
+	"github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
+	"github.com/onflow/flow-go/module/compliance"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/state_synchronization"
+	edrequester "github.com/onflow/flow-go/module/state_synchronization/requester"
 	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/network"
+	netcache "github.com/onflow/flow-go/network/cache"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
+	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
-	storage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage"
+	bstorage "github.com/onflow/flow-go/storage/badger"
 )
 
 // AccessNodeBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node
@@ -77,6 +88,7 @@ type AccessNodeConfig struct {
 	staked                       bool
 	bootstrapNodeAddresses       []string
 	bootstrapNodePublicKeys      []string
+	observerNetworkingKeyPath    string
 	bootstrapIdentities          flow.IdentityList // the identity list of bootstrap peers the node uses to discover other nodes
 	NetworkKey                   crypto.PrivateKey // the networking key passed in by the caller when being used as a library
 	supportsUnstakedFollower     bool              // True if this is a staked Access node which also supports unstaked access nodes/unstaked consensus follower engines
@@ -94,6 +106,10 @@ type AccessNodeConfig struct {
 	logTxTimeToFinalizedExecuted bool
 	retryEnabled                 bool
 	rpcMetricsEnabled            bool
+	executionDataSyncEnabled     bool
+	executionDataDir             string
+	executionDataStartHeight     uint64
+	executionDataConfig          edrequester.ExecutionDataConfig
 	baseOptions                  []cmd.Option
 
 	PublicNetworkConfig PublicNetworkConfig
@@ -108,6 +124,7 @@ type PublicNetworkConfig struct {
 
 // DefaultAccessNodeConfig defines all the default values for the AccessNodeConfig
 func DefaultAccessNodeConfig() *AccessNodeConfig {
+	homedir, _ := os.UserHomeDir()
 	return &AccessNodeConfig{
 		collectionGRPCPort: 9000,
 		executionGRPCPort:  9000,
@@ -142,6 +159,17 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			BindAddress: cmd.NotSet,
 			Metrics:     metrics.NewNoopCollector(),
 		},
+		observerNetworkingKeyPath: cmd.NotSet,
+		executionDataSyncEnabled:  false,
+		executionDataDir:          filepath.Join(homedir, ".flow", "execution_data"),
+		executionDataStartHeight:  0,
+		executionDataConfig: edrequester.ExecutionDataConfig{
+			InitialBlockHeight: 0,
+			MaxSearchAhead:     edrequester.DefaultMaxSearchAhead,
+			FetchTimeout:       edrequester.DefaultFetchTimeout,
+			RetryDelay:         edrequester.DefaultRetryDelay,
+			MaxRetryDelay:      edrequester.DefaultMaxRetryDelay,
+		},
 	}
 }
 
@@ -165,11 +193,14 @@ type FlowAccessNodeBuilder struct {
 	CollectionsToMarkExecuted  *stdmap.Times
 	BlocksToMarkExecuted       *stdmap.Times
 	TransactionMetrics         module.TransactionMetrics
+	AccessMetrics              module.AccessMetrics
 	PingMetrics                module.PingMetrics
 	Committee                  hotstuff.Committee
 	Finalized                  *flow.Header
 	Pending                    []*flow.Header
 	FollowerCore               module.HotStuffFollower
+	ExecutionDataService       state_synchronization.ExecutionDataService
+	ExecutionDataRequester     state_synchronization.ExecutionDataRequester
 	// for the unstaked access node, the sync engine participants provider is the libp2p peer store which is not
 	// available until after the network has started. Hence, a factory function that needs to be called just before
 	// creating the sync engine
@@ -190,10 +221,12 @@ func (builder *FlowAccessNodeBuilder) deriveBootstrapPeerIdentities() error {
 	if builder.bootstrapIdentities != nil {
 		return nil
 	}
+
 	ids, err := BootstrapIdentities(builder.bootstrapNodeAddresses, builder.bootstrapNodePublicKeys)
 	if err != nil {
 		return fmt.Errorf("failed to derive bootstrap peer identities: %w", err)
 	}
+
 	builder.bootstrapIdentities = ids
 
 	return nil
@@ -226,7 +259,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilde
 
 func (builder *FlowAccessNodeBuilder) buildSyncCore() *FlowAccessNodeBuilder {
 	builder.Module("sync core", func(node *cmd.NodeConfig) error {
-		syncCore, err := synchronization.New(node.Logger, synchronization.DefaultConfig())
+		syncCore, err := synchronization.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector())
 		builder.SyncCore = syncCore
 
 		return err
@@ -270,8 +303,18 @@ func (builder *FlowAccessNodeBuilder) buildFollowerCore() *FlowAccessNodeBuilder
 		// initialize the verifier for the protocol consensus
 		verifier := verification.NewCombinedVerifier(builder.Committee, packer)
 
-		followerCore, err := consensus.NewFollower(node.Logger, builder.Committee, node.Storage.Headers, final, verifier,
-			builder.FinalizationDistributor, node.RootBlock.Header, node.RootQC, builder.Finalized, builder.Pending)
+		followerCore, err := consensus.NewFollower(
+			node.Logger,
+			builder.Committee,
+			node.Storage.Headers,
+			final,
+			verifier,
+			builder.FinalizationDistributor,
+			node.RootBlock.Header,
+			node.RootQC,
+			builder.Finalized,
+			builder.Pending,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize follower core: %w", err)
 		}
@@ -286,7 +329,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerCore() *FlowAccessNodeBuilder
 func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuilder {
 	builder.Component("follower engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		// initialize cleaner for DB
-		cleaner := storage.NewCleaner(node.Logger, node.DB, builder.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
+		cleaner := bstorage.NewCleaner(node.Logger, node.DB, builder.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
 		conCache := buffer.NewPendingBlocks()
 
 		followerEng, err := follower.New(
@@ -303,6 +346,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuild
 			builder.FollowerCore,
 			builder.SyncCore,
 			node.Tracer,
+			compliance.WithSkipNewProposalsThreshold(builder.ComplianceConfig.SkipNewProposalsThreshold),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create follower engine: %w", err)
@@ -363,6 +407,112 @@ func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() AccessNodeBuilder
 		buildFollowerEngine().
 		buildFinalizedHeader().
 		buildSyncEngine()
+
+	return builder
+}
+
+func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessNodeBuilder {
+	var ds *badger.Datastore
+	var bs network.BlobService
+	var processedBlockHeight storage.ConsumerProgress
+	var processedNotifications storage.ConsumerProgress
+
+	builder.
+		Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
+			err := os.MkdirAll(builder.executionDataDir, 0700)
+			if err != nil {
+				return err
+			}
+
+			ds, err = badger.NewDatastore(builder.executionDataDir, &badger.DefaultOptions)
+			if err != nil {
+				return err
+			}
+
+			builder.ShutdownFunc(func() error {
+				if err := ds.Close(); err != nil {
+					return fmt.Errorf("could not close execution data datastore: %w", err)
+				}
+				return nil
+			})
+
+			return nil
+		}).
+		Module("processed block height consumer progress", func(node *cmd.NodeConfig) error {
+			// uses the datastore's DB
+			processedBlockHeight = bstorage.NewConsumerProgress(ds.DB, module.ConsumeProgressExecutionDataRequesterBlockHeight)
+			return nil
+		}).
+		Module("processed notifications consumer progress", func(node *cmd.NodeConfig) error {
+			// uses the datastore's DB
+			processedNotifications = bstorage.NewConsumerProgress(ds.DB, module.ConsumeProgressExecutionDataRequesterNotification)
+			return nil
+		}).
+		Component("execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			var err error
+			bs, err = node.Network.RegisterBlobService(engine.ExecutionDataService, ds)
+			if err != nil {
+				return nil, fmt.Errorf("could not register blob service: %w", err)
+			}
+
+			builder.ExecutionDataService = state_synchronization.NewExecutionDataService(
+				new(cbor.Codec),
+				compressor.NewLz4Compressor(),
+				bs,
+				metrics.NewExecutionDataServiceCollector(),
+				builder.Logger,
+			)
+
+			return builder.ExecutionDataService, nil
+		}).
+		Component("execution data requester", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			// Validation of the start block height needs to be done after loading state
+			if builder.executionDataStartHeight > 0 {
+				if builder.executionDataStartHeight <= builder.RootBlock.Header.Height {
+					return nil, fmt.Errorf(
+						"execution data start block height (%d) must be greater than the root block height (%d)",
+						builder.executionDataStartHeight, builder.RootBlock.Header.Height)
+				}
+
+				latestSeal, err := builder.State.Sealed().Head()
+				if err != nil {
+					return nil, fmt.Errorf("failed to get latest sealed height")
+				}
+
+				// Note: since the root block of a spork is also sealed in the root protocol state, the
+				// latest sealed height is always equal to the root block height. That means that at the
+				// very beginning of a spork, this check will always fail. Operators should not specify
+				// an InitialBlockHeight when starting from the beginning of a spork.
+				if builder.executionDataStartHeight > latestSeal.Height {
+					return nil, fmt.Errorf(
+						"execution data start block height (%d) must be less than or equal to the latest sealed block height (%d)",
+						builder.executionDataStartHeight, latestSeal.Height)
+				}
+
+				// executionDataStartHeight is provided as the first block to sync, but the
+				// requester expects the initial last processed height, which is the first height - 1
+				builder.executionDataConfig.InitialBlockHeight = builder.executionDataStartHeight - 1
+			} else {
+				builder.executionDataConfig.InitialBlockHeight = builder.RootBlock.Header.Height
+			}
+
+			builder.ExecutionDataRequester = edrequester.New(
+				builder.Logger,
+				metrics.NewExecutionDataRequesterCollector(),
+				builder.ExecutionDataService,
+				processedBlockHeight,
+				processedNotifications,
+				builder.State,
+				builder.Storage.Headers,
+				builder.Storage.Results,
+				builder.Storage.Seals,
+				builder.executionDataConfig,
+			)
+
+			builder.FinalizationDistributor.AddOnBlockFinalizedConsumer(builder.ExecutionDataRequester.OnBlockFinalized)
+
+			return builder.ExecutionDataRequester, nil
+		})
 
 	return builder
 }
@@ -446,13 +596,38 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.StringToIntVar(&builder.apiRatelimits, "api-rate-limits", defaultConfig.apiRatelimits, "per second rate limits for Access API methods e.g. Ping=300,GetTransaction=500 etc.")
 		flags.StringToIntVar(&builder.apiBurstlimits, "api-burst-limits", defaultConfig.apiBurstlimits, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
 		flags.BoolVar(&builder.staked, "staked", defaultConfig.staked, "whether this node is a staked access node or not")
+		flags.StringVar(&builder.observerNetworkingKeyPath, "observer-networking-key-path", defaultConfig.observerNetworkingKeyPath, "path to the networking key for observer")
 		flags.StringSliceVar(&builder.bootstrapNodeAddresses, "bootstrap-node-addresses", defaultConfig.bootstrapNodeAddresses, "the network addresses of the bootstrap access node if this is an unstaked access node e.g. access-001.mainnet.flow.org:9653,access-002.mainnet.flow.org:9653")
 		flags.StringSliceVar(&builder.bootstrapNodePublicKeys, "bootstrap-node-public-keys", defaultConfig.bootstrapNodePublicKeys, "the networking public key of the bootstrap access node if this is an unstaked access node (in the same order as the bootstrap node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
 		flags.BoolVar(&builder.supportsUnstakedFollower, "supports-unstaked-node", defaultConfig.supportsUnstakedFollower, "true if this staked access node supports unstaked node")
 		flags.StringVar(&builder.PublicNetworkConfig.BindAddress, "public-network-address", defaultConfig.PublicNetworkConfig.BindAddress, "staked access node's public network bind address")
+
+		// ExecutionDataRequester config
+		flags.BoolVar(&builder.executionDataSyncEnabled, "execution-data-sync-enabled", defaultConfig.executionDataSyncEnabled, "whether to enable the execution data sync protocol")
+		flags.StringVar(&builder.executionDataDir, "execution-data-dir", defaultConfig.executionDataDir, "directory to use for Execution Data database")
+		flags.Uint64Var(&builder.executionDataStartHeight, "execution-data-start-height", defaultConfig.executionDataStartHeight, "height of first block to sync execution data from when starting with an empty Execution Data database")
+		flags.Uint64Var(&builder.executionDataConfig.MaxSearchAhead, "execution-data-max-search-ahead", defaultConfig.executionDataConfig.MaxSearchAhead, "max number of heights to search ahead of the lowest outstanding execution data height")
+		flags.DurationVar(&builder.executionDataConfig.FetchTimeout, "execution-data-fetch-timeout", defaultConfig.executionDataConfig.FetchTimeout, "timeout to use when fetching execution data from the network e.g. 300s")
+		flags.DurationVar(&builder.executionDataConfig.RetryDelay, "execution-data-retry-delay", defaultConfig.executionDataConfig.RetryDelay, "initial delay for exponential backoff when fetching execution data fails e.g. 10s")
+		flags.DurationVar(&builder.executionDataConfig.MaxRetryDelay, "execution-data-max-retry-delay", defaultConfig.executionDataConfig.MaxRetryDelay, "maximum delay for exponential backoff when fetching execution data fails e.g. 5m")
 	}).ValidateFlags(func() error {
 		if builder.supportsUnstakedFollower && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-unstaked-node is true")
+		}
+
+		if builder.executionDataSyncEnabled {
+			if builder.executionDataConfig.FetchTimeout <= 0 {
+				return errors.New("execution-data-fetch-timeout must be greater than 0")
+			}
+			if builder.executionDataConfig.RetryDelay <= 0 {
+				return errors.New("execution-data-retry-delay must be greater than 0")
+			}
+			if builder.executionDataConfig.MaxRetryDelay < builder.executionDataConfig.RetryDelay {
+				return errors.New("execution-data-max-retry-delay must be greater than or equal to execution-data-retry-delay")
+			}
+			if builder.executionDataConfig.MaxSearchAhead == 0 {
+				return errors.New("execution-data-max-search-ahead must be greater than 0")
+			}
 		}
 
 		return nil
@@ -466,6 +641,7 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 	networkMetrics module.NetworkMetrics,
 	middleware network.Middleware,
 	topology network.Topology,
+	receiveCache *netcache.ReceiveCache,
 ) (*p2p.Network, error) {
 
 	codec := cborcodec.NewCodec()
@@ -476,11 +652,11 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 		codec,
 		nodeID,
 		func() (network.Middleware, error) { return builder.Middleware, nil },
-		p2p.DefaultCacheSize,
 		topology,
 		p2p.NewChannelSubscriptionManager(middleware),
 		networkMetrics,
 		builder.IdentityProvider,
+		receiveCache,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize network: %w", err)
@@ -515,8 +691,8 @@ func BootstrapIdentities(addresses []string, keys []string) (flow.IdentityList, 
 
 	ids := make([]*flow.Identity, len(addresses))
 	for i, address := range addresses {
-
 		key := keys[i]
+
 		// json unmarshaller needs a quotes before and after the string
 		// the pflags.StringSliceVar does not retain quotes for the command line arg even if escaped with \"
 		// hence this additional check to ensure the key is indeed quoted
@@ -531,14 +707,12 @@ func BootstrapIdentities(addresses []string, keys []string) (flow.IdentityList, 
 		}
 
 		// create the identity of the peer by setting only the relevant fields
-		id := &flow.Identity{
+		ids[i] = &flow.Identity{
 			NodeID:        flow.ZeroID, // the NodeID is the hash of the staking key and for the unstaked network it does not apply
 			Address:       address,
 			Role:          flow.RoleAccess, // the upstream node has to be an access node
 			NetworkPubKey: networkKey,
 		}
-
-		ids = append(ids, id)
 	}
 	return ids, nil
 }

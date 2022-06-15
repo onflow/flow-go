@@ -27,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
+	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/seed"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -74,14 +75,14 @@ func (s *CombinedVoteProcessorV2TestSuite) SetupTest() {
 	}).Maybe()
 
 	s.processor = &CombinedVoteProcessorV2{
-		log:              unittest.Logger(),
-		block:            s.proposal.Block,
-		stakingSigAggtor: s.stakingAggregator,
-		rbRector:         s.reconstructor,
-		onQCCreated:      s.onQCCreated,
-		packer:           s.packer,
-		minRequiredStake: s.minRequiredStake,
-		done:             *atomic.NewBool(false),
+		log:               unittest.Logger(),
+		block:             s.proposal.Block,
+		stakingSigAggtor:  s.stakingAggregator,
+		rbRector:          s.reconstructor,
+		onQCCreated:       s.onQCCreated,
+		packer:            s.packer,
+		minRequiredWeight: s.minRequiredWeight,
+		done:              *atomic.NewBool(false),
 	}
 }
 
@@ -113,7 +114,7 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_InvalidSignatureFormat() 
 
 	// valid length is SigLen or 2*SigLen
 	generator := rapid.IntRange(0, 128).Filter(func(value int) bool {
-		return value != hsig.SigLen && value != 2*hsig.SigLen
+		return value != msig.SigLen && value != 2*msig.SigLen
 	})
 	rapid.Check(s.T(), func(t *rapid.T) {
 		// create a signature with invalid length
@@ -122,8 +123,8 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_InvalidSignatureFormat() 
 		})
 		err := s.processor.Process(vote)
 		require.Error(s.T(), err)
-		require.True(s.T(), model.IsInvalidVoteError(err))
-		require.ErrorAs(s.T(), err, &model.ErrInvalidFormat)
+		require.True(s.T(), model.IsInvalidVoteError(err), err)
+		require.True(s.T(), errors.Is(err, msig.ErrInvalidSignatureFormat), err)
 	})
 }
 
@@ -266,8 +267,8 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_TrustedAdd_Exception() {
 func (s *CombinedVoteProcessorV2TestSuite) TestProcess_BuildQCError() {
 	mockAggregator := func(aggregator *mockhotstuff.WeightedSignatureAggregator) {
 		aggregator.On("Verify", mock.Anything, mock.Anything).Return(nil)
-		aggregator.On("TrustedAdd", mock.Anything, mock.Anything).Return(s.minRequiredStake, nil)
-		aggregator.On("TotalWeight").Return(s.minRequiredStake)
+		aggregator.On("TrustedAdd", mock.Anything, mock.Anything).Return(s.minRequiredWeight, nil)
+		aggregator.On("TotalWeight").Return(s.minRequiredWeight)
 	}
 
 	stakingSigAggregator := &mockhotstuff.WeightedSignatureAggregator{}
@@ -285,7 +286,7 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_BuildQCError() {
 	reconstructor.On("EnoughShares").Return(true)
 	reconstructor.On("Reconstruct").Return(unittest.SignatureFixture(), nil)
 
-	packer.On("Pack", mock.Anything, mock.Anything).Return(identities, unittest.RandomBytes(128), nil)
+	packer.On("Pack", mock.Anything, mock.Anything).Return(unittest.RandomBytes(100), unittest.RandomBytes(128), nil)
 
 	// Helper factory function to create processors. We need new processor for every test case
 	// because QC creation is one time operation and is triggered as soon as we have collected enough weight and shares.
@@ -293,14 +294,14 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_BuildQCError() {
 		rbReconstructor *mockhotstuff.RandomBeaconReconstructor,
 		packer *mockhotstuff.Packer) *CombinedVoteProcessorV2 {
 		return &CombinedVoteProcessorV2{
-			log:              unittest.Logger(),
-			block:            s.proposal.Block,
-			stakingSigAggtor: stakingAggregator,
-			rbRector:         rbReconstructor,
-			onQCCreated:      s.onQCCreated,
-			packer:           packer,
-			minRequiredStake: s.minRequiredStake,
-			done:             *atomic.NewBool(false),
+			log:               unittest.Logger(),
+			block:             s.proposal.Block,
+			stakingSigAggtor:  stakingAggregator,
+			rbRector:          rbReconstructor,
+			onQCCreated:       s.onQCCreated,
+			packer:            packer,
+			minRequiredWeight: s.minRequiredWeight,
+			done:              *atomic.NewBool(false),
 		}
 	}
 
@@ -340,11 +341,11 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_BuildQCError() {
 	})
 }
 
-// TestProcess_EnoughStakeNotEnoughShares tests a scenario where we first don't have enough stake,
+// TestProcess_EnoughWeightNotEnoughShares tests a scenario where we first don't have enough weight,
 // then we iteratively increase it to the point where we have enough staking weight. No QC should be created
 // in this scenario since there is not enough random beacon shares.
-func (s *CombinedVoteProcessorV2TestSuite) TestProcess_EnoughStakeNotEnoughShares() {
-	for i := uint64(0); i < s.minRequiredStake; i += s.sigWeight {
+func (s *CombinedVoteProcessorV2TestSuite) TestProcess_EnoughWeightNotEnoughShares() {
+	for i := uint64(0); i < s.minRequiredWeight; i += s.sigWeight {
 		vote := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithStakingSig())
 		s.stakingAggregator.On("Verify", vote.SignerID, mock.Anything).Return(nil)
 		err := s.processor.Process(vote)
@@ -356,10 +357,10 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_EnoughStakeNotEnoughShare
 	s.onQCCreatedState.AssertNotCalled(s.T(), "onQCCreated")
 }
 
-// TestProcess_EnoughSharesNotEnoughStakes tests a scenario where we are collecting votes with staking and beacon sigs
+// TestProcess_EnoughSharesNotEnoughWeight tests a scenario where we are collecting votes with staking and beacon sigs
 // to the point where we have enough shares to reconstruct RB signature. No QC should be created
 // in this scenario since there is not enough staking weight.
-func (s *CombinedVoteProcessorV2TestSuite) TestProcess_EnoughSharesNotEnoughStakes() {
+func (s *CombinedVoteProcessorV2TestSuite) TestProcess_EnoughSharesNotEnoughWeight() {
 	// change sig weight to be really low, so we don't reach min staking weight while collecting
 	// beacon signatures
 	s.sigWeight = 10
@@ -384,8 +385,8 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_ConcurrentCreatingQC() {
 	stakingSigners := unittest.IdentifierListFixture(10)
 	mockAggregator := func(aggregator *mockhotstuff.WeightedSignatureAggregator) {
 		aggregator.On("Verify", mock.Anything, mock.Anything).Return(nil)
-		aggregator.On("TrustedAdd", mock.Anything, mock.Anything).Return(s.minRequiredStake, nil)
-		aggregator.On("TotalWeight").Return(s.minRequiredStake)
+		aggregator.On("TrustedAdd", mock.Anything, mock.Anything).Return(s.minRequiredWeight, nil)
+		aggregator.On("TotalWeight").Return(s.minRequiredWeight)
 		aggregator.On("Aggregate").Return(stakingSigners, unittest.RandomBytes(128), nil)
 	}
 
@@ -398,7 +399,7 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_ConcurrentCreatingQC() {
 	s.reconstructor.On("EnoughShares").Return(true)
 
 	// at this point sending any vote should result in creating QC.
-	s.packer.On("Pack", s.proposal.Block.BlockID, mock.Anything).Return(stakingSigners, unittest.RandomBytes(128), nil)
+	s.packer.On("Pack", s.proposal.Block.BlockID, mock.Anything).Return(unittest.RandomBytes(100), unittest.RandomBytes(128), nil)
 	s.onQCCreatedState.On("onQCCreated", mock.Anything).Return(nil).Once()
 
 	var startupWg, shutdownWg sync.WaitGroup
@@ -442,16 +443,16 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 		// 1 <= honestParticipants <= participants <= maxParticipants
 		honestParticipants := participants*2/3 + 1
 		sigWeight := uint64(100)
-		minRequiredStake := honestParticipants * sigWeight
+		minRequiredWeight := honestParticipants * sigWeight
 
 		// proposing block
 		block := helper.MakeBlock()
 
 		t.Logf("running conf\n\t"+
 			"staking signers: %v, beacon signers: %v\n\t"+
-			"required stake: %v", stakingSignersCount, beaconSignersCount, minRequiredStake)
+			"required weight: %v", stakingSignersCount, beaconSignersCount, minRequiredWeight)
 
-		stakingTotalWeight, collectedShares := uint64(0), atomic.NewUint64(0)
+		stakingTotalWeight, collectedShares := *atomic.NewUint64(0), *atomic.NewUint64(0)
 
 		// setup aggregators and reconstructor
 		stakingAggregator := &mockhotstuff.WeightedSignatureAggregator{}
@@ -469,7 +470,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 		stakingAggregatorLock := &sync.Mutex{}
 
 		stakingAggregator.On("TotalWeight").Return(func() uint64 {
-			return stakingTotalWeight
+			return stakingTotalWeight.Load()
 		})
 		reconstructor.On("EnoughShares").Return(func() bool {
 			return collectedShares.Load() >= beaconSignersCount
@@ -490,14 +491,16 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 		// mock expected call to Packer
 		mergedSignerIDs := make([]flow.Identifier, 0)
 		packedSigData := unittest.RandomBytes(128)
-		packer := &mockhotstuff.Packer{}
-		packer.On("Pack", block.BlockID, mock.Anything).Run(func(args mock.Arguments) {
+		pcker := &mockhotstuff.Packer{}
+		pcker.On("Pack", block.BlockID, mock.Anything).Run(func(args mock.Arguments) {
 			blockSigData := args.Get(1).(*hotstuff.BlockSignatureData)
 
 			// check that aggregated signers are part of all votes signers
 			// due to concurrent processing it is possible that Aggregate will return less that we have actually aggregated
 			// but still enough to construct the QC
+			stakingAggregatorLock.Lock()
 			require.Subset(t, aggregatedStakingSigners, blockSigData.StakingSigners)
+			stakingAggregatorLock.Unlock()
 			require.Nil(t, blockSigData.RandomBeaconSigners)
 			require.Nil(t, blockSigData.AggregatedRandomBeaconSig)
 			require.GreaterOrEqual(t, uint64(len(blockSigData.StakingSigners)),
@@ -516,7 +519,10 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 			// fill merged signers with collected signers
 			mergedSignerIDs = append(expectedBlockSigData.StakingSigners, expectedBlockSigData.RandomBeaconSigners...)
 		}).Return(
-			func(flow.Identifier, *hotstuff.BlockSignatureData) []flow.Identifier { return mergedSignerIDs },
+			func(flow.Identifier, *hotstuff.BlockSignatureData) []byte {
+				signerIndices, _ := msig.EncodeSignersToIndices(mergedSignerIDs, mergedSignerIDs)
+				return signerIndices
+			},
 			func(flow.Identifier, *hotstuff.BlockSignatureData) []byte { return packedSigData },
 			func(flow.Identifier, *hotstuff.BlockSignatureData) error { return nil }).Once()
 
@@ -530,37 +536,40 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 				t.Fatalf("QC created more than once")
 			}
 
+			signerIndices, err := msig.EncodeSignersToIndices(mergedSignerIDs, mergedSignerIDs)
+			require.NoError(t, err)
+
 			// ensure that QC contains correct field
 			expectedQC := &flow.QuorumCertificate{
-				View:      block.View,
-				BlockID:   block.BlockID,
-				SignerIDs: mergedSignerIDs,
-				SigData:   packedSigData,
+				View:          block.View,
+				BlockID:       block.BlockID,
+				SignerIndices: signerIndices,
+				SigData:       packedSigData,
 			}
 			require.Equalf(t, expectedQC, qc, "QC should be equal to what we expect")
 		}
 
 		processor := &CombinedVoteProcessorV2{
-			log:              unittest.Logger(),
-			block:            block,
-			stakingSigAggtor: stakingAggregator,
-			rbRector:         reconstructor,
-			onQCCreated:      onQCCreated,
-			packer:           packer,
-			minRequiredStake: minRequiredStake,
-			done:             *atomic.NewBool(false),
+			log:               unittest.Logger(),
+			block:             block,
+			stakingSigAggtor:  stakingAggregator,
+			rbRector:          reconstructor,
+			onQCCreated:       onQCCreated,
+			packer:            pcker,
+			minRequiredWeight: minRequiredWeight,
+			done:              *atomic.NewBool(false),
 		}
 
 		votes := make([]*model.Vote, 0, stakingSignersCount+beaconSignersCount)
 
 		expectStakingAggregatorCalls := func(vote *model.Vote) {
-			expectedSig := crypto.Signature(vote.SigData[:hsig.SigLen])
+			expectedSig := crypto.Signature(vote.SigData[:msig.SigLen])
 			stakingAggregator.On("Verify", vote.SignerID, expectedSig).Return(nil).Maybe()
 			stakingAggregator.On("TrustedAdd", vote.SignerID, expectedSig).Run(func(args mock.Arguments) {
 				signerID := args.Get(0).(flow.Identifier)
 				stakingAggregatorLock.Lock()
 				defer stakingAggregatorLock.Unlock()
-				stakingTotalWeight += sigWeight
+				stakingTotalWeight.Add(sigWeight)
 				aggregatedStakingSigners = append(aggregatedStakingSigners, signerID)
 			}).Return(uint64(0), nil).Maybe()
 		}
@@ -577,7 +586,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 			vote := unittest.VoteForBlockFixture(processor.Block(), VoteWithDoubleSig())
 			vote.SignerID = signer
 			expectStakingAggregatorCalls(vote)
-			expectedSig := crypto.Signature(vote.SigData[hsig.SigLen:])
+			expectedSig := crypto.Signature(vote.SigData[msig.SigLen:])
 			reconstructor.On("Verify", vote.SignerID, expectedSig).Return(nil).Maybe()
 			reconstructor.On("TrustedAdd", vote.SignerID, expectedSig).Run(func(args mock.Arguments) {
 				collectedShares.Inc()
@@ -636,15 +645,15 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T)
 
 		stakingWeightRange, beaconWeightRange := rapid.Uint64Range(1, 10), rapid.Uint64Range(1, 10)
 
-		minRequiredStake := uint64(0)
+		minRequiredWeight := uint64(0)
 		// draw weight for each signer randomly
 		stakingSigners := unittest.IdentityListFixture(int(stakingSignersCount), func(identity *flow.Identity) {
-			identity.Stake = stakingWeightRange.Draw(t, identity.String()).(uint64)
-			minRequiredStake += identity.Stake
+			identity.Weight = stakingWeightRange.Draw(t, identity.String()).(uint64)
+			minRequiredWeight += identity.Weight
 		})
 		beaconSigners := unittest.IdentityListFixture(int(beaconSignersCount), func(identity *flow.Identity) {
-			identity.Stake = beaconWeightRange.Draw(t, identity.String()).(uint64)
-			minRequiredStake += identity.Stake
+			identity.Weight = beaconWeightRange.Draw(t, identity.String()).(uint64)
+			minRequiredWeight += identity.Weight
 		})
 
 		// proposing block
@@ -652,7 +661,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T)
 
 		t.Logf("running conf\n\t"+
 			"staking signers: %v, beacon signers: %v\n\t"+
-			"required stake: %v", stakingSignersCount, beaconSignersCount, minRequiredStake)
+			"required weight: %v", stakingSignersCount, beaconSignersCount, minRequiredWeight)
 
 		stakingTotalWeight, collectedShares := atomic.NewUint64(0), atomic.NewUint64(0)
 
@@ -670,14 +679,17 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T)
 
 		// mock expected calls to aggregator and reconstructor
 		combinedSigs := unittest.SignaturesFixture(2)
-		stakingAggregator.On("Aggregate").Return(stakingSigners.NodeIDs(), []byte(combinedSigs[0]), nil).Once()
+		stakingAggregator.On("Aggregate").Return([]flow.Identifier(stakingSigners.NodeIDs()), []byte(combinedSigs[0]), nil).Once()
 		reconstructor.On("Reconstruct").Return(combinedSigs[1], nil).Once()
 
 		// mock expected call to Packer
 		mergedSignerIDs := append(stakingSigners.NodeIDs(), beaconSigners.NodeIDs()...)
 		packedSigData := unittest.RandomBytes(128)
-		packer := &mockhotstuff.Packer{}
-		packer.On("Pack", block.BlockID, mock.Anything).Return(mergedSignerIDs, packedSigData, nil)
+		pcker := &mockhotstuff.Packer{}
+
+		signerIndices, err := msig.EncodeSignersToIndices(mergedSignerIDs, mergedSignerIDs)
+		require.NoError(t, err)
+		pcker.On("Pack", block.BlockID, mock.Anything).Return(signerIndices, packedSigData, nil)
 
 		// track if QC was created
 		qcCreated := atomic.NewBool(false)
@@ -691,23 +703,23 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T)
 		}
 
 		processor := &CombinedVoteProcessorV2{
-			log:              unittest.Logger(),
-			block:            block,
-			stakingSigAggtor: stakingAggregator,
-			rbRector:         reconstructor,
-			onQCCreated:      onQCCreated,
-			packer:           packer,
-			minRequiredStake: minRequiredStake,
-			done:             *atomic.NewBool(false),
+			log:               unittest.Logger(),
+			block:             block,
+			stakingSigAggtor:  stakingAggregator,
+			rbRector:          reconstructor,
+			onQCCreated:       onQCCreated,
+			packer:            pcker,
+			minRequiredWeight: minRequiredWeight,
+			done:              *atomic.NewBool(false),
 		}
 
 		votes := make([]*model.Vote, 0, stakingSignersCount+beaconSignersCount)
 
-		expectStakingAggregatorCalls := func(vote *model.Vote, stake uint64) {
-			expectedSig := crypto.Signature(vote.SigData[:hsig.SigLen])
+		expectStakingAggregatorCalls := func(vote *model.Vote, weight uint64) {
+			expectedSig := crypto.Signature(vote.SigData[:msig.SigLen])
 			stakingAggregator.On("Verify", vote.SignerID, expectedSig).Return(nil).Maybe()
 			stakingAggregator.On("TrustedAdd", vote.SignerID, expectedSig).Run(func(args mock.Arguments) {
-				stakingTotalWeight.Add(stake)
+				stakingTotalWeight.Add(weight)
 			}).Return(uint64(0), nil).Maybe()
 		}
 
@@ -715,14 +727,14 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T)
 		for _, signer := range stakingSigners {
 			vote := unittest.VoteForBlockFixture(processor.Block(), VoteWithStakingSig())
 			vote.SignerID = signer.ID()
-			expectStakingAggregatorCalls(vote, signer.Stake)
+			expectStakingAggregatorCalls(vote, signer.Weight)
 			votes = append(votes, vote)
 		}
 		for _, signer := range beaconSigners {
 			vote := unittest.VoteForBlockFixture(processor.Block(), VoteWithDoubleSig())
 			vote.SignerID = signer.ID()
-			expectStakingAggregatorCalls(vote, signer.Stake)
-			expectedSig := crypto.Signature(vote.SigData[hsig.SigLen:])
+			expectStakingAggregatorCalls(vote, signer.Weight)
+			expectedSig := crypto.Signature(vote.SigData[msig.SigLen:])
 			reconstructor.On("Verify", vote.SignerID, expectedSig).Return(nil).Maybe()
 			reconstructor.On("TrustedAdd", vote.SignerID, expectedSig).Run(func(args mock.Arguments) {
 				collectedShares.Inc()
@@ -896,7 +908,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 
 func VoteWithStakingSig() func(*model.Vote) {
 	return func(vote *model.Vote) {
-		vote.SigData = unittest.RandomBytes(hsig.SigLen)
+		vote.SigData = unittest.RandomBytes(msig.SigLen)
 	}
 }
 
@@ -932,13 +944,12 @@ func TestReadRandomSourceFromPackedQCV2(t *testing.T) {
 	qc, err := buildQCWithPackerAndSigData(packer, block, blockSigData)
 	require.NoError(t, err)
 
-	indices := []uint32{1, 2, 3, 4}
-	randomSource, err := seed.FromParentSignature(indices, qc.SigData)
+	randomSource, err := seed.FromParentQCSignature(qc.SigData)
 	require.NoError(t, err)
 
-	randomSourceAgain, err := seed.FromParentSignature(indices, qc.SigData)
+	randomSourceAgain, err := seed.FromParentQCSignature(qc.SigData)
 	require.NoError(t, err)
 
-	// verify the randomness is deterministic
+	// verify the random source is deterministic
 	require.Equal(t, randomSource, randomSourceAgain)
 }

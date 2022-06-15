@@ -67,8 +67,8 @@ func (s Snapshot) Phase() (flow.EpochPhase, error) {
 	return s.enc.Phase, nil
 }
 
-func (s Snapshot) Seed(indices ...uint32) ([]byte, error) {
-	return seed.FromParentSignature(indices, s.enc.QuorumCertificate.SigData)
+func (s Snapshot) RandomSource() ([]byte, error) {
+	return seed.FromParentQCSignature(s.enc.QuorumCertificate.SigData)
 }
 
 func (s Snapshot) Epochs() protocol.EpochQuery {

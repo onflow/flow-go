@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -21,7 +22,8 @@ func TestArrayBackData_SingleBucket(t *testing.T) {
 	bd := NewCache(uint32(limit),
 		1,
 		heropool.LRUEjection,
-		unittest.Logger())
+		unittest.Logger(),
+		metrics.NewNoopCollector())
 
 	entities := unittest.EntityListFixture(uint(limit))
 
@@ -53,7 +55,8 @@ func TestArrayBackData_Adjust(t *testing.T) {
 	bd := NewCache(uint32(limit),
 		8,
 		heropool.LRUEjection,
-		unittest.Logger())
+		unittest.Logger(),
+		metrics.NewNoopCollector())
 
 	entities := unittest.EntityListFixture(uint(limit))
 
@@ -131,7 +134,8 @@ func TestArrayBackData_WriteHeavy(t *testing.T) {
 	bd := NewCache(uint32(limit),
 		8,
 		heropool.LRUEjection,
-		unittest.Logger())
+		unittest.Logger(),
+		metrics.NewNoopCollector())
 
 	entities := unittest.EntityListFixture(uint(limit))
 
@@ -154,7 +158,8 @@ func TestArrayBackData_LRU_Ejection(t *testing.T) {
 	bd := NewCache(uint32(limit),
 		8,
 		heropool.LRUEjection,
-		unittest.Logger())
+		unittest.Logger(),
+		metrics.NewNoopCollector())
 
 	entities := unittest.EntityListFixture(items)
 
@@ -178,7 +183,8 @@ func TestArrayBackData_Random_Ejection(t *testing.T) {
 	bd := NewCache(uint32(limit),
 		8,
 		heropool.RandomEjection,
-		unittest.Logger())
+		unittest.Logger(),
+		metrics.NewNoopCollector())
 
 	entities := unittest.EntityListFixture(items)
 
@@ -198,7 +204,8 @@ func TestArrayBackData_AddDuplicate(t *testing.T) {
 	bd := NewCache(uint32(limit),
 		8,
 		heropool.LRUEjection,
-		unittest.Logger())
+		unittest.Logger(),
+		metrics.NewNoopCollector())
 
 	entities := unittest.EntityListFixture(uint(limit))
 
@@ -221,7 +228,8 @@ func TestArrayBackData_Clear(t *testing.T) {
 	bd := NewCache(uint32(limit),
 		8,
 		heropool.LRUEjection,
-		unittest.Logger())
+		unittest.Logger(),
+		metrics.NewNoopCollector())
 
 	entities := unittest.EntityListFixture(uint(limit))
 
@@ -276,7 +284,8 @@ func TestArrayBackData_All(t *testing.T) {
 			bd := NewCache(tc.limit,
 				8,
 				tc.ejectionMode,
-				unittest.Logger())
+				unittest.Logger(),
+				metrics.NewNoopCollector())
 			entities := unittest.EntityListFixture(uint(tc.items))
 
 			testAddEntities(t, bd, entities)
@@ -338,7 +347,12 @@ func TestArrayBackData_Rem(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(fmt.Sprintf("%d-limit-%d-items-%dfrom-%dcount", tc.limit, tc.items, tc.from, tc.count), func(t *testing.T) {
-			bd := NewCache(tc.limit, 8, heropool.RandomEjection, unittest.Logger())
+			bd := NewCache(
+				tc.limit,
+				8,
+				heropool.RandomEjection,
+				unittest.Logger(),
+				metrics.NewNoopCollector())
 			entities := unittest.EntityListFixture(uint(tc.items))
 
 			testAddEntities(t, bd, entities)

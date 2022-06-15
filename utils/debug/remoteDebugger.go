@@ -60,16 +60,14 @@ func (d *RemoteDebugger) RunTransaction(txBody *flow.TransactionBody) (txErr, pr
 // if regCachePath is empty, the register values won't be cached
 func (d *RemoteDebugger) RunTransactionAtBlockID(txBody *flow.TransactionBody, blockID flow.Identifier, regCachePath string) (txErr, processError error) {
 	view := NewRemoteView(d.grpcAddress, WithBlockID(blockID))
+	defer view.Done()
+
 	blockCtx := fvm.NewContextFromParent(d.ctx, fvm.WithBlockHeader(d.ctx.BlockHeader))
 	if len(regCachePath) > 0 {
 		view.Cache = newFileRegisterCache(regCachePath)
 	}
 	tx := fvm.Transaction(txBody, 0)
 	err := d.vm.Run(blockCtx, tx, view, programs.NewEmptyPrograms())
-	if err != nil {
-		return nil, err
-	}
-	err = view.Cache.Persist()
 	if err != nil {
 		return nil, err
 	}

@@ -21,6 +21,8 @@ type NetworkCollector struct {
 	duplicateMessagesDropped     *prometheus.CounterVec
 	queueSize                    *prometheus.GaugeVec
 	queueDuration                *prometheus.HistogramVec
+	numMessagesProcessing        *prometheus.GaugeVec
+	numDirectMessagesSending     *prometheus.GaugeVec
 	inboundProcessTime           *prometheus.CounterVec
 	outboundConnectionCount      prometheus.Gauge
 	inboundConnectionCount       prometheus.Gauge
@@ -144,6 +146,24 @@ func NewNetworkCollector(opts ...NetworkCollectorOpt) *NetworkCollector {
 		}, []string{LabelPriority},
 	)
 
+	nc.numMessagesProcessing = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemQueue,
+			Name:      nc.prefix + "current_messages_processing",
+			Help:      "the number of messages currently being processed",
+		}, []string{LabelChannel},
+	)
+
+	nc.numDirectMessagesSending = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      nc.prefix + "direct_messages_in_progress",
+			Help:      "the number of direct messages currently in the process of sending",
+		}, []string{LabelChannel},
+	)
+
 	nc.inboundProcessTime = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: namespaceNetwork,
@@ -203,8 +223,21 @@ func (nc *NetworkCollector) QueueDuration(duration time.Duration, priority int) 
 	nc.queueDuration.WithLabelValues(strconv.Itoa(priority)).Observe(duration.Seconds())
 }
 
-// InboundProcessDuration tracks the time a queue worker blocked by an engine for processing an incoming message on specified topic (i.e., channel).
-func (nc *NetworkCollector) InboundProcessDuration(topic string, duration time.Duration) {
+func (nc *NetworkCollector) MessageProcessingStarted(topic string) {
+	nc.numMessagesProcessing.WithLabelValues(topic).Inc()
+}
+
+func (nc *NetworkCollector) DirectMessageStarted(topic string) {
+	nc.numDirectMessagesSending.WithLabelValues(topic).Inc()
+}
+
+func (nc *NetworkCollector) DirectMessageFinished(topic string) {
+	nc.numDirectMessagesSending.WithLabelValues(topic).Dec()
+}
+
+// MessageProcessingFinished tracks the time a queue worker blocked by an engine for processing an incoming message on specified topic (i.e., channel).
+func (nc *NetworkCollector) MessageProcessingFinished(topic string, duration time.Duration) {
+	nc.numMessagesProcessing.WithLabelValues(topic).Dec()
 	nc.inboundProcessTime.WithLabelValues(topic).Add(duration.Seconds())
 }
 

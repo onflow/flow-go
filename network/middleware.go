@@ -48,7 +48,7 @@ type Middleware interface {
 	// Unsubscribe unsubscribes the middleware from a channel.
 	Unsubscribe(channel Channel) error
 
-	// UpdateNodeAddresses fetches and updates the addresses of all the staked participants
+	// UpdateNodeAddresses fetches and updates the addresses of all the authorized participants
 	// in the Flow protocol.
 	UpdateNodeAddresses()
 

@@ -8,8 +8,10 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
+	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -33,23 +35,25 @@ const defaultVoteQueueCapacity = 1000
 // Engine is a wrapper struct for `Core` which implements consensus algorithm.
 // Engine is responsible for handling incoming messages, queueing for processing, broadcasting proposals.
 type Engine struct {
-	unit           *engine.Unit
-	lm             *lifecycle.LifecycleManager
-	log            zerolog.Logger
-	mempool        module.MempoolMetrics
-	metrics        module.EngineMetrics
-	me             module.Local
-	headers        storage.Headers
-	payloads       storage.Payloads
-	tracer         module.Tracer
-	state          protocol.State
-	prov           network.Engine
-	core           *Core
-	pendingBlocks  engine.MessageStore
-	pendingVotes   engine.MessageStore
-	messageHandler *engine.MessageHandler
-	con            network.Conduit
-	stopHotstuff   context.CancelFunc
+	unit                       *engine.Unit
+	lm                         *lifecycle.LifecycleManager
+	log                        zerolog.Logger
+	mempool                    module.MempoolMetrics
+	metrics                    module.EngineMetrics
+	me                         module.Local
+	headers                    storage.Headers
+	payloads                   storage.Payloads
+	tracer                     module.Tracer
+	state                      protocol.State
+	prov                       network.Engine
+	core                       *Core
+	pendingBlocks              engine.MessageStore
+	pendingVotes               engine.MessageStore
+	messageHandler             *engine.MessageHandler
+	finalizedView              counters.StrictMonotonousCounter
+	finalizationEventsNotifier engine.Notifier
+	con                        network.Conduit
+	stopHotstuff               context.CancelFunc
 }
 
 func NewEngine(
@@ -129,21 +133,22 @@ func NewEngine(
 	)
 
 	eng := &Engine{
-		unit:           engine.NewUnit(),
-		lm:             lifecycle.NewLifecycleManager(),
-		log:            log.With().Str("compliance", "engine").Logger(),
-		me:             me,
-		mempool:        core.mempool,
-		metrics:        core.metrics,
-		headers:        core.headers,
-		payloads:       core.payloads,
-		pendingBlocks:  pendingBlocks,
-		pendingVotes:   pendingVotes,
-		state:          core.state,
-		tracer:         core.tracer,
-		prov:           prov,
-		core:           core,
-		messageHandler: handler,
+		unit:                       engine.NewUnit(),
+		lm:                         lifecycle.NewLifecycleManager(),
+		log:                        log.With().Str("compliance", "engine").Logger(),
+		me:                         me,
+		mempool:                    core.mempool,
+		metrics:                    core.metrics,
+		headers:                    core.headers,
+		payloads:                   core.payloads,
+		pendingBlocks:              pendingBlocks,
+		pendingVotes:               pendingVotes,
+		state:                      core.state,
+		tracer:                     core.tracer,
+		prov:                       prov,
+		core:                       core,
+		messageHandler:             handler,
+		finalizationEventsNotifier: engine.NewNotifier(),
 	}
 
 	// register the core with the network layer and store the conduit
@@ -171,10 +176,18 @@ func (e *Engine) Ready() <-chan struct{} {
 	}
 	e.lm.OnStart(func() {
 		e.unit.Launch(e.loop)
+		e.unit.Launch(e.finalizationProcessingLoop)
 
 		ctx, cancel := context.WithCancel(context.Background())
-		signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+		signalerCtx, hotstuffErrChan := irrecoverable.WithSignaler(ctx)
 		e.stopHotstuff = cancel
+
+		// TODO: this workaround for handling fatal HotStuff errors is required only
+		//  because this engine and epochmgr do not use the Component pattern yet
+		e.unit.Launch(func() {
+			e.handleHotStuffError(hotstuffErrChan)
+		})
+
 		e.core.hotstuff.Start(signalerCtx)
 		// wait for request handler to startup
 
@@ -345,8 +358,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 		Int("seals_count", len(payload.Seals)).
 		Int("receipts_count", len(payload.Receipts)).
 		Time("timestamp", header.Timestamp).
-		Hex("proposer", header.ProposerID[:]).
-		Int("num_signers", len(header.ParentVoterIDs)).
+		Hex("signers", header.ParentVoterIndices).
 		Dur("delay", delay).
 		Logger()
 
@@ -398,4 +410,45 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 // Note the header has incomplete fields, because it was converted from a hotstuff.
 func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	return e.BroadcastProposalWithDelay(header, 0)
+}
+
+// OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
+//  (1) Informs sealing.Core about finalization of respective block.
+// CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
+// from external nodes cannot be considered as inputs to this function
+func (e *Engine) OnFinalizedBlock(block *model.Block) {
+	if e.finalizedView.Set(block.View) {
+		e.finalizationEventsNotifier.Notify()
+	}
+}
+
+// finalizationProcessingLoop is a separate goroutine that performs processing of finalization events
+func (e *Engine) finalizationProcessingLoop() {
+	finalizationNotifier := e.finalizationEventsNotifier.Channel()
+	for {
+		select {
+		case <-e.unit.Quit():
+			return
+		case <-finalizationNotifier:
+			e.core.ProcessFinalizedView(e.finalizedView.Value())
+		}
+	}
+}
+
+// handleHotStuffError accepts the error channel from the HotStuff component and
+// crashes the node if any error is detected.
+// TODO: this function should be removed in favour of refactoring this engine and
+//  the epochmgr engine to use the Component pattern, so that irrecoverable errors
+//  can be bubbled all the way to the node scaffold
+func (e *Engine) handleHotStuffError(hotstuffErrs <-chan error) {
+	for {
+		select {
+		case <-e.unit.Quit():
+			return
+		case err := <-hotstuffErrs:
+			if err != nil {
+				e.log.Fatal().Err(err).Msg("encountered fatal error in HotStuff")
+			}
+		}
+	}
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	modulemock "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -209,4 +210,21 @@ func (cs *ComplianceSuite) TestProcessUnsupportedMessageType() {
 	err = cs.engine.ProcessLocal(invalidEvent)
 	require.Error(cs.T(), err)
 	require.True(cs.T(), engine.IsIncompatibleInputTypeError(err))
+}
+
+// TestOnFinalizedBlock tests if finalized block gets processed when send through `Engine`.
+// Tests the whole processing pipeline.
+func (cs *ComplianceSuite) TestOnFinalizedBlock() {
+	finalizedBlock := unittest.BlockHeaderFixture()
+	cs.head = &finalizedBlock
+
+	*cs.pending = modulemock.PendingBlockBuffer{}
+	cs.pending.On("PruneByView", finalizedBlock.View).Return(nil).Once()
+	cs.pending.On("Size").Return(uint(0)).Once()
+	cs.engine.OnFinalizedBlock(model.BlockFromFlow(&finalizedBlock, finalizedBlock.View-1))
+
+	require.Eventually(cs.T(),
+		func() bool {
+			return cs.pending.AssertCalled(cs.T(), "PruneByView", finalizedBlock.View)
+		}, time.Second, time.Millisecond*20)
 }

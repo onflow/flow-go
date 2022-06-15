@@ -25,7 +25,7 @@ var expectedEmptyHash = []byte{
 // TestTreeInitialization verifies that tree initialization only accepts
 // compatible key lengths.
 func TestTreeInitialization(t *testing.T) {
-	// constructor should reject `keyLength` _outside_ of interval [1, 8192]
+	// constructor should reject `keyLength` _outside_ of interval [1, maxKeyLength]
 	t.Run("key length outside of compatible bounds", func(t *testing.T) {
 		tree, err := NewTree(-1)
 		require.Nil(t, tree)
@@ -35,18 +35,18 @@ func TestTreeInitialization(t *testing.T) {
 		require.Nil(t, tree)
 		require.ErrorIs(t, err, ErrorIncompatibleKeyLength)
 
-		tree, err = NewTree(8193)
+		tree, err = NewTree(maxKeyLength + 1)
 		require.Nil(t, tree)
 		require.ErrorIs(t, err, ErrorIncompatibleKeyLength)
 	})
 
-	// constructor should accept `keyLength` values in the interval [1, 8192]
+	// constructor should accept `keyLength` values in the interval [1, maxKeyLength]
 	t.Run("compatible key length", func(t *testing.T) {
 		tree, err := NewTree(1)
 		require.NotNil(t, tree)
 		require.NoError(t, err)
 
-		tree, err = NewTree(8192)
+		tree, err = NewTree(maxKeyLength)
 		require.NotNil(t, tree)
 		require.NoError(t, err)
 	})
@@ -58,7 +58,7 @@ func TestTreeInitialization(t *testing.T) {
 //  * a newly initialized trie (empty)
 //  * a trie, whose last element was removed
 func TestEmptyTreeHash(t *testing.T) {
-	for _, keyLength := range []int{1, 32, 8192} {
+	for _, keyLength := range []int{1, 32, maxKeyLength} {
 		tree, _ := NewTree(keyLength)
 		assert.Equal(t, tree.Hash(), expectedEmptyHash)
 
@@ -109,21 +109,22 @@ func Test_ReferenceSingleEntry(t *testing.T) {
 		require.Equal(t, expectedRootHash, hex.EncodeToString(tree.Hash()))
 	})
 
-	t.Run("8192-byte path", func(t *testing.T) {
+	t.Run("maxKeyLength-byte path", func(t *testing.T) {
 		// as key, we just repeat the following 32 bytes 256 times
 		k, _ := hex.DecodeString("1b30482d4dc8c1a8d846d05765c03a33f0267b56b9a7be8defe38958f89c95fc")
-		key := make([]byte, 0, 8192)
-		for i := 1; i <= 256; i++ {
+		key := make([]byte, 0, maxKeyLength)
+		for i := 1; i <= maxKeyLength/len(k); i++ {
 			key = append(key, k...)
 		}
+		key = append(key, k[:maxKeyLength%len(k)]...)
 
-		expectedRootHash := "80ae4aaff2f9cc82e56968db6c313a578b07723701e6fd745f256b30fac496bf" // from python reference impl
+		expectedRootHash := "bf6eab5ce259b8a936f4fe205ca49f5d6614a7bee4162cafa5a6ab4691eba40d" // from python reference impl
 		tree, err := NewTree(len(key))
 		assert.NoError(t, err)
 		replaced, err := tree.Put(key, val)
 		assert.NoError(t, err)
 		assert.False(t, replaced)
-		require.Equal(t, expectedRootHash, hex.EncodeToString(tree.Hash()))
+		assert.Equal(t, expectedRootHash, hex.EncodeToString(tree.Hash()))
 	})
 }
 
@@ -215,9 +216,9 @@ func Test_KeyLengthChecked(t *testing.T) {
 		assert.False(t, replaced)
 	})
 
-	t.Run("8192-byte key", func(t *testing.T) {
+	t.Run("maxKeyLength-byte key", func(t *testing.T) {
 		key := make([]byte, maxKeyLength)
-		tree, err := NewTree(8192)
+		tree, err := NewTree(maxKeyLength)
 		assert.NoError(t, err)
 		replaced, err := tree.Put(key, val) // key has the pre-configured length and should be accepted
 		assert.NoError(t, err)
@@ -226,7 +227,7 @@ func Test_KeyLengthChecked(t *testing.T) {
 
 	t.Run("key too long", func(t *testing.T) {
 		key := make([]byte, maxKeyLength+1)
-		tree, err := NewTree(8192)
+		tree, err := NewTree(maxKeyLength)
 		assert.NoError(t, err)
 		_, err = tree.Put(key, val)
 		assert.ErrorIs(t, err, ErrorIncompatibleKeyLength)

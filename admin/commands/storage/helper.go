@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -89,24 +88,4 @@ func getBlockHeader(state protocol.State, req *blocksRequest) (*flow.Header, err
 	default:
 		return nil, fmt.Errorf("invalid request type: %v", req.requestType)
 	}
-}
-
-func convertToInterfaceList(list interface{}) ([]interface{}, error) {
-	var resultList []interface{}
-	bytes, err := json.Marshal(list)
-	if err != nil {
-		return nil, err
-	}
-	err = json.Unmarshal(bytes, &resultList)
-	return resultList, err
-}
-
-func convertToMap(object interface{}) (map[string]interface{}, error) {
-	var result map[string]interface{}
-	bytes, err := json.Marshal(object)
-	if err != nil {
-		return nil, err
-	}
-	err = json.Unmarshal(bytes, &result)
-	return result, err
 }

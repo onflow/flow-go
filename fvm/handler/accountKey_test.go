@@ -75,8 +75,6 @@ func TestNewAccountKey_error_handling_produces_valid_utf8_and_sign_algo(t *testi
 	publicKey := &runtime.PublicKey{
 		PublicKey: nil,
 		SignAlgo:  invalidSignAlgo,
-		IsValid:   false,
-		Validated: false,
 	}
 
 	_, err := NewAccountPublicKey(publicKey, sema.HashAlgorithmSHA2_384, 0, 0)
@@ -106,8 +104,6 @@ func TestNewAccountKey_error_handling_produces_valid_utf8_and_hash_algo(t *testi
 	publicKey := &runtime.PublicKey{
 		PublicKey: nil,
 		SignAlgo:  runtime.SignatureAlgorithmECDSA_P256,
-		IsValid:   false,
-		Validated: false,
 	}
 
 	invalidHashAlgo := sema.HashAlgorithm(112)
@@ -139,8 +135,6 @@ func TestNewAccountKey_error_handling_produces_valid_utf8(t *testing.T) {
 	publicKey := &runtime.PublicKey{
 		PublicKey: []byte{0xc3, 0x28}, //some invalid UTF8
 		SignAlgo:  runtime.SignatureAlgorithmECDSA_P256,
-		IsValid:   false,
-		Validated: false,
 	}
 
 	_, err := NewAccountPublicKey(publicKey, runtime.HashAlgorithmSHA2_256, 0, 0)
@@ -194,6 +188,7 @@ func (f FakeAccounts) SetPublicKey(_ flow.Address, _ uint64, _ flow.AccountPubli
 }
 func (f FakeAccounts) GetContractNames(_ flow.Address) ([]string, error)             { return nil, nil }
 func (f FakeAccounts) GetContract(_ string, _ flow.Address) ([]byte, error)          { return nil, nil }
+func (f FakeAccounts) ContractExists(_ string, _ flow.Address) (bool, error)         { return false, nil }
 func (f FakeAccounts) SetContract(_ string, _ flow.Address, _ []byte) error          { return nil }
 func (f FakeAccounts) DeleteContract(_ string, _ flow.Address) error                 { return nil }
 func (f FakeAccounts) Create(_ []flow.AccountPublicKey, _ flow.Address) error        { return nil }

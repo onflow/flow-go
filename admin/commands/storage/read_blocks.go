@@ -47,7 +47,7 @@ func (r *ReadBlocksCommand) Handler(ctx context.Context, req *admin.CommandReque
 		blockID = block.Header.ParentID
 	}
 
-	return convertToInterfaceList(result)
+	return commands.ConvertToInterfaceList(result)
 }
 
 func (r *ReadBlocksCommand) Validator(req *admin.CommandRequest) error {

@@ -1,12 +1,15 @@
 package flow_test
 
 import (
+	"encoding/json"
 	"math/rand"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encodable"
@@ -48,15 +51,42 @@ func TestHexStringToIdentifier(t *testing.T) {
 	}
 }
 
-/*
 func TestIdentityEncodingJSON(t *testing.T) {
-	identity := unittest.IdentityFixture(unittest.WithRandomPublicKeys())
-	enc, err := json.Marshal(identity)
-	require.NoError(t, err)
-	var dec flow.Identity
-	err = json.Unmarshal(enc, &dec)
-	require.NoError(t, err)
-	require.Equal(t, identity, &dec)
+
+	t.Run("normal identity", func(t *testing.T) {
+		identity := unittest.IdentityFixture(unittest.WithRandomPublicKeys())
+		enc, err := json.Marshal(identity)
+		require.NoError(t, err)
+		var dec flow.Identity
+		err = json.Unmarshal(enc, &dec)
+		require.NoError(t, err)
+		require.Equal(t, identity, &dec)
+	})
+
+	t.Run("empty address should be omitted", func(t *testing.T) {
+		identity := unittest.IdentityFixture(unittest.WithRandomPublicKeys())
+		identity.Address = ""
+		enc, err := json.Marshal(identity)
+		require.NoError(t, err)
+		// should have no address field in output
+		assert.False(t, strings.Contains(string(enc), "Address"))
+		var dec flow.Identity
+		err = json.Unmarshal(enc, &dec)
+		require.NoError(t, err)
+		require.Equal(t, identity, &dec)
+	})
+
+	t.Run("compat: should accept old files using Stake field", func(t *testing.T) {
+		identity := unittest.IdentityFixture(unittest.WithRandomPublicKeys())
+		enc, err := json.Marshal(identity)
+		require.NoError(t, err)
+		// emulate the old encoding by replacing the new field with old field name
+		enc = []byte(strings.Replace(string(enc), "Weight", "Stake", 1))
+		var dec flow.Identity
+		err = json.Unmarshal(enc, &dec)
+		require.NoError(t, err)
+		require.Equal(t, identity, &dec)
+	})
 }
 
 func TestIdentityEncodingMsgpack(t *testing.T) {
@@ -68,10 +98,53 @@ func TestIdentityEncodingMsgpack(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, identity, &dec)
 }
-*/
+
+func TestIdentityList_Exists(t *testing.T) {
+	t.Run("should find a given element", func(t *testing.T) {
+		il1 := unittest.IdentityListFixture(10)
+		il2 := unittest.IdentityListFixture(1)
+
+		// sort the first list
+		il1 = il1.Sort(order.Canonical)
+
+		for i := 0; i < 10; i++ {
+			assert.True(t, il1.Exists(il1[i]))
+		}
+		assert.False(t, il1.Exists(il2[0]))
+	})
+}
+
+func TestIdentityList_IdentifierExists(t *testing.T) {
+	t.Run("should find a given identifier", func(t *testing.T) {
+		il1 := unittest.IdentityListFixture(10)
+		il2 := unittest.IdentityListFixture(1)
+
+		// sort the first list
+		il1 = il1.Sort(order.Canonical)
+
+		for i := 0; i < 10; i++ {
+			assert.True(t, il1.IdentifierExists(il1[i].NodeID))
+		}
+		assert.False(t, il1.IdentifierExists(il2[0].NodeID))
+	})
+}
 
 func TestIdentityList_Union(t *testing.T) {
+	t.Run("retains the original identity list", func(t *testing.T) {
+		// An identity list is a slice, i.e. it is vulnerable to in-place modifications via append.
+		// Per convention, all IdentityList operations should leave the original lists invariant.
+		// Here, we purposefully create a slice, whose backing array has enough space to
+		// include the elements we are going to add via Union. Furthermore, we force element duplication
+		// by taking the union of the IdentityList with itself. If the implementation is not careful
+		// about creating copies and works with the slices itself, it will modify the input and fail the test.
 
+		il := unittest.IdentityListFixture(20)
+		il = il[:10]
+		ilBackup := il.Copy()
+
+		_ = il.Union(il)
+		assert.Equal(t, ilBackup, il)
+	})
 	t.Run("should contain all identities", func(t *testing.T) {
 		il1 := unittest.IdentityListFixture(10)
 		il2 := unittest.IdentityListFixture(10)
@@ -120,7 +193,6 @@ func TestIdentityList_Union(t *testing.T) {
 			uniques[identity.NodeID] = struct{}{}
 		}
 	})
-
 }
 
 func TestSample(t *testing.T) {
@@ -209,9 +281,9 @@ func TestIdentity_EqualTo(t *testing.T) {
 		require.False(t, b.EqualTo(a))
 	})
 
-	t.Run("Stake diff", func(t *testing.T) {
-		a := &flow.Identity{Stake: 1}
-		b := &flow.Identity{Stake: 2}
+	t.Run("Weight diff", func(t *testing.T) {
+		a := &flow.Identity{Weight: 1}
+		b := &flow.Identity{Weight: 2}
 
 		require.False(t, a.EqualTo(b))
 		require.False(t, b.EqualTo(a))
@@ -246,7 +318,7 @@ func TestIdentity_EqualTo(t *testing.T) {
 			NodeID:        flow.Identifier{1, 2, 3},
 			Address:       "address",
 			Role:          flow.RoleCollection,
-			Stake:         23,
+			Weight:        23,
 			Ejected:       false,
 			StakingPubKey: pks[0],
 			NetworkPubKey: pks[1],
@@ -255,7 +327,7 @@ func TestIdentity_EqualTo(t *testing.T) {
 			NodeID:        flow.Identifier{1, 2, 3},
 			Address:       "address",
 			Role:          flow.RoleCollection,
-			Stake:         23,
+			Weight:        23,
 			Ejected:       false,
 			StakingPubKey: pks[0],
 			NetworkPubKey: pks[1],

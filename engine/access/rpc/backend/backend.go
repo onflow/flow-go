@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	lru "github.com/hashicorp/golang-lru"
+
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
@@ -35,6 +37,13 @@ const DefaultMaxHeightRange = 250
 // DefaultSnapshotHistoryLimit the amount of blocks to look back in state
 // when recursively searching for a valid snapshot
 const DefaultSnapshotHistoryLimit = 50
+
+// DefaultLoggedScriptsCacheSize is the default size of the lookup cache used to dedupe logs of scripts sent to ENs
+// limiting cache size to 16MB and does not affect script execution, only for keeping logs tidy
+const DefaultLoggedScriptsCacheSize = 1_000_000
+
+// DefaultConnectionPoolSize is the default size for the connection pool to collection and execution nodes
+const DefaultConnectionPoolSize = 10
 
 var preferredENIdentifiers flow.IdentifierList
 var fixedENIdentifiers flow.IdentifierList
@@ -95,6 +104,13 @@ func New(
 		retry.Activate()
 	}
 
+	var err error
+
+	loggedScripts, _ := lru.New(DefaultLoggedScriptsCacheSize)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to initialize script logging cache")
+	}
+
 	b := &Backend{
 		state: state,
 		// create the sub-backends
@@ -104,6 +120,8 @@ func New(
 			connFactory:       connFactory,
 			state:             state,
 			log:               log,
+			metrics:           transactionMetrics,
+			loggedScripts:     loggedScripts,
 		},
 		backendTransactions: backendTransactions{
 			staticCollectionRPC:  collectionRPC,
@@ -155,7 +173,6 @@ func New(
 
 	retry.SetBackend(b)
 
-	var err error
 	preferredENIdentifiers, err = identifierList(preferredExecutionNodeIDs)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to convert node id string to Flow Identifier for preferred EN map")
@@ -392,9 +409,13 @@ func executionNodesForBlockID(
 		}
 
 		receiptCnt := len(executorIDs)
-		// if less than minExecutionNodesCnt execution receipts have been received so far, then throw an error
+		// if less than minExecutionNodesCnt execution receipts have been received so far, then return random ENs
 		if receiptCnt < minExecutionNodesCnt {
-			return flow.IdentityList{}, InsufficientExecutionReceipts{blockID: blockID, receiptCount: receiptCnt}
+			newExecutorIDs, err := state.AtBlockID(blockID).Identities(filter.HasRole(flow.RoleExecution))
+			if err != nil {
+				return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
+			}
+			executorIDs = newExecutorIDs.NodeIDs()
 		}
 	}
 
@@ -409,7 +430,7 @@ func executionNodesForBlockID(
 
 	if len(executionIdentitiesRandom) == 0 {
 		return flow.IdentityList{},
-			fmt.Errorf("no matching execution node could for block ID %v", blockID)
+			fmt.Errorf("no matching execution node found for block ID %v", blockID)
 	}
 
 	return executionIdentitiesRandom, nil
@@ -422,7 +443,7 @@ func findAllExecutionNodes(
 	executionReceipts storage.ExecutionReceipts,
 	log zerolog.Logger) (flow.IdentifierList, error) {
 
-	// lookup the receipts storage with the block ID
+	// lookup the receipt's storage with the block ID
 	allReceipts, err := executionReceipts.ByBlockID(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retreive execution receipts for block ID %v: %w", blockID, err)

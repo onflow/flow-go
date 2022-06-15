@@ -8,8 +8,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type OnBlockFinalizedConsumer = func(finalizedBlockID flow.Identifier)
-type OnBlockIncorporatedConsumer = func(incorporatedBlockID flow.Identifier)
+type OnBlockFinalizedConsumer = func(block *model.Block)
+type OnBlockIncorporatedConsumer = func(block *model.Block)
 
 // FinalizationDistributor subscribes for finalization events from hotstuff and distributes it to subscribers
 type FinalizationDistributor struct {
@@ -53,7 +53,7 @@ func (p *FinalizationDistributor) OnBlockIncorporated(block *model.Block) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, consumer := range p.blockIncorporatedConsumers {
-		consumer(block.BlockID)
+		consumer(block)
 	}
 	for _, consumer := range p.hotStuffFinalizationConsumers {
 		consumer.OnBlockIncorporated(block)
@@ -64,7 +64,7 @@ func (p *FinalizationDistributor) OnFinalizedBlock(block *model.Block) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, consumer := range p.blockFinalizedConsumers {
-		consumer(block.BlockID)
+		consumer(block)
 	}
 	for _, consumer := range p.hotStuffFinalizationConsumers {
 		consumer.OnFinalizedBlock(block)

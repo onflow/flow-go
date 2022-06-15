@@ -27,14 +27,14 @@ func genNetworkAndStakingKeys() []model.NodeInfo {
 	log.Debug().Msg("all node addresses are unique")
 
 	log.Debug().Msgf("will generate %v networking keys for nodes in config", nodes)
-	networkKeys, err := utils.GenerateNetworkingKeys(nodes, GenerateRandomSeeds(nodes))
+	networkKeys, err := utils.GenerateNetworkingKeys(nodes, GenerateRandomSeeds(nodes, crypto.KeyGenSeedMinLenECDSAP256))
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot generate networking keys")
 	}
 	log.Info().Msgf("generated %v networking keys for nodes in config", nodes)
 
 	log.Debug().Msgf("will generate %v staking keys for nodes in config", nodes)
-	stakingKeys, err := utils.GenerateStakingKeys(nodes, GenerateRandomSeeds(nodes))
+	stakingKeys, err := utils.GenerateStakingKeys(nodes, GenerateRandomSeeds(nodes, crypto.KeyGenSeedMinLenBLSBLS12381))
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot generate staking keys")
 	}
@@ -69,7 +69,7 @@ func assembleNodeInfo(nodeConfig model.NodeConfig, networkKey, stakingKey crypto
 		nodeID,
 		nodeConfig.Role,
 		nodeConfig.Address,
-		nodeConfig.Stake,
+		nodeConfig.Weight,
 		networkKey,
 		stakingKey,
 	)

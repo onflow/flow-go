@@ -7,7 +7,6 @@ import (
 
 	"github.com/onflow/flow-go/crypto/random"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/indices"
 )
 
 const EstimatedSixMonthOfViews = 15000000 // 1 sec block time * 60 secs * 60 mins * 24 hours * 30 days * 6 months
@@ -26,7 +25,7 @@ func (err InvalidViewError) Error() string {
 	)
 }
 
-// IsInvalidViwError returns whether or not the input error is an invalid view error.
+// IsInvalidViewError returns whether or not the input error is an invalid view error.
 func IsInvalidViewError(err error) bool {
 	return errors.As(err, &InvalidViewError{})
 }
@@ -83,14 +82,19 @@ func (l LeaderSelection) newInvalidViewError(view uint64) InvalidViewError {
 	}
 }
 
-// ComputeLeaderSelectionFromSeed pre-generates a certain number of leader selections, and returns a
+// ComputeLeaderSelection pre-generates a certain number of leader selections, and returns a
 // leader selection instance for querying the leader indexes for certain views.
 // firstView - the start view of the epoch, the generated leader selections start from this view.
-// seed - the random seed for leader selection
+// rng - the deterministic source of randoms
 // count - the number of leader selections to be pre-generated and cached.
-// identities - the identities that contain the stake info, which is used as weight for the chance of
+// identities - the identities that contain the weight info, which is used as probability for
 //							the identity to be selected as leader.
-func ComputeLeaderSelectionFromSeed(firstView uint64, seed []byte, count int, identities flow.IdentityList) (*LeaderSelection, error) {
+func ComputeLeaderSelection(
+	firstView uint64,
+	rng random.Rand,
+	count int,
+	identities flow.IdentityList,
+) (*LeaderSelection, error) {
 
 	if count < 1 {
 		return nil, fmt.Errorf("number of views must be positive (got %d)", count)
@@ -98,10 +102,10 @@ func ComputeLeaderSelectionFromSeed(firstView uint64, seed []byte, count int, id
 
 	weights := make([]uint64, 0, len(identities))
 	for _, id := range identities {
-		weights = append(weights, id.Stake)
+		weights = append(weights, id.Weight)
 	}
 
-	leaders, err := WeightedRandomSelection(seed, count, weights)
+	leaders, err := weightedRandomSelection(rng, count, weights)
 	if err != nil {
 		return nil, fmt.Errorf("could not select leader: %w", err)
 	}
@@ -113,17 +117,16 @@ func ComputeLeaderSelectionFromSeed(firstView uint64, seed []byte, count int, id
 	}, nil
 }
 
-// WeightedRandomSelection - given a seed and a given count, pre-generate the indexs of leader.
+// weightedRandomSelection - given a random source source and a given count, pre-generate the indices of leader.
 // The chance to be selected as leader is proportional to its weight.
-// If an identity has 0 stake (weight is 0), it won't be selected as leader.
+// If an identity has 0 weight, it won't be selected as leader.
 // This algorithm is essentially Fitness proportionate selection:
 // See https://en.wikipedia.org/wiki/Fitness_proportionate_selection
-func WeightedRandomSelection(seed []byte, count int, weights []uint64) ([]uint16, error) {
-	// create random number generator from the seed
-	rng, err := random.NewChacha20PRG(seed, indices.ConsensusLeaderSelectionCustomizer)
-	if err != nil {
-		return nil, fmt.Errorf("can not create rng: %w", err)
-	}
+func weightedRandomSelection(
+	rng random.Rand,
+	count int,
+	weights []uint64,
+) ([]uint16, error) {
 
 	if len(weights) == 0 {
 		return nil, fmt.Errorf("weights is empty")
@@ -138,7 +141,7 @@ func WeightedRandomSelection(seed []byte, count int, weights []uint64) ([]uint16
 	weightSums := make([]uint64, 0, len(weights))
 
 	// cumulative sum of weights
-	// after cumulating the weights, the sum is the total weight
+	// after cumulating the weights, the sum is the total weight;
 	// total weight is used to specify the range of the random number.
 	var cumsum uint64
 	for _, weight := range weights {
@@ -156,31 +159,35 @@ func WeightedRandomSelection(seed []byte, count int, weights []uint64) ([]uint16
 		randomness := rng.UintN(cumsum)
 
 		// binary search to find the leader index by the random number
-		leader := binarySearch(randomness, weightSums)
+		leader := binarySearchStrictlyBigger(randomness, weightSums)
 
 		leaders = append(leaders, uint16(leader))
 	}
 	return leaders, nil
 }
 
-// binary search to find the index of the first item in the given array that is
+// binarySearchStriclyBigger finds the index of the first item in the given array that is
 // strictly bigger to the given value.
 // There are a few assumptions on inputs:
 // - `arr` must be non-empty
 // - items in `arr` must be in non-decreasing order
 // - `value` must be less than the last item in `arr`
-func binarySearch(value uint64, arr []uint64) int {
-	return bsearch(0, len(arr)-1, value, arr)
-}
+func binarySearchStrictlyBigger(value uint64, arr []uint64) int {
+	left := 0
+	arrayLen := len(arr)
+	right := arrayLen - 1
+	mid := arrayLen >> 1
+	for {
+		if arr[mid] <= value {
+			left = mid + 1
+		} else {
+			right = mid
+		}
 
-func bsearch(left, right int, value uint64, arr []uint64) int {
-	if left == right {
-		return left
-	}
+		if left >= right {
+			return left
+		}
 
-	mid := (left + right) / 2
-	if value < arr[mid] {
-		return bsearch(left, mid, value, arr)
+		mid = int(left+right) >> 1
 	}
-	return bsearch(mid+1, right, value, arr)
 }

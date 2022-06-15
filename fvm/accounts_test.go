@@ -40,7 +40,7 @@ func createAccount(t *testing.T, vm fvm.VirtualMachine, chain flow.Chain, ctx fv
 
 	require.Len(t, accountCreatedEvents, 1)
 
-	data, err := jsoncdc.Decode(accountCreatedEvents[0].Payload)
+	data, err := jsoncdc.Decode(nil, accountCreatedEvents[0].Payload)
 	require.NoError(t, err)
 	address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
 
@@ -309,7 +309,7 @@ transaction(keyIndex1: Int, keyIndex2: Int) {
 `
 
 func newAccountKey(
-	t *testing.T,
+	tb testing.TB,
 	privateKey *flow.AccountPrivateKey,
 	apiVersion accountKeyAPIVersion,
 ) (
@@ -322,14 +322,14 @@ func newAccountKey(
 	if apiVersion == accountKeyAPIVersionV1 {
 		var err error
 		publicKeyBytes, err = flow.EncodeRuntimeAccountPublicKey(publicKey)
-		require.NoError(t, err)
+		require.NoError(tb, err)
 	} else {
 		publicKeyBytes = publicKey.PublicKey.Encode()
 	}
 
 	cadencePublicKey := testutil.BytesToCadenceArray(publicKeyBytes)
 	encodedCadencePublicKey, err := jsoncdc.Encode(cadencePublicKey)
-	require.NoError(t, err)
+	require.NoError(tb, err)
 
 	return publicKey, encodedCadencePublicKey
 }
@@ -359,7 +359,7 @@ func TestCreateAccount(t *testing.T) {
 				accountCreatedEvents := filterAccountCreatedEvents(tx.Events)
 				require.Len(t, accountCreatedEvents, 1)
 
-				data, err := jsoncdc.Decode(accountCreatedEvents[0].Payload)
+				data, err := jsoncdc.Decode(nil, accountCreatedEvents[0].Payload)
 				require.NoError(t, err)
 				address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
 
@@ -394,7 +394,7 @@ func TestCreateAccount(t *testing.T) {
 					}
 					accountCreatedEventCount += 1
 
-					data, err := jsoncdc.Decode(tx.Events[i].Payload)
+					data, err := jsoncdc.Decode(nil, tx.Events[i].Payload)
 					require.NoError(t, err)
 					address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
 
@@ -1090,7 +1090,7 @@ func TestGetAccountKey(t *testing.T) {
 				expected := fmt.Sprintf(
 					"AccountKey("+
 						"keyIndex: %d, "+
-						"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1), isValid: true), "+
+						"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1)), "+
 						"hashAlgorithm: HashAlgorithm(rawValue: 3), "+
 						"weight: 1000.00000000, "+
 						"isRevoked: false)",
@@ -1142,7 +1142,7 @@ func TestGetAccountKey(t *testing.T) {
 				expected := fmt.Sprintf(
 					"AccountKey("+
 						"keyIndex: %d, "+
-						"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1), isValid: true), "+
+						"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1)), "+
 						"hashAlgorithm: HashAlgorithm(rawValue: 3), "+
 						"weight: 1000.00000000, "+
 						"isRevoked: false)",
@@ -1194,7 +1194,7 @@ func TestGetAccountKey(t *testing.T) {
 					expected := fmt.Sprintf(
 						"AccountKey("+
 							"keyIndex: %d, "+
-							"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1), isValid: true), "+
+							"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1)), "+
 							"hashAlgorithm: HashAlgorithm(rawValue: 3), "+
 							"weight: 1000.00000000, "+
 							"isRevoked: false)",
@@ -1284,7 +1284,7 @@ func TestAccountBalanceFields(t *testing.T) {
 
 				assert.NoError(t, err)
 				assert.NoError(t, script.Err)
-				assert.Equal(t, cadence.UFix64(9999_3930), script.Value)
+				assert.Equal(t, cadence.UFix64(9999_2520), script.Value)
 			}),
 	)
 

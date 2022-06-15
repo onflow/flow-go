@@ -1,22 +1,26 @@
 package testutil
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/module/signature"
+
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/crypto"
 
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/collection/epochmgr"
 	"github.com/onflow/flow-go/engine/collection/epochmgr/factories"
@@ -55,6 +59,7 @@ import (
 	"github.com/onflow/flow-go/module/chunks"
 	confinalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/mempool"
 	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
@@ -149,9 +154,14 @@ func GenericNodeWithStateFixture(t testing.TB,
 	chainID flow.ChainID) testmock.GenericNode {
 
 	me := LocalFixture(t, identity)
-	stubnet := stub.NewNetwork(stateFixture.State, me, hub)
+	net := stub.NewNetwork(t, identity.NodeID, hub)
+
+	parentCtx, cancel := context.WithCancel(context.Background())
+	ctx, _ := irrecoverable.WithSignaler(parentCtx)
 
 	return testmock.GenericNode{
+		Ctx:            ctx,
+		Cancel:         cancel,
 		Log:            log,
 		Metrics:        metrics,
 		Tracer:         tracer,
@@ -164,7 +174,7 @@ func GenericNodeWithStateFixture(t testing.TB,
 		Payloads:       stateFixture.Storage.Payloads,
 		Blocks:         stateFixture.Storage.Blocks,
 		Me:             me,
-		Net:            stubnet,
+		Net:            net,
 		DBDir:          stateFixture.DBDir,
 		ChainID:        chainID,
 		ProtocolEvents: stateFixture.ProtocolEvents,
@@ -235,12 +245,15 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 	node.Me, err = local.New(identity.Identity(), privKeys.StakingKey)
 	require.NoError(t, err)
 
-	pools := epochs.NewTransactionPools(func() mempool.Transactions { return herocache.NewTransactions(1000, node.Log) })
+	pools := epochs.NewTransactionPools(
+		func(_ uint64) mempool.Transactions {
+			return herocache.NewTransactions(1000, node.Log, metrics.NewNoopCollector())
+		})
 	transactions := storage.NewTransactions(node.Metrics, node.PublicDB)
 	collections := storage.NewCollections(node.PublicDB, transactions)
 	clusterPayloads := storage.NewClusterPayloads(node.Metrics, node.PublicDB)
 
-	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, node.ChainID.Chain(), pools, collectioningest.DefaultConfig())
+	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Metrics, node.Me, node.ChainID.Chain(), pools, collectioningest.DefaultConfig())
 	require.NoError(t, err)
 
 	selector := filter.HasRole(flow.RoleAccess, flow.RoleVerification)
@@ -472,8 +485,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	results := storage.NewExecutionResults(node.Metrics, node.PublicDB)
 	receipts := storage.NewExecutionReceipts(node.Metrics, node.PublicDB, results, storage.DefaultCacheSize)
 	myReceipts := storage.NewMyExecutionReceipts(node.Metrics, node.PublicDB, receipts)
-	checkStakedAtBlock := func(blockID flow.Identifier) (bool, error) {
-		return protocol.IsNodeStakedAt(node.State.AtBlockID(blockID), node.Me.NodeID())
+	checkAuthorizedAtBlock := func(blockID flow.Identifier) (bool, error) {
+		return protocol.IsNodeAuthorizedAt(node.State.AtBlockID(blockID), node.Me.NodeID())
 	}
 
 	protoState, ok := node.State.(*badgerstate.MutableState)
@@ -510,7 +523,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.NoError(t, err)
 
 	execState := executionState.NewExecutionState(
-		ls, commitsStorage, node.Blocks, node.Headers, collectionsStorage, chunkDataPackStorage, results, receipts, myReceipts, eventsStorage, serviceEventsStorage, txResultStorage, node.PublicDB, node.Tracer,
+		ls, commitsStorage, node.Blocks, node.Headers, collectionsStorage, chunkDataPackStorage, results, myReceipts, eventsStorage, serviceEventsStorage, txResultStorage, node.PublicDB, node.Tracer,
 	)
 
 	requestEngine, err := requester.New(
@@ -521,9 +534,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	)
 	require.NoError(t, err)
 
-	metrics := metrics.NewNoopCollector()
 	pusherEngine, err := executionprovider.New(
-		node.Log, node.Tracer, node.Net, node.State, node.Me, execState, metrics, checkStakedAtBlock, 10, 10,
+		node.Log, node.Tracer, node.Net, node.State, node.Me, execState, metricsCollector, checkAuthorizedAtBlock, 10, 10,
 	)
 	require.NoError(t, err)
 
@@ -557,6 +569,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		computation.DefaultProgramsCacheSize,
 		committer,
 		computation.DefaultScriptLogThreshold,
+		computation.DefaultScriptExecutionTimeLimit,
 		nil,
 		eds,
 		edCache,
@@ -567,7 +580,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		Manager: computationEngine,
 	}
 
-	syncCore, err := chainsync.New(node.Log, chainsync.DefaultConfig())
+	syncCore, err := chainsync.New(node.Log, chainsync.DefaultConfig(), metrics.NewChainSyncCollector())
 	require.NoError(t, err)
 
 	deltas, err := ingestion.NewDeltas(1000)
@@ -597,7 +610,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		deltas,
 		syncThreshold,
 		false,
-		checkStakedAtBlock,
+		checkAuthorizedAtBlock,
 		false,
 	)
 	require.NoError(t, err)
@@ -668,12 +681,14 @@ func getRoot(t *testing.T, node *testmock.GenericNode) (*flow.Header, *flow.Quor
 	require.NoError(t, err)
 
 	signerIDs := signers.NodeIDs()
+	signerIndices, err := signature.EncodeSignersToIndices(signerIDs, signerIDs)
+	require.NoError(t, err)
 
 	rootQC := &flow.QuorumCertificate{
-		View:      rootHead.View,
-		BlockID:   rootHead.ID(),
-		SignerIDs: signerIDs,
-		SigData:   unittest.SignatureFixture(),
+		View:          rootHead.View,
+		BlockID:       rootHead.ID(),
+		SignerIndices: signerIndices,
+		SigData:       unittest.SignatureFixture(),
 	}
 
 	return rootHead, rootQC
@@ -684,8 +699,8 @@ type RoundRobinLeaderSelection struct {
 	me         flow.Identifier
 }
 
-func (s *RoundRobinLeaderSelection) Identities(blockID flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
-	return s.identities.Filter(selector), nil
+func (s *RoundRobinLeaderSelection) Identities(blockID flow.Identifier) (flow.IdentityList, error) {
+	return s.identities, nil
 }
 
 func (s *RoundRobinLeaderSelection) Identity(blockID flow.Identifier, participantID flow.Identifier) (*flow.Identity, error) {

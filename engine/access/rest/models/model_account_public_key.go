@@ -9,17 +9,16 @@
 package models
 
 type AccountPublicKey struct {
+	// Index of the public key.
 	Index string `json:"index"`
-
-	PublicKey string `json:"public_key"`
-
+	// Hex encoded public key.
+	PublicKey        string            `json:"public_key"`
 	SigningAlgorithm *SigningAlgorithm `json:"signing_algorithm"`
-
 	HashingAlgorithm *HashingAlgorithm `json:"hashing_algorithm"`
-
+	// Current account sequence number.
 	SequenceNumber string `json:"sequence_number"`
-
+	// Weight of the key.
 	Weight string `json:"weight"`
-
+	// Flag indicating whether the key is active or not.
 	Revoked bool `json:"revoked"`
 }

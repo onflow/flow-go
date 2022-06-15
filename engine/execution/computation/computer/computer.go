@@ -3,7 +3,7 @@ package computer
 import (
 	"context"
 	"fmt"
-	"strings"
+	"runtime"
 	"sync"
 	"time"
 
@@ -28,7 +28,6 @@ import (
 
 const SystemChunkEventCollectionMaxSize = 256_000_000  // ~256MB
 const SystemChunkLedgerIntractionLimit = 1_000_000_000 // ~1GB
-const MaxTransactionErrorStringSize = 1000             // 1000 chars
 
 // VirtualMachine runs procedures
 type VirtualMachine interface {
@@ -333,6 +332,12 @@ func (e *blockComputer) executeTransaction(
 	isSystemChunk bool,
 ) error {
 	startedAt := time.Now()
+
+	var memAllocBefore uint64
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	memAllocBefore = m.TotalAlloc
+
 	txID := txBody.ID()
 
 	// we capture two spans one for tx-based view and one for the current context (block-based) view
@@ -381,17 +386,7 @@ func (e *blockComputer) executeTransaction(
 	}
 
 	if tx.Err != nil {
-		// limit the size of transaction error that is going to be captured
-		errorMsg := tx.Err.Error()
-		if len(errorMsg) > MaxTransactionErrorStringSize {
-			split := int(MaxTransactionErrorStringSize/2) - 1
-			var sb strings.Builder
-			sb.WriteString(errorMsg[:split])
-			sb.WriteString(" ... ")
-			sb.WriteString(errorMsg[len(errorMsg)-split:])
-			errorMsg = sb.String()
-		}
-		txResult.ErrorMessage = errorMsg
+		txResult.ErrorMessage = tx.Err.Error()
 	}
 
 	mergeSpan := e.tracer.StartSpanFromParent(txSpan, trace.EXEMergeTransactionView)
@@ -410,12 +405,19 @@ func (e *blockComputer) executeTransaction(
 	res.AddTransactionResult(&txResult)
 	res.AddComputationUsed(tx.ComputationUsed)
 
-	lg := e.log.With().
+	runtime.ReadMemStats(&m)
+	memAllocAfter := m.TotalAlloc
+
+	evt := e.log.With().
 		Hex("tx_id", txResult.TransactionID[:]).
 		Str("block_id", res.ExecutableBlock.ID().String()).
 		Str("traceID", traceID).
 		Uint64("computation_used", txResult.ComputationUsed).
-		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
+		Uint64("memory_used", tx.MemoryUsed).
+		Uint64("memAlloc", memAllocAfter-memAllocBefore).
+		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds())
+
+	lg := evt.
 		Logger()
 
 	if tx.Err != nil {
@@ -427,7 +429,14 @@ func (e *blockComputer) executeTransaction(
 		lg.Info().Msg("transaction executed successfully")
 	}
 
-	e.metrics.ExecutionTransactionExecuted(time.Since(startedAt), tx.ComputationUsed, len(tx.Events), tx.Err != nil)
+	e.metrics.ExecutionTransactionExecuted(
+		time.Since(startedAt),
+		tx.ComputationUsed,
+		memAllocAfter-memAllocBefore,
+		tx.MemoryUsed,
+		len(tx.Events),
+		tx.Err != nil,
+	)
 	return nil
 }
 

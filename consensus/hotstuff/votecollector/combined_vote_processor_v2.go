@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	msig "github.com/onflow/flow-go/module/signature"
 )
 
@@ -38,7 +37,7 @@ type combinedVoteProcessorFactoryBaseV2 struct {
 // Create creates CombinedVoteProcessorV2 for processing votes for the given block.
 // Caller must treat all errors as exceptions
 func (f *combinedVoteProcessorFactoryBaseV2) Create(log zerolog.Logger, block *model.Block) (hotstuff.VerifyingVoteProcessor, error) {
-	allParticipants, err := f.committee.Identities(block.BlockID, filter.Any)
+	allParticipants, err := f.committee.Identities(block.BlockID)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving consensus participants at block %v: %w", block.BlockID, err)
 	}
@@ -77,7 +76,7 @@ func (f *combinedVoteProcessorFactoryBaseV2) Create(log zerolog.Logger, block *m
 	}
 
 	rbRector := signature.NewRandomBeaconReconstructor(dkg, randomBeaconInspector)
-	minRequiredStake := hotstuff.ComputeStakeThresholdForBuildingQC(allParticipants.TotalStake())
+	minRequiredWeight := hotstuff.ComputeWeightThresholdForBuildingQC(allParticipants.TotalWeight())
 
 	return NewCombinedVoteProcessor(
 		log,
@@ -86,7 +85,7 @@ func (f *combinedVoteProcessorFactoryBaseV2) Create(log zerolog.Logger, block *m
 		rbRector,
 		f.onQCCreated,
 		f.packer,
-		minRequiredStake,
+		minRequiredWeight,
 	), nil
 }
 
@@ -101,14 +100,14 @@ func (f *combinedVoteProcessorFactoryBaseV2) Create(log zerolog.Logger, block *m
 // still contribute only to consensus (as fallback).
 // CombinedVoteProcessorV2 is Concurrency safe.
 type CombinedVoteProcessorV2 struct {
-	log              zerolog.Logger
-	block            *model.Block
-	stakingSigAggtor hotstuff.WeightedSignatureAggregator
-	rbRector         hotstuff.RandomBeaconReconstructor
-	onQCCreated      hotstuff.OnQCCreated
-	packer           hotstuff.Packer
-	minRequiredStake uint64
-	done             atomic.Bool
+	log               zerolog.Logger
+	block             *model.Block
+	stakingSigAggtor  hotstuff.WeightedSignatureAggregator
+	rbRector          hotstuff.RandomBeaconReconstructor
+	onQCCreated       hotstuff.OnQCCreated
+	packer            hotstuff.Packer
+	minRequiredWeight uint64
+	done              atomic.Bool
 }
 
 var _ hotstuff.VerifyingVoteProcessor = (*CombinedVoteProcessorV2)(nil)
@@ -119,17 +118,17 @@ func NewCombinedVoteProcessor(log zerolog.Logger,
 	rbRector hotstuff.RandomBeaconReconstructor,
 	onQCCreated hotstuff.OnQCCreated,
 	packer hotstuff.Packer,
-	minRequiredStake uint64,
+	minRequiredWeight uint64,
 ) *CombinedVoteProcessorV2 {
 	return &CombinedVoteProcessorV2{
-		log:              log.With().Hex("block_id", block.BlockID[:]).Logger(),
-		block:            block,
-		stakingSigAggtor: stakingSigAggtor,
-		rbRector:         rbRector,
-		onQCCreated:      onQCCreated,
-		packer:           packer,
-		minRequiredStake: minRequiredStake,
-		done:             *atomic.NewBool(false),
+		log:               log.With().Hex("block_id", block.BlockID[:]).Logger(),
+		block:             block,
+		stakingSigAggtor:  stakingSigAggtor,
+		rbRector:          rbRector,
+		onQCCreated:       onQCCreated,
+		packer:            packer,
+		minRequiredWeight: minRequiredWeight,
+		done:              *atomic.NewBool(false),
 	}
 }
 
@@ -168,9 +167,9 @@ func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 	if p.done.Load() {
 		return nil
 	}
-	stakingSig, randomBeaconSig, err := signature.DecodeDoubleSig(vote.SigData)
+	stakingSig, randomBeaconSig, err := msig.DecodeDoubleSig(vote.SigData)
 	if err != nil {
-		if errors.Is(err, model.ErrInvalidFormat) {
+		if errors.Is(err, msig.ErrInvalidSignatureFormat) {
 			return model.NewInvalidVoteErrorf(vote, "could not decode signature: %w", err)
 		}
 		return fmt.Errorf("unexpected error decoding vote %v: %w", vote.ID(), err)
@@ -233,7 +232,7 @@ func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 	}
 
 	// checking of conditions for building QC are satisfied
-	if p.stakingSigAggtor.TotalWeight() < p.minRequiredStake {
+	if p.stakingSigAggtor.TotalWeight() < p.minRequiredWeight {
 		return nil
 	}
 	if !p.rbRector.EnoughShares() {
@@ -256,7 +255,7 @@ func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 
 	p.log.Info().
 		Uint64("view", qc.View).
-		Int("num_signers", len(qc.SignerIDs)).
+		Hex("signers", qc.SignerIndices).
 		Msg("new qc has been created")
 
 	p.onQCCreated(qc)
@@ -307,15 +306,16 @@ func buildQCWithPackerAndSigData(
 	block *model.Block,
 	blockSigData *hotstuff.BlockSignatureData,
 ) (*flow.QuorumCertificate, error) {
-	signerIDs, sigData, err := packer.Pack(block.BlockID, blockSigData)
+	signerIndices, sigData, err := packer.Pack(block.BlockID, blockSigData)
+
 	if err != nil {
 		return nil, fmt.Errorf("could not pack the block sig data: %w", err)
 	}
 
 	return &flow.QuorumCertificate{
-		View:      block.View,
-		BlockID:   block.BlockID,
-		SignerIDs: signerIDs,
-		SigData:   sigData,
+		View:          block.View,
+		BlockID:       block.BlockID,
+		SignerIndices: signerIndices,
+		SigData:       sigData,
 	}, nil
 }

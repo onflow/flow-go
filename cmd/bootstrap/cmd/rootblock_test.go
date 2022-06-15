@@ -13,17 +13,18 @@ import (
 
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	model "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 const rootBlockHappyPathLogs = "^deterministic bootstrapping random seed" +
 	"collecting partner network and staking keys" +
 	`read \d+ partner node configuration files` +
-	`read \d+ stakes for partner nodes` +
+	`read \d+ weights for partner nodes` +
 	"generating internal private networking and staking keys" +
 	`read \d+ internal private node-info files` +
 	`read internal node configurations` +
-	`read \d+ stakes for internal nodes` +
+	`read \d+ weights for internal nodes` +
 	`checking constraints on consensus nodes` +
 	`assembling network and staking keys` +
 	`wrote file \S+/node-infos.pub.json` +
@@ -41,18 +42,18 @@ const rootBlockHappyPathLogs = "^deterministic bootstrapping random seed" +
 var rootBlockHappyPathRegex = regexp.MustCompile(rootBlockHappyPathLogs)
 
 func TestRootBlock_HappyPath(t *testing.T) {
-	deterministicSeed := GenerateRandomSeed()
+	deterministicSeed := GenerateRandomSeed(flow.EpochSetupRandomSourceLength)
 	rootParent := unittest.StateCommitmentFixture()
 	chainName := "main"
 	rootHeight := uint64(12332)
 
-	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerStakes, internalPrivDir, configPath string) {
+	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerWeights, internalPrivDir, configPath string) {
 
 		flagOutdir = bootDir
 
 		flagConfig = configPath
 		flagPartnerNodeInfoDir = partnerDir
-		flagPartnerStakes = partnerStakes
+		flagPartnerWeights = partnerWeights
 		flagInternalNodePrivInfoDir = internalPrivDir
 
 		flagFastKG = true
@@ -78,18 +79,18 @@ func TestRootBlock_HappyPath(t *testing.T) {
 }
 
 func TestRootBlock_Deterministic(t *testing.T) {
-	deterministicSeed := GenerateRandomSeed()
+	deterministicSeed := GenerateRandomSeed(flow.EpochSetupRandomSourceLength)
 	rootParent := unittest.StateCommitmentFixture()
 	chainName := "main"
 	rootHeight := uint64(1000)
 
-	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerStakes, internalPrivDir, configPath string) {
+	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerWeights, internalPrivDir, configPath string) {
 
 		flagOutdir = bootDir
 
 		flagConfig = configPath
 		flagPartnerNodeInfoDir = partnerDir
-		flagPartnerStakes = partnerStakes
+		flagPartnerWeights = partnerWeights
 		flagInternalNodePrivInfoDir = internalPrivDir
 
 		flagFastKG = true

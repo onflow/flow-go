@@ -11,6 +11,7 @@ import (
 	chmodels "github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	protocolMock "github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/state/protocol/seed"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -106,17 +107,16 @@ func (a *PublicAssignmentTestSuite) TestAssignDuplicate() {
 // TestPermuteEntirely tests permuting an entire IdentityList against
 // randomness and deterministicity
 func (a *PublicAssignmentTestSuite) TestPermuteEntirely() {
-	head, snapshot, state := a.SetupTest(10)
+	_, snapshot, state := a.SetupTest(10)
 
 	// create a assigner object with alpha = 10
 	assigner, err := NewChunkAssigner(10, state)
 	require.NoError(a.T(), err)
 
 	// create seed
-	result := a.CreateResult(head, 4, a.T())
-	seed := a.HashResult(result, a.T())
+	seed := a.GetSeed(a.T())
 
-	snapshot.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(seed, nil)
+	snapshot.On("RandomSource").Return(seed, nil)
 
 	// creates random ids
 	count := 10
@@ -150,16 +150,15 @@ func (a *PublicAssignmentTestSuite) TestPermuteEntirely() {
 // TestPermuteSublist tests permuting an a sublist of an
 // IdentityList against randomness and deterministicity
 func (a *PublicAssignmentTestSuite) TestPermuteSublist() {
-	head, snapshot, state := a.SetupTest(10)
+	_, snapshot, state := a.SetupTest(10)
 
 	// create a assigner object with alpha = 10
 	assigner, err := NewChunkAssigner(10, state)
 	require.NoError(a.T(), err)
 
 	// create seed
-	result := a.CreateResult(head, 4, a.T())
-	seed := a.HashResult(result, a.T())
-	snapshot.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(seed, nil)
+	seed := a.GetSeed(a.T())
+	snapshot.On("RandomSource").Return(seed, nil)
 
 	// creates random ids
 	count := 10
@@ -195,8 +194,8 @@ func (a *PublicAssignmentTestSuite) TestDeterministicy() {
 
 	// create seed
 	result := a.CreateResult(head, c, a.T())
-	seed := a.HashResult(result, a.T())
-	snapshot.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(seed, nil)
+	seed := a.GetSeed(a.T())
+	snapshot.On("RandomSource").Return(seed, nil)
 
 	// creates two set of the same nodes
 	nodes1 := unittest.IdentityListFixture(n)
@@ -262,8 +261,8 @@ func (a *PublicAssignmentTestSuite) ChunkAssignmentScenario(chunkNum, verNum, al
 	head, snapshot, state := a.SetupTest(alpha)
 
 	result := a.CreateResult(head, chunkNum, a.T())
-	seed := a.HashResult(result, a.T())
-	snapshot.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(seed, nil)
+	seed := a.GetSeed(a.T())
+	snapshot.On("RandomSource").Return(seed, nil)
 
 	// creates nodes and keeps a copy of them
 	nodes := unittest.IdentityListFixture(verNum)
@@ -289,8 +288,8 @@ func (a *PublicAssignmentTestSuite) TestCacheAssignment() {
 	head, snapshot, state := a.SetupTest(3)
 
 	result := a.CreateResult(head, 20, a.T())
-	seed := a.HashResult(result, a.T())
-	snapshot.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(seed, nil)
+	seed := a.GetSeed(a.T())
+	snapshot.On("RandomSource").Return(seed, nil)
 
 	// creates nodes and keeps a copy of them
 	nodes := unittest.IdentityListFixture(5)
@@ -361,7 +360,9 @@ func (a *PublicAssignmentTestSuite) CreateResult(head *flow.Header, num int, t *
 	return result
 }
 
-func (a *PublicAssignmentTestSuite) HashResult(res *flow.ExecutionResult, t *testing.T) []byte {
-	id := res.ID()
-	return id[:]
+func (a *PublicAssignmentTestSuite) GetSeed(t *testing.T) []byte {
+	seed := make([]byte, seed.RandomSourceLength)
+	_, err := rand.Read(seed)
+	require.NoError(t, err)
+	return seed
 }

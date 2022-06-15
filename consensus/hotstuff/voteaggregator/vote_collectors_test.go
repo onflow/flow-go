@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 var factoryError = errors.New("factory error")
@@ -44,7 +45,7 @@ func (s *VoteCollectorsTestSuite) SetupTest() {
 		}
 		return nil, fmt.Errorf("mocked collector %v not found: %w", view, factoryError)
 	}
-	s.collectors = NewVoteCollectors(s.lowestLevel, s.workerPool, s.factoryMethod)
+	s.collectors = NewVoteCollectors(unittest.Logger(), s.lowestLevel, s.workerPool, s.factoryMethod)
 }
 
 func (s *VoteCollectorsTestSuite) TearDownTest() {
