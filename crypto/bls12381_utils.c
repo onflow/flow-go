@@ -88,6 +88,7 @@ ctx_t* relic_init_BLS12_381() {
 
     // initialize relic core with a new context
     ctx_t* bls_ctx = (ctx_t*) calloc(1, sizeof(ctx_t));
+    if (!bls_ctx) return NULL;
     core_set(bls_ctx);
     if (core_init() != RLC_OK) return NULL;
 
@@ -547,10 +548,11 @@ int bls_spock_verify(const ep2_t pk1, const byte* sig1, const ep2_t pk2, const b
     ep2_free(elemsG2[0]);
     ep2_free(elemsG2[1]);
     
-    if (res == RLC_EQ && core_get()->code == RLC_OK) 
-        return VALID;
-    else 
+    if (core_get()->code == RLC_OK) {
+        if (res == RLC_EQ) return VALID;
         return INVALID;
+    }
+    return UNDEFINED;
 }
 
 // Subtracts the sum of a G2 array elements y from an element x and writes the 
@@ -573,13 +575,14 @@ void ep_sum_vector(ep_t jointx, ep_st* x, const int len) {
 // and writes the sum (G1 element) as bytes in dest.
 // The function assumes sigs is correctly allocated with regards to len.
 int ep_sum_vector_byte(byte* dest, const byte* sigs_bytes, const int len) {
-    int error;
+    int error = UNDEFINED;
 
     // temp variables
     ep_t acc;        
     ep_new(acc);
     ep_set_infty(acc);
     ep_st* sigs = (ep_st*) malloc(len * sizeof(ep_st));
+    if (!sigs) goto mem_error;
     for (int i=0; i < len; i++) ep_new(sigs[i]);
 
     // import the points from the array
@@ -601,6 +604,7 @@ out:
     ep_free(acc);
     for (int i=0; i < len; i++) ep_free(sigs[i]);
     free(sigs);
+mem_error:
     return error;
 }
 
