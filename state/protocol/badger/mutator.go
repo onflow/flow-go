@@ -520,10 +520,19 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	}
 	epochFallbackTriggered, err := m.isEpochEmergencyFallbackTriggered()
 	if err != nil {
-		return fmt.Errorf("could not check epoch emergency fallback flag: %w", err)
+		return fmt.Errorf("could not check persisted epoch emergency fallback flag: %w", err)
 	}
 
-	// Determine metric updates and protocol events related to epoch phase changes.
+	// if epoch fallback was not previously triggered, check whether this block triggers it
+	if !epochFallbackTriggered {
+		epochFallbackTriggered, err = m.epochFallbackTriggeredByFinalizedBlock(header, epochStatus, currentEpochSetup)
+		if err != nil {
+			return fmt.Errorf("could not check whether finalized block triggers epoch fallback: %w", err)
+		}
+	}
+
+	// Determine metric updates and protocol events related to epoch phase
+	// changes and epoch transitions.
 	// If epoch emergency fallback is triggered, the current epoch continues until
 	// the next spork - so skip these updates.
 	if !epochFallbackTriggered {
@@ -533,12 +542,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		}
 		metrics = append(metrics, epochPhaseMetrics...)
 		events = append(events, epochPhaseEvents...)
-	}
 
-	// Determine metric updates and protocol events related to epoch transitions.
-	// If epoch emergency fallback is triggered, the current epoch continues until
-	// the next spork - so skip these updates.
-	if !epochFallbackTriggered {
 		epochTransitionMetrics, epochTransitionEvents, err := m.epochTransitionMetricsAndEventsOnBlockFinalized(header, currentEpochSetup)
 		if err != nil {
 			return fmt.Errorf("could not determine epoch transition metrics/events for finalized block: %w", err)
@@ -546,8 +550,6 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		metrics = append(metrics, epochTransitionMetrics...)
 		events = append(events, epochTransitionEvents...)
 	}
-
-	// TODO - check EECC triggered by epoch commit deadline
 
 	// if epoch emergency fallback is triggered, update metric
 	if epochFallbackTriggered {
@@ -560,6 +562,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	// * Update the largest height of sealed and finalized block.
 	//   This value could actually stay the same if it has no seals in
 	//   its payload, in which case the parent's seal is the same.
+	// * set the epoch fallback flag, if it is triggered
 	err = operation.RetryOnConflict(m.db.Update, func(tx *badger.Txn) error {
 		err = operation.IndexBlockHeight(header.Height, blockID)(tx)
 		if err != nil {
@@ -573,6 +576,12 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		if err != nil {
 			return fmt.Errorf("could not update sealed height: %w", err)
 		}
+		if epochFallbackTriggered {
+			err = operation.SetEpochEmergencyFallbackTriggered(blockID)(tx)
+			if err != nil {
+				return fmt.Errorf("could not set epoch fallback flag: %w", err)
+			}
+		}
 
 		// emit protocol events within the scope of the Badger transaction to
 		// guarantee at-least-once delivery
@@ -583,7 +592,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("could not execute finalization: %w", err)
+		return fmt.Errorf("could not persist finalization operations for block (%x): %w", blockID, err)
 	}
 
 	// update sealed/finalized block metrics
@@ -604,6 +613,38 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	}
 
 	return nil
+}
+
+// epochFallbackTriggeredByFinalizedBlock checks whether finalizing the input block
+// would trigger epoch emergency fallback mode. In particular, we trigger epoch
+// fallback mode when finalizing a block B when:
+// 1. B is the first finalized block with view greater than or equal to the epoch
+//    commitment deadline for the current epoch.
+// 2. The next epoch has not been committed as of B.
+//
+// This function should only be called when epoch fallback has not already been triggered.
+// See protocol.Params for more details on the epoch commitment deadline.
+//
+// No errors are expected during normal operation.
+func (m *FollowerState) epochFallbackTriggeredByFinalizedBlock(block *flow.Header, epochStatus *flow.EpochStatus, currentEpochSetup *flow.EpochSetup) (bool, error) {
+
+	// 1. determine whether block B is past the epoch commitment deadline
+	safetyThreshold, err := m.Params().EpochCommitSafetyThreshold()
+	if err != nil {
+		return false, fmt.Errorf("could not get epoch commit safety threshold: %w", err)
+	}
+	epochCommitmentDeadline := currentEpochSetup.FinalView - safetyThreshold
+	blockExceedsDeadline := block.View >= epochCommitmentDeadline
+
+	// 2. determine whether the next epoch is committed w.r.t. block B
+	currentEpochPhase, err := epochStatus.Phase()
+	if err != nil {
+		return false, fmt.Errorf("could not get current epoch phase: %w", err)
+	}
+	isNextEpochCommitted := currentEpochPhase == flow.EpochPhaseCommitted
+
+	blockTriggersEpochFallback := blockExceedsDeadline && !isNextEpochCommitted
+	return blockTriggersEpochFallback, nil
 }
 
 // TODO docs

@@ -37,6 +37,7 @@ func RetrieveEpochStatus(blockID flow.Identifier, status *flow.EpochStatus) func
 // epoch emergency fallback has been triggered, and the block where it was triggered.
 // EECC can be triggered by 2 blocks:
 //
+// TODO -doc updates
 // 1. The first block of a new epoch, when that epoch has not been set up.
 // 2. The block where an invalid service event is being applied to the state.
 //
