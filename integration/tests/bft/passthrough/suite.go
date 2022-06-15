@@ -74,7 +74,7 @@ func (s *Suite) SetupSuite() {
 	for _, nodeID := range s.nodeIDs {
 		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus,
 			testnet.WithID(nodeID),
-			testnet.WithLogLevel(zerolog.FatalLevel),
+			testnet.WithLogLevel(zerolog.DebugLevel),
 			testnet.WithAdditionalFlag("--required-verification-seal-approvals=1"),
 			testnet.WithAdditionalFlag("--required-construction-seal-approvals=1"),
 		)
@@ -93,23 +93,23 @@ func (s *Suite) SetupSuite() {
 	s.exe1ID = unittest.IdentifierFixture()
 	exe1Config := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.exe1ID),
-		testnet.WithLogLevel(zerolog.FatalLevel),
+		testnet.WithLogLevel(zerolog.DebugLevel),
 		testnet.AsCorrupted())
 	s.nodeConfigs = append(s.nodeConfigs, exe1Config)
 
 	s.exe2ID = unittest.IdentifierFixture()
 	exe2Config := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.exe2ID),
-		testnet.WithLogLevel(zerolog.FatalLevel),
+		testnet.WithLogLevel(zerolog.DebugLevel),
 		testnet.AsCorrupted())
 	s.nodeConfigs = append(s.nodeConfigs, exe2Config)
 
 	// generates two collection node
 	coll1Config := testnet.NewNodeConfig(flow.RoleCollection,
-		testnet.WithLogLevel(zerolog.FatalLevel),
+		testnet.WithLogLevel(zerolog.DebugLevel),
 	)
 	coll2Config := testnet.NewNodeConfig(flow.RoleCollection,
-		testnet.WithLogLevel(zerolog.FatalLevel),
+		testnet.WithLogLevel(zerolog.DebugLevel),
 	)
 	s.nodeConfigs = append(s.nodeConfigs, coll1Config, coll2Config)
 
@@ -121,7 +121,7 @@ func (s *Suite) SetupSuite() {
 	ghostConfig := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.ghostID),
 		testnet.AsGhost(),
-		testnet.WithLogLevel(zerolog.FatalLevel))
+		testnet.WithLogLevel(zerolog.DebugLevel))
 	s.nodeConfigs = append(s.nodeConfigs, ghostConfig)
 
 	// generates, initializes, and starts the Flow network
