@@ -250,7 +250,7 @@ func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
 	originID := unittest.IdentifierFixture()
 	voteCount := 15
 
-	channel := engine.ChannelConsensusCluster(cs.clusterID)
+	channel := netint.ChannelConsensusCluster(cs.clusterID)
 
 	var wg sync.WaitGroup
 	wg.Add(1)

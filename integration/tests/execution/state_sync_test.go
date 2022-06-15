@@ -5,15 +5,13 @@ import (
 	"testing"
 
 	sdk "github.com/onflow/flow-go-sdk"
-
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
-
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 )
 
 func TestExecutionStateSync(t *testing.T) {
@@ -71,7 +69,7 @@ func (s *StateSyncSuite) TestStateSyncAfterNetworkPartition() {
 	s.T().Logf("block C has been sealed: %v", sealed.Header.ID())
 
 	// send a ExecutionStateSyncRequest from Ghost node
-	err = s.Ghost().Send(context.Background(), engine.SyncExecution,
+	err = s.Ghost().Send(context.Background(), network.SyncExecution,
 		&messages.ExecutionStateSyncRequest{FromHeight: blockA.Header.Height, ToHeight: blockC.Header.Height},
 		[]flow.Identifier{s.exe1ID}...)
 	require.NoError(s.T(), err)

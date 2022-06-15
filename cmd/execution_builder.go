@@ -32,7 +32,6 @@ import (
 	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
-	"github.com/onflow/flow-go/engine"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/provider"
 	"github.com/onflow/flow-go/engine/common/requester"
@@ -65,6 +64,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	chainsync "github.com/onflow/flow-go/module/synchronization"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/state/protocol"
@@ -420,7 +420,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			executionDataCIDCache = state_synchronization.NewExecutionDataCIDCache(executionDataCIDCacheSize)
 
 			bs, err := node.Network.RegisterBlobService(
-				engine.ExecutionDataService,
+				network.ExecutionDataService,
 				ds,
 				p2p.WithBitswapOptions(
 					bitswap.WithTaskComparator(
@@ -609,7 +609,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Component("ingestion engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			var err error
 			collectionRequester, err = requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
-				engine.RequestCollections,
+				network.RequestCollections,
 				filter.Any,
 				func() flow.Entity { return &flow.Collection{} },
 				// we are manually triggering batches in execution, but lets still send off a batch once a minute, as a safety net for the sake of retries
@@ -737,7 +737,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				node.Network,
 				node.Me,
 				node.State,
-				engine.ProvideReceiptsByBlockID,
+				network.ProvideReceiptsByBlockID,
 				filter.HasRole(flow.RoleConsensus),
 				retrieve,
 			)
