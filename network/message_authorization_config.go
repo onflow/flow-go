@@ -295,6 +295,6 @@ func GetMessageAuthConfig(v interface{}) (MsgAuthConfig, error) {
 		return dkgMessage, nil
 
 	default:
-		return MsgAuthConfig{}, fmt.Errorf("could not get authorizatoin config for message with type (%T)", v)
+		return MsgAuthConfig{}, fmt.Errorf("could not get authorization config for message with type (%T)", v)
 	}
 }
