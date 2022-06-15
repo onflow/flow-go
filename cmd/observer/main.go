@@ -14,8 +14,6 @@ func main() {
 		anb.Logger.Fatal().Err(err).Send()
 	}
 
-	anb.WithNewObserverServiceBuilder()
-
 	if err := anb.Initialize(); err != nil {
 		anb.Logger.Fatal().Err(err).Send()
 	}

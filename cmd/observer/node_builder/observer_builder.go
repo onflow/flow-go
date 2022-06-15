@@ -541,12 +541,15 @@ func NewFlowObserverServiceBuilder(opts ...Option) *ObserverServiceBuilder {
 	for _, opt := range opts {
 		opt(config)
 	}
-
-	return &ObserverServiceBuilder{
+	anb := &ObserverServiceBuilder{
 		ObserverServiceConfig:   config,
 		FlowNodeBuilder:         cmd.FlowNode(flow.RoleAccess.String(), config.baseOptions...),
 		FinalizationDistributor: pubsub.NewFinalizationDistributor(),
 	}
+	// the observer gets a version of the root snapshot file that does not contain any node addresses
+	// hence skip all the root snapshot validations that involved an identity address
+	anb.FlowNodeBuilder.SkipNwAddressBasedValidations = true
+	return anb
 }
 
 func (builder *ObserverServiceBuilder) ParseFlags() error {
@@ -680,12 +683,6 @@ func BootstrapIdentities(addresses []string, keys []string) (flow.IdentityList, 
 	return ids, nil
 }
 
-// the observer gets a version of the root snapshot file that does not contain any node addresses
-// hence skip all the root snapshot validations that involved an identity address
-func (builder *ObserverServiceBuilder) WithNewObserverServiceBuilder() {
-	builder.SkipNwAddressBasedValidations = true
-}
-
 func (builder *ObserverServiceBuilder) initNodeInfo() error {
 	// use the networking key that was loaded from the configured file
 	networkingKey, err := loadNetworkingKey(builder.observerNetworkingKeyPath)
@@ -778,7 +775,7 @@ func (builder *ObserverServiceBuilder) Initialize() error {
 
 	builder.enqueueConnectWithStakedAN()
 
-	builder.attachRPCEngine()
+	builder.enqueueRPCServer()
 
 	if builder.BaseConfig.MetricsEnabled {
 		builder.EnqueueMetricsServerInit()
@@ -963,7 +960,7 @@ func (builder *ObserverServiceBuilder) enqueueConnectWithStakedAN() {
 	})
 }
 
-func (builder *ObserverServiceBuilder) attachRPCEngine() {
+func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 	builder.Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		ids := builder.upstreamIdentities
 		proxy, err := apiservice.NewFlowAPIService(ids, builder.apiTimeout)
