@@ -456,6 +456,15 @@ func (state *State) bootstrapSporkInfo(root protocol.Snapshot) func(*badger.Txn)
 			return fmt.Errorf("could not insert protocol version: %w", err)
 		}
 
+		threshold, err := params.EpochCommitSafetyThreshold()
+		if err != nil {
+			return fmt.Errorf("could not get epoch commit safety threshold: %w", err)
+		}
+		err = operation.InsertEpochCommitSafetyThreshold(threshold)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert epoch commit safety threshold: %w", err)
+		}
+
 		return nil
 	}
 }
@@ -492,7 +501,7 @@ func OpenState(
 }
 
 func (state *State) Params() protocol.Params {
-	return &Params{state: state}
+	return Params{state: state}
 }
 
 func (state *State) Sealed() protocol.Snapshot {
@@ -667,8 +676,8 @@ func (state *State) updateCommittedEpochFinalView(snap protocol.Snapshot) error 
 	return nil
 }
 
-func (m *State) isEpochEmergencyFallbackTriggered() (bool, error) {
+func (state *State) isEpochEmergencyFallbackTriggered() (bool, error) {
 	var triggered bool
-	err := m.db.View(operation.CheckEpochEmergencyFallbackTriggered(&triggered))
+	err := state.db.View(operation.CheckEpochEmergencyFallbackTriggered(&triggered))
 	return triggered, err
 }

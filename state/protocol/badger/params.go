@@ -11,7 +11,7 @@ type Params struct {
 	state *State
 }
 
-func (p *Params) ChainID() (flow.ChainID, error) {
+func (p Params) ChainID() (flow.ChainID, error) {
 
 	// retrieve root header
 	root, err := p.Root()
@@ -22,7 +22,7 @@ func (p *Params) ChainID() (flow.ChainID, error) {
 	return root.ChainID, nil
 }
 
-func (p *Params) SporkID() (flow.Identifier, error) {
+func (p Params) SporkID() (flow.Identifier, error) {
 
 	var sporkID flow.Identifier
 	err := p.state.db.View(operation.RetrieveSporkID(&sporkID))
@@ -33,7 +33,7 @@ func (p *Params) SporkID() (flow.Identifier, error) {
 	return sporkID, nil
 }
 
-func (p *Params) ProtocolVersion() (uint, error) {
+func (p Params) ProtocolVersion() (uint, error) {
 
 	var version uint
 	err := p.state.db.View(operation.RetrieveProtocolVersion(&version))
@@ -44,7 +44,17 @@ func (p *Params) ProtocolVersion() (uint, error) {
 	return version, nil
 }
 
-func (p *Params) Root() (*flow.Header, error) {
+func (p Params) EpochCommitSafetyThreshold() (uint64, error) {
+
+	var threshold uint64
+	err := p.state.db.View(operation.RetrieveEpochCommitSafetyThreshold(&threshold))
+	if err != nil {
+		return 0, fmt.Errorf("could not get epoch commit safety threshold")
+	}
+	return threshold, nil
+}
+
+func (p Params) Root() (*flow.Header, error) {
 
 	// retrieve the root height
 	var height uint64
@@ -69,7 +79,7 @@ func (p *Params) Root() (*flow.Header, error) {
 	return header, nil
 }
 
-func (p *Params) Seal() (*flow.Seal, error) {
+func (p Params) Seal() (*flow.Seal, error) {
 
 	// retrieve the root height
 	var height uint64

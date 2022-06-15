@@ -25,9 +25,10 @@ type StaticEpochTransitionSuite struct {
 func (s *StaticEpochTransitionSuite) SetupTest() {
 	// use shorter epoch phases as no staking operations need to occur in the
 	// staking phase for this test
-	s.StakingAuctionLen = 10
+	s.StakingAuctionLen = 1
 	s.DKGPhaseLen = 50
 	s.EpochLen = 200
+	s.EpochCommitSafetyThreshold = 20
 
 	// run the generic setup, which starts up the network
 	s.Suite.SetupTest()
