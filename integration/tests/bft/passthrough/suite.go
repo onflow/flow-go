@@ -145,6 +145,9 @@ func (s *Suite) SetupSuite() {
 	s.cancel = cancel
 	s.net.Start(ctx)
 
+	// starts tracking blocks by the ghost node
+	s.Track(s.T(), ctx, s.Ghost())
+
 	s.Orchestrator = NewDummyOrchestrator(logger)
 
 	// start attack network
@@ -170,9 +173,6 @@ func (s *Suite) SetupSuite() {
 
 	attackNetwork.Start(attackCtx)
 	unittest.RequireCloseBefore(s.T(), attackNetwork.Ready(), 1*time.Second, "could not start attack network on time")
-
-	// starts tracking blocks by the ghost node
-	s.Track(s.T(), ctx, s.Ghost())
 }
 
 // TearDownSuite tears down the test network of Flow as well as the BFT testing attack network.
