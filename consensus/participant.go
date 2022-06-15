@@ -41,12 +41,12 @@ func NewParticipant(
 	// initialize the default configuration
 	defTimeout := timeout.DefaultConfig
 	cfg := ParticipantConfig{
-		TimeoutInitial:             time.Duration(defTimeout.ReplicaTimeout) * time.Millisecond,
-		TimeoutMinimum:             time.Duration(defTimeout.MinReplicaTimeout) * time.Millisecond,
-		TimeoutAggregationFraction: defTimeout.VoteAggregationTimeoutFraction,
-		TimeoutIncreaseFactor:      defTimeout.TimeoutIncrease,
-		TimeoutDecreaseFactor:      defTimeout.TimeoutDecrease,
-		BlockRateDelay:             time.Duration(defTimeout.BlockRateDelayMS) * time.Millisecond,
+		TimeoutInitial:        time.Duration(defTimeout.ReplicaTimeout) * time.Millisecond,
+		TimeoutMinimum:        time.Duration(defTimeout.MinReplicaTimeout) * time.Millisecond,
+		TimeoutMaximum:        time.Duration(defTimeout.MaxReplicaTimeout) * time.Millisecond,
+		TimeoutIncreaseFactor: defTimeout.TimeoutIncrease,
+		TimeoutDecreaseFactor: defTimeout.TimeoutDecrease,
+		BlockRateDelay:        time.Duration(defTimeout.BlockRateDelayMS) * time.Millisecond,
 	}
 
 	// apply the configuration options
@@ -54,16 +54,11 @@ func NewParticipant(
 		option(&cfg)
 	}
 
-	livenessData, err := modules.Persist.GetLivenessData()
-	if err != nil {
-		return nil, fmt.Errorf("could not recover liveness data: %w", err)
-	}
-
 	// prune vote aggregator to initial view
 	modules.Aggregator.PruneUpToView(finalized.View)
 
 	// recover the hotstuff state, mainly to recover all pending blocks in Forks
-	err = recovery.Participant(log, modules.Forks, modules.Aggregator, modules.Validator, finalized, pending)
+	err := recovery.Participant(log, modules.Forks, modules.Aggregator, modules.Validator, finalized, pending)
 	if err != nil {
 		return nil, fmt.Errorf("could not recover hotstuff state: %w", err)
 	}
@@ -72,7 +67,7 @@ func NewParticipant(
 	timeoutConfig, err := timeout.NewConfig(
 		cfg.TimeoutInitial,
 		cfg.TimeoutMinimum,
-		cfg.TimeoutAggregationFraction,
+		cfg.TimeoutMaximum,
 		cfg.TimeoutIncreaseFactor,
 		cfg.TimeoutDecreaseFactor,
 		cfg.BlockRateDelay,
@@ -83,9 +78,7 @@ func NewParticipant(
 
 	// initialize the pacemaker
 	controller := timeout.NewController(timeoutConfig)
-
-	// TODO: pacemaker should retrieve the livenessData itself to reduce risk of inconsistent initialization
-	pacemaker, err := pacemaker.New(livenessData.CurrentView, controller, modules.Notifier)
+	pacemaker, err := pacemaker.New(controller, modules.Notifier, modules.Persist)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize flow pacemaker: %w", err)
 	}

@@ -77,6 +77,14 @@ func (lc *LogConsumer) OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newVi
 		Msg("QC triggered view change")
 }
 
+func (lc *LogConsumer) OnTcTriggeredViewChange(tc *flow.TimeoutCertificate, newView uint64) {
+	lc.log.Debug().
+		Uint64("tc_view", tc.View).
+		Uint64("tc_newest_qc_view", tc.NewestQC.View).
+		Uint64("new_view", newView).
+		Msg("TC triggered view change")
+}
+
 func (lc *LogConsumer) OnProposingBlock(block *model.Proposal) {
 	lc.logBasicBlockData(lc.log.Debug(), block.Block).
 		Msg("proposing block")
@@ -101,7 +109,6 @@ func (lc *LogConsumer) OnStartingTimeout(info *model.TimerInfo) {
 	lc.log.Debug().
 		Uint64("timeout_view", info.View).
 		Time("timeout_cutoff", info.StartTime.Add(info.Duration)).
-		Str("timeout_mode", info.Mode.String()).
 		Msg("timeout started")
 }
 
@@ -109,7 +116,6 @@ func (lc *LogConsumer) OnReachedTimeout(info *model.TimerInfo) {
 	lc.log.Debug().
 		Uint64("timeout_view", info.View).
 		Time("timeout_cutoff", info.StartTime.Add(info.Duration)).
-		Str("timeout_mode", info.Mode.String()).
 		Msg("timeout reached")
 }
 
