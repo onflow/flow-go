@@ -107,7 +107,7 @@ func (p *Provider) storeBlobs(parent context.Context, blockHeight uint64, blobCh
 	return ch
 }
 
-func (p *Provider) Provide(ctx context.Context, blockHeight uint64, executionData *execution_data.BlockExecutionData) (flow.Identifier, error) {
+func (p *Provider) Provide(ctx context.Context, blockHeight uint64, executionData *execution_data.BlockExecutionData) (flow.Identifier, *execution_data.BlockExecutionDataRoot, error) {
 	logger := p.logger.With().Uint64("height", blockHeight).Str("block_id", executionData.BlockID.String()).Logger()
 	logger.Debug().Msg("providing execution data")
 
@@ -138,7 +138,7 @@ func (p *Provider) Provide(ctx context.Context, blockHeight uint64, executionDat
 	}
 
 	if err := g.Wait(); err != nil {
-		return flow.ZeroID, err
+		return flow.ZeroID, nil, err
 	}
 
 	edRoot := &execution_data.BlockExecutionDataRoot{
@@ -147,7 +147,7 @@ func (p *Provider) Provide(ctx context.Context, blockHeight uint64, executionDat
 	}
 	rootID, err := p.addExecutionDataRoot(ctx, edRoot, blobCh)
 	if err != nil {
-		return flow.ZeroID, fmt.Errorf("failed to add execution data root: %w", err)
+		return flow.ZeroID, nil, fmt.Errorf("failed to add execution data root: %w", err)
 	}
 	logger.Debug().Str("root_id", rootID.String()).Msg("root ID computed")
 
@@ -156,9 +156,9 @@ func (p *Provider) Provide(ctx context.Context, blockHeight uint64, executionDat
 
 	err, ok := <-errCh
 	if ok {
-		return flow.ZeroID, err
+		return flow.ZeroID, nil, err
 	} else {
-		return rootID, nil
+		return rootID, edRoot, nil
 	}
 }
 

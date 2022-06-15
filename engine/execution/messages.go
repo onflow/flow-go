@@ -4,6 +4,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/mempool/entity"
 )
 
@@ -29,6 +30,7 @@ type ComputationResult struct {
 	StateReads         uint64
 	TrieUpdates        []*ledger.TrieUpdate
 	ExecutionDataID    flow.Identifier
+	ExecutionDataRoot  execution_data.BlockExecutionDataRoot
 }
 
 func (cr *ComputationResult) AddEvents(chunkIndex int, inp []flow.Event) {
