@@ -647,7 +647,7 @@ func (builder *FollowerServiceBuilder) Build() (cmd.Node, error) {
 // enqueuePublicNetworkInit enqueues the observer network component initialized for the observer
 func (builder *FollowerServiceBuilder) enqueuePublicNetworkInit() {
 
-	builder.Component("unstaked network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+	builder.Component("public network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
 		if builder.HeroCacheMetricsEnable {
 			heroCacheCollector = metrics.NetworkReceiveCacheMetricsFactory(builder.MetricsRegisterer)

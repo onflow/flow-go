@@ -929,7 +929,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 				containerExternalNetworkPort := fmt.Sprintf("%d/tcp", AccessNodePublicNetworkPort)
 				nodeContainer.bindPort(hostExternalNetworkPort, containerExternalNetworkPort)
 				net.AccessPorts[AccessNodeExternalNetworkPort] = hostExternalNetworkPort
-				nodeContainer.AddFlag("supports-unstaked-node", "true")
+				nodeContainer.AddFlag("supports-observer", "true")
 				nodeContainer.AddFlag("public-network-address", fmt.Sprintf("%s:%d", nodeContainer.Name(), AccessNodePublicNetworkPort))
 			}
 

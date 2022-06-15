@@ -5,7 +5,7 @@ import (
 )
 
 func main() {
-	builder := nodebuilder.FlowAccessNode() // use the generic Access Node builder till it is determined if this is a staked AN or an unstaked AN
+	builder := nodebuilder.FlowAccessNode() // use the Access Node builder
 
 	builder.PrintBuildVersionDetails()
 

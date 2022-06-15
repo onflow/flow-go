@@ -90,7 +90,7 @@ import (
 // For a node running as a standalone process, the config fields will be populated from the command line params,
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
 type AccessNodeConfig struct {
-	supportsObserverAndFollower  bool // True if this is an Access node that supports observers and consensus follower engines
+	supportsObserver             bool // True if this is an Access node that supports observers and consensus follower engines
 	collectionGRPCPort           uint
 	executionGRPCPort            uint
 	pingEnabled                  bool
@@ -125,9 +125,9 @@ type PublicNetworkConfig struct {
 func DefaultAccessNodeConfig() *AccessNodeConfig {
 	homedir, _ := os.UserHomeDir()
 	return &AccessNodeConfig{
-		supportsObserverAndFollower: false,
-		collectionGRPCPort:          9000,
-		executionGRPCPort:           9000,
+		supportsObserver:   false,
+		collectionGRPCPort: 9000,
+		executionGRPCPort:  9000,
 		rpcConf: rpc.Config{
 			UnsecureGRPCListenAddr:    "0.0.0.0:9000",
 			SecureGRPCListenAddr:      "0.0.0.0:9001",
@@ -545,7 +545,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.StringVarP(&builder.nodeInfoFile, "node-info-file", "", defaultConfig.nodeInfoFile, "full path to a json file which provides more details about nodes when reporting its reachability metrics")
 		flags.StringToIntVar(&builder.apiRatelimits, "api-rate-limits", defaultConfig.apiRatelimits, "per second rate limits for Access API methods e.g. Ping=300,GetTransaction=500 etc.")
 		flags.StringToIntVar(&builder.apiBurstlimits, "api-burst-limits", defaultConfig.apiBurstlimits, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
-		flags.BoolVar(&builder.supportsObserverAndFollower, "supports-unstaked-node", defaultConfig.supportsObserverAndFollower, "true if this staked access node supports observer or follower connections")
+		flags.BoolVar(&builder.supportsObserver, "supports-observer", defaultConfig.supportsObserver, "true if this staked access node supports observer or follower connections")
 		flags.StringVar(&builder.PublicNetworkConfig.BindAddress, "public-network-address", defaultConfig.PublicNetworkConfig.BindAddress, "staked access node's public network bind address")
 		// ExecutionDataRequester config
 		flags.BoolVar(&builder.executionDataSyncEnabled, "execution-data-sync-enabled", defaultConfig.executionDataSyncEnabled, "whether to enable the execution data sync protocol")
@@ -556,8 +556,8 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.DurationVar(&builder.executionDataConfig.RetryDelay, "execution-data-retry-delay", defaultConfig.executionDataConfig.RetryDelay, "initial delay for exponential backoff when fetching execution data fails e.g. 10s")
 		flags.DurationVar(&builder.executionDataConfig.MaxRetryDelay, "execution-data-max-retry-delay", defaultConfig.executionDataConfig.MaxRetryDelay, "maximum delay for exponential backoff when fetching execution data fails e.g. 5m")
 	}).ValidateFlags(func() error {
-		if builder.supportsObserverAndFollower && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
-			return errors.New("public-network-address must be set if supports-unstaked-node is true")
+		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
+			return errors.New("public-network-address must be set if supports-observer is true")
 		}
 		if builder.executionDataSyncEnabled {
 			if builder.executionDataConfig.FetchTimeout <= 0 {
@@ -665,8 +665,8 @@ func (builder *FlowAccessNodeBuilder) Initialize() error {
 	})
 
 	// if this is an access node that supports unstaked followers, enqueue the unstaked network
-	if builder.supportsObserverAndFollower {
-		builder.enqueueUnstakedNetworkInit()
+	if builder.supportsObserver {
+		builder.enqueuePublicNetworkInit()
 		builder.enqueueRelayNetwork()
 	}
 
@@ -863,7 +863,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return builder.RequestEng, nil
 		})
 
-	if builder.supportsObserverAndFollower {
+	if builder.supportsObserver {
 		builder.Component("unstaked sync request handler", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			syncRequestHandler, err := synceng.NewRequestHandlerEngine(
 				node.Logger.With().Bool("unstaked", true).Logger(),
@@ -909,9 +909,9 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 	return builder.FlowNodeBuilder.Build()
 }
 
-// enqueueUnstakedNetworkInit enqueues the unstaked network component initialized for the staked node
-func (builder *FlowAccessNodeBuilder) enqueueUnstakedNetworkInit() {
-	builder.Component("unstaked network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+// enqueuePublicNetworkInit enqueues the public network component initialized for the staked node
+func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
+	builder.Component("public network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		builder.PublicNetworkConfig.Metrics = metrics.NewNetworkCollector(metrics.WithNetworkPrefix("unstaked"))
 
 		libP2PFactory := builder.initLibP2PFactory(builder.NodeConfig.NetworkKey)
