@@ -10,16 +10,18 @@ import (
 )
 
 const (
-	startRepTimeout        float64 = 120  // Milliseconds
-	minRepTimeout          float64 = 100  // Milliseconds
-	multiplicativeIncrease float64 = 1.5  // multiplicative factor
-	multiplicativeDecrease float64 = 0.85 // multiplicative factor
+	startRepTimeout        float64 = 120   // Milliseconds
+	minRepTimeout          float64 = 100   // Milliseconds
+	maxRepTimeout          float64 = 10000 // Milliseconds
+	multiplicativeIncrease float64 = 1.5   // multiplicative factor
+	multiplicativeDecrease float64 = 0.85  // multiplicative factor
 )
 
 func initTimeoutController(t *testing.T) *Controller {
 	tc, err := NewConfig(
 		time.Duration(startRepTimeout*1e6),
 		time.Duration(minRepTimeout*1e6),
+		time.Duration(maxRepTimeout*1e6),
 		multiplicativeIncrease,
 		multiplicativeDecrease,
 		0)
@@ -95,7 +97,8 @@ func Test_MaxCutoff(t *testing.T) {
 	c, err := NewConfig(
 		time.Duration(200*float64(time.Millisecond)),
 		time.Duration(minRepTimeout*float64(time.Millisecond)),
-		10,
+		time.Duration(maxRepTimeout*float64(time.Millisecond)),
+		multiplicativeIncrease,
 		multiplicativeDecrease,
 		0)
 	if err != nil {
@@ -105,7 +108,7 @@ func Test_MaxCutoff(t *testing.T) {
 
 	for i := 1; i <= 50; i += 1 {
 		tc.OnTimeout() // after already 7 iterations we should have reached the max value
-		assert.True(t, float64(tc.ReplicaTimeout().Milliseconds()) <= timeoutCap)
+		assert.True(t, float64(tc.ReplicaTimeout().Milliseconds()) <= maxRepTimeout)
 	}
 }
 
@@ -141,6 +144,7 @@ func Test_BlockRateDelay(t *testing.T) {
 	c, err := NewConfig(
 		time.Duration(200*float64(time.Millisecond)),
 		time.Duration(minRepTimeout*float64(time.Millisecond)),
+		time.Duration(maxRepTimeout*float64(time.Millisecond)),
 		10,
 		multiplicativeDecrease,
 		time.Second)

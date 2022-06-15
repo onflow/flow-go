@@ -20,6 +20,7 @@ import (
 const (
 	startRepTimeout        float64 = 400.0 // Milliseconds
 	minRepTimeout          float64 = 100.0 // Milliseconds
+	maxRepTimeout          float64 = 600.0 // Milliseconds
 	multiplicativeIncrease float64 = 1.5   // multiplicative factor
 	multiplicativeDecrease float64 = 0.85  // multiplicative factor
 )
@@ -51,6 +52,7 @@ func (s *ActivePaceMakerTestSuite) SetupTest() {
 	tc, err := timeout.NewConfig(
 		time.Duration(startRepTimeout*1e6),
 		time.Duration(minRepTimeout*1e6),
+		time.Duration(maxRepTimeout*1e6),
 		multiplicativeIncrease,
 		multiplicativeDecrease,
 		0)
@@ -190,7 +192,8 @@ func (s *ActivePaceMakerTestSuite) TestProcessTC_PersistException() {
 	require.ErrorIs(s.T(), err, exception)
 }
 
-// TestProcessQC_InvalidatesLastViewTC
+// TestProcessQC_InvalidatesLastViewTC verifies that PaceMaker does not retain any old
+// TC if the last view change was triggered by observing a QC from the previous view.
 func (s *ActivePaceMakerTestSuite) TestProcessQC_InvalidatesLastViewTC() {
 	tc := helper.MakeTC(helper.WithTCView(s.livenessData.CurrentView+1),
 		helper.WithTCNewestQC(s.livenessData.NewestQC))

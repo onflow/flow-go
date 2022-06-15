@@ -26,6 +26,7 @@ import (
 const (
 	startRepTimeout        float64 = 400.0 // Milliseconds
 	minRepTimeout          float64 = 100.0 // Milliseconds
+	maxRepTimeout          float64 = 600.0 // Milliseconds
 	multiplicativeIncrease float64 = 1.5   // multiplicative factor
 	multiplicativeDecrease float64 = 0.85  // multiplicative factor
 )
@@ -77,6 +78,7 @@ func initPaceMaker(t require.TestingT, livenessData *hotstuff.LivenessData) hots
 	tc, err := timeout.NewConfig(
 		time.Duration(startRepTimeout*1e6),
 		time.Duration(minRepTimeout*1e6),
+		time.Duration(maxRepTimeout*1e6),
 		multiplicativeIncrease,
 		multiplicativeDecrease,
 		0)

@@ -18,11 +18,6 @@ type Controller struct {
 	timeoutChannel <-chan time.Time
 }
 
-// timeoutCap this is an internal cap on the timeout to avoid numerical overflows.
-// Its value is large enough to be of no practical implication.
-// We use 1E9 milliseconds which is about 11 days for a single timout (i.e. more than a full epoch)
-const timeoutCap float64 = 1e9
-
 // NewController creates a new Controller.
 func NewController(timeoutConfig Config) *Controller {
 	// the initial value for the timeout channel is a closed channel which returns immediately
@@ -76,7 +71,7 @@ func (t *Controller) ReplicaTimeout() time.Duration {
 
 // OnTimeout indicates to the Controller that a view change was triggered by a TC (unhappy path).
 func (t *Controller) OnTimeout() {
-	t.cfg.ReplicaTimeout = math.Min(t.cfg.ReplicaTimeout*t.cfg.TimeoutIncrease, timeoutCap)
+	t.cfg.ReplicaTimeout = math.Min(t.cfg.ReplicaTimeout*t.cfg.TimeoutIncrease, t.cfg.MaxReplicaTimeout)
 }
 
 // OnProgressBeforeTimeout indicates to the Controller that progress was made _before_ the timeout was reached
