@@ -14,8 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/cmd/bootstrap/dkg"
-
 	"github.com/dapperlabs/testingdock"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -24,6 +22,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/cmd/bootstrap/dkg"
 
 	"github.com/onflow/flow-go-sdk/crypto"
 
@@ -108,9 +108,10 @@ const (
 	// AccessNodePublicNetworkPort is the port used by access nodes for the public libp2p network
 	AccessNodePublicNetworkPort = 9876
 
-	DefaultViewsInStakingAuction uint64 = 5
-	DefaultViewsInDKGPhase       uint64 = 50
-	DefaultViewsInEpoch          uint64 = 180
+	DefaultViewsInStakingAuction      uint64 = 1
+	DefaultViewsInDKGPhase            uint64 = 50
+	DefaultViewsInEpoch               uint64 = 200
+	DefaultEpochCommitSafetyThreshold uint64 = 20
 
 	integrationBootstrap = "flow-integration-bootstrap"
 
@@ -333,49 +334,53 @@ func NewConsensusFollowerConfig(t *testing.T, networkingPrivKey crypto.PrivateKe
 
 // NetworkConfig is the config for the network.
 type NetworkConfig struct {
-	Nodes                 []NodeConfig
-	ConsensusFollowers    []ConsensusFollowerConfig
-	Name                  string
-	NClusters             uint
-	ViewsInDKGPhase       uint64
-	ViewsInStakingAuction uint64
-	ViewsInEpoch          uint64
+	Nodes                      []NodeConfig
+	ConsensusFollowers         []ConsensusFollowerConfig
+	Name                       string
+	NClusters                  uint
+	ViewsInDKGPhase            uint64
+	ViewsInStakingAuction      uint64
+	ViewsInEpoch               uint64
+	EpochCommitSafetyThreshold uint64
 }
 
 type NetworkConfigOpt func(*NetworkConfig)
 
 func NewNetworkConfig(name string, nodes []NodeConfig, opts ...NetworkConfigOpt) NetworkConfig {
 	c := NetworkConfig{
-		Nodes:                 nodes,
-		Name:                  name,
-		NClusters:             1, // default to 1 cluster
-		ViewsInStakingAuction: DefaultViewsInStakingAuction,
-		ViewsInDKGPhase:       DefaultViewsInDKGPhase,
-		ViewsInEpoch:          DefaultViewsInEpoch,
+		Nodes:                      nodes,
+		Name:                       name,
+		NClusters:                  1, // default to 1 cluster
+		ViewsInStakingAuction:      DefaultViewsInStakingAuction,
+		ViewsInDKGPhase:            DefaultViewsInDKGPhase,
+		ViewsInEpoch:               DefaultViewsInEpoch,
+		EpochCommitSafetyThreshold: DefaultEpochCommitSafetyThreshold,
 	}
 
 	for _, apply := range opts {
 		apply(&c)
+	}
+
+	// sanity check: the difference between DKG end and safety threshold is >= the default safety threshold
+	if c.ViewsInEpoch-c.EpochCommitSafetyThreshold < c.ViewsInStakingAuction+3*c.ViewsInDKGPhase+c.EpochCommitSafetyThreshold {
+		panic(fmt.Sprintf("potentially unsafe epoch config: dkg_final_view=%d, epoch_final_view=%d, safety_threshold=%d",
+			c.ViewsInStakingAuction+3*c.ViewsInDKGPhase, c.ViewsInEpoch, c.EpochCommitSafetyThreshold))
 	}
 
 	return c
 }
 
 func NewNetworkConfigWithEpochConfig(name string, nodes []NodeConfig, viewsInStakingAuction, viewsInDKGPhase, viewsInEpoch uint64, opts ...NetworkConfigOpt) NetworkConfig {
-	c := NetworkConfig{
-		Nodes:                 nodes,
-		Name:                  name,
-		NClusters:             1, // default to 1 cluster
-		ViewsInStakingAuction: viewsInStakingAuction,
-		ViewsInDKGPhase:       viewsInDKGPhase,
-		ViewsInEpoch:          viewsInEpoch,
-	}
-
-	for _, apply := range opts {
-		apply(&c)
-	}
-
-	return c
+	return NewNetworkConfig(
+		name,
+		nodes,
+		append(
+			opts,
+			WithViewsInStakingAuction(viewsInStakingAuction),
+			WithViewsInDKGPhase(viewsInDKGPhase),
+			WithViewsInEpoch(viewsInEpoch),
+		)...,
+	)
 }
 
 func WithViewsInStakingAuction(views uint64) func(*NetworkConfig) {
@@ -393,6 +398,12 @@ func WithViewsInEpoch(views uint64) func(*NetworkConfig) {
 func WithViewsInDKGPhase(views uint64) func(*NetworkConfig) {
 	return func(config *NetworkConfig) {
 		config.ViewsInDKGPhase = views
+	}
+}
+
+func WithEpochCommitSafetyThreshold(views uint64) func(*NetworkConfig) {
+	return func(config *NetworkConfig) {
+		config.EpochCommitSafetyThreshold = views
 	}
 }
 
@@ -1195,7 +1206,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*Bootstra
 		return nil, fmt.Errorf("generating root seal failed: %w", err)
 	}
 
-	snapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)
+	snapshot, err := inmem.SnapshotFromBootstrapStateWithParams(root, result, seal, qc, flow.DefaultProtocolVersion, networkConf.EpochCommitSafetyThreshold)
 	if err != nil {
 		return nil, fmt.Errorf("could not create bootstrap state snapshot: %w", err)
 	}

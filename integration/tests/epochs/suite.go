@@ -8,11 +8,12 @@ import (
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
-	sdk "github.com/onflow/flow-go-sdk"
-	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+
+	sdk "github.com/onflow/flow-go-sdk"
+	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/ghost/client"
@@ -48,15 +49,16 @@ type Suite struct {
 	client      *testnet.Client
 
 	// Epoch config (lengths in views)
-	StakingAuctionLen uint64
-	DKGPhaseLen       uint64
-	EpochLen          uint64
+	StakingAuctionLen          uint64
+	DKGPhaseLen                uint64
+	EpochLen                   uint64
+	EpochCommitSafetyThreshold uint64
 }
 
 // SetupTest is run automatically by the testing framework before each test case.
 func (s *Suite) SetupTest() {
 	// ensure epoch lengths are set correctly
-	require.Greater(s.T(), s.EpochLen, s.StakingAuctionLen+s.DKGPhaseLen*3)
+	require.Greater(s.T(), s.EpochLen, s.StakingAuctionLen+s.DKGPhaseLen*3+s.EpochCommitSafetyThreshold)
 
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
@@ -794,7 +796,7 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 	checkNetworkHealth(s.ctx, env, snapshot, info)
 }
 
-// DynamicEpochTransitionSuite  is the suite used for epoch transitions tests
+// DynamicEpochTransitionSuite is the suite used for epoch transitions tests
 // with a dynamic identity table.
 type DynamicEpochTransitionSuite struct {
 	Suite
@@ -805,7 +807,8 @@ func (s *DynamicEpochTransitionSuite) SetupTest() {
 	// joining/leaving nodes
 	s.StakingAuctionLen = 200
 	s.DKGPhaseLen = 50
-	s.EpochLen = 380
+	s.EpochLen = 400
+	s.EpochCommitSafetyThreshold = 20
 
 	// run the generic setup, which starts up the network
 	s.Suite.SetupTest()
