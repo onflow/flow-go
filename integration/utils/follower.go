@@ -154,9 +154,9 @@ Loop:
 		f.logger.Debug().
 			Uint64("blockHeight", block.Height).
 			Hex("blockID", block.ID.Bytes()).
-			Dur("timeSinceLastBlock", time.Since(lastBlockTime)).
-			Dur("timeToParseBlock", time.Since(blockResolutionStart)).
-			Dur("timeToGetBlockByHeight", getBlockByHeightDuration).
+			Dur("timeSinceLastBlockInMS", time.Since(lastBlockTime)).
+			Dur("timeToParseBlockInMS", time.Since(blockResolutionStart)).
+			Dur("timeToGetBlockByHeightInMS", getBlockByHeightDuration).
 			Int("numCollections", len(block.CollectionGuarantees)).
 			Int("numSeals", len(block.Seals)).
 			Uint64("txsTotal", totalTxs).
