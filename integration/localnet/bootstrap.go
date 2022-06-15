@@ -56,19 +56,20 @@ const (
 )
 
 var (
-	collectionCount        int
-	consensusCount         int
-	executionCount         int
-	verificationCount      int
-	accessCount            int
-	observerCount          int
-	nClusters              uint
-	numViewsInStakingPhase uint64
-	numViewsInDKGPhase     uint64
-	numViewsEpoch          uint64
-	profiler               bool
-	consensusDelay         time.Duration
-	collectionDelay        time.Duration
+	collectionCount            int
+	consensusCount             int
+	executionCount             int
+	verificationCount          int
+	accessCount                int
+	observerCount              int
+	nClusters                  uint
+	numViewsInStakingPhase     uint64
+	numViewsInDKGPhase         uint64
+	numViewsEpoch              uint64
+	epochCommitSafetyThreshold uint64
+	profiler                   bool
+	consensusDelay             time.Duration
+	collectionDelay            time.Duration
 )
 
 func init() {
@@ -79,9 +80,10 @@ func init() {
 	flag.IntVar(&accessCount, "access", DefaultAccessCount, "number of staked access nodes")
 	flag.IntVar(&observerCount, "observer", DefaultObserverCount, "number of observers")
 	flag.UintVar(&nClusters, "nclusters", DefaultNClusters, "number of collector clusters")
-	flag.Uint64Var(&numViewsEpoch, "epoch-length", 10000, "number of views in epoch")
-	flag.Uint64Var(&numViewsInStakingPhase, "epoch-staking-phase-length", 2000, "number of views in epoch staking phase")
-	flag.Uint64Var(&numViewsInDKGPhase, "epoch-dkg-phase-length", 2000, "number of views in epoch dkg phase")
+	flag.Uint64Var(&numViewsEpoch, "epoch-length", 10_000, "number of views in epoch")
+	flag.Uint64Var(&numViewsInStakingPhase, "epoch-staking-phase-length", 2_000, "number of views in epoch staking phase")
+	flag.Uint64Var(&numViewsInDKGPhase, "epoch-dkg-phase-length", 2_000, "number of views in epoch dkg phase")
+	flag.Uint64Var(&epochCommitSafetyThreshold, "epoch-commit-safety-threshold", 500, "defines epoch commitment deadline")
 	flag.BoolVar(&profiler, "profiler", DefaultProfiler, "whether to enable the auto-profiler")
 	flag.DurationVar(&consensusDelay, "consensus-delay", DefaultConsensusDelay, "delay on consensus node block proposals")
 	flag.DurationVar(&collectionDelay, "collection-delay", DefaultCollectionDelay, "delay on collection node block proposals")
@@ -118,6 +120,9 @@ func main() {
 	}
 	if numViewsInDKGPhase != 0 {
 		flowNetworkOpts = append(flowNetworkOpts, testnet.WithViewsInDKGPhase(numViewsInDKGPhase))
+	}
+	if epochCommitSafetyThreshold != 0 {
+		flowNetworkOpts = append(flowNetworkOpts, testnet.WithEpochCommitSafetyThreshold(epochCommitSafetyThreshold))
 	}
 	flowNetworkConf := testnet.NewNetworkConfig("localnet", flowNodes, flowNetworkOpts...)
 	displayFlowNetworkConf(flowNetworkConf)
