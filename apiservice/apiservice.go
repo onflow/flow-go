@@ -20,8 +20,8 @@ import (
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
-func NewFlowAPIService(accessNodeAddressAndPort flow.IdentityList, timeout time.Duration) (*FlowAPIService, error) {
-	ret := &FlowAPIService{}
+func NewFlowCachedAccessAPI(accessNodeAddressAndPort flow.IdentityList, timeout time.Duration) (*FlowCachedAccessAPI, error) {
+	ret := &FlowCachedAccessAPI{}
 	ret.timeout = timeout
 	ret.upstream = make([]access.AccessAPIClient, accessNodeAddressAndPort.Count())
 	ret.connections = make([]*grpc.ClientConn, accessNodeAddressAndPort.Count())
@@ -42,7 +42,7 @@ func NewFlowAPIService(accessNodeAddressAndPort flow.IdentityList, timeout time.
 	return ret, nil
 }
 
-type FlowAPIService struct {
+type FlowCachedAccessAPI struct {
 	access.AccessAPIServer
 	lock        sync.Mutex
 	roundRobin  int
@@ -52,11 +52,11 @@ type FlowAPIService struct {
 	timeout     time.Duration
 }
 
-func (h *FlowAPIService) SetLocalAPI(local access.AccessAPIServer) {
+func (h *FlowCachedAccessAPI) SetLocalAPI(local access.AccessAPIServer) {
 	h.AccessAPIServer = local
 }
 
-func (h *FlowAPIService) updateClient(i int) error {
+func (h *FlowCachedAccessAPI) updateClient(i int) error {
 	timeout := h.timeout
 
 	if h.connections[i] == nil || h.connections[i].GetState() != connectivity.Ready {
@@ -96,7 +96,7 @@ func (h *FlowAPIService) updateClient(i int) error {
 	return nil
 }
 
-func (h *FlowAPIService) client() (access.AccessAPIClient, error) {
+func (h *FlowCachedAccessAPI) client() (access.AccessAPIClient, error) {
 	if h.upstream == nil || len(h.upstream) == 0 {
 		return nil, status.Errorf(codes.Unimplemented, "method not implemented")
 	}
@@ -117,39 +117,39 @@ func (h *FlowAPIService) client() (access.AccessAPIClient, error) {
 	return nil, err
 }
 
-func (h *FlowAPIService) Ping(context context.Context, req *access.PingRequest) (*access.PingResponse, error) {
+func (h *FlowCachedAccessAPI) Ping(context context.Context, req *access.PingRequest) (*access.PingResponse, error) {
 	return h.AccessAPIServer.Ping(context, req)
 }
 
-func (h *FlowAPIService) GetLatestBlockHeader(context context.Context, req *access.GetLatestBlockHeaderRequest) (*access.BlockHeaderResponse, error) {
+func (h *FlowCachedAccessAPI) GetLatestBlockHeader(context context.Context, req *access.GetLatestBlockHeaderRequest) (*access.BlockHeaderResponse, error) {
 	return h.AccessAPIServer.GetLatestBlockHeader(context, req)
 }
 
-func (h *FlowAPIService) GetBlockHeaderByID(context context.Context, req *access.GetBlockHeaderByIDRequest) (*access.BlockHeaderResponse, error) {
+func (h *FlowCachedAccessAPI) GetBlockHeaderByID(context context.Context, req *access.GetBlockHeaderByIDRequest) (*access.BlockHeaderResponse, error) {
 	return h.AccessAPIServer.GetBlockHeaderByID(context, req)
 }
 
-func (h *FlowAPIService) GetBlockHeaderByHeight(context context.Context, req *access.GetBlockHeaderByHeightRequest) (*access.BlockHeaderResponse, error) {
+func (h *FlowCachedAccessAPI) GetBlockHeaderByHeight(context context.Context, req *access.GetBlockHeaderByHeightRequest) (*access.BlockHeaderResponse, error) {
 	return h.AccessAPIServer.GetBlockHeaderByHeight(context, req)
 }
 
-func (h *FlowAPIService) GetLatestBlock(context context.Context, req *access.GetLatestBlockRequest) (*access.BlockResponse, error) {
+func (h *FlowCachedAccessAPI) GetLatestBlock(context context.Context, req *access.GetLatestBlockRequest) (*access.BlockResponse, error) {
 	return h.AccessAPIServer.GetLatestBlock(context, req)
 }
 
-func (h *FlowAPIService) GetBlockByID(context context.Context, req *access.GetBlockByIDRequest) (*access.BlockResponse, error) {
+func (h *FlowCachedAccessAPI) GetBlockByID(context context.Context, req *access.GetBlockByIDRequest) (*access.BlockResponse, error) {
 	return h.AccessAPIServer.GetBlockByID(context, req)
 }
 
-func (h *FlowAPIService) GetBlockByHeight(context context.Context, req *access.GetBlockByHeightRequest) (*access.BlockResponse, error) {
+func (h *FlowCachedAccessAPI) GetBlockByHeight(context context.Context, req *access.GetBlockByHeightRequest) (*access.BlockResponse, error) {
 	return h.AccessAPIServer.GetBlockByHeight(context, req)
 }
 
-func (h *FlowAPIService) GetCollectionByID(context context.Context, req *access.GetCollectionByIDRequest) (*access.CollectionResponse, error) {
+func (h *FlowCachedAccessAPI) GetCollectionByID(context context.Context, req *access.GetCollectionByIDRequest) (*access.CollectionResponse, error) {
 	return h.AccessAPIServer.GetCollectionByID(context, req)
 }
 
-func (h *FlowAPIService) SendTransaction(context context.Context, req *access.SendTransactionRequest) (*access.SendTransactionResponse, error) {
+func (h *FlowCachedAccessAPI) SendTransaction(context context.Context, req *access.SendTransactionRequest) (*access.SendTransactionResponse, error) {
 	// This is a passthrough request
 	upstream, err := h.client()
 	if err != nil {
@@ -158,7 +158,7 @@ func (h *FlowAPIService) SendTransaction(context context.Context, req *access.Se
 	return upstream.SendTransaction(context, req)
 }
 
-func (h *FlowAPIService) GetTransaction(context context.Context, req *access.GetTransactionRequest) (*access.TransactionResponse, error) {
+func (h *FlowCachedAccessAPI) GetTransaction(context context.Context, req *access.GetTransactionRequest) (*access.TransactionResponse, error) {
 	// This is a passthrough request
 	upstream, err := h.client()
 	if err != nil {
@@ -167,7 +167,7 @@ func (h *FlowAPIService) GetTransaction(context context.Context, req *access.Get
 	return upstream.GetTransaction(context, req)
 }
 
-func (h *FlowAPIService) GetTransactionResult(context context.Context, req *access.GetTransactionRequest) (*access.TransactionResultResponse, error) {
+func (h *FlowCachedAccessAPI) GetTransactionResult(context context.Context, req *access.GetTransactionRequest) (*access.TransactionResultResponse, error) {
 	// This is a passthrough request
 	upstream, err := h.client()
 	if err != nil {
@@ -176,7 +176,7 @@ func (h *FlowAPIService) GetTransactionResult(context context.Context, req *acce
 	return upstream.GetTransactionResult(context, req)
 }
 
-func (h *FlowAPIService) GetTransactionResultByIndex(context context.Context, req *access.GetTransactionByIndexRequest) (*access.TransactionResultResponse, error) {
+func (h *FlowCachedAccessAPI) GetTransactionResultByIndex(context context.Context, req *access.GetTransactionByIndexRequest) (*access.TransactionResultResponse, error) {
 	// This is a passthrough request
 	upstream, err := h.client()
 	if err != nil {
@@ -185,7 +185,7 @@ func (h *FlowAPIService) GetTransactionResultByIndex(context context.Context, re
 	return upstream.GetTransactionResultByIndex(context, req)
 }
 
-func (h *FlowAPIService) GetAccount(context context.Context, req *access.GetAccountRequest) (*access.GetAccountResponse, error) {
+func (h *FlowCachedAccessAPI) GetAccount(context context.Context, req *access.GetAccountRequest) (*access.GetAccountResponse, error) {
 	// This is a passthrough request
 	upstream, err := h.client()
 	if err != nil {
@@ -194,7 +194,7 @@ func (h *FlowAPIService) GetAccount(context context.Context, req *access.GetAcco
 	return upstream.GetAccount(context, req)
 }
 
-func (h *FlowAPIService) GetAccountAtLatestBlock(context context.Context, req *access.GetAccountAtLatestBlockRequest) (*access.AccountResponse, error) {
+func (h *FlowCachedAccessAPI) GetAccountAtLatestBlock(context context.Context, req *access.GetAccountAtLatestBlockRequest) (*access.AccountResponse, error) {
 	// This is a passthrough request
 	upstream, err := h.client()
 	if err != nil {
@@ -203,7 +203,7 @@ func (h *FlowAPIService) GetAccountAtLatestBlock(context context.Context, req *a
 	return upstream.GetAccountAtLatestBlock(context, req)
 }
 
-func (h *FlowAPIService) GetAccountAtBlockHeight(context context.Context, req *access.GetAccountAtBlockHeightRequest) (*access.AccountResponse, error) {
+func (h *FlowCachedAccessAPI) GetAccountAtBlockHeight(context context.Context, req *access.GetAccountAtBlockHeightRequest) (*access.AccountResponse, error) {
 	// This is a passthrough request
 	upstream, err := h.client()
 	if err != nil {
@@ -212,7 +212,7 @@ func (h *FlowAPIService) GetAccountAtBlockHeight(context context.Context, req *a
 	return upstream.GetAccountAtBlockHeight(context, req)
 }
 
-func (h *FlowAPIService) ExecuteScriptAtLatestBlock(context context.Context, req *access.ExecuteScriptAtLatestBlockRequest) (*access.ExecuteScriptResponse, error) {
+func (h *FlowCachedAccessAPI) ExecuteScriptAtLatestBlock(context context.Context, req *access.ExecuteScriptAtLatestBlockRequest) (*access.ExecuteScriptResponse, error) {
 	// This is a passthrough request
 	upstream, err := h.client()
 	if err != nil {
@@ -221,7 +221,7 @@ func (h *FlowAPIService) ExecuteScriptAtLatestBlock(context context.Context, req
 	return upstream.ExecuteScriptAtLatestBlock(context, req)
 }
 
-func (h *FlowAPIService) ExecuteScriptAtBlockID(context context.Context, req *access.ExecuteScriptAtBlockIDRequest) (*access.ExecuteScriptResponse, error) {
+func (h *FlowCachedAccessAPI) ExecuteScriptAtBlockID(context context.Context, req *access.ExecuteScriptAtBlockIDRequest) (*access.ExecuteScriptResponse, error) {
 	// This is a passthrough request
 	upstream, err := h.client()
 	if err != nil {
@@ -230,7 +230,7 @@ func (h *FlowAPIService) ExecuteScriptAtBlockID(context context.Context, req *ac
 	return upstream.ExecuteScriptAtBlockID(context, req)
 }
 
-func (h *FlowAPIService) ExecuteScriptAtBlockHeight(context context.Context, req *access.ExecuteScriptAtBlockHeightRequest) (*access.ExecuteScriptResponse, error) {
+func (h *FlowCachedAccessAPI) ExecuteScriptAtBlockHeight(context context.Context, req *access.ExecuteScriptAtBlockHeightRequest) (*access.ExecuteScriptResponse, error) {
 	// This is a passthrough request
 	upstream, err := h.client()
 	if err != nil {
@@ -239,7 +239,7 @@ func (h *FlowAPIService) ExecuteScriptAtBlockHeight(context context.Context, req
 	return upstream.ExecuteScriptAtBlockHeight(context, req)
 }
 
-func (h *FlowAPIService) GetEventsForHeightRange(context context.Context, req *access.GetEventsForHeightRangeRequest) (*access.EventsResponse, error) {
+func (h *FlowCachedAccessAPI) GetEventsForHeightRange(context context.Context, req *access.GetEventsForHeightRangeRequest) (*access.EventsResponse, error) {
 	// This is a passthrough request
 	upstream, err := h.client()
 	if err != nil {
@@ -248,7 +248,7 @@ func (h *FlowAPIService) GetEventsForHeightRange(context context.Context, req *a
 	return upstream.GetEventsForHeightRange(context, req)
 }
 
-func (h *FlowAPIService) GetEventsForBlockIDs(context context.Context, req *access.GetEventsForBlockIDsRequest) (*access.EventsResponse, error) {
+func (h *FlowCachedAccessAPI) GetEventsForBlockIDs(context context.Context, req *access.GetEventsForBlockIDsRequest) (*access.EventsResponse, error) {
 	// This is a passthrough request
 	upstream, err := h.client()
 	if err != nil {
@@ -257,15 +257,15 @@ func (h *FlowAPIService) GetEventsForBlockIDs(context context.Context, req *acce
 	return upstream.GetEventsForBlockIDs(context, req)
 }
 
-func (h *FlowAPIService) GetNetworkParameters(context context.Context, req *access.GetNetworkParametersRequest) (*access.GetNetworkParametersResponse, error) {
+func (h *FlowCachedAccessAPI) GetNetworkParameters(context context.Context, req *access.GetNetworkParametersRequest) (*access.GetNetworkParametersResponse, error) {
 	return h.AccessAPIServer.GetNetworkParameters(context, req)
 }
 
-func (h *FlowAPIService) GetLatestProtocolStateSnapshot(context context.Context, req *access.GetLatestProtocolStateSnapshotRequest) (*access.ProtocolStateSnapshotResponse, error) {
+func (h *FlowCachedAccessAPI) GetLatestProtocolStateSnapshot(context context.Context, req *access.GetLatestProtocolStateSnapshotRequest) (*access.ProtocolStateSnapshotResponse, error) {
 	return h.AccessAPIServer.GetLatestProtocolStateSnapshot(context, req)
 }
 
-func (h *FlowAPIService) GetExecutionResultForBlockID(context context.Context, req *access.GetExecutionResultForBlockIDRequest) (*access.ExecutionResultForBlockIDResponse, error) {
+func (h *FlowCachedAccessAPI) GetExecutionResultForBlockID(context context.Context, req *access.GetExecutionResultForBlockIDRequest) (*access.ExecutionResultForBlockIDResponse, error) {
 	// This is a passthrough request
 	upstream, err := h.client()
 	if err != nil {

@@ -963,7 +963,7 @@ func (builder *ObserverServiceBuilder) enqueueConnectWithStakedAN() {
 func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 	builder.Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		ids := builder.upstreamIdentities
-		proxy, err := apiservice.NewFlowAPIService(ids, builder.apiTimeout)
+		proxy, err := apiservice.NewFlowCachedAccessAPI(ids, builder.apiTimeout)
 		if err != nil {
 			return nil, err
 		}
