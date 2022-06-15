@@ -153,7 +153,11 @@ func (p *ActivePaceMaker) ProcessTC(tc *flow.TimeoutCertificate) (*model.NewView
 	timerInfo := p.timeoutControl.StartTimeout(newView)
 	p.notifier.OnStartingTimeout(timerInfo)
 
-	return &model.NewViewEvent{View: newView}, nil
+	return &model.NewViewEvent{
+		View:      timerInfo.View,
+		StartTime: timerInfo.StartTime,
+		Duration:  timerInfo.Duration,
+	}, nil
 }
 
 // NewestQC returns QC with the highest view discovered by PaceMaker.
