@@ -15,12 +15,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-type EpochValidator interface {
-	ValidateIncorporatedServiceEvents(events []*flow.ServiceEvent) error
-
-	ValidateSealedServiceEvents(events []*flow.ServiceEvent) error
-}
-
 // isValidExtendingEpochSetup checks whether an epoch setup service being
 // added to the state is valid. In addition to intrinsic validitym, we also
 // check that it is valid w.r.t. the previous epoch setup event, and the
