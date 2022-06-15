@@ -15,10 +15,19 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
+type EpochValidator interface {
+	ValidateIncorporatedServiceEvents(events []*flow.ServiceEvent) error
+
+	ValidateSealedServiceEvents(events []*flow.ServiceEvent) error
+}
+
 // isValidExtendingEpochSetup checks whether an epoch setup service being
 // added to the state is valid. In addition to intrinsic validitym, we also
 // check that it is valid w.r.t. the previous epoch setup event, and the
 // current epoch status.
+// Expected errors during normal operations:
+// * protocol.InvalidServiceEventError
+//   if the input service event is invalid to extend the currently active epoch status
 func isValidExtendingEpochSetup(extendingSetup *flow.EpochSetup, activeSetup *flow.EpochSetup, status *flow.EpochStatus) error {
 
 	// We should only have a single epoch setup event per epoch.
@@ -145,6 +154,9 @@ func verifyEpochSetup(setup *flow.EpochSetup, verifyNetworkAddress bool) error {
 // added to the state is valid. In addition to intrinsic validity, we also
 // check that it is valid w.r.t. the previous epoch setup event, and the
 // current epoch status.
+// Expected errors during normal operations:
+// * protocol.InvalidServiceEventError
+//   if the input service event is invalid to extend the currently active epoch status
 func isValidExtendingEpochCommit(extendingCommit *flow.EpochCommit, extendingSetup *flow.EpochSetup, activeSetup *flow.EpochSetup, status *flow.EpochStatus) error {
 
 	// We should only have a single epoch commit event per epoch.
