@@ -228,11 +228,12 @@ func (e *blockComputer) executeBlock(
 
 	executionData := generateExecutionData(res, collections, systemCol)
 
-	executionDataID, err := e.executionDataProvider.Provide(ctx, block.Height(), executionData)
+	executionDataID, executionDataRoot, err := e.executionDataProvider.Provide(ctx, block.Height(), executionData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to provide execution data: %w", err)
 	}
 
+	res.ExecutionDataRoot = *executionDataRoot
 	res.ExecutionDataID = executionDataID
 
 	return res, nil

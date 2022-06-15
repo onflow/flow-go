@@ -5,6 +5,7 @@ import (
 
 	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 )
 
 func GenerateExecutionResultAndChunkDataPacks(
@@ -40,14 +41,14 @@ func GenerateExecutionResultAndChunkDataPacks(
 			completeCollection := result.ExecutableBlock.CompleteCollections[collectionGuarantee.ID()]
 			collection := completeCollection.Collection()
 			chunk = GenerateChunk(i, startState, endState, blockID, result.EventsHashes[i], uint64(len(completeCollection.Transactions)))
-			chdps[i] = GenerateChunkDataPack(chunk.ID(), startState, &collection, result.Proofs[i])
+			chdps[i] = GenerateChunkDataPack(chunk.ID(), startState, &collection, result.Proofs[i], result.ExecutionDataRoot)
 		} else {
 			// system chunk
 			// note that system chunk does not have a collection.
 			// also, number of transactions is one for system chunk.
 			chunk = GenerateChunk(i, startState, endState, blockID, result.EventsHashes[i], 1)
 			// system chunk has a nil collection.
-			chdps[i] = GenerateChunkDataPack(chunk.ID(), startState, nil, result.Proofs[i])
+			chdps[i] = GenerateChunkDataPack(chunk.ID(), startState, nil, result.Proofs[i], result.ExecutionDataRoot)
 		}
 
 		// TODO use view.SpockSecret() as an input to spock generator
@@ -118,11 +119,13 @@ func GenerateChunkDataPack(
 	startState flow.StateCommitment,
 	collection *flow.Collection,
 	proof flow.StorageProof,
+	executionDataRoot execution_data.BlockExecutionDataRoot,
 ) *flow.ChunkDataPack {
 	return &flow.ChunkDataPack{
-		ChunkID:    chunkID,
-		StartState: startState,
-		Proof:      proof,
-		Collection: collection,
+		ChunkID:           chunkID,
+		StartState:        startState,
+		Proof:             proof,
+		Collection:        collection,
+		ExecutionDataRoot: executionDataRoot,
 	}
 }

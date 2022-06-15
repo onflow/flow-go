@@ -1,5 +1,7 @@
 package flow
 
+import "github.com/onflow/flow-go/module/executiondatasync/execution_data"
+
 type ChunkBody struct {
 	CollectionIndex uint
 
@@ -38,10 +40,11 @@ func (ch *Chunk) Checksum() Identifier {
 // Register proofs order must not be correlated to the order of register reads during
 // the chunk execution in order to enforce the SPoCK secret high entropy.
 type ChunkDataPack struct {
-	ChunkID    Identifier
-	StartState StateCommitment
-	Proof      StorageProof
-	Collection *Collection
+	ChunkID           Identifier
+	StartState        StateCommitment
+	Proof             StorageProof
+	Collection        *Collection
+	ExecutionDataRoot execution_data.BlockExecutionDataRoot
 }
 
 // ID returns the unique identifier for the concrete view, which is the ID of
