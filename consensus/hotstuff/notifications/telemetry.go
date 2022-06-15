@@ -76,8 +76,9 @@ func (t *TelemetryConsumer) OnEventProcessed() {
 	t.pathHandler.CloseCurrentPath()
 }
 
-// TODO: In the new consensus model, `OnEnteringView` and `OnStartingTimeout` are now largely redundant. 
-//       Will be cleaned up as part of https://github.com/dapperlabs/flow-go/issues/6251
+// TODO: In the new consensus model, `OnEnteringView` and `OnStartingTimeout` are now largely redundant.
+// Will be cleaned up as part of https://github.com/dapperlabs/flow-go/issues/6251
+
 func (t *TelemetryConsumer) OnStartingTimeout(info *model.TimerInfo) {
 	// the PaceMarker starts a new timeout only as part of transitioning to new view
 	t.pathHandler.StartNextPath(info.View)
@@ -127,7 +128,7 @@ func (t *TelemetryConsumer) OnTcTriggeredViewChange(tc *flow.TimeoutCertificate,
 		Uint64("tc_view", tc.View).
 		Uint64("next_view", newView).
 		Uint64("tc_newest_qc_view", tc.NewestQC.View).
-		Hex("tc_newest_qc_block_id", tc.NewestQC.BlockID[:]).		
+		Hex("tc_newest_qc_block_id", tc.NewestQC.BlockID[:]).
 		Msg("OnTcTriggeredViewChange")
 }
 
