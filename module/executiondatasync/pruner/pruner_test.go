@@ -3,6 +3,7 @@ package pruner_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -11,6 +12,7 @@ import (
 	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestBasicPrune(t *testing.T) {
@@ -40,7 +42,7 @@ func TestBasicPrune(t *testing.T) {
 	}).Once()
 
 	pruner.NotifyFulfilledHeight(16)
-	<-pruned
+	unittest.AssertClosesBefore(t, pruned, time.Second)
 	trackerStorage.AssertExpectations(t)
 
 	cancel()
@@ -78,7 +80,7 @@ func TestInitialPrune(t *testing.T) {
 	}).Once()
 
 	pruner.Start(signalerCtx)
-	<-pruned
+	unittest.AssertClosesBefore(t, pruned, time.Second)
 	trackerStorage.AssertExpectations(t)
 
 	cancel()
@@ -118,7 +120,7 @@ func TestUpdateThreshold(t *testing.T) {
 	}).Once()
 
 	pruner.SetThreshold(4)
-	<-pruned
+	unittest.AssertClosesBefore(t, pruned, time.Second)
 	trackerStorage.AssertExpectations(t)
 
 	cancel()
@@ -158,7 +160,7 @@ func TestUpdateHeightRangeTarget(t *testing.T) {
 	}).Once()
 
 	pruner.SetHeightRangeTarget(5)
-	<-pruned
+	unittest.AssertClosesBefore(t, pruned, time.Second)
 	trackerStorage.AssertExpectations(t)
 
 	cancel()

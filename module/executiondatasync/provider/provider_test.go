@@ -109,12 +109,9 @@ func TestHappyPath(t *testing.T) {
 
 	test := func(numChunks int, minSerializedSizePerChunk uint64) {
 		expected := generateBlockExecutionData(t, numChunks, minSerializedSizePerChunk)
-		job, err := provider.Provide(context.Background(), 0, expected)
+		executionDataID, err := provider.Provide(context.Background(), 0, expected)
 		require.NoError(t, err)
-		err, ok := <-job.Done
-		require.False(t, ok)
-		require.NoError(t, err)
-		actual, err := store.GetExecutionData(context.Background(), job.ExecutionDataID)
+		actual, err := store.GetExecutionData(context.Background(), executionDataID)
 		require.NoError(t, err)
 		goassert.DeepEqual(t, expected, actual)
 	}
@@ -129,9 +126,8 @@ func TestProvideContextCanceled(t *testing.T) {
 	bed := generateBlockExecutionData(t, 5, 5*execution_data.DefaultMaxBlobSize)
 
 	provider := getProvider(getBlobservice(getDatastore()))
-	job, err := provider.Provide(context.Background(), 0, bed)
+	_, err := provider.Provide(context.Background(), 0, bed)
 	require.NoError(t, err)
-	expectedID := job.ExecutionDataID
 
 	blobService := new(mocknetwork.BlobService)
 	blobService.On("AddBlobs", mock.Anything, mock.AnythingOfType("[]blocks.Block")).
@@ -142,10 +138,6 @@ func TestProvideContextCanceled(t *testing.T) {
 	provider = getProvider(blobService)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	job, err = provider.Provide(ctx, 0, bed)
-	require.NoError(t, err)
-	assert.Equal(t, expectedID, job.ExecutionDataID)
-	err, ok := <-job.Done
-	assert.True(t, ok)
+	_, err = provider.Provide(ctx, 0, bed)
 	assert.ErrorIs(t, err, ctx.Err())
 }

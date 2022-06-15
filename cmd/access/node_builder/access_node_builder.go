@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/ipfs/go-cid"
-	"github.com/ipfs/go-datastore"
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
@@ -392,7 +391,7 @@ func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() *FlowAccessNodeBu
 }
 
 func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessNodeBuilder {
-	var executionDataDatastore datastore.Batching
+	var executionDataDatastore *badger.Datastore
 	var trackerStorage tracker.Storage
 
 	builder.Module("execution data datastore", func(node *cmd.NodeConfig) error {
@@ -461,6 +460,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				node.Logger,
 				prunerMetrics,
 				trackerStorage,
+				pruner.WithPruneCallback(func(ctx context.Context) error {
+					return executionDataDatastore.CollectGarbage(ctx)
+				}),
 				pruner.WithHeightRangeTarget(builder.executionDataPrunerHeightRangeTarget),
 				pruner.WithThreshold(builder.executionDataPrunerThreshold),
 			)

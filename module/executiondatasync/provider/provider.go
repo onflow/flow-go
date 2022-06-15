@@ -108,6 +108,21 @@ func (p *Provider) storeBlobs(parent context.Context, blockHeight uint64, blobCh
 }
 
 func (p *Provider) Provide(ctx context.Context, blockHeight uint64, executionData *execution_data.BlockExecutionData) (flow.Identifier, *execution_data.BlockExecutionDataRoot, error) {
+	rootID, rootData, errCh, err := p.provide(ctx, blockHeight, executionData)
+	storeErr, ok := <-errCh
+
+	if err != nil {
+		return flow.ZeroID, nil, err
+	}
+
+	if ok {
+		return flow.ZeroID, nil, storeErr
+	} else {
+		return rootID, rootData, nil
+	}
+}
+
+func (p *Provider) provide(ctx context.Context, blockHeight uint64, executionData *execution_data.BlockExecutionData) (flow.Identifier, *execution_data.BlockExecutionDataRoot, <-chan error, error) {
 	logger := p.logger.With().Uint64("height", blockHeight).Str("block_id", executionData.BlockID.String()).Logger()
 	logger.Debug().Msg("providing execution data")
 
@@ -138,7 +153,7 @@ func (p *Provider) Provide(ctx context.Context, blockHeight uint64, executionDat
 	}
 
 	if err := g.Wait(); err != nil {
-		return flow.ZeroID, nil, err
+		return flow.ZeroID, nil, errCh, err
 	}
 
 	edRoot := &execution_data.BlockExecutionDataRoot{
@@ -147,19 +162,14 @@ func (p *Provider) Provide(ctx context.Context, blockHeight uint64, executionDat
 	}
 	rootID, err := p.addExecutionDataRoot(ctx, edRoot, blobCh)
 	if err != nil {
-		return flow.ZeroID, nil, fmt.Errorf("failed to add execution data root: %w", err)
+		return flow.ZeroID, nil, errCh, fmt.Errorf("failed to add execution data root: %w", err)
 	}
 	logger.Debug().Str("root_id", rootID.String()).Msg("root ID computed")
 
 	duration := time.Since(start)
 	p.metrics.RootIDComputed(duration, len(executionData.ChunkExecutionDatas))
 
-	err, ok := <-errCh
-	if ok {
-		return flow.ZeroID, nil, err
-	} else {
-		return rootID, edRoot, nil
-	}
+	return rootID, edRoot, errCh, nil
 }
 
 func (p *Provider) addExecutionDataRoot(

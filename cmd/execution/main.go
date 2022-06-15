@@ -13,7 +13,6 @@ import (
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/ipfs/go-cid"
-	"github.com/ipfs/go-datastore"
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
@@ -132,7 +131,7 @@ func main() {
 		blockDataUploaderMaxRetry            uint64 = 5
 		blockdataUploaderRetryTimeout               = 1 * time.Second
 		executionDataStore                   execution_data.ExecutionDataStore
-		executionDataDatastore               datastore.Batching
+		executionDataDatastore               *badger.Datastore
 		executionDataPruner                  *pruner.Pruner
 		executionDataBlobstore               blobs.Blobstore
 		executionDataTracker                 tracker.Storage
@@ -421,6 +420,9 @@ func main() {
 				node.Logger,
 				prunerMetrics,
 				executionDataTracker,
+				pruner.WithPruneCallback(func(ctx context.Context) error {
+					return executionDataDatastore.CollectGarbage(ctx)
+				}),
 				pruner.WithHeightRangeTarget(executionDataPrunerHeightRangeTarget),
 				pruner.WithThreshold(executionDataPrunerThreshold),
 			)
