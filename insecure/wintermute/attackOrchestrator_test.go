@@ -8,12 +8,12 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/insecure"
 	mockinsecure "github.com/onflow/flow-go/insecure/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -247,7 +247,7 @@ func mockAttackNetworkForCorruptedExecutionResult(
 			seen[event.CorruptedNodeId] = struct{}{}
 
 			// make sure message being sent on correct channel
-			require.Equal(t, network.PushReceipts, event.Channel)
+			require.Equal(t, engine.PushReceipts, event.Channel)
 
 			corruptedResult, ok := event.FlowProtocolEvent.(*flow.ExecutionReceipt)
 			require.True(t, ok)

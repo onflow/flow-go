@@ -5,6 +5,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
@@ -62,7 +63,7 @@ func NewRequestHandlerEngine(
 ) (*RequestHandlerEngine, error) {
 	e := &RequestHandlerEngine{}
 
-	con, err := net.Register(network.PublicSyncCommittee, e)
+	con, err := net.Register(engine.PublicSyncCommittee, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}

@@ -19,6 +19,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
@@ -84,7 +85,6 @@ type Middleware struct {
 	unicastMessageTimeout      time.Duration
 	idTranslator               IDTranslator
 	previousProtocolStatePeers []peer.AddrInfo
-	codec                      network.Codec
 	component.Component
 }
 
@@ -125,7 +125,6 @@ func NewMiddleware(
 	rootBlockID flow.Identifier,
 	unicastMessageTimeout time.Duration,
 	idTranslator IDTranslator,
-	codec network.Codec,
 	opts ...MiddlewareOption,
 ) *Middleware {
 
@@ -145,7 +144,6 @@ func NewMiddleware(
 		unicastMessageTimeout: unicastMessageTimeout,
 		peerManagerFactory:    nil,
 		idTranslator:          idTranslator,
-		codec:                 codec,
 	}
 
 	for _, opt := range opts {
@@ -483,19 +481,10 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 		m.wg.Add(1)
 		go func(msg *message.Message) {
 			defer m.wg.Done()
-			if decodedMsgPayload, err := m.codec.Decode(msg.Payload); err != nil {
-				m.log.
-					Warn().
-					Err(fmt.Errorf("could not decode message: %w", err)).
-					Hex("sender", msg.OriginID).
-					Hex("event_id", msg.EventID).
-					Str("event_type", msg.Type).
-					Str("channel", msg.ChannelID)
-			} else {
-				// log metrics with the channel name as OneToOne
-				m.metrics.NetworkMessageReceived(msg.Size(), metrics.ChannelOneToOne, msg.Type)
-				m.processAuthenticatedMessage(msg, decodedMsgPayload, s.Conn().RemotePeer())
-			}
+
+			// log metrics with the channel name as OneToOne
+			m.metrics.NetworkMessageReceived(msg.Size(), metrics.ChannelOneToOne, msg.Type)
+			m.processAuthenticatedMessage(msg, s.Conn().RemotePeer())
 		}(&msg)
 	}
 
@@ -505,10 +494,10 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 // Subscribe subscribes the middleware to a channel.
 func (m *Middleware) Subscribe(channel network.Channel) error {
 
-	topic := network.TopicFromChannel(channel, m.rootBlockID)
+	topic := engine.TopicFromChannel(channel, m.rootBlockID)
 
 	var validators []psValidator.MessageValidator
-	if !network.PublicChannels().Contains(channel) {
+	if !engine.PublicChannels().Contains(channel) {
 		// for channels used by the staked nodes, add the topic validator to filter out messages from non-staked nodes
 		validators = append(validators,
 			// NOTE: The AuthorizedSenderValidator will assert the sender is a staked node
@@ -516,7 +505,7 @@ func (m *Middleware) Subscribe(channel network.Channel) error {
 		)
 	}
 
-	s, err := m.libP2PNode.Subscribe(topic, m.codec, validators...)
+	s, err := m.libP2PNode.Subscribe(topic, validators...)
 	if err != nil {
 		return fmt.Errorf("failed to subscribe for channel %s: %w", channel, err)
 	}
@@ -536,7 +525,7 @@ func (m *Middleware) Subscribe(channel network.Channel) error {
 
 // Unsubscribe unsubscribes the middleware from a channel.
 func (m *Middleware) Unsubscribe(channel network.Channel) error {
-	topic := network.TopicFromChannel(channel, m.rootBlockID)
+	topic := engine.TopicFromChannel(channel, m.rootBlockID)
 	err := m.libP2PNode.UnSubscribe(topic)
 	if err != nil {
 		return fmt.Errorf("failed to unsubscribe from channel %s: %w", channel, err)
@@ -552,7 +541,7 @@ func (m *Middleware) Unsubscribe(channel network.Channel) error {
 // In particular, it populates the `OriginID` field of the message with a Flow ID translated from this source.
 // The assumption is that the message has been authenticated at the network level (libp2p) to originate from the peer with ID `peerID`
 // this requirement is fulfilled by e.g. the output of readConnection and readSubscription
-func (m *Middleware) processAuthenticatedMessage(msg *message.Message, decodedMsgPayload interface{}, peerID peer.ID) {
+func (m *Middleware) processAuthenticatedMessage(msg *message.Message, peerID peer.ID) {
 	flowID, err := m.idTranslator.GetFlowID(peerID)
 	if err != nil {
 		m.log.Warn().Err(err).Msgf("received message from unknown peer %v, and was dropped", peerID.String())
@@ -561,11 +550,11 @@ func (m *Middleware) processAuthenticatedMessage(msg *message.Message, decodedMs
 
 	msg.OriginID = flowID[:]
 
-	m.processMessage(msg, decodedMsgPayload)
+	m.processMessage(msg)
 }
 
 // processMessage processes a message and eventually passes it to the overlay
-func (m *Middleware) processMessage(msg *message.Message, decodedMsgPayload interface{}) {
+func (m *Middleware) processMessage(msg *message.Message) {
 	originID := flow.HashToID(msg.OriginID)
 
 	m.log.Debug().
@@ -583,7 +572,7 @@ func (m *Middleware) processMessage(msg *message.Message, decodedMsgPayload inte
 	}
 
 	// if validation passed, send the message to the overlay
-	err := m.ov.Receive(originID, msg, decodedMsgPayload)
+	err := m.ov.Receive(originID, msg)
 	if err != nil {
 		m.log.Error().Err(err).Msg("could not deliver payload")
 	}
@@ -610,7 +599,7 @@ func (m *Middleware) Publish(msg *message.Message, channel network.Channel) erro
 		return fmt.Errorf("message size %d exceeds configured max message size %d", msgSize, DefaultMaxPubSubMsgSize)
 	}
 
-	topic := network.TopicFromChannel(channel, m.rootBlockID)
+	topic := engine.TopicFromChannel(channel, m.rootBlockID)
 
 	// publish the bytes on the topic
 	err = m.libP2PNode.Publish(m.ctx, topic, data)

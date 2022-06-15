@@ -7,13 +7,12 @@ import (
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 
-	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
-
 	"github.com/onflow/flow-go/engine"
 	ghost "github.com/onflow/flow-go/engine/ghost/protobuf"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
+	jsoncodec "github.com/onflow/flow-go/network/codec/json"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
@@ -48,7 +47,7 @@ func New(net network.Network, log zerolog.Logger, me module.Local, state protoco
 	// create a channel to buffer messages in case the consumer is slow
 	messages := make(chan ghost.FlowMessage, 1000)
 
-	codec := cborcodec.NewCodec()
+	codec := jsoncodec.NewCodec()
 
 	if config.MaxMsgSize == 0 {
 		config.MaxMsgSize = grpcutils.DefaultMaxMsgSize
@@ -85,16 +84,16 @@ func registerConduits(net network.Network, state protocol.State, eng network.Eng
 
 	// create a list of all channels that don't change over time
 	channels := network.ChannelList{
-		network.ConsensusCommittee,
-		network.SyncCommittee,
-		network.SyncExecution,
-		network.PushTransactions,
-		network.PushGuarantees,
-		network.PushBlocks,
-		network.PushReceipts,
-		network.PushApprovals,
-		network.RequestCollections,
-		network.RequestChunks,
+		engine.ConsensusCommittee,
+		engine.SyncCommittee,
+		engine.SyncExecution,
+		engine.PushTransactions,
+		engine.PushGuarantees,
+		engine.PushBlocks,
+		engine.PushReceipts,
+		engine.PushApprovals,
+		engine.RequestCollections,
+		engine.RequestChunks,
 	}
 
 	// add channels that are dependent on protocol state and change over time
@@ -116,8 +115,8 @@ func registerConduits(net network.Network, state protocol.State, eng network.Eng
 		// add the dynamic channels for the cluster
 		channels = append(
 			channels,
-			network.ChannelConsensusCluster(clusterID),
-			network.ChannelSyncCluster(clusterID),
+			engine.ChannelConsensusCluster(clusterID),
+			engine.ChannelSyncCluster(clusterID),
 		)
 	}
 

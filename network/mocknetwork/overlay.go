@@ -55,13 +55,13 @@ func (_m *Overlay) Identity(_a0 peer.ID) (*flow.Identity, bool) {
 	return r0, r1
 }
 
-// Receive provides a mock function with given fields: nodeID, msg, decodedMsgPayload
-func (_m *Overlay) Receive(nodeID flow.Identifier, msg *message.Message, decodedMsgPayload interface{}) error {
-	ret := _m.Called(nodeID, msg, decodedMsgPayload)
+// Receive provides a mock function with given fields: nodeID, msg
+func (_m *Overlay) Receive(nodeID flow.Identifier, msg *message.Message) error {
+	ret := _m.Called(nodeID, msg)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, *message.Message, interface{}) error); ok {
-		r0 = rf(nodeID, msg, decodedMsgPayload)
+	if rf, ok := ret.Get(0).(func(flow.Identifier, *message.Message) error); ok {
+		r0 = rf(nodeID, msg)
 	} else {
 		r0 = ret.Error(0)
 	}

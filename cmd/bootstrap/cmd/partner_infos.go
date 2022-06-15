@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/spf13/cobra"
 
-	client "github.com/onflow/flow-go-sdk/access/grpc"
+	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/crypto"

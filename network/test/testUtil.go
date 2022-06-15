@@ -21,6 +21,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/libp2p/message"
@@ -143,7 +144,7 @@ func GenerateIDs(
 }
 
 // GenerateMiddlewares creates and initializes middleware instances for all the identities
-func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.IdentityList, libP2PNodes []*p2p.Node, codec network.Codec, opts ...func(*optsConfig)) ([]network.Middleware, []*UpdatableIDProvider) {
+func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.IdentityList, libP2PNodes []*p2p.Node, opts ...func(*optsConfig)) ([]network.Middleware, []*UpdatableIDProvider) {
 	metrics := metrics.NewNoopCollector()
 	mws := make([]network.Middleware, len(identities))
 	idProviders := make([]*UpdatableIDProvider, len(identities))
@@ -176,7 +177,6 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 			sporkID,
 			p2p.DefaultUnicastTimeout,
 			p2p.NewIdentityProviderIDTranslator(idProviders[i]),
-			codec,
 			p2p.WithPeerManager(peerManagerFactory),
 		)
 	}
@@ -263,12 +263,11 @@ func GenerateNetworks(
 func GenerateIDsAndMiddlewares(t *testing.T,
 	n int,
 	logger zerolog.Logger,
-	codec network.Codec,
 	opts ...func(*optsConfig),
 ) (flow.IdentityList, []network.Middleware, []observable.Observable, []*UpdatableIDProvider) {
 
 	ids, libP2PNodes, protectObservables := GenerateIDs(t, logger, n, opts...)
-	mws, providers := GenerateMiddlewares(t, logger, ids, libP2PNodes, codec, opts...)
+	mws, providers := GenerateMiddlewares(t, logger, ids, libP2PNodes, opts...)
 	return ids, mws, protectObservables, providers
 }
 
@@ -305,10 +304,9 @@ func GenerateIDsMiddlewaresNetworks(
 	n int,
 	log zerolog.Logger,
 	tops []network.Topology,
-	codec network.Codec,
 	opts ...func(*optsConfig),
 ) (flow.IdentityList, []network.Middleware, []network.Network, []observable.Observable) {
-	ids, mws, observables, _ := GenerateIDsAndMiddlewares(t, n, log, codec, opts...)
+	ids, mws, observables, _ := GenerateIDsAndMiddlewares(t, n, log, opts...)
 	sms := GenerateSubscriptionManagers(t, mws)
 	networks := GenerateNetworks(ctx, t, log, ids, mws, tops, sms)
 	return ids, mws, networks, observables
@@ -319,7 +317,7 @@ func GenerateEngines(t *testing.T, nets []network.Network) []*MeshEngine {
 	count := len(nets)
 	engs := make([]*MeshEngine, count)
 	for i, n := range nets {
-		eng := NewMeshEngine(t, n, 100, network.TestNetworkChannel)
+		eng := NewMeshEngine(t, n, 100, engine.TestNetwork)
 		engs[i] = eng
 	}
 	return engs
