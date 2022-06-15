@@ -2,10 +2,8 @@ package utils
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io/fs"
-	"os"
+
 	"time"
 
 	"github.com/onflow/cadence"
@@ -28,8 +26,10 @@ const (
 	LedgerHeavyLoadType   LoadType = "ledger-heavy"
 )
 
-var accountCreationBatchSize = 50 // a higher number would hit max storage interaction limit
-const tokensPerTransfer = 0.01    // flow testnets only have 10e6 total supply, so we choose a small amount here
+const slowTransactionThreshold = 30 * time.Second
+
+var accountCreationBatchSize = 250 // a higher number would hit max storage interaction limit
+const tokensPerTransfer = 0.01     // flow testnets only have 10e6 total supply, so we choose a small amount here
 
 // ContLoadGenerator creates a continuous load of transactions to the network
 // by creating many accounts and transfer flow tokens between them
@@ -46,14 +46,13 @@ type ContLoadGenerator struct {
 	fungibleTokenAddress *flowsdk.Address
 	favContractAddress   *flowsdk.Address
 	accounts             []*flowAccount
-	availableAccounts    chan *flowAccount                             // queue with accounts available for   workers
-	happeningAccounts    chan func() (*flowAccount, string, time.Time) // queue with accounts happening after worker processing
+	availableAccounts    chan *flowAccount // queue with accounts available for   workers
 	txTracker            *TxTracker
 	workerStatsTracker   *WorkerStatsTracker
 	workers              []*Worker
-	blockRef             BlockRef
 	stopped              bool
 	loadType             LoadType
+	follower             TxFollower
 	feedbackEnabled      bool
 	availableAccountsLo  int
 }
@@ -71,16 +70,12 @@ func NewContLoadGenerator(
 	flowTokenAddress *flowsdk.Address,
 	trackTxs bool,
 	tps int,
+	accountMultiplier int,
 	loadType LoadType,
 	feedbackEnabled bool,
 ) (*ContLoadGenerator, error) {
-
-	multiplier := 10
-	if feedbackEnabled {
-		multiplier = 20                // bigger if feedbackEnabled otherwise we can run out of accounts for sending transactions
-		accountCreationBatchSize = 250 // due to the bigger multiplier we enlarge accountCreationBatchSize to create the accounts faster
-	}
-	numberOfAccounts := tps * multiplier // 1 second per block, factor 10 for delays to prevent sequence number collisions
+	// Create "enough" accounts to prevent sequence number collisions.
+	numberOfAccounts := tps * accountMultiplier
 
 	servAcc, err := loadServiceAccount(flowClient, serviceAccountAddress, servAccPrivKeyHex)
 	if err != nil {
@@ -89,6 +84,16 @@ func NewContLoadGenerator(
 
 	txStatsTracker := NewTxStatsTracker()
 	txTracker, err := NewTxTracker(log, 5000, 100, loadedAccessAddr, time.Second, txStatsTracker)
+	if err != nil {
+		return nil, err
+	}
+
+	var follower TxFollower
+	if feedbackEnabled {
+		follower, err = NewTxFollower(context.TODO(), supervisorClient, WithLogger(log))
+	} else {
+		follower, err = NewNopTxFollower(context.TODO(), supervisorClient, WithLogger(log))
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -106,10 +111,9 @@ func NewContLoadGenerator(
 		flowTokenAddress:     flowTokenAddress,
 		accounts:             make([]*flowAccount, 0),
 		availableAccounts:    make(chan *flowAccount, numberOfAccounts),
-		happeningAccounts:    make(chan func() (*flowAccount, string, time.Time), numberOfAccounts),
 		txTracker:            txTracker,
 		workerStatsTracker:   NewWorkerStatsTracker(),
-		blockRef:             NewBlockRef(supervisorClient),
+		follower:             follower,
 		loadType:             loadType,
 		feedbackEnabled:      feedbackEnabled,
 		availableAccountsLo:  numberOfAccounts,
@@ -120,7 +124,7 @@ func NewContLoadGenerator(
 
 func (lg *ContLoadGenerator) Init() error {
 	for i := 0; i < lg.numberOfAccounts; i += accountCreationBatchSize {
-		if lg.stopped == true {
+		if lg.stopped {
 			return nil
 		}
 
@@ -128,6 +132,8 @@ func (lg *ContLoadGenerator) Init() error {
 		if num > accountCreationBatchSize {
 			num = accountCreationBatchSize
 		}
+
+		lg.log.Info().Int("cumulative", i).Int("num", num).Int("numberOfAccounts", lg.numberOfAccounts).Msg("creating accounts")
 		err := lg.createAccounts(num)
 		if err != nil {
 			return err
@@ -150,18 +156,12 @@ func (lg *ContLoadGenerator) SetupFavContract() error {
 
 	acc := lg.accounts[0]
 
-	blockRef, err := lg.blockRef.Get()
-	if err != nil {
-		lg.log.Error().Err(err).Msgf("error getting reference block")
-		return err
-	}
-
 	lg.log.Trace().Msgf("creating fav contract deployment script")
 	deployScript := DeployingMyFavContractScript()
 
 	lg.log.Trace().Msgf("creating fav contract deployment transaction")
 	deploymentTx := flowsdk.NewTransaction().
-		SetReferenceBlockID(blockRef).
+		SetReferenceBlockID(lg.follower.BlockID()).
 		SetScript(deployScript).
 		SetGasLimit(9999).
 		SetProposalKey(*acc.address, 0, acc.seqNumber).
@@ -169,7 +169,7 @@ func (lg *ContLoadGenerator) SetupFavContract() error {
 		AddAuthorizer(*acc.address)
 
 	lg.log.Trace().Msgf("signing transaction")
-	err = acc.signTx(deploymentTx, 0)
+	err := acc.signTx(deploymentTx, 0)
 	if err != nil {
 		lg.log.Error().Err(err).Msgf("error signing transaction")
 		return err
@@ -241,16 +241,10 @@ func (lg *ContLoadGenerator) Stop() {
 	}
 	lg.txTracker.Stop()
 	lg.workerStatsTracker.StopPrinting()
+	lg.follower.Stop()
 }
 
 func (lg *ContLoadGenerator) createAccounts(num int) error {
-	lg.log.Info().Msgf("creating and funding %d accounts...", num)
-
-	blockRef, err := lg.blockRef.Get()
-	if err != nil {
-		return err
-	}
-
 	privKey := randomPrivateKey()
 	accountKey := flowsdk.NewAccountKey().
 		FromPrivateKey(privKey).
@@ -260,7 +254,7 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 	// Generate an account creation script
 	createAccountTx := flowsdk.NewTransaction().
 		SetScript(CreateAccountsScript(*lg.fungibleTokenAddress, *lg.flowTokenAddress)).
-		SetReferenceBlockID(blockRef).
+		SetReferenceBlockID(lg.follower.BlockID()).
 		SetGasLimit(9999).
 		SetProposalKey(
 			*lg.serviceAccount.address,
@@ -314,13 +308,15 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 		return err
 	}
 
+	executed := make(chan struct{})
+
 	var i int
 	log := lg.log.With().Str("tx_id", createAccountTx.ID().String()).Logger()
 	wait := lg.txTracker.AddTx(
 		createAccountTx.ID(),
 		txCallbacks{
 			onExecuted: func(txID flowsdk.Identifier, res *flowsdk.TransactionResult) {
-				log.Debug().
+				log.Trace().
 					Str("status", res.Status.String()).
 					Msg("account creation tx executed")
 
@@ -355,11 +351,12 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 						lg.accounts = append(lg.accounts, newAcc)
 						lg.availableAccounts <- newAcc
 
-						log.Debug().
+						log.Trace().
 							Hex("address", accountAddress.Bytes()).
 							Msg("new account added")
 					}
 				}
+				close(executed)
 			},
 			onExpired: func(_ flowsdk.Identifier) {
 				log.Error().Msg("setup transaction (account creation) has expired")
@@ -371,7 +368,10 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 		120*time.Second,
 	)
 
-	<-wait
+	select {
+	case <-wait:
+	case <-executed:
+	}
 
 	return nil
 }
@@ -379,11 +379,6 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 func (lg *ContLoadGenerator) sendAddKeyTx(workerID int) {
 	// TODO move this as a configurable parameter
 	numberOfKeysToAdd := 40
-	blockRef, err := lg.blockRef.Get()
-	if err != nil {
-		lg.log.Error().Err(err).Msgf("workerID=%d error getting reference block", workerID)
-		return
-	}
 
 	lg.log.Trace().Msgf("workerID=%d getting next available account", workerID)
 
@@ -406,7 +401,7 @@ func (lg *ContLoadGenerator) sendAddKeyTx(workerID int) {
 	addKeysTx := flowsdk.NewTransaction().
 		SetScript(addKeysScript).
 		AddAuthorizer(*acc.address).
-		SetReferenceBlockID(blockRef).
+		SetReferenceBlockID(lg.follower.BlockID()).
 		SetGasLimit(9999).
 		SetProposalKey(
 			*lg.serviceAccount.address,
@@ -423,7 +418,7 @@ func (lg *ContLoadGenerator) sendAddKeyTx(workerID int) {
 
 	lg.log.Trace().Msgf("workerID=%d creating transaction", workerID)
 
-	addKeysTx.SetReferenceBlockID(blockRef).
+	addKeysTx.SetReferenceBlockID(lg.follower.BlockID()).
 		SetProposalKey(*acc.address, 0, acc.seqNumber).
 		SetPayer(*acc.address).
 		AddAuthorizer(*acc.address)
@@ -438,130 +433,94 @@ func (lg *ContLoadGenerator) sendAddKeyTx(workerID int) {
 	lg.sendTx(workerID, addKeysTx)
 }
 
-func (lg *ContLoadGenerator) pushAccountsHappening(workerID int, acc *flowAccount, tx_id string, timeNow time.Time) {
-	lg.log.Trace().Msgf("workerID=%d pushing happening address", workerID)
-	lg.happeningAccounts <- (func() (*flowAccount, string, time.Time) { return acc, tx_id, timeNow })
-}
-
-func (lg *ContLoadGenerator) probeAccountsHappening(workerID int) {
-	channelElements := len(lg.happeningAccounts)
-	lg.log.Trace().Msgf("workerID=%d probing happening address from channel with %d elements", workerID, channelElements)
-	for i := 0; i < channelElements; i++ {
-		acc, tx_id, timeAtSendTx := (<-lg.happeningAccounts)()
-		txIdFile := fmt.Sprintf("/dev/shm/flow-transaction-feedback/%s/%s/%s.txt", tx_id[0:2], tx_id[2:4], tx_id[4:]) // e.g. /dev/shm/flow-transaction-feedback/70/b9/4146a01bc7843dc9547837e19ba0da6899fdd83ae61e2cf2e3fb4555da6a.txt
-		lg.log.Trace().Msgf("workerID=%d probing happening address %x account %d tx_id %s AKA %s", workerID, acc.address.Bytes(), acc.i, tx_id, txIdFile)
-		if _, err := os.Stat(txIdFile); errors.Is(err, fs.ErrNotExist) {
-			// come here if file does not exist; means account is still happening...
-			lg.pushAccountsHappening(workerID, acc, tx_id, timeAtSendTx)
-
-			elapsed := time.Since(timeAtSendTx).Seconds()
-			elapsedSuspicious := 30.0
-			if (elapsed >= elapsedSuspicious) && (elapsed < (1 + elapsedSuspicious)) {
-				// come here to capture transactions which mysteriously have had no feedback after 30 seconds
-				// note: this should only be output once as its age reaches and passes through a certain amount of seconds...
-				lg.log.Warn().Msgf("workerID=%d address %x account %d tx_id=%s has been happening for %f seconds and counting", workerID, acc.address.Bytes(), acc.i, tx_id, elapsed)
-			}
-		} else {
-			// come here if file exists; means account is good to be used again
-			lg.availableAccounts <- acc
-			e := os.Remove(txIdFile)
-			if e != nil {
-				lg.log.Error().Err(err).Msgf("workerID=%d error removing txIdFile=%s", workerID, txIdFile)
-				panic("ERROR: failed to remove txIdFile")
-			}
-		}
-	}
-}
-
 func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
+	log := lg.log.With().Int("workerID", workerID).Logger()
 
-	blockRef, err := lg.blockRef.Get()
-	if err != nil {
-		lg.log.Error().Err(err).Msgf("workerID=%d error getting reference block", workerID)
-		return
-	}
+	log.Trace().
+		Int("availableAccounts", len(lg.availableAccounts)).
+		Msgf("getting next available account")
 
-	if 0 == workerID {
-		if lg.feedbackEnabled {
-			// come here if feedbackEnabled so that worker with workerID 0 can probe to see if accounts are no longer happening
-			defer lg.probeAccountsHappening(workerID)
-
-			// come here to have workerID 0 keep track of lowest number of available accounts in channel
-			if len(lg.availableAccounts) < lg.availableAccountsLo {
-				lg.availableAccountsLo = len(lg.availableAccounts)
-				lg.log.Debug().Msgf("workerID=%d discovered new availableAccountsLo=%d of numberOfAccounts=%d", workerID, lg.availableAccountsLo, lg.numberOfAccounts)
-			}
+	if workerID == 0 {
+		l := len(lg.availableAccounts)
+		if l < lg.availableAccountsLo {
+			lg.availableAccountsLo = l
+			log.Debug().Int("availableAccountsLo", l).Int("numberOfAccounts", lg.numberOfAccounts).Msg("discovered new account low")
 		}
 	}
 
-	lg.log.Trace().Msgf("workerID=%d getting next available account from channel with %d elements", workerID, len(lg.availableAccounts))
 	var acc *flowAccount
-	var ok bool
-	select { // use select so that channel is non-blocking
-	case acc, ok = <-lg.availableAccounts:
-		if ok {
-			// come here if read from next available account channel
-		} else {
-			// come here if next available account channel closed; in theory this should never happen
-			lg.log.Error().Msgf("workerID=%d ERROR: next available account channel closed; skipping send", workerID)
-			return
-		}
+	select {
+	case acc = <-lg.availableAccounts:
 	default:
-		// come here if nothing to read from next available account channel; in theory this should never happen
-		lg.log.Error().Msgf("workerID=%d ERROR: next available account channel empty; skipping send // channels availableAccounts[%d] happeningAccounts[%d]", workerID, len(lg.availableAccounts), len(lg.happeningAccounts))
+		log.Error().Msgf("next available account channel empty; skipping send")
 		return
 	}
-	if !lg.feedbackEnabled {
-		// come here if feedback disabled and happening accounts get recycled by time... which can result in transaction execution sequence mismatch errors
-		defer func() { lg.availableAccounts <- acc }()
-	}
-
-	lg.log.Trace().Msgf("workerID=%d getting next account", workerID)
+	defer func() { lg.availableAccounts <- acc }()
 	nextAcc := lg.accounts[(acc.i+1)%len(lg.accounts)]
 
-	lg.log.Trace().Msgf("workerID=%d creating transfer script for tokensPerTransfer %f from address %x to %x account %d to %d", workerID, tokensPerTransfer, acc.address.Bytes(), nextAcc.address.Bytes(), acc.i, nextAcc.i)
+	log.Trace().
+		Float64("tokens", tokensPerTransfer).
+		Hex("srcAddress", acc.address.Bytes()).
+		Hex("dstAddress", nextAcc.address.Bytes()).
+		Int("srcAccount", acc.i).
+		Int("dstAccount", nextAcc.i).
+		Msgf("creating transfer script")
+
 	transferTx, err := TokenTransferTransaction(
 		lg.fungibleTokenAddress,
 		lg.flowTokenAddress,
 		nextAcc.address,
 		tokensPerTransfer)
 	if err != nil {
-		lg.log.Error().Err(err).Msgf("workerID=%d error creating token transfer script", workerID)
+		log.Error().Err(err).Msgf("error creating token transfer script")
 		return
 	}
 
-	lg.log.Trace().Msgf("workerID=%d creating token transfer transaction", workerID)
+	log.Trace().Msgf("creating token transfer transaction")
 	transferTx = transferTx.
-		SetReferenceBlockID(blockRef).
+		SetReferenceBlockID(lg.follower.BlockID()).
 		SetGasLimit(9999).
 		SetProposalKey(*acc.address, 0, acc.seqNumber).
 		SetPayer(*acc.address).
 		AddAuthorizer(*acc.address)
 
-	lg.log.Trace().Msgf("workerID=%d signing transaction", workerID)
+	log.Trace().Msgf("signing transaction")
 	err = acc.signTx(transferTx, 0)
 	if err != nil {
-		lg.log.Error().Err(err).Msgf("workerID=%d error signing transaction", workerID)
+		log.Error().Err(err).Msgf("error signing transaction")
 		return
 	}
 
+	// Wait for completion before sending next transaction to avoid race condition
+	ch := lg.follower.CompleteChanByID(transferTx.ID())
+
+	startTime := time.Now()
 	lg.sendTx(workerID, transferTx)
 
-	if lg.feedbackEnabled {
-		// come here if feedback enable and happening accounts get recycled after checking they make it into a block
-		lg.pushAccountsHappening(workerID, acc, transferTx.ID().String(), time.Now())
+	log.Trace().
+		Hex("txID", transferTx.ID().Bytes()).
+		Msgf("transaction sent")
+
+	for {
+		select {
+		case <-ch:
+			log.Trace().
+				Hex("txID", transferTx.ID().Bytes()).
+				Dur("duration", time.Since(startTime)).
+				Msgf("transaction confirmed")
+			return
+		case <-time.After(slowTransactionThreshold):
+			log.Warn().
+				Hex("txID", transferTx.ID().Bytes()).
+				Dur("duration", time.Since(startTime)).
+				Int("availableAccounts", len(lg.availableAccounts)).
+				Msgf("is taking too long")
+		}
 	}
 }
 
 // TODO update this to include loadtype
 func (lg *ContLoadGenerator) sendFavContractTx(workerID int) {
-
-	blockRef, err := lg.blockRef.Get()
-	if err != nil {
-		lg.log.Error().Err(err).Msgf("workerID=%d error getting reference block", workerID)
-		return
-	}
-
 	lg.log.Trace().Msgf("workerID=%d getting next available account", workerID)
 
 	acc := <-lg.availableAccounts
@@ -579,7 +538,7 @@ func (lg *ContLoadGenerator) sendFavContractTx(workerID int) {
 
 	lg.log.Trace().Msgf("workerID=%d creating transaction", workerID)
 	tx := flowsdk.NewTransaction().
-		SetReferenceBlockID(blockRef).
+		SetReferenceBlockID(lg.follower.BlockID()).
 		SetScript(txScript).
 		SetGasLimit(9999).
 		SetProposalKey(*acc.address, 0, acc.seqNumber).
@@ -587,7 +546,7 @@ func (lg *ContLoadGenerator) sendFavContractTx(workerID int) {
 		AddAuthorizer(*acc.address)
 
 	lg.log.Trace().Msgf("workerID=%d signing transaction", workerID)
-	err = acc.signTx(tx, 0)
+	err := acc.signTx(tx, 0)
 	if err != nil {
 		lg.log.Error().Err(err).Msgf("workerID=%d error signing transaction", workerID)
 		return
