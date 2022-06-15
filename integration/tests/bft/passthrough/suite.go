@@ -69,6 +69,8 @@ func (s *Suite) SetupSuite() {
 
 	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.ErrorLevel)))
 
+	blockRateFlag := "--block-rate-delay=1ms"
+
 	// generate the four consensus identities
 	s.nodeIDs = unittest.IdentifierListFixture(4)
 	for _, nodeID := range s.nodeIDs {
@@ -77,6 +79,7 @@ func (s *Suite) SetupSuite() {
 			testnet.WithLogLevel(zerolog.DebugLevel),
 			testnet.WithAdditionalFlag("--required-verification-seal-approvals=1"),
 			testnet.WithAdditionalFlag("--required-construction-seal-approvals=1"),
+			testnet.WithAdditionalFlag(blockRateFlag),
 		)
 		s.nodeConfigs = append(s.nodeConfigs, nodeConfig)
 	}
@@ -107,9 +110,11 @@ func (s *Suite) SetupSuite() {
 	// generates two collection node
 	coll1Config := testnet.NewNodeConfig(flow.RoleCollection,
 		testnet.WithLogLevel(zerolog.DebugLevel),
+		testnet.WithAdditionalFlag(blockRateFlag),
 	)
 	coll2Config := testnet.NewNodeConfig(flow.RoleCollection,
 		testnet.WithLogLevel(zerolog.DebugLevel),
+		testnet.WithAdditionalFlag(blockRateFlag),
 	)
 	s.nodeConfigs = append(s.nodeConfigs, coll1Config, coll2Config)
 
