@@ -138,13 +138,13 @@ var (
 		},
 	}
 
-	// execution state synchronization
+	// [deprecated] execution state synchronization
 	executionStateSyncRequest = MsgAuthConfig{
-		String: "",
+		String: "ExecutionStateSyncRequest",
 		config: nil,
 	}
 	executionStateDelta = MsgAuthConfig{
-		String: "",
+		String: "ExecutionStateDelta",
 		config: nil,
 	}
 
