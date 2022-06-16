@@ -9,17 +9,20 @@ package crypto
 // This implementation does not include any security against side-channel attacks.
 
 // existing features:
-//  - the implementation is optimized for shorter signatures (on G1)
-//  - public keys are longer (on G2)
+//  - the implementation variant is minimal-signature-size signatures:
+//    shorter signatures in G1, longer public keys in G2
 //  - serialization of points on G1 and G2 is compressed ([zcash]
 //     https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-)
-//  - hash to curve is using the optimized SWU map
-//    (https://eprint.iacr.org/2019/403.pdf section 4)
-//  - expanding the message is using a cSHAKE-based KMAC128 with a domain separation tag
-//  - signature verification checks the membership of signature in G1
+//  - hashing to curve uses the Simplified SWU map-to-curve
+//    (https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-14#section-6.6.3)
+//  - expanding the message in hash-to-curve uses a cSHAKE-based KMAC128 with a domain separation tag.
+//    KMAC128 serves as an expand_message_xof function.
+//  - this results in the full ciphersuite BLS_SIG_BLS12381G1_XOF:KMAC128_SSWU_RO_POP_ for signatures
+//    and BLS_POP_BLS12381G1_XOF:KMAC128_SSWU_RO_POP_ for proofs of possession.
+//  - signature verification checks the membership of signature in G1.
 //  - the public key membership check in G2 is implemented separately from the signature verification.
-//  - membership check in G1 is implemented using fast Bowe's check (https://eprint.iacr.org/2019/814.pdf)
-//  - membership check in G2 is using a simple scalar multiplication with the group order.
+//  - membership check in G1 is implemented using fast Bowe's check (to be updated to Scott's check).
+//  - membership check in G2 is using a simple scalar multiplication with the group order (to be updated to Scott's check).
 //  - multi-signature tools are defined in bls_multisg.go
 //  - SPoCK scheme based on BLS: verifies two signatures have been generated from the same message,
 //    that is unknown to the verifier.
@@ -51,29 +54,44 @@ type blsBLS12381Algo struct {
 //  BLS context on the BLS 12-381 curve
 var blsInstance *blsBLS12381Algo
 
-// NewBLSKMAC returns a new KMAC128 instance with the right parameters
-// chosen for BLS signatures and verifications.
-//
-// It expands the message into 1024 bits (required for the optimal SwU hash to curve).
-// tag is the domain separation tag, it is recommended to use a different tag for each signature domain.
-// The returned KMAC is customized by the tag and is guaranteed to be different than the KMAC used
+// NewExpandMsgXOFKMAC128 returns a new expand_message_xof instance for
+// the hash-to-curve function, hashing data to G1 on BLS12 381.
+// This instance must only be used to generate signatures (and not PoP),
+// because the internal ciphersuite is customized for signatures. It
+// is guaranteed to be different than the expand_message_xof instance used
 // to generate proofs of possession.
-func NewBLSKMAC(tag string) hash.Hasher {
+//
+// KMAC128 is used as the underligned extendable-output function (xof)
+// as required by https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-14#section-5.4.4.
+//
+// `domainTag` is a domain separation tag that defines the protocol and its subdomain. Such tag should be of the
+// format: <protocol>-V<xx>-CS<yy>-with- where <protocol> is the name of the protocol, <xx> the protocol
+// version number and <yy> the index of the ciphersuite in the protocol.
+// The function suffixes the given `domainTag` by the BLS ciphersuite supported by the library.
+//
+// The returned instance is a `Hasher` and can be used to generate BLS signatures
+// with the `Sign` method.
+func NewExpandMsgXOFKMAC128(domainTag string) hash.Hasher {
 	// application tag is guaranteed to be different than the tag used
-	// to generate proofs of possession.
-	appTag := applicationTagPrefix + tag
-	return internalBLSKMAC(appTag)
+	// to generate proofs of possession
+	// postfix the domain tag with the BLS ciphersuite
+	key := domainTag + blsSigCipherSuite
+	return internalExpandMsgXOFKMAC128(key)
 }
 
-// returns a customized KMAC instance for BLS
-func internalBLSKMAC(tag string) hash.Hasher {
-	// postfix the tag with the BLS ciphersuite
-	key := []byte(tag + blsCipherSuite)
+// returns an expand_message_xof instance for
+// the hash-to-curve function, hashing data to G1 on BLS12 381.
+// The key is used as a customizer rather than a MAC key.
+func internalExpandMsgXOFKMAC128(key string) hash.Hasher {
+	// UTF-8 is used by Go to convert strings into bytes.
+	// UTF-8 is a non-ambiguous encoding as required by draft-irtf-cfrg-hash-to-curve
+	// (similarly to the recommended ASCII).
+
 	// blsKMACFunction is the customizer used for KMAC in BLS
 	const blsKMACFunction = "H2C"
 	// the error is ignored as the parameter lengths are chosen to be in the correct range for kmac
 	// (tested by TestBLSBLS12381Hasher)
-	kmac, _ := hash.NewKMAC_128(key, []byte(blsKMACFunction), minHashSizeBLSBLS12381)
+	kmac, _ := hash.NewKMAC_128([]byte(key), []byte(blsKMACFunction), expandMsgOutput)
 	return kmac
 }
 
@@ -83,7 +101,7 @@ func internalBLSKMAC(tag string) hash.Hasher {
 // https://github.com/zkcrypto/pairing/blob/master/src/bls12_381/README.md#serialization
 // The private key is read only.
 // If the hasher used is KMAC128, the hasher is read only.
-// It is recommended to use Sign with the hasher from NewBLSKMAC. If not, the hasher used
+// It is recommended to use Sign with the hasher from NewExpandMsgXOFKMAC128. If not, the hasher used
 // must expand the message to 1024 bits. It is also recommended to use a hasher
 // with a domain separation tag.
 func (sk *PrKeyBLSBLS12381) Sign(data []byte, kmac hash.Hasher) (Signature, error) {
@@ -91,10 +109,10 @@ func (sk *PrKeyBLSBLS12381) Sign(data []byte, kmac hash.Hasher) (Signature, erro
 		return nil, invalidInputsErrorf("hasher is empty")
 	}
 	// check hasher output size
-	if kmac.Size() < minHashSizeBLSBLS12381 {
+	if kmac.Size() != expandMsgOutput {
 		return nil, invalidInputsErrorf(
-			"hasher with at least %d output byte size is required, got hasher with size %d",
-			minHashSizeBLSBLS12381,
+			"hasher with %d output byte size is required, got hasher with size %d",
+			expandMsgOutput,
 			kmac.Size())
 	}
 	// hash the input to 128 bytes
@@ -131,10 +149,10 @@ func (pk *PubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) 
 		return false, invalidInputsErrorf("hasher is empty")
 	}
 	// check hasher output size
-	if kmac.Size() < minHashSizeBLSBLS12381 {
+	if kmac.Size() != expandMsgOutput {
 		return false, invalidInputsErrorf(
 			"hasher with at least %d output byte size is required, got hasher with size %d",
-			minHashSizeBLSBLS12381,
+			expandMsgOutput,
 			kmac.Size())
 	}
 
@@ -442,10 +460,10 @@ func mapToG1(data []byte) *pointG1 {
 func (sk *PrKeyBLSBLS12381) signWithXMDSHA256(data []byte) Signature {
 
 	dst := []byte("BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_NUL_")
-	hash := make([]byte, opSwUInputLenBLSBLS12381)
+	hash := make([]byte, expandMsgOutput)
 	// XMD using SHA256
 	C.xmd_sha256((*C.uchar)(&hash[0]),
-		(C.int)(opSwUInputLenBLSBLS12381),
+		(C.int)(expandMsgOutput),
 		(*C.uchar)(&data[0]), (C.int)(len(data)),
 		(*C.uchar)(&dst[0]), (C.int)(len(dst)))
 

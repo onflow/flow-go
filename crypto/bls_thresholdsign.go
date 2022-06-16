@@ -173,7 +173,7 @@ func NewBLSThresholdSignatureInspector(
 		size:               size,
 		threshold:          threshold,
 		message:            message,
-		hasher:             NewBLSKMAC(dsTag),
+		hasher:             NewExpandMsgXOFKMAC128(dsTag),
 		shares:             make(map[index]Signature),
 		thresholdSignature: nil,
 		groupPublicKey:     groupPublicKey,  // groupPublicKey is the group public key corresponding to the group secret key

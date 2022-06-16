@@ -220,7 +220,7 @@ func benchG1Test() {
 // It hashes `data` to a G1 point using the tag `dst` and returns the G1 point serialization.
 // The function uses xmd with SHA256 in the hash-to-field.
 func hashToG1Bytes(data, dst []byte) []byte {
-	hash := make([]byte, opSwUInputLenBLSBLS12381)
+	hash := make([]byte, expandMsgOutput)
 
 	inputLength := len(data)
 	if len(data) == 0 {
@@ -229,7 +229,7 @@ func hashToG1Bytes(data, dst []byte) []byte {
 
 	// XMD using SHA256
 	C.xmd_sha256((*C.uchar)(&hash[0]),
-		(C.int)(opSwUInputLenBLSBLS12381),
+		(C.int)(expandMsgOutput),
 		(*C.uchar)(&data[0]), (C.int)(inputLength),
 		(*C.uchar)(&dst[0]), (C.int)(len(dst)))
 

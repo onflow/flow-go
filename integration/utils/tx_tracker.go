@@ -98,7 +98,7 @@ func (txt *TxTracker) AddTx(
 		stat:        &TxStats{},
 		wait:        make(chan struct{}),
 	}
-	txt.log.Debug().Str("tx_id", txID.String()).Msg("tx added to tx tracker")
+	txt.log.Trace().Str("tx_id", txID.String()).Msg("tx added to tx tracker")
 	txt.txs <- newTx
 	return newTx.wait
 }
@@ -131,7 +131,7 @@ func (txt *TxTracker) Stop() {
 
 func (txt *TxTracker) statusWorker(ctx context.Context, workerID int, fclient *client.Client, sleepAfterOp time.Duration) {
 	log := txt.log.With().Int("worker_id", workerID).Logger()
-	log.Debug().Msg("worker started")
+	log.Trace().Msg("worker started")
 
 	defer txt.wg.Done()
 

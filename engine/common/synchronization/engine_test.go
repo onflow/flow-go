@@ -489,7 +489,7 @@ func (ss *SyncSuite) TestProcessingMultipleItems() {
 			Height: uint64(1000 + i),
 		}
 		ss.core.On("HandleHeight", mock.Anything, msg.Height).Once()
-		require.NoError(ss.T(), ss.e.Process(engine.SyncCommittee, originID, msg))
+		require.NoError(ss.T(), ss.e.Process(netint.SyncCommittee, originID, msg))
 	}
 
 	finalHeight := ss.head.Height
@@ -504,7 +504,7 @@ func (ss *SyncSuite) TestProcessingMultipleItems() {
 		ss.core.On("HandleHeight", mock.Anything, msg.Height).Once()
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil)
 
-		require.NoError(ss.T(), ss.e.Process(engine.SyncCommittee, originID, msg))
+		require.NoError(ss.T(), ss.e.Process(netint.SyncCommittee, originID, msg))
 	}
 
 	// give at least some time to process items
