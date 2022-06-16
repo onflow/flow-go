@@ -49,8 +49,12 @@ func (w *WintermuteTestSuite) TestWintermuteAttack() {
 			2)
 	}
 
-	// waits till victim block gets sealed.
-	w.BlockState.WaitForSealed(w.T(), victimBlock.Header.Height)
+	// waits till sealing height goes beyond the victim block
+	w.BlockState.WaitForSealed(w.T(), victimBlock.Header.Height+1)
+	// then checks querying victim block by height returns the victim block itself.
+	blockByHeight, ok := w.BlockState.FinalizedHeight(victimBlock.Header.Height)
+	require.True(w.T(), ok)
+	require.Equal(w.T(), blockByHeight.Header.ID(), victimBlock.Header.ID())
 }
 
 // waitForExecutionResultCorruption waits within a timeout till wintermute orchestrator corrupts an execution result.
