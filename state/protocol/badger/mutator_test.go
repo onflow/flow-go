@@ -1411,6 +1411,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 
 			receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
 			receipt1.ExecutionResult.ServiceEvents = []flow.ServiceEvent{epoch2Setup.ServiceEvent()}
+			seal1.ResultID = receipt1.ExecutionResult.ID()
 
 			// add a block containing a receipt for block 1
 			block2 := unittest.BlockWithParentFixture(block1.Header)
@@ -1431,7 +1432,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			require.NoError(t, err)
 
 			// incorporating the service event should trigger EECC
-			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
+			metricsMock.On("EpochEmergencyFallbackTriggered").Twice()
 
 			// block 4 is where the service event state change comes into effect
 			block4 := unittest.BlockWithParentFixture(block3.Header)
