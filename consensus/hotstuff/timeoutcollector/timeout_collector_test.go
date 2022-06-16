@@ -28,23 +28,21 @@ type TimeoutCollectorTestSuite struct {
 
 	view              uint64
 	notifier          *mocks.Consumer
+	collectorNotifier *mocks.TimeoutCollectorConsumer
 	processor         *mocks.TimeoutProcessor
-	onNewQCDiscovered *mocks.OnNewQCDiscovered
-	onNewTCDiscovered *mocks.OnNewTCDiscovered
 	collector         *TimeoutCollector
 }
 
 func (s *TimeoutCollectorTestSuite) SetupTest() {
 	s.view = 1000
 	s.notifier = mocks.NewConsumer(s.T())
+	s.collectorNotifier = mocks.NewTimeoutCollectorConsumer(s.T())
 	s.processor = mocks.NewTimeoutProcessor(s.T())
-	s.onNewQCDiscovered = mocks.NewOnNewQCDiscovered(s.T())
-	s.onNewTCDiscovered = mocks.NewOnNewTCDiscovered(s.T())
 
-	s.onNewQCDiscovered.On("Execute", mock.Anything).Maybe()
-	s.onNewTCDiscovered.On("Execute", mock.Anything).Maybe()
+	s.collectorNotifier.On("OnNewQcDiscovered", mock.Anything).Maybe()
+	s.collectorNotifier.On("OnNewTcDiscovered", mock.Anything).Maybe()
 
-	s.collector = NewTimeoutCollector(s.view, s.notifier, s.processor, s.onNewQCDiscovered.Execute, s.onNewTCDiscovered.Execute)
+	s.collector = NewTimeoutCollector(s.view, s.notifier, s.collectorNotifier, s.processor)
 }
 
 // TestView tests that `View` returns the same value that was passed in constructor
@@ -140,11 +138,10 @@ func (s *TimeoutCollectorTestSuite) TestAddTimeout_TONotifications() {
 		s.T().Fatal("invalid test configuration")
 	}
 
-	*s.onNewQCDiscovered = mocks.OnNewQCDiscovered{}
-	*s.onNewTCDiscovered = mocks.OnNewTCDiscovered{}
+	*s.collectorNotifier = *mocks.NewTimeoutCollectorConsumer(s.T())
 
 	var highestReportedQC *flow.QuorumCertificate
-	s.onNewQCDiscovered.On("Execute", mock.Anything).Run(func(args mock.Arguments) {
+	s.collectorNotifier.On("OnNewQcDiscovered", mock.Anything).Run(func(args mock.Arguments) {
 		qc := args.Get(0).(*flow.QuorumCertificate)
 		if highestReportedQC == nil || highestReportedQC.View < qc.View {
 			highestReportedQC = qc
@@ -152,7 +149,7 @@ func (s *TimeoutCollectorTestSuite) TestAddTimeout_TONotifications() {
 	})
 
 	lastViewTC := helper.MakeTC(helper.WithTCView(s.view - 1))
-	s.onNewTCDiscovered.On("Execute", lastViewTC).Once()
+	s.collectorNotifier.On("OnNewTcDiscovered", lastViewTC).Once()
 
 	timeouts := make([]*model.TimeoutObject, 0, qcCount)
 	for i := 0; i < qcCount; i++ {
@@ -185,6 +182,5 @@ func (s *TimeoutCollectorTestSuite) TestAddTimeout_TONotifications() {
 	}
 	wg.Wait()
 
-	s.onNewTCDiscovered.AssertCalled(s.T(), "Execute", lastViewTC)
 	require.Equal(s.T(), expectedHighestQC, highestReportedQC)
 }

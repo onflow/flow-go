@@ -106,6 +106,7 @@ func NewTimeoutProcessor(committee hotstuff.Replicas,
 		view:      view,
 		committee: committee,
 		validator: validator,
+		notifier:  notifier,
 		partialTCTracker: accumulatedWeightTracker{
 			minRequiredWeight: timeoutThreshold,
 			done:              *atomic.NewBool(false),

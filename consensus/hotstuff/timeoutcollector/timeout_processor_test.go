@@ -33,17 +33,16 @@ func TestTimeoutProcessor(t *testing.T) {
 type TimeoutProcessorTestSuite struct {
 	suite.Suite
 
-	participants       flow.IdentityList
-	signer             *flow.Identity
-	view               uint64
-	sigWeight          uint64
-	totalWeight        uint64
-	committee          *mocks.Replicas
-	validator          *mocks.Validator
-	sigAggregator      *mocks.TimeoutSignatureAggregator
-	onTCCreated        *mocks.OnTCCreated
-	onPartialTCCreated *mocks.OnPartialTCCreated
-	processor          *TimeoutProcessor
+	participants  flow.IdentityList
+	signer        *flow.Identity
+	view          uint64
+	sigWeight     uint64
+	totalWeight   uint64
+	committee     *mocks.Replicas
+	validator     *mocks.Validator
+	sigAggregator *mocks.TimeoutSignatureAggregator
+	notifier      *mocks.TimeoutCollectorConsumer
+	processor     *TimeoutProcessor
 }
 
 func (s *TimeoutProcessorTestSuite) SetupTest() {
@@ -52,8 +51,7 @@ func (s *TimeoutProcessorTestSuite) SetupTest() {
 	s.committee = mocks.NewReplicas(s.T())
 	s.validator = mocks.NewValidator(s.T())
 	s.sigAggregator = mocks.NewTimeoutSignatureAggregator(s.T())
-	s.onTCCreated = mocks.NewOnTCCreated(s.T())
-	s.onPartialTCCreated = mocks.NewOnPartialTCCreated(s.T())
+	s.notifier = mocks.NewTimeoutCollectorConsumer(s.T())
 	s.participants = unittest.IdentityListFixture(11, unittest.WithWeight(s.sigWeight))
 	s.signer = s.participants[0]
 	s.view = (uint64)(rand.Uint32() + 100)
@@ -77,8 +75,7 @@ func (s *TimeoutProcessorTestSuite) SetupTest() {
 	s.processor, err = NewTimeoutProcessor(s.committee,
 		s.validator,
 		s.sigAggregator,
-		s.onPartialTCCreated.Execute,
-		s.onTCCreated.Execute,
+		s.notifier,
 	)
 	require.NoError(s.T(), err)
 }
@@ -307,8 +304,8 @@ func (s *TimeoutProcessorTestSuite) TestProcess_CreatingTC() {
 	expectedSig := crypto.Signature(unittest.RandomBytes(128))
 	s.validator.On("ValidateQC", mock.Anything).Return(nil)
 	s.validator.On("ValidateTC", mock.Anything).Return(nil)
-	s.onPartialTCCreated.On("Execute", s.view).Return(nil).Once()
-	s.onTCCreated.On("Execute", mock.Anything).Run(func(args mock.Arguments) {
+	s.notifier.On("OnPartialTcCreated", s.view).Return(nil).Once()
+	s.notifier.On("OnTcConstructedFromTimeouts", mock.Anything).Run(func(args mock.Arguments) {
 		newestQC := timeouts[len(timeouts)-1].NewestQC
 		tc := args.Get(0).(*flow.TimeoutCertificate)
 		// ensure that TC contains correct fields
@@ -329,7 +326,7 @@ func (s *TimeoutProcessorTestSuite) TestProcess_CreatingTC() {
 		err := s.processor.Process(timeout)
 		require.NoError(s.T(), err)
 	}
-	s.onTCCreated.AssertExpectations(s.T())
+	s.notifier.AssertExpectations(s.T())
 	s.sigAggregator.AssertExpectations(s.T())
 
 	// add extra timeout, make sure we don't create another TC
@@ -343,7 +340,7 @@ func (s *TimeoutProcessorTestSuite) TestProcess_CreatingTC() {
 	err = s.processor.Process(timeout)
 	require.NoError(s.T(), err)
 
-	s.onTCCreated.AssertExpectations(s.T())
+	s.notifier.AssertExpectations(s.T())
 	s.validator.AssertExpectations(s.T())
 }
 
@@ -351,8 +348,8 @@ func (s *TimeoutProcessorTestSuite) TestProcess_CreatingTC() {
 // we expect only one TC created in this scenario.
 func (s *TimeoutProcessorTestSuite) TestProcess_ConcurrentCreatingTC() {
 	s.validator.On("ValidateQC", mock.Anything).Return(nil)
-	s.onPartialTCCreated.On("Execute", mock.Anything).Return(nil).Once()
-	s.onTCCreated.On("Execute", mock.Anything).Return(nil).Once()
+	s.notifier.On("OnPartialTcCreated", mock.Anything).Return(nil).Once()
+	s.notifier.On("OnTcConstructedFromTimeouts", mock.Anything).Return(nil).Once()
 	s.sigAggregator.On("Aggregate").Return([]flow.Identifier(s.participants.NodeIDs()), []uint64{}, crypto.Signature{}, nil)
 	s.committee.On("IdentitiesByEpoch", mock.Anything).Return(s.participants, nil)
 	s.committee.On("IdentityByEpoch", mock.Anything, mock.Anything).Return(s.signer, nil)
@@ -459,21 +456,21 @@ func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 	validator := hotstuffvalidator.New(committee, verifier)
 
 	var lastViewTC *flow.TimeoutCertificate
-	onTCCreated := mocks.NewOnTCCreated(t)
-	onTCCreated.On("Execute", mock.Anything).Run(func(args mock.Arguments) {
+	onTCCreated := func(args mock.Arguments) {
 		tc := args.Get(0).(*flow.TimeoutCertificate)
 		// check if resulted TC is valid
 		err := validator.ValidateTC(tc)
 		require.NoError(t, err)
 		lastViewTC = tc
-	}).Times(2) // should be called twice
+	}
 
 	aggregator, err := NewTimeoutSignatureAggregator(view, stakingSigners, encoding.CollectorVoteTag)
 	require.NoError(t, err)
 
-	onPartialTCCreated := mocks.NewOnPartialTCCreated(t)
-	onPartialTCCreated.On("Execute", view).Once()
-	processor, err := NewTimeoutProcessor(committee, validator, aggregator, onPartialTCCreated.Execute, onTCCreated.Execute)
+	notifier := mocks.NewTimeoutCollectorConsumer(t)
+	notifier.On("OnPartialTcCreated", view).Return().Once()
+	notifier.On("OnTcConstructedFromTimeouts", mock.Anything).Run(onTCCreated).Return().Once()
+	processor, err := NewTimeoutProcessor(committee, validator, aggregator, notifier)
 	require.NoError(t, err)
 
 	// last view was successful, no lastViewTC in this case
@@ -483,13 +480,15 @@ func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	onTCCreated.AssertNumberOfCalls(t, "Execute", 1)
+	notifier.AssertExpectations(t)
 
 	aggregator, err = NewTimeoutSignatureAggregator(view+1, stakingSigners, encoding.CollectorVoteTag)
 	require.NoError(t, err)
 
-	onPartialTCCreated.On("Execute", view+1).Once()
-	processor, err = NewTimeoutProcessor(committee, validator, aggregator, onPartialTCCreated.Execute, onTCCreated.Execute)
+	notifier = mocks.NewTimeoutCollectorConsumer(t)
+	notifier.On("OnPartialTcCreated", view+1).Return().Once()
+	notifier.On("OnTcConstructedFromTimeouts", mock.Anything).Run(onTCCreated).Return().Once()
+	processor, err = NewTimeoutProcessor(committee, validator, aggregator, notifier)
 	require.NoError(t, err)
 
 	// last view ended with TC, need to include lastViewTC
@@ -499,5 +498,5 @@ func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	onTCCreated.AssertNumberOfCalls(t, "Execute", 2)
+	notifier.AssertExpectations(t)
 }

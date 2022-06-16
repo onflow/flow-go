@@ -26,8 +26,8 @@ var _ hotstuff.TimeoutCollector = (*TimeoutCollector)(nil)
 // NewTimeoutCollector creates new instance of TimeoutCollector
 func NewTimeoutCollector(view uint64,
 	notifier hotstuff.Consumer,
-	processor hotstuff.TimeoutProcessor,
 	collectorNotifier hotstuff.TimeoutCollectorConsumer,
+	processor hotstuff.TimeoutProcessor,
 ) *TimeoutCollector {
 	return &TimeoutCollector{
 		notifier:          notifier,
