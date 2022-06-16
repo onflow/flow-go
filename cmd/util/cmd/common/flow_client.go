@@ -6,7 +6,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/onflow/flow-go-sdk/client"
+	client "github.com/onflow/flow-go-sdk/access/grpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/order"
@@ -62,7 +62,7 @@ func secureFlowClient(accessAddress, accessApiNodePubKey string) (*client.Client
 	}
 
 	// create flow client
-	flowClient, err := client.New(accessAddress, dialOpts)
+	flowClient, err := client.NewClient(accessAddress, dialOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +73,7 @@ func secureFlowClient(accessAddress, accessApiNodePubKey string) (*client.Client
 // insecureFlowClient creates flow client with insecure GRPC connection
 func insecureFlowClient(accessAddress string) (*client.Client, error) {
 	// create flow client
-	flowClient, err := client.New(accessAddress, grpc.WithInsecure()) //nolint:staticcheck
+	flowClient, err := client.NewClient(accessAddress, grpc.WithInsecure()) //nolint:staticcheck
 	if err != nil {
 		return nil, fmt.Errorf("failed to create flow client %w", err)
 	}
