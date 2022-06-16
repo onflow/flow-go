@@ -4,8 +4,12 @@ import (
 	"context"
 
 	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/module"
 )
 
 // This produces a new IPFS DHT
@@ -22,19 +26,19 @@ func NewDHT(ctx context.Context, host host.Host, prefix protocol.ID, logger zero
 		return nil, err
 	}
 
-	logger := logger.With().Str("component", "dht").Logger(),
+	dhtLogger := logger.With().Str("component", "dht").Logger()
 
 	routingTable := kdht.RoutingTable()
 	peerRemovedCb := routingTable.PeerRemoved
 	peerAddedCb := routingTable.PeerAdded
 	routingTable.PeerRemoved = func(pid peer.ID) {
 		peerRemovedCb(pid)
-		logger.Debug().Str("peer_id", pid.Pretty()).Msg("peer removed from routing table")
+		dhtLogger.Debug().Str("peer_id", pid.Pretty()).Msg("peer removed from routing table")
 		metrics.RoutingTablePeerRemoved()
 	}
 	routingTable.PeerAdded = func(pid peer.ID) {
 		peerAddedCb(pid)
-		logger.Debug().Str("peer_id", pid.Pretty()).Msg("peer added to routing table")
+		dhtLogger.Debug().Str("peer_id", pid.Pretty()).Msg("peer added to routing table")
 		metrics.RoutingTablePeerAdded()
 	}
 
