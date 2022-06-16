@@ -26,7 +26,7 @@ func WithBlobSizeLimit(size int) ProviderOption {
 }
 
 type Provider interface {
-	Provide(ctx context.Context, blockHeight uint64, executionData *execution_data.BlockExecutionData) (flow.Identifier, *execution_data.BlockExecutionDataRoot, error)
+	Provide(ctx context.Context, blockHeight uint64, executionData *execution_data.BlockExecutionData) (flow.Identifier, *flow.BlockExecutionDataRoot, error)
 }
 
 type ExecutionDataProvider struct {
@@ -114,7 +114,7 @@ func (p *ExecutionDataProvider) storeBlobs(parent context.Context, blockHeight u
 	return ch
 }
 
-func (p *ExecutionDataProvider) Provide(ctx context.Context, blockHeight uint64, executionData *execution_data.BlockExecutionData) (flow.Identifier, *execution_data.BlockExecutionDataRoot, error) {
+func (p *ExecutionDataProvider) Provide(ctx context.Context, blockHeight uint64, executionData *execution_data.BlockExecutionData) (flow.Identifier, *flow.BlockExecutionDataRoot, error) {
 	rootID, rootData, errCh, err := p.provide(ctx, blockHeight, executionData)
 	storeErr, ok := <-errCh
 
@@ -129,7 +129,7 @@ func (p *ExecutionDataProvider) Provide(ctx context.Context, blockHeight uint64,
 	}
 }
 
-func (p *ExecutionDataProvider) provide(ctx context.Context, blockHeight uint64, executionData *execution_data.BlockExecutionData) (flow.Identifier, *execution_data.BlockExecutionDataRoot, <-chan error, error) {
+func (p *ExecutionDataProvider) provide(ctx context.Context, blockHeight uint64, executionData *execution_data.BlockExecutionData) (flow.Identifier, *flow.BlockExecutionDataRoot, <-chan error, error) {
 	logger := p.logger.With().Uint64("height", blockHeight).Str("block_id", executionData.BlockID.String()).Logger()
 	logger.Debug().Msg("providing execution data")
 
@@ -163,7 +163,7 @@ func (p *ExecutionDataProvider) provide(ctx context.Context, blockHeight uint64,
 		return flow.ZeroID, nil, errCh, err
 	}
 
-	edRoot := &execution_data.BlockExecutionDataRoot{
+	edRoot := &flow.BlockExecutionDataRoot{
 		BlockID:               executionData.BlockID,
 		ChunkExecutionDataIDs: chunkDataIDs,
 	}
@@ -193,7 +193,7 @@ type ExecutionDataCIDProvider struct {
 
 func (p *ExecutionDataCIDProvider) AddExecutionDataRoot(
 	ctx context.Context,
-	edRoot *execution_data.BlockExecutionDataRoot,
+	edRoot *flow.BlockExecutionDataRoot,
 	blobCh chan<- blobs.Blob,
 ) (flow.Identifier, error) {
 	buf := new(bytes.Buffer)
