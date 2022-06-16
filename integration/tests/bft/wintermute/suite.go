@@ -209,8 +209,7 @@ func (s *Suite) SetupSuite() {
 	s.Track(s.T(), ctx, s.Ghost())
 }
 
-// TearDownSuite tears down the test network of Flow as w
-//+6ell as the BFT testing attack network.
+// TearDownSuite tears down the test network of Flow as well as the BFT testing attack network.
 func (s *Suite) TearDownSuite() {
 	s.net.Remove()
 	s.cancel()
