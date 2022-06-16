@@ -73,7 +73,7 @@ func (w *WintermuteTestSuite) waitForExecutionResultCorruption() *flow.Execution
 
 		w.T().Logf("wintermute orchesterator conducted corruption, original result: %x, corrupted result: %x", original.ID(), corrupted.ID())
 		return true
-	}, wintermuteTimeout, 5*time.Second,
+	}, wintermuteTimeout, 100*time.Millisecond,
 		fmt.Sprintf("orchestrator could not conduct execution result corruption within %v seconds", wintermuteTimeout))
 
 	return corruptedResult
