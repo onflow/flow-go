@@ -30,6 +30,7 @@ type ResolverMetrics interface {
 
 type NetworkMetrics interface {
 	ResolverMetrics
+	DHTMetrics
 
 	// NetworkMessageSent size in bytes and count of the network message sent
 	NetworkMessageSent(sizeBytes int, topic string, messageType string)
@@ -485,4 +486,9 @@ type HeroCacheMetrics interface {
 	// Hence, adding a new key to that bucket will replace the oldest valid key inside that bucket.
 	// Note: in context of HeroCache, the key corresponds to the identifier of its entity.
 	OnEntityEjectionDueToEmergency()
+}
+
+type DHTMetrics interface {
+	RoutingTablePeerAdded()
+	RoutingTablePeerRemoved()
 }

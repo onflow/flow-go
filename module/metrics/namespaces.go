@@ -19,6 +19,7 @@ const (
 	subsystemGossip = "gossip"
 	subsystemEngine = "engine"
 	subsystemQueue  = "queue"
+	subsystemDHT    = "dht"
 )
 
 // Storage subsystems represent the various components of the storage layer.
