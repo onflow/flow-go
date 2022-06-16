@@ -24,6 +24,7 @@ type OnNewTCDiscovered func(*flow.TimeoutCertificate)
 
 // TimeoutCollector collects all timeout objects for a specified view. On the happy path, it
 // generates a TimeoutCertificate when enough timeouts have been collected.
+// Implementations of TimeoutCollector must be concurrency safe.
 type TimeoutCollector interface {
 	// AddTimeout adds a timeout object to the collector
 	// When f+1 TOs will be collected then callback for partial TC will be triggered,
