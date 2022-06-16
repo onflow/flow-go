@@ -120,14 +120,8 @@ func (m *FollowerState) Extend(ctx context.Context, candidate *flow.Block) error
 		return fmt.Errorf("seal in parent block does not compliance the chain state: %w", err)
 	}
 
-	// apply any state changes from service events sealed by this block's parent
-	dbUpdates, err := m.handleEpochServiceEvents(candidate)
-	if err != nil {
-		return fmt.Errorf("could not process service events: %w", err)
-	}
-
 	// insert the block and index the last seal for the block
-	err = m.insert(ctx, candidate, last, dbUpdates)
+	err = m.insert(ctx, candidate, last)
 	if err != nil {
 		return fmt.Errorf("failed to insert the block: %w", err)
 	}
@@ -166,14 +160,8 @@ func (m *MutableState) Extend(ctx context.Context, candidate *flow.Block) error 
 		return fmt.Errorf("seal in parent block does not compliance the chain state: %w", err)
 	}
 
-	// apply any state changes from service events sealed by this block's parent
-	dbUpdates, err := m.handleEpochServiceEvents(candidate)
-	if err != nil {
-		return fmt.Errorf("could not process service events: %w", err)
-	}
-
 	// insert the block and index the last seal for the block
-	err = m.insert(ctx, candidate, lastSeal, dbUpdates)
+	err = m.insert(ctx, candidate, lastSeal)
 	if err != nil {
 		return fmt.Errorf("failed to insert the block: %w", err)
 	}
@@ -415,17 +403,23 @@ func (m *FollowerState) lastSealed(candidate *flow.Block) (*flow.Seal, error) {
 // The `candidate` block _must be valid_ (otherwise, the state will be corrupted).
 // dbUpdates contains other database operations which must be applied atomically
 // with inserting the block.
-func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last *flow.Seal, dbUpdates []func(*transaction.Tx) error) error {
+func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last *flow.Seal) error {
 
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendDBInsert)
 	defer span.Finish()
 
 	blockID := candidate.ID()
 
+	// apply any state changes from service events sealed by this block's parent
+	dbUpdates, insertingBlockTriggersEpochFallback, err := m.handleEpochServiceEvents(candidate)
+	if err != nil {
+		return fmt.Errorf("could not process service events: %w", err)
+	}
+
 	// Both the header itself and its payload are in compliance with the protocol state.
 	// We can now store the candidate block, as well as adding its final seal
 	// to the seal index and initializing its children index.
-	err := operation.RetryOnConflictTx(m.db, transaction.Update, func(tx *transaction.Tx) error {
+	err = operation.RetryOnConflictTx(m.db, transaction.Update, func(tx *transaction.Tx) error {
 		// insert the block into the database AND cache
 		err := m.blocks.StoreTx(candidate)(tx)
 		if err != nil {
@@ -444,12 +438,25 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 			return fmt.Errorf("could not index new block: %w", err)
 		}
 
+		// if applicable, flag that epoch fallback has been triggered
+		if insertingBlockTriggersEpochFallback {
+			err = transaction.WithTx(operation.SetEpochEmergencyFallbackTriggered(blockID))(tx)
+			if err != nil {
+				return fmt.Errorf("could not set epoch fallback triggered flag: %w", err)
+			}
+		}
+
 		// apply any optional DB operations from service events
 		for _, apply := range dbUpdates {
 			err := apply(tx)
 			if err != nil {
 				return fmt.Errorf("could not apply operation: %w", err)
 			}
+		}
+
+		// emit protocol events
+		if insertingBlockTriggersEpochFallback {
+			m.consumer.EpochEmergencyFallbackTriggered()
 		}
 
 		return nil
@@ -530,6 +537,10 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		epochFallbackTriggered, err = m.epochFallbackTriggeredByFinalizedBlock(header, epochStatus, currentEpochSetup)
 		if err != nil {
 			return fmt.Errorf("could not check whether finalized block triggers epoch fallback: %w", err)
+		}
+		if epochFallbackTriggered {
+			// emit the protocol event only the first time epoch fallback is triggered
+			events = append(events, m.consumer.EpochEmergencyFallbackTriggered)
 		}
 	}
 
@@ -845,30 +856,42 @@ func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, erro
 // input block has the form of block D (ie. has a parent, which contains a seal
 // for a block in which a service event was emitted).
 //
-// If the service events are valid, or there are no service events, this method
-// returns a slice of Badger operations to apply while storing the block. This
-// includes an operation to index the epoch status for every block, and
-// operations to insert service events for blocks that include them.
+// Return values:
+//  * dbUpdates - If the service events are valid, or there are no service events,
+//    this method returns a slice of Badger operations to apply while storing the block.
+//    This includes an operation to index the epoch status for every block, and
+//    operations to insert service events for blocks that include them.
+//  * insertingCandidateTriggersEpochFallback - if inserting this block causes epoch
+//    fallback mode to be triggered, this is true. This causes flag to be set in the
+//    database and a protocol event to be emitted. This can only be true for at most
+//    one block for a given database instance.
 //
 // No errors are expected during normal operation.
-func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) ([]func(*transaction.Tx) error, error) {
+func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (
+	dbUpdates []func(*transaction.Tx) error,
+	insertingCandidateTriggersEpochFallback bool,
+	err error,
+) {
 
-	var dbUpdates []func(*transaction.Tx) error
 	blockID := candidate.ID()
 
 	epochStatus, err := m.epochStatus(candidate.Header)
 	if err != nil {
-		return nil, fmt.Errorf("could not determine epoch status for candidate block: %w", err)
+		return nil, false, fmt.Errorf("could not determine epoch status for candidate block: %w", err)
 	}
 	activeSetup, err := m.epoch.setups.ByID(epochStatus.CurrentEpoch.SetupID)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve current epoch setup event: %w", err)
+		return nil, false, fmt.Errorf("could not retrieve current epoch setup event: %w", err)
+	}
+	isEpochFallbackTriggered, err := m.isEpochEmergencyFallbackTriggered()
+	if err != nil {
+		return nil, false, fmt.Errorf("could not check if epoch fallback mode triggered: %w", err)
 	}
 
 	// we will apply service events from blocks which are sealed by this block's PARENT
 	parent, err := m.blocks.ByID(candidate.Header.ParentID)
 	if err != nil {
-		return nil, fmt.Errorf("could not get parent (id=%x): %w", candidate.Header.ParentID, err)
+		return nil, false, fmt.Errorf("could not get parent (id=%x): %w", candidate.Header.ParentID, err)
 	}
 
 	// The payload might contain epoch preparation service events for the next
@@ -879,9 +902,14 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) ([]func(
 	// chain finalization should halt.
 SealLoop:
 	for _, seal := range parent.Payload.Seals {
+		// never process service events after epoch fallback is triggered
+		if isEpochFallbackTriggered {
+			break
+		}
+
 		result, err := m.results.ByID(seal.ResultID)
 		if err != nil {
-			return nil, fmt.Errorf("could not get result (id=%x) for seal (id=%x): %w", seal.ResultID, seal.ID(), err)
+			return nil, false, fmt.Errorf("could not get result (id=%x) for seal (id=%x): %w", seal.ResultID, seal.ID(), err)
 		}
 
 		for _, event := range result.ServiceEvents {
@@ -892,10 +920,12 @@ SealLoop:
 				// validate the service event
 				err := isValidExtendingEpochSetup(ev, activeSetup, epochStatus)
 				if protocol.IsInvalidServiceEventError(err) {
-					// EECC - we have observed an invalid service event, which is
-					// an unrecoverable failure. Flag this in the DB and exit
-					dbUpdates = append(dbUpdates, transaction.WithTx(operation.SetEpochEmergencyFallbackTriggered(blockID)))
+					// we have observed an invalid service event, which triggers epoch fallback mode
+					insertingCandidateTriggersEpochFallback = true
 					break SealLoop
+				}
+				if err != nil {
+					return nil, false, fmt.Errorf("unexpected error validating EpochSetup service event: %w", err)
 				}
 
 				// prevents multiple setup events for same Epoch (including multiple setup events in payload of same block)
@@ -908,15 +938,17 @@ SealLoop:
 
 				extendingSetup, err := m.epoch.setups.ByID(epochStatus.NextEpoch.SetupID)
 				if err != nil {
-					return nil, state.NewInvalidExtensionErrorf("could not retrieve next epoch setup: %s", err)
+					return nil, false, state.NewInvalidExtensionErrorf("could not retrieve next epoch setup: %s", err)
 				}
 				// validate the service event
 				err = isValidExtendingEpochCommit(ev, extendingSetup, activeSetup, epochStatus)
 				if protocol.IsInvalidServiceEventError(err) {
-					// EECC - we have observed an invalid service event, which is
-					// an unrecoverable failure. Flag this in the DB and exit
-					dbUpdates = append(dbUpdates, transaction.WithTx(operation.SetEpochEmergencyFallbackTriggered(blockID)))
+					// we have observed an invalid service event, which triggers epoch fallback mode
+					insertingCandidateTriggersEpochFallback = true
 					break SealLoop
+				}
+				if err != nil {
+					return nil, false, fmt.Errorf("unexpected error validating EpochCommit service event: %w", err)
 				}
 
 				// prevents multiple setup events for same Epoch (including multiple setup events in payload of same block)
@@ -926,15 +958,14 @@ SealLoop:
 				dbUpdates = append(dbUpdates, m.epoch.commits.StoreTx(ev))
 
 			default:
-				return nil, fmt.Errorf("invalid service event type: %s", event.Type)
+				return nil, false, fmt.Errorf("invalid service event type: %s", event.Type)
 			}
 		}
 	}
 
 	// always persist the candidate's epoch status
 	dbUpdates = append(dbUpdates, m.epoch.statuses.StoreTx(blockID, epochStatus))
-
-	return dbUpdates, nil
+	return
 }
 
 // MarkValid marks the block as valid in protocol state, and triggers

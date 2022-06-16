@@ -1226,8 +1226,10 @@ func TestEmergencyEpochFallback(t *testing.T) {
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
 		metricsMock := new(mockmodule.ComplianceMetrics)
 		mockMetricsForRootSnapshot(metricsMock, rootSnapshot)
+		protoEventsMock := new(mockprotocol.Consumer)
+		protoEventsMock.On("BlockFinalized", mock.Anything)
 
-		util.RunWithFullProtocolStateAndMetrics(t, rootSnapshot, metricsMock, func(db *badger.DB, state *protocol.MutableState) {
+		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.MutableState) {
 			head, err := rootSnapshot.Head()
 			require.NoError(t, err)
 			result, _, err := rootSnapshot.SealedResult()
@@ -1241,6 +1243,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 
 			// finalizing block 1 should trigger EECC
 			metricsMock.On("EpochEmergencyFallbackTriggered").Twice()
+			protoEventsMock.On("EpochEmergencyFallbackTriggered").Once()
 
 			// we begin the epoch in the EpochStaking phase and
 			// block 1 will be the first block on or past the epoch commitment deadline
@@ -1265,6 +1268,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			metricsMock.AssertNotCalled(t, "EpochTransition", mock.Anything, mock.Anything)
 			metricsMock.AssertNotCalled(t, "CurrentEpochCounter", epoch1Setup.Counter+1)
 			metricsMock.AssertExpectations(t)
+			protoEventsMock.AssertExpectations(t)
 		})
 	})
 
@@ -1281,8 +1285,10 @@ func TestEmergencyEpochFallback(t *testing.T) {
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
 		metricsMock := new(mockmodule.ComplianceMetrics)
 		mockMetricsForRootSnapshot(metricsMock, rootSnapshot)
+		protoEventsMock := new(mockprotocol.Consumer)
+		protoEventsMock.On("BlockFinalized", mock.Anything)
 
-		util.RunWithFullProtocolStateAndMetrics(t, rootSnapshot, metricsMock, func(db *badger.DB, state *protocol.MutableState) {
+		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.MutableState) {
 			head, err := rootSnapshot.Head()
 			require.NoError(t, err)
 			result, _, err := rootSnapshot.SealedResult()
@@ -1342,6 +1348,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 
 			// finalizing block 4 should trigger EECC
 			metricsMock.On("EpochEmergencyFallbackTriggered").Twice()
+			protoEventsMock.On("EpochEmergencyFallbackTriggered").Once()
 
 			err = state.Extend(context.Background(), block4)
 			require.NoError(t, err)
@@ -1362,6 +1369,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			metricsMock.AssertNotCalled(t, "EpochTransition", epoch2Setup.Counter, mock.Anything)
 			metricsMock.AssertNotCalled(t, "CurrentEpochCounter", epoch2Setup.Counter)
 			metricsMock.AssertExpectations(t)
+			protoEventsMock.AssertExpectations(t)
 		})
 	})
 
@@ -1378,8 +1386,10 @@ func TestEmergencyEpochFallback(t *testing.T) {
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
 		metricsMock := new(mockmodule.ComplianceMetrics)
 		mockMetricsForRootSnapshot(metricsMock, rootSnapshot)
+		protoEventsMock := new(mockprotocol.Consumer)
+		protoEventsMock.On("BlockFinalized", mock.Anything)
 
-		util.RunWithFullProtocolStateAndMetrics(t, rootSnapshot, metricsMock, func(db *badger.DB, state *protocol.MutableState) {
+		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.MutableState) {
 			head, err := rootSnapshot.Head()
 			require.NoError(t, err)
 			result, _, err := rootSnapshot.SealedResult()
@@ -1433,6 +1443,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 
 			// incorporating the service event should trigger EECC
 			metricsMock.On("EpochEmergencyFallbackTriggered").Twice()
+			protoEventsMock.On("EpochEmergencyFallbackTriggered").Once()
 
 			// block 4 is where the service event state change comes into effect
 			block4 := unittest.BlockWithParentFixture(block3.Header)
@@ -1455,6 +1466,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			metricsMock.AssertNotCalled(t, "EpochTransition", epoch2Setup.Counter, mock.Anything)
 			metricsMock.AssertNotCalled(t, "CurrentEpochCounter", epoch2Setup.Counter)
 			metricsMock.AssertExpectations(t)
+			protoEventsMock.AssertExpectations(t)
 		})
 	})
 }
@@ -1859,5 +1871,4 @@ func mockMetricsForRootSnapshot(metricsMock *mockmodule.ComplianceMetrics, rootS
 	metricsMock.On("BlockFinalized", mock.Anything)
 	metricsMock.On("FinalizedHeight", mock.Anything)
 	metricsMock.On("SealedHeight", mock.Anything)
-
 }
