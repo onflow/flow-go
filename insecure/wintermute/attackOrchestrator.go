@@ -6,7 +6,6 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -353,10 +352,10 @@ func (o *Orchestrator) replyWithAttestation(chunkDataPackRequestEvent *insecure.
 		consensusIds := o.allNodeIds.Filter(filter.HasRole(flow.RoleConsensus)).NodeIDs()
 		err = o.network.Send(&insecure.Event{
 			CorruptedNodeId: chunkDataPackRequestEvent.CorruptedNodeId,
-			Channel:         engine.PushApprovals,
-			Protocol:        insecure.Protocol_PUBLISH,
-			TargetNum:       0,
-			TargetIds:       consensusIds,
+			// Channel:         engine.PushApprovals,
+			Protocol:  insecure.Protocol_PUBLISH,
+			TargetNum: 0,
+			TargetIds: consensusIds,
 
 			// wrapping attestation in a result approval for sake of encoding and decoding.
 			FlowProtocolEvent: &flow.ResultApproval{Body: flow.ResultApprovalBody{Attestation: *attestation}},
