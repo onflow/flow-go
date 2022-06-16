@@ -8,18 +8,16 @@ import (
 	"net"
 
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/common/rpc"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-
-	"github.com/onflow/flow-go/engine/access/rpc"
-
-	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/common/rpc/convert"
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
 // Backend defines the core functionality required by the RPC API.
