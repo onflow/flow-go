@@ -51,7 +51,7 @@ func (r *ResultApprovalState) WaitForResultApproval(t *testing.T, verNodeID, res
 
 // WaitForTotalApprovalsFrom waits until "count" number of result approval for the given execution result id and
 // the chunk index is disseminated in the network from any subset of the given (verification) ids.
-// It returns the captured result approval.
+// It returns the captured result approvals.
 func (r *ResultApprovalState) WaitForTotalApprovalsFrom(
 	t *testing.T,
 	verificationIds flow.IdentifierList,
