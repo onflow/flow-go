@@ -43,7 +43,7 @@ func getBlobservice(ds datastore.Batching) network.BlobService {
 	return blobService
 }
 
-func getProvider(blobService network.BlobService) *provider.Provider {
+func getProvider(blobService network.BlobService) provider.Provider {
 	trackerStorage := new(mocktracker.Storage)
 	trackerStorage.On("Update", mock.AnythingOfType("UpdateFn")).Return(func(fn tracker.UpdateFn) error {
 		return fn(func(uint64, ...cid.Cid) error { return nil })
@@ -109,7 +109,7 @@ func TestHappyPath(t *testing.T) {
 
 	test := func(numChunks int, minSerializedSizePerChunk uint64) {
 		expected := generateBlockExecutionData(t, numChunks, minSerializedSizePerChunk)
-		executionDataID, err := provider.Provide(context.Background(), 0, expected)
+		executionDataID, _, err := provider.Provide(context.Background(), 0, expected)
 		require.NoError(t, err)
 		actual, err := store.GetExecutionData(context.Background(), executionDataID)
 		require.NoError(t, err)
@@ -126,7 +126,7 @@ func TestProvideContextCanceled(t *testing.T) {
 	bed := generateBlockExecutionData(t, 5, 5*execution_data.DefaultMaxBlobSize)
 
 	provider := getProvider(getBlobservice(getDatastore()))
-	_, err := provider.Provide(context.Background(), 0, bed)
+	_, _, err := provider.Provide(context.Background(), 0, bed)
 	require.NoError(t, err)
 
 	blobService := new(mocknetwork.BlobService)
@@ -138,6 +138,6 @@ func TestProvideContextCanceled(t *testing.T) {
 	provider = getProvider(blobService)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	_, err = provider.Provide(ctx, 0, bed)
+	_, _, err = provider.Provide(ctx, 0, bed)
 	assert.ErrorIs(t, err, ctx.Err())
 }

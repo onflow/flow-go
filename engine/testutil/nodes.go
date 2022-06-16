@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	mockprovider "github.com/onflow/flow-go/module/executiondatasync/provider/mock"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -67,7 +68,6 @@ import (
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
-	state_synchronization "github.com/onflow/flow-go/module/state_synchronization/mock"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/module/validation"
 	"github.com/onflow/flow-go/network/p2p"
@@ -551,11 +551,13 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	)
 	committer := committer.NewLedgerViewCommitter(ls, node.Tracer)
 
-	eds := new(state_synchronization.ExecutionDataService)
-	eds.On("Add", mock.Anything, mock.Anything).Return(flow.ZeroID, nil, nil)
+	//eds := new(state_synchronization.ExecutionDataService)
+	//eds.On("Add", mock.Anything, mock.Anything).Return(flow.ZeroID, nil, nil)
+	//
+	//edCache := new(state_synchronization.ExecutionDataCIDCache)
+	//edCache.On("Insert", mock.AnythingOfType("*flow.Header"), mock.AnythingOfType("BlobTree"))
 
-	edCache := new(state_synchronization.ExecutionDataCIDCache)
-	edCache.On("Insert", mock.AnythingOfType("*flow.Header"), mock.AnythingOfType("BlobTree"))
+	edProvider := new(mockprovider.Provider)
 
 	computationEngine, err := computation.New(
 		node.Log,
@@ -570,8 +572,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		computation.DefaultScriptLogThreshold,
 		computation.DefaultScriptExecutionTimeLimit,
 		nil,
-		eds,
-		edCache,
+		edProvider,
 	)
 	require.NoError(t, err)
 
@@ -611,6 +612,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		false,
 		checkAuthorizedAtBlock,
 		false,
+		nil, // nil ok?
 	)
 	require.NoError(t, err)
 	requestEngine.WithHandle(ingestionEngine.OnCollection)

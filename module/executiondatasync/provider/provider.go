@@ -17,21 +17,26 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-type ProviderOption func(*Provider)
+type ProviderOption func(*ExecutionDataProvider)
 
 func WithBlobSizeLimit(size int) ProviderOption {
-	return func(p *Provider) {
+	return func(p *ExecutionDataProvider) {
 		p.maxBlobSize = size
 	}
 }
 
-type Provider struct {
-	logger      zerolog.Logger
-	metrics     module.ExecutionDataProviderMetrics
-	maxBlobSize int
-	serializer  execution_data.Serializer
-	blobService network.BlobService
-	storage     tracker.Storage
+type Provider interface {
+	Provide(ctx context.Context, blockHeight uint64, executionData *execution_data.BlockExecutionData) (flow.Identifier, *execution_data.BlockExecutionDataRoot, error)
+}
+
+type ExecutionDataProvider struct {
+	logger       zerolog.Logger
+	metrics      module.ExecutionDataProviderMetrics
+	maxBlobSize  int
+	serializer   execution_data.Serializer
+	blobService  network.BlobService
+	storage      tracker.Storage
+	cidsProvider *ExecutionDataCIDProvider
 }
 
 func NewProvider(
@@ -40,15 +45,17 @@ func NewProvider(
 	serializer execution_data.Serializer,
 	blobService network.BlobService,
 	storage tracker.Storage,
+	cidsProvider *ExecutionDataCIDProvider,
 	opts ...ProviderOption,
-) *Provider {
-	p := &Provider{
-		logger:      logger.With().Str("component", "execution_data_provider").Logger(),
-		metrics:     metrics,
-		maxBlobSize: execution_data.DefaultMaxBlobSize,
-		serializer:  serializer,
-		blobService: blobService,
-		storage:     storage,
+) *ExecutionDataProvider {
+	p := &ExecutionDataProvider{
+		logger:       logger.With().Str("component", "execution_data_provider").Logger(),
+		metrics:      metrics,
+		maxBlobSize:  execution_data.DefaultMaxBlobSize,
+		serializer:   serializer,
+		blobService:  blobService,
+		storage:      storage,
+		cidsProvider: NewExecutionDataCIDProvider(serializer),
 	}
 
 	for _, opt := range opts {
@@ -58,7 +65,7 @@ func NewProvider(
 	return p
 }
 
-func (p *Provider) storeBlobs(parent context.Context, blockHeight uint64, blobCh <-chan blobs.Blob) <-chan error {
+func (p *ExecutionDataProvider) storeBlobs(parent context.Context, blockHeight uint64, blobCh <-chan blobs.Blob) <-chan error {
 	ch := make(chan error, 1)
 	go func() {
 		defer close(ch)
@@ -107,7 +114,7 @@ func (p *Provider) storeBlobs(parent context.Context, blockHeight uint64, blobCh
 	return ch
 }
 
-func (p *Provider) Provide(ctx context.Context, blockHeight uint64, executionData *execution_data.BlockExecutionData) (flow.Identifier, *execution_data.BlockExecutionDataRoot, error) {
+func (p *ExecutionDataProvider) Provide(ctx context.Context, blockHeight uint64, executionData *execution_data.BlockExecutionData) (flow.Identifier, *execution_data.BlockExecutionDataRoot, error) {
 	rootID, rootData, errCh, err := p.provide(ctx, blockHeight, executionData)
 	storeErr, ok := <-errCh
 
@@ -122,7 +129,7 @@ func (p *Provider) Provide(ctx context.Context, blockHeight uint64, executionDat
 	}
 }
 
-func (p *Provider) provide(ctx context.Context, blockHeight uint64, executionData *execution_data.BlockExecutionData) (flow.Identifier, *execution_data.BlockExecutionDataRoot, <-chan error, error) {
+func (p *ExecutionDataProvider) provide(ctx context.Context, blockHeight uint64, executionData *execution_data.BlockExecutionData) (flow.Identifier, *execution_data.BlockExecutionDataRoot, <-chan error, error) {
 	logger := p.logger.With().Uint64("height", blockHeight).Str("block_id", executionData.BlockID.String()).Logger()
 	logger.Debug().Msg("providing execution data")
 
@@ -141,7 +148,7 @@ func (p *Provider) provide(ctx context.Context, blockHeight uint64, executionDat
 
 		g.Go(func() error {
 			logger.Debug().Int("chunk_index", i).Msg("adding chunk execution data")
-			cedID, err := p.addChunkExecutionData(gCtx, chunkExecutionData, blobCh)
+			cedID, err := p.cidsProvider.AddChunkExecutionData(gCtx, chunkExecutionData, blobCh)
 			if err != nil {
 				return fmt.Errorf("failed to add chunk execution data at index %d: %w", i, err)
 			}
@@ -160,7 +167,7 @@ func (p *Provider) provide(ctx context.Context, blockHeight uint64, executionDat
 		BlockID:               executionData.BlockID,
 		ChunkExecutionDataIDs: chunkDataIDs,
 	}
-	rootID, err := p.addExecutionDataRoot(ctx, edRoot, blobCh)
+	rootID, err := p.cidsProvider.AddExecutionDataRoot(ctx, edRoot, blobCh)
 	if err != nil {
 		return flow.ZeroID, nil, errCh, fmt.Errorf("failed to add execution data root: %w", err)
 	}
@@ -172,7 +179,19 @@ func (p *Provider) provide(ctx context.Context, blockHeight uint64, executionDat
 	return rootID, edRoot, errCh, nil
 }
 
-func (p *Provider) addExecutionDataRoot(
+func NewExecutionDataCIDProvider(serializer execution_data.Serializer) *ExecutionDataCIDProvider {
+	return &ExecutionDataCIDProvider{
+		serializer:  serializer,
+		maxBlobSize: execution_data.DefaultMaxBlobSize,
+	}
+}
+
+type ExecutionDataCIDProvider struct {
+	serializer  execution_data.Serializer
+	maxBlobSize int
+}
+
+func (p *ExecutionDataCIDProvider) AddExecutionDataRoot(
 	ctx context.Context,
 	edRoot *execution_data.BlockExecutionDataRoot,
 	blobCh chan<- blobs.Blob,
@@ -193,12 +212,12 @@ func (p *Provider) addExecutionDataRoot(
 	return rootID, nil
 }
 
-func (p *Provider) addChunkExecutionData(
+func (p *ExecutionDataCIDProvider) AddChunkExecutionData(
 	ctx context.Context,
 	ced *execution_data.ChunkExecutionData,
 	blobCh chan<- blobs.Blob,
 ) (cid.Cid, error) {
-	cids, err := p.addBlobs(ctx, ced, blobCh)
+	cids, err := p.AddBlobs(ctx, ced, blobCh)
 	if err != nil {
 		return cid.Undef, fmt.Errorf("failed to add chunk execution data blobs: %w", err)
 	}
@@ -208,14 +227,14 @@ func (p *Provider) addChunkExecutionData(
 			return cids[0], nil
 		}
 
-		if cids, err = p.addBlobs(ctx, cids, blobCh); err != nil {
+		if cids, err = p.AddBlobs(ctx, cids, blobCh); err != nil {
 			return cid.Undef, fmt.Errorf("failed to add cid blobs: %w", err)
 		}
 	}
 }
 
 // addBlobs serializes the given object, splits the serialized data into blobs, and sends them to the given channel.
-func (p *Provider) addBlobs(ctx context.Context, v interface{}, blobCh chan<- blobs.Blob) ([]cid.Cid, error) {
+func (p *ExecutionDataCIDProvider) AddBlobs(ctx context.Context, v interface{}, blobCh chan<- blobs.Blob) ([]cid.Cid, error) {
 	bcw := blobs.NewBlobChannelWriter(blobCh, p.maxBlobSize)
 	defer bcw.Close()
 
