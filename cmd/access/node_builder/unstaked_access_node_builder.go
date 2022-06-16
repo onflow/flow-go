@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/crypto"
 
 	"github.com/onflow/flow-go/cmd"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
@@ -295,7 +294,7 @@ func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 			return nil, err
 		}
 
-		builder.Network = converter.NewNetwork(net, engine.SyncCommittee, engine.PublicSyncCommittee)
+		builder.Network = converter.NewNetwork(net, network.SyncCommittee, network.PublicSyncCommittee)
 
 		builder.Logger.Info().Msgf("network will run on address: %s", builder.BindAddr)
 
@@ -333,6 +332,7 @@ func (builder *UnstakedAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 		builder.SporkID,
 		p2p.DefaultUnicastTimeout,
 		builder.IDTranslator,
+		builder.CodecFactory(),
 		p2p.WithMessageValidators(validators...),
 		// no peer manager
 		// use default identifier provider

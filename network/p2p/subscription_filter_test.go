@@ -10,7 +10,6 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/network"
@@ -51,15 +50,15 @@ func TestFilterSubscribe(t *testing.T) {
 	require.NoError(t, node1.AddPeer(context.TODO(), *host.InfoFromHost(node2.Host())))
 	require.NoError(t, node1.AddPeer(context.TODO(), *host.InfoFromHost(unstakedNode.Host())))
 
-	badTopic := engine.TopicFromChannel(engine.SyncCommittee, sporkId)
+	badTopic := network.TopicFromChannel(network.SyncCommittee, sporkId)
 
-	sub1, err := node1.Subscribe(badTopic)
+	sub1, err := node1.Subscribe(badTopic, unittest.NetworkCodec())
 	require.NoError(t, err)
 
-	sub2, err := node2.Subscribe(badTopic)
+	sub2, err := node2.Subscribe(badTopic, unittest.NetworkCodec())
 	require.NoError(t, err)
 
-	unstakedSub, err := unstakedNode.Subscribe(badTopic)
+	unstakedSub, err := unstakedNode.Subscribe(badTopic, unittest.NetworkCodec())
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
@@ -129,26 +128,26 @@ func TestCanSubscribe(t *testing.T) {
 		unittest.RequireCloseBefore(t, done, 1*time.Second, "could not stop collection node on time")
 	}()
 
-	goodTopic := engine.TopicFromChannel(engine.ProvideCollections, sporkId)
-	_, err := collectionNode.Subscribe(goodTopic)
+	goodTopic := network.TopicFromChannel(network.ProvideCollections, sporkId)
+	_, err := collectionNode.Subscribe(goodTopic, unittest.NetworkCodec())
 	require.NoError(t, err)
 
 	var badTopic network.Topic
 	allowedChannels := make(map[network.Channel]struct{})
-	for _, ch := range engine.ChannelsByRole(flow.RoleCollection) {
+	for _, ch := range network.ChannelsByRole(flow.RoleCollection) {
 		allowedChannels[ch] = struct{}{}
 	}
-	for _, ch := range engine.Channels() {
+	for _, ch := range network.Channels() {
 		if _, ok := allowedChannels[ch]; !ok {
-			badTopic = engine.TopicFromChannel(ch, sporkId)
+			badTopic = network.TopicFromChannel(ch, sporkId)
 			break
 		}
 	}
-	_, err = collectionNode.Subscribe(badTopic)
+	_, err = collectionNode.Subscribe(badTopic, unittest.NetworkCodec())
 	require.Error(t, err)
 
-	clusterTopic := engine.TopicFromChannel(engine.ChannelSyncCluster(flow.Emulator), sporkId)
-	_, err = collectionNode.Subscribe(clusterTopic)
+	clusterTopic := network.TopicFromChannel(network.ChannelSyncCluster(flow.Emulator), sporkId)
+	_, err = collectionNode.Subscribe(clusterTopic, unittest.NetworkCodec())
 	require.NoError(t, err)
 }
 

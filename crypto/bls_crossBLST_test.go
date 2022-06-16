@@ -44,7 +44,7 @@ func validSignatureBytesFlow(t *rapid.T) []byte {
 	seed := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLenBLSBLS12381, KeyGenSeedMaxLenBLSBLS12381).Draw(t, "seed").([]byte)
 	sk, err := GeneratePrivateKey(BLSBLS12381, seed)
 	require.NoError(t, err)
-	hasher := NewBLSKMAC("random_tag")
+	hasher := NewExpandMsgXOFKMAC128("random_tag")
 	message := rapid.SliceOfN(rapid.Byte(), 1, 1000).Draw(t, "msg").([]byte)
 	signature, err := sk.Sign(message, hasher)
 	require.NoError(t, err)
@@ -166,7 +166,7 @@ func testEncodeDecodeSignatureCrossBLST(t *rapid.T) {
 // The tests assumes the used hash-to-field and map-to-curve are identical in the 2 signatures:
 // - hash-to-field : use XMD_SHA256 in both signatures
 // - map to curve : Flow and BLST use an SWU mapping consistent with the test vector in
-// https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-11#appendix-J.9.1
+// https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-14#appendix-J.9.1
 // (Flow map to curve is tested agaisnt the IETF draft in TestMapToG1, BLST map to curve is not
 // tested in this repo)
 //

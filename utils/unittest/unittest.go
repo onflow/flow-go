@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network"
+	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
@@ -377,4 +379,9 @@ func Concurrently(n int, f func(int)) {
 // AssertEqualBlocksLenAndOrder asserts that both a segment of blocks have the same len and blocks are in the same order
 func AssertEqualBlocksLenAndOrder(t *testing.T, expectedBlocks, actualSegmentBlocks []*flow.Block) {
 	assert.Equal(t, flow.GetIDs(expectedBlocks), flow.GetIDs(actualSegmentBlocks))
+}
+
+// NetworkCodec returns cbor codec
+func NetworkCodec() network.Codec {
+	return cborcodec.NewCodec()
 }
