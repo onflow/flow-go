@@ -60,19 +60,17 @@ type PaceMaker interface {
 
 	// ProcessQC will check if the given QC will allow PaceMaker to fast-forward to QC.view+1.
 	// If PaceMaker incremented the current View, a NewViewEvent will be returned.
-	ProcessQC(qc *flow.QuorumCertificate) (*model.NewViewEvent, bool)
+	// No errors are expected during normal operation.
+	ProcessQC(qc *flow.QuorumCertificate) (*model.NewViewEvent, error)
 
 	// ProcessTC will check if the given TC will allow PaceMaker to fast-forward to TC.view+1.
 	// If PaceMaker incremented the current View, a NewViewEvent will be returned.
-	ProcessTC(tc *flow.TimeoutCertificate) (*model.NewViewEvent, bool)
+	// No errors are expected during normal operation.
+	ProcessTC(tc *flow.TimeoutCertificate) (*model.NewViewEvent, error)
 
 	// TimeoutChannel returns the timeout channel for the CURRENTLY ACTIVE timeout.
 	// Each time the pacemaker starts a new timeout, this channel is replaced.
 	TimeoutChannel() <-chan time.Time
-
-	// OnPartialTC is called when TimeoutAggregator has collected f+1 timeouts. This implements Bracha style timeouts,
-	// which times out current view after receiving partial TC.
-	OnPartialTC(curView uint64)
 
 	// Start starts the PaceMaker (i.e. the timeout for the configured starting value for view).
 	Start()
