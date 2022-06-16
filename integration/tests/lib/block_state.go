@@ -201,7 +201,7 @@ func (bs *BlockState) WaitForSealed(t *testing.T, height uint64) *messages.Block
 	require.Eventually(t,
 		func() bool {
 			if bs.highestSealed != nil {
-				t.Logf("waiting for sealed height (%d/%d)", bs.highestSealed.Header.Height, height)
+				t.Logf("waiting for sealed height (%d/%d), last finalized %d", bs.highestSealed.Header.Height, height, bs.highestFinalized)
 			}
 			return bs.highestSealed != nil && bs.highestSealed.Header.Height >= height
 		},
