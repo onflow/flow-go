@@ -17,6 +17,9 @@ type Local interface {
 	// Address returns the (listen) address of the local node.
 	Address() string
 
+	// StakedNode returns true if the local node is a staked node. (i.e. not an observer)
+	StakedNode() bool
+
 	// Sign provides a signature oracle that given a message and hasher, it
 	// generates and returns a signature over the message using the node's private key
 	// as well as the input hasher

@@ -37,6 +37,10 @@ func (l *Local) Address() string {
 	return l.me.Address
 }
 
+func (l *Local) StakedNode() bool {
+	return true
+}
+
 func (l *Local) Sign(msg []byte, hasher hash.Hasher) (crypto.Signature, error) {
 	return l.sk.Sign(msg, hasher)
 }

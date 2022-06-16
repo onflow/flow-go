@@ -81,7 +81,12 @@ func New(
 		tracer:         tracer,
 	}
 
-	con, err := net.Register(channels.ReceiveBlocks, e)
+	channel := channels.ReceiveBlocks
+	if !me.StakedNode() {
+		channel = channels.PublicPushBlocks
+	}
+
+	con, err := net.Register(channel, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine to network: %w", err)
 	}

@@ -64,6 +64,7 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel channels.Channel, get
 			log.Error().
 				Err(err).
 				Str("peer_id", from.String()).
+				Str("peer_node_id", identity.NodeID.String()).
 				Str("role", identity.Role.String()).
 				Str("peer_node_id", identity.NodeID.String()).
 				Str("message_type", msgType).
@@ -107,6 +108,10 @@ func isAuthorizedSender(identity *flow.Identity, channel channels.Channel, msg i
 	conf, err := message.GetMessageAuthConfig(msg)
 	if err != nil {
 		return "", err
+	}
+
+	if network.PublicChannels().Contains(channel) {
+		return conf.String, nil
 	}
 
 	// handle special case for cluster prefixed channels
