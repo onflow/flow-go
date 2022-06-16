@@ -201,7 +201,7 @@ func (r *Requester) runDispatcher(results storage.ExecutionResults, fulfilledHei
 				Uint64("block_height", h).
 				Msg("pre-submitting job")
 
-			r.fulfiller.submitSealedResult(sealedResult.ID())
+			r.fulfiller.submitSealedResult(sealedResult.ID(), h)
 			r.handler.submitJob(&job{
 				ctx:             ctx,
 				resultID:        sealedResult.ID(),
