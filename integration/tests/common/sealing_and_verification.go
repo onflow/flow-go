@@ -66,9 +66,8 @@ func SealingAndVerificationHappyPathTest(
 	}
 
 	// waits until blockB is sealed by consensus nodes after result approvals for all of its chunks emitted.
-	// blockState.WaitForSealed(t, blockB.Header.Height)
-	// waits till sealing height goes beyond the victim block
-	blockState.WaitForSealed(t, blockB.Header.Height+1)
+	// waits until we seal a height equal to the victim block height
+	blockState.WaitForSealed(t, blockB.Header.Height)
 	// then checks querying victim block by height returns the victim block itself.
 	blockByHeight, ok := blockState.FinalizedHeight(blockB.Header.Height)
 	require.True(t, ok)
