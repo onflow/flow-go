@@ -715,6 +715,7 @@ func TestWintermute_ResultApproval(t *testing.T) {
 
 	// mocks attack network
 	mockAttackNetwork := &mockinsecure.AttackNetwork{}
+	// Send() method should never be called, don't set method mock
 	wintermuteOrchestrator.WithAttackNetwork(mockAttackNetwork)
 
 	// sends approval to the orchestrator
