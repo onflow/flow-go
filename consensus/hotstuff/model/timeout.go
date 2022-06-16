@@ -41,9 +41,22 @@ type TimeoutObject struct {
 	SigData crypto.Signature
 }
 
-// ID returns the identifier for the vote.
+// ID returns the TimeoutObject's identifier
 func (t *TimeoutObject) ID() flow.Identifier {
-	return flow.MakeID(t)
+	body := struct {
+		View         uint64
+		NewestQCID   flow.Identifier
+		LastViewTCID flow.Identifier
+		SignerID     flow.Identifier
+		SigData      crypto.Signature
+	}{
+		View:         t.View,
+		NewestQCID:   t.NewestQC.ID(),
+		LastViewTCID: t.LastViewTC.ID(),
+		SignerID:     t.SignerID,
+		SigData:      t.SigData,
+	}
+	return flow.MakeID(body)
 }
 
 func (t *TimeoutObject) String() string {
