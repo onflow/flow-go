@@ -1211,18 +1211,6 @@ func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
 // when an epoch fails to be committed before the epoch commitment deadline,
 // or when an invalid service event (indicating service account smart contract bug)
 // is sealed.
-//
-// CASES:
-// Service Events:
-// * seal an invalid flow.EpochSetup event
-// * seal an invalid flow.EpochCommit event
-// * seal a valid flow.EpochCommit event before a flow.EpochSetup event
-// * seal two consecutive flow.EpochSetup events
-// * seal two consecutive flow.EpochCommit events
-//
-// Block Finalization:
-// * finalize a block past epoch commitment deadline, while in EpochStaking Phase
-// * finalize a block past epoch commitment deadline, while in EpochSetup Phase
 func TestEmergencyEpochFallback(t *testing.T) {
 
 	// if we finalize the first block past the epoch commitment deadline while
@@ -1377,74 +1365,15 @@ func TestEmergencyEpochFallback(t *testing.T) {
 		})
 	})
 
-	// if we reach the first block of the next epoch before either setup and commit
-	// service events are finalized, the chain should continue with the previous epoch.
-	//
-	// ROOT <- B1 <- B2(R1) <- B3(S1) <- B4
-	t.Run("epoch transition without setup event - should continue with fallback epoch", func(t *testing.T) {
-
-		rootSnapshot := unittest.RootSnapshotFixture(participants)
-		metricsMock := new(mockmodule.ComplianceMetrics)
-		mockMetricsForRootSnapshot(metricsMock, rootSnapshot)
-
-		util.RunWithFullProtocolStateAndMetrics(t, rootSnapshot, metricsMock, func(db *badger.DB, state *protocol.MutableState) {
-			head, err := rootSnapshot.Head()
-			require.NoError(t, err)
-			result, _, err := rootSnapshot.SealedResult()
-			require.NoError(t, err)
-
-			// add a block for the first seal to reference
-			block1 := unittest.BlockWithParentFixture(head)
-			block1.SetPayload(flow.EmptyPayload())
-			err = state.Extend(context.Background(), block1)
-			require.NoError(t, err)
-			err = state.Finalize(context.Background(), block1.ID())
-			require.NoError(t, err)
-
-			epoch1Setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
-			receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
-
-			// add a block containing a receipt for block 1
-			block2 := unittest.BlockWithParentFixture(block1.Header)
-			block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
-			err = state.Extend(context.Background(), block2)
-			require.NoError(t, err)
-			err = state.Finalize(context.Background(), block2.ID())
-			require.NoError(t, err)
-
-			// block 3 seals block 1
-			block3 := unittest.BlockWithParentFixture(block2.Header)
-			block3.SetPayload(flow.Payload{
-				Seals: []*flow.Seal{seal1},
-			})
-			err = state.Extend(context.Background(), block3)
-			require.NoError(t, err)
-
-			// block 4 will be the first block for epoch 2
-			block4 := unittest.BlockWithParentFixture(block3.Header)
-			block4.Header.View = epoch1Setup.FinalView + 1
-
-			// inserting block 4 should trigger EECC
-			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
-
-			err = state.Extend(context.Background(), block4)
-			require.NoError(t, err)
-
-			assertEpochEmergencyFallbackTriggered(t, db)
-
-			// epoch metrics should not be emitted
-			metricsMock.AssertNotCalled(t, "EpochTransition", epoch1Setup.Counter+1, mock.Anything)
-			metricsMock.AssertNotCalled(t, "CurrentEpochCounter", epoch1Setup.Counter+1)
-			metricsMock.AssertExpectations(t)
-		})
-	})
-
 	// if an invalid epoch service event is incorporated, we should:
 	//  * not apply the phase transition corresponding to the invalid service event
-	//  * trigger EECC
+	//  * immediately trigger EECC
 	//
-	// ROOT <- B1 <- B2(R1) <- B3(S1) <- B4
-	t.Run("epoch transition with invalid service event - should continue with fallback epoch", func(t *testing.T) {
+	//                                       Epoch Boundary
+	//                                       |
+	//                                       v
+	// ROOT <- B1 <- B2(R1) <- B3(S1) <- B4 <- B5
+	t.Run("epoch transition with invalid service event - should trigger EECC", func(t *testing.T) {
 
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
 		metricsMock := new(mockmodule.ComplianceMetrics)
@@ -1483,9 +1412,6 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
 			receipt1.ExecutionResult.ServiceEvents = []flow.ServiceEvent{epoch2Setup.ServiceEvent()}
 
-			// incorporating the service event should trigger EECC
-			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
-
 			// add a block containing a receipt for block 1
 			block2 := unittest.BlockWithParentFixture(block1.Header)
 			block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
@@ -1501,17 +1427,30 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			})
 			err = state.Extend(context.Background(), block3)
 			require.NoError(t, err)
+			err = state.Finalize(context.Background(), block3.ID())
+			require.NoError(t, err)
 
-			// block 4 will be the first block for epoch 2
+			// incorporating the service event should trigger EECC
+			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
+
+			// block 4 is where the service event state change comes into effect
 			block4 := unittest.BlockWithParentFixture(block3.Header)
-			block4.Header.View = epoch1Setup.FinalView + 1
-
 			err = state.Extend(context.Background(), block4)
+			require.NoError(t, err)
+			err = state.Finalize(context.Background(), block4.ID())
 			require.NoError(t, err)
 
 			assertEpochEmergencyFallbackTriggered(t, db)
 
-			// epoch metrics should not be emitted
+			// block 5 is the first block past the current epoch boundary
+			block5 := unittest.BlockWithParentFixture(block4.Header)
+			block5.Header.View = epoch1Setup.FinalView + 1
+			err = state.Extend(context.Background(), block5)
+			require.NoError(t, err)
+			err = state.Finalize(context.Background(), block5.ID())
+			require.NoError(t, err)
+
+			// since EECC has been triggered, epoch transition metrics should not be updated
 			metricsMock.AssertNotCalled(t, "EpochTransition", epoch2Setup.Counter, mock.Anything)
 			metricsMock.AssertNotCalled(t, "CurrentEpochCounter", epoch2Setup.Counter)
 			metricsMock.AssertExpectations(t)
