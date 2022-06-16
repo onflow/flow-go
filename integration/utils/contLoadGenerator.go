@@ -37,7 +37,6 @@ const tokensPerTransfer = 0.01     // flow testnets only have 10e6 total supply,
 type ContLoadGenerator struct {
 	log                  zerolog.Logger
 	loaderMetrics        *metrics.LoaderCollector
-	initialized          bool
 	tps                  int
 	numberOfAccounts     int
 	flowClient           *client.Client
@@ -52,7 +51,6 @@ type ContLoadGenerator struct {
 	stopped              bool
 	loadType             LoadType
 	follower             TxFollower
-	feedbackEnabled      bool
 	availableAccountsLo  int
 }
 
@@ -93,7 +91,6 @@ func NewContLoadGenerator(
 	lGen := &ContLoadGenerator{
 		log:                  log,
 		loaderMetrics:        loaderMetrics,
-		initialized:          false,
 		tps:                  tps,
 		numberOfAccounts:     numberOfAccounts,
 		flowClient:           flowClient,
@@ -105,7 +102,6 @@ func NewContLoadGenerator(
 		workerStatsTracker:   NewWorkerStatsTracker(),
 		follower:             follower,
 		loadType:             loadType,
-		feedbackEnabled:      feedbackEnabled,
 		availableAccountsLo:  numberOfAccounts,
 	}
 
