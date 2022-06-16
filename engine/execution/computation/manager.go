@@ -89,7 +89,7 @@ func New(
 	scriptLogThreshold time.Duration,
 	scriptExecutionTimeLimit time.Duration,
 	uploaders []uploader.Uploader,
-	executionDataProvider *provider.Provider,
+	executionDataProvider provider.Provider,
 ) (*Manager, error) {
 	log := logger.With().Str("engine", "computation").Logger()
 

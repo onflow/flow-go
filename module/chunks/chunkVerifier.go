@@ -4,6 +4,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/flow-go/ledger/common/pathfinder"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/blueprints"
@@ -104,6 +107,11 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 
 	if chunkDataPack == nil {
 		return nil, nil, fmt.Errorf("missing chunk data pack")
+	}
+
+	if int(chIndex) >= len(result.Chunks) {
+		return nil, chmodels.NewCFInvalidVerifiableChunk("error constructing partial trie: ", fmt.Errorf("chunk index out of bounds of ExecutionResult's chunk list"), chIndex, execResID),
+			nil
 	}
 
 	events := make(flow.EventsList, 0)
@@ -270,6 +278,53 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 			return nil, chmodels.NewCFMissingRegisterTouch(stringKeys, chIndex, execResID, problematicTx), nil
 		}
 		return nil, chmodels.NewCFMissingRegisterTouch(nil, chIndex, execResID, problematicTx), nil
+	}
+
+	// check basic execution data root fields
+	if chunkDataPack.ExecutionDataRoot.BlockID != chunk.BlockID {
+		return nil, chmodels.NewCFExecutionDataBlockIDMismatch(chunkDataPack.ExecutionDataRoot.BlockID, chunk.BlockID, chIndex, execResID), nil
+	}
+
+	if len(chunkDataPack.ExecutionDataRoot.ChunkExecutionDataIDs) != len(result.Chunks) {
+		return nil, chmodels.NewCFExecutionDataChunksLengthMismatch(len(chunkDataPack.ExecutionDataRoot.ChunkExecutionDataIDs), len(result.Chunks), chIndex, execResID), nil
+	}
+
+	// check our chunk id inside
+	trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, partial.DefaultPathFinderVersion)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to convert to trie update: %w", err)
+	}
+
+	chunkExecutionData := &execution_data.ChunkExecutionData{
+		Collection: chunkDataPack.Collection,
+		Events:     events,
+		TrieUpdate: trieUpdate,
+	}
+
+	cidProvider := provider.NewExecutionDataCIDProvider(execution_data.DefaultSerializer)
+
+	cedID, err := cidProvider.AddChunkExecutionData(nil, chunkExecutionData, nil)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to calculate CID of ChunkExecutionData: %w", err)
+	}
+
+	// we checked that index is valid
+	if cedID != chunkDataPack.ExecutionDataRoot.ChunkExecutionDataIDs[chIndex] {
+		return nil, chmodels.NewCFExecutionDataInvalidChunkCID(
+			chunkDataPack.ExecutionDataRoot.ChunkExecutionDataIDs[chIndex],
+			cedID,
+			chIndex,
+			execResID,
+		), nil
+	}
+
+	executionDataID, err := cidProvider.AddExecutionDataRoot(nil, &chunkDataPack.ExecutionDataRoot, nil)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to calculate ID of ExecutionDataRoot: %w", err)
+	}
+
+	if result.ExecutionDataID != executionDataID {
+		return nil, chmodels.NewCFInvalidExecutionDataID(result.ExecutionDataID, executionDataID, chIndex, execResID), nil
 	}
 
 	// TODO check if exec node provided register touches that was not used (no read and no update)

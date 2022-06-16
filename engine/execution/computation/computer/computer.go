@@ -56,7 +56,7 @@ type blockComputer struct {
 	log                   zerolog.Logger
 	systemChunkCtx        fvm.Context
 	committer             ViewCommitter
-	executionDataProvider *provider.Provider
+	executionDataProvider provider.Provider
 }
 
 func SystemChunkContext(vmCtx fvm.Context, logger zerolog.Logger) fvm.Context {
@@ -82,7 +82,7 @@ func NewBlockComputer(
 	tracer module.Tracer,
 	logger zerolog.Logger,
 	committer ViewCommitter,
-	executionDataProvider *provider.Provider,
+	executionDataProvider provider.Provider,
 ) (BlockComputer, error) {
 	return &blockComputer{
 		vm:                    vm,

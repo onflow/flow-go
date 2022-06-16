@@ -64,7 +64,9 @@ func (bw *BlobChannelWriter) Write(data []byte) (int, error) {
 // sendNewBlob sends the currently buffered data to the blob channel and resets the buffer.
 func (bw *BlobChannelWriter) sendNewBlob() {
 	blob := NewBlob(bw.buf.Bytes())
-	bw.blobs <- blob
+	if bw.blobs != nil {
+		bw.blobs <- blob
+	}
 	bw.cids = append(bw.cids, blob.Cid())
 	bw.bytesSent += uint64(bw.buf.Len())
 
