@@ -19,7 +19,7 @@ import (
 	p2ppubsub "github.com/libp2p/go-libp2p-pubsub"
 
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
-	"github.com/onflow/flow-go/apiservice"
+	"github.com/onflow/flow-go/apiproxy"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -962,7 +962,7 @@ func (builder *ObserverServiceBuilder) enqueueConnectWithStakedAN() {
 func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 	builder.Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		ids := builder.upstreamIdentities
-		proxy, err := apiservice.NewFlowCachedAccessAPI(ids, builder.apiTimeout)
+		proxy, err := apiproxy.NewFlowCachedAccessAPIProxy(ids, builder.apiTimeout)
 		if err != nil {
 			return nil, err
 		}

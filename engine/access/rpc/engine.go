@@ -17,7 +17,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
-	observer "github.com/onflow/flow-go/apiservice"
+	observer "github.com/onflow/flow-go/apiproxy"
 
 	"github.com/onflow/flow-go/access"
 	legacyaccess "github.com/onflow/flow-go/access/legacy"
@@ -92,7 +92,7 @@ func New(log zerolog.Logger,
 	rpcMetricsEnabled bool,
 	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the Access API e.g. Ping->100, GetTransaction->300
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the Access API e.g. Ping->50, GetTransaction->10
-	proxy *observer.FlowCachedAccessAPI,
+	proxy *observer.FlowCachedAccessAPIProxy,
 ) (*Engine, error) {
 
 	log = log.With().Str("engine", "rpc").Logger()

@@ -3,9 +3,8 @@
 package mock
 
 import (
-	mock "github.com/stretchr/testify/mock"
-
 	ledger "github.com/onflow/flow-go/ledger"
+	mock "github.com/stretchr/testify/mock"
 
 	testing "testing"
 )
@@ -29,13 +28,13 @@ func (_m *Reporter) Name() string {
 	return r0
 }
 
-// Report provides a mock function with given fields: payloads
-func (_m *Reporter) Report(payloads []ledger.Payload) error {
-	ret := _m.Called(payloads)
+// Report provides a mock function with given fields: payloads, statecommitment
+func (_m *Reporter) Report(payloads []ledger.Payload, statecommitment ledger.State) error {
+	ret := _m.Called(payloads, statecommitment)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func([]ledger.Payload) error); ok {
-		r0 = rf(payloads)
+	if rf, ok := ret.Get(0).(func([]ledger.Payload, ledger.State) error); ok {
+		r0 = rf(payloads, statecommitment)
 	} else {
 		r0 = ret.Error(0)
 	}

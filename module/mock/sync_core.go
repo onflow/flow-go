@@ -3,10 +3,10 @@
 package mock
 
 import (
-	mock "github.com/stretchr/testify/mock"
-
-	"github.com/onflow/flow-go/model/chainsync"
+	chainsync "github.com/onflow/flow-go/model/chainsync"
 	flow "github.com/onflow/flow-go/model/flow"
+
+	mock "github.com/stretchr/testify/mock"
 
 	testing "testing"
 )

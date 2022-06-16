@@ -3,9 +3,8 @@
 package component
 
 import (
-	mock "github.com/stretchr/testify/mock"
-
 	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
+	mock "github.com/stretchr/testify/mock"
 
 	testing "testing"
 )
