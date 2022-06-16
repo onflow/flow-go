@@ -713,9 +713,6 @@ func TestWintermute_ResultApproval(t *testing.T) {
 			unittest.WithChunk(0)),
 	}
 
-	approvalPassThrough := &sync.WaitGroup{}
-	approvalPassThrough.Add(1)
-
 	// mocks attack network
 	mockAttackNetwork := &mockinsecure.AttackNetwork{}
 	wintermuteOrchestrator.WithAttackNetwork(mockAttackNetwork)
