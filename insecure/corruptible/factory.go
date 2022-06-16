@@ -231,7 +231,7 @@ func (c *ConduitFactory) processAttackerMessage(msg *insecure.Message) error {
 
 	lg = lg.With().
 		Str("event_type", fmt.Sprintf("%T", event)).
-		Hex("event_id", logging.ID(event.(flow.Entity).ID())).
+		Str("event", fmt.Sprintf("%+v", event)).
 		Logger()
 
 	targetIds, err := flow.ByteSlicesToIds(msg.TargetIDs)
