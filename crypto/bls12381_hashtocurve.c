@@ -210,8 +210,7 @@ static inline void compute_map_zvals(const fp_t inv[], fp_t zv[],
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 static inline void eval_iso11(ep_t r, const ep_t  p) {
-    const int tmp_len = 32;
-    fp_t* fp_tmp = (fp_t*) malloc(tmp_len*sizeof(fp_t));
+    fp_t fp_tmp[32];
 
     // precompute even powers of Z up to Z^30 in fp_tmp[31]..fp_tmp[17]
     fp_sqr(fp_tmp[31], p->z);                       // Z^2
@@ -272,8 +271,6 @@ static inline void eval_iso11(ep_t r, const ep_t  p) {
     fp_mul(r->y, fp_tmp[16], fp_tmp[14]);  // Ny Dx
     fp_mul(r->y, r->y, fp_tmp[12]);   // Yo = Ny Dx Zo^2
     r->coord = JACOB;
-    
-    free(fp_tmp);
 }
 
 // map an input point in E to a point in G1 by clearing the cofactor of G1 
