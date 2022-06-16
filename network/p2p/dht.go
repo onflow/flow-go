@@ -10,7 +10,7 @@ import (
 
 // This produces a new IPFS DHT
 // on the name, see https://github.com/libp2p/go-libp2p-kad-dht/issues/337
-func NewDHT(ctx context.Context, host host.Host, prefix protocol.ID, options ...dht.Option) (*dht.IpfsDHT, error) {
+func NewDHT(ctx context.Context, host host.Host, prefix protocol.ID, logger zerolog.Logger, metrics module.DHTMetrics, options ...dht.Option) (*dht.IpfsDHT, error) {
 	allOptions := append(options, dht.ProtocolPrefix(prefix))
 
 	kdht, err := dht.New(ctx, host, allOptions...)
@@ -20,6 +20,22 @@ func NewDHT(ctx context.Context, host host.Host, prefix protocol.ID, options ...
 
 	if err = kdht.Bootstrap(ctx); err != nil {
 		return nil, err
+	}
+
+	logger := logger.With().Str("component", "dht").Logger(),
+
+	routingTable := kdht.RoutingTable()
+	peerRemovedCb := routingTable.PeerRemoved
+	peerAddedCb := routingTable.PeerAdded
+	routingTable.PeerRemoved = func(pid peer.ID) {
+		peerRemovedCb(pid)
+		logger.Info().Str("peer_id", pid.Pretty()).Msg("peer removed from routing table")
+		metrics.RoutingTablePeerRemoved()
+	}
+	routingTable.PeerAdded = func(pid peer.ID) {
+		peerAddedCb(pid)
+		logger.Info().Str("peer_id", pid.Pretty()).Msg("peer added to routing table")
+		metrics.RoutingTablePeerAdded()
 	}
 
 	return kdht, nil
