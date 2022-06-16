@@ -69,7 +69,7 @@ func (r *ResultApprovalState) WaitForTotalApprovalsFrom(
 		for _, verificationId := range verificationIds {
 			approvals, ok := r.resultApprovals[verificationId]
 			if !ok {
-				return false
+				continue
 			}
 
 			for _, approval := range approvals {
