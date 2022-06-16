@@ -361,32 +361,40 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 		}
 	}
 
-	// system chunk transaction
-	if i >= len(resp.TransactionResults) {
-		return nil, errInsufficientResults
-	} else if i < len(resp.TransactionResults)-1 {
-		return nil, status.Errorf(codes.Internal, "number of transaction results returned by execution node is more than the number of transactions in the block")
+	rootBlock, err := b.state.Params().Root()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to retrieve root block: %v", err)
 	}
 
-	systemTx, err := blueprints.SystemChunkTransaction(b.chainID.Chain())
-	if err != nil {
-		return nil, fmt.Errorf("could not get system chunk transaction: %w", err)
-	}
-	systemTxResult := resp.TransactionResults[len(resp.TransactionResults)-1]
-	systemTxStatus, err := b.deriveTransactionStatus(systemTx, true, block)
-	if err != nil {
-		return nil, convertStorageError(err)
-	}
+	// root block has no system transaction result
+	if rootBlock.ID() != blockID {
+		// system chunk transaction
+		if i >= len(resp.TransactionResults) {
+			return nil, errInsufficientResults
+		} else if i < len(resp.TransactionResults)-1 {
+			return nil, status.Errorf(codes.Internal, "number of transaction results returned by execution node is more than the number of transactions in the block")
+		}
 
-	results = append(results, &access.TransactionResult{
-		Status:        systemTxStatus,
-		StatusCode:    uint(systemTxResult.GetStatusCode()),
-		Events:        convert.MessagesToEvents(systemTxResult.GetEvents()),
-		ErrorMessage:  systemTxResult.GetErrorMessage(),
-		BlockID:       blockID,
-		TransactionID: systemTx.ID(),
-		BlockHeight:   block.Header.Height,
-	})
+		systemTx, err := blueprints.SystemChunkTransaction(b.chainID.Chain())
+		if err != nil {
+			return nil, fmt.Errorf("could not get system chunk transaction: %w", err)
+		}
+		systemTxResult := resp.TransactionResults[len(resp.TransactionResults)-1]
+		systemTxStatus, err := b.deriveTransactionStatus(systemTx, true, block)
+		if err != nil {
+			return nil, convertStorageError(err)
+		}
+
+		results = append(results, &access.TransactionResult{
+			Status:        systemTxStatus,
+			StatusCode:    uint(systemTxResult.GetStatusCode()),
+			Events:        convert.MessagesToEvents(systemTxResult.GetEvents()),
+			ErrorMessage:  systemTxResult.GetErrorMessage(),
+			BlockID:       blockID,
+			TransactionID: systemTx.ID(),
+			BlockHeight:   block.Header.Height,
+		})
+	}
 
 	return results, nil
 }
