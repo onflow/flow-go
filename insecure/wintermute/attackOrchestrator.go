@@ -2,8 +2,9 @@ package wintermute
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/network"
 	"sync"
+
+	"github.com/onflow/flow-go/network"
 
 	"github.com/rs/zerolog"
 

@@ -3,6 +3,9 @@ package passthrough
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/network/codec/cbor"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -85,23 +88,23 @@ func (s *Suite) SetupSuite() {
 	s.verID = unittest.IdentifierFixture()
 	verConfig := testnet.NewNodeConfig(flow.RoleVerification,
 		testnet.WithID(s.verID),
-		testnet.WithLogLevel(zerolog.FatalLevel))
-	// testnet.AsCorrupted())
+		testnet.WithLogLevel(zerolog.FatalLevel),
+		testnet.AsCorrupted())
 	s.nodeConfigs = append(s.nodeConfigs, verConfig)
 
 	// generates two corrupted execution nodes
 	s.exe1ID = unittest.IdentifierFixture()
 	exe1Config := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.exe1ID),
-		testnet.WithLogLevel(zerolog.InfoLevel))
-	// testnet.AsCorrupted())
+		testnet.WithLogLevel(zerolog.InfoLevel),
+		testnet.AsCorrupted())
 	s.nodeConfigs = append(s.nodeConfigs, exe1Config)
 
 	s.exe2ID = unittest.IdentifierFixture()
 	exe2Config := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.exe2ID),
-		testnet.WithLogLevel(zerolog.InfoLevel))
-	// testnet.AsCorrupted())
+		testnet.WithLogLevel(zerolog.InfoLevel),
+		testnet.AsCorrupted())
 	s.nodeConfigs = append(s.nodeConfigs, exe2Config)
 
 	// generates two collection node
@@ -146,34 +149,34 @@ func (s *Suite) SetupSuite() {
 
 	s.Orchestrator = NewDummyOrchestrator(logger)
 
-	//// start attack network
-	//codec := cbor.NewCodec()
-	//connector := attacknetwork.NewCorruptedConnector(s.log, s.net.CorruptedIdentities(), s.net.CorruptedPortMapping)
-	//attackNetwork, err := attacknetwork.NewAttackNetwork(s.log,
-	//	codec,
-	//	s.Orchestrator,
-	//	connector,
-	//	s.net.CorruptedIdentities())
-	//require.NoError(s.T(), err)
-	//s.attackNet = attackNetwork
-	//
-	//attackCtx, errChan := irrecoverable.WithSignaler(ctx)
-	//go func() {
-	//	select {
-	//	case err := <-errChan:
-	//		s.T().Error("attackNetwork startup encountered fatal error", err)
-	//	case <-ctx.Done():
-	//		return
-	//	}
-	//}()
-	//
-	//attackNetwork.Start(attackCtx)
-	//unittest.RequireCloseBefore(s.T(), attackNetwork.Ready(), 1*time.Second, "could not start attack network on time")
+	// start attack network
+	codec := cbor.NewCodec()
+	connector := attacknetwork.NewCorruptedConnector(s.log, s.net.CorruptedIdentities(), s.net.CorruptedPortMapping)
+	attackNetwork, err := attacknetwork.NewAttackNetwork(s.log,
+		codec,
+		s.Orchestrator,
+		connector,
+		s.net.CorruptedIdentities())
+	require.NoError(s.T(), err)
+	s.attackNet = attackNetwork
+
+	attackCtx, errChan := irrecoverable.WithSignaler(ctx)
+	go func() {
+		select {
+		case err := <-errChan:
+			s.T().Error("attackNetwork startup encountered fatal error", err)
+		case <-ctx.Done():
+			return
+		}
+	}()
+
+	attackNetwork.Start(attackCtx)
+	unittest.RequireCloseBefore(s.T(), attackNetwork.Ready(), 1*time.Second, "could not start attack network on time")
 }
 
 // TearDownSuite tears down the test network of Flow as well as the BFT testing attack network.
 func (s *Suite) TearDownSuite() {
 	s.net.Remove()
 	s.cancel()
-	// unittest.RequireCloseBefore(s.T(), s.attackNet.Done(), 1*time.Second, "could not stop attack network on time")
+	unittest.RequireCloseBefore(s.T(), s.attackNet.Done(), 1*time.Second, "could not stop attack network on time")
 }
