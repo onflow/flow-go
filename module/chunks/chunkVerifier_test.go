@@ -326,6 +326,11 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 	EventsMerkleRootHash, err := flow.EventsMerkleRootHash(chunkEvents)
 	require.NoError(t, err)
 
+	executionDataRoot := flow.BlockExecutionDataRoot{
+		BlockID:               blockID,
+		ChunkExecutionDataIDs: nil,
+	}
+
 	// Chunk setup
 	chunk := flow.Chunk{
 		ChunkBody: flow.ChunkBody{
@@ -338,17 +343,19 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 	}
 
 	chunkDataPack := flow.ChunkDataPack{
-		ChunkID:    chunk.ID(),
-		StartState: flow.StateCommitment(startState),
-		Proof:      proof,
-		Collection: &coll,
+		ChunkID:           chunk.ID(),
+		StartState:        flow.StateCommitment(startState),
+		Proof:             proof,
+		Collection:        &coll,
+		ExecutionDataRoot: executionDataRoot,
 	}
 
 	// ExecutionResult setup
 	result := flow.ExecutionResult{
-		BlockID:       blockID,
-		Chunks:        flow.ChunkList{&chunk},
-		ServiceEvents: erServiceEvents,
+		BlockID:         blockID,
+		Chunks:          flow.ChunkList{&chunk},
+		ServiceEvents:   erServiceEvents,
+		ExecutionDataID: executionDataID,
 	}
 
 	verifiableChunkData = verification.VerifiableChunkData{

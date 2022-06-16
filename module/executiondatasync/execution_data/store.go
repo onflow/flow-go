@@ -53,7 +53,7 @@ func NewExecutionDataStore(blobstore blobs.Blobstore, serializer Serializer, opt
 }
 
 func (s *store) AddExecutionData(ctx context.Context, executionData *BlockExecutionData) (flow.Identifier, error) {
-	executionDataRoot := &BlockExecutionDataRoot{
+	executionDataRoot := &flow.BlockExecutionDataRoot{
 		BlockID:               executionData.BlockID,
 		ChunkExecutionDataIDs: make([]cid.Cid, len(executionData.ChunkExecutionDatas)),
 	}
@@ -148,7 +148,7 @@ func (s *store) GetExecutionData(ctx context.Context, rootID flow.Identifier) (*
 		return nil, NewMalformedDataError(err)
 	}
 
-	executionDataRoot, ok := rootData.(*BlockExecutionDataRoot)
+	executionDataRoot, ok := rootData.(*flow.BlockExecutionDataRoot)
 	if !ok {
 		return nil, NewMalformedDataError(fmt.Errorf("root blob does not deserialize to a BlockExecutionDataRoot"))
 	}

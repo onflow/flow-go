@@ -1,6 +1,8 @@
 package flow
 
-import "github.com/onflow/flow-go/module/executiondatasync/execution_data"
+import (
+	"github.com/ipfs/go-cid"
+)
 
 type ChunkBody struct {
 	CollectionIndex uint
@@ -44,7 +46,7 @@ type ChunkDataPack struct {
 	StartState        StateCommitment
 	Proof             StorageProof
 	Collection        *Collection
-	ExecutionDataRoot execution_data.BlockExecutionDataRoot
+	ExecutionDataRoot BlockExecutionDataRoot
 }
 
 // ID returns the unique identifier for the concrete view, which is the ID of
@@ -113,4 +115,9 @@ func (cl ChunkList) ByIndex(i uint64) (*Chunk, bool) {
 // interface that makes ChunkList sortable
 func (cl ChunkList) Len() int {
 	return len(cl)
+}
+
+type BlockExecutionDataRoot struct {
+	BlockID               Identifier
+	ChunkExecutionDataIDs []cid.Cid
 }

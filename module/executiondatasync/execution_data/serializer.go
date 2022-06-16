@@ -7,6 +7,7 @@ import (
 
 	cborlib "github.com/fxamacker/cbor/v2"
 	"github.com/ipfs/go-cid"
+	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/encoding/cbor"
@@ -43,7 +44,7 @@ const (
 
 func getCode(v interface{}) (byte, error) {
 	switch v.(type) {
-	case *BlockExecutionDataRoot:
+	case *flow.BlockExecutionDataRoot:
 		return codeExecutionDataRoot, nil
 	case *ChunkExecutionData:
 		return codeChunkExecutionData, nil
@@ -57,7 +58,7 @@ func getCode(v interface{}) (byte, error) {
 func getPrototype(code byte) (interface{}, error) {
 	switch code {
 	case codeExecutionDataRoot:
-		return &BlockExecutionDataRoot{}, nil
+		return &flow.BlockExecutionDataRoot{}, nil
 	case codeChunkExecutionData:
 		return &ChunkExecutionData{}, nil
 	case codeRecursiveCIDs:

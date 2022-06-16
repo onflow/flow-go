@@ -5,7 +5,6 @@ import (
 
 	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 )
 
 func GenerateExecutionResultAndChunkDataPacks(
@@ -119,7 +118,7 @@ func GenerateChunkDataPack(
 	startState flow.StateCommitment,
 	collection *flow.Collection,
 	proof flow.StorageProof,
-	executionDataRoot execution_data.BlockExecutionDataRoot,
+	executionDataRoot flow.BlockExecutionDataRoot,
 ) *flow.ChunkDataPack {
 	return &flow.ChunkDataPack{
 		ChunkID:           chunkID,
