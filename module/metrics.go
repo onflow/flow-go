@@ -488,21 +488,6 @@ type HeroCacheMetrics interface {
 	OnEntityEjectionDueToEmergency()
 }
 
-type ChainSyncMetrics interface {
-	// record pruned blocks. requested and received times might be zero values
-	PrunedBlockById(status *chainsync.Status)
-
-	PrunedBlockByHeight(status *chainsync.Status)
-
-	// totalByHeight and totalById are the number of blocks pruned for blocks requested by height and by id
-	// storedByHeight and storedById are the number of blocks still stored by height and id
-	PrunedBlocks(totalByHeight, totalById, storedByHeight, storedById int)
-
-	RangeRequested(ran chainsync.Range)
-
-	BatchRequested(batch chainsync.Batch)
-}
-
 type DHTMetrics interface {
 	RoutingTablePeerAdded()
 	RoutingTablePeerRemoved()
