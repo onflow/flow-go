@@ -194,3 +194,42 @@ type QCCreatedConsumer interface {
 	// and must handle repetition of the same events (with some processing overhead).
 	OnQcConstructedFromVotes(*flow.QuorumCertificate)
 }
+
+// TimeoutCollectorConsumer consumes outbound notifications produced by HotStuff and its components.
+// Notifications are consensus-internal state changes which are potentially relevant to
+// the larger node in which HotStuff is running. The notifications are emitted
+// in the order in which the HotStuff algorithm makes the respective steps.
+//
+// Implementations must:
+//   * be concurrency safe
+//   * be non-blocking
+//   * handle repetition of the same events (with some processing overhead).
+type TimeoutCollectorConsumer interface {
+	// OnTcConstructedFromTimeouts notifications are produced by the TimeoutProcessor
+	// component, whenever it constructs a TC from timeouts.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnTcConstructedFromTimeouts(certificate *flow.TimeoutCertificate)
+
+	// OnPartialTcCreated notifications are produced by the TimeoutProcessor
+	// component, whenever it aggregates enough timeouts(1/3+1) to claim that TC eventually will be constructed
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnPartialTcCreated(view uint64)
+
+	// OnNewQcDiscovered notifications are produced by the TimeoutCollector
+	// component, whenever it discovers new QC included in timeout object.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnNewQcDiscovered(certificate *flow.QuorumCertificate)
+
+	// OnNewTcDiscovered notifications are produced by the TimeoutCollector
+	// component, whenever it discovers new TC included in timeout object.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnNewTcDiscovered(certificate *flow.TimeoutCertificate)
+}

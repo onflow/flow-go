@@ -13,12 +13,10 @@ import (
 // of timeouts, delegating those tasks to underlying modules. Performs notifications about verified QCs and TCs.
 // This module is safe to use in concurrent environment.
 type TimeoutCollector struct {
-	notifier      hotstuff.Consumer
-	timeoutsCache *TimeoutObjectsCache // cache for tracking double timeout and timeout equivocation
-	processor     hotstuff.TimeoutProcessor
-
-	onNewQCDiscovered hotstuff.OnNewQCDiscovered       // a callback that will be used to notify PaceMaker about new validated QC discovered
-	onNewTCDiscovered hotstuff.OnNewTCDiscovered       // a callback that will be used to notify PaceMaker about new validated TC discovered
+	notifier          hotstuff.Consumer
+	timeoutsCache     *TimeoutObjectsCache // cache for tracking double timeout and timeout equivocation
+	collectorNotifier hotstuff.TimeoutCollectorConsumer
+	processor         hotstuff.TimeoutProcessor
 	newestReportedQC  counters.StrictMonotonousCounter // newest QC that was reported
 	newestReportedTC  counters.StrictMonotonousCounter // newest TC that was reported
 }
@@ -29,15 +27,13 @@ var _ hotstuff.TimeoutCollector = (*TimeoutCollector)(nil)
 func NewTimeoutCollector(view uint64,
 	notifier hotstuff.Consumer,
 	processor hotstuff.TimeoutProcessor,
-	onNewQCDiscovered hotstuff.OnNewQCDiscovered,
-	onNewTCDiscovered hotstuff.OnNewTCDiscovered,
+	collectorNotifier hotstuff.TimeoutCollectorConsumer,
 ) *TimeoutCollector {
 	return &TimeoutCollector{
 		notifier:          notifier,
 		timeoutsCache:     NewTimeoutObjectsCache(view),
 		processor:         processor,
-		onNewQCDiscovered: onNewQCDiscovered,
-		onNewTCDiscovered: onNewTCDiscovered,
+		collectorNotifier: collectorNotifier,
 		newestReportedQC:  counters.NewMonotonousCounter(0),
 		newestReportedTC:  counters.NewMonotonousCounter(0),
 	}
@@ -83,11 +79,11 @@ func (c *TimeoutCollector) processTimeout(timeout *model.TimeoutObject) error {
 	}
 
 	if c.newestReportedQC.Set(timeout.NewestQC.View) {
-		c.onNewQCDiscovered(timeout.NewestQC)
+		c.collectorNotifier.OnNewQcDiscovered(timeout.NewestQC)
 	}
 
 	if c.newestReportedTC.Set(timeout.LastViewTC.View) {
-		c.onNewTCDiscovered(timeout.LastViewTC)
+		c.collectorNotifier.OnNewTcDiscovered(timeout.LastViewTC)
 	}
 
 	return nil

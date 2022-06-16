@@ -72,15 +72,14 @@ func (t *NewestQCTracker) NewestQC() *flow.QuorumCertificate {
 // TimeoutProcessor will create a timeout certificate which can be used to advance round.
 // Concurrency safe.
 type TimeoutProcessor struct {
-	view               uint64
-	validator          hotstuff.Validator
-	committee          hotstuff.Replicas
-	sigAggregator      hotstuff.TimeoutSignatureAggregator
-	onPartialTCCreated hotstuff.OnPartialTCCreated
-	onTCCreated        hotstuff.OnTCCreated
-	partialTCTracker   accumulatedWeightTracker
-	tcTracker          accumulatedWeightTracker
-	NewestQCTracker    NewestQCTracker
+	view             uint64
+	validator        hotstuff.Validator
+	committee        hotstuff.Replicas
+	sigAggregator    hotstuff.TimeoutSignatureAggregator
+	notifier         hotstuff.TimeoutCollectorConsumer
+	partialTCTracker accumulatedWeightTracker
+	tcTracker        accumulatedWeightTracker
+	NewestQCTracker  NewestQCTracker
 }
 
 var _ hotstuff.TimeoutProcessor = (*TimeoutProcessor)(nil)
@@ -92,8 +91,7 @@ var _ hotstuff.TimeoutProcessor = (*TimeoutProcessor)(nil)
 func NewTimeoutProcessor(committee hotstuff.Replicas,
 	validator hotstuff.Validator,
 	sigAggregator hotstuff.TimeoutSignatureAggregator,
-	onPartialTCCreated hotstuff.OnPartialTCCreated,
-	onTCCreated hotstuff.OnTCCreated,
+	notifier hotstuff.TimeoutCollectorConsumer,
 ) (*TimeoutProcessor, error) {
 	view := sigAggregator.View()
 	qcThreshold, err := committee.QuorumThresholdForView(view)
@@ -116,9 +114,7 @@ func NewTimeoutProcessor(committee hotstuff.Replicas,
 			minRequiredWeight: qcThreshold,
 			done:              *atomic.NewBool(false),
 		},
-		onPartialTCCreated: onPartialTCCreated,
-		onTCCreated:        onTCCreated,
-		sigAggregator:      sigAggregator,
+		sigAggregator: sigAggregator,
 	}, nil
 }
 
@@ -154,7 +150,7 @@ func (p *TimeoutProcessor) Process(timeout *model.TimeoutObject) error {
 	p.NewestQCTracker.Track(timeout.NewestQC)
 
 	if p.partialTCTracker.Track(totalWeight) {
-		p.onPartialTCCreated(p.view)
+		p.notifier.OnPartialTcCreated(p.view)
 	}
 
 	// checking of conditions for building TC are satisfied
@@ -168,7 +164,7 @@ func (p *TimeoutProcessor) Process(timeout *model.TimeoutObject) error {
 	if err != nil {
 		return fmt.Errorf("internal error constructing TC: %w", err)
 	}
-	p.onTCCreated(tc)
+	p.notifier.OnTcConstructedFromTimeouts(tc)
 
 	return nil
 }
