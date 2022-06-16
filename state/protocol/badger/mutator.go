@@ -411,8 +411,10 @@ func (m *FollowerState) lastSealed(candidate *flow.Block) (*flow.Seal, error) {
 	return last, nil
 }
 
-// insert stores the candidate block in the database. The
-// `candidate` block _must be valid_ (otherwise, the state will be corrupted).
+// insert stores the candidate block in the database.
+// The `candidate` block _must be valid_ (otherwise, the state will be corrupted).
+// dbUpdates contains other database operations which must be applied atomically
+// with inserting the block.
 func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last *flow.Seal, dbUpdates []func(*transaction.Tx) error) error {
 
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendDBInsert)
@@ -460,9 +462,9 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 	return nil
 }
 
-// Finalize marks the specified block as finalized. This method only
-// finalizes one block at a time. Hence, the parent of `blockID`
-// has to be the last finalized block.
+// Finalize marks the specified block as finalized.
+// This method only finalizes one block at a time.
+// Hence, the parent of `blockID` has to be the last finalized block.
 func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) error {
 
 	// preliminaries: start tracer and retrieve full block
@@ -622,7 +624,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 //    commitment deadline for the current epoch.
 // 2. The next epoch has not been committed as of B.
 //
-// This function should only be called when epoch fallback has not already been triggered.
+// This function should only be called when epoch fallback *has not already been triggered*.
 // See protocol.Params for more details on the epoch commitment deadline.
 //
 // No errors are expected during normal operation.
@@ -647,18 +649,18 @@ func (m *FollowerState) epochFallbackTriggeredByFinalizedBlock(block *flow.Heade
 	return blockTriggersEpochFallback, nil
 }
 
-// TODO docs
-// don't call if EECC triggered
-// Service notifications and updating metrics happen when we finalize the _first_
-// block of the new Epoch (same convention as for Epoch-Phase-Changes)
-// Approach: We retrieve the parent block's epoch information. If this block's view
-// exceeds the final view of its parent's current epoch, this block begins the next epoch.
-
+// epochTransitionMetricsAndEventsOnBlockFinalized determines metrics to update
+// and protocol events to emit, if this block is the first of a new epoch.
+//
+// Protocol events and updating metrics happen when we finalize the _first_
+// block of the new Epoch (same convention as for Epoch-Phase-Changes).
+// Approach: We retrieve the parent block's epoch information.
 // When this block's view exceeds the parent epoch's final view, this block
 // represents the first block of the next epoch. Therefore we update metrics
 // related to the epoch transition here.
 //
-// We skip updating these metrics when EECC has been triggered
+// This function should only be called when epoch fallback *has not already been triggered*.
+// No errors are expected during normal operation.
 func (m *FollowerState) epochTransitionMetricsAndEventsOnBlockFinalized(block *flow.Header, currentEpochSetup *flow.EpochSetup) (
 	metrics []func(),
 	events []func(),
@@ -691,18 +693,26 @@ func (m *FollowerState) epochTransitionMetricsAndEventsOnBlockFinalized(block *f
 	return
 }
 
-// TODO docs
-// don't call if EECC triggered
+// epochPhaseMetricsAndEventsOnBlockFinalized determines metrics to update
+// and protocol events to emit, if this block is the first of a new epoch phase.
+//
+// Protocol events and metric updates happen when we finalize the block at
+// which a service event causing an epoch phase change comes into effect.
+// See handleEpochServiceEvents for details.
 //
 // Convention:
-//                            .. <--- P <----- B
-//                                    ↑        ↑
-//             block sealing service event        first block of new
-//           for epoch-phase transition        Epoch phase (e.g.
-//              (e.g. EpochSetup event)        (EpochSetup phase)
-// Per convention, service notifications for Epoch-Phase-Changes are emitted, when
-// the first block of the new phase (EpochSetup phase) is _finalized_. Meaning
-// that the new phase has started.
+//           A <-- ... <-- P(Seal_A) <----- B
+//                         ↑                ↑
+//           block con service event        first block of new Epoch phase
+//           for epoch-phase transition     (e.g. EpochSetup phase)
+//           (e.g. EpochSetup event)
+//
+// Per convention, protocol events for epoch phase changes are emitted when
+// the first block of the new phase (eg. EpochSetup phase) is _finalized_.
+// Meaning that the new phase has started.
+//
+// This function should only be called when epoch fallback *has not already been triggered*.
+// No errors are expected during normal operation.
 func (m *FollowerState) epochPhaseMetricsAndEventsOnBlockFinalized(block *flow.Header, epochStatus *flow.EpochStatus) (
 	metrics []func(),
 	events []func(),
@@ -813,7 +823,9 @@ func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, erro
 }
 
 // handleEpochServiceEvents handles applying state changes which occur as a result
-// of service events being included in a block payload.
+// of service events being included in a block payload:
+// * inserting incorporated service events
+// * updating EpochStatus for the candidate block
 //
 // Consider a chain where a service event is emitted during execution of block A.
 // Block B contains a receipt for A. Block C contains a seal for block A. Block
@@ -837,8 +849,6 @@ func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, erro
 // returns a slice of Badger operations to apply while storing the block. This
 // includes an operation to index the epoch status for every block, and
 // operations to insert service events for blocks that include them.
-//
-// TODO - document that storing epoch status is this responsibility
 //
 // No errors are expected during normal operation.
 func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) ([]func(*transaction.Tx) error, error) {
@@ -896,7 +906,6 @@ SealLoop:
 
 			case *flow.EpochCommit:
 
-				// TODO should this trigger EECC?
 				extendingSetup, err := m.epoch.setups.ByID(epochStatus.NextEpoch.SetupID)
 				if err != nil {
 					return nil, state.NewInvalidExtensionErrorf("could not retrieve next epoch setup: %s", err)
