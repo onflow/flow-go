@@ -10,6 +10,12 @@ import (
 	"time"
 
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	legacyaccessproto "github.com/onflow/flow/protobuf/go/flow/legacy/access"
+	"github.com/rs/zerolog"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+
 	"github.com/onflow/flow-go/access"
 	legacyaccess "github.com/onflow/flow-go/access/legacy"
 	"github.com/onflow/flow-go/engine"
@@ -21,11 +27,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/grpcutils"
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
-	legacyaccessproto "github.com/onflow/flow/protobuf/go/flow/legacy/access"
-	"github.com/rs/zerolog"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 )
 
 // Config defines the configurable options for the access node server
