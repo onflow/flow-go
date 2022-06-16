@@ -10,18 +10,18 @@ import (
 )
 
 const (
-	startRepTimeout        float64 = 120  // Milliseconds
-	minRepTimeout          float64 = 100  // Milliseconds
-	voteTimeoutFraction    float64 = 0.5  // multiplicative factor
-	multiplicativeIncrease float64 = 1.5  // multiplicative factor
-	multiplicativeDecrease float64 = 0.85 // multiplicative factor
+	startRepTimeout        float64 = 120   // Milliseconds
+	minRepTimeout          float64 = 100   // Milliseconds
+	maxRepTimeout          float64 = 10000 // Milliseconds
+	multiplicativeIncrease float64 = 1.5   // multiplicative factor
+	multiplicativeDecrease float64 = 0.85  // multiplicative factor
 )
 
 func initTimeoutController(t *testing.T) *Controller {
 	tc, err := NewConfig(
 		time.Duration(startRepTimeout*1e6),
 		time.Duration(minRepTimeout*1e6),
-		voteTimeoutFraction,
+		time.Duration(maxRepTimeout*1e6),
 		multiplicativeIncrease,
 		multiplicativeDecrease,
 		0)
@@ -35,7 +35,6 @@ func initTimeoutController(t *testing.T) *Controller {
 func Test_TimeoutInitialization(t *testing.T) {
 	tc := initTimeoutController(t)
 	assert.Equal(t, tc.ReplicaTimeout().Milliseconds(), int64(startRepTimeout))
-	assert.Equal(t, tc.VoteCollectionTimeout().Milliseconds(), int64(startRepTimeout*voteTimeoutFraction))
 
 	// verify that returned timeout channel
 	select {
@@ -58,10 +57,6 @@ func Test_TimeoutIncrease(t *testing.T) {
 			tc.ReplicaTimeout().Milliseconds(),
 			int64(startRepTimeout*math.Pow(multiplicativeIncrease, float64(i))),
 		)
-		assert.Equal(t,
-			tc.VoteCollectionTimeout().Milliseconds(),
-			int64(startRepTimeout*voteTimeoutFraction*math.Pow(multiplicativeIncrease, float64(i))),
-		)
 	}
 }
 
@@ -79,10 +74,6 @@ func Test_TimeoutDecrease(t *testing.T) {
 			tc.ReplicaTimeout().Milliseconds(),
 			int64(repTimeout*math.Pow(multiplicativeDecrease, float64(i))),
 		)
-		assert.Equal(t,
-			tc.VoteCollectionTimeout().Milliseconds(),
-			int64((repTimeout*math.Pow(multiplicativeDecrease, float64(i)))*voteTimeoutFraction),
-		)
 	}
 }
 
@@ -98,7 +89,6 @@ func Test_MinCutoff(t *testing.T) {
 
 	tc.OnProgressBeforeTimeout()
 	assert.Equal(t, tc.ReplicaTimeout().Milliseconds(), int64(minRepTimeout))
-	assert.Equal(t, tc.VoteCollectionTimeout().Milliseconds(), int64(minRepTimeout*voteTimeoutFraction))
 }
 
 // Test_MinCutoff verifies that timeout does not increase beyond timeout cap
@@ -107,8 +97,8 @@ func Test_MaxCutoff(t *testing.T) {
 	c, err := NewConfig(
 		time.Duration(200*float64(time.Millisecond)),
 		time.Duration(minRepTimeout*float64(time.Millisecond)),
-		voteTimeoutFraction,
-		10,
+		time.Duration(maxRepTimeout*float64(time.Millisecond)),
+		multiplicativeIncrease,
 		multiplicativeDecrease,
 		0)
 	if err != nil {
@@ -118,8 +108,7 @@ func Test_MaxCutoff(t *testing.T) {
 
 	for i := 1; i <= 50; i += 1 {
 		tc.OnTimeout() // after already 7 iterations we should have reached the max value
-		assert.True(t, float64(tc.ReplicaTimeout().Milliseconds()) <= timeoutCap)
-		assert.True(t, float64(tc.VoteCollectionTimeout().Milliseconds()) <= timeoutCap*voteTimeoutFraction)
+		assert.True(t, float64(tc.ReplicaTimeout().Milliseconds()) <= maxRepTimeout)
 	}
 }
 
@@ -144,8 +133,6 @@ func Test_CombinedIncreaseDecreaseDynamics(t *testing.T) {
 		expectedRepTimeout := startRepTimeout * math.Pow(multiplicativeIncrease, float64(numberIncreases)) * math.Pow(multiplicativeDecrease, float64(numberDecreases))
 		numericalError := math.Abs(expectedRepTimeout - float64(tc.ReplicaTimeout().Milliseconds()))
 		require.True(t, numericalError <= 1.0) // at most one millisecond numerical error
-		numericalError = math.Abs(expectedRepTimeout*voteTimeoutFraction - float64(tc.VoteCollectionTimeout().Milliseconds()))
-		require.True(t, numericalError <= 1.0) // at most one millisecond numerical error
 	}
 
 	testDynamicSequence([]bool{increase, increase, increase, decrease, decrease, decrease})
@@ -157,7 +144,7 @@ func Test_BlockRateDelay(t *testing.T) {
 	c, err := NewConfig(
 		time.Duration(200*float64(time.Millisecond)),
 		time.Duration(minRepTimeout*float64(time.Millisecond)),
-		voteTimeoutFraction,
+		time.Duration(maxRepTimeout*float64(time.Millisecond)),
 		10,
 		multiplicativeDecrease,
 		time.Second)

@@ -69,6 +69,14 @@ func (p *Distributor) OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newVie
 	}
 }
 
+func (p *Distributor) OnTcTriggeredViewChange(tc *flow.TimeoutCertificate, newView uint64) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.subscribers {
+		subscriber.OnTcTriggeredViewChange(tc, newView)
+	}
+}
+
 func (p *Distributor) OnProposingBlock(proposal *model.Proposal) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()

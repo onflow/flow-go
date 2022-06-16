@@ -53,21 +53,20 @@ import (
 func main() {
 
 	var (
-		txLimit                                uint
-		maxCollectionSize                      uint
-		maxCollectionByteSize                  uint64
-		maxCollectionTotalGas                  uint64
-		builderExpiryBuffer                    uint
-		builderPayerRateLimit                  float64
-		builderUnlimitedPayers                 []string
-		hotstuffTimeout                        time.Duration
-		hotstuffMinTimeout                     time.Duration
-		hotstuffTimeoutIncreaseFactor          float64
-		hotstuffTimeoutDecreaseFactor          float64
-		hotstuffTimeoutVoteAggregationFraction float64
-		blockRateDelay                         time.Duration
-		startupTimeString                      string
-		startupTime                            time.Time
+		txLimit                       uint
+		maxCollectionSize             uint
+		maxCollectionByteSize         uint64
+		maxCollectionTotalGas         uint64
+		builderExpiryBuffer           uint
+		builderPayerRateLimit         float64
+		builderUnlimitedPayers        []string
+		hotstuffTimeout               time.Duration
+		hotstuffMinTimeout            time.Duration
+		hotstuffTimeoutIncreaseFactor float64
+		hotstuffTimeoutDecreaseFactor float64
+		blockRateDelay                time.Duration
+		startupTimeString             string
+		startupTime                   time.Time
 
 		followerState           protocol.MutableState
 		ingestConf              = ingest.DefaultConfig()
@@ -137,9 +136,6 @@ func main() {
 		flags.Float64Var(&hotstuffTimeoutDecreaseFactor, "hotstuff-timeout-decrease-factor",
 			timeout.DefaultConfig.TimeoutDecrease,
 			"multiplicative decrease of timeout value in case of progress")
-		flags.Float64Var(&hotstuffTimeoutVoteAggregationFraction, "hotstuff-timeout-vote-aggregation-fraction",
-			timeout.DefaultConfig.VoteAggregationTimeoutFraction,
-			"additional fraction of replica timeout that the primary will wait for votes")
 		flags.DurationVar(&blockRateDelay, "block-rate-delay", 250*time.Millisecond,
 			"the delay to broadcast block proposal in order to control block production rate")
 		flags.Uint64Var(&clusterComplianceConfig.SkipNewProposalsThreshold,
@@ -455,7 +451,6 @@ func main() {
 				consensus.WithBlockRateDelay(blockRateDelay),
 				consensus.WithInitialTimeout(hotstuffTimeout),
 				consensus.WithMinTimeout(hotstuffMinTimeout),
-				consensus.WithVoteAggregationTimeoutFraction(hotstuffTimeoutVoteAggregationFraction),
 				consensus.WithTimeoutIncreaseFactor(hotstuffTimeoutIncreaseFactor),
 				consensus.WithTimeoutDecreaseFactor(hotstuffTimeoutDecreaseFactor),
 			}

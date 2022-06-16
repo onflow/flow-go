@@ -7,29 +7,20 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// TimeoutMode enum type
-type TimeoutMode int
-
-const (
-	// ReplicaTimeout represents the time period that the replica is waiting for the block for the current view.
-	ReplicaTimeout TimeoutMode = iota
-	// VoteCollectionTimeout represents the time period that the leader is waiting for votes in order to build
-	// the next block.
-	VoteCollectionTimeout
-)
-
 // TimerInfo represents a time period that pacemaker is waiting for a specific event.
 // The end of the time period is the timeout that will trigger pacemaker's view change.
 type TimerInfo struct {
-	Mode      TimeoutMode
 	View      uint64
 	StartTime time.Time
 	Duration  time.Duration
 }
 
-func (m TimeoutMode) String() string {
-	return [...]string{"ReplicaTimeout", "VoteCollectionTimeout"}[m]
-}
+// NewViewEvent indicates that a new view has started. While it has the same
+// data model as `TimerInfo`, their semantics are different (hence we use
+// different types): `TimerInfo` represents a continuous time interval. In
+// contrast, NewViewEvent marks the specific point in time, when the timer
+// is started.
+type NewViewEvent TimerInfo
 
 // TimeoutObject represents intent of replica to leave its current view with a timeout. This concept is very similar to
 // HotStuff vote. Valid TimeoutObject is signed by staking key.
