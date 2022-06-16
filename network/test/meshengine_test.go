@@ -18,7 +18,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/libp2p/message"
@@ -69,6 +68,7 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 		count,
 		logger,
 		nil,
+		unittest.NetworkCodec(),
 		WithIdentityOpts(unittest.WithAllRoles()),
 	)
 
@@ -172,7 +172,7 @@ func (suite *MeshEngineTestSuite) allToAllScenario(send ConduitSendWrapperFunc) 
 	// logs[i][j] keeps the message that node i sends to node j
 	logs := make(map[int][]string)
 	for i := range suite.nets {
-		eng := NewMeshEngine(suite.Suite.T(), suite.nets[i], count-1, engine.TestNetwork)
+		eng := NewMeshEngine(suite.Suite.T(), suite.nets[i], count-1, network.TestNetworkChannel)
 		engs = append(engs, eng)
 		logs[i] = make([]string, 0)
 	}
@@ -220,7 +220,7 @@ func (suite *MeshEngineTestSuite) allToAllScenario(send ConduitSendWrapperFunc) 
 		}
 
 		for i := 0; i < count-1; i++ {
-			assertChannelReceived(suite.T(), e, engine.TestNetwork)
+			assertChannelReceived(suite.T(), e, network.TestNetworkChannel)
 		}
 
 		// extracts failed messages
@@ -252,7 +252,7 @@ func (suite *MeshEngineTestSuite) targetValidatorScenario(send ConduitSendWrappe
 	wg := sync.WaitGroup{}
 
 	for i := range suite.nets {
-		eng := NewMeshEngine(suite.Suite.T(), suite.nets[i], count-1, engine.TestNetwork)
+		eng := NewMeshEngine(suite.Suite.T(), suite.nets[i], count-1, network.TestNetworkChannel)
 		engs = append(engs, eng)
 	}
 
@@ -295,7 +295,7 @@ func (suite *MeshEngineTestSuite) targetValidatorScenario(send ConduitSendWrappe
 	for index, e := range engs {
 		if index < len(engs)/2 {
 			assert.Len(suite.Suite.T(), e.event, 1, fmt.Sprintf("message not received %v", index))
-			assertChannelReceived(suite.T(), e, engine.TestNetwork)
+			assertChannelReceived(suite.T(), e, network.TestNetworkChannel)
 		} else {
 			assert.Len(suite.Suite.T(), e.event, 0, fmt.Sprintf("message received when none was expected %v", index))
 		}
@@ -312,7 +312,7 @@ func (suite *MeshEngineTestSuite) messageSizeScenario(send ConduitSendWrapperFun
 	wg := sync.WaitGroup{}
 
 	for i := range suite.nets {
-		eng := NewMeshEngine(suite.Suite.T(), suite.nets[i], count-1, engine.TestNetwork)
+		eng := NewMeshEngine(suite.Suite.T(), suite.nets[i], count-1, network.TestNetworkChannel)
 		engs = append(engs, eng)
 	}
 
@@ -350,7 +350,7 @@ func (suite *MeshEngineTestSuite) messageSizeScenario(send ConduitSendWrapperFun
 	// evaluates that all messages are received
 	for index, e := range engs[1:] {
 		assert.Len(suite.Suite.T(), e.event, 1, "message not received by engine %d", index+1)
-		assertChannelReceived(suite.T(), e, engine.TestNetwork)
+		assertChannelReceived(suite.T(), e, network.TestNetworkChannel)
 	}
 }
 
@@ -365,7 +365,7 @@ func (suite *MeshEngineTestSuite) conduitCloseScenario(send ConduitSendWrapperFu
 	wg := sync.WaitGroup{}
 
 	for i := range suite.nets {
-		eng := NewMeshEngine(suite.Suite.T(), suite.nets[i], count-1, engine.TestNetwork)
+		eng := NewMeshEngine(suite.Suite.T(), suite.nets[i], count-1, network.TestNetworkChannel)
 		engs = append(engs, eng)
 	}
 

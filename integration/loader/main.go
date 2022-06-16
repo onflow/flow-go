@@ -1,17 +1,19 @@
 package main
 
 import (
+	"context"
 	"encoding/hex"
 	"flag"
 	"net"
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/client"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/push"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 
@@ -28,7 +30,6 @@ type LoadCase struct {
 }
 
 func main() {
-
 	sleep := flag.Duration("sleep", 0, "duration to sleep before benchmarking starts")
 	loadTypeFlag := flag.String("load-type", "token-transfer", "type of loads (\"token-transfer\", \"add-keys\", \"computation-heavy\", \"event-heavy\", \"ledger-heavy\")")
 	tpsFlag := flag.String("tps", "1", "transactions per second (TPS) to send, accepts a comma separated list of values if used in conjunction with `tps-durations`")
@@ -38,11 +39,17 @@ func main() {
 	serviceAccountPrivateKeyHex := flag.String("servPrivHex", unittest.ServiceAccountPrivateKeyHex, "service account private key hex")
 	logLvl := flag.String("log-level", "info", "set log level")
 	metricport := flag.Uint("metricport", 8080, "port for /metrics endpoint")
+	pushgateway := flag.String("pushgateway", "127.0.0.1:9091", "host:port for pushgateway")
 	profilerEnabled := flag.Bool("profiler-enabled", false, "whether to enable the auto-profiler")
-	feedbackEnabled := flag.Bool("feedback-enabled", false, "whether to enable feedback / transaction tracking before account reuse (to avoid sequence number mismatch errors during transaction execution)")
+	trackTxsFlag := flag.Bool("track-txs", false, "track individual transaction timings (adds significant overhead)")
+	accountMultiplierFlag := flag.Int("account-multiplier", 50, "number of accounts to create per load tps")
+	feedbackEnabled := flag.Bool("feedback-enabled", true, "wait for trannsaction execution before submitting new transaction")
 	flag.Parse()
 
 	chainID := flowsdk.ChainID([]byte(*chainIDStr))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	// parse log level and apply to logger
 	log := zerolog.New(os.Stderr).With().Timestamp().Logger().Output(zerolog.ConsoleWriter{Out: os.Stderr})
@@ -55,6 +62,26 @@ func main() {
 	server := metrics.NewServer(log, *metricport, *profilerEnabled)
 	<-server.Ready()
 	loaderMetrics := metrics.NewLoaderCollector()
+
+	if *pushgateway != "" {
+		pusher := push.New(*pushgateway, "loader").Gatherer(prometheus.DefaultGatherer)
+		go func() {
+			t := time.NewTicker(10 * time.Second)
+			defer t.Stop()
+
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-t.C:
+					err := pusher.Push()
+					if err != nil {
+						log.Warn().Err(err).Msg("failed to push metrics to pushgateway")
+					}
+				}
+			}
+		}()
+	}
 
 	accessNodeAddrs := strings.Split(*access, ",")
 
@@ -127,7 +154,9 @@ func main() {
 					&serviceAccountAddress,
 					&fungibleTokenAddress,
 					&flowTokenAddress,
+					*trackTxsFlag,
 					c.tps,
+					*accountMultiplierFlag,
 					utils.LoadType(*loadTypeFlag),
 					*feedbackEnabled,
 				)
@@ -155,9 +184,7 @@ func main() {
 		}
 	}()
 
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	wg.Wait()
+	<-ctx.Done()
 }
 
 func parseLoadCases(log zerolog.Logger, tpsFlag, tpsDurationsFlag *string) []LoadCase {

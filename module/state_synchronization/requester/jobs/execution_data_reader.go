@@ -24,6 +24,7 @@ type ExecutionDataReader struct {
 	eds     state_synchronization.ExecutionDataService
 	headers storage.Headers
 	results storage.ExecutionResults
+	seals   storage.Seals
 
 	fetchTimeout           time.Duration
 	highestAvailableHeight func() uint64
@@ -38,6 +39,7 @@ func NewExecutionDataReader(
 	eds state_synchronization.ExecutionDataService,
 	headers storage.Headers,
 	results storage.ExecutionResults,
+	seals storage.Seals,
 	fetchTimeout time.Duration,
 	highestAvailableHeight func() uint64,
 ) *ExecutionDataReader {
@@ -45,6 +47,7 @@ func NewExecutionDataReader(
 		eds:                    eds,
 		headers:                headers,
 		results:                results,
+		seals:                  seals,
 		fetchTimeout:           fetchTimeout,
 		highestAvailableHeight: highestAvailableHeight,
 	}
@@ -94,7 +97,13 @@ func (r *ExecutionDataReader) getExecutionData(signalCtx irrecoverable.SignalerC
 		return nil, fmt.Errorf("failed to lookup header for height %d: %w", height, err)
 	}
 
-	result, err := r.results.ByBlockID(header.ID())
+	// get the ExecutionResultID for the block from the block's seal
+	seal, err := r.seals.FinalizedSealForBlock(header.ID())
+	if err != nil {
+		return nil, fmt.Errorf("failed to lookup seal for block %s: %w", header.ID(), err)
+	}
+
+	result, err := r.results.ByID(seal.ResultID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to lookup execution result for block %s: %w", header.ID(), err)
 	}

@@ -24,6 +24,7 @@ import (
 
 	"github.com/onflow/flow-go/admin/commands"
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
+	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	uploaderCommands "github.com/onflow/flow-go/admin/commands/uploader"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -31,7 +32,6 @@ import (
 	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
-	"github.com/onflow/flow-go/engine"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/provider"
 	"github.com/onflow/flow-go/engine/common/requester"
@@ -64,6 +64,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	chainsync "github.com/onflow/flow-go/module/synchronization"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/state/protocol"
@@ -90,6 +91,7 @@ type ExecutionConfig struct {
 	syncFast                    bool
 	syncThreshold               int
 	extensiveLog                bool
+	extensiveTracing            bool
 	pauseExecution              bool
 	scriptLogThreshold          time.Duration
 	scriptExecutionTimeLimit    time.Duration
@@ -132,6 +134,7 @@ func (e *ExecutionNodeBuilder) LoadFlags() {
 			flags.UintVar(&e.exeConf.stateDeltasLimit, "state-deltas-limit", 100, "maximum number of state deltas in the memory pool")
 			flags.UintVar(&e.exeConf.cadenceExecutionCache, "cadence-execution-cache", computation.DefaultProgramsCacheSize,
 				"cache size for Cadence execution")
+			flags.BoolVar(&e.exeConf.extensiveTracing, "extensive-tracing", false, "adds high-overhead tracing to execution")
 			flags.BoolVar(&e.exeConf.cadenceTracing, "cadence-tracing", false, "enables cadence runtime level tracing")
 			flags.UintVar(&e.exeConf.chdpCacheSize, "chdp-cache", storage.DefaultCacheSize, "cache size for Chunk Data Packs")
 			flags.DurationVar(&e.exeConf.requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
@@ -212,6 +215,9 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		AdminCommand("set-uploader-enabled", func(config *NodeConfig) commands.AdminCommand {
 			return uploaderCommands.NewToggleUploaderCommand()
 		}).
+		AdminCommand("get-transactions", func(conf *NodeConfig) commands.AdminCommand {
+			return storageCommands.NewGetTransactionsCommand(conf.State, conf.Storage.Payloads, conf.Storage.Collections)
+		}).
 		Module("mutable follower state", func(node *NodeConfig) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
@@ -248,7 +254,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		}).
 		Module("sync core", func(node *NodeConfig) error {
 			var err error
-			syncCore, err = chainsync.New(node.Logger, node.SyncCoreConfig)
+			syncCore, err = chainsync.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector())
 			return err
 		}).
 		Module("execution receipts storage", func(node *NodeConfig) error {
@@ -418,7 +424,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			executionDataCIDCache = state_synchronization.NewExecutionDataCIDCache(executionDataCIDCacheSize)
 
 			bs, err := node.Network.RegisterBlobService(
-				engine.ExecutionDataService,
+				network.ExecutionDataService,
 				ds,
 				p2p.WithBitswapOptions(
 					bitswap.WithTaskComparator(
@@ -473,14 +479,16 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 
 			extralog.ExtraLogDumpPath = extraLogPath
 
-			options := []runtime.Option{}
-			if e.exeConf.cadenceTracing {
-				options = append(options, runtime.WithTracingEnabled(true))
-			}
+			options := []runtime.Option{runtime.WithTracingEnabled(e.exeConf.cadenceTracing)}
 			rt := fvm.NewInterpreterRuntime(options...)
 
 			vm := fvm.NewVirtualMachine(rt)
-			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
+
+			fvmOptions := append([]fvm.Option{}, node.FvmOptions...)
+			if e.exeConf.extensiveTracing {
+				fvmOptions = append(fvmOptions, fvm.WithExtensiveTracing())
+			}
+			vmCtx := fvm.NewContext(node.Logger, fvmOptions...)
 
 			ledgerViewCommitter := committer.NewLedgerViewCommitter(ledgerStorage, node.Tracer)
 			manager, err := computation.New(
@@ -605,7 +613,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Component("ingestion engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			var err error
 			collectionRequester, err = requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
-				engine.RequestCollections,
+				network.RequestCollections,
 				filter.Any,
 				func() flow.Entity { return &flow.Collection{} },
 				// we are manually triggering batches in execution, but lets still send off a batch once a minute, as a safety net for the sake of retries
@@ -733,7 +741,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				node.Network,
 				node.Me,
 				node.State,
-				engine.ProvideReceiptsByBlockID,
+				network.ProvideReceiptsByBlockID,
 				filter.HasRole(flow.RoleConsensus),
 				retrieve,
 			)

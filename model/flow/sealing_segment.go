@@ -73,6 +73,34 @@ func (segment *SealingSegment) Lowest() *Block {
 	return segment.Blocks[0]
 }
 
+// FinalizedSeal returns the seal that seals the lowest block
+// For a valid SealingSegment, it's guaranteed to be found
+func (segment *SealingSegment) FinalizedSeal() (*Seal, error) {
+	seal, err := findFinalizedSeal(segment)
+	if err != nil {
+		return nil, err
+	}
+
+	// sanity check
+	if seal.BlockID != segment.Lowest().ID() {
+		return nil, fmt.Errorf("finalized seal should seal the lowest block %v, but actually is to seal %v",
+			segment.Lowest().ID(), seal.BlockID)
+	}
+	return seal, nil
+}
+
+func findFinalizedSeal(segment *SealingSegment) (*Seal, error) {
+	if isRootSegment(segment) {
+		return segment.FirstSeal, nil
+	}
+
+	return findLatestSealForLowestBlock(segment.Lowest().ID(), segment.Highest().ID(), segment.LatestSeals, segment.Blocks)
+}
+
+func isRootSegment(segment *SealingSegment) bool {
+	return len(segment.Blocks) == rootSegmentBlocksLen
+}
+
 // Validate validates the sealing segment structure and returns an error if
 // the segment isn't valid. This is done by re-building the segment from scratch,
 // re-using the validation logic already present in the SealingSegmentBuilder.
@@ -256,25 +284,39 @@ func (builder *SealingSegmentBuilder) isValidHeight(block *Block) bool {
 	return block.Header.Height == builder.highest().Header.Height+1
 }
 
-// hasValidSeal returns true if the latest seal as of highest is for lowest.
+// findLatestSealForLowestBlock finds the latest seal as of the highest block for the lowest block
+// it returns the latest seal and no error if found
+// it returns nil and error if not found
 // NOTE: only applicable for non-root sealing segments containing multiple blocks,
 // root sealing segments are checked by isValidRootSegment.
-func (builder *SealingSegmentBuilder) hasValidSeal() bool {
-	lowestID := builder.lowest().ID()
-	highestID := builder.highest().ID()
+// A <- B <- C <- D(seal_A)               ==> valid
+// A <- B <- C <- D(seal_A) <- E()        ==> valid
+// A <- B <- C <- D(seal_A,seal_B)        ==> invalid, because latest seal is B, but lowest block is A
+// A <- B <- C <- D(seal_X,seal_A)        ==> valid, because it's OK for block X to be unknown
+// A <- B <- C <- D(seal_A) <- E(seal_B)  ==> invalid, because latest seal is B, but lowest block is A
+// A(seal_A)                              ==> invalid, because this is impossible for non-root sealing segments
+func (builder *SealingSegmentBuilder) findLatestSealForLowestBlock() error {
+	_, err := findLatestSealForLowestBlock(builder.lowest().ID(), builder.highest().ID(), builder.latestSeals, builder.blocks)
+	return err
+}
 
+func findLatestSealForLowestBlock(lowestID, highestID Identifier, latestSeals map[Identifier]Identifier, blocks []*Block) (*Seal, error) {
 	// get the ID of the latest seal for highest block
-	latestSealID := builder.latestSeals[highestID]
+	latestSealID := latestSeals[highestID]
 
 	// find the seal within the block payloads
 	// NOTE: for non-root sealing segments, it is impossible for latestSeal to be builder.FirstSeal
-	for i := len(builder.blocks) - 1; i >= 0; i-- {
-		block := builder.blocks[i]
+	for i := len(blocks) - 1; i >= 0; i-- {
+		block := blocks[i]
 		// look for latestSealID in the payload
 		for _, seal := range block.Payload.Seals {
 			// if we found the latest seal, confirm it seals lowest
 			if seal.ID() == latestSealID {
-				return seal.BlockID == lowestID
+				if seal.BlockID == lowestID {
+					return seal, nil
+				}
+				return nil, fmt.Errorf("invalid segment: segment contain seal for block %v, but doesn't match lowest block %v",
+					seal.BlockID, lowestID)
 			}
 		}
 
@@ -282,15 +324,23 @@ func (builder *SealingSegmentBuilder) hasValidSeal() bool {
 		// backwards from higher height to lower height.
 		// otherwise, the sealing segment is invalid
 		if len(block.Payload.Seals) > 0 {
-			return false
+			return nil, fmt.Errorf("invalid segment: segment's last block contain seal %v, but doesn't match latestSealID: %v",
+				block.Payload.Seals[0].ID(), latestSealID)
 		}
 	}
-	return false
+
+	return nil, fmt.Errorf("invalid segment: seal %v not found", latestSealID)
 }
 
 // isValidRootSegment will check that the block in the root segment has a view of 0.
 func (builder *SealingSegmentBuilder) isValidRootSegment() bool {
-	return len(builder.blocks) == rootSegmentBlocksLen && builder.highest().Header.View == rootSegmentBlockView
+	return len(builder.blocks) == rootSegmentBlocksLen &&
+		builder.highest().Header.View == rootSegmentBlockView &&
+		len(builder.results) == rootSegmentBlocksLen && // root segment has only 1 result
+		builder.firstSeal != nil && // first seal is the root seal itself and must exist
+		builder.results[0].BlockID == builder.blocks[0].ID() && // root result matches the root block
+		builder.results[0].ID() == builder.firstSeal.ResultID && // root seal matches the root result
+		builder.results[0].BlockID == builder.firstSeal.BlockID // root seal seals the root block
 }
 
 // validateSegment will validate if builder satisfies conditions for a valid sealing segment.
@@ -309,8 +359,10 @@ func (builder *SealingSegmentBuilder) validateSegment() error {
 		return nil
 	}
 
-	if !builder.hasValidSeal() {
-		return fmt.Errorf("sealing segment missing seal lowest (%x) highest (%x): %w", builder.lowest().ID(), builder.highest().ID(), ErrSegmentMissingSeal)
+	// validate the latest seal is for the lowest block
+	err := builder.findLatestSealForLowestBlock()
+	if err != nil {
+		return fmt.Errorf("sealing segment missing seal lowest (%x) highest (%x) %v: %w", builder.lowest().ID(), builder.highest().ID(), err, ErrSegmentMissingSeal)
 	}
 
 	return nil
