@@ -103,7 +103,6 @@ type ObserverServiceConfig struct {
 	executionDataDir          string
 	executionDataStartHeight  uint64
 	executionDataConfig       edrequester.ExecutionDataConfig
-	baseOptions               []cmd.Option
 	apiTimeout                time.Duration
 	upstreamNodeAddresses     []string
 	upstreamNodePublicKeys    []string
@@ -543,7 +542,7 @@ func NewFlowObserverServiceBuilder(opts ...Option) *ObserverServiceBuilder {
 	}
 	anb := &ObserverServiceBuilder{
 		ObserverServiceConfig:   config,
-		FlowNodeBuilder:         cmd.FlowNode(flow.RoleAccess.String(), config.baseOptions...),
+		FlowNodeBuilder:         cmd.FlowNode(flow.RoleAccess.String()),
 		FinalizationDistributor: pubsub.NewFinalizationDistributor(),
 	}
 	// the observer gets a version of the root snapshot file that does not contain any node addresses
