@@ -30,6 +30,8 @@ func TestSafetyCheck(t *testing.T) {
 
 	t.Run("parsing error in imported contract", func(t *testing.T) {
 
+		t.Skip()
+
 		// temporary solution
 		dumpPath := extralog.ExtraLogDumpPath
 
@@ -106,6 +108,8 @@ func TestSafetyCheck(t *testing.T) {
 	})
 
 	t.Run("checking error in imported contract", func(t *testing.T) {
+
+		t.Skip()
 
 		rt := fvm.NewInterpreterRuntime()
 
@@ -233,6 +237,8 @@ func TestSafetyCheck(t *testing.T) {
 	})
 
 	t.Run("retriable errors causes retry", func(t *testing.T) {
+
+		t.Skip()
 
 		rt := &ErrorReturningRuntime{TxErrors: []error{
 			runtime.Error{ // first error
