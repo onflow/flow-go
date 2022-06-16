@@ -4,8 +4,9 @@ import (
 	"context"
 	"testing"
 
-	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/stretchr/testify/require"
+
+	sdk "github.com/onflow/flow-go-sdk"
 
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
@@ -65,7 +66,13 @@ func SealingAndVerificationHappyPathTest(
 	}
 
 	// waits until blockB is sealed by consensus nodes after result approvals for all of its chunks emitted.
-	blockState.WaitForSealed(t, blockB.Header.Height)
+	// blockState.WaitForSealed(t, blockB.Header.Height)
+	// waits till sealing height goes beyond the victim block
+	blockState.WaitForSealed(t, blockB.Header.Height+1)
+	// then checks querying victim block by height returns the victim block itself.
+	blockByHeight, ok := blockState.FinalizedHeight(blockB.Header.Height)
+	require.True(t, ok)
+	require.Equal(t, blockByHeight.Header.ID(), blockB.Header.ID())
 
 	return []*flow.ExecutionReceipt{receiptB1, receiptB2}, approvals
 }

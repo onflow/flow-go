@@ -12,7 +12,7 @@ import (
 )
 
 // wintermuteTimeout corresponds to the timeout the wintermute orchestrator have to conduct the attack.
-const wintermuteTimeout = 1 * time.Minute
+const wintermuteTimeout = 2 * time.Minute
 
 type WintermuteTestSuite struct {
 	Suite
