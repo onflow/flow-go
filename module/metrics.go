@@ -510,3 +510,8 @@ type ChainSyncMetrics interface {
 
 	BatchRequested(batch chainsync.Batch)
 }
+
+type DHTMetrics interface {
+	RoutingTablePeerAdded()
+	RoutingTablePeerRemoved()
+}
