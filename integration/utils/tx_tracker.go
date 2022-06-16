@@ -37,6 +37,7 @@ type txCallbacks struct {
 // transactions by txID, in case of transaction state change
 // it calls the provided callbacks
 type TxTracker struct {
+	ctx           context.Context
 	cancel        context.CancelFunc
 	log           zerolog.Logger
 	numbOfWorkers int
@@ -58,6 +59,7 @@ func NewTxTracker(
 
 	ctx, cancel := context.WithCancel(context.Background())
 	txt := &TxTracker{
+		ctx:           ctx,
 		cancel:        cancel,
 		log:           log,
 		numbOfWorkers: numberOfWorkers,
@@ -76,7 +78,7 @@ func NewTxTracker(
 		txt.clients[i] = fclient
 
 		txt.wg.Add(1)
-		go txt.statusWorker(ctx, i, fclient, sleepAfterOp)
+		go txt.statusWorker(i, fclient, sleepAfterOp)
 	}
 	return txt, nil
 }
@@ -99,8 +101,12 @@ func (txt *TxTracker) AddTx(
 		wait:        make(chan struct{}),
 	}
 	txt.log.Trace().Str("tx_id", txID.String()).Msg("tx added to tx tracker")
-	txt.txs <- newTx
-	return newTx.wait
+	select {
+	case txt.txs <- newTx:
+		return newTx.wait
+	case <-txt.ctx.Done():
+		return nil
+	}
 }
 
 // Stop stops the tracker workers
@@ -129,16 +135,18 @@ func (txt *TxTracker) Stop() {
 	}
 }
 
-func (txt *TxTracker) statusWorker(ctx context.Context, workerID int, fclient *client.Client, sleepAfterOp time.Duration) {
+func (txt *TxTracker) statusWorker(workerID int, fclient *client.Client, sleepAfterOp time.Duration) {
 	log := txt.log.With().Int("worker_id", workerID).Logger()
 	log.Trace().Msg("worker started")
 
-	defer txt.wg.Done()
+	defer func() {
+		log.Debug().Msg("worker stopped")
+		txt.wg.Done()
+	}()
 
 	for {
 		select {
-		case <-ctx.Done():
-			log.Debug().Msg("worker stopped")
+		case <-txt.ctx.Done():
 			return
 		case tx := <-txt.txs:
 			log = log.With().Str("tx_id", tx.txID.String()).Logger()
@@ -156,7 +164,7 @@ func (txt *TxTracker) statusWorker(ctx context.Context, workerID int, fclient *c
 			}
 			log.Trace().Msg("status update request sent for tx")
 
-			result, err := fclient.GetTransactionResult(ctx, tx.txID)
+			result, err := fclient.GetTransactionResult(txt.ctx, tx.txID)
 			if err != nil {
 				log.Warn().Err(err).Msg("error getting tx result, will put tx back to queue after sleep")
 
@@ -219,8 +227,12 @@ func (txt *TxTracker) statusWorker(ctx context.Context, workerID int, fclient *c
 			// don't put too much pressure on access node
 			time.Sleep(sleepAfterOp)
 
-			// put it back
-			txt.txs <- tx
+			select {
+			case txt.txs <- tx:
+				// put it back
+			case <-txt.ctx.Done():
+				return
+			}
 		}
 	}
 }
