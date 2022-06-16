@@ -318,7 +318,7 @@ func (o *Orchestrator) handleResultApprovalEvent(resultApprovalEvent *insecure.E
 			Str("target_ids", fmt.Sprintf("%v", resultApprovalEvent.TargetIds)).Logger()
 
 		if o.state.originalResult.ID() == approval.Body.ExecutionResultID {
-			lg.Info().Msg("wintermuting result approval for original execution result")
+			lg.Info().Msg("wintermuting result approval for original un-corrupted execution result")
 			return nil
 		}
 	}
