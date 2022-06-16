@@ -194,7 +194,7 @@
                 "uid": "prometheus"
               },
               "editorMode": "code",
-              "expr": "sum(increase(loader_transactions_tte_seconds_bucket{}[$__rate_interval])) by (le)",
+              "expr": "sum(increase(loader_transactions_executed_in_seconds_bucket{}[$__rate_interval])) by (le)",
               "hide": false,
               "legendFormat": "__auto",
               "range": true,

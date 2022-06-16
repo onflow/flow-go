@@ -34,7 +34,7 @@ func NewLoaderCollector() *LoaderCollector {
 			Help:      "transaction successfully executed by the loader",
 		}),
 		tteInSeconds: promauto.NewHistogram(prometheus.HistogramOpts{
-			Name:      "transactions_tte_seconds",
+			Name:      "transactions_executed_in_seconds",
 			Namespace: namespaceLoader,
 			Help:      "Time To Execute histogram for transactions (in seconds)",
 			Buckets:   prometheus.ExponentialBuckets(2, 2, 8),
