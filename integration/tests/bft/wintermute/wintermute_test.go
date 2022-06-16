@@ -49,7 +49,7 @@ func (w *WintermuteTestSuite) TestWintermuteAttack() {
 			2)
 	}
 
-	// waits till sealing height goes beyond the victim block
+	// waits until we seal a height equal to the victim block height
 	w.BlockState.WaitForSealed(w.T(), victimBlock.Header.Height)
 	// then checks querying victim block by height returns the victim block itself.
 	blockByHeight, ok := w.BlockState.FinalizedHeight(victimBlock.Header.Height)
