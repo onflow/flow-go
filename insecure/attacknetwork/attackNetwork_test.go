@@ -33,7 +33,7 @@ func testAttackNetworkObserve(t *testing.T, concurrencyDegree int) {
 	// creates event fixtures and their corresponding messages.
 	messages, events, corruptedIds := insecure.MessageFixtures(t, cbor.NewCodec(), insecure.Protocol_MULTICAST, concurrencyDegree)
 
-	withOrchestrator(
+	withMockOrchestrator(
 		t,
 		corruptedIds,
 		func(network *AttackNetwork, orchestrator *mockinsecure.AttackOrchestrator, ccfs []*mockCorruptibleConduitFactory) {
@@ -93,7 +93,7 @@ func testAttackNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegr
 	// creates event fixtures and their corresponding messages.
 	_, events, corruptedIds := insecure.MessageFixtures(t, cbor.NewCodec(), protocol, concurrencyDegree)
 
-	withOrchestrator(t,
+	withMockOrchestrator(t,
 		corruptedIds,
 		func(attackNetwork *AttackNetwork, _ *mockinsecure.AttackOrchestrator, ccfs []*mockCorruptibleConduitFactory) {
 			attackerMsgReceived := &sync.WaitGroup{}
@@ -157,13 +157,13 @@ func matchEventForMessage(t *testing.T, events []*insecure.Event, message *insec
 	require.Fail(t, fmt.Sprintf("could not find any matching event for the message: %v", message))
 }
 
-// withOrchestrator creates an attack network with a mock orchestrator.
-// It then starts the attack network, executes the given run function on the attack network and its orchestrator,
-// and finally terminates the attack network.
-func withOrchestrator(t *testing.T,
+// withMockOrchestrator creates a Corrupted Conduit Factory (CCF) for each given corrupted identity.
+// It then creates an attack network, establishes a connection to each CCF, and then registers a mock orchestrator
+// on top of the attack network.
+// Once the attack network, CCFs, and mock orchestrator are all ready, it executes the injected "run" function.
+func withMockOrchestrator(t *testing.T,
 	corruptedIds flow.IdentityList,
 	run func(*AttackNetwork, *mockinsecure.AttackOrchestrator, []*mockCorruptibleConduitFactory)) {
-	codec := cbor.NewCodec()
 
 	withMockCorruptibleConduitFactories(t,
 		corruptedIds.NodeIDs(),
@@ -174,7 +174,7 @@ func withOrchestrator(t *testing.T,
 
 			attackNetwork, err := NewAttackNetwork(
 				unittest.Logger(),
-				codec,
+				cbor.NewCodec(),
 				orchestrator,
 				connector,
 				corruptedIds)
@@ -249,14 +249,12 @@ func mockOrchestratorHandlingEvent(t *testing.T, orchestrator *mockinsecure.Atta
 	return orchestratorWG
 }
 
-// withMockCorruptibleConduitFactories creates and starts mock Corruptible Conduit Factories (CCF)s.
+// withMockCorruptibleConduitFactories creates and starts mock Corruptible Conduit Factories (CCF)s for each given corrupted identity.
 // These mock CCFs only run the gRPC part of an actual CCF. Once all CCFs are up and running, the injected "run" function is executed.
 func withMockCorruptibleConduitFactories(
 	t *testing.T,
 	corruptedIds flow.IdentifierList,
-	run func(irrecoverable.SignalerContext,
-		[]*mockCorruptibleConduitFactory,
-		map[flow.Identifier]string)) {
+	run func(irrecoverable.SignalerContext, []*mockCorruptibleConduitFactory, map[flow.Identifier]string)) {
 
 	count := len(corruptedIds)
 
