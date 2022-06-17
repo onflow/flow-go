@@ -52,6 +52,27 @@ func (bs *BlockState) Add(t *testing.T, b *messages.BlockProposal) {
 	bs.processAncestors(t, b, confirmsHeight)
 }
 
+func (bs *BlockState) WaitForBlockById(t *testing.T, blockId flow.Identifier) *messages.BlockProposal {
+	var blockProposal *messages.BlockProposal
+
+	require.Eventually(t, func() bool {
+		bs.RLock() // avoiding concurrent map access
+		defer bs.RUnlock()
+
+		if block, ok := bs.blocksByID[blockId]; !ok {
+			t.Logf("pending for block id: %x\n", blockId)
+			return false
+		} else {
+			blockProposal = block
+			return true
+		}
+
+	}, blockStateTimeout, 100*time.Millisecond,
+		fmt.Sprintf("did not receive requested block id (%x) within %v seconds", blockId, blockStateTimeout))
+
+	return blockProposal
+}
+
 // processAncestors checks whether ancestors of block are within the confirming height, and finalizes
 // them if that is the case.
 // It also processes the seals of blocks being finalized.
@@ -180,7 +201,7 @@ func (bs *BlockState) WaitForSealed(t *testing.T, height uint64) *messages.Block
 	require.Eventually(t,
 		func() bool {
 			if bs.highestSealed != nil {
-				t.Logf("waiting for sealed height (%d/%d)", bs.highestSealed.Header.Height, height)
+				t.Logf("waiting for sealed height (%d/%d), last finalized %d", bs.highestSealed.Header.Height, height, bs.highestFinalized)
 			}
 			return bs.highestSealed != nil && bs.highestSealed.Header.Height >= height
 		},
