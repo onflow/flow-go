@@ -119,6 +119,12 @@ func (c *mockCorruptibleConduitFactory) RegisterAttacker(_ *empty.Empty, stream 
 		close(c.attackerRegMsg)
 	}
 
+	// WARNING: this method call should not return through the entire lifetime of this
+	// corruptible conduit factory.
+	// This is a client streaming gRPC implementation, and the input stream's lifecycle
+	// is tightly coupled with the lifecycle of this function call.
+	// Once it returns, the client stream is closed forever.
+	// Hence, we block the call and wait till a component shutdown.
 	<-c.cm.ShutdownSignal()
 
 	return nil
