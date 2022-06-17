@@ -184,6 +184,7 @@ func (c *ConduitFactory) ProcessAttackerMessage(stream insecure.CorruptibleCondu
 func (c *ConduitFactory) processAttackerMessage(msg *insecure.Message) error {
 	lg := c.logger.With().
 		Str("protocol", insecure.ProtocolStr(msg.Protocol)).
+		Uint32("target_num", msg.TargetNum).
 		Str("channel", string(msg.ChannelID)).Logger()
 
 	event, err := c.codec.Decode(msg.Payload)
@@ -193,9 +194,7 @@ func (c *ConduitFactory) processAttackerMessage(msg *insecure.Message) error {
 	}
 
 	lg = c.logger.With().
-		Hex("corrupted_id", logging.ID(c.me.NodeID())).
-		Uint32("target_num", msg.TargetNum).
-		Str("flow_protocol_event", fmt.Sprintf("%T", event)).Logger()
+		Str("flow_protocol_event_type", fmt.Sprintf("%T", event)).Logger()
 
 	switch e := event.(type) {
 	case *flow.ExecutionReceipt:
@@ -230,7 +229,6 @@ func (c *ConduitFactory) processAttackerMessage(msg *insecure.Message) error {
 	}
 
 	lg = lg.With().
-		Str("event_type", fmt.Sprintf("%T", event)).
 		Str("event", fmt.Sprintf("%+v", event)).
 		Logger()
 
@@ -381,6 +379,7 @@ func (c *ConduitFactory) generateResultApproval(attestation *flow.Attestation) (
 	return verifier.GenerateResultApproval(c.me, c.approvalHasher, c.spockHasher, attestation, []byte{})
 }
 
+// AttackerRegistered returns whether an attacker has registered on this CCF or not.
 func (c *ConduitFactory) AttackerRegistered() bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()

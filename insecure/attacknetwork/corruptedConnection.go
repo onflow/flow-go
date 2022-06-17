@@ -31,7 +31,7 @@ func NewCorruptedNodeConnection(
 	outbound insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient,
 	inbound insecure.CorruptibleConduitFactory_RegisterAttackerClient) *CorruptedNodeConnection {
 	c := &CorruptedNodeConnection{
-		logger:         logger,
+		logger:         logger.With().Str("component", "corrupted-connector").Logger(),
 		outbound:       outbound,
 		inbound:        inbound,
 		inboundHandler: inboundHandler,
