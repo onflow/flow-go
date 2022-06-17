@@ -115,6 +115,14 @@ func (d *dispatcher) processReceipts(ctx irrecoverable.SignalerContext, ready co
 			return
 		case r := <-d.receiptsOut:
 			receipt := r.(*flow.ExecutionReceipt)
+
+			// TODO: The dispatcher should only dispatch jobs for results with corresponding block heights that
+			// are near enough to the sealed height that, if they are for invalid results, would be cancelled
+			// relatively quickly by falling beneath the sealed height. Otherwise, jobs for malicious receipts
+			// could block a handler thread forever. Currently, we implement this by checking if the block exists
+			// in local storage (and hence has been incorporated), but we may want to consider adding more
+			// aggressive checks in the future since unfinalized subtrees of incorporated but uncertified blocks
+			// are not guaranteed to be bounded in size.
 			block, err := d.blocks.ByID(receipt.ExecutionResult.BlockID)
 			if err != nil {
 				d.logger.Debug().
@@ -239,6 +247,8 @@ func (d *dispatcher) handleSealedResult(ctx irrecoverable.SignalerContext, rinfo
 			if rinfo.resultID == resultID {
 				requested = true
 			} else {
+				// The dispatcher must cancel jobs for unsealed result IDs once they fall below the sealed height.
+				// Otherwise jobs for malicious receipts could block a handler thread forever.
 				cancel()
 				d.metrics.RequestCanceled()
 			}

@@ -46,15 +46,33 @@ func (e *MismatchedBlockIDError) Error() string {
 }
 
 func isRetryable(err error) bool {
+	// The blob data received for the CID was invalid. Since the BlobService guarantees that
+	// the CID is the hash of blob data returned, the CID is invalid and shouldn't be retried.
 	var malformedDataErr *execution_data.MalformedDataError
 	if errors.As(err, &malformedDataErr) {
 		return false
 	}
-
 	var blobSizeLimitExceededErr *BlobSizeLimitExceededError
-	return !errors.As(err, &blobSizeLimitExceededErr)
+	if errors.As(err, &blobSizeLimitExceededErr) {
+		return false
+	}
+
+	// The blob data wasn't found, but might be found later so we'll retry
+	var blobNotFoundErr *execution_data.BlobNotFoundError
+	if errors.As(err, &blobNotFoundErr) {
+		return true
+	}
+
+	// Retry on all other errors, because BlobService can return generic errors for
+	// transient failures, which should result in a retry
+	return true
 }
 
+// This struct encapsulates all the metadata of an execution data download job.
+// It is created by the dispatcher, and the context must be canceled by the dispatcher
+// if the job's result falls below the sealed height without being sealed. Otherwise
+// jobs for unsealed results could saturate all worker threads and prevent downloading
+// progress.
 type job struct {
 	ctx             context.Context
 	resultID        flow.Identifier
@@ -63,6 +81,8 @@ type job struct {
 	blockHeight     uint64
 }
 
+// This component is responsible for downloading execution data and forwarding the results to the
+// fulfiller. It handles retries if transient errors occur.
 type handler struct {
 	jobsIn  chan<- interface{}
 	jobsOut <-chan interface{}
@@ -141,6 +161,19 @@ func (h *handler) loop(ctx irrecoverable.SignalerContext, ready component.ReadyF
 	}
 }
 
+// handle carries out an execution data download job.
+//
+// The handler's threads are blocking until they complete a job, and have no strict timing bound.
+// Since we process unsealed receipts, we are dealing with potentially malicious inputs which
+// could block these requester threads. We rely on the following things:
+// * The dispatcher cancels jobs for unsealed result IDs once they fall below the sealed height.
+//   Otherwise jobs for malicious receipts could block a thread forever, because we don't bound
+//   retry attempts and "blob not found" is considered a retryable error.
+// * The dispatcher only dispatches jobs for results with corresponding block heights that are
+//   near enough to the sealed height that, if they are for invalid results, would be cancelled
+//   relatively quickly by falling beneath the sealed height. Otherwise we have the same problem
+//   of jobs blocking a thread forever. This is implemented in the dispatcher by checking whether
+//   the block has been incorporated.
 func (h *handler) handle(parentCtx irrecoverable.SignalerContext, j *job) {
 	getCtx, cancel := onecontext.Merge(parentCtx, j.ctx)
 	defer cancel()
@@ -356,7 +389,7 @@ type retrieveBlobsResult struct {
 	totalSize uint64
 }
 
-// retrieveBlobs retrieves the blobs for the given CIDs from the blobservice.
+// retrieveBlobs retrieves the blobs for the given CIDs with the given BlobGetter.
 func (h *handler) retrieveBlobs(parent context.Context, blobGetter network.BlobGetter, cids []cid.Cid) (<-chan blobs.Blob, <-chan *retrieveBlobsResult) {
 	blobsOut := make(chan blobs.Blob, len(cids))
 	resultCh := make(chan *retrieveBlobsResult, 1)
