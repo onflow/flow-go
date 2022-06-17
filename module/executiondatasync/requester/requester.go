@@ -35,6 +35,11 @@ type RequesterConfig struct {
 	NumConcurrentWorkers int
 }
 
+// Requester is a component responsible for downloading execution data for
+// executed blocks via Bitswap.
+// It consumes execution receipts and finalized blocks, and initiates requests
+// for the execution data that they contain. It also keeps track of a set of
+// subscribers, who it notifies each time a new block is fulfilled.
 type Requester struct {
 	notifier   *notifier
 	dispatcher *dispatcher
@@ -51,7 +56,7 @@ type Requester struct {
 }
 
 func NewRequester(
-	startHeight uint64,
+	sealedHeight uint64,
 	trackerStorage tracker.Storage,
 	blocks storage.Blocks,
 	results storage.ExecutionResults,
@@ -91,7 +96,7 @@ func NewRequester(
 		logger,
 		metrics,
 	)
-	dispatcher := newDispatcher(startHeight, blocks, results, handler, fulfiller, logger, metrics)
+	dispatcher := newDispatcher(sealedHeight, blocks, results, handler, fulfiller, logger, metrics)
 
 	r := &Requester{
 		notifier:          notifier,
@@ -109,7 +114,7 @@ func NewRequester(
 		AddWorker(r.runFulfiller).
 		AddWorker(r.runHandler).
 		AddWorker(r.runNotifier).
-		AddWorker(r.runDispatcher(results, fulfilledHeight, startHeight)).
+		AddWorker(r.runDispatcher(results, fulfilledHeight, sealedHeight)).
 		AddWorker(r.processFinalizedBlocks).
 		Build()
 	r.Component = r.cm
@@ -183,7 +188,10 @@ func (r *Requester) runNotifier(ctx irrecoverable.SignalerContext, ready compone
 
 func (r *Requester) runDispatcher(results storage.ExecutionResults, fulfilledHeight, sealedHeight uint64) component.ComponentWorker {
 	return func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-		for h := fulfilledHeight + 1; h < sealedHeight; h++ {
+		// On startup, queue jobs for all sealed heights that are not yet fulfilled.
+		// This is necessary because the Finalization Distributor will only send
+		// notifications for new blocks past the sealed height.
+		for h := fulfilledHeight + 1; h <= sealedHeight; h++ {
 			blk, err := r.blocks.ByHeight(h)
 			if err != nil {
 				ctx.Throw(fmt.Errorf("failed to retrieve sealed block at height %d: %w", h, err))

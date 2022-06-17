@@ -22,6 +22,8 @@ type subRequest struct {
 	done chan struct{}
 }
 
+// This component notifies subscribers about fulfilled block heights.
+// A "fulfilled" block is one which has been sealed and for which execution data has been downloaded.
 type notifier struct {
 	notificationsIn  chan<- interface{}
 	notificationsOut <-chan interface{}

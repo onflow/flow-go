@@ -25,6 +25,7 @@ func WithBlobSizeLimit(size int) ProviderOption {
 	}
 }
 
+// Provider is used to provide execution data blobs over the blob service.
 type Provider struct {
 	logger      zerolog.Logger
 	metrics     module.ExecutionDataProviderMetrics
@@ -107,6 +108,8 @@ func (p *Provider) storeBlobs(parent context.Context, blockHeight uint64, blobCh
 	return ch
 }
 
+// Provide adds the block execution data for a newly executed (generally not sealed or finalized) block to the blob store for distribution using Bitswap.
+// It computes and returns the root CID of the execution data blob tree.
 func (p *Provider) Provide(ctx context.Context, blockHeight uint64, executionData *execution_data.BlockExecutionData) (flow.Identifier, error) {
 	rootID, errCh, err := p.provide(ctx, blockHeight, executionData)
 	storeErr, ok := <-errCh
