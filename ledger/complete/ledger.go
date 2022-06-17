@@ -223,7 +223,7 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *
 	l.metrics.UpdateDuration(elapsed)
 
 	if len(trieUpdate.Paths) > 0 {
-		durationPerValue := time.Duration(elapsed.Nanoseconds()/int64(len(trieUpdate.Paths)))
+		durationPerValue := time.Duration(elapsed.Nanoseconds() / int64(len(trieUpdate.Paths)))
 		l.metrics.UpdateDurationPerItem(durationPerValue)
 	}
 
