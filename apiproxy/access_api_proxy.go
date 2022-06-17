@@ -27,6 +27,7 @@ import (
 func NewFlowCachedAccessAPIProxy(accessNodeAddressAndPort flow.IdentityList, timeout time.Duration) (*FlowCachedAccessAPIProxy, error) {
 	ret := &FlowCachedAccessAPIProxy{}
 	ret.timeout = timeout
+	ret.ids = accessNodeAddressAndPort
 	ret.upstream = make([]access.AccessAPIClient, accessNodeAddressAndPort.Count())
 	ret.connections = make([]*grpc.ClientConn, accessNodeAddressAndPort.Count())
 	for i, identity := range accessNodeAddressAndPort {
@@ -96,6 +97,12 @@ func (h *FlowCachedAccessAPIProxy) reconnectingClient(i int) error {
 				return fmt.Errorf("cannot connect to %s %w", identity.Address, err)
 			}
 		}
+		connection.Connect()
+		time.Sleep(1 * time.Second)
+		state := connection.GetState()
+		if state != connectivity.Ready && state != connectivity.Connecting {
+			return fmt.Errorf("%v", state)
+		}
 		h.connections[i] = connection
 		h.upstream[i] = access.NewAccessAPIClient(connection)
 	}
@@ -126,16 +133,28 @@ func (h *FlowCachedAccessAPIProxy) faultTolerantClient() (access.AccessAPIClient
 		h.roundRobin++
 		h.roundRobin = h.roundRobin % len(h.upstream)
 		err = h.reconnectingClient(h.roundRobin)
-		if err == nil {
-			return h.upstream[h.roundRobin], nil
+		if err != nil {
+			continue
 		}
+		state := h.connections[h.roundRobin].GetState()
+		if state != connectivity.Ready && state != connectivity.Connecting {
+			continue
+		}
+		return h.upstream[h.roundRobin], nil
 	}
 
 	return nil, err
 }
 
+// Ping pings the service. It is special in the sense that it responds successful,
+// only if all underlying services are ready.
 func (h *FlowCachedAccessAPIProxy) Ping(context context.Context, req *access.PingRequest) (*access.PingResponse, error) {
-	return h.AccessAPIServer.Ping(context, req)
+	// This is a passthrough request
+	upstream, err := h.faultTolerantClient()
+	if err != nil {
+		return nil, err
+	}
+	return upstream.Ping(context, req)
 }
 
 func (h *FlowCachedAccessAPIProxy) GetLatestBlockHeader(context context.Context, req *access.GetLatestBlockHeaderRequest) (*access.BlockHeaderResponse, error) {
