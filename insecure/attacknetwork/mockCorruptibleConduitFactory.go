@@ -28,7 +28,7 @@ type mockCorruptibleConduitFactory struct {
 	cm                    *component.ComponentManager
 	server                *grpc.Server           // touch point of attack network to this factory.
 	address               net.Addr               // address of gRPC endpoint for this mock ccf
-	attackerRegMsg        chan interface{}       // channel keeping the last registration message coming from an attacker.
+	attackerRegMsg        chan interface{}       // channel indicating whether attacker has registered.
 	attackerMsg           chan *insecure.Message // channel  keeping the last incoming (insecure) message from an attacker.
 	attackerObserveStream insecure.CorruptibleConduitFactory_RegisterAttackerServer
 }
