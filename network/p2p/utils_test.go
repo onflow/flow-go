@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 )
@@ -35,7 +36,7 @@ func createNode(
 ) *p2p.Node {
 	builder := p2p.NewNodeBuilder(zerolog.Nop(), "0.0.0.0:0", networkKey, sporkID).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
-			return p2p.NewDHT(c, h, unicast.FlowDHTProtocolID(sporkID))
+			return p2p.NewDHT(c, h, unicast.FlowDHTProtocolID(sporkID), zerolog.Nop(), metrics.NewNoopCollector())
 		}).
 		SetPubSub(pubsub.NewGossipSub)
 

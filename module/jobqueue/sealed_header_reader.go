@@ -14,6 +14,8 @@ type SealedBlockHeaderReader struct {
 	headers storage.Headers
 }
 
+var _ module.Jobs = (*SealedBlockHeaderReader)(nil)
+
 // NewSealedBlockHeaderReader creates and returns a SealedBlockHeaderReader.
 func NewSealedBlockHeaderReader(state protocol.State, headers storage.Headers) *SealedBlockHeaderReader {
 	return &SealedBlockHeaderReader{
@@ -24,6 +26,8 @@ func NewSealedBlockHeaderReader(state protocol.State, headers storage.Headers) *
 
 // AtIndex returns the block header job at the given index.
 // The block header job at an index is just the finalized block header at that index (i.e., height).
+// Error returns:
+//   * storage.ErrNotFound if the provided index is not sealed
 func (r SealedBlockHeaderReader) AtIndex(index uint64) (module.Job, error) {
 	sealed, err := r.Head()
 	if err != nil {
