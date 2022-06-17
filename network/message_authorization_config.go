@@ -1,6 +1,7 @@
 package network
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -12,14 +13,15 @@ import (
 // is represented as a map from network channel -> list of all roles allowed to send the message on
 // the channel.
 type MsgAuthConfig struct {
-	String string
-	config map[Channel]flow.RoleList
+	String    string
+	Interface interface{}
+	Config    map[Channel]flow.RoleList
 }
 
 // IsAuthorized checks if the specified role is authorized to send the message on channel and
 // asserts that the message is authorized to be sent on channel.
 func (m MsgAuthConfig) IsAuthorized(role flow.Role, channel Channel) error {
-	authorizedRoles, ok := m.config[channel]
+	authorizedRoles, ok := m.Config[channel]
 	if !ok {
 		return fmt.Errorf("message (%s) is not authorized to be sent on channel (%s)", m.String, channel)
 	}
@@ -32,53 +34,62 @@ func (m MsgAuthConfig) IsAuthorized(role flow.Role, channel Channel) error {
 }
 
 var (
+	ErrUnknownMsgType = errors.New("could not get authorization Config for unknown message type")
+
 	// consensus
 	blockProposal = MsgAuthConfig{
-		String: "BlockProposal",
-		config: map[Channel]flow.RoleList{
+		String:    "BlockProposal",
+		Interface: &messages.BlockProposal{},
+		Config: map[Channel]flow.RoleList{
 			ConsensusCommittee: {flow.RoleConsensus},
 			PushBlocks:         {flow.RoleConsensus}, // channel alias ReceiveBlocks = PushBlocks
 		},
 	}
 	blockVote = MsgAuthConfig{
-		String: "BlockVote",
-		config: map[Channel]flow.RoleList{
+		String:    "BlockVote",
+		Interface: &messages.BlockVote{},
+		Config: map[Channel]flow.RoleList{
 			ConsensusCommittee: {flow.RoleConsensus},
 		},
 	}
 
 	// protocol state sync
 	syncRequest = MsgAuthConfig{
-		String: "SyncRequest",
-		config: map[Channel]flow.RoleList{
+		String:    "SyncRequest",
+		Interface: &messages.SyncRequest{},
+		Config: map[Channel]flow.RoleList{
 			SyncCommittee:     flow.Roles(),
 			SyncClusterPrefix: flow.Roles(),
 		},
 	}
 	syncResponse = MsgAuthConfig{
-		String: "SyncResponse",
-		config: map[Channel]flow.RoleList{
+		String:    "SyncResponse",
+		Interface: &messages.SyncResponse{},
+		Config: map[Channel]flow.RoleList{
 			SyncCommittee:     flow.Roles(),
 			SyncClusterPrefix: flow.Roles(),
 		},
 	}
 	rangeRequest = MsgAuthConfig{
-		String: "RangeRequest",
-		config: map[Channel]flow.RoleList{
+		String:    "RangeRequest",
+		Interface: &messages.RangeRequest{},
+		Config: map[Channel]flow.RoleList{
 			SyncCommittee:     flow.Roles(),
 			SyncClusterPrefix: flow.Roles(),
 		},
 	}
 	batchRequest = MsgAuthConfig{
-		String: "BatchRequest",
-		config: map[Channel]flow.RoleList{
+		String:    "BatchRequest",
+		Interface: &messages.BatchRequest{},
+		Config: map[Channel]flow.RoleList{
 			SyncCommittee:     flow.Roles(),
 			SyncClusterPrefix: flow.Roles(),
 		},
 	}
 	blockResponse = MsgAuthConfig{
-		String: "BlockResponse",
-		config: map[Channel]flow.RoleList{
+		String:    "BlockResponse",
+		Interface: &messages.BlockResponse{},
+		Config: map[Channel]flow.RoleList{
 			SyncCommittee:     flow.Roles(),
 			SyncClusterPrefix: flow.Roles(),
 		},
@@ -86,54 +97,62 @@ var (
 
 	// cluster consensus
 	clusterBlockProposal = MsgAuthConfig{
-		String: "ClusterBlockProposal",
-		config: map[Channel]flow.RoleList{
+		String:    "ClusterBlockProposal",
+		Interface: &messages.ClusterBlockProposal{},
+		Config: map[Channel]flow.RoleList{
 			ConsensusClusterPrefix: {flow.RoleCollection},
 		},
 	}
 	clusterBlockVote = MsgAuthConfig{
-		String: "ClusterBlockVote",
-		config: map[Channel]flow.RoleList{
+		String:    "ClusterBlockVote",
+		Interface: &messages.ClusterBlockVote{},
+		Config: map[Channel]flow.RoleList{
 			ConsensusClusterPrefix: {flow.RoleCollection},
 		},
 	}
 	clusterBlockResponse = MsgAuthConfig{
-		String: "ClusterBlockResponse",
-		config: map[Channel]flow.RoleList{
+		String:    "ClusterBlockResponse",
+		Interface: &messages.ClusterBlockResponse{},
+		Config: map[Channel]flow.RoleList{
 			ConsensusClusterPrefix: {flow.RoleCollection},
 		},
 	}
 
 	// collections, guarantees & transactions
 	collectionGuarantee = MsgAuthConfig{
-		String: "CollectionGuarantee",
-		config: map[Channel]flow.RoleList{
+		String:    "CollectionGuarantee",
+		Interface: &flow.CollectionGuarantee{},
+		Config: map[Channel]flow.RoleList{
 			PushGuarantees: {flow.RoleCollection}, // channel alias ReceiveGuarantees = PushGuarantees
 		},
 	}
 	transaction = MsgAuthConfig{
-		String: "Transaction",
-		config: map[Channel]flow.RoleList{
+		String:    "Transaction",
+		Interface: &flow.Transaction{},
+		Config: map[Channel]flow.RoleList{
 			PushTransactions: {flow.RoleCollection}, // channel alias ReceiveTransactions = PushTransactions
 		},
 	}
 	transactionBody = MsgAuthConfig{
-		String: "TransactionBody",
-		config: map[Channel]flow.RoleList{
+		String:    "TransactionBody",
+		Interface: &flow.TransactionBody{},
+		Config: map[Channel]flow.RoleList{
 			PushTransactions: {flow.RoleCollection}, // channel alias ReceiveTransactions = PushTransactions
 		},
 	}
 
 	// core messages for execution & verification
 	executionReceipt = MsgAuthConfig{
-		String: "ExecutionReceipt",
-		config: map[Channel]flow.RoleList{
+		String:    "ExecutionReceipt",
+		Interface: &flow.ExecutionReceipt{},
+		Config: map[Channel]flow.RoleList{
 			PushReceipts: {flow.RoleExecution}, // channel alias ReceiveReceipts = PushReceipts
 		},
 	}
 	resultApproval = MsgAuthConfig{
-		String: "ResultApproval",
-		config: map[Channel]flow.RoleList{
+		String:    "ResultApproval",
+		Interface: &flow.ResultApproval{},
+		Config: map[Channel]flow.RoleList{
 			PushApprovals: {flow.RoleVerification}, // channel alias ReceiveApprovals = PushApprovals
 		},
 	}
@@ -141,17 +160,18 @@ var (
 	// [deprecated] execution state synchronization
 	executionStateSyncRequest = MsgAuthConfig{
 		String: "ExecutionStateSyncRequest",
-		config: nil,
+		Config: nil,
 	}
 	executionStateDelta = MsgAuthConfig{
 		String: "ExecutionStateDelta",
-		config: nil,
+		Config: nil,
 	}
 
 	// data exchange for execution of blocks
 	chunkDataRequest = MsgAuthConfig{
-		String: "ChunkDataRequest",
-		config: map[Channel]flow.RoleList{
+		String:    "ChunkDataRequest",
+		Interface: &messages.ChunkDataRequest{},
+		Config: map[Channel]flow.RoleList{
 			ProvideChunks:            {flow.RoleVerification}, // channel alias RequestChunks = ProvideChunks
 			RequestCollections:       {flow.RoleVerification},
 			RequestApprovalsByChunk:  {flow.RoleVerification},
@@ -159,8 +179,9 @@ var (
 		},
 	}
 	chunkDataResponse = MsgAuthConfig{
-		String: "ChunkDataResponse",
-		config: map[Channel]flow.RoleList{
+		String:    "ChunkDataResponse",
+		Interface: &messages.ChunkDataResponse{},
+		Config: map[Channel]flow.RoleList{
 			ProvideChunks:            {flow.RoleExecution}, // channel alias RequestChunks = ProvideChunks
 			RequestCollections:       {flow.RoleExecution},
 			RequestApprovalsByChunk:  {flow.RoleExecution},
@@ -170,22 +191,25 @@ var (
 
 	// result approvals
 	approvalRequest = MsgAuthConfig{
-		String: "ApprovalRequest",
-		config: map[Channel]flow.RoleList{
+		String:    "ApprovalRequest",
+		Interface: &messages.ApprovalRequest{},
+		Config: map[Channel]flow.RoleList{
 			ProvideApprovalsByChunk: {flow.RoleConsensus},
 		},
 	}
 	approvalResponse = MsgAuthConfig{
-		String: "ApprovalResponse",
-		config: map[Channel]flow.RoleList{
+		String:    "ApprovalResponse",
+		Interface: &messages.ApprovalResponse{},
+		Config: map[Channel]flow.RoleList{
 			ProvideApprovalsByChunk: {flow.RoleVerification},
 		},
 	}
 
 	// generic entity exchange engines
 	entityRequest = MsgAuthConfig{
-		String: "EntityRequest",
-		config: map[Channel]flow.RoleList{
+		String:    "EntityRequest",
+		Interface: &messages.EntityRequest{},
+		Config: map[Channel]flow.RoleList{
 			RequestChunks:            {flow.RoleAccess, flow.RoleConsensus, flow.RoleCollection},
 			RequestCollections:       {flow.RoleAccess, flow.RoleConsensus, flow.RoleCollection},
 			RequestApprovalsByChunk:  {flow.RoleAccess, flow.RoleConsensus, flow.RoleCollection},
@@ -193,8 +217,9 @@ var (
 		},
 	}
 	entityResponse = MsgAuthConfig{
-		String: "EntityResponse",
-		config: map[Channel]flow.RoleList{
+		String:    "EntityResponse",
+		Interface: &messages.EntityResponse{},
+		Config: map[Channel]flow.RoleList{
 			RequestChunks:            {flow.RoleCollection, flow.RoleExecution},
 			RequestCollections:       {flow.RoleCollection, flow.RoleExecution},
 			RequestApprovalsByChunk:  {flow.RoleCollection, flow.RoleExecution},
@@ -204,8 +229,9 @@ var (
 
 	// testing
 	echo = MsgAuthConfig{
-		String: "echo",
-		config: map[Channel]flow.RoleList{
+		String:    "echo",
+		Interface: &message.TestMessage{},
+		Config: map[Channel]flow.RoleList{
 			TestNetworkChannel: flow.Roles(),
 			TestMetricsChannel: flow.Roles(),
 		},
@@ -213,13 +239,18 @@ var (
 
 	// DKG
 	dkgMessage = MsgAuthConfig{
-		String: "DKGMessage",
-		config: map[Channel]flow.RoleList{
+		String:    "DKGMessage",
+		Interface: &messages.DKGMessage{},
+		Config: map[Channel]flow.RoleList{
 			DKGCommittee: {flow.RoleConsensus},
 		},
 	}
 )
 
+// GetMessageAuthConfig checks the underlying type and returns the correct
+// message auth Config.
+// Expected error returns during normal operations:
+//  * ErrUnknownMsgType : if underlying type of v does  not match any of the known message types
 func GetMessageAuthConfig(v interface{}) (MsgAuthConfig, error) {
 	switch v.(type) {
 	// consensus
@@ -295,6 +326,16 @@ func GetMessageAuthConfig(v interface{}) (MsgAuthConfig, error) {
 		return dkgMessage, nil
 
 	default:
-		return MsgAuthConfig{}, fmt.Errorf("could not get authorization config for message with type (%T)", v)
+		return MsgAuthConfig{}, fmt.Errorf("%w (%T)", ErrUnknownMsgType, v)
+	}
+}
+
+// GetAllMessageAuthConfigs returns a list with all message auth configurations
+func GetAllMessageAuthConfigs() []MsgAuthConfig {
+	return []MsgAuthConfig{
+		blockProposal, blockVote, syncRequest, syncResponse, rangeRequest, batchRequest,
+		blockResponse, clusterBlockProposal, clusterBlockVote, clusterBlockResponse, collectionGuarantee,
+		transaction, transactionBody, executionReceipt, resultApproval,
+		chunkDataRequest, chunkDataResponse, approvalRequest, approvalResponse, entityRequest, entityResponse, echo, dkgMessage,
 	}
 }
