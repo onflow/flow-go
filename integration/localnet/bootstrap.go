@@ -182,45 +182,14 @@ func displayPortAssignments() {
 }
 
 func prepareCommonHostFolders() {
-	// Remove and recreate working folders
-	err := os.RemoveAll(BootstrapDir)
-	if err != nil && !os.IsNotExist(err) {
-		panic(err)
-	}
+	for _, dir := range []string{BootstrapDir, ProfilerDir, DataDir, TrieDir} {
+		if err := os.RemoveAll(dir); err != nil && !os.IsNotExist(err) {
+			panic(err)
+		}
 
-	err = os.Mkdir(BootstrapDir, 0755)
-	if err != nil {
-		panic(err)
-	}
-
-	err = os.RemoveAll(ProfilerDir)
-	if err != nil && !os.IsNotExist(err) {
-		panic(err)
-	}
-
-	err = os.Mkdir(ProfilerDir, 0755)
-	if err != nil && !os.IsExist(err) {
-		panic(err)
-	}
-
-	err = os.RemoveAll(DataDir)
-	if err != nil && !os.IsNotExist(err) {
-		panic(err)
-	}
-
-	err = os.Mkdir(DataDir, 0755)
-	if err != nil && !os.IsExist(err) {
-		panic(err)
-	}
-
-	err = os.RemoveAll(TrieDir)
-	if err != nil && !os.IsNotExist(err) {
-		panic(err)
-	}
-
-	err = os.Mkdir(TrieDir, 0755)
-	if err != nil && !os.IsExist(err) {
-		panic(err)
+		if err := os.Mkdir(dir, 0755); err != nil {
+			panic(err)
+		}
 	}
 }
 
