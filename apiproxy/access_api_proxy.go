@@ -143,7 +143,7 @@ func (h *FlowCachedAccessAPIProxy) faultTolerantClient() (access.AccessAPIClient
 		return h.upstream[h.roundRobin], nil
 	}
 
-	return nil, err
+	return nil, status.Errorf(codes.Unavailable, err.Error())
 }
 
 // Ping pings the service. It is special in the sense that it responds successful,
