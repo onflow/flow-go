@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	realmodule "github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/defaults"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
@@ -72,7 +71,7 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 		EmergencySealingActive:    false,
 		ApprovalRequestsThreshold: 2,
 	}
-	setter := unittest.NewRequiredApprovalsForSealConstructionInstance(defaults.DefaultChunkAssignmentAlpha)
+	setter := unittest.NewRequiredApprovalsForSealConstructionInstance(flow.DefaultChunkAssignmentAlpha)
 	var err error
 	s.core, err = NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(), s.Headers, s.State, s.sealsDB, s.Assigner, s.SigHasher, s.SealsPL, s.Conduit, options, setter)
 	require.NoError(s.T(), err)

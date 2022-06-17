@@ -5,13 +5,14 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/module/defaults"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/updatable_configs"
 )
 
 func TestRequiredApprovalsForSealingContruction(t *testing.T) {
 
-	instance, err := updatable_configs.NewRequiredApprovalsForSealConstructionInstance(1, 0, 3)
+	instance, err := updatable_configs.NewRequiredApprovalsForSealConstructionInstance(
+		flow.DefaultRequiredApprovalsForSealConstruction, flow.DefaultRequiredApprovalsForSealValidation, flow.DefaultChunkAssignmentAlpha)
 	require.NoError(t, err)
 
 	// should get the default value
@@ -28,13 +29,13 @@ func TestRequiredApprovalsForSealingContruction(t *testing.T) {
 	require.Equal(t, uint(0), newVal)
 
 	// test updating multiple times
-	for i := 1; i <= defaults.DefaultChunkAssignmentAlpha; i++ {
+	for i := 1; i <= flow.DefaultChunkAssignmentAlpha; i++ {
 		old, err := instance.SetValue(uint(i))
 		require.NoError(t, err, err)
 		require.Equal(t, uint(i-1), old)
 		require.Equal(t, uint(i), instance.GetValue())
 	}
 
-	_, err = instance.SetValue(defaults.DefaultChunkAssignmentAlpha + 1)
+	_, err = instance.SetValue(flow.DefaultChunkAssignmentAlpha + 1)
 	require.Error(t, err)
 }

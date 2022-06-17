@@ -53,7 +53,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
 	"github.com/onflow/flow-go/module/chunks"
-	"github.com/onflow/flow-go/module/defaults"
 	confinalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -380,7 +379,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	receiptRequester, err := requester.New(node.Log, node.Metrics, node.Net, node.Me, node.State, network.RequestReceiptsByBlockID, filter.Any, func() flow.Entity { return &flow.ExecutionReceipt{} })
 	require.Nil(t, err)
 
-	assigner, err := chunks.NewChunkAssigner(defaults.DefaultChunkAssignmentAlpha, node.State)
+	assigner, err := chunks.NewChunkAssigner(flow.DefaultChunkAssignmentAlpha, node.State)
 	require.Nil(t, err)
 
 	receiptValidator := validation.NewReceiptValidator(node.State, node.Headers, node.Index, resultsDB, node.Seals)
@@ -405,7 +404,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		assigner,
 		seals,
 		sealingConfig,
-		unittest.NewRequiredApprovalsForSealConstructionInstance(defaults.DefaultRequiredApprovalsForSealConstruction),
+		unittest.NewRequiredApprovalsForSealConstructionInstance(flow.DefaultRequiredApprovalsForSealConstruction),
 	)
 	require.NoError(t, err)
 
