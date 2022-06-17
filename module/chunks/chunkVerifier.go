@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
@@ -307,6 +308,8 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to calculate CID of ChunkExecutionData: %w", err)
 	}
+	fmt.Print("verification\n")
+	spew.Dump(chunkExecutionData)
 
 	// we checked that index is valid
 	if cedID != chunkDataPack.ExecutionDataRoot.ChunkExecutionDataIDs[chIndex] {
