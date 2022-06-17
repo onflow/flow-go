@@ -125,7 +125,7 @@ func nodeFixture(
 		SetPubSub(pubsub.NewGossipSub).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2p.NewDHT(c, h,
-				protocol.ID(unicast.FlowDHTProtocolIDPrefix+sporkId.String()+"/"+dhtPrefix),
+				protocol.ID(unicast.FlowDHTProtocolIDPrefix+sporkID.String()+"/"+dhtPrefix),
 				logger,
 				noopMetrics,
 				parameters.dhtOptions...,
