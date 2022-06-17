@@ -132,7 +132,7 @@ func TestNewFlowCachedAccessAPIProxy(t *testing.T) {
 
 	// Prepare a proxy that fails due to the second connection being idle
 	l := flow.IdentityList{{Address: "127.0.0.1:11634"}, {Address: "127.0.0.1:11635"}}
-	c, err := NewFlowCachedAccessAPIProxy(l, time.Second)
+	c, err := NewFlowAccessAPIProxy(l, time.Second)
 	if err == nil {
 		t.Fatal(fmt.Errorf("should not start with one connection ready"))
 	}
@@ -147,7 +147,7 @@ func TestNewFlowCachedAccessAPIProxy(t *testing.T) {
 
 	// Prepare a proxy
 	l = flow.IdentityList{{Address: "127.0.0.1:11634"}, {Address: "127.0.0.1:11635"}}
-	c, err = NewFlowCachedAccessAPIProxy(l, time.Second)
+	c, err = NewFlowAccessAPIProxy(l, time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
