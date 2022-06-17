@@ -3,9 +3,10 @@ package passthrough
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/codec/cbor"
-	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -76,7 +77,7 @@ func (s *Suite) SetupSuite() {
 	for _, nodeID := range s.nodeIDs {
 		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus,
 			testnet.WithID(nodeID),
-			testnet.WithLogLevel(zerolog.InfoLevel),
+			testnet.WithLogLevel(zerolog.FatalLevel),
 			testnet.WithAdditionalFlag("--required-verification-seal-approvals=1"),
 			testnet.WithAdditionalFlag("--required-construction-seal-approvals=1"),
 			testnet.WithAdditionalFlag(blockRateFlag),
@@ -96,14 +97,14 @@ func (s *Suite) SetupSuite() {
 	s.exe1ID = unittest.IdentifierFixture()
 	exe1Config := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.exe1ID),
-		testnet.WithLogLevel(zerolog.InfoLevel),
+		testnet.WithLogLevel(zerolog.FatalLevel),
 		testnet.AsCorrupted())
 	s.nodeConfigs = append(s.nodeConfigs, exe1Config)
 
 	s.exe2ID = unittest.IdentifierFixture()
 	exe2Config := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.exe2ID),
-		testnet.WithLogLevel(zerolog.InfoLevel),
+		testnet.WithLogLevel(zerolog.FatalLevel),
 		testnet.AsCorrupted())
 	s.nodeConfigs = append(s.nodeConfigs, exe2Config)
 
