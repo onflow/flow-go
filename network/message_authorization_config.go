@@ -20,21 +20,26 @@ type MsgAuthConfig struct {
 
 // IsAuthorized checks if the specified role is authorized to send the message on channel and
 // asserts that the message is authorized to be sent on channel.
+// Expected error returns during normal operations:
+//  * ErrUnauthorizedMessageOnChannel: if channel does not exist in message config
+//  * ErrUnauthorizedRole: if list of authorized roles for message config does not include role
 func (m MsgAuthConfig) IsAuthorized(role flow.Role, channel Channel) error {
 	authorizedRoles, ok := m.Config[channel]
 	if !ok {
-		return fmt.Errorf("message (%s) is not authorized to be sent on channel (%s)", m.String, channel)
+		return ErrUnauthorizedMessageOnChannel
 	}
 
 	if !authorizedRoles.Contains(role) {
-		return fmt.Errorf("sender with role (%s) is not authorized to send message (%s) on channel (%s)", role, m.String, channel)
+		return ErrUnauthorizedRole
 	}
 
 	return nil
 }
 
 var (
-	ErrUnknownMsgType = errors.New("could not get authorization Config for unknown message type")
+	ErrUnknownMsgType               = errors.New("could not get authorization Config for unknown message type")
+	ErrUnauthorizedMessageOnChannel = errors.New("message is not authorized to be sent on channel")
+	ErrUnauthorizedRole             = errors.New("sender with role (%s) is not authorized to send message (%s) on channel (%s)")
 
 	// consensus
 	blockProposal = MsgAuthConfig{
