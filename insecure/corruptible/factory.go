@@ -192,10 +192,8 @@ func (c *ConduitFactory) processAttackerMessage(msg *insecure.Message) error {
 		return fmt.Errorf("could not decode message: %w", err)
 	}
 
-	lg := c.logger.With().
+	lg = c.logger.With().
 		Hex("corrupted_id", logging.ID(c.me.NodeID())).
-		Str("channel", string(msg.ChannelID)).
-		Str("protocol", msg.Protocol.String()).
 		Uint32("target_num", msg.TargetNum).
 		Str("flow_protocol_event", fmt.Sprintf("%T", event)).Logger()
 

@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/onflow/flow-go/network"
-
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/insecure"
