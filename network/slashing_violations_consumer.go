@@ -1,8 +1,9 @@
 package network
 
 import (
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // SlashingViolationsConsumer is a struct that logs a message for any slashable offences.
