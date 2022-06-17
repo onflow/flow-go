@@ -125,7 +125,7 @@ func (lg *ContLoadGenerator) Init() error {
 			return err
 		}
 	}
-	err := lg.SetupFavContract()
+	err := lg.setupFavContract()
 	if err != nil {
 		lg.log.Error().Err(err).Msg("failed to setup fav contract")
 		return err
@@ -134,7 +134,7 @@ func (lg *ContLoadGenerator) Init() error {
 	return nil
 }
 
-func (lg *ContLoadGenerator) SetupFavContract() error {
+func (lg *ContLoadGenerator) setupFavContract() error {
 	// take one of the accounts
 	if len(lg.accounts) == 0 {
 		return errors.New("can't setup fav contract, zero accounts available")
