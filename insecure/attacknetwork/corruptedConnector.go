@@ -61,12 +61,12 @@ func (c *CorruptedConnector) Connect(ctx irrecoverable.SignalerContext, targetId
 
 	inbound, err := client.RegisterAttacker(ctx, &empty.Empty{})
 	if err != nil {
-		return nil, fmt.Errorf("could not establish an outbound stream to corruptible conduit factory: %w", err)
+		return nil, fmt.Errorf("could not establish an inbound stream to corruptible conduit factory: %w", err)
 	}
 
 	outbound, err := client.ProcessAttackerMessage(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("could not establish a inbound stream to corruptible conduit factory: %w", err)
+		return nil, fmt.Errorf("could not establish an outbount stream to corruptible conduit factory: %w", err)
 	}
 
 	connection := NewCorruptedNodeConnection(c.logger, c.inboundHandler, outbound, inbound)
