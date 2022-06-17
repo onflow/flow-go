@@ -68,7 +68,7 @@ func TestConnectorHappyPath_Send(t *testing.T) {
 			require.NoError(t, connection.CloseConnection())
 		}()
 
-		// sends a message over the corruptible conduit ccf
+		// sends a message to ccf
 		require.NoError(t, connection.SendMessage(msg))
 
 		// checks a timely arrival of the registration and sent message at the ccf.
@@ -78,8 +78,9 @@ func TestConnectorHappyPath_Send(t *testing.T) {
 	})
 }
 
-// TestConnectorHappy_Send path checks that a CorruptedConnector can successfully create a connection to a remote Corruptible Conduit Factory (CCF).
-// Moreover, it checks that the resulted connection is capable of intact message delivery in a timely fashion to CCF.
+// TestConnectorHappy_Receive checks that a CorruptedConnector can successfully create a connection to a remote Corruptible Conduit Factory (
+// CCF).
+// Moreover, it checks that the resulted connection is capable of intact message delivery in a timely fashion from CCF to attacker.
 func TestConnectorHappyPath_Receive(t *testing.T) {
 	withMockCorruptibleConduitFactory(t, func(corruptedId flow.Identity, ctx irrecoverable.SignalerContext, ccf *mockCorruptibleConduitFactory) {
 		// extracting port that ccf gRPC server is running on
@@ -117,7 +118,7 @@ func TestConnectorHappyPath_Receive(t *testing.T) {
 			close(registerMsgReceived)
 		}()
 
-		// creates a connection to the corruptible conduit ccf.
+		// creates a connection to ccf.
 		_, err = connector.Connect(ctx, corruptedId.NodeID)
 		require.NoError(t, err)
 
