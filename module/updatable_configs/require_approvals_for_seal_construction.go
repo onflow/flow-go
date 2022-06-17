@@ -1,10 +1,9 @@
 package updatable_configs
 
 import (
+	"fmt"
 	"sync"
 
-	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/defaults"
 	"github.com/onflow/flow-go/module/updatable_configs/validation"
 )
 
@@ -12,30 +11,28 @@ import (
 type RequiredApprovalsForSealConstructionInstance struct {
 	sync.RWMutex
 	requiredApprovalsForSealConstruction uint
+	requiredApprovalsForSealVerification uint
+	chunkAlpha                           uint
 }
 
-var createRequiredApprovalsForSealConstructionOnce sync.Once
-var instanceRequiredApprovalsForSealConstruction *RequiredApprovalsForSealConstructionInstance
-
-func createRequiredApprovalsForSealConstruction() *RequiredApprovalsForSealConstructionInstance {
-	createRequiredApprovalsForSealConstructionOnce.Do(func() {
-		instanceRequiredApprovalsForSealConstruction = &RequiredApprovalsForSealConstructionInstance{
-			requiredApprovalsForSealConstruction: defaults.DefaultRequiredApprovalsForSealConstruction,
-		}
-	})
-	return instanceRequiredApprovalsForSealConstruction
-}
-
-// AcquireRequiredApprovalsForSealConstructionSetter always return the same singleton instance,
-// which is created by the very first call
-func AcquireRequiredApprovalsForSealConstructionSetter() module.RequiredApprovalsForSealConstructionInstanceSetter {
-	return createRequiredApprovalsForSealConstruction()
-}
-
-// AcquireRequiredApprovalsForSealConstructionGetter always return the same singleton instance,
-// which is created by the very first call
-func AcquireRequiredApprovalsForSealConstructionGetter() module.RequiredApprovalsForSealConstructionInstanceGetter {
-	return createRequiredApprovalsForSealConstruction()
+func NewRequiredApprovalsForSealConstructionInstance(
+	requiredApprovalsForSealConstruction uint,
+	requiredApprovalsForSealVerification uint,
+	chunkAlpha uint,
+) (*RequiredApprovalsForSealConstructionInstance, error) {
+	err := validation.ValidateRequireApprovals(
+		requiredApprovalsForSealConstruction,
+		requiredApprovalsForSealVerification,
+		chunkAlpha,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("can not create RequiredApprovalsForSealConstructionInstance: %w", err)
+	}
+	return &RequiredApprovalsForSealConstructionInstance{
+		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
+		requiredApprovalsForSealVerification: requiredApprovalsForSealVerification,
+		chunkAlpha:                           chunkAlpha,
+	}, nil
 }
 
 // SetValue updates the requiredApprovalsForSealConstruction and return the old value
@@ -44,7 +41,11 @@ func (r *RequiredApprovalsForSealConstructionInstance) SetValue(requiredApproval
 	r.Lock()
 	defer r.Unlock()
 
-	err := validation.ValidateRequireApprovals(requiredApprovalsForSealConstruction)
+	err := validation.ValidateRequireApprovals(
+		requiredApprovalsForSealConstruction,
+		r.requiredApprovalsForSealVerification,
+		r.chunkAlpha,
+	)
 	if err != nil {
 		return 0, err
 	}

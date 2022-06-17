@@ -101,28 +101,30 @@ func main() {
 		insecureAccessAPI  bool
 		accessNodeIDS      []string
 
-		err                     error
-		mutableState            protocol.MutableState
-		beaconPrivateKey        *encodable.RandomBeaconPrivKey
-		guarantees              mempool.Guarantees
-		receipts                mempool.ExecutionTree
-		seals                   mempool.IncorporatedResultSeals
-		pendingReceipts         mempool.PendingReceipts
-		prov                    *provider.Engine
-		receiptRequester        *requester.Engine
-		syncCore                *synchronization.Core
-		comp                    *compliance.Engine
-		conMetrics              module.ConsensusMetrics
-		mainMetrics             module.HotstuffMetrics
-		receiptValidator        module.ReceiptValidator
-		chunkAssigner           *chmodule.ChunkAssigner
-		finalizationDistributor *pubsub.FinalizationDistributor
-		dkgBrokerTunnel         *dkgmodule.BrokerTunnel
-		blockTimer              protocol.BlockTimer
-		finalizedHeader         *synceng.FinalizedHeaderCache
-		hotstuffModules         *consensus.HotstuffModules
-		dkgState                *bstorage.DKGState
-		safeBeaconKeys          *bstorage.SafeBeaconPrivateKeys
+		err                          error
+		mutableState                 protocol.MutableState
+		beaconPrivateKey             *encodable.RandomBeaconPrivKey
+		guarantees                   mempool.Guarantees
+		receipts                     mempool.ExecutionTree
+		seals                        mempool.IncorporatedResultSeals
+		pendingReceipts              mempool.PendingReceipts
+		prov                         *provider.Engine
+		receiptRequester             *requester.Engine
+		syncCore                     *synchronization.Core
+		comp                         *compliance.Engine
+		conMetrics                   module.ConsensusMetrics
+		mainMetrics                  module.HotstuffMetrics
+		receiptValidator             module.ReceiptValidator
+		chunkAssigner                *chmodule.ChunkAssigner
+		finalizationDistributor      *pubsub.FinalizationDistributor
+		dkgBrokerTunnel              *dkgmodule.BrokerTunnel
+		blockTimer                   protocol.BlockTimer
+		finalizedHeader              *synceng.FinalizedHeaderCache
+		hotstuffModules              *consensus.HotstuffModules
+		dkgState                     *bstorage.DKGState
+		safeBeaconKeys               *bstorage.SafeBeaconPrivateKeys
+		adminCmdSetRequiredApprovals commands.AdminCommand
+		requiredApprovalsGetter      module.RequiredApprovalsForSealConstructionInstanceGetter
 	)
 
 	nodeBuilder := cmd.FlowNode(flow.RoleConsensus.String())
@@ -186,24 +188,26 @@ func main() {
 			return nil
 		}).
 		Module("requiredApprovalsForSealConstruction setter", func(node *cmd.NodeConfig) error {
-			// We need to ensure `requiredApprovalsForSealVerification <= requiredApprovalsForSealConstruction <= chunkAlpha`
-			if requiredApprovalsForSealVerification > requiredApprovalsForSealConstruction {
-				return fmt.Errorf("invalid consensus parameters: requiredApprovalsForSealVerification > requiredApprovalsForSealConstruction")
-			}
-			if requiredApprovalsForSealConstruction > chunkAlpha {
-				return fmt.Errorf("invalid consensus parameters: requiredApprovalsForSealConstruction > chunkAlpha")
-			}
+			setter, err := updatable_configs.NewRequiredApprovalsForSealConstructionInstance(
+				requiredApprovalsForSealConstruction,
+				requiredApprovalsForSealVerification,
+				chunkAlpha)
 
-			// create the singleton instance and set the value with the flag
-			_, err := updatable_configs.AcquireRequiredApprovalsForSealConstructionSetter().SetValue(requiredApprovalsForSealConstruction)
 			if err != nil {
 				return err
 			}
 
+			// update the getter with the setter, so other modules can only get, but not set
+			requiredApprovalsGetter = setter
+
+			// admin tool is the only instance that have access to the setter interface, therefore, is
+			// the only module can change this config
+			adminCmdSetRequiredApprovals = admincommon.NewSetRequiredApprovalsForSealingCommand(setter)
+
 			return nil
 		}).
 		AdminCommand("set-required-approvals-for-sealing", func(node *cmd.NodeConfig) commands.AdminCommand {
-			return &admincommon.SetRequiredApprovalsForSealingCommand{}
+			return adminCmdSetRequiredApprovals
 		}).
 		Module("mutable follower state", func(node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
@@ -232,7 +236,7 @@ func main() {
 				node.Storage.Results,
 				node.Storage.Seals,
 				chunkAssigner,
-				updatable_configs.AcquireRequiredApprovalsForSealConstructionGetter(),
+				requiredApprovalsGetter,
 				requiredApprovalsForSealVerification,
 				conMetrics)
 			if err != nil {
@@ -424,7 +428,7 @@ func main() {
 				chunkAssigner,
 				seals,
 				config,
-				updatable_configs.AcquireRequiredApprovalsForSealConstructionGetter(),
+				requiredApprovalsGetter,
 			)
 
 			// subscribe for finalization events from hotstuff

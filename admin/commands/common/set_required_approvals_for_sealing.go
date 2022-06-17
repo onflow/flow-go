@@ -9,20 +9,28 @@ import (
 
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
-	"github.com/onflow/flow-go/module/updatable_configs"
-	"github.com/onflow/flow-go/module/updatable_configs/validation"
+	"github.com/onflow/flow-go/module"
 )
 
 var _ commands.AdminCommand = (*SetRequiredApprovalsForSealingCommand)(nil)
 
-type SetRequiredApprovalsForSealingCommand struct{}
+type SetRequiredApprovalsForSealingCommand struct {
+	setter module.RequiredApprovalsForSealConstructionInstanceSetter
+}
+
+func NewSetRequiredApprovalsForSealingCommand(setter module.RequiredApprovalsForSealConstructionInstanceSetter) *SetRequiredApprovalsForSealingCommand {
+	return &SetRequiredApprovalsForSealingCommand{
+		setter: setter,
+	}
+}
 
 func (s *SetRequiredApprovalsForSealingCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 	val := req.ValidatorData.(uint)
 
-	oldVal, err := updatable_configs.AcquireRequiredApprovalsForSealConstructionSetter().SetValue(val)
+	// SetValue will validate and only set it if the value is valid.
+	oldVal, err := s.setter.SetValue(val)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("Validator should have validated the data field, but it's still invalid, val: %v", val)
+		return "fail", fmt.Errorf("fail to set required approvals for sealing %v: %w", val, err)
 	}
 
 	log.Info().Msgf("admintool: required approvals for sealing is changed from %v to %v", oldVal, val)
@@ -38,11 +46,8 @@ func (s *SetRequiredApprovalsForSealingCommand) Validator(req *admin.CommandRequ
 
 	val := uint(value)
 
-	err := validation.ValidateRequireApprovals(val)
-	if err != nil {
-		return fmt.Errorf("the data field contains invalid value %v: %w", val, err)
-	}
-
+	// since the validation is stateful, so we rely on the SetValue to validate the value.
+	// the response will include the error if the value is invalid.
 	req.ValidatorData = val
 
 	return nil
