@@ -257,7 +257,7 @@ func (c *ConduitFactory) processAttackerMessage(msg *insecure.Message) error {
 // Registering an attacker on a conduit is an exactly-once immutable operation, any second attempt after a successful registration returns an error.
 func (c *ConduitFactory) RegisterAttacker(_ *empty.Empty, stream insecure.CorruptibleConduitFactory_RegisterAttackerServer) error {
 	c.mu.Lock()
-	c.logger.Info().Msg("attacker registration called arrived, locked")
+	c.logger.Info().Msg("attacker registration called arrived")
 	if c.attackerInboundStream != nil {
 		c.mu.Unlock()
 		return fmt.Errorf("could not register a new network adapter, one already exists")
@@ -265,10 +265,17 @@ func (c *ConduitFactory) RegisterAttacker(_ *empty.Empty, stream insecure.Corrup
 	c.attackerInboundStream = stream
 
 	c.mu.Unlock()
-	c.logger.Info().Msg("attacker registered successfully, unlocked")
+	c.logger.Info().Msg("attacker registered successfully")
 
-	// blocking call
+	// WARNING: this method call should not return through the entire lifetime of this
+	// corruptible conduit factory.
+	// This is a client streaming gRPC implementation, and the input stream's lifecycle
+	// is tightly coupled with the lifecycle of this function call.
+	// Once it returns, the client stream is closed forever.
+	// Hence, we block the call and wait till a component shutdown.
 	<-c.cm.ShutdownSignal()
+	c.logger.Info().Msg("component is shutting down, closing attacker's inbound stream ")
+
 	return nil
 }
 
