@@ -5,11 +5,13 @@
 package mocks
 
 import (
+	reflect "reflect"
+
 	gomock "github.com/golang/mock/gomock"
+
 	flow "github.com/onflow/flow-go/model/flow"
 	storage "github.com/onflow/flow-go/storage"
 	transaction "github.com/onflow/flow-go/storage/badger/transaction"
-	reflect "reflect"
 )
 
 // MockBlocks is a mock of Blocks interface

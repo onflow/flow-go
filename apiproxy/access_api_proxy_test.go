@@ -3,13 +3,15 @@ package apiproxy
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/utils/grpcutils"
-	"github.com/onflow/flow/protobuf/go/flow/access"
-	"google.golang.org/grpc"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow/protobuf/go/flow/access"
+	"google.golang.org/grpc"
+
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
 // Methodology
