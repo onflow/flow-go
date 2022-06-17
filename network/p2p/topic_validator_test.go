@@ -26,19 +26,15 @@ import (
 // TestAuthorizedSenderValidator_Unauthorized tests that the authorized sender validator rejects messages from nodes that are not authorized to send the message
 func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
-	identity1, privateKey1 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
-	sn1 := createNode(t, identity1.NodeID, privateKey1, sporkId)
 
-	identity2, privateKey2 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
-	sn2 := createNode(t, identity2.NodeID, privateKey2, sporkId)
-
-	identity3, privateKey3 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleAccess))
-	an1 := createNode(t, identity3.NodeID, privateKey3, sporkId)
+	sn1, identity1 := nodeFixture(t, context.Background(), sporkId, "TestAuthorizedSenderValidator_Unauthorized", withRole(flow.RoleConsensus))
+	sn2, identity2 := nodeFixture(t, context.Background(), sporkId, "TestAuthorizedSenderValidator_Unauthorized", withRole(flow.RoleConsensus))
+	an1, identity3 := nodeFixture(t, context.Background(), sporkId, "TestAuthorizedSenderValidator_Unauthorized", withRole(flow.RoleAccess))
 
 	channel := network.ConsensusCommittee
 	topic := network.TopicFromChannel(channel, sporkId)
 
-	ids := flow.IdentityList{identity1, identity2, identity3}
+	ids := flow.IdentityList{&identity1, &identity2, &identity3}
 	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
@@ -134,17 +130,15 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 // TestAuthorizedSenderValidator_Authorized tests that the authorized sender validator rejects messages being sent on the wrong channel
 func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
-	identity1, privateKey1 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
-	sn1 := createNode(t, identity1.NodeID, privateKey1, sporkId)
 
-	identity2, privateKey2 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
-	sn2 := createNode(t, identity2.NodeID, privateKey2, sporkId)
+	sn1, identity1 := nodeFixture(t, context.Background(), sporkId, "TestAuthorizedSenderValidator_InvalidMsg", withRole(flow.RoleConsensus))
+	sn2, identity2 := nodeFixture(t, context.Background(), sporkId, "TestAuthorizedSenderValidator_InvalidMsg", withRole(flow.RoleConsensus))
 
 	// try to publish BlockProposal on invalid SyncCommittee channel
 	channel := network.SyncCommittee
 	topic := network.TopicFromChannel(channel, sporkId)
 
-	ids := flow.IdentityList{identity1, identity2}
+	ids := flow.IdentityList{&identity1, &identity2}
 	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
@@ -181,7 +175,7 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 			len(sn2.ListPeers(topic.String())) > 0
 	}, 3*time.Second, 100*time.Millisecond)
 
-	timedCtx, cancel5s := context.WithTimeout(context.Background(), 5*time.Second)
+	timedCtx, cancel5s := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel5s()
 	// create a dummy block proposal to publish from our SN node
 	header := unittest.BlockHeaderFixture()
@@ -207,17 +201,15 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 // TestAuthorizedSenderValidator_Authorized tests that the authorized sender validator rejects messages from unstaked nodes
 func TestAuthorizedSenderValidator_Unstaked(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
-	identity1, privateKey1 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
-	sn1 := createNode(t, identity1.NodeID, privateKey1, sporkId)
 
-	identity2, privateKey2 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
-	sn2 := createNode(t, identity2.NodeID, privateKey2, sporkId)
+	sn1, identity1 := nodeFixture(t, context.Background(), sporkId, "consensus_1", withRole(flow.RoleConsensus))
+	sn2, _ := nodeFixture(t, context.Background(), sporkId, "consensus_2", withRole(flow.RoleConsensus))
 
 	channel := network.ConsensusCommittee
 	topic := network.TopicFromChannel(channel, sporkId)
 
 	//NOTE: identity2 is not in the ids list simulating an un-staked node
-	ids := flow.IdentityList{identity1}
+	ids := flow.IdentityList{&identity1}
 	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
@@ -280,19 +272,15 @@ func TestAuthorizedSenderValidator_Unstaked(t *testing.T) {
 // TestAuthorizedSenderValidator_Ejected tests that the authorized sender validator rejects messages from nodes that are ejected
 func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
-	identity1, privateKey1 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
-	sn1 := createNode(t, identity1.NodeID, privateKey1, sporkId)
 
-	identity2, privateKey2 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
-	sn2 := createNode(t, identity2.NodeID, privateKey2, sporkId)
-
-	identity3, privateKey3 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleAccess))
-	an1 := createNode(t, identity3.NodeID, privateKey3, sporkId)
+	sn1, identity1 := nodeFixture(t, context.Background(), sporkId, "consensus_1", withRole(flow.RoleConsensus))
+	sn2, identity2 := nodeFixture(t, context.Background(), sporkId, "consensus_2", withRole(flow.RoleConsensus))
+	an1, identity3 := nodeFixture(t, context.Background(), sporkId, "access_1", withRole(flow.RoleAccess))
 
 	channel := network.ConsensusCommittee
 	topic := network.TopicFromChannel(channel, sporkId)
 
-	ids := flow.IdentityList{identity1, identity2, identity3}
+	ids := flow.IdentityList{&identity1, &identity2, &identity3}
 	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
@@ -377,19 +365,15 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 // TestAuthorizedSenderValidator_ClusterChannel tests that the authorized sender validator correctly validates messages sent on cluster channels
 func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
-	identity1, privateKey1 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleCollection))
-	ln1 := createNode(t, identity1.NodeID, privateKey1, sporkId)
 
-	identity2, privateKey2 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleCollection))
-	ln2 := createNode(t, identity2.NodeID, privateKey2, sporkId)
-
-	identity3, privateKey3 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleCollection))
-	ln3 := createNode(t, identity3.NodeID, privateKey3, sporkId)
+	ln1, identity1 := nodeFixture(t, context.Background(), sporkId, "collection_1", withRole(flow.RoleCollection))
+	ln2, identity2 := nodeFixture(t, context.Background(), sporkId, "collection_2", withRole(flow.RoleCollection))
+	ln3, identity3 := nodeFixture(t, context.Background(), sporkId, "collection_3", withRole(flow.RoleCollection))
 
 	channel := network.ChannelSyncCluster(flow.Testnet)
 	topic := network.TopicFromChannel(channel, sporkId)
 
-	ids := flow.IdentityList{identity1, identity2}
+	ids := flow.IdentityList{&identity1, &identity2, &identity3}
 	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 

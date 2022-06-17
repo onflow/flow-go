@@ -2,7 +2,6 @@ package p2p_test
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -43,6 +42,7 @@ type nodeFixtureParameters struct {
 	address     string
 	dhtOptions  []dht.Option
 	peerFilter  p2p.PeerFilter
+	role        flow.Role
 }
 
 type nodeFixtureParameterOption func(*nodeFixtureParameters)
@@ -83,12 +83,18 @@ func withPeerFilter(filter p2p.PeerFilter) nodeFixtureParameterOption {
 	}
 }
 
+func withRole(role flow.Role) nodeFixtureParameterOption {
+	return func(p *nodeFixtureParameters) {
+		p.role = role
+	}
+}
+
 // nodeFixture is a test fixture that creates a single libp2p node with the given key, spork id, and options.
 // It returns the node and its identity.
 func nodeFixture(
 	t *testing.T,
 	ctx context.Context,
-	sporkId flow.Identifier,
+	sporkID flow.Identifier,
 	dhtPrefix string,
 	opts ...nodeFixtureParameterOption,
 ) (*p2p.Node, flow.Identity) {
@@ -108,16 +114,17 @@ func nodeFixture(
 
 	identity := unittest.IdentityFixture(
 		unittest.WithNetworkingKey(parameters.key.PublicKey()),
-		unittest.WithAddress(parameters.address))
+		unittest.WithAddress(parameters.address),
+		unittest.WithRole(parameters.role))
 
 	noopMetrics := metrics.NewNoopCollector()
 	connManager := p2p.NewConnManager(logger, noopMetrics)
 
-	builder := p2p.NewNodeBuilder(logger, parameters.address, parameters.key, sporkId).
+	builder := p2p.NewNodeBuilder(logger, parameters.address, parameters.key, sporkID).
 		SetConnectionManager(connManager).
 		SetPubSub(pubsub.NewGossipSub).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
-			return p2p.NewDHT(c, h, protocol.ID(unicast.FlowDHTProtocolIDPrefix+sporkId.String()+"/"+dhtPrefix), parameters.dhtOptions...)
+			return p2p.NewDHT(c, h, protocol.ID(unicast.FlowDHTProtocolIDPrefix+sporkID.String()+"/"+dhtPrefix), parameters.dhtOptions...)
 		})
 
 	if parameters.peerFilter != nil {
@@ -131,16 +138,15 @@ func nodeFixture(
 	err = n.WithDefaultUnicastProtocol(parameters.handlerFunc, parameters.unicasts)
 	require.NoError(t, err)
 
-	require.Eventuallyf(t, func() bool {
-		ip, p, err := n.GetIPPort()
-		return err == nil && ip != "" && p != ""
-	}, 3*time.Second, ticksForAssertEventually, fmt.Sprintf("could not start node %s", identity.NodeID.String()))
+	//require.Eventuallyf(t, func() bool {
+	//	ip, p, err := n.GetIPPort()
+	//	return err == nil && ip != "" && p != ""
+	//}, 3*time.Second, ticksForAssertEventually, fmt.Sprintf("could not start node %s", identity.NodeID.String()))
 
 	// get the actual IP and port that have been assigned by the subsystem
 	ip, port, err := n.GetIPPort()
 	require.NoError(t, err)
 	identity.Address = ip + ":" + port
-
 	return n, *identity
 }
 
