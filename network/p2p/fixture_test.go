@@ -217,7 +217,7 @@ func acceptAndHang(t *testing.T, l net.Listener) {
 
 // nodesFixture is a test fixture that creates a number of libp2p nodes with the given callback function for stream handling.
 // It returns the nodes and their identities.
-func nodesFixture(t *testing.T, ctx context.Context, sporkId flow.Identifier, dhtPrefix string, count int, opts ...nodeFixtureParameterOption) ([]*p2p.Node,
+func nodesFixture(t *testing.T, ctx context.Context, sporkID flow.Identifier, dhtPrefix string, count int, opts ...nodeFixtureParameterOption) ([]*p2p.Node,
 	flow.IdentityList) {
 	// keeps track of errors on creating a node
 	var err error
@@ -235,7 +235,7 @@ func nodesFixture(t *testing.T, ctx context.Context, sporkId flow.Identifier, dh
 	var identities flow.IdentityList
 	for i := 0; i < count; i++ {
 		// create a node on localhost with a random port assigned by the OS
-		node, identity := nodeFixture(t, ctx, sporkId, dhtPrefix, opts...)
+		node, identity := nodeFixture(t, ctx, sporkID, dhtPrefix, opts...)
 		nodes = append(nodes, node)
 		identities = append(identities, &identity)
 	}
