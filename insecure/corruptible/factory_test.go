@@ -233,7 +233,6 @@ func TestFactoryHandleIncomingEvent_MulticastOverNetwork(t *testing.T) {
 // TestProcessAttackerMessage evaluates that corrupted conduit factory (ccf)
 // relays the messages coming from the attack network to its underlying flow network.
 func TestProcessAttackerMessage(t *testing.T) {
-	t.Skip()
 	withCorruptibleConduitFactory(t,
 		func(
 			corruptedId flow.Identity, // identity of ccf
@@ -275,7 +274,6 @@ func TestProcessAttackerMessage(t *testing.T) {
 // empty signature field,
 // it fills its related fields with its own credentials (e.g., signature), and passes it through the Flow network.
 func TestProcessAttackerMessage_ResultApproval_Dictated(t *testing.T) {
-	t.Skip()
 	withCorruptibleConduitFactory(t,
 		func(
 			corruptedId flow.Identity, // identity of ccf
@@ -347,7 +345,6 @@ func TestProcessAttackerMessage_ResultApproval_Dictated(t *testing.T) {
 // ccf) receives a completely filled result approval,
 // it fills its related fields with its own credentials (e.g., signature), and passes it through the Flow network.
 func TestProcessAttackerMessage_ResultApproval_PassThrough(t *testing.T) {
-	t.Skip()
 	withCorruptibleConduitFactory(t,
 		func(
 			corruptedId flow.Identity, // identity of ccf
@@ -392,7 +389,6 @@ func TestProcessAttackerMessage_ResultApproval_PassThrough(t *testing.T) {
 // TestProcessAttackerMessage_ExecutionReceipt_Dictated evaluates that when corrupted conduit factory (ccf) receives an execution receipt with
 // empty signature field, it fills its related fields with its own credentials (e.g., signature), and passes it through the Flow network.
 func TestProcessAttackerMessage_ExecutionReceipt_Dictated(t *testing.T) {
-	t.Skip()
 	withCorruptibleConduitFactory(t,
 		func(
 			corruptedId flow.Identity, // identity of ccf
@@ -453,7 +449,6 @@ func TestProcessAttackerMessage_ExecutionReceipt_Dictated(t *testing.T) {
 // TestProcessAttackerMessage_ExecutionReceipt_PassThrough evaluates that when corrupted conduit factory (
 // ccf) receives a completely filled execution receipt, it treats it as a pass-through event and passes it as it is on the Flow network.
 func TestProcessAttackerMessage_ExecutionReceipt_PassThrough(t *testing.T) {
-	t.Skip()
 	withCorruptibleConduitFactory(t,
 		func(
 			corruptedId flow.Identity, // identity of ccf
