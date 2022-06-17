@@ -263,7 +263,6 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 	lg.serviceAccount.accountKey.SequenceNumber++
 	lg.serviceAccount.signerLock.Unlock()
 
-	var i int
 	ch, err := lg.sendTx(-1, createAccountTx)
 	if err != nil {
 		return err
@@ -281,6 +280,7 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 		log.Error().Err(result.Error).Msg("account creation tx failed")
 	}
 
+	var accountsCreated int
 	for _, event := range result.Events {
 		log.Trace().Str("event_type", event.Type).Str("event", event.String()).Msg("account creation tx event")
 
@@ -292,17 +292,21 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 
 			signer, err := crypto.NewInMemorySigner(privKey, accountKey.HashAlgo)
 			if err != nil {
-				panic(err)
+				return fmt.Errorf("singer creation failed: %w", err)
 			}
 
-			newAcc := newFlowAccount(i, &accountAddress, accountKey, signer)
-			i++
+			newAcc := newFlowAccount(accountsCreated, &accountAddress, accountKey, signer)
+			accountsCreated++
 
 			lg.accounts = append(lg.accounts, newAcc)
 			lg.availableAccounts <- newAcc
 
 			log.Trace().Hex("address", accountAddress.Bytes()).Msg("new account added")
 		}
+	}
+	if accountsCreated != num {
+		return fmt.Errorf("failed to create enough contracts, expected: %d, created: %d",
+			num, accountsCreated)
 	}
 	return nil
 }
