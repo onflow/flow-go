@@ -16,7 +16,7 @@ func TestRequiredApprovalsForSealingContruction(t *testing.T) {
 
 	// should get the default value
 	val := instance.GetValue()
-	require.Equal(t, 1, val)
+	require.Equal(t, uint(1), val)
 
 	// SetValue should return the old value
 	old, err := instance.SetValue(0)

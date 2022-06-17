@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/updatable_configs/validation"
 )
 
 // min number of approvals required for constructing a candidate seal
-type RequiredApprovalsForSealConstructionInstance struct {
+type requiredApprovalsForSealConstructionInstance struct {
 	sync.RWMutex
 	requiredApprovalsForSealConstruction uint
 	requiredApprovalsForSealVerification uint
@@ -19,7 +20,7 @@ func NewRequiredApprovalsForSealConstructionInstance(
 	requiredApprovalsForSealConstruction uint,
 	requiredApprovalsForSealVerification uint,
 	chunkAlpha uint,
-) (*RequiredApprovalsForSealConstructionInstance, error) {
+) (module.RequiredApprovalsForSealConstructionInstanceSetter, error) {
 	err := validation.ValidateRequireApprovals(
 		requiredApprovalsForSealConstruction,
 		requiredApprovalsForSealVerification,
@@ -28,7 +29,7 @@ func NewRequiredApprovalsForSealConstructionInstance(
 	if err != nil {
 		return nil, fmt.Errorf("can not create RequiredApprovalsForSealConstructionInstance: %w", err)
 	}
-	return &RequiredApprovalsForSealConstructionInstance{
+	return &requiredApprovalsForSealConstructionInstance{
 		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
 		requiredApprovalsForSealVerification: requiredApprovalsForSealVerification,
 		chunkAlpha:                           chunkAlpha,
@@ -37,7 +38,7 @@ func NewRequiredApprovalsForSealConstructionInstance(
 
 // SetValue updates the requiredApprovalsForSealConstruction and return the old value
 // This assume the caller has validated the new value
-func (r *RequiredApprovalsForSealConstructionInstance) SetValue(requiredApprovalsForSealConstruction uint) (uint, error) {
+func (r *requiredApprovalsForSealConstructionInstance) SetValue(requiredApprovalsForSealConstruction uint) (uint, error) {
 	r.Lock()
 	defer r.Unlock()
 
@@ -57,7 +58,7 @@ func (r *RequiredApprovalsForSealConstructionInstance) SetValue(requiredApproval
 }
 
 // GetValue gets the requiredApprovalsForSealConstruction
-func (r *RequiredApprovalsForSealConstructionInstance) GetValue() uint {
+func (r *requiredApprovalsForSealConstructionInstance) GetValue() uint {
 	r.RLock()
 	defer r.RUnlock()
 	return r.requiredApprovalsForSealConstruction

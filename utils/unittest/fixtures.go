@@ -28,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/model/verification"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/updatable_configs"
 	"github.com/onflow/flow-go/state/protocol"
@@ -2082,9 +2083,12 @@ func TransactionResultsFixture(n int) []flow.TransactionResult {
 	return results
 }
 
-func NewRequiredApprovalsForSealConstructionInstance(val uint) *updatable_configs.RequiredApprovalsForSealConstructionInstance {
-	instance := &updatable_configs.RequiredApprovalsForSealConstructionInstance{}
-	_, err := instance.SetValue(val)
+func NewRequiredApprovalsForSealConstructionInstance(val uint) module.RequiredApprovalsForSealConstructionInstanceSetter {
+	instance, err := updatable_configs.NewRequiredApprovalsForSealConstructionInstance(1, 0, 3)
+	if err != nil {
+		panic(err)
+	}
+	_, err = instance.SetValue(val)
 	if err != nil {
 		panic(err)
 	}
