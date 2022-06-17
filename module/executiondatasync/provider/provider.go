@@ -45,14 +45,12 @@ func NewProvider(
 	serializer execution_data.Serializer,
 	blobService network.BlobService,
 	storage tracker.Storage,
-	cidsProvider *ExecutionDataCIDProvider,
 	opts ...ProviderOption,
 ) *ExecutionDataProvider {
 	p := &ExecutionDataProvider{
 		logger:       logger.With().Str("component", "execution_data_provider").Logger(),
 		metrics:      metrics,
 		maxBlobSize:  execution_data.DefaultMaxBlobSize,
-		serializer:   serializer,
 		blobService:  blobService,
 		storage:      storage,
 		cidsProvider: NewExecutionDataCIDProvider(serializer),
@@ -202,7 +200,9 @@ func (p *ExecutionDataCIDProvider) AddExecutionDataRoot(
 	}
 
 	rootBlob := blobs.NewBlob(buf.Bytes())
-	blobCh <- rootBlob
+	if blobCh != nil {
+		blobCh <- rootBlob
+	}
 
 	rootID, err := flow.CidToId(rootBlob.Cid())
 	if err != nil {
