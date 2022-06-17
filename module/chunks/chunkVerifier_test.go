@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/ipfs/go-cid"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/partial"
@@ -163,29 +162,7 @@ func (s *ChunkVerifierTestSuite) TestWrongEndState() {
 		executionState.RegisterValuesToValues(values),
 	)
 
-	trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, partial.DefaultPathFinderVersion)
-	require.NoError(s.T(), err)
-
-	ced := &execution_data.ChunkExecutionData{
-		Collection: vch.ChunkDataPack.Collection,
-		Events:     chunkEvents,
-		TrieUpdate: trieUpdate,
-	}
-
-	fmt.Printf("test data\n")
-	spew.Dump(ced)
-
-	cedCID, err := ExecutionDataCIDProvider.AddChunkExecutionData(context.Background(), ced, nil)
-	require.NoError(s.T(), err)
-
-	bedr := flow.BlockExecutionDataRoot{
-		BlockID:               vch.Result.BlockID,
-		ChunkExecutionDataIDs: []cid.Cid{cedCID},
-	}
-	vch.ChunkDataPack.ExecutionDataRoot = bedr
-
-	vch.Result.ExecutionDataID, err = ExecutionDataCIDProvider.AddExecutionDataRoot(context.Background(), &bedr, nil)
-	require.NoError(s.T(), err)
+	updateExecutionData(s.T(), vch.ChunkDataPack.Collection, chunkEvents, update, vch.Result.BlockID, vch)
 
 	spockSecret, chFaults, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
@@ -270,32 +247,101 @@ func (s *ChunkVerifierTestSuite) TestEmptyCollection() {
 	assert.NoError(s.T(), err)
 	vch.Chunk.EventCollection = emptyListHash //empty collection emits no events
 
-	ced := &execution_data.ChunkExecutionData{
-		Collection: &col,
-		Events:     flow.EventsList{},
-		TrieUpdate: &ledger.TrieUpdate{
-			RootHash: ledger.RootHash(vch.ChunkDataPack.StartState),
-			Paths:    []ledger.Path{},
-			Payloads: []*ledger.Payload{},
-		},
-	}
-
-	cedCID, err := ExecutionDataCIDProvider.AddChunkExecutionData(context.Background(), ced, nil)
+	update, err := ledger.NewEmptyUpdate(ledger.State(vch.ChunkDataPack.StartState))
 	require.NoError(s.T(), err)
-
-	bedr := flow.BlockExecutionDataRoot{
-		BlockID:               vch.Result.BlockID,
-		ChunkExecutionDataIDs: []cid.Cid{cedCID},
-	}
-	vch.ChunkDataPack.ExecutionDataRoot = bedr
-
-	vch.Result.ExecutionDataID, err = ExecutionDataCIDProvider.AddExecutionDataRoot(context.Background(), &bedr, nil)
-	require.NoError(s.T(), err)
+	updateExecutionData(s.T(), &col, flow.EventsList{}, update, vch.Result.BlockID, vch)
 
 	spockSecret, chFaults, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
 	assert.Nil(s.T(), chFaults)
 	assert.NotNil(s.T(), spockSecret)
+}
+
+func (s *ChunkVerifierTestSuite) TestExecutionDataBlockMismatch() {
+	vch, _ := GetBaselineVerifiableChunk(s.T(), "", false)
+	assert.NotNil(s.T(), vch)
+	col := unittest.CollectionFixture(0)
+	vch.ChunkDataPack.Collection = &col
+	vch.EndState = vch.ChunkDataPack.StartState
+	emptyListHash, err := flow.EventsMerkleRootHash(flow.EventsList{})
+	assert.NoError(s.T(), err)
+	vch.Chunk.EventCollection = emptyListHash //empty collection emits no events
+
+	update, err := ledger.NewEmptyUpdate(ledger.State(vch.ChunkDataPack.StartState))
+	require.NoError(s.T(), err)
+
+	wrongBlock := vch.Result.BlockID
+
+	wrongBlock[5]++ //it wraps
+
+	updateExecutionData(s.T(), &col, flow.EventsList{}, update, wrongBlock, vch)
+
+	_, chFaults, err := s.verifier.Verify(vch)
+	assert.Nil(s.T(), err)
+	assert.NotNil(s.T(), chFaults)
+	assert.IsType(s.T(), &chunksmodels.CFExecutionDataBlockIDMismatch{}, chFaults)
+}
+
+func (s *ChunkVerifierTestSuite) TestExecutionDataChunkIdsLengthDiffers() {
+	vch, _ := GetBaselineVerifiableChunk(s.T(), "", false)
+
+	vch.ChunkDataPack.ExecutionDataRoot.ChunkExecutionDataIDs = append(vch.ChunkDataPack.ExecutionDataRoot.ChunkExecutionDataIDs, cid.Undef)
+
+	assert.NotNil(s.T(), vch)
+	_, chFaults, err := s.verifier.Verify(vch)
+
+	assert.Nil(s.T(), err)
+	assert.NotNil(s.T(), chFaults)
+	assert.IsType(s.T(), &chunksmodels.CFExecutionDataChunksLengthMismatch{}, chFaults)
+}
+
+func (s *ChunkVerifierTestSuite) TestExecutionDataChunkIdMismatch() {
+	vch, _ := GetBaselineVerifiableChunk(s.T(), "", false)
+
+	vch.ChunkDataPack.ExecutionDataRoot.ChunkExecutionDataIDs[0] = cid.Undef // substitute invalid CID
+
+	assert.NotNil(s.T(), vch)
+	_, chFaults, err := s.verifier.Verify(vch)
+
+	assert.Nil(s.T(), err)
+	assert.NotNil(s.T(), chFaults)
+	assert.IsType(s.T(), &chunksmodels.CFExecutionDataInvalidChunkCID{}, chFaults)
+}
+
+func (s *ChunkVerifierTestSuite) TestExecutionDataIdMismatch() {
+	vch, _ := GetBaselineVerifiableChunk(s.T(), "", false)
+
+	vch.Result.ExecutionDataID[5]++ //wraparounds
+
+	assert.NotNil(s.T(), vch)
+	_, chFaults, err := s.verifier.Verify(vch)
+
+	assert.Nil(s.T(), err)
+	assert.NotNil(s.T(), chFaults)
+	assert.IsType(s.T(), &chunksmodels.CFInvalidExecutionDataID{}, chFaults)
+}
+
+func updateExecutionData(t *testing.T, collection *flow.Collection, chunkEvents flow.EventsList, update *ledger.Update, blockID flow.Identifier, vch *verification.VerifiableChunkData) {
+	trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, partial.DefaultPathFinderVersion)
+	require.NoError(t, err)
+
+	ced := &execution_data.ChunkExecutionData{
+		Collection: collection,
+		Events:     chunkEvents,
+		TrieUpdate: trieUpdate,
+	}
+
+	cedCID, err := ExecutionDataCIDProvider.AddChunkExecutionData(context.Background(), ced, nil)
+	require.NoError(t, err)
+
+	bedr := flow.BlockExecutionDataRoot{
+		BlockID:               blockID,
+		ChunkExecutionDataIDs: []cid.Cid{cedCID},
+	}
+	vch.ChunkDataPack.ExecutionDataRoot = bedr
+
+	vch.Result.ExecutionDataID, err = ExecutionDataCIDProvider.AddExecutionDataRoot(context.Background(), &bedr, nil)
+	require.NoError(t, err)
 }
 
 // GetBaselineVerifiableChunk returns a verifiable chunk and sets the script
