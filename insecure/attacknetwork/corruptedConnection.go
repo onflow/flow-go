@@ -14,14 +14,15 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
-// CorruptedNodeConnection abstracts connection between orchestrator to corrupted conduit factory through the attack network.
+// CorruptedNodeConnection abstracts connection between an attack orchestrator to a corruptible conduit factory (ccf)
+// through the attack network.
 type CorruptedNodeConnection struct {
 	component.Component
 	cm             *component.ComponentManager
 	logger         zerolog.Logger
-	inboundHandler func(*insecure.Message)                                         // handler for incoming messages from corrupted conduit factory.
-	outbound       insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient // from orchestrator to corrupted conduit factory
-	inbound        insecure.CorruptibleConduitFactory_RegisterAttackerClient       // from corrupted conduit factory to orchestrator
+	inboundHandler func(*insecure.Message)                                         // handler for incoming messages from corruptible conduit factories.
+	outbound       insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient // from orchestrator to ccf.
+	inbound        insecure.CorruptibleConduitFactory_RegisterAttackerClient       // from ccf to orchestrator.
 }
 
 func NewCorruptedNodeConnection(
@@ -62,6 +63,8 @@ func (c *CorruptedNodeConnection) SendMessage(message *insecure.Message) error {
 	return nil
 }
 
+// receiveLoop implements the continuous procedure of reading from inbound stream of this connection, which
+// is established from the remote ccf to the local attack orchestrator.
 func (c *CorruptedNodeConnection) receiveLoop() {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -71,6 +74,7 @@ func (c *CorruptedNodeConnection) receiveLoop() {
 			select {
 			case <-c.cm.ShutdownSignal():
 				// connection closed
+				c.logger.Info().Msg("receive loop terminated")
 				return
 			default:
 				msg, err := c.inbound.Recv()
@@ -86,6 +90,7 @@ func (c *CorruptedNodeConnection) receiveLoop() {
 	}()
 
 	wg.Wait()
+	c.logger.Info().Msg("receive loop started")
 }
 
 // CloseConnection closes the connection to the corrupted conduit factory.
