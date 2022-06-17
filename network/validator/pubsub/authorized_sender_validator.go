@@ -110,10 +110,6 @@ func isAuthorizedSender(identity *flow.Identity, channel channels.Channel, msg i
 		return "", err
 	}
 
-	if network.PublicChannels().Contains(channel) {
-		return conf.String, nil
-	}
-
 	// handle special case for cluster prefixed channels
 	if prefix, ok := channels.ClusterChannelPrefix(channel); ok {
 		channel = channels.Channel(prefix)

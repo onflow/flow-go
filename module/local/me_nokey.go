@@ -28,10 +28,6 @@ func (l *LocalNoKey) Address() string {
 	return l.me.Address
 }
 
-func (l *LocalNoKey) StakedNode() bool {
-	return false
-}
-
 func (l *LocalNoKey) Sign(msg []byte, hasher hash.Hasher) (crypto.Signature, error) {
 	return nil, fmt.Errorf("no private key")
 }
