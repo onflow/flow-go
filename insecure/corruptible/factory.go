@@ -182,8 +182,13 @@ func (c *ConduitFactory) ProcessAttackerMessage(stream insecure.CorruptibleCondu
 
 // processAttackerMessage dispatches the attacker message on the Flow network on behalf of this node.
 func (c *ConduitFactory) processAttackerMessage(msg *insecure.Message) error {
+	lg := c.logger.With().
+		Str("protocol", insecure.ProtocolStr(msg.Protocol)).
+		Str("channel", string(msg.ChannelID)).Logger()
+
 	event, err := c.codec.Decode(msg.Payload)
 	if err != nil {
+		lg.Err(err).Msg("could not decode attacker's message")
 		return fmt.Errorf("could not decode message: %w", err)
 	}
 
@@ -201,6 +206,9 @@ func (c *ConduitFactory) processAttackerMessage(msg *insecure.Message) error {
 			// CCF, and the receipt fields must be filled out locally.
 			receipt, err := c.generateExecutionReceipt(&e.ExecutionResult)
 			if err != nil {
+				lg.Err(err).
+					Hex("result_id", logging.ID(e.ExecutionResult.ID())).
+					Msg("could not generate receipt for attacker's dictated result")
 				return fmt.Errorf("could not generate execution receipt for attacker's result: %w", err)
 			}
 			event = receipt // swaps event with the receipt.
@@ -212,20 +220,32 @@ func (c *ConduitFactory) processAttackerMessage(msg *insecure.Message) error {
 			// CCF, and the approval fields must be filled out locally.
 			approval, err := c.generateResultApproval(&e.Body.Attestation)
 			if err != nil {
+				lg.Err(err).
+					Hex("result_id", logging.ID(e.Body.ExecutionResultID)).
+					Hex("block_id", logging.ID(e.Body.BlockID)).
+					Uint64("chunk_index", e.Body.ChunkIndex).
+					Msg("could not generate result approval for attacker's dictated attestation")
 				return fmt.Errorf("could not generate result approval for attacker's attestation: %w", err)
 			}
 			event = approval // swaps event with the receipt.
 		}
 	}
 
+	lg = lg.With().
+		Str("event_type", fmt.Sprintf("%T", event)).
+		Str("event", fmt.Sprintf("%+v", event)).
+		Logger()
+
 	targetIds, err := flow.ByteSlicesToIds(msg.TargetIDs)
 	if err != nil {
+		lg.Err(err).Msg("could not convert target ids from byte to identifiers for attacker's dictated message")
 		return fmt.Errorf("could not convert target ids from byte to identifiers: %w", err)
 	}
 
 	lg = lg.With().Str("target_ids", fmt.Sprintf("%v", msg.TargetIDs)).Logger()
 	err = c.sendOnNetwork(event, network.Channel(msg.ChannelID), msg.Protocol, uint(msg.TargetNum), targetIds...)
 	if err != nil {
+		lg.Err(err).Msg("could not send attacker message to the network")
 		return fmt.Errorf("could not send attacker message to the network: %w", err)
 	}
 

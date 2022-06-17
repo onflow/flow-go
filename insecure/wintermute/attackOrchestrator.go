@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/utils/logging"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -306,20 +307,19 @@ func (o *Orchestrator) handleChunkDataPackResponseEvent(chunkDataPackReplyEvent 
 // handleResultApprovalEvent wintermutes the result approvals for the chunks of original result that are coming from
 // corrupted verification nodes. Otherwise, it is passed through.
 func (o *Orchestrator) handleResultApprovalEvent(resultApprovalEvent *insecure.Event) error {
+	// non-nil state means a result has been corrupted, hence checking whether the approval
+	// belongs to the chunks of the original (non-corrupted) result.
+	approval := resultApprovalEvent.FlowProtocolEvent.(*flow.ResultApproval)
+	lg := o.logger.With().
+		Hex("result_id", logging.ID(approval.Body.ExecutionResultID)).
+		Uint64("chunk_index", approval.Body.ChunkIndex).
+		Hex("result_id", logging.ID(approval.Body.BlockID)).
+		Hex("sender_id", logging.ID(resultApprovalEvent.CorruptedNodeId)).
+		Str("target_ids", fmt.Sprintf("%v", resultApprovalEvent.TargetIds)).Logger()
+
 	if o.state != nil {
-		// non-nil state means a result has been corrupted, hence checking whether the approval
-		// belongs to the chunks of the original (non-corrupted) result.
-		approval := resultApprovalEvent.FlowProtocolEvent.(*flow.ResultApproval)
-
-		lg := o.logger.With().
-			Hex("result_id", logging.ID(approval.Body.ExecutionResultID)).
-			Uint64("chunk_index", approval.Body.ChunkIndex).
-			Hex("result_id", logging.ID(approval.Body.BlockID)).
-			Hex("sender_id", logging.ID(resultApprovalEvent.CorruptedNodeId)).
-			Str("target_ids", fmt.Sprintf("%v", resultApprovalEvent.TargetIds)).Logger()
-
 		if o.state.originalResult.ID() == approval.Body.ExecutionResultID {
-			lg.Info().Msg("wintermuting result approval for original execution result")
+			lg.Info().Msg("wintermuting result approval for original un-corrupted execution result")
 			return nil
 		}
 	}
@@ -328,6 +328,7 @@ func (o *Orchestrator) handleResultApprovalEvent(resultApprovalEvent *insecure.E
 	if err != nil {
 		return fmt.Errorf("could not passed through result approval event %w", err)
 	}
+	lg.Info().Msg("result approval is passing through")
 	return nil
 }
 

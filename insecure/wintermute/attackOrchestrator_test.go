@@ -590,25 +590,25 @@ func TestPassingThroughMiscellaneousEvents(t *testing.T) {
 	wintermuteOrchestrator.WithAttackNetwork(mockAttackNetwork)
 
 	// sends miscellaneous event to orchestrator.
-	sendMiscellaneousEventWG := &sync.WaitGroup{}
-	sendMiscellaneousEventWG.Add(1)
+	eventPassThroughWG := &sync.WaitGroup{}
+	eventPassThroughWG.Add(1)
 
 	go func() {
 		err := wintermuteOrchestrator.HandleEventFromCorruptedNode(miscellaneousEvent)
 		require.NoError(t, err)
 
-		sendMiscellaneousEventWG.Done()
+		eventPassThroughWG.Done()
 	}()
 
 	// waits till miscellaneous event is sent to orchestrator.
 	unittest.RequireReturnsBefore(t,
-		sendMiscellaneousEventWG.Wait,
+		eventPassThroughWG.Wait,
 		1*time.Second,
 		"could not send miscellaneous event on time to orchestrator")
 
 	// waits till miscellaneous event is passed through by the orchestrator.
 	unittest.RequireReturnsBefore(t,
-		sendMiscellaneousEventWG.Wait,
+		eventPassThroughWG.Wait,
 		1*time.Second,
 		"orchestrator could not pass through miscellaneous event on time")
 }
@@ -713,11 +713,9 @@ func TestWintermute_ResultApproval(t *testing.T) {
 			unittest.WithChunk(0)),
 	}
 
-	approvalPassThrough := &sync.WaitGroup{}
-	approvalPassThrough.Add(1)
-
 	// mocks attack network
 	mockAttackNetwork := &mockinsecure.AttackNetwork{}
+	// Send() method should never be called, don't set method mock
 	wintermuteOrchestrator.WithAttackNetwork(mockAttackNetwork)
 
 	// sends approval to the orchestrator

@@ -49,8 +49,12 @@ func (w *WintermuteTestSuite) TestWintermuteAttack() {
 			2)
 	}
 
-	// waits till victim block gets sealed.
+	// waits until we seal a height equal to the victim block height
 	w.BlockState.WaitForSealed(w.T(), victimBlock.Header.Height)
+	// then checks querying victim block by height returns the original victim block.
+	blockByHeight, ok := w.BlockState.FinalizedHeight(victimBlock.Header.Height)
+	require.True(w.T(), ok)
+	require.Equal(w.T(), blockByHeight.Header.ID(), victimBlock.Header.ID())
 }
 
 // waitForExecutionResultCorruption waits within a timeout till wintermute orchestrator corrupts an execution result.
@@ -69,7 +73,7 @@ func (w *WintermuteTestSuite) waitForExecutionResultCorruption() *flow.Execution
 
 		w.T().Logf("wintermute orchesterator conducted corruption, original result: %x, corrupted result: %x", original.ID(), corrupted.ID())
 		return true
-	}, wintermuteTimeout, 5*time.Second,
+	}, wintermuteTimeout, 100*time.Millisecond,
 		fmt.Sprintf("orchestrator could not conduct execution result corruption within %v seconds", wintermuteTimeout))
 
 	return corruptedResult
