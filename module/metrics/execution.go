@@ -215,6 +215,7 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Subsystem: subsystemRuntime,
 		Name:      "block_transaction_counts",
 		Help:      "the total number of transactions per block",
+		Buckets:   prometheus.ExponentialBuckets(4, 2, 8),
 	})
 
 	blockCollectionCounts := promauto.NewHistogram(prometheus.HistogramOpts{
@@ -222,6 +223,7 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Subsystem: subsystemRuntime,
 		Name:      "block_collection_counts",
 		Help:      "the total number of collections per block",
+		Buckets:   prometheus.ExponentialBuckets(1, 2, 8),
 	})
 
 	collectionExecutionTime := promauto.NewHistogram(prometheus.HistogramOpts{
@@ -245,6 +247,7 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Subsystem: subsystemRuntime,
 		Name:      "collection_transaction_counts",
 		Help:      "the total number of transactions per collection",
+		Buckets:   prometheus.ExponentialBuckets(4, 2, 8),
 	})
 
 	collectionRequestsSent := promauto.NewCounter(prometheus.CounterOpts{
@@ -266,6 +269,7 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Subsystem: subsystemRuntime,
 		Name:      "transaction_parse_time_nanoseconds",
 		Help:      "the parse time for a transaction in nanoseconds",
+		Buckets:   prometheus.ExponentialBuckets(10, 10, 8),
 	})
 
 	transactionCheckTime := promauto.NewHistogram(prometheus.HistogramOpts{
@@ -273,6 +277,7 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Subsystem: subsystemRuntime,
 		Name:      "transaction_check_time_nanoseconds",
 		Help:      "the checking time for a transaction in nanoseconds",
+		Buckets:   prometheus.ExponentialBuckets(10, 10, 8),
 	})
 
 	transactionInterpretTime := promauto.NewHistogram(prometheus.HistogramOpts{
@@ -280,6 +285,7 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Subsystem: subsystemRuntime,
 		Name:      "transaction_interpret_time_nanoseconds",
 		Help:      "the interpretation time for a transaction in nanoseconds",
+		Buckets:   prometheus.ExponentialBuckets(10, 10, 8),
 	})
 
 	transactionExecutionTime := promauto.NewHistogram(prometheus.HistogramOpts{
