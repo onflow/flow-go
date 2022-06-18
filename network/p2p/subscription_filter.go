@@ -4,7 +4,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/network"
@@ -36,7 +35,7 @@ func (f *RoleBasedFilter) getRole(pid peer.ID) flow.Role {
 }
 
 func (f *RoleBasedFilter) allowed(role flow.Role, topic string) bool {
-	channel, ok := engine.ChannelFromTopic(network.Topic(topic))
+	channel, ok := network.ChannelFromTopic(network.Topic(topic))
 	if !ok {
 		return false
 	}
@@ -45,9 +44,9 @@ func (f *RoleBasedFilter) allowed(role flow.Role, topic string) bool {
 		// TODO: eventually we should have block proposals relayed on a separate
 		// channel on the public network. For now, we need to make sure that
 		// full observer nodes can subscribe to the block proposal channel.
-		return append(engine.PublicChannels(), engine.ReceiveBlocks).Contains(channel)
+		return append(network.PublicChannels(), network.ReceiveBlocks).Contains(channel)
 	} else {
-		if roles, ok := engine.RolesByChannel(channel); ok {
+		if roles, ok := network.RolesByChannel(channel); ok {
 			return roles.Contains(role)
 		}
 

@@ -117,7 +117,12 @@ func nodeFixture(
 		SetConnectionManager(connManager).
 		SetPubSub(pubsub.NewGossipSub).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
-			return p2p.NewDHT(c, h, protocol.ID(unicast.FlowDHTProtocolIDPrefix+sporkId.String()+"/"+dhtPrefix), parameters.dhtOptions...)
+			return p2p.NewDHT(c, h,
+				protocol.ID(unicast.FlowDHTProtocolIDPrefix+sporkId.String()+"/"+dhtPrefix),
+				logger,
+				noopMetrics,
+				parameters.dhtOptions...,
+			)
 		})
 
 	if parameters.peerFilter != nil {

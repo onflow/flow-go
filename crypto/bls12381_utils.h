@@ -25,11 +25,12 @@ typedef uint8_t byte;
 #define Fp_BITS   381
 #define Fr_BITS   255
 #define Fp_BYTES  BITS_TO_BYTES(Fp_BITS)
+#define Fp2_BYTES (2*Fp_BYTES)
 #define Fp_DIGITS BITS_TO_DIGITS(Fp_BITS)
 #define Fr_BYTES  BITS_TO_BYTES(Fr_BITS)
 
 #define G1_BYTES (2*Fp_BYTES)
-#define G2_BYTES (4*Fp_BYTES)
+#define G2_BYTES (2*Fp2_BYTES)
 
 // Compressed and uncompressed points
 #define COMPRESSED      1
@@ -45,7 +46,7 @@ typedef uint8_t byte;
 
 
 // constants used in the optimized SWU hash to curve
-#if (hashToPoint == OPSWU)
+#if (hashToPoint == LOCAL_SSWU)
     #define ELLP_Nx_LEN 12
     #define ELLP_Dx_LEN 10
     #define ELLP_Ny_LEN 16
@@ -55,23 +56,25 @@ typedef uint8_t byte;
 
 // Structure of precomputed data
 typedef struct prec_ {
-    #if (hashToPoint == OPSWU)
+    #if (hashToPoint == LOCAL_SSWU)
+    // constants needed in optimized SSWU
     bn_st p_3div4;
-    fp_st fp_p_1div2; 
-    // coefficients of E1(Fp)
-    fp_st a1;
-    fp_st b1; 
+    fp_st sqrt_z;
+    // related hardcoded constants for faster access,
+    // where a1 is the coefficient of isogenous curve E1
+    fp_st minus_a1;
+    fp_st a1z;
     // coefficients of the isogeny map
     fp_st iso_Nx[ELLP_Nx_LEN];
-    fp_st iso_Dx[ELLP_Dx_LEN];
     fp_st iso_Ny[ELLP_Ny_LEN];
-    fp_st iso_Dy[ELLP_Dy_LEN];
     #endif
     #if  (MEMBERSHIP_CHECK_G1 == BOWE)
     bn_st beta;
     bn_st z2_1_by3;
     #endif
+    // other field-related constants
     bn_st p_1div2;
+    fp_t r;   // Montgomery multiplication constant
 } prec_st;
 
 // BLS based SPoCK
@@ -96,7 +99,8 @@ int      ep2_read_bin_compact(ep2_t, const byte *,  const int);
 void     ep2_write_bin_compact(byte *, const ep2_t,  const int);
 int      bn_read_Zr_bin(bn_t, const uint8_t *, int );
 
-void     ep_mult_gen(ep_t, const bn_t);
+void     ep_mult_gen_bench(ep_t, const bn_t);
+void     ep_mult_generic_bench(ep_t, const bn_t);
 void     ep_mult(ep_t, const ep_t, const bn_t);
 void     ep2_mult_gen(ep2_t, const bn_t);
 

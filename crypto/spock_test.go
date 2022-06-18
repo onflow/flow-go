@@ -1,3 +1,4 @@
+//go:build relic
 // +build relic
 
 package crypto
@@ -24,7 +25,7 @@ func TestSPOCKProveVerifyAgainstData(t *testing.T) {
 	require.NoError(t, err)
 
 	// generate a SPoCK proof
-	kmac := NewBLSKMAC("spock test")
+	kmac := NewExpandMsgXOFKMAC128("spock test")
 	s, err := SPOCKProve(sk, data, kmac)
 	require.NoError(t, err)
 	pk := sk.PublicKey()
@@ -92,7 +93,7 @@ func TestSPOCKProveVerify(t *testing.T) {
 	require.NoError(t, err)
 
 	// generate SPoCK proofs
-	kmac := NewBLSKMAC("spock test")
+	kmac := NewExpandMsgXOFKMAC128("spock test")
 	pr1, err := SPOCKProve(sk1, data, kmac)
 	require.NoError(t, err)
 	pr2, err := SPOCKProve(sk2, data, kmac)
