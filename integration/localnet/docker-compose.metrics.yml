@@ -2,6 +2,7 @@ version: '3.7'
 services:
   tempo:
     image: grafana/tempo:main-4d7e191
+    user: root
     command: [ "-config.file=/etc/tempo.yaml" ]
     volumes:
       - ./conf/tempo-local.yaml:/etc/tempo.yaml:z
@@ -11,6 +12,7 @@ services:
 
   loki:
     image: grafana/loki:main-9218e46
+    user: root
     command: [ "-config.file=/etc/loki/local-config.yaml" ]
     volumes:
       - ./data/loki:/loki:z
@@ -26,6 +28,7 @@ services:
 
   prometheus:
     image: prom/prometheus:v2.36.0
+    user: root
     volumes:
       - ./conf/prometheus.yaml:/etc/prometheus/prometheus.yaml:z
       - ./targets.nodes.json:/etc/prometheus/targets.nodes.json:z
