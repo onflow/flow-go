@@ -224,9 +224,24 @@ func (e *Manager) ExecuteScript(
 		return nil, fmt.Errorf("failed to execute script at block (%s): %s", blockHeader.ID(), scriptErrMsg)
 	}
 
-	encodedValue, err := jsoncdc.Encode(script.Value)
+	var encodedValue []byte
+	func() {
+		defer func() {
+			recovered := recover()
+			switch recovered := recovered.(type) {
+			case nil:
+				break
+			case error:
+				err = recovered
+			default:
+				err = fmt.Errorf("%s", recovered)
+			}
+		}()
+
+		encodedValue, err = jsoncdc.Encode(script.Value)
+	}()
 	if err != nil {
-		return nil, fmt.Errorf("failed to encode runtime value: %w", err)
+		return nil, fmt.Errorf("failed to encode script result: %w", err)
 	}
 
 	runtime.ReadMemStats(&m)
