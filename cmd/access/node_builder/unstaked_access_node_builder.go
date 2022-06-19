@@ -199,6 +199,8 @@ func (builder *UnstakedAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Pr
 			).
 			SetRoutingSystem(func(ctx context.Context, h host.Host) (routing.Routing, error) {
 				return p2p.NewDHT(ctx, h, unicast.FlowPublicDHTProtocolID(builder.SporkID),
+					builder.Logger,
+					builder.Metrics.Network,
 					p2p.AsClient(),
 					dht.BootstrapPeers(pis...),
 				)
