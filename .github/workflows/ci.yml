@@ -126,23 +126,24 @@ jobs:
       uses: actions/checkout@v2
     - name: Build relic and other tools
       run: make install-tools
-    - name: Install Flow Client
+    - name: Install Flow Client In Docker
+      # This proved to be more reliable than installing it locally.
       run: cd integration/localnet && sh client/client.sh
     - name: Set up Localnet
-      run: bash -c 'cd integration/localnet/ && make -e OBSERVER=1 init && make start'
+      run: bash -c 'cd integration/localnet/ && make -e OBSERVER=2 init && make start'
     - name: Ensure Observer is started
       run: docker ps -f name=localnet_observer_1_1 | grep localnet_observer
     - name: Get Client Version ensuring the client is provisioned
-      run: docker run --network host localnet-client /go/flow-cli-0.34.0/cmd/flow/flow -f /go/flow-localnet.json -n observer version
+      run: docker run --network host localnet-client /go/flow -f /go/flow-localnet.json -n observer version
     - name: Wait for a default waiting period until a clean state
       # This will not cause flakiness.
       # The waiting time is a reasonable time to expect an observer to be responsive
       run: sleep 10
     - name: Get Status ensuring the access endpoint is online
-      run: docker run --network host localnet-client /go/flow-cli-0.34.0/cmd/flow/flow -f /go/flow-localnet.json -n access blocks get latest
+      run: docker run --network host localnet-client /go/flow -f /go/flow-localnet.json -n access status
     - name: Wait for finalized blocks and check them
-      run: docker run --network host localnet-client /go/flow-cli-0.34.0/cmd/flow/flow -f /go/flow-localnet.json -n observer blocks get latest
+      run: docker run --network host localnet-client /go/flow -f /go/flow-localnet.json -n observer blocks get latest
     - name: Wait for finalized blocks and check them with Observer
-      run: sleep 5 && docker run --network host localnet-client /go/flow-cli-0.34.0/cmd/flow/flow -f /go/flow-localnet.json -n access blocks get latest && docker run --network host localnet-client /go/flow-cli-0.34.0/cmd/flow/flow -f /go/flow-localnet.json -n observer blocks get latest
+      run: sleep 5 && docker run --network host localnet-client /go/flow -f /go/flow-localnet.json -n access blocks get latest && docker run --network host localnet-client /go/flow -f /go/flow-localnet.json -n observer blocks get latest
     - name: Stop localnet
       run: bash -c 'cd integration/localnet/ && make stop'
