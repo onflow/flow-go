@@ -17,11 +17,17 @@ func NewTransactionAccountFrozenChecker() *TransactionAccountFrozenChecker {
 
 func (c *TransactionAccountFrozenChecker) Process(
 	_ *VirtualMachine,
-	_ *Context,
+	ctx *Context,
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
 	_ *programs.Programs,
 ) error {
+
+	if ctx.Tracer != nil && proc.TraceSpan != nil {
+		span := ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMFrozenAccountCheckAccount)
+		defer span.Finish()
+	}
+
 	sth.DisableAllLimitEnforcements()
 	defer sth.EnableAllLimitEnforcements()
 	return c.checkAccountNotFrozen(proc.Transaction, sth)
