@@ -80,7 +80,7 @@ func New(
 		tracer:         tracer,
 	}
 
-	con, err := net.Register(engine.ReceiveBlocks, e)
+	con, err := net.Register(network.ReceiveBlocks, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine to network: %w", err)
 	}

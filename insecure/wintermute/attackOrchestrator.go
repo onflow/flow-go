@@ -6,13 +6,13 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/messages"
-	"github.com/onflow/flow-go/utils/logging"
-	"github.com/onflow/flow-go/utils/unittest"
-
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/utils/logging"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // Orchestrator encapsulates a stateful implementation of wintermute attack orchestrator logic.
@@ -23,6 +23,9 @@ import (
 //    for that corrupted chunk.
 // 4. If Orchestrator receives any chunk data pack response from a corrupted execution node to an honest verification node, it drops the response
 //    if it is for one of the corrupted chunks.
+// 5. If Orchestrator receives a result approval for the original result (i.e., conflicting result with corrupted result),
+//    from a corrupted VN, it drops it, hence no conflicting result with the corrupted result is getting approved by any
+//    corrupted VN.
 // 5. Any other incoming messages to the orchestrator are passed through, i.e., are sent as they are in the original Flow network without any tampering.
 type Orchestrator struct {
 	sync.Mutex
@@ -54,12 +57,13 @@ func (o *Orchestrator) WithAttackNetwork(network insecure.AttackNetwork) {
 // HandleEventFromCorruptedNode implements logic of processing the events received from a corrupted node.
 //
 // In Corruptible Conduit Framework for BFT testing, corrupted nodes relay their outgoing events to
-// the attack Orchestrator instead of dispatching them directly to the network. The Orchestrator completely determines what the corrupted conduit should send to the network.
+// the attack Orchestrator instead of dispatching them directly to the network.
+// The Orchestrator completely determines what the corrupted conduit should send to the network.
 func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error {
 	o.Lock()
 	defer o.Unlock()
 
-	switch protocolEvent := event.FlowProtocolEvent.(type) {
+	switch event.FlowProtocolEvent.(type) {
 
 	case *flow.ExecutionReceipt:
 		// orchestrator received execution receipt from corrupted EN after EN executed a block.
@@ -76,8 +80,20 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error
 		if err := o.handleChunkDataPackResponseEvent(event); err != nil {
 			return fmt.Errorf("could not handle chunk data pack response event: %w", err)
 		}
+	case *flow.ResultApproval:
+		// orchestrator receives a result approval from corrupted VN. If it is an approval for the original result, it should
+		// be wintermuted, i.e., a corrupted VN must not approve any conflicting result with the corrupted result (otherwise, it
+		// causes a sealing halt at consensus nodes).
+		if err := o.handleResultApprovalEvent(event); err != nil {
+			return fmt.Errorf("could not handle result approval event: %w", err)
+		}
+
 	default:
-		return fmt.Errorf("unexpected message type for wintermute attack orchestrator: %T", protocolEvent)
+		// Any other event is just passed through the network as it is.
+		err := o.network.Send(event)
+		if err != nil {
+			return fmt.Errorf("could not send rpc on channel: %w", err)
+		}
 	}
 
 	return nil
@@ -86,14 +102,25 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error
 // corruptExecutionResult creates a corrupted version of the input receipt by tampering its content so that
 // the resulted corrupted version would not pass verification.
 func (o *Orchestrator) corruptExecutionResult(receipt *flow.ExecutionReceipt) *flow.ExecutionResult {
-	return &flow.ExecutionResult{
+	receiptStartState := receipt.ExecutionResult.Chunks[0].StartState
+	chunksNum := len(receipt.ExecutionResult.Chunks)
+
+	result := &flow.ExecutionResult{
 		PreviousResultID: receipt.ExecutionResult.PreviousResultID,
 		BlockID:          receipt.ExecutionResult.BlockID,
 		// replace all chunks with new ones to simulate chunk corruption
-		Chunks:          unittest.ChunkListFixture(uint(len(receipt.ExecutionResult.Chunks)), receipt.ExecutionResult.BlockID),
+		Chunks: flow.ChunkList{
+			unittest.ChunkFixture(receipt.ExecutionResult.BlockID, 0, unittest.WithChunkStartState(receiptStartState)),
+		},
 		ServiceEvents:   receipt.ExecutionResult.ServiceEvents,
 		ExecutionDataID: receipt.ExecutionResult.ExecutionDataID,
 	}
+
+	if chunksNum > 1 {
+		result.Chunks = append(result.Chunks, unittest.ChunkListFixture(uint(chunksNum-1), receipt.ExecutionResult.BlockID)...)
+	}
+
+	return result
 }
 
 // handleExecutionReceiptEvent processes incoming execution receipt event from a corrupted execution node.
@@ -275,6 +302,34 @@ func (o *Orchestrator) handleChunkDataPackResponseEvent(chunkDataPackReplyEvent 
 	return nil
 }
 
+// handleResultApprovalEvent wintermutes the result approvals for the chunks of original result that are coming from
+// corrupted verification nodes. Otherwise, it is passed through.
+func (o *Orchestrator) handleResultApprovalEvent(resultApprovalEvent *insecure.Event) error {
+	// non-nil state means a result has been corrupted, hence checking whether the approval
+	// belongs to the chunks of the original (non-corrupted) result.
+	approval := resultApprovalEvent.FlowProtocolEvent.(*flow.ResultApproval)
+	lg := o.logger.With().
+		Hex("result_id", logging.ID(approval.Body.ExecutionResultID)).
+		Uint64("chunk_index", approval.Body.ChunkIndex).
+		Hex("result_id", logging.ID(approval.Body.BlockID)).
+		Hex("sender_id", logging.ID(resultApprovalEvent.CorruptedNodeId)).
+		Str("target_ids", fmt.Sprintf("%v", resultApprovalEvent.TargetIds)).Logger()
+
+	if o.state != nil {
+		if o.state.originalResult.ID() == approval.Body.ExecutionResultID {
+			lg.Info().Msg("wintermuting result approval for original un-corrupted execution result")
+			return nil
+		}
+	}
+
+	err := o.network.Send(resultApprovalEvent)
+	if err != nil {
+		return fmt.Errorf("could not passed through result approval event %w", err)
+	}
+	lg.Info().Msg("result approval is passing through")
+	return nil
+}
+
 // replyWithAttestation sends an attestation for the given chunk data pack request if it belongs to
 // the corrupted result of orchestrator's state.
 func (o *Orchestrator) replyWithAttestation(chunkDataPackRequestEvent *insecure.Event) (bool, error) {
@@ -294,13 +349,14 @@ func (o *Orchestrator) replyWithAttestation(chunkDataPackRequestEvent *insecure.
 			ChunkIndex:        corruptedChunkIndex,
 		}
 
-		// sends an attestation for the corrupted chunk to corrupted verification node.
+		// sends an attestation on behalf of verification node to all consensus nodes
+		consensusIds := o.allNodeIds.Filter(filter.HasRole(flow.RoleConsensus)).NodeIDs()
 		err = o.network.Send(&insecure.Event{
 			CorruptedNodeId: chunkDataPackRequestEvent.CorruptedNodeId,
-			Channel:         chunkDataPackRequestEvent.Channel,
-			Protocol:        chunkDataPackRequestEvent.Protocol,
-			TargetNum:       chunkDataPackRequestEvent.TargetNum,
-			TargetIds:       chunkDataPackRequestEvent.TargetIds,
+			Channel:         network.PushApprovals,
+			Protocol:        insecure.Protocol_PUBLISH,
+			TargetNum:       0,
+			TargetIds:       consensusIds,
 
 			// wrapping attestation in a result approval for sake of encoding and decoding.
 			FlowProtocolEvent: &flow.ResultApproval{Body: flow.ResultApprovalBody{Attestation: *attestation}},
@@ -315,10 +371,24 @@ func (o *Orchestrator) replyWithAttestation(chunkDataPackRequestEvent *insecure.
 			Str("channel", string(chunkDataPackRequestEvent.Channel)).
 			Uint32("targets_num", chunkDataPackRequestEvent.TargetNum).
 			Str("target_ids", fmt.Sprintf("%v", chunkDataPackRequestEvent.TargetIds)).
-			Msg("chunk data pack request event passed through")
+			Msg("chunk data pack request replied with attestation")
 
 		return true, nil
 	}
 
 	return false, nil
+}
+
+// AttackState returns the corrupted and original execution results involved in this attack.
+// Boolean return value determines whether attack conducted.
+func (o *Orchestrator) AttackState() (flow.ExecutionResult, flow.ExecutionResult, bool) {
+	o.Lock()
+	defer o.Unlock()
+
+	if o.state == nil {
+		// no attack yet conducted.
+		return flow.ExecutionResult{}, flow.ExecutionResult{}, false
+	}
+
+	return *o.state.corruptedResult, *o.state.originalResult, true
 }

@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"google.golang.org/grpc"
-
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	emulator "github.com/onflow/flow-emulator"
@@ -27,20 +25,20 @@ func NewEmulatorClient(blockchain *emulator.Blockchain) *EmulatorClient {
 	return client
 }
 
-func (c *EmulatorClient) GetAccount(ctx context.Context, address sdk.Address, opts ...grpc.CallOption) (*sdk.Account, error) {
+func (c *EmulatorClient) GetAccount(ctx context.Context, address sdk.Address) (*sdk.Account, error) {
 	return c.blockchain.GetAccount(address)
 }
 
-func (c *EmulatorClient) GetAccountAtLatestBlock(ctx context.Context, address sdk.Address, opts ...grpc.CallOption) (*sdk.Account, error) {
+func (c *EmulatorClient) GetAccountAtLatestBlock(ctx context.Context, address sdk.Address) (*sdk.Account, error) {
 	return c.blockchain.GetAccount(address)
 }
 
-func (c *EmulatorClient) SendTransaction(ctx context.Context, tx sdk.Transaction, opts ...grpc.CallOption) error {
+func (c *EmulatorClient) SendTransaction(ctx context.Context, tx sdk.Transaction) error {
 	_, err := c.Submit(&tx)
 	return err
 }
 
-func (c *EmulatorClient) GetLatestBlock(ctx context.Context, isSealed bool, opts ...grpc.CallOption) (*sdk.Block, error) {
+func (c *EmulatorClient) GetLatestBlock(ctx context.Context, isSealed bool) (*sdk.Block, error) {
 	block, err := c.blockchain.GetLatestBlock()
 	if err != nil {
 		return nil, err
@@ -57,11 +55,11 @@ func (c *EmulatorClient) GetLatestBlock(ctx context.Context, isSealed bool, opts
 	return sdkBlock, nil
 }
 
-func (c *EmulatorClient) GetTransactionResult(ctx context.Context, txID sdk.Identifier, opts ...grpc.CallOption) (*sdk.TransactionResult, error) {
+func (c *EmulatorClient) GetTransactionResult(ctx context.Context, txID sdk.Identifier) (*sdk.TransactionResult, error) {
 	return c.blockchain.GetTransactionResult(txID)
 }
 
-func (c *EmulatorClient) ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, args []cadence.Value, opts ...grpc.CallOption) (cadence.Value, error) {
+func (c *EmulatorClient) ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, args []cadence.Value) (cadence.Value, error) {
 
 	arguments := [][]byte{}
 	for _, arg := range args {
@@ -80,7 +78,7 @@ func (c *EmulatorClient) ExecuteScriptAtLatestBlock(ctx context.Context, script 
 	return scriptResult.Value, nil
 }
 
-func (c *EmulatorClient) ExecuteScriptAtBlockID(ctx context.Context, blockID sdk.Identifier, script []byte, args []cadence.Value, opts ...grpc.CallOption) (cadence.Value, error) {
+func (c *EmulatorClient) ExecuteScriptAtBlockID(ctx context.Context, blockID sdk.Identifier, script []byte, args []cadence.Value) (cadence.Value, error) {
 
 	arguments := [][]byte{}
 	for _, arg := range args {

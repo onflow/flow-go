@@ -1098,8 +1098,14 @@ func IdentityListFixture(n int, opts ...func(*flow.Identity)) flow.IdentityList 
 	return identities
 }
 
-func ChunkFixture(blockID flow.Identifier, collectionIndex uint) *flow.Chunk {
-	return &flow.Chunk{
+func WithChunkStartState(startState flow.StateCommitment) func(chunk *flow.Chunk) {
+	return func(chunk *flow.Chunk) {
+		chunk.StartState = startState
+	}
+}
+
+func ChunkFixture(blockID flow.Identifier, collectionIndex uint, opts ...func(*flow.Chunk)) *flow.Chunk {
+	chunk := &flow.Chunk{
 		ChunkBody: flow.ChunkBody{
 			CollectionIndex:      collectionIndex,
 			StartState:           StateCommitmentFixture(),
@@ -1111,6 +1117,12 @@ func ChunkFixture(blockID flow.Identifier, collectionIndex uint) *flow.Chunk {
 		Index:    0,
 		EndState: StateCommitmentFixture(),
 	}
+
+	for _, opt := range opts {
+		opt(chunk)
+	}
+
+	return chunk
 }
 
 func ChunkListFixture(n uint, blockID flow.Identifier) flow.ChunkList {
