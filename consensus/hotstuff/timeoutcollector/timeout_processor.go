@@ -3,8 +3,6 @@ package timeoutcollector
 import (
 	"errors"
 	"fmt"
-	"sync"
-
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -36,31 +34,31 @@ func (t *accumulatedWeightTracker) Track(weight uint64) bool {
 // NewestQCTracker is a helper structure which keeps track of the highest QC(by view)
 // in concurrency safe way.
 type NewestQCTracker struct {
-	lock     sync.RWMutex
-	newestQC *flow.QuorumCertificate
+	newestQC atomic.Value
+}
+
+func NewNewestQCTracker() *NewestQCTracker {
+	tracker := &NewestQCTracker{}
+	// store dummy QC with view 0 to workaround limitation of storing nil into atomic.Value
+	tracker.newestQC.Store(&flow.QuorumCertificate{
+		View: 0,
+	})
+	return tracker
 }
 
 // Track updates local state of NewestQC if the provided instance is newer(by view)
 // Concurrently safe
 func (t *NewestQCTracker) Track(qc *flow.QuorumCertificate) {
 	NewestQC := t.NewestQC()
-	if NewestQC != nil && NewestQC.View >= qc.View {
-		return
-	}
-
-	t.lock.Lock()
-	defer t.lock.Unlock()
-	if t.newestQC == nil || t.newestQC.View < qc.View {
-		t.newestQC = qc
+	if NewestQC.View < qc.View {
+		t.newestQC.CompareAndSwap(NewestQC, qc)
 	}
 }
 
 // NewestQC returns the newest QC(by view) tracked.
 // Concurrently safe
 func (t *NewestQCTracker) NewestQC() *flow.QuorumCertificate {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
-	return t.newestQC
+	return t.newestQC.Load().(*flow.QuorumCertificate)
 }
 
 // TimeoutProcessor implements the hotstuff.TimeoutProcessor interface.
@@ -76,7 +74,7 @@ type TimeoutProcessor struct {
 	notifier         hotstuff.TimeoutCollectorConsumer
 	partialTCTracker accumulatedWeightTracker
 	tcTracker        accumulatedWeightTracker
-	NewestQCTracker  NewestQCTracker
+	newestQCTracker  *NewestQCTracker
 }
 
 var _ hotstuff.TimeoutProcessor = (*TimeoutProcessor)(nil)
@@ -112,7 +110,8 @@ func NewTimeoutProcessor(committee hotstuff.Replicas,
 			minRequiredWeight: qcThreshold,
 			done:              *atomic.NewBool(false),
 		},
-		sigAggregator: sigAggregator,
+		sigAggregator:   sigAggregator,
+		newestQCTracker: NewNewestQCTracker(),
 	}, nil
 }
 
@@ -140,12 +139,12 @@ func (p *TimeoutProcessor) Process(timeout *model.TimeoutObject) error {
 		return fmt.Errorf("received invalid timeout: %w", err)
 	}
 
+	p.newestQCTracker.Track(timeout.NewestQC)
+
 	totalWeight, err := p.sigAggregator.VerifyAndAdd(timeout.SignerID, timeout.SigData, timeout.NewestQC.View)
 	if err != nil {
 		return fmt.Errorf("could not process invalid signature: %w", err)
 	}
-
-	p.NewestQCTracker.Track(timeout.NewestQC)
 
 	if p.partialTCTracker.Track(totalWeight) {
 		p.notifier.OnPartialTcCreated(p.view)
@@ -271,7 +270,7 @@ func (p *TimeoutProcessor) buildTC() (*flow.TimeoutCertificate, error) {
 	return &flow.TimeoutCertificate{
 		View:          p.view,
 		NewestQCViews: highQCViews,
-		NewestQC:      p.NewestQCTracker.NewestQC(),
+		NewestQC:      p.newestQCTracker.NewestQC(),
 		SignerIndices: signerIndices,
 		SigData:       aggregatedSig,
 	}, nil
