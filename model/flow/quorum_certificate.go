@@ -23,19 +23,8 @@ type QuorumCertificate struct {
 }
 
 // ID returns the QuorumCertificate's identifier
-func (t QuorumCertificate) ID() Identifier {
-	body := struct {
-		View          uint64
-		BlockID       Identifier
-		SignerIndices []byte
-		SigData       []byte
-	}{
-		View:          t.View,
-		BlockID:       t.BlockID,
-		SignerIndices: t.SignerIndices,
-		SigData:       t.SigData,
-	}
-	return MakeID(body)
+func (qc QuorumCertificate) ID() Identifier {
+	return MakeID(qc)
 }
 
 // QuorumCertificateWithSignerIDs is a QuorumCertificate, where the signing nodes are

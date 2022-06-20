@@ -372,7 +372,7 @@ func NewDoubleTimeoutErrorf(firstTimeout, conflictingTimeout *TimeoutObject, msg
 	}
 }
 
-// InvalidTimeoutError indicates that the timeout object with identifier `TimeoutID` is invalid
+// InvalidTimeoutError indicates that the embedded timeout object is invalid
 type InvalidTimeoutError struct {
 	Timeout *TimeoutObject
 	Err     error

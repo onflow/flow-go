@@ -130,7 +130,7 @@ func (s *TimeoutCollectorTestSuite) TestAddTimeout_InvalidTimeout() {
 	})
 }
 
-// TestAddTimeout_TONotifications tests that TimeoutCollector in happy path reports the newest discovered QC and TC>
+// TestAddTimeout_TONotifications tests that TimeoutCollector in happy path reports the newest discovered QC and TC
 func (s *TimeoutCollectorTestSuite) TestAddTimeout_TONotifications() {
 	qcCount := 100
 	// generate QCs with increasing view numbers
