@@ -187,7 +187,7 @@ func (e *Manager) ExecuteScript(
 				}
 				return e.log.Error().
 					Hex("script_hex", code).
-					Str("args", strings.Join(args[:], ","))
+					Str("args", strings.Join(args, ","))
 			}
 
 			elapsed := time.Since(start)
