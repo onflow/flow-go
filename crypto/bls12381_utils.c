@@ -27,27 +27,15 @@ prec_st bls_prec_st;
 prec_st* bls_prec = NULL;
 
 // required constants for the optimized SWU hash to curve
-#if (hashToPoint == OPSWU)
-extern const uint64_t p_3div4_data[Fp_DIGITS];
-extern const uint64_t fp_p_1div2_data[Fp_DIGITS];
-extern const uint64_t a1_data[Fp_DIGITS];
-extern const uint64_t b1_data[Fp_DIGITS];
+#if (hashToPoint == LOCAL_SSWU)
 extern const uint64_t iso_Nx_data[ELLP_Nx_LEN][Fp_DIGITS];
-extern const uint64_t iso_Dx_data[ELLP_Dx_LEN][Fp_DIGITS];
 extern const uint64_t iso_Ny_data[ELLP_Ny_LEN][Fp_DIGITS];
-extern const uint64_t iso_Dy_data[ELLP_Dy_LEN][Fp_DIGITS];
 #endif
 
 #if (MEMBERSHIP_CHECK_G1 == BOWE)
 extern const uint64_t beta_data[Fp_DIGITS];
 extern const uint64_t z2_1_by3_data[2];
 #endif
-
-const uint64_t p_1div2_data[Fp_DIGITS] = {
-   0xdcff7fffffffd555, 0x0f55ffff58a9ffff, 0xb39869507b587b12, 
-   0xb23ba5c279c2895f, 0x258dd3db21a5d66b, 0x0d0088f51cbff34d,
-};
-
 
 // sets the global variable to input
 void precomputed_data_set(const prec_st* p) {
@@ -61,22 +49,22 @@ void precomputed_data_set(const prec_st* p) {
 // pre-compute some data required for curve BLS12-381
 prec_st* init_precomputed_data_BLS12_381() {
     bls_prec = &bls_prec_st;
+    ctx_t* ctx = core_get();
 
-    #if (hashToPoint == OPSWU)
-    // isogenous curve constants used in optimized SWU
-    fp_read_raw(bls_prec->a1, a1_data);
-    fp_read_raw(bls_prec->b1, b1_data);
-    // (p-3)/4
-    bn_new(&bls_prec->p_3div4);
-    bn_read_raw(&bls_prec->p_3div4, p_3div4_data, Fp_DIGITS);
     // (p-1)/2
-    fp_read_raw(bls_prec->fp_p_1div2, fp_p_1div2_data);
-    for (int i=0; i<ELLP_Dx_LEN; i++)  
-        fp_read_raw(bls_prec->iso_Dx[i], iso_Dx_data[i]);
+    bn_div_dig(&bls_prec->p_1div2, &ctx->prime, 2);
+    #if (hashToPoint == LOCAL_SSWU)
+    // (p-3)/4
+    bn_div_dig(&bls_prec->p_3div4, &bls_prec->p_1div2, 2);
+    // sqrt(-z)
+    fp_neg(bls_prec->sqrt_z, ctx->ep_map_u);
+    fp_srt(bls_prec->sqrt_z, bls_prec->sqrt_z);
+    // -a1 and a1*z
+    fp_neg(bls_prec->minus_a1, ctx->ep_iso.a);
+    fp_mul(bls_prec->a1z, ctx->ep_iso.a, ctx->ep_map_u);
+    
     for (int i=0; i<ELLP_Nx_LEN; i++)  
         fp_read_raw(bls_prec->iso_Nx[i], iso_Nx_data[i]);
-    for (int i=0; i<ELLP_Dy_LEN; i++)  
-        fp_read_raw(bls_prec->iso_Dy[i], iso_Dy_data[i]);
     for (int i=0; i<ELLP_Ny_LEN; i++)  
         fp_read_raw(bls_prec->iso_Ny[i], iso_Ny_data[i]);
     #endif
@@ -88,8 +76,8 @@ prec_st* init_precomputed_data_BLS12_381() {
     bn_read_raw(&bls_prec->z2_1_by3, z2_1_by3_data, 2);
     #endif
 
-    bn_new(&bls_prec->p_1div2);
-    bn_read_raw(&bls_prec->p_1div2, p_1div2_data, Fp_DIGITS);
+    // Montgomery constant R
+    fp_set_dig(bls_prec->r, 1);
     return bls_prec;
 }
 
@@ -100,6 +88,7 @@ ctx_t* relic_init_BLS12_381() {
 
     // initialize relic core with a new context
     ctx_t* bls_ctx = (ctx_t*) calloc(1, sizeof(ctx_t));
+    if (!bls_ctx) return NULL;
     core_set(bls_ctx);
     if (core_init() != RLC_OK) return NULL;
 
@@ -133,17 +122,15 @@ void ep_mult(ep_t res, const ep_t p, const bn_t expo) {
 }
 
 // Exponentiation of generator g1 in G1
-// This function is not called by BLS but is here for DEBUG/TESTs purposes
-void ep_mult_gen(ep_t res, const bn_t expo) {
-#define GENERIC_POINT 0
-#define FIXED_MULT    (GENERIC_POINT^1)
-
-#if GENERIC_POINT
-    ep_mult(res, &core_get()->ep_g, expo);
-#elif FIXED_MULT
+// These two function are here for bench purposes only
+void ep_mult_gen_bench(ep_t res, const bn_t expo) {
     // Using precomputed table of size 4
     ep_mul_gen(res, (bn_st *)expo);
-#endif
+}
+
+void ep_mult_generic_bench(ep_t res, const bn_t expo) {
+    // generic point multiplication
+    ep_mult(res, &core_get()->ep_g, expo);
 }
 
 // Exponentiation of a generic point p in G2
@@ -194,8 +181,8 @@ void ep2_print_(char* s, ep2_st* p) {
 // generates a random number less than the order r
 void bn_randZr_star(bn_t x) {
     // reduce the modular reduction bias
-    int seed_len = BITS_TO_BYTES(Fr_BITS + SEC_BITS);
-    byte* seed = (byte*) malloc(seed_len);
+    const int seed_len = BITS_TO_BYTES(Fr_BITS + SEC_BITS);
+    byte seed[seed_len];
     rand_bytes(seed, seed_len);
     bn_map_to_Zr_star(x, seed, seed_len);
 }
@@ -326,15 +313,10 @@ int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
 
 	a->coord = BASIC;
 	fp_set_dig(a->z, 1);
-    byte* temp = (byte*)malloc(Fp_BYTES);
-    if (!temp) {
-        RLC_THROW(ERR_NO_MEMORY);
-        return UNDEFINED;
-    }
+    byte temp[Fp_BYTES];
     memcpy(temp, bin, Fp_BYTES);
     temp[0] &= 0x1F;
 	fp_read_bin(a->x, temp, Fp_BYTES);
-    free(temp);
 
     if (G1_SERIALIZATION == UNCOMPRESSED) {
         fp_read_bin(a->y, bin + Fp_BYTES, Fp_BYTES);
@@ -383,12 +365,12 @@ void ep2_write_bin_compact(byte *bin, const ep2_t a, const int len) {
     RLC_TRY {
         ep2_new(t);
         ep2_norm(t, (ep2_st *)a);
-        fp2_write_bin(bin, 2*Fp_BYTES, t->x, 0);
+        fp2_write_bin(bin, Fp2_BYTES, t->x, 0);
 
         if (G2_SERIALIZATION == COMPRESSED) {
             bin[0] |= (fp2_get_sign(t->y) << 5);
         } else {
-            fp2_write_bin(bin + 2*Fp_BYTES, 2*Fp_BYTES, t->y, 0);
+            fp2_write_bin(bin + Fp2_BYTES, Fp2_BYTES, t->y, 0);
         }
     } RLC_CATCH_ANY {
         RLC_THROW(ERR_CAUGHT);
@@ -440,19 +422,14 @@ int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
 	a->coord = BASIC;
 	fp_set_dig(a->z[0], 1);
 	fp_zero(a->z[1]);
-    byte* temp = (byte*)malloc(2*Fp_BYTES);
-    if (!temp) {
-        RLC_THROW(ERR_NO_MEMORY);
-        return UNDEFINED;
-    }
-    memcpy(temp, bin, 2*Fp_BYTES);
+    byte temp[Fp2_BYTES];
+    memcpy(temp, bin, Fp2_BYTES);
     // clear the header bits
     temp[0] &= 0x1F;
-    fp2_read_bin(a->x, temp, 2*Fp_BYTES);
-    free(temp);
+    fp2_read_bin(a->x, temp, Fp2_BYTES);
 
     if (G2_SERIALIZATION == UNCOMPRESSED) {
-        fp2_read_bin(a->y, bin + 2*Fp_BYTES, 2*Fp_BYTES);
+        fp2_read_bin(a->y, bin + Fp2_BYTES, Fp2_BYTES);
         return RLC_OK;
     }
     
@@ -571,10 +548,11 @@ int bls_spock_verify(const ep2_t pk1, const byte* sig1, const ep2_t pk2, const b
     ep2_free(elemsG2[0]);
     ep2_free(elemsG2[1]);
     
-    if (res == RLC_EQ && core_get()->code == RLC_OK) 
-        return VALID;
-    else 
+    if (core_get()->code == RLC_OK) {
+        if (res == RLC_EQ) return VALID;
         return INVALID;
+    }
+    return UNDEFINED;
 }
 
 // Subtracts the sum of a G2 array elements y from an element x and writes the 
@@ -594,33 +572,40 @@ void ep_sum_vector(ep_t jointx, ep_st* x, const int len) {
 }
 
 // Computes the sum of the signatures (G1 elements) flattened in a single sigs array
-// and store the sum bytes in dest.
+// and writes the sum (G1 element) as bytes in dest.
 // The function assumes sigs is correctly allocated with regards to len.
 int ep_sum_vector_byte(byte* dest, const byte* sigs_bytes, const int len) {
+    int error = UNDEFINED;
+
     // temp variables
     ep_t acc;        
     ep_new(acc);
     ep_set_infty(acc);
     ep_st* sigs = (ep_st*) malloc(len * sizeof(ep_st));
+    if (!sigs) goto mem_error;
+    for (int i=0; i < len; i++) ep_new(sigs[i]);
 
     // import the points from the array
     for (int i=0; i < len; i++) {
-        ep_new(sigs[i]);
         // deserialize each point from the input array
-        int read_ret = ep_read_bin_compact(&sigs[i], &sigs_bytes[SIGNATURE_LEN*i], SIGNATURE_LEN);
-        if (read_ret != RLC_OK)
-            return read_ret;
+        error = ep_read_bin_compact(&sigs[i], &sigs_bytes[SIGNATURE_LEN*i], SIGNATURE_LEN);
+        if (error != RLC_OK) {
+            goto out;
+        }
     }
     // sum the points
     ep_sum_vector(acc, sigs, len);
     // export the result
     ep_write_bin_compact(dest, acc, SIGNATURE_LEN);
 
+    error = VALID;
+out:
     // free the temp memory
     ep_free(acc);
-    for (int i=0; i < len; i++) ep_free(sig[i]);
+    for (int i=0; i < len; i++) ep_free(sigs[i]);
     free(sigs);
-    return VALID;
+mem_error:
+    return error;
 }
 
 // uses a simple scalar multiplication by G1's order
@@ -675,7 +660,6 @@ int bowe_subgroup_check_G1(const ep_t p){
     if (ep_is_infty(p) == 1) 
         return VALID;
     fp_t b;
-    fp_new(b);
     dv_copy(b, beta_data, Fp_DIGITS); 
     ep_t sigma, sigma2, p_inv;
     ep_new(sigma);
