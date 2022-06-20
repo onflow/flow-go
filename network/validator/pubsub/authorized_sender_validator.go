@@ -23,11 +23,15 @@ var (
 	ErrIdentityUnverified = errors.New("validation failed: could not verify identity of sender")
 )
 
+// GetIdentityFunc is a callback func used by the AuthorizedSenderValidator to get the flow identity of the message sender. This func should
+// only return identities of staked nodes, thus it serves also as a check that a node is staked.
+type GetIdentityFunc func(peer.ID) (*flow.Identity, bool)
+
 // AuthorizedSenderValidator returns a MessageValidator that will check if the sender of a message is authorized to send the message.
 // The MessageValidator returned will use the getIdentity to get the flow identity for the sender, asserting that the sender is a staked node.
 // If the sender is an unstaked node the message is rejected. IsAuthorizedSender is used to perform further message validation. If validation
 // fails the message is rejected, if the validation error is an expected error slashing data is collected before the message is rejected.
-func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, getIdentity func(peer.ID) (*flow.Identity, bool)) MessageValidator {
+func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, getIdentity GetIdentityFunc) MessageValidator {
 	slashingViolationsConsumer := network.NewSlashingViolationsConsumer(log.With().
 		Str("component", "authorized_sender_validator").
 		Str("network_channel", channel.String()).

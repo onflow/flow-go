@@ -265,7 +265,7 @@ func (m *Middleware) start(ctx context.Context) error {
 	}
 
 	m.libP2PNode = libP2PNode
-	err = m.libP2PNode.WithDefaultUnicastProtocol(m.handleIncomingStream, m.preferredUnicasts)
+	err = m.libP2PNode.WithDefaultUnicastProtocol(m.unicastStreamHandler(m.ov.Identity), m.preferredUnicasts)
 	if err != nil {
 		return fmt.Errorf("could not register preferred unicast protocols on libp2p node: %w", err)
 	}
@@ -403,9 +403,25 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 	return nil
 }
 
+// unicastStreamHandler returns a libP2P stream handler that uses the getIdentity func to get the flow identity
+// of the streams remote peer before calling  handleIncomingStream. If the flow identity can not be retrieved
+// a warning is logged and the message is dropped.
+func (m *Middleware) unicastStreamHandler(getIdentity psValidator.GetIdentityFunc) libp2pnetwork.StreamHandler {
+	return func(s libp2pnetwork.Stream) {
+		identity, ok := getIdentity(s.Conn().RemotePeer())
+		if !ok {
+			m.log.
+				Warn().
+				Err(fmt.Errorf("could not get flow identity of peer with ID (%s) during unicast stream handling", s.Conn().RemotePeer()))
+		}
+
+		m.handleIncomingStream(identity, s)
+	}
+}
+
 // handleIncomingStream handles an incoming stream from a remote peer
 // it is a callback that gets called for each incoming stream by libp2p with a new stream object
-func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
+func (m *Middleware) handleIncomingStream(identity *flow.Identity, s libp2pnetwork.Stream) {
 	// qualify the logger with local and remote address
 	log := streamLogger(m.log, s)
 
@@ -480,26 +496,48 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 			return
 		}
 
-		m.wg.Add(1)
-		go func(msg *message.Message) {
-			defer m.wg.Done()
-			if decodedMsgPayload, err := m.codec.Decode(msg.Payload); err != nil {
-				m.log.
-					Warn().
-					Err(fmt.Errorf("could not decode message: %w", err)).
-					Hex("sender", msg.OriginID).
-					Hex("event_id", msg.EventID).
-					Str("event_type", msg.Type).
-					Str("channel", msg.ChannelID)
-			} else {
-				// log metrics with the channel name as OneToOne
-				m.metrics.NetworkMessageReceived(msg.Size(), metrics.ChannelOneToOne, msg.Type)
-				m.processAuthenticatedMessage(msg, decodedMsgPayload, s.Conn().RemotePeer())
-			}
-		}(&msg)
+		m.processStreamMessage(identity, s.Conn().RemotePeer(), &msg)
 	}
 
 	success = true
+}
+
+// processStreamMessage decodes messages from unicast incoming streams and performs message authorization validation.
+// If validation fails a warning is logged and the message is dropped otherwise it will be processed further. Messaging
+// processing is done in a goroutine.
+func (m *Middleware) processStreamMessage(identity *flow.Identity, remotePeer peer.ID, msg *message.Message) {
+	m.wg.Add(1)
+	go func(identity *flow.Identity, remotePeer peer.ID, msg *message.Message) {
+		defer m.wg.Done()
+		decodedMsgPayload, err := m.codec.Decode(msg.Payload)
+		if err != nil {
+			m.log.
+				Warn().
+				Err(fmt.Errorf("could not decode message: %w", err)).
+				Hex("sender", msg.OriginID).
+				Hex("event_id", msg.EventID).
+				Str("event_type", msg.Type).
+				Str("channel", msg.ChannelID)
+		}
+
+		// perform authorization validation
+		msgType, err := psValidator.IsAuthorizedSender(identity, network.Channel(msg.ChannelID), decodedMsgPayload)
+		if err != nil {
+			m.log.
+				Warn().
+				Err(err).
+				Hex("sender", msg.OriginID).
+				Hex("event_id", msg.EventID).
+				Str("event_type", msg.Type).
+				Str("channel", msg.ChannelID).
+				Str("message_type", msgType).
+				Msg("unicast message authorization validation failed")
+		}
+
+		// log metrics with the channel name as OneToOne
+		m.metrics.NetworkMessageReceived(msg.Size(), metrics.ChannelOneToOne, msg.Type)
+		m.processAuthenticatedMessage(msg, decodedMsgPayload, remotePeer)
+	}(identity, remotePeer, msg)
 }
 
 // Subscribe subscribes the middleware to a channel.
