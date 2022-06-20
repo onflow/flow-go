@@ -1,12 +1,10 @@
 package dns
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"log"
 	"net"
-	"runtime/debug"
 	"sync"
 	"testing"
 	"time"
@@ -89,7 +87,7 @@ func TestResolver_CacheExpiry(t *testing.T) {
 	unittest.RequireCloseBefore(t, resolver.Ready(), 100*time.Millisecond, "could not start dns resolver on time")
 
 	// potentially consider reducing the test case count to reduce complexity
-	size := 10 // we have 10 txt and 10 ip lookup test cases
+	size := 1  // we have 10 txt and 10 ip lookup test cases
 	times := 5 // each domain is queried for resolution 5 times
 	txtTestCases := testnetwork.TxtLookupFixture(size)
 	ipTestCase := testnetwork.IpLookupFixture(size)
@@ -343,9 +341,8 @@ func mockBasicResolverForDomains(t *testing.T,
 			count = 0
 		}
 		count++
-		log.Printf("IPAddr count: %d domain: %s", count, domain)
 
-		// require.LessOrEqual(t, count, times)
+		require.LessOrEqual(t, count, times)
 		ipRequested[domain] = count
 
 		wg.Done()
@@ -384,8 +381,7 @@ func mockBasicResolverForDomains(t *testing.T,
 			count = 0
 		}
 		count++
-		log.Printf("R%s Lookup IPTxt count: %d domain: %s", string(bytes.Fields(debug.Stack())[1]), count, domain)
-		// require.LessOrEqual(t, count, times)
+		require.LessOrEqual(t, count, times)
 		txtRequested[domain] = count
 
 		wg.Done()

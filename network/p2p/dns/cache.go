@@ -2,6 +2,7 @@ package dns
 
 import (
 	"net"
+	"sync"
 	"time"
 
 	"github.com/onflow/flow-go/module/mempool"
@@ -20,6 +21,7 @@ const (
 type cache struct {
 	ttl    time.Duration // time-to-live for cache entry
 	dCache mempool.DNSCache
+	sync.Mutex
 }
 
 func newCache(dnsCache mempool.DNSCache) *cache {
@@ -69,22 +71,30 @@ func (c *cache) resolveTXTCache(txt string) ([]string, bool, bool) {
 
 // updateIPCache updates the cache entry for the domain.
 func (c *cache) updateIPCache(domain string, addr []net.IPAddr) {
+	c.Lock()
+	defer c.Unlock()
 	c.dCache.PutDomainIp(domain, addr, runtimeNano())
 }
 
 // updateTXTCache updates the cache entry for the txt record.
 func (c *cache) updateTXTCache(txt string, record []string) {
+	c.Lock()
+	defer c.Unlock()
 	c.dCache.PutTxtRecord(txt, record, runtimeNano())
 }
 
 // invalidateIPCacheEntry atomically invalidates ip cache entry. Boolean variable determines whether invalidation
 // is successful.
 func (c *cache) invalidateIPCacheEntry(domain string) bool {
+	c.Lock()
+	defer c.Unlock()
 	return c.dCache.RemoveIp(domain)
 }
 
 // invalidateTXTCacheEntry atomically invalidates txt cache entry. Boolean variable determines whether invalidation
 // is successful.
 func (c *cache) invalidateTXTCacheEntry(txt string) bool {
+	c.Lock()
+	defer c.Unlock()
 	return c.dCache.RemoveTxt(txt)
 }
