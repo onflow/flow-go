@@ -72,10 +72,13 @@ func (ac *VerifyingAssignmentCollector) collectorByBlockID(incorporatedBlockID f
 // hangs far enough behind finalization (measured in finalized but unsealed blocks), emergency
 // sealing kicks in. This will be removed when implementation of Sealing & Verification is finished.
 func (ac *VerifyingAssignmentCollector) emergencySealable(collector *ApprovalCollector, finalizedBlockHeight uint64) bool {
-	// Criterion for emergency sealing:
-	// there must be at least DefaultEmergencySealingThreshold number of blocks between
-	// the block that _incorporates_ result and the latest finalized block
-	return collector.IncorporatedBlock().Height+DefaultEmergencySealingThreshold <= finalizedBlockHeight
+	// Criterion for emergency sealing, both of the following condition must be true:
+	// 1. there must be at least DefaultEmergencySealingThreshold number of blocks between
+	//    the block and the latest finalized block
+	// 2. there must be at least 7 blocks
+	//    between the block the block that _incorporates_ result and the latest finalized block
+	return collector.executedBlock.Height+DefaultEmergencySealingThreshold <= finalizedBlockHeight &&
+		collector.IncorporatedBlock().Height+7 <= finalizedBlockHeight
 }
 
 // CheckEmergencySealing checks the managed assignments whether their result can be emergency
