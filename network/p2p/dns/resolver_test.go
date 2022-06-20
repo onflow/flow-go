@@ -112,7 +112,7 @@ func TestResolver_CacheExpiry(t *testing.T) {
 	unittest.RequireReturnsBefore(t, resolverWG.Wait, 2*time.Second, "could not resolve all expected domains")
 	// unittest.RequireReturnsBefore(t, queryWG.Wait, 1*time.Second, "could not perform all queries on time")
 	cancel()
-	unittest.RequireCloseBefore(t, resolver.Done(), 100*time.Millisecond, "could not stop dns resolver on time")
+	unittest.RequireCloseBefore(t, resolver.Done(), 2*time.Second, "could not stop dns resolver on time")
 }
 
 // TestResolver_Error evaluates that when the underlying resolver returns an error, the resolver itself does not cache the result.

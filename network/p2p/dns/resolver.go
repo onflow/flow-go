@@ -177,6 +177,7 @@ func (r *Resolver) lookupIPAddr(ctx context.Context, domain string) ([]net.IPAdd
 		return r.lookupResolverForIPAddr(ctx, domain)
 	}
 
+	log.Printf("LookupIP condition vars fresh: %t shouldResolveIP: %t CheckClosed: %t", !fresh, r.shouldResolveIP(domain), !util.CheckClosed(r.cm.ShutdownSignal()))
 	if !fresh && r.shouldResolveIP(domain) && !util.CheckClosed(r.cm.ShutdownSignal()) {
 		select {
 		case r.ipRequests <- &lookupIPRequest{domain}:
@@ -227,6 +228,7 @@ func (r *Resolver) lookupTXT(ctx context.Context, txt string) ([]string, error) 
 		return r.lookupResolverForTXTRecord(ctx, txt)
 	}
 
+	log.Printf("LookupTXT condition vars fresh: %t shouldResolveTXT: %t CheckClosed: %t", !fresh, r.shouldResolveTXT(txt), !util.CheckClosed(r.cm.ShutdownSignal()))
 	if !fresh && r.shouldResolveTXT(txt) && !util.CheckClosed(r.cm.ShutdownSignal()) {
 		select {
 		case r.txtRequests <- &lookupTXTRequest{txt}:
