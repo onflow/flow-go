@@ -12,6 +12,6 @@ type AttackNetwork interface {
 	Send(*Event) error
 	// Observe is the inbound message handler of the attack network.
 	// Instead of dispatching their messages to the networking layer of Flow, the conduits of corrupted nodes
-	// dispatch the outgoing to the attack network through a remote call to this method.
+	// dispatch the outgoing message to the attack network through a remote call to this method.
 	Observe(*Message)
 }
