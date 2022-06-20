@@ -195,15 +195,14 @@ type QCCreatedConsumer interface {
 	OnQcConstructedFromVotes(*flow.QuorumCertificate)
 }
 
-```suggestion
 // TimeoutCollectorConsumer consumes outbound notifications produced by HotStuff's timeout aggregation
 // component. These events are primarily intended for the HotStuff-internal state machine (EventHandler),
-// but might also be relevant to the larger node in which HotStuff is running. 
+// but might also be relevant to the larger node in which HotStuff is running.
 //
 // Caution: the events are not strictly ordered by increasing views!
-// The notifications are emitted by concurrent processing logic. Over larger time scales, the 
+// The notifications are emitted by concurrent processing logic. Over larger time scales, the
 // emitted events are for statistically increasing views. However, on short time scales there
-// are _no_ monotonicity guarantees w.r.t. the events' views.  
+// are _no_ monotonicity guarantees w.r.t. the events' views.
 //
 // Implementations must:
 //   * be concurrency safe
@@ -211,7 +210,7 @@ type QCCreatedConsumer interface {
 //   * handle repetition of the same events (with some processing overhead).
 type TimeoutCollectorConsumer interface {
 	// OnTcConstructedFromTimeouts notifications are produced by the TimeoutProcessor
-	// component, whenever it constructs a TC based on TimeoutObjects from a 
+	// component, whenever it constructs a TC based on TimeoutObjects from a
 	// supermajority of consensus participants.
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
@@ -219,7 +218,7 @@ type TimeoutCollectorConsumer interface {
 	OnTcConstructedFromTimeouts(certificate *flow.TimeoutCertificate)
 
 	// OnPartialTcCreated notifications are produced by the TimeoutProcessor
-	// component, whenever it collected TimeoutObjects from a superminority 
+	// component, whenever it collected TimeoutObjects from a superminority
 	// of consensus participants.
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;

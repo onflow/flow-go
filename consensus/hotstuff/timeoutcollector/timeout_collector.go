@@ -10,7 +10,7 @@ import (
 )
 
 // TimeoutCollector implements logic for collecting timeout objects. Performs deduplication, caching and processing
-// of timeouts, delegating those tasks to underlying modules. Emits notifications about verified QCs and TCs, if 
+// of timeouts, delegating those tasks to underlying modules. Emits notifications about verified QCs and TCs, if
 // their view is newer than any QC or TC previously known to the TimeoutCollector.
 // This module is safe to use in concurrent environment.
 type TimeoutCollector struct {
@@ -40,10 +40,10 @@ func NewTimeoutCollector(view uint64,
 	}
 }
 
-// AddTimeout adds a timeout object to the collector
-// When f+1 TOs will be collected then callback for partial TC will be triggered,
-// after collecting 2f+1 TOs a TC will be created and passed to the EventLoop.
-// No errors are expected during normal flow of operations.
+// AddTimeout adds a Timeout Object [TO] to the collector.
+// When TOs from strictly more than 1/3 of consensus participants (measured by weight)
+// were collected, the callback for partial TC will be triggered.
+// After collecting TOs from a supermajority, a TC will be created and passed to the EventLoop.
 func (c *TimeoutCollector) AddTimeout(timeout *model.TimeoutObject) error {
 	// cache timeout
 	err := c.timeoutsCache.AddTimeoutObject(timeout)
@@ -92,11 +92,11 @@ func (c *TimeoutCollector) processTimeout(timeout *model.TimeoutObject) error {
 	// known QC at the time we check via the `if ... Set(..)` statement. Thereby, we implement the desired filtering
 	// behaviour, i.e. that the recipient of the notifications is not spammed by old (or repeated) QCs.
 	// Reasoning for this approach:
-	// The current implementation is completely lock-free without noteworthy risk of congestion. For the recipient 
-	// of the notifications, the weak ordering is of no concern, because it anyway is only interested in the newest 
+	// The current implementation is completely lock-free without noteworthy risk of congestion. For the recipient
+	// of the notifications, the weak ordering is of no concern, because it anyway is only interested in the newest
 	// QC. Time-localized disorder is irrelevant, because newer QCs that would arrive later in a strongly ordered
-	// system can only arrive earlier in our weakly ordered implementation. Hence, if anything, the recipient 
-	// receives the desired information _earlier_ but not later. 
+	// system can only arrive earlier in our weakly ordered implementation. Hence, if anything, the recipient
+	// receives the desired information _earlier_ but not later.
 	if c.newestReportedQC.Set(timeout.NewestQC.View) {
 		c.collectorNotifier.OnNewQcDiscovered(timeout.NewestQC)
 	}

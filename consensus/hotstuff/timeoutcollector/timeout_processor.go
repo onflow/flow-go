@@ -24,8 +24,8 @@ func (t *accumulatedWeightTracker) Done() bool {
 	return t.done.Load()
 }
 
-// Track returns true if `weight` reaches or exceeds `minRequiredWeight` for the _first time_. 
-// All subsequent calls of `Track` (with any value) return false.  
+// Track returns true if `weight` reaches or exceeds `minRequiredWeight` for the _first time_.
+// All subsequent calls of `Track` (with any value) return false.
 func (t *accumulatedWeightTracker) Track(weight uint64) bool {
 	if weight < t.minRequiredWeight {
 		return false

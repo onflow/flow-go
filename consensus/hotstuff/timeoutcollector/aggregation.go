@@ -155,8 +155,8 @@ func (a *TimeoutSignatureAggregator) View() uint64 {
 }
 
 // Aggregate aggregates the signatures and returns the aggregated signature.
-// The function performs a final verification of aggregated
-// signature. Caller can be sure that resulting signature is valid.
+// The resulting aggregated signature is guaranteed to be valid, as all individual
+// signatures are pre-validated before their addition.
 // Expected errors during normal operations:
 //  - model.InsufficientSignaturesError if no signatures have been added yet
 // This function is thread-safe
