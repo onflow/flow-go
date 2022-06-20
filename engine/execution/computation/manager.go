@@ -157,10 +157,10 @@ func (e *Manager) ExecuteScript(
 	// scripts might not be unique so we use this extra tracker to follow their logs
 	// TODO: this is a temporary measure, we could remove this in the future
 	trackerID := rand.Uint32()
-	e.log.Info().Hex("script_hex", code).Uint32("trackerID", trackerID).Msg("script is sent for execution")
+	e.log.Debug().Hex("script_hex", code).Uint32("trackerID", trackerID).Msg("script is sent for execution")
 
 	defer func() {
-		e.log.Info().Uint32("trackerID", trackerID).Msg("script execution is complete")
+		e.log.Debug().Uint32("trackerID", trackerID).Msg("script execution is complete")
 	}()
 
 	requestCtx, cancel := context.WithTimeout(ctx, e.scriptExecutionTimeLimit)
