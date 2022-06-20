@@ -3,6 +3,7 @@ package timeoutcollector
 import (
 	"errors"
 	"fmt"
+
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
