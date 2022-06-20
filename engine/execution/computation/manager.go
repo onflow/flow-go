@@ -181,7 +181,7 @@ func (e *Manager) ExecuteScript(
 
 			prepareLog := func() *zerolog.Event {
 
-				args := make([]string, 0)
+				args := make([]string, 0, len(arguments))
 				for _, a := range arguments {
 					args = append(args, hex.EncodeToString(a))
 				}
