@@ -480,7 +480,7 @@ func (bc *blockCommitter) Commit(view state.View) {
 
 func (bc *blockCommitter) Close() {
 	defer func() {
-		recover() // allow double closing the channel
+		_ = recover() // allow double closing the channel
 	}()
 
 	close(bc.views)
@@ -508,7 +508,7 @@ func (eh *eventHasher) Hash(events flow.EventsList) {
 
 func (eh *eventHasher) Close() {
 	defer func() {
-		recover() // allow double closing the channel
+		_ = recover() // allow double closing the channel
 	}()
 
 	close(eh.data)
