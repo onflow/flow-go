@@ -157,10 +157,10 @@ func (e *Manager) ExecuteScript(
 	// scripts might not be unique so we use this extra tracker to follow their logs
 	// TODO: this is a temporary measure, we could remove this in the future
 	trackerID := rand.Uint32()
-	e.log.Info().Hex("script_hex", code).Uint32("trackerID", trackerID).Msg("script is sent for execution")
+	e.log.Debug().Hex("script_hex", code).Uint32("trackerID", trackerID).Msg("script is sent for execution")
 
 	defer func() {
-		e.log.Info().Uint32("trackerID", trackerID).Msg("script execution is complete")
+		e.log.Debug().Uint32("trackerID", trackerID).Msg("script execution is complete")
 	}()
 
 	requestCtx, cancel := context.WithTimeout(ctx, e.scriptExecutionTimeLimit)
@@ -224,9 +224,24 @@ func (e *Manager) ExecuteScript(
 		return nil, fmt.Errorf("failed to execute script at block (%s): %s", blockHeader.ID(), scriptErrMsg)
 	}
 
-	encodedValue, err := jsoncdc.Encode(script.Value)
+	var encodedValue []byte
+	func() {
+		defer func() {
+			recovered := recover()
+			switch recovered := recovered.(type) {
+			case nil:
+				break
+			case error:
+				err = recovered
+			default:
+				err = fmt.Errorf("%s", recovered)
+			}
+		}()
+
+		encodedValue, err = jsoncdc.Encode(script.Value)
+	}()
 	if err != nil {
-		return nil, fmt.Errorf("failed to encode runtime value: %w", err)
+		return nil, fmt.Errorf("failed to encode script result: %w", err)
 	}
 
 	runtime.ReadMemStats(&m)

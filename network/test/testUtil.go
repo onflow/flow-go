@@ -328,7 +328,11 @@ type nodeBuilderOption func(p2p.NodeBuilder)
 func withDHT(prefix string, dhtOpts ...dht.Option) nodeBuilderOption {
 	return func(nb p2p.NodeBuilder) {
 		nb.SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
-			return p2p.NewDHT(c, h, pc.ID(unicast.FlowDHTProtocolIDPrefix+prefix), dhtOpts...)
+			return p2p.NewDHT(c, h,
+				pc.ID(unicast.FlowDHTProtocolIDPrefix+prefix),
+				zerolog.Nop(),
+				metrics.NewNoopCollector(),
+				dhtOpts...)
 		})
 	}
 }

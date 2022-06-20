@@ -20,7 +20,7 @@ func TestCoreContractsMigration(t *testing.T) {
 
 		migration := migrations.CoreContractsMigration{
 			Log:       zerolog.Logger{},
-			Chain:     flow.Testnet,
+			Chain:     flow.Testnet.Chain(),
 			OutputDir: dir,
 		}
 
@@ -49,7 +49,7 @@ func TestCoreContractsMigration(t *testing.T) {
 		dir := t.TempDir()
 		migration := migrations.CoreContractsMigration{
 			Log:       zerolog.Logger{},
-			Chain:     flow.Testnet,
+			Chain:     flow.Testnet.Chain(),
 			OutputDir: dir,
 		}
 
