@@ -140,11 +140,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 	t.Parallel()
 
-	rt := fvm.NewInterpreterRuntime()
-
-	chain := flow.Testnet.Chain()
-
-	vm := fvm.NewVirtualMachine(rt)
+	chain, vm := createChainAndVm(flow.Testnet)
 
 	ctx := fvm.NewContext(
 		zerolog.Nop(),
@@ -265,11 +261,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 	t.Parallel()
 
-	rt := fvm.NewInterpreterRuntime()
-
-	chain := flow.Mainnet.Chain()
-
-	vm := fvm.NewVirtualMachine(rt)
+	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctx := fvm.NewContext(
 		zerolog.Nop(),
@@ -637,11 +629,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 
 	t.Parallel()
 
-	rt := fvm.NewInterpreterRuntime()
-
-	chain := flow.Mainnet.Chain()
-
-	vm := fvm.NewVirtualMachine(rt)
+	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctx := fvm.NewContext(
 		zerolog.Nop(),
@@ -748,11 +736,7 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 
 	t.Parallel()
 
-	rt := fvm.NewInterpreterRuntime()
-
-	chain := flow.Mainnet.Chain()
-
-	vm := fvm.NewVirtualMachine(rt)
+	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctx := fvm.NewContext(
 		zerolog.Nop(),
@@ -1080,11 +1064,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 	t.Parallel()
 
-	rt := fvm.NewInterpreterRuntime()
-
-	chain := flow.Mainnet.Chain()
-
-	vm := fvm.NewVirtualMachine(rt)
+	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctx := fvm.NewContext(
 		zerolog.Nop(),
@@ -1226,11 +1206,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 
 	t.Parallel()
 
-	rt := fvm.NewInterpreterRuntime()
-
-	chain := flow.Mainnet.Chain()
-
-	vm := fvm.NewVirtualMachine(rt)
+	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctx := fvm.NewContext(
 		zerolog.Nop(),
@@ -1389,11 +1365,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 	const count = 100
 
-	rt := fvm.NewInterpreterRuntime()
-
-	chain := flow.Mainnet.Chain()
-
-	vm := fvm.NewVirtualMachine(rt)
+	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctx := fvm.NewContext(
 		zerolog.Nop(),
@@ -1491,11 +1463,7 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 
 	t.Parallel()
 
-	rt := fvm.NewInterpreterRuntime()
-
-	chain := flow.Mainnet.Chain()
-
-	vm := fvm.NewVirtualMachine(rt)
+	chain, vm := createChainAndVm(flow.Mainnet)
 
 	header := flow.Header{Height: 42}
 
@@ -1542,11 +1510,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 
 	t.Parallel()
 
-	rt := fvm.NewInterpreterRuntime()
-
-	chain := flow.MonotonicEmulator.Chain()
-
-	vm := fvm.NewVirtualMachine(rt)
+	chain, vm := createChainAndVm(flow.MonotonicEmulator)
 
 	ctx := fvm.NewContext(
 		zerolog.Nop(),

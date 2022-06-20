@@ -52,15 +52,16 @@ func (vmt vmTest) withContextOptions(opts ...fvm.Option) vmTest {
 	return vmt
 }
 
+func createChainAndVm(chainID flow.ChainID) (flow.Chain, *fvm.VirtualMachine) {
+	rt := fvm.NewInterpreterRuntime()
+	return chainID.Chain(), fvm.NewVirtualMachine(rt)
+}
+
 func (vmt vmTest) run(
 	f func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs),
 ) func(t *testing.T) {
 	return func(t *testing.T) {
-		rt := fvm.NewInterpreterRuntime()
-
-		chain := flow.Testnet.Chain()
-
-		vm := fvm.NewVirtualMachine(rt)
+		chain, vm := createChainAndVm(flow.Testnet)
 
 		baseOpts := []fvm.Option{
 			fvm.WithChain(chain),
@@ -158,11 +159,7 @@ func TestHashing(t *testing.T) {
 
 	t.Parallel()
 
-	rt := fvm.NewInterpreterRuntime()
-
-	chain := flow.Mainnet.Chain()
-
-	vm := fvm.NewVirtualMachine(rt)
+	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctx := fvm.NewContext(
 		zerolog.Nop(),
@@ -413,11 +410,7 @@ func TestWithServiceAccount(t *testing.T) {
 
 	t.Parallel()
 
-	rt := fvm.NewInterpreterRuntime()
-
-	chain := flow.Mainnet.Chain()
-
-	vm := fvm.NewVirtualMachine(rt)
+	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctxA := fvm.NewContext(
 		zerolog.Nop(),
@@ -460,9 +453,7 @@ func TestEventLimits(t *testing.T) {
 
 	t.Parallel()
 
-	rt := fvm.NewInterpreterRuntime()
-	chain := flow.Mainnet.Chain()
-	vm := fvm.NewVirtualMachine(rt)
+	chain, vm := createChainAndVm(flow.Mainnet)
 
 	ctx := fvm.NewContext(
 		zerolog.Nop(),
@@ -1376,11 +1367,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 func TestStorageUsed(t *testing.T) {
 	t.Parallel()
 
-	rt := fvm.NewInterpreterRuntime()
-
-	chain := flow.Testnet.Chain()
-
-	vm := fvm.NewVirtualMachine(rt)
+	chain, vm := createChainAndVm(flow.Testnet)
 
 	ctx := fvm.NewContext(
 		zerolog.Nop(),
@@ -1436,9 +1423,7 @@ func TestStorageUsed(t *testing.T) {
 func TestEnforcingComputationLimit(t *testing.T) {
 	t.Parallel()
 
-	rt := fvm.NewInterpreterRuntime()
-	chain := flow.Testnet.Chain()
-	vm := fvm.NewVirtualMachine(rt)
+	chain, vm := createChainAndVm(flow.Testnet)
 
 	ctx := fvm.NewContext(
 		zerolog.Nop(),
