@@ -125,7 +125,7 @@ func (i *TransactionInvoker) Process(
 			}
 		}
 
-		location := common.TransactionLocation(proc.ID[:])
+		location := common.TransactionLocation(proc.ID)
 
 		err := vm.Runtime.ExecuteTransaction(
 			runtime.Script{
