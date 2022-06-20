@@ -417,7 +417,7 @@ func (i *TransactionInvoker) requiresRetry(err error, proc *TransactionProcedure
 		return false
 	}
 
-	i.dumpRuntimeError(&runtimeErr, proc)
+	//i.dumpRuntimeError(&runtimeErr, proc)
 	return true
 }
 
