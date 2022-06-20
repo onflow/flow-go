@@ -24,16 +24,13 @@ func (t *accumulatedWeightTracker) Done() bool {
 	return t.done.Load()
 }
 
-// Track checks if required threshold was reached as one-time event and
-// returns true whenever it's reached.
+// Track returns true if `weight` reaches or exceeds `minRequiredWeight` for the _first time_. 
+// All subsequent calls of `Track` (with any value) return false.  
 func (t *accumulatedWeightTracker) Track(weight uint64) bool {
 	if weight < t.minRequiredWeight {
 		return false
 	}
-	if t.done.CAS(false, true) {
-		return true
-	}
-	return false
+	return t.done.CAS(false, true)
 }
 
 // NewestQCTracker is a helper structure which keeps track of the highest QC(by view)
@@ -67,7 +64,7 @@ func (t *NewestQCTracker) NewestQC() *flow.QuorumCertificate {
 }
 
 // TimeoutProcessor implements the hotstuff.TimeoutProcessor interface.
-// It processes timeout objects broadcast by other replicas of consensus committee.
+// It processes timeout objects broadcast by other replicas of the consensus committee.
 // TimeoutProcessor collects TOs for one view, eventually when enough timeout objects are contributed
 // TimeoutProcessor will create a timeout certificate which can be used to advance round.
 // Concurrency safe.
@@ -122,7 +119,7 @@ func NewTimeoutProcessor(committee hotstuff.Replicas,
 // Process performs processing of timeout object in concurrent safe way. This
 // function is implemented to be called by multiple goroutines at the same time.
 // Design of this function is event driven, as soon as we collect enough weight
-// to create a TC or a partial TC we will immediately do this and submit it
+// to create a TC or a partial TC we will immediately do so and submit it
 // via callback for further processing.
 // Expected error returns during normal operations:
 // * ErrTimeoutForIncompatibleView - submitted timeout for incompatible view

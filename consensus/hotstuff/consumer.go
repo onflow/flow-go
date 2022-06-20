@@ -195,10 +195,15 @@ type QCCreatedConsumer interface {
 	OnQcConstructedFromVotes(*flow.QuorumCertificate)
 }
 
-// TimeoutCollectorConsumer consumes outbound notifications produced by HotStuff and its components.
-// Notifications are consensus-internal state changes which are potentially relevant to
-// the larger node in which HotStuff is running. The notifications are emitted
-// in the order in which the HotStuff algorithm makes the respective steps.
+```suggestion
+// TimeoutCollectorConsumer consumes outbound notifications produced by HotStuff's timeout aggregation
+// component. These events are primarily intended for the HotStuff-internal state machine (EventHandler),
+// but might also be relevant to the larger node in which HotStuff is running. 
+//
+// Caution: the events are not strictly ordered by increasing views!
+// The notifications are emitted by concurrent processing logic. Over larger time scales, the 
+// emitted events are for statistically increasing views. However, on short time scales there
+// are _no_ monotonicity guarantees w.r.t. the events' views.  
 //
 // Implementations must:
 //   * be concurrency safe
@@ -206,14 +211,16 @@ type QCCreatedConsumer interface {
 //   * handle repetition of the same events (with some processing overhead).
 type TimeoutCollectorConsumer interface {
 	// OnTcConstructedFromTimeouts notifications are produced by the TimeoutProcessor
-	// component, whenever it constructs a TC from timeouts.
+	// component, whenever it constructs a TC based on TimeoutObjects from a 
+	// supermajority of consensus participants.
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
 	OnTcConstructedFromTimeouts(certificate *flow.TimeoutCertificate)
 
 	// OnPartialTcCreated notifications are produced by the TimeoutProcessor
-	// component, whenever it aggregates enough timeouts(1/3+1) to claim that TC eventually will be constructed
+	// component, whenever it collected TimeoutObjects from a superminority 
+	// of consensus participants.
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
