@@ -28,7 +28,7 @@ func (s *SetRequiredApprovalsForSealingCommand) Handler(ctx context.Context, req
 	val := req.ValidatorData.(uint)
 
 	// SetValue will validate and only set it if the value is valid.
-	oldVal, err := s.setter.SetValue(val)
+	oldVal, err := s.setter.SetRequiredApprovalsForSealingConstruction(val)
 	if err != nil {
 		return "fail", fmt.Errorf("fail to set required approvals for sealing %v: %w", val, err)
 	}

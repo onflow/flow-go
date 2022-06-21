@@ -40,7 +40,7 @@ func NewSealingConfigs(
 
 // SetValue updates the requiredApprovalsForSealConstruction and return the old value
 // This assumes the caller has validated the new value
-func (r *sealingConfigs) SetValue(requiredApprovalsForSealConstruction uint) (uint, error) {
+func (r *sealingConfigs) SetRequiredApprovalsForSealingConstruction(requiredApprovalsForSealConstruction uint) (uint, error) {
 	err := validation.ValidateRequireApprovals(
 		requiredApprovalsForSealConstruction,
 		r.requiredApprovalsForSealVerification,
