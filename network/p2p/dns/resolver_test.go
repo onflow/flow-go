@@ -89,26 +89,26 @@ func TestResolver_CacheExpiry(t *testing.T) {
 	// potentially consider reducing the test case count to reduce complexity
 	size := 1  // we have 10 txt and 10 ip lookup test cases
 	times := 5 // each domain is queried for resolution 5 times
-	txtTestCases := testnetwork.TxtLookupFixture(size)
+	// txtTestCases := testnetwork.TxtLookupFixture(size)
 	ipTestCase := testnetwork.IpLookupFixture(size)
 
 	// each domain gets resolved through underlying resolver twice: once initially, and once after expiry.
-	resolverWG := mockBasicResolverForDomains(t, &basicResolver, ipTestCase, txtTestCases, happyPath, 2)
+	resolverWG := mockBasicResolverForDomains(t, &basicResolver, ipTestCase, nil, happyPath, 2)
 
-	// // queries 20 cases * 5 = 100 queries.
-	// queryWG := syncThenAsyncQuery(t, times, resolver, txtTestCases, ipTestCase, happyPath)
-	// unittest.RequireReturnsBefore(t, queryWG.Wait, 1*time.Second, "could not perform all queries on time")
-	querySeq(t, times, resolver, txtTestCases, ipTestCase)
+	// queries 20 cases * 5 = 100 queries.
+	queryWG := syncThenAsyncQuery(t, times, resolver, nil, ipTestCase, happyPath)
+	unittest.RequireReturnsBefore(t, queryWG.Wait, 1*time.Second, "could not perform all queries on time")
 
-	time.Sleep(1500 * time.Millisecond) // waits enough for cache to get invalidated
+	time.Sleep(2000 * time.Millisecond) // waits enough for cache to get invalidated
+	log.Printf("--------------------------------------------------------------")
 	log.Printf("LOGLOGLOGLOGLOG SLEEP FOR 2 SECONDS")
-
+	log.Printf("--------------------------------------------------------------")
 	// Querying each test case 5 times, but we should set the times to query to 1 for just testing that the cache has expire and we will hit the resolver
-	// queryWG = syncThenAsyncQuery(t, times, resolver, txtTestCases, ipTestCase, happyPath)
-	querySeq(t, times, resolver, txtTestCases, ipTestCase)
+	queryWG = syncThenAsyncQuery(t, times, resolver, nil, ipTestCase, happyPath)
 
 	unittest.RequireReturnsBefore(t, resolverWG.Wait, 2*time.Second, "could not resolve all expected domains")
-	// unittest.RequireReturnsBefore(t, queryWG.Wait, 1*time.Second, "could not perform all queries on time")
+	unittest.RequireReturnsBefore(t, queryWG.Wait, 1*time.Second, "could not perform all queries on time")
+
 	cancel()
 	unittest.RequireCloseBefore(t, resolver.Done(), 2*time.Second, "could not stop dns resolver on time")
 }
