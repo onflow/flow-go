@@ -81,7 +81,7 @@ type ActiveRange interface {
     TargetFinalizedHeight(height uint64)
 
     // Get returns the range of requestable block heights.
-    Get() flow.Range
+    Get() chainsync.Range
 }
 ```
 

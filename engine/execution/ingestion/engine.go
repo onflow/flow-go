@@ -124,7 +124,7 @@ func New(
 	}
 
 	// move to state syncing engine
-	syncConduit, err := net.Register(engine.SyncExecution, &eng)
+	syncConduit, err := net.Register(network.SyncExecution, &eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register execution blockSync engine: %w", err)
 	}

@@ -1,4 +1,4 @@
-package access
+package rpc
 
 import (
 	"context"
@@ -18,7 +18,6 @@ import (
 	"google.golang.org/grpc/status"
 
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
-	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
@@ -42,7 +41,7 @@ type RateLimitTestSuite struct {
 	me         *module.Local
 	chainID    flow.ChainID
 	metrics    *metrics.NoopCollector
-	rpcEng     *rpc.Engine
+	rpcEng     *Engine
 	client     accessproto.AccessAPIClient
 	closer     io.Closer
 
@@ -90,7 +89,7 @@ func (suite *RateLimitTestSuite) SetupTest() {
 	suite.chainID = flow.Testnet
 	suite.metrics = metrics.NewNoopCollector()
 
-	config := rpc.Config{
+	config := Config{
 		UnsecureGRPCListenAddr: ":0", // :0 to let the OS pick a free port
 		SecureGRPCListenAddr:   ":0",
 		HTTPListenAddr:         ":0",
@@ -109,8 +108,11 @@ func (suite *RateLimitTestSuite) SetupTest() {
 		"Ping": suite.rateLimit,
 	}
 
-	suite.rpcEng = rpc.New(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions,
-		nil, nil, suite.chainID, suite.metrics, 0, 0, false, false, apiRateLimt, apiBurstLimt)
+	var err error
+	suite.rpcEng, err = New(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions,
+		nil, nil, suite.chainID, suite.metrics, suite.metrics, 0, 0, false, false, apiRateLimt, apiBurstLimt)
+	assert.NoError(suite.T(), err)
+
 	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
 
 	// wait for the server to startup
@@ -119,7 +121,6 @@ func (suite *RateLimitTestSuite) SetupTest() {
 	}, 5*time.Second, 10*time.Millisecond)
 
 	// create the access api client
-	var err error
 	suite.client, suite.closer, err = accessAPIClient(suite.rpcEng.UnsecureGRPCAddress().String())
 	assert.NoError(suite.T(), err)
 }

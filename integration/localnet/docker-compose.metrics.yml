@@ -2,6 +2,7 @@ version: '3.7'
 services:
   tempo:
     image: grafana/tempo:main-4d7e191
+    user: root
     command: [ "-config.file=/etc/tempo.yaml" ]
     volumes:
       - ./conf/tempo-local.yaml:/etc/tempo.yaml:z
@@ -10,15 +11,24 @@ services:
       - "14268"
 
   loki:
-    image: grafana/loki:main-f52fc9d
+    image: grafana/loki:main-9218e46
+    user: root
     command: [ "-config.file=/etc/loki/local-config.yaml" ]
     volumes:
       - ./data/loki:/loki:z
     ports:
       - "3100:3100"
 
+  promtail:
+    image: grafana/promtail:main-9218e46
+    command: -config.file=/etc/promtail/promtail-config.yaml
+    volumes:
+      - ./conf/promtail-config.yaml:/etc/promtail/promtail-config.yaml:z
+      - /var/run/docker.sock:/var/run/docker.sock:z
+
   prometheus:
     image: prom/prometheus:v2.36.0
+    user: root
     volumes:
       - ./conf/prometheus.yaml:/etc/prometheus/prometheus.yaml:z
       - ./targets.nodes.json:/etc/prometheus/targets.nodes.json:z
@@ -38,7 +48,7 @@ services:
       - "9100:9100"
 
   grafana:
-    image: grafana/grafana:9.0.0-beta2
+    image: grafana/grafana:9.0.0-beta3
     volumes:
       - ./conf/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:z
       - ./conf/grafana-dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml:z

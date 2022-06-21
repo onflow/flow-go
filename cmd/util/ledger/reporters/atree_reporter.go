@@ -28,7 +28,7 @@ func (r *AtreeReporter) Name() string {
 	return "Atree Reporter"
 }
 
-func (r *AtreeReporter) Report(payloads []ledger.Payload) error {
+func (r *AtreeReporter) Report(payloads []ledger.Payload, commit ledger.State) error {
 	rwa := r.RWF.ReportWriter("atree_report")
 	defer rwa.Close()
 

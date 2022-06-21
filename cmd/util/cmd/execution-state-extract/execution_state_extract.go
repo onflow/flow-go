@@ -91,7 +91,6 @@ func extractExecutionState(
 			extractionReportName: reporters.NewExportReporter(log,
 				chain,
 				func() flow.StateCommitment { return targetHash },
-				func() flow.StateCommitment { return flow.StateCommitment(newState) },
 			),
 			"account": &reporters.AccountReporter{
 				Log:   log,
@@ -106,7 +105,7 @@ func extractExecutionState(
 		}
 	}
 
-	newState, err = led.ExportCheckpointAt(
+	migratedState, err := led.ExportCheckpointAt(
 		newState,
 		migrations,
 		rs,
@@ -121,8 +120,8 @@ func extractExecutionState(
 
 	log.Info().Msgf(
 		"New state commitment for the exported state is: %s (base64: %s)",
-		newState.String(),
-		newState.Base64(),
+		migratedState.String(),
+		migratedState.Base64(),
 	)
 
 	return nil
