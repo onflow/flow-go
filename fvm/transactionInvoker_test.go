@@ -18,7 +18,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/extralog"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
@@ -30,12 +29,9 @@ func TestSafetyCheck(t *testing.T) {
 
 	t.Run("parsing error in imported contract", func(t *testing.T) {
 
-		// temporary solution
-		dumpPath := extralog.ExtraLogDumpPath
+		t.Skip()
 
 		unittest.RunWithTempDir(t, func(tmpDir string) {
-
-			extralog.ExtraLogDumpPath = tmpDir
 
 			rt := fvm.NewInterpreterRuntime()
 
@@ -101,8 +97,6 @@ func TestSafetyCheck(t *testing.T) {
 			// one for codes, one for programs, per retry
 			require.Len(t, dumpFiles, 2*proc.Retried)
 		})
-
-		extralog.ExtraLogDumpPath = dumpPath
 	})
 
 	t.Run("checking error in imported contract", func(t *testing.T) {
