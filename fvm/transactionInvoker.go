@@ -1,12 +1,8 @@
 package fvm
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"path"
 	"strconv"
-	"time"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
@@ -19,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/fvm/handler"
 
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/extralog"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -375,43 +370,7 @@ func (i *TransactionInvoker) requiresRetry(err error, proc *TransactionProcedure
 		return false
 	}
 
-	i.dumpRuntimeError(&runtimeErr, proc)
 	return true
-}
-
-// logRuntimeError logs run time errors into a file
-// This is a temporary measure.
-func (i *TransactionInvoker) dumpRuntimeError(runtimeErr *runtime.Error, procedure *TransactionProcedure) {
-
-	codesJSON, err := json.Marshal(runtimeErr.Codes)
-	if err != nil {
-		i.logger.Error().Err(err).Msg("cannot marshal codes JSON")
-	}
-	programsJSON, err := json.Marshal(runtimeErr.Programs)
-	if err != nil {
-		i.logger.Error().Err(err).Msg("cannot marshal programs JSON")
-	}
-
-	t := time.Now().UnixNano()
-
-	codesPath := path.Join(extralog.ExtraLogDumpPath, fmt.Sprintf("%s-codes-%d", procedure.ID.String(), t))
-	programsPath := path.Join(extralog.ExtraLogDumpPath, fmt.Sprintf("%s-programs-%d", procedure.ID.String(), t))
-
-	err = ioutil.WriteFile(codesPath, codesJSON, 0700)
-	if err != nil {
-		i.logger.Error().Err(err).Msg("cannot write codes json")
-	}
-
-	err = ioutil.WriteFile(programsPath, programsJSON, 0700)
-	if err != nil {
-		i.logger.Error().Err(err).Msg("cannot write programs json")
-	}
-
-	i.logger.Error().
-		Str("txHash", procedure.ID.String()).
-		Str("codes", string(codesJSON)).
-		Str("programs", string(programsJSON)).
-		Msg("checking failed")
 }
 
 // logExecutionIntensities logs execution intensities of the transaction
