@@ -20,11 +20,11 @@ import (
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
-// NewFlowAccessAPIProxy creates a backend access API that forwards some requests to an upstream node.
+// NewFlowAccessAPIRouter creates a backend access API that forwards some requests to an upstream node.
 // It is used by Observer services, Blockchain Data Service, etc.
 // Make sure that this is just for observation and not a staked participant in the flow network.
 // This means that observers see a copy of the data but there is no interaction to ensure integrity from the root block.
-func NewFlowAccessAPIProxy(accessNodeAddressAndPort flow.IdentityList, timeout time.Duration) (*FlowAccessAPIRouter, error) {
+func NewFlowAccessAPIRouter(accessNodeAddressAndPort flow.IdentityList, timeout time.Duration) (*FlowAccessAPIRouter, error) {
 	ret := &FlowAccessAPIRouter{}
 	err := ret.upstream.setFlowAccessAPI(accessNodeAddressAndPort, timeout)
 	if err != nil {
