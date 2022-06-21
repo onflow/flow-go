@@ -17,7 +17,8 @@ import (
 // StakingVerifier is a verifier capable of verifying staking signature for each
 // verifying operation. It's used primarily with collection cluster where hotstuff without beacon signers is used.
 type StakingVerifier struct {
-	stakingHasher hash.Hasher
+	stakingHasher       hash.Hasher
+	timeoutObjectHasher hash.Hasher
 }
 
 var _ hotstuff.Verifier = (*StakingVerifier)(nil)
@@ -25,7 +26,8 @@ var _ hotstuff.Verifier = (*StakingVerifier)(nil)
 // NewStakingVerifier creates a new single verifier with the given dependencies.
 func NewStakingVerifier() *StakingVerifier {
 	return &StakingVerifier{
-		stakingHasher: crypto.NewBLSKMAC(encoding.CollectorVoteTag),
+		stakingHasher:       crypto.NewBLSKMAC(encoding.CollectorVoteTag),
+		timeoutObjectHasher: crypto.NewBLSKMAC(encoding.CollectorTimeoutTag),
 	}
 }
 
@@ -105,7 +107,7 @@ func (v *StakingVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, vi
 //  * unexpected errors should be treated as symptoms of bugs or uncovered
 //	  edge cases in the logic (i.e. as fatal)
 func (v *StakingVerifier) VerifyTC(signers flow.IdentityList, sigData []byte, view uint64, highQCViews []uint64) error {
-	return verifyTC(signers, sigData, view, highQCViews, v.stakingHasher)
+	return verifyTC(signers, sigData, view, highQCViews, v.timeoutObjectHasher)
 }
 
 // verifyTC checks cryptographic validity of the TC's `sigData` w.r.t. the

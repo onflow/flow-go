@@ -155,7 +155,7 @@ func (p *TimeoutProcessor) Process(timeout *model.TimeoutObject) error {
 	// At this point, we have enough signatures to build a TC. Another routine
 	// might just be at this point. To avoid duplicate work, Track returns true only once.
 	willBuildTC := p.tcTracker.Track(totalWeight)
-	
+
 	if !willBuildTC {
 		// either we do not have enough timeouts to build a TC, or another thread
 		// has already passed this gate and created a TC
@@ -184,7 +184,7 @@ func (p *TimeoutProcessor) validateTimeout(timeout *model.TimeoutObject) error {
 		return model.NewInvalidTimeoutErrorf(timeout, "TimeoutObject without QC is invalid")
 	}
 
-	if timeout.View < timeout.NewestQC.View {
+	if timeout.View <= timeout.NewestQC.View {
 		return model.NewInvalidTimeoutErrorf(timeout, "TO's QC %d cannot be newer than the TO's view %d",
 			timeout.NewestQC.View, timeout.View)
 	}
