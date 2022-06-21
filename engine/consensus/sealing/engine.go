@@ -92,7 +92,7 @@ func NewEngine(log zerolog.Logger,
 	assigner module.ChunkAssigner,
 	sealsMempool mempool.IncorporatedResultSeals,
 	options Config,
-	requiredApprovalsForSealConstructionGetter module.RequiredApprovalsForSealConstructionInstanceGetter,
+	requiredApprovalsForSealConstructionGetter module.SealingConfigsGetter,
 ) (*Engine, error) {
 	rootHeader, err := state.Params().Root()
 	if err != nil {
@@ -173,7 +173,7 @@ func (e *Engine) setupTrustedInboundQueues() error {
 }
 
 // setupMessageHandler initializes the inbound queues and the MessageHandler for UNTRUSTED INPUTS.
-func (e *Engine) setupMessageHandler(getRequiredApprovalsForSealConstruction module.RequiredApprovalsForSealConstructionInstanceGetter) error {
+func (e *Engine) setupMessageHandler(getSealingConfigs module.SealingConfigsGetter) error {
 	// FIFO queue for broadcasted approvals
 	pendingApprovalsQueue, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultApprovalQueueCapacity),
@@ -212,7 +212,7 @@ func (e *Engine) setupMessageHandler(getRequiredApprovalsForSealConstruction mod
 				return ok
 			},
 			Map: func(msg *engine.Message) (*engine.Message, bool) {
-				if getRequiredApprovalsForSealConstruction.GetValue() < 1 {
+				if getSealingConfigs.RequireApprovalsForSealConstructionDynamicValue() < 1 {
 					// if we don't require approvals to construct a seal, don't even process approvals.
 					return nil, false
 				}
@@ -230,7 +230,7 @@ func (e *Engine) setupMessageHandler(getRequiredApprovalsForSealConstruction mod
 				return ok
 			},
 			Map: func(msg *engine.Message) (*engine.Message, bool) {
-				if getRequiredApprovalsForSealConstruction.GetValue() < 1 {
+				if getSealingConfigs.RequireApprovalsForSealConstructionDynamicValue() < 1 {
 					// if we don't require approvals to construct a seal, don't even process approvals.
 					return nil, false
 				}

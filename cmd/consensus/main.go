@@ -123,7 +123,7 @@ func main() {
 		dkgState                     *bstorage.DKGState
 		safeBeaconKeys               *bstorage.SafeBeaconPrivateKeys
 		adminCmdSetRequiredApprovals commands.AdminCommand
-		requiredApprovalsGetter      module.RequiredApprovalsForSealConstructionInstanceGetter
+		getSealingConfigs            module.SealingConfigsGetter
 	)
 
 	nodeBuilder := cmd.FlowNode(flow.RoleConsensus.String())
@@ -197,7 +197,7 @@ func main() {
 			}
 
 			// update the getter with the setter, so other modules can only get, but not set
-			requiredApprovalsGetter = setter
+			getSealingConfigs = setter
 
 			// admin tool is the only instance that have access to the setter interface, therefore, is
 			// the only module can change this config
@@ -235,7 +235,7 @@ func main() {
 				node.Storage.Results,
 				node.Storage.Seals,
 				chunkAssigner,
-				requiredApprovalsGetter,
+				getSealingConfigs,
 				conMetrics)
 
 			blockTimer, err = blocktimer.NewBlockTimer(minInterval, maxInterval)
@@ -423,7 +423,7 @@ func main() {
 				chunkAssigner,
 				seals,
 				config,
-				requiredApprovalsGetter,
+				getSealingConfigs,
 			)
 
 			// subscribe for finalization events from hotstuff

@@ -17,15 +17,15 @@ import (
 // sealValidator holds all needed context for checking seal
 // validity against current protocol state.
 type sealValidator struct {
-	state                                      protocol.State
-	assigner                                   module.ChunkAssigner
-	signatureHasher                            hash.Hasher
-	seals                                      storage.Seals
-	headers                                    storage.Headers
-	index                                      storage.Index
-	results                                    storage.ExecutionResults
-	requiredApprovalsForSealConstructionGetter module.RequiredApprovalsForSealConstructionInstanceGetter // number of required approvals per chunk to construct a seal
-	metrics                                    module.ConsensusMetrics
+	state                protocol.State
+	assigner             module.ChunkAssigner
+	signatureHasher      hash.Hasher
+	seals                storage.Seals
+	headers              storage.Headers
+	index                storage.Index
+	results              storage.ExecutionResults
+	sealingConfigsGetter module.SealingConfigsGetter // number of required approvals per chunk to construct a seal
+	metrics              module.ConsensusMetrics
 }
 
 func NewSealValidator(
@@ -35,19 +35,19 @@ func NewSealValidator(
 	results storage.ExecutionResults,
 	seals storage.Seals,
 	assigner module.ChunkAssigner,
-	requiredApprovalsForSealConstructionGetter module.RequiredApprovalsForSealConstructionInstanceGetter,
+	sealingConfigsGetter module.SealingConfigsGetter,
 	metrics module.ConsensusMetrics,
 ) *sealValidator {
 	return &sealValidator{
-		state:           state,
-		assigner:        assigner,
-		signatureHasher: crypto.NewBLSKMAC(encoding.ResultApprovalTag),
-		headers:         headers,
-		results:         results,
-		seals:           seals,
-		index:           index,
-		requiredApprovalsForSealConstructionGetter: requiredApprovalsForSealConstructionGetter,
-		metrics: metrics,
+		state:                state,
+		assigner:             assigner,
+		signatureHasher:      crypto.NewBLSKMAC(encoding.ResultApprovalTag),
+		headers:              headers,
+		results:              results,
+		seals:                seals,
+		index:                index,
+		sealingConfigsGetter: sealingConfigsGetter,
+		metrics:              metrics,
 	}
 }
 
@@ -273,8 +273,8 @@ func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.I
 
 		// the chunk must have been approved by at least the minimally
 		// required number of Verification Nodes
-		requireApprovalsForSealConstruction := s.requiredApprovalsForSealConstructionGetter.GetValue()
-		requireApprovalsForSealVerification := s.requiredApprovalsForSealConstructionGetter.RequireApprovalsForSealVerificationConst()
+		requireApprovalsForSealConstruction := s.sealingConfigsGetter.RequireApprovalsForSealConstructionDynamicValue()
+		requireApprovalsForSealVerification := s.sealingConfigsGetter.RequireApprovalsForSealVerificationConst()
 		if uint(numberApprovers) < requireApprovalsForSealConstruction {
 			if uint(numberApprovers) >= requireApprovalsForSealVerification {
 				// Emergency sealing is a _temporary_ fallback to reduce the probability of

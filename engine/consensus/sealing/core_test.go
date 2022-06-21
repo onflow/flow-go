@@ -43,7 +43,7 @@ type ApprovalProcessingCoreTestSuite struct {
 	sealsDB    *storage.Seals
 	rootHeader *flow.Header
 	core       *Core
-	setter     realmodule.RequiredApprovalsForSealConstructionInstanceSetter
+	setter     realmodule.SealingConfigsSetter
 }
 
 func (s *ApprovalProcessingCoreTestSuite) TearDownTest() {

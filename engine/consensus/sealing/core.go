@@ -86,7 +86,7 @@ func NewCore(
 	sealsMempool mempool.IncorporatedResultSeals,
 	approvalConduit network.Conduit,
 	config Config,
-	getRequiredApprovalsForSealConstruction module.RequiredApprovalsForSealConstructionInstanceGetter,
+	sealingConfigsGetter module.SealingConfigsGetter,
 ) (*Core, error) {
 	lastSealed, err := state.Sealed().Head()
 	if err != nil {
@@ -112,7 +112,7 @@ func NewCore(
 	}
 
 	factoryMethod := func(result *flow.ExecutionResult) (approvals.AssignmentCollector, error) {
-		requiredApprovalsForSealConstruction := getRequiredApprovalsForSealConstruction.GetValue()
+		requiredApprovalsForSealConstruction := sealingConfigsGetter.RequireApprovalsForSealConstructionDynamicValue()
 		base, err := approvals.NewAssignmentCollectorBase(core.log, core.workerPool, result, core.state, core.headers,
 			assigner, sealsMempool, signatureHasher,
 			approvalConduit, core.requestTracker, requiredApprovalsForSealConstruction)

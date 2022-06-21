@@ -15,10 +15,10 @@ import (
 var _ commands.AdminCommand = (*SetRequiredApprovalsForSealingCommand)(nil)
 
 type SetRequiredApprovalsForSealingCommand struct {
-	setter module.RequiredApprovalsForSealConstructionInstanceSetter
+	setter module.SealingConfigsSetter
 }
 
-func NewSetRequiredApprovalsForSealingCommand(setter module.RequiredApprovalsForSealConstructionInstanceSetter) *SetRequiredApprovalsForSealingCommand {
+func NewSetRequiredApprovalsForSealingCommand(setter module.SealingConfigsSetter) *SetRequiredApprovalsForSealingCommand {
 	return &SetRequiredApprovalsForSealingCommand{
 		setter: setter,
 	}
