@@ -202,6 +202,13 @@ func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.
 	}
 	maxHeight := req.FromHeight + uint64(maxSize)
 	if maxHeight < req.ToHeight {
+		r.log.Warn().
+			Uint64("from", req.FromHeight).
+			Uint64("to", req.FromHeight).
+			Uint64("size", (req.ToHeight-req.FromHeight)+1).
+			Uint("max_size", maxSize).
+			Msg("range request too large")
+
 		req.ToHeight = maxHeight
 	}
 
