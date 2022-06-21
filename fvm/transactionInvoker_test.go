@@ -284,6 +284,10 @@ type ErrorReturningRuntime struct {
 	TxErrors []error
 }
 
+func (e *ErrorReturningRuntime) SetInvalidatedResourceValidationEnabled(_ bool) {
+	panic("SetInvalidatedResourceValidationEnabled not expected")
+}
+
 func (e *ErrorReturningRuntime) SetResourceOwnerChangeHandlerEnabled(_ bool) {
 	panic("SetResourceOwnerChangeHandlerEnabled not expected")
 }
@@ -334,6 +338,10 @@ func (e *ErrorReturningRuntime) InvokeContractFunction(_ common.AddressLocation,
 
 func (e *ErrorReturningRuntime) SetTracingEnabled(_ bool) {
 	panic("SetTracingEnabled not expected")
+}
+
+func (*ErrorReturningRuntime) SetDebugger(_ *interpreter.Debugger) {
+	panic("SetDebugger not expected")
 }
 
 func encodeContractNames(contractNames []string) ([]byte, error) {

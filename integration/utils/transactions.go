@@ -7,6 +7,7 @@ import (
 	fttemplates "github.com/onflow/flow-ft/lib/go/templates"
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/crypto"
+	sdktemplates "github.com/onflow/flow-go-sdk/templates"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -63,7 +64,7 @@ func MakeStakingCollectionRegisterNodeTx(
 	networkingKey string,
 	stakingKey string,
 	amount string,
-	machineKey string,
+	machineKey sdk.AccountKey,
 ) (*sdk.Transaction, error) {
 	accountKey := stakingAccount.Keys[stakingAccountKeyID]
 	tx := sdk.NewTransaction().
@@ -110,9 +111,12 @@ func MakeStakingCollectionRegisterNodeTx(
 		return nil, err
 	}
 
-	machineKeyCDC, _ := cadence.NewString(machineKey)
 	publicKeys := make([]cadence.Value, 1)
-	publicKeys[0] = machineKeyCDC
+	publicKey, err := sdktemplates.AccountKeyToCadenceCryptoKey(&machineKey)
+	if err != nil {
+		return nil, err
+	}
+	publicKeys[0] = publicKey
 	publicKeysCDC := cadence.NewArray(publicKeys)
 
 	err = tx.AddArgument(cadence.NewOptional(publicKeysCDC))

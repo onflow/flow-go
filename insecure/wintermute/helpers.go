@@ -5,7 +5,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/testutil"
 	enginemock "github.com/onflow/flow-go/engine/testutil/mock"
 	"github.com/onflow/flow-go/insecure"
@@ -13,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -57,7 +57,7 @@ func chunkDataPackRequestForReceipts(
 			for _, verId := range corVnIds {
 				event := &insecure.Event{
 					CorruptedNodeId:   verId,
-					Channel:           engine.RequestChunks,
+					Channel:           network.RequestChunks,
 					Protocol:          insecure.Protocol_PUBLISH,
 					TargetNum:         0,
 					TargetIds:         executorIds[result.ID()],
@@ -119,7 +119,7 @@ func receiptsWithSameResultFixture(
 func executionReceiptEvent(receipt *flow.ExecutionReceipt, targetIds flow.IdentifierList) *insecure.Event {
 	return &insecure.Event{
 		CorruptedNodeId:   receipt.ExecutorID,
-		Channel:           engine.PushReceipts,
+		Channel:           network.PushReceipts,
 		Protocol:          insecure.Protocol_UNICAST,
 		TargetIds:         targetIds,
 		FlowProtocolEvent: receipt,
@@ -150,7 +150,7 @@ func chunkDataPackResponseForReceipts(receipts []*flow.ExecutionReceipt, verIds 
 			for _, verId := range verIds {
 				event := &insecure.Event{
 					CorruptedNodeId:   receipt.ExecutorID,
-					Channel:           engine.RequestChunks,
+					Channel:           network.RequestChunks,
 					Protocol:          insecure.Protocol_PUBLISH,
 					TargetNum:         0,
 					TargetIds:         flow.IdentifierList{verId},
@@ -201,24 +201,29 @@ func orchestratorOutputSanityCheck(
 	// keeps a map of (corrupted results ids -> execution node ids)
 	dictatedResults := make(map[flow.Identifier]flow.IdentifierList)
 
-	// keeps a list of all bounced back events.
-	bouncedReceipts := flow.IdentifierList{}
+	// keeps a list of all pass through receipts.
+	passThroughReceipts := flow.IdentifierList{}
 
 	for _, outputEvent := range outputEvents {
 		switch event := outputEvent.FlowProtocolEvent.(type) {
 		case *flow.ExecutionReceipt:
-			// makes sure sender is a corrupted execution node.
-			ok := corrEnIds.Contains(outputEvent.CorruptedNodeId)
-			require.True(t, ok)
-			// uses union to avoid adding duplicate.
-			bouncedReceipts = bouncedReceipts.Union(flow.IdentifierList{event.ID()})
-		case *flow.ExecutionResult:
-			resultId := event.ID()
-			if dictatedResults[resultId] == nil {
-				dictatedResults[resultId] = flow.IdentifierList{}
+			if len(event.ExecutorSignature.Bytes()) != 0 {
+				// a receipt with a non-empty signature is a pass-through receipt.
+				// makes sure sender is a corrupted execution node.
+				ok := corrEnIds.Contains(outputEvent.CorruptedNodeId)
+				require.True(t, ok)
+				// uses union to avoid adding duplicate.
+				passThroughReceipts = passThroughReceipts.Union(flow.IdentifierList{event.ID()})
+			} else {
+				// a receipt with an empty signature contains a dictated result from wintermute orchestrator.
+				// the rest of receipt will be filled by the corrupted node
+				resultId := event.ExecutionResult.ID()
+				if dictatedResults[resultId] == nil {
+					dictatedResults[resultId] = flow.IdentifierList{}
+				}
+				// uses union to avoid adding duplicate.
+				dictatedResults[resultId] = dictatedResults[resultId].Union(flow.IdentifierList{outputEvent.CorruptedNodeId})
 			}
-			// uses union to avoid adding duplicate.
-			dictatedResults[resultId] = dictatedResults[resultId].Union(flow.IdentifierList{outputEvent.CorruptedNodeId})
 		}
 	}
 
@@ -229,14 +234,14 @@ func orchestratorOutputSanityCheck(
 		require.ElementsMatch(t, corrEnIds, actualCorrEnIds)
 	}
 
-	// number of bounced receipts should match the expected value.
-	actualBouncedReceiptCount := 0
+	// number of passed through receipts should match the expected value.
+	actualPassedThroughReceiptCount := 0
 	for _, originalReceiptId := range orgReceiptIds {
-		if bouncedReceipts.Contains(originalReceiptId) {
-			actualBouncedReceiptCount++
+		if passThroughReceipts.Contains(originalReceiptId) {
+			actualPassedThroughReceiptCount++
 		}
 	}
-	require.Equal(t, expBouncedReceiptCount, actualBouncedReceiptCount)
+	require.Equal(t, expBouncedReceiptCount, actualPassedThroughReceiptCount)
 }
 
 // receiptsWithDistinctResultFixture creates a set of execution receipts (with distinct result) one per given executor id.

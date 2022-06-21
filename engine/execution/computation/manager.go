@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/rand"
+	"runtime"
 	"strings"
 	"time"
 
@@ -147,14 +148,19 @@ func (e *Manager) ExecuteScript(
 
 	startedAt := time.Now()
 
+	var memAllocBefore uint64
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	memAllocBefore = m.TotalAlloc
+
 	// allocate a random ID to be able to track this script when its done,
 	// scripts might not be unique so we use this extra tracker to follow their logs
 	// TODO: this is a temporary measure, we could remove this in the future
 	trackerID := rand.Uint32()
-	e.log.Info().Hex("script_hex", code).Uint32("trackerID", trackerID).Msg("script is sent for execution")
+	e.log.Debug().Hex("script_hex", code).Uint32("trackerID", trackerID).Msg("script is sent for execution")
 
 	defer func() {
-		e.log.Info().Uint32("trackerID", trackerID).Msg("script execution is complete")
+		e.log.Debug().Uint32("trackerID", trackerID).Msg("script execution is complete")
 	}()
 
 	requestCtx, cancel := context.WithTimeout(ctx, e.scriptExecutionTimeLimit)
@@ -223,7 +229,10 @@ func (e *Manager) ExecuteScript(
 		return nil, fmt.Errorf("failed to encode runtime value: %w", err)
 	}
 
-	e.metrics.ExecutionScriptExecuted(time.Since(startedAt), script.GasUsed)
+	runtime.ReadMemStats(&m)
+	memAllocAfter := m.TotalAlloc
+
+	e.metrics.ExecutionScriptExecuted(time.Since(startedAt), script.GasUsed, script.MemoryUsed, memAllocBefore-memAllocAfter)
 
 	return encodedValue, nil
 }
@@ -313,7 +322,7 @@ func (e *Manager) ComputeBlock(
 
 	e.edCache.Insert(block.Block.Header, blobTree)
 	e.log.Info().Hex("block_id", logging.Entity(block.Block)).Hex("execution_data_id", rootID[:]).Msg("execution data ID computed")
-	// result.ExecutionDataID = rootID
+	result.ExecutionDataID = rootID
 
 	return result, nil
 }

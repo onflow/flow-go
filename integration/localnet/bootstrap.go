@@ -6,9 +6,11 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"time"
 
 	"github.com/go-yaml/yaml"
@@ -18,7 +20,7 @@ import (
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/crypto"
-	testnet "github.com/onflow/flow-go/integration/testnet"
+	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -42,6 +44,9 @@ const (
 	DefaultObserverCount     = 0
 	DefaultNClusters         = 1
 	DefaultProfiler          = false
+	DefaultTracing           = true
+	DefaultCadenceTracing    = false
+	DefaultExtensiveTracing  = false
 	DefaultConsensusDelay    = 800 * time.Millisecond
 	DefaultCollectionDelay   = 950 * time.Millisecond
 	AccessAPIPort            = 3569
@@ -67,6 +72,9 @@ var (
 	numViewsInDKGPhase     uint64
 	numViewsEpoch          uint64
 	profiler               bool
+	tracing                bool
+	cadenceTracing         bool
+	extesiveTracing        bool
 	consensusDelay         time.Duration
 	collectionDelay        time.Duration
 )
@@ -83,6 +91,9 @@ func init() {
 	flag.Uint64Var(&numViewsInStakingPhase, "epoch-staking-phase-length", 2000, "number of views in epoch staking phase")
 	flag.Uint64Var(&numViewsInDKGPhase, "epoch-dkg-phase-length", 2000, "number of views in epoch dkg phase")
 	flag.BoolVar(&profiler, "profiler", DefaultProfiler, "whether to enable the auto-profiler")
+	flag.BoolVar(&tracing, "tracing", DefaultTracing, "whether to enable low-overhead tracing in flow")
+	flag.BoolVar(&cadenceTracing, "cadence-tracing", DefaultCadenceTracing, "whether to enable the tracing in cadance")
+	flag.BoolVar(&extesiveTracing, "extensive-tracing", DefaultExtensiveTracing, "enables high-overhead tracing in fvm")
 	flag.DurationVar(&consensusDelay, "consensus-delay", DefaultConsensusDelay, "delay on consensus node block proposals")
 	flag.DurationVar(&collectionDelay, "collection-delay", DefaultCollectionDelay, "delay on collection node block proposals")
 }
@@ -90,12 +101,12 @@ func init() {
 func generateBootstrapData(flowNetworkConf testnet.NetworkConfig) []testnet.ContainerConfig {
 	// Prepare localnet host folders, mapped to Docker container volumes upon `docker compose up`
 	prepareCommonHostFolders()
-	_, _, _, flowNodeContainerConfigs, _, err := testnet.BootstrapNetwork(flowNetworkConf, BootstrapDir)
+	bootstrapData, err := testnet.BootstrapNetwork(flowNetworkConf, BootstrapDir, flow.Localnet)
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println("Flow test network bootstrapping data generated...")
-	return flowNodeContainerConfigs
+	return bootstrapData.StakedConfs
 }
 
 // localnet/bootstrap.go generates a docker compose file with images configured for a
@@ -171,45 +182,14 @@ func displayPortAssignments() {
 }
 
 func prepareCommonHostFolders() {
-	// Remove and recreate working folders
-	err := os.RemoveAll(BootstrapDir)
-	if err != nil && !os.IsNotExist(err) {
-		panic(err)
-	}
+	for _, dir := range []string{BootstrapDir, ProfilerDir, DataDir, TrieDir} {
+		if err := os.RemoveAll(dir); err != nil && !os.IsNotExist(err) {
+			panic(err)
+		}
 
-	err = os.Mkdir(BootstrapDir, 0755)
-	if err != nil {
-		panic(err)
-	}
-
-	err = os.RemoveAll(ProfilerDir)
-	if err != nil && !os.IsNotExist(err) {
-		panic(err)
-	}
-
-	err = os.Mkdir(ProfilerDir, 0755)
-	if err != nil && !os.IsExist(err) {
-		panic(err)
-	}
-
-	err = os.RemoveAll(DataDir)
-	if err != nil && !os.IsNotExist(err) {
-		panic(err)
-	}
-
-	err = os.Mkdir(DataDir, 0755)
-	if err != nil && !os.IsExist(err) {
-		panic(err)
-	}
-
-	err = os.RemoveAll(TrieDir)
-	if err != nil && !os.IsNotExist(err) {
-		panic(err)
-	}
-
-	err = os.Mkdir(TrieDir, 0755)
-	if err != nil && !os.IsExist(err) {
-		panic(err)
+		if err := os.Mkdir(dir, 0755); err != nil {
+			panic(err)
+		}
 	}
 }
 
@@ -260,6 +240,7 @@ type Service struct {
 	Environment []string `yaml:"environment,omitempty"`
 	Volumes     []string
 	Ports       []string `yaml:"ports,omitempty"`
+	Labels      map[string]string
 }
 
 // Build ...
@@ -333,8 +314,7 @@ func prepareService(container testnet.ContainerConfig, i int, n int) Service {
 			"--secretsdir=/data/secret",
 			"--loglevel=DEBUG",
 			fmt.Sprintf("--profiler-enabled=%t", profiler),
-			// TODO change it to flag
-			fmt.Sprintf("--tracer-enabled=%t", true),
+			fmt.Sprintf("--tracer-enabled=%t", tracing),
 			"--profiler-dir=/profiler",
 			"--profiler-interval=2m",
 		},
@@ -344,14 +324,17 @@ func prepareService(container testnet.ContainerConfig, i int, n int) Service {
 			fmt.Sprintf("%s:/data:z", dataDir),
 		},
 		Environment: []string{
-			"JAEGER_AGENT_HOST=jaeger",
-			"JAEGER_AGENT_PORT=6831",
+			"JAEGER_ENDPOINT=http://tempo:14268/api/traces",
 			// NOTE: these env vars are not set by default, but can be set [1] to enable binstat logging:
 			// [1] https://docs.docker.com/compose/environment-variables/#pass-environment-variables-to-containers
 			"BINSTAT_ENABLE",
 			"BINSTAT_LEN_WHAT",
 			"BINSTAT_DMP_NAME",
 			"BINSTAT_DMP_PATH",
+		},
+		Labels: map[string]string{
+			"com.dapperlabs.role": container.Role.String(),
+			"com.dapperlabs.num":  fmt.Sprintf("%03d", i+1),
 		},
 	}
 
@@ -363,7 +346,7 @@ func prepareService(container testnet.ContainerConfig, i int, n int) Service {
 			Context:    "../../",
 			Dockerfile: "cmd/Dockerfile",
 			Args: map[string]string{
-				"TARGET":  container.Role.String(),
+				"TARGET":  fmt.Sprintf("./cmd/%s", container.Role.String()),
 				"VERSION": build.Semver(),
 				"COMMIT":  build.Commit(),
 				"GOARCH":  runtime.GOARCH,
@@ -467,6 +450,8 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 		service.Command,
 		"--triedir=/trie",
 		fmt.Sprintf("--rpc-addr=%s:%d", container.ContainerName, RPCPort),
+		fmt.Sprintf("--cadence-tracing=%t", cadenceTracing),
+		fmt.Sprintf("--extensive-tracing=%t", extesiveTracing),
 	)
 
 	service.Volumes = append(
@@ -486,7 +471,7 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 func prepareAccessService(container testnet.ContainerConfig, i int, n int) Service {
 	service := prepareService(container, i, n)
 
-	service.Command = append(service.Command, []string{
+	service.Command = append(service.Command,
 		fmt.Sprintf("--rpc-addr=%s:%d", container.ContainerName, RPCPort),
 		fmt.Sprintf("--secure-rpc-addr=%s:%d", container.ContainerName, SecuredRPCPort),
 		fmt.Sprintf("--http-addr=%s:%d", container.ContainerName, HTTPPort),
@@ -496,7 +481,7 @@ func prepareAccessService(container testnet.ContainerConfig, i int, n int) Servi
 		"--log-tx-time-to-finalized",
 		"--log-tx-time-to-executed",
 		"--log-tx-time-to-finalized-executed",
-	}...)
+	)
 
 	service.Ports = []string{
 		fmt.Sprintf("%d:%d", AccessPubNetworkPort+i, AccessPubNetworkPort),
@@ -528,48 +513,34 @@ func writeDockerComposeConfig(services Services) error {
 	return nil
 }
 
-// PrometheusServiceDiscovery ...
-type PrometheusServiceDiscovery []PrometheusTargetList
+// PrometheusServiceDiscovery is a list of prometheus targets
+type PrometheusServiceDiscovery []PrometheusTarget
 
-// PrometheusTargetList ...
-type PrometheusTargetList struct {
+// PrometheusTargetList defines addresses and labels for a prometheus target
+type PrometheusTarget struct {
 	Targets []string          `json:"targets"`
 	Labels  map[string]string `json:"labels"`
 }
 
-func newPrometheusTargetList(role flow.Role) PrometheusTargetList {
-	return PrometheusTargetList{
-		Targets: make([]string, 0),
-		Labels: map[string]string{
-			"job":  "flow",
-			"role": role.String(),
-		},
-	}
-}
-
 func prepareServiceDiscovery(containers []testnet.ContainerConfig) PrometheusServiceDiscovery {
-	targets := map[flow.Role]PrometheusTargetList{
-		flow.RoleCollection:   newPrometheusTargetList(flow.RoleCollection),
-		flow.RoleConsensus:    newPrometheusTargetList(flow.RoleConsensus),
-		flow.RoleExecution:    newPrometheusTargetList(flow.RoleExecution),
-		flow.RoleVerification: newPrometheusTargetList(flow.RoleVerification),
-		flow.RoleAccess:       newPrometheusTargetList(flow.RoleAccess),
-	}
+	counters := map[flow.Role]int{}
 
+	sd := PrometheusServiceDiscovery{}
 	for _, container := range containers {
-		containerAddr := fmt.Sprintf("%s:%d", container.ContainerName, MetricsPort)
-		containerTargets := targets[container.Role]
-		containerTargets.Targets = append(containerTargets.Targets, containerAddr)
-		targets[container.Role] = containerTargets
+		counters[container.Role]++
+		pt := PrometheusTarget{
+			Targets: []string{net.JoinHostPort(container.ContainerName, strconv.Itoa(MetricsPort))},
+			Labels: map[string]string{
+				"job":     "flow",
+				"role":    container.Role.String(),
+				"network": "localnet",
+				"num":     fmt.Sprintf("%03d", counters[container.Role]),
+			},
+		}
+		sd = append(sd, pt)
 	}
 
-	return PrometheusServiceDiscovery{
-		targets[flow.RoleCollection],
-		targets[flow.RoleConsensus],
-		targets[flow.RoleExecution],
-		targets[flow.RoleVerification],
-		targets[flow.RoleAccess],
-	}
+	return sd
 }
 
 func writePrometheusConfig(serviceDisc PrometheusServiceDiscovery) error {
@@ -692,8 +663,8 @@ func prepareObserverService(i int, observerName string, agPublicKey string, prof
 			"--datadir=/data/protocol",
 			"--secretsdir=/data/secret",
 			"--loglevel=DEBUG",
-			fmt.Sprintf("--profiler-enabled=%t", true),
-			fmt.Sprintf("--tracer-enabled=%t", false),
+			fmt.Sprintf("--profiler-enabled=%t", profiler),
+			fmt.Sprintf("--tracer-enabled=%t", tracing),
 			"--profiler-dir=/profiler",
 			"--profiler-interval=2m",
 		},
@@ -703,8 +674,7 @@ func prepareObserverService(i int, observerName string, agPublicKey string, prof
 			fmt.Sprintf("%s:/data:z", dataDir),
 		},
 		Environment: []string{
-			"JAEGER_AGENT_HOST=jaeger",
-			"JAEGER_AGENT_PORT=6831",
+			"JAEGER_ENDPOINT=http://tempo:14268/api/traces",
 			"BINSTAT_ENABLE",
 			"BINSTAT_LEN_WHAT",
 			"BINSTAT_DMP_NAME",
@@ -717,7 +687,7 @@ func prepareObserverService(i int, observerName string, agPublicKey string, prof
 			Context:    "../../",
 			Dockerfile: "cmd/Dockerfile",
 			Args: map[string]string{
-				"TARGET":  "access", // hardcoded to access for now until we make it a separate cmd
+				"TARGET":  "./cmd/access", // hardcoded to access for now until we make it a separate cmd
 				"VERSION": build.Semver(),
 				"COMMIT":  build.Commit(),
 				"GOARCH":  runtime.GOARCH,
@@ -738,6 +708,7 @@ func prepareObserverService(i int, observerName string, agPublicKey string, prof
 		fmt.Sprintf("%d:%d", (accessCount*2)+AccessAPIPort+(2*i), RPCPort),
 		fmt.Sprintf("%d:%d", (accessCount*2)+AccessAPIPort+(2*i)+1, SecuredRPCPort),
 	}
+
 	return observerService
 }
 

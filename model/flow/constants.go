@@ -12,8 +12,13 @@ var GenesisTime = time.Date(2018, time.December, 19, 22, 32, 30, 42, time.UTC)
 // explicitly set during bootstrapping.
 const DefaultProtocolVersion = 0
 
-// DefaultTransactionExpiry is the default expiry for transactions, measured
-// in blocks. Equivalent to 10 minutes for a 1-second block time.
+// DefaultTransactionExpiry is the default expiry for transactions, measured in blocks.
+// The default value is equivalent to 10 minutes for a 1-second block time.
+//
+// Let E by the transaction expiry. If a transaction T specifies a reference
+// block R with height H, then T may be included in any block B where:
+// * R<-*B - meaning B has R as an ancestor, and
+// * R.height < B.height <= R.height+E
 const DefaultTransactionExpiry = 10 * 60
 
 // DefaultTransactionExpiryBuffer is the default buffer time between a transaction being ingested by a
@@ -35,29 +40,29 @@ const DefaultMaxCollectionTotalGas = 10_000_000 // 10M
 // DefaultMaxCollectionSize is the default maximum number of transactions allowed inside a collection.
 const DefaultMaxCollectionSize = 100
 
-// DefaultMaxAddressIndex is the default for the maximum address index allowed to be acceptable by collection and acccess nodes.
-const DefaultMaxAddressIndex = 20_000_000
-
 // DefaultValueLogGCFrequency is the default frequency in blocks that we call the
 // badger value log GC. Equivalent to 10 mins for a 1 second block time
 const DefaultValueLogGCFrequency = 10 * 60
 
+// DomainTagLength is set to 32 bytes.
+//
+// Signatures on Flow that needs to be scoped to a certain domain need to
+// have the same length in order to avoid tag collision issues, when prefixing the
+// message to sign.
 const DomainTagLength = 32
 
 const TransactionTagString = "FLOW-V0.0-transaction"
 
-const UserTagString = "FLOW-V0.0-user"
-
 // TransactionDomainTag is the prefix of all signed transaction payloads.
 //
-// A domain tag is encoded as UTF-8 bytes, right padded to a total length of 32 bytes.
+// The tag is the string `TransactionTagString` encoded as UTF-8 bytes,
+// right padded to a total length of 32 bytes.
 var TransactionDomainTag = paddedDomainTag(TransactionTagString)
 
-// UserDomainTag is the prefix of all signed user space payloads.
+// paddedDomainTag padds string tags to form the actuatl domain separation tag used for signing
+// and verifiying.
 //
 // A domain tag is encoded as UTF-8 bytes, right padded to a total length of 32 bytes.
-var UserDomainTag = paddedDomainTag(UserTagString)
-
 func paddedDomainTag(s string) [DomainTagLength]byte {
 	var tag [DomainTagLength]byte
 

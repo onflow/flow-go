@@ -15,7 +15,6 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/testutil"
 	enginemock "github.com/onflow/flow-go/engine/testutil/mock"
 	"github.com/onflow/flow-go/engine/verification/assigner/blockconsumer"
@@ -57,7 +56,7 @@ func SetupChunkDataPackProvider(t *testing.T,
 	exeNode := testutil.GenericNodeFromParticipants(t, hub, exeIdentity, participants, chainID)
 	exeEngine := new(mocknetwork.Engine)
 
-	exeChunkDataConduit, err := exeNode.Net.Register(engine.ProvideChunks, exeEngine)
+	exeChunkDataConduit, err := exeNode.Net.Register(network.ProvideChunks, exeEngine)
 	assert.Nil(t, err)
 
 	replied := make(map[flow.Identifier]struct{})
@@ -235,7 +234,7 @@ func SetupMockConsensusNode(t *testing.T,
 			wg.Done()
 		}).Return(nil)
 
-	_, err := conNode.Net.Register(engine.ReceiveApprovals, conEngine)
+	_, err := conNode.Net.Register(network.ReceiveApprovals, conEngine)
 	assert.Nil(t, err)
 
 	return &conNode, conEngine, wg
@@ -380,7 +379,7 @@ func ExtendStateWithFinalizedBlocks(t *testing.T, completeExecutionReceipts Comp
 			}
 
 			err := state.Extend(context.Background(), receipt.ReferenceBlock)
-			require.NoError(t, err)
+			require.NoError(t, err, fmt.Errorf("can not extend block %v: %w", receipt.ReferenceBlock.ID(), err))
 			err = state.Finalize(context.Background(), refBlockID)
 			require.NoError(t, err)
 			blocks = append(blocks, receipt.ReferenceBlock)
@@ -464,9 +463,6 @@ func withConsumers(t *testing.T,
 	s, verID, participants := bootstrapSystem(t, tracer, authorized)
 	exeID := participants.Filter(filter.HasRole(flow.RoleExecution))[0]
 	conID := participants.Filter(filter.HasRole(flow.RoleConsensus))[0]
-	ops = append(ops, WithExecutorIDs(
-		participants.Filter(filter.HasRole(flow.RoleExecution)).NodeIDs()))
-
 	// generates a chain of blocks in the form of root <- R1 <- C1 <- R2 <- C2 <- ... where Rs are distinct reference
 	// blocks (i.e., containing guarantees), and Cs are container blocks for their preceding reference block,
 	// Container blocks only contain receipts of their preceding reference blocks. But they do not
@@ -474,6 +470,12 @@ func withConsumers(t *testing.T,
 	root, err := s.State.Final().Head()
 	require.NoError(t, err)
 	chainID := root.ChainID
+	ops = append(ops, WithExecutorIDs(
+		participants.Filter(filter.HasRole(flow.RoleExecution)).NodeIDs()), func(builder *CompleteExecutionReceiptBuilder) {
+		// needed for the guarantees to have the correct chainID and signer indices
+		builder.clusterCommittee = participants.Filter(filter.HasRole(flow.RoleCollection))
+	})
+
 	completeERs := CompleteExecutionReceiptChainFixture(t, root, blockCount, ops...)
 	blocks := ExtendStateWithFinalizedBlocks(t, completeERs, s.State)
 
