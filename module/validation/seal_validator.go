@@ -25,7 +25,6 @@ type sealValidator struct {
 	index                                      storage.Index
 	results                                    storage.ExecutionResults
 	requiredApprovalsForSealConstructionGetter module.RequiredApprovalsForSealConstructionInstanceGetter // number of required approvals per chunk to construct a seal
-	requiredApprovalsForSealVerification       uint                                                      // number of required approvals per chunk for a seal to be valid
 	metrics                                    module.ConsensusMetrics
 }
 
@@ -37,15 +36,8 @@ func NewSealValidator(
 	seals storage.Seals,
 	assigner module.ChunkAssigner,
 	requiredApprovalsForSealConstructionGetter module.RequiredApprovalsForSealConstructionInstanceGetter,
-	requiredApprovalsForSealVerification uint,
 	metrics module.ConsensusMetrics,
-) (*sealValidator, error) {
-	requiredApprovalsForSealConstruction := requiredApprovalsForSealConstructionGetter.GetValue()
-	if requiredApprovalsForSealConstruction < requiredApprovalsForSealVerification {
-		return nil, fmt.Errorf("required number of approvals for seal construction (%d) cannot be smaller than for seal verification (%d)",
-			requiredApprovalsForSealConstruction, requiredApprovalsForSealVerification)
-	}
-
+) *sealValidator {
 	return &sealValidator{
 		state:           state,
 		assigner:        assigner,
@@ -55,9 +47,8 @@ func NewSealValidator(
 		seals:           seals,
 		index:           index,
 		requiredApprovalsForSealConstructionGetter: requiredApprovalsForSealConstructionGetter,
-		requiredApprovalsForSealVerification:       requiredApprovalsForSealVerification,
-		metrics:                                    metrics,
-	}, nil
+		metrics: metrics,
+	}
 }
 
 func (s *sealValidator) verifySealSignature(aggregatedSignatures *flow.AggregatedSignature,
@@ -282,8 +273,10 @@ func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.I
 
 		// the chunk must have been approved by at least the minimally
 		// required number of Verification Nodes
-		if uint(numberApprovers) < s.requiredApprovalsForSealConstructionGetter.GetValue() {
-			if uint(numberApprovers) >= s.requiredApprovalsForSealVerification {
+		requireApprovalsForSealConstruction := s.requiredApprovalsForSealConstructionGetter.GetValue()
+		requireApprovalsForSealVerification := s.requiredApprovalsForSealConstructionGetter.RequireApprovalsForSealVerificationConst()
+		if uint(numberApprovers) < requireApprovalsForSealConstruction {
+			if uint(numberApprovers) >= requireApprovalsForSealVerification {
 				// Emergency sealing is a _temporary_ fallback to reduce the probability of
 				// sealing halts due to bugs in the verification nodes, where they don't
 				// approve a chunk even though they should (false-negative).
@@ -291,7 +284,7 @@ func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.I
 				emergencySealed = true
 			} else {
 				return engine.NewInvalidInputErrorf("chunk %d has %d approvals but require at least %d",
-					chunk.Index, numberApprovers, s.requiredApprovalsForSealVerification)
+					chunk.Index, numberApprovers, requireApprovalsForSealVerification)
 			}
 		}
 

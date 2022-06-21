@@ -37,7 +37,7 @@ func NewRequiredApprovalsForSealConstructionInstance(
 }
 
 // SetValue updates the requiredApprovalsForSealConstruction and return the old value
-// This assume the caller has validated the new value
+// This assumes the caller has validated the new value
 func (r *requiredApprovalsForSealConstructionInstance) SetValue(requiredApprovalsForSealConstruction uint) (uint, error) {
 	err := validation.ValidateRequireApprovals(
 		requiredApprovalsForSealConstruction,
@@ -57,4 +57,14 @@ func (r *requiredApprovalsForSealConstructionInstance) SetValue(requiredApproval
 // GetValue gets the requiredApprovalsForSealConstruction
 func (r *requiredApprovalsForSealConstructionInstance) GetValue() uint {
 	return uint(r.requiredApprovalsForSealConstruction.Load())
+}
+
+// ChunkAlphaConst returns the constant chunk alpha value
+func (r *requiredApprovalsForSealConstructionInstance) ChunkAlphaConst() uint {
+	return r.chunkAlpha
+}
+
+// RequireApprovalsForSealVerificationConst returns the constant RequireApprovalsForSealVerification value
+func (r *requiredApprovalsForSealConstructionInstance) RequireApprovalsForSealVerificationConst() uint {
+	return r.requiredApprovalsForSealVerification
 }

@@ -228,7 +228,7 @@ func main() {
 				node.Storage.Results,
 				node.Storage.Seals)
 
-			sealValidator, err := validation.NewSealValidator(
+			sealValidator := validation.NewSealValidator(
 				node.State,
 				node.Storage.Headers,
 				node.Storage.Index,
@@ -236,11 +236,7 @@ func main() {
 				node.Storage.Seals,
 				chunkAssigner,
 				requiredApprovalsGetter,
-				requiredApprovalsForSealVerification,
 				conMetrics)
-			if err != nil {
-				return fmt.Errorf("could not instantiate seal validator: %w", err)
-			}
 
 			blockTimer, err = blocktimer.NewBlockTimer(minInterval, maxInterval)
 			if err != nil {
