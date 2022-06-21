@@ -811,7 +811,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			}
 
 			engineBuilder.WithLegacy()
-			engineBuilder.WithRegisterRPC()
 			builder.RpcEng = engineBuilder.Build()
 			return builder.RpcEng, nil
 		}).

@@ -49,11 +49,12 @@ func (builder *RPCEngineBuilder) WithMetrics() {
 	grpc_prometheus.Register(builder.secureGrpcServer)
 }
 
-func (builder *RPCEngineBuilder) WithRegisterRPC() {
+func (builder *RPCEngineBuilder) withRegisterRPC() {
 	accessproto.RegisterAccessAPIServer(builder.unsecureGrpcServer, builder.localAPIServer)
 	accessproto.RegisterAccessAPIServer(builder.secureGrpcServer, builder.localAPIServer)
 }
 
 func (builder *RPCEngineBuilder) Build() *Engine {
+	builder.withRegisterRPC()
 	return builder.Engine
 }

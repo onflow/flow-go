@@ -993,7 +993,6 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		}
 		engineBuilder.WithRouting(proxy)
 		engineBuilder.WithLegacy()
-		engineBuilder.WithRegisterRPC()
 		builder.RpcEng = engineBuilder.Build()
 		return builder.RpcEng, nil
 	})

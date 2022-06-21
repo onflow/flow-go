@@ -105,7 +105,6 @@ func (suite *Suite) SetupTest() {
 	rpcEngBuilder, err := rpc.NewBuilder(log, suite.proto.state, rpc.Config{}, nil, nil, suite.blocks, suite.headers, suite.collections,
 		suite.transactions, suite.receipts, suite.results, flow.Testnet, metrics.NewNoopCollector(), metrics.NewNoopCollector(), 0, 0, false, false, nil, nil)
 	rpcEngBuilder.WithLegacy()
-	rpcEngBuilder.WithRegisterRPC()
 	rpcEng := rpcEngBuilder.Build()
 	require.NoError(suite.T(), err)
 
