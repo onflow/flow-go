@@ -207,7 +207,7 @@ func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.
 			Uint64("to", req.FromHeight).
 			Uint64("size", (req.ToHeight-req.FromHeight)+1).
 			Uint("max_size", maxSize).
-			Msg("range request too large")
+			Msg("range request is too large")
 
 		req.ToHeight = maxHeight
 	}
@@ -261,6 +261,13 @@ func (r *RequestHandler) onBatchRequest(originID flow.Identifier, req *messages.
 		maxSize = core.Config.MaxSize
 	} else {
 		maxSize = synchronization.DefaultConfig().MaxSize
+	}
+
+	if len(req.BlockIDs) > int(maxSize) {
+		r.log.Warn().
+		Int("size", len(req.BlockIDs)).
+		Uint("max_size", maxSize).
+		Msg("batch request is too large")
 	}
 
 	// deduplicate the block IDs in the batch request
