@@ -12,8 +12,10 @@ import (
 )
 
 // NewRPCEngineBuilder helps to build a new RPC engine.
-func NewRPCEngineBuilder() *RPCEngineBuilder {
+func NewRPCEngineBuilder(engine *Engine) *RPCEngineBuilder {
 	builder := &RPCEngineBuilder{}
+	builder.Engine = engine
+	builder.localAPIServer = access.NewHandler(builder.backend, builder.chain)
 	return builder
 }
 
@@ -21,11 +23,6 @@ type RPCEngineBuilder struct {
 	*Engine
 	// Use the parent interface instead of implementation, so that we can assign it to proxy.
 	localAPIServer accessproto.AccessAPIServer
-}
-
-func (builder *RPCEngineBuilder) WithBase(engine *Engine) {
-	builder.Engine = engine
-	builder.localAPIServer = access.NewHandler(builder.backend, builder.chain)
 }
 
 func (builder *RPCEngineBuilder) WithRouting(router *apiproxy.FlowAccessAPIRouter) {
