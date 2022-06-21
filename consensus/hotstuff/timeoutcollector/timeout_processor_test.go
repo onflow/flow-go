@@ -483,7 +483,7 @@ func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 
 	notifier.AssertExpectations(t)
 
-	aggregator, err = NewTimeoutSignatureAggregator(view+1, stakingSigners, encoding.CollectorVoteTag)
+	aggregator, err = NewTimeoutSignatureAggregator(view+1, stakingSigners, encoding.CollectorTimeoutTag)
 	require.NoError(t, err)
 
 	notifier = mocks.NewTimeoutCollectorConsumer(t)
