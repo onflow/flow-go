@@ -215,10 +215,15 @@ func (p *TimeoutProcessor) validateTimeout(timeout *model.TimeoutObject) error {
 
 	// 2. Check if signer identity is valid
 	_, err := p.committee.IdentityByEpoch(timeout.View, timeout.SignerID)
-	if model.IsInvalidSignerError(err) {
-		return model.NewInvalidTimeoutErrorf(timeout, "invalid signer for timeout: %w", err)
-	}
 	if err != nil {
+		if model.IsInvalidSignerError(err) {
+			return model.NewInvalidTimeoutErrorf(timeout, "invalid signer for timeout: %w", err)
+		}
+		if errors.Is(err, model.ErrViewForUnknownEpoch) {
+			// This situation should be impossible since we query epoch information for this view in constructor,
+			// receiving sentinel here is symptom of internal bug.
+			return fmt.Errorf("no Epoch information availalbe for timeout object at view %d; symptom of internal bug or invalid bootstrapping information: %s", timeout.View, err.Error())
+		}
 		return fmt.Errorf("error retrieving signer Identity at view %d: %w", timeout.View, err)
 	}
 

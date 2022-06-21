@@ -152,7 +152,7 @@ func (s *TimeoutProcessorTestSuite) TestProcess_TimeoutNewerHighestQC() {
 	})
 }
 
-// TestProcess_LastViewTCRequiredButNotPresent tests that TimeoutProcessor fails with model.InvalidTimeoutError if
+// TestProcess_LastViewTCWrongView tests that TimeoutProcessor fails with model.InvalidTimeoutError if
 // timeout contains a proof that sender legitimately entered timeout.View but it has wrong view meaning he used TC from previous rounds.
 func (s *TimeoutProcessorTestSuite) TestProcess_LastViewTCWrongView() {
 	// if TC is included it must have timeout.View == timeout.LastViewTC.View+1
@@ -203,6 +203,14 @@ func (s *TimeoutProcessorTestSuite) TestProcess_InvalidSigner() {
 		require.ErrorIs(s.T(), err, exception)
 		require.False(s.T(), model.IsInvalidTimeoutError(err))
 		require.False(s.T(), model.IsInvalidSignerError(err))
+	})
+	s.Run("identity-by-epoch-err-view-for-unknown-epoch", func() {
+		*s.committee = *mocks.NewReplicas(s.T())
+		s.committee.On("IdentityByEpoch", mock.Anything, mock.Anything).Return(nil, model.ErrViewForUnknownEpoch).Once()
+
+		err := s.processor.Process(timeout)
+		require.False(s.T(), model.IsInvalidTimeoutError(err))
+		require.NotErrorIs(s.T(), err, model.ErrViewForUnknownEpoch)
 	})
 }
 
