@@ -784,8 +784,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			var err error
-			builder.RpcEng, err = rpc.New(
+			engineBuilder, err := rpc.NewBuilder(
 				node.Logger,
 				node.State,
 				builder.rpcConf,
@@ -806,11 +805,14 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.rpcMetricsEnabled,
 				builder.apiRatelimits,
 				builder.apiBurstlimits,
-				nil,
 			)
 			if err != nil {
 				return nil, err
 			}
+
+			engineBuilder.WithLegacy()
+			engineBuilder.WithRegisterRPC()
+			builder.RpcEng = engineBuilder.Build()
 			return builder.RpcEng, nil
 		}).
 		Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {

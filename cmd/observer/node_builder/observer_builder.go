@@ -966,7 +966,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		if err != nil {
 			return nil, err
 		}
-		builder.RpcEng, err = rpc.New(
+		engineBuilder, err := rpc.NewBuilder(
 			node.Logger,
 			node.State,
 			builder.rpcConf,
@@ -987,11 +987,14 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			builder.rpcMetricsEnabled,
 			builder.apiRatelimits,
 			builder.apiBurstlimits,
-			proxy,
 		)
 		if err != nil {
 			return nil, err
 		}
+		engineBuilder.WithRouting(proxy)
+		engineBuilder.WithLegacy()
+		engineBuilder.WithRegisterRPC()
+		builder.RpcEng = engineBuilder.Build()
 		return builder.RpcEng, nil
 	})
 }

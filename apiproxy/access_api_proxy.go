@@ -24,8 +24,8 @@ import (
 // It is used by Observer services, Blockchain Data Service, etc.
 // Make sure that this is just for observation and not a staked participant in the flow network.
 // This means that observers see a copy of the data but there is no interaction to ensure integrity from the root block.
-func NewFlowAccessAPIProxy(accessNodeAddressAndPort flow.IdentityList, timeout time.Duration) (*FlowAccessAPIProxy, error) {
-	ret := &FlowAccessAPIProxy{}
+func NewFlowAccessAPIProxy(accessNodeAddressAndPort flow.IdentityList, timeout time.Duration) (*FlowAccessAPIRouter, error) {
+	ret := &FlowAccessAPIRouter{}
 	err := ret.upstream.setFlowAccessAPI(accessNodeAddressAndPort, timeout)
 	if err != nil {
 		return nil, err
@@ -59,15 +59,16 @@ func (ret *FlowAccessAPIForwarder) setFlowAccessAPI(accessNodeAddressAndPort flo
 	return nil
 }
 
-// Structure that represents the proxy algorithm
-type FlowAccessAPIProxy struct {
+// FlowAccessAPIRouter is a structure that represents the routing proxy algorithm.
+// It splits requests between a local and a remote API service.
+type FlowAccessAPIRouter struct {
 	access.AccessAPIServer
 	upstream FlowAccessAPIForwarder
 }
 
 // SetLocalAPI sets the local backend that responds to block related calls
 // Everything else is forwarded to a selected upstream node
-func (h *FlowAccessAPIProxy) SetLocalAPI(local access.AccessAPIServer) {
+func (h *FlowAccessAPIRouter) SetLocalAPI(local access.AccessAPIServer) {
 	h.AccessAPIServer = local
 }
 
@@ -155,95 +156,95 @@ func (h *FlowAccessAPIForwarder) faultTolerantClient() (access.AccessAPIClient, 
 
 // Ping pings the service. It is special in the sense that it responds successful,
 // only if all underlying services are ready.
-func (h *FlowAccessAPIProxy) Ping(context context.Context, req *access.PingRequest) (*access.PingResponse, error) {
+func (h *FlowAccessAPIRouter) Ping(context context.Context, req *access.PingRequest) (*access.PingResponse, error) {
 	return h.AccessAPIServer.Ping(context, req)
 }
 
-func (h *FlowAccessAPIProxy) GetLatestBlockHeader(context context.Context, req *access.GetLatestBlockHeaderRequest) (*access.BlockHeaderResponse, error) {
+func (h *FlowAccessAPIRouter) GetLatestBlockHeader(context context.Context, req *access.GetLatestBlockHeaderRequest) (*access.BlockHeaderResponse, error) {
 	return h.AccessAPIServer.GetLatestBlockHeader(context, req)
 }
 
-func (h *FlowAccessAPIProxy) GetBlockHeaderByID(context context.Context, req *access.GetBlockHeaderByIDRequest) (*access.BlockHeaderResponse, error) {
+func (h *FlowAccessAPIRouter) GetBlockHeaderByID(context context.Context, req *access.GetBlockHeaderByIDRequest) (*access.BlockHeaderResponse, error) {
 	return h.AccessAPIServer.GetBlockHeaderByID(context, req)
 }
 
-func (h *FlowAccessAPIProxy) GetBlockHeaderByHeight(context context.Context, req *access.GetBlockHeaderByHeightRequest) (*access.BlockHeaderResponse, error) {
+func (h *FlowAccessAPIRouter) GetBlockHeaderByHeight(context context.Context, req *access.GetBlockHeaderByHeightRequest) (*access.BlockHeaderResponse, error) {
 	return h.AccessAPIServer.GetBlockHeaderByHeight(context, req)
 }
 
-func (h *FlowAccessAPIProxy) GetLatestBlock(context context.Context, req *access.GetLatestBlockRequest) (*access.BlockResponse, error) {
+func (h *FlowAccessAPIRouter) GetLatestBlock(context context.Context, req *access.GetLatestBlockRequest) (*access.BlockResponse, error) {
 	return h.AccessAPIServer.GetLatestBlock(context, req)
 }
 
-func (h *FlowAccessAPIProxy) GetBlockByID(context context.Context, req *access.GetBlockByIDRequest) (*access.BlockResponse, error) {
+func (h *FlowAccessAPIRouter) GetBlockByID(context context.Context, req *access.GetBlockByIDRequest) (*access.BlockResponse, error) {
 	return h.AccessAPIServer.GetBlockByID(context, req)
 }
 
-func (h *FlowAccessAPIProxy) GetBlockByHeight(context context.Context, req *access.GetBlockByHeightRequest) (*access.BlockResponse, error) {
+func (h *FlowAccessAPIRouter) GetBlockByHeight(context context.Context, req *access.GetBlockByHeightRequest) (*access.BlockResponse, error) {
 	return h.AccessAPIServer.GetBlockByHeight(context, req)
 }
 
-func (h *FlowAccessAPIProxy) GetCollectionByID(context context.Context, req *access.GetCollectionByIDRequest) (*access.CollectionResponse, error) {
+func (h *FlowAccessAPIRouter) GetCollectionByID(context context.Context, req *access.GetCollectionByIDRequest) (*access.CollectionResponse, error) {
 	return h.AccessAPIServer.GetCollectionByID(context, req)
 }
 
-func (h *FlowAccessAPIProxy) SendTransaction(context context.Context, req *access.SendTransactionRequest) (*access.SendTransactionResponse, error) {
+func (h *FlowAccessAPIRouter) SendTransaction(context context.Context, req *access.SendTransactionRequest) (*access.SendTransactionResponse, error) {
 	return h.upstream.SendTransaction(context, req)
 }
 
-func (h *FlowAccessAPIProxy) GetTransaction(context context.Context, req *access.GetTransactionRequest) (*access.TransactionResponse, error) {
+func (h *FlowAccessAPIRouter) GetTransaction(context context.Context, req *access.GetTransactionRequest) (*access.TransactionResponse, error) {
 	return h.upstream.GetTransaction(context, req)
 }
 
-func (h *FlowAccessAPIProxy) GetTransactionResult(context context.Context, req *access.GetTransactionRequest) (*access.TransactionResultResponse, error) {
+func (h *FlowAccessAPIRouter) GetTransactionResult(context context.Context, req *access.GetTransactionRequest) (*access.TransactionResultResponse, error) {
 	return h.upstream.GetTransactionResult(context, req)
 }
 
-func (h *FlowAccessAPIProxy) GetTransactionResultByIndex(context context.Context, req *access.GetTransactionByIndexRequest) (*access.TransactionResultResponse, error) {
+func (h *FlowAccessAPIRouter) GetTransactionResultByIndex(context context.Context, req *access.GetTransactionByIndexRequest) (*access.TransactionResultResponse, error) {
 	return h.upstream.GetTransactionResultByIndex(context, req)
 }
 
-func (h *FlowAccessAPIProxy) GetAccount(context context.Context, req *access.GetAccountRequest) (*access.GetAccountResponse, error) {
+func (h *FlowAccessAPIRouter) GetAccount(context context.Context, req *access.GetAccountRequest) (*access.GetAccountResponse, error) {
 	return h.upstream.GetAccount(context, req)
 }
 
-func (h *FlowAccessAPIProxy) GetAccountAtLatestBlock(context context.Context, req *access.GetAccountAtLatestBlockRequest) (*access.AccountResponse, error) {
+func (h *FlowAccessAPIRouter) GetAccountAtLatestBlock(context context.Context, req *access.GetAccountAtLatestBlockRequest) (*access.AccountResponse, error) {
 	return h.upstream.GetAccountAtLatestBlock(context, req)
 }
 
-func (h *FlowAccessAPIProxy) GetAccountAtBlockHeight(context context.Context, req *access.GetAccountAtBlockHeightRequest) (*access.AccountResponse, error) {
+func (h *FlowAccessAPIRouter) GetAccountAtBlockHeight(context context.Context, req *access.GetAccountAtBlockHeightRequest) (*access.AccountResponse, error) {
 	return h.upstream.GetAccountAtBlockHeight(context, req)
 }
 
-func (h *FlowAccessAPIProxy) ExecuteScriptAtLatestBlock(context context.Context, req *access.ExecuteScriptAtLatestBlockRequest) (*access.ExecuteScriptResponse, error) {
+func (h *FlowAccessAPIRouter) ExecuteScriptAtLatestBlock(context context.Context, req *access.ExecuteScriptAtLatestBlockRequest) (*access.ExecuteScriptResponse, error) {
 	return h.upstream.ExecuteScriptAtLatestBlock(context, req)
 }
 
-func (h *FlowAccessAPIProxy) ExecuteScriptAtBlockID(context context.Context, req *access.ExecuteScriptAtBlockIDRequest) (*access.ExecuteScriptResponse, error) {
+func (h *FlowAccessAPIRouter) ExecuteScriptAtBlockID(context context.Context, req *access.ExecuteScriptAtBlockIDRequest) (*access.ExecuteScriptResponse, error) {
 	return h.upstream.ExecuteScriptAtBlockID(context, req)
 }
 
-func (h *FlowAccessAPIProxy) ExecuteScriptAtBlockHeight(context context.Context, req *access.ExecuteScriptAtBlockHeightRequest) (*access.ExecuteScriptResponse, error) {
+func (h *FlowAccessAPIRouter) ExecuteScriptAtBlockHeight(context context.Context, req *access.ExecuteScriptAtBlockHeightRequest) (*access.ExecuteScriptResponse, error) {
 	return h.upstream.ExecuteScriptAtBlockHeight(context, req)
 }
 
-func (h *FlowAccessAPIProxy) GetEventsForHeightRange(context context.Context, req *access.GetEventsForHeightRangeRequest) (*access.EventsResponse, error) {
+func (h *FlowAccessAPIRouter) GetEventsForHeightRange(context context.Context, req *access.GetEventsForHeightRangeRequest) (*access.EventsResponse, error) {
 	return h.upstream.GetEventsForHeightRange(context, req)
 }
 
-func (h *FlowAccessAPIProxy) GetEventsForBlockIDs(context context.Context, req *access.GetEventsForBlockIDsRequest) (*access.EventsResponse, error) {
+func (h *FlowAccessAPIRouter) GetEventsForBlockIDs(context context.Context, req *access.GetEventsForBlockIDsRequest) (*access.EventsResponse, error) {
 	return h.upstream.GetEventsForBlockIDs(context, req)
 }
 
-func (h *FlowAccessAPIProxy) GetNetworkParameters(context context.Context, req *access.GetNetworkParametersRequest) (*access.GetNetworkParametersResponse, error) {
+func (h *FlowAccessAPIRouter) GetNetworkParameters(context context.Context, req *access.GetNetworkParametersRequest) (*access.GetNetworkParametersResponse, error) {
 	return h.AccessAPIServer.GetNetworkParameters(context, req)
 }
 
-func (h *FlowAccessAPIProxy) GetLatestProtocolStateSnapshot(context context.Context, req *access.GetLatestProtocolStateSnapshotRequest) (*access.ProtocolStateSnapshotResponse, error) {
+func (h *FlowAccessAPIRouter) GetLatestProtocolStateSnapshot(context context.Context, req *access.GetLatestProtocolStateSnapshotRequest) (*access.ProtocolStateSnapshotResponse, error) {
 	return h.AccessAPIServer.GetLatestProtocolStateSnapshot(context, req)
 }
 
-func (h *FlowAccessAPIProxy) GetExecutionResultForBlockID(context context.Context, req *access.GetExecutionResultForBlockIDRequest) (*access.ExecutionResultForBlockIDResponse, error) {
+func (h *FlowAccessAPIRouter) GetExecutionResultForBlockID(context context.Context, req *access.GetExecutionResultForBlockIDRequest) (*access.ExecutionResultForBlockIDResponse, error) {
 	return h.upstream.GetExecutionResultForBlockID(context, req)
 }
 
