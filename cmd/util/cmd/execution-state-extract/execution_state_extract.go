@@ -86,6 +86,7 @@ func extractExecutionState(
 		reportFileWriterFactory := reporters.NewReportFileWriterFactory(outputDir, log)
 
 		preCheckpointReporters = []ledger.Reporter{
+			// report epoch counter which is needed for finalizing root block
 			reporters.NewExportReporter(log,
 				chain,
 				func() flow.StateCommitment { return targetHash },

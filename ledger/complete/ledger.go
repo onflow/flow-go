@@ -395,15 +395,15 @@ func (l *Ledger) ExportCheckpointAt(
 	l.logger.Info().Msgf("finished running post-checkpoint reporters")
 
 	// running post checkpoint reporters
-	for _, reporter := range postCheckpointReporters {
-		l.logger.Info().Msgf("running a post-checkpoint generation reporter: %s", reporter.Name())
+	for i, reporter := range postCheckpointReporters {
+		l.logger.Info().Msgf("running a post-checkpoint generation reporter: %s, (%v/%v)", reporter.Name(), (i, len(postCheckpointReporters))
 		err := runReport(reporter, payloads, l.logger)
 		if err != nil {
 			return ledger.State(hash.DummyHash), err
 		}
 	}
 
-	l.logger.Info().Msgf("ran all pre-checkpoint reporters")
+	l.logger.Info().Msgf("ran all post-checkpoint reporters")
 
 	return statecommitment, nil
 }
