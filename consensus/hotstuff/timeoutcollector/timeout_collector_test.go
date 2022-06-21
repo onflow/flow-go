@@ -65,7 +65,7 @@ func (s *TimeoutCollectorTestSuite) TestAddTimeout_HappyPath() {
 		}()
 	}
 
-	wg.Wait()
+	unittest.AssertReturnsBefore(s.T(), wg.Wait, time.Second)
 	s.processor.AssertExpectations(s.T())
 }
 
@@ -84,7 +84,7 @@ func (s *TimeoutCollectorTestSuite) TestAddTimeout_DoubleTimeout() {
 
 	err = s.collector.AddTimeout(otherTimeout)
 	require.NoError(s.T(), err)
-	s.notifier.AssertCalled(s.T(), "OnDoubleTimeoutDetected", timeout, otherTimeout)
+	s.notifier.AssertExpectations(s.T())
 	s.processor.AssertNumberOfCalls(s.T(), "Process", 1)
 }
 
