@@ -32,7 +32,7 @@ func (s *SealValidationSuite) SetupTest() {
 	s.metrics = &module.ConsensusMetrics{}
 
 	s.sealValidator = NewSealValidator(s.State, s.HeadersDB, s.IndexDB, s.ResultsDB, s.SealsDB,
-		s.Assigner, unittest.NewRequiredApprovalsForSealConstructionInstance(2), s.metrics)
+		s.Assigner, unittest.NewSealingConfigs(2), s.metrics)
 }
 
 // TestSealValid tests that a candidate block with a valid seal passes validation.
@@ -113,7 +113,7 @@ func (s *SealValidationSuite) TestSealInvalidAggregatedSigCount() {
 // The gap of 1 block, i.e. B2, is required to avoid a sealing edge-case
 // (see test `TestSeal_EnforceGap` for more details)
 func (s *SealValidationSuite) TestSealEmergencySeal_VerificationRequire0ApprovalEmergencyNotTriggered() {
-	instance, err := updatable_configs.NewRequiredApprovalsForSealConstructionInstance(2, 0, 3)
+	instance, err := updatable_configs.NewSealingConfigs(2, 0, 3)
 	require.NoError(s.T(), err)
 	s.sealValidator = NewSealValidator(s.State, s.HeadersDB, s.IndexDB, s.ResultsDB, s.SealsDB,
 		s.Assigner, instance, s.metrics)
@@ -134,7 +134,7 @@ func (s *SealValidationSuite) TestSealEmergencySeal_VerificationRequire0Approval
 }
 
 func (s *SealValidationSuite) TestSealEmergencySeal_VerificationRequire1ApprovalReceive1Approval() {
-	instance, err := updatable_configs.NewRequiredApprovalsForSealConstructionInstance(2, 1, 3)
+	instance, err := updatable_configs.NewSealingConfigs(2, 1, 3)
 	require.NoError(s.T(), err)
 	s.sealValidator = NewSealValidator(s.State, s.HeadersDB, s.IndexDB, s.ResultsDB, s.SealsDB,
 		s.Assigner, instance, s.metrics)
@@ -156,7 +156,7 @@ func (s *SealValidationSuite) TestSealEmergencySeal_VerificationRequire1Approval
 }
 
 func (s *SealValidationSuite) TestSealEmergencySeal_VerificationRequire1ApprovalReceiveEmergencyNotTriggered() {
-	instance, err := updatable_configs.NewRequiredApprovalsForSealConstructionInstance(1, 1, 3)
+	instance, err := updatable_configs.NewSealingConfigs(1, 1, 3)
 	require.NoError(s.T(), err)
 	s.sealValidator = NewSealValidator(s.State, s.HeadersDB, s.IndexDB, s.ResultsDB, s.SealsDB,
 		s.Assigner, instance, s.metrics)
@@ -179,7 +179,7 @@ func (s *SealValidationSuite) TestSealEmergencySeal_VerificationRequire1Approval
 }
 
 func (s *SealValidationSuite) TestSealEmergencySeal_VerificationRequire0ApprovalReceiveEmergencyTriggered() {
-	instance, err := updatable_configs.NewRequiredApprovalsForSealConstructionInstance(2, 0, 3)
+	instance, err := updatable_configs.NewSealingConfigs(2, 0, 3)
 	require.NoError(s.T(), err)
 	s.sealValidator = NewSealValidator(s.State, s.HeadersDB, s.IndexDB, s.ResultsDB, s.SealsDB,
 		s.Assigner, instance, s.metrics)
@@ -201,7 +201,7 @@ func (s *SealValidationSuite) TestSealEmergencySeal_VerificationRequire0Approval
 }
 
 func (s *SealValidationSuite) TestSealEmergencySeal_VerificationRequire0ApprovalReceive0ApprovalEmergencyTriggered() {
-	instance, err := updatable_configs.NewRequiredApprovalsForSealConstructionInstance(2, 0, 3)
+	instance, err := updatable_configs.NewSealingConfigs(2, 0, 3)
 	require.NoError(s.T(), err)
 	s.sealValidator = NewSealValidator(s.State, s.HeadersDB, s.IndexDB, s.ResultsDB, s.SealsDB,
 		s.Assigner, instance, s.metrics)

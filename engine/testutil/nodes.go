@@ -404,7 +404,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		assigner,
 		seals,
 		sealingConfig,
-		unittest.NewRequiredApprovalsForSealConstructionInstance(flow.DefaultRequiredApprovalsForSealConstruction),
+		unittest.NewSealingConfigs(flow.DefaultRequiredApprovalsForSealConstruction),
 	)
 	require.NoError(t, err)
 

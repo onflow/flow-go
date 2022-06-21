@@ -71,7 +71,7 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 		EmergencySealingActive:    false,
 		ApprovalRequestsThreshold: 2,
 	}
-	setter := unittest.NewRequiredApprovalsForSealConstructionInstance(flow.DefaultChunkAssignmentAlpha)
+	setter := unittest.NewSealingConfigs(flow.DefaultChunkAssignmentAlpha)
 	var err error
 	s.core, err = NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(), s.Headers, s.State, s.sealsDB, s.Assigner, s.SigHasher, s.SealsPL, s.Conduit, options, setter)
 	require.NoError(s.T(), err)

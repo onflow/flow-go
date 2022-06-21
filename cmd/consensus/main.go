@@ -187,7 +187,7 @@ func main() {
 			return nil
 		}).
 		Module("requiredApprovalsForSealConstruction setter", func(node *cmd.NodeConfig) error {
-			setter, err := updatable_configs.NewRequiredApprovalsForSealConstructionInstance(
+			setter, err := updatable_configs.NewSealingConfigs(
 				requiredApprovalsForSealConstruction,
 				requiredApprovalsForSealVerification,
 				chunkAlpha)

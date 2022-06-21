@@ -2083,8 +2083,8 @@ func TransactionResultsFixture(n int) []flow.TransactionResult {
 	return results
 }
 
-func NewRequiredApprovalsForSealConstructionInstance(val uint) module.RequiredApprovalsForSealConstructionInstanceSetter {
-	instance, err := updatable_configs.NewRequiredApprovalsForSealConstructionInstance(1, 0, 3)
+func NewSealingConfigs(val uint) module.RequiredApprovalsForSealConstructionInstanceSetter {
+	instance, err := updatable_configs.NewSealingConfigs(1, 0, 3)
 	if err != nil {
 		panic(err)
 	}
