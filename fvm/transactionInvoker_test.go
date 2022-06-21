@@ -86,7 +86,6 @@ func TestSafetyCheck(t *testing.T) {
 				view,
 				state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
 				state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
-				state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
 			))
 
 			err = txInvoker.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
@@ -156,7 +155,6 @@ func TestSafetyCheck(t *testing.T) {
 			view,
 			state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
 			state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
-			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
 		))
 
 		err = txInvoker.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
@@ -188,7 +186,6 @@ func TestSafetyCheck(t *testing.T) {
 			view,
 			state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
 			state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
-			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
 		))
 
 		err := txInvoker.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
@@ -221,7 +218,6 @@ func TestSafetyCheck(t *testing.T) {
 			view,
 			state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
 			state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
-			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
 		))
 
 		err := txInvoker.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())

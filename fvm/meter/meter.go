@@ -44,19 +44,27 @@ type MeteredMemoryIntensities map[common.MemoryKind]uint
 type Meter interface {
 	// merge child funcionality
 	NewChild() Meter
-	MergeMeter(child Meter, enforceLimits bool) error
+	MergeMeter(child Meter) error
 
 	// computation metering
 	MeterComputation(kind common.ComputationKind, intensity uint) error
 	ComputationIntensities() MeteredComputationIntensities
 	TotalComputationUsed() uint
-	TotalComputationLimit() uint
 
 	// memory metering
 	MeterMemory(kind common.MemoryKind, intensity uint) error
 	MemoryIntensities() MeteredMemoryIntensities
 	TotalMemoryUsed() uint
-	TotalMemoryLimit() uint
+
+	// interaction metering
+	MeterRead(size uint64) error
+	MeterWrite(previousSize uint64, newSize uint64) error
+	MeterNewWrite(size uint64) error
+	ReadCounter() uint64
+	WriteCounter() uint64
+	TotalBytesRead() uint64
+	TotalBytesWritten() uint64
+	TotalInteractionUsed() uint64
 
 	// TODO move storage metering to here
 	// MeterStorageRead(byteSize uint) error

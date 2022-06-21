@@ -1112,7 +1112,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			tx := fvm.Transaction(txBody, 0)
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
-			require.Equal(t, uint64(0), tx.MemoryUsed)
+			require.Greater(t, tx.MemoryUsed, uint64(0))
 
 			require.NoError(t, tx.Err)
 		},
@@ -1122,13 +1122,13 @@ func TestSettingExecutionWeights(t *testing.T) {
 	for k, v := range weightedMeter.DefaultMemoryWeights {
 		memoryWeights[k] = v
 	}
-	memoryWeights[common.MemoryKindBreakStatement] = 1_000_000
+	memoryWeights[common.MemoryKindBreakStatement] = 10_000_000
 	t.Run("transaction should fail with low memory limit (set in the state)", newVMTest().withBootstrapProcedureOptions(
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithExecutionMemoryLimit(
-			100_000_000,
+			1_000_000_000,
 		),
 		fvm.WithExecutionMemoryWeights(
 			memoryWeights,

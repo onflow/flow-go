@@ -45,14 +45,17 @@ func NewVirtualMachine(rt runtime.Runtime) *VirtualMachine {
 
 // Run runs a procedure against a ledger in the given context.
 func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, programs *programs.Programs) (err error) {
+	mh := weighted.NewMeteringHandler(
+		proc.ComputationLimit(ctx),
+		proc.MemoryLimit(ctx),
+		ctx.MaxStateInteractionSize)
+
 	st := state.NewState(v,
-		state.WithMeter(weighted.NewMeter(
-			uint(proc.ComputationLimit(ctx)),
-			uint(proc.MemoryLimit(ctx)))),
+		state.WithMeter(weighted.NewMeter(mh)),
 		state.WithMaxKeySizeAllowed(ctx.MaxStateKeySize),
-		state.WithMaxValueSizeAllowed(ctx.MaxStateValueSize),
-		state.WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize))
-	sth := state.NewStateHolder(st)
+		state.WithMaxValueSizeAllowed(ctx.MaxStateValueSize))
+
+	sth := state.NewStateHolder(st, state.WithMeteringHandler(mh))
 
 	err = proc.Run(vm, ctx, sth, programs)
 	if err != nil {
@@ -64,12 +67,17 @@ func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, program
 
 // GetAccount returns an account by address or an error if none exists.
 func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.View, programs *programs.Programs) (*flow.Account, error) {
-	st := state.NewState(v,
-		state.WithMaxKeySizeAllowed(ctx.MaxStateKeySize),
-		state.WithMaxValueSizeAllowed(ctx.MaxStateValueSize),
-		state.WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize))
+	mh := weighted.NewMeteringHandler(
+		ctx.ComputationLimit,
+		ctx.MemoryLimit,
+		ctx.MaxStateInteractionSize)
 
-	sth := state.NewStateHolder(st)
+	st := state.NewState(v,
+		state.WithMeter(weighted.NewMeter(mh)),
+		state.WithMaxKeySizeAllowed(ctx.MaxStateKeySize),
+		state.WithMaxValueSizeAllowed(ctx.MaxStateValueSize))
+
+	sth := state.NewStateHolder(st, state.WithMeteringHandler(mh))
 	account, err := getAccount(vm, ctx, sth, programs, address)
 	if err != nil {
 		if errors.IsALedgerFailure(err) {

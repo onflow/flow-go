@@ -11,6 +11,38 @@ var _ interfaceMeter.Meter = &Meter{}
 // Meter is a noop meter
 type Meter struct{}
 
+func (m *Meter) MeterRead(size uint64) error {
+	return nil
+}
+
+func (m *Meter) MeterWrite(previousSize uint64, newSize uint64) error {
+	return nil
+}
+
+func (m *Meter) MeterNewWrite(size uint64) error {
+	return nil
+}
+
+func (m *Meter) ReadCounter() uint64 {
+	return 0
+}
+
+func (m *Meter) WriteCounter() uint64 {
+	return 0
+}
+
+func (m *Meter) TotalBytesRead() uint64 {
+	return 0
+}
+
+func (m *Meter) TotalBytesWritten() uint64 {
+	return 0
+}
+
+func (m *Meter) TotalInteractionUsed() uint64 {
+	return 0
+}
+
 // NewMeter construct a new noop meter
 func NewMeter() *Meter {
 	return &Meter{}
@@ -22,7 +54,7 @@ func (m *Meter) NewChild() interfaceMeter.Meter {
 }
 
 // MergeMeter merges two noop meters
-func (m *Meter) MergeMeter(child interfaceMeter.Meter, enforceLimits bool) error {
+func (m *Meter) MergeMeter(_ interfaceMeter.Meter) error {
 	return nil
 }
 
@@ -41,11 +73,6 @@ func (m *Meter) TotalComputationUsed() uint {
 	return 0
 }
 
-// TotalComputationLimit always returns zero
-func (m *Meter) TotalComputationLimit() uint {
-	return 0
-}
-
 // MeterMemory is a noop
 func (m *Meter) MeterMemory(_ common.MemoryKind, _ uint) error {
 	return nil
@@ -58,10 +85,5 @@ func (m *Meter) MemoryIntensities() interfaceMeter.MeteredMemoryIntensities {
 
 // TotalMemoryUsed always returns zero
 func (m *Meter) TotalMemoryUsed() uint {
-	return 0
-}
-
-// TotalMemoryLimit always returns zero
-func (m *Meter) TotalMemoryLimit() uint {
 	return 0
 }

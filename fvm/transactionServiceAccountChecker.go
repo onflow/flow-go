@@ -26,7 +26,10 @@ func (c *TransactionServiceAccountChecker) Process(
 ) error {
 
 	if proc.Transaction.Payer == ctx.Chain.ServiceAddress() {
-		sth.SetPayerIsServiceAccount()
+		sth.MeteringHandler().SetLimitEnforcements(
+			true, // computation limits are still in effect
+			false,
+			false)
 	}
 	return nil
 }

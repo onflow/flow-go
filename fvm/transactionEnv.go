@@ -154,9 +154,9 @@ func (e *TransactionEnv) setExecutionParameters() error {
 	}
 
 	var ok bool
-	var m *weighted.Meter
-	// only set the weights if the meter is a weighted.Meter
-	if m, ok = e.sth.State().Meter().(*weighted.Meter); !ok {
+	var m *weighted.MeteringHandler
+	// only set the weights if the meter is a weighted.MeteringHandler
+	if m, ok = e.sth.MeteringHandler().(*weighted.MeteringHandler); !ok {
 		return nil
 	}
 
@@ -736,10 +736,7 @@ func (e *TransactionEnv) GenerateUUID() (uint64, error) {
 }
 
 func (e *TransactionEnv) meterComputation(kind common.ComputationKind, intensity uint) error {
-	if e.sth.EnforceComputationLimits {
-		return e.sth.State().MeterComputation(kind, intensity)
-	}
-	return nil
+	return e.sth.State().MeterComputation(kind, intensity)
 }
 
 func (e *TransactionEnv) MeterComputation(kind common.ComputationKind, intensity uint) error {
@@ -751,10 +748,7 @@ func (e *TransactionEnv) ComputationUsed() uint64 {
 }
 
 func (e *TransactionEnv) meterMemory(kind common.MemoryKind, intensity uint) error {
-	if e.sth.EnforceMemoryLimits() {
-		return e.sth.State().MeterMemory(kind, intensity)
-	}
-	return nil
+	return e.sth.State().MeterMemory(kind, intensity)
 }
 
 func (e *TransactionEnv) MeterMemory(usage common.MemoryUsage) error {
@@ -940,8 +934,8 @@ func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 		return address, err
 	}
 
-	e.sth.DisableAllLimitEnforcements() // don't enforce limit during account creation
-	defer e.sth.EnableAllLimitEnforcements()
+	e.sth.MeteringHandler().DisableAllLimitEnforcements() // don't enforce limit during account creation
+	defer e.sth.MeteringHandler().RestoreLimitEnforcements()
 
 	flowAddress, err := e.addressGenerator.NextAddress()
 	if err != nil {
@@ -981,9 +975,8 @@ func (e *TransactionEnv) AddEncodedAccountKey(address runtime.Address, publicKey
 		return fmt.Errorf("add encoded account key failed: %w", err)
 	}
 
-	// TODO do a call to track the computation usage and memory usage
-	e.sth.DisableAllLimitEnforcements() // don't enforce limit during adding a key
-	defer e.sth.EnableAllLimitEnforcements()
+	e.sth.MeteringHandler().DisableAllLimitEnforcements() // don't enforce limit during adding a key
+	defer e.sth.MeteringHandler().RestoreLimitEnforcements()
 
 	err = e.accounts.CheckAccountNotFrozen(flow.Address(address))
 	if err != nil {

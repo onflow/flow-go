@@ -242,23 +242,23 @@ func (e StateValueSizeLimitError) Code() ErrorCode {
 	return ErrCodeStateValueSizeLimitError
 }
 
-// LedgerIntractionLimitExceededError is returned when a tx hits the maximum ledger interaction limit
-type LedgerIntractionLimitExceededError struct {
+// LedgerInteractionLimitExceededError is returned when a tx hits the maximum ledger interaction limit
+type LedgerInteractionLimitExceededError struct {
 	used  uint64
 	limit uint64
 }
 
-// NewLedgerIntractionLimitExceededError constructs a LedgerIntractionLimitExceededError
-func NewLedgerIntractionLimitExceededError(used, limit uint64) *LedgerIntractionLimitExceededError {
-	return &LedgerIntractionLimitExceededError{used: used, limit: limit}
+// NewLedgerInteractionLimitExceededError constructs a LedgerInteractionLimitExceededError
+func NewLedgerInteractionLimitExceededError(used, limit uint64) *LedgerInteractionLimitExceededError {
+	return &LedgerInteractionLimitExceededError{used: used, limit: limit}
 }
 
-func (e *LedgerIntractionLimitExceededError) Error() string {
+func (e *LedgerInteractionLimitExceededError) Error() string {
 	return fmt.Sprintf("%s max interaction with storage has exceeded the limit (used: %d bytes, limit %d bytes)", e.Code().String(), e.used, e.limit)
 }
 
 // Code returns the error code for this error
-func (e *LedgerIntractionLimitExceededError) Code() ErrorCode {
+func (e *LedgerInteractionLimitExceededError) Code() ErrorCode {
 	return ErrCodeLedgerIntractionLimitExceededError
 }
 

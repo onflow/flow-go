@@ -3,7 +3,6 @@ package reporters
 import (
 	"context"
 	"fmt"
-	"math"
 	goRuntime "runtime"
 	"sync"
 
@@ -66,7 +65,7 @@ func (r *AccountReporter) Report(payload []ledger.Payload, commit ledger.State) 
 	defer rwm.Close()
 
 	l := migrations.NewView(payload)
-	st := state.NewState(l, state.WithMaxInteractionSizeAllowed(math.MaxUint64))
+	st := state.NewState(l)
 	sth := state.NewStateHolder(st)
 	gen := state.NewStateBoundAddressGenerator(sth, r.Chain)
 
@@ -141,7 +140,7 @@ func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
 	prog := programs.NewEmptyPrograms()
 
 	v := view.NewChild()
-	st := state.NewState(v, state.WithMaxInteractionSizeAllowed(math.MaxUint64))
+	st := state.NewState(v)
 	sth := state.NewStateHolder(st)
 	accounts := state.NewAccounts(sth)
 

@@ -86,8 +86,14 @@ func (a *StatefulAccounts) AllocateStorageIndex(address flow.Address) (atree.Sto
 	// store nil so that the setValue for new allocated slabs would be faster
 	// and won't do ledger getValue for every new slabs (currently happening to compute storage size changes)
 	// this way the getValue would load this value from deltas
-	key := atree.SlabIndexToLedgerKey(index)
-	err = a.stateHolder.State().Set(string(address.Bytes()), "", string(key), []byte{}, false)
+	// don't enforce limits for this change
+	err = func() error {
+		a.stateHolder.MeteringHandler().DisableAllLimitEnforcements()
+		defer a.stateHolder.MeteringHandler().RestoreLimitEnforcements()
+		key := atree.SlabIndexToLedgerKey(index)
+		return a.stateHolder.State().Set(string(address.Bytes()), "", string(key), []byte{})
+	}()
+
 	if err != nil {
 		return atree.StorageIndex{}, fmt.Errorf("failed to store empty value for newly allocated storage index: %w", err)
 	}
@@ -419,9 +425,9 @@ func (a *StatefulAccounts) GetValue(address flow.Address, key string) (flow.Regi
 
 func (a *StatefulAccounts) getValue(address flow.Address, isController bool, key string) (flow.RegisterValue, error) {
 	if isController {
-		return a.stateHolder.State().Get(string(address.Bytes()), string(address.Bytes()), key, a.stateHolder.EnforceInteractionLimits())
+		return a.stateHolder.State().Get(string(address.Bytes()), string(address.Bytes()), key)
 	}
-	return a.stateHolder.State().Get(string(address.Bytes()), "", key, a.stateHolder.EnforceInteractionLimits())
+	return a.stateHolder.State().Get(string(address.Bytes()), "", key)
 }
 
 // SetValue sets a value in address' storage
@@ -436,9 +442,9 @@ func (a *StatefulAccounts) setValue(address flow.Address, isController bool, key
 	}
 
 	if isController {
-		return a.stateHolder.State().Set(string(address.Bytes()), string(address.Bytes()), key, value, a.stateHolder.EnforceInteractionLimits())
+		return a.stateHolder.State().Set(string(address.Bytes()), string(address.Bytes()), key, value)
 	}
-	return a.stateHolder.State().Set(string(address.Bytes()), "", key, value, a.stateHolder.EnforceInteractionLimits())
+	return a.stateHolder.State().Set(string(address.Bytes()), "", key, value)
 }
 
 func (a *StatefulAccounts) updateRegisterSizeChange(address flow.Address, isController bool, key string, value flow.RegisterValue) error {
@@ -502,10 +508,10 @@ func RegisterSize(address flow.Address, isController bool, key string, value flo
 // TODO handle errors
 func (a *StatefulAccounts) touch(address flow.Address, isController bool, key string) {
 	if isController {
-		_, _ = a.stateHolder.State().Get(string(address.Bytes()), string(address.Bytes()), key, a.stateHolder.EnforceInteractionLimits())
+		_, _ = a.stateHolder.State().Get(string(address.Bytes()), string(address.Bytes()), key)
 		return
 	}
-	_, _ = a.stateHolder.State().Get(string(address.Bytes()), "", key, a.stateHolder.EnforceInteractionLimits())
+	_, _ = a.stateHolder.State().Get(string(address.Bytes()), "", key)
 }
 
 func (a *StatefulAccounts) TouchContract(contractName string, address flow.Address) {

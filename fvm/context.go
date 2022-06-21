@@ -64,6 +64,7 @@ const AccountKeyWeightThreshold = 1000
 const (
 	DefaultComputationLimit             = 100_000        // 100K
 	DefaultMemoryLimit                  = math.MaxUint64 //
+	DefaultInteractionLimit             = 20_000_000     // ~20MB
 	DefaultEventCollectionByteSizeLimit = 256_000        // 256KB
 	DefaultMaxNumOfTxRetries            = 3
 )
@@ -78,7 +79,7 @@ func defaultContext(logger zerolog.Logger) Context {
 		MemoryLimit:                   DefaultMemoryLimit,
 		MaxStateKeySize:               state.DefaultMaxKeySize,
 		MaxStateValueSize:             state.DefaultMaxValueSize,
-		MaxStateInteractionSize:       state.DefaultMaxInteractionSize,
+		MaxStateInteractionSize:       DefaultInteractionLimit,
 		EventCollectionByteSizeLimit:  DefaultEventCollectionByteSizeLimit,
 		MaxNumOfTxRetries:             DefaultMaxNumOfTxRetries,
 		BlockHeader:                   nil,

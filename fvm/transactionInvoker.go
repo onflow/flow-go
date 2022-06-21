@@ -82,7 +82,9 @@ func (i *TransactionInvoker) Process(
 			proc.Events = make([]flow.Event, 0)
 			proc.ServiceEvents = make([]flow.Event, 0)
 		}
-		if mergeError := parentState.MergeState(childState, sth.EnforceInteractionLimits()); mergeError != nil {
+		sth.MeteringHandler().DisableAllLimitEnforcements()
+		defer sth.MeteringHandler().RestoreLimitEnforcements()
+		if mergeError := parentState.MergeState(childState); mergeError != nil {
 			processErr = fmt.Errorf("transaction invocation failed when merging state: %w", mergeError)
 		}
 		sth.SetActiveState(parentState)
@@ -106,7 +108,7 @@ func (i *TransactionInvoker) Process(
 				Str("txHash", txIDStr).
 				Uint64("blockHeight", blockHeight).
 				Int("retries_count", numberOfRetries).
-				Uint64("ledger_interaction_used", sth.State().InteractionUsed()).
+				Uint64("ledger_interaction_used", sth.State().Meter().TotalInteractionUsed()).
 				Msg("retrying transaction execution")
 
 			// reset error part of proc
@@ -139,12 +141,12 @@ func (i *TransactionInvoker) Process(
 			},
 		)
 		if err != nil {
-			var interactionLimiExceededErr *errors.LedgerIntractionLimitExceededError
-			if errors.As(err, &interactionLimiExceededErr) {
+			var interactionLimitExceededErr *errors.LedgerInteractionLimitExceededError
+			if errors.As(err, &interactionLimitExceededErr) {
 				// If it is this special interaction limit error, just set it directly as the tx error
 				txError = err
 			} else {
-				// Otherwise, do what we use to do
+				// Otherwise, do what we used to do
 				txError = fmt.Errorf("transaction invocation failed when executing transaction: %w", errors.HandleRuntimeError(err))
 			}
 		}
@@ -171,16 +173,12 @@ func (i *TransactionInvoker) Process(
 	// transaction deduction, because the payer is not charged for those.
 	i.logExecutionIntensities(sth, txIDStr)
 
-	// disable the limit checks on states
-	sth.DisableAllLimitEnforcements()
 	// try to deduct fees even if there is an error.
-	// disable the limit checks on states
 	feesError := i.deductTransactionFees(env, proc, sth, computationUsed)
 	if feesError != nil {
+		// the fees error replaces the transaction error
 		txError = feesError
 	}
-
-	sth.EnableAllLimitEnforcements()
 
 	// applying contract changes
 	// this writes back the contract contents to accounts
@@ -193,19 +191,13 @@ func (i *TransactionInvoker) Process(
 
 	// if there is still no error check if all account storage limits are ok
 	if txError == nil {
-		// disable the computation/memory limit checks on storage checks,
-		// so we don't error from computation/memory limits on this part.
-		// We cannot charge the user for this part, since fee deduction already happened.
-		sth.DisableAllLimitEnforcements()
-		txError = NewTransactionStorageLimiter().CheckLimits(env, sth.State().UpdatedAddresses())
-		sth.EnableAllLimitEnforcements()
+		txError = i.checkAccountStorageLimits(sth, env)
 	}
 
-	// it there was any transaction error clear changes and try to deduct fees again
+	// it there was any transaction error clear changes and try to deduct fees again.
+	// this catches the problem where because of the transaction invocation, fee deduction becomes impossible.
+	// for example the transaction moves the default FLOW vault.
 	if txError != nil {
-		sth.DisableAllLimitEnforcements()
-		defer sth.EnableAllLimitEnforcements()
-
 		// drop delta since transaction failed
 		childState.View().DropDelta()
 		// if tx fails just do clean up
@@ -261,6 +253,20 @@ func (i *TransactionInvoker) Process(
 	return txError
 }
 
+// checkAccountStorageLimits checks that participating accounts have sufficient
+// default FLOW balance to hold the new amount of storage.
+func (i *TransactionInvoker) checkAccountStorageLimits(sth *state.StateHolder, env *TransactionEnv) error {
+	// disable the computation/memory limit checks on storage checks,
+	// so we don't error from computation/memory limits on this part.
+	// We cannot charge the user for this part, since fee deduction already happened.
+	sth.MeteringHandler().DisableAllLimitEnforcements()
+	defer sth.MeteringHandler().RestoreLimitEnforcements()
+
+	err := NewTransactionStorageLimiter().CheckLimits(env, sth.State().UpdatedAddresses())
+
+	return err
+}
+
 func (i *TransactionInvoker) deductTransactionFees(
 	env *TransactionEnv,
 	proc *TransactionProcedure,
@@ -269,9 +275,11 @@ func (i *TransactionInvoker) deductTransactionFees(
 	if !env.ctx.TransactionFeesEnabled {
 		return nil
 	}
+	sth.MeteringHandler().DisableAllLimitEnforcements()
+	defer sth.MeteringHandler().RestoreLimitEnforcements()
 
-	if computationUsed > uint64(sth.State().TotalComputationLimit()) {
-		computationUsed = uint64(sth.State().TotalComputationLimit())
+	if computationUsed > uint64(sth.MeteringHandler().TotalComputationLimit()) {
+		computationUsed = uint64(sth.MeteringHandler().TotalComputationLimit())
 	}
 
 	deductTxFees := DeductTransactionFeesInvocation(env, proc.TraceSpan)
@@ -451,7 +459,7 @@ func (i *TransactionInvoker) logExecutionIntensities(sth *state.StateHolder, txH
 		}
 		i.logger.Info().
 			Str("txHash", txHash).
-			Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
+			Uint64("ledgerInteractionUsed", sth.State().Meter().TotalInteractionUsed()).
 			Uint("computationUsed", sth.State().TotalComputationUsed()).
 			Uint("memoryUsed", sth.State().TotalMemoryUsed()).
 			Dict("computationIntensities", computation).

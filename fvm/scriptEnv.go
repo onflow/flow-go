@@ -136,9 +136,9 @@ func (e *ScriptEnv) setExecutionParameters() {
 	}
 
 	var ok bool
-	var m *weighted.Meter
-	// only set the weights if the meter is a weighted.Meter
-	if m, ok = e.sth.State().Meter().(*weighted.Meter); !ok {
+	var m *weighted.MeteringHandler
+	// only set the weights if the meter is a weighted.MeteringHandler
+	if m, ok = e.sth.MeteringHandler().(*weighted.MeteringHandler); !ok {
 		return
 	}
 
@@ -591,10 +591,7 @@ func (e *ScriptEnv) meterComputation(kind common.ComputationKind, intensity uint
 		return err
 	}
 
-	if e.sth.EnforceComputationLimits {
-		return e.sth.State().MeterComputation(kind, intensity)
-	}
-	return nil
+	return e.sth.State().MeterComputation(kind, intensity)
 }
 
 func (e *ScriptEnv) MeterComputation(kind common.ComputationKind, intensity uint) error {
@@ -606,10 +603,7 @@ func (e *ScriptEnv) ComputationUsed() uint64 {
 }
 
 func (e *ScriptEnv) meterMemory(kind common.MemoryKind, intensity uint) error {
-	if e.sth.EnforceMemoryLimits() {
-		return e.sth.State().MeterMemory(kind, intensity)
-	}
-	return nil
+	return e.sth.State().MeterMemory(kind, intensity)
 }
 
 func (e *ScriptEnv) MeterMemory(usage common.MemoryUsage) error {
