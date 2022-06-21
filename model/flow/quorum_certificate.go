@@ -23,7 +23,10 @@ type QuorumCertificate struct {
 }
 
 // ID returns the QuorumCertificate's identifier
-func (qc QuorumCertificate) ID() Identifier {
+func (qc *QuorumCertificate) ID() Identifier {
+	if qc == nil {
+		return ZeroID
+	}
 	return MakeID(qc)
 }
 

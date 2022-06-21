@@ -2,6 +2,7 @@ package timeoutcollector
 
 import (
 	"errors"
+	"go.uber.org/atomic"
 	"math/rand"
 	"sync"
 	"testing"
@@ -37,7 +38,7 @@ type TimeoutProcessorTestSuite struct {
 	signer        *flow.Identity
 	view          uint64
 	sigWeight     uint64
-	totalWeight   uint64
+	totalWeight   atomic.Uint64
 	committee     *mocks.Replicas
 	validator     *mocks.Validator
 	sigAggregator *mocks.TimeoutSignatureAggregator
@@ -55,21 +56,21 @@ func (s *TimeoutProcessorTestSuite) SetupTest() {
 	s.participants = unittest.IdentityListFixture(11, unittest.WithWeight(s.sigWeight))
 	s.signer = s.participants[0]
 	s.view = (uint64)(rand.Uint32() + 100)
-	s.totalWeight = 0
+	s.totalWeight = *atomic.NewUint64(0)
 
 	s.committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(s.participants.TotalWeight()), nil).Maybe()
 	s.committee.On("TimeoutThresholdForView", mock.Anything).Return(committees.WeightThresholdToTimeout(s.participants.TotalWeight()), nil).Maybe()
 	s.committee.On("IdentityByEpoch", mock.Anything, mock.Anything).Return(s.signer, nil).Maybe()
 	s.sigAggregator.On("View").Return(s.view).Maybe()
 	s.sigAggregator.On("VerifyAndAdd", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		s.totalWeight += s.sigWeight
+		s.totalWeight.Add(s.sigWeight)
 	}).Return(func(signerID flow.Identifier, sig crypto.Signature, newestQCView uint64) uint64 {
-		return s.totalWeight
+		return s.totalWeight.Load()
 	}, func(signerID flow.Identifier, sig crypto.Signature, newestQCView uint64) error {
 		return nil
 	}).Maybe()
 	s.sigAggregator.On("TotalWeight").Return(func() uint64 {
-		return s.totalWeight
+		return s.totalWeight.Load()
 	}).Maybe()
 
 	s.processor, err = NewTimeoutProcessor(s.committee,

@@ -28,7 +28,6 @@ type TimeoutProcessor interface {
 	// Expected error returns during normal operations:
 	// * timeoutcollector.ErrTimeoutForIncompatibleView - submitted timeout for incompatible view
 	// * model.InvalidTimeoutError - submitted invalid timeout(invalid structure or invalid signature)
-	// * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
 	// All other errors should be treated as exceptions.
 	Process(timeout *model.TimeoutObject) error
 }
