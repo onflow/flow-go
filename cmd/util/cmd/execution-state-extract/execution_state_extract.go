@@ -94,7 +94,7 @@ func extractExecutionState(
 				RWF:   reportFileWriterFactory,
 			},
 			reporters.NewFungibleTokenTracker(log, reportFileWriterFactory, chain, []string{reporters.FlowTokenTypeID(chain)}),
-      &reporters.AtreeReporter{
+			&reporters.AtreeReporter{
 				Log: log,
 				RWF: reportFileWriterFactory,
 			},
