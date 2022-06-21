@@ -265,9 +265,9 @@ func (r *RequestHandler) onBatchRequest(originID flow.Identifier, req *messages.
 
 	if len(req.BlockIDs) > int(maxSize) {
 		r.log.Warn().
-		Int("size", len(req.BlockIDs)).
-		Uint("max_size", maxSize).
-		Msg("batch request is too large")
+			Int("size", len(req.BlockIDs)).
+			Uint("max_size", maxSize).
+			Msg("batch request is too large")
 	}
 
 	// deduplicate the block IDs in the batch request
