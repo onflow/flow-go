@@ -9,12 +9,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/compliance"
 	metrics "github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	realstorage "github.com/onflow/flow-go/storage"
@@ -99,16 +100,16 @@ func (suite *Suite) TestHandlePendingBlock() {
 	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
 
 	// don't return the parent when requested
-	suite.snapshot.On("Head").Return(head.Header, nil).Once()
+	suite.snapshot.On("Head").Return(head.Header, nil)
 	suite.cache.On("ByID", block.Header.ParentID).Return(nil, false).Once()
 	suite.headers.On("ByBlockID", block.Header.ParentID).Return(nil, realstorage.ErrNotFound).Once()
 
 	suite.cache.On("Add", mock.Anything, mock.Anything).Return(true).Once()
-	suite.sync.On("RequestBlock", block.Header.ParentID).Return().Once()
+	suite.sync.On("RequestBlock", block.Header.ParentID, block.Header.Height-1).Return().Once()
 
 	// submit the block
 	proposal := unittest.ProposalFromBlock(&block)
-	err := suite.engine.Process(engine.ReceiveBlocks, originID, proposal)
+	err := suite.engine.Process(network.ReceiveBlocks, originID, proposal)
 	assert.Nil(suite.T(), err)
 
 	suite.follower.AssertNotCalled(suite.T(), "SubmitProposal", mock.Anything)
@@ -132,7 +133,7 @@ func (suite *Suite) TestHandleProposal() {
 	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
 
 	// the parent is the last finalized state
-	suite.snapshot.On("Head").Return(parent.Header, nil).Once()
+	suite.snapshot.On("Head").Return(parent.Header, nil)
 	// we should be able to extend the state with the block
 	suite.state.On("Extend", mock.Anything, &block).Return(nil).Once()
 	// we should be able to get the parent header by its ID
@@ -144,10 +145,35 @@ func (suite *Suite) TestHandleProposal() {
 
 	// submit the block
 	proposal := unittest.ProposalFromBlock(&block)
-	err := suite.engine.Process(engine.ReceiveBlocks, originID, proposal)
+	err := suite.engine.Process(network.ReceiveBlocks, originID, proposal)
 	assert.Nil(suite.T(), err)
 
 	suite.follower.AssertExpectations(suite.T())
+}
+
+func (suite *Suite) TestHandleProposalSkipProposalThreshold() {
+
+	// mock latest finalized state
+	final := unittest.BlockHeaderFixture()
+	suite.snapshot.On("Head").Return(&final, nil)
+
+	originID := unittest.IdentifierFixture()
+	block := unittest.BlockFixture()
+
+	block.Header.Height = final.Height + compliance.DefaultConfig().SkipNewProposalsThreshold + 1
+
+	// not in cache or storage
+	suite.cache.On("ByID", block.ID()).Return(nil, false).Once()
+	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
+
+	// submit the block
+	proposal := unittest.ProposalFromBlock(&block)
+	err := suite.engine.Process(network.ReceiveBlocks, originID, proposal)
+	assert.NoError(suite.T(), err)
+
+	// block should be dropped - not added to state or cache
+	suite.state.AssertNotCalled(suite.T(), "Extend", mock.Anything)
+	suite.cache.AssertNotCalled(suite.T(), "Add", originID, mock.Anything)
 }
 
 func (suite *Suite) TestHandleProposalWithPendingChildren() {
@@ -198,7 +224,7 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 
 	// submit the block proposal
 	proposal := unittest.ProposalFromBlock(&block)
-	err := suite.engine.Process(engine.ReceiveBlocks, originID, proposal)
+	err := suite.engine.Process(network.ReceiveBlocks, originID, proposal)
 	assert.Nil(suite.T(), err)
 
 	suite.follower.AssertExpectations(suite.T())

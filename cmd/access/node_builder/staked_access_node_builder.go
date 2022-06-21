@@ -13,9 +13,10 @@ import (
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
 
+	"github.com/onflow/flow-go/admin/commands"
+	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/engine/access/rpc"
@@ -30,6 +31,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/metrics/unstaked"
 	"github.com/onflow/flow-go/network"
+	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	relaynet "github.com/onflow/flow-go/network/relay"
@@ -83,6 +85,10 @@ func (builder *StakedAccessNodeBuilder) Initialize() error {
 	// enqueue the regular network
 	builder.EnqueueNetworkInit()
 
+	builder.AdminCommand("get-transactions", func(conf *cmd.NodeConfig) commands.AdminCommand {
+		return storageCommands.NewGetTransactionsCommand(conf.State, conf.Storage.Payloads, conf.Storage.Collections)
+	})
+
 	// if this is an access node that supports unstaked followers, enqueue the unstaked network
 	if builder.supportsUnstakedFollower {
 		builder.enqueueUnstakedNetworkInit()
@@ -97,8 +103,6 @@ func (builder *StakedAccessNodeBuilder) Initialize() error {
 		return err
 	}
 
-	builder.EnqueueAdminServerInit()
-
 	builder.EnqueueTracer()
 	builder.PreInit(cmd.DynamicStartPreInit)
 	return nil
@@ -110,7 +114,7 @@ func (builder *StakedAccessNodeBuilder) enqueueRelayNetwork() {
 			node.Network,
 			builder.AccessNodeConfig.PublicNetworkConfig.Network,
 			node.Logger,
-			[]network.Channel{engine.ReceiveBlocks},
+			[]network.Channel{network.ReceiveBlocks},
 		)
 		node.Network = relayNet
 		return relayNet, nil
@@ -186,6 +190,10 @@ func (builder *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.logTxTimeToExecuted, builder.logTxTimeToFinalizedExecuted)
 			return nil
 		}).
+		Module("access metrics", func(node *cmd.NodeConfig) error {
+			builder.AccessMetrics = metrics.NewAccessCollector()
+			return nil
+		}).
 		Module("ping metrics", func(node *cmd.NodeConfig) error {
 			builder.PingMetrics = metrics.NewPingCollector()
 			return nil
@@ -201,7 +209,8 @@ func (builder *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			builder.RpcEng = rpc.New(
+			var err error
+			builder.RpcEng, err = rpc.New(
 				node.Logger,
 				node.State,
 				builder.rpcConf,
@@ -215,6 +224,7 @@ func (builder *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Storage.Results,
 				node.RootChainID,
 				builder.TransactionMetrics,
+				builder.AccessMetrics,
 				builder.collectionGRPCPort,
 				builder.executionGRPCPort,
 				builder.retryEnabled,
@@ -222,6 +232,9 @@ func (builder *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.apiRatelimits,
 				builder.apiBurstlimits,
 			)
+			if err != nil {
+				return nil, err
+			}
 			return builder.RpcEng, nil
 		}).
 		Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -233,7 +246,7 @@ func (builder *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Network,
 				node.Me,
 				node.State,
-				engine.RequestCollections,
+				network.RequestCollections,
 				filter.HasRole(flow.RoleCollection),
 				func() flow.Entity { return &flow.Collection{} },
 			)
@@ -241,8 +254,24 @@ func (builder *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 				return nil, fmt.Errorf("could not create requester engine: %w", err)
 			}
 
-			builder.IngestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, builder.RequestEng, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, node.Storage.Results, node.Storage.Receipts, builder.TransactionMetrics,
-				builder.CollectionsToMarkFinalized, builder.CollectionsToMarkExecuted, builder.BlocksToMarkExecuted, builder.RpcEng)
+			builder.IngestEng, err = ingestion.New(
+				node.Logger,
+				node.Network,
+				node.State,
+				node.Me,
+				builder.RequestEng,
+				node.Storage.Blocks,
+				node.Storage.Headers,
+				node.Storage.Collections,
+				node.Storage.Transactions,
+				node.Storage.Results,
+				node.Storage.Receipts,
+				builder.TransactionMetrics,
+				builder.CollectionsToMarkFinalized,
+				builder.CollectionsToMarkExecuted,
+				builder.BlocksToMarkExecuted,
+				builder.RpcEng,
+			)
 			if err != nil {
 				return nil, err
 			}
@@ -276,6 +305,10 @@ func (builder *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			return syncRequestHandler, nil
 		})
+	}
+
+	if builder.executionDataSyncEnabled {
+		builder.BuildExecutionDataRequester()
 	}
 
 	builder.Component("ping engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -314,15 +347,28 @@ func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 		// topology returns empty list since peers are not known upfront
 		top := topology.EmptyListTopology{}
 
-		network, err := builder.initNetwork(builder.Me, builder.PublicNetworkConfig.Metrics, middleware, top)
+		var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+		if builder.HeroCacheMetricsEnable {
+			heroCacheCollector = metrics.PublicNetworkReceiveCacheMetricsFactory(builder.MetricsRegisterer)
+		}
+		receiveCache := netcache.NewHeroReceiveCache(builder.NetworkReceivedMessageCacheSize,
+			builder.Logger,
+			heroCacheCollector)
+
+		err := node.Metrics.Mempool.Register(metrics.ResourcePublicNetworkingReceiveCache, receiveCache.Size)
+		if err != nil {
+			return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
+		}
+
+		net, err := builder.initNetwork(builder.Me, builder.PublicNetworkConfig.Metrics, middleware, top, receiveCache)
 		if err != nil {
 			return nil, err
 		}
 
-		builder.AccessNodeConfig.PublicNetworkConfig.Network = network
+		builder.AccessNodeConfig.PublicNetworkConfig.Network = net
 
 		node.Logger.Info().Msgf("network will run on address: %s", builder.PublicNetworkConfig.BindAddress)
-		return network, nil
+		return net, nil
 	})
 }
 
@@ -347,7 +393,14 @@ func (builder *StakedAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Priv
 			).
 			SetConnectionManager(connManager).
 			SetRoutingSystem(func(ctx context.Context, h host.Host) (routing.Routing, error) {
-				return p2p.NewDHT(ctx, h, unicast.FlowPublicDHTProtocolID(builder.SporkID), p2p.AsServer())
+				return p2p.NewDHT(
+					ctx,
+					h,
+					unicast.FlowPublicDHTProtocolID(builder.SporkID),
+					builder.Logger,
+					builder.PublicNetworkConfig.Metrics,
+					p2p.AsServer(),
+				)
 			}).
 			SetPubSub(pubsub.NewGossipSub).
 			Build(ctx)
@@ -380,6 +433,7 @@ func (builder *StakedAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 		builder.SporkID,
 		p2p.DefaultUnicastTimeout,
 		builder.IDTranslator,
+		builder.CodecFactory(),
 		p2p.WithMessageValidators(validators...),
 		p2p.WithPeerManager(peerManagerFactory),
 		// use default identifier provider

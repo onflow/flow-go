@@ -14,10 +14,10 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// batchInsert will encode the given entity using msgpack and will upsert the resulting
+// batchWrite will encode the given entity using msgpack and will upsert the resulting
 // binary data in the badger wrote batch under the provided key - if the value already exists
 // in the database it will be overridden
-func batchInsert(key []byte, entity interface{}) func(writeBatch *badger.WriteBatch) error {
+func batchWrite(key []byte, entity interface{}) func(writeBatch *badger.WriteBatch) error {
 	return func(writeBatch *badger.WriteBatch) error {
 
 		// update the maximum key size if the inserted key is bigger
@@ -84,7 +84,7 @@ func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 	}
 }
 
-// update will encode the given entity with JSON and update the binary data
+// update will encode the given entity with MsgPack and update the binary data
 // under the given key in the badger DB. It will error if the key does not exist
 // yet.
 func update(key []byte, entity interface{}) func(*badger.Txn) error {
@@ -130,6 +130,28 @@ func remove(key []byte) func(*badger.Txn) error {
 
 		err = tx.Delete(key)
 		return err
+	}
+}
+
+// removeByPrefix removes all the entities if the prefix of the key matches the given prefix.
+// if no key matches, this is a no-op
+func removeByPrefix(prefix []byte) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.AllVersions = false
+		opts.PrefetchValues = false
+		it := tx.NewIterator(opts)
+		defer it.Close()
+
+		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+			key := it.Item().KeyCopy(nil)
+			err := tx.Delete(key)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
 	}
 }
 
@@ -204,6 +226,14 @@ func lookup(entityIDs *[]flow.Identifier) func() (checkFunc, createFunc, handleF
 	}
 }
 
+// withPrefetchValuesFalse configures a Badger iteration to NOT preemptively load
+// the values when iterating over keys (ie. key-only iteration). Key-only iteration
+// is several order of magnitudes faster than regular iteration, because it involves
+// access to the LSM-tree only, which is usually resident entirely in RAM.
+func withPrefetchValuesFalse(options *badger.IteratorOptions) {
+	options.PrefetchValues = false
+}
+
 // iterate iterates over a range of keys defined by a start and end key. The
 // start key may be higher than the end key, in which case we iterate in
 // reverse order.
@@ -219,12 +249,15 @@ func lookup(entityIDs *[]flow.Identifier) func() (checkFunc, createFunc, handleF
 //
 // TODO: this function is unbounded – pass context.Context to this or calling
 // functions to allow timing functions out.
-func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn) error {
+func iterate(start []byte, end []byte, iteration iterationFunc, opts ...func(*badger.IteratorOptions)) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
 		// initialize the default options and comparison modifier for iteration
 		modifier := 1
 		options := badger.DefaultIteratorOptions
+		for _, apply := range opts {
+			apply(&options)
+		}
 
 		// In order to satisfy this function's prefix-wise inclusion semantics,
 		// we append 0xff bytes to the largest of start and end.

@@ -92,7 +92,7 @@ func TestGetSnapshotAtEpochAndPhase(t *testing.T) {
 			unittest.Logger(),
 			targetEpoch,
 			targetPhase,
-			time.Millisecond,
+			time.Nanosecond,
 			getSnapshot,
 		)
 		require.NoError(t, err)
@@ -118,7 +118,7 @@ func TestGetSnapshotAtEpochAndPhase(t *testing.T) {
 			unittest.Logger(),
 			targetEpoch,
 			targetPhase,
-			time.Millisecond,
+			time.Nanosecond,
 			getSnapshot,
 		)
 		require.NoError(t, err)
@@ -148,7 +148,7 @@ func TestGetSnapshotAtEpochAndPhase(t *testing.T) {
 			unittest.Logger(),
 			5,
 			targetPhase,
-			time.Millisecond,
+			time.Nanosecond,
 			getSnapshot,
 		)
 		require.NoError(t, err)

@@ -124,13 +124,13 @@ func NewEngine(log zerolog.Logger,
 	}
 
 	// register engine with the approval provider
-	_, err = net.Register(engine.ReceiveApprovals, e)
+	_, err = net.Register(network.ReceiveApprovals, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register for approvals: %w", err)
 	}
 
 	// register engine to the channel for requesting missing approvals
-	approvalConduit, err := net.Register(engine.RequestApprovalsByChunk, e)
+	approvalConduit, err := net.Register(network.RequestApprovalsByChunk, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register for requesting approvals: %w", err)
 	}
@@ -161,12 +161,12 @@ func (e *Engine) setupTrustedInboundQueues() error {
 	var err error
 	e.pendingIncorporatedResults, err = fifoqueue.NewFifoQueue()
 	if err != nil {
-		return fmt.Errorf("failed to create queue for incorproated results: %w", err)
+		return fmt.Errorf("failed to create queue for incorporated results: %w", err)
 	}
 	e.pendingIncorporatedBlocks, err = fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultIncorporatedBlockQueueCapacity))
 	if err != nil {
-		return fmt.Errorf("failed to create queue for incorproated blocks: %w", err)
+		return fmt.Errorf("failed to create queue for incorporated blocks: %w", err)
 	}
 	return nil
 }

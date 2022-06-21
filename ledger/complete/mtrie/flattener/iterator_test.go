@@ -40,7 +40,7 @@ func TestPopulatedTrie(t *testing.T) {
 	paths := []ledger.Path{p1, p2}
 	payloads := []ledger.Payload{*v1, *v2}
 
-	testTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
+	testTrie, _, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
 	require.NoError(t, err)
 
 	for itr := flattener.NewNodeIterator(testTrie); itr.Next(); {
@@ -105,7 +105,7 @@ func TestUniqueNodeIterator(t *testing.T) {
 		paths := []ledger.Path{p1, p2}
 		payloads := []ledger.Payload{*v1, *v2}
 
-		updatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
+		updatedTrie, _, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
 		require.NoError(t, err)
 
 		//              n4
@@ -167,7 +167,7 @@ func TestUniqueNodeIterator(t *testing.T) {
 		paths := []ledger.Path{p1, p2}
 		payloads := []ledger.Payload{*v1, *v2}
 
-		trie1, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
+		trie1, _, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
 		require.NoError(t, err)
 
 		// trie1
@@ -195,7 +195,7 @@ func TestUniqueNodeIterator(t *testing.T) {
 		paths = []ledger.Path{p3, p4}
 		payloads = []ledger.Payload{*v3, *v4}
 
-		trie2, err := trie.NewTrieWithUpdatedRegisters(trie1, paths, payloads, true)
+		trie2, _, err := trie.NewTrieWithUpdatedRegisters(trie1, paths, payloads, true)
 		require.NoError(t, err)
 
 		// trie2
@@ -218,7 +218,7 @@ func TestUniqueNodeIterator(t *testing.T) {
 		paths = []ledger.Path{p1}
 		payloads = []ledger.Payload{*v5}
 
-		trie3, err := trie.NewTrieWithUpdatedRegisters(trie2, paths, payloads, true)
+		trie3, _, err := trie.NewTrieWithUpdatedRegisters(trie2, paths, payloads, true)
 		require.NoError(t, err)
 
 		// trie3

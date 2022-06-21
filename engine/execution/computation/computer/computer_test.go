@@ -67,7 +67,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(nil).
 			Times(2) // 1 collection + system collection
 
-		metrics.On("ExecutionTransactionExecuted", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		metrics.On("ExecutionTransactionExecuted", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).
 			Times(2 + 1) // 2 txs in collection + system chunk tx
 
@@ -336,6 +336,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				events = events[1:]
 				return nil
 			},
+			readStored: func(address common.Address, path cadence.Path, r runtime.Context) (cadence.Value, error) {
+				return nil, nil
+			},
 		}
 
 		vm := fvm.NewVirtualMachine(emittingRuntime)
@@ -374,7 +377,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		rt := &testRuntime{
 			executeTransaction: func(script runtime.Script, r runtime.Context) error {
 
-				program, err := r.Interface.GetProgram(contractLocation)
+				program, err := r.Interface.GetProgram(contractLocation) //nolint:staticcheck
 				require.NoError(t, err)
 				require.Nil(t, program)
 
@@ -385,6 +388,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				require.NoError(t, err)
 
 				return nil
+			},
+			readStored: func(address common.Address, path cadence.Path, r runtime.Context) (cadence.Value, error) {
+				return nil, nil
 			},
 		}
 
@@ -436,7 +442,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 				// NOTE: set a program and revert all transactions but the system chunk transaction
 
-				program, err := r.Interface.GetProgram(contractLocation)
+				program, err := r.Interface.GetProgram(contractLocation) //nolint:staticcheck
 				require.NoError(t, err)
 
 				if executionCalls > collectionCount*transactionCount {
@@ -454,6 +460,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				return runtime.Error{
 					Err: fmt.Errorf("TX reverted"),
 				}
+			},
+			readStored: func(address common.Address, path cadence.Path, r runtime.Context) (cadence.Value, error) {
+				return nil, nil
 			},
 		}
 
@@ -490,9 +499,14 @@ func assertEventHashesMatch(t *testing.T, expectedNoOfChunks int, result *execut
 type testRuntime struct {
 	executeScript      func(runtime.Script, runtime.Context) (cadence.Value, error)
 	executeTransaction func(runtime.Script, runtime.Context) error
+	readStored         func(common.Address, cadence.Path, runtime.Context) (cadence.Value, error)
 }
 
 var _ runtime.Runtime = &testRuntime{}
+
+func (e *testRuntime) SetInvalidatedResourceValidationEnabled(_ bool) {
+	panic("SetInvalidatedResourceValidationEnabled not expected")
+}
 
 func (e *testRuntime) SetTracingEnabled(_ bool) {
 	panic("SetTracingEnabled not expected")
@@ -530,12 +544,16 @@ func (*testRuntime) SetAtreeValidationEnabled(_ bool) {
 	panic("SetAtreeValidationEnabled not expected")
 }
 
-func (*testRuntime) ReadStored(_ common.Address, _ cadence.Path, _ runtime.Context) (cadence.Value, error) {
-	panic("ReadStored not expected")
+func (e *testRuntime) ReadStored(a common.Address, p cadence.Path, c runtime.Context) (cadence.Value, error) {
+	return e.readStored(a, p, c)
 }
 
 func (*testRuntime) ReadLinked(_ common.Address, _ cadence.Path, _ runtime.Context) (cadence.Value, error) {
 	panic("ReadLinked not expected")
+}
+
+func (*testRuntime) SetDebugger(_ *interpreter.Debugger) {
+	panic("SetDebugger not expected")
 }
 
 type RandomAddressGenerator struct{}
@@ -651,7 +669,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		Return(nil).
 		Times(1) // system collection
 
-	metrics.On("ExecutionTransactionExecuted", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+	metrics.On("ExecutionTransactionExecuted", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(nil).
 		Times(1) // system chunk tx
 

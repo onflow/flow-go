@@ -56,7 +56,7 @@ func TestFungibleTokenTracker(t *testing.T) {
 	pub contract WrappedToken {
 		pub resource WrappedVault {
 			pub var vault: @FungibleToken.Vault
-	
+
 			init(v: @FungibleToken.Vault) {
 				self.vault <- v
 			}
@@ -90,12 +90,12 @@ func TestFungibleTokenTracker(t *testing.T) {
 							import FungibleToken from 0x%s
 							import FlowToken from 0x%s
 							import WrappedToken from 0x%s
-							
-							transaction(amount: UFix64) {							
+
+							transaction(amount: UFix64) {
 								prepare(signer: AuthAccount) {
 									let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
 										?? panic("Could not borrow reference to the owner's Vault!")
-							
+
 									let sentVault <- vaultRef.withdraw(amount: amount)
 									let wrappedFlow <- WrappedToken.CreateWrappedVault(inp :<- sentVault)
 									signer.save(<-wrappedFlow, to: /storage/wrappedToken)
@@ -117,7 +117,7 @@ func TestFungibleTokenTracker(t *testing.T) {
 	reporterFactory := reporters.NewReportFileWriterFactory(dir, log)
 
 	br := reporters.NewFungibleTokenTracker(log, reporterFactory, chain, []string{reporters.FlowTokenTypeID(chain)})
-	err = br.Report(view.Payloads())
+	err = br.Report(view.Payloads(), ledger.State{})
 	require.NoError(t, err)
 
 	data, err := os.ReadFile(reporterFactory.Filename(reporters.FungibleTokenTrackerReportPrefix))
@@ -131,4 +131,6 @@ func TestFungibleTokenTracker(t *testing.T) {
 	require.True(t, strings.Contains(string(data), `{"path":"storage/flowTokenVault","address":"7e60df042a9c0868","balance":100000,"type_id":"A.7e60df042a9c0868.FlowToken.Vault"}`))
 	require.True(t, strings.Contains(string(data), `{"path":"storage/flowTokenVault","address":"912d5440f7e3769e","balance":100000,"type_id":"A.7e60df042a9c0868.FlowToken.Vault"}`))
 
+	// do not remove this line, see https://github.com/onflow/flow-go/pull/2237
+	t.Log("success")
 }

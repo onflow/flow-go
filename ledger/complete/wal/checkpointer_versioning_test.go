@@ -4,12 +4,13 @@ import (
 	"encoding/hex"
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/ledger"
 )
 
-func Test_LoadingV1Checkpoint(t *testing.T) {
+func TestLoadCheckpointV1(t *testing.T) {
 
 	expectedRootHash := [4]ledger.RootHash{
 		mustToHash("568f4ec740fe3b5de88034cb7b1fbddb41548b068f31aebc8ae9189e429c5749"), // empty trie root hash
@@ -18,7 +19,8 @@ func Test_LoadingV1Checkpoint(t *testing.T) {
 		mustToHash("63df641430e5e0745c3d99ece6ac209467ccfdb77e362e7490a830db8e8803ae"),
 	}
 
-	tries, err := LoadCheckpoint("test_data/checkpoint.v1")
+	logger := zerolog.Nop()
+	tries, err := LoadCheckpoint("test_data/checkpoint.v1", &logger)
 	require.NoError(t, err)
 	require.Equal(t, len(expectedRootHash), len(tries))
 
@@ -28,7 +30,7 @@ func Test_LoadingV1Checkpoint(t *testing.T) {
 	}
 }
 
-func Test_LoadingV3Checkpoint(t *testing.T) {
+func TestLoadCheckpointV3(t *testing.T) {
 
 	expectedRootHash := [4]ledger.RootHash{
 		mustToHash("568f4ec740fe3b5de88034cb7b1fbddb41548b068f31aebc8ae9189e429c5749"), // empty trie root hash
@@ -37,7 +39,28 @@ func Test_LoadingV3Checkpoint(t *testing.T) {
 		mustToHash("63df641430e5e0745c3d99ece6ac209467ccfdb77e362e7490a830db8e8803ae"),
 	}
 
-	tries, err := LoadCheckpoint("test_data/checkpoint.v3")
+	logger := zerolog.Nop()
+	tries, err := LoadCheckpoint("test_data/checkpoint.v3", &logger)
+	require.NoError(t, err)
+	require.Equal(t, len(expectedRootHash), len(tries))
+
+	for i, trie := range tries {
+		require.Equal(t, expectedRootHash[i], trie.RootHash())
+		require.True(t, trie.RootNode().VerifyCachedHash())
+	}
+}
+
+func TestLoadCheckpointV4(t *testing.T) {
+
+	expectedRootHash := [4]ledger.RootHash{
+		mustToHash("568f4ec740fe3b5de88034cb7b1fbddb41548b068f31aebc8ae9189e429c5749"), // empty trie root hash
+		mustToHash("f53f9696b85b7428227f1b39f40b2ce07c175f58dea2b86cb6f84dc7c9fbeabd"),
+		mustToHash("7ac8daf34733cce3d5d03b5a1afde33a572249f81c45da91106412e94661e109"),
+		mustToHash("63df641430e5e0745c3d99ece6ac209467ccfdb77e362e7490a830db8e8803ae"),
+	}
+
+	logger := zerolog.Nop()
+	tries, err := LoadCheckpoint("test_data/checkpoint.v4", &logger)
 	require.NoError(t, err)
 	require.Equal(t, len(expectedRootHash), len(tries))
 

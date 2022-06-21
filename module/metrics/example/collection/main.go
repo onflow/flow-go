@@ -6,10 +6,10 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/metrics/example"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/queue"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -30,8 +30,8 @@ func main() {
 			NetworkCollector:    metrics.NewNetworkCollector(),
 		}
 
-		topic1 := engine.TestNetwork.String()
-		topic2 := engine.TestMetrics.String()
+		topic1 := network.TestNetworkChannel.String()
+		topic2 := network.TestMetricsChannel.String()
 		message1 := "CollectionRequest"
 		message2 := "ClusterBlockProposal"
 

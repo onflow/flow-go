@@ -87,8 +87,10 @@ func (p *Pool) initFreeEntities() {
 
 // Add writes given entity into a poolEntity on the underlying entities linked-list. Return value is
 // the index at which given entity is written on entities linked-list so that it can be accessed directly later.
-func (p *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) EIndex {
-	entityIndex := p.sliceIndexForEntity()
+//
+// Boolean returned value determines whether an ejection happened to add this entity.
+func (p *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) (EIndex, bool) {
+	entityIndex, ejection := p.sliceIndexForEntity()
 	p.poolEntities[entityIndex].entity = entity
 	p.poolEntities[entityIndex].id = entityId
 	p.poolEntities[entityIndex].owner = owner
@@ -110,7 +112,7 @@ func (p *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) E
 	p.used.tail.setPoolIndex(entityIndex)
 
 	p.size++
-	return entityIndex
+	return entityIndex, ejection
 }
 
 // Get returns entity corresponding to the entity index from the underlying list.
@@ -133,8 +135,12 @@ func (p Pool) All() []PoolEntity {
 }
 
 // sliceIndexForEntity returns a slice index which hosts the next entity to be added to the list.
-func (p *Pool) sliceIndexForEntity() EIndex {
+// The boolean returned value determines whether an ejection happened to make one slot free or not.
+func (p *Pool) sliceIndexForEntity() (EIndex, bool) {
+	ejection := false
+
 	if p.free.head.isUndefined() {
+		ejection = true
 		// the free list is empty, so we are out of space, and we need to eject.
 		if p.ejectionMode == RandomEjection {
 			// we only eject randomly when the pool is full and random ejection is on.
@@ -148,7 +154,7 @@ func (p *Pool) sliceIndexForEntity() EIndex {
 	}
 
 	// claiming the head of free list as the slice index for the next entity to be added
-	return p.claimFreeHead()
+	return p.claimFreeHead(), ejection
 }
 
 // Size returns total number of entities that this list maintains.
