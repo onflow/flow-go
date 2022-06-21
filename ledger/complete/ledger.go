@@ -415,7 +415,7 @@ func (l *Ledger) ExportCheckpointAt(
 
 	// running post checkpoint reporters
 	for i, reporter := range postCheckpointReporters {
-		l.logger.Info().Msgf("running a post-checkpoint generation reporter: %s, (%v/%v)", reporter.Name(), (i, len(postCheckpointReporters))
+		l.logger.Info().Msgf("running a post-checkpoint generation reporter: %s, (%v/%v)", reporter.Name(), i, len(postCheckpointReporters))
 		err := runReport(reporter, payloads, statecommitment,  l.logger)
 		if err != nil {
 			return ledger.State(hash.DummyHash), err
