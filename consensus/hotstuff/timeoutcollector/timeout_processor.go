@@ -151,10 +151,14 @@ func (p *TimeoutProcessor) Process(timeout *model.TimeoutObject) error {
 		p.notifier.OnPartialTcCreated(p.view)
 	}
 
-	// checking of conditions for building TC are satisfied
+	// Checking of conditions for building TC are satisfied when willBuildTC is true.
 	// At this point, we have enough signatures to build a TC. Another routine
-	// might just be at this point. To avoid duplicate work, only one routine can pass:
-	if !p.tcTracker.Track(totalWeight) {
+	// might just be at this point. To avoid duplicate work, Track returns true only once.
+	willBuildTC := p.tcTracker.Track(totalWeight)
+	
+	if !willBuildTC {
+		// either we do not have enough timeouts to build a TC, or another thread
+		// has already passed this gate and created a TC
 		return nil
 	}
 
@@ -172,7 +176,6 @@ func (p *TimeoutProcessor) Process(timeout *model.TimeoutObject) error {
 // ATTENTION: this function doesn't check if timeout signature is valid, this check happens in signature aggregator
 // Expected error returns during normal operations:
 // * model.InvalidTimeoutError - submitted invalid timeout(invalid structure or invalid signature)
-// * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
 // All other errors should be treated as exceptions.
 func (p *TimeoutProcessor) validateTimeout(timeout *model.TimeoutObject) error {
 	// 1. check if it's correctly structured
@@ -191,10 +194,10 @@ func (p *TimeoutProcessor) validateTimeout(timeout *model.TimeoutObject) error {
 	//     _both_ QC and TC for the previous round, in which case it can include both.
 	if timeout.LastViewTC != nil {
 		if timeout.View != timeout.LastViewTC.View+1 {
-			return model.NewInvalidTimeoutErrorf(timeout, "invalid TC for previous round")
+			return model.NewInvalidTimeoutErrorf(timeout, "invalid TC for non-previous view, expected view %d, got view %d", timeout.View-1, timeout.LastViewTC.View)
 		}
 		if timeout.NewestQC.View < timeout.LastViewTC.NewestQC.View {
-			return model.NewInvalidTimeoutErrorf(timeout, "timeout.NewestQC has older view that the QC in timeout.LastViewTC")
+			return model.NewInvalidTimeoutErrorf(timeout, "timeout.NewestQC is older (view=%d) than the QC in timeout.LastViewTC (view=%d)", timeout.NewestQC.View, timeout.LastViewTC.NewestQC.View)
 		}
 	}
 	// (c) The TO must contain a proof that sender legitimately entered timeout.View. Transitioning
@@ -210,7 +213,7 @@ func (p *TimeoutProcessor) validateTimeout(timeout *model.TimeoutObject) error {
 		}
 	}
 
-	// 2. Check fi signer identity is valid
+	// 2. Check if signer identity is valid
 	_, err := p.committee.IdentityByEpoch(timeout.View, timeout.SignerID)
 	if model.IsInvalidSignerError(err) {
 		return model.NewInvalidTimeoutErrorf(timeout, "invalid signer for timeout: %w", err)

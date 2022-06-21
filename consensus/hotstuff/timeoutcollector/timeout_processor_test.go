@@ -30,7 +30,7 @@ func TestTimeoutProcessor(t *testing.T) {
 	suite.Run(t, new(TimeoutProcessorTestSuite))
 }
 
-// StakingVoteProcessorTestSuite is a test suite that holds mocked state for isolated testing of StakingVoteProcessor.
+// TimeoutProcessorTestSuite is a test suite that holds mocked state for isolated testing of TimeoutProcessor.
 type TimeoutProcessorTestSuite struct {
 	suite.Suite
 
@@ -453,7 +453,7 @@ func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 
 	// create verifier that will do crypto checks of created TC
 	verifier := verification.NewStakingVerifier()
-	// create validator which will do compliance and crypto checked of created TC
+	// create validator which will do compliance and crypto checks of created TC
 	validator := hotstuffvalidator.New(committee, verifier)
 
 	var lastViewTC *flow.TimeoutCertificate
