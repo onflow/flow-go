@@ -38,8 +38,9 @@ func NewSealingConfigs(
 	}, nil
 }
 
-// SetValue updates the requiredApprovalsForSealConstruction and return the old value
-// This assumes the caller has validated the new value
+// SetRequiredApprovalsForSealingConstruction takes a new value and returns the old value
+// if the new value is valid.  otherwise returns an error,
+// and the value is not updated (equivalent to no-op)
 func (r *sealingConfigs) SetRequiredApprovalsForSealingConstruction(requiredApprovalsForSealConstruction uint) (uint, error) {
 	err := validation.ValidateRequireApprovals(
 		requiredApprovalsForSealConstruction,
@@ -56,7 +57,7 @@ func (r *sealingConfigs) SetRequiredApprovalsForSealingConstruction(requiredAppr
 	return from, nil
 }
 
-// GetValue gets the requiredApprovalsForSealConstruction
+// RequireApprovalsForSealConstructionDynamicValue gets the latest value of requiredApprovalsForSealConstruction
 func (r *sealingConfigs) RequireApprovalsForSealConstructionDynamicValue() uint {
 	return uint(r.requiredApprovalsForSealConstruction.Load())
 }

@@ -1,14 +1,22 @@
 package module
 
+// SealingConfigsGetter is an interface for the actual updatable configs module.
+// but only exposes its getter methods to return the config values without exposing
+// its setter methods.
+// SealingConfigs contains three configs:
+// - RequireApprovalsForSealingConstruction (updatable)
+// - RequireApprovalsForSealingVerification (not-updatable)
+// - ChunkAlpha (not-updatable)
 type SealingConfigsGetter interface {
-	// updatable
+	// updatable fields
 	RequireApprovalsForSealConstructionDynamicValue() uint
 
-	// not-updatable
+	// not-updatable fields
 	ChunkAlphaConst() uint
 	RequireApprovalsForSealVerificationConst() uint
 }
 
+// SealingConfigsSetter is an interface that allows the caller to update updatable configs
 type SealingConfigsSetter interface {
 	SealingConfigsGetter
 	// SetRequiredApprovalsForSealingConstruction takes a new value and returns the old value
