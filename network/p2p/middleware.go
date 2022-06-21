@@ -58,7 +58,17 @@ const (
 	LargeMsgUnicastTimeout = 1000 * time.Second
 )
 
-var _ network.Middleware = (*Middleware)(nil)
+var (
+	_ network.Middleware = (*Middleware)(nil)
+
+	// defaultIsStakedFunc is the default callback func used to check if a node
+	// is staked or not in the topic validator before decoding network messages.
+	// This default func should only be used on public network channels, since all
+	// nodes can participate on public channels this func always returns true.
+	defaultIsStakedFunc = func(_ peer.ID) bool { return true }
+)
+
+type isStakedFunc func(id peer.ID) bool
 
 // Middleware handles the input & output on the direct connections we have to
 // our neighbours on the peer-to-peer network.
@@ -507,16 +517,25 @@ func (m *Middleware) Subscribe(channel network.Channel) error {
 
 	topic := network.TopicFromChannel(channel, m.rootBlockID)
 
+	// NOTE: for public channels the callback used to check if a node is staked will
+	// return true for every node.
+	isStakedFunc := defaultIsStakedFunc
 	var validators []psValidator.MessageValidator
 	if !network.PublicChannels().Contains(channel) {
 		// for channels used by the staked nodes, add the topic validator to filter out messages from non-staked nodes
 		validators = append(validators,
-			// NOTE: The AuthorizedSenderValidator will assert the sender is a staked node
 			psValidator.AuthorizedSenderValidator(m.log, channel, m.ov.Identity),
 		)
+
+		// NOTE: For non-public channels the libP2P node topic validator will reject
+		// messages from unstaked nodes.
+		isStakedFunc = func(id peer.ID) bool {
+			_, ok := m.ov.Identity(id)
+			return ok
+		}
 	}
 
-	s, err := m.libP2PNode.Subscribe(topic, m.codec, validators...)
+	s, err := m.libP2PNode.Subscribe(topic, m.codec, isStakedFunc, validators...)
 	if err != nil {
 		return fmt.Errorf("failed to subscribe for channel %s: %w", channel, err)
 	}

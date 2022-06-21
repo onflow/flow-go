@@ -7,9 +7,8 @@ import (
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/flow-go/network"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/network/message"
 	_ "github.com/onflow/flow-go/utils/binstat"
@@ -64,7 +63,11 @@ type ValidatorData struct {
 	From              peer.ID
 }
 
-func TopicValidator(logger zerolog.Logger, codec network.Codec, validators ...MessageValidator) pubsub.ValidatorEx {
+func TopicValidator(log zerolog.Logger, codec network.Codec, staked func(peer.ID) bool, validators ...MessageValidator) pubsub.ValidatorEx {
+	log = log.With().
+		Str("component", "libp2p_node_topic_validator").
+		Logger()
+
 	return func(ctx context.Context, receivedFrom peer.ID, rawMsg *pubsub.Message) pubsub.ValidationResult {
 		var msg message.Message
 		// convert the incoming raw message payload to Message type
@@ -80,10 +83,19 @@ func TopicValidator(logger zerolog.Logger, codec network.Codec, validators ...Me
 			return pubsub.ValidationReject
 		}
 
+		if !staked(from) {
+			log.Warn().
+				Err(fmt.Errorf("peer is unstaked")).
+				Str("peer_id", from.String()).
+				Hex("sender", msg.OriginID).
+				Msg("rejecting message from unstaked peer")
+			return pubsub.ValidationReject
+		}
+
 		// Convert message payload to a known message type
 		decodedMsgPayload, err := codec.Decode(msg.Payload)
 		if err != nil {
-			logger.Warn().
+			log.Warn().
 				Err(fmt.Errorf("could not decode message: %w", err)).
 				Str("peer_id", from.String()).
 				Hex("sender", msg.OriginID).

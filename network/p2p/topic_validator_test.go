@@ -23,17 +23,91 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TestTopicValidator_Unstaked tests that the libP2P node topic validator rejects messages from unstaked nodes
+func TestTopicValidator_Unstaked(t *testing.T) {
+	// setup hooked logger
+	var hookCalls uint64
+	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
+		if level == zerolog.WarnLevel {
+			atomic.AddUint64(&hookCalls, 1)
+		}
+	})
+	logger := zerolog.New(os.Stdout).Level(zerolog.WarnLevel).Hook(hook)
+
+	sporkId := unittest.IdentifierFixture()
+	identity1, privateKey1 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
+	sn1 := createNode(t, identity1.NodeID, privateKey1, sporkId, logger)
+
+	identity2, privateKey2 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
+	sn2 := createNode(t, identity2.NodeID, privateKey2, sporkId, zerolog.Nop())
+
+	channel := network.ConsensusCommittee
+	topic := network.TopicFromChannel(channel, sporkId)
+
+	//NOTE: identity2 is not in the ids list simulating an un-staked node
+	ids := flow.IdentityList{identity1}
+	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
+	require.NoError(t, err)
+
+	// callback used by the topic validator to check if node is staked
+	isStaked := func(pid peer.ID) bool {
+		fid, err := translator.GetFlowID(pid)
+		if err != nil {
+			return false
+		}
+		_, ok := ids.ByNodeID(fid)
+		return ok
+	}
+
+	// node1 is connected to node2
+	// sn1 <-> sn2
+	require.NoError(t, sn1.AddPeer(context.TODO(), *host.InfoFromHost(sn2.Host())))
+
+	// sn1 will subscribe with is staked callback that should force the TopicValidator to drop the message received from sn2
+	sub1, err := sn1.Subscribe(topic, unittest.NetworkCodec(), isStaked)
+	require.NoError(t, err)
+	_, err = sn2.Subscribe(topic, unittest.NetworkCodec(), unittest.IsStakedTopicValidatorFunc())
+	require.NoError(t, err)
+
+	// assert that the nodes are connected as expected
+	require.Eventually(t, func() bool {
+		return len(sn1.ListPeers(topic.String())) > 0 &&
+			len(sn2.ListPeers(topic.String())) > 0
+	}, 3*time.Second, 100*time.Millisecond)
+
+	timedCtx, cancel5s := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel5s()
+	// create a dummy block proposal to publish from our SN node
+	header := unittest.BlockHeaderFixture()
+	data1 := getMsgFixtureBz(t, &messages.BlockProposal{Header: &header})
+
+	err = sn2.Publish(timedCtx, topic, data1)
+	require.NoError(t, err)
+
+	var wg sync.WaitGroup
+
+	// sn1 should not receive message from sn2 because sn2 is unstaked
+	timedCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	checkReceive(timedCtx, t, nil, sub1, &wg, false)
+
+	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "could not receive message on time")
+
+	// expecting 1 warn calls for each rejected message from ejected node
+	require.Equalf(t, uint64(1), hookCalls, "expected 1 warning to be logged")
+}
+
 // TestAuthorizedSenderValidator_Unauthorized tests that the authorized sender validator rejects messages from nodes that are not authorized to send the message
 func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
 	identity1, privateKey1 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
-	sn1 := createNode(t, identity1.NodeID, privateKey1, sporkId)
+	sn1 := createNode(t, identity1.NodeID, privateKey1, sporkId, zerolog.Nop())
 
 	identity2, privateKey2 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
-	sn2 := createNode(t, identity2.NodeID, privateKey2, sporkId)
+	sn2 := createNode(t, identity2.NodeID, privateKey2, sporkId, zerolog.Nop())
 
 	identity3, privateKey3 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleAccess))
-	an1 := createNode(t, identity3.NodeID, privateKey3, sporkId)
+	an1 := createNode(t, identity3.NodeID, privateKey3, sporkId, zerolog.Nop())
 
 	channel := network.ConsensusCommittee
 	topic := network.TopicFromChannel(channel, sporkId)
@@ -66,11 +140,11 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	require.NoError(t, an1.AddPeer(context.TODO(), *host.InfoFromHost(sn1.Host())))
 
 	// sn1 and sn2 subscribe to the topic with the topic validator
-	sub1, err := sn1.Subscribe(topic, unittest.NetworkCodec(), authorizedSenderValidator)
+	sub1, err := sn1.Subscribe(topic, unittest.NetworkCodec(), unittest.IsStakedTopicValidatorFunc(), authorizedSenderValidator)
 	require.NoError(t, err)
-	sub2, err := sn2.Subscribe(topic, unittest.NetworkCodec(), authorizedSenderValidator)
+	sub2, err := sn2.Subscribe(topic, unittest.NetworkCodec(), unittest.IsStakedTopicValidatorFunc(), authorizedSenderValidator)
 	require.NoError(t, err)
-	sub3, err := an1.Subscribe(topic, unittest.NetworkCodec())
+	sub3, err := an1.Subscribe(topic, unittest.NetworkCodec(), unittest.IsStakedTopicValidatorFunc())
 	require.NoError(t, err)
 
 	// assert that the nodes are connected as expected
@@ -135,10 +209,10 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
 	identity1, privateKey1 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
-	sn1 := createNode(t, identity1.NodeID, privateKey1, sporkId)
+	sn1 := createNode(t, identity1.NodeID, privateKey1, sporkId, zerolog.Nop())
 
 	identity2, privateKey2 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
-	sn2 := createNode(t, identity2.NodeID, privateKey2, sporkId)
+	sn2 := createNode(t, identity2.NodeID, privateKey2, sporkId, zerolog.Nop())
 
 	// try to publish BlockProposal on invalid SyncCommittee channel
 	channel := network.SyncCommittee
@@ -170,82 +244,9 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	require.NoError(t, sn1.AddPeer(context.TODO(), *host.InfoFromHost(sn2.Host())))
 
 	// sn1 subscribe to the topic with the topic validator, while sn2 will subscribe without the topic validator to allow sn2 to publish unauthorized messages
-	sub1, err := sn1.Subscribe(topic, unittest.NetworkCodec(), authorizedSenderValidator)
+	sub1, err := sn1.Subscribe(topic, unittest.NetworkCodec(), unittest.IsStakedTopicValidatorFunc(), authorizedSenderValidator)
 	require.NoError(t, err)
-	_, err = sn2.Subscribe(topic, unittest.NetworkCodec())
-	require.NoError(t, err)
-
-	// assert that the nodes are connected as expected
-	require.Eventually(t, func() bool {
-		return len(sn1.ListPeers(topic.String())) > 0 &&
-			len(sn2.ListPeers(topic.String())) > 0
-	}, 3*time.Second, 100*time.Millisecond)
-
-	timedCtx, cancel5s := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel5s()
-	// create a dummy block proposal to publish from our SN node
-	header := unittest.BlockHeaderFixture()
-	data1 := getMsgFixtureBz(t, &messages.BlockProposal{Header: &header})
-
-	// sn2 publishes the block proposal on the sync committee channel
-	err = sn2.Publish(timedCtx, topic, data1)
-	require.NoError(t, err)
-
-	var wg sync.WaitGroup
-
-	// sn1 should not receive message from sn2
-	timedCtx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	checkReceive(timedCtx, t, nil, sub1, &wg, false)
-
-	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "could not receive message on time")
-
-	// expecting 1 warn calls for each rejected message from ejected node
-	require.Equalf(t, uint64(1), hookCalls, "expected 1 warning to be logged")
-}
-
-// TestAuthorizedSenderValidator_Authorized tests that the authorized sender validator rejects messages from unstaked nodes
-func TestAuthorizedSenderValidator_Unstaked(t *testing.T) {
-	sporkId := unittest.IdentifierFixture()
-	identity1, privateKey1 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
-	sn1 := createNode(t, identity1.NodeID, privateKey1, sporkId)
-
-	identity2, privateKey2 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
-	sn2 := createNode(t, identity2.NodeID, privateKey2, sporkId)
-
-	channel := network.ConsensusCommittee
-	topic := network.TopicFromChannel(channel, sporkId)
-
-	//NOTE: identity2 is not in the ids list simulating an un-staked node
-	ids := flow.IdentityList{identity1}
-	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
-	require.NoError(t, err)
-
-	// setup hooked logger
-	var hookCalls uint64
-	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
-		if level == zerolog.WarnLevel {
-			atomic.AddUint64(&hookCalls, 1)
-		}
-	})
-	logger := zerolog.New(os.Stdout).Level(zerolog.WarnLevel).Hook(hook)
-
-	authorizedSenderValidator := validator.AuthorizedSenderValidator(logger, channel, func(pid peer.ID) (*flow.Identity, bool) {
-		fid, err := translator.GetFlowID(pid)
-		if err != nil {
-			return &flow.Identity{}, false
-		}
-		return ids.ByNodeID(fid)
-	})
-
-	// node1 is connected to node2
-	// sn1 <-> sn2
-	require.NoError(t, sn1.AddPeer(context.TODO(), *host.InfoFromHost(sn2.Host())))
-
-	// sn1 subscribe to the topic with the topic validator, while sn2 will subscribe without the topic validator to allow sn2 to publish unauthorized messages
-	sub1, err := sn1.Subscribe(topic, unittest.NetworkCodec(), authorizedSenderValidator)
-	require.NoError(t, err)
-	_, err = sn2.Subscribe(topic, unittest.NetworkCodec())
+	_, err = sn2.Subscribe(topic, unittest.NetworkCodec(), unittest.IsStakedTopicValidatorFunc())
 	require.NoError(t, err)
 
 	// assert that the nodes are connected as expected
@@ -281,13 +282,13 @@ func TestAuthorizedSenderValidator_Unstaked(t *testing.T) {
 func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
 	identity1, privateKey1 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
-	sn1 := createNode(t, identity1.NodeID, privateKey1, sporkId)
+	sn1 := createNode(t, identity1.NodeID, privateKey1, sporkId, zerolog.Nop())
 
 	identity2, privateKey2 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
-	sn2 := createNode(t, identity2.NodeID, privateKey2, sporkId)
+	sn2 := createNode(t, identity2.NodeID, privateKey2, sporkId, zerolog.Nop())
 
 	identity3, privateKey3 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleAccess))
-	an1 := createNode(t, identity3.NodeID, privateKey3, sporkId)
+	an1 := createNode(t, identity3.NodeID, privateKey3, sporkId, zerolog.Nop())
 
 	channel := network.ConsensusCommittee
 	topic := network.TopicFromChannel(channel, sporkId)
@@ -319,11 +320,11 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	require.NoError(t, an1.AddPeer(context.TODO(), *host.InfoFromHost(sn1.Host())))
 
 	// sn1 subscribe to the topic with the topic validator, while sn2 will subscribe without the topic validator to allow sn2 to publish unauthorized messages
-	sub1, err := sn1.Subscribe(topic, unittest.NetworkCodec(), authorizedSenderValidator)
+	sub1, err := sn1.Subscribe(topic, unittest.NetworkCodec(), unittest.IsStakedTopicValidatorFunc(), authorizedSenderValidator)
 	require.NoError(t, err)
-	sub2, err := sn2.Subscribe(topic, unittest.NetworkCodec())
+	sub2, err := sn2.Subscribe(topic, unittest.NetworkCodec(), unittest.IsStakedTopicValidatorFunc())
 	require.NoError(t, err)
-	sub3, err := an1.Subscribe(topic, unittest.NetworkCodec())
+	sub3, err := an1.Subscribe(topic, unittest.NetworkCodec(), unittest.IsStakedTopicValidatorFunc())
 	require.NoError(t, err)
 
 	// assert that the nodes are connected as expected
@@ -378,13 +379,13 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
 	identity1, privateKey1 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleCollection))
-	ln1 := createNode(t, identity1.NodeID, privateKey1, sporkId)
+	ln1 := createNode(t, identity1.NodeID, privateKey1, sporkId, zerolog.Nop())
 
 	identity2, privateKey2 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleCollection))
-	ln2 := createNode(t, identity2.NodeID, privateKey2, sporkId)
+	ln2 := createNode(t, identity2.NodeID, privateKey2, sporkId, zerolog.Nop())
 
 	identity3, privateKey3 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleCollection))
-	ln3 := createNode(t, identity3.NodeID, privateKey3, sporkId)
+	ln3 := createNode(t, identity3.NodeID, privateKey3, sporkId, zerolog.Nop())
 
 	channel := network.ChannelSyncCluster(flow.Testnet)
 	topic := network.TopicFromChannel(channel, sporkId)
@@ -405,11 +406,11 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	require.NoError(t, ln1.AddPeer(context.TODO(), *host.InfoFromHost(ln2.Host())))
 	require.NoError(t, ln3.AddPeer(context.TODO(), *host.InfoFromHost(ln1.Host())))
 
-	sub1, err := ln1.Subscribe(topic, unittest.NetworkCodec(), authorizedSenderValidator)
+	sub1, err := ln1.Subscribe(topic, unittest.NetworkCodec(), unittest.IsStakedTopicValidatorFunc(), authorizedSenderValidator)
 	require.NoError(t, err)
-	sub2, err := ln2.Subscribe(topic, unittest.NetworkCodec(), authorizedSenderValidator)
+	sub2, err := ln2.Subscribe(topic, unittest.NetworkCodec(), unittest.IsStakedTopicValidatorFunc(), authorizedSenderValidator)
 	require.NoError(t, err)
-	sub3, err := ln3.Subscribe(topic, unittest.NetworkCodec(), authorizedSenderValidator)
+	sub3, err := ln3.Subscribe(topic, unittest.NetworkCodec(), unittest.IsStakedTopicValidatorFunc(), authorizedSenderValidator)
 	require.NoError(t, err)
 
 	// assert that the nodes are connected as expected
