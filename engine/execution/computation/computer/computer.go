@@ -461,6 +461,7 @@ type blockCommitter struct {
 	callBack  func(state flow.StateCommitment, proof []byte, update *ledger.TrieUpdate, err error)
 	state     flow.StateCommitment
 	views     chan state.View
+	closeOnce sync.Once
 	blockSpan opentracing.Span
 }
 
@@ -479,17 +480,14 @@ func (bc *blockCommitter) Commit(view state.View) {
 }
 
 func (bc *blockCommitter) Close() {
-	defer func() {
-		_ = recover() // allow double closing the channel
-	}()
-
-	close(bc.views)
+	bc.closeOnce.Do(func() { close(bc.views) })
 }
 
 type eventHasher struct {
 	tracer    module.Tracer
 	callBack  func(hash flow.Identifier, err error)
 	data      chan flow.EventsList
+	closeOnce sync.Once
 	blockSpan opentracing.Span
 }
 
@@ -507,9 +505,5 @@ func (eh *eventHasher) Hash(events flow.EventsList) {
 }
 
 func (eh *eventHasher) Close() {
-	defer func() {
-		_ = recover() // allow double closing the channel
-	}()
-
-	close(eh.data)
+	eh.closeOnce.Do(func() { close(eh.data) })
 }
