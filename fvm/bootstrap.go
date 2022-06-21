@@ -195,13 +195,6 @@ func WithRestrictedAccountCreationEnabled(enabled cadence.Bool) BootstrapProcedu
 	}
 }
 
-// @Depricated please use WithRestrictedContractDeployment instead of this
-// this has been kept to reduce breaking change on the emulator, but would be
-// removed at some point.
-func WithRestrictedDeployment(restricted *bool) BootstrapProcedureOption {
-	return WithRestrictedContractDeployment(restricted)
-}
-
 func WithRestrictedContractDeployment(restricted *bool) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
 		bp.restrictedContractDeployment = restricted

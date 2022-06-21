@@ -269,6 +269,13 @@ func WithContractRemovalRestricted(enabled bool) Option {
 	}
 }
 
+// @Depricated please use WithContractDeploymentRestricted instead of this
+// this has been kept to reduce breaking change on the emulator, but would be
+// removed at some point.
+func WithRestrictedDeployment(restricted bool) Option {
+	return WithContractDeploymentRestricted(restricted)
+}
+
 // WithRestrictedContractDeployment enables or disables restricted contract deployment for a
 // virtual machine context. Warning! this would be overridden with the flag stored on chain.
 // this is just a fallback value
