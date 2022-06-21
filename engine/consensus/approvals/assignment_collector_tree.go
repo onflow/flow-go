@@ -203,6 +203,18 @@ func (t *AssignmentCollectorTree) updateForkState(vertex *assignmentCollectorVer
 // whose executed block has height in [from; to)
 func (t *AssignmentCollectorTree) GetCollectorsByInterval(from, to uint64) []AssignmentCollector {
 	var vertices []AssignmentCollector
+	t.RunForCollectorsByInterval(from, to, func(c AssignmentCollector) (bool, error) {
+		vertices = append(vertices, c)
+		return false, nil
+	})
+
+	return vertices
+}
+
+// RunForCollectorsByInterval will run the given runner function over the height interval defined by the given [from, to)
+// The runner function takes the collector and return a bool indicates whether to stop
+// It will stop if the returned bool is true, or it returns an error
+func (t *AssignmentCollectorTree) RunForCollectorsByInterval(from, to uint64, fn func(AssignmentCollector) (bool, error)) error {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
@@ -215,12 +227,18 @@ func (t *AssignmentCollectorTree) GetCollectorsByInterval(from, to uint64) []Ass
 		for iter.HasNext() {
 			vertex := iter.NextVertex().(*assignmentCollectorVertex)
 			if vertex.collector.ProcessingStatus() == VerifyingApprovals {
-				vertices = append(vertices, vertex.collector)
+				stop, err := fn(vertex.collector)
+				if err != nil {
+					return fmt.Errorf("fail to run for collector at height %v: %w", l, err)
+				}
+				if stop {
+					return nil
+				}
 			}
 		}
 	}
 
-	return vertices
+	return nil
 }
 
 // LazyInitCollector is a helper structure that is used to return collector which is lazy initialized

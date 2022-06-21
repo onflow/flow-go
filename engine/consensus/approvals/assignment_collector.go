@@ -84,7 +84,10 @@ type AssignmentCollectorState interface {
 	// CheckEmergencySealing checks whether this AssignmentCollector can be emergency
 	// sealed. If this is the case, the AssignmentCollector produces a candidate seal
 	// as part of this method call. No errors are expected during normal operations.
-	CheckEmergencySealing(observer consensus.SealingObservation, finalizedBlockHeight uint64) error
+	// It returns (true, nil) if some result can be emergency sealed
+	// It returns (false, nil) if no result can be emergency sealed
+	// It returns (false, err) if running into any exception
+	CheckEmergencySealing(observer consensus.SealingObservation, finalizedBlockHeight uint64) (bool, error)
 
 	// RequestMissingApprovals sends requests for missing approvals to the respective
 	// verification nodes. Returns number of requests made. No errors are expected

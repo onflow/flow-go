@@ -17,9 +17,10 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// DefaultEmergencySealingThreshold is the default number of blocks which indicates that ER should be sealed using emergency
+// DefaultEmergencySealingThresholdForExecution is the default number of blocks which indicates that ER should be sealed using emergency
 // sealing.
-const DefaultEmergencySealingThreshold = 100
+const DefaultEmergencySealingThresholdForExecution = 75
+const DefaultEmergencySealingThresholdForVerification = 25
 
 // VerifyingAssignmentCollector
 // Context:
@@ -72,28 +73,37 @@ func (ac *VerifyingAssignmentCollector) collectorByBlockID(incorporatedBlockID f
 // hangs far enough behind finalization (measured in finalized but unsealed blocks), emergency
 // sealing kicks in. This will be removed when implementation of Sealing & Verification is finished.
 func (ac *VerifyingAssignmentCollector) emergencySealable(collector *ApprovalCollector, finalizedBlockHeight uint64) bool {
-	// Criterion for emergency sealing:
-	// there must be at least DefaultEmergencySealingThreshold number of blocks between
-	// the block that _incorporates_ result and the latest finalized block
-	return collector.IncorporatedBlock().Height+DefaultEmergencySealingThreshold <= finalizedBlockHeight
+	// Criterion for emergency sealing, both of the following condition need to be true for trigger emergency sealing:
+	// 1. there must be at least DefaultEmergencySealingThresholdForExecution number of blocks between
+	//    the executed block and the latest finalized block
+	// 2. there must be at least DefaultEmergencySealingThresholdForVerification number of blocks between
+	//  	the block that _incorporates_ result and the latest finalized block
+	return collector.executedBlock.Height+DefaultEmergencySealingThresholdForExecution <= finalizedBlockHeight &&
+		collector.IncorporatedBlock().Height+DefaultEmergencySealingThresholdForVerification <= finalizedBlockHeight
 }
 
 // CheckEmergencySealing checks the managed assignments whether their result can be emergency
 // sealed. Seals the results where possible.
-func (ac *VerifyingAssignmentCollector) CheckEmergencySealing(observer consensus.SealingObservation, finalizedBlockHeight uint64) error {
+// It returns (true, nil) if some result can be emergency sealed
+// It returns (false, nil) if no result can be emergency sealed
+// It returns (false, err) if running into any exception
+func (ac *VerifyingAssignmentCollector) CheckEmergencySealing(observer consensus.SealingObservation, finalizedBlockHeight uint64) (bool, error) {
+	sealable := false
+	// Emergency sealing only seals for finalized blocks, however, there might still be multiple results for finalized blocks.
+	// so we anyway need to iterate through all collectors to check whether any result can be emergency sealed.
 	for _, collector := range ac.allCollectors() {
-		sealable := ac.emergencySealable(collector, finalizedBlockHeight)
+		sealable = ac.emergencySealable(collector, finalizedBlockHeight)
 		observer.QualifiesForEmergencySealing(collector.IncorporatedResult(), sealable)
 		if sealable {
 			err := collector.SealResult()
 			if err != nil {
-				return fmt.Errorf("could not create emergency seal for result %x incorporated at %x: %w",
+				return false, fmt.Errorf("could not create emergency seal for result %x incorporated at %x: %w",
 					ac.ResultID(), collector.IncorporatedBlockID(), err)
 			}
 		}
 	}
 
-	return nil
+	return sealable, nil
 }
 
 func (ac *VerifyingAssignmentCollector) ProcessingStatus() ProcessingStatus {
