@@ -84,9 +84,9 @@ func (ac *VerifyingAssignmentCollector) emergencySealable(collector *ApprovalCol
 
 // CheckEmergencySealing checks the managed assignments whether their result can be emergency
 // sealed. Seals the results where possible.
+// It returns error when running into any exception
+// It returns nil when it's done the checking regardless whether there is any results being emergency sealed or not
 func (ac *VerifyingAssignmentCollector) CheckEmergencySealing(observer consensus.SealingObservation, finalizedBlockHeight uint64) error {
-	// Emergency sealing only seals for finalized blocks, however, there might still be multiple results for finalized blocks.
-	// so we anyway need to iterate through all collectors to check whether any result can be emergency sealed.
 	for _, collector := range ac.allCollectors() {
 		sealable := ac.emergencySealable(collector, finalizedBlockHeight)
 		observer.QualifiesForEmergencySealing(collector.IncorporatedResult(), sealable)
