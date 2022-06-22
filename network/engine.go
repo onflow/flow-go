@@ -41,7 +41,7 @@ type Engine interface {
 
 // MessageProcessor represents a component which receives messages from the
 // networking layer. Since these messages come from other nodes, which may
-// by Byzantine, implementations must expect and handle arbitrary message inputs
+// be Byzantine, implementations must expect and handle arbitrary message inputs
 // (including invalid message types, malformed messages, etc.). Because of this,
 // node-internal messages should NEVER be submitted to a component using Process.
 type MessageProcessor interface {
