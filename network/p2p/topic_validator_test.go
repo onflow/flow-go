@@ -23,7 +23,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestTopicValidator_Unstaked tests that the libP2P node topic validator rejects messages from unstaked nodes
+// TestTopicValidator_Unstaked tests that the libP2P node topic validator rejects unauthenticated messages on non-public channels (unstaked)
 func TestTopicValidator_Unstaked(t *testing.T) {
 	// setup hooked logger
 	var hookCalls uint64
@@ -99,7 +99,7 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 	require.Equalf(t, uint64(1), hookCalls, "expected 1 warning to be logged")
 }
 
-// TestTopicValidator_PublicChannel tests that the libP2P node topic validator rejects messages from unstaked nodes
+// TestTopicValidator_PublicChannel tests that the libP2P node topic validator does not reject unauthenticated messages on public channels
 func TestTopicValidator_PublicChannel(t *testing.T) {
 	// setup hooked logger
 	var hookCalls uint64
