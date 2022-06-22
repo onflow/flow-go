@@ -429,39 +429,33 @@ func (c *Core) checkEmergencySealing(observer consensus.SealingObservation, last
 		return nil
 	}
 
-	// emergency sealing is checked at collector level, however we don't have to check collector level if
-	// there are not so many blocks are not sealed.
-	// Since emergency sealing won't trigger unless there are at least DefaultEmergencySealingThresholdForExecution blocks finalized
-	// after it, we can use this fact to skip checking at collector level
+	emergencySealingHeight := lastSealedHeight + approvals.DefaultEmergencySealingThreshold
 
-	if lastSealedHeight+approvals.DefaultEmergencySealingThresholdForExecution >= lastFinalizedHeight {
+	// we are interested in all collectors that match condition:
+	// lastSealedBlock + sealing.DefaultEmergencySealingThreshold < lastFinalizedHeight
+	// in other words we should check for emergency sealing only if threshold was reached
+	if emergencySealingHeight >= lastFinalizedHeight {
 		return nil
 	}
 
-	// prevent from underflow in case lastFinalizedHeight is too small
-	if lastFinalizedHeight < approvals.DefaultEmergencySealingThresholdForExecution {
-		return nil
+	delta := lastFinalizedHeight - emergencySealingHeight
+
+	// if there are too many finalized and unsealed blocks, we at most will emergency seal for the next 100 blocks.
+	// because the builder has a limit (maxSealCount) on the max number of seals to be included in
+	// a new block
+	if delta > 100 {
+		delta = 100
 	}
-
-	// We iterate through the collectorTree to check if any collector is able to trigger emergency sealing.
-	// We can do some optimization instead of bindly iterate through all collectors.
-	// The optimization is to start from the collector for the first unsealed block, if it can trigger emergency sealing, we
-	// check for the next unsealed and finalized block, and stop as soon as we met with a height that cannot trigger emergency sealing.
-	// The reason this optimization could work is because the following facts:
-	// 1) emergency sealing is only for finalized blocks,
-	// 2) for finalized blocks, there is only one collector at each height
-	// 3) if a height can't trigger emergency sealing, the next height won't be able to trigger either.
-	c.collectorTree.RunForCollectorsByInterval(lastSealedHeight+1, lastFinalizedHeight-approvals.DefaultEmergencySealingThresholdForExecution,
-		func(collector approvals.AssignmentCollector) (bool, error) {
-			emergencySealed, err := collector.CheckEmergencySealing(observer, lastFinalizedHeight)
-			if err != nil {
-				return true, err
-			}
-
-			// if there is no result can be emergency sealed, then we can stop, because the next height won't be emergency sealed either.
-			stop := !emergencySealed
-			return stop, nil
-		})
+	// if block is emergency sealable depends on it's incorporated block height
+	// collectors tree stores collector by executed block height
+	// we need to select multiple levels to find eligible collectors for emergency sealing
+	for _, collector := range c.collectorTree.GetCollectorsByInterval(lastSealedHeight, lastSealedHeight+delta) {
+		err := collector.CheckEmergencySealing(observer, lastFinalizedHeight)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (c *Core) processPendingApprovals(collector approvals.AssignmentCollectorState) error {
