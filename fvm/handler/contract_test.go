@@ -26,7 +26,11 @@ func TestContract_ChildMergeFunctionality(t *testing.T) {
 	err := accounts.Create(nil, address)
 	require.NoError(t, err)
 
-	contractHandler := handler.NewContractHandler(accounts, func() bool { return false }, nil, nil, nil)
+	contractHandler := handler.NewContractHandler(
+		accounts,
+		func() bool { return false },
+		func() bool { return false },
+		nil, nil, nil)
 
 	// no contract initially
 	names, err := contractHandler.GetContractNames(rAdd)
@@ -114,6 +118,7 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 
 	makeHandler := func() *handler.ContractHandler {
 		return handler.NewContractHandler(accounts,
+			func() bool { return true },
 			func() bool { return true },
 			func() []common.Address { return []common.Address{rAdd, rBoth} },
 			func() []common.Address { return []common.Address{rRemove, rBoth} },
@@ -223,6 +228,7 @@ func TestContract_DeploymentVouchers(t *testing.T) {
 	contractHandler := handler.NewContractHandler(
 		accounts,
 		func() bool { return true },
+		func() bool { return true },
 		func() []common.Address {
 			return []common.Address{}
 		},
@@ -275,6 +281,7 @@ func TestContract_ContractUpdate(t *testing.T) {
 
 	contractHandler := handler.NewContractHandler(
 		accounts,
+		func() bool { return true },
 		func() bool { return true },
 		func() []common.Address {
 			return []common.Address{}
@@ -344,6 +351,7 @@ func TestContract_DeterministicErrorOnCommit(t *testing.T) {
 	contractHandler := handler.NewContractHandler(
 		mockAccounts,
 		func() bool { return false },
+		func() bool { return false },
 		nil,
 		nil,
 		nil,
@@ -363,4 +371,159 @@ func TestContract_DeterministicErrorOnCommit(t *testing.T) {
 
 	_, err = contractHandler.Commit()
 	require.EqualError(t, err, "A 0000000000000001")
+}
+
+func TestContract_ContractRemoval(t *testing.T) {
+
+	sth := state.NewStateHolder(state.NewState(utils.NewSimpleView()))
+	accounts := state.NewAccounts(sth)
+
+	flowAddress := flow.HexToAddress("01")
+	runtimeAddress := runtime.Address(flowAddress)
+	err := accounts.Create(nil, flowAddress)
+	require.NoError(t, err)
+
+	t.Run("contract removal with restriction", func(t *testing.T) {
+		var authorizationChecked bool
+
+		contractHandler := handler.NewContractHandler(
+			accounts,
+			func() bool { return false },
+			func() bool { return true },
+			func() []common.Address {
+				return []common.Address{}
+			},
+			func() []common.Address {
+				return []common.Address{}
+			},
+			func(address runtime.Address, code []byte) (bool, error) {
+				// Ensure the voucher check is only called once,
+				// for the initial contract deployment,
+				// and not for the subsequent update
+				require.False(t, authorizationChecked)
+				authorizationChecked = true
+				return true, nil
+			},
+		)
+
+		// deploy contract with voucher
+		err = contractHandler.SetContract(
+			runtimeAddress,
+			"TestContract",
+			[]byte("pub contract TestContract {}"),
+			[]common.Address{
+				runtimeAddress,
+			},
+		)
+		require.NoError(t, err)
+		require.True(t, contractHandler.HasUpdates())
+
+		contractUpdateKeys, err := contractHandler.Commit()
+		require.NoError(t, err)
+		require.Equal(
+			t,
+			[]programs.ContractUpdateKey{
+				{
+					Address: flowAddress,
+					Name:    "TestContract",
+				},
+			},
+			contractUpdateKeys,
+		)
+
+		// update should work
+		err = contractHandler.SetContract(
+			runtimeAddress,
+			"TestContract",
+			[]byte("pub contract TestContract {}"),
+			[]common.Address{
+				runtimeAddress,
+			},
+		)
+		require.NoError(t, err)
+		require.True(t, contractHandler.HasUpdates())
+
+		// try remove contract should fail
+		err = contractHandler.RemoveContract(
+			runtimeAddress,
+			"TestContract",
+			[]common.Address{
+				runtimeAddress,
+			},
+		)
+		require.Error(t, err)
+	})
+
+	t.Run("contract removal without restriction", func(t *testing.T) {
+		var authorizationChecked bool
+
+		contractHandler := handler.NewContractHandler(
+			accounts,
+			func() bool { return false },
+			func() bool { return false },
+			func() []common.Address {
+				return []common.Address{}
+			},
+			func() []common.Address {
+				return []common.Address{}
+			},
+			func(address runtime.Address, code []byte) (bool, error) {
+				// Ensure the voucher check is only called once,
+				// for the initial contract deployment,
+				// and not for the subsequent update
+				require.False(t, authorizationChecked)
+				authorizationChecked = true
+				return true, nil
+			},
+		)
+
+		// deploy contract with voucher
+		err = contractHandler.SetContract(
+			runtimeAddress,
+			"TestContract",
+			[]byte("pub contract TestContract {}"),
+			[]common.Address{
+				runtimeAddress,
+			},
+		)
+		require.NoError(t, err)
+		require.True(t, contractHandler.HasUpdates())
+
+		contractUpdateKeys, err := contractHandler.Commit()
+		require.NoError(t, err)
+		require.Equal(
+			t,
+			[]programs.ContractUpdateKey{
+				{
+					Address: flowAddress,
+					Name:    "TestContract",
+				},
+			},
+			contractUpdateKeys,
+		)
+
+		// update should work
+		err = contractHandler.SetContract(
+			runtimeAddress,
+			"TestContract",
+			[]byte("pub contract TestContract {}"),
+			[]common.Address{
+				runtimeAddress,
+			},
+		)
+		require.NoError(t, err)
+		require.True(t, contractHandler.HasUpdates())
+
+		// try remove contract should fail
+		err = contractHandler.RemoveContract(
+			runtimeAddress,
+			"TestContract",
+			[]common.Address{
+				runtimeAddress,
+			},
+		)
+		require.NoError(t, err)
+		require.True(t, contractHandler.HasUpdates())
+
+	})
 }

@@ -224,7 +224,7 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 	b.vm = vm
 	b.ctx = NewContextFromParent(
 		ctx,
-		WithRestrictedDeployment(false))
+		WithContractDeploymentRestricted(false))
 	b.rootBlock = flow.Genesis(flow.ChainID(ctx.Chain.String())).Header
 	b.sth = sth
 	b.programs = programs
