@@ -122,7 +122,7 @@ func NewTransactionEnvironment(
 
 	var err error
 	// set the execution parameters from the state
-	if ctx.LoadContextFromState {
+	if ctx.AllowContextOverrideByExecutionState {
 		err = env.setExecutionParameters()
 	}
 
