@@ -19,3 +19,7 @@ func (p Params) SporkID() (flow.Identifier, error) {
 func (p Params) ProtocolVersion() (uint, error) {
 	return p.enc.ProtocolVersion, nil
 }
+
+func (p Params) EpochCommitSafetyThreshold() (uint64, error) {
+	return p.enc.EpochCommitSafetyThreshold, nil
+}

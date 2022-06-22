@@ -11,6 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/mapfunc"
 	"github.com/onflow/flow-go/state/protocol"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/state/protocol/seed"
@@ -199,6 +200,126 @@ func TestConsensus_IdentitiesByEpoch(t *testing.T) {
 			_, err := com.IdentityByEpoch(randUint64(201, 1_000_000), epoch2Identity.NodeID)
 			require.Error(t, err)
 			require.True(t, errors.Is(err, model.ErrViewForUnknownEpoch))
+		})
+	})
+}
+
+// TestConsensus_LeaderForView tests that the weight threshold methods return the
+// correct thresholds for the previous and current epoch and that it returns the
+// appropriate sentinel for the next epoch if it is not yet ready.
+//
+// There are 3 epochs in this test case, each with the same identities but different
+// weights.
+func TestConsensus_Thresholds(t *testing.T) {
+
+	identities := unittest.IdentityListFixture(10)
+	me := identities[0].NodeID
+
+	// the counter for the current epoch
+	epochCounter := uint64(2)
+
+	// create mocks
+	state := new(protocolmock.State)
+	snapshot := new(protocolmock.Snapshot)
+
+	prevEpoch := newMockEpoch(
+		epochCounter-1,
+		identities.Map(mapfunc.WithWeight(100)), // total weight = 1000
+		1,
+		100,
+		unittest.SeedFixture(seed.RandomSourceLength),
+	)
+	currEpoch := newMockEpoch(
+		epochCounter,
+		identities.Map(mapfunc.WithWeight(200)), // total weight = 2000
+		101,
+		200,
+		unittest.SeedFixture(32),
+	)
+
+	state.On("Final").Return(snapshot)
+	epochs := mocks.NewEpochQuery(t, epochCounter, prevEpoch, currEpoch)
+	snapshot.On("Epochs").Return(epochs)
+
+	committee, err := NewConsensusCommittee(state, me)
+	require.Nil(t, err)
+
+	t.Run("next epoch not ready", func(t *testing.T) {
+		t.Run("previous epoch", func(t *testing.T) {
+			threshold, err := committee.QuorumThresholdForView(randUint64(1, 100))
+			require.Nil(t, err)
+			assert.Equal(t, WeightThresholdToBuildQC(1000), threshold)
+			threshold, err = committee.TimeoutThresholdForView(randUint64(1, 100))
+			require.Nil(t, err)
+			assert.Equal(t, WeightThresholdToTimeout(1000), threshold)
+		})
+
+		t.Run("current epoch", func(t *testing.T) {
+			threshold, err := committee.QuorumThresholdForView(randUint64(101, 200))
+			require.Nil(t, err)
+			assert.Equal(t, WeightThresholdToBuildQC(2000), threshold)
+			threshold, err = committee.TimeoutThresholdForView(randUint64(101, 200))
+			require.Nil(t, err)
+			assert.Equal(t, WeightThresholdToTimeout(2000), threshold)
+		})
+
+		t.Run("after current epoch - should return ErrViewForUnknownEpoch", func(t *testing.T) {
+			// get threshold for view in next epoch when it is not set up yet
+			_, err := committee.QuorumThresholdForView(randUint64(201, 300))
+			assert.Error(t, err)
+			assert.True(t, errors.Is(err, model.ErrViewForUnknownEpoch))
+			_, err = committee.TimeoutThresholdForView(randUint64(201, 300))
+			assert.Error(t, err)
+			assert.True(t, errors.Is(err, model.ErrViewForUnknownEpoch))
+		})
+	})
+
+	// now, add a valid next epoch
+	nextEpoch := newMockEpoch(
+		epochCounter+1,
+		identities.Map(mapfunc.WithWeight(300)), // total weight 3000
+		201,
+		300,
+		unittest.SeedFixture(seed.RandomSourceLength),
+	)
+	epochs.Add(nextEpoch)
+
+	t.Run("next epoch ready", func(t *testing.T) {
+		t.Run("previous epoch", func(t *testing.T) {
+			threshold, err := committee.QuorumThresholdForView(randUint64(1, 100))
+			require.Nil(t, err)
+			assert.Equal(t, WeightThresholdToBuildQC(1000), threshold)
+			threshold, err = committee.TimeoutThresholdForView(randUint64(1, 100))
+			require.Nil(t, err)
+			assert.Equal(t, WeightThresholdToTimeout(1000), threshold)
+		})
+
+		t.Run("current epoch", func(t *testing.T) {
+			threshold, err := committee.QuorumThresholdForView(randUint64(101, 200))
+			require.Nil(t, err)
+			assert.Equal(t, WeightThresholdToBuildQC(2000), threshold)
+			threshold, err = committee.TimeoutThresholdForView(randUint64(101, 200))
+			require.Nil(t, err)
+			assert.Equal(t, WeightThresholdToTimeout(2000), threshold)
+		})
+
+		t.Run("next epoch", func(t *testing.T) {
+			threshold, err := committee.QuorumThresholdForView(randUint64(201, 300))
+			require.Nil(t, err)
+			assert.Equal(t, WeightThresholdToBuildQC(3000), threshold)
+			threshold, err = committee.TimeoutThresholdForView(randUint64(201, 300))
+			require.Nil(t, err)
+			assert.Equal(t, WeightThresholdToTimeout(3000), threshold)
+		})
+
+		t.Run("beyond known epochs", func(t *testing.T) {
+			// get threshold for view in next epoch when it is not set up yet
+			_, err := committee.QuorumThresholdForView(randUint64(301, 10_000))
+			assert.Error(t, err)
+			assert.True(t, errors.Is(err, model.ErrViewForUnknownEpoch))
+			_, err = committee.TimeoutThresholdForView(randUint64(301, 10_000))
+			assert.Error(t, err)
+			assert.True(t, errors.Is(err, model.ErrViewForUnknownEpoch))
 		})
 	})
 }

@@ -152,6 +152,27 @@ func (_m *DynamicCommittee) LeaderForView(view uint64) (flow.Identifier, error) 
 	return r0, r1
 }
 
+// QuorumThresholdForView provides a mock function with given fields: view
+func (_m *DynamicCommittee) QuorumThresholdForView(view uint64) (uint64, error) {
+	ret := _m.Called(view)
+
+	var r0 uint64
+	if rf, ok := ret.Get(0).(func(uint64) uint64); ok {
+		r0 = rf(view)
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(uint64) error); ok {
+		r1 = rf(view)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Self provides a mock function with given fields:
 func (_m *DynamicCommittee) Self() flow.Identifier {
 	ret := _m.Called()
@@ -168,8 +189,8 @@ func (_m *DynamicCommittee) Self() flow.Identifier {
 	return r0
 }
 
-// WeightThresholdForView provides a mock function with given fields: view
-func (_m *DynamicCommittee) WeightThresholdForView(view uint64) (uint64, error) {
+// TimeoutThresholdForView provides a mock function with given fields: view
+func (_m *DynamicCommittee) TimeoutThresholdForView(view uint64) (uint64, error) {
 	ret := _m.Called(view)
 
 	var r0 uint64

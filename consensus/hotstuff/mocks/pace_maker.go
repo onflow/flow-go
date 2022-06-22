@@ -77,11 +77,6 @@ func (_m *PaceMaker) NewestQC() *flow.QuorumCertificate {
 	return r0
 }
 
-// OnPartialTC provides a mock function with given fields: curView
-func (_m *PaceMaker) OnPartialTC(curView uint64) {
-	_m.Called(curView)
-}
-
 // ProcessQC provides a mock function with given fields: qc
 func (_m *PaceMaker) ProcessQC(qc *flow.QuorumCertificate) (*model.NewViewEvent, error) {
 	ret := _m.Called(qc)

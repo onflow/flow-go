@@ -54,6 +54,10 @@ func (p *Params) ProtocolVersion() (uint, error) {
 	return 0, fmt.Errorf("not implemented")
 }
 
+func (p *Params) EpochCommitSafetyThreshold() (uint64, error) {
+	return 0, fmt.Errorf("not implemented")
+}
+
 func (p *Params) Root() (*flow.Header, error) {
 	return p.state.root.Header, nil
 }

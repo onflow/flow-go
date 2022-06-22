@@ -734,8 +734,12 @@ func (s *RoundRobinLeaderSelection) LeaderForView(view uint64) (flow.Identifier,
 	return s.identities[int(view)%len(s.identities)].NodeID, nil
 }
 
-func (s *RoundRobinLeaderSelection) WeightThresholdForView(_ uint64) (uint64, error) {
+func (s *RoundRobinLeaderSelection) QuorumThresholdForView(_ uint64) (uint64, error) {
 	return committees.WeightThresholdToBuildQC(s.identities.TotalWeight()), nil
+}
+
+func (s *RoundRobinLeaderSelection) TimeoutThresholdForView(_ uint64) (uint64, error) {
+	return committees.WeightThresholdToTimeout(s.identities.TotalWeight()), nil
 }
 
 func (s *RoundRobinLeaderSelection) Self() flow.Identifier {

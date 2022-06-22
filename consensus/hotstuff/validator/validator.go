@@ -60,7 +60,7 @@ func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 	}
 
 	// determine whether signers reach minimally required weight threshold for consensus
-	threshold, err := v.committee.WeightThresholdForView(tc.View)
+	threshold, err := v.committee.QuorumThresholdForView(tc.View)
 	if err != nil {
 		return fmt.Errorf("could not get weight threshold for view %d: %w", tc.View, err)
 	}
@@ -143,7 +143,7 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate) error {
 	}
 
 	// determine whether signers reach minimally required weight threshold for consensus
-	threshold, err := v.committee.WeightThresholdForView(qc.View)
+	threshold, err := v.committee.QuorumThresholdForView(qc.View)
 	if err != nil {
 		return fmt.Errorf("could not get weight threshold for view %d: %w", qc.View, err)
 	}

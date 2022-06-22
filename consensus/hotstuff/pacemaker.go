@@ -72,10 +72,6 @@ type PaceMaker interface {
 	// Each time the pacemaker starts a new timeout, this channel is replaced.
 	TimeoutChannel() <-chan time.Time
 
-	// OnPartialTC is called when TimeoutAggregator has collected f+1 timeouts. This implements Bracha style timeouts,
-	// which times out current view after receiving partial TC.
-	OnPartialTC(curView uint64)
-
 	// Start starts the PaceMaker (i.e. the timeout for the configured starting value for view).
 	Start()
 
