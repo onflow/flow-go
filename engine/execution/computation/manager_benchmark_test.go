@@ -58,6 +58,21 @@ func createAccounts(b *testing.B, vm *fvm.VirtualMachine, ledger state.View, num
 	return accs
 }
 
+func mustFundAccounts(b *testing.B, vm *fvm.VirtualMachine, ledger state.View, execCtx fvm.Context, accs *testAccounts) {
+	var err error
+	for i, acc := range accs.accounts {
+		transferTx := createTokenTransferTx(1_000_000, acc.address, chain.ServiceAddress())
+		err = testutil.SignTransactionAsServiceAccount(transferTx, accs.seq, chain)
+		require.NoError(b, err)
+		accs.seq++
+
+		tx := fvm.Transaction(transferTx, uint32(i))
+		err = vm.Run(execCtx, tx, ledger, programs.NewEmptyPrograms())
+		require.NoError(b, err)
+		require.NoError(b, tx.Err)
+	}
+}
+
 func BenchmarkComputeBlock(b *testing.B) {
 	b.StopTimer()
 
@@ -67,6 +82,7 @@ func BenchmarkComputeBlock(b *testing.B) {
 	execCtx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain))
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
 	accs := createAccounts(b, vm, ledger, 1000)
+	mustFundAccounts(b, vm, ledger, execCtx, accs)
 
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
@@ -182,7 +198,7 @@ func createTokenTransferTransaction(b *testing.B, accs *testAccounts) *flow.Tran
 	src := accs.accounts[rnd]
 	dst := accs.accounts[(rnd+1)%len(accs.accounts)]
 
-	tx := createTokenTransferTx(dst.address, src.address)
+	tx := createTokenTransferTx(1, dst.address, src.address)
 	tx.SetProposalKey(chain.ServiceAddress(), 0, accs.seq).
 		SetGasLimit(1000).
 		SetPayer(chain.ServiceAddress())
@@ -198,9 +214,7 @@ func createTokenTransferTransaction(b *testing.B, accs *testAccounts) *flow.Tran
 }
 
 // TODO(rbtz): move to testutil
-func createTokenTransferTx(to flow.Address, signer flow.Address) *flow.TransactionBody {
-	// TODO(rbtz): fund accounts
-	const amount = 0
+func createTokenTransferTx(amount int, to flow.Address, signer flow.Address) *flow.TransactionBody {
 	return flow.NewTransactionBody().
 		SetScript([]byte(fmt.Sprintf(`
 		import FungibleToken from 0x%s
