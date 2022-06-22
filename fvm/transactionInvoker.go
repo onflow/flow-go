@@ -54,8 +54,6 @@ func (i *TransactionInvoker) Process(
 
 	var env *TransactionEnv
 	var txError error
-	retry := false
-	numberOfRetries := 0
 
 	parentState := sth.State()
 	childState := sth.NewChild()
@@ -89,74 +87,56 @@ func (i *TransactionInvoker) Process(
 	}
 	predeclaredValues := valueDeclarations(ctx, env)
 
-	for numberOfRetries = 0; numberOfRetries < int(ctx.MaxNumOfTxRetries); numberOfRetries++ {
-		if retry {
-			// rest state
-			sth.SetActiveState(parentState)
-			childState = sth.NewChild()
-			// force cleanup if retries
-			programs.ForceCleanup()
+	// rest state
+	sth.SetActiveState(parentState)
+	childState = sth.NewChild()
+	// force cleanup if retries
+	programs.ForceCleanup()
 
-			i.logger.Warn().
-				Str("txHash", txIDStr).
-				Uint64("blockHeight", blockHeight).
-				Int("retries_count", numberOfRetries).
-				Uint64("ledger_interaction_used", sth.State().InteractionUsed()).
-				Msg("retrying transaction execution")
+	i.logger.Warn().
+		Str("txHash", txIDStr).
+		Uint64("blockHeight", blockHeight).
+		Uint64("ledger_interaction_used", sth.State().InteractionUsed()).
+		Msg("retrying transaction execution")
 
-			// reset error part of proc
-			// Warning right now the tx requires retry logic doesn't change
-			// anything on state, but we might want to revert the state changes (or not committing)
-			// if we decided to expand it further.
-			proc.Err = nil
-			proc.Logs = make([]string, 0)
-			proc.Events = make([]flow.Event, 0)
-			proc.ServiceEvents = make([]flow.Event, 0)
+	// reset error part of proc
+	// Warning right now the tx requires retry logic doesn't change
+	// anything on state, but we might want to revert the state changes (or not committing)
+	// if we decided to expand it further.
+	proc.Err = nil
+	proc.Logs = make([]string, 0)
+	proc.Events = make([]flow.Event, 0)
+	proc.ServiceEvents = make([]flow.Event, 0)
 
-			// reset env
-			env, err = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
-			if err != nil {
-				return fmt.Errorf("error creating new environment: %w", err)
-			}
-		}
-
-		location := common.TransactionLocation(proc.ID[:])
-
-		err := vm.Runtime.ExecuteTransaction(
-			runtime.Script{
-				Source:    proc.Transaction.Script,
-				Arguments: proc.Transaction.Arguments,
-			},
-			runtime.Context{
-				Interface:         env,
-				Location:          location,
-				PredeclaredValues: predeclaredValues,
-			},
-		)
-		if err != nil {
-			var interactionLimiExceededErr *errors.LedgerIntractionLimitExceededError
-			if errors.As(err, &interactionLimiExceededErr) {
-				// If it is this special interaction limit error, just set it directly as the tx error
-				txError = err
-			} else {
-				// Otherwise, do what we use to do
-				txError = fmt.Errorf("transaction invocation failed when executing transaction: %w", errors.HandleRuntimeError(err))
-			}
-		}
-
-		// break the loop
-		if !i.requiresRetry(err, proc) {
-			break
-		}
-
-		retry = true
-		proc.Retried++
+	// reset env
+	env, err = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
+	if err != nil {
+		return fmt.Errorf("error creating new environment: %w", err)
 	}
 
-	// (for future use) panic if we tried several times and still failing because of checking issue
-	// if numberOfTries == maxNumberOfRetries {
-	// 	panic(err)
-	// }
+	location := common.TransactionLocation(proc.ID[:])
+
+	err = vm.Runtime.ExecuteTransaction(
+		runtime.Script{
+			Source:    proc.Transaction.Script,
+			Arguments: proc.Transaction.Arguments,
+		},
+		runtime.Context{
+			Interface:         env,
+			Location:          location,
+			PredeclaredValues: predeclaredValues,
+		},
+	)
+	if err != nil {
+		var interactionLimiExceededErr *errors.LedgerIntractionLimitExceededError
+		if errors.As(err, &interactionLimiExceededErr) {
+			// If it is this special interaction limit error, just set it directly as the tx error
+			txError = err
+		} else {
+			// Otherwise, do what we use to do
+			txError = fmt.Errorf("transaction invocation failed when executing transaction: %w", errors.HandleRuntimeError(err))
+		}
+	}
 
 	// read computationUsed from the environment. This will be used to charge fees.
 	computationUsed := env.ComputationUsed()
