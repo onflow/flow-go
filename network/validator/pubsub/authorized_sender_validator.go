@@ -55,7 +55,7 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, getI
 				Err(err).
 				Str("peer_id", from.String()).
 				Str("role", identity.Role.String()).
-				Str("node_id", identity.NodeID.String()).
+				Str("peer_node_id", identity.NodeID.String()).
 				Str("message_type", msgType).
 				Msg("unexpected error during message validation")
 			return pubsub.ValidationReject
