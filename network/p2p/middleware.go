@@ -531,7 +531,11 @@ func (m *Middleware) Subscribe(channel network.Channel) error {
 
 	var peerFilter peerFilterFunc
 	var validators []psValidator.MessageValidator
-	if !network.PublicChannels().Contains(channel) {
+	if network.PublicChannels().Contains(channel) {
+		// NOTE: for public channels the callback used to check if a node is staked will
+		// return true for every node.
+		peerFilter = allowAll
+	} else {
 		// for channels used by the staked nodes, add the topic validator to filter out messages from non-staked nodes
 		validators = append(validators,
 			psValidator.AuthorizedSenderValidator(m.log, channel, m.ov.Identity),
@@ -540,10 +544,6 @@ func (m *Middleware) Subscribe(channel network.Channel) error {
 		// NOTE: For non-public channels the libP2P node topic validator will reject
 		// messages from unstaked nodes.
 		peerFilter = m.isStakedPeerFilter()
-	} else {
-		// NOTE: for public channels the callback used to check if a node is staked will
-		// return true for every node.
-		peerFilter = allowAll
 	}
 
 	s, err := m.libP2PNode.Subscribe(topic, m.codec, peerFilter, validators...)
