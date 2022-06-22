@@ -67,7 +67,7 @@ func (v *VerificationNodeBuilder) LoadFlags() {
 	v.FlowNodeBuilder.
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.UintVar(&v.verConf.chunkLimit, "chunk-limit", 10000, "maximum number of chunk states in the memory pool")
-			flags.UintVar(&v.verConf.chunkAlpha, "chunk-alpha", chunks.DefaultChunkAssignmentAlpha, "number of verifiers should be assigned to each chunk")
+			flags.UintVar(&v.verConf.chunkAlpha, "chunk-alpha", flow.DefaultChunkAssignmentAlpha, "number of verifiers should be assigned to each chunk")
 			flags.DurationVar(&v.verConf.requestInterval, "chunk-request-interval", requester.DefaultRequestInterval, "time interval chunk data pack request is processed")
 			flags.DurationVar(&v.verConf.backoffMinInterval, "backoff-min-interval", requester.DefaultBackoffMinInterval, "min time interval a chunk data pack request waits before dispatching")
 			flags.DurationVar(&v.verConf.backoffMaxInterval, "backoff-max-interval", requester.DefaultBackoffMaxInterval, "min time interval a chunk data pack request waits before dispatching")
