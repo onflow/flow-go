@@ -70,5 +70,4 @@ func (d *Distributor) EpochEmergencyFallbackTriggered() {
 	for _, sub := range d.subscribers {
 		sub.EpochEmergencyFallbackTriggered()
 	}
-
 }
