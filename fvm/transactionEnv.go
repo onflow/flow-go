@@ -120,8 +120,11 @@ func NewTransactionEnvironment(
 		env.seedRNG(ctx.BlockHeader)
 	}
 
+	var err error
 	// set the execution parameters from the state
-	err := env.setExecutionParameters()
+	if ctx.LoadContextFromState {
+		err = env.setExecutionParameters()
+	}
 
 	return env, err
 }
