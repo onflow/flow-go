@@ -43,16 +43,17 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, getI
 		}
 
 		msgType, err := IsAuthorizedSender(identity, channel, msg)
-		if errors.Is(err, ErrUnauthorizedSender) {
+		switch {
+		case errors.Is(err, ErrUnauthorizedSender):
 			slashingViolationsConsumer.OnUnAuthorizedSenderError(identity, from.String(), msgType, err)
 			return pubsub.ValidationReject
-		} else if errors.Is(err, ErrUnknownMessageType) {
+		case errors.Is(err, ErrUnknownMessageType):
 			slashingViolationsConsumer.OnUnknownMsgTypeError(identity, from.String(), msgType, err)
 			return pubsub.ValidationReject
-		} else if errors.Is(err, ErrSenderEjected) {
+		case errors.Is(err, ErrSenderEjected):
 			slashingViolationsConsumer.OnSenderEjectedError(identity, from.String(), msgType, err)
 			return pubsub.ValidationReject
-		} else if err != nil {
+		case err != nil:
 			log.Error().
 				Err(err).
 				Str("peer_id", from.String()).
@@ -61,9 +62,9 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, getI
 				Str("message_type", msgType).
 				Msg("unexpected error during message validation")
 			return pubsub.ValidationReject
+		default:
+			return pubsub.ValidationAccept
 		}
-
-		return pubsub.ValidationAccept
 	}
 }
 
