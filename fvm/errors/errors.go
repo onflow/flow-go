@@ -7,7 +7,7 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 )
 
-// Error covers all non-fatal errors happing
+// Error covers all non-fatal errors happening
 // while validating and executing a transaction or an script.
 type Error interface {
 	// Code returns the code for this error
@@ -17,7 +17,7 @@ type Error interface {
 }
 
 // Failure captures fatal unexpected virtual machine errors,
-// we capture this type of error instead of panicing
+// we capture this type of error instead of panicking
 // to collect all necessary data before crashing
 // if any of these errors occurs we should halt the
 // execution.

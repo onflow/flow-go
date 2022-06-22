@@ -8,7 +8,6 @@ import (
 )
 
 func TestErrorHandling(t *testing.T) {
-
 	t.Run("test nonfatal error detection", func(t *testing.T) {
 		e1 := &OperationNotSupportedError{"some operations"}
 		e2 := fmt.Errorf("some other errors: %w", e1)

@@ -25,7 +25,7 @@ func (e *UnknownFailure) FailureCode() FailureCode {
 }
 
 // Unwrap unwraps the error
-func (e UnknownFailure) Unwrap() error {
+func (e *UnknownFailure) Unwrap() error {
 	return e.err
 }
 
@@ -51,7 +51,7 @@ func (e *EncodingFailure) FailureCode() FailureCode {
 }
 
 // Unwrap unwraps the error
-func (e EncodingFailure) Unwrap() error {
+func (e *EncodingFailure) Unwrap() error {
 	return e.err
 }
 
@@ -75,7 +75,7 @@ func (e *LedgerFailure) FailureCode() FailureCode {
 }
 
 // Unwrap unwraps the error
-func (e LedgerFailure) Unwrap() error {
+func (e *LedgerFailure) Unwrap() error {
 	return e.err
 }
 
@@ -130,53 +130,5 @@ func (e BlockFinderFailure) FailureCode() FailureCode {
 
 // Unwrap unwraps the error
 func (e BlockFinderFailure) Unwrap() error {
-	return e.err
-}
-
-// HasherFailure captures a fatal caused by hasher
-type HasherFailure struct {
-	err error
-}
-
-// NewHasherFailuref constructs a new hasherFailure
-func NewHasherFailuref(msg string, args ...interface{}) *HasherFailure {
-	return &HasherFailure{err: fmt.Errorf(msg, args...)}
-}
-
-func (e HasherFailure) Error() string {
-	return fmt.Sprintf("%s hasher failed: %s", e.FailureCode().String(), e.err.Error())
-}
-
-// FailureCode returns the failure code
-func (e HasherFailure) FailureCode() FailureCode {
-	return FailureCodeHasherFailure
-}
-
-// Unwrap unwraps the error
-func (e HasherFailure) Unwrap() error {
-	return e.err
-}
-
-// MetaTransactionFailure captures a fatal caused by invoking a meta transaction
-type MetaTransactionFailure struct {
-	err error
-}
-
-// NewMetaTransactionFailuref constructs a new hasherFailure
-func NewMetaTransactionFailuref(msg string, args ...interface{}) *MetaTransactionFailure {
-	return &MetaTransactionFailure{err: fmt.Errorf(msg, args...)}
-}
-
-func (e MetaTransactionFailure) Error() string {
-	return fmt.Sprintf("%s meta transaction failed: %s", e.FailureCode().String(), e.err.Error())
-}
-
-// FailureCode returns the failure code
-func (e MetaTransactionFailure) FailureCode() FailureCode {
-	return FailureCodeMetaTransactionFailure
-}
-
-// Unwrap unwraps the error
-func (e MetaTransactionFailure) Unwrap() error {
 	return e.err
 }

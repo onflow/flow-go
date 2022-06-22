@@ -173,7 +173,7 @@ func (e OperationAuthorizationError) Unwrap() error {
 // AccountAuthorizationError indicates that an authorization issues
 // either a transaction is missing a required signature to
 // authorize access to an account or a transaction doesn't have authorization
-// to performe some operations like account creation.
+// to perform some operations like account creation.
 type AccountAuthorizationError struct {
 	address flow.Address
 	err     error

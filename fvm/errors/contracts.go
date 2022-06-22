@@ -33,28 +33,3 @@ func (e *ContractNotFoundError) Error() string {
 func (e *ContractNotFoundError) Code() ErrorCode {
 	return ErrCodeContractNotFoundError
 }
-
-// ContractNamesNotFoundError is returned when fetching a list of contract names under an account
-type ContractNamesNotFoundError struct {
-	address flow.Address
-}
-
-// NewContractNamesNotFoundError constructs a new ContractNamesNotFoundError
-func NewContractNamesNotFoundError(address flow.Address) error {
-	return &ContractNamesNotFoundError{
-		address: address,
-	}
-}
-
-func (e *ContractNamesNotFoundError) Error() string {
-	return fmt.Sprintf(
-		"%s cannot retrieve current contract names for account %s",
-		e.Code().String(),
-		e.address,
-	)
-}
-
-// Code returns the error code for this error type
-func (e *ContractNamesNotFoundError) Code() ErrorCode {
-	return ErrCodeContractNamesNotFoundError
-}

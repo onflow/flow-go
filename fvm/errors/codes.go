@@ -2,12 +2,18 @@ package errors
 
 import "fmt"
 
+// ErrorCode represent a fvm error code of errors that does not fail execution.
+// Error codes no longer in use should be deprecated instead of deleted to prevent code reuse, which could lead to
+// incorrect interpretation of errors
 type ErrorCode uint16
 
 func (ec ErrorCode) String() string {
 	return fmt.Sprintf("[Error Code: %d]", ec)
 }
 
+// FailureCode represent a fvm error code of errors that fail execution.
+// Failure codes no longer in use should be deprecated instead of deleted to prevent code reuse, which could lead to
+// incorrect interpretation of errors
 type FailureCode uint16
 
 func (fc FailureCode) String() string {
@@ -15,24 +21,22 @@ func (fc FailureCode) String() string {
 }
 
 const (
-	FailureCodeUnknownFailure         FailureCode = 2000
-	FailureCodeEncodingFailure        FailureCode = 2001
-	FailureCodeLedgerFailure          FailureCode = 2002
-	FailureCodeStateMergeFailure      FailureCode = 2003
-	FailureCodeBlockFinderFailure     FailureCode = 2004
-	FailureCodeHasherFailure          FailureCode = 2005
+	FailureCodeUnknownFailure     FailureCode = 2000
+	FailureCodeEncodingFailure    FailureCode = 2001
+	FailureCodeLedgerFailure      FailureCode = 2002
+	FailureCodeStateMergeFailure  FailureCode = 2003
+	FailureCodeBlockFinderFailure FailureCode = 2004
+
+	// errors no longer in use
+	// Deprecated: FailureCodeHasherFailure
+	FailureCodeHasherFailure FailureCode = 2005
+	// Deprecated: FailureCodeMetaTransactionFailure
 	FailureCodeMetaTransactionFailure FailureCode = 2100
 )
 
 const (
 	// tx validation errors 1000 - 1049
 	// ErrCodeTxValidationError         ErrorCode = 1000 - reserved
-	ErrCodeInvalidTxByteSizeError     ErrorCode = 1001
-	ErrCodeInvalidReferenceBlockError ErrorCode = 1002
-	// Deprecated: ErrCodeExpiredTransactionError
-	ErrCodeExpiredTransactionError       ErrorCode = 1003
-	ErrCodeInvalidScriptError            ErrorCode = 1004
-	ErrCodeInvalidGasLimitError          ErrorCode = 1005
 	ErrCodeInvalidProposalSignatureError ErrorCode = 1006
 	ErrCodeInvalidProposalSeqNumberError ErrorCode = 1007
 	ErrCodeInvalidPayloadSignatureError  ErrorCode = 1008
@@ -50,10 +54,8 @@ const (
 
 	// execution errors 1100 - 1200
 	// ErrCodeExecutionError                 ErrorCode = 1100 - reserved
-	ErrCodeCadenceRunTimeError      ErrorCode = 1101
-	ErrCodeEncodingUnsupportedValue ErrorCode = 1102
-	ErrCodeStorageCapacityExceeded  ErrorCode = 1103
-	//  Deprecated: ErrCodeGasLimitExceededError  ErrorCode = 1104
+	ErrCodeCadenceRunTimeError                       ErrorCode = 1101
+	ErrCodeStorageCapacityExceeded                   ErrorCode = 1103
 	ErrCodeEventLimitExceededError                   ErrorCode = 1105
 	ErrCodeLedgerIntractionLimitExceededError        ErrorCode = 1106
 	ErrCodeStateKeySizeLimitError                    ErrorCode = 1107
@@ -75,6 +77,23 @@ const (
 
 	// contract errors 1250 - 1300
 	// ErrCodeContractError          ErrorCode = 1250 - reserved
-	ErrCodeContractNotFoundError      ErrorCode = 1251
+	ErrCodeContractNotFoundError ErrorCode = 1251
+
+	// errors no longer in use
+	// Deprecated: ErrCodeInvalidTxByteSizeError
+	ErrCodeInvalidTxByteSizeError ErrorCode = 1001
+	// Deprecated: ErrCodeInvalidReferenceBlockError
+	ErrCodeInvalidReferenceBlockError ErrorCode = 1002
+	// Deprecated: ErrCodeInvalidScriptError
+	ErrCodeInvalidScriptError ErrorCode = 1004
+	// Deprecated: ErrCodeInvalidGasLimitError
+	ErrCodeInvalidGasLimitError ErrorCode = 1005
+	// Deprecated: ErrCodeExpiredTransactionError
+	ErrCodeExpiredTransactionError ErrorCode = 1003
+	// Deprecated: ErrCodeEncodingUnsupportedValue
+	ErrCodeEncodingUnsupportedValue ErrorCode = 1102
+	// Deprecated: ErrCodeGasLimitExceededError
+	ErrCodeGasLimitExceededError ErrorCode = 1104
+	// Deprecated: ErrCodeContractNamesNotFoundError
 	ErrCodeContractNamesNotFoundError ErrorCode = 1252
 )

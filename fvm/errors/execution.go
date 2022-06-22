@@ -6,8 +6,6 @@ import (
 	"strings"
 
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/interpreter"
-
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -242,23 +240,23 @@ func (e StateValueSizeLimitError) Code() ErrorCode {
 	return ErrCodeStateValueSizeLimitError
 }
 
-// LedgerIntractionLimitExceededError is returned when a tx hits the maximum ledger interaction limit
-type LedgerIntractionLimitExceededError struct {
+// LedgerInteractionLimitExceededError is returned when a tx hits the maximum ledger interaction limit
+type LedgerInteractionLimitExceededError struct {
 	used  uint64
 	limit uint64
 }
 
-// NewLedgerIntractionLimitExceededError constructs a LedgerIntractionLimitExceededError
-func NewLedgerIntractionLimitExceededError(used, limit uint64) *LedgerIntractionLimitExceededError {
-	return &LedgerIntractionLimitExceededError{used: used, limit: limit}
+// NewLedgerInteractionLimitExceededError constructs a LedgerInteractionLimitExceededError
+func NewLedgerInteractionLimitExceededError(used, limit uint64) *LedgerInteractionLimitExceededError {
+	return &LedgerInteractionLimitExceededError{used: used, limit: limit}
 }
 
-func (e *LedgerIntractionLimitExceededError) Error() string {
+func (e *LedgerInteractionLimitExceededError) Error() string {
 	return fmt.Sprintf("%s max interaction with storage has exceeded the limit (used: %d bytes, limit %d bytes)", e.Code().String(), e.used, e.limit)
 }
 
 // Code returns the error code for this error
-func (e *LedgerIntractionLimitExceededError) Code() ErrorCode {
+func (e *LedgerInteractionLimitExceededError) Code() ErrorCode {
 	return ErrCodeLedgerIntractionLimitExceededError
 }
 
@@ -280,32 +278,6 @@ func (e *OperationNotSupportedError) Error() string {
 // Code returns the error code for this error
 func (e *OperationNotSupportedError) Code() ErrorCode {
 	return ErrCodeOperationNotSupportedError
-}
-
-// EncodingUnsupportedValueError indicates that Cadence attempted
-// to encode a value that is not supported.
-type EncodingUnsupportedValueError struct {
-	value interpreter.Value
-	path  []string
-}
-
-// NewEncodingUnsupportedValueError construct a new EncodingUnsupportedValueError
-func NewEncodingUnsupportedValueError(value interpreter.Value, path []string) *EncodingUnsupportedValueError {
-	return &EncodingUnsupportedValueError{value: value, path: path}
-}
-
-func (e *EncodingUnsupportedValueError) Error() string {
-	return fmt.Sprintf(
-		"%s encoding unsupported value to path [%s]: %[1]T, %[1]v",
-		e.Code().String(),
-		strings.Join(e.path, ","),
-		e.value,
-	)
-}
-
-// Code returns the error code for this error
-func (e *EncodingUnsupportedValueError) Code() ErrorCode {
-	return ErrCodeEncodingUnsupportedValue
 }
 
 // ScriptExecutionCancelledError indicates that Cadence Script execution
