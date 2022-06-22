@@ -462,8 +462,11 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				MaxMapPairs:      math.MaxInt64,
 				MaxNestedLevels:  math.MaxInt16,
 			}.DecMode()
+			if err != nil {
+				return nil, fmt.Errorf("could not create cbor decoder: %w", err)
+			}
 
-			codec := cbor.NewCodec(nil, decMode)
+			codec := cbor.NewCodec(cbor.WithDecMode(decMode))
 
 			builder.ExecutionDataService = state_synchronization.NewExecutionDataService(
 				codec,

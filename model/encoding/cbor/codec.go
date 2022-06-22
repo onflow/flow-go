@@ -57,6 +57,20 @@ func (m *Marshaler) MustUnmarshal(b []byte, val interface{}) {
 
 var _ encoding.Codec = (*Codec)(nil)
 
+type Option func(*Codec)
+
+func WithEncMode(encMode cbor.EncMode) Option {
+	return func(c *Codec) {
+		c.encMode = encMode
+	}
+}
+
+func WithDecMode(decMode cbor.DecMode) Option {
+	return func(c *Codec) {
+		c.decMode = decMode
+	}
+}
+
 type Codec struct {
 	encMode cbor.EncMode
 	decMode cbor.DecMode
@@ -64,11 +78,14 @@ type Codec struct {
 
 // NewCodec returns a new cbor Codec with the provided EncMode and DecMode.
 // If either is nil, the default cbor EncMode/DecMode will be used.
-func NewCodec(encMode cbor.EncMode, decMode cbor.DecMode) *Codec {
-	return &Codec{
-		encMode: encMode,
-		decMode: decMode,
+func NewCodec(opts ...Option) *Codec {
+	c := &Codec{}
+
+	for _, opt := range opts {
+		opt(c)
 	}
+
+	return c
 }
 
 func (c *Codec) NewEncoder(w io.Writer) encoding.Encoder {
