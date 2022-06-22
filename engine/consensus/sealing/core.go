@@ -584,14 +584,14 @@ func (c *Core) prune(parentSpan opentracing.Span, finalized, lastSealed *flow.He
 // ... <-- A <-- A+1 <- ... <-- D <-- D+1 <- ... -- F
 //       sealed       maxHeightForRequesting      final
 func (c *Core) requestPendingApprovals(observation consensus.SealingObservation, lastSealedHeight, lastFinalizedHeight uint64) error {
-	if lastSealedHeight+c.config.ApprovalRequestsThreshold >= lastFinalizedHeight {
+	if lastSealedHeight+c.sealingConfigsGetter.ApprovalRequestsThresholdConst() >= lastFinalizedHeight {
 		return nil
 	}
 
 	// Reaching the following code implies:
 	// 0 <= sealed.Height < final.Height - ApprovalRequestsThreshold
 	// Hence, the following operation cannot underflow
-	maxHeightForRequesting := lastFinalizedHeight - c.config.ApprovalRequestsThreshold
+	maxHeightForRequesting := lastFinalizedHeight - c.sealingConfigsGetter.ApprovalRequestsThresholdConst()
 
 	pendingApprovalRequests := uint(0)
 	collectors := c.collectorTree.GetCollectorsByInterval(lastSealedHeight, maxHeightForRequesting)

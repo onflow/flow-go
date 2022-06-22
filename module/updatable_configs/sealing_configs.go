@@ -5,6 +5,7 @@ import (
 
 	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/updatable_configs/validation"
 )
@@ -14,7 +15,8 @@ type sealingConfigs struct {
 	requiredApprovalsForSealConstruction *atomic.Uint32
 	requiredApprovalsForSealVerification uint
 	chunkAlpha                           uint
-	emergencySealingActive               bool // flag which indicates if emergency sealing is active or not. NOTE: this is temporary while sealing & verification is under development
+	emergencySealingActive               bool   // flag which indicates if emergency sealing is active or not. NOTE: this is temporary while sealing & verification is under development
+	approvalRequestsThreshold            uint64 // threshold for re-requesting approvals: min height difference between the latest finalized block and the block incorporating a result
 }
 
 var _ module.SealingConfigsSetter = (*sealingConfigs)(nil)
@@ -38,6 +40,7 @@ func NewSealingConfigs(
 		requiredApprovalsForSealVerification: requiredApprovalsForSealVerification,
 		chunkAlpha:                           chunkAlpha,
 		emergencySealingActive:               emergencySealingActive,
+		approvalRequestsThreshold:            flow.DefaultApprovalRequestsThreshold,
 	}, nil
 }
 
@@ -78,4 +81,8 @@ func (r *sealingConfigs) RequireApprovalsForSealVerificationConst() uint {
 // EmergencySealingActiveConst returns the constant EmergencySealingActive value
 func (r *sealingConfigs) EmergencySealingActiveConst() bool {
 	return r.emergencySealingActive
+}
+
+func (r *sealingConfigs) ApprovalRequestsThresholdConst() uint64 {
+	return r.approvalRequestsThreshold
 }

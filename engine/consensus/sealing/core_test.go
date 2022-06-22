@@ -324,7 +324,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_EmergencySealing(
 		flow.DefaultChunkAssignmentAlpha,
 		true, // enable emergency sealing
 	)
-	require.NoError(t, err)
+	require.NoError(s.T(), err)
 	s.core, err = NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(), s.Headers, s.State, s.sealsDB, s.Assigner, s.SigHasher, s.SealsPL, s.Conduit, setter)
 	require.NoError(s.T(), err)
 	s.setter = setter
@@ -342,7 +342,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_EmergencySealing(
 	s.sealsDB.On("HighestInFork", mock.Anything).Return(seal, nil).Times(approvals.DefaultEmergencySealingThreshold)
 	s.State.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(&s.ParentBlock, nil))
 
-	err := s.core.ProcessIncorporatedResult(s.IncorporatedResult)
+	err = s.core.ProcessIncorporatedResult(s.IncorporatedResult)
 	require.NoError(s.T(), err)
 
 	lastFinalizedBlock := &s.IncorporatedBlock
@@ -610,7 +610,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 
 	// start delivering finalization events
 	lastProcessedIndex := 0
-	for ; lastProcessedIndex < int(s.core.config.ApprovalRequestsThreshold); lastProcessedIndex++ {
+	for ; lastProcessedIndex < int(s.core.sealingConfigsGetter.ApprovalRequestsThresholdConst()); lastProcessedIndex++ {
 		finalized := unsealedFinalizedBlocks[lastProcessedIndex].Header
 		s.MarkFinalized(finalized)
 		err := s.core.ProcessFinalizedBlock(finalized.ID())
@@ -741,7 +741,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 	s.State.On("Final").Return(finalSnapShot)
 
 	core, err := NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(),
-		s.Headers, s.State, s.sealsDB, assigner, s.SigHasher, s.SealsPL, s.Conduit, s.core.config, s.setter)
+		s.Headers, s.State, s.sealsDB, assigner, s.SigHasher, s.SealsPL, s.Conduit, s.setter)
 	require.NoError(s.T(), err)
 
 	err = core.RepopulateAssignmentCollectorTree(payloads)
@@ -821,7 +821,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_
 	s.State.On("Final").Return(finalSnapShot)
 
 	core, err := NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(),
-		s.Headers, s.State, s.sealsDB, assigner, s.SigHasher, s.SealsPL, s.Conduit, s.core.config, s.setter)
+		s.Headers, s.State, s.sealsDB, assigner, s.SigHasher, s.SealsPL, s.Conduit, s.setter)
 	require.NoError(s.T(), err)
 
 	err = core.RepopulateAssignmentCollectorTree(payloads)

@@ -66,6 +66,10 @@ const DefaultChunkAssignmentAlpha = 3
 // to make fire fighting easier while seal & verification is under development.
 const DefaultEmergencySealingActive = false
 
+// threshold for re-requesting approvals: min height difference between the latest finalized block
+// and the block incorporating a result
+const DefaultApprovalRequestsThreshold = uint64(10)
+
 // DomainTagLength is set to 32 bytes.
 //
 // Signatures on Flow that needs to be scoped to a certain domain need to

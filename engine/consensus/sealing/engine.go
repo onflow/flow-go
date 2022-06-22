@@ -136,7 +136,7 @@ func NewEngine(log zerolog.Logger,
 	}
 
 	signatureHasher := crypto.NewBLSKMAC(encoding.ResultApprovalTag)
-	core, err := NewCore(log, e.workerPool, tracer, conMetrics, sealingTracker, unit, headers, state, sealsDB, assigner, signatureHasher, sealsMempool, approvalConduit, options, requiredApprovalsForSealConstructionGetter)
+	core, err := NewCore(log, e.workerPool, tracer, conMetrics, sealingTracker, unit, headers, state, sealsDB, assigner, signatureHasher, sealsMempool, approvalConduit, requiredApprovalsForSealConstructionGetter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init sealing engine: %w", err)
 	}

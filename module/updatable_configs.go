@@ -8,6 +8,7 @@ package module
 // - RequireApprovalsForSealingVerification (not-updatable)
 // - ChunkAlpha (not-updatable)
 // - EmergencySealingActive (not-updatable)
+// - ApprovalRequestsThreshold (not-updatable)
 type SealingConfigsGetter interface {
 	// updatable fields
 	RequireApprovalsForSealConstructionDynamicValue() uint
@@ -16,6 +17,7 @@ type SealingConfigsGetter interface {
 	ChunkAlphaConst() uint
 	RequireApprovalsForSealVerificationConst() uint
 	EmergencySealingActiveConst() bool
+	ApprovalRequestsThresholdConst() uint64
 }
 
 // SealingConfigsSetter is an interface that allows the caller to update updatable configs
