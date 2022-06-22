@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -53,8 +53,8 @@ func (s *TestIsAuthorizedSenderSuite) TestIsAuthorizedSender_UnAuthorizedSender(
 		str := fmt.Sprintf("role (%s) should not be authorized to send message type (%s) on channel (%s)", c.Identity.Role, c.MessageStr, c.Channel)
 		s.Run(str, func() {
 			msgType, err := IsAuthorizedSender(c.Identity, c.Channel, c.Message)
-			require.ErrorIs(s.T(), err, ErrUnauthorizedSender)
-			require.Equal(s.T(), c.MessageStr, msgType)
+			s.Require().ErrorIs(err, ErrUnauthorizedSender)
+			s.Require().Equal(c.MessageStr, msgType)
 		})
 	}
 }
@@ -65,15 +65,31 @@ func (s *TestIsAuthorizedSenderSuite) TestIsAuthorizedSender_ValidationFailure()
 		identity := unittest.IdentityFixture()
 		identity.Ejected = true
 		msgType, err := IsAuthorizedSender(identity, network.Channel(""), nil)
-		require.ErrorIs(s.T(), err, ErrSenderEjected)
-		require.Equal(s.T(), "", msgType)
+		s.Require().ErrorIs(err, ErrSenderEjected)
+		s.Require().Equal("", msgType)
 	})
 
 	s.Run("unknown message type", func() {
 		identity := unittest.IdentityFixture()
 		msgType, err := IsAuthorizedSender(identity, network.Channel(""), nil)
-		require.ErrorIs(s.T(), err, ErrUnknownMessageType)
-		require.Equal(s.T(), "", msgType)
+		s.Require().ErrorIs(err, ErrUnknownMessageType)
+		s.Require().Equal("", msgType)
+	})
+
+	s.Run("unknown message type with message embedded", func() {
+		identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
+		type msg struct {
+			*messages.BlockProposal
+		}
+
+		m := &msg{&messages.BlockProposal{
+			Header:  nil,
+			Payload: nil,
+		}}
+
+		msgType, err := IsAuthorizedSender(identity, network.ConsensusCommittee, m)
+		s.Require().ErrorIs(err, ErrUnknownMessageType)
+		s.Require().Equal("", msgType)
 	})
 }
 
