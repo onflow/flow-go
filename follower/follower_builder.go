@@ -27,7 +27,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/follower"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/encodable"
@@ -575,6 +574,8 @@ func (builder *FollowerServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 			).
 			SetRoutingSystem(func(ctx context.Context, h host.Host) (routing.Routing, error) {
 				return p2p.NewDHT(ctx, h, unicast.FlowPublicDHTProtocolID(builder.SporkID),
+					builder.Logger,
+					builder.Metrics.Network,
 					p2p.AsClient(),
 					dht.BootstrapPeers(pis...),
 				)
@@ -667,7 +668,7 @@ func (builder *FollowerServiceBuilder) enqueuePublicNetworkInit() {
 			return nil, err
 		}
 
-		builder.Network = converter.NewNetwork(net, engine.SyncCommittee, engine.PublicSyncCommittee)
+		builder.Network = converter.NewNetwork(net, network.SyncCommittee, network.PublicSyncCommittee)
 
 		builder.Logger.Info().Msgf("network will run on address: %s", builder.BindAddr)
 
@@ -705,6 +706,7 @@ func (builder *FollowerServiceBuilder) initMiddleware(nodeID flow.Identifier,
 		builder.SporkID,
 		p2p.DefaultUnicastTimeout,
 		builder.IDTranslator,
+		builder.CodecFactory(),
 		p2p.WithMessageValidators(validators...),
 		// no peer manager
 		// use default identifier provider

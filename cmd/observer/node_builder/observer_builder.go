@@ -29,7 +29,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/common/follower"
@@ -466,7 +465,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionDataRequester() *ObserverSe
 		}).
 		Component("execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			var err error
-			bs, err = node.Network.RegisterBlobService(engine.ExecutionDataService, ds)
+			bs, err = node.Network.RegisterBlobService(network.ExecutionDataService, ds)
 			if err != nil {
 				return nil, fmt.Errorf("could not register blob service: %w", err)
 			}
@@ -841,6 +840,8 @@ func (builder *ObserverServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 			).
 			SetRoutingSystem(func(ctx context.Context, h host.Host) (routing.Routing, error) {
 				return p2p.NewDHT(ctx, h, unicast.FlowPublicDHTProtocolID(builder.SporkID),
+					builder.Logger,
+					builder.Metrics.Network,
 					p2p.AsClient(),
 					dht.BootstrapPeers(pis...),
 				)
@@ -936,7 +937,7 @@ func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
 			return nil, err
 		}
 
-		builder.Network = converter.NewNetwork(net, engine.SyncCommittee, engine.PublicSyncCommittee)
+		builder.Network = converter.NewNetwork(net, network.SyncCommittee, network.PublicSyncCommittee)
 
 		builder.Logger.Info().Msgf("network will run on address: %s", builder.BindAddr)
 
@@ -1013,6 +1014,7 @@ func (builder *ObserverServiceBuilder) initMiddleware(nodeID flow.Identifier,
 		builder.SporkID,
 		p2p.DefaultUnicastTimeout,
 		builder.IDTranslator,
+		builder.CodecFactory(),
 		p2p.WithMessageValidators(validators...),
 		// no peer manager
 		// use default identifier provider
