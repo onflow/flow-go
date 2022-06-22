@@ -101,7 +101,9 @@ func NewScriptEnvironment(
 		env.seedRNG(fvmContext.BlockHeader)
 	}
 
-	env.setExecutionParameters()
+	if fvmContext.LoadContextFromState {
+		env.setExecutionParameters()
+	}
 
 	return env
 }

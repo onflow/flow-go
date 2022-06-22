@@ -13,10 +13,12 @@ import (
 
 // A Context defines a set of execution parameters used by the virtual machine.
 type Context struct {
-	Chain                        flow.Chain
-	Blocks                       Blocks
-	Metrics                      handler.MetricsReporter
-	Tracer                       module.Tracer
+	Chain   flow.Chain
+	Blocks  Blocks
+	Metrics handler.MetricsReporter
+	Tracer  module.Tracer
+	// LoadContextFromState is a flag telling the fvm to load certain parts of the context from the state
+	LoadContextFromState         bool
 	ComputationLimit             uint64
 	MemoryLimit                  uint64
 	MaxStateKeySize              uint64
@@ -75,6 +77,7 @@ func defaultContext(logger zerolog.Logger) Context {
 		Blocks:                           nil,
 		Metrics:                          &handler.NoopMetricsReporter{},
 		Tracer:                           nil,
+		LoadContextFromState:             true,
 		ComputationLimit:                 DefaultComputationLimit,
 		MemoryLimit:                      DefaultMemoryLimit,
 		MaxStateKeySize:                  state.DefaultMaxKeySize,
@@ -121,6 +124,14 @@ func WithChain(chain flow.Chain) Option {
 func WithGasLimit(limit uint64) Option {
 	return func(ctx Context) Context {
 		ctx.ComputationLimit = limit
+		return ctx
+	}
+}
+
+// WithLoadContextFromState sets if certain context parameters get loaded from the state or not
+func WithLoadContextFromState(load bool) Option {
+	return func(ctx Context) Context {
+		ctx.LoadContextFromState = load
 		return ctx
 	}
 }

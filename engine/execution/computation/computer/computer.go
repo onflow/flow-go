@@ -64,6 +64,7 @@ func SystemChunkContext(vmCtx fvm.Context, logger zerolog.Logger) fvm.Context {
 		fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(logger)),
 		fvm.WithMaxStateInteractionSize(SystemChunkLedgerIntractionLimit),
 		fvm.WithEventCollectionSizeLimit(SystemChunkEventCollectionMaxSize),
+		fvm.WithLoadContextFromState(false),
 	)
 }
 
