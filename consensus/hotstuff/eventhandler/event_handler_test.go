@@ -95,46 +95,6 @@ func initPaceMaker(t require.TestingT, livenessData *hotstuff.LivenessData) hots
 	return pm
 }
 
-// VoteAggregator is a mock for testing eventhandler
-type VoteAggregator struct {
-	// if a blockID exists in qcs field, then a vote can be made into a QC
-	qcs map[flow.Identifier]*flow.QuorumCertificate
-	t   require.TestingT
-}
-
-func NewVoteAggregator(t require.TestingT) *VoteAggregator {
-	return &VoteAggregator{
-		qcs: make(map[flow.Identifier]*flow.QuorumCertificate),
-		t:   t,
-	}
-}
-
-func (v *VoteAggregator) StoreVoteAndBuildQC(vote *model.Vote, block *model.Block) (*flow.QuorumCertificate, bool, error) {
-	qc, ok := v.qcs[block.BlockID]
-	log.Info().Msgf("voteaggregator.StoreVoteAndBuildQC, qc built: %v, for view: %x, blockID: %v\n", ok, block.View, block.BlockID)
-
-	return qc, ok, nil
-}
-
-func (v *VoteAggregator) StorePendingVote(vote *model.Vote) (bool, error) {
-	return false, nil
-}
-
-func (v *VoteAggregator) StoreProposerVote(vote *model.Vote) bool {
-	return true
-}
-
-func (v *VoteAggregator) BuildQCOnReceivedBlock(block *model.Block) (*flow.QuorumCertificate, bool, error) {
-	qc, ok := v.qcs[block.BlockID]
-	log.Info().Msgf("voteaggregator.BuildQCOnReceivedBlock, qc built: %v, for view: %x, blockID: %v\n", ok, block.View, block.BlockID)
-
-	return qc, ok, nil
-}
-
-func (v *VoteAggregator) PruneByView(view uint64) {
-	log.Info().Msgf("pruned at view:%v\n", view)
-}
-
 type Committee struct {
 	mocks.DynamicCommittee
 	// to mock I'm the leader of a certain view, add the view into the keys of leaders field
@@ -290,7 +250,10 @@ func (f *Forks) MakeForkChoice(curView uint64) (*flow.QuorumCertificate, *model.
 type BlockProducer struct{}
 
 func (b *BlockProducer) MakeBlockProposal(qc *flow.QuorumCertificate, view uint64, lastViewTC *flow.TimeoutCertificate) (*model.Proposal, error) {
-	return createProposal(view, qc.View), nil
+	return &model.Proposal{
+		Block:      helper.MakeBlock(helper.WithBlockView(view), helper.WithBlockQC(qc)),
+		LastViewTC: lastViewTC,
+	}, nil
 }
 
 func TestEventHandler(t *testing.T) {
@@ -315,17 +278,22 @@ type EventHandlerSuite struct {
 
 	initView    uint64
 	endView     uint64
+	parentBlock *model.Block
 	votingBlock *model.Block
 	qc          *flow.QuorumCertificate
+	tc          *flow.TimeoutCertificate
 	newview     *model.NewViewEvent
 }
 
 func (es *EventHandlerSuite) SetupTest() {
 	finalized := uint64(3)
 
+	es.parentBlock = createBlock(4)
+	newestQC := createQC(es.parentBlock)
+
 	livenessData := &hotstuff.LivenessData{
-		CurrentView: 6,
-		NewestQC:    helper.MakeQC(helper.WithQCView(5)),
+		CurrentView: newestQC.View + 1,
+		NewestQC:    newestQC,
 	}
 
 	es.paceMaker = initPaceMaker(es.T(), livenessData)
@@ -359,16 +327,18 @@ func (es *EventHandlerSuite) SetupTest() {
 	es.initView = livenessData.CurrentView
 	es.endView = livenessData.CurrentView
 	// voting block is a block for the current view, which will trigger view change
-	es.votingBlock = createBlockWithQC(es.paceMaker.CurView(), es.paceMaker.CurView()-1)
-	es.qc = &flow.QuorumCertificate{
-		BlockID:       es.votingBlock.BlockID,
-		View:          es.votingBlock.View,
-		SignerIndices: nil,
-		SigData:       nil,
-	}
+	es.votingBlock = helper.MakeBlock(helper.WithBlockView(es.paceMaker.CurView()),
+		helper.WithParentBlock(es.parentBlock))
+	es.qc = helper.MakeQC(helper.WithQCBlock(es.votingBlock))
+	// create a TC that will trigger view change for current view, based on newest QC
+	es.tc = helper.MakeTC(helper.WithTCView(es.paceMaker.CurView()),
+		helper.WithTCNewestQC(es.votingBlock.QC))
 	es.newview = &model.NewViewEvent{
 		View: es.votingBlock.View + 1, // the vote for the voting blocks will trigger a view change to the next view
 	}
+
+	// add es.parentBlock into forks, otherwise we won't vote or propose based on it's QC sicne the parent is unknown
+	es.forks.blocks[es.parentBlock.BlockID] = es.parentBlock
 }
 
 // a QC for current view triggered view change
@@ -702,6 +672,30 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_ForCurView_NoVote_IsNextLeade
 	es.voteAggregator.AssertCalled(es.T(), "AddBlock", proposal)
 }
 
+// TestOnTCConstructed_NextLeaderProposes tests that after receiving TC and advancing view we as next leader create a proposal
+// and broadcast it
+func (es *EventHandlerSuite) TestOnTCConstructed_NextLeaderProposes() {
+	es.committee.leaders[es.tc.View+1] = struct{}{}
+	es.endView++
+	err := es.eventhandler.OnTCConstructed(es.tc)
+	require.NoError(es.T(), err)
+	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "TC didn't trigger view change")
+
+	lastCall := es.communicator.Calls[len(es.communicator.Calls)-1]
+	// the last call is BroadcastProposal
+	require.Equal(es.T(), "BroadcastProposalWithDelay", lastCall.Method)
+	header, ok := lastCall.Arguments[0].(*flow.Header)
+	require.True(es.T(), ok)
+	// it should broadcast a header as the same as endView
+	require.Equal(es.T(), es.endView, header.View)
+
+	// proposed block should contain valid newest QC and lastViewTC
+	expectedNewestQC := es.paceMaker.NewestQC()
+	proposal := model.ProposalFromFlow(header, expectedNewestQC.View)
+	require.Equal(es.T(), expectedNewestQC, proposal.Block.QC)
+	require.Equal(es.T(), es.paceMaker.LastViewTC(), proposal.LastViewTC)
+}
+
 func (es *EventHandlerSuite) TestOnTimeout() {
 	unittest.SkipUnless(es.T(), unittest.TEST_TODO, "active-pacemaker")
 	err := es.eventhandler.OnLocalTimeout()
@@ -775,13 +769,13 @@ func (es *EventHandlerSuite) TestFollowerFollows100Blocks() {
 		// create each proposal as if they are created by some leader
 		proposal := createProposal(es.initView+uint64(i)+1, es.initView+uint64(i))
 		es.voteAggregator.On("AddBlock", proposal).Return(nil).Once()
-		// as a follower, I receive these propsals
+		// as a follower, I receive these proposals
 		err := es.eventhandler.OnReceiveProposal(proposal)
 		require.NoError(es.T(), err)
 		es.endView++
 	}
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
-	require.Equal(es.T(), 100, len(es.forks.blocks))
+	require.Equal(es.T(), 100, len(es.forks.blocks)-1)
 	es.voteAggregator.AssertExpectations(es.T())
 }
 
@@ -791,12 +785,12 @@ func (es *EventHandlerSuite) TestFollowerReceives100Forks() {
 		// create each proposal as if they are created by some leader
 		proposal := createProposal(es.initView+uint64(i)+1, es.initView-1)
 		es.voteAggregator.On("AddBlock", proposal).Return(nil).Once()
-		// as a follower, I receive these propsals
+		// as a follower, I receive these proposals
 		err := es.eventhandler.OnReceiveProposal(proposal)
 		require.NoError(es.T(), err)
 	}
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
-	require.Equal(es.T(), 100, len(es.forks.blocks))
+	require.Equal(es.T(), 100, len(es.forks.blocks)-1)
 	es.voteAggregator.AssertExpectations(es.T())
 }
 
@@ -808,7 +802,7 @@ func createBlock(view uint64) *model.Block {
 	})
 	return &model.Block{
 		BlockID: blockID,
-		View:    uint64(view),
+		View:    view,
 	}
 }
 

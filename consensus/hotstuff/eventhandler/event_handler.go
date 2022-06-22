@@ -224,20 +224,20 @@ func (e *EventHandler) startNewView() error {
 
 		// as the leader of the current view,
 		// build the block proposal for the current view
-		qc := e.paceMaker.NewestQC()
+		newestQC := e.paceMaker.NewestQC()
 		lastViewTC := e.paceMaker.LastViewTC()
 
-		_, found := e.forks.GetBlock(qc.BlockID)
+		_, found := e.forks.GetBlock(newestQC.BlockID)
 		if !found {
 			// we don't know anything about block referenced by our newest QC, in this case we can't
 			// create a valid proposal since we can't guarantee validity of block payload.
 			log.Debug().
-				Uint64("qc_view", qc.View).
-				Hex("block_id", qc.BlockID[:]).Msg("no parent found for newest QC, can't propose")
+				Uint64("qc_view", newestQC.View).
+				Hex("block_id", newestQC.BlockID[:]).Msg("no parent found for newest QC, can't propose")
 			return nil
 		}
 
-		proposal, err := e.blockProducer.MakeBlockProposal(qc, curView, lastViewTC)
+		proposal, err := e.blockProducer.MakeBlockProposal(newestQC, curView, lastViewTC)
 		if err != nil {
 			return fmt.Errorf("can not make block proposal for curView %v: %w", curView, err)
 		}
@@ -247,8 +247,8 @@ func (e *EventHandler) startNewView() error {
 		log.Debug().
 			Uint64("block_view", block.View).
 			Hex("block_id", block.BlockID[:]).
-			Uint64("parent_view", qc.View).
-			Hex("parent_id", qc.BlockID[:]).
+			Uint64("parent_view", newestQC.View).
+			Hex("parent_id", newestQC.BlockID[:]).
 			Hex("signer", block.ProposerID[:]).
 			Msg("forwarding proposal to communicator for broadcasting")
 
