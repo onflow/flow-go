@@ -17,17 +17,17 @@ type Context struct {
 	Blocks  Blocks
 	Metrics handler.MetricsReporter
 	Tracer  module.Tracer
-	// LoadContextFromState is a flag telling the fvm to load certain parts of the context from the state
-	LoadContextFromState         bool
-	ComputationLimit             uint64
-	MemoryLimit                  uint64
-	MaxStateKeySize              uint64
-	MaxStateValueSize            uint64
-	MaxStateInteractionSize      uint64
-	EventCollectionByteSizeLimit uint64
-	MaxNumOfTxRetries            uint8
-	BlockHeader                  *flow.Header
-	ServiceAccountEnabled        bool
+	// AllowContextOverrideByExecutionState is a flag telling the fvm to override certain parts of the context from the state
+	AllowContextOverrideByExecutionState bool
+	ComputationLimit                     uint64
+	MemoryLimit                          uint64
+	MaxStateKeySize                      uint64
+	MaxStateValueSize                    uint64
+	MaxStateInteractionSize              uint64
+	EventCollectionByteSizeLimit         uint64
+	MaxNumOfTxRetries                    uint8
+	BlockHeader                          *flow.Header
+	ServiceAccountEnabled                bool
 	// Depricated: RestrictedDeploymentEnabled is deprecated use SetIsContractDeploymentRestrictedTransaction instead.
 	// Can be removed after all networks are migrated to SetIsContractDeploymentRestrictedTransaction
 	RestrictedDeploymentEnabled      bool
@@ -73,27 +73,27 @@ const (
 
 func defaultContext(logger zerolog.Logger) Context {
 	return Context{
-		Chain:                            flow.Mainnet.Chain(),
-		Blocks:                           nil,
-		Metrics:                          &handler.NoopMetricsReporter{},
-		Tracer:                           nil,
-		LoadContextFromState:             true,
-		ComputationLimit:                 DefaultComputationLimit,
-		MemoryLimit:                      DefaultMemoryLimit,
-		MaxStateKeySize:                  state.DefaultMaxKeySize,
-		MaxStateValueSize:                state.DefaultMaxValueSize,
-		MaxStateInteractionSize:          state.DefaultMaxInteractionSize,
-		EventCollectionByteSizeLimit:     DefaultEventCollectionByteSizeLimit,
-		MaxNumOfTxRetries:                DefaultMaxNumOfTxRetries,
-		BlockHeader:                      nil,
-		ServiceAccountEnabled:            true,
-		RestrictedDeploymentEnabled:      true,
-		RestrictedContractRemovalEnabled: true,
-		CadenceLoggingEnabled:            false,
-		EventCollectionEnabled:           true,
-		ServiceEventCollectionEnabled:    false,
-		AccountFreezeAvailable:           false,
-		ExtensiveTracing:                 false,
+		Chain:                                flow.Mainnet.Chain(),
+		Blocks:                               nil,
+		Metrics:                              &handler.NoopMetricsReporter{},
+		Tracer:                               nil,
+		AllowContextOverrideByExecutionState: true,
+		ComputationLimit:                     DefaultComputationLimit,
+		MemoryLimit:                          DefaultMemoryLimit,
+		MaxStateKeySize:                      state.DefaultMaxKeySize,
+		MaxStateValueSize:                    state.DefaultMaxValueSize,
+		MaxStateInteractionSize:              state.DefaultMaxInteractionSize,
+		EventCollectionByteSizeLimit:         DefaultEventCollectionByteSizeLimit,
+		MaxNumOfTxRetries:                    DefaultMaxNumOfTxRetries,
+		BlockHeader:                          nil,
+		ServiceAccountEnabled:                true,
+		RestrictedDeploymentEnabled:          true,
+		RestrictedContractRemovalEnabled:     true,
+		CadenceLoggingEnabled:                false,
+		EventCollectionEnabled:               true,
+		ServiceEventCollectionEnabled:        false,
+		AccountFreezeAvailable:               false,
+		ExtensiveTracing:                     false,
 		TransactionProcessors: []TransactionProcessor{
 			NewTransactionAccountFrozenChecker(),
 			NewTransactionSignatureVerifier(AccountKeyWeightThreshold),
@@ -131,7 +131,7 @@ func WithGasLimit(limit uint64) Option {
 // WithLoadContextFromState sets if certain context parameters get loaded from the state or not
 func WithLoadContextFromState(load bool) Option {
 	return func(ctx Context) Context {
-		ctx.LoadContextFromState = load
+		ctx.AllowContextOverrideByExecutionState = load
 		return ctx
 	}
 }
