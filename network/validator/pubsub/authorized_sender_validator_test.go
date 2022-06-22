@@ -70,27 +70,22 @@ func TestIsAuthorizedSender_ValidationFailure(t *testing.T) {
 
 // initializeTestCases initializes happy and sad path test cases for checking authorized and unauthorized role message combinations.
 func initializeTestCases() {
-	for _, c := range network.GetAllMessageAuthConfigs() {
+	for _, c := range network.MessageAuthConfigs {
 		for channel, authorizedRoles := range c.Config {
 			for _, role := range flow.Roles() {
 				identity := unittest.IdentityFixture(unittest.WithRole(role))
+				tc := TestCase{
+					Identity:   identity,
+					Channel:    channel,
+					Message:    c.Interface(),
+					MessageStr: c.String,
+				}
+
 				if authorizedRoles.Contains(role) {
 					// test cases for validation success happy path
-					tc := TestCase{
-						Identity:   identity,
-						Channel:    channel,
-						Message:    c.Interface,
-						MessageStr: c.String,
-					}
 					happyPathTestCases = append(happyPathTestCases, tc)
 				} else {
 					// test cases for validation unsuccessful sad path
-					tc := TestCase{
-						Identity:   identity,
-						Channel:    channel,
-						Message:    c.Interface,
-						MessageStr: c.String,
-					}
 					sadPathTestCases = append(sadPathTestCases, tc)
 				}
 			}
