@@ -26,23 +26,11 @@ func (lc *LegacyControllerMigration) Migrate(payload []ledger.Payload) ([]ledger
 
 		if len(controller) > 0 {
 			if bytes.Equal(owner, controller) {
-				// case - public key count
-				if string(key) == state.KeyPublicKeyCount {
-					p.Key.KeyParts[1].Value = []byte("")
-					continue
-				}
-				// case - public keys
-				if bytes.HasPrefix(key, []byte("public_key_")) {
-					p.Key.KeyParts[1].Value = []byte("")
-					continue
-				}
-				// case - contract names
-				if string(key) == state.KeyContractNames {
-					p.Key.KeyParts[1].Value = []byte("")
-					continue
-				}
-				// case - contracts
-				if bytes.HasPrefix(key, []byte(state.KeyCode)) {
+				//
+				if string(key) == state.KeyPublicKeyCount || //  case - public key count
+					bytes.HasPrefix(key, []byte("public_key_")) || // case - public keys
+					string(key) == state.KeyContractNames || // case - contract names
+					bytes.HasPrefix(key, []byte(state.KeyCode)) { // case - contracts
 					p.Key.KeyParts[1].Value = []byte("")
 					continue
 				}
