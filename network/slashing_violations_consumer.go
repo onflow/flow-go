@@ -23,7 +23,7 @@ func (c *SlashingViolationsConsumer) OnUnAuthorizedSenderError(identity *flow.Id
 		Err(err).
 		Str("peer_id", peerID).
 		Str("role", identity.Role.String()).
-		Str("node_id", identity.NodeID.String()).
+		Str("peer_node_id", identity.NodeID.String()).
 		Str("message_type", msgType).
 		Msg("potential slashable offense")
 }
