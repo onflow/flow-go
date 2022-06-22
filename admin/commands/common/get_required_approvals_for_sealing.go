@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/rs/zerolog/log"
 
@@ -27,10 +28,7 @@ func (s *GetRequiredApprovalsForSealingCommand) Handler(ctx context.Context, req
 
 	log.Info().Msgf("admintool: required approvals for sealing is %v", val)
 
-	out := make(map[string]uint)
-	out["required_approvals_for_seal_construction"] = val
-
-	return out, nil
+	return fmt.Sprintf("%v", val), nil
 }
 
 func (s *GetRequiredApprovalsForSealingCommand) Validator(req *admin.CommandRequest) error {
