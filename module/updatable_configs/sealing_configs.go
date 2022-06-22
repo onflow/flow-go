@@ -14,6 +14,7 @@ type sealingConfigs struct {
 	requiredApprovalsForSealConstruction *atomic.Uint32
 	requiredApprovalsForSealVerification uint
 	chunkAlpha                           uint
+	emergencySealingActive               bool // flag which indicates if emergency sealing is active or not. NOTE: this is temporary while sealing & verification is under development
 }
 
 var _ module.SealingConfigsSetter = (*sealingConfigs)(nil)
@@ -22,6 +23,7 @@ func NewSealingConfigs(
 	requiredApprovalsForSealConstruction uint,
 	requiredApprovalsForSealVerification uint,
 	chunkAlpha uint,
+	emergencySealingActive bool,
 ) (module.SealingConfigsSetter, error) {
 	err := validation.ValidateRequireApprovals(
 		requiredApprovalsForSealConstruction,
@@ -35,6 +37,7 @@ func NewSealingConfigs(
 		requiredApprovalsForSealConstruction: atomic.NewUint32(uint32(requiredApprovalsForSealConstruction)),
 		requiredApprovalsForSealVerification: requiredApprovalsForSealVerification,
 		chunkAlpha:                           chunkAlpha,
+		emergencySealingActive:               emergencySealingActive,
 	}, nil
 }
 
@@ -70,4 +73,9 @@ func (r *sealingConfigs) ChunkAlphaConst() uint {
 // RequireApprovalsForSealVerificationConst returns the constant RequireApprovalsForSealVerification value
 func (r *sealingConfigs) RequireApprovalsForSealVerificationConst() uint {
 	return r.requiredApprovalsForSealVerification
+}
+
+// EmergencySealingActiveConst returns the constant EmergencySealingActive value
+func (r *sealingConfigs) EmergencySealingActiveConst() bool {
+	return r.emergencySealingActive
 }

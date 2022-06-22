@@ -148,7 +148,7 @@ func main() {
 		flags.UintVar(&chunkAlpha, "chunk-alpha", flow.DefaultChunkAssignmentAlpha, "number of verifiers that should be assigned to each chunk")
 		flags.UintVar(&requiredApprovalsForSealVerification, "required-verification-seal-approvals", flow.DefaultRequiredApprovalsForSealValidation, "minimum number of approvals that are required to verify a seal")
 		flags.UintVar(&requiredApprovalsForSealConstruction, "required-construction-seal-approvals", flow.DefaultRequiredApprovalsForSealConstruction, "minimum number of approvals that are required to construct a seal")
-		flags.BoolVar(&emergencySealing, "emergency-sealing-active", sealing.DefaultEmergencySealingActive, "(de)activation of emergency sealing")
+		flags.BoolVar(&emergencySealing, "emergency-sealing-active", flow.DefaultEmergencySealingActive, "(de)activation of emergency sealing")
 		flags.BoolVar(&insecureAccessAPI, "insecure-access-api", false, "required if insecure GRPC connection should be used")
 		flags.StringSliceVar(&accessNodeIDS, "access-node-ids", []string{}, fmt.Sprintf("array of access node IDs sorted in priority order where the first ID in this array will get the first connection attempt and each subsequent ID after serves as a fallback. Minimum length %d. Use '*' for all IDs in protocol state.", common.DefaultAccessNodeIDSMinimum))
 		flags.DurationVar(&dkgControllerConfig.BaseStartDelay, "dkg-controller-base-start-delay", dkgmodule.DefaultBaseStartDelay, "used to define the range for jitter prior to DKG start (eg. 500µs) - the base value is scaled quadratically with the # of DKG participants")
@@ -190,7 +190,9 @@ func main() {
 			setter, err := updatable_configs.NewSealingConfigs(
 				requiredApprovalsForSealConstruction,
 				requiredApprovalsForSealVerification,
-				chunkAlpha)
+				chunkAlpha,
+				emergencySealing,
+			)
 
 			if err != nil {
 				return err
@@ -402,9 +404,6 @@ func main() {
 
 			sealingTracker := tracker.NewSealingTracker(node.Logger, node.Storage.Headers, node.Storage.Receipts, seals)
 
-			config := sealing.DefaultConfig()
-			config.EmergencySealingActive = emergencySealing
-
 			e, err := sealing.NewEngine(
 				node.Logger,
 				node.Tracer,
@@ -422,7 +421,6 @@ func main() {
 				node.Storage.Seals,
 				chunkAssigner,
 				seals,
-				config,
 				getSealingConfigs,
 			)
 

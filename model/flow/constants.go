@@ -62,6 +62,10 @@ const DefaultRequiredApprovalsForSealValidation = 0
 // assigned to each chunk.
 const DefaultChunkAssignmentAlpha = 3
 
+// DefaultEmergencySealingActive is a flag which indicates when emergency sealing is active, this is a temporary measure
+// to make fire fighting easier while seal & verification is under development.
+const DefaultEmergencySealingActive = false
+
 // DomainTagLength is set to 32 bytes.
 //
 // Signatures on Flow that needs to be scoped to a certain domain need to

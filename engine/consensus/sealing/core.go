@@ -29,23 +29,6 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// DefaultEmergencySealingActive is a flag which indicates when emergency sealing is active, this is a temporary measure
-// to make fire fighting easier while seal & verification is under development.
-const DefaultEmergencySealingActive = false
-
-// Config is a structure of values that configure behavior of sealing engine
-type Config struct {
-	EmergencySealingActive    bool   // flag which indicates if emergency sealing is active or not. NOTE: this is temporary while sealing & verification is under development
-	ApprovalRequestsThreshold uint64 // threshold for re-requesting approvals: min height difference between the latest finalized block and the block incorporating a result
-}
-
-func DefaultConfig() Config {
-	return Config{
-		EmergencySealingActive:    DefaultEmergencySealingActive,
-		ApprovalRequestsThreshold: 10,
-	}
-}
-
 // Core is an implementation of SealingCore interface
 // This struct is responsible for:
 // 	- collecting approvals for execution results
@@ -68,7 +51,7 @@ type Core struct {
 	metrics                    module.ConsensusMetrics            // used to track consensus metrics
 	sealingTracker             consensus.SealingTracker           // logic-aware component for tracking sealing progress.
 	tracer                     module.Tracer                      // used to trace execution
-	config                     Config
+	sealingConfigsGetter       module.SealingConfigsGetter        // used to access configs for sealing conditions
 }
 
 func NewCore(
@@ -85,7 +68,6 @@ func NewCore(
 	signatureHasher hash.Hasher,
 	sealsMempool mempool.IncorporatedResultSeals,
 	approvalConduit network.Conduit,
-	config Config,
 	sealingConfigsGetter module.SealingConfigsGetter,
 ) (*Core, error) {
 	lastSealed, err := state.Sealed().Head()
@@ -107,8 +89,8 @@ func NewCore(
 		state:                      state,
 		seals:                      sealsDB,
 		sealsMempool:               sealsMempool,
-		config:                     config,
 		requestTracker:             approvals.NewRequestTracker(headers, 10, 30),
+		sealingConfigsGetter:       sealingConfigsGetter,
 	}
 
 	factoryMethod := func(result *flow.ExecutionResult) (approvals.AssignmentCollector, error) {
@@ -442,7 +424,7 @@ func (c *Core) processApproval(approval *flow.ResultApproval) error {
 }
 
 func (c *Core) checkEmergencySealing(observer consensus.SealingObservation, lastSealedHeight, lastFinalizedHeight uint64) error {
-	if !c.config.EmergencySealingActive {
+	if !c.sealingConfigsGetter.EmergencySealingActiveConst() {
 		return nil
 	}
 
