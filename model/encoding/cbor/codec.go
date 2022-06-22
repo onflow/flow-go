@@ -17,9 +17,10 @@ func NewMarshaler() *Marshaler {
 	return &Marshaler{}
 }
 
-// "For best performance, reuse EncMode and DecMode after creating them." [1]
-// [1] https://github.com/fxamacker/cbor
+// EncMode is the default EncMode to use when creating a new cbor Encoder
 var EncMode = func() cbor.EncMode {
+	// "For best performance, reuse EncMode and DecMode after creating them." [1]
+	// [1] https://github.com/fxamacker/cbor
 	options := cbor.CoreDetEncOptions() // CBOR deterministic options
 	// default: "2021-07-06 21:20:00 +0000 UTC" <- unwanted
 	// option : "2021-07-06 21:20:00.820603 +0000 UTC" <- wanted
@@ -30,6 +31,9 @@ var EncMode = func() cbor.EncMode {
 	}
 	return encMode
 }()
+
+// DecMode is the default DecMode to use when creating a new cbor Decoder
+var DecMode, _ = cbor.DecOptions{}.DecMode()
 
 func (m *Marshaler) Marshal(val interface{}) ([]byte, error) {
 	return EncMode.Marshal(val)
@@ -59,12 +63,14 @@ var _ encoding.Codec = (*Codec)(nil)
 
 type Option func(*Codec)
 
+// WithEncMode sets the EncMode to use when creating a new cbor Encoder.
 func WithEncMode(encMode cbor.EncMode) Option {
 	return func(c *Codec) {
 		c.encMode = encMode
 	}
 }
 
+// WithDecMode sets the DecMode to use when creating a new cbor Decoder.
 func WithDecMode(decMode cbor.DecMode) Option {
 	return func(c *Codec) {
 		c.decMode = decMode
@@ -79,7 +85,10 @@ type Codec struct {
 // NewCodec returns a new cbor Codec with the provided EncMode and DecMode.
 // If either is nil, the default cbor EncMode/DecMode will be used.
 func NewCodec(opts ...Option) *Codec {
-	c := &Codec{}
+	c := &Codec{
+		encMode: EncMode,
+		decMode: DecMode,
+	}
 
 	for _, opt := range opts {
 		opt(c)
@@ -89,18 +98,9 @@ func NewCodec(opts ...Option) *Codec {
 }
 
 func (c *Codec) NewEncoder(w io.Writer) encoding.Encoder {
-	if c.encMode != nil {
-		return c.encMode.NewEncoder(w)
-	}
-
-	return EncMode.NewEncoder(w)
+	return c.encMode.NewEncoder(w)
 }
 
 func (c *Codec) NewDecoder(r io.Reader) encoding.Decoder {
-	if c.decMode != nil {
-		return c.decMode.NewDecoder(r)
-	}
-
-	// use cbor defaultDecMode
-	return cbor.NewDecoder(r)
+	return c.decMode.NewDecoder(r)
 }
