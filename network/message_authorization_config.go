@@ -51,7 +51,7 @@ func init() {
 
 func initializeMessageAuthConfigsMap() {
 	MessageAuthConfigs = make(map[string]MsgAuthConfig)
-	
+
 	// consensus
 	MessageAuthConfigs["BlockProposal"] = MsgAuthConfig{
 		String: "BlockProposal",
@@ -286,8 +286,8 @@ func initializeMessageAuthConfigsMap() {
 	}
 
 	// testing
-	MessageAuthConfigs["Echo"] = MsgAuthConfig{
-		String: "echo",
+	MessageAuthConfigs["TestMessage"] = MsgAuthConfig{
+		String: "TestMessage",
 		Interface: func() interface{} {
 			return new(message.TestMessage)
 		},

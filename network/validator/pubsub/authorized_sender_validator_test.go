@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
@@ -18,58 +19,66 @@ type TestCase struct {
 	MessageStr string
 }
 
-var (
-	happyPathTestCases = make([]TestCase, 0)
-	sadPathTestCases   = make([]TestCase, 0)
-)
+func TestIsAuthorizedSender(t *testing.T) {
+	suite.Run(t, new(TestIsAuthorizedSenderSuite))
+}
+
+type TestIsAuthorizedSenderSuite struct {
+	suite.Suite
+	happyPathTestCases []TestCase
+	sadPathTestCases   []TestCase
+}
+
+func (s *TestIsAuthorizedSenderSuite) SetupTest() {
+	s.initializeTestCases()
+}
 
 // TestIsAuthorizedSender_AuthorizedSender checks that IsAuthorizedSender does not return false positive
 // validation errors for all possible valid combinations (authorized sender role, message type).
-func TestIsAuthorizedSender_AuthorizedSender(t *testing.T) {
-	for _, c := range happyPathTestCases {
+func (s *TestIsAuthorizedSenderSuite) TestIsAuthorizedSender_AuthorizedSender() {
+	for _, c := range s.happyPathTestCases {
 		str := fmt.Sprintf("role (%s) should be authorized to send message type (%s) on channel (%s)", c.Identity.Role, c.MessageStr, c.Channel)
-		t.Run(str, func(t *testing.T) {
+		s.Run(str, func() {
 			msgType, err := IsAuthorizedSender(c.Identity, c.Channel, c.Message)
-			require.NoError(t, err)
-
-			require.Equal(t, c.MessageStr, msgType)
+			s.Require().NoError(err)
+			s.Require().Equal(c.MessageStr, msgType)
 		})
 	}
 }
 
 // TestIsAuthorizedSender_UnAuthorizedSender checks that IsAuthorizedSender return's ErrUnauthorizedSender
 // validation error for all possible invalid combinations (unauthorized sender role, message type).
-func TestIsAuthorizedSender_UnAuthorizedSender(t *testing.T) {
-	for _, c := range sadPathTestCases {
+func (s *TestIsAuthorizedSenderSuite) TestIsAuthorizedSender_UnAuthorizedSender() {
+	for _, c := range s.sadPathTestCases {
 		str := fmt.Sprintf("role (%s) should not be authorized to send message type (%s) on channel (%s)", c.Identity.Role, c.MessageStr, c.Channel)
-		t.Run(str, func(t *testing.T) {
+		s.Run(str, func() {
 			msgType, err := IsAuthorizedSender(c.Identity, c.Channel, c.Message)
-			require.ErrorIs(t, err, ErrUnauthorizedSender)
-			require.Equal(t, c.MessageStr, msgType)
+			require.ErrorIs(s.T(), err, ErrUnauthorizedSender)
+			require.Equal(s.T(), c.MessageStr, msgType)
 		})
 	}
 }
 
 // TestIsAuthorizedSender_ValidationFailure checks that IsAuthorizedSender returns the expected validation error.
-func TestIsAuthorizedSender_ValidationFailure(t *testing.T) {
-	t.Run("sender is ejected", func(t *testing.T) {
+func (s *TestIsAuthorizedSenderSuite) TestIsAuthorizedSender_ValidationFailure() {
+	s.Run("sender is ejected", func() {
 		identity := unittest.IdentityFixture()
 		identity.Ejected = true
 		msgType, err := IsAuthorizedSender(identity, network.Channel(""), nil)
-		require.ErrorIs(t, err, ErrSenderEjected)
-		require.Equal(t, "", msgType)
+		require.ErrorIs(s.T(), err, ErrSenderEjected)
+		require.Equal(s.T(), "", msgType)
 	})
 
-	t.Run("unknown message type", func(t *testing.T) {
+	s.Run("unknown message type", func() {
 		identity := unittest.IdentityFixture()
 		msgType, err := IsAuthorizedSender(identity, network.Channel(""), nil)
-		require.ErrorIs(t, err, ErrUnknownMessageType)
-		require.Equal(t, "", msgType)
+		require.ErrorIs(s.T(), err, ErrUnknownMessageType)
+		require.Equal(s.T(), "", msgType)
 	})
 }
 
 // initializeTestCases initializes happy and sad path test cases for checking authorized and unauthorized role message combinations.
-func initializeTestCases() {
+func (s *TestIsAuthorizedSenderSuite) initializeTestCases() {
 	for _, c := range network.MessageAuthConfigs {
 		for channel, authorizedRoles := range c.Config {
 			for _, role := range flow.Roles() {
@@ -83,16 +92,12 @@ func initializeTestCases() {
 
 				if authorizedRoles.Contains(role) {
 					// test cases for validation success happy path
-					happyPathTestCases = append(happyPathTestCases, tc)
+					s.happyPathTestCases = append(s.happyPathTestCases, tc)
 				} else {
 					// test cases for validation unsuccessful sad path
-					sadPathTestCases = append(sadPathTestCases, tc)
+					s.sadPathTestCases = append(s.sadPathTestCases, tc)
 				}
 			}
 		}
 	}
-}
-
-func init() {
-	initializeTestCases()
 }
