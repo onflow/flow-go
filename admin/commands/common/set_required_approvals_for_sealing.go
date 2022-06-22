@@ -46,6 +46,11 @@ func (s *SetRequiredApprovalsForSealingCommand) Validator(req *admin.CommandRequ
 
 	val := uint(value)
 
+	if value != float64(val) {
+		return fmt.Errorf("required approvals for sealing must be whole integer value (%v != %v)",
+			value, val)
+	}
+
 	// since the validation is stateful, so we rely on the SetValue to validate the value.
 	// the response will include the error if the value is invalid.
 	req.ValidatorData = val

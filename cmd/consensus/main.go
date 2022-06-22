@@ -210,6 +210,9 @@ func main() {
 		AdminCommand("set-required-approvals-for-sealing", func(node *cmd.NodeConfig) commands.AdminCommand {
 			return adminCmdSetRequiredApprovals
 		}).
+		AdminCommand("get-required-approvals-for-sealing", func(node *cmd.NodeConfig) commands.AdminCommand {
+			return admincommon.NewGetRequiredApprovalsForSealingCommand(getSealingConfigs)
+		}).
 		Module("mutable follower state", func(node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
