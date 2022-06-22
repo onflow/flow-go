@@ -12,7 +12,11 @@ import (
 func TestRequiredApprovalsForSealingContruction(t *testing.T) {
 
 	instance, err := updatable_configs.NewSealingConfigs(
-		flow.DefaultRequiredApprovalsForSealConstruction, flow.DefaultRequiredApprovalsForSealValidation, flow.DefaultChunkAssignmentAlpha)
+		flow.DefaultRequiredApprovalsForSealConstruction,
+		flow.DefaultRequiredApprovalsForSealValidation,
+		flow.DefaultChunkAssignmentAlpha,
+		flow.DefaultEmergencySealingActive,
+	)
 	require.NoError(t, err)
 
 	// should get the default value

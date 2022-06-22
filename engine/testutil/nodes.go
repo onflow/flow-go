@@ -384,8 +384,6 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	receiptValidator := validation.NewReceiptValidator(node.State, node.Headers, node.Index, resultsDB, node.Seals)
 
-	sealingConfig := sealing.DefaultConfig()
-
 	sealingEngine, err := sealing.NewEngine(
 		node.Log,
 		node.Tracer,
@@ -403,7 +401,6 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Seals,
 		assigner,
 		seals,
-		sealingConfig,
 		unittest.NewSealingConfigs(flow.DefaultRequiredApprovalsForSealConstruction),
 	)
 	require.NoError(t, err)

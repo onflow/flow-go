@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/module/updatable_configs"
 	mockstate "github.com/onflow/flow-go/state/protocol/mock"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -67,13 +68,9 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 
-	options := Config{
-		EmergencySealingActive:    false,
-		ApprovalRequestsThreshold: 2,
-	}
 	setter := unittest.NewSealingConfigs(flow.DefaultChunkAssignmentAlpha)
 	var err error
-	s.core, err = NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(), s.Headers, s.State, s.sealsDB, s.Assigner, s.SigHasher, s.SealsPL, s.Conduit, options, setter)
+	s.core, err = NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(), s.Headers, s.State, s.sealsDB, s.Assigner, s.SigHasher, s.SealsPL, s.Conduit, setter)
 	require.NoError(s.T(), err)
 	s.setter = setter
 }
@@ -317,7 +314,21 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalVerifi
 
 // TestOnBlockFinalized_EmergencySealing tests that emergency sealing kicks in to resolve sealing halt
 func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_EmergencySealing() {
-	s.core.config.EmergencySealingActive = true
+
+	metrics := metrics.NewNoopCollector()
+	tracer := trace.NewNoopTracer()
+
+	setter, err := updatable_configs.NewSealingConfigs(
+		flow.DefaultRequiredApprovalsForSealConstruction,
+		flow.DefaultRequiredApprovalsForSealValidation,
+		flow.DefaultChunkAssignmentAlpha,
+		true, // enable emergency sealing
+	)
+	require.NoError(t, err)
+	s.core, err = NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(), s.Headers, s.State, s.sealsDB, s.Assigner, s.SigHasher, s.SealsPL, s.Conduit, setter)
+	require.NoError(s.T(), err)
+	s.setter = setter
+
 	s.SealsPL.On("ByID", mock.Anything).Return(nil, false).Maybe()
 	s.SealsPL.On("Add", mock.Anything).Run(
 		func(args mock.Arguments) {

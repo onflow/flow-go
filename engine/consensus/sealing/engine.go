@@ -91,7 +91,6 @@ func NewEngine(log zerolog.Logger,
 	sealsDB storage.Seals,
 	assigner module.ChunkAssigner,
 	sealsMempool mempool.IncorporatedResultSeals,
-	options Config,
 	requiredApprovalsForSealConstructionGetter module.SealingConfigsGetter,
 ) (*Engine, error) {
 	rootHeader, err := state.Params().Root()
