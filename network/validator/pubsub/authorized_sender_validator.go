@@ -28,10 +28,12 @@ var (
 // If the sender is an unstaked node the message is rejected. IsAuthorizedSender is used to perform further message validation. If validation
 // fails the message is rejected, if the validation error is an expected error slashing data is collected before the message is rejected.
 func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, getIdentity func(peer.ID) (*flow.Identity, bool)) MessageValidator {
-	slashingViolationsConsumer := network.NewSlashingViolationsConsumer(log.With().
+	log = log.With().
 		Str("component", "authorized_sender_validator").
 		Str("network_channel", channel.String()).
-		Logger())
+		Logger()
+
+	slashingViolationsConsumer := network.NewSlashingViolationsConsumer(log)
 
 	return func(ctx context.Context, from peer.ID, msg interface{}) pubsub.ValidationResult {
 		identity, ok := getIdentity(from)
@@ -51,7 +53,7 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, getI
 			slashingViolationsConsumer.OnSenderEjectedError(identity, from.String(), msgType, err)
 			return pubsub.ValidationReject
 		} else if err != nil {
-			log.Warn().
+			log.Error().
 				Err(err).
 				Str("peer_id", from.String()).
 				Str("role", identity.Role.String()).
