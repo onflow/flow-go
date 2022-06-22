@@ -730,6 +730,10 @@ func (s *RoundRobinLeaderSelection) IdentityByEpoch(_ uint64, participantID flow
 	return id, nil
 }
 
+func (s *RoundRobinLeaderSelection) HasEpochForView(_ uint64) (bool, error) {
+	return true, nil
+}
+
 func (s *RoundRobinLeaderSelection) LeaderForView(view uint64) (flow.Identifier, error) {
 	return s.identities[int(view)%len(s.identities)].NodeID, nil
 }

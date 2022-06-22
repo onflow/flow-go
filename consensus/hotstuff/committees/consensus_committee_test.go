@@ -429,6 +429,65 @@ func TestConsensus_LeaderForView(t *testing.T) {
 	})
 }
 
+// TestConsensus_HasEpochForView tests that HasEpochForView returns valid values whenever consensus
+// committee has information about epoch.
+func TestConsensus_HasEpochForView(t *testing.T) {
+	identities := unittest.IdentityListFixture(10)
+	me := identities[0].NodeID
+
+	// the counter for the current epoch
+	epochCounter := uint64(2)
+
+	// create mocks
+	state := new(protocolmock.State)
+	snapshot := new(protocolmock.Snapshot)
+
+	prevEpoch := newMockEpoch(
+		epochCounter-1,
+		identities,
+		1,
+		100,
+		unittest.SeedFixture(seed.RandomSourceLength),
+	)
+	currEpoch := newMockEpoch(
+		epochCounter,
+		identities,
+		101,
+		200,
+		unittest.SeedFixture(32),
+	)
+
+	state.On("Final").Return(snapshot)
+	epochs := mocks.NewEpochQuery(t, epochCounter, prevEpoch, currEpoch)
+	snapshot.On("Epochs").Return(epochs)
+
+	committee, err := NewConsensusCommittee(state, me)
+	require.Nil(t, err)
+
+	t.Run("next epoch not ready", func(t *testing.T) {
+		t.Run("previous epoch", func(t *testing.T) {
+			// get epoch info for view in previous epoch
+			has, err := committee.HasEpochForView(randUint64(1, 100))
+			require.Nil(t, err)
+			assert.True(t, has)
+		})
+
+		t.Run("current epoch", func(t *testing.T) {
+			// get epoch info for view in current epoch
+			has, err := committee.HasEpochForView(randUint64(101, 200))
+			require.Nil(t, err)
+			assert.True(t, has)
+		})
+
+		t.Run("after current epoch", func(t *testing.T) {
+			// get epoch info for view in next epoch when it is not set up yet
+			has, err := committee.HasEpochForView(randUint64(201, 300))
+			assert.NoError(t, err)
+			assert.False(t, has)
+		})
+	})
+}
+
 // TestRemoveOldEpochs tests that old epochs are pruned
 func TestRemoveOldEpochs(t *testing.T) {
 

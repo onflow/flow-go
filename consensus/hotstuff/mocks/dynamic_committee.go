@@ -37,6 +37,27 @@ func (_m *DynamicCommittee) DKG(view uint64) (hotstuff.DKG, error) {
 	return r0, r1
 }
 
+// HasEpochForView provides a mock function with given fields: view
+func (_m *DynamicCommittee) HasEpochForView(view uint64) (bool, error) {
+	ret := _m.Called(view)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(uint64) bool); ok {
+		r0 = rf(view)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(uint64) error); ok {
+		r1 = rf(view)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // IdentitiesByBlock provides a mock function with given fields: blockID
 func (_m *DynamicCommittee) IdentitiesByBlock(blockID flow.Identifier) (flow.IdentityList, error) {
 	ret := _m.Called(blockID)

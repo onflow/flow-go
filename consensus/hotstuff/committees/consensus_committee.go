@@ -174,6 +174,19 @@ func (c *Consensus) IdentityByEpoch(view uint64, nodeID flow.Identifier) (*flow.
 	return identity, nil
 }
 
+// HasEpochForView returns whenever we have information about epoch for a given view.
+// No errors are exported during normal operations.
+func (c *Consensus) HasEpochForView(view uint64) (bool, error) {
+	_, err := c.staticEpochInfoByView(view)
+	if err != nil {
+		if errors.Is(err, model.ErrViewForUnknownEpoch) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
 // LeaderForView returns the node ID of the leader for the given view.
 //
 // Error returns:

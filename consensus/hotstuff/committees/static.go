@@ -67,6 +67,10 @@ func (s Static) IdentityByEpoch(_ uint64, participantID flow.Identifier) (*flow.
 	return identity, nil
 }
 
+func (s Static) HasEpochForView(_ uint64) (bool, error) {
+	return true, nil
+}
+
 func (s Static) LeaderForView(_ uint64) (flow.Identifier, error) {
 	return flow.ZeroID, fmt.Errorf("invalid for static committee")
 }

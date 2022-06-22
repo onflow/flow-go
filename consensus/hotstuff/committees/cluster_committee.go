@@ -145,6 +145,14 @@ func (c *Cluster) IdentityByEpoch(_ uint64, nodeID flow.Identifier) (*flow.Ident
 	return identity, nil
 }
 
+// HasEpochForView returns whenever we have information about epoch for a given view.
+// The view parameter is the view in the cluster consensus. Since clusters only exist for
+// one epoch, we don't need to check the view.
+// No errors are exported during normal operations.
+func (c *Cluster) HasEpochForView(_ uint64) (bool, error) {
+	return true, nil
+}
+
 func (c *Cluster) LeaderForView(view uint64) (flow.Identifier, error) {
 	return c.selection.LeaderForView(view)
 }

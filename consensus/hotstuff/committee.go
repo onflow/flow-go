@@ -30,6 +30,10 @@ import (
 //
 type Replicas interface {
 
+	// HasEpochForView returns whenever we have information about epoch for a given view.
+	// No errors are exported during normal operations.
+	HasEpochForView(view uint64) (bool, error)
+
 	// LeaderForView returns the identity of the leader for a given view.
 	// CAUTION: per liveness requirement of HotStuff, the leader must be fork-independent.
 	//          Therefore, a node retains its proposer view slots even if it is slashed.

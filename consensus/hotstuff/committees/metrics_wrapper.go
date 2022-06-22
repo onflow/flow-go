@@ -64,6 +64,13 @@ func (w CommitteeMetricsWrapper) LeaderForView(view uint64) (flow.Identifier, er
 	return id, err
 }
 
+func (w CommitteeMetricsWrapper) HasEpochForView(view uint64) (bool, error) {
+	processStart := time.Now()
+	has, err := w.committee.HasEpochForView(view)
+	w.metrics.CommitteeProcessingDuration(time.Since(processStart))
+	return has, err
+}
+
 func (w CommitteeMetricsWrapper) QuorumThresholdForView(view uint64) (uint64, error) {
 	processStart := time.Now()
 	id, err := w.committee.QuorumThresholdForView(view)
