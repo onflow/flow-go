@@ -41,9 +41,9 @@ func (d *timeoutCollectorDistributor) OnTcConstructedFromTimeouts(tc *flow.Timeo
 	}
 }
 
-func (d *timeoutCollectorDistributor) OnPartialTcCreated(view uint64) {
+func (d *timeoutCollectorDistributor) OnPartialTcCreated(view uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) {
 	for _, consumer := range d.consumers {
-		consumer.OnPartialTcCreated(view)
+		consumer.OnPartialTcCreated(view, newestQC, lastViewTC)
 	}
 }
 

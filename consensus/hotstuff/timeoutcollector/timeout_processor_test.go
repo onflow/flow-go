@@ -2,7 +2,6 @@ package timeoutcollector
 
 import (
 	"errors"
-	"go.uber.org/atomic"
 	"math/rand"
 	"sync"
 	"testing"
@@ -10,6 +9,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
@@ -336,7 +336,7 @@ func (s *TimeoutProcessorTestSuite) TestProcess_CreatingTC() {
 	expectedSig := crypto.Signature(unittest.RandomBytes(128))
 	s.validator.On("ValidateQC", mock.Anything).Return(nil)
 	s.validator.On("ValidateTC", mock.Anything).Return(nil)
-	s.notifier.On("OnPartialTcCreated", s.view).Return(nil).Once()
+	s.notifier.On("OnPartialTcCreated", s.view, mock.Anything, lastViewTC).Return(nil).Once()
 	s.notifier.On("OnTcConstructedFromTimeouts", mock.Anything).Run(func(args mock.Arguments) {
 		newestQC := timeouts[len(timeouts)-1].NewestQC
 		tc := args.Get(0).(*flow.TimeoutCertificate)
@@ -380,7 +380,7 @@ func (s *TimeoutProcessorTestSuite) TestProcess_CreatingTC() {
 // we expect only one TC created in this scenario.
 func (s *TimeoutProcessorTestSuite) TestProcess_ConcurrentCreatingTC() {
 	s.validator.On("ValidateQC", mock.Anything).Return(nil)
-	s.notifier.On("OnPartialTcCreated", mock.Anything).Return(nil).Once()
+	s.notifier.On("OnPartialTcCreated", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	s.notifier.On("OnTcConstructedFromTimeouts", mock.Anything).Return(nil).Once()
 	s.sigAggregator.On("Aggregate").Return([]flow.Identifier(s.participants.NodeIDs()), []uint64{}, crypto.Signature{}, nil)
 	s.committee.On("IdentitiesByEpoch", mock.Anything).Return(s.participants, nil)
@@ -500,7 +500,7 @@ func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 	require.NoError(t, err)
 
 	notifier := mocks.NewTimeoutCollectorConsumer(t)
-	notifier.On("OnPartialTcCreated", view).Return().Once()
+	notifier.On("OnPartialTcCreated", view, newestQC, (*flow.TimeoutCertificate)(nil)).Return().Once()
 	notifier.On("OnTcConstructedFromTimeouts", mock.Anything).Run(onTCCreated).Return().Once()
 	processor, err := NewTimeoutProcessor(committee, validator, aggregator, notifier)
 	require.NoError(t, err)
@@ -518,7 +518,7 @@ func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 	require.NoError(t, err)
 
 	notifier = mocks.NewTimeoutCollectorConsumer(t)
-	notifier.On("OnPartialTcCreated", view+1).Return().Once()
+	notifier.On("OnPartialTcCreated", view+1, newestQC, lastViewTC).Return().Once()
 	notifier.On("OnTcConstructedFromTimeouts", mock.Anything).Run(onTCCreated).Return().Once()
 	processor, err = NewTimeoutProcessor(committee, validator, aggregator, notifier)
 	require.NoError(t, err)

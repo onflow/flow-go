@@ -219,11 +219,12 @@ type TimeoutCollectorConsumer interface {
 
 	// OnPartialTcCreated notifications are produced by the TimeoutProcessor
 	// component, whenever it collected TimeoutObjects from a superminority
-	// of consensus participants.
+	// of consensus participants. Along with view it reports the newest QC and TC for previous view(can be nil)
+	// discovered in process of timeout collection.
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnPartialTcCreated(view uint64)
+	OnPartialTcCreated(view uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate)
 
 	// OnNewQcDiscovered notifications are produced by the TimeoutCollector
 	// component, whenever it discovers new QC included in timeout object.

@@ -23,9 +23,9 @@ func (_m *TimeoutCollectorConsumer) OnNewTcDiscovered(certificate *flow.TimeoutC
 	_m.Called(certificate)
 }
 
-// OnPartialTcCreated provides a mock function with given fields: view
-func (_m *TimeoutCollectorConsumer) OnPartialTcCreated(view uint64) {
-	_m.Called(view)
+// OnPartialTcCreated provides a mock function with given fields: view, newestQC, lastViewTC
+func (_m *TimeoutCollectorConsumer) OnPartialTcCreated(view uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) {
+	_m.Called(view, newestQC, lastViewTC)
 }
 
 // OnTcConstructedFromTimeouts provides a mock function with given fields: certificate

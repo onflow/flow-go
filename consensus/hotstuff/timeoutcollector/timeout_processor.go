@@ -148,7 +148,7 @@ func (p *TimeoutProcessor) Process(timeout *model.TimeoutObject) error {
 	}
 
 	if p.partialTCTracker.Track(totalWeight) {
-		p.notifier.OnPartialTcCreated(p.view)
+		p.notifier.OnPartialTcCreated(p.view, p.newestQCTracker.NewestQC(), timeout.LastViewTC)
 	}
 
 	// Checking of conditions for building TC are satisfied when willBuildTC is true.
