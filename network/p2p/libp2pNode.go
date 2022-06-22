@@ -172,7 +172,7 @@ func (n *Node) ListPeers(topic string) []peer.ID {
 // Subscribe subscribes the node to the given topic and returns the subscription
 // Currently only one subscriber is allowed per topic.
 // NOTE: A node will receive its own published messages.
-func (n *Node) Subscribe(topic flownet.Topic, codec flownet.Codec, isStaked isStakedFunc, validators ...validator.MessageValidator) (*pubsub.Subscription, error) {
+func (n *Node) Subscribe(topic flownet.Topic, codec flownet.Codec, authenticatePeer validatorPeerAuthenticationFunc, validators ...validator.MessageValidator) (*pubsub.Subscription, error) {
 	n.Lock()
 	defer n.Unlock()
 
@@ -181,7 +181,7 @@ func (n *Node) Subscribe(topic flownet.Topic, codec flownet.Codec, isStaked isSt
 	tp, found := n.topics[topic]
 	var err error
 	if !found {
-		topicValidator := validator.TopicValidator(n.logger, codec, isStaked, validators...)
+		topicValidator := validator.TopicValidator(n.logger, codec, authenticatePeer, validators...)
 		if err := n.pubSub.RegisterTopicValidator(
 			topic.String(), topicValidator, pubsub.WithValidatorInline(true),
 		); err != nil {

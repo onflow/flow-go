@@ -2082,7 +2082,7 @@ func TransactionResultsFixture(n int) []flow.TransactionResult {
 	return results
 }
 
-func IsStakedTopicValidatorFunc() func(peer.ID) bool {
+func UnauthenticatedTopicValidatorFunc() func(peer.ID) bool {
 	return func(_ peer.ID) bool {
 		return true
 	}

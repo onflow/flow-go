@@ -64,7 +64,7 @@ type ValidatorData struct {
 	From              peer.ID
 }
 
-func TopicValidator(log zerolog.Logger, codec network.Codec, staked func(peer.ID) bool, validators ...MessageValidator) pubsub.ValidatorEx {
+func TopicValidator(log zerolog.Logger, codec network.Codec, authenticatePeer func(peer.ID) bool, validators ...MessageValidator) pubsub.ValidatorEx {
 	log = log.With().
 		Str("component", "libp2p_node_topic_validator").
 		Logger()
@@ -84,12 +84,12 @@ func TopicValidator(log zerolog.Logger, codec network.Codec, staked func(peer.ID
 			return pubsub.ValidationReject
 		}
 
-		if !staked(from) {
+		if !authenticatePeer(from) {
 			log.Warn().
-				Err(fmt.Errorf("peer is unstaked")).
+				Err(fmt.Errorf("peer is unauthenticated")).
 				Str("peer_id", from.String()).
 				Hex("sender", msg.OriginID).
-				Msg("rejecting message from unstaked peer")
+				Msg("rejecting message from unauthenticated peer")
 			return pubsub.ValidationReject
 		}
 

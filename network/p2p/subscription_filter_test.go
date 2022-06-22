@@ -41,13 +41,13 @@ func TestFilterSubscribe(t *testing.T) {
 
 	badTopic := network.TopicFromChannel(network.SyncCommittee, sporkId)
 
-	sub1, err := node1.Subscribe(badTopic, unittest.NetworkCodec(), unittest.IsStakedTopicValidatorFunc())
+	sub1, err := node1.Subscribe(badTopic, unittest.NetworkCodec(), unittest.UnauthenticatedTopicValidatorFunc())
 	require.NoError(t, err)
 
-	sub2, err := node2.Subscribe(badTopic, unittest.NetworkCodec(), unittest.IsStakedTopicValidatorFunc())
+	sub2, err := node2.Subscribe(badTopic, unittest.NetworkCodec(), unittest.UnauthenticatedTopicValidatorFunc())
 	require.NoError(t, err)
 
-	unstakedSub, err := unstakedNode.Subscribe(badTopic, unittest.NetworkCodec(), unittest.IsStakedTopicValidatorFunc())
+	unstakedSub, err := unstakedNode.Subscribe(badTopic, unittest.NetworkCodec(), unittest.UnauthenticatedTopicValidatorFunc())
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
@@ -112,7 +112,7 @@ func TestCanSubscribe(t *testing.T) {
 	}()
 
 	goodTopic := network.TopicFromChannel(network.ProvideCollections, sporkId)
-	_, err := collectionNode.Subscribe(goodTopic, unittest.NetworkCodec(), unittest.IsStakedTopicValidatorFunc())
+	_, err := collectionNode.Subscribe(goodTopic, unittest.NetworkCodec(), unittest.UnauthenticatedTopicValidatorFunc())
 	require.NoError(t, err)
 
 	var badTopic network.Topic
@@ -126,11 +126,11 @@ func TestCanSubscribe(t *testing.T) {
 			break
 		}
 	}
-	_, err = collectionNode.Subscribe(badTopic, unittest.NetworkCodec(), unittest.IsStakedTopicValidatorFunc())
+	_, err = collectionNode.Subscribe(badTopic, unittest.NetworkCodec(), unittest.UnauthenticatedTopicValidatorFunc())
 	require.Error(t, err)
 
 	clusterTopic := network.TopicFromChannel(network.ChannelSyncCluster(flow.Emulator), sporkId)
-	_, err = collectionNode.Subscribe(clusterTopic, unittest.NetworkCodec(), unittest.IsStakedTopicValidatorFunc())
+	_, err = collectionNode.Subscribe(clusterTopic, unittest.NetworkCodec(), unittest.UnauthenticatedTopicValidatorFunc())
 	require.NoError(t, err)
 }
 
