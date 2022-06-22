@@ -2084,7 +2084,12 @@ func TransactionResultsFixture(n int) []flow.TransactionResult {
 }
 
 func NewSealingConfigs(val uint) module.SealingConfigsSetter {
-	instance, err := updatable_configs.NewSealingConfigs(1, 0, 3)
+	instance, err := updatable_configs.NewSealingConfigs(
+		flow.DefaultRequiredApprovalsForSealConstruction,
+		flow.DefaultRequiredApprovalsForSealValidation,
+		flow.DefaultChunkAssignmentAlpha,
+		flow.DefaultEmergencySealingActive,
+	)
 	if err != nil {
 		panic(err)
 	}
