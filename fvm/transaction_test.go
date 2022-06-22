@@ -127,7 +127,7 @@ func TestAccountFreezing(t *testing.T) {
 		procNotFrozen := fvm.Transaction(&flow.TransactionBody{Script: deployContract, Authorizers: []flow.Address{notFrozenAddress}, Payer: notFrozenAddress}, 0)
 		context := fvm.NewContext(zerolog.Nop(),
 			fvm.WithServiceAccount(false),
-			fvm.WithRestrictedDeployment(false),
+			fvm.WithContractDeploymentRestricted(false),
 			fvm.WithCadenceLogging(true),
 			fvm.WithTransactionProcessors( // run with limited processor to test just core of freezing, but still inside FVM
 				fvm.NewTransactionInvoker(zerolog.Nop())))
@@ -322,7 +322,7 @@ func TestAccountFreezing(t *testing.T) {
 
 		context := fvm.NewContext(zerolog.Nop(),
 			fvm.WithServiceAccount(false),
-			fvm.WithRestrictedDeployment(false),
+			fvm.WithContractDeploymentRestricted(false),
 			fvm.WithCadenceLogging(true),
 			fvm.WithTransactionProcessors( // run with limited processor to test just core of freezing, but still inside FVM
 				fvm.NewTransactionVerifier(-1),
