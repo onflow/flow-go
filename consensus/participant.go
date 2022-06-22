@@ -106,7 +106,6 @@ func NewParticipant(
 		modules.Committee,
 		modules.Aggregator,
 		voter,
-		modules.Validator,
 		modules.Notifier,
 	)
 	if err != nil {

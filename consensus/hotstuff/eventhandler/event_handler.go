@@ -227,6 +227,16 @@ func (e *EventHandler) startNewView() error {
 		qc := e.paceMaker.NewestQC()
 		lastViewTC := e.paceMaker.LastViewTC()
 
+		_, found := e.forks.GetBlock(qc.BlockID)
+		if !found {
+			// we don't know anything about block referenced by our newest QC, in this case we can't
+			// create a valid proposal since we can't guarantee validity of block payload.
+			log.Debug().
+				Uint64("qc_view", qc.View).
+				Hex("block_id", qc.BlockID[:]).Msg("no parent found for newest QC, can't propose")
+			return nil
+		}
+
 		proposal, err := e.blockProducer.MakeBlockProposal(qc, curView, lastViewTC)
 		if err != nil {
 			return fmt.Errorf("can not make block proposal for curView %v: %w", curView, err)
@@ -316,7 +326,7 @@ func (e *EventHandler) processBlockForCurrentView(proposal *model.Proposal) erro
 		return fmt.Errorf("failed to determine primary for next view %d: %w", curView+1, err)
 	}
 
-	// voter performs all the checks to decide whether to vote for this block or not.
+	// safetyRules performs all the checks to decide whether to vote for this block or not.
 	err = e.ownVote(proposal, curView, nextLeader)
 	if err != nil {
 		return fmt.Errorf("unexpected error in voting logic: %w", err)
@@ -353,7 +363,16 @@ func (e *EventHandler) ownVote(proposal *model.Proposal, curView uint64, nextLea
 		Hex("signer", block.ProposerID[:]).
 		Logger()
 
-	// voter performs all the checks to decide whether to vote for this block or not.
+	_, found := e.forks.GetBlock(proposal.Block.QC.BlockID)
+	if !found {
+		// we don't have parent for this proposal, we can't vote since we can't guarantee validity of proposals
+		// payload. Strictly speaking this shouldn't ever happen because compliance engine makes sure that we
+		// receive proposals with valid parents.
+		log.Warn().Msg("won't vote for proposal, no parent block for this proposal")
+		return nil
+	}
+
+	// safetyRules performs all the checks to decide whether to vote for this block or not.
 	ownVote, err := e.voter.ProduceVote(proposal, curView)
 	if err != nil {
 		if !model.IsNoVoteError(err) {
