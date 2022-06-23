@@ -284,7 +284,7 @@ func (r *Resolver) shouldResolveIP(domain string) bool {
 
 	if _, ok := r.processingIPs[domain]; !ok {
 		r.processingIPs[domain] = struct{}{}
-		// log.Printf("Should resolve true %s", domain)
+		r.logger.Trace().Str("domain", domain).Msg("resolving is in progress, extra request is dropped")
 		return true
 	}
 
