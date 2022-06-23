@@ -21,10 +21,7 @@ func getExecutionEffortWeights(
 ) {
 	value, err := env.VM().Runtime.ReadStored(
 		service,
-		cadence.Path{
-			Domain:     blueprints.TransactionExecutionParametersPathDomain,
-			Identifier: blueprints.TransactionFeesExecutionEffortWeightsPathIdentifier,
-		},
+		blueprints.TransactionFeesExecutionEffortWeightsPath,
 		runtime.Context{Interface: env},
 	)
 	if err != nil {
@@ -37,8 +34,7 @@ func getExecutionEffortWeights(
 		// this is a non-fatal error. It is expected if the weights are not set up on the network yet.
 		return nil, errors.NewCouldNotGetExecutionParameterFromStateError(
 			service.Hex(),
-			blueprints.TransactionExecutionParametersPathDomain,
-			blueprints.TransactionFeesExecutionEffortWeightsPathIdentifier)
+			blueprints.TransactionFeesExecutionEffortWeightsPath.String())
 	}
 
 	// Merge the default weights with the weights from the state.
@@ -67,10 +63,7 @@ func getExecutionMemoryWeights(
 ) {
 	value, err := env.VM().Runtime.ReadStored(
 		service,
-		cadence.Path{
-			Domain:     blueprints.TransactionExecutionParametersPathDomain,
-			Identifier: blueprints.TransactionFeesExecutionMemoryWeightsPathIdentifier,
-		},
+		blueprints.TransactionFeesExecutionMemoryWeightsPath,
 		runtime.Context{Interface: env},
 	)
 	if err != nil {
@@ -83,8 +76,7 @@ func getExecutionMemoryWeights(
 		// this is a non-fatal error. It is expected if the weights are not set up on the network yet.
 		return nil, errors.NewCouldNotGetExecutionParameterFromStateError(
 			service.Hex(),
-			blueprints.TransactionExecutionParametersPathDomain,
-			blueprints.TransactionFeesExecutionMemoryWeightsPathIdentifier)
+			blueprints.TransactionFeesExecutionMemoryWeightsPath.String())
 	}
 
 	// Merge the default weights with the weights from the state.
@@ -113,10 +105,7 @@ func getExecutionMemoryLimit(
 ) {
 	value, err := env.VM().Runtime.ReadStored(
 		service,
-		cadence.Path{
-			Domain:     blueprints.TransactionExecutionParametersPathDomain,
-			Identifier: blueprints.TransactionFeesExecutionMemoryLimitPathIdentifier,
-		},
+		blueprints.TransactionFeesExecutionMemoryLimitPath,
 		runtime.Context{Interface: env},
 	)
 	if err != nil {
@@ -129,8 +118,7 @@ func getExecutionMemoryLimit(
 		// this is a non-fatal error. It is expected if the weights are not set up on the network yet.
 		return 0, errors.NewCouldNotGetExecutionParameterFromStateError(
 			service.Hex(),
-			blueprints.TransactionExecutionParametersPathDomain,
-			blueprints.TransactionFeesExecutionMemoryLimitPathIdentifier)
+			blueprints.TransactionFeesExecutionMemoryLimitPath.String())
 	}
 
 	return memoryLimitRaw.ToGoValue().(uint64), nil

@@ -220,20 +220,12 @@ func (e *TransactionEnv) isTraceable() bool {
 
 // GetAccountsAuthorizedForContractUpdate returns a list of addresses authorized to update/deploy contracts
 func (e *TransactionEnv) GetAccountsAuthorizedForContractUpdate() []common.Address {
-	return e.GetAuthorizedAccounts(
-		cadence.Path{
-			Domain:     blueprints.ContractDeploymentAuthorizedAddressesPathDomain,
-			Identifier: blueprints.ContractDeploymentAuthorizedAddressesPathIdentifier,
-		})
+	return e.GetAuthorizedAccounts(blueprints.ContractDeploymentAuthorizedAddressesPath)
 }
 
 // GetAccountsAuthorizedForContractRemoval returns a list of addresses authorized to remove contracts
 func (e *TransactionEnv) GetAccountsAuthorizedForContractRemoval() []common.Address {
-	return e.GetAuthorizedAccounts(
-		cadence.Path{
-			Domain:     blueprints.ContractRemovalAuthorizedAddressesPathDomain,
-			Identifier: blueprints.ContractRemovalAuthorizedAddressesPathIdentifier,
-		})
+	return e.GetAuthorizedAccounts(blueprints.ContractRemovalAuthorizedAddressesPath)
 }
 
 // GetAuthorizedAccounts returns a list of addresses authorized by the service account.
@@ -274,10 +266,7 @@ func (e *TransactionEnv) GetIsContractDeploymentRestricted() (restricted bool, d
 
 	value, err := e.vm.Runtime.ReadStored(
 		service,
-		cadence.Path{
-			Domain:     blueprints.IsContractDeploymentRestrictedPathDomain,
-			Identifier: blueprints.IsContractDeploymentRestrictedPathIdentifier,
-		},
+		blueprints.IsContractDeploymentRestrictedPath,
 		runtime.Context{Interface: e},
 	)
 	if err != nil {
