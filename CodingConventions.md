@@ -94,9 +94,6 @@ why it is acceptable to keep going, even if the other component returned an erro
 **If this is out of scope, we _prioritize safety over liveness_.** This means that we rather crash the node than
 continue on a best-effort basis.
 
-New engines should implement the [`Component` interface](https://github.com/onflow/flow-go/blob/57f89d4e96259f08fe84163c91ecd32484401b45/module/component/component.go#L22)
-and throw unexpected errors using the related [irrecoverable context](https://github.com/onflow/flow-go/blob/277b6515add6136946913747efebd508f0419a25/module/irrecoverable/irrecoverable.go). 
-
 When in doubt, use the following as a fall-back:
 
 ```golang
@@ -124,12 +121,67 @@ technical debt for later hopefully does not add much overhead. In contrast, if y
 best-effort basis, you also leave the _entire_ logic for differentiating errors as tech debt. When adding this logic
 later, you need to revisit the _entire_ business logic again.
 
-## Engines
+# A Flow Node    
 
 On a high level, a Flow node consists of various data-processing components that receive information from node-internal
-and external sources. We model the data flow inside a Flow node as a graph:
-a data-processing component forms a vertex; two components exchanging messages is represented as an edge. An `Engine` is
-the interface for a data-processing component.
+and external sources. We model the data flow inside a Flow node as a graph, aka the **data flow graph**:
+* a data-processing component forms a vertex; 
+* two components exchanging messages is represented as an edge. 
+
+Generally, an individual vertex (data processing component) has a dedicated pool of go-routines for processing its work.
+Inbound data packages are appended to queue(s), and the vertex's internal worker threads process the inbound messages from the queue(s).
+In this design, there is an upper limit to the CPU resources an individual vertex can consume. A vertex with `k` go-routines as workers can
+at most keep `k` cores busy. The benefit of this desin is that the node can remain responsive even if one (or a few) of
+its data processing vertices are completely overwhelmed.
+
+In its entirety, a node is composed of many data flow vertices, that together form the node's data flow graph. The vertices
+within the node typically trust each other; while external messages are untrusted. Depending on the inputs it consumes, a vertex
+must carefully differentiate between trusted and untrusted inputs. 
+
+⇒ **A vertex (data processing component within a node) implements the [`Component` interface](https://github.com/onflow/flow-go/blob/57f89d4e96259f08fe84163c91ecd32484401b45/module/component/component.go#L22)**.
+
+For example, [`VoteAggregator`](https://github.com/onflow/flow-go/blob/3899d335d5a6ce3cbbb9fde4f7af780d6bec8c9a/consensus/hotstuff/vote_aggregator.go#L29) is
+a data flow vertex within a consensus nodes, whose job it is to collect incoming votes from other consensus nodes.
+Hence, the corresponding function [`AddVote(vote *model.Vote)`](https://github.com/onflow/flow-go/blob/3899d335d5a6ce3cbbb9fde4f7af780d6bec8c9a/consensus/hotstuff/vote_aggregator.go#L37)
+treats all inputs as untrusted. Furthermore, `VoteAggregator` consumes auxiliary inputs
+([`AddBlock(block *model.Proposal)`](https://github.com/onflow/flow-go/blob/3899d335d5a6ce3cbbb9fde4f7af780d6bec8c9a/consensus/hotstuff/vote_aggregator.go#L45),
+[`InvalidBlock(block *model.Proposal)`](https://github.com/onflow/flow-go/blob/3899d335d5a6ce3cbbb9fde4f7af780d6bec8c9a/consensus/hotstuff/vote_aggregator.go#L51),
+[`PruneUpToView(view uint64)`](https://github.com/onflow/flow-go/blob/3899d335d5a6ce3cbbb9fde4f7af780d6bec8c9a/consensus/hotstuff/vote_aggregator.go#L57))
+from the node's main consensus logic, which trusted.
+
+
+## Byzantine Inputs result in benign sentinel errors 
+
+Any input that is coming from another node is untrusted and the vertex processing it should gracefully handle any arbitrarily malicious input.
+Under no circumstances should a byzantine input result in the vertex's internal state being corrupted.
+Per convention, failure case due to a byzantine inputs are represented by specifically-typed
+[sentinel errors](https://pkg.go.dev/errors#New) (for further details, see error handling section).
+
+Byzantine inputs are one particular case, where a function returns a 'benign error'. The critical property for an error
+to be benign is that the component returning it is still fully functional, despite encountering the error condition. 
+
+
+an input leads to a benign error return but without an
+Internally, a vertex should represent 
+The vertex-internal logic
+
+Use :
+By convention, byzantine inputs are represented 
+By convention, a vertex should not generate any errors during normal operations.   
+In other words, a broken input should always be gracefully rejected by the vertex's internal logic and never lead to state corruption.
+ 
+
+Vertices should implement the [`Component` interface](https://github.com/onflow/flow-go/blob/57f89d4e96259f08fe84163c91ecd32484401b45/module/component/component.go#L22)
+and throw unexpected errors using the related [irrecoverable context](https://github.com/onflow/flow-go/blob/277b6515add6136946913747efebd508f0419a25/module/irrecoverable/irrecoverable.go).
+
+
+
+# Appendix
+
+## Engines (interface deprecated)
+We model the data flow inside a node as a 'data flow graph'. An `Engine` is the deprecated interface for a vertex within the node's data flow graph. 
+New vertices should implement the [`Component` interface](https://github.com/onflow/flow-go/blob/57f89d4e96259f08fe84163c91ecd32484401b45/module/component/component.go#L22)
+and throw unexpected errors using the related [irrecoverable context](https://github.com/onflow/flow-go/blob/277b6515add6136946913747efebd508f0419a25/module/irrecoverable/irrecoverable.go).
 
 Generally, we consider node-internal components as _trusted_ and external nodes as untrusted data sources. The `Engine`
 API differentiates between trusted and untrusted inputs:
