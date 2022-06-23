@@ -87,33 +87,6 @@ func (i *TransactionInvoker) Process(
 	}
 	predeclaredValues := valueDeclarations(ctx, env)
 
-	// rest state
-	sth.SetActiveState(parentState)
-	childState = sth.NewChild()
-	// force cleanup if retries
-	programs.ForceCleanup()
-
-	i.logger.Warn().
-		Str("txHash", txIDStr).
-		Uint64("blockHeight", blockHeight).
-		Uint64("ledger_interaction_used", sth.State().InteractionUsed()).
-		Msg("retrying transaction execution")
-
-	// reset error part of proc
-	// Warning right now the tx requires retry logic doesn't change
-	// anything on state, but we might want to revert the state changes (or not committing)
-	// if we decided to expand it further.
-	proc.Err = nil
-	proc.Logs = make([]string, 0)
-	proc.Events = make([]flow.Event, 0)
-	proc.ServiceEvents = make([]flow.Event, 0)
-
-	// reset env
-	env, err = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
-	if err != nil {
-		return fmt.Errorf("error creating new environment: %w", err)
-	}
-
 	location := common.TransactionLocation(proc.ID[:])
 
 	err = vm.Runtime.ExecuteTransaction(
