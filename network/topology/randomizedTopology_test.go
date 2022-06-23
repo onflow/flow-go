@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -89,7 +89,7 @@ func (suite *RandomizedTopologyTestSuite) TestUnhappyInitialization() {
 func (suite *RandomizedTopologyTestSuite) TestUniqueness() {
 	var previous, current []string
 
-	topics := engine.ChannelsByRole(flow.RoleConsensus)
+	topics := network.ChannelsByRole(flow.RoleConsensus)
 	require.Greater(suite.T(), len(topics), 1)
 
 	for _, identity := range suite.all {
@@ -126,7 +126,7 @@ func (suite *RandomizedTopologyTestSuite) TestUniqueness() {
 // TestConnectedness_NonClusterChannel checks whether graph components corresponding to a
 // non-cluster channel are individually connected.
 func (suite *RandomizedTopologyTestSuite) TestConnectedness_NonClusterChannel() {
-	channel := engine.TestNetwork
+	channel := network.TestNetworkChannel
 	// adjacency map keeps graph component of a single channel
 	channelAdjMap := make(map[flow.Identifier]flow.IdentityList)
 
@@ -151,7 +151,7 @@ func (suite *RandomizedTopologyTestSuite) TestConnectedness_NonClusterChannel() 
 // cluster channel are individually connected.
 func (suite *RandomizedTopologyTestSuite) TestConnectedness_ClusterChannel() {
 	// picks one cluster channel as sample
-	channel := engine.ChannelSyncCluster(flow.Emulator)
+	channel := network.ChannelSyncCluster(flow.Emulator)
 
 	// adjacency map keeps graph component of a single channel
 	channelAdjMap := make(map[flow.Identifier]flow.IdentityList)

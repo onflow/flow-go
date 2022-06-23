@@ -49,16 +49,19 @@ func loadServiceAccount(flowClient *client.Client,
 
 	acc, err := flowClient.GetAccount(context.Background(), *servAccAddress)
 	if err != nil {
-		return nil, fmt.Errorf("error while calling get account for service account %w", err)
+		return nil, fmt.Errorf("error while calling get account for service account: %w", err)
 	}
 	accountKey := acc.Keys[0]
 
 	privateKey, err := crypto.DecodePrivateKeyHex(accountKey.SigAlgo, servAccPrivKeyHex)
 	if err != nil {
-		return nil, fmt.Errorf("error while decoding serice account private key hex %w", err)
+		return nil, fmt.Errorf("error while decoding serice account private key hex: %w", err)
 	}
 
-	signer := crypto.NewInMemorySigner(privateKey, accountKey.HashAlgo)
+	signer, err := crypto.NewInMemorySigner(privateKey, accountKey.HashAlgo)
+	if err != nil {
+		return nil, fmt.Errorf("error while creating signer: %w", err)
+	}
 
 	return &flowAccount{
 		address:    servAccAddress,

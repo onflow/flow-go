@@ -34,8 +34,7 @@ import (
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/state/protocol"
 	statemock "github.com/onflow/flow-go/state/protocol/mock"
-	storage "github.com/onflow/flow-go/storage/badger"
-	storagemock "github.com/onflow/flow-go/storage/mock"
+	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -45,9 +44,7 @@ type ExecutionDataRequesterSuite struct {
 	blobservice *mocknetwork.BlobService
 	datastore   datastore.Batching
 	db          *badger.DB
-	headers     *storagemock.Headers
-
-	eds *syncmock.ExecutionDataService
+	eds         *syncmock.ExecutionDataService
 
 	run edTestRun
 
@@ -296,7 +293,7 @@ func (suite *ExecutionDataRequesterSuite) TestRequesterPausesAndResumes() {
 	})
 }
 
-// TestRequesterHalts tests that the requester handles halting correctly when it encouters an
+// TestRequesterHalts tests that the requester handles halting correctly when it encounters an
 // invalid block
 func (suite *ExecutionDataRequesterSuite) TestRequesterHalts() {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
@@ -395,15 +392,23 @@ func generatePauseResume(pauseHeight uint64) (specialBlockGenerator, func()) {
 }
 
 func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun) (state_synchronization.ExecutionDataRequester, *pubsub.FinalizationDistributor) {
-	suite.headers = synctest.MockBlockHeaderStorage(synctest.WithByID(cfg.blocksByID), synctest.WithByHeight(cfg.blocksByHeight))
-	results := synctest.MockResultsStorage(synctest.WithByBlockID(cfg.resultsByID))
+	headers := synctest.MockBlockHeaderStorage(
+		synctest.WithByID(cfg.blocksByID),
+		synctest.WithByHeight(cfg.blocksByHeight),
+	)
+	results := synctest.MockResultsStorage(
+		synctest.WithResultByID(cfg.resultsByID),
+	)
+	seals := synctest.MockSealsStorage(
+		synctest.WithSealsByBlockID(cfg.sealsByBlockID),
+	)
 	state := suite.mockProtocolState(cfg.blocksByHeight)
 
 	suite.eds = mockExecutionDataService(cfg.executionDataEntries)
 
 	finalizationDistributor := pubsub.NewFinalizationDistributor()
-	processedHeight := storage.NewConsumerProgress(suite.db, module.ConsumeProgressExecutionDataRequesterBlockHeight)
-	processedNotification := storage.NewConsumerProgress(suite.db, module.ConsumeProgressExecutionDataRequesterNotification)
+	processedHeight := bstorage.NewConsumerProgress(suite.db, module.ConsumeProgressExecutionDataRequesterBlockHeight)
+	processedNotification := bstorage.NewConsumerProgress(suite.db, module.ConsumeProgressExecutionDataRequesterNotification)
 
 	edr := requester.New(
 		zerolog.New(os.Stdout).With().Timestamp().Logger(),
@@ -412,8 +417,9 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 		processedHeight,
 		processedNotification,
 		state,
-		suite.headers,
+		headers,
 		results,
+		seals,
 		requester.ExecutionDataConfig{
 			InitialBlockHeight: cfg.startHeight - 1,
 			MaxSearchAhead:     cfg.maxSearchAhead,
@@ -573,6 +579,8 @@ type fetchTestRun struct {
 	blocksByHeight           map[uint64]*flow.Block
 	blocksByID               map[flow.Identifier]*flow.Block
 	resultsByID              map[flow.Identifier]*flow.ExecutionResult
+	resultsByBlockID         map[flow.Identifier]*flow.ExecutionResult
+	sealsByBlockID           map[flow.Identifier]*flow.Seal
 	executionDataByID        map[flow.Identifier]*state_synchronization.ExecutionData
 	executionDataEntries     map[flow.Identifier]*testExecutionDataServiceEntry
 	executionDataIDByBlockID map[flow.Identifier]flow.Identifier
@@ -622,6 +630,8 @@ func (suite *ExecutionDataRequesterSuite) generateTestData(blockCount int, speci
 	blocksByHeight := map[uint64]*flow.Block{}
 	blocksByID := map[flow.Identifier]*flow.Block{}
 	resultsByID := map[flow.Identifier]*flow.ExecutionResult{}
+	resultsByBlockID := map[flow.Identifier]*flow.ExecutionResult{}
+	sealsByBlockID := map[flow.Identifier]*flow.Seal{}
 	executionDataByID := map[flow.Identifier]*state_synchronization.ExecutionData{}
 	executionDataIDByBlockID := map[flow.Identifier]flow.Identifier{}
 
@@ -634,7 +644,7 @@ func (suite *ExecutionDataRequesterSuite) generateTestData(blockCount int, speci
 
 	// instantiate ExecutionDataService to generate correct CIDs
 	eds := state_synchronization.NewExecutionDataService(
-		new(cbor.Codec),
+		cbor.NewCodec(),
 		compressor.NewLz4Compressor(),
 		suite.blobservice,
 		metrics.NewNoopCollector(),
@@ -647,9 +657,16 @@ func (suite *ExecutionDataRequesterSuite) generateTestData(blockCount int, speci
 		var seals []*flow.Header
 
 		if i >= firstSeal {
+			sealedBlock := blocksByHeight[uint64(i-firstSeal+1)]
 			seals = []*flow.Header{
-				blocksByHeight[uint64(i-firstSeal+1)].Header, // block 0 doesn't get sealed (it's pre-sealed in the genesis state)
+				sealedBlock.Header, // block 0 doesn't get sealed (it's pre-sealed in the genesis state)
 			}
+
+			sealsByBlockID[sealedBlock.ID()] = unittest.Seal.Fixture(
+				unittest.Seal.WithBlockID(sealedBlock.ID()),
+				unittest.Seal.WithResult(resultsByBlockID[sealedBlock.ID()]),
+			)
+
 			suite.T().Logf("block %d has seals for %d", i, seals[0].Height)
 		}
 
@@ -665,7 +682,8 @@ func (suite *ExecutionDataRequesterSuite) generateTestData(blockCount int, speci
 
 		blocksByHeight[height] = block
 		blocksByID[block.ID()] = block
-		resultsByID[block.ID()] = result
+		resultsByBlockID[block.ID()] = result
+		resultsByID[result.ID()] = result
 
 		// ignore all the data we don't need to verify the test
 		if i > 0 && i <= sealedCount {
@@ -688,7 +706,9 @@ func (suite *ExecutionDataRequesterSuite) generateTestData(blockCount int, speci
 		endHeight:                endHeight,
 		blocksByHeight:           blocksByHeight,
 		blocksByID:               blocksByID,
+		resultsByBlockID:         resultsByBlockID,
 		resultsByID:              resultsByID,
+		sealsByBlockID:           sealsByBlockID,
 		executionDataByID:        executionDataByID,
 		executionDataEntries:     edsEntries,
 		executionDataIDByBlockID: executionDataIDByBlockID,

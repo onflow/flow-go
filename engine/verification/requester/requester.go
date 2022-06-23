@@ -87,7 +87,7 @@ func New(log zerolog.Logger,
 		reqQualifierFunc: reqQualifierFunc,
 	}
 
-	con, err := net.Register(engine.RequestChunks, e)
+	con, err := net.Register(network.RequestChunks, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register chunk data pack provider engine: %w", err)
 	}

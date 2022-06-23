@@ -104,6 +104,12 @@ func WithHead(head *flow.Header) SnapshotMockOptions {
 	}
 }
 
+func WithSeal(seal *flow.Seal) SnapshotMockOptions {
+	return func(snapshot *statemock.Snapshot) {
+		snapshot.On("Seal").Return(seal, nil)
+	}
+}
+
 func MockProtocolStateSnapshot(opts ...SnapshotMockOptions) *statemock.Snapshot {
 	snapshot := new(statemock.Snapshot)
 
@@ -116,7 +122,7 @@ func MockProtocolStateSnapshot(opts ...SnapshotMockOptions) *statemock.Snapshot 
 
 type StateMockOptions func(*statemock.State)
 
-func WithSnapshot(snapshot *statemock.Snapshot) StateMockOptions {
+func WithSealedSnapshot(snapshot *statemock.Snapshot) StateMockOptions {
 	return func(state *statemock.State) {
 		state.On("Sealed").Return(snapshot)
 	}
@@ -203,6 +209,25 @@ func WithByBlockID(resultsByID map[flow.Identifier]*flow.ExecutionResult) Result
 	}
 }
 
+func WithResultByID(resultsByID map[flow.Identifier]*flow.ExecutionResult) ResultsMockOptions {
+	return func(results *storagemock.ExecutionResults) {
+		results.On("ByID", mock.AnythingOfType("flow.Identifier")).Return(
+			func(resultID flow.Identifier) *flow.ExecutionResult {
+				if _, has := resultsByID[resultID]; !has {
+					return nil
+				}
+				return resultsByID[resultID]
+			},
+			func(resultID flow.Identifier) error {
+				if _, has := resultsByID[resultID]; !has {
+					return fmt.Errorf("result %s not found: %w", resultID, storage.ErrNotFound)
+				}
+				return nil
+			},
+		)
+	}
+}
+
 func MockResultsStorage(opts ...ResultsMockOptions) *storagemock.ExecutionResults {
 	results := new(storagemock.ExecutionResults)
 
@@ -211,6 +236,37 @@ func MockResultsStorage(opts ...ResultsMockOptions) *storagemock.ExecutionResult
 	}
 
 	return results
+}
+
+type SealsMockOptions func(*storagemock.Seals)
+
+func WithSealsByBlockID(sealsByBlockID map[flow.Identifier]*flow.Seal) SealsMockOptions {
+	return func(seals *storagemock.Seals) {
+		seals.On("FinalizedSealForBlock", mock.AnythingOfType("flow.Identifier")).Return(
+			func(blockID flow.Identifier) *flow.Seal {
+				if _, has := sealsByBlockID[blockID]; !has {
+					return nil
+				}
+				return sealsByBlockID[blockID]
+			},
+			func(blockID flow.Identifier) error {
+				if _, has := sealsByBlockID[blockID]; !has {
+					return fmt.Errorf("seal for block %s not found: %w", blockID, storage.ErrNotFound)
+				}
+				return nil
+			},
+		)
+	}
+}
+
+func MockSealsStorage(opts ...SealsMockOptions) *storagemock.Seals {
+	seals := new(storagemock.Seals)
+
+	for _, opt := range opts {
+		opt(seals)
+	}
+
+	return seals
 }
 
 func RemoveExpectedCall(method string, expectedCalls []*mock.Call) []*mock.Call {

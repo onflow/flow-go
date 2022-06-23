@@ -159,7 +159,7 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 	updatedDurationPerValue := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
-		Name:      "update_duration_per_Value",
+		Name:      "update_duration_per_value",
 		Help:      "the duration of update operation per value",
 		Buckets:   []float64{0.05, 0.2, 0.5, 1, 2, 5},
 	})

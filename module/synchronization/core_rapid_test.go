@@ -11,6 +11,7 @@ import (
 	"pgregory.net/rapid"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -41,7 +42,7 @@ type rapidSync struct {
 func (r *rapidSync) Init(t *rapid.T) {
 	var err error
 
-	r.core, err = New(zerolog.New(ioutil.Discard), DefaultConfig())
+	r.core, err = New(zerolog.New(ioutil.Discard), DefaultConfig(), metrics.NewNoopCollector())
 	require.NoError(t, err)
 
 	r.store = populatedBlockStore(t)
@@ -52,7 +53,7 @@ func (r *rapidSync) Init(t *rapid.T) {
 // RequestByID is an action that requests a block by its ID.
 func (r *rapidSync) RequestByID(t *rapid.T) {
 	b := rapid.SampledFrom(r.store).Draw(t, "id_request").(flow.Header)
-	r.core.RequestBlock(b.ID())
+	r.core.RequestBlock(b.ID(), b.Height)
 	// Re-queueing by ID should always succeed
 	r.idRequests[b.ID()] = true
 	// Re-qeueuing by ID "forgets" a past height request

@@ -40,7 +40,7 @@ func run(*cobra.Command, []string) {
 	logger := zerolog.New(os.Stdout)
 
 	eds := state_synchronization.NewExecutionDataService(
-		&cbor.Codec{},
+		cbor.NewCodec(),
 		compressor.NewLz4Compressor(),
 		bs,
 		metrics.NewNoopCollector(),

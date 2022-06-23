@@ -939,9 +939,11 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			// net.MetricsPortsByContainerName[nodeContainer.Name()] = hostMetricsPort
 
 		case flow.RoleConsensus:
-			// use 1 here instead of the default 5, because the integration
-			// tests only start 1 verification node
-			nodeContainer.AddFlag("chunk-alpha", "1")
+			if !nodeContainer.IsFlagSet("chunk-alpha") {
+				// use 1 here instead of the default 5, because most of the integration
+				// tests only start 1 verification node
+				nodeContainer.AddFlag("chunk-alpha", "1")
+			}
 			t.Logf("%v hotstuff startup time will be in 8 seconds: %v", time.Now().UTC(), hotstuffStartupTime)
 			nodeContainer.AddFlag("hotstuff-startup-time", hotstuffStartupTime)
 
@@ -950,9 +952,11 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			// net.AccessPorts[ConNodeMetricsPort] = hostMetricsPort
 			// net.MetricsPortsByContainerName[nodeContainer.Name()] = hostMetricsPort
 		case flow.RoleVerification:
-			// use 1 here instead of the default 5, because the integration
-			// tests only start 1 verification node
-			nodeContainer.AddFlag("chunk-alpha", "1")
+			if !nodeContainer.IsFlagSet("chunk-alpha") {
+				// use 1 here instead of the default 5, because most of the integration
+				// tests only start 1 verification node
+				nodeContainer.AddFlag("chunk-alpha", "1")
+			}
 
 			// nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
 			// nodeContainer.Ports[VerNodeMetricsPort] = hostMetricsPort

@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	cborlib "github.com/fxamacker/cbor/v2"
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
@@ -23,7 +25,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
@@ -167,6 +168,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			InitialBlockHeight: 0,
 			MaxSearchAhead:     edrequester.DefaultMaxSearchAhead,
 			FetchTimeout:       edrequester.DefaultFetchTimeout,
+			MaxFetchTimeout:    edrequester.DefaultMaxFetchTimeout,
 			RetryDelay:         edrequester.DefaultRetryDelay,
 			MaxRetryDelay:      edrequester.DefaultMaxRetryDelay,
 		},
@@ -193,6 +195,7 @@ type FlowAccessNodeBuilder struct {
 	CollectionsToMarkExecuted  *stdmap.Times
 	BlocksToMarkExecuted       *stdmap.Times
 	TransactionMetrics         module.TransactionMetrics
+	AccessMetrics              module.AccessMetrics
 	PingMetrics                module.PingMetrics
 	Committee                  hotstuff.Committee
 	Finalized                  *flow.Header
@@ -258,7 +261,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilde
 
 func (builder *FlowAccessNodeBuilder) buildSyncCore() *FlowAccessNodeBuilder {
 	builder.Module("sync core", func(node *cmd.NodeConfig) error {
-		syncCore, err := synchronization.New(node.Logger, node.SyncCoreConfig)
+		syncCore, err := synchronization.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector())
 		builder.SyncCore = syncCore
 
 		return err
@@ -449,13 +452,24 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 		}).
 		Component("execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			var err error
-			bs, err = node.Network.RegisterBlobService(engine.ExecutionDataService, ds)
+			bs, err = node.Network.RegisterBlobService(network.ExecutionDataService, ds)
 			if err != nil {
 				return nil, fmt.Errorf("could not register blob service: %w", err)
 			}
 
+			decMode, err := cborlib.DecOptions{
+				MaxArrayElements: math.MaxInt64,
+				MaxMapPairs:      math.MaxInt64,
+				MaxNestedLevels:  math.MaxInt16,
+			}.DecMode()
+			if err != nil {
+				return nil, fmt.Errorf("could not create cbor decoder: %w", err)
+			}
+
+			codec := cbor.NewCodec(cbor.WithDecMode(decMode))
+
 			builder.ExecutionDataService = state_synchronization.NewExecutionDataService(
-				new(cbor.Codec),
+				codec,
 				compressor.NewLz4Compressor(),
 				bs,
 				metrics.NewExecutionDataServiceCollector(),
@@ -504,6 +518,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				builder.State,
 				builder.Storage.Headers,
 				builder.Storage.Results,
+				builder.Storage.Seals,
 				builder.executionDataConfig,
 			)
 
@@ -605,7 +620,8 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.StringVar(&builder.executionDataDir, "execution-data-dir", defaultConfig.executionDataDir, "directory to use for Execution Data database")
 		flags.Uint64Var(&builder.executionDataStartHeight, "execution-data-start-height", defaultConfig.executionDataStartHeight, "height of first block to sync execution data from when starting with an empty Execution Data database")
 		flags.Uint64Var(&builder.executionDataConfig.MaxSearchAhead, "execution-data-max-search-ahead", defaultConfig.executionDataConfig.MaxSearchAhead, "max number of heights to search ahead of the lowest outstanding execution data height")
-		flags.DurationVar(&builder.executionDataConfig.FetchTimeout, "execution-data-fetch-timeout", defaultConfig.executionDataConfig.FetchTimeout, "timeout to use when fetching execution data from the network e.g. 300s")
+		flags.DurationVar(&builder.executionDataConfig.FetchTimeout, "execution-data-fetch-timeout", defaultConfig.executionDataConfig.FetchTimeout, "initial timeout to use when fetching execution data from the network. timeout increases using an incremental backoff until execution-data-max-fetch-timeout. e.g. 30s")
+		flags.DurationVar(&builder.executionDataConfig.MaxFetchTimeout, "execution-data-max-fetch-timeout", defaultConfig.executionDataConfig.MaxFetchTimeout, "maximum timeout to use when fetching execution data from the network e.g. 300s")
 		flags.DurationVar(&builder.executionDataConfig.RetryDelay, "execution-data-retry-delay", defaultConfig.executionDataConfig.RetryDelay, "initial delay for exponential backoff when fetching execution data fails e.g. 10s")
 		flags.DurationVar(&builder.executionDataConfig.MaxRetryDelay, "execution-data-max-retry-delay", defaultConfig.executionDataConfig.MaxRetryDelay, "maximum delay for exponential backoff when fetching execution data fails e.g. 5m")
 	}).ValidateFlags(func() error {
@@ -616,6 +632,9 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		if builder.executionDataSyncEnabled {
 			if builder.executionDataConfig.FetchTimeout <= 0 {
 				return errors.New("execution-data-fetch-timeout must be greater than 0")
+			}
+			if builder.executionDataConfig.MaxFetchTimeout < builder.executionDataConfig.FetchTimeout {
+				return errors.New("execution-data-max-fetch-timeout must be greater than execution-data-fetch-timeout")
 			}
 			if builder.executionDataConfig.RetryDelay <= 0 {
 				return errors.New("execution-data-retry-delay must be greater than 0")
