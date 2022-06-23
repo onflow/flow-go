@@ -5,9 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/network/codec/cbor"
-
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -17,6 +14,8 @@ import (
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
