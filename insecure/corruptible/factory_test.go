@@ -101,7 +101,7 @@ func TestFactoryHandleIncomingEvent_AttackerObserve(t *testing.T) {
 	go func() {
 		attackerRegistered.Done()
 
-		err := f.RegisterAttacker(&empty.Empty{}, attacker) // blocking call
+		err := f.ConnectAttacker(&empty.Empty{}, attacker) // blocking call
 		require.NoError(t, err)
 	}()
 	unittest.RequireReturnsBefore(t, attackerRegistered.Wait, 1*time.Second, "could not register attacker on time")

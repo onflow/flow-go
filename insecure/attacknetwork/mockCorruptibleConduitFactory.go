@@ -30,7 +30,7 @@ type mockCorruptibleConduitFactory struct {
 	address               net.Addr               // address of gRPC endpoint for this mock ccf
 	attackerRegMsg        chan interface{}       // channel indicating whether attacker has registered.
 	attackerMsg           chan *insecure.Message // channel  keeping the last incoming (insecure) message from an attacker.
-	attackerObserveStream insecure.CorruptibleConduitFactory_RegisterAttackerServer
+	attackerObserveStream insecure.CorruptibleConduitFactory_ConnectAttackerServer
 }
 
 func newMockCorruptibleConduitFactory() *mockCorruptibleConduitFactory {
@@ -107,9 +107,9 @@ func (c *mockCorruptibleConduitFactory) ProcessAttackerMessage(stream insecure.C
 	}
 }
 
-// RegisterAttacker is a gRPC end-point of this mock corruptible conduit factory, that accepts attacker registration messages from the attack network.
+// ConnectAttacker is a gRPC end-point of this mock corruptible conduit factory, that accepts attacker registration messages from the attack network.
 // It puts the incoming message into a channel to be read by test procedure.
-func (c *mockCorruptibleConduitFactory) RegisterAttacker(_ *empty.Empty, stream insecure.CorruptibleConduitFactory_RegisterAttackerServer) error {
+func (c *mockCorruptibleConduitFactory) ConnectAttacker(_ *empty.Empty, stream insecure.CorruptibleConduitFactory_ConnectAttackerServer) error {
 	select {
 	case <-c.cm.ShutdownSignal():
 		return nil

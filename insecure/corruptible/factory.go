@@ -48,7 +48,7 @@ type ConduitFactory struct {
 	receiptHasher         hash.Hasher
 	spockHasher           hash.Hasher
 	approvalHasher        hash.Hasher
-	attackerInboundStream insecure.CorruptibleConduitFactory_RegisterAttackerServer // inbound stream to attacker
+	attackerInboundStream insecure.CorruptibleConduitFactory_ConnectAttackerServer // inbound stream to attacker
 	incomingMessageChan   chan *insecure.Message
 }
 
@@ -250,10 +250,10 @@ func (c *ConduitFactory) processAttackerMessage(msg *insecure.Message) error {
 	return nil
 }
 
-// RegisterAttacker is a gRPC end-point for this conduit factory that lets an attacker register itself to it, so that the attacker can
+// ConnectAttacker is a gRPC end-point for this conduit factory that lets an attacker register itself to it, so that the attacker can
 // control it.
 // Registering an attacker on a conduit is an exactly-once immutable operation, any second attempt after a successful registration returns an error.
-func (c *ConduitFactory) RegisterAttacker(_ *empty.Empty, stream insecure.CorruptibleConduitFactory_RegisterAttackerServer) error {
+func (c *ConduitFactory) ConnectAttacker(_ *empty.Empty, stream insecure.CorruptibleConduitFactory_ConnectAttackerServer) error {
 	c.mu.Lock()
 	c.logger.Info().Msg("attacker registration called arrived")
 	if c.attackerInboundStream != nil {

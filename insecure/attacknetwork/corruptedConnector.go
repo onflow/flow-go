@@ -59,7 +59,7 @@ func (c *CorruptedConnector) Connect(ctx irrecoverable.SignalerContext, targetId
 
 	client := insecure.NewCorruptibleConduitFactoryClient(gRpcClient)
 
-	inbound, err := client.RegisterAttacker(ctx, &empty.Empty{})
+	inbound, err := client.ConnectAttacker(ctx, &empty.Empty{})
 	if err != nil {
 		return nil, fmt.Errorf("could not establish an inbound stream to corruptible conduit factory: %w", err)
 	}

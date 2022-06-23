@@ -22,14 +22,14 @@ type CorruptedNodeConnection struct {
 	logger         zerolog.Logger
 	inboundHandler func(*insecure.Message)                                         // handler for incoming messages from corruptible conduit factories.
 	outbound       insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient // from orchestrator to ccf.
-	inbound        insecure.CorruptibleConduitFactory_RegisterAttackerClient       // from ccf to orchestrator.
+	inbound        insecure.CorruptibleConduitFactory_ConnectAttackerClient        // from ccf to orchestrator.
 }
 
 func NewCorruptedNodeConnection(
 	logger zerolog.Logger,
 	inboundHandler func(message *insecure.Message),
 	outbound insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient,
-	inbound insecure.CorruptibleConduitFactory_RegisterAttackerClient) *CorruptedNodeConnection {
+	inbound insecure.CorruptibleConduitFactory_ConnectAttackerClient) *CorruptedNodeConnection {
 	c := &CorruptedNodeConnection{
 		logger:         logger.With().Str("component", "corrupted-connector").Logger(),
 		outbound:       outbound,
