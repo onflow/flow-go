@@ -55,6 +55,7 @@ type Engine struct {
 	mempool                *Mempool
 	execState              state.ExecutionState
 	metrics                module.ExecutionMetrics
+	maxCollectionHeight    uint64
 	tracer                 module.Tracer
 	extensiveLogging       bool
 	spockHasher            hash.Hasher
@@ -113,6 +114,7 @@ func New(
 		mempool:                mempool,
 		execState:              execState,
 		metrics:                metrics,
+		maxCollectionHeight:    0,
 		tracer:                 tracer,
 		extensiveLogging:       extLog,
 		syncFilter:             syncFilter,
@@ -819,6 +821,11 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 	err := e.collections.Store(collection)
 	if err != nil {
 		return fmt.Errorf("cannot store collection: %w", err)
+	}
+
+	block, err := e.blocks.ByID(collection.Guarantee().ReferenceBlockID)
+	if err != nil && block.Header.Height > e.maxCollectionHeight {
+		e.metrics.UpdateCollectionMaxHeight(block.Header.Height)
 	}
 
 	return e.mempool.BlockByCollection.Run(

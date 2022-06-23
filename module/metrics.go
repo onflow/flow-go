@@ -422,6 +422,8 @@ type ExecutionMetrics interface {
 	ExecutionBlockDataUploadStarted()
 
 	ExecutionBlockDataUploadFinished(dur time.Duration)
+
+	UpdateCollectionMaxHeight(height uint64)
 }
 
 type BackendScriptsMetrics interface {
