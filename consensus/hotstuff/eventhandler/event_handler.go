@@ -153,6 +153,11 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 		return fmt.Errorf("failed processing current block: %w", err)
 	}
 
+	// we don't call startNewView() which will trigger proposing logic because to make a proposal
+	// we need to construct a QC or TC, both QC and TC will be delivered in dedicated callback
+	// (see OnQCCreated and OnTCCreated). When obtaining QC or TC for active view EventHandler calls
+	// startNewView() which will initiate proposing logic.
+
 	return nil
 }
 
@@ -237,6 +242,19 @@ func (e *EventHandler) startNewView() error {
 			return nil
 		}
 
+		// TODO: discuss whenever this check should be here, maybe move it to BlockProducer?
+		// Generally speaking this situation shouldn't happen if startNewView() is called as result of
+		// QC or TC constructed. But there are some edge cases where we might be produce invalid proposal
+		// without this sanity checks in case of making proposal after booting up.
+		if newestQC.View+1 != curView {
+			if lastViewTC == nil {
+				return fmt.Errorf("inconsistent state, expected lastViewTC to be not nil")
+			}
+			if lastViewTC.View+1 != curView {
+				return nil
+			}
+		}
+
 		proposal, err := e.blockProducer.MakeBlockProposal(newestQC, curView, lastViewTC)
 		if err != nil {
 			return fmt.Errorf("can not make block proposal for curView %v: %w", curView, err)
@@ -311,7 +329,6 @@ func (e *EventHandler) startNewView() error {
 // processBlockForCurrentView processes the block for the current view.
 // It is called AFTER the block has been stored or found in Forks
 // It checks whether to vote for this block.
-// It might trigger a view change to go to a different view, which might re-enter this function.
 func (e *EventHandler) processBlockForCurrentView(proposal *model.Proposal) error {
 	// sanity check that block is really for the current view:
 	curView := e.paceMaker.CurView()
@@ -332,22 +349,6 @@ func (e *EventHandler) processBlockForCurrentView(proposal *model.Proposal) erro
 		return fmt.Errorf("unexpected error in voting logic: %w", err)
 	}
 
-	// Inform PaceMaker that we've processed a block for the current view. We expect
-	// a view change if an only if we are _not_ the next leader. We perform a sanity
-	// check here, because a wrong view change can have disastrous consequences.
-	//isSelfNextLeader := e.committee.Self() == nextLeader
-	// TODO(active-pacemaker: this function is not available anymore, rewrite it when working on EventHandler
-	//_, viewChanged := e.paceMaker.UpdateCurViewWithBlock(block, isSelfNextLeader)
-	//if viewChanged == isSelfNextLeader {
-	//	if isSelfNextLeader {
-	//		return fmt.Errorf("I am primary for next view (%v) and should be collecting votes, but pacemaker triggered already view change", curView+1)
-	//	}
-	//	return fmt.Errorf("pacemaker should trigger a view change to net view (%v), but didn't", curView+1)
-	//}
-	//
-	//if viewChanged {
-	//	return e.startNewView()
-	//}
 	return nil
 }
 
