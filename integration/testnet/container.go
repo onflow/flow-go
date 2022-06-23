@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	sdk "github.com/onflow/flow-go-sdk"
@@ -194,6 +195,16 @@ func (c *Container) AddFlag(flag, val string) {
 		c.opts.Config.Cmd,
 		fmt.Sprintf("--%s=%s", flag, val),
 	)
+}
+
+func (c Container) IsFlagSet(flag string) bool {
+	for _, cmd := range c.opts.Config.Cmd {
+		if strings.HasPrefix(cmd, fmt.Sprintf("--%s", flag)) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // Name returns the container name. This is the name that appears in logs as
