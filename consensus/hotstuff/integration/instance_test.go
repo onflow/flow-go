@@ -403,7 +403,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	require.NoError(t, err)
 
 	// initialize the event handler
-	in.handler, err = eventhandler.NewEventHandler(log, in.pacemaker, in.producer, in.forks, in.persist, in.communicator, in.committee, in.aggregator, in.voter, in.validator, notifier)
+	in.handler, err = eventhandler.NewEventHandler(log, in.pacemaker, in.producer, in.forks, in.persist, in.communicator, in.committee, in.aggregator, in.voter, notifier)
 	require.NoError(t, err)
 
 	return &in
