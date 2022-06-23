@@ -102,9 +102,14 @@ func NewTransactionEnvironment(
 				// If the contract deployment bool is not set by the state
 				// fallback to the default value set by the configuration
 				// after the contract deployment bool is set by the state on all chains, this logic can be simplified
-				return ctx.RestrictedDeploymentEnabled
+				return ctx.RestrictContractDeployment
 			}
 			return enabled
+		},
+		func() bool {
+			// TODO read this from the chain similar to the contract deployment
+			// but for now we would honor the fallback context flag
+			return ctx.RestrictContractRemoval
 		},
 		env.GetAccountsAuthorizedForContractUpdate,
 		env.GetAccountsAuthorizedForContractRemoval,
