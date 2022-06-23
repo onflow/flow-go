@@ -197,7 +197,7 @@ func (i *TransactionInvoker) Process(
 		// so we don't error from computation/memory limits on this part.
 		// We cannot charge the user for this part, since fee deduction already happened.
 		sth.DisableAllLimitEnforcements()
-		txError = NewTransactionStorageLimiter().CheckLimits(env, sth.State().UpdatedAddresses())
+		txError = i.CheckAccountStorageLimits(env, sth.State().UpdatedAddresses())
 		sth.EnableAllLimitEnforcements()
 	}
 
@@ -458,4 +458,37 @@ func (i *TransactionInvoker) logExecutionIntensities(sth *state.StateHolder, txH
 			Dict("memoryIntensities", memory).
 			Msg("transaction execution data")
 	}
+}
+
+// CheckAccountStorageLimits checks all addresses that their storage used is not above their storage capacity
+// The addresses should be deterministically sorted because the loop exits on first error.
+func (i *TransactionInvoker) CheckAccountStorageLimits(
+	env Environment,
+	addresses []flow.Address,
+) error {
+	// if we are not limiting storage of accounts, we don't need to check anything
+	if !env.Context().LimitAccountStorage {
+		return nil
+	}
+
+	// TODO(JanezP): could this be faster and more modular if it was single smart contract function invocation.
+	for _, address := range addresses {
+		commonAddress := common.Address(address)
+
+		capacity, err := env.GetStorageCapacity(commonAddress)
+		if err != nil {
+			return fmt.Errorf("storage limit check failed: %w", err)
+		}
+
+		usage, err := env.GetStorageUsed(commonAddress)
+		if err != nil {
+			return fmt.Errorf("storage limit check failed: %w", err)
+		}
+
+		if usage > capacity {
+			return errors.NewStorageCapacityExceededError(address, usage, capacity)
+		}
+	}
+
+	return nil
 }
