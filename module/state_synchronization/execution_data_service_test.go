@@ -171,7 +171,7 @@ func allKeys(t *testing.T, bs blockstore.Blockstore, timeout time.Duration) []ci
 }
 
 func executionDataService(bs network.BlobService) *executionDataServiceImpl {
-	codec := new(cbor.Codec)
+	codec := cbor.NewCodec()
 	compressor := compressor.NewLz4Compressor()
 	return NewExecutionDataService(codec, compressor, bs, metrics.NewNoopCollector(), zerolog.Nop())
 }
