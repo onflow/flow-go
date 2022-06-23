@@ -285,11 +285,16 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			if b.config.DryRunRateLimit {
 				// log that this transaction would have been rate-limited, but we will still include it in the collection
 				b.log.Info().
-					Hex("tx_id", logging.Entity(tx)).
+					Hex("tx_id", logging.ID(txID)).
 					Str("payer_addr", tx.Payer.String()).
 					Float64("rate_limit", b.config.MaxPayerTransactionRate).
 					Msg("dry-run: observed transaction that would have been rate limited")
 			} else {
+				b.log.Debug().
+					Hex("tx_id", logging.ID(txID)).
+					Str("payer_addr", tx.Payer.String()).
+					Float64("rate_limit", b.config.MaxPayerTransactionRate).
+					Msg("transaction is rate-limited")
 				continue
 			}
 		}
