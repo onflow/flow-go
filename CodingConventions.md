@@ -1,4 +1,4 @@
-# Coding Style Guidelines for Flow core-protocol
+# Coding Style Guidelines for Flow Core Protocol
 
 Below, we discuss code-style conventions for Flow's core-protocol implementation. They are _guidelines_ with the goal to
 increase readability, uniformity, and maintainability of the code base.
@@ -22,15 +22,15 @@ prevent others from going through the same learning process that led to your dec
 This is a highly-compressed summary
 of [Error Handling in Flow (Notion)](https://www.notion.so/dapperlabs/Error-Handling-in-Flow-a7692d60681c4063b48851c0dbc6ed10)
 
-A blockchain is a security-first system. Therefore, encountering a problem and continuing on a "best effort" basis is *
-not* an option. There is a clear definition of the happy path (i.e. the block must be in storage). Any deviation of this
+A blockchain is a security-first system. Therefore, encountering a problem and continuing on a "best effort" basis is
+*not* an option. There is a clear definition of the happy path (i.e. the block must be in storage). Any deviation of this
 happy path is either
 
 1. a protocol violation (from a different node), which itself is clearly defined
 2. is an uncovered edge case (which could be exploited in the worst case to compromise the system)
 3. a corrupted internal state of the node
 
-### guidelines
+### Guidelines
 
 * avoid generic errors, such as
   ```golang
@@ -38,14 +38,14 @@ happy path is either
   ```
 * Use [sentinel errors](https://pkg.go.dev/errors#New):
   ```golang
-  XFailedErr := errors.New("x failed")
+  ErrXFailed := errors.New("x failed")
 
   // foo does abc.
   // Expected error returns during normal operations:
-  //  * XFailedErr: if x failed
+  //  * ErrXFailed: if x failed
   func foo() err {
      ...
-     return fmt.Errorf("details about failure: %w", XFailedErr)
+     return fmt.Errorf("details about failure: %w", ErrXFailed)
   }
   ```
     - If some operation _can_ fail, create specific sentinel errors.
@@ -69,7 +69,7 @@ happy path is either
   operations.
 * Errors of unexpected types are indicators that the node's internal state might be corrupted.
 
-### anti-pattern
+### Anti-Pattern
 
 Continuing on a best-effort basis is not an option, i.e. the following is an anti-pattern in the context of Flow:
 
@@ -83,23 +83,29 @@ if err != nil {
 
 There are _rare_ instances, where this might be acceptable. For example, when attempting to send a message via the
 network to another node and the networking layer errored. In this case, please include a comment with an explanation,
-why it is acceptable to keep going, even if the other component returned an error.
+why it is acceptable to keep going, even if the other component returned an error. For this example, it is acceptable to handle the error by logging because:
+* we expect transient errors from this component (networking layer) during normal operation
+* the networking layer uses a 3rd party library, which does not expose specific and exhaustive sentinel errors for expected failure conditions
+* either it is not critical that the message is successfully sent at all, or it will be retried later on
 
-### prioritize safety over liveness
+### Prioritize Safety Over Liveness
 
 **Ideally, a component should restart** (from a known good state), **when it encounters an unexpected error.**
 **If this is out of scope, we _prioritize safety over liveness_.** This means that we rather crash the node than
 continue on a best-effort basis.
 
+New engines should implement the [`Component` interface](https://github.com/onflow/flow-go/blob/57f89d4e96259f08fe84163c91ecd32484401b45/module/component/component.go#L22)
+and throw unexpected errors using the related [irrecoverable context](https://github.com/onflow/flow-go/blob/277b6515add6136946913747efebd508f0419a25/module/irrecoverable/irrecoverable.go). 
+
 When in doubt, use the following as a fall-back:
 
 ```golang
 err := foo()
+if errors.Is(err, XFailedErr) {
+   // expected error
+   return
+}
 if err != nil {
-   if errors.Is(err, XFailedErr) {
-      // expected error
-      return
-   }
    log.Fatal().Err(err).Msg("unexpected internal error")
    return
 }
@@ -157,7 +163,7 @@ Furthermore, engines offer synchronous and asynchronous processing of their inpu
     * Note: computationally very cheap and predominantly non-blocking computation should _still_ be executed in the
       calling routine. This is beneficial to avoid a cascade of go-routine launches when stacking multiple engines.
 
-### guidelines
+### Guidelines
 
 * In the error handling within an `Engine`, differentiate between trusted and untrusted inputs. For example, most
   engines expect specific input types. Inputs with incompatible type should result in a specific sentinel error (
