@@ -163,6 +163,7 @@ func (e *blockComputer) executeBlock(
 			trieUpdates = append(trieUpdates, trieUpdate)
 		},
 	}
+	defer bc.Close()
 
 	eh := eventHasher{
 		tracer:    e.tracer,
@@ -175,6 +176,7 @@ func (e *blockComputer) executeBlock(
 			res.EventsHashes = append(res.EventsHashes, hash)
 		},
 	}
+	defer eh.Close()
 
 	go func() {
 		bc.Run()
@@ -210,16 +212,18 @@ func (e *blockComputer) executeBlock(
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute system chunk transaction: %w", err)
 	}
+
 	bc.Commit(colView)
 	eh.Hash(res.Events[len(res.Events)-1])
+	// close the views and wait for all views to be committed
+	bc.Close()
+	eh.Close()
+
 	err = e.mergeView(stateView, colView, blockSpan, trace.EXEMergeCollectionView)
 	if err != nil {
 		return nil, fmt.Errorf("cannot merge view: %w", err)
 	}
 
-	// close the views and wait for all views to be committed
-	close(bc.views)
-	close(eh.data)
 	wg.Wait()
 	res.StateReads = stateView.(*delta.View).ReadsCount()
 	res.StateCommitments = stateCommitments
@@ -457,6 +461,7 @@ type blockCommitter struct {
 	callBack  func(state flow.StateCommitment, proof []byte, update *ledger.TrieUpdate, err error)
 	state     flow.StateCommitment
 	views     chan state.View
+	closeOnce sync.Once
 	blockSpan opentracing.Span
 }
 
@@ -474,10 +479,15 @@ func (bc *blockCommitter) Commit(view state.View) {
 	bc.views <- view
 }
 
+func (bc *blockCommitter) Close() {
+	bc.closeOnce.Do(func() { close(bc.views) })
+}
+
 type eventHasher struct {
 	tracer    module.Tracer
 	callBack  func(hash flow.Identifier, err error)
 	data      chan flow.EventsList
+	closeOnce sync.Once
 	blockSpan opentracing.Span
 }
 
@@ -492,4 +502,8 @@ func (eh *eventHasher) Run() {
 
 func (eh *eventHasher) Hash(events flow.EventsList) {
 	eh.data <- events
+}
+
+func (eh *eventHasher) Close() {
+	eh.closeOnce.Do(func() { close(eh.data) })
 }
