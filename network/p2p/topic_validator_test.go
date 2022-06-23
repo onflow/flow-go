@@ -139,7 +139,7 @@ func TestTopicValidator_PublicChannel(t *testing.T) {
 
 	timedCtx, cancel5s := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel5s()
-	// create a dummy block proposal to publish from our SN node
+	// create a dummy sync request to publish from our SN node
 	data1 := getMsgFixtureBz(t, &messages.SyncRequest{Nonce: 0, Height: 0})
 
 	err = sn2.Publish(timedCtx, topic, data1)
