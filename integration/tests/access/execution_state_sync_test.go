@@ -199,7 +199,7 @@ func (s *ExecutionStateSyncSuite) nodeExecutionDataService(node *testnet.Contain
 	blobService.Start(ctx)
 
 	return state_synchronization.NewExecutionDataService(
-		new(cbor.Codec),
+		cbor.NewCodec(),
 		compressor.NewLz4Compressor(),
 		blobService,
 		metrics.NewNoopCollector(),
