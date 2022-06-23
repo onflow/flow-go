@@ -100,6 +100,7 @@ func BenchmarkComputeBlock(b *testing.B) {
 
 	engine := &Manager{
 		blockComputer: blockComputer,
+		tracer:        trace.NewNoopTracer(),
 		me:            me,
 		programsCache: programsCache,
 		eds:           eds,
