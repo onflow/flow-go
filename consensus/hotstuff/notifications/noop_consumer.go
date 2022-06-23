@@ -47,8 +47,6 @@ func (*NoopConsumer) OnReachedTimeout(*model.TimerInfo) {}
 
 func (*NoopConsumer) OnQcIncorporated(*flow.QuorumCertificate) {}
 
-func (*NoopConsumer) OnForkChoiceGenerated(uint64, *flow.QuorumCertificate) {}
-
 func (*NoopConsumer) OnDoubleVotingDetected(*model.Vote, *model.Vote) {}
 
 func (*NoopConsumer) OnInvalidVoteDetected(*model.Vote) {}

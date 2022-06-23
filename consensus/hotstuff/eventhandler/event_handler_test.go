@@ -272,19 +272,6 @@ func (f *Forks) GetBlocksForView(view uint64) []*model.Block {
 	return blocks
 }
 
-func (f *Forks) MakeForkChoice(curView uint64) (*flow.QuorumCertificate, *model.Block, error) {
-	if f.qc == nil {
-		log.Fatal().Msgf("cannot make fork choice for curview: %v", curView)
-	}
-
-	block, ok := f.blocks[f.qc.BlockID]
-	if !ok {
-		return nil, nil, fmt.Errorf("cannot block %V for fork choice qc", f.qc.BlockID)
-	}
-	log.Info().Msgf("forks.MakeForkChoice for view: %v, qc view: %v\n", curView, f.qc.View)
-	return f.qc, block, nil
-}
-
 // BlockProducer mock will always make a valid block
 type BlockProducer struct{}
 
