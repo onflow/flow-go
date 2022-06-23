@@ -119,7 +119,7 @@ func BenchmarkComputeBlock(b *testing.B) {
 		for _, txes := range []int{16, 32, 64, 128} {
 			cols := cols
 			txes := txes
-			b.Run(fmt.Sprintf("ComputeBlock/%d/cols/%d/txes", cols, txes), func(b *testing.B) {
+			b.Run(fmt.Sprintf("%d/cols/%d/txes", cols, txes), func(b *testing.B) {
 				b.StopTimer()
 				b.ResetTimer()
 
