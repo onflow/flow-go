@@ -283,7 +283,7 @@ func (e *Manager) ComputeBlock(
 	var blobTree [][]cid.Cid
 
 	group.Go(func() error {
-		span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXEAddToEDS)
+		span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXEAddToExecutionDataService)
 		defer span.Finish()
 
 		var collections []*flow.Collection
