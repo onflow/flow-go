@@ -215,7 +215,7 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Subsystem: subsystemRuntime,
 		Name:      "block_transaction_counts",
 		Help:      "the total number of transactions per block",
-		Buckets:   prometheus.ExponentialBuckets(4, 2, 8),
+		Buckets:   prometheus.ExponentialBuckets(4, 2, 10),
 	})
 
 	blockCollectionCounts := promauto.NewHistogram(prometheus.HistogramOpts{
