@@ -7,12 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-
-	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
@@ -27,6 +21,10 @@ import (
 	state_synchronization "github.com/onflow/flow-go/module/state_synchronization/mock"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
+
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 type testAccount struct {
@@ -61,7 +59,7 @@ func createAccounts(b *testing.B, vm *fvm.VirtualMachine, ledger state.View, num
 func mustFundAccounts(b *testing.B, vm *fvm.VirtualMachine, ledger state.View, execCtx fvm.Context, accs *testAccounts) {
 	var err error
 	for i, acc := range accs.accounts {
-		transferTx := createTokenTransferTx(1_000_000, acc.address, chain.ServiceAddress())
+		transferTx := testutil.CreateTokenTransferTransaction(chain, 1_000_000, acc.address, chain.ServiceAddress())
 		err = testutil.SignTransactionAsServiceAccount(transferTx, accs.seq, chain)
 		require.NoError(b, err)
 		accs.seq++
@@ -198,7 +196,7 @@ func createTokenTransferTransaction(b *testing.B, accs *testAccounts) *flow.Tran
 	src := accs.accounts[rnd]
 	dst := accs.accounts[(rnd+1)%len(accs.accounts)]
 
-	tx := createTokenTransferTx(1, dst.address, src.address)
+	tx := testutil.CreateTokenTransferTransaction(chain, 1, dst.address, src.address)
 	tx.SetProposalKey(chain.ServiceAddress(), 0, accs.seq).
 		SetGasLimit(1000).
 		SetPayer(chain.ServiceAddress())
@@ -211,33 +209,4 @@ func createTokenTransferTransaction(b *testing.B, accs *testAccounts) *flow.Tran
 	require.NoError(b, err)
 
 	return tx
-}
-
-// TODO(rbtz): move to testutil
-func createTokenTransferTx(amount int, to flow.Address, signer flow.Address) *flow.TransactionBody {
-	return flow.NewTransactionBody().
-		SetScript([]byte(fmt.Sprintf(`
-		import FungibleToken from 0x%s
-		import FlowToken from 0x%s
-
-		transaction(amount: UFix64, to: Address) {
-			let sentVault: @FungibleToken.Vault
-
-			prepare(signer: AuthAccount) {
-				let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
-					?? panic("Could not borrow reference to the owner's Vault!")
-				self.sentVault <- vaultRef.withdraw(amount: amount)
-			}
-
-			execute {
-				let receiverRef = getAccount(to)
-					.getCapability(/public/flowTokenReceiver)
-					.borrow<&{FungibleToken.Receiver}>()
-					?? panic("Could not borrow receiver reference to the recipient's Vault")
-				receiverRef.deposit(from: <-self.sentVault)
-			}
-		}`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain)))).
-		AddArgument(jsoncdc.MustEncode(cadence.UFix64(amount))).
-		AddArgument(jsoncdc.MustEncode(cadence.NewAddress(to))).
-		AddAuthorizer(signer)
 }
