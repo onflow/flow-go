@@ -147,7 +147,7 @@ func TestTopicValidator_PublicChannel(t *testing.T) {
 
 	var wg sync.WaitGroup
 
-	// sn1 should not receive message from sn2 because sn2 is unstaked
+	// sn1 should receive message from sn2 because the public channel is unauthenticated
 	timedCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
