@@ -128,8 +128,8 @@ func WithGasLimit(limit uint64) Option {
 	}
 }
 
-// WithLoadContextFromState sets if certain context parameters get loaded from the state or not
-func WithLoadContextFromState(load bool) Option {
+// WithAllowContextOverrideByExecutionState sets if certain context parameters get loaded from the state or not
+func WithAllowContextOverrideByExecutionState(load bool) Option {
 	return func(ctx Context) Context {
 		ctx.AllowContextOverrideByExecutionState = load
 		return ctx
