@@ -462,20 +462,20 @@ func TestConsensus_HasEpochForView(t *testing.T) {
 	snapshot.On("Epochs").Return(epochs)
 
 	committee, err := NewConsensusCommittee(state, me)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	t.Run("next epoch not ready", func(t *testing.T) {
 		t.Run("previous epoch", func(t *testing.T) {
 			// get epoch info for view in previous epoch
 			has, err := committee.HasEpochForView(randUint64(1, 100))
-			require.Nil(t, err)
+			require.NoError(t, err)
 			assert.True(t, has)
 		})
 
 		t.Run("current epoch", func(t *testing.T) {
 			// get epoch info for view in current epoch
 			has, err := committee.HasEpochForView(randUint64(101, 200))
-			require.Nil(t, err)
+			require.NoError(t, err)
 			assert.True(t, has)
 		})
 
