@@ -29,20 +29,6 @@ func (_m *Forks) AddBlock(block *model.Block) error {
 	return r0
 }
 
-// AddQC provides a mock function with given fields: qc
-func (_m *Forks) AddQC(qc *flow.QuorumCertificate) error {
-	ret := _m.Called(qc)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.QuorumCertificate) error); ok {
-		r0 = rf(qc)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // FinalizedBlock provides a mock function with given fields:
 func (_m *Forks) FinalizedBlock() *model.Block {
 	ret := _m.Called()
@@ -110,52 +96,6 @@ func (_m *Forks) GetBlocksForView(view uint64) []*model.Block {
 	}
 
 	return r0
-}
-
-// IsSafeBlock provides a mock function with given fields: block
-func (_m *Forks) IsSafeBlock(block *model.Block) bool {
-	ret := _m.Called(block)
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func(*model.Block) bool); ok {
-		r0 = rf(block)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	return r0
-}
-
-// MakeForkChoice provides a mock function with given fields: curView
-func (_m *Forks) MakeForkChoice(curView uint64) (*flow.QuorumCertificate, *model.Block, error) {
-	ret := _m.Called(curView)
-
-	var r0 *flow.QuorumCertificate
-	if rf, ok := ret.Get(0).(func(uint64) *flow.QuorumCertificate); ok {
-		r0 = rf(curView)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.QuorumCertificate)
-		}
-	}
-
-	var r1 *model.Block
-	if rf, ok := ret.Get(1).(func(uint64) *model.Block); ok {
-		r1 = rf(curView)
-	} else {
-		if ret.Get(1) != nil {
-			r1 = ret.Get(1).(*model.Block)
-		}
-	}
-
-	var r2 error
-	if rf, ok := ret.Get(2).(func(uint64) error); ok {
-		r2 = rf(curView)
-	} else {
-		r2 = ret.Error(2)
-	}
-
-	return r0, r1, r2
 }
 
 type NewForksT interface {
