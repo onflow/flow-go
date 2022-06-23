@@ -90,9 +90,11 @@ const (
 
 	EXEComputeBlock            SpanName = "exe.computer.computeBlock"
 	EXEComputeCollection       SpanName = "exe.computer.computeCollection"
+	EXEMergeCollectionView     SpanName = "exe.computer.mergeCollectionView"
 	EXEComputeSystemCollection SpanName = "exe.computer.computeSystemCollection"
 	EXEComputeTransaction      SpanName = "exe.computer.computeTransaction"
 	EXERunTransaction          SpanName = "exe.computer.runTransaction"
+	EXEPostProcessTransaction  SpanName = "exe.computer.postProcessTransaction"
 	EXEMergeTransactionView    SpanName = "exe.computer.mergeTransactionView"
 
 	EXEStateSaveExecutionResults          SpanName = "exe.state.saveExecutionResults"

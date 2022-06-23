@@ -196,7 +196,7 @@ func (e *blockComputer) executeBlock(
 		}
 		bc.Commit(colView)
 		eh.Hash(res.Events[i])
-		err = stateView.MergeView(colView)
+		err = e.mergeView(stateView, colView, blockSpan, trace.EXEMergeCollectionView)
 		if err != nil {
 			return nil, fmt.Errorf("cannot merge view: %w", err)
 		}
@@ -212,7 +212,7 @@ func (e *blockComputer) executeBlock(
 	}
 	bc.Commit(colView)
 	eh.Hash(res.Events[len(res.Events)-1])
-	err = stateView.MergeView(colView)
+	err = e.mergeView(stateView, colView, blockSpan, trace.EXEMergeCollectionView)
 	if err != nil {
 		return nil, fmt.Errorf("cannot merge view: %w", err)
 	}
@@ -390,12 +390,13 @@ func (e *blockComputer) executeTransaction(
 		txResult.ErrorMessage = tx.Err.Error()
 	}
 
-	mergeSpan := e.tracer.StartSpanFromParent(txSpan, trace.EXEMergeTransactionView)
-	defer mergeSpan.Finish()
+	postProcessSpan := e.tracer.StartSpanFromParent(txSpan, trace.EXEPostProcessTransaction)
+	defer postProcessSpan.Finish()
 
 	// always merge the view, fvm take cares of reverting changes
 	// of failed transaction invocation
-	err = collectionView.MergeView(txView)
+
+	err = e.mergeView(collectionView, txView, postProcessSpan, trace.EXEMergeTransactionView)
 	if err != nil {
 		return fmt.Errorf("merging tx view to collection view failed for tx %v: %w",
 			txID.String(), err)
@@ -409,16 +410,14 @@ func (e *blockComputer) executeTransaction(
 	runtime.ReadMemStats(&m)
 	memAllocAfter := m.TotalAlloc
 
-	evt := e.log.With().
+	lg := e.log.With().
 		Hex("tx_id", txResult.TransactionID[:]).
 		Str("block_id", res.ExecutableBlock.ID().String()).
 		Str("traceID", traceID).
 		Uint64("computation_used", txResult.ComputationUsed).
 		Uint64("memory_used", tx.MemoryUsed).
 		Uint64("memAlloc", memAllocAfter-memAllocBefore).
-		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds())
-
-	lg := evt.
+		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Logger()
 
 	if tx.Err != nil {
@@ -439,6 +438,17 @@ func (e *blockComputer) executeTransaction(
 		tx.Err != nil,
 	)
 	return nil
+}
+
+func (e *blockComputer) mergeView(
+	parent, child state.View,
+	parentSpan opentracing.Span,
+	mergeSpanName trace.SpanName) error {
+
+	mergeSpan := e.tracer.StartSpanFromParent(parentSpan, mergeSpanName)
+	defer mergeSpan.Finish()
+
+	return parent.MergeView(child)
 }
 
 type blockCommitter struct {
