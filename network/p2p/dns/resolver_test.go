@@ -60,9 +60,7 @@ func TestResolver_HappyPath(t *testing.T) {
 }
 
 // TestResolver_CacheExpiry evaluates that cached dns entries get expired and underlying resolver gets called after their time-to-live is passed.
-// Test is currently setting timeout @ln 83 to 5s and sleep at ln 103 to 6.  Originally 1 and 2.
 func TestResolver_CacheExpiry(t *testing.T) {
-	// unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky test")
 	basicResolver := mocknetwork.BasicResolver{}
 
 	dnsCache := herocache.NewDNSCache(
@@ -85,22 +83,21 @@ func TestResolver_CacheExpiry(t *testing.T) {
 	resolver.Start(ctx)
 	unittest.RequireCloseBefore(t, resolver.Ready(), 100*time.Millisecond, "could not start dns resolver on time")
 
-	// potentially consider reducing the test case count to reduce complexity
 	size := 10 // we have 10 txt and 10 ip lookup test cases
 	times := 5 // each domain is queried for resolution 5 times
-	// txtTestCases := testnetwork.TxtLookupFixture(size)
+	txtTestCases := testnetwork.TxtLookupFixture(size)
 	ipTestCase := testnetwork.IpLookupFixture(size)
 
 	// each domain gets resolved through underlying resolver twice: once initially, and once after expiry.
-	resolverWG := mockBasicResolverForDomains(t, &basicResolver, ipTestCase, nil, happyPath, 2)
+	resolverWG := mockBasicResolverForDomains(t, &basicResolver, ipTestCase, txtTestCases, happyPath, 2)
 
 	// queries 20 cases * 5 = 100 queries.
-	queryWG := syncThenAsyncQuery(t, times, resolver, nil, ipTestCase, happyPath)
+	queryWG := syncThenAsyncQuery(t, times, resolver, txtTestCases, ipTestCase, happyPath)
 	unittest.RequireReturnsBefore(t, queryWG.Wait, 1*time.Second, "could not perform all queries on time")
 
 	time.Sleep(2 * time.Second) // waits enough for cache to get invalidated
 
-	queryWG = syncThenAsyncQuery(t, times, resolver, nil, ipTestCase, happyPath)
+	queryWG = syncThenAsyncQuery(t, times, resolver, txtTestCases, ipTestCase, happyPath)
 
 	unittest.RequireReturnsBefore(t, resolverWG.Wait, 3*time.Second, "could not resolve all expected domains")
 	unittest.RequireReturnsBefore(t, queryWG.Wait, 1*time.Second, "could not perform all queries on time")
@@ -215,7 +212,6 @@ func syncThenAsyncQuery(t *testing.T,
 
 	ctx := context.Background()
 	wg := &sync.WaitGroup{}
-	// log.Printf("Number times queried %d", times*(len(txtTestCases)+len(ipTestCases)))
 	wg.Add(times * (len(txtTestCases) + len(ipTestCases)))
 
 	for _, txttc := range txtTestCases {
@@ -268,7 +264,6 @@ func cacheAndQuery(t *testing.T,
 				close(firstCallDone) // now lets other invocations go
 			}
 
-			// log.Printf("Index %d Domain %s", index, domain)
 			wg.Done()
 
 		}(i)
