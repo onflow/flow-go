@@ -29,7 +29,9 @@ import (
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/model/verification"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/entity"
+	"github.com/onflow/flow-go/module/updatable_configs"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/dsl"
@@ -2086,4 +2088,20 @@ func AllowAllPeerFilter() func(peer.ID) bool {
 	return func(_ peer.ID) bool {
 		return true
 	}
+
+func NewSealingConfigs(val uint) module.SealingConfigsSetter {
+	instance, err := updatable_configs.NewSealingConfigs(
+		flow.DefaultRequiredApprovalsForSealConstruction,
+		flow.DefaultRequiredApprovalsForSealValidation,
+		flow.DefaultChunkAssignmentAlpha,
+		flow.DefaultEmergencySealingActive,
+	)
+	if err != nil {
+		panic(err)
+	}
+	_, err = instance.SetRequiredApprovalsForSealingConstruction(val)
+	if err != nil {
+		panic(err)
+	}
+	return instance
 }

@@ -26,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/state_synchronization"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -61,6 +62,7 @@ const MaxScriptErrorMessageSize = 1000 // 1000 chars
 // Manager manages computation and execution
 type Manager struct {
 	log                      zerolog.Logger
+	tracer                   module.Tracer
 	metrics                  module.ExecutionMetrics
 	me                       module.Local
 	protoState               protocol.State
@@ -113,6 +115,7 @@ func New(
 
 	e := Manager{
 		log:                      log,
+		tracer:                   tracer,
 		metrics:                  metrics,
 		me:                       me,
 		protoState:               protoState,
@@ -178,13 +181,13 @@ func (e *Manager) ExecuteScript(
 
 			prepareLog := func() *zerolog.Event {
 
-				args := make([]string, 0)
+				args := make([]string, 0, len(arguments))
 				for _, a := range arguments {
 					args = append(args, hex.EncodeToString(a))
 				}
 				return e.log.Error().
 					Hex("script_hex", code).
-					Str("args", strings.Join(args[:], ","))
+					Str("args", strings.Join(args, ","))
 			}
 
 			elapsed := time.Since(start)
@@ -280,6 +283,9 @@ func (e *Manager) ComputeBlock(
 	var blobTree [][]cid.Cid
 
 	group.Go(func() error {
+		span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXEAddToExecutionDataService)
+		defer span.Finish()
+
 		var collections []*flow.Collection
 		for _, collection := range result.ExecutableBlock.Collections() {
 			collections = append(collections, &flow.Collection{
@@ -305,6 +311,9 @@ func (e *Manager) ComputeBlock(
 			uploader := uploader
 
 			group.Go(func() error {
+				span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXEUploadCollections)
+				defer span.Finish()
+
 				return uploader.Upload(result)
 			})
 		}
