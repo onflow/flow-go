@@ -2,6 +2,7 @@ package attacknetwork
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
@@ -18,6 +19,7 @@ import (
 type AttackNetwork struct {
 	component.Component
 	cm                   *component.ComponentManager
+	orchestratorMutex    sync.Mutex // to ensure thread-safe calls into orchestrator.
 	logger               zerolog.Logger
 	orchestrator         insecure.AttackOrchestrator // the mounted orchestrator that implements certain attack logic.
 	codec                network.Codec
@@ -128,6 +130,10 @@ func (a *AttackNetwork) processMessageFromCorruptedNode(message *insecure.Messag
 	if err != nil {
 		return fmt.Errorf("could not convert target ids to flow identifiers: %w", err)
 	}
+
+	// making sure events are sequentialized to orchestrator.
+	a.orchestratorMutex.Lock()
+	defer a.orchestratorMutex.Unlock()
 
 	err = a.orchestrator.HandleEventFromCorruptedNode(&insecure.Event{
 		CorruptedNodeId:   sender,
