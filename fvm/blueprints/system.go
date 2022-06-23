@@ -1,6 +1,7 @@
 package blueprints
 
 import (
+	_ "embed"
 	"fmt"
 
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -11,17 +12,8 @@ const SystemChunkTransactionGasLimit = 100_000_000
 
 // TODO (Ramtin) after changes to this method are merged into master move them here.
 
-const systemChunkTransactionTemplate = `
-import FlowEpoch from 0x%s
-
-transaction {
-  prepare(serviceAccount: AuthAccount) { 
-	let heartbeat = serviceAccount.borrow<&FlowEpoch.Heartbeat>(from: FlowEpoch.heartbeatStoragePath)
-      ?? panic("Could not borrow heartbeat from storage path")
-    heartbeat.advanceBlock()
-  }
-} 
-`
+//go:embed scripts/systemChunkTransactionTemplate.cdc
+var systemChunkTransactionTemplate string
 
 // SystemChunkTransaction creates and returns the transaction corresponding to the system chunk
 // for the given chain.

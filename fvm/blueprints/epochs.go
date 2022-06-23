@@ -1,6 +1,7 @@
 package blueprints
 
 import (
+	_ "embed"
 	"encoding/hex"
 	"fmt"
 
@@ -17,111 +18,20 @@ import (
 	"github.com/onflow/flow-go/module/epochs"
 )
 
-const deployIDTableStakingTransactionTemplate = `
-transaction {
-  prepare(serviceAccount: AuthAccount) {
-	serviceAccount.contracts.add(name: "FlowIDTableStaking", code: "%s".decodeHex(), epochTokenPayout: UFix64(%d), rewardCut: UFix64(%d))
-  }
-}
-`
+//go:embed scripts/deployIDTableStakingTransactionTemplate.cdc
+var deployIDTableStakingTransactionTemplate string
 
-const deployEpochTransactionTemplate = `
-import FlowClusterQC from 0x%s
+//go:embed scripts/deployEpochTransactionTemplate.cdc
+var deployEpochTransactionTemplate string
 
-transaction(clusterWeights: [{String: UInt64}]) {
-  prepare(serviceAccount: AuthAccount)	{
+//go:embed scripts/setupAccountTemplate.cdc
+var setupAccountTemplate string
 
-    // first, construct Cluster objects from cluster weights
-    let clusters: [FlowClusterQC.Cluster] = []
-    var clusterIndex: UInt16 = 0
-    for weightMapping in clusterWeights {
-      let cluster = FlowClusterQC.Cluster(index: clusterIndex, nodeWeights: weightMapping)
-      clusterIndex = clusterIndex + 1
-    }
+//go:embed scripts/fundAccountTemplate.cdc
+var fundAccountTemplate string
 
-	serviceAccount.contracts.add(
-		name: "FlowEpoch",
-		code: "%s".decodeHex(),
-		currentEpochCounter: UInt64(%d),
-		numViewsInEpoch: UInt64(%d),
-		numViewsInStakingAuction: UInt64(%d),
-		numViewsInDKGPhase: UInt64(%d),
-		numCollectorClusters: UInt16(%d),
-		FLOWsupplyIncreasePercentage: UFix64(%d),
-		randomSource: %s,
-		collectorClusters: clusters,
-        // NOTE: clusterQCs and dkgPubKeys are empty because these initial values are not used
-		clusterQCs: [] as [FlowClusterQC.ClusterQC],
-		dkgPubKeys: [] as [String],
-	)
-  }
-}
-`
-
-const setupAccountTemplate = `
-// This transaction is a template for a transaction
-// to add a Vault resource to their account
-// so that they can use the flowToken
-
-import FungibleToken from 0x%s
-import FlowToken from 0x%s
-
-transaction {
-
-    prepare(signer: AuthAccount) {
-
-        if signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault) == nil {
-            // Create a new flowToken Vault and put it in storage
-            signer.save(<-FlowToken.createEmptyVault(), to: /storage/flowTokenVault)
-
-            // Create a public capability to the Vault that only exposes
-            // the deposit function through the Receiver interface
-            signer.link<&FlowToken.Vault{FungibleToken.Receiver}>(
-                /public/flowTokenReceiver,
-                target: /storage/flowTokenVault
-            )
-
-            // Create a public capability to the Vault that only exposes
-            // the balance field through the Balance interface
-            signer.link<&FlowToken.Vault{FungibleToken.Balance}>(
-                /public/flowTokenBalance,
-                target: /storage/flowTokenVault
-            )
-        }
-    }
-}
-`
-
-const fundAccountTemplate = `
-import FungibleToken from 0x%s
-import FlowToken from 0x%s
-
-transaction(amount: UFix64, recipient: Address) {
-	let sentVault: @FungibleToken.Vault
-	prepare(signer: AuthAccount) {
-	let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
-		?? panic("failed to borrow reference to sender vault")
-	self.sentVault <- vaultRef.withdraw(amount: amount)
-	}
-	execute {
-	let receiverRef =  getAccount(recipient)
-		.getCapability(/public/flowTokenReceiver)
-		.borrow<&{FungibleToken.Receiver}>()
-		?? panic("failed to borrow reference to recipient vault")
-	receiverRef.deposit(from: <-self.sentVault)
-	}
-}
-`
-
-const deployLockedTokensTemplate = `
-transaction(publicKeys: [[UInt8]]) {
-    
-    prepare(admin: AuthAccount) {
-        admin.contracts.add(name: "LockedTokens", code: "%s".decodeHex(), admin)
-
-    }
-}
-`
+//go:embed scripts/deployLockedTokensTemplate.cdc
+var deployLockedTokensTemplate string
 
 // DeployEpochTransaction returns the transaction body for the deploy epoch transaction
 func DeployEpochTransaction(service flow.Address, contract []byte, epochConfig epochs.EpochConfig) *flow.TransactionBody {
