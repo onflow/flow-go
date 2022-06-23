@@ -3,6 +3,7 @@ package computer
 import (
 	"context"
 	"fmt"
+	"math"
 	"runtime"
 	"sync"
 	"time"
@@ -64,6 +65,8 @@ func SystemChunkContext(vmCtx fvm.Context, logger zerolog.Logger) fvm.Context {
 		fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(logger)),
 		fvm.WithMaxStateInteractionSize(SystemChunkLedgerIntractionLimit),
 		fvm.WithEventCollectionSizeLimit(SystemChunkEventCollectionMaxSize),
+		fvm.WithAllowContextOverrideByExecutionState(false), // disable reading the memory limit (and computation/memory weights) from the state
+		fvm.WithMemoryLimit(math.MaxUint64),                 // and set the memory limit to the maximum
 	)
 }
 
