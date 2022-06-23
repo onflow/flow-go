@@ -95,7 +95,7 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "could not receive message on time")
 
-	// expecting 1 warn calls for each rejected message from ejected node
+	// expecting 1 warn calls for each rejected message from unauthenticated node
 	require.Equalf(t, uint64(1), hookCalls, "expected 1 warning to be logged")
 }
 
