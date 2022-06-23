@@ -644,7 +644,7 @@ func (suite *ExecutionDataRequesterSuite) generateTestData(blockCount int, speci
 
 	// instantiate ExecutionDataService to generate correct CIDs
 	eds := state_synchronization.NewExecutionDataService(
-		new(cbor.Codec),
+		cbor.NewCodec(),
 		compressor.NewLz4Compressor(),
 		suite.blobservice,
 		metrics.NewNoopCollector(),

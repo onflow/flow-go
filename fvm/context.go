@@ -26,9 +26,10 @@ type Context struct {
 	MaxNumOfTxRetries            uint8
 	BlockHeader                  *flow.Header
 	ServiceAccountEnabled        bool
-	// Depricated: RestrictedDeploymentEnabled is deprecated use SetIsContractDeploymentRestrictedTransaction instead.
+	// Depricated: RestrictContractDeployment is deprecated use SetIsContractDeploymentRestrictedTransaction instead.
 	// Can be removed after all networks are migrated to SetIsContractDeploymentRestrictedTransaction
-	RestrictedDeploymentEnabled   bool
+	RestrictContractDeployment    bool
+	RestrictContractRemoval       bool
 	LimitAccountStorage           bool
 	TransactionFeesEnabled        bool
 	CadenceLoggingEnabled         bool
@@ -83,7 +84,8 @@ func defaultContext(logger zerolog.Logger) Context {
 		MaxNumOfTxRetries:             DefaultMaxNumOfTxRetries,
 		BlockHeader:                   nil,
 		ServiceAccountEnabled:         true,
-		RestrictedDeploymentEnabled:   true,
+		RestrictContractDeployment:    true,
+		RestrictContractRemoval:       true,
 		CadenceLoggingEnabled:         false,
 		EventCollectionEnabled:        true,
 		ServiceEventCollectionEnabled: false,
@@ -257,11 +259,29 @@ func WithServiceAccount(enabled bool) Option {
 	}
 }
 
-// WithRestrictedDeployment enables or disables restricted contract deployment for a
-// virtual machine context.
-func WithRestrictedDeployment(enabled bool) Option {
+// WithRestrictContractRemoval enables or disables restricted contract removal for a
+// virtual machine context. Warning! this would be overridden with the flag stored on chain.
+// this is just a fallback value
+func WithContractRemovalRestricted(enabled bool) Option {
 	return func(ctx Context) Context {
-		ctx.RestrictedDeploymentEnabled = enabled
+		ctx.RestrictContractRemoval = enabled
+		return ctx
+	}
+}
+
+// @Depricated please use WithContractDeploymentRestricted instead of this
+// this has been kept to reduce breaking change on the emulator, but would be
+// removed at some point.
+func WithRestrictedDeployment(restricted bool) Option {
+	return WithContractDeploymentRestricted(restricted)
+}
+
+// WithRestrictedContractDeployment enables or disables restricted contract deployment for a
+// virtual machine context. Warning! this would be overridden with the flag stored on chain.
+// this is just a fallback value
+func WithContractDeploymentRestricted(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.RestrictContractDeployment = enabled
 		return ctx
 	}
 }
