@@ -223,7 +223,7 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *
 	l.metrics.UpdateDuration(elapsed)
 
 	if len(trieUpdate.Paths) > 0 {
-		durationPerValue := time.Duration(elapsed.Nanoseconds()/int64(len(trieUpdate.Paths))) * time.Nanosecond
+		durationPerValue := time.Duration(elapsed.Nanoseconds() / int64(len(trieUpdate.Paths)))
 		l.metrics.UpdateDurationPerItem(durationPerValue)
 	}
 
@@ -286,8 +286,8 @@ func (l *Ledger) Checkpointer() (*wal.Checkpointer, error) {
 func (l *Ledger) ExportCheckpointAt(
 	state ledger.State,
 	migrations []ledger.Migration,
-	reporters map[string]ledger.Reporter,
-	extractionReportName string,
+	preCheckpointReporters []ledger.Reporter,
+	postCheckpointReporters []ledger.Reporter,
 	targetPathFinderVersion uint8,
 	outputDir, outputFile string,
 ) (ledger.State, error) {
@@ -375,17 +375,19 @@ func (l *Ledger) ExportCheckpointAt(
 
 	l.logger.Info().Msgf("successfully built new trie. NEW ROOT STATECOMMIEMENT: %v", statecommitment.String())
 
-	// If defined, run extraction report BEFORE writing checkpoint file
-	// This is used to optmize the spork process
-	if extractionReport, ok := reporters[extractionReportName]; ok {
-		err := runReport(extractionReport, payloads, statecommitment, l.logger)
+	l.logger.Info().Msgf("running pre-checkpoint reporters")
+	// run post migration reporters
+	for i, reporter := range preCheckpointReporters {
+		l.logger.Info().Msgf("running a pre-checkpoint generation reporter: %s, (%v/%v)", reporter.Name(), i, len(preCheckpointReporters))
+		err := runReport(reporter, payloads, statecommitment, l.logger)
 		if err != nil {
 			return ledger.State(hash.DummyHash), err
 		}
 	}
 
-	l.logger.Info().Msg("creating a checkpoint for the new trie")
+	l.logger.Info().Msgf("finished running pre-checkpoint reporters")
 
+	l.logger.Info().Msg("creating a checkpoint for the new trie")
 	writer, err := wal.CreateCheckpointWriterForFile(outputDir, outputFile, &l.logger)
 	if err != nil {
 		return ledger.State(hash.DummyHash), fmt.Errorf("failed to create a checkpoint writer: %w", err)
@@ -409,17 +411,18 @@ func (l *Ledger) ExportCheckpointAt(
 
 	l.logger.Info().Msgf("checkpoint file successfully stored at: %v %v", outputDir, outputFile)
 
-	l.logger.Info().Msgf("generating reports")
+	l.logger.Info().Msgf("finished running post-checkpoint reporters")
 
-	// run reporters
-	for _, reporter := range reporters {
+	// running post checkpoint reporters
+	for i, reporter := range postCheckpointReporters {
+		l.logger.Info().Msgf("running a post-checkpoint generation reporter: %s, (%v/%v)", reporter.Name(), i, len(postCheckpointReporters))
 		err := runReport(reporter, payloads, statecommitment, l.logger)
 		if err != nil {
 			return ledger.State(hash.DummyHash), err
 		}
 	}
 
-	l.logger.Info().Msgf("all reports genereated")
+	l.logger.Info().Msgf("ran all post-checkpoint reporters")
 
 	return statecommitment, nil
 }

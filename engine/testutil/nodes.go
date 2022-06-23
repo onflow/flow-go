@@ -379,12 +379,10 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	receiptRequester, err := requester.New(node.Log, node.Metrics, node.Net, node.Me, node.State, network.RequestReceiptsByBlockID, filter.Any, func() flow.Entity { return &flow.ExecutionReceipt{} })
 	require.Nil(t, err)
 
-	assigner, err := chunks.NewChunkAssigner(chunks.DefaultChunkAssignmentAlpha, node.State)
+	assigner, err := chunks.NewChunkAssigner(flow.DefaultChunkAssignmentAlpha, node.State)
 	require.Nil(t, err)
 
 	receiptValidator := validation.NewReceiptValidator(node.State, node.Headers, node.Index, resultsDB, node.Seals)
-
-	sealingConfig := sealing.DefaultConfig()
 
 	sealingEngine, err := sealing.NewEngine(
 		node.Log,
@@ -403,7 +401,8 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Seals,
 		assigner,
 		seals,
-		sealingConfig)
+		unittest.NewSealingConfigs(flow.DefaultRequiredApprovalsForSealConstruction),
+	)
 	require.NoError(t, err)
 
 	matchingConfig := matching.DefaultConfig()
