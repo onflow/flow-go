@@ -17,7 +17,6 @@ import (
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/engine/access/rpc"
@@ -115,7 +114,7 @@ func (builder *StakedAccessNodeBuilder) enqueueRelayNetwork() {
 			node.Network,
 			builder.AccessNodeConfig.PublicNetworkConfig.Network,
 			node.Logger,
-			[]network.Channel{engine.ReceiveBlocks},
+			[]network.Channel{network.ReceiveBlocks},
 		)
 		node.Network = relayNet
 		return relayNet, nil
@@ -247,7 +246,7 @@ func (builder *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Network,
 				node.Me,
 				node.State,
-				engine.RequestCollections,
+				network.RequestCollections,
 				filter.HasRole(flow.RoleCollection),
 				func() flow.Entity { return &flow.Collection{} },
 			)
@@ -394,7 +393,14 @@ func (builder *StakedAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Priv
 			).
 			SetConnectionManager(connManager).
 			SetRoutingSystem(func(ctx context.Context, h host.Host) (routing.Routing, error) {
-				return p2p.NewDHT(ctx, h, unicast.FlowPublicDHTProtocolID(builder.SporkID), p2p.AsServer())
+				return p2p.NewDHT(
+					ctx,
+					h,
+					unicast.FlowPublicDHTProtocolID(builder.SporkID),
+					builder.Logger,
+					builder.PublicNetworkConfig.Metrics,
+					p2p.AsServer(),
+				)
 			}).
 			SetPubSub(pubsub.NewGossipSub).
 			Build(ctx)
@@ -427,6 +433,7 @@ func (builder *StakedAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 		builder.SporkID,
 		p2p.DefaultUnicastTimeout,
 		builder.IDTranslator,
+		builder.CodecFactory(),
 		p2p.WithMessageValidators(validators...),
 		p2p.WithPeerManager(peerManagerFactory),
 		// use default identifier provider

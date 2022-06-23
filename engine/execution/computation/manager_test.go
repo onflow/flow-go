@@ -131,6 +131,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 		programsCache: programsCache,
 		eds:           eds,
 		edCache:       eCache,
+		tracer:        trace.NewNoopTracer(),
 	}
 
 	view := delta.NewView(ledger.Get)
@@ -182,6 +183,7 @@ func TestComputeBlock_Uploader(t *testing.T) {
 		uploaders:     []uploader.Uploader{fakeUploader},
 		eds:           eds,
 		edCache:       eCache,
+		tracer:        trace.NewNoopTracer(),
 	}
 
 	view := delta.NewView(state2.LedgerGetRegister(ledger, flow.StateCommitment(ledger.InitialState())))
@@ -229,7 +231,7 @@ func TestExecuteScript(t *testing.T) {
 
 	engine, err := New(logger,
 		metrics.NewNoopCollector(),
-		nil,
+		trace.NewNoopTracer(),
 		me,
 		nil,
 		vm,
@@ -264,7 +266,7 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 
 	manager, err := New(log,
 		metrics.NewNoopCollector(),
-		nil,
+		trace.NewNoopTracer(),
 		nil,
 		nil,
 		vm,
@@ -301,7 +303,7 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 
 	manager, err := New(log,
 		metrics.NewNoopCollector(),
-		nil,
+		trace.NewNoopTracer(),
 		nil,
 		nil,
 		vm,
@@ -338,7 +340,7 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 
 	manager, err := New(log,
 		metrics.NewNoopCollector(),
-		nil,
+		trace.NewNoopTracer(),
 		nil,
 		nil,
 		vm,
@@ -419,7 +421,7 @@ func TestExecuteScriptTimeout(t *testing.T) {
 	manager, err := New(
 		zerolog.Nop(),
 		metrics.NewNoopCollector(),
-		nil,
+		trace.NewNoopTracer(),
 		nil,
 		nil,
 		fvm.NewVirtualMachine(fvm.NewInterpreterRuntime()),
@@ -458,7 +460,7 @@ func TestExecuteScriptCancelled(t *testing.T) {
 	manager, err := New(
 		zerolog.Nop(),
 		metrics.NewNoopCollector(),
-		nil,
+		trace.NewNoopTracer(),
 		nil,
 		nil,
 		fvm.NewVirtualMachine(fvm.NewInterpreterRuntime()),
@@ -509,7 +511,7 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 	manager, _ := New(
 		zerolog.Nop(),
 		metrics.NewExecutionCollector(ctx.Tracer),
-		nil,
+		trace.NewNoopTracer(),
 		nil,
 		nil,
 		vm,

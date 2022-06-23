@@ -294,6 +294,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		fnb.SporkID,
 		fnb.BaseConfig.UnicastMessageTimeout,
 		fnb.IDTranslator,
+		fnb.CodecFactory(),
 		mwOpts...,
 	)
 
@@ -858,7 +859,7 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 	}
 	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Canary || fnb.RootChainID == flow.Localnet || fnb.RootChainID == flow.Benchnet {
 		vmOpts = append(vmOpts,
-			fvm.WithRestrictedDeployment(false),
+			fvm.WithContractDeploymentRestricted(false),
 		)
 	}
 	fnb.FvmOptions = vmOpts

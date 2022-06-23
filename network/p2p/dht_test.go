@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	libp2pmsg "github.com/onflow/flow-go/model/libp2p/message"
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
@@ -134,8 +135,11 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 	// hence expect count and not count - 1 messages to be received (one by each node, including the sender)
 	ch := make(chan peer.ID, count)
 
+	codec := unittest.NetworkCodec()
+
+	payload, _ := codec.Encode(&libp2pmsg.TestMessage{})
 	msg := &message.Message{
-		Payload: []byte("hello"),
+		Payload: payload,
 	}
 
 	data, err := msg.Marshal()
@@ -152,7 +156,7 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 		}
 
 		// Subscribes to the test topic
-		s, err := n.Subscribe(topic)
+		s, err := n.Subscribe(topic, codec)
 		require.NoError(t, err)
 
 		// kick off the reader

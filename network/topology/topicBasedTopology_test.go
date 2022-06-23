@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -59,12 +59,12 @@ func (suite *TopicAwareTopologyTestSuite) TestTopologySize_Topic() {
 		top, err := NewTopicBasedTopology(suite.all[0].NodeID, suite.logger, suite.state)
 		require.NoError(suite.T(), err)
 
-		topics := engine.ChannelsByRole(suite.all[0].Role)
+		topics := network.ChannelsByRole(suite.all[0].Role)
 		require.Greater(suite.T(), len(topics), 1)
 
 		for _, topic := range topics {
 			// extracts total number of nodes subscribed to topic
-			roles, ok := engine.RolesByChannel(topic)
+			roles, ok := network.RolesByChannel(topic)
 			require.True(suite.T(), ok)
 
 			ids, err := top.subsetChannel(suite.all, nil, topic)
@@ -86,7 +86,7 @@ func (suite *TopicAwareTopologyTestSuite) TestDeteministicity() {
 	top, err := NewTopicBasedTopology(suite.all[0].NodeID, suite.logger, suite.state)
 	require.NoError(suite.T(), err)
 
-	topics := engine.ChannelsByRole(suite.all[0].Role)
+	topics := network.ChannelsByRole(suite.all[0].Role)
 	require.Greater(suite.T(), len(topics), 1)
 
 	// for each topic samples 100 topologies
@@ -135,7 +135,7 @@ func (suite *TopicAwareTopologyTestSuite) TestUniqueness() {
 
 	// for each topic samples 100 topologies
 	// all topologies for a topic should be the same
-	topics := engine.ChannelsByRole(flow.RoleConsensus)
+	topics := network.ChannelsByRole(flow.RoleConsensus)
 	require.Greater(suite.T(), len(topics), 1)
 
 	for _, identity := range suite.all {
@@ -173,7 +173,7 @@ func (suite *TopicAwareTopologyTestSuite) TestUniqueness() {
 // TestConnectedness_NonClusterTopics checks whether graph components corresponding to a
 // non-cluster channel are individually connected.
 func (suite *TopicAwareTopologyTestSuite) TestConnectedness_NonClusterChannel() {
-	channel := engine.TestNetwork
+	channel := network.TestNetworkChannel
 	// adjacency map keeps graph component of a single channel
 	channelAdjMap := make(map[flow.Identifier]flow.IdentityList)
 
@@ -196,7 +196,7 @@ func (suite *TopicAwareTopologyTestSuite) TestConnectedness_NonClusterChannel() 
 // cluster channel are individually connected.
 func (suite *TopicAwareTopologyTestSuite) TestConnectedness_ClusterChannel() {
 	// picks one cluster channel as sample
-	channel := engine.ChannelSyncCluster(flow.Emulator)
+	channel := network.ChannelSyncCluster(flow.Emulator)
 
 	// adjacency map keeps graph component of a single channel
 	channelAdjMap := make(map[flow.Identifier]flow.IdentityList)

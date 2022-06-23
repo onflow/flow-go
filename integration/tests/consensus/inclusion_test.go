@@ -6,18 +6,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
-
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 )
 
 func TestCollectionGuaranteeInclusion(t *testing.T) {
@@ -178,7 +177,7 @@ func (is *InclusionSuite) sendCollectionToConsensus(deadline time.Time, sentinel
 	for time.Now().Before(deadline) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		is.T().Logf("%s sending collection %x to consensus node %v\n", time.Now(), colID, conID)
-		err := is.Collection().Send(ctx, engine.PushGuarantees, sentinel, conID)
+		err := is.Collection().Send(ctx, network.PushGuarantees, sentinel, conID)
 		cancel()
 		if err != nil {
 			is.T().Logf("could not send collection guarantee: %s\n", err)

@@ -11,9 +11,8 @@ import (
 	modulecompliance "github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 
-	"github.com/onflow/flow-go-sdk/client"
+	client "github.com/onflow/flow-go-sdk/access/grpc"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
-
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -22,7 +21,6 @@ import (
 	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/collection/epochmgr"
 	"github.com/onflow/flow-go/engine/collection/epochmgr/factories"
 	"github.com/onflow/flow-go/engine/collection/ingest"
@@ -43,6 +41,7 @@ import (
 	epochpool "github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/synchronization"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
@@ -91,6 +90,8 @@ func main() {
 		flowClientConfigs  []*common.FlowClientConfig
 		insecureAccessAPI  bool
 		accessNodeIDS      []string
+		apiRatelimits      map[string]int
+		apiBurstlimits     map[string]int
 	)
 
 	nodeBuilder := cmd.FlowNode(flow.RoleCollection.String())
@@ -147,6 +148,8 @@ func main() {
 		// epoch qc contract flags
 		flags.BoolVar(&insecureAccessAPI, "insecure-access-api", false, "required if insecure GRPC connection should be used")
 		flags.StringSliceVar(&accessNodeIDS, "access-node-ids", []string{}, fmt.Sprintf("array of access node IDs sorted in priority order where the first ID in this array will get the first connection attempt and each subsequent ID after serves as a fallback. Minimum length %d. Use '*' for all IDs in protocol state.", common.DefaultAccessNodeIDSMinimum))
+		flags.StringToIntVar(&apiRatelimits, "api-rate-limits", map[string]int{}, "per second rate limits for GRPC API methods e.g. Ping=300,SendTransaction=500 etc. note limits apply globally to all clients.")
+		flags.StringToIntVar(&apiBurstlimits, "api-burst-limits", map[string]int{}, "burst limits for gRPC API methods e.g. Ping=100,SendTransaction=100 etc. note limits apply globally to all clients.")
 
 	}).ValidateFlags(func() error {
 		if startupTimeString != cmd.NotSet {
@@ -360,7 +363,14 @@ func main() {
 			return ing, err
 		}).
 		Component("transaction ingress rpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			server := rpc.New(rpcConf, ing, node.Logger, node.RootChainID)
+			server := rpc.New(
+				rpcConf,
+				ing,
+				node.Logger,
+				node.RootChainID,
+				apiRatelimits,
+				apiBurstlimits,
+			)
 			return server, nil
 		}).
 		Component("collection provider engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -369,7 +379,7 @@ func main() {
 				return coll, err
 			}
 			return provider.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
-				engine.ProvideCollections,
+				network.ProvideCollections,
 				filter.HasRole(flow.RoleAccess, flow.RoleExecution),
 				retrieve,
 			)

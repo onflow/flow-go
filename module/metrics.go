@@ -31,6 +31,7 @@ type ResolverMetrics interface {
 
 type NetworkMetrics interface {
 	ResolverMetrics
+	DHTMetrics
 
 	// NetworkMessageSent size in bytes and count of the network message sent
 	NetworkMessageSent(sizeBytes int, topic string, messageType string)
@@ -509,4 +510,9 @@ type ChainSyncMetrics interface {
 	RangeRequested(ran chainsync.Range)
 
 	BatchRequested(batch chainsync.Batch)
+}
+
+type DHTMetrics interface {
+	RoutingTablePeerAdded()
+	RoutingTablePeerRemoved()
 }
