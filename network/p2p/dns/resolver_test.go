@@ -3,7 +3,6 @@ package dns
 import (
 	"context"
 	"fmt"
-	"log"
 	"net"
 	"sync"
 	"testing"
@@ -78,7 +77,7 @@ func TestResolver_CacheExpiry(t *testing.T) {
 		metrics.NewNoopCollector(),
 		dnsCache,
 		WithBasicResolver(&basicResolver),
-		WithTTL(1*time.Second)) // cache timeout set to 1 seconds for this test
+		WithTTL(5*time.Second)) // cache timeout set to 1 seconds for this test
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -99,14 +98,14 @@ func TestResolver_CacheExpiry(t *testing.T) {
 	queryWG := syncThenAsyncQuery(t, times, resolver, nil, ipTestCase, happyPath)
 	unittest.RequireReturnsBefore(t, queryWG.Wait, 1*time.Second, "could not perform all queries on time")
 
-	time.Sleep(2000 * time.Millisecond) // waits enough for cache to get invalidated
-	log.Printf("--------------------------------------------------------------")
-	log.Printf("LOGLOGLOGLOGLOG SLEEP FOR 2 SECONDS")
-	log.Printf("--------------------------------------------------------------")
+	time.Sleep(8 * time.Second) // waits enough for cache to get invalidated
+	//log.Printf("--------------------------------------------------------------")
+	//log.Printf("LOGLOGLOGLOGLOG SLEEP FOR 2 SECONDS")
+	//log.Printf("--------------------------------------------------------------")
 	// Querying each test case 5 times, but we should set the times to query to 1 for just testing that the cache has expire and we will hit the resolver
 	queryWG = syncThenAsyncQuery(t, times, resolver, nil, ipTestCase, happyPath)
 
-	unittest.RequireReturnsBefore(t, resolverWG.Wait, 2*time.Second, "could not resolve all expected domains")
+	unittest.RequireReturnsBefore(t, resolverWG.Wait, 10*time.Second, "could not resolve all expected domains")
 	unittest.RequireReturnsBefore(t, queryWG.Wait, 1*time.Second, "could not perform all queries on time")
 
 	cancel()
@@ -219,7 +218,7 @@ func syncThenAsyncQuery(t *testing.T,
 
 	ctx := context.Background()
 	wg := &sync.WaitGroup{}
-	log.Printf("Number times queried %d", times*(len(txtTestCases)+len(ipTestCases)))
+	// log.Printf("Number times queried %d", times*(len(txtTestCases)+len(ipTestCases)))
 	wg.Add(times * (len(txtTestCases) + len(ipTestCases)))
 
 	for _, txttc := range txtTestCases {
@@ -247,13 +246,13 @@ func querySeq(t *testing.T,
 		for _, txt := range txtTestCases {
 			ctx := context.Background()
 			resolver.LookupTXT(ctx, txt.Txt)
-			log.Printf("%d times of %s", i, txt.Txt)
+			// log.Printf("%d times of %s", i, txt.Txt)
 		}
 
 		for _, ip := range ipTestCases {
 			ctx := context.Background()
 			resolver.LookupIPAddr(ctx, ip.Domain)
-			log.Printf("%d times of %s", i, ip.Domain)
+			// log.Printf("%d times of %s", i, ip.Domain)
 		}
 	}
 }
@@ -293,7 +292,7 @@ func cacheAndQuery(t *testing.T,
 				close(firstCallDone) // now lets other invocations go
 			}
 
-			log.Printf("Index %d Domain %s", index, domain)
+			// log.Printf("Index %d Domain %s", index, domain)
 			wg.Done()
 
 		}(i)
@@ -315,7 +314,7 @@ func mockBasicResolverForDomains(t *testing.T,
 	txtRequested := make(map[string]int)
 
 	wg := &sync.WaitGroup{}
-	log.Printf("Expected number of times %d", times*(len(ipLookupTestCases)+len(txtLookupTestCases)))
+	// log.Printf("Expected number of times %d", times*(len(ipLookupTestCases)+len(txtLookupTestCases)))
 	wg.Add(times * (len(ipLookupTestCases) + len(txtLookupTestCases)))
 	// wg.Add()
 

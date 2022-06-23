@@ -2,7 +2,6 @@ package dns
 
 import (
 	"context"
-	"log"
 	"net"
 	"sync"
 	"time"
@@ -15,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/util"
 )
 
 //go:linkname runtimeNano runtime.nanotime
@@ -112,10 +112,13 @@ func NewResolver(logger zerolog.Logger, collector module.ResolverMetrics, dnsCac
 func (r *Resolver) processIPAddrLookups(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
+	r.logger.Trace().Msg("processing ip worker started")
+
 	for {
 		select {
 		case req := <-r.ipRequests:
-			log.Printf("This request has been recorded, request: %s", req.domain)
+			lg := r.logger.With().Str("domain", req.domain).Logger()
+			lg.Trace().Msg("ip domain request picked for resolving")
 			_, err := r.lookupResolverForIPAddr(ctx, req.domain)
 			if err != nil {
 				// invalidates cached entry when hits error on resolving.
@@ -123,11 +126,12 @@ func (r *Resolver) processIPAddrLookups(ctx irrecoverable.SignalerContext, ready
 				if invalidated {
 					r.collector.OnDNSCacheInvalidated()
 				}
-				log.Printf("Looking up for %s, resulted in error: %s", req.domain, err)
+				lg.Error().Err(err).Msg("resolving ip address faced an error")
 			}
 			r.doneResolvingIP(req.domain)
-			log.Printf("Done resolving for query on domain %s", req.domain)
+			lg.Trace().Msg("ip domain resolved successfully")
 		case <-ctx.Done():
+			r.logger.Trace().Msg("processing ip worker terminated")
 			return
 		}
 	}
@@ -135,11 +139,13 @@ func (r *Resolver) processIPAddrLookups(ctx irrecoverable.SignalerContext, ready
 
 func (r *Resolver) processTxtLookups(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
+	r.logger.Trace().Msg("processing txt worker started")
 
 	for {
 		select {
 		case req := <-r.txtRequests:
-			log.Printf("This request has been recorded, request: %s", req.txt)
+			lg := r.logger.With().Str("domain", req.txt).Logger()
+			lg.Trace().Msg("txt domain picked for resolving")
 			_, err := r.lookupResolverForTXTRecord(ctx, req.txt)
 			if err != nil {
 				// invalidates cached entry when hits error on resolving.
@@ -147,11 +153,12 @@ func (r *Resolver) processTxtLookups(ctx irrecoverable.SignalerContext, ready co
 				if invalidated {
 					r.collector.OnDNSCacheInvalidated()
 				}
-				log.Printf("Looking up for %s, resulted in error: %s", req.txt, err)
+				lg.Error().Err(err).Msg("resolving txt domain faced an error")
 			}
 			r.doneResolvingTXT(req.txt)
-			log.Printf("Done resolving for query on domain %s", req.txt)
+			lg.Trace().Msg("txt domain resolved successfully")
 		case <-ctx.Done():
+			r.logger.Trace().Msg("processing txt worker terminated")
 			return
 		}
 	}
@@ -175,21 +182,24 @@ func (r *Resolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAdd
 func (r *Resolver) lookupIPAddr(ctx context.Context, domain string) ([]net.IPAddr, error) {
 	addr, exists, fresh := r.c.resolveIPCache(domain)
 
-	log.Printf("Cache Status domain: %s exists: %t fresh: %t", domain, exists, fresh)
+	lg := r.logger.With().
+		Str("domain", domain).
+		Bool("cache_hit", exists).
+		Bool("cache_fresh", fresh).Logger()
+
+	lg.Trace().Msg("ip lookup request arrived")
 
 	if !exists {
 		r.collector.OnDNSCacheMiss()
 		return r.lookupResolverForIPAddr(ctx, domain)
 	}
 
-	// log.Printf("LookupIP condition vars fresh: %t shouldResolveIP: %t CheckClosed: %t", !fresh, r.shouldResolveIP(domain), !util.CheckClosed(r.cm.ShutdownSignal()))
-	// if !fresh && r.shouldResolveIP(domain) && !util.CheckClosed(r.cm.ShutdownSignal()) {
-	if !fresh && r.shouldResolveIP(domain) {
+	if !fresh && r.shouldResolveIP(domain) && !util.CheckClosed(r.cm.ShutdownSignal()) {
 		select {
 		case r.ipRequests <- &lookupIPRequest{domain}:
-			log.Printf("Domain request added to queue for %s", domain)
+			lg.Trace().Msg("ip lookup request queued for resolving")
 		default:
-			r.logger.Warn().Str("domain", domain).Msg("IP lookup request queue is full, dropping request")
+			lg.Warn().Msg("ip lookup request queue is full, dropping request")
 			r.collector.OnDNSLookupRequestDropped()
 		}
 	}
@@ -206,7 +216,7 @@ func (r *Resolver) lookupResolverForIPAddr(ctx context.Context, domain string) (
 	}
 
 	r.c.updateIPCache(domain, addr) // updates cache
-
+	r.logger.Info().Str("ip_domain", domain).Msg("domain updated in cache")
 	return addr, nil
 }
 
@@ -228,20 +238,25 @@ func (r *Resolver) LookupTXT(ctx context.Context, txt string) ([]string, error) 
 // lookupIPAddr encapsulates the logic of resolving a txt through cache.
 func (r *Resolver) lookupTXT(ctx context.Context, txt string) ([]string, error) {
 	addr, exists, fresh := r.c.resolveTXTCache(txt)
-	log.Printf("Cache Status txt: %s exists: %t fresh: %t", txt, exists, fresh)
+
+	lg := r.logger.With().
+		Str("txt", txt).
+		Bool("cache_hit", exists).
+		Bool("cache_fresh", fresh).Logger()
+
+	lg.Trace().Msg("txt lookup request arrived")
 
 	if !exists {
 		r.collector.OnDNSCacheMiss()
 		return r.lookupResolverForTXTRecord(ctx, txt)
 	}
 
-	// log.Printf("LookupTXT condition vars fresh: %t shouldResolveTXT: %t CheckClosed: %t", !fresh, r.shouldResolveTXT(txt), !util.CheckClosed(r.cm.ShutdownSignal()))
-	// if !fresh && r.shouldResolveTXT(txt) && !util.CheckClosed(r.cm.ShutdownSignal()) {
-	if !fresh && r.shouldResolveTXT(txt) {
+	if !fresh && r.shouldResolveTXT(txt) && !util.CheckClosed(r.cm.ShutdownSignal()) {
 		select {
 		case r.txtRequests <- &lookupTXTRequest{txt}:
+			lg.Trace().Msg("ip lookup request queued for resolving")
 		default:
-			r.logger.Warn().Str("txt", txt).Msg("TXT lookup request queue is full, dropping request")
+			lg.Warn().Msg("txt lookup request queue is full, dropping request")
 			r.collector.OnDNSLookupRequestDropped()
 		}
 	}
@@ -258,7 +273,7 @@ func (r *Resolver) lookupResolverForTXTRecord(ctx context.Context, txt string) (
 	}
 
 	r.c.updateTXTCache(txt, addr) // updates cache
-
+	r.logger.Info().Str("txt_domain", txt).Msg("domain updated in cache")
 	return addr, nil
 }
 
@@ -269,7 +284,7 @@ func (r *Resolver) shouldResolveIP(domain string) bool {
 
 	if _, ok := r.processingIPs[domain]; !ok {
 		r.processingIPs[domain] = struct{}{}
-		log.Printf("Should resolve true %s", domain)
+		// log.Printf("Should resolve true %s", domain)
 		return true
 	}
 
@@ -299,7 +314,7 @@ func (r *Resolver) shouldResolveTXT(txt string) bool {
 
 	if _, ok := r.processingTXTs[txt]; !ok {
 		r.processingTXTs[txt] = struct{}{}
-		log.Printf("Should resolve true %s", txt)
+		r.logger.Trace().Str("txt", txt).Msg("resolving is in progress, extra request is dropped")
 		return true
 	}
 
