@@ -15,10 +15,13 @@ import (
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/extralog"
+	fvmmock "github.com/onflow/flow-go/fvm/mock"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/onflow/cadence/runtime"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
