@@ -153,13 +153,13 @@ func (b *backendAccounts) getAccountFromAnyExeNode(ctx context.Context, execNode
 }
 
 func (b *backendAccounts) tryGetAccount(ctx context.Context, execNode *flow.Identity, req execproto.GetAccountAtBlockIDRequest) (*execproto.GetAccountAtBlockIDResponse, error) {
-	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
+	execRPCClient, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
 		return nil, err
 	}
-	defer closer.Close()
 	resp, err := execRPCClient.GetAccountAtBlockID(ctx, &req)
 	if err != nil {
+		b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
 		return nil, err
 	}
 	return resp, nil

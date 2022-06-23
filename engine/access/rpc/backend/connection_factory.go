@@ -3,7 +3,6 @@ package backend
 import (
 	"context"
 	"fmt"
-	"io"
 	"net"
 	"time"
 
@@ -22,8 +21,10 @@ const defaultClientTimeout = 3 * time.Second
 
 // ConnectionFactory is used to create an access api client
 type ConnectionFactory interface {
-	GetAccessAPIClient(address string) (access.AccessAPIClient, io.Closer, error)
-	GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, io.Closer, error)
+	GetAccessAPIClient(address string) (access.AccessAPIClient, error)
+	InvalidateAccessAPIClient(address string) bool
+	GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, error)
+	InvalidateExecutionAPIClient(address string) bool
 }
 
 type ProxyConnectionFactory struct {
@@ -31,11 +32,11 @@ type ProxyConnectionFactory struct {
 	targetAddress string
 }
 
-func (p *ProxyConnectionFactory) GetAccessAPIClient(address string) (access.AccessAPIClient, io.Closer, error) {
+func (p *ProxyConnectionFactory) GetAccessAPIClient(address string) (access.AccessAPIClient, error) {
 	return p.ConnectionFactory.GetAccessAPIClient(p.targetAddress)
 }
 
-func (p *ProxyConnectionFactory) GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, io.Closer, error) {
+func (p *ProxyConnectionFactory) GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, error) {
 	return p.ConnectionFactory.GetExecutionAPIClient(p.targetAddress)
 }
 
@@ -93,38 +94,52 @@ func (cf *ConnectionFactoryImpl) retrieveConnection(grpcAddress string, timeout 
 	return conn, nil
 }
 
-func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string) (access.AccessAPIClient, io.Closer, error) {
+func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string) (access.AccessAPIClient, error) {
 
 	grpcAddress, err := getGRPCAddress(address, cf.CollectionGRPCPort)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	conn, err := cf.retrieveConnection(grpcAddress, cf.CollectionNodeGRPCTimeout)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	accessAPIClient := access.NewAccessAPIClient(conn)
-	closer := io.Closer(conn)
-	return accessAPIClient, closer, nil
+	return accessAPIClient, nil
 }
 
-func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, io.Closer, error) {
+func (cf *ConnectionFactoryImpl) InvalidateAccessAPIClient(address string) bool {
+	grpcAddress, err := getGRPCAddress(address, cf.CollectionGRPCPort)
+	if err != nil {
+		return true
+	}
+	return cf.ConnectionsCache.Remove(grpcAddress)
+}
+
+func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, error) {
 
 	grpcAddress, err := getGRPCAddress(address, cf.ExecutionGRPCPort)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	conn, err := cf.retrieveConnection(grpcAddress, cf.ExecutionNodeGRPCTimeout)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	executionAPIClient := execution.NewExecutionAPIClient(conn)
-	closer := io.Closer(conn)
-	return executionAPIClient, closer, nil
+	return executionAPIClient, nil
+}
+
+func (cf *ConnectionFactoryImpl) InvalidateExecutionAPIClient(address string) bool {
+	grpcAddress, err := getGRPCAddress(address, cf.ExecutionGRPCPort)
+	if err != nil {
+		return true
+	}
+	return cf.ConnectionsCache.Remove(grpcAddress)
 }
 
 // getExecutionNodeAddress translates flow.Identity address to the GRPC address of the node by switching the port to the
