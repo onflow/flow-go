@@ -86,6 +86,9 @@ const (
 	EXEExecuteBlock            SpanName = "exe.ingestion.executeBlock"
 	EXESaveExecutionResults    SpanName = "exe.ingestion.saveExecutionResults"
 
+	EXEUploadCollections         SpanName = "exe.manager.uploadCollections"
+	EXEAddToExecutionDataService SpanName = "exe.manager.addToExecutionDataService"
+
 	EXEBroadcastExecutionReceipt SpanName = "exe.provider.broadcastExecutionReceipt"
 
 	EXEComputeBlock            SpanName = "exe.computer.computeBlock"
