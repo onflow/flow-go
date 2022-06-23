@@ -1,12 +1,12 @@
 package passthrough
 
 import (
-	"github.com/onflow/flow-go/model/flow"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/integration/tests/common"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type PassThroughTestSuite struct {
