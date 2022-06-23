@@ -2088,6 +2088,7 @@ func AllowAllPeerFilter() func(peer.ID) bool {
 	return func(_ peer.ID) bool {
 		return true
 	}
+}
 
 func NewSealingConfigs(val uint) module.SealingConfigsSetter {
 	instance, err := updatable_configs.NewSealingConfigs(
