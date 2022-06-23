@@ -57,7 +57,7 @@ Per convention, failure case due to a byzantine inputs are represented by specif
 
 Byzantine inputs are one particular case, where a function returns a 'benign error'. The critical property for an error
 to be benign is that the component returning it is still fully functional, despite encountering the error condition. All
-beging errors should be handled within the vertex.
+benign errors should be handled within the vertex.
 
 ## Error handling
 
@@ -74,41 +74,40 @@ happy path is either
 
 ### Best Practice Guidelines
 
-**1. Errors are part of your API:** If there is an error return, there is a documentation what the error means
+1. **Errors are part of your API:** If there is an error return, there is a documentation what the error means. We conceptually differentiate between the following two classes of errors:
 
-* Protocol logic responds to byzantine inputs with specifically typed sentinel errors ([basic errors](https://pkg.go.dev/errors#New) and [higher-level errors](https://dev.to/tigorlazuardi/go-creating-custom-error-wrapper-and-do-proper-error-equality-check-11k7)).
-* Documentation of error returns should be part of every interface. We also encourage to copy the higher-level interface documentation to every implementation
-  and possibly extend it with implementation-specific comments. In particular, it simplifies maintenance work on the implementation, when the API-level contracts
-  are directly documented above the implementation.
-* Adding a new sentinel often means that the higher-level logic has to gracefully handle an additional error case, potentially triggering slashing etc.
-Therefore, changing the set of specified sentinel errors is generally considered a breaking API change. 
-
-The main aspect that your error documentation should convey:
-1. What are the different error types that could be returned?
-2. What is the severity of the error? please clearly differentiate between:
    1. _benign error: the component returning the error still _fully functional_ despite the error_.  
-     Ideally, benign errors would be represented by sentinel errors, so we can do type checks.
+       Benign failure cases are represented as typed sentinel errors
+       ([basic errors](https://pkg.go.dev/errors#New) and [higher-level errors](https://dev.to/tigorlazuardi/go-creating-custom-error-wrapper-and-do-proper-error-equality-check-11k7)),
+       so we can do type checks.  
    2. _exception: the error a potential symptom of internal state corruption_.  
-     For example, a failed sanity check. In this case, the error is most likely fatal.
+      For example, a failed sanity check. In this case, the error is most likely fatal.
+      <br /><br />
 
-**2. All errors beyond the specified, benign sentinel errors ere considered unexpected failures, i.e. a symptom for potential state corruption.**       
+   * Documentation of error returns should be part of every interface. We also encourage to copy the higher-level interface documentation to every implementation
+     and possibly extend it with implementation-specific comments. In particular, it simplifies maintenance work on the implementation, when the API-level contracts
+     are directly documented above the implementation.
+   * Adding a new sentinel often means that the higher-level logic has to gracefully handle an additional error case, potentially triggering slashing etc.
+     Therefore, changing the set of specified sentinel errors is generally considered a breaking API change. 
 
-* We employ a fundamental principle of [High Assurance Software Engineering](https://www.researchgate.net/publication/228563190_High_Assurance_Software_Development),
+
+2. **All errors beyond the specified, benign sentinel errors ere considered unexpected failures, i.e. a symptom for potential state corruption.**       
+   * We employ a fundamental principle of [High Assurance Software Engineering](https://www.researchgate.net/publication/228563190_High_Assurance_Software_Development),
 where we treat everything beyond the known benign errors as critical failures. In unexpected failure cases, we assume that the vertex's in-memory state has been
 broken and proper functioning is no longer guaranteed. The only safe route of recovery is to restart the vertex from a previously persisted, safe state.
 Per convention, a vertex should throw any unexpected exceptions using the related [irrecoverable context](https://github.com/onflow/flow-go/blob/277b6515add6136946913747efebd508f0419a25/module/irrecoverable/irrecoverable.go).
+   * Many components in our BFT system can return benign errors (type (i)) and exceptions (type (ii))
 
-* Many components in our BFT system can return benign errors (type (i)) and exceptions (type (ii))
-
-_3. Optional Simplification for components that solely return benign errors._
-* In this case, you _can_ use untyped errors to represent benign error cases (e.g. using `fmt.Errorf`).
-* By using untyped errors, the code would be _breaking with our best practice guideline_ that benign errors should be represented as typed sentinel errors.
+    
+3. _Optional Simplification for components that solely return benign errors._
+   * In this case, you _can_ use untyped errors to represent benign error cases (e.g. using `fmt.Errorf`).
+   * By using untyped errors, the code would be _breaking with our best practice guideline_ that benign errors should be represented as typed sentinel errors.
 Therefore, whenever all returned errors are benign, please clearly document this _for each public functions individually_.
-For example, a statement like the following would be sufficient
-  ```golang
-  // This function errors if XYZ was not successful. All returned errors are 
-  // benign, as the function is side-effect free and failures are simply a no-op.  
-  ```
+For example, a statement like the following would be sufficient:
+      ```golang
+      // This function errors if XYZ was not successful. All returned errors are 
+      // benign, as the function is side-effect free and failures are simply a no-op.  
+      ```
 
 
 ### Hands-on suggestions
