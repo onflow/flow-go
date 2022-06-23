@@ -410,6 +410,7 @@ func (m *Middleware) unicastStreamHandler(getIdentity psValidator.GetIdentityFun
 	return func(s libp2pnetwork.Stream) {
 		identity, ok := getIdentity(s.Conn().RemotePeer())
 		if !ok {
+			// avoid processing unicast message from unstaked nodes
 			m.log.
 				Warn().
 				Err(fmt.Errorf("could not get flow identity of peer with ID (%s) during unicast stream handling", s.Conn().RemotePeer()))
