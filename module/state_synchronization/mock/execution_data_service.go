@@ -5,8 +5,9 @@ package state_synchronization
 import (
 	context "context"
 
-	flow "github.com/onflow/flow-go/model/flow"
 	mock "github.com/stretchr/testify/mock"
+
+	flow "github.com/onflow/flow-go/model/flow"
 
 	state_synchronization "github.com/onflow/flow-go/module/state_synchronization"
 )
