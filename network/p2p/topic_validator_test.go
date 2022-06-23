@@ -159,7 +159,7 @@ func TestTopicValidator_PublicChannel(t *testing.T) {
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "could not receive message on time")
 
-	// expecting 1 warn calls for each rejected message from ejected node
+	// expecting no warn calls for rejected messages
 	require.Equalf(t, uint64(0), hookCalls, "expected 0 warning to be logged")
 }
 
