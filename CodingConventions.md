@@ -17,6 +17,48 @@ of code
 case, please include a comment in the code with a brief motivation for your decision. This will help reviewers and
 prevent others from going through the same learning process that led to your decission to break with the conventions.
 
+
+## Motivation and Context
+### A Flow Node
+
+On a high level, a Flow node consists of various data-processing components that receive information from node-internal
+and external sources. We model the data flow inside a Flow node as a graph, aka the **data flow graph**:
+* a data-processing component forms a vertex;
+* two components exchanging messages is represented as an edge.
+
+Generally, an individual vertex (data processing component) has a dedicated pool of go-routines for processing its work.
+Inbound data packages are appended to queue(s), and the vertex's internal worker threads process the inbound messages from the queue(s).
+In this design, there is an upper limit to the CPU resources an individual vertex can consume. A vertex with `k` go-routines as workers can
+at most keep `k` cores busy. The benefit of this desin is that the node can remain responsive even if one (or a few) of
+its data processing vertices are completely overwhelmed.
+
+In its entirety, a node is composed of many data flow vertices, that together form the node's data flow graph. The vertices
+within the node typically trust each other; while external messages are untrusted. Depending on the inputs it consumes, a vertex
+must carefully differentiate between trusted and untrusted inputs.
+
+⇒ **A vertex (data processing component within a node) implements the [`Component` interface](https://github.com/onflow/flow-go/blob/57f89d4e96259f08fe84163c91ecd32484401b45/module/component/component.go#L22)**.
+
+For example, [`VoteAggregator`](https://github.com/onflow/flow-go/blob/3899d335d5a6ce3cbbb9fde4f7af780d6bec8c9a/consensus/hotstuff/vote_aggregator.go#L29) is
+a data flow vertex within a consensus nodes, whose job it is to collect incoming votes from other consensus nodes.
+Hence, the corresponding function [`AddVote(vote *model.Vote)`](https://github.com/onflow/flow-go/blob/3899d335d5a6ce3cbbb9fde4f7af780d6bec8c9a/consensus/hotstuff/vote_aggregator.go#L37)
+treats all inputs as untrusted. Furthermore, `VoteAggregator` consumes auxiliary inputs
+([`AddBlock(block *model.Proposal)`](https://github.com/onflow/flow-go/blob/3899d335d5a6ce3cbbb9fde4f7af780d6bec8c9a/consensus/hotstuff/vote_aggregator.go#L45),
+[`InvalidBlock(block *model.Proposal)`](https://github.com/onflow/flow-go/blob/3899d335d5a6ce3cbbb9fde4f7af780d6bec8c9a/consensus/hotstuff/vote_aggregator.go#L51),
+[`PruneUpToView(view uint64)`](https://github.com/onflow/flow-go/blob/3899d335d5a6ce3cbbb9fde4f7af780d6bec8c9a/consensus/hotstuff/vote_aggregator.go#L57))
+from the node's main consensus logic, which trusted.
+
+
+### Byzantine Inputs result in benign sentinel errors
+
+Any input that is coming from another node is untrusted and the vertex processing it should gracefully handle any arbitrarily malicious input.
+Under no circumstances should a byzantine input result in the vertex's internal state being corrupted.
+Per convention, failure case due to a byzantine inputs are represented by specifically-typed
+[sentinel errors](https://pkg.go.dev/errors#New) (for further details, see error handling section).
+
+Byzantine inputs are one particular case, where a function returns a 'benign error'. The critical property for an error
+to be benign is that the component returning it is still fully functional, despite encountering the error condition. All
+beging errors should be handled within the vertex.
+
 ## Error handling
 
 This is a highly-compressed summary
@@ -30,7 +72,47 @@ happy path is either
 2. is an uncovered edge case (which could be exploited in the worst case to compromise the system)
 3. a corrupted internal state of the node
 
-### Guidelines
+### Best Practice Guidelines
+
+**1. Errors are part of your API:** If there is an error return, there is a documentation what the error means
+
+* Protocol logic responds to byzantine inputs with specifically typed sentinel errors ([basic errors](https://pkg.go.dev/errors#New) and [higher-level errors](https://dev.to/tigorlazuardi/go-creating-custom-error-wrapper-and-do-proper-error-equality-check-11k7)).
+* Documentation of error returns should be part of every interface. We also encourage to copy the higher-level interface documentation to every implementation
+  and possibly extend it with implementation-specific comments. In particular, it simplifies maintenance work on the implementation, when the API-level contracts
+  are directly documented above the implementation.
+* Adding a new sentinel often means that the higher-level logic has to gracefully handle an additional error case, potentially triggering slashing etc.
+Therefore, changing the set of specified sentinel errors is generally considered a breaking API change. 
+
+The main aspect that your error documentation should convey:
+1. What are the different error types that could be returned?
+2. What is the severity of the error? please clearly differentiate between:
+   1. _benign error: the component returning the error still _fully functional_ despite the error_.  
+     Ideally, benign errors would be represented by sentinel errors, so we can do type checks.
+   2. _exception: the error a potential symptom of internal state corruption_.  
+     For example, a failed sanity check. In this case, the error is most likely fatal.
+
+**2. All errors beyond the specified, benign sentinel errors ere considered unexpected failures, i.e. a symptom for potential state corruption.**       
+
+We employ a fundamental principle of [High Assurance Software Engineering](https://www.researchgate.net/publication/228563190_High_Assurance_Software_Development),
+where we treat everything beyond the known benign errors as critical failures. In unexpected failure cases, we assume that the vertex's in-memory state has been
+broken and proper functioning is no longer guaranteed. The only safe route of recovery is to restart the vertex from a previously persisted, safe state.
+Per convention, a vertex should throw any unexpected exceptions using the related [irrecoverable context](https://github.com/onflow/flow-go/blob/277b6515add6136946913747efebd508f0419a25/module/irrecoverable/irrecoverable.go).
+
+
+Many components in our BFT system can return benign errors (type (i)) and exceptions (type (ii))
+
+_Simplification for components that solely return benign errors._
+* In this case, you _can_ use untyped errors to represent benign error cases (e.g. using `fmt.Errorf`).
+* By using untyped errors, the code would be _breaking with our best practice guideline_ that benign errors should be represented as typed sentinel errors.
+Therefore, whenever all returned errors are benign, please clearly document this _for each public functions individually_.
+For example, a statement like the following would be sufficient
+  ```golang
+  // This function errors if XYZ was not successful. All returned errors are 
+  // benign, as the function is side-effect free and failures are simply a no-op.  
+  ```
+
+
+### Hands-on suggestions
 
 * avoid generic errors, such as
   ```golang
@@ -120,60 +202,6 @@ section of this doc). If you have followed the error handling guidelines, leavin
 technical debt for later hopefully does not add much overhead. In contrast, if you log errors and continue on a
 best-effort basis, you also leave the _entire_ logic for differentiating errors as tech debt. When adding this logic
 later, you need to revisit the _entire_ business logic again.
-
-# A Flow Node    
-
-On a high level, a Flow node consists of various data-processing components that receive information from node-internal
-and external sources. We model the data flow inside a Flow node as a graph, aka the **data flow graph**:
-* a data-processing component forms a vertex; 
-* two components exchanging messages is represented as an edge. 
-
-Generally, an individual vertex (data processing component) has a dedicated pool of go-routines for processing its work.
-Inbound data packages are appended to queue(s), and the vertex's internal worker threads process the inbound messages from the queue(s).
-In this design, there is an upper limit to the CPU resources an individual vertex can consume. A vertex with `k` go-routines as workers can
-at most keep `k` cores busy. The benefit of this desin is that the node can remain responsive even if one (or a few) of
-its data processing vertices are completely overwhelmed.
-
-In its entirety, a node is composed of many data flow vertices, that together form the node's data flow graph. The vertices
-within the node typically trust each other; while external messages are untrusted. Depending on the inputs it consumes, a vertex
-must carefully differentiate between trusted and untrusted inputs. 
-
-⇒ **A vertex (data processing component within a node) implements the [`Component` interface](https://github.com/onflow/flow-go/blob/57f89d4e96259f08fe84163c91ecd32484401b45/module/component/component.go#L22)**.
-
-For example, [`VoteAggregator`](https://github.com/onflow/flow-go/blob/3899d335d5a6ce3cbbb9fde4f7af780d6bec8c9a/consensus/hotstuff/vote_aggregator.go#L29) is
-a data flow vertex within a consensus nodes, whose job it is to collect incoming votes from other consensus nodes.
-Hence, the corresponding function [`AddVote(vote *model.Vote)`](https://github.com/onflow/flow-go/blob/3899d335d5a6ce3cbbb9fde4f7af780d6bec8c9a/consensus/hotstuff/vote_aggregator.go#L37)
-treats all inputs as untrusted. Furthermore, `VoteAggregator` consumes auxiliary inputs
-([`AddBlock(block *model.Proposal)`](https://github.com/onflow/flow-go/blob/3899d335d5a6ce3cbbb9fde4f7af780d6bec8c9a/consensus/hotstuff/vote_aggregator.go#L45),
-[`InvalidBlock(block *model.Proposal)`](https://github.com/onflow/flow-go/blob/3899d335d5a6ce3cbbb9fde4f7af780d6bec8c9a/consensus/hotstuff/vote_aggregator.go#L51),
-[`PruneUpToView(view uint64)`](https://github.com/onflow/flow-go/blob/3899d335d5a6ce3cbbb9fde4f7af780d6bec8c9a/consensus/hotstuff/vote_aggregator.go#L57))
-from the node's main consensus logic, which trusted.
-
-
-## Byzantine Inputs result in benign sentinel errors 
-
-Any input that is coming from another node is untrusted and the vertex processing it should gracefully handle any arbitrarily malicious input.
-Under no circumstances should a byzantine input result in the vertex's internal state being corrupted.
-Per convention, failure case due to a byzantine inputs are represented by specifically-typed
-[sentinel errors](https://pkg.go.dev/errors#New) (for further details, see error handling section).
-
-Byzantine inputs are one particular case, where a function returns a 'benign error'. The critical property for an error
-to be benign is that the component returning it is still fully functional, despite encountering the error condition. 
-
-
-an input leads to a benign error return but without an
-Internally, a vertex should represent 
-The vertex-internal logic
-
-Use :
-By convention, byzantine inputs are represented 
-By convention, a vertex should not generate any errors during normal operations.   
-In other words, a broken input should always be gracefully rejected by the vertex's internal logic and never lead to state corruption.
- 
-
-Vertices should implement the [`Component` interface](https://github.com/onflow/flow-go/blob/57f89d4e96259f08fe84163c91ecd32484401b45/module/component/component.go#L22)
-and throw unexpected errors using the related [irrecoverable context](https://github.com/onflow/flow-go/blob/277b6515add6136946913747efebd508f0419a25/module/irrecoverable/irrecoverable.go).
-
 
 
 # Appendix
