@@ -4,15 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/onflow/flow-go/admin/commands"
-	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
-	"github.com/onflow/flow-go/crypto"
-
+	cborlib "github.com/fxamacker/cbor/v2"
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/routing"
@@ -23,6 +21,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
+	"github.com/onflow/flow-go/admin/commands"
+	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -31,6 +31,7 @@ import (
 	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/engine/access/rpc"
@@ -432,8 +433,19 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				return nil, fmt.Errorf("could not register blob service: %w", err)
 			}
 
+			decMode, err := cborlib.DecOptions{
+				MaxArrayElements: math.MaxInt64,
+				MaxMapPairs:      math.MaxInt64,
+				MaxNestedLevels:  math.MaxInt16,
+			}.DecMode()
+			if err != nil {
+				return nil, fmt.Errorf("could not create cbor decoder: %w", err)
+			}
+
+			codec := cbor.NewCodec(cbor.WithDecMode(decMode))
+
 			builder.ExecutionDataService = state_synchronization.NewExecutionDataService(
-				new(cbor.Codec),
+				codec,
 				compressor.NewLz4Compressor(),
 				bs,
 				metrics.NewExecutionDataServiceCollector(),
