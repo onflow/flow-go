@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"sync"
 
 	"github.com/rs/zerolog"
 
@@ -39,9 +38,9 @@ func NewCorruptedNodeConnection(
 
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			c.receiveLoop()
 
 			ready()
+			c.receiveLoop()
 
 			<-ctx.Done()
 
@@ -66,31 +65,25 @@ func (c *CorruptedNodeConnection) SendMessage(message *insecure.Message) error {
 // receiveLoop implements the continuous procedure of reading from inbound stream of this connection, which
 // is established from the remote ccf to the local attack orchestrator.
 func (c *CorruptedNodeConnection) receiveLoop() {
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		wg.Done()
-		for {
-			select {
-			case <-c.cm.ShutdownSignal():
-				// connection closed
-				c.logger.Info().Msg("receive loop terminated")
-				return
-			default:
-				msg, err := c.inbound.Recv()
-				if err == io.EOF || errors.Is(c.inbound.Context().Err(), context.Canceled) {
-					c.logger.Warn().Msg("inbound stream closed")
-					return
-				} else if err != nil {
-					c.logger.Error().Err(err).Msg("error reading inbound stream")
-				}
-				c.inboundHandler(msg)
-			}
-		}
-	}()
-
-	wg.Wait()
 	c.logger.Info().Msg("receive loop started")
+
+	for {
+		select {
+		case <-c.cm.ShutdownSignal():
+			// connection closed
+			c.logger.Info().Msg("receive loop terminated")
+			return
+		default:
+			msg, err := c.inbound.Recv()
+			if err == io.EOF || errors.Is(c.inbound.Context().Err(), context.Canceled) {
+				c.logger.Warn().Msg("inbound stream closed")
+				return
+			} else if err != nil {
+				c.logger.Error().Err(err).Msg("error reading inbound stream")
+			}
+			c.inboundHandler(msg)
+		}
+	}
 }
 
 // CloseConnection closes the connection to the corrupted conduit factory.
