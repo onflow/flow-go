@@ -93,15 +93,14 @@ The main aspect that your error documentation should convey:
 
 **2. All errors beyond the specified, benign sentinel errors ere considered unexpected failures, i.e. a symptom for potential state corruption.**       
 
-We employ a fundamental principle of [High Assurance Software Engineering](https://www.researchgate.net/publication/228563190_High_Assurance_Software_Development),
+* We employ a fundamental principle of [High Assurance Software Engineering](https://www.researchgate.net/publication/228563190_High_Assurance_Software_Development),
 where we treat everything beyond the known benign errors as critical failures. In unexpected failure cases, we assume that the vertex's in-memory state has been
 broken and proper functioning is no longer guaranteed. The only safe route of recovery is to restart the vertex from a previously persisted, safe state.
 Per convention, a vertex should throw any unexpected exceptions using the related [irrecoverable context](https://github.com/onflow/flow-go/blob/277b6515add6136946913747efebd508f0419a25/module/irrecoverable/irrecoverable.go).
 
+* Many components in our BFT system can return benign errors (type (i)) and exceptions (type (ii))
 
-Many components in our BFT system can return benign errors (type (i)) and exceptions (type (ii))
-
-_Simplification for components that solely return benign errors._
+_3. Optional Simplification for components that solely return benign errors._
 * In this case, you _can_ use untyped errors to represent benign error cases (e.g. using `fmt.Errorf`).
 * By using untyped errors, the code would be _breaking with our best practice guideline_ that benign errors should be represented as typed sentinel errors.
 Therefore, whenever all returned errors are benign, please clearly document this _for each public functions individually_.
@@ -172,12 +171,13 @@ why it is acceptable to keep going, even if the other component returned an erro
 
 ### Prioritize Safety Over Liveness
 
-**Ideally, a component should restart** (from a known good state), **when it encounters an unexpected error.**
-**If this is out of scope, we _prioritize safety over liveness_.** This means that we rather crash the node than
-continue on a best-effort basis.
+**Ideally, a vertex should restart** (from a known good state), **when it encounters an unexpected error.**
+Per convention, a vertex should throw any unexpected exceptions using the related [irrecoverable context](https://github.com/onflow/flow-go/blob/277b6515add6136946913747efebd508f0419a25/module/irrecoverable/irrecoverable.go).
 
+[TODO: expend this section] 
+
+If this is out of scope, we _prioritize safety over liveness_. This means that we rather crash the node than continue on a best-effort basis.
 When in doubt, use the following as a fall-back:
-
 ```golang
 err := foo()
 if errors.Is(err, XFailedErr) {
