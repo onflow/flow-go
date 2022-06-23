@@ -407,6 +407,11 @@ func createTestBlockAndRun(t *testing.T, engine *Manager, parentBlock *flow.Bloc
 	}
 	returnedComputationResult, err := engine.ComputeBlock(context.Background(), executableBlock, view)
 	require.NoError(t, err)
+
+	for _, txResult := range returnedComputationResult.TransactionResults {
+		require.Empty(t, txResult.ErrorMessage)
+	}
+
 	return block, returnedComputationResult
 }
 
