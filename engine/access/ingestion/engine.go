@@ -74,6 +74,7 @@ type Engine struct {
 	collections       storage.Collections
 	transactions      storage.Transactions
 	executionReceipts storage.ExecutionReceipts
+	maxReceiptHeight  uint64
 	executionResults  storage.ExecutionResults
 
 	// metrics
@@ -153,6 +154,7 @@ func New(
 		transactions:               transactions,
 		executionResults:           executionResults,
 		executionReceipts:          executionReceipts,
+		maxReceiptHeight:           0,
 		transactionMetrics:         transactionMetrics,
 		collectionsToMarkFinalized: collectionsToMarkFinalized,
 		collectionsToMarkExecuted:  collectionsToMarkExecuted,
@@ -422,6 +424,11 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, r *flow.Execut
 	err := e.executionReceipts.Store(r)
 	if err != nil {
 		return fmt.Errorf("failed to store execution receipt: %w", err)
+	}
+
+	block, err := e.blocks.ByID(r.ExecutionResult.BlockID)
+	if err != nil && block.Header.Height > e.maxReceiptHeight {
+		e.transactionMetrics.UpdateExecutionReceiptMaxHeight(block.Header.Height)
 	}
 
 	e.trackExecutedMetricForReceipt(r)
