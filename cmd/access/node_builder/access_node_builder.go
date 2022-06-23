@@ -4,17 +4,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	cborlib "github.com/fxamacker/cbor/v2"
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
-
-	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
@@ -48,6 +48,7 @@ import (
 	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/network"
 	netcache "github.com/onflow/flow-go/network/cache"
+	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/validator"
@@ -456,8 +457,19 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				return nil, fmt.Errorf("could not register blob service: %w", err)
 			}
 
+			decMode, err := cborlib.DecOptions{
+				MaxArrayElements: math.MaxInt64,
+				MaxMapPairs:      math.MaxInt64,
+				MaxNestedLevels:  math.MaxInt16,
+			}.DecMode()
+			if err != nil {
+				return nil, fmt.Errorf("could not create cbor decoder: %w", err)
+			}
+
+			codec := cbor.NewCodec(cbor.WithDecMode(decMode))
+
 			builder.ExecutionDataService = state_synchronization.NewExecutionDataService(
-				new(cbor.Codec),
+				codec,
 				compressor.NewLz4Compressor(),
 				bs,
 				metrics.NewExecutionDataServiceCollector(),

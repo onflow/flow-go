@@ -58,7 +58,8 @@ type blockComputer struct {
 func SystemChunkContext(vmCtx fvm.Context, logger zerolog.Logger) fvm.Context {
 	return fvm.NewContextFromParent(
 		vmCtx,
-		fvm.WithRestrictedDeployment(false),
+		fvm.WithContractDeploymentRestricted(false),
+		fvm.WithContractRemovalRestricted(false),
 		fvm.WithTransactionFeesEnabled(false),
 		fvm.WithServiceEventCollectionEnabled(),
 		fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(logger)),
