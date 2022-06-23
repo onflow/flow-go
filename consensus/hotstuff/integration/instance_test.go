@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/eventhandler"
 	"github.com/onflow/flow-go/consensus/hotstuff/forks"
 	"github.com/onflow/flow-go/consensus/hotstuff/forks/finalizer"
-	"github.com/onflow/flow-go/consensus/hotstuff/forks/forkchoice"
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -345,12 +344,8 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	forkalizer, err := finalizer.New(rootBlockQC, in.finalizer, notifier)
 	require.NoError(t, err)
 
-	// initialize the forks choice
-	choice, err := forkchoice.NewNewestForkChoice(forkalizer, notifier)
-	require.NoError(t, err)
-
 	// initialize the forks handler
-	in.forks = forks.New(forkalizer, choice)
+	in.forks = forks.New(forkalizer)
 
 	// initialize the validator
 	in.validator = validator.New(in.committee, in.verifier)

@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/eventloop"
 	"github.com/onflow/flow-go/consensus/hotstuff/forks"
 	"github.com/onflow/flow-go/consensus/hotstuff/forks/finalizer"
-	"github.com/onflow/flow-go/consensus/hotstuff/forks/forkchoice"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
@@ -132,14 +131,8 @@ func NewForks(final *flow.Header, headers storage.Headers, updater module.Finali
 		return nil, fmt.Errorf("could not initialize finalizer: %w", err)
 	}
 
-	// initialize the fork choice
-	forkchoice, err := forkchoice.NewNewestForkChoice(finalizer, notifier)
-	if err != nil {
-		return nil, fmt.Errorf("could not initialize fork choice: %w", err)
-	}
-
 	// initialize the Forks manager
-	return forks.New(finalizer, forkchoice), nil
+	return forks.New(finalizer), nil
 }
 
 // NewValidator creates new instance of hotstuff validator needed for votes & proposal validation

@@ -8,19 +8,18 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// Forks implements the hotstuff.Reactor API
+// Forks is a tiny wrapper over Finalizer which implements hotstuff.Forks interface
+// and performs state lookups and safe insertion of blocks
 type Forks struct {
-	finalizer  Finalizer
-	forkchoice ForkChoice
+	finalizer Finalizer
 }
 
 var _ hotstuff.Forks = (*Forks)(nil)
 
 // New creates a Forks instance
-func New(finalizer Finalizer, forkchoice ForkChoice) *Forks {
+func New(finalizer Finalizer) *Forks {
 	return &Forks{
-		finalizer:  finalizer,
-		forkchoice: forkchoice,
+		finalizer: finalizer,
 	}
 }
 
@@ -44,16 +43,7 @@ func (f *Forks) FinalizedView() uint64 {
 	return f.finalizer.FinalizedBlock().View
 }
 
-// IsSafeBlock returns whether a block is safe to vote for.
-func (f *Forks) IsSafeBlock(block *model.Block) bool {
-	if err := f.finalizer.VerifyBlock(block); err != nil {
-		return false
-	}
-	return f.finalizer.IsSafeBlock(block)
-}
-
-// AddBlock passes the block to the finalizer for finalization and
-// gives the QC to forkchoice for updating the preferred parent block
+// AddBlock passes the block to the finalizer for finalization
 func (f *Forks) AddBlock(block *model.Block) error {
 	if err := f.finalizer.VerifyBlock(block); err != nil {
 		// technically, this not strictly required. However, we leave this as a sanity check for now
@@ -64,22 +54,5 @@ func (f *Forks) AddBlock(block *model.Block) error {
 		return fmt.Errorf("error storing block in Forks: %w", err)
 	}
 
-	// We only process the block's QC if the block's view is larger than the last finalized block.
-	// By ignoring hte qc's of block's at or below the finalized view, we allow the genesis block
-	// to have a nil QC.
-	if block.View <= f.finalizer.FinalizedBlock().View {
-		return nil
-	}
-	return f.AddQC(block.QC)
-}
-
-// MakeForkChoice returns the block to build new block proposal from for the current view.
-// the QC is the QC that points to that block.
-func (f *Forks) MakeForkChoice(curView uint64) (*flow.QuorumCertificate, *model.Block, error) {
-	return f.forkchoice.MakeForkChoice(curView)
-}
-
-// AddQC gives the QC to the forkchoice for updating the preferred parent block
-func (f *Forks) AddQC(qc *flow.QuorumCertificate) error {
-	return f.forkchoice.AddQC(qc) // forkchoice ensures that block referenced by qc is known
+	return nil
 }

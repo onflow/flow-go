@@ -249,10 +249,7 @@ func (e *EventHandler) startNewView() error {
 
 		// as the leader of the current view,
 		// build the block proposal for the current view
-		qc, _, err := e.forks.MakeForkChoice(curView)
-		if err != nil {
-			return fmt.Errorf("can not make fork choice for view %v: %w", curView, err)
-		}
+		qc := e.paceMaker.NewestQC()
 
 		proposal, err := e.blockProducer.MakeBlockProposal(qc, curView)
 		if err != nil {
@@ -412,11 +409,6 @@ func (e *EventHandler) processQC(qc *flow.QuorumCertificate) error {
 		Uint64("block_view", qc.View).
 		Hex("block_id", qc.BlockID[:]).
 		Logger()
-
-	err := e.forks.AddQC(qc)
-	if err != nil {
-		return fmt.Errorf("cannot add QC to forks: %w", err)
-	}
 
 	newViewEvent, err := e.paceMaker.ProcessQC(qc)
 	if err != nil {

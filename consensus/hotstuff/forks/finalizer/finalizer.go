@@ -22,6 +22,8 @@ type Finalizer struct {
 	lastFinalized        *forks.BlockQC // lastFinalizedBlockQC is the QC that POINTS TO the most recently finalized locked block
 }
 
+var _ forks.Finalizer = (*Finalizer)(nil)
+
 type ancestryChain struct {
 	block      *BlockContainer
 	oneChain   *forks.BlockQC
