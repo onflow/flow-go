@@ -14,9 +14,11 @@ import (
 	"github.com/onflow/flow-go/engine/consensus/approvals/tracker"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
+	realmodule "github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/module/updatable_configs"
 	mockstate "github.com/onflow/flow-go/state/protocol/mock"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -42,6 +44,7 @@ type ApprovalProcessingCoreTestSuite struct {
 	sealsDB    *storage.Seals
 	rootHeader *flow.Header
 	core       *Core
+	setter     realmodule.SealingConfigsSetter
 }
 
 func (s *ApprovalProcessingCoreTestSuite) TearDownTest() {
@@ -65,15 +68,11 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 
-	options := Config{
-		EmergencySealingActive:               false,
-		RequiredApprovalsForSealConstruction: uint(len(s.AuthorizedVerifiers)),
-		ApprovalRequestsThreshold:            2,
-	}
-
+	setter := unittest.NewSealingConfigs(flow.DefaultChunkAssignmentAlpha)
 	var err error
-	s.core, err = NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(), s.Headers, s.State, s.sealsDB, s.Assigner, s.SigHasher, s.SealsPL, s.Conduit, options)
+	s.core, err = NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(), s.Headers, s.State, s.sealsDB, s.Assigner, s.SigHasher, s.SealsPL, s.Conduit, setter)
 	require.NoError(s.T(), err)
+	s.setter = setter
 }
 
 // TestOnBlockFinalized_RejectOutdatedApprovals tests that approvals will be rejected as outdated
@@ -315,7 +314,21 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalVerifi
 
 // TestOnBlockFinalized_EmergencySealing tests that emergency sealing kicks in to resolve sealing halt
 func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_EmergencySealing() {
-	s.core.config.EmergencySealingActive = true
+
+	metrics := metrics.NewNoopCollector()
+	tracer := trace.NewNoopTracer()
+
+	setter, err := updatable_configs.NewSealingConfigs(
+		flow.DefaultRequiredApprovalsForSealConstruction,
+		flow.DefaultRequiredApprovalsForSealValidation,
+		flow.DefaultChunkAssignmentAlpha,
+		true, // enable emergency sealing
+	)
+	require.NoError(s.T(), err)
+	s.core, err = NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(), s.Headers, s.State, s.sealsDB, s.Assigner, s.SigHasher, s.SealsPL, s.Conduit, setter)
+	require.NoError(s.T(), err)
+	s.setter = setter
+
 	s.SealsPL.On("ByID", mock.Anything).Return(nil, false).Maybe()
 	s.SealsPL.On("Add", mock.Anything).Run(
 		func(args mock.Arguments) {
@@ -329,7 +342,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_EmergencySealing(
 	s.sealsDB.On("HighestInFork", mock.Anything).Return(seal, nil).Times(approvals.DefaultEmergencySealingThreshold)
 	s.State.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(&s.ParentBlock, nil))
 
-	err := s.core.ProcessIncorporatedResult(s.IncorporatedResult)
+	err = s.core.ProcessIncorporatedResult(s.IncorporatedResult)
 	require.NoError(s.T(), err)
 
 	lastFinalizedBlock := &s.IncorporatedBlock
@@ -540,7 +553,8 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 	}
 
 	// the sealing Core requires approvals from both verifiers for each chunk
-	s.core.config.RequiredApprovalsForSealConstruction = 2
+	_, err := s.setter.SetRequiredApprovalsForSealingConstruction(2)
+	require.NoError(s.T(), err)
 
 	// populate the incorporated-results tree with:
 	// - 50 that have collected two signatures per chunk
@@ -596,7 +610,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 
 	// start delivering finalization events
 	lastProcessedIndex := 0
-	for ; lastProcessedIndex < int(s.core.config.ApprovalRequestsThreshold); lastProcessedIndex++ {
+	for ; lastProcessedIndex < int(s.core.sealingConfigsGetter.ApprovalRequestsThresholdConst()); lastProcessedIndex++ {
 		finalized := unsealedFinalizedBlocks[lastProcessedIndex].Header
 		s.MarkFinalized(finalized)
 		err := s.core.ProcessFinalizedBlock(finalized.ID())
@@ -627,7 +641,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 	// process next block
 	finalized := unsealedFinalizedBlocks[lastProcessedIndex].Header
 	s.MarkFinalized(finalized)
-	err := s.core.ProcessFinalizedBlock(finalized.ID())
+	err = s.core.ProcessFinalizedBlock(finalized.ID())
 	require.NoError(s.T(), err)
 
 	// now 2 results should be pending
@@ -727,7 +741,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 	s.State.On("Final").Return(finalSnapShot)
 
 	core, err := NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(),
-		s.Headers, s.State, s.sealsDB, assigner, s.SigHasher, s.SealsPL, s.Conduit, s.core.config)
+		s.Headers, s.State, s.sealsDB, assigner, s.SigHasher, s.SealsPL, s.Conduit, s.setter)
 	require.NoError(s.T(), err)
 
 	err = core.RepopulateAssignmentCollectorTree(payloads)
@@ -807,7 +821,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_
 	s.State.On("Final").Return(finalSnapShot)
 
 	core, err := NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(),
-		s.Headers, s.State, s.sealsDB, assigner, s.SigHasher, s.SealsPL, s.Conduit, s.core.config)
+		s.Headers, s.State, s.sealsDB, assigner, s.SigHasher, s.SealsPL, s.Conduit, s.setter)
 	require.NoError(s.T(), err)
 
 	err = core.RepopulateAssignmentCollectorTree(payloads)

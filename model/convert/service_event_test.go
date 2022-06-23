@@ -1,4 +1,4 @@
-package convert
+package convert_test
 
 import (
 	"testing"
@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/convert/fixtures"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -19,7 +20,7 @@ func TestEventConversion(t *testing.T) {
 		fixture, expected := fixtures.EpochSetupFixtureByChainID(chainID)
 
 		// convert Cadence types to Go types
-		event, err := ServiceEvent(chainID, fixture)
+		event, err := convert.ServiceEvent(chainID, fixture)
 		require.NoError(t, err)
 		require.NotNil(t, event)
 
@@ -36,7 +37,7 @@ func TestEventConversion(t *testing.T) {
 		fixture, expected := fixtures.EpochCommitFixtureByChainID(chainID)
 
 		// convert Cadence types to Go types
-		event, err := ServiceEvent(chainID, fixture)
+		event, err := convert.ServiceEvent(chainID, fixture)
 		require.NoError(t, err)
 		require.NotNil(t, event)
 

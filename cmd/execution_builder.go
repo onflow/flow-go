@@ -457,7 +457,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			}
 
 			eds := state_synchronization.NewExecutionDataService(
-				&cbor.Codec{},
+				cbor.NewCodec(),
 				compressor.NewLz4Compressor(),
 				bs,
 				executionDataServiceCollector,
