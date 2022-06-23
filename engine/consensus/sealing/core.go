@@ -429,27 +429,28 @@ func (c *Core) checkEmergencySealing(observer consensus.SealingObservation, last
 		return nil
 	}
 
-	emergencySealingHeight := lastSealedHeight + approvals.DefaultEmergencySealingThreshold
+	unsealedFinalizedHeight := lastFinalizedHeight - lastSealedHeight
 
-	// we are interested in all collectors that match condition:
-	// lastSealedBlock + sealing.DefaultEmergencySealingThreshold < lastFinalizedHeight
-	// in other words we should check for emergency sealing only if threshold was reached
-	if emergencySealingHeight >= lastFinalizedHeight {
+	// We are checking emergency sealing only if there are more than approvals.DefaultEmergencySealingThresholdForExecution
+	// number of unsealed and finalized blocks
+	if unsealedFinalizedHeight <= approvals.DefaultEmergencySealingThresholdForExecution {
 		return nil
 	}
 
-	delta := lastFinalizedHeight - emergencySealingHeight
+	// we will check all the unsealed finalized height except the last approvals.DefaultEmergencySealingThresholdForExecution
+	// number of finalized heights
+	heightCountCheckEmegencySealing := unsealedFinalizedHeight - approvals.DefaultEmergencySealingThresholdForExecution
 
-	// if there are too many finalized and unsealed blocks, we at most will emergency seal for the next 100 blocks.
-	// because the builder has a limit (maxSealCount) on the max number of seals to be included in
-	// a new block
-	if delta > 100 {
-		delta = 100
+	// if there are too many unsealed and finalized blocks, we don't have to check emergency sealing for all of them,
+	// instead, only check for at most 100 blocks.
+	// because the builder has a limit (maxSealCount) on the max number of seals to be included in a new block
+	if heightCountCheckEmegencySealing > 100 {
+		heightCountCheckEmegencySealing = 100
 	}
 	// if block is emergency sealable depends on it's incorporated block height
 	// collectors tree stores collector by executed block height
 	// we need to select multiple levels to find eligible collectors for emergency sealing
-	for _, collector := range c.collectorTree.GetCollectorsByInterval(lastSealedHeight, lastSealedHeight+delta) {
+	for _, collector := range c.collectorTree.GetCollectorsByInterval(lastSealedHeight, lastSealedHeight+heightCountCheckEmegencySealing) {
 		err := collector.CheckEmergencySealing(observer, lastFinalizedHeight)
 		if err != nil {
 			return err

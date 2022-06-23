@@ -401,7 +401,7 @@ func (s *AssignmentCollectorTestSuite) TestCheckEmergencySealing() {
 		},
 	).Return(true, nil).Once()
 
-	err = s.collector.CheckEmergencySealing(&tracker.NoopSealingTracker{}, DefaultEmergencySealingThreshold+s.IncorporatedBlock.Height)
+	err = s.collector.CheckEmergencySealing(&tracker.NoopSealingTracker{}, DefaultEmergencySealingThresholdForVerification+s.IncorporatedBlock.Height)
 	require.NoError(s.T(), err)
 
 	s.SealsPL.AssertExpectations(s.T())
