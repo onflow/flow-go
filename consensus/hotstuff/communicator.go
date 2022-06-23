@@ -3,6 +3,7 @@ package hotstuff
 import (
 	"time"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -12,6 +13,9 @@ type Communicator interface {
 
 	// SendVote sends a vote for the given parameters to the specified recipient.
 	SendVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) error
+
+	// BroadcastTimeout broadcasts the given timeout object(TO) to all actors of the consensus process.
+	BroadcastTimeout(timeout *model.TimeoutObject) error
 
 	// BroadcastProposal broadcasts the given block proposal to all actors of
 	// the consensus process.

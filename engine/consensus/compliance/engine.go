@@ -8,6 +8,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
@@ -55,6 +56,8 @@ type Engine struct {
 	con                        network.Conduit
 	stopHotstuff               context.CancelFunc
 }
+
+var _ hotstuff.Communicator = (*Engine)(nil)
 
 func NewEngine(
 	log zerolog.Logger,
@@ -310,6 +313,60 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 		}
 		e.metrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockVote)
 		log.Info().Msg("block vote transmitted")
+	})
+
+	return nil
+}
+
+// BroadcastTimeout submits a cluster timeout object to all collection nodes in our cluster
+func (e *Engine) BroadcastTimeout(timeout *model.TimeoutObject) error {
+	logContext := e.log.With().
+		Uint64("timeout_newest_qc_view", timeout.NewestQC.View).
+		Hex("timeout_newest_qc_block_id", timeout.NewestQC.BlockID[:]).
+		Uint64("timeout_view", timeout.View)
+
+	if timeout.LastViewTC != nil {
+		logContext.
+			Uint64("last_view_tc_view", timeout.LastViewTC.View).
+			Uint64("last_view_tc_newest_qc_view", timeout.LastViewTC.NewestQC.View)
+
+	}
+
+	log := logContext.Logger()
+
+	log.Info().Msg("processing timeout broadcast request from hotstuff")
+
+	// retrieve all consensus nodes without our ID
+	recipients, err := e.state.Final().Identities(filter.And(
+		filter.HasRole(flow.RoleConsensus),
+		filter.Not(filter.HasNodeID(e.me.NodeID())),
+	))
+	if err != nil {
+		return fmt.Errorf("could not get consensus recipients: %w", err)
+	}
+
+	e.unit.Launch(func() {
+		// create the proposal message for the collection
+		msg := &messages.TimeoutObject{
+			View:       timeout.View,
+			NewestQC:   timeout.NewestQC,
+			LastViewTC: timeout.LastViewTC,
+			SigData:    timeout.SigData,
+		}
+
+		err := e.con.Publish(msg, recipients.NodeIDs()...)
+		if errors.Is(err, network.EmptyTargetList) {
+			return
+		}
+		if err != nil {
+			log.Error().Err(err).Msg("could not broadcast timeout")
+			return
+		}
+
+		log.Info().Msg("consensus timeout broadcast")
+
+		//e.metrics.MessageSent(metrics.EngineClusterCompliance, metrics.MessageClusterBlockProposal)
+		//e.core.collectionMetrics.ClusterBlockProposed(block)
 	})
 
 	return nil

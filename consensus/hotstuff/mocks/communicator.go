@@ -7,6 +7,8 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 
+	model "github.com/onflow/flow-go/consensus/hotstuff/model"
+
 	time "time"
 )
 
@@ -36,6 +38,20 @@ func (_m *Communicator) BroadcastProposalWithDelay(proposal *flow.Header, delay 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(*flow.Header, time.Duration) error); ok {
 		r0 = rf(proposal, delay)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// BroadcastTimeout provides a mock function with given fields: timeout
+func (_m *Communicator) BroadcastTimeout(timeout *model.TimeoutObject) error {
+	ret := _m.Called(timeout)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*model.TimeoutObject) error); ok {
+		r0 = rf(timeout)
 	} else {
 		r0 = ret.Error(0)
 	}
