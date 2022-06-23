@@ -81,7 +81,7 @@ func NewResolver(logger zerolog.Logger, collector module.ResolverMetrics, dnsCac
 	resolver := &Resolver{
 		logger:         logger.With().Str("component", "dns-resolver").Logger(),
 		res:            madns.DefaultResolver,
-		c:              newCache(dnsCache),
+		c:              newCache(logger, dnsCache),
 		collector:      collector,
 		processingIPs:  map[string]struct{}{},
 		processingTXTs: map[string]struct{}{},

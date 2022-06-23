@@ -1,9 +1,12 @@
 package dns
 
 import (
+	"fmt"
 	"net"
 	"sync"
 	"time"
+
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module/mempool"
 )
@@ -19,15 +22,18 @@ const (
 
 // cache is a ttl-based cache for dns entries
 type cache struct {
+	sync.RWMutex
+
 	ttl    time.Duration // time-to-live for cache entry
 	dCache mempool.DNSCache
-	sync.Mutex
+	logger zerolog.Logger
 }
 
-func newCache(dnsCache mempool.DNSCache) *cache {
+func newCache(logger zerolog.Logger, dnsCache mempool.DNSCache) *cache {
 	return &cache{
 		ttl:    DefaultTimeToLive,
 		dCache: dnsCache,
+		logger: logger.With().Str("component", "dns-cache").Logger(),
 	}
 }
 
@@ -35,13 +41,23 @@ func newCache(dnsCache mempool.DNSCache) *cache {
 // First boolean variable determines whether the domain exists in the cache.
 // Second boolean variable determines whether the domain cache is fresh, i.e., TTL has not yet reached.
 func (c *cache) resolveIPCache(domain string) ([]net.IPAddr, bool, bool) {
-	addresses, timeStamp, ok := c.dCache.GetDomainIp(domain)
+	c.RLock()
+	defer c.RUnlock()
+
+	addresses, recordTimeStamp, ok := c.dCache.GetDomainIp(domain)
+	currentTimeStamp := runtimeNano()
+	c.logger.Trace().
+		Str("domain", domain).
+		Str("address", fmt.Sprintf("%v", addresses)).
+		Int64("record_timestamp", recordTimeStamp).
+		Int64("current_timestamp", currentTimeStamp).
+		Msg("dns record retrieved")
 	if !ok {
 		// does not exist
 		return nil, !cacheEntryExists, !cacheEntryFresh
 	}
 
-	if time.Duration(runtimeNano()-timeStamp) > c.ttl {
+	if time.Duration(currentTimeStamp-recordTimeStamp) > c.ttl {
 		// exists but expired
 		return addresses, cacheEntryExists, !cacheEntryFresh
 	}
@@ -54,13 +70,23 @@ func (c *cache) resolveIPCache(domain string) ([]net.IPAddr, bool, bool) {
 // First boolean variable determines whether the txt record exists in the cache.
 // Second boolean variable determines whether the txt record cache is fresh, i.e., TTL has not yet reached.
 func (c *cache) resolveTXTCache(txt string) ([]string, bool, bool) {
-	records, timeStamp, ok := c.dCache.GetTxtRecord(txt)
+	c.RLock()
+	defer c.RUnlock()
+
+	records, recordTimeStamp, ok := c.dCache.GetTxtRecord(txt)
+	currentTimeStamp := runtimeNano()
+	c.logger.Trace().
+		Str("txt", txt).
+		Str("address", fmt.Sprintf("%v", records)).
+		Int64("record_timestamp", recordTimeStamp).
+		Int64("current_timestamp", currentTimeStamp).
+		Msg("dns record retrieved")
 	if !ok {
 		// does not exist
 		return nil, !cacheEntryExists, !cacheEntryFresh
 	}
 
-	if time.Duration(runtimeNano()-timeStamp) > c.ttl {
+	if time.Duration(currentTimeStamp-recordTimeStamp) > c.ttl {
 		// exists but expired
 		return records, cacheEntryExists, !cacheEntryFresh
 	}
@@ -73,14 +99,33 @@ func (c *cache) resolveTXTCache(txt string) ([]string, bool, bool) {
 func (c *cache) updateIPCache(domain string, addr []net.IPAddr) {
 	c.Lock()
 	defer c.Unlock()
-	c.dCache.PutDomainIp(domain, addr, runtimeNano())
+
+	timestamp := runtimeNano()
+	removed := c.dCache.RemoveIp(domain)
+	added := c.dCache.PutDomainIp(domain, addr, runtimeNano())
+	c.logger.Trace().
+		Str("domain", domain).
+		Str("address", fmt.Sprintf("%v", addr)).
+		Bool("old_entry_removed", removed).
+		Bool("new_entry_added", added).
+		Int64("timestamp", timestamp).
+		Msg("dns cache updated")
 }
 
 // updateTXTCache updates the cache entry for the txt record.
 func (c *cache) updateTXTCache(txt string, record []string) {
 	c.Lock()
 	defer c.Unlock()
-	c.dCache.PutTxtRecord(txt, record, runtimeNano())
+	timestamp := runtimeNano()
+	removed := c.dCache.RemoveTxt(txt)
+	added := c.dCache.PutTxtRecord(txt, record, runtimeNano())
+	c.logger.Trace().
+		Str("txt", txt).
+		Strs("record", record).
+		Bool("old_entry_removed", removed).
+		Bool("new_entry_added", added).
+		Int64("timestamp", timestamp).
+		Msg("dns cache updated")
 }
 
 // invalidateIPCacheEntry atomically invalidates ip cache entry. Boolean variable determines whether invalidation
@@ -88,6 +133,7 @@ func (c *cache) updateTXTCache(txt string, record []string) {
 func (c *cache) invalidateIPCacheEntry(domain string) bool {
 	c.Lock()
 	defer c.Unlock()
+
 	return c.dCache.RemoveIp(domain)
 }
 
@@ -96,5 +142,6 @@ func (c *cache) invalidateIPCacheEntry(domain string) bool {
 func (c *cache) invalidateTXTCacheEntry(txt string) bool {
 	c.Lock()
 	defer c.Unlock()
+
 	return c.dCache.RemoveTxt(txt)
 }
