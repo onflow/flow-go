@@ -743,5 +743,5 @@ func (ec *ExecutionCollector) DiskSize(bytes uint64) {
 }
 
 func (ec *ExecutionCollector) UpdateCollectionMaxHeight(height uint64) {
-	
+
 }
