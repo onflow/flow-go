@@ -165,7 +165,7 @@ func (i *TransactionInvoker) Process(
 
 	// read computationUsed from the environment. This will be used to charge fees.
 	computationUsed := env.ComputationUsed()
-	memoryUsed := env.MemoryUsed()
+	memoryEstimate := env.MemoryEstimate()
 
 	// log te execution intensities here, so tha they do not contain data from storage limit checks and
 	// transaction deduction, because the payer is not charged for those.
@@ -247,7 +247,7 @@ func (i *TransactionInvoker) Process(
 	// if tx failed this will only contain fee deduction logs
 	proc.Logs = append(proc.Logs, env.Logs()...)
 	proc.ComputationUsed = proc.ComputationUsed + computationUsed
-	proc.MemoryUsed = proc.MemoryUsed + memoryUsed
+	proc.MemoryEstimate = proc.MemoryEstimate + memoryEstimate
 
 	// based on the contract updates we decide how to clean up the programs
 	// for failed transactions we also do the same as
@@ -453,7 +453,7 @@ func (i *TransactionInvoker) logExecutionIntensities(sth *state.StateHolder, txH
 			Str("txHash", txHash).
 			Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
 			Uint("computationUsed", sth.State().TotalComputationUsed()).
-			Uint("memoryUsed", sth.State().TotalMemoryUsed()).
+			Uint("memoryEstimate", sth.State().TotalMemoryEstimate()).
 			Dict("computationIntensities", computation).
 			Dict("memoryIntensities", memory).
 			Msg("transaction execution data")

@@ -27,12 +27,9 @@ func NewHasher(algo hash.HashingAlgorithm) (hash.Hasher, error) {
 	switch algo {
 	case hash.SHA2_256:
 		return hash.NewSHA2_256(), nil
-	case hash.SHA2_384:
-		return hash.NewSHA2_384(), nil
 	case hash.SHA3_256:
 		return hash.NewSHA3_256(), nil
-	case hash.SHA3_384:
-		return hash.NewSHA3_384(), nil
+	default:
+		return nil, fmt.Errorf("not supported hashing algorithms: %d", algo)
 	}
-	return nil, fmt.Errorf("not supported hashing algorithms: %d", algo)
 }
