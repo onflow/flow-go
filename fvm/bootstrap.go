@@ -208,10 +208,13 @@ func Bootstrap(
 	serviceAccountPublicKey flow.AccountPublicKey,
 	opts ...BootstrapProcedureOption,
 ) *BootstrapProcedure {
+	// transient networks (or new networks) don't have restrictedContractDeployment
+	restrictedContractDeployment := false
 	bootstrapProcedure := &BootstrapProcedure{
-		serviceAccountPublicKey: serviceAccountPublicKey,
-		transactionFees:         BootstrapProcedureFeeParameters{0, 0, 0},
-		epochConfig:             epochs.DefaultEpochConfig(),
+		serviceAccountPublicKey:      serviceAccountPublicKey,
+		transactionFees:              BootstrapProcedureFeeParameters{0, 0, 0},
+		epochConfig:                  epochs.DefaultEpochConfig(),
+		restrictedContractDeployment: &restrictedContractDeployment,
 	}
 
 	for _, applyOption := range opts {
