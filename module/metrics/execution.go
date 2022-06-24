@@ -317,7 +317,7 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Subsystem: subsystemRuntime,
 		Name:      "transaction_memory_estimate",
 		Help:      "the estimated memory used by a transaction",
-		Buckets:   []float64{100_000, 1_000_000, 10_000_000, 50_000_000, 100_000_000, 500_000_000, 1_000_000_000},
+		Buckets:   []float64{1_000_000, 10_000_000, 100_000_000, 1_000_000_000, 5_000_000_000, 10_000_000_000, 50_000_000_000, 100_000_000_000},
 	})
 
 	transactionMemoryDifference := promauto.NewHistogram(prometheus.HistogramOpts{
@@ -364,7 +364,7 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Subsystem: subsystemRuntime,
 		Name:      "script_memory_estimate",
 		Help:      "the estimated memory used by a script",
-		Buckets:   []float64{100_000, 1_000_000, 10_000_000, 50_000_000, 100_000_000, 500_000_000, 1_000_000_000},
+		Buckets:   []float64{1_000_000, 10_000_000, 100_000_000, 1_000_000_000, 5_000_000_000, 10_000_000_000, 50_000_000_000, 100_000_000_000},
 	})
 
 	scriptMemoryDifference := promauto.NewHistogram(prometheus.HistogramOpts{
