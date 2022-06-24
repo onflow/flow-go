@@ -406,7 +406,10 @@ func TestBlockContext_DeployContract(t *testing.T) {
 	)
 
 	t.Run("account update with set code succeeds as service account", func(t *testing.T) {
-		ledger := testutil.RootBootstrappedLedger(vm, ctx)
+		restricted := true
+		ledger := testutil.RootBootstrappedLedger(vm, ctx,
+			fvm.WithRestrictedContractDeployment(&restricted),
+		)
 
 		// Create an account private key.
 		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -436,7 +439,10 @@ func TestBlockContext_DeployContract(t *testing.T) {
 	})
 
 	t.Run("account with deployed contract has `contracts.names` filled", func(t *testing.T) {
-		ledger := testutil.RootBootstrappedLedger(vm, ctx)
+		restricted := true
+		ledger := testutil.RootBootstrappedLedger(vm, ctx,
+			fvm.WithRestrictedContractDeployment(&restricted),
+		)
 
 		// Create an account private key.
 		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -531,7 +537,10 @@ func TestBlockContext_DeployContract(t *testing.T) {
 	})
 
 	t.Run("account update with set code fails if not signed by service account", func(t *testing.T) {
-		ledger := testutil.RootBootstrappedLedger(vm, ctx)
+		restricted := true
+		ledger := testutil.RootBootstrappedLedger(vm, ctx,
+			fvm.WithRestrictedContractDeployment(&restricted),
+		)
 
 		// Create an account private key.
 		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -795,7 +804,10 @@ func TestBlockContext_DeployContract(t *testing.T) {
 	})
 
 	t.Run("account update with set code succeeds when there is a matching audit voucher", func(t *testing.T) {
-		ledger := testutil.RootBootstrappedLedger(vm, ctx)
+		restricted := true
+		ledger := testutil.RootBootstrappedLedger(vm, ctx,
+			fvm.WithRestrictedContractDeployment(&restricted),
+		)
 
 		// Create an account private key.
 		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
