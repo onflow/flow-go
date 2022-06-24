@@ -741,3 +741,7 @@ func (ec *ExecutionCollector) RuntimeSetNumberOfAccounts(count uint64) {
 func (ec *ExecutionCollector) DiskSize(bytes uint64) {
 	ec.executionStateDiskUsage.Set(float64(bytes))
 }
+
+func (ec *ExecutionCollector) UpdateCollectionMaxHeight(height uint64) {
+	
+}
