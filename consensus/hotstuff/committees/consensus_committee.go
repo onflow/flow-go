@@ -106,11 +106,13 @@ func newEmergencyFallbackEpoch(lastCommittedEpoch *staticEpochInfo) (*staticEpoc
 // Consensus represents the main committee for consensus nodes. The consensus
 // committee might be active for multiple successive epochs.
 type Consensus struct {
-	state       protocol.State              // the protocol state
-	me          flow.Identifier             // the node ID of this node
-	mu          sync.RWMutex                // protects access to epochs
-	epochs      map[uint64]*staticEpochInfo // cache of initial committee & leader selection per epoch
-	events.Noop                             // implements protocol.Consumer
+	state                  protocol.State              // the protocol state
+	me                     flow.Identifier             // the node ID of this node
+	mu                     sync.RWMutex                // protects access to epochs
+	epochs                 map[uint64]*staticEpochInfo // cache of initial committee & leader selection per epoch
+	committedEpochsCh      chan protocol.Epoch         // protocol events for newly committed epochs
+	epochEmergencyFallback chan struct{}               // protocol event for epoch emergency fallback
+	events.Noop                                        // implements protocol.Consumer
 	component.Component
 }
 
@@ -120,9 +122,11 @@ var _ hotstuff.DynamicCommittee = (*Consensus)(nil)
 func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus, error) {
 
 	com := &Consensus{
-		state:  state,
-		me:     me,
-		epochs: make(map[uint64]*staticEpochInfo),
+		state:                  state,
+		me:                     me,
+		epochs:                 make(map[uint64]*staticEpochInfo),
+		committedEpochsCh:      make(chan protocol.Epoch),
+		epochEmergencyFallback: make(chan struct{}),
 	}
 
 	final := state.Final()
@@ -156,14 +160,10 @@ func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus
 	}
 
 	com.Component = component.NewComponentManagerBuilder().
-		AddWorker(component.NoopWorker).
+		AddWorker(com.handleProtocolEvents).
 		Build()
 
 	return com, nil
-}
-
-func (c *Consensus) Start(ctx irrecoverable.SignalerContext) {
-	c.Component.Start(ctx)
 }
 
 func (c *Consensus) IdentitiesByBlock(blockID flow.Identifier) (flow.IdentityList, error) {
@@ -192,7 +192,6 @@ func (c *Consensus) IdentityByBlock(blockID flow.Identifier, nodeID flow.Identif
 //   * model.ErrViewForUnknownEpoch if no committed epoch containing the given view is known.
 //     This is an expected error and must be handled.
 //   * unspecific error in case of unexpected problems and bugs
-//
 func (c *Consensus) IdentitiesByEpoch(view uint64) (flow.IdentityList, error) {
 	epochInfo, err := c.staticEpochInfoByView(view)
 	if err != nil {
@@ -229,13 +228,6 @@ func (c *Consensus) IdentityByEpoch(view uint64, nodeID flow.Identifier) (*flow.
 //   * model.ErrViewForUnknownEpoch if no committed epoch containing the given view is known.
 //     This is an expected error and must be handled.
 //   * unspecific error in case of unexpected problems and bugs
-//
-// TODO: Update protocol state to trigger EECC early using safety threshold
-//   * see https://github.com/dapperlabs/flow-go/issues/6227 for details
-//   * the current implementation assumes #6227 is implemented
-//   * we no longer need EECC logic here, because the protocol state will
-//     inject a "next" fallback epoch carrying over the last committee until
-//     the next spork, which we query here
 func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 
 	epochInfo, err := c.staticEpochInfoByView(view)
@@ -248,6 +240,11 @@ func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 // QuorumThresholdForView returns the minimum weight required to build a valid
 // QC in the given view. The weight threshold only changes at epoch boundaries
 // and is computed based on the initial committee weights.
+//
+// Error returns:
+//   * model.ErrViewForUnknownEpoch if no committed epoch containing the given view is known.
+//     This is an expected error and must be handled.
+//   * unspecific error in case of unexpected problems and bugs
 func (c *Consensus) QuorumThresholdForView(view uint64) (uint64, error) {
 	epochInfo, err := c.staticEpochInfoByView(view)
 	if err != nil {
@@ -285,15 +282,69 @@ func (c *Consensus) DKG(view uint64) (hotstuff.DKG, error) {
 	return epochInfo.dkg, nil
 }
 
-// EpochCommittedPhaseStarted handles the protocol event for a committed epoch.
-// When we observe a new epoch being committed, we cache the corresponding
-// initial committee and leader selection to satisfy future requests.
-func (c *Consensus) EpochCommittedPhaseStarted(_ uint64, first *flow.Header) {
-	next := c.state.AtBlockID(first.ID()).Epochs().Next()
-	_, err := c.prepareEpoch(next)
-	if err != nil {
-		// TODO fatal error
+// handleProtocolEvents is a worker routine which processes protocol events from
+// the protocol state. When we observe a new epoch being committed, we compute
+// the leader selection and cache static info for the epoch. When we observe
+// epoch emergency fallback being triggered, we inject a fallback epoch.
+func (c *Consensus) handleProtocolEvents(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case epoch := <-c.committedEpochsCh:
+			_, err := c.prepareEpoch(epoch)
+			if err != nil {
+				ctx.Throw(err)
+			}
+		case <-c.epochEmergencyFallback:
+			err := c.onEpochEmergencyFallbackTriggered()
+			if err != nil {
+				ctx.Throw(err)
+			}
+		}
 	}
+}
+
+// onEpochEmergencyFallbackTriggered handles the protocol event for emergency epoch
+// fallback mode being triggered. When this occurs, we inject a fallback epoch
+// to the committee which extends the current epoch.
+func (c *Consensus) onEpochEmergencyFallbackTriggered() error {
+	currentEpochCounter, err := c.state.Final().Epochs().Current().Counter()
+	if err != nil {
+		return fmt.Errorf("could not get current epoch counter: %w", err)
+	}
+
+	c.mu.RLock()
+	// sanity check: current epoch must be cached already
+	currentEpoch, ok := c.epochs[currentEpochCounter]
+	c.mu.RUnlock()
+	if !ok {
+		return fmt.Errorf("epoch fallback: could not find current epoch (counter=%d) info", currentEpochCounter)
+	}
+	// sanity check: next epoch must never be committed, therefore must not be cached
+	c.mu.RLock()
+	_, ok = c.epochs[currentEpochCounter+1]
+	c.mu.RUnlock()
+	if ok {
+		return fmt.Errorf("epoch fallback: next epoch (counter=%d) is cached contrary to expectation", currentEpochCounter+1)
+	}
+
+	fallbackEpoch, err := newEmergencyFallbackEpoch(currentEpoch)
+	if err != nil {
+		return fmt.Errorf("could not construct fallback epoch: %w", err)
+	}
+
+	// cache the epoch info
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.epochs[currentEpochCounter+1] = fallbackEpoch
+	// now prune any old epochs, if we have exceeded our maximum of 3
+	// if we have fewer than 3 epochs, this is a no-op
+	c.pruneEpochInfo()
+
+	return nil
 }
 
 // staticEpochInfoByView retrieves the previously cached static epoch info for
@@ -318,59 +369,14 @@ func (c *Consensus) staticEpochInfoByView(view uint64) (*staticEpochInfo, error)
 	}
 	c.mu.RUnlock()
 
-	// at this point, we know that the epoch for the given view is not cached
-	// try to retrieve and cache epoch info for the next epoch
-	nextEpochInfo, ok, err := c.tryPrepareNextEpoch()
-	if err != nil {
-		return nil, fmt.Errorf("unexpected error trying to cache next epoch: %w", err)
-	}
-	// we don't know about the epoch for this view yet, return the sentinel
-	if !ok {
-		return nil, model.ErrViewForUnknownEpoch
-	}
-	// we successfully cached the next epoch, return the corresponding static info
-	// if it contains the given view
-	if nextEpochInfo.firstView <= view && view <= nextEpochInfo.finalView {
-		return nextEpochInfo, nil
-	}
 	return nil, model.ErrViewForUnknownEpoch
-}
-
-// tryPrepareNextEpoch tries to cache the next epoch, returning the cached static
-// epoch info if caching is successful.
-//
-// Returns:
-// * nextEpochInfo, true, nil if the next epoch info was successfully cached
-// * nil, false, nil if the next epoch is not committed
-// * nil, false, err for any unexpected errors
-//
-// TODO: trigger this via an event from protocol state instead
-//   * previously the asynchrony of protocol events was not acceptable, because any
-//     unknown view errors for LeaderForView were fatal
-//   * now, we handle these errors, since we may validate messages from future views -
-//     so long as we eventually cache a newly committed epoch, liveness is not compromised
-func (c *Consensus) tryPrepareNextEpoch() (*staticEpochInfo, bool, error) {
-	next := c.state.Final().Epochs().Next()
-	committed, err := protocol.IsEpochCommitted(next)
-	if err != nil {
-		return nil, false, fmt.Errorf("could not check if epoch is committed: %w", err)
-	}
-	if !committed {
-		return nil, false, nil
-	}
-	epochInfo, err := c.prepareEpoch(next)
-	if err != nil {
-		return nil, false, fmt.Errorf("could not prepare next epoch: %w", err)
-	}
-	return epochInfo, true, nil
 }
 
 // prepareEpoch pre-computes and stores the static epoch information for the
 // given epoch, including leader selection. Calling prepareEpoch multiple times
 // for the same epoch returns cached static epoch information.
-//
 // Input must be a committed epoch.
-//
+// No errors are expected during normal operation.
 func (c *Consensus) prepareEpoch(epoch protocol.Epoch) (*staticEpochInfo, error) {
 
 	counter, err := epoch.Counter()
@@ -410,7 +416,6 @@ func (c *Consensus) prepareEpoch(epoch protocol.Epoch) (*staticEpochInfo, error)
 	// now prune any old epochs, if we have exceeded our maximum of 3
 	// if we have fewer than 3 epochs, this is a no-op
 	c.pruneEpochInfo()
-
 	return epochInfo, nil
 }
 
