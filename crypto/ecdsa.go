@@ -15,7 +15,6 @@ import (
 	"math/big"
 
 	"github.com/btcsuite/btcd/btcec"
-
 	"github.com/onflow/flow-go/crypto/hash"
 )
 

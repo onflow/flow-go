@@ -5,14 +5,12 @@
 package mocknetwork
 
 import (
-	reflect "reflect"
-
 	gomock "github.com/golang/mock/gomock"
 	go_datastore "github.com/ipfs/go-datastore"
 	protocol "github.com/libp2p/go-libp2p-core/protocol"
-
 	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
 	network "github.com/onflow/flow-go/network"
+	reflect "reflect"
 )
 
 // MockNetwork is a mock of Network interface

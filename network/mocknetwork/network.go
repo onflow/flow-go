@@ -4,9 +4,8 @@ package mocknetwork
 
 import (
 	datastore "github.com/ipfs/go-datastore"
-	mock "github.com/stretchr/testify/mock"
-
 	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
+	mock "github.com/stretchr/testify/mock"
 
 	network "github.com/onflow/flow-go/network"
 

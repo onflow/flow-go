@@ -6,7 +6,6 @@ import (
 	"math/rand"
 
 	"github.com/onflow/cadence"
-
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
