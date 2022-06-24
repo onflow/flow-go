@@ -766,8 +766,8 @@ func (e *TransactionEnv) MeterMemory(usage common.MemoryUsage) error {
 	return e.meterMemory(usage.Kind, uint(usage.Amount))
 }
 
-func (e *TransactionEnv) MemoryUsed() uint64 {
-	return uint64(e.sth.State().TotalMemoryUsed())
+func (e *TransactionEnv) MemoryEstimate() uint64 {
+	return uint64(e.sth.State().TotalMemoryEstimate())
 }
 
 func (e *TransactionEnv) SetAccountFrozen(address common.Address, frozen bool) error {
