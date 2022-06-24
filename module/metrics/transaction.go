@@ -268,3 +268,7 @@ func (tc *TransactionCollector) TransactionExpired(txID flow.Identifier) {
 	tc.transactionSubmission.WithLabelValues("expired").Inc()
 	tc.transactionTimings.Rem(txID)
 }
+
+func (tc *TransactionCollector) UpdateExecutionReceiptMaxHeight(height uint64) {
+
+}
