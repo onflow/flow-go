@@ -10,7 +10,10 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/seed"
 )
 
@@ -103,10 +106,12 @@ func newEmergencyFallbackEpoch(lastCommittedEpoch *staticEpochInfo) (*staticEpoc
 // Consensus represents the main committee for consensus nodes. The consensus
 // committee might be active for multiple successive epochs.
 type Consensus struct {
-	mu     sync.RWMutex
-	state  protocol.State              // the protocol state
-	me     flow.Identifier             // the node ID of this node
-	epochs map[uint64]*staticEpochInfo // cache of initial committee & leader selection per epoch
+	state       protocol.State              // the protocol state
+	me          flow.Identifier             // the node ID of this node
+	mu          sync.RWMutex                // protects access to epochs
+	epochs      map[uint64]*staticEpochInfo // cache of initial committee & leader selection per epoch
+	events.Noop                             // implements protocol.Consumer
+	component.Component
 }
 
 var _ hotstuff.Replicas = (*Consensus)(nil)
@@ -150,7 +155,15 @@ func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus
 		return nil, fmt.Errorf("could not add leader for previous epoch: %w", err)
 	}
 
+	com.Component = component.NewComponentManagerBuilder().
+		AddWorker(component.NoopWorker).
+		Build()
+
 	return com, nil
+}
+
+func (c *Consensus) Start(ctx irrecoverable.SignalerContext) {
+	c.Component.Start(ctx)
 }
 
 func (c *Consensus) IdentitiesByBlock(blockID flow.Identifier) (flow.IdentityList, error) {
@@ -270,6 +283,17 @@ func (c *Consensus) DKG(view uint64) (hotstuff.DKG, error) {
 		return nil, err
 	}
 	return epochInfo.dkg, nil
+}
+
+// EpochCommittedPhaseStarted handles the protocol event for a committed epoch.
+// When we observe a new epoch being committed, we cache the corresponding
+// initial committee and leader selection to satisfy future requests.
+func (c *Consensus) EpochCommittedPhaseStarted(_ uint64, first *flow.Header) {
+	next := c.state.AtBlockID(first.ID()).Epochs().Next()
+	_, err := c.prepareEpoch(next)
+	if err != nil {
+		// TODO fatal error
+	}
 }
 
 // staticEpochInfoByView retrieves the previously cached static epoch info for
