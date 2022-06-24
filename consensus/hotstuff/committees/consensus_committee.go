@@ -11,14 +11,16 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/seed"
 )
 
 // staticEpochInfo contains leader selection and the initial committee for one epoch.
 // This data structure must not be mutated after construction.
 type staticEpochInfo struct {
-	firstView uint64                  // first view of the epoch (inclusive)
-	finalView uint64                  // final view of the epoch (inclusive)
-	leaders   *leader.LeaderSelection // pre-computed leader selection for the epoch
+	firstView    uint64                  // first view of the epoch (inclusive)
+	finalView    uint64                  // final view of the epoch (inclusive)
+	randomSource []byte                  // random source of epoch
+	leaders      *leader.LeaderSelection // pre-computed leader selection for the epoch
 	// TODO: should use identity skeleton https://github.com/dapperlabs/flow-go/issues/6232
 	initialCommittee     flow.IdentityList
 	weightThresholdForQC uint64 // computed based on initial committee weights
@@ -36,6 +38,10 @@ func newStaticEpochInfo(epoch protocol.Epoch) (*staticEpochInfo, error) {
 	finalView, err := epoch.FinalView()
 	if err != nil {
 		return nil, fmt.Errorf("could not get final view: %w", err)
+	}
+	randomSource, err := epoch.RandomSource()
+	if err != nil {
+		return nil, fmt.Errorf("could not get random source: %w", err)
 	}
 	leaders, err := leader.SelectionForConsensus(epoch)
 	if err != nil {
@@ -55,11 +61,41 @@ func newStaticEpochInfo(epoch protocol.Epoch) (*staticEpochInfo, error) {
 	epochInfo := &staticEpochInfo{
 		firstView:            firstView,
 		finalView:            finalView,
+		randomSource:         randomSource,
 		leaders:              leaders,
 		initialCommittee:     initialCommittee,
 		weightThresholdForQC: WeightThresholdToBuildQC(totalWeight),
 		weightThresholdForTO: WeightThresholdToTimeout(totalWeight),
 		dkg:                  dkg,
+	}
+	return epochInfo, nil
+}
+
+// newEmergencyFallbackEpoch creates an artificial fallback epoch generated from
+// the last committed epoch at the time epoch emergency fallback is triggered.
+// The fallback epoch:
+// * begins after the last committed epoch
+// * lasts until the next spork (estimated 6 months)
+// * has the same static committee as the last committed epoch
+func newEmergencyFallbackEpoch(lastCommittedEpoch *staticEpochInfo) (*staticEpochInfo, error) {
+
+	rng, err := seed.PRGFromRandomSource(lastCommittedEpoch.randomSource, seed.ProtocolConsensusLeaderSelection)
+	if err != nil {
+		return nil, fmt.Errorf("could not create rng from seed: %w", err)
+	}
+	leaders, err := leader.ComputeLeaderSelection(lastCommittedEpoch.finalView+1, rng, leader.EstimatedSixMonthOfViews, lastCommittedEpoch.initialCommittee)
+	if err != nil {
+		return nil, fmt.Errorf("could not compute leader selection for fallback epoch: %w", err)
+	}
+	epochInfo := &staticEpochInfo{
+		firstView:            lastCommittedEpoch.finalView + 1,
+		finalView:            lastCommittedEpoch.finalView + leader.EstimatedSixMonthOfViews,
+		randomSource:         lastCommittedEpoch.randomSource,
+		leaders:              leaders,
+		initialCommittee:     lastCommittedEpoch.initialCommittee,
+		weightThresholdForQC: lastCommittedEpoch.weightThresholdForQC,
+		weightThresholdForTO: lastCommittedEpoch.weightThresholdForTO,
+		dkg:                  lastCommittedEpoch.dkg,
 	}
 	return epochInfo, nil
 }
@@ -354,7 +390,8 @@ func (c *Consensus) prepareEpoch(epoch protocol.Epoch) (*staticEpochInfo, error)
 	return epochInfo, nil
 }
 
-// pruneEpochInfo removes any epochs
+// pruneEpochInfo removes any epochs older than the most recent 3.
+// NOTE: Not safe for concurrent use - the caller must first acquire the lock.
 func (c *Consensus) pruneEpochInfo() {
 	// find the maximum counter, including the epoch we just computed
 	max := uint64(0)
