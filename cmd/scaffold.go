@@ -857,7 +857,17 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 	}
 	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Canary || fnb.RootChainID == flow.Localnet || fnb.RootChainID == flow.Benchnet {
 		vmOpts = append(vmOpts,
-			fvm.WithRestrictedDeployment(false),
+			// restricted deployment of contracts will still be false even though this is set to true because the
+			// setting from the state takes precedence over the setting here.
+			// This can be seen in `fvm.GetIsContractDeploymentRestricted`.
+			// the reason this is set to true and not simply removed,
+			// is to test that this behaviour is in fact working properly.
+			// see doc for more info:
+			// https://www.notion.so/dapperlabs/Enable-Permissionless-Contract-Deployment-On-mainnet-3a9ff010423444c0975ed6052e028968
+			// Transient networks (Localnet/Benchnet) will also use the setting from the state set at bootstrapping.
+			// see: `fvm.Bootstrap`
+			// TODO: Remove WithRestrictedDeployment and related constants after this is deployed.
+			fvm.WithRestrictedDeployment(true),
 		)
 	}
 	fnb.FvmOptions = vmOpts
