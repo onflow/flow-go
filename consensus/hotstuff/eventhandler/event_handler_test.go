@@ -508,9 +508,9 @@ func (es *EventHandlerSuite) TestInNewView_NotLeader_HasBlock_NotSafeNode_IsNext
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
 }
 
-// received a valid proposal that has older view, and cannot build qc from votes for this block,
-// the proposal's QC didn't trigger view change
-func (es *EventHandlerSuite) TestOnReceiveProposal_OlderThanCurView_CannotBuildQCFromVotes_NoViewChange() {
+// TestOnReceiveProposal_OlderThanCurView tests scenario: received a valid proposal that has older view,
+// and cannot build qc from votes for this block, the proposal's QC shouldn't trigger view change.
+func (es *EventHandlerSuite) TestOnReceiveProposal_OlderThanCurView() {
 	proposal := createProposal(es.initView-1, es.initView-2)
 	es.voteAggregator.On("AddBlock", proposal).Return(nil).Once()
 
@@ -522,32 +522,76 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_OlderThanCurView_CannotBuildQ
 	es.voteAggregator.AssertCalled(es.T(), "AddBlock", proposal)
 }
 
-// received a valid proposal that has older view, and can built a qc from votes for this block,
-// the proposal's QC didn't trigger view change
-func (es *EventHandlerSuite) TestOnReceiveProposal_OlderThanCurView_CanBuildQCFromVotes_NoViewChange() {
-	proposal := createProposal(es.initView-1, es.initView-2)
+// TestOnReceiveProposal_NoVote tests scenario: received a valid proposal for cur view, but not a safe node to vote, and I'm the next leader
+// should not vote.
+func (es *EventHandlerSuite) TestOnReceiveProposal_NoVote() {
+	proposal := createProposal(es.initView, es.initView-1)
 	es.voteAggregator.On("AddBlock", proposal).Return(nil).Once()
 
-	//should not trigger view change
+	// I'm the next leader
+	es.committee.leaders[es.initView+1] = struct{}{}
+	// no vote for this proposal
 	err := es.eventhandler.OnReceiveProposal(proposal)
 	require.NoError(es.T(), err)
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
 	es.voteAggregator.AssertCalled(es.T(), "AddBlock", proposal)
 }
 
-// received a valid proposal for cur view, but not a safe node to vote, and I'm the next leader,
-// no qc for the block
-func (es *EventHandlerSuite) TestOnReceiveProposal_ForCurView_NoVote_IsNextLeader_NoQC() {
+// TestOnReceiveProposal_NoVote_ProposalParentNotFound tests scenario: received a valid proposal for cur view, no parent for this proposal found
+// should not vote.
+func (es *EventHandlerSuite) TestOnReceiveProposal_NoVote_ProposalParentNotFound() {
 	proposal := createProposal(es.initView, es.initView-1)
 	es.voteAggregator.On("AddBlock", proposal).Return(nil).Once()
 
-	// I'm the next leader
-	es.committee.leaders[es.initView+1] = struct{}{}
-	// no qc can be built for this block
+	// remove parent from known blocks
+	delete(es.forks.blocks, proposal.Block.QC.BlockID)
+
+	// no vote for this proposal, no parent found
 	err := es.eventhandler.OnReceiveProposal(proposal)
 	require.NoError(es.T(), err)
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
 	es.voteAggregator.AssertCalled(es.T(), "AddBlock", proposal)
+}
+
+// TestOnReceiveProposal_Vote_NextLeader tests scenario: received a valid proposal for cur view, safe to vote, I'm the next leader
+// should vote and add vote to VoteAggregator.
+func (es *EventHandlerSuite) TestOnReceiveProposal_Vote_NextLeader() {
+	proposal := createProposal(es.initView, es.initView-1)
+	es.voteAggregator.On("AddBlock", proposal).Return(nil).Once()
+	es.voteAggregator.On("AddVote", mock.Anything).Return().Once()
+
+	// I'm the next leader
+	es.committee.leaders[es.initView+1] = struct{}{}
+
+	// proposal is safe to vote
+	es.safetyRules.votable[proposal.Block.BlockID] = struct{}{}
+
+	// vote should be created for this proposal
+	err := es.eventhandler.OnReceiveProposal(proposal)
+	require.NoError(es.T(), err)
+	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
+}
+
+// TestOnReceiveProposal_Vote_NextLeader tests scenario: received a valid proposal for cur view, safe to vote, I'm not the next leader
+// should vote and send vote to next leader.
+func (es *EventHandlerSuite) TestOnReceiveProposal_Vote_NotNextLeader() {
+	proposal := createProposal(es.initView, es.initView-1)
+	es.voteAggregator.On("AddBlock", proposal).Return(nil).Once()
+
+	// proposal is safe to vote
+	es.safetyRules.votable[proposal.Block.BlockID] = struct{}{}
+
+	// vote should be created for this proposal
+	err := es.eventhandler.OnReceiveProposal(proposal)
+	require.NoError(es.T(), err)
+	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
+
+	lastCall := es.communicator.Calls[len(es.communicator.Calls)-1]
+	// the last call is SendVote
+	require.Equal(es.T(), "SendVote", lastCall.Method)
+	blockID, ok := lastCall.Arguments[0].(flow.Identifier)
+	require.True(es.T(), ok)
+	require.Equal(es.T(), proposal.Block.BlockID, blockID)
 }
 
 // received a valid proposal for cur view, but not a safe node to vote, and I'm the next leader,
