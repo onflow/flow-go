@@ -188,7 +188,7 @@ func UnstakedNetworkingKey() (crypto.PrivateKey, error) {
 	if err != nil || n != crypto.KeyGenSeedMinLenECDSASecp256k1 {
 		return nil, err
 	}
-	return utils.GenerateUnstakedNetworkingKey(unittest.SeedFixture(n))
+	return utils.GeneratePublicNetworkingKey(unittest.SeedFixture(n))
 }
 
 // followerManager is a convenience wrapper around the consensus follower
