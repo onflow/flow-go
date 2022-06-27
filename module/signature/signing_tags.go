@@ -18,7 +18,7 @@ import (
 const protocolPrefix = "FLOW-"
 
 // Flow protocol version
-const protocolVersion = "V00-"
+const protocolVersion = "-V00-"
 
 // Ciphersuite index
 // Only one ciphersuite is used in Flow protocol
@@ -30,7 +30,7 @@ const cipherSuiteIndex = "CS00-"
 // (only one ciphersuite is provided for BLS signatures by the crypto library
 //	and therefore it's not possible to choose one)
 func tag(domain string) string {
-	return protocolPrefix + domain + protocolVersion + cipherSuiteIndex + "-with-"
+	return protocolPrefix + domain + protocolVersion + cipherSuiteIndex + "with-"
 }
 
 var (
