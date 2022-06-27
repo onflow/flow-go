@@ -6,6 +6,9 @@ type AttackOrchestrator interface {
 	//
 	// In Corruptible Conduit Framework for BFT testing, corrupted nodes relay their outgoing events to
 	// the attacker instead of dispatching them to the network.
+	//
+	// Note: as a design assumption, this method is invoked sequentially by the AttackNetwork to pass the
+	// events of corrupted nodes. Hence, no extra concurrency-safe consideration is needed.
 	HandleEventFromCorruptedNode(*Event) error
 
 	WithAttackNetwork(AttackNetwork)
