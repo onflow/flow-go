@@ -770,7 +770,7 @@ func TestBlocksArentExecutedMultipleTimes_collectionArrival(t *testing.T) {
 		wgC.Add(1)
 
 		// stops .ByID() call from blocking in handleCollection
-		ctx.blocks.EXPECT().ByID(gomock.Any()).AnyTimes().Return(nil, errors.New(""))
+		ctx.blocks.EXPECT().ByID(gomock.Any()).AnyTimes().Return(nil, errors.New("mock error"))
 
 		ctx.assertSuccessfulBlockComputation(commits, func(blockID flow.Identifier, commit flow.StateCommitment) {
 			wgB.Wait()
