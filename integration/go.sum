@@ -1437,12 +1437,10 @@ github.com/oklog/ulid v1.3.1/go.mod h1:CirwcVhetQ6Lv90oh/F+FBtV6XMibvdAFo93nm5qn
 github.com/olekukonko/tablewriter v0.0.0-20170122224234-a0225b3f23b5/go.mod h1:vsDQFd/mU46D+Z4whnwzcISnGGzXWMclvtLoiIKAKIo=
 github.com/olekukonko/tablewriter v0.0.1/go.mod h1:vsDQFd/mU46D+Z4whnwzcISnGGzXWMclvtLoiIKAKIo=
 github.com/olekukonko/tablewriter v0.0.2-0.20190409134802-7e037d187b0c/go.mod h1:vsDQFd/mU46D+Z4whnwzcISnGGzXWMclvtLoiIKAKIo=
-github.com/onflow/atree v0.3.1-0.20220531231935-525fbc26f40a/go.mod h1:PZESmRR4bI/w/9nEDCqRoWxBq/jFNUEzkfypHf0j8cw=
 github.com/onflow/atree v0.4.0 h1:+TbNisavAkukAKhgQ4plWnvR9o5+SkwPIsi3jaeAqKs=
 github.com/onflow/atree v0.4.0/go.mod h1:7Qe1xaW0YewvouLXrugzMFUYXNoRQ8MT/UsVAWx1Ndo=
 github.com/onflow/cadence v0.11.2/go.mod h1:8NwJGO535nnY/+QWEMDc2rhvOFChToWQ9Bg7fUIIc/I=
 github.com/onflow/cadence v0.15.0/go.mod h1:KMzDF6cIv6nb5PJW9aITaqazbmJX8MMeibFcpPP385M=
-github.com/onflow/cadence v0.24.1/go.mod h1:tIJiQ4RIq1WUTXdBewv8p+gNUETN93Eb7jSFedjqs5w=
 github.com/onflow/cadence v0.24.2-0.20220627202951-5a06fec82b4a h1:Wr7+zfFj7ehr3nwNtQ9LXGpwS3MWDsUvnlX78aOnnZY=
 github.com/onflow/cadence v0.24.2-0.20220627202951-5a06fec82b4a/go.mod h1:g19FlFrcQsiegiZDe6wYtUCBO8O1hM1x/+l68aVO07k=
 github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220513155751-c4c1f8d59f83 h1:mpJirFu/JWMLV0IhKDZleVrVdN5B8QERV4gSXDef5bA=
@@ -1457,8 +1455,8 @@ github.com/onflow/flow-ft/lib/go/templates v0.2.0 h1:oQQk5UthLS9KfKLkZVJg/XAVq8C
 github.com/onflow/flow-ft/lib/go/templates v0.2.0/go.mod h1:qwkTElMcI+PnSBGIWGu1K9OYBLatNimWTC8un9qUji0=
 github.com/onflow/flow-go-sdk v0.13.0/go.mod h1:yqnSajzJVFfrTg68F4WXRR1Yzs1akqAjyscEDyFudPE=
 github.com/onflow/flow-go-sdk v0.20.0/go.mod h1:52QZyLwU3p3UZ2FXOy+sRl4JPdtvJoae1spIUBOFxA8=
-github.com/onflow/flow-go-sdk v0.26.1 h1:v0rzbBQPy+LEuAmX6d7E9TUBUW6lLyBIStUxchXwh9k=
-github.com/onflow/flow-go-sdk v0.26.1/go.mod h1:Z0SxMQgapt5aBgIdI3trG+IvAAux8WAvCKhgZ7tP6dQ=
+github.com/onflow/flow-go-sdk v0.26.4-0.20220627211850-c53a8e5a7f6a h1:Y8OPkAFbzDxUwtct0iubXq6j4UXJjsRF/C71vtw/R1o=
+github.com/onflow/flow-go-sdk v0.26.4-0.20220627211850-c53a8e5a7f6a/go.mod h1:qmeb+zyY+YU7EcSXIolbxu6h1sOo9tFGYKtHKIcq/AQ=
 github.com/onflow/flow-go/crypto v0.12.0/go.mod h1:oXuvU0Dr4lHKgye6nHEFbBXIWNv+dBQUzoVW5Go38+o=
 github.com/onflow/flow-go/crypto v0.24.3 h1:5puosmiy853m1GPmBLJr4PiLVcCzE4n5o60hRPo9kYA=
 github.com/onflow/flow-go/crypto v0.24.3/go.mod h1:dkVL98P6GHR48iD9zCB6XlnkJX8IQd00FKgt1reV90w=
@@ -1756,8 +1754,9 @@ github.com/stretchr/testify v1.5.1/go.mod h1:5W2xD1RspED5o8YsWQXVCued0rvSQ+mT+I5
 github.com/stretchr/testify v1.6.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/stretchr/testify v1.7.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
-github.com/stretchr/testify v1.7.3 h1:dAm0YRdRQlWojc3CrCRgPBzG5f941d0zvAKu7qY4e+I=
 github.com/stretchr/testify v1.7.3/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO+kdMU+MU=
+github.com/stretchr/testify v1.7.5 h1:s5PTfem8p8EbKQOctVV53k6jCJt3UX4IEJzwh+C324Q=
+github.com/stretchr/testify v1.7.5/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO+kdMU+MU=
 github.com/subosito/gotenv v1.2.0 h1:Slr1R9HxAlEKefgq5jn9U+DnETlIUa6HfgEzj0g5d7s=
 github.com/subosito/gotenv v1.2.0/go.mod h1:N0PQaV/YGNqwC0u51sEeR/aUtSLEXKX9iv69rRypqCw=
 github.com/supranational/blst v0.3.4 h1:iZE9lBMoywK2uy2U/5hDOvobQk9FnOQ2wNlu9GmRCoA=
@@ -1776,7 +1775,6 @@ github.com/tklauser/numcpus v0.3.0 h1:ILuRUQBtssgnxw0XXIjKUC56fgnOrFoQQ/4+DeU2bi
 github.com/tklauser/numcpus v0.3.0/go.mod h1:yFGUr7TUHQRAhyqBcEg0Ge34zDBAsIvJJcyE6boqnA8=
 github.com/tmc/grpc-websocket-proxy v0.0.0-20170815181823-89b8d40f7ca8/go.mod h1:ncp9v5uamzpCO7NfCPTXjqaC+bZgJeR0sMTm6dMHP7U=
 github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5/go.mod h1:ncp9v5uamzpCO7NfCPTXjqaC+bZgJeR0sMTm6dMHP7U=
-github.com/turbolent/prettier v0.0.0-20210613180524-3a3f5a5b49ba/go.mod h1:Nlx5Y115XQvNcIdIy7dZXaNSUpzwBSge4/Ivk93/Yog=
 github.com/turbolent/prettier v0.0.0-20220320183459-661cc755135d h1:5JInRQbk5UBX8JfUvKh2oYTLMVwj3p6n+wapDDm7hko=
 github.com/turbolent/prettier v0.0.0-20220320183459-661cc755135d/go.mod h1:Nlx5Y115XQvNcIdIy7dZXaNSUpzwBSge4/Ivk93/Yog=
 github.com/tv42/httpunix v0.0.0-20150427012821-b75d8614f926/go.mod h1:9ESjWnEqriFuLhtthL60Sar/7RFoluCcXsuvEwTV5KM=

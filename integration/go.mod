@@ -20,14 +20,14 @@ require (
 	github.com/onflow/flow-emulator v0.33.2
 	github.com/onflow/flow-ft/lib/go/templates v0.2.0
 	github.com/onflow/flow-go v0.25.13-0.20220609230330-ac8d2d78c212
-	github.com/onflow/flow-go-sdk v0.26.1
+	github.com/onflow/flow-go-sdk v0.26.4-0.20220627211850-c53a8e5a7f6a
 	github.com/onflow/flow-go/crypto v0.24.3
 	github.com/onflow/flow/protobuf/go/flow v0.3.1
 	github.com/openhistogram/circonusllhist v0.3.0
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/prometheus/client_golang v1.12.1
 	github.com/rs/zerolog v1.26.1
-	github.com/stretchr/testify v1.7.3
+	github.com/stretchr/testify v1.7.5
 	go.uber.org/atomic v1.9.0
 	google.golang.org/grpc v1.45.0
 )

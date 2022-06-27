@@ -1364,6 +1364,8 @@ github.com/onflow/flow-ft/lib/go/contracts v0.5.0/go.mod h1:1zoTjp1KzNnOPkyqKmWK
 github.com/onflow/flow-go-sdk v0.20.0/go.mod h1:52QZyLwU3p3UZ2FXOy+sRl4JPdtvJoae1spIUBOFxA8=
 github.com/onflow/flow-go-sdk v0.26.1 h1:v0rzbBQPy+LEuAmX6d7E9TUBUW6lLyBIStUxchXwh9k=
 github.com/onflow/flow-go-sdk v0.26.1/go.mod h1:Z0SxMQgapt5aBgIdI3trG+IvAAux8WAvCKhgZ7tP6dQ=
+github.com/onflow/flow-go-sdk v0.26.4-0.20220627211850-c53a8e5a7f6a h1:Y8OPkAFbzDxUwtct0iubXq6j4UXJjsRF/C71vtw/R1o=
+github.com/onflow/flow-go-sdk v0.26.4-0.20220627211850-c53a8e5a7f6a/go.mod h1:qmeb+zyY+YU7EcSXIolbxu6h1sOo9tFGYKtHKIcq/AQ=
 github.com/onflow/flow-go/crypto v0.12.0/go.mod h1:oXuvU0Dr4lHKgye6nHEFbBXIWNv+dBQUzoVW5Go38+o=
 github.com/onflow/flow-go/crypto v0.24.3 h1:5puosmiy853m1GPmBLJr4PiLVcCzE4n5o60hRPo9kYA=
 github.com/onflow/flow-go/crypto v0.24.3/go.mod h1:dkVL98P6GHR48iD9zCB6XlnkJX8IQd00FKgt1reV90w=
@@ -1643,6 +1645,8 @@ github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/
 github.com/stretchr/testify v1.7.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/stretchr/testify v1.7.3 h1:dAm0YRdRQlWojc3CrCRgPBzG5f941d0zvAKu7qY4e+I=
 github.com/stretchr/testify v1.7.3/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO+kdMU+MU=
+github.com/stretchr/testify v1.7.5 h1:s5PTfem8p8EbKQOctVV53k6jCJt3UX4IEJzwh+C324Q=
+github.com/stretchr/testify v1.7.5/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO+kdMU+MU=
 github.com/subosito/gotenv v1.2.0 h1:Slr1R9HxAlEKefgq5jn9U+DnETlIUa6HfgEzj0g5d7s=
 github.com/subosito/gotenv v1.2.0/go.mod h1:N0PQaV/YGNqwC0u51sEeR/aUtSLEXKX9iv69rRypqCw=
 github.com/supranational/blst v0.3.4 h1:iZE9lBMoywK2uy2U/5hDOvobQk9FnOQ2wNlu9GmRCoA=

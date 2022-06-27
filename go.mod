@@ -59,7 +59,7 @@ require (
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220513155751-c4c1f8d59f83
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220513155751-c4c1f8d59f83
 	github.com/onflow/flow-emulator v0.33.2
-	github.com/onflow/flow-go-sdk v0.26.1
+	github.com/onflow/flow-go-sdk v0.26.4-0.20220627211850-c53a8e5a7f6a
 	github.com/onflow/flow-go/crypto v0.24.3
 	github.com/onflow/flow/protobuf/go/flow v0.3.1
 	github.com/opentracing/opentracing-go v1.2.0
@@ -74,7 +74,7 @@ require (
 	github.com/spf13/cobra v1.3.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.10.1
-	github.com/stretchr/testify v1.7.3
+	github.com/stretchr/testify v1.7.5
 	github.com/uber/jaeger-client-go v2.29.1+incompatible
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/vmihailenco/msgpack/v4 v4.3.11
