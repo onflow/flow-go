@@ -16,7 +16,7 @@ import (
 
 func TestGenerateUnstakedNetworkingKey(t *testing.T) {
 
-	key, err := GenerateUnstakedNetworkingKey(unittest.SeedFixture(crypto.KeyGenSeedMinLenECDSASecp256k1))
+	key, err := GeneratePublicNetworkingKey(unittest.SeedFixture(crypto.KeyGenSeedMinLenECDSASecp256k1))
 	require.NoError(t, err)
 	assert.Equal(t, crypto.ECDSASecp256k1, key.Algorithm())
 	assert.Equal(t, X962_NO_INVERSION, key.PublicKey().EncodeCompressed()[0])

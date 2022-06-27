@@ -343,7 +343,7 @@ type ConsensusFollowerConfig struct {
 func NewConsensusFollowerConfig(t *testing.T, networkingPrivKey crypto.PrivateKey, stakedNodeID flow.Identifier, opts ...consensus_follower.Option) ConsensusFollowerConfig {
 	pid, err := keyutils.PeerIDFromFlowPublicKey(networkingPrivKey.PublicKey())
 	assert.NoError(t, err)
-	nodeID, err := p2p.NewUnstakedNetworkIDTranslator().GetFlowID(pid)
+	nodeID, err := p2p.NewPublicNetworkIDTranslator().GetFlowID(pid)
 	assert.NoError(t, err)
 	return ConsensusFollowerConfig{
 		NetworkingPrivKey: networkingPrivKey,
@@ -929,7 +929,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 				containerExternalNetworkPort := fmt.Sprintf("%d/tcp", AccessNodePublicNetworkPort)
 				nodeContainer.bindPort(hostExternalNetworkPort, containerExternalNetworkPort)
 				net.AccessPorts[AccessNodeExternalNetworkPort] = hostExternalNetworkPort
-				nodeContainer.AddFlag("supports-unstaked-node", "true")
+				nodeContainer.AddFlag("supports-observer", "true")
 				nodeContainer.AddFlag("public-network-address", fmt.Sprintf("%s:%d", nodeContainer.Name(), AccessNodePublicNetworkPort))
 			}
 
