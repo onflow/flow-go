@@ -27,7 +27,6 @@ type EventHandler struct {
 	timeoutAggregator hotstuff.TimeoutAggregator
 	safetyRules       hotstuff.SafetyRules
 	notifier          hotstuff.Consumer
-	ownProposal       flow.Identifier
 }
 
 var _ hotstuff.EventHandler = (*EventHandler)(nil)
@@ -58,7 +57,6 @@ func NewEventHandler(
 		voteAggregator:    voteAggregator,
 		timeoutAggregator: timeoutAggregator,
 		notifier:          notifier,
-		ownProposal:       flow.ZeroID,
 	}
 	return e, nil
 }
@@ -292,8 +290,6 @@ func (e *EventHandler) startNewView() error {
 		if err != nil {
 			log.Warn().Err(err).Msg("could not forward proposal")
 		}
-		// mark our own proposals to avoid double validation
-		e.ownProposal = proposal.Block.BlockID
 
 		// We return here to correspond to the HotStuff state machine.
 		return nil

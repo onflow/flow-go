@@ -89,8 +89,8 @@ func NewParticipant(
 		return nil, fmt.Errorf("could not initialize block producer: %w", err)
 	}
 
-	// initialize the voter
-	voter, err := safetyrules.New(modules.Signer, modules.Persist, modules.Committee)
+	// initialize the safetyRules
+	safetyRules, err := safetyrules.New(modules.Signer, modules.Persist, modules.Committee)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize safety rules: %w", err)
 	}
@@ -105,7 +105,7 @@ func NewParticipant(
 		communicator,
 		modules.Committee,
 		modules.Aggregator,
-		voter,
+		safetyRules,
 		modules.Notifier,
 	)
 	if err != nil {
