@@ -171,7 +171,7 @@ func NewEngine(
 	}
 
 	// register network conduit
-	conduit, err := net.Register(engine.ChannelConsensusCluster(chainID), eng)
+	conduit, err := net.Register(network.ChannelConsensusCluster(chainID), eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}

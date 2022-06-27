@@ -9,7 +9,6 @@ import (
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine"
 	mockfetcher "github.com/onflow/flow-go/engine/verification/fetcher/mock"
 	"github.com/onflow/flow-go/engine/verification/requester"
 	vertestutils "github.com/onflow/flow-go/engine/verification/utils/unittest"
@@ -22,6 +21,7 @@ import (
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -68,7 +68,7 @@ func setupTest() *RequesterEngineTestSuite {
 func newRequesterEngine(t *testing.T, s *RequesterEngineTestSuite) *requester.Engine {
 	net := &mocknetwork.Network{}
 	// mocking the network registration of the engine
-	net.On("Register", engine.RequestChunks, testifymock.Anything).
+	net.On("Register", network.RequestChunks, testifymock.Anything).
 		Return(s.con, nil).
 		Once()
 
@@ -136,7 +136,7 @@ func TestHandleChunkDataPack_HappyPath(t *testing.T) {
 	s.metrics.On("OnChunkDataPackResponseReceivedFromNetworkByRequester").Return().Once()
 	s.metrics.On("OnChunkDataPackSentToFetcher").Return().Once()
 
-	err := e.Process(engine.RequestChunks, originID, response)
+	err := e.Process(network.RequestChunks, originID, response)
 	require.Nil(t, err)
 
 	testifymock.AssertExpectationsForObjects(t, s.con, s.handler, s.pendingRequests, s.metrics)
@@ -165,7 +165,7 @@ func TestHandleChunkDataPack_HappyPath_Multiple(t *testing.T) {
 	s.metrics.On("OnChunkDataPackSentToFetcher").Return().Times(len(responses))
 
 	for _, response := range responses {
-		err := e.Process(engine.RequestChunks, originID, response)
+		err := e.Process(network.RequestChunks, originID, response)
 		require.Nil(t, err)
 	}
 
@@ -191,7 +191,7 @@ func TestHandleChunkDataPack_FailedRequestRemoval(t *testing.T) {
 	s.pendingRequests.On("PopAll", response.ChunkDataPack.ChunkID).Return(nil, false).Once()
 	s.metrics.On("OnChunkDataPackResponseReceivedFromNetworkByRequester").Return().Once()
 
-	err := e.Process(engine.RequestChunks, originID, response)
+	err := e.Process(network.RequestChunks, originID, response)
 	require.Nil(t, err)
 
 	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.con, s.metrics)
@@ -271,7 +271,7 @@ func TestCompleteRequestingUnsealedChunkLifeCycle(t *testing.T) {
 
 	// we wait till the engine submits the chunk request to the network, and receive the response
 	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, requests, 1, func(request *messages.ChunkDataRequest) {
-		err := e.Process(engine.RequestChunks, requests[0].Agrees[0], response)
+		err := e.Process(network.RequestChunks, requests[0].Agrees[0], response)
 		require.NoError(t, err)
 	})
 	unittest.RequireReturnsBefore(t, requestHistoryWG.Wait, time.Duration(2)*s.retryInterval, "could not check chunk requests qualification on time")
@@ -365,7 +365,7 @@ func TestReceivingChunkDataResponseForDuplicateChunkRequests(t *testing.T) {
 	s.metrics.On("OnChunkDataPackResponseReceivedFromNetworkByRequester").Return().Once()
 	s.metrics.On("OnChunkDataPackSentToFetcher").Return().Twice()
 
-	err := e.Process(engine.RequestChunks, originID, responseA)
+	err := e.Process(network.RequestChunks, originID, responseA)
 	require.Nil(t, err)
 
 	unittest.RequireReturnsBefore(t, handlerWG.Wait, time.Second, "could not handle chunk data responses on time")

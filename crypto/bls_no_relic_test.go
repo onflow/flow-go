@@ -12,7 +12,7 @@ import (
 // Test for all public APIs requiring relic build tag.
 // These functions should panic if build without the relic tag.
 func TestNoRelicPanic(t *testing.T) {
-	assert.PanicsWithValue(t, relic_panic, func() { NewBLSKMAC("") })
+	assert.PanicsWithValue(t, relic_panic, func() { NewExpandMsgXOFKMAC128("") })
 	assert.PanicsWithValue(t, relic_panic, func() { BLSInvalidSignature() })
 	assert.PanicsWithValue(t, relic_panic, func() { BLSGeneratePOP(nil) })
 	assert.PanicsWithValue(t, relic_panic, func() { BLSVerifyPOP(nil, nil) })

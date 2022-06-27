@@ -19,7 +19,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
@@ -59,7 +58,18 @@ const (
 	LargeMsgUnicastTimeout = 1000 * time.Second
 )
 
-var _ network.Middleware = (*Middleware)(nil)
+var (
+	_ network.Middleware = (*Middleware)(nil)
+
+	// allowAll is a peerFilterFunc that will always return true for all peer ids.
+	// This filter is used to allow communication by all roles on public network channels.
+	allowAll = func(_ peer.ID) bool { return true }
+)
+
+// peerFilterFunc is a func type that will be used in the TopicValidator to filter
+// peers by ID and drop messages from unwanted peers before message payload decoding
+// happens.
+type peerFilterFunc func(id peer.ID) bool
 
 // Middleware handles the input & output on the direct connections we have to
 // our neighbours on the peer-to-peer network.
@@ -85,6 +95,7 @@ type Middleware struct {
 	unicastMessageTimeout      time.Duration
 	idTranslator               IDTranslator
 	previousProtocolStatePeers []peer.AddrInfo
+	codec                      network.Codec
 	component.Component
 }
 
@@ -125,6 +136,7 @@ func NewMiddleware(
 	rootBlockID flow.Identifier,
 	unicastMessageTimeout time.Duration,
 	idTranslator IDTranslator,
+	codec network.Codec,
 	opts ...MiddlewareOption,
 ) *Middleware {
 
@@ -144,6 +156,7 @@ func NewMiddleware(
 		unicastMessageTimeout: unicastMessageTimeout,
 		peerManagerFactory:    nil,
 		idTranslator:          idTranslator,
+		codec:                 codec,
 	}
 
 	for _, opt := range opts {
@@ -175,6 +188,17 @@ func DefaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.Mes
 		validator.ValidateNotSender(flowID),   // validator to filter out messages sent by this node itself
 		validator.ValidateTarget(log, flowID), // validator to filter out messages not intended for this node
 	}
+}
+
+// isStakedPeerFilter returns a peerFilterFunc that uses m.ov.Identity to get the identity
+// for a peer ID. If a identity is not found the peer is unstaked.
+func (m *Middleware) isStakedPeerFilter() peerFilterFunc {
+	f := func(id peer.ID) bool {
+		_, ok := m.ov.Identity(id)
+		return ok
+	}
+
+	return f
 }
 
 func (m *Middleware) NewBlobService(channel network.Channel, ds datastore.Batching, opts ...network.BlobServiceOption) network.BlobService {
@@ -481,10 +505,19 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 		m.wg.Add(1)
 		go func(msg *message.Message) {
 			defer m.wg.Done()
-
-			// log metrics with the channel name as OneToOne
-			m.metrics.NetworkMessageReceived(msg.Size(), metrics.ChannelOneToOne, msg.Type)
-			m.processAuthenticatedMessage(msg, s.Conn().RemotePeer())
+			if decodedMsgPayload, err := m.codec.Decode(msg.Payload); err != nil {
+				m.log.
+					Warn().
+					Err(fmt.Errorf("could not decode message: %w", err)).
+					Hex("sender", msg.OriginID).
+					Hex("event_id", msg.EventID).
+					Str("event_type", msg.Type).
+					Str("channel", msg.ChannelID)
+			} else {
+				// log metrics with the channel name as OneToOne
+				m.metrics.NetworkMessageReceived(msg.Size(), metrics.ChannelOneToOne, msg.Type)
+				m.processAuthenticatedMessage(msg, decodedMsgPayload, s.Conn().RemotePeer())
+			}
 		}(&msg)
 	}
 
@@ -494,18 +527,26 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 // Subscribe subscribes the middleware to a channel.
 func (m *Middleware) Subscribe(channel network.Channel) error {
 
-	topic := engine.TopicFromChannel(channel, m.rootBlockID)
+	topic := network.TopicFromChannel(channel, m.rootBlockID)
 
+	var peerFilter peerFilterFunc
 	var validators []psValidator.MessageValidator
-	if !engine.PublicChannels().Contains(channel) {
+	if network.PublicChannels().Contains(channel) {
+		// NOTE: for public channels the callback used to check if a node is staked will
+		// return true for every node.
+		peerFilter = allowAll
+	} else {
 		// for channels used by the staked nodes, add the topic validator to filter out messages from non-staked nodes
 		validators = append(validators,
-			// NOTE: The AuthorizedSenderValidator will assert the sender is a staked node
 			psValidator.AuthorizedSenderValidator(m.log, channel, m.ov.Identity),
 		)
+
+		// NOTE: For non-public channels the libP2P node topic validator will reject
+		// messages from unstaked nodes.
+		peerFilter = m.isStakedPeerFilter()
 	}
 
-	s, err := m.libP2PNode.Subscribe(topic, validators...)
+	s, err := m.libP2PNode.Subscribe(topic, m.codec, peerFilter, validators...)
 	if err != nil {
 		return fmt.Errorf("failed to subscribe for channel %s: %w", channel, err)
 	}
@@ -525,7 +566,7 @@ func (m *Middleware) Subscribe(channel network.Channel) error {
 
 // Unsubscribe unsubscribes the middleware from a channel.
 func (m *Middleware) Unsubscribe(channel network.Channel) error {
-	topic := engine.TopicFromChannel(channel, m.rootBlockID)
+	topic := network.TopicFromChannel(channel, m.rootBlockID)
 	err := m.libP2PNode.UnSubscribe(topic)
 	if err != nil {
 		return fmt.Errorf("failed to unsubscribe from channel %s: %w", channel, err)
@@ -541,7 +582,7 @@ func (m *Middleware) Unsubscribe(channel network.Channel) error {
 // In particular, it populates the `OriginID` field of the message with a Flow ID translated from this source.
 // The assumption is that the message has been authenticated at the network level (libp2p) to originate from the peer with ID `peerID`
 // this requirement is fulfilled by e.g. the output of readConnection and readSubscription
-func (m *Middleware) processAuthenticatedMessage(msg *message.Message, peerID peer.ID) {
+func (m *Middleware) processAuthenticatedMessage(msg *message.Message, decodedMsgPayload interface{}, peerID peer.ID) {
 	flowID, err := m.idTranslator.GetFlowID(peerID)
 	if err != nil {
 		m.log.Warn().Err(err).Msgf("received message from unknown peer %v, and was dropped", peerID.String())
@@ -550,11 +591,11 @@ func (m *Middleware) processAuthenticatedMessage(msg *message.Message, peerID pe
 
 	msg.OriginID = flowID[:]
 
-	m.processMessage(msg)
+	m.processMessage(msg, decodedMsgPayload)
 }
 
 // processMessage processes a message and eventually passes it to the overlay
-func (m *Middleware) processMessage(msg *message.Message) {
+func (m *Middleware) processMessage(msg *message.Message, decodedMsgPayload interface{}) {
 	originID := flow.HashToID(msg.OriginID)
 
 	m.log.Debug().
@@ -572,7 +613,7 @@ func (m *Middleware) processMessage(msg *message.Message) {
 	}
 
 	// if validation passed, send the message to the overlay
-	err := m.ov.Receive(originID, msg)
+	err := m.ov.Receive(originID, msg, decodedMsgPayload)
 	if err != nil {
 		m.log.Error().Err(err).Msg("could not deliver payload")
 	}
@@ -599,7 +640,7 @@ func (m *Middleware) Publish(msg *message.Message, channel network.Channel) erro
 		return fmt.Errorf("message size %d exceeds configured max message size %d", msgSize, DefaultMaxPubSubMsgSize)
 	}
 
-	topic := engine.TopicFromChannel(channel, m.rootBlockID)
+	topic := network.TopicFromChannel(channel, m.rootBlockID)
 
 	// publish the bytes on the topic
 	err = m.libP2PNode.Publish(m.ctx, topic, data)
