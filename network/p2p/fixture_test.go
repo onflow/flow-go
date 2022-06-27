@@ -43,6 +43,7 @@ type nodeFixtureParameters struct {
 	dhtOptions  []dht.Option
 	peerFilter  p2p.PeerFilter
 	role        flow.Role
+	logger      zerolog.Logger
 }
 
 type nodeFixtureParameterOption func(*nodeFixtureParameters)
@@ -89,6 +90,12 @@ func withRole(role flow.Role) nodeFixtureParameterOption {
 	}
 }
 
+func withLogger(logger zerolog.Logger) nodeFixtureParameterOption {
+	return func(p *nodeFixtureParameters) {
+		p.logger = logger
+	}
+}
+
 // nodeFixture is a test fixture that creates a single libp2p node with the given key, spork id, and options.
 // It returns the node and its identity.
 func nodeFixture(
@@ -98,14 +105,13 @@ func nodeFixture(
 	dhtPrefix string,
 	opts ...nodeFixtureParameterOption,
 ) (*p2p.Node, flow.Identity) {
-	logger := unittest.Logger().Level(zerolog.ErrorLevel)
-
 	// default parameters
 	parameters := &nodeFixtureParameters{
 		handlerFunc: func(network.Stream) {},
 		unicasts:    nil,
 		key:         generateNetworkingKey(t),
 		address:     defaultAddress,
+		logger:      unittest.Logger().Level(zerolog.ErrorLevel),
 	}
 
 	for _, opt := range opts {
@@ -118,22 +124,22 @@ func nodeFixture(
 		unittest.WithRole(parameters.role))
 
 	noopMetrics := metrics.NewNoopCollector()
-	connManager := p2p.NewConnManager(logger, noopMetrics)
+	connManager := p2p.NewConnManager(parameters.logger, noopMetrics)
 
-	builder := p2p.NewNodeBuilder(logger, parameters.address, parameters.key, sporkID).
+	builder := p2p.NewNodeBuilder(parameters.logger, parameters.address, parameters.key, sporkID).
 		SetConnectionManager(connManager).
 		SetPubSub(pubsub.NewGossipSub).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2p.NewDHT(c, h,
 				protocol.ID(unicast.FlowDHTProtocolIDPrefix+sporkID.String()+"/"+dhtPrefix),
-				logger,
+				parameters.logger,
 				noopMetrics,
 				parameters.dhtOptions...,
 			)
 		})
 
 	if parameters.peerFilter != nil {
-		connGater := p2p.NewConnGater(logger, parameters.peerFilter)
+		connGater := p2p.NewConnGater(parameters.logger, parameters.peerFilter)
 		builder.SetConnectionGater(connGater)
 	}
 
