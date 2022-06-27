@@ -116,7 +116,7 @@ func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log 
 			Name:      "max_receipt_height",
 			Namespace: namespaceAccess,
 			Subsystem: subsystemIngestion,
-			Help:      "todo",
+			Help:      "gauge to track the maximum block height of execution receipts received",
 		}),
 	}
 

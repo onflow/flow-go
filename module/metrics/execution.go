@@ -534,7 +534,7 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 			Name:      "max_collection_height",
 			Namespace: namespaceExecution,
 			Subsystem: subsystemIngestion,
-			Help:      "todo",
+			Help:      "gauge to track the maximum block height of collections received",
 		}),
 	}
 
