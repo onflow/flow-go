@@ -824,7 +824,7 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 	}
 
 	block, err := e.blocks.ByID(collection.Guarantee().ReferenceBlockID)
-	if err != nil && block.Header.Height > e.maxCollectionHeight {
+	if err != nil && block != nil && block.Header.Height > e.maxCollectionHeight {
 		e.metrics.UpdateCollectionMaxHeight(block.Header.Height)
 	}
 
