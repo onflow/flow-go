@@ -91,7 +91,7 @@ func NewEngine(log zerolog.Logger,
 	sealsDB storage.Seals,
 	assigner module.ChunkAssigner,
 	sealsMempool mempool.IncorporatedResultSeals,
-	options Config,
+	requiredApprovalsForSealConstructionGetter module.SealingConfigsGetter,
 ) (*Engine, error) {
 	rootHeader, err := state.Params().Root()
 	if err != nil {
@@ -118,7 +118,7 @@ func NewEngine(log zerolog.Logger,
 		return nil, fmt.Errorf("initialization of inbound queues for trusted inputs failed: %w", err)
 	}
 
-	err = e.setupMessageHandler(options.RequiredApprovalsForSealConstruction)
+	err = e.setupMessageHandler(requiredApprovalsForSealConstructionGetter)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize message handler for untrusted inputs: %w", err)
 	}
@@ -136,7 +136,7 @@ func NewEngine(log zerolog.Logger,
 	}
 
 	signatureHasher := crypto.NewBLSKMAC(encoding.ResultApprovalTag)
-	core, err := NewCore(log, e.workerPool, tracer, conMetrics, sealingTracker, unit, headers, state, sealsDB, assigner, signatureHasher, sealsMempool, approvalConduit, options)
+	core, err := NewCore(log, e.workerPool, tracer, conMetrics, sealingTracker, unit, headers, state, sealsDB, assigner, signatureHasher, sealsMempool, approvalConduit, requiredApprovalsForSealConstructionGetter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init sealing engine: %w", err)
 	}
@@ -172,7 +172,7 @@ func (e *Engine) setupTrustedInboundQueues() error {
 }
 
 // setupMessageHandler initializes the inbound queues and the MessageHandler for UNTRUSTED INPUTS.
-func (e *Engine) setupMessageHandler(requiredApprovalsForSealConstruction uint) error {
+func (e *Engine) setupMessageHandler(getSealingConfigs module.SealingConfigsGetter) error {
 	// FIFO queue for broadcasted approvals
 	pendingApprovalsQueue, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultApprovalQueueCapacity),
@@ -211,7 +211,7 @@ func (e *Engine) setupMessageHandler(requiredApprovalsForSealConstruction uint) 
 				return ok
 			},
 			Map: func(msg *engine.Message) (*engine.Message, bool) {
-				if requiredApprovalsForSealConstruction < 1 {
+				if getSealingConfigs.RequireApprovalsForSealConstructionDynamicValue() < 1 {
 					// if we don't require approvals to construct a seal, don't even process approvals.
 					return nil, false
 				}
@@ -229,7 +229,7 @@ func (e *Engine) setupMessageHandler(requiredApprovalsForSealConstruction uint) 
 				return ok
 			},
 			Map: func(msg *engine.Message) (*engine.Message, bool) {
-				if requiredApprovalsForSealConstruction < 1 {
+				if getSealingConfigs.RequireApprovalsForSealConstructionDynamicValue() < 1 {
 					// if we don't require approvals to construct a seal, don't even process approvals.
 					return nil, false
 				}
