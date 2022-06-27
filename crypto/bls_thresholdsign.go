@@ -173,7 +173,7 @@ func NewBLSThresholdSignatureInspector(
 		size:               size,
 		threshold:          threshold,
 		message:            message,
-		hasher:             NewBLSKMAC(dsTag),
+		hasher:             NewExpandMsgXOFKMAC128(dsTag),
 		shares:             make(map[index]Signature),
 		thresholdSignature: nil,
 		groupPublicKey:     groupPublicKey,  // groupPublicKey is the group public key corresponding to the group secret key
@@ -563,7 +563,7 @@ func BLSThresholdKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 		)
 	}
 	// group public key
-	genScalarMultG2(&X0, &a[0])
+	generatorScalarMultG2(&X0, &a[0])
 	// export the keys
 	skShares := make([]PrivateKey, size)
 	pkShares := make([]PublicKey, size)

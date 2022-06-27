@@ -30,31 +30,31 @@ var (
 
 		// Values
 
-		common.MemoryKindBool:      8,
-		common.MemoryKindAddress:   32,
-		common.MemoryKindString:    138,
-		common.MemoryKindCharacter: 24,
-		common.MemoryKindMetaType:  0,
-		common.MemoryKindNumber:    8,
+		common.MemoryKindBoolValue:      8,
+		common.MemoryKindAddressValue:   32,
+		common.MemoryKindStringValue:    138,
+		common.MemoryKindCharacterValue: 24,
+		common.MemoryKindNumberValue:    8,
 		// weights for these values include the cost of the Go struct itself (first number)
 		// as well as the overhead for creation of the underlying atree (second number)
-		common.MemoryKindArrayBase:               57 + 48,
-		common.MemoryKindDictionaryBase:          33 + 96,
-		common.MemoryKindCompositeBase:           233 + 96,
-		common.MemoryKindSimpleComposite:         73,
-		common.MemoryKindOptional:                41,
-		common.MemoryKindNil:                     1,
-		common.MemoryKindVoid:                    1,
-		common.MemoryKindTypeValue:               0,
-		common.MemoryKindPathValue:               24,
-		common.MemoryKindCapabilityValue:         1,
-		common.MemoryKindLinkValue:               1,
-		common.MemoryKindStorageReferenceValue:   41,
-		common.MemoryKindEphemeralReferenceValue: 41,
-		common.MemoryKindInterpretedFunction:     128,
-		common.MemoryKindHostFunction:            41,
-		common.MemoryKindBoundFunction:           25,
-		common.MemoryKindBigInt:                  50,
+		common.MemoryKindArrayValueBase:           57 + 48,
+		common.MemoryKindDictionaryValueBase:      33 + 96,
+		common.MemoryKindCompositeValueBase:       233 + 96,
+		common.MemoryKindSimpleCompositeValue:     73,
+		common.MemoryKindSimpleCompositeValueBase: 89,
+		common.MemoryKindOptionalValue:            41,
+		common.MemoryKindNilValue:                 1,
+		common.MemoryKindVoidValue:                1,
+		common.MemoryKindTypeValue:                17,
+		common.MemoryKindPathValue:                24,
+		common.MemoryKindCapabilityValue:          1,
+		common.MemoryKindLinkValue:                1,
+		common.MemoryKindStorageReferenceValue:    41,
+		common.MemoryKindEphemeralReferenceValue:  41,
+		common.MemoryKindInterpretedFunctionValue: 128,
+		common.MemoryKindHostFunctionValue:        41,
+		common.MemoryKindBoundFunctionValue:       25,
+		common.MemoryKindBigInt:                   50,
 
 		// Atree
 
@@ -65,6 +65,7 @@ var (
 		common.MemoryKindAtreeMapMetaDataSlab:        1024,
 		common.MemoryKindAtreeMapElementOverhead:     64,
 		common.MemoryKindAtreeMapPreAllocatedElement: 24,
+		common.MemoryKindAtreeEncodedSlab:            1536,
 
 		// Static Types
 
@@ -82,33 +83,32 @@ var (
 
 		// Cadence Values
 
-		common.MemoryKindCadenceVoid:           1,
-		common.MemoryKindCadenceOptional:       17,
-		common.MemoryKindCadenceBool:           8,
-		common.MemoryKindCadenceString:         16,
-		common.MemoryKindCadenceCharacter:      16,
-		common.MemoryKindCadenceAddress:        8,
-		common.MemoryKindCadenceInt:            50,
-		common.MemoryKindCadenceNumber:         1,
-		common.MemoryKindCadenceArrayBase:      41,
-		common.MemoryKindCadenceArrayLength:    16,
-		common.MemoryKindCadenceDictionaryBase: 41,
-		common.MemoryKindCadenceDictionarySize: 0, // go array w/ metered elements
-		common.MemoryKindCadenceKeyValuePair:   33,
-		common.MemoryKindCadenceStructBase:     33,
-		common.MemoryKindCadenceStructSize:     16,
-		common.MemoryKindCadenceResourceBase:   33,
-		common.MemoryKindCadenceResourceSize:   16,
-		common.MemoryKindCadenceEventBase:      33,
-		common.MemoryKindCadenceEventSize:      16,
-		common.MemoryKindCadenceContractBase:   33,
-		common.MemoryKindCadenceContractSize:   16,
-		common.MemoryKindCadenceEnumBase:       33,
-		common.MemoryKindCadenceEnumSize:       16,
-		common.MemoryKindCadenceLink:           1,
-		common.MemoryKindCadencePath:           33,
-		common.MemoryKindCadenceTypeValue:      17,
-		common.MemoryKindCadenceCapability:     1,
+		common.MemoryKindCadenceVoidValue:         1,
+		common.MemoryKindCadenceOptionalValue:     17,
+		common.MemoryKindCadenceBoolValue:         8,
+		common.MemoryKindCadenceStringValue:       16,
+		common.MemoryKindCadenceCharacterValue:    16,
+		common.MemoryKindCadenceAddressValue:      8,
+		common.MemoryKindCadenceIntValue:          50,
+		common.MemoryKindCadenceNumberValue:       1,
+		common.MemoryKindCadenceArrayValueBase:    41,
+		common.MemoryKindCadenceArrayValueLength:  16,
+		common.MemoryKindCadenceDictionaryValue:   41,
+		common.MemoryKindCadenceKeyValuePair:      33,
+		common.MemoryKindCadenceStructValueBase:   33,
+		common.MemoryKindCadenceStructValueSize:   16,
+		common.MemoryKindCadenceResourceValueBase: 33,
+		common.MemoryKindCadenceResourceValueSize: 16,
+		common.MemoryKindCadenceEventValueBase:    33,
+		common.MemoryKindCadenceEventValueSize:    16,
+		common.MemoryKindCadenceContractValueBase: 33,
+		common.MemoryKindCadenceContractValueSize: 16,
+		common.MemoryKindCadenceEnumValueBase:     33,
+		common.MemoryKindCadenceEnumValueSize:     16,
+		common.MemoryKindCadenceLinkValue:         1,
+		common.MemoryKindCadencePathValue:         33,
+		common.MemoryKindCadenceTypeValue:         17,
+		common.MemoryKindCadenceCapabilityValue:   1,
 
 		// Cadence Types
 
@@ -134,10 +134,15 @@ var (
 
 		// Misc
 
-		common.MemoryKindRawString:       9,
-		common.MemoryKindAddressLocation: 18,
-		common.MemoryKindBytes:           24,
-		common.MemoryKindVariable:        18,
+		common.MemoryKindRawString:         9,
+		common.MemoryKindAddressLocation:   18,
+		common.MemoryKindBytes:             24,
+		common.MemoryKindVariable:          18,
+		common.MemoryKindCompositeTypeInfo: 41,
+		common.MemoryKindCompositeField:    33,
+		common.MemoryKindInvocation:        89,
+		common.MemoryKindStorageMap:        58,
+		common.MemoryKindStorageKey:        41,
 
 		// Tokens
 
@@ -147,16 +152,17 @@ var (
 
 		// AST nodes
 
-		common.MemoryKindProgram:        220,
-		common.MemoryKindIdentifier:     17,
-		common.MemoryKindArgument:       49,
-		common.MemoryKindBlock:          25,
-		common.MemoryKindFunctionBlock:  25,
-		common.MemoryKindParameter:      25,
-		common.MemoryKindParameterList:  59,
-		common.MemoryKindTransfer:       1,
-		common.MemoryKindMembers:        276,
-		common.MemoryKindTypeAnnotation: 25,
+		common.MemoryKindProgram:         220,
+		common.MemoryKindIdentifier:      17,
+		common.MemoryKindArgument:        49,
+		common.MemoryKindBlock:           25,
+		common.MemoryKindFunctionBlock:   25,
+		common.MemoryKindParameter:       25,
+		common.MemoryKindParameterList:   59,
+		common.MemoryKindTransfer:        1,
+		common.MemoryKindMembers:         276,
+		common.MemoryKindTypeAnnotation:  25,
+		common.MemoryKindDictionaryEntry: 33,
 
 		common.MemoryKindFunctionDeclaration:        49,
 		common.MemoryKindCompositeDeclaration:       65,
@@ -213,8 +219,25 @@ var (
 		common.MemoryKindRestrictedType:    41,
 		common.MemoryKindVariableSizedType: 17,
 
-		common.MemoryKindPosition: 25,
-		common.MemoryKindRange:    1,
+		common.MemoryKindPosition:          25,
+		common.MemoryKindRange:             1,
+		common.MemoryKindActivation:        128,
+		common.MemoryKindActivationEntries: 256,
+		common.MemoryKindElaboration:       501,
+
+		// sema types
+		common.MemoryKindVariableSizedSemaType: 51,
+		common.MemoryKindConstantSizedSemaType: 59,
+		common.MemoryKindDictionarySemaType:    67,
+		common.MemoryKindOptionalSemaType:      17,
+		common.MemoryKindRestrictedSemaType:    75,
+		common.MemoryKindReferenceSemaType:     25,
+		common.MemoryKindCapabilitySemaType:    51,
+
+		// ordered-map
+		common.MemoryKindOrderedMap:          17,
+		common.MemoryKindOrderedMapEntryList: 50,
+		common.MemoryKindOrderedMapEntry:     64,
 	}
 )
 
@@ -232,7 +255,7 @@ var _ interfaceMeter.Meter = &Meter{}
 type Meter struct {
 	computationUsed  uint64
 	computationLimit uint64
-	memoryUsed       uint64
+	memoryEstimate   uint64
 	memoryLimit      uint64
 
 	computationIntensities interfaceMeter.MeteredComputationIntensities
@@ -307,14 +330,14 @@ func (m *Meter) MergeMeter(child interfaceMeter.Meter, enforceLimits bool) error
 		m.computationIntensities[key] += intensity
 	}
 
-	var childMemoryUsed uint64
+	var childMemoryEstimate uint64
 	if basic, ok := child.(*Meter); ok {
-		childMemoryUsed = basic.memoryUsed
+		childMemoryEstimate = basic.memoryEstimate
 	} else {
-		childMemoryUsed = uint64(child.TotalMemoryUsed())
+		childMemoryEstimate = uint64(child.TotalMemoryEstimate())
 	}
-	m.memoryUsed = m.memoryUsed + childMemoryUsed
-	if enforceLimits && m.memoryUsed > m.memoryLimit {
+	m.memoryEstimate = m.memoryEstimate + childMemoryEstimate
+	if enforceLimits && m.memoryEstimate > m.memoryLimit {
 		return errors.NewMemoryLimitExceededError(uint64(m.TotalMemoryLimit()))
 	}
 
@@ -370,8 +393,8 @@ func (m *Meter) MeterMemory(kind common.MemoryKind, intensity uint) error {
 	if !ok {
 		return nil
 	}
-	m.memoryUsed += w * uint64(intensity)
-	if m.memoryUsed > m.memoryLimit {
+	m.memoryEstimate += w * uint64(intensity)
+	if m.memoryEstimate > m.memoryLimit {
 		return errors.NewMemoryLimitExceededError(uint64(m.TotalMemoryLimit()))
 	}
 	return nil
@@ -382,12 +405,17 @@ func (m *Meter) MemoryIntensities() interfaceMeter.MeteredMemoryIntensities {
 	return m.memoryIntensities
 }
 
-// TotalMemoryUsed returns the total memory used
-func (m *Meter) TotalMemoryUsed() uint {
-	return uint(m.memoryUsed)
+// TotalMemoryEstimate returns the total memory used
+func (m *Meter) TotalMemoryEstimate() uint {
+	return uint(m.memoryEstimate)
 }
 
 // TotalMemoryLimit returns the total memory limit
 func (m *Meter) TotalMemoryLimit() uint {
 	return uint(m.memoryLimit)
+}
+
+// SetTotalMemoryLimit sets the total memory limit
+func (m *Meter) SetTotalMemoryLimit(limit uint64) {
+	m.memoryLimit = limit
 }

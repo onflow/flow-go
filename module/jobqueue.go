@@ -7,6 +7,9 @@ import (
 const (
 	ConsumeProgressVerificationBlockHeight = "ConsumeProgressVerificationBlockHeight"
 	ConsumeProgressVerificationChunkIndex  = "ConsumeProgressVerificationChunkIndex"
+
+	ConsumeProgressExecutionDataRequesterBlockHeight  = "ConsumeProgressExecutionDataRequesterBlockHeight"
+	ConsumeProgressExecutionDataRequesterNotification = "ConsumeProgressExecutionDataRequesterNotification"
 )
 
 // JobID is a unique ID of the job.
@@ -32,6 +35,9 @@ type JobConsumer interface {
 	// It blocks until the existing worker finish processing the job
 	Stop()
 
+	// LastProcessedIndex returns the last processed job index
+	LastProcessedIndex() uint64
+
 	// NotifyJobIsDone let the consumer know a job has been finished, so that consumer will take
 	// the next job from the job queue if there are workers available. It returns the last processed job index.
 	NotifyJobIsDone(JobID) uint64
@@ -48,6 +54,9 @@ type Job interface {
 // Jobs is the reader for an ordered job queue. Job can be fetched by the index,
 // which start from 0
 type Jobs interface {
+	// AtIndex returns the job at the given index.
+	// Error returns:
+	//   * storage.ErrNotFound if a job at the provided index is not available
 	AtIndex(index uint64) (Job, error)
 
 	// Head returns the index of the last job

@@ -3,8 +3,9 @@ package backend
 import (
 	"context"
 	"crypto/md5" //nolint:gosec
-	"sync"
 	"time"
+
+	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/hashicorp/go-multierror"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
@@ -13,6 +14,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -26,25 +28,8 @@ type backendScripts struct {
 	state             protocol.State
 	connFactory       ConnectionFactory
 	log               zerolog.Logger
-	seenScripts       *scriptMap
-}
-
-type scriptMap struct {
-	scripts map[[md5.Size]byte]time.Time // to keep track of unique scripts sent by clients. bounded to 1MB (2^16*2*8) due to fixed key size
-	lock    sync.RWMutex
-}
-
-func (s *scriptMap) getLastSeen(scriptId [md5.Size]byte) (time.Time, bool) {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-	timestamp, seen := s.scripts[scriptId]
-	return timestamp, seen
-}
-
-func (s *scriptMap) setLastSeenToTime(scriptId [md5.Size]byte, execTime time.Time) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	s.scripts[scriptId] = execTime
+	metrics           module.BackendScriptsMetrics
+	loggedScripts     *lru.Cache
 }
 
 func (b *backendScripts) ExecuteScriptAtLatestBlock(
@@ -116,28 +101,36 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 		return nil, status.Errorf(codes.Internal, "failed to find execution nodes at blockId %v: %v", blockID.String(), err)
 	}
 	// encode to MD5 as low compute/memory lookup key
-	encodedScript := md5.Sum(script) //nolint:gosec
+	// CAUTION: cryptographically insecure md5 is used here, but only to de-duplicate logs.
+	// *DO NOT* use this hash for any protocol-related or cryptographic functions.
+	insecureScriptHash := md5.Sum(script) //nolint:gosec
 
 	// try each of the execution nodes found
 	var errors *multierror.Error
 	// try to execute the script on one of the execution nodes
 	for _, execNode := range execNodes {
+		execStartTime := time.Now() // record start time
 		result, err := b.tryExecuteScript(ctx, execNode, execReq)
 		if err == nil {
 			if b.log.GetLevel() == zerolog.DebugLevel {
 				executionTime := time.Now()
-				timestamp, seen := b.seenScripts.getLastSeen(encodedScript)
-				// log if the script is unique in the time window
-				if !seen || executionTime.Sub(timestamp) >= uniqueScriptLoggingTimeWindow {
+				if b.shouldLogScript(executionTime, insecureScriptHash) {
 					b.log.Debug().
 						Str("execution_node", execNode.String()).
 						Hex("block_id", blockID[:]).
-						Hex("script_hash", encodedScript[:]).
+						Hex("script_hash", insecureScriptHash[:]).
 						Str("script", string(script)).
 						Msg("Successfully executed script")
-					b.seenScripts.setLastSeenToTime(encodedScript, executionTime)
+					b.loggedScripts.Add(insecureScriptHash, executionTime)
 				}
 			}
+
+			// log execution time
+			b.metrics.ScriptExecuted(
+				time.Since(execStartTime),
+				len(script),
+			)
+
 			return result, nil
 		}
 		// return if it's just a script failure as opposed to an EN failure and skip trying other ENs
@@ -145,7 +138,7 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 			b.log.Debug().Err(err).
 				Str("execution_node", execNode.String()).
 				Hex("block_id", blockID[:]).
-				Hex("script_hash", encodedScript[:]).
+				Hex("script_hash", insecureScriptHash[:]).
 				Str("script", string(script)).
 				Msg("script failed to execute on the execution node")
 			return nil, err
@@ -157,6 +150,18 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 		b.log.Error().Err(err).Msg("script execution failed for execution node internal reasons")
 	}
 	return nil, errToReturn
+}
+
+// shouldLogScript checks if the script hash is unique in the time window
+func (b *backendScripts) shouldLogScript(execTime time.Time, scriptHash [16]byte) bool {
+	rawTimestamp, seen := b.loggedScripts.Get(scriptHash)
+	if !seen || rawTimestamp == nil {
+		return true
+	} else {
+		// safe cast
+		timestamp := rawTimestamp.(time.Time)
+		return execTime.Sub(timestamp) >= uniqueScriptLoggingTimeWindow
+	}
 }
 
 func (b *backendScripts) tryExecuteScript(ctx context.Context, execNode *flow.Identity, req execproto.ExecuteScriptAtBlockIDRequest) ([]byte, error) {

@@ -65,7 +65,6 @@ func New(
 			Expiry:                 flow.DefaultTransactionExpiry,
 			ExpiryBuffer:           config.ExpiryBuffer,
 			MaxGasLimit:            config.MaxGasLimit,
-			MaxAddressIndex:        config.MaxAddressIndex,
 			CheckScriptsParse:      config.CheckScriptsParse,
 			MaxTransactionByteSize: config.MaxTransactionByteSize,
 			MaxCollectionByteSize:  config.MaxCollectionByteSize,
@@ -117,7 +116,7 @@ func New(
 		AddWorker(e.processQueuedTransactions).
 		Build()
 
-	conduit, err := net.Register(engine.PushTransactions, e)
+	conduit, err := net.Register(network.PushTransactions, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}

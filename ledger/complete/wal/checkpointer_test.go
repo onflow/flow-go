@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
+	"github.com/onflow/flow-go/ledger/complete/wal"
 	realWAL "github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -241,19 +242,19 @@ func Test_Checkpointing(t *testing.T) {
 					paths = append(paths, path)
 				}
 
-				payloads1, err := f.Read(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
+				values1, err := f.Read(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
 				require.NoError(t, err)
 
-				payloads2, err := f2.Read(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
+				values2, err := f2.Read(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
 				require.NoError(t, err)
 
-				payloads3, err := f3.Read(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
+				values3, err := f3.Read(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
 				require.NoError(t, err)
 
 				for i, path := range paths {
-					require.True(t, data[path].Equals(payloads1[i]))
-					require.True(t, data[path].Equals(payloads2[i]))
-					require.True(t, data[path].Equals(payloads3[i]))
+					require.Equal(t, data[path].Value, values1[i])
+					require.Equal(t, data[path].Value, values2[i])
+					require.Equal(t, data[path].Value, values3[i])
 				}
 			}
 		})
@@ -324,16 +325,24 @@ func Test_Checkpointing(t *testing.T) {
 			trieRead, err := pathfinder.QueryToTrieRead(query, pathFinderVersion)
 			require.NoError(t, err)
 
-			payloads, err := f.Read(trieRead)
+			values, err := f.Read(trieRead)
 			require.NoError(t, err)
 
-			payloads5, err := f5.Read(trieRead)
+			values5, err := f5.Read(trieRead)
 			require.NoError(t, err)
 
 			for i := range keys2 {
-				require.Equal(t, values2[i], payloads[i].Value)
-				require.Equal(t, values2[i], payloads5[i].Value)
+				require.Equal(t, values2[i], values[i])
+				require.Equal(t, values2[i], values5[i])
 			}
+		})
+
+		t.Run("advise to evict checkpoints from page cache", func(t *testing.T) {
+			logger := zerolog.Nop()
+			evictedFileNames, err := wal.EvictAllCheckpointsFromLinuxPageCache(dir, &logger)
+			require.NoError(t, err)
+			require.Equal(t, 1, len(evictedFileNames))
+			require.Equal(t, path.Join(dir, "checkpoint.00000010"), evictedFileNames[0])
 		})
 
 		t.Run("corrupted checkpoints are skipped", func(t *testing.T) {
@@ -406,18 +415,19 @@ func Test_Checkpointing(t *testing.T) {
 			trieRead, err := pathfinder.QueryToTrieRead(query, pathFinderVersion)
 			require.NoError(t, err)
 
-			payloads, err := f.Read(trieRead)
+			values, err := f.Read(trieRead)
 			require.NoError(t, err)
 
-			payloads6, err := f6.Read(trieRead)
+			values6, err := f6.Read(trieRead)
 			require.NoError(t, err)
 
 			for i := range keys2 {
-				require.Equal(t, values2[i], payloads[i].Value)
-				require.Equal(t, values2[i], payloads6[i].Value)
+				require.Equal(t, values2[i], values[i])
+				require.Equal(t, values2[i], values6[i])
 			}
 
 		})
+
 	})
 }
 
@@ -534,7 +544,8 @@ func Test_StoringLoadingCheckpoints(t *testing.T) {
 		file.Close()
 
 		t.Run("works without data modification", func(t *testing.T) {
-			tries, err := realWAL.LoadCheckpoint(filepath, nil)
+			logger := zerolog.Nop()
+			tries, err := realWAL.LoadCheckpoint(filepath, &logger)
 			require.NoError(t, err)
 			require.Equal(t, 1, len(tries))
 			require.Equal(t, updatedTrie, tries[0])
@@ -551,7 +562,8 @@ func Test_StoringLoadingCheckpoints(t *testing.T) {
 			err = os.WriteFile(filepath, b, 0644)
 			require.NoError(t, err)
 
-			tries, err := realWAL.LoadCheckpoint(filepath, nil)
+			logger := zerolog.Nop()
+			tries, err := realWAL.LoadCheckpoint(filepath, &logger)
 			require.Error(t, err)
 			require.Nil(t, tries)
 			require.Contains(t, err.Error(), "checksum")

@@ -86,7 +86,7 @@ func TestGetEvents(t *testing.T) {
 			description:      "Get invalid - too big interval",
 			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", "0", "5000", nil),
 			expectedStatus:   http.StatusBadRequest,
-			expectedResponse: `{"code":400,"message":"height range 5000 exceeds maximum allowed of 50"}`,
+			expectedResponse: `{"code":400,"message":"height range 5000 exceeds maximum allowed of 250"}`,
 		},
 		{
 			description:      "Get invalid - can not provide all params",

@@ -171,7 +171,7 @@ func NewEngine(
 	}
 
 	// register network conduit
-	conduit, err := net.Register(engine.ChannelConsensusCluster(chainID), eng)
+	conduit, err := net.Register(network.ChannelConsensusCluster(chainID), eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
@@ -206,8 +206,15 @@ func (e *Engine) Ready() <-chan struct{} {
 		e.unit.Launch(e.finalizationProcessingLoop)
 
 		ctx, cancel := context.WithCancel(context.Background())
-		signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+		signalerCtx, hotstuffErrChan := irrecoverable.WithSignaler(ctx)
 		e.stopHotstuff = cancel
+
+		// TODO: this workaround for handling fatal HotStuff errors is required only
+		//  because this engine and epochmgr do not use the Component pattern yet
+		e.unit.Launch(func() {
+			e.handleHotStuffError(hotstuffErrChan)
+		})
+
 		e.core.hotstuff.Start(signalerCtx)
 		// wait for request handler to startup
 		<-e.core.hotstuff.Ready()
@@ -359,20 +366,25 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 	header.ChainID = parent.ChainID
 	header.Height = parent.Height + 1
 
-	log := e.log.With().
-		Hex("block_id", logging.ID(header.ID())).
-		Uint64("block_height", header.Height).
-		Logger()
-
-	log.Debug().Msg("preparing to broadcast proposal from hotstuff")
-
 	// retrieve the payload for the block
 	payload, err := e.payloads.ByBlockID(header.ID())
 	if err != nil {
 		return fmt.Errorf("could not get payload for block: %w", err)
 	}
 
-	log = log.With().Int("collection_size", payload.Collection.Len()).Logger()
+	log := e.log.With().
+		Str("chain_id", header.ChainID.String()).
+		Uint64("block_height", header.Height).
+		Uint64("block_view", header.View).
+		Hex("block_id", logging.ID(header.ID())).
+		Hex("parent_id", header.ParentID[:]).
+		Hex("ref_block", payload.ReferenceBlockID[:]).
+		Int("transaction_count", payload.Collection.Len()).
+		Hex("parent_signer_indices", header.ParentVoterIndices).
+		Dur("delay", delay).
+		Logger()
+
+	log.Debug().Msg("processing cluster broadcast request from hotstuff")
 
 	// retrieve all collection nodes in our cluster
 	recipients, err := e.state.Final().Identities(filter.And(
@@ -402,9 +414,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 			return
 		}
 
-		log.Debug().
-			Str("recipients", fmt.Sprintf("%v", recipients.NodeIDs())).
-			Msg("broadcast proposal from hotstuff")
+		log.Info().Msg("cluster proposal proposed")
 
 		e.metrics.MessageSent(metrics.EngineClusterCompliance, metrics.MessageClusterBlockProposal)
 		block := &cluster.Block{
@@ -442,6 +452,24 @@ func (e *Engine) finalizationProcessingLoop() {
 			return
 		case <-finalizationNotifier:
 			e.core.ProcessFinalizedView(e.finalizedView.Value())
+		}
+	}
+}
+
+// handleHotStuffError accepts the error channel from the HotStuff component and
+// crashes the node if any error is detected.
+// TODO: this function should be removed in favour of refactoring this engine and
+//  the epochmgr engine to use the Component pattern, so that irrecoverable errors
+//  can be bubbled all the way to the node scaffold
+func (e *Engine) handleHotStuffError(hotstuffErrs <-chan error) {
+	for {
+		select {
+		case <-e.unit.Quit():
+			return
+		case err := <-hotstuffErrs:
+			if err != nil {
+				e.log.Fatal().Err(err).Msg("encountered fatal error in HotStuff")
+			}
 		}
 	}
 }

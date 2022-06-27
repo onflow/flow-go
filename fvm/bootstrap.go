@@ -36,9 +36,16 @@ type BootstrapProcedure struct {
 	storagePerFlow                   cadence.UFix64
 	restrictedAccountCreationEnabled cadence.Bool
 
+	// TODO: restrictedContractDeployment should be a bool after RestrictedDeploymentEnabled is removed from the context
+	// restrictedContractDeployment of nil means that the contract deployment is taken from the fvm Context instead of from the state.
+	// This can be used to mimic behaviour on chain before the restrictedContractDeployment is set with a service account transaction.
+	restrictedContractDeployment *bool
+
 	transactionFees        BootstrapProcedureFeeParameters
 	executionEffortWeights weightedMeter.ExecutionEffortWeights
 	executionMemoryWeights weightedMeter.ExecutionMemoryWeights
+	// executionMemoryLimit of 0 means that it won't be set in the state. The FVM will use the default value from the context.
+	executionMemoryLimit uint64
 
 	// config values for epoch smart-contracts
 	epochConfig epochs.EpochConfig
@@ -139,6 +146,13 @@ func WithExecutionMemoryWeights(weights weightedMeter.ExecutionMemoryWeights) Bo
 	}
 }
 
+func WithExecutionMemoryLimit(limit uint64) BootstrapProcedureOption {
+	return func(bp *BootstrapProcedure) *BootstrapProcedure {
+		bp.executionMemoryLimit = limit
+		return bp
+	}
+}
+
 func WithMinimumStorageReservation(reservation cadence.UFix64) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
 		bp.minimumStorageReservation = reservation
@@ -181,6 +195,13 @@ func WithRestrictedAccountCreationEnabled(enabled cadence.Bool) BootstrapProcedu
 	}
 }
 
+func WithRestrictedContractDeployment(restricted *bool) BootstrapProcedureOption {
+	return func(bp *BootstrapProcedure) *BootstrapProcedure {
+		bp.restrictedContractDeployment = restricted
+		return bp
+	}
+}
+
 // Bootstrap returns a new BootstrapProcedure instance configured with the provided
 // genesis parameters.
 func Bootstrap(
@@ -203,7 +224,7 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 	b.vm = vm
 	b.ctx = NewContextFromParent(
 		ctx,
-		WithRestrictedDeployment(false))
+		WithContractDeploymentRestricted(false))
 	b.rootBlock = flow.Genesis(flow.ChainID(ctx.Chain.String())).Header
 	b.sth = sth
 	b.programs = programs
@@ -242,6 +263,8 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 		b.transactionFees.InclusionEffortCost,
 		b.transactionFees.ExecutionEffortCost,
 	)
+
+	b.setContractDeploymentRestrictions(service, b.restrictedContractDeployment)
 
 	b.setupExecutionWeights(service)
 
@@ -585,6 +608,9 @@ func (b *BootstrapProcedure) setupExecutionWeights(service flow.Address) {
 	if b.executionMemoryWeights != nil {
 		b.setupExecutionMemoryWeights(service)
 	}
+	if b.executionMemoryLimit != 0 {
+		b.setExecutionMemoryLimitTransaction(service)
+	}
 }
 
 func (b *BootstrapProcedure) setupExecutionEffortWeights(service flow.Address) {
@@ -621,7 +647,7 @@ func (b *BootstrapProcedure) setupExecutionMemoryWeights(service flow.Address) {
 
 	tb, err := blueprints.SetExecutionMemoryWeightsTransaction(service, uintWeights)
 	if err != nil {
-		panic(fmt.Sprintf("failed to setup execution effort weights %s", err.Error()))
+		panic(fmt.Sprintf("failed to setup execution memory weights %s", err.Error()))
 	}
 
 	txError, err := b.vm.invokeMetaTransaction(
@@ -632,7 +658,25 @@ func (b *BootstrapProcedure) setupExecutionMemoryWeights(service flow.Address) {
 		b.sth,
 		b.programs,
 	)
-	panicOnMetaInvokeErrf("failed to setup execution effort weights: %s", txError, err)
+	panicOnMetaInvokeErrf("failed to setup execution memory weights: %s", txError, err)
+}
+
+func (b *BootstrapProcedure) setExecutionMemoryLimitTransaction(service flow.Address) {
+
+	tb, err := blueprints.SetExecutionMemoryLimitTransaction(service, b.executionMemoryLimit)
+	if err != nil {
+		panic(fmt.Sprintf("failed to setup execution memory limit %s", err.Error()))
+	}
+
+	txError, err := b.vm.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			tb,
+			0),
+		b.sth,
+		b.programs,
+	)
+	panicOnMetaInvokeErrf("failed to setup execution memory limit: %s", txError, err)
 }
 
 func (b *BootstrapProcedure) setupStorageForServiceAccounts(
@@ -778,6 +822,27 @@ func (b *BootstrapProcedure) deployStakingCollection(service flow.Address, fungi
 		b.ctx,
 		Transaction(
 			blueprints.DeployContractTransaction(service, contract, "FlowStakingCollection"),
+			0,
+		),
+		b.sth,
+		b.programs,
+	)
+	panicOnMetaInvokeErrf("failed to deploy FlowStakingCollection contract: %s", txError, err)
+}
+
+func (b *BootstrapProcedure) setContractDeploymentRestrictions(service flow.Address, deployment *bool) {
+	if deployment == nil {
+		return
+	}
+
+	txBody, err := blueprints.SetIsContractDeploymentRestrictedTransaction(service, *deployment)
+	if err != nil {
+		panic(err)
+	}
+	txError, err := b.vm.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			txBody,
 			0,
 		),
 		b.sth,

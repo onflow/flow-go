@@ -10,7 +10,7 @@ on:
 env:
   BIGQUERY_DATASET: production_src_flow_test_metrics
   BIGQUERY_TABLE: test_results
-  GO_VERSION: 1.17
+  GO_VERSION: 1.18
 
 jobs:
   upload-flaky-test-summary:

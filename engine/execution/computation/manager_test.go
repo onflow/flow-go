@@ -4,11 +4,15 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"math"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/onflow/cadence"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -127,6 +131,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 		programsCache: programsCache,
 		eds:           eds,
 		edCache:       eCache,
+		tracer:        trace.NewNoopTracer(),
 	}
 
 	view := delta.NewView(ledger.Get)
@@ -178,6 +183,7 @@ func TestComputeBlock_Uploader(t *testing.T) {
 		uploaders:     []uploader.Uploader{fakeUploader},
 		eds:           eds,
 		edCache:       eCache,
+		tracer:        trace.NewNoopTracer(),
 	}
 
 	view := delta.NewView(state2.LedgerGetRegister(ledger, flow.StateCommitment(ledger.InitialState())))
@@ -205,7 +211,7 @@ func TestExecuteScript(t *testing.T) {
 
 	vm := fvm.NewVirtualMachine(rt)
 
-	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
+	ledger := testutil.RootBootstrappedLedger(vm, execCtx, fvm.WithExecutionMemoryLimit(math.MaxUint64))
 
 	view := delta.NewView(ledger.Get)
 
@@ -225,7 +231,7 @@ func TestExecuteScript(t *testing.T) {
 
 	engine, err := New(logger,
 		metrics.NewNoopCollector(),
-		nil,
+		trace.NewNoopTracer(),
 		me,
 		nil,
 		vm,
@@ -260,7 +266,7 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 
 	manager, err := New(log,
 		metrics.NewNoopCollector(),
-		nil,
+		trace.NewNoopTracer(),
 		nil,
 		nil,
 		vm,
@@ -297,7 +303,7 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 
 	manager, err := New(log,
 		metrics.NewNoopCollector(),
-		nil,
+		trace.NewNoopTracer(),
 		nil,
 		nil,
 		vm,
@@ -334,7 +340,7 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 
 	manager, err := New(log,
 		metrics.NewNoopCollector(),
-		nil,
+		trace.NewNoopTracer(),
 		nil,
 		nil,
 		vm,
@@ -415,7 +421,7 @@ func TestExecuteScriptTimeout(t *testing.T) {
 	manager, err := New(
 		zerolog.Nop(),
 		metrics.NewNoopCollector(),
-		nil,
+		trace.NewNoopTracer(),
 		nil,
 		nil,
 		fvm.NewVirtualMachine(fvm.NewInterpreterRuntime()),
@@ -454,7 +460,7 @@ func TestExecuteScriptCancelled(t *testing.T) {
 	manager, err := New(
 		zerolog.Nop(),
 		metrics.NewNoopCollector(),
-		nil,
+		trace.NewNoopTracer(),
 		nil,
 		nil,
 		fvm.NewVirtualMachine(fvm.NewInterpreterRuntime()),
@@ -494,4 +500,66 @@ func TestExecuteScriptCancelled(t *testing.T) {
 	wg.Wait()
 	require.Nil(t, value)
 	require.Contains(t, err.Error(), fvmErrors.ErrCodeScriptExecutionCancelledError.String())
+}
+
+func TestScriptStorageMutationsDiscarded(t *testing.T) {
+
+	timeout := 1 * time.Millisecond
+	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime())
+	chain := flow.Mainnet.Chain()
+	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain))
+	manager, _ := New(
+		zerolog.Nop(),
+		metrics.NewExecutionCollector(ctx.Tracer),
+		trace.NewNoopTracer(),
+		nil,
+		nil,
+		vm,
+		ctx,
+		DefaultProgramsCacheSize,
+		committer.NewNoopViewCommitter(),
+		DefaultScriptLogThreshold,
+		timeout,
+		nil,
+		nil,
+		nil)
+	view := testutil.RootBootstrappedLedger(vm, ctx)
+	programs := programs.NewEmptyPrograms()
+	st := state.NewState(view)
+	sth := state.NewStateHolder(st)
+	env := fvm.NewScriptEnvironment(context.Background(), ctx, vm, sth, programs)
+
+	// Create an account private key.
+	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+	require.NoError(t, err)
+
+	// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+	accounts, err := testutil.CreateAccounts(vm, view, programs, privateKeys, chain)
+	require.NoError(t, err)
+	account := accounts[0]
+	address := cadence.NewAddress(account)
+	commonAddress, _ := common.HexToAddress(address.Hex())
+
+	script := []byte(`
+	pub fun main(account: Address) {
+		let acc = getAuthAccount(account)
+		acc.save(3, to: /storage/x)
+	}
+	`)
+
+	header := unittest.BlockHeaderFixture()
+	scriptView := view.NewChild()
+	_, err = manager.ExecuteScript(context.Background(), script, [][]byte{jsoncdc.MustEncode(address)}, &header, scriptView)
+
+	require.NoError(t, err)
+
+	v, err := vm.Runtime.ReadStored(
+		commonAddress,
+		cadence.NewPath("storage", "x"),
+		runtime.Context{Interface: env},
+	)
+
+	// the save should not update account storage by writing the delta from the child view back to the parent
+	require.NoError(t, err)
+	require.Equal(t, nil, v)
 }

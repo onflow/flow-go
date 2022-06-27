@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	mockstorage "github.com/onflow/flow-go/storage/mock"
@@ -121,7 +122,7 @@ func (s *MatchingEngineSuite) TestMultipleProcessingItems() {
 	go func() {
 		defer wg.Done()
 		for _, receipt := range receipts {
-			err := s.engine.Process(engine.ReceiveReceipts, originID, receipt)
+			err := s.engine.Process(network.ReceiveReceipts, originID, receipt)
 			s.Require().NoError(err, "should add receipt and result to mempool if valid")
 		}
 	}()

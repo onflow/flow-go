@@ -81,7 +81,7 @@ func withAttackNetworkClient(
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			gRpcClient, err := grpc.Dial(attackNetwork.ServerAddress().String(), grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
+			gRpcClient, err := grpc.Dial(attackNetwork.ServerAddress(), grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
 			require.NoError(t, err)
 
 			client := insecure.NewAttackerClient(gRpcClient)
@@ -177,7 +177,7 @@ func matchEventForMessage(t *testing.T, events []*insecure.Event, message *insec
 	require.Equal(t, corruptedId[:], message.OriginID[:])
 
 	for _, event := range events {
-		if event.CorruptedId == corruptedId {
+		if event.CorruptedNodeId == corruptedId {
 			require.Equal(t, event.Channel.String(), message.ChannelID)
 			require.Equal(t, event.Protocol, message.Protocol)
 			require.Equal(t, flow.IdsToBytes(event.TargetIds), message.TargetIDs)
@@ -205,7 +205,14 @@ func withCorruptedConnections(t *testing.T,
 	orchestrator := &mockinsecure.AttackOrchestrator{}
 	connector := &mockinsecure.CorruptedNodeConnector{}
 
-	attackNetwork, err := NewAttackNetwork(unittest.Logger(), serverAddress, codec, orchestrator, connector, corruptedIds)
+	attackNetwork, err := NewAttackNetwork(
+		unittest.Logger(),
+		serverAddress,
+		codec,
+		orchestrator,
+		connector,
+		corruptedIds,
+		WithLocalHostRuntime)
 	require.NoError(t, err)
 	connector.On("WithAttackerAddress", mock.Anything).Return().Once()
 

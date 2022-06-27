@@ -24,6 +24,7 @@ type ScriptProcedure struct {
 	Logs           []string
 	Events         []flow.Event
 	GasUsed        uint64
+	MemoryEstimate uint64
 	Err            errors.Error
 }
 
@@ -140,5 +141,6 @@ func (i ScriptInvoker) Process(
 	proc.Logs = env.Logs()
 	proc.Events = env.Events()
 	proc.GasUsed = env.ComputationUsed()
+	proc.MemoryEstimate = env.MemoryEstimate()
 	return nil
 }
