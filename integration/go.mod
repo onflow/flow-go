@@ -21,7 +21,7 @@ require (
 	github.com/onflow/flow-ft/lib/go/templates v0.2.0
 	github.com/onflow/flow-go v0.26.3 // replaced by version on-disk
 	github.com/onflow/flow-go-sdk v0.26.1
-	github.com/onflow/flow-go/crypto v0.24.4-0.20220615204607-ead294d1f25d
+	github.com/onflow/flow-go/crypto v0.24.4
 	github.com/onflow/flow/protobuf/go/flow v0.3.1
 	github.com/openhistogram/circonusllhist v0.3.0
 	github.com/plus3it/gorecurcopy v0.0.1
