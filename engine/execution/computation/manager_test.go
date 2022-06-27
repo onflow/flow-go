@@ -510,7 +510,7 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain))
 	manager, _ := New(
 		zerolog.Nop(),
-		metrics.NewNoopCollector(),
+		metrics.NewExecutionCollector(ctx.Tracer),
 		trace.NewNoopTracer(),
 		nil,
 		nil,

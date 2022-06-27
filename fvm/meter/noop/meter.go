@@ -56,8 +56,8 @@ func (m *Meter) MemoryIntensities() interfaceMeter.MeteredMemoryIntensities {
 	return map[common.MemoryKind]uint{}
 }
 
-// TotalMemoryUsed always returns zero
-func (m *Meter) TotalMemoryUsed() uint {
+// TotalMemoryEstimate always returns zero
+func (m *Meter) TotalMemoryEstimate() uint {
 	return 0
 }
 
