@@ -237,9 +237,9 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 	service := b.createServiceAccount(b.serviceAccountPublicKey)
 
 	b.deployContractAuditVouchers(service)
-	fungibleToken := b.deployFungibleToken()
-	flowToken := b.deployFlowToken(service, fungibleToken)
-	feeContract := b.deployFlowFees(service, fungibleToken, flowToken)
+	fungibleToken := b.deployFungibleToken(b.serviceAccountPublicKey)
+	flowToken := b.deployFlowToken(b.serviceAccountPublicKey, service, fungibleToken)
+	feeContract := b.deployFlowFees(b.serviceAccountPublicKey, service, fungibleToken, flowToken)
 	b.deployStorageFees(service, fungibleToken, flowToken)
 
 	if b.initialTokenSupply > 0 {
@@ -292,7 +292,7 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 	// deploy staking collection contract to the service account
 	b.deployStakingCollection(service, fungibleToken, flowToken)
 
-	b.registerNodes(service, fungibleToken, flowToken)
+	b.registerNodes(b.serviceAccountPublicKey, service, fungibleToken, flowToken)
 
 	return nil
 }
@@ -305,13 +305,13 @@ func (proc *BootstrapProcedure) MemoryLimit(_ Context) uint64 {
 	return math.MaxUint64
 }
 
-func (b *BootstrapProcedure) createAccount() flow.Address {
+func (b *BootstrapProcedure) createAccount(publicKey flow.AccountPublicKey) flow.Address {
 	address, err := b.addressGenerator.NextAddress()
 	if err != nil {
 		panic(fmt.Sprintf("failed to generate address: %s", err))
 	}
 
-	err = b.accounts.Create(nil, address)
+	err = b.accounts.Create([]flow.AccountPublicKey{publicKey}, address)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create account: %s", err))
 	}
@@ -333,8 +333,8 @@ func (b *BootstrapProcedure) createServiceAccount(accountKey flow.AccountPublicK
 	return address
 }
 
-func (b *BootstrapProcedure) deployFungibleToken() flow.Address {
-	fungibleToken := b.createAccount()
+func (b *BootstrapProcedure) deployFungibleToken(publicKey flow.AccountPublicKey) flow.Address {
+	fungibleToken := b.createAccount(publicKey)
 
 	txError, err := b.vm.invokeMetaTransaction(
 		b.ctx,
@@ -348,8 +348,8 @@ func (b *BootstrapProcedure) deployFungibleToken() flow.Address {
 	return fungibleToken
 }
 
-func (b *BootstrapProcedure) deployFlowToken(service, fungibleToken flow.Address) flow.Address {
-	flowToken := b.createAccount()
+func (b *BootstrapProcedure) deployFlowToken(publicKey flow.AccountPublicKey, service, fungibleToken flow.Address) flow.Address {
+	flowToken := b.createAccount(publicKey)
 	txError, err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
@@ -365,8 +365,8 @@ func (b *BootstrapProcedure) deployFlowToken(service, fungibleToken flow.Address
 	return flowToken
 }
 
-func (b *BootstrapProcedure) deployFlowFees(service, fungibleToken, flowToken flow.Address) flow.Address {
-	flowFees := b.createAccount()
+func (b *BootstrapProcedure) deployFlowFees(publicKey flow.AccountPublicKey, service, fungibleToken, flowToken flow.Address) flow.Address {
+	flowFees := b.createAccount(publicKey)
 
 	txError, err := b.vm.invokeMetaTransaction(
 		b.ctx,
@@ -713,11 +713,11 @@ func (b *BootstrapProcedure) setStakingAllowlist(service flow.Address, allowedID
 	panicOnMetaInvokeErrf("failed to set staking allow-list: %s", txError, err)
 }
 
-func (b *BootstrapProcedure) registerNodes(service, fungibleToken, flowToken flow.Address) {
+func (b *BootstrapProcedure) registerNodes(publicKey flow.AccountPublicKey, service, fungibleToken, flowToken flow.Address) {
 	for _, id := range b.identities {
 
 		// create a staking account for the node
-		nodeAddress := b.createAccount()
+		nodeAddress := b.createAccount(publicKey)
 
 		// give a vault resource to the staking account
 		txError, err := b.vm.invokeMetaTransaction(
