@@ -103,12 +103,16 @@ func (c *cache) updateIPCache(domain string, addr []net.IPAddr) {
 	timestamp := runtimeNano()
 	removed := c.dCache.RemoveIp(domain)
 	added := c.dCache.PutDomainIp(domain, addr, runtimeNano())
+
+	ipSize, txtSize := c.dCache.Size()
 	c.logger.Trace().
 		Str("domain", domain).
 		Str("address", fmt.Sprintf("%v", addr)).
 		Bool("old_entry_removed", removed).
 		Bool("new_entry_added", added).
 		Int64("timestamp", timestamp).
+		Uint("ip_size", ipSize).
+		Uint("txt_size", txtSize).
 		Msg("dns cache updated")
 }
 
@@ -116,15 +120,20 @@ func (c *cache) updateIPCache(domain string, addr []net.IPAddr) {
 func (c *cache) updateTXTCache(txt string, record []string) {
 	c.Lock()
 	defer c.Unlock()
+
 	timestamp := runtimeNano()
 	removed := c.dCache.RemoveTxt(txt)
 	added := c.dCache.PutTxtRecord(txt, record, runtimeNano())
+
+	ipSize, txtSize := c.dCache.Size()
 	c.logger.Trace().
 		Str("txt", txt).
 		Strs("record", record).
 		Bool("old_entry_removed", removed).
 		Bool("new_entry_added", added).
 		Int64("timestamp", timestamp).
+		Uint("ip_size", ipSize).
+		Uint("txt_size", txtSize).
 		Msg("dns cache updated")
 }
 

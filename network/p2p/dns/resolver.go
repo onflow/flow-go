@@ -180,6 +180,8 @@ func (r *Resolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAdd
 // An expired domain on cache is still addressed through the cache, however, a request is fired up asynchronously
 // through the underlying basic resolver to resolve it from the network.
 func (r *Resolver) lookupIPAddr(ctx context.Context, domain string) ([]net.IPAddr, error) {
+	resolving := r.txtResolvingInProgress(domain)
+
 	addr, exists, fresh := r.c.resolveIPCache(domain)
 
 	lg := r.logger.With().
@@ -192,6 +194,11 @@ func (r *Resolver) lookupIPAddr(ctx context.Context, domain string) ([]net.IPAdd
 	if !exists {
 		r.collector.OnDNSCacheMiss()
 		return r.lookupResolverForIPAddr(ctx, domain)
+	}
+
+	if !fresh && resolving {
+		lg.Trace().Msg("ip expired, but a resolving is in progress, returning expired one for now")
+		return addr, nil
 	}
 
 	if !fresh && r.shouldResolveIP(domain) && !util.CheckClosed(r.cm.ShutdownSignal()) {
@@ -237,6 +244,8 @@ func (r *Resolver) LookupTXT(ctx context.Context, txt string) ([]string, error) 
 
 // lookupIPAddr encapsulates the logic of resolving a txt through cache.
 func (r *Resolver) lookupTXT(ctx context.Context, txt string) ([]string, error) {
+	resolving := r.txtResolvingInProgress(txt)
+
 	addr, exists, fresh := r.c.resolveTXTCache(txt)
 
 	lg := r.logger.With().
@@ -249,6 +258,11 @@ func (r *Resolver) lookupTXT(ctx context.Context, txt string) ([]string, error) 
 	if !exists {
 		r.collector.OnDNSCacheMiss()
 		return r.lookupResolverForTXTRecord(ctx, txt)
+	}
+
+	if !fresh && resolving {
+		lg.Trace().Msg("txt expired, but a resolving is in progress, returning expired one for now")
+		return addr, nil
 	}
 
 	if !fresh && r.shouldResolveTXT(txt) && !util.CheckClosed(r.cm.ShutdownSignal()) {
@@ -305,6 +319,24 @@ func (r *Resolver) doneResolvingTXT(txt string) {
 	defer r.Unlock()
 
 	delete(r.processingTXTs, txt)
+}
+
+// ipResolvingInProgress returns true if resolving is in progress for this ip.
+func (r *Resolver) ipResolvingInProgress(domain string) bool {
+	r.Lock()
+	defer r.Unlock()
+
+	_, ok := r.processingIPs[domain]
+	return ok
+}
+
+// txtResolvingInProgress returns true if resolving is in progress for this txt.
+func (r *Resolver) txtResolvingInProgress(txt string) bool {
+	r.Lock()
+	defer r.Unlock()
+
+	_, ok := r.processingTXTs[txt]
+	return ok
 }
 
 // shouldResolveIP returns true if there is no other concurrent attempt ongoing for resolving the txt.
