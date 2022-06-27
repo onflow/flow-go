@@ -147,7 +147,7 @@ For an ER to be emergency sealed, all of the following conditions have to be sat
 ![Emergency sealing](/docs/Emergency_Sealing.png)
 
 1. Let Δh<sub>1</sub> be the height difference between the latest finalized block and block `A`.
-   We require that Δh<sub>1</sub> > `DefaultEmergencySealingThresholdForExecution`
+   We require that Δh<sub>1</sub> > `DefaultEmergencySealingThresholdForExecution`.
    * This means that block `A` must have at least `DefaultEmergencySealingThresholdForExecution` unsealed but
      finalized descendants. 
    * This condition is enforced by the `VerifyingAssignmentCollector`.
