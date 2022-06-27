@@ -280,6 +280,8 @@ func (e *Manager) ComputeBlock(
 		return nil, fmt.Errorf("failed to execute block: %w", err)
 	}
 
+	e.log.Debug().Hex("block_id", logging.Entity(block.Block)).Msg("block result computed")
+
 	toInsert := blockPrograms
 
 	// if we have item from cache and there were no changes
@@ -289,6 +291,8 @@ func (e *Manager) ComputeBlock(
 	}
 
 	e.programsCache.Set(block.ID(), toInsert)
+
+	e.log.Debug().Hex("block_id", logging.Entity(block.Block)).Msg("programs cache updated")
 
 	group, uploadCtx := errgroup.WithContext(ctx)
 	var rootID flow.Identifier
