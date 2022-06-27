@@ -3,6 +3,7 @@ package ingestion
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	mathRand "math/rand"
 	"sync"
 	"testing"
@@ -767,6 +768,9 @@ func TestBlocksArentExecutedMultipleTimes_collectionArrival(t *testing.T) {
 
 		wgC := sync.WaitGroup{}
 		wgC.Add(1)
+
+		// stops .ByID() call from blocking in handleCollection
+		ctx.blocks.EXPECT().ByID(gomock.Any()).AnyTimes().Return(nil, errors.New(""))
 
 		ctx.assertSuccessfulBlockComputation(commits, func(blockID flow.Identifier, commit flow.StateCommitment) {
 			wgB.Wait()
