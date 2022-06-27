@@ -613,8 +613,10 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		handler := access.NewHandler(backend, suite.chainID.Chain())
 
-		rpcEng, err := rpc.New(suite.log, suite.state, rpc.Config{}, nil, nil, blocks, headers, collections, transactions,
+		rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, rpc.Config{}, nil, nil, blocks, headers, collections, transactions,
 			receipts, results, suite.chainID, metrics, metrics, 0, 0, false, false, nil, nil)
+		rpcEngBuilder.WithLegacy()
+		rpcEng := rpcEngBuilder.Build()
 		require.NoError(suite.T(), err)
 
 		// create the ingest engine
