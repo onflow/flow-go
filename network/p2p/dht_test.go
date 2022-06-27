@@ -156,7 +156,7 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 		}
 
 		// Subscribes to the test topic
-		s, err := n.Subscribe(topic, codec)
+		s, err := n.Subscribe(topic, codec, unittest.AllowAllPeerFilter())
 		require.NoError(t, err)
 
 		// kick off the reader
