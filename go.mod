@@ -54,7 +54,7 @@ require (
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/multiformats/go-multihash v0.1.0
 	github.com/onflow/atree v0.4.0
-	github.com/onflow/cadence v0.24.6
+	github.com/onflow/cadence v0.24.2-0.20220627202951-5a06fec82b4a
 	github.com/onflow/flow v0.3.1
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220513155751-c4c1f8d59f83
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220513155751-c4c1f8d59f83
@@ -115,6 +115,7 @@ require (
 	github.com/aws/smithy-go v1.8.0 // indirect
 	github.com/benbjohnson/clock v1.3.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
+	github.com/bits-and-blooms/bitset v1.2.2 // indirect
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
