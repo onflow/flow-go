@@ -210,7 +210,7 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 
 	// Get the latest sealed result on this fork and the corresponding block,
 	// whose result is sealed. This block is not necessarily finalized.
-	lastSeal, err := v.seals.ByBlockID(header.ParentID)
+	lastSeal, err := v.seals.HighestInFork(header.ParentID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve latest seal for fork with head %x: %w", header.ParentID, err)
 	}

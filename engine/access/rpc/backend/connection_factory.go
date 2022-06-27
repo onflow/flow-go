@@ -7,10 +7,13 @@ import (
 	"net"
 	"time"
 
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
 
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
@@ -41,6 +44,9 @@ type ConnectionFactoryImpl struct {
 	ExecutionGRPCPort         uint
 	CollectionNodeGRPCTimeout time.Duration
 	ExecutionNodeGRPCTimeout  time.Duration
+	ConnectionsCache          *lru.Cache
+	CacheSize                 uint
+	AccessMetrics             module.AccessMetrics
 }
 
 // createConnection creates new gRPC connections to remote node
@@ -50,6 +56,10 @@ func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.D
 		timeout = defaultClientTimeout
 	}
 
+	// ClientConn's default KeepAlive on connections is indefinite, assuming the timeout isn't reached
+	// The connections should be safe to be persisted and reused
+	// https://pkg.go.dev/google.golang.org/grpc#WithKeepaliveParams
+	// https://grpc.io/blog/grpc-on-http2/#keeping-connections-alive
 	conn, err := grpc.Dial(
 		address,
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
@@ -61,16 +71,40 @@ func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.D
 	return conn, nil
 }
 
+func (cf *ConnectionFactoryImpl) retrieveConnection(grpcAddress string, timeout time.Duration) (*grpc.ClientConn, error) {
+	var conn *grpc.ClientConn
+	if res, ok := cf.ConnectionsCache.Get(grpcAddress); ok {
+		conn = res.(*grpc.ClientConn)
+		if cf.AccessMetrics != nil {
+			cf.AccessMetrics.ConnectionFromPoolRetrieved()
+		}
+	}
+	if conn == nil || conn.GetState() != connectivity.Ready {
+		var err error
+		conn, err = cf.createConnection(grpcAddress, timeout)
+		if err != nil {
+			return nil, err
+		}
+		cf.ConnectionsCache.Add(grpcAddress, conn)
+		if cf.AccessMetrics != nil {
+			cf.AccessMetrics.TotalConnectionsInPool(uint(cf.ConnectionsCache.Len()), cf.CacheSize)
+		}
+	}
+	return conn, nil
+}
+
 func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string) (access.AccessAPIClient, io.Closer, error) {
 
 	grpcAddress, err := getGRPCAddress(address, cf.CollectionGRPCPort)
 	if err != nil {
 		return nil, nil, err
 	}
-	conn, err := cf.createConnection(grpcAddress, cf.CollectionNodeGRPCTimeout)
+
+	conn, err := cf.retrieveConnection(grpcAddress, cf.CollectionNodeGRPCTimeout)
 	if err != nil {
 		return nil, nil, err
 	}
+
 	accessAPIClient := access.NewAccessAPIClient(conn)
 	closer := io.Closer(conn)
 	return accessAPIClient, closer, nil
@@ -83,10 +117,11 @@ func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (executio
 		return nil, nil, err
 	}
 
-	conn, err := cf.createConnection(grpcAddress, cf.ExecutionNodeGRPCTimeout)
+	conn, err := cf.retrieveConnection(grpcAddress, cf.ExecutionNodeGRPCTimeout)
 	if err != nil {
 		return nil, nil, err
 	}
+
 	executionAPIClient := execution.NewExecutionAPIClient(conn)
 	closer := io.Closer(conn)
 	return executionAPIClient, closer, nil

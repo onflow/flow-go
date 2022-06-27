@@ -15,7 +15,6 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/testutil"
 	enginemock "github.com/onflow/flow-go/engine/testutil/mock"
 	"github.com/onflow/flow-go/engine/verification/assigner/blockconsumer"
@@ -57,7 +56,7 @@ func SetupChunkDataPackProvider(t *testing.T,
 	exeNode := testutil.GenericNodeFromParticipants(t, hub, exeIdentity, participants, chainID)
 	exeEngine := new(mocknetwork.Engine)
 
-	exeChunkDataConduit, err := exeNode.Net.Register(engine.ProvideChunks, exeEngine)
+	exeChunkDataConduit, err := exeNode.Net.Register(network.ProvideChunks, exeEngine)
 	assert.Nil(t, err)
 
 	replied := make(map[flow.Identifier]struct{})
@@ -235,7 +234,7 @@ func SetupMockConsensusNode(t *testing.T,
 			wg.Done()
 		}).Return(nil)
 
-	_, err := conNode.Net.Register(engine.ReceiveApprovals, conEngine)
+	_, err := conNode.Net.Register(network.ReceiveApprovals, conEngine)
 	assert.Nil(t, err)
 
 	return &conNode, conEngine, wg

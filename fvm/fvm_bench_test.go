@@ -270,7 +270,7 @@ type txWeights struct {
 	TXHash                string `json:"txHash"`
 	LedgerInteractionUsed uint64 `json:"ledgerInteractionUsed"`
 	ComputationUsed       uint   `json:"computationUsed"`
-	MemoryUsed            uint   `json:"memoryUsed"`
+	MemoryEstimate        uint   `json:"memoryEstimate"`
 }
 
 type txSuccessfulLog struct {

@@ -70,12 +70,12 @@ func New(
 	}
 
 	var err error
-	e.pushConduit, err = net.Register(engine.PushApprovals, e)
+	e.pushConduit, err = net.Register(network.PushApprovals, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine on approval push channel: %w", err)
 	}
 
-	e.pullConduit, err = net.Register(engine.ProvideApprovalsByChunk, e)
+	e.pullConduit, err = net.Register(network.ProvideApprovalsByChunk, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine on approval pull channel: %w", err)
 	}

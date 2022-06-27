@@ -46,7 +46,7 @@ func New(log zerolog.Logger, net network.Network, state protocol.State, engMetri
 		transactions: transactions,
 	}
 
-	conduit, err := net.Register(engine.PushGuarantees, e)
+	conduit, err := net.Register(network.PushGuarantees, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register for push protocol: %w", err)
 	}

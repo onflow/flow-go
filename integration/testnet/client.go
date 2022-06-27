@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/onflow/cadence"
+
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go-sdk/crypto"
@@ -50,7 +51,10 @@ func NewClientWithKey(accessAddr string, accountAddr sdk.Address, key sdkcrypto.
 	}
 	accountKey := acc.Keys[0]
 
-	mySigner := crypto.NewInMemorySigner(key, accountKey.HashAlgo)
+	mySigner, err := crypto.NewInMemorySigner(key, accountKey.HashAlgo)
+	if err != nil {
+		return nil, err
+	}
 
 	tc := &Client{
 		client:         flowClient,
