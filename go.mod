@@ -59,7 +59,7 @@ require (
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220513155751-c4c1f8d59f83
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220513155751-c4c1f8d59f83
 	github.com/onflow/flow-emulator v0.33.2
-	github.com/onflow/flow-go-sdk v0.26.2
+	github.com/onflow/flow-go-sdk v0.26.1
 	github.com/onflow/flow-go/crypto v0.24.3
 	github.com/onflow/flow/protobuf/go/flow v0.3.1
 	github.com/opentracing/opentracing-go v1.2.0
@@ -267,7 +267,7 @@ require (
 	github.com/subosito/gotenv v1.2.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.9 // indirect
 	github.com/tklauser/numcpus v0.3.0 // indirect
-	github.com/turbolent/prettier v0.0.0-20210613180524-3a3f5a5b49ba // indirect
+	github.com/turbolent/prettier v0.0.0-20220320183459-661cc755135d // indirect
 	github.com/uber/jaeger-lib v2.4.0+incompatible // indirect
 	github.com/vmihailenco/tagparser v0.1.1 // indirect
 	github.com/whyrusleeping/go-keyspace v0.0.0-20160322163242-5b898ac5add1 // indirect

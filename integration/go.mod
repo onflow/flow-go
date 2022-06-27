@@ -19,8 +19,8 @@ require (
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220513155751-c4c1f8d59f83
 	github.com/onflow/flow-emulator v0.33.2
 	github.com/onflow/flow-ft/lib/go/templates v0.2.0
-	github.com/onflow/flow-go v0.26.3 // replaced by version on-disk
-	github.com/onflow/flow-go-sdk v0.26.2
+	github.com/onflow/flow-go v0.25.13-0.20220609230330-ac8d2d78c212
+	github.com/onflow/flow-go-sdk v0.26.1
 	github.com/onflow/flow-go/crypto v0.24.3
 	github.com/onflow/flow/protobuf/go/flow v0.3.1
 	github.com/openhistogram/circonusllhist v0.3.0
@@ -251,7 +251,7 @@ require (
 	github.com/subosito/gotenv v1.2.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.9 // indirect
 	github.com/tklauser/numcpus v0.3.0 // indirect
-	github.com/turbolent/prettier v0.0.0-20210613180524-3a3f5a5b49ba // indirect
+	github.com/turbolent/prettier v0.0.0-20220320183459-661cc755135d // indirect
 	github.com/uber/jaeger-client-go v2.29.1+incompatible // indirect
 	github.com/uber/jaeger-lib v2.4.1+incompatible // indirect
 	github.com/vmihailenco/msgpack v4.0.4+incompatible // indirect
