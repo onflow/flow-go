@@ -17,9 +17,15 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// DefaultEmergencySealingThresholdForExecution is the default number of blocks which indicates that ER should be sealed using emergency
-// sealing.
-const DefaultEmergencySealingThresholdForExecution = 75
+// **Emergency-sealing parameters**
+
+// DefaultEmergencySealingThresholdForExecution is the minimal number of unsealed but finalized descendants that a
+// block must have in order to be eligible for emergency sealing (further conditions apply for emergency sealing).
+const DefaultEmergencySealingThresholdForExecution = 100
+
+// DefaultEmergencySealingThresholdForVerification is the minimal number of finalized descendants
+// that the block _incorporating_ an Execution Result [ER] must have for the ER to be eligible for
+// emergency sealing (further conditions apply for emergency sealing).
 const DefaultEmergencySealingThresholdForVerification = 25
 
 // VerifyingAssignmentCollector
@@ -74,10 +80,10 @@ func (ac *VerifyingAssignmentCollector) collectorByBlockID(incorporatedBlockID f
 // sealing kicks in. This will be removed when implementation of Sealing & Verification is finished.
 func (ac *VerifyingAssignmentCollector) emergencySealable(collector *ApprovalCollector, finalizedBlockHeight uint64) bool {
 	// Criterion for emergency sealing, both of the following condition need to be true for trigger emergency sealing:
-	// 1. there must be at least DefaultEmergencySealingThresholdForExecution number of blocks between
+	// 1. There must be at least DefaultEmergencySealingThresholdForExecution number of blocks between
 	//    the executed block and the latest finalized block
 	// 2. there must be at least DefaultEmergencySealingThresholdForVerification number of blocks between
-	//  	the block that _incorporates_ result and the latest finalized block
+	//    the block that _incorporates_ result and the latest finalized block
 	return collector.executedBlock.Height+DefaultEmergencySealingThresholdForExecution <= finalizedBlockHeight &&
 		collector.IncorporatedBlock().Height+DefaultEmergencySealingThresholdForVerification <= finalizedBlockHeight
 }

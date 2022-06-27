@@ -423,17 +423,28 @@ func (c *Core) processApproval(approval *flow.ResultApproval) error {
 	return nil
 }
 
-func (c *Core) checkEmergencySealing(observer consensus.SealingObservation, lastSealedHeight, lastFinalizedHeight uint64) error {
+// checkEmergencySealing triggers the AssignmentCollectors to check whether satisfy the conditions to
+// generate an emergency seal. To limit performance impact of these checks, we limit emergency sealing
+// to the 100 lowest finalized blocks that are still unsealed.
+// Inputs:
+//  * `observer` for tracking and reporting the current internal state of the local sealing logic
+//  * `lastFinalizedHeight` is the height of the latest block that is finalized
+//  * `lastHeightWithFinazliedSeal` is the height of the latest block that is finalized and in addition
+// No errors are expected during normal operations.
+func (c *Core) checkEmergencySealing(observer consensus.SealingObservation, lastHeightWithFinazliedSeal, lastFinalizedHeight uint64) error {
 	// if emergency sealing is not activated, then exit
 	if !c.sealingConfigsGetter.EmergencySealingActiveConst() {
 		return nil
 	}
 
-	// calculate total number of unseald and finalized blocks
-	unsealedFinalizedCount := lastFinalizedHeight - lastSealedHeight
+	// calculate total number of finalized blocks that are still unsealed
+	if lastHeightWithFinazliedSeal > lastFinalizedHeight { // sanity check; protects calculation of `unsealedFinalizedCount` from underflow
+		return fmt.Errorf(
+			"latest finalized block must have height (%d) ≥ latest finalized _and_ sealed block (%d)", lastFinalizedHeight, lastHeightWithFinazliedSeal)
+	}
+	unsealedFinalizedCount := lastFinalizedHeight - lastHeightWithFinazliedSeal
 
-	// we don't want to trigger emergency sealing, if there are not many unsealed finalized blocks.
-	// we are checking emergency sealing only if there are more than approvals.DefaultEmergencySealingThresholdForExecution
+	// We are checking emergency sealing only if there are more than approvals.DefaultEmergencySealingThresholdForExecution
 	// number of unsealed finalized blocks.
 	if unsealedFinalizedCount <= approvals.DefaultEmergencySealingThresholdForExecution {
 		return nil
@@ -443,16 +454,18 @@ func (c *Core) checkEmergencySealing(observer consensus.SealingObservation, last
 	// number of finalized heights
 	heightCountForCheckingEmergencySealing := unsealedFinalizedCount - approvals.DefaultEmergencySealingThresholdForExecution
 
-	// if there are too many unsealed and finalized blocks, we don't have to check emergency sealing for all of them,
-	// instead, only check for at most 100 blocks.
-	// because the builder has a limit (maxSealCount) on the max number of seals to be included in a new block
+	// If there are too many unsealed and finalized blocks, we don't have to check emergency sealing for all of them,
+	// instead, only check for at most 100 blocks. This limits computation cost.
+	// Note: the block builder also limits the max number of seals that can be included in a new block to `maxSealCount`.
+	// While `maxSealCount` doesn't have to be the same value as the limit below, there is little benefit of our limit
+	// exceeding `maxSealCount`.
 	if heightCountForCheckingEmergencySealing > 100 {
 		heightCountForCheckingEmergencySealing = 100
 	}
 	// if block is emergency sealable depends on it's incorporated block height
 	// collectors tree stores collector by executed block height
 	// we need to select multiple levels to find eligible collectors for emergency sealing
-	for _, collector := range c.collectorTree.GetCollectorsByInterval(lastSealedHeight, lastSealedHeight+heightCountForCheckingEmergencySealing) {
+	for _, collector := range c.collectorTree.GetCollectorsByInterval(lastHeightWithFinazliedSeal, lastHeightWithFinazliedSeal+heightCountForCheckingEmergencySealing) {
 		err := collector.CheckEmergencySealing(observer, lastFinalizedHeight)
 		if err != nil {
 			return err
@@ -504,41 +517,41 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 		return nil
 	}
 
-	// retrieve latest seal in the fork with head finalizedBlock and update last
+	// retrieve latest _finalized_ finalizedSeal in the fork with head finalizedBlock and update last
 	// sealed height; we do _not_ bail, because we want to re-request approvals
 	// especially, when sealing is stuck, i.e. last sealed height does not increase
-	seal, err := c.seals.HighestInFork(finalizedBlockID)
+	finalizedSeal, err := c.seals.HighestInFork(finalizedBlockID)
 	if err != nil {
-		return fmt.Errorf("could not retrieve seal for finalized block %s", finalizedBlockID)
+		return fmt.Errorf("could not retrieve finalizedSeal for finalized block %s", finalizedBlockID)
 	}
-	lastSealed, err := c.headers.ByBlockID(seal.BlockID)
+	lastBlockWithFinalizedSeal, err := c.headers.ByBlockID(finalizedSeal.BlockID)
 	if err != nil {
-		return fmt.Errorf("could not retrieve last sealed block %v: %w", seal.BlockID, err)
+		return fmt.Errorf("could not retrieve last sealed block %v: %w", finalizedSeal.BlockID, err)
 	}
-	c.counterLastSealedHeight.Set(lastSealed.Height)
+	c.counterLastSealedHeight.Set(lastBlockWithFinalizedSeal.Height)
 
 	// STEP 1: Pruning
 	// ------------------------------------------------------------------------
-	c.log.Info().Msgf("processing finalized block %v at height %d, lastSealedHeight %d", finalizedBlockID, finalized.Height, lastSealed.Height)
-	err = c.prune(processFinalizedBlockSpan, finalized, lastSealed)
+	c.log.Info().Msgf("processing finalized block %v at height %d, lastSealedHeight %d", finalizedBlockID, finalized.Height, lastBlockWithFinalizedSeal.Height)
+	err = c.prune(processFinalizedBlockSpan, finalized, lastBlockWithFinalizedSeal)
 	if err != nil {
-		return fmt.Errorf("updating to finalized block %v and sealed block %v failed: %w", finalizedBlockID, lastSealed.ID(), err)
+		return fmt.Errorf("updating to finalized block %v and sealed block %v failed: %w", finalizedBlockID, lastBlockWithFinalizedSeal.ID(), err)
 	}
 
 	// STEP 2: Check emergency sealing and re-request missing approvals
 	// ------------------------------------------------------------------------
-	sealingObservation := c.sealingTracker.NewSealingObservation(finalized, seal, lastSealed)
+	sealingObservation := c.sealingTracker.NewSealingObservation(finalized, finalizedSeal, lastBlockWithFinalizedSeal)
 
 	checkEmergencySealingSpan := c.tracer.StartSpanFromParent(processFinalizedBlockSpan, trace.CONSealingCheckForEmergencySealableBlocks)
 	// check if there are stale results qualified for emergency sealing
-	err = c.checkEmergencySealing(sealingObservation, lastSealed.Height, finalized.Height)
+	err = c.checkEmergencySealing(sealingObservation, lastBlockWithFinalizedSeal.Height, finalized.Height)
 	checkEmergencySealingSpan.Finish()
 	if err != nil {
 		return fmt.Errorf("could not check emergency sealing at block %v", finalizedBlockID)
 	}
 
 	requestPendingApprovalsSpan := c.tracer.StartSpanFromParent(processFinalizedBlockSpan, trace.CONSealingRequestingPendingApproval)
-	err = c.requestPendingApprovals(sealingObservation, lastSealed.Height, finalized.Height)
+	err = c.requestPendingApprovals(sealingObservation, lastBlockWithFinalizedSeal.Height, finalized.Height)
 	requestPendingApprovalsSpan.Finish()
 	if err != nil {
 		return fmt.Errorf("internal error while requesting pending approvals: %w", err)

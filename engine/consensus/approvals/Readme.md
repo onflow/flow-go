@@ -126,5 +126,46 @@ Instead, we only want to cache _one_ approval per Verification node for each spe
 `ResultApproval.PartialID()`, which is only computed over the chunk-identifier plus the verifier's node ID.  
 
 
+# Emergency Sealing
+
+Emergency sealing is a temporary fallback to maintain liveness in case there are problems with verification.
+In a nutshell, emergency sealing means that (selected) consensus nodes can seal blocks without sufficient approvals
+from verification nodes. 
+
+Conceptually, emergency sealing follows a similar process as regular sealing: we consider verification assignments that
+have not yet been sealed (or orphaned). We inspect each assignment individually whether it satisfies the emergency sealing
+conditions (details below). If this is the case, we generate a _candidate seal_ and place it in the consensus node's local
+`IncorporatedResultSeals` mempool. The block builder will then pick out a continuous sequence of seals from the mempool
+if such exists. This simplifies the sealing logic (happy path as well as emergency sealing fallback), because we can
+evaluate sealing conditions for each incorporated Execution Result [ER] individually. 
+
+Consider block `A`, whose Execution Result [ER] was incorporated in block `B` (illustrated below). 
+we consider an  for block `B`. The decision whether the ER can be emergency sealed is governed by two protocol
+parameters: `DefaultEmergencySealingThresholdForExecution` and `DefaultEmergencySealingThresholdForVerification`. 
+For an ER to be emergency sealed, all of the following conditions have to be satisfied:
+
+![Emergency sealing](/docs/Emergency_Sealing.png)
+
+1. Let Δh<sub>1</sub> be the height difference between the latest finalized block and block `A`.
+   We require that Δh<sub>1</sub> > `DefaultEmergencySealingThresholdForExecution`
+   * This means that block `A` must have at least `DefaultEmergencySealingThresholdForExecution` unsealed but
+     finalized descendants. 
+   * This condition is enforced by the `VerifyingAssignmentCollector`.
+   * We also use this condition in `sealing.Core` to evaluate which high range we need to check for emergency sealing. 
+2. Let Δh<sub>2</sub> be the height difference between the latest finalized block and block `B`,
+   which incorporates the ER for block `A`.
+   We require that Δh<sub>2</sub> > `DefaultEmergencySealingThresholdForVerification`
+    * This means that the block incorporating the ER must have at least `DefaultEmergencySealingThresholdForVerification`
+      finalized descendants.
+    * This condition is enforced by the `VerifyingAssignmentCollector`.
+3. There must be at least consistent execution results from two at least two different Execution Nodes to even consider
+   a result for emergency sealing.
+   * This condition is enforced by the `consensus.IncorporatedResultSeals`. This mempool stores all candidate seals, but
+     hides them from the block builder until at least two consistent execution results are known. 
+   * Comment: as a temporary safety measure, requireing at least two consistent results must hold for any block,
+     no matter whether the seal was generated through the happy path or via emergency sealing.
+4. The parent block has to be sealed. 
+   * This condition is enforced by the `consensus.Builder`
+
 
 
