@@ -7,7 +7,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/engine/consensus"
@@ -135,7 +134,7 @@ func NewEngine(log zerolog.Logger,
 		return nil, fmt.Errorf("could not register for requesting approvals: %w", err)
 	}
 
-	signatureHasher := crypto.NewBLSKMAC(msig.ResultApprovalTag)
+	signatureHasher := msig.NewBLSHasher(msig.ResultApprovalTag)
 	core, err := NewCore(log, e.workerPool, tracer, conMetrics, sealingTracker, unit, headers, state, sealsDB, assigner, signatureHasher, sealsMempool, approvalConduit, requiredApprovalsForSealConstructionGetter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init sealing engine: %w", err)

@@ -74,7 +74,7 @@ func TestCombinedSignWithDKGKeyV3(t *testing.T) {
 	// check that a created proposal's signature is a combined staking sig and random beacon sig
 	msg := MakeVoteMessage(block.View, block.BlockID)
 
-	beaconSig, err := dkgKey.Sign(msg, crypto.NewBLSKMAC(msig.RandomBeaconTag))
+	beaconSig, err := dkgKey.Sign(msg, msig.NewBLSHasher(msig.RandomBeaconTag))
 	require.NoError(t, err)
 
 	expectedSig := msig.EncodeSingleSig(encoding.SigTypeRandomBeacon, beaconSig)
@@ -143,7 +143,7 @@ func TestCombinedSignWithNoDKGKeyV3(t *testing.T) {
 
 	// check that a created proposal's signature is a combined staking sig and random beacon sig
 	msg := MakeVoteMessage(block.View, block.BlockID)
-	stakingSig, err := stakingPriv.Sign(msg, crypto.NewBLSKMAC(msig.ConsensusVoteTag))
+	stakingSig, err := stakingPriv.Sign(msg, msig.NewBLSHasher(msig.ConsensusVoteTag))
 	require.NoError(t, err)
 
 	expectedSig := msig.EncodeSingleSig(encoding.SigTypeStaking, stakingSig)
@@ -316,13 +316,13 @@ func generateAggregatedSignature(t *testing.T, n int, msg []byte, tag string) ([
 // using domain separation `tag` and return the private key and signature.
 func generateSignature(t *testing.T, message []byte, tag string) (crypto.PrivateKey, crypto.Signature) {
 	priv := unittest.PrivateKeyFixture(crypto.BLSBLS12381, crypto.KeyGenSeedMinLenBLSBLS12381)
-	sig, err := priv.Sign(message, crypto.NewBLSKMAC(tag))
+	sig, err := priv.Sign(message, msig.NewBLSHasher(tag))
 	require.NoError(t, err)
 	return priv, sig
 }
 
 func aggregatedSignature(t *testing.T, pivKeys []crypto.PrivateKey, message []byte, tag string) crypto.Signature {
-	hasher := crypto.NewBLSKMAC(tag)
+	hasher := msig.NewBLSHasher(tag)
 	sigs := make([]crypto.Signature, 0, len(pivKeys))
 	for _, k := range pivKeys {
 		sig, err := k.Sign(message, hasher)

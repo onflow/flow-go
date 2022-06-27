@@ -271,7 +271,7 @@ func TestWithWhiteboard(t *testing.T) {
 	t.Logf("there are %d result(s)", len(whiteboard.results))
 	assert.Equal(t, 1, len(whiteboard.results))
 	tag := "some tag"
-	hasher := crypto.NewBLSKMAC(tag)
+	hasher := msig.NewBLSHasher(tag)
 
 	for _, result := range whiteboard.results {
 		signers := whiteboard.resultSubmitters[flow.MakeID(result)]

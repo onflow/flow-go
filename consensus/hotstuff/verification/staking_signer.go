@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -29,7 +28,7 @@ func NewStakingSigner(
 
 	sc := &StakingSigner{
 		me:            me,
-		stakingHasher: crypto.NewBLSKMAC(msig.CollectorVoteTag),
+		stakingHasher: msig.NewBLSHasher(msig.CollectorVoteTag),
 		signerID:      me.NodeID(),
 	}
 	return sc

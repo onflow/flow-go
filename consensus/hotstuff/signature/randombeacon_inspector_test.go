@@ -50,7 +50,7 @@ func (rs *randomBeaconSuite) SetupTest() {
 	rs.signers = make([]int, 0, rs.n)
 
 	// hasher
-	rs.kmac = crypto.NewBLSKMAC(signature.RandomBeaconTag)
+	rs.kmac = signature.NewBLSHasher(signature.RandomBeaconTag)
 	rs.thresholdSignatureMessage = []byte("random_message")
 
 	// fill the signers list and shuffle it

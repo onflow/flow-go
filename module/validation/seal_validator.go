@@ -3,7 +3,6 @@ package validation
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -41,7 +40,7 @@ func NewSealValidator(
 	return &sealValidator{
 		state:                state,
 		assigner:             assigner,
-		signatureHasher:      crypto.NewBLSKMAC(signature.ResultApprovalTag),
+		signatureHasher:      signature.NewBLSHasher(signature.ResultApprovalTag),
 		headers:              headers,
 		results:              results,
 		seals:                seals,

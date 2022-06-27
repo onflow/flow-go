@@ -145,7 +145,7 @@ func (s *DKGSuite) runTest(goodNodes int, emulatorProblems bool) {
 	assert.NoError(s.T(), err)
 
 	tag := "some tag"
-	hasher := crypto.NewBLSKMAC(tag)
+	hasher := msig.NewBLSHasher(tag)
 	// create and test a threshold signature with the keys computed by dkg
 	sigData := []byte("message to be signed")
 	beaconKeys := make([]crypto.PrivateKey, 0, len(nodes))

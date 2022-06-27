@@ -25,7 +25,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
-	"github.com/onflow/flow-go/module/signature"
+	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -177,8 +177,7 @@ func SetupMockConsensusNode(t *testing.T,
 	}
 
 	// creates a hasher for spock
-	hasher := crypto.NewBLSKMAC(signature.SPOCKTag)
-
+	hasher := msig.NewBLSHasher(msig.SPOCKTag)
 	mu := &sync.Mutex{} // making testify mock thread-safe
 
 	conEngine.On("Process", testifymock.AnythingOfType("network.Channel"), testifymock.Anything, testifymock.Anything).

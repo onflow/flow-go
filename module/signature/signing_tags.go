@@ -1,5 +1,10 @@
 package signature
 
+import (
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
+)
+
 // List of domain separation tags for protocol signatures.
 //
 // Protocol-level signature uses BLS signature scheme.
@@ -48,3 +53,12 @@ var (
 	// DKGMessageTag is used for DKG messages
 	DKGMessageTag = tag("DKG_Message")
 )
+
+// NewBLSHasher returns a hasher to be used for BLS signing and verifying
+// in the protocol and abstracts the hasher details from the protocol logic.
+//
+// The hasher returned is the the expand-message step in the BLS hash-to-curve.
+// It uses a xof (extendable output function) based on KMAC128.
+func NewBLSHasher(tag string) hash.Hasher {
+	return crypto.NewExpandMsgXOFKMAC128(tag)
+}

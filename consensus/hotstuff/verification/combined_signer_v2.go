@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/signature"
@@ -39,9 +38,9 @@ func NewCombinedSigner(
 
 	sc := &CombinedSigner{
 		staking:        staking,
-		stakingHasher:  crypto.NewBLSKMAC(signature.ConsensusVoteTag),
+		stakingHasher:  signature.NewBLSHasher(signature.ConsensusVoteTag),
 		beaconKeyStore: beaconKeyStore,
-		beaconHasher:   crypto.NewBLSKMAC(signature.RandomBeaconTag),
+		beaconHasher:   signature.NewBLSHasher(signature.RandomBeaconTag),
 	}
 	return sc
 }

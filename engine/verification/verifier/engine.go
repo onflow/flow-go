@@ -65,7 +65,7 @@ func New(
 		me:             me,
 		chVerif:        chVerif,
 		approvalHasher: utils.NewResultApprovalHasher(),
-		spockHasher:    crypto.NewBLSKMAC(signature.SPOCKTag),
+		spockHasher:    signature.NewBLSHasher(signature.SPOCKTag),
 		approvals:      approvals,
 	}
 
