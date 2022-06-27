@@ -158,7 +158,7 @@ For an ER to be emergency sealed, all of the following conditions have to be sat
     * This means that the block incorporating the ER must have at least `DefaultEmergencySealingThresholdForVerification`
       finalized descendants.
     * This condition is enforced by the `VerifyingAssignmentCollector`.
-3. There must be at least consistent execution results from two at least two different Execution Nodes to even consider
+3. There must be consistent execution results from at least two different Execution Nodes to even consider
    a result for emergency sealing.
    * This condition is enforced by the `consensus.IncorporatedResultSeals`. This mempool stores all candidate seals, but
      hides them from the block builder until at least two consistent execution results are known. 
