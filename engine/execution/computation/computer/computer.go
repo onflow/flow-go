@@ -223,6 +223,9 @@ func (e *blockComputer) executeBlock(
 	close(bc.views)
 	close(eh.data)
 	wg.Wait()
+
+	e.log.Debug().Hex("block_id", logging.Entity(block)).Msg("all views committed")
+
 	res.StateReads = stateView.(*delta.View).ReadsCount()
 	res.StateCommitments = stateCommitments
 	res.Proofs = proofs
