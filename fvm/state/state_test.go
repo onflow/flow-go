@@ -205,9 +205,8 @@ func TestState_IsFVMStateKey(t *testing.T) {
 	require.True(t, state.IsFVMStateKey("Address", "Address", state.KeyContractNames))
 	require.True(t, state.IsFVMStateKey("Address", "Address", state.KeyContractNames))
 	require.True(t, state.IsFVMStateKey("Address", "Address", "code.MYCODE"))
-	require.True(t, state.IsFVMStateKey("Address", "", state.KeyExists))
+	require.True(t, state.IsFVMStateKey("Address", "", state.KeyAccountStatus))
 	require.True(t, state.IsFVMStateKey("Address", "", state.KeyStorageUsed))
-	require.True(t, state.IsFVMStateKey("Address", "", state.KeyAccountFrozen))
 
 	require.False(t, state.IsFVMStateKey("Address", "", "anything else"))
 }
