@@ -15,7 +15,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type RestrictedDeploymentEnabledFunc func() bool
+type RestrictionIsEnabledFunc func() bool
 type AuthorizedAccountsFunc func() []common.Address
 type UseContractAuditVoucherFunc func(address runtime.Address, code []byte) (bool, error)
 
@@ -27,7 +27,8 @@ type UseContractAuditVoucherFunc func(address runtime.Address, code []byte) (boo
 type ContractHandler struct {
 	accounts                     state.Accounts
 	draftUpdates                 map[programs.ContractUpdateKey]programs.ContractUpdate
-	restrictedDeploymentEnabled  RestrictedDeploymentEnabledFunc
+	restrictedDeploymentEnabled  RestrictionIsEnabledFunc
+	restrictedRemovalEnabled     RestrictionIsEnabledFunc
 	authorizedDeploymentAccounts AuthorizedAccountsFunc
 	authorizedRemovalAccounts    AuthorizedAccountsFunc
 	useContractAuditVoucher      UseContractAuditVoucherFunc
@@ -38,7 +39,8 @@ type ContractHandler struct {
 }
 
 func NewContractHandler(accounts state.Accounts,
-	restrictedDeploymentEnabled RestrictedDeploymentEnabledFunc,
+	restrictedDeploymentEnabled RestrictionIsEnabledFunc,
+	restrictedRemovalEnabled RestrictionIsEnabledFunc,
 	authorizedDeploymentAccounts AuthorizedAccountsFunc,
 	authorizedRemovalAccounts AuthorizedAccountsFunc,
 	useContractAuditVoucher UseContractAuditVoucherFunc,
@@ -47,6 +49,7 @@ func NewContractHandler(accounts state.Accounts,
 		accounts:                     accounts,
 		draftUpdates:                 make(map[programs.ContractUpdateKey]programs.ContractUpdate),
 		restrictedDeploymentEnabled:  restrictedDeploymentEnabled,
+		restrictedRemovalEnabled:     restrictedRemovalEnabled,
 		authorizedDeploymentAccounts: authorizedDeploymentAccounts,
 		authorizedRemovalAccounts:    authorizedRemovalAccounts,
 		useContractAuditVoucher:      useContractAuditVoucher,
@@ -213,25 +216,28 @@ func (h *ContractHandler) UpdateKeys() []programs.ContractUpdateKey {
 }
 
 func (h *ContractHandler) isAuthorizedForDeployment(signingAccounts []runtime.Address) bool {
-	return h.isAuthorized(signingAccounts, h.authorizedDeploymentAccounts)
+	if h.restrictedDeploymentEnabled() {
+		return h.isAuthorized(signingAccounts, h.authorizedDeploymentAccounts)
+	}
+	return true
 }
 
 func (h *ContractHandler) isAuthorizedForRemoval(signingAccounts []runtime.Address) bool {
-	return h.isAuthorized(signingAccounts, h.authorizedRemovalAccounts)
+	if h.restrictedRemovalEnabled() {
+		return h.isAuthorized(signingAccounts, h.authorizedRemovalAccounts)
+	}
+	return true
 }
 
 func (h *ContractHandler) isAuthorized(signingAccounts []runtime.Address, authorizedAccounts AuthorizedAccountsFunc) bool {
-	if h.restrictedDeploymentEnabled() {
-		accts := authorizedAccounts()
-		for _, authorized := range accts {
-			for _, signer := range signingAccounts {
-				if signer == authorized {
-					// a single authorized singer is enough
-					return true
-				}
+	accts := authorizedAccounts()
+	for _, authorized := range accts {
+		for _, signer := range signingAccounts {
+			if signer == authorized {
+				// a single authorized singer is enough
+				return true
 			}
 		}
-		return false
 	}
-	return true
+	return false
 }

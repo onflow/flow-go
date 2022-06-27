@@ -87,9 +87,8 @@ func NewScriptEnvironment(
 
 	env.contracts = handler.NewContractHandler(
 		accounts,
-		func() bool {
-			return true
-		},
+		func() bool { return true },
+		func() bool { return true },
 		func() []common.Address { return []common.Address{} },
 		func() []common.Address { return []common.Address{} },
 		func(address runtime.Address, code []byte) (bool, error) { return false, nil })
@@ -616,8 +615,8 @@ func (e *ScriptEnv) MeterMemory(usage common.MemoryUsage) error {
 	return e.meterMemory(usage.Kind, uint(usage.Amount))
 }
 
-func (e *ScriptEnv) MemoryUsed() uint64 {
-	return uint64(e.sth.State().TotalMemoryUsed())
+func (e *ScriptEnv) MemoryEstimate() uint64 {
+	return uint64(e.sth.State().TotalMemoryEstimate())
 }
 
 func (e *ScriptEnv) DecodeArgument(b []byte, t cadence.Type) (cadence.Value, error) {
