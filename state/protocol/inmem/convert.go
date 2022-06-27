@@ -222,17 +222,23 @@ func ClusterFromEncodable(enc EncodableCluster) (*Cluster, error) {
 // root bootstrap state. This is used to bootstrap the protocol state for
 // genesis or post-spork states.
 func SnapshotFromBootstrapState(root *flow.Block, result *flow.ExecutionResult, seal *flow.Seal, qc *flow.QuorumCertificate) (*Snapshot, error) {
-	return SnapshotFromBootstrapStateWithProtocolVersion(root, result, seal, qc, flow.DefaultProtocolVersion)
+	version := flow.DefaultProtocolVersion
+	threshold, err := protocol.DefaultEpochCommitSafetyThreshold(root.Header.ChainID)
+	if err != nil {
+		return nil, fmt.Errorf("could not get default epoch commit safety threshold: %w", err)
+	}
+	return SnapshotFromBootstrapStateWithParams(root, result, seal, qc, version, threshold)
 }
 
-// SnapshotFromBootstrapStateWithProtocolVersion is SnapshotFromBootstrapState
+// SnapshotFromBootstrapStateWithParams is SnapshotFromBootstrapState
 // with a caller-specified protocol version.
-func SnapshotFromBootstrapStateWithProtocolVersion(
+func SnapshotFromBootstrapStateWithParams(
 	root *flow.Block,
 	result *flow.ExecutionResult,
 	seal *flow.Seal,
 	qc *flow.QuorumCertificate,
-	version uint,
+	protocolVersion uint,
+	epochCommitSafetyThreshold uint64,
 ) (*Snapshot, error) {
 
 	setup, ok := result.ServiceEvents[0].Event.(*flow.EpochSetup)
@@ -274,9 +280,10 @@ func SnapshotFromBootstrapStateWithProtocolVersion(
 	}
 
 	params := EncodableParams{
-		ChainID:         root.Header.ChainID, // chain ID must match the root block
-		SporkID:         root.ID(),           // use root block ID as the unique spork identifier
-		ProtocolVersion: version,             // major software version for this spork
+		ChainID:                    root.Header.ChainID,        // chain ID must match the root block
+		SporkID:                    root.ID(),                  // use root block ID as the unique spork identifier
+		ProtocolVersion:            protocolVersion,            // major software version for this spork
+		EpochCommitSafetyThreshold: epochCommitSafetyThreshold, // see protocol.Params for details
 	}
 
 	snap := SnapshotFromEncodable(EncodableSnapshot{

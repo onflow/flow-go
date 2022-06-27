@@ -15,54 +15,43 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestTimeoutCollector(t *testing.T) {
 	suite.Run(t, new(TimeoutCollectorTestSuite))
 }
 
+// TimeoutCollectorTestSuite is a test suite for testing TimeoutCollector. It stores mocked
+// state internally for testing behavior.
 type TimeoutCollectorTestSuite struct {
 	suite.Suite
 
-	view                   uint64
-	notifier               *mocks.Consumer
-	processor              *mocks.TimeoutProcessor
-	onNewQCDiscoveredState mock.Mock
-	onNewTCDiscoveredState mock.Mock
-	collector              *TimeoutCollector
+	view              uint64
+	notifier          *mocks.Consumer
+	collectorNotifier *mocks.TimeoutCollectorConsumer
+	processor         *mocks.TimeoutProcessor
+	collector         *TimeoutCollector
 }
 
 func (s *TimeoutCollectorTestSuite) SetupTest() {
 	s.view = 1000
-	s.notifier = &mocks.Consumer{}
-	s.processor = &mocks.TimeoutProcessor{}
+	s.notifier = mocks.NewConsumer(s.T())
+	s.collectorNotifier = mocks.NewTimeoutCollectorConsumer(s.T())
+	s.processor = mocks.NewTimeoutProcessor(s.T())
 
-	s.onNewQCDiscoveredState.On("onNewQCDiscovered", mock.Anything).Maybe()
-	s.onNewTCDiscoveredState.On("onNewTCDiscovered", mock.Anything).Maybe()
+	s.collectorNotifier.On("OnNewQcDiscovered", mock.Anything).Maybe()
+	s.collectorNotifier.On("OnNewTcDiscovered", mock.Anything).Maybe()
 
-	s.collector = NewTimeoutCollector(s.view, s.notifier, s.processor, s.onNewQCDiscovered, s.onNewTCDiscovered)
-
+	s.collector = NewTimeoutCollector(s.view, s.notifier, s.collectorNotifier, s.processor)
 }
 
-// onQCCreated is a special function that registers call in mocked state.
-// ATTENTION: don't change name of this function since the same name is used in:
-// s.onNewQCDiscoveredState.On("onNewQCDiscovered") statements
-func (s *TimeoutCollectorTestSuite) onNewQCDiscovered(qc *flow.QuorumCertificate) {
-	s.onNewQCDiscoveredState.Called(qc)
-}
-
-// onNewTCDiscovered is a special function that registers call in mocked state.
-// ATTENTION: don't change name of this function since the same name is used in:
-// s.onNewTCDiscoveredState.On("onNewTCDiscovered") statements
-func (s *TimeoutCollectorTestSuite) onNewTCDiscovered(tc *flow.TimeoutCertificate) {
-	s.onNewTCDiscoveredState.Called(tc)
-}
-
+// TestView tests that `View` returns the same value that was passed in constructor
 func (s *TimeoutCollectorTestSuite) TestView() {
 	require.Equal(s.T(), s.view, s.collector.View())
 }
 
-// Test_AddTimeoutHappyPath tests that process in happy path executed by multiple workers deliver expected results
+// TestAddTimeout_HappyPath tests that process in happy path executed by multiple workers deliver expected results
 // all operations should be successful, no errors expected
 func (s *TimeoutCollectorTestSuite) TestAddTimeout_HappyPath() {
 	var wg sync.WaitGroup
@@ -77,10 +66,12 @@ func (s *TimeoutCollectorTestSuite) TestAddTimeout_HappyPath() {
 		}()
 	}
 
-	wg.Wait()
+	unittest.AssertReturnsBefore(s.T(), wg.Wait, time.Second)
 	s.processor.AssertExpectations(s.T())
 }
 
+// TestAddTimeout_DoubleTimeout tests that submitting two different timeouts for same view ends with reporting
+// double timeout to notifier which can be slashed later.
 func (s *TimeoutCollectorTestSuite) TestAddTimeout_DoubleTimeout() {
 	timeout := helper.TimeoutObjectFixture(helper.WithTimeoutObjectView(s.view))
 	s.processor.On("Process", timeout).Return(nil).Once()
@@ -94,10 +85,11 @@ func (s *TimeoutCollectorTestSuite) TestAddTimeout_DoubleTimeout() {
 
 	err = s.collector.AddTimeout(otherTimeout)
 	require.NoError(s.T(), err)
-	s.notifier.AssertCalled(s.T(), "OnDoubleTimeoutDetected", timeout, otherTimeout)
+	s.notifier.AssertExpectations(s.T())
 	s.processor.AssertNumberOfCalls(s.T(), "Process", 1)
 }
 
+// TestAddTimeout_RepeatedTimeout checks that repeated timeouts are silently dropped without any errors.
 func (s *TimeoutCollectorTestSuite) TestAddTimeout_RepeatedTimeout() {
 	timeout := helper.TimeoutObjectFixture(helper.WithTimeoutObjectView(s.view))
 	s.processor.On("Process", timeout).Return(nil).Once()
@@ -108,6 +100,8 @@ func (s *TimeoutCollectorTestSuite) TestAddTimeout_RepeatedTimeout() {
 	s.processor.AssertNumberOfCalls(s.T(), "Process", 1)
 }
 
+// TestAddTimeout_TimeoutCacheException tests that submitting timeout object for view which is not designated for this
+// collector results in ErrTimeoutForIncompatibleView.
 func (s *TimeoutCollectorTestSuite) TestAddTimeout_TimeoutCacheException() {
 	// incompatible view is an exception and not handled by timeout collector
 	timeout := helper.TimeoutObjectFixture(helper.WithTimeoutObjectView(s.view + 1))
@@ -116,6 +110,8 @@ func (s *TimeoutCollectorTestSuite) TestAddTimeout_TimeoutCacheException() {
 	s.processor.AssertNotCalled(s.T(), "Process")
 }
 
+// TestAddTimeout_InvalidTimeout tests that sentinel errors while processing timeouts are correctly handled and reported
+// to notifier, but exceptions are propagated to caller.
 func (s *TimeoutCollectorTestSuite) TestAddTimeout_InvalidTimeout() {
 	s.Run("invalid-timeout", func() {
 		timeout := helper.TimeoutObjectFixture(helper.WithTimeoutObjectView(s.view))
@@ -135,6 +131,7 @@ func (s *TimeoutCollectorTestSuite) TestAddTimeout_InvalidTimeout() {
 	})
 }
 
+// TestAddTimeout_TONotifications tests that TimeoutCollector in happy path reports the newest discovered QC and TC
 func (s *TimeoutCollectorTestSuite) TestAddTimeout_TONotifications() {
 	qcCount := 100
 	// generate QCs with increasing view numbers
@@ -142,11 +139,10 @@ func (s *TimeoutCollectorTestSuite) TestAddTimeout_TONotifications() {
 		s.T().Fatal("invalid test configuration")
 	}
 
-	s.onNewQCDiscoveredState = mock.Mock{}
-	s.onNewTCDiscoveredState = mock.Mock{}
+	*s.collectorNotifier = *mocks.NewTimeoutCollectorConsumer(s.T())
 
 	var highestReportedQC *flow.QuorumCertificate
-	s.onNewQCDiscoveredState.On("onNewQCDiscovered", mock.Anything).Run(func(args mock.Arguments) {
+	s.collectorNotifier.On("OnNewQcDiscovered", mock.Anything).Run(func(args mock.Arguments) {
 		qc := args.Get(0).(*flow.QuorumCertificate)
 		if highestReportedQC == nil || highestReportedQC.View < qc.View {
 			highestReportedQC = qc
@@ -154,7 +150,7 @@ func (s *TimeoutCollectorTestSuite) TestAddTimeout_TONotifications() {
 	})
 
 	lastViewTC := helper.MakeTC(helper.WithTCView(s.view - 1))
-	s.onNewTCDiscoveredState.On("onNewTCDiscovered", lastViewTC).Once()
+	s.collectorNotifier.On("OnNewTcDiscovered", lastViewTC).Once()
 
 	timeouts := make([]*model.TimeoutObject, 0, qcCount)
 	for i := 0; i < qcCount; i++ {
@@ -187,6 +183,5 @@ func (s *TimeoutCollectorTestSuite) TestAddTimeout_TONotifications() {
 	}
 	wg.Wait()
 
-	s.onNewTCDiscoveredState.AssertCalled(s.T(), "onNewTCDiscovered", lastViewTC)
 	require.Equal(s.T(), expectedHighestQC, highestReportedQC)
 }

@@ -155,7 +155,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 			return in.participants[int(view)%len(in.participants)].NodeID
 		}, nil,
 	)
-	in.committee.On("WeightThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(in.participants.TotalWeight()), nil)
+	in.committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(in.participants.TotalWeight()), nil)
 
 	// program the builder module behaviour
 	in.builder.On("BuildOn", mock.Anything, mock.Anything).Return(
@@ -335,9 +335,11 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		NewestQC:    rootQC,
 	}
 
+	in.persist.On("GetLivenessData").Return(livnessData, nil).Once()
+
 	// initialize the pacemaker
 	controller := timeout.NewController(cfg.Timeouts)
-	in.pacemaker, err = pacemaker.New(livnessData.CurrentView, controller, notifier)
+	in.pacemaker, err = pacemaker.New(controller, notifier, in.persist)
 	require.NoError(t, err)
 
 	forkalizer, err := finalizer.New(rootBlockQC, in.finalizer, notifier)

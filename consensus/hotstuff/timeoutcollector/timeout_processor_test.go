@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
@@ -29,60 +30,96 @@ func TestTimeoutProcessor(t *testing.T) {
 	suite.Run(t, new(TimeoutProcessorTestSuite))
 }
 
-// StakingVoteProcessorTestSuite is a test suite that holds mocked state for isolated testing of StakingVoteProcessor.
+// TimeoutProcessorTestSuite is a test suite that holds mocked state for isolated testing of TimeoutProcessor.
 type TimeoutProcessorTestSuite struct {
 	suite.Suite
 
-	participants       flow.IdentityList
-	view               uint64
-	committee          *mocks.Replicas
-	validator          *mocks.Validator
-	sigAggregator      *mocks.TimeoutSignatureAggregator
-	sigWeight          uint64
-	totalWeight        uint64
-	onTCCreated        *mocks.OnTCCreated
-	onPartialTCCreated *mocks.OnPartialTCCreated
-	processor          *TimeoutProcessor
+	participants  flow.IdentityList
+	signer        *flow.Identity
+	view          uint64
+	sigWeight     uint64
+	totalWeight   atomic.Uint64
+	committee     *mocks.Replicas
+	validator     *mocks.Validator
+	sigAggregator *mocks.TimeoutSignatureAggregator
+	notifier      *mocks.TimeoutCollectorConsumer
+	processor     *TimeoutProcessor
 }
 
 func (s *TimeoutProcessorTestSuite) SetupTest() {
 	var err error
 	s.sigWeight = 1000
-	s.committee = &mocks.Replicas{}
-	s.validator = &mocks.Validator{}
-	s.sigAggregator = &mocks.TimeoutSignatureAggregator{}
-	s.onTCCreated = mocks.NewOnTCCreated(s.T())
-	s.onPartialTCCreated = mocks.NewOnPartialTCCreated(s.T())
+	s.committee = mocks.NewReplicas(s.T())
+	s.validator = mocks.NewValidator(s.T())
+	s.sigAggregator = mocks.NewTimeoutSignatureAggregator(s.T())
+	s.notifier = mocks.NewTimeoutCollectorConsumer(s.T())
 	s.participants = unittest.IdentityListFixture(11, unittest.WithWeight(s.sigWeight))
+	s.signer = s.participants[0]
 	s.view = (uint64)(rand.Uint32() + 100)
-	s.totalWeight = 0
+	s.totalWeight = *atomic.NewUint64(0)
 
-	s.committee.On("WeightThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(s.participants.TotalWeight()), nil)
+	s.committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(s.participants.TotalWeight()), nil).Maybe()
+	s.committee.On("TimeoutThresholdForView", mock.Anything).Return(committees.WeightThresholdToTimeout(s.participants.TotalWeight()), nil).Maybe()
+	s.committee.On("IdentityByEpoch", mock.Anything, mock.Anything).Return(s.signer, nil).Maybe()
 	s.sigAggregator.On("View").Return(s.view).Maybe()
 	s.sigAggregator.On("VerifyAndAdd", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		s.totalWeight += s.sigWeight
+		s.totalWeight.Add(s.sigWeight)
 	}).Return(func(signerID flow.Identifier, sig crypto.Signature, newestQCView uint64) uint64 {
-		return s.totalWeight
+		return s.totalWeight.Load()
 	}, func(signerID flow.Identifier, sig crypto.Signature, newestQCView uint64) error {
 		return nil
 	}).Maybe()
 	s.sigAggregator.On("TotalWeight").Return(func() uint64 {
-		return s.totalWeight
+		return s.totalWeight.Load()
 	}).Maybe()
 
 	s.processor, err = NewTimeoutProcessor(s.committee,
 		s.validator,
 		s.sigAggregator,
-		s.onPartialTCCreated.Execute,
-		s.onTCCreated.Execute,
+		s.notifier,
 	)
 	require.NoError(s.T(), err)
+}
+
+// TimeoutLastViewSuccessfulFixture creates a valid timeout if last view has ended with QC.
+func (s *TimeoutProcessorTestSuite) TimeoutLastViewSuccessfulFixture(opts ...func(*model.TimeoutObject)) *model.TimeoutObject {
+	timeout := helper.TimeoutObjectFixture(
+		helper.WithTimeoutObjectView(s.view),
+		helper.WithTimeoutNewestQC(helper.MakeQC(helper.WithQCView(s.view-1))),
+		helper.WithTimeoutLastViewTC(nil),
+	)
+
+	for _, opt := range opts {
+		opt(timeout)
+	}
+
+	return timeout
+}
+
+// TimeoutLastViewFailedFixture creates a valid timeout if last view has ended with TC.
+func (s *TimeoutProcessorTestSuite) TimeoutLastViewFailedFixture(opts ...func(*model.TimeoutObject)) *model.TimeoutObject {
+	newestQC := helper.MakeQC(helper.WithQCView(s.view - 10))
+	timeout := helper.TimeoutObjectFixture(
+		helper.WithTimeoutObjectView(s.view),
+		helper.WithTimeoutNewestQC(newestQC),
+		helper.WithTimeoutLastViewTC(helper.MakeTC(
+			helper.WithTCView(s.view-1),
+			helper.WithTCNewestQC(helper.MakeQC(helper.WithQCView(newestQC.View))))),
+	)
+
+	for _, opt := range opts {
+		opt(timeout)
+	}
+
+	return timeout
 }
 
 // TestProcess_TimeoutNotForView tests that TimeoutProcessor accepts only timeouts for the view it was initialized with
 // We expect dedicated sentinel errors for timeouts for different views (`ErrTimeoutForIncompatibleView`).
 func (s *TimeoutProcessorTestSuite) TestProcess_TimeoutNotForView() {
-	err := s.processor.Process(helper.TimeoutObjectFixture(helper.WithTimeoutObjectView(s.view + 1)))
+	err := s.processor.Process(s.TimeoutLastViewSuccessfulFixture(func(t *model.TimeoutObject) {
+		t.View++
+	}))
 	require.ErrorIs(s.T(), err, ErrTimeoutForIncompatibleView)
 	require.False(s.T(), model.IsInvalidTimeoutError(err))
 
@@ -92,27 +129,36 @@ func (s *TimeoutProcessorTestSuite) TestProcess_TimeoutNotForView() {
 // TestProcess_TimeoutWithoutQC tests that TimeoutProcessor fails with model.InvalidTimeoutError if
 // timeout doesn't contain QC.
 func (s *TimeoutProcessorTestSuite) TestProcess_TimeoutWithoutQC() {
-	err := s.processor.Process(helper.TimeoutObjectFixture(helper.WithTimeoutObjectView(s.view),
-		helper.WithTimeoutNewestQC(nil)))
+	err := s.processor.Process(s.TimeoutLastViewSuccessfulFixture(func(t *model.TimeoutObject) {
+		t.NewestQC = nil
+	}))
 	require.True(s.T(), model.IsInvalidTimeoutError(err))
 }
 
 // TestProcess_TimeoutNewerHighestQC tests that TimeoutProcessor fails with model.InvalidTimeoutError if
 // timeout contains a QC with QC.View > timeout.View, QC can be only with lower view than timeout.
 func (s *TimeoutProcessorTestSuite) TestProcess_TimeoutNewerHighestQC() {
-	err := s.processor.Process(helper.TimeoutObjectFixture(helper.WithTimeoutObjectView(s.view),
-		helper.WithTimeoutNewestQC(helper.MakeQC(helper.WithQCView(s.view)))))
-	require.True(s.T(), model.IsInvalidTimeoutError(err))
+	s.Run("t.View == t.NewestQC.View", func() {
+		err := s.processor.Process(s.TimeoutLastViewSuccessfulFixture(func(t *model.TimeoutObject) {
+			t.NewestQC.View = t.View
+		}))
+		require.True(s.T(), model.IsInvalidTimeoutError(err))
+	})
+	s.Run("t.View < t.NewestQC.View", func() {
+		err := s.processor.Process(s.TimeoutLastViewSuccessfulFixture(func(t *model.TimeoutObject) {
+			t.NewestQC.View = t.View + 1
+		}))
+		require.True(s.T(), model.IsInvalidTimeoutError(err))
+	})
 }
 
-// TestProcess_LastViewTCRequiredButNotPresent tests that TimeoutProcessor fails with model.InvalidTimeoutError if
+// TestProcess_LastViewTCWrongView tests that TimeoutProcessor fails with model.InvalidTimeoutError if
 // timeout contains a proof that sender legitimately entered timeout.View but it has wrong view meaning he used TC from previous rounds.
 func (s *TimeoutProcessorTestSuite) TestProcess_LastViewTCWrongView() {
 	// if TC is included it must have timeout.View == timeout.LastViewTC.View+1
-	err := s.processor.Process(helper.TimeoutObjectFixture(
-		helper.WithTimeoutObjectView(s.view),
-		helper.WithTimeoutNewestQC(helper.MakeQC(helper.WithQCView(s.view-10))),
-		helper.WithTimeoutLastViewTC(helper.MakeTC(helper.WithTCView(s.view)))))
+	err := s.processor.Process(s.TimeoutLastViewFailedFixture(func(t *model.TimeoutObject) {
+		t.LastViewTC.View = t.View - 10
+	}))
 	require.True(s.T(), model.IsInvalidTimeoutError(err))
 }
 
@@ -120,13 +166,9 @@ func (s *TimeoutProcessorTestSuite) TestProcess_LastViewTCWrongView() {
 // timeout contains a proof that sender legitimately entered timeout.View but included HighestQC has older view
 // than QC included in TC. For honest nodes this shouldn't happen.
 func (s *TimeoutProcessorTestSuite) TestProcess_LastViewHighestQCInvalidView() {
-	err := s.processor.Process(helper.TimeoutObjectFixture(
-		helper.WithTimeoutObjectView(s.view),
-		helper.WithTimeoutNewestQC(helper.MakeQC(helper.WithQCView(s.view-10))),
-		helper.WithTimeoutLastViewTC(
-			helper.MakeTC(
-				helper.WithTCView(s.view-1),
-				helper.WithTCNewestQC(helper.MakeQC(helper.WithQCView(s.view-5)))))))
+	err := s.processor.Process(s.TimeoutLastViewFailedFixture(func(t *model.TimeoutObject) {
+		t.LastViewTC.NewestQC.View = t.NewestQC.View + 1 // TC contains newer QC than Timeout Object
+	}))
 	require.True(s.T(), model.IsInvalidTimeoutError(err))
 }
 
@@ -135,71 +177,127 @@ func (s *TimeoutProcessorTestSuite) TestProcess_LastViewHighestQCInvalidView() {
 func (s *TimeoutProcessorTestSuite) TestProcess_LastViewTCRequiredButNotPresent() {
 	// if last view is not successful(timeout.View != timeout.HighestQC.View+1) then this
 	// timeout must contain valid timeout.LastViewTC
-	err := s.processor.Process(helper.TimeoutObjectFixture(
-		helper.WithTimeoutObjectView(s.view),
-		helper.WithTimeoutNewestQC(helper.MakeQC(helper.WithQCView(s.view-10))),
-		helper.WithTimeoutLastViewTC(nil)))
+	err := s.processor.Process(s.TimeoutLastViewFailedFixture(func(t *model.TimeoutObject) {
+		t.LastViewTC = nil
+	}))
 	require.True(s.T(), model.IsInvalidTimeoutError(err))
 }
 
-// TestProcess_IncludedQCInvalid tests that TimeoutProcessor fails with model.InvalidTimeoutError if
+// TestProcess_InvalidSigner tests that TimeoutProcessor correctly handles errors when timeout was created
+// by invalid signer.
+func (s *TimeoutProcessorTestSuite) TestProcess_InvalidSigner() {
+	timeout := s.TimeoutLastViewSuccessfulFixture()
+
+	s.Run("invalid-signer", func() {
+		*s.committee = *mocks.NewReplicas(s.T())
+		s.committee.On("IdentityByEpoch", mock.Anything, mock.Anything).Return(nil, model.NewInvalidSignerError(errors.New(""))).Once()
+		err := s.processor.Process(timeout)
+		require.True(s.T(), model.IsInvalidTimeoutError(err))
+		require.True(s.T(), model.IsInvalidSignerError(err))
+	})
+	s.Run("identity-by-epoch-exception", func() {
+		*s.committee = *mocks.NewReplicas(s.T())
+		exception := errors.New("identity-by-epoch-exception")
+		s.committee.On("IdentityByEpoch", mock.Anything, mock.Anything).Return(nil, exception).Once()
+		err := s.processor.Process(timeout)
+		require.ErrorIs(s.T(), err, exception)
+		require.False(s.T(), model.IsInvalidTimeoutError(err))
+		require.False(s.T(), model.IsInvalidSignerError(err))
+	})
+	s.Run("identity-by-epoch-err-view-for-unknown-epoch", func() {
+		*s.committee = *mocks.NewReplicas(s.T())
+		s.committee.On("IdentityByEpoch", mock.Anything, mock.Anything).Return(nil, model.ErrViewForUnknownEpoch).Once()
+
+		err := s.processor.Process(timeout)
+		require.False(s.T(), model.IsInvalidTimeoutError(err))
+		require.NotErrorIs(s.T(), err, model.ErrViewForUnknownEpoch)
+	})
+}
+
+// TestProcess_IncludedQCInvalid tests that TimeoutProcessor correctly handles validation errors if
 // timeout is well-formed but included QC is invalid
 func (s *TimeoutProcessorTestSuite) TestProcess_IncludedQCInvalid() {
-	timeout := helper.TimeoutObjectFixture(
-		helper.WithTimeoutObjectView(s.view),
-		helper.WithTimeoutNewestQC(helper.MakeQC(helper.WithQCView(s.view-1))),
-		helper.WithTimeoutLastViewTC(
-			helper.MakeTC(helper.WithTCView(s.view-1),
-				helper.WithTCNewestQC(helper.MakeQC(helper.WithQCView(s.view-1))))),
-	)
+	timeout := s.TimeoutLastViewSuccessfulFixture()
 
-	exception := errors.New("validate-qc-failed")
-	s.validator.On("ValidateQC", timeout.NewestQC).Return(exception)
+	s.Run("invalid-qc-sentinel", func() {
+		*s.validator = *mocks.NewValidator(s.T())
+		s.validator.On("ValidateQC", timeout.NewestQC).Return(model.InvalidQCError{}).Once()
 
-	err := s.processor.Process(timeout)
-	require.True(s.T(), model.IsInvalidTimeoutError(err))
-	require.ErrorIs(s.T(), err, exception)
+		err := s.processor.Process(timeout)
+		require.True(s.T(), model.IsInvalidTimeoutError(err))
+		require.True(s.T(), model.IsInvalidQCError(err))
+	})
+	s.Run("invalid-qc-exception", func() {
+		exception := errors.New("validate-qc-failed")
+		*s.validator = *mocks.NewValidator(s.T())
+		s.validator.On("ValidateQC", timeout.NewestQC).Return(exception).Once()
+
+		err := s.processor.Process(timeout)
+		require.ErrorIs(s.T(), err, exception)
+		require.False(s.T(), model.IsInvalidTimeoutError(err))
+	})
+	s.Run("invalid-qc-err-view-for-unknown-epoch", func() {
+		*s.validator = *mocks.NewValidator(s.T())
+		s.validator.On("ValidateQC", timeout.NewestQC).Return(model.ErrViewForUnknownEpoch).Once()
+
+		err := s.processor.Process(timeout)
+		require.False(s.T(), model.IsInvalidTimeoutError(err))
+		require.NotErrorIs(s.T(), err, model.ErrViewForUnknownEpoch)
+	})
 }
 
-// TestProcess_IncludedTCInvalid tests that TimeoutProcessor fails with model.InvalidTimeoutError if
+// TestProcess_IncludedTCInvalid tests that TimeoutProcessor correctly handles validation errors if
 // timeout is well-formed but included TC is invalid
 func (s *TimeoutProcessorTestSuite) TestProcess_IncludedTCInvalid() {
-	timeout := helper.TimeoutObjectFixture(
-		helper.WithTimeoutObjectView(s.view),
-		helper.WithTimeoutNewestQC(helper.MakeQC(helper.WithQCView(s.view-1))),
-		helper.WithTimeoutLastViewTC(
-			helper.MakeTC(helper.WithTCView(s.view-1),
-				helper.WithTCNewestQC(helper.MakeQC(helper.WithQCView(s.view-1))))),
-	)
+	timeout := s.TimeoutLastViewFailedFixture()
 
-	exception := errors.New("validate-qc-failed")
-	s.validator.On("ValidateQC", timeout.NewestQC).Return(nil)
-	s.validator.On("ValidateTC", timeout.LastViewTC).Return(exception)
+	s.Run("invalid-tc-sentinel", func() {
+		*s.validator = *mocks.NewValidator(s.T())
+		s.validator.On("ValidateQC", timeout.NewestQC).Return(nil)
+		s.validator.On("ValidateTC", timeout.LastViewTC).Return(model.InvalidTCError{})
 
-	err := s.processor.Process(timeout)
-	require.True(s.T(), model.IsInvalidTimeoutError(err))
-	require.ErrorIs(s.T(), err, exception)
+		err := s.processor.Process(timeout)
+		require.True(s.T(), model.IsInvalidTimeoutError(err))
+		require.True(s.T(), model.IsInvalidTCError(err))
+	})
+	s.Run("invalid-tc-exception", func() {
+		exception := errors.New("validate-tc-failed")
+		*s.validator = *mocks.NewValidator(s.T())
+		s.validator.On("ValidateQC", timeout.NewestQC).Return(nil)
+		s.validator.On("ValidateTC", timeout.LastViewTC).Return(exception).Once()
+
+		err := s.processor.Process(timeout)
+		require.ErrorIs(s.T(), err, exception)
+		require.False(s.T(), model.IsInvalidTimeoutError(err))
+	})
+	s.Run("invalid-tc-err-view-for-unknown-epoch", func() {
+		*s.validator = *mocks.NewValidator(s.T())
+		s.validator.On("ValidateQC", timeout.NewestQC).Return(nil)
+		s.validator.On("ValidateTC", timeout.LastViewTC).Return(model.ErrViewForUnknownEpoch).Once()
+
+		err := s.processor.Process(timeout)
+		require.False(s.T(), model.IsInvalidTimeoutError(err))
+		require.NotErrorIs(s.T(), err, model.ErrViewForUnknownEpoch)
+	})
 }
 
 // TestProcess_ValidTimeout tests that processing a valid timeout succeeds without error
 func (s *TimeoutProcessorTestSuite) TestProcess_ValidTimeout() {
-	timeout := helper.TimeoutObjectFixture(
-		helper.WithTimeoutObjectView(s.view),
-		helper.WithTimeoutNewestQC(helper.MakeQC(helper.WithQCView(s.view-1))),
-		helper.WithTimeoutLastViewTC(
-			helper.MakeTC(helper.WithTCView(s.view-1),
-				helper.WithTCNewestQC(helper.MakeQC(helper.WithQCView(s.view-1))))),
-	)
-
-	s.validator.On("ValidateQC", timeout.NewestQC).Return(nil)
-	s.validator.On("ValidateTC", timeout.LastViewTC).Return(nil)
-	s.sigAggregator.On("VerifyAndAdd", timeout.SignerID, timeout.SigData, timeout.NewestQC.View).Return(uint64(0), nil)
-
-	err := s.processor.Process(timeout)
-	require.NoError(s.T(), err)
-	s.validator.AssertCalled(s.T(), "ValidateQC", timeout.NewestQC)
-	s.validator.AssertCalled(s.T(), "ValidateTC", timeout.LastViewTC)
-	s.sigAggregator.AssertCalled(s.T(), "VerifyAndAdd", timeout.SignerID, timeout.SigData, timeout.NewestQC.View)
+	s.Run("happy-path", func() {
+		timeout := s.TimeoutLastViewSuccessfulFixture()
+		s.validator.On("ValidateQC", timeout.NewestQC).Return(nil).Once()
+		err := s.processor.Process(timeout)
+		require.NoError(s.T(), err)
+		s.sigAggregator.AssertCalled(s.T(), "VerifyAndAdd", timeout.SignerID, timeout.SigData, timeout.NewestQC.View)
+	})
+	s.Run("recovery-path", func() {
+		timeout := s.TimeoutLastViewFailedFixture()
+		s.validator.On("ValidateQC", timeout.NewestQC).Return(nil).Once()
+		s.validator.On("ValidateTC", timeout.LastViewTC).Return(nil).Once()
+		err := s.processor.Process(timeout)
+		require.NoError(s.T(), err)
+		s.sigAggregator.AssertCalled(s.T(), "VerifyAndAdd", timeout.SignerID, timeout.SigData, timeout.NewestQC.View)
+	})
 }
 
 // TestProcess_CreatingTC is a test for happy path single threaded signature aggregation and TC creation
@@ -238,8 +336,8 @@ func (s *TimeoutProcessorTestSuite) TestProcess_CreatingTC() {
 	expectedSig := crypto.Signature(unittest.RandomBytes(128))
 	s.validator.On("ValidateQC", mock.Anything).Return(nil)
 	s.validator.On("ValidateTC", mock.Anything).Return(nil)
-	s.onPartialTCCreated.On("Execute", s.view).Return(nil).Once()
-	s.onTCCreated.On("Execute", mock.Anything).Run(func(args mock.Arguments) {
+	s.notifier.On("OnPartialTcCreated", s.view, mock.Anything, lastViewTC).Return(nil).Once()
+	s.notifier.On("OnTcConstructedFromTimeouts", mock.Anything).Run(func(args mock.Arguments) {
 		newestQC := timeouts[len(timeouts)-1].NewestQC
 		tc := args.Get(0).(*flow.TimeoutCertificate)
 		// ensure that TC contains correct fields
@@ -260,7 +358,7 @@ func (s *TimeoutProcessorTestSuite) TestProcess_CreatingTC() {
 		err := s.processor.Process(timeout)
 		require.NoError(s.T(), err)
 	}
-	s.onTCCreated.AssertExpectations(s.T())
+	s.notifier.AssertExpectations(s.T())
 	s.sigAggregator.AssertExpectations(s.T())
 
 	// add extra timeout, make sure we don't create another TC
@@ -274,7 +372,7 @@ func (s *TimeoutProcessorTestSuite) TestProcess_CreatingTC() {
 	err = s.processor.Process(timeout)
 	require.NoError(s.T(), err)
 
-	s.onTCCreated.AssertExpectations(s.T())
+	s.notifier.AssertExpectations(s.T())
 	s.validator.AssertExpectations(s.T())
 }
 
@@ -282,10 +380,11 @@ func (s *TimeoutProcessorTestSuite) TestProcess_CreatingTC() {
 // we expect only one TC created in this scenario.
 func (s *TimeoutProcessorTestSuite) TestProcess_ConcurrentCreatingTC() {
 	s.validator.On("ValidateQC", mock.Anything).Return(nil)
-	s.onPartialTCCreated.On("Execute", mock.Anything).Return(nil).Once()
-	s.onTCCreated.On("Execute", mock.Anything).Return(nil).Once()
+	s.notifier.On("OnPartialTcCreated", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	s.notifier.On("OnTcConstructedFromTimeouts", mock.Anything).Return(nil).Once()
 	s.sigAggregator.On("Aggregate").Return([]flow.Identifier(s.participants.NodeIDs()), []uint64{}, crypto.Signature{}, nil)
 	s.committee.On("IdentitiesByEpoch", mock.Anything).Return(s.participants, nil)
+	s.committee.On("IdentityByEpoch", mock.Anything, mock.Anything).Return(s.signer, nil)
 
 	var startupWg, shutdownWg sync.WaitGroup
 
@@ -357,8 +456,10 @@ func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 
 	committee := mocks.NewDynamicCommittee(t)
 	committee.On("IdentitiesByEpoch", mock.Anything).Return(stakingSigners, nil)
+	committee.On("IdentityByEpoch", mock.Anything, mock.Anything).Return(leader, nil)
 	committee.On("IdentitiesByBlock", mock.Anything).Return(stakingSigners, nil)
-	committee.On("WeightThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(stakingSigners.TotalWeight()), nil)
+	committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(stakingSigners.TotalWeight()), nil)
+	committee.On("TimeoutThresholdForView", mock.Anything).Return(committees.WeightThresholdToTimeout(stakingSigners.TotalWeight()), nil)
 
 	proposal, err := signers[leader.NodeID].CreateProposal(block)
 	require.NoError(t, err)
@@ -383,25 +484,25 @@ func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 
 	// create verifier that will do crypto checks of created TC
 	verifier := verification.NewStakingVerifier()
-	// create validator which will do compliance and crypto checked of created TC
+	// create validator which will do compliance and crypto checks of created TC
 	validator := hotstuffvalidator.New(committee, verifier)
 
 	var lastViewTC *flow.TimeoutCertificate
-	onTCCreated := mocks.NewOnTCCreated(t)
-	onTCCreated.On("Execute", mock.Anything).Run(func(args mock.Arguments) {
+	onTCCreated := func(args mock.Arguments) {
 		tc := args.Get(0).(*flow.TimeoutCertificate)
 		// check if resulted TC is valid
 		err := validator.ValidateTC(tc)
 		require.NoError(t, err)
 		lastViewTC = tc
-	}).Times(2) // should be called twice
+	}
 
-	aggregator, err := NewTimeoutSignatureAggregator(view, stakingSigners, encoding.CollectorVoteTag)
+	aggregator, err := NewTimeoutSignatureAggregator(view, stakingSigners, encoding.CollectorTimeoutTag)
 	require.NoError(t, err)
 
-	onPartialTCCreated := mocks.NewOnPartialTCCreated(t)
-	onPartialTCCreated.On("Execute", view).Once()
-	processor, err := NewTimeoutProcessor(committee, validator, aggregator, onPartialTCCreated.Execute, onTCCreated.Execute)
+	notifier := mocks.NewTimeoutCollectorConsumer(t)
+	notifier.On("OnPartialTcCreated", view, newestQC, (*flow.TimeoutCertificate)(nil)).Return().Once()
+	notifier.On("OnTcConstructedFromTimeouts", mock.Anything).Run(onTCCreated).Return().Once()
+	processor, err := NewTimeoutProcessor(committee, validator, aggregator, notifier)
 	require.NoError(t, err)
 
 	// last view was successful, no lastViewTC in this case
@@ -411,13 +512,15 @@ func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	onTCCreated.AssertNumberOfCalls(t, "Execute", 1)
+	notifier.AssertExpectations(t)
 
-	aggregator, err = NewTimeoutSignatureAggregator(view+1, stakingSigners, encoding.CollectorVoteTag)
+	aggregator, err = NewTimeoutSignatureAggregator(view+1, stakingSigners, encoding.CollectorTimeoutTag)
 	require.NoError(t, err)
 
-	onPartialTCCreated.On("Execute", view+1).Once()
-	processor, err = NewTimeoutProcessor(committee, validator, aggregator, onPartialTCCreated.Execute, onTCCreated.Execute)
+	notifier = mocks.NewTimeoutCollectorConsumer(t)
+	notifier.On("OnPartialTcCreated", view+1, newestQC, lastViewTC).Return().Once()
+	notifier.On("OnTcConstructedFromTimeouts", mock.Anything).Run(onTCCreated).Return().Once()
+	processor, err = NewTimeoutProcessor(committee, validator, aggregator, notifier)
 	require.NoError(t, err)
 
 	// last view ended with TC, need to include lastViewTC
@@ -427,5 +530,5 @@ func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	onTCCreated.AssertNumberOfCalls(t, "Execute", 2)
+	notifier.AssertExpectations(t)
 }

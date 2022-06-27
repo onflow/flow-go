@@ -22,6 +22,14 @@ type QuorumCertificate struct {
 	SigData []byte
 }
 
+// ID returns the QuorumCertificate's identifier
+func (qc *QuorumCertificate) ID() Identifier {
+	if qc == nil {
+		return ZeroID
+	}
+	return MakeID(qc)
+}
+
 // QuorumCertificateWithSignerIDs is a QuorumCertificate, where the signing nodes are
 // identified via their `flow.Identifier`s instead of indices. Working with IDs as opposed to
 // indices is less efficient, but simpler, because we don't require a canonical node order.

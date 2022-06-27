@@ -79,7 +79,7 @@ func (ps *ProposalSuite) SetupTest() {
 	// set up the mocked hotstuff Replicas state
 	ps.committee = &mocks.Replicas{}
 	ps.committee.On("LeaderForView", ps.block.View).Return(ps.leader.NodeID, nil)
-	ps.committee.On("WeightThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(ps.participants.TotalWeight()), nil)
+	ps.committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(ps.participants.TotalWeight()), nil)
 	ps.committee.On("IdentitiesByEpoch", mock.Anything).Return(
 		func(_ uint64) flow.IdentityList {
 			return ps.participants
@@ -606,7 +606,7 @@ func (qs *QCSuite) SetupTest() {
 		},
 		nil,
 	)
-	qs.committee.On("WeightThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(qs.participants.TotalWeight()), nil)
+	qs.committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(qs.participants.TotalWeight()), nil)
 
 	// set up the mocked verifier to verify the QC correctly
 	qs.verifier = &mocks.Verifier{}
@@ -783,7 +783,7 @@ func (s *TCSuite) SetupTest() {
 		},
 		nil,
 	)
-	s.committee.On("WeightThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(s.participants.TotalWeight()), nil)
+	s.committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(s.participants.TotalWeight()), nil)
 
 	s.verifier = &mocks.Verifier{}
 	s.verifier.On("VerifyQC", s.signers, s.block.QC.SigData, parent.View, parent.BlockID).Return(nil)

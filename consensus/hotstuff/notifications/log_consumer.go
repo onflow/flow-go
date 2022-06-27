@@ -77,6 +77,14 @@ func (lc *LogConsumer) OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newVi
 		Msg("QC triggered view change")
 }
 
+func (lc *LogConsumer) OnTcTriggeredViewChange(tc *flow.TimeoutCertificate, newView uint64) {
+	lc.log.Debug().
+		Uint64("tc_view", tc.View).
+		Uint64("tc_newest_qc_view", tc.NewestQC.View).
+		Uint64("new_view", newView).
+		Msg("TC triggered view change")
+}
+
 func (lc *LogConsumer) OnProposingBlock(block *model.Proposal) {
 	lc.logBasicBlockData(lc.log.Debug(), block.Block).
 		Msg("proposing block")
@@ -101,7 +109,6 @@ func (lc *LogConsumer) OnStartingTimeout(info *model.TimerInfo) {
 	lc.log.Debug().
 		Uint64("timeout_view", info.View).
 		Time("timeout_cutoff", info.StartTime.Add(info.Duration)).
-		Str("timeout_mode", info.Mode.String()).
 		Msg("timeout started")
 }
 
@@ -109,7 +116,6 @@ func (lc *LogConsumer) OnReachedTimeout(info *model.TimerInfo) {
 	lc.log.Debug().
 		Uint64("timeout_view", info.View).
 		Time("timeout_cutoff", info.StartTime.Add(info.Duration)).
-		Str("timeout_mode", info.Mode.String()).
 		Msg("timeout reached")
 }
 
@@ -157,15 +163,16 @@ func (lc *LogConsumer) OnVoteForInvalidBlockDetected(vote *model.Vote, proposal 
 func (lc *LogConsumer) OnDoubleTimeoutDetected(timeout *model.TimeoutObject, alt *model.TimeoutObject) {
 	lc.log.Warn().
 		Uint64("timeout_view", timeout.View).
-		Str("timeout", timeout.String()).
-		Str("alt", timeout.String()).
-		Msg("double vote detected")
+		Hex("signer_id", logging.ID(timeout.SignerID)).
+		Hex("timeout_id", logging.ID(timeout.ID())).
+		Hex("alt_id", logging.ID(alt.ID())).
+		Msg("double timeout detected")
 }
 
 func (lc *LogConsumer) OnInvalidTimeoutDetected(timeout *model.TimeoutObject) {
 	lc.log.Warn().
 		Uint64("timeout_view", timeout.View).
-		Hex("voter_id", timeout.SignerID[:]).
+		Hex("signer_id", timeout.SignerID[:]).
 		Msg("invalid timeout detected")
 }
 

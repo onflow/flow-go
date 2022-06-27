@@ -1,8 +1,8 @@
 package timeoutcollector
 
 import (
+	"errors"
 	"fmt"
-	"sync"
 
 	"go.uber.org/atomic"
 
@@ -23,63 +23,59 @@ func (t *accumulatedWeightTracker) Done() bool {
 	return t.done.Load()
 }
 
-// Track checks if required threshold was reached as one-time event and
-// returns true whenever it's reached.
+// Track returns true if `weight` reaches or exceeds `minRequiredWeight` for the _first time_.
+// All subsequent calls of `Track` (with any value) return false.
 func (t *accumulatedWeightTracker) Track(weight uint64) bool {
 	if weight < t.minRequiredWeight {
 		return false
 	}
-	if t.done.CAS(false, true) {
-		return true
-	}
-	return false
+	return t.done.CAS(false, true)
 }
 
 // NewestQCTracker is a helper structure which keeps track of the highest QC(by view)
 // in concurrency safe way.
 type NewestQCTracker struct {
-	lock     sync.RWMutex
-	newestQC *flow.QuorumCertificate
+	newestQC atomic.Value
+}
+
+func NewNewestQCTracker() *NewestQCTracker {
+	tracker := &NewestQCTracker{}
+	// store dummy QC with view 0 to workaround limitation of storing nil into atomic.Value
+	tracker.newestQC.Store(&flow.QuorumCertificate{
+		View: 0,
+	})
+	return tracker
 }
 
 // Track updates local state of NewestQC if the provided instance is newer(by view)
 // Concurrently safe
 func (t *NewestQCTracker) Track(qc *flow.QuorumCertificate) {
 	NewestQC := t.NewestQC()
-	if NewestQC != nil && NewestQC.View >= qc.View {
-		return
-	}
-
-	t.lock.Lock()
-	defer t.lock.Unlock()
-	if t.newestQC == nil || t.newestQC.View < qc.View {
-		t.newestQC = qc
+	if NewestQC.View < qc.View {
+		t.newestQC.CompareAndSwap(NewestQC, qc)
 	}
 }
 
 // NewestQC returns the newest QC(by view) tracked.
 // Concurrently safe
 func (t *NewestQCTracker) NewestQC() *flow.QuorumCertificate {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
-	return t.newestQC
+	return t.newestQC.Load().(*flow.QuorumCertificate)
 }
 
 // TimeoutProcessor implements the hotstuff.TimeoutProcessor interface.
-// It processes timeout objects broadcast by other replicas of consensus committee.
+// It processes timeout objects broadcast by other replicas of the consensus committee.
 // TimeoutProcessor collects TOs for one view, eventually when enough timeout objects are contributed
 // TimeoutProcessor will create a timeout certificate which can be used to advance round.
 // Concurrency safe.
 type TimeoutProcessor struct {
-	view               uint64
-	validator          hotstuff.Validator
-	committee          hotstuff.Replicas
-	sigAggregator      hotstuff.TimeoutSignatureAggregator
-	onPartialTCCreated hotstuff.OnPartialTCCreated
-	onTCCreated        hotstuff.OnTCCreated
-	partialTCTracker   accumulatedWeightTracker
-	tcTracker          accumulatedWeightTracker
-	NewestQCTracker    NewestQCTracker
+	view             uint64
+	validator        hotstuff.Validator
+	committee        hotstuff.Replicas
+	sigAggregator    hotstuff.TimeoutSignatureAggregator
+	notifier         hotstuff.TimeoutCollectorConsumer
+	partialTCTracker accumulatedWeightTracker
+	tcTracker        accumulatedWeightTracker
+	newestQCTracker  *NewestQCTracker
 }
 
 var _ hotstuff.TimeoutProcessor = (*TimeoutProcessor)(nil)
@@ -87,48 +83,52 @@ var _ hotstuff.TimeoutProcessor = (*TimeoutProcessor)(nil)
 // NewTimeoutProcessor creates new instance of TimeoutProcessor
 // Returns the following expected errors for invalid inputs:
 //   * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
+// All other errors should be treated as exceptions.
 func NewTimeoutProcessor(committee hotstuff.Replicas,
 	validator hotstuff.Validator,
 	sigAggregator hotstuff.TimeoutSignatureAggregator,
-	onPartialTCCreated hotstuff.OnPartialTCCreated,
-	onTCCreated hotstuff.OnTCCreated,
+	notifier hotstuff.TimeoutCollectorConsumer,
 ) (*TimeoutProcessor, error) {
 	view := sigAggregator.View()
-	qcThreshold, err := committee.WeightThresholdForView(view)
+	qcThreshold, err := committee.QuorumThresholdForView(view)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve weight threshold for view %d: %w", view, err)
+		return nil, fmt.Errorf("could not retrieve QC weight threshold for view %d: %w", view, err)
+	}
+	timeoutThreshold, err := committee.TimeoutThresholdForView(view)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve timeout weight threshold for view %d: %w", view, err)
 	}
 	return &TimeoutProcessor{
 		view:      view,
 		committee: committee,
 		validator: validator,
+		notifier:  notifier,
 		partialTCTracker: accumulatedWeightTracker{
-			// TODO(active-pacemaker): fix this, add weight for f+1
-			minRequiredWeight: qcThreshold / 2,
+			minRequiredWeight: timeoutThreshold,
 			done:              *atomic.NewBool(false),
 		},
 		tcTracker: accumulatedWeightTracker{
 			minRequiredWeight: qcThreshold,
 			done:              *atomic.NewBool(false),
 		},
-		onPartialTCCreated: onPartialTCCreated,
-		onTCCreated:        onTCCreated,
-		sigAggregator:      sigAggregator,
+		sigAggregator:   sigAggregator,
+		newestQCTracker: NewNewestQCTracker(),
 	}, nil
 }
 
 // Process performs processing of timeout object in concurrent safe way. This
 // function is implemented to be called by multiple goroutines at the same time.
 // Design of this function is event driven, as soon as we collect enough weight
-// to create a TC or a partial TC we will immediately do this and submit it
+// to create a TC or a partial TC we will immediately do so and submit it
 // via callback for further processing.
 // Expected error returns during normal operations:
-// * hotstuff.TimeoutForIncompatibleViewError - submitted timeout for incompatible view
+// * ErrTimeoutForIncompatibleView - submitted timeout for incompatible view
 // * model.InvalidTimeoutError - submitted invalid timeout(invalid structure or invalid signature)
+// * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
 // All other errors should be treated as exceptions.
 func (p *TimeoutProcessor) Process(timeout *model.TimeoutObject) error {
 	if p.view != timeout.View {
-		return fmt.Errorf("received incompatible timeout, expected %d got %d", p.view, timeout.View)
+		return fmt.Errorf("received incompatible timeout, expected %d got %d: %w", p.view, timeout.View, ErrTimeoutForIncompatibleView)
 	}
 
 	if p.tcTracker.Done() {
@@ -140,21 +140,25 @@ func (p *TimeoutProcessor) Process(timeout *model.TimeoutObject) error {
 		return fmt.Errorf("received invalid timeout: %w", err)
 	}
 
+	p.newestQCTracker.Track(timeout.NewestQC)
+
 	totalWeight, err := p.sigAggregator.VerifyAndAdd(timeout.SignerID, timeout.SigData, timeout.NewestQC.View)
 	if err != nil {
 		return fmt.Errorf("could not process invalid signature: %w", err)
 	}
 
-	p.NewestQCTracker.Track(timeout.NewestQC)
-
 	if p.partialTCTracker.Track(totalWeight) {
-		p.onPartialTCCreated(p.view)
+		p.notifier.OnPartialTcCreated(p.view, p.newestQCTracker.NewestQC(), timeout.LastViewTC)
 	}
 
-	// checking of conditions for building TC are satisfied
+	// Checking of conditions for building TC are satisfied when willBuildTC is true.
 	// At this point, we have enough signatures to build a TC. Another routine
-	// might just be at this point. To avoid duplicate work, only one routine can pass:
-	if !p.tcTracker.Track(totalWeight) {
+	// might just be at this point. To avoid duplicate work, Track returns true only once.
+	willBuildTC := p.tcTracker.Track(totalWeight)
+
+	if !willBuildTC {
+		// either we do not have enough timeouts to build a TC, or another thread
+		// has already passed this gate and created a TC
 		return nil
 	}
 
@@ -162,7 +166,7 @@ func (p *TimeoutProcessor) Process(timeout *model.TimeoutObject) error {
 	if err != nil {
 		return fmt.Errorf("internal error constructing TC: %w", err)
 	}
-	p.onTCCreated(tc)
+	p.notifier.OnTcConstructedFromTimeouts(tc)
 
 	return nil
 }
@@ -170,6 +174,9 @@ func (p *TimeoutProcessor) Process(timeout *model.TimeoutObject) error {
 // validateTimeout performs validation of timeout object, verifies if timeout is correctly structured
 // and included QC and TC is correctly structured and signed.
 // ATTENTION: this function doesn't check if timeout signature is valid, this check happens in signature aggregator
+// Expected error returns during normal operations:
+// * model.InvalidTimeoutError - submitted invalid timeout(invalid structure or invalid signature)
+// All other errors should be treated as exceptions.
 func (p *TimeoutProcessor) validateTimeout(timeout *model.TimeoutObject) error {
 	// 1. check if it's correctly structured
 	// (a) Every TO must contain a QC
@@ -177,7 +184,7 @@ func (p *TimeoutProcessor) validateTimeout(timeout *model.TimeoutObject) error {
 		return model.NewInvalidTimeoutErrorf(timeout, "TimeoutObject without QC is invalid")
 	}
 
-	if timeout.View < timeout.NewestQC.View {
+	if timeout.View <= timeout.NewestQC.View {
 		return model.NewInvalidTimeoutErrorf(timeout, "TO's QC %d cannot be newer than the TO's view %d",
 			timeout.NewestQC.View, timeout.View)
 	}
@@ -187,10 +194,10 @@ func (p *TimeoutProcessor) validateTimeout(timeout *model.TimeoutObject) error {
 	//     _both_ QC and TC for the previous round, in which case it can include both.
 	if timeout.LastViewTC != nil {
 		if timeout.View != timeout.LastViewTC.View+1 {
-			return model.NewInvalidTimeoutErrorf(timeout, "invalid TC for previous round")
+			return model.NewInvalidTimeoutErrorf(timeout, "invalid TC for non-previous view, expected view %d, got view %d", timeout.View-1, timeout.LastViewTC.View)
 		}
 		if timeout.NewestQC.View < timeout.LastViewTC.NewestQC.View {
-			return model.NewInvalidTimeoutErrorf(timeout, "timeout.NewestQC has older view that the QC in timeout.LastViewTC")
+			return model.NewInvalidTimeoutErrorf(timeout, "timeout.NewestQC is older (view=%d) than the QC in timeout.LastViewTC (view=%d)", timeout.NewestQC.View, timeout.LastViewTC.NewestQC.View)
 		}
 	}
 	// (c) The TO must contain a proof that sender legitimately entered timeout.View. Transitioning
@@ -206,17 +213,49 @@ func (p *TimeoutProcessor) validateTimeout(timeout *model.TimeoutObject) error {
 		}
 	}
 
-	// 2. Check if QC is valid
-	err := p.validator.ValidateQC(timeout.NewestQC)
+	// 2. Check if signer identity is valid
+	_, err := p.committee.IdentityByEpoch(timeout.View, timeout.SignerID)
 	if err != nil {
-		return model.NewInvalidTimeoutErrorf(timeout, "included QC is invalid: %w", err)
+		if model.IsInvalidSignerError(err) {
+			return model.NewInvalidTimeoutErrorf(timeout, "invalid signer for timeout: %w", err)
+		}
+		if errors.Is(err, model.ErrViewForUnknownEpoch) {
+			// This situation should be impossible since we query epoch information for this view in constructor,
+			// receiving sentinel here is symptom of internal bug.
+			return fmt.Errorf("no Epoch information availalbe for timeout object at view %d; symptom of internal bug or invalid bootstrapping information: %s", timeout.View, err.Error())
+		}
+		return fmt.Errorf("error retrieving signer Identity at view %d: %w", timeout.View, err)
 	}
 
-	// 3. If TC is included, it must be valid
+	// 3. Check if QC is valid
+	err = p.validator.ValidateQC(timeout.NewestQC)
+	if err != nil {
+		if model.IsInvalidQCError(err) {
+			return model.NewInvalidTimeoutErrorf(timeout, "included QC is invalid: %w", err)
+		}
+		if errors.Is(err, model.ErrViewForUnknownEpoch) {
+			// We require each replica to be bootstrapped with a QC pointing to a finalized block. Therefore, we should know the
+			// Epoch for any QC.View and TC.View we encounter. Receiving a `model.ErrViewForUnknownEpoch` is conceptually impossible,
+			// i.e. a symptom of an internal bug or invalid bootstrapping information.
+			return fmt.Errorf("no Epoch information availalbe for QC that was included in TO; symptom of internal bug or invalid bootstrapping information: %s", err.Error())
+		}
+		return fmt.Errorf("unexpected error when validating QC: %w", err)
+	}
+
+	// 4. If TC is included, it must be valid
 	if timeout.LastViewTC != nil {
 		err = p.validator.ValidateTC(timeout.LastViewTC)
 		if err != nil {
-			return model.NewInvalidTimeoutErrorf(timeout, "included TC is invalid: %w", err)
+			if model.IsInvalidTCError(err) {
+				return model.NewInvalidTimeoutErrorf(timeout, "included TC is invalid: %w", err)
+			}
+			if errors.Is(err, model.ErrViewForUnknownEpoch) {
+				// We require each replica to be bootstrapped with a QC pointing to a finalized block. Therefore, we should know the
+				// Epoch for any QC.View and TC.View we encounter. Receiving a `model.ErrViewForUnknownEpoch` is conceptually impossible,
+				// i.e. a symptom of an internal bug or invalid bootstrapping information.
+				return fmt.Errorf("no Epoch information availalbe for TC that was included in TO; symptom of internal bug or invalid bootstrapping information: %s", err.Error())
+			}
+			return fmt.Errorf("unexpected error when validating TC: %w", err)
 		}
 	}
 	return nil
@@ -240,12 +279,14 @@ func (p *TimeoutProcessor) buildTC() (*flow.TimeoutCertificate, error) {
 	return &flow.TimeoutCertificate{
 		View:          p.view,
 		NewestQCViews: highQCViews,
-		NewestQC:      p.NewestQCTracker.NewestQC(),
+		NewestQC:      p.newestQCTracker.NewestQC(),
 		SignerIndices: signerIndices,
 		SigData:       aggregatedSig,
 	}, nil
 }
 
+// signerIndicesFromIdentities encodes identities into signer indices.
+// Any error should be treated as exception.
 func (p *TimeoutProcessor) signerIndicesFromIdentities(signerIDs flow.IdentifierList) ([]byte, error) {
 	allIdentities, err := p.committee.IdentitiesByEpoch(p.view)
 	if err != nil {

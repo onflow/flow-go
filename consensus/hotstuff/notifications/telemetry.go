@@ -76,13 +76,13 @@ func (t *TelemetryConsumer) OnEventProcessed() {
 	t.pathHandler.CloseCurrentPath()
 }
 
+// TODO: In the new consensus model, `OnEnteringView` and `OnStartingTimeout` are now largely redundant.
+// Will be cleaned up as part of https://github.com/dapperlabs/flow-go/issues/6251
+
 func (t *TelemetryConsumer) OnStartingTimeout(info *model.TimerInfo) {
-	if info.Mode == model.ReplicaTimeout {
-		// the PaceMarker starts a new ReplicaTimeout if and only if it transitions to a higher view
-		t.pathHandler.StartNextPath(info.View)
-	}
+	// the PaceMarker starts a new timeout only as part of transitioning to new view
+	t.pathHandler.StartNextPath(info.View)
 	t.pathHandler.NextStep().
-		Str("timeout_mode", info.Mode.String()).
 		Float64("timeout_duration_seconds", info.Duration.Seconds()).
 		Time("timeout_cutoff", info.StartTime.Add(info.Duration)).
 		Msg("OnStartingTimeout")
@@ -98,7 +98,6 @@ func (t *TelemetryConsumer) OnEnteringView(viewNumber uint64, leader flow.Identi
 func (t *TelemetryConsumer) OnReachedTimeout(info *model.TimerInfo) {
 	t.pathHandler.StartNextPath(info.View)
 	t.pathHandler.NextStep().
-		Str("timeout_mode", info.Mode.String()).
 		Time("timeout_start_time", info.StartTime).
 		Float64("timeout_duration_seconds", info.Duration.Seconds()).
 		Msg("OnReachedTimeout")
@@ -122,6 +121,15 @@ func (t *TelemetryConsumer) OnQcTriggeredViewChange(qc *flow.QuorumCertificate, 
 		Uint64("next_view", newView).
 		Hex("qc_block_id", qc.BlockID[:]).
 		Msg("OnQcTriggeredViewChange")
+}
+
+func (t *TelemetryConsumer) OnTcTriggeredViewChange(tc *flow.TimeoutCertificate, newView uint64) {
+	t.pathHandler.NextStep().
+		Uint64("tc_view", tc.View).
+		Uint64("next_view", newView).
+		Uint64("tc_newest_qc_view", tc.NewestQC.View).
+		Hex("tc_newest_qc_block_id", tc.NewestQC.BlockID[:]).
+		Msg("OnTcTriggeredViewChange")
 }
 
 func (t *TelemetryConsumer) OnProposingBlock(proposal *model.Proposal) {

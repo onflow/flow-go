@@ -83,6 +83,14 @@ type Consumer interface {
 	// and must handle repetition of the same events (with some processing overhead).
 	OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newView uint64)
 
+	// OnTcTriggeredViewChange notifications are produced by PaceMaker when it moves to a new view
+	// based on processing a TC. The arguments specify the tc (first argument), which triggered
+	// the view change, and the newView to which the PaceMaker transitioned (second argument).
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnTcTriggeredViewChange(tc *flow.TimeoutCertificate, newView uint64)
+
 	// OnProposingBlock notifications are produced by the EventHandler when the replica, as
 	// leader for the respective view, proposing a block.
 	// Prerequisites:
@@ -185,4 +193,50 @@ type QCCreatedConsumer interface {
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
 	OnQcConstructedFromVotes(*flow.QuorumCertificate)
+}
+
+// TimeoutCollectorConsumer consumes outbound notifications produced by HotStuff's timeout aggregation
+// component. These events are primarily intended for the HotStuff-internal state machine (EventHandler),
+// but might also be relevant to the larger node in which HotStuff is running.
+//
+// Caution: the events are not strictly ordered by increasing views!
+// The notifications are emitted by concurrent processing logic. Over larger time scales, the
+// emitted events are for statistically increasing views. However, on short time scales there
+// are _no_ monotonicity guarantees w.r.t. the events' views.
+//
+// Implementations must:
+//   * be concurrency safe
+//   * be non-blocking
+//   * handle repetition of the same events (with some processing overhead).
+type TimeoutCollectorConsumer interface {
+	// OnTcConstructedFromTimeouts notifications are produced by the TimeoutProcessor
+	// component, whenever it constructs a TC based on TimeoutObjects from a
+	// supermajority of consensus participants.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnTcConstructedFromTimeouts(certificate *flow.TimeoutCertificate)
+
+	// OnPartialTcCreated notifications are produced by the TimeoutProcessor
+	// component, whenever it collected TimeoutObjects from a superminority
+	// of consensus participants. Along with view it reports the newest QC and TC for previous view(can be nil)
+	// discovered in process of timeout collection.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnPartialTcCreated(view uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate)
+
+	// OnNewQcDiscovered notifications are produced by the TimeoutCollector
+	// component, whenever it discovers new QC included in timeout object.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnNewQcDiscovered(certificate *flow.QuorumCertificate)
+
+	// OnNewTcDiscovered notifications are produced by the TimeoutCollector
+	// component, whenever it discovers new TC included in timeout object.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnNewTcDiscovered(certificate *flow.TimeoutCertificate)
 }

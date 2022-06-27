@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
@@ -25,7 +26,7 @@ import (
 const (
 	startRepTimeout        float64 = 400.0 // Milliseconds
 	minRepTimeout          float64 = 100.0 // Milliseconds
-	voteTimeoutFraction    float64 = 0.5   // multiplicative factor
+	maxRepTimeout          float64 = 600.0 // Milliseconds
 	multiplicativeIncrease float64 = 1.5   // multiplicative factor
 	multiplicativeDecrease float64 = 0.85  // multiplicative factor
 )
@@ -36,51 +37,56 @@ type TestPaceMaker struct {
 	t require.TestingT
 }
 
-func NewTestPaceMaker(t require.TestingT, startView uint64, timeoutController *timeout.Controller, notifier hotstuff.Consumer) *TestPaceMaker {
-	p, err := pacemaker.New(startView, timeoutController, notifier)
+var _ hotstuff.PaceMaker = (*TestPaceMaker)(nil)
+
+func NewTestPaceMaker(t require.TestingT, timeoutController *timeout.Controller,
+	notifier hotstuff.Consumer,
+	persist hotstuff.Persister,
+) *TestPaceMaker {
+	p, err := pacemaker.New(timeoutController, notifier, persist)
 	if err != nil {
 		panic(err)
 	}
 	return &TestPaceMaker{p, t}
 }
 
-func (p *TestPaceMaker) ProcessQC(qc *flow.QuorumCertificate) (*model.NewViewEvent, bool) {
+func (p *TestPaceMaker) ProcessQC(qc *flow.QuorumCertificate) (*model.NewViewEvent, error) {
 	oldView := p.CurView()
-	newView, changed := p.PaceMaker.ProcessQC(qc)
+	newView, err := p.PaceMaker.ProcessQC(qc)
 	log.Info().Msgf("pacemaker.ProcessQC old view: %v, new view: %v\n", oldView, p.CurView())
-	return newView, changed
+	return newView, err
 }
 
-func (p *TestPaceMaker) ProcessTC(tc *flow.TimeoutCertificate) (*model.NewViewEvent, bool) {
-	panic("not yet implemented")
-}
-
-func (p *TestPaceMaker) OnPartialTC(curView uint64) {
-	panic("not yet implemented")
+func (p *TestPaceMaker) ProcessTC(tc *flow.TimeoutCertificate) (*model.NewViewEvent, error) {
+	oldView := p.CurView()
+	newView, err := p.PaceMaker.ProcessTC(tc)
+	log.Info().Msgf("pacemaker.ProcessTC old view: %v, new view: %v\n", oldView, p.CurView())
+	return newView, err
 }
 
 func (p *TestPaceMaker) NewestQC() *flow.QuorumCertificate {
-	panic("not yet implemented")
+	return p.PaceMaker.NewestQC()
 }
 
 func (p *TestPaceMaker) LastViewTC() *flow.TimeoutCertificate {
-	panic("not yet implemented")
+	return p.PaceMaker.LastViewTC()
 }
 
 // using a real pacemaker for testing event handler
-func initPaceMaker(t require.TestingT, view uint64) hotstuff.PaceMaker {
+func initPaceMaker(t require.TestingT, livenessData *hotstuff.LivenessData) hotstuff.PaceMaker {
 	notifier := &mocks.Consumer{}
 	tc, err := timeout.NewConfig(
 		time.Duration(startRepTimeout*1e6),
 		time.Duration(minRepTimeout*1e6),
-		voteTimeoutFraction,
+		time.Duration(maxRepTimeout*1e6),
 		multiplicativeIncrease,
 		multiplicativeDecrease,
 		0)
-	if err != nil {
-		t.FailNow()
-	}
-	pm := NewTestPaceMaker(t, view, timeout.NewController(tc), notifier)
+	require.NoError(t, err)
+	persist := &mocks.Persister{}
+	persist.On("PutLivenessData", mock.Anything).Return(nil).Maybe()
+	persist.On("GetLivenessData").Return(livenessData, nil).Once()
+	pm := NewTestPaceMaker(t, timeout.NewController(tc), notifier, persist)
 	notifier.On("OnStartingTimeout", mock.Anything).Return()
 	notifier.On("OnQcTriggeredViewChange", mock.Anything, mock.Anything).Return()
 	notifier.On("OnReachedTimeout", mock.Anything).Return()
@@ -354,9 +360,14 @@ type EventHandlerSuite struct {
 }
 
 func (es *EventHandlerSuite) SetupTest() {
-	finalized, curView := uint64(3), uint64(6)
+	finalized := uint64(3)
 
-	es.paceMaker = initPaceMaker(es.T(), curView)
+	livenessData := &hotstuff.LivenessData{
+		CurrentView: 6,
+		NewestQC:    helper.MakeQC(helper.WithQCView(5)),
+	}
+
+	es.paceMaker = initPaceMaker(es.T(), livenessData)
 	es.forks = NewForks(es.T(), finalized)
 	es.persist = &mocks.Persister{}
 	es.persist.On("PutStarted", mock.Anything).Return(nil)
@@ -386,8 +397,8 @@ func (es *EventHandlerSuite) SetupTest() {
 
 	es.eventhandler = eventhandler
 
-	es.initView = curView
-	es.endView = curView
+	es.initView = livenessData.CurrentView
+	es.endView = livenessData.CurrentView
 	// voting block is a block for the current view, which will trigger view change
 	es.votingBlock = createBlockWithQC(es.paceMaker.CurView(), es.paceMaker.CurView()-1)
 	es.qc = &flow.QuorumCertificate{

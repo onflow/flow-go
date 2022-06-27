@@ -60,5 +60,5 @@ func (u *Snapshot) RandomSource() ([]byte, error) {
 }
 
 func (u *Snapshot) Params() protocol.GlobalParams {
-	return &Params{u.err}
+	return Params{u.err}
 }
