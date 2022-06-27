@@ -531,10 +531,10 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		}),
 
 		maxCollectionHeight: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "max_collection_height",
+			Name:      "max_collection_height",
 			Namespace: namespaceExecution,
 			Subsystem: subsystemIngestion,
-			Help: "todo",
+			Help:      "todo",
 		}),
 	}
 

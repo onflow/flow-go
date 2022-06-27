@@ -113,10 +113,10 @@ func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log 
 			Help:      "histogram for the transaction size in kb of scripts used in GetTransactionResult",
 		}),
 		maxReceiptHeight: promauto.NewGauge(prometheus.GaugeOpts{
-			Name: "max_receipt_height",
+			Name:      "max_receipt_height",
 			Namespace: namespaceAccess,
 			Subsystem: subsystemIngestion,
-			Help: "todo",
+			Help:      "todo",
 		}),
 	}
 
