@@ -67,6 +67,7 @@ type ExecutionCollector struct {
 	executionStateDiskUsage          prometheus.Gauge
 	blockDataUploadsInProgress       prometheus.Gauge
 	blockDataUploadsDuration         prometheus.Histogram
+	maxCollectionHeight              prometheus.Gauge
 }
 
 func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
@@ -528,6 +529,13 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 			Name:      "execution_state_disk_usage",
 			Help:      "the disk usage of execution state",
 		}),
+
+		maxCollectionHeight: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "max_collection_height",
+			Namespace: namespaceExecution,
+			Subsystem: subsystemIngestion,
+			Help: "todo",
+		}),
 	}
 
 	return ec
@@ -749,5 +757,5 @@ func (ec *ExecutionCollector) DiskSize(bytes uint64) {
 }
 
 func (ec *ExecutionCollector) UpdateCollectionMaxHeight(height uint64) {
-
+	ec.maxCollectionHeight.Set(float64(height))
 }
