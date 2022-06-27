@@ -498,7 +498,7 @@ func createNode(
 		Signer:               signer,
 		Persist:              persist,
 		QCCreatedDistributor: qcDistributor,
-		Aggregator:           aggregator,
+		VoteAggregator:       aggregator,
 	}
 
 	// initialize the compliance engine
@@ -566,7 +566,7 @@ func createNode(
 	node.sync = sync
 	node.state = fullState
 	node.hot = hot
-	node.aggregator = hotstuffModules.Aggregator
+	node.aggregator = hotstuffModules.VoteAggregator
 	node.headers = headersDB
 	node.net = net
 	node.log = log

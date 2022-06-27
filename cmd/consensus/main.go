@@ -589,7 +589,7 @@ func main() {
 				FinalizationDistributor: finalizationDistributor,
 				Forks:                   forks,
 				Validator:               validator,
-				Aggregator:              aggregator,
+				VoteAggregator:          aggregator,
 			}
 
 			return aggregator, nil
@@ -655,7 +655,7 @@ func main() {
 				mutableState,
 				proposals,
 				syncCore,
-				hotstuffModules.Aggregator,
+				hotstuffModules.VoteAggregator,
 				modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),
 			)
 			if err != nil {

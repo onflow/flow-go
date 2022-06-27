@@ -130,7 +130,7 @@ func (f *HotStuffFactory) CreateModules(
 		Committee:               committee,
 		Signer:                  signer,
 		Persist:                 persister.New(f.db, cluster.ChainID()),
-		Aggregator:              aggregator,
+		VoteAggregator:          aggregator,
 		QCCreatedDistributor:    qcDistributor,
 		FinalizationDistributor: finalizationDistributor,
 	}, metrics, nil

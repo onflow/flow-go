@@ -127,9 +127,9 @@ func (factory *EpochComponentsFactory) Create(
 		err = fmt.Errorf("could not create consensus modules: %w", err)
 		return
 	}
-	voteAggregator = hotstuffModules.Aggregator
+	voteAggregator = hotstuffModules.VoteAggregator
 
-	proposalEng, err := factory.proposal.Create(mutableState, headers, payloads, hotstuffModules.Aggregator)
+	proposalEng, err := factory.proposal.Create(mutableState, headers, payloads, hotstuffModules.VoteAggregator)
 	if err != nil {
 		err = fmt.Errorf("could not create proposal engine: %w", err)
 		return

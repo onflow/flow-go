@@ -18,7 +18,8 @@ type HotstuffModules struct {
 	QCCreatedDistributor    *pubsub.QCCreatedDistributor    // observer for qc created event, used by leader
 	Forks                   hotstuff.Forks                  // information about multiple forks
 	Validator               hotstuff.Validator              // validator of proposals & votes
-	Aggregator              hotstuff.VoteAggregator         // aggregator of votes, used by leader
+	VoteAggregator          hotstuff.VoteAggregator         // aggregator of votes, used by leader
+	TimeoutAggregator       hotstuff.TimeoutAggregator      // aggregator of timeouts, used by every replica
 }
 
 type ParticipantConfig struct {

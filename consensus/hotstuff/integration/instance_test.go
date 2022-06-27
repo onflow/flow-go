@@ -64,9 +64,9 @@ type Instance struct {
 	// real dependencies
 	pacemaker  hotstuff.PaceMaker
 	producer   *blockproducer.BlockProducer
-	forks      *forks.Forks
-	aggregator *voteaggregator.VoteAggregator
-	voter      *safetyrules.SafetyRules
+	forks          *forks.Forks
+	voteAggregator *voteaggregator.VoteAggregator
+	voter          *safetyrules.SafetyRules
 	validator  *validator.Validator
 
 	// main logic
@@ -388,8 +388,8 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, notifier, voteProcessorFactory.Create)
 	voteCollectors := voteaggregator.NewVoteCollectors(log, DefaultPruned(), workerpool.New(2), createCollectorFactoryMethod)
 
-	// initialize the vote aggregator
-	in.aggregator, err = voteaggregator.NewVoteAggregator(log, notifier, DefaultPruned(), voteCollectors)
+	// initialize the vote voteAggregator
+	in.voteAggregator, err = voteaggregator.NewVoteAggregator(log, notifier, DefaultPruned(), voteCollectors)
 	require.NoError(t, err)
 
 	safetyData := &hotstuff.SafetyData{
@@ -403,7 +403,19 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	require.NoError(t, err)
 
 	// initialize the event handler
-	in.handler, err = eventhandler.NewEventHandler(log, in.pacemaker, in.producer, in.forks, in.persist, in.communicator, in.committee, in.aggregator, in.voter, notifier)
+	in.handler, err = eventhandler.NewEventHandler(
+		log,
+		in.pacemaker,
+		in.producer,
+		in.forks,
+		in.persist,
+		in.communicator,
+		in.committee,
+		in.voteAggregator,
+		in
+		in.voter,
+		notifier,
+	)
 	require.NoError(t, err)
 
 	return &in
@@ -413,11 +425,11 @@ func (in *Instance) Run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
 		cancel()
-		<-in.aggregator.Done()
+		<-in.voteAggregator.Done()
 	}()
 	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
-	in.aggregator.Start(signalerCtx)
-	<-in.aggregator.Ready()
+	in.voteAggregator.Start(signalerCtx)
+	<-in.voteAggregator.Ready()
 
 	// start the event handler
 	err := in.handler.Start()
@@ -463,7 +475,7 @@ func (in *Instance) Run() error {
 					return fmt.Errorf("could not process proposal: %w", err)
 				}
 			case *model.Vote:
-				in.aggregator.AddVote(m)
+				in.voteAggregator.AddVote(m)
 			case *flow.QuorumCertificate:
 				err := in.handler.OnQCConstructed(m)
 				if err != nil {
