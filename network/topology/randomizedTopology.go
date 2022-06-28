@@ -3,13 +3,13 @@ package topology
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto/random"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/seed"
 )
@@ -71,8 +71,8 @@ func NewRandomizedTopology(nodeID flow.Identifier, logger zerolog.Logger, edgePr
 // Independent invocations of GenerateFanout on different nodes collaboratively must construct a cohesive
 // connected graph of nodes that enables them talking to each other. This should be done with a very high probability
 // in randomized topology.
-func (r RandomizedTopology) GenerateFanout(ids flow.IdentityList, channels channels.ChannelList) (flow.IdentityList, error) {
-	myUniqueChannels := channels.UniqueChannels(channels)
+func (r RandomizedTopology) GenerateFanout(ids flow.IdentityList, channelList channels.ChannelList) (flow.IdentityList, error) {
+	myUniqueChannels := channels.UniqueChannels(channelList)
 	if len(myUniqueChannels) == 0 {
 		// no subscribed channel, hence skip topology creation
 		// we do not return an error at this state as invocation of MakeTopology may happen before
