@@ -180,14 +180,15 @@ func (r *Resolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAdd
 // An expired domain on cache is still addressed through the cache, however, a request is fired up asynchronously
 // through the underlying basic resolver to resolve it from the network.
 func (r *Resolver) lookupIPAddr(ctx context.Context, domain string) ([]net.IPAddr, error) {
-	resolving := r.txtResolvingInProgress(domain)
+	resolving := r.ipResolvingInProgress(domain)
 
 	addr, exists, fresh := r.c.resolveIPCache(domain)
 
 	lg := r.logger.With().
 		Str("domain", domain).
 		Bool("cache_hit", exists).
-		Bool("cache_fresh", fresh).Logger()
+		Bool("cache_fresh", fresh).
+		Bool("resolving", resolving).Logger()
 
 	lg.Trace().Msg("ip lookup request arrived")
 
@@ -251,7 +252,8 @@ func (r *Resolver) lookupTXT(ctx context.Context, txt string) ([]string, error) 
 	lg := r.logger.With().
 		Str("txt", txt).
 		Bool("cache_hit", exists).
-		Bool("cache_fresh", fresh).Logger()
+		Bool("cache_fresh", fresh).
+		Bool("resolving", resolving).Logger()
 
 	lg.Trace().Msg("txt lookup request arrived")
 
@@ -298,7 +300,6 @@ func (r *Resolver) shouldResolveIP(domain string) bool {
 
 	if _, ok := r.processingIPs[domain]; !ok {
 		r.processingIPs[domain] = struct{}{}
-		r.logger.Trace().Str("domain", domain).Msg("resolving is in progress, extra request is dropped")
 		return true
 	}
 
@@ -346,7 +347,6 @@ func (r *Resolver) shouldResolveTXT(txt string) bool {
 
 	if _, ok := r.processingTXTs[txt]; !ok {
 		r.processingTXTs[txt] = struct{}{}
-		r.logger.Trace().Str("txt", txt).Msg("resolving is in progress, extra request is dropped")
 		return true
 	}
 
