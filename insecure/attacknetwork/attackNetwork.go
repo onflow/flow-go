@@ -8,9 +8,10 @@ import (
 
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/hashicorp/go-multierror"
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
+
+	"github.com/onflow/flow-go/network/channels"
 
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/model/flow"

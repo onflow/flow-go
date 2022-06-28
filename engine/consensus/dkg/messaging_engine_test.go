@@ -4,10 +4,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/network/channels"
 
 	msg "github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/dkg"

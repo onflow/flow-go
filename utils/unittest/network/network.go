@@ -3,8 +3,9 @@ package network
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/stretchr/testify/mock"
+
+	"github.com/onflow/flow-go/network/channels"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"

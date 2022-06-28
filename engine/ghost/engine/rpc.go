@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
+
+	"github.com/onflow/flow-go/network/channels"
 
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 
@@ -85,7 +86,7 @@ func New(net network.Network, log zerolog.Logger, me module.Local, state protoco
 func registerConduits(net network.Network, state protocol.State, eng network.Engine) (map[channels.Channel]network.Conduit, error) {
 
 	// create a list of all channels that don't change over time
-	channels := channels.ChannelList{
+	channelList := channels.ChannelList{
 		channels.ConsensusCommittee,
 		channels.SyncCommittee,
 		channels.SyncExecution,
@@ -115,17 +116,17 @@ func registerConduits(net network.Network, state protocol.State, eng network.Eng
 		clusterID := cluster.RootBlock().Header.ChainID
 
 		// add the dynamic channels for the cluster
-		channels = append(
-			channels,
+		channelList = append(
+			channelList,
 			channels.ChannelConsensusCluster(clusterID),
 			channels.ChannelSyncCluster(clusterID),
 		)
 	}
 
-	conduitMap := make(map[channels.Channel]network.Conduit, len(channels))
+	conduitMap := make(map[channels.Channel]network.Conduit, len(channelList))
 
 	// Register for ALL channels here and return a map of conduits
-	for _, e := range channels {
+	for _, e := range channelList {
 		c, err := net.Register(e, eng)
 		if err != nil {
 			return nil, fmt.Errorf("could not register collection provider engine: %w", err)

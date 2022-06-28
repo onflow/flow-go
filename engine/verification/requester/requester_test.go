@@ -5,10 +5,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/rs/zerolog"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/network/channels"
 
 	mockfetcher "github.com/onflow/flow-go/engine/verification/fetcher/mock"
 	"github.com/onflow/flow-go/engine/verification/requester"

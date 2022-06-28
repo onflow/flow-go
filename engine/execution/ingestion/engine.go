@@ -8,9 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+
+	"github.com/onflow/flow-go/network/channels"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"

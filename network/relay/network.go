@@ -5,8 +5,9 @@ import (
 
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p-core/protocol"
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/network/channels"
 
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/util"
@@ -16,8 +17,8 @@ import (
 type RelayNetwork struct {
 	originNet      network.Network
 	destinationNet network.Network
-	logger   zerolog.Logger
-	channels channels.ChannelList
+	logger         zerolog.Logger
+	channels       channels.ChannelList
 }
 
 var _ network.Network = (*RelayNetwork)(nil)

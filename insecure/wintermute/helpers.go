@@ -3,8 +3,9 @@ package wintermute
 import (
 	"testing"
 
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/network/channels"
 
 	"github.com/onflow/flow-go/engine/testutil"
 	enginemock "github.com/onflow/flow-go/engine/testutil/mock"

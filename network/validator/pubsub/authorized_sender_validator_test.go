@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/suite"
+
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
-	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/messages"
 
@@ -15,9 +16,9 @@ import (
 )
 
 type TestCase struct {
-	Identity *flow.Identity
-	Channel  channels.Channel
-	Message  interface{}
+	Identity   *flow.Identity
+	Channel    channels.Channel
+	Message    interface{}
 	MessageStr string
 }
 

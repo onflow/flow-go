@@ -7,8 +7,9 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/network/channels"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution/state"

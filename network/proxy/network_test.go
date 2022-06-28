@@ -3,9 +3,10 @@ package proxy_test
 import (
 	"testing"
 
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/onflow/flow-go/network/channels"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"

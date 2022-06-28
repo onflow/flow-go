@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/sethvargo/go-retry"
+
+	"github.com/onflow/flow-go/network/channels"
 
 	"github.com/rs/zerolog"
 

@@ -5,8 +5,9 @@ package provider
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/network/channels"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"

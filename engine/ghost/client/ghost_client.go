@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/onflow/flow-go/network/channels"
 	"google.golang.org/grpc"
+
+	"github.com/onflow/flow-go/network/channels"
 
 	"github.com/onflow/flow-go/utils/unittest"
 

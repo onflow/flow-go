@@ -8,8 +8,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/network/channels"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"

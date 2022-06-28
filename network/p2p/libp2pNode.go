@@ -16,8 +16,9 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	kbucket "github.com/libp2p/go-libp2p-kbucket"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/network/channels"
 
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p/unicast"

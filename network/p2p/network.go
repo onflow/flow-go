@@ -10,8 +10,9 @@ import (
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/network/channels"
 
 	"github.com/onflow/flow-go/crypto/hash"
 
@@ -87,8 +88,8 @@ type registerEngineResp struct {
 }
 
 type registerBlobServiceRequest struct {
-	channel channels.Channel
-	ds      datastore.Batching
+	channel  channels.Channel
+	ds       datastore.Batching
 	opts     []network.BlobServiceOption
 	respChan chan *registerBlobServiceResp
 }

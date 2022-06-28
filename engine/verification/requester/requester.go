@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/rs/zerolog"
 	"golang.org/x/exp/rand"
+
+	"github.com/onflow/flow-go/network/channels"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/verification/fetcher"

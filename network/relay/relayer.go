@@ -3,8 +3,9 @@ package relay
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/network/channels"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/onflow/flow-go/network/channels"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"

@@ -3,6 +3,7 @@ package p2p
 import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
+
 	"github.com/onflow/flow-go/network/channels"
 
 	"github.com/onflow/flow-go/model/flow"

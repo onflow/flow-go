@@ -4,8 +4,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/network/channels"
 
 	"github.com/onflow/flow-go/engine"
 	commonsync "github.com/onflow/flow-go/engine/common/synchronization"

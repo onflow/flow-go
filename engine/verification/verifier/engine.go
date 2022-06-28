@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/network/channels"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"

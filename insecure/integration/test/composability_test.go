@@ -7,8 +7,9 @@ import (
 	"testing"
 	"time"
 
-	flownet "github.com/onflow/flow-go/network/channels"
 	"github.com/stretchr/testify/require"
+
+	flownet "github.com/onflow/flow-go/network/channels"
 
 	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/insecure"
