@@ -24,7 +24,7 @@ func createPayloadKeyWithLegacyController(a flow.Address, key string) ledger.Key
 }
 
 func TestLegacyControllerMigration(t *testing.T) {
-	mig := AccountStatusMigration{
+	mig := LegacyControllerMigration{
 		Logger: zerolog.Logger{},
 	}
 
@@ -33,10 +33,10 @@ func TestLegacyControllerMigration(t *testing.T) {
 
 	payloads := []ledger.Payload{
 		{Key: createAccountPayloadKey(address1, state.KeyStorageUsed), Value: utils.Uint64ToBinary(1)},
-		{Key: createAccountPayloadKey(address1, state.ContractKey("CoreContract")), Value: utils.Uint64ToBinary(2)},
-		{Key: createAccountPayloadKey(address1, state.KeyContractNames), Value: utils.Uint64ToBinary(3)},
-		{Key: createAccountPayloadKey(address2, state.KeyPublicKey(1)), Value: utils.Uint64ToBinary(4)},
-		{Key: createAccountPayloadKey(address2, state.KeyPublicKeyCount), Value: utils.Uint64ToBinary(4)},
+		{Key: createPayloadKeyWithLegacyController(address1, state.ContractKey("CoreContract")), Value: utils.Uint64ToBinary(2)},
+		{Key: createPayloadKeyWithLegacyController(address1, state.KeyContractNames), Value: utils.Uint64ToBinary(3)},
+		{Key: createPayloadKeyWithLegacyController(address2, state.KeyPublicKey(1)), Value: utils.Uint64ToBinary(4)},
+		{Key: createPayloadKeyWithLegacyController(address2, state.KeyPublicKeyCount), Value: utils.Uint64ToBinary(4)},
 	}
 
 	newPayloads, err := mig.Migrate(payloads)
