@@ -415,7 +415,7 @@ func TestExecuteOneBlock(t *testing.T) {
 
 		// A <- B
 		blockA := unittest.BlockHeaderFixture()
-		blockB := unittest.ExecutableBlockFixtureWithParent(nil, &blockA)
+		blockB := unittest.ExecutableBlockFixtureWithParent(nil, blockA)
 		blockB.StartState = unittest.StateCommitmentPointerFixture()
 
 		ctx.mockHasWeightAtBlockID(blockA.ID(), true)
@@ -430,7 +430,7 @@ func TestExecuteOneBlock(t *testing.T) {
 		ctx.mockStateCommitsWithMap(commits)
 
 		ctx.state.On("Sealed").Return(ctx.snapshot)
-		ctx.snapshot.On("Head").Return(&blockA, nil)
+		ctx.snapshot.On("Head").Return(blockA, nil)
 
 		ctx.assertSuccessfulBlockComputation(commits, func(blockID flow.Identifier, commit flow.StateCommitment) {
 			wg.Done()
@@ -476,7 +476,7 @@ func Test_OnlyHeadOfTheQueueIsExecuted(t *testing.T) {
 		})
 
 		// last executed block - it will be re-queued regardless of state commit
-		blockB := unittest.ExecutableBlockFixtureWithParent(nil, &blockA)
+		blockB := unittest.ExecutableBlockFixtureWithParent(nil, blockA)
 		blockB.StartState = unittest.StateCommitmentPointerFixture()
 
 		// finalized block - it can be executed in parallel, as blockB has been executed
@@ -611,7 +611,7 @@ func TestBlocksArentExecutedMultipleTimes_multipleBlockEnqueue(t *testing.T) {
 
 		// A <- B <- C
 		blockA := unittest.BlockHeaderFixture()
-		blockB := unittest.ExecutableBlockFixtureWithParent(nil, &blockA)
+		blockB := unittest.ExecutableBlockFixtureWithParent(nil, blockA)
 		blockB.StartState = unittest.StateCommitmentPointerFixture()
 
 		//blockCstartState := unittest.StateCommitmentFixture()
@@ -716,7 +716,7 @@ func TestBlocksArentExecutedMultipleTimes_collectionArrival(t *testing.T) {
 
 		// A (0 collection) <- B (0 collection) <- C (0 collection) <- D (1 collection)
 		blockA := unittest.BlockHeaderFixture()
-		blockB := unittest.ExecutableBlockFixtureWithParent(nil, &blockA)
+		blockB := unittest.ExecutableBlockFixtureWithParent(nil, blockA)
 		blockB.StartState = unittest.StateCommitmentPointerFixture()
 
 		collectionIdentities := ctx.identities.Filter(filter.HasRole(flow.RoleCollection))
@@ -854,7 +854,7 @@ func TestExecuteBlockInOrder(t *testing.T) {
 		blockSealed := unittest.BlockHeaderFixture()
 
 		blocks := make(map[string]*entity.ExecutableBlock)
-		blocks["A"] = unittest.ExecutableBlockFixtureWithParent(nil, &blockSealed)
+		blocks["A"] = unittest.ExecutableBlockFixtureWithParent(nil, blockSealed)
 		blocks["A"].StartState = unittest.StateCommitmentPointerFixture()
 
 		blocks["B"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["A"].Block.Header)
@@ -880,7 +880,7 @@ func TestExecuteBlockInOrder(t *testing.T) {
 		ctx.mockHasWeightAtBlockID(blocks["A"].ID(), true)
 		ctx.state.On("Sealed").Return(ctx.snapshot)
 		// a receipt for sealed block won't be broadcasted
-		ctx.snapshot.On("Head").Return(&blockSealed, nil)
+		ctx.snapshot.On("Head").Return(blockSealed, nil)
 		ctx.mockSnapshot(blocks["A"].Block.Header, unittest.IdentityListFixture(1))
 		ctx.mockSnapshot(blocks["B"].Block.Header, unittest.IdentityListFixture(1))
 		ctx.mockSnapshot(blocks["C"].Block.Header, unittest.IdentityListFixture(1))
@@ -1062,7 +1062,7 @@ func TestUnauthorizedNodeDoesNotBroadcastReceipts(t *testing.T) {
 		blockSealed := unittest.BlockHeaderFixture()
 
 		blocks := make(map[string]*entity.ExecutableBlock)
-		blocks["A"] = unittest.ExecutableBlockFixtureWithParent(nil, &blockSealed)
+		blocks["A"] = unittest.ExecutableBlockFixtureWithParent(nil, blockSealed)
 		blocks["A"].StartState = unittest.StateCommitmentPointerFixture()
 
 		blocks["B"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["A"].Block.Header)
@@ -1091,7 +1091,7 @@ func TestUnauthorizedNodeDoesNotBroadcastReceipts(t *testing.T) {
 		// will be executed.
 		ctx.state.On("Sealed").Return(ctx.snapshot)
 		// a receipt for sealed block won't be broadcasted
-		ctx.snapshot.On("Head").Return(&blockSealed, nil)
+		ctx.snapshot.On("Head").Return(blockSealed, nil)
 
 		ctx.mockHasWeightAtBlockID(blocks["A"].ID(), true)
 		identity := *ctx.identity
