@@ -122,10 +122,10 @@ func TestDelta_RegisterUpdatesAreSorted(t *testing.T) {
 	data := make(flow.RegisterEntries, 5)
 
 	data[0].Key = flow.NewRegisterID("a", "1")
-	data[1].Key = flow.NewRegisterID("a", "1")
-	data[2].Key = flow.NewRegisterID("b", "1")
-	data[3].Key = flow.NewRegisterID("b", "1")
-	data[4].Key = flow.NewRegisterID("b", "2")
+	data[1].Key = flow.NewRegisterID("b", "1")
+	data[2].Key = flow.NewRegisterID("c", "1")
+	data[3].Key = flow.NewRegisterID("d", "1")
+	data[4].Key = flow.NewRegisterID("e", "2")
 
 	data[0].Value = flow.RegisterValue("a")
 	data[1].Value = flow.RegisterValue("b")

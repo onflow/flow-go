@@ -84,11 +84,11 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		assert.Len(t, update.Paths, 2)
 		assert.Len(t, update.Payloads, 2)
 
-		key1 := ledger2.NewKey([]ledger2.KeyPart{ledger2.NewKeyPart(0, []byte(registerID1)), ledger2.NewKeyPart(1, []byte("")), ledger2.NewKeyPart(2, []byte(""))})
+		key1 := ledger2.NewKey([]ledger2.KeyPart{ledger2.NewKeyPart(0, []byte(registerID1)), ledger2.NewKeyPart(2, []byte(""))})
 		path1, err := pathfinder.KeyToPath(key1, ledger.DefaultPathFinderVersion)
 		assert.NoError(t, err)
 
-		key2 := ledger2.NewKey([]ledger2.KeyPart{ledger2.NewKeyPart(0, []byte(registerID2)), ledger2.NewKeyPart(1, []byte("")), ledger2.NewKeyPart(2, []byte(""))})
+		key2 := ledger2.NewKey([]ledger2.KeyPart{ledger2.NewKeyPart(0, []byte(registerID2)), ledger2.NewKeyPart(2, []byte(""))})
 		path2, err := pathfinder.KeyToPath(key2, ledger.DefaultPathFinderVersion)
 		assert.NoError(t, err)
 
