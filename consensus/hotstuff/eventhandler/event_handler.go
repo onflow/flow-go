@@ -260,6 +260,8 @@ func (e *EventHandler) startNewView() error {
 			if lastViewTC.View+1 != curView {
 				return nil
 			}
+		} else {
+			lastViewTC = nil
 		}
 
 		proposal, err := e.blockProducer.MakeBlockProposal(newestQC, curView, lastViewTC)
