@@ -245,7 +245,7 @@ func openFlowLite(address string) error {
 	c, err := grpc.Dial(
 		"unix://"+address,
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
-		grpc.WithInsecure())
+		grpc.WithInsecure()) //nolint:staticcheck
 	if err != nil {
 		return err
 	}

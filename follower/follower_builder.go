@@ -12,8 +12,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/routing"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	p2ppubsub "github.com/libp2p/go-libp2p-pubsub"
-	"github.com/onflow/flow-go/network/channels"
-
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
@@ -43,6 +41,7 @@ import (
 	"github.com/onflow/flow-go/module/upstream"
 	"github.com/onflow/flow-go/network"
 	netcache "github.com/onflow/flow-go/network/cache"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/converter"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/keyutils"

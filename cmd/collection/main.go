@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
@@ -42,6 +41,7 @@ import (
 	epochpool "github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/synchronization"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"

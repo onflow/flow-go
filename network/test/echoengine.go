@@ -6,13 +6,13 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	mockcomponent "github.com/onflow/flow-go/module/component/mock"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 )
 
 // EchoEngine is a simple engine that is used for testing the correctness of
