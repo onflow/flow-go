@@ -1,6 +1,7 @@
 package herocache_test
 
 import (
+	"net"
 	"sync"
 	"testing"
 
@@ -37,6 +38,56 @@ func TestDNSCache_Concurrent(t *testing.T) {
 
 	// only 500 txt records and 500 ip domains must be retrievable
 	testRetrievalMatchCount(t, cache, ipFixtures, txtFixtures, int(sizeLimit))
+}
+
+func TestDNSCache_Lock(t *testing.T) {
+	ipFixture := []net.IPAddr{network.NetIPAddrFixture()}
+	ipDomain := "ip-domain"
+
+	txtFixture := []string{network.TxtIPFixture()}
+	txtDomain := "txt-domain"
+
+	cache := herocache.NewDNSCache(
+		10,
+		unittest.Logger(),
+		metrics.NewNoopCollector(),
+		metrics.NewNoopCollector())
+
+	// adding records to dns cache
+	require.True(t, cache.PutDomainIp(ipDomain, ipFixture, int64(0)))
+	require.True(t, cache.PutTxtRecord(txtDomain, txtFixture, int64(0)))
+
+	// locks ip record
+	locked, err := cache.LockIPDomain(ipDomain)
+	require.NoError(t, err)
+	require.True(t, locked) // first locking attempt must go through
+	locked, err = cache.LockIPDomain(ipDomain)
+	require.NoError(t, err)
+	require.False(t, locked) // other locking attempts must fail
+
+	// locks txt record
+	locked, err = cache.LockTxtRecord(txtDomain)
+	require.NoError(t, err)
+	require.True(t, locked) // first locking attempt must go through
+	locked, err = cache.LockTxtRecord(txtDomain)
+	require.NoError(t, err)
+	require.False(t, locked) // other locking attempts must fail
+
+	// locked ip record must be retrievable
+	ipRecord, ok := cache.GetDomainIp(ipDomain)
+	require.True(t, ok)
+	require.Equal(t, ipRecord.Addresses, ipFixture)
+	require.Equal(t, ipRecord.Domain, ipDomain)
+	require.True(t, ipRecord.Locked)
+	require.Equal(t, ipRecord.Timestamp, int64(0))
+
+	// locked txt record must be retrievable
+	txtRecord, ok := cache.GetTxtRecord(txtDomain)
+	require.True(t, ok)
+	require.Equal(t, txtRecord.Record, txtFixture)
+	require.Equal(t, txtRecord.Txt, txtDomain)
+	require.True(t, txtRecord.Locked)
+	require.Equal(t, txtRecord.Timestamp, int64(0))
 }
 
 // TestDNSCache_LRU checks the correctness of cache against LRU ejection.
