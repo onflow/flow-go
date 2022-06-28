@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
@@ -368,8 +369,12 @@ func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *messa
 	log.Info().Msg("forwarding block proposal to hotstuff")
 
 	// submit the model to follower for processing
-	e.follower.SubmitProposal(header, parent.View)
-
+	select {
+	case <-e.follower.SubmitProposal(header, parent.View):
+		break
+	case <-time.After(time.Millisecond * 200):
+		break
+	}
 	// check for any descendants of the block to process
 	err = e.processPendingChildren(ctx, header)
 	if err != nil {
