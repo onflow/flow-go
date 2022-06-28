@@ -345,7 +345,7 @@ func (suite *ReactorEngineSuite_CommittedPhase) SetupTest() {
 	epochQuery.Add(nextEpoch)
 
 	firstBlock := unittest.BlockHeaderFixture(unittest.HeaderWithView(100))
-	suite.firstBlock = &firstBlock
+	suite.firstBlock = firstBlock
 
 	suite.snap = new(protocol.Snapshot)
 	suite.snap.On("Epochs").Return(epochQuery)
