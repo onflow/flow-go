@@ -40,6 +40,9 @@ func TestDNSCache_Concurrent(t *testing.T) {
 	testRetrievalMatchCount(t, cache, ipFixtures, txtFixtures, int(sizeLimit))
 }
 
+// TestDNSCache_Lock evaluates that locking a txt (or ip) record can be done successfully once, and
+// attempts to lock and already locked record fail.
+// It also evaluates that a locked record can be retrieved successfully.
 func TestDNSCache_Lock(t *testing.T) {
 	ipFixture := []net.IPAddr{network.NetIPAddrFixture()}
 	ipDomain := "ip-domain"
