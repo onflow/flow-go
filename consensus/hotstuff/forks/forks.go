@@ -23,14 +23,15 @@ func New(finalizer Finalizer) *Forks {
 	}
 }
 
-// GetBlocksForView returns all the blocks for a certain view.
-func (f *Forks) GetBlocksForView(view uint64) []*model.Block {
-	return f.finalizer.GetBlocksForView(view)
+// GetProposalsForView returns all BlockProposals at the given view number.
+func (f *Forks) GetProposalsForView(view uint64) []*model.Proposal {
+	return f.finalizer.GetProposalsForView(view)
 }
 
-// GetBlock returns the block for the given block ID
-func (f *Forks) GetBlock(id flow.Identifier) (*model.Block, bool) {
-	return f.finalizer.GetBlock(id)
+// GetProposal returns (BlockProposal, true) if the block with the specified
+// id was found (nil, false) otherwise.
+func (f *Forks) GetProposal(id flow.Identifier) (*model.Proposal, bool) {
+	return f.finalizer.GetProposal(id)
 }
 
 // FinalizedBlock returns the latest finalized block
@@ -43,15 +44,15 @@ func (f *Forks) FinalizedView() uint64 {
 	return f.finalizer.FinalizedBlock().View
 }
 
-// AddBlock passes the block to the finalizer for finalization
-func (f *Forks) AddBlock(block *model.Block) error {
-	if err := f.finalizer.VerifyBlock(block); err != nil {
+// AddProposal passes the block proposal to the finalizer for finalization
+func (f *Forks) AddProposal(proposal *model.Proposal) error {
+	if err := f.finalizer.VerifyProposal(proposal); err != nil {
 		// technically, this not strictly required. However, we leave this as a sanity check for now
-		return fmt.Errorf("cannot add invalid block to Forks: %w", err)
+		return fmt.Errorf("cannot add invalid proposal to Forks: %w", err)
 	}
-	err := f.finalizer.AddBlock(block)
+	err := f.finalizer.AddProposal(proposal)
 	if err != nil {
-		return fmt.Errorf("error storing block in Forks: %w", err)
+		return fmt.Errorf("error storing proposal in Forks: %w", err)
 	}
 
 	return nil

@@ -7,11 +7,11 @@ import (
 
 // Finalizer is responsible for block finalization.
 type Finalizer interface {
-	VerifyBlock(*model.Block) error
+	VerifyProposal(proposal *model.Proposal) error
 	IsSafeBlock(*model.Block) bool
-	AddBlock(*model.Block) error
-	GetBlock(blockID flow.Identifier) (*model.Block, bool)
-	GetBlocksForView(view uint64) []*model.Block
+	AddProposal(proposal *model.Proposal) error
+	GetProposal(blockID flow.Identifier) (*model.Proposal, bool)
+	GetProposalsForView(view uint64) []*model.Proposal
 	FinalizedBlock() *model.Block
 	LockedBlock() *model.Block
 }

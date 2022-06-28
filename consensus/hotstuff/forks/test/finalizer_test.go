@@ -363,7 +363,7 @@ func TestTolerableForksNotExtendsFromLockedBlock2(t *testing.T) {
 	require.Nil(t, err)
 
 	fin, notifier, _ := newFinalizer(t)
-	notifier.On("OnDoubleProposeDetected", blocks[5], blocks[4]).Return(nil)
+	notifier.On("OnDoubleProposeDetected", blocks[5].Block, blocks[4].Block).Return(nil)
 
 	err = addBlocksToFinalizer(fin, blocks)
 	require.Nil(t, err)
@@ -483,7 +483,7 @@ func TestDoubleProposal(t *testing.T) {
 	require.Nil(t, err)
 
 	fin, notifier, _ := newFinalizer(t)
-	notifier.On("OnDoubleProposeDetected", blocks[5], blocks[4]).Return(nil)
+	notifier.On("OnDoubleProposeDetected", blocks[5].Block, blocks[4].Block).Return(nil)
 
 	err = addBlocksToFinalizer(fin, blocks)
 	require.Nil(t, err)
@@ -509,7 +509,7 @@ func TestUntolerableForks(t *testing.T) {
 	require.Nil(t, err)
 
 	fin, notifier, _ := newFinalizer(t)
-	notifier.On("OnDoubleProposeDetected", blocks[3], blocks[2]).Return(nil)
+	notifier.On("OnDoubleProposeDetected", blocks[3].Block, blocks[2].Block).Return(nil)
 
 	err = addBlocksToFinalizer(fin, blocks)
 	require.NotNil(t, err)
@@ -552,9 +552,9 @@ func TestNotification(t *testing.T) {
 	notifier := &mocks.Consumer{}
 	// 5 blocks including the genesis are incorporated
 	notifier.On("OnBlockIncorporated", mock.Anything).Return(nil).Times(5)
-	notifier.On("OnFinalizedBlock", blocks[0]).Return(nil).Once()
+	notifier.On("OnFinalizedBlock", blocks[0].Block).Return(nil).Once()
 	finalizationCallback := &mockm.Finalizer{}
-	finalizationCallback.On("MakeFinal", blocks[0].BlockID).Return(nil).Once()
+	finalizationCallback.On("MakeFinal", blocks[0].Block.BlockID).Return(nil).Once()
 	finalizationCallback.On("MakeValid", mock.Anything).Return(nil)
 
 	genesisBQ := makeGenesis()
@@ -586,11 +586,11 @@ func newFinalizer(t *testing.T) (forks.Finalizer, *mocks.Consumer, *mockm.Finali
 	return fin, notifier, finalizationCallback
 }
 
-func addBlocksToFinalizer(fin forks.Finalizer, blocks []*model.Block) error {
-	for _, block := range blocks {
-		err := fin.AddBlock(block)
+func addBlocksToFinalizer(fin forks.Finalizer, proposals []*model.Proposal) error {
+	for _, proposal := range proposals {
+		err := fin.AddProposal(proposal)
 		if err != nil {
-			return fmt.Errorf("test case failed at adding block: %v: %w", block.View, err)
+			return fmt.Errorf("test case failed at adding proposal: %v: %w", proposal.Block.View, err)
 		}
 	}
 

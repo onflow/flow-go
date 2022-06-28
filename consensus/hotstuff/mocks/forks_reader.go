@@ -45,16 +45,16 @@ func (_m *ForksReader) FinalizedView() uint64 {
 	return r0
 }
 
-// GetBlock provides a mock function with given fields: id
-func (_m *ForksReader) GetBlock(id flow.Identifier) (*model.Block, bool) {
+// GetProposal provides a mock function with given fields: id
+func (_m *ForksReader) GetProposal(id flow.Identifier) (*model.Proposal, bool) {
 	ret := _m.Called(id)
 
-	var r0 *model.Block
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *model.Block); ok {
+	var r0 *model.Proposal
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *model.Proposal); ok {
 		r0 = rf(id)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*model.Block)
+			r0 = ret.Get(0).(*model.Proposal)
 		}
 	}
 
@@ -68,16 +68,16 @@ func (_m *ForksReader) GetBlock(id flow.Identifier) (*model.Block, bool) {
 	return r0, r1
 }
 
-// GetBlocksForView provides a mock function with given fields: view
-func (_m *ForksReader) GetBlocksForView(view uint64) []*model.Block {
+// GetProposalsForView provides a mock function with given fields: view
+func (_m *ForksReader) GetProposalsForView(view uint64) []*model.Proposal {
 	ret := _m.Called(view)
 
-	var r0 []*model.Block
-	if rf, ok := ret.Get(0).(func(uint64) []*model.Block); ok {
+	var r0 []*model.Proposal
+	if rf, ok := ret.Get(0).(func(uint64) []*model.Proposal); ok {
 		r0 = rf(view)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*model.Block)
+			r0 = ret.Get(0).([]*model.Proposal)
 		}
 	}
 

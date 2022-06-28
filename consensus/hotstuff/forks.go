@@ -5,7 +5,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// Forks maintains an in-memory data-structure of all blocks whose view-number is larger or equal to
+// Forks maintains an in-memory data-structure of all proposals whose view-number is larger or equal to
 // the latest finalized block. The latest finalized block is defined as the finalized block with the largest view number.
 // When adding blocks, Forks automatically updates its internal state (including finalized blocks).
 // Furthermore, blocks whose view number is smaller than the latest finalized block are pruned automatically.
@@ -17,7 +17,7 @@ import (
 type Forks interface {
 	ForksReader
 
-	// AddBlock adds the block to Forks. This might cause an update of the finalized block
+	// AddProposal adds the block to Forks. This might cause an update of the finalized block
 	// and pruning of older blocks.
 	// Handles duplicated addition of blocks (at the potential cost of additional computation time).
 	// PREREQUISITE:
@@ -25,18 +25,18 @@ type Forks interface {
 	// (without missing interim ancestors). Otherwise, an error is raised.
 	// When the new block causes the conflicting finalized blocks, it will return
 	// Might error with ByzantineThresholdExceededError (e.g. if finalizing conflicting forks)
-	AddBlock(block *model.Block) error
+	AddProposal(proposal *model.Proposal) error
 }
 
 // ForksReader only reads the forks' state
 type ForksReader interface {
 
-	// GetBlocksForView returns all BlockProposals at the given view number.
-	GetBlocksForView(view uint64) []*model.Block
+	// GetProposalsForView returns all BlockProposals at the given view number.
+	GetProposalsForView(view uint64) []*model.Proposal
 
-	// GetBlock returns (BlockProposal, true) if the block with the specified
+	// GetProposal returns (BlockProposal, true) if the block with the specified
 	// id was found (nil, false) otherwise.
-	GetBlock(id flow.Identifier) (*model.Block, bool)
+	GetProposal(id flow.Identifier) (*model.Proposal, bool)
 
 	// FinalizedView returns the largest view number where a finalized block is known
 	FinalizedView() uint64

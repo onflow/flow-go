@@ -23,7 +23,7 @@ func Follower(
 ) error {
 	return Recover(log, finalized, pending, validator, func(proposal *model.Proposal) error {
 		// add it to finalizer
-		err := finalizer.AddBlock(proposal.Block)
+		err := finalizer.AddProposal(proposal)
 		if err != nil {
 			return fmt.Errorf("could not add block to finalizer: %w", err)
 		}

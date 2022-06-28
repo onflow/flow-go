@@ -90,7 +90,7 @@ type MissingBlockError struct {
 }
 
 func (e MissingBlockError) Error() string {
-	return fmt.Sprintf("missing Block at view %d with ID %v", e.View, e.BlockID)
+	return fmt.Sprintf("missing Proposal at view %d with ID %v", e.View, e.BlockID)
 }
 
 // IsMissingBlockError returns whether an error is MissingBlockError

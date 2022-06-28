@@ -162,7 +162,7 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 	}
 
 	// store the block.
-	err = e.forks.AddBlock(block)
+	err = e.forks.AddProposal(proposal)
 	if err != nil {
 		return fmt.Errorf("cannot add block to fork (%x): %w", block.BlockID, err)
 	}
@@ -294,8 +294,8 @@ func (e *EventHandler) startNewView() error {
 	}
 
 	// as a replica of the current view, find and process the block for the current view
-	blocks := e.forks.GetBlocksForView(curView)
-	if len(blocks) == 0 {
+	proposals := e.forks.GetProposalsForView(curView)
+	if len(proposals) == 0 {
 		// if there is no block stored before for the current view, then exit and keep waiting
 		log.Debug().Msg("waiting for proposal from leader")
 		return nil
@@ -305,7 +305,7 @@ func (e *EventHandler) startNewView() error {
 	// forks is responsible for slashing double proposal behavior, and
 	// event handler is aware of double proposals, but picking any should work and
 	// won't hurt safety
-	block := blocks[0]
+	block := proposals[0].Block
 
 	log.Debug().
 		Uint64("block_view", block.View).

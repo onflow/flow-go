@@ -15,13 +15,13 @@ type Forks struct {
 	mock.Mock
 }
 
-// AddBlock provides a mock function with given fields: block
-func (_m *Forks) AddBlock(block *model.Block) error {
-	ret := _m.Called(block)
+// AddProposal provides a mock function with given fields: proposal
+func (_m *Forks) AddProposal(proposal *model.Proposal) error {
+	ret := _m.Called(proposal)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*model.Block) error); ok {
-		r0 = rf(block)
+	if rf, ok := ret.Get(0).(func(*model.Proposal) error); ok {
+		r0 = rf(proposal)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -59,16 +59,16 @@ func (_m *Forks) FinalizedView() uint64 {
 	return r0
 }
 
-// GetBlock provides a mock function with given fields: id
-func (_m *Forks) GetBlock(id flow.Identifier) (*model.Block, bool) {
+// GetProposal provides a mock function with given fields: id
+func (_m *Forks) GetProposal(id flow.Identifier) (*model.Proposal, bool) {
 	ret := _m.Called(id)
 
-	var r0 *model.Block
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *model.Block); ok {
+	var r0 *model.Proposal
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *model.Proposal); ok {
 		r0 = rf(id)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*model.Block)
+			r0 = ret.Get(0).(*model.Proposal)
 		}
 	}
 
@@ -82,16 +82,16 @@ func (_m *Forks) GetBlock(id flow.Identifier) (*model.Block, bool) {
 	return r0, r1
 }
 
-// GetBlocksForView provides a mock function with given fields: view
-func (_m *Forks) GetBlocksForView(view uint64) []*model.Block {
+// GetProposalsForView provides a mock function with given fields: view
+func (_m *Forks) GetProposalsForView(view uint64) []*model.Proposal {
 	ret := _m.Called(view)
 
-	var r0 []*model.Block
-	if rf, ok := ret.Get(0).(func(uint64) []*model.Block); ok {
+	var r0 []*model.Proposal
+	if rf, ok := ret.Get(0).(func(uint64) []*model.Proposal); ok {
 		r0 = rf(view)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*model.Block)
+			r0 = ret.Get(0).([]*model.Proposal)
 		}
 	}
 
