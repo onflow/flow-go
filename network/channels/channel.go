@@ -1,4 +1,4 @@
-package network
+package channels
 
 import (
 	"sort"
@@ -17,20 +17,20 @@ func (c Channel) String() string {
 }
 
 // Len returns length of the ChannelList in the number of stored Channels.
-// It satisfies the sort.Interface making the ChannelList sortable.
+// It satisfies the sort.Type making the ChannelList sortable.
 func (cl ChannelList) Len() int {
 	return len(cl)
 }
 
 // Less returns true if element i in the ChannelList  is less than j based on the numerical value of its Channel.
 // Otherwise it returns true.
-// It satisfies the sort.Interface making the ChannelList sortable.
+// It satisfies the sort.Type making the ChannelList sortable.
 func (cl ChannelList) Less(i, j int) bool {
 	return cl[i] < cl[j]
 }
 
 // Swap swaps the element i and j in the ChannelList.
-// It satisfies the sort.Interface making the ChannelList sortable.
+// It satisfies the sort.Type making the ChannelList sortable.
 func (cl ChannelList) Swap(i, j int) {
 	cl[i], cl[j] = cl[j], cl[i]
 }

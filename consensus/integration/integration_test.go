@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/util"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -136,10 +136,10 @@ func chainViews(t *testing.T, node *Node) []uint64 {
 	return low2high
 }
 
-type BlockOrDelayFunc func(channel network.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration)
+type BlockOrDelayFunc func(channel channels.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration)
 
 // block nothing
-func blockNothing(channel network.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+func blockNothing(channel channels.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 	return false, 0
 }
 
@@ -149,7 +149,7 @@ func blockNodes(denyList ...*Node) BlockOrDelayFunc {
 	for _, n := range denyList {
 		blackList[n.id.ID()] = n
 	}
-	return func(channel network.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+	return func(channel channels.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 		block, notBlock := true, false
 		if _, ok := blackList[sender.id.ID()]; ok {
 			return block, 0

@@ -11,12 +11,12 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
@@ -39,8 +39,8 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 	sn1, identity1 := nodeFixture(t, context.Background(), sporkId, "TestAuthorizedSenderValidator_Unauthorized", withRole(flow.RoleConsensus), withLogger(logger))
 	sn2, _ := nodeFixture(t, context.Background(), sporkId, "TestAuthorizedSenderValidator_Unauthorized", withRole(flow.RoleConsensus), withLogger(logger))
 
-	channel := network.ConsensusCommittee
-	topic := network.TopicFromChannel(channel, sporkId)
+	channel := channels.ConsensusCommittee
+	topic := channels.TopicFromChannel(channel, sporkId)
 
 	//NOTE: identity2 is not in the ids list simulating an un-staked node
 	ids := flow.IdentityList{&identity1}
@@ -116,8 +116,8 @@ func TestTopicValidator_PublicChannel(t *testing.T) {
 	sn2 := createNode(t, identity2.NodeID, privateKey2, sporkId, zerolog.Nop())
 
 	// unauthenticated messages should not be dropped on public channels
-	channel := network.PublicSyncCommittee
-	topic := network.TopicFromChannel(channel, sporkId)
+	channel := channels.PublicSyncCommittee
+	topic := channels.TopicFromChannel(channel, sporkId)
 
 	// node1 is connected to node2
 	// sn1 <-> sn2
@@ -178,8 +178,8 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	sn2, identity2 := nodeFixture(t, context.Background(), sporkId, "TestAuthorizedSenderValidator_InvalidMsg", withRole(flow.RoleConsensus))
 	an1, identity3 := nodeFixture(t, context.Background(), sporkId, "TestAuthorizedSenderValidator_InvalidMsg", withRole(flow.RoleAccess))
 
-	channel := network.ConsensusCommittee
-	topic := network.TopicFromChannel(channel, sporkId)
+	channel := channels.ConsensusCommittee
+	topic := channels.TopicFromChannel(channel, sporkId)
 
 	ids := flow.IdentityList{&identity1, &identity2, &identity3}
 
@@ -274,8 +274,8 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	sn2, identity2 := nodeFixture(t, context.Background(), sporkId, "consensus_2", withRole(flow.RoleConsensus))
 
 	// try to publish BlockProposal on invalid SyncCommittee channel
-	channel := network.SyncCommittee
-	topic := network.TopicFromChannel(channel, sporkId)
+	channel := channels.SyncCommittee
+	topic := channels.TopicFromChannel(channel, sporkId)
 
 	ids := flow.IdentityList{&identity1, &identity2}
 	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
@@ -345,8 +345,8 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	sn2, identity2 := nodeFixture(t, context.Background(), sporkId, "consensus_2", withRole(flow.RoleConsensus))
 	an1, identity3 := nodeFixture(t, context.Background(), sporkId, "access_1", withRole(flow.RoleAccess))
 
-	channel := network.ConsensusCommittee
-	topic := network.TopicFromChannel(channel, sporkId)
+	channel := channels.ConsensusCommittee
+	topic := channels.TopicFromChannel(channel, sporkId)
 
 	ids := flow.IdentityList{&identity1, &identity2, &identity3}
 	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
@@ -438,8 +438,8 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	ln2, identity2 := nodeFixture(t, context.Background(), sporkId, "collection_2", withRole(flow.RoleCollection))
 	ln3, identity3 := nodeFixture(t, context.Background(), sporkId, "collection_3", withRole(flow.RoleCollection))
 
-	channel := network.ChannelSyncCluster(flow.Testnet)
-	topic := network.TopicFromChannel(channel, sporkId)
+	channel := channels.ChannelSyncCluster(flow.Testnet)
+	topic := channels.TopicFromChannel(channel, sporkId)
 
 	ids := flow.IdentityList{&identity1, &identity2, &identity3}
 	translator, err := p2p.NewFixedTableIdentityTranslator(ids)

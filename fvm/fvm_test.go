@@ -184,7 +184,7 @@ func TestHashing(t *testing.T) {
 			`
 				import Crypto
 
-				pub fun main(data: [UInt8], tag: String): [UInt8] {
+				pub fun main(data: [UInt8], tag: Name): [UInt8] {
 					return Crypto.hashWithTag(data, tag: tag, algorithm: HashAlgorithm.%s)
 				}
 			`, hashName))
@@ -467,7 +467,7 @@ func TestEventLimits(t *testing.T) {
 
 	testContract := `
 	access(all) contract TestContract {
-		access(all) event LargeEvent(value: Int256, str: String, list: [UInt256], dic: {String: String})
+		access(all) event LargeEvent(value: Int256, str: Name, list: [UInt256], dic: {Name: Name})
 		access(all) fun EmitEvent() {
 			var s: Int256 = 1024102410241024
 			var i = 0

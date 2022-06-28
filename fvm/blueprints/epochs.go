@@ -28,7 +28,7 @@ transaction {
 const deployEpochTransactionTemplate = `
 import FlowClusterQC from 0x%s
 
-transaction(clusterWeights: [{String: UInt64}]) {
+transaction(clusterWeights: [{Name: UInt64}]) {
   prepare(serviceAccount: AuthAccount)	{
 
     // first, construct Cluster objects from cluster weights
@@ -52,7 +52,7 @@ transaction(clusterWeights: [{String: UInt64}]) {
 		collectorClusters: clusters,
         // NOTE: clusterQCs and dkgPubKeys are empty because these initial values are not used
 		clusterQCs: [] as [FlowClusterQC.ClusterQC],
-		dkgPubKeys: [] as [String],
+		dkgPubKeys: [] as [Name],
 	)
   }
 }

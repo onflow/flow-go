@@ -32,7 +32,7 @@ func Test_EmptyTrie(t *testing.T) {
 	expectedRootHashHex := "568f4ec740fe3b5de88034cb7b1fbddb41548b068f31aebc8ae9189e429c5749"
 	require.Equal(t, expectedRootHashHex, hashToString(rootHash))
 
-	// check String() method does not panic:
+	// check Name() method does not panic:
 	_ = emptyTrie.String()
 }
 

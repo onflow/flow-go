@@ -127,7 +127,7 @@ access(all) contract MyFavContract {
     }
 
     // items
-    access(all) event NewItemAddedEvent(id: UInt32, metadata: {String: String})
+    access(all) event NewItemAddedEvent(id: UInt32, metadata: {Name: Name})
 
     access(self) var itemCounter: UInt32
 
@@ -135,9 +135,9 @@ access(all) contract MyFavContract {
 
             pub let itemID: UInt32
 
-            pub let metadata: {String: String}
+            pub let metadata: {Name: Name}
 
-            init(_ metadata: {String: String}) {
+            init(_ metadata: {Name: Name}) {
                 self.itemID = MyFavContract.itemCounter
                 self.metadata = metadata
 
@@ -151,7 +151,7 @@ access(all) contract MyFavContract {
 
     access(self) var items: [Item]
 
-    access(all) fun AddItem(_ metadata: {String: String}){
+    access(all) fun AddItem(_ metadata: {Name: Name}){
         let item = Item(metadata)
         self.items.append(item)
     }
@@ -181,7 +181,7 @@ access(all) contract MyFavContract {
         log(i)
     }
 
-    access(all) event LargeEvent(value: Int256, str: String, list: [UInt256], dic: {String: String})
+    access(all) event LargeEvent(value: Int256, str: Name, list: [UInt256], dic: {Name: Name})
 
     // event heavy function
     access(all) fun EventHeavy() {

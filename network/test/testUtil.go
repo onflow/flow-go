@@ -16,6 +16,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/routing"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -319,7 +320,7 @@ func GenerateEngines(t *testing.T, nets []network.Network) []*MeshEngine {
 	count := len(nets)
 	engs := make([]*MeshEngine, count)
 	for i, n := range nets {
-		eng := NewMeshEngine(t, n, 100, network.TestNetworkChannel)
+		eng := NewMeshEngine(t, n, 100, channels.TestNetworkChannel)
 		engs[i] = eng
 	}
 	return engs

@@ -8,12 +8,12 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
 
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -162,7 +162,7 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 	require.NoError(t, err)
 
 	// spork topic is derived by suffixing the channel with the root block ID
-	topicBeforeSpork := network.TopicFromChannel(network.TestNetworkChannel, previousSporkId)
+	topicBeforeSpork := channels.TopicFromChannel(channels.TestNetworkChannel, previousSporkId)
 
 	// both nodes are initially on the same spork and subscribed to the same topic
 	_, err = node1.Subscribe(topicBeforeSpork, unittest.NetworkCodec(), unittest.AllowAllPeerFilter())
@@ -184,7 +184,7 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 	rootIDAfterSpork := unittest.IdentifierFixture()
 
 	// topic after the spork
-	topicAfterSpork := network.TopicFromChannel(network.TestNetworkChannel, rootIDAfterSpork)
+	topicAfterSpork := channels.TopicFromChannel(channels.TestNetworkChannel, rootIDAfterSpork)
 
 	// mimic that node1 now is now part of the new spork while node2 remains on the old spork
 	// by unsubscribing node1 from 'topicBeforeSpork' and subscribing it to 'topicAfterSpork'
@@ -221,7 +221,7 @@ func testOneToKMessagingSucceeds(ctx context.Context,
 	t *testing.T,
 	sourceNode *p2p.Node,
 	dstnSub *pubsub.Subscription,
-	topic network.Topic) {
+	topic channels.Topic) {
 
 	payload := createTestMessage(t)
 
@@ -243,7 +243,7 @@ func testOneToKMessagingFails(ctx context.Context,
 	t *testing.T,
 	sourceNode *p2p.Node,
 	dstnSub *pubsub.Subscription,
-	topic network.Topic) {
+	topic channels.Topic) {
 
 	payload := createTestMessage(t)
 

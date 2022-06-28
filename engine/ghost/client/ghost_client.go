@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/onflow/flow-go/network/channels"
 	"google.golang.org/grpc"
 
 	"github.com/onflow/flow-go/utils/unittest"
@@ -51,7 +52,7 @@ func (c *GhostClient) Close() error {
 	return c.close()
 }
 
-func (c *GhostClient) Send(ctx context.Context, channel network.Channel, event interface{}, targetIDs ...flow.Identifier) error {
+func (c *GhostClient) Send(ctx context.Context, channel channels.Channel, event interface{}, targetIDs ...flow.Identifier) error {
 
 	message, err := c.codec.Encode(event)
 	if err != nil {

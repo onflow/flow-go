@@ -9,6 +9,8 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/message"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/network"
@@ -27,7 +29,7 @@ var (
 // The MessageValidator returned will use the getIdentity to get the flow identity for the sender, asserting that the sender is a staked node.
 // If the sender is an unstaked node the message is rejected. IsAuthorizedSender is used to perform further message validation. If validation
 // fails the message is rejected, if the validation error is an expected error slashing data is collected before the message is rejected.
-func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, getIdentity func(peer.ID) (*flow.Identity, bool)) MessageValidator {
+func AuthorizedSenderValidator(log zerolog.Logger, channel channels.Channel, getIdentity func(peer.ID) (*flow.Identity, bool)) MessageValidator {
 	log = log.With().
 		Str("component", "authorized_sender_validator").
 		Str("network_channel", channel.String()).
@@ -78,25 +80,25 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, getI
 //  * ErrSenderEjected: if identity of sender is ejected
 //  * ErrUnknownMessageType: if retrieving the message auth config for msg fails
 //  * ErrUnauthorizedSender: if the message auth config validation for msg fails
-func IsAuthorizedSender(identity *flow.Identity, channel network.Channel, msg interface{}) (string, error) {
+func IsAuthorizedSender(identity *flow.Identity, channel channels.Channel, msg interface{}) (string, error) {
 	if identity.Ejected {
 		return "", ErrSenderEjected
 	}
 
 	// get message auth config
-	conf, err := network.GetMessageAuthConfig(msg)
+	conf, err := message.GetMessageAuthConfig(msg)
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", err, ErrUnknownMessageType)
 	}
 
 	// handle special case for cluster prefixed channels
-	if prefix, ok := network.ClusterChannelPrefix(channel); ok {
-		channel = network.Channel(prefix)
+	if prefix, ok := channels.ClusterChannelPrefix(channel); ok {
+		channel = channels.Channel(prefix)
 	}
 
 	if err := conf.IsAuthorized(identity.Role, channel); err != nil {
-		return conf.String, fmt.Errorf("%s: %w", err, ErrUnauthorizedSender)
+		return conf.Name, fmt.Errorf("%s: %w", err, ErrUnauthorizedSender)
 	}
 
-	return conf.String, nil
+	return conf.Name, nil
 }

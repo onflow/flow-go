@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/network/channels"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -19,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -54,7 +54,7 @@ func TestNewConduit_HappyPath(t *testing.T) {
 		me,
 		cbor.NewCodec(),
 		"localhost:0")
-	channel := network.Channel("test-channel")
+	channel := channels.Channel("test-channel")
 
 	adapter := &mocknetwork.Adapter{}
 
@@ -75,7 +75,7 @@ func TestNewConduit_MissingAdapter(t *testing.T) {
 		me,
 		cbor.NewCodec(),
 		"localhost:0")
-	channel := network.Channel("test-channel")
+	channel := channels.Channel("test-channel")
 
 	c, err := f.NewConduit(context.Background(), channel)
 	require.Error(t, err)
@@ -98,7 +98,7 @@ func TestFactoryHandleIncomingEvent_AttackerObserve(t *testing.T) {
 
 	event := &message.TestMessage{Text: "this is a test message"}
 	targetIds := unittest.IdentifierListFixture(10)
-	channel := network.Channel("test-channel")
+	channel := channels.Channel("test-channel")
 
 	go func() {
 		err := f.HandleIncomingEvent(event, channel, insecure.Protocol_MULTICAST, uint32(3), targetIds...)
@@ -142,7 +142,7 @@ func TestFactoryHandleIncomingEvent_UnicastOverNetwork(t *testing.T) {
 
 	event := &message.TestMessage{Text: "this is a test message"}
 	targetId := unittest.IdentifierFixture()
-	channel := network.Channel("test-channel")
+	channel := channels.Channel("test-channel")
 
 	adapter.On("UnicastOnChannel", channel, event, targetId).Return(nil).Once()
 
@@ -170,7 +170,7 @@ func TestFactoryHandleIncomingEvent_PublishOverNetwork(t *testing.T) {
 	require.NoError(t, err)
 
 	event := &message.TestMessage{Text: "this is a test message"}
-	channel := network.Channel("test-channel")
+	channel := channels.Channel("test-channel")
 
 	targetIds := unittest.IdentifierListFixture(10)
 	params := []interface{}{channel, event}
@@ -204,7 +204,7 @@ func TestFactoryHandleIncomingEvent_MulticastOverNetwork(t *testing.T) {
 	require.NoError(t, err)
 
 	event := &message.TestMessage{Text: "this is a test message"}
-	channel := network.Channel("test-channel")
+	channel := channels.Channel("test-channel")
 	targetIds := unittest.IdentifierListFixture(10)
 
 	params := []interface{}{channel, event, uint(3)}
@@ -236,7 +236,7 @@ func TestProcessAttackerMessage(t *testing.T) {
 				Text: fmt.Sprintf("this is a test message: %d", rand.Int()),
 			})
 
-			params := []interface{}{network.Channel(msg.ChannelID), event.FlowProtocolEvent, uint(3)}
+			params := []interface{}{channels.Channel(msg.ChannelID), event.FlowProtocolEvent, uint(3)}
 			targetIds, err := flow.ByteSlicesToIds(msg.TargetIDs)
 			require.NoError(t, err)
 
@@ -282,7 +282,7 @@ func TestProcessAttackerMessage_ResultApproval_Dictated(t *testing.T) {
 				},
 			})
 
-			params := []interface{}{network.Channel(msg.ChannelID), testifymock.Anything}
+			params := []interface{}{channels.Channel(msg.ChannelID), testifymock.Anything}
 			targetIds, err := flow.ByteSlicesToIds(msg.TargetIDs)
 			require.NoError(t, err)
 			for _, id := range targetIds {
@@ -346,7 +346,7 @@ func TestProcessAttackerMessage_ResultApproval_PassThrough(t *testing.T) {
 			passThroughApproval := unittest.ResultApprovalFixture()
 			msg, _, _ := insecure.MessageFixture(t, cbor.NewCodec(), insecure.Protocol_PUBLISH, passThroughApproval)
 
-			params := []interface{}{network.Channel(msg.ChannelID), testifymock.Anything}
+			params := []interface{}{channels.Channel(msg.ChannelID), testifymock.Anything}
 			targetIds, err := flow.ByteSlicesToIds(msg.TargetIDs)
 			require.NoError(t, err)
 			for _, id := range targetIds {
@@ -395,7 +395,7 @@ func TestProcessAttackerMessage_ExecutionReceipt_Dictated(t *testing.T) {
 				ExecutionResult: dictatedResult,
 			})
 
-			params := []interface{}{network.Channel(msg.ChannelID), testifymock.Anything}
+			params := []interface{}{channels.Channel(msg.ChannelID), testifymock.Anything}
 			targetIds, err := flow.ByteSlicesToIds(msg.TargetIDs)
 			require.NoError(t, err)
 			for _, id := range targetIds {
@@ -450,7 +450,7 @@ func TestProcessAttackerMessage_ExecutionReceipt_PassThrough(t *testing.T) {
 			passThroughReceipt := unittest.ExecutionReceiptFixture()
 			msg, _, _ := insecure.MessageFixture(t, cbor.NewCodec(), insecure.Protocol_PUBLISH, passThroughReceipt)
 
-			params := []interface{}{network.Channel(msg.ChannelID), testifymock.Anything}
+			params := []interface{}{channels.Channel(msg.ChannelID), testifymock.Anything}
 			targetIds, err := flow.ByteSlicesToIds(msg.TargetIDs)
 			require.NoError(t, err)
 			for _, id := range targetIds {
@@ -497,7 +497,7 @@ func TestEngineClosingChannel(t *testing.T) {
 	err := f.RegisterAdapter(adapter)
 	require.NoError(t, err)
 
-	channel := network.Channel("test-channel")
+	channel := channels.Channel("test-channel")
 
 	// on invoking adapter.UnRegisterChannel(channel), it must return a nil, which means
 	// that the channel has been unregistered by the adapter successfully.

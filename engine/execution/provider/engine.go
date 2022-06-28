@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -74,12 +75,12 @@ func New(
 
 	var err error
 
-	eng.receiptCon, err = net.Register(network.PushReceipts, &eng)
+	eng.receiptCon, err = net.Register(channels.PushReceipts, &eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register receipt provider engine: %w", err)
 	}
 
-	chunksConduit, err := net.Register(network.ProvideChunks, &eng)
+	chunksConduit, err := net.Register(channels.ProvideChunks, &eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register chunk data pack provider engine: %w", err)
 	}
@@ -97,7 +98,7 @@ func (e *Engine) SubmitLocal(event interface{}) {
 	})
 }
 
-func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
+func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(channel, originID, event)
 		if err != nil {
@@ -124,7 +125,7 @@ func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done()
 }
 
-func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		return e.process(originID, event)
 	})

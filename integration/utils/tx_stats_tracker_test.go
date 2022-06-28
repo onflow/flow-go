@@ -40,7 +40,7 @@ func TestTxStatsTracker(t *testing.T) {
 	assert.InDelta(t, 10., st.TTS.Max(), 1.)
 }
 
-// TestTxStatsTrackerString tests the String() method.
+// TestTxStatsTrackerString tests the Name() method.
 func TestTxStatsTrackerString(t *testing.T) {
 	st := NewTxStatsTracker()
 	assert.Equal(t, "[]\n[]\n[]\n", st.String())

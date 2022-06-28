@@ -393,7 +393,7 @@ func (s *DKGSuite) getResult() []string {
 	script := fmt.Sprintf(`
 	import FlowDKG from 0x%s
 
-	pub fun main(): [String?]? {
+	pub fun main(): [Name?]? {
 		return FlowDKG.dkgCompleted()
 	} `,
 		s.env.DkgAddress,

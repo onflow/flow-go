@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -121,7 +122,7 @@ func (cs *ComplianceSuite) SetupTest() {
 	// set up network module mock
 	cs.net = &mocknetwork.Network{}
 	cs.net.On("Register", mock.Anything, mock.Anything).Return(
-		func(channel netint.Channel, engine netint.MessageProcessor) netint.Conduit {
+		func(channel channels.Channel, engine netint.MessageProcessor) netint.Conduit {
 			return cs.con
 		},
 		nil,
@@ -250,7 +251,7 @@ func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
 	originID := unittest.IdentifierFixture()
 	voteCount := 15
 
-	channel := netint.ChannelConsensusCluster(cs.clusterID)
+	channel := channels.ChannelConsensusCluster(cs.clusterID)
 
 	var wg sync.WaitGroup
 	wg.Add(1)

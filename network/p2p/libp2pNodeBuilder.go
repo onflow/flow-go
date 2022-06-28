@@ -19,6 +19,7 @@ import (
 	"github.com/libp2p/go-tcp-transport"
 	"github.com/multiformats/go-multiaddr"
 	madns "github.com/multiformats/go-multiaddr-dns"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/rs/zerolog"
 
 	fcrypto "github.com/onflow/flow-go/crypto"
@@ -26,7 +27,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
-	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 )
@@ -218,8 +218,8 @@ func (builder *LibP2PNodeBuilder) Build(ctx context.Context) (*Node, error) {
 	}
 
 	node := &Node{
-		topics:  make(map[flownet.Topic]*pubsub.Topic),
-		subs:    make(map[flownet.Topic]*pubsub.Subscription),
+		topics:  make(map[channels.Topic]*pubsub.Topic),
+		subs:    make(map[channels.Topic]*pubsub.Subscription),
 		logger:  builder.logger,
 		routing: rsys,
 		host:    host,

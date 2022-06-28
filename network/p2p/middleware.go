@@ -17,6 +17,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -201,7 +202,7 @@ func (m *Middleware) isStakedPeerFilter() peerFilterFunc {
 	return f
 }
 
-func (m *Middleware) NewBlobService(channel network.Channel, ds datastore.Batching, opts ...network.BlobServiceOption) network.BlobService {
+func (m *Middleware) NewBlobService(channel channels.Channel, ds datastore.Batching, opts ...network.BlobServiceOption) network.BlobService {
 	return NewBlobService(m.libP2PNode.Host(), m.libP2PNode.routing, channel.String(), ds, opts...)
 }
 
@@ -525,13 +526,13 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 }
 
 // Subscribe subscribes the middleware to a channel.
-func (m *Middleware) Subscribe(channel network.Channel) error {
+func (m *Middleware) Subscribe(channel channels.Channel) error {
 
-	topic := network.TopicFromChannel(channel, m.rootBlockID)
+	topic := channels.TopicFromChannel(channel, m.rootBlockID)
 
 	var peerFilter peerFilterFunc
 	var validators []psValidator.MessageValidator
-	if network.PublicChannels().Contains(channel) {
+	if channels.PublicChannels().Contains(channel) {
 		// NOTE: for public channels the callback used to check if a node is staked will
 		// return true for every node.
 		peerFilter = allowAll
@@ -565,8 +566,8 @@ func (m *Middleware) Subscribe(channel network.Channel) error {
 }
 
 // Unsubscribe unsubscribes the middleware from a channel.
-func (m *Middleware) Unsubscribe(channel network.Channel) error {
-	topic := network.TopicFromChannel(channel, m.rootBlockID)
+func (m *Middleware) Unsubscribe(channel channels.Channel) error {
+	topic := channels.TopicFromChannel(channel, m.rootBlockID)
 	err := m.libP2PNode.UnSubscribe(topic)
 	if err != nil {
 		return fmt.Errorf("failed to unsubscribe from channel %s: %w", channel, err)
@@ -622,7 +623,7 @@ func (m *Middleware) processMessage(msg *message.Message, decodedMsgPayload inte
 // Publish publishes a message on the channel. It models a distributed broadcast where the message is meant for all or
 // a many nodes subscribing to the channel. It does not guarantee the delivery though, and operates on a best
 // effort.
-func (m *Middleware) Publish(msg *message.Message, channel network.Channel) error {
+func (m *Middleware) Publish(msg *message.Message, channel channels.Channel) error {
 	m.log.Debug().Str("channel", channel.String()).Interface("msg", msg).Msg("publishing new message")
 
 	// convert the message to bytes to be put on the wire.
@@ -640,7 +641,7 @@ func (m *Middleware) Publish(msg *message.Message, channel network.Channel) erro
 		return fmt.Errorf("message size %d exceeds configured max message size %d", msgSize, DefaultMaxPubSubMsgSize)
 	}
 
-	topic := network.TopicFromChannel(channel, m.rootBlockID)
+	topic := channels.TopicFromChannel(channel, m.rootBlockID)
 
 	// publish the bytes on the topic
 	err = m.libP2PNode.Publish(m.ctx, topic, data)

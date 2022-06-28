@@ -4,19 +4,20 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/message"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/messages"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type TestCase struct {
-	Identity   *flow.Identity
-	Channel    network.Channel
-	Message    interface{}
+	Identity *flow.Identity
+	Channel  channels.Channel
+	Message  interface{}
 	MessageStr string
 }
 
@@ -65,14 +66,14 @@ func (s *TestIsAuthorizedSenderSuite) TestIsAuthorizedSender_ValidationFailure()
 	s.Run("sender is ejected", func() {
 		identity := unittest.IdentityFixture()
 		identity.Ejected = true
-		msgType, err := IsAuthorizedSender(identity, network.Channel(""), nil)
+		msgType, err := IsAuthorizedSender(identity, channels.Channel(""), nil)
 		s.Require().ErrorIs(err, ErrSenderEjected)
 		s.Require().Equal("", msgType)
 	})
 
 	s.Run("unknown message type", func() {
 		identity := unittest.IdentityFixture()
-		msgType, err := IsAuthorizedSender(identity, network.Channel(""), nil)
+		msgType, err := IsAuthorizedSender(identity, channels.Channel(""), nil)
 		s.Require().ErrorIs(err, ErrUnknownMessageType)
 		s.Require().Equal("", msgType)
 	})
@@ -88,7 +89,7 @@ func (s *TestIsAuthorizedSenderSuite) TestIsAuthorizedSender_ValidationFailure()
 			Payload: nil,
 		}}
 
-		msgType, err := IsAuthorizedSender(identity, network.ConsensusCommittee, m)
+		msgType, err := IsAuthorizedSender(identity, channels.ConsensusCommittee, m)
 		s.Require().ErrorIs(err, ErrUnknownMessageType)
 		s.Require().Equal("", msgType)
 	})
@@ -96,15 +97,15 @@ func (s *TestIsAuthorizedSenderSuite) TestIsAuthorizedSender_ValidationFailure()
 
 // initializeTestCases initializes happy and sad path test cases for checking authorized and unauthorized role message combinations.
 func (s *TestIsAuthorizedSenderSuite) initializeTestCases() {
-	for _, c := range network.MessageAuthConfigs {
+	for _, c := range message.AuthorizationConfigs {
 		for channel, authorizedRoles := range c.Config {
 			for _, role := range flow.Roles() {
 				identity := unittest.IdentityFixture(unittest.WithRole(role))
 				tc := TestCase{
 					Identity:   identity,
 					Channel:    channel,
-					Message:    c.Interface(),
-					MessageStr: c.String,
+					Message:    c.Type(),
+					MessageStr: c.Name,
 				}
 
 				if authorizedRoles.Contains(role) {

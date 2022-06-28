@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
@@ -56,7 +57,7 @@ func SetupChunkDataPackProvider(t *testing.T,
 	exeNode := testutil.GenericNodeFromParticipants(t, hub, exeIdentity, participants, chainID)
 	exeEngine := new(mocknetwork.Engine)
 
-	exeChunkDataConduit, err := exeNode.Net.Register(network.ProvideChunks, exeEngine)
+	exeChunkDataConduit, err := exeNode.Net.Register(channels.ProvideChunks, exeEngine)
 	assert.Nil(t, err)
 
 	replied := make(map[flow.Identifier]struct{})
@@ -234,7 +235,7 @@ func SetupMockConsensusNode(t *testing.T,
 			wg.Done()
 		}).Return(nil)
 
-	_, err := conNode.Net.Register(network.ReceiveApprovals, conEngine)
+	_, err := conNode.Net.Register(channels.ReceiveApprovals, conEngine)
 	assert.Nil(t, err)
 
 	return &conNode, conEngine, wg

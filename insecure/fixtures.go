@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -33,7 +34,7 @@ func MessageFixture(t *testing.T, codec network.Codec, protocol Protocol, conten
 		targetNum = uint32(3)
 	}
 
-	channel := network.Channel("test-channel")
+	channel := channels.Channel("test-channel")
 	// encodes event to create payload
 	payload, err := codec.Encode(content)
 	require.NoError(t, err)

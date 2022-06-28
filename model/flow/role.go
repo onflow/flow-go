@@ -110,20 +110,20 @@ func (r RoleList) Union(other RoleList) RoleList {
 }
 
 // Len returns length of the RoleList in the number of stored roles.
-// It satisfies the sort.Interface making the RoleList sortable.
+// It satisfies the sort.Type making the RoleList sortable.
 func (r RoleList) Len() int {
 	return len(r)
 }
 
 // Less returns true if element i in the RoleList is less than j based on the numerical value of its role.
 // Otherwise it returns true.
-// It satisfies the sort.Interface making the RoleList sortable.
+// It satisfies the sort.Type making the RoleList sortable.
 func (r RoleList) Less(i, j int) bool {
 	return r[i] < r[j]
 }
 
 // Swap swaps the element i and j in the RoleList.
-// It satisfies the sort.Interface making the RoleList sortable.
+// It satisfies the sort.Type making the RoleList sortable.
 func (r RoleList) Swap(i, j int) {
 	r[i], r[j] = r[j], r[i]
 }

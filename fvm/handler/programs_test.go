@@ -39,7 +39,7 @@ func Test_Programs(t *testing.T) {
 
 	contractA0Code := `
 		pub contract A {
-			pub fun hello(): String {
+			pub fun hello(): Name {
         		return "bad version"
     		}
 		}
@@ -47,7 +47,7 @@ func Test_Programs(t *testing.T) {
 
 	contractACode := `
 		pub contract A {
-			pub fun hello(): String {
+			pub fun hello(): Name {
         		return "hello from A"
     		}
 		}
@@ -57,7 +57,7 @@ func Test_Programs(t *testing.T) {
 		import A from 0xa
 	
 		pub contract B {
-			pub fun hello(): String {
+			pub fun hello(): Name {
        		return "hello from B but also ".concat(A.hello())
     		}
 		}
@@ -67,7 +67,7 @@ func Test_Programs(t *testing.T) {
 		import B from 0xb
 	
 		pub contract C {
-			pub fun hello(): String {
+			pub fun hello(): Name {
 	   		return "hello from C, ".concat(B.hello())
 			}
 		}

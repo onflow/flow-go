@@ -31,7 +31,7 @@ func TestScript_InvalidParse(t *testing.T) {
 }
 
 func TestScript_ValidParse(t *testing.T) {
-	arg1 := []byte(`{"type": "String", "value": "hello" }`)
+	arg1 := []byte(`{"type": "Name", "value": "hello" }`)
 	body := strings.NewReader(fmt.Sprintf(
 		`{ "script": "%s", "arguments": ["%s"] }`,
 		validBodyEncoded,

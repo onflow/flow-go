@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 
@@ -81,20 +82,20 @@ func New(net network.Network, log zerolog.Logger, me module.Local, state protoco
 }
 
 // registerConduits registers for ALL channels and returns a map of engine id to conduit
-func registerConduits(net network.Network, state protocol.State, eng network.Engine) (map[network.Channel]network.Conduit, error) {
+func registerConduits(net network.Network, state protocol.State, eng network.Engine) (map[channels.Channel]network.Conduit, error) {
 
 	// create a list of all channels that don't change over time
-	channels := network.ChannelList{
-		network.ConsensusCommittee,
-		network.SyncCommittee,
-		network.SyncExecution,
-		network.PushTransactions,
-		network.PushGuarantees,
-		network.PushBlocks,
-		network.PushReceipts,
-		network.PushApprovals,
-		network.RequestCollections,
-		network.RequestChunks,
+	channels := channels.ChannelList{
+		channels.ConsensusCommittee,
+		channels.SyncCommittee,
+		channels.SyncExecution,
+		channels.PushTransactions,
+		channels.PushGuarantees,
+		channels.PushBlocks,
+		channels.PushReceipts,
+		channels.PushApprovals,
+		channels.RequestCollections,
+		channels.RequestChunks,
 	}
 
 	// add channels that are dependent on protocol state and change over time
@@ -116,12 +117,12 @@ func registerConduits(net network.Network, state protocol.State, eng network.Eng
 		// add the dynamic channels for the cluster
 		channels = append(
 			channels,
-			network.ChannelConsensusCluster(clusterID),
-			network.ChannelSyncCluster(clusterID),
+			channels.ChannelConsensusCluster(clusterID),
+			channels.ChannelSyncCluster(clusterID),
 		)
 	}
 
-	conduitMap := make(map[network.Channel]network.Conduit, len(channels))
+	conduitMap := make(map[channels.Channel]network.Conduit, len(channels))
 
 	// Register for ALL channels here and return a map of conduits
 	for _, e := range channels {
@@ -163,7 +164,7 @@ func (e *RPC) SubmitLocal(event interface{}) {
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *RPC) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
+func (e *RPC) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.process(originID, event)
 		if err != nil {
@@ -181,7 +182,7 @@ func (e *RPC) ProcessLocal(event interface{}) error {
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *RPC) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+func (e *RPC) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		return e.process(originID, event)
 	})

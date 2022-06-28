@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"testing"
 
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -14,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storage "github.com/onflow/flow-go/storage/mock"
@@ -109,7 +109,7 @@ func (suite *Suite) TestSubmitCollectionGuaranteeNonLocal() {
 	msg := &messages.SubmitCollectionGuarantee{
 		Guarantee: *guarantee,
 	}
-	err := suite.engine.Process(network.PushGuarantees, sender.NodeID, msg)
+	err := suite.engine.Process(channels.PushGuarantees, sender.NodeID, msg)
 	suite.Require().Error(err)
 
 	suite.conduit.AssertNumberOfCalls(suite.T(), "Multicast", 0)

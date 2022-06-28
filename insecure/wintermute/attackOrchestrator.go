@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/utils/logging"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -353,7 +353,7 @@ func (o *Orchestrator) replyWithAttestation(chunkDataPackRequestEvent *insecure.
 		consensusIds := o.allNodeIds.Filter(filter.HasRole(flow.RoleConsensus)).NodeIDs()
 		err = o.network.Send(&insecure.Event{
 			CorruptedNodeId: chunkDataPackRequestEvent.CorruptedNodeId,
-			Channel:         network.PushApprovals,
+			Channel:         channels.PushApprovals,
 			Protocol:        insecure.Protocol_PUBLISH,
 			TargetNum:       0,
 			TargetIds:       consensusIds,

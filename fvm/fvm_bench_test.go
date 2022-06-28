@@ -87,9 +87,9 @@ func (account *TestBenchAccount) AddArrayToStorage(b *testing.B, blockExec TestB
 	serviceAccount := blockExec.ServiceAccount(b)
 	txBody := flow.NewTransactionBody().
 		SetScript([]byte(`
-		transaction(list: [String]) {
+		transaction(list: [Name]) {
 		  prepare(acct: AuthAccount) {
-			acct.load<[String]>(from: /storage/test)
+			acct.load<[Name]>(from: /storage/test)
 			acct.save(list, to: /storage/test)
 		  }
 		  execute {}
@@ -446,13 +446,13 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 	})
 	b.Run("load and save empty string on signers address", func(b *testing.B) {
 		benchTransaction(b, templateTx(100, `
-				signer.load<String>(from: /storage/testpath)
+				signer.load<Name>(from: /storage/testpath)
 				signer.save("", to: /storage/testpath)
 			`))
 	})
 	b.Run("load and save long string on signers address", func(b *testing.B) {
 		benchTransaction(b, templateTx(100, fmt.Sprintf(`
-				signer.load<String>(from: /storage/testpath)
+				signer.load<Name>(from: /storage/testpath)
 				signer.save("%s", to: /storage/testpath)
 			`, longString)))
 	})
@@ -467,7 +467,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 	})
 	b.Run("borrow array from storage", func(b *testing.B) {
 		benchTransaction(b, templateTx(100, `
-			let strings = signer.borrow<&[String]>(from: /storage/test)!
+			let strings = signer.borrow<&[Name]>(from: /storage/test)!
 			var i = 0
 			while (i < strings.length) {
 			  log(strings[i])
@@ -477,7 +477,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 	})
 	b.Run("copy array from storage", func(b *testing.B) {
 		benchTransaction(b, templateTx(100, `
-			let strings = signer.copy<[String]>(from: /storage/test)!
+			let strings = signer.copy<[Name]>(from: /storage/test)!
 			var i = 0
 			while (i < strings.length) {
 			  log(strings[i])
@@ -697,7 +697,7 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 
 			pub contract BatchNFT: NonFungibleToken {
 				pub event ContractInitialized()
-				pub event PlayCreated(id: UInt32, metadata: {String:String})
+				pub event PlayCreated(id: UInt32, metadata: {Name:Name})
 				pub event NewSeriesStarted(newCurrentSeries: UInt32)
 				pub event SetCreated(setID: UInt32, series: UInt32)
 				pub event PlayAddedToSet(setID: UInt32, playID: UInt32)
@@ -717,9 +717,9 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 
 				pub struct Play {
 					pub let playID: UInt32
-					pub let metadata: {String: String}
+					pub let metadata: {Name: Name}
 
-					init(metadata: {String: String}) {
+					init(metadata: {Name: Name}) {
 						pre {
 							metadata.length != 0: "New Play Metadata cannot be empty"
 						}
@@ -733,9 +733,9 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 
 				pub struct SetData {
 					pub let setID: UInt32
-					pub let name: String
+					pub let name: Name
 					pub let series: UInt32
-					init(name: String) {
+					init(name: Name) {
 						pre {
 							name.length > 0: "New Set name cannot be empty"
 						}
@@ -754,7 +754,7 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 					pub var locked: Bool
 					pub var numberMintedPerPlay: {UInt32: UInt32}
 
-					init(name: String) {
+					init(name: Name) {
 						self.setID = BatchNFT.nextSetID
 						self.plays = []
 						self.retired = {}
@@ -869,7 +869,7 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 				}
 
 				pub resource Admin {
-					pub fun createPlay(metadata: {String: String}): UInt32 {
+					pub fun createPlay(metadata: {Name: Name}): UInt32 {
 						var newPlay = Play(metadata: metadata)
 						let newID = newPlay.playID
 
@@ -878,7 +878,7 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 						return newID
 					}
 
-					pub fun createSet(name: String) {
+					pub fun createSet(name: Name) {
 						var newSet <- create Set(name: name)
 
 						BatchNFT.sets[newSet.setID] <-! newSet
@@ -993,11 +993,11 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 					return BatchNFT.playDatas.values
 				}
 
-				pub fun getPlayMetaData(playID: UInt32): {String: String}? {
+				pub fun getPlayMetaData(playID: UInt32): {Name: Name}? {
 					return self.playDatas[playID]?.metadata
 				}
 
-				pub fun getPlayMetaDataByField(playID: UInt32, field: String): String? {
+				pub fun getPlayMetaDataByField(playID: UInt32, field: Name): Name? {
 					if let play = BatchNFT.playDatas[playID] {
 						return play.metadata[field]
 					} else {
@@ -1005,7 +1005,7 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 					}
 				}
 
-				pub fun getSetName(setID: UInt32): String? {
+				pub fun getSetName(setID: UInt32): Name? {
 					return BatchNFT.setDatas[setID]?.name
 				}
 
@@ -1013,7 +1013,7 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 					return BatchNFT.setDatas[setID]?.series
 				}
 
-				pub fun getSetIDsByName(setName: String): [UInt32]? {
+				pub fun getSetIDsByName(setName: Name): [UInt32]? {
 					var setIDs: [UInt32] = []
 
 					for setData in BatchNFT.setDatas.values {

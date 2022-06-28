@@ -2,6 +2,7 @@ package p2p_test
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -28,7 +29,7 @@ import (
 )
 
 // Workaround for https://github.com/stretchr/testify/pull/808
-const ticksForAssertEventually = 100 * time.Millisecond
+const ticksForAssertEventually = 10 * time.Millisecond
 
 // Creating a node fixture with defaultAddress lets libp2p runs it on an
 // allocated port by OS. So after fixture created, its address would be
@@ -149,10 +150,10 @@ func nodeFixture(
 	err = n.WithDefaultUnicastProtocol(parameters.handlerFunc, parameters.unicasts)
 	require.NoError(t, err)
 
-	//require.Eventuallyf(t, func() bool {
-	//	ip, p, err := n.GetIPPort()
-	//	return err == nil && ip != "" && p != ""
-	//}, 3*time.Second, ticksForAssertEventually, fmt.Sprintf("could not start node %s", identity.NodeID.String()))
+	require.Eventuallyf(t, func() bool {
+		ip, p, err := n.GetIPPort()
+		return err == nil && ip != "" && p != ""
+	}, 3*time.Second, ticksForAssertEventually, fmt.Sprintf("could not start node %s", identity.NodeID))
 
 	// get the actual IP and port that have been assigned by the subsystem
 	ip, port, err := n.GetIPPort()

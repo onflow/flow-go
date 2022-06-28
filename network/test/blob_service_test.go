@@ -11,6 +11,7 @@ import (
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
@@ -34,7 +35,7 @@ type conditionalTopology struct {
 
 var _ network.Topology = (*conditionalTopology)(nil)
 
-func (t *conditionalTopology) GenerateFanout(ids flow.IdentityList, channels network.ChannelList) (flow.IdentityList, error) {
+func (t *conditionalTopology) GenerateFanout(ids flow.IdentityList, channels channels.ChannelList) (flow.IdentityList, error) {
 	if t.condition() {
 		return t.top.GenerateFanout(ids, channels)
 	} else {
@@ -94,7 +95,7 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 	)
 	suite.networks = networks
 
-	blobExchangeChannel := network.Channel("blob-exchange")
+	blobExchangeChannel := channels.Channel("blob-exchange")
 
 	for i, net := range networks {
 		ds := sync.MutexWrap(datastore.NewMapDatastore())

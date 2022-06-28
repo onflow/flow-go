@@ -3,6 +3,7 @@ package synchronization
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -62,7 +63,7 @@ func NewRequestHandlerEngine(
 ) (*RequestHandlerEngine, error) {
 	e := &RequestHandlerEngine{}
 
-	con, err := net.Register(network.PublicSyncCommittee, e)
+	con, err := net.Register(channels.PublicSyncCommittee, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
@@ -81,7 +82,7 @@ func NewRequestHandlerEngine(
 	return e, nil
 }
 
-func (r *RequestHandlerEngine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+func (r *RequestHandlerEngine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	return r.requestHandler.Process(channel, originID, event)
 }
 

@@ -6,19 +6,11 @@ import (
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
 )
-
-// Topic is the internal type of Libp2p which corresponds to the Channel in the network level.
-// It is a virtual medium enabling nodes to subscribe and communicate over epidemic dissemination.
-type Topic string
-
-func (t Topic) String() string {
-	return string(t)
-}
 
 // Middleware represents the middleware layer, which manages the connections to
 // our direct neighbours on the network. It handles the creation & teardown of
@@ -40,20 +32,20 @@ type Middleware interface {
 	// Publish publishes a message on the channel. It models a distributed broadcast where the message is meant for all or
 	// a many nodes subscribing to the channel. It does not guarantee the delivery though, and operates on a best
 	// effort.
-	Publish(msg *message.Message, channel Channel) error
+	Publish(msg *message.Message, channel channels.Channel) error
 
 	// Subscribe subscribes the middleware to a channel.
-	Subscribe(channel Channel) error
+	Subscribe(channel channels.Channel) error
 
 	// Unsubscribe unsubscribes the middleware from a channel.
-	Unsubscribe(channel Channel) error
+	Unsubscribe(channel channels.Channel) error
 
 	// UpdateNodeAddresses fetches and updates the addresses of all the authorized participants
 	// in the Flow protocol.
 	UpdateNodeAddresses()
 
 	// NewBlobService creates a new BlobService for the given channel.
-	NewBlobService(channel Channel, store datastore.Batching, opts ...BlobServiceOption) BlobService
+	NewBlobService(channel channels.Channel, store datastore.Batching, opts ...BlobServiceOption) BlobService
 
 	// NewPingService creates a new PingService for the given ping protocol ID.
 	NewPingService(pingProtocol protocol.ID, provider PingInfoProvider) PingService

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/golang/protobuf/ptypes/empty"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -17,14 +18,14 @@ import (
 // Handler handles the GRPC calls from a client
 type Handler struct {
 	log        zerolog.Logger
-	conduitMap map[network.Channel]network.Conduit
+	conduitMap map[channels.Channel]network.Conduit
 	msgChan    chan ghost.FlowMessage
 	codec      network.Codec
 }
 
 var _ ghost.GhostNodeAPIServer = Handler{}
 
-func NewHandler(log zerolog.Logger, conduitMap map[network.Channel]network.Conduit, msgChan chan ghost.FlowMessage, codec network.Codec) *Handler {
+func NewHandler(log zerolog.Logger, conduitMap map[channels.Channel]network.Conduit, msgChan chan ghost.FlowMessage, codec network.Codec) *Handler {
 	return &Handler{
 		log:        log.With().Str("component", "ghost_engine_handler").Logger(),
 		conduitMap: conduitMap,
@@ -38,7 +39,7 @@ func (h Handler) SendEvent(_ context.Context, req *ghost.SendEventRequest) (*emp
 	channelID := req.GetChannelId()
 
 	// find the conduit for the channel
-	conduit, found := h.conduitMap[network.Channel(channelID)]
+	conduit, found := h.conduitMap[channels.Channel(channelID)]
 
 	if !found {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("conduit not found for given channel %v", channelID))

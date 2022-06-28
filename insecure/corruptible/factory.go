@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/golang/protobuf/ptypes/empty"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	grpcinsecure "google.golang.org/grpc/credentials/insecure"
@@ -138,7 +139,7 @@ func (c *ConduitFactory) RegisterAdapter(adapter network.Adapter) error {
 
 // NewConduit creates a conduit on the specified channel.
 // Prior to creating any conduit, the factory requires an Adapter to be registered with it.
-func (c *ConduitFactory) NewConduit(ctx context.Context, channel network.Channel) (network.Conduit, error) {
+func (c *ConduitFactory) NewConduit(ctx context.Context, channel channels.Channel) (network.Conduit, error) {
 	if c.adapter == nil {
 		return nil, fmt.Errorf("could not create a new conduit, missing a registered network adapter")
 	}
@@ -245,7 +246,7 @@ func (c *ConduitFactory) processAttackerMessage(msg *insecure.Message) error {
 		Uint32("targets_num", msg.TargetNum).
 		Logger()
 
-	err = c.sendOnNetwork(event, network.Channel(msg.ChannelID), msg.Protocol, uint(msg.TargetNum), targetIds...)
+	err = c.sendOnNetwork(event, channels.Channel(msg.ChannelID), msg.Protocol, uint(msg.TargetNum), targetIds...)
 	if err != nil {
 		lg.Err(err).Msg("could not send attacker message to the network")
 		return fmt.Errorf("could not send attacker message to the network: %w", err)
@@ -296,7 +297,7 @@ func (c *ConduitFactory) registerAttacker(address string) error {
 // to deliver to its targets.
 func (c *ConduitFactory) HandleIncomingEvent(
 	event interface{},
-	channel network.Channel,
+	channel channels.Channel,
 	protocol insecure.Protocol,
 	num uint32,
 	targetIds ...flow.Identifier) error {
@@ -322,14 +323,14 @@ func (c *ConduitFactory) HandleIncomingEvent(
 
 // EngineClosingChannel is called by the slave conduits of this factory to let it know that the corresponding engine of the
 // conduit is not going to use it anymore, so the channel can be closed safely.
-func (c *ConduitFactory) EngineClosingChannel(channel network.Channel) error {
+func (c *ConduitFactory) EngineClosingChannel(channel channels.Channel) error {
 	return c.adapter.UnRegisterChannel(channel)
 }
 
 // eventToMessage converts the given application layer event to a protobuf message that is meant to be sent to the attacker.
 func (c *ConduitFactory) eventToMessage(
 	event interface{},
-	channel network.Channel,
+	channel channels.Channel,
 	protocol insecure.Protocol,
 	targetNum uint32, targetIds ...flow.Identifier) (*insecure.Message, error) {
 
@@ -352,7 +353,7 @@ func (c *ConduitFactory) eventToMessage(
 // sendOnNetwork dispatches the given event to the networking layer of the node in order to be delivered
 // through the specified protocol to the target identifiers.
 func (c *ConduitFactory) sendOnNetwork(event interface{},
-	channel network.Channel,
+	channel channels.Channel,
 	protocol insecure.Protocol,
 	num uint, targetIds ...flow.Identifier) error {
 	switch protocol {
