@@ -556,6 +556,11 @@ func (e *Engine) enqueueBlockAndCheckExecutable(
 // executeBlock will execute the block.
 // When finish executing, it will check if the children becomes executable and execute them if yes.
 func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.ExecutableBlock) {
+	// hotfix: this is only for EN at version 0.26.9 to halt execution after block 32359720
+	// so that it can restart with v0.26.13 to continue executing
+	if executableBlock.Height() >= uint64(32359730) {
+		e.log.Fatal().Msgf("halt execution at above 32359727 %v", executableBlock.Height)
+	}
 
 	e.log.Info().
 		Hex("block_id", logging.Entity(executableBlock)).
