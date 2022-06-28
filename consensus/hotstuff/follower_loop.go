@@ -76,7 +76,8 @@ func (fl *FollowerLoop) loop() {
 		select {
 		case p := <-fl.proposals:
 			err := fl.followerLogic.AddBlock(p.Proposal)
-			defer close(p.done)
+			close(p.done)
+			
 			if err != nil { // all errors are fatal
 				fl.log.Error().
 					Hex("block_id", logging.ID(p.Block.BlockID)).
