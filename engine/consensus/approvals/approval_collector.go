@@ -108,9 +108,22 @@ func (c *ApprovalCollector) SealResult() error {
 	// ********************** HotFix **********************
 	myResultID := c.incorporatedResult.Result.ID()
 
-	var blackListedResults flow.IdentifierList
+	blackListedResults := []string{
+		"10a39c61c5d23ae197614ee76f4339a75572a73c1f527c3fd665103441a09cce",
+		"21caee09c7aa8bbb56df7b303e10e7e3f115c3465dd98307998da19d5bc4324c",
+		"30aebb6d29d3d85973ec79283a67121b6618cd8dc4aa37acec3841b64f06d3b3",
+		"7b754cd1c1bb1cdc57520191ca32b86c62126e515fc87395db3a0c339dedb32d",
+		"5ee05e5b25d93d5495a51f35855f020e2edf6c5ca58fb7b6867bdd2358f7389a",
+		"d518bcc545dc06ac75ee3d609644ce18d8869d83a680ab309c3aa8601c2bdd5b",
+		"4f197e3620c1c0b4ce99ff8ae768c68df2348d628a7d81fb78a2c6ae77467907",
+	}
+
 	for _, noSealResultID := range blackListedResults {
-		if noSealResultID == myResultID {
+		i, err := flow.HexStringToIdentifier(noSealResultID)
+		if err != nil {
+			panic("could not convert blacklisted result ID")
+		}
+		if i == myResultID {
 			return nil
 		}
 	}
