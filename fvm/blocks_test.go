@@ -65,7 +65,7 @@ func Test_BlockFinder_ReturnsHeaderIfSameHeight(t *testing.T) {
 
 		heightFrom, err := blockFinder.ByHeightFrom(0, header5)
 		require.NoError(t, err)
-		require.Equal(t, header0, *heightFrom)
+		require.Equal(t, *header0, *heightFrom)
 	}))
 
 	t.Run("skips heights once it get to finalized chain", doTest(t, func(t *testing.T, headers *storageMock.Headers, blockFinder Blocks, header *flow.Header) {
@@ -78,15 +78,15 @@ func Test_BlockFinder_ReturnsHeaderIfSameHeight(t *testing.T) {
 		header4 := unittest.BlockHeaderWithParentFixture(header3)
 		header5 := unittest.BlockHeaderWithParentFixture(header4)
 
-		headers.On("ByBlockID", header4.ID()).Return(&header4, nil)
+		headers.On("ByBlockID", header4.ID()).Return(header4, nil)
 		headers.On("ByHeight", uint64(4)).Return(nil, storage.ErrNotFound)
-		headers.On("ByBlockID", header3.ID()).Return(&header3, nil)
-		headers.On("ByHeight", uint64(3)).Return(&header3, nil)
-		headers.On("ByHeight", uint64(0)).Return(&header0, nil)
+		headers.On("ByBlockID", header3.ID()).Return(header3, nil)
+		headers.On("ByHeight", uint64(3)).Return(header3, nil)
+		headers.On("ByHeight", uint64(0)).Return(header0, nil)
 
 		heightFrom, err := blockFinder.ByHeightFrom(0, header5)
 		require.NoError(t, err)
-		require.Equal(t, header0, *heightFrom)
+		require.Equal(t, *header0, *heightFrom)
 	}))
 
 }
