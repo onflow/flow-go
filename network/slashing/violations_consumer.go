@@ -1,9 +1,17 @@
-package network
+package slashing
 
 import (
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/utils/logging"
+
 	"github.com/onflow/flow-go/model/flow"
+)
+
+const (
+	unAuthorizedSenderViolation = "unauthorized_sender"
+	unknownMsgTypeViolation     = "unknown_message_type"
+	senderEjectedViolation      = "sender_ejected"
 )
 
 // SlashingViolationsConsumer is a struct that logs a message for any slashable offences.
@@ -23,8 +31,9 @@ func (c *SlashingViolationsConsumer) OnUnAuthorizedSenderError(identity *flow.Id
 		Err(err).
 		Str("peer_id", peerID).
 		Str("role", identity.Role.String()).
-		Str("peer_node_id", identity.NodeID.String()).
+		Hex("sender_id", logging.ID(identity.NodeID)).
 		Str("message_type", msgType).
+		Str("offense", unAuthorizedSenderViolation).
 		Msg("potential slashable offense")
 }
 
@@ -34,8 +43,9 @@ func (c *SlashingViolationsConsumer) OnUnknownMsgTypeError(identity *flow.Identi
 		Err(err).
 		Str("peer_id", peerID).
 		Str("role", identity.Role.String()).
-		Str("peer_node_id", identity.NodeID.String()).
+		Hex("sender_id", logging.ID(identity.NodeID)).
 		Str("message_type", msgType).
+		Str("offense", unknownMsgTypeViolation).
 		Msg("potential slashable offense")
 }
 
@@ -45,7 +55,8 @@ func (c *SlashingViolationsConsumer) OnSenderEjectedError(identity *flow.Identit
 		Err(err).
 		Str("peer_id", peerID).
 		Str("role", identity.Role.String()).
-		Str("peer_node_id", identity.NodeID.String()).
+		Hex("sender_id", logging.ID(identity.NodeID)).
 		Str("message_type", msgType).
+		Str("offense", senderEjectedViolation).
 		Msg("potential slashable offense")
 }

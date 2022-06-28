@@ -11,10 +11,10 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/network/slashing"
+
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
-
-	"github.com/onflow/flow-go/network"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -36,7 +36,7 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel channels.Channel, get
 		Str("network_channel", channel.String()).
 		Logger()
 
-	slashingViolationsConsumer := network.NewSlashingViolationsConsumer(log)
+	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(log)
 
 	return func(ctx context.Context, from peer.ID, msg interface{}) pubsub.ValidationResult {
 		identity, ok := getIdentity(from)
