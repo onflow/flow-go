@@ -71,7 +71,8 @@ type ExecutionState interface {
 
 const (
 	KeyPartOwner = uint16(0)
-	// depricated
+	// @deprecated - controller was used only by the very first
+	// version of cadence for access controll which was retired later on
 	// KeyPartController = uint16(1)
 	KeyPartKey = uint16(2)
 )
