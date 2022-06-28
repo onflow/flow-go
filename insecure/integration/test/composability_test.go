@@ -49,6 +49,11 @@ func TestCorruptibleConduitFrameworkHappyPath(t *testing.T) {
 				// implementing the corruption functionality of the orchestrator.
 				event.FlowProtocolEvent = corruptedEvent
 			}, func(t *testing.T) {
+
+				require.Eventually(t, func() bool {
+					return ccf.AttackerRegistered() // attacker's registration must be done on CCF prior to sending any messages.
+				}, 2*time.Second, 100*time.Millisecond, "registration of attacker on CCF could not be done one time")
+
 				hub := stub.NewNetworkHub()
 				originalEvent := &message.TestMessage{Text: "this is a test message"}
 				testChannel := flownet.Channel("test-channel")
@@ -141,16 +146,14 @@ func withAttackOrchestrator(t *testing.T, corruptedIds flow.IdentityList, corrup
 	run func(t *testing.T)) {
 	codec := cbor.NewCodec()
 	o := &mockOrchestrator{eventCorrupter: corrupter}
-	connector := attacknetwork.NewCorruptedConnector(corruptedIds, corruptedPortMap)
+	connector := attacknetwork.NewCorruptedConnector(unittest.Logger(), corruptedIds, corruptedPortMap)
 
 	attackNetwork, err := attacknetwork.NewAttackNetwork(
 		unittest.Logger(),
-		"localhost:0",
 		codec,
 		o,
 		connector,
-		corruptedIds,
-		attacknetwork.WithLocalHostRuntime)
+		corruptedIds)
 	require.NoError(t, err)
 
 	// life-cycle management of attackNetwork.

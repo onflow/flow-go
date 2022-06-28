@@ -61,9 +61,6 @@ func (o *Orchestrator) WithAttackNetwork(network insecure.AttackNetwork) {
 // the attack Orchestrator instead of dispatching them directly to the network.
 // The Orchestrator completely determines what the corrupted conduit should send to the network.
 func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error {
-	o.Lock()
-	defer o.Unlock()
-
 	switch event.FlowProtocolEvent.(type) {
 
 	case *flow.ExecutionReceipt:

@@ -61,7 +61,7 @@ func MessageFixture(t *testing.T, codec network.Codec, protocol Protocol, conten
 		TargetIds:         targetIds,
 	}
 
-	return m, e, unittest.IdentityFixture(unittest.WithNodeID(originId))
+	return m, e, unittest.IdentityFixture(unittest.WithNodeID(originId), unittest.WithAddress("localhost:0"))
 }
 
 // MessageFixtures creates and returns randomly generated gRCP messages and their corresponding protocol-level events.
