@@ -410,7 +410,7 @@ func (f *FakeUploader) Upload(computationResult *execution.ComputationResult) er
 }
 
 func noopView() *delta.View {
-	return delta.NewView(func(_, _, _ string) (flow.RegisterValue, error) {
+	return delta.NewView(func(_, _ string) (flow.RegisterValue, error) {
 		return nil, nil
 	})
 }

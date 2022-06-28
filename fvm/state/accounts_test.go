@@ -67,7 +67,8 @@ func TestAccounts_GetPublicKey(t *testing.T) {
 			view := utils.NewSimpleView()
 
 			err := view.Set(
-				string(address.Bytes()), string(address.Bytes()), "public_key_0",
+				string(address.Bytes()),
+				"public_key_0",
 				ledgerValue,
 			)
 			require.NoError(t, err)
@@ -94,7 +95,8 @@ func TestAccounts_GetPublicKeyCount(t *testing.T) {
 
 			view := utils.NewSimpleView()
 			err := view.Set(
-				string(address.Bytes()), string(address.Bytes()), "public_key_count",
+				string(address.Bytes()),
+				"public_key_count",
 				ledgerValue,
 			)
 			require.NoError(t, err)
@@ -122,7 +124,8 @@ func TestAccounts_GetPublicKeys(t *testing.T) {
 
 			view := utils.NewSimpleView()
 			err := view.Set(
-				string(address.Bytes()), string(address.Bytes()), "public_key_count",
+				string(address.Bytes()),
+				"public_key_count",
 				ledgerValue,
 			)
 			require.NoError(t, err)
@@ -153,7 +156,6 @@ func TestAccounts_GetWithNoKeysCounter(t *testing.T) {
 	require.NoError(t, err)
 
 	err = view.Delete(
-		string(address.Bytes()),
 		string(address.Bytes()),
 		"public_key_count")
 

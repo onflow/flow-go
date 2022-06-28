@@ -72,9 +72,9 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 
 		view1 := es.NewView(sc1)
 
-		err = view1.Set(registerID1, "", "", flow.RegisterValue("apple"))
+		err = view1.Set(registerID1, "", flow.RegisterValue("apple"))
 		assert.NoError(t, err)
-		err = view1.Set(registerID2, "", "", flow.RegisterValue("carrot"))
+		err = view1.Set(registerID2, "", flow.RegisterValue("carrot"))
 		assert.NoError(t, err)
 
 		sc2, update, err := state.CommitDelta(l, view1.Delta(), sc1)
@@ -103,9 +103,9 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 
 		view2 := es.NewView(sc2)
 
-		b1, err := view2.Get(registerID1, "", "")
+		b1, err := view2.Get(registerID1, "")
 		assert.NoError(t, err)
-		b2, err := view2.Get(registerID2, "", "")
+		b2, err := view2.Get(registerID2, "")
 		assert.NoError(t, err)
 
 		assert.Equal(t, flow.RegisterValue("apple"), b1)
@@ -119,14 +119,14 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 
 		view1 := es.NewView(sc1)
 
-		err = view1.Set(registerID1, "", "", []byte("apple"))
+		err = view1.Set(registerID1, "", []byte("apple"))
 		assert.NoError(t, err)
 		sc2, _, err := state.CommitDelta(l, view1.Delta(), sc1)
 		assert.NoError(t, err)
 
 		// update value and get resulting state commitment
 		view2 := es.NewView(sc2)
-		err = view2.Set(registerID1, "", "", []byte("orange"))
+		err = view2.Set(registerID1, "", []byte("orange"))
 		assert.NoError(t, err)
 
 		sc3, _, err := state.CommitDelta(l, view2.Delta(), sc2)
@@ -139,10 +139,10 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		view4 := es.NewView(sc3)
 
 		// fetch the value at both versions
-		b1, err := view3.Get(registerID1, "", "")
+		b1, err := view3.Get(registerID1, "")
 		assert.NoError(t, err)
 
-		b2, err := view4.Get(registerID1, "", "")
+		b2, err := view4.Get(registerID1, "")
 		assert.NoError(t, err)
 
 		assert.Equal(t, flow.RegisterValue("apple"), b1)
@@ -156,9 +156,9 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 
 		// set initial value
 		view1 := es.NewView(sc1)
-		err = view1.Set(registerID1, "", "", []byte("apple"))
+		err = view1.Set(registerID1, "", []byte("apple"))
 		assert.NoError(t, err)
-		err = view1.Set(registerID2, "", "", []byte("apple"))
+		err = view1.Set(registerID2, "", []byte("apple"))
 		assert.NoError(t, err)
 
 		sc2, _, err := state.CommitDelta(l, view1.Delta(), sc1)
@@ -166,7 +166,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 
 		// update value and get resulting state commitment
 		view2 := es.NewView(sc2)
-		err = view2.Delete(registerID1, "", "")
+		err = view2.Delete(registerID1, "")
 		assert.NoError(t, err)
 
 		sc3, _, err := state.CommitDelta(l, view2.Delta(), sc2)
@@ -179,10 +179,10 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		view4 := es.NewView(sc3)
 
 		// fetch the value at both versions
-		b1, err := view3.Get(registerID1, "", "")
+		b1, err := view3.Get(registerID1, "")
 		assert.NoError(t, err)
 
-		b2, err := view4.Get(registerID1, "", "")
+		b2, err := view4.Get(registerID1, "")
 		assert.NoError(t, err)
 
 		assert.Equal(t, flow.RegisterValue("apple"), b1)
@@ -196,9 +196,9 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 
 		// set initial value
 		view1 := es.NewView(sc1)
-		err = view1.Set(registerID1, "", "", flow.RegisterValue("apple"))
+		err = view1.Set(registerID1, "", flow.RegisterValue("apple"))
 		assert.NoError(t, err)
-		err = view1.Set(registerID2, "", "", flow.RegisterValue("apple"))
+		err = view1.Set(registerID2, "", flow.RegisterValue("apple"))
 		assert.NoError(t, err)
 
 		sc2, _, err := state.CommitDelta(l, view1.Delta(), sc1)
