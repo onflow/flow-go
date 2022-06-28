@@ -208,10 +208,7 @@ func initializeMessageAuthConfigsMap() {
 			return new(messages.ChunkDataRequest)
 		},
 		Config: map[channels.Channel]flow.RoleList{
-			channels.ProvideChunks:            {flow.RoleVerification}, // channel alias RequestChunks = ProvideChunks
-			channels.RequestCollections:       {flow.RoleVerification},
-			channels.RequestApprovalsByChunk:  {flow.RoleVerification},
-			channels.RequestReceiptsByBlockID: {flow.RoleVerification},
+			channels.ProvideChunks: {flow.RoleVerification}, // channel alias RequestChunks = ProvideChunks
 		},
 	}
 	AuthorizationConfigs[ChunkDataResponse] = MsgAuthConfig{
@@ -220,10 +217,7 @@ func initializeMessageAuthConfigsMap() {
 			return new(messages.ChunkDataResponse)
 		},
 		Config: map[channels.Channel]flow.RoleList{
-			channels.ProvideChunks:            {flow.RoleExecution}, // channel alias RequestChunks = ProvideChunks
-			channels.RequestCollections:       {flow.RoleExecution},
-			channels.RequestApprovalsByChunk:  {flow.RoleExecution},
-			channels.RequestReceiptsByBlockID: {flow.RoleExecution},
+			channels.ProvideChunks: {flow.RoleExecution}, // channel alias RequestChunks = ProvideChunks
 		},
 	}
 
