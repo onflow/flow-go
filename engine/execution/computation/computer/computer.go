@@ -178,14 +178,23 @@ func (e *blockComputer) executeBlock(
 		},
 	}
 
+	blockID := logging.Entity(block)
+
 	go func() {
 		bc.Run()
 		wg.Done()
+		e.log.Debug().
+			Hex("block_id", blockID).
+			Msg("block committer done")
 	}()
 
 	go func() {
 		eh.Run()
 		wg.Done()
+		e.log.Debug().
+			Hex("block_id", blockID).
+			Msg("event hasher done")
+
 	}()
 
 	collectionIndex := 0
@@ -196,17 +205,34 @@ func (e *blockComputer) executeBlock(
 		if err != nil {
 			return nil, fmt.Errorf("failed to execute collection at txIndex %v: %w", txIndex, err)
 		}
+		collectionID := collection.Guarantee.CollectionID[:]
+		e.log.Debug().
+			Hex("block_id", blockID).
+			Hex("collection_id", collectionID).
+			Msg("collection executed")
 		bc.Commit(colView)
+		e.log.Debug().
+			Hex("block_id", blockID).
+			Hex("collection_id", collectionID).
+			Msg("collection committed")
 		eh.Hash(res.Events[i])
+		e.log.Debug().
+			Hex("block_id", blockID).
+			Hex("collection_id", collectionID).
+			Msg("collection events hashed")
 		err = stateView.MergeView(colView)
 		if err != nil {
 			return nil, fmt.Errorf("cannot merge view: %w", err)
 		}
+		e.log.Debug().
+			Hex("block_id", blockID).
+			Hex("collection_id", collectionID).
+			Msg("collection view merged")
 		collectionIndex++
 	}
 
 	// executing system chunk
-	e.log.Debug().Hex("block_id", logging.Entity(block)).Msg("executing system chunk")
+	e.log.Debug().Hex("block_id", blockID).Msg("executing system chunk")
 	colView := stateView.NewChild()
 	_, err = e.executeSystemCollection(blockSpan, collectionIndex, txIndex, systemChunkCtx, colView, programs, res)
 	if err != nil {
@@ -224,7 +250,7 @@ func (e *blockComputer) executeBlock(
 	close(eh.data)
 	wg.Wait()
 
-	e.log.Debug().Hex("block_id", logging.Entity(block)).Msg("all views committed")
+	e.log.Debug().Hex("block_id", blockID).Msg("all views committed")
 
 	res.StateReads = stateView.(*delta.View).ReadsCount()
 	res.StateCommitments = stateCommitments
