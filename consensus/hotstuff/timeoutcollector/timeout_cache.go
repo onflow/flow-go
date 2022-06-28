@@ -53,7 +53,6 @@ func (vc *TimeoutObjectsCache) AddTimeoutObject(timeout *model.TimeoutObject) er
 		return ErrTimeoutForIncompatibleView
 	}
 	vc.lock.Lock()
-	defer vc.lock.Unlock()
 
 	// De-duplicated timeouts based on the following rules:
 	//  * For each voter (i.e. SignerID), we store the _first_  t0.
@@ -63,6 +62,7 @@ func (vc *TimeoutObjectsCache) AddTimeoutObject(timeout *model.TimeoutObject) er
 	//    we return a model.DoubleTimeoutError.
 	firstTimeout, exists := vc.timeouts[timeout.SignerID]
 	if exists {
+		vc.lock.Unlock()
 		// TODO: once we have signer indices, implement Equals methods for QC, TC
 		// and TimeoutObjects, to avoid the comparatively very expensive ID computation.
 		if firstTimeout.ID() != timeout.ID() {
@@ -71,6 +71,7 @@ func (vc *TimeoutObjectsCache) AddTimeoutObject(timeout *model.TimeoutObject) er
 		return ErrRepeatedTimeout
 	}
 	vc.timeouts[timeout.SignerID] = timeout
+	vc.lock.Unlock()
 
 	return nil
 }
