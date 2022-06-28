@@ -121,7 +121,8 @@ func (d *DNSCache) RemoveTxt(domain string) bool {
 // Once a domain record gets locked the only way to unlock it is through removing it from the cache
 // and re-inserting it. This is trivial, as a domain is locked when it is expired and a resolving attempt is ongoing
 // for it. So the locking happens to avoid any other parallel resolving.
-func (d *DNSCache) LockIPDomain(domain string) bool {
+func (d *DNSCache) LockIPDomain(domain string) (bool, error) {
+	locked := false
 	err := d.ipCache.Run(func(backdata mempool.BackData) error {
 		id := domainToIdentifier(domain)
 		entity, ok := backdata.ByID(id)
@@ -135,7 +136,7 @@ func (d *DNSCache) LockIPDomain(domain string) bool {
 		}
 
 		if record.Locked {
-			return fmt.Errorf("attempting to lock an already locked record")
+			return nil // record has already been locked
 		}
 
 		record.Locked = true
@@ -148,10 +149,11 @@ func (d *DNSCache) LockIPDomain(domain string) bool {
 			return fmt.Errorf("updated record could not be added to back data")
 		}
 
+		locked = true
 		return nil
 	})
 
-	return err != nil
+	return locked, err
 }
 
 // LockTxtRecord locks a txt address dns record if exists in the cache.
@@ -161,7 +163,8 @@ func (d *DNSCache) LockIPDomain(domain string) bool {
 // Once a domain record gets locked the only way to unlock it is through removing it from the cache
 // and re-inserting it. This is trivial, as a domain is locked when it is expired and a resolving attempt is ongoing
 // for it. So the locking happens to avoid any other parallel resolving.
-func (d *DNSCache) LockTxtRecord(txt string) bool {
+func (d *DNSCache) LockTxtRecord(txt string) (bool, error) {
+	locked := false
 	err := d.txtCache.Run(func(backdata mempool.BackData) error {
 		id := domainToIdentifier(txt)
 		entity, ok := backdata.ByID(id)
@@ -175,7 +178,7 @@ func (d *DNSCache) LockTxtRecord(txt string) bool {
 		}
 
 		if record.Locked {
-			return fmt.Errorf("attempting to lock an already locked record")
+			return nil // record has already been locked
 		}
 
 		record.Locked = true
@@ -188,10 +191,11 @@ func (d *DNSCache) LockTxtRecord(txt string) bool {
 			return fmt.Errorf("updated record could not be added to back data")
 		}
 
+		locked = true
 		return nil
 	})
 
-	return err != nil
+	return locked, err
 }
 
 // Size returns total domains maintained into this cache.
