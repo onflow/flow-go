@@ -27,14 +27,8 @@ func withSubscriptionFilter(filter pubsub.SubscriptionFilter) nodeOpt {
 	}
 }
 
-func createNode(
-	t *testing.T,
-	nodeID flow.Identifier,
-	networkKey crypto.PrivateKey,
-	sporkID flow.Identifier,
-	opts ...nodeOpt,
-) *p2p.Node {
-	builder := p2p.NewNodeBuilder(zerolog.Nop(), "0.0.0.0:0", networkKey, sporkID).
+func createNode(t *testing.T, nodeID flow.Identifier, networkKey crypto.PrivateKey, sporkID flow.Identifier, logger zerolog.Logger, opts ...nodeOpt) *p2p.Node {
+	builder := p2p.NewNodeBuilder(logger, "0.0.0.0:0", networkKey, sporkID).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2p.NewDHT(c, h, unicast.FlowDHTProtocolID(sporkID), zerolog.Nop(), metrics.NewNoopCollector())
 		}).
