@@ -92,8 +92,8 @@ func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 			newestQCView = view
 		}
 	}
-	if newestQCView != tc.NewestQC.View {
-		return newInvalidTCError(tc, fmt.Errorf("included QC (view=%d) should be equal to highest contributed view: %d", tc.NewestQC.View, newestQCView))
+	if newestQCView > tc.NewestQC.View {
+		return newInvalidTCError(tc, fmt.Errorf("included QC (view=%d) should be equal or higher to highest contributed view: %d", tc.NewestQC.View, newestQCView))
 	}
 
 	// Validate QC
