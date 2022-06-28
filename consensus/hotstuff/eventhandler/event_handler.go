@@ -249,18 +249,23 @@ func (e *EventHandler) startNewView() error {
 			return nil
 		}
 
-		// TODO: discuss whenever this check should be here, maybe move it to BlockProducer?
-		// Generally speaking this situation shouldn't happen if startNewView() is called as result of
-		// QC or TC constructed. But there are some edge cases where we might be produce invalid proposal
-		// without this sanity checks in case of making proposal after booting up.
+		// perform sanity checks to make sure that resulted proposal is valid.
+		// to create proposal leader for view N needs to present evidence that has was allowed to.
+		// To do that he includes QC or TC for view N-1. Note that PaceMaker advances views only after observing QC or TC,
+		// moreover QC and TC are processed always together, keeping in mind that EventHandler is used strictly single-threaded without reentrancy
+		// we reach a conclusion that we must have a QC or TC with view equal to (curView-1). Failing one of these sanity checks
+		// is a symptom of state corruption or a severe implementation bug.
 		if newestQC.View+1 != curView {
 			if lastViewTC == nil {
-				return fmt.Errorf("inconsistent state, expected lastViewTC to be not nil")
+				return fmt.Errorf("possible state corruption, expected lastViewTC to be not nil")
 			}
 			if lastViewTC.View+1 != curView {
-				return nil
+				return fmt.Errorf("possible state corruption, don't have QC(view=%d) and TC(view=%d) for previous view(currentView=%d)",
+					newestQC.View, lastViewTC.View, curView)
 			}
 		} else {
+			// in case last view has ended with QC and TC, make sure that only QC is included
+			// otherwise such proposal is invalid.
 			lastViewTC = nil
 		}
 
