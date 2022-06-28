@@ -7,6 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/mempool"
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
@@ -41,10 +42,12 @@ func NewDNSCache(sizeLimit uint32, logger zerolog.Logger, ipCollector module.Her
 // PutDomainIp adds the given ip domain into the cache.
 func (d *DNSCache) PutDomainIp(domain string, addresses []net.IPAddr, timestamp int64) bool {
 	i := ipEntity{
-		id:        domainToIdentifier(domain),
-		domain:    domain,
-		addresses: addresses,
-		timestamp: timestamp,
+		IpRecord: mempool.IpRecord{
+			Domain:    domain,
+			Addresses: addresses,
+			Timestamp: timestamp,
+		},
+		id: domainToIdentifier(domain),
 	}
 
 	return d.ipCache.Add(i)
@@ -53,10 +56,12 @@ func (d *DNSCache) PutDomainIp(domain string, addresses []net.IPAddr, timestamp 
 // PutTxtRecord adds the given txt record into the cache.
 func (d *DNSCache) PutTxtRecord(domain string, record []string, timestamp int64) bool {
 	t := txtEntity{
-		id:        domainToIdentifier(domain),
-		txt:       domain,
-		record:    record,
-		timestamp: timestamp,
+		TxtRecord: mempool.TxtRecord{
+			Txt:       domain,
+			Record:    record,
+			Timestamp: timestamp,
+		},
+		id: domainToIdentifier(domain),
 	}
 
 	return d.txtCache.Add(t)
@@ -66,36 +71,38 @@ func (d *DNSCache) PutTxtRecord(domain string, record []string, timestamp int64)
 // The second return value determines the timestamp of adding the
 // domain to the cache.
 // The boolean return value determines if domain exists in the cache.
-func (d *DNSCache) GetDomainIp(domain string) ([]net.IPAddr, int64, bool) {
+func (d *DNSCache) GetDomainIp(domain string) (*mempool.IpRecord, bool) {
 	entity, ok := d.ipCache.ByID(domainToIdentifier(domain))
 	if !ok {
-		return nil, 0, false
+		return nil, false
 	}
 
 	i, ok := entity.(ipEntity)
 	if !ok {
-		return nil, 0, false
+		return nil, false
 	}
+	ipRecord := i.IpRecord
 
-	return i.addresses, i.timestamp, true
+	return &ipRecord, true
 }
 
 // GetTxtRecord returns the txt record if exists in the cache.
 // The second return value determines the timestamp of adding the
 // record to the cache.
 // The boolean return value determines if record exists in the cache.
-func (d *DNSCache) GetTxtRecord(domain string) ([]string, int64, bool) {
+func (d *DNSCache) GetTxtRecord(domain string) (*mempool.TxtRecord, bool) {
 	entity, ok := d.txtCache.ByID(domainToIdentifier(domain))
 	if !ok {
-		return nil, 0, false
+		return nil, false
 	}
 
 	t, ok := entity.(txtEntity)
 	if !ok {
-		return nil, 0, false
+		return nil, false
 	}
+	txtRecord := t.TxtRecord
 
-	return t.record, t.timestamp, true
+	return &txtRecord, true
 }
 
 // RemoveIp removes an ip domain from cache.
@@ -117,12 +124,10 @@ func (d DNSCache) Size() (uint, uint) {
 
 // ipEntity is a dns cache entry for ip records.
 type ipEntity struct {
+	mempool.IpRecord
 	// caching identifier to avoid cpu overhead
 	// per query.
-	id        flow.Identifier
-	domain    string
-	addresses []net.IPAddr
-	timestamp int64
+	id flow.Identifier
 }
 
 func (i ipEntity) ID() flow.Identifier {
@@ -130,17 +135,15 @@ func (i ipEntity) ID() flow.Identifier {
 }
 
 func (i ipEntity) Checksum() flow.Identifier {
-	return domainToIdentifier(i.domain)
+	return domainToIdentifier(i.IpRecord.Domain)
 }
 
 // txtEntity is a dns cache entry for txt records.
 type txtEntity struct {
+	mempool.TxtRecord
 	// caching identifier to avoid cpu overhead
 	// per query.
-	id        flow.Identifier
-	txt       string
-	record    []string
-	timestamp int64
+	id flow.Identifier
 }
 
 func (t txtEntity) ID() flow.Identifier {
@@ -148,7 +151,7 @@ func (t txtEntity) ID() flow.Identifier {
 }
 
 func (t txtEntity) Checksum() flow.Identifier {
-	return domainToIdentifier(t.txt)
+	return domainToIdentifier(t.TxtRecord.Txt)
 }
 
 func domainToIdentifier(domain string) flow.Identifier {

@@ -44,26 +44,26 @@ func (c *cache) resolveIPCache(domain string) ([]net.IPAddr, bool, bool) {
 	c.RLock()
 	defer c.RUnlock()
 
-	addresses, recordTimeStamp, ok := c.dCache.GetDomainIp(domain)
+	record, ok := c.dCache.GetDomainIp(domain)
 	currentTimeStamp := runtimeNano()
-	c.logger.Trace().
-		Str("domain", domain).
-		Str("address", fmt.Sprintf("%v", addresses)).
-		Int64("record_timestamp", recordTimeStamp).
-		Int64("current_timestamp", currentTimeStamp).
-		Msg("dns record retrieved")
 	if !ok {
 		// does not exist
 		return nil, !cacheEntryExists, !cacheEntryFresh
 	}
+	c.logger.Trace().
+		Str("domain", domain).
+		Str("address", fmt.Sprintf("%v", record.Addresses)).
+		Int64("record_timestamp", record.Timestamp).
+		Int64("current_timestamp", currentTimeStamp).
+		Msg("dns record retrieved")
 
-	if time.Duration(currentTimeStamp-recordTimeStamp) > c.ttl {
+	if time.Duration(currentTimeStamp-record.Timestamp) > c.ttl {
 		// exists but expired
-		return addresses, cacheEntryExists, !cacheEntryFresh
+		return record.Addresses, cacheEntryExists, !cacheEntryFresh
 	}
 
 	// exists and fresh
-	return addresses, cacheEntryExists, cacheEntryFresh
+	return record.Addresses, cacheEntryExists, cacheEntryFresh
 }
 
 // resolveIPCache resolves the txt through the cache if it is available.
@@ -73,26 +73,26 @@ func (c *cache) resolveTXTCache(txt string) ([]string, bool, bool) {
 	c.RLock()
 	defer c.RUnlock()
 
-	records, recordTimeStamp, ok := c.dCache.GetTxtRecord(txt)
+	record, ok := c.dCache.GetTxtRecord(txt)
 	currentTimeStamp := runtimeNano()
-	c.logger.Trace().
-		Str("txt", txt).
-		Str("address", fmt.Sprintf("%v", records)).
-		Int64("record_timestamp", recordTimeStamp).
-		Int64("current_timestamp", currentTimeStamp).
-		Msg("dns record retrieved")
 	if !ok {
 		// does not exist
 		return nil, !cacheEntryExists, !cacheEntryFresh
 	}
+	c.logger.Trace().
+		Str("txt", txt).
+		Str("address", fmt.Sprintf("%v", record.Record)).
+		Int64("record_timestamp", record.Timestamp).
+		Int64("current_timestamp", currentTimeStamp).
+		Msg("dns record retrieved")
 
-	if time.Duration(currentTimeStamp-recordTimeStamp) > c.ttl {
+	if time.Duration(currentTimeStamp-record.Timestamp) > c.ttl {
 		// exists but expired
-		return records, cacheEntryExists, !cacheEntryFresh
+		return record.Record, cacheEntryExists, !cacheEntryFresh
 	}
 
 	// exists and fresh
-	return records, cacheEntryExists, cacheEntryFresh
+	return record.Record, cacheEntryExists, cacheEntryFresh
 }
 
 // updateIPCache updates the cache entry for the domain.
