@@ -347,5 +347,5 @@ func (mc *MockConsensus) extendBlock(blockView uint64, parent *flow.Header) *flo
 	nextBlock.ProposerID = mc.identities[int(blockView)%len(mc.identities)].NodeID
 	signerIndices, _ := signature.EncodeSignersToIndices(mc.identities.NodeIDs(), mc.identities.NodeIDs())
 	nextBlock.ParentVoterIndices = signerIndices
-	return &nextBlock
+	return nextBlock
 }

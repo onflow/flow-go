@@ -46,7 +46,7 @@ func TestBlockJob(t *testing.T) {
 
 func TestBlockHeaderJob(t *testing.T) {
 	block := unittest.BlockHeaderFixture()
-	job := jobqueue.BlockHeaderToJob(&block)
+	job := jobqueue.BlockHeaderToJob(block)
 
 	t.Run("job is correct type", func(t *testing.T) {
 		assert.IsType(t, &jobqueue.BlockHeaderJob{}, job, "job is not a block job")

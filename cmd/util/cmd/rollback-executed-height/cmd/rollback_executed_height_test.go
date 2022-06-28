@@ -134,7 +134,7 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		// bootstrap to init highest executed height
 		bootstrapper := bootstrap.NewBootstrapper(unittest.Logger())
 		genesis := unittest.BlockHeaderFixture()
-		err := bootstrapper.BootstrapExecutionDatabase(db, unittest.StateCommitmentFixture(),&genesis)
+		err := bootstrapper.BootstrapExecutionDatabase(db, unittest.StateCommitmentFixture(), genesis)
 		require.NoError(t, err)
 
 		// create all modules
