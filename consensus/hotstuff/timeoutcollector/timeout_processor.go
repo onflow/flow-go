@@ -3,6 +3,7 @@ package timeoutcollector
 import (
 	"errors"
 	"fmt"
+	"unsafe"
 
 	"go.uber.org/atomic"
 
@@ -35,15 +36,13 @@ func (t *accumulatedWeightTracker) Track(weight uint64) bool {
 // NewestQCTracker is a helper structure which keeps track of the highest QC(by view)
 // in concurrency safe way.
 type NewestQCTracker struct {
-	newestQC atomic.Value
+	newestQC *atomic.UnsafePointer
 }
 
 func NewNewestQCTracker() *NewestQCTracker {
-	tracker := &NewestQCTracker{}
-	// store dummy QC with view 0 to workaround limitation of storing nil into atomic.Value
-	tracker.newestQC.Store(&flow.QuorumCertificate{
-		View: 0,
-	})
+	tracker := &NewestQCTracker{
+		newestQC: atomic.NewUnsafePointer(unsafe.Pointer(nil)),
+	}
 	return tracker
 }
 
@@ -51,15 +50,19 @@ func NewNewestQCTracker() *NewestQCTracker {
 // Concurrently safe
 func (t *NewestQCTracker) Track(qc *flow.QuorumCertificate) {
 	NewestQC := t.NewestQC()
-	if NewestQC.View < qc.View {
-		t.newestQC.CompareAndSwap(NewestQC, qc)
+	if NewestQC != nil && NewestQC.View >= qc.View {
+		return
+	}
+
+	if NewestQC == nil || NewestQC.View < qc.View {
+		t.newestQC.CAS(unsafe.Pointer(NewestQC), unsafe.Pointer(qc))
 	}
 }
 
 // NewestQC returns the newest QC(by view) tracked.
 // Concurrently safe
 func (t *NewestQCTracker) NewestQC() *flow.QuorumCertificate {
-	return t.newestQC.Load().(*flow.QuorumCertificate)
+	return (*flow.QuorumCertificate)(t.newestQC.Load())
 }
 
 // TimeoutProcessor implements the hotstuff.TimeoutProcessor interface.
@@ -124,7 +127,8 @@ func NewTimeoutProcessor(committee hotstuff.Replicas,
 // Expected error returns during normal operations:
 // * ErrTimeoutForIncompatibleView - submitted timeout for incompatible view
 // * model.InvalidTimeoutError - submitted invalid timeout(invalid structure or invalid signature)
-// * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
+// * model.DuplicatedSignerError if a timeout from the same signer was previously already added
+//   It does _not necessarily_ imply that the timeout is invalid or the sender is equivocating.
 // All other errors should be treated as exceptions.
 func (p *TimeoutProcessor) Process(timeout *model.TimeoutObject) error {
 	if p.view != timeout.View {
@@ -137,14 +141,31 @@ func (p *TimeoutProcessor) Process(timeout *model.TimeoutObject) error {
 
 	err := p.validateTimeout(timeout)
 	if err != nil {
-		return fmt.Errorf("received invalid timeout: %w", err)
+		return fmt.Errorf("validating timeout failed: %w", err)
+	}
+	if p.tcTracker.Done() {
+		return nil
 	}
 
+	// CAUTION: for correctness it is critical that we update the `newestQCTracker` first, _before_ we add the
+	// TO's signature to `sigAggregator`. Reasoning:
+	//  * For a valid TC, we require that the TC includes a QC with view ≥ max{TC.NewestQCViews}.
+	//  * The `NewestQCViews` is maintained by `sigAggregator`.
+	//  * Hence, for any view `v ∈ NewestQCViews` that `sigAggregator` knows, a QC with equal or larger view is
+	//    known to `newestQCTracker`. This is guaranteed if and only if `newestQCTracker` is updated first.
 	p.newestQCTracker.Track(timeout.NewestQC)
 
 	totalWeight, err := p.sigAggregator.VerifyAndAdd(timeout.SignerID, timeout.SigData, timeout.NewestQC.View)
 	if err != nil {
-		return fmt.Errorf("could not process invalid signature: %w", err)
+		if model.IsInvalidSignerError(err) {
+			return model.NewInvalidTimeoutErrorf(timeout, "invalid signer for timeout: %w", err)
+		}
+		if errors.Is(err, model.ErrInvalidSignature) {
+			return model.NewInvalidTimeoutErrorf(timeout, "timeout is from valid signer but has cryptographically invalid signature: %w", err)
+		}
+		// model.DuplicatedSignerError is an expected error and just bubbled up the call stack.
+		// It does _not necessarily_ imply that the timeout is invalid or the sender is equivocating.
+		return fmt.Errorf("adding signature to aggregator failed: %w", err)
 	}
 
 	if p.partialTCTracker.Track(totalWeight) {
@@ -155,7 +176,6 @@ func (p *TimeoutProcessor) Process(timeout *model.TimeoutObject) error {
 	// At this point, we have enough signatures to build a TC. Another routine
 	// might just be at this point. To avoid duplicate work, Track returns true only once.
 	willBuildTC := p.tcTracker.Track(totalWeight)
-
 	if !willBuildTC {
 		// either we do not have enough timeouts to build a TC, or another thread
 		// has already passed this gate and created a TC
@@ -173,9 +193,10 @@ func (p *TimeoutProcessor) Process(timeout *model.TimeoutObject) error {
 
 // validateTimeout performs validation of timeout object, verifies if timeout is correctly structured
 // and included QC and TC is correctly structured and signed.
-// ATTENTION: this function doesn't check if timeout signature is valid, this check happens in signature aggregator
+// ATTENTION: this function does _not_ check whether the TO's `SignerID` is an authorized node nor if
+// the signature is valid. These checks happens in signature aggregator.
 // Expected error returns during normal operations:
-// * model.InvalidTimeoutError - submitted invalid timeout(invalid structure or invalid signature)
+// * model.InvalidTimeoutError - submitted invalid timeout
 // All other errors should be treated as exceptions.
 func (p *TimeoutProcessor) validateTimeout(timeout *model.TimeoutObject) error {
 	// 1. check if it's correctly structured
@@ -213,22 +234,8 @@ func (p *TimeoutProcessor) validateTimeout(timeout *model.TimeoutObject) error {
 		}
 	}
 
-	// 2. Check if signer identity is valid
-	_, err := p.committee.IdentityByEpoch(timeout.View, timeout.SignerID)
-	if err != nil {
-		if model.IsInvalidSignerError(err) {
-			return model.NewInvalidTimeoutErrorf(timeout, "invalid signer for timeout: %w", err)
-		}
-		if errors.Is(err, model.ErrViewForUnknownEpoch) {
-			// This situation should be impossible since we query epoch information for this view in constructor,
-			// receiving sentinel here is symptom of internal bug.
-			return fmt.Errorf("no Epoch information availalbe for timeout object at view %d; symptom of internal bug or invalid bootstrapping information: %s", timeout.View, err.Error())
-		}
-		return fmt.Errorf("error retrieving signer Identity at view %d: %w", timeout.View, err)
-	}
-
-	// 3. Check if QC is valid
-	err = p.validator.ValidateQC(timeout.NewestQC)
+	// 2. Check if QC is valid
+	err := p.validator.ValidateQC(timeout.NewestQC)
 	if err != nil {
 		if model.IsInvalidQCError(err) {
 			return model.NewInvalidTimeoutErrorf(timeout, "included QC is invalid: %w", err)
@@ -242,7 +249,7 @@ func (p *TimeoutProcessor) validateTimeout(timeout *model.TimeoutObject) error {
 		return fmt.Errorf("unexpected error when validating QC: %w", err)
 	}
 
-	// 4. If TC is included, it must be valid
+	// 3. If TC is included, it must be valid
 	if timeout.LastViewTC != nil {
 		err = p.validator.ValidateTC(timeout.LastViewTC)
 		if err != nil {
@@ -276,10 +283,18 @@ func (p *TimeoutProcessor) buildTC() (*flow.TimeoutCertificate, error) {
 		return nil, fmt.Errorf("could not encode signer indices: %w", err)
 	}
 
+	// Note that `newestQC` can have a larger view than any of the views included in `highQCViews`.
+	// This is because for a TO currently being processes following two operations are executed in separate steps:
+	// * updating the `newestQCTracker` with the QC from the TO
+	// * adding the TO's signature to `sigAggregator`
+	// Therefore, races are possible, where the `newestQCTracker` already knows of a QC with larger view
+	// than the data stored in `sigAggregator`.
+	newestQC := p.newestQCTracker.NewestQC()
+
 	return &flow.TimeoutCertificate{
 		View:          p.view,
 		NewestQCViews: highQCViews,
-		NewestQC:      p.newestQCTracker.NewestQC(),
+		NewestQC:      newestQC,
 		SignerIndices: signerIndices,
 		SigData:       aggregatedSig,
 	}, nil

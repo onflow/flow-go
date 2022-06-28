@@ -389,7 +389,7 @@ func (e InvalidTimeoutError) Error() string {
 	return fmt.Sprintf("invalid timeout %x for view %d: %s", e.Timeout.ID(), e.Timeout.View, e.Err.Error())
 }
 
-// IsInvalidTimeoutError returns whether an error is InvalidVoteError
+// IsInvalidTimeoutError returns whether an error is InvalidTimeoutError
 func IsInvalidTimeoutError(err error) bool {
 	var e InvalidTimeoutError
 	return errors.As(err, &e)
