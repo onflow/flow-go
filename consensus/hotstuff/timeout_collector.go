@@ -32,7 +32,8 @@ type TimeoutCollector interface {
 type TimeoutProcessor interface {
 	// Process performs processing of single timeout object. This function is safe to call from multiple goroutines.
 	// Expected error returns during normal operations:
-	// * model.InvalidTimeoutError - submitted invalid timeout (invalid structure or invalid signature)
+	// * timeoutcollector.ErrTimeoutForIncompatibleView - submitted timeout for incompatible view
+	// * model.InvalidTimeoutError - submitted invalid timeout(invalid structure or invalid signature)
 	// * model.DuplicatedSignerError if a timeout from the same signer was previously already added
 	//   It does _not necessarily_ imply that the timeout is invalid or the sender is equivocating.
 	// All other errors should be treated as exceptions.

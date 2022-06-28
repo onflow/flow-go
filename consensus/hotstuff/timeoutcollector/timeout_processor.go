@@ -124,7 +124,8 @@ func NewTimeoutProcessor(committee hotstuff.Replicas,
 // Expected error returns during normal operations:
 // * ErrTimeoutForIncompatibleView - submitted timeout for incompatible view
 // * model.InvalidTimeoutError - submitted invalid timeout(invalid structure or invalid signature)
-// * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
+// * model.DuplicatedSignerError if a timeout from the same signer was previously already added
+//   It does _not necessarily_ imply that the timeout is invalid or the sender is equivocating.
 // All other errors should be treated as exceptions.
 func (p *TimeoutProcessor) Process(timeout *model.TimeoutObject) error {
 	if p.view != timeout.View {
@@ -148,12 +149,20 @@ func (p *TimeoutProcessor) Process(timeout *model.TimeoutObject) error {
 	//  * For a valid TC, we require that the TC includes a QC with view ≥ max{TC.NewestQCViews}.
 	//  * The `NewestQCViews` is maintained by `sigAggregator`.
 	//  * Hence, for any view `v ∈ NewestQCViews` that `sigAggregator` knows, a QC with equal or larger view is
-	//    known to `newestQCTracker`. This is guaranteed if and only if `newestQCTracker` is updated first. 
+	//    known to `newestQCTracker`. This is guaranteed if and only if `newestQCTracker` is updated first.
 	p.newestQCTracker.Track(timeout.NewestQC)
 
 	totalWeight, err := p.sigAggregator.VerifyAndAdd(timeout.SignerID, timeout.SigData, timeout.NewestQC.View)
 	if err != nil {
-		return fmt.Errorf("could not process invalid signature: %w", err)
+		if model.IsInvalidSignerError(err) {
+			return model.NewInvalidTimeoutErrorf(timeout, "invalid signer for timeout: %w", err)
+		}
+		if errors.Is(err, model.ErrInvalidSignature) {
+			return model.NewInvalidTimeoutErrorf(timeout, "timeout is from valid signer but has cryptographically invalid signature: %w", err)
+		}
+		// model.DuplicatedSignerError is an expected error and just bubbled up the call stack.
+		// It does _not necessarily_ imply that the timeout is invalid or the sender is equivocating.
+		return fmt.Errorf("adding signature to aggregator failed: %w", err)
 	}
 
 	if p.partialTCTracker.Track(totalWeight) {
@@ -181,7 +190,7 @@ func (p *TimeoutProcessor) Process(timeout *model.TimeoutObject) error {
 
 // validateTimeout performs validation of timeout object, verifies if timeout is correctly structured
 // and included QC and TC is correctly structured and signed.
-// ATTENTION: this function does _not_ check whether the TO's `SignerID` is an authorized node nor if 
+// ATTENTION: this function does _not_ check whether the TO's `SignerID` is an authorized node nor if
 // the signature is valid. These checks happens in signature aggregator.
 // Expected error returns during normal operations:
 // * model.InvalidTimeoutError - submitted invalid timeout
@@ -222,22 +231,8 @@ func (p *TimeoutProcessor) validateTimeout(timeout *model.TimeoutObject) error {
 		}
 	}
 
-	// 2. Check if signer identity is valid
-	_, err := p.committee.IdentityByEpoch(timeout.View, timeout.SignerID)
-	if err != nil {
-		if model.IsInvalidSignerError(err) {
-			return model.NewInvalidTimeoutErrorf(timeout, "invalid signer for timeout: %w", err)
-		}
-		if errors.Is(err, model.ErrViewForUnknownEpoch) {
-			// This situation should be impossible since we query epoch information for this view in constructor,
-			// receiving sentinel here is symptom of internal bug.
-			return fmt.Errorf("no Epoch information availalbe for timeout object at view %d; symptom of internal bug or invalid bootstrapping information: %s", timeout.View, err.Error())
-		}
-		return fmt.Errorf("error retrieving signer Identity at view %d: %w", timeout.View, err)
-	}
-
-	// 3. Check if QC is valid
-	err = p.validator.ValidateQC(timeout.NewestQC)
+	// 2. Check if QC is valid
+	err := p.validator.ValidateQC(timeout.NewestQC)
 	if err != nil {
 		if model.IsInvalidQCError(err) {
 			return model.NewInvalidTimeoutErrorf(timeout, "included QC is invalid: %w", err)
@@ -251,7 +246,7 @@ func (p *TimeoutProcessor) validateTimeout(timeout *model.TimeoutObject) error {
 		return fmt.Errorf("unexpected error when validating QC: %w", err)
 	}
 
-	// 4. If TC is included, it must be valid
+	// 3. If TC is included, it must be valid
 	if timeout.LastViewTC != nil {
 		err = p.validator.ValidateTC(timeout.LastViewTC)
 		if err != nil {

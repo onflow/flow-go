@@ -44,6 +44,9 @@ func NewTimeoutCollector(view uint64,
 // When TOs from strictly more than 1/3 of consensus participants (measured by weight)
 // were collected, the callback for partial TC will be triggered.
 // After collecting TOs from a supermajority, a TC will be created and passed to the EventLoop.
+// Expected error returns during normal operations:
+//  * timeoutcollector.ErrTimeoutForIncompatibleView - submitted timeout for incompatible view
+// All other exceptions are symptoms of potential state corruption.
 func (c *TimeoutCollector) AddTimeout(timeout *model.TimeoutObject) error {
 	// cache timeout
 	err := c.timeoutsCache.AddTimeoutObject(timeout)
