@@ -2,6 +2,7 @@ package timeoutcollector
 
 import (
 	"errors"
+	"fmt"
 	"math/rand"
 	"sync"
 	"testing"
@@ -183,37 +184,6 @@ func (s *TimeoutProcessorTestSuite) TestProcess_LastViewTCRequiredButNotPresent(
 	require.True(s.T(), model.IsInvalidTimeoutError(err))
 }
 
-// TestProcess_InvalidSigner tests that TimeoutProcessor correctly handles errors when timeout was created
-// by invalid signer.
-func (s *TimeoutProcessorTestSuite) TestProcess_InvalidSigner() {
-	timeout := s.TimeoutLastViewSuccessfulFixture()
-
-	s.Run("invalid-signer", func() {
-		*s.committee = *mocks.NewReplicas(s.T())
-		s.committee.On("IdentityByEpoch", mock.Anything, mock.Anything).Return(nil, model.NewInvalidSignerError(errors.New(""))).Once()
-		err := s.processor.Process(timeout)
-		require.True(s.T(), model.IsInvalidTimeoutError(err))
-		require.True(s.T(), model.IsInvalidSignerError(err))
-	})
-	s.Run("identity-by-epoch-exception", func() {
-		*s.committee = *mocks.NewReplicas(s.T())
-		exception := errors.New("identity-by-epoch-exception")
-		s.committee.On("IdentityByEpoch", mock.Anything, mock.Anything).Return(nil, exception).Once()
-		err := s.processor.Process(timeout)
-		require.ErrorIs(s.T(), err, exception)
-		require.False(s.T(), model.IsInvalidTimeoutError(err))
-		require.False(s.T(), model.IsInvalidSignerError(err))
-	})
-	s.Run("identity-by-epoch-err-view-for-unknown-epoch", func() {
-		*s.committee = *mocks.NewReplicas(s.T())
-		s.committee.On("IdentityByEpoch", mock.Anything, mock.Anything).Return(nil, model.ErrViewForUnknownEpoch).Once()
-
-		err := s.processor.Process(timeout)
-		require.False(s.T(), model.IsInvalidTimeoutError(err))
-		require.NotErrorIs(s.T(), err, model.ErrViewForUnknownEpoch)
-	})
-}
-
 // TestProcess_IncludedQCInvalid tests that TimeoutProcessor correctly handles validation errors if
 // timeout is well-formed but included QC is invalid
 func (s *TimeoutProcessorTestSuite) TestProcess_IncludedQCInvalid() {
@@ -297,6 +267,47 @@ func (s *TimeoutProcessorTestSuite) TestProcess_ValidTimeout() {
 		err := s.processor.Process(timeout)
 		require.NoError(s.T(), err)
 		s.sigAggregator.AssertCalled(s.T(), "VerifyAndAdd", timeout.SignerID, timeout.SigData, timeout.NewestQC.View)
+	})
+}
+
+// TestProcess_VerifyAndAddFailed tests different scenarios when TimeoutSignatureAggregator fails with error.
+// We check all sentinel errors and exceptions in this scenario.
+func (s *TimeoutProcessorTestSuite) TestProcess_VerifyAndAddFailed() {
+	timeout := s.TimeoutLastViewSuccessfulFixture()
+	s.validator.On("ValidateQC", timeout.NewestQC).Return(nil)
+	s.Run("invalid-signer", func() {
+		*s.sigAggregator = *mocks.NewTimeoutSignatureAggregator(s.T())
+		s.sigAggregator.On("VerifyAndAdd", mock.Anything, mock.Anything, mock.Anything).
+			Return(uint64(0), model.NewInvalidSignerError(fmt.Errorf(""))).Once()
+		err := s.processor.Process(timeout)
+		require.True(s.T(), model.IsInvalidTimeoutError(err))
+		require.True(s.T(), model.IsInvalidSignerError(err))
+	})
+	s.Run("invalid-signature", func() {
+		*s.sigAggregator = *mocks.NewTimeoutSignatureAggregator(s.T())
+		s.sigAggregator.On("VerifyAndAdd", mock.Anything, mock.Anything, mock.Anything).
+			Return(uint64(0), model.ErrInvalidSignature).Once()
+		err := s.processor.Process(timeout)
+		require.True(s.T(), model.IsInvalidTimeoutError(err))
+		require.ErrorIs(s.T(), err, model.ErrInvalidSignature)
+	})
+	s.Run("duplicated-signer", func() {
+		*s.sigAggregator = *mocks.NewTimeoutSignatureAggregator(s.T())
+		s.sigAggregator.On("VerifyAndAdd", mock.Anything, mock.Anything, mock.Anything).
+			Return(uint64(0), model.NewDuplicatedSignerErrorf("")).Once()
+		err := s.processor.Process(timeout)
+		require.True(s.T(), model.IsDuplicatedSignerError(err))
+		// this shouldn't be wrapped in invalid timeout
+		require.False(s.T(), model.IsInvalidTimeoutError(err))
+	})
+	s.Run("verify-exception", func() {
+		*s.sigAggregator = *mocks.NewTimeoutSignatureAggregator(s.T())
+		exception := errors.New("verify-exception")
+		s.sigAggregator.On("VerifyAndAdd", mock.Anything, mock.Anything, mock.Anything).
+			Return(uint64(0), exception).Once()
+		err := s.processor.Process(timeout)
+		require.False(s.T(), model.IsInvalidTimeoutError(err))
+		require.ErrorIs(s.T(), err, exception)
 	})
 }
 
@@ -384,7 +395,6 @@ func (s *TimeoutProcessorTestSuite) TestProcess_ConcurrentCreatingTC() {
 	s.notifier.On("OnTcConstructedFromTimeouts", mock.Anything).Return(nil).Once()
 	s.sigAggregator.On("Aggregate").Return([]flow.Identifier(s.participants.NodeIDs()), []uint64{}, crypto.Signature{}, nil)
 	s.committee.On("IdentitiesByEpoch", mock.Anything).Return(s.participants, nil)
-	s.committee.On("IdentityByEpoch", mock.Anything, mock.Anything).Return(s.signer, nil)
 
 	var startupWg, shutdownWg sync.WaitGroup
 
@@ -456,7 +466,6 @@ func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 
 	committee := mocks.NewDynamicCommittee(t)
 	committee.On("IdentitiesByEpoch", mock.Anything).Return(stakingSigners, nil)
-	committee.On("IdentityByEpoch", mock.Anything, mock.Anything).Return(leader, nil)
 	committee.On("IdentitiesByBlock", mock.Anything).Return(stakingSigners, nil)
 	committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(stakingSigners.TotalWeight()), nil)
 	committee.On("TimeoutThresholdForView", mock.Anything).Return(committees.WeightThresholdToTimeout(stakingSigners.TotalWeight()), nil)
