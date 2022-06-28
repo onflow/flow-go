@@ -102,9 +102,14 @@ func NewTransactionEnvironment(
 				// If the contract deployment bool is not set by the state
 				// fallback to the default value set by the configuration
 				// after the contract deployment bool is set by the state on all chains, this logic can be simplified
-				return ctx.RestrictedDeploymentEnabled
+				return ctx.RestrictContractDeployment
 			}
 			return enabled
+		},
+		func() bool {
+			// TODO read this from the chain similar to the contract deployment
+			// but for now we would honor the fallback context flag
+			return ctx.RestrictContractRemoval
 		},
 		env.GetAccountsAuthorizedForContractUpdate,
 		env.GetAccountsAuthorizedForContractRemoval,
@@ -761,11 +766,15 @@ func (e *TransactionEnv) MeterMemory(usage common.MemoryUsage) error {
 	return e.meterMemory(usage.Kind, uint(usage.Amount))
 }
 
-func (e *TransactionEnv) MemoryUsed() uint64 {
-	return uint64(e.sth.State().TotalMemoryUsed())
+func (e *TransactionEnv) MemoryEstimate() uint64 {
+	return uint64(e.sth.State().TotalMemoryEstimate())
 }
 
 func (e *TransactionEnv) SetAccountFrozen(address common.Address, frozen bool) error {
+
+	if !e.ctx.AccountFreezeEnabled {
+		return errors.NewOperationNotSupportedError("SetAccountFrozen")
+	}
 
 	flowAddress := flow.Address(address)
 

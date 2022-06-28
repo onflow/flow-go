@@ -10,7 +10,7 @@ on:
       - '**/*6221*'
 
 env:
-  GO_VERSION: 1.17
+  GO_VERSION: 1.18
 
 jobs:
   golangci:
@@ -59,7 +59,7 @@ jobs:
       - name: Build relic
         run: make crypto_setup_gopath
       - name: Docker build
-        run: make docker-build-flow-corrupted
+        run: make integration-test-bft
       - name: Run tests
         if: github.actor != 'bors[bot]'
         run: ./tools/test_monitor/run-tests.sh
