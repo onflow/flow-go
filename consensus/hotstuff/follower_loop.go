@@ -77,7 +77,7 @@ func (fl *FollowerLoop) loop() {
 		case p := <-fl.proposals:
 			err := fl.followerLogic.AddBlock(p.Proposal)
 			close(p.done)
-			
+
 			if err != nil { // all errors are fatal
 				fl.log.Error().
 					Hex("block_id", logging.ID(p.Block.BlockID)).
