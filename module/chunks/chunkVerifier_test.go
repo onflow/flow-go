@@ -251,12 +251,12 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 	blockID := block.ID()
 
 	// registerTouch and State setup
-	id1 := flow.NewRegisterID("00", "", "")
+	id1 := flow.NewRegisterID("00", "")
 	value1 := []byte{'a'}
 
 	id2Bytes := make([]byte, 32)
 	id2Bytes[0] = byte(5)
-	id2 := flow.NewRegisterID("05", "", "")
+	id2 := flow.NewRegisterID("05", "")
 	value2 := []byte{'b'}
 	UpdatedValue2 := []byte{'B'}
 
@@ -375,12 +375,12 @@ func (vm *vmMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View, progr
 	switch string(tx.Transaction.Script) {
 	case "wrongEndState":
 		// add updates to the ledger
-		_ = led.Set("00", "", "", []byte{'F'})
+		_ = led.Set("00", "", []byte{'F'})
 		tx.Logs = []string{"log1", "log2"}
 		tx.Events = eventsList
 	case "failedTx":
 		// add updates to the ledger
-		_ = led.Set("05", "", "", []byte{'B'})
+		_ = led.Set("05", "", []byte{'B'})
 		tx.Err = &fvmErrors.CadenceRuntimeError{} // inside the runtime (e.g. div by zero, access account)
 	case "eventsMismatch":
 		tx.Events = append(eventsList, flow.Event{
@@ -391,9 +391,9 @@ func (vm *vmMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View, progr
 			Payload:          []byte{88},
 		})
 	default:
-		_, _ = led.Get("00", "", "")
-		_, _ = led.Get("05", "", "")
-		_ = led.Set("05", "", "", []byte{'B'})
+		_, _ = led.Get("00", "")
+		_, _ = led.Get("05", "")
+		_ = led.Set("05", "", []byte{'B'})
 		tx.Logs = []string{"log1", "log2"}
 		tx.Events = eventsList
 	}
@@ -412,9 +412,9 @@ func (vm *vmSystemOkMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.Vie
 	tx.ServiceEvents = []flow.Event{epochSetupEvent}
 
 	// add "default" interaction expected in tests
-	_, _ = led.Get("00", "", "")
-	_, _ = led.Get("05", "", "")
-	_ = led.Set("05", "", "", []byte{'B'})
+	_, _ = led.Get("00", "")
+	_, _ = led.Get("05", "")
+	_ = led.Set("05", "", []byte{'B'})
 	tx.Logs = []string{"log1", "log2"}
 
 	return nil
