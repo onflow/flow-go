@@ -25,6 +25,10 @@ var (
 	ConsensusVoteTag = tag("Consensus-Vote")
 	// CollectorVoteTag is used for Collection Hotstuff votes
 	CollectorVoteTag = tag("Collector-Vote")
+	// ConsensusTimeoutTag is used for Consensus Active Pacemaker timeouts
+	ConsensusTimeoutTag = tag("Consensus-Timeout")
+	// CollectorTimeoutTag is used for Collector Active Pacemaker timeouts
+	CollectorTimeoutTag = tag("Collector-Timeout")
 	// ExecutionReceiptTag is used for execution receipts
 	ExecutionReceiptTag = tag("Execution-Receipt")
 	// ResultApprovalTag is used for result approvals

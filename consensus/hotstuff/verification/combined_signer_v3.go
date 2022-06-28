@@ -25,10 +25,11 @@ import (
 // The difference between V2 and V3 is that V2 will sign 2 sigs, whereas
 // V3 only sign 1 sig.
 type CombinedSignerV3 struct {
-	staking        module.Local
-	stakingHasher  hash.Hasher
-	beaconKeyStore module.RandomBeaconKeyStore
-	beaconHasher   hash.Hasher
+	staking             module.Local
+	stakingHasher       hash.Hasher
+	timeoutObjectHasher hash.Hasher
+	beaconKeyStore      module.RandomBeaconKeyStore
+	beaconHasher        hash.Hasher
 }
 
 var _ hotstuff.Signer = (*CombinedSignerV3)(nil)
@@ -43,10 +44,11 @@ func NewCombinedSignerV3(
 ) *CombinedSignerV3 {
 
 	sc := &CombinedSignerV3{
-		staking:        staking,
-		stakingHasher:  crypto.NewBLSKMAC(encoding.ConsensusVoteTag),
-		beaconKeyStore: beaconKeyStore,
-		beaconHasher:   crypto.NewBLSKMAC(encoding.RandomBeaconTag),
+		staking:             staking,
+		stakingHasher:       crypto.NewBLSKMAC(encoding.ConsensusVoteTag),
+		timeoutObjectHasher: crypto.NewBLSKMAC(encoding.ConsensusTimeoutTag),
+		beaconKeyStore:      beaconKeyStore,
+		beaconHasher:        crypto.NewBLSKMAC(encoding.RandomBeaconTag),
 	}
 	return sc
 }
@@ -99,7 +101,7 @@ func (c *CombinedSignerV3) CreateVote(block *model.Block) (*model.Vote, error) {
 func (c *CombinedSignerV3) CreateTimeout(curView uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
 	// create timeout object specific message
 	msg := MakeTimeoutMessage(curView, newestQC.View)
-	sigData, err := c.staking.Sign(msg, c.stakingHasher)
+	sigData, err := c.staking.Sign(msg, c.timeoutObjectHasher)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate signature for timeout object at view %d: %w", curView, err)
 	}

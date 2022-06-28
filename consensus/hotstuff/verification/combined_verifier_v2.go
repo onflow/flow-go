@@ -23,10 +23,11 @@ import (
 // a signature from a random beacon signer, which verifies either the signature share or
 // the reconstructed threshold signature.
 type CombinedVerifier struct {
-	committee     hotstuff.Replicas
-	stakingHasher hash.Hasher
-	beaconHasher  hash.Hasher
-	packer        hotstuff.Packer
+	committee           hotstuff.Replicas
+	stakingHasher       hash.Hasher
+	timeoutObjectHasher hash.Hasher
+	beaconHasher        hash.Hasher
+	packer              hotstuff.Packer
 }
 
 var _ hotstuff.Verifier = (*CombinedVerifier)(nil)
@@ -37,10 +38,11 @@ var _ hotstuff.Verifier = (*CombinedVerifier)(nil)
 // - the packer is used to unpack QC for verification;
 func NewCombinedVerifier(committee hotstuff.Replicas, packer hotstuff.Packer) *CombinedVerifier {
 	return &CombinedVerifier{
-		committee:     committee,
-		stakingHasher: crypto.NewBLSKMAC(encoding.ConsensusVoteTag),
-		beaconHasher:  crypto.NewBLSKMAC(encoding.RandomBeaconTag),
-		packer:        packer,
+		committee:           committee,
+		stakingHasher:       crypto.NewBLSKMAC(encoding.ConsensusVoteTag),
+		timeoutObjectHasher: crypto.NewBLSKMAC(encoding.ConsensusTimeoutTag),
+		beaconHasher:        crypto.NewBLSKMAC(encoding.RandomBeaconTag),
+		packer:              packer,
 	}
 }
 
@@ -186,5 +188,5 @@ func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, v
 //  * unexpected errors should be treated as symptoms of bugs or uncovered
 //	  edge cases in the logic (i.e. as fatal)
 func (c *CombinedVerifier) VerifyTC(signers flow.IdentityList, sigData []byte, view uint64, highQCViews []uint64) error {
-	return verifyTC(signers, sigData, view, highQCViews, c.stakingHasher)
+	return verifyTC(signers, sigData, view, highQCViews, c.timeoutObjectHasher)
 }
