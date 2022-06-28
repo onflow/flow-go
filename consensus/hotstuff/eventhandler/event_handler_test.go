@@ -270,13 +270,13 @@ func (es *EventHandlerSuite) SetupTest() {
 
 	es.paceMaker = initPaceMaker(es.T(), livenessData)
 	es.forks = NewForks(es.T(), finalized)
-	es.persist = &mocks.Persister{}
-	es.persist.On("PutStarted", mock.Anything).Return(nil)
+	es.persist = mocks.NewPersister(es.T())
+	es.persist.On("PutStarted", mock.Anything).Return(nil).Maybe()
 	es.blockProducer = &BlockProducer{}
-	es.communicator = &mocks.Communicator{}
-	es.communicator.On("BroadcastProposalWithDelay", mock.Anything, mock.Anything).Return(nil)
-	es.communicator.On("SendVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	es.communicator.On("BroadcastTimeout", mock.Anything).Return(nil)
+	es.communicator = mocks.NewCommunicator(es.T())
+	es.communicator.On("BroadcastProposalWithDelay", mock.Anything, mock.Anything).Return(nil).Maybe()
+	es.communicator.On("SendVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+	es.communicator.On("BroadcastTimeout", mock.Anything).Return(nil).Maybe()
 	es.committee = NewCommittee()
 	es.voteAggregator = mocks.NewVoteAggregator(es.T())
 	es.timeoutAggregator = mocks.NewTimeoutAggregator(es.T())
@@ -719,7 +719,6 @@ func (es *EventHandlerSuite) TestFollowerFollows100Blocks() {
 	}
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
 	require.Equal(es.T(), 100, len(es.forks.blocks)-1)
-	es.voteAggregator.AssertExpectations(es.T())
 }
 
 // TestFollowerReceives100Forks tests scenario where follower receives 100 forks built on top of the same block
@@ -734,7 +733,46 @@ func (es *EventHandlerSuite) TestFollowerReceives100Forks() {
 	}
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
 	require.Equal(es.T(), 100, len(es.forks.blocks)-1)
-	es.voteAggregator.AssertExpectations(es.T())
+}
+
+// TestStart_PendingBlocksRecovery tests a scenario where node has unprocessed pending blocks that were not processed
+// by event handler yet. After startup, we need to process all pending blocks.
+func (es *EventHandlerSuite) TestStart_PendingBlocksRecovery() {
+	// after processing first pending proposal we are expected to recover one by one
+	es.endView++
+	es.endView++
+	es.endView++
+
+	err := es.eventhandler.Start()
+	require.NoError(es.T(), err)
+	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
+}
+
+// TestCreateProposal_SanityChecks tests that proposing logic performs sanity checks when creating new block proposal.
+// This test modifies internal state of PaceMaker to reproduce state corruption.
+func (es *EventHandlerSuite) TestCreateProposal_SanityChecks() {
+	es.Run("qc-and-tc-included", func() {
+		// round ended with TC where TC.View == TC.NewestQC.View
+		tc := helper.MakeTC(helper.WithTCView(es.initView),
+			helper.WithTCNewestQC(helper.MakeQC(helper.WithQCBlock(es.votingBlock))))
+
+		es.forks.blocks[es.votingBlock.BlockID] = es.votingBlock
+
+		// I'm the next leader
+		es.committee.leaders[tc.View+1] = struct{}{}
+
+		err := es.eventhandler.OnTCConstructed(tc)
+		require.NoError(es.T(), err)
+
+		lastCall := es.communicator.Calls[len(es.communicator.Calls)-1]
+		// the last call is BroadcastProposal
+		require.Equal(es.T(), "BroadcastProposalWithDelay", lastCall.Method)
+		header, ok := lastCall.Arguments[0].(*flow.Header)
+		require.True(es.T(), ok)
+		require.Nil(es.T(), header.LastViewTC)
+
+		require.Equal(es.T(), tc.View+1, es.paceMaker.CurView(), "incorrect view change")
+	})
 }
 
 func createBlock(view uint64) *model.Block {

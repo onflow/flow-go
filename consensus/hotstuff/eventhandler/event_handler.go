@@ -265,7 +265,8 @@ func (e *EventHandler) startNewView() error {
 			}
 		} else {
 			// in case last view has ended with QC and TC, make sure that only QC is included
-			// otherwise such proposal is invalid.
+			// otherwise such proposal is invalid. This case is possible if TC has included QC with the same
+			// view as the TC itself, meaning that newestQC.View == lastViewTC.View
 			lastViewTC = nil
 		}
 
