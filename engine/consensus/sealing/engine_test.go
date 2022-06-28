@@ -87,9 +87,9 @@ func (s *SealingEngineSuite) TestOnFinalizedBlock() {
 	finalizedBlock := unittest.BlockHeaderFixture()
 	finalizedBlockID := finalizedBlock.ID()
 
-	s.state.On("Final").Return(unittest.StateSnapshotForKnownBlock(&finalizedBlock, nil))
+	s.state.On("Final").Return(unittest.StateSnapshotForKnownBlock(finalizedBlock, nil))
 	s.core.On("ProcessFinalizedBlock", finalizedBlockID).Return(nil).Once()
-	s.engine.OnFinalizedBlock(model.BlockFromFlow(&finalizedBlock, finalizedBlock.View-1))
+	s.engine.OnFinalizedBlock(model.BlockFromFlow(finalizedBlock, finalizedBlock.View-1))
 
 	// matching engine has at least 100ms ticks for processing events
 	time.Sleep(1 * time.Second)
@@ -101,7 +101,7 @@ func (s *SealingEngineSuite) TestOnFinalizedBlock() {
 // Tests the whole processing pipeline.
 func (s *SealingEngineSuite) TestOnBlockIncorporated() {
 	parentBlock := unittest.BlockHeaderFixture()
-	incorporatedBlock := unittest.BlockHeaderWithParentFixture(&parentBlock)
+	incorporatedBlock := unittest.BlockHeaderWithParentFixture(parentBlock)
 	incorporatedBlockID := incorporatedBlock.ID()
 	// setup payload fixture
 	payload := unittest.PayloadFixture(unittest.WithAllTheFixins)
@@ -121,7 +121,7 @@ func (s *SealingEngineSuite) TestOnBlockIncorporated() {
 	headers.On("ByBlockID", incorporatedBlockID).Return(&incorporatedBlock, nil).Once()
 	s.engine.headers = headers
 
-	s.engine.OnBlockIncorporated(model.BlockFromFlow(&incorporatedBlock, incorporatedBlock.View-1))
+	s.engine.OnBlockIncorporated(model.BlockFromFlow(incorporatedBlock, incorporatedBlock.View-1))
 
 	// matching engine has at least 100ms ticks for processing events
 	time.Sleep(1 * time.Second)

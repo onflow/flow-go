@@ -70,7 +70,7 @@ func (ss *SyncSuite) SetupTest() {
 
 	// generate a header for the final state
 	header := unittest.BlockHeaderFixture()
-	ss.head = &header
+	ss.head = header
 
 	// create maps to enable block returns
 	ss.heights = make(map[uint64]*flow.Block)
@@ -518,7 +518,7 @@ func (ss *SyncSuite) TestProcessingMultipleItems() {
 func (ss *SyncSuite) TestOnFinalizedBlock() {
 	finalizedBlock := unittest.BlockHeaderWithParentFixture(ss.head)
 	// change head
-	ss.head = &finalizedBlock
+	ss.head = finalizedBlock
 
 	err := ss.e.finalizedHeader.updateHeader()
 	require.NoError(ss.T(), err)

@@ -135,7 +135,7 @@ func (suite *IngestionCoreSuite) SetupTest() {
 
 	ingest := NewCore(unittest.Logger(), tracer, metrics, state, headers, pool)
 
-	suite.head = &head
+	suite.head = head
 	suite.final = final
 	suite.ref = ref
 	suite.headers = headers

@@ -147,7 +147,7 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 		header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(uint64(i)))
 		ids[i] = header.ID()
 
-		events[i] = unittest.BlockEventsFixture(header, 2)
+		events[i] = unittest.BlockEventsFixture(*header, 2)
 
 		backend.Mock.
 			On("GetEventsForBlockIDs", mocks.Anything, mocks.Anything, []flow.Identifier{header.ID()}).

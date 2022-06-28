@@ -254,7 +254,7 @@ func TestExecuteScript(t *testing.T) {
 	require.NoError(t, err)
 
 	header := unittest.BlockHeaderFixture()
-	_, err = engine.ExecuteScript(context.Background(), script, nil, &header, scriptView)
+	_, err = engine.ExecuteScript(context.Background(), script, nil, header, scriptView)
 	require.NoError(t, err)
 }
 
@@ -288,7 +288,7 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 		edCache)
 	require.NoError(t, err)
 
-	_, err = manager.ExecuteScript(context.Background(), []byte("whatever"), nil, &header, noopView())
+	_, err = manager.ExecuteScript(context.Background(), []byte("whatever"), nil, header, noopView())
 
 	require.Error(t, err)
 
@@ -325,7 +325,7 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 		edCache)
 	require.NoError(t, err)
 
-	_, err = manager.ExecuteScript(context.Background(), []byte("whatever"), nil, &header, noopView())
+	_, err = manager.ExecuteScript(context.Background(), []byte("whatever"), nil, header, noopView())
 
 	require.NoError(t, err)
 
@@ -362,7 +362,7 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 		edCache)
 	require.NoError(t, err)
 
-	_, err = manager.ExecuteScript(context.Background(), []byte("whatever"), nil, &header, noopView())
+	_, err = manager.ExecuteScript(context.Background(), []byte("whatever"), nil, header, noopView())
 
 	require.NoError(t, err)
 
@@ -455,7 +455,7 @@ func TestExecuteScriptTimeout(t *testing.T) {
 	`)
 
 	header := unittest.BlockHeaderFixture()
-	value, err := manager.ExecuteScript(context.Background(), script, nil, &header, noopView())
+	value, err := manager.ExecuteScript(context.Background(), script, nil, header, noopView())
 
 	require.Error(t, err)
 	require.Nil(t, value)
@@ -501,7 +501,7 @@ func TestExecuteScriptCancelled(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		header := unittest.BlockHeaderFixture()
-		value, err = manager.ExecuteScript(reqCtx, script, nil, &header, noopView())
+		value, err = manager.ExecuteScript(reqCtx, script, nil, header, noopView())
 		wg.Done()
 	}()
 	cancel()
@@ -557,7 +557,7 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 
 	header := unittest.BlockHeaderFixture()
 	scriptView := view.NewChild()
-	_, err = manager.ExecuteScript(context.Background(), script, [][]byte{jsoncdc.MustEncode(address)}, &header, scriptView)
+	_, err = manager.ExecuteScript(context.Background(), script, [][]byte{jsoncdc.MustEncode(address)}, header, scriptView)
 
 	require.NoError(t, err)
 
