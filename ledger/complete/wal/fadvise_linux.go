@@ -23,6 +23,7 @@ func fadviseNoLinuxPageCache(fd uintptr, fsync bool) error {
 // If GOOS != "linux" then this function does nothing.
 // CAUTION: If fsync=true, this will call unix.Fsync which
 // can cause performance hit especially when used inside a loop.
+//nolint:unused,deadcode
 func fadviseSegmentNoLinuxPageCache(fd uintptr, off, len int64, fsync bool) error {
 	// Optionally call fsync because dirty pages won't be evicted.
 	if fsync {

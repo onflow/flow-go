@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/network"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	mockstorage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -54,7 +55,7 @@ func (s *SealingEngineSuite) SetupTest() {
 		},
 	)
 
-	rootHeader, err := unittest.RootSnapshotFixture(unittest.IdentityListFixture(5)).Head()
+	rootHeader, err := unittest.RootSnapshotFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles())).Head()
 	require.NoError(s.T(), err)
 
 	s.engine = &Engine{
@@ -73,7 +74,7 @@ func (s *SealingEngineSuite) SetupTest() {
 	// setup inbound queues for trusted inputs and message handler for untrusted inputs
 	err = s.engine.setupTrustedInboundQueues()
 	require.NoError(s.T(), err)
-	err = s.engine.setupMessageHandler(RequiredApprovalsForSealConstructionTestingValue)
+	err = s.engine.setupMessageHandler(unittest.NewSealingConfigs(RequiredApprovalsForSealConstructionTestingValue))
 	require.NoError(s.T(), err)
 
 	<-s.engine.Ready()
@@ -165,7 +166,7 @@ func (s *SealingEngineSuite) TestMultipleProcessingItems() {
 	go func() {
 		defer wg.Done()
 		for _, approval := range approvals {
-			err := s.engine.Process(engine.ReceiveApprovals, approverID, approval)
+			err := s.engine.Process(network.ReceiveApprovals, approverID, approval)
 			s.Require().NoError(err, "should process approval")
 		}
 	}()
@@ -173,7 +174,7 @@ func (s *SealingEngineSuite) TestMultipleProcessingItems() {
 	go func() {
 		defer wg.Done()
 		for _, approval := range responseApprovals {
-			err := s.engine.Process(engine.ReceiveApprovals, approverID, approval)
+			err := s.engine.Process(network.ReceiveApprovals, approverID, approval)
 			s.Require().NoError(err, "should process approval")
 		}
 	}()
@@ -192,7 +193,7 @@ func (s *SealingEngineSuite) TestApprovalInvalidOrigin() {
 	originID := unittest.IdentifierFixture()
 	approval := unittest.ResultApprovalFixture() // with random ApproverID
 
-	err := s.engine.Process(engine.ReceiveApprovals, originID, approval)
+	err := s.engine.Process(network.ReceiveApprovals, originID, approval)
 	s.Require().NoError(err, "approval from unknown verifier should be dropped but not error")
 
 	// sealing engine has at least 100ms ticks for processing events

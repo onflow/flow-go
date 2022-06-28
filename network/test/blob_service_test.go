@@ -15,6 +15,8 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/utils/unittest"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/util"
@@ -86,6 +88,7 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 		suite.numNodes,
 		logger,
 		tops,
+		unittest.NetworkCodec(),
 		WithDHT("blob_service_test", p2p.AsServer()),
 		WithPeerManagerOpts(p2p.WithInterval(time.Second)),
 	)

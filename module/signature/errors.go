@@ -5,7 +5,21 @@ import (
 	"fmt"
 )
 
-var ErrInsufficientShares = errors.New("insufficient threshold signature shares")
+var (
+	ErrInvalidSignatureFormat = errors.New("signature's binary format is invalid")
+
+	ErrInsufficientShares = errors.New("insufficient threshold signature shares")
+
+	// ErrIncompatibleBitVectorLength indicates that the bit vector's length is different than
+	// the expected length, based on the supplied node list.
+	ErrIncompatibleBitVectorLength = errors.New("bit vector has incompatible length")
+
+	// ErrIllegallyPaddedBitVector indicates that the index vector was padded with unexpected bit values.
+	ErrIllegallyPaddedBitVector = errors.New("index vector padded with unexpected bit values")
+
+	// ErrInvalidChecksum indicates that the index vector's checksum is invalid
+	ErrInvalidChecksum = errors.New("index vector's checksum is invalid")
+)
 
 /* ********************* InvalidSignatureIncludedError ********************* */
 
@@ -92,5 +106,49 @@ func (e InsufficientSignaturesError) Unwrap() error { return e.err }
 // IsInsufficientSignaturesError returns whether err is an InsufficientSignaturesError
 func IsInsufficientSignaturesError(err error) bool {
 	var e InsufficientSignaturesError
+	return errors.As(err, &e)
+}
+
+/* ********************** InvalidSignerIndicesError ********************** */
+
+// InvalidSignerIndicesError indicates that a bit vector does not encode a valid set of signers
+type InvalidSignerIndicesError struct {
+	err error
+}
+
+func NewInvalidSignerIndicesErrorf(msg string, args ...interface{}) error {
+	return InvalidSignerIndicesError{
+		err: fmt.Errorf(msg, args...),
+	}
+}
+
+func (e InvalidSignerIndicesError) Error() string { return e.err.Error() }
+func (e InvalidSignerIndicesError) Unwrap() error { return e.err }
+
+// IsInvalidSignerIndicesError returns whether err is an InvalidSignerIndicesError
+func IsInvalidSignerIndicesError(err error) bool {
+	var e InvalidSignerIndicesError
+	return errors.As(err, &e)
+}
+
+/* ********************** InvalidSignerIndicesError ********************** */
+
+// InvalidSigTypesError indicates that the given data not encode valid signature types
+type InvalidSigTypesError struct {
+	err error
+}
+
+func NewInvalidSigTypesErrorf(msg string, args ...interface{}) error {
+	return InvalidSigTypesError{
+		err: fmt.Errorf(msg, args...),
+	}
+}
+
+func (e InvalidSigTypesError) Error() string { return e.err.Error() }
+func (e InvalidSigTypesError) Unwrap() error { return e.err }
+
+// IsInvalidSigTypesError returns whether err is an InvalidSigTypesError
+func IsInvalidSigTypesError(err error) bool {
+	var e InvalidSigTypesError
 	return errors.As(err, &e)
 }

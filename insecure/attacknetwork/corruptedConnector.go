@@ -1,41 +1,55 @@
 package attacknetwork
 
 import (
-	"context"
 	"fmt"
-	"net"
-	"strconv"
 
+	"github.com/golang/protobuf/ptypes/empty"
+	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	grpcinsecure "google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 type CorruptedConnector struct {
-	attackerAddress  string
-	corruptedNodeIds flow.IdentityList
-	ccfPort          int // conventional port for dialing remote corruptible conduit factories
+	logger           zerolog.Logger
+	inboundHandler   func(*insecure.Message)
+	corruptedNodeIds flow.IdentityList // identifier of the corrupted nodes
+
+	// ports on which each corrupted node's conduit factory is running.
+	// corrupted nodes are running on docker containers, while the attack network is on local host.
+	// hence, each container comes with a port binding on local host.
+	corruptedPortMapping map[flow.Identifier]string
 }
 
-func NewCorruptedConnector(corruptedNodeIds flow.IdentityList, ccfPort int) *CorruptedConnector {
+func NewCorruptedConnector(
+	logger zerolog.Logger,
+	corruptedNodeIds flow.IdentityList,
+	corruptedPortMapping map[flow.Identifier]string) *CorruptedConnector {
 	return &CorruptedConnector{
-		corruptedNodeIds: corruptedNodeIds,
-		ccfPort:          ccfPort,
+		logger:               logger.With().Str("component", "corrupted-connector").Logger(),
+		corruptedNodeIds:     corruptedNodeIds,
+		corruptedPortMapping: corruptedPortMapping,
 	}
 }
 
 // Connect creates a connection the corruptible conduit factory of the given corrupted identity.
-func (c *CorruptedConnector) Connect(ctx context.Context, targetId flow.Identifier) (insecure.CorruptedNodeConnection, error) {
-	if len(c.attackerAddress) == 0 {
-		return nil, fmt.Errorf("attacker address has not set on the connector")
+func (c *CorruptedConnector) Connect(ctx irrecoverable.SignalerContext, targetId flow.Identifier) (insecure.CorruptedNodeConnection, error) {
+	if c.inboundHandler == nil {
+		return nil, fmt.Errorf("inbound handler has not set")
 	}
 
-	corruptedAddress, err := c.corruptedConduitFactoryAddress(targetId)
-	if err != nil {
-		return nil, fmt.Errorf("could not generate corruptible conduit factory address for: %w", err)
+	port, ok := c.corruptedPortMapping[targetId]
+	if !ok {
+		return nil, fmt.Errorf("could not find port mapping for corrupted id: %x", targetId)
 	}
+
+	// corrupted nodes are running on docker containers, while the attack network is on local host.
+	// hence, each container is accessible on local host through port binding.
+	corruptedAddress := fmt.Sprintf("localhost:%s", port)
 	gRpcClient, err := grpc.Dial(
 		corruptedAddress,
 		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
@@ -45,36 +59,33 @@ func (c *CorruptedConnector) Connect(ctx context.Context, targetId flow.Identifi
 
 	client := insecure.NewCorruptibleConduitFactoryClient(gRpcClient)
 
-	_, err = client.RegisterAttacker(ctx, &insecure.AttackerRegisterMessage{
-		Address: c.attackerAddress,
-	})
+	inbound, err := client.ConnectAttacker(ctx, &empty.Empty{})
 	if err != nil {
-		return nil, fmt.Errorf("could not register attacker: %w", err)
+		return nil, fmt.Errorf("could not establish an inbound stream to corruptible conduit factory: %w", err)
 	}
 
-	stream, err := client.ProcessAttackerMessage(ctx)
+	outbound, err := client.ProcessAttackerMessage(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("could not establish a stream to corruptible conduit factory: %w", err)
+		return nil, fmt.Errorf("could not establish an outbound stream to corruptible conduit factory: %w", err)
 	}
 
-	return &CorruptedNodeConnection{stream: stream}, nil
+	connection := NewCorruptedNodeConnection(c.logger, c.inboundHandler, outbound, inbound)
+	connection.Start(ctx)
+
+	c.logger.Debug().
+		Hex("target_id", logging.ID(targetId)).
+		Msg("starting a corrupted connector")
+
+	<-connection.Ready()
+
+	c.logger.Info().
+		Hex("target_id", logging.ID(targetId)).
+		Msg("corrupted connection started and established")
+
+	return connection, nil
 }
 
-func (c *CorruptedConnector) WithAttackerAddress(address string) {
-	c.attackerAddress = address
-}
-
-// corruptedConduitFactoryAddress generates and returns the gRPC interface address of corruptible conduit factory for given identity.
-func (c *CorruptedConnector) corruptedConduitFactoryAddress(id flow.Identifier) (string, error) {
-	identity, found := c.corruptedNodeIds.ByNodeID(id)
-	if !found {
-		return "", fmt.Errorf("could not find corrupted id for identifier: %x", id)
-	}
-
-	corruptedAddress, _, err := net.SplitHostPort(identity.Address)
-	if err != nil {
-		return "", fmt.Errorf("could not extract address of corruptible conduit factory %s: %w", identity.Address, err)
-	}
-
-	return net.JoinHostPort(corruptedAddress, strconv.Itoa(c.ccfPort)), nil
+// WithIncomingMessageHandler sets the handler for the incoming messages from remote corrupted nodes.
+func (c *CorruptedConnector) WithIncomingMessageHandler(handler func(*insecure.Message)) {
+	c.inboundHandler = handler
 }

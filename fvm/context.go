@@ -1,9 +1,10 @@
 package fvm
 
 import (
+	"math"
+
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -12,28 +13,30 @@ import (
 
 // A Context defines a set of execution parameters used by the virtual machine.
 type Context struct {
-	Chain                         flow.Chain
-	Blocks                        Blocks
-	Metrics                       handler.MetricsReporter
-	Tracer                        module.Tracer
-	ComputationLimit              uint64
-	MemoryLimit                   uint64
-	MaxStateKeySize               uint64
-	MaxStateValueSize             uint64
-	MaxStateInteractionSize       uint64
-	EventCollectionByteSizeLimit  uint64
-	MaxNumOfTxRetries             uint8
-	BlockHeader                   *flow.Header
-	ServiceAccountEnabled         bool
-	RestrictedDeploymentEnabled   bool
+	Chain                        flow.Chain
+	Blocks                       Blocks
+	Metrics                      handler.MetricsReporter
+	Tracer                       module.Tracer
+	ComputationLimit             uint64
+	MemoryLimit                  uint64
+	MaxStateKeySize              uint64
+	MaxStateValueSize            uint64
+	MaxStateInteractionSize      uint64
+	EventCollectionByteSizeLimit uint64
+	MaxNumOfTxRetries            uint8
+	BlockHeader                  *flow.Header
+	ServiceAccountEnabled        bool
+	// Depricated: RestrictContractDeployment is deprecated use SetIsContractDeploymentRestrictedTransaction instead.
+	// Can be removed after all networks are migrated to SetIsContractDeploymentRestrictedTransaction
+	RestrictContractDeployment    bool
+	RestrictContractRemoval       bool
 	LimitAccountStorage           bool
 	TransactionFeesEnabled        bool
 	CadenceLoggingEnabled         bool
 	EventCollectionEnabled        bool
 	ServiceEventCollectionEnabled bool
-	AccountFreezeAvailable        bool
+	AccountFreezeEnabled          bool
 	ExtensiveTracing              bool
-	SignatureVerifier             crypto.SignatureVerifier
 	TransactionProcessors         []TransactionProcessor
 	ScriptProcessors              []ScriptProcessor
 	Logger                        zerolog.Logger
@@ -60,9 +63,9 @@ func newContext(ctx Context, opts ...Option) Context {
 const AccountKeyWeightThreshold = 1000
 
 const (
-	DefaultComputationLimit             = 100_000   // 100K
-	DefaultMemoryLimit                  = 2_000_000 // 2G
-	DefaultEventCollectionByteSizeLimit = 256_000   // 256KB
+	DefaultComputationLimit             = 100_000        // 100K
+	DefaultMemoryLimit                  = math.MaxUint64 //
+	DefaultEventCollectionByteSizeLimit = 256_000        // 256KB
 	DefaultMaxNumOfTxRetries            = 3
 )
 
@@ -81,18 +84,16 @@ func defaultContext(logger zerolog.Logger) Context {
 		MaxNumOfTxRetries:             DefaultMaxNumOfTxRetries,
 		BlockHeader:                   nil,
 		ServiceAccountEnabled:         true,
-		RestrictedDeploymentEnabled:   true,
+		RestrictContractDeployment:    true,
+		RestrictContractRemoval:       true,
 		CadenceLoggingEnabled:         false,
 		EventCollectionEnabled:        true,
 		ServiceEventCollectionEnabled: false,
-		AccountFreezeAvailable:        false,
+		AccountFreezeEnabled:          true,
 		ExtensiveTracing:              false,
-		SignatureVerifier:             crypto.NewDefaultSignatureVerifier(),
 		TransactionProcessors: []TransactionProcessor{
-			NewTransactionAccountFrozenChecker(),
-			NewTransactionSignatureVerifier(AccountKeyWeightThreshold),
+			NewTransactionVerifier(AccountKeyWeightThreshold),
 			NewTransactionSequenceNumberChecker(),
-			NewTransactionAccountFrozenEnabler(),
 			NewTransactionInvoker(logger),
 		},
 		ScriptProcessors: []ScriptProcessor{
@@ -182,12 +183,12 @@ func WithBlockHeader(header *flow.Header) Option {
 	}
 }
 
-// WithAccountFreezeAvailable sets availability of account freeze function for a virtual machine context.
+// WithAccountFreezeEnabled enable/disable of account freeze functionality for a virtual machine context.
 //
 // With this option set to true, a setAccountFreeze function will be enabled for transactions processed by the VM
-func WithAccountFreezeAvailable(accountFreezeAvailable bool) Option {
+func WithAccountFreezeEnabled(accountFreezeEnabled bool) Option {
 	return func(ctx Context) Context {
-		ctx.AccountFreezeAvailable = accountFreezeAvailable
+		ctx.AccountFreezeEnabled = accountFreezeEnabled
 		return ctx
 	}
 }
@@ -256,11 +257,29 @@ func WithServiceAccount(enabled bool) Option {
 	}
 }
 
-// WithRestrictedDeployment enables or disables restricted contract deployment for a
-// virtual machine context.
-func WithRestrictedDeployment(enabled bool) Option {
+// WithRestrictContractRemoval enables or disables restricted contract removal for a
+// virtual machine context. Warning! this would be overridden with the flag stored on chain.
+// this is just a fallback value
+func WithContractRemovalRestricted(enabled bool) Option {
 	return func(ctx Context) Context {
-		ctx.RestrictedDeploymentEnabled = enabled
+		ctx.RestrictContractRemoval = enabled
+		return ctx
+	}
+}
+
+// @Depricated please use WithContractDeploymentRestricted instead of this
+// this has been kept to reduce breaking change on the emulator, but would be
+// removed at some point.
+func WithRestrictedDeployment(restricted bool) Option {
+	return WithContractDeploymentRestricted(restricted)
+}
+
+// WithRestrictedContractDeployment enables or disables restricted contract deployment for a
+// virtual machine context. Warning! this would be overridden with the flag stored on chain.
+// this is just a fallback value
+func WithContractDeploymentRestricted(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.RestrictContractDeployment = enabled
 		return ctx
 	}
 }

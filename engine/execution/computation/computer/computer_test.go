@@ -67,7 +67,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(nil).
 			Times(2) // 1 collection + system collection
 
-		metrics.On("ExecutionTransactionExecuted", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		metrics.On("ExecutionTransactionExecuted", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).
 			Times(2 + 1) // 2 txs in collection + system chunk tx
 
@@ -367,8 +367,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		execCtx := fvm.NewContext(zerolog.Nop())
 
+		address := common.Address{0x1}
 		contractLocation := common.AddressLocation{
-			Address: common.Address{0x1},
+			Address: address,
 			Name:    "Test",
 		}
 
@@ -377,7 +378,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		rt := &testRuntime{
 			executeTransaction: func(script runtime.Script, r runtime.Context) error {
 
-				program, err := r.Interface.GetProgram(contractLocation)
+				program, err := r.Interface.GetProgram(contractLocation) //nolint:staticcheck
 				require.NoError(t, err)
 				require.Nil(t, program)
 
@@ -407,6 +408,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
+		err = view.Set(string(address.Bytes()), "", state.KeyAccountStatus, []byte{1})
+		require.NoError(t, err)
+
 		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, collectionCount+1) // +1 system chunk
@@ -423,8 +427,10 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			),
 		)
 
+		address := common.Address{0x1}
+
 		contractLocation := common.AddressLocation{
-			Address: common.Address{0x1},
+			Address: address,
 			Name:    "Test",
 		}
 
@@ -442,7 +448,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 				// NOTE: set a program and revert all transactions but the system chunk transaction
 
-				program, err := r.Interface.GetProgram(contractLocation)
+				program, err := r.Interface.GetProgram(contractLocation) //nolint:staticcheck
 				require.NoError(t, err)
 
 				if executionCalls > collectionCount*transactionCount {
@@ -477,6 +483,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
+		err = view.Set(string(address.Bytes()), "", state.KeyAccountStatus, []byte{1})
+		require.NoError(t, err)
+
 		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
 		require.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, collectionCount+1) // +1 system chunk
@@ -503,6 +512,10 @@ type testRuntime struct {
 }
 
 var _ runtime.Runtime = &testRuntime{}
+
+func (e *testRuntime) SetInvalidatedResourceValidationEnabled(_ bool) {
+	panic("SetInvalidatedResourceValidationEnabled not expected")
+}
 
 func (e *testRuntime) SetTracingEnabled(_ bool) {
 	panic("SetTracingEnabled not expected")
@@ -548,6 +561,10 @@ func (*testRuntime) ReadLinked(_ common.Address, _ cadence.Path, _ runtime.Conte
 	panic("ReadLinked not expected")
 }
 
+func (*testRuntime) SetDebugger(_ *interpreter.Debugger) {
+	panic("SetDebugger not expected")
+}
+
 type RandomAddressGenerator struct{}
 
 func (r *RandomAddressGenerator) NextAddress() (flow.Address, error) {
@@ -586,7 +603,7 @@ func (f *FixedAddressGenerator) AddressCount() uint64 {
 	panic("not implemented")
 }
 
-func Test_FreezeAccountChecksAreIncluded(t *testing.T) {
+func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 
 	address := flow.HexToAddress("1234")
 	fag := &FixedAddressGenerator{Address: address}
@@ -625,11 +642,11 @@ func Test_FreezeAccountChecksAreIncluded(t *testing.T) {
 
 	registerTouches := view.Interactions().RegisterTouches()
 
-	// make sure check for frozen account has been registered
+	// make sure check for account status has been registered
 	id := flow.RegisterID{
 		Owner:      string(address.Bytes()),
 		Controller: "",
-		Key:        state.KeyAccountFrozen,
+		Key:        state.KeyAccountStatus,
 	}
 
 	require.Contains(t, registerTouches, id.String())
@@ -661,7 +678,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		Return(nil).
 		Times(1) // system collection
 
-	metrics.On("ExecutionTransactionExecuted", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+	metrics.On("ExecutionTransactionExecuted", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(nil).
 		Times(1) // system chunk tx
 

@@ -3,6 +3,7 @@ package computer
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"sync"
 	"time"
 
@@ -60,7 +61,8 @@ type blockComputer struct {
 func SystemChunkContext(vmCtx fvm.Context, logger zerolog.Logger) fvm.Context {
 	return fvm.NewContextFromParent(
 		vmCtx,
-		fvm.WithRestrictedDeployment(false),
+		fvm.WithContractDeploymentRestricted(false),
+		fvm.WithContractRemovalRestricted(false),
 		fvm.WithTransactionFeesEnabled(false),
 		fvm.WithServiceEventCollectionEnabled(),
 		fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(logger)),
@@ -139,8 +141,10 @@ func (e *blockComputer) executeBlock(
 		Events:             make([]flow.EventsList, chunksSize),
 		ServiceEvents:      make(flow.EventsList, 0),
 		TransactionResults: make([]flow.TransactionResult, 0),
-		StateCommitments:   make([]flow.StateCommitment, 0),
-		Proofs:             make([][]byte, 0),
+		StateCommitments:   make([]flow.StateCommitment, 0, chunksSize),
+		Proofs:             make([][]byte, 0, chunksSize),
+		TrieUpdates:        make([]*ledger.TrieUpdate, 0, chunksSize),
+		EventsHashes:       make([]flow.Identifier, 0, chunksSize),
 	}
 
 	var txIndex uint32
@@ -148,37 +152,23 @@ func (e *blockComputer) executeBlock(
 	var wg sync.WaitGroup
 	wg.Add(2) // block commiter and event hasher
 
-	stateCommitments := make([]flow.StateCommitment, 0, len(collections)+1)
-	proofs := make([][]byte, 0, len(collections)+1)
-	trieUpdates := make([]*ledger.TrieUpdate, 0, len(collections)+1)
-
 	bc := blockCommitter{
 		committer: e.committer,
 		blockSpan: blockSpan,
 		tracer:    e.tracer,
 		state:     *block.StartState,
-		views:     make(chan state.View, len(collections)+1),
-		callBack: func(state flow.StateCommitment, proof []byte, trieUpdate *ledger.TrieUpdate, err error) {
-			if err != nil {
-				panic(err)
-			}
-			stateCommitments = append(stateCommitments, state)
-			proofs = append(proofs, proof)
-			trieUpdates = append(trieUpdates, trieUpdate)
-		},
+		views:     make(chan state.View, chunksSize),
+		res:       res,
 	}
+	defer bc.Close()
 
 	eh := eventHasher{
 		tracer:    e.tracer,
-		data:      make(chan flow.EventsList, len(collections)+1),
+		data:      make(chan flow.EventsList, chunksSize),
 		blockSpan: blockSpan,
-		callBack: func(hash flow.Identifier, err error) {
-			if err != nil {
-				panic(err)
-			}
-			res.EventsHashes = append(res.EventsHashes, hash)
-		},
+		res:       res,
 	}
+	defer eh.Close()
 
 	go func() {
 		bc.Run()
@@ -200,7 +190,7 @@ func (e *blockComputer) executeBlock(
 		}
 		bc.Commit(colView)
 		eh.Hash(res.Events[i])
-		err = stateView.MergeView(colView)
+		err = e.mergeView(stateView, colView, blockSpan, trace.EXEMergeCollectionView)
 		if err != nil {
 			return nil, fmt.Errorf("cannot merge view: %w", err)
 		}
@@ -215,21 +205,20 @@ func (e *blockComputer) executeBlock(
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute system chunk transaction: %w", err)
 	}
+
 	bc.Commit(colView)
 	eh.Hash(res.Events[len(res.Events)-1])
-	err = stateView.MergeView(colView)
+	// close the views and wait for all views to be committed
+	bc.Close()
+	eh.Close()
+
+	err = e.mergeView(stateView, colView, blockSpan, trace.EXEMergeCollectionView)
 	if err != nil {
 		return nil, fmt.Errorf("cannot merge view: %w", err)
 	}
 
-	// close the views and wait for all views to be committed
-	close(bc.views)
-	close(eh.data)
 	wg.Wait()
 	res.StateReads = stateView.(*delta.View).ReadsCount()
-	res.StateCommitments = stateCommitments
-	res.Proofs = proofs
-	res.TrieUpdates = trieUpdates
 
 	executionData := generateExecutionData(res, collections, systemCol)
 
@@ -376,6 +365,12 @@ func (e *blockComputer) executeTransaction(
 	isSystemChunk bool,
 ) error {
 	startedAt := time.Now()
+
+	var memAllocBefore uint64
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	memAllocBefore = m.TotalAlloc
+
 	txID := txBody.ID()
 
 	// we capture two spans one for tx-based view and one for the current context (block-based) view
@@ -427,12 +422,13 @@ func (e *blockComputer) executeTransaction(
 		txResult.ErrorMessage = tx.Err.Error()
 	}
 
-	mergeSpan := e.tracer.StartSpanFromParent(txSpan, trace.EXEMergeTransactionView)
-	defer mergeSpan.Finish()
+	postProcessSpan := e.tracer.StartSpanFromParent(txSpan, trace.EXEPostProcessTransaction)
+	defer postProcessSpan.Finish()
 
 	// always merge the view, fvm take cares of reverting changes
 	// of failed transaction invocation
-	err = collectionView.MergeView(txView)
+
+	err = e.mergeView(collectionView, txView, postProcessSpan, trace.EXEMergeTransactionView)
 	if err != nil {
 		return fmt.Errorf("merging tx view to collection view failed for tx %v: %w",
 			txID.String(), err)
@@ -443,11 +439,16 @@ func (e *blockComputer) executeTransaction(
 	res.AddTransactionResult(&txResult)
 	res.AddComputationUsed(tx.ComputationUsed)
 
+	runtime.ReadMemStats(&m)
+	memAllocAfter := m.TotalAlloc
+
 	lg := e.log.With().
 		Hex("tx_id", txResult.TransactionID[:]).
 		Str("block_id", res.ExecutableBlock.ID().String()).
 		Str("traceID", traceID).
 		Uint64("computation_used", txResult.ComputationUsed).
+		Uint64("memory_used", tx.MemoryEstimate).
+		Uint64("memAlloc", memAllocAfter-memAllocBefore).
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Logger()
 
@@ -460,24 +461,51 @@ func (e *blockComputer) executeTransaction(
 		lg.Info().Msg("transaction executed successfully")
 	}
 
-	e.metrics.ExecutionTransactionExecuted(time.Since(startedAt), tx.ComputationUsed, len(tx.Events), tx.Err != nil)
+	e.metrics.ExecutionTransactionExecuted(
+		time.Since(startedAt),
+		tx.ComputationUsed,
+		memAllocAfter-memAllocBefore,
+		tx.MemoryEstimate,
+		len(tx.Events),
+		tx.Err != nil,
+	)
 	return nil
+}
+
+func (e *blockComputer) mergeView(
+	parent, child state.View,
+	parentSpan opentracing.Span,
+	mergeSpanName trace.SpanName) error {
+
+	mergeSpan := e.tracer.StartSpanFromParent(parentSpan, mergeSpanName)
+	defer mergeSpan.Finish()
+
+	return parent.MergeView(child)
 }
 
 type blockCommitter struct {
 	tracer    module.Tracer
 	committer ViewCommitter
-	callBack  func(state flow.StateCommitment, proof []byte, update *ledger.TrieUpdate, err error)
 	state     flow.StateCommitment
 	views     chan state.View
+	closeOnce sync.Once
 	blockSpan opentracing.Span
+
+	res *execution.ComputationResult
 }
 
 func (bc *blockCommitter) Run() {
 	for view := range bc.views {
 		span := bc.tracer.StartSpanFromParent(bc.blockSpan, trace.EXECommitDelta)
 		stateCommit, proof, trieUpdate, err := bc.committer.CommitView(view, bc.state)
-		bc.callBack(stateCommit, proof, trieUpdate, err)
+		if err != nil {
+			panic(err)
+		}
+
+		bc.res.StateCommitments = append(bc.res.StateCommitments, stateCommit)
+		bc.res.Proofs = append(bc.res.Proofs, proof)
+		bc.res.TrieUpdates = append(bc.res.TrieUpdates, trieUpdate)
+
 		bc.state = stateCommit
 		span.Finish()
 	}
@@ -487,22 +515,37 @@ func (bc *blockCommitter) Commit(view state.View) {
 	bc.views <- view
 }
 
+func (bc *blockCommitter) Close() {
+	bc.closeOnce.Do(func() { close(bc.views) })
+}
+
 type eventHasher struct {
 	tracer    module.Tracer
-	callBack  func(hash flow.Identifier, err error)
 	data      chan flow.EventsList
+	closeOnce sync.Once
 	blockSpan opentracing.Span
+
+	res *execution.ComputationResult
 }
 
 func (eh *eventHasher) Run() {
 	for data := range eh.data {
 		span := eh.tracer.StartSpanFromParent(eh.blockSpan, trace.EXEHashEvents)
 		rootHash, err := flow.EventsMerkleRootHash(data)
-		eh.callBack(rootHash, err)
+		if err != nil {
+			panic(err)
+		}
+
+		eh.res.EventsHashes = append(eh.res.EventsHashes, rootHash)
+
 		span.Finish()
 	}
 }
 
 func (eh *eventHasher) Hash(events flow.EventsList) {
 	eh.data <- events
+}
+
+func (eh *eventHasher) Close() {
+	eh.closeOnce.Do(func() { close(eh.data) })
 }

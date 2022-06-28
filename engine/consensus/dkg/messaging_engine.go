@@ -56,7 +56,7 @@ func NewMessagingEngine(
 	}
 
 	var err error
-	eng.conduit, err = net.Register(engine.DKGCommittee, &eng)
+	eng.conduit, err = net.Register(network.DKGCommittee, &eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register dkg network engine: %w", err)
 	}

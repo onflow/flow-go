@@ -29,31 +29,6 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// DefaultRequiredApprovalsForSealConstruction is the default number of approvals required to construct a candidate seal
-// for subsequent inclusion in block.
-// when set to 1, it requires at least 1 approval to build a seal
-// when set to 0, it can build seal without any approval
-const DefaultRequiredApprovalsForSealConstruction = 1
-
-// DefaultEmergencySealingActive is a flag which indicates when emergency sealing is active, this is a temporary measure
-// to make fire fighting easier while seal & verification is under development.
-const DefaultEmergencySealingActive = false
-
-// Config is a structure of values that configure behavior of sealing engine
-type Config struct {
-	EmergencySealingActive               bool   // flag which indicates if emergency sealing is active or not. NOTE: this is temporary while sealing & verification is under development
-	RequiredApprovalsForSealConstruction uint   // min number of approvals required for constructing a candidate seal
-	ApprovalRequestsThreshold            uint64 // threshold for re-requesting approvals: min height difference between the latest finalized block and the block incorporating a result
-}
-
-func DefaultConfig() Config {
-	return Config{
-		EmergencySealingActive:               DefaultEmergencySealingActive,
-		RequiredApprovalsForSealConstruction: DefaultRequiredApprovalsForSealConstruction,
-		ApprovalRequestsThreshold:            10,
-	}
-}
-
 // Core is an implementation of SealingCore interface
 // This struct is responsible for:
 // 	- collecting approvals for execution results
@@ -76,7 +51,7 @@ type Core struct {
 	metrics                    module.ConsensusMetrics            // used to track consensus metrics
 	sealingTracker             consensus.SealingTracker           // logic-aware component for tracking sealing progress.
 	tracer                     module.Tracer                      // used to trace execution
-	config                     Config
+	sealingConfigsGetter       module.SealingConfigsGetter        // used to access configs for sealing conditions
 }
 
 func NewCore(
@@ -93,7 +68,7 @@ func NewCore(
 	signatureHasher hash.Hasher,
 	sealsMempool mempool.IncorporatedResultSeals,
 	approvalConduit network.Conduit,
-	config Config,
+	sealingConfigsGetter module.SealingConfigsGetter,
 ) (*Core, error) {
 	lastSealed, err := state.Sealed().Head()
 	if err != nil {
@@ -114,14 +89,15 @@ func NewCore(
 		state:                      state,
 		seals:                      sealsDB,
 		sealsMempool:               sealsMempool,
-		config:                     config,
 		requestTracker:             approvals.NewRequestTracker(headers, 10, 30),
+		sealingConfigsGetter:       sealingConfigsGetter,
 	}
 
 	factoryMethod := func(result *flow.ExecutionResult) (approvals.AssignmentCollector, error) {
+		requiredApprovalsForSealConstruction := sealingConfigsGetter.RequireApprovalsForSealConstructionDynamicValue()
 		base, err := approvals.NewAssignmentCollectorBase(core.log, core.workerPool, result, core.state, core.headers,
 			assigner, sealsMempool, signatureHasher,
-			approvalConduit, core.requestTracker, config.RequiredApprovalsForSealConstruction)
+			approvalConduit, core.requestTracker, requiredApprovalsForSealConstruction)
 		if err != nil {
 			return nil, fmt.Errorf("could not create base collector: %w", err)
 		}
@@ -148,7 +124,7 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 
 	// Get the latest sealed block on this fork, ie the highest block for which
 	// there is a seal in this fork.
-	latestSeal, err := c.seals.ByBlockID(finalizedID)
+	latestSeal, err := c.seals.HighestInFork(finalizedID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve parent seal (%x): %w", finalizedID, err)
 	}
@@ -448,7 +424,7 @@ func (c *Core) processApproval(approval *flow.ResultApproval) error {
 }
 
 func (c *Core) checkEmergencySealing(observer consensus.SealingObservation, lastSealedHeight, lastFinalizedHeight uint64) error {
-	if !c.config.EmergencySealingActive {
+	if !c.sealingConfigsGetter.EmergencySealingActiveConst() {
 		return nil
 	}
 
@@ -520,7 +496,7 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 	// retrieve latest seal in the fork with head finalizedBlock and update last
 	// sealed height; we do _not_ bail, because we want to re-request approvals
 	// especially, when sealing is stuck, i.e. last sealed height does not increase
-	seal, err := c.seals.ByBlockID(finalizedBlockID)
+	seal, err := c.seals.HighestInFork(finalizedBlockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve seal for finalized block %s", finalizedBlockID)
 	}
@@ -608,14 +584,14 @@ func (c *Core) prune(parentSpan opentracing.Span, finalized, lastSealed *flow.He
 // ... <-- A <-- A+1 <- ... <-- D <-- D+1 <- ... -- F
 //       sealed       maxHeightForRequesting      final
 func (c *Core) requestPendingApprovals(observation consensus.SealingObservation, lastSealedHeight, lastFinalizedHeight uint64) error {
-	if lastSealedHeight+c.config.ApprovalRequestsThreshold >= lastFinalizedHeight {
+	if lastSealedHeight+c.sealingConfigsGetter.ApprovalRequestsThresholdConst() >= lastFinalizedHeight {
 		return nil
 	}
 
 	// Reaching the following code implies:
 	// 0 <= sealed.Height < final.Height - ApprovalRequestsThreshold
 	// Hence, the following operation cannot underflow
-	maxHeightForRequesting := lastFinalizedHeight - c.config.ApprovalRequestsThreshold
+	maxHeightForRequesting := lastFinalizedHeight - c.sealingConfigsGetter.ApprovalRequestsThresholdConst()
 
 	pendingApprovalRequests := uint(0)
 	collectors := c.collectorTree.GetCollectorsByInterval(lastSealedHeight, maxHeightForRequesting)

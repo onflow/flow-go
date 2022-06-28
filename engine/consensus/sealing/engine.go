@@ -91,7 +91,7 @@ func NewEngine(log zerolog.Logger,
 	sealsDB storage.Seals,
 	assigner module.ChunkAssigner,
 	sealsMempool mempool.IncorporatedResultSeals,
-	options Config,
+	requiredApprovalsForSealConstructionGetter module.SealingConfigsGetter,
 ) (*Engine, error) {
 	rootHeader, err := state.Params().Root()
 	if err != nil {
@@ -118,25 +118,25 @@ func NewEngine(log zerolog.Logger,
 		return nil, fmt.Errorf("initialization of inbound queues for trusted inputs failed: %w", err)
 	}
 
-	err = e.setupMessageHandler(options.RequiredApprovalsForSealConstruction)
+	err = e.setupMessageHandler(requiredApprovalsForSealConstructionGetter)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize message handler for untrusted inputs: %w", err)
 	}
 
 	// register engine with the approval provider
-	_, err = net.Register(engine.ReceiveApprovals, e)
+	_, err = net.Register(network.ReceiveApprovals, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register for approvals: %w", err)
 	}
 
 	// register engine to the channel for requesting missing approvals
-	approvalConduit, err := net.Register(engine.RequestApprovalsByChunk, e)
+	approvalConduit, err := net.Register(network.RequestApprovalsByChunk, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register for requesting approvals: %w", err)
 	}
 
 	signatureHasher := crypto.NewBLSKMAC(encoding.ResultApprovalTag)
-	core, err := NewCore(log, e.workerPool, tracer, conMetrics, sealingTracker, unit, headers, state, sealsDB, assigner, signatureHasher, sealsMempool, approvalConduit, options)
+	core, err := NewCore(log, e.workerPool, tracer, conMetrics, sealingTracker, unit, headers, state, sealsDB, assigner, signatureHasher, sealsMempool, approvalConduit, requiredApprovalsForSealConstructionGetter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init sealing engine: %w", err)
 	}
@@ -161,18 +161,18 @@ func (e *Engine) setupTrustedInboundQueues() error {
 	var err error
 	e.pendingIncorporatedResults, err = fifoqueue.NewFifoQueue()
 	if err != nil {
-		return fmt.Errorf("failed to create queue for incorproated results: %w", err)
+		return fmt.Errorf("failed to create queue for incorporated results: %w", err)
 	}
 	e.pendingIncorporatedBlocks, err = fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultIncorporatedBlockQueueCapacity))
 	if err != nil {
-		return fmt.Errorf("failed to create queue for incorproated blocks: %w", err)
+		return fmt.Errorf("failed to create queue for incorporated blocks: %w", err)
 	}
 	return nil
 }
 
 // setupMessageHandler initializes the inbound queues and the MessageHandler for UNTRUSTED INPUTS.
-func (e *Engine) setupMessageHandler(requiredApprovalsForSealConstruction uint) error {
+func (e *Engine) setupMessageHandler(getSealingConfigs module.SealingConfigsGetter) error {
 	// FIFO queue for broadcasted approvals
 	pendingApprovalsQueue, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultApprovalQueueCapacity),
@@ -211,7 +211,7 @@ func (e *Engine) setupMessageHandler(requiredApprovalsForSealConstruction uint) 
 				return ok
 			},
 			Map: func(msg *engine.Message) (*engine.Message, bool) {
-				if requiredApprovalsForSealConstruction < 1 {
+				if getSealingConfigs.RequireApprovalsForSealConstructionDynamicValue() < 1 {
 					// if we don't require approvals to construct a seal, don't even process approvals.
 					return nil, false
 				}
@@ -229,7 +229,7 @@ func (e *Engine) setupMessageHandler(requiredApprovalsForSealConstruction uint) 
 				return ok
 			},
 			Map: func(msg *engine.Message) (*engine.Message, bool) {
-				if requiredApprovalsForSealConstruction < 1 {
+				if getSealingConfigs.RequireApprovalsForSealConstructionDynamicValue() < 1 {
 					// if we don't require approvals to construct a seal, don't even process approvals.
 					return nil, false
 				}
