@@ -23,7 +23,7 @@ import (
 const blockCount = 5 // number of finalized blocks to wait for
 
 func TestConsensusFollower(t *testing.T) {
-	unittest.SkipUnless(s.T(), unittest.TEST_TODO, "active-pacemaker")
+	unittest.SkipUnless(t, unittest.TEST_TODO, "active-pacemaker")
 	suite.Run(t, new(ConsensusFollowerSuite))
 }
 
