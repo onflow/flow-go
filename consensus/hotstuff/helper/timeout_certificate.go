@@ -75,14 +75,20 @@ func WithTimeoutObjectSignerID(signerID flow.Identifier) func(*hotstuff.TimeoutO
 	}
 }
 
-func WithTimeoutObjectView(view uint64) func(*hotstuff.TimeoutObject) {
-	return func(TimeoutObject *hotstuff.TimeoutObject) {
-		TimeoutObject.View = view
+func WithTimeoutNewestQC(newestQC *flow.QuorumCertificate) func(*hotstuff.TimeoutObject) {
+	return func(timeout *hotstuff.TimeoutObject) {
+		timeout.NewestQC = newestQC
 	}
 }
 
-func TimeoutObjectWithStakingSig() func(*hotstuff.TimeoutObject) {
+func WithTimeoutLastViewTC(lastViewTC *flow.TimeoutCertificate) func(*hotstuff.TimeoutObject) {
+	return func(timeout *hotstuff.TimeoutObject) {
+		timeout.LastViewTC = lastViewTC
+	}
+}
+
+func WithTimeoutObjectView(view uint64) func(*hotstuff.TimeoutObject) {
 	return func(TimeoutObject *hotstuff.TimeoutObject) {
-		TimeoutObject.SigData = unittest.RandomBytes(128)
+		TimeoutObject.View = view
 	}
 }

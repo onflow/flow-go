@@ -17,9 +17,10 @@ import (
 // as part of their vote. StakingSigner is responsible for creating correctly
 // signed proposals and votes.
 type StakingSigner struct {
-	me            module.Local
-	stakingHasher hash.Hasher
-	signerID      flow.Identifier
+	me                  module.Local
+	stakingHasher       hash.Hasher
+	timeoutObjectHasher hash.Hasher
+	signerID            flow.Identifier
 }
 
 var _ hotstuff.Signer = (*StakingSigner)(nil)
@@ -31,9 +32,10 @@ func NewStakingSigner(
 ) *StakingSigner {
 
 	sc := &StakingSigner{
-		me:            me,
-		stakingHasher: crypto.NewBLSKMAC(encoding.CollectorVoteTag),
-		signerID:      me.NodeID(),
+		me:                  me,
+		stakingHasher:       crypto.NewBLSKMAC(encoding.CollectorVoteTag),
+		timeoutObjectHasher: crypto.NewBLSKMAC(encoding.CollectorTimeoutTag),
+		signerID:            me.NodeID(),
 	}
 	return sc
 }
@@ -85,7 +87,7 @@ func (c *StakingSigner) CreateVote(block *model.Block) (*model.Vote, error) {
 func (c *StakingSigner) CreateTimeout(curView uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
 	// create timeout object specific message
 	msg := MakeTimeoutMessage(curView, newestQC.View)
-	sigData, err := c.me.Sign(msg, c.stakingHasher)
+	sigData, err := c.me.Sign(msg, c.timeoutObjectHasher)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate signature for timeout object at view %d: %w", curView, err)
 	}

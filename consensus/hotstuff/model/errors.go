@@ -371,3 +371,30 @@ func NewDoubleTimeoutErrorf(firstTimeout, conflictingTimeout *TimeoutObject, msg
 		err:                fmt.Errorf(msg, args...),
 	}
 }
+
+// InvalidTimeoutError indicates that the embedded timeout object is invalid
+type InvalidTimeoutError struct {
+	Timeout *TimeoutObject
+	Err     error
+}
+
+func NewInvalidTimeoutErrorf(timeout *TimeoutObject, msg string, args ...interface{}) error {
+	return InvalidTimeoutError{
+		Timeout: timeout,
+		Err:     fmt.Errorf(msg, args...),
+	}
+}
+
+func (e InvalidTimeoutError) Error() string {
+	return fmt.Sprintf("invalid timeout %x for view %d: %s", e.Timeout.ID(), e.Timeout.View, e.Err.Error())
+}
+
+// IsInvalidTimeoutError returns whether an error is InvalidTimeoutError
+func IsInvalidTimeoutError(err error) bool {
+	var e InvalidTimeoutError
+	return errors.As(err, &e)
+}
+
+func (e InvalidTimeoutError) Unwrap() error {
+	return e.Err
+}

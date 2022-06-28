@@ -60,7 +60,7 @@ func (h Header) Body() interface{} {
 		ParentVoterIndices []byte
 		ParentVoterSigData []byte
 		ProposerID         Identifier
-		LastViewTC         interface{}
+		LastViewTCID       Identifier
 	}{
 		ChainID:            h.ChainID,
 		ParentID:           h.ParentID,
@@ -71,7 +71,7 @@ func (h Header) Body() interface{} {
 		ParentVoterIndices: h.ParentVoterIndices,
 		ParentVoterSigData: h.ParentVoterSigData,
 		ProposerID:         h.ProposerID,
-		LastViewTC:         h.LastViewTC.Body(),
+		LastViewTCID:       h.LastViewTC.ID(),
 	}
 }
 

@@ -52,3 +52,7 @@ func (*NoopConsumer) OnDoubleVotingDetected(*model.Vote, *model.Vote) {}
 func (*NoopConsumer) OnInvalidVoteDetected(*model.Vote) {}
 
 func (*NoopConsumer) OnVoteForInvalidBlockDetected(*model.Vote, *model.Proposal) {}
+
+func (*NoopConsumer) OnDoubleTimeoutDetected(*model.TimeoutObject, *model.TimeoutObject) {}
+
+func (*NoopConsumer) OnInvalidTimeoutDetected(*model.TimeoutObject) {}

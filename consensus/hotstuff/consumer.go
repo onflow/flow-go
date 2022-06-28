@@ -153,6 +153,20 @@ type Consumer interface {
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
 	OnVoteForInvalidBlockDetected(vote *model.Vote, invalidProposal *model.Proposal)
+
+	// OnDoubleTimeoutDetected notifications are produced by the Timeout Aggregation logic
+	// whenever a double timeout (same replica producing two different timeouts at the same view) was detected.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnDoubleTimeoutDetected(*model.TimeoutObject, *model.TimeoutObject)
+
+	// OnInvalidTimeoutDetected notifications are produced by the Timeout Aggregation logic
+	// whenever an invalid timeout was detected.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnInvalidTimeoutDetected(*model.TimeoutObject)
 }
 
 // QCCreatedConsumer consumes outbound notifications produced by HotStuff and its components.
@@ -171,4 +185,52 @@ type QCCreatedConsumer interface {
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
 	OnQcConstructedFromVotes(*flow.QuorumCertificate)
+}
+
+// TimeoutCollectorConsumer consumes outbound notifications produced by HotStuff's timeout aggregation
+// component. These events are primarily intended for the HotStuff-internal state machine (EventHandler),
+// but might also be relevant to the larger node in which HotStuff is running.
+//
+// Caution: the events are not strictly ordered by increasing views!
+// The notifications are emitted by concurrent processing logic. Over larger time scales, the
+// emitted events are for statistically increasing views. However, on short time scales there
+// are _no_ monotonicity guarantees w.r.t. the events' views.
+//
+// Implementations must:
+//   * be concurrency safe
+//   * be non-blocking
+//   * handle repetition of the same events (with some processing overhead).
+type TimeoutCollectorConsumer interface {
+	// OnTcConstructedFromTimeouts notifications are produced by the TimeoutProcessor
+	// component, whenever it constructs a TC based on TimeoutObjects from a
+	// supermajority of consensus participants.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnTcConstructedFromTimeouts(certificate *flow.TimeoutCertificate)
+
+	// OnPartialTcCreated notifications are produced by the TimeoutProcessor
+	// component, whenever it collected TimeoutObjects from a superminority
+	// of consensus participants for a specific view. Along with the view, it
+	// reports the newest QC and TC (for previous view) discovered in process of
+	// timeout collection. Per convention, the newest QC is never nil, while
+	// the TC for the previous view might be nil.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnPartialTcCreated(view uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate)
+
+	// OnNewQcDiscovered notifications are produced by the TimeoutCollector
+	// component, whenever it discovers new QC included in timeout object.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnNewQcDiscovered(certificate *flow.QuorumCertificate)
+
+	// OnNewTcDiscovered notifications are produced by the TimeoutCollector
+	// component, whenever it discovers new TC included in timeout object.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnNewTcDiscovered(certificate *flow.TimeoutCertificate)
 }

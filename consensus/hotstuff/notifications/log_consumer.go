@@ -152,6 +152,22 @@ func (lc *LogConsumer) OnVoteForInvalidBlockDetected(vote *model.Vote, proposal 
 		Msg("vote for invalid proposal detected")
 }
 
+func (lc *LogConsumer) OnDoubleTimeoutDetected(timeout *model.TimeoutObject, alt *model.TimeoutObject) {
+	lc.log.Warn().
+		Uint64("timeout_view", timeout.View).
+		Hex("signer_id", logging.ID(timeout.SignerID)).
+		Hex("timeout_id", logging.ID(timeout.ID())).
+		Hex("alt_id", logging.ID(alt.ID())).
+		Msg("double timeout detected")
+}
+
+func (lc *LogConsumer) OnInvalidTimeoutDetected(timeout *model.TimeoutObject) {
+	lc.log.Warn().
+		Uint64("timeout_view", timeout.View).
+		Hex("signer_id", timeout.SignerID[:]).
+		Msg("invalid timeout detected")
+}
+
 func (lc *LogConsumer) logBasicBlockData(loggerEvent *zerolog.Event, block *model.Block) *zerolog.Event {
 	loggerEvent.
 		Uint64("block_view", block.View).
