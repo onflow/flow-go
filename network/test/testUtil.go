@@ -16,9 +16,10 @@ import (
 	"github.com/libp2p/go-libp2p-core/routing"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/network/channels"
 
 	"github.com/onflow/flow-go/crypto"
 

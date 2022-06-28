@@ -17,6 +17,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/routing"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	p2ppubsub "github.com/libp2p/go-libp2p-pubsub"
+
 	"github.com/onflow/flow-go/network/channels"
 
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
