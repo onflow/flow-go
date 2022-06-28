@@ -1579,7 +1579,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 	setupHeadHeight := func(height uint64) {
 		header := unittest.BlockHeaderFixture() // create a mock header
 		header.Height = height                  // set the header height
-		head = &header
+		head = header
 	}
 
 	setupStorage := func(min uint64, max uint64) ([]*flow.Header, []*flow.ExecutionReceipt, flow.IdentityList) {

@@ -73,9 +73,9 @@ func TestReExecuteBlock(t *testing.T) {
 		}
 		endState, err := executionReceipt.ExecutionResult.FinalStateCommitment()
 		require.NoError(t, err)
-		blockEvents := unittest.BlockEventsFixture(header, 3)
+		blockEvents := unittest.BlockEventsFixture(*header, 3)
 		// se := unittest.ServiceEventsFixture(2)
-		se := unittest.BlockEventsFixture(header, 8)
+		se := unittest.BlockEventsFixture(*header, 8)
 		tes := unittest.TransactionResultsFixture(4)
 
 		err = headers.Store(header)
@@ -183,9 +183,9 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		}
 		endState, err := executionReceipt.ExecutionResult.FinalStateCommitment()
 		require.NoError(t, err)
-		blockEvents := unittest.BlockEventsFixture(header, 3)
+		blockEvents := unittest.BlockEventsFixture(*header, 3)
 		// se := unittest.ServiceEventsFixture(2)
-		se := unittest.BlockEventsFixture(header, 8)
+		se := unittest.BlockEventsFixture(*header, 8)
 		tes := unittest.TransactionResultsFixture(4)
 
 		err = headers.Store(header)
