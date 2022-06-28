@@ -105,6 +105,17 @@ func (c *ApprovalCollector) SealResult() error {
 		return fmt.Errorf("failed to get final state commitment from Execution Result: %w", err)
 	}
 
+	// ********************** HotFix **********************
+	myResultID := c.incorporatedResult.Result.ID()
+
+	var blackListedResults flow.IdentifierList
+	for _, noSealResultID := range blackListedResults {
+		if noSealResultID == myResultID {
+			return nil
+		}
+	}
+	// ****************************************************
+
 	// TODO: Check SPoCK proofs
 
 	// generate & store seal
