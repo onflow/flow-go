@@ -98,7 +98,7 @@ func IsAuthorizedSender(identity *flow.Identity, channel channels.Channel, msg i
 	}
 
 	if err := conf.IsAuthorized(identity.Role, channel); err != nil {
-		return conf.Name, fmt.Errorf("%s: %w", err, ErrUnauthorizedSender)
+		return conf.Name, fmt.Errorf("%w: %s", err, ErrUnauthorizedSender)
 	}
 
 	return conf.Name, nil

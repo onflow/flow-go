@@ -35,7 +35,7 @@ func TestGetRolesByChannel_NonClusterChannel(t *testing.T) {
 // operates on top of channelRoleMap, and correctly identifies and strips of the cluster channel.
 func TestGetRolesByChannel_ClusterChannel(t *testing.T) {
 	// creates a cluster channel.
-	conClusterChannel := ChannelConsensusCluster("some-consensus-cluster-id")
+	conClusterChannel := ConsensusCluster("some-consensus-cluster-id")
 
 	// the roles list should contain collection
 	roles, ok := RolesByChannel(conClusterChannel)
@@ -74,12 +74,12 @@ func TestGetChannelByRole(t *testing.T) {
 // against cluster and non-cluster channel.
 func TestIsClusterChannel(t *testing.T) {
 	// creates a consensus cluster channel and verifies it
-	conClusterChannel := ChannelConsensusCluster("some-consensus-cluster-id")
+	conClusterChannel := ConsensusCluster("some-consensus-cluster-id")
 	ok := IsClusterChannel(conClusterChannel)
 	require.True(t, ok)
 
 	// creates a sync cluster channel and verifies it
-	syncClusterChannel := ChannelSyncCluster("some-sync-cluster-id")
+	syncClusterChannel := SyncCluster("some-sync-cluster-id")
 	ok = IsClusterChannel(syncClusterChannel)
 	require.True(t, ok)
 

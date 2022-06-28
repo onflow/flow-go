@@ -118,8 +118,8 @@ func registerConduits(net network.Network, state protocol.State, eng network.Eng
 		// add the dynamic channels for the cluster
 		channelList = append(
 			channelList,
-			channels.ChannelConsensusCluster(clusterID),
-			channels.ChannelSyncCluster(clusterID),
+			channels.ConsensusCluster(clusterID),
+			channels.SyncCluster(clusterID),
 		)
 	}
 

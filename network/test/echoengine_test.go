@@ -76,7 +76,7 @@ func (suite *EchoEngineTestSuite) TestUnknownChannel() {
 func (suite *EchoEngineTestSuite) TestClusterChannel() {
 	e := NewEchoEngine(suite.T(), suite.nets[0], 1, channels.TestNetworkChannel, false, suite.Unicast)
 	// creates a cluster channel
-	clusterChannel := channels.ChannelSyncCluster(flow.Testnet)
+	clusterChannel := channels.SyncCluster(flow.Testnet)
 	// registers engine with cluster channel
 	_, err := suite.nets[0].Register(clusterChannel, e)
 	// registering cluster channel should not cause an error

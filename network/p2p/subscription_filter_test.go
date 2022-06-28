@@ -130,7 +130,7 @@ func TestCanSubscribe(t *testing.T) {
 	_, err = collectionNode.Subscribe(badTopic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter())
 	require.Error(t, err)
 
-	clusterTopic := channels.TopicFromChannel(channels.ChannelSyncCluster(flow.Emulator), sporkId)
+	clusterTopic := channels.TopicFromChannel(channels.SyncCluster(flow.Emulator), sporkId)
 	_, err = collectionNode.Subscribe(clusterTopic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter())
 	require.NoError(t, err)
 }

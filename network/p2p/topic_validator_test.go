@@ -439,7 +439,7 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	ln2, identity2 := nodeFixture(t, context.Background(), sporkId, "collection_2", withRole(flow.RoleCollection))
 	ln3, identity3 := nodeFixture(t, context.Background(), sporkId, "collection_3", withRole(flow.RoleCollection))
 
-	channel := channels.ChannelSyncCluster(flow.Testnet)
+	channel := channels.SyncCluster(flow.Testnet)
 	topic := channels.TopicFromChannel(channel, sporkId)
 
 	ids := flow.IdentityList{&identity1, &identity2, &identity3}

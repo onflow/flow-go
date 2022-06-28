@@ -74,7 +74,7 @@ func (ss *SyncSuite) SetupTest() {
 
 	// set up the network module mock
 	ss.net = &mocknetwork.Network{}
-	ss.net.On("Register", channels.ChannelSyncCluster(clusterID), mock.Anything).Return(
+	ss.net.On("Register", channels.SyncCluster(clusterID), mock.Anything).Return(
 		func(network channels.Channel, engine netint.MessageProcessor) netint.Conduit {
 			return ss.con
 		},

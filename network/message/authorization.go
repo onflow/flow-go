@@ -30,7 +30,7 @@ type MsgAuthConfig struct {
 func (m MsgAuthConfig) IsAuthorized(role flow.Role, channel channels.Channel) error {
 	authorizedRoles, ok := m.Config[channel]
 	if !ok {
-		return fmt.Errorf("could not get authorization config for message type (%s) on channel (%s): %w", m.Name, channel, ErrUnauthorizedMessageOnChannel)
+		return ErrUnauthorizedMessageOnChannel
 	}
 
 	if !authorizedRoles.Contains(role) {
@@ -199,16 +199,6 @@ func initializeMessageAuthConfigsMap() {
 		Config: map[channels.Channel]flow.RoleList{
 			channels.PushApprovals: {flow.RoleVerification}, // channel alias ReceiveApprovals = PushApprovals
 		},
-	}
-
-	// [deprecated] execution state synchronization
-	AuthorizationConfigs[ExecutionStateSyncRequest] = MsgAuthConfig{
-		Name:   ExecutionStateSyncRequest,
-		Config: nil,
-	}
-	AuthorizationConfigs[ExecutionStateDelta] = MsgAuthConfig{
-		Name:   ExecutionStateDelta,
-		Config: nil,
 	}
 
 	// data exchange for execution of blocks
