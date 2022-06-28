@@ -45,22 +45,22 @@ func TestHeaderFingerprint(t *testing.T) {
 		ProposerID         flow.Identifier
 	}
 	rlp.NewMarshaler().MustUnmarshal(data, &decoded)
-	decHeader := flow.Header{
-		ChainID:            decoded.ChainID,
-		ParentID:           decoded.ParentID,
-		Height:             decoded.Height,
-		PayloadHash:        decoded.PayloadHash,
-		Timestamp:          time.Unix(0, int64(decoded.Timestamp)).UTC(),
-		View:               decoded.View,
-		ParentVoterIndices: decoded.ParentVoterIndices,
-		ParentVoterSigData: decoded.ParentVoterSigData,
-		ProposerID:         decoded.ProposerID,
-		ProposerSigData:    header.ProposerSigData, // since this field is not encoded/decoded, just set it to the original
+	decHeader := flow.NewHeader(
+		decoded.ChainID,
+		decoded.ParentID,
+		decoded.Height,
+		decoded.PayloadHash,
+		time.Unix(0, int64(decoded.Timestamp)).UTC(),
+		decoded.View,
+		decoded.ParentVoterIndices,
+		decoded.ParentVoterSigData,
+		decoded.ProposerID,
+		// since this field is not encoded/decoded, just set it to the original
 		// value to pass test
-	}
+		header.ProposerSigData)
 	decodedID := decHeader.ID()
 	assert.Equal(t, headerID, decodedID)
-	assert.Equal(t, header, decHeader)
+	assert.Equal(t, header, *decHeader)
 }
 
 func TestHeaderEncodingMsgpack(t *testing.T) {

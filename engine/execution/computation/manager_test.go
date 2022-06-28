@@ -91,9 +91,17 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	}
 
 	block := flow.Block{
-		Header: &flow.Header{
-			View: 42,
-		},
+		Header: flow.NewHeader(
+			"",
+			flow.ZeroID,
+			0,
+			flow.ZeroID,
+			time.Time{},
+			42,
+			nil,
+			nil,
+			flow.ZeroID,
+			nil),
 		Payload: &flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{&guarantee},
 		},

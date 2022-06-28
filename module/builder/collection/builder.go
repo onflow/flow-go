@@ -298,25 +298,29 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// build the payload from the transactions
 	payload := cluster.PayloadFromTransactions(minRefID, transactions...)
 
-	header := flow.Header{
-		ChainID:     parent.ChainID,
-		ParentID:    parentID,
-		Height:      parent.Height + 1,
-		PayloadHash: payload.Hash(),
-		Timestamp:   time.Now().UTC(),
+	header := flow.NewHeader(
+		parent.ChainID,
+		parentID,
+		parent.Height+1,
+		payload.Hash(),
+		time.Now().UTC(),
 
 		// NOTE: we rely on the HotStuff-provided setter to set the other
 		// fields, which are related to signatures and HotStuff internals
-	}
+		0,
+		nil,
+		nil,
+		flow.ZeroID,
+		nil)
 
 	// set fields specific to the consensus algorithm
-	err = setter(&header)
+	err = setter(header)
 	if err != nil {
 		return nil, fmt.Errorf("could not set fields to header: %w", err)
 	}
 
 	proposal = cluster.Block{
-		Header:  &header,
+		Header:  header,
 		Payload: &payload,
 	}
 

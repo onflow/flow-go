@@ -12,21 +12,20 @@ func GenerateRootBlock(chainID flow.ChainID, parentID flow.Identifier, height ui
 		Guarantees: nil,
 		Seals:      nil,
 	}
-	header := flow.Header{
-		ChainID:            chainID,
-		ParentID:           parentID,
-		Height:             height,
-		PayloadHash:        payload.Hash(),
-		Timestamp:          timestamp,
-		View:               0,
-		ParentVoterIndices: nil,
-		ParentVoterSigData: nil,
-		ProposerID:         flow.ZeroID,
-		ProposerSigData:    nil,
-	}
+	header := flow.NewHeader(
+		chainID,
+		parentID,
+		height,
+		payload.Hash(),
+		timestamp,
+		0,
+		nil,
+		nil,
+		flow.ZeroID,
+		nil)
 
 	return &flow.Block{
-		Header:  &header,
+		Header:  header,
 		Payload: &payload,
 	}
 }

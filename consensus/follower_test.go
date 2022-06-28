@@ -101,12 +101,17 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 	// root block and QC
 	parentID, err := flow.HexStringToIdentifier("aa7693d498e9a087b1cadf5bfe9a1ff07829badc1915c210e482f369f9a00a70")
 	require.NoError(s.T(), err)
-	s.rootHeader = &flow.Header{
-		ParentID:  parentID,
-		Timestamp: time.Now().UTC(),
-		Height:    21053,
-		View:      52078,
-	}
+	s.rootHeader = flow.NewHeader(
+		"",
+		parentID,
+		21053,
+		flow.ZeroID,
+		time.Now().UTC(),
+		52078,
+		nil,
+		nil,
+		flow.ZeroID,
+		nil)
 
 	signerIndices, err := signature.EncodeSignersToIndices(identities.NodeIDs(), identities.NodeIDs()[:3])
 	require.NoError(s.T(), err)

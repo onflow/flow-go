@@ -8,6 +8,7 @@ import (
 	"math"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/mock"
 
@@ -1551,12 +1552,22 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 
 	chain, vm := createChainAndVm(flow.Mainnet)
 
-	header := flow.Header{Height: 42}
+	header := flow.NewHeader(
+		"",
+		flow.ZeroID,
+		42,
+		flow.ZeroID,
+		time.Time{},
+		0,
+		nil,
+		nil,
+		flow.ZeroID,
+		nil)
 
 	ctx := fvm.NewContext(
 		zerolog.Nop(),
 		fvm.WithChain(chain),
-		fvm.WithBlockHeader(&header),
+		fvm.WithBlockHeader(header),
 		fvm.WithCadenceLogging(true),
 	)
 

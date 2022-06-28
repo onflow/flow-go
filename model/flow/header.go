@@ -43,6 +43,32 @@ type Header struct {
 	// signature since the data represents cryptographic signatures serialized in some way (concatenation or other)
 }
 
+func NewHeader(
+	chainID ChainID,
+	parentID Identifier,
+	height uint64,
+	payloadHash Identifier,
+	timestamp time.Time,
+	view uint64,
+	parentVoterIndices []byte,
+	parentVoterSigData []byte,
+	proposerID Identifier,
+	proposerSigData []byte) *Header {
+
+	return &Header{
+		ChainID:            chainID,
+		ParentID:           parentID,
+		Height:             height,
+		PayloadHash:        payloadHash,
+		Timestamp:          timestamp,
+		View:               view,
+		ParentVoterIndices: parentVoterIndices,
+		ParentVoterSigData: parentVoterSigData,
+		ProposerID:         proposerID,
+		ProposerSigData:    proposerSigData,
+	}
+}
+
 // Body returns the immutable part of the block header.
 func (h Header) Body() interface{} {
 	return struct {

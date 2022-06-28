@@ -717,11 +717,17 @@ func generateBlockWithVisitor(collectionCount, transactionCount int, addressGene
 	}
 
 	block := flow.Block{
-		Header: &flow.Header{
-			Timestamp: flow.GenesisTime,
-			Height:    42,
-			View:      42,
-		},
+		Header: flow.NewHeader(
+			"",
+			flow.ZeroID,
+			42,
+			flow.ZeroID,
+			flow.GenesisTime,
+			42,
+			nil,
+			nil,
+			flow.ZeroID,
+			nil),
 		Payload: &flow.Payload{
 			Guarantees: guarantees,
 		},

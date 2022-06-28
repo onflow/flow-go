@@ -81,9 +81,17 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 	}
 
 	block := flow.Block{
-		Header: &flow.Header{
-			View: 26,
-		},
+		Header: flow.NewHeader(
+			"",
+			flow.ZeroID,
+			0,
+			flow.ZeroID,
+			time.Time{},
+			26,
+			nil,
+			nil,
+			flow.ZeroID,
+			nil),
 		Payload: &flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{&guarantee},
 		},
@@ -231,9 +239,17 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 
 	t.Run("executing block1 (no collection)", func(t *testing.T) {
 		block1 = &flow.Block{
-			Header: &flow.Header{
-				View: 1,
-			},
+			Header: flow.NewHeader(
+				"",
+				flow.ZeroID,
+				0,
+				flow.ZeroID,
+				time.Time{},
+				1,
+				nil,
+				nil,
+				flow.ZeroID,
+				nil),
 			Payload: &flow.Payload{
 				Guarantees: []*flow.CollectionGuarantee{},
 			},
@@ -405,11 +421,17 @@ func createTestBlockAndRun(t *testing.T, engine *Manager, parentBlock *flow.Bloc
 	}
 
 	block := &flow.Block{
-		Header: &flow.Header{
-			ParentID:  parentBlock.ID(),
-			View:      parentBlock.Header.Height + 1,
-			Timestamp: time.Now(),
-		},
+		Header: flow.NewHeader(
+			"",
+			parentBlock.ID(),
+			0,
+			flow.ZeroID,
+			time.Now(),
+			parentBlock.Header.Height+1,
+			nil,
+			nil,
+			flow.ZeroID,
+			nil),
 		Payload: &flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{&guarantee},
 		},

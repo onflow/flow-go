@@ -621,22 +621,21 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	timestamp := b.cfg.blockTimer.Build(parent.Timestamp)
 
 	// construct default block on top of the provided parent
-	header := &flow.Header{
-		ChainID:     parent.ChainID,
-		ParentID:    parentID,
-		Height:      parent.Height + 1,
-		Timestamp:   timestamp,
-		PayloadHash: payload.Hash(),
+	header := flow.NewHeader(
+		parent.ChainID,
+		parentID,
+		parent.Height+1,
+		payload.Hash(),
+		timestamp,
 
 		// the following fields should be set by the custom function as needed
 		// NOTE: we could abstract all of this away into an interface{} field,
 		// but that would be over the top as we will probably always use hotstuff
-		View:               0,
-		ParentVoterIndices: nil,
-		ParentVoterSigData: nil,
-		ProposerID:         flow.ZeroID,
-		ProposerSigData:    nil,
-	}
+		0,
+		nil,
+		nil,
+		flow.ZeroID,
+		nil)
 
 	// apply the custom fields setter of the consensus algorithm
 	err = setter(header)

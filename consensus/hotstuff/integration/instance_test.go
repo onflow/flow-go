@@ -164,13 +164,17 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 			if !ok {
 				return nil
 			}
-			header := &flow.Header{
-				ChainID:     "chain",
-				ParentID:    parentID,
-				Height:      parent.Height + 1,
-				PayloadHash: unittest.IdentifierFixture(),
-				Timestamp:   time.Now().UTC(),
-			}
+			header := flow.NewHeader(
+				"chain",
+				parentID,
+				parent.Height+1,
+				unittest.IdentifierFixture(),
+				time.Now().UTC(),
+				0,
+				nil,
+				nil,
+				flow.ZeroID,
+				nil)
 			require.NoError(t, setter(header))
 			in.headers[header.ID()] = header
 			return header

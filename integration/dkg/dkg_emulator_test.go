@@ -63,7 +63,17 @@ func (s *DKGSuite) runTest(goodNodes int, emulatorProblems bool) {
 		FinalView:    600,
 	}
 
-	firstBlock := &flow.Header{View: 100}
+	firstBlock := flow.NewHeader(
+		"",
+		flow.ZeroID,
+		0,
+		flow.ZeroID,
+		time.Time{},
+		100,
+		nil,
+		nil,
+		flow.ZeroID,
+		nil)
 
 	for _, node := range nodes {
 		node.setEpochs(s.T(), currentEpochSetup, nextEpochSetup, firstBlock)

@@ -39,16 +39,15 @@ func ProposalFromFlow(header *flow.Header, parentView uint64) *Proposal {
 func ProposalToFlow(proposal *Proposal) *flow.Header {
 
 	block := proposal.Block
-	header := flow.Header{
-		ParentID:           block.QC.BlockID,
-		PayloadHash:        block.PayloadHash,
-		Timestamp:          block.Timestamp,
-		View:               block.View,
-		ParentVoterIndices: block.QC.SignerIndices,
-		ParentVoterSigData: block.QC.SigData,
-		ProposerID:         block.ProposerID,
-		ProposerSigData:    proposal.SigData,
-	}
-
-	return &header
+	return flow.NewHeader(
+		"",
+		block.QC.BlockID,
+		0,
+		block.PayloadHash,
+		block.Timestamp,
+		block.View,
+		block.QC.SignerIndices,
+		block.QC.SigData,
+		block.ProposerID,
+		proposal.SigData)
 }

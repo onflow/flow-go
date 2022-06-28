@@ -8,14 +8,17 @@ import (
 )
 
 func DefaultRoot() *flow.Header {
-	header := &flow.Header{
-		ChainID:     "chain",
-		ParentID:    flow.ZeroID,
-		Height:      0,
-		PayloadHash: unittest.IdentifierFixture(),
-		Timestamp:   time.Now().UTC(),
-	}
-	return header
+	return flow.NewHeader(
+		"chain",
+		flow.ZeroID,
+		0,
+		unittest.IdentifierFixture(),
+		time.Now().UTC(),
+		0,
+		nil,
+		nil,
+		flow.ZeroID,
+		nil)
 }
 
 func DefaultStart() uint64 {

@@ -7,12 +7,17 @@ import (
 )
 
 func Genesis() *Block {
-	header := &flow.Header{
-		View:      0,
-		ChainID:   "cluster",
-		Timestamp: flow.GenesisTime,
-		ParentID:  flow.ZeroID,
-	}
+	header := flow.NewHeader(
+		"cluster",
+		flow.ZeroID,
+		0,
+		flow.ZeroID,
+		flow.GenesisTime,
+		0,
+		nil,
+		nil,
+		flow.ZeroID,
+		nil)
 
 	payload := EmptyPayload(flow.ZeroID)
 

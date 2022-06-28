@@ -92,10 +92,17 @@ func (v *RemoteView) getLatestBlockID() ([]byte, *flow.Header, error) {
 	}
 
 	// TODO set chainID and parentID
-	header := &flow.Header{
-		Height:    resp.Block.Height,
-		Timestamp: resp.Block.Timestamp.AsTime(),
-	}
+	header := flow.NewHeader(
+		"",
+		flow.ZeroID,
+		resp.Block.Height,
+		flow.ZeroID,
+		resp.Block.Timestamp.AsTime(),
+		0,
+		nil,
+		nil,
+		flow.ZeroID,
+		nil)
 
 	return resp.Block.Id, header, nil
 }
@@ -111,10 +118,17 @@ func (v *RemoteView) getBlockHeader(blockID flow.Identifier) (*flow.Header, erro
 	}
 
 	// TODO set chainID and parentID
-	header := &flow.Header{
-		Height:    resp.Block.Height,
-		Timestamp: resp.Block.Timestamp.AsTime(),
-	}
+	header := flow.NewHeader(
+		"",
+		flow.ZeroID,
+		resp.Block.Height,
+		flow.ZeroID,
+		resp.Block.Timestamp.AsTime(),
+		0,
+		nil,
+		nil,
+		flow.ZeroID,
+		nil)
 
 	return header, nil
 }

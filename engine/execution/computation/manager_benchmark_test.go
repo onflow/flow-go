@@ -174,10 +174,17 @@ func createBlock(b *testing.B, parentBlock *flow.Block, accs *testAccounts, colN
 	}
 
 	block := flow.Block{
-		Header: &flow.Header{
-			ParentID: parentBlock.ID(),
-			View:     parentBlock.Header.Height + 1,
-		},
+		Header: flow.NewHeader(
+			"",
+			parentBlock.ID(),
+			0,
+			flow.ZeroID,
+			time.Time{},
+			parentBlock.Header.Height+1,
+			nil,
+			nil,
+			flow.ZeroID,
+			nil),
 		Payload: &flow.Payload{
 			Guarantees: guarantees,
 		},

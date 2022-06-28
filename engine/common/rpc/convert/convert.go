@@ -162,18 +162,18 @@ func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert ChainId: %w", err)
 	}
-	return &flow.Header{
-		ParentID:           MessageToIdentifier(m.ParentId),
-		Height:             m.Height,
-		PayloadHash:        MessageToIdentifier(m.PayloadHash),
-		Timestamp:          m.Timestamp.AsTime(),
-		View:               m.View,
-		ParentVoterIndices: m.ParentVoterIndices,
-		ParentVoterSigData: m.ParentVoterSigData,
-		ProposerID:         MessageToIdentifier(m.ProposerId),
-		ProposerSigData:    m.ProposerSigData,
-		ChainID:            *chainId,
-	}, nil
+	return flow.NewHeader(
+		*chainId,
+		MessageToIdentifier(m.ParentId),
+		m.Height,
+		MessageToIdentifier(m.PayloadHash),
+		m.Timestamp.AsTime(),
+		m.View,
+		m.ParentVoterIndices,
+		m.ParentVoterSigData,
+		MessageToIdentifier(m.ProposerId),
+		m.ProposerSigData,
+	), nil
 }
 
 // MessageToChainId checks chainId from enumeration to prevent a panic on Chain() being called
