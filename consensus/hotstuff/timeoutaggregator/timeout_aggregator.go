@@ -23,6 +23,8 @@ const defaultTimeoutAggregatorWorkers = 4
 // defaultTimeoutQueueCapacity maximum capacity of buffering unprocessed timeouts
 const defaultTimeoutQueueCapacity = 1000
 
+// TimeoutAggregator stores the timeout objects and aggregates them into a TC when enough TOs have been collected.
+// It's safe to use in concurrent environment.
 type TimeoutAggregator struct {
 	*component.ComponentManager
 	log                        zerolog.Logger
