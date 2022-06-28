@@ -1,9 +1,10 @@
 package pubsub
 
 import (
+	"sync"
+
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/model/flow"
-	"sync"
 )
 
 // timeoutCollectorDistributor subscribes for events from hotstuff and distributes it to subscribers.

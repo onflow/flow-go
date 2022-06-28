@@ -3,6 +3,7 @@ package timeoutcollector
 import (
 	"errors"
 	"fmt"
+	"unsafe"
 
 	"go.uber.org/atomic"
 
@@ -35,15 +36,13 @@ func (t *accumulatedWeightTracker) Track(weight uint64) bool {
 // NewestQCTracker is a helper structure which keeps track of the highest QC(by view)
 // in concurrency safe way.
 type NewestQCTracker struct {
-	newestQC atomic.Value
+	newestQC *atomic.UnsafePointer
 }
 
 func NewNewestQCTracker() *NewestQCTracker {
-	tracker := &NewestQCTracker{}
-	// store dummy QC with view 0 to workaround limitation of storing nil into atomic.Value
-	tracker.newestQC.Store(&flow.QuorumCertificate{
-		View: 0,
-	})
+	tracker := &NewestQCTracker{
+		newestQC: atomic.NewUnsafePointer(unsafe.Pointer(nil)),
+	}
 	return tracker
 }
 
@@ -51,15 +50,19 @@ func NewNewestQCTracker() *NewestQCTracker {
 // Concurrently safe
 func (t *NewestQCTracker) Track(qc *flow.QuorumCertificate) {
 	NewestQC := t.NewestQC()
-	if NewestQC.View < qc.View {
-		t.newestQC.CompareAndSwap(NewestQC, qc)
+	if NewestQC != nil && NewestQC.View >= qc.View {
+		return
+	}
+
+	if NewestQC == nil || NewestQC.View < qc.View {
+		t.newestQC.CAS(unsafe.Pointer(NewestQC), unsafe.Pointer(qc))
 	}
 }
 
 // NewestQC returns the newest QC(by view) tracked.
 // Concurrently safe
 func (t *NewestQCTracker) NewestQC() *flow.QuorumCertificate {
-	return t.newestQC.Load().(*flow.QuorumCertificate)
+	return (*flow.QuorumCertificate)(t.newestQC.Load())
 }
 
 // TimeoutProcessor implements the hotstuff.TimeoutProcessor interface.
