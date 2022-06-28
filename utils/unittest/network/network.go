@@ -93,7 +93,7 @@ func NewEngine() *Engine {
 
 // OnProcess specifies the callback that should be executed when `Process` is called on this mock engine.
 func (e *Engine) OnProcess(processFunc EngineProcessFunc) *Engine {
-	e.On("Process", mock.AnythingOfType("network.Channel"), mock.AnythingOfType("flow.Identifier"), mock.Anything).
+	e.On("Process", mock.AnythingOfType("channels.Channel"), mock.AnythingOfType("flow.Identifier"), mock.Anything).
 		Return((func(channels.Channel, flow.Identifier, interface{}) error)(processFunc))
 
 	return e

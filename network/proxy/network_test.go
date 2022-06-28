@@ -44,7 +44,7 @@ func (suite *Suite) SetupTest() {
 	suite.proxyNet = proxy.NewProxyNetwork(suite.net, suite.targetNodeID)
 	suite.engine = new(mocknetwork.Engine)
 
-	net.On("Register", mock.AnythingOfType("network.Channel"), mock.Anything).Return(suite.con, nil)
+	net.On("Register", mock.AnythingOfType("channels.Channel"), mock.Anything).Return(suite.con, nil)
 }
 
 // TestUnicast tests that the Unicast method is translated to a unicast to the target node

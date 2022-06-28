@@ -20,7 +20,7 @@ type Engine struct {
 
 func New(
 	log zerolog.Logger,
-	channels channels.ChannelList,
+	channelList channels.ChannelList,
 	net network.Network,
 	unstakedNet network.Network,
 ) (*Engine, error) {
@@ -30,7 +30,7 @@ func New(
 		conduits: make(map[channels.Channel]network.Conduit),
 	}
 
-	for _, channel := range channels {
+	for _, channel := range channelList {
 		_, err := net.Register(channel, e)
 		if err != nil {
 			return nil, fmt.Errorf("could not register relay engine on channel: %w", err)

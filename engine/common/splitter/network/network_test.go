@@ -36,7 +36,7 @@ func (suite *Suite) SetupTest() {
 	suite.con = new(mocknetwork.Conduit)
 	suite.engines = make(map[channels.Channel]network.MessageProcessor)
 
-	net.On("Register", mock.AnythingOfType("network.Channel"), mock.Anything).Run(func(args mock.Arguments) {
+	net.On("Register", mock.AnythingOfType("channels.Channel"), mock.Anything).Run(func(args mock.Arguments) {
 		channel, _ := args.Get(0).(channels.Channel)
 		engine, ok := args.Get(1).(network.MessageProcessor)
 		suite.Assert().True(ok)

@@ -119,13 +119,13 @@ func TestUniqueChannels_Uniqueness(t *testing.T) {
 // We use the identifier of RoleList to determine their uniqueness.
 func TestUniqueChannels_ClusterChannels(t *testing.T) {
 	channels := ChannelsByRole(flow.RoleCollection)
-	consensusCluster := channels.ChannelConsensusCluster(flow.Emulator)
-	syncCluster := channels.ChannelSyncCluster(flow.Emulator)
+	consensusCluster := ConsensusCluster(flow.Emulator)
+	syncCluster := SyncCluster(flow.Emulator)
 	channels = append(channels, consensusCluster, syncCluster)
-	uniques := channels.UniqueChannels(channels)
+	uniques := UniqueChannels(channels)
 	// collection role has two cluster and one non-cluster channels all with the same RoleList.
 	// Hence all of them should be returned as unique channels.
-	require.Contains(t, uniques, syncCluster)               // cluster channel
-	require.Contains(t, uniques, consensusCluster)          // cluster channel
-	require.Contains(t, uniques, channels.PushTransactions) // non-cluster channel
+	require.Contains(t, uniques, syncCluster)      // cluster channel
+	require.Contains(t, uniques, consensusCluster) // cluster channel
+	require.Contains(t, uniques, PushTransactions) // non-cluster channel
 }

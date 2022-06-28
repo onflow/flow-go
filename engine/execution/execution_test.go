@@ -141,7 +141,7 @@ func TestExecutionFlow(t *testing.T) {
 	// check collection node received the collection request from execution node
 	providerEngine := new(mocknetwork.Engine)
 	provConduit, _ := collectionNode.Net.Register(channels.ProvideCollections, providerEngine)
-	providerEngine.On("Process", mock.AnythingOfType("network.Channel"), exeID.NodeID, mock.Anything).
+	providerEngine.On("Process", mock.AnythingOfType("channels.Channel"), exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
 			originID := args.Get(1).(flow.Identifier)
 			req := args.Get(2).(*messages.EntityRequest)
@@ -178,7 +178,7 @@ func TestExecutionFlow(t *testing.T) {
 	// check the verification engine received the ER from execution node
 	verificationEngine := new(mocknetwork.Engine)
 	_, _ = verificationNode.Net.Register(channels.ReceiveReceipts, verificationEngine)
-	verificationEngine.On("Process", mock.AnythingOfType("network.Channel"), exeID.NodeID, mock.Anything).
+	verificationEngine.On("Process", mock.AnythingOfType("channels.Channel"), exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
 			lock.Lock()
 			defer lock.Unlock()
@@ -193,7 +193,7 @@ func TestExecutionFlow(t *testing.T) {
 	// check the consensus engine has received the result from execution node
 	consensusEngine := new(mocknetwork.Engine)
 	_, _ = consensusNode.Net.Register(channels.ReceiveReceipts, consensusEngine)
-	consensusEngine.On("Process", mock.AnythingOfType("network.Channel"), exeID.NodeID, mock.Anything).
+	consensusEngine.On("Process", mock.AnythingOfType("channels.Channel"), exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
 			lock.Lock()
 			defer lock.Unlock()
@@ -404,7 +404,7 @@ func TestFailedTxWillNotChangeStateCommitment(t *testing.T) {
 
 	consensusEngine := new(mocknetwork.Engine)
 	_, _ = consensusNode.Net.Register(channels.ReceiveReceipts, consensusEngine)
-	consensusEngine.On("Process", mock.AnythingOfType("network.Channel"), mock.Anything, mock.Anything).
+	consensusEngine.On("Process", mock.AnythingOfType("channels.Channel"), mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			receiptsReceived.Inc()
 			originID := args[1].(flow.Identifier)
@@ -474,7 +474,7 @@ func mockCollectionEngineToReturnCollections(t *testing.T, collectionNode *testm
 		blob, _ := msgpack.Marshal(col)
 		colMap[col.ID()] = blob
 	}
-	collectionEngine.On("Process", mock.AnythingOfType("network.Channel"), mock.Anything, mock.Anything).
+	collectionEngine.On("Process", mock.AnythingOfType("channels.Channel"), mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			originID := args[1].(flow.Identifier)
 			req := args[2].(*messages.EntityRequest)
@@ -549,7 +549,7 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 	verificationEngine := new(mocknetwork.Engine)
 	_, _ = verification1Node.Net.Register(channels.ReceiveReceipts, verificationEngine)
 	_, _ = verification2Node.Net.Register(channels.ReceiveReceipts, verificationEngine)
-	verificationEngine.On("Process", mock.AnythingOfType("network.Channel"), exeID.NodeID, mock.Anything).
+	verificationEngine.On("Process", mock.AnythingOfType("channels.Channel"), exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
 			actualCalls.Inc()
 

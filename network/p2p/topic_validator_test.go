@@ -169,11 +169,11 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	// setup hooked logger
 	var hookCalls uint64
 	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
-		if level == zerolog.WarnLevel {
+		if level == zerolog.ErrorLevel {
 			atomic.AddUint64(&hookCalls, 1)
 		}
 	})
-	logger := zerolog.New(os.Stdout).Level(zerolog.WarnLevel).Hook(hook)
+	logger := zerolog.New(os.Stdout).Level(zerolog.ErrorLevel).Hook(hook)
 
 	sn1, identity1 := nodeFixture(t, context.Background(), sporkId, "TestAuthorizedSenderValidator_InvalidMsg", withRole(flow.RoleConsensus))
 	sn2, identity2 := nodeFixture(t, context.Background(), sporkId, "TestAuthorizedSenderValidator_InvalidMsg", withRole(flow.RoleConsensus))
@@ -263,7 +263,7 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "could not receive message on time")
 
-	// expecting 1 warn calls for each rejected message from unauthorized node
+	// expecting 1 error log for each rejected message from unauthorized node
 	require.Equalf(t, uint64(1), hookCalls, "expected 1 warning to be logged")
 }
 
@@ -285,11 +285,11 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	// setup hooked logger
 	var hookCalls uint64
 	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
-		if level == zerolog.WarnLevel {
+		if level == zerolog.ErrorLevel {
 			atomic.AddUint64(&hookCalls, 1)
 		}
 	})
-	logger := zerolog.New(os.Stdout).Level(zerolog.WarnLevel).Hook(hook)
+	logger := zerolog.New(os.Stdout).Level(zerolog.ErrorLevel).Hook(hook)
 
 	authorizedSenderValidator := validator.AuthorizedSenderValidator(logger, channel, func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translator.GetFlowID(pid)
@@ -334,7 +334,7 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "could not receive message on time")
 
-	// expecting 1 warn calls for each rejected message from ejected node
+	// expecting 1 error log for each rejected message from ejected node
 	require.Equalf(t, uint64(1), hookCalls, "expected 1 warning to be logged")
 }
 
@@ -356,11 +356,11 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	// setup hooked logger
 	var hookCalls uint64
 	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
-		if level == zerolog.WarnLevel {
+		if level == zerolog.ErrorLevel {
 			atomic.AddUint64(&hookCalls, 1)
 		}
 	})
-	logger := zerolog.New(os.Stdout).Level(zerolog.WarnLevel).Hook(hook)
+	logger := zerolog.New(os.Stdout).Level(zerolog.ErrorLevel).Hook(hook)
 
 	authorizedSenderValidator := validator.AuthorizedSenderValidator(logger, channel, func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translator.GetFlowID(pid)

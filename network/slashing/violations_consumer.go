@@ -27,7 +27,7 @@ func NewSlashingViolationsConsumer(log zerolog.Logger) *SlashingViolationsConsum
 
 // OnUnAuthorizedSenderError logs a warning for unauthorized sender error
 func (c *SlashingViolationsConsumer) OnUnAuthorizedSenderError(identity *flow.Identity, peerID, msgType string, err error) {
-	c.log.Warn().
+	c.log.Error().
 		Err(err).
 		Str("peer_id", peerID).
 		Str("role", identity.Role.String()).
@@ -39,7 +39,7 @@ func (c *SlashingViolationsConsumer) OnUnAuthorizedSenderError(identity *flow.Id
 
 // OnUnknownMsgTypeError logs a warning for unknown message type error
 func (c *SlashingViolationsConsumer) OnUnknownMsgTypeError(identity *flow.Identity, peerID, msgType string, err error) {
-	c.log.Warn().
+	c.log.Error().
 		Err(err).
 		Str("peer_id", peerID).
 		Str("role", identity.Role.String()).
@@ -51,7 +51,7 @@ func (c *SlashingViolationsConsumer) OnUnknownMsgTypeError(identity *flow.Identi
 
 // OnSenderEjectedError logs a warning for sender ejected error
 func (c *SlashingViolationsConsumer) OnSenderEjectedError(identity *flow.Identity, peerID, msgType string, err error) {
-	c.log.Warn().
+	c.log.Error().
 		Err(err).
 		Str("peer_id", peerID).
 		Str("role", identity.Role.String()).
