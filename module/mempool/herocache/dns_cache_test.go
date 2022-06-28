@@ -73,11 +73,11 @@ func TestDNSCache_LRU(t *testing.T) {
 		if i < total-int(sizeLimit) {
 			// old dns entries must be ejected
 			// ip
-			ip, _, ok := cache.GetDomainIp(ipFixtures[i].Domain)
+			ipRecord, ok := cache.GetDomainIp(ipFixtures[i].Domain)
 			require.False(t, ok)
-			require.Nil(t, ip)
+			require.Nil(t, ipRecord)
 			// txt records
-			txt, _, ok := cache.GetTxtRecord(txtFixtures[i].Txt)
+			txt, ok := cache.GetTxtRecord(txtFixtures[i].Txt)
 			require.False(t, ok)
 			require.Nil(t, txt)
 
@@ -86,15 +86,15 @@ func TestDNSCache_LRU(t *testing.T) {
 
 		// new dns entries must be persisted
 		// ip
-		ip, ts, ok := cache.GetDomainIp(ipFixtures[i].Domain)
+		ipRecord, ok := cache.GetDomainIp(ipFixtures[i].Domain)
 		require.True(t, ok)
-		require.Equal(t, ipFixtures[i].Result, ip)
-		require.Equal(t, ipFixtures[i].TimeStamp, ts)
+		require.Equal(t, ipFixtures[i].Result, ipRecord.Addresses)
+		require.Equal(t, ipFixtures[i].TimeStamp, ipRecord.Timestamp)
 		// txt records
-		txt, ts, ok := cache.GetTxtRecord(txtFixtures[i].Txt)
+		txtRecord, ok := cache.GetTxtRecord(txtFixtures[i].Txt)
 		require.True(t, ok)
-		require.Equal(t, txtFixtures[i].Records, txt)
-		require.Equal(t, txtFixtures[i].TimeStamp, ts)
+		require.Equal(t, txtFixtures[i].Records, txtRecord.Record)
+		require.Equal(t, txtFixtures[i].TimeStamp, txtRecord.Timestamp)
 	}
 }
 
@@ -162,28 +162,28 @@ func TestDNSCache_Rem(t *testing.T) {
 		if i == 0 {
 			// removed entries must no longer exist.
 			// ip
-			ip, _, ok := cache.GetDomainIp(ipFixtures[i].Domain)
+			ipRecord, ok := cache.GetDomainIp(ipFixtures[i].Domain)
 			require.False(t, ok)
-			require.Nil(t, ip)
+			require.Nil(t, ipRecord)
 			// txt records
-			txt, _, ok := cache.GetTxtRecord(txtFixtures[i].Txt)
+			txtRecord, ok := cache.GetTxtRecord(txtFixtures[i].Txt)
 			require.False(t, ok)
-			require.Nil(t, txt)
+			require.Nil(t, txtRecord)
 
 			continue
 		}
 
 		// other entries must be existing.
 		// ip
-		ip, ts, ok := cache.GetDomainIp(ipFixtures[i].Domain)
+		ipRecord, ok := cache.GetDomainIp(ipFixtures[i].Domain)
 		require.True(t, ok)
-		require.Equal(t, ipFixtures[i].Result, ip)
-		require.Equal(t, ipFixtures[i].TimeStamp, ts)
+		require.Equal(t, ipFixtures[i].Result, ipRecord.Addresses)
+		require.Equal(t, ipFixtures[i].TimeStamp, ipRecord.Timestamp)
 		// txt records
-		txt, ts, ok := cache.GetTxtRecord(txtFixtures[i].Txt)
+		txtRecord, ok := cache.GetTxtRecord(txtFixtures[i].Txt)
 		require.True(t, ok)
-		require.Equal(t, txtFixtures[i].Records, txt)
-		require.Equal(t, txtFixtures[i].TimeStamp, ts)
+		require.Equal(t, txtFixtures[i].Records, txtRecord.Record)
+		require.Equal(t, txtFixtures[i].TimeStamp, txtRecord.Timestamp)
 	}
 }
 
@@ -198,14 +198,14 @@ func testRetrievalMatchCount(t *testing.T,
 	// checking ip domains
 	actualCount := 0
 	for _, tc := range ipTestCases {
-		addresses, timestamp, ok := cache.GetDomainIp(tc.Domain)
+		ipRecord, ok := cache.GetDomainIp(tc.Domain)
 		if !ok {
 			continue
 		}
 		require.True(t, ok)
 
-		require.Equal(t, tc.TimeStamp, timestamp)
-		require.Equal(t, tc.Result, addresses)
+		require.Equal(t, tc.TimeStamp, ipRecord.Timestamp)
+		require.Equal(t, tc.Result, ipRecord.Addresses)
 		actualCount++
 	}
 	require.Equal(t, count, actualCount)
@@ -213,14 +213,14 @@ func testRetrievalMatchCount(t *testing.T,
 	// checking txt records
 	actualCount = 0
 	for _, tc := range txtTestCases {
-		records, timestamp, ok := cache.GetTxtRecord(tc.Txt)
+		txtRecord, ok := cache.GetTxtRecord(tc.Txt)
 		if !ok {
 			continue
 		}
 		require.True(t, ok)
 
-		require.Equal(t, tc.TimeStamp, timestamp)
-		require.Equal(t, tc.Records, records)
+		require.Equal(t, tc.TimeStamp, txtRecord.Timestamp)
+		require.Equal(t, tc.Records, txtRecord.Record)
 		actualCount++
 	}
 	require.Equal(t, count, actualCount)
