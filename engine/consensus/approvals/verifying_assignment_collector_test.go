@@ -127,8 +127,8 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_ReusingCach
 		}
 	}
 
-	incorporatedBlock := unittest.BlockHeaderWithParentFixture(&s.Block)
-	s.Blocks[incorporatedBlock.ID()] = &incorporatedBlock
+	incorporatedBlock := unittest.BlockHeaderWithParentFixture(s.Block)
+	s.Blocks[incorporatedBlock.ID()] = incorporatedBlock
 
 	// at this point we have proposed a seal, let's construct new incorporated result with same assignment
 	// but different incorporated block ID resulting in new seal.
@@ -217,7 +217,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult() {
 	s.Run("invalid-verifier-identities", func() {
 		// delete identities for Result.BlockID
 		delete(s.IdentitiesCache, s.IncorporatedResult.Result.BlockID)
-		s.Snapshots[s.IncorporatedResult.Result.BlockID] = unittest.StateSnapshotForKnownBlock(&s.Block, nil)
+		s.Snapshots[s.IncorporatedResult.Result.BlockID] = unittest.StateSnapshotForKnownBlock(s.Block, nil)
 		collector, err := newVerifyingAssignmentCollector(unittest.Logger(), s.WorkerPool, s.IncorporatedResult.Result, s.State, s.Headers,
 			s.Assigner, s.SealsPL, s.SigHasher, s.Conduit, s.RequestTracker, 1)
 		require.Error(s.T(), err)
@@ -237,7 +237,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 		state.On("AtBlockID", mock.Anything).Return(
 			func(blockID flow.Identifier) realproto.Snapshot {
 				return unittest.StateSnapshotForKnownBlock(
-					&s.Block,
+					s.Block,
 					map[flow.Identifier]*flow.Identity{identity.NodeID: identity},
 				)
 			},
@@ -257,7 +257,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 		state.On("AtBlockID", mock.Anything).Return(
 			func(blockID flow.Identifier) realproto.Snapshot {
 				return unittest.StateSnapshotForKnownBlock(
-					&s.Block,
+					s.Block,
 					map[flow.Identifier]*flow.Identity{identity.NodeID: identity},
 				)
 			},
@@ -276,7 +276,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 		state.On("AtBlockID", mock.Anything).Return(
 			func(blockID flow.Identifier) realproto.Snapshot {
 				return unittest.StateSnapshotForKnownBlock(
-					&s.Block,
+					s.Block,
 					map[flow.Identifier]*flow.Identity{identity.NodeID: identity},
 				)
 			},
@@ -323,8 +323,8 @@ func (s *AssignmentCollectorTestSuite) TestRequestMissingApprovals() {
 		incorporatedBlock.Height = lastHeight
 		lastHeight++
 
-		s.Blocks[incorporatedBlock.ID()] = &incorporatedBlock
-		incorporatedBlocks = append(incorporatedBlocks, &incorporatedBlock)
+		s.Blocks[incorporatedBlock.ID()] = incorporatedBlock
+		incorporatedBlocks = append(incorporatedBlocks, incorporatedBlock)
 	}
 
 	incorporatedResults := make([]*flow.IncorporatedResult, 0, len(incorporatedBlocks))
