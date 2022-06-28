@@ -311,7 +311,7 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 			OriginID: originID,
 			Block:    block,
 		}
-		
+
 		e.comp.SubmitLocal(synced)
 	}
 }
