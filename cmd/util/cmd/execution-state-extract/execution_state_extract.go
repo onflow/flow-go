@@ -66,13 +66,12 @@ func extractExecutionState(
 			Log:       log,
 			OutputDir: outputDir,
 		}
-
-		accountStatusMigration := mgr.AccountStatusMigration{
-			Logger: log,
-		}
+		accountStatusMigration := mgr.AccountStatusMigration{Logger: log}
+		legacyControllerMigration := mgr.LegacyControllerMigration{Logger: log}
 
 		migrations = []ledger.Migration{
 			accountStatusMigration.Migrate,
+			legacyControllerMigration.Migrate,
 			storageUsedUpdateMigration.Migrate,
 			mgr.PruneMigration,
 		}
