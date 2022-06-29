@@ -541,7 +541,7 @@ func BenchRunNFTBatchTransfer(b *testing.B,
 
 	// deploy NFT
 	batchNFTAccount := accounts[1]
-	deployBatchNFT(b, blockExecutor, &batchNFTAccount, nftAccount.Address)
+	// deployBatchNFT(b, blockExecutor, &batchNFTAccount, nftAccount.Address)
 
 	// fund all accounts so not to run into storage problems
 	fundAccounts(b, blockExecutor, cadence.UFix64(10_0000_0000), nftAccount.Address, batchNFTAccount.Address, accounts[2].Address)
