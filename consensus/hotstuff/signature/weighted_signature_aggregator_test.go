@@ -13,8 +13,8 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/utils/unittest"
 	msig "github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func createAggregationData(t *testing.T, signersNumber int) (
