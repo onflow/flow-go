@@ -1833,6 +1833,7 @@ func TestHeaderInvalidTimestamp(t *testing.T) {
 }
 
 func assertEpochEmergencyFallbackTriggered(t *testing.T, db *badger.DB) {
+	// TODO use params func
 	var triggered bool
 	err := db.View(operation.CheckEpochEmergencyFallbackTriggered(&triggered))
 	require.NoError(t, err)

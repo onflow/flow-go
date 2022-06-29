@@ -54,6 +54,15 @@ func (p Params) EpochCommitSafetyThreshold() (uint64, error) {
 	return threshold, nil
 }
 
+func (p Params) EpochFallbackTriggered() (bool, error) {
+	var triggered bool
+	err := p.state.db.View(operation.CheckEpochEmergencyFallbackTriggered(&triggered))
+	if err != nil {
+		return false, fmt.Errorf("could not check epoch fallback triggered: %w", err)
+	}
+	return triggered, nil
+}
+
 func (p Params) Root() (*flow.Header, error) {
 
 	// retrieve the root height
