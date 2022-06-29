@@ -79,7 +79,7 @@ func (r *Finalizer) GetProposal(blockID flow.Identifier) (*model.Proposal, bool)
 	return blockContainer.(*BlockContainer).Proposal, true
 }
 
-// GetProposalsForView returns all known proposals for the given
+// GetProposalsForView returns all known proposals for the given view
 func (r *Finalizer) GetProposalsForView(view uint64) []*model.Proposal {
 	vertexIterator := r.forest.GetVerticesAtLevel(view)
 	l := make([]*model.Proposal, 0, 1) // in the vast majority of cases, there will only be one proposal for a particular view

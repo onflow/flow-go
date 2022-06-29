@@ -6,9 +6,7 @@ import (
 	"github.com/onflow/flow-go/module/forest"
 )
 
-// BlockContainer wraps a block to implement forest.Vertex
-// In addition, it holds some additional properties for efficient processing of blocks
-// by the Finalizer
+// BlockContainer wraps a block proposal to implement forest.Vertex so the proposal can be stored in `LevelledForest`
 type BlockContainer struct {
 	Proposal *model.Proposal
 }
