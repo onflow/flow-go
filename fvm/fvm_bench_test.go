@@ -512,6 +512,7 @@ const TransferTxTemplate = `
 
 // BenchmarkRuntimeNFTBatchTransfer runs BenchRunNFTBatchTransfer with BasicBlockExecutor
 func BenchmarkRuntimeNFTBatchTransfer(b *testing.B) {
+	b.Skip()
 	blockExecutor := NewBasicBlockExecutor(b, flow.Testnet.Chain(), zerolog.Nop())
 
 	// Create an account private key.
