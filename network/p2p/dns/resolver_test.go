@@ -61,7 +61,6 @@ func TestResolver_HappyPath(t *testing.T) {
 
 // TestResolver_CacheExpiry evaluates that cached dns entries get expired and underlying resolver gets called after their time-to-live is passed.
 func TestResolver_CacheExpiry(t *testing.T) {
-	fmt.Println("-------------Begin Of Test-----------------------------------------------------------------------")
 	basicResolver := mocknetwork.BasicResolver{}
 
 	dnsCache := herocache.NewDNSCache(
@@ -105,8 +104,6 @@ func TestResolver_CacheExpiry(t *testing.T) {
 
 	cancel()
 	unittest.RequireCloseBefore(t, resolver.Done(), 2*time.Second, "could not stop dns resolver on time")
-
-	fmt.Println("-------------End Of Test-----------------------------------------------------------------------")
 }
 
 // TestResolver_Error evaluates that when the underlying resolver returns an error, the resolver itself does not cache the result.
