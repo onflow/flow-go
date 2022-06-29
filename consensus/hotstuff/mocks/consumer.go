@@ -50,11 +50,6 @@ func (_m *Consumer) OnFinalizedBlock(_a0 *model.Block) {
 	_m.Called(_a0)
 }
 
-// OnForkChoiceGenerated provides a mock function with given fields: _a0, _a1
-func (_m *Consumer) OnForkChoiceGenerated(_a0 uint64, _a1 *flow.QuorumCertificate) {
-	_m.Called(_a0, _a1)
-}
-
 // OnInvalidTimeoutDetected provides a mock function with given fields: _a0
 func (_m *Consumer) OnInvalidTimeoutDetected(_a0 *model.TimeoutObject) {
 	_m.Called(_a0)

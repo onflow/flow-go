@@ -195,23 +195,23 @@ func (v *Voter) IsSafeToTimeout(curView uint64, newestQC *flow.QuorumCertificate
 	panic("to be implemented")
 }
 
-// Forks mock allows to customize the Add QC and AddBlock function by specifying the addQC and addBlock callbacks
+// Forks mock allows to customize the Add QC and AddBlock function by specifying the addQC and addProposal callbacks
 type Forks struct {
 	mocks.Forks
 	// blocks stores all the blocks that have been added to the forks
-	blocks    map[flow.Identifier]*model.Block
+	blocks    map[flow.Identifier]*model.Proposal
 	finalized uint64
 	t         require.TestingT
 	qc        *flow.QuorumCertificate
 	// addQC is to customize the logic to change finalized view
 	addQC func(qc *flow.QuorumCertificate) error
-	// addBlock is to customize the logic to change finalized view
-	addBlock func(block *model.Block) error
+	// addProposal is to customize the logic to change finalized view
+	addProposal func(block *model.Proposal) error
 }
 
 func NewForks(t require.TestingT, finalized uint64) *Forks {
 	f := &Forks{
-		blocks:    make(map[flow.Identifier]*model.Block),
+		blocks:    make(map[flow.Identifier]*model.Proposal),
 		finalized: finalized,
 		t:         t,
 	}
@@ -222,8 +222,9 @@ func NewForks(t require.TestingT, finalized uint64) *Forks {
 		}
 		return nil
 	}
-	f.addBlock = func(block *model.Block) error {
-		f.blocks[block.BlockID] = block
+	f.addProposal = func(proposal *model.Proposal) error {
+		block := proposal.Block
+		f.blocks[block.BlockID] = proposal
 		if block.QC == nil {
 			panic(fmt.Sprintf("block has no QC: %v", block.View))
 		}
@@ -237,9 +238,9 @@ func NewForks(t require.TestingT, finalized uint64) *Forks {
 	return f
 }
 
-func (f *Forks) AddBlock(block *model.Block) error {
-	log.Info().Msgf("forks.AddBlock received Block for view: %v, qc: %v\n", block.View, block.QC.View)
-	return f.addBlock(block)
+func (f *Forks) AddProposal(proposal *model.Proposal) error {
+	log.Info().Msgf("forks.AddProposal received Proposal for view: %v, qc: %v\n", proposal.Block.View, proposal.Block.QC.View)
+	return f.addProposal(proposal)
 }
 
 func (f *Forks) AddQC(qc *flow.QuorumCertificate) error {
@@ -251,38 +252,25 @@ func (f *Forks) FinalizedView() uint64 {
 	return f.finalized
 }
 
-func (f *Forks) GetBlock(blockID flow.Identifier) (*model.Block, bool) {
+func (f *Forks) GetProposal(blockID flow.Identifier) (*model.Proposal, bool) {
 	b, ok := f.blocks[blockID]
 	var view uint64
 	if ok {
-		view = b.View
+		view = b.Block.View
 	}
-	log.Info().Msgf("forks.GetBlock found: %v, view: %v\n", ok, view)
+	log.Info().Msgf("forks.GetProposal found: %v, view: %v\n", ok, view)
 	return b, ok
 }
 
-func (f *Forks) GetBlocksForView(view uint64) []*model.Block {
-	blocks := make([]*model.Block, 0)
+func (f *Forks) GetProposalsForView(view uint64) []*model.Proposal {
+	blocks := make([]*model.Proposal, 0)
 	for _, b := range f.blocks {
-		if b.View == view {
+		if b.Block.View == view {
 			blocks = append(blocks, b)
 		}
 	}
-	log.Info().Msgf("forks.GetBlocksForView found %v block(s) for view %v\n", len(blocks), view)
+	log.Info().Msgf("forks.GetProposalsForView found %v block(s) for view %v\n", len(blocks), view)
 	return blocks
-}
-
-func (f *Forks) MakeForkChoice(curView uint64) (*flow.QuorumCertificate, *model.Block, error) {
-	if f.qc == nil {
-		log.Fatal().Msgf("cannot make fork choice for curview: %v", curView)
-	}
-
-	block, ok := f.blocks[f.qc.BlockID]
-	if !ok {
-		return nil, nil, fmt.Errorf("cannot block %V for fork choice qc", f.qc.BlockID)
-	}
-	log.Info().Msgf("forks.MakeForkChoice for view: %v, qc view: %v\n", curView, f.qc.View)
-	return f.qc, block, nil
 }
 
 // BlockProducer mock will always make a valid block
@@ -354,7 +342,7 @@ type EventHandlerSuite struct {
 
 	initView    uint64
 	endView     uint64
-	votingBlock *model.Block
+	votingBlock *model.Proposal
 	qc          *flow.QuorumCertificate
 	newview     *model.NewViewEvent
 }
@@ -400,15 +388,15 @@ func (es *EventHandlerSuite) SetupTest() {
 	es.initView = livenessData.CurrentView
 	es.endView = livenessData.CurrentView
 	// voting block is a block for the current view, which will trigger view change
-	es.votingBlock = createBlockWithQC(es.paceMaker.CurView(), es.paceMaker.CurView()-1)
+	es.votingBlock = createProposal(es.paceMaker.CurView(), es.paceMaker.CurView()-1)
 	es.qc = &flow.QuorumCertificate{
-		BlockID:       es.votingBlock.BlockID,
-		View:          es.votingBlock.View,
+		BlockID:       es.votingBlock.Block.BlockID,
+		View:          es.votingBlock.Block.View,
 		SignerIndices: nil,
 		SigData:       nil,
 	}
 	es.newview = &model.NewViewEvent{
-		View: es.votingBlock.View + 1, // the vote for the voting blocks will trigger a view change to the next view
+		View: es.votingBlock.Block.View + 1, // the vote for the voting blocks will trigger a view change to the next view
 	}
 }
 
@@ -419,10 +407,10 @@ func (es *EventHandlerSuite) markInvalidProposal(blockID flow.Identifier) {
 // a QC for current view triggered view change
 func (es *EventHandlerSuite) TestQCBuiltViewChanged() {
 	// voting block exists
-	es.forks.blocks[es.votingBlock.BlockID] = es.votingBlock
+	es.forks.blocks[es.votingBlock.Block.BlockID] = es.votingBlock
 
 	// a qc is built
-	qc := createQC(es.votingBlock)
+	qc := createQC(es.votingBlock.Block)
 
 	// new qc is added to forks
 	// view changed
@@ -447,34 +435,34 @@ func (es *EventHandlerSuite) TestQCBuiltFutureViewChanged() {
 
 	// b1 is for current view
 	// b2 and b3 is for future view, but branched out from the same parent as b1
-	b1 := createBlockWithQC(curView, curView-1)
-	b2 := createBlockWithQC(curView+1, curView-1)
-	b3 := createBlockWithQC(curView+2, curView-1)
+	b1 := createProposal(curView, curView-1)
+	b2 := createProposal(curView+1, curView-1)
+	b3 := createProposal(curView+2, curView-1)
 
 	// a qc is built
 	// qc3 is for future view
 	// qc2 is an older than qc3
 	// since vote aggregator can concurrently process votes and build qcs,
 	// we prepare qcs at different view to be processed, and verify the view change.
-	qc1 := createQC(b1)
-	qc2 := createQC(b2)
-	qc3 := createQC(b3)
+	qc1 := createQC(b1.Block)
+	qc2 := createQC(b2.Block)
+	qc3 := createQC(b3.Block)
 
 	// all three blocks are known
-	es.forks.blocks[b1.BlockID] = b1
-	es.forks.blocks[b2.BlockID] = b2
-	es.forks.blocks[b3.BlockID] = b3
+	es.forks.blocks[b1.Block.BlockID] = b1
+	es.forks.blocks[b2.Block.BlockID] = b2
+	es.forks.blocks[b3.Block.BlockID] = b3
 
 	// test that qc for future view should trigger view change
 	err := es.eventhandler.OnQCConstructed(qc3)
-	endView := b3.View + 1 // next view
+	endView := b3.Block.View + 1 // next view
 	require.NoError(es.T(), err, "if a vote can trigger a QC to be built,"+
 		"and the QC triggered a view change, then start new view")
 	require.Equal(es.T(), endView, es.paceMaker.CurView(), "incorrect view change")
 
 	// the same qc would not trigger view change
 	err = es.eventhandler.OnQCConstructed(qc3)
-	endView = b3.View + 1 // next view
+	endView = b3.Block.View + 1 // next view
 	require.NoError(es.T(), err, "same qc should not trigger view change")
 	require.Equal(es.T(), endView, es.paceMaker.CurView(), "incorrect view change")
 
@@ -492,16 +480,16 @@ func (es *EventHandlerSuite) TestQCBuiltFutureViewChanged() {
 // and the block is not a safe node, and I'm the next leader, and no qc built for this block.
 func (es *EventHandlerSuite) TestInNewView_NotLeader_HasBlock_NoVote_IsNextLeader_NoQC() {
 	// voting block exists
-	es.forks.blocks[es.votingBlock.BlockID] = es.votingBlock
+	es.forks.blocks[es.votingBlock.Block.BlockID] = es.votingBlock
 	// a qc is built
-	qc := createQC(es.votingBlock)
+	qc := createQC(es.votingBlock.Block)
 	// viewchanged
 	es.endView++
 	// not leader for newview
 
 	// has block for newview
-	newviewblock := createBlockWithQC(es.newview.View, es.newview.View-1)
-	es.forks.blocks[newviewblock.BlockID] = newviewblock
+	newviewblock := createProposal(es.newview.View, es.newview.View-1)
+	es.forks.blocks[newviewblock.Block.BlockID] = newviewblock
 
 	// I'm the next leader
 	es.committee.leaders[es.newview.View+1] = struct{}{}
@@ -518,16 +506,16 @@ func (es *EventHandlerSuite) TestInNewView_NotLeader_HasBlock_NoVote_IsNextLeade
 // and the qc triggered view change.
 func (es *EventHandlerSuite) TestInNewView_NotLeader_HasBlock_NoVote_IsNextLeader_QCBuilt_ViewChanged() {
 	// voting block exists
-	es.forks.blocks[es.votingBlock.BlockID] = es.votingBlock
+	es.forks.blocks[es.votingBlock.Block.BlockID] = es.votingBlock
 	// a qc is built
-	qc := createQC(es.votingBlock)
+	qc := createQC(es.votingBlock.Block)
 	// viewchanged
 	es.endView++
 	// not leader for newview
 
 	// has block for newview
-	newviewblock := createBlockWithQC(es.newview.View, es.newview.View-1)
-	es.forks.blocks[newviewblock.BlockID] = newviewblock
+	newviewblock := createProposal(es.newview.View, es.newview.View-1)
+	es.forks.blocks[newviewblock.Block.BlockID] = newviewblock
 
 	// not to vote for the new view block
 
@@ -535,7 +523,7 @@ func (es *EventHandlerSuite) TestInNewView_NotLeader_HasBlock_NoVote_IsNextLeade
 	es.committee.leaders[es.newview.View+1] = struct{}{}
 
 	// qc built for the new view block
-	nextQC := createQC(newviewblock)
+	nextQC := createQC(newviewblock.Block)
 	// view change by this qc
 	es.endView++
 
@@ -561,16 +549,16 @@ func (es *EventHandlerSuite) TestInNewView_NotLeader_HasBlock_NoVote_IsNextLeade
 // and the block is a safe node to vote, and I'm the next leader, and no qc is built for this block.
 func (es *EventHandlerSuite) TestInNewView_NotLeader_HasBlock_NotSafeNode_IsNextLeader_Voted_NoQC() {
 	// voting block exists
-	es.forks.blocks[es.votingBlock.BlockID] = es.votingBlock
+	es.forks.blocks[es.votingBlock.Block.BlockID] = es.votingBlock
 	// a qc is built
-	qc := createQC(es.votingBlock)
+	qc := createQC(es.votingBlock.Block)
 	// viewchanged by new qc
 	es.endView++
 	// not leader for newview
 
 	// has block for newview
-	newviewblock := createBlockWithQC(es.newview.View, es.newview.View-1)
-	es.forks.blocks[newviewblock.BlockID] = newviewblock
+	newviewblock := createProposal(es.newview.View, es.newview.View-1)
+	es.forks.blocks[newviewblock.Block.BlockID] = newviewblock
 
 	// not to vote for the new view block
 
@@ -590,9 +578,9 @@ func (es *EventHandlerSuite) TestInNewView_NotLeader_HasBlock_NotSafeNode_IsNext
 func (es *EventHandlerSuite) TestInNewView_NotLeader_HasBlock_NotSafeNode_NotNextLeader() {
 	unittest.SkipUnless(es.T(), unittest.TEST_TODO, "active-pacemaker")
 	// voting block exists
-	es.forks.blocks[es.votingBlock.BlockID] = es.votingBlock
+	es.forks.blocks[es.votingBlock.Block.BlockID] = es.votingBlock
 	// a qc is built
-	qc := createQC(es.votingBlock)
+	qc := createQC(es.votingBlock.Block)
 	// viewchanged by new qc
 	es.endView++
 
@@ -600,8 +588,8 @@ func (es *EventHandlerSuite) TestInNewView_NotLeader_HasBlock_NotSafeNode_NotNex
 	// I'm not the leader for newview
 
 	// have received block for cur view
-	newviewblock := createBlockWithQC(es.newview.View, es.newview.View-1)
-	es.forks.blocks[newviewblock.BlockID] = newviewblock
+	newviewblock := createProposal(es.newview.View, es.newview.View-1)
+	es.forks.blocks[newviewblock.Block.BlockID] = newviewblock
 
 	// I'm not the next leader
 	// no vote for this block
@@ -680,7 +668,7 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_NewerThanCurView_CanBuildQCFr
 	proposal := createProposal(es.initView+1, es.initView)
 	es.voteAggregator.On("AddBlock", proposal).Return(nil).Once()
 
-	es.forks.blocks[proposal.Block.BlockID] = proposal.Block
+	es.forks.blocks[proposal.Block.BlockID] = proposal
 
 	// trigged view change
 	es.endView++

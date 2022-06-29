@@ -156,14 +156,6 @@ func (t *TelemetryConsumer) OnVoting(vote *model.Vote) {
 		Msg("OnVoting")
 }
 
-func (t *TelemetryConsumer) OnForkChoiceGenerated(current_view uint64, qc *flow.QuorumCertificate) {
-	t.pathHandler.NextStep().
-		Uint64("block_view", current_view).
-		Msg("OnForkChoiceGenerated")
-	// Telemetry does not capture the details of the qc as the qc will be included in the
-	// proposed block, whose details (including the qc) are captured by telemetry
-}
-
 func (t *TelemetryConsumer) OnQcConstructedFromVotes(curView uint64, qc *flow.QuorumCertificate) {
 	t.pathHandler.StartNextPath(curView)
 	t.pathHandler.NextStep().

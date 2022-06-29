@@ -126,14 +126,6 @@ func (lc *LogConsumer) OnQcIncorporated(qc *flow.QuorumCertificate) {
 		Msg("QC incorporated")
 }
 
-func (lc *LogConsumer) OnForkChoiceGenerated(view uint64, qc *flow.QuorumCertificate) {
-	lc.log.Debug().
-		Uint64("proposal_view", view).
-		Uint64("qc_view", qc.View).
-		Hex("qc_id", qc.BlockID[:]).
-		Msg("fork choice generated")
-}
-
 func (lc *LogConsumer) OnDoubleVotingDetected(vote *model.Vote, alt *model.Vote) {
 	lc.log.Warn().
 		Uint64("vote_view", vote.View).
