@@ -2,6 +2,7 @@ package timeoutaggregator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -29,6 +30,7 @@ type TimeoutAggregator struct {
 	*component.ComponentManager
 	log                        zerolog.Logger
 	notifier                   hotstuff.Consumer
+	committee                  hotstuff.Replicas
 	lowestRetainedView         counters.StrictMonotonousCounter // lowest view, for which we still process timeouts
 	activeView                 counters.StrictMonotonousCounter // cache the last view that we have entered to queue up the pruning work, and unblock the caller who's delivering the finalization event.
 	collectors                 hotstuff.TimeoutCollectors
@@ -45,6 +47,7 @@ var _ component.Component = (*TimeoutAggregator)(nil)
 func NewTimeoutAggregator(log zerolog.Logger,
 	notifier hotstuff.Consumer,
 	lowestRetainedView uint64,
+	committee hotstuff.Replicas,
 	collectors hotstuff.TimeoutCollectors,
 ) (*TimeoutAggregator, error) {
 	queuedTimeouts, err := fifoqueue.NewFifoQueue(fifoqueue.WithCapacity(defaultTimeoutQueueCapacity))
@@ -57,6 +60,7 @@ func NewTimeoutAggregator(log zerolog.Logger,
 		notifier:                   notifier,
 		lowestRetainedView:         counters.NewMonotonousCounter(lowestRetainedView),
 		activeView:                 counters.NewMonotonousCounter(lowestRetainedView),
+		committee:                  committee,
 		collectors:                 collectors,
 		queuedTimeoutsNotifier:     engine.NewNotifier(),
 		enteringViewEventsNotifier: engine.NewNotifier(),
@@ -134,11 +138,17 @@ func (t *TimeoutAggregator) processQueuedTimeoutEvents(ctx context.Context) erro
 // processQueuedTimeout performs actual processing of queued timeouts, this method is called from multiple
 // concurrent goroutines.
 func (t *TimeoutAggregator) processQueuedTimeout(timeoutObject *model.TimeoutObject) error {
-	collector, created, err := t.collectors.GetOrCreateCollector(timeoutObject.View)
-	if created {
-		t.log.Info().Uint64("view", timeoutObject.View).Msg("timeouts collector is created by processing TO")
+	// TODO: replace this check by a specific function to query if there is epoch by view
+	_, err := t.committee.LeaderForView(timeoutObject.View)
+	if err != nil {
+		// ignore TO if we don't have information for epoch
+		if errors.Is(err, model.ErrViewForUnknownEpoch) {
+			return nil
+		}
+		return fmt.Errorf("unknown error when querying epoch state for view %d: %w", timeoutObject.View, err)
 	}
 
+	collector, created, err := t.collectors.GetOrCreateCollector(timeoutObject.View)
 	if err != nil {
 		// ignore if our routine is outdated and some other one has pruned collectors
 		if mempool.IsDecreasingPruningHeightError(err) {
@@ -147,6 +157,10 @@ func (t *TimeoutAggregator) processQueuedTimeout(timeoutObject *model.TimeoutObj
 		return fmt.Errorf("could not get collector for view %d: %w",
 			timeoutObject.View, err)
 	}
+	if created {
+		t.log.Info().Uint64("view", timeoutObject.View).Msg("timeouts collector is created by processing TO")
+	}
+
 	err = collector.AddTimeout(timeoutObject)
 	if err != nil {
 		if model.IsDoubleTimeoutError(err) {

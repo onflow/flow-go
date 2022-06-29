@@ -2,6 +2,7 @@ package timeoutaggregator
 
 import (
 	"context"
+	"github.com/onflow/flow-go/model/flow"
 	"sync"
 	"testing"
 	"time"
@@ -29,8 +30,10 @@ type TimeoutAggregatorTestSuite struct {
 	suite.Suite
 
 	lowestRetainedView uint64
+	highestKnownView   uint64
 	aggregator         *TimeoutAggregator
 	collectors         *mocks.TimeoutCollectors
+	committee          *mocks.Replicas
 	consumer           *mocks.Consumer
 	stopAggregator     context.CancelFunc
 }
@@ -39,10 +42,13 @@ func (s *TimeoutAggregatorTestSuite) SetupTest() {
 	var err error
 	s.collectors = mocks.NewTimeoutCollectors(s.T())
 	s.consumer = mocks.NewConsumer(s.T())
+	s.committee = mocks.NewReplicas(s.T())
 
 	s.lowestRetainedView = 100
 
-	s.aggregator, err = NewTimeoutAggregator(unittest.Logger(), s.consumer, s.lowestRetainedView, s.collectors)
+	s.committee.On("LeaderForView", mock.Anything).Return(flow.Identifier{}, nil).Maybe()
+
+	s.aggregator, err = NewTimeoutAggregator(unittest.Logger(), s.consumer, s.lowestRetainedView, s.committee, s.collectors)
 	require.NoError(s.T(), err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -97,6 +103,19 @@ func (s *TimeoutAggregatorTestSuite) TestAddTimeout_DoubleTimeout() {
 		func() bool {
 			return s.consumer.AssertCalled(s.T(), "OnDoubleTimeoutDetected", timeout, timeout)
 		}, time.Second, time.Millisecond*20)
+}
+
+// TestAddTimeout_EpochUnknown tests if timeout objects targeting unknown epoch should be ignored
+func (s *TimeoutAggregatorTestSuite) TestAddTimeout_EpochUnknown() {
+	*s.committee = *mocks.NewReplicas(s.T())
+	timeout := helper.TimeoutObjectFixture(helper.WithTimeoutObjectView(s.lowestRetainedView))
+	s.committee.On("LeaderForView", timeout.View).Return(nil, model.ErrViewForUnknownEpoch).Once()
+	s.aggregator.AddTimeout(timeout)
+	require.Eventually(s.T(),
+		func() bool {
+			return s.committee.AssertCalled(s.T(), "LeaderForView", timeout.View)
+		}, time.Second, time.Millisecond*20)
+	s.collectors.AssertNotCalled(s.T(), "GetOrCreateCollector")
 }
 
 // TestPruneUpToView tests that pruning removes collectors lower that retained view
