@@ -533,8 +533,8 @@ func (e *testRuntime) ExecuteScript(script runtime.Script, context runtime.Conte
 	return e.executeScript(script, context)
 }
 
-func (e *testRuntime) ExecuteTransaction(script runtime.Script, context runtime.Context) error {
-	return e.executeTransaction(script, context)
+func (e *testRuntime) ExecuteTransaction(script runtime.Script, context runtime.Context) (error, *interpreter.Interpreter) {
+	return e.executeTransaction(script, context), nil
 }
 
 func (*testRuntime) ParseAndCheckProgram(_ []byte, _ runtime.Context) (*interpreter.Program, error) {

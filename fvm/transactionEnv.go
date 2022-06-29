@@ -440,7 +440,7 @@ func (e *TransactionEnv) GetStorageCapacity(address common.Address) (value uint6
 		return value, fmt.Errorf("get storage capacity failed: %w", err)
 	}
 
-	accountStorageCapacity := AccountStorageCapacityInvocation(e, e.traceSpan)
+	accountStorageCapacity := AccountStorageCapacityInvocation(e, e.traceSpan, nil)
 	result, invokeErr := accountStorageCapacity(address)
 
 	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, storage capacity will be 0.

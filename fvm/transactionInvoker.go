@@ -65,6 +65,8 @@ func (i *TransactionInvoker) Process(
 	parentState := sth.State()
 	childState := sth.NewChild()
 
+	var inter *interpreter.Interpreter
+
 	defer func() {
 		// an extra check for state holder health, this should never happen
 		if childState != sth.State() {
@@ -127,7 +129,7 @@ func (i *TransactionInvoker) Process(
 
 		location := common.TransactionLocation(proc.ID[:])
 
-		err := vm.Runtime.ExecuteTransaction(
+		err, inter = vm.Runtime.ExecuteTransaction(
 			runtime.Script{
 				Source:    proc.Transaction.Script,
 				Arguments: proc.Transaction.Arguments,
@@ -175,7 +177,7 @@ func (i *TransactionInvoker) Process(
 	sth.DisableAllLimitEnforcements()
 	// try to deduct fees even if there is an error.
 	// disable the limit checks on states
-	feesError := i.deductTransactionFees(env, proc, sth, computationUsed)
+	feesError := i.deductTransactionFees(env, proc, sth, computationUsed, inter)
 	if feesError != nil {
 		txError = feesError
 	}
@@ -197,7 +199,7 @@ func (i *TransactionInvoker) Process(
 		// so we don't error from computation/memory limits on this part.
 		// We cannot charge the user for this part, since fee deduction already happened.
 		sth.DisableAllLimitEnforcements()
-		txError = NewTransactionStorageLimiter().CheckLimits(env, sth.State().UpdatedAddresses())
+		txError = NewTransactionStorageLimiter().CheckLimits(env, sth.State().UpdatedAddresses(), inter)
 		sth.EnableAllLimitEnforcements()
 	}
 
@@ -223,7 +225,7 @@ func (i *TransactionInvoker) Process(
 		}
 
 		// try to deduct fees again, to get the fee deduction events
-		feesError = i.deductTransactionFees(env, proc, sth, computationUsed)
+		feesError = i.deductTransactionFees(env, proc, sth, computationUsed, inter)
 
 		updatedKeys, err = env.Commit()
 		if err != nil && feesError == nil {
@@ -265,7 +267,8 @@ func (i *TransactionInvoker) deductTransactionFees(
 	env *TransactionEnv,
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
-	computationUsed uint64) (err error) {
+	computationUsed uint64,
+	inter *interpreter.Interpreter) (err error) {
 	if !env.ctx.TransactionFeesEnabled {
 		return nil
 	}
@@ -274,7 +277,7 @@ func (i *TransactionInvoker) deductTransactionFees(
 		computationUsed = uint64(sth.State().TotalComputationLimit())
 	}
 
-	deductTxFees := DeductTransactionFeesInvocation(env, proc.TraceSpan)
+	deductTxFees := DeductTransactionFeesInvocation(env, proc.TraceSpan, inter)
 	// Hardcoded inclusion effort (of 1.0 UFix). Eventually this will be dynamic.
 	// Execution effort will be connected to computation used.
 	inclusionEffort := uint64(100_000_000)

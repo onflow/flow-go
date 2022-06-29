@@ -23,14 +23,10 @@ type ContractFunctionInvoker struct {
 	argumentTypes    []sema.Type
 	logger           zerolog.Logger
 	logSpanFields    []traceLog.Field
+	inter            *interpreter.Interpreter
 }
 
-func NewContractFunctionInvoker(
-	contractLocation common.AddressLocation,
-	functionName string,
-	arguments []interpreter.Value,
-	argumentTypes []sema.Type,
-	logger zerolog.Logger) *ContractFunctionInvoker {
+func NewContractFunctionInvoker(contractLocation common.AddressLocation, functionName string, arguments []interpreter.Value, argumentTypes []sema.Type, logger zerolog.Logger, inter *interpreter.Interpreter) *ContractFunctionInvoker {
 	return &ContractFunctionInvoker{
 		contractLocation: contractLocation,
 		functionName:     functionName,
@@ -38,6 +34,7 @@ func NewContractFunctionInvoker(
 		argumentTypes:    argumentTypes,
 		logger:           logger,
 		logSpanFields:    []traceLog.Field{traceLog.String("transaction.ContractFunctionCall", fmt.Sprintf("%s.%s", contractLocation.String(), functionName))},
+		inter:            inter,
 	}
 }
 
@@ -64,6 +61,7 @@ func (i *ContractFunctionInvoker) Invoke(env Environment, parentTraceSpan opentr
 			Interface:         env,
 			PredeclaredValues: predeclaredValues,
 		},
+		i.inter,
 	)
 
 	if err != nil {

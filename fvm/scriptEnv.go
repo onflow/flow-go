@@ -286,7 +286,7 @@ func (e *ScriptEnv) GetStorageCapacity(address common.Address) (value uint64, er
 		return 0, fmt.Errorf("get storage capacity failed: %w", err)
 	}
 
-	accountStorageCapacity := AccountStorageCapacityInvocation(e, e.traceSpan)
+	accountStorageCapacity := AccountStorageCapacityInvocation(e, e.traceSpan, nil)
 	result, invokeErr := accountStorageCapacity(address)
 
 	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, storage capacity will be 0.
