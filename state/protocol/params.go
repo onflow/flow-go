@@ -34,6 +34,7 @@ type InstanceParams interface {
 	// epoch fails to be committed in the allocated time. Once EECC is triggered,
 	// it will remain in effect until the next spork.
 	// No errors are expected during normal operation.
+	// TODO tests
 	EpochFallbackTriggered() (bool, error)
 }
 

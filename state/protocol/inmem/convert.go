@@ -152,7 +152,7 @@ func FromEpoch(from protocol.Epoch) (*Epoch, error) {
 	// convert dkg
 	dkg, err := from.DKG()
 	// if this epoch hasn't been committed yet, return the epoch as-is
-	if errors.Is(err, protocol.ErrEpochNotCommitted) {
+	if errors.Is(err, protocol.ErrNextEpochNotCommitted) {
 		return &Epoch{epoch}, nil
 	}
 	if err != nil {
