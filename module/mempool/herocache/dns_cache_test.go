@@ -13,8 +13,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest/network"
 )
 
-// TestDNSCache_Concurrent checks the correctness of cache under concurrent insertions.
-func TestDNSCache_Concurrent(t *testing.T) {
+// TestDNSCache_HappyPath checks the correctness storing and retrieving from dns cache.
+func TestDNSCache_HappyPath(t *testing.T) {
 	total := 700             // total entries to store (i.e., 700 ip domains and 700 txt records)
 	sizeLimit := uint32(500) // cache size limit (i.e., 500 ip domains and 500 txt records)
 
@@ -29,7 +29,7 @@ func TestDNSCache_Concurrent(t *testing.T) {
 	require.Equal(t, uint(0), txts)
 
 	// adding 700 txt records and 700 ip domains to cache
-	testConcurrentAddToCache(t, cache, ipFixtures, txtFixtures)
+	testAddToCache(t, cache, ipFixtures, txtFixtures)
 
 	// cache must be full up to its limit
 	ips, txts = cache.Size()
@@ -152,8 +152,8 @@ func TestDNSCache_LRU(t *testing.T) {
 	}
 }
 
-// testConcurrentAddToCache is a test helper that concurrently adds ip and txt records concurrently to the cache.
-func testConcurrentAddToCache(t *testing.T,
+// testAddToCache is a test helper that adds ip and txt records to the cache.
+func testAddToCache(t *testing.T,
 	cache *herocache.DNSCache,
 	ipTestCases map[string]*network.IpLookupTestCase,
 	txtTestCases map[string]*network.TxtLookupTestCase) {
