@@ -57,7 +57,7 @@ func TestDNSCache_Lock(t *testing.T) {
 		metrics.NewNoopCollector())
 
 	// adding records to dns cache
-	require.True(t, cache.PutDomainIp(ipDomain, ipFixture, int64(0)))
+	require.True(t, cache.PutIpDomain(ipDomain, ipFixture, int64(0)))
 	require.True(t, cache.PutTxtRecord(txtDomain, txtFixture, int64(0)))
 
 	// locks ip record
@@ -110,7 +110,7 @@ func TestDNSCache_LRU(t *testing.T) {
 
 	// adding 700 txt and 700 ip domains to cache
 	for _, fixture := range ipFixtures {
-		require.True(t, cache.PutDomainIp(fixture.Domain, fixture.Result, fixture.TimeStamp))
+		require.True(t, cache.PutIpDomain(fixture.Domain, fixture.Result, fixture.TimeStamp))
 	}
 
 	for _, fixture := range txtFixtures {
@@ -162,7 +162,7 @@ func testConcurrentAddToCache(t *testing.T,
 	wg.Add(len(ipTestCases) + len(txtTestCases))
 
 	for _, fixture := range ipTestCases {
-		require.True(t, cache.PutDomainIp(fixture.Domain, fixture.Result, fixture.TimeStamp))
+		require.True(t, cache.PutIpDomain(fixture.Domain, fixture.Result, fixture.TimeStamp))
 	}
 
 	for _, fixture := range txtTestCases {
@@ -187,7 +187,7 @@ func TestDNSCache_Rem(t *testing.T) {
 
 	// adding 700 txt records and 700 ip domains to cache
 	for _, fixture := range ipFixtures {
-		require.True(t, cache.PutDomainIp(fixture.Domain, fixture.Result, fixture.TimeStamp))
+		require.True(t, cache.PutIpDomain(fixture.Domain, fixture.Result, fixture.TimeStamp))
 	}
 
 	for _, fixture := range txtFixtures {
