@@ -1,7 +1,6 @@
 package committees
 
 import (
-	"errors"
 	"fmt"
 	"sync"
 
@@ -129,39 +128,53 @@ func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus
 		epochEmergencyFallback: make(chan struct{}),
 	}
 
-	final := state.Final()
-
-	// pre-compute leader selection for current epoch
-	current := final.Epochs().Current()
-	_, err := com.prepareEpoch(current)
-	if err != nil {
-		return nil, fmt.Errorf("could not add leader for current epoch: %w", err)
-	}
-
-	// Pre-compute leader selection for previous epoch, if it exists.
-	//
-	// This ensures we always know about leader selection for at least one full
-	// epoch into the past, ensuring we are able to not only determine the leader
-	// for block proposals we receive, but also adjudicate consensus-related
-	// challenges up to one epoch into the past.
-	previous := final.Epochs().Previous()
-	_, err = previous.Counter()
-	// if there is no previous epoch, return the committee as-is
-	if errors.Is(err, protocol.ErrNoPreviousEpoch) {
-		return com, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("could not get previous epoch: %w", err)
-	}
-
-	_, err = com.prepareEpoch(previous)
-	if err != nil {
-		return nil, fmt.Errorf("could not add leader for previous epoch: %w", err)
-	}
-
 	com.Component = component.NewComponentManagerBuilder().
 		AddWorker(com.handleProtocolEvents).
 		Build()
+
+	final := state.Final()
+
+	// pre-compute leader selection for all presently relevant committed epochs
+	epochs := make([]protocol.Epoch, 0, 3)
+	// we always prepare the current epoch
+	epochs = append(epochs, final.Epochs().Current())
+
+	// we prepare the previous epoch, if one exists
+	exists, err := protocol.PreviousEpochExists(final)
+	if err != nil {
+		return nil, fmt.Errorf("could not check previous epoch exists: %w", err)
+	}
+	if exists {
+		epochs = append(epochs, final.Epochs().Previous())
+	}
+
+	// we prepare the next epoch, if it is committed
+	phase, err := final.Phase()
+	if err != nil {
+		return nil, fmt.Errorf("could not check epoch phase: %w", err)
+	}
+	if phase == flow.EpochPhaseCommitted {
+		epochs = append(epochs, final.Epochs().Next())
+	}
+
+	// if epoch emergency fallback was triggered, inject the fallback epoch
+	triggered, err := state.Params().EpochFallbackTriggered()
+	if err != nil {
+		return nil, fmt.Errorf("could not check epoch fallback: %w", err)
+	}
+	if triggered {
+		err = com.onEpochEmergencyFallbackTriggered()
+		if err != nil {
+			return nil, fmt.Errorf("could not prepare emergency fallback epoch: %w", err)
+		}
+	}
+
+	for _, epoch := range epochs {
+		_, err = com.prepareEpoch(epoch)
+		if err != nil {
+			return nil, fmt.Errorf("could not prepare initial epochs: %w", err)
+		}
+	}
 
 	return com, nil
 }
@@ -310,6 +323,9 @@ func (c *Consensus) handleProtocolEvents(ctx irrecoverable.SignalerContext, read
 // onEpochEmergencyFallbackTriggered handles the protocol event for emergency epoch
 // fallback mode being triggered. When this occurs, we inject a fallback epoch
 // to the committee which extends the current epoch.
+// This method must also be called on initialization, if emergency fallback mode
+// was triggered in the past.
+// No errors are expected during normal operation.
 func (c *Consensus) onEpochEmergencyFallbackTriggered() error {
 	currentEpochCounter, err := c.state.Final().Epochs().Current().Counter()
 	if err != nil {
@@ -338,11 +354,8 @@ func (c *Consensus) onEpochEmergencyFallbackTriggered() error {
 
 	// cache the epoch info
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	c.epochs[currentEpochCounter+1] = fallbackEpoch
-	// now prune any old epochs, if we have exceeded our maximum of 3
-	// if we have fewer than 3 epochs, this is a no-op
-	c.pruneEpochInfo()
+	c.mu.Unlock()
 
 	return nil
 }
