@@ -40,7 +40,7 @@ func NewFollowerLoop(log zerolog.Logger, followerLogic FollowerLogic) (*Follower
 //
 // Block proposals must be submitted in order, i.e. a proposal's parent must
 // have been previously processed by the FollowerLoop.
-func (fl *FollowerLoop) SubmitProposal(proposalHeader *flow.Header, parentView uint64) chan struct{} {
+func (fl *FollowerLoop) SubmitProposal(proposalHeader *flow.Header, parentView uint64) <-chan struct{} {
 	received := time.Now()
 	proposal := proposalTask{
 		Proposal: model.ProposalFromFlow(proposalHeader, parentView),
