@@ -11,9 +11,10 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+// proposalTask struct used to send a proposal and done channel in one message
 type proposalTask struct {
 	*model.Proposal
-	done chan struct{}
+	done chan struct{} // closed when the proposal has finished being processed
 }
 
 // FollowerLoop implements interface FollowerLoop
