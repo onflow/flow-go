@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
@@ -21,10 +22,90 @@ import (
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
-// TestConsensus_IdentitiesByBlock tests retrieving committee members by block.
+func TestConsensusCommittee(t *testing.T) {
+	suite.Run(t, new(ConsensusSuite))
+}
+
+type ConsensusSuite struct {
+	suite.Suite
+
+	// mocks
+	state    *protocolmock.State
+	snapshot *protocolmock.Snapshot
+	params   *protocolmock.Params
+	epochs   *mocks.EpochQuery
+
+	// backend for mocked functions
+	phase                  flow.EpochPhase
+	epochFallbackTriggered bool
+	currentEpochCounter    uint64
+	myID                   flow.Identifier
+
+	committee *Consensus
+	cancel    context.CancelFunc
+}
+
+func (suite *ConsensusSuite) SetupTest() {
+	suite.phase = flow.EpochPhaseStaking
+	suite.epochFallbackTriggered = false
+	suite.currentEpochCounter = 1
+	suite.myID = unittest.IdentifierFixture()
+
+	suite.state = new(protocolmock.State)
+	suite.snapshot = new(protocolmock.Snapshot)
+	suite.params = new(protocolmock.Params)
+	suite.epochs = mocks.NewEpochQuery(suite.T(), suite.currentEpochCounter)
+
+	suite.state.On("Final").Return(suite.snapshot)
+	suite.state.On("Params").Return(suite.params)
+	suite.params.On("EpochFallbackTriggered").Return(
+		func() bool { return suite.epochFallbackTriggered },
+		func() error { return nil },
+	)
+	suite.snapshot.On("Phase").Return(
+		func() flow.EpochPhase { return suite.phase },
+		func() error { return nil },
+	)
+	suite.snapshot.On("Epochs").Return(suite.epochs)
+}
+
+func (suite *ConsensusSuite) TearDownTest() {
+	if suite.cancel != nil {
+		suite.cancel()
+	}
+}
+
+// CreateAndStartCommittee instantiates and starts the committee.
+// Should be called only once per test, after initial epoch mocks are created.
+// It spawns a goroutine to detect fatal errors from the committee's error channel.
+func (suite *ConsensusSuite) CreateAndStartCommittee() {
+	committee, err := NewConsensusCommittee(suite.state, suite.myID)
+	require.NoError(suite.T(), err)
+	ctx, cancel, errCh := unittest.IrrecoverableContextWithCancel(context.Background())
+	committee.Start(ctx)
+	go unittest.FailOnIrrecoverableError(suite.T(), ctx.Done(), errCh)
+
+	suite.committee = committee
+	suite.cancel = cancel
+}
+
+func (suite *ConsensusSuite) CommitEpoch(epoch protocol.Epoch) {
+	firstBlockOfCommittedPhase := unittest.BlockHeaderFixture()
+	suite.state.On("AtBlockID", firstBlockOfCommittedPhase.ID()).Return(suite.snapshot)
+	suite.epochs.Add(epoch)
+	suite.committee.EpochCommittedPhaseStarted(1, &firstBlockOfCommittedPhase)
+	// wait for the protocol event to be processed (async)
+	assert.Eventually(suite.T(), func() bool {
+		_, err := suite.committee.IdentityByEpoch(randUint64(101, 200), unittest.IdentifierFixture())
+		return !errors.Is(err, model.ErrViewForUnknownEpoch)
+	}, time.Second, time.Millisecond)
+}
+
+// TestIdentitiesByBlock tests retrieving committee members by block.
 // * should use up-to-block committee information
 // * should exclude non-committee members
-func TestConsensus_IdentitiesByBlock(t *testing.T) {
+func (suite *ConsensusSuite) TestIdentitiesByBlock() {
+	t := suite.T()
 
 	realIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
 	zeroWeightConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithWeight(0))
@@ -32,10 +113,6 @@ func TestConsensus_IdentitiesByBlock(t *testing.T) {
 	validNonConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	fakeID := unittest.IdentifierFixture()
 	blockID := unittest.IdentifierFixture()
-
-	state := new(protocolmock.State)
-	snapshot := new(protocolmock.Snapshot)
-	params := new(protocolmock.Params)
 
 	// create a mock epoch for leader selection setup in constructor
 	currEpoch := newMockEpoch(
@@ -45,60 +122,53 @@ func TestConsensus_IdentitiesByBlock(t *testing.T) {
 		100,
 		unittest.SeedFixture(seed.RandomSourceLength),
 	)
-	epochs := mocks.NewEpochQuery(t, 1, currEpoch)
-	snapshot.On("Epochs").Return(epochs)
+	suite.epochs.Add(currEpoch)
 
-	state.On("Final").Return(snapshot)
-	state.On("AtBlockID", blockID).Return(snapshot)
-	state.On("Params").Return(params)
+	suite.state.On("AtBlockID", blockID).Return(suite.snapshot)
+	suite.snapshot.On("Identity", realIdentity.NodeID).Return(realIdentity, nil)
+	suite.snapshot.On("Identity", zeroWeightConsensusIdentity.NodeID).Return(zeroWeightConsensusIdentity, nil)
+	suite.snapshot.On("Identity", ejectedConsensusIdentity.NodeID).Return(ejectedConsensusIdentity, nil)
+	suite.snapshot.On("Identity", validNonConsensusIdentity.NodeID).Return(validNonConsensusIdentity, nil)
+	suite.snapshot.On("Identity", fakeID).Return(nil, protocol.IdentityNotFoundError{})
 
-	params.On("EpochFallbackTriggered").Return(false, nil)
-
-	snapshot.On("Identity", realIdentity.NodeID).Return(realIdentity, nil)
-	snapshot.On("Identity", zeroWeightConsensusIdentity.NodeID).Return(zeroWeightConsensusIdentity, nil)
-	snapshot.On("Identity", ejectedConsensusIdentity.NodeID).Return(ejectedConsensusIdentity, nil)
-	snapshot.On("Identity", validNonConsensusIdentity.NodeID).Return(validNonConsensusIdentity, nil)
-	snapshot.On("Identity", fakeID).Return(nil, protocol.IdentityNotFoundError{})
-	snapshot.On("Phase").Return(flow.EpochPhaseStaking, nil)
-
-	com, err := NewConsensusCommittee(state, unittest.IdentifierFixture())
-	require.NoError(t, err)
+	suite.CreateAndStartCommittee()
 
 	t.Run("non-existent identity should return InvalidSignerError", func(t *testing.T) {
-		_, err := com.IdentityByBlock(blockID, fakeID)
+		_, err := suite.committee.IdentityByBlock(blockID, fakeID)
 		require.True(t, model.IsInvalidSignerError(err))
 	})
 
 	t.Run("existent but non-committee-member identity should return InvalidSignerError", func(t *testing.T) {
 		t.Run("zero-weight consensus node", func(t *testing.T) {
-			_, err := com.IdentityByBlock(blockID, zeroWeightConsensusIdentity.NodeID)
+			_, err := suite.committee.IdentityByBlock(blockID, zeroWeightConsensusIdentity.NodeID)
 			require.True(t, model.IsInvalidSignerError(err))
 		})
 
 		t.Run("ejected consensus node", func(t *testing.T) {
-			_, err := com.IdentityByBlock(blockID, ejectedConsensusIdentity.NodeID)
+			_, err := suite.committee.IdentityByBlock(blockID, ejectedConsensusIdentity.NodeID)
 			require.True(t, model.IsInvalidSignerError(err))
 		})
 
 		t.Run("otherwise valid non-consensus node", func(t *testing.T) {
-			_, err := com.IdentityByBlock(blockID, validNonConsensusIdentity.NodeID)
+			_, err := suite.committee.IdentityByBlock(blockID, validNonConsensusIdentity.NodeID)
 			require.True(t, model.IsInvalidSignerError(err))
 		})
 	})
 
 	t.Run("should be able to retrieve real identity", func(t *testing.T) {
-		actual, err := com.IdentityByBlock(blockID, realIdentity.NodeID)
+		actual, err := suite.committee.IdentityByBlock(blockID, realIdentity.NodeID)
 		require.NoError(t, err)
 		require.Equal(t, realIdentity, actual)
 	})
 }
 
-// TestConsensus_IdentitiesByEpoch tests that identities can be queried by epoch.
+// TestIdentitiesByEpoch tests that identities can be queried by epoch.
 // * should use static epoch info (initial identities)
 // * should exclude non-committee members
 // * should correctly map views to epochs
 // * should return ErrViewForUnknownEpoch sentinel for unknown epochs
-func TestConsensus_IdentitiesByEpoch(t *testing.T) {
+func (suite *ConsensusSuite) TestIdentitiesByEpoch() {
+	t := suite.T()
 
 	// epoch 1 identities with varying conditions which would disqualify them
 	// from committee participation
@@ -112,16 +182,9 @@ func TestConsensus_IdentitiesByEpoch(t *testing.T) {
 	epoch2Identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
 	epoch2Identities := flow.IdentityList{epoch2Identity}
 
-	state := new(protocolmock.State)
-	snapshot := new(protocolmock.Snapshot)
-	params := new(protocolmock.Params)
-	state.On("Final").Return(snapshot)
-	state.On("Params").Return(params)
-	params.On("EpochFallbackTriggered").Return(false, nil)
-
 	// create a mock epoch for leader selection setup in constructor
 	epoch1 := newMockEpoch(
-		1,
+		suite.currentEpochCounter,
 		epoch1Identities,
 		1,
 		100,
@@ -129,188 +192,143 @@ func TestConsensus_IdentitiesByEpoch(t *testing.T) {
 	)
 	// initially epoch 2 is not committed
 	epoch2 := newMockEpoch(
-		2,
+		suite.currentEpochCounter+1,
 		epoch2Identities,
 		101,
 		200,
 		unittest.SeedFixture(seed.RandomSourceLength),
 	)
-	currentEpochPhase := flow.EpochPhaseStaking
-	epochs := mocks.NewEpochQuery(t, 1, epoch1)
-	snapshot.On("Epochs").Return(epochs)
-	snapshot.On("Phase").Return(
-		func() flow.EpochPhase { return currentEpochPhase },
-		func() error { return nil },
-	)
+	suite.epochs.Add(epoch1)
 
-	com, err := NewConsensusCommittee(state, unittest.IdentifierFixture())
-	require.NoError(t, err)
-
-	ctx, cancel, errCh := unittest.IrrecoverableContextWithCancel(context.Background())
-	com.Start(ctx)
-	go unittest.FailOnIrrecoverableError(t, ctx.Done(), errCh)
-	defer cancel()
+	suite.CreateAndStartCommittee()
 
 	t.Run("only epoch 1 committed", func(t *testing.T) {
 		t.Run("non-existent identity should return InvalidSignerError", func(t *testing.T) {
-			_, err := com.IdentityByEpoch(randUint64(1, 100), unittest.IdentifierFixture())
+			_, err := suite.committee.IdentityByEpoch(randUint64(1, 100), unittest.IdentifierFixture())
 			require.True(t, model.IsInvalidSignerError(err))
 		})
 
 		t.Run("existent but non-committee-member identity should return InvalidSignerError", func(t *testing.T) {
 			t.Run("zero-weight consensus node", func(t *testing.T) {
-				_, err := com.IdentityByEpoch(randUint64(1, 100), zeroWeightConsensusIdentity.NodeID)
+				_, err := suite.committee.IdentityByEpoch(randUint64(1, 100), zeroWeightConsensusIdentity.NodeID)
 				require.True(t, model.IsInvalidSignerError(err))
 			})
 
 			t.Run("ejected consensus node", func(t *testing.T) {
-				_, err := com.IdentityByEpoch(randUint64(1, 100), ejectedConsensusIdentity.NodeID)
+				_, err := suite.committee.IdentityByEpoch(randUint64(1, 100), ejectedConsensusIdentity.NodeID)
 				require.True(t, model.IsInvalidSignerError(err))
 			})
 
 			t.Run("otherwise valid non-consensus node", func(t *testing.T) {
-				_, err := com.IdentityByEpoch(randUint64(1, 100), validNonConsensusIdentity.NodeID)
+				_, err := suite.committee.IdentityByEpoch(randUint64(1, 100), validNonConsensusIdentity.NodeID)
 				require.True(t, model.IsInvalidSignerError(err))
 			})
 		})
 
 		t.Run("should be able to retrieve real identity", func(t *testing.T) {
-			actual, err := com.IdentityByEpoch(randUint64(1, 100), realIdentity.NodeID)
+			actual, err := suite.committee.IdentityByEpoch(randUint64(1, 100), realIdentity.NodeID)
 			require.NoError(t, err)
 			require.Equal(t, realIdentity, actual)
 		})
 
 		t.Run("should return ErrViewForUnknownEpoch for view outside existing epoch", func(t *testing.T) {
-			_, err := com.IdentityByEpoch(randUint64(101, 1_000_000), epoch2Identity.NodeID)
+			_, err := suite.committee.IdentityByEpoch(randUint64(101, 1_000_000), epoch2Identity.NodeID)
 			require.Error(t, err)
 			require.True(t, errors.Is(err, model.ErrViewForUnknownEpoch))
 		})
 	})
 
 	// commit epoch 2
-	currentEpochPhase = flow.EpochPhaseCommitted
-	firstBlockOfCommittedPhase := unittest.BlockHeaderFixture()
-	state.On("AtBlockID", firstBlockOfCommittedPhase.ID()).Return(snapshot)
-	epochs.Add(epoch2)
-	com.EpochCommittedPhaseStarted(1, &firstBlockOfCommittedPhase)
-	// wait for the protocol event to be processed (async)
-	assert.Eventually(t, func() bool {
-		_, err := com.IdentityByEpoch(randUint64(101, 200), unittest.IdentifierFixture())
-		return !errors.Is(err, model.ErrViewForUnknownEpoch)
-	}, time.Second, time.Millisecond)
+	suite.CommitEpoch(epoch2)
 
 	t.Run("epoch 1 and 2 committed", func(t *testing.T) {
 		t.Run("should be able to retrieve epoch 1 identity in epoch 1", func(t *testing.T) {
-			actual, err := com.IdentityByEpoch(randUint64(1, 100), realIdentity.NodeID)
+			actual, err := suite.committee.IdentityByEpoch(randUint64(1, 100), realIdentity.NodeID)
 			require.NoError(t, err)
 			require.Equal(t, realIdentity, actual)
 		})
 
 		t.Run("should be unable to retrieve epoch 1 identity in epoch 2", func(t *testing.T) {
-			_, err := com.IdentityByEpoch(randUint64(101, 200), realIdentity.NodeID)
+			_, err := suite.committee.IdentityByEpoch(randUint64(101, 200), realIdentity.NodeID)
 			require.Error(t, err)
 			require.True(t, model.IsInvalidSignerError(err))
 		})
 
 		t.Run("should be unable to retrieve epoch 2 identity in epoch 1", func(t *testing.T) {
-			_, err := com.IdentityByEpoch(randUint64(1, 100), epoch2Identity.NodeID)
+			_, err := suite.committee.IdentityByEpoch(randUint64(1, 100), epoch2Identity.NodeID)
 			require.Error(t, err)
 			require.True(t, model.IsInvalidSignerError(err))
 		})
 
 		t.Run("should be able to retrieve epoch 2 identity in epoch 2", func(t *testing.T) {
-			actual, err := com.IdentityByEpoch(randUint64(101, 200), epoch2Identity.NodeID)
+			actual, err := suite.committee.IdentityByEpoch(randUint64(101, 200), epoch2Identity.NodeID)
 			require.NoError(t, err)
 			require.Equal(t, epoch2Identity, actual)
 		})
 
 		t.Run("should return ErrViewForUnknownEpoch for view outside existing epochs", func(t *testing.T) {
-			_, err := com.IdentityByEpoch(randUint64(201, 1_000_000), epoch2Identity.NodeID)
+			_, err := suite.committee.IdentityByEpoch(randUint64(201, 1_000_000), epoch2Identity.NodeID)
 			require.Error(t, err)
 			require.True(t, errors.Is(err, model.ErrViewForUnknownEpoch))
 		})
 	})
 }
 
-// TestConsensus_LeaderForView tests that the weight threshold methods return the
+// TestThresholds tests that the weight threshold methods return the
 // correct thresholds for the previous and current epoch and that it returns the
 // appropriate sentinel for the next epoch if it is not yet ready.
 //
 // There are 3 epochs in this test case, each with the same identities but different
 // weights.
-func TestConsensus_Thresholds(t *testing.T) {
+func (suite *ConsensusSuite) TestThresholds() {
+	t := suite.T()
 
 	identities := unittest.IdentityListFixture(10)
 
-	// the counter for the current epoch
-	epochCounter := uint64(2)
-
-	// create mocks
-	state := new(protocolmock.State)
-	snapshot := new(protocolmock.Snapshot)
-	params := new(protocolmock.Params)
-	state.On("Final").Return(snapshot)
-	state.On("Params").Return(params)
-	params.On("EpochFallbackTriggered").Return(false, nil)
-
 	prevEpoch := newMockEpoch(
-		epochCounter-1,
+		suite.currentEpochCounter-1,
 		identities.Map(mapfunc.WithWeight(100)), // total weight = 1000
 		1,
 		100,
 		unittest.SeedFixture(seed.RandomSourceLength),
 	)
 	currEpoch := newMockEpoch(
-		epochCounter,
+		suite.currentEpochCounter,
 		identities.Map(mapfunc.WithWeight(200)), // total weight = 2000
 		101,
 		200,
 		unittest.SeedFixture(32),
 	)
+	suite.epochs.Add(prevEpoch)
+	suite.epochs.Add(currEpoch)
 
-	state.On("Final").Return(snapshot)
-	epochs := mocks.NewEpochQuery(t, epochCounter, prevEpoch, currEpoch)
-	snapshot.On("Epochs").Return(epochs)
-	currentEpochPhase := flow.EpochPhaseStaking
-	snapshot.On("Epochs").Return(epochs)
-	snapshot.On("Phase").Return(
-		func() flow.EpochPhase { return currentEpochPhase },
-		func() error { return nil },
-	)
-
-	com, err := NewConsensusCommittee(state, unittest.IdentifierFixture())
-	require.NoError(t, err)
-
-	ctx, cancel, errCh := unittest.IrrecoverableContextWithCancel(context.Background())
-	com.Start(ctx)
-	go unittest.FailOnIrrecoverableError(t, ctx.Done(), errCh)
-	defer cancel()
+	suite.CreateAndStartCommittee()
 
 	t.Run("next epoch not ready", func(t *testing.T) {
 		t.Run("previous epoch", func(t *testing.T) {
-			threshold, err := com.QuorumThresholdForView(randUint64(1, 100))
+			threshold, err := suite.committee.QuorumThresholdForView(randUint64(1, 100))
 			require.Nil(t, err)
 			assert.Equal(t, WeightThresholdToBuildQC(1000), threshold)
-			threshold, err = com.TimeoutThresholdForView(randUint64(1, 100))
+			threshold, err = suite.committee.TimeoutThresholdForView(randUint64(1, 100))
 			require.Nil(t, err)
 			assert.Equal(t, WeightThresholdToTimeout(1000), threshold)
 		})
 
 		t.Run("current epoch", func(t *testing.T) {
-			threshold, err := com.QuorumThresholdForView(randUint64(101, 200))
+			threshold, err := suite.committee.QuorumThresholdForView(randUint64(101, 200))
 			require.Nil(t, err)
 			assert.Equal(t, WeightThresholdToBuildQC(2000), threshold)
-			threshold, err = com.TimeoutThresholdForView(randUint64(101, 200))
+			threshold, err = suite.committee.TimeoutThresholdForView(randUint64(101, 200))
 			require.Nil(t, err)
 			assert.Equal(t, WeightThresholdToTimeout(2000), threshold)
 		})
 
 		t.Run("after current epoch - should return ErrViewForUnknownEpoch", func(t *testing.T) {
 			// get threshold for view in next epoch when it is not set up yet
-			_, err := com.QuorumThresholdForView(randUint64(201, 300))
+			_, err := suite.committee.QuorumThresholdForView(randUint64(201, 300))
 			assert.Error(t, err)
 			assert.True(t, errors.Is(err, model.ErrViewForUnknownEpoch))
-			_, err = com.TimeoutThresholdForView(randUint64(201, 300))
+			_, err = suite.committee.TimeoutThresholdForView(randUint64(201, 300))
 			assert.Error(t, err)
 			assert.True(t, errors.Is(err, model.ErrViewForUnknownEpoch))
 		})
@@ -318,117 +336,85 @@ func TestConsensus_Thresholds(t *testing.T) {
 
 	// now, add a valid next epoch
 	nextEpoch := newMockEpoch(
-		epochCounter+1,
+		suite.currentEpochCounter+1,
 		identities.Map(mapfunc.WithWeight(300)), // total weight 3000
 		201,
 		300,
 		unittest.SeedFixture(seed.RandomSourceLength),
 	)
-	currentEpochPhase = flow.EpochPhaseCommitted
-	firstBlockOfCommittedPhase := unittest.BlockHeaderFixture()
-	state.On("AtBlockID", firstBlockOfCommittedPhase.ID()).Return(snapshot)
-	epochs.Add(nextEpoch)
-	com.EpochCommittedPhaseStarted(1, &firstBlockOfCommittedPhase)
-	// wait for the protocol event to be processed (async)
-	assert.Eventually(t, func() bool {
-		_, err := com.IdentityByEpoch(randUint64(101, 200), unittest.IdentifierFixture())
-		return !errors.Is(err, model.ErrViewForUnknownEpoch)
-	}, time.Second, time.Millisecond)
+	suite.CommitEpoch(nextEpoch)
 
 	t.Run("next epoch ready", func(t *testing.T) {
 		t.Run("previous epoch", func(t *testing.T) {
-			threshold, err := com.QuorumThresholdForView(randUint64(1, 100))
+			threshold, err := suite.committee.QuorumThresholdForView(randUint64(1, 100))
 			require.Nil(t, err)
 			assert.Equal(t, WeightThresholdToBuildQC(1000), threshold)
-			threshold, err = com.TimeoutThresholdForView(randUint64(1, 100))
+			threshold, err = suite.committee.TimeoutThresholdForView(randUint64(1, 100))
 			require.Nil(t, err)
 			assert.Equal(t, WeightThresholdToTimeout(1000), threshold)
 		})
 
 		t.Run("current epoch", func(t *testing.T) {
-			threshold, err := com.QuorumThresholdForView(randUint64(101, 200))
+			threshold, err := suite.committee.QuorumThresholdForView(randUint64(101, 200))
 			require.Nil(t, err)
 			assert.Equal(t, WeightThresholdToBuildQC(2000), threshold)
-			threshold, err = com.TimeoutThresholdForView(randUint64(101, 200))
+			threshold, err = suite.committee.TimeoutThresholdForView(randUint64(101, 200))
 			require.Nil(t, err)
 			assert.Equal(t, WeightThresholdToTimeout(2000), threshold)
 		})
 
 		t.Run("next epoch", func(t *testing.T) {
-			threshold, err := com.QuorumThresholdForView(randUint64(201, 300))
+			threshold, err := suite.committee.QuorumThresholdForView(randUint64(201, 300))
 			require.Nil(t, err)
 			assert.Equal(t, WeightThresholdToBuildQC(3000), threshold)
-			threshold, err = com.TimeoutThresholdForView(randUint64(201, 300))
+			threshold, err = suite.committee.TimeoutThresholdForView(randUint64(201, 300))
 			require.Nil(t, err)
 			assert.Equal(t, WeightThresholdToTimeout(3000), threshold)
 		})
 
 		t.Run("beyond known epochs", func(t *testing.T) {
 			// get threshold for view in next epoch when it is not set up yet
-			_, err := com.QuorumThresholdForView(randUint64(301, 10_000))
+			_, err := suite.committee.QuorumThresholdForView(randUint64(301, 10_000))
 			assert.Error(t, err)
 			assert.True(t, errors.Is(err, model.ErrViewForUnknownEpoch))
-			_, err = com.TimeoutThresholdForView(randUint64(301, 10_000))
+			_, err = suite.committee.TimeoutThresholdForView(randUint64(301, 10_000))
 			assert.Error(t, err)
 			assert.True(t, errors.Is(err, model.ErrViewForUnknownEpoch))
 		})
 	})
 }
 
-// TestConsensus_LeaderForView tests that LeaderForView returns a valid leader
+// TestLeaderForView tests that LeaderForView returns a valid leader
 // for the previous and current epoch and that it returns the appropriate
 // sentinel for the next epoch if it is not yet ready
-func TestConsensus_LeaderForView(t *testing.T) {
+func (suite *ConsensusSuite) TestLeaderForView() {
+	t := suite.T()
 
 	identities := unittest.IdentityListFixture(10)
-	me := identities[0].NodeID
-
-	// the counter for the current epoch
-	epochCounter := uint64(2)
-
-	// create mocks
-	state := new(protocolmock.State)
-	snapshot := new(protocolmock.Snapshot)
-	params := new(protocolmock.Params)
-	state.On("Final").Return(snapshot)
-	state.On("Params").Return(params)
-	params.On("EpochFallbackTriggered").Return(false, nil)
 
 	prevEpoch := newMockEpoch(
-		epochCounter-1,
+		suite.currentEpochCounter-1,
 		identities,
 		1,
 		100,
 		unittest.SeedFixture(seed.RandomSourceLength),
 	)
 	currEpoch := newMockEpoch(
-		epochCounter,
+		suite.currentEpochCounter,
 		identities,
 		101,
 		200,
 		unittest.SeedFixture(32),
 	)
+	suite.epochs.Add(currEpoch)
+	suite.epochs.Add(prevEpoch)
 
-	currentEpochPhase := flow.EpochPhaseStaking
-	epochs := mocks.NewEpochQuery(t, epochCounter, prevEpoch, currEpoch)
-	snapshot.On("Epochs").Return(epochs)
-	snapshot.On("Phase").Return(
-		func() flow.EpochPhase { return currentEpochPhase },
-		func() error { return nil },
-	)
-
-	com, err := NewConsensusCommittee(state, me)
-	require.Nil(t, err)
-
-	ctx, cancel, errCh := unittest.IrrecoverableContextWithCancel(context.Background())
-	com.Start(ctx)
-	go unittest.FailOnIrrecoverableError(t, ctx.Done(), errCh)
-	defer cancel()
+	suite.CreateAndStartCommittee()
 
 	t.Run("next epoch not ready", func(t *testing.T) {
 		t.Run("previous epoch", func(t *testing.T) {
 			// get leader for view in previous epoch
-			leaderID, err := com.LeaderForView(randUint64(1, 100))
+			leaderID, err := suite.committee.LeaderForView(randUint64(1, 100))
 			assert.NoError(t, err)
 			_, exists := identities.ByNodeID(leaderID)
 			assert.True(t, exists)
@@ -436,7 +422,7 @@ func TestConsensus_LeaderForView(t *testing.T) {
 
 		t.Run("current epoch", func(t *testing.T) {
 			// get leader for view in current epoch
-			leaderID, err := com.LeaderForView(randUint64(101, 200))
+			leaderID, err := suite.committee.LeaderForView(randUint64(101, 200))
 			assert.NoError(t, err)
 			_, exists := identities.ByNodeID(leaderID)
 			assert.True(t, exists)
@@ -444,7 +430,7 @@ func TestConsensus_LeaderForView(t *testing.T) {
 
 		t.Run("after current epoch - should return ErrViewForUnknownEpoch", func(t *testing.T) {
 			// get leader for view in next epoch when it is not set up yet
-			_, err := com.LeaderForView(randUint64(201, 300))
+			_, err := suite.committee.LeaderForView(randUint64(201, 300))
 			assert.Error(t, err)
 			assert.True(t, errors.Is(err, model.ErrViewForUnknownEpoch))
 		})
@@ -452,28 +438,18 @@ func TestConsensus_LeaderForView(t *testing.T) {
 
 	// now, add a valid next epoch
 	nextEpoch := newMockEpoch(
-		epochCounter+1,
+		suite.currentEpochCounter+1,
 		identities,
 		201,
 		300,
 		unittest.SeedFixture(seed.RandomSourceLength),
 	)
-	// commit epoch 2
-	currentEpochPhase = flow.EpochPhaseCommitted
-	firstBlockOfCommittedPhase := unittest.BlockHeaderFixture()
-	state.On("AtBlockID", firstBlockOfCommittedPhase.ID()).Return(snapshot)
-	epochs.Add(nextEpoch)
-	com.EpochCommittedPhaseStarted(1, &firstBlockOfCommittedPhase)
-	// wait for the protocol event to be processed (async)
-	assert.Eventually(t, func() bool {
-		_, err := com.IdentityByEpoch(randUint64(101, 200), unittest.IdentifierFixture())
-		return !errors.Is(err, model.ErrViewForUnknownEpoch)
-	}, time.Second, time.Millisecond)
+	suite.CommitEpoch(nextEpoch)
 
 	t.Run("next epoch ready", func(t *testing.T) {
 		t.Run("previous epoch", func(t *testing.T) {
 			// get leader for view in previous epoch
-			leaderID, err := com.LeaderForView(randUint64(1, 100))
+			leaderID, err := suite.committee.LeaderForView(randUint64(1, 100))
 			require.Nil(t, err)
 			_, exists := identities.ByNodeID(leaderID)
 			assert.True(t, exists)
@@ -481,7 +457,7 @@ func TestConsensus_LeaderForView(t *testing.T) {
 
 		t.Run("current epoch", func(t *testing.T) {
 			// get leader for view in current epoch
-			leaderID, err := com.LeaderForView(randUint64(101, 200))
+			leaderID, err := suite.committee.LeaderForView(randUint64(101, 200))
 			require.Nil(t, err)
 			_, exists := identities.ByNodeID(leaderID)
 			assert.True(t, exists)
@@ -489,14 +465,14 @@ func TestConsensus_LeaderForView(t *testing.T) {
 
 		t.Run("next epoch", func(t *testing.T) {
 			// get leader for view in next epoch after it has been set up
-			leaderID, err := com.LeaderForView(randUint64(201, 300))
+			leaderID, err := suite.committee.LeaderForView(randUint64(201, 300))
 			require.Nil(t, err)
 			_, exists := identities.ByNodeID(leaderID)
 			assert.True(t, exists)
 		})
 
 		t.Run("beyond known epochs", func(t *testing.T) {
-			_, err := com.LeaderForView(randUint64(301, 1_000_000))
+			_, err := suite.committee.LeaderForView(randUint64(301, 1_000_000))
 			assert.Error(t, err)
 			assert.True(t, errors.Is(err, model.ErrViewForUnknownEpoch))
 		})
@@ -591,10 +567,12 @@ func TestRemoveOldEpochs(t *testing.T) {
 	}
 }
 
+// randUint64 returns a uint64 in [min,max]
 func randUint64(min, max int) uint64 {
 	return uint64(min + rand.Intn(max+1-min))
 }
 
+// newMockEpoch returns a new mocked epoch with the given fields
 func newMockEpoch(
 	counter uint64,
 	identities flow.IdentityList,
