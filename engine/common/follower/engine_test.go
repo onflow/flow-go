@@ -141,7 +141,7 @@ func (suite *Suite) TestHandleProposal() {
 	// we do not have any children cached
 	suite.cache.On("ByParentID", block.ID()).Return(nil, false)
 	// the proposal should be forwarded to the follower
-	suite.follower.On("SubmitProposal", block.Header, parent.Header.View).Once().Return(make(chan struct{}))
+	suite.follower.On("SubmitProposal", block.Header, parent.Header.View).Once().Return(make(<-chan struct{}))
 
 	// submit the block
 	proposal := unittest.ProposalFromBlock(&block)
