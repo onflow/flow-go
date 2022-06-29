@@ -12,11 +12,11 @@ import (
 )
 
 // Follower recovers the HotStuff state for a follower instance.
-// It reads the pending blocks from storage and pass them to the input Finalizer
+// It reads the pending blocks from storage and pass them to the input Forks
 // instance to recover its state from before the restart.
 func Follower(
 	log zerolog.Logger,
-	finalizer forks.Finalizer,
+	finalizer forks.Forks,
 	validator hotstuff.Validator,
 	finalized *flow.Header,
 	pending []*flow.Header,

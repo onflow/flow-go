@@ -1,9 +1,8 @@
-package test
+package forks
 
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/forks"
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
@@ -131,7 +130,7 @@ func makeBlockID(block *model.Block) flow.Identifier {
 	})
 }
 
-func makeGenesis() *forks.BlockQC {
+func makeGenesis() *BlockQC {
 	genesis := &model.Block{
 		View: 1,
 	}
@@ -141,7 +140,7 @@ func makeGenesis() *forks.BlockQC {
 		View:    1,
 		BlockID: genesis.BlockID,
 	}
-	genesisBQ := &forks.BlockQC{
+	genesisBQ := &BlockQC{
 		Block: genesis,
 		QC:    genesisQC,
 	}

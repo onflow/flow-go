@@ -21,14 +21,14 @@ import (
 type FollowerLogic struct {
 	log               zerolog.Logger
 	validator         hotstuff.Validator
-	finalizationLogic forks.Finalizer
+	finalizationLogic forks.Forks
 }
 
 // New creates a new FollowerLogic instance
 func New(
 	log zerolog.Logger,
 	validator hotstuff.Validator,
-	finalizationLogic forks.Finalizer,
+	finalizationLogic forks.Forks,
 ) (*FollowerLogic, error) {
 	return &FollowerLogic{
 		log:               log.With().Str("hotstuff", "follower").Logger(),

@@ -35,7 +35,7 @@ type Forks interface {
 	// PREREQUISITE:
 	// Forks must be able to connect `proposal` to its latest finalized block
 	// (without missing interim ancestors). Otherwise, an exception is raised.
-	// If the new block results in conflicting finalized blocks, it will return
-	// a ByzantineThresholdExceededError.
+	// Expected errors during normal operations:
+	//  * model.ByzantineThresholdExceededError - new block results in conflicting finalized blocks
 	AddProposal(proposal *model.Proposal) error
 }

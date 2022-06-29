@@ -1,4 +1,4 @@
-package finalizer
+package forks
 
 import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
