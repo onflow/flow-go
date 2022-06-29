@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-const receiptTimeout = 60 * time.Second
+const receiptTimeout = 120 * time.Second
 const receiptStateTimeout = 120 * time.Second
 
 type ReceiptState struct {
