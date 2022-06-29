@@ -42,7 +42,7 @@ func DefaultEpochConfig() EpochConfig {
 // transaction argument for the deployEpoch transaction used during execution
 // state bootstrapping.
 //
-// The resulting argument has type [{Name: UInt64}] which represents a list
+// The resulting argument has type [{String: UInt64}] which represents a list
 // of weight mappings for each cluster. The full Cluster struct is constructed
 // within the transaction in Cadence for simplicity here.
 //

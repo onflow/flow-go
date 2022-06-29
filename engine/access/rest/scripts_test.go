@@ -39,8 +39,8 @@ func scriptReq(id string, height string, body interface{}) *http.Request {
 }
 
 func TestScripts(t *testing.T) {
-	validCode := []byte(`pub fun main(foo: Name): Name { return foo }`)
-	validArgs := []byte(`{ "type": "Name", "value": "hello world" }`)
+	validCode := []byte(`pub fun main(foo: String): String { return foo }`)
+	validArgs := []byte(`{ "type": "String", "value": "hello world" }`)
 	validBody := map[string]interface{}{
 		"script":    util.ToBase64(validCode),
 		"arguments": []string{util.ToBase64(validArgs)},

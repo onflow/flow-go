@@ -256,7 +256,7 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 
 // trim0x trims the `0x` if it exists from a hexadecimal string
 // This method is required as the DKG contract expects key lengths of 192 bytes
-// the `PublicKey.Name()` method returns the hexadecimal string representation of the
+// the `PublicKey.String()` method returns the hexadecimal string representation of the
 // public key prefixed with `0x` resulting in length of 194 bytes.
 func trim0x(hexString string) string {
 

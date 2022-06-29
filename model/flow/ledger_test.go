@@ -8,7 +8,7 @@ import (
 )
 
 // this benchmark can run with this command:
-//  go test -run=Name -bench=.
+//  go test -run=String -bench=.
 
 // this is to prevent lint errors
 var length int

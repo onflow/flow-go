@@ -768,7 +768,7 @@ func TestBLSMultiSignature(t *testing.T) {
 								publicKeys: [[UInt8]],
 								signatures: [[UInt8]],
 								message:  [UInt8],
-								tag: Name,
+								tag: String,
 							): Bool {
 								let pks: [PublicKey] = []
 								for pk in publicKeys {

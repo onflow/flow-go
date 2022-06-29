@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	flownet "github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/channels"
 
 	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/insecure"
@@ -56,7 +56,7 @@ func TestCorruptibleConduitFrameworkHappyPath(t *testing.T) {
 
 				hub := stub.NewNetworkHub()
 				originalEvent := &message.TestMessage{Text: "this is a test message"}
-				testChannel := flownet.Channel("test-channel")
+				testChannel := channels.Channel("test-channel")
 
 				// corrupted node network
 				corruptedEngine := &network.Engine{}
@@ -75,7 +75,7 @@ func TestCorruptibleConduitFrameworkHappyPath(t *testing.T) {
 
 				wg := &sync.WaitGroup{}
 				wg.Add(1)
-				honestEngine.OnProcess(func(channel flownet.Channel, originId flow.Identifier, event interface{}) error {
+				honestEngine.OnProcess(func(channel channels.Channel, originId flow.Identifier, event interface{}) error {
 					// implementing the process logic of the honest engine on reception of message from underlying network.
 					require.Equal(t, testChannel, channel)               // event must arrive at the channel set by orchestrator.
 					require.Equal(t, corruptedIdentity.NodeID, originId) // origin id of the message must be the corrupted node.

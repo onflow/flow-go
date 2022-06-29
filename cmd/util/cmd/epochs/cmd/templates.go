@@ -10,7 +10,7 @@ var deployEpochTransactionTemplate = `
 // This transaction is needed to adjust the numViewsInEpoch and numViewsInStakingAuction
 // value based on the current block when epochs is deployed
 
-transaction(name: Name, 
+transaction(name: String, 
             currentEpochCounter: UInt64,
             // this value should be the number of views in the epoch, as computed from the 
             // first and final views of the epoch info from the protocol state
@@ -19,7 +19,7 @@ transaction(name: Name,
             numViewsInDKGPhase: UInt64,
             numCollectorClusters: UInt16,
             FLOWsupplyIncreasePercentage: UFix64,
-            randomSource: Name) {
+            randomSource: String) {
 
   prepare(signer: AuthAccount) {
 
@@ -51,6 +51,6 @@ transaction(name: Name,
             // the below arguments are unused and are safe to be left empty
             collectorClusters: [] as [FlowClusterQC.Cluster],
             clusterQCs: [] as [FlowClusterQC.ClusterQC],
-            dkgPubKeys: [] as [Name])
+            dkgPubKeys: [] as [String])
   }
 }`

@@ -93,7 +93,7 @@ func filterAccountCreatedEvents(events []flow.Event) []flow.Event {
 const auditContractForDeploymentTransactionTemplate = `
 import FlowContractAudits from 0x%s
 
-transaction(deployAddress: Address, code: Name) {
+transaction(deployAddress: Address, code: String) {
 	prepare(serviceAccount: AuthAccount) {
 
 		let auditorAdmin = serviceAccount.borrow<&FlowContractAudits.Administrator>(from: FlowContractAudits.AdminStoragePath)
@@ -333,7 +333,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 			SetScript([]byte(`
 				transaction {
 					prepare(signer: AuthAccount) {
-						var s : Name = ""
+						var s : String = ""
 						for name in signer.contracts.names {
 							s = s.concat(name).concat(",")
 						}
@@ -756,7 +756,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 		},
 		{
 			label:  "Multiple parameters",
-			script: `transaction(x: Int, y: Name) { execute { log(x); log(y) } }`,
+			script: `transaction(x: Int, y: String) { execute { log(x); log(y) } }`,
 			args:   [][]byte{arg1, arg2},
 			check: func(t *testing.T, tx *fvm.TransactionProcedure) {
 				require.NoError(t, tx.Err)
@@ -768,7 +768,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 		{
 			label: "Parameters and authorizer",
 			script: `
-                transaction(x: Int, y: Name) {
+                transaction(x: Int, y: String) {
                     prepare(acct: AuthAccount) { log(acct.address) }
                     execute { log(x); log(y) }
                 }`,
@@ -899,7 +899,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 	script := fmt.Sprintf(`
 			access(all) contract Container {
 				access(all) resource Counter {
-					pub var longString: Name
+					pub var longString: String
 					init() {
 						self.longString = "%s"
 					}
@@ -1014,7 +1014,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 	script := fmt.Sprintf(`
 			access(all) contract Container {
 				access(all) resource Counter {
-					pub var longString: Name
+					pub var longString: String
 					init() {
 						self.longString = "%s"
 					}
