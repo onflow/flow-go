@@ -749,30 +749,31 @@ func (es *EventHandlerSuite) TestStart_PendingBlocksRecovery() {
 }
 
 // TestCreateProposal_SanityChecks tests that proposing logic performs sanity checks when creating new block proposal.
-// This test modifies internal state of PaceMaker to reproduce state corruption.
+// Specifically it tests a case where TC contains QC which: TC.View == TC.NewestQC.View
 func (es *EventHandlerSuite) TestCreateProposal_SanityChecks() {
-	es.Run("qc-and-tc-included", func() {
-		// round ended with TC where TC.View == TC.NewestQC.View
-		tc := helper.MakeTC(helper.WithTCView(es.initView),
-			helper.WithTCNewestQC(helper.MakeQC(helper.WithQCBlock(es.votingBlock))))
+	// round ended with TC where TC.View == TC.NewestQC.View
+	tc := helper.MakeTC(helper.WithTCView(es.initView),
+		helper.WithTCNewestQC(helper.MakeQC(helper.WithQCBlock(es.votingBlock))))
 
-		es.forks.blocks[es.votingBlock.BlockID] = es.votingBlock
+	es.forks.blocks[es.votingBlock.BlockID] = es.votingBlock
 
-		// I'm the next leader
-		es.committee.leaders[tc.View+1] = struct{}{}
+	// I'm the next leader
+	es.committee.leaders[tc.View+1] = struct{}{}
 
-		err := es.eventhandler.OnTCConstructed(tc)
-		require.NoError(es.T(), err)
+	err := es.eventhandler.OnTCConstructed(tc)
+	require.NoError(es.T(), err)
 
-		lastCall := es.communicator.Calls[len(es.communicator.Calls)-1]
-		// the last call is BroadcastProposal
-		require.Equal(es.T(), "BroadcastProposalWithDelay", lastCall.Method)
-		header, ok := lastCall.Arguments[0].(*flow.Header)
-		require.True(es.T(), ok)
-		require.Nil(es.T(), header.LastViewTC)
+	lastCall := es.communicator.Calls[len(es.communicator.Calls)-1]
+	// the last call is BroadcastProposal
+	require.Equal(es.T(), "BroadcastProposalWithDelay", lastCall.Method)
+	header, ok := lastCall.Arguments[0].(*flow.Header)
+	require.True(es.T(), ok)
+	// we need to make sure that produced proposal contains only QC even if there is TC for previous view as well
+	require.Nil(es.T(), header.LastViewTC)
 
-		require.Equal(es.T(), tc.View+1, es.paceMaker.CurView(), "incorrect view change")
-	})
+	require.Equal(es.T(), tc.NewestQC, es.paceMaker.NewestQC())
+	require.Equal(es.T(), tc, es.paceMaker.LastViewTC())
+	require.Equal(es.T(), tc.View+1, es.paceMaker.CurView(), "incorrect view change")
 }
 
 func createBlock(view uint64) *model.Block {
