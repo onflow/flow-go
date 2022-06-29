@@ -128,7 +128,7 @@ func (suite *IngestionCoreSuite) SetupTest() {
 	)
 
 	// we need to return the head as it's also used as reference block
-	headers.On("ByBlockID", head.ID()).Return(&head, nil)
+	headers.On("ByBlockID", head.ID()).Return(head, nil)
 
 	// only used for metrics, nobody cares
 	pool.On("Size").Return(uint(0))
