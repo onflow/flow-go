@@ -194,7 +194,7 @@ func (p *TimeoutProcessor) Process(timeout *model.TimeoutObject) error {
 // validateTimeout performs validation of timeout object, verifies if timeout is correctly structured
 // and included QC and TC is correctly structured and signed.
 // ATTENTION: this function does _not_ check whether the TO's `SignerID` is an authorized node nor if
-// the signature is valid. These checks happens in signature aggregator.
+// the signature is valid. These checks happen in signature aggregator.
 // Expected error returns during normal operations:
 // * model.InvalidTimeoutError - submitted invalid timeout
 // All other errors should be treated as exceptions.

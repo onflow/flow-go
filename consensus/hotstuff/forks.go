@@ -17,14 +17,14 @@ import (
 type Forks interface {
 	ForksReader
 
-	// AddProposal adds the block to Forks. This might cause an update of the finalized block
+	// AddProposal adds the block proposal to Forks. This might cause an update of the finalized block
 	// and pruning of older blocks.
 	// Handles duplicated addition of blocks (at the potential cost of additional computation time).
 	// PREREQUISITE:
-	// Forks must be able to connect `block` to its latest finalized block
-	// (without missing interim ancestors). Otherwise, an error is raised.
-	// When the new block causes the conflicting finalized blocks, it will return
-	// Might error with ByzantineThresholdExceededError (e.g. if finalizing conflicting forks)
+	// Forks must be able to connect `proposal` to its latest finalized block
+	// (without missing interim ancestors). Otherwise, an exception is raised.
+	// If the new block results in conflicting finalized blocks, it will return
+	// a ByzantineThresholdExceededError.
 	AddProposal(proposal *model.Proposal) error
 }
 
