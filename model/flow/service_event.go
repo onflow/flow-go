@@ -56,7 +56,7 @@ func (se *ServiceEvent) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	tp, ok := enc["Interface"].(string)
+	tp, ok := enc["Type"].(string)
 	if !ok {
 		return fmt.Errorf("missing type key")
 	}
@@ -106,7 +106,7 @@ func (se *ServiceEvent) UnmarshalMsgpack(b []byte) error {
 		return err
 	}
 
-	tp, ok := enc["Interface"].(string)
+	tp, ok := enc["Type"].(string)
 	if !ok {
 		return fmt.Errorf("missing type key")
 	}
@@ -156,7 +156,7 @@ func (se *ServiceEvent) UnmarshalCBOR(b []byte) error {
 		return err
 	}
 
-	tp, ok := enc["Interface"].(string)
+	tp, ok := enc["Type"].(string)
 	if !ok {
 		return fmt.Errorf("missing type key")
 	}
