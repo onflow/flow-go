@@ -58,7 +58,18 @@ const (
 	LargeMsgUnicastTimeout = 1000 * time.Second
 )
 
-var _ network.Middleware = (*Middleware)(nil)
+var (
+	_ network.Middleware = (*Middleware)(nil)
+
+	// allowAll is a peerFilterFunc that will always return true for all peer ids.
+	// This filter is used to allow communication by all roles on public network channels.
+	allowAll = func(_ peer.ID) bool { return true }
+)
+
+// peerFilterFunc is a func type that will be used in the TopicValidator to filter
+// peers by ID and drop messages from unwanted peers before message payload decoding
+// happens.
+type peerFilterFunc func(id peer.ID) bool
 
 // Middleware handles the input & output on the direct connections we have to
 // our neighbours on the peer-to-peer network.
@@ -177,6 +188,17 @@ func DefaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.Mes
 		validator.ValidateNotSender(flowID),   // validator to filter out messages sent by this node itself
 		validator.ValidateTarget(log, flowID), // validator to filter out messages not intended for this node
 	}
+}
+
+// isStakedPeerFilter returns a peerFilterFunc that uses m.ov.Identity to get the identity
+// for a peer ID. If a identity is not found the peer is unstaked.
+func (m *Middleware) isStakedPeerFilter() peerFilterFunc {
+	f := func(id peer.ID) bool {
+		_, ok := m.ov.Identity(id)
+		return ok
+	}
+
+	return f
 }
 
 func (m *Middleware) NewBlobService(channel network.Channel, ds datastore.Batching, opts ...network.BlobServiceOption) network.BlobService {
@@ -507,16 +529,24 @@ func (m *Middleware) Subscribe(channel network.Channel) error {
 
 	topic := network.TopicFromChannel(channel, m.rootBlockID)
 
+	var peerFilter peerFilterFunc
 	var validators []psValidator.MessageValidator
-	if !network.PublicChannels().Contains(channel) {
+	if network.PublicChannels().Contains(channel) {
+		// NOTE: for public channels the callback used to check if a node is staked will
+		// return true for every node.
+		peerFilter = allowAll
+	} else {
 		// for channels used by the staked nodes, add the topic validator to filter out messages from non-staked nodes
 		validators = append(validators,
-			// NOTE: The AuthorizedSenderValidator will assert the sender is a staked node
 			psValidator.AuthorizedSenderValidator(m.log, channel, m.ov.Identity),
 		)
+
+		// NOTE: For non-public channels the libP2P node topic validator will reject
+		// messages from unstaked nodes.
+		peerFilter = m.isStakedPeerFilter()
 	}
 
-	s, err := m.libP2PNode.Subscribe(topic, m.codec, validators...)
+	s, err := m.libP2PNode.Subscribe(topic, m.codec, peerFilter, validators...)
 	if err != nil {
 		return fmt.Errorf("failed to subscribe for channel %s: %w", channel, err)
 	}

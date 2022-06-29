@@ -98,6 +98,16 @@ func (_m *NetworkMetrics) QueueDuration(duration time.Duration, priority int) {
 	_m.Called(duration, priority)
 }
 
+// RoutingTablePeerAdded provides a mock function with given fields:
+func (_m *NetworkMetrics) RoutingTablePeerAdded() {
+	_m.Called()
+}
+
+// RoutingTablePeerRemoved provides a mock function with given fields:
+func (_m *NetworkMetrics) RoutingTablePeerRemoved() {
+	_m.Called()
+}
+
 type NewNetworkMetricsT interface {
 	mock.TestingT
 	Cleanup(func())

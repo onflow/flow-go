@@ -35,11 +35,11 @@ func TestBasicComputationMetering(t *testing.T) {
 
 		err = m.MeterMemory(0, 2)
 		require.NoError(t, err)
-		require.Equal(t, uint(2), m.TotalMemoryUsed())
+		require.Equal(t, uint(2), m.TotalMemoryEstimate())
 
 		err = m.MeterMemory(0, 3)
 		require.NoError(t, err)
-		require.Equal(t, uint(2+3), m.TotalMemoryUsed())
+		require.Equal(t, uint(2+3), m.TotalMemoryEstimate())
 
 		err = m.MeterMemory(0, 8)
 		require.Error(t, err)
