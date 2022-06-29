@@ -7,11 +7,10 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/network/channels"
-
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 )
 
 // Engine is the splitter engine, which maintains a list of registered engines

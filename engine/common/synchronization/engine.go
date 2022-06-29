@@ -10,8 +10,6 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/network/channels"
-
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/chainsync"
@@ -24,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	synccore "github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/storage"
 )
 

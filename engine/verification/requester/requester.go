@@ -8,8 +8,6 @@ import (
 	"github.com/rs/zerolog"
 	"golang.org/x/exp/rand"
 
-	"github.com/onflow/flow-go/network/channels"
-
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/verification/fetcher"
 	"github.com/onflow/flow-go/model/flow"
@@ -19,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/logging"
 )

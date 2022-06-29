@@ -6,8 +6,6 @@ import (
 	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/network/channels"
-
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
@@ -20,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )

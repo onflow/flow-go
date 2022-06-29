@@ -6,10 +6,9 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/network/channels"
-
 	splitterNetwork "github.com/onflow/flow-go/engine/common/splitter/network"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/channels"
 	testnet "github.com/onflow/flow-go/utils/unittest/network"
 )
 

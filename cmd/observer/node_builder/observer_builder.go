@@ -18,8 +18,6 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	p2ppubsub "github.com/libp2p/go-libp2p-pubsub"
 
-	"github.com/onflow/flow-go/network/channels"
-
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/apiproxy"
 	"github.com/onflow/flow-go/cmd"
@@ -53,6 +51,7 @@ import (
 	consensus_follower "github.com/onflow/flow-go/module/upstream"
 	"github.com/onflow/flow-go/network"
 	netcache "github.com/onflow/flow-go/network/cache"
+	"github.com/onflow/flow-go/network/channels"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/network/converter"

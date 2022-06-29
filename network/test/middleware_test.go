@@ -15,8 +15,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	mockery "github.com/stretchr/testify/mock"
 
-	"github.com/onflow/flow-go/network/channels"
-
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -27,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/observable"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/mocknetwork"

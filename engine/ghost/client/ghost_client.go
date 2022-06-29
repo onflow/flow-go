@@ -8,13 +8,12 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/onflow/flow-go/network/channels"
-
 	"github.com/onflow/flow-go/utils/unittest"
 
 	ghost "github.com/onflow/flow-go/engine/ghost/protobuf"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 )
 
 // GhostClient is a client for the ghost node.

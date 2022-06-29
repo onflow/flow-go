@@ -5,11 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/sethvargo/go-retry"
-
-	"github.com/onflow/flow-go/network/channels"
-
 	"github.com/rs/zerolog"
+	"github.com/sethvargo/go-retry"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -17,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/dkg"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 )
 
 // retryMax is the maximum number of times the engine will attempt to forward

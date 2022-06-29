@@ -12,8 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/network/channels"
-
 	"github.com/onflow/flow-go/engine"
 	clustermodel "github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/events"
@@ -24,6 +22,7 @@ import (
 	module "github.com/onflow/flow-go/module/mock"
 	synccore "github.com/onflow/flow-go/module/synchronization"
 	netint "github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	clusterint "github.com/onflow/flow-go/state/cluster"
 	cluster "github.com/onflow/flow-go/state/cluster/mock"
