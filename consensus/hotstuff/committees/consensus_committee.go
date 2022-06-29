@@ -320,6 +320,17 @@ func (c *Consensus) handleProtocolEvents(ctx irrecoverable.SignalerContext, read
 	}
 }
 
+// EpochCommittedPhaseStarted passes the protocol event to the worker thread.
+func (c *Consensus) EpochCommittedPhaseStarted(_ uint64, first *flow.Header) {
+	nextEpoch := c.state.AtBlockID(first.ID()).Epochs().Next()
+	c.committedEpochsCh <- nextEpoch
+}
+
+// EpochEmergencyFallbackTriggered passes the protocol event to the worker thread.
+func (c *Consensus) EpochEmergencyFallbackTriggered() {
+	c.epochEmergencyFallback <- struct{}{}
+}
+
 // onEpochEmergencyFallbackTriggered handles the protocol event for emergency epoch
 // fallback mode being triggered. When this occurs, we inject a fallback epoch
 // to the committee which extends the current epoch.
@@ -394,7 +405,7 @@ func (c *Consensus) prepareEpoch(epoch protocol.Epoch) (*staticEpochInfo, error)
 
 	counter, err := epoch.Counter()
 	if err != nil {
-		return nil, fmt.Errorf("could not get counter for current epoch: %w", err)
+		return nil, fmt.Errorf("could not get counter for epoch to prepare: %w", err)
 	}
 
 	// this is a no-op if we have already computed static info for this epoch
