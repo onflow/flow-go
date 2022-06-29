@@ -3,10 +3,9 @@ package mocks
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/invalid"
+	"github.com/stretchr/testify/require"
 )
 
 // EpochQuery implements protocol.EpochQuery for testing purposes.
@@ -60,6 +59,6 @@ func (mock *EpochQuery) Transition() {
 
 func (mock *EpochQuery) Add(epoch protocol.Epoch) {
 	counter, err := epoch.Counter()
-	assert.Nil(mock.t, err, "cannot add epoch with invalid counter")
+	require.Nil(mock.t, err, "cannot add epoch with invalid counter")
 	mock.byCounter[counter] = epoch
 }
