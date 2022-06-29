@@ -40,6 +40,64 @@ func TestDNSCache_HappyPath(t *testing.T) {
 	testRetrievalMatchCount(t, cache, ipFixtures, txtFixtures, int(sizeLimit))
 }
 
+// TestDNSCache_Update checks the correctness of updating dns records.
+func TestDNSCache_Update(t *testing.T) {
+	ipFixture := []net.IPAddr{network.NetIPAddrFixture()}
+	ipDomain := "ip-domain"
+
+	txtFixture := []string{network.TxtIPFixture()}
+	txtDomain := "txt-domain"
+
+	cache := herocache.NewDNSCache(10,
+		unittest.Logger(),
+		metrics.NewNoopCollector(),
+		metrics.NewNoopCollector())
+
+	// adding records to dns cache
+	require.True(t, cache.PutIpDomain(ipDomain, ipFixture, int64(0)))
+	require.True(t, cache.PutTxtRecord(txtDomain, txtFixture, int64(0)))
+
+	// locking both txt and ip records before updating
+	// to later check an update unlocks them.
+	locked, err := cache.LockIPDomain(ipDomain)
+	require.NoError(t, err)
+	require.True(t, locked)
+	locked, err = cache.LockTxtRecord(txtDomain)
+	require.NoError(t, err)
+	require.True(t, locked)
+
+	// updating ip record
+	updatedIpFixture := []net.IPAddr{network.NetIPAddrFixture()}
+	updatedIpTimestamp := int64(10)
+	require.NoError(t, cache.UpdateIPDomain(ipDomain, updatedIpFixture, updatedIpTimestamp))
+
+	// updating txt record
+	updatedTxtFixture := []string{network.TxtIPFixture()}
+	updatedTxtTimestamp := int64(12)
+	require.NoError(t, cache.UpdateTxtRecord(txtDomain, updatedTxtFixture, updatedTxtTimestamp))
+
+	// sanity checking of the updated records
+	// updated ip record
+	ipRecord, ok := cache.GetDomainIp(ipDomain)
+	require.True(t, ok)
+	require.Equal(t, ipRecord.Addresses, updatedIpFixture)
+	require.Equal(t, ipRecord.Domain, ipDomain)
+	require.False(t, ipRecord.Locked) // an update must unlock it.
+	require.Equal(t, ipRecord.Timestamp, updatedIpTimestamp)
+
+	// updated txt record
+	txtRecord, ok := cache.GetTxtRecord(txtDomain)
+	require.True(t, ok)
+	require.Equal(t, txtRecord.Record, updatedTxtFixture)
+	require.Equal(t, txtRecord.Txt, txtDomain)
+	require.False(t, txtRecord.Locked) // an update must unlock it.
+	require.Equal(t, txtRecord.Timestamp, updatedTxtTimestamp)
+
+	// updating non-existing records should fail.
+	require.Error(t, cache.UpdateTxtRecord("non-exiting", []string{network.TxtIPFixture()}, int64(0)))
+	require.Error(t, cache.UpdateIPDomain("non-exiting", []net.IPAddr{network.NetIPAddrFixture()}, int64(0)))
+}
+
 // TestDNSCache_Lock evaluates that locking a txt (or ip) record can be done successfully once, and
 // attempts to lock and already locked record fail.
 // It also evaluates that a locked record can be retrieved successfully.
