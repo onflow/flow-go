@@ -118,7 +118,7 @@ func (s *SealingEngineSuite) TestOnBlockIncorporated() {
 
 	// setup headers storage
 	headers := &mockstorage.Headers{}
-	headers.On("ByBlockID", incorporatedBlockID).Return(&incorporatedBlock, nil).Once()
+	headers.On("ByBlockID", incorporatedBlockID).Return(incorporatedBlock, nil).Once()
 	s.engine.headers = headers
 
 	s.engine.OnBlockIncorporated(model.BlockFromFlow(incorporatedBlock, incorporatedBlock.View-1))

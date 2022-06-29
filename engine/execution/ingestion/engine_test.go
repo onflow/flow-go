@@ -519,7 +519,7 @@ func Test_OnlyHeadOfTheQueueIsExecuted(t *testing.T) {
 		ctx.executionState.On("StateCommitmentByBlockID", mock.Anything, mock.Anything).Return(nil, storageerr.ErrNotFound)
 
 		ctx.state.On("Sealed").Return(ctx.snapshot)
-		ctx.snapshot.On("Head").Return(&blockA, nil)
+		ctx.snapshot.On("Head").Return(blockA, nil)
 
 		wgB := sync.WaitGroup{}
 		wgB.Add(1)
@@ -633,7 +633,7 @@ func TestBlocksArentExecutedMultipleTimes_multipleBlockEnqueue(t *testing.T) {
 		ctx.mockStateCommitsWithMap(commits)
 
 		ctx.state.On("Sealed").Return(ctx.snapshot)
-		ctx.snapshot.On("Head").Return(&blockA, nil)
+		ctx.snapshot.On("Head").Return(blockA, nil)
 
 		// wait finishing execution until all the blocks are sent to execution
 		wgPut := sync.WaitGroup{}
@@ -759,7 +759,7 @@ func TestBlocksArentExecutedMultipleTimes_collectionArrival(t *testing.T) {
 		ctx.mockSnapshot(blockD.Block.Header, ctx.identities)
 
 		ctx.state.On("Sealed").Return(ctx.snapshot)
-		ctx.snapshot.On("Head").Return(&blockA, nil)
+		ctx.snapshot.On("Head").Return(blockA, nil)
 
 		// wait to control parent (block B) execution until we are ready
 		wgB := sync.WaitGroup{}
