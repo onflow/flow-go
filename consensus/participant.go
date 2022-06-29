@@ -123,17 +123,6 @@ func NewParticipant(
 	return loop, nil
 }
 
-// NewForks creates new consensus forks manager
-func NewForks(final *flow.Header, headers storage.Headers, updater module.Finalizer, notifier hotstuff.Consumer, rootHeader *flow.Header, rootQC *flow.QuorumCertificate) (hotstuff.Forks, error) {
-	finalizer, err := newFinalizer(final, headers, updater, notifier, rootHeader, rootQC)
-	if err != nil {
-		return nil, fmt.Errorf("could not initialize finalizer: %w", err)
-	}
-
-	// initialize the Forks manager
-	return forks.New(finalizer), nil
-}
-
 // NewValidator creates new instance of hotstuff validator needed for votes & proposal validation
 func NewValidator(metrics module.HotstuffMetrics, committee hotstuff.DynamicCommittee) hotstuff.Validator {
 	packer := signature.NewConsensusSigDataPacker(committee)
@@ -144,21 +133,21 @@ func NewValidator(metrics module.HotstuffMetrics, committee hotstuff.DynamicComm
 	return validatorImpl.NewMetricsWrapper(validator, metrics) // wrapper for measuring time spent in Validator component
 }
 
-// newFinalizer recovers trusted root and creates new finalizer
-func newFinalizer(final *flow.Header, headers storage.Headers, updater module.Finalizer, notifier hotstuff.FinalizationConsumer, rootHeader *flow.Header, rootQC *flow.QuorumCertificate) (*forks.Forks, error) {
+// NewForks recovers trusted root and creates new forks manager
+func NewForks(final *flow.Header, headers storage.Headers, updater module.Finalizer, notifier hotstuff.FinalizationConsumer, rootHeader *flow.Header, rootQC *flow.QuorumCertificate) (*forks.Forks, error) {
 	// recover the trusted root
 	trustedRoot, err := recoverTrustedRoot(final, headers, rootHeader, rootQC)
 	if err != nil {
 		return nil, fmt.Errorf("could not recover trusted root: %w", err)
 	}
 
-	// initialize the finalizer
-	finalizer, err := forks.New(trustedRoot, updater, notifier)
+	// initialize the forks
+	forks, err := forks.New(trustedRoot, updater, notifier)
 	if err != nil {
-		return nil, fmt.Errorf("could not initialize finalizer: %w", err)
+		return nil, fmt.Errorf("could not initialize forks: %w", err)
 	}
 
-	return finalizer, nil
+	return forks, nil
 }
 
 // recoverTrustedRoot based on our local state returns root block and QC that can be used to initialize base state

@@ -7,7 +7,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/consensus/hotstuff/forks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -21,14 +20,14 @@ import (
 type FollowerLogic struct {
 	log               zerolog.Logger
 	validator         hotstuff.Validator
-	finalizationLogic forks.Forks
+	finalizationLogic hotstuff.Forks
 }
 
 // New creates a new FollowerLogic instance
 func New(
 	log zerolog.Logger,
 	validator hotstuff.Validator,
-	finalizationLogic forks.Forks,
+	finalizationLogic hotstuff.Forks,
 ) (*FollowerLogic, error) {
 	return &FollowerLogic{
 		log:               log.With().Str("hotstuff", "follower").Logger(),

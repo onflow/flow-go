@@ -6,7 +6,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/consensus/hotstuff/forks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -16,7 +15,7 @@ import (
 // instance to recover its state from before the restart.
 func Follower(
 	log zerolog.Logger,
-	finalizer forks.Forks,
+	finalizer hotstuff.Forks,
 	validator hotstuff.Validator,
 	finalized *flow.Header,
 	pending []*flow.Header,

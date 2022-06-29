@@ -3,6 +3,7 @@ package forks
 import (
 	"errors"
 	"fmt"
+
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"

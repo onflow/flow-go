@@ -340,11 +340,9 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	in.pacemaker, err = pacemaker.New(controller, notifier, in.persist)
 	require.NoError(t, err)
 
-	forkalizer, err := forks.New(rootBlockQC, in.finalizer, notifier)
-	require.NoError(t, err)
-
 	// initialize the forks handler
-	in.forks = forks.New(forkalizer)
+	in.forks, err = forks.New(rootBlockQC, in.finalizer, notifier)
+	require.NoError(t, err)
 
 	// initialize the validator
 	in.validator = validator.New(in.committee, in.verifier)
