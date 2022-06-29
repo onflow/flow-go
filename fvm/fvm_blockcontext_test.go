@@ -1102,8 +1102,6 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 	t.Run("Using to much interaction fails but does not panic", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
 		withContextOptions(
 			fvm.WithTransactionProcessors(
-				fvm.NewTransactionAccountFrozenChecker(),
-				fvm.NewTransactionAccountFrozenEnabler(),
 				fvm.NewTransactionInvoker(zerolog.Nop()),
 			),
 		).
