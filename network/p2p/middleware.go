@@ -64,6 +64,8 @@ var (
 	// allowAll is a peerFilterFunc that will always return true for all peer ids.
 	// This filter is used to allow communication by all roles on public network channels.
 	allowAll = func(_ peer.ID) bool { return true }
+
+	ErrMissingOverlay = errors.New("overlay must be configured by calling SetOverlay before middleware can be started")
 )
 
 // peerFilterFunc is a func type that will be used in the TopicValidator to filter
@@ -128,6 +130,8 @@ func WithPeerManager(peerManagerFunc PeerManagerFactoryFunc) MiddlewareOption {
 // connectionGating if set to True, restricts this node to only talk to other nodes which are part of the identity list
 // managePeerConnections if set to True, enables the default PeerManager which continuously updates the node's peer connections
 // validators are the set of the different message validators that each inbound messages is passed through
+// During normal operations, the following errors are expected to be thrown by the irrecoverable.SignalerContext:
+//  * MiddlewareStartError if middleware fails to start for any reason.
 func NewMiddleware(
 	log zerolog.Logger,
 	libP2PNodeFactory LibP2PFactoryFunc,
@@ -209,6 +213,8 @@ func (m *Middleware) NewPingService(pingProtocol protocol.ID, provider network.P
 	return NewPingService(m.libP2PNode.Host(), pingProtocol, m.log, provider)
 }
 
+// topologyPeers callback used by the peer manager that the list of peer ID's
+// which this node should be directly connected to as peers.
 func (m *Middleware) topologyPeers() (peer.IDSlice, error) {
 	identities, err := m.ov.Topology()
 	if err != nil {
@@ -242,8 +248,15 @@ func (m *Middleware) Me() flow.Identifier {
 }
 
 // GetIPPort returns the ip address and port number associated with the middleware
+// During normal operations, the following benign errors are expected:
+//  * BenignNetworkingError if the libP2P node fails to return the IP and port.
 func (m *Middleware) GetIPPort() (string, string, error) {
-	return m.libP2PNode.GetIPPort()
+	ipOrHostname, port, err := m.libP2PNode.GetIPPort()
+	if err != nil {
+		return "", "", network.NewBenignNetworkingErrorf("failed to get ip and port from libP2P node: %w", err)
+	}
+
+	return ipOrHostname, port, nil
 }
 
 func (m *Middleware) UpdateNodeAddresses() {
@@ -276,20 +289,27 @@ func (m *Middleware) SetOverlay(ov network.Overlay) {
 }
 
 // start will start the middleware.
+// During normal operations, the following errors are expected:
+//  * MiddlewareStartError if
+//		- the overlay is not set on the Middleware.
+//		- creating the libP2P node fails.
+//		- registering the preferred unicast protocols fails.
+//		- creating the peer manager fails.
+//		- starting the peer manager fails.
 func (m *Middleware) start(ctx context.Context) error {
 	if m.ov == nil {
-		return errors.New("overlay must be configured by calling SetOverlay before middleware can be started")
+		return NewMiddlewareStartErrorf("could not start middleware: %w", ErrMissingOverlay)
 	}
 
 	libP2PNode, err := m.libP2PNodeFactory(ctx)
 	if err != nil {
-		return fmt.Errorf("could not create libp2p node: %w", err)
+		return NewMiddlewareStartErrorf("could not create libp2p node: %w", err)
 	}
 
 	m.libP2PNode = libP2PNode
 	err = m.libP2PNode.WithDefaultUnicastProtocol(m.handleIncomingStream, m.preferredUnicasts)
 	if err != nil {
-		return fmt.Errorf("could not register preferred unicast protocols on libp2p node: %w", err)
+		return NewMiddlewareStartErrorf("could not register preferred unicast protocols on libp2p node: %w", err)
 	}
 
 	m.UpdateNodeAddresses()
@@ -298,14 +318,14 @@ func (m *Middleware) start(ctx context.Context) error {
 	if m.peerManagerFactory != nil {
 		m.peerManager, err = m.peerManagerFactory(m.libP2PNode.host, m.topologyPeers, m.log)
 		if err != nil {
-			return fmt.Errorf("failed to create peer manager: %w", err)
+			return NewMiddlewareStartErrorf("failed to create peer manager: %w", err)
 		}
 
 		select {
 		case <-m.peerManager.Ready():
 			m.log.Debug().Msg("peer manager successfully started")
 		case <-time.After(30 * time.Second):
-			return fmt.Errorf("could not start peer manager")
+			return NewMiddlewareStartErrorf("could not start peer manager")
 		}
 	}
 
@@ -340,11 +360,21 @@ func (m *Middleware) stop() {
 //
 // Dispatch should be used whenever guaranteed delivery to a specific target is required. Otherwise, Publish is
 // a more efficient candidate.
+//
+// During normal operations, the following benign errors are expected:
+//  * BenignNetworkingError if
+// 		- the peer ID for the target node ID cannot be found.
+// 		- the msg size exceeds result returned from unicastMaxMsgSize(msg)
+// 		- the libP2P node fails to publish the message.
+// 		- the libP2P node fails to create the stream.
+// 		- setting write deadline on the stream fails.
+// 		- the gogo protobuf writer fails to write the message.
+// 		- flushing the stream fails.
 func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) (err error) {
 	// translates identifier to peer id
 	peerID, err := m.idTranslator.GetPeerID(targetID)
 	if err != nil {
-		return fmt.Errorf("could not find peer id for target id: %w", err)
+		return network.NewBenignNetworkingErrorf("could not find peer id for target id: %w", err)
 	}
 
 	maxMsgSize := unicastMaxMsgSize(msg)
@@ -352,7 +382,7 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 		// message size goes beyond maximum size that the serializer can handle.
 		// proceeding with this message results in closing the connection by the target side, and
 		// delivery failure.
-		return fmt.Errorf("message size %d exceeds configured max message size %d", msg.Size(), maxMsgSize)
+		return network.NewBenignNetworkingErrorf("message size %d exceeds configured max message size %d", msg.Size(), maxMsgSize)
 	}
 
 	maxTimeout := m.unicastMaxMsgDuration(msg)
@@ -376,7 +406,7 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 	// sent out the receiver
 	stream, err := m.libP2PNode.CreateStream(ctx, peerID)
 	if err != nil {
-		return fmt.Errorf("failed to create stream for %s: %w", targetID, err)
+		return network.NewBenignNetworkingErrorf("failed to create stream for %s: %w", targetID, err)
 	}
 
 	success := false
@@ -402,7 +432,7 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 	deadline, _ := ctx.Deadline()
 	err = stream.SetWriteDeadline(deadline)
 	if err != nil {
-		return fmt.Errorf("failed to set write deadline for stream: %w", err)
+		return network.NewBenignNetworkingErrorf("failed to set write deadline for stream: %w", err)
 	}
 
 	// create a gogo protobuf writer
@@ -411,13 +441,13 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 
 	err = writer.WriteMsg(msg)
 	if err != nil {
-		return fmt.Errorf("failed to send message to %s: %w", targetID, err)
+		return network.NewBenignNetworkingErrorf("failed to send message to %s: %w", targetID, err)
 	}
 
 	// flush the stream
 	err = bufw.Flush()
 	if err != nil {
-		return fmt.Errorf("failed to flush stream for %s: %w", targetID, err)
+		return network.NewBenignNetworkingErrorf("failed to flush stream for %s: %w", targetID, err)
 	}
 
 	success = true
@@ -525,6 +555,9 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 }
 
 // Subscribe subscribes the middleware to a channel.
+// During normal operations, the following benign errors are expected:
+//  * BenignNetworkingError if the libP2P node fails to subscribe to the topic
+// 	  created from the provided channel.
 func (m *Middleware) Subscribe(channel network.Channel) error {
 
 	topic := network.TopicFromChannel(channel, m.rootBlockID)
@@ -548,7 +581,7 @@ func (m *Middleware) Subscribe(channel network.Channel) error {
 
 	s, err := m.libP2PNode.Subscribe(topic, m.codec, peerFilter, validators...)
 	if err != nil {
-		return fmt.Errorf("failed to subscribe for channel %s: %w", channel, err)
+		return network.NewBenignNetworkingErrorf("could not subscribe to topic (%s): %w", topic, err)
 	}
 
 	// create a new readSubscription with the context of the middleware
@@ -565,11 +598,14 @@ func (m *Middleware) Subscribe(channel network.Channel) error {
 }
 
 // Unsubscribe unsubscribes the middleware from a channel.
+// During normal operations, the following benign errors are expected:
+//  * BenignNetworkingError if the libP2P node fails to unsubscribe to the topic
+// 	  created from the provided channel.
 func (m *Middleware) Unsubscribe(channel network.Channel) error {
 	topic := network.TopicFromChannel(channel, m.rootBlockID)
 	err := m.libP2PNode.UnSubscribe(topic)
 	if err != nil {
-		return fmt.Errorf("failed to unsubscribe from channel %s: %w", channel, err)
+		return network.NewBenignNetworkingErrorf("failed to unsubscribe from channel (%s): %w", channel, err)
 	}
 
 	// update peers to remove nodes subscribed to channel
@@ -622,6 +658,11 @@ func (m *Middleware) processMessage(msg *message.Message, decodedMsgPayload inte
 // Publish publishes a message on the channel. It models a distributed broadcast where the message is meant for all or
 // a many nodes subscribing to the channel. It does not guarantee the delivery though, and operates on a best
 // effort.
+// During normal operations, the following benign errors are expected:
+//  * BenignNetworkingError if
+// 		- the msg cannot be marshalled.
+// 		- the msg size exceeds DefaultMaxPubSubMsgSize.
+// 		- the libP2P node fails to publish the message.
 func (m *Middleware) Publish(msg *message.Message, channel network.Channel) error {
 	m.log.Debug().Str("channel", channel.String()).Interface("msg", msg).Msg("publishing new message")
 
@@ -630,14 +671,14 @@ func (m *Middleware) Publish(msg *message.Message, channel network.Channel) erro
 	data, err := msg.Marshal()
 	//binstat.LeaveVal(bs, int64(len(data)))
 	if err != nil {
-		return fmt.Errorf("failed to marshal the message: %w", err)
+		return network.NewBenignNetworkingErrorf("failed to marshal the message: %w", err)
 	}
 
 	msgSize := len(data)
 	if msgSize > DefaultMaxPubSubMsgSize {
 		// libp2p pubsub will silently drop the message if its size is greater than the configured pubsub max message size
 		// hence return an error as this message is undeliverable
-		return fmt.Errorf("message size %d exceeds configured max message size %d", msgSize, DefaultMaxPubSubMsgSize)
+		return network.NewBenignNetworkingErrorf("message size %d exceeds configured max message size %d", msgSize, DefaultMaxPubSubMsgSize)
 	}
 
 	topic := network.TopicFromChannel(channel, m.rootBlockID)
@@ -645,7 +686,7 @@ func (m *Middleware) Publish(msg *message.Message, channel network.Channel) erro
 	// publish the bytes on the topic
 	err = m.libP2PNode.Publish(m.ctx, topic, data)
 	if err != nil {
-		return fmt.Errorf("failed to publish the message: %w", err)
+		return network.NewBenignNetworkingErrorf("failed to publish the message: %w", err)
 	}
 
 	m.metrics.NetworkMessageSent(len(data), string(channel), msg.Type)
@@ -654,10 +695,12 @@ func (m *Middleware) Publish(msg *message.Message, channel network.Channel) erro
 }
 
 // IsConnected returns true if this node is connected to the node with id nodeID.
+// During normal operations, the following benign errors are expected:
+//  * BenignNetworkingError if the peer ID for the target node ID cannot be found.
 func (m *Middleware) IsConnected(nodeID flow.Identifier) (bool, error) {
 	peerID, err := m.idTranslator.GetPeerID(nodeID)
 	if err != nil {
-		return false, fmt.Errorf("could not find peer id for target id: %w", err)
+		return false, network.NewBenignNetworkingErrorf("could not find peer id for target id: %w", err)
 	}
 	return m.libP2PNode.IsConnected(peerID)
 }
