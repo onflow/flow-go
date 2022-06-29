@@ -373,6 +373,8 @@ func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *messa
 	case <-e.follower.SubmitProposal(header, parent.View):
 		break
 	case <-time.After(time.Millisecond * 200):
+		// this shouldn't happen very often. 99.8% of proposals are processed within 150ms
+		e.log.Warn().Msg("HotStuffFollower SubmitProposal timeout")
 		break
 	}
 	// check for any descendants of the block to process
