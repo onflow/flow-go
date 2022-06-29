@@ -20,7 +20,7 @@ require (
 	github.com/onflow/flow-emulator v0.33.2
 	github.com/onflow/flow-ft/lib/go/templates v0.2.0
 	github.com/onflow/flow-go v0.25.13-0.20220609230330-ac8d2d78c212
-	github.com/onflow/flow-go-sdk v0.26.4-0.20220627211850-c53a8e5a7f6a
+	github.com/onflow/flow-go-sdk v0.26.5-0.20220629191626-900f9f91bffc
 	github.com/onflow/flow-go/crypto v0.24.3
 	github.com/onflow/flow/protobuf/go/flow v0.3.1
 	github.com/openhistogram/circonusllhist v0.3.0
