@@ -47,7 +47,9 @@ func New(trustedRoot *forks.BlockQC, finalizationCallback module.Finalizer, noti
 		lastFinalized:        trustedRoot,
 	}
 
-	// we don't care about sig data and last view TC since this block was already finalized
+	// CAUTION: instead of a proposal, we use a normal block (without `SigData` and `LastViewTC`, which would be
+	// possibly included in a full proposal). Per convention, we consider the root block as already and enter a
+	// higher view. Therefore, the root block's proposer signature and TC are irrelevant for consensus.
 	trustedRootProposal := &model.Proposal{
 		Block: trustedRoot.Block,
 	}
