@@ -15,21 +15,6 @@ import (
 // (without missing interim ancestors). If this condition is violated, Forks will raise an error
 // and ignore the block.
 type Forks interface {
-	ForksReader
-
-	// AddProposal adds the block proposal to Forks. This might cause an update of the finalized block
-	// and pruning of older blocks.
-	// Handles duplicated addition of blocks (at the potential cost of additional computation time).
-	// PREREQUISITE:
-	// Forks must be able to connect `proposal` to its latest finalized block
-	// (without missing interim ancestors). Otherwise, an exception is raised.
-	// If the new block results in conflicting finalized blocks, it will return
-	// a ByzantineThresholdExceededError.
-	AddProposal(proposal *model.Proposal) error
-}
-
-// ForksReader only reads the forks' state
-type ForksReader interface {
 
 	// GetProposalsForView returns all BlockProposals at the given view number.
 	GetProposalsForView(view uint64) []*model.Proposal
@@ -43,4 +28,14 @@ type ForksReader interface {
 
 	// FinalizedBlock returns the finalized block with the largest view number
 	FinalizedBlock() *model.Block
+
+	// AddProposal adds the block proposal to Forks. This might cause an update of the finalized block
+	// and pruning of older blocks.
+	// Handles duplicated addition of blocks (at the potential cost of additional computation time).
+	// PREREQUISITE:
+	// Forks must be able to connect `proposal` to its latest finalized block
+	// (without missing interim ancestors). Otherwise, an exception is raised.
+	// If the new block results in conflicting finalized blocks, it will return
+	// a ByzantineThresholdExceededError.
+	AddProposal(proposal *model.Proposal) error
 }
