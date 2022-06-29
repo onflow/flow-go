@@ -26,7 +26,7 @@ func TestHeaderEncodingJSON(t *testing.T) {
 	require.NoError(t, err)
 	decodedID := decoded.ID()
 	assert.Equal(t, headerID, decodedID)
-	assert.Equal(t, header, decoded)
+	assert.Equal(t, *header, decoded)
 }
 
 func TestHeaderFingerprint(t *testing.T) {
@@ -60,7 +60,7 @@ func TestHeaderFingerprint(t *testing.T) {
 		header.ProposerSigData)
 	decodedID := decHeader.ID()
 	assert.Equal(t, headerID, decodedID)
-	assert.Equal(t, header, *decHeader)
+	assert.Equal(t, *header, *decHeader)
 }
 
 func TestHeaderEncodingMsgpack(t *testing.T) {
@@ -73,7 +73,7 @@ func TestHeaderEncodingMsgpack(t *testing.T) {
 	require.NoError(t, err)
 	decodedID := decoded.ID()
 	assert.Equal(t, headerID, decodedID)
-	assert.Equal(t, header, decoded)
+	assert.Equal(t, *header, decoded)
 }
 
 func TestHeaderEncodingCBOR(t *testing.T) {
@@ -86,7 +86,7 @@ func TestHeaderEncodingCBOR(t *testing.T) {
 	require.NoError(t, err)
 	decodedID := decoded.ID()
 	assert.Equal(t, headerID, decodedID)
-	assert.Equal(t, header, decoded)
+	assert.Equal(t, *header, decoded)
 }
 
 func TestNonUTCTimestampSameHashAsUTC(t *testing.T) {

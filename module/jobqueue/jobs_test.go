@@ -60,7 +60,7 @@ func TestBlockHeaderJob(t *testing.T) {
 	t.Run("job converts to header", func(t *testing.T) {
 		b, err := jobqueue.JobToBlockHeader(job)
 		assert.NoError(t, err, "unexpected error converting notify job to header")
-		assert.Equal(t, block, *b, "converted header is not the same as the original header")
+		assert.Equal(t, *block, *b, "converted header is not the same as the original header")
 	})
 
 	t.Run("incorrect job type fails to convert to header", func(t *testing.T) {
