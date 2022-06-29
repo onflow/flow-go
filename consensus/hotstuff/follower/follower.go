@@ -65,12 +65,6 @@ func (f *FollowerLogic) AddBlock(blockProposal *model.Proposal) error {
 		return fmt.Errorf("cannot validate block proposal %x: %w", blockProposal.Block.BlockID, err)
 	}
 
-	// as a sanity check, we run the finalization logic's internal validation on the block
-	if err := f.finalizationLogic.VerifyProposal(blockProposal); err != nil {
-		// this should never happen: the block was found to be valid by the validator
-		// if the finalization logic's internal validation errors, we have a bug
-		return fmt.Errorf("invaid block passed validation: %w", err)
-	}
 	err = f.finalizationLogic.AddProposal(blockProposal)
 	if err != nil {
 		return fmt.Errorf("finalization logic cannot process block proposal %x: %w", blockProposal.Block.BlockID, err)
