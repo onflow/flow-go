@@ -524,7 +524,7 @@ func (ss *SyncSuite) TestOnFinalizedBlock() {
 	require.NoError(ss.T(), err)
 	actualHeader := ss.e.finalizedHeader.Get()
 	require.ElementsMatch(ss.T(), ss.e.participantsProvider.Identifiers(), ss.participants[1:].NodeIDs())
-	require.Equal(ss.T(), actualHeader, &finalizedBlock)
+	require.Equal(ss.T(), actualHeader, finalizedBlock)
 }
 
 // TestProcessUnsupportedMessageType tests that Process and ProcessLocal correctly handle a case where invalid message type

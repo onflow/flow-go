@@ -76,7 +76,7 @@ func (suite *Suite) SetupTest() {
 	suite.snapshot.On("Epochs").Return(suite.epochQuery).Maybe()
 	header := unittest.BlockHeaderFixture()
 	params := new(protocol.Params)
-	params.On("Root").Return(&header, nil)
+	params.On("Root").Return(header, nil)
 	suite.state.On("Params").Return(params).Maybe()
 
 	suite.collClient = new(accessmock.AccessAPIClient)
