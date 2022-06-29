@@ -40,8 +40,8 @@ func NewDNSCache(sizeLimit uint32, logger zerolog.Logger, ipCollector module.Her
 	}
 }
 
-// PutDomainIp adds the given ip domain into the cache.
-func (d *DNSCache) PutDomainIp(domain string, addresses []net.IPAddr, timestamp int64) bool {
+// PutIpDomain adds the given ip domain into the cache.
+func (d *DNSCache) PutIpDomain(domain string, addresses []net.IPAddr, timestamp int64) bool {
 	i := ipEntity{
 		IpRecord: mempool.IpRecord{
 			Domain:    domain,
@@ -154,6 +154,32 @@ func (d *DNSCache) LockIPDomain(domain string) (bool, error) {
 	})
 
 	return locked, err
+}
+
+// UpdateIPDomain atomically updates the dns record for the given domain with the new address and timestamp values.
+func (d *DNSCache) UpdateIPDomain(domain string, addresses []net.IPAddr, timestamp int64) error {
+	return d.ipCache.Run(func(backdata mempool.BackData) error {
+		id := domainToIdentifier(domain)
+		if _, removed := backdata.Rem(id); !removed {
+			return fmt.Errorf("ip record could not be removed from backdata")
+		}
+
+		record := ipEntity{
+			IpRecord: mempool.IpRecord{
+				Domain:    domain,
+				Addresses: addresses,
+				Timestamp: timestamp,
+				Locked:    false, // by default an ip record is unlocked.
+			},
+			id: id,
+		}
+
+		if added := backdata.Add(id, record); !added {
+			return fmt.Errorf("updated record could not be added to backdata")
+		}
+
+		return nil
+	})
 }
 
 // LockTxtRecord locks a txt address dns record if exists in the cache.
