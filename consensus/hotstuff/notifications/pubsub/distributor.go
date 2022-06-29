@@ -125,14 +125,6 @@ func (p *Distributor) OnQcIncorporated(qc *flow.QuorumCertificate) {
 	}
 }
 
-func (p *Distributor) OnForkChoiceGenerated(curView uint64, selectedQC *flow.QuorumCertificate) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	for _, subscriber := range p.subscribers {
-		subscriber.OnForkChoiceGenerated(curView, selectedQC)
-	}
-}
-
 func (p *Distributor) OnBlockIncorporated(block *model.Block) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
@@ -178,5 +170,21 @@ func (p *Distributor) OnVoteForInvalidBlockDetected(vote *model.Vote, invalidPro
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.subscribers {
 		subscriber.OnVoteForInvalidBlockDetected(vote, invalidProposal)
+	}
+}
+
+func (p *Distributor) OnDoubleTimeoutDetected(timeout *model.TimeoutObject, altTimeout *model.TimeoutObject) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.subscribers {
+		subscriber.OnDoubleTimeoutDetected(timeout, altTimeout)
+	}
+}
+
+func (p *Distributor) OnInvalidTimeoutDetected(timeout *model.TimeoutObject) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.subscribers {
+		subscriber.OnInvalidTimeoutDetected(timeout)
 	}
 }

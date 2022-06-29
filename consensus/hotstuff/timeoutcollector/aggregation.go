@@ -89,7 +89,7 @@ func NewTimeoutSignatureAggregator(
 }
 
 // VerifyAndAdd verifies the signature under the stored public keys and adds signature with corresponding
-// highest QC view to the internal set. Internal set and collected weight is modified iff the signer ID is not a duplicate and signature _is_ valid.
+// newest QC view to the internal set. Internal set and collected weight is modified iff the signer ID is not a duplicate and signature _is_ valid.
 // The total weight of all collected signatures (excluding duplicates) is returned regardless
 // of any returned error.
 // Expected errors during normal operations:
@@ -148,9 +148,15 @@ func (a *TimeoutSignatureAggregator) TotalWeight() uint64 {
 	return a.totalWeight
 }
 
+// View returns view for which aggregation happens
+// The function is thread-safe
+func (a *TimeoutSignatureAggregator) View() uint64 {
+	return a.view
+}
+
 // Aggregate aggregates the signatures and returns the aggregated signature.
-// The function performs a final verification of aggregated
-// signature. Caller can be sure that resulting signature is valid.
+// The resulting aggregated signature is guaranteed to be valid, as all individual
+// signatures are pre-validated before their addition.
 // Expected errors during normal operations:
 //  - model.InsufficientSignaturesError if no signatures have been added yet
 // This function is thread-safe

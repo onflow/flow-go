@@ -36,6 +36,9 @@ func New(
 // Any other error should be treated as exception
 func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 	newestQC := tc.NewestQC
+	if newestQC == nil {
+		return newInvalidTCError(tc, fmt.Errorf("TC must include a QC but found nil"))
+	}
 
 	// The TC's view cannot be smaller than the view of the QC it contains.
 	// Note: we specifically allow for the TC to have the same view as the highest QC.
@@ -85,15 +88,21 @@ func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 		}
 	}
 
-	// verifying that tc.NewestQC is the QC with the highest view
+	// verifying that tc.NewestQC is the QC with the highest view.
+	// Note: A byzantine TC could include `nil` for tc.NewestQCViews, in which case `tc.NewestQCViews[0]`
+	// would panic. Though, per API specification `verifier.VerifyTC(…)` should return a `model.InvalidFormatError`
+	// if `signers` and `tc.NewestQCViews` have different length. Hence, the following code is safe only if it is executed
+	//  1. _after_ checking the quorum threshold (thereby we guarantee that `signers` is not empty); and
+	//  2. _after_ `verifier.VerifyTC(…)`, which enforces that `signers` and `tc.NewestQCViews` have identical length.
+	// Only then we can be sure that `tc.NewestQCViews` cannot be nil.
 	newestQCView := tc.NewestQCViews[0]
 	for _, view := range tc.NewestQCViews {
 		if newestQCView < view {
 			newestQCView = view
 		}
 	}
-	if newestQCView != tc.NewestQC.View {
-		return newInvalidTCError(tc, fmt.Errorf("included QC (view=%d) should be equal to highest contributed view: %d", tc.NewestQC.View, newestQCView))
+	if newestQCView > tc.NewestQC.View {
+		return newInvalidTCError(tc, fmt.Errorf("included QC (view=%d) should be equal or higher to highest contributed view: %d", tc.NewestQC.View, newestQCView))
 	}
 
 	// Validate QC
