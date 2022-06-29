@@ -7,7 +7,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/consensus/hotstuff/forks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -21,14 +20,14 @@ import (
 type FollowerLogic struct {
 	log               zerolog.Logger
 	validator         hotstuff.Validator
-	finalizationLogic forks.Finalizer
+	finalizationLogic hotstuff.Forks
 }
 
 // New creates a new FollowerLogic instance
 func New(
 	log zerolog.Logger,
 	validator hotstuff.Validator,
-	finalizationLogic forks.Finalizer,
+	finalizationLogic hotstuff.Forks,
 ) (*FollowerLogic, error) {
 	return &FollowerLogic{
 		log:               log.With().Str("hotstuff", "follower").Logger(),
@@ -65,13 +64,7 @@ func (f *FollowerLogic) AddBlock(blockProposal *model.Proposal) error {
 		return fmt.Errorf("cannot validate block proposal %x: %w", blockProposal.Block.BlockID, err)
 	}
 
-	// as a sanity check, we run the finalization logic's internal validation on the block
-	if err := f.finalizationLogic.VerifyBlock(blockProposal.Block); err != nil {
-		// this should never happen: the block was found to be valid by the validator
-		// if the finalization logic's internal validation errors, we have a bug
-		return fmt.Errorf("invaid block passed validation: %w", err)
-	}
-	err = f.finalizationLogic.AddBlock(blockProposal.Block)
+	err = f.finalizationLogic.AddProposal(blockProposal)
 	if err != nil {
 		return fmt.Errorf("finalization logic cannot process block proposal %x: %w", blockProposal.Block.BlockID, err)
 	}

@@ -125,14 +125,6 @@ func (p *Distributor) OnQcIncorporated(qc *flow.QuorumCertificate) {
 	}
 }
 
-func (p *Distributor) OnForkChoiceGenerated(curView uint64, selectedQC *flow.QuorumCertificate) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	for _, subscriber := range p.subscribers {
-		subscriber.OnForkChoiceGenerated(curView, selectedQC)
-	}
-}
-
 func (p *Distributor) OnBlockIncorporated(block *model.Block) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()

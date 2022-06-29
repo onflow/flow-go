@@ -124,9 +124,9 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 	}
 
 	// store the block.
-	err := e.forks.AddBlock(block)
+	err := e.forks.AddProposal(proposal)
 	if err != nil {
-		return fmt.Errorf("cannot add block to fork (%x): %w", block.BlockID, err)
+		return fmt.Errorf("cannot add proposal to forks (%x): %w", block.BlockID, err)
 	}
 
 	_, err = e.paceMaker.ProcessQC(proposal.Block.QC)
@@ -239,7 +239,7 @@ func (e *EventHandler) startNewView() error {
 		newestQC := e.paceMaker.NewestQC()
 		lastViewTC := e.paceMaker.LastViewTC()
 
-		_, found := e.forks.GetBlock(newestQC.BlockID)
+		_, found := e.forks.GetProposal(newestQC.BlockID)
 		if !found {
 			// we don't know anything about block referenced by our newest QC, in this case we can't
 			// create a valid proposal since we can't guarantee validity of block payload.
@@ -311,8 +311,8 @@ func (e *EventHandler) startNewView() error {
 	}
 
 	// as a replica of the current view, find and process the block for the current view
-	blocks := e.forks.GetBlocksForView(curView)
-	if len(blocks) == 0 {
+	proposals := e.forks.GetProposalsForView(curView)
+	if len(proposals) == 0 {
 		// if there is no block stored before for the current view, then exit and keep waiting
 		log.Debug().Msg("waiting for proposal from leader")
 		return nil
@@ -325,7 +325,7 @@ func (e *EventHandler) startNewView() error {
 	// forks is responsible for slashing double proposal behavior, and
 	// event handler is aware of double proposals, but picking any should work and
 	// won't hurt safety
-	//block := blocks[0]
+	//block := proposals[0]
 	//
 	//log.Debug().
 	//	Uint64("block_view", block.View).
@@ -377,7 +377,7 @@ func (e *EventHandler) ownVote(proposal *model.Proposal, curView uint64, nextLea
 		Hex("signer", block.ProposerID[:]).
 		Logger()
 
-	_, found := e.forks.GetBlock(proposal.Block.QC.BlockID)
+	_, found := e.forks.GetProposal(proposal.Block.QC.BlockID)
 	if !found {
 		// we don't have parent for this proposal, we can't vote since we can't guarantee validity of proposals
 		// payload. Strictly speaking this shouldn't ever happen because compliance engine makes sure that we
@@ -420,11 +420,6 @@ func (e *EventHandler) processQC(qc *flow.QuorumCertificate) error {
 		Uint64("block_view", qc.View).
 		Hex("block_id", qc.BlockID[:]).
 		Logger()
-
-	err := e.forks.AddQC(qc)
-	if err != nil {
-		return fmt.Errorf("cannot add QC to forks: %w", err)
-	}
 
 	newViewEvent, err := e.paceMaker.ProcessQC(qc)
 	if err != nil {

@@ -63,13 +63,13 @@ func (s *StateMachineTestSuite) SetupTest() {
 
 // prepareMockedProcessor prepares a mocked processor and stores it in map, later it will be used
 // to mock behavior of verifying vote processor.
-func (s *StateMachineTestSuite) prepareMockedProcessor(block *model.Block) *mocks.VerifyingVoteProcessor {
+func (s *StateMachineTestSuite) prepareMockedProcessor(proposal *model.Proposal) *mocks.VerifyingVoteProcessor {
 	processor := &mocks.VerifyingVoteProcessor{}
 	processor.On("Block").Return(func() *model.Block {
-		return block
+		return proposal.Block
 	}).Maybe()
 	processor.On("Status").Return(hotstuff.VoteCollectorStatusVerifying)
-	s.mockedProcessors[block.BlockID] = processor
+	s.mockedProcessors[proposal.Block.BlockID] = processor
 	return processor
 }
 
@@ -78,7 +78,7 @@ func (s *StateMachineTestSuite) prepareMockedProcessor(block *model.Block) *mock
 func (s *StateMachineTestSuite) TestStatus_StateTransitions() {
 	block := helper.MakeBlock(helper.WithBlockView(s.view))
 	proposal := helper.MakeProposal(helper.WithBlock(block))
-	s.prepareMockedProcessor(block)
+	s.prepareMockedProcessor(proposal)
 
 	// by default, we should create in caching status
 	require.Equal(s.T(), hotstuff.VoteCollectorStatusCaching, s.collector.Status())
@@ -116,7 +116,7 @@ func (s *StateMachineTestSuite) Test_FactoryErrorPropagation() {
 func (s *StateMachineTestSuite) TestAddVote_VerifyingState() {
 	block := helper.MakeBlock(helper.WithBlockView(s.view))
 	proposal := helper.MakeProposal(helper.WithBlock(block))
-	processor := s.prepareMockedProcessor(block)
+	processor := s.prepareMockedProcessor(proposal)
 	err := s.collector.ProcessBlock(proposal)
 	require.NoError(s.T(), err)
 	s.T().Run("add-valid-vote", func(t *testing.T) {
@@ -199,7 +199,7 @@ func (s *StateMachineTestSuite) TestProcessBlock_ProcessingOfCachedVotes() {
 	votes := 10
 	block := helper.MakeBlock(helper.WithBlockView(s.view))
 	proposal := helper.MakeProposal(helper.WithBlock(block))
-	processor := s.prepareMockedProcessor(block)
+	processor := s.prepareMockedProcessor(proposal)
 	for i := 0; i < votes; i++ {
 		vote := unittest.VoteForBlockFixture(block)
 		// eventually it has to be process by processor
@@ -219,7 +219,8 @@ func (s *StateMachineTestSuite) TestProcessBlock_ProcessingOfCachedVotes() {
 // are propagated up the call stack (potentially wrapped), but are not replaced.
 func (s *StateMachineTestSuite) Test_VoteProcessorErrorPropagation() {
 	block := helper.MakeBlock(helper.WithBlockView(s.view))
-	processor := s.prepareMockedProcessor(block)
+	proposal := helper.MakeProposal(helper.WithBlock(block))
+	processor := s.prepareMockedProcessor(proposal)
 
 	err := s.collector.ProcessBlock(helper.MakeProposal(helper.WithBlock(block)))
 	require.NoError(s.T(), err)
@@ -236,7 +237,8 @@ func (s *StateMachineTestSuite) Test_VoteProcessorErrorPropagation() {
 func (s *StateMachineTestSuite) RegisterVoteConsumer() {
 	votes := 10
 	block := helper.MakeBlock(helper.WithBlockView(s.view))
-	processor := s.prepareMockedProcessor(block)
+	proposal := helper.MakeProposal(helper.WithBlock(block))
+	processor := s.prepareMockedProcessor(proposal)
 	expectedVotes := make([]*model.Vote, 0)
 	for i := 0; i < votes; i++ {
 		vote := unittest.VoteForBlockFixture(block)
