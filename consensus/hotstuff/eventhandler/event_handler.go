@@ -318,25 +318,7 @@ func (e *EventHandler) startNewView() error {
 		return nil
 	}
 
-	// TODO(active-pacemaker): add processing of cached proposals
 	return nil
-
-	// when there are multiple block proposals, we will just pick the first one.
-	// forks is responsible for slashing double proposal behavior, and
-	// event handler is aware of double proposals, but picking any should work and
-	// won't hurt safety
-	//block := proposals[0]
-	//
-	//log.Debug().
-	//	Uint64("block_view", block.View).
-	//	Hex("block_id", block.BlockID[:]).
-	//	Uint64("parent_view", block.QC.View).
-	//	Hex("parent_id", block.QC.BlockID[:]).
-	//	Hex("signer", block.ProposerID[:]).
-	//	Msg("processing cached proposal from leader")
-	//
-	//
-	//return e.processBlockForCurrentView(block)
 }
 
 // processBlockForCurrentView processes the block for the current view.
