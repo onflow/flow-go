@@ -6,9 +6,9 @@ import (
 
 // DNSCache provides an in-memory cache for storing dns entries.
 type DNSCache interface {
-	// PutDomainIp adds the given ip domain into cache.
+	// PutIpDomain adds the given ip domain into cache.
 	// The int64 argument is the timestamp associated with the domain.
-	PutDomainIp(string, []net.IPAddr, int64) bool
+	PutIpDomain(string, []net.IPAddr, int64) bool
 
 	// PutTxtRecord adds the given txt record into the cache.
 	// The int64 argument is the timestamp associated with the domain.
@@ -22,6 +22,24 @@ type DNSCache interface {
 	// The boolean return value determines if record exists in the cache.
 	GetTxtRecord(string) (*TxtRecord, bool)
 
+	// LockIPDomain locks an ip address dns record if exists in the cache.
+	// The boolean return value determines whether attempt on locking was successful.
+	// A locking attempt is successful when the domain record exists in the cache and has not
+	// been locked before.
+	// Once a domain record gets locked the only way to unlock it is through removing it from the cache
+	// and re-inserting it. This is trivial, as a domain is locked when it is expired and a resolving attempt is ongoing
+	// for it. So the locking happens to avoid any other parallel resolving.
+	LockIPDomain(string) (bool, error)
+
+	// LockTxtRecord locks a txt address dns record if exists in the cache.
+	// The boolean return value determines whether attempt on locking was successful.
+	// A locking attempt is successful when the domain record exists in the cache and has not
+	// been locked before.
+	// Once a domain record gets locked the only way to unlock it is through removing it from the cache
+	// and re-inserting it. This is trivial, as a domain is locked when it is expired and a resolving attempt is ongoing
+	// for it. So the locking happens to avoid any other parallel resolving.
+	LockTxtRecord(string) (bool, error)
+
 	// RemoveIp removes an ip domain from cache.
 	RemoveIp(string) bool
 
@@ -34,6 +52,7 @@ type DNSCache interface {
 	Size() (uint, uint)
 }
 
+// TxtRecord represents the data model for maintaining a txt dns record in cache.
 type TxtRecord struct {
 	Txt       string
 	Record    []string
