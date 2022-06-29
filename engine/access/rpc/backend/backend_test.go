@@ -118,7 +118,7 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 	// setup the mocks
 	block := unittest.BlockHeaderFixture()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
-	suite.snapshot.On("Head").Return(&block, nil).Once()
+	suite.snapshot.On("Head").Return(block, nil).Once()
 
 	backend := New(
 		suite.state,
@@ -484,7 +484,7 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
 	block := unittest.BlockHeaderFixture()
-	suite.snapshot.On("Head").Return(&block, nil).Once()
+	suite.snapshot.On("Head").Return(block, nil).Once()
 
 	backend := New(
 		suite.state,
@@ -666,7 +666,7 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	head := unittest.BlockHeaderFixture()
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
-	suite.snapshot.On("Head").Return(&head, nil)
+	suite.snapshot.On("Head").Return(head, nil)
 
 	ctx := context.Background()
 	block := unittest.BlockFixture()
@@ -1548,7 +1548,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 
 	rootHeader := unittest.BlockHeaderFixture()
 	params := new(protocol.Params)
-	params.On("Root").Return(&rootHeader, nil)
+	params.On("Root").Return(rootHeader, nil)
 	state.On("Params").Return(params).Maybe()
 
 	// mock snapshot to return head backend
