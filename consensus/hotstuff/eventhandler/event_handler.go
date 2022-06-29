@@ -162,7 +162,7 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 	}
 
 	// store the block.
-	err = e.forks.AddBlock(block)
+	err = e.forks.AddProposal(proposal)
 	if err != nil {
 		return fmt.Errorf("cannot add block to fork (%x): %w", block.BlockID, err)
 	}
@@ -249,10 +249,7 @@ func (e *EventHandler) startNewView() error {
 
 		// as the leader of the current view,
 		// build the block proposal for the current view
-		qc, _, err := e.forks.MakeForkChoice(curView)
-		if err != nil {
-			return fmt.Errorf("can not make fork choice for view %v: %w", curView, err)
-		}
+		qc := e.paceMaker.NewestQC()
 
 		proposal, err := e.blockProducer.MakeBlockProposal(qc, curView)
 		if err != nil {
@@ -297,8 +294,8 @@ func (e *EventHandler) startNewView() error {
 	}
 
 	// as a replica of the current view, find and process the block for the current view
-	blocks := e.forks.GetBlocksForView(curView)
-	if len(blocks) == 0 {
+	proposals := e.forks.GetProposalsForView(curView)
+	if len(proposals) == 0 {
 		// if there is no block stored before for the current view, then exit and keep waiting
 		log.Debug().Msg("waiting for proposal from leader")
 		return nil
@@ -308,7 +305,7 @@ func (e *EventHandler) startNewView() error {
 	// forks is responsible for slashing double proposal behavior, and
 	// event handler is aware of double proposals, but picking any should work and
 	// won't hurt safety
-	block := blocks[0]
+	block := proposals[0].Block
 
 	log.Debug().
 		Uint64("block_view", block.View).
@@ -412,11 +409,6 @@ func (e *EventHandler) processQC(qc *flow.QuorumCertificate) error {
 		Uint64("block_view", qc.View).
 		Hex("block_id", qc.BlockID[:]).
 		Logger()
-
-	err := e.forks.AddQC(qc)
-	if err != nil {
-		return fmt.Errorf("cannot add QC to forks: %w", err)
-	}
 
 	newViewEvent, err := e.paceMaker.ProcessQC(qc)
 	if err != nil {

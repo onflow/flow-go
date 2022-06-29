@@ -1,9 +1,9 @@
-package test
+package forks
 
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/forks"
+	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -59,8 +59,8 @@ func (f *BlockBuilder) AddVersioned(qcView uint64, blockView uint64, qcversion i
 	})
 }
 
-func (f *BlockBuilder) Blocks() ([]*model.Block, error) {
-	blocks := make([]*model.Block, 0, len(f.blockViews))
+func (f *BlockBuilder) Blocks() ([]*model.Proposal, error) {
+	blocks := make([]*model.Proposal, 0, len(f.blockViews))
 
 	genesisBQ := makeGenesis()
 	genesisBV := &BlockView{
@@ -77,19 +77,27 @@ func (f *BlockBuilder) Blocks() ([]*model.Block, error) {
 			return nil, fmt.Errorf("test fail: no qc found for qc index: %v", bv.QCIndex())
 		}
 		payloadHash := makePayloadHash(bv.View, qc, bv.BlockVersion)
-		block := &model.Block{
-			View:        bv.View,
-			QC:          qc,
-			PayloadHash: payloadHash,
+		var lastViewTC *flow.TimeoutCertificate
+		if qc.View+1 != bv.View {
+			lastViewTC = helper.MakeTC(helper.WithTCView(bv.View - 1))
 		}
-		block.BlockID = makeBlockID(block)
+		proposal := &model.Proposal{
+			Block: &model.Block{
+				View:        bv.View,
+				QC:          qc,
+				PayloadHash: payloadHash,
+			},
+			LastViewTC: lastViewTC,
+			SigData:    nil,
+		}
+		proposal.Block.BlockID = makeBlockID(proposal.Block)
 
-		blocks = append(blocks, block)
+		blocks = append(blocks, proposal)
 
-		// generate QC for the new block
+		// generate QC for the new proposal
 		qcs[bv.BlockIndex()] = &flow.QuorumCertificate{
-			View:          block.View,
-			BlockID:       block.BlockID,
+			View:          proposal.Block.View,
+			BlockID:       proposal.Block.BlockID,
 			SignerIndices: nil,
 			SigData:       nil,
 		}
@@ -122,7 +130,7 @@ func makeBlockID(block *model.Block) flow.Identifier {
 	})
 }
 
-func makeGenesis() *forks.BlockQC {
+func makeGenesis() *BlockQC {
 	genesis := &model.Block{
 		View: 1,
 	}
@@ -132,7 +140,7 @@ func makeGenesis() *forks.BlockQC {
 		View:    1,
 		BlockID: genesis.BlockID,
 	}
-	genesisBQ := &forks.BlockQC{
+	genesisBQ := &BlockQC{
 		Block: genesis,
 		QC:    genesisQC,
 	}
