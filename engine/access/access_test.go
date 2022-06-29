@@ -145,12 +145,12 @@ func (suite *Suite) TestSendAndGetTransaction() {
 
 		refSnapshot.
 			On("Head").
-			Return(&referenceBlock, nil).
+			Return(referenceBlock, nil).
 			Twice()
 
 		suite.snapshot.
 			On("Head").
-			Return(&referenceBlock, nil).
+			Return(referenceBlock, nil).
 			Once()
 
 		expected := convert.TransactionToMessage(transaction.TransactionBody)
@@ -203,12 +203,12 @@ func (suite *Suite) TestSendExpiredTransaction() {
 
 		refSnapshot.
 			On("Head").
-			Return(&referenceBlock, nil).
+			Return(referenceBlock, nil).
 			Twice()
 
 		suite.snapshot.
 			On("Head").
-			Return(&latestBlock, nil).
+			Return(latestBlock, nil).
 			Once()
 
 		req := &accessproto.SendTransactionRequest{
@@ -236,7 +236,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 
 		// setup the state and snapshot mock expectations
 		suite.state.On("AtBlockID", referenceBlock.ID()).Return(suite.snapshot, nil)
-		suite.snapshot.On("Head").Return(&referenceBlock, nil)
+		suite.snapshot.On("Head").Return(referenceBlock, nil)
 
 		// create storage
 		metrics := metrics.NewNoopCollector()
