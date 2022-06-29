@@ -1,4 +1,4 @@
-package test
+package forks
 
 import (
 	"fmt"
@@ -8,8 +8,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/forks"
-	"github.com/onflow/flow-go/consensus/hotstuff/forks/finalizer"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	mockm "github.com/onflow/flow-go/module/mock"
@@ -363,7 +361,7 @@ func TestTolerableForksNotExtendsFromLockedBlock2(t *testing.T) {
 	require.Nil(t, err)
 
 	fin, notifier, _ := newFinalizer(t)
-	notifier.On("OnDoubleProposeDetected", blocks[5], blocks[4]).Return(nil)
+	notifier.On("OnDoubleProposeDetected", blocks[5].Block, blocks[4].Block).Return(nil)
 
 	err = addBlocksToFinalizer(fin, blocks)
 	require.Nil(t, err)
@@ -483,7 +481,7 @@ func TestDoubleProposal(t *testing.T) {
 	require.Nil(t, err)
 
 	fin, notifier, _ := newFinalizer(t)
-	notifier.On("OnDoubleProposeDetected", blocks[5], blocks[4]).Return(nil)
+	notifier.On("OnDoubleProposeDetected", blocks[5].Block, blocks[4].Block).Return(nil)
 
 	err = addBlocksToFinalizer(fin, blocks)
 	require.Nil(t, err)
@@ -509,7 +507,7 @@ func TestUntolerableForks(t *testing.T) {
 	require.Nil(t, err)
 
 	fin, notifier, _ := newFinalizer(t)
-	notifier.On("OnDoubleProposeDetected", blocks[3], blocks[2]).Return(nil)
+	notifier.On("OnDoubleProposeDetected", blocks[3].Block, blocks[2].Block).Return(nil)
 
 	err = addBlocksToFinalizer(fin, blocks)
 	require.NotNil(t, err)
@@ -552,14 +550,14 @@ func TestNotification(t *testing.T) {
 	notifier := &mocks.Consumer{}
 	// 5 blocks including the genesis are incorporated
 	notifier.On("OnBlockIncorporated", mock.Anything).Return(nil).Times(5)
-	notifier.On("OnFinalizedBlock", blocks[0]).Return(nil).Once()
+	notifier.On("OnFinalizedBlock", blocks[0].Block).Return(nil).Once()
 	finalizationCallback := &mockm.Finalizer{}
-	finalizationCallback.On("MakeFinal", blocks[0].BlockID).Return(nil).Once()
+	finalizationCallback.On("MakeFinal", blocks[0].Block.BlockID).Return(nil).Once()
 	finalizationCallback.On("MakeValid", mock.Anything).Return(nil)
 
 	genesisBQ := makeGenesis()
 
-	fin, err := finalizer.New(genesisBQ, finalizationCallback, notifier)
+	fin, err := New(genesisBQ, finalizationCallback, notifier)
 	require.NoError(t, err)
 
 	err = addBlocksToFinalizer(fin, blocks)
@@ -570,7 +568,7 @@ func TestNotification(t *testing.T) {
 
 // ========== internal functions ===============
 
-func newFinalizer(t *testing.T) (forks.Finalizer, *mocks.Consumer, *mockm.Finalizer) {
+func newFinalizer(t *testing.T) (*Forks, *mocks.Consumer, *mockm.Finalizer) {
 	notifier := &mocks.Consumer{}
 	notifier.On("OnBlockIncorporated", mock.Anything).Return(nil)
 	notifier.On("OnFinalizedBlock", mock.Anything).Return(nil)
@@ -580,17 +578,17 @@ func newFinalizer(t *testing.T) (forks.Finalizer, *mocks.Consumer, *mockm.Finali
 
 	genesisBQ := makeGenesis()
 
-	fin, err := finalizer.New(genesisBQ, finalizationCallback, notifier)
+	fin, err := New(genesisBQ, finalizationCallback, notifier)
 
 	require.Nil(t, err)
 	return fin, notifier, finalizationCallback
 }
 
-func addBlocksToFinalizer(fin forks.Finalizer, blocks []*model.Block) error {
-	for _, block := range blocks {
-		err := fin.AddBlock(block)
+func addBlocksToFinalizer(fin *Forks, proposals []*model.Proposal) error {
+	for _, proposal := range proposals {
+		err := fin.AddProposal(proposal)
 		if err != nil {
-			return fmt.Errorf("test case failed at adding block: %v: %w", block.View, err)
+			return fmt.Errorf("test case failed at adding proposal: %v: %w", proposal.Block.View, err)
 		}
 	}
 
@@ -598,13 +596,13 @@ func addBlocksToFinalizer(fin forks.Finalizer, blocks []*model.Block) error {
 }
 
 // check the view and QC's view of the locked block for the finalizer
-func assertTheLockedBlock(t *testing.T, fin forks.Finalizer, qc int, view int) {
+func assertTheLockedBlock(t *testing.T, fin *Forks, qc int, view int) {
 	assert.Equal(t, fin.LockedBlock().View, uint64(view), "locked block has wrong view")
 	assert.Equal(t, fin.LockedBlock().QC.View, uint64(qc), "locked block has wrong qc")
 }
 
 // check the view and QC's view of the finalized block for the finalizer
-func assertFinalizedBlock(t *testing.T, fin forks.Finalizer, qc int, view int) {
+func assertFinalizedBlock(t *testing.T, fin *Forks, qc int, view int) {
 	assert.Equal(t, fin.FinalizedBlock().View, uint64(view), "finalized block has wrong view")
 	assert.Equal(t, fin.FinalizedBlock().QC.View, uint64(qc), "fianlized block has wrong qc")
 }

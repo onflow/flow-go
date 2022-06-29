@@ -133,14 +133,6 @@ type Consumer interface {
 	// and must handle repetition of the same events (with some processing overhead).
 	OnQcIncorporated(*flow.QuorumCertificate)
 
-	// OnForkChoiceGenerated notifications are produced by ForkChoice whenever a fork choice is generated.
-	// The arguments specify the view (first argument) of the block which is to be built and the
-	// quorum certificate (second argument) that is supposed to be in the block.
-	// Prerequisites:
-	// Implementation must be concurrency safe; Non-blocking;
-	// and must handle repetition of the same events (with some processing overhead).
-	OnForkChoiceGenerated(uint64, *flow.QuorumCertificate)
-
 	// OnDoubleVotingDetected notifications are produced by the Vote Aggregation logic
 	// whenever a double voting (same voter voting for different blocks at the same view) was detected.
 	// Prerequisites:

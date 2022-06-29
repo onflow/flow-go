@@ -23,7 +23,7 @@ func Participant(
 ) error {
 	return Recover(log, finalized, pending, validator, func(proposal *model.Proposal) error {
 		// add it to forks
-		err := forks.AddBlock(proposal.Block)
+		err := forks.AddProposal(proposal)
 		if err != nil {
 			return fmt.Errorf("could not add block to forks: %w", err)
 		}
