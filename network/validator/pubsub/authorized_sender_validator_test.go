@@ -6,12 +6,10 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
-
-	"github.com/onflow/flow-go/model/messages"
-
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 

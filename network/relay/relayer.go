@@ -5,10 +5,9 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/onflow/flow-go/network/channels"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 )
 
 type Relayer struct {

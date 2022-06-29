@@ -4,10 +4,9 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 
-	"github.com/onflow/flow-go/network/channels"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/network/channels"
 )
 
 // RoleBasedFilter implements a subscription filter that filters subscriptions based on a node's role.
