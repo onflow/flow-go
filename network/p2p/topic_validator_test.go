@@ -36,8 +36,11 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 
 	sporkId := unittest.IdentifierFixture()
 
-	sn1, identity1 := nodeFixture(t, context.Background(), sporkId, "TestAuthorizedSenderValidator_Unauthorized", withRole(flow.RoleConsensus), withLogger(logger))
-	sn2, _ := nodeFixture(t, context.Background(), sporkId, "TestAuthorizedSenderValidator_Unauthorized", withRole(flow.RoleConsensus), withLogger(logger))
+	nodeFixtureCtx, nodeFixtureCtxCancel := context.WithCancel(context.Background())
+	defer nodeFixtureCtxCancel()
+
+	sn1, identity1 := nodeFixture(t, nodeFixtureCtx, sporkId, "TestAuthorizedSenderValidator_Unauthorized", withRole(flow.RoleConsensus), withLogger(logger))
+	sn2, _ := nodeFixture(t, nodeFixtureCtx, sporkId, "TestAuthorizedSenderValidator_Unauthorized", withRole(flow.RoleConsensus), withLogger(logger))
 
 	channel := channels.ConsensusCommittee
 	topic := channels.TopicFromChannel(channel, sporkId)
@@ -47,7 +50,7 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
-	// callback used by the topic validator to check if node is staked
+	// peer filter used by the topic validator to check if node is staked
 	isStaked := func(pid peer.ID) bool {
 		fid, err := translator.GetFlowID(pid)
 		if err != nil {
@@ -109,11 +112,12 @@ func TestTopicValidator_PublicChannel(t *testing.T) {
 	logger := zerolog.New(os.Stdout).Level(zerolog.WarnLevel).Hook(hook)
 
 	sporkId := unittest.IdentifierFixture()
-	identity1, privateKey1 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
-	sn1 := createNode(t, identity1.NodeID, privateKey1, sporkId, logger)
 
-	identity2, privateKey2 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
-	sn2 := createNode(t, identity2.NodeID, privateKey2, sporkId, zerolog.Nop())
+	nodeFixtureCtx, nodeFixtureCtxCancel := context.WithCancel(context.Background())
+	defer nodeFixtureCtxCancel()
+
+	sn1, _ := nodeFixture(t, nodeFixtureCtx, sporkId, "TestTopicValidator_PublicChannel", withRole(flow.RoleConsensus), withLogger(logger))
+	sn2, _ := nodeFixture(t, nodeFixtureCtx, sporkId, "TestTopicValidator_PublicChannel", withRole(flow.RoleConsensus), withLogger(logger))
 
 	// unauthenticated messages should not be dropped on public channels
 	channel := channels.PublicSyncCommittee
@@ -174,9 +178,12 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	})
 	logger := zerolog.New(os.Stdout).Level(zerolog.ErrorLevel).Hook(hook)
 
-	sn1, identity1 := nodeFixture(t, context.Background(), sporkId, "TestAuthorizedSenderValidator_InvalidMsg", withRole(flow.RoleConsensus))
-	sn2, identity2 := nodeFixture(t, context.Background(), sporkId, "TestAuthorizedSenderValidator_InvalidMsg", withRole(flow.RoleConsensus))
-	an1, identity3 := nodeFixture(t, context.Background(), sporkId, "TestAuthorizedSenderValidator_InvalidMsg", withRole(flow.RoleAccess))
+	nodeFixtureCtx, nodeFixtureCtxCancel := context.WithCancel(context.Background())
+	defer nodeFixtureCtxCancel()
+
+	sn1, identity1 := nodeFixture(t, nodeFixtureCtx, sporkId, "TestAuthorizedSenderValidator_InvalidMsg", withRole(flow.RoleConsensus))
+	sn2, identity2 := nodeFixture(t, nodeFixtureCtx, sporkId, "TestAuthorizedSenderValidator_InvalidMsg", withRole(flow.RoleConsensus))
+	an1, identity3 := nodeFixture(t, nodeFixtureCtx, sporkId, "TestAuthorizedSenderValidator_InvalidMsg", withRole(flow.RoleAccess))
 
 	channel := channels.ConsensusCommittee
 	topic := channels.TopicFromChannel(channel, sporkId)
@@ -270,8 +277,11 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
 
-	sn1, identity1 := nodeFixture(t, context.Background(), sporkId, "consensus_1", withRole(flow.RoleConsensus))
-	sn2, identity2 := nodeFixture(t, context.Background(), sporkId, "consensus_2", withRole(flow.RoleConsensus))
+	nodeFixtureCtx, nodeFixtureCtxCancel := context.WithCancel(context.Background())
+	defer nodeFixtureCtxCancel()
+
+	sn1, identity1 := nodeFixture(t, nodeFixtureCtx, sporkId, "consensus_1", withRole(flow.RoleConsensus))
+	sn2, identity2 := nodeFixture(t, nodeFixtureCtx, sporkId, "consensus_2", withRole(flow.RoleConsensus))
 
 	// try to publish BlockProposal on invalid SyncCommittee channel
 	channel := channels.SyncCommittee
@@ -341,9 +351,12 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
 
-	sn1, identity1 := nodeFixture(t, context.Background(), sporkId, "consensus_1", withRole(flow.RoleConsensus))
-	sn2, identity2 := nodeFixture(t, context.Background(), sporkId, "consensus_2", withRole(flow.RoleConsensus))
-	an1, identity3 := nodeFixture(t, context.Background(), sporkId, "access_1", withRole(flow.RoleAccess))
+	nodeFixtureCtx, nodeFixtureCtxCancel := context.WithCancel(context.Background())
+	defer nodeFixtureCtxCancel()
+
+	sn1, identity1 := nodeFixture(t, nodeFixtureCtx, sporkId, "consensus_1", withRole(flow.RoleConsensus))
+	sn2, identity2 := nodeFixture(t, nodeFixtureCtx, sporkId, "consensus_2", withRole(flow.RoleConsensus))
+	an1, identity3 := nodeFixture(t, nodeFixtureCtx, sporkId, "access_1", withRole(flow.RoleAccess))
 
 	channel := channels.ConsensusCommittee
 	topic := channels.TopicFromChannel(channel, sporkId)
@@ -434,9 +447,12 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
 
-	ln1, identity1 := nodeFixture(t, context.Background(), sporkId, "collection_1", withRole(flow.RoleCollection))
-	ln2, identity2 := nodeFixture(t, context.Background(), sporkId, "collection_2", withRole(flow.RoleCollection))
-	ln3, identity3 := nodeFixture(t, context.Background(), sporkId, "collection_3", withRole(flow.RoleCollection))
+	nodeFixtureCtx, nodeFixtureCtxCancel := context.WithCancel(context.Background())
+	defer nodeFixtureCtxCancel()
+
+	ln1, identity1 := nodeFixture(t, nodeFixtureCtx, sporkId, "collection_1", withRole(flow.RoleCollection))
+	ln2, identity2 := nodeFixture(t, nodeFixtureCtx, sporkId, "collection_2", withRole(flow.RoleCollection))
+	ln3, identity3 := nodeFixture(t, nodeFixtureCtx, sporkId, "collection_3", withRole(flow.RoleCollection))
 
 	channel := channels.SyncCluster(flow.Testnet)
 	topic := channels.TopicFromChannel(channel, sporkId)
