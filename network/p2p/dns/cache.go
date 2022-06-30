@@ -84,7 +84,7 @@ func (c *cache) resolveTXTCache(txt string) ([]string, bool, bool, bool) {
 	}
 	c.logger.Trace().
 		Str("txt", txt).
-		Str("address", fmt.Sprintf("%v", record.Record)).
+		Str("address", fmt.Sprintf("%v", record.Records)).
 		Int64("record_timestamp", record.Timestamp).
 		Int64("current_timestamp", currentTimeStamp).
 		Bool("record_locked", record.Locked).
@@ -92,11 +92,11 @@ func (c *cache) resolveTXTCache(txt string) ([]string, bool, bool, bool) {
 
 	if time.Duration(currentTimeStamp-record.Timestamp) > c.ttl {
 		// exists but expired
-		return record.Record, cacheEntryExists, !cacheEntryFresh, record.Locked
+		return record.Records, cacheEntryExists, !cacheEntryFresh, record.Locked
 	}
 
 	// exists and fresh
-	return record.Record, cacheEntryExists, cacheEntryFresh, record.Locked
+	return record.Records, cacheEntryExists, cacheEntryFresh, record.Locked
 }
 
 // updateIPCache updates the cache entry for the domain.
@@ -104,16 +104,20 @@ func (c *cache) updateIPCache(domain string, addr []net.IPAddr) {
 	c.Lock()
 	defer c.Unlock()
 
+	lg := c.logger.With().
+		Str("domain", domain).
+		Str("address", fmt.Sprintf("%v", addr)).Logger()
+
 	timestamp := runtimeNano()
-	removed := c.dCache.RemoveIp(domain)
-	added := c.dCache.PutIpDomain(domain, addr, runtimeNano())
+
+	err := c.dCache.UpdateIPDomain(domain, addr, runtimeNano())
+	if err != nil {
+		lg.Error().Err(err).Msg("could not update ip record")
+		return
+	}
 
 	ipSize, txtSize := c.dCache.Size()
-	c.logger.Trace().
-		Str("domain", domain).
-		Str("address", fmt.Sprintf("%v", addr)).
-		Bool("old_entry_removed", removed).
-		Bool("new_entry_added", added).
+	lg.Trace().
 		Int64("timestamp", timestamp).
 		Uint("ip_size", ipSize).
 		Uint("txt_size", txtSize).
@@ -125,16 +129,19 @@ func (c *cache) updateTXTCache(txt string, record []string) {
 	c.Lock()
 	defer c.Unlock()
 
+	lg := c.logger.With().
+		Str("txt", txt).
+		Strs("record", record).Logger()
+
 	timestamp := runtimeNano()
-	removed := c.dCache.RemoveTxt(txt)
-	added := c.dCache.PutTxtRecord(txt, record, runtimeNano())
+	err := c.dCache.UpdateTxtRecord(txt, record, runtimeNano())
+	if err != nil {
+		lg.Error().Err(err).Msg("could not update txt record")
+		return
+	}
 
 	ipSize, txtSize := c.dCache.Size()
-	c.logger.Trace().
-		Str("txt", txt).
-		Strs("record", record).
-		Bool("old_entry_removed", removed).
-		Bool("new_entry_added", added).
+	lg.Trace().
 		Int64("timestamp", timestamp).
 		Uint("ip_size", ipSize).
 		Uint("txt_size", txtSize).

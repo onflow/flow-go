@@ -60,7 +60,7 @@ func (d *DNSCache) PutTxtRecord(domain string, record []string, timestamp int64)
 	t := txtEntity{
 		TxtRecord: mempool.TxtRecord{
 			Txt:       domain,
-			Record:    record,
+			Records:   record,
 			Timestamp: timestamp,
 			Locked:    false,
 		},
@@ -160,9 +160,9 @@ func (d *DNSCache) LockIPDomain(domain string) (bool, error) {
 func (d *DNSCache) UpdateIPDomain(domain string, addresses []net.IPAddr, timestamp int64) error {
 	return d.ipCache.Run(func(backdata mempool.BackData) error {
 		id := domainToIdentifier(domain)
-		if _, removed := backdata.Rem(id); !removed {
-			return fmt.Errorf("ip record could not be removed from backdata")
-		}
+
+		// removes old entry if exists.
+		backdata.Rem(id)
 
 		ipRecord := ipEntity{
 			IpRecord: mempool.IpRecord{
@@ -187,14 +187,13 @@ func (d *DNSCache) UpdateTxtRecord(txt string, records []string, timestamp int64
 	return d.txtCache.Run(func(backdata mempool.BackData) error {
 		id := domainToIdentifier(txt)
 
-		if _, removed := backdata.Rem(id); !removed {
-			return fmt.Errorf("txt record could not be removed from backdata")
-		}
+		// removes old entry if exists.
+		backdata.Rem(id)
 
 		txtRecord := txtEntity{
 			TxtRecord: mempool.TxtRecord{
 				Txt:       txt,
-				Record:    records,
+				Records:   records,
 				Timestamp: timestamp,
 				Locked:    false, // by default a txt record is unlocked.
 			},

@@ -88,14 +88,10 @@ func TestDNSCache_Update(t *testing.T) {
 	// updated txt record
 	txtRecord, ok := cache.GetTxtRecord(txtDomain)
 	require.True(t, ok)
-	require.Equal(t, txtRecord.Record, updatedTxtFixture)
+	require.Equal(t, txtRecord.Records, updatedTxtFixture)
 	require.Equal(t, txtRecord.Txt, txtDomain)
 	require.False(t, txtRecord.Locked) // an update must unlock it.
 	require.Equal(t, txtRecord.Timestamp, updatedTxtTimestamp)
-
-	// updating non-existing records should fail.
-	require.Error(t, cache.UpdateTxtRecord("non-exiting", []string{network.TxtIPFixture()}, int64(0)))
-	require.Error(t, cache.UpdateIPDomain("non-exiting", []net.IPAddr{network.NetIPAddrFixture()}, int64(0)))
 }
 
 // TestDNSCache_Lock evaluates that locking a txt (or ip) record can be done successfully once, and
@@ -145,7 +141,7 @@ func TestDNSCache_Lock(t *testing.T) {
 	// locked txt record must be retrievable
 	txtRecord, ok := cache.GetTxtRecord(txtDomain)
 	require.True(t, ok)
-	require.Equal(t, txtRecord.Record, txtFixture)
+	require.Equal(t, txtRecord.Records, txtFixture)
 	require.Equal(t, txtRecord.Txt, txtDomain)
 	require.True(t, txtRecord.Locked)
 	require.Equal(t, txtRecord.Timestamp, int64(0))
@@ -205,7 +201,7 @@ func TestDNSCache_LRU(t *testing.T) {
 		// txt records
 		txtRecord, ok := cache.GetTxtRecord(txtFixtures[i].Txt)
 		require.True(t, ok)
-		require.Equal(t, txtFixtures[i].Records, txtRecord.Record)
+		require.Equal(t, txtFixtures[i].Records, txtRecord.Records)
 		require.Equal(t, txtFixtures[i].TimeStamp, txtRecord.Timestamp)
 	}
 }
@@ -294,7 +290,7 @@ func TestDNSCache_Rem(t *testing.T) {
 		// txt records
 		txtRecord, ok := cache.GetTxtRecord(txtFixtures[i].Txt)
 		require.True(t, ok)
-		require.Equal(t, txtFixtures[i].Records, txtRecord.Record)
+		require.Equal(t, txtFixtures[i].Records, txtRecord.Records)
 		require.Equal(t, txtFixtures[i].TimeStamp, txtRecord.Timestamp)
 	}
 }
@@ -332,7 +328,7 @@ func testRetrievalMatchCount(t *testing.T,
 		require.True(t, ok)
 
 		require.Equal(t, tc.TimeStamp, txtRecord.Timestamp)
-		require.Equal(t, tc.Records, txtRecord.Record)
+		require.Equal(t, tc.Records, txtRecord.Records)
 		actualCount++
 	}
 	require.Equal(t, count, actualCount)
