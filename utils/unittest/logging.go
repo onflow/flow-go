@@ -27,7 +27,7 @@ func Logger() zerolog.Logger {
 		writer = os.Stderr
 	}
 
-	return LoggerWithWriterAndLevel(writer, zerolog.TraceLevel)
+	return LoggerWithWriterAndLevel(writer, zerolog.DebugLevel)
 }
 
 func LoggerWithWriterAndLevel(writer io.Writer, level zerolog.Level) zerolog.Logger {
