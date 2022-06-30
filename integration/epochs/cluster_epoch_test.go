@@ -17,8 +17,6 @@ import (
 
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
 
-	emulatormod "github.com/onflow/flow-go/module/emulator"
-
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
@@ -28,6 +26,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/utils/unittest"
+
+	"github.com/onflow/flow-go/integration/utils"
 )
 
 // Suite tests the quorum certificate voting process against the
@@ -37,7 +37,7 @@ type Suite struct {
 
 	env            templates.Environment
 	blockchain     *emulator.Blockchain
-	emulatorClient *emulatormod.EmulatorClient
+	emulatorClient *utils.EmulatorClient
 
 	// Quorum Certificate deployed account and address
 	qcAddress    sdk.Address
