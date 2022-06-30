@@ -58,7 +58,6 @@ require (
 	github.com/onflow/flow v0.3.1
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220620142725-49b5accb2a84
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220513155751-c4c1f8d59f83
-	github.com/onflow/flow-emulator v0.33.2
 	github.com/onflow/flow-go-sdk v0.26.5-0.20220629191626-900f9f91bffc
 	github.com/onflow/flow-go/crypto v0.24.3
 	github.com/onflow/flow/protobuf/go/flow v0.3.1
@@ -100,6 +99,7 @@ require (
 	cloud.google.com/go/compute v1.3.0 // indirect
 	cloud.google.com/go/iam v0.3.0 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78 // indirect
+	github.com/HdrHistogram/hdrhistogram-go v1.1.2 // indirect
 	github.com/Microsoft/go-winio v0.4.16 // indirect
 	github.com/Microsoft/hcsshim v0.8.7 // indirect
 	github.com/ajstarks/svgo v0.0.0-20180226025133-644b8db467af // indirect
@@ -286,6 +286,7 @@ require (
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
 	golang.org/x/tools v0.1.10 // indirect
 	golang.org/x/xerrors v0.0.0-20220411194840-2f41105eb62f // indirect
+	gonum.org/v1/gonum v0.8.2 // indirect
 	gonum.org/v1/plot v0.0.0-20190515093506-e2840ee46a6b // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	gopkg.in/ini.v1 v1.66.2 // indirect
