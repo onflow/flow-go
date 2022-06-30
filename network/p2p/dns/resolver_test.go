@@ -200,6 +200,50 @@ func TestResolver_Expired_Invalidated(t *testing.T) {
 	require.Zero(t, txtSize)
 }
 
+// TestResolver_HappyPath evaluates once the request for a domain gets cached, the subsequent requests are going through the cache
+// instead of going through the underlying basic resolver, and hence through the network.
+func TestResolver_MaxChannel(t *testing.T) {
+	basicResolver := mocknetwork.BasicResolver{}
+	dnsCache := herocache.NewDNSCache(
+		DefaultCacheSize,
+		unittest.Logger(),
+		metrics.NewNoopCollector(),
+		metrics.NewNoopCollector(),
+	)
+
+	SetResolverConfig(1, 1, 2, 2)
+	resolver := NewResolver(
+		unittest.Logger(),
+		metrics.NewNoopCollector(),
+		dnsCache,
+		WithBasicResolver(&basicResolver),
+		WithTTL(1*time.Second))
+
+	cancelCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ctx, _ := irrecoverable.WithSignaler(cancelCtx)
+	resolver.Start(ctx)
+	unittest.RequireCloseBefore(t, resolver.Ready(), 100*time.Millisecond, "could not start dns resolver on time")
+
+	size := 10 // 10 text and 10 ip domains.
+	times := 3 // each domain is queried 5 times.
+	txtTestCases := testnetwork.TxtLookupFixture(size)
+	ipTestCases := testnetwork.IpLookupFixture(size)
+
+	// each domain is resolved only once through the underlying resolver, and then is cached for subsequent times.
+	resolverWG := mockBasicResolverForDomains(t, &basicResolver, ipTestCases, txtTestCases, happyPath, 2)
+	queryWG := syncThenAsyncQuery(t, times, resolver, txtTestCases, ipTestCases, happyPath)
+
+	time.Sleep(2 * time.Second) // waits enough for cache to get invalidated
+
+	queryWG = syncThenAsyncQuery(t, times, resolver, txtTestCases, ipTestCases, happyPath)
+
+	unittest.RequireReturnsBefore(t, resolverWG.Wait, 1*time.Second, "could not resolve all expected domains")
+	unittest.RequireReturnsBefore(t, queryWG.Wait, 1*time.Second, "could not perform all queries on time")
+	cancel()
+	unittest.RequireCloseBefore(t, resolver.Done(), 100*time.Millisecond, "could not stop dns resolver on time")
+}
+
 // syncThenAsyncQuery concurrently requests each test case for the specified number of times. The returned wait group will be released when
 // all queries have been resolved.
 func syncThenAsyncQuery(t *testing.T,

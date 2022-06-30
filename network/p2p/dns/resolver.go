@@ -2,6 +2,7 @@ package dns
 
 import (
 	"context"
+	"log"
 	"net"
 	"sync"
 	"time"
@@ -69,12 +70,19 @@ func WithTTL(ttl time.Duration) optFunc {
 	}
 }
 
-const (
+var (
 	numIPAddrLookupWorkers = 16
 	numTxtLookupWorkers    = 16
 	ipAddrLookupQueueSize  = 64
 	txtLookupQueueSize     = 64
 )
+
+func SetResolverConfig(ipWorker int, txtWorker int, ipQueue int, txtQueue int) {
+	numIPAddrLookupWorkers = ipWorker
+	numTxtLookupWorkers = txtWorker
+	ipAddrLookupQueueSize = ipQueue
+	txtLookupQueueSize = txtQueue
+}
 
 // NewResolver is the factory function for creating an instance of this resolver.
 func NewResolver(logger zerolog.Logger, collector module.ResolverMetrics, dnsCache mempool.DNSCache, opts ...optFunc) *Resolver {
@@ -174,7 +182,9 @@ func (r *Resolver) lookupIPAddr(ctx context.Context, domain string) ([]net.IPAdd
 		return r.lookupResolverForIPAddr(ctx, domain)
 	}
 
-	if !fresh && r.shouldResolveIP(domain) && !util.CheckClosed(r.cm.ShutdownSignal()) {
+	shouldResolve := r.shouldResolveIP(domain)
+	log.Printf("LOOKUP IP domain: %s fresh: %t should resolve: %t check closed: %t", domain, !fresh, shouldResolve, !util.CheckClosed(r.cm.ShutdownSignal()))
+	if !fresh && shouldResolve && !util.CheckClosed(r.cm.ShutdownSignal()) {
 		select {
 		case r.ipRequests <- &lookupIPRequest{domain}:
 		default:
@@ -227,6 +237,7 @@ func (r *Resolver) lookupTXT(ctx context.Context, txt string) ([]string, error) 
 		select {
 		case r.txtRequests <- &lookupTXTRequest{txt}:
 		default:
+			log.Printf("WARN DROPPING REQUEST")
 			r.logger.Warn().Str("txt", txt).Msg("TXT lookup request queue is full, dropping request")
 			r.collector.OnDNSLookupRequestDropped()
 		}
