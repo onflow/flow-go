@@ -16,7 +16,7 @@ import (
 type MsgAuthConfig struct {
 	// Name is the string representation of the message type.
 	Name string
-	// Type a func that returns a new instance of message type.
+	// Type is a func that returns a new instance of message type.
 	Type func() interface{}
 	// Config is the mapping of network channel to list of authorized flow roles.
 	Config map[channels.Channel]flow.RoleList
