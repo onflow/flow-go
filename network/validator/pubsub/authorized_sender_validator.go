@@ -39,7 +39,7 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel channels.Channel, get
 	return func(ctx context.Context, from peer.ID, msg interface{}) pubsub.ValidationResult {
 		identity, ok := getIdentity(from)
 		if !ok {
-			log.Warn().Err(ErrIdentityUnverified).Str("peer_id", from.String()).Msg("rejecting message")
+			log.Error().Err(ErrIdentityUnverified).Str("peer_id", from.String()).Msg("rejecting message")
 			return pubsub.ValidationReject
 		}
 
