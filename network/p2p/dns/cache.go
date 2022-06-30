@@ -3,7 +3,6 @@ package dns
 import (
 	"fmt"
 	"net"
-	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -20,10 +19,24 @@ const (
 	cacheEntryFresh   = true // TTL yet has not reached
 )
 
+// ipResolutionResult encapsulates result of resolving an ip address within dns cache.
+type ipResolutionResult struct {
+	addresses []net.IPAddr
+	exists    bool // determines whether the domain exists in the cache.
+	fresh     bool // determines whether the domain cache is fresh, i.e., TTL has not yet reached.
+	locked    bool // determines whether the domain record is currently being resolved by another thread.
+}
+
+// txtResolutionResult encapsulates result of resolving a txt record within dns cache.
+type txtResolutionResult struct {
+	records []string
+	exists  bool // determines whether the domain exists in the cache.
+	fresh   bool // determines whether the domain cache is fresh, i.e., TTL has not yet reached.
+	locked  bool // determines whether the domain record is currently being resolved by another thread.
+}
+
 // cache is a ttl-based cache for dns entries
 type cache struct {
-	sync.RWMutex
-
 	ttl    time.Duration // time-to-live for cache entry
 	dCache mempool.DNSCache
 	logger zerolog.Logger
@@ -38,18 +51,17 @@ func newCache(logger zerolog.Logger, dnsCache mempool.DNSCache) *cache {
 }
 
 // resolveIPCache resolves the domain through the cache if it is available.
-// First boolean variable determines whether the domain exists in the cache.
-// Second boolean variable determines whether the domain cache is fresh, i.e., TTL has not yet reached.
-// Third boolean variable determines whether the domain record is currently being resolved by another thread.
-func (c *cache) resolveIPCache(domain string) ([]net.IPAddr, bool, bool, bool) {
-	c.RLock()
-	defer c.RUnlock()
-
+func (c *cache) resolveIPCache(domain string) *ipResolutionResult {
 	record, ok := c.dCache.GetDomainIp(domain)
 	currentTimeStamp := runtimeNano()
 	if !ok {
 		// does not exist
-		return nil, !cacheEntryExists, !cacheEntryFresh, false
+		return &ipResolutionResult{
+			addresses: nil,
+			exists:    !cacheEntryExists,
+			fresh:     !cacheEntryFresh,
+			locked:    false,
+		}
 	}
 	c.logger.Trace().
 		Str("domain", domain).
@@ -60,27 +72,36 @@ func (c *cache) resolveIPCache(domain string) ([]net.IPAddr, bool, bool, bool) {
 		Msg("dns record retrieved")
 
 	if time.Duration(currentTimeStamp-record.Timestamp) > c.ttl {
-		// exists but expired
-		return record.Addresses, cacheEntryExists, !cacheEntryFresh, record.Locked
+		// exists but fresh
+		return &ipResolutionResult{
+			addresses: record.Addresses,
+			exists:    cacheEntryExists,
+			fresh:     !cacheEntryFresh,
+			locked:    record.Locked,
+		}
 	}
 
 	// exists and fresh
-	return record.Addresses, cacheEntryExists, cacheEntryFresh, record.Locked
+	return &ipResolutionResult{
+		addresses: record.Addresses,
+		exists:    cacheEntryExists,
+		fresh:     cacheEntryFresh,
+		locked:    record.Locked,
+	}
 }
 
 // resolveIPCache resolves the txt through the cache if it is available.
-// First boolean variable determines whether the txt record exists in the cache.
-// Second boolean variable determines whether the txt record cache is fresh, i.e., TTL has not yet reached.
-// Third boolean variable determines whether the domain record is currently being resolved by another thread.
-func (c *cache) resolveTXTCache(txt string) ([]string, bool, bool, bool) {
-	c.RLock()
-	defer c.RUnlock()
-
+func (c *cache) resolveTXTCache(txt string) *txtResolutionResult {
 	record, ok := c.dCache.GetTxtRecord(txt)
 	currentTimeStamp := runtimeNano()
 	if !ok {
 		// does not exist
-		return nil, !cacheEntryExists, !cacheEntryFresh, false
+		return &txtResolutionResult{
+			records: nil,
+			exists:  !cacheEntryExists,
+			fresh:   !cacheEntryFresh,
+			locked:  false,
+		}
 	}
 	c.logger.Trace().
 		Str("txt", txt).
@@ -91,19 +112,26 @@ func (c *cache) resolveTXTCache(txt string) ([]string, bool, bool, bool) {
 		Msg("dns record retrieved")
 
 	if time.Duration(currentTimeStamp-record.Timestamp) > c.ttl {
-		// exists but expired
-		return record.Records, cacheEntryExists, !cacheEntryFresh, record.Locked
+		// exists but fresh
+		return &txtResolutionResult{
+			records: record.Records,
+			exists:  cacheEntryExists,
+			fresh:   !cacheEntryFresh,
+			locked:  record.Locked,
+		}
 	}
 
 	// exists and fresh
-	return record.Records, cacheEntryExists, cacheEntryFresh, record.Locked
+	return &txtResolutionResult{
+		records: record.Records,
+		exists:  cacheEntryExists,
+		fresh:   cacheEntryFresh,
+		locked:  record.Locked,
+	}
 }
 
 // updateIPCache updates the cache entry for the domain.
 func (c *cache) updateIPCache(domain string, addr []net.IPAddr) {
-	c.Lock()
-	defer c.Unlock()
-
 	lg := c.logger.With().
 		Str("domain", domain).
 		Str("address", fmt.Sprintf("%v", addr)).Logger()
@@ -126,9 +154,6 @@ func (c *cache) updateIPCache(domain string, addr []net.IPAddr) {
 
 // updateTXTCache updates the cache entry for the txt record.
 func (c *cache) updateTXTCache(txt string, record []string) {
-	c.Lock()
-	defer c.Unlock()
-
 	lg := c.logger.With().
 		Str("txt", txt).
 		Strs("record", record).Logger()
@@ -146,15 +171,6 @@ func (c *cache) updateTXTCache(txt string, record []string) {
 		Uint("ip_size", ipSize).
 		Uint("txt_size", txtSize).
 		Msg("dns cache updated")
-}
-
-// invalidateIPCacheEntry atomically invalidates ip cache entry. Boolean variable determines whether invalidation
-// is successful.
-func (c *cache) invalidateIPCacheEntry(domain string) bool {
-	c.Lock()
-	defer c.Unlock()
-
-	return c.dCache.RemoveIp(domain)
 }
 
 // shouldResolveIP returns true if there is no other concurrent attempt ongoing for resolving the domain.
@@ -185,11 +201,14 @@ func (c *cache) shouldResolveTXT(txt string) bool {
 	return locked
 }
 
+// invalidateIPCacheEntry atomically invalidates ip cache entry. Boolean variable determines whether invalidation
+// is successful.
+func (c *cache) invalidateIPCacheEntry(domain string) bool {
+	return c.dCache.RemoveIp(domain)
+}
+
 // invalidateTXTCacheEntry atomically invalidates txt cache entry. Boolean variable determines whether invalidation
 // is successful.
 func (c *cache) invalidateTXTCacheEntry(txt string) bool {
-	c.Lock()
-	defer c.Unlock()
-
 	return c.dCache.RemoveTxt(txt)
 }

@@ -174,27 +174,27 @@ func (r *Resolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAdd
 // An expired domain on cache is still addressed through the cache, however, a request is fired up asynchronously
 // through the underlying basic resolver to resolve it from the network.
 func (r *Resolver) lookupIPAddr(ctx context.Context, domain string) ([]net.IPAddr, error) {
-	addr, exists, fresh, resolving := r.c.resolveIPCache(domain)
+	result := r.c.resolveIPCache(domain)
 
 	lg := r.logger.With().
 		Str("domain", domain).
-		Bool("cache_hit", exists).
-		Bool("cache_fresh", fresh).
-		Bool("resolving", resolving).Logger()
+		Bool("cache_hit", result.exists).
+		Bool("cache_fresh", result.fresh).
+		Bool("locked_for_resolving", result.locked).Logger()
 
 	lg.Trace().Msg("ip lookup request arrived")
 
-	if !exists {
+	if !result.exists {
 		r.collector.OnDNSCacheMiss()
 		return r.lookupResolverForIPAddr(ctx, domain)
 	}
 
-	if !fresh && resolving {
+	if !result.fresh && result.locked {
 		lg.Trace().Msg("ip expired, but a resolving is in progress, returning expired one for now")
-		return addr, nil
+		return result.addresses, nil
 	}
 
-	if !fresh && r.c.shouldResolveIP(domain) && !util.CheckClosed(r.cm.ShutdownSignal()) {
+	if !result.fresh && r.c.shouldResolveIP(domain) && !util.CheckClosed(r.cm.ShutdownSignal()) {
 		select {
 		case r.ipRequests <- &lookupIPRequest{domain}:
 			lg.Trace().Msg("ip lookup request queued for resolving")
@@ -205,7 +205,7 @@ func (r *Resolver) lookupIPAddr(ctx context.Context, domain string) ([]net.IPAdd
 	}
 
 	r.collector.OnDNSCacheHit()
-	return addr, nil
+	return result.addresses, nil
 }
 
 // lookupResolverForIPAddr queries the underlying resolver for the domain and updates the cache if query is successful.
@@ -237,27 +237,27 @@ func (r *Resolver) LookupTXT(ctx context.Context, txt string) ([]string, error) 
 
 // lookupIPAddr encapsulates the logic of resolving a txt through cache.
 func (r *Resolver) lookupTXT(ctx context.Context, txt string) ([]string, error) {
-	addr, exists, fresh, resolving := r.c.resolveTXTCache(txt)
+	result := r.c.resolveTXTCache(txt)
 
 	lg := r.logger.With().
 		Str("txt", txt).
-		Bool("cache_hit", exists).
-		Bool("cache_fresh", fresh).
-		Bool("resolving", resolving).Logger()
+		Bool("cache_hit", result.exists).
+		Bool("cache_fresh", result.fresh).
+		Bool("locked_for_resolving", result.locked).Logger()
 
 	lg.Trace().Msg("txt lookup request arrived")
 
-	if !exists {
+	if !result.exists {
 		r.collector.OnDNSCacheMiss()
 		return r.lookupResolverForTXTRecord(ctx, txt)
 	}
 
-	if !fresh && resolving {
+	if !result.fresh && result.locked {
 		lg.Trace().Msg("txt expired, but a resolving is in progress, returning expired one for now")
-		return addr, nil
+		return result.records, nil
 	}
 
-	if !fresh && r.c.shouldResolveTXT(txt) && !util.CheckClosed(r.cm.ShutdownSignal()) {
+	if !result.fresh && r.c.shouldResolveTXT(txt) && !util.CheckClosed(r.cm.ShutdownSignal()) {
 		select {
 		case r.txtRequests <- &lookupTXTRequest{txt}:
 			lg.Trace().Msg("ip lookup request queued for resolving")
@@ -268,7 +268,7 @@ func (r *Resolver) lookupTXT(ctx context.Context, txt string) ([]string, error) 
 	}
 
 	r.collector.OnDNSCacheHit()
-	return addr, nil
+	return result.records, nil
 }
 
 // lookupResolverForTXTRecord queries the underlying resolver for the domain and updates the cache if query is successful.
