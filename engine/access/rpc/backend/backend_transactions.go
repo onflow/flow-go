@@ -767,6 +767,11 @@ func (b *backendTransactions) getTransactionResultByIndexFromAnyExeNode(
 		}
 	}
 	defer logAnyError()
+
+	if len(execNodes) == 0 {
+		errs = multierror.Append(errs, errors.New("zero execution nodes provided"))
+	}
+
 	// try to execute the script on one of the execution nodes
 	for _, execNode := range execNodes {
 		resp, err := b.tryGetTransactionResultByIndex(ctx, execNode, req)
