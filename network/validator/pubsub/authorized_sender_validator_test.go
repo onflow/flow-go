@@ -107,6 +107,7 @@ func (s *TestIsAuthorizedSenderSuite) TestIsAuthorizedSender_ValidationFailure()
 			Payload: nil,
 		}}
 
+		// unknown message types are rejected
 		msgType, err := IsAuthorizedSender(identity, channels.ConsensusCommittee, m)
 		s.Require().ErrorIs(err, ErrUnknownMessageType)
 		s.Require().Equal("", msgType)
