@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/rand"
-	"runtime"
+	"runtime/metrics"
 	"strings"
 	"time"
 
@@ -151,10 +151,13 @@ func (e *Manager) ExecuteScript(
 
 	startedAt := time.Now()
 
+	sample := []metrics.Sample{metrics.Sample{Name: "/gc/heap/allocs:bytes"}}
+	metrics.Read(sample)
+
 	var memAllocBefore uint64
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
-	memAllocBefore = m.TotalAlloc
+	if sample[0].Value.Kind() != metrics.KindBad {
+		memAllocBefore = sample[0].Value.Uint64()
+	}
 
 	// allocate a random ID to be able to track this script when its done,
 	// scripts might not be unique so we use this extra tracker to follow their logs
@@ -232,8 +235,12 @@ func (e *Manager) ExecuteScript(
 		return nil, fmt.Errorf("failed to encode runtime value: %w", err)
 	}
 
-	runtime.ReadMemStats(&m)
-	memAllocAfter := m.TotalAlloc
+	metrics.Read(sample)
+
+	var memAllocAfter uint64
+	if sample[0].Value.Kind() != metrics.KindBad {
+		memAllocAfter = sample[0].Value.Uint64()
+	}
 
 	e.metrics.ExecutionScriptExecuted(time.Since(startedAt), script.GasUsed, memAllocAfter-memAllocBefore, script.MemoryEstimate)
 
