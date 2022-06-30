@@ -3,9 +3,10 @@ package mocks
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/invalid"
-	"github.com/stretchr/testify/require"
 )
 
 // EpochQuery implements protocol.EpochQuery for testing purposes.

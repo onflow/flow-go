@@ -338,7 +338,7 @@ func (c *Consensus) EpochEmergencyFallbackTriggered() {
 // This method must also be called on initialization, if emergency fallback mode
 // was triggered in the past.
 // No errors are expected during normal operation.
-func (c *Consensus) onEpochEmergencyFallbackTriggered() (err error) {
+func (c *Consensus) onEpochEmergencyFallbackTriggered() (retErr error) {
 
 	// we respond to epoch fallback being triggered at most once, therefore
 	// the core logic is wrapped in sync.Once
@@ -347,7 +347,7 @@ func (c *Consensus) onEpochEmergencyFallbackTriggered() (err error) {
 	c.handleEpochFallbackOnce.Do(func() {
 		currentEpochCounter, err := c.state.Final().Epochs().Current().Counter()
 		if err != nil {
-			err = fmt.Errorf("could not get current epoch counter: %w", err)
+			retErr = fmt.Errorf("could not get current epoch counter: %w", err)
 			return
 		}
 
@@ -356,7 +356,7 @@ func (c *Consensus) onEpochEmergencyFallbackTriggered() (err error) {
 		currentEpoch, ok := c.epochs[currentEpochCounter]
 		c.mu.RUnlock()
 		if !ok {
-			err = fmt.Errorf("epoch fallback: could not find current epoch (counter=%d) info", currentEpochCounter)
+			retErr = fmt.Errorf("epoch fallback: could not find current epoch (counter=%d) info", currentEpochCounter)
 			return
 		}
 		// sanity check: next epoch must never be committed, therefore must not be cached
@@ -364,13 +364,13 @@ func (c *Consensus) onEpochEmergencyFallbackTriggered() (err error) {
 		_, ok = c.epochs[currentEpochCounter+1]
 		c.mu.RUnlock()
 		if ok {
-			err = fmt.Errorf("epoch fallback: next epoch (counter=%d) is cached contrary to expectation", currentEpochCounter+1)
+			retErr = fmt.Errorf("epoch fallback: next epoch (counter=%d) is cached contrary to expectation", currentEpochCounter+1)
 			return
 		}
 
 		fallbackEpoch, err := newEmergencyFallbackEpoch(currentEpoch)
 		if err != nil {
-			err = fmt.Errorf("could not construct fallback epoch: %w", err)
+			retErr = fmt.Errorf("could not construct fallback epoch: %w", err)
 			return
 		}
 
