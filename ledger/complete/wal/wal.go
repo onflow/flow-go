@@ -1,6 +1,7 @@
 package wal
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"time"
@@ -19,33 +20,61 @@ import (
 const SegmentSize = 32 * 1024 * 1024
 
 type DiskWAL struct {
+	ctx    context.Context
+	cancel context.CancelFunc
+	done   chan struct{}
+
 	wal            *prometheusWAL.WAL
 	paused         bool
 	forestCapacity int
 	pathByteSize   int
 	log            zerolog.Logger
-	// disk size reading can be time consuming, so limit how often its read
-	diskUpdateLimiter *time.Ticker
-	metrics           module.WALMetrics
-	dir               string
+	metrics        module.WALMetrics
+	dir            string
 }
 
 // TODO use real logger and metrics, but that would require passing them to Trie storage
 func NewDiskWAL(logger zerolog.Logger, reg prometheus.Registerer, metrics module.WALMetrics, dir string, forestCapacity int, pathByteSize int, segmentSize int) (*DiskWAL, error) {
-	w, err := prometheusWAL.NewSize(logger, reg, dir, segmentSize, false)
+	wal, err := prometheusWAL.NewSize(logger, reg, dir, segmentSize, false)
 	if err != nil {
 		return nil, err
 	}
-	return &DiskWAL{
-		wal:               w,
-		paused:            false,
-		forestCapacity:    forestCapacity,
-		pathByteSize:      pathByteSize,
-		log:               logger,
-		diskUpdateLimiter: time.NewTicker(5 * time.Second),
-		metrics:           metrics,
-		dir:               dir,
-	}, nil
+
+	ctx, cancel := context.WithCancel(context.TODO())
+	w := &DiskWAL{
+		ctx:    ctx,
+		cancel: cancel,
+		done:   make(chan struct{}),
+
+		wal:            wal,
+		paused:         false,
+		forestCapacity: forestCapacity,
+		pathByteSize:   pathByteSize,
+		log:            logger,
+		metrics:        metrics,
+		dir:            dir,
+	}
+	go w.emitMetrics()
+	return w, nil
+}
+
+func (w *DiskWAL) emitMetrics() {
+	defer close(w.done)
+
+	t := time.NewTicker(10 * time.Second)
+	defer t.Stop()
+	for {
+		select {
+		case <-w.ctx.Done():
+			return
+		case <-t.C:
+			if diskSize, err := w.DiskSize(); err != nil {
+				w.log.Warn().Err(err).Msg("error while checking forest disk size")
+			} else {
+				w.metrics.DiskSize(diskSize)
+			}
+		}
+	}
 }
 
 func (w *DiskWAL) PauseRecord() {
@@ -64,20 +93,8 @@ func (w *DiskWAL) RecordUpdate(update *ledger.TrieUpdate) error {
 	bytes := EncodeUpdate(update)
 
 	_, err := w.wal.Log(bytes)
-
 	if err != nil {
 		return fmt.Errorf("error while recording update in LedgerWAL: %w", err)
-	}
-
-	select {
-	case <-w.diskUpdateLimiter.C:
-		diskSize, err := w.DiskSize()
-		if err != nil {
-			w.log.Warn().Err(err).Msg("error while checking forest disk size")
-		} else {
-			w.metrics.DiskSize(diskSize)
-		}
-	default: //don't block
 	}
 
 	return nil
@@ -322,13 +339,13 @@ func (w *DiskWAL) Ready() <-chan struct{} {
 // Done implements interface module.ReadyDoneAware
 // it closes all the open write-ahead log files.
 func (w *DiskWAL) Done() <-chan struct{} {
+	w.cancel()
+
 	err := w.wal.Close()
 	if err != nil {
 		w.log.Err(err).Msg("error while closing WAL")
 	}
-	done := make(chan struct{})
-	close(done)
-	return done
+	return w.done
 }
 
 type LedgerWAL interface {
