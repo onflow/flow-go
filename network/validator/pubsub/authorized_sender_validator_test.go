@@ -112,6 +112,7 @@ func (s *TestIsAuthorizedSenderSuite) TestIsAuthorizedSender_ValidationFailure()
 		s.Require().ErrorIs(err, ErrUnknownMessageType)
 		s.Require().Equal("", msgType)
 
+		// nil messages are rejected
 		msgType, err = IsAuthorizedSender(identity, channels.ConsensusCommittee, nil)
 		s.Require().ErrorIs(err, ErrUnknownMessageType)
 		s.Require().Equal("", msgType)
