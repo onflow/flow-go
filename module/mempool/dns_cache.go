@@ -24,20 +24,24 @@ type DNSCache interface {
 
 	// LockIPDomain locks an ip address dns record if exists in the cache.
 	// The boolean return value determines whether attempt on locking was successful.
+	//
 	// A locking attempt is successful when the domain record exists in the cache and has not
 	// been locked before.
-	// Once a domain record gets locked the only way to unlock it is through removing it from the cache
-	// and re-inserting it. This is trivial, as a domain is locked when it is expired and a resolving attempt is ongoing
-	// for it. So the locking happens to avoid any other parallel resolving.
+	// Once a domain record gets locked the only way to unlock it is through updating that record.
+	//
+	// The locking process is defined to record that a resolving attempt is ongoing for an expired domain.
+	// So the locking happens to avoid any other parallel resolving.
 	LockIPDomain(string) (bool, error)
 
 	// LockTxtRecord locks a txt address dns record if exists in the cache.
 	// The boolean return value determines whether attempt on locking was successful.
+	//
 	// A locking attempt is successful when the domain record exists in the cache and has not
 	// been locked before.
-	// Once a domain record gets locked the only way to unlock it is through removing it from the cache
-	// and re-inserting it. This is trivial, as a domain is locked when it is expired and a resolving attempt is ongoing
-	// for it. So the locking happens to avoid any other parallel resolving.
+	// Once a domain record gets locked the only way to unlock it is through updating that record.
+	//
+	// The locking process is defined to record that a resolving attempt is ongoing for an expired domain.
+	// So the locking happens to avoid any other parallel resolving.
 	LockTxtRecord(string) (bool, error)
 
 	// RemoveIp removes an ip domain from cache.
@@ -46,10 +50,10 @@ type DNSCache interface {
 	// RemoveTxt removes a txt record from cache.
 	RemoveTxt(string) bool
 
-	// UpdateTxtRecord atomically updates the dns record for the given txt domain with the new address and timestamp values.
+	// UpdateTxtRecord updates the dns record for the given txt domain with the new address and timestamp values.
 	UpdateTxtRecord(string, []string, int64) error
 
-	// UpdateIPDomain atomically updates the dns record for the given ip domain with the new address and timestamp values.
+	// UpdateIPDomain updates the dns record for the given ip domain with the new address and timestamp values.
 	UpdateIPDomain(string, []net.IPAddr, int64) error
 
 	// Size returns total domains maintained into this cache.
@@ -61,14 +65,21 @@ type DNSCache interface {
 // TxtRecord represents the data model for maintaining a txt dns record in cache.
 type TxtRecord struct {
 	Txt       string
-	Record    []string
+	Records   []string
 	Timestamp int64
-	Locked    bool
+
+	// A TxtRecord is locked when it is expired and a resolving is ongoing for it.
+	// A locked TxtRecord is unlocked by updating it through the cache.
+	Locked bool
 }
 
+// IpRecord represents the data model for maintaining an ip dns record in cache.
 type IpRecord struct {
 	Domain    string
 	Addresses []net.IPAddr
 	Timestamp int64
-	Locked    bool
+
+	// An IpRecord is locked when it is expired and a resolving is ongoing for it.
+	// A locked IpRecord is unlocked by updating it through the cache.
+	Locked bool
 }
