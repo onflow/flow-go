@@ -3,7 +3,7 @@ package computer
 import (
 	"context"
 	"fmt"
-	"runtime"
+	"runtime/metrics"
 	"sync"
 	"time"
 
@@ -321,10 +321,13 @@ func (e *blockComputer) executeTransaction(
 ) error {
 	startedAt := time.Now()
 
+	sample := []metrics.Sample{metrics.Sample{Name: "/gc/heap/allocs:bytes"}}
+	metrics.Read(sample)
+
 	var memAllocBefore uint64
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
-	memAllocBefore = m.TotalAlloc
+	if sample[0].Value.Kind() != metrics.KindBad {
+		memAllocBefore = sample[0].Value.Uint64()
+	}
 
 	txID := txBody.ID()
 
@@ -394,8 +397,12 @@ func (e *blockComputer) executeTransaction(
 	res.AddTransactionResult(&txResult)
 	res.AddComputationUsed(tx.ComputationUsed)
 
-	runtime.ReadMemStats(&m)
-	memAllocAfter := m.TotalAlloc
+	metrics.Read(sample)
+
+	var memAllocAfter uint64
+	if sample[0].Value.Kind() != metrics.KindBad {
+		memAllocAfter = sample[0].Value.Uint64()
+	}
 
 	lg := e.log.With().
 		Hex("tx_id", txResult.TransactionID[:]).
