@@ -46,6 +46,12 @@ type DNSCache interface {
 	// RemoveTxt removes a txt record from cache.
 	RemoveTxt(string) bool
 
+	// UpdateTxtRecord atomically updates the dns record for the given txt domain with the new address and timestamp values.
+	UpdateTxtRecord(string, []string, int64) error
+
+	// UpdateIPDomain atomically updates the dns record for the given ip domain with the new address and timestamp values.
+	UpdateIPDomain(string, []net.IPAddr, int64) error
+
 	// Size returns total domains maintained into this cache.
 	// The first returned value determines number of ip domains.
 	// The second returned value determines number of txt records.
