@@ -16,17 +16,17 @@ import (
 type MsgAuthConfig struct {
 	// Name is the string representation of the message type.
 	Name string
-	// Type a func that returns a new instance of message type.
+	// Type is a func that returns a new instance of message type.
 	Type func() interface{}
 	// Config is the mapping of network channel to list of authorized flow roles.
 	Config map[channels.Channel]flow.RoleList
 }
 
-// IsAuthorized checks if the specified role is authorized to send the message on channel and
-// asserts that the message is authorized to be sent on channel.
+// IsAuthorized checks if the specified role is authorized to send the message on the provided channel and
+// asserts that the message is authorized to be sent on the channel.
 // Expected error returns during normal operations:
-//  * ErrUnauthorizedMessageOnChannel: if channel does not exist in message config
-//  * ErrUnauthorizedRole: if list of authorized roles for message config does not include role
+//  * ErrUnauthorizedMessageOnChannel: the channel is not included in the message's list of authorized channels 
+//  * ErrUnauthorizedRole: the role is not included in the message's list of authorized roles for the provided channel
 func (m MsgAuthConfig) IsAuthorized(role flow.Role, channel channels.Channel) error {
 	authorizedRoles, ok := m.Config[channel]
 	if !ok {

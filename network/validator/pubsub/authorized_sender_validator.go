@@ -25,9 +25,10 @@ var (
 )
 
 // AuthorizedSenderValidator returns a MessageValidator that will check if the sender of a message is authorized to send the message.
-// The MessageValidator returned will use the getIdentity to get the flow identity for the sender, asserting that the sender is a staked node.
-// If the sender is an unstaked node the message is rejected. IsAuthorizedSender is used to perform further message validation. If validation
-// fails the message is rejected, if the validation error is an expected error slashing data is collected before the message is rejected.
+// The MessageValidator returned will use the getIdentity to get the flow identity for the sender, asserting that the sender is a staked node and not ejected. Otherwise, the message is rejected.
+// The message is also authorized by checking that the sender is allowed to send the message on the channel.
+// If validation fails the message is rejected, and if the validation error is an expected error, slashing data is also collected.
+// Authorization config is defined in message.MsgAuthConfig
 func AuthorizedSenderValidator(log zerolog.Logger, channel channels.Channel, getIdentity func(peer.ID) (*flow.Identity, bool)) MessageValidator {
 	log = log.With().
 		Str("component", "authorized_sender_validator").
@@ -73,12 +74,11 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel channels.Channel, get
 // 1. The node is not ejected.
 // 2. Using the message auth config
 //  A. The message is authorized to be sent on channel.
-//  B. The sender role is authorized to send message channel.
-//  C. The sender role is authorized to participate on channel.
+//  B. The sender role is authorized to send message on channel.
 // Expected error returns during normal operations:
-//  * ErrSenderEjected: if identity of sender is ejected
-//  * ErrUnknownMessageType: if retrieving the message auth config for msg fails
-//  * ErrUnauthorizedSender: if the message auth config validation for msg fails
+//  * ErrSenderEjected: if identity of sender is ejected from the network
+//  * ErrUnknownMessageType: if the message type does not have an auth config
+//  * ErrUnauthorizedSender: if the sender is not authorized to send message on the channel
 func IsAuthorizedSender(identity *flow.Identity, channel channels.Channel, msg interface{}) (string, error) {
 	if identity.Ejected {
 		return "", ErrSenderEjected

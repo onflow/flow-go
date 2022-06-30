@@ -108,15 +108,18 @@ func (s *TestIsAuthorizedSenderSuite) TestIsAuthorizedSender_ValidationFailure()
 			*messages.BlockProposal
 		}
 
+		// *validator.msg is not a known message type, but embeds *messages.BlockProposal which is
 		m := &msg{&messages.BlockProposal{
 			Header:  nil,
 			Payload: nil,
 		}}
 
+		// unknown message types are rejected
 		msgType, err := IsAuthorizedSender(identity, channels.ConsensusCommittee, m)
 		s.Require().ErrorIs(err, ErrUnknownMessageType)
 		s.Require().Equal("", msgType)
 
+		// nil messages are rejected
 		msgType, err = IsAuthorizedSender(identity, channels.ConsensusCommittee, nil)
 		s.Require().ErrorIs(err, ErrUnknownMessageType)
 		s.Require().Equal("", msgType)
@@ -151,10 +154,15 @@ func (s *TestIsAuthorizedSenderSuite) initializeAuthorizationTestCases() {
 // initializeInvalidMessageOnChannelTestCases initializes test cases for all possible combinations of invalid message types on channel.
 // NOTE: the role in the test case does not matter since ErrUnauthorizedMessageOnChannel will be returned before the role is checked.
 func (s *TestIsAuthorizedSenderSuite) initializeInvalidMessageOnChannelTestCases() {
+	// iterate all channels
 	for _, c := range message.AuthorizationConfigs {
 		for channel, authorizedRoles := range c.Config {
 			identity := unittest.IdentityFixture(unittest.WithRole(authorizedRoles[0]))
+
+			// iterate all message types
 			for _, config := range message.AuthorizationConfigs {
+
+				// include test if message type is not authorized on channel
 				_, ok := config.Config[channel]
 				if config.Name != c.Name && !ok {
 					tc := TestCase{
