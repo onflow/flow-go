@@ -68,6 +68,7 @@ func main() {
 		startupTimeString             string
 		startupTime                   time.Time
 
+		mainConsensusCommittee  *committees.Consensus
 		followerState           protocol.MutableState
 		ingestConf              = ingest.DefaultConfig()
 		rpcConf                 rpc.Config
@@ -247,6 +248,13 @@ func main() {
 
 			return validator, err
 		}).
+		Component("consensus committee", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			// initialize consensus committee's membership state
+			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
+			// Note: node.Me.NodeID() is not part of the consensus committee
+			mainConsensusCommittee, err = committees.NewConsensusCommittee(node.State, node.Me.NodeID())
+			return mainConsensusCommittee, err
+		}).
 		Component("follower engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
@@ -255,14 +263,6 @@ func main() {
 			// create a finalizer that will handling updating the protocol
 			// state when the follower detects newly finalized blocks
 			finalizer := confinalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState, node.Tracer)
-
-			// initialize consensus committee's membership state
-			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
-			// Note: node.Me.NodeID() is not part of the consensus committee
-			mainConsensusCommittee, err := committees.NewConsensusCommittee(node.State, node.Me.NodeID())
-			if err != nil {
-				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
-			}
 
 			packer := hotsignature.NewConsensusSigDataPacker(mainConsensusCommittee)
 			// initialize the verifier for the protocol consensus

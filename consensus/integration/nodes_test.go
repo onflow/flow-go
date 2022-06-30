@@ -137,6 +137,7 @@ type Node struct {
 	compliance *compliance.Engine
 	sync       *synceng.Engine
 	hot        module.HotStuff
+	committee  *committees.Consensus
 	aggregator hotstuff.VoteAggregator
 	state      *bprotocol.MutableState
 	headers    *storage.Headers
@@ -566,6 +567,7 @@ func createNode(
 	node.sync = sync
 	node.state = fullState
 	node.hot = hot
+	node.committee = committee
 	node.aggregator = hotstuffModules.Aggregator
 	node.headers = headersDB
 	node.net = net
