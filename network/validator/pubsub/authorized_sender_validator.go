@@ -73,8 +73,7 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel channels.Channel, get
 // 1. The node is not ejected.
 // 2. Using the message auth config
 //  A. The message is authorized to be sent on channel.
-//  B. The sender role is authorized to send message channel.
-//  C. The sender role is authorized to participate on channel.
+//  B. The sender role is authorized to send message on channel.
 // Expected error returns during normal operations:
 //  * ErrSenderEjected: if identity of sender is ejected
 //  * ErrUnknownMessageType: if retrieving the message auth config for msg fails
