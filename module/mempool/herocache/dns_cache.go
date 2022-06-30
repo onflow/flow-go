@@ -148,10 +148,10 @@ func (d *DNSCache) LockIPDomain(domain string) (bool, error) {
 		}
 
 		if added := backdata.Add(id, record); !added {
-			return fmt.Errorf("updated record could not be added to back data")
+			return fmt.Errorf("updated ip record could not be added to back data")
 		}
 
-		locked = true
+		locked = record.Locked
 		return nil
 	})
 
@@ -244,10 +244,10 @@ func (d *DNSCache) LockTxtRecord(txt string) (bool, error) {
 		}
 
 		if added := backdata.Add(id, record); !added {
-			return fmt.Errorf("updated record could not be added to back data")
+			return fmt.Errorf("updated txt record could not be added to back data")
 		}
 
-		locked = true
+		locked = record.Locked
 		return nil
 	})
 
