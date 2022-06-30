@@ -181,6 +181,7 @@ func (c *cache) shouldResolveIP(domain string) bool {
 	locked, err := c.dCache.LockIPDomain(domain)
 	if err != nil {
 		lg.Error().Err(err).Msg("cannot lock ip domain")
+		return false
 	}
 
 	lg.Trace().Bool("locked", locked).Msg("attempt on locking ip domain")
@@ -195,6 +196,7 @@ func (c *cache) shouldResolveTXT(txt string) bool {
 	locked, err := c.dCache.LockTxtRecord(txt)
 	if err != nil {
 		lg.Error().Err(err).Msg("cannot lock txt domain")
+		return false
 	}
 
 	lg.Trace().Bool("locked", locked).Msg("attempt on locking txt domain")
