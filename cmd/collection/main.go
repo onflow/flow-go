@@ -253,6 +253,7 @@ func main() {
 			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
 			// Note: node.Me.NodeID() is not part of the consensus committee
 			mainConsensusCommittee, err = committees.NewConsensusCommittee(node.State, node.Me.NodeID())
+			node.ProtocolEvents.AddConsumer(mainConsensusCommittee)
 			return mainConsensusCommittee, err
 		}).
 		Component("follower engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {

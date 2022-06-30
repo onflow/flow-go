@@ -316,6 +316,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			// Note: node.Me.NodeID() is not part of the consensus committee
 			var err error
 			committee, err = committees.NewConsensusCommittee(node.State, node.Me.NodeID())
+			node.ProtocolEvents.AddConsumer(committee)
 			return committee, err
 		}).
 		Component("follower engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
