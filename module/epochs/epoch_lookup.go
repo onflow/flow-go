@@ -31,6 +31,8 @@ func NewEpochLookup(state protocol.State) *EpochLookup {
 // -- these queries indicate a bug in the querier.
 //
 // TODO should return model.ErrViewForUnknownEpoch, move to non-Hotstuff dir
+// TODO should handle epoch fallback triggered protocol events
+// TODO doc should be updated, to match behaviour of EpochForViewWithFallback
 func (l *EpochLookup) EpochForView(view uint64) (epochCounter uint64, err error) {
 	epochs := l.state.Final().Epochs()
 	previous := epochs.Previous()
