@@ -52,7 +52,7 @@ func (s *Suite) SetupTest() {
 	var err error
 	s.blockchain, err = emulator.NewBlockchain(emulator.WithStorageLimitEnabled(false))
 	s.Require().NoError(err)
-	s.emulatorClient = emulatormod.NewEmulatorClient(s.blockchain)
+	s.emulatorClient = utils.NewEmulatorClient(s.blockchain)
 
 	// deploy epoch qc contract
 	s.deployEpochQCContract()
