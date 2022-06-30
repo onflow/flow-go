@@ -25,9 +25,10 @@ var (
 )
 
 // AuthorizedSenderValidator returns a MessageValidator that will check if the sender of a message is authorized to send the message.
-// The MessageValidator returned will use the getIdentity to get the flow identity for the sender, asserting that the sender is a staked node.
-// If the sender is an unstaked node the message is rejected. IsAuthorizedSender is used to perform further message validation. If validation
-// fails the message is rejected, if the validation error is an expected error slashing data is collected before the message is rejected.
+// The MessageValidator returned will use the getIdentity to get the flow identity for the sender, asserting that the sender is a staked node and not ejected. Otherwise, the message is rejected.
+// The message is also authorized by checking that the sender is allowed to send the message on the channel.
+// If validation fails the message is rejected, and if the validation error is an expected error, slashing data is also collected.
+// Authorization config is defined in message.MsgAuthConfig
 func AuthorizedSenderValidator(log zerolog.Logger, channel channels.Channel, getIdentity func(peer.ID) (*flow.Identity, bool)) MessageValidator {
 	log = log.With().
 		Str("component", "authorized_sender_validator").
