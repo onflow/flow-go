@@ -75,9 +75,9 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel channels.Channel, get
 //  A. The message is authorized to be sent on channel.
 //  B. The sender role is authorized to send message on channel.
 // Expected error returns during normal operations:
-//  * ErrSenderEjected: if identity of sender is ejected
-//  * ErrUnknownMessageType: if retrieving the message auth config for msg fails
-//  * ErrUnauthorizedSender: if the message auth config validation for msg fails
+//  * ErrSenderEjected: if identity of sender is ejected from the network
+//  * ErrUnknownMessageType: if the message type does not have an auth config
+//  * ErrUnauthorizedSender: if the sender is not authorized to send message on the channel
 func IsAuthorizedSender(identity *flow.Identity, channel channels.Channel, msg interface{}) (string, error) {
 	if identity.Ejected {
 		return "", ErrSenderEjected
