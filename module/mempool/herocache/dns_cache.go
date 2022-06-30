@@ -116,11 +116,13 @@ func (d *DNSCache) RemoveTxt(domain string) bool {
 
 // LockIPDomain locks an ip address dns record if exists in the cache.
 // The boolean return value determines whether attempt on locking was successful.
+//
 // A locking attempt is successful when the domain record exists in the cache and has not
 // been locked before.
-// Once a domain record gets locked the only way to unlock it is through removing it from the cache
-// and re-inserting it. This is trivial, as a domain is locked when it is expired and a resolving attempt is ongoing
-// for it. So the locking happens to avoid any other parallel resolving.
+// Once a domain record gets locked the only way to unlock it is through updating that record.
+//
+// The locking process is defined to record that a resolving attempt is ongoing for an expired domain.
+// So the locking happens to avoid any other parallel resolving
 func (d *DNSCache) LockIPDomain(domain string) (bool, error) {
 	locked := false
 	err := d.ipCache.Run(func(backdata mempool.BackData) error {
@@ -210,11 +212,13 @@ func (d *DNSCache) UpdateTxtRecord(txt string, records []string, timestamp int64
 
 // LockTxtRecord locks a txt address dns record if exists in the cache.
 // The boolean return value determines whether attempt on locking was successful.
+//
 // A locking attempt is successful when the domain record exists in the cache and has not
 // been locked before.
-// Once a domain record gets locked the only way to unlock it is through removing it from the cache
-// and re-inserting it. This is trivial, as a domain is locked when it is expired and a resolving attempt is ongoing
-// for it. So the locking happens to avoid any other parallel resolving.
+// Once a domain record gets locked the only way to unlock it is through updating that record.
+//
+// The locking process is defined to record that a resolving attempt is ongoing for an expired domain.
+// So the locking happens to avoid any other parallel resolving.
 func (d *DNSCache) LockTxtRecord(txt string) (bool, error) {
 	locked := false
 	err := d.txtCache.Run(func(backdata mempool.BackData) error {
