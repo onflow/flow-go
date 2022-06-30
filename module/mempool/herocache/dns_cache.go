@@ -158,7 +158,7 @@ func (d *DNSCache) LockIPDomain(domain string) (bool, error) {
 	return locked, err
 }
 
-// UpdateIPDomain atomically updates the dns record for the given ip domain with the new address and timestamp values.
+// UpdateIPDomain updates the dns record for the given ip domain with the new address and timestamp values.
 func (d *DNSCache) UpdateIPDomain(domain string, addresses []net.IPAddr, timestamp int64) error {
 	return d.ipCache.Run(func(backdata mempool.BackData) error {
 		id := domainToIdentifier(domain)
@@ -184,7 +184,7 @@ func (d *DNSCache) UpdateIPDomain(domain string, addresses []net.IPAddr, timesta
 	})
 }
 
-// UpdateTxtRecord atomically updates the dns record for the given txt domain with the new address and timestamp values.
+// UpdateTxtRecord updates the dns record for the given txt domain with the new address and timestamp values.
 func (d *DNSCache) UpdateTxtRecord(txt string, records []string, timestamp int64) error {
 	return d.txtCache.Run(func(backdata mempool.BackData) error {
 		id := domainToIdentifier(txt)
@@ -199,7 +199,7 @@ func (d *DNSCache) UpdateTxtRecord(txt string, records []string, timestamp int64
 				Timestamp: timestamp,
 				Locked:    false, // by default a txt record is unlocked.
 			},
-			id: flow.Identifier{},
+			id: id,
 		}
 
 		if added := backdata.Add(id, txtRecord); !added {
