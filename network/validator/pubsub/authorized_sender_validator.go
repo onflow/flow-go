@@ -45,6 +45,8 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel channels.Channel, get
 
 		msgType, err := IsAuthorizedSender(identity, channel, msg)
 		switch {
+		case err == nil:
+			return pubsub.ValidationAccept
 		case errors.Is(err, ErrUnauthorizedSender):
 			slashingViolationsConsumer.OnUnAuthorizedSenderError(identity, from.String(), msgType, err)
 			return pubsub.ValidationReject
@@ -54,7 +56,7 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel channels.Channel, get
 		case errors.Is(err, ErrSenderEjected):
 			slashingViolationsConsumer.OnSenderEjectedError(identity, from.String(), msgType, err)
 			return pubsub.ValidationReject
-		case err != nil:
+		default:
 			log.Error().
 				Err(err).
 				Str("peer_id", from.String()).
@@ -63,8 +65,6 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel channels.Channel, get
 				Str("message_type", msgType).
 				Msg("unexpected error during message validation")
 			return pubsub.ValidationReject
-		default:
-			return pubsub.ValidationAccept
 		}
 	}
 }
