@@ -80,9 +80,16 @@ func (s *TestIsAuthorizedSenderSuite) TestIsAuthorizedSender_UnAuthorizedMessage
 func (s *TestIsAuthorizedSenderSuite) TestIsAuthorizedSender_ClusterPrefixedChannels() {
 	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 	clusterID := flow.Localnet
+
+	// collection consensus cluster
 	msgType, err := IsAuthorizedSender(identity, channels.ConsensusCluster(clusterID), &messages.ClusterBlockResponse{})
 	s.Require().NoError(err)
 	s.Require().Equal(message.ClusterBlockResponse, msgType)
+
+	// collection sync cluster
+	msgType, err = IsAuthorizedSender(identity, channels.SyncCluster(clusterID), &messages.SyncRequest{})
+	s.Require().NoError(err)
+	s.Require().Equal(message.SyncRequest, msgType)
 }
 
 // TestIsAuthorizedSender_ValidationFailure checks that IsAuthorizedSender returns the expected validation error.
