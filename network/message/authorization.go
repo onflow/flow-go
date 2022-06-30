@@ -79,7 +79,7 @@ func initializeMessageAuthConfigsMap() {
 		},
 		Config: map[channels.Channel]flow.RoleList{
 			channels.SyncCommittee:     flow.Roles(),
-			channels.SyncClusterPrefix: flow.Roles(),
+			channels.SyncClusterPrefix: {flow.RoleCollection},
 		},
 	}
 	AuthorizationConfigs[SyncResponse] = MsgAuthConfig{
@@ -89,7 +89,7 @@ func initializeMessageAuthConfigsMap() {
 		},
 		Config: map[channels.Channel]flow.RoleList{
 			channels.SyncCommittee:     flow.Roles(),
-			channels.SyncClusterPrefix: flow.Roles(),
+			channels.SyncClusterPrefix: {flow.RoleCollection},
 		},
 	}
 	AuthorizationConfigs[RangeRequest] = MsgAuthConfig{
@@ -99,7 +99,7 @@ func initializeMessageAuthConfigsMap() {
 		},
 		Config: map[channels.Channel]flow.RoleList{
 			channels.SyncCommittee:     flow.Roles(),
-			channels.SyncClusterPrefix: flow.Roles(),
+			channels.SyncClusterPrefix: {flow.RoleCollection},
 		},
 	}
 	AuthorizationConfigs[BatchRequest] = MsgAuthConfig{
@@ -109,7 +109,7 @@ func initializeMessageAuthConfigsMap() {
 		},
 		Config: map[channels.Channel]flow.RoleList{
 			channels.SyncCommittee:     flow.Roles(),
-			channels.SyncClusterPrefix: flow.Roles(),
+			channels.SyncClusterPrefix: {flow.RoleCollection},
 		},
 	}
 	AuthorizationConfigs[BlockResponse] = MsgAuthConfig{
@@ -119,7 +119,7 @@ func initializeMessageAuthConfigsMap() {
 		},
 		Config: map[channels.Channel]flow.RoleList{
 			channels.SyncCommittee:     flow.Roles(),
-			channels.SyncClusterPrefix: flow.Roles(),
+			channels.SyncClusterPrefix: {flow.RoleCollection},
 		},
 	}
 
@@ -248,10 +248,10 @@ func initializeMessageAuthConfigsMap() {
 			return new(messages.EntityRequest)
 		},
 		Config: map[channels.Channel]flow.RoleList{
-			channels.RequestChunks:            {flow.RoleAccess, flow.RoleConsensus, flow.RoleCollection},
+			channels.RequestChunks:            {flow.RoleConsensus, flow.RoleCollection},
+			channels.RequestApprovalsByChunk:  {flow.RoleConsensus, flow.RoleCollection},
+			channels.RequestReceiptsByBlockID: {flow.RoleConsensus, flow.RoleCollection},
 			channels.RequestCollections:       {flow.RoleAccess, flow.RoleConsensus, flow.RoleCollection},
-			channels.RequestApprovalsByChunk:  {flow.RoleAccess, flow.RoleConsensus, flow.RoleCollection},
-			channels.RequestReceiptsByBlockID: {flow.RoleAccess, flow.RoleConsensus, flow.RoleCollection},
 		},
 	}
 	AuthorizationConfigs[EntityResponse] = MsgAuthConfig{
