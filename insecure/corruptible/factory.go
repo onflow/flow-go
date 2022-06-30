@@ -239,11 +239,7 @@ func (c *ConduitFactory) processAttackerMessage(msg *insecure.Message) error {
 		return fmt.Errorf("could not convert target ids from byte to identifiers: %w", err)
 	}
 
-	lg = lg.With().
-		Str("target_ids", fmt.Sprintf("%v", targetIds)).
-		Uint32("targets_num", msg.TargetNum).
-		Logger()
-
+	lg = lg.With().Str("target_ids", fmt.Sprintf("%v", msg.TargetIDs)).Logger()
 	err = c.sendOnNetwork(event, channels.Channel(msg.ChannelID), msg.Protocol, uint(msg.TargetNum), targetIds...)
 
 	if err != nil {
