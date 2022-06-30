@@ -89,16 +89,162 @@ func (suite *ConsensusSuite) CreateAndStartCommittee() {
 	suite.cancel = cancel
 }
 
+// CommitEpoch adds the epoch to the protocol state and mimics the protocol state
+// behaviour when committing an epoch, by sending the protocol event to the committee.
 func (suite *ConsensusSuite) CommitEpoch(epoch protocol.Epoch) {
 	firstBlockOfCommittedPhase := unittest.BlockHeaderFixture()
 	suite.state.On("AtBlockID", firstBlockOfCommittedPhase.ID()).Return(suite.snapshot)
 	suite.epochs.Add(epoch)
 	suite.committee.EpochCommittedPhaseStarted(1, &firstBlockOfCommittedPhase)
+
+	// get the first view, to test when the epoch has been processed
+	firstView, err := epoch.FirstView()
+	require.NoError(suite.T(), err)
+
 	// wait for the protocol event to be processed (async)
 	assert.Eventually(suite.T(), func() bool {
-		_, err := suite.committee.IdentityByEpoch(randUint64(101, 200), unittest.IdentifierFixture())
+		_, err := suite.committee.IdentityByEpoch(firstView, unittest.IdentifierFixture())
 		return !errors.Is(err, model.ErrViewForUnknownEpoch)
 	}, time.Second, time.Millisecond)
+}
+
+// AssertStoredEpochCounterRange asserts that the cached epochs are for exactly
+// the given contiguous, inclusive counter range.
+// Eg. for the input (2,4), the committee must have epochs cached with counters 2,3,4
+func (suite *ConsensusSuite) AssertStoredEpochCounterRange(from, to uint64) {
+	set := make(map[uint64]struct{})
+	for i := from; i <= to; i++ {
+		set[i] = struct{}{}
+	}
+
+	suite.committee.mu.RLock()
+	defer suite.committee.mu.RUnlock()
+	for epoch := range suite.committee.epochs {
+		delete(set, epoch)
+	}
+
+	if !assert.Len(suite.T(), set, 0) {
+		suite.T().Logf("%v should be empty, but isn't; expected epoch range [%d,%d]", set, from, to)
+	}
+}
+
+// TestConstruction_CurrentEpoch tests construction with only a current epoch.
+// Only the current epoch should be cached after construction.
+func (suite *ConsensusSuite) TestConstruction_CurrentEpoch() {
+	curEpoch := newMockEpoch(suite.currentEpochCounter, unittest.IdentityListFixture(10), 101, 200, unittest.SeedFixture(32), true)
+	suite.epochs.Add(curEpoch)
+
+	suite.CreateAndStartCommittee()
+	suite.Assert().Len(suite.committee.epochs, 1)
+	suite.AssertStoredEpochCounterRange(suite.currentEpochCounter, suite.currentEpochCounter)
+}
+
+// TestConstruction_PreviousEpoch tests construction with a previous epoch.
+// Both current and previous epoch should be cached after construction.
+func (suite *ConsensusSuite) TestConstruction_PreviousEpoch() {
+	prevEpoch := newMockEpoch(suite.currentEpochCounter-1, unittest.IdentityListFixture(10), 1, 100, unittest.SeedFixture(32), true)
+	curEpoch := newMockEpoch(suite.currentEpochCounter, unittest.IdentityListFixture(10), 101, 200, unittest.SeedFixture(32), true)
+	suite.epochs.Add(prevEpoch)
+	suite.epochs.Add(curEpoch)
+
+	suite.CreateAndStartCommittee()
+	suite.Assert().Len(suite.committee.epochs, 2)
+	suite.AssertStoredEpochCounterRange(suite.currentEpochCounter-1, suite.currentEpochCounter)
+}
+
+// TestConstruction_UncommittedNextEpoch tests construction with an uncommitted next epoch.
+// Only the current epoch should be cached after construction.
+func (suite *ConsensusSuite) TestConstruction_UncommittedNextEpoch() {
+	curEpoch := newMockEpoch(suite.currentEpochCounter, unittest.IdentityListFixture(10), 101, 200, unittest.SeedFixture(32), true)
+	nextEpoch := newMockEpoch(suite.currentEpochCounter+1, unittest.IdentityListFixture(10), 201, 300, unittest.SeedFixture(32), false)
+	suite.epochs.Add(curEpoch)
+	suite.epochs.Add(nextEpoch)
+
+	suite.CreateAndStartCommittee()
+	suite.Assert().Len(suite.committee.epochs, 1)
+	suite.AssertStoredEpochCounterRange(suite.currentEpochCounter, suite.currentEpochCounter)
+}
+
+// TestConstruction_CommittedNextEpoch tests construction with a committed next epoch.
+// Both current and next epochs should be cached after construction.
+func (suite *ConsensusSuite) TestConstruction_CommittedNextEpoch() {
+	curEpoch := newMockEpoch(suite.currentEpochCounter, unittest.IdentityListFixture(10), 101, 200, unittest.SeedFixture(32), true)
+	nextEpoch := newMockEpoch(suite.currentEpochCounter+1, unittest.IdentityListFixture(10), 201, 300, unittest.SeedFixture(32), true)
+	suite.epochs.Add(curEpoch)
+	suite.epochs.Add(nextEpoch)
+	suite.phase = flow.EpochPhaseCommitted
+
+	suite.CreateAndStartCommittee()
+	suite.Assert().Len(suite.committee.epochs, 2)
+	suite.AssertStoredEpochCounterRange(suite.currentEpochCounter, suite.currentEpochCounter+1)
+}
+
+// TestConstruction_EpochFallbackTriggered tests construction when EECC has been triggered.
+// Both current and the injected fallback epoch should be cached after construction.
+func (suite *ConsensusSuite) TestConstruction_EpochFallbackTriggered() {
+	curEpoch := newMockEpoch(suite.currentEpochCounter, unittest.IdentityListFixture(10), 101, 200, unittest.SeedFixture(32), true)
+	suite.epochs.Add(curEpoch)
+	suite.epochFallbackTriggered = true
+
+	suite.CreateAndStartCommittee()
+	suite.Assert().Len(suite.committee.epochs, 2)
+	suite.AssertStoredEpochCounterRange(suite.currentEpochCounter, suite.currentEpochCounter+1)
+}
+
+func (suite *ConsensusSuite) TestProtocolEvents_CommittedEpoch() {
+	curEpoch := newMockEpoch(suite.currentEpochCounter, unittest.IdentityListFixture(10), 101, 200, unittest.SeedFixture(32), true)
+	suite.epochs.Add(curEpoch)
+
+	suite.CreateAndStartCommittee()
+
+	nextEpoch := newMockEpoch(suite.currentEpochCounter+1, unittest.IdentityListFixture(10), 201, 300, unittest.SeedFixture(32), true)
+
+	firstBlockOfCommittedPhase := unittest.BlockHeaderFixture()
+	suite.state.On("AtBlockID", firstBlockOfCommittedPhase.ID()).Return(suite.snapshot)
+	suite.epochs.Add(nextEpoch)
+	suite.committee.EpochCommittedPhaseStarted(suite.currentEpochCounter, &firstBlockOfCommittedPhase)
+	// wait for the protocol event to be processed (async)
+	assert.Eventually(suite.T(), func() bool {
+		_, err := suite.committee.IdentityByEpoch(randUint64(201, 300), unittest.IdentifierFixture())
+		return !errors.Is(err, model.ErrViewForUnknownEpoch)
+	}, time.Second, time.Millisecond)
+
+	suite.Assert().Len(suite.committee.epochs, 2)
+	suite.AssertStoredEpochCounterRange(suite.currentEpochCounter, suite.currentEpochCounter+1)
+
+	// should handle multiple deliveries of the protocol event
+	suite.committee.EpochCommittedPhaseStarted(suite.currentEpochCounter, &firstBlockOfCommittedPhase)
+	suite.committee.EpochCommittedPhaseStarted(suite.currentEpochCounter, &firstBlockOfCommittedPhase)
+	suite.committee.EpochCommittedPhaseStarted(suite.currentEpochCounter, &firstBlockOfCommittedPhase)
+
+	suite.Assert().Len(suite.committee.epochs, 2)
+	suite.AssertStoredEpochCounterRange(suite.currentEpochCounter, suite.currentEpochCounter+1)
+
+}
+
+func (suite *ConsensusSuite) TestProtocolEvents_EpochFallback() {
+	curEpoch := newMockEpoch(suite.currentEpochCounter, unittest.IdentityListFixture(10), 101, 200, unittest.SeedFixture(32), true)
+	suite.epochs.Add(curEpoch)
+
+	suite.CreateAndStartCommittee()
+
+	suite.committee.EpochEmergencyFallbackTriggered()
+	// wait for the protocol event to be processed (async)
+	assert.Eventually(suite.T(), func() bool {
+		_, err := suite.committee.IdentityByEpoch(randUint64(201, 10_000), unittest.IdentifierFixture())
+		return !errors.Is(err, model.ErrViewForUnknownEpoch)
+	}, time.Second, time.Millisecond)
+
+	suite.Assert().Len(suite.committee.epochs, 2)
+	suite.AssertStoredEpochCounterRange(suite.currentEpochCounter, suite.currentEpochCounter+1)
+
+	// should handle multiple deliveries of the protocol event
+	suite.committee.EpochEmergencyFallbackTriggered()
+	suite.committee.EpochEmergencyFallbackTriggered()
+	suite.committee.EpochEmergencyFallbackTriggered()
+
+	suite.Assert().Len(suite.committee.epochs, 2)
+	suite.AssertStoredEpochCounterRange(suite.currentEpochCounter, suite.currentEpochCounter+1)
 }
 
 // TestIdentitiesByBlock tests retrieving committee members by block.
@@ -115,13 +261,7 @@ func (suite *ConsensusSuite) TestIdentitiesByBlock() {
 	blockID := unittest.IdentifierFixture()
 
 	// create a mock epoch for leader selection setup in constructor
-	currEpoch := newMockEpoch(
-		1,
-		unittest.IdentityListFixture(10), // static initial identities should not be used
-		1,
-		100,
-		unittest.SeedFixture(seed.RandomSourceLength),
-	)
+	currEpoch := newMockEpoch(1, unittest.IdentityListFixture(10), 1, 100, unittest.SeedFixture(seed.RandomSourceLength), true)
 	suite.epochs.Add(currEpoch)
 
 	suite.state.On("AtBlockID", blockID).Return(suite.snapshot)
@@ -183,21 +323,9 @@ func (suite *ConsensusSuite) TestIdentitiesByEpoch() {
 	epoch2Identities := flow.IdentityList{epoch2Identity}
 
 	// create a mock epoch for leader selection setup in constructor
-	epoch1 := newMockEpoch(
-		suite.currentEpochCounter,
-		epoch1Identities,
-		1,
-		100,
-		unittest.SeedFixture(seed.RandomSourceLength),
-	)
+	epoch1 := newMockEpoch(suite.currentEpochCounter, epoch1Identities, 1, 100, unittest.SeedFixture(seed.RandomSourceLength), true)
 	// initially epoch 2 is not committed
-	epoch2 := newMockEpoch(
-		suite.currentEpochCounter+1,
-		epoch2Identities,
-		101,
-		200,
-		unittest.SeedFixture(seed.RandomSourceLength),
-	)
+	epoch2 := newMockEpoch(suite.currentEpochCounter+1, epoch2Identities, 101, 200, unittest.SeedFixture(seed.RandomSourceLength), true)
 	suite.epochs.Add(epoch1)
 
 	suite.CreateAndStartCommittee()
@@ -285,20 +413,8 @@ func (suite *ConsensusSuite) TestThresholds() {
 
 	identities := unittest.IdentityListFixture(10)
 
-	prevEpoch := newMockEpoch(
-		suite.currentEpochCounter-1,
-		identities.Map(mapfunc.WithWeight(100)), // total weight = 1000
-		1,
-		100,
-		unittest.SeedFixture(seed.RandomSourceLength),
-	)
-	currEpoch := newMockEpoch(
-		suite.currentEpochCounter,
-		identities.Map(mapfunc.WithWeight(200)), // total weight = 2000
-		101,
-		200,
-		unittest.SeedFixture(32),
-	)
+	prevEpoch := newMockEpoch(suite.currentEpochCounter-1, identities.Map(mapfunc.WithWeight(100)), 1, 100, unittest.SeedFixture(seed.RandomSourceLength), true)
+	currEpoch := newMockEpoch(suite.currentEpochCounter, identities.Map(mapfunc.WithWeight(200)), 101, 200, unittest.SeedFixture(32), true)
 	suite.epochs.Add(prevEpoch)
 	suite.epochs.Add(currEpoch)
 
@@ -335,13 +451,7 @@ func (suite *ConsensusSuite) TestThresholds() {
 	})
 
 	// now, add a valid next epoch
-	nextEpoch := newMockEpoch(
-		suite.currentEpochCounter+1,
-		identities.Map(mapfunc.WithWeight(300)), // total weight 3000
-		201,
-		300,
-		unittest.SeedFixture(seed.RandomSourceLength),
-	)
+	nextEpoch := newMockEpoch(suite.currentEpochCounter+1, identities.Map(mapfunc.WithWeight(300)), 201, 300, unittest.SeedFixture(seed.RandomSourceLength), true)
 	suite.CommitEpoch(nextEpoch)
 
 	t.Run("next epoch ready", func(t *testing.T) {
@@ -392,20 +502,8 @@ func (suite *ConsensusSuite) TestLeaderForView() {
 
 	identities := unittest.IdentityListFixture(10)
 
-	prevEpoch := newMockEpoch(
-		suite.currentEpochCounter-1,
-		identities,
-		1,
-		100,
-		unittest.SeedFixture(seed.RandomSourceLength),
-	)
-	currEpoch := newMockEpoch(
-		suite.currentEpochCounter,
-		identities,
-		101,
-		200,
-		unittest.SeedFixture(32),
-	)
+	prevEpoch := newMockEpoch(suite.currentEpochCounter-1, identities, 1, 100, unittest.SeedFixture(seed.RandomSourceLength), true)
+	currEpoch := newMockEpoch(suite.currentEpochCounter, identities, 101, 200, unittest.SeedFixture(32), true)
 	suite.epochs.Add(currEpoch)
 	suite.epochs.Add(prevEpoch)
 
@@ -437,13 +535,7 @@ func (suite *ConsensusSuite) TestLeaderForView() {
 	})
 
 	// now, add a valid next epoch
-	nextEpoch := newMockEpoch(
-		suite.currentEpochCounter+1,
-		identities,
-		201,
-		300,
-		unittest.SeedFixture(seed.RandomSourceLength),
-	)
+	nextEpoch := newMockEpoch(suite.currentEpochCounter+1, identities, 201, 300, unittest.SeedFixture(seed.RandomSourceLength), true)
 	suite.CommitEpoch(nextEpoch)
 
 	t.Run("next epoch ready", func(t *testing.T) {
@@ -490,7 +582,7 @@ func TestRemoveOldEpochs(t *testing.T) {
 	currentEpochCounter := firstEpochCounter
 	epochFinalView := uint64(100)
 
-	epoch1 := newMockEpoch(currentEpochCounter, identities, 1, epochFinalView, unittest.SeedFixture(seed.RandomSourceLength))
+	epoch1 := newMockEpoch(currentEpochCounter, identities, 1, epochFinalView, unittest.SeedFixture(seed.RandomSourceLength), true)
 
 	// create mocks
 	state := new(protocolmock.State)
@@ -527,7 +619,7 @@ func TestRemoveOldEpochs(t *testing.T) {
 		firstView := epochFinalView + 1
 		epochFinalView = epochFinalView + 100
 		currentEpochCounter++
-		nextEpoch := newMockEpoch(currentEpochCounter, identities, firstView, epochFinalView, unittest.SeedFixture(seed.RandomSourceLength))
+		nextEpoch := newMockEpoch(currentEpochCounter, identities, firstView, epochFinalView, unittest.SeedFixture(seed.RandomSourceLength), true)
 		epochQuery.Add(nextEpoch)
 
 		currentEpochPhase = flow.EpochPhaseCommitted
@@ -573,21 +665,19 @@ func randUint64(min, max int) uint64 {
 }
 
 // newMockEpoch returns a new mocked epoch with the given fields
-func newMockEpoch(
-	counter uint64,
-	identities flow.IdentityList,
-	firstView uint64,
-	finalView uint64,
-	seed []byte,
-) *protocolmock.Epoch {
+func newMockEpoch(counter uint64, identities flow.IdentityList, firstView uint64, finalView uint64, seed []byte, committed bool) *protocolmock.Epoch {
 
 	epoch := new(protocolmock.Epoch)
 	epoch.On("Counter").Return(counter, nil)
 	epoch.On("InitialIdentities").Return(identities, nil)
 	epoch.On("FirstView").Return(firstView, nil)
 	epoch.On("FinalView").Return(finalView, nil)
-	// return nil error to indicate the epoch is committed
-	epoch.On("DKG").Return(nil, nil)
+	if committed {
+		// return nil error to indicate the epoch is committed
+		epoch.On("DKG").Return(nil, nil)
+	} else {
+		epoch.On("DKG").Return(nil, protocol.ErrNextEpochNotCommitted)
+	}
 
 	epoch.On("RandomSource").Return(seed, nil)
 	return epoch
