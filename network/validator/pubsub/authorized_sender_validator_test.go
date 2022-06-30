@@ -101,6 +101,7 @@ func (s *TestIsAuthorizedSenderSuite) TestIsAuthorizedSender_ValidationFailure()
 			*messages.BlockProposal
 		}
 
+		// *validator.msg is not a known message type, but embeds *messages.BlockProposal which is
 		m := &msg{&messages.BlockProposal{
 			Header:  nil,
 			Payload: nil,
