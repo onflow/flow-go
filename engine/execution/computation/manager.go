@@ -151,11 +151,11 @@ func (e *Manager) ExecuteScript(
 
 	startedAt := time.Now()
 
-	sample := []metrics.Sample{metrics.Sample{Name: "/gc/heap/allocs:bytes"}}
+	sample := []metrics.Sample{{Name: "/gc/heap/allocs:bytes"}}
 	metrics.Read(sample)
 
 	var memAllocBefore uint64
-	if sample[0].Value.Kind() != metrics.KindBad {
+	if sample[0].Value.Kind() == metrics.KindUint64 {
 		memAllocBefore = sample[0].Value.Uint64()
 	}
 
@@ -238,7 +238,7 @@ func (e *Manager) ExecuteScript(
 	metrics.Read(sample)
 
 	var memAllocAfter uint64
-	if sample[0].Value.Kind() != metrics.KindBad {
+	if sample[0].Value.Kind() == metrics.KindUint64 {
 		memAllocAfter = sample[0].Value.Uint64()
 	}
 
