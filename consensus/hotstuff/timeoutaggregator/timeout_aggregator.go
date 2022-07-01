@@ -18,7 +18,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool"
 )
 
-// defaultTimeoutAggregatorWorkers number of workers to dispatch events for timeout aggregators
+// defaultTimeoutAggregatorWorkers number of workers to dispatch events for timeout aggregator
 const defaultTimeoutAggregatorWorkers = 4
 
 // defaultTimeoutQueueCapacity maximum capacity of buffering unprocessed timeouts

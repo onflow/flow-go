@@ -53,7 +53,7 @@ func (s *TimeoutCollectorsTestSuite) TearDownTest() {
 }
 
 // prepareMockedCollector prepares a mocked collector and stores it in map, later it will be used
-// to mock behavior of vote collectors.
+// to mock behavior of timeout collectors.
 func (s *TimeoutCollectorsTestSuite) prepareMockedCollector(view uint64) *mocks.TimeoutCollector {
 	collector := mocks.NewTimeoutCollector(s.T())
 	collector.On("View").Return(view).Maybe()
