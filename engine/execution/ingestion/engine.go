@@ -226,6 +226,7 @@ func (e *Engine) finalizedUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.
 		if executed {
 			break
 		}
+
 	}
 
 	firstUnexecuted := lastExecuted + 1
@@ -236,13 +237,16 @@ func (e *Engine) finalizedUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.
 
 	// starting from the first unexecuted block, go through each unexecuted and finalized block
 	// reload its block to execution queues
-	for height := firstUnexecuted; height <= final.Height; height++ {
+	// TMP, HOTFIX: only load up to 200 blocks to execute for debugging purpose
+	total := 0
+	for height := firstUnexecuted; height <= final.Height || total <= 200; height++ {
 		header, err := e.state.AtHeight(height).Head()
 		if err != nil {
 			return nil, fmt.Errorf("could not get header at height: %v, %w", height, err)
 		}
 
 		unexecuted = append(unexecuted, header.ID())
+		total++
 	}
 
 	return unexecuted, nil
@@ -267,7 +271,8 @@ func (e *Engine) pendingUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.Id
 		}
 	}
 
-	return unexecuted, nil
+	// TMP HOTFIX: to not load any pending block
+	return nil, nil
 }
 
 func (e *Engine) unexecutedBlocks() (finalized []flow.Identifier, pending []flow.Identifier, err error) {
