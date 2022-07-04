@@ -218,13 +218,10 @@ func (c *Consensus) IdentityByEpoch(view uint64, nodeID flow.Identifier) (*flow.
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println("IdentityByEpoch", view, nodeID)
-	fmt.Println("IdentityByEpoch", epochInfo)
 	identity, ok := epochInfo.initialCommittee.ByNodeID(nodeID)
 	if !ok {
 		return nil, model.NewInvalidSignerErrorf("id %v is not a valid node id: %w", nodeID, err)
 	}
-	fmt.Println("IdentityByEpoch", identity)
 	return identity, nil
 }
 
