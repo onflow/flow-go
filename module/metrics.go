@@ -319,8 +319,6 @@ type LedgerMetrics interface {
 }
 
 type WALMetrics interface {
-	// DiskSize records the amount of disk space used by the storage (in bytes)
-	DiskSize(uint64)
 }
 
 type ExecutionDataServiceMetrics interface {

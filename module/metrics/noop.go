@@ -156,7 +156,6 @@ func (nc *NoopCollector) TransactionSubmissionFailed()                          
 func (nc *NoopCollector) UpdateExecutionReceiptMaxHeight(height uint64)                         {}
 func (nc *NoopCollector) ChunkDataPackRequested()                                               {}
 func (nc *NoopCollector) ExecutionSync(syncing bool)                                            {}
-func (nc *NoopCollector) DiskSize(uint64)                                                       {}
 func (nc *NoopCollector) ExecutionBlockDataUploadStarted()                                      {}
 func (nc *NoopCollector) ExecutionBlockDataUploadFinished(dur time.Duration)                    {}
 func (nc *NoopCollector) ExecutionDataAddStarted()                                              {}
