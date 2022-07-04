@@ -307,13 +307,9 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 			e.log.Debug().Uint64("height", block.Header.Height).Msg("block handler rejected")
 			continue
 		}
-		synced := &events.SyncedBlock{
-			OriginID: originID,
-			Block:    block,
-		}
-
-		e.comp.SubmitLocal(synced)
 	}
+
+	e.comp.SubmitLocal(res)
 }
 
 // checkLoop will regularly scan for items that need requesting.
