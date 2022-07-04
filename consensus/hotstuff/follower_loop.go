@@ -21,7 +21,7 @@ type proposalTask struct {
 type FollowerLoop struct {
 	log           zerolog.Logger
 	followerLogic FollowerLogic
-	proposals     chan proposalTask
+	proposals     chan *proposalTask
 
 	runner runner.SingleRunner // lock for preventing concurrent state transitions
 }
@@ -43,7 +43,7 @@ func NewFollowerLoop(log zerolog.Logger, followerLogic FollowerLogic) (*Follower
 // have been previously processed by the FollowerLoop.
 func (fl *FollowerLoop) SubmitProposal(proposalHeader *flow.Header, parentView uint64) <-chan struct{} {
 	received := time.Now()
-	proposal := proposalTask{
+	proposal := &proposalTask{
 		Proposal: model.ProposalFromFlow(proposalHeader, parentView),
 		done:     make(chan struct{}),
 	}
