@@ -1,11 +1,11 @@
 package hotstuff
 
-// TimeoutCollectors is an interface which allows TimeoutCollector to interact with collectors structured by
+// TimeoutCollectors is an interface which allows TimeoutAggregator to interact with collectors structured by
 // view.
 // Implementations of this interface are responsible for state transitions of `TimeoutCollector`s and pruning of
 // stale and outdated collectors by view.
 type TimeoutCollectors interface {
-	// GetOrCreateCollector retrieves the hotstuff.TimeoutCollector for the specified
+	// GetOrCreateCollector retrieves the TimeoutCollector for the specified
 	// view or creates one if none exists.
 	// When creating a timeout collector, the view will be used to get epoch by view, then create the staking
 	// signer object by epoch, because epoch determines committee.
@@ -14,7 +14,7 @@ type TimeoutCollectors interface {
 	//  -  (collector, false, nil) if the collector can be found by the view.
 	//  -  (nil, false, error) if running into any exception creating the timeout collector.
 	// Expected error returns during normal operations:
-	//  * mempool.DecreasingPruningHeightError
+	//  * mempool.DecreasingPruningHeightError - - in case view is lower than last pruned view
 	GetOrCreateCollector(view uint64) (collector TimeoutCollector, created bool, err error)
 
 	// PruneUpToView prunes the timeout collectors with views _below_ the given value, i.e.

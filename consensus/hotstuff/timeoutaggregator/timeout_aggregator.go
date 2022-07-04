@@ -181,7 +181,6 @@ func (t *TimeoutAggregator) processQueuedTimeout(timeoutObject *model.TimeoutObj
 func (t *TimeoutAggregator) AddTimeout(timeoutObject *model.TimeoutObject) {
 	// drop stale objects
 	if timeoutObject.View < t.lowestRetainedView.Value() {
-
 		t.log.Info().
 			Uint64("view", timeoutObject.View).
 			Hex("signer", timeoutObject.SignerID[:]).

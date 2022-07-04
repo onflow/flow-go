@@ -19,7 +19,7 @@ type VoteCollectors interface {
 	//  -  (collector, false, nil) if the collector can be found by the view
 	//  -  (nil, false, error) if running into any exception creating the vote collector state machine
 	// Expected error returns during normal operations:
-	//  * mempool.DecreasingPruningHeightError
+	//  * mempool.DecreasingPruningHeightError - in case view is lower than last pruned view
 	GetOrCreateCollector(view uint64) (collector VoteCollector, created bool, err error)
 
 	// PruneUpToView prunes the vote collectors with views _below_ the given value, i.e.
