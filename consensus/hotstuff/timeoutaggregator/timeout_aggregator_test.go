@@ -2,7 +2,6 @@ package timeoutaggregator
 
 import (
 	"context"
-	"github.com/onflow/flow-go/model/flow"
 	"sync"
 	"testing"
 	"time"
@@ -15,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/utils/unittest"
 )
