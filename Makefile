@@ -89,10 +89,6 @@ test: generate-mocks emulator-build unittest
 integration-test: docker-build-flow
 	$(MAKE) -C integration integration-test
 
-# separate integration tests for BFT because they will currently always fail if they're added to regular CI
-#.PHONY: integration-test-bft
-#integration-test-bft: docker-build-flow docker-build-flow-corrupted
-
 .PHONY: benchmark
 benchmark: docker-build-flow
 	$(MAKE) -C integration benchmark
