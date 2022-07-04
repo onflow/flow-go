@@ -51,6 +51,10 @@ func TestConsumer(t *testing.T) {
 	// when more jobs are arrived than the max number of workers, only the first 3 jobs will be processed
 	t.Run("testMaxWorker", testMaxWorker)
 
+	// [+1, +2, +3, +4, +5, +6] => [0#, !1, *2, *3, *4, *5, 6, +7] => [0#, *1, *2, *3, *4, *5, !6, !7]
+	// when processing lags behind, the consumer is paused until processing catches up
+	t.Run("testPauseResume", testPauseResume)
+
 	// [+1, +2, +3, +4, 3*] => 	[0#, 1!, 2!, 3*, 4!]
 	// when job 3 is finished, which is not the next processing job 1, the processed index won't change
 	t.Run("testNonNextFinished", testNonNextFinished)
@@ -173,6 +177,52 @@ func testMaxWorker(t *testing.T) {
 
 		w.AssertCalled(t, []int64{1, 2, 3})
 		assertProcessed(t, cp, 0)
+	})
+}
+
+// [+1, +2, +3, +4, +5, +6] => [0#, !1, *2, *3, *4, *5, 6, +7] => [0#, *1, *2, *3, *4, *5, !6, !7]
+// when processing lags behind, the consumer is paused until processing catches up
+func testPauseResume(t *testing.T) {
+	runWithSeatchAhead(t, 5, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+		require.NoError(t, c.Start(DefaultIndex))
+		require.NoError(t, j.PushOne()) // +1
+		c.Check()
+
+		require.NoError(t, j.PushOne()) // +2
+		c.Check()
+
+		require.NoError(t, j.PushOne()) // +3
+		c.Check()
+
+		require.NoError(t, j.PushOne()) // +4
+		c.Check()
+
+		require.NoError(t, j.PushOne()) // +5
+		c.Check()
+		time.Sleep(1 * time.Millisecond)
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(2)) // 2*
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(3)) // 3*
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(4)) // 4*
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(5)) // 5*
+
+		require.NoError(t, j.PushOne()) // +6
+		c.Check()
+
+		time.Sleep(1 * time.Millisecond)
+
+		// all jobs so far are processed, except 1 and 6
+		w.AssertCalled(t, []int64{1, 2, 3, 4, 5})
+		assertProcessed(t, cp, 0)
+
+		require.NoError(t, j.PushOne())             // +7
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(1)) // 1*
+		c.Check()
+
+		time.Sleep(1 * time.Millisecond)
+
+		// processing resumed after job 1 finished
+		w.AssertCalled(t, []int64{1, 2, 3, 4, 5, 6, 7})
+		assertProcessed(t, cp, 5)
 	})
 }
 
@@ -420,7 +470,7 @@ func testWorkOnNextAfterFastforward(t *testing.T) {
 		// jobs need to be reused, since it stores all the jobs
 		reWorker := newMockWorker()
 		reProgress := badger.NewConsumerProgress(db, ConsumerTag)
-		reConsumer := newTestConsumer(reProgress, j, reWorker)
+		reConsumer := newTestConsumer(reProgress, j, reWorker, 0)
 
 		err := reConsumer.Start(DefaultIndex)
 		require.NoError(t, err)
@@ -500,11 +550,15 @@ type JobID = module.JobID
 type Job = module.Job
 
 func runWith(t testing.TB, runTestWith func(module.JobConsumer, storage.ConsumerProgress, *mockWorker, *jobqueue.MockJobs, *badgerdb.DB)) {
+	runWithSeatchAhead(t, 0, runTestWith)
+}
+
+func runWithSeatchAhead(t testing.TB, maxSearchAhead uint64, runTestWith func(module.JobConsumer, storage.ConsumerProgress, *mockWorker, *jobqueue.MockJobs, *badgerdb.DB)) {
 	unittest.RunWithBadgerDB(t, func(db *badgerdb.DB) {
 		jobs := jobqueue.NewMockJobs()
 		worker := newMockWorker()
 		progress := badger.NewConsumerProgress(db, ConsumerTag)
-		consumer := newTestConsumer(progress, jobs, worker)
+		consumer := newTestConsumer(progress, jobs, worker, maxSearchAhead)
 		runTestWith(consumer, progress, worker, jobs, db)
 	})
 }
@@ -515,11 +569,10 @@ func assertProcessed(t testing.TB, cp storage.ConsumerProgress, expectProcessed 
 	require.Equal(t, expectProcessed, processed)
 }
 
-func newTestConsumer(cp storage.ConsumerProgress, jobs module.Jobs, worker jobqueue.Worker) module.JobConsumer {
+func newTestConsumer(cp storage.ConsumerProgress, jobs module.Jobs, worker jobqueue.Worker, maxSearchAhead uint64) module.JobConsumer {
 	log := unittest.Logger().With().Str("module", "consumer").Logger()
 	maxProcessing := uint64(3)
-	c := jobqueue.NewConsumer(log, jobs, cp, worker, maxProcessing)
-	return c
+	return jobqueue.NewConsumer(log, jobs, cp, worker, maxProcessing, maxSearchAhead)
 }
 
 // a Mock worker that stores all the jobs that it was asked to work on

@@ -84,7 +84,7 @@ func NewEngine(
 	}
 
 	// register engine with the receipt provider
-	_, err = net.Register(engine.ReceiveReceipts, e)
+	_, err = net.Register(network.ReceiveReceipts, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register for results: %w", err)
 	}
