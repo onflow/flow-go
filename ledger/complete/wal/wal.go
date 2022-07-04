@@ -69,17 +69,6 @@ func (w *DiskWAL) RecordUpdate(update *ledger.TrieUpdate) error {
 		return fmt.Errorf("error while recording update in LedgerWAL: %w", err)
 	}
 
-	select {
-	case <-w.diskUpdateLimiter.C:
-		diskSize, err := w.DiskSize()
-		if err != nil {
-			w.log.Warn().Err(err).Msg("error while checking forest disk size")
-		} else {
-			w.metrics.DiskSize(diskSize)
-		}
-	default: //don't block
-	}
-
 	return nil
 }
 
