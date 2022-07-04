@@ -505,7 +505,6 @@ func main() {
 		}).
 		Component("hotstuff committee", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			committee, err = committees.NewConsensusCommittee(node.State, node.Me.NodeID())
-			node.ProtocolEvents.AddConsumer(committee)
 			return committee, err
 		}).
 		Component("hotstuff modules", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
