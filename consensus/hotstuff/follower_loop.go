@@ -31,7 +31,7 @@ func NewFollowerLoop(log zerolog.Logger, followerLogic FollowerLogic) (*Follower
 	return &FollowerLoop{
 		log:           log,
 		followerLogic: followerLogic,
-		proposals:     make(chan proposalTask),
+		proposals:     make(chan *proposalTask),
 		runner:        runner.NewSingleRunner(),
 	}, nil
 }
