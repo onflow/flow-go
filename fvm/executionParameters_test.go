@@ -289,6 +289,10 @@ type TestReadStoredRuntime struct {
 	readStored func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error)
 }
 
+func (t *TestReadStoredRuntime) SetDebugger(debugger *interpreter.Debugger) {
+	panic("not implemented")
+}
+
 func (t *TestReadStoredRuntime) ExecuteScript(runtime.Script, runtime.Context) (cadence.Value, error) {
 	panic("not implemented")
 }
