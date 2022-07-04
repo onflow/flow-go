@@ -243,14 +243,14 @@ func (builder *FlowAccessNodeBuilder) buildSyncCore() *FlowAccessNodeBuilder {
 }
 
 func (builder *FlowAccessNodeBuilder) buildCommittee() *FlowAccessNodeBuilder {
-	builder.Component("committee", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+	builder.Module("committee", func(node *cmd.NodeConfig) error {
 		// initialize consensus committee's membership state
 		// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS committee
 		// Note: node.Me.NodeID() is not part of the consensus committee
 		committee, err := committees.NewConsensusCommittee(node.State, node.Me.NodeID())
 		builder.Committee = committee
 
-		return committee, err
+		return err
 	})
 
 	return builder
