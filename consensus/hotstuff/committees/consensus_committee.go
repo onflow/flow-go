@@ -218,10 +218,13 @@ func (c *Consensus) IdentityByEpoch(view uint64, nodeID flow.Identifier) (*flow.
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println("IdentityByEpoch", view, nodeID)
+	fmt.Println("IdentityByEpoch", epochInfo)
 	identity, ok := epochInfo.initialCommittee.ByNodeID(nodeID)
 	if !ok {
 		return nil, model.NewInvalidSignerErrorf("id %v is not a valid node id: %w", nodeID, err)
 	}
+	fmt.Println("IdentityByEpoch", identity)
 	return identity, nil
 }
 
@@ -366,11 +369,16 @@ func (c *Consensus) staticEpochInfoByView(view uint64) (*staticEpochInfo, error)
 	if err != nil {
 		return nil, fmt.Errorf("unexpected error attempting to prepare next epoch: %w", err)
 	}
-	if ok {
-		return nextEpoch, nil
+	// the next epoch is not committed yet
+	if !ok {
+		return nil, model.ErrViewForUnknownEpoch
 	}
-
-	return nil, model.ErrViewForUnknownEpoch
+	// the next epoch is committed, but the queried view is outside that epoch's range
+	if nextEpoch.firstView > view || nextEpoch.finalView <= view {
+		return nil, model.ErrViewForUnknownEpoch
+	}
+	// the next epoch was newly prepared, and the queried view is in that epoch's range
+	return nextEpoch, nil
 }
 
 // staticEpochInfoByCounter retrieves the epoch info with the given counter.
@@ -383,7 +391,8 @@ func (c *Consensus) staticEpochInfoByCounter(counter uint64) (*staticEpochInfo, 
 }
 
 // tryPrepareNextEpoch tries to cache the next epoch, returning the cached static
-// epoch info if caching is successful.
+// epoch info if caching is successful. If epoch emergency fallback mode is triggered,
+// injects and returns the fallback epoch.
 //
 // Returns:
 // * nextEpochInfo, true, nil if the next epoch info was successfully cached
@@ -397,7 +406,11 @@ func (c *Consensus) tryPrepareNextEpoch() (*staticEpochInfo, bool, error) {
 		return nil, false, fmt.Errorf("could not check if epoch fallback triggered: %w", err)
 	}
 	if isEpochFallbackTriggered {
-		c.prepareFallbackEpoch()
+		epochInfo, err := c.prepareFallbackEpoch()
+		if err != nil {
+			return nil, false, fmt.Errorf("epoch fallback is triggered, failed to prepare fallback epoch: %w", err)
+		}
+		return epochInfo, true, nil
 	}
 
 	next := c.state.Final().Epochs().Next()
