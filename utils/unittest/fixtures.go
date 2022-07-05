@@ -10,10 +10,9 @@ import (
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/onflow/cadence"
-	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/cadence"
 	sdk "github.com/onflow/flow-go-sdk"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
@@ -33,6 +32,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/updatable_configs"
+	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/dsl"
@@ -1414,7 +1414,7 @@ func WithChunkID(chunkID flow.Identifier) func(*verification.ChunkDataPackReques
 // and height of zero.
 // Use options to customize the request.
 func ChunkDataPackRequestFixture(opts ...func(*verification.ChunkDataPackRequest)) *verification.
-ChunkDataPackRequest {
+	ChunkDataPackRequest {
 
 	req := &verification.ChunkDataPackRequest{
 		Locator: chunks.Locator{
@@ -2112,12 +2112,12 @@ func PeerIDFromFlowID(identity *flow.Identity) (peer.ID, error) {
 	networkKey := identity.NetworkPubKey
 	peerPK, err := keyutils.LibP2PPublicKeyFromFlow(networkKey)
 	if err != nil {
-		return peer.ID(0), err
+		return "", err
 	}
 
 	peerID, err := peer.IDFromPublicKey(peerPK)
 	if err != nil {
-		return peer.ID(0), err
+		return "", err
 	}
 
 	return peerID, nil
