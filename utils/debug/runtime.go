@@ -4,6 +4,7 @@ import (
 	"runtime/metrics"
 )
 
+// GetHeapAllocsBytes returns the value of /gc/heap/allocs:bytes.
 func GetHeapAllocsBytes() uint64 {
 	sample := []metrics.Sample{{Name: "/gc/heap/allocs:bytes"}}
 	metrics.Read(sample)
