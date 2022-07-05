@@ -100,8 +100,23 @@ func (_m *NetworkMetrics) QueueDuration(duration time.Duration, priority int) {
 	_m.Called(duration, priority)
 }
 
-// NewNetworkMetrics creates a new instance of NetworkMetrics. It also registers the testing.TB interface on the mock and a cleanup function to assert the mocks expectations.
-func NewNetworkMetrics(t testing.TB) *NetworkMetrics {
+// RoutingTablePeerAdded provides a mock function with given fields:
+func (_m *NetworkMetrics) RoutingTablePeerAdded() {
+	_m.Called()
+}
+
+// RoutingTablePeerRemoved provides a mock function with given fields:
+func (_m *NetworkMetrics) RoutingTablePeerRemoved() {
+	_m.Called()
+}
+
+type NewNetworkMetricsT interface {
+	mock.TestingT
+	Cleanup(func())
+}
+
+// NewNetworkMetrics creates a new instance of NetworkMetrics. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
+func NewNetworkMetrics(t NewNetworkMetricsT) *NetworkMetrics {
 	mock := &NetworkMetrics{}
 	mock.Mock.Test(t)
 

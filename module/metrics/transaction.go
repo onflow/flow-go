@@ -25,6 +25,8 @@ type TransactionCollector struct {
 	transactionResultDuration  *prometheus.HistogramVec
 	scriptSize                 prometheus.Histogram
 	transactionSize            prometheus.Histogram
+	connectionReused           prometheus.Counter
+	connectionAddedToPool      *prometheus.GaugeVec
 }
 
 func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log zerolog.Logger,
@@ -111,6 +113,18 @@ func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log 
 			Subsystem: subsystemTransactionSubmission,
 			Help:      "histogram for the transaction size in kb of scripts used in GetTransactionResult",
 		}),
+		connectionReused: promauto.NewCounter(prometheus.CounterOpts{
+			Name:      "connection_reused",
+			Namespace: namespaceAccess,
+			Subsystem: subsystemConnectionReuse,
+			Help:      "counter for the number of times connections get reused",
+		}),
+		connectionAddedToPool: promauto.NewGaugeVec(prometheus.GaugeOpts{
+			Name:      "connection_added",
+			Namespace: namespaceAccess,
+			Subsystem: subsystemConnectionAdded,
+			Help:      "counter for the number of connections in the pool against max number tne pool can hold",
+		}, []string{"result"}),
 	}
 
 	return tc

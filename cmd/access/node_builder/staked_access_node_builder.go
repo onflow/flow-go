@@ -186,6 +186,10 @@ func (builder *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.logTxTimeToExecuted, builder.logTxTimeToFinalizedExecuted)
 			return nil
 		}).
+		Module("access metrics", func(node *cmd.NodeConfig) error {
+			builder.AccessMetrics = metrics.NewAccessCollector()
+			return nil
+		}).
 		Module("ping metrics", func(node *cmd.NodeConfig) error {
 			builder.PingMetrics = metrics.NewPingCollector()
 			return nil
@@ -201,7 +205,8 @@ func (builder *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			builder.RpcEng = rpc.New(
+			var err error
+			builder.RpcEng, err = rpc.New(
 				node.Logger,
 				node.State,
 				builder.rpcConf,
@@ -215,6 +220,7 @@ func (builder *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Storage.Results,
 				node.RootChainID,
 				builder.TransactionMetrics,
+				builder.AccessMetrics,
 				builder.collectionGRPCPort,
 				builder.executionGRPCPort,
 				builder.retryEnabled,
@@ -222,6 +228,9 @@ func (builder *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.apiRatelimits,
 				builder.apiBurstlimits,
 			)
+			if err != nil {
+				return nil, err
+			}
 			return builder.RpcEng, nil
 		}).
 		Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {

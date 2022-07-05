@@ -144,15 +144,14 @@ func (b *backendTransactions) sendTransactionToCollector(ctx context.Context,
 	tx *flow.TransactionBody,
 	collectionNodeAddr string) error {
 
-	// TODO: Use a connection pool to cache connections
-	collectionRPC, conn, err := b.connFactory.GetAccessAPIClient(collectionNodeAddr)
+	collectionRPC, err := b.connFactory.GetAccessAPIClient(collectionNodeAddr)
 	if err != nil {
 		return fmt.Errorf("failed to connect to collection node at %s: %w", collectionNodeAddr, err)
 	}
-	defer conn.Close()
 
 	err = b.grpcTxSend(ctx, collectionRPC, tx)
 	if err != nil {
+		b.connFactory.InvalidateAccessAPIClient(collectionNodeAddr)
 		return fmt.Errorf("failed to send transaction to collection node at %s: %v", collectionNodeAddr, err)
 	}
 	return nil
@@ -703,12 +702,15 @@ func (b *backendTransactions) tryGetTransactionResult(
 	execNode *flow.Identity,
 	req execproto.GetTransactionResultRequest,
 ) (*execproto.GetTransactionResultResponse, error) {
-	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
+	execRPCClient, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
 		return nil, err
 	}
-	defer closer.Close()
 	resp, err := execRPCClient.GetTransactionResult(ctx, &req)
+	if err != nil {
+		b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
+		return nil, err
+	}
 	return resp, err
 }
 
@@ -747,12 +749,15 @@ func (b *backendTransactions) tryGetTransactionResultsByBlockID(
 	execNode *flow.Identity,
 	req execproto.GetTransactionsByBlockIDRequest,
 ) (*execproto.GetTransactionResultsResponse, error) {
-	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
+	execRPCClient, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
 		return nil, err
 	}
-	defer closer.Close()
 	resp, err := execRPCClient.GetTransactionResultsByBlockID(ctx, &req)
+	if err != nil {
+		b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
+		return nil, err
+	}
 	return resp, err
 }
 
@@ -793,11 +798,14 @@ func (b *backendTransactions) tryGetTransactionResultByIndex(
 	execNode *flow.Identity,
 	req execproto.GetTransactionByIndexRequest,
 ) (*execproto.GetTransactionResultResponse, error) {
-	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
+	execRPCClient, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
 		return nil, err
 	}
-	defer closer.Close()
 	resp, err := execRPCClient.GetTransactionResultByIndex(ctx, &req)
+	if err != nil {
+		b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
+		return nil, err
+	}
 	return resp, err
 }

@@ -278,8 +278,8 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 
 		// create a mock connection factory
 		connFactory := new(factorymock.ConnectionFactory)
-		connFactory.On("GetAccessAPIClient", collNode1.Address).Return(col1ApiClient, &mockCloser{}, nil)
-		connFactory.On("GetAccessAPIClient", collNode2.Address).Return(col2ApiClient, &mockCloser{}, nil)
+		connFactory.On("GetAccessAPIClient", collNode1.Address).Return(col1ApiClient, nil)
+		connFactory.On("GetAccessAPIClient", collNode2.Address).Return(col2ApiClient, nil)
 
 		backend := backend.New(suite.state,
 			nil,
@@ -578,7 +578,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		// create a mock connection factory
 		connFactory := new(factorymock.ConnectionFactory)
-		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, nil)
 
 		// initialize storage
 		metrics := metrics.NewNoopCollector()
@@ -613,8 +613,9 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		handler := access.NewHandler(backend, suite.chainID.Chain())
 
-		rpcEng := rpc.New(suite.log, suite.state, rpc.Config{}, nil, nil, blocks, headers, collections, transactions,
-			receipts, results, suite.chainID, metrics, 0, 0, false, false, nil, nil)
+		rpcEng, err := rpc.New(suite.log, suite.state, rpc.Config{}, nil, nil, blocks, headers, collections, transactions,
+			receipts, results, suite.chainID, metrics, metrics, 0, 0, false, false, nil, nil)
+		require.NoError(suite.T(), err)
 
 		// create the ingest engine
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, blocks, headers, collections,
@@ -679,7 +680,7 @@ func (suite *Suite) TestExecuteScript() {
 
 		// create a mock connection factory
 		connFactory := new(factorymock.ConnectionFactory)
-		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, nil)
 
 		suite.backend = backend.New(suite.state,
 			suite.collClient,
