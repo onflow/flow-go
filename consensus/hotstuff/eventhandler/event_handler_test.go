@@ -736,10 +736,32 @@ func (es *EventHandlerSuite) TestFollowerReceives100Forks() {
 // TestStart_PendingBlocksRecovery tests a scenario where node has unprocessed pending proposals that were not processed
 // by event handler yet. After startup, we need to process all pending proposals.
 func (es *EventHandlerSuite) TestStart_PendingBlocksRecovery() {
-	// after processing first pending proposal we are expected to recover one by one
-	es.endView++
-	es.endView++
-	es.endView++
+
+	var pendingProposals []*model.Proposal
+	proposal := createProposal(es.initView+1, es.initView)
+	pendingProposals = append(pendingProposals, proposal)
+	proposalWithTC := helper.MakeProposal(helper.WithBlock(
+		helper.MakeBlock(
+			helper.WithBlockView(es.initView+10),
+			helper.WithBlockQC(proposal.Block.QC))),
+		func(proposal *model.Proposal) {
+			proposal.LastViewTC = helper.MakeTC(
+				helper.WithTCView(proposal.Block.View-1),
+				helper.WithTCNewestQC(proposal.Block.QC))
+		},
+	)
+	pendingProposals = append(pendingProposals, proposalWithTC)
+	proposal = createProposal(proposalWithTC.Block.View+1, proposalWithTC.Block.View)
+	pendingProposals = append(pendingProposals, proposal)
+
+	for _, proposal := range pendingProposals {
+		es.forks.proposals[proposal.Block.BlockID] = proposal
+	}
+
+	lastProposal := pendingProposals[len(pendingProposals)-1]
+	es.endView = lastProposal.Block.View
+
+	es.forks.On("NewestView").Return(es.endView).Once()
 
 	err := es.eventhandler.Start()
 	require.NoError(es.T(), err)

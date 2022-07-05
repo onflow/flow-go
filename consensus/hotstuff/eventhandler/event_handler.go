@@ -206,7 +206,52 @@ func (e *EventHandler) OnLocalTimeout() error {
 // Start will start the pacemaker's timer and start the new view
 func (e *EventHandler) Start() error {
 	e.paceMaker.Start()
+	err := e.processPendingBlocks()
+	if err != nil {
+		return fmt.Errorf("could not process pending blocks: %w", err)
+	}
 	return e.startNewView()
+}
+
+// processPendingBlocks performs processing of pending blocks that were applied to chain state but weren't processed
+// by Hotstuff event loop. Due to asynchronous nature of our processing pipelines compliance engine can validate and apply
+// blocks to the chain state but fail to deliver them to EventHandler because of shutdown or crash. To recover those QCs and TCs
+// recovery logic puts them in Forks and EventHandler can traverse pending blocks by view to obtain them.
+func (e *EventHandler) processPendingBlocks() error {
+	newestView := e.forks.NewestView()
+	currentView := e.paceMaker.CurView()
+	for {
+		paceMakerActiveView := e.paceMaker.CurView()
+		if currentView < paceMakerActiveView {
+			currentView = paceMakerActiveView
+		}
+
+		if currentView > newestView {
+			return nil
+		}
+
+		// check if there are pending proposals for active view
+		pendingProposals := e.forks.GetProposalsForView(currentView)
+		// process all proposals for view, we are dealing only with valid QCs and TCs so no harm in processing
+		// double proposals here.
+		for _, proposal := range pendingProposals {
+			block := proposal.Block
+			_, err := e.paceMaker.ProcessQC(block.QC)
+			if err != nil {
+				return fmt.Errorf("could not process QC for block %x: %w", block.BlockID, err)
+			}
+
+			_, err = e.paceMaker.ProcessTC(proposal.LastViewTC)
+			if err != nil {
+				return fmt.Errorf("could not process TC for block %x: %w", block.BlockID, err)
+			}
+
+			// TODO: generally speaking we are only interested in QC and TC, but in some cases
+			// we might want to vote for blocks as well. Discuss if it's needed.
+		}
+
+		currentView++
+	}
 }
 
 // startNewView will only be called when there is a view change from pacemaker.
