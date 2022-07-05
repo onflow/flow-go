@@ -42,18 +42,18 @@ func NewClientWithKey(accessAddr string, accountAddr sdk.Address, key sdkcrypto.
 
 	flowClient, err := client.New(accessAddr, grpc.WithInsecure()) //nolint:staticcheck
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not create new flow client: %w", err)
 	}
 
 	acc, err := flowClient.GetAccount(context.Background(), accountAddr)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not get the account %x: %w", accountAddr, err)
 	}
 	accountKey := acc.Keys[0]
 
 	mySigner, err := crypto.NewInMemorySigner(key, accountKey.HashAlgo)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not create a signer: %w", err)
 	}
 
 	tc := &Client{
@@ -74,7 +74,7 @@ func NewClient(addr string, chain flow.Chain) (*Client, error) {
 	key := unittest.ServiceAccountPrivateKey
 	privateKey, err := sdkcrypto.DecodePrivateKey(sdkcrypto.SignatureAlgorithm(key.SignAlgo), key.PrivateKey.Encode())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not decode private key: %w", err)
 	}
 	// Uncomment for debugging keys
 

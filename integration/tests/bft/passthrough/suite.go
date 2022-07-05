@@ -69,6 +69,8 @@ func (s *Suite) SetupSuite() {
 
 	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)))
 
+	blockRateFlag := "--block-rate-delay=1ms"
+
 	// generate the four consensus identities
 	s.nodeIDs = unittest.IdentifierListFixture(4)
 	for _, nodeID := range s.nodeIDs {
@@ -77,6 +79,7 @@ func (s *Suite) SetupSuite() {
 			testnet.WithLogLevel(zerolog.FatalLevel),
 			testnet.WithAdditionalFlag("--required-verification-seal-approvals=1"),
 			testnet.WithAdditionalFlag("--required-construction-seal-approvals=1"),
+			testnet.WithAdditionalFlag(blockRateFlag),
 		)
 		s.nodeConfigs = append(s.nodeConfigs, nodeConfig)
 	}
@@ -85,7 +88,7 @@ func (s *Suite) SetupSuite() {
 	s.verID = unittest.IdentifierFixture()
 	verConfig := testnet.NewNodeConfig(flow.RoleVerification,
 		testnet.WithID(s.verID),
-		testnet.WithLogLevel(zerolog.WarnLevel),
+		testnet.WithLogLevel(zerolog.FatalLevel),
 		testnet.AsCorrupted())
 	s.nodeConfigs = append(s.nodeConfigs, verConfig)
 
@@ -93,23 +96,25 @@ func (s *Suite) SetupSuite() {
 	s.exe1ID = unittest.IdentifierFixture()
 	exe1Config := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.exe1ID),
-		testnet.WithLogLevel(zerolog.InfoLevel),
+		testnet.WithLogLevel(zerolog.FatalLevel),
 		testnet.AsCorrupted())
 	s.nodeConfigs = append(s.nodeConfigs, exe1Config)
 
 	s.exe2ID = unittest.IdentifierFixture()
 	exe2Config := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.exe2ID),
-		testnet.WithLogLevel(zerolog.InfoLevel),
+		testnet.WithLogLevel(zerolog.FatalLevel),
 		testnet.AsCorrupted())
 	s.nodeConfigs = append(s.nodeConfigs, exe2Config)
 
 	// generates two collection node
 	coll1Config := testnet.NewNodeConfig(flow.RoleCollection,
 		testnet.WithLogLevel(zerolog.FatalLevel),
+		testnet.WithAdditionalFlag(blockRateFlag),
 	)
 	coll2Config := testnet.NewNodeConfig(flow.RoleCollection,
 		testnet.WithLogLevel(zerolog.FatalLevel),
+		testnet.WithAdditionalFlag(blockRateFlag),
 	)
 	s.nodeConfigs = append(s.nodeConfigs, coll1Config, coll2Config)
 
@@ -139,14 +144,15 @@ func (s *Suite) SetupSuite() {
 	s.cancel = cancel
 	s.net.Start(ctx)
 
+	// starts tracking blocks by the ghost node
+	s.Track(s.T(), ctx, s.Ghost())
+
 	s.Orchestrator = NewDummyOrchestrator(logger)
 
 	// start attack network
-	const serverAddress = "localhost:0" // we let OS picking an available port for attack network
 	codec := cbor.NewCodec()
-	connector := attacknetwork.NewCorruptedConnector(s.net.CorruptedIdentities(), s.net.CorruptedPortMapping)
+	connector := attacknetwork.NewCorruptedConnector(s.log, s.net.CorruptedIdentities(), s.net.CorruptedPortMapping)
 	attackNetwork, err := attacknetwork.NewAttackNetwork(s.log,
-		serverAddress,
 		codec,
 		s.Orchestrator,
 		connector,
@@ -166,9 +172,6 @@ func (s *Suite) SetupSuite() {
 
 	attackNetwork.Start(attackCtx)
 	unittest.RequireCloseBefore(s.T(), attackNetwork.Ready(), 1*time.Second, "could not start attack network on time")
-
-	// starts tracking blocks by the ghost node
-	s.Track(s.T(), ctx, s.Ghost())
 }
 
 // TearDownSuite tears down the test network of Flow as well as the BFT testing attack network.
