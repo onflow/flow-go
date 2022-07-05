@@ -823,11 +823,6 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 		return fmt.Errorf("cannot store collection: %w", err)
 	}
 
-	block, err := e.blocks.ByID(collection.Guarantee().ReferenceBlockID)
-	if err == nil && block.Header.Height > e.maxCollectionHeight {
-		e.metrics.UpdateCollectionMaxHeight(block.Header.Height)
-	}
-
 	return e.mempool.BlockByCollection.Run(
 		func(backdata *stdmap.BlockByCollectionBackdata) error {
 			blockByCollectionID, exists := backdata.ByID(collID)
@@ -843,6 +838,11 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 
 			for _, executableBlock := range blockByCollectionID.ExecutableBlocks {
 				blockID := executableBlock.ID()
+				blockHeight := executableBlock.Block.Header.Height
+
+				if err == nil && blockHeight > e.maxCollectionHeight {
+					e.metrics.UpdateCollectionMaxHeight(blockHeight)
+				}
 
 				completeCollection, ok := executableBlock.CompleteCollections[collID]
 				if !ok {
