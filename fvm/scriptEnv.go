@@ -141,7 +141,7 @@ func (e *ScriptEnv) setExecutionParameters() {
 		return
 	}
 
-	computationWeights, err := getExecutionEffortWeights(e, service)
+	computationWeights, err := GetExecutionEffortWeights(e, service)
 	err = setIfOk(
 		"execution effort weights",
 		err,
@@ -150,7 +150,7 @@ func (e *ScriptEnv) setExecutionParameters() {
 		return
 	}
 
-	memoryWeights, err := getExecutionMemoryWeights(e, service)
+	memoryWeights, err := GetExecutionMemoryWeights(e, service)
 	err = setIfOk(
 		"execution memory weights",
 		err,
@@ -159,7 +159,7 @@ func (e *ScriptEnv) setExecutionParameters() {
 		return
 	}
 
-	memoryLimit, err := getExecutionMemoryLimit(e, service)
+	memoryLimit, err := GetExecutionMemoryLimit(e, service)
 	err = setIfOk(
 		"execution memory limit",
 		err,
