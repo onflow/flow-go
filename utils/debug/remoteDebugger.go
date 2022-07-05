@@ -1,6 +1,8 @@
 package debug
 
 import (
+	"strings"
+
 	"github.com/onflow/cadence"
 	"github.com/rs/zerolog"
 
@@ -15,20 +17,47 @@ type RemoteDebugger struct {
 	grpcAddress string
 }
 
+type DebugInfo struct {
+	RegistersRead []RegisterInfo
+}
+
+func (v *DebugInfo) RegistersReadCollapseSlabReads() []RegisterInfo {
+	compact := make([]RegisterInfo, 0)
+	lastIndex := -1
+
+	for _, info := range v.RegistersRead {
+		if strings.HasPrefix(info.Key, "24") && lastIndex >= 0 {
+			compact[lastIndex].Size += info.Size
+			continue
+		}
+		compact = append(compact, info)
+		lastIndex += 1
+	}
+
+	return compact
+}
+
 // Warning : make sure you use the proper flow-go version, same version as the network you are collecting registers
 // from, otherwise the execution might differ from the way runs on the network
-func NewRemoteDebugger(grpcAddress string,
+func NewRemoteDebugger(
+	grpcAddress string,
 	chain flow.Chain,
-	logger zerolog.Logger) *RemoteDebugger {
+	logger zerolog.Logger,
+) *RemoteDebugger {
 	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime())
 
 	// no signature processor here
-	// TODO Maybe we add fee-deduction step as well
 	ctx := fvm.NewContext(
 		logger,
 		fvm.WithChain(chain),
 		fvm.WithTransactionProcessors(
+<<<<<<< Updated upstream
 			fvm.NewTransactionSequenceNumberChecker(),
+=======
+			fvm.NewTransactionAccountFrozenChecker(),
+			//fvm.NewTransactionSequenceNumberChecker(),
+			fvm.NewTransactionAccountFrozenEnabler(),
+>>>>>>> Stashed changes
 			fvm.NewTransactionInvoker(logger),
 		),
 	)
@@ -41,22 +70,23 @@ func NewRemoteDebugger(grpcAddress string,
 }
 
 // RunTransaction runs the transaction given the latest sealed block data
-func (d *RemoteDebugger) RunTransaction(txBody *flow.TransactionBody) (txErr, processError error) {
+func (d *RemoteDebugger) RunTransaction(txBody *flow.TransactionBody) (txErr, processError error, info DebugInfo) {
 	view := NewRemoteView(d.grpcAddress)
 	blockCtx := fvm.NewContextFromParent(d.ctx, fvm.WithBlockHeader(d.ctx.BlockHeader))
 	tx := fvm.Transaction(txBody, 0)
-	err := d.vm.Run(blockCtx, tx, view, programs.NewEmptyPrograms())
-	if err != nil {
-		return nil, err
-	}
-	return tx.Err, nil
+
+	processError = d.vm.Run(blockCtx, tx, view, programs.NewEmptyPrograms())
+	txErr = tx.Err
+	info.RegistersRead = view.RegistersRead()
+
+	return
 }
 
 // RunTransaction runs the transaction and tries to collect the registers at the given blockID
 // note that it would be very likely that block is far in the past and you can't find the trie to
 // read the registers from
 // if regCachePath is empty, the register values won't be cached
-func (d *RemoteDebugger) RunTransactionAtBlockID(txBody *flow.TransactionBody, blockID flow.Identifier, regCachePath string) (txErr, processError error) {
+func (d *RemoteDebugger) RunTransactionAtBlockID(txBody *flow.TransactionBody, blockID flow.Identifier, regCachePath string) (txErr, processError error, info DebugInfo) {
 	view := NewRemoteView(d.grpcAddress, WithBlockID(blockID))
 	defer view.Done()
 
@@ -65,35 +95,44 @@ func (d *RemoteDebugger) RunTransactionAtBlockID(txBody *flow.TransactionBody, b
 		view.Cache = newFileRegisterCache(regCachePath)
 	}
 	tx := fvm.Transaction(txBody, 0)
-	err := d.vm.Run(blockCtx, tx, view, programs.NewEmptyPrograms())
-	if err != nil {
-		return nil, err
+
+	processError = d.vm.Run(blockCtx, tx, view, programs.NewEmptyPrograms())
+	txErr = tx.Err
+	info.RegistersRead = view.RegistersRead()
+
+	if processError != nil {
+		processError = view.Cache.Persist()
 	}
-	err = view.Cache.Persist()
-	if err != nil {
-		return nil, err
-	}
-	return tx.Err, nil
+	return
 }
 
-func (d *RemoteDebugger) RunScript(code []byte, arguments [][]byte) (value cadence.Value, scriptError, processError error) {
+func (d *RemoteDebugger) RunScript(code []byte, arguments [][]byte) (value cadence.Value, scriptError, processError error, info DebugInfo) {
 	view := NewRemoteView(d.grpcAddress)
 	scriptCtx := fvm.NewContextFromParent(d.ctx, fvm.WithBlockHeader(d.ctx.BlockHeader))
 	script := fvm.Script(code).WithArguments(arguments...)
-	err := d.vm.Run(scriptCtx, script, view, programs.NewEmptyPrograms())
-	if err != nil {
-		return nil, nil, err
+
+	processError = d.vm.Run(scriptCtx, script, view, programs.NewEmptyPrograms())
+	if processError != nil {
+		return
 	}
-	return script.Value, script.Err, nil
+	scriptError = script.Err
+	value = script.Value
+	info.RegistersRead = view.RegistersRead()
+
+	return
 }
 
-func (d *RemoteDebugger) RunScriptAtBlockID(code []byte, arguments [][]byte, blockID flow.Identifier) (value cadence.Value, scriptError, processError error) {
+func (d *RemoteDebugger) RunScriptAtBlockID(code []byte, arguments [][]byte, blockID flow.Identifier) (value cadence.Value, scriptError, processError error, info DebugInfo) {
 	view := NewRemoteView(d.grpcAddress, WithBlockID(blockID))
 	scriptCtx := fvm.NewContextFromParent(d.ctx, fvm.WithBlockHeader(d.ctx.BlockHeader))
 	script := fvm.Script(code).WithArguments(arguments...)
-	err := d.vm.Run(scriptCtx, script, view, programs.NewEmptyPrograms())
-	if err != nil {
-		return nil, nil, err
+	processError = d.vm.Run(scriptCtx, script, view, programs.NewEmptyPrograms())
+	if processError != nil {
+		return
 	}
-	return script.Value, script.Err, nil
+	scriptError = script.Err
+	value = script.Value
+	info.RegistersRead = view.RegistersRead()
+
+	return
 }

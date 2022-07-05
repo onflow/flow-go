@@ -2,7 +2,10 @@ package debug
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
+	"google.golang.org/grpc/credentials/insecure"
+	"strings"
 
 	"google.golang.org/grpc"
 
@@ -24,6 +27,15 @@ type RemoteView struct {
 	BlockHeader        *flow.Header
 	connection         *grpc.ClientConn
 	executionAPIclient execution.ExecutionAPIClient
+
+	// a list of register that needed to be read to execute the transaction in order as they were needed
+	registersReadInfo []RegisterInfo
+}
+
+type RegisterInfo struct {
+	Owner string // owner address
+	Key   string // decoded from hex to plain test unless it starts with a "$" (0x24)
+	Size  int    // byte size of the register
 }
 
 // A RemoteViewOption sets a configuration parameter for the remote view
@@ -54,7 +66,7 @@ func WithBlockID(blockID flow.Identifier) RemoteViewOption {
 }
 
 func NewRemoteView(grpcAddress string, opts ...RemoteViewOption) *RemoteView {
-	conn, err := grpc.Dial(grpcAddress, grpc.WithInsecure()) //nolint:staticcheck
+	conn, err := grpc.Dial(grpcAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		panic(err)
 	}
@@ -79,6 +91,10 @@ func NewRemoteView(grpcAddress string, opts ...RemoteViewOption) *RemoteView {
 
 func (v *RemoteView) Done() {
 	v.connection.Close()
+}
+
+func (v *RemoteView) RegistersRead() []RegisterInfo {
+	return v.registersReadInfo
 }
 
 func (v *RemoteView) getLatestBlockID() ([]byte, *flow.Header, error) {
@@ -185,6 +201,19 @@ func (v *RemoteView) Get(owner, controller, key string) (flow.RegisterValue, err
 	}
 
 	v.Cache.Set(owner, controller, key, resp.Value)
+
+	var keyString string
+	if strings.HasPrefix(key, "$") {
+		keyString = hex.EncodeToString([]byte(key))
+	} else {
+		keyString = key
+	}
+
+	v.registersReadInfo = append(v.registersReadInfo, RegisterInfo{
+		Owner: hex.EncodeToString([]byte(owner)),
+		Key:   keyString,
+		Size:  len(resp.Value),
+	})
 
 	// append value to the file cache
 
