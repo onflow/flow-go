@@ -17,6 +17,7 @@ type Forks struct {
 	forest   forest.LevelledForest
 
 	finalizationCallback module.Finalizer
+	newestView           uint64
 	lastLocked           *BlockQC // lastLockedBlockQC is the QC that POINTS TO the the most recently locked block
 	lastFinalized        *BlockQC // lastFinalizedBlockQC is the QC that POINTS TO the most recently finalized locked block
 }
@@ -44,6 +45,7 @@ func New(trustedRoot *BlockQC, finalizationCallback module.Finalizer, notifier h
 		forest:               *forest.NewLevelledForest(trustedRoot.Block.View),
 		lastLocked:           trustedRoot,
 		lastFinalized:        trustedRoot,
+		newestView:           trustedRoot.Block.View,
 	}
 
 	// CAUTION: instead of a proposal, we use a normal block (without `SigData` and `LastViewTC`, which would be
@@ -63,11 +65,10 @@ func New(trustedRoot *BlockQC, finalizationCallback module.Finalizer, notifier h
 	return &fnlzr, nil
 }
 
-func (f *Forks) LockedBlock() *model.Block                 { return f.lastLocked.Block }
-func (f *Forks) LockedBlockQC() *flow.QuorumCertificate    { return f.lastLocked.QC }
-func (f *Forks) FinalizedBlock() *model.Block              { return f.lastFinalized.Block }
-func (f *Forks) FinalizedView() uint64                     { return f.lastFinalized.Block.View }
-func (f *Forks) FinalizedBlockQC() *flow.QuorumCertificate { return f.lastFinalized.QC }
+func (f *Forks) LockedBlock() *model.Block    { return f.lastLocked.Block }
+func (f *Forks) FinalizedBlock() *model.Block { return f.lastFinalized.Block }
+func (f *Forks) FinalizedView() uint64        { return f.lastFinalized.Block.View }
+func (f *Forks) NewestView() uint64           { return f.newestView }
 
 // GetProposal returns block for given ID
 func (f *Forks) GetProposal(blockID flow.Identifier) (*model.Proposal, bool) {
@@ -146,6 +147,9 @@ func (f *Forks) UnverifiedAddProposal(proposal *model.Proposal) error {
 	}
 	f.checkForDoubleProposal(blockContainer)
 	f.forest.AddVertex(blockContainer)
+	if f.newestView < block.View {
+		f.newestView = block.View
+	}
 	err := f.updateConsensusState(blockContainer)
 	if err != nil {
 		return fmt.Errorf("updating consensus state failed: %w", err)

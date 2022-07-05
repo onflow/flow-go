@@ -60,12 +60,13 @@ type Instance struct {
 	communicator *mocks.Communicator
 
 	// real dependencies
-	pacemaker      hotstuff.PaceMaker
-	producer       *blockproducer.BlockProducer
-	forks          *forks.Forks
-	voteAggregator *voteaggregator.VoteAggregator
-	voter          *safetyrules.SafetyRules
-	validator      *validator.Validator
+	pacemaker         hotstuff.PaceMaker
+	producer          *blockproducer.BlockProducer
+	forks             *forks.Forks
+	voteAggregator    *voteaggregator.VoteAggregator
+	timeoutAggregator hotstuff.TimeoutAggregator
+	voter             *safetyrules.SafetyRules
+	validator         *validator.Validator
 
 	// main logic
 	handler *eventhandler.EventHandler
@@ -404,6 +405,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		in.communicator,
 		in.committee,
 		in.voteAggregator,
+		in.timeoutAggregator,
 		in.voter,
 		notifier,
 	)
