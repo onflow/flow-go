@@ -838,16 +838,17 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 
 			for _, executableBlock := range blockByCollectionID.ExecutableBlocks {
 				blockID := executableBlock.ID()
-				blockHeight := executableBlock.Block.Header.Height
-
-				if err == nil && blockHeight > e.maxCollectionHeight {
-					e.metrics.UpdateCollectionMaxHeight(blockHeight)
-				}
 
 				completeCollection, ok := executableBlock.CompleteCollections[collID]
 				if !ok {
 					return fmt.Errorf("cannot handle collection: internal inconsistency - collection pointing to block %v which does not contain said collection",
 						blockID)
+				}
+
+				// record collection max height metrics
+				blockHeight := executableBlock.Block.Header.Height
+				if blockHeight > e.maxCollectionHeight {
+					e.metrics.UpdateCollectionMaxHeight(blockHeight)
 				}
 
 				if completeCollection.IsCompleted() {
