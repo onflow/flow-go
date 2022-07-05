@@ -355,8 +355,6 @@ func executionNodesForBlockID(
 	log zerolog.Logger) (flow.IdentityList, error) {
 
 	var executorIDs flow.IdentifierList
-	var err error
-	attempt := 0
 
 	// check if the block ID is of the root block. If it is then don't look for execution receipts since they
 	// will not be present for the root block.
@@ -373,11 +371,10 @@ func executionNodesForBlockID(
 		executorIDs = executorIdentities.NodeIDs()
 	} else {
 		// try to find atleast minExecutionNodesCnt execution node ids from the execution receipts for the given blockID
-		for ; attempt < maxAttemptsForExecutionReceipt; attempt++ {
-
+		for attempt := 0; attempt < maxAttemptsForExecutionReceipt; attempt++ {
 			executorIDs, err = findAllExecutionNodes(blockID, executionReceipts, log)
 			if err != nil {
-				return flow.IdentityList{}, err
+				return nil, err
 			}
 
 			if len(executorIDs) >= minExecutionNodesCnt {
@@ -395,7 +392,7 @@ func executionNodesForBlockID(
 
 			select {
 			case <-ctx.Done():
-				return flow.IdentityList{}, err
+				return nil, ctx.Err()
 			case <-time.After(100 * time.Millisecond << time.Duration(attempt)):
 				//retry after an exponential backoff
 			}
@@ -422,8 +419,7 @@ func executionNodesForBlockID(
 	executionIdentitiesRandom := subsetENs.Sample(maxExecutionNodesCnt)
 
 	if len(executionIdentitiesRandom) == 0 {
-		return flow.IdentityList{},
-			fmt.Errorf("no matching execution node found for block ID %v", blockID)
+		return nil, fmt.Errorf("no matching execution node found for block ID %v", blockID)
 	}
 
 	return executionIdentitiesRandom, nil
