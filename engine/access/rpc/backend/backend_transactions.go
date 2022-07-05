@@ -716,13 +716,7 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromAnyExeNode(
 	req execproto.GetTransactionsByBlockIDRequest,
 ) (*execproto.GetTransactionResultsResponse, error) {
 	var errs *multierror.Error
-	logAnyError := func() {
-		errToReturn := errs.ErrorOrNil()
-		if errToReturn != nil {
-			b.log.Err(errToReturn).Msg("failed to get transaction results from execution nodes")
-		}
-	}
-	defer logAnyError()
+
 	for _, execNode := range execNodes {
 		resp, err := b.tryGetTransactionResultsByBlockID(ctx, execNode, req)
 		if err == nil {
@@ -737,6 +731,14 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromAnyExeNode(
 		}
 		errs = multierror.Append(errs, err)
 	}
+
+	// if we were passed 0 execution nodes add a specific error
+	if len(execNodes) == 0 {
+		errs = multierror.Append(errs, errors.New("zero execution nodes"))
+	}
+	
+	// log the errors
+	b.log.Err(errs).Msg("failed to get transaction results from execution nodes")
 	return nil, errs.ErrorOrNil()
 }
 
