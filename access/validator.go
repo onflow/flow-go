@@ -6,7 +6,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 
-	"github.com/onflow/cadence/runtime/parser2"
+	"github.com/onflow/cadence/runtime/parser"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
@@ -225,7 +225,7 @@ func (v *TransactionValidator) checkExpiry(tx *flow.TransactionBody) error {
 
 func (v *TransactionValidator) checkCanBeParsed(tx *flow.TransactionBody) error {
 	if v.options.CheckScriptsParse {
-		_, err := parser2.ParseProgram(string(tx.Script), nil)
+		_, err := parser.ParseProgram(string(tx.Script), nil)
 		if err != nil {
 			return InvalidScriptError{ParserErr: err}
 		}
