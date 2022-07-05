@@ -19,7 +19,7 @@ type RegisterID struct {
 func (r *RegisterID) String() string {
 	ownerLen := len(r.Owner)
 
-	requiredLen := ((ownerLen + len(r.Key)) * 2) + 2
+	requiredLen := ((ownerLen + len(r.Key)) * 2) + 1
 
 	arr := make([]byte, requiredLen)
 

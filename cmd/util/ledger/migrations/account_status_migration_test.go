@@ -1,7 +1,6 @@
 package migrations
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -42,6 +41,5 @@ func TestAccountStatusMigration(t *testing.T) {
 		Key:   createPayloadKeyWithLegacyController(address1, state.KeyAccountStatus, true),
 		Value: state.NewAccountStatus().ToBytes(),
 	}
-	fmt.Println(newPayloads[3])
 	require.True(t, newPayloads[3].Equals(expectedPayload))
 }

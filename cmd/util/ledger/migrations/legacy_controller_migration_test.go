@@ -32,6 +32,15 @@ func createPayloadKeyWithLegacyController(a flow.Address, key string, emptyContr
 	}
 }
 
+func createMigratedPayloadKey(a flow.Address, key string) ledger.Key {
+	return ledger.Key{
+		KeyParts: []ledger.KeyPart{
+			ledger.NewKeyPart(0, a.Bytes()),
+			ledger.NewKeyPart(2, []byte(key)),
+		},
+	}
+}
+
 func TestLegacyControllerMigration(t *testing.T) {
 	mig := LegacyControllerMigration{
 		Logger: zerolog.Logger{},
@@ -48,11 +57,20 @@ func TestLegacyControllerMigration(t *testing.T) {
 		{Key: createPayloadKeyWithLegacyController(address2, state.KeyPublicKeyCount, true), Value: utils.Uint64ToBinary(4)},
 	}
 
+	expectedKeys := []ledger.Key{
+		createMigratedPayloadKey(address1, state.KeyStorageUsed),
+		createMigratedPayloadKey(address1, state.ContractKey("CoreContract")),
+		createMigratedPayloadKey(address1, state.KeyContractNames),
+		createMigratedPayloadKey(address2, state.KeyPublicKey(1)),
+		createMigratedPayloadKey(address2, state.KeyPublicKeyCount),
+	}
+
 	newPayloads, err := mig.Migrate(payloads)
 	require.NoError(t, err)
-	require.Equal(t, 5, len(newPayloads))
+	require.Equal(t, len(payloads), len(newPayloads))
 
-	for _, p := range newPayloads {
-		require.Equal(t, 0, len(p.Key.KeyParts[1].Value))
+	for i, p := range newPayloads {
+		require.Equal(t, expectedKeys[i], p.Key)
 	}
+
 }
