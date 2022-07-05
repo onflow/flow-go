@@ -24,12 +24,14 @@ var (
 	ErrIdentityUnverified = errors.New("validation failed: could not verify identity of sender")
 )
 
+type validateFunc func(ctx context.Context, from peer.ID, msg interface{}) (string, error)
+
 // AuthorizedSenderValidator returns a MessageValidator that will check if the sender of a message is authorized to send the message.
 // The MessageValidator returned will use the getIdentity to get the flow identity for the sender, asserting that the sender is a staked node and not ejected. Otherwise, the message is rejected.
 // The message is also authorized by checking that the sender is allowed to send the message on the channel.
 // If validation fails the message is rejected, and if the validation error is an expected error, slashing data is also collected.
 // Authorization config is defined in message.MsgAuthConfig
-func AuthorizedSenderValidator(log zerolog.Logger, channel channels.Channel, getIdentity func(peer.ID) (*flow.Identity, bool)) MessageValidator {
+func AuthorizedSenderValidator(log zerolog.Logger, channel channels.Channel, getIdentity func(peer.ID) (*flow.Identity, bool)) validateFunc {
 	log = log.With().
 		Str("component", "authorized_sender_validator").
 		Str("network_channel", channel.String()).
@@ -37,26 +39,26 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel channels.Channel, get
 
 	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(log)
 
-	return func(ctx context.Context, from peer.ID, msg interface{}) pubsub.ValidationResult {
+	return func(ctx context.Context, from peer.ID, msg interface{}) (string, error) {
 		identity, ok := getIdentity(from)
 		if !ok {
 			log.Error().Err(ErrIdentityUnverified).Str("peer_id", from.String()).Msg("rejecting message")
-			return pubsub.ValidationReject
+			return "", ErrUnauthorizedSender
 		}
 
-		msgType, err := IsAuthorizedSender(identity, channel, msg)
+		msgType, err := isAuthorizedSender(identity, channel, msg)
 		switch {
 		case err == nil:
-			return pubsub.ValidationAccept
+			return msgType, nil
 		case errors.Is(err, ErrUnauthorizedSender):
 			slashingViolationsConsumer.OnUnAuthorizedSenderError(identity, from.String(), msgType, err)
-			return pubsub.ValidationReject
+			return msgType, ErrUnauthorizedSender
 		case errors.Is(err, ErrUnknownMessageType):
 			slashingViolationsConsumer.OnUnknownMsgTypeError(identity, from.String(), msgType, err)
-			return pubsub.ValidationReject
+			return msgType, ErrUnknownMessageType
 		case errors.Is(err, ErrSenderEjected):
 			slashingViolationsConsumer.OnSenderEjectedError(identity, from.String(), msgType, err)
-			return pubsub.ValidationReject
+			return msgType, ErrSenderEjected
 		default:
 			log.Error().
 				Err(err).
@@ -65,12 +67,27 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel channels.Channel, get
 				Str("peer_node_id", identity.NodeID.String()).
 				Str("message_type", msgType).
 				Msg("unexpected error during message validation")
-			return pubsub.ValidationReject
+			return msgType, err
 		}
 	}
 }
 
-// IsAuthorizedSender performs network authorization validation. This func will assert the following;
+// AuthorizedSenderMessageValidator wraps the callback returned by AuthorizedSenderValidator and returns
+// MessageValidator callback that returns pubsub.ValidationReject if validation fails and pubsub.ValidationAccept if validation passes.
+func AuthorizedSenderMessageValidator(log zerolog.Logger, channel channels.Channel, getIdentity func(peer.ID) (*flow.Identity, bool)) MessageValidator {
+	return func(ctx context.Context, from peer.ID, msg interface{}) pubsub.ValidationResult {
+		validate := AuthorizedSenderValidator(log, channel, getIdentity)
+
+		_, err := validate(ctx, from, msg)
+		if err != nil {
+			return pubsub.ValidationReject
+		}
+
+		return pubsub.ValidationAccept
+	}
+}
+
+// isAuthorizedSender performs network authorization validation. This func will assert the following;
 // 1. The node is not ejected.
 // 2. Using the message auth config
 //  A. The message is authorized to be sent on channel.
@@ -79,7 +96,7 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel channels.Channel, get
 //  * ErrSenderEjected: if identity of sender is ejected from the network
 //  * ErrUnknownMessageType: if the message type does not have an auth config
 //  * ErrUnauthorizedSender: if the sender is not authorized to send message on the channel
-func IsAuthorizedSender(identity *flow.Identity, channel channels.Channel, msg interface{}) (string, error) {
+func isAuthorizedSender(identity *flow.Identity, channel channels.Channel, msg interface{}) (string, error) {
 	if identity.Ejected {
 		return "", ErrSenderEjected
 	}

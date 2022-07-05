@@ -539,7 +539,7 @@ func (m *Middleware) Subscribe(channel channels.Channel) error {
 	} else {
 		// for channels used by the staked nodes, add the topic validator to filter out messages from non-staked nodes
 		validators = append(validators,
-			psValidator.AuthorizedSenderValidator(m.log, channel, m.ov.Identity),
+			psValidator.AuthorizedSenderMessageValidator(m.log, channel, m.ov.Identity),
 		)
 
 		// NOTE: For non-public channels the libP2P node topic validator will reject

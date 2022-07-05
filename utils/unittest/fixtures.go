@@ -11,6 +11,7 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/onflow/cadence"
+	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/stretchr/testify/require"
 
 	sdk "github.com/onflow/flow-go-sdk"
@@ -1413,7 +1414,7 @@ func WithChunkID(chunkID flow.Identifier) func(*verification.ChunkDataPackReques
 // and height of zero.
 // Use options to customize the request.
 func ChunkDataPackRequestFixture(opts ...func(*verification.ChunkDataPackRequest)) *verification.
-	ChunkDataPackRequest {
+ChunkDataPackRequest {
 
 	req := &verification.ChunkDataPackRequest{
 		Locator: chunks.Locator{
@@ -2105,4 +2106,19 @@ func NewSealingConfigs(val uint) module.SealingConfigsSetter {
 		panic(err)
 	}
 	return instance
+}
+
+func PeerIDFromFlowID(identity *flow.Identity) (peer.ID, error) {
+	networkKey := identity.NetworkPubKey
+	peerPK, err := keyutils.LibP2PPublicKeyFromFlow(networkKey)
+	if err != nil {
+		return peer.ID(0), err
+	}
+
+	peerID, err := peer.IDFromPublicKey(peerPK)
+	if err != nil {
+		return peer.ID(0), err
+	}
+
+	return peerID, nil
 }

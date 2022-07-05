@@ -193,7 +193,7 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
-	authorizedSenderValidator := validator.AuthorizedSenderValidator(logger, channel, func(pid peer.ID) (*flow.Identity, bool) {
+	authorizedSenderValidator := validator.AuthorizedSenderMessageValidator(logger, channel, func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translator.GetFlowID(pid)
 		if err != nil {
 			return &flow.Identity{}, false
@@ -300,7 +300,7 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	})
 	logger := zerolog.New(os.Stdout).Level(zerolog.ErrorLevel).Hook(hook)
 
-	authorizedSenderValidator := validator.AuthorizedSenderValidator(logger, channel, func(pid peer.ID) (*flow.Identity, bool) {
+	authorizedSenderValidator := validator.AuthorizedSenderMessageValidator(logger, channel, func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translator.GetFlowID(pid)
 		if err != nil {
 			return &flow.Identity{}, false
@@ -374,7 +374,7 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	})
 	logger := zerolog.New(os.Stdout).Level(zerolog.ErrorLevel).Hook(hook)
 
-	authorizedSenderValidator := validator.AuthorizedSenderValidator(logger, channel, func(pid peer.ID) (*flow.Identity, bool) {
+	authorizedSenderValidator := validator.AuthorizedSenderMessageValidator(logger, channel, func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translator.GetFlowID(pid)
 		if err != nil {
 			return &flow.Identity{}, false
@@ -461,7 +461,7 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
-	authorizedSenderValidator := validator.AuthorizedSenderValidator(zerolog.Nop(), channel, func(pid peer.ID) (*flow.Identity, bool) {
+	authorizedSenderValidator := validator.AuthorizedSenderMessageValidator(zerolog.Nop(), channel, func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translator.GetFlowID(pid)
 		if err != nil {
 			return &flow.Identity{}, false

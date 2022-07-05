@@ -1,9 +1,12 @@
 package validator
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
+	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -14,96 +17,121 @@ import (
 )
 
 type TestCase struct {
-	Identity   *flow.Identity
-	Channel    channels.Channel
-	Message    interface{}
-	MessageStr string
+	Identity    *flow.Identity
+	GetIdentity func(pid peer.ID) (*flow.Identity, bool)
+	Channel     channels.Channel
+	Message     interface{}
+	MessageStr  string
 }
 
 func TestIsAuthorizedSender(t *testing.T) {
-	suite.Run(t, new(TestIsAuthorizedSenderSuite))
+	suite.Run(t, new(TestAuthorizedSenderValidatorSuite))
 }
 
-type TestIsAuthorizedSenderSuite struct {
+type TestAuthorizedSenderValidatorSuite struct {
 	suite.Suite
 	authorizedSenderTestCases             []TestCase
 	unauthorizedSenderTestCases           []TestCase
 	unauthorizedMessageOnChannelTestCases []TestCase
 }
 
-func (s *TestIsAuthorizedSenderSuite) SetupTest() {
+func (s *TestAuthorizedSenderValidatorSuite) SetupTest() {
 	s.initializeAuthorizationTestCases()
 	s.initializeInvalidMessageOnChannelTestCases()
 }
 
-// TestIsAuthorizedSender_AuthorizedSender checks that IsAuthorizedSender does not return false positive
+// TestValidatorCallback_AuthorizedSender checks that the call back returned from AuthorizedSenderValidator does not return false positive
 // validation errors for all possible valid combinations (authorized sender role, message type).
-func (s *TestIsAuthorizedSenderSuite) TestIsAuthorizedSender_AuthorizedSender() {
+func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_AuthorizedSender() {
 	for _, c := range s.authorizedSenderTestCases {
 		str := fmt.Sprintf("role (%s) should be authorized to send message type (%s) on channel (%s)", c.Identity.Role, c.MessageStr, c.Channel)
 		s.Run(str, func() {
-			msgType, err := IsAuthorizedSender(c.Identity, c.Channel, c.Message)
+			validate := AuthorizedSenderValidator(zerolog.Nop(), c.Channel, c.GetIdentity)
+
+			pid, err := unittest.PeerIDFromFlowID(c.Identity)
+			s.Require().NoError(err)
+
+			msgType, err := validate(context.Background(), pid, c.Message)
 			s.Require().NoError(err)
 			s.Require().Equal(c.MessageStr, msgType)
 		})
 	}
 }
 
-// TestIsAuthorizedSender_UnAuthorizedSender checks that IsAuthorizedSender return's ErrUnauthorizedSender
+// TestValidatorCallback_UnAuthorizedSender checks that the call back returned from AuthorizedSenderValidator return's ErrUnauthorizedSender
 // validation error for all possible invalid combinations (unauthorized sender role, message type).
-func (s *TestIsAuthorizedSenderSuite) TestIsAuthorizedSender_UnAuthorizedSender() {
+func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_UnAuthorizedSender() {
 	for _, c := range s.unauthorizedSenderTestCases {
 		str := fmt.Sprintf("role (%s) should not be authorized to send message type (%s) on channel (%s)", c.Identity.Role, c.MessageStr, c.Channel)
 		s.Run(str, func() {
-			msgType, err := IsAuthorizedSender(c.Identity, c.Channel, c.Message)
+			validate := AuthorizedSenderValidator(zerolog.Nop(), c.Channel, c.GetIdentity)
+
+			pid, err := unittest.PeerIDFromFlowID(c.Identity)
+			s.Require().NoError(err)
+			msgType, err := validate(context.Background(), pid, c.Message)
 			s.Require().ErrorIs(err, message.ErrUnauthorizedRole)
 			s.Require().Equal(c.MessageStr, msgType)
 		})
 	}
 }
 
-// TestIsAuthorizedSender_UnAuthorizedSender for each invalid combination of message type and channel
-// an appropriate error message.ErrUnauthorizedMessageOnChannel is returned.
-func (s *TestIsAuthorizedSenderSuite) TestIsAuthorizedSender_UnAuthorizedMessageOnChannel() {
+// TestValidatorCallback_UnAuthorizedMessageOnChannel for each invalid combination of message type and channel
+// the call back returned from AuthorizedSenderValidator returns the appropriate error message.ErrUnauthorizedMessageOnChannel.
+func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_UnAuthorizedMessageOnChannel() {
 	for _, c := range s.unauthorizedMessageOnChannelTestCases {
 		str := fmt.Sprintf("message type (%s) should not be authorized to be sent on channel (%s)", c.MessageStr, c.Channel)
 		s.Run(str, func() {
-			msgType, err := IsAuthorizedSender(c.Identity, c.Channel, c.Message)
+			validate := AuthorizedSenderValidator(zerolog.Nop(), c.Channel, c.GetIdentity)
+
+			pid, err := unittest.PeerIDFromFlowID(c.Identity)
+			s.Require().NoError(err)
+
+			msgType, err := validate(context.Background(), pid, c.Message)
 			s.Require().ErrorIs(err, message.ErrUnauthorizedMessageOnChannel)
 			s.Require().Equal(c.MessageStr, msgType)
 		})
 	}
 }
 
-// TestIsAuthorizedSender_ClusterPrefixedChannels checks that IsAuthorizedSender correctly
+// TestValidatorCallback_ClusterPrefixedChannels checks that the call back returned from AuthorizedSenderValidator correctly
 // handles cluster prefixed channels during validation.
-func (s *TestIsAuthorizedSenderSuite) TestIsAuthorizedSender_ClusterPrefixedChannels() {
-	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
+func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ClusterPrefixedChannels() {
+	identity, _ := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleCollection))
 	clusterID := flow.Localnet
 
-	// collection consensus cluster
-	msgType, err := IsAuthorizedSender(identity, channels.ConsensusCluster(clusterID), &messages.ClusterBlockResponse{})
+	getIdentityFunc := s.getIdentity(identity)
+	pid, err := unittest.PeerIDFromFlowID(identity)
+	s.Require().NoError(err)
+
+	// validate collection consensus cluster
+	validateCollConsensus := AuthorizedSenderValidator(zerolog.Nop(), channels.ConsensusCluster(clusterID), getIdentityFunc)
+	msgType, err := validateCollConsensus(context.Background(), pid, &messages.ClusterBlockResponse{})
 	s.Require().NoError(err)
 	s.Require().Equal(message.ClusterBlockResponse, msgType)
 
-	// collection sync cluster
-	msgType, err = IsAuthorizedSender(identity, channels.SyncCluster(clusterID), &messages.SyncRequest{})
+	// validate collection sync cluster
+	validateSyncCluster := AuthorizedSenderValidator(zerolog.Nop(), channels.SyncCluster(clusterID), getIdentityFunc)
+	msgType, err = validateSyncCluster(context.Background(), pid, &messages.SyncRequest{})
 	s.Require().NoError(err)
 	s.Require().Equal(message.SyncRequest, msgType)
 }
 
-// TestIsAuthorizedSender_ValidationFailure checks that IsAuthorizedSender returns the expected validation error.
-func (s *TestIsAuthorizedSenderSuite) TestIsAuthorizedSender_ValidationFailure() {
+// TestValidatorCallback_ValidationFailure checks that the call back returned from AuthorizedSenderValidator returns the expected validation error.
+func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ValidationFailure() {
 	s.Run("sender is ejected", func() {
-		identity := unittest.IdentityFixture()
+		identity, _ := unittest.IdentityWithNetworkingKeyFixture()
 		identity.Ejected = true
-		msgType, err := IsAuthorizedSender(identity, channels.SyncCommittee, &messages.SyncRequest{})
+		getIdentityFunc := s.getIdentity(identity)
+		pid, err := unittest.PeerIDFromFlowID(identity)
+		s.Require().NoError(err)
+		validate := AuthorizedSenderValidator(zerolog.Nop(), channels.SyncCommittee, getIdentityFunc)
+		msgType, err := validate(context.Background(), pid, &messages.SyncRequest{})
 		s.Require().ErrorIs(err, ErrSenderEjected)
 		s.Require().Equal("", msgType)
 	})
 
 	s.Run("unknown message type", func() {
-		identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
+		identity, _ := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
 		type msg struct {
 			*messages.BlockProposal
 		}
@@ -114,29 +142,51 @@ func (s *TestIsAuthorizedSenderSuite) TestIsAuthorizedSender_ValidationFailure()
 			Payload: nil,
 		}}
 
+		getIdentityFunc := s.getIdentity(identity)
+		pid, err := unittest.PeerIDFromFlowID(identity)
+		s.Require().NoError(err)
+		validate := AuthorizedSenderValidator(zerolog.Nop(), channels.ConsensusCommittee, getIdentityFunc)
+
 		// unknown message types are rejected
-		msgType, err := IsAuthorizedSender(identity, channels.ConsensusCommittee, m)
+		msgType, err := validate(context.Background(), pid, m)
+
 		s.Require().ErrorIs(err, ErrUnknownMessageType)
 		s.Require().Equal("", msgType)
 
 		// nil messages are rejected
-		msgType, err = IsAuthorizedSender(identity, channels.ConsensusCommittee, nil)
+		msgType, err = validate(context.Background(), pid, nil)
 		s.Require().ErrorIs(err, ErrUnknownMessageType)
+		s.Require().Equal("", msgType)
+	})
+
+	s.Run("sender is not staked getIdentityFunc does not return identity ", func() {
+		identity, _ := unittest.IdentityWithNetworkingKeyFixture()
+
+		// getIdentityFunc simulates unstaked node not found in participant list
+		getIdentityFunc := func(id peer.ID) (*flow.Identity, bool) { return nil, false }
+
+		pid, err := unittest.PeerIDFromFlowID(identity)
+		s.Require().NoError(err)
+
+		validate := AuthorizedSenderValidator(zerolog.Nop(), channels.SyncCommittee, getIdentityFunc)
+		msgType, err := validate(context.Background(), pid, &messages.SyncRequest{})
+		s.Require().ErrorIs(err, ErrUnauthorizedSender)
 		s.Require().Equal("", msgType)
 	})
 }
 
 // initializeAuthorizationTestCases initializes happy and sad path test cases for checking authorized and unauthorized role message combinations.
-func (s *TestIsAuthorizedSenderSuite) initializeAuthorizationTestCases() {
+func (s *TestAuthorizedSenderValidatorSuite) initializeAuthorizationTestCases() {
 	for _, c := range message.AuthorizationConfigs {
 		for channel, authorizedRoles := range c.Config {
 			for _, role := range flow.Roles() {
-				identity := unittest.IdentityFixture(unittest.WithRole(role))
+				identity, _ := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(role))
 				tc := TestCase{
-					Identity:   identity,
-					Channel:    channel,
-					Message:    c.Type(),
-					MessageStr: c.Name,
+					Identity:    identity,
+					GetIdentity: s.getIdentity(identity),
+					Channel:     channel,
+					Message:     c.Type(),
+					MessageStr:  c.Name,
 				}
 
 				if authorizedRoles.Contains(role) {
@@ -153,11 +203,11 @@ func (s *TestIsAuthorizedSenderSuite) initializeAuthorizationTestCases() {
 
 // initializeInvalidMessageOnChannelTestCases initializes test cases for all possible combinations of invalid message types on channel.
 // NOTE: the role in the test case does not matter since ErrUnauthorizedMessageOnChannel will be returned before the role is checked.
-func (s *TestIsAuthorizedSenderSuite) initializeInvalidMessageOnChannelTestCases() {
+func (s *TestAuthorizedSenderValidatorSuite) initializeInvalidMessageOnChannelTestCases() {
 	// iterate all channels
 	for _, c := range message.AuthorizationConfigs {
 		for channel, authorizedRoles := range c.Config {
-			identity := unittest.IdentityFixture(unittest.WithRole(authorizedRoles[0]))
+			identity, _ := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(authorizedRoles[0]))
 
 			// iterate all message types
 			for _, config := range message.AuthorizationConfigs {
@@ -166,14 +216,22 @@ func (s *TestIsAuthorizedSenderSuite) initializeInvalidMessageOnChannelTestCases
 				_, ok := config.Config[channel]
 				if config.Name != c.Name && !ok {
 					tc := TestCase{
-						Identity:   identity,
-						Channel:    channel,
-						Message:    config.Type(),
-						MessageStr: config.Name,
+						Identity:    identity,
+						GetIdentity: s.getIdentity(identity),
+						Channel:     channel,
+						Message:     config.Type(),
+						MessageStr:  config.Name,
 					}
 					s.unauthorizedMessageOnChannelTestCases = append(s.unauthorizedMessageOnChannelTestCases, tc)
 				}
 			}
 		}
+	}
+}
+
+// getIdentity returns a callback that simply returns the provided identity.
+func (s *TestAuthorizedSenderValidatorSuite) getIdentity(id *flow.Identity) func(pid peer.ID) (*flow.Identity, bool) {
+	return func(pid peer.ID) (*flow.Identity, bool) {
+		return id, true
 	}
 }
