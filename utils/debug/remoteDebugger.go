@@ -51,13 +51,6 @@ func NewRemoteDebugger(
 		logger,
 		fvm.WithChain(chain),
 		fvm.WithTransactionProcessors(
-<<<<<<< Updated upstream
-			fvm.NewTransactionSequenceNumberChecker(),
-=======
-			fvm.NewTransactionAccountFrozenChecker(),
-			//fvm.NewTransactionSequenceNumberChecker(),
-			fvm.NewTransactionAccountFrozenEnabler(),
->>>>>>> Stashed changes
 			fvm.NewTransactionInvoker(logger),
 		),
 	)
