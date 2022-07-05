@@ -18,7 +18,7 @@ jobs:
       - name: Set benchmark repetitions
         # reducing repetition will speed up execution,
         # but will be more inaccurate at detecting change
-        run: echo "::set-output name=benchmark_repetitions::7"
+        run: echo "::set-output name=benchmark_repetitions::15"
         id: settings
 
       - name: Checkout
@@ -37,14 +37,14 @@ jobs:
 
       - name: Run benchmark on current branch
         run: |
-          (for i in {1..${{ steps.settings.outputs.benchmark_repetitions }}}; do go test ./fvm --bench . --tags relic -shuffle=on; done) | tee new.txt
+          (for i in {1..${{ steps.settings.outputs.benchmark_repetitions }}}; do go test ./fvm --bench . --tags relic -shuffle=on --benchmem --run ^$; done) | tee new.txt
 
       - name: Checkout base branch
         run: git checkout ${{ github.event.pull_request.base.sha }}
 
       - name: Run benchmark on base branch
         run: |
-          (for i in {1..${{ steps.settings.outputs.benchmark_repetitions }}}; do go test ./fvm --bench . --tags relic -shuffle=on; done) | tee old.txt
+          (for i in {1..${{ steps.settings.outputs.benchmark_repetitions }}}; do go test ./fvm --bench . --tags relic -shuffle=on --benchmem --run ^$; done) | tee old.txt
 
       # see https://trstringer.com/github-actions-multiline-strings/ to see why this part is complex
       - name: Use benchstat for comparison
