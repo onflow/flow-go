@@ -427,7 +427,11 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, r *flow.Execut
 	}
 
 	block, err := e.blocks.ByID(r.ExecutionResult.BlockID)
-	if err == nil && block.Header.Height > e.maxReceiptHeight {
+	if err != nil {
+		return err
+	}
+	
+	if block.Header.Height > e.maxReceiptHeight {
 		e.transactionMetrics.UpdateExecutionReceiptMaxHeight(block.Header.Height)
 	}
 
