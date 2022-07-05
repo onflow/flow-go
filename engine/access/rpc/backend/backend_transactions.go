@@ -736,7 +736,7 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromAnyExeNode(
 	if len(execNodes) == 0 {
 		errs = multierror.Append(errs, errors.New("zero execution nodes"))
 	}
-	
+
 	// log the errors
 	b.log.Err(errs).Msg("failed to get transaction results from execution nodes")
 	return nil, errs.ErrorOrNil()
