@@ -180,11 +180,9 @@ func (s *Suite) SetupSuite() {
 	s.Orchestrator = wintermute.NewOrchestrator(logger, s.net.CorruptedIdentities().NodeIDs(), s.net.Identities())
 
 	// start attack network
-	const serverAddress = "localhost:0" // we let OS picking an available port for attack network
 	codec := cbor.NewCodec()
-	connector := attacknetwork.NewCorruptedConnector(s.net.CorruptedIdentities(), s.net.CorruptedPortMapping)
+	connector := attacknetwork.NewCorruptedConnector(s.log, s.net.CorruptedIdentities(), s.net.CorruptedPortMapping)
 	attackNetwork, err := attacknetwork.NewAttackNetwork(s.log,
-		serverAddress,
 		codec,
 		s.Orchestrator,
 		connector,
