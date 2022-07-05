@@ -41,5 +41,10 @@ type QCContractClient interface {
 type EpochLookup interface {
 
 	// EpochForView returns the counter of the epoch that the view belongs to.
+	// If epoch emergency fallback has been triggered, returns the current epoch counter for all queries.
+	// Error returns:
+	// * model.ErrViewForUnknownEpoch if the view belongs to an epoch outside the
+	//     current, previous, and next epoch, based on the current finalized state.
+	// * any other error is a symptom of an internal error or bug
 	EpochForView(view uint64) (epochCounter uint64, err error)
 }
