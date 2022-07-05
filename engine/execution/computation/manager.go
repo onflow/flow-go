@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/rand"
-	"runtime/metrics"
 	"strings"
 	"time"
 
@@ -28,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/utils/debug"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -150,14 +150,7 @@ func (e *Manager) ExecuteScript(
 ) ([]byte, error) {
 
 	startedAt := time.Now()
-
-	sample := []metrics.Sample{{Name: "/gc/heap/allocs:bytes"}}
-	metrics.Read(sample)
-
-	var memAllocBefore uint64
-	if sample[0].Value.Kind() == metrics.KindUint64 {
-		memAllocBefore = sample[0].Value.Uint64()
-	}
+	memAllocBefore := debug.GetHeapAllocsBytes()
 
 	// allocate a random ID to be able to track this script when its done,
 	// scripts might not be unique so we use this extra tracker to follow their logs
@@ -235,13 +228,7 @@ func (e *Manager) ExecuteScript(
 		return nil, fmt.Errorf("failed to encode runtime value: %w", err)
 	}
 
-	metrics.Read(sample)
-
-	var memAllocAfter uint64
-	if sample[0].Value.Kind() == metrics.KindUint64 {
-		memAllocAfter = sample[0].Value.Uint64()
-	}
-
+	memAllocAfter := debug.GetHeapAllocsBytes()
 	e.metrics.ExecutionScriptExecuted(time.Since(startedAt), script.GasUsed, memAllocAfter-memAllocBefore, script.MemoryEstimate)
 
 	return encodedValue, nil
