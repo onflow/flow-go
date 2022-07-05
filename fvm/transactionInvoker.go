@@ -125,7 +125,7 @@ func (i *TransactionInvoker) Process(
 			}
 		}
 
-		location := common.TransactionLocation(proc.ID[:])
+		location := common.TransactionLocation(proc.ID)
 
 		err := vm.Runtime.ExecuteTransaction(
 			runtime.Script{
@@ -307,7 +307,7 @@ var setAccountFrozenFunctionType = &sema.FunctionType{
 func valueDeclarations(ctx *Context, env Environment) []runtime.ValueDeclaration {
 	var predeclaredValues []runtime.ValueDeclaration
 
-	if ctx.AccountFreezeAvailable {
+	if ctx.AccountFreezeEnabled {
 		// TODO return the errors instead of panicing
 
 		setAccountFrozen := runtime.ValueDeclaration{

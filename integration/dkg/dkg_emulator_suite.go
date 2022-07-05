@@ -24,11 +24,11 @@ import (
 	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/integration/tests/lib"
+	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/dkg"
-	emulatormod "github.com/onflow/flow-go/module/emulator"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	"github.com/onflow/flow-go/storage/badger"
@@ -44,7 +44,7 @@ type DKGSuite struct {
 	hub                    *stub.Hub // in-mem test network
 	env                    templates.Environment
 	blockchain             *emulator.Blockchain
-	adminEmulatorClient    *emulatormod.EmulatorClient
+	adminEmulatorClient    *utils.EmulatorClient
 	adminDKGContractClient *dkg.Client
 	dkgAddress             sdk.Address
 	dkgAccountKey          *sdk.AccountKey
@@ -114,7 +114,7 @@ func (s *DKGSuite) initEmulator() {
 
 	s.blockchain = blockchain
 
-	s.adminEmulatorClient = emulatormod.NewEmulatorClient(blockchain)
+	s.adminEmulatorClient = utils.NewEmulatorClient(blockchain)
 
 	s.hub = stub.NewNetworkHub()
 }
@@ -268,7 +268,7 @@ func (s *DKGSuite) createAndFundAccount(netID *flow.Identity) *nodeAccount {
 // createNode creates a DKG test node from an account and initializes its DKG
 // smart-contract client
 func (s *DKGSuite) createNode(account *nodeAccount) *node {
-	emulatorClient := emulatormod.NewEmulatorClient(s.blockchain)
+	emulatorClient := utils.NewEmulatorClient(s.blockchain)
 	contractClient := dkg.NewClient(
 		zerolog.Nop(),
 		emulatorClient,
