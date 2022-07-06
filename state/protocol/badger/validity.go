@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/order"
-	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
@@ -19,9 +18,9 @@ import (
 // added to the state is valid. In addition to intrinsic validity, we also
 // check that it is valid w.r.t. the previous epoch setup event, and the
 // current epoch status.
+// Assumes all inputs besides extendingSetup are already validated.
 // Expected errors during normal operations:
-// * protocol.InvalidServiceEventError
-//   if the input service event is invalid to extend the currently active epoch status
+// * protocol.InvalidServiceEventError if the input service event is invalid to extend the currently active epoch status
 func isValidExtendingEpochSetup(extendingSetup *flow.EpochSetup, activeSetup *flow.EpochSetup, status *flow.EpochStatus) error {
 	// We should only have a single epoch setup event per epoch.
 	if status.NextEpoch.SetupID != flow.ZeroID {
@@ -88,8 +87,7 @@ func verifyEpochSetup(setup *flow.EpochSetup, verifyNetworkAddress bool) error {
 	}
 
 	// there should be no nodes with zero weight
-	// TODO: we might want to remove the following as we generally want to allow nodes with
-	// zero weight in the protocol state.
+	// TODO: we might want to remove the following as we generally want to allow nodes with zero weight in the protocol state.
 	for _, participant := range setup.Participants {
 		if participant.Weight == 0 {
 			return fmt.Errorf("node with zero weight (%x)", participant.NodeID)
@@ -147,9 +145,9 @@ func verifyEpochSetup(setup *flow.EpochSetup, verifyNetworkAddress bool) error {
 // added to the state is valid. In addition to intrinsic validity, we also
 // check that it is valid w.r.t. the previous epoch setup event, and the
 // current epoch status.
+// Assumes all inputs besides extendingCommit are already validated.
 // Expected errors during normal operations:
-// * protocol.InvalidServiceEventError
-//   if the input service event is invalid to extend the currently active epoch status
+// * protocol.InvalidServiceEventError if the input service event is invalid to extend the currently active epoch status
 func isValidExtendingEpochCommit(extendingCommit *flow.EpochCommit, extendingSetup *flow.EpochSetup, activeSetup *flow.EpochSetup, status *flow.EpochStatus) error {
 
 	// We should only have a single epoch commit event per epoch.
@@ -170,31 +168,34 @@ func isValidExtendingEpochCommit(extendingCommit *flow.EpochCommit, extendingSet
 
 	err := isValidEpochCommit(extendingCommit, extendingSetup)
 	if err != nil {
-		return state.NewInvalidExtensionErrorf("invalid epoch commit: %s", err)
+		return protocol.NewInvalidServiceEventErrorf("invalid epoch commit: %s", err)
 	}
 
 	return nil
 }
 
 // isValidEpochCommit checks whether an epoch commit service event is intrinsically valid.
+// Assumes the input flow.EpochSetup event has already been validated.
+// Expected errors during normal operations:
+// * protocol.InvalidServiceEventError if the EpochCommit is invalid
 func isValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error {
 
 	if len(setup.Assignments) != len(commit.ClusterQCs) {
-		return fmt.Errorf("number of clusters (%d) does not number of QCs (%d)", len(setup.Assignments), len(commit.ClusterQCs))
+		return protocol.NewInvalidServiceEventErrorf("number of clusters (%d) does not number of QCs (%d)", len(setup.Assignments), len(commit.ClusterQCs))
 	}
 
 	if commit.Counter != setup.Counter {
-		return fmt.Errorf("inconsistent epoch counter between commit (%d) and setup (%d) events in same epoch", commit.Counter, setup.Counter)
+		return protocol.NewInvalidServiceEventErrorf("inconsistent epoch counter between commit (%d) and setup (%d) events in same epoch", commit.Counter, setup.Counter)
 	}
 
 	// make sure we have a valid DKG public key
 	if commit.DKGGroupKey == nil {
-		return fmt.Errorf("missing DKG public group key")
+		return protocol.NewInvalidServiceEventErrorf("missing DKG public group key")
 	}
 
 	participants := setup.Participants.Filter(filter.IsValidDKGParticipant)
 	if len(participants) != len(commit.DKGParticipantKeys) {
-		return fmt.Errorf("participant list (len=%d) does not match dkg key list (len=%d)", len(participants), len(commit.DKGParticipantKeys))
+		return protocol.NewInvalidServiceEventErrorf("participant list (len=%d) does not match dkg key list (len=%d)", len(participants), len(commit.DKGParticipantKeys))
 	}
 
 	return nil
