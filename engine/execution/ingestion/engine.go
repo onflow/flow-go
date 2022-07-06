@@ -849,6 +849,7 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 				blockHeight := executableBlock.Block.Header.Height
 				if blockHeight > e.maxCollectionHeight {
 					e.metrics.UpdateCollectionMaxHeight(blockHeight)
+					e.maxCollectionHeight = blockHeight
 				}
 
 				if completeCollection.IsCompleted() {
