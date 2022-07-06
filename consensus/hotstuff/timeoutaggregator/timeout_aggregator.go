@@ -28,14 +28,14 @@ const defaultTimeoutQueueCapacity = 1000
 // It's safe to use in concurrent environment.
 type TimeoutAggregator struct {
 	*component.ComponentManager
-	log                        zerolog.Logger
-	notifier                   hotstuff.Consumer
-	committee                  hotstuff.Replicas
-	lowestRetainedView         counters.StrictMonotonousCounter // lowest view, for which we still process timeouts
-	collectors                 hotstuff.TimeoutCollectors
-	queuedTimeoutsNotifier     engine.Notifier
-	enteringViewNotifier engine.Notifier
-	queuedTimeouts             *fifoqueue.FifoQueue
+	log                    zerolog.Logger
+	notifier               hotstuff.Consumer
+	committee              hotstuff.Replicas
+	lowestRetainedView     counters.StrictMonotonousCounter // lowest view, for which we still process timeouts
+	collectors             hotstuff.TimeoutCollectors
+	queuedTimeoutsNotifier engine.Notifier
+	enteringViewNotifier   engine.Notifier
+	queuedTimeouts         *fifoqueue.FifoQueue
 }
 
 var _ hotstuff.TimeoutAggregator = (*TimeoutAggregator)(nil)
@@ -55,15 +55,14 @@ func NewTimeoutAggregator(log zerolog.Logger,
 	}
 
 	aggregator := &TimeoutAggregator{
-		log:                        log.With().Str("component", "timeout_aggregator").Logger(),
-		notifier:                   notifier,
-		lowestRetainedView:         counters.NewMonotonousCounter(lowestRetainedView),
-		activeView:                 counters.NewMonotonousCounter(lowestRetainedView),
-		committee:                  committee,
-		collectors:                 collectors,
-		queuedTimeoutsNotifier:     engine.NewNotifier(),
-		enteringViewEventsNotifier: engine.NewNotifier(),
-		queuedTimeouts:             queuedTimeouts,
+		log:                    log.With().Str("component", "timeout_aggregator").Logger(),
+		notifier:               notifier,
+		lowestRetainedView:     counters.NewMonotonousCounter(lowestRetainedView),
+		committee:              committee,
+		collectors:             collectors,
+		queuedTimeoutsNotifier: engine.NewNotifier(),
+		enteringViewNotifier:   engine.NewNotifier(),
+		queuedTimeouts:         queuedTimeouts,
 	}
 
 	componentBuilder := component.NewComponentManagerBuilder()
@@ -201,14 +200,12 @@ func (t *TimeoutAggregator) AddTimeout(timeoutObject *model.TimeoutObject) {
 	}
 }
 
-// PruneUpToView deletes all timeouts _below_ to the given view, as well as
+// PruneUpToView deletes all `TimeoutCollector`s _below_ to the given view, as well as
 // related indices. We only retain and process `TimeoutCollector`s, whose view is equal or larger
 // than `lowestRetainedView`. If `lowestRetainedView` is smaller than the
 // previous value, the previous value is kept and the method call is a NoOp.
 func (t *TimeoutAggregator) PruneUpToView(lowestRetainedView uint64) {
-	if t.lowestRetainedView.Set(lowestRetainedView) {
-		t.collectors.PruneUpToView(lowestRetainedView)
-	}
+	t.collectors.PruneUpToView(lowestRetainedView)
 }
 
 // OnEnteringView implements the `OnEnteringView` callback from the `hotstuff.FinalizationConsumer`
@@ -216,20 +213,20 @@ func (t *TimeoutAggregator) PruneUpToView(lowestRetainedView uint64) {
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
 func (t *TimeoutAggregator) OnEnteringView(viewNumber uint64, _ flow.Identifier) {
-	if t.activeView.Set(viewNumber) {
-		t.enteringViewEventsNotifier.Notify()
+	if t.lowestRetainedView.Set(viewNumber) {
+		t.enteringViewNotifier.Notify()
 	}
 }
 
 // enteringViewProcessingLoop is a separate goroutine that performs processing of entering view events
 func (t *TimeoutAggregator) enteringViewProcessingLoop(ctx context.Context) {
-	notifier := t.enteringViewEventsNotifier.Channel()
+	notifier := t.enteringViewNotifier.Channel()
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-notifier:
-			t.PruneUpToView(t.activeView.Value())
+			t.PruneUpToView(t.lowestRetainedView.Value())
 		}
 	}
 }

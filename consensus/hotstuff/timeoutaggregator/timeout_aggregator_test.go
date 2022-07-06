@@ -120,10 +120,6 @@ func (s *TimeoutAggregatorTestSuite) TestAddTimeout_EpochUnknown() {
 
 // TestPruneUpToView tests that pruning removes collectors lower that retained view
 func (s *TimeoutAggregatorTestSuite) TestPruneUpToView() {
-	// try pruning with lower view than already set
-	s.aggregator.PruneUpToView(s.lowestRetainedView)
-	s.collectors.AssertNotCalled(s.T(), "PruneUpToView")
-
 	s.collectors.On("PruneUpToView", s.lowestRetainedView+1).Once()
 	s.aggregator.PruneUpToView(s.lowestRetainedView + 1)
 }

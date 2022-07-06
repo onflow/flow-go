@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/gammazero/workerpool"
 	"github.com/stretchr/testify/require"
@@ -31,12 +32,12 @@ type TimeoutCollectorsTestSuite struct {
 	mockedCollectors map[uint64]*mocks.TimeoutCollector
 	factoryMethod    NewCollectorFactoryMethod
 	collectors       *TimeoutCollectors
-	lowestView      uint64
+	lowestView       uint64
 	workerPool       *workerpool.WorkerPool
 }
 
 func (s *TimeoutCollectorsTestSuite) SetupTest() {
-	s.lowestLevel = 1000
+	s.lowestView = 1000
 	s.mockedCollectors = make(map[uint64]*mocks.TimeoutCollector)
 	s.workerPool = workerpool.New(2)
 	s.factoryMethod = func(view uint64) (hotstuff.TimeoutCollector, error) {
@@ -45,7 +46,7 @@ func (s *TimeoutCollectorsTestSuite) SetupTest() {
 		}
 		return nil, fmt.Errorf("mocked collector %v not found: %w", view, factoryError)
 	}
-	s.collectors = NewTimeoutCollectors(unittest.Logger(), s.lowestLevel, s.factoryMethod)
+	s.collectors = NewTimeoutCollectors(unittest.Logger(), s.lowestView, s.factoryMethod)
 }
 
 func (s *TimeoutCollectorsTestSuite) TearDownTest() {
@@ -64,7 +65,7 @@ func (s *TimeoutCollectorsTestSuite) prepareMockedCollector(view uint64) *mocks.
 // TestGetOrCreatorCollector_ViewLowerThanLowest tests a scenario where caller tries to create a collector with view
 // lower than already pruned one. This should result in sentinel error `DecreasingPruningHeightError`
 func (s *TimeoutCollectorsTestSuite) TestGetOrCreatorCollector_ViewLowerThanLowest() {
-	collector, created, err := s.collectors.GetOrCreateCollector(s.lowestLevel - 10)
+	collector, created, err := s.collectors.GetOrCreateCollector(s.lowestView - 10)
 	require.Nil(s.T(), collector)
 	require.False(s.T(), created)
 	require.Error(s.T(), err)
@@ -73,7 +74,7 @@ func (s *TimeoutCollectorsTestSuite) TestGetOrCreatorCollector_ViewLowerThanLowe
 
 // TestGetOrCreateCollector_ValidCollector tests a happy path scenario where we try first to create and then retrieve cached collector.
 func (s *TimeoutCollectorsTestSuite) TestGetOrCreateCollector_ValidCollector() {
-	view := s.lowestLevel + 10
+	view := s.lowestView + 10
 	s.prepareMockedCollector(view)
 	collector, created, err := s.collectors.GetOrCreateCollector(view)
 	require.NoError(s.T(), err)
@@ -89,7 +90,7 @@ func (s *TimeoutCollectorsTestSuite) TestGetOrCreateCollector_ValidCollector() {
 // TestGetOrCreateCollector_FactoryError tests that error from factory method is propagated to caller.
 func (s *TimeoutCollectorsTestSuite) TestGetOrCreateCollector_FactoryError() {
 	// creating collector without calling prepareMockedCollector will yield factoryError.
-	collector, created, err := s.collectors.GetOrCreateCollector(s.lowestLevel + 10)
+	collector, created, err := s.collectors.GetOrCreateCollector(s.lowestView + 10)
 	require.Nil(s.T(), collector)
 	require.False(s.T(), created)
 	require.ErrorIs(s.T(), err, factoryError)
@@ -99,7 +100,7 @@ func (s *TimeoutCollectorsTestSuite) TestGetOrCreateCollector_FactoryError() {
 // only one collector and all other instances are retrieved from cache.
 func (s *TimeoutCollectorsTestSuite) TestGetOrCreateCollectors_ConcurrentAccess() {
 	createdTimes := atomic.NewUint64(0)
-	view := s.lowestLevel + 10
+	view := s.lowestView + 10
 	s.prepareMockedCollector(view)
 	var wg sync.WaitGroup
 	for i := 0; i < 10; i++ {
@@ -123,14 +124,14 @@ func (s *TimeoutCollectorsTestSuite) TestPruneUpToView() {
 	numberOfCollectors := uint64(10)
 	prunedViews := make([]uint64, 0)
 	for i := uint64(0); i < numberOfCollectors; i++ {
-		view := s.lowestLevel + i
+		view := s.lowestView + i
 		s.prepareMockedCollector(view)
 		_, _, err := s.collectors.GetOrCreateCollector(view)
 		require.NoError(s.T(), err)
 		prunedViews = append(prunedViews, view)
 	}
 
-	pruningHeight := s.lowestLevel + numberOfCollectors
+	pruningHeight := s.lowestView + numberOfCollectors
 
 	expectedCollectors := make([]hotstuff.TimeoutCollector, 0)
 	for i := uint64(0); i < numberOfCollectors; i++ {
