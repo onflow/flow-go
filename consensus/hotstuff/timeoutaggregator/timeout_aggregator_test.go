@@ -92,12 +92,12 @@ func (s *TimeoutAggregatorTestSuite) TestAddTimeout_HappyPath() {
 func (s *TimeoutAggregatorTestSuite) TestAddTimeout_EpochUnknown() {
 	timeout := helper.TimeoutObjectFixture(helper.WithTimeoutObjectView(s.lowestRetainedView))
 	*s.collectors = *mocks.NewTimeoutCollectors(s.T())
-	s.collectors.On("GetOrCreateCollector", timeout.View).Return(nil, false, model.ErrViewForUnknownEpoch).Once()
+	done := make(chan struct{})
+	s.collectors.On("GetOrCreateCollector", timeout.View).Return(nil, false, model.ErrViewForUnknownEpoch).Run(func(args mock.Arguments) {
+		close(done)
+	}).Once()
 	s.aggregator.AddTimeout(timeout)
-	require.Eventually(s.T(),
-		func() bool {
-			return s.collectors.AssertCalled(s.T(), "GetOrCreateCollector", timeout.View)
-		}, time.Second, time.Millisecond*20)
+	unittest.AssertClosesBefore(s.T(), done, time.Second)
 }
 
 // TestPruneUpToView tests that pruning removes collectors lower that retained view
@@ -110,10 +110,10 @@ func (s *TimeoutAggregatorTestSuite) TestPruneUpToView() {
 // Tests the whole processing pipeline.
 func (s *TimeoutAggregatorTestSuite) TestOnEnteringView() {
 	view := s.lowestRetainedView + 1
-	s.collectors.On("PruneUpToView", view).Once()
+	done := make(chan struct{})
+	s.collectors.On("PruneUpToView", view).Run(func(args mock.Arguments) {
+		close(done)
+	}).Once()
 	s.aggregator.OnEnteringView(view, unittest.IdentifierFixture())
-	require.Eventually(s.T(),
-		func() bool {
-			return s.collectors.AssertCalled(s.T(), "PruneUpToView", view)
-		}, time.Second, time.Millisecond*20)
+	unittest.AssertClosesBefore(s.T(), done, time.Second)
 }
