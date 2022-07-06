@@ -409,6 +409,7 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 	defer span.Finish()
 
 	blockID := candidate.ID()
+	latestSealID := last.ID()
 
 	// apply any state changes from service events sealed by this block's parent
 	dbUpdates, insertingBlockTriggersEpochFallback, err := m.handleEpochServiceEvents(candidate)
@@ -427,7 +428,7 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 		}
 
 		// index the latest sealed block in this fork
-		err = transaction.WithTx(operation.IndexBlockSeal(blockID, last.ID()))(tx)
+		err = transaction.WithTx(operation.IndexBlockSeal(blockID, latestSealID))(tx)
 		if err != nil {
 			return fmt.Errorf("could not index candidate seal: %w", err)
 		}
@@ -454,16 +455,19 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 			}
 		}
 
-		// emit protocol events
+		// TODO deliver protocol events async https://github.com/dapperlabs/flow-go/issues/6317
 		if insertingBlockTriggersEpochFallback {
 			m.consumer.EpochEmergencyFallbackTriggered()
 		}
 
 		return nil
 	})
-
 	if err != nil {
 		return fmt.Errorf("could not execute state extension: %w", err)
+	}
+
+	if insertingBlockTriggersEpochFallback {
+		m.metrics.EpochEmergencyFallbackTriggered()
 	}
 
 	return nil
@@ -486,6 +490,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	// keep track of metrics updates and protocol events to emit:
 	// * metrics are updated after a successful database update
 	// * protocol events are emitted atomically with the database update
+	// TODO deliver protocol events async https://github.com/dapperlabs/flow-go/issues/6317
 	var metrics []func()
 	var events []func()
 
@@ -541,6 +546,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		if epochFallbackTriggered {
 			// emit the protocol event only the first time epoch fallback is triggered
 			events = append(events, m.consumer.EpochEmergencyFallbackTriggered)
+			metrics = append(metrics, m.metrics.EpochEmergencyFallbackTriggered)
 		}
 	}
 
@@ -562,11 +568,6 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		}
 		metrics = append(metrics, epochTransitionMetrics...)
 		events = append(events, epochTransitionEvents...)
-	}
-
-	// if epoch emergency fallback is triggered, update metric
-	if epochFallbackTriggered {
-		metrics = append(metrics, m.metrics.EpochEmergencyFallbackTriggered)
 	}
 
 	// Persist updates in database
@@ -596,8 +597,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 			}
 		}
 
-		// emit protocol events within the scope of the Badger transaction to
-		// guarantee at-least-once delivery
+		// TODO deliver protocol events async https://github.com/dapperlabs/flow-go/issues/6317
 		m.consumer.BlockFinalized(header)
 		for _, emit := range events {
 			emit()
@@ -646,8 +646,7 @@ func (m *FollowerState) epochFallbackTriggeredByFinalizedBlock(block *flow.Heade
 	if err != nil {
 		return false, fmt.Errorf("could not get epoch commit safety threshold: %w", err)
 	}
-	epochCommitmentDeadline := currentEpochSetup.FinalView - safetyThreshold
-	blockExceedsDeadline := block.View >= epochCommitmentDeadline
+	blockExceedsDeadline := block.View+safetyThreshold >= currentEpochSetup.FinalView
 
 	// 2. determine whether the next epoch is committed w.r.t. block B
 	currentEpochPhase, err := epochStatus.Phase()
@@ -685,6 +684,16 @@ func (m *FollowerState) epochTransitionMetricsAndEventsOnBlockFinalized(block *f
 	}
 
 	if block.View > parentEpochFinalView {
+		// sanity check: new currentEpochSetup extends parent epoch
+		parentEpochCounter, err := parentBlocksEpoch.Counter()
+		if err != nil {
+			return nil, nil, fmt.Errorf("could not retrieve parent epoch counter: %w", err)
+		}
+		if parentEpochCounter+1 != currentEpochSetup.Counter {
+			return nil, nil, fmt.Errorf("sanity check failed: counter for new current epoch is not consecutive with parent epoch (expected %d+1 = %d)",
+				parentEpochCounter, currentEpochSetup.Counter)
+		}
+
 		events = append(events, func() { m.consumer.EpochTransition(currentEpochSetup.Counter, block) })
 
 		// set current epoch counter corresponding to new epoch
@@ -714,7 +723,7 @@ func (m *FollowerState) epochTransitionMetricsAndEventsOnBlockFinalized(block *f
 // Convention:
 //           A <-- ... <-- P(Seal_A) <----- B
 //                         ↑                ↑
-//           block con service event        first block of new Epoch phase
+//           block sealing service event    first block of new Epoch phase
 //           for epoch-phase transition     (e.g. EpochSetup phase)
 //           (e.g. EpochSetup event)
 //
@@ -789,48 +798,45 @@ func (m *FollowerState) epochPhaseMetricsAndEventsOnBlockFinalized(block *flow.H
 // As the parent was a valid extension of the chain, by induction, the parent
 // satisfies all consistency requirements of the protocol.
 //
+// Return values:
+//  1. EpochStatus for `block`
+//  2. boolean flag indicating whether we are in EECC
 // No error returns are expected under normal operations
-func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, error) {
-
+func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, bool, error) {
 	parentStatus, err := m.epoch.statuses.ByBlockID(block.ParentID)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve epoch state for parent: %w", err)
+		return nil, false, fmt.Errorf("could not retrieve epoch state for parent: %w", err)
 	}
 	parentSetup, err := m.epoch.setups.ByID(parentStatus.CurrentEpoch.SetupID)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve EpochSetup event for parent: %w", err)
+		return nil, false, fmt.Errorf("could not retrieve EpochSetup event for parent: %w", err)
 	}
 	epochFallbackTriggered, err := m.isEpochEmergencyFallbackTriggered()
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve epoch fallback status: %w", err)
+		return nil, false, fmt.Errorf("could not retrieve epoch fallback status: %w", err)
 	}
 
-	// if epoch fallback mode is triggered, we continue with our parent's epoch status
-	if epochFallbackTriggered {
-		return parentStatus.Copy(), nil
+	// Case 1 or 2b (still in parent block's epoch or epoch fallback triggered):
+	if block.View <= parentSetup.FinalView || epochFallbackTriggered {
+		// IMPORTANT: copy the status to avoid modifying the parent status in the cache
+		return parentStatus.Copy(), epochFallbackTriggered, nil
 	}
 
-	// candidate represents the first block of a new epoch.
-	if parentSetup.FinalView < block.View {
-		// sanity check: parent's epoch Preparation should be completed and have EpochSetup and EpochCommit events
-		if parentStatus.NextEpoch.SetupID == flow.ZeroID {
-			return nil, fmt.Errorf("missing setup event for starting next epoch")
-		}
-		if parentStatus.NextEpoch.CommitID == flow.ZeroID {
-			return nil, fmt.Errorf("missing commit event for starting next epoch")
-		}
-		status, err := flow.NewEpochStatus(
-			parentStatus.CurrentEpoch.SetupID, parentStatus.CurrentEpoch.CommitID,
-			parentStatus.NextEpoch.SetupID, parentStatus.NextEpoch.CommitID,
-			flow.ZeroID, flow.ZeroID,
-		)
-		return status, err
+	// Case 2a (first block of new epoch):
+	// sanity check: parent's epoch Preparation should be completed and have EpochSetup and EpochCommit events
+	if parentStatus.NextEpoch.SetupID == flow.ZeroID {
+		return nil, false, fmt.Errorf("missing setup event for starting next epoch")
 	}
+	if parentStatus.NextEpoch.CommitID == flow.ZeroID {
+		return nil, false, fmt.Errorf("missing commit event for starting next epoch")
+	}
+	epochStatus, err := flow.NewEpochStatus(
+		parentStatus.CurrentEpoch.SetupID, parentStatus.CurrentEpoch.CommitID,
+		parentStatus.NextEpoch.SetupID, parentStatus.NextEpoch.CommitID,
+		flow.ZeroID, flow.ZeroID,
+	)
+	return epochStatus, epochFallbackTriggered, err
 
-	// Block is in the same epoch as its parent, re-use the same epoch status
-	// IMPORTANT: copy the status to avoid modifying the parent status in the cache
-	currentStatus := parentStatus.Copy()
-	return currentStatus, err
 }
 
 // handleEpochServiceEvents handles applying state changes which occur as a result
@@ -867,15 +873,13 @@ func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, erro
 //    one block for a given database instance.
 //
 // No errors are expected during normal operation.
+// TODO: we should only consider an incorporated service fatal, and trigger EECC, on finalization of block D https://github.com/dapperlabs/flow-go/issues/6316
 func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (
 	dbUpdates []func(*transaction.Tx) error,
 	insertingCandidateTriggersEpochFallback bool,
 	err error,
 ) {
-
-	blockID := candidate.ID()
-
-	epochStatus, err := m.epochStatus(candidate.Header)
+	epochStatus, isEpochFallbackTriggered, err := m.epochStatus(candidate.Header)
 	if err != nil {
 		return nil, false, fmt.Errorf("could not determine epoch status for candidate block: %w", err)
 	}
@@ -883,30 +887,30 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (
 	if err != nil {
 		return nil, false, fmt.Errorf("could not retrieve current epoch setup event: %w", err)
 	}
-	isEpochFallbackTriggered, err := m.isEpochEmergencyFallbackTriggered()
-	if err != nil {
-		return nil, false, fmt.Errorf("could not check if epoch fallback mode triggered: %w", err)
+
+	// always persist the candidate's epoch status
+	// note: We are scheduling the operation to store the Epoch status using the _pointer_ variable `epochStatus`.
+	// The struct `epochStatus` points to will still be modified below.
+	blockID := candidate.ID()
+	dbUpdates = append(dbUpdates, m.epoch.statuses.StoreTx(blockID, epochStatus))
+
+	// never process service events after epoch fallback is triggered
+	if isEpochFallbackTriggered {
+		return dbUpdates, false, nil
 	}
 
-	// we will apply service events from blocks which are sealed by this block's PARENT
-	parent, err := m.blocks.ByID(candidate.Header.ParentID)
-	if err != nil {
-		return nil, false, fmt.Errorf("could not get parent (id=%x): %w", candidate.Header.ParentID, err)
-	}
-
-	// The payload might contain epoch preparation service events for the next
+	// We apply service events from blocks which are sealed by this block's PARENT.
+	// The parent's payload might contain epoch preparation service events for the next
 	// epoch. In this case, we need to update the tentative protocol state.
 	// We need to validate whether all information is available in the protocol
 	// state to go to the next epoch when needed. In cases where there is a bug
 	// in the smart contract, it could be that this happens too late and the
 	// chain finalization should halt.
-SealLoop:
+	parent, err := m.blocks.ByID(candidate.Header.ParentID)
+	if err != nil {
+		return nil, false, fmt.Errorf("could not get parent (id=%x): %w", candidate.Header.ParentID, err)
+	}
 	for _, seal := range parent.Payload.Seals {
-		// never process service events after epoch fallback is triggered
-		if isEpochFallbackTriggered {
-			break
-		}
-
 		result, err := m.results.ByID(seal.ResultID)
 		if err != nil {
 			return nil, false, fmt.Errorf("could not get result (id=%x) for seal (id=%x): %w", seal.ResultID, seal.ID(), err)
@@ -921,8 +925,7 @@ SealLoop:
 				err := isValidExtendingEpochSetup(ev, activeSetup, epochStatus)
 				if protocol.IsInvalidServiceEventError(err) {
 					// we have observed an invalid service event, which triggers epoch fallback mode
-					insertingCandidateTriggersEpochFallback = true
-					break SealLoop
+					return dbUpdates, true, nil
 				}
 				if err != nil {
 					return nil, false, fmt.Errorf("unexpected error validating EpochSetup service event: %w", err)
@@ -944,8 +947,7 @@ SealLoop:
 				err = isValidExtendingEpochCommit(ev, extendingSetup, activeSetup, epochStatus)
 				if protocol.IsInvalidServiceEventError(err) {
 					// we have observed an invalid service event, which triggers epoch fallback mode
-					insertingCandidateTriggersEpochFallback = true
-					break SealLoop
+					return dbUpdates, true, nil
 				}
 				if err != nil {
 					return nil, false, fmt.Errorf("unexpected error validating EpochCommit service event: %w", err)
@@ -962,9 +964,6 @@ SealLoop:
 			}
 		}
 	}
-
-	// always persist the candidate's epoch status
-	dbUpdates = append(dbUpdates, m.epoch.statuses.StoreTx(blockID, epochStatus))
 	return
 }
 
@@ -1022,8 +1021,7 @@ func (m *FollowerState) MarkValid(blockID flow.Identifier) error {
 
 		// trigger BlockProcessable for parent blocks above root height
 		if parent.Height > rootHeight {
-			// emit protocol event within the scope of the Badger transaction to
-			// guarantee at-least-once delivery
+			// TODO deliver protocol events async https://github.com/dapperlabs/flow-go/issues/6317
 			m.consumer.BlockProcessable(parent)
 		}
 		return nil

@@ -1232,7 +1232,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			epoch1CommitmentDeadline := epoch1FinalView - safetyThreshold
 
 			// finalizing block 1 should trigger EECC
-			metricsMock.On("EpochEmergencyFallbackTriggered").Twice()
+			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
 			protoEventsMock.On("EpochEmergencyFallbackTriggered").Once()
 
 			// we begin the epoch in the EpochStaking phase and
@@ -1335,7 +1335,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			block4.Header.View = epoch1CommitmentDeadline + rand.Uint64()%2
 
 			// finalizing block 4 should trigger EECC
-			metricsMock.On("EpochEmergencyFallbackTriggered").Twice()
+			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
 			protoEventsMock.On("EpochEmergencyFallbackTriggered").Once()
 
 			err = state.Extend(context.Background(), block4)
@@ -1428,7 +1428,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			require.NoError(t, err)
 
 			// incorporating the service event should trigger EECC
-			metricsMock.On("EpochEmergencyFallbackTriggered").Twice()
+			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
 			protoEventsMock.On("EpochEmergencyFallbackTriggered").Once()
 
 			// block 4 is where the service event state change comes into effect
