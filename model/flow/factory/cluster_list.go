@@ -9,7 +9,7 @@ import (
 
 // NewClusterList creates a new cluster list based on the given cluster assignment
 // and the provided list of identities.
-// As part os its computation, this function exhaustively verifies that the input is
+// As part of its computation, this function exhaustively verifies that the input is
 // protocol compliant. All error returns indicate that the inputs were not constructed
 // according to protocol rules.
 func NewClusterList(assignments flow.AssignmentList, collectors flow.IdentityList) (flow.ClusterList, error) {
