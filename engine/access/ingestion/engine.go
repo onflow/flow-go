@@ -433,6 +433,7 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, r *flow.Execut
 
 	if block.Header.Height > e.maxReceiptHeight {
 		e.transactionMetrics.UpdateExecutionReceiptMaxHeight(block.Header.Height)
+		e.maxReceiptHeight = block.Header.Height
 	}
 
 	e.trackExecutedMetricForReceipt(r)
