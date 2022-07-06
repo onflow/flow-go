@@ -21,10 +21,10 @@ func TestConduitRelayMessage_Publish(t *testing.T) {
 	channel := network.Channel("test-channel")
 
 	c := &Conduit{
-		ctx:               ctx,
-		cancel:            cancel,
-		channel:           channel,
-		conduitController: controller,
+		ctx:              ctx,
+		cancel:           cancel,
+		channel:          channel,
+		egressController: controller,
 	}
 
 	event := unittest.MockEntityFixture()
@@ -50,10 +50,10 @@ func TestConduitRelayMessage_Multicast(t *testing.T) {
 	num := 3 // targets of multicast
 
 	c := &Conduit{
-		ctx:               ctx,
-		cancel:            cancel,
-		channel:           channel,
-		conduitController: controller,
+		ctx:              ctx,
+		cancel:           cancel,
+		channel:          channel,
+		egressController: controller,
 	}
 
 	event := unittest.MockEntityFixture()
@@ -78,10 +78,10 @@ func TestConduitRelayMessage_Unicast(t *testing.T) {
 	channel := network.Channel("test-channel")
 
 	c := &Conduit{
-		ctx:               ctx,
-		cancel:            cancel,
-		channel:           channel,
-		conduitController: controller,
+		ctx:              ctx,
+		cancel:           cancel,
+		channel:          channel,
+		egressController: controller,
 	}
 
 	event := unittest.MockEntityFixture()
@@ -103,10 +103,10 @@ func TestConduitReflectError_Unicast(t *testing.T) {
 	channel := network.Channel("test-channel")
 
 	c := &Conduit{
-		ctx:               ctx,
-		cancel:            cancel,
-		channel:           channel,
-		conduitController: controller,
+		ctx:              ctx,
+		cancel:           cancel,
+		channel:          channel,
+		egressController: controller,
 	}
 
 	event := unittest.MockEntityFixture()
@@ -129,10 +129,10 @@ func TestConduitReflectError_Multicast(t *testing.T) {
 	num := 3 // targets of multicast
 
 	c := &Conduit{
-		ctx:               ctx,
-		cancel:            cancel,
-		channel:           channel,
-		conduitController: controller,
+		ctx:              ctx,
+		cancel:           cancel,
+		channel:          channel,
+		egressController: controller,
 	}
 
 	event := unittest.MockEntityFixture()
@@ -158,10 +158,10 @@ func TestConduitReflectError_Publish(t *testing.T) {
 	channel := network.Channel("test-channel")
 
 	c := &Conduit{
-		ctx:               ctx,
-		cancel:            cancel,
-		channel:           channel,
-		conduitController: controller,
+		ctx:              ctx,
+		cancel:           cancel,
+		channel:          channel,
+		egressController: controller,
 	}
 
 	event := unittest.MockEntityFixture()
@@ -187,10 +187,10 @@ func TestConduitClose_HappyPath(t *testing.T) {
 	channel := network.Channel("test-channel")
 
 	c := &Conduit{
-		ctx:               ctx,
-		cancel:            cancel,
-		channel:           channel,
-		conduitController: controller,
+		ctx:              ctx,
+		cancel:           cancel,
+		channel:          channel,
+		egressController: controller,
 	}
 
 	controller.On("EngineClosingChannel", channel).
@@ -213,10 +213,10 @@ func TestConduitClose_Error(t *testing.T) {
 	channel := network.Channel("test-channel")
 
 	c := &Conduit{
-		ctx:               ctx,
-		cancel:            cancel,
-		channel:           channel,
-		conduitController: controller,
+		ctx:              ctx,
+		cancel:           cancel,
+		channel:          channel,
+		egressController: controller,
 	}
 
 	controller.On("EngineClosingChannel", channel).
