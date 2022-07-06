@@ -31,7 +31,7 @@ func (_m *ConduitMaster) EngineClosingChannel(_a0 network.Channel) error {
 }
 
 // HandleIncomingEvent provides a mock function with given fields: _a0, _a1, _a2, _a3, _a4
-func (_m *ConduitMaster) HandleIncomingEvent(_a0 interface{}, _a1 network.Channel, _a2 insecure.Protocol, _a3 uint32, _a4 ...flow.Identifier) error {
+func (_m *ConduitMaster) HandleOutgoingEvent(_a0 interface{}, _a1 network.Channel, _a2 insecure.Protocol, _a3 uint32, _a4 ...flow.Identifier) error {
 	_va := make([]interface{}, len(_a4))
 	for _i := range _a4 {
 		_va[_i] = _a4[_i]

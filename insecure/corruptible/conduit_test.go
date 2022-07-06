@@ -34,7 +34,7 @@ func TestConduitRelayMessage_Publish(t *testing.T) {
 	for _, id := range targetIds {
 		params = append(params, id)
 	}
-	controller.On("HandleIncomingEvent", params...).
+	controller.On("HandleOutgoingEvent", params...).
 		Return(nil).
 		Once()
 
@@ -63,7 +63,7 @@ func TestConduitRelayMessage_Multicast(t *testing.T) {
 	for _, id := range targetIds {
 		params = append(params, id)
 	}
-	controller.On("HandleIncomingEvent", params...).
+	controller.On("HandleOutgoingEvent", params...).
 		Return(nil).
 		Once()
 
@@ -87,7 +87,7 @@ func TestConduitRelayMessage_Unicast(t *testing.T) {
 	event := unittest.MockEntityFixture()
 	targetId := unittest.IdentifierFixture()
 
-	controller.On("HandleIncomingEvent", event, channel, insecure.Protocol_UNICAST, uint32(0), targetId).
+	controller.On("HandleOutgoingEvent", event, channel, insecure.Protocol_UNICAST, uint32(0), targetId).
 		Return(nil).
 		Once()
 
@@ -112,7 +112,7 @@ func TestConduitReflectError_Unicast(t *testing.T) {
 	event := unittest.MockEntityFixture()
 	targetId := unittest.IdentifierFixture()
 
-	controller.On("HandleIncomingEvent", event, channel, insecure.Protocol_UNICAST, uint32(0), targetId).
+	controller.On("HandleOutgoingEvent", event, channel, insecure.Protocol_UNICAST, uint32(0), targetId).
 		Return(fmt.Errorf("could not handle event")).
 		Once()
 
@@ -142,7 +142,7 @@ func TestConduitReflectError_Multicast(t *testing.T) {
 	for _, id := range targetIds {
 		params = append(params, id)
 	}
-	controller.On("HandleIncomingEvent", params...).
+	controller.On("HandleOutgoingEvent", params...).
 		Return(fmt.Errorf("could not handle event")).
 		Once()
 
@@ -171,7 +171,7 @@ func TestConduitReflectError_Publish(t *testing.T) {
 	for _, id := range targetIds {
 		params = append(params, id)
 	}
-	controller.On("HandleIncomingEvent", params...).
+	controller.On("HandleOutgoingEvent", params...).
 		Return(nil).
 		Once()
 

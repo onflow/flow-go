@@ -277,11 +277,11 @@ func (c *ConduitFactory) ConnectAttacker(_ *empty.Empty, stream insecure.Corrupt
 	return nil
 }
 
-// HandleIncomingEvent is called by the slave conduits of this factory to relay their incoming events.
+// HandleOutgoingEvent is called by the corruptible conduits of this factory to relay their outgoing events.
 // If there is an attacker registered to this factory, the event is dispatched to it.
 // Otherwise, the factory follows the correct protocol path by sending the message down to the networking layer
 // to deliver to its targets.
-func (c *ConduitFactory) HandleIncomingEvent(
+func (c *ConduitFactory) HandleOutgoingEvent(
 	event interface{},
 	channel network.Channel,
 	protocol insecure.Protocol,
