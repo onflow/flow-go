@@ -13,7 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
-	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -68,7 +68,7 @@ func (s *VoteCollectorsTestSuite) TestGetOrCreatorCollector_ViewLowerThanLowest(
 	require.Nil(s.T(), collector)
 	require.False(s.T(), created)
 	require.Error(s.T(), err)
-	require.True(s.T(), mempool.IsDecreasingPruningHeightError(err))
+	require.True(s.T(), model.IsBelowPrunedThresholdError(err))
 }
 
 // TestGetOrCreateCollector_ValidCollector tests a happy path scenario where we try first to create and then retrieve cached collector.
@@ -148,7 +148,7 @@ func (s *VoteCollectorsTestSuite) TestPruneUpToView() {
 	for _, prunedView := range prunedViews {
 		_, _, err := s.collectors.GetOrCreateCollector(prunedView)
 		require.Error(s.T(), err)
-		require.True(s.T(), mempool.IsDecreasingPruningHeightError(err))
+		require.True(s.T(), model.IsBelowPrunedThresholdError(err))
 	}
 
 	for _, collector := range expectedCollectors {

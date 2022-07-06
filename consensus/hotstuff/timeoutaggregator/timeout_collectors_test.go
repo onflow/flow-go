@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -75,7 +74,7 @@ func (s *TimeoutCollectorsTestSuite) TestGetOrCreateCollector_ViewLowerThanLowes
 	require.Nil(s.T(), collector)
 	require.False(s.T(), created)
 	require.Error(s.T(), err)
-	require.True(s.T(), mempool.IsDecreasingPruningHeightError(err))
+	require.True(s.T(), model.IsBelowPrunedThresholdError(err))
 }
 
 // TestGetOrCreateCollector_UnknownEpoch tests a scenario where caller tries to create a collector with view referring epoch
@@ -166,7 +165,7 @@ func (s *TimeoutCollectorsTestSuite) TestPruneUpToView() {
 	for _, prunedView := range prunedViews {
 		_, _, err := s.collectors.GetOrCreateCollector(prunedView)
 		require.Error(s.T(), err)
-		require.True(s.T(), mempool.IsDecreasingPruningHeightError(err))
+		require.True(s.T(), model.IsBelowPrunedThresholdError(err))
 	}
 
 	for _, collector := range expectedCollectors {

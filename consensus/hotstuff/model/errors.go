@@ -398,3 +398,30 @@ func IsInvalidTimeoutError(err error) bool {
 func (e InvalidTimeoutError) Unwrap() error {
 	return e.Err
 }
+
+// BelowPrunedThresholdError indicates that we are attempting to query or prune a mempool by a
+// key (typically block height or block view) which is lower than the lowest retained key threshold.
+// In other words, we have already pruned above the queried key.
+type BelowPrunedThresholdError struct {
+	err error
+}
+
+func NewBelowPrunedThresholdErrorf(msg string, args ...interface{}) error {
+	return BelowPrunedThresholdError{
+		err: fmt.Errorf(msg, args...),
+	}
+}
+
+func (e BelowPrunedThresholdError) Unwrap() error {
+	return e.err
+}
+
+func (e BelowPrunedThresholdError) Error() string {
+	return e.err.Error()
+}
+
+// IsBelowPrunedThresholdError returns whether the given error is an BelowPrunedThresholdError error
+func IsBelowPrunedThresholdError(err error) bool {
+	var newIsBelowPrunedThresholdError BelowPrunedThresholdError
+	return errors.As(err, &newIsBelowPrunedThresholdError)
+}

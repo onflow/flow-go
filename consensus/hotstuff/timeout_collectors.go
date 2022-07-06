@@ -14,7 +14,7 @@ type TimeoutCollectors interface {
 	//  -  (collector, false, nil) if the collector can be found by the view.
 	//  -  (nil, false, error) if running into any exception creating the timeout collector.
 	// Expected error returns during normal operations:
-	//  * mempool.DecreasingPruningHeightError if view is below the pruning threshold
+	//  * model.BelowPrunedThresholdError if view is below the pruning threshold
 	//  * model.ErrViewForUnknownEpoch if view is not yet pruned but no epoch containing the given view is known
 	GetOrCreateCollector(view uint64) (collector TimeoutCollector, created bool, err error)
 
