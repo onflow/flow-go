@@ -35,17 +35,24 @@ type Middleware interface {
 	//
 	// Dispatch should be used whenever guaranteed delivery to a specific target is required. Otherwise, Publish is
 	// a more efficient candidate.
+	// During normal operations any error returned is expected to be benign.
 	SendDirect(msg *message.Message, targetID flow.Identifier) error
 
 	// Publish publishes a message on the channel. It models a distributed broadcast where the message is meant for all or
 	// a many nodes subscribing to the channel. It does not guarantee the delivery though, and operates on a best
 	// effort.
+	// During normal operations any error returned is expected to be benign.
 	Publish(msg *message.Message, channel Channel) error
 
 	// Subscribe subscribes the middleware to a channel.
+	// During normal operations no errors are expected to be returned.
+	// If the libP2P node fails to subscribe to the topic created from
+	// the provided channel and returns an error this error is considered
+	// catastrophic as the node would not be able to operate correctly.
 	Subscribe(channel Channel) error
 
 	// Unsubscribe unsubscribes the middleware from a channel.
+	// During normal operations any error returned is expected to be benign.
 	Unsubscribe(channel Channel) error
 
 	// UpdateNodeAddresses fetches and updates the addresses of all the authorized participants
