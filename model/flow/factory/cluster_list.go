@@ -9,9 +9,9 @@ import (
 
 // NewClusterList creates a new cluster list based on the given cluster assignment
 // and the provided list of identities.
-// The caller must ensure each assignment contains identities ordered in canonical order, so that
-// each cluster in the returned cluster list is ordered in canonical order as well. If not,
-// an error will be returned.
+// As part of its computation, this function exhaustively verifies that the input is
+// protocol compliant. All error returns indicate that the inputs were not constructed
+// according to protocol rules.
 func NewClusterList(assignments flow.AssignmentList, collectors flow.IdentityList) (flow.ClusterList, error) {
 
 	// build a lookup for all the identities by node identifier

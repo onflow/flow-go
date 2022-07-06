@@ -27,6 +27,13 @@ type InstanceParams interface {
 	// the seal for the root block used to bootstrap this state and may differ from
 	// node to node for the same protocol state.
 	Seal() (*flow.Seal, error)
+
+	// EpochFallbackTriggered returns whether epoch fallback mode (EECC) has been triggered.
+	// EECC is a permanent, spork-scoped state which is triggered when the next
+	// epoch fails to be committed in the allocated time. Once EECC is triggered,
+	// it will remain in effect until the next spork.
+	// TODO necessary?
+	//EpochFallbackTriggered() (bool, error)
 }
 
 // GlobalParams represents protocol state parameters that do not vary between instances.
