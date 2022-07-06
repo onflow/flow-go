@@ -681,6 +681,16 @@ func (m *FollowerState) epochTransitionMetricsAndEventsOnBlockFinalized(block *f
 	}
 
 	if block.View > parentEpochFinalView {
+		// sanity check: new currentEpochSetup extends parent epoch
+		parentEpochCounter, err := parentBlocksEpoch.Counter()
+		if err != nil {
+			return nil, nil, fmt.Errorf("could not retrieve parent epoch counter: %w", err)
+		}
+		if parentEpochCounter+1 != currentEpochSetup.Counter {
+			return nil, nil, fmt.Errorf("sanity check failed: counter for new current epoch is not consecutive with parent epoch (expected %d+1 = %d)",
+				parentEpochCounter, currentEpochSetup.Counter)
+		}
+
 		events = append(events, func() { m.consumer.EpochTransition(currentEpochSetup.Counter, block) })
 
 		// set current epoch counter corresponding to new epoch
