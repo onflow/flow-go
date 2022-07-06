@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -33,7 +32,6 @@ type TimeoutAggregatorTestSuite struct {
 	highestKnownView   uint64
 	aggregator         *TimeoutAggregator
 	collectors         *mocks.TimeoutCollectors
-	committee          *mocks.Replicas
 	consumer           *mocks.Consumer
 	stopAggregator     context.CancelFunc
 }
@@ -42,13 +40,10 @@ func (s *TimeoutAggregatorTestSuite) SetupTest() {
 	var err error
 	s.collectors = mocks.NewTimeoutCollectors(s.T())
 	s.consumer = mocks.NewConsumer(s.T())
-	s.committee = mocks.NewReplicas(s.T())
 
 	s.lowestRetainedView = 100
 
-	s.committee.On("LeaderForView", mock.Anything).Return(flow.Identifier{}, nil).Maybe()
-
-	s.aggregator, err = NewTimeoutAggregator(unittest.Logger(), s.consumer, s.lowestRetainedView, s.committee, s.collectors)
+	s.aggregator, err = NewTimeoutAggregator(unittest.Logger(), s.consumer, s.lowestRetainedView, s.collectors)
 	require.NoError(s.T(), err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -81,41 +76,28 @@ func (s *TimeoutAggregatorTestSuite) TestAddTimeout_HappyPath() {
 		go func() {
 			defer wg.Done()
 			timeout := helper.TimeoutObjectFixture(helper.WithTimeoutObjectView(s.lowestRetainedView))
+			startWg.Wait()
 			s.aggregator.AddTimeout(timeout)
 		}()
 	}
+
+	startWg.Done()
 
 	require.Eventually(s.T(), func() bool {
 		return callCount.Load() == uint64(timeoutsCount)
 	}, time.Second, time.Millisecond*20)
 }
 
-// TestAddTimeout_DoubleTimeout tests if double timeout is reported to notifier when returned by TimeoutCollector
-func (s *TimeoutAggregatorTestSuite) TestAddTimeout_DoubleTimeout() {
-	collector := mocks.NewTimeoutCollector(s.T())
-	timeout := helper.TimeoutObjectFixture(helper.WithTimeoutObjectView(s.lowestRetainedView))
-	collector.On("AddTimeout", timeout).Return(model.NewDoubleTimeoutErrorf(timeout, timeout, "")).Once()
-	s.collectors.On("GetOrCreateCollector", s.lowestRetainedView).Return(collector, true, nil).Once()
-	s.consumer.On("OnDoubleTimeoutDetected", mock.Anything, mock.Anything).Once()
-	s.aggregator.AddTimeout(timeout)
-
-	require.Eventually(s.T(),
-		func() bool {
-			return s.consumer.AssertCalled(s.T(), "OnDoubleTimeoutDetected", timeout, timeout)
-		}, time.Second, time.Millisecond*20)
-}
-
 // TestAddTimeout_EpochUnknown tests if timeout objects targeting unknown epoch should be ignored
 func (s *TimeoutAggregatorTestSuite) TestAddTimeout_EpochUnknown() {
-	*s.committee = *mocks.NewReplicas(s.T())
 	timeout := helper.TimeoutObjectFixture(helper.WithTimeoutObjectView(s.lowestRetainedView))
-	s.committee.On("LeaderForView", timeout.View).Return(nil, model.ErrViewForUnknownEpoch).Once()
+	*s.collectors = *mocks.NewTimeoutCollectors(s.T())
+	s.collectors.On("GetOrCreateCollector", timeout.View).Return(nil, false, model.ErrViewForUnknownEpoch).Once()
 	s.aggregator.AddTimeout(timeout)
 	require.Eventually(s.T(),
 		func() bool {
-			return s.committee.AssertCalled(s.T(), "LeaderForView", timeout.View)
+			return s.collectors.AssertCalled(s.T(), "GetOrCreateCollector", timeout.View)
 		}, time.Second, time.Millisecond*20)
-	s.collectors.AssertNotCalled(s.T(), "GetOrCreateCollector")
 }
 
 // TestPruneUpToView tests that pruning removes collectors lower that retained view

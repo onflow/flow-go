@@ -8,12 +8,15 @@ import (
 	"time"
 
 	"github.com/gammazero/workerpool"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -31,6 +34,7 @@ type TimeoutCollectorsTestSuite struct {
 
 	mockedCollectors map[uint64]*mocks.TimeoutCollector
 	factoryMethod    NewCollectorFactoryMethod
+	committee        *mocks.Replicas
 	collectors       *TimeoutCollectors
 	lowestView       uint64
 	workerPool       *workerpool.WorkerPool
@@ -46,7 +50,9 @@ func (s *TimeoutCollectorsTestSuite) SetupTest() {
 		}
 		return nil, fmt.Errorf("mocked collector %v not found: %w", view, factoryError)
 	}
-	s.collectors = NewTimeoutCollectors(unittest.Logger(), s.lowestView, s.factoryMethod)
+	s.committee = mocks.NewReplicas(s.T())
+	s.committee.On("LeaderForView", mock.Anything).Return(flow.ZeroID, nil).Maybe()
+	s.collectors = NewTimeoutCollectors(unittest.Logger(), s.committee, s.lowestView, s.factoryMethod)
 }
 
 func (s *TimeoutCollectorsTestSuite) TearDownTest() {
@@ -62,14 +68,25 @@ func (s *TimeoutCollectorsTestSuite) prepareMockedCollector(view uint64) *mocks.
 	return collector
 }
 
-// TestGetOrCreatorCollector_ViewLowerThanLowest tests a scenario where caller tries to create a collector with view
+// TestGetOrCreateCollector_ViewLowerThanLowest tests a scenario where caller tries to create a collector with view
 // lower than already pruned one. This should result in sentinel error `DecreasingPruningHeightError`
-func (s *TimeoutCollectorsTestSuite) TestGetOrCreatorCollector_ViewLowerThanLowest() {
+func (s *TimeoutCollectorsTestSuite) TestGetOrCreateCollector_ViewLowerThanLowest() {
 	collector, created, err := s.collectors.GetOrCreateCollector(s.lowestView - 10)
 	require.Nil(s.T(), collector)
 	require.False(s.T(), created)
 	require.Error(s.T(), err)
 	require.True(s.T(), mempool.IsDecreasingPruningHeightError(err))
+}
+
+// TestGetOrCreateCollector_UnknownEpoch tests a scenario where caller tries to create a collector with view referring epoch
+// that we don't know about. This should result in sentinel error `
+func (s *TimeoutCollectorsTestSuite) TestGetOrCreateCollector_UnknownEpoch() {
+	*s.committee = *mocks.NewReplicas(s.T())
+	s.committee.On("LeaderForView", s.lowestView+100).Return(nil, model.ErrViewForUnknownEpoch).Once()
+	collector, created, err := s.collectors.GetOrCreateCollector(s.lowestView + 100)
+	require.Nil(s.T(), collector)
+	require.False(s.T(), created)
+	require.ErrorIs(s.T(), err, model.ErrViewForUnknownEpoch)
 }
 
 // TestGetOrCreateCollector_ValidCollector tests a happy path scenario where we try first to create and then retrieve cached collector.
@@ -106,12 +123,12 @@ func (s *TimeoutCollectorsTestSuite) TestGetOrCreateCollectors_ConcurrentAccess(
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			_, created, err := s.collectors.GetOrCreateCollector(view)
 			require.NoError(s.T(), err)
 			if created {
 				createdTimes.Add(1)
 			}
-			wg.Done()
 		}()
 	}
 

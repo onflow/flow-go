@@ -18,20 +18,23 @@ type NewCollectorFactoryMethod = func(view uint64) (hotstuff.TimeoutCollector, e
 // particular view is lazy (instances are created on demand).
 // This structure is concurrently safe.
 // TODO: once VoteCollectors gets updated to stop managing worker pool we can merge VoteCollectors and TimeoutCollectors using generics
+// TODO(active-pacemaker): add metrics for tracking size of collectors and active range
 type TimeoutCollectors struct {
 	log                zerolog.Logger
 	lock               sync.RWMutex
-	lowestRetainedView uint64                               // lowest view, for which we still retain a TimeoutCollector and process timeouts
+	lowestRetainedView uint64 // lowest view, for which we still retain a TimeoutCollector and process timeouts
+	committee          hotstuff.Replicas
 	collectors         map[uint64]hotstuff.TimeoutCollector // view -> TimeoutCollector
 	createCollector    NewCollectorFactoryMethod            // factory method for creating collectors
 }
 
 var _ hotstuff.TimeoutCollectors = (*TimeoutCollectors)(nil)
 
-func NewTimeoutCollectors(log zerolog.Logger, lowestRetainedView uint64, createCollector NewCollectorFactoryMethod) *TimeoutCollectors {
+func NewTimeoutCollectors(log zerolog.Logger, committee hotstuff.Replicas, lowestRetainedView uint64, createCollector NewCollectorFactoryMethod) *TimeoutCollectors {
 	return &TimeoutCollectors{
 		log:                log.With().Str("component", "timeout_collectors").Logger(),
 		lowestRetainedView: lowestRetainedView,
+		committee:          committee,
 		collectors:         make(map[uint64]hotstuff.TimeoutCollector),
 		createCollector:    createCollector,
 	}
@@ -54,6 +57,12 @@ func (t *TimeoutCollectors) GetOrCreateCollector(view uint64) (hotstuff.TimeoutC
 		return cachedCollector, false, nil
 	}
 
+	// TODO: replace this check by a specific function to query if there is epoch by view
+	_, err = t.committee.LeaderForView(view)
+	if err != nil {
+		return nil, false, fmt.Errorf("could not query epoch for view %d: %w", view, err)
+	}
+
 	collector, err := t.createCollector(view)
 	if err != nil {
 		return nil, false, fmt.Errorf("could not create timeout collector for view %d: %w", view, err)
@@ -63,14 +72,15 @@ func (t *TimeoutCollectors) GetOrCreateCollector(view uint64) (hotstuff.TimeoutC
 	// initial check but before acquiring the lock to add the newly-created collector, another
 	// goroutine already added the needed collector. Hence, check again after acquiring the lock:
 	t.lock.Lock()
-	defer t.lock.Unlock()
-
 	clr, found := t.collectors[view]
 	if found {
+		t.lock.Unlock()
 		return clr, false, nil
 	}
-
 	t.collectors[view] = collector
+	t.lock.Unlock()
+
+	t.log.Info().Uint64("view", view).Msg("timeout collector has been created")
 	return collector, true, nil
 }
 
@@ -99,18 +109,17 @@ func (t *TimeoutCollectors) PruneUpToView(lowestRetainedView uint64) {
 	if t.lowestRetainedView >= lowestRetainedView {
 		return
 	}
-	if len(t.collectors) == 0 {
+	sizeBefore := len(t.collectors)
+	if sizeBefore == 0 {
 		t.lowestRetainedView = lowestRetainedView
 		return
 	}
-
-	sizeBefore := len(t.collectors)
 
 	// to optimize the pruning of large view-ranges, we compare:
 	//  * the number of views for which we have collectors: len(t.collectors)
 	//  * the number of views that need to be pruned: view-t.lowestRetainedView
 	// We iterate over the dimension which is smaller.
-	if uint64(len(t.collectors)) < lowestRetainedView-t.lowestRetainedView {
+	if uint64(sizeBefore) < lowestRetainedView-t.lowestRetainedView {
 		for w := range t.collectors {
 			if w < lowestRetainedView {
 				delete(t.collectors, w)

@@ -30,7 +30,6 @@ type TimeoutAggregator struct {
 	*component.ComponentManager
 	log                    zerolog.Logger
 	notifier               hotstuff.Consumer
-	committee              hotstuff.Replicas
 	lowestRetainedView     counters.StrictMonotonousCounter // lowest view, for which we still process timeouts
 	collectors             hotstuff.TimeoutCollectors
 	queuedTimeoutsNotifier engine.Notifier
@@ -46,9 +45,9 @@ var _ component.Component = (*TimeoutAggregator)(nil)
 func NewTimeoutAggregator(log zerolog.Logger,
 	notifier hotstuff.Consumer,
 	lowestRetainedView uint64,
-	committee hotstuff.Replicas,
 	collectors hotstuff.TimeoutCollectors,
 ) (*TimeoutAggregator, error) {
+	// TODO(active-pacemaker): add metrics to track size of timeouts queue
 	queuedTimeouts, err := fifoqueue.NewFifoQueue(fifoqueue.WithCapacity(defaultTimeoutQueueCapacity))
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize timeouts queue")
@@ -58,7 +57,6 @@ func NewTimeoutAggregator(log zerolog.Logger,
 		log:                    log.With().Str("component", "timeout_aggregator").Logger(),
 		notifier:               notifier,
 		lowestRetainedView:     counters.NewMonotonousCounter(lowestRetainedView),
-		committee:              committee,
 		collectors:             collectors,
 		queuedTimeoutsNotifier: engine.NewNotifier(),
 		enteringViewNotifier:   engine.NewNotifier(),
@@ -137,42 +135,27 @@ func (t *TimeoutAggregator) processQueuedTimeoutEvents(ctx context.Context) erro
 // concurrent goroutines.
 // No errors are expected during normal operation
 func (t *TimeoutAggregator) processQueuedTimeout(timeoutObject *model.TimeoutObject) error {
-	// TODO: replace this check by a specific function to query if there is epoch by view
-	_, err := t.committee.LeaderForView(timeoutObject.View)
-	if err != nil {
-		// ignore TO if we don't have information for epoch
-		if errors.Is(err, model.ErrViewForUnknownEpoch) {
-			t.log.Debug().Uint64("view", timeoutObject.View).Msg("discarding TO for view beyond known epochs")
-			return nil
-		}
-		return fmt.Errorf("unknown error when querying epoch state for view %d: %w", timeoutObject.View, err)
-	}
-
 	// We create a timeout collector before validating the first TO, so processing an invalid TO will
 	// result in a collector being added, until the corresponding view is pruned.
-	// Since epochs on Mainnet have 500,000-1,000,000 views, there is an opportunity for memory exhaustion here.
+	// Since epochs on mainnet have 500,000-1,000,000 views, there is an opportunity for memory exhaustion here.
 	// However, because only invalid TOs can result in creating collectors at an arbitrary view,
-	// and invalid TOs are slashable, resulting eventually in ejection of the sender, this attack is impactical.
-	collector, created, err := t.collectors.GetOrCreateCollector(timeoutObject.View)
+	// and invalid TOs are slashable, resulting eventually in ejection of the sender, this attack is impractical.
+	collector, _, err := t.collectors.GetOrCreateCollector(timeoutObject.View)
 	if err != nil {
 		// ignore if our routine is outdated and some other one has pruned collectors
 		if mempool.IsDecreasingPruningHeightError(err) {
+			return nil
+		} else if errors.Is(err, model.ErrViewForUnknownEpoch) {
+			// ignore TO if we don't have information for epoch
+			t.log.Debug().Uint64("view", timeoutObject.View).Msg("discarding TO for view beyond known epochs")
 			return nil
 		}
 		return fmt.Errorf("could not get collector for view %d: %w",
 			timeoutObject.View, err)
 	}
-	if created {
-		t.log.Info().Uint64("view", timeoutObject.View).Msg("timeouts collector is created by processing TO")
-	}
 
 	err = collector.AddTimeout(timeoutObject)
 	if err != nil {
-		if doubleTimeoutErr, is := model.AsDoubleTimeoutError(err); is {
-			t.notifier.OnDoubleTimeoutDetected(doubleTimeoutErr.FirstTimeout, doubleTimeoutErr.ConflictingTimeout)
-			return nil
-		}
-
 		return fmt.Errorf("could not process TO for view %d: %w",
 			timeoutObject.View, err)
 	}
