@@ -455,7 +455,7 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 			}
 		}
 
-		// emit protocol events
+		// TODO deliver protocol events async https://github.com/dapperlabs/flow-go/issues/6317
 		if insertingBlockTriggersEpochFallback {
 			m.consumer.EpochEmergencyFallbackTriggered()
 		}
@@ -487,6 +487,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	// keep track of metrics updates and protocol events to emit:
 	// * metrics are updated after a successful database update
 	// * protocol events are emitted atomically with the database update
+	// TODO deliver protocol events async https://github.com/dapperlabs/flow-go/issues/6317
 	var metrics []func()
 	var events []func()
 
@@ -597,8 +598,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 			}
 		}
 
-		// emit protocol events within the scope of the Badger transaction to
-		// guarantee at-least-once delivery
+		// TODO deliver protocol events async https://github.com/dapperlabs/flow-go/issues/6317
 		m.consumer.BlockFinalized(header)
 		for _, emit := range events {
 			emit()
@@ -1012,8 +1012,7 @@ func (m *FollowerState) MarkValid(blockID flow.Identifier) error {
 
 		// trigger BlockProcessable for parent blocks above root height
 		if parent.Height > rootHeight {
-			// emit protocol event within the scope of the Badger transaction to
-			// guarantee at-least-once delivery
+			// TODO deliver protocol events async https://github.com/dapperlabs/flow-go/issues/6317
 			m.consumer.BlockProcessable(parent)
 		}
 		return nil
