@@ -462,9 +462,12 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 
 		return nil
 	})
-
 	if err != nil {
 		return fmt.Errorf("could not execute state extension: %w", err)
+	}
+
+	if insertingBlockTriggersEpochFallback {
+		m.metrics.EpochEmergencyFallbackTriggered()
 	}
 
 	return nil
@@ -893,7 +896,7 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (
 
 	// never process service events after epoch fallback is triggered
 	if isEpochFallbackTriggered {
-		return
+		return dbUpdates, false, nil
 	}
 
 	// We apply service events from blocks which are sealed by this block's PARENT.
