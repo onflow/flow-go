@@ -110,24 +110,22 @@ func (t *TimeoutAggregator) processQueuedTimeoutEvents(ctx context.Context) erro
 		}
 
 		msg, ok := t.queuedTimeouts.Pop()
-		if ok {
-			timeoutObject := msg.(*model.TimeoutObject)
-			err := t.processQueuedTimeout(timeoutObject)
-			if err != nil {
-				return fmt.Errorf("could not process pending TO %v: %w", timeoutObject.ID(), err)
-			}
-
-			t.log.Info().
-				Uint64("view", timeoutObject.View).
-				Hex("signer", timeoutObject.SignerID[:]).
-				Msg("TO has been processed successfully")
-
-			continue
+		if !ok {
+			// when there is no more messages in the queue, back to the loop to wait
+			// for the next incoming message to arrive.
+			return nil
 		}
 
-		// when there is no more messages in the queue, back to the loop to wait
-		// for the next incoming message to arrive.
-		return nil
+		timeoutObject := msg.(*model.TimeoutObject)
+		err := t.processQueuedTimeout(timeoutObject)
+		if err != nil {
+			return fmt.Errorf("could not process pending TO %v: %w", timeoutObject.ID(), err)
+		}
+
+		t.log.Info().
+			Uint64("view", timeoutObject.View).
+			Hex("signer", timeoutObject.SignerID[:]).
+			Msg("TO has been processed successfully")
 	}
 }
 
