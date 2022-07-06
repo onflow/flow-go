@@ -543,6 +543,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		if epochFallbackTriggered {
 			// emit the protocol event only the first time epoch fallback is triggered
 			events = append(events, m.consumer.EpochEmergencyFallbackTriggered)
+			metrics = append(metrics, m.metrics.EpochEmergencyFallbackTriggered)
 		}
 	}
 
@@ -564,11 +565,6 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		}
 		metrics = append(metrics, epochTransitionMetrics...)
 		events = append(events, epochTransitionEvents...)
-	}
-
-	// if epoch emergency fallback is triggered, update metric
-	if epochFallbackTriggered {
-		metrics = append(metrics, m.metrics.EpochEmergencyFallbackTriggered)
 	}
 
 	// Persist updates in database
