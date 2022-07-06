@@ -312,78 +312,6 @@ func (es *EventHandlerSuite) SetupTest() {
 	es.forks.proposals[es.parentProposal.Block.BlockID] = es.parentProposal
 }
 
-// TestOnQCConstructed_HappyPath tests that building a QC for current view triggers view change
-func (es *EventHandlerSuite) TestOnQCConstructed_HappyPath() {
-	// voting block exists
-	es.forks.proposals[es.votingProposal.Block.BlockID] = es.votingProposal
-
-	// a qc is built
-	qc := createQC(es.votingProposal.Block)
-
-	// new qc is added to forks
-	// view changed
-	// I'm not the next leader
-	// haven't received block for next view
-	// goes to the new view
-	es.endView++
-	// not the leader of the newview
-	// don't have block for the newview
-	// over
-
-	err := es.eventhandler.OnQCConstructed(qc)
-	require.NoError(es.T(), err, "if a vote can trigger a QC to be built,"+
-		"and the QC triggered a view change, then start new view")
-	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
-}
-
-// TestOnQCConstructed_FutureView tests that building a QC for future view triggers view change
-func (es *EventHandlerSuite) TestOnQCConstructed_FutureView() {
-	// voting block exists
-	curView := es.paceMaker.CurView()
-
-	// b1 is for current view
-	// b2 and b3 is for future view, but branched out from the same parent as b1
-	b1 := createProposal(curView, curView-1)
-	b2 := createProposal(curView+1, curView-1)
-	b3 := createProposal(curView+2, curView-1)
-
-	// a qc is built
-	// qc3 is for future view
-	// qc2 is an older than qc3
-	// since vote aggregator can concurrently process votes and build qcs,
-	// we prepare qcs at different view to be processed, and verify the view change.
-	qc1 := createQC(b1.Block)
-	qc2 := createQC(b2.Block)
-	qc3 := createQC(b3.Block)
-
-	// all three proposals are known
-	es.forks.proposals[b1.Block.BlockID] = b1
-	es.forks.proposals[b2.Block.BlockID] = b2
-	es.forks.proposals[b3.Block.BlockID] = b3
-
-	// test that qc for future view should trigger view change
-	err := es.eventhandler.OnQCConstructed(qc3)
-	endView := b3.Block.View + 1 // next view
-	require.NoError(es.T(), err, "if a vote can trigger a QC to be built,"+
-		"and the QC triggered a view change, then start new view")
-	require.Equal(es.T(), endView, es.paceMaker.CurView(), "incorrect view change")
-
-	// the same qc would not trigger view change
-	err = es.eventhandler.OnQCConstructed(qc3)
-	endView = b3.Block.View + 1 // next view
-	require.NoError(es.T(), err, "same qc should not trigger view change")
-	require.Equal(es.T(), endView, es.paceMaker.CurView(), "incorrect view change")
-
-	// old QCs won't trigger view change
-	err = es.eventhandler.OnQCConstructed(qc2)
-	require.NoError(es.T(), err)
-	require.Equal(es.T(), endView, es.paceMaker.CurView(), "incorrect view change")
-
-	err = es.eventhandler.OnQCConstructed(qc1)
-	require.NoError(es.T(), err)
-	require.Equal(es.T(), endView, es.paceMaker.CurView(), "incorrect view change")
-}
-
 // in the newview, I'm not the leader, and I have the cur block,
 // and the block is not a safe node, and I'm the next leader, and no qc built for this block.
 func (es *EventHandlerSuite) TestInNewView_NotLeader_HasBlock_NoVote_IsNextLeader_NoQC() {
@@ -481,13 +409,35 @@ func (es *EventHandlerSuite) TestInNewView_NotLeader_HasBlock_NotSafeNode_IsNext
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
 }
 
-// TestOnReceiveProposal_OlderThanCurView tests scenario: received a valid proposal that has older view,
-// and cannot build qc from votes for this block, the proposal's QC shouldn't trigger view change.
-func (es *EventHandlerSuite) TestOnReceiveProposal_OlderThanCurView() {
+// TestOnReceiveProposal_StaleProposal test that proposals lower than finalized view are not processed at all
+// we are not interested in this data because we already performed finalization of that height.
+func (es *EventHandlerSuite) TestOnReceiveProposal_StaleProposal() {
+	proposal := createProposal(es.forks.FinalizedView(), es.forks.FinalizedView()-1)
+	err := es.eventhandler.OnReceiveProposal(proposal)
+	require.NoError(es.T(), err)
+	es.voteAggregator.AssertNotCalled(es.T(), "AddBlock", proposal)
+}
+
+// TestOnReceiveProposal_QCOlderThanCurView tests scenario: received a valid proposal with QC that has older view,
+// the proposal's QC shouldn't trigger view change.
+func (es *EventHandlerSuite) TestOnReceiveProposal_QCOlderThanCurView() {
 	proposal := createProposal(es.initView-1, es.initView-2)
 	es.voteAggregator.On("AddBlock", proposal).Return(nil).Once()
 
-	// can not build qc from votes for block
+	// should not trigger view change
+	err := es.eventhandler.OnReceiveProposal(proposal)
+	require.NoError(es.T(), err)
+	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
+	es.voteAggregator.AssertCalled(es.T(), "AddBlock", proposal)
+}
+
+// TestOnReceiveProposal_TCOlderThanCurView tests scenario: received a valid proposal with QC and TC that has older view,
+// the proposal's QC shouldn't trigger view change.
+func (es *EventHandlerSuite) TestOnReceiveProposal_TCOlderThanCurView() {
+	proposal := createProposal(es.initView-1, es.initView-3)
+	proposal.LastViewTC = helper.MakeTC(helper.WithTCView(proposal.Block.View-1), helper.WithTCNewestQC(proposal.Block.QC))
+	es.voteAggregator.On("AddBlock", proposal).Return(nil).Once()
+
 	// should not trigger view change
 	err := es.eventhandler.OnReceiveProposal(proposal)
 	require.NoError(es.T(), err)
@@ -567,6 +517,78 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_Vote_NotNextLeader() {
 	require.Equal(es.T(), proposal.Block.BlockID, blockID)
 }
 
+// TestOnQCConstructed_HappyPath tests that building a QC for current view triggers view change
+func (es *EventHandlerSuite) TestOnQCConstructed_HappyPath() {
+	// voting block exists
+	es.forks.proposals[es.votingProposal.Block.BlockID] = es.votingProposal
+
+	// a qc is built
+	qc := createQC(es.votingProposal.Block)
+
+	// new qc is added to forks
+	// view changed
+	// I'm not the next leader
+	// haven't received block for next view
+	// goes to the new view
+	es.endView++
+	// not the leader of the newview
+	// don't have block for the newview
+	// over
+
+	err := es.eventhandler.OnQCConstructed(qc)
+	require.NoError(es.T(), err, "if a vote can trigger a QC to be built,"+
+		"and the QC triggered a view change, then start new view")
+	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
+}
+
+// TestOnQCConstructed_FutureView tests that building a QC for future view triggers view change
+func (es *EventHandlerSuite) TestOnQCConstructed_FutureView() {
+	// voting block exists
+	curView := es.paceMaker.CurView()
+
+	// b1 is for current view
+	// b2 and b3 is for future view, but branched out from the same parent as b1
+	b1 := createProposal(curView, curView-1)
+	b2 := createProposal(curView+1, curView-1)
+	b3 := createProposal(curView+2, curView-1)
+
+	// a qc is built
+	// qc3 is for future view
+	// qc2 is an older than qc3
+	// since vote aggregator can concurrently process votes and build qcs,
+	// we prepare qcs at different view to be processed, and verify the view change.
+	qc1 := createQC(b1.Block)
+	qc2 := createQC(b2.Block)
+	qc3 := createQC(b3.Block)
+
+	// all three proposals are known
+	es.forks.proposals[b1.Block.BlockID] = b1
+	es.forks.proposals[b2.Block.BlockID] = b2
+	es.forks.proposals[b3.Block.BlockID] = b3
+
+	// test that qc for future view should trigger view change
+	err := es.eventhandler.OnQCConstructed(qc3)
+	endView := b3.Block.View + 1 // next view
+	require.NoError(es.T(), err, "if a vote can trigger a QC to be built,"+
+		"and the QC triggered a view change, then start new view")
+	require.Equal(es.T(), endView, es.paceMaker.CurView(), "incorrect view change")
+
+	// the same qc would not trigger view change
+	err = es.eventhandler.OnQCConstructed(qc3)
+	endView = b3.Block.View + 1 // next view
+	require.NoError(es.T(), err, "same qc should not trigger view change")
+	require.Equal(es.T(), endView, es.paceMaker.CurView(), "incorrect view change")
+
+	// old QCs won't trigger view change
+	err = es.eventhandler.OnQCConstructed(qc2)
+	require.NoError(es.T(), err)
+	require.Equal(es.T(), endView, es.paceMaker.CurView(), "incorrect view change")
+
+	err = es.eventhandler.OnQCConstructed(qc1)
+	require.NoError(es.T(), err)
+	require.Equal(es.T(), endView, es.paceMaker.CurView(), "incorrect view change")
+}
+
 // TestOnQCConstructed_NextLeaderProposes tests that after receiving a valid proposal for cur view, but not a safe node to vote, and I'm the next leader,
 // a QC can be built for the block, triggered view change, and I will propose
 func (es *EventHandlerSuite) TestOnQCConstructed_NextLeaderProposes() {
@@ -597,6 +619,22 @@ func (es *EventHandlerSuite) TestOnQCConstructed_NextLeaderProposes() {
 
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
 	es.voteAggregator.AssertCalled(es.T(), "AddBlock", proposal)
+}
+
+// TestOnTCConstructed_HappyPath tests that building a TC for current view triggers view change
+func (es *EventHandlerSuite) TestOnTCConstructed_HappyPath() {
+	// voting block exists
+	es.forks.proposals[es.votingProposal.Block.BlockID] = es.votingProposal
+
+	// a qc is built
+	tc := helper.MakeTC(helper.WithTCView(es.initView), helper.WithTCNewestQC(es.qc))
+
+	// expect a view change
+	es.endView++
+
+	err := es.eventhandler.OnTCConstructed(tc)
+	require.NoError(es.T(), err, "TC should trigger a view change and start of new view")
+	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
 }
 
 // TestOnTCConstructed_NextLeaderProposes tests that after receiving TC and advancing view we as next leader create a proposal
@@ -724,6 +762,10 @@ func (es *EventHandlerSuite) TestFollowerReceives100Forks() {
 	for i := 0; i < 100; i++ {
 		// create each proposal as if they are created by some leader
 		proposal := createProposal(es.initView+uint64(i)+1, es.initView-1)
+		proposal.LastViewTC = helper.MakeTC(helper.WithTCView(es.initView+uint64(i)),
+			helper.WithTCNewestQC(proposal.Block.QC))
+		// expect a view change since fork can be made only if last view has ended with TC.
+		es.endView++
 		es.voteAggregator.On("AddBlock", proposal).Return(nil).Once()
 		// as a follower, I receive these proposals
 		err := es.eventhandler.OnReceiveProposal(proposal)

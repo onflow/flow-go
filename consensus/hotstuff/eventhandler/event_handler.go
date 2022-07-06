@@ -118,7 +118,7 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 	log.Debug().Msg("proposal forwarded from compliance engine")
 
 	// ignore stale proposals
-	if block.View < e.forks.FinalizedView() {
+	if block.View <= e.forks.FinalizedView() {
 		log.Debug().Msg("stale proposal")
 		return nil
 	}
@@ -353,14 +353,6 @@ func (e *EventHandler) startNewView() error {
 		//    EventLoop. In other words, the own proposal is not yet stored in Forks.
 		//    Hence, Forks cannot contain _any_ valid proposal for the current view.
 		//  Therefore, if this replica is the leader, the following code is a no-op.
-	}
-
-	// as a replica of the current view, find and process the block for the current view
-	proposals := e.forks.GetProposalsForView(curView)
-	if len(proposals) == 0 {
-		// if there is no block stored before for the current view, then exit and keep waiting
-		log.Debug().Msg("waiting for proposal from leader")
-		return nil
 	}
 
 	return nil
