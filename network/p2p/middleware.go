@@ -5,7 +5,6 @@ package p2p
 import (
 	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"sync"
@@ -64,8 +63,6 @@ var (
 	// allowAll is a peerFilterFunc that will always return true for all peer ids.
 	// This filter is used to allow communication by all roles on public network channels.
 	allowAll = func(_ peer.ID) bool { return true }
-
-	ErrMissingOverlay = errors.New("overlay must be configured by calling SetOverlay before middleware can be started")
 )
 
 // peerFilterFunc is a func type that will be used in the TopicValidator to filter
@@ -213,8 +210,9 @@ func (m *Middleware) NewPingService(pingProtocol protocol.ID, provider network.P
 	return NewPingService(m.libP2PNode.Host(), pingProtocol, m.log, provider)
 }
 
-// topologyPeers callback used by the peer manager that the list of peer ID's
+// topologyPeers callback used by the peer manager to get the list of peer ID's
 // which this node should be directly connected to as peers.
+// No errors are expected during normal operation.
 func (m *Middleware) topologyPeers() (peer.IDSlice, error) {
 	identities, err := m.ov.Topology()
 	if err != nil {
@@ -248,8 +246,7 @@ func (m *Middleware) Me() flow.Identifier {
 }
 
 // GetIPPort returns the ip address and port number associated with the middleware
-// During normal operations a benign error is expected
-// if the libP2P node fails to return the IP and port.
+// All errors returned from this function can be considered benign.
 func (m *Middleware) GetIPPort() (string, string, error) {
 	ipOrHostname, port, err := m.libP2PNode.GetIPPort()
 	if err != nil {
@@ -289,11 +286,10 @@ func (m *Middleware) SetOverlay(ov network.Overlay) {
 }
 
 // start will start the middleware.
-// During normal operations if any error is returned it
-// is considered catastrophic and the node should crash.
+// No errors are expected during normal operation.
 func (m *Middleware) start(ctx context.Context) error {
 	if m.ov == nil {
-		return fmt.Errorf("could not start middleware: %w", ErrMissingOverlay)
+		return fmt.Errorf("could not start middleware: overlay must be configured by calling SetOverlay before middleware can be started")
 	}
 
 	libP2PNode, err := m.libP2PNodeFactory(ctx)
@@ -356,7 +352,7 @@ func (m *Middleware) stop() {
 // Dispatch should be used whenever guaranteed delivery to a specific target is required. Otherwise, Publish is
 // a more efficient candidate.
 //
-// During normal operations, the following benign errors are expected:
+// The following benign errors can be returned from libp2p:
 // - the peer ID for the target node ID cannot be found.
 // - the msg size exceeds result returned from unicastMaxMsgSize(msg)
 // - the libP2P node fails to publish the message.
@@ -364,6 +360,8 @@ func (m *Middleware) stop() {
 // - setting write deadline on the stream fails.
 // - the gogo protobuf writer fails to write the message.
 // - flushing the stream fails.
+//
+// All errors returned from this function can be considered benign.
 func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) (err error) {
 	// translates identifier to peer id
 	peerID, err := m.idTranslator.GetPeerID(targetID)
@@ -549,10 +547,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 }
 
 // Subscribe subscribes the middleware to a channel.
-// During normal operations no errors are expected to be returned.
-// If the libP2P node fails to subscribe to the topic created from
-// the provided channel and returns an error this error is considered
-// catastrophic as the node would not be able to operate correctly.
+// No errors are expected during normal operation.
 func (m *Middleware) Subscribe(channel network.Channel) error {
 
 	topic := network.TopicFromChannel(channel, m.rootBlockID)
@@ -593,8 +588,10 @@ func (m *Middleware) Subscribe(channel network.Channel) error {
 }
 
 // Unsubscribe unsubscribes the middleware from a channel.
-// During normal operations, the following benign errors are expected:
+// The following benign errors are expected during normal operations from libP2P:
 // - the libP2P node fails to unsubscribe to the topic created from the provided channel.
+//
+// All errors returned from this function can be considered benign.
 func (m *Middleware) Unsubscribe(channel network.Channel) error {
 	topic := network.TopicFromChannel(channel, m.rootBlockID)
 	err := m.libP2PNode.UnSubscribe(topic)
@@ -652,10 +649,12 @@ func (m *Middleware) processMessage(msg *message.Message, decodedMsgPayload inte
 // Publish publishes a message on the channel. It models a distributed broadcast where the message is meant for all or
 // a many nodes subscribing to the channel. It does not guarantee the delivery though, and operates on a best
 // effort.
-// During normal operations, the following benign errors are expected:
+// The following benign errors are expected during normal operations:
 // - the msg cannot be marshalled.
 // - the msg size exceeds DefaultMaxPubSubMsgSize.
 // - the libP2P node fails to publish the message.
+//
+// All errors returned from this function can be considered benign.
 func (m *Middleware) Publish(msg *message.Message, channel network.Channel) error {
 	m.log.Debug().Str("channel", channel.String()).Interface("msg", msg).Msg("publishing new message")
 
@@ -688,8 +687,7 @@ func (m *Middleware) Publish(msg *message.Message, channel network.Channel) erro
 }
 
 // IsConnected returns true if this node is connected to the node with id nodeID.
-// During normal operations, the following benign errors are expected:
-// - the peer ID for the target node ID cannot be found.
+// All errors returned from this function can be considered benign.
 func (m *Middleware) IsConnected(nodeID flow.Identifier) (bool, error) {
 	peerID, err := m.idTranslator.GetPeerID(nodeID)
 	if err != nil {
