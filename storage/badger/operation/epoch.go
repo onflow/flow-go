@@ -41,6 +41,7 @@ func RetrieveEpochStatus(blockID flow.Identifier, status *flow.EpochStatus) func
 //    next epoch has not yet been committed (see protocol.Params for more detail)
 // 2. Incorporating a block where an invalid service event would have been applied
 //    to the protocol state (see function handleEpochServiceEvents for more detail)
+//    TODO: update doc when implementing https://github.com/dapperlabs/flow-go/issues/6316
 //
 // Calling this function multiple times is a no-op and returns no expected errors.
 func SetEpochEmergencyFallbackTriggered(blockID flow.Identifier) func(txn *badger.Txn) error {

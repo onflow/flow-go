@@ -864,6 +864,7 @@ func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, bool
 //    one block for a given database instance.
 //
 // No errors are expected during normal operation.
+// TODO: we should only consider an incorporated service fatal, and trigger EECC, on finalization of block D https://github.com/dapperlabs/flow-go/issues/6316
 func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (
 	dbUpdates []func(*transaction.Tx) error,
 	insertingCandidateTriggersEpochFallback bool,
