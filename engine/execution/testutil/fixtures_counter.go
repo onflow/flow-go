@@ -58,6 +58,14 @@ func UpdateUnauthorizedCounterContractTransaction(authorizer flow.Address) *flow
 	return UpdateContractUnathorizedDeploymentTransaction("Container", CounterContractV2, authorizer)
 }
 
+func RemoveUnauthorizedCounterContractTransaction(authorizer flow.Address) *flow.TransactionBody {
+	return RemoveContractUnathorizedDeploymentTransaction("Container", authorizer)
+}
+
+func RemoveCounterContractTransaction(authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
+	return RemoveContractDeploymentTransaction("Container", authorizer, chain)
+}
+
 func CreateCounterTransaction(counter, signer flow.Address) *flow.TransactionBody {
 	return flow.NewTransactionBody().
 		SetScript([]byte(fmt.Sprintf(`

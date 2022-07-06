@@ -221,9 +221,9 @@ func (s *State) MemoryIntensities() meter.MeteredMemoryIntensities {
 	return s.meter.MemoryIntensities()
 }
 
-// TotalMemoryUsed returns total memory used
-func (s *State) TotalMemoryUsed() uint {
-	return s.meter.TotalMemoryUsed()
+// TotalMemoryEstimate returns total memory used
+func (s *State) TotalMemoryEstimate() uint {
+	return s.meter.TotalMemoryEstimate()
 }
 
 // TotalMemoryLimit returns total memory limit
@@ -340,14 +340,14 @@ func IsFVMStateKey(owner, controller, key string) bool {
 	}
 	// check account level keys
 	// cases:
-	// 		- address, address, "public_key_count"
-	// 		- address, address, "public_key_%d" (index)
-	// 		- address, address, "contract_names"
-	// 		- address, address, "code.%s" (contract name)
+	// 		- address, "", "public_key_count"
+	// 		- address, "", "public_key_%d" (index)
+	// 		- address, "", "contract_names"
+	// 		- address, "", "code.%s" (contract name)
 	// 		- address, "", exists
 	// 		- address, "", "storage_used"
 	// 		- address, "", "frozen"
-	if owner == controller {
+	if len(controller) == 0 {
 		if key == KeyPublicKeyCount {
 			return true
 		}
@@ -360,19 +360,13 @@ func IsFVMStateKey(owner, controller, key string) bool {
 		if bytes.HasPrefix([]byte(key), []byte(KeyCode)) {
 			return true
 		}
-	}
-
-	if len(controller) == 0 {
-		if key == KeyExists {
+		if key == KeyAccountStatus {
 			return true
 		}
 		if key == KeyStorageUsed {
 			return true
 		}
 		if key == KeyStorageIndex {
-			return true
-		}
-		if key == KeyAccountFrozen {
 			return true
 		}
 	}
