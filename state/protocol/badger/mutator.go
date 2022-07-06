@@ -714,7 +714,7 @@ func (m *FollowerState) epochTransitionMetricsAndEventsOnBlockFinalized(block *f
 // Convention:
 //           A <-- ... <-- P(Seal_A) <----- B
 //                         ↑                ↑
-//           block con service event        first block of new Epoch phase
+//           block sealing service event    first block of new Epoch phase
 //           for epoch-phase transition     (e.g. EpochSetup phase)
 //           (e.g. EpochSetup event)
 //
