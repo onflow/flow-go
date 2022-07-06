@@ -233,12 +233,12 @@ func (n *Network) handleRegisterEngineRequest(parent irrecoverable.SignalerConte
 		Msg("channel successfully registered")
 
 	// create the conduit
-	conduit, err := n.conduitFactory.NewConduit(parent, channel)
+	newConduit, err := n.conduitFactory.NewConduit(parent, channel)
 	if err != nil {
 		return nil, fmt.Errorf("could not create conduit using factory: %w", err)
 	}
 
-	return conduit, nil
+	return newConduit, nil
 }
 
 func (n *Network) handleRegisterBlobServiceRequest(parent irrecoverable.SignalerContext, channel network.Channel, ds datastore.Batching, opts []network.BlobServiceOption) (network.BlobService, error) {
