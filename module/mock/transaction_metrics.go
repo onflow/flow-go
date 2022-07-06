@@ -19,15 +19,6 @@ type TransactionMetrics struct {
 // ScriptExecuted provides a mock function with given fields: dur, size
 func (_m *TransactionMetrics) ScriptExecuted(dur time.Duration, size int) {
 	_m.Called(dur, size)
-
-// ConnectionFromPoolRetrieved provides a mock function with given fields:
-func (_m *TransactionMetrics) ConnectionFromPoolRetrieved() {
-	_m.Called()
-}
-
-// TotalConnectionsInPool provides a mock function with given fields: connectionCount, connectionPoolSize
-func (_m *TransactionMetrics) TotalConnectionsInPool(connectionCount uint, connectionPoolSize uint) {
-	_m.Called(connectionCount, connectionPoolSize)
 }
 
 // TransactionExecuted provides a mock function with given fields: txID, when
@@ -68,10 +59,4 @@ func NewTransactionMetrics(t testing.TB) *TransactionMetrics {
 	t.Cleanup(func() { mock.AssertExpectations(t) })
 
 	return mock
-func (_m *TransactionMetrics) TotalConnectionsInPool(connectionCount uint, connectionPoolSize uint) {
-	_m.Called(connectionCount, connectionPoolSize)
-}
-
-func (_m *TransactionMetrics) ConnectionFromPoolRetrieved() {
-	_m.Called()
 }
