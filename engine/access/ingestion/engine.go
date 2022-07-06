@@ -428,7 +428,7 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, r *flow.Execut
 
 	block, err := e.blocks.ByID(r.ExecutionResult.BlockID)
 	if err != nil {
-		return fmt.Errorf("failed to lookup block id while handling receipt: %w", err)
+		return fmt.Errorf("failed to lookup block while handling receipt: %w", err)
 	}
 
 	if block.Header.Height > e.maxReceiptHeight {
