@@ -21,7 +21,7 @@ import (
 // defaultTimeoutAggregatorWorkers number of workers to dispatch events for timeout aggregator
 const defaultTimeoutAggregatorWorkers = 4
 
-// defaultTimeoutQueueCapacity maximum capacity of buffering unprocessed timeouts
+// defaultTimeoutQueueCapacity maximum capacity for buffering unprocessed timeouts
 const defaultTimeoutQueueCapacity = 1000
 
 // TimeoutAggregator stores the timeout objects and aggregates them into a TC when enough TOs have been collected.
@@ -32,17 +32,16 @@ type TimeoutAggregator struct {
 	notifier                   hotstuff.Consumer
 	committee                  hotstuff.Replicas
 	lowestRetainedView         counters.StrictMonotonousCounter // lowest view, for which we still process timeouts
-	activeView                 counters.StrictMonotonousCounter // cache the last view that we have entered to queue up the pruning work, and unblock the caller who's delivering the finalization event.
 	collectors                 hotstuff.TimeoutCollectors
 	queuedTimeoutsNotifier     engine.Notifier
-	enteringViewEventsNotifier engine.Notifier
+	enteringViewNotifier engine.Notifier
 	queuedTimeouts             *fifoqueue.FifoQueue
 }
 
 var _ hotstuff.TimeoutAggregator = (*TimeoutAggregator)(nil)
 var _ component.Component = (*TimeoutAggregator)(nil)
 
-// NewTimeoutAggregator creates an instance of timeout aggregator
+// NewTimeoutAggregator creates an instance of timeout aggregator.
 // No errors are expected during normal operations.
 func NewTimeoutAggregator(log zerolog.Logger,
 	notifier hotstuff.Consumer,
@@ -56,7 +55,7 @@ func NewTimeoutAggregator(log zerolog.Logger,
 	}
 
 	aggregator := &TimeoutAggregator{
-		log:                        log,
+		log:                        log.With().Str("component", "timeout_aggregator").Logger(),
 		notifier:                   notifier,
 		lowestRetainedView:         counters.NewMonotonousCounter(lowestRetainedView),
 		activeView:                 counters.NewMonotonousCounter(lowestRetainedView),
@@ -123,7 +122,7 @@ func (t *TimeoutAggregator) processQueuedTimeoutEvents(ctx context.Context) erro
 
 			t.log.Info().
 				Uint64("view", timeoutObject.View).
-				Str("timeout_id", timeoutObject.ID().String()).
+				Hex("signer", timeoutObject.SignerID[:]).
 				Msg("TO has been processed successfully")
 
 			continue
@@ -137,17 +136,24 @@ func (t *TimeoutAggregator) processQueuedTimeoutEvents(ctx context.Context) erro
 
 // processQueuedTimeout performs actual processing of queued timeouts, this method is called from multiple
 // concurrent goroutines.
+// No errors are expected during normal operation
 func (t *TimeoutAggregator) processQueuedTimeout(timeoutObject *model.TimeoutObject) error {
 	// TODO: replace this check by a specific function to query if there is epoch by view
 	_, err := t.committee.LeaderForView(timeoutObject.View)
 	if err != nil {
 		// ignore TO if we don't have information for epoch
 		if errors.Is(err, model.ErrViewForUnknownEpoch) {
+			t.log.Debug().Uint64("view", timeoutObject.View).Msg("discarding TO for view beyond known epochs")
 			return nil
 		}
 		return fmt.Errorf("unknown error when querying epoch state for view %d: %w", timeoutObject.View, err)
 	}
 
+	// We create a timeout collector before validating the first TO, so processing an invalid TO will
+	// result in a collector being added, until the corresponding view is pruned.
+	// Since epochs on Mainnet have 500,000-1,000,000 views, there is an opportunity for memory exhaustion here.
+	// However, because only invalid TOs can result in creating collectors at an arbitrary view,
+	// and invalid TOs are slashable, resulting eventually in ejection of the sender, this attack is impactical.
 	collector, created, err := t.collectors.GetOrCreateCollector(timeoutObject.View)
 	if err != nil {
 		// ignore if our routine is outdated and some other one has pruned collectors
@@ -163,8 +169,7 @@ func (t *TimeoutAggregator) processQueuedTimeout(timeoutObject *model.TimeoutObj
 
 	err = collector.AddTimeout(timeoutObject)
 	if err != nil {
-		if model.IsDoubleTimeoutError(err) {
-			doubleTimeoutErr := err.(model.DoubleTimeoutError)
+		if doubleTimeoutErr, is := model.AsDoubleTimeoutError(err); is {
 			t.notifier.OnDoubleTimeoutDetected(doubleTimeoutErr.FirstTimeout, doubleTimeoutErr.ConflictingTimeout)
 			return nil
 		}
@@ -176,15 +181,14 @@ func (t *TimeoutAggregator) processQueuedTimeout(timeoutObject *model.TimeoutObj
 	return nil
 }
 
-// AddTimeout checks if TO is stale and appends TO into processing queue
-// actual processing will be called in other dispatching goroutine.
+// AddTimeout checks if TO is stale and appends TO to processing queue.
+// The actual processing will be done asynchronously by one of the `TimeoutAggregator` internal worker routines.
 func (t *TimeoutAggregator) AddTimeout(timeoutObject *model.TimeoutObject) {
 	// drop stale objects
 	if timeoutObject.View < t.lowestRetainedView.Value() {
-		t.log.Info().
+		t.log.Debug().
 			Uint64("view", timeoutObject.View).
 			Hex("signer", timeoutObject.SignerID[:]).
-			Str("timeout_id", timeoutObject.ID().String()).
 			Msg("drop stale timeouts")
 
 		return
@@ -198,7 +202,7 @@ func (t *TimeoutAggregator) AddTimeout(timeoutObject *model.TimeoutObject) {
 }
 
 // PruneUpToView deletes all timeouts _below_ to the given view, as well as
-// related indices. We only retain and process whose view is equal or larger
+// related indices. We only retain and process `TimeoutCollector`s, whose view is equal or larger
 // than `lowestRetainedView`. If `lowestRetainedView` is smaller than the
 // previous value, the previous value is kept and the method call is a NoOp.
 func (t *TimeoutAggregator) PruneUpToView(lowestRetainedView uint64) {
@@ -208,7 +212,7 @@ func (t *TimeoutAggregator) PruneUpToView(lowestRetainedView uint64) {
 }
 
 // OnEnteringView implements the `OnEnteringView` callback from the `hotstuff.FinalizationConsumer`
-//  (1) Informs sealing.Core about entering view.
+// We notify the enteringViewProcessingLoop worker, which then prunes up to the active view.
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
 func (t *TimeoutAggregator) OnEnteringView(viewNumber uint64, _ flow.Identifier) {

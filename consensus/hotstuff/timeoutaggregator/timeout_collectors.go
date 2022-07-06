@@ -30,7 +30,7 @@ var _ hotstuff.TimeoutCollectors = (*TimeoutCollectors)(nil)
 
 func NewTimeoutCollectors(log zerolog.Logger, lowestRetainedView uint64, createCollector NewCollectorFactoryMethod) *TimeoutCollectors {
 	return &TimeoutCollectors{
-		log:                log,
+		log:                log.With("component", "timeout_collectors").Logger(),
 		lowestRetainedView: lowestRetainedView,
 		collectors:         make(map[uint64]hotstuff.TimeoutCollector),
 		createCollector:    createCollector,
@@ -43,13 +43,13 @@ func NewTimeoutCollectors(log zerolog.Logger, lowestRetainedView uint64, createC
 //  -  (collector, false, nil) if the collector can be found by the view
 //  -  (nil, false, error) if running into any exception creating the timeout collector state machine
 // Expected error returns during normal operations:
-//  * mempool.DecreasingPruningHeightError - in case view is lower than lowestRetainedView
+	//  * mempool.DecreasingPruningHeightError if view is below the pruning threshold
+	//  * model.ErrViewForUnknownEpoch if view is not yet pruned but no epoch containing the given view is known
 func (t *TimeoutCollectors) GetOrCreateCollector(view uint64) (hotstuff.TimeoutCollector, bool, error) {
 	cachedCollector, hasCachedCollector, err := t.getCollector(view)
 	if err != nil {
 		return nil, false, err
 	}
-
 	if hasCachedCollector {
 		return cachedCollector, false, nil
 	}
@@ -86,7 +86,6 @@ func (t *TimeoutCollectors) getCollector(view uint64) (hotstuff.TimeoutCollector
 	}
 
 	clr, found := t.collectors[view]
-
 	return clr, found, nil
 }
 

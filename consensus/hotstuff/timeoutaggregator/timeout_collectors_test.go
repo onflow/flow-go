@@ -31,7 +31,7 @@ type TimeoutCollectorsTestSuite struct {
 	mockedCollectors map[uint64]*mocks.TimeoutCollector
 	factoryMethod    NewCollectorFactoryMethod
 	collectors       *TimeoutCollectors
-	lowestLevel      uint64
+	lowestView      uint64
 	workerPool       *workerpool.WorkerPool
 }
 
@@ -114,7 +114,7 @@ func (s *TimeoutCollectorsTestSuite) TestGetOrCreateCollectors_ConcurrentAccess(
 		}()
 	}
 
-	wg.Wait()
+	unittest.AssertReturnsBefore(s.T(), wg.Wait, time.Second)
 	require.Equal(s.T(), uint64(1), createdTimes.Load())
 }
 
