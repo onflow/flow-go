@@ -84,10 +84,10 @@ func IsInvalidServiceEventError(err error) bool {
 	return errors.As(err, &errInvalidServiceEventError)
 }
 
-// NewInvalidServiceEventError returns an invalid service event error. Since all invalid
+// NewInvalidServiceEventErrorf returns an invalid service event error. Since all invalid
 // service events indicate an invalid extension, the service event error is wrapped in
 // the invalid extension error at construction.
-func NewInvalidServiceEventError(msg string, args ...interface{}) error {
+func NewInvalidServiceEventErrorf(msg string, args ...interface{}) error {
 	return state.NewInvalidExtensionErrorf(
 		"cannot extend state with invalid service event: %w",
 		InvalidServiceEventError{
