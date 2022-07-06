@@ -73,7 +73,7 @@ jobs:
 
             This branch with compared with the base branch ${{  github.event.pull_request.base.label }} commit ${{ github.event.pull_request.base.sha }}
 
-            The command `(for i in {1..N}; do go test ./fvm --bench . --tags relic -shuffle=on; done)` was used.
+            The command `(for i in {1..N}; do go test ./fvm --bench . --tags relic -shuffle=on --benchmem --run ^$; done)` was used.
 
             Bench tests were run a total of ${{ steps.settings.outputs.benchmark_repetitions }} times on each branch.
 
