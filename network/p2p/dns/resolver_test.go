@@ -91,7 +91,7 @@ func TestResolver_CacheExpiry(t *testing.T) {
 	// each domain gets resolved through underlying resolver twice: once initially, and once after expiry.
 	resolverWG := mockBasicResolverForDomains(t, &basicResolver, ipTestCase, txtTestCases, happyPath, 2)
 
-	// queries (5 + 5) cases * 3 = 100 queries.
+	// queries (5 + 5) cases * 3 = 30 queries.
 	queryWG := syncThenAsyncQuery(t, times, resolver, txtTestCases, ipTestCase, happyPath)
 	unittest.RequireReturnsBefore(t, queryWG.Wait, 1*time.Second, "could not perform all queries on time")
 
