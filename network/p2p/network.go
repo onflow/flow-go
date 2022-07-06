@@ -99,44 +99,46 @@ type registerBlobServiceResp struct {
 
 var ErrNetworkShutdown = errors.New("network has already shutdown")
 
+type NetworkParameters struct {
+	Logger              zerolog.Logger
+	Codec               network.Codec
+	Me                  module.Local
+	MiddlewareFactory   func() (network.Middleware, error)
+	Topology            network.Topology
+	SubscriptionManager network.SubscriptionManager
+	Metrics             module.NetworkMetrics
+	IdentityProvider    id.IdentityProvider
+	ReceiveCache        *netcache.ReceiveCache
+	Options             []NetworkOptFunction
+}
+
 // NewNetwork creates a new naive overlay network, using the given middleware to
 // communicate to direct peers, using the given codec for serialization, and
 // using the given state & cache interfaces to track volatile information.
 // csize determines the size of the cache dedicated to keep track of received messages
-func NewNetwork(
-	log zerolog.Logger,
-	codec network.Codec,
-	me module.Local,
-	mwFactory func() (network.Middleware, error),
-	top network.Topology,
-	sm network.SubscriptionManager,
-	metrics module.NetworkMetrics,
-	identityProvider id.IdentityProvider,
-	receiveCache *netcache.ReceiveCache,
-	options ...NetworkOptFunction,
-) (*Network, error) {
+func NewNetwork(param *NetworkParameters) (*Network, error) {
 
-	mw, err := mwFactory()
+	mw, err := param.MiddlewareFactory()
 	if err != nil {
 		return nil, fmt.Errorf("could not create middleware: %w", err)
 	}
 
 	n := &Network{
-		logger:                      log,
-		codec:                       codec,
-		me:                          me,
+		logger:                      param.Logger,
+		codec:                       param.Codec,
+		me:                          param.Me,
 		mw:                          mw,
-		receiveCache:                receiveCache,
-		top:                         top,
-		metrics:                     metrics,
-		subscriptionManager:         sm,
-		identityProvider:            identityProvider,
+		receiveCache:                param.ReceiveCache,
+		top:                         param.Topology,
+		metrics:                     param.Metrics,
+		subscriptionManager:         param.SubscriptionManager,
+		identityProvider:            param.IdentityProvider,
 		conduitFactory:              conduit.NewDefaultConduitFactory(),
 		registerEngineRequests:      make(chan *registerEngineRequest),
 		registerBlobServiceRequests: make(chan *registerBlobServiceRequest),
 	}
 
-	for _, opt := range options {
+	for _, opt := range param.Options {
 		opt(n)
 	}
 
