@@ -75,7 +75,7 @@ func TestResolver_CacheExpiry(t *testing.T) {
 		metrics.NewNoopCollector(),
 		dnsCache,
 		WithBasicResolver(&basicResolver),
-		WithTTL(3*time.Second)) // cache timeout set to 3 seconds for this test
+		WithTTL(1*time.Second)) // cache timeout set to 3 seconds for this test
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -95,7 +95,7 @@ func TestResolver_CacheExpiry(t *testing.T) {
 	queryWG := syncThenAsyncQuery(t, times, resolver, txtTestCases, ipTestCase, happyPath)
 	unittest.RequireReturnsBefore(t, queryWG.Wait, 1*time.Second, "could not perform all queries on time")
 
-	time.Sleep(4 * time.Second) // waits enough for cache to get invalidated
+	time.Sleep(2 * time.Second) // waits enough for cache to get invalidated
 
 	queryWG = syncThenAsyncQuery(t, times, resolver, txtTestCases, ipTestCase, happyPath)
 
