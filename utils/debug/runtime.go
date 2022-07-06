@@ -6,6 +6,7 @@ import (
 
 // GetHeapAllocsBytes returns the value of /gc/heap/allocs:bytes.
 func GetHeapAllocsBytes() uint64 {
+	// https://pkg.go.dev/runtime/metrics#hdr-Supported_metrics
 	sample := []metrics.Sample{{Name: "/gc/heap/allocs:bytes"}}
 	metrics.Read(sample)
 
