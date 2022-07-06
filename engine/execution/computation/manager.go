@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ipfs/go-cid"
@@ -75,6 +76,9 @@ type Manager struct {
 	uploaders                []uploader.Uploader
 	eds                      state_synchronization.ExecutionDataService
 	edCache                  state_synchronization.ExecutionDataCIDCache
+
+	rngLock *sync.Mutex
+	rng     *rand.Rand
 }
 
 func New(
@@ -128,6 +132,9 @@ func New(
 		uploaders:                uploaders,
 		eds:                      eds,
 		edCache:                  edCache,
+
+		rngLock: &sync.Mutex{},
+		rng:     rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 
 	return &e, nil
@@ -159,12 +166,17 @@ func (e *Manager) ExecuteScript(
 	// allocate a random ID to be able to track this script when its done,
 	// scripts might not be unique so we use this extra tracker to follow their logs
 	// TODO: this is a temporary measure, we could remove this in the future
-	trackerID := rand.Uint32()
-	e.log.Debug().Hex("script_hex", code).Uint32("trackerID", trackerID).Msg("script is sent for execution")
+	if e.log.Debug().Enabled() {
+		e.rngLock.Lock()
+		trackerID := e.rng.Uint32()
+		e.rngLock.Unlock()
 
-	defer func() {
-		e.log.Debug().Uint32("trackerID", trackerID).Msg("script execution is complete")
-	}()
+		trackedLogger := e.log.With().Hex("script_hex", code).Uint32("trackerID", trackerID).Logger()
+		trackedLogger.Debug().Msg("script is sent for execution")
+		defer func() {
+			trackedLogger.Debug().Msg("script execution is complete")
+		}()
+	}
 
 	requestCtx, cancel := context.WithTimeout(ctx, e.scriptExecutionTimeLimit)
 	defer cancel()
