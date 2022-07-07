@@ -17,7 +17,7 @@ import (
 // TestConduitRelayMessage_Publish evaluates that corruptible conduit relays all incoming publish events to its controller.
 func TestConduitRelayMessage_Publish(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	controller := &mockinsecure.ConduitMaster{}
+	controller := &mockinsecure.EgressController{}
 	channel := network.Channel("test-channel")
 
 	c := &Conduit{
@@ -45,7 +45,7 @@ func TestConduitRelayMessage_Publish(t *testing.T) {
 // TestConduitRelayMessage_Multicast evaluates that corruptible conduit relays all incoming multicast events to its controller.
 func TestConduitRelayMessage_Multicast(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	controller := &mockinsecure.ConduitMaster{}
+	controller := &mockinsecure.EgressController{}
 	channel := network.Channel("test-channel")
 	num := 3 // targets of multicast
 
@@ -74,7 +74,7 @@ func TestConduitRelayMessage_Multicast(t *testing.T) {
 // TestConduitRelayMessage_Unicast evaluates that corruptible conduit relays all incoming unicast events to its controller.
 func TestConduitRelayMessage_Unicast(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	controller := &mockinsecure.ConduitMaster{}
+	controller := &mockinsecure.EgressController{}
 	channel := network.Channel("test-channel")
 
 	c := &Conduit{
@@ -99,7 +99,7 @@ func TestConduitRelayMessage_Unicast(t *testing.T) {
 // the error is reflected to the invoker of the corruptible conduit unicast.
 func TestConduitReflectError_Unicast(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	controller := &mockinsecure.ConduitMaster{}
+	controller := &mockinsecure.EgressController{}
 	channel := network.Channel("test-channel")
 
 	c := &Conduit{
@@ -124,7 +124,7 @@ func TestConduitReflectError_Unicast(t *testing.T) {
 // the error is reflected to the invoker of the corruptible conduit multicast.
 func TestConduitReflectError_Multicast(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	controller := &mockinsecure.ConduitMaster{}
+	controller := &mockinsecure.EgressController{}
 	channel := network.Channel("test-channel")
 	num := 3 // targets of multicast
 
@@ -154,7 +154,7 @@ func TestConduitReflectError_Multicast(t *testing.T) {
 // the error is reflected to the invoker of the corruptible conduit multicast.
 func TestConduitReflectError_Publish(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	controller := &mockinsecure.ConduitMaster{}
+	controller := &mockinsecure.EgressController{}
 	channel := network.Channel("test-channel")
 
 	c := &Conduit{
@@ -183,7 +183,7 @@ func TestConduitReflectError_Publish(t *testing.T) {
 // factory) of the conduit for processing further.
 func TestConduitClose_HappyPath(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	controller := &mockinsecure.ConduitMaster{}
+	controller := &mockinsecure.EgressController{}
 	channel := network.Channel("test-channel")
 
 	c := &Conduit{
@@ -209,7 +209,7 @@ func TestConduitClose_HappyPath(t *testing.T) {
 // the error is reflected to original invoker of the corruptible conduit close method.
 func TestConduitClose_Error(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	controller := &mockinsecure.ConduitMaster{}
+	controller := &mockinsecure.EgressController{}
 	channel := network.Channel("test-channel")
 
 	c := &Conduit{

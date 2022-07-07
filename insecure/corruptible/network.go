@@ -4,15 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/gogo/protobuf/codec"
+	"io"
+	"net"
+	"sync"
+
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution/utils"
 	verutils "github.com/onflow/flow-go/engine/verification/utils"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/network/p2p"
-	"io"
-	"net"
-	"sync"
 
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/ipfs/go-datastore"
@@ -52,14 +51,14 @@ type Network struct {
 
 var _ flownet.Network = &Network{}
 
-func (n *Network) NewCorruptibleNetwork(
+func NewCorruptibleNetwork(
 	logger zerolog.Logger,
 	chainId flow.ChainID,
 	address string,
 	me module.Local,
 	codec flownet.Codec,
 	flowNetwork flownet.Network,
-	conduitFactory ConduitFactory) (*Network, error) {
+	conduitFactory *ConduitFactory) (*Network, error) {
 	if chainId != flow.BftTestnet {
 		panic("illegal chain id for using corruptible network")
 	}
@@ -67,33 +66,26 @@ func (n *Network) NewCorruptibleNetwork(
 	corruptibleNetwork := &Network{
 		codec:          codec,
 		me:             me,
+		conduitFactory: conduitFactory,
+		flowNetwork:    flowNetwork,
 		logger:         logger.With().Str("component", "corruptible-network").Logger(),
 		receiptHasher:  utils.NewExecutionReceiptHasher(),
 		spockHasher:    utils.NewSPOCKHasher(),
 		approvalHasher: verutils.NewResultApprovalHasher(),
 	}
 
-	corruptibleNetwork.conduitFactory = NewCorruptibleConduitFactory(params.Logger, chainId, corruptibleNetwork)
-
-	// instantiating flow network
-	if params.Options == nil {
-		params.Options = make([]p2p.NetworkOptFunction, 0)
-	}
-	params.Options = append(params.Options, p2p.WithConduitFactory(corruptibleNetwork.conduitFactory))
-
-	flowNetwork, err := p2p.NewNetwork(params)
+	err := corruptibleNetwork.conduitFactory.RegisterEgressController(corruptibleNetwork)
 	if err != nil {
-		return nil, fmt.Errorf("could not initialize Flow network: %w", err)
+		return nil, fmt.Errorf("could not register egress controller on conduit factory: %w", err)
 	}
-	corruptibleNetwork.flowNetwork = flowNetwork
-
 	corruptibleNetwork.ComponentManager = component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			corruptibleNetwork.flowNetwork.Start(ctx)
+
+			ready()
 		}).
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			corruptibleNetwork.start(ctx, address)
-
 			ready()
 
 			<-ctx.Done()
@@ -209,7 +201,7 @@ func (n *Network) processAttackerMessage(msg *insecure.Message) error {
 	}
 
 	lg = lg.With().Str("target_ids", fmt.Sprintf("%v", msg.TargetIDs)).Logger()
-	err = n.8conduitFactory.sendOnNetwork(event, flownet.Channel(msg.ChannelID), msg.Protocol, uint(msg.TargetNum), targetIds...)
+	err = n.conduitFactory.SendOnFlowNetwork(event, flownet.Channel(msg.ChannelID), msg.Protocol, uint(msg.TargetNum), targetIds...)
 	if err != nil {
 		lg.Err(err).Msg("could not send attacker message to the network")
 		return fmt.Errorf("could not send attacker message to the network: %w", err)
@@ -353,7 +345,7 @@ func (n *Network) HandleOutgoingEvent(
 		// no attacker yet registered, hence sending message on the network following the
 		// correct expected behavior.
 		lg.Info().Msg("no attacker registered, passing through event")
-		return n.conduitFactory.sendOnNetwork(event, channel, protocol, uint(num), targetIds...)
+		return n.conduitFactory.SendOnFlowNetwork(event, channel, protocol, uint(num), targetIds...)
 	}
 
 	msg, err := n.eventToMessage(event, channel, protocol, num, targetIds...)
