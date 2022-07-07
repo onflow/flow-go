@@ -31,13 +31,13 @@ import (
 )
 
 // Network is a wrapper around the original flow network, that allows a remote attacker
-// to take control over its ingress and egress traffics.
+// to take control over its ingress and egress traffic flows.
 type Network struct {
 	*component.ComponentManager
+	logger                zerolog.Logger
 	codec                 flownet.Codec
 	mu                    sync.Mutex
 	me                    module.Local
-	logger                zerolog.Logger
 	flowNetwork           flownet.Network // original flow network of the node.
 	server                *grpc.Server    // touch point of attack network to this factory.
 	address               net.Addr
@@ -52,6 +52,9 @@ type Network struct {
 var _ flownet.Network = &Network{}
 
 func (n *Network) NewCorruptibleNetwork(chainId flow.ChainID, address string, me module.Local, params *p2p.NetworkParameters) (*Network, error) {
+	if chainId != flow.BftTestnet {
+		panic("illegal chain id for using corruptible network")
+	}
 
 	corruptibleNetwork := &Network{
 		codec:          params.Codec,
@@ -72,7 +75,7 @@ func (n *Network) NewCorruptibleNetwork(chainId flow.ChainID, address string, me
 
 	flowNetwork, err := p2p.NewNetwork(params)
 	if err != nil {
-		return nil, fmt.Errorf("could not initialize flow network: %w", err)
+		return nil, fmt.Errorf("could not initialize Flow network: %w", err)
 	}
 	corruptibleNetwork.flowNetwork = flowNetwork
 
@@ -144,7 +147,7 @@ func (n *Network) processAttackerMessage(msg *insecure.Message) error {
 	lg := n.logger.With().
 		Str("protocol", insecure.ProtocolStr(msg.Protocol)).
 		Uint32("target_num", msg.TargetNum).
-		Str("channel", string(msg.ChannelID)).Logger()
+		Str("channel", msg.ChannelID).Logger()
 
 	event, err := n.codec.Decode(msg.Payload)
 	if err != nil {
@@ -210,7 +213,7 @@ func (n *Network) processAttackerMessage(msg *insecure.Message) error {
 }
 
 func (n *Network) start(ctx irrecoverable.SignalerContext, address string) {
-	// starts up gRPC server of corruptible conduit factory at given address.
+	// starts up gRPC server of corruptible network at given address.
 	server := grpc.NewServer()
 	insecure.RegisterCorruptibleConduitFactoryServer(server, n)
 	ln, err := net.Listen(networkingProtocolTCP, address)
@@ -226,25 +229,25 @@ func (n *Network) start(ctx irrecoverable.SignalerContext, address string) {
 	go func() {
 		wg.Done()
 		if err = server.Serve(ln); err != nil { // blocking call
-			ctx.Throw(fmt.Errorf("could not bind factory to the tcp listener: %w", err))
+			ctx.Throw(fmt.Errorf("could not bind corruptible network to the tcp listener: %w", err))
 		}
 	}()
 
 	wg.Wait()
 }
 
-// stop conducts the termination logic of the sub-modules of attack network.
+// stop terminates the corruptible network.
 func (n *Network) stop() {
 	n.server.Stop()
 }
 
-// ServerAddress returns address of the gRPC server that is running by this corrupted conduit factory.
+// ServerAddress returns address of the gRPC server that is running by this corruptible network.
 func (n *Network) ServerAddress() string {
 	return n.address.String()
 }
 
-// EngineClosingChannel is called by the slave conduits of this factory to let it know that the corresponding engine of the
-// conduit is not going to use it anymore, so the channel can be closed safely.
+// EngineClosingChannel is called by the conduits of this corruptible network to let it know that the corresponding
+// engine of the conduit is not going to use it anymore, so the channel can be closed safely.
 func (n *Network) EngineClosingChannel(channel flownet.Channel) error {
 	return n.conduitFactory.unregisterChannel(channel)
 }
@@ -254,7 +257,8 @@ func (n *Network) eventToMessage(
 	event interface{},
 	channel flownet.Channel,
 	protocol insecure.Protocol,
-	targetNum uint32, targetIds ...flow.Identifier) (*insecure.Message, error) {
+	targetNum uint32,
+	targetIds ...flow.Identifier) (*insecure.Message, error) {
 
 	payload, err := n.codec.Encode(event)
 	if err != nil {
@@ -290,15 +294,16 @@ func (n *Network) AttackerRegistered() bool {
 	return n.attackerInboundStream != nil
 }
 
-// ConnectAttacker is a gRPC end-point for this conduit factory that lets an attacker register itself to it, so that the attacker can
-// control it.
-// Registering an attacker on a conduit is an exactly-once immutable operation, any second attempt after a successful registration returns an error.
+// ConnectAttacker is a gRPC end-point for this corruptible network that lets an attacker register itself to it, so that the attacker can
+// control its ingress and egress traffic flow.
+// Registering an attacker on a networking layer is an exactly-once immutable operation,
+// any second attempt after a successful registration returns an error.
 func (n *Network) ConnectAttacker(_ *empty.Empty, stream insecure.CorruptibleConduitFactory_ConnectAttackerServer) error {
 	n.mu.Lock()
 	n.logger.Info().Msg("attacker registration called arrived")
 	if n.attackerInboundStream != nil {
 		n.mu.Unlock()
-		return fmt.Errorf("could not register a new network adapter, one already exists")
+		return fmt.Errorf("could not register a new attacker, one already exists")
 	}
 	n.attackerInboundStream = stream
 
@@ -317,10 +322,10 @@ func (n *Network) ConnectAttacker(_ *empty.Empty, stream insecure.CorruptibleCon
 	return nil
 }
 
-// HandleOutgoingEvent is called by the corruptible conduits of this factory to relay their outgoing events.
-// If there is an attacker registered to this factory, the event is dispatched to it.
-// Otherwise, the factory follows the correct protocol path by sending the message down to the networking layer
-// to deliver to its targets.
+// HandleOutgoingEvent is called by the conduits generated by this network to relay their outgoing events.
+// If there is an attacker connected to this network, the event is dispatched to it.
+// Otherwise, the network follows the correct protocol path by sending the message down to the original networking layer
+// of Flow to deliver to its targets.
 func (n *Network) HandleOutgoingEvent(
 	event interface{},
 	channel flownet.Channel,
