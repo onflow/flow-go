@@ -35,10 +35,13 @@ func RetrieveEpochStatus(blockID flow.Identifier, status *flow.EpochStatus) func
 
 // SetEpochEmergencyFallbackTriggered sets a flag in the DB indicating that
 // epoch emergency fallback has been triggered, and the block where it was triggered.
-// EECC can be triggered by 2 blocks:
 //
-// 1. The first block of a new epoch, when that epoch has not been set up.
-// 2. The block where an invalid service event is being applied to the state.
+// EECC can be triggered in two ways:
+// 1. Finalizing the first block past the epoch commitment deadline, when the
+//    next epoch has not yet been committed (see protocol.Params for more detail)
+// 2. Incorporating a block where an invalid service event would have been applied
+//    to the protocol state (see function handleEpochServiceEvents for more detail)
+//    TODO: update doc when implementing https://github.com/dapperlabs/flow-go/issues/6316
 //
 // Calling this function multiple times is a no-op and returns no expected errors.
 func SetEpochEmergencyFallbackTriggered(blockID flow.Identifier) func(txn *badger.Txn) error {

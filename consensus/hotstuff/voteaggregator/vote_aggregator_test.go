@@ -71,10 +71,10 @@ func (s *VoteAggregatorTestSuite) TearDownTest() {
 // Tests the whole processing pipeline.
 func (s *VoteAggregatorTestSuite) TestOnFinalizedBlock() {
 	finalizedBlock := unittest.BlockHeaderFixture(unittest.HeaderWithView(100))
-	s.collectors.On("PruneUpToView", finalizedBlock.View).Once()
+	done := make(chan struct{})
+	s.collectors.On("PruneUpToView", finalizedBlock.View).Run(func(args mock.Arguments) {
+		close(done)
+	}).Once()
 	s.aggregator.OnFinalizedBlock(model.BlockFromFlow(&finalizedBlock, finalizedBlock.View-1))
-	require.Eventually(s.T(),
-		func() bool {
-			return s.collectors.AssertCalled(s.T(), "PruneUpToView", finalizedBlock.View)
-		}, time.Second, time.Millisecond*20)
+	unittest.AssertClosesBefore(s.T(), done, time.Second)
 }

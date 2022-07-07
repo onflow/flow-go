@@ -40,10 +40,6 @@ type DecreasingPruningHeightError struct {
 	err error
 }
 
-func NewDecreasingPruningHeightError(msg string) error {
-	return NewDecreasingPruningHeightErrorf(msg)
-}
-
 func NewDecreasingPruningHeightErrorf(msg string, args ...interface{}) error {
 	return DecreasingPruningHeightError{
 		err: fmt.Errorf(msg, args...),
