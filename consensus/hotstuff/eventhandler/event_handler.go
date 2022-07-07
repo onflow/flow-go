@@ -126,7 +126,7 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 		err := e.validator.ValidateProposal(proposal)
 		if model.IsInvalidBlockError(err) {
 			perr := e.voteAggregator.InvalidBlock(proposal)
-			if mempool.IsDecreasingPruningHeightError(perr) {
+			if mempool.IsBelowPrunedThresholdError(perr) {
 				log.Warn().Err(err).Msgf("invalid block proposal, but vote aggregator has pruned this height: %v", perr)
 				return nil
 			}
@@ -156,7 +156,7 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 	// votes for it.
 	err := e.voteAggregator.AddBlock(proposal)
 	if err != nil {
-		if !mempool.IsDecreasingPruningHeightError(err) {
+		if !mempool.IsBelowPrunedThresholdError(err) {
 			return fmt.Errorf("could not add block (%v) to vote aggregator: %w", block.BlockID, err)
 		}
 	}

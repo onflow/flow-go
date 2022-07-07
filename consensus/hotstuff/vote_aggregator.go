@@ -24,13 +24,13 @@ type VoteAggregator interface {
 	// validity of the proposer's vote for its own block.
 	// Expected error returns during normal operations:
 	// * model.InvalidBlockError if the proposer's vote for its own block is invalid
-	// * mempool.DecreasingPruningHeightError if the block's view has already been pruned
+	// * mempool.BelowPrunedThresholdError if the block's view has already been pruned
 	AddBlock(block *model.Proposal) error
 
 	// InvalidBlock notifies the VoteAggregator about an invalid proposal, so that it
 	// can process votes for the invalid block and slash the voters. Expected error
 	// returns during normal operations:
-	// * mempool.DecreasingPruningHeightError if proposal's view has already been pruned
+	// * mempool.BelowPrunedThresholdError if proposal's view has already been pruned
 	InvalidBlock(block *model.Proposal) error
 
 	// PruneUpToView deletes all votes _below_ to the given view, as well as
