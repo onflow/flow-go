@@ -3,11 +3,11 @@ package corruptible
 import (
 	"context"
 	"fmt"
+
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/network"
 )
 
@@ -19,20 +19,18 @@ const networkingProtocolTCP = "tcp"
 // factory, which in turn is relayed to the register attacker.
 // The attacker can asynchronously dictate the conduit factory to send messages on behalf of the node this factory resides on.
 type ConduitFactory struct {
-	component.Component
 	logger           zerolog.Logger
 	adapter          network.Adapter
 	egressController insecure.EgressController
 }
 
-func NewCorruptibleConduitFactory(logger zerolog.Logger, chainId flow.ChainID, egressController insecure.EgressController) *ConduitFactory {
+func NewCorruptibleConduitFactory(logger zerolog.Logger, chainId flow.ChainID) *ConduitFactory {
 	if chainId != flow.BftTestnet {
 		panic("illegal chain id for using corruptible conduit factory")
 	}
 
 	factory := &ConduitFactory{
-		logger:           logger.With().Str("module", "corruptible-conduit-factory").Logger(),
-		egressController: egressController,
+		logger: logger.With().Str("module", "corruptible-conduit-factory").Logger(),
 	}
 
 	return factory
@@ -51,11 +49,26 @@ func (c *ConduitFactory) RegisterAdapter(adapter network.Adapter) error {
 	return nil
 }
 
+// RegisterEgressController sets the EgressController component of the factory.
+func (c *ConduitFactory) RegisterEgressController(controller insecure.EgressController) error {
+	if c.egressController != nil {
+		return fmt.Errorf("could not register a new egress controller, one already exists")
+	}
+
+	c.egressController = controller
+
+	return nil
+}
+
 // NewConduit creates a conduit on the specified channel.
 // Prior to creating any conduit, the factory requires an Adapter to be registered with it.
 func (c *ConduitFactory) NewConduit(ctx context.Context, channel network.Channel) (network.Conduit, error) {
 	if c.adapter == nil {
 		return nil, fmt.Errorf("could not create a new conduit, missing a registered network adapter")
+	}
+
+	if c.egressController == nil {
+		return nil, fmt.Errorf("could not create a new conduit, missing a registered egress controller")
 	}
 
 	child, cancel := context.WithCancel(ctx)
@@ -76,9 +89,9 @@ func (c *ConduitFactory) unregisterChannel(channel network.Channel) error {
 	return c.adapter.UnRegisterChannel(channel)
 }
 
-// sendOnNetwork dispatches the given event to the networking layer of the node in order to be delivered
+// SendOnFlowNetwork dispatches the given event to the networking layer of the node in order to be delivered
 // through the specified protocol to the target identifiers.
-func (c *ConduitFactory) sendOnNetwork(event interface{},
+func (c *ConduitFactory) SendOnFlowNetwork(event interface{},
 	channel network.Channel,
 	protocol insecure.Protocol,
 	num uint, targetIds ...flow.Identifier) error {
