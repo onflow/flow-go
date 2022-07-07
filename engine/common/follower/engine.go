@@ -201,7 +201,7 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 	return nil
 }
 
-// onBlockProposal handles incoming block proposals.
+// onBlockProposal handles incoming block proposals. inRangeBlockResponse will determine whether or not we should wait in processBlockAndDescendants
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal, inRangeBlockResponse bool) error {
 
 	span, ctx, _ := e.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.FollowerOnBlockProposal)
@@ -395,7 +395,7 @@ func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *messa
 		select {
 		case <-e.follower.SubmitProposal(header, parent.View):
 			// after submitting proposal to hotstuff, then hotstuff will start processing block n, and follower
-			// engine is concurrently processing block n + 1. 
+			// engine is concurrently processing block n + 1.
 			// however follower engine will fail to process block n + 1 if block n is not saved in protocol state.
 			// Block n is only saved in protocol state when hotstuff finishes processing block n.
 			// In order to ensure follower engine don't process block n + 1 too early, we wait until hotstuff finish
