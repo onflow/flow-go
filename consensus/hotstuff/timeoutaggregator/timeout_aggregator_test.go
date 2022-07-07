@@ -69,19 +69,22 @@ func (s *TimeoutAggregatorTestSuite) TestAddTimeout_HappyPath() {
 	}).Return(nil).Times(timeoutsCount)
 	s.collectors.On("GetOrCreateCollector", s.lowestRetainedView).Return(collector, true, nil).Times(timeoutsCount)
 
-	var wg, startWg sync.WaitGroup
-	wg.Add(timeoutsCount)
-	startWg.Add(1)
+	var start sync.WaitGroup
+	start.Add(timeoutsCount)
 	for i := 0; i < timeoutsCount; i++ {
 		go func() {
-			defer wg.Done()
 			timeout := helper.TimeoutObjectFixture(helper.WithTimeoutObjectView(s.lowestRetainedView))
-			startWg.Wait()
+
+			start.Done()
+			// Wait for last worker routine to signal ready. Then,
+			// feed all timeouts into cache
+			start.Wait()
+
 			s.aggregator.AddTimeout(timeout)
 		}()
 	}
 
-	startWg.Done()
+	start.Wait()
 
 	require.Eventually(s.T(), func() bool {
 		return callCount.Load() == uint64(timeoutsCount)

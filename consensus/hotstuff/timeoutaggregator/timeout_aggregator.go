@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/mempool"
 )
 
 // defaultTimeoutAggregatorWorkers number of workers to dispatch events for timeout aggregator
@@ -89,7 +88,7 @@ func (t *TimeoutAggregator) queuedTimeoutsProcessingLoop(ctx irrecoverable.Signa
 		case <-ctx.Done():
 			return
 		case <-notifier:
-			err := t.processQueuedTimeoutEvents(ctx)
+			err := t.processQueuedTimeoutObjects(ctx)
 			if err != nil {
 				ctx.Throw(fmt.Errorf("internal error processing queued timeout events: %w", err))
 				return

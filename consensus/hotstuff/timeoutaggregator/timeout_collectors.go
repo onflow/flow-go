@@ -11,6 +11,8 @@ import (
 )
 
 // NewCollectorFactoryMethod is a factory method to generate a TimeoutCollector for concrete view
+// Expected error returns during normal operations:
+//  * model.ErrViewForUnknownEpoch if view is not yet pruned but no epoch containing the given view is known
 type NewCollectorFactoryMethod = func(view uint64) (hotstuff.TimeoutCollector, error)
 
 // TimeoutCollectors implements management of multiple timeout collectors indexed by view.
@@ -22,19 +24,17 @@ type NewCollectorFactoryMethod = func(view uint64) (hotstuff.TimeoutCollector, e
 type TimeoutCollectors struct {
 	log                zerolog.Logger
 	lock               sync.RWMutex
-	lowestRetainedView uint64 // lowest view, for which we still retain a TimeoutCollector and process timeouts
-	committee          hotstuff.Replicas
+	lowestRetainedView uint64                               // lowest view, for which we still retain a TimeoutCollector and process timeouts
 	collectors         map[uint64]hotstuff.TimeoutCollector // view -> TimeoutCollector
 	createCollector    NewCollectorFactoryMethod            // factory method for creating collectors
 }
 
 var _ hotstuff.TimeoutCollectors = (*TimeoutCollectors)(nil)
 
-func NewTimeoutCollectors(log zerolog.Logger, committee hotstuff.Replicas, lowestRetainedView uint64, createCollector NewCollectorFactoryMethod) *TimeoutCollectors {
+func NewTimeoutCollectors(log zerolog.Logger, lowestRetainedView uint64, createCollector NewCollectorFactoryMethod) *TimeoutCollectors {
 	return &TimeoutCollectors{
 		log:                log.With().Str("component", "timeout_collectors").Logger(),
 		lowestRetainedView: lowestRetainedView,
-		committee:          committee,
 		collectors:         make(map[uint64]hotstuff.TimeoutCollector),
 		createCollector:    createCollector,
 	}
@@ -47,7 +47,8 @@ func NewTimeoutCollectors(log zerolog.Logger, committee hotstuff.Replicas, lowes
 //  -  (nil, false, error) if running into any exception creating the timeout collector state machine
 // Expected error returns during normal operations:
 //  * model.BelowPrunedThresholdError if view is below the pruning threshold
-//  * model.ErrViewForUnknownEpoch if view is not yet pruned but no epoch containing the given view is known
+//  * model.ErrViewForUnknownEpoch if view is not yet pruned but no epoch containing the given view is known, this error
+// can be returned from factory method.
 func (t *TimeoutCollectors) GetOrCreateCollector(view uint64) (hotstuff.TimeoutCollector, bool, error) {
 	cachedCollector, hasCachedCollector, err := t.getCollector(view)
 	if err != nil {
@@ -55,12 +56,6 @@ func (t *TimeoutCollectors) GetOrCreateCollector(view uint64) (hotstuff.TimeoutC
 	}
 	if hasCachedCollector {
 		return cachedCollector, false, nil
-	}
-
-	// TODO: replace this check by a specific function to query if there is epoch by view
-	_, err = t.committee.LeaderForView(view)
-	if err != nil {
-		return nil, false, fmt.Errorf("could not query epoch for view %d: %w", view, err)
 	}
 
 	collector, err := t.createCollector(view)

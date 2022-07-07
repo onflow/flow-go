@@ -21,6 +21,6 @@ type TimeoutAggregator interface {
 	// related indices. We only retain and process `TimeoutCollector`s, whose view is equal or larger
 	// than `lowestRetainedView`. If `lowestRetainedView` is smaller than the
 	// previous value, the previous value is kept and the method call is a NoOp.
-	// This value should be set the latest active view maintained by `Pacemaker`.
+	// This value should be set to the latest active view maintained by `Pacemaker`.
 	PruneUpToView(lowestRetainedView uint64)
 }
