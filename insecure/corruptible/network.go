@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/gogo/protobuf/codec"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution/utils"
 	verutils "github.com/onflow/flow-go/engine/verification/utils"
@@ -51,15 +52,22 @@ type Network struct {
 
 var _ flownet.Network = &Network{}
 
-func (n *Network) NewCorruptibleNetwork(chainId flow.ChainID, address string, me module.Local, params *p2p.NetworkParameters) (*Network, error) {
+func (n *Network) NewCorruptibleNetwork(
+	logger zerolog.Logger,
+	chainId flow.ChainID,
+	address string,
+	me module.Local,
+	codec flownet.Codec,
+	flowNetwork flownet.Network,
+	conduitFactory ConduitFactory) (*Network, error) {
 	if chainId != flow.BftTestnet {
 		panic("illegal chain id for using corruptible network")
 	}
 
 	corruptibleNetwork := &Network{
-		codec:          params.Codec,
+		codec:          codec,
 		me:             me,
-		logger:         params.Logger.With().Str("component", "corruptible-network").Logger(),
+		logger:         logger.With().Str("component", "corruptible-network").Logger(),
 		receiptHasher:  utils.NewExecutionReceiptHasher(),
 		spockHasher:    utils.NewSPOCKHasher(),
 		approvalHasher: verutils.NewResultApprovalHasher(),
@@ -201,7 +209,7 @@ func (n *Network) processAttackerMessage(msg *insecure.Message) error {
 	}
 
 	lg = lg.With().Str("target_ids", fmt.Sprintf("%v", msg.TargetIDs)).Logger()
-	err = n.conduitFactory.sendOnNetwork(event, flownet.Channel(msg.ChannelID), msg.Protocol, uint(msg.TargetNum), targetIds...)
+	err = n.8conduitFactory.sendOnNetwork(event, flownet.Channel(msg.ChannelID), msg.Protocol, uint(msg.TargetNum), targetIds...)
 	if err != nil {
 		lg.Err(err).Msg("could not send attacker message to the network")
 		return fmt.Errorf("could not send attacker message to the network: %w", err)
