@@ -15,6 +15,7 @@ import (
 // critical path of protocol state mutations. Most subscribers should immediately
 // spawn a goroutine to handle the notification to avoid blocking protocol state
 // progression, especially for frequent protocol events (eg. BlockFinalized).
+// TODO deliver protocol events async https://github.com/dapperlabs/flow-go/issues/6317
 //
 // NOTE: the epoch-related callbacks are only called once the fork containing
 // the relevant event has been finalized.
@@ -76,4 +77,11 @@ type Consumer interface {
 	//
 	// NOTE: Only called once the phase transition has been finalized.
 	EpochCommittedPhaseStarted(currentEpochCounter uint64, first *flow.Header)
+
+	// EpochEmergencyFallbackTriggered is called when epoch fallback mode (EECC) is triggered.
+	// Since EECC is a permanent, spork-scoped state, this event is triggered only once.
+	// After this event is triggered, no further epoch transitions will occur,
+	// no further epoch phase transitions will occur, and no further epoch-related
+	// related protocol events (the events defined in this interface) will be emitted.
+	EpochEmergencyFallbackTriggered()
 }
