@@ -21,6 +21,6 @@ type EgressController interface {
 // By the inbound traffic, we mean the traffic from networking layer to the engine that carries on the
 // messages from remote nodes to this engine.
 type IngressController interface {
-	// HandleIncomingEvent sends an incoming event (to an engine) to the corrupted networking layer to proces.
+	// HandleIncomingEvent sends an incoming event (to an engine) to the corrupted networking layer to process.
 	HandleIncomingEvent(network.Channel, flow.Identifier, interface{})
 }
