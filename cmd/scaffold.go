@@ -325,17 +325,18 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 	}
 
 	// creates network instance
-	net, err := p2p.NewNetwork(fnb.Logger,
-		fnb.CodecFactory(),
-		fnb.Me,
-		func() (network.Middleware, error) { return fnb.Middleware, nil },
-		topologyCache,
-		subscriptionManager,
-		fnb.Metrics.Network,
-		fnb.IdentityProvider,
-		receiveCache,
-		p2p.WithConduitFactory(cf),
-	)
+	net, err := p2p.NewNetwork(&p2p.NetworkParameters{
+		Logger:              fnb.Logger,
+		Codec:               fnb.CodecFactory(),
+		Me:                  fnb.Me,
+		MiddlewareFactory:   func() (network.Middleware, error) { return fnb.Middleware, nil },
+		Topology:            topologyCache,
+		SubscriptionManager: subscriptionManager,
+		Metrics:             fnb.Metrics.Network,
+		IdentityProvider:    fnb.IdentityProvider,
+		ReceiveCache:        receiveCache,
+		Options:             []p2p.NetworkOptFunction{p2p.WithConduitFactory(cf)},
+	})
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize network: %w", err)
 	}
