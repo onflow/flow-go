@@ -45,6 +45,7 @@ type Engine struct {
 
 type Option func(*Engine)
 
+// WithComplianceOptions sets options for the engine's compliance config
 func WithComplianceOptions(opts ...compliance.Opt) Option {
 	return func(e *Engine) {
 		for _, apply := range opts {
@@ -53,6 +54,7 @@ func WithComplianceOptions(opts ...compliance.Opt) Option {
 	}
 }
 
+// WithChannel sets the channel the follower engine will use to receive blocks.
 func WithChannel(channel network.Channel) Option {
 	return func(e *Engine) {
 		e.channel = channel
