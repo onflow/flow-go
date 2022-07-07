@@ -27,7 +27,11 @@ func (_m *Consumer) EpochCommittedPhaseStarted(currentEpochCounter uint64, first
 	_m.Called(currentEpochCounter, first)
 }
 
+<<<<<<< HEAD
 // EpochEmergencyFallbackTriggered provides a mock function with given fields:
+=======
+// EpochFallbackModeTriggered provides a mock function with given fields:
+>>>>>>> feature/active-pacemaker
 func (_m *Consumer) EpochEmergencyFallbackTriggered() {
 	_m.Called()
 }
