@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -55,6 +56,8 @@ func NewNetwork(t testing.TB, myId flow.Identifier, hub *Hub, opts ...func(*Netw
 	for _, opt := range opts {
 		opt(net)
 	}
+
+	net.On("Start", mock.Anything).Return()
 
 	require.NoError(t, net.conduitFactory.RegisterAdapter(net))
 
