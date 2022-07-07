@@ -10,11 +10,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 )
 
-// NewCollectorFactoryMethod is a factory method to generate a TimeoutCollector for concrete view
-// Expected error returns during normal operations:
-//  * model.ErrViewForUnknownEpoch if view is not yet pruned but no epoch containing the given view is known
-type NewCollectorFactoryMethod = func(view uint64) (hotstuff.TimeoutCollector, error)
-
 // TimeoutCollectors implements management of multiple timeout collectors indexed by view.
 // Implements hotstuff.TimeoutCollectors interface. Creating a TimeoutCollector for a
 // particular view is lazy (instances are created on demand).
@@ -26,17 +21,17 @@ type TimeoutCollectors struct {
 	lock               sync.RWMutex
 	lowestRetainedView uint64                               // lowest view, for which we still retain a TimeoutCollector and process timeouts
 	collectors         map[uint64]hotstuff.TimeoutCollector // view -> TimeoutCollector
-	createCollector    NewCollectorFactoryMethod            // factory method for creating collectors
+	collectorFactory   hotstuff.TimeoutCollectorFactory     // factory method for creating collectors
 }
 
 var _ hotstuff.TimeoutCollectors = (*TimeoutCollectors)(nil)
 
-func NewTimeoutCollectors(log zerolog.Logger, lowestRetainedView uint64, createCollector NewCollectorFactoryMethod) *TimeoutCollectors {
+func NewTimeoutCollectors(log zerolog.Logger, lowestRetainedView uint64, collectorFactory hotstuff.TimeoutCollectorFactory) *TimeoutCollectors {
 	return &TimeoutCollectors{
 		log:                log.With().Str("component", "timeout_collectors").Logger(),
 		lowestRetainedView: lowestRetainedView,
 		collectors:         make(map[uint64]hotstuff.TimeoutCollector),
-		createCollector:    createCollector,
+		collectorFactory:   collectorFactory,
 	}
 }
 
@@ -58,7 +53,7 @@ func (t *TimeoutCollectors) GetOrCreateCollector(view uint64) (hotstuff.TimeoutC
 		return cachedCollector, false, nil
 	}
 
-	collector, err := t.createCollector(view)
+	collector, err := t.collectorFactory.Create(view)
 	if err != nil {
 		return nil, false, fmt.Errorf("could not create timeout collector for view %d: %w", view, err)
 	}

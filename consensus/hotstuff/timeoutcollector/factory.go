@@ -6,15 +6,28 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 )
 
-type Factory struct {
-	notifier          hotstuff.Consumer
-	collectorNotifier hotstuff.TimeoutCollectorConsumer
-	validator         hotstuff.Validator
-	committee         hotstuff.Replicas
-	encodingTag       string
+type TimeoutProcessorFactory struct {
+	committee   hotstuff.Replicas
+	notifier    hotstuff.TimeoutCollectorConsumer
+	validator   hotstuff.Validator
+	encodingTag string
 }
 
-func (f *Factory) Create(view uint64) (hotstuff.TimeoutCollector, error) {
+func NewTimeoutProcessorFactory(
+	notifier hotstuff.TimeoutCollectorConsumer,
+	committee hotstuff.Replicas,
+	validator hotstuff.Validator,
+	encodingTag string,
+) *TimeoutProcessorFactory {
+	return &TimeoutProcessorFactory{
+		committee:   committee,
+		notifier:    notifier,
+		validator:   validator,
+		encodingTag: encodingTag,
+	}
+}
+
+func (f *TimeoutProcessorFactory) Create(view uint64) (hotstuff.TimeoutProcessor, error) {
 	allParticipants, err := f.committee.IdentitiesByEpoch(view)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving consensus participants: %w", err)
@@ -25,10 +38,5 @@ func (f *Factory) Create(view uint64) (hotstuff.TimeoutCollector, error) {
 		return nil, fmt.Errorf("could not create TimeoutSignatureAggregator at view %d: %w", view, err)
 	}
 
-	processor, err := NewTimeoutProcessor(f.committee, f.validator, sigAggregator, f.collectorNotifier)
-	if err != nil {
-		return nil, fmt.Errorf("could not create TimeoutProcessor at view %d: %w", view, err)
-	}
-
-	return NewTimeoutCollector(view, f.notifier, f.collectorNotifier, processor), nil
+	return NewTimeoutProcessor(f.committee, f.validator, sigAggregator, f.notifier)
 }

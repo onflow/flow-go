@@ -39,3 +39,14 @@ type TimeoutProcessor interface {
 	// All other errors should be treated as exceptions.
 	Process(timeout *model.TimeoutObject) error
 }
+
+type TimeoutCollectorFactory interface {
+	Create(view uint64) (TimeoutCollector, error)
+}
+
+type TimeoutProcessorFactory interface {
+	// Create is a factory method to generate a TimeoutCollector for concrete view
+	// Expected error returns during normal operations:
+	//  * model.ErrViewForUnknownEpoch if view is not yet pruned but no epoch containing the given view is known
+	Create(view uint64) (TimeoutProcessor, error)
+}
