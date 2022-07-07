@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"github.com/onflow/cadence"
-	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module/metrics"
 
+	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go-sdk/crypto"
 )
@@ -29,7 +29,7 @@ const (
 
 const slowTransactionThreshold = 30 * time.Second
 
-var accountCreationBatchSize = 250 // a higher number would hit max storage interaction limit
+var accountCreationBatchSize = 750 // a higher number would hit max gRPC message size
 const tokensPerTransfer = 0.01     // flow testnets only have 10e6 total supply, so we choose a small amount here
 
 // ContLoadGenerator creates a continuous load of transactions to the network
@@ -256,7 +256,7 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 	createAccountTx := flowsdk.NewTransaction().
 		SetScript(CreateAccountsScript(*lg.fungibleTokenAddress, *lg.flowTokenAddress)).
 		SetReferenceBlockID(lg.follower.BlockID()).
-		SetGasLimit(9999).
+		SetGasLimit(999999).
 		SetProposalKey(
 			*lg.serviceAccount.address,
 			lg.serviceAccount.accountKey.Index,
