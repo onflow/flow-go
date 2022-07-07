@@ -7,7 +7,7 @@ transaction(clusterWeights: [{String: UInt64}]) {
     let clusters: [FlowClusterQC.Cluster] = []
     var clusterIndex: UInt16 = 0
     for weightMapping in clusterWeights {
-      let cluster = FlowClusterQC.Cluster(clusterIndex, weightMapping)
+      let cluster = FlowClusterQC.Cluster(index: clusterIndex, nodeWeights: weightMapping)
       clusterIndex = clusterIndex + 1
     }
 

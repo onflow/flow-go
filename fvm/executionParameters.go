@@ -11,8 +11,8 @@ import (
 	"github.com/onflow/flow-go/fvm/utils"
 )
 
-// getExecutionWeights reads stored execution effort weights from the service account
-func getExecutionEffortWeights(
+// GetExecutionEffortWeights reads stored execution effort weights from the service account
+func GetExecutionEffortWeights(
 	env Environment,
 	service runtime.Address,
 ) (
@@ -53,8 +53,8 @@ func getExecutionEffortWeights(
 	return computationWeights, nil
 }
 
-// getExecutionMemoryWeights reads stored execution memory weights from the service account
-func getExecutionMemoryWeights(
+// GetExecutionMemoryWeights reads stored execution memory weights from the service account
+func GetExecutionMemoryWeights(
 	env Environment,
 	service runtime.Address,
 ) (
@@ -95,8 +95,8 @@ func getExecutionMemoryWeights(
 	return memoryWeights, nil
 }
 
-// getExecutionMemoryLimit reads the stored execution memory limit from the service account
-func getExecutionMemoryLimit(
+// GetExecutionMemoryLimit reads the stored execution memory limit from the service account
+func GetExecutionMemoryLimit(
 	env Environment,
 	service runtime.Address,
 ) (

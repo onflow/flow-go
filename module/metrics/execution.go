@@ -67,6 +67,7 @@ type ExecutionCollector struct {
 	executionStateDiskUsage          prometheus.Gauge
 	blockDataUploadsInProgress       prometheus.Gauge
 	blockDataUploadsDuration         prometheus.Histogram
+	maxCollectionHeight              prometheus.Gauge
 }
 
 func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
@@ -215,6 +216,7 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Subsystem: subsystemRuntime,
 		Name:      "block_transaction_counts",
 		Help:      "the total number of transactions per block",
+		Buckets:   prometheus.ExponentialBuckets(4, 2, 10),
 	})
 
 	blockCollectionCounts := promauto.NewHistogram(prometheus.HistogramOpts{
@@ -222,6 +224,7 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Subsystem: subsystemRuntime,
 		Name:      "block_collection_counts",
 		Help:      "the total number of collections per block",
+		Buckets:   prometheus.ExponentialBuckets(1, 2, 8),
 	})
 
 	collectionExecutionTime := promauto.NewHistogram(prometheus.HistogramOpts{
@@ -245,6 +248,7 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Subsystem: subsystemRuntime,
 		Name:      "collection_transaction_counts",
 		Help:      "the total number of transactions per collection",
+		Buckets:   prometheus.ExponentialBuckets(4, 2, 8),
 	})
 
 	collectionRequestsSent := promauto.NewCounter(prometheus.CounterOpts{
@@ -266,6 +270,7 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Subsystem: subsystemRuntime,
 		Name:      "transaction_parse_time_nanoseconds",
 		Help:      "the parse time for a transaction in nanoseconds",
+		Buckets:   prometheus.ExponentialBuckets(10, 10, 8),
 	})
 
 	transactionCheckTime := promauto.NewHistogram(prometheus.HistogramOpts{
@@ -273,6 +278,7 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Subsystem: subsystemRuntime,
 		Name:      "transaction_check_time_nanoseconds",
 		Help:      "the checking time for a transaction in nanoseconds",
+		Buckets:   prometheus.ExponentialBuckets(10, 10, 8),
 	})
 
 	transactionInterpretTime := promauto.NewHistogram(prometheus.HistogramOpts{
@@ -280,6 +286,7 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Subsystem: subsystemRuntime,
 		Name:      "transaction_interpret_time_nanoseconds",
 		Help:      "the interpretation time for a transaction in nanoseconds",
+		Buckets:   prometheus.ExponentialBuckets(10, 10, 8),
 	})
 
 	transactionExecutionTime := promauto.NewHistogram(prometheus.HistogramOpts{
@@ -311,7 +318,7 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Subsystem: subsystemRuntime,
 		Name:      "transaction_memory_estimate",
 		Help:      "the estimated memory used by a transaction",
-		Buckets:   []float64{100_000, 1_000_000, 10_000_000, 50_000_000, 100_000_000, 500_000_000, 1_000_000_000},
+		Buckets:   []float64{1_000_000, 10_000_000, 100_000_000, 1_000_000_000, 5_000_000_000, 10_000_000_000, 50_000_000_000, 100_000_000_000},
 	})
 
 	transactionMemoryDifference := promauto.NewHistogram(prometheus.HistogramOpts{
@@ -358,7 +365,7 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Subsystem: subsystemRuntime,
 		Name:      "script_memory_estimate",
 		Help:      "the estimated memory used by a script",
-		Buckets:   []float64{100_000, 1_000_000, 10_000_000, 50_000_000, 100_000_000, 500_000_000, 1_000_000_000},
+		Buckets:   []float64{1_000_000, 10_000_000, 100_000_000, 1_000_000_000, 5_000_000_000, 10_000_000_000, 50_000_000_000, 100_000_000_000},
 	})
 
 	scriptMemoryDifference := promauto.NewHistogram(prometheus.HistogramOpts{
@@ -521,6 +528,13 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 			Subsystem: subsystemMTrie,
 			Name:      "execution_state_disk_usage",
 			Help:      "the disk usage of execution state",
+		}),
+
+		maxCollectionHeight: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name:      "max_collection_height",
+			Namespace: namespaceExecution,
+			Subsystem: subsystemIngestion,
+			Help:      "gauge to track the maximum block height of collections received",
 		}),
 	}
 
@@ -740,4 +754,8 @@ func (ec *ExecutionCollector) RuntimeSetNumberOfAccounts(count uint64) {
 
 func (ec *ExecutionCollector) DiskSize(bytes uint64) {
 	ec.executionStateDiskUsage.Set(float64(bytes))
+}
+
+func (ec *ExecutionCollector) UpdateCollectionMaxHeight(height uint64) {
+	ec.maxCollectionHeight.Set(float64(height))
 }
