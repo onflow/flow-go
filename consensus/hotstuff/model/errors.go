@@ -401,7 +401,7 @@ func (e InvalidTimeoutError) Unwrap() error {
 
 // BelowPrunedThresholdError indicates that we are attempting to query or prune a mempool by a
 // key (typically block height or block view) which is lower than the lowest retained key threshold.
-// In other words, we have already pruned above the queried key.
+// In other words, we have already pruned above the specified key value.
 type BelowPrunedThresholdError struct {
 	err error
 }

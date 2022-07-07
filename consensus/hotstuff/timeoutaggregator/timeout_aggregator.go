@@ -98,10 +98,11 @@ func (t *TimeoutAggregator) queuedTimeoutsProcessingLoop(ctx irrecoverable.Signa
 	}
 }
 
-// processQueuedTimeoutEvents is a function which dispatches previously queued timeouts on worker thread
-// This function is called whenever we have queued timeouts ready to be dispatched.
+// processQueuedTimeoutObjects sequentially processes items from `queuedTimeouts`
+// until the queue returns 'empty'. Only when there are no more queued up TimeoutObjects,
+// this function call returns.
 // No errors are expected during normal operations.
-func (t *TimeoutAggregator) processQueuedTimeoutEvents(ctx context.Context) error {
+func (t *TimeoutAggregator) processQueuedTimeoutObjects(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -125,7 +126,7 @@ func (t *TimeoutAggregator) processQueuedTimeoutEvents(ctx context.Context) erro
 		t.log.Info().
 			Uint64("view", timeoutObject.View).
 			Hex("signer", timeoutObject.SignerID[:]).
-			Msg("TO has been processed successfully")
+			Msg("TimeoutObject processed successfully")
 	}
 }
 
@@ -141,9 +142,10 @@ func (t *TimeoutAggregator) processQueuedTimeout(timeoutObject *model.TimeoutObj
 	collector, _, err := t.collectors.GetOrCreateCollector(timeoutObject.View)
 	if err != nil {
 		// ignore if our routine is outdated and some other one has pruned collectors
-		if mempool.IsDecreasingPruningHeightError(err) {
+		if model.IsBelowPrunedThresholdError(err) {
 			return nil
-		} else if errors.Is(err, model.ErrViewForUnknownEpoch) {
+		}
+		if errors.Is(err, model.ErrViewForUnknownEpoch) {
 			// ignore TO if we don't have information for epoch
 			t.log.Debug().Uint64("view", timeoutObject.View).Msg("discarding TO for view beyond known epochs")
 			return nil
@@ -162,7 +164,7 @@ func (t *TimeoutAggregator) processQueuedTimeout(timeoutObject *model.TimeoutObj
 }
 
 // AddTimeout checks if TO is stale and appends TO to processing queue.
-// The actual processing will be done asynchronously by one of the `TimeoutAggregator` internal worker routines.
+// The actual processing will be done asynchronously by the `TimeoutAggregator`'s internal worker routines.
 func (t *TimeoutAggregator) AddTimeout(timeoutObject *model.TimeoutObject) {
 	// drop stale objects
 	if timeoutObject.View < t.lowestRetainedView.Value() {
@@ -174,11 +176,16 @@ func (t *TimeoutAggregator) AddTimeout(timeoutObject *model.TimeoutObject) {
 		return
 	}
 
-	// It's ok to silently drop timeouts in case our processing pipeline is full.
-	// It means that we are probably catching up.
-	if ok := t.queuedTimeouts.Push(timeoutObject); ok {
-		t.queuedTimeoutsNotifier.Notify()
+	placedInQueue := t.queuedTimeouts.Push(timeoutObject)
+	if !placedInQueue { // processing pipeline `queuedTimeouts` is full
+		// It's ok to silently drop timeouts, because we are probably catching up.
+		t.log.Debug().
+			Uint64("view", timeoutObject.View).
+			Hex("signer", timeoutObject.SignerID[:]).
+			Msg("no queue capacity, dropping timeout")
+		return
 	}
+	t.queuedTimeoutsNotifier.Notify()
 }
 
 // PruneUpToView deletes all `TimeoutCollector`s _below_ to the given view, as well as

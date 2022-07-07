@@ -46,7 +46,7 @@ func NewTimeoutCollectors(log zerolog.Logger, committee hotstuff.Replicas, lowes
 //  -  (collector, false, nil) if the collector can be found by the view
 //  -  (nil, false, error) if running into any exception creating the timeout collector state machine
 // Expected error returns during normal operations:
-//  * mempool.DecreasingPruningHeightError if view is below the pruning threshold
+//  * model.BelowPrunedThresholdError if view is below the pruning threshold
 //  * model.ErrViewForUnknownEpoch if view is not yet pruned but no epoch containing the given view is known
 func (t *TimeoutCollectors) GetOrCreateCollector(view uint64) (hotstuff.TimeoutCollector, bool, error) {
 	cachedCollector, hasCachedCollector, err := t.getCollector(view)
