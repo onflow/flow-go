@@ -186,7 +186,7 @@ func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBl
 }
 
 func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockResponse) error {
-	for _, block := range res.Blocks {
+	for i, block := range res.Blocks {
 		proposal := &messages.BlockProposal{
 			Header:  block.Header,
 			Payload: block.Payload,
@@ -194,7 +194,7 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 
 		// process block proposal with a wait
 		if err := e.onBlockProposal(originID, proposal, true); err != nil {
-			return err
+			return fmt.Errorf("fail to process the block at index %v in a range block response that contains %v blocks: %w", i, len(res.Blocks), err)
 		}
 	}
 
