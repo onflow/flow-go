@@ -17,10 +17,10 @@ type TimeoutAggregator interface {
 	// This method can be called concurrently, timeouts will be queued and processed asynchronously.
 	AddTimeout(timeoutObject *model.TimeoutObject)
 
-	// PruneUpToView deletes all timeouts _below_ to the given view, as well as
-	// related indices. We only retain and process timeouts, whose view is equal or larger
+	// PruneUpToView deletes all `TimeoutCollector`s _below_ to the given view, as well as
+	// related indices. We only retain and process `TimeoutCollector`s, whose view is equal or larger
 	// than `lowestRetainedView`. If `lowestRetainedView` is smaller than the
 	// previous value, the previous value is kept and the method call is a NoOp.
-	// This value should be set the latest active view maintained by `Pacemaker`.
+	// This value should be set to the latest active view maintained by `Pacemaker`.
 	PruneUpToView(lowestRetainedView uint64)
 }

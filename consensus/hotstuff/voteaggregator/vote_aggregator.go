@@ -122,6 +122,9 @@ func (va *VoteAggregator) queuedVotesProcessingLoop(ctx irrecoverable.SignalerCo
 	}
 }
 
+// processQueuedVoteEvents is a function which dispatches previously queued votes on worker thread
+// This function is called whenever we have queued votes ready to be dispatched.
+// No errors are expected during normal operations.
 func (va *VoteAggregator) processQueuedVoteEvents(ctx context.Context) error {
 	for {
 		select {
@@ -131,25 +134,23 @@ func (va *VoteAggregator) processQueuedVoteEvents(ctx context.Context) error {
 		}
 
 		msg, ok := va.queuedVotes.Pop()
-		if ok {
-			vote := msg.(*model.Vote)
-			err := va.processQueuedVote(vote)
-			if err != nil {
-				return fmt.Errorf("could not process pending vote %v: %w", vote.ID(), err)
-			}
-
-			va.log.Info().
-				Uint64("view", vote.View).
-				Hex("block_id", vote.BlockID[:]).
-				Str("vote_id", vote.ID().String()).
-				Msg("vote has been processed successfully")
-
-			continue
+		if !ok {
+			// when there is no more messages in the queue, back to the loop to wait
+			// for the next incoming message to arrive.
+			return nil
 		}
 
-		// when there is no more messages in the queue, back to the loop to wait
-		// for the next incoming message to arrive.
-		return nil
+		vote := msg.(*model.Vote)
+		err := va.processQueuedVote(vote)
+		if err != nil {
+			return fmt.Errorf("could not process pending vote %v: %w", vote.ID(), err)
+		}
+
+		va.log.Info().
+			Uint64("view", vote.View).
+			Hex("block_id", vote.BlockID[:]).
+			Str("vote_id", vote.ID().String()).
+			Msg("vote has been processed successfully")
 	}
 }
 
