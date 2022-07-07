@@ -22,6 +22,7 @@ jobs:
           - unit
           - unit-crypto
           - unit-integration
+          - integration-bft
           - integration-mvp
           - integration-ghost
           - integration-network

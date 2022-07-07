@@ -207,13 +207,13 @@ func (b *backendEvents) getEventsFromAnyExeNode(ctx context.Context,
 func (b *backendEvents) tryGetEvents(ctx context.Context,
 	execNode *flow.Identity,
 	req execproto.GetEventsForBlockIDsRequest) (*execproto.GetEventsForBlockIDsResponse, error) {
-	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
+	execRPCClient, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
 		return nil, err
 	}
-	defer closer.Close()
 	resp, err := execRPCClient.GetEventsForBlockIDs(ctx, &req)
 	if err != nil {
+		b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
 		return nil, err
 	}
 	return resp, nil
