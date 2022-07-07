@@ -81,6 +81,7 @@ func (cf *ConnectionFactoryImpl) retrieveConnection(grpcAddress string, timeout 
 		}
 	}
 	if conn == nil || conn.GetState() != connectivity.Ready {
+		cf.ConnectionsCache.Remove(grpcAddress)
 		var err error
 		conn, err = cf.createConnection(grpcAddress, timeout)
 		if err != nil {
