@@ -50,8 +50,7 @@ func TestGetExecutionMemoryWeights(t *testing.T) {
 			require.Error(t, err)
 			require.EqualError(t, err, errors.NewCouldNotGetExecutionParameterFromStateError(
 				address.Hex(),
-				blueprints.TransactionExecutionParametersPathDomain,
-				blueprints.TransactionFeesExecutionMemoryWeightsPathIdentifier).Error())
+				blueprints.TransactionFeesExecutionMemoryWeightsPath.String()).Error())
 		},
 	)
 	t.Run("return error if can't parse stored",
@@ -64,8 +63,7 @@ func TestGetExecutionMemoryWeights(t *testing.T) {
 			require.Error(t, err)
 			require.EqualError(t, err, errors.NewCouldNotGetExecutionParameterFromStateError(
 				address.Hex(),
-				blueprints.TransactionExecutionParametersPathDomain,
-				blueprints.TransactionFeesExecutionMemoryWeightsPathIdentifier).Error())
+				blueprints.TransactionFeesExecutionMemoryWeightsPath.String()).Error())
 		},
 	)
 	t.Run("return error if get stored returns error",
@@ -182,8 +180,7 @@ func TestGetExecutionEffortWeights(t *testing.T) {
 			require.Error(t, err)
 			require.EqualError(t, err, errors.NewCouldNotGetExecutionParameterFromStateError(
 				address.Hex(),
-				blueprints.TransactionExecutionParametersPathDomain,
-				blueprints.TransactionFeesExecutionEffortWeightsPathIdentifier).Error())
+				blueprints.TransactionFeesExecutionEffortWeightsPath.String()).Error())
 		},
 	)
 	t.Run("return error if can't parse stored",
@@ -196,8 +193,7 @@ func TestGetExecutionEffortWeights(t *testing.T) {
 			require.Error(t, err)
 			require.EqualError(t, err, errors.NewCouldNotGetExecutionParameterFromStateError(
 				address.Hex(),
-				blueprints.TransactionExecutionParametersPathDomain,
-				blueprints.TransactionFeesExecutionEffortWeightsPathIdentifier).Error())
+				blueprints.TransactionFeesExecutionEffortWeightsPath.String()).Error())
 		},
 	)
 	t.Run("return error if get stored returns error",
