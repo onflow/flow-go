@@ -3,18 +3,11 @@ package corruptible
 import (
 	"context"
 	"fmt"
-	"sync"
-
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/engine/execution/utils"
-	verutils "github.com/onflow/flow-go/engine/verification/utils"
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
 )
 
@@ -27,65 +20,23 @@ const networkingProtocolTCP = "tcp"
 // The attacker can asynchronously dictate the conduit factory to send messages on behalf of the node this factory resides on.
 type ConduitFactory struct {
 	component.Component
-	mu             sync.Mutex
-	cm             *component.ComponentManager
-	logger         zerolog.Logger
-	me             module.Local
-	adapter        network.Adapter
-	ctx            context.Context
-	receiptHasher  hash.Hasher
-	spockHasher    hash.Hasher
-	approvalHasher hash.Hasher
-
-	incomingMessageChan chan *insecure.Message
-	egressController    insecure.EgressController
+	logger           zerolog.Logger
+	adapter          network.Adapter
+	egressController insecure.EgressController
 }
 
-func NewCorruptibleConduitFactory(
-	logger zerolog.Logger,
-	chainId flow.ChainID,
-	me module.Local,
-	address string) *ConduitFactory {
+func NewCorruptibleConduitFactory(logger zerolog.Logger, chainId flow.ChainID, egressController insecure.EgressController) *ConduitFactory {
 
 	if chainId != flow.BftTestnet {
 		panic("illegal chain id for using corruptible conduit factory")
 	}
 
 	factory := &ConduitFactory{
-		me:                  me,
-		logger:              logger.With().Str("module", "corruptible-conduit-factory").Logger(),
-		receiptHasher:       utils.NewExecutionReceiptHasher(),
-		spockHasher:         utils.NewSPOCKHasher(),
-		approvalHasher:      verutils.NewResultApprovalHasher(),
-		incomingMessageChan: make(chan *insecure.Message),
+		logger:           logger.With().Str("module", "corruptible-conduit-factory").Logger(),
+		egressController: egressController,
 	}
 
-	cm := component.NewComponentManagerBuilder().
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			factory.start(ctx, address)
-			factory.ctx = ctx
-
-			ready()
-
-			<-ctx.Done()
-
-			factory.stop()
-		}).Build()
-
-	factory.Component = cm
-	factory.cm = cm
-
 	return factory
-}
-
-// ServerAddress returns address of the gRPC server that is running by this corrupted conduit factory.
-func (c *ConduitFactory) ServerAddress() string {
-	return c.address.String()
-}
-
-// stop conducts the termination logic of the sub-modules of attack network.
-func (c *ConduitFactory) stop() {
-	c.server.Stop()
 }
 
 // RegisterAdapter sets the Adapter component of the factory.

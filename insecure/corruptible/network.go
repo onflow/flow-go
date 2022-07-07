@@ -4,6 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/engine/execution/utils"
+	verutils "github.com/onflow/flow-go/engine/verification/utils"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/network/p2p"
 	"io"
 	"net"
 	"sync"
@@ -28,49 +33,64 @@ import (
 // Network is a wrapper around the original flow network, that allows a remote attacker
 // to take control over its ingress and egress traffics.
 type Network struct {
-	component.Component
+	*component.ComponentManager
 	codec                 flownet.Codec
 	mu                    sync.Mutex
-	cm                    *component.ComponentManager
+	me                    module.Local
 	logger                zerolog.Logger
 	flowNetwork           flownet.Network // original flow network of the node.
 	server                *grpc.Server    // touch point of attack network to this factory.
 	address               net.Addr
 	conduitFactory        *ConduitFactory
 	attackerInboundStream insecure.CorruptibleConduitFactory_ConnectAttackerServer // inbound stream to attacker
+
+	receiptHasher  hash.Hasher
+	spockHasher    hash.Hasher
+	approvalHasher hash.Hasher
 }
 
 var _ flownet.Network = &Network{}
 
-func (n *Network) NewCorruptibleNetwork() *Network {
-	return &Network{
-		Component:             nil,
-		codec:                 nil,
-		mu:                    sync.Mutex{},
-		cm:                    nil,
-		logger:                zerolog.Logger{},
-		flowNetwork:           nil,
-		server:                nil,
-		address:               nil,
-		conduitFactory:        New,
-		attackerInboundStream: nil,
+func (n *Network) NewCorruptibleNetwork(chainId flow.ChainID, address string, me module.Local, params *p2p.NetworkParameters) (*Network, error) {
+
+	corruptibleNetwork := &Network{
+		codec:          params.Codec,
+		me:             me,
+		logger:         params.Logger.With().Str("component", "corruptible-network").Logger(),
+		receiptHasher:  utils.NewExecutionReceiptHasher(),
+		spockHasher:    utils.NewSPOCKHasher(),
+		approvalHasher: verutils.NewResultApprovalHasher(),
 	}
-}
 
-func (n *Network) ServerAddress() string {
-	return n.address.String()
-}
+	corruptibleNetwork.conduitFactory = NewCorruptibleConduitFactory(params.Logger, chainId, corruptibleNetwork)
 
-func (n *Network) Start(context irrecoverable.SignalerContext) {
-	n.flowNetwork.Start(context)
-}
+	// instantiating flow network
+	if params.Options == nil {
+		params.Options = make([]p2p.NetworkOptFunction, 0)
+	}
+	params.Options = append(params.Options, p2p.WithConduitFactory(corruptibleNetwork.conduitFactory))
 
-func (n Network) Ready() <-chan struct{} {
-	return n.flowNetwork.Ready()
-}
+	flowNetwork, err := p2p.NewNetwork(params)
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize flow network: %w", err)
+	}
+	corruptibleNetwork.flowNetwork = flowNetwork
 
-func (n Network) Done() <-chan struct{} {
-	return n.flowNetwork.Done()
+	corruptibleNetwork.ComponentManager = component.NewComponentManagerBuilder().
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			corruptibleNetwork.flowNetwork.Start(ctx)
+		}).
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			corruptibleNetwork.start(ctx, address)
+
+			ready()
+
+			<-ctx.Done()
+			corruptibleNetwork.stop()
+
+		}).Build()
+
+	return corruptibleNetwork, nil
 }
 
 // Register serves as the typical network registration of the given message processor on the channel.
@@ -99,7 +119,7 @@ func (n *Network) RegisterPingService(pingProtocolID protocol.ID, pingInfoProvid
 func (n *Network) ProcessAttackerMessage(stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageServer) error {
 	for {
 		select {
-		case <-n.cm.ShutdownSignal():
+		case <-n.ComponentManager.ShutdownSignal():
 			return nil
 		default:
 			msg, err := stream.Recv()
@@ -178,7 +198,7 @@ func (n *Network) processAttackerMessage(msg *insecure.Message) error {
 	}
 
 	lg = lg.With().Str("target_ids", fmt.Sprintf("%v", msg.TargetIDs)).Logger()
-	err = n.sendOnNetwork(event, flownet.Channel(msg.ChannelID), msg.Protocol, uint(msg.TargetNum), targetIds...)
+	err = n.conduitFactory.sendOnNetwork(event, flownet.Channel(msg.ChannelID), msg.Protocol, uint(msg.TargetNum), targetIds...)
 	if err != nil {
 		lg.Err(err).Msg("could not send attacker message to the network")
 		return fmt.Errorf("could not send attacker message to the network: %w", err)
@@ -213,10 +233,20 @@ func (n *Network) start(ctx irrecoverable.SignalerContext, address string) {
 	wg.Wait()
 }
 
+// stop conducts the termination logic of the sub-modules of attack network.
+func (n *Network) stop() {
+	n.server.Stop()
+}
+
+// ServerAddress returns address of the gRPC server that is running by this corrupted conduit factory.
+func (n *Network) ServerAddress() string {
+	return n.address.String()
+}
+
 // EngineClosingChannel is called by the slave conduits of this factory to let it know that the corresponding engine of the
 // conduit is not going to use it anymore, so the channel can be closed safely.
 func (n *Network) EngineClosingChannel(channel flownet.Channel) error {
-	return n.adapter.UnRegisterChannel(channel)
+	return n.conduitFactory.unregisterChannel(channel)
 }
 
 // eventToMessage converts the given application layer event to a protobuf message that is meant to be sent to the attacker.
@@ -231,7 +261,7 @@ func (n *Network) eventToMessage(
 		return nil, fmt.Errorf("could not encode event: %w", err)
 	}
 
-	myId := c.me.NodeID()
+	myId := n.me.NodeID()
 	return &insecure.Message{
 		ChannelID: channel.String(),
 		OriginID:  myId[:],
@@ -242,14 +272,14 @@ func (n *Network) eventToMessage(
 	}, nil
 }
 
-func (c *ConduitFactory) generateExecutionReceipt(result *flow.ExecutionResult) (*flow.ExecutionReceipt, error) {
+func (n *Network) generateExecutionReceipt(result *flow.ExecutionResult) (*flow.ExecutionReceipt, error) {
 	// TODO: fill spock secret with dictated spock data from attacker.
-	return ingestion.GenerateExecutionReceipt(c.me, c.receiptHasher, c.spockHasher, result, []*delta.SpockSnapshot{})
+	return ingestion.GenerateExecutionReceipt(n.me, n.receiptHasher, n.spockHasher, result, []*delta.SpockSnapshot{})
 }
 
-func (c *ConduitFactory) generateResultApproval(attestation *flow.Attestation) (*flow.ResultApproval, error) {
+func (n *Network) generateResultApproval(attestation *flow.Attestation) (*flow.ResultApproval, error) {
 	// TODO: fill spock secret with dictated spock data from attacker.
-	return verifier.GenerateResultApproval(c.me, c.approvalHasher, c.spockHasher, attestation, []byte{})
+	return verifier.GenerateResultApproval(n.me, n.approvalHasher, n.spockHasher, attestation, []byte{})
 }
 
 // AttackerRegistered returns whether an attacker has registered on this corruptible network instance.
@@ -281,7 +311,7 @@ func (n *Network) ConnectAttacker(_ *empty.Empty, stream insecure.CorruptibleCon
 	// is tightly coupled with the lifecycle of this function call.
 	// Once it returns, the client stream is closed forever.
 	// Hence, we block the call and wait till a component shutdown.
-	<-n.cm.ShutdownSignal()
+	<-n.ComponentManager.ShutdownSignal()
 	n.logger.Info().Msg("component is shutting down, closing attacker's inbound stream ")
 
 	return nil
@@ -299,7 +329,7 @@ func (n *Network) HandleOutgoingEvent(
 	targetIds ...flow.Identifier) error {
 
 	lg := n.logger.With().
-		Hex("corrupted_id", logging.ID(c.me.NodeID())).
+		Hex("corrupted_id", logging.ID(n.me.NodeID())).
 		Str("channel", string(channel)).
 		Str("protocol", protocol.String()).
 		Uint32("target_num", num).
@@ -310,15 +340,15 @@ func (n *Network) HandleOutgoingEvent(
 		// no attacker yet registered, hence sending message on the network following the
 		// correct expected behavior.
 		lg.Info().Msg("no attacker registered, passing through event")
-		return n.sendOnNetwork(event, channel, protocol, uint(num), targetIds...)
+		return n.conduitFactory.sendOnNetwork(event, channel, protocol, uint(num), targetIds...)
 	}
 
-	msg, err := c.eventToMessage(event, channel, protocol, num, targetIds...)
+	msg, err := n.eventToMessage(event, channel, protocol, num, targetIds...)
 	if err != nil {
 		return fmt.Errorf("could not convert event to message: %w", err)
 	}
 
-	err = c.attackerInboundStream.Send(msg)
+	err = n.attackerInboundStream.Send(msg)
 	if err != nil {
 		return fmt.Errorf("could not send message to attacker to observe: %w", err)
 	}
