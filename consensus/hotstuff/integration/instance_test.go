@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/consensus/hotstuff/timeoutaggregator"
 	"sync"
 	"time"
 
@@ -64,7 +65,7 @@ type Instance struct {
 	producer          *blockproducer.BlockProducer
 	forks             *forks.Forks
 	voteAggregator    *voteaggregator.VoteAggregator
-	timeoutAggregator hotstuff.TimeoutAggregator
+	timeoutAggregator *timeoutaggregator.TimeoutAggregator
 	voter             *safetyrules.SafetyRules
 	validator         *validator.Validator
 
@@ -379,11 +380,17 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		}, nil)
 
 	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, notifier, voteProcessorFactory.Create)
-	voteCollectors := voteaggregator.NewVoteCollectors(log, DefaultPruned(), workerpool.New(2), createCollectorFactoryMethod)
+	voteCollectors := voteaggregator.NewVoteCollectors(log, livnessData.CurrentView, workerpool.New(2), createCollectorFactoryMethod)
 
-	// initialize the vote voteAggregator
-	in.voteAggregator, err = voteaggregator.NewVoteAggregator(log, notifier, DefaultPruned(), voteCollectors)
+	// initialize the vote aggregator
+	in.voteAggregator, err = voteaggregator.NewVoteAggregator(log, notifier, livnessData.CurrentView, voteCollectors)
 	require.NoError(t, err)
+
+	createTimeoutCollectorFactoryMethod := timeoutaggregator.NewTimeoutCollectorFactory()
+	timeoutCollectors := timeoutaggregator.NewTimeoutCollectors(log, livnessData.CurrentView, createTimeoutCollectorFactoryMethod)
+
+	// initialize the timeout aggregator
+	in.timeoutAggregator, err = timeoutaggregator.NewTimeoutAggregator(log, notifier, timeoutCollectors)
 
 	safetyData := &hotstuff.SafetyData{
 		LockedOneChainView:      rootBlock.View,
