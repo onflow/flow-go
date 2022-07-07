@@ -114,6 +114,8 @@ func (nc *NoopCollector) TotalConnectionsInPool(connectionCount uint, connection
 func (nc *NoopCollector) ConnectionFromPoolRetrieved()                                         {}
 func (nc *NoopCollector) StartBlockReceivedToExecuted(blockID flow.Identifier)                 {}
 func (nc *NoopCollector) FinishBlockReceivedToExecuted(blockID flow.Identifier)                {}
+func (nc *NoopCollector) ExecutionBlockAddedToWorkQueue()                                      {}
+func (nc *NoopCollector) ExecutionBlockRemovedFromWorkQueue()                                  {}
 func (nc *NoopCollector) ExecutionComputationUsedPerBlock(computation uint64)                  {}
 func (nc *NoopCollector) ExecutionStateReadsPerBlock(reads uint64)                             {}
 func (nc *NoopCollector) ExecutionStorageStateCommitment(bytes int64)                          {}

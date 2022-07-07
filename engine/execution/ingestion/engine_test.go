@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/rand"
 	mathRand "math/rand"
+	"strconv"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -29,6 +31,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
+	flowMock "github.com/onflow/flow-go/module/mock"
 	module "github.com/onflow/flow-go/module/mocks"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/trace"
@@ -1480,4 +1483,119 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 			blockH.ID()},
 			pending)
 	})
+}
+
+func TestLimitToNumberOfBlocksBeingHandled(t *testing.T) {
+	t.Run("work queue limit not reached", func(t *testing.T) {
+		runWithEngine(t, func(ctx testingContext) {
+			runWithRateLimitChan(t, &ctx,
+				4, /* total blocks to handle */
+				int32(10) /* max # of blocks in work q */)
+		})
+	})
+
+	t.Run("work queue limit reached", func(t *testing.T) {
+		runWithEngine(t, func(ctx testingContext) {
+			runWithRateLimitChan(t, &ctx,
+				20, /* total blocks to handle */
+				int32(2) /* max # of blocks in work q */)
+		})
+	})
+}
+
+func runWithRateLimitChan(t *testing.T, ctx *testingContext,
+	blockCount int, maxBlockCountInWorkQ int32) {
+	currBlockCountInWorkQ := int32(0)
+	wg := sync.WaitGroup{}
+
+	metrics := new(flowMock.ExecutionMetrics)
+
+	metrics.On("ExecutionBlockAddedToWorkQueue").Run(func(args mock.Arguments) {
+		// make sure the number of blocks in work queue does not exceed max allowed
+		currVal := atomic.AddInt32(&currBlockCountInWorkQ, 1)
+		assert.LessOrEqual(t, currVal, maxBlockCountInWorkQ)
+	}).Return().Times(blockCount)
+
+	metrics.On("ExecutionBlockRemovedFromWorkQueue").Run(func(args mock.Arguments) {
+		// make sure the number of blocks in work queue is non-negative and also in range
+		currVal := atomic.AddInt32(&currBlockCountInWorkQ, -1)
+		assert.GreaterOrEqual(t, currVal, int32(0))
+		assert.LessOrEqual(t, currVal, maxBlockCountInWorkQ)
+		wg.Done()
+	}).Return().Times(blockCount)
+
+	metrics.On("ExecutionStateReadsPerBlock", mock.Anything).Return()
+	metrics.On("ExecutionBlockExecuted", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return()
+	metrics.On("ExecutionStorageStateCommitment", mock.Anything).Return()
+	metrics.On("ExecutionLastExecutedBlockHeight", mock.Anything).Return()
+	ctx.engine.metrics = metrics
+
+	// manually setup the rate limit channel
+	ctx.engine.workQueueLimitCh = make(chan struct{}, maxBlockCountInWorkQ)
+
+	blocks := make(map[string]*entity.ExecutableBlock)
+
+	blockSealed := unittest.BlockHeaderFixture()
+	for i := 0; i < blockCount; i++ {
+		currBlockName := strconv.Itoa(i)
+		if i == 0 {
+			blocks[currBlockName] = unittest.ExecutableBlockFixtureWithParent(nil, &blockSealed)
+			blocks[currBlockName].StartState = unittest.StateCommitmentPointerFixture()
+		} else {
+			prevBlockName := strconv.Itoa(i - 1)
+			blocks[currBlockName] = unittest.ExecutableBlockFixtureWithParent(nil, blocks[prevBlockName].Block.Header)
+		}
+	}
+
+	// Block ID field is lazily loaded, now forcing ID() call to load it
+	for _, b := range blocks {
+		b.ID()
+	}
+
+	// none of the blocks has any collection, so state is essentially the same
+	for i := 1; i < blockCount; i++ {
+		prevBlockName, currBlockName := strconv.Itoa(i-1), strconv.Itoa(i)
+		blocks[currBlockName].StartState = blocks[prevBlockName].StartState
+	}
+
+	commits := make(map[flow.Identifier]flow.StateCommitment)
+	commits[blocks["0"].Block.Header.ParentID] = *blocks["0"].StartState
+	ctx.mockStateCommitsWithMap(commits)
+
+	// make sure the seal height won't trigger state syncing, so that all blocks
+	// will be executed.
+	ctx.mockHasWeightAtBlockID(blocks["0"].ID(), true)
+	ctx.state.On("Sealed").Return(ctx.snapshot)
+	// a receipt for sealed block won't be broadcasted
+	ctx.snapshot.On("Head").Return(&blockSealed, nil)
+
+	for i := 0; i < blockCount; i++ {
+		currBlockName := strconv.Itoa(i)
+		ctx.mockSnapshot(blocks[currBlockName].Block.Header, unittest.IdentityListFixture(1))
+	}
+
+	// once block A is computed, it should trigger B and C being sent to compute,
+	// which in turn should trigger D
+	for i := 0; i < blockCount; i++ {
+		currBlockName := strconv.Itoa(i)
+		ctx.assertSuccessfulBlockComputation(commits,
+			func(blockID flow.Identifier, commit flow.StateCommitment) {},
+			blocks[currBlockName],
+			unittest.IdentifierFixture(),
+			true,
+			*blocks[currBlockName].StartState,
+			nil)
+	}
+
+	// queue in blocks to handle in batch
+	for i := 0; i < blockCount; i++ {
+		currBlockName := strconv.Itoa(i)
+		wg.Add(1)
+		err := ctx.engine.handleBlock(context.Background(), blocks[currBlockName].Block)
+		require.NoError(t, err)
+	}
+
+	// wait until all blocks have been executed
+	unittest.AssertReturnsBefore(t, wg.Wait, 100*time.Second)
+	mock.AssertExpectationsForObjects(t, metrics)
 }

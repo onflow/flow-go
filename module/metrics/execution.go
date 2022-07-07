@@ -18,6 +18,7 @@ type ExecutionCollector struct {
 	totalExecutedTransactionsCounter prometheus.Counter
 	totalExecutedScriptsCounter      prometheus.Counter
 	totalFailedTransactionsCounter   prometheus.Counter
+	currentBlockCountBeingProcessed  prometheus.Gauge
 	lastExecutedBlockHeightGauge     prometheus.Gauge
 	stateStorageDiskTotal            prometheus.Gauge
 	storageStateCommitment           prometheus.Gauge
@@ -481,6 +482,13 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 			Help:      "the total number of transactions that has failed when executed",
 		}),
 
+		currentBlockCountBeingProcessed: promauto.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemRuntime,
+			Name:      "current_block_count_being_processed",
+			Help:      "current number of blocks that are actively being processed by EN",
+		}),
+
 		totalExecutedScriptsCounter: promauto.NewCounter(prometheus.CounterOpts{
 			Namespace: namespaceExecution,
 			Subsystem: subsystemRuntime,
@@ -549,6 +557,16 @@ func (ec *ExecutionCollector) StartBlockReceivedToExecuted(blockID flow.Identifi
 // FinishBlockReceivedToExecuted finishes a span to trace the duration of a block
 // from being received for execution to execution being finished
 func (ec *ExecutionCollector) FinishBlockReceivedToExecuted(blockID flow.Identifier) {
+}
+
+// ExecutionBlockAddedToWorkQueue reports the event that one block is added into work queue
+func (ec *ExecutionCollector) ExecutionBlockAddedToWorkQueue() {
+	ec.currentBlockCountBeingProcessed.Inc()
+}
+
+// ExecutionBlockRemovedFromWorkQueue reports the event that one block is removed into work queue
+func (ec *ExecutionCollector) ExecutionBlockRemovedFromWorkQueue() {
+	ec.currentBlockCountBeingProcessed.Dec()
 }
 
 // ExecutionBlockExecuted reports computation and total time spent on a block computation

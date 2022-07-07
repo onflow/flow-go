@@ -35,6 +35,14 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+// This is mostly to limit the currently being process blocks at reloadUnexecutedBlocks()
+// which load blocks in sequential orders, so limiting the number of blocks in work queue
+// should effectively limit the memory usage too. However handleBlock() is called asynchronously
+// this won't help limit the memory usage after we've done with reloadUnexecutedBlocks() and start
+// the normal block processing use cases, because new blocks will keep staying in memory before
+// they can be processed.
+const DefaultMaxWorkQueueSize = 1_000_000
+
 // An Engine receives and saves incoming blocks.
 type Engine struct {
 	psEvents.Noop // satisfy protocol events consumer interface
@@ -66,6 +74,8 @@ type Engine struct {
 	syncFast               bool                // sync fast allows execution node to skip fetching collection during state syncing, and rely on state syncing to catch up
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
 	pauseExecution         bool
+	workQueueLimitCh       chan struct{} // a buffered channel of struct{} to guard max number of blocks currently being processed
+	workQueueLimitSize     uint32
 }
 
 func New(
@@ -140,6 +150,8 @@ func New(
 // successfully started.
 func (e *Engine) Ready() <-chan struct{} {
 	if !e.pauseExecution {
+		e.initWorkQueueLimitChannel()
+
 		err := e.reloadUnexecutedBlocks()
 		if err != nil {
 			e.log.Fatal().Err(err).Msg("failed to load all unexecuted blocks")
@@ -152,6 +164,7 @@ func (e *Engine) Ready() <-chan struct{} {
 // Done returns a channel that will close when the engine has
 // successfully stopped.
 func (e *Engine) Done() <-chan struct{} {
+	e.deinitWorkQueueLimitChannel()
 	return e.unit.Done()
 }
 
@@ -390,10 +403,11 @@ func (e *Engine) reloadBlock(
 	}
 
 	err = e.enqueueBlockAndCheckExecutable(blockByCollection, executionQueues, block, false)
-
 	if err != nil {
 		return fmt.Errorf("could not enqueue block %x on reloading: %w", blockID, err)
 	}
+
+	e.blockingMarkOneBlockAddedToWorkQueue()
 
 	return nil
 }
@@ -460,6 +474,8 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 		return fmt.Errorf("could not enqueue block %v: %w", blockID, err)
 	}
 
+	e.blockingMarkOneBlockAddedToWorkQueue()
+
 	return nil
 }
 
@@ -489,7 +505,7 @@ func (e *Engine) enqueueBlockAndCheckExecutable(
 		log.Debug().Hex("block_id", logging.Entity(executableBlock)).
 			Int("block_height", int(executableBlock.Height())).
 			Msg("block already exists in the execution queue")
-		return nil
+		return fmt.Errorf("block already exists in the execution queue %s", executableBlock.ID().String())
 	}
 
 	firstUnexecutedHeight := queue.Head.Item.Height()
@@ -728,6 +744,10 @@ func (e *Engine) onBlockExecuted(executed *entity.ExecutableBlock, finalState fl
 		e.log.Err(err).
 			Hex("block", logging.Entity(executed)).
 			Msg("error while requeueing blocks after execution")
+	} else {
+		// Invariant: the buffered channel workQueueLimitCh will never be empty here
+		// because we send in new struct{} with each new incoming block.
+		e.markOneBlockRemovedFromWorkQueue()
 	}
 
 	return nil
@@ -1216,6 +1236,37 @@ func (e *Engine) logExecutableBlock(eb *entity.ExecutableBlock) {
 				Hex("start_state_commitment", eb.StartState[:]).
 				RawJSON("transaction", logging.AsJSON(tx)).
 				Msg("extensive log: executed tx content")
+		}
+	}
+}
+
+func (e *Engine) initWorkQueueLimitChannel() {
+	if e.workQueueLimitCh == nil {
+		e.workQueueLimitSize = DefaultMaxWorkQueueSize
+		e.workQueueLimitCh = make(chan struct{}, e.workQueueLimitSize)
+	}
+}
+
+func (e *Engine) deinitWorkQueueLimitChannel() {
+	if e.workQueueLimitCh != nil {
+		close(e.workQueueLimitCh)
+		e.workQueueLimitCh = nil
+	}
+}
+
+func (e *Engine) blockingMarkOneBlockAddedToWorkQueue() {
+	if e.workQueueLimitCh != nil {
+		// NOTE: since this could be blocking when chan is full, this function should
+		//		 not be called inside mempool.Run() which is globally locked itself.
+		e.workQueueLimitCh <- struct{}{}
+		e.metrics.ExecutionBlockAddedToWorkQueue()
+	}
+}
+
+func (e *Engine) markOneBlockRemovedFromWorkQueue() {
+	if e.workQueueLimitCh != nil {
+		if _, ok := <-e.workQueueLimitCh; ok {
+			e.metrics.ExecutionBlockRemovedFromWorkQueue()
 		}
 	}
 }

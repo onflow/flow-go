@@ -389,6 +389,12 @@ type ExecutionMetrics interface {
 	// from being received for execution to execution being finished
 	FinishBlockReceivedToExecuted(blockID flow.Identifier)
 
+	// ExecutionBlockAddedToWorkQueue reports the event that one block is added into work queue
+	ExecutionBlockAddedToWorkQueue()
+
+	// ExecutionBlockRemovedFromWorkQueue reports the event that one block is removed into work queue
+	ExecutionBlockRemovedFromWorkQueue()
+
 	// ExecutionStateReadsPerBlock reports number of state access/read operations per block
 	ExecutionStateReadsPerBlock(reads uint64)
 
