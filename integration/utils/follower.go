@@ -226,6 +226,7 @@ func (f *txFollowerImpl) InProgress() int {
 	return len(f.txToChan)
 }
 
+// Height returns the latest block height.
 func (f *txFollowerImpl) Height() uint64 {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
@@ -233,6 +234,7 @@ func (f *txFollowerImpl) Height() uint64 {
 	return f.height
 }
 
+// BlockID returns the latest block ID.
 func (f *txFollowerImpl) BlockID() flowsdk.Identifier {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
@@ -240,6 +242,7 @@ func (f *txFollowerImpl) BlockID() flowsdk.Identifier {
 	return f.blockID
 }
 
+// Stop stops all followers, notifies existing watches, and returns.
 func (f *txFollowerImpl) Stop() {
 	f.cancel()
 	<-f.stopped
@@ -259,7 +262,8 @@ type nopTxFollower struct {
 	closedCh chan struct{}
 }
 
-// NewNopTxFollower creates a new follower that tracks the current block height and ID but does not notify on transaction completion.
+// NewNopTxFollower creates a new follower that tracks the current block height and ID
+// but does not notify on transaction completion.
 func NewNopTxFollower(ctx context.Context, client access.Client, opts ...followerOption) (TxFollower, error) {
 	f, err := NewTxFollower(ctx, client, opts...)
 	if err != nil {
@@ -277,7 +281,7 @@ func NewNopTxFollower(ctx context.Context, client access.Client, opts ...followe
 	return nop, nil
 }
 
-// CompleteChanByID always returns a closed channel.
+// Follow always returns a closed channel.
 func (nop *nopTxFollower) Follow(ID flowsdk.Identifier) <-chan struct{} {
 	return nop.closedCh
 }
