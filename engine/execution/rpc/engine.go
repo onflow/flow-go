@@ -535,7 +535,13 @@ func (h *handler) GetLatestBlockHeader(
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "not found: %v", err)
 	}
-	return blockHeaderResponse(header)
+
+	signerIDs, err := protocol.DecodeSignerIDs(h.state, header)
+	if err != nil {
+		return nil, err
+	}
+
+	return blockHeaderResponse(header, signerIDs)
 }
 
 // GetBlockHeaderByID gets a block header by ID.
@@ -552,11 +558,16 @@ func (h *handler) GetBlockHeaderByID(
 		return nil, status.Errorf(codes.NotFound, "not found: %v", err)
 	}
 
-	return blockHeaderResponse(header)
+	signerIDs, err := protocol.DecodeSignerIDs(h.state, header)
+	if err != nil {
+		return nil, err
+	}
+
+	return blockHeaderResponse(header, signerIDs)
 }
 
-func blockHeaderResponse(header *flow.Header) (*execution.BlockHeaderResponse, error) {
-	msg, err := convert.BlockHeaderToMessage(header)
+func blockHeaderResponse(header *flow.Header, signerIDs []flow.Identifier) (*execution.BlockHeaderResponse, error) {
+	msg, err := convert.BlockHeaderToMessage(header, signerIDs)
 	if err != nil {
 		return nil, err
 	}

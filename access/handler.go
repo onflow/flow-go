@@ -11,17 +11,20 @@ import (
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 type Handler struct {
 	api   API
 	chain flow.Chain
+	state protocol.State
 }
 
-func NewHandler(api API, chain flow.Chain) *Handler {
+func NewHandler(api API, chain flow.Chain, state protocol.State) *Handler {
 	return &Handler{
 		api:   api,
 		chain: chain,
+		state: state,
 	}
 }
 
@@ -56,7 +59,12 @@ func (h *Handler) GetLatestBlockHeader(
 		return nil, err
 	}
 
-	return blockHeaderResponse(header)
+	signerIDs, err := protocol.DecodeSignerIDs(h.state, header)
+	if err != nil {
+		return nil, err
+	}
+
+	return blockHeaderResponse(header, signerIDs)
 }
 
 // GetBlockHeaderByHeight gets a block header by height.
@@ -69,7 +77,12 @@ func (h *Handler) GetBlockHeaderByHeight(
 		return nil, err
 	}
 
-	return blockHeaderResponse(header)
+	signerIDs, err := protocol.DecodeSignerIDs(h.state, header)
+	if err != nil {
+		return nil, err
+	}
+
+	return blockHeaderResponse(header, signerIDs)
 }
 
 // GetBlockHeaderByID gets a block header by ID.
@@ -87,7 +100,12 @@ func (h *Handler) GetBlockHeaderByID(
 		return nil, err
 	}
 
-	return blockHeaderResponse(header)
+	signerIDs, err := protocol.DecodeSignerIDs(h.state, header)
+	if err != nil {
+		return nil, err
+	}
+
+	return blockHeaderResponse(header, signerIDs)
 }
 
 // GetLatestBlock gets the latest sealed block.
@@ -100,7 +118,12 @@ func (h *Handler) GetLatestBlock(
 		return nil, err
 	}
 
-	return blockResponse(block, req.GetFullBlockResponse())
+	signerIDs, err := protocol.DecodeSignerIDs(h.state, block.Header)
+	if err != nil {
+		return nil, err
+	}
+
+	return blockResponse(block, signerIDs, req.GetFullBlockResponse())
 }
 
 // GetBlockByHeight gets a block by height.
@@ -113,7 +136,12 @@ func (h *Handler) GetBlockByHeight(
 		return nil, err
 	}
 
-	return blockResponse(block, req.GetFullBlockResponse())
+	signerIDs, err := protocol.DecodeSignerIDs(h.state, block.Header)
+	if err != nil {
+		return nil, err
+	}
+
+	return blockResponse(block, signerIDs, req.GetFullBlockResponse())
 }
 
 // GetBlockByID gets a block by ID.
@@ -131,7 +159,12 @@ func (h *Handler) GetBlockByID(
 		return nil, err
 	}
 
-	return blockResponse(block, req.GetFullBlockResponse())
+	signerIDs, err := protocol.DecodeSignerIDs(h.state, block.Header)
+	if err != nil {
+		return nil, err
+	}
+
+	return blockResponse(block, signerIDs, req.GetFullBlockResponse())
 }
 
 // GetCollectionByID gets a collection by ID.
@@ -486,11 +519,11 @@ func (h *Handler) GetExecutionResultForBlockID(ctx context.Context, req *access.
 	return executionResultToMessages(result)
 }
 
-func blockResponse(block *flow.Block, fullResponse bool) (*access.BlockResponse, error) {
+func blockResponse(block *flow.Block, signerIDs []flow.Identifier, fullResponse bool) (*access.BlockResponse, error) {
 	var msg *entities.Block
 	var err error
 	if fullResponse {
-		msg, err = convert.BlockToMessage(block)
+		msg, err = convert.BlockToMessage(block, signerIDs)
 		if err != nil {
 			return nil, err
 		}
@@ -502,8 +535,8 @@ func blockResponse(block *flow.Block, fullResponse bool) (*access.BlockResponse,
 	}, nil
 }
 
-func blockHeaderResponse(header *flow.Header) (*access.BlockHeaderResponse, error) {
-	msg, err := convert.BlockHeaderToMessage(header)
+func blockHeaderResponse(header *flow.Header, signerIDs []flow.Identifier) (*access.BlockHeaderResponse, error) {
+	msg, err := convert.BlockHeaderToMessage(header, signerIDs)
 	if err != nil {
 		return nil, err
 	}

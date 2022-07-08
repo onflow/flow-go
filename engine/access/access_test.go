@@ -35,6 +35,7 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
+	protocolInterface "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
@@ -125,7 +126,7 @@ func (suite *Suite) RunTest(
 			backend.DefaultSnapshotHistoryLimit,
 		)
 
-		handler := access.NewHandler(suite.backend, suite.chainID.Chain())
+		handler := access.NewHandler(suite.backend, suite.chainID.Chain(), suite.state)
 
 		f(handler, db, blocks, headers, results)
 	})
@@ -301,7 +302,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 			backend.DefaultSnapshotHistoryLimit,
 		)
 
-		handler := access.NewHandler(backend, suite.chainID.Chain())
+		handler := access.NewHandler(backend, suite.chainID.Chain(), suite.state)
 
 		// Send transaction 1
 		resp, err := handler.SendTransaction(context.Background(), sendReq1)
@@ -340,24 +341,40 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 func (suite *Suite) TestGetBlockByIDAndHeight() {
 	suite.RunTest(func(handler *access.Handler, db *badger.DB, blocks *storage.Blocks, _ *storage.Headers, _ *storage.ExecutionResults) {
 
+		// the default header fixture creates a signerIDs out of 10 nodes committee, so we prepare a committee same as that
+		allConsensus := unittest.IdentityListFixture(40, unittest.WithRole(flow.RoleConsensus))
+
+		voterIndices, err := signature.EncodeSignersToIndices(allConsensus.NodeIDs(), allConsensus.NodeIDs())
+		require.NoError(suite.T(), err)
 		// test block1 get by ID
 		block1 := unittest.BlockFixture()
+		block1.Header.ParentVoterIndices = voterIndices
 		// test block2 get by height
 		block2 := unittest.BlockFixture()
 		block2.Header.Height = 2
+		block2.Header.ParentVoterIndices = voterIndices
 
 		require.NoError(suite.T(), blocks.Store(&block1))
 		require.NoError(suite.T(), blocks.Store(&block2))
 
 		// the follower logic should update height index on the block storage when a block is finalized
-		err := db.Update(operation.IndexBlockHeight(block2.Header.Height, block2.ID()))
+		err = db.Update(operation.IndexBlockHeight(block2.Header.Height, block2.ID()))
 		require.NoError(suite.T(), err)
 
+		snapshotForSignerIDs := new(protocol.Snapshot)
+		snapshotForSignerIDs.On("Identities", mock.Anything).Return(allConsensus, nil)
+		suite.state.On("AtBlockID", block1.Header.ID()).Return(snapshotForSignerIDs, nil)
+		suite.state.On("AtBlockID", block2.Header.ID()).Return(snapshotForSignerIDs, nil)
+
 		assertHeaderResp := func(resp *accessproto.BlockHeaderResponse, err error, header *flow.Header) {
+			suite.state.On("AtBlockID", header.ID()).Return(snapshotForSignerIDs, nil)
+			expectedSignerIDs, err := protocolInterface.DecodeSignerIDs(suite.state, header)
+			require.NoError(suite.T(), err)
+
 			require.NoError(suite.T(), err)
 			require.NotNil(suite.T(), resp)
 			actual := *resp.Block
-			expectedMessage, err := convert.BlockHeaderToMessage(header)
+			expectedMessage, err := convert.BlockHeaderToMessage(header, expectedSignerIDs)
 			require.NoError(suite.T(), err)
 			require.Equal(suite.T(), *expectedMessage, actual)
 			expectedBlockHeader, err := convert.MessageToBlockHeader(&actual)
@@ -369,7 +386,10 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 			require.NoError(suite.T(), err)
 			require.NotNil(suite.T(), resp)
 			actual := resp.Block
-			expectedMessage, err := convert.BlockToMessage(block)
+			suite.state.On("AtBlockID", block.Header.ID()).Return(snapshotForSignerIDs, nil)
+			expectedSignerIDs, err := protocolInterface.DecodeSignerIDs(suite.state, block.Header)
+			require.NoError(suite.T(), err)
+			expectedMessage, err := convert.BlockToMessage(block, expectedSignerIDs)
 			require.NoError(suite.T(), err)
 			require.Equal(suite.T(), expectedMessage, actual)
 			expectedBlock, err := convert.MessageToBlock(resp.Block)
@@ -388,6 +408,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		suite.Run("get header 1 by ID", func() {
 			// get header by ID
 			id := block1.ID()
+			suite.state.On("AtBlockID", block1.Header.ID()).Return(snapshotForSignerIDs, nil)
 			req := &accessproto.GetBlockHeaderByIDRequest{
 				Id: id[:],
 			}
@@ -611,7 +632,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 			backend.DefaultSnapshotHistoryLimit,
 		)
 
-		handler := access.NewHandler(backend, suite.chainID.Chain())
+		handler := access.NewHandler(backend, suite.chainID.Chain(), suite.state)
 
 		rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, rpc.Config{}, nil, nil, blocks, headers, collections, transactions,
 			receipts, results, suite.chainID, metrics, metrics, 0, 0, false, false, nil, nil)
@@ -704,7 +725,7 @@ func (suite *Suite) TestExecuteScript() {
 			backend.DefaultSnapshotHistoryLimit,
 		)
 
-		handler := access.NewHandler(suite.backend, suite.chainID.Chain())
+		handler := access.NewHandler(suite.backend, suite.chainID.Chain(), suite.state)
 
 		// initialize metrics related storage
 		metrics := metrics.NewNoopCollector()

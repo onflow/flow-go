@@ -6,16 +6,17 @@ import (
 	legacyaccessproto "github.com/onflow/flow/protobuf/go/flow/legacy/access"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/state/protocol"
 
 	legacyaccess "github.com/onflow/flow-go/access/legacy"
 	"github.com/onflow/flow-go/apiproxy"
 )
 
 // NewRPCEngineBuilder helps to build a new RPC engine.
-func NewRPCEngineBuilder(engine *Engine) *RPCEngineBuilder {
+func NewRPCEngineBuilder(engine *Engine, state protocol.State) *RPCEngineBuilder {
 	builder := &RPCEngineBuilder{}
 	builder.Engine = engine
-	builder.localAPIServer = access.NewHandler(builder.backend, builder.chain)
+	builder.localAPIServer = access.NewHandler(builder.backend, builder.chain, state)
 	return builder
 }
 

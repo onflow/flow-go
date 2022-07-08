@@ -184,7 +184,7 @@ func NewBuilder(log zerolog.Logger,
 		chain:              chainID.Chain(),
 	}
 
-	builder := NewRPCEngineBuilder(eng)
+	builder := NewRPCEngineBuilder(eng, state)
 	if rpcMetricsEnabled {
 		builder.WithMetrics()
 	}
