@@ -308,6 +308,15 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 	return bp, nil
 }
 
+// HasTrie returns true if trie exist at specific rootHash
+func (f *Forest) HasTrie(rootHash ledger.RootHash) bool {
+	// if in memory
+	if _, found := f.tries.Get(rootHash); found {
+		return true
+	}
+	return false
+}
+
 // GetTrie returns trie at specific rootHash
 // warning, use this function for read-only operation
 func (f *Forest) GetTrie(rootHash ledger.RootHash) (*trie.MTrie, error) {
