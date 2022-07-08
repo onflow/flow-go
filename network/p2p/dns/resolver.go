@@ -76,31 +76,43 @@ const (
 
 // NewResolver is the factory function for creating an instance of this resolver.
 func NewResolver(logger zerolog.Logger, collector module.ResolverMetrics, dnsCache mempool.DNSCache, opts ...optFunc) *Resolver {
+	resolver := newResolver(logger, collector, dnsCache, numIPAddrLookupWorkers, numTxtLookupWorkers, ipAddrLookupQueueSize, txtLookupQueueSize)
+	for _, opt := range opts {
+		opt(resolver)
+	}
+	return resolver
+}
+
+func NewTestResolver(logger zerolog.Logger, collector module.ResolverMetrics, dnsCache mempool.DNSCache, opts ...optFunc) *Resolver {
+	resolver := newResolver(logger, collector, dnsCache, 1, 1, 2, 2)
+	for _, opt := range opts {
+		opt(resolver)
+	}
+	return resolver
+}
+
+func newResolver(logger zerolog.Logger, collector module.ResolverMetrics, dnsCache mempool.DNSCache, ipWorker int, txtWorker int, ipQueue int, txtQueue int) *Resolver {
 	resolver := &Resolver{
 		logger:      logger.With().Str("component", "dns-resolver").Logger(),
 		res:         madns.DefaultResolver,
 		c:           newCache(logger, dnsCache),
 		collector:   collector,
-		ipRequests:  make(chan *lookupIPRequest, ipAddrLookupQueueSize),
-		txtRequests: make(chan *lookupTXTRequest, txtLookupQueueSize),
+		ipRequests:  make(chan *lookupIPRequest, ipQueue),
+		txtRequests: make(chan *lookupTXTRequest, txtQueue),
 	}
 
 	cm := component.NewComponentManagerBuilder()
 
-	for i := 0; i < numIPAddrLookupWorkers; i++ {
+	for i := 0; i < ipWorker; i++ {
 		cm.AddWorker(resolver.processIPAddrLookups)
 	}
 
-	for i := 0; i < numTxtLookupWorkers; i++ {
+	for i := 0; i < txtWorker; i++ {
 		cm.AddWorker(resolver.processTxtLookups)
 	}
 
 	resolver.cm = cm.Build()
 	resolver.Component = resolver.cm
-
-	for _, opt := range opts {
-		opt(resolver)
-	}
 
 	return resolver
 }
