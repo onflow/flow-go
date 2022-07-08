@@ -12,6 +12,7 @@ import (
 func TestEpochJoinAndLeaveVN(t *testing.T) {
 	unittest.SkipUnless(t, unittest.TEST_FLAKY, "epochs join/leave tests should be run on an machine with adequate resources")
 	suite.Run(t, new(EpochJoinAndLeaveVNSuite))
+	// this is a dummy update TODO: remove this before merging anything to master. AJM
 }
 
 type EpochJoinAndLeaveVNSuite struct {
