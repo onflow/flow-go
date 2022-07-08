@@ -352,14 +352,10 @@ func (m *Middleware) stop() {
 // Dispatch should be used whenever guaranteed delivery to a specific target is required. Otherwise, Publish is
 // a more efficient candidate.
 //
-// The following benign errors can be returned from libp2p:
-// - the peer ID for the target node ID cannot be found.
-// - the msg size exceeds result returned from unicastMaxMsgSize(msg)
-// - the libP2P node fails to publish the message.
-// - the libP2P node fails to create the stream.
-// - setting write deadline on the stream fails.
-// - the gogo protobuf writer fails to write the message.
-// - flushing the stream fails.
+// The following benign errors can be returned:
+// - he peer ID for the target node ID cannot be found.
+// - the msg size was too large.
+// - failed to send message to peer.
 //
 // All errors returned from this function can be considered benign.
 func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) (err error) {
