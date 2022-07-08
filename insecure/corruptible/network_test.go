@@ -8,7 +8,7 @@ import (
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec/cbor"
-	"github.com/onflow/flow-go/network/stub"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/stretchr/testify/require"
 	"sync"
@@ -23,9 +23,8 @@ func TestFactoryHandleIncomingEvent_AttackerObserve(t *testing.T) {
 
 	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress("localhost:0"))
 
-	hub := stub.NewNetworkHub()
 	ccf := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet)
-	flowNetwork := stub.NewNetwork(t, corruptedIdentity.NodeID, hub, stub.WithConduitFactory(ccf))
+	flowNetwork := &mocknetwork.Network{}
 
 	corruptibleNetwork, err := NewCorruptibleNetwork(
 		unittest.Logger(),
