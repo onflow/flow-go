@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	mathRand "math/rand"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -123,8 +124,6 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 
 	identityListUnsorted := flow.IdentityList{myIdentity, collection1Identity, collection2Identity, collection3Identity}
 	identityList := identityListUnsorted.Sort(order.Canonical)
-
-	executionState.On("DiskSize").Return(int64(1024*1024), nil).Maybe()
 
 	snapshot.On("Identities", mock.Anything).Return(func(selector flow.IdentityFilter) flow.IdentityList {
 		return identityList.Filter(selector)
@@ -974,42 +973,72 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 }
 
 func TestExecuteScriptAtBlockID(t *testing.T) {
-	runWithEngine(t, func(ctx testingContext) {
-		// Meaningless script
-		script := []byte{1, 1, 2, 3, 5, 8, 11}
-		scriptResult := []byte{1}
+	t.Run("happy path", func(t *testing.T) {
+		runWithEngine(t, func(ctx testingContext) {
+			// Meaningless script
+			script := []byte{1, 1, 2, 3, 5, 8, 11}
+			scriptResult := []byte{1}
 
-		// Ensure block we're about to query against is executable
-		blockA := unittest.ExecutableBlockFixture(nil)
-		blockA.StartState = unittest.StateCommitmentPointerFixture()
+			// Ensure block we're about to query against is executable
+			blockA := unittest.ExecutableBlockFixture(nil)
+			blockA.StartState = unittest.StateCommitmentPointerFixture()
 
-		snapshot := new(protocol.Snapshot)
-		snapshot.On("Head").Return(blockA.Block.Header, nil)
+			snapshot := new(protocol.Snapshot)
+			snapshot.On("Head").Return(blockA.Block.Header, nil)
 
-		commits := make(map[flow.Identifier]flow.StateCommitment)
-		commits[blockA.ID()] = *blockA.StartState
+			commits := make(map[flow.Identifier]flow.StateCommitment)
+			commits[blockA.ID()] = *blockA.StartState
 
-		ctx.stateCommitmentExist(blockA.ID(), *blockA.StartState)
+			ctx.stateCommitmentExist(blockA.ID(), *blockA.StartState)
 
-		ctx.state.On("AtBlockID", blockA.Block.ID()).Return(snapshot)
-		view := new(delta.View)
-		ctx.executionState.On("NewView", *blockA.StartState).Return(view)
+			ctx.state.On("AtBlockID", blockA.Block.ID()).Return(snapshot)
+			view := new(delta.View)
+			ctx.executionState.On("NewView", *blockA.StartState).Return(view)
+			ctx.executionState.On("HasState", *blockA.StartState).Return(true)
 
-		// Successful call to computation manager
-		ctx.computationManager.
-			On("ExecuteScript", mock.Anything, script, [][]byte(nil), blockA.Block.Header, view).
-			Return(scriptResult, nil)
+			// Successful call to computation manager
+			ctx.computationManager.
+				On("ExecuteScript", mock.Anything, script, [][]byte(nil), blockA.Block.Header, view).
+				Return(scriptResult, nil)
 
-		// Execute our script and expect no error
-		res, err := ctx.engine.ExecuteScriptAtBlockID(context.Background(), script, nil, blockA.Block.ID())
-		assert.NoError(t, err)
-		assert.Equal(t, scriptResult, res)
+			// Execute our script and expect no error
+			res, err := ctx.engine.ExecuteScriptAtBlockID(context.Background(), script, nil, blockA.Block.ID())
+			assert.NoError(t, err)
+			assert.Equal(t, scriptResult, res)
 
-		// Assert other components were called as expected
-		ctx.computationManager.AssertExpectations(t)
-		ctx.executionState.AssertExpectations(t)
-		ctx.state.AssertExpectations(t)
+			// Assert other components were called as expected
+			ctx.computationManager.AssertExpectations(t)
+			ctx.executionState.AssertExpectations(t)
+			ctx.state.AssertExpectations(t)
+		})
 	})
+
+	t.Run("return early when state commitment not exist", func(t *testing.T) {
+		runWithEngine(t, func(ctx testingContext) {
+			// Meaningless script
+			script := []byte{1, 1, 2, 3, 5, 8, 11}
+
+			// Ensure block we're about to query against is executable
+			blockA := unittest.ExecutableBlockFixture(nil)
+			blockA.StartState = unittest.StateCommitmentPointerFixture()
+
+			// make sure blockID to state commitment mapping exist
+			ctx.executionState.On("StateCommitmentByBlockID", mock.Anything, blockA.ID()).Return(*blockA.StartState, nil)
+
+			// but the state commitment does not exist (e.g. purged)
+			ctx.executionState.On("HasState", *blockA.StartState).Return(false)
+
+			// Execute our script and expect no error
+			_, err := ctx.engine.ExecuteScriptAtBlockID(context.Background(), script, nil, blockA.Block.ID())
+			assert.Error(t, err)
+			assert.True(t, strings.Contains(err.Error(), "state commitment not found"))
+
+			// Assert other components were called as expected
+			ctx.executionState.AssertExpectations(t)
+			ctx.state.AssertExpectations(t)
+		})
+	})
+
 }
 
 func Test_SPOCKGeneration(t *testing.T) {

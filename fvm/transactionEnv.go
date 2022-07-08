@@ -165,7 +165,7 @@ func (e *TransactionEnv) setExecutionParameters() error {
 		return nil
 	}
 
-	computationWeights, err := getExecutionEffortWeights(e, service)
+	computationWeights, err := GetExecutionEffortWeights(e, service)
 	err = setIfOk(
 		"execution effort weights",
 		err,
@@ -174,7 +174,7 @@ func (e *TransactionEnv) setExecutionParameters() error {
 		return err
 	}
 
-	memoryWeights, err := getExecutionMemoryWeights(e, service)
+	memoryWeights, err := GetExecutionMemoryWeights(e, service)
 	err = setIfOk(
 		"execution memory weights",
 		err,
@@ -183,7 +183,7 @@ func (e *TransactionEnv) setExecutionParameters() error {
 		return err
 	}
 
-	memoryLimit, err := getExecutionMemoryLimit(e, service)
+	memoryLimit, err := GetExecutionMemoryLimit(e, service)
 	err = setIfOk(
 		"execution memory limit",
 		err,
@@ -771,6 +771,10 @@ func (e *TransactionEnv) MemoryEstimate() uint64 {
 }
 
 func (e *TransactionEnv) SetAccountFrozen(address common.Address, frozen bool) error {
+
+	if !e.ctx.AccountFreezeEnabled {
+		return errors.NewOperationNotSupportedError("SetAccountFrozen")
+	}
 
 	flowAddress := flow.Address(address)
 
