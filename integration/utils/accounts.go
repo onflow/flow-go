@@ -8,7 +8,7 @@ import (
 
 	flowsdk "github.com/onflow/flow-go-sdk"
 
-	"github.com/onflow/flow-go-sdk/client"
+	"github.com/onflow/flow-go-sdk/access"
 	"github.com/onflow/flow-go-sdk/crypto"
 )
 
@@ -60,7 +60,7 @@ func newFlowAccount(i int, address *flowsdk.Address, accountKey *flowsdk.Account
 	}
 }
 
-func loadServiceAccount(flowClient *client.Client,
+func loadServiceAccount(flowClient access.Client,
 	servAccAddress *flowsdk.Address,
 	servAccPrivKeyHex string) (*flowAccount, error) {
 
