@@ -25,9 +25,10 @@ import (
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
 	uploaderCommands "github.com/onflow/flow-go/admin/commands/uploader"
 	"github.com/onflow/flow-go/consensus"
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
-	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
+	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine"
@@ -171,6 +172,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		executionDataServiceCollector module.ExecutionDataServiceMetrics
 		executionState                state.ExecutionState
 		followerState                 protocol.MutableState
+		committee                     hotstuff.Committee
 		ledgerStorage                 *ledger.Ledger
 		events                        *storage.Events
 		serviceEvents                 *storage.ServiceEvents
@@ -664,7 +666,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
 			}
 
-			packer := hotsignature.NewConsensusSigDataPacker(committee)
+			packer := signature.NewConsensusSigDataPacker(committee)
 			// initialize the verifier for the protocol consensus
 			verifier := verification.NewCombinedVerifier(committee, packer)
 
@@ -755,8 +757,19 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			return syncEngine, nil
 		}).
 		Component("grpc server", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-			rpcEng := rpc.New(node.Logger, e.exeConf.rpcConf, ingestionEng, node.Storage.Blocks, node.Storage.Headers, node.State, events, results, txResults, node.RootChainID)
-			return rpcEng, nil
+			return rpc.New(
+				node.Logger,
+				e.exeConf.rpcConf,
+				ingestionEng,
+				node.Storage.Blocks,
+				node.Storage.Headers,
+				node.State,
+				events,
+				results,
+				txResults,
+				node.RootChainID,
+				signature.NewBlockSignerDecoder(committee),
+			), nil
 		})
 }
 
