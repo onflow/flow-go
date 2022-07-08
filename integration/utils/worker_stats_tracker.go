@@ -57,21 +57,21 @@ func (st *WorkerStatsTracker) AddTxSent() {
 // AvgTPSBetween returns the average transactions per second TPS between the two time points
 func (st *WorkerStatsTracker) AvgTPSBetween(start, stop time.Time) float64 {
 	sum := 0
-	toDelete := make([]int64, 0)
+	//toDelete := make([]int64, 0)
 
 	st.mux.Lock()
 	defer st.mux.Unlock()
 	for timestamp, count := range st.txsSentPerSecond {
-		if timestamp < start.Unix() {
-			toDelete = append(toDelete, timestamp)
+		if timestamp < start.Unix() || timestamp > stop.Unix() {
+			//toDelete = append(toDelete, timestamp)
 			continue
 		}
 		sum += count
 	}
 
-	for _, timestamp := range toDelete {
-		delete(st.txsSentPerSecond, timestamp)
-	}
+	//for _, timestamp := range toDelete {
+	//	delete(st.txsSentPerSecond, timestamp)
+	//}
 
 	diff := stop.Sub(start)
 
@@ -92,4 +92,8 @@ func (st *WorkerStatsTracker) Digest() string {
 		st.AvgTPSBetween(time.Now().Add(-11*time.Second), time.Now()),
 	})
 	return t.Render()
+}
+
+func (st *WorkerStatsTracker) TotalTxs() int {
+	return st.txsSent
 }

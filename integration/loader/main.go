@@ -177,7 +177,9 @@ func main() {
 				return
 			}
 
+			lg.StartTime()
 			time.Sleep(c.duration)
+			lg.StopTime()
 
 			if lg != nil {
 				lg.Stop()

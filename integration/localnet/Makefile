@@ -72,3 +72,14 @@ stop:
 .PHONY: load
 load:
 	go run --tags relic ../loader -log-level info -tps 1,0,10,0,100 -tps-durations 30s,10s,30s,10s
+
+.PHONY: tpsTest
+tpsTest:
+	go run --tags relic ../loader -log-level info -account-multiplier 100 -tps 25 -tps-durations 15s
+
+.PHONY: end2endTest
+end2endTest:
+	make init
+	make start
+	go run --tags relic ../loader -log-level info -tps 25 -tps-durations 15s
+	make stop
