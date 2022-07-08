@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 )
 
-const blockStateTimeout = 60 * time.Second
+const blockStateTimeout = 120 * time.Second
 
 type BlockState struct {
 	sync.RWMutex
