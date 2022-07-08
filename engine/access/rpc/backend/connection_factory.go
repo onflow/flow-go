@@ -81,6 +81,8 @@ func (cf *ConnectionFactoryImpl) retrieveConnection(grpcAddress string, timeout 
 		}
 	}
 	if conn == nil || conn.GetState() != connectivity.Ready {
+		// This line ensures that when a connection is renewed, the previously cached connection is evicted and closed
+		cf.ConnectionsCache.Remove(grpcAddress)
 		var err error
 		conn, err = cf.createConnection(grpcAddress, timeout)
 		if err != nil {
