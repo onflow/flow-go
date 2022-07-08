@@ -201,10 +201,10 @@ func (lg *ContLoadGenerator) Stop() {
 
 	lg.stopped = true
 	wg := sync.WaitGroup{}
+	wg.Add(len(lg.workers))
 	for _, w := range lg.workers {
 		w := w
 
-		wg.Add(1)
 		go func() {
 			defer wg.Done()
 
