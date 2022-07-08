@@ -63,6 +63,7 @@ func NewCore(
 	pending module.PendingBlockBuffer,
 	sync module.BlockRequester,
 	voteAggregator hotstuff.VoteAggregator,
+	timeoutAggregator hotstuff.TimeoutAggregator,
 	opts ...compliance.Opt,
 ) (*Core, error) {
 
@@ -86,6 +87,7 @@ func NewCore(
 		sync:              sync,
 		hotstuff:          nil, // use `WithConsensus`
 		voteAggregator:    voteAggregator,
+		timeoutAggregator: timeoutAggregator,
 	}
 
 	e.mempool.MempoolEntries(metrics.ResourceProposal, e.pending.Size())

@@ -33,6 +33,9 @@ const defaultBlockQueueCapacity = 10000
 // defaultVoteQueueCapacity maximum capacity of block votes queue
 const defaultVoteQueueCapacity = 1000
 
+// defaultTimeoutObjectsQueueCapacity maximum capacity of timeout objects queue
+const defaultTimeoutObjectsQueueCapacity = 1000
+
 // Engine is a wrapper struct for `Core` which implements consensus algorithm.
 // Engine is responsible for handling incoming messages, queueing for processing, broadcasting proposals.
 type Engine struct {
@@ -50,6 +53,7 @@ type Engine struct {
 	core                       *Core
 	pendingBlocks              engine.MessageStore
 	pendingVotes               engine.MessageStore
+	pendingTimeouts            engine.MessageStore
 	messageHandler             *engine.MessageHandler
 	finalizedView              counters.StrictMonotonousCounter
 	finalizationEventsNotifier engine.Notifier
@@ -87,6 +91,15 @@ func NewEngine(
 		return nil, fmt.Errorf("failed to create queue for inbound approvals: %w", err)
 	}
 	pendingVotes := &engine.FifoMessageStore{FifoQueue: votesQueue}
+
+	// FIFO queue for timeout objects
+	// TODO(active-pacemaker): update metrics
+	timeoutObjectsQueue, err := fifoqueue.NewFifoQueue(
+		fifoqueue.WithCapacity(defaultTimeoutObjectsQueueCapacity))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create queue for inbound timeout objects: %w", err)
+	}
+	pendingTimeouts := &engine.FifoMessageStore{FifoQueue: timeoutObjectsQueue}
 
 	// define message queueing behaviour
 	handler := engine.NewMessageHandler(
@@ -133,6 +146,17 @@ func NewEngine(
 			},
 			Store: pendingVotes,
 		},
+		engine.Pattern{
+			Match: func(msg *engine.Message) bool {
+				_, ok := msg.Payload.(*messages.TimeoutObject)
+				if ok {
+					// TODO(active-pacemaker): update metrics
+					//core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockVote)
+				}
+				return ok
+			},
+			Store: pendingTimeouts,
+		},
 	)
 
 	eng := &Engine{
@@ -146,6 +170,7 @@ func NewEngine(
 		payloads:                   core.payloads,
 		pendingBlocks:              pendingBlocks,
 		pendingVotes:               pendingVotes,
+		pendingTimeouts:            pendingTimeouts,
 		state:                      core.state,
 		tracer:                     core.tracer,
 		prov:                       prov,
@@ -279,6 +304,15 @@ func (e *Engine) processAvailableMessages() error {
 			continue
 		}
 
+		msg, ok = e.pendingTimeouts.Get()
+		if ok {
+			err := e.core.OnTimeoutObject(msg.OriginID, msg.Payload.(*messages.TimeoutObject))
+			if err != nil {
+				return fmt.Errorf("could not handle timeout object: %w", err)
+			}
+			continue
+		}
+
 		// when there is no more messages in the queue, back to the loop to wait
 		// for the next incoming message to arrive.
 		return nil
@@ -365,6 +399,7 @@ func (e *Engine) BroadcastTimeout(timeout *model.TimeoutObject) error {
 
 		log.Info().Msg("consensus timeout broadcast")
 
+		// TODO(active-pacemaker): update metrics
 		//e.metrics.MessageSent(metrics.EngineClusterCompliance, metrics.MessageClusterBlockProposal)
 		//e.core.collectionMetrics.ClusterBlockProposed(block)
 	})
