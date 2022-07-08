@@ -260,10 +260,10 @@ func initializeMessageAuthConfigsMap() {
 			return new(messages.EntityResponse)
 		},
 		Config: map[channels.Channel]flow.RoleList{
-			channels.RequestChunks:            {flow.RoleCollection, flow.RoleExecution},
-			channels.RequestCollections:       {flow.RoleCollection, flow.RoleExecution},
-			channels.RequestApprovalsByChunk:  {flow.RoleCollection, flow.RoleExecution},
-			channels.RequestReceiptsByBlockID: {flow.RoleCollection, flow.RoleExecution},
+			channels.ProvideChunks:            {flow.RoleExecution},
+			channels.ProvideCollections:       {flow.RoleCollection},
+			channels.ProvideApprovalsByChunk:  {flow.RoleVerification},
+			channels.ProvideReceiptsByBlockID: {flow.RoleExecution},
 		},
 	}
 
