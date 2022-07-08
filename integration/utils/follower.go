@@ -177,7 +177,7 @@ Loop:
 }
 
 // Follow returns a channel that will be closed when the transaction is completed.
-func (f *txFollowerImpl) Follow(ID flowsdk.Identifier) <-chan struct{} {
+func (f *txFollowerImpl) Follow(txID flowsdk.Identifier) <-chan struct{} {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -189,23 +189,23 @@ func (f *txFollowerImpl) Follow(ID flowsdk.Identifier) <-chan struct{} {
 	}
 
 	// Return existing follower if exists.
-	if txi, ok := f.txToChan[ID]; ok {
+	if txi, ok := f.txToChan[txID]; ok {
 		return txi.C
 	}
 
 	// Create new one.
 	ch := make(chan struct{})
-	f.txToChan[ID] = txInfo{submisionTime: time.Now(), C: ch}
+	f.txToChan[txID] = txInfo{submisionTime: time.Now(), C: ch}
 	return ch
 }
 
-func (f *txFollowerImpl) loadAndDelete(tx flowsdk.Identifier) (txInfo, bool) {
+func (f *txFollowerImpl) loadAndDelete(txID flowsdk.Identifier) (txInfo, bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	txi, ok := f.txToChan[tx]
+	txi, ok := f.txToChan[txID]
 	if ok {
-		delete(f.txToChan, tx)
+		delete(f.txToChan, txID)
 	}
 	return txi, ok
 }
