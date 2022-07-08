@@ -433,6 +433,11 @@ func (l *Ledger) MostRecentTouchedState() (ledger.State, error) {
 	return ledger.State(root), err
 }
 
+// HasState returns true if the given state exists inside the ledger
+func (l *Ledger) HasState(state ledger.State) bool {
+	return l.forest.HasTrie(ledger.RootHash(state))
+}
+
 // DumpTrieAsJSON export trie at specific state as JSONL (each line is JSON encoding of a payload)
 func (l *Ledger) DumpTrieAsJSON(state ledger.State, writer io.Writer) error {
 	fmt.Println(ledger.RootHash(state))
