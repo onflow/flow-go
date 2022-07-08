@@ -4,6 +4,7 @@ import (
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/insecure"
+	mockinsecure "github.com/onflow/flow-go/insecure/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network"
@@ -23,8 +24,12 @@ func TestFactoryHandleIncomingEvent_AttackerObserve(t *testing.T) {
 
 	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress("localhost:0"))
 
-	ccf := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet)
+	//ccf := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet)
 	flowNetwork := &mocknetwork.Network{}
+
+	//ccfMock := &mocknetwork.ConduitFactory{}
+
+	ccfMock2 := &mockinsecure.CorruptibleConduitFactory{}
 
 	corruptibleNetwork, err := NewCorruptibleNetwork(
 		unittest.Logger(),
@@ -33,7 +38,7 @@ func TestFactoryHandleIncomingEvent_AttackerObserve(t *testing.T) {
 		testutil.LocalFixture(t, corruptedIdentity),
 		codec,
 		flowNetwork,
-		ccf)
+		ccfMock2)
 	require.NoError(t, err)
 
 	attacker := newMockAttackerObserverClient()
