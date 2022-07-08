@@ -2,6 +2,9 @@ package integration_test
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/consensus/hotstuff/timeoutaggregator"
+	"github.com/onflow/flow-go/consensus/hotstuff/timeoutcollector"
+	"github.com/onflow/flow-go/model/encoding"
 	"os"
 	"sort"
 	"testing"
@@ -129,18 +132,19 @@ func (p *ConsensusParticipants) Update(epochCounter uint64, data *run.Participan
 }
 
 type Node struct {
-	db         *badger.DB
-	dbDir      string
-	index      int
-	log        zerolog.Logger
-	id         *flow.Identity
-	compliance *compliance.Engine
-	sync       *synceng.Engine
-	hot        module.HotStuff
-	aggregator hotstuff.VoteAggregator
-	state      *bprotocol.MutableState
-	headers    *storage.Headers
-	net        *Network
+	db                *badger.DB
+	dbDir             string
+	index             int
+	log               zerolog.Logger
+	id                *flow.Identity
+	compliance        *compliance.Engine
+	sync              *synceng.Engine
+	hot               module.HotStuff
+	voteAggregator    hotstuff.VoteAggregator
+	timeoutAggregator hotstuff.TimeoutAggregator
+	state             *bprotocol.MutableState
+	headers           *storage.Headers
+	net               *Network
 }
 
 func (n *Node) Shutdown() {
@@ -487,18 +491,29 @@ func createNode(
 	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, notifier, voteProcessorFactory.Create)
 	voteCollectors := voteaggregator.NewVoteCollectors(log, livenessData.CurrentView, workerpool.New(2), createCollectorFactoryMethod)
 
-	aggregator, err := voteaggregator.NewVoteAggregator(log, notifier, livenessData.CurrentView, voteCollectors)
+	voteAggregator, err := voteaggregator.NewVoteAggregator(log, notifier, livenessData.CurrentView, voteCollectors)
+	require.NoError(t, err)
+
+	timeoutCollectorDistributor := pubsub.NewTimeoutCollectorDistributor()
+
+	timeoutProcessorFactory := timeoutcollector.NewTimeoutProcessorFactory(timeoutCollectorDistributor, committee, validator, encoding.ConsensusTimeoutTag)
+	timeoutCollectorsFactory := timeoutcollector.NewTimeoutCollectorFactory(notifier, timeoutCollectorDistributor, timeoutProcessorFactory)
+	timeoutCollectors := timeoutaggregator.NewTimeoutCollectors(log, livenessData.CurrentView, timeoutCollectorsFactory)
+
+	timeoutAggregator, err := timeoutaggregator.NewTimeoutAggregator(log, notifier, livenessData.CurrentView, timeoutCollectors)
 	require.NoError(t, err)
 
 	hotstuffModules := &consensus.HotstuffModules{
-		Forks:                forks,
-		Validator:            validator,
-		Notifier:             notifier,
-		Committee:            committee,
-		Signer:               signer,
-		Persist:              persist,
-		QCCreatedDistributor: qcDistributor,
-		VoteAggregator:       aggregator,
+		Forks:                       forks,
+		Validator:                   validator,
+		Notifier:                    notifier,
+		Committee:                   committee,
+		Signer:                      signer,
+		Persist:                     persist,
+		QCCreatedDistributor:        qcDistributor,
+		TimeoutCollectorDistributor: timeoutCollectorDistributor,
+		VoteAggregator:              voteAggregator,
+		TimeoutAggregator:           timeoutAggregator,
 	}
 
 	// initialize the compliance engine
@@ -514,7 +529,8 @@ func createNode(
 		fullState,
 		cache,
 		syncCore,
-		aggregator,
+		voteAggregator,
+		timeoutAggregator,
 	)
 	require.NoError(t, err)
 
@@ -566,7 +582,8 @@ func createNode(
 	node.sync = sync
 	node.state = fullState
 	node.hot = hot
-	node.aggregator = hotstuffModules.VoteAggregator
+	node.voteAggregator = hotstuffModules.VoteAggregator
+	node.timeoutAggregator = hotstuffModules.TimeoutAggregator
 	node.headers = headersDB
 	node.net = net
 	node.log = log

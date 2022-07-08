@@ -18,8 +18,9 @@ import (
 func runNodes(signalerCtx irrecoverable.SignalerContext, nodes []*Node) {
 	for _, n := range nodes {
 		go func(n *Node) {
-			n.aggregator.Start(signalerCtx)
-			<-util.AllReady(n.aggregator, n.compliance, n.sync)
+			n.voteAggregator.Start(signalerCtx)
+			n.timeoutAggregator.Start(signalerCtx)
+			<-util.AllReady(n.voteAggregator, n.timeoutAggregator, n.compliance, n.sync)
 		}(n)
 	}
 }
@@ -28,7 +29,7 @@ func stopNodes(t *testing.T, cancel context.CancelFunc, nodes []*Node) {
 	stoppingNodes := make([]<-chan struct{}, 0)
 	cancel()
 	for _, n := range nodes {
-		stoppingNodes = append(stoppingNodes, util.AllDone(n.aggregator, n.compliance, n.sync))
+		stoppingNodes = append(stoppingNodes, util.AllDone(n.voteAggregator, n.timeoutAggregator, n.compliance, n.sync))
 	}
 	unittest.RequireCloseBefore(t, util.AllClosed(stoppingNodes...), time.Second, "requiring nodes to stop")
 }
@@ -58,7 +59,7 @@ func Test3Nodes(t *testing.T) {
 
 // with 5 nodes, and one node completely blocked, the other 4 nodes can still reach consensus
 func Test5Nodes(t *testing.T) {
-	// 4 nodes should be able finalize at least 3 blocks.
+	// 4 nodes should be able to finalize at least 3 blocks.
 	stopper := NewStopper(2, 1)
 	participantsData := createConsensusIdentities(t, 5)
 	rootSnapshot := createRootSnapshot(t, participantsData)

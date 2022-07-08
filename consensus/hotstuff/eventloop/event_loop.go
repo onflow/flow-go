@@ -3,6 +3,7 @@ package eventloop
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -19,6 +20,7 @@ import (
 // EventLoop buffers all incoming events to the hotstuff EventHandler, and feeds EventHandler one event at a time.
 type EventLoop struct {
 	*component.ComponentManager
+	notifications.NoopConsumer
 	log                 zerolog.Logger
 	eventHandler        hotstuff.EventHandler
 	metrics             module.HotstuffMetrics
@@ -30,19 +32,22 @@ type EventLoop struct {
 
 var _ hotstuff.EventLoop = (*EventLoop)(nil)
 var _ component.Component = (*EventLoop)(nil)
+var _ hotstuff.TimeoutCollectorConsumer = (*EventLoop)(nil)
 
 // NewEventLoop creates an instance of EventLoop.
 func NewEventLoop(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandler hotstuff.EventHandler, startTime time.Time) (*EventLoop, error) {
 	proposals := make(chan *model.Proposal)
 	quorumCertificates := make(chan *flow.QuorumCertificate, 1)
+	timeoutCertificates := make(chan *flow.TimeoutCertificate, 1)
 
 	el := &EventLoop{
-		log:                log,
-		eventHandler:       eventHandler,
-		metrics:            metrics,
-		proposals:          proposals,
-		quorumCertificates: quorumCertificates,
-		startTime:          startTime,
+		log:                 log,
+		eventHandler:        eventHandler,
+		metrics:             metrics,
+		proposals:           proposals,
+		quorumCertificates:  quorumCertificates,
+		timeoutCertificates: timeoutCertificates,
+		startTime:           startTime,
 	}
 
 	componentBuilder := component.NewComponentManagerBuilder()
@@ -238,7 +243,8 @@ func (el *EventLoop) SubmitTrustedQC(qc *flow.QuorumCertificate) {
 	el.metrics.HotStuffWaitDuration(time.Since(received), metrics.HotstuffEventTypeOnQC)
 }
 
-func (el *EventLoop) SubmitTrustedTC(tc *flow.TimeoutCertificate) {
+// OnTcConstructedFromTimeouts pushes the received TC to the timeoutCertificates channel
+func (el *EventLoop) OnTcConstructedFromTimeouts(tc *flow.TimeoutCertificate) {
 	received := time.Now()
 
 	select {

@@ -3,7 +3,9 @@ package integration
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/timeoutaggregator"
+	"github.com/onflow/flow-go/consensus/hotstuff/timeoutcollector"
 	"sync"
 	"time"
 
@@ -330,12 +332,12 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	}
 	rootBlockQC := &forks.BlockQC{Block: rootBlock, QC: rootQC}
 
-	livnessData := &hotstuff.LivenessData{
+	livenessData := &hotstuff.LivenessData{
 		CurrentView: rootQC.View + 1,
 		NewestQC:    rootQC,
 	}
 
-	in.persist.On("GetLivenessData").Return(livnessData, nil).Once()
+	in.persist.On("GetLivenessData").Return(livenessData, nil).Once()
 
 	// initialize the pacemaker
 	controller := timeout.NewController(cfg.Timeouts)
@@ -380,17 +382,21 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		}, nil)
 
 	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, notifier, voteProcessorFactory.Create)
-	voteCollectors := voteaggregator.NewVoteCollectors(log, livnessData.CurrentView, workerpool.New(2), createCollectorFactoryMethod)
+	voteCollectors := voteaggregator.NewVoteCollectors(log, livenessData.CurrentView, workerpool.New(2), createCollectorFactoryMethod)
 
 	// initialize the vote aggregator
-	in.voteAggregator, err = voteaggregator.NewVoteAggregator(log, notifier, livnessData.CurrentView, voteCollectors)
+	in.voteAggregator, err = voteaggregator.NewVoteAggregator(log, notifier, livenessData.CurrentView, voteCollectors)
 	require.NoError(t, err)
 
-	createTimeoutCollectorFactoryMethod := timeoutaggregator.NewTimeoutCollectorFactory()
-	timeoutCollectors := timeoutaggregator.NewTimeoutCollectors(log, livnessData.CurrentView, createTimeoutCollectorFactoryMethod)
+	// initialize factories for timeout collector and timeout processor
+	collectorDistributor := pubsub.NewTimeoutCollectorDistributorBuilder().Build()
+	createProcessorFactory := &mocks.TimeoutProcessorFactory{}
+	timeoutCollectorFactory := timeoutcollector.NewTimeoutCollectorFactory(notifier, collectorDistributor, createProcessorFactory)
+	timeoutCollectors := timeoutaggregator.NewTimeoutCollectors(log, livenessData.CurrentView, timeoutCollectorFactory)
 
 	// initialize the timeout aggregator
-	in.timeoutAggregator, err = timeoutaggregator.NewTimeoutAggregator(log, notifier, timeoutCollectors)
+	in.timeoutAggregator, err = timeoutaggregator.NewTimeoutAggregator(log, notifier, livenessData.CurrentView, timeoutCollectors)
+	require.NoError(t, err)
 
 	safetyData := &hotstuff.SafetyData{
 		LockedOneChainView:      rootBlock.View,
