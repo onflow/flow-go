@@ -2,6 +2,7 @@ package fvm_test
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"strconv"
 	"testing"
 
@@ -1252,7 +1253,10 @@ func TestAccountBalanceFields(t *testing.T) {
 			}),
 	)
 
-	t.Run("Get balance fails for accounts that dont exist",
+	// TODO - this is because get account + borrow returns
+	// empty values instead of failing for an account that doesnt exist
+	// this behavior needs to addressed on Cadence side
+	t.Run("Get balance returns 0 for accounts that don't exist",
 		newVMTest().withContextOptions(
 			fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())),
 			fvm.WithCadenceLogging(true),
@@ -1271,7 +1275,32 @@ func TestAccountBalanceFields(t *testing.T) {
 				err = vm.Run(ctx, script, view, programs)
 
 				require.NoError(t, err)
-				require.Error(t, script.Err)
+				require.NoError(t, script.Err)
+				require.Equal(t, cadence.UFix64(0), script.Value)
+			}),
+	)
+
+	t.Run("Get balance fails if view returns an error",
+		newVMTest().withContextOptions(
+			fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())),
+			fvm.WithCadenceLogging(true),
+		).
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				address := chain.ServiceAddress()
+
+				script := fvm.Script([]byte(fmt.Sprintf(`
+					pub fun main(): UFix64 {
+						let acc = getAccount(0x%s)
+						return acc.balance
+					}
+				`, address)))
+
+				view = delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+					return nil, fmt.Errorf("error getting register %s, %s", flow.BytesToAddress([]byte(owner)).Hex(), key)
+				})
+
+				err := vm.Run(ctx, script, view, programs)
+				require.ErrorContains(t, err, fmt.Sprintf("error getting register %s, %s", address.Hex(), state.KeyAccountStatus))
 			}),
 	)
 
@@ -1417,7 +1446,7 @@ func TestGetStorageCapacity(t *testing.T) {
 				require.Equal(t, cadence.UInt64(10_010_000), script.Value)
 			}),
 	)
-	t.Run("Get storage capacity fails for accounts that don't exist",
+	t.Run("Get storage capacity returns 0 for accounts that don't exist",
 		newVMTest().withContextOptions(
 			fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())),
 			fvm.WithCadenceLogging(true),
@@ -1441,7 +1470,36 @@ func TestGetStorageCapacity(t *testing.T) {
 				err = vm.Run(ctx, script, view, programs)
 
 				require.NoError(t, err)
-				require.Error(t, script.Err)
+				require.NoError(t, script.Err)
+				require.Equal(t, cadence.UInt64(0), script.Value)
+			}),
+	)
+	t.Run("Get storage capacity fails if view returns an error",
+		newVMTest().withContextOptions(
+			fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())),
+			fvm.WithCadenceLogging(true),
+			fvm.WithAccountStorageLimit(false),
+		).withBootstrapProcedureOptions(
+			fvm.WithStorageMBPerFLOW(1_000_000_000),
+			fvm.WithAccountCreationFee(100_000),
+			fvm.WithMinimumStorageReservation(100_000),
+		).
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				address := chain.ServiceAddress()
+
+				script := fvm.Script([]byte(fmt.Sprintf(`
+					pub fun main(): UInt64 {
+						let acc = getAccount(0x%s)
+						return acc.storageCapacity
+					}
+				`, address)))
+
+				view = delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+					return nil, fmt.Errorf("error getting register %s, %s", flow.BytesToAddress([]byte(owner)).Hex(), key)
+				})
+
+				err := vm.Run(ctx, script, view, programs)
+				require.ErrorContains(t, err, fmt.Sprintf("error getting register %s, %s", address.Hex(), state.KeyAccountStatus))
 			}),
 	)
 }
