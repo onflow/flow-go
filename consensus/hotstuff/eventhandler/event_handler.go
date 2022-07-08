@@ -205,12 +205,16 @@ func (e *EventHandler) OnLocalTimeout() error {
 
 // Start will start the pacemaker's timer and start the new view
 func (e *EventHandler) Start() error {
-	e.paceMaker.Start()
 	err := e.processPendingBlocks()
 	if err != nil {
 		return fmt.Errorf("could not process pending blocks: %w", err)
 	}
-	return e.startNewView()
+	err = e.startNewView()
+	if err != nil {
+		return fmt.Errorf("could not start new view: %w", err)
+	}
+	e.paceMaker.Start()
+	return nil
 }
 
 // processPendingBlocks performs processing of pending blocks that were applied to chain state but weren't processed
