@@ -54,12 +54,13 @@ type txFollowerImpl struct {
 
 	interval time.Duration
 
+	stopped chan struct{}
+
+	// Following fields are protected by mu.
 	mu       *sync.RWMutex
 	height   uint64
 	blockID  flowsdk.Identifier
 	txToChan map[flowsdk.Identifier]txInfo
-
-	stopped chan struct{}
 }
 
 type txInfo struct {
@@ -79,11 +80,11 @@ func NewTxFollower(ctx context.Context, client access.Client, opts ...followerOp
 		cancel: cancel,
 		logger: zerolog.Nop(),
 
+		stopped:  make(chan struct{}),
+		interval: 100 * time.Millisecond,
+
 		mu:       &sync.RWMutex{},
 		txToChan: make(map[flowsdk.Identifier]txInfo),
-
-		stopped:  make(chan struct{}, 1),
-		interval: 100 * time.Millisecond,
 	}
 
 	for _, opt := range opts {
@@ -95,8 +96,7 @@ func NewTxFollower(ctx context.Context, client access.Client, opts ...followerOp
 		if err != nil {
 			return nil, err
 		}
-		f.height = hdr.Height
-		f.blockID = hdr.ID
+		f.updateFromBlockHeader(*hdr)
 	}
 
 	go f.run()
@@ -136,14 +136,7 @@ Loop:
 			for _, tx := range col.TransactionIDs {
 				blockTxs++
 
-				f.mu.Lock()
-				txi, ok := f.txToChan[tx]
-				if ok {
-					delete(f.txToChan, tx)
-				}
-				f.mu.Unlock()
-
-				if ok {
+				if txi, loaded := f.loadAndDelete(tx); loaded {
 					duration := time.Since(txi.submisionTime)
 					f.logger.Trace().
 						Dur("durationInMS", duration).
@@ -158,10 +151,6 @@ Loop:
 				}
 			}
 		}
-
-		f.mu.RLock()
-		inProgress := len(f.txToChan)
-		f.mu.RUnlock()
 
 		totalTxs += blockTxs
 		totalUnknownTxs += blockUnknownTxs
@@ -178,13 +167,10 @@ Loop:
 			Uint64("txsTotalUnknown", totalUnknownTxs).
 			Uint64("txsInBlock", blockTxs).
 			Uint64("txsInBlockUnknown", blockUnknownTxs).
-			Int("txsInProgress", inProgress).
+			Int("txsInProgress", f.InProgress()).
 			Msg("new block parsed")
 
-		f.mu.Lock()
-		f.height = block.Height
-		f.blockID = block.ID
-		f.mu.Unlock()
+		f.updateFromBlockHeader(block.BlockHeader)
 
 		lastBlockTime = time.Now()
 	}
@@ -213,6 +199,33 @@ func (f *txFollowerImpl) Follow(ID flowsdk.Identifier) <-chan struct{} {
 	return ch
 }
 
+func (f *txFollowerImpl) loadAndDelete(tx flowsdk.Identifier) (txInfo, bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	txi, ok := f.txToChan[tx]
+	if ok {
+		delete(f.txToChan, tx)
+	}
+	return txi, ok
+}
+
+func (f *txFollowerImpl) updateFromBlockHeader(block flowsdk.BlockHeader) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.height = block.Height
+	f.blockID = block.ID
+}
+
+// InProgress returns the number of transactions in progress.
+func (f *txFollowerImpl) InProgress() int {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	return len(f.txToChan)
+}
+
 func (f *txFollowerImpl) Height() uint64 {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
@@ -234,10 +247,10 @@ func (f *txFollowerImpl) Stop() {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	for k, v := range f.txToChan {
+	for _, v := range f.txToChan {
 		close(v.C)
-		delete(f.txToChan, k)
 	}
+	f.txToChan = make(map[flowsdk.Identifier]txInfo)
 }
 
 type nopTxFollower struct {
