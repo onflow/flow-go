@@ -83,9 +83,9 @@ func (c *ConduitFactory) NewConduit(ctx context.Context, channel network.Channel
 	return con, nil
 }
 
-// unregisterChannel is called by the slave conduits of this factory to let it know that the corresponding engine of the
+// UnregisterChannel is called by the slave conduits of this factory to let it know that the corresponding engine of the
 // conduit is not going to use it anymore, so the channel can be closed safely.
-func (c *ConduitFactory) unregisterChannel(channel network.Channel) error {
+func (c *ConduitFactory) UnregisterChannel(channel network.Channel) error {
 	return c.adapter.UnRegisterChannel(channel)
 }
 

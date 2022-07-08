@@ -41,7 +41,7 @@ type Network struct {
 	flowNetwork           flownet.Network // original flow network of the node.
 	server                *grpc.Server    // touch point of attack network to this factory.
 	address               net.Addr
-	conduitFactory        *ConduitFactory
+	conduitFactory        insecure.CorruptibleConduitFactory
 	attackerInboundStream insecure.CorruptibleConduitFactory_ConnectAttackerServer // inbound stream to attacker
 
 	receiptHasher  hash.Hasher
@@ -58,7 +58,7 @@ func NewCorruptibleNetwork(
 	me module.Local,
 	codec flownet.Codec,
 	flowNetwork flownet.Network,
-	conduitFactory *ConduitFactory) (*Network, error) {
+	conduitFactory insecure.CorruptibleConduitFactory) (*Network, error) {
 	if chainId != flow.BftTestnet {
 		panic("illegal chain id for using corruptible network")
 	}
@@ -249,7 +249,7 @@ func (n *Network) ServerAddress() string {
 // EngineClosingChannel is called by the conduits of this corruptible network to let it know that the corresponding
 // engine of the conduit is not going to use it anymore, so the channel can be closed safely.
 func (n *Network) EngineClosingChannel(channel flownet.Channel) error {
-	return n.conduitFactory.unregisterChannel(channel)
+	return n.conduitFactory.UnregisterChannel(channel)
 }
 
 // eventToMessage converts the given application layer event to a protobuf message that is meant to be sent to the attacker.

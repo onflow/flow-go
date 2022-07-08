@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"sync"
 	"testing"
@@ -24,12 +25,9 @@ func TestFactoryHandleIncomingEvent_AttackerObserve(t *testing.T) {
 
 	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress("localhost:0"))
 
-	//ccf := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet)
 	flowNetwork := &mocknetwork.Network{}
-
-	//ccfMock := &mocknetwork.ConduitFactory{}
-
-	ccfMock2 := &mockinsecure.CorruptibleConduitFactory{}
+	ccf := &mockinsecure.CorruptibleConduitFactory{}
+	ccf.On("RegisterEgressController", mock.Anything).Return(nil)
 
 	corruptibleNetwork, err := NewCorruptibleNetwork(
 		unittest.Logger(),
@@ -38,7 +36,7 @@ func TestFactoryHandleIncomingEvent_AttackerObserve(t *testing.T) {
 		testutil.LocalFixture(t, corruptedIdentity),
 		codec,
 		flowNetwork,
-		ccfMock2)
+		ccf)
 	require.NoError(t, err)
 
 	attacker := newMockAttackerObserverClient()
