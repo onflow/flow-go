@@ -37,7 +37,7 @@ type Context struct {
 	CadenceLoggingEnabled         bool
 	EventCollectionEnabled        bool
 	ServiceEventCollectionEnabled bool
-	AccountFreezeAvailable        bool
+	AccountFreezeEnabled          bool
 	ExtensiveTracing              bool
 	TransactionProcessors         []TransactionProcessor
 	ScriptProcessors              []ScriptProcessor
@@ -92,13 +92,11 @@ func defaultContext(logger zerolog.Logger) Context {
 		CadenceLoggingEnabled:                false,
 		EventCollectionEnabled:               true,
 		ServiceEventCollectionEnabled:        false,
-		AccountFreezeAvailable:               false,
+		AccountFreezeEnabled:                 true,
 		ExtensiveTracing:                     false,
 		TransactionProcessors: []TransactionProcessor{
-			NewTransactionAccountFrozenChecker(),
-			NewTransactionSignatureVerifier(AccountKeyWeightThreshold),
+			NewTransactionVerifier(AccountKeyWeightThreshold),
 			NewTransactionSequenceNumberChecker(),
-			NewTransactionAccountFrozenEnabler(),
 			NewTransactionInvoker(logger),
 		},
 		ScriptProcessors: []ScriptProcessor{
@@ -196,12 +194,12 @@ func WithBlockHeader(header *flow.Header) Option {
 	}
 }
 
-// WithAccountFreezeAvailable sets availability of account freeze function for a virtual machine context.
+// WithAccountFreezeEnabled enable/disable of account freeze functionality for a virtual machine context.
 //
 // With this option set to true, a setAccountFreeze function will be enabled for transactions processed by the VM
-func WithAccountFreezeAvailable(accountFreezeAvailable bool) Option {
+func WithAccountFreezeEnabled(accountFreezeEnabled bool) Option {
 	return func(ctx Context) Context {
-		ctx.AccountFreezeAvailable = accountFreezeAvailable
+		ctx.AccountFreezeEnabled = accountFreezeEnabled
 		return ctx
 	}
 }

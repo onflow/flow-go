@@ -143,7 +143,7 @@ func (e *ScriptEnv) setExecutionParameters() {
 		return
 	}
 
-	computationWeights, err := getExecutionEffortWeights(e, service)
+	computationWeights, err := GetExecutionEffortWeights(e, service)
 	err = setIfOk(
 		"execution effort weights",
 		err,
@@ -152,7 +152,7 @@ func (e *ScriptEnv) setExecutionParameters() {
 		return
 	}
 
-	memoryWeights, err := getExecutionMemoryWeights(e, service)
+	memoryWeights, err := GetExecutionMemoryWeights(e, service)
 	err = setIfOk(
 		"execution memory weights",
 		err,
@@ -161,7 +161,7 @@ func (e *ScriptEnv) setExecutionParameters() {
 		return
 	}
 
-	memoryLimit, err := getExecutionMemoryLimit(e, service)
+	memoryLimit, err := GetExecutionMemoryLimit(e, service)
 	err = setIfOk(
 		"execution memory limit",
 		err,
@@ -617,8 +617,8 @@ func (e *ScriptEnv) MeterMemory(usage common.MemoryUsage) error {
 	return e.meterMemory(usage.Kind, uint(usage.Amount))
 }
 
-func (e *ScriptEnv) MemoryUsed() uint64 {
-	return uint64(e.sth.State().TotalMemoryUsed())
+func (e *ScriptEnv) MemoryEstimate() uint64 {
+	return uint64(e.sth.State().TotalMemoryEstimate())
 }
 
 func (e *ScriptEnv) DecodeArgument(b []byte, t cadence.Type) (cadence.Value, error) {

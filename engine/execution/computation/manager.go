@@ -5,8 +5,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/rand"
-	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ipfs/go-cid"
@@ -28,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/utils/debug"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -75,6 +76,9 @@ type Manager struct {
 	uploaders                []uploader.Uploader
 	eds                      state_synchronization.ExecutionDataService
 	edCache                  state_synchronization.ExecutionDataCIDCache
+
+	rngLock *sync.Mutex
+	rng     *rand.Rand
 }
 
 func New(
@@ -128,6 +132,9 @@ func New(
 		uploaders:                uploaders,
 		eds:                      eds,
 		edCache:                  edCache,
+
+		rngLock: &sync.Mutex{},
+		rng:     rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 
 	return &e, nil
@@ -150,21 +157,22 @@ func (e *Manager) ExecuteScript(
 ) ([]byte, error) {
 
 	startedAt := time.Now()
-
-	var memAllocBefore uint64
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
-	memAllocBefore = m.TotalAlloc
+	memAllocBefore := debug.GetHeapAllocsBytes()
 
 	// allocate a random ID to be able to track this script when its done,
 	// scripts might not be unique so we use this extra tracker to follow their logs
 	// TODO: this is a temporary measure, we could remove this in the future
-	trackerID := rand.Uint32()
-	e.log.Debug().Hex("script_hex", code).Uint32("trackerID", trackerID).Msg("script is sent for execution")
+	if e.log.Debug().Enabled() {
+		e.rngLock.Lock()
+		trackerID := e.rng.Uint32()
+		e.rngLock.Unlock()
 
-	defer func() {
-		e.log.Debug().Uint32("trackerID", trackerID).Msg("script execution is complete")
-	}()
+		trackedLogger := e.log.With().Hex("script_hex", code).Uint32("trackerID", trackerID).Logger()
+		trackedLogger.Debug().Msg("script is sent for execution")
+		defer func() {
+			trackedLogger.Debug().Msg("script execution is complete")
+		}()
+	}
 
 	requestCtx, cancel := context.WithTimeout(ctx, e.scriptExecutionTimeLimit)
 	defer cancel()
@@ -232,10 +240,8 @@ func (e *Manager) ExecuteScript(
 		return nil, fmt.Errorf("failed to encode runtime value: %w", err)
 	}
 
-	runtime.ReadMemStats(&m)
-	memAllocAfter := m.TotalAlloc
-
-	e.metrics.ExecutionScriptExecuted(time.Since(startedAt), script.GasUsed, script.MemoryUsed, memAllocBefore-memAllocAfter)
+	memAllocAfter := debug.GetHeapAllocsBytes()
+	e.metrics.ExecutionScriptExecuted(time.Since(startedAt), script.GasUsed, memAllocAfter-memAllocBefore, script.MemoryEstimate)
 
 	return encodedValue, nil
 }

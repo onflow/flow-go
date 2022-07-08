@@ -9,6 +9,7 @@ import (
 
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/onflow/cadence"
 	"github.com/stretchr/testify/require"
 
@@ -2081,6 +2082,12 @@ func TransactionResultsFixture(n int) []flow.TransactionResult {
 		})
 	}
 	return results
+}
+
+func AllowAllPeerFilter() func(peer.ID) bool {
+	return func(_ peer.ID) bool {
+		return true
+	}
 }
 
 func NewSealingConfigs(val uint) module.SealingConfigsSetter {

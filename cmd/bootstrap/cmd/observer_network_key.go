@@ -57,8 +57,8 @@ func observerNetworkKeyRun(_ *cobra.Command, _ []string) {
 		return
 	}
 
-	// generate unstaked networking private key
-	networkKey, err := utils.GenerateUnstakedNetworkingKey(flagNetworkSeed)
+	// generate observer networking private key
+	networkKey, err := utils.GeneratePublicNetworkingKey(flagNetworkSeed)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not generate network key")
 	}
