@@ -7,6 +7,7 @@ import (
 
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/client"
+	"github.com/onflow/flow-go/module/metrics"
 	"go.uber.org/atomic"
 
 	"github.com/rs/zerolog"
@@ -40,8 +41,13 @@ func WithInteval(interval time.Duration) followerOption {
 	return func(f *txFollowerImpl) { f.interval = interval }
 }
 
+func WithMetrics(m *metrics.LoaderCollector) followerOption {
+	return func(f *txFollowerImpl) { f.metrics = m }
+}
+
 type txFollowerImpl struct {
-	logger zerolog.Logger
+	logger  zerolog.Logger
+	metrics *metrics.LoaderCollector
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -136,12 +142,16 @@ Loop:
 				if ch, loaded := f.txToChan.LoadAndDelete(tx.Hex()); loaded {
 					txi := ch.(txInfo)
 
+					duration := time.Since(txi.submisionTime)
 					f.logger.Trace().
-						Dur("duration", time.Since(txi.submisionTime)).
+						Dur("durationInMS", duration).
 						Hex("txID", tx.Bytes()).
-						Msg("returned tx to the pool")
+						Msg("returned account to the pool")
 					close(txi.C)
 					f.inprogress.Dec()
+					if f.metrics != nil {
+						f.metrics.TransactionExecuted(duration)
+					}
 				} else {
 					blockUnknownTxs++
 				}
