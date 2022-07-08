@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go-sdk/client"
+	"github.com/onflow/flow-go-sdk/access"
 	"github.com/onflow/flow-go-sdk/crypto"
 )
 
@@ -39,7 +39,7 @@ type ContLoadGenerator struct {
 	loaderMetrics        *metrics.LoaderCollector
 	tps                  int
 	numberOfAccounts     int
-	flowClient           *client.Client
+	flowClient           access.Client
 	serviceAccount       *flowAccount
 	flowTokenAddress     *flowsdk.Address
 	fungibleTokenAddress *flowsdk.Address
@@ -58,8 +58,8 @@ type ContLoadGenerator struct {
 func NewContLoadGenerator(
 	log zerolog.Logger,
 	loaderMetrics *metrics.LoaderCollector,
-	flowClient *client.Client,
-	supervisorClient *client.Client,
+	flowClient access.Client,
+	supervisorClient access.Client,
 	loadedAccessAddr string,
 	servAccPrivKeyHex string,
 	serviceAccountAddress *flowsdk.Address,
