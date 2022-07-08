@@ -319,8 +319,6 @@ type LedgerMetrics interface {
 }
 
 type WALMetrics interface {
-	// DiskSize records the amount of disk space used by the storage (in bytes)
-	DiskSize(uint64)
 }
 
 type ExecutionDataServiceMetrics interface {
@@ -422,6 +420,8 @@ type ExecutionMetrics interface {
 	ExecutionBlockDataUploadStarted()
 
 	ExecutionBlockDataUploadFinished(dur time.Duration)
+
+	UpdateCollectionMaxHeight(height uint64)
 }
 
 type BackendScriptsMetrics interface {
@@ -451,6 +451,9 @@ type TransactionMetrics interface {
 
 	// TransactionSubmissionFailed should be called whenever we try to submit a transaction and it fails
 	TransactionSubmissionFailed()
+
+	// UpdateExecutionReceiptMaxHeight is called whenever we store an execution receipt from a block from a newer height
+	UpdateExecutionReceiptMaxHeight(height uint64)
 }
 
 type PingMetrics interface {

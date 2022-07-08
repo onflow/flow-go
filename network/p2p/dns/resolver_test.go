@@ -75,7 +75,7 @@ func TestResolver_CacheExpiry(t *testing.T) {
 		metrics.NewNoopCollector(),
 		dnsCache,
 		WithBasicResolver(&basicResolver),
-		WithTTL(3*time.Second)) // cache timeout set to 3 seconds for this test
+		WithTTL(1*time.Second)) // cache timeout set to 3 seconds for this test
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -91,11 +91,11 @@ func TestResolver_CacheExpiry(t *testing.T) {
 	// each domain gets resolved through underlying resolver twice: once initially, and once after expiry.
 	resolverWG, _, _ := mockBasicResolverForDomains(t, &basicResolver, ipTestCase, txtTestCases, happyPath, 2)
 
-	// queries (5 + 5) cases * 3 = 100 queries.
+	// queries (5 + 5) cases * 3 = 30 queries.
 	queryWG := syncThenAsyncQuery(t, times, resolver, txtTestCases, ipTestCase, happyPath)
 	unittest.RequireReturnsBefore(t, queryWG.Wait, 1*time.Second, "could not perform all queries on time")
 
-	time.Sleep(4 * time.Second) // waits enough for cache to get invalidated
+	time.Sleep(2 * time.Second) // waits enough for cache to get invalidated
 
 	queryWG = syncThenAsyncQuery(t, times, resolver, txtTestCases, ipTestCase, happyPath)
 

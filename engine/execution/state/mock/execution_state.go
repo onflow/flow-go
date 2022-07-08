@@ -186,6 +186,20 @@ func (_m *ExecutionState) GetRegisters(_a0 context.Context, _a1 flow.StateCommit
 	return r0, r1
 }
 
+// HasState provides a mock function with given fields: _a0
+func (_m *ExecutionState) HasState(_a0 flow.StateCommitment) bool {
+	ret := _m.Called(_a0)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(flow.StateCommitment) bool); ok {
+		r0 = rf(_a0)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
 // NewView provides a mock function with given fields: _a0
 func (_m *ExecutionState) NewView(_a0 flow.StateCommitment) *delta.View {
 	ret := _m.Called(_a0)
