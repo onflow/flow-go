@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	"time"
 
@@ -196,11 +197,24 @@ func (lg *ContLoadGenerator) Start() {
 }
 
 func (lg *ContLoadGenerator) Stop() {
+	defer lg.log.Debug().Msg("stopped generator")
+
 	lg.stopped = true
+	wg := sync.WaitGroup{}
+	wg.Add(len(lg.workers))
 	for _, w := range lg.workers {
-		w.Stop()
+		w := w
+
+		go func() {
+			defer wg.Done()
+
+			lg.log.Debug().Int("workerID", w.workerID).Msg("stopping worker")
+			w.Stop()
+		}()
 	}
+	wg.Wait()
 	lg.workerStatsTracker.StopPrinting()
+	lg.log.Debug().Msg("stopping follower")
 	lg.follower.Stop()
 }
 
