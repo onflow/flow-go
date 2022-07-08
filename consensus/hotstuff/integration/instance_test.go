@@ -389,7 +389,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	require.NoError(t, err)
 
 	// initialize factories for timeout collector and timeout processor
-	collectorDistributor := pubsub.NewTimeoutCollectorDistributorBuilder().Build()
+	collectorDistributor := pubsub.NewTimeoutCollectorDistributor()
 	createProcessorFactory := &mocks.TimeoutProcessorFactory{}
 	timeoutCollectorFactory := timeoutcollector.NewTimeoutCollectorFactory(notifier, collectorDistributor, createProcessorFactory)
 	timeoutCollectors := timeoutaggregator.NewTimeoutCollectors(log, livenessData.CurrentView, timeoutCollectorFactory)

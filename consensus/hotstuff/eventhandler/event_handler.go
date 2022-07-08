@@ -94,6 +94,11 @@ func (e *EventHandler) OnTCConstructed(tc *flow.TimeoutCertificate) error {
 	if nve == nil {
 		return nil
 	}
+	log := e.log.With().
+		Uint64("tc_view", tc.View).
+		Logger()
+
+	log.Debug().Msg("TC triggered view change, starting new view now")
 	return e.startNewView()
 }
 
@@ -349,7 +354,6 @@ func (e *EventHandler) startNewView() error {
 		}
 
 		// We return here to correspond to the HotStuff state machine.
-		return nil
 		// Algorithmically, this return statement is optional:
 		//  * If this replica is the leader for the current view, there can be no valid proposal from any
 		//    other node. This replica's proposal is the only valid proposal.

@@ -495,6 +495,7 @@ func createNode(
 	require.NoError(t, err)
 
 	timeoutCollectorDistributor := pubsub.NewTimeoutCollectorDistributor()
+	timeoutCollectorDistributor.AddConsumer(logConsumer)
 
 	timeoutProcessorFactory := timeoutcollector.NewTimeoutProcessorFactory(timeoutCollectorDistributor, committee, validator, encoding.ConsensusTimeoutTag)
 	timeoutCollectorsFactory := timeoutcollector.NewTimeoutCollectorFactory(notifier, timeoutCollectorDistributor, timeoutProcessorFactory)
