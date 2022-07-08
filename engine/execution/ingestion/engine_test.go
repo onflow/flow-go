@@ -14,8 +14,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	engineCommon "github.com/onflow/flow-go/network"
+
 	"github.com/onflow/flow-go/crypto"
-	engineCommon "github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution"
 	computation "github.com/onflow/flow-go/engine/execution/computation/mock"
 	provider "github.com/onflow/flow-go/engine/execution/provider/mock"
@@ -122,8 +123,6 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 
 	identityListUnsorted := flow.IdentityList{myIdentity, collection1Identity, collection2Identity, collection3Identity}
 	identityList := identityListUnsorted.Sort(order.Canonical)
-
-	executionState.On("DiskSize").Return(int64(1024*1024), nil).Maybe()
 
 	snapshot.On("Identities", mock.Anything).Return(func(selector flow.IdentityFilter) flow.IdentityList {
 		return identityList.Filter(selector)

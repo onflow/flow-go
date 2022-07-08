@@ -55,6 +55,7 @@ type Engine struct {
 	mempool                *Mempool
 	execState              state.ExecutionState
 	metrics                module.ExecutionMetrics
+	maxCollectionHeight    uint64
 	tracer                 module.Tracer
 	extensiveLogging       bool
 	spockHasher            hash.Hasher
@@ -113,6 +114,7 @@ func New(
 		mempool:                mempool,
 		execState:              execState,
 		metrics:                metrics,
+		maxCollectionHeight:    0,
 		tracer:                 tracer,
 		extensiveLogging:       extLog,
 		syncFilter:             syncFilter,
@@ -124,7 +126,7 @@ func New(
 	}
 
 	// move to state syncing engine
-	syncConduit, err := net.Register(engine.SyncExecution, &eng)
+	syncConduit, err := net.Register(network.SyncExecution, &eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register execution blockSync engine: %w", err)
 	}
@@ -841,6 +843,13 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 				if !ok {
 					return fmt.Errorf("cannot handle collection: internal inconsistency - collection pointing to block %v which does not contain said collection",
 						blockID)
+				}
+
+				// record collection max height metrics
+				blockHeight := executableBlock.Block.Header.Height
+				if blockHeight > e.maxCollectionHeight {
+					e.metrics.UpdateCollectionMaxHeight(blockHeight)
+					e.maxCollectionHeight = blockHeight
 				}
 
 				if completeCollection.IsCompleted() {

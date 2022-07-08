@@ -1,27 +1,62 @@
 version: '3.7'
 services:
-  jaeger:
-    image: jaegertracing/all-in-one:latest
+  tempo:
+    image: grafana/tempo:main-4d7e191
+    user: root
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    volumes:
+      - ./conf/tempo-local.yaml:/etc/tempo.yaml:z
+      - ./data/tempo:/tmp/tempo:z
     ports:
-      - "6831:6831/udp"
-      - "16686:16686"
+      - "14268"
 
-  prom:
-    image: prom/prometheus:latest
+  loki:
+    image: grafana/loki:main-9218e46
+    user: root
+    command: [ "-config.file=/etc/loki/local-config.yaml" ]
+    volumes:
+      - ./data/loki:/loki:z
+    ports:
+      - "3100:3100"
+
+  promtail:
+    image: grafana/promtail:main-9218e46
+    command: -config.file=/etc/promtail/promtail-config.yaml
+    volumes:
+      - ./conf/promtail-config.yaml:/etc/promtail/promtail-config.yaml:z
+      - /var/run/docker.sock:/var/run/docker.sock:z
+
+  prometheus:
+    image: prom/prometheus:v2.36.0
+    user: root
     volumes:
       - ./conf/prometheus.yaml:/etc/prometheus/prometheus.yaml:z
       - ./targets.nodes.json:/etc/prometheus/targets.nodes.json:z
+      - ./data/prometheus:/prometheus:z
     command: "--config.file=/etc/prometheus/prometheus.yaml --storage.tsdb.path=/prometheus"
     ports:
       - 9090:9090
-    depends_on:
-      - exporter
-    environment:
-      - LOGSPOUT=ignore
+
+  pushgateway:
+    image: prom/pushgateway:v1.4.3
+    ports:
+      - 9091:9091
 
   exporter:
-    image: prom/node-exporter:latest
+    image: prom/node-exporter:v1.3.1
     ports:
       - "9100:9100"
+
+  grafana:
+    image: grafana/grafana:9.0.0-beta3
+    volumes:
+      - ./conf/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:z
+      - ./conf/grafana-dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml:z
+      - ./conf/grafana-localnet.json:/etc/grafana/provisioning/dashboards/localnet.json:z
+      - ./conf/grafana.ini:/etc/grafana/grafana.ini
     environment:
-      - LOGSPOUT=ignore
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+    ports:
+      - "3000:3000"
