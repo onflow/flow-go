@@ -52,6 +52,7 @@ func NewCore(
 	state clusterkv.MutableState,
 	pending module.PendingClusterBlockBuffer,
 	voteAggregator hotstuff.VoteAggregator,
+	timeoutAggregator hotstuff.TimeoutAggregator,
 	opts ...compliance.Opt,
 ) (*Core, error) {
 
@@ -72,6 +73,7 @@ func NewCore(
 		sync:              nil, // use `WithSync`
 		hotstuff:          nil, // use `WithConsensus`
 		voteAggregator:    voteAggregator,
+		timeoutAggregator: timeoutAggregator,
 	}
 
 	// log the mempool size off the bat
