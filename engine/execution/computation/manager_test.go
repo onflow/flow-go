@@ -253,7 +253,7 @@ func TestExecuteScript(t *testing.T) {
 // Balance script used to swallow errors, which meant that even if the view was empty, a script that did nothing but get
 // the balance of an account would succeed and return 0.
 func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
-	
+
 	logger := zerolog.Nop()
 
 	execCtx := fvm.NewContext(logger)
