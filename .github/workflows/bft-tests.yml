@@ -61,6 +61,8 @@ jobs:
         run: make crypto_setup_gopath
       - name: Docker build
         run: make docker-build-flow
+      - name: Move to Integration
+        run: cd integration
       - name: Run tests
         if: github.actor != 'bors[bot]'
         run: make epochs-tests-VN
