@@ -104,8 +104,10 @@ func (c *TimeoutCollector) processTimeout(timeout *model.TimeoutObject) error {
 		c.collectorNotifier.OnNewQcDiscovered(timeout.NewestQC)
 	}
 	// Same explanation for weak ordering of QCs also applies to TCs.
-	if c.newestReportedTC.Set(timeout.LastViewTC.View) {
-		c.collectorNotifier.OnNewTcDiscovered(timeout.LastViewTC)
+	if timeout.LastViewTC != nil {
+		if c.newestReportedTC.Set(timeout.LastViewTC.View) {
+			c.collectorNotifier.OnNewTcDiscovered(timeout.LastViewTC)
+		}
 	}
 
 	return nil
