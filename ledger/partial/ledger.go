@@ -63,6 +63,11 @@ func (l *Ledger) InitialState() ledger.State {
 	return l.state
 }
 
+// HasState returns true if the given state exists inside the ledger
+func (l *Ledger) HasState(other ledger.State) bool {
+	return l.state.Equals(other)
+}
+
 // GetSingleValue reads value of a given key at the given state
 func (l *Ledger) GetSingleValue(query *ledger.QuerySingleValue) (value ledger.Value, err error) {
 	path, err := pathfinder.KeyToPath(query.Key(), l.pathFinderVersion)
