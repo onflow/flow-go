@@ -63,9 +63,14 @@ jobs:
         run: make docker-build-flow
       - name: Move to Integration
         run: cd integration
+      - name: Check location
+        run: ls
       - name: Run tests
         if: github.actor != 'bors[bot]'
         run: make epochs-tests-VN
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+        if: success() || failure()
       - name: Run tests (Bors)
         if: github.actor == 'bors[bot]'
         uses: nick-invision/retry@v2
