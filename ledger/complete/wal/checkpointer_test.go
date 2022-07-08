@@ -148,7 +148,7 @@ func Test_Checkpointing(t *testing.T) {
 				trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, pathFinderVersion)
 				require.NoError(t, err)
 
-				err = wal.RecordUpdate(trieUpdate)
+				_, err = wal.RecordUpdate(trieUpdate)
 				require.NoError(t, err)
 
 				rootHash, err := f.Update(trieUpdate)
@@ -277,7 +277,7 @@ func Test_Checkpointing(t *testing.T) {
 			trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, pathFinderVersion)
 			require.NoError(t, err)
 
-			err = wal4.RecordUpdate(trieUpdate)
+			_, err = wal4.RecordUpdate(trieUpdate)
 			require.NoError(t, err)
 
 			rootHash, err = f.Update(trieUpdate)
@@ -448,7 +448,7 @@ func TestCheckpointFileError(t *testing.T) {
 		trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, pathFinderVersion)
 		require.NoError(t, err)
 
-		err = wal.RecordUpdate(trieUpdate)
+		_, err = wal.RecordUpdate(trieUpdate)
 		require.NoError(t, err)
 
 		// some buffer time of the checkpointer to run

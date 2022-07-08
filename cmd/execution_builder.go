@@ -52,6 +52,7 @@ import (
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	ledger "github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	bootstrapFilenames "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encoding/cbor"
@@ -206,6 +207,9 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		executionDataService          state_synchronization.ExecutionDataService
 		executionDataCIDCache         state_synchronization.ExecutionDataCIDCache
 		executionDataCIDCacheSize     uint = 100
+
+		ledgerInitialState           []*trie.MTrie
+		ledgerInitialStateSegmentNum = -1
 	)
 
 	e.FlowNodeBuilder.
@@ -382,18 +386,39 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				}
 			}
 
-			ledgerStorage, err = ledger.NewLedger(diskWAL, int(e.exeConf.mTrieCacheSize), collector, node.Logger.With().Str("subcomponent",
-				"ledger").Logger(), ledger.DefaultPathFinderVersion)
+			ledgerStorage, ledgerInitialState, ledgerInitialStateSegmentNum, err = ledger.NewSyncLedger(
+				diskWAL,
+				int(e.exeConf.mTrieCacheSize),
+				collector,
+				node.Logger.With().Str("subcomponent", "ledger").Logger(),
+				ledger.DefaultPathFinderVersion)
+
 			return ledgerStorage, err
 		}).
 		Component("execution state ledger WAL compactor", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-
 			checkpointer, err := ledgerStorage.Checkpointer()
 			if err != nil {
 				return nil, fmt.Errorf("cannot create checkpointer: %w", err)
 			}
-			compactor := wal.NewCompactor(checkpointer,
-				10*time.Second,
+
+			trieUpdateChan := ledgerStorage.SegmentTrieChan()
+
+			if trieUpdateChan == nil {
+				compactor := wal.NewCompactor(checkpointer,
+					10*time.Second,
+					e.exeConf.checkpointDistance,
+					e.exeConf.checkpointsToKeep,
+					node.Logger.With().Str("subcomponent", "checkpointer").Logger())
+
+				return compactor, nil
+			}
+
+			compactor, err := wal.NewCachedCompactor(
+				checkpointer,
+				trieUpdateChan,
+				ledgerInitialState,
+				ledgerInitialStateSegmentNum,
+				int(e.exeConf.mTrieCacheSize),
 				e.exeConf.checkpointDistance,
 				e.exeConf.checkpointsToKeep,
 				node.Logger.With().Str("subcomponent", "checkpointer").Logger())

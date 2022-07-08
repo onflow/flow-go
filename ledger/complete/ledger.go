@@ -21,6 +21,7 @@ import (
 
 const DefaultCacheSize = 1000
 const DefaultPathFinderVersion = 1
+const defaultSegmentUpdateChanSize = 500
 
 // Ledger (complete) is a fast memory-efficient fork-aware thread-safe trie-based key/value storage.
 // Ledger holds an array of registers (key-value pairs) and keeps tracks of changes over a limited time.
@@ -39,6 +40,7 @@ type Ledger struct {
 	metrics           module.LedgerMetrics
 	logger            zerolog.Logger
 	pathFinderVersion uint8
+	trieUpdateCh      chan *wal.SegmentTrie
 }
 
 // NewLedger creates a new in-memory trie-backed ledger storage with persistence.
@@ -84,6 +86,61 @@ func NewLedger(
 	metrics.ForestApproxMemorySize(0)
 
 	return storage, nil
+}
+
+func NewSyncLedger(lwal wal.LedgerWAL, capacity int, metrics module.LedgerMetrics, log zerolog.Logger, pathFinderVer uint8) (*Ledger, []*trie.MTrie, int, error) {
+
+	logger := log.With().Str("ledger", "complete").Logger()
+
+	forest, err := mtrie.NewForest(capacity, metrics, func(evictedTrie *trie.MTrie) {
+		err := lwal.RecordDelete(evictedTrie.RootHash())
+		if err != nil {
+			logger.Error().Err(err).Msg("failed to save delete record in wal")
+		}
+	})
+	if err != nil {
+		return nil, nil, 0, fmt.Errorf("cannot create forest: %w", err)
+	}
+
+	storage := &Ledger{
+		forest:            forest,
+		wal:               lwal,
+		trieUpdateCh:      make(chan *wal.SegmentTrie, defaultSegmentUpdateChanSize),
+		metrics:           metrics,
+		logger:            logger,
+		pathFinderVersion: pathFinderVer,
+	}
+
+	// pause records to prevent double logging trie removals
+	lwal.PauseRecord()
+	defer lwal.UnpauseRecord()
+
+	err = lwal.ReplayOnForest(forest)
+	if err != nil {
+		return nil, nil, 0, fmt.Errorf("cannot restore LedgerWAL: %w", err)
+	}
+
+	lwal.UnpauseRecord()
+
+	tries, err := forest.GetTries()
+	if err != nil {
+		return nil, nil, 0, fmt.Errorf("cannot get tries from forest: %w", err)
+	}
+
+	_, to, err := lwal.Segments()
+	if err != nil {
+		return nil, nil, 0, fmt.Errorf("cannot get segment numbers: %w", err)
+	}
+
+	// TODO update to proper value once https://github.com/onflow/flow-go/pull/3720 is merged
+	metrics.ForestApproxMemorySize(0)
+
+	// TODO verify to-1 is correct because DiskWAL is created and passed in as LedgerWAL and DiskWAL creates new segment file.
+	return storage, tries, to - 1, nil
+}
+
+func (l *Ledger) SegmentTrieChan() <-chan *wal.SegmentTrie {
+	return l.trieUpdateCh
 }
 
 // Ready implements interface module.ReadyDoneAware
@@ -182,6 +239,11 @@ func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 	return values, err
 }
 
+type walUpdateResult struct {
+	segmentNum int
+	err        error
+}
+
 // Set updates the ledger given an update
 // it returns the state after update and errors (if any)
 func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *ledger.TrieUpdate, err error) {
@@ -200,20 +262,31 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *
 
 	l.metrics.UpdateCount()
 
-	walChan := make(chan error)
+	walChan := make(chan walUpdateResult)
 
 	go func() {
-		walChan <- l.wal.RecordUpdate(trieUpdate)
+		segmentNum, err := l.wal.RecordUpdate(trieUpdate)
+		walChan <- walUpdateResult{segmentNum, err}
 	}()
 
 	newRootHash, err := l.forest.Update(trieUpdate)
-	walError := <-walChan
+	walResult := <-walChan
 
 	if err != nil {
 		return ledger.State(hash.DummyHash), nil, fmt.Errorf("cannot update state: %w", err)
 	}
-	if walError != nil {
-		return ledger.State(hash.DummyHash), nil, fmt.Errorf("error while writing LedgerWAL: %w", walError)
+	if walResult.err != nil {
+		return ledger.State(hash.DummyHash), nil, fmt.Errorf("error while writing LedgerWAL: %w", walResult.err)
+	}
+
+	if l.trieUpdateCh != nil {
+		// Get updated trie from forest
+		trie, err := l.forest.GetTrie(newRootHash)
+		if err != nil {
+			return ledger.State(hash.DummyHash), nil, fmt.Errorf("cannot get updated trie: %w", err)
+		}
+
+		l.trieUpdateCh <- &wal.SegmentTrie{Trie: trie, SegmentNum: walResult.segmentNum}
 	}
 
 	// TODO update to proper value once https://github.com/onflow/flow-go/pull/3720 is merged

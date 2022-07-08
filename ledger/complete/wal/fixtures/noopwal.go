@@ -29,7 +29,7 @@ func (w *NoopWAL) PauseRecord() {}
 
 func (w *NoopWAL) UnpauseRecord() {}
 
-func (w *NoopWAL) RecordUpdate(update *ledger.TrieUpdate) error { return nil }
+func (w *NoopWAL) RecordUpdate(update *ledger.TrieUpdate) (int, error) { return 0, nil }
 
 func (w *NoopWAL) RecordDelete(rootHash ledger.RootHash) error { return nil }
 

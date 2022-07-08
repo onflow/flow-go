@@ -15,33 +15,11 @@ import (
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
-	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// Compactor observer that waits until it gets notified of a
-// latest checkpoint larger than fromBound
-type CompactorObserver struct {
-	fromBound int
-	done      chan struct{}
-}
-
-func (co *CompactorObserver) OnNext(val interface{}) {
-	res, ok := val.(int)
-	if ok {
-		new := res
-		if new >= co.fromBound {
-			co.done <- struct{}{}
-		}
-	}
-}
-func (co *CompactorObserver) OnError(err error) {}
-func (co *CompactorObserver) OnComplete() {
-	close(co.done)
-}
-
-func Test_Compactor(t *testing.T) {
+func Test_CachedCompactor(t *testing.T) {
 	numInsPerStep := 2
 	pathByteSize := 32
 	minPayloadByteSize := 2 << 15
@@ -71,7 +49,19 @@ func Test_Compactor(t *testing.T) {
 			checkpointer, err := wal.NewCheckpointer()
 			require.NoError(t, err)
 
-			compactor := NewCompactor(checkpointer, 100*time.Millisecond, checkpointDistance, 1, zerolog.Nop()) //keep only latest checkpoint
+			trieUpdateCh := make(chan *SegmentTrie, defaultTrieUpdateChannelBufSize)
+			compactor, err := NewCachedCompactor(
+				checkpointer,
+				trieUpdateCh,
+				nil,
+				-1,
+				size*10,
+				checkpointDistance,
+				1,
+				zerolog.Nop(),
+			) //keep only latest checkpoint
+			require.NoError(t, err)
+
 			co := CompactorObserver{fromBound: 9, done: make(chan struct{})}
 			compactor.Subscribe(&co)
 
@@ -91,11 +81,17 @@ func Test_Compactor(t *testing.T) {
 
 				update := &ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads}
 
-				_, err = wal.RecordUpdate(update)
+				segmentNum, err := wal.RecordUpdate(update)
 				require.NoError(t, err)
 
 				rootHash, err = f.Update(update)
 				require.NoError(t, err)
+
+				// The following code is done in Ledger.Set().
+				// Since this test does't use ledger, we need to send updated trie data manually.
+				trie, err := f.GetTrie(rootHash)
+				require.NoError(t, err)
+				trieUpdateCh <- &SegmentTrie{Trie: trie, SegmentNum: segmentNum}
 
 				require.FileExists(t, path.Join(dir, NumberToFilenamePart(i)))
 
@@ -215,116 +211,6 @@ func Test_Compactor(t *testing.T) {
 
 			// order might be different
 			require.Equal(t, len(forestTries), len(forestTries2))
-		})
-
-	})
-}
-
-func Test_Compactor_checkpointInterval(t *testing.T) {
-
-	numInsPerStep := 2
-	pathByteSize := 32
-	minPayloadByteSize := 100
-	maxPayloadByteSize := 2 << 16
-	size := 20
-	metricsCollector := &metrics.NoopCollector{}
-	checkpointDistance := uint(3) // there should be 3 WAL not checkpointed
-
-	unittest.RunWithTempDir(t, func(dir string) {
-
-		f, err := mtrie.NewForest(size*10, metricsCollector, nil)
-		require.NoError(t, err)
-
-		var rootHash = f.GetEmptyRootHash()
-
-		t.Run("Compactor creates checkpoints", func(t *testing.T) {
-
-			wal, err := NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, 32*1024)
-			require.NoError(t, err)
-
-			// WAL segments are 32kB, so here we generate 2 keys 64kB each, times `size`
-			// so we should get at least `size` segments
-			checkpointer, err := wal.NewCheckpointer()
-			require.NoError(t, err)
-
-			compactor := NewCompactor(checkpointer, 100*time.Millisecond, checkpointDistance, 2, zerolog.Nop())
-
-			// Generate the tree and create WAL
-			for i := 0; i < size; i++ {
-
-				paths0 := utils.RandomPaths(numInsPerStep)
-				payloads0 := utils.RandomPayloads(numInsPerStep, minPayloadByteSize, maxPayloadByteSize)
-
-				var paths []ledger.Path
-				var payloads []*ledger.Payload
-				// TODO figure out twice insert
-				paths = append(paths, paths0...)
-				payloads = append(payloads, payloads0...)
-
-				update := &ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads}
-
-				_, err = wal.RecordUpdate(update)
-				require.NoError(t, err)
-
-				rootHash, err = f.Update(update)
-				require.NoError(t, err)
-
-				require.FileExists(t, path.Join(dir, NumberToFilenamePart(i)))
-
-				// run checkpoint creation after every file
-				_, err = compactor.createCheckpoints()
-				require.NoError(t, err)
-			}
-
-			// assert creation of checkpoint files precisely
-			require.NoFileExists(t, path.Join(dir, bootstrap.FilenameWALRootCheckpoint))
-			require.NoFileExists(t, path.Join(dir, "checkpoint.00000001"))
-			require.NoFileExists(t, path.Join(dir, "checkpoint.00000002"))
-			require.FileExists(t, path.Join(dir, "checkpoint.00000003"))
-			require.NoFileExists(t, path.Join(dir, "checkpoint.00000004"))
-			require.NoFileExists(t, path.Join(dir, "checkpoint.00000005"))
-			require.NoFileExists(t, path.Join(dir, "checkpoint.00000006"))
-			require.FileExists(t, path.Join(dir, "checkpoint.00000007"))
-			require.NoFileExists(t, path.Join(dir, "checkpoint.00000008"))
-			require.NoFileExists(t, path.Join(dir, "checkpoint.00000009"))
-			require.NoFileExists(t, path.Join(dir, "checkpoint.00000010"))
-			require.FileExists(t, path.Join(dir, "checkpoint.00000011"))
-			require.NoFileExists(t, path.Join(dir, "checkpoint.00000012"))
-			require.NoFileExists(t, path.Join(dir, "checkpoint.00000013"))
-			require.NoFileExists(t, path.Join(dir, "checkpoint.00000014"))
-			require.FileExists(t, path.Join(dir, "checkpoint.00000015"))
-			require.NoFileExists(t, path.Join(dir, "checkpoint.00000016"))
-			require.NoFileExists(t, path.Join(dir, "checkpoint.00000017"))
-			require.NoFileExists(t, path.Join(dir, "checkpoint.00000017"))
-			require.FileExists(t, path.Join(dir, "checkpoint.00000019"))
-
-			// expect all but last 2 checkpoints gone
-			err = compactor.cleanupCheckpoints()
-			require.NoError(t, err)
-
-			require.NoFileExists(t, path.Join(dir, bootstrap.FilenameWALRootCheckpoint))
-			require.NoFileExists(t, path.Join(dir, "checkpoint.00000001"))
-			require.NoFileExists(t, path.Join(dir, "checkpoint.00000002"))
-			require.NoFileExists(t, path.Join(dir, "checkpoint.00000003"))
-			require.NoFileExists(t, path.Join(dir, "checkpoint.00000004"))
-			require.NoFileExists(t, path.Join(dir, "checkpoint.00000005"))
-			require.NoFileExists(t, path.Join(dir, "checkpoint.00000006"))
-			require.NoFileExists(t, path.Join(dir, "checkpoint.00000007"))
-			require.NoFileExists(t, path.Join(dir, "checkpoint.00000008"))
-			require.NoFileExists(t, path.Join(dir, "checkpoint.00000009"))
-			require.NoFileExists(t, path.Join(dir, "checkpoint.00000010"))
-			require.NoFileExists(t, path.Join(dir, "checkpoint.00000011"))
-			require.NoFileExists(t, path.Join(dir, "checkpoint.00000012"))
-			require.NoFileExists(t, path.Join(dir, "checkpoint.00000013"))
-			require.NoFileExists(t, path.Join(dir, "checkpoint.00000014"))
-			require.FileExists(t, path.Join(dir, "checkpoint.00000015"))
-			require.NoFileExists(t, path.Join(dir, "checkpoint.00000016"))
-			require.NoFileExists(t, path.Join(dir, "checkpoint.00000017"))
-			require.NoFileExists(t, path.Join(dir, "checkpoint.00000017"))
-			require.FileExists(t, path.Join(dir, "checkpoint.00000019"))
-
-			<-wal.Done()
-			require.NoError(t, err)
 		})
 	})
 }

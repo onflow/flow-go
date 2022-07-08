@@ -745,9 +745,9 @@ func TestWALUpdateIsRunInParallel(t *testing.T) {
 	wg.Add(1)
 
 	w := &LongRunningDummyWAL{
-		updateFn: func(update *ledger.TrieUpdate) error {
+		updateFn: func(update *ledger.TrieUpdate) (int, error) {
 			wg.Wait() //wg will let work after the trie has been updated
-			return nil
+			return 0, nil
 		},
 	}
 
@@ -795,8 +795,8 @@ func TestWALUpdateFailuresBubbleUp(t *testing.T) {
 	theError := fmt.Errorf("error error")
 
 	w := &LongRunningDummyWAL{
-		updateFn: func(update *ledger.TrieUpdate) error {
-			return theError
+		updateFn: func(update *ledger.TrieUpdate) (int, error) {
+			return 0, theError
 		},
 	}
 
@@ -849,10 +849,10 @@ func migrationByValue(p []ledger.Payload) ([]ledger.Payload, error) {
 
 type LongRunningDummyWAL struct {
 	fixtures.NoopWAL
-	updateFn func(update *ledger.TrieUpdate) error
+	updateFn func(update *ledger.TrieUpdate) (int, error)
 }
 
-func (w *LongRunningDummyWAL) RecordUpdate(update *ledger.TrieUpdate) error {
+func (w *LongRunningDummyWAL) RecordUpdate(update *ledger.TrieUpdate) (int, error) {
 	return w.updateFn(update)
 }
 
