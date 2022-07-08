@@ -121,7 +121,7 @@ func (i ScriptInvoker) Process(
 	programs *programs.Programs,
 ) error {
 	env := NewScriptEnvironment(proc.RequestContext, ctx, vm, sth, programs)
-	location := common.ScriptLocation(proc.ID[:])
+	location := common.ScriptLocation(proc.ID)
 	value, err := vm.Runtime.ExecuteScript(
 		runtime.Script{
 			Source:    proc.Script,
