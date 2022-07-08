@@ -61,13 +61,9 @@ jobs:
         run: make crypto_setup_gopath
       - name: Docker build
         run: make docker-build-flow
-      - name: Move to Integration
-        run: cd integration
-      - name: Check location
-        run: ls
       - name: Run tests
         if: github.actor != 'bors[bot]'
-        run: make epochs-tests-VN
+        run: cd integration || make epochs-tests-VN
       - name: Setup tmate session
         uses: mxschmitt/action-tmate@v3
         if: success() || failure()
@@ -77,4 +73,4 @@ jobs:
         with:
           timeout_minutes: 15
           max_attempts: 2
-          command: make epochs-tests-VN
+          command: cd integration || make epochs-tests-VN
