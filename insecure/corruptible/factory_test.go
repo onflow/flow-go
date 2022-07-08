@@ -67,56 +67,6 @@ func TestNewConduit_MissingEgressController(t *testing.T) {
 	require.Nil(t, c)
 }
 
-// TestFactoryHandleIncomingEvent_AttackerObserve evaluates that the incoming messages to the conduit factory are routed to the
-// registered attacker if one exists.
-//func TestFactoryHandleIncomingEvent_AttackerObserve(t *testing.T) {
-//	cboreCodec := cbor.NewCodec()
-//	me := testutil.LocalFixture(t, unittest.IdentityFixture())
-//	f := NewCorruptibleConduitFactory(
-//		unittest.Logger(),
-//		flow.BftTestnet,
-//		me,
-//		cboreCodec,
-//		"localhost:0")
-//	attacker := newMockAttackerObserverClient()
-//
-//	attackerRegistered := sync.WaitGroup{}
-//	attackerRegistered.Add(1)
-//	go func() {
-//		attackerRegistered.Done()
-//
-//		err := f.ConnectAttacker(&empty.Empty{}, attacker) // blocking call
-//		require.NoError(t, err)
-//	}()
-//	unittest.RequireReturnsBefore(t, attackerRegistered.Wait, 1*time.Second, "could not register attacker on time")
-//
-//	event := &message.TestMessage{Text: "this is a test message"}
-//	targetIds := unittest.IdentifierListFixture(10)
-//	channel := network.Channel("test-channel")
-//
-//	go func() {
-//		err := f.HandleOutgoingEvent(event, channel, insecure.Protocol_MULTICAST, uint32(3), targetIds...)
-//		require.NoError(t, err)
-//	}()
-//
-//	// For this test we use a mock attacker, that puts the incoming messages into a channel. Then in this test we keep reading from that channel till
-//	// either a message arrives or a timeout. Reading a message from that channel means attackers Observe has been called.
-//	var receivedMsg *insecure.Message
-//	unittest.RequireReturnsBefore(t, func() {
-//		receivedMsg = <-attacker.incomingBuffer
-//	}, 100*time.Millisecond, "mock attack could not receive incoming message on time")
-//
-//	// checks content of the received message matches what has been sent.
-//	require.ElementsMatch(t, receivedMsg.TargetIDs, flow.IdsToBytes(targetIds))
-//	require.Equal(t, receivedMsg.TargetNum, uint32(3))
-//	require.Equal(t, receivedMsg.Protocol, insecure.Protocol_MULTICAST)
-//	require.Equal(t, receivedMsg.ChannelID, string(channel))
-//
-//	decodedEvent, err := cboreCodec.Decode(receivedMsg.Payload)
-//	require.NoError(t, err)
-//	require.Equal(t, event, decodedEvent)
-//}
-
 // TestFactoryHandleIncomingEvent_UnicastOverNetwork evaluates that the incoming unicast events to the conduit factory are routed to the
 // network adapter when no attacker registered to the factory.
 //func TestFactoryHandleIncomingEvent_UnicastOverNetwork(t *testing.T) {
