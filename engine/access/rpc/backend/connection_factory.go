@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"sync"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru"
@@ -47,6 +48,7 @@ type ConnectionFactoryImpl struct {
 	ExecutionNodeGRPCTimeout  time.Duration
 	ConnectionsCache          *lru.Cache
 	CacheSize                 uint
+	lock                      sync.Mutex
 	AccessMetrics             module.AccessMetrics
 }
 
@@ -81,14 +83,16 @@ func (cf *ConnectionFactoryImpl) retrieveConnection(grpcAddress string, timeout 
 		}
 	}
 	if conn == nil || conn.GetState() != connectivity.Ready {
-		// This line ensures that when a connection is renewed, the previously cached connection is evicted and closed
-		cf.ConnectionsCache.Remove(grpcAddress)
 		var err error
 		conn, err = cf.createConnection(grpcAddress, timeout)
 		if err != nil {
 			return nil, err
 		}
+		cf.lock.Lock()
+		// This line ensures that when a connection is renewed, the previously cached connection is evicted and closed
+		cf.ConnectionsCache.Remove(grpcAddress)
 		cf.ConnectionsCache.Add(grpcAddress, conn)
+		cf.lock.Unlock()
 		if cf.AccessMetrics != nil {
 			cf.AccessMetrics.TotalConnectionsInPool(uint(cf.ConnectionsCache.Len()), cf.CacheSize)
 		}
