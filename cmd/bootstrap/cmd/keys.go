@@ -34,7 +34,7 @@ func genNetworkAndStakingKeys() []model.NodeInfo {
 	log.Info().Msgf("generated %v networking keys for nodes in config", nodes)
 
 	log.Debug().Msgf("will generate %v staking keys for nodes in config", nodes)
-	stakingKeys, err := utils.GenerateStakingKeys(nodes, GenerateRandomSeeds(nodes, crypto.KeyGenSeedMinLenBLSBLS12381))
+	stakingKeys, _, err := utils.GenerateStakingKeys(nodes, GenerateRandomSeeds(nodes, crypto.KeyGenSeedMinLenBLSBLS12381))
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot generate staking keys")
 	}

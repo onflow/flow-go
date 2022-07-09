@@ -43,9 +43,17 @@ func TestGenerateKeys(t *testing.T) {
 }
 
 func TestGenerateStakingKeys(t *testing.T) {
-	keys, err := GenerateStakingKeys(2, unittest.SeedFixtures(2, crypto.KeyGenSeedMinLenBLSBLS12381))
+	keys, pops, err := GenerateStakingKeys(2, unittest.SeedFixtures(2, crypto.KeyGenSeedMinLenBLSBLS12381))
 	require.NoError(t, err)
 	require.Len(t, keys, 2)
+	require.Len(t, pops, 2)
+
+	for i, key := range keys {
+		valid, err := crypto.BLSVerifyPOP(key.PublicKey(), pops[i])
+		require.NoError(t, err)
+		require.True(t, valid)
+	}
+
 }
 
 func TestWriteMachineAccountFiles(t *testing.T) {
