@@ -100,7 +100,7 @@ func FindGuarantors(state State, guarantee *flow.CollectionGuarantee) ([]flow.Id
 // DecodeSignerIDs decodes the signer indices from the given block header, and finds the signer identifiers from protocol state
 // Expected Error returns during normal operations:
 //  * storage.ErrNotFound if block not found for the given header
-//  * signature.InvalidSignerIndicesError if `signerIndices` does not encode a valid set of consensus committiee
+//  * signature.InvalidSignerIndicesError if `signerIndices` does not encode a valid subset of the consensus committee
 func DecodeSignerIDs(state State, header *flow.Header) ([]flow.Identifier, error) {
 	// root block does not have signer indices
 	if header.ParentVoterIndices == nil && header.View == 0 {
