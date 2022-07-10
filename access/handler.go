@@ -17,6 +17,7 @@ import (
 type Handler struct {
 	api   API
 	chain flow.Chain
+	// TODO: update to Replicas API once active PaceMaker is merged
 	state protocol.State
 }
 
