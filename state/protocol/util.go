@@ -107,7 +107,7 @@ func DecodeSignerIDs(state State, header *flow.Header) ([]flow.Identifier, error
 		return []flow.Identifier{}, nil
 	}
 	snapshot := state.AtBlockID(header.ID())
-	members, err := snapshot.Identities(filter.HasRole(flow.RoleConsensus))
+	members, err := snapshot.Identities(filter.IsVotingConsensusCommitteeMember)
 	if err != nil {
 		return nil, fmt.Errorf("fail to retrieve identities for block %v: %w", header.ID(), err)
 	}
