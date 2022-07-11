@@ -276,7 +276,7 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 	<-ch
 
 	log := lg.log.With().Str("tx_id", createAccountTx.ID().String()).Logger()
-	result, err := GetTransactionResult(context.Background(), lg.flowClient, createAccountTx.ID())
+	result, err := WaitForTransactionResult(context.Background(), lg.flowClient, createAccountTx.ID())
 	if err != nil {
 		return fmt.Errorf("failed to get transactions result: %w", err)
 	}

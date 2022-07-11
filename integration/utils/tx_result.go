@@ -11,8 +11,8 @@ import (
 	"github.com/onflow/flow-go-sdk/access"
 )
 
-// GetTransactionResult waits for the transaction to get into the terminal state and returns the result.
-func GetTransactionResult(ctx context.Context, client access.Client, txID flowsdk.Identifier) (*flowsdk.TransactionResult, error) {
+// WaitForTransactionResult waits for the transaction to get into the terminal state and returns the result.
+func WaitForTransactionResult(ctx context.Context, client access.Client, txID flowsdk.Identifier) (*flowsdk.TransactionResult, error) {
 	var b retry.Backoff
 	b = retry.NewFibonacci(100 * time.Millisecond)
 	b = retry.WithMaxDuration(60*time.Second, b)
