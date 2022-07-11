@@ -33,30 +33,34 @@ import (
 
 // mockComponents is a container for the mocked version of epoch components.
 type mockComponents struct {
-	state      *cluster.State
-	prop       *mocknetwork.Engine
-	sync       *mocknetwork.Engine
-	hotstuff   *module.HotStuff
-	aggregator *mockhotstuff.VoteAggregator
+	state             *cluster.State
+	prop              *mocknetwork.Engine
+	sync              *mocknetwork.Engine
+	hotstuff          *module.HotStuff
+	voteAggregator    *mockhotstuff.VoteAggregator
+	timeoutAggregator *mockhotstuff.TimeoutAggregator
 }
 
 func newMockComponents() *mockComponents {
 
 	components := &mockComponents{
-		state:      new(cluster.State),
-		prop:       new(mocknetwork.Engine),
-		sync:       new(mocknetwork.Engine),
-		hotstuff:   new(module.HotStuff),
-		aggregator: new(mockhotstuff.VoteAggregator),
+		state:             new(cluster.State),
+		prop:              new(mocknetwork.Engine),
+		sync:              new(mocknetwork.Engine),
+		hotstuff:          new(module.HotStuff),
+		voteAggregator:    new(mockhotstuff.VoteAggregator),
+		timeoutAggregator: new(mockhotstuff.TimeoutAggregator),
 	}
 	unittest.ReadyDoneify(components.prop)
 	unittest.ReadyDoneify(components.sync)
 	unittest.ReadyDoneify(components.hotstuff)
-	unittest.ReadyDoneify(components.aggregator)
+	unittest.ReadyDoneify(components.voteAggregator)
+	unittest.ReadyDoneify(components.timeoutAggregator)
 
 	// for now only voteAggregator and hotstuff supports module.Startable, mock only it
 	components.hotstuff.On("Start", mock.Anything)
-	components.aggregator.On("Start", mock.Anything)
+	components.voteAggregator.On("Start", mock.Anything)
+	components.timeoutAggregator.On("Start", mock.Anything)
 
 	return components
 }
@@ -117,7 +121,10 @@ func (suite *Suite) SetupTest() {
 			func(epoch realprotocol.Epoch) network.Engine { return suite.ComponentsForEpoch(epoch).sync },
 			func(epoch realprotocol.Epoch) realmodule.HotStuff { return suite.ComponentsForEpoch(epoch).hotstuff },
 			func(epoch realprotocol.Epoch) hotstuff.VoteAggregator {
-				return suite.ComponentsForEpoch(epoch).aggregator
+				return suite.ComponentsForEpoch(epoch).voteAggregator
+			},
+			func(epoch realprotocol.Epoch) hotstuff.TimeoutAggregator {
+				return suite.ComponentsForEpoch(epoch).timeoutAggregator
 			},
 			func(epoch realprotocol.Epoch) error { return nil },
 		)
@@ -164,8 +171,8 @@ func (suite *Suite) AssertEpochStarted(counter uint64) {
 	suite.Assert().True(ok, "asserting nonexistent epoch started", counter)
 	components.prop.AssertCalled(suite.T(), "Ready")
 	components.sync.AssertCalled(suite.T(), "Ready")
-	components.aggregator.AssertCalled(suite.T(), "Ready")
-	components.aggregator.AssertCalled(suite.T(), "Start", mock.Anything)
+	components.voteAggregator.AssertCalled(suite.T(), "Ready")
+	components.voteAggregator.AssertCalled(suite.T(), "Start", mock.Anything)
 }
 
 // AssertEpochStopped asserts that the components for the given epoch have been stopped.
@@ -191,7 +198,7 @@ func (suite *Suite) MockAsUnauthorizedNode() {
 	suite.factory = new(epochmgr.EpochComponentsFactory)
 	suite.factory.
 		On("Create", mock.Anything).
-		Return(nil, nil, nil, nil, nil, ErrNotAuthorizedForEpoch)
+		Return(nil, nil, nil, nil, nil, nil, ErrNotAuthorizedForEpoch)
 
 	var err error
 	suite.engine, err = New(suite.log, suite.me, suite.state, suite.pools, suite.voter, suite.factory, suite.heights)
