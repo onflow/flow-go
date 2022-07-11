@@ -1232,7 +1232,11 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			epoch1CommitmentDeadline := epoch1FinalView - safetyThreshold
 
 			// finalizing block 1 should trigger EECC
+<<<<<<< HEAD
 			metricsMock.On("EpochEmergencyFallbackTriggered").Twice()
+=======
+			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
+>>>>>>> feature/active-pacemaker
 			protoEventsMock.On("EpochEmergencyFallbackTriggered").Once()
 
 			// we begin the epoch in the EpochStaking phase and
@@ -1244,7 +1248,11 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			err = state.Finalize(context.Background(), block1.ID())
 			require.NoError(t, err)
 
+<<<<<<< HEAD
 			assertEpochEmergencyFallbackTriggered(t, state)
+=======
+			assertEpochEmergencyFallbackTriggered(t, db)
+>>>>>>> feature/active-pacemaker
 
 			// block 2 will be the first block past the first epoch boundary
 			block2 := unittest.BlockWithParentFixture(block1.Header)
@@ -1335,7 +1343,11 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			block4.Header.View = epoch1CommitmentDeadline + rand.Uint64()%2
 
 			// finalizing block 4 should trigger EECC
+<<<<<<< HEAD
 			metricsMock.On("EpochEmergencyFallbackTriggered").Twice()
+=======
+			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
+>>>>>>> feature/active-pacemaker
 			protoEventsMock.On("EpochEmergencyFallbackTriggered").Once()
 
 			err = state.Extend(context.Background(), block4)
@@ -1428,7 +1440,11 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			require.NoError(t, err)
 
 			// incorporating the service event should trigger EECC
+<<<<<<< HEAD
 			metricsMock.On("EpochEmergencyFallbackTriggered").Twice()
+=======
+			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
+>>>>>>> feature/active-pacemaker
 			protoEventsMock.On("EpochEmergencyFallbackTriggered").Once()
 
 			// block 4 is where the service event state change comes into effect
@@ -1448,6 +1464,17 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			err = state.Finalize(context.Background(), block5.ID())
 			require.NoError(t, err)
 
+<<<<<<< HEAD
+=======
+			// block 5 is the first block past the current epoch boundary
+			block5 := unittest.BlockWithParentFixture(block4.Header)
+			block5.Header.View = epoch1Setup.FinalView + 1
+			err = state.Extend(context.Background(), block5)
+			require.NoError(t, err)
+			err = state.Finalize(context.Background(), block5.ID())
+			require.NoError(t, err)
+
+>>>>>>> feature/active-pacemaker
 			// since EECC has been triggered, epoch transition metrics should not be updated
 			metricsMock.AssertNotCalled(t, "EpochTransition", epoch2Setup.Counter, mock.Anything)
 			metricsMock.AssertNotCalled(t, "CurrentEpochCounter", epoch2Setup.Counter)

@@ -15,6 +15,7 @@ import (
 // critical path of protocol state mutations. Most subscribers should immediately
 // spawn a goroutine to handle the notification to avoid blocking protocol state
 // progression, especially for frequent protocol events (eg. BlockFinalized).
+// TODO deliver protocol events async https://github.com/dapperlabs/flow-go/issues/6317
 //
 // NOTE: the epoch-related callbacks are only called once the fork containing
 // the relevant event has been finalized.

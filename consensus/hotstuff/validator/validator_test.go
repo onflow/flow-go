@@ -894,7 +894,7 @@ func (s *TCSuite) TestTCInvalidSignature() {
 		s.verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		s.verifier.On("VerifyTC", s.signers, []byte(s.tc.SigData), s.tc.View, s.tc.NewestQCViews).Return(exception).Once()
 		err := s.validator.ValidateTC(s.tc)
-		assert.ErrorAs(s.T(), err, &exception, "if included TC's signature is invalid, an exception should be propagated")
+		assert.ErrorIs(s.T(), err, exception, "if included TC's signature is invalid, an exception should be propagated")
 		assert.False(s.T(), model.IsInvalidTCError(err))
 	})
 }
