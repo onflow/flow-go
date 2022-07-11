@@ -8,7 +8,7 @@ name: BFT Tests
 on:
   push:
     branches:
-      - '**/*bft*'
+      - '**/*6313*'
 
 env:
   GO_VERSION: 1.18
@@ -46,7 +46,7 @@ jobs:
       fail-fast: false
       matrix:
         test-category:
-          - integration-bft
+          - integration-epochs
     env:
       TEST_CATEGORY: ${{ matrix.test-category }}
     runs-on: ubuntu-latest
