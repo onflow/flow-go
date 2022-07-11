@@ -97,6 +97,7 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 	s.verifier = &mockhotstuff.Verifier{}
 	s.verifier.On("VerifyVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	s.verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	s.verifier.On("VerifyTC", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	// mock consumer for finalization notifications
 	s.notifier = &mockhotstuff.FinalizationConsumer{}
@@ -185,7 +186,7 @@ func (s *HotStuffFollowerSuite) TestSubmitProposal() {
 // for all the added blocks. Furthermore, the follower should finalize the first submitted block,
 // i.e. call s.updater.MakeFinal and s.notifier.OnFinalizedBlock
 func (s *HotStuffFollowerSuite) TestFollowerFinalizedBlock() {
-	unittest.SkipUnless(s.T(), unittest.TEST_TODO, "active-pacemaker, need new finalization rules")
+	// TODO(active-pacemaker): this test needs to be updated to follow new finalization rules(2-chain instead of 3-chain)
 	expectedFinalized := s.mockConsensus.extendBlock(s.rootHeader.View+1, s.rootHeader)
 	s.notifier.On("OnBlockIncorporated", blockWithID(expectedFinalized.ID())).Return().Once()
 	s.updater.On("MakeValid", blockID(expectedFinalized.ID())).Return(nil).Once()
@@ -245,7 +246,6 @@ func (s *HotStuffFollowerSuite) TestFollowerFinalizedBlock() {
 //                                              \       /
 //                                            [52078+ 0, x] (root block; no qc to parent)
 func (s *HotStuffFollowerSuite) TestOutOfOrderBlocks() {
-	unittest.SkipUnless(s.T(), unittest.TEST_TODO, "active-pacemaker, need new finalization rules")
 	// in the following, we reference the block's by their view minus the view of the
 	// root block (52078). E.g. block [52078+ 9, 52078+10] would be referenced as `block10`
 	rootView := s.rootHeader.View
@@ -349,10 +349,18 @@ func (mc *MockConsensus) extendBlock(blockView uint64, parent *flow.Header) *flo
 	nextBlock.ParentVoterIndices = signerIndices
 	if nextBlock.View == parent.View+1 {
 		nextBlock.LastViewTC = nil
-	} else if nextBlock.LastViewTC != nil {
-		nextBlock.LastViewTC.View = blockView - 1
-		nextBlock.LastViewTC.SignerIndices = signerIndices
-		nextBlock.LastViewTC.NewestQC.SignerIndices = signerIndices
+	} else {
+		newestQC := unittest.QuorumCertificateFixture(func(qc *flow.QuorumCertificate) {
+			qc.View = parent.View
+			qc.SignerIndices = signerIndices
+		})
+		nextBlock.LastViewTC = &flow.TimeoutCertificate{
+			View:          blockView - 1,
+			NewestQCViews: []uint64{newestQC.View},
+			NewestQC:      newestQC,
+			SignerIndices: signerIndices,
+			SigData:       unittest.SignatureFixture(),
+		}
 	}
 	return &nextBlock
 }
