@@ -5,10 +5,11 @@ import (
 	"sync"
 	"time"
 
-	flowsdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go-sdk/client"
-	"github.com/onflow/flow-go/module/metrics"
 	"go.uber.org/atomic"
+
+	flowsdk "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go-sdk/access"
+	"github.com/onflow/flow-go/module/metrics"
 
 	"github.com/rs/zerolog"
 )
@@ -51,7 +52,7 @@ type txFollowerImpl struct {
 
 	ctx    context.Context
 	cancel context.CancelFunc
-	client *client.Client
+	client access.Client
 
 	interval time.Duration
 
@@ -74,7 +75,7 @@ type txInfo struct {
 
 // NewTxFollower creates a new follower that tracks the current block height
 // and can notify on transaction completion.
-func NewTxFollower(ctx context.Context, client *client.Client, opts ...followerOption) (TxFollower, error) {
+func NewTxFollower(ctx context.Context, client access.Client, opts ...followerOption) (TxFollower, error) {
 	newCtx, cancel := context.WithCancel(ctx)
 
 	f := &txFollowerImpl{
@@ -231,7 +232,7 @@ type nopTxFollower struct {
 }
 
 // NewNopTxFollower creates a new follower that tracks the current block height and ID but does not notify on transaction completion.
-func NewNopTxFollower(ctx context.Context, client *client.Client, opts ...followerOption) (TxFollower, error) {
+func NewNopTxFollower(ctx context.Context, client access.Client, opts ...followerOption) (TxFollower, error) {
 	f, err := NewTxFollower(ctx, client, opts...)
 	if err != nil {
 		return nil, err
