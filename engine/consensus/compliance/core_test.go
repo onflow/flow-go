@@ -2,6 +2,7 @@ package compliance
 
 import (
 	"errors"
+	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"math/rand"
 	"testing"
 	"time"
@@ -49,21 +50,22 @@ type ComplianceCoreSuite struct {
 	childrenDB map[flow.Identifier][]*flow.PendingBlock
 
 	// mocked dependencies
-	me             *module.Local
-	metrics        *metrics.NoopCollector
-	tracer         realModule.Tracer
-	cleaner        *storage.Cleaner
-	headers        *storage.Headers
-	payloads       *storage.Payloads
-	state          *protocol.MutableState
-	snapshot       *protocol.Snapshot
-	con            *mocknetwork.Conduit
-	net            *mocknetwork.Network
-	prov           *mocknetwork.Engine
-	pending        *module.PendingBlockBuffer
-	hotstuff       *module.HotStuff
-	sync           *module.BlockRequester
-	voteAggregator *hotstuff.VoteAggregator
+	me                *module.Local
+	metrics           *metrics.NoopCollector
+	tracer            realModule.Tracer
+	cleaner           *storage.Cleaner
+	headers           *storage.Headers
+	payloads          *storage.Payloads
+	state             *protocol.MutableState
+	snapshot          *protocol.Snapshot
+	con               *mocknetwork.Conduit
+	net               *mocknetwork.Network
+	prov              *mocknetwork.Engine
+	pending           *module.PendingBlockBuffer
+	hotstuff          *module.HotStuff
+	sync              *module.BlockRequester
+	voteAggregator    *hotstuff.VoteAggregator
+	timeoutAggregator *hotstuff.TimeoutAggregator
 
 	// engine under test
 	core *Core
@@ -227,9 +229,10 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	}()
 
 	// set up hotstuff module mock
-	cs.hotstuff = &module.HotStuff{}
+	cs.hotstuff = module.NewHotStuff(cs.T())
 
-	cs.voteAggregator = &hotstuff.VoteAggregator{}
+	cs.voteAggregator = hotstuff.NewVoteAggregator(cs.T())
+	cs.timeoutAggregator = hotstuff.NewTimeoutAggregator(cs.T())
 
 	// set up synchronization module mock
 	cs.sync = &module.BlockRequester{}
@@ -256,6 +259,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 		cs.pending,
 		cs.sync,
 		cs.voteAggregator,
+		cs.timeoutAggregator,
 	)
 	require.NoError(cs.T(), err, "engine initialization should pass")
 
@@ -420,6 +424,34 @@ func (cs *ComplianceCoreSuite) TestOnSubmitVote() {
 	// execute the vote submission
 	err := cs.core.OnBlockVote(originID, &vote)
 	require.NoError(cs.T(), err, "block vote should pass")
+
+	// check that submit vote was called with correct parameters
+	cs.hotstuff.AssertExpectations(cs.T())
+}
+
+// TestOnSubmitTimeout tests that submitting messages.TimeoutObject adds model.TimeoutObject into
+// TimeoutAggregator.
+func (cs *ComplianceCoreSuite) TestOnSubmitTimeout() {
+	// create a vote
+	originID := unittest.IdentifierFixture()
+	timeout := messages.TimeoutObject{
+		View:       rand.Uint64(),
+		NewestQC:   helper.MakeQC(),
+		LastViewTC: helper.MakeTC(),
+		SigData:    unittest.SignatureFixture(),
+	}
+
+	cs.timeoutAggregator.On("AddTimeout", &model.TimeoutObject{
+		View:       timeout.View,
+		NewestQC:   timeout.NewestQC,
+		LastViewTC: timeout.LastViewTC,
+		SignerID:   originID,
+		SigData:    timeout.SigData,
+	}).Return()
+
+	// execute the timeout submission
+	err := cs.core.OnTimeoutObject(originID, &timeout)
+	require.NoError(cs.T(), err, "timeout object should pass")
 
 	// check that submit vote was called with correct parameters
 	cs.hotstuff.AssertExpectations(cs.T())
