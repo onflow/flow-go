@@ -5,7 +5,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/module/signature"
 )
 
 // randomBeaconInspector implements hotstuff.RandomBeaconInspector interface.
@@ -31,7 +31,7 @@ func NewRandomBeaconInspector(
 		publicKeyShares,
 		threshold,
 		message,
-		encoding.RandomBeaconTag)
+		signature.RandomBeaconTag)
 	if err != nil {
 		if crypto.IsInvalidInputsError(err) {
 			return nil, model.NewConfigurationErrorf("invalid parametrization for BLS Threshold Signature Inspector: %w", err)

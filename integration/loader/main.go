@@ -14,9 +14,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus/push"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go-sdk/client"
+	client "github.com/onflow/flow-go-sdk/access/grpc"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/integration/utils"
@@ -42,7 +43,7 @@ func main() {
 	metricport := flag.Uint("metricport", 8080, "port for /metrics endpoint")
 	pushgateway := flag.String("pushgateway", "127.0.0.1:9091", "host:port for pushgateway")
 	profilerEnabled := flag.Bool("profiler-enabled", false, "whether to enable the auto-profiler")
-	trackTxsFlag := flag.Bool("track-txs", false, "track individual transaction timings (adds significant overhead)")
+	_ = flag.Bool("track-txs", false, "deprecated")
 	accountMultiplierFlag := flag.Int("account-multiplier", 50, "number of accounts to create per load tps")
 	feedbackEnabled := flag.Bool("feedback-enabled", true, "wait for trannsaction execution before submitting new transaction")
 	flag.Parse()
@@ -121,7 +122,7 @@ func main() {
 	}
 
 	loadedAccessAddr := accessNodeAddrs[0]
-	flowClient, err := client.New(loadedAccessAddr, grpc.WithInsecure()) //nolint:staticcheck
+	flowClient, err := client.NewClient(loadedAccessAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatal().Err(err).Msgf("unable to initialize Flow client")
 	}
@@ -130,7 +131,7 @@ func main() {
 	if len(accessNodeAddrs) > 1 {
 		supervisorAccessAddr = accessNodeAddrs[1]
 	}
-	supervisorClient, err := client.New(supervisorAccessAddr, grpc.WithInsecure()) //nolint:staticcheck
+	supervisorClient, err := client.NewClient(supervisorAccessAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatal().Err(err).Msgf("unable to initialize Flow supervisor client")
 	}
@@ -155,7 +156,6 @@ func main() {
 					&serviceAccountAddress,
 					&fungibleTokenAddress,
 					&flowTokenAddress,
-					*trackTxsFlag,
 					c.tps,
 					*accountMultiplierFlag,
 					utils.LoadType(*loadTypeFlag),

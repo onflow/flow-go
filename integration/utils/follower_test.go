@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	flowsdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go-sdk/client"
-	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/stretchr/testify/require"
+
+	flowsdk "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestTxFollower creates new follower with a fixed block height and stops it.
@@ -18,8 +18,9 @@ func TestTxFollower(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	f, err := NewTxFollower(ctx,
-		&client.Client{},
+	f, err := NewTxFollower(
+		ctx,
+		nil,
 		WithBlockHeight(2),
 		WithInteval(1*time.Hour),
 	)
@@ -35,8 +36,9 @@ func TestNopTxFollower(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	f, err := NewNopTxFollower(ctx,
-		&client.Client{},
+	f, err := NewNopTxFollower(
+		ctx,
+		nil,
 		WithBlockHeight(1),
 		WithInteval(1*time.Hour),
 	)

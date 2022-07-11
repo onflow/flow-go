@@ -24,6 +24,9 @@ type Ledger interface {
 	// InitialState returns the initial state of the ledger
 	InitialState() State
 
+	// HasState returns true if the given state exists inside the ledger
+	HasState(state State) bool
+
 	// GetSingleValue returns value for a given key at specific state
 	GetSingleValue(query *QuerySingleValue) (value Value, err error)
 

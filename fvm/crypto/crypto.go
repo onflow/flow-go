@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
+	msig "github.com/onflow/flow-go/module/signature"
 )
 
 func HashWithTag(hashAlgo hash.HashingAlgorithm, tag string, data []byte) ([]byte, error) {
@@ -22,7 +23,7 @@ func HashWithTag(hashAlgo hash.HashingAlgorithm, tag string, data []byte) ([]byt
 			return nil, errors.NewValueErrorf(err.Error(), "verification failed")
 		}
 	case hash.KMAC128:
-		hasher = crypto.NewBLSKMAC(tag)
+		hasher = msig.NewBLSHasher(tag)
 	default:
 		err := errors.NewValueErrorf(fmt.Sprint(hashAlgo), "hashing algorithm type not found")
 		return nil, fmt.Errorf("hashing failed: %w", err)
@@ -179,7 +180,7 @@ func VerifySignatureFromRuntime(
 			return false, errors.NewValueErrorf(err.Error(), "runtime verification failed")
 		}
 	case hash.KMAC128:
-		hasher = crypto.NewBLSKMAC(tag)
+		hasher = msig.NewBLSHasher(tag)
 	default:
 		return false, errors.NewValueErrorf(fmt.Sprint(hashAlgo), "hashing algorithm type not found")
 	}
