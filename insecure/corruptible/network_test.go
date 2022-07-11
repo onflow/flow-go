@@ -18,9 +18,9 @@ import (
 	"time"
 )
 
-// TestFactoryHandleIncomingEvent_AttackerObserve evaluates that the incoming messages to the corrupted network are routed to the
+// TestNetworkHandleOutgoingEvent_AttackerObserve evaluates that the incoming messages to the corrupted network are routed to the
 // registered attacker if one exists.
-func TestFactoryHandleIncomingEvent_AttackerObserve(t *testing.T) {
+func TestNetworkHandleOutgoingEvent_AttackerObserve(t *testing.T) {
 	codec := cbor.NewCodec()
 
 	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress("localhost:0"))
@@ -76,4 +76,40 @@ func TestFactoryHandleIncomingEvent_AttackerObserve(t *testing.T) {
 	decodedEvent, err := codec.Decode(receivedMsg.Payload)
 	require.NoError(t, err)
 	require.Equal(t, event, decodedEvent)
+}
+
+// TestNetworkHandleOutgoingEvent_NoAttacker_UnicastOverNetwork evaluates that the incoming unicast events to the corrupted network
+// are routed to the network adapter when no attacker is registered.
+func TestNetworkHandleOutgoingEvent_NoAttacker_UnicastOverNetwork(t *testing.T) {
+	codec := cbor.NewCodec()
+	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress("localhost:0"))
+	flowNetwork := &mocknetwork.Network{}
+
+	ccf2 := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet)
+
+	// corruptible network with no attacker registered.
+	corruptibleNetwork, err := NewCorruptibleNetwork(
+		unittest.Logger(),
+		flow.BftTestnet,
+		"localhost:0",
+		testutil.LocalFixture(t, corruptedIdentity),
+		codec,
+		flowNetwork,
+		ccf2)
+	require.NoError(t, err)
+
+	adapter := &mocknetwork.Adapter{}
+	err = ccf2.RegisterAdapter(adapter)
+	require.NoError(t, err)
+
+	event := &message.TestMessage{Text: "this is a test message"}
+	targetId := unittest.IdentifierFixture()
+	channel := network.Channel("test-channel")
+
+	adapter.On("UnicastOnChannel", channel, event, targetId).Return(nil).Once()
+
+	err = corruptibleNetwork.HandleOutgoingEvent(event, channel, insecure.Protocol_UNICAST, uint32(0), targetId)
+	require.NoError(t, err)
+
+	mock.AssertExpectationsForObjects(t, adapter)
 }

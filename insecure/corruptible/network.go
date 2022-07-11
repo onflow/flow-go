@@ -32,6 +32,10 @@ import (
 
 // Network is a wrapper around the original flow network, that allows a remote attacker
 // to take control over its ingress and egress traffic flows.
+// A remote attacker can register itself to this corruptible network.
+// Whenever any corruptible conduit receives an event from its engine, it relays the event to this
+// network, which in turn is relayed to the register attacker.
+// The attacker can asynchronously dictate to the network to send messages on behalf of the node.
 type Network struct {
 	*component.ComponentManager
 	logger                zerolog.Logger

@@ -14,14 +14,26 @@ import (
 // TestRegisterAdapter_FailDoubleRegistration checks that CorruptibleConduitFactory can be registered with only one adapter.
 func TestRegisterAdapter_FailDoubleRegistration(t *testing.T) {
 	ccf := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet)
-
 	adapter := &mocknetwork.Adapter{}
 
-	// registering adapter must go successful
+	// registering adapter should be successful
 	require.NoError(t, ccf.RegisterAdapter(adapter))
 
-	// second attempt on registering adapter must fail
-	require.ErrorContains(t, ccf.RegisterAdapter(adapter), "already exists")
+	// second attempt at registering adapter should fail
+	require.ErrorContains(t, ccf.RegisterAdapter(adapter), "network adapter, one already exists")
+}
+
+// TestRegisterEgressController_FailDoubleRegistration checks that CorruptibleConduitFactory can be registered with only one egress controller.
+func TestRegisterEgressController_FailDoubleRegistration(t *testing.T) {
+	ccf := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet)
+	egressController := &mockinsecure.EgressController{}
+
+	// registering egress controller should be successful
+	require.NoError(t, ccf.RegisterEgressController(egressController))
+
+	// second attempt at registering egress controller should fail
+	require.ErrorContains(t, ccf.RegisterEgressController(egressController), "egress controller, one already exists")
+
 }
 
 // TestNewConduit_HappyPath checks when factory has an adapter registered and an egress controller,
@@ -29,11 +41,8 @@ func TestRegisterAdapter_FailDoubleRegistration(t *testing.T) {
 func TestNewConduit_HappyPath(t *testing.T) {
 	ccf := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet)
 	channel := network.Channel("test-channel")
-
-	ccf.egressController = &mockinsecure.EgressController{}
-
-	adapter := &mocknetwork.Adapter{}
-	require.NoError(t, ccf.RegisterAdapter(adapter))
+	require.NoError(t, ccf.RegisterEgressController(&mockinsecure.EgressController{}))
+	require.NoError(t, ccf.RegisterAdapter(&mocknetwork.Adapter{}))
 
 	c, err := ccf.NewConduit(context.Background(), channel)
 	require.NoError(t, err)
@@ -44,9 +53,8 @@ func TestNewConduit_HappyPath(t *testing.T) {
 // any attempts on creating a conduit fails with an error.
 func TestNewConduit_MissingAdapter(t *testing.T) {
 	ccf := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet)
-
 	channel := network.Channel("test-channel")
-	ccf.egressController = &mockinsecure.EgressController{}
+	require.NoError(t, ccf.RegisterEgressController(&mockinsecure.EgressController{}))
 
 	c, err := ccf.NewConduit(context.Background(), channel)
 	require.ErrorContains(t, err, "missing a registered network adapter")
@@ -58,43 +66,12 @@ func TestNewConduit_MissingAdapter(t *testing.T) {
 func TestNewConduit_MissingEgressController(t *testing.T) {
 	ccf := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet)
 	channel := network.Channel("test-channel")
-
-	adapter := &mocknetwork.Adapter{}
-	require.NoError(t, ccf.RegisterAdapter(adapter))
+	require.NoError(t, ccf.RegisterAdapter(&mocknetwork.Adapter{}))
 
 	c, err := ccf.NewConduit(context.Background(), channel)
 	require.ErrorContains(t, err, "missing a registered egress controller")
 	require.Nil(t, c)
 }
-
-// TestFactoryHandleIncomingEvent_UnicastOverNetwork evaluates that the incoming unicast events to the conduit factory are routed to the
-// network adapter when no attacker registered to the factory.
-//func TestFactoryHandleIncomingEvent_UnicastOverNetwork(t *testing.T) {
-//	cborCodec := cbor.NewCodec()
-//	me := testutil.LocalFixture(t, unittest.IdentityFixture())
-//	// corruptible conduit factory with no attacker registered.
-//	f := NewCorruptibleConduitFactory(
-//		unittest.Logger(),
-//		flow.BftTestnet,
-//		me,
-//		cborCodec,
-//		"localhost:0")
-//
-//	adapter := &mocknetwork.Adapter{}
-//	err := f.RegisterAdapter(adapter)
-//	require.NoError(t, err)
-//
-//	event := &message.TestMessage{Text: "this is a test message"}
-//	targetId := unittest.IdentifierFixture()
-//	channel := network.Channel("test-channel")
-//
-//	adapter.On("UnicastOnChannel", channel, event, targetId).Return(nil).Once()
-//
-//	err = f.HandleOutgoingEvent(event, channel, insecure.Protocol_UNICAST, uint32(0), targetId)
-//	require.NoError(t, err)
-//
-//	testifymock.AssertExpectationsForObjects(t, adapter)
-//}
 
 // TestFactoryHandleIncomingEvent_PublishOverNetwork evaluates that the incoming publish events to the conduit factory are routed to the
 // network adapter when no attacker registered to the factory.
