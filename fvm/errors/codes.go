@@ -26,10 +26,9 @@ const (
 	FailureCodeLedgerFailure      FailureCode = 2002
 	FailureCodeStateMergeFailure  FailureCode = 2003
 	FailureCodeBlockFinderFailure FailureCode = 2004
-
-	// errors no longer in use
 	// Deprecated: FailureCodeHasherFailure
 	FailureCodeHasherFailure FailureCode = 2005
+
 	// Deprecated: FailureCodeMetaTransactionFailure
 	FailureCodeMetaTransactionFailure FailureCode = 2100
 )
@@ -37,6 +36,16 @@ const (
 const (
 	// tx validation errors 1000 - 1049
 	// ErrCodeTxValidationError         ErrorCode = 1000 - reserved
+	// Deprecated: ErrCodeInvalidTxByteSizeError
+	ErrCodeInvalidTxByteSizeError ErrorCode = 1001
+	// Deprecated: ErrCodeInvalidReferenceBlockError
+	ErrCodeInvalidReferenceBlockError ErrorCode = 1002
+	// Deprecated: ErrCodeExpiredTransactionError
+	ErrCodeExpiredTransactionError ErrorCode = 1003
+	// Deprecated: ErrCodeInvalidScriptError
+	ErrCodeInvalidScriptError ErrorCode = 1004
+	// Deprecated: ErrCodeInvalidGasLimitError
+	ErrCodeInvalidGasLimitError          ErrorCode = 1005
 	ErrCodeInvalidProposalSignatureError ErrorCode = 1006
 	ErrCodeInvalidProposalSeqNumberError ErrorCode = 1007
 	ErrCodeInvalidPayloadSignatureError  ErrorCode = 1008
@@ -54,8 +63,12 @@ const (
 
 	// execution errors 1100 - 1200
 	// ErrCodeExecutionError                 ErrorCode = 1100 - reserved
-	ErrCodeCadenceRunTimeError                       ErrorCode = 1101
-	ErrCodeStorageCapacityExceeded                   ErrorCode = 1103
+	ErrCodeCadenceRunTimeError ErrorCode = 1101
+	// Deprecated: ErrCodeEncodingUnsupportedValue
+	ErrCodeEncodingUnsupportedValue ErrorCode = 1102
+	ErrCodeStorageCapacityExceeded  ErrorCode = 1103
+	// Deprecated: ErrCodeGasLimitExceededError
+	ErrCodeGasLimitExceededError                     ErrorCode = 1104
 	ErrCodeEventLimitExceededError                   ErrorCode = 1105
 	ErrCodeLedgerIntractionLimitExceededError        ErrorCode = 1106
 	ErrCodeStateKeySizeLimitError                    ErrorCode = 1107
@@ -78,22 +91,6 @@ const (
 	// contract errors 1250 - 1300
 	// ErrCodeContractError          ErrorCode = 1250 - reserved
 	ErrCodeContractNotFoundError ErrorCode = 1251
-
-	// errors no longer in use
-	// Deprecated: ErrCodeInvalidTxByteSizeError
-	ErrCodeInvalidTxByteSizeError ErrorCode = 1001
-	// Deprecated: ErrCodeInvalidReferenceBlockError
-	ErrCodeInvalidReferenceBlockError ErrorCode = 1002
-	// Deprecated: ErrCodeInvalidScriptError
-	ErrCodeInvalidScriptError ErrorCode = 1004
-	// Deprecated: ErrCodeInvalidGasLimitError
-	ErrCodeInvalidGasLimitError ErrorCode = 1005
-	// Deprecated: ErrCodeExpiredTransactionError
-	ErrCodeExpiredTransactionError ErrorCode = 1003
-	// Deprecated: ErrCodeEncodingUnsupportedValue
-	ErrCodeEncodingUnsupportedValue ErrorCode = 1102
-	// Deprecated: ErrCodeGasLimitExceededError
-	ErrCodeGasLimitExceededError ErrorCode = 1104
 	// Deprecated: ErrCodeContractNamesNotFoundError
 	ErrCodeContractNamesNotFoundError ErrorCode = 1252
 )
