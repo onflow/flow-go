@@ -17,8 +17,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-core/protocol"
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
@@ -30,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/network/validator"
 	psValidator "github.com/onflow/flow-go/network/validator/pubsub"
 	_ "github.com/onflow/flow-go/utils/binstat"
+	"github.com/rs/zerolog"
 )
 
 const (
@@ -82,20 +81,22 @@ type Middleware struct {
 	// goroutines to exit, because new goroutines could be started after we've already
 	// returned from wg.Wait(). We need to solve this the right way using ComponentManager
 	// and worker routines.
-	wg                         *sync.WaitGroup
-	libP2PNode                 *Node
-	libP2PNodeFactory          LibP2PFactoryFunc
-	preferredUnicasts          []unicast.ProtocolName
-	me                         flow.Identifier
-	metrics                    module.NetworkMetrics
-	rootBlockID                flow.Identifier
-	validators                 []network.MessageValidator
-	peerManagerFactory         PeerManagerFactoryFunc
-	peerManager                *PeerManager
-	unicastMessageTimeout      time.Duration
-	idTranslator               IDTranslator
-	previousProtocolStatePeers []peer.AddrInfo
-	codec                      network.Codec
+	wg                          *sync.WaitGroup
+	libP2PNode                  *Node
+	libP2PNodeFactory           LibP2PFactoryFunc
+	preferredUnicasts           []unicast.ProtocolName
+	me                          flow.Identifier
+	metrics                     module.NetworkMetrics
+	rootBlockID                 flow.Identifier
+	validators                  []network.MessageValidator
+	peerManagerFactory          PeerManagerFactoryFunc
+	peerManager                 *PeerManager
+	unicastMessageTimeout       time.Duration
+	idTranslator                IDTranslator
+	previousProtocolStatePeers  []peer.AddrInfo
+	codec                       network.Codec
+	unicastStreamRateLimiter    unicast.RateLimiter
+	unicastBandwidthRateLimiter unicast.RateLimiter
 	component.Component
 }
 
@@ -371,7 +372,7 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 	defer m.libP2PNode.host.ConnManager().Unprotect(peerID, tag)
 
 	// create new stream
-	// (streams don't need to be reused and are fairly inexpensive to be created for each send.
+	// streams don't need to be reused and are fairly inexpensive to be created for each send.
 	// A stream creation does NOT incur an RTT as stream negotiation happens as part of the first message
 	// sent out the receiver
 	stream, err := m.libP2PNode.CreateStream(ctx, peerID)
@@ -522,6 +523,18 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 	}
 
 	success = true
+}
+
+// isUnicastStreamAllowed will check if the peer is able to create an
+// unicast stream using the configured Middleware.unicastStreamRateLimiter
+func (m *Middleware) isUnicastStreamAllowed(peerID peer.ID, msg *message.Message) bool {
+	return m.unicastStreamRateLimiter.Allow(peerID, msg)
+}
+
+// isUnciastMessageAllowed will check if the peer is able to send a message
+// of size msg.Size() using the configured Middleware.unicastBandwidthRateLimiter.
+func (m *Middleware) isUnciastMessageAllowed(peerID peer.ID, msg *message.Message) bool {
+	return m.unicastBandwidthRateLimiter.Allow(peerID, msg)
 }
 
 // Subscribe subscribes the middleware to a channel.
