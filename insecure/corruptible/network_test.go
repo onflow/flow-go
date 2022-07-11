@@ -18,9 +18,9 @@ import (
 	"time"
 )
 
-// TestNetworkHandleOutgoingEvent_AttackerObserve evaluates that the incoming messages to the corrupted network are routed to the
+// TestHandleOutgoingEvent_AttackerObserve evaluates that the incoming messages to the corrupted network are routed to the
 // registered attacker if one exists.
-func TestNetworkHandleOutgoingEvent_AttackerObserve(t *testing.T) {
+func TestHandleOutgoingEvent_AttackerObserve(t *testing.T) {
 	codec := cbor.NewCodec()
 	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress("localhost:0"))
 	flowNetwork := &mocknetwork.Network{}
@@ -75,11 +75,10 @@ func TestNetworkHandleOutgoingEvent_AttackerObserve(t *testing.T) {
 	require.Equal(t, event, decodedEvent)
 }
 
-// TestNetworkHandleOutgoingEvent_NoAttacker_UnicastOverNetwork checks that outgoing unicast events to the corrupted network
+// TestHandleOutgoingEvent_NoAttacker_UnicastOverNetwork checks that outgoing unicast events to the corrupted network
 // are routed to the network adapter when no attacker is registered to the network.
-func TestNetworkHandleOutgoingEvent_NoAttacker_UnicastOverNetwork(t *testing.T) {
+func TestHandleOutgoingEvent_NoAttacker_UnicastOverNetwork(t *testing.T) {
 	corruptibleNetwork, adapter := getCorruptibleNetworkNoAttacker(t)
-
 	event, channel := getMessageAndChannel()
 	targetId := unittest.IdentifierFixture()
 
@@ -93,11 +92,10 @@ func TestNetworkHandleOutgoingEvent_NoAttacker_UnicastOverNetwork(t *testing.T) 
 	mock.AssertExpectationsForObjects(t, adapter)
 }
 
-// TestNetworkHandleOutgoingEvent_NoAttacker_PublishOverNetwork checks that the outgoing publish events to the corrupted network
+// TestHandleOutgoingEvent_NoAttacker_PublishOverNetwork checks that the outgoing publish events to the corrupted network
 // are routed to the network adapter when no attacker registered to the network.
-func TestNetworkHandleOutgoingEvent_NoAttacker_PublishOverNetwork(t *testing.T) {
+func TestHandleOutgoingEvent_NoAttacker_PublishOverNetwork(t *testing.T) {
 	corruptibleNetwork, adapter := getCorruptibleNetworkNoAttacker(t)
-
 	event, channel := getMessageAndChannel()
 
 	targetIds := unittest.IdentifierListFixture(10)
@@ -111,10 +109,34 @@ func TestNetworkHandleOutgoingEvent_NoAttacker_PublishOverNetwork(t *testing.T) 
 	// simulate sending message by conduit
 	err := corruptibleNetwork.HandleOutgoingEvent(event, channel, insecure.Protocol_PUBLISH, uint32(0), targetIds...)
 	require.NoError(t, err)
+
+	// check that correct Adapter method called
 	mock.AssertExpectationsForObjects(t, adapter)
 }
 
-// HELPERS
+// TestHandleOutgoingEvent_NoAttacker_MulticastOverNetwork checks that the outgoing multicast events to the corrupted network
+// are routed to the network adapter when no attacker registered to the network.
+func TestHandleOutgoingEvent_NoAttacker_MulticastOverNetwork(t *testing.T) {
+	corruptibleNetwork, adapter := getCorruptibleNetworkNoAttacker(t)
+	event, channel := getMessageAndChannel()
+
+	targetIds := unittest.IdentifierListFixture(10)
+
+	params := []interface{}{channel, event, uint(3)}
+	for _, id := range targetIds {
+		params = append(params, id)
+	}
+	adapter.On("MulticastOnChannel", params...).Return(nil).Once()
+
+	// simulate sending message by conduit
+	err := corruptibleNetwork.HandleOutgoingEvent(event, channel, insecure.Protocol_MULTICAST, uint32(3), targetIds...)
+	require.NoError(t, err)
+
+	// check that correct Adapter method called
+	mock.AssertExpectationsForObjects(t, adapter)
+}
+
+// ******************** HELPERS ****************************
 
 func getCorruptibleNetworkNoAttacker(t *testing.T) (*Network, *mocknetwork.Adapter) {
 	// create corruptible network with no attacker registered
