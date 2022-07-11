@@ -24,6 +24,7 @@ type EpochComponentsFactory interface {
 		sync network.Engine,
 		hotstuff module.HotStuff,
 		voteAggregator hotstuff.VoteAggregator,
+		timeoutAggregator hotstuff.TimeoutAggregator,
 		err error,
 	)
 }

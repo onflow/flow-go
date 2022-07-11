@@ -2,6 +2,8 @@ package factories
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/consensus/hotstuff/timeoutcollector"
+	"github.com/onflow/flow-go/model/encoding"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
@@ -110,7 +112,7 @@ func (f *HotStuffFactory) CreateModules(
 	verifier := verification.NewStakingVerifier()
 	validator := validatorImpl.NewMetricsWrapper(validatorImpl.New(committee, verifier), metrics)
 	voteProcessorFactory := votecollector.NewStakingVoteProcessorFactory(committee, qcDistributor.OnQcConstructedFromVotes)
-	aggregator, err := consensus.NewVoteAggregator(
+	voteAggregator, err := consensus.NewVoteAggregator(
 		f.log,
 		// since we don't want to aggregate votes for finalized view,
 		// the lowest retained view starts with the next view of the last finalized view.
@@ -123,16 +125,32 @@ func (f *HotStuffFactory) CreateModules(
 		return nil, nil, err
 	}
 
+	timeoutCollectorDistributor := pubsub.NewTimeoutCollectorDistributor()
+	timeoutProcessorFactory := timeoutcollector.NewTimeoutProcessorFactory(timeoutCollectorDistributor, committee, validator, encoding.CollectorTimeoutTag)
+
+	timeoutAggregator, err := consensus.NewTimeoutAggregator(
+		f.log,
+		finalizedBlock.View+1,
+		notifier,
+		timeoutProcessorFactory,
+		timeoutCollectorDistributor,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	return &consensus.HotstuffModules{
-		Forks:                   forks,
-		Validator:               validator,
-		Notifier:                notifier,
-		Committee:               committee,
-		Signer:                  signer,
-		Persist:                 persister.New(f.db, cluster.ChainID()),
-		VoteAggregator:          aggregator,
-		QCCreatedDistributor:    qcDistributor,
-		FinalizationDistributor: finalizationDistributor,
+		Forks:                       forks,
+		Validator:                   validator,
+		Notifier:                    notifier,
+		Committee:                   committee,
+		Signer:                      signer,
+		Persist:                     persister.New(f.db, cluster.ChainID()),
+		VoteAggregator:              voteAggregator,
+		TimeoutAggregator:           timeoutAggregator,
+		QCCreatedDistributor:        qcDistributor,
+		TimeoutCollectorDistributor: timeoutCollectorDistributor,
+		FinalizationDistributor:     finalizationDistributor,
 	}, metrics, nil
 }
 

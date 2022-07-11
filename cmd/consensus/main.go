@@ -656,6 +656,7 @@ func main() {
 				proposals,
 				syncCore,
 				hotstuffModules.VoteAggregator,
+				hotstuffModules.TimeoutAggregator,
 				modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),
 			)
 			if err != nil {

@@ -60,6 +60,7 @@ func (f *ProposalEngineFactory) Create(
 	headers storage.Headers,
 	payloads storage.ClusterPayloads,
 	voteAggregator hotstuff.VoteAggregator,
+	timeoutAggregator hotstuff.TimeoutAggregator,
 ) (*compliance.Engine, error) {
 
 	cache := buffer.NewPendingClusterBlocks()
@@ -72,6 +73,7 @@ func (f *ProposalEngineFactory) Create(
 		clusterState,
 		cache,
 		voteAggregator,
+		timeoutAggregator,
 		f.complianceOpts...,
 	)
 	if err != nil {

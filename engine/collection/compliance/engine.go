@@ -186,6 +186,7 @@ func NewEngine(
 		core:                       core,
 		pendingBlocks:              pendingBlocks,
 		pendingVotes:               pendingVotes,
+		pendingTimeouts:            pendingTimeouts,
 		messageHandler:             handler,
 		finalizationEventsNotifier: engine.NewNotifier(),
 		con:                        nil,
