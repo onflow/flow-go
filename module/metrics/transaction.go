@@ -25,6 +25,7 @@ type TransactionCollector struct {
 	transactionResultDuration  *prometheus.HistogramVec
 	scriptSize                 prometheus.Histogram
 	transactionSize            prometheus.Histogram
+	maxReceiptHeight           prometheus.Gauge
 }
 
 func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log zerolog.Logger,
@@ -110,6 +111,12 @@ func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log 
 			Namespace: namespaceAccess,
 			Subsystem: subsystemTransactionSubmission,
 			Help:      "histogram for the transaction size in kb of scripts used in GetTransactionResult",
+		}),
+		maxReceiptHeight: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:      "max_receipt_height",
+			Namespace: namespaceAccess,
+			Subsystem: subsystemIngestion,
+			Help:      "gauge to track the maximum block height of execution receipts received",
 		}),
 	}
 
@@ -267,4 +274,8 @@ func (tc *TransactionCollector) TransactionExpired(txID flow.Identifier) {
 	}
 	tc.transactionSubmission.WithLabelValues("expired").Inc()
 	tc.transactionTimings.Rem(txID)
+}
+
+func (tc *TransactionCollector) UpdateExecutionReceiptMaxHeight(height uint64) {
+	tc.maxReceiptHeight.Set(float64(height))
 }

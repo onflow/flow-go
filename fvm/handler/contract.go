@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"sort"
-	"sync"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
@@ -32,10 +31,6 @@ type ContractHandler struct {
 	authorizedDeploymentAccounts AuthorizedAccountsFunc
 	authorizedRemovalAccounts    AuthorizedAccountsFunc
 	useContractAuditVoucher      UseContractAuditVoucherFunc
-	// handler doesn't have to be thread safe and right now
-	// is only used in a single thread but a mutex has been added
-	// here to prevent accidental multi-thread use in the future
-	lock sync.Mutex
 }
 
 func NewContractHandler(accounts state.Accounts,
@@ -105,9 +100,6 @@ func (h *ContractHandler) SetContract(
 		}
 	}
 
-	h.lock.Lock()
-	defer h.lock.Unlock()
-
 	contractUpdateKey := programs.ContractUpdateKey{
 		Address: flowAddress,
 		Name:    name,
@@ -133,9 +125,6 @@ func (h *ContractHandler) RemoveContract(
 	}
 
 	add := flow.Address(address)
-	// removes are stored in the draft updates with code value of nil
-	h.lock.Lock()
-	defer h.lock.Unlock()
 	uk := programs.ContractUpdateKey{Address: add, Name: name}
 	u := programs.ContractUpdate{ContractUpdateKey: uk}
 	h.draftUpdates[uk] = u
@@ -159,15 +148,14 @@ func (l contractUpdateList) Less(i, j int) bool {
 }
 
 func (h *ContractHandler) Commit() ([]programs.ContractUpdateKey, error) {
-
-	h.lock.Lock()
-	defer h.lock.Unlock()
-
 	updatedKeys := h.UpdateKeys()
 	updateList := make(contractUpdateList, 0)
 
-	for _, uk := range h.draftUpdates {
+	for k, uk := range h.draftUpdates {
 		updateList = append(updateList, uk)
+
+		// delete as we go to clear h.draftUpdates
+		delete(h.draftUpdates, k)
 	}
 	// sort does not need to be stable as the contract update key is unique
 	sort.Sort(updateList)
@@ -187,15 +175,10 @@ func (h *ContractHandler) Commit() ([]programs.ContractUpdateKey, error) {
 		}
 	}
 
-	// reset draft
-	h.draftUpdates = make(map[programs.ContractUpdateKey]programs.ContractUpdate)
 	return updatedKeys, nil
 }
 
 func (h *ContractHandler) Rollback() error {
-	h.lock.Lock()
-	defer h.lock.Unlock()
-
 	h.draftUpdates = make(map[programs.ContractUpdateKey]programs.ContractUpdate)
 	return nil
 }
@@ -204,14 +187,31 @@ func (h *ContractHandler) HasUpdates() bool {
 	return len(h.draftUpdates) > 0
 }
 
+type contractUpdateKeyList []programs.ContractUpdateKey
+
+func (l contractUpdateKeyList) Len() int      { return len(l) }
+func (l contractUpdateKeyList) Swap(i, j int) { l[i], l[j] = l[j], l[i] }
+func (l contractUpdateKeyList) Less(i, j int) bool {
+	switch bytes.Compare(l[i].Address[:], l[j].Address[:]) {
+	case -1:
+		return true
+	case 0:
+		return l[i].Name < l[j].Name
+	default:
+		return false
+	}
+}
+
 func (h *ContractHandler) UpdateKeys() []programs.ContractUpdateKey {
 	if len(h.draftUpdates) == 0 {
 		return nil
 	}
-	keys := make([]programs.ContractUpdateKey, 0, len(h.draftUpdates))
+	keys := make(contractUpdateKeyList, 0, len(h.draftUpdates))
 	for k := range h.draftUpdates {
 		keys = append(keys, k)
 	}
+
+	sort.Sort(keys)
 	return keys
 }
 
