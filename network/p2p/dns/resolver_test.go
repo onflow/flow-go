@@ -3,6 +3,7 @@ package dns
 import (
 	"context"
 	"fmt"
+	"log"
 	"net"
 	"sync"
 	"testing"
@@ -24,6 +25,7 @@ const happyPath = true
 // TestResolver_HappyPath evaluates once the request for a domain gets cached, the subsequent requests are going through the cache
 // instead of going through the underlying basic resolver, and hence through the network.
 func TestResolver_HappyPath(t *testing.T) {
+	dummyIntPointer := 0
 	basicResolver := mocknetwork.BasicResolver{}
 	dnsCache := herocache.NewDNSCache(
 		DefaultCacheSize,
@@ -50,7 +52,7 @@ func TestResolver_HappyPath(t *testing.T) {
 	ipTestCases := testnetwork.IpLookupFixture(size)
 
 	// each domain is resolved only once through the underlying resolver, and then is cached for subsequent times.
-	resolverWG := mockBasicResolverForDomains(t, &basicResolver, ipTestCases, txtTestCases, happyPath, 1, 0, 0)
+	resolverWG := mockBasicResolverForDomains(t, &basicResolver, ipTestCases, txtTestCases, happyPath, 1, &dummyIntPointer, &dummyIntPointer)
 	queryWG := syncThenAsyncQuery(t, times, resolver, txtTestCases, ipTestCases, happyPath)
 
 	unittest.RequireReturnsBefore(t, resolverWG.Wait, 1*time.Second, "could not resolve all expected domains")
@@ -61,6 +63,7 @@ func TestResolver_HappyPath(t *testing.T) {
 
 // TestResolver_CacheExpiry evaluates that cached dns entries get expired and underlying resolver gets called after their time-to-live is passed.
 func TestResolver_CacheExpiry(t *testing.T) {
+	dummyIntPointer := 0
 	basicResolver := mocknetwork.BasicResolver{}
 
 	dnsCache := herocache.NewDNSCache(
@@ -89,7 +92,7 @@ func TestResolver_CacheExpiry(t *testing.T) {
 	ipTestCase := testnetwork.IpLookupFixture(size)
 
 	// each domain gets resolved through underlying resolver twice: once initially, and once after expiry.
-	resolverWG := mockBasicResolverForDomains(t, &basicResolver, ipTestCase, txtTestCases, happyPath, 2, 0, 0)
+	resolverWG := mockBasicResolverForDomains(t, &basicResolver, ipTestCase, txtTestCases, happyPath, 2, &dummyIntPointer, &dummyIntPointer)
 
 	// queries (5 + 5) cases * 3 = 30 queries.
 	queryWG := syncThenAsyncQuery(t, times, resolver, txtTestCases, ipTestCase, happyPath)
@@ -108,6 +111,7 @@ func TestResolver_CacheExpiry(t *testing.T) {
 
 // TestResolver_Error evaluates that when the underlying resolver returns an error, the resolver itself does not cache the result.
 func TestResolver_Error(t *testing.T) {
+	dummyInt := 0
 	basicResolver := mocknetwork.BasicResolver{}
 
 	dnsCache := herocache.NewDNSCache(
@@ -137,7 +141,7 @@ func TestResolver_Error(t *testing.T) {
 	// mocks underlying basic resolver invoked 5 times per domain and returns an error each time.
 	// this evaluates that upon returning an error, the result is not cached, so the next invocation again goes
 	// through the resolver.
-	resolverWG := mockBasicResolverForDomains(t, &basicResolver, ipTestCase, txtTestCases, !happyPath, times, 0, 0)
+	resolverWG := mockBasicResolverForDomains(t, &basicResolver, ipTestCase, txtTestCases, !happyPath, times, &dummyInt, &dummyInt)
 	queryWG := syncThenAsyncQuery(t, times, resolver, txtTestCases, ipTestCase, !happyPath)
 
 	unittest.RequireReturnsBefore(t, resolverWG.Wait, 1*time.Second, "could not resolve all expected domains")
@@ -154,6 +158,7 @@ func TestResolver_Error(t *testing.T) {
 // TestResolver_Expired_Invalidated evaluates that when resolver is queried for an expired entry, it returns the expired one, but queries async on the
 // network to refresh the cache. However, when the query hits an error, it invalidates the cache.
 func TestResolver_Expired_Invalidated(t *testing.T) {
+	dummyIntPointer := 0
 	basicResolver := mocknetwork.BasicResolver{}
 	dnsCache := herocache.NewDNSCache(
 		DefaultCacheSize,
@@ -186,7 +191,7 @@ func TestResolver_Expired_Invalidated(t *testing.T) {
 	// queries for an expired entry must return the expired entry but also fire an async update on it.
 	// though we mock async update to fail, so the cache should be invalidated literally.
 	// mocks underlying basic resolver invoked once per domain and returns an error on each domain
-	resolverWG := mockBasicResolverForDomains(t, &basicResolver, ipTestCase, txtTestCases, !happyPath, 1, 0, 0)
+	resolverWG := mockBasicResolverForDomains(t, &basicResolver, ipTestCase, txtTestCases, !happyPath, 1, &dummyIntPointer, &dummyIntPointer)
 	// queries are answered by cache, so resolver returning an error only invalidates the cache asynchronously for the first time.
 	queryWG := syncThenAsyncQuery(t, 1, resolver, txtTestCases, ipTestCase, happyPath)
 
@@ -234,7 +239,7 @@ func TestResolver_OverloadQueue(t *testing.T) {
 	ipTestCases := testnetwork.IpLookupFixture(size)
 
 	// each domain is resolved only once through the underlying resolver, and then is cached for subsequent times.
-	mockBasicResolverForDomains(t, &basicResolver, ipTestCases, txtTestCases, happyPath, 2, 0, 0)
+	mockBasicResolverForDomains(t, &basicResolver, ipTestCases, txtTestCases, happyPath, 2, &ipQueryCount, &txtQueryCount)
 	queryWG := syncThenAsyncQuery(t, times, resolver, txtTestCases, ipTestCases, happyPath)
 	unittest.RequireReturnsBefore(t, queryWG.Wait, 1*time.Second, "could not perform all queries on time")
 
@@ -246,6 +251,7 @@ func TestResolver_OverloadQueue(t *testing.T) {
 	//Verifying
 	cancel()
 	unittest.RequireCloseBefore(t, resolver.Done(), 100*time.Millisecond, "could not stop dns resolver on time")
+	log.Printf("ipQueryCount: %d txtQueryCount: %d", ipQueryCount, txtQueryCount)
 	require.True(t, ipQueryCount < 20, "IPLookup resolver count %d < 20", ipQueryCount)
 	require.True(t, txtQueryCount < 20, "IPLookup resolver count %d < 20", txtQueryCount)
 
@@ -331,7 +337,7 @@ func mockBasicResolverForDomains(t *testing.T,
 	ipLookupTestCases map[string]*testnetwork.IpLookupTestCase,
 	txtLookupTestCases map[string]*testnetwork.TxtLookupTestCase,
 	happyPath bool,
-	times int, ipLookupCount int, txtLookupCount int) *sync.WaitGroup {
+	times int, ipLookupCount *int, txtLookupCount *int) *sync.WaitGroup {
 
 	// keeping track of requested domains
 	ipRequested := make(map[string]int)
@@ -362,7 +368,7 @@ func mockBasicResolverForDomains(t *testing.T,
 			count = 0
 		}
 		count++
-		ipLookupCount++
+		*ipLookupCount++
 
 		require.LessOrEqual(t, count, times, domain)
 		ipRequested[domain] = count
@@ -403,7 +409,7 @@ func mockBasicResolverForDomains(t *testing.T,
 			count = 0
 		}
 		count++
-		txtLookupCount++
+		*txtLookupCount++
 
 		require.LessOrEqual(t, count, times, domain)
 		txtRequested[domain] = count
