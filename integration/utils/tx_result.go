@@ -12,7 +12,7 @@ import (
 )
 
 // GetTransactionResult waits for the transaction to get into the terminal state and returns the result.
-func GetTransactionResult(ctx context.Context, client access.Client, txID flowsdk.Identifier) *flowsdk.TransactionResult {
+func GetTransactionResult(ctx context.Context, client access.Client, txID flowsdk.Identifier) (*flowsdk.TransactionResult, error) {
 	var b retry.Backoff
 	b = retry.NewFibonacci(100 * time.Millisecond)
 	b = retry.WithMaxDuration(60*time.Second, b)
@@ -38,7 +38,7 @@ func GetTransactionResult(ctx context.Context, client access.Client, txID flowsd
 		}
 	})
 	if err != nil {
-		return &flowsdk.TransactionResult{Error: err}
+		return &flowsdk.TransactionResult{Error: err}, err
 	}
-	return result
+	return result, result.Error
 }
