@@ -51,7 +51,7 @@ func (suite *ObserverSuite) SetupTest() {
 	}()
 
 	nodeConfigs := []testnet.NodeConfig{
-		testnet.NewNodeConfig(flow.AccessObserver, testnet.WithLogLevel(zerolog.InfoLevel))
+		testnet.NewNodeConfig(flow.AccessObserver, testnet.WithLogLevel(zerolog.InfoLevel)),
 		testnet.NewNodeConfig(flow.RoleObserver, testnet.WithLogLevel(zerolog.InfoLevel)),
 	}
 
