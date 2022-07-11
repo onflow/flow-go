@@ -137,8 +137,8 @@ func (b *baselineLRU) Add(entityID flow.Identifier, entity flow.Entity) bool {
 	return true
 }
 
-// Rem will remove the item with the given hash.
-func (b *baselineLRU) Rem(entityID flow.Identifier) (flow.Entity, bool) {
+// Remove will remove the item with the given hash.
+func (b *baselineLRU) Remove(entityID flow.Identifier) (flow.Entity, bool) {
 	e, ok := b.c.Get(entityID)
 	if !ok {
 		return nil, false
@@ -154,7 +154,7 @@ func (b *baselineLRU) Rem(entityID flow.Identifier) (flow.Entity, bool) {
 // Adjust will adjust the value item using the given function if the given key can be found.
 // Returns a bool which indicates whether the value was updated as well as the updated value
 func (b *baselineLRU) Adjust(entityID flow.Identifier, f func(flow.Entity) flow.Entity) (flow.Entity, bool) {
-	entity, removed := b.Rem(entityID)
+	entity, removed := b.Remove(entityID)
 	if !removed {
 		return nil, false
 	}
