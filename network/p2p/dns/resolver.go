@@ -30,14 +30,12 @@ func runtimeNano() int64
 //     - Detecting expired cached domain triggers async DNS lookup to refresh cached entry.
 // [1] https://en.wikipedia.org/wiki/Name_server#Caching_name_server
 type Resolver struct {
-	c              *cache
-	res            madns.BasicResolver // underlying resolver
-	collector      module.ResolverMetrics
-	processingIPs  map[string]struct{} // ongoing ip lookups through underlying resolver
-	processingTXTs map[string]struct{} // ongoing txt lookups through underlying resolver
-	ipRequests     chan *lookupIPRequest
-	txtRequests    chan *lookupTXTRequest
-	logger         zerolog.Logger
+	c           *cache
+	res         madns.BasicResolver // underlying resolver
+	collector   module.ResolverMetrics
+	ipRequests  chan *lookupIPRequest
+	txtRequests chan *lookupTXTRequest
+	logger      zerolog.Logger
 	component.Component
 	cm *component.ComponentManager
 }
@@ -67,6 +65,26 @@ func WithTTL(ttl time.Duration) optFunc {
 	}
 }
 
+// WithTTL is an option function for setting the time to live for cache entries.
+func WithResolverSize(numIPAddrLookupWorkers int, numTxtLookupWorkers int, ipAddrLookupQueueSize int, txtLookupQueueSize int) optFunc {
+	return func(resolver *Resolver) {
+		resolver.ipRequests = make(chan *lookupIPRequest, ipAddrLookupQueueSize)
+		resolver.txtRequests = make(chan *lookupTXTRequest, txtLookupQueueSize)
+		cm := component.NewComponentManagerBuilder()
+
+		for i := 0; i < numIPAddrLookupWorkers; i++ {
+			cm.AddWorker(resolver.processIPAddrLookups)
+		}
+
+		for i := 0; i < numTxtLookupWorkers; i++ {
+			cm.AddWorker(resolver.processTxtLookups)
+		}
+
+		resolver.cm = cm.Build()
+		resolver.Component = resolver.cm
+	}
+}
+
 const (
 	numIPAddrLookupWorkers = 16
 	numTxtLookupWorkers    = 16
@@ -76,43 +94,32 @@ const (
 
 // NewResolver is the factory function for creating an instance of this resolver.
 func NewResolver(logger zerolog.Logger, collector module.ResolverMetrics, dnsCache mempool.DNSCache, opts ...optFunc) *Resolver {
-	resolver := newResolver(logger, collector, dnsCache, numIPAddrLookupWorkers, numTxtLookupWorkers, ipAddrLookupQueueSize, txtLookupQueueSize)
-	for _, opt := range opts {
-		opt(resolver)
-	}
-	return resolver
-}
 
-func NewTestResolver(logger zerolog.Logger, collector module.ResolverMetrics, dnsCache mempool.DNSCache, opts ...optFunc) *Resolver {
-	resolver := newResolver(logger, collector, dnsCache, 1, 1, 2, 2)
-	for _, opt := range opts {
-		opt(resolver)
-	}
-	return resolver
-}
-
-func newResolver(logger zerolog.Logger, collector module.ResolverMetrics, dnsCache mempool.DNSCache, ipWorker int, txtWorker int, ipQueue int, txtQueue int) *Resolver {
 	resolver := &Resolver{
 		logger:      logger.With().Str("component", "dns-resolver").Logger(),
 		res:         madns.DefaultResolver,
 		c:           newCache(logger, dnsCache),
 		collector:   collector,
-		ipRequests:  make(chan *lookupIPRequest, ipQueue),
-		txtRequests: make(chan *lookupTXTRequest, txtQueue),
+		ipRequests:  make(chan *lookupIPRequest, ipAddrLookupQueueSize),
+		txtRequests: make(chan *lookupTXTRequest, txtLookupQueueSize),
 	}
 
 	cm := component.NewComponentManagerBuilder()
 
-	for i := 0; i < ipWorker; i++ {
+	for i := 0; i < numIPAddrLookupWorkers; i++ {
 		cm.AddWorker(resolver.processIPAddrLookups)
 	}
 
-	for i := 0; i < txtWorker; i++ {
+	for i := 0; i < numTxtLookupWorkers; i++ {
 		cm.AddWorker(resolver.processTxtLookups)
 	}
 
 	resolver.cm = cm.Build()
 	resolver.Component = resolver.cm
+
+	for _, opt := range opts {
+		opt(resolver)
+	}
 
 	return resolver
 }
