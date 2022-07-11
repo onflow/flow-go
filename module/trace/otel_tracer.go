@@ -5,10 +5,8 @@ import (
 	"io"
 	"math/rand"
 	"time"
-
+	"go.opentelemetry.io/otel/trace"
 	lru "github.com/hashicorp/golang-lru"
-	tprovider "github.com/dapperlabs/tracing/otel/provider"
-	"github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
 	"github.com/uber/jaeger-client-go"
 	"github.com/uber/jaeger-client-go/config"
@@ -30,8 +28,8 @@ func (s SpanName) Child(subOp string) SpanName {
 }
 
 // OpenTracer is the implementation of the Tracer interface
-type OpenTracer struct {
-	tprovider.Tracer
+type OtelTracer struct {
+	trace.Tracer
 	closer      io.Closer
 	log         zerolog.Logger
 	spanCache   *lru.Cache
@@ -39,12 +37,6 @@ type OpenTracer struct {
 	chainID     string
 }
 
-type Config struct {
-	// TracingEnabled determines whether to collect and export traces
-	TracingEnabled bool `default:"false"`
-	// TracingOTLPGRPCCollectorEndpoint is the OTEL collector endpoint to which traces should be sent
-	TracingOTLPGRPCCollectorEndpoint string `default:"grafana-tracing-agent.sre.svc.cluster.local:4317"`
-}
 
 type traceLogger struct {
 	zerolog.Logger
