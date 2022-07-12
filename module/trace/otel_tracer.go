@@ -7,18 +7,17 @@ import (
 	"time"
 
 	lru "github.com/hashicorp/golang-lru"
-	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
 	"github.com/uber/jaeger-client-go"
-	oteltrace "go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/model/flow"
 )
 
 // OtelTracer is the implementation of the Tracer interface
 type OtelTracer struct {
-	oteltrace.Tracer
+	trace.Tracer
 	closer      io.Closer
 	log         zerolog.Logger
 	spanCache   *lru.Cache
@@ -59,27 +58,37 @@ func (t *OtelTracer) Done() <-chan struct{} {
 // entityRootSpan returns the root span for the given entity from the cache
 // and if not exist it would construct it and cache it and return it
 // This should be used mostly for the very first span created for an entity on the service
-func (t *OtelTracer) entityRootSpan(entityID flow.Identifier, entityType string, opts ...oteltrace.SpanStartOption) oteltrace.Span {
+func (t *OtelTracer) entityRootSpan(entityID flow.Identifier, entityType string, opts ...trace.SpanStartOption) trace.Span {
 	if span, ok := t.spanCache.Get(entityID); ok {
-		return span.(opentracing.Span)
+		return span.(trace.Span)
 	}
-
 	// flow.Identifier to flow
-	traceID, err := jaeger.TraceIDFromString(entityID.String()[:32])
+	traceID, err := trace.TraceIDFromHex(entityID.String()[:32]) //get traceID from hex
 	if err != nil {
-		// don't panic, gracefully move forward with background context
 		sp, _ := t.StartSpanFromContext(context.Background(), "entity tracing started")
 		return sp
 	}
 
-	ctx := jaeger.NewSpanContext(
-		traceID,
-		jaeger.SpanID(rand.Uint64()),
-		jaeger.SpanID(0),
-		true,
-		nil,
-	)
-	opts = append(opts, jaeger.SelfRef(ctx))
+	spanID, err := trace.SpanIDFromHex(entityID.String()[:32]) //get traceID from hex
+	if err != nil {
+		sp, _ := t.StartSpanFromContext(context.Background(), "entity tracing started")
+		return sp
+	}
+
+	traceState, err := trace.ParseTraceState(entityID.String()[:32])
+	if err != nil {
+		sp, _ := t.StartSpanFromContext(context.Background(), "entity tracing started")
+		return sp
+	}
+ 
+
+	ctx := trace.ContextWithRemoteSpanContext(ctx, trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID:    traceID,
+		SpanID:     spanID,
+		TraceState: traceState,
+		TraceFlags: 1,
+	}))
+	// opts = append(opts, jaeger.SelfRef(ctx))
 	span := t.Tracer.StartSpan(string(entityType), opts...)
 	// keep full entityID
 	span.LogFields(log.String("entity_id", entityID.String()))
@@ -95,14 +104,14 @@ func (t *OtelTracer) StartBlockSpan(
 	ctx context.Context,
 	blockID flow.Identifier,
 	spanName SpanName,
-	opts ...oteltrace.SpanStartOption) (oteltrace.Span, context.Context, bool) {
+	opts ...trace.SpanStartOption) (trace.Span, context.Context, bool) {
 
 	if !blockID.IsSampled(t.sensitivity) {
 		return &NoopSpan{&NoopTracer{}}, ctx, false
 	}
 
 	rootSpan := t.entityRootSpan(blockID, EntityTypeBlock)
-	ctx = opentracing.ContextWithSpan(ctx, rootSpan)
+	ctx = trace.ContextWithSpan(ctx, rootSpan)
 	return t.StartSpanFromParent(rootSpan, spanName, opts...), ctx, true
 }
 
@@ -110,14 +119,14 @@ func (t *OtelTracer) StartCollectionSpan(
 	ctx context.Context,
 	collectionID flow.Identifier,
 	spanName SpanName,
-	opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context, bool) {
+	opts ...trace.StartSpanOption) (trace.Span, context.Context, bool) {
 
 	if !collectionID.IsSampled(t.sensitivity) {
 		return &NoopSpan{&NoopTracer{}}, ctx, false
 	}
 
 	rootSpan := t.entityRootSpan(collectionID, EntityTypeCollection)
-	ctx = opentracing.ContextWithSpan(ctx, rootSpan)
+	ctx = trace.ContextWithSpan(ctx, rootSpan)
 	return t.StartSpanFromParent(rootSpan, spanName, opts...), ctx, true
 }
 
@@ -127,23 +136,23 @@ func (t *OtelTracer) StartTransactionSpan(
 	ctx context.Context,
 	transactionID flow.Identifier,
 	spanName SpanName,
-	opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context, bool) {
+	opts ...trace.StartSpanOption) (trace.Span, context.Context, bool) {
 
 	if !transactionID.IsSampled(t.sensitivity) {
 		return &NoopSpan{&NoopTracer{}}, ctx, false
 	}
 
 	rootSpan := t.entityRootSpan(transactionID, EntityTypeTransaction)
-	ctx = opentracing.ContextWithSpan(ctx, rootSpan)
+	ctx = trace.ContextWithSpan(ctx, rootSpan)
 	return t.StartSpanFromParent(rootSpan, spanName, opts...), ctx, true
 }
 
 func (t *OtelTracer) StartSpanFromContext(
 	ctx context.Context,
 	operationName SpanName,
-	opts ...opentracing.StartSpanOption,
-) (opentracing.Span, context.Context) {
-	parentSpan := opentracing.SpanFromContext(ctx)
+	opts ...trace.StartSpanOption,
+) (trace.Span, context.Context) {
+	parentSpan := trace.SpanFromContext(ctx)
 	if parentSpan == nil {
 		return &NoopSpan{&NoopTracer{}}, ctx
 	}
@@ -151,39 +160,39 @@ func (t *OtelTracer) StartSpanFromContext(
 		return &NoopSpan{&NoopTracer{}}, ctx
 	}
 
-	opts = append(opts, opentracing.ChildOf(parentSpan.Context()))
+	opts = append(opts, trace.ChildOf(parentSpan.Context()))
 	span := t.Tracer.StartSpan(string(operationName), opts...)
-	return span, opentracing.ContextWithSpan(ctx, span)
+	return span, trace.ContextWithSpan(ctx, span)
 }
 
 func (t *OtelTracer) StartSpanFromParent(
-	span opentracing.Span,
+	span trace.Span,
 	operationName SpanName,
-	opts ...opentracing.StartSpanOption,
-) opentracing.Span {
+	opts ...trace.StartSpanOption,
+) trace.Span {
 	if _, ok := span.(*NoopSpan); ok {
 		return &NoopSpan{&NoopTracer{}}
 	}
-	opts = append(opts, opentracing.ChildOf(span.Context()))
+	opts = append(opts, trace.ChildOf(span.Context()))
 	return t.Tracer.StartSpan(string(operationName), opts...)
 }
 
 func (t *OtelTracer) RecordSpanFromParent(
-	span opentracing.Span,
+	span trace.Span,
 	operationName SpanName,
 	duration time.Duration,
-	logs []opentracing.LogRecord,
-	opts ...opentracing.StartSpanOption,
+	logs []trace.LogRecord,
+	opts ...trace.StartSpanOption,
 ) {
 	if _, ok := span.(*NoopSpan); ok {
 		return
 	}
 	end := time.Now()
 	start := end.Add(-duration)
-	opts = append(opts, opentracing.FollowsFrom(span.Context()))
-	opts = append(opts, opentracing.StartTime(start))
+	opts = append(opts, trace.FollowsFrom(span.Context()))
+	opts = append(opts, trace.StartTime(start))
 	sp := t.Tracer.StartSpan(string(operationName), opts...)
-	sp.FinishWithOptions(opentracing.FinishOptions{FinishTime: end, LogRecords: logs})
+	sp.FinishWithOptions(trace.FinishOptions{FinishTime: end, LogRecords: logs})
 }
 
 // WithSpanFromContext encapsulates executing a function within an span, i.e., it starts a span with the specified SpanName from the context,
@@ -191,7 +200,7 @@ func (t *OtelTracer) RecordSpanFromParent(
 func (t *OtelTracer) WithSpanFromContext(ctx context.Context,
 	operationName SpanName,
 	f func(),
-	opts ...opentracing.StartSpanOption) {
+	opts ...trace.StartSpanOption) {
 	span, _ := t.StartSpanFromContext(ctx, operationName, opts...)
 	defer span.Finish()
 
