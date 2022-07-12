@@ -32,6 +32,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/chainsync"
+	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -1180,6 +1181,12 @@ func WithMetricsEnabled(enabled bool) Option {
 func WithSyncCoreConfig(syncConfig chainsync.Config) Option {
 	return func(config *BaseConfig) {
 		config.SyncCoreConfig = syncConfig
+	}
+}
+
+func WithComplianceConfig(complianceConfig compliance.Config) Option {
+	return func(config *BaseConfig) {
+		config.ComplianceConfig = complianceConfig
 	}
 }
 

@@ -106,8 +106,8 @@ func (_m *IncorporatedResultSeals) PruneUpToHeight(height uint64) error {
 	return r0
 }
 
-// Rem provides a mock function with given fields: incorporatedResultID
-func (_m *IncorporatedResultSeals) Rem(incorporatedResultID flow.Identifier) bool {
+// Remove provides a mock function with given fields: incorporatedResultID
+func (_m *IncorporatedResultSeals) Remove(incorporatedResultID flow.Identifier) bool {
 	ret := _m.Called(incorporatedResultID)
 
 	var r0 bool
