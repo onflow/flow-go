@@ -8,9 +8,9 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
@@ -484,7 +484,7 @@ func (h *Handler) GetExecutionResultForBlockID(ctx context.Context, req *access.
 }
 
 func (h *Handler) blockResponse(block *flow.Block, fullResponse bool) (*access.BlockResponse, error) {
-	signerIDs, err := protocol.DecodeSignerIDs(h.committee, block.Header)
+	signerIDs, err := signature.DecodeSignerIDs(h.committee, block.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -504,7 +504,7 @@ func (h *Handler) blockResponse(block *flow.Block, fullResponse bool) (*access.B
 }
 
 func (h *Handler) blockHeaderResponse(header *flow.Header) (*access.BlockHeaderResponse, error) {
-	signerIDs, err := protocol.DecodeSignerIDs(h.committee, header)
+	signerIDs, err := signature.DecodeSignerIDs(h.committee, header)
 	if err != nil {
 		return nil, err
 	}

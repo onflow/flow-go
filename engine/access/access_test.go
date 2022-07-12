@@ -3,8 +3,6 @@ package access_test
 import (
 	"context"
 	"encoding/json"
-	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"os"
 	"testing"
 
@@ -16,7 +14,10 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	consig "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
@@ -34,7 +35,6 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
-	protocolInterface "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
@@ -374,7 +374,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 
 		assertHeaderResp := func(resp *accessproto.BlockHeaderResponse, err error, header *flow.Header) {
 			suite.state.On("AtBlockID", header.ID()).Return(snapshotForSignerIDs, nil)
-			expectedSignerIDs, err := protocolInterface.DecodeSignerIDs(suite.committee, header)
+			expectedSignerIDs, err := consig.DecodeSignerIDs(suite.committee, header)
 			require.NoError(suite.T(), err)
 
 			require.NoError(suite.T(), err)
@@ -393,7 +393,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 			require.NotNil(suite.T(), resp)
 			actual := resp.Block
 			suite.state.On("AtBlockID", block.Header.ID()).Return(snapshotForSignerIDs, nil)
-			expectedSignerIDs, err := protocolInterface.DecodeSignerIDs(suite.committee, block.Header)
+			expectedSignerIDs, err := consig.DecodeSignerIDs(suite.committee, block.Header)
 			require.NoError(suite.T(), err)
 			expectedMessage, err := convert.BlockToMessage(block, expectedSignerIDs)
 			require.NoError(suite.T(), err)

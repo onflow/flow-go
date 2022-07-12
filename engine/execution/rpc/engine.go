@@ -5,8 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"net"
 	"strings"
 	"unicode/utf8"
@@ -17,6 +15,9 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
+	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
@@ -56,7 +57,7 @@ func New(
 	exeResults storage.ExecutionResults,
 	txResults storage.TransactionResults,
 	chainID flow.ChainID,
-	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the gRPC API e.g. Ping->100, ExecuteScriptAtBlockID->300
+	apiRatelimits map[string]int,  // the api rate limit (max calls per second) for each of the gRPC API e.g. Ping->100, ExecuteScriptAtBlockID->300
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the gRPC API e.g. Ping->50, ExecuteScriptAtBlockID->10
 ) (*Engine, error) {
 	log = log.With().Str("engine", "rpc").Logger()
@@ -540,17 +541,11 @@ func (h *handler) GetLatestBlockHeader(
 		// get the finalized header from state
 		header, err = h.state.Final().Head()
 	}
-
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "not found: %v", err)
 	}
 
-	signerIDs, err := protocol.DecodeSignerIDs(h.committee, header)
-	if err != nil {
-		return nil, err
-	}
-
-	return blockHeaderResponse(header, signerIDs)
+	return h.blockHeaderResponse(header)
 }
 
 // GetBlockHeaderByID gets a block header by ID.
@@ -566,16 +561,15 @@ func (h *handler) GetBlockHeaderByID(
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "not found: %v", err)
 	}
-
-	signerIDs, err := protocol.DecodeSignerIDs(h.committee, header)
-	if err != nil {
-		return nil, err
-	}
-
-	return blockHeaderResponse(header, signerIDs)
+	return h.blockHeaderResponse(header)
 }
 
-func blockHeaderResponse(header *flow.Header, signerIDs []flow.Identifier) (*execution.BlockHeaderResponse, error) {
+func (h *handler) blockHeaderResponse(header *flow.Header) (*execution.BlockHeaderResponse, error) {
+	signerIDs, err := signature.DecodeSignerIDs(h.committee, header)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode signer indices to Identifiers for block %v: %w", header.ID(), err)
+	}
+
 	msg, err := convert.BlockHeaderToMessage(header, signerIDs)
 	if err != nil {
 		return nil, err
