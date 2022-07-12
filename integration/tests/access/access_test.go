@@ -10,10 +10,12 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"google.golang.org/grpc"
 
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 )
 
 func TestAccess(t *testing.T) {
@@ -90,4 +92,21 @@ func (suite *AccessSuite) TestHTTPProxyPortOpen() {
 	conn, err := net.DialTimeout("tcp", httpProxyAddress, 1*time.Second)
 	require.NoError(suite.T(), err, "http proxy port not open on the access node")
 	conn.Close()
+}
+
+func (suite *AccessSuite) TestAccessConnection() {
+	t := suite.T()
+	addr := "0.0.0.0:" + suite.net.AccessPorts["access-api-port"]
+
+	conn, err := grpc.Dial(addr, grpc.WithInsecure())
+	if err != nil {
+		t.Failed()
+	}
+
+	client := accessproto.NewAccessAPIClient(conn)
+
+	_, err = client.Ping(suite.ctx, &accessproto.PingRequest{})
+	if err != nil {
+		t.Failed()
+	}
 }
