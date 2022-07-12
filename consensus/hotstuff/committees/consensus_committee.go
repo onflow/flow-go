@@ -118,6 +118,7 @@ type Consensus struct {
 	component.Component
 }
 
+var _ protocol.Consumer = (*Consensus)(nil)
 var _ hotstuff.Replicas = (*Consensus)(nil)
 var _ hotstuff.DynamicCommittee = (*Consensus)(nil)
 
