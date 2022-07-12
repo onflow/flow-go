@@ -54,10 +54,10 @@ import (
 // * results referenced by seals within segment payloads
 // * seals which represent the latest state commitment as of a segment block
 type SealingSegment struct {
-	// Blocks contains the chain segment blocks in ascending height order.
+	// Blocks contain the chain segment blocks in ascending height order.
 	Blocks []*Block
 
-	// ExecutionResults contains any results which are referenced by receipts
+	// ExecutionResults contain any results which are referenced by receipts
 	// or seals in the sealing segment, but not included in any segment block
 	// payloads.
 	//
