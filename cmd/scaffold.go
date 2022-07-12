@@ -245,15 +245,11 @@ func (fnb *FlowNodeBuilder) EnqueueResolver() {
 }
 
 func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
-	fnb.Module(ConduitFactoryComponent, func(nodeConfig *NodeConfig) error {
+	fnb.Component(NetworkComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		cf := conduit.NewDefaultConduitFactory()
-		fnb.ConduitFactory = cf
 		fnb.Logger.Info().Hex("node_id", logging.ID(fnb.NodeID)).Msg("default conduit factory initiated")
 
-		return nil
-	})
-	fnb.Component(NetworkComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		return fnb.InitFlowNetworkWithConduitFactory(node, fnb.ConduitFactory)
+		return fnb.InitFlowNetworkWithConduitFactory(node, cf)
 	})
 }
 
