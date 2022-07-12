@@ -25,6 +25,7 @@ type staticEpochInfo struct {
 	leaders      *leader.LeaderSelection // pre-computed leader selection for the epoch
 	// TODO: should use identity skeleton https://github.com/dapperlabs/flow-go/issues/6232
 	initialCommittee     flow.IdentityList
+	initialCommitteeMap  map[flow.Identifier]*flow.Identity
 	weightThresholdForQC uint64 // computed based on initial committee weights
 	weightThresholdForTO uint64 // computed based on initial committee weights
 	dkg                  hotstuff.DKG
@@ -66,6 +67,7 @@ func newStaticEpochInfo(epoch protocol.Epoch) (*staticEpochInfo, error) {
 		randomSource:         randomSource,
 		leaders:              leaders,
 		initialCommittee:     initialCommittee,
+		initialCommitteeMap:  initialCommittee.Lookup(),
 		weightThresholdForQC: WeightThresholdToBuildQC(totalWeight),
 		weightThresholdForTO: WeightThresholdToTimeout(totalWeight),
 		dkg:                  dkg,
@@ -229,7 +231,7 @@ func (c *Consensus) IdentityByEpoch(view uint64, nodeID flow.Identifier) (*flow.
 	if err != nil {
 		return nil, err
 	}
-	identity, ok := epochInfo.initialCommittee.ByNodeID(nodeID)
+	identity, ok := epochInfo.initialCommitteeMap[nodeID]
 	if !ok {
 		return nil, model.NewInvalidSignerErrorf("id %v is not a valid node id: %w", nodeID, err)
 	}
