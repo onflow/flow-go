@@ -20,7 +20,7 @@ type HotstuffModules struct {
 	Forks                       hotstuff.Forks             // information about multiple forks
 	Validator                   hotstuff.Validator         // validator of proposals & votes
 	VoteAggregator              hotstuff.VoteAggregator    // aggregator of votes, used by leader
-	TimeoutAggregator           hotstuff.TimeoutAggregator // aggregator of timeouts, used by every replica
+	TimeoutAggregator           hotstuff.TimeoutAggregator // aggregator of `TimeoutObject`s, used by every replica
 }
 
 type ParticipantConfig struct {

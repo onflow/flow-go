@@ -38,6 +38,8 @@ func NewVoteAggregator(
 	return aggregator, nil
 }
 
+// timeoutAggregatorConsumerAdapter is an utilitity function that serves as adapter for hotstuff.Consumer which overrides
+// events and forwards them to `TimeoutAggregator`.
 type timeoutAggregatorConsumerAdapter struct {
 	notifications.NoopConsumer
 	aggregator *timeoutaggregator.TimeoutAggregator

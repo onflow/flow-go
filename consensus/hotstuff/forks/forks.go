@@ -17,9 +17,9 @@ type Forks struct {
 	forest   forest.LevelledForest
 
 	finalizationCallback module.Finalizer
-	newestView           uint64
-	lastLocked           *BlockQC // lastLockedBlockQC is the QC that POINTS TO the the most recently locked block
-	lastFinalized        *BlockQC // lastFinalizedBlockQC is the QC that POINTS TO the most recently finalized locked block
+	newestView           uint64   // newestView is the highest view of block proposal stored in Forks
+	lastLocked           *BlockQC // lastLocked is the QC that POINTS TO the the most recently locked block
+	lastFinalized        *BlockQC // lastFinalized is the QC that POINTS TO the most recently finalized locked block
 }
 
 var _ hotstuff.Forks = (*Forks)(nil)

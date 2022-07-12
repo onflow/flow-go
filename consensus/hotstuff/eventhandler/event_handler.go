@@ -77,7 +77,7 @@ func (e *EventHandler) OnQCConstructed(qc *flow.QuorumCertificate) error {
 	log.Debug().Msg("received constructed QC")
 
 	// ignore stale qc
-	if qc.View < e.forks.FinalizedView() {
+	if qc.View <= e.forks.FinalizedView() {
 		log.Debug().Msg("stale qc")
 		return nil
 	}
@@ -255,7 +255,7 @@ func (e *EventHandler) processPendingBlocks() error {
 				return fmt.Errorf("could not process TC for block %x: %w", block.BlockID, err)
 			}
 
-			// TODO: generally speaking we are only interested in QC and TC, but in some cases
+			// TODO(active-pacemaker): generally speaking we are only interested in QC and TC, but in some cases
 			// we might want to vote for blocks as well. Discuss if it's needed.
 		}
 
