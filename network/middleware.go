@@ -36,15 +36,15 @@ type Middleware interface {
 	// effort.
 
 	// All errors returned from this function can be considered benign.
-	Publish(msg *message.Message, channel Channel) error
+	Publish(msg *message.Message, channel channels.Channel) error
 
 	// Subscribe subscribes the middleware to a channel.
 	// No errors are expected during normal operation.
-	Subscribe(channel Channel) error
+	Subscribe(channel channels.Channel) error
 
 	// Unsubscribe unsubscribes the middleware from a channel.
 	// All errors returned from this function can be considered benign.
-	Unsubscribe(channel Channel) error
+	Unsubscribe(channel channels.Channel) error
 
 	// UpdateNodeAddresses fetches and updates the addresses of all the authorized participants
 	// in the Flow protocol.
