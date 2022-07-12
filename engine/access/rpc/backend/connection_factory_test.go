@@ -58,7 +58,6 @@ func TestProxyAccessAPI(t *testing.T) {
 	resp, err := client.Ping(ctx, req)
 	assert.NoError(t, err)
 	assert.Equal(t, resp, expected)
-	proxyConnectionFactory.InvalidateAccessAPIClient("foo")
 }
 
 func TestProxyExecutionAPI(t *testing.T) {
@@ -97,7 +96,6 @@ func TestProxyExecutionAPI(t *testing.T) {
 	resp, err := client.Ping(ctx, req)
 	assert.NoError(t, err)
 	assert.Equal(t, resp, expected)
-	proxyConnectionFactory.InvalidateExecutionAPIClient("foo")
 }
 
 func TestProxyAccessAPIConnectionReuse(t *testing.T) {
@@ -143,7 +141,6 @@ func TestProxyAccessAPIConnectionReuse(t *testing.T) {
 	resp, err := accessAPIClient.Ping(ctx, req)
 	assert.NoError(t, err)
 	assert.Equal(t, resp, expected)
-	proxyConnectionFactory.InvalidateAccessAPIClient("foo")
 }
 
 func TestProxyExecutionAPIConnectionReuse(t *testing.T) {
@@ -189,7 +186,6 @@ func TestProxyExecutionAPIConnectionReuse(t *testing.T) {
 	resp, err := executionAPIClient.Ping(ctx, req)
 	assert.NoError(t, err)
 	assert.Equal(t, resp, expected)
-	proxyConnectionFactory.InvalidateExecutionAPIClient("foo")
 }
 
 // TestExecutionNodeClientTimeout tests that the execution API client times out after the timeout duration
@@ -231,7 +227,6 @@ func TestExecutionNodeClientTimeout(t *testing.T) {
 
 	// assert that the client timed out
 	assert.Equal(t, codes.DeadlineExceeded, status.Code(err))
-	connectionFactory.InvalidateExecutionAPIClient(en.listener.Addr().String())
 }
 
 // TestCollectionNodeClientTimeout tests that the collection API client times out after the timeout duration
@@ -273,7 +268,6 @@ func TestCollectionNodeClientTimeout(t *testing.T) {
 
 	// assert that the client timed out
 	assert.Equal(t, codes.DeadlineExceeded, status.Code(err))
-	connectionFactory.InvalidateAccessAPIClient(cn.listener.Addr().String())
 }
 
 // TestConnectionPoolFull tests that the LRU cache replaces connections when full
@@ -345,9 +339,6 @@ func TestConnectionPoolFull(t *testing.T) {
 	assert.True(t, contains1)
 	assert.False(t, contains2)
 	assert.True(t, contains3)
-	connectionFactory.InvalidateAccessAPIClient(cn1Address)
-	connectionFactory.InvalidateAccessAPIClient(cn2Address)
-	connectionFactory.InvalidateAccessAPIClient(cn3Address)
 }
 
 // TestConnectionPoolStale tests that a new connection will be established if the old one cached is stale
@@ -384,10 +375,9 @@ func TestConnectionPoolStale(t *testing.T) {
 	assert.Equal(t, connectionFactory.ConnectionsCache.Len(), 1)
 	assert.NoError(t, err)
 	// close connection to simulate something "going wrong" with our stored connection
-	proxyConnectionFactory.InvalidateAccessAPIClient(proxyConnectionFactory.targetAddress)
+	res, _ := connectionFactory.ConnectionsCache.Get(proxyConnectionFactory.targetAddress)
 
-	// check if key still exists (should no longer exist)
-	assert.False(t, connectionFactory.ConnectionsCache.Contains(proxyConnectionFactory.targetAddress))
+	res.(ConnectionCacheStore).ClientConn.Close()
 
 	ctx := context.Background()
 	// make the call to the collection node (should fail, connection closed)
@@ -409,7 +399,6 @@ func TestConnectionPoolStale(t *testing.T) {
 	resp, err := accessAPIClient.Ping(ctx, req)
 	assert.NoError(t, err)
 	assert.Equal(t, resp, expected)
-	proxyConnectionFactory.InvalidateAccessAPIClient("foo")
 }
 
 // node mocks a flow node that runs a GRPC server
