@@ -169,10 +169,6 @@ func (nc *NoopCollector) RequestFailed(duration time.Duration, retryable bool)  
 func (nc *NoopCollector) RequestCanceled()                                                      {}
 func (nc *NoopCollector) ResponseDropped()                                                      {}
 func (nc *NoopCollector) Pruned(height uint64, duration time.Duration)                          {}
-func (nc *NoopCollector) ExecutionDataAddStarted()                                              {}
-func (nc *NoopCollector) ExecutionDataAddFinished(time.Duration, bool, uint64)                  {}
-func (nc *NoopCollector) ExecutionDataGetStarted()                                              {}
-func (nc *NoopCollector) ExecutionDataGetFinished(time.Duration, bool, uint64)                  {}
 func (nc *NoopCollector) UpdateCollectionMaxHeight(height uint64)                               {}
 func (nc *NoopCollector) BucketAvailableSlots(uint64, uint64)                                   {}
 func (nc *NoopCollector) OnKeyPutSuccess()                                                      {}
