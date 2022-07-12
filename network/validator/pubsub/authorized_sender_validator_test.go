@@ -195,14 +195,14 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ValidationFai
 
 		// unknown message types are rejected
 		msgType, err := validate(ctx, pid, m)
-		require.ErrorIs(s.T(), err, message.ErrUnknownMsgType)
+		require.True(s.T(), message.IsUnknownMsgTypeErr(err))
 		require.Equal(s.T(), "", msgType)
 		pubsubResult := validatePubsub(ctx, pid, m)
 		require.Equal(s.T(), pubsub.ValidationReject, pubsubResult)
 
 		// nil messages are rejected
 		msgType, err = validate(ctx, pid, nil)
-		require.ErrorIs(s.T(), err, message.ErrUnknownMsgType)
+		require.True(s.T(), message.IsUnknownMsgTypeErr(err))
 		require.Equal(s.T(), "", msgType)
 		pubsubResult = validatePubsub(ctx, pid, nil)
 		require.Equal(s.T(), pubsub.ValidationReject, pubsubResult)

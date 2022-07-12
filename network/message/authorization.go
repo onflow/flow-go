@@ -1,9 +1,6 @@
 package message
 
 import (
-	"errors"
-	"fmt"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/model/messages"
@@ -39,13 +36,6 @@ func (m MsgAuthConfig) IsAuthorized(role flow.Role, channel channels.Channel) er
 
 	return nil
 }
-
-var (
-	ErrUnknownMsgType               = errors.New("could not get authorization config for unknown message type")
-	ErrUnauthorizedMessageOnChannel = errors.New("message is not authorized to be sent on channel")
-	ErrUnauthorizedRole             = errors.New("sender role not authorized to send message on channel")
-	AuthorizationConfigs            map[string]MsgAuthConfig
-)
 
 func initializeMessageAuthConfigsMap() {
 	AuthorizationConfigs = make(map[string]MsgAuthConfig)
@@ -357,6 +347,6 @@ func GetMessageAuthConfig(v interface{}) (MsgAuthConfig, error) {
 		return AuthorizationConfigs[DKGMessage], nil
 
 	default:
-		return MsgAuthConfig{}, fmt.Errorf("%w (%T)", ErrUnknownMsgType, v)
+		return MsgAuthConfig{}, NewUnknownMsgTypeErr(v)
 	}
 }

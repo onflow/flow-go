@@ -51,11 +51,11 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel channels.Channel, get
 		switch {
 		case err == nil:
 			return msgType, nil
+		case message.IsUnknownMsgTypeErr(err):
+			slashingViolationsConsumer.OnUnknownMsgTypeError(identity, from.String(), msgType, err)
+			return msgType, err
 		case errors.Is(err, message.ErrUnauthorizedMessageOnChannel) || errors.Is(err, message.ErrUnauthorizedRole):
 			slashingViolationsConsumer.OnUnAuthorizedSenderError(identity, from.String(), msgType, err)
-			return msgType, err
-		case errors.Is(err, message.ErrUnknownMsgType):
-			slashingViolationsConsumer.OnUnknownMsgTypeError(identity, from.String(), msgType, err)
 			return msgType, err
 		case errors.Is(err, ErrSenderEjected):
 			slashingViolationsConsumer.OnSenderEjectedError(identity, from.String(), msgType, err)
