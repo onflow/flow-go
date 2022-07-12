@@ -1,18 +1,24 @@
 package corruptible
 
 import (
+	"context"
+	"fmt"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/insecure"
 	mockinsecure "github.com/onflow/flow-go/insecure/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+	grpcinsecure "google.golang.org/grpc/credentials/insecure"
+	"net"
 	"sync"
 	"testing"
 	"time"
@@ -168,4 +174,57 @@ func getMessageAndChannel() (*message.TestMessage, network.Channel) {
 	channel := network.Channel("test-channel")
 
 	return message, channel
+}
+
+// withCorruptibleNetwork creates and starts a corruptible network, runs the "run" function and then
+// terminates the network.
+func withCorruptibleNetwork(t *testing.T,
+	run func(
+		flow.Identity, // identity of corrupted network
+		*Network, // corrupted network
+		*mocknetwork.Adapter, // mock adapter that corrupted network uses to communicate with authorized flow nodes.
+		insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that attack network uses to send messages to this ccf.
+	)) {
+
+	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress("localhost:0"))
+
+	// life-cycle management of corruptible network
+	ctx, cancel := context.WithCancel(context.Background())
+	ccfCtx, errChan := irrecoverable.WithSignaler(ctx)
+	go func() {
+		select {
+		case err := <-errChan:
+			t.Error("corruptible network startup encountered fatal error", err)
+		case <-ctx.Done():
+			return
+		}
+	}()
+
+	corruptibleNetwork, adapter := getCorruptibleNetworkNoAttacker(t)
+	//event, channel := getMessageAndChannel()
+
+	// start corruptible network
+	corruptibleNetwork.start(ccfCtx, corruptibleNetwork.ServerAddress())
+	unittest.RequireCloseBefore(t, corruptibleNetwork.Ready(), 1*time.Second, "could not start corruptible network on time")
+
+	// extracting port that ccf gRPC server is running on
+	_, ccfPortStr, err := net.SplitHostPort(corruptibleNetwork.ServerAddress())
+	require.NoError(t, err)
+
+	// imitating an attacker dial to corruptible network and opening a stream to it
+	// on which the attacker dictates to relay messages on the actual flow network
+	gRpcClient, err := grpc.Dial(
+		fmt.Sprintf("localhost:%s", ccfPortStr),
+		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
+	require.NoError(t, err)
+
+	client := insecure.NewCorruptibleConduitFactoryClient(gRpcClient)
+	stream, err := client.ProcessAttackerMessage(context.Background())
+	require.NoError(t, err)
+
+	run(*corruptedIdentity, corruptibleNetwork, adapter, stream)
+
+	// terminates attackNetwork
+	cancel()
+	unittest.RequireCloseBefore(t, corruptibleNetwork.Done(), 1*time.Second, "could not stop corruptible conduit on time")
 }

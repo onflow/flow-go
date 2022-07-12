@@ -11,6 +11,19 @@ import (
 	"testing"
 )
 
+// TestNewConduit_HappyPath checks when factory has an adapter registered and an egress controller,
+// it can successfully create conduits.
+func TestNewConduit_HappyPath(t *testing.T) {
+	ccf := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet)
+	channel := network.Channel("test-channel")
+	require.NoError(t, ccf.RegisterEgressController(&mockinsecure.EgressController{}))
+	require.NoError(t, ccf.RegisterAdapter(&mocknetwork.Adapter{}))
+
+	c, err := ccf.NewConduit(context.Background(), channel)
+	require.NoError(t, err)
+	require.NotNil(t, c)
+}
+
 // TestRegisterAdapter_FailDoubleRegistration checks that CorruptibleConduitFactory can be registered with only one adapter.
 func TestRegisterAdapter_FailDoubleRegistration(t *testing.T) {
 	ccf := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet)
@@ -34,19 +47,6 @@ func TestRegisterEgressController_FailDoubleRegistration(t *testing.T) {
 	// second attempt at registering egress controller should fail
 	require.ErrorContains(t, ccf.RegisterEgressController(egressController), "egress controller, one already exists")
 
-}
-
-// TestNewConduit_HappyPath checks when factory has an adapter registered and an egress controller,
-// it can successfully create conduits.
-func TestNewConduit_HappyPath(t *testing.T) {
-	ccf := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet)
-	channel := network.Channel("test-channel")
-	require.NoError(t, ccf.RegisterEgressController(&mockinsecure.EgressController{}))
-	require.NoError(t, ccf.RegisterAdapter(&mocknetwork.Adapter{}))
-
-	c, err := ccf.NewConduit(context.Background(), channel)
-	require.NoError(t, err)
-	require.NotNil(t, c)
 }
 
 // TestNewConduit_MissingAdapter checks when factory does not have an adapter registered (but does have egress controller),
@@ -76,7 +76,7 @@ func TestNewConduit_MissingEgressController(t *testing.T) {
 // TestProcessAttackerMessage evaluates that corrupted conduit factory (ccf)
 // relays the messages coming from the attack network to its underlying flow network.
 //func TestProcessAttackerMessage(t *testing.T) {
-//	withCorruptibleConduitFactory(t,
+//	withCorruptibleNetwork(t,
 //		func(
 //			corruptedId flow.Identity, // identity of ccf
 //			factory *ConduitFactory, // the ccf itself
@@ -117,7 +117,7 @@ func TestNewConduit_MissingEgressController(t *testing.T) {
 // empty signature field,
 // it fills its related fields with its own credentials (e.g., signature), and passes it through the Flow network.
 //func TestProcessAttackerMessage_ResultApproval_Dictated(t *testing.T) {
-//	withCorruptibleConduitFactory(t,
+//	withCorruptibleNetwork(t,
 //		func(
 //			corruptedId flow.Identity,                                              // identity of ccf
 //			factory *ConduitFactory,                                                // the ccf itself
@@ -188,7 +188,7 @@ func TestNewConduit_MissingEgressController(t *testing.T) {
 // ccf) receives a completely filled result approval,
 // it fills its related fields with its own credentials (e.g., signature), and passes it through the Flow network.
 //func TestProcessAttackerMessage_ResultApproval_PassThrough(t *testing.T) {
-//	withCorruptibleConduitFactory(t,
+//	withCorruptibleNetwork(t,
 //		func(
 //			corruptedId flow.Identity, // identity of ccf
 //			factory *ConduitFactory, // the ccf itself
@@ -232,7 +232,7 @@ func TestNewConduit_MissingEgressController(t *testing.T) {
 // TestProcessAttackerMessage_ExecutionReceipt_Dictated evaluates that when corrupted conduit factory (ccf) receives an execution receipt with
 // empty signature field, it fills its related fields with its own credentials (e.g., signature), and passes it through the Flow network.
 //func TestProcessAttackerMessage_ExecutionReceipt_Dictated(t *testing.T) {
-//	withCorruptibleConduitFactory(t,
+//	withCorruptibleNetwork(t,
 //		func(
 //			corruptedId flow.Identity, // identity of ccf
 //			factory *ConduitFactory, // the ccf itself
@@ -292,7 +292,7 @@ func TestNewConduit_MissingEgressController(t *testing.T) {
 // TestProcessAttackerMessage_ExecutionReceipt_PassThrough evaluates that when corrupted conduit factory (
 // ccf) receives a completely filled execution receipt, it treats it as a pass-through event and passes it as it is on the Flow network.
 //func TestProcessAttackerMessage_ExecutionReceipt_PassThrough(t *testing.T) {
-//	withCorruptibleConduitFactory(t,
+//	withCorruptibleNetwork(t,
 //		func(
 //			corruptedId flow.Identity,                                              // identity of ccf
 //			factory *ConduitFactory,                                                // the ccf itself
@@ -361,68 +361,4 @@ func TestNewConduit_MissingEgressController(t *testing.T) {
 //
 //	// adapter's UnRegisterChannel method must be called once.
 //	testifymock.AssertExpectationsForObjects(t, adapter)
-//}
-
-// withCorruptibleConduitFactory creates and starts a corruptible conduit factory, runs the "run" function and then
-// terminates the factory.
-//func withCorruptibleConduitFactory(t *testing.T,
-//	run func(
-//		flow.Identity, // identity of ccf
-//		*ConduitFactory, // the ccf itself
-//		*mocknetwork.Adapter, // mock flow network that ccf uses to communicate with authorized flow nodes.
-//		insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that attack network uses to send messages to this ccf.
-//	)) {
-//
-//	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress("localhost:0"))
-//
-//	// life-cycle management of corruptible conduit factory.
-//	ctx, cancel := context.WithCancel(context.Background())
-//	ccfCtx, errChan := irrecoverable.WithSignaler(ctx)
-//	go func() {
-//		select {
-//		case err := <-errChan:
-//			t.Error("mock corruptible conduit factory startup encountered fatal error", err)
-//		case <-ctx.Done():
-//			return
-//		}
-//	}()
-//
-//	me := testutil.LocalFixture(t, corruptedIdentity)
-//	ccf := NewCorruptibleConduitFactory(
-//		unittest.Logger(),
-//		flow.BftTestnet,
-//		me,
-//		cbor.NewCodec(),
-//		"localhost:0",
-//	)
-//
-//	// starts corruptible conduit factory
-//	ccf.Start(ccfCtx)
-//	unittest.RequireCloseBefore(t, ccf.Ready(), 1*time.Second, "could not start corruptible conduit factory on time")
-//
-//	// extracting port that ccf gRPC server is running on
-//	_, ccfPortStr, err := net.SplitHostPort(ccf.ServerAddress())
-//	require.NoError(t, err)
-//
-//	// registers a mock adapter to the corruptible conduit factory
-//	adapter := &mocknetwork.Adapter{}
-//	err = ccf.RegisterAdapter(adapter)
-//	require.NoError(t, err)
-//
-//	// imitating an attacker dial to corruptible conduit factory (ccf) and opening a stream to it
-//	// on which the attacker dictates ccf to relay messages on the actual flow network
-//	gRpcClient, err := grpc.Dial(
-//		fmt.Sprintf("localhost:%s", ccfPortStr),
-//		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
-//	require.NoError(t, err)
-//
-//	client := insecure.NewCorruptibleConduitFactoryClient(gRpcClient)
-//	stream, err := client.ProcessAttackerMessage(context.Background())
-//	require.NoError(t, err)
-//
-//	run(*corruptedIdentity, ccf, adapter, stream)
-//
-//	// terminates attackNetwork
-//	cancel()
-//	unittest.RequireCloseBefore(t, ccf.Done(), 1*time.Second, "could not stop corruptible conduit on time")
 //}
