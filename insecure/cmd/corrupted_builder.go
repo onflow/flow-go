@@ -30,13 +30,13 @@ func (cnb *CorruptedNodeBuilder) Initialize() error {
 		return fmt.Errorf("could not initilized flow node builder: %w", err)
 	}
 
-	cnb.enqueueCorruptibleConduitFactory() // initializes corrupted conduit factory (ccf).
+	cnb.enqueueNetworkingLayer() // initializes corrupted conduit factory (ccf).
 
 	return nil
 }
 
-func (cnb *CorruptedNodeBuilder) enqueueCorruptibleConduitFactory() {
-	cnb.FlowNodeBuilder.OverrideComponent(cmd.ConduitFactoryComponent, func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
+	cnb.FlowNodeBuilder.OverrideComponent(cmd.NetworkComponent, func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		myAddr := cnb.FlowNodeBuilder.NodeConfig.Me.Address()
 		if cnb.FlowNodeBuilder.BaseConfig.BindAddr != cmd.NotSet {
 			myAddr = cnb.FlowNodeBuilder.BaseConfig.BindAddr
@@ -50,12 +50,20 @@ func (cnb *CorruptedNodeBuilder) enqueueCorruptibleConduitFactory() {
 		address := net.JoinHostPort(host, strconv.Itoa(CorruptibleConduitFactoryPort))
 		ccf := corruptible.NewCorruptibleConduitFactory(cnb.FlowNodeBuilder.Logger, cnb.FlowNodeBuilder.RootChainID)
 
-		cnb.FlowNodeBuilder.ConduitFactory = ccf
-		node.Logger.Info().Hex("node_id", logging.ID(node.NodeID)).Str("address", address).Msg("corrupted conduit factory initiated")
-		return ccf, nil
-	})
+		cnb.Logger.Info().Hex("node_id", logging.ID(cnb.NodeID)).Str("address", address).Msg("corrupted conduit factory initiated")
 
-	cnb.FlowNodeBuilder.OverrideComponent(cmd.NetworkComponent, func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		return cnb.FlowNodeBuilder.InitFlowNetworkWithConduitFactory(node, cnb.FlowNodeBuilder.ConduitFactory)
+		flowNetwork, err := cnb.FlowNodeBuilder.InitFlowNetworkWithConduitFactory(node, ccf)
+		if err != nil {
+			return nil, fmt.Errorf("could not initiate flow network: %w", err)
+		}
+
+		return corruptible.NewCorruptibleNetwork(
+			cnb.Logger,
+			cnb.RootChainID,
+			address,
+			cnb.Me,
+			cnb.CodecFactory(),
+			flowNetwork,
+			ccf)
 	})
 }
