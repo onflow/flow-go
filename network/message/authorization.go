@@ -218,7 +218,7 @@ func initializeMessageAuthConfigsMap() {
 			return new(messages.ApprovalRequest)
 		},
 		Config: map[channels.Channel]flow.RoleList{
-			channels.ProvideApprovalsByChunk: {flow.RoleConsensus},
+			channels.RequestApprovalsByChunk: {flow.RoleConsensus}, // channel alias ProvideApprovalsByChunk  = RequestApprovalsByChunk
 		},
 	}
 	AuthorizationConfigs[ApprovalResponse] = MsgAuthConfig{
