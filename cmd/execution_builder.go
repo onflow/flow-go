@@ -777,7 +777,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			return syncEngine, nil
 		}).
 		Component("grpc server", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-			rpcEng := rpc.New(
+			return rpc.New(
 				node.Logger,
 				e.exeConf.rpcConf,
 				ingestionEng,
@@ -791,7 +791,6 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				e.exeConf.apiRatelimits,
 				e.exeConf.apiBurstlimits,
 			)
-			return rpcEng, nil
 		})
 }
 

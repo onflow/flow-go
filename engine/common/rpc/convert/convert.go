@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/onflow/flow-go/crypto"
@@ -13,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
 var ErrEmptyMessage = errors.New("protobuf message is empty")

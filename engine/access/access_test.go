@@ -1,15 +1,14 @@
-package access
+package access_test
 
 import (
 	"context"
 	"encoding/json"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"os"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
-	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
-	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -41,11 +40,15 @@ import (
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 )
 
 type Suite struct {
 	suite.Suite
 	state      *protocol.State
+	committee  hotstuff.Committee
 	snapshot   *protocol.Snapshot
 	epochQuery *protocol.EpochQuery
 	log        zerolog.Logger
@@ -66,10 +69,13 @@ func TestAccess(t *testing.T) {
 }
 
 func (suite *Suite) SetupTest() {
+	var err error
 	suite.log = zerolog.New(os.Stderr)
 	suite.net = new(mocknetwork.Network)
-	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
+	suite.state = new(protocol.State)
+	suite.committee, err = committees.NewConsensusCommittee(suite.state, flow.ZeroID)
+	suite.Require().NoError(err)
 
 	suite.epochQuery = new(protocol.EpochQuery)
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
@@ -126,7 +132,7 @@ func (suite *Suite) RunTest(
 			backend.DefaultSnapshotHistoryLimit,
 		)
 
-		handler := access.NewHandler(suite.backend, suite.chainID.Chain(), suite.state)
+		handler := access.NewHandler(suite.backend, suite.chainID.Chain(), suite.committee)
 
 		f(handler, db, blocks, headers, results)
 	})
@@ -302,7 +308,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 			backend.DefaultSnapshotHistoryLimit,
 		)
 
-		handler := access.NewHandler(backend, suite.chainID.Chain(), suite.state)
+		handler := access.NewHandler(backend, suite.chainID.Chain(), suite.committee)
 
 		// Send transaction 1
 		resp, err := handler.SendTransaction(context.Background(), sendReq1)
@@ -368,7 +374,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 
 		assertHeaderResp := func(resp *accessproto.BlockHeaderResponse, err error, header *flow.Header) {
 			suite.state.On("AtBlockID", header.ID()).Return(snapshotForSignerIDs, nil)
-			expectedSignerIDs, err := protocolInterface.DecodeSignerIDs(suite.state, header)
+			expectedSignerIDs, err := protocolInterface.DecodeSignerIDs(suite.committee, header)
 			require.NoError(suite.T(), err)
 
 			require.NoError(suite.T(), err)
@@ -387,7 +393,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 			require.NotNil(suite.T(), resp)
 			actual := resp.Block
 			suite.state.On("AtBlockID", block.Header.ID()).Return(snapshotForSignerIDs, nil)
-			expectedSignerIDs, err := protocolInterface.DecodeSignerIDs(suite.state, block.Header)
+			expectedSignerIDs, err := protocolInterface.DecodeSignerIDs(suite.committee, block.Header)
 			require.NoError(suite.T(), err)
 			expectedMessage, err := convert.BlockToMessage(block, expectedSignerIDs)
 			require.NoError(suite.T(), err)
@@ -632,7 +638,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 			backend.DefaultSnapshotHistoryLimit,
 		)
 
-		handler := access.NewHandler(backend, suite.chainID.Chain(), suite.state)
+		handler := access.NewHandler(backend, suite.chainID.Chain(), suite.committee)
 
 		rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, rpc.Config{}, nil, nil, blocks, headers, collections, transactions,
 			receipts, results, suite.chainID, metrics, metrics, 0, 0, false, false, nil, nil)
@@ -725,7 +731,7 @@ func (suite *Suite) TestExecuteScript() {
 			backend.DefaultSnapshotHistoryLimit,
 		)
 
-		handler := access.NewHandler(suite.backend, suite.chainID.Chain(), suite.state)
+		handler := access.NewHandler(suite.backend, suite.chainID.Chain(), suite.committee)
 
 		// initialize metrics related storage
 		metrics := metrics.NewNoopCollector()

@@ -3,6 +3,7 @@ package protocol
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/signature"
@@ -107,12 +108,11 @@ func DecodeSignerIDs(committee hotstuff.Committee, header *flow.Header) ([]flow.
 	if header.ParentVoterIndices == nil && header.View == 0 {
 		return []flow.Identifier{}, nil
 	}
-	snapshot := state.AtBlockID(header.ID())
-	members, err := snapshot.Identities(filter.IsVotingConsensusCommitteeMember)
+
+	members, err := committee.Identities(header.ID())
 	if err != nil {
 		return nil, fmt.Errorf("fail to retrieve identities for block %v: %w", header.ID(), err)
 	}
-
 	signerIDs, err := signature.DecodeSignerIndicesToIdentifiers(members.NodeIDs(), header.ParentVoterIndices)
 	if err != nil {
 		return nil, fmt.Errorf("could not decode signer indices for block %v: %w", header.ID(), err)

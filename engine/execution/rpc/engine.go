@@ -5,12 +5,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"net"
 	"strings"
 	"unicode/utf8"
 
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
-	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -24,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/grpcutils"
+	"github.com/onflow/flow/protobuf/go/flow/execution"
 )
 
 // Config defines the configurable options for the gRPC server.
@@ -56,7 +58,7 @@ func New(
 	chainID flow.ChainID,
 	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the gRPC API e.g. Ping->100, ExecuteScriptAtBlockID->300
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the gRPC API e.g. Ping->50, ExecuteScriptAtBlockID->10
-) *Engine {
+) (*Engine, error) {
 	log = log.With().Str("engine", "rpc").Logger()
 
 	if config.MaxMsgSize == 0 {
@@ -87,6 +89,11 @@ func New(
 
 	server := grpc.NewServer(serverOptions...)
 
+	committee, err := committees.NewConsensusCommittee(state, flow.ZeroID)
+	if err != nil {
+		return nil, fmt.Errorf("initializing hotstuff.Committee abstraction failed: %w", err)
+	}
+
 	eng := &Engine{
 		log:  log,
 		unit: engine.NewUnit(),
@@ -96,6 +103,7 @@ func New(
 			blocks:             blocks,
 			headers:            headers,
 			state:              state,
+			committee:          committee,
 			events:             events,
 			exeResults:         exeResults,
 			transactionResults: txResults,
@@ -112,7 +120,7 @@ func New(
 
 	execution.RegisterExecutionAPIServer(eng.server, eng.handler)
 
-	return eng
+	return eng, nil
 }
 
 // Ready returns a ready channel that is closed once the engine has fully
@@ -154,6 +162,7 @@ type handler struct {
 	blocks             storage.Blocks
 	headers            storage.Headers
 	state              protocol.State
+	committee          hotstuff.Committee
 	events             storage.Events
 	exeResults         storage.ExecutionResults
 	transactionResults storage.TransactionResults
@@ -163,7 +172,7 @@ type handler struct {
 var _ execution.ExecutionAPIServer = &handler{}
 
 // Ping responds to requests when the server is up.
-func (h *handler) Ping(ctx context.Context, req *execution.PingRequest) (*execution.PingResponse, error) {
+func (h *handler) Ping(_ context.Context, _ *execution.PingRequest) (*execution.PingResponse, error) {
 	return &execution.PingResponse{}, nil
 }
 
@@ -518,7 +527,7 @@ func (h *handler) GetAccountAtBlockID(
 
 // GetLatestBlockHeader gets the latest sealed or finalized block header.
 func (h *handler) GetLatestBlockHeader(
-	ctx context.Context,
+	_ context.Context,
 	req *execution.GetLatestBlockHeaderRequest,
 ) (*execution.BlockHeaderResponse, error) {
 	var header *flow.Header
@@ -536,7 +545,7 @@ func (h *handler) GetLatestBlockHeader(
 		return nil, status.Errorf(codes.NotFound, "not found: %v", err)
 	}
 
-	signerIDs, err := protocol.DecodeSignerIDs(h.state, header)
+	signerIDs, err := protocol.DecodeSignerIDs(h.committee, header)
 	if err != nil {
 		return nil, err
 	}
@@ -546,7 +555,7 @@ func (h *handler) GetLatestBlockHeader(
 
 // GetBlockHeaderByID gets a block header by ID.
 func (h *handler) GetBlockHeaderByID(
-	ctx context.Context,
+	_ context.Context,
 	req *execution.GetBlockHeaderByIDRequest,
 ) (*execution.BlockHeaderResponse, error) {
 	id, err := convert.BlockID(req.GetId())
@@ -558,7 +567,7 @@ func (h *handler) GetBlockHeaderByID(
 		return nil, status.Errorf(codes.NotFound, "not found: %v", err)
 	}
 
-	signerIDs, err := protocol.DecodeSignerIDs(h.state, header)
+	signerIDs, err := protocol.DecodeSignerIDs(h.committee, header)
 	if err != nil {
 		return nil, err
 	}
