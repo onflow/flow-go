@@ -392,21 +392,7 @@ func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *messa
 
 	// submit the model to follower for processing
 	if inRangeBlockResponse {
-		select {
-		case <-e.follower.SubmitProposal(header, parent.View):
-			// after submitting proposal to hotstuff, then hotstuff will start processing block n, and follower
-			// engine is concurrently processing block n + 1.
-			// however follower engine will fail to process block n + 1 if block n is not saved in protocol state.
-			// Block n is only saved in protocol state when hotstuff finishes processing block n.
-			// In order to ensure follower engine don't process block n + 1 too early, we wait until hotstuff finish
-			// processing block n.
-			// this wait is only needed when processing range block response, since blocks are processed in order.
-			break
-		case <-time.After(time.Millisecond * 200):
-			// this shouldn't happen very often. 99.8% of proposals are processed within 200ms
-			e.log.Warn().Msg("HotStuffFollower SubmitProposal timeout")
-			break
-		}
+		<-e.follower.SubmitProposal(header, parent.View)
 	} else {
 		// ignore returned channel to avoid waiting
 		e.follower.SubmitProposal(header, parent.View)
