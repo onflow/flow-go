@@ -18,9 +18,7 @@ import (
 )
 
 var (
-	ErrUnauthorizedSender = errors.New("validation failed: sender is not authorized to send this message type")
 	ErrSenderEjected      = errors.New("validation failed: sender is an ejected node")
-	ErrUnknownMessageType = errors.New("validation failed: failed to get message auth config")
 	ErrIdentityUnverified = errors.New("validation failed: could not verify identity of sender")
 )
 
@@ -53,12 +51,12 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel channels.Channel, get
 		switch {
 		case err == nil:
 			return msgType, nil
-		case errors.Is(err, ErrUnauthorizedSender):
+		case errors.Is(err, message.ErrUnauthorizedMessageOnChannel) || errors.Is(err, message.ErrUnauthorizedRole):
 			slashingViolationsConsumer.OnUnAuthorizedSenderError(identity, from.String(), msgType, err)
-			return msgType, ErrUnauthorizedSender
-		case errors.Is(err, ErrUnknownMessageType):
+			return msgType, err
+		case errors.Is(err, message.ErrUnknownMsgType):
 			slashingViolationsConsumer.OnUnknownMsgTypeError(identity, from.String(), msgType, err)
-			return msgType, ErrUnknownMessageType
+			return msgType, err
 		case errors.Is(err, ErrSenderEjected):
 			slashingViolationsConsumer.OnSenderEjectedError(identity, from.String(), msgType, err)
 			return msgType, ErrSenderEjected
@@ -97,8 +95,9 @@ func AuthorizedSenderMessageValidator(log zerolog.Logger, channel channels.Chann
 //  B. The sender role is authorized to send message on channel.
 // Expected error returns during normal operations:
 //  * ErrSenderEjected: if identity of sender is ejected from the network
-//  * ErrUnknownMessageType: if the message type does not have an auth config
-//  * ErrUnauthorizedSender: if the sender is not authorized to send message on the channel
+//  * message.ErrUnknownMsgType if message auth config us not found for the msg
+//  * message.ErrUnauthorizedMessageOnChannel if msg is not authorized to be sent on channel
+//  * message.ErrUnauthorizedRole if sender role is not authorized to send msg
 func isAuthorizedSender(identity *flow.Identity, channel channels.Channel, msg interface{}) (string, error) {
 	if identity.Ejected {
 		return "", ErrSenderEjected
@@ -107,7 +106,7 @@ func isAuthorizedSender(identity *flow.Identity, channel channels.Channel, msg i
 	// get message auth config
 	conf, err := message.GetMessageAuthConfig(msg)
 	if err != nil {
-		return "", fmt.Errorf("%s: %w", err, ErrUnknownMessageType)
+		return "", err
 	}
 
 	// handle special case for cluster prefixed channels
@@ -116,7 +115,7 @@ func isAuthorizedSender(identity *flow.Identity, channel channels.Channel, msg i
 	}
 
 	if err := conf.IsAuthorized(identity.Role, channel); err != nil {
-		return conf.Name, fmt.Errorf("%w: %s", ErrUnauthorizedSender, err)
+		return conf.Name, err
 	}
 
 	return conf.Name, nil

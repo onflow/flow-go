@@ -7,7 +7,6 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -50,7 +49,7 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_AuthorizedSen
 	for _, c := range s.authorizedSenderTestCases {
 		str := fmt.Sprintf("role (%s) should be authorized to send message type (%s) on channel (%s)", c.Identity.Role, c.MessageStr, c.Channel)
 		s.Run(str, func() {
-			validate := AuthorizedSenderValidator(zerolog.Nop(), c.Channel, c.GetIdentity)
+			validate := AuthorizedSenderValidator(unittest.Logger(), c.Channel, c.GetIdentity)
 
 			pid, err := unittest.PeerIDFromFlowID(c.Identity)
 			s.Require().NoError(err)
@@ -59,7 +58,7 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_AuthorizedSen
 			s.Require().NoError(err)
 			s.Require().Equal(c.MessageStr, msgType)
 
-			validatePubsub := AuthorizedSenderMessageValidator(zerolog.Nop(), c.Channel, c.GetIdentity)
+			validatePubsub := AuthorizedSenderMessageValidator(unittest.Logger(), c.Channel, c.GetIdentity)
 			pubsubResult := validatePubsub(ctx, pid, c.Message)
 			s.Require().Equal(pubsub.ValidationAccept, pubsubResult)
 		})
@@ -78,12 +77,12 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_UnAuthorizedS
 			pid, err := unittest.PeerIDFromFlowID(c.Identity)
 			s.Require().NoError(err)
 
-			validate := AuthorizedSenderValidator(zerolog.Nop(), c.Channel, c.GetIdentity)
+			validate := AuthorizedSenderValidator(unittest.Logger(), c.Channel, c.GetIdentity)
 			msgType, err := validate(ctx, pid, c.Message)
 			s.Require().ErrorIs(err, message.ErrUnauthorizedRole)
 			s.Require().Equal(c.MessageStr, msgType)
 
-			validatePubsub := AuthorizedSenderMessageValidator(zerolog.Nop(), c.Channel, c.GetIdentity)
+			validatePubsub := AuthorizedSenderMessageValidator(unittest.Logger(), c.Channel, c.GetIdentity)
 			pubsubResult := validatePubsub(ctx, pid, c.Message)
 			s.Require().Equal(pubsub.ValidationReject, pubsubResult)
 		})
@@ -102,13 +101,13 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_UnAuthorizedM
 			pid, err := unittest.PeerIDFromFlowID(c.Identity)
 			s.Require().NoError(err)
 
-			validate := AuthorizedSenderValidator(zerolog.Nop(), c.Channel, c.GetIdentity)
+			validate := AuthorizedSenderValidator(unittest.Logger(), c.Channel, c.GetIdentity)
 
 			msgType, err := validate(ctx, pid, c.Message)
 			s.Require().ErrorIs(err, message.ErrUnauthorizedMessageOnChannel)
 			s.Require().Equal(c.MessageStr, msgType)
 
-			validatePubsub := AuthorizedSenderMessageValidator(zerolog.Nop(), c.Channel, c.GetIdentity)
+			validatePubsub := AuthorizedSenderMessageValidator(unittest.Logger(), c.Channel, c.GetIdentity)
 			pubsubResult := validatePubsub(ctx, pid, c.Message)
 			s.Require().Equal(pubsub.ValidationReject, pubsubResult)
 		})
@@ -129,22 +128,22 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ClusterPrefix
 	s.Require().NoError(err)
 
 	// validate collection consensus cluster
-	validateCollConsensus := AuthorizedSenderValidator(zerolog.Nop(), channels.ConsensusCluster(clusterID), getIdentityFunc)
+	validateCollConsensus := AuthorizedSenderValidator(unittest.Logger(), channels.ConsensusCluster(clusterID), getIdentityFunc)
 	msgType, err := validateCollConsensus(ctx, pid, &messages.ClusterBlockResponse{})
 	s.Require().NoError(err)
 	s.Require().Equal(message.ClusterBlockResponse, msgType)
 
-	validateCollConsensusPubsub := AuthorizedSenderMessageValidator(zerolog.Nop(), channels.ConsensusCluster(clusterID), getIdentityFunc)
+	validateCollConsensusPubsub := AuthorizedSenderMessageValidator(unittest.Logger(), channels.ConsensusCluster(clusterID), getIdentityFunc)
 	pubsubResult := validateCollConsensusPubsub(ctx, pid, &messages.ClusterBlockResponse{})
 	s.Require().Equal(pubsub.ValidationAccept, pubsubResult)
 
 	// validate collection sync cluster
-	validateSyncCluster := AuthorizedSenderValidator(zerolog.Nop(), channels.SyncCluster(clusterID), getIdentityFunc)
+	validateSyncCluster := AuthorizedSenderValidator(unittest.Logger(), channels.SyncCluster(clusterID), getIdentityFunc)
 	msgType, err = validateSyncCluster(ctx, pid, &messages.SyncRequest{})
 	s.Require().NoError(err)
 	s.Require().Equal(message.SyncRequest, msgType)
 
-	validateSyncClusterPubsub := AuthorizedSenderMessageValidator(zerolog.Nop(), channels.SyncCluster(clusterID), getIdentityFunc)
+	validateSyncClusterPubsub := AuthorizedSenderMessageValidator(unittest.Logger(), channels.SyncCluster(clusterID), getIdentityFunc)
 	pubsubResult = validateSyncClusterPubsub(ctx, pid, &messages.SyncRequest{})
 	s.Require().Equal(pubsub.ValidationAccept, pubsubResult)
 }
@@ -161,12 +160,12 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ValidationFai
 		pid, err := unittest.PeerIDFromFlowID(identity)
 		s.Require().NoError(err)
 
-		validate := AuthorizedSenderValidator(zerolog.Nop(), channels.SyncCommittee, getIdentityFunc)
+		validate := AuthorizedSenderValidator(unittest.Logger(), channels.SyncCommittee, getIdentityFunc)
 		msgType, err := validate(ctx, pid, &messages.SyncRequest{})
 		s.Require().ErrorIs(err, ErrSenderEjected)
 		s.Require().Equal("", msgType)
 
-		validatePubsub := AuthorizedSenderMessageValidator(zerolog.Nop(), channels.SyncCommittee, getIdentityFunc)
+		validatePubsub := AuthorizedSenderMessageValidator(unittest.Logger(), channels.SyncCommittee, getIdentityFunc)
 		pubsubResult := validatePubsub(ctx, pid, &messages.SyncRequest{})
 		s.Require().Equal(pubsub.ValidationReject, pubsubResult)
 	})
@@ -190,19 +189,19 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ValidationFai
 		pid, err := unittest.PeerIDFromFlowID(identity)
 		s.Require().NoError(err)
 
-		validate := AuthorizedSenderValidator(zerolog.Nop(), channels.ConsensusCommittee, getIdentityFunc)
-		validatePubsub := AuthorizedSenderMessageValidator(zerolog.Nop(), channels.ConsensusCommittee, getIdentityFunc)
+		validate := AuthorizedSenderValidator(unittest.Logger(), channels.ConsensusCommittee, getIdentityFunc)
+		validatePubsub := AuthorizedSenderMessageValidator(unittest.Logger(), channels.ConsensusCommittee, getIdentityFunc)
 
 		// unknown message types are rejected
 		msgType, err := validate(ctx, pid, m)
-		s.Require().ErrorIs(err, ErrUnknownMessageType)
+		s.Require().ErrorIs(err, message.ErrUnknownMsgType)
 		s.Require().Equal("", msgType)
 		pubsubResult := validatePubsub(ctx, pid, m)
 		s.Require().Equal(pubsub.ValidationReject, pubsubResult)
 
 		// nil messages are rejected
 		msgType, err = validate(ctx, pid, nil)
-		s.Require().ErrorIs(err, ErrUnknownMessageType)
+		s.Require().ErrorIs(err, message.ErrUnknownMsgType)
 		s.Require().Equal("", msgType)
 		pubsubResult = validatePubsub(ctx, pid, nil)
 		s.Require().Equal(pubsub.ValidationReject, pubsubResult)
@@ -220,12 +219,12 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ValidationFai
 		pid, err := unittest.PeerIDFromFlowID(identity)
 		s.Require().NoError(err)
 
-		validate := AuthorizedSenderValidator(zerolog.Nop(), channels.SyncCommittee, getIdentityFunc)
+		validate := AuthorizedSenderValidator(unittest.Logger(), channels.SyncCommittee, getIdentityFunc)
 		msgType, err := validate(ctx, pid, &messages.SyncRequest{})
-		s.Require().ErrorIs(err, ErrUnauthorizedSender)
+		s.Require().ErrorIs(err, ErrIdentityUnverified)
 		s.Require().Equal("", msgType)
 
-		validatePubsub := AuthorizedSenderMessageValidator(zerolog.Nop(), channels.SyncCommittee, getIdentityFunc)
+		validatePubsub := AuthorizedSenderMessageValidator(unittest.Logger(), channels.SyncCommittee, getIdentityFunc)
 		pubsubResult := validatePubsub(ctx, pid, &messages.SyncRequest{})
 		s.Require().Equal(pubsub.ValidationReject, pubsubResult)
 	})

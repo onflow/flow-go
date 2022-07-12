@@ -247,7 +247,7 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "could not receive message on time")
 
 	// ensure the correct error is contained in the logged error
-	require.Contains(t, hook.Logs(), validator.ErrUnauthorizedSender.Error())
+	require.Contains(t, hook.Logs(), message.ErrUnauthorizedRole.Error())
 }
 
 // TestAuthorizedSenderValidator_Authorized tests that the authorized sender validator rejects messages being sent on the wrong channel
