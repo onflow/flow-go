@@ -250,7 +250,17 @@ func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 	if err != nil {
 		return flow.ZeroID, err
 	}
-	return epochInfo.leaders.LeaderForView(view)
+	leaderID, err := epochInfo.leaders.LeaderForView(view)
+	if leader.IsInvalidViewError(err) {
+		// an invalid view error indicates that no leader was computed for this view
+		// this is a fatal internal error, because the view necessarily is within an
+		// epoch for which we have pre-computed leader selection
+		return flow.ZeroID, fmt.Errorf("unexpected inconsistency in epoch view spans for view %d: %v", view, err)
+	}
+	if err != nil {
+		return flow.ZeroID, err
+	}
+	return leaderID, nil
 }
 
 // QuorumThresholdForView returns the minimum weight required to build a valid
