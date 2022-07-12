@@ -26,6 +26,7 @@ require (
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/prometheus/client_golang v1.12.1
 	github.com/rs/zerolog v1.26.1
+	github.com/sethvargo/go-retry v0.2.3
 	github.com/stretchr/testify v1.7.5
 	go.uber.org/atomic v1.9.0
 	google.golang.org/grpc v1.45.0
@@ -230,7 +231,6 @@ require (
 	github.com/raulk/clock v1.1.0 // indirect
 	github.com/raulk/go-watchdog v1.2.0 // indirect
 	github.com/rivo/uniseg v0.2.1-0.20211004051800-57c86be7915a // indirect
-	github.com/sethvargo/go-retry v0.2.3 // indirect
 	github.com/shirou/gopsutil/v3 v3.22.2 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572 // indirect
