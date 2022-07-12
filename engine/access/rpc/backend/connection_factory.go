@@ -92,6 +92,10 @@ func (cf *ConnectionFactoryImpl) retrieveConnection(grpcAddress string, timeout 
 	if res, ok := cf.ConnectionsCache.Get(grpcAddress); ok {
 		conn = res.(ConnectionCacheStore).ClientConn
 		mutex = res.(ConnectionCacheStore).mutex
+
+		// we lock this mutex to prevent a scenario where the connection is not good, which will result in
+		// re-establishing the connection for this address. if the mutex is not locked, we may attempt to re-establish
+		// the connection multiple times which would result in cache thrashing.
 		mutex.Lock()
 		defer mutex.Unlock()
 		if cf.AccessMetrics != nil {
@@ -99,6 +103,8 @@ func (cf *ConnectionFactoryImpl) retrieveConnection(grpcAddress string, timeout 
 		}
 	}
 	if conn == nil || conn.GetState() != connectivity.Ready {
+		// this lock prevents a memory leak where a race condition may occur if 2 requests to a new connection at the
+		// same address occur. the second add would overwrite the first without closing the connection
 		cf.lock.Lock()
 		// updates to the cache don't trigger evictions; this line closes connections before re-establishing new ones
 		if conn != nil {
