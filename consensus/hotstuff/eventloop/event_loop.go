@@ -9,7 +9,6 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
@@ -20,7 +19,6 @@ import (
 // EventLoop buffers all incoming events to the hotstuff EventHandler, and feeds EventHandler one event at a time.
 type EventLoop struct {
 	*component.ComponentManager
-	notifications.NoopConsumer
 	log                 zerolog.Logger
 	eventHandler        hotstuff.EventHandler
 	metrics             module.HotstuffMetrics
@@ -256,4 +254,18 @@ func (el *EventLoop) OnTcConstructedFromTimeouts(tc *flow.TimeoutCertificate) {
 	// the wait duration is measured as how long it takes from a tc being
 	// received to event handler commencing the processing of the tc
 	el.metrics.HotStuffWaitDuration(time.Since(received), metrics.HotstuffEventTypeOnTC)
+}
+
+func (el *EventLoop) OnPartialTcCreated(view uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) {
+	// TODO(active-pacemaker): implement handler to support Bracha timeouts.
+}
+
+// OnNewQcDiscovered pushes already validated QCs that were submitted from TimeoutAggregator to the event handler
+func (el *EventLoop) OnNewQcDiscovered(qc *flow.QuorumCertificate) {
+	el.SubmitTrustedQC(qc)
+}
+
+// OnNewTcDiscovered pushes already validated TCs that were submitted from TimeoutAggregator to the event handler
+func (el *EventLoop) OnNewTcDiscovered(tc *flow.TimeoutCertificate) {
+	el.OnTcConstructedFromTimeouts(tc)
 }
