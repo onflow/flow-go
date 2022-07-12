@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
+	"google.golang.org/grpc/keepalive"
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/utils/grpcutils"
@@ -52,11 +53,21 @@ type ConnectionFactoryImpl struct {
 	AccessMetrics             module.AccessMetrics
 }
 
+type ConnectionCacheStore struct {
+	ClientConn *grpc.ClientConn
+	mutex      *sync.Mutex
+}
+
 // createConnection creates new gRPC connections to remote node
 func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.Duration) (*grpc.ClientConn, error) {
 
 	if timeout == 0 {
 		timeout = defaultClientTimeout
+	}
+
+	keepaliveParams := keepalive.ClientParameters{
+		Time:    10 * time.Second,
+		Timeout: timeout,
 	}
 
 	// ClientConn's default KeepAlive on connections is indefinite, assuming the timeout isn't reached
@@ -67,6 +78,7 @@ func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.D
 		address,
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
 		grpc.WithInsecure(), //nolint:staticcheck
+		grpc.WithKeepaliveParams(keepaliveParams),
 		WithClientUnaryInterceptor(timeout))
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to address %s: %w", address, err)
@@ -76,22 +88,37 @@ func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.D
 
 func (cf *ConnectionFactoryImpl) retrieveConnection(grpcAddress string, timeout time.Duration) (*grpc.ClientConn, error) {
 	var conn *grpc.ClientConn
+	var mutex *sync.Mutex
 	if res, ok := cf.ConnectionsCache.Get(grpcAddress); ok {
-		conn = res.(*grpc.ClientConn)
+		conn = res.(ConnectionCacheStore).ClientConn
+		mutex = res.(ConnectionCacheStore).mutex
+		mutex.Lock()
+		defer mutex.Unlock()
 		if cf.AccessMetrics != nil {
 			cf.AccessMetrics.ConnectionFromPoolRetrieved()
 		}
 	}
 	if conn == nil || conn.GetState() != connectivity.Ready {
+		cf.lock.Lock()
+		// updates to the cache don't trigger evictions; this line closes connections before re-establishing new ones
+		if conn != nil {
+			conn.Close()
+		}
 		var err error
 		conn, err = cf.createConnection(grpcAddress, timeout)
 		if err != nil {
 			return nil, err
 		}
-		cf.lock.Lock()
-		// This line ensures that when a connection is renewed, the previously cached connection is evicted and closed
-		cf.ConnectionsCache.Remove(grpcAddress)
-		cf.ConnectionsCache.Add(grpcAddress, conn)
+
+		store := ConnectionCacheStore{
+			ClientConn: conn,
+			mutex:      new(sync.Mutex),
+		}
+		if mutex != nil {
+			store.mutex = mutex
+		}
+
+		cf.ConnectionsCache.Add(grpcAddress, store)
 		cf.lock.Unlock()
 		if cf.AccessMetrics != nil {
 			cf.AccessMetrics.TotalConnectionsInPool(uint(cf.ConnectionsCache.Len()), cf.CacheSize)

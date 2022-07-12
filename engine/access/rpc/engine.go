@@ -89,7 +89,7 @@ func New(log zerolog.Logger,
 	executionGRPCPort uint,
 	retryEnabled bool,
 	rpcMetricsEnabled bool,
-	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the Access API e.g. Ping->100, GetTransaction->300
+	apiRatelimits map[string]int,  // the api rate limit (max calls per second) for each of the Access API e.g. Ping->100, GetTransaction->300
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the Access API e.g. Ping->50, GetTransaction->10
 	signerIndicesDecoder hotstuff.BlockSignerDecoder,
 ) (*Engine, error) {
@@ -141,7 +141,7 @@ func New(log zerolog.Logger,
 		cacheSize = backend.DefaultConnectionPoolSize
 	}
 	cache, err := lru.NewWithEvict(int(cacheSize), func(_, evictedValue interface{}) {
-		evictedValue.(*grpc.ClientConn).Close()
+		evictedValue.(backend.ConnectionCacheStore).ClientConn.Close()
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize connection pool cache: %w", err)

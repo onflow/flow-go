@@ -38,7 +38,7 @@ func TestProxyAccessAPI(t *testing.T) {
 	connectionFactory.CollectionGRPCPort = cn.port
 	// set the connection pool cache size
 	cache, _ := lru.NewWithEvict(5, func(_, evictedValue interface{}) {
-		evictedValue.(*grpc.ClientConn).Close()
+		evictedValue.(ConnectionCacheStore).ClientConn.Close()
 	})
 	connectionFactory.ConnectionsCache = cache
 	// set metrics reporting
@@ -77,7 +77,7 @@ func TestProxyExecutionAPI(t *testing.T) {
 	connectionFactory.ExecutionGRPCPort = en.port
 	// set the connection pool cache size
 	cache, _ := lru.NewWithEvict(5, func(_, evictedValue interface{}) {
-		evictedValue.(*grpc.ClientConn).Close()
+		evictedValue.(ConnectionCacheStore).ClientConn.Close()
 	})
 	connectionFactory.ConnectionsCache = cache
 	// set metrics reporting
@@ -116,7 +116,7 @@ func TestProxyAccessAPIConnectionReuse(t *testing.T) {
 	connectionFactory.CollectionGRPCPort = cn.port
 	// set the connection pool cache size
 	cache, _ := lru.NewWithEvict(5, func(_, evictedValue interface{}) {
-		evictedValue.(*grpc.ClientConn).Close()
+		evictedValue.(ConnectionCacheStore).ClientConn.Close()
 	})
 	connectionFactory.ConnectionsCache = cache
 	// set metrics reporting
@@ -135,7 +135,7 @@ func TestProxyAccessAPIConnectionReuse(t *testing.T) {
 	var conn *grpc.ClientConn
 	res, ok := connectionFactory.ConnectionsCache.Get(proxyConnectionFactory.targetAddress)
 	assert.True(t, ok)
-	conn = res.(*grpc.ClientConn)
+	conn = res.(ConnectionCacheStore).ClientConn
 
 	// check if api client can be rebuilt with retrieved connection
 	accessAPIClient := access.NewAccessAPIClient(conn)
@@ -162,7 +162,7 @@ func TestProxyExecutionAPIConnectionReuse(t *testing.T) {
 	connectionFactory.ExecutionGRPCPort = en.port
 	// set the connection pool cache size
 	cache, _ := lru.NewWithEvict(5, func(_, evictedValue interface{}) {
-		evictedValue.(*grpc.ClientConn).Close()
+		evictedValue.(ConnectionCacheStore).ClientConn.Close()
 	})
 	connectionFactory.ConnectionsCache = cache
 	// set metrics reporting
@@ -181,7 +181,7 @@ func TestProxyExecutionAPIConnectionReuse(t *testing.T) {
 	var conn *grpc.ClientConn
 	res, ok := connectionFactory.ConnectionsCache.Get(proxyConnectionFactory.targetAddress)
 	assert.True(t, ok)
-	conn = res.(*grpc.ClientConn)
+	conn = res.(ConnectionCacheStore).ClientConn
 
 	// check if api client can be rebuilt with retrieved connection
 	executionAPIClient := execution.NewExecutionAPIClient(conn)
@@ -215,7 +215,7 @@ func TestExecutionNodeClientTimeout(t *testing.T) {
 	connectionFactory.ExecutionNodeGRPCTimeout = timeout
 	// set the connection pool cache size
 	cache, _ := lru.NewWithEvict(5, func(_, evictedValue interface{}) {
-		evictedValue.(*grpc.ClientConn).Close()
+		evictedValue.(ConnectionCacheStore).ClientConn.Close()
 	})
 	connectionFactory.ConnectionsCache = cache
 	// set metrics reporting
@@ -257,7 +257,7 @@ func TestCollectionNodeClientTimeout(t *testing.T) {
 	connectionFactory.CollectionNodeGRPCTimeout = timeout
 	// set the connection pool cache size
 	cache, _ := lru.NewWithEvict(5, func(_, evictedValue interface{}) {
-		evictedValue.(*grpc.ClientConn).Close()
+		evictedValue.(ConnectionCacheStore).ClientConn.Close()
 	})
 	connectionFactory.ConnectionsCache = cache
 	// set metrics reporting
@@ -299,7 +299,7 @@ func TestConnectionPoolFull(t *testing.T) {
 	connectionFactory.CollectionGRPCPort = cn1.port
 	// set the connection pool cache size
 	cache, _ := lru.NewWithEvict(2, func(_, evictedValue interface{}) {
-		evictedValue.(*grpc.ClientConn).Close()
+		evictedValue.(ConnectionCacheStore).ClientConn.Close()
 	})
 	connectionFactory.ConnectionsCache = cache
 	// set metrics reporting
@@ -368,7 +368,7 @@ func TestConnectionPoolStale(t *testing.T) {
 	// set the connection pool cache size
 
 	cache, _ := lru.NewWithEvict(5, func(_, evictedValue interface{}) {
-		evictedValue.(*grpc.ClientConn).Close()
+		evictedValue.(ConnectionCacheStore).ClientConn.Close()
 	})
 	connectionFactory.ConnectionsCache = cache
 	// set metrics reporting
@@ -401,7 +401,7 @@ func TestConnectionPoolStale(t *testing.T) {
 	var conn *grpc.ClientConn
 	res, ok := connectionFactory.ConnectionsCache.Get(proxyConnectionFactory.targetAddress)
 	assert.True(t, ok)
-	conn = res.(*grpc.ClientConn)
+	conn = res.(ConnectionCacheStore).ClientConn
 
 	// check if api client can be rebuilt with retrieved connection
 	accessAPIClient := access.NewAccessAPIClient(conn)
