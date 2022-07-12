@@ -7,7 +7,6 @@ import (
 	"github.com/hashicorp/go-multierror"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -160,7 +159,7 @@ func (b *backendAccounts) tryGetAccount(ctx context.Context, execNode *flow.Iden
 	}
 	resp, err := execRPCClient.GetAccountAtBlockID(ctx, &req)
 	if err != nil {
-		if err == grpc.ErrServerStopped {
+		if status.Code(err) == codes.Unavailable {
 			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
 		}
 		return nil, err
