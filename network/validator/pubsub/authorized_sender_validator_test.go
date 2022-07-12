@@ -44,6 +44,9 @@ func (s *TestAuthorizedSenderValidatorSuite) SetupTest() {
 // TestValidatorCallback_AuthorizedSender checks that the call back returned from AuthorizedSenderValidator does not return false positive
 // validation errors for all possible valid combinations (authorized sender role, message type).
 func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_AuthorizedSender() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	for _, c := range s.authorizedSenderTestCases {
 		str := fmt.Sprintf("role (%s) should be authorized to send message type (%s) on channel (%s)", c.Identity.Role, c.MessageStr, c.Channel)
 		s.Run(str, func() {
@@ -51,9 +54,6 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_AuthorizedSen
 
 			pid, err := unittest.PeerIDFromFlowID(c.Identity)
 			s.Require().NoError(err)
-
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
 
 			msgType, err := validate(ctx, pid, c.Message)
 			s.Require().NoError(err)
@@ -69,14 +69,14 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_AuthorizedSen
 // TestValidatorCallback_UnAuthorizedSender checks that the call back returned from AuthorizedSenderValidator return's ErrUnauthorizedSender
 // validation error for all possible invalid combinations (unauthorized sender role, message type).
 func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_UnAuthorizedSender() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	for _, c := range s.unauthorizedSenderTestCases {
 		str := fmt.Sprintf("role (%s) should not be authorized to send message type (%s) on channel (%s)", c.Identity.Role, c.MessageStr, c.Channel)
 		s.Run(str, func() {
 			pid, err := unittest.PeerIDFromFlowID(c.Identity)
 			s.Require().NoError(err)
-
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
 
 			validate := AuthorizedSenderValidator(zerolog.Nop(), c.Channel, c.GetIdentity)
 			msgType, err := validate(ctx, pid, c.Message)
@@ -93,14 +93,14 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_UnAuthorizedS
 // TestValidatorCallback_UnAuthorizedMessageOnChannel for each invalid combination of message type and channel
 // the call back returned from AuthorizedSenderValidator returns the appropriate error message.ErrUnauthorizedMessageOnChannel.
 func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_UnAuthorizedMessageOnChannel() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	for _, c := range s.unauthorizedMessageOnChannelTestCases {
 		str := fmt.Sprintf("message type (%s) should not be authorized to be sent on channel (%s)", c.MessageStr, c.Channel)
 		s.Run(str, func() {
 			pid, err := unittest.PeerIDFromFlowID(c.Identity)
 			s.Require().NoError(err)
-
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
 
 			validate := AuthorizedSenderValidator(zerolog.Nop(), c.Channel, c.GetIdentity)
 
@@ -201,10 +201,10 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ValidationFai
 		s.Require().Equal(pubsub.ValidationReject, pubsubResult)
 
 		// nil messages are rejected
-		msgType, err = validate(context.Background(), pid, nil)
+		msgType, err = validate(ctx, pid, nil)
 		s.Require().ErrorIs(err, ErrUnknownMessageType)
 		s.Require().Equal("", msgType)
-		pubsubResult = validatePubsub(context.Background(), pid, nil)
+		pubsubResult = validatePubsub(ctx, pid, nil)
 		s.Require().Equal(pubsub.ValidationReject, pubsubResult)
 	})
 
