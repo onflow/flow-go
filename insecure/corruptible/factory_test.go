@@ -1,4 +1,5 @@
-//package corruptible
+package corruptible
+
 //
 //import (
 //	"context"
