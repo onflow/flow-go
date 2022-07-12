@@ -149,10 +149,10 @@ func NewEngine(
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.TimeoutObject)
-				if ok {
-					// TODO(active-pacemaker): update metrics
-					//core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockVote)
-				}
+				// TODO(active-pacemaker): update metrics
+				//if ok {
+				//core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockVote)
+				//}
 				return ok
 			},
 			Store: pendingTimeouts,

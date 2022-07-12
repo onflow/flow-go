@@ -164,10 +164,10 @@ func NewEngine(
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.ClusterTimeoutObject)
-				if ok {
-					// TODO(active-pacemaker): update metrics
-					//core.metrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageClusterBlockVote)
-				}
+				// TODO(active-pacemaker): update metrics
+				//if ok {
+				//core.metrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageClusterBlockVote)
+				//}
 				return ok
 			},
 			Store: pendingTimeouts,

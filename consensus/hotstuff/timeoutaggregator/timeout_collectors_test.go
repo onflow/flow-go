@@ -3,12 +3,12 @@ package timeoutaggregator
 import (
 	"errors"
 	"fmt"
-	"github.com/stretchr/testify/mock"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/gammazero/workerpool"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
