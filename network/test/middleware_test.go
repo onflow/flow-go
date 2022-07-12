@@ -84,7 +84,7 @@ func TestMiddlewareTestSuite(t *testing.T) {
 
 // SetupTest initiates the test setups prior to each test
 func (m *MiddlewareTestSuite) SetupTest() {
-	logger := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
+	logger := zerolog.New(os.Stderr).Level(zerolog.WarnLevel)
 	log.SetAllLoggers(log.LevelError)
 	m.logger = logger
 
@@ -176,6 +176,77 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	// now the message should send successfully
 	err = m.mws[0].SendDirect(msg, newId.NodeID)
 	require.NoError(m.T(), err)
+}
+
+func (m *MiddlewareTestSuite) TestUnicastRateLimit_Streams() {
+	// setup hooked logger
+	//var hookCalls uint64
+	//hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
+	//	if level == zerolog.WarnLevel {
+	//		atomic.AddUint64(&hookCalls, 1)
+	//	}
+	//})
+	//logger := zerolog.New(os.Stdout).Level(zerolog.WarnLevel).Hook(hook)
+
+	// interval at which to rate limit streams (per second)
+	//interval := time.Second
+	// amount of streams allowed per interval 5 streams/sec
+	//burst := 5
+
+	// setup streams rate limiter
+	//streamsRateLimiter := unicast.NewStreamsRateLimiter(interval, burst)
+	//WithUnicastRateLimiters(streamsRateLimiter, nil),
+
+	// create a new staked identity
+	ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1)
+	mws, providers := GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, unittest.NetworkCodec())
+	require.Len(m.T(), ids, 1)
+	require.Len(m.T(), providers, 1)
+	require.Len(m.T(), mws, 1)
+	newId := ids[0]
+	newMw := mws[0]
+
+	//providers[0].SetIdentities(flow.IdentityList{m.ids[0]})
+
+	overlay := m.createOverlay(providers[0])
+	overlay.On("Receive",
+		m.ids[0].NodeID,
+		mock.AnythingOfType("*message.Message"),
+	).Return(nil)
+
+	newMw.SetOverlay(overlay)
+	newMw.Start(m.mwCtx)
+
+	idList := flow.IdentityList(append(m.ids, newId))
+
+	// needed to enable ID translation
+	m.providers[0].SetIdentities(idList)
+
+	msg, _ := createMessage(m.ids[0].NodeID, newId.NodeID, "hello")
+
+	// update the addresses
+	m.mws[0].UpdateNodeAddresses()
+	newMw.UpdateNodeAddresses()
+
+	// now the message should send successfully
+	err := m.mws[0].SendDirect(msg, newId.NodeID)
+	require.NoError(m.T(), err)
+
+	err = m.mws[0].SendDirect(msg, newId.NodeID)
+	require.NoError(m.T(), err)
+
+	err = m.mws[0].SendDirect(msg, newId.NodeID)
+	require.NoError(m.T(), err)
+
+	//for i := 0; i < 6; i++ {
+	//	// now the message should send successfully
+	//	err := m.mws[0].SendDirect(msg, newId.NodeID)
+	//	require.NoError(m.T(), err)
+	//}
+
+	// expect 1 warning logged by the middleware unicast stream handler
+	// for the rate limited message.
+	//require.Equal(m.T(), uint64(1), hookCalls)
 }
 
 func (m *MiddlewareTestSuite) createOverlay(provider *UpdatableIDProvider) *mocknetwork.Overlay {

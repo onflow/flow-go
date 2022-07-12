@@ -9,16 +9,23 @@ import (
 	"golang.org/x/time/rate"
 )
 
-var (
-	defaultBandwidthRateLimitInterval = rate.Every(time.Second) // default time interval in between rate limits
-	defaultBandwidthRateLimitBurst    = 1_048_576               // bytes allowed to be sent per interval above
-)
-
 // BandWidthRateLimiter unicast rate limiter that limits the bandwidth that can be sent
 // by a peer per some configured interval.
 type BandWidthRateLimiter struct {
 	lock     sync.Mutex
 	limiters map[peer.ID]*rate.Limiter
+	interval time.Duration
+	burst    int
+}
+
+// NewBandWidthRateLimiter returns a new BandWidthRateLimiter.
+func NewBandWidthRateLimiter(interval time.Duration, burst int) *BandWidthRateLimiter {
+	return &BandWidthRateLimiter{
+		lock:     sync.Mutex{},
+		limiters: make(map[peer.ID]*rate.Limiter),
+		interval: interval,
+		burst:    burst,
+	}
 }
 
 // Allow checks the cached limiter for the peer and returns limiter.AllowN(msg.Size())
@@ -37,6 +44,6 @@ func (b *BandWidthRateLimiter) Allow(peerID peer.ID, msg *message.Message) bool 
 func (b *BandWidthRateLimiter) setNewLimiter(peerID peer.ID) *rate.Limiter {
 	b.lock.Lock()
 	defer b.lock.Unlock()
-	b.limiters[peerID] = rate.NewLimiter(defaultBandwidthRateLimitInterval, defaultBandwidthRateLimitBurst)
+	b.limiters[peerID] = rate.NewLimiter(rate.Every(b.interval), b.burst)
 	return b.limiters[peerID]
 }

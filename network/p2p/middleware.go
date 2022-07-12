@@ -120,6 +120,22 @@ func WithPeerManager(peerManagerFunc PeerManagerFactoryFunc) MiddlewareOption {
 	}
 }
 
+// WithUnicastStreamsRateLimiter sets the streams rate limiter on the middleware. This will
+// force the middleware to rate limit streams per interval for each peer.
+func WithUnicastStreamsRateLimiter(unicastStreamRateLimiter unicast.RateLimiter) MiddlewareOption {
+	return func(mw *Middleware) {
+		mw.unicastStreamRateLimiter = unicastStreamRateLimiter
+	}
+}
+
+// WithUnicastBandwidthRateLimiter sets the streams rate limiter on the middleware. This will
+// force the middleware to rate limit streams per interval for each peer.
+func WithUnicastBandwidthRateLimiter(unicastBandwidthRateLimiter unicast.RateLimiter) MiddlewareOption {
+	return func(mw *Middleware) {
+		mw.unicastBandwidthRateLimiter = unicastBandwidthRateLimiter
+	}
+}
+
 // NewMiddleware creates a new middleware instance
 // libP2PNodeFactory is the factory used to create a LibP2PNode
 // flowID is this node's Flow ID
@@ -434,6 +450,13 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 	log.Info().Msg("incoming stream received")
 
+	remotePeer := s.Conn().RemotePeer()
+
+	// check if unicast stream creation is rate limited for peer
+	if !m.isStreamAllowed(remotePeer) {
+		log.Warn().Msg("rate-limiting peer unicast stream creation dropping message")
+	}
+
 	success := false
 
 	defer func() {
@@ -503,6 +526,11 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 			return
 		}
 
+		// check unicast bandwidth rate limiter for peer
+		if !m.isBandwidthAllowed(remotePeer, &msg) {
+			log.Warn().Msg("rate-limiting peer unicast stream creation dropping message")
+		}
+
 		m.wg.Add(1)
 		go func(msg *message.Message) {
 			defer m.wg.Done()
@@ -525,16 +553,24 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 	success = true
 }
 
-// isUnicastStreamAllowed will check if the peer is able to create an
-// unicast stream using the configured Middleware.unicastStreamRateLimiter
-func (m *Middleware) isUnicastStreamAllowed(peerID peer.ID, msg *message.Message) bool {
-	return m.unicastStreamRateLimiter.Allow(peerID, msg)
+// isStreamAllowed will check if the peer is able to create an
+// unicast stream using the configured Middleware.unicastStreamRateLimiter.
+// If no unicastStreamRateLimiter is configured rate limiting is skipped.
+func (m *Middleware) isStreamAllowed(peerID peer.ID) bool {
+	if m.unicastStreamRateLimiter != nil {
+		return m.unicastStreamRateLimiter.Allow(peerID, nil)
+	}
+	return true
 }
 
-// isUnciastMessageAllowed will check if the peer is able to send a message
+// isBandwidthAllowed will check if the peer is able to send a message
 // of size msg.Size() using the configured Middleware.unicastBandwidthRateLimiter.
-func (m *Middleware) isUnciastMessageAllowed(peerID peer.ID, msg *message.Message) bool {
-	return m.unicastBandwidthRateLimiter.Allow(peerID, msg)
+// If no unicastBandwidthRateLimiter is configured rate limiting is skipped.
+func (m *Middleware) isBandwidthAllowed(peerID peer.ID, msg *message.Message) bool {
+	if m.unicastBandwidthRateLimiter != nil {
+		return m.unicastBandwidthRateLimiter.Allow(peerID, msg)
+	}
+	return true
 }
 
 // Subscribe subscribes the middleware to a channel.

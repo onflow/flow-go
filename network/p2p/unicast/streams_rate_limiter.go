@@ -9,17 +9,25 @@ import (
 	"golang.org/x/time/rate"
 )
 
-var (
-	defaultStreamsRateLimitInterval = rate.Every(time.Second) // default time interval in between rate limits
-	defaultStreamsRateLimitBurst    = 1                       // streams allowed per rate limit 1 stream/sec
-)
-
 // StreamsRateLimiter unicast rate limiter that limits the amount of streams that can
 // be created per some configured interval. A new stream is created each time a libP2P
 // node sends a direct message.
 type StreamsRateLimiter struct {
 	lock     sync.Mutex
 	limiters map[peer.ID]*rate.Limiter
+	interval time.Duration
+	burst    int
+}
+
+// NewStreamsRateLimiter returns a new StreamsRateLimiter.
+func NewStreamsRateLimiter(interval time.Duration, burst int) *StreamsRateLimiter {
+
+	return &StreamsRateLimiter{
+		lock:     sync.Mutex{},
+		limiters: make(map[peer.ID]*rate.Limiter),
+		interval: interval,
+		burst:    burst,
+	}
 }
 
 // Allow checks the cached limiter for the peer and returns limiter.Allow().
@@ -37,6 +45,6 @@ func (s *StreamsRateLimiter) Allow(peerID peer.ID, _ *message.Message) bool {
 func (s *StreamsRateLimiter) setNewLimiter(peerID peer.ID) *rate.Limiter {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	s.limiters[peerID] = rate.NewLimiter(defaultStreamsRateLimitInterval, defaultStreamsRateLimitBurst)
+	s.limiters[peerID] = rate.NewLimiter(rate.Every(s.interval), s.burst)
 	return s.limiters[peerID]
 }
