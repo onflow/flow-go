@@ -162,15 +162,6 @@ func initializeMessageAuthConfigsMap() {
 			channels.PushGuarantees: {flow.RoleCollection}, // channel alias ReceiveGuarantees = PushGuarantees
 		},
 	}
-	AuthorizationConfigs[Transaction] = MsgAuthConfig{
-		Name: Transaction,
-		Type: func() interface{} {
-			return new(flow.Transaction)
-		},
-		Config: map[channels.Channel]flow.RoleList{
-			channels.PushTransactions: {flow.RoleCollection}, // channel alias ReceiveTransactions = PushTransactions
-		},
-	}
 	AuthorizationConfigs[TransactionBody] = MsgAuthConfig{
 		Name: TransactionBody,
 		Type: func() interface{} {
