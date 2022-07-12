@@ -11,6 +11,7 @@ import (
 
 	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/codec"
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
@@ -46,7 +47,7 @@ func (c *Codec) NewDecoder(r io.Reader) network.Decoder {
 func (c *Codec) Encode(v interface{}) ([]byte, error) {
 
 	// encode the value
-	what, code, err := v2envelopeCode(v)
+	code, what, err := codec.MessageCodeFromInterface(v)
 	if err != nil {
 		return nil, fmt.Errorf("could not determine envelope code: %w", err)
 	}
@@ -85,35 +86,21 @@ func (c *Codec) Decode(data []byte) (interface{}, error) {
 
 	// decode the envelope
 	//bs1 := binstat.EnterTime(binstat.BinNet + ":wire>3(cbor)payload2envelope")
-	code := data[0] // only first byte
+
 	//binstat.LeaveVal(bs1, int64(len(data)))
 
-	what, v, err := envelopeCode2v(code)
+	msgInterface, what, err := codec.InterfaceFromMessageCode(data[0])
 	if err != nil {
 		return nil, fmt.Errorf("could not determine interface from code: %w", err)
 	}
 
 	// unmarshal the payload
 	//bs2 := binstat.EnterTimeVal(fmt.Sprintf("%s%s%s:%d", binstat.BinNet, ":wire>4(cbor)", what, code), int64(len(data))) // e.g. ~3net:wire>4(cbor)CodeEntityRequest:23
-	err = cbor.Unmarshal(data[1:], v) // all but first byte
+	err = cbor.Unmarshal(data[1:], msgInterface) // all but first byte
 	//binstat.Leave(bs2)
 	if err != nil {
-		return nil, fmt.Errorf("could not decode CBOR payload with envelope code %d AKA %s: %w", code, what, err) // e.g. 2, "CodeBlockProposal", <CBOR error>
+		return nil, fmt.Errorf("could not decode cbor payload with message code %d aka %s: %w", data[0], what, err) // e.g. 2, "CodeBlockProposal", <CBOR error>
 	}
 
-	return v, nil
-}
-
-// DecodeMsgType is a helper func that returns the first byte of cbor encoded data which
-// corresponds to the message type. This allows users of the codec to have an explicit dependency
-// on this specific property of encoding with the cbor codec. You should not directly interpret
-// the message type in code. i:e msgType := data[0], instead use this func.
-func (c *Codec) DecodeMsgType(data []byte) (byte, string, error) {
-	code := data[0]
-	what, err := switchenv2what(code)
-	if err != nil {
-		return byte(0), "", fmt.Errorf("could not decode message type check encoding: %w", err)
-	}
-
-	return code, what, nil
+	return msgInterface, nil
 }

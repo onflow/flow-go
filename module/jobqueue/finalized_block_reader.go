@@ -15,6 +15,8 @@ type FinalizedBlockReader struct {
 	blocks storage.Blocks
 }
 
+var _ module.Jobs = (*FinalizedBlockReader)(nil)
+
 // NewFinalizedBlockReader creates and returns a FinalizedBlockReader.
 func NewFinalizedBlockReader(state protocol.State, blocks storage.Blocks) *FinalizedBlockReader {
 	return &FinalizedBlockReader{

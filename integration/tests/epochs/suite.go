@@ -8,11 +8,12 @@ import (
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
-	sdk "github.com/onflow/flow-go-sdk"
-	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+
+	sdk "github.com/onflow/flow-go-sdk"
+	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/ghost/client"
@@ -138,16 +139,17 @@ func (s *Suite) TearDownTest() {
 // StakedNodeOperationInfo struct contains all the node information needed to
 // start a node after it is onboarded (staked and registered).
 type StakedNodeOperationInfo struct {
-	NodeID                  flow.Identifier
-	Role                    flow.Role
-	StakingAccountAddress   sdk.Address
-	FullAccountKey          *sdk.AccountKey
-	StakingAccountKey       sdkcrypto.PrivateKey
-	NetworkingKey           sdkcrypto.PrivateKey
-	StakingKey              sdkcrypto.PrivateKey
+	NodeID                flow.Identifier
+	Role                  flow.Role
+	StakingAccountAddress sdk.Address
+	FullAccountKey        *sdk.AccountKey
+	StakingAccountKey     sdkcrypto.PrivateKey
+	NetworkingKey         sdkcrypto.PrivateKey
+	StakingKey            sdkcrypto.PrivateKey
+	// machine account info defined only for consensus/collection nodes
 	MachineAccountAddress   sdk.Address
 	MachineAccountKey       sdkcrypto.PrivateKey
-	MachineAccountPublicKey sdk.AccountKey
+	MachineAccountPublicKey *sdk.AccountKey
 	ContainerName           string
 }
 
@@ -283,7 +285,7 @@ func (s *Suite) generateAccountKeys(role flow.Role) (
 	networkingKey,
 	stakingKey,
 	machineAccountKey crypto.PrivateKey,
-	machineAccountPubKey sdk.AccountKey,
+	machineAccountPubKey *sdk.AccountKey,
 ) {
 	operatorAccountKey = unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256)
 	networkingKey = unittest.NetworkingPrivKeyFixture()
@@ -293,7 +295,7 @@ func (s *Suite) generateAccountKeys(role flow.Role) (
 	if role == flow.RoleConsensus || role == flow.RoleCollection {
 		machineAccountKey = unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256)
 
-		machineAccountPubKey = sdk.AccountKey{
+		machineAccountPubKey = &sdk.AccountKey{
 			PublicKey: machineAccountKey.PublicKey(),
 			SigAlgo:   machineAccountKey.PublicKey().Algorithm(),
 			HashAlgo:  bootstrap.DefaultMachineAccountHashAlgo,
@@ -325,7 +327,8 @@ func (s *Suite) createStakingCollection(ctx context.Context, env templates.Envir
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
 
-	signer := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA2_256)
+	signer, err := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA2_256)
+	require.NoError(s.T(), err)
 
 	createStakingCollectionTx, err := utils.MakeCreateStakingCollectionTx(
 		env,
@@ -358,12 +361,13 @@ func (s *Suite) SubmitStakingCollectionRegisterNodeTx(
 	networkingKey string,
 	stakingKey string,
 	amount string,
-	machineKey sdk.AccountKey,
+	machineKey *sdk.AccountKey,
 ) (*sdk.TransactionResult, sdk.Address, error) {
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
 
-	signer := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA2_256)
+	signer, err := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA2_256)
+	require.NoError(s.T(), err)
 
 	registerNodeTx, err := utils.MakeStakingCollectionRegisterNodeTx(
 		env,
@@ -417,7 +421,8 @@ func (s *Suite) SubmitStakingCollectionCloseStakeTx(
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
 
-	signer := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA2_256)
+	signer, err := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA2_256)
+	require.NoError(s.T(), err)
 
 	closeStakeTx, err := utils.MakeStakingCollectionCloseStakeTx(
 		env,

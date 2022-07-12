@@ -19,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc"
@@ -34,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storage "github.com/onflow/flow-go/storage/badger"
@@ -278,8 +278,8 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 
 		// create a mock connection factory
 		connFactory := new(factorymock.ConnectionFactory)
-		connFactory.On("GetAccessAPIClient", collNode1.Address).Return(col1ApiClient, &mockCloser{}, nil)
-		connFactory.On("GetAccessAPIClient", collNode2.Address).Return(col2ApiClient, &mockCloser{}, nil)
+		connFactory.On("GetAccessAPIClient", collNode1.Address).Return(col1ApiClient, nil)
+		connFactory.On("GetAccessAPIClient", collNode2.Address).Return(col2ApiClient, nil)
 
 		backend := backend.New(suite.state,
 			nil,
@@ -555,7 +555,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		// setup mocks
 		originID := unittest.IdentifierFixture()
 		conduit := new(mocknetwork.Conduit)
-		suite.net.On("Register", engine.ReceiveReceipts, mock.Anything).Return(conduit, nil).
+		suite.net.On("Register", network.ReceiveReceipts, mock.Anything).Return(conduit, nil).
 			Once()
 		suite.request.On("Request", mock.Anything, mock.Anything).Return()
 
@@ -578,7 +578,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		// create a mock connection factory
 		connFactory := new(factorymock.ConnectionFactory)
-		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, nil)
 
 		// initialize storage
 		metrics := metrics.NewNoopCollector()
@@ -613,8 +613,11 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		handler := access.NewHandler(backend, suite.chainID.Chain())
 
-		rpcEng := rpc.New(suite.log, suite.state, rpc.Config{}, nil, nil, blocks, headers, collections, transactions,
-			receipts, results, suite.chainID, metrics, 0, 0, false, false, nil, nil)
+		rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, rpc.Config{}, nil, nil, blocks, headers, collections, transactions,
+			receipts, results, suite.chainID, metrics, metrics, 0, 0, false, false, nil, nil)
+		rpcEngBuilder.WithLegacy()
+		rpcEng := rpcEngBuilder.Build()
+		require.NoError(suite.T(), err)
 
 		// create the ingest engine
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, blocks, headers, collections,
@@ -647,7 +650,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		ingestEng.OnCollection(originID, &collection)
 
 		for _, r := range executionReceipts {
-			err = ingestEng.Process(engine.ReceiveReceipts, enNodeIDs[0], r)
+			err = ingestEng.Process(network.ReceiveReceipts, enNodeIDs[0], r)
 			require.NoError(suite.T(), err)
 		}
 
@@ -679,7 +682,7 @@ func (suite *Suite) TestExecuteScript() {
 
 		// create a mock connection factory
 		connFactory := new(factorymock.ConnectionFactory)
-		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, nil)
 
 		suite.backend = backend.New(suite.state,
 			suite.collClient,
@@ -713,7 +716,7 @@ func (suite *Suite) TestExecuteScript() {
 		require.NoError(suite.T(), err)
 
 		conduit := new(mocknetwork.Conduit)
-		suite.net.On("Register", engine.ReceiveReceipts, mock.Anything).Return(conduit, nil).
+		suite.net.On("Register", network.ReceiveReceipts, mock.Anything).Return(conduit, nil).
 			Once()
 		// create the ingest engine
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, blocks, headers, collections,

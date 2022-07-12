@@ -6,7 +6,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto/random"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/network"
@@ -72,7 +71,7 @@ func NewRandomizedTopology(nodeID flow.Identifier, logger zerolog.Logger, edgePr
 // connected graph of nodes that enables them talking to each other. This should be done with a very high probability
 // in randomized topology.
 func (r RandomizedTopology) GenerateFanout(ids flow.IdentityList, channels network.ChannelList) (flow.IdentityList, error) {
-	myUniqueChannels := engine.UniqueChannels(channels)
+	myUniqueChannels := network.UniqueChannels(channels)
 	if len(myUniqueChannels) == 0 {
 		// no subscribed channel, hence skip topology creation
 		// we do not return an error at this state as invocation of MakeTopology may happen before
@@ -109,7 +108,7 @@ func (r RandomizedTopology) subsetChannel(ids flow.IdentityList, channel network
 	sampleSpace := ids.Filter(filter.Not(filter.HasNodeID(r.myNodeID)))
 
 	// samples a random graph based on whether channel is cluster-based or not.
-	if engine.IsClusterChannel(channel) {
+	if network.IsClusterChannel(channel) {
 		return r.clusterChannelHandler(sampleSpace)
 	}
 	return r.nonClusterChannelHandler(sampleSpace, channel)
@@ -160,12 +159,12 @@ func (r RandomizedTopology) clusterChannelHandler(ids flow.IdentityList) (flow.I
 
 // clusterChannelHandler returns a connected graph fanout of peers from `ids` that subscribed to `channel`.
 func (r RandomizedTopology) nonClusterChannelHandler(ids flow.IdentityList, channel network.Channel) (flow.IdentityList, error) {
-	if engine.IsClusterChannel(channel) {
+	if network.IsClusterChannel(channel) {
 		return nil, fmt.Errorf("could not handle cluster channel: %s", channel)
 	}
 
 	// extracts flow roles subscribed to topic.
-	roles, ok := engine.RolesByChannel(channel)
+	roles, ok := network.RolesByChannel(channel)
 	if !ok {
 		return nil, fmt.Errorf("unknown topic with no subscribed roles: %s", channel)
 	}

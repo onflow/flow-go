@@ -139,8 +139,6 @@ func (suite *ComponentConsumerSuite) TestHappyPath() {
 	}
 
 	suite.Run("runs and notifies using pre-notifier", func() {
-		unittest.SkipUnless(suite.T(), unittest.TEST_FLAKY, "flaky test")
-
 		wg.Add(int(testJobsCount))
 		consumer, workSignal := suite.prepareTest(processor, nil, notifier, jobData)
 
@@ -211,7 +209,7 @@ func (suite *ComponentConsumerSuite) TestProgressesOnComplete() {
 
 	suite.runTest(testCtx, consumer, workSignal, func() {
 		workSignal <- struct{}{}
-		unittest.RequireNeverClosedWithin(suite.T(), done, 50*time.Millisecond, fmt.Sprintf("job %d wasn't supposed to finish", stopIndex+1))
+		unittest.RequireNeverClosedWithin(suite.T(), done, 100*time.Millisecond, fmt.Sprintf("job %d wasn't supposed to finish", stopIndex+1))
 	})
 
 	// verify all jobs were run
@@ -251,7 +249,7 @@ func (suite *ComponentConsumerSuite) TestPassesIrrecoverableErrors() {
 	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
 
 	consumer.Start(signalCtx)
-	unittest.RequireCloseBefore(suite.T(), consumer.Ready(), 10*time.Millisecond, "timeout waiting for consumer to be ready")
+	unittest.RequireCloseBefore(suite.T(), consumer.Ready(), 100*time.Millisecond, "timeout waiting for consumer to be ready")
 
 	// send job signal, then wait for the irrecoverable error
 	// don't need to sent signal since the worker is kicked off by Start()
@@ -264,7 +262,7 @@ func (suite *ComponentConsumerSuite) TestPassesIrrecoverableErrors() {
 
 	// shutdown
 	cancel()
-	unittest.RequireCloseBefore(suite.T(), consumer.Done(), 10*time.Millisecond, "timeout waiting for consumer to be done")
+	unittest.RequireCloseBefore(suite.T(), consumer.Done(), 100*time.Millisecond, "timeout waiting for consumer to be done")
 
 	// no notification should have been sent
 	unittest.RequireNotClosed(suite.T(), done, "job wasn't supposed to finish")
@@ -283,13 +281,13 @@ func (suite *ComponentConsumerSuite) runTest(
 	go irrecoverableNotExpected(suite.T(), testCtx, errChan)
 
 	consumer.Start(signalCtx)
-	unittest.RequireCloseBefore(suite.T(), consumer.Ready(), 10*time.Millisecond, "timeout waiting for consumer to be ready")
+	unittest.RequireCloseBefore(suite.T(), consumer.Ready(), 100*time.Millisecond, "timeout waiting for the consumer to be ready")
 
 	sendJobs()
 
 	// shutdown
 	cancel()
-	unittest.RequireCloseBefore(suite.T(), consumer.Done(), 10*time.Millisecond, "timeout waiting for consumer to be done")
+	unittest.RequireCloseBefore(suite.T(), consumer.Done(), 100*time.Millisecond, "timeout waiting for the consumer to be done")
 }
 
 func irrecoverableNotExpected(t *testing.T, ctx context.Context, errChan <-chan error) {

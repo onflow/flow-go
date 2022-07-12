@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol"
@@ -38,8 +37,8 @@ var _ hotstuff.Verifier = (*CombinedVerifier)(nil)
 func NewCombinedVerifier(committee hotstuff.Committee, packer hotstuff.Packer) *CombinedVerifier {
 	return &CombinedVerifier{
 		committee:     committee,
-		stakingHasher: crypto.NewBLSKMAC(encoding.ConsensusVoteTag),
-		beaconHasher:  crypto.NewBLSKMAC(encoding.RandomBeaconTag),
+		stakingHasher: signature.NewBLSHasher(signature.ConsensusVoteTag),
+		beaconHasher:  signature.NewBLSHasher(signature.RandomBeaconTag),
 		packer:        packer,
 	}
 }

@@ -24,9 +24,11 @@
 #define MEMBERSHIP_CHECK 1
 
 // algorithm choice for the hashing to G1 
-#define RELIC_OPSWU 1  // relic library implementation (compliant with the BLS IRTF draft)
-#define OPSWU 2        // local flow implementation using different parameters than the IRTF draft 
-#define hashToPoint RELIC_OPSWU
+// both methods are similar implementations of the same optimzed SSWU 
+// but offer different timings.
+#define RELIC_SSWU 1  // relic library implementation
+#define LOCAL_SSWU 2       // local implementation
+#define hashToPoint LOCAL_SSWU
 
 // bls core (functions in bls_core.c)
 int      get_signature_len();

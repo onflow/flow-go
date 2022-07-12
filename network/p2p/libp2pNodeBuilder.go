@@ -60,7 +60,14 @@ func DefaultLibP2PNodeFactory(
 			SetConnectionManager(connManager).
 			SetConnectionGater(connGater).
 			SetRoutingSystem(func(ctx context.Context, host host.Host) (routing.Routing, error) {
-				return NewDHT(ctx, host, unicast.FlowDHTProtocolID(sporkId), AsServer())
+				return NewDHT(
+					ctx,
+					host,
+					unicast.FlowDHTProtocolID(sporkId),
+					log,
+					metrics,
+					AsServer(),
+				)
 			}).
 			SetPubSub(pubsub.NewGossipSub)
 

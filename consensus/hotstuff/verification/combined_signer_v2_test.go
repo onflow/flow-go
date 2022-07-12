@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
@@ -74,10 +73,10 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 
 	// check that a created proposal's signature is a combined staking sig and random beacon sig
 	msg := MakeVoteMessage(block.View, block.BlockID)
-	stakingSig, err := stakingPriv.Sign(msg, crypto.NewBLSKMAC(encoding.ConsensusVoteTag))
+	stakingSig, err := stakingPriv.Sign(msg, msig.NewBLSHasher(msig.ConsensusVoteTag))
 	require.NoError(t, err)
 
-	beaconSig, err := dkgKey.Sign(msg, crypto.NewBLSKMAC(encoding.RandomBeaconTag))
+	beaconSig, err := dkgKey.Sign(msg, msig.NewBLSHasher(msig.RandomBeaconTag))
 	require.NoError(t, err)
 
 	expectedSig := msig.EncodeDoubleSig(stakingSig, beaconSig)
@@ -179,7 +178,7 @@ func TestCombinedSignWithNoDKGKey(t *testing.T) {
 	// In this case, the SigData should be identical to the staking sig.
 	expectedStakingSig, err := stakingPriv.Sign(
 		MakeVoteMessage(block.View, block.BlockID),
-		crypto.NewBLSKMAC(encoding.ConsensusVoteTag),
+		msig.NewBLSHasher(msig.ConsensusVoteTag),
 	)
 	require.NoError(t, err)
 	require.Equal(t, expectedStakingSig, crypto.Signature(proposal.SigData))
