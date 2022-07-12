@@ -255,6 +255,51 @@ func TestProcessAttackerMessage_ResultApproval_Dictated(t *testing.T) {
 		})
 }
 
+// TestProcessAttackerMessage_ResultApproval_PassThrough evaluates that when corrupted network
+// receives a completely filled result approval,
+// it fills its related fields with its own credentials (e.g., signature), and passes it through the Flow network.
+func TestProcessAttackerMessage_ResultApproval_PassThrough(t *testing.T) {
+	withCorruptibleNetwork(t,
+		func(
+			corruptedId flow.Identity, // identity of ccf
+			corruptibleNetwork *Network,
+			adapter *mocknetwork.Adapter, // mock flow network that ccf uses to communicate with authorized flow nodes.
+			stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that attack network uses to send messages to this ccf.
+		) {
+
+			passThroughApproval := unittest.ResultApprovalFixture()
+			msg, _, _ := insecure.MessageFixture(t, cbor.NewCodec(), insecure.Protocol_PUBLISH, passThroughApproval)
+
+			params := []interface{}{network.Channel(msg.ChannelID), mock.Anything}
+			targetIds, err := flow.ByteSlicesToIds(msg.TargetIDs)
+			require.NoError(t, err)
+			for _, id := range targetIds {
+				params = append(params, id)
+			}
+
+			corruptedEventDispatchedOnFlowNetWg := sync.WaitGroup{}
+			corruptedEventDispatchedOnFlowNetWg.Add(1)
+			adapter.On("PublishOnChannel", params...).Run(func(args mock.Arguments) {
+				approval, ok := args[1].(*flow.ResultApproval)
+				require.True(t, ok)
+
+				// attestation part of the approval must be the same as attacker dictates.
+				require.Equal(t, passThroughApproval, approval)
+
+				corruptedEventDispatchedOnFlowNetWg.Done()
+			}).Return(nil).Once()
+
+			// imitates a gRPC call from orchestrator to ccf through attack network
+			require.NoError(t, stream.Send(msg))
+
+			unittest.RequireReturnsBefore(
+				t,
+				corruptedEventDispatchedOnFlowNetWg.Wait,
+				1*time.Second,
+				"attacker's message was not dispatched on flow network on time")
+		})
+}
+
 // ******************** HELPERS ****************************
 
 func getCorruptibleNetworkNoAttacker(t *testing.T, corruptedID *flow.Identity) (*Network, *mocknetwork.Adapter) {
