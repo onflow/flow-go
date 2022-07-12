@@ -151,6 +151,11 @@ func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string) (access.Acce
 
 func (cf *ConnectionFactoryImpl) InvalidateAccessAPIClient(address string) bool {
 	grpcAddress, err := getGRPCAddress(address, cf.CollectionGRPCPort)
+	if res, ok := cf.ConnectionsCache.Get(grpcAddress); ok {
+		store := res.(ConnectionCacheStore)
+		store.mutex.Lock()
+		defer store.mutex.Unlock()
+	}
 	if err != nil {
 		return true
 	}
@@ -175,6 +180,11 @@ func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (executio
 
 func (cf *ConnectionFactoryImpl) InvalidateExecutionAPIClient(address string) bool {
 	grpcAddress, err := getGRPCAddress(address, cf.ExecutionGRPCPort)
+	if res, ok := cf.ConnectionsCache.Get(grpcAddress); ok {
+		store := res.(ConnectionCacheStore)
+		store.mutex.Lock()
+		defer store.mutex.Unlock()
+	}
 	if err != nil {
 		return true
 	}
