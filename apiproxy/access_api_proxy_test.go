@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"google.golang.org/grpc"
+	grpcinsecure "google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/grpcutils"
@@ -245,7 +246,7 @@ func openFlowLite(address string) error {
 	c, err := grpc.Dial(
 		"unix://"+address,
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
-		grpc.WithInsecure())
+		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
 	if err != nil {
 		return err
 	}

@@ -5,9 +5,11 @@ import (
 	"sync"
 	"time"
 
-	flowsdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go-sdk/client"
 	"go.uber.org/atomic"
+
+	flowsdk "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go-sdk/access"
+	"github.com/onflow/flow-go/module/metrics"
 
 	"github.com/rs/zerolog"
 )
@@ -40,12 +42,17 @@ func WithInteval(interval time.Duration) followerOption {
 	return func(f *txFollowerImpl) { f.interval = interval }
 }
 
+func WithMetrics(m *metrics.LoaderCollector) followerOption {
+	return func(f *txFollowerImpl) { f.metrics = m }
+}
+
 type txFollowerImpl struct {
-	logger zerolog.Logger
+	logger  zerolog.Logger
+	metrics *metrics.LoaderCollector
 
 	ctx    context.Context
 	cancel context.CancelFunc
-	client *client.Client
+	client access.Client
 
 	interval time.Duration
 
@@ -68,7 +75,7 @@ type txInfo struct {
 
 // NewTxFollower creates a new follower that tracks the current block height
 // and can notify on transaction completion.
-func NewTxFollower(ctx context.Context, client *client.Client, opts ...followerOption) (TxFollower, error) {
+func NewTxFollower(ctx context.Context, client access.Client, opts ...followerOption) (TxFollower, error) {
 	newCtx, cancel := context.WithCancel(ctx)
 
 	f := &txFollowerImpl{
@@ -136,12 +143,16 @@ Loop:
 				if ch, loaded := f.txToChan.LoadAndDelete(tx.Hex()); loaded {
 					txi := ch.(txInfo)
 
+					duration := time.Since(txi.submisionTime)
 					f.logger.Trace().
-						Dur("duration", time.Since(txi.submisionTime)).
+						Dur("durationInMS", duration).
 						Hex("txID", tx.Bytes()).
-						Msg("returned tx to the pool")
+						Msg("returned account to the pool")
 					close(txi.C)
 					f.inprogress.Dec()
+					if f.metrics != nil {
+						f.metrics.TransactionExecuted(duration)
+					}
 				} else {
 					blockUnknownTxs++
 				}
@@ -221,7 +232,7 @@ type nopTxFollower struct {
 }
 
 // NewNopTxFollower creates a new follower that tracks the current block height and ID but does not notify on transaction completion.
-func NewNopTxFollower(ctx context.Context, client *client.Client, opts ...followerOption) (TxFollower, error) {
+func NewNopTxFollower(ctx context.Context, client access.Client, opts ...followerOption) (TxFollower, error) {
 	f, err := NewTxFollower(ctx, client, opts...)
 	if err != nil {
 		return nil, err

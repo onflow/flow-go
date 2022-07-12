@@ -19,11 +19,6 @@ func (_m *ExecutionMetrics) ChunkDataPackRequested() {
 	_m.Called()
 }
 
-// DiskSize provides a mock function with given fields: _a0
-func (_m *ExecutionMetrics) DiskSize(_a0 uint64) {
-	_m.Called(_a0)
-}
-
 // ExecutionBlockDataUploadFinished provides a mock function with given fields: dur
 func (_m *ExecutionMetrics) ExecutionBlockDataUploadFinished(dur time.Duration) {
 	_m.Called(dur)
@@ -172,6 +167,11 @@ func (_m *ExecutionMetrics) RuntimeTransactionParsed(dur time.Duration) {
 // StartBlockReceivedToExecuted provides a mock function with given fields: blockID
 func (_m *ExecutionMetrics) StartBlockReceivedToExecuted(blockID flow.Identifier) {
 	_m.Called(blockID)
+}
+
+// UpdateCollectionMaxHeight provides a mock function with given fields: height
+func (_m *ExecutionMetrics) UpdateCollectionMaxHeight(height uint64) {
+	_m.Called(height)
 }
 
 // UpdateCount provides a mock function with given fields:
