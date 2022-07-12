@@ -24,9 +24,9 @@ const defaultClientTimeout = 3 * time.Second
 // ConnectionFactory is used to create an access api client
 type ConnectionFactory interface {
 	GetAccessAPIClient(address string) (access.AccessAPIClient, error)
-	InvalidateAccessAPIClient(address string) bool
+	RefreshAccessAPIClient(address string)
 	GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, error)
-	InvalidateExecutionAPIClient(address string) bool
+	RefreshExecutionAPIClient(address string)
 }
 
 type ProxyConnectionFactory struct {
@@ -106,29 +106,45 @@ func (cf *ConnectionFactoryImpl) retrieveConnection(grpcAddress string, timeout 
 		// this lock prevents a memory leak where a race condition may occur if 2 requests to a new connection at the
 		// same address occur. the second add would overwrite the first without closing the connection
 		cf.lock.Lock()
+		defer cf.lock.Unlock()
+		// Check if connection was created/refreshed by another thread
+		if res, ok := cf.ConnectionsCache.Get(grpcAddress); ok {
+			conn = res.(ConnectionCacheStore).ClientConn
+			if conn.GetState() == connectivity.Ready {
+				return conn, nil
+			}
+		}
+
 		// updates to the cache don't trigger evictions; this line closes connections before re-establishing new ones
 		if conn != nil {
 			conn.Close()
 		}
 		var err error
-		conn, err = cf.createConnection(grpcAddress, timeout)
+		conn, err = cf.addConnection(grpcAddress, timeout, mutex)
 		if err != nil {
 			return nil, err
 		}
+	}
+	return conn, nil
+}
 
-		store := ConnectionCacheStore{
-			ClientConn: conn,
-			mutex:      new(sync.Mutex),
-		}
-		if mutex != nil {
-			store.mutex = mutex
-		}
+func (cf *ConnectionFactoryImpl) addConnection(grpcAddress string, timeout time.Duration, mutex *sync.Mutex) (*grpc.ClientConn, error) {
+	conn, err := cf.createConnection(grpcAddress, timeout)
+	if err != nil {
+		return nil, err
+	}
 
-		cf.ConnectionsCache.Add(grpcAddress, store)
-		cf.lock.Unlock()
-		if cf.AccessMetrics != nil {
-			cf.AccessMetrics.TotalConnectionsInPool(uint(cf.ConnectionsCache.Len()), cf.CacheSize)
-		}
+	store := ConnectionCacheStore{
+		ClientConn: conn,
+		mutex:      new(sync.Mutex),
+	}
+	if mutex != nil {
+		store.mutex = mutex
+	}
+
+	cf.ConnectionsCache.Add(grpcAddress, store)
+	if cf.AccessMetrics != nil {
+		cf.AccessMetrics.TotalConnectionsInPool(uint(cf.ConnectionsCache.Len()), cf.CacheSize)
 	}
 	return conn, nil
 }
@@ -149,17 +165,17 @@ func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string) (access.Acce
 	return accessAPIClient, nil
 }
 
-func (cf *ConnectionFactoryImpl) InvalidateAccessAPIClient(address string) bool {
-	grpcAddress, err := getGRPCAddress(address, cf.CollectionGRPCPort)
+func (cf *ConnectionFactoryImpl) RefreshAccessAPIClient(address string) {
+	grpcAddress, _ := getGRPCAddress(address, cf.CollectionGRPCPort)
 	if res, ok := cf.ConnectionsCache.Get(grpcAddress); ok {
 		store := res.(ConnectionCacheStore)
 		store.mutex.Lock()
+		cf.lock.Lock()
 		defer store.mutex.Unlock()
+		defer cf.lock.Unlock()
+		store.ClientConn.Close()
+		cf.addConnection(grpcAddress, cf.CollectionNodeGRPCTimeout, store.mutex)
 	}
-	if err != nil {
-		return true
-	}
-	return cf.ConnectionsCache.Remove(grpcAddress)
 }
 
 func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, error) {
@@ -178,17 +194,17 @@ func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (executio
 	return executionAPIClient, nil
 }
 
-func (cf *ConnectionFactoryImpl) InvalidateExecutionAPIClient(address string) bool {
-	grpcAddress, err := getGRPCAddress(address, cf.ExecutionGRPCPort)
+func (cf *ConnectionFactoryImpl) RefreshExecutionAPIClient(address string) {
+	grpcAddress, _ := getGRPCAddress(address, cf.CollectionGRPCPort)
 	if res, ok := cf.ConnectionsCache.Get(grpcAddress); ok {
 		store := res.(ConnectionCacheStore)
 		store.mutex.Lock()
+		cf.lock.Lock()
 		defer store.mutex.Unlock()
+		defer cf.lock.Unlock()
+		store.ClientConn.Close()
+		cf.addConnection(grpcAddress, cf.ExecutionNodeGRPCTimeout, store.mutex)
 	}
-	if err != nil {
-		return true
-	}
-	return cf.ConnectionsCache.Remove(grpcAddress)
 }
 
 // getExecutionNodeAddress translates flow.Identity address to the GRPC address of the node by switching the port to the
