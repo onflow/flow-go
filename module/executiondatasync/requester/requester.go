@@ -64,7 +64,7 @@ func NewRequester(
 	serializer execution_data.Serializer,
 	finalizationDistributor *pubsub.FinalizationDistributor,
 	logger zerolog.Logger,
-	metrics module.ExecutionDataRequesterMetrics,
+	metrics module.ExecutionDataRequesterV2Metrics,
 	opts ...RequesterOption,
 ) (*Requester, error) {
 	config := &RequesterConfig{

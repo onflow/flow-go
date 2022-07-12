@@ -24,7 +24,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/onflow/flow-go/module/mempool/entity"
-	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/logging"
@@ -273,34 +272,6 @@ func (e *Manager) ComputeBlock(
 
 	e.programsCache.Set(block.ID(), toInsert)
 
-	group, uploadCtx := errgroup.WithContext(ctx)
-	var rootID flow.Identifier
-	var blobTree [][]cid.Cid
-
-	group.Go(func() error {
-		span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXEAddToExecutionDataService)
-		defer span.Finish()
-
-		var collections []*flow.Collection
-		for _, collection := range result.ExecutableBlock.Collections() {
-			collections = append(collections, &flow.Collection{
-				Transactions: collection.Transactions,
-			})
-		}
-
-		ed := &state_synchronization.ExecutionData{
-			BlockID:     block.ID(),
-			Collections: collections,
-			Events:      result.Events,
-			TrieUpdates: result.TrieUpdates,
-		}
-
-		var err error
-		rootID, blobTree, err = e.eds.Add(uploadCtx, ed)
-
-		return err
-	})
-
 	if uploadEnabled {
 		var group errgroup.Group
 
@@ -325,10 +296,6 @@ func (e *Manager) ComputeBlock(
 	e.log.Debug().
 		Hex("block_id", logging.Entity(result.ExecutableBlock.Block)).
 		Msg("computed block result")
-
-	e.edCache.Insert(block.Block.Header, blobTree)
-	e.log.Info().Hex("block_id", logging.Entity(block.Block)).Hex("execution_data_id", rootID[:]).Msg("execution data ID computed")
-	result.ExecutionDataID = rootID
 
 	return result, nil
 }

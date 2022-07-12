@@ -56,7 +56,7 @@ type fulfiller struct {
 	resultsOut <-chan interface{}
 
 	logger  zerolog.Logger
-	metrics module.ExecutionDataRequesterMetrics
+	metrics module.ExecutionDataRequesterV2Metrics
 
 	notifier *notifier
 	storage  tracker.Storage
@@ -69,7 +69,7 @@ func newFulfiller(
 	notifier *notifier,
 	storage tracker.Storage,
 	logger zerolog.Logger,
-	metrics module.ExecutionDataRequesterMetrics,
+	metrics module.ExecutionDataRequesterV2Metrics,
 ) *fulfiller {
 	jobsIn, jobsOut := util.UnboundedChannel()
 	resultsIn, resultsOut := util.UnboundedChannel()

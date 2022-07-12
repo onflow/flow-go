@@ -2,16 +2,13 @@ package node_builder
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
-	cborlib "github.com/fxamacker/cbor/v2"
 	"github.com/ipfs/go-cid"
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/libp2p/go-libp2p-core/host"
@@ -34,7 +31,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/engine/access/rpc"
@@ -43,7 +39,6 @@ import (
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
-	"github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -61,11 +56,9 @@ import (
 	"github.com/onflow/flow-go/module/metrics/unstaked"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	edrequester "github.com/onflow/flow-go/module/state_synchronization/requester"
-	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/network"
 	netcache "github.com/onflow/flow-go/network/cache"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
-	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	relaynet "github.com/onflow/flow-go/network/relay"
@@ -118,7 +111,6 @@ type AccessNodeConfig struct {
 	executionDataStartHeight     uint64
 	executionDataConfig          edrequester.ExecutionDataConfig
 	baseOptions                  []cmd.Option
-	executionDataDir             string
 
 	executionDataPrunerHeightRangeTarget uint64
 	executionDataPrunerThreshold         uint64
@@ -207,7 +199,7 @@ type FlowAccessNodeBuilder struct {
 	Finalized                  *flow.Header
 	Pending                    []*flow.Header
 	FollowerCore               module.HotStuffFollower
-	ExecutionDataService       state_synchronization.ExecutionDataService
+	ExecutionDataDownloader    execution_data.Downloader
 	ExecutionDataRequester     state_synchronization.ExecutionDataRequester
 
 	// The sync engine participants provider is the libp2p peer store for the access node
@@ -216,10 +208,10 @@ type FlowAccessNodeBuilder struct {
 	SyncEngineParticipantsProviderFactory func() id.IdentifierProvider
 
 	// engines
-	IngestEng              *ingestion.Engine
-	RequestEng             *requester.Engine
-	FollowerEng            *followereng.Engine
-	SyncEng                *synceng.Engine
+	IngestEng                *ingestion.Engine
+	RequestEng               *requester.Engine
+	FollowerEng              *followereng.Engine
+	SyncEng                  *synceng.Engine
 	ExecutionDataRequesterV2 *exedatarequester.Requester
 }
 
@@ -421,7 +413,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequesterV2() *FlowAcces
 		return nil
 	}).
 		Component("execution data requester", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			bs, err := node.Network.RegisterBlobService(engine.ExecutionDataService, executionDataDatastore)
+			bs, err := node.Network.RegisterBlobService(network.ExecutionDataService, executionDataDatastore)
 			if err != nil {
 				return nil, fmt.Errorf("failed to register blob service: %w", err)
 			}
@@ -444,9 +436,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequesterV2() *FlowAcces
 				return nil, err
 			}
 
-			var requesterMetrics module.ExecutionDataRequesterMetrics = metrics.NewNoopCollector()
+			var requesterMetrics module.ExecutionDataRequesterV2Metrics = metrics.NewNoopCollector()
 			if node.MetricsEnabled {
-				requesterMetrics = metrics.NewExecutionDataRequesterCollector()
+				requesterMetrics = metrics.NewExecutionDataRequesterV2Collector()
 			}
 
 			builder.ExecutionDataRequesterV2, err = exedatarequester.NewRequester(
@@ -539,26 +531,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				return nil, fmt.Errorf("could not register blob service: %w", err)
 			}
 
-			decMode, err := cborlib.DecOptions{
-				MaxArrayElements: math.MaxInt64,
-				MaxMapPairs:      math.MaxInt64,
-				MaxNestedLevels:  math.MaxInt16,
-			}.DecMode()
-			if err != nil {
-				return nil, fmt.Errorf("could not create cbor decoder: %w", err)
-			}
+			builder.ExecutionDataDownloader = execution_data.NewDownloader(bs)
 
-			codec := cbor.NewCodec(cbor.WithDecMode(decMode))
-
-			builder.ExecutionDataService = state_synchronization.NewExecutionDataService(
-				codec,
-				compressor.NewLz4Compressor(),
-				bs,
-				metrics.NewExecutionDataServiceCollector(),
-				builder.Logger,
-			)
-
-			return builder.ExecutionDataService, nil
+			return builder.ExecutionDataDownloader, nil
 		}).
 		Component("execution data requester", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// Validation of the start block height needs to be done after loading state
@@ -594,7 +569,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			builder.ExecutionDataRequester = edrequester.New(
 				builder.Logger,
 				metrics.NewExecutionDataRequesterCollector(),
-				builder.ExecutionDataService,
+				builder.ExecutionDataDownloader,
 				processedBlockHeight,
 				processedNotifications,
 				builder.State,
@@ -977,7 +952,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.CollectionsToMarkExecuted,
 				builder.BlocksToMarkExecuted,
 				builder.RpcEng,
-				builder.ExecutionDataRequesterV2
+				builder.ExecutionDataRequesterV2,
 			)
 			if err != nil {
 				return nil, err

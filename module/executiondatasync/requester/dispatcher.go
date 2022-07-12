@@ -52,7 +52,7 @@ type dispatcher struct {
 	fulfiller *fulfiller
 
 	logger  zerolog.Logger
-	metrics module.ExecutionDataRequesterMetrics
+	metrics module.ExecutionDataRequesterV2Metrics
 
 	component.Component
 }
@@ -64,7 +64,7 @@ func newDispatcher(
 	handler *handler,
 	fulfiller *fulfiller,
 	logger zerolog.Logger,
-	metrics module.ExecutionDataRequesterMetrics,
+	metrics module.ExecutionDataRequesterV2Metrics,
 ) *dispatcher {
 	receiptsIn, receiptsOut := util.UnboundedChannel()
 	finalizedBlocksIn, finalizedBlocksOut := util.UnboundedChannel()

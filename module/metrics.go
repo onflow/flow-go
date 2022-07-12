@@ -373,7 +373,7 @@ type ExecutionDataProviderMetrics interface {
 	AddBlobsFailed()
 }
 
-type ExecutionDataRequesterMetrics interface {
+type ExecutionDataRequesterV2Metrics interface {
 	FulfilledHeight(blockHeight uint64)
 	ReceiptSkipped()
 	RequestSucceeded(blockHeight uint64, duration time.Duration, totalSize uint64, numberOfAttempts int)
@@ -384,6 +384,8 @@ type ExecutionDataRequesterMetrics interface {
 
 type ExecutionDataPrunerMetrics interface {
 	Pruned(height uint64, duration time.Duration)
+}
+
 type AccessMetrics interface {
 	// TotalConnectionsInPool updates the number connections to collection/execution nodes stored in the pool, and the size of the pool
 	TotalConnectionsInPool(connectionCount uint, connectionPoolSize uint)

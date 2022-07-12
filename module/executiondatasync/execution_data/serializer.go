@@ -3,7 +3,9 @@ package execution_data
 import (
 	"fmt"
 	"io"
+	"math"
 
+	cborlib "github.com/fxamacker/cbor/v2"
 	"github.com/ipfs/go-cid"
 
 	"github.com/onflow/flow-go/model/encoding"
@@ -12,7 +14,25 @@ import (
 	"github.com/onflow/flow-go/network/compressor"
 )
 
-var DefaultSerializer = NewSerializer(&cbor.Codec{}, compressor.NewLz4Compressor())
+var DefaultSerializer Serializer
+
+func init() {
+	var codec encoding.Codec
+
+	decMode, err := cborlib.DecOptions{
+		MaxArrayElements: math.MaxInt64,
+		MaxMapPairs:      math.MaxInt64,
+		MaxNestedLevels:  math.MaxInt16,
+	}.DecMode()
+
+	if err != nil {
+		codec = &cbor.Codec{}
+	} else {
+		codec = cbor.NewCodec(cbor.WithDecMode(decMode))
+	}
+
+	DefaultSerializer = NewSerializer(codec, compressor.NewLz4Compressor())
+}
 
 // header codes to distinguish between different types of data
 const (

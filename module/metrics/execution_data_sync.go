@@ -8,7 +8,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-type ExecutionDataRequesterCollector struct {
+type ExecutionDataRequesterV2Collector struct {
 	fulfilledHeight               prometheus.Gauge
 	receiptsSkipped               prometheus.Counter
 	requestDurations              prometheus.Summary
@@ -20,8 +20,8 @@ type ExecutionDataRequesterCollector struct {
 	responsesDropped              prometheus.Counter
 }
 
-func NewExecutionDataRequesterCollector() *ExecutionDataRequesterCollector {
-	return &ExecutionDataRequesterCollector{
+func NewExecutionDataRequesterV2Collector() *ExecutionDataRequesterV2Collector {
+	return &ExecutionDataRequesterV2Collector{
 		fulfilledHeight: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:      "fulfilled_height",
 			Namespace: namespaceExecutionDataSync,
@@ -98,31 +98,31 @@ func NewExecutionDataRequesterCollector() *ExecutionDataRequesterCollector {
 	}
 }
 
-func (c *ExecutionDataRequesterCollector) FulfilledHeight(blockHeight uint64) {
+func (c *ExecutionDataRequesterV2Collector) FulfilledHeight(blockHeight uint64) {
 	c.fulfilledHeight.Set(float64(blockHeight))
 }
 
-func (c *ExecutionDataRequesterCollector) ReceiptSkipped() {
+func (c *ExecutionDataRequesterV2Collector) ReceiptSkipped() {
 	c.receiptsSkipped.Inc()
 }
 
-func (c *ExecutionDataRequesterCollector) RequestSucceeded(blockHeight uint64, duration time.Duration, totalSize uint64, numberOfAttempts int) {
+func (c *ExecutionDataRequesterV2Collector) RequestSucceeded(blockHeight uint64, duration time.Duration, totalSize uint64, numberOfAttempts int) {
 	c.requestDurations.Observe(float64(duration.Milliseconds()))
 	c.latestSuccessfulRequestHeight.Set(float64(blockHeight))
 	c.executionDataSizes.Observe(float64(totalSize))
 	c.requestAttempts.Observe(float64(numberOfAttempts))
 }
 
-func (c *ExecutionDataRequesterCollector) RequestFailed(duration time.Duration, retryable bool) {
+func (c *ExecutionDataRequesterV2Collector) RequestFailed(duration time.Duration, retryable bool) {
 	c.requestDurations.Observe(float64(duration.Milliseconds()))
 	c.requestsFailed.WithLabelValues(strconv.FormatBool(retryable)).Inc()
 }
 
-func (c *ExecutionDataRequesterCollector) RequestCanceled() {
+func (c *ExecutionDataRequesterV2Collector) RequestCanceled() {
 	c.requestsCancelled.Inc()
 }
 
-func (c *ExecutionDataRequesterCollector) ResponseDropped() {
+func (c *ExecutionDataRequesterV2Collector) ResponseDropped() {
 	c.responsesDropped.Inc()
 }
 

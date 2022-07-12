@@ -97,7 +97,7 @@ type handler struct {
 	numWorkers       int
 
 	logger  zerolog.Logger
-	metrics module.ExecutionDataRequesterMetrics
+	metrics module.ExecutionDataRequesterV2Metrics
 
 	component.Component
 }
@@ -111,7 +111,7 @@ func newHandler(
 	retryBaseTimeout time.Duration,
 	numWorkers int,
 	logger zerolog.Logger,
-	metrics module.ExecutionDataRequesterMetrics,
+	metrics module.ExecutionDataRequesterV2Metrics,
 ) *handler {
 	jobsIn, jobsOut := util.UnboundedChannel()
 
