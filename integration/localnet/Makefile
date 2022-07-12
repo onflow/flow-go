@@ -1,5 +1,6 @@
 COLLECTION = 3
 CONSENSUS = 3
+VALID_CONSENSUS := $(shell test $(CONSENSUS) -ge 2; echo $$?)
 EXECUTION = 2
 VALID_EXECUTION := $(shell test $(EXECUTION) -ge 2; echo $$?)
 VERIFICATION = 1
@@ -26,6 +27,8 @@ init:
 ifeq ($(strip $(VALID_EXECUTION)), 1)
 	# multiple execution nodes are required to prevent seals being generated in case of execution forking.
 	$(error Number of Execution nodes should be no less than 2)
+else ifeq ($(strip $(VALID_CONSENSUS)), 1)
+	$(error Number of Consensus nodes should be no less than 2)
 else
 	go run -tags relic \
 		-ldflags="-X 'github.com/onflow/flow-go/cmd/build.commit=${COMMIT}' \
