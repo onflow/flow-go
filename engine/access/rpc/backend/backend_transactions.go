@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -152,7 +151,7 @@ func (b *backendTransactions) sendTransactionToCollector(ctx context.Context,
 
 	err = b.grpcTxSend(ctx, collectionRPC, tx)
 	if err != nil {
-		if err == grpc.ErrServerStopped {
+		if status.Code(err) == codes.Unavailable {
 			b.connFactory.InvalidateAccessAPIClient(collectionNodeAddr)
 		}
 		return fmt.Errorf("failed to send transaction to collection node at %s: %v", collectionNodeAddr, err)
@@ -711,7 +710,7 @@ func (b *backendTransactions) tryGetTransactionResult(
 	}
 	resp, err := execRPCClient.GetTransactionResult(ctx, &req)
 	if err != nil {
-		if err == grpc.ErrServerStopped {
+		if status.Code(err) == codes.Unavailable {
 			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
 		}
 		return nil, err
@@ -767,7 +766,7 @@ func (b *backendTransactions) tryGetTransactionResultsByBlockID(
 	}
 	resp, err := execRPCClient.GetTransactionResultsByBlockID(ctx, &req)
 	if err != nil {
-		if err == grpc.ErrServerStopped {
+		if status.Code(err) == codes.Unavailable {
 			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
 		}
 		return nil, err
@@ -824,7 +823,7 @@ func (b *backendTransactions) tryGetTransactionResultByIndex(
 	}
 	resp, err := execRPCClient.GetTransactionResultByIndex(ctx, &req)
 	if err != nil {
-		if err == grpc.ErrServerStopped {
+		if status.Code(err) == codes.Unavailable {
 			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
 		}
 		return nil, err
