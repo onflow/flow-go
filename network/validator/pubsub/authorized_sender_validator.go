@@ -40,10 +40,13 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel channels.Channel, get
 	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(log)
 
 	return func(ctx context.Context, from peer.ID, msg interface{}) (string, error) {
+		// NOTE: messages from unstaked nodes should be reject by the libP2P node topic validator
+		// before they reach message validators. If a message from a unstaked gets to this point
+		// something terrible went wrong.
 		identity, ok := getIdentity(from)
 		if !ok {
-			log.Error().Err(ErrIdentityUnverified).Str("peer_id", from.String()).Msg("rejecting message")
-			return "", ErrUnauthorizedSender
+			log.Error().Str("peer_id", from.String()).Msg(fmt.Sprintf("rejecting message: %s", ErrIdentityUnverified))
+			return "", ErrIdentityUnverified
 		}
 
 		msgType, err := isAuthorizedSender(identity, channel, msg)
@@ -113,7 +116,7 @@ func isAuthorizedSender(identity *flow.Identity, channel channels.Channel, msg i
 	}
 
 	if err := conf.IsAuthorized(identity.Role, channel); err != nil {
-		return conf.Name, fmt.Errorf("%w: %s", err, ErrUnauthorizedSender)
+		return conf.Name, fmt.Errorf("%w: %s", ErrUnauthorizedSender, err)
 	}
 
 	return conf.Name, nil

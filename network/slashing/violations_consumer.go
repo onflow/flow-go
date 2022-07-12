@@ -1,6 +1,8 @@
 package slashing
 
 import (
+	"fmt"
+
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/utils/logging"
@@ -28,35 +30,32 @@ func NewSlashingViolationsConsumer(log zerolog.Logger) *SlashingViolationsConsum
 // OnUnAuthorizedSenderError logs a warning for unauthorized sender error
 func (c *SlashingViolationsConsumer) OnUnAuthorizedSenderError(identity *flow.Identity, peerID, msgType string, err error) {
 	c.log.Error().
-		Err(err).
 		Str("peer_id", peerID).
 		Str("role", identity.Role.String()).
 		Hex("sender_id", logging.ID(identity.NodeID)).
 		Str("message_type", msgType).
 		Str("offense", unAuthorizedSenderViolation).
-		Msg("potential slashable offense")
+		Msg(fmt.Sprintf("potential slashable offense: %s", err))
 }
 
 // OnUnknownMsgTypeError logs a warning for unknown message type error
 func (c *SlashingViolationsConsumer) OnUnknownMsgTypeError(identity *flow.Identity, peerID, msgType string, err error) {
 	c.log.Error().
-		Err(err).
 		Str("peer_id", peerID).
 		Str("role", identity.Role.String()).
 		Hex("sender_id", logging.ID(identity.NodeID)).
 		Str("message_type", msgType).
 		Str("offense", unknownMsgTypeViolation).
-		Msg("potential slashable offense")
+		Msg(fmt.Sprintf("potential slashable offense: %s", err))
 }
 
 // OnSenderEjectedError logs a warning for sender ejected error
 func (c *SlashingViolationsConsumer) OnSenderEjectedError(identity *flow.Identity, peerID, msgType string, err error) {
 	c.log.Error().
-		Err(err).
 		Str("peer_id", peerID).
 		Str("role", identity.Role.String()).
 		Hex("sender_id", logging.ID(identity.NodeID)).
 		Str("message_type", msgType).
 		Str("offense", senderEjectedViolation).
-		Msg("potential slashable offense")
+		Msg(fmt.Sprintf("potential slashable offense: %s", err))
 }
