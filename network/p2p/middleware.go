@@ -545,7 +545,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 // Subscribe subscribes the middleware to a channel.
 // No errors are expected during normal operation.
-func (m *Middleware) Subscribe(channel network.Channel) error {
+func (m *Middleware) Subscribe(channel channels.Channel) error {
 
 	topic := channels.TopicFromChannel(channel, m.rootBlockID)
 
@@ -589,8 +589,8 @@ func (m *Middleware) Subscribe(channel network.Channel) error {
 // - the libP2P node fails to unsubscribe to the topic created from the provided channel.
 //
 // All errors returned from this function can be considered benign.
-func (m *Middleware) Unsubscribe(channel network.Channel) error {
-	topic := network.TopicFromChannel(channel, m.rootBlockID)
+func (m *Middleware) Unsubscribe(channel channels.Channel) error {
+	topic := channels.TopicFromChannel(channel, m.rootBlockID)
 	err := m.libP2PNode.UnSubscribe(topic)
 	if err != nil {
 		return fmt.Errorf("failed to unsubscribe from channel (%s): %w", channel, err)
@@ -652,7 +652,7 @@ func (m *Middleware) processMessage(msg *message.Message, decodedMsgPayload inte
 // - the libP2P node fails to publish the message.
 //
 // All errors returned from this function can be considered benign.
-func (m *Middleware) Publish(msg *message.Message, channel network.Channel) error {
+func (m *Middleware) Publish(msg *message.Message, channel channels.Channel) error {
 	m.log.Debug().Str("channel", channel.String()).Interface("msg", msg).Msg("publishing new message")
 
 	// convert the message to bytes to be put on the wire.
