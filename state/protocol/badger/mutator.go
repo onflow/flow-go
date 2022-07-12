@@ -816,11 +816,6 @@ func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, bool
 		return nil, false, fmt.Errorf("could not retrieve epoch fallback status: %w", err)
 	}
 
-	// if epoch fallback mode is triggered, we continue with our parent's epoch status
-	if epochFallbackTriggered {
-		return parentStatus.Copy(), true, nil
-	}
-
 	// Case 1 or 2b (still in parent block's epoch or epoch fallback triggered):
 	if block.View <= parentSetup.FinalView || epochFallbackTriggered {
 		// IMPORTANT: copy the status to avoid modifying the parent status in the cache
@@ -916,11 +911,6 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (
 		return nil, false, fmt.Errorf("could not get parent (id=%x): %w", candidate.Header.ParentID, err)
 	}
 	for _, seal := range parent.Payload.Seals {
-		// never process service events after epoch fallback is triggered
-		if isEpochFallbackTriggered {
-			break
-		}
-
 		result, err := m.results.ByID(seal.ResultID)
 		if err != nil {
 			return nil, false, fmt.Errorf("could not get result (id=%x) for seal (id=%x): %w", seal.ResultID, seal.ID(), err)
@@ -936,9 +926,6 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (
 				if protocol.IsInvalidServiceEventError(err) {
 					// we have observed an invalid service event, which triggers epoch fallback mode
 					return dbUpdates, true, nil
-				}
-				if err != nil {
-					return nil, false, fmt.Errorf("unexpected error validating EpochSetup service event: %w", err)
 				}
 				if err != nil {
 					return nil, false, fmt.Errorf("unexpected error validating EpochSetup service event: %w", err)
@@ -961,9 +948,6 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (
 				if protocol.IsInvalidServiceEventError(err) {
 					// we have observed an invalid service event, which triggers epoch fallback mode
 					return dbUpdates, true, nil
-				}
-				if err != nil {
-					return nil, false, fmt.Errorf("unexpected error validating EpochCommit service event: %w", err)
 				}
 				if err != nil {
 					return nil, false, fmt.Errorf("unexpected error validating EpochCommit service event: %w", err)

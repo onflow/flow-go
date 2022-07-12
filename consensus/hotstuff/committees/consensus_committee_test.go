@@ -103,8 +103,8 @@ func (suite *ConsensusSuite) CommitEpoch(epoch protocol.Epoch) {
 
 	// wait for the protocol event to be processed (async)
 	assert.Eventually(suite.T(), func() bool {
-		_, err := suite.committee.IdentityByEpoch(firstView, unittest.IdentifierFixture())
-		return !errors.Is(err, model.ErrViewForUnknownEpoch)
+		_, err := suite.committee.IdentitiesByEpoch(firstView)
+		return err == nil
 	}, time.Second, time.Millisecond)
 }
 

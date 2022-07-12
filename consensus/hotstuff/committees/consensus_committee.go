@@ -309,8 +309,10 @@ func (c *Consensus) DKG(view uint64) (hotstuff.DKG, error) {
 	return epochInfo.dkg, nil
 }
 
-// handleProtocolEvents is a worker routine which processes protocol events from
-// the protocol state. When we observe a new epoch being committed, we compute
+// handleProtocolEvents processes queued Epoch events `EpochCommittedPhaseStarted`
+// and `EpochEmergencyFallbackTriggered`. This function permanently utilizes a worker
+// routine until the `Component` terminates.    
+// When we observe a new epoch being committed, we compute
 // the leader selection and cache static info for the epoch. When we observe
 // epoch emergency fallback being triggered, we inject a fallback epoch.
 func (c *Consensus) handleProtocolEvents(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
@@ -334,7 +336,7 @@ func (c *Consensus) handleProtocolEvents(ctx irrecoverable.SignalerContext, read
 	}
 }
 
-// EpochCommittedPhaseStarted passes the protocol event to the worker thread.
+// EpochCommittedPhaseStarted informs the `committee.Consensus` that the block starting the Epoch Committed Phase has been finalized.
 func (c *Consensus) EpochCommittedPhaseStarted(_ uint64, first *flow.Header) {
 	nextEpoch := c.state.AtBlockID(first.ID()).Epochs().Next()
 	c.committedEpochsCh <- nextEpoch
