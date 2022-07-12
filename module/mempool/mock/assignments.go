@@ -81,8 +81,8 @@ func (_m *Assignments) Has(assignmentID flow.Identifier) bool {
 	return r0
 }
 
-// Rem provides a mock function with given fields: assignmentID
-func (_m *Assignments) Rem(assignmentID flow.Identifier) bool {
+// Remove provides a mock function with given fields: assignmentID
+func (_m *Assignments) Remove(assignmentID flow.Identifier) bool {
 	ret := _m.Called(assignmentID)
 
 	var r0 bool

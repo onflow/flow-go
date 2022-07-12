@@ -3,22 +3,21 @@ package utils
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/module/signature"
 )
 
 // NewExecutionReceiptHasher generates and returns a hasher for signing
 // and verification of execution receipts
 func NewExecutionReceiptHasher() hash.Hasher {
-	h := crypto.NewBLSKMAC(encoding.ExecutionReceiptTag)
+	h := signature.NewBLSHasher(signature.ExecutionReceiptTag)
 	return h
 }
 
 // NewSPOCKHasher generates and returns a hasher for signing
 // and verification of SPoCKs
 func NewSPOCKHasher() hash.Hasher {
-	h := crypto.NewBLSKMAC(encoding.SPOCKTag)
+	h := signature.NewBLSHasher(signature.SPOCKTag)
 	return h
 }
 

@@ -7,8 +7,6 @@ import (
 
 	execution "github.com/onflow/flow/protobuf/go/flow/execution"
 
-	io "io"
-
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -18,7 +16,7 @@ type ConnectionFactory struct {
 }
 
 // GetAccessAPIClient provides a mock function with given fields: address
-func (_m *ConnectionFactory) GetAccessAPIClient(address string) (access.AccessAPIClient, io.Closer, error) {
+func (_m *ConnectionFactory) GetAccessAPIClient(address string) (access.AccessAPIClient, error) {
 	ret := _m.Called(address)
 
 	var r0 access.AccessAPIClient
@@ -30,27 +28,18 @@ func (_m *ConnectionFactory) GetAccessAPIClient(address string) (access.AccessAP
 		}
 	}
 
-	var r1 io.Closer
-	if rf, ok := ret.Get(1).(func(string) io.Closer); ok {
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string) error); ok {
 		r1 = rf(address)
 	} else {
-		if ret.Get(1) != nil {
-			r1 = ret.Get(1).(io.Closer)
-		}
+		r1 = ret.Error(1)
 	}
 
-	var r2 error
-	if rf, ok := ret.Get(2).(func(string) error); ok {
-		r2 = rf(address)
-	} else {
-		r2 = ret.Error(2)
-	}
-
-	return r0, r1, r2
+	return r0, r1
 }
 
 // GetExecutionAPIClient provides a mock function with given fields: address
-func (_m *ConnectionFactory) GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, io.Closer, error) {
+func (_m *ConnectionFactory) GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, error) {
 	ret := _m.Called(address)
 
 	var r0 execution.ExecutionAPIClient
@@ -62,23 +51,42 @@ func (_m *ConnectionFactory) GetExecutionAPIClient(address string) (execution.Ex
 		}
 	}
 
-	var r1 io.Closer
-	if rf, ok := ret.Get(1).(func(string) io.Closer); ok {
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string) error); ok {
 		r1 = rf(address)
 	} else {
-		if ret.Get(1) != nil {
-			r1 = ret.Get(1).(io.Closer)
-		}
+		r1 = ret.Error(1)
 	}
 
-	var r2 error
-	if rf, ok := ret.Get(2).(func(string) error); ok {
-		r2 = rf(address)
+	return r0, r1
+}
+
+// InvalidateAccessAPIClient provides a mock function with given fields: address
+func (_m *ConnectionFactory) InvalidateAccessAPIClient(address string) bool {
+	ret := _m.Called(address)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(string) bool); ok {
+		r0 = rf(address)
 	} else {
-		r2 = ret.Error(2)
+		r0 = ret.Get(0).(bool)
 	}
 
-	return r0, r1, r2
+	return r0
+}
+
+// InvalidateExecutionAPIClient provides a mock function with given fields: address
+func (_m *ConnectionFactory) InvalidateExecutionAPIClient(address string) bool {
+	ret := _m.Called(address)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(string) bool); ok {
+		r0 = rf(address)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
 }
 
 type NewConnectionFactoryT interface {

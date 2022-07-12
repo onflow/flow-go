@@ -74,7 +74,7 @@ func TestCombinedSignWithDKGKeyV3(t *testing.T) {
 	// check that a created proposal's signature is a combined staking sig and random beacon sig
 	msg := MakeVoteMessage(block.View, block.BlockID)
 
-	beaconSig, err := dkgKey.Sign(msg, crypto.NewBLSKMAC(encoding.RandomBeaconTag))
+	beaconSig, err := dkgKey.Sign(msg, msig.NewBLSHasher(msig.RandomBeaconTag))
 	require.NoError(t, err)
 
 	expectedSig := msig.EncodeSingleSig(encoding.SigTypeRandomBeacon, beaconSig)
@@ -143,7 +143,7 @@ func TestCombinedSignWithNoDKGKeyV3(t *testing.T) {
 
 	// check that a created proposal's signature is a combined staking sig and random beacon sig
 	msg := MakeVoteMessage(block.View, block.BlockID)
-	stakingSig, err := stakingPriv.Sign(msg, crypto.NewBLSKMAC(encoding.ConsensusVoteTag))
+	stakingSig, err := stakingPriv.Sign(msg, msig.NewBLSHasher(msig.ConsensusVoteTag))
 	require.NoError(t, err)
 
 	expectedSig := msig.EncodeSingleSig(encoding.SigTypeStaking, stakingSig)
@@ -159,7 +159,7 @@ func Test_VerifyQCV3(t *testing.T) {
 	msg := MakeVoteMessage(block.View, block.BlockID)
 
 	// generate some BLS key as a stub of the random beacon group key and use it to generate a reconstructed beacon sig
-	privGroupKey, beaconSig := generateSignature(t, msg, encoding.RandomBeaconTag)
+	privGroupKey, beaconSig := generateSignature(t, msg, msig.RandomBeaconTag)
 	dkg := &mocks.DKG{}
 	dkg.On("GroupKey").Return(privGroupKey.PublicKey(), nil)
 	dkg.On("Size").Return(uint(20))
@@ -167,9 +167,9 @@ func Test_VerifyQCV3(t *testing.T) {
 	committee.On("DKG", mock.Anything).Return(dkg, nil)
 
 	// generate 17 BLS keys as stubs for staking keys and use them to generate an aggregated staking sig
-	privStakingKeys, aggStakingSig := generateAggregatedSignature(t, 17, msg, encoding.ConsensusVoteTag)
+	privStakingKeys, aggStakingSig := generateAggregatedSignature(t, 17, msg, msig.ConsensusVoteTag)
 	// generate 11 BLS keys as stubs for individual random beacon key shares and use them to generate an aggregated rand beacon sig
-	privRbKeyShares, aggRbSig := generateAggregatedSignature(t, 11, msg, encoding.RandomBeaconTag)
+	privRbKeyShares, aggRbSig := generateAggregatedSignature(t, 11, msg, msig.RandomBeaconTag)
 
 	stakingSigners := generateIdentitiesForPrivateKeys(t, privStakingKeys)
 	rbSigners := generateIdentitiesForPrivateKeys(t, privRbKeyShares)
@@ -247,7 +247,7 @@ func Test_VerifyQCV3(t *testing.T) {
 		// beacon sig shares. But we only supply 5 aggregated key shares.
 		sd := unpackedSigData // copy correct QC
 		sd.RandomBeaconSigners = rbSigners[:5].NodeIDs()
-		sd.AggregatedRandomBeaconSig = aggregatedSignature(t, privRbKeyShares[:5], msg, encoding.RandomBeaconTag)
+		sd.AggregatedRandomBeaconSig = aggregatedSignature(t, privRbKeyShares[:5], msg, msig.RandomBeaconTag)
 
 		packer := &mocks.Packer{}
 		packer.On("Unpack", mock.Anything, packedSigData).Return(&sd, nil)
@@ -316,13 +316,13 @@ func generateAggregatedSignature(t *testing.T, n int, msg []byte, tag string) ([
 // using domain separation `tag` and return the private key and signature.
 func generateSignature(t *testing.T, message []byte, tag string) (crypto.PrivateKey, crypto.Signature) {
 	priv := unittest.PrivateKeyFixture(crypto.BLSBLS12381, crypto.KeyGenSeedMinLenBLSBLS12381)
-	sig, err := priv.Sign(message, crypto.NewBLSKMAC(tag))
+	sig, err := priv.Sign(message, msig.NewBLSHasher(tag))
 	require.NoError(t, err)
 	return priv, sig
 }
 
 func aggregatedSignature(t *testing.T, pivKeys []crypto.PrivateKey, message []byte, tag string) crypto.Signature {
-	hasher := crypto.NewBLSKMAC(tag)
+	hasher := msig.NewBLSHasher(tag)
 	sigs := make([]crypto.Signature, 0, len(pivKeys))
 	for _, k := range pivKeys {
 		sig, err := k.Sign(message, hasher)

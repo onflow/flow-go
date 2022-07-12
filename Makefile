@@ -89,10 +89,6 @@ test: generate-mocks emulator-build unittest
 integration-test: docker-build-flow
 	$(MAKE) -C integration integration-test
 
-# separate integration tests for BFT because they will currently always fail if they're added to regular CI
-.PHONY: integration-test-bft
-integration-test-bft: docker-build-flow docker-build-flow-corrupted
-
 .PHONY: benchmark
 benchmark: docker-build-flow
 	$(MAKE) -C integration benchmark
@@ -335,7 +331,7 @@ docker-build-loader:
 		-t "$(CONTAINER_REGISTRY)/loader:latest" -t "$(CONTAINER_REGISTRY)/loader:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/loader:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-flow
-docker-build-flow: docker-build-collection docker-build-consensus docker-build-execution docker-build-verification docker-build-access docker-build-observer docker-build-ghost
+docker-build-flow: docker-build-flow-corrupted docker-build-collection docker-build-consensus docker-build-execution docker-build-verification docker-build-access docker-build-observer docker-build-ghost
 
 .PHONY: docker-build-flow-corrupted
 docker-build-flow-corrupted: docker-build-execution-corrupted docker-build-verification-corrupted
