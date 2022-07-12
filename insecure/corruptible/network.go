@@ -44,7 +44,7 @@ type Network struct {
 	me                    module.Local
 	flowNetwork           flownet.Network // original flow network of the node.
 	server                *grpc.Server    // touch point of attack network to this factory.
-	address               net.Addr
+	gRPCListenAddress     net.Addr
 	conduitFactory        insecure.CorruptibleConduitFactory
 	attackerInboundStream insecure.CorruptibleConduitFactory_ConnectAttackerServer // inbound stream to attacker
 
@@ -216,16 +216,16 @@ func (n *Network) processAttackerMessage(msg *insecure.Message) error {
 	return nil
 }
 
-func (n *Network) start(ctx irrecoverable.SignalerContext, address string) {
+func (n *Network) start(ctx irrecoverable.SignalerContext, gRPCListenAddress string) {
 	// starts up gRPC server of corruptible network at given address.
 	server := grpc.NewServer()
 	insecure.RegisterCorruptibleConduitFactoryServer(server, n)
-	ln, err := net.Listen(networkingProtocolTCP, address)
+	ln, err := net.Listen(networkingProtocolTCP, gRPCListenAddress)
 	if err != nil {
 		ctx.Throw(fmt.Errorf("could not listen on specified address: %w", err))
 	}
 	n.server = server
-	n.address = ln.Addr()
+	n.gRPCListenAddress = ln.Addr()
 
 	// waits till gRPC server is coming up and running.
 	wg := sync.WaitGroup{}
@@ -245,9 +245,9 @@ func (n *Network) stop() {
 	n.server.Stop()
 }
 
-// ServerAddress returns address of the gRPC server that is running by this corruptible network.
+// ServerAddress returns listen address of the gRPC server that is running by this corruptible network.
 func (n *Network) ServerAddress() string {
-	return n.address.String()
+	return n.gRPCListenAddress.String()
 }
 
 // EngineClosingChannel is called by the conduits of this corruptible network to let it know that the corresponding

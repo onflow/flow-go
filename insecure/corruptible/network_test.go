@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	grpcinsecure "google.golang.org/grpc/credentials/insecure"
+	"math/rand"
 	"net"
 	"sync"
 	"testing"
@@ -142,6 +143,45 @@ func TestHandleOutgoingEvent_NoAttacker_MulticastOverNetwork(t *testing.T) {
 	mock.AssertExpectationsForObjects(t, adapter)
 }
 
+// TestProcessAttackerMessage evaluates that corrupted network relays the messages to its underlying flow network.
+func TestProcessAttackerMessage(t *testing.T) {
+	withCorruptibleNetwork(t,
+		func(
+			corruptedId flow.Identity, // identity of corrupt network
+			corruptibleNetwork *Network,
+			flowNetwork *mocknetwork.Adapter, // mock flow network that ccf uses to communicate with authorized flow nodes.
+			stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that attack network uses to send messages to this ccf.
+		) {
+			// creates a corrupted event that attacker is sending on the flow network through the
+			// corrupted conduit factory.
+			msg, event, _ := insecure.MessageFixture(t, cbor.NewCodec(), insecure.Protocol_MULTICAST, &message.TestMessage{
+				Text: fmt.Sprintf("this is a test message: %d", rand.Int()),
+			})
+
+			params := []interface{}{network.Channel(msg.ChannelID), event.FlowProtocolEvent, uint(3)}
+			targetIds, err := flow.ByteSlicesToIds(msg.TargetIDs)
+			require.NoError(t, err)
+
+			for _, id := range targetIds {
+				params = append(params, id)
+			}
+			corruptedEventDispatchedOnFlowNetWg := sync.WaitGroup{}
+			corruptedEventDispatchedOnFlowNetWg.Add(1)
+			flowNetwork.On("MulticastOnChannel", params...).Run(func(args mock.Arguments) {
+				corruptedEventDispatchedOnFlowNetWg.Done()
+			}).Return(nil).Once()
+
+			// imitates a gRPC call from orchestrator to ccf through attack network
+			require.NoError(t, stream.Send(msg))
+
+			unittest.RequireReturnsBefore(
+				t,
+				corruptedEventDispatchedOnFlowNetWg.Wait,
+				1*time.Second,
+				"attacker's message was not dispatched on flow network on time")
+		})
+}
+
 // ******************** HELPERS ****************************
 
 func getCorruptibleNetworkNoAttacker(t *testing.T) (*Network, *mocknetwork.Adapter) {
@@ -149,6 +189,7 @@ func getCorruptibleNetworkNoAttacker(t *testing.T) (*Network, *mocknetwork.Adapt
 	codec := cbor.NewCodec()
 	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress("localhost:0"))
 	flowNetwork := &mocknetwork.Network{}
+	flowNetwork.On("Start", mock.Anything).Return()
 	ccf := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet)
 
 	// set up adapter, so we can check if that it called the expected method
@@ -181,7 +222,7 @@ func getMessageAndChannel() (*message.TestMessage, network.Channel) {
 func withCorruptibleNetwork(t *testing.T,
 	run func(
 		flow.Identity, // identity of corrupted network
-		*Network, // corrupted network
+		*Network, // corruptible network
 		*mocknetwork.Adapter, // mock adapter that corrupted network uses to communicate with authorized flow nodes.
 		insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that attack network uses to send messages to this ccf.
 	)) {
@@ -204,7 +245,7 @@ func withCorruptibleNetwork(t *testing.T,
 	//event, channel := getMessageAndChannel()
 
 	// start corruptible network
-	corruptibleNetwork.start(ccfCtx, corruptibleNetwork.ServerAddress())
+	corruptibleNetwork.Start(ccfCtx)
 	unittest.RequireCloseBefore(t, corruptibleNetwork.Ready(), 1*time.Second, "could not start corruptible network on time")
 
 	// extracting port that ccf gRPC server is running on

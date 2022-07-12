@@ -73,46 +73,6 @@ func TestNewConduit_MissingEgressController(t *testing.T) {
 	require.Nil(t, c)
 }
 
-// TestProcessAttackerMessage evaluates that corrupted conduit factory (ccf)
-// relays the messages coming from the attack network to its underlying flow network.
-//func TestProcessAttackerMessage(t *testing.T) {
-//	withCorruptibleNetwork(t,
-//		func(
-//			corruptedId flow.Identity, // identity of ccf
-//			factory *ConduitFactory, // the ccf itself
-//			flowNetwork *mocknetwork.Adapter, // mock flow network that ccf uses to communicate with authorized flow nodes.
-//			stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that attack network uses to send messages to this ccf.
-//		) {
-//			// creates a corrupted event that attacker is sending on the flow network through the
-//			// corrupted conduit factory.
-//			msg, event, _ := insecure.MessageFixture(t, cbor.NewCodec(), insecure.Protocol_MULTICAST, &message.TestMessage{
-//				Text: fmt.Sprintf("this is a test message: %d", rand.Int()),
-//			})
-//
-//			params := []interface{}{network.Channel(msg.ChannelID), event.FlowProtocolEvent, uint(3)}
-//			targetIds, err := flow.ByteSlicesToIds(msg.TargetIDs)
-//			require.NoError(t, err)
-//
-//			for _, id := range targetIds {
-//				params = append(params, id)
-//			}
-//			corruptedEventDispatchedOnFlowNetWg := sync.WaitGroup{}
-//			corruptedEventDispatchedOnFlowNetWg.Add(1)
-//			flowNetwork.On("MulticastOnChannel", params...).Run(func(args testifymock.Arguments) {
-//				corruptedEventDispatchedOnFlowNetWg.Done()
-//			}).Return(nil).Once()
-//
-//			// imitates a gRPC call from orchestrator to ccf through attack network
-//			require.NoError(t, stream.Send(msg))
-//
-//			unittest.RequireReturnsBefore(
-//				t,
-//				corruptedEventDispatchedOnFlowNetWg.Wait,
-//				1*time.Second,
-//				"attacker's message was not dispatched on flow network on time")
-//		})
-//}
-
 // TestProcessAttackerMessage_ResultApproval_Dictated evaluates that when corrupted conduit factory (ccf) receives a result approval with
 // empty signature field,
 // it fills its related fields with its own credentials (e.g., signature), and passes it through the Flow network.
