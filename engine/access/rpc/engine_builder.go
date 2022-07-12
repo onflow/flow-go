@@ -2,21 +2,21 @@ package rpc
 
 import (
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	legacyaccessproto "github.com/onflow/flow/protobuf/go/flow/legacy/access"
 
 	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/state/protocol"
-
 	legacyaccess "github.com/onflow/flow-go/access/legacy"
 	"github.com/onflow/flow-go/apiproxy"
+	"github.com/onflow/flow-go/consensus/hotstuff"
 )
 
 // NewRPCEngineBuilder helps to build a new RPC engine.
-func NewRPCEngineBuilder(engine *Engine, state protocol.State) *RPCEngineBuilder {
+func NewRPCEngineBuilder(engine *Engine, committee hotstuff.Committee) *RPCEngineBuilder {
 	builder := &RPCEngineBuilder{}
 	builder.Engine = engine
-	builder.localAPIServer = access.NewHandler(builder.backend, builder.chain, state)
+	builder.localAPIServer = access.NewHandler(builder.backend, builder.chain, committee)
 	return builder
 }
 

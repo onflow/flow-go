@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"net"
 	"net/http"
 	"sync"
@@ -86,7 +87,7 @@ func NewBuilder(log zerolog.Logger,
 	executionGRPCPort uint,
 	retryEnabled bool,
 	rpcMetricsEnabled bool,
-	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the Access API e.g. Ping->100, GetTransaction->300
+	apiRatelimits map[string]int,  // the api rate limit (max calls per second) for each of the Access API e.g. Ping->100, GetTransaction->300
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the Access API e.g. Ping->50, GetTransaction->10
 ) (*RPCEngineBuilder, error) {
 
@@ -184,7 +185,15 @@ func NewBuilder(log zerolog.Logger,
 		chain:              chainID.Chain(),
 	}
 
-	builder := NewRPCEngineBuilder(eng, state)
+	// TODO: update to Replicas API once active PaceMaker is merged
+	// The second parameter (flow.Identifier) is only used by hotstuff internally and also
+	// going to be removed soon. For now, we set it to zero.
+	committee, err := committees.NewConsensusCommittee(state, flow.ZeroID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize hotstuff.Committee abstractiono: %w", err)
+	}
+
+	builder := NewRPCEngineBuilder(eng, committee)
 	if rpcMetricsEnabled {
 		builder.WithMetrics()
 	}

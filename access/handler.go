@@ -22,6 +22,8 @@ type Handler struct {
 	committee hotstuff.Committee
 }
 
+type HandlerOption func(*Handler)
+
 func NewHandler(api API, chain flow.Chain, committee hotstuff.Committee) *Handler {
 	return &Handler{
 		api:       api,

@@ -57,7 +57,7 @@ func New(
 	exeResults storage.ExecutionResults,
 	txResults storage.TransactionResults,
 	chainID flow.ChainID,
-	apiRatelimits map[string]int,  // the api rate limit (max calls per second) for each of the gRPC API e.g. Ping->100, ExecuteScriptAtBlockID->300
+	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the gRPC API e.g. Ping->100, ExecuteScriptAtBlockID->300
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the gRPC API e.g. Ping->50, ExecuteScriptAtBlockID->10
 ) (*Engine, error) {
 	log = log.With().Str("engine", "rpc").Logger()
@@ -90,6 +90,9 @@ func New(
 
 	server := grpc.NewServer(serverOptions...)
 
+	// TODO: update to Replicas API once active PaceMaker is merged
+	// The second parameter (flow.Identifier) is only used by hotstuff internally and also
+	// going to be removed soon. For now, we set it to zero.
 	committee, err := committees.NewConsensusCommittee(state, flow.ZeroID)
 	if err != nil {
 		return nil, fmt.Errorf("initializing hotstuff.Committee abstraction failed: %w", err)
