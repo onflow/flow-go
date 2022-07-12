@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	"time"
 
@@ -13,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go-sdk/client"
+	"github.com/onflow/flow-go-sdk/access"
 	"github.com/onflow/flow-go-sdk/crypto"
 )
 
@@ -39,7 +40,7 @@ type ContLoadGenerator struct {
 	loaderMetrics        *metrics.LoaderCollector
 	tps                  int
 	numberOfAccounts     int
-	flowClient           *client.Client
+	flowClient           access.Client
 	serviceAccount       *flowAccount
 	flowTokenAddress     *flowsdk.Address
 	fungibleTokenAddress *flowsdk.Address
@@ -58,8 +59,8 @@ type ContLoadGenerator struct {
 func NewContLoadGenerator(
 	log zerolog.Logger,
 	loaderMetrics *metrics.LoaderCollector,
-	flowClient *client.Client,
-	supervisorClient *client.Client,
+	flowClient access.Client,
+	supervisorClient access.Client,
 	loadedAccessAddr string,
 	servAccPrivKeyHex string,
 	serviceAccountAddress *flowsdk.Address,
@@ -196,11 +197,24 @@ func (lg *ContLoadGenerator) Start() {
 }
 
 func (lg *ContLoadGenerator) Stop() {
+	defer lg.log.Debug().Msg("stopped generator")
+
 	lg.stopped = true
+	wg := sync.WaitGroup{}
+	wg.Add(len(lg.workers))
 	for _, w := range lg.workers {
-		w.Stop()
+		w := w
+
+		go func() {
+			defer wg.Done()
+
+			lg.log.Debug().Int("workerID", w.workerID).Msg("stopping worker")
+			w.Stop()
+		}()
 	}
+	wg.Wait()
 	lg.workerStatsTracker.StopPrinting()
+	lg.log.Debug().Msg("stopping follower")
 	lg.follower.Stop()
 }
 
@@ -262,7 +276,7 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 	<-ch
 
 	log := lg.log.With().Str("tx_id", createAccountTx.ID().String()).Logger()
-	result, err := lg.flowClient.GetTransactionResult(context.Background(), createAccountTx.ID())
+	result, err := WaitForTransactionResult(context.Background(), lg.flowClient, createAccountTx.ID())
 	if err != nil {
 		return fmt.Errorf("failed to get transactions result: %w", err)
 	}
