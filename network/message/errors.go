@@ -8,7 +8,6 @@ import (
 var (
 	ErrUnauthorizedMessageOnChannel = errors.New("message is not authorized to be sent on channel")
 	ErrUnauthorizedRole             = errors.New("sender role not authorized to send message on channel")
-	AuthorizationConfigs            map[string]MsgAuthConfig
 )
 
 // UnknownMsgTypeErr indicates that no message auth configured for the message type v

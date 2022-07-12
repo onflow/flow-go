@@ -7,6 +7,8 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 )
 
+var AuthorizationConfigs map[string]MsgAuthConfig
+
 // MsgAuthConfig contains authorization information for a specific flow message. The authorization
 // is represented as a map from network channel -> list of all roles allowed to send the message on
 // the channel.
