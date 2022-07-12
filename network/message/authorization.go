@@ -118,7 +118,7 @@ func initializeMessageAuthConfigsMap() {
 			return new(messages.BlockResponse)
 		},
 		Config: map[channels.Channel]flow.RoleList{
-			channels.SyncCommittee:     {flow.RoleConsensus},
+			channels.SyncCommittee: {flow.RoleConsensus},
 		},
 	}
 

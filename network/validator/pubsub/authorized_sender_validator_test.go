@@ -130,12 +130,12 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ClusterPrefix
 
 	// validate collection consensus cluster
 	validateCollConsensus := AuthorizedSenderValidator(unittest.Logger(), channels.ConsensusCluster(clusterID), getIdentityFunc)
-	msgType, err := validateCollConsensus(ctx, pid, &messages.ClusterBlockResponse{})
+	msgType, err := validateCollConsensus(ctx, pid, &messages.ClusterBlockProposal{})
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), message.ClusterBlockResponse, msgType)
+	require.Equal(s.T(), message.ClusterBlockProposal, msgType)
 
 	validateCollConsensusPubsub := AuthorizedSenderMessageValidator(unittest.Logger(), channels.ConsensusCluster(clusterID), getIdentityFunc)
-	pubsubResult := validateCollConsensusPubsub(ctx, pid, &messages.ClusterBlockResponse{})
+	pubsubResult := validateCollConsensusPubsub(ctx, pid, &messages.ClusterBlockProposal{})
 	require.Equal(s.T(), pubsub.ValidationAccept, pubsubResult)
 
 	// validate collection sync cluster
