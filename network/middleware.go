@@ -34,7 +34,6 @@ type Middleware interface {
 	// Publish publishes a message on the channel. It models a distributed broadcast where the message is meant for all or
 	// a many nodes subscribing to the channel. It does not guarantee the delivery though, and operates on a best
 	// effort.
-
 	// All errors returned from this function can be considered benign.
 	Publish(msg *message.Message, channel channels.Channel) error
 
