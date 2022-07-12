@@ -128,8 +128,8 @@ func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus
 		state:                  state,
 		me:                     me,
 		epochs:                 make(map[uint64]*staticEpochInfo),
-		committedEpochsCh:      make(chan protocol.Epoch),
-		epochEmergencyFallback: make(chan struct{}),
+		committedEpochsCh:      make(chan protocol.Epoch, 1),
+		epochEmergencyFallback: make(chan struct{}, 1),
 	}
 
 	com.Component = component.NewComponentManagerBuilder().
