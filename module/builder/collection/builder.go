@@ -244,14 +244,14 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		}
 		if blockFinalizedAtReferenceHeight.ID() != tx.ReferenceBlockID {
 			// the transaction references an orphaned block - it will never be valid
-			b.transactions.Rem(tx.ID())
+			b.transactions.Remove(tx.ID())
 			continue
 		}
 
 		// ensure the reference block is not too old
 		if refHeader.Height < minPossibleRefHeight {
 			// the transaction is expired, it will never be valid
-			b.transactions.Rem(tx.ID())
+			b.transactions.Remove(tx.ID())
 			continue
 		}
 
@@ -264,7 +264,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		// check that the transaction was not already included in finalized history.
 		if lookup.isFinalizedAncestor(txID) {
 			// remove from mempool, conflicts with finalized block will never be valid
-			b.transactions.Rem(txID)
+			b.transactions.Remove(txID)
 			continue
 		}
 

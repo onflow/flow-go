@@ -101,8 +101,8 @@ func (_m *Transactions) Hash() flow.Identifier {
 	return r0
 }
 
-// Rem provides a mock function with given fields: txID
-func (_m *Transactions) Rem(txID flow.Identifier) bool {
+// Remove provides a mock function with given fields: txID
+func (_m *Transactions) Remove(txID flow.Identifier) bool {
 	ret := _m.Called(txID)
 
 	var r0 bool

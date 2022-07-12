@@ -96,8 +96,8 @@ func (_m *Blocks) Hash() flow.Identifier {
 	return r0
 }
 
-// Rem provides a mock function with given fields: blockID
-func (_m *Blocks) Rem(blockID flow.Identifier) bool {
+// Remove provides a mock function with given fields: blockID
+func (_m *Blocks) Remove(blockID flow.Identifier) bool {
 	ret := _m.Called(blockID)
 
 	var r0 bool

@@ -112,8 +112,8 @@ func (_m *Deltas) Limit() uint {
 	return r0
 }
 
-// Rem provides a mock function with given fields: blockID
-func (_m *Deltas) Rem(blockID flow.Identifier) bool {
+// Remove provides a mock function with given fields: blockID
+func (_m *Deltas) Remove(blockID flow.Identifier) bool {
 	ret := _m.Called(blockID)
 
 	var r0 bool

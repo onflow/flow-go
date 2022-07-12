@@ -156,8 +156,8 @@ func (_m *BackData) Identifiers() flow.IdentifierList {
 	return r0
 }
 
-// Rem provides a mock function with given fields: entityID
-func (_m *BackData) Rem(entityID flow.Identifier) (flow.Entity, bool) {
+// Remove provides a mock function with given fields: entityID
+func (_m *BackData) Remove(entityID flow.Identifier) (flow.Entity, bool) {
 	ret := _m.Called(entityID)
 
 	var r0 flow.Entity

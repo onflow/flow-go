@@ -4,11 +4,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -36,7 +35,7 @@ func NewReceiptValidator(state protocol.State,
 		headers:         headers,
 		index:           index,
 		results:         results,
-		signatureHasher: crypto.NewBLSKMAC(encoding.ExecutionReceiptTag),
+		signatureHasher: signature.NewBLSHasher(signature.ExecutionReceiptTag),
 		seals:           seals,
 	}
 
