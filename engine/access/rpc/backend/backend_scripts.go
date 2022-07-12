@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -171,7 +172,9 @@ func (b *backendScripts) tryExecuteScript(ctx context.Context, execNode *flow.Id
 	}
 	execResp, err := execRPCClient.ExecuteScriptAtBlockID(ctx, &req)
 	if err != nil {
-		b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
+		if err == grpc.ErrServerStopped {
+			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
+		}
 		return nil, status.Errorf(status.Code(err), "failed to execute the script on the execution node %s: %v", execNode.String(), err)
 	}
 	return execResp.GetValue(), nil

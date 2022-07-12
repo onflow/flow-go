@@ -5,10 +5,10 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-
 	"github.com/hashicorp/go-multierror"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -213,7 +213,9 @@ func (b *backendEvents) tryGetEvents(ctx context.Context,
 	}
 	resp, err := execRPCClient.GetEventsForBlockIDs(ctx, &req)
 	if err != nil {
-		b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
+		if err == grpc.ErrServerStopped {
+			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
+		}
 		return nil, err
 	}
 	return resp, nil
