@@ -174,7 +174,7 @@ func (cf *ConnectionFactoryImpl) RefreshAccessAPIClient(address string) {
 		defer store.mutex.Unlock()
 		defer cf.lock.Unlock()
 		store.ClientConn.Close()
-		cf.addConnection(grpcAddress, cf.CollectionNodeGRPCTimeout, store.mutex)
+		_, _ = cf.addConnection(grpcAddress, cf.CollectionNodeGRPCTimeout, store.mutex)
 	}
 }
 
@@ -203,7 +203,7 @@ func (cf *ConnectionFactoryImpl) RefreshExecutionAPIClient(address string) {
 		defer store.mutex.Unlock()
 		defer cf.lock.Unlock()
 		store.ClientConn.Close()
-		cf.addConnection(grpcAddress, cf.ExecutionNodeGRPCTimeout, store.mutex)
+		_, _ = cf.addConnection(grpcAddress, cf.CollectionNodeGRPCTimeout, store.mutex)
 	}
 }
 
