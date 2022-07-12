@@ -339,7 +339,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_EmergencySealing(
 	).Return(true, nil).Once()
 
 	seal := unittest.Seal.Fixture(unittest.Seal.WithBlock(&s.ParentBlock))
-	s.sealsDB.On("HighestInFork", mock.Anything).Return(seal, nil).Times(approvals.DefaultEmergencySealingThreshold)
+	s.sealsDB.On("HighestInFork", mock.Anything).Return(seal, nil).Times(approvals.DefaultEmergencySealingThresholdForFinalization)
 	s.State.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(&s.ParentBlock, nil))
 
 	err = s.core.ProcessIncorporatedResult(s.IncorporatedResult)
@@ -347,7 +347,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_EmergencySealing(
 
 	lastFinalizedBlock := &s.IncorporatedBlock
 	s.MarkFinalized(lastFinalizedBlock)
-	for i := 0; i < approvals.DefaultEmergencySealingThreshold; i++ {
+	for i := 0; i < approvals.DefaultEmergencySealingThresholdForFinalization; i++ {
 		finalizedBlock := unittest.BlockHeaderWithParentFixture(lastFinalizedBlock)
 		s.Blocks[finalizedBlock.ID()] = &finalizedBlock
 		s.MarkFinalized(&finalizedBlock)

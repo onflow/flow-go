@@ -28,18 +28,23 @@ type Middleware interface {
 	//
 	// Dispatch should be used whenever guaranteed delivery to a specific target is required. Otherwise, Publish is
 	// a more efficient candidate.
+	// All errors returned from this function can be considered benign.
 	SendDirect(msg *message.Message, targetID flow.Identifier) error
 
 	// Publish publishes a message on the channel. It models a distributed broadcast where the message is meant for all or
 	// a many nodes subscribing to the channel. It does not guarantee the delivery though, and operates on a best
 	// effort.
-	Publish(msg *message.Message, channel channels.Channel) error
+
+	// All errors returned from this function can be considered benign.
+	Publish(msg *message.Message, channel Channel) error
 
 	// Subscribe subscribes the middleware to a channel.
-	Subscribe(channel channels.Channel) error
+	// No errors are expected during normal operation.
+	Subscribe(channel Channel) error
 
 	// Unsubscribe unsubscribes the middleware from a channel.
-	Unsubscribe(channel channels.Channel) error
+	// All errors returned from this function can be considered benign.
+	Unsubscribe(channel Channel) error
 
 	// UpdateNodeAddresses fetches and updates the addresses of all the authorized participants
 	// in the Flow protocol.

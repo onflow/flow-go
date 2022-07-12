@@ -180,15 +180,15 @@ func testConcurrentExecutionReceipts(t *testing.T,
 	wintermuteOrchestrator.WithAttackNetwork(mockAttackNetwork)
 
 	// imitates sending events from corrupted execution nodes to the attacker orchestrator.
-	corruptedEnEventSendWG := sync.WaitGroup{}
-	corruptedEnEventSendWG.Add(len(eventMap))
+	corruptedEnEventSendWG := &sync.WaitGroup{}
+	l := len(eventMap)
+	corruptedEnEventSendWG.Add(l)
 	for _, event := range eventMap {
 		event := event // suppress loop variable
 
 		go func() {
 			err := wintermuteOrchestrator.HandleEventFromCorruptedNode(event)
 			require.NoError(t, err)
-
 			corruptedEnEventSendWG.Done()
 		}()
 	}

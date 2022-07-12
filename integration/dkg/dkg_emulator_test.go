@@ -13,7 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/signature"
+	msig "github.com/onflow/flow-go/module/signature"
 )
 
 func TestWithEmulator(t *testing.T) {
@@ -145,7 +145,7 @@ func (s *DKGSuite) runTest(goodNodes int, emulatorProblems bool) {
 	assert.NoError(s.T(), err)
 
 	tag := "some tag"
-	hasher := crypto.NewBLSKMAC(tag)
+	hasher := msig.NewBLSHasher(tag)
 	// create and test a threshold signature with the keys computed by dkg
 	sigData := []byte("message to be signed")
 	beaconKeys := make([]crypto.PrivateKey, 0, len(nodes))
@@ -180,7 +180,7 @@ func (s *DKGSuite) runTest(goodNodes int, emulatorProblems bool) {
 		indices[i], indices[j] = indices[j], indices[i]
 	})
 
-	threshold := signature.RandomBeaconThreshold(numberOfNodes)
+	threshold := msig.RandomBeaconThreshold(numberOfNodes)
 	groupSignature, err := crypto.BLSReconstructThresholdSignature(numberOfNodes, threshold, signatures, indices)
 	require.NoError(s.T(), err)
 
@@ -197,7 +197,7 @@ func (s *DKGSuite) TestHappyPath() {
 // TestNodesDown checks that DKG still works with the maximum number of bad
 // nodes.
 func (s *DKGSuite) TestNodesDown() {
-	minHonestNodes := numberOfNodes - signature.RandomBeaconThreshold(numberOfNodes)
+	minHonestNodes := numberOfNodes - msig.RandomBeaconThreshold(numberOfNodes)
 	s.runTest(minHonestNodes, false)
 }
 

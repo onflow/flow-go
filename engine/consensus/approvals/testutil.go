@@ -5,12 +5,12 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
 	module "github.com/onflow/flow-go/module/mock"
+	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	realproto "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -55,7 +55,7 @@ func (s *BaseApprovalsTestSuite) SetupTest() {
 		// mock all verifier's valid signatures
 		identity.StakingPubKey = s.PublicKey
 	}
-	s.SigHasher = crypto.NewBLSKMAC("test_tag")
+	s.SigHasher = msig.NewBLSHasher("test_tag")
 
 	// create assignment
 	for _, chunk := range s.Chunks {

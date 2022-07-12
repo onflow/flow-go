@@ -5,7 +5,6 @@ package p2p
 import (
 	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"sync"
@@ -129,6 +128,8 @@ func WithPeerManager(peerManagerFunc PeerManagerFactoryFunc) MiddlewareOption {
 // connectionGating if set to True, restricts this node to only talk to other nodes which are part of the identity list
 // managePeerConnections if set to True, enables the default PeerManager which continuously updates the node's peer connections
 // validators are the set of the different message validators that each inbound messages is passed through
+// During normal operations any error returned by Middleware.start is considered to be catastrophic
+// and will be thrown by the irrecoverable.SignalerContext causing the node to crash.
 func NewMiddleware(
 	log zerolog.Logger,
 	libP2PNodeFactory LibP2PFactoryFunc,
@@ -210,6 +211,9 @@ func (m *Middleware) NewPingService(pingProtocol protocol.ID, provider network.P
 	return NewPingService(m.libP2PNode.Host(), pingProtocol, m.log, provider)
 }
 
+// topologyPeers callback used by the peer manager to get the list of peer ID's
+// which this node should be directly connected to as peers.
+// No errors are expected during normal operation.
 func (m *Middleware) topologyPeers() (peer.IDSlice, error) {
 	identities, err := m.ov.Topology()
 	if err != nil {
@@ -243,8 +247,14 @@ func (m *Middleware) Me() flow.Identifier {
 }
 
 // GetIPPort returns the ip address and port number associated with the middleware
+// All errors returned from this function can be considered benign.
 func (m *Middleware) GetIPPort() (string, string, error) {
-	return m.libP2PNode.GetIPPort()
+	ipOrHostname, port, err := m.libP2PNode.GetIPPort()
+	if err != nil {
+		return "", "", fmt.Errorf("failed to get ip and port from libP2P node: %w", err)
+	}
+
+	return ipOrHostname, port, nil
 }
 
 func (m *Middleware) UpdateNodeAddresses() {
@@ -277,9 +287,10 @@ func (m *Middleware) SetOverlay(ov network.Overlay) {
 }
 
 // start will start the middleware.
+// No errors are expected during normal operation.
 func (m *Middleware) start(ctx context.Context) error {
 	if m.ov == nil {
-		return errors.New("overlay must be configured by calling SetOverlay before middleware can be started")
+		return fmt.Errorf("could not start middleware: overlay must be configured by calling SetOverlay before middleware can be started")
 	}
 
 	libP2PNode, err := m.libP2PNodeFactory(ctx)
@@ -341,6 +352,13 @@ func (m *Middleware) stop() {
 //
 // Dispatch should be used whenever guaranteed delivery to a specific target is required. Otherwise, Publish is
 // a more efficient candidate.
+//
+// The following benign errors can be returned:
+// - he peer ID for the target node ID cannot be found.
+// - the msg size was too large.
+// - failed to send message to peer.
+//
+// All errors returned from this function can be considered benign.
 func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) (err error) {
 	// translates identifier to peer id
 	peerID, err := m.idTranslator.GetPeerID(targetID)
@@ -526,7 +544,8 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 }
 
 // Subscribe subscribes the middleware to a channel.
-func (m *Middleware) Subscribe(channel channels.Channel) error {
+// No errors are expected during normal operation.
+func (m *Middleware) Subscribe(channel network.Channel) error {
 
 	topic := channels.TopicFromChannel(channel, m.rootBlockID)
 
@@ -549,7 +568,7 @@ func (m *Middleware) Subscribe(channel channels.Channel) error {
 
 	s, err := m.libP2PNode.Subscribe(topic, m.codec, peerFilter, validators...)
 	if err != nil {
-		return fmt.Errorf("failed to subscribe for channel %s: %w", channel, err)
+		return fmt.Errorf("could not subscribe to topic (%s): %w", topic, err)
 	}
 
 	// create a new readSubscription with the context of the middleware
@@ -566,11 +585,15 @@ func (m *Middleware) Subscribe(channel channels.Channel) error {
 }
 
 // Unsubscribe unsubscribes the middleware from a channel.
-func (m *Middleware) Unsubscribe(channel channels.Channel) error {
-	topic := channels.TopicFromChannel(channel, m.rootBlockID)
+// The following benign errors are expected during normal operations from libP2P:
+// - the libP2P node fails to unsubscribe to the topic created from the provided channel.
+//
+// All errors returned from this function can be considered benign.
+func (m *Middleware) Unsubscribe(channel network.Channel) error {
+	topic := network.TopicFromChannel(channel, m.rootBlockID)
 	err := m.libP2PNode.UnSubscribe(topic)
 	if err != nil {
-		return fmt.Errorf("failed to unsubscribe from channel %s: %w", channel, err)
+		return fmt.Errorf("failed to unsubscribe from channel (%s): %w", channel, err)
 	}
 
 	// update peers to remove nodes subscribed to channel
@@ -623,7 +646,13 @@ func (m *Middleware) processMessage(msg *message.Message, decodedMsgPayload inte
 // Publish publishes a message on the channel. It models a distributed broadcast where the message is meant for all or
 // a many nodes subscribing to the channel. It does not guarantee the delivery though, and operates on a best
 // effort.
-func (m *Middleware) Publish(msg *message.Message, channel channels.Channel) error {
+// The following benign errors are expected during normal operations:
+// - the msg cannot be marshalled.
+// - the msg size exceeds DefaultMaxPubSubMsgSize.
+// - the libP2P node fails to publish the message.
+//
+// All errors returned from this function can be considered benign.
+func (m *Middleware) Publish(msg *message.Message, channel network.Channel) error {
 	m.log.Debug().Str("channel", channel.String()).Interface("msg", msg).Msg("publishing new message")
 
 	// convert the message to bytes to be put on the wire.
@@ -655,6 +684,7 @@ func (m *Middleware) Publish(msg *message.Message, channel channels.Channel) err
 }
 
 // IsConnected returns true if this node is connected to the node with id nodeID.
+// All errors returned from this function can be considered benign.
 func (m *Middleware) IsConnected(nodeID flow.Identifier) (bool, error) {
 	peerID, err := m.idTranslator.GetPeerID(nodeID)
 	if err != nil {
