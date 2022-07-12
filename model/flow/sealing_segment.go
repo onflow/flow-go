@@ -44,7 +44,7 @@ import (
 //   ROOT <- A <- B
 //
 // All non-root sealing segments contain more than one block.
-// Sealing segments is in ascending height order.
+// Sealing segments are in ascending height order.
 //
 // In addition to storing the blocks within the sealing segment, as defined above,
 // the SealingSegment structure also stores any resources which are referenced
@@ -91,7 +91,7 @@ func (segment *SealingSegment) Lowest() *Block {
 
 // FinalizedSeal returns the seal that seals the lowest block.
 // Per specification, this seal must be included in a SealingSegment.
-// The receiver SealingSegment must be validated.
+// The SealingSegment must be validated.
 // No errors are expected during normal operation.
 func (segment *SealingSegment) FinalizedSeal() (*Seal, error) {
 	if isRootSegment(segment.LatestSeals) {
@@ -358,7 +358,7 @@ func (builder *SealingSegmentBuilder) validateSegment() error {
 	// validate the latest seal is for the lowest block
 	_, err := findLatestSealForLowestBlock(builder.blocks, builder.latestSeals)
 	if err != nil {
-		return fmt.Errorf("sealing segment missing (block_id=%x) highest (block_id%x) %v: %w", builder.lowest().ID(), builder.highest().ID(), err, ErrSegmentMissingSeal)
+		return fmt.Errorf("sealing segment missing seal (lowest block id: %x) (highest block id: %x) %v: %w", builder.lowest().ID(), builder.highest().ID(), err, ErrSegmentMissingSeal)
 	}
 
 	return nil
