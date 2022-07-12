@@ -261,16 +261,13 @@ func TestOverrideModules(t *testing.T) {
 
 	logs := logger.logs
 
-	assert.Len(t, logs, 6)
+	assert.Len(t, logs, 3)
 
 	// components are initialized in a specific order, so check that the order is correct
 	assert.Equal(t, []string{
 		"module 1 initialized",
-		"module 1 ready",
 		"module 2 overridden", // overridden version of 2 should be initialized.
-		"module 2 ready",
 		"module 3 initialized",
-		"module 3 ready",
 	}, logs)
 
 	cancel()
