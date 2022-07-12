@@ -148,7 +148,7 @@ func initializeMessageAuthConfigsMap() {
 			return new(messages.ClusterBlockResponse)
 		},
 		Config: map[channels.Channel]flow.RoleList{
-			channels.ConsensusClusterPrefix: {flow.RoleCollection},
+			channels.SyncClusterPrefix: {flow.RoleCollection},
 		},
 	}
 
