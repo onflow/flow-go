@@ -720,7 +720,7 @@ func (e *Engine) onBlockExecuted(executed *entity.ExecutableBlock, finalState fl
 			}
 
 			// remove the executed block
-			executionQueues.Rem(executed.ID())
+			executionQueues.Remove(executed.ID())
 
 			return nil
 		})
@@ -762,7 +762,7 @@ func (e *Engine) executeBlockIfComplete(eb *entity.ExecutableBlock) bool {
 	// 		Hex("delta_start_state", delta.ExecutableBlock.StartState).
 	// 		Msg("can not apply the state delta, the start state does not match")
 	//
-	// 	e.syncDeltas.Rem(eb.Block.ID())
+	// 	e.syncDeltas.Remove(eb.Block.ID())
 	// }
 
 	// if don't have the delta, then check if everything is ready for executing
@@ -871,7 +871,7 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 			// this also prevents from executing the same block twice, because the second
 			// time when the collection arrives, it will not be found in the blockByCollectionID
 			// index.
-			backdata.Rem(collID)
+			backdata.Remove(collID)
 
 			return nil
 		},
