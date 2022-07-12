@@ -59,6 +59,9 @@ read-badger
 read-protocol-state
 remove-execution-fork
 
+# generated key
+integration/localnet/observer-network-key
+
 # go workspace
 go.work
 go.work.sum

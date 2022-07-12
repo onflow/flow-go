@@ -305,7 +305,7 @@ func TestHashing(t *testing.T) {
 			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
 				require.NoError(t, scriptErr)
 				require.NoError(t, executionErr)
-				require.Equal(t, "627d7e8fe50384601ca550ceecb61c23e9cbde7feb75ae6b53227f128f2dc3b78b543a044058403e4822f88cb7040d90d588c9e8575f0de3012fe7edaf02b9997a8a5fad234d21b2af359ec3abaeaf4a7ef60e5f04623a983bd5e071f4113678710e910d48ac4d1713073a707ab9057867e0ba32aca6b33010b1d20b8006dd25", result)
+				require.Equal(t, "44dc46111abacfe2bb4a04cea4805aad03f84e4849f138cc3ed431478472b185548628e96d0c963b21ebaf17132d73fc13031eb82d5f4cbe3b6047ff54d20e8d663904373d73348b97ce18305ebc56114cb7e7394e486684007f78aa59abc5d0a8f6bae6bd186db32528af80857cd12112ce6960be29c96074df9c4aaed5b0e6", result)
 			},
 		},
 		{
@@ -315,7 +315,7 @@ func TestHashing(t *testing.T) {
 			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
 				require.NoError(t, scriptErr)
 				require.NoError(t, executionErr)
-				require.Equal(t, "dc6889f9ca46803a9c7759068989dfc3cffe632fd991e25f6589603c73b7891e2f4736eebe5248f211bbddaa3d763b1b9318185eaf3ab3bfd6f159f345c3148795e4ff3ad376c98d5616febebcf4520ca2a83dda4be2f98b1ead9fb5a622355305b156e06db173a9e1d7af973b11acc1e714cd3aa0fb367dfaadc5a957b4742b", result)
+				require.Equal(t, "de7d9aa24274fa12c98cce5c09eea0634108ead2e91828b9a9a450e878088393e3e63eb4b19834f579ce215b00a9915919b67a71dab1112560319e6e1e5e9ad0fb670e8a09d586508c84547cee7ddbe8c9362c996846154865eb271bdc4523dbcdbdae5a77391fb54374f37534c8bb2281589cb2e3d62742596cdad7e4f9f35c", result)
 			},
 		},
 	}
@@ -1076,7 +1076,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			tx := fvm.Transaction(txBody, 0)
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
-			require.Greater(t, tx.MemoryUsed, uint64(20_000_000_000))
+			require.Greater(t, tx.MemoryEstimate, uint64(20_000_000_000))
 
 			assert.True(t, errors.IsMemoryLimitExceededError(tx.Err))
 		},
@@ -1112,7 +1112,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			tx := fvm.Transaction(txBody, 0)
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
-			require.Equal(t, uint64(0), tx.MemoryUsed)
+			require.Equal(t, uint64(0), tx.MemoryEstimate)
 
 			require.NoError(t, tx.Err)
 		},
@@ -1179,7 +1179,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
 			// There are 100 breaks and each break uses 1_000_000 memory
-			require.Greater(t, tx.MemoryUsed, uint64(100_000_000))
+			require.Greater(t, tx.MemoryEstimate, uint64(100_000_000))
 
 			var memoryLimitExceededError *errors.MemoryLimitExceededError
 			assert.ErrorAs(t, tx.Err, &memoryLimitExceededError)

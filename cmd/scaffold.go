@@ -31,6 +31,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -483,7 +484,12 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 
 	fnb.Tracer = trace.NewNoopTracer()
 	if fnb.BaseConfig.tracerEnabled {
-		serviceName := fnb.BaseConfig.NodeRole + "-" + fnb.BaseConfig.nodeIDHex[:8]
+
+		nodeIdHex := fnb.NodeID.String()
+		if len(nodeIdHex) > 8 {
+			nodeIdHex = nodeIdHex[:8]
+		}
+		serviceName := fnb.BaseConfig.NodeRole + "-" + nodeIdHex
 		tracer, err := trace.NewTracer(fnb.Logger,
 			serviceName,
 			fnb.RootChainID.String(),
@@ -859,7 +865,7 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 	}
 	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Canary || fnb.RootChainID == flow.Localnet || fnb.RootChainID == flow.Benchnet {
 		vmOpts = append(vmOpts,
-			fvm.WithRestrictedDeployment(false),
+			fvm.WithContractDeploymentRestricted(false),
 		)
 	}
 	fnb.FvmOptions = vmOpts
@@ -1175,6 +1181,12 @@ func WithMetricsEnabled(enabled bool) Option {
 func WithSyncCoreConfig(syncConfig synchronization.Config) Option {
 	return func(config *BaseConfig) {
 		config.SyncCoreConfig = syncConfig
+	}
+}
+
+func WithComplianceConfig(complianceConfig compliance.Config) Option {
+	return func(config *BaseConfig) {
+		config.ComplianceConfig = complianceConfig
 	}
 }
 
