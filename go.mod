@@ -75,8 +75,8 @@ require (
 	github.com/spf13/cobra v1.3.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.10.1
-	github.com/teivah/onecontext v1.3.0 // indirect
 	github.com/stretchr/testify v1.7.5
+	github.com/teivah/onecontext v1.3.0 // indirect
 	github.com/uber/jaeger-client-go v2.29.1+incompatible
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/vmihailenco/msgpack/v4 v4.3.11
@@ -169,7 +169,6 @@ require (
 	github.com/ipfs/go-cidutil v0.0.2 // indirect
 	github.com/ipfs/go-fetcher v1.5.0 // indirect
 	github.com/ipfs/go-ipfs-delay v0.0.1 // indirect
-	github.com/ipfs/go-ipfs-ds-help v1.1.0 // indirect
 	github.com/ipfs/go-ipfs-exchange-interface v0.1.0 // indirect
 	github.com/ipfs/go-ipfs-pq v0.0.2 // indirect
 	github.com/ipfs/go-ipfs-util v0.0.2 // indirect
@@ -234,7 +233,6 @@ require (
 	github.com/mitchellh/mapstructure v1.4.3 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/mr-tron/base58 v1.2.0 // indirect
-	github.com/multiformats/go-base32 v0.0.4 // indirect
 	github.com/multiformats/go-base36 v0.1.0 // indirect
 	github.com/multiformats/go-multiaddr-fmt v0.1.0 // indirect
 	github.com/multiformats/go-multibase v0.0.3 // indirect
