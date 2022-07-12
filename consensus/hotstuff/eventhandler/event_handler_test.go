@@ -33,7 +33,6 @@ const (
 // TestPaceMaker is a real pacemaker module with logging for view changes
 type TestPaceMaker struct {
 	hotstuff.PaceMaker
-	t require.TestingT
 }
 
 var _ hotstuff.PaceMaker = (*TestPaceMaker)(nil)
@@ -46,7 +45,7 @@ func NewTestPaceMaker(t require.TestingT, timeoutController *timeout.Controller,
 	if err != nil {
 		panic(err)
 	}
-	return &TestPaceMaker{p, t}
+	return &TestPaceMaker{p}
 }
 
 func (p *TestPaceMaker) ProcessQC(qc *flow.QuorumCertificate) (*model.NewViewEvent, error) {
@@ -120,32 +119,44 @@ func (c *Committee) Self() flow.Identifier {
 
 // The SafetyRules mock will not vote for any block unless the block's ID exists in votable field's key
 type SafetyRules struct {
+	*mocks.SafetyRules
 	votable map[flow.Identifier]struct{}
-	t       require.TestingT
 }
 
-func NewSafetyRules(t require.TestingT, lastVotedView uint64) *SafetyRules {
-	return &SafetyRules{
-		votable: make(map[flow.Identifier]struct{}),
-		t:       t,
+func NewSafetyRules(t *testing.T) *SafetyRules {
+	safetyRules := &SafetyRules{
+		SafetyRules: mocks.NewSafetyRules(t),
+		votable:     make(map[flow.Identifier]struct{}),
 	}
-}
 
-// SafetyRules will not vote for any block, unless the blockID exists in votable map
-func (v *SafetyRules) ProduceVote(block *model.Proposal, curView uint64) (*model.Vote, error) {
-	_, ok := v.votable[block.Block.BlockID]
-	if !ok {
-		return nil, model.NewNoVoteErrorf("block not found")
-	}
-	return createVote(block.Block), nil
-}
+	// SafetyRules will not vote for any block, unless the blockID exists in votable map
+	safetyRules.On("ProduceVote", mock.Anything, mock.Anything).Return(
+		func(block *model.Proposal, _ uint64) *model.Vote {
+			_, ok := safetyRules.votable[block.Block.BlockID]
+			if !ok {
+				return nil
+			}
+			return createVote(block.Block)
+		},
+		func(block *model.Proposal, _ uint64) error {
+			_, ok := safetyRules.votable[block.Block.BlockID]
+			if !ok {
+				return model.NewNoVoteErrorf("block not found")
+			}
+			return nil
+		}).Maybe()
 
-func (v *SafetyRules) ProduceTimeout(curView uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
-	return helper.TimeoutObjectFixture(func(timeout *model.TimeoutObject) {
-		timeout.View = curView
-		timeout.NewestQC = newestQC
-		timeout.LastViewTC = lastViewTC
-	}), nil
+	safetyRules.On("ProduceTimeout", mock.Anything, mock.Anything, mock.Anything).Return(
+		func(curView uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) *model.TimeoutObject {
+			return helper.TimeoutObjectFixture(func(timeout *model.TimeoutObject) {
+				timeout.View = curView
+				timeout.NewestQC = newestQC
+				timeout.LastViewTC = lastViewTC
+			})
+		},
+		func(uint64, *flow.QuorumCertificate, *flow.TimeoutCertificate) error { return nil }).Maybe()
+
+	return safetyRules
 }
 
 // Forks mock allows to customize the AddBlock function by specifying the addProposal callbacks
@@ -274,7 +285,7 @@ func (es *EventHandlerSuite) SetupTest() {
 	es.committee = NewCommittee()
 	es.voteAggregator = mocks.NewVoteAggregator(es.T())
 	es.timeoutAggregator = mocks.NewTimeoutAggregator(es.T())
-	es.safetyRules = NewSafetyRules(es.T(), finalized)
+	es.safetyRules = NewSafetyRules(es.T())
 	es.notifier = &notifications.NoopConsumer{}
 
 	eventhandler, err := NewEventHandler(
@@ -314,8 +325,8 @@ func (es *EventHandlerSuite) SetupTest() {
 	es.forks.proposals[es.parentProposal.Block.BlockID] = es.parentProposal
 }
 
-// TestStartNewView_ParentProposalNotFound tests next scenario: constructed TC, it contains newest QC that references block that we
-// know about, proposal can't be generated because we can't be sure that resulting block payload is valid.
+// TestStartNewView_ParentProposalNotFound tests next scenario: constructed TC, it contains NewestQC that references block that we
+// don't know about, proposal can't be generated because we can't be sure that resulting block payload is valid.
 func (es *EventHandlerSuite) TestStartNewView_ParentProposalNotFound() {
 	newestQC := helper.MakeQC(helper.WithQCView(es.initView + 10))
 	tc := helper.MakeTC(helper.WithTCView(newestQC.View+1),
@@ -597,16 +608,16 @@ func (es *EventHandlerSuite) TestOnTimeout() {
 	err := es.eventhandler.OnLocalTimeout()
 	require.NoError(es.T(), err)
 
-	// timeout shouldn't trigger view change
+	// TimeoutObject shouldn't trigger view change
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
 
 	lastCall := es.communicator.Calls[len(es.communicator.Calls)-1]
 	// the last call is BroadcastProposal
 	require.Equal(es.T(), "BroadcastTimeout", lastCall.Method)
-	timeout, ok := lastCall.Arguments[0].(*model.TimeoutObject)
+	timeoutObject, ok := lastCall.Arguments[0].(*model.TimeoutObject)
 	require.True(es.T(), ok)
 	// it should broadcast a TO with same view as endView
-	require.Equal(es.T(), es.endView, timeout.View)
+	require.Equal(es.T(), es.endView, timeoutObject.View)
 }
 
 // Test100Timeout tests that receiving 100 TCs for increasing views advances rounds
