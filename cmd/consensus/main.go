@@ -6,6 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/consensus/hotstuff/timeoutcollector"
+	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/module/util"
 	"os"
 	"path/filepath"
 	"time"
@@ -571,7 +574,8 @@ func main() {
 			validator := consensus.NewValidator(mainMetrics, committee)
 			voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(committee, qcDistributor.OnQcConstructedFromVotes)
 			lowestViewForVoteProcessing := finalizedBlock.View + 1
-			aggregator, err := consensus.NewVoteAggregator(node.Logger,
+			voteAggregator, err := consensus.NewVoteAggregator(
+				node.Logger,
 				lowestViewForVoteProcessing,
 				notifier,
 				voteProcessorFactory,
@@ -580,19 +584,34 @@ func main() {
 				return nil, fmt.Errorf("could not initialize vote aggregator: %w", err)
 			}
 
-			hotstuffModules = &consensus.HotstuffModules{
-				Notifier:                notifier,
-				Committee:               committee,
-				Signer:                  signer,
-				Persist:                 persist,
-				QCCreatedDistributor:    qcDistributor,
-				FinalizationDistributor: finalizationDistributor,
-				Forks:                   forks,
-				Validator:               validator,
-				VoteAggregator:          aggregator,
+			timeoutCollectorDistributor := pubsub.NewTimeoutCollectorDistributor()
+			timeoutProcessorFactory := timeoutcollector.NewTimeoutProcessorFactory(timeoutCollectorDistributor, committee, validator, encoding.ConsensusTimeoutTag)
+			timeoutAggregator, err := consensus.NewTimeoutAggregator(
+				node.Logger,
+				lowestViewForVoteProcessing,
+				notifier,
+				timeoutProcessorFactory,
+				timeoutCollectorDistributor,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize timeout aggregator: %w", err)
 			}
 
-			return aggregator, nil
+			hotstuffModules = &consensus.HotstuffModules{
+				Notifier:                    notifier,
+				Committee:                   committee,
+				Signer:                      signer,
+				Persist:                     persist,
+				QCCreatedDistributor:        qcDistributor,
+				FinalizationDistributor:     finalizationDistributor,
+				TimeoutCollectorDistributor: timeoutCollectorDistributor,
+				Forks:                       forks,
+				Validator:                   validator,
+				VoteAggregator:              voteAggregator,
+				TimeoutAggregator:           timeoutAggregator,
+			}
+
+			return util.MergeReadyDone(voteAggregator, timeoutAggregator), nil
 		}).
 		Component("consensus compliance engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize the block builder

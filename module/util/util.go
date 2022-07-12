@@ -145,3 +145,24 @@ func WaitError(errChan <-chan error, done <-chan struct{}) error {
 		return nil
 	}
 }
+
+// readyDoneAwareMerger is a utility structure which implements module.ReadyDoneAware interface
+// and is used to merge []module.ReadyDoneAware into one module.ReadyDoneAware.
+type readyDoneAwareMerger struct {
+	components []module.ReadyDoneAware
+}
+
+func (m readyDoneAwareMerger) Ready() <-chan struct{} {
+	return AllReady(m.components...)
+}
+
+func (m readyDoneAwareMerger) Done() <-chan struct{} {
+	return AllDone(m.components...)
+}
+
+var _ module.ReadyDoneAware = (*readyDoneAwareMerger)(nil)
+
+// MergeReadyDone merges []module.ReadyDoneAware into one module.ReadyDoneAware.
+func MergeReadyDone(components ...module.ReadyDoneAware) module.ReadyDoneAware {
+	return readyDoneAwareMerger{components: components}
+}

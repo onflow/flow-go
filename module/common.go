@@ -2,7 +2,6 @@ package module
 
 import (
 	"errors"
-
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
