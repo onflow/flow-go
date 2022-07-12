@@ -26,6 +26,7 @@ require (
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/prometheus/client_golang v1.12.1
 	github.com/rs/zerolog v1.26.1
+	github.com/sethvargo/go-retry v0.2.3
 	github.com/stretchr/testify v1.7.5
 	go.uber.org/atomic v1.9.0
 	google.golang.org/grpc v1.45.0
