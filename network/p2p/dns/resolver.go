@@ -65,7 +65,7 @@ func WithTTL(ttl time.Duration) optFunc {
 	}
 }
 
-// WithTTL is an option function for setting the time to live for cache entries.
+// WithResolverSize is an option function for setting the number of resolver workers and queue size.
 func WithResolverSize(numIPAddrLookupWorkers int, numTxtLookupWorkers int, ipAddrLookupQueueSize int, txtLookupQueueSize int) optFunc {
 	return func(resolver *Resolver) {
 		resolver.ipRequests = make(chan *lookupIPRequest, ipAddrLookupQueueSize)
