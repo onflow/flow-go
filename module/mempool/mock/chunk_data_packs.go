@@ -96,8 +96,8 @@ func (_m *ChunkDataPacks) Hash() flow.Identifier {
 	return r0
 }
 
-// Rem provides a mock function with given fields: chunkID
-func (_m *ChunkDataPacks) Rem(chunkID flow.Identifier) bool {
+// Remove provides a mock function with given fields: chunkID
+func (_m *ChunkDataPacks) Remove(chunkID flow.Identifier) bool {
 	ret := _m.Called(chunkID)
 
 	var r0 bool

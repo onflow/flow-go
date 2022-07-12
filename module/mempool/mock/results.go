@@ -80,8 +80,8 @@ func (_m *Results) Has(resultID flow.Identifier) bool {
 	return r0
 }
 
-// Rem provides a mock function with given fields: resultID
-func (_m *Results) Rem(resultID flow.Identifier) bool {
+// Remove provides a mock function with given fields: resultID
+func (_m *Results) Remove(resultID flow.Identifier) bool {
 	ret := _m.Called(resultID)
 
 	var r0 bool

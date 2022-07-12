@@ -182,14 +182,14 @@ func (s *ExecForkSuppressor) ByID(identifier flow.Identifier) (*flow.Incorporate
 	return s.seals.ByID(identifier)
 }
 
-// Rem removes the IncorporatedResultSeal with id from the mempool
-func (s *ExecForkSuppressor) Rem(id flow.Identifier) bool {
+// Remove removes the IncorporatedResultSeal with id from the mempool
+func (s *ExecForkSuppressor) Remove(id flow.Identifier) bool {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
 	seal, found := s.seals.ByID(id)
 	if found {
-		s.seals.Rem(id)
+		s.seals.Remove(id)
 		set, found := s.sealsForBlock[seal.Seal.BlockID]
 		if !found {
 			// In the current implementation, this cannot happen, as every entity in the mempool is also contained in sealsForBlock.
