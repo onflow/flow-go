@@ -119,7 +119,6 @@ func initializeMessageAuthConfigsMap() {
 		},
 		Config: map[channels.Channel]flow.RoleList{
 			channels.SyncCommittee:     {flow.RoleConsensus},
-			channels.SyncClusterPrefix: {flow.RoleCollection},
 		},
 	}
 
