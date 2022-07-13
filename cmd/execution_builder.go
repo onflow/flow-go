@@ -382,23 +382,19 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				}
 			}
 
-			ledgerStorage, err = ledger.NewLedger(diskWAL, int(e.exeConf.mTrieCacheSize), collector, node.Logger.With().Str("subcomponent",
+			ledgerStorage, err = ledger.NewSyncLedger(diskWAL, int(e.exeConf.mTrieCacheSize), collector, node.Logger.With().Str("subcomponent",
 				"ledger").Logger(), ledger.DefaultPathFinderVersion)
 			return ledgerStorage, err
 		}).
 		Component("execution state ledger WAL compactor", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 
-			checkpointer, err := ledgerStorage.Checkpointer()
-			if err != nil {
-				return nil, fmt.Errorf("cannot create checkpointer: %w", err)
-			}
-			compactor := wal.NewCompactor(checkpointer,
-				10*time.Second,
+			return ledger.NewCompactor(
+				ledgerStorage,
+				diskWAL,
 				e.exeConf.checkpointDistance,
 				e.exeConf.checkpointsToKeep,
-				node.Logger.With().Str("subcomponent", "checkpointer").Logger())
-
-			return compactor, nil
+				node.Logger.With().Str("subcomponent", "checkpointer").Logger(),
+			)
 		}).
 		Component("execution data service", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			err := os.MkdirAll(e.exeConf.executionDataDir, 0700)

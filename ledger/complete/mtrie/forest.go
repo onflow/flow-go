@@ -190,19 +190,36 @@ func (f *Forest) Read(r *ledger.TrieRead) ([]ledger.Value, error) {
 	return orderedValues, nil
 }
 
-// Update updates the Values for the registers and returns rootHash and error (if any).
+// Update updates the Values for the registers, adds updated tries to forest,
+// and returns rootHash and error (if any).
+// In case there are multiple updates to the same register, Update will persist
+// the latest written value.
+func (f *Forest) Update(u *ledger.TrieUpdate) (ledger.RootHash, error) {
+	t, err := f.NewTrie(u)
+	if err != nil {
+		return ledger.RootHash(hash.DummyHash), err
+	}
+
+	err = f.AddTrie(t)
+	if err != nil {
+		return ledger.RootHash(hash.DummyHash), fmt.Errorf("adding updated trie to forest failed: %w", err)
+	}
+
+	return t.RootHash(), nil
+}
+
+// NewTrie updates the Values for the registers and returns updated trie and error (if any).
 // In case there are multiple updates to the same register, Update will persist the latest
 // written value.
-func (f *Forest) Update(u *ledger.TrieUpdate) (ledger.RootHash, error) {
-	emptyHash := ledger.RootHash(hash.DummyHash)
+func (f *Forest) NewTrie(u *ledger.TrieUpdate) (*trie.MTrie, error) {
 
 	parentTrie, err := f.GetTrie(u.RootHash)
 	if err != nil {
-		return emptyHash, err
+		return nil, err
 	}
 
 	if len(u.Paths) == 0 { // no key no change
-		return u.RootHash, nil
+		return parentTrie, nil
 	}
 
 	// Deduplicate writes to the same register: we only retain the value of the last write
@@ -235,7 +252,7 @@ func (f *Forest) Update(u *ledger.TrieUpdate) (ledger.RootHash, error) {
 	applyPruning := true
 	newTrie, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(parentTrie, deduplicatedPaths, deduplicatedPayloads, applyPruning)
 	if err != nil {
-		return emptyHash, fmt.Errorf("constructing updated trie failed: %w", err)
+		return nil, fmt.Errorf("constructing updated trie failed: %w", err)
 	}
 
 	f.metrics.LatestTrieRegCount(newTrie.AllocatedRegCount())
@@ -244,12 +261,7 @@ func (f *Forest) Update(u *ledger.TrieUpdate) (ledger.RootHash, error) {
 	f.metrics.LatestTrieRegSizeDiff(int64(newTrie.AllocatedRegSize() - parentTrie.AllocatedRegSize()))
 	f.metrics.LatestTrieMaxDepthTouched(maxDepthTouched)
 
-	err = f.AddTrie(newTrie)
-	if err != nil {
-		return emptyHash, fmt.Errorf("adding updated trie to forest failed: %w", err)
-	}
-
-	return newTrie.RootHash(), nil
+	return newTrie, nil
 }
 
 // Proofs returns a batch proof for the given paths.

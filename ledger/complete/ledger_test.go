@@ -2,11 +2,9 @@ package complete_test
 
 import (
 	"bytes"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/rand"
-	"sync"
 	"testing"
 	"time"
 
@@ -734,69 +732,13 @@ func Test_ExportCheckpointAt(t *testing.T) {
 	})
 }
 
-func TestWALUpdateIsRunInParallel(t *testing.T) {
-
-	// The idea of this test is - WAL update should be run in parallel
-	// so we block it until we can find a new trie with expected state
-	// this doesn't really proves WAL update is run in parallel, but at least
-	// checks if its run after the trie update
-
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-
-	w := &LongRunningDummyWAL{
-		updateFn: func(update *ledger.TrieUpdate) error {
-			wg.Wait() //wg will let work after the trie has been updated
-			return nil
-		},
-	}
-
-	led, err := complete.NewLedger(w, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
-	require.NoError(t, err)
-
-	key := ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(0, []byte{1, 2, 3})})
-
-	values := []ledger.Value{[]byte{1, 2, 3}}
-	update, err := ledger.NewUpdate(led.InitialState(), []ledger.Key{key}, values)
-	require.NoError(t, err)
-
-	// this state should correspond to fresh state with given update
-	decoded, err := hex.DecodeString("097b7f74413bc03200889c34c6979eacbad58345ef7c0c65e8057a071440df75")
-	var expectedState ledger.State
-	copy(expectedState[:], decoded)
-	require.NoError(t, err)
-
-	query, err := ledger.NewQuery(expectedState, []ledger.Key{key})
-	require.NoError(t, err)
-
-	go func() {
-		newState, _, err := led.Set(update)
-		require.NoError(t, err)
-		require.Equal(t, newState, expectedState)
-	}()
-
-	require.Eventually(t, func() bool {
-		retrievedValues, err := led.Get(query)
-		if err != nil {
-			return false
-		}
-
-		require.NoError(t, err)
-		require.Equal(t, values, retrievedValues)
-
-		wg.Done()
-
-		return true
-	}, 500*time.Millisecond, 5*time.Millisecond)
-}
-
 func TestWALUpdateFailuresBubbleUp(t *testing.T) {
 
 	theError := fmt.Errorf("error error")
 
 	w := &LongRunningDummyWAL{
-		updateFn: func(update *ledger.TrieUpdate) error {
-			return theError
+		updateFn: func(update *ledger.TrieUpdate) (int, bool, error) {
+			return 0, false, theError
 		},
 	}
 
@@ -849,10 +791,10 @@ func migrationByValue(p []ledger.Payload) ([]ledger.Payload, error) {
 
 type LongRunningDummyWAL struct {
 	fixtures.NoopWAL
-	updateFn func(update *ledger.TrieUpdate) error
+	updateFn func(update *ledger.TrieUpdate) (int, bool, error)
 }
 
-func (w *LongRunningDummyWAL) RecordUpdate(update *ledger.TrieUpdate) error {
+func (w *LongRunningDummyWAL) RecordUpdate(update *ledger.TrieUpdate) (int, bool, error) {
 	return w.updateFn(update)
 }
 

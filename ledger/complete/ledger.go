@@ -15,12 +15,13 @@ import (
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
-	"github.com/onflow/flow-go/ledger/complete/wal"
+	realWAL "github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/module"
 )
 
 const DefaultCacheSize = 1000
 const DefaultPathFinderVersion = 1
+const defaultTrieUpdateChanSize = 500
 
 // Ledger (complete) is a fast memory-efficient fork-aware thread-safe trie-based key/value storage.
 // Ledger holds an array of registers (key-value pairs) and keeps tracks of changes over a limited time.
@@ -35,15 +36,16 @@ const DefaultPathFinderVersion = 1
 // for archival usage but make it possible for other software components to reconstruct very old tries using write-ahead logs.
 type Ledger struct {
 	forest            *mtrie.Forest
-	wal               wal.LedgerWAL
+	wal               realWAL.LedgerWAL
 	metrics           module.LedgerMetrics
 	logger            zerolog.Logger
+	trieUpdatec       chan *WALTrieUpdate
 	pathFinderVersion uint8
 }
 
 // NewLedger creates a new in-memory trie-backed ledger storage with persistence.
 func NewLedger(
-	wal wal.LedgerWAL,
+	wal realWAL.LedgerWAL,
 	capacity int,
 	metrics module.LedgerMetrics,
 	log zerolog.Logger,
@@ -84,6 +86,26 @@ func NewLedger(
 	metrics.ForestApproxMemorySize(0)
 
 	return storage, nil
+}
+
+func NewSyncLedger(
+	wal realWAL.LedgerWAL,
+	capacity int,
+	metrics module.LedgerMetrics,
+	log zerolog.Logger,
+	pathFinderVer uint8) (*Ledger, error) {
+
+	l, err := NewLedger(wal, capacity, metrics, log, pathFinderVer)
+	if err != nil {
+		return nil, err
+	}
+
+	l.trieUpdatec = make(chan *WALTrieUpdate, defaultTrieUpdateChanSize)
+	return l, nil
+}
+
+func (l *Ledger) TrieUpdateChan() <-chan *WALTrieUpdate {
+	return l.trieUpdatec
 }
 
 // Ready implements interface module.ReadyDoneAware
@@ -202,11 +224,16 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *
 
 	walChan := make(chan error)
 
-	go func() {
-		walChan <- l.wal.RecordUpdate(trieUpdate)
-	}()
+	if l.trieUpdatec == nil {
+		go func() {
+			_, _, err := l.wal.RecordUpdate(trieUpdate)
+			walChan <- err
+		}()
+	} else {
+		l.trieUpdatec <- &WALTrieUpdate{Update: trieUpdate, Resultc: walChan}
+	}
 
-	newRootHash, err := l.forest.Update(trieUpdate)
+	newTrie, err := l.forest.NewTrie(trieUpdate)
 	walError := <-walChan
 
 	if err != nil {
@@ -214,6 +241,11 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *
 	}
 	if walError != nil {
 		return ledger.State(hash.DummyHash), nil, fmt.Errorf("error while writing LedgerWAL: %w", walError)
+	}
+
+	err = l.forest.AddTrie(newTrie)
+	if err != nil {
+		return ledger.State(hash.DummyHash), nil, fmt.Errorf("adding updated trie to forest failed: %w", err)
 	}
 
 	// TODO update to proper value once https://github.com/onflow/flow-go/pull/3720 is merged
@@ -228,6 +260,7 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *
 	}
 
 	state := update.State()
+	newRootHash := newTrie.RootHash()
 	l.logger.Info().Hex("from", state[:]).
 		Hex("to", newRootHash[:]).
 		Int("update_size", update.Size()).
@@ -273,8 +306,13 @@ func (l *Ledger) ForestSize() int {
 	return l.forest.Size()
 }
 
+// Tries returns the tries stored in the forest
+func (l *Ledger) Tries() ([]*trie.MTrie, error) {
+	return l.forest.GetTries()
+}
+
 // Checkpointer returns a checkpointer instance
-func (l *Ledger) Checkpointer() (*wal.Checkpointer, error) {
+func (l *Ledger) Checkpointer() (*realWAL.Checkpointer, error) {
 	checkpointer, err := l.wal.NewCheckpointer()
 	if err != nil {
 		return nil, fmt.Errorf("cannot create checkpointer for compactor: %w", err)
@@ -388,14 +426,14 @@ func (l *Ledger) ExportCheckpointAt(
 	l.logger.Info().Msgf("finished running pre-checkpoint reporters")
 
 	l.logger.Info().Msg("creating a checkpoint for the new trie")
-	writer, err := wal.CreateCheckpointWriterForFile(outputDir, outputFile, &l.logger)
+	writer, err := realWAL.CreateCheckpointWriterForFile(outputDir, outputFile, &l.logger)
 	if err != nil {
 		return ledger.State(hash.DummyHash), fmt.Errorf("failed to create a checkpoint writer: %w", err)
 	}
 
 	l.logger.Info().Msg("storing the checkpoint to the file")
 
-	err = wal.StoreCheckpoint(writer, newTrie)
+	err = realWAL.StoreCheckpoint(writer, newTrie)
 
 	// Writing the checkpoint takes time to write and copy.
 	// Without relying on an exit code or stdout, we need to know when the copy is complete.
