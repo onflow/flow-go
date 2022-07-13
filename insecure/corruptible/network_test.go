@@ -85,7 +85,7 @@ func TestHandleOutgoingEvent_AttackerObserve(t *testing.T) {
 // TestHandleOutgoingEvent_NoAttacker_UnicastOverNetwork checks that outgoing unicast events to the corrupted network
 // are routed to the network adapter when no attacker is registered to the network.
 func TestHandleOutgoingEvent_NoAttacker_UnicastOverNetwork(t *testing.T) {
-	corruptibleNetwork, adapter := getCorruptibleNetworkNoAttacker(t, nil)
+	corruptibleNetwork, adapter := getCorruptibleNetworkNoAttacker(t)
 	event, channel := getMessageAndChannel()
 	targetId := unittest.IdentifierFixture()
 
@@ -102,7 +102,7 @@ func TestHandleOutgoingEvent_NoAttacker_UnicastOverNetwork(t *testing.T) {
 // TestHandleOutgoingEvent_NoAttacker_PublishOverNetwork checks that the outgoing publish events to the corrupted network
 // are routed to the network adapter when no attacker registered to the network.
 func TestHandleOutgoingEvent_NoAttacker_PublishOverNetwork(t *testing.T) {
-	corruptibleNetwork, adapter := getCorruptibleNetworkNoAttacker(t, nil)
+	corruptibleNetwork, adapter := getCorruptibleNetworkNoAttacker(t)
 	event, channel := getMessageAndChannel()
 
 	targetIds := unittest.IdentifierListFixture(10)
@@ -124,7 +124,7 @@ func TestHandleOutgoingEvent_NoAttacker_PublishOverNetwork(t *testing.T) {
 // TestHandleOutgoingEvent_NoAttacker_MulticastOverNetwork checks that the outgoing multicast events to the corrupted network
 // are routed to the network adapter when no attacker registered to the network.
 func TestHandleOutgoingEvent_NoAttacker_MulticastOverNetwork(t *testing.T) {
-	corruptibleNetwork, adapter := getCorruptibleNetworkNoAttacker(t, nil)
+	corruptibleNetwork, adapter := getCorruptibleNetworkNoAttacker(t)
 	event, channel := getMessageAndChannel()
 
 	targetIds := unittest.IdentifierListFixture(10)
@@ -360,15 +360,60 @@ func TestProcessAttackerMessage_ExecutionReceipt_Dictated(t *testing.T) {
 		})
 }
 
+// TestProcessAttackerMessage_ExecutionReceipt_PassThrough evaluates that when corrupted network
+// receives a completely filled execution receipt, it treats it as a pass-through event and passes it as it is on the Flow network.
+func TestProcessAttackerMessage_ExecutionReceipt_PassThrough(t *testing.T) {
+	withCorruptibleNetwork(t,
+		func(
+			corruptedId flow.Identity, // identity of ccf
+			corruptibleNetwork *Network,
+			adapter *mocknetwork.Adapter, // mock flow network that ccf uses to communicate with authorized flow nodes.
+			stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that attack network uses to send messages to this ccf.
+		) {
+
+			passThroughReceipt := unittest.ExecutionReceiptFixture()
+			msg, _, _ := insecure.MessageFixture(t, cbor.NewCodec(), insecure.Protocol_PUBLISH, passThroughReceipt)
+
+			params := []interface{}{network.Channel(msg.ChannelID), mock.Anything}
+			targetIds, err := flow.ByteSlicesToIds(msg.TargetIDs)
+			require.NoError(t, err)
+			for _, id := range targetIds {
+				params = append(params, id)
+			}
+
+			corruptedEventDispatchedOnFlowNetWg := sync.WaitGroup{}
+			corruptedEventDispatchedOnFlowNetWg.Add(1)
+			adapter.On("PublishOnChannel", params...).Run(func(args mock.Arguments) {
+				receipt, ok := args[1].(*flow.ExecutionReceipt)
+				require.True(t, ok)
+
+				// receipt should be completely intact.
+				require.Equal(t, passThroughReceipt, receipt)
+
+				corruptedEventDispatchedOnFlowNetWg.Done()
+			}).Return(nil).Once()
+
+			// imitates a gRPC call from orchestrator to ccf through attack network
+			require.NoError(t, stream.Send(msg))
+
+			unittest.RequireReturnsBefore(
+				t,
+				corruptedEventDispatchedOnFlowNetWg.Wait,
+				1*time.Second,
+				"attacker's message was not dispatched on flow network on time")
+		})
+}
+
 // ******************** HELPERS ****************************
 
-func getCorruptibleNetworkNoAttacker(t *testing.T, corruptedID *flow.Identity) (*Network, *mocknetwork.Adapter) {
+func getCorruptibleNetworkNoAttacker(t *testing.T, corruptedID ...*flow.Identity) (*Network, *mocknetwork.Adapter) {
 	// create corruptible network with no attacker registered
 	codec := cbor.NewCodec()
 
-	corruptedIdentity := corruptedID
-	if corruptedID == nil {
-		corruptedIdentity = unittest.IdentityFixture(unittest.WithAddress("localhost:0"))
+	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress("localhost:0"))
+	// some tests will want to create corruptible network with a specific ID
+	if len(corruptedID) > 0 {
+		corruptedIdentity = corruptedID[0]
 	}
 
 	//corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress("localhost:0"))

@@ -73,50 +73,6 @@ func TestNewConduit_MissingEgressController(t *testing.T) {
 	require.Nil(t, c)
 }
 
-// TestProcessAttackerMessage_ExecutionReceipt_PassThrough evaluates that when corrupted conduit factory (
-// ccf) receives a completely filled execution receipt, it treats it as a pass-through event and passes it as it is on the Flow network.
-//func TestProcessAttackerMessage_ExecutionReceipt_PassThrough(t *testing.T) {
-//	withCorruptibleNetwork(t,
-//		func(
-//			corruptedId flow.Identity,                                              // identity of ccf
-//			factory *ConduitFactory,                                                // the ccf itself
-//			flowNetwork *mocknetwork.Adapter,                                       // mock flow network that ccf uses to communicate with authorized flow nodes.
-//			stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that attack network uses to send messages to this ccf.
-//		) {
-//
-//			passThroughReceipt := unittest.ExecutionReceiptFixture()
-//			msg, _, _ := insecure.MessageFixture(t, cbor.NewCodec(), insecure.Protocol_PUBLISH, passThroughReceipt)
-//
-//			params := []interface{}{network.Channel(msg.ChannelID), testifymock.Anything}
-//			targetIds, err := flow.ByteSlicesToIds(msg.TargetIDs)
-//			require.NoError(t, err)
-//			for _, id := range targetIds {
-//				params = append(params, id)
-//			}
-//
-//			corruptedEventDispatchedOnFlowNetWg := sync.WaitGroup{}
-//			corruptedEventDispatchedOnFlowNetWg.Add(1)
-//			flowNetwork.On("PublishOnChannel", params...).Run(func(args testifymock.Arguments) {
-//				receipt, ok := args[1].(*flow.ExecutionReceipt)
-//				require.True(t, ok)
-//
-//				// receipt should be completely intact.
-//				require.Equal(t, passThroughReceipt, receipt)
-//
-//				corruptedEventDispatchedOnFlowNetWg.Done()
-//			}).Return(nil).Once()
-//
-//			// imitates a gRPC call from orchestrator to ccf through attack network
-//			require.NoError(t, stream.Send(msg))
-//
-//			unittest.RequireReturnsBefore(
-//				t,
-//				corruptedEventDispatchedOnFlowNetWg.Wait,
-//				1*time.Second,
-//				"attacker's message was not dispatched on flow network on time")
-//		})
-//}
-
 // TestEngineClosingChannel evaluates that factory closes the channel whenever the corresponding engine of that channel attempts
 // on closing it.
 //func TestEngineClosingChannel(t *testing.T) {
