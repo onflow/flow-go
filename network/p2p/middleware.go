@@ -55,6 +55,9 @@ const (
 
 	// maximum time to wait for a unicast request to complete for large message size
 	LargeMsgUnicastTimeout = 1000 * time.Second
+
+	UnicastStreamRateLimited    = "rate-limiting peer unicast stream creation dropping message"
+	UnicastBandwidthRateLimited = "rate-limiting peer unicast bandwidth limit exceeded dropping message"
 )
 
 var (
@@ -454,7 +457,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 	// check if unicast stream creation is rate limited for peer
 	if !m.isStreamAllowed(remotePeer) {
-		log.Warn().Msg("rate-limiting peer unicast stream creation dropping message")
+		log.Warn().Msg(UnicastStreamRateLimited)
 	}
 
 	success := false
@@ -528,7 +531,13 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 		// check unicast bandwidth rate limiter for peer
 		if !m.isBandwidthAllowed(remotePeer, &msg) {
-			log.Warn().Msg("rate-limiting peer unicast stream creation dropping message")
+			log.Warn().
+				Hex("sender", msg.OriginID).
+				Hex("event_id", msg.EventID).
+				Str("event_type", msg.Type).
+				Str("channel", msg.ChannelID).
+				Int("maxSize", maxSize).
+				Msg(UnicastBandwidthRateLimited)
 		}
 
 		m.wg.Add(1)
