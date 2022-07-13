@@ -2,13 +2,15 @@ package corruptible
 
 import (
 	"context"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+
 	mockinsecure "github.com/onflow/flow-go/insecure/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 // TestNewConduit_HappyPath checks when factory has an adapter registered and an egress controller,
