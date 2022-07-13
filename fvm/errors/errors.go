@@ -4,7 +4,7 @@ import (
 	stdErrors "errors"
 
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/onflow/cadence/runtime/errors"
 )
 
 // Error covers all non-fatal errors happing
@@ -74,7 +74,7 @@ func HandleRuntimeError(err error) error {
 
 	// External errors are reported by the runtime but originate from the VM.
 	// External errors may be fatal or non-fatal, so additional handling by SplitErrorTypes
-	if externalErr, ok := innerErr.(interpreter.ExternalError); ok {
+	if externalErr, ok := innerErr.(errors.ExternalError); ok {
 		if recoveredErr, ok := externalErr.Recovered.(error); ok {
 			// If the recovered value is an error, pass it to the original
 			// error handler to distinguish between fatal and non-fatal errors.
