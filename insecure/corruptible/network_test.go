@@ -300,6 +300,66 @@ func TestProcessAttackerMessage_ResultApproval_PassThrough(t *testing.T) {
 		})
 }
 
+// TestProcessAttackerMessage_ExecutionReceipt_Dictated evaluates that when corrupted network receives an execution receipt with
+// empty signature field, it fills its related fields with its own credentials (e.g., signature), and passes it through the Flow network.
+func TestProcessAttackerMessage_ExecutionReceipt_Dictated(t *testing.T) {
+	withCorruptibleNetwork(t,
+		func(
+			corruptedId flow.Identity, // identity of ccf
+			corruptibleNetwork *Network,
+			adapter *mocknetwork.Adapter, // mock flow network that ccf uses to communicate with authorized flow nodes.
+			stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that attack network uses to send messages to this ccf.
+		) {
+			// creates a corrupted execution receipt that attacker is sending on the flow network through the
+			// corrupted conduit factory.
+			// corrupted execution receipt dictated by attacker needs to only have the result field, as the rest will be
+			// filled up by the CCF.
+			dictatedResult := *unittest.ExecutionResultFixture()
+			msg, _, _ := insecure.MessageFixture(t, cbor.NewCodec(), insecure.Protocol_PUBLISH, &flow.ExecutionReceipt{
+				ExecutionResult: dictatedResult,
+			})
+
+			params := []interface{}{network.Channel(msg.ChannelID), mock.Anything}
+			targetIds, err := flow.ByteSlicesToIds(msg.TargetIDs)
+			require.NoError(t, err)
+			for _, id := range targetIds {
+				params = append(params, id)
+			}
+
+			corruptedEventDispatchedOnFlowNetWg := sync.WaitGroup{}
+			corruptedEventDispatchedOnFlowNetWg.Add(1)
+			adapter.On("PublishOnChannel", params...).Run(func(args mock.Arguments) {
+				receipt, ok := args[1].(*flow.ExecutionReceipt)
+				require.True(t, ok)
+
+				// result part of the receipt must be the same as attacker dictates.
+				require.Equal(t, dictatedResult, receipt.ExecutionResult)
+
+				// corrupted node should set itself as the executor
+				require.Equal(t, corruptedId.NodeID, receipt.ExecutorID)
+
+				// receipt should have a valid signature from corrupted node
+				id := receipt.ID()
+				valid, err := corruptedId.StakingPubKey.Verify(receipt.ExecutorSignature, id[:], corruptibleNetwork.receiptHasher)
+				require.NoError(t, err)
+				require.True(t, valid)
+
+				// TODO: check correctness of spock
+
+				corruptedEventDispatchedOnFlowNetWg.Done()
+			}).Return(nil).Once()
+
+			// imitates a gRPC call from orchestrator to ccf through attack network
+			require.NoError(t, stream.Send(msg))
+
+			unittest.RequireReturnsBefore(
+				t,
+				corruptedEventDispatchedOnFlowNetWg.Wait,
+				1*time.Second,
+				"attacker's message was not dispatched on flow network on time")
+		})
+}
+
 // ******************** HELPERS ****************************
 
 func getCorruptibleNetworkNoAttacker(t *testing.T, corruptedID *flow.Identity) (*Network, *mocknetwork.Adapter) {
