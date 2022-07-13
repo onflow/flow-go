@@ -1,4 +1,4 @@
-package access
+package access_test
 
 import (
 	"context"
@@ -16,9 +16,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
+
+	"github.com/onflow/flow-go/access"
+	hsmock "github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc"
@@ -35,7 +37,6 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
-	protocolInterface "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
@@ -45,18 +46,20 @@ import (
 
 type Suite struct {
 	suite.Suite
-	state      *protocol.State
-	snapshot   *protocol.Snapshot
-	epochQuery *protocol.EpochQuery
-	log        zerolog.Logger
-	net        *mocknetwork.Network
-	request    *module.Requester
-	collClient *accessmock.AccessAPIClient
-	execClient *accessmock.ExecutionAPIClient
-	me         *module.Local
-	chainID    flow.ChainID
-	metrics    *metrics.NoopCollector
-	backend    *backend.Backend
+	state                *protocol.State
+	snapshot             *protocol.Snapshot
+	epochQuery           *protocol.EpochQuery
+	signerIndicesDecoder *hsmock.BlockSignerDecoder
+	signerIds            flow.IdentifierList
+	log                  zerolog.Logger
+	net                  *mocknetwork.Network
+	request              *module.Requester
+	collClient           *accessmock.AccessAPIClient
+	execClient           *accessmock.ExecutionAPIClient
+	me                   *module.Local
+	chainID              flow.ChainID
+	metrics              *metrics.NoopCollector
+	backend              *backend.Backend
 }
 
 // TestAccess tests scenarios which exercise multiple API calls using both the RPC handler and the ingest engine
@@ -87,6 +90,10 @@ func (suite *Suite) SetupTest() {
 	suite.request.On("EntityByID", mock.Anything, mock.Anything)
 
 	suite.me = new(module.Local)
+
+	suite.signerIds = unittest.IdentifierListFixture(4)
+	suite.signerIndicesDecoder = new(hsmock.BlockSignerDecoder)
+	suite.signerIndicesDecoder.On("DecodeSignerIDs", mock.Anything).Return(suite.signerIds, nil).Maybe()
 
 	accessIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
 	suite.me.
@@ -126,8 +133,7 @@ func (suite *Suite) RunTest(
 			backend.DefaultSnapshotHistoryLimit,
 		)
 
-		handler := access.NewHandler(suite.backend, suite.chainID.Chain(), suite.state)
-
+		handler := access.NewHandler(suite.backend, suite.chainID.Chain(), access.WithBlockSignerDecoder(suite.signerIndicesDecoder))
 		f(handler, db, blocks, headers, results)
 	})
 }
@@ -302,7 +308,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 			backend.DefaultSnapshotHistoryLimit,
 		)
 
-		handler := access.NewHandler(backend, suite.chainID.Chain(), suite.state)
+		handler := access.NewHandler(backend, suite.chainID.Chain())
 
 		// Send transaction 1
 		resp, err := handler.SendTransaction(context.Background(), sendReq1)
@@ -341,40 +347,24 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 func (suite *Suite) TestGetBlockByIDAndHeight() {
 	suite.RunTest(func(handler *access.Handler, db *badger.DB, blocks *storage.Blocks, _ *storage.Headers, _ *storage.ExecutionResults) {
 
-		// the default header fixture creates a signerIDs out of 10 nodes committee, so we prepare a committee same as that
-		allConsensus := unittest.IdentityListFixture(40, unittest.WithRole(flow.RoleConsensus))
-
-		voterIndices, err := signature.EncodeSignersToIndices(allConsensus.NodeIDs(), allConsensus.NodeIDs())
-		require.NoError(suite.T(), err)
 		// test block1 get by ID
 		block1 := unittest.BlockFixture()
-		block1.Header.ParentVoterIndices = voterIndices
 		// test block2 get by height
 		block2 := unittest.BlockFixture()
 		block2.Header.Height = 2
-		block2.Header.ParentVoterIndices = voterIndices
 
 		require.NoError(suite.T(), blocks.Store(&block1))
 		require.NoError(suite.T(), blocks.Store(&block2))
 
 		// the follower logic should update height index on the block storage when a block is finalized
-		err = db.Update(operation.IndexBlockHeight(block2.Header.Height, block2.ID()))
+		err := db.Update(operation.IndexBlockHeight(block2.Header.Height, block2.ID()))
 		require.NoError(suite.T(), err)
 
-		snapshotForSignerIDs := new(protocol.Snapshot)
-		snapshotForSignerIDs.On("Identities", mock.Anything).Return(allConsensus, nil)
-		suite.state.On("AtBlockID", block1.Header.ID()).Return(snapshotForSignerIDs, nil)
-		suite.state.On("AtBlockID", block2.Header.ID()).Return(snapshotForSignerIDs, nil)
-
 		assertHeaderResp := func(resp *accessproto.BlockHeaderResponse, err error, header *flow.Header) {
-			suite.state.On("AtBlockID", header.ID()).Return(snapshotForSignerIDs, nil)
-			expectedSignerIDs, err := protocolInterface.DecodeSignerIDs(suite.state, header)
-			require.NoError(suite.T(), err)
-
 			require.NoError(suite.T(), err)
 			require.NotNil(suite.T(), resp)
 			actual := *resp.Block
-			expectedMessage, err := convert.BlockHeaderToMessage(header, expectedSignerIDs)
+			expectedMessage, err := convert.BlockHeaderToMessage(header, suite.signerIds)
 			require.NoError(suite.T(), err)
 			require.Equal(suite.T(), *expectedMessage, actual)
 			expectedBlockHeader, err := convert.MessageToBlockHeader(&actual)
@@ -386,10 +376,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 			require.NoError(suite.T(), err)
 			require.NotNil(suite.T(), resp)
 			actual := resp.Block
-			suite.state.On("AtBlockID", block.Header.ID()).Return(snapshotForSignerIDs, nil)
-			expectedSignerIDs, err := protocolInterface.DecodeSignerIDs(suite.state, block.Header)
-			require.NoError(suite.T(), err)
-			expectedMessage, err := convert.BlockToMessage(block, expectedSignerIDs)
+			expectedMessage, err := convert.BlockToMessage(block, suite.signerIds)
 			require.NoError(suite.T(), err)
 			require.Equal(suite.T(), expectedMessage, actual)
 			expectedBlock, err := convert.MessageToBlock(resp.Block)
@@ -408,7 +395,6 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		suite.Run("get header 1 by ID", func() {
 			// get header by ID
 			id := block1.ID()
-			suite.state.On("AtBlockID", block1.Header.ID()).Return(snapshotForSignerIDs, nil)
 			req := &accessproto.GetBlockHeaderByIDRequest{
 				Id: id[:],
 			}
@@ -632,12 +618,11 @@ func (suite *Suite) TestGetSealedTransaction() {
 			backend.DefaultSnapshotHistoryLimit,
 		)
 
-		handler := access.NewHandler(backend, suite.chainID.Chain(), suite.state)
+		handler := access.NewHandler(backend, suite.chainID.Chain())
 
 		rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, rpc.Config{}, nil, nil, blocks, headers, collections, transactions,
 			receipts, results, suite.chainID, metrics, metrics, 0, 0, false, false, nil, nil)
-		rpcEngBuilder.WithLegacy()
-		rpcEng := rpcEngBuilder.Build()
+		rpcEng := rpcEngBuilder.WithLegacy().Build()
 		require.NoError(suite.T(), err)
 
 		// create the ingest engine
@@ -725,7 +710,7 @@ func (suite *Suite) TestExecuteScript() {
 			backend.DefaultSnapshotHistoryLimit,
 		)
 
-		handler := access.NewHandler(suite.backend, suite.chainID.Chain(), suite.state)
+		handler := access.NewHandler(suite.backend, suite.chainID.Chain())
 
 		// initialize metrics related storage
 		metrics := metrics.NewNoopCollector()
@@ -737,8 +722,7 @@ func (suite *Suite) TestExecuteScript() {
 		require.NoError(suite.T(), err)
 
 		conduit := new(mocknetwork.Conduit)
-		suite.net.On("Register", network.ReceiveReceipts, mock.Anything).Return(conduit, nil).
-			Once()
+		suite.net.On("Register", network.ReceiveReceipts, mock.Anything).Return(conduit, nil).Once()
 		// create the ingest engine
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, blocks, headers, collections,
 			transactions, results, receipts, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, nil)
