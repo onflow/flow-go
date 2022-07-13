@@ -111,7 +111,7 @@ func WrapAsUnknownBlockError(blockID flow.Identifier, err error) error {
 func NewUnknownBlockError(blockID flow.Identifier) error {
 	return UnknownBlockError{
 		blockID: blockID,
-		err:     fmt.Errorf("block %v has not been processed yet: %w", blockID),
+		err:     fmt.Errorf("block %v has not been processed yet", blockID),
 	}
 }
 
