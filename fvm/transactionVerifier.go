@@ -138,6 +138,9 @@ func (v *TransactionVerifier) verifyTransaction(
 		return errors.NewAccountAuthorizationErrorf(tx.Payer, msg)
 	}
 
+	if proc.Transaction.Payer == ctx.Chain.ServiceAddress() {
+		sth.SetPayerIsServiceAccount()
+	}
 	return nil
 }
 

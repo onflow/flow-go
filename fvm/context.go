@@ -93,7 +93,6 @@ func defaultContext(logger zerolog.Logger) Context {
 		ExtensiveTracing:              false,
 		TransactionProcessors: []TransactionProcessor{
 			NewTransactionVerifier(AccountKeyWeightThreshold),
-			NewTransactionServiceAccountChecker(),
 			NewTransactionSequenceNumberChecker(),
 			NewTransactionInvoker(logger),
 		},
