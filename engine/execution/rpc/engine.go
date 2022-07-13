@@ -17,8 +17,6 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/consensus/hotstuff/committees"
-	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
@@ -57,9 +55,10 @@ func New(
 	exeResults storage.ExecutionResults,
 	txResults storage.TransactionResults,
 	chainID flow.ChainID,
+	sgnIdcsDecoder hotstuff.BlockSignerDecoder,
 	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the gRPC API e.g. Ping->100, ExecuteScriptAtBlockID->300
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the gRPC API e.g. Ping->50, ExecuteScriptAtBlockID->10
-) (*Engine, error) {
+) *Engine {
 	log = log.With().Str("engine", "rpc").Logger()
 	if config.MaxMsgSize == 0 {
 		config.MaxMsgSize = grpcutils.DefaultMaxMsgSize
@@ -89,14 +88,6 @@ func New(
 
 	server := grpc.NewServer(serverOptions...)
 
-	// TODO: update to Replicas API once active PaceMaker is merged
-	// The second parameter (flow.Identifier) is only used by hotstuff internally and also
-	// going to be removed soon. For now, we set it to zero.
-	committee, err := committees.NewConsensusCommittee(state, flow.ZeroID)
-	if err != nil {
-		return nil, fmt.Errorf("initializing hotstuff.Committee abstraction failed: %w", err)
-	}
-
 	eng := &Engine{
 		log:  log,
 		unit: engine.NewUnit(),
@@ -106,7 +97,7 @@ func New(
 			blocks:             blocks,
 			headers:            headers,
 			state:              state,
-			committee:          committee,
+			sgnIdcsDecoder:     sgnIdcsDecoder,
 			events:             events,
 			exeResults:         exeResults,
 			transactionResults: txResults,
@@ -123,7 +114,7 @@ func New(
 
 	execution.RegisterExecutionAPIServer(eng.server, eng.handler)
 
-	return eng, nil
+	return eng
 }
 
 // Ready returns a ready channel that is closed once the engine has fully
@@ -165,7 +156,7 @@ type handler struct {
 	blocks             storage.Blocks
 	headers            storage.Headers
 	state              protocol.State
-	committee          hotstuff.Committee
+	sgnIdcsDecoder     hotstuff.BlockSignerDecoder
 	events             storage.Events
 	exeResults         storage.ExecutionResults
 	transactionResults storage.TransactionResults
@@ -567,7 +558,7 @@ func (h *handler) GetBlockHeaderByID(
 }
 
 func (h *handler) blockHeaderResponse(header *flow.Header) (*execution.BlockHeaderResponse, error) {
-	signerIDs, err := signature.DecodeSignerIDs(h.committee, header)
+	signerIDs, err := h.sgnIdcsDecoder.DecodeSignerIDs(header)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode signer indices to Identifiers for block %v: %w", header.ID(), err)
 	}
