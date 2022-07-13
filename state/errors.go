@@ -3,6 +3,8 @@ package state
 import (
 	"errors"
 	"fmt"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // InvalidExtensionError is an error for invalid extension of the state
@@ -95,11 +97,21 @@ func IsNoValidChildBlockError(err error) bool {
 // has not been ingested yet.
 type UnknownBlockError struct {
 	blockID flow.Identifier
+	err     error
 }
 
-func NewUnknownBlockErrorf(msg string, args ...interface{}) error {
+// WrapAsUnknownBlockError wraps a given error as UnknownBlockError
+func WrapAsUnknownBlockError(blockID flow.Identifier, err error) error {
 	return UnknownBlockError{
-		err: fmt.Errorf(msg, args...),
+		blockID: blockID,
+		err:     fmt.Errorf("block %v has not been processed yet: %w", blockID, err),
+	}
+}
+
+func NewUnknownBlockError(blockID flow.Identifier) error {
+	return UnknownBlockError{
+		blockID: blockID,
+		err:     fmt.Errorf("block %v has not been processed yet: %w", blockID),
 	}
 }
 

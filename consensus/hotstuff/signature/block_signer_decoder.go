@@ -41,7 +41,7 @@ func (b *BlockSignerDecoder) DecodeSignerIDs(header *flow.Header) (flow.Identifi
 		// TODO: this potentially needs to be updated when we implement and document proper error handling for
 		//       `hotstuff.Committee` and underlying code (such as `protocol.Snapshot`)
 		if errors.Is(err, storage.ErrNotFound) {
-			return nil, state.NewUnknownBlockErrorf("block %v has not been processed yet: %w", id, err)
+			return nil, state.WrapAsUnknownBlockError(id, err)
 		}
 		return nil, fmt.Errorf("fail to retrieve identities for block %v: %w", id, err)
 	}
