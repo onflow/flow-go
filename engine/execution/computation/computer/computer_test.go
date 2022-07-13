@@ -397,7 +397,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		block := generateBlock(0, 0, rag)
 
-		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 

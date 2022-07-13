@@ -1295,7 +1295,7 @@ func TestAccountBalanceFields(t *testing.T) {
 					}
 				`, address)))
 
-				view = delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+				view = delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 					return nil, fmt.Errorf("error getting register %s, %s", flow.BytesToAddress([]byte(owner)).Hex(), key)
 				})
 
@@ -1494,7 +1494,7 @@ func TestGetStorageCapacity(t *testing.T) {
 					}
 				`, address)))
 
-				view = delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+				view = delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 					return nil, fmt.Errorf("error getting register %s, %s", flow.BytesToAddress([]byte(owner)).Hex(), key)
 				})
 
