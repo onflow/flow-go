@@ -87,7 +87,7 @@ func (s *EventLoopTestSuite) Test_SubmitProposal() {
 func (s *EventLoopTestSuite) Test_SubmitQC() {
 	qc := unittest.QuorumCertificateFixture()
 	processed := atomic.NewBool(false)
-	s.eh.On("OnQCConstructed", qc).Run(func(args mock.Arguments) {
+	s.eh.On("OnReceiveQc", qc).Run(func(args mock.Arguments) {
 		processed.Store(true)
 	}).Return(nil).Once()
 	s.eventLoop.SubmitTrustedQC(qc)
@@ -101,7 +101,7 @@ func TestEventLoop_Timeout(t *testing.T) {
 	processed := atomic.NewBool(false)
 	eh.On("Start").Return(nil).Once()
 	eh.On("TimeoutChannel").Return(time.NewTimer(100 * time.Millisecond).C)
-	eh.On("OnQCConstructed", mock.Anything).Return(nil).Maybe()
+	eh.On("OnReceiveQc", mock.Anything).Return(nil).Maybe()
 	eh.On("OnReceiveProposal", mock.Anything).Return(nil).Maybe()
 	eh.On("OnLocalTimeout").Run(func(args mock.Arguments) {
 		processed.Store(true)

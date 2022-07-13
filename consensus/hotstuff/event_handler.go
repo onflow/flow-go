@@ -10,22 +10,31 @@ import (
 // EventHandler runs a state machine to process proposals, QC and local timeouts.
 type EventHandler interface {
 
-	// OnQCConstructed processes a valid qc constructed by internal vote aggregator.
-	OnQCConstructed(qc *flow.QuorumCertificate) error
+	// OnReceiveQc processes a valid qc constructed by internal vote aggregator or discovered in TimeoutObject.
+	// All inputs should be validated before feeding into this function. Assuming trusted data.
+	// No errors are expected during normal operation.
+	OnReceiveQc(qc *flow.QuorumCertificate) error
 
-	// OnTCConstructed processes a valid tc constructed by internal timeout aggregator.
-	OnTCConstructed(tc *flow.TimeoutCertificate) error
+	// OnReceiveTc processes a valid tc constructed by internal timeout aggregator, discovered in TimeoutObject or
+	// broadcast over the network.
+	// All inputs should be validated before feeding into this function. Assuming trusted data.
+	// No errors are expected during normal operation.
+	OnReceiveTc(tc *flow.TimeoutCertificate) error
 
 	// OnReceiveProposal processes a block proposal received from another HotStuff
 	// consensus participant.
+	// All inputs should be validated before feeding into this function. Assuming trusted data.
+	// No errors are expected during normal operation.
 	OnReceiveProposal(proposal *model.Proposal) error
 
-	// OnLocalTimeout will check if there was a local timeout.
+	// OnLocalTimeout will handle local timeout event by creating TimeoutObject and broadcasting it.
+	// No errors are expected during normal operation.
 	OnLocalTimeout() error
 
-	// TimeoutChannel returs a channel that sends a signal on timeout.
+	// TimeoutChannel returns a channel that sends a signal on timeout.
 	TimeoutChannel() <-chan time.Time
 
 	// Start starts the event handler.
+	// No errors are expected during normal operation.
 	Start() error
 }

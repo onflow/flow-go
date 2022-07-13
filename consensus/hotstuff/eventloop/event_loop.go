@@ -180,7 +180,7 @@ func (el *EventLoop) loop(ctx context.Context) error {
 
 			processStart := time.Now()
 
-			err := el.eventHandler.OnQCConstructed(qc)
+			err := el.eventHandler.OnReceiveQc(qc)
 
 			// measure how long it takes for a QC to be processed
 			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeOnQC)
@@ -197,7 +197,7 @@ func (el *EventLoop) loop(ctx context.Context) error {
 
 			processStart := time.Now()
 
-			err := el.eventHandler.OnTCConstructed(tc)
+			err := el.eventHandler.OnReceiveTc(tc)
 
 			// measure how long it takes for a TC to be processed
 			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeOnTC)

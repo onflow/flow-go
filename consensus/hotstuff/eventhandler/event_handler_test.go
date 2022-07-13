@@ -337,7 +337,7 @@ func (es *EventHandlerSuite) TestStartNewView_ParentProposalNotFound() {
 	// I'm leader for next block
 	es.committee.leaders[es.endView] = struct{}{}
 
-	err := es.eventhandler.OnTCConstructed(tc)
+	err := es.eventhandler.OnReceiveTc(tc)
 	require.NoError(es.T(), err)
 
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
@@ -472,7 +472,7 @@ func (es *EventHandlerSuite) TestOnQCConstructed_HappyPath() {
 	// don't have block for the newview
 	// over
 
-	err := es.eventhandler.OnQCConstructed(qc)
+	err := es.eventhandler.OnReceiveQc(qc)
 	require.NoError(es.T(), err, "if a vote can trigger a QC to be built,"+
 		"and the QC triggered a view change, then start new view")
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
@@ -505,24 +505,24 @@ func (es *EventHandlerSuite) TestOnQCConstructed_FutureView() {
 	es.forks.proposals[b3.Block.BlockID] = b3
 
 	// test that qc for future view should trigger view change
-	err := es.eventhandler.OnQCConstructed(qc3)
+	err := es.eventhandler.OnReceiveQc(qc3)
 	endView := b3.Block.View + 1 // next view
 	require.NoError(es.T(), err, "if a vote can trigger a QC to be built,"+
 		"and the QC triggered a view change, then start new view")
 	require.Equal(es.T(), endView, es.paceMaker.CurView(), "incorrect view change")
 
 	// the same qc would not trigger view change
-	err = es.eventhandler.OnQCConstructed(qc3)
+	err = es.eventhandler.OnReceiveQc(qc3)
 	endView = b3.Block.View + 1 // next view
 	require.NoError(es.T(), err, "same qc should not trigger view change")
 	require.Equal(es.T(), endView, es.paceMaker.CurView(), "incorrect view change")
 
 	// old QCs won't trigger view change
-	err = es.eventhandler.OnQCConstructed(qc2)
+	err = es.eventhandler.OnReceiveQc(qc2)
 	require.NoError(es.T(), err)
 	require.Equal(es.T(), endView, es.paceMaker.CurView(), "incorrect view change")
 
-	err = es.eventhandler.OnQCConstructed(qc1)
+	err = es.eventhandler.OnReceiveQc(qc1)
 	require.NoError(es.T(), err)
 	require.Equal(es.T(), endView, es.paceMaker.CurView(), "incorrect view change")
 }
@@ -544,7 +544,7 @@ func (es *EventHandlerSuite) TestOnQCConstructed_NextLeaderProposes() {
 	require.NoError(es.T(), err)
 
 	// after receiving proposal build QC and deliver it to event handler
-	err = es.eventhandler.OnQCConstructed(qc)
+	err = es.eventhandler.OnReceiveQc(qc)
 	require.NoError(es.T(), err)
 
 	lastCall := es.communicator.Calls[len(es.communicator.Calls)-1]
@@ -570,7 +570,7 @@ func (es *EventHandlerSuite) TestOnTCConstructed_HappyPath() {
 	// expect a view change
 	es.endView++
 
-	err := es.eventhandler.OnTCConstructed(tc)
+	err := es.eventhandler.OnReceiveTc(tc)
 	require.NoError(es.T(), err, "TC should trigger a view change and start of new view")
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
 }
@@ -580,7 +580,7 @@ func (es *EventHandlerSuite) TestOnTCConstructed_HappyPath() {
 func (es *EventHandlerSuite) TestOnTCConstructed_NextLeaderProposes() {
 	es.committee.leaders[es.tc.View+1] = struct{}{}
 	es.endView++
-	err := es.eventhandler.OnTCConstructed(es.tc)
+	err := es.eventhandler.OnReceiveTc(es.tc)
 	require.NoError(es.T(), err)
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "TC didn't trigger view change")
 
@@ -624,7 +624,7 @@ func (es *EventHandlerSuite) TestOnTimeout() {
 func (es *EventHandlerSuite) Test100Timeout() {
 	for i := 0; i < 100; i++ {
 		tc := helper.MakeTC(helper.WithTCView(es.initView + uint64(i)))
-		err := es.eventhandler.OnTCConstructed(tc)
+		err := es.eventhandler.OnReceiveTc(tc)
 		es.endView++
 		require.NoError(es.T(), err)
 	}
@@ -665,7 +665,7 @@ func (es *EventHandlerSuite) TestLeaderBuild100Blocks() {
 
 		err := es.eventhandler.OnReceiveProposal(proposal)
 		require.NoError(es.T(), err)
-		err = es.eventhandler.OnQCConstructed(qc)
+		err = es.eventhandler.OnReceiveQc(qc)
 		require.NoError(es.T(), err)
 
 		lastCall := es.communicator.Calls[len(es.communicator.Calls)-1]
@@ -760,7 +760,7 @@ func (es *EventHandlerSuite) TestCreateProposal_SanityChecks() {
 	// I'm the next leader
 	es.committee.leaders[tc.View+1] = struct{}{}
 
-	err := es.eventhandler.OnTCConstructed(tc)
+	err := es.eventhandler.OnReceiveTc(tc)
 	require.NoError(es.T(), err)
 
 	lastCall := es.communicator.Calls[len(es.communicator.Calls)-1]

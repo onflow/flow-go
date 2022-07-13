@@ -483,7 +483,7 @@ func (in *Instance) Run() error {
 			case *model.Vote:
 				in.voteAggregator.AddVote(m)
 			case *flow.QuorumCertificate:
-				err := in.handler.OnQCConstructed(m)
+				err := in.handler.OnReceiveQc(m)
 				if err != nil {
 					return fmt.Errorf("could not process created qc: %w", err)
 				}
