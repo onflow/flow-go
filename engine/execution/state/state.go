@@ -40,6 +40,9 @@ type ReadOnlyExecutionState interface {
 	// StateCommitmentByBlockID returns the final state commitment for the provided block ID.
 	StateCommitmentByBlockID(context.Context, flow.Identifier) (flow.StateCommitment, error)
 
+	// HasState returns true if the state with the given state commitment exists in memory
+	HasState(flow.StateCommitment) bool
+
 	// ChunkDataPackByChunkID retrieve a chunk data pack given the chunk ID.
 	ChunkDataPackByChunkID(context.Context, flow.Identifier) (*flow.ChunkDataPack, error)
 
@@ -298,6 +301,10 @@ func (s *state) GetProof(
 		return nil, fmt.Errorf("cannot get proof: %w", err)
 	}
 	return proof, nil
+}
+
+func (s *state) HasState(commitment flow.StateCommitment) bool {
+	return s.ls.HasState(ledger.State(commitment))
 }
 
 func (s *state) StateCommitmentByBlockID(ctx context.Context, blockID flow.Identifier) (flow.StateCommitment, error) {

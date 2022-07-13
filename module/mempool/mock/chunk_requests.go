@@ -87,8 +87,8 @@ func (_m *ChunkRequests) PopAll(chunkID flow.Identifier) (chunks.LocatorMap, boo
 	return r0, r1
 }
 
-// Rem provides a mock function with given fields: chunkID
-func (_m *ChunkRequests) Rem(chunkID flow.Identifier) bool {
+// Remove provides a mock function with given fields: chunkID
+func (_m *ChunkRequests) Remove(chunkID flow.Identifier) bool {
 	ret := _m.Called(chunkID)
 
 	var r0 bool

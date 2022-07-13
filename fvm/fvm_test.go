@@ -305,7 +305,7 @@ func TestHashing(t *testing.T) {
 			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
 				require.NoError(t, scriptErr)
 				require.NoError(t, executionErr)
-				require.Equal(t, "627d7e8fe50384601ca550ceecb61c23e9cbde7feb75ae6b53227f128f2dc3b78b543a044058403e4822f88cb7040d90d588c9e8575f0de3012fe7edaf02b9997a8a5fad234d21b2af359ec3abaeaf4a7ef60e5f04623a983bd5e071f4113678710e910d48ac4d1713073a707ab9057867e0ba32aca6b33010b1d20b8006dd25", result)
+				require.Equal(t, "44dc46111abacfe2bb4a04cea4805aad03f84e4849f138cc3ed431478472b185548628e96d0c963b21ebaf17132d73fc13031eb82d5f4cbe3b6047ff54d20e8d663904373d73348b97ce18305ebc56114cb7e7394e486684007f78aa59abc5d0a8f6bae6bd186db32528af80857cd12112ce6960be29c96074df9c4aaed5b0e6", result)
 			},
 		},
 		{
@@ -315,7 +315,7 @@ func TestHashing(t *testing.T) {
 			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
 				require.NoError(t, scriptErr)
 				require.NoError(t, executionErr)
-				require.Equal(t, "dc6889f9ca46803a9c7759068989dfc3cffe632fd991e25f6589603c73b7891e2f4736eebe5248f211bbddaa3d763b1b9318185eaf3ab3bfd6f159f345c3148795e4ff3ad376c98d5616febebcf4520ca2a83dda4be2f98b1ead9fb5a622355305b156e06db173a9e1d7af973b11acc1e714cd3aa0fb367dfaadc5a957b4742b", result)
+				require.Equal(t, "de7d9aa24274fa12c98cce5c09eea0634108ead2e91828b9a9a450e878088393e3e63eb4b19834f579ce215b00a9915919b67a71dab1112560319e6e1e5e9ad0fb670e8a09d586508c84547cee7ddbe8c9362c996846154865eb271bdc4523dbcdbdae5a77391fb54374f37534c8bb2281589cb2e3d62742596cdad7e4f9f35c", result)
 			},
 		},
 	}
@@ -1286,6 +1286,56 @@ func TestSettingExecutionWeights(t *testing.T) {
 			require.NoError(t, err)
 
 			assert.True(t, errors.IsComputationLimitExceededError(tx.Err))
+		},
+	))
+
+	t.Run("transaction should not read context from the state if AllowContextOverrideByExecutionState if false", newVMTest().
+		withBootstrapProcedureOptions(
+			fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+			fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+			fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+			fvm.WithExecutionEffortWeights(
+				weightedMeter.ExecutionEffortWeights{
+					meter.ComputationKindCreateAccount: 1_000_000_000_000 << weightedMeter.MeterExecutionInternalPrecisionBytes,
+				},
+			),
+			fvm.WithExecutionMemoryWeights(
+				weightedMeter.ExecutionMemoryWeights{
+					common.MemoryKindBreakStatement: 1_000_000_000_000,
+				},
+			),
+			fvm.WithExecutionMemoryLimit(0),
+		).withContextOptions(
+		fvm.WithAllowContextOverrideByExecutionState(false),
+		fvm.WithMemoryLimit(math.MaxUint64),
+	).run(
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(`
+				transaction {
+                  prepare(signer: AuthAccount) {
+					while true {
+						AuthAccount(payer: signer)
+						break
+					}
+                  }
+                }
+			`)).
+				SetProposalKey(chain.ServiceAddress(), 0, 0).
+				AddAuthorizer(chain.ServiceAddress()).
+				SetPayer(chain.ServiceAddress()).
+				SetGasLimit(1_000)
+
+			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+			require.NoError(t, err)
+
+			tx := fvm.Transaction(txBody, 0)
+			err = vm.Run(ctx, tx, view, programs)
+			// tx would fail if ExecutionEffortWeights from the state were used due to computation limit
+			// tx would fail if ExecutionMemoryWeights from the state were used due to memory limit
+			// tx would fail if MemoryLimit from the state was used due to memory limit
+			require.NoError(t, err)
+			require.NoError(t, tx.Err)
 		},
 	))
 

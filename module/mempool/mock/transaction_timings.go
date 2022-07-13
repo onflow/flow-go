@@ -89,8 +89,8 @@ func (_m *TransactionTimings) ByID(txID flow.Identifier) (*flow.TransactionTimin
 	return r0, r1
 }
 
-// Rem provides a mock function with given fields: txID
-func (_m *TransactionTimings) Rem(txID flow.Identifier) bool {
+// Remove provides a mock function with given fields: txID
+func (_m *TransactionTimings) Remove(txID flow.Identifier) bool {
 	ret := _m.Called(txID)
 
 	var r0 bool

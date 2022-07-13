@@ -31,6 +31,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -245,15 +246,11 @@ func (fnb *FlowNodeBuilder) EnqueueResolver() {
 }
 
 func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
-	fnb.Component(ConduitFactoryComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		cf := conduit.NewDefaultConduitFactory()
-		fnb.ConduitFactory = cf
-		node.Logger.Info().Hex("node_id", logging.ID(node.NodeID)).Msg("default conduit factory initiated")
-
-		return cf, nil
-	})
 	fnb.Component(NetworkComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		return fnb.InitFlowNetworkWithConduitFactory(node, fnb.ConduitFactory)
+		cf := conduit.NewDefaultConduitFactory()
+		fnb.Logger.Info().Hex("node_id", logging.ID(fnb.NodeID)).Msg("default conduit factory initiated")
+
+		return fnb.InitFlowNetworkWithConduitFactory(node, cf)
 	})
 }
 
@@ -881,6 +878,16 @@ func (fnb *FlowNodeBuilder) handleModule(v namedModuleFunc) error {
 	return nil
 }
 
+func (fnb *FlowNodeBuilder) handleModules() error {
+	for _, f := range fnb.modules {
+		if err := fnb.handleModule(f); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // handleComponents registers the component's factory method with the ComponentManager to be run
 // when the node starts.
 // It uses signal channels to ensure that components are started serially.
@@ -1112,6 +1119,25 @@ func (fnb *FlowNodeBuilder) OverrideComponent(name string, f ReadyDoneFactory) N
 	return fnb.Component(name, f)
 }
 
+// OverrideModule adds given builder function to the modules set of the node builder. If a builder function with that name
+// already exists, it will be overridden.
+func (fnb *FlowNodeBuilder) OverrideModule(name string, f BuilderFunc) NodeBuilder {
+	for i := 0; i < len(fnb.modules); i++ {
+		if fnb.modules[i].name == name {
+			// found component with the name, override it.
+			fnb.modules[i] = namedModuleFunc{
+				fn:   f,
+				name: name,
+			}
+
+			return fnb
+		}
+	}
+
+	// no component found with the same name, hence just adding it.
+	return fnb.Module(name, f)
+}
+
 // RestartableComponent adds a new component to the node that conforms to the ReadyDoneAware
 // interface, and calls the provided error handler when an irrecoverable error is encountered.
 // Use RestartableComponent if the component is not critical to the node's safe operation and
@@ -1181,6 +1207,12 @@ func WithMetricsEnabled(enabled bool) Option {
 func WithSyncCoreConfig(syncConfig synchronization.Config) Option {
 	return func(config *BaseConfig) {
 		config.SyncCoreConfig = syncConfig
+	}
+}
+
+func WithComplianceConfig(complianceConfig compliance.Config) Option {
+	return func(config *BaseConfig) {
+		config.ComplianceConfig = complianceConfig
 	}
 }
 
@@ -1321,10 +1353,8 @@ func (fnb *FlowNodeBuilder) onStart() error {
 	fnb.EnqueueAdminServerInit()
 
 	// run all modules
-	for _, f := range fnb.modules {
-		if err := fnb.handleModule(f); err != nil {
-			return err
-		}
+	if err := fnb.handleModules(); err != nil {
+		return fmt.Errorf("could not handle modules: %w", err)
 	}
 
 	// run all components
