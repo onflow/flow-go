@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/chainsync"
-	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
@@ -307,15 +306,9 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 			e.log.Debug().Uint64("height", block.Header.Height).Msg("block handler rejected")
 			continue
 		}
-		synced := &events.SyncedBlock{
-			OriginID: originID,
-			Block:    block,
-		}
-		// tempfix: to help nodes falling far behind to catch up.
-		// it avoids the race condition in compliance engine and hotstuff to validate blocks
-		time.Sleep(150 * time.Millisecond)
-		e.comp.SubmitLocal(synced)
 	}
+
+	e.comp.SubmitLocal(res)
 }
 
 // checkLoop will regularly scan for items that need requesting.
