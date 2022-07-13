@@ -720,13 +720,18 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromAnyExeNode(
 	req execproto.GetTransactionsByBlockIDRequest,
 ) (*execproto.GetTransactionResultsResponse, error) {
 	var errs *multierror.Error
-	logAnyError := func() {
-		errToReturn := errs.ErrorOrNil()
-		if errToReturn != nil {
-			b.log.Err(errToReturn).Msg("failed to get transaction results from execution nodes")
+
+	defer func() {
+		if err := errs.ErrorOrNil(); err != nil {
+			b.log.Err(errs).Msg("failed to get transaction results from execution nodes")
 		}
+	}()
+
+	// if we were passed 0 execution nodes add a specific error
+	if len(execNodes) == 0 {
+		return nil, errors.New("zero execution nodes")
 	}
-	defer logAnyError()
+
 	for _, execNode := range execNodes {
 		resp, err := b.tryGetTransactionResultsByBlockID(ctx, execNode, req)
 		if err == nil {
@@ -741,6 +746,8 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromAnyExeNode(
 		}
 		errs = multierror.Append(errs, err)
 	}
+
+	// log the errors
 	return nil, errs.ErrorOrNil()
 }
 
@@ -774,6 +781,11 @@ func (b *backendTransactions) getTransactionResultByIndexFromAnyExeNode(
 		}
 	}
 	defer logAnyError()
+
+	if len(execNodes) == 0 {
+		return nil, errors.New("zero execution nodes provided")
+	}
+
 	// try to execute the script on one of the execution nodes
 	for _, execNode := range execNodes {
 		resp, err := b.tryGetTransactionResultByIndex(ctx, execNode, req)
@@ -790,6 +802,7 @@ func (b *backendTransactions) getTransactionResultByIndexFromAnyExeNode(
 		}
 		errs = multierror.Append(errs, err)
 	}
+
 	return nil, errs.ErrorOrNil()
 }
 

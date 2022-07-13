@@ -19,13 +19,13 @@ import (
 	enginemock "github.com/onflow/flow-go/engine/testutil/mock"
 	"github.com/onflow/flow-go/engine/verification/assigner/blockconsumer"
 	"github.com/onflow/flow-go/model/chunks"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
+	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -177,8 +177,7 @@ func SetupMockConsensusNode(t *testing.T,
 	}
 
 	// creates a hasher for spock
-	hasher := crypto.NewBLSKMAC(encoding.SPOCKTag)
-
+	hasher := msig.NewBLSHasher(msig.SPOCKTag)
 	mu := &sync.Mutex{} // making testify mock thread-safe
 
 	conEngine.On("Process", testifymock.AnythingOfType("network.Channel"), testifymock.Anything, testifymock.Anything).

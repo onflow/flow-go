@@ -49,6 +49,11 @@ func (_m *TransactionMetrics) TransactionSubmissionFailed() {
 	_m.Called()
 }
 
+// UpdateExecutionReceiptMaxHeight provides a mock function with given fields: height
+func (_m *TransactionMetrics) UpdateExecutionReceiptMaxHeight(height uint64) {
+	_m.Called(height)
+}
+
 type NewTransactionMetricsT interface {
 	mock.TestingT
 	Cleanup(func())
