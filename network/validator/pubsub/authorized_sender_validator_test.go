@@ -233,7 +233,7 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ValidationFai
 
 // initializeAuthorizationTestCases initializes happy and sad path test cases for checking authorized and unauthorized role message combinations.
 func (s *TestAuthorizedSenderValidatorSuite) initializeAuthorizationTestCases() {
-	for _, c := range message.AuthorizationConfigs {
+	for _, c := range message.GetAllMessageAuthConfigs() {
 		for channel, authorizedRoles := range c.Config {
 			for _, role := range flow.Roles() {
 				identity, _ := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(role))
@@ -260,13 +260,15 @@ func (s *TestAuthorizedSenderValidatorSuite) initializeAuthorizationTestCases() 
 // initializeInvalidMessageOnChannelTestCases initializes test cases for all possible combinations of invalid message types on channel.
 // NOTE: the role in the test case does not matter since ErrUnauthorizedMessageOnChannel will be returned before the role is checked.
 func (s *TestAuthorizedSenderValidatorSuite) initializeInvalidMessageOnChannelTestCases() {
+	configs := message.GetAllMessageAuthConfigs()
+
 	// iterate all channels
-	for _, c := range message.AuthorizationConfigs {
+	for _, c := range configs {
 		for channel, authorizedRoles := range c.Config {
 			identity, _ := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(authorizedRoles[0]))
 
 			// iterate all message types
-			for _, config := range message.AuthorizationConfigs {
+			for _, config := range configs {
 
 				// include test if message type is not authorized on channel
 				_, ok := config.Config[channel]

@@ -352,3 +352,13 @@ func GetMessageAuthConfig(v interface{}) (MsgAuthConfig, error) {
 		return MsgAuthConfig{}, NewUnknownMsgTypeErr(v)
 	}
 }
+
+// GetAllMessageAuthConfigs returns all the configured message auth configurations.
+func GetAllMessageAuthConfigs() []MsgAuthConfig {
+	configs := make([]MsgAuthConfig, 0)
+	for _, config := range authorizationConfigs {
+		configs = append(configs, config)
+	}
+
+	return configs
+}
