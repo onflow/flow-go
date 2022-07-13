@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
 
 	"github.com/onflow/flow-go/module/trace"
@@ -19,7 +18,7 @@ import (
 type ContractFunctionInvoker struct {
 	contractLocation common.AddressLocation
 	functionName     string
-	arguments        []interpreter.Value
+	arguments        []cadence.Value
 	argumentTypes    []sema.Type
 	logger           zerolog.Logger
 	logSpanFields    []traceLog.Field
@@ -28,7 +27,7 @@ type ContractFunctionInvoker struct {
 func NewContractFunctionInvoker(
 	contractLocation common.AddressLocation,
 	functionName string,
-	arguments []interpreter.Value,
+	arguments []cadence.Value,
 	argumentTypes []sema.Type,
 	logger zerolog.Logger) *ContractFunctionInvoker {
 	return &ContractFunctionInvoker{

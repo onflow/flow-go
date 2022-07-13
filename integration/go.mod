@@ -288,3 +288,7 @@ require (
 //replace golang.org/x/sys => golang.org/x/sys v0.0.0-20200826173525-f9321e4c35a6
 
 replace github.com/onflow/flow-go => ../
+
+replace github.com/onflow/cadence => ../../cadence
+
+replace github.com/onflow/flow-core-contracts/lib/go/contracts => ../flow-core-contracts/lib/go/contracts
