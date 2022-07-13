@@ -160,7 +160,7 @@ func (b *backendAccounts) tryGetAccount(ctx context.Context, execNode *flow.Iden
 	resp, err := execRPCClient.GetAccountAtBlockID(ctx, &req)
 	if err != nil {
 		if status.Code(err) == codes.Unavailable {
-			b.connFactory.RefreshExecutionAPIClient(execNode.Address)
+			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
 		}
 		return nil, err
 	}

@@ -214,7 +214,7 @@ func (b *backendEvents) tryGetEvents(ctx context.Context,
 	resp, err := execRPCClient.GetEventsForBlockIDs(ctx, &req)
 	if err != nil {
 		if status.Code(err) == codes.Unavailable {
-			b.connFactory.RefreshExecutionAPIClient(execNode.Address)
+			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
 		}
 		return nil, err
 	}

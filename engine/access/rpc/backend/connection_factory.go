@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
 
 	"github.com/onflow/flow-go/module"
@@ -24,9 +25,9 @@ const defaultClientTimeout = 3 * time.Second
 // ConnectionFactory is used to create an access api client
 type ConnectionFactory interface {
 	GetAccessAPIClient(address string) (access.AccessAPIClient, error)
-	RefreshAccessAPIClient(address string)
+	InvalidateAccessAPIClient(address string)
 	GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, error)
-	RefreshExecutionAPIClient(address string)
+	InvalidateExecutionAPIClient(address string)
 }
 
 type ProxyConnectionFactory struct {
@@ -77,7 +78,7 @@ func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.D
 	conn, err := grpc.Dial(
 		address,
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
-		grpc.WithInsecure(), //nolint:staticcheck
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithKeepaliveParams(keepaliveParams),
 		WithClientUnaryInterceptor(timeout))
 	if err != nil {
@@ -88,21 +89,28 @@ func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.D
 
 func (cf *ConnectionFactoryImpl) retrieveConnection(grpcAddress string, timeout time.Duration) (*grpc.ClientConn, error) {
 	var conn *grpc.ClientConn
-	var mutex *sync.Mutex
+	clientMutex := new(sync.Mutex)
+	store := ConnectionCacheStore{
+		ClientConn: nil,
+		mutex:      clientMutex,
+	}
+	if prev, ok, _ := cf.ConnectionsCache.PeekOrAdd(grpcAddress, store); ok {
+		clientMutex = prev.(ConnectionCacheStore).mutex
+	}
+	// we lock this mutex to prevent a scenario where the connection is not good, which will result in
+	// re-establishing the connection for this address. if the mutex is not locked, we may attempt to re-establish
+	// the connection multiple times which would result in cache thrashing.
+	clientMutex.Lock()
+	defer clientMutex.Unlock()
+
+	// get again to update the LRU cache
 	if res, ok := cf.ConnectionsCache.Get(grpcAddress); ok {
 		conn = res.(ConnectionCacheStore).ClientConn
-		mutex = res.(ConnectionCacheStore).mutex
-
-		// we lock this mutex to prevent a scenario where the connection is not good, which will result in
-		// re-establishing the connection for this address. if the mutex is not locked, we may attempt to re-establish
-		// the connection multiple times which would result in cache thrashing.
-		mutex.Lock()
-		defer mutex.Unlock()
 		if cf.AccessMetrics != nil {
 			cf.AccessMetrics.ConnectionFromPoolRetrieved()
 		}
 	}
-	if conn == nil || conn.GetState() != connectivity.Ready {
+	if conn == nil || conn.GetState() == connectivity.Shutdown {
 		// this lock prevents a memory leak where a race condition may occur if 2 requests to a new connection at the
 		// same address occur. the second add would overwrite the first without closing the connection
 		cf.lock.Lock()
@@ -110,7 +118,7 @@ func (cf *ConnectionFactoryImpl) retrieveConnection(grpcAddress string, timeout 
 		// Check if connection was created/refreshed by another thread
 		if res, ok := cf.ConnectionsCache.Get(grpcAddress); ok {
 			conn = res.(ConnectionCacheStore).ClientConn
-			if conn.GetState() == connectivity.Ready {
+			if conn != nil && conn.GetState() != connectivity.Shutdown {
 				return conn, nil
 			}
 		}
@@ -120,7 +128,7 @@ func (cf *ConnectionFactoryImpl) retrieveConnection(grpcAddress string, timeout 
 			conn.Close()
 		}
 		var err error
-		conn, err = cf.addConnection(grpcAddress, timeout, mutex)
+		conn, err = cf.addConnection(grpcAddress, timeout, clientMutex)
 		if err != nil {
 			return nil, err
 		}
@@ -136,10 +144,7 @@ func (cf *ConnectionFactoryImpl) addConnection(grpcAddress string, timeout time.
 
 	store := ConnectionCacheStore{
 		ClientConn: conn,
-		mutex:      new(sync.Mutex),
-	}
-	if mutex != nil {
-		store.mutex = mutex
+		mutex:      mutex,
 	}
 
 	cf.ConnectionsCache.Add(grpcAddress, store)
@@ -165,17 +170,8 @@ func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string) (access.Acce
 	return accessAPIClient, nil
 }
 
-func (cf *ConnectionFactoryImpl) RefreshAccessAPIClient(address string) {
-	grpcAddress, _ := getGRPCAddress(address, cf.CollectionGRPCPort)
-	if res, ok := cf.ConnectionsCache.Get(grpcAddress); ok {
-		store := res.(ConnectionCacheStore)
-		store.mutex.Lock()
-		cf.lock.Lock()
-		defer store.mutex.Unlock()
-		defer cf.lock.Unlock()
-		store.ClientConn.Close()
-		_, _ = cf.addConnection(grpcAddress, cf.CollectionNodeGRPCTimeout, store.mutex)
-	}
+func (cf *ConnectionFactoryImpl) InvalidateAccessAPIClient(address string) {
+	cf.invalidateAPIClient(address, cf.CollectionGRPCPort)
 }
 
 func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, error) {
@@ -194,16 +190,21 @@ func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (executio
 	return executionAPIClient, nil
 }
 
-func (cf *ConnectionFactoryImpl) RefreshExecutionAPIClient(address string) {
-	grpcAddress, _ := getGRPCAddress(address, cf.CollectionGRPCPort)
+func (cf *ConnectionFactoryImpl) InvalidateExecutionAPIClient(address string) {
+	cf.invalidateAPIClient(address, cf.ExecutionGRPCPort)
+}
+
+func (cf *ConnectionFactoryImpl) invalidateAPIClient(address string, port uint) {
+	grpcAddress, _ := getGRPCAddress(address, port)
 	if res, ok := cf.ConnectionsCache.Get(grpcAddress); ok {
 		store := res.(ConnectionCacheStore)
 		store.mutex.Lock()
-		cf.lock.Lock()
-		defer store.mutex.Unlock()
-		defer cf.lock.Unlock()
-		store.ClientConn.Close()
-		_, _ = cf.addConnection(grpcAddress, cf.CollectionNodeGRPCTimeout, store.mutex)
+		if store.ClientConn != nil {
+			conn := store.ClientConn
+			conn.Close()
+			store.ClientConn = nil
+		}
+		store.mutex.Unlock()
 	}
 }
 
