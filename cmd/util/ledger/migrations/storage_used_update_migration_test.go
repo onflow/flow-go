@@ -8,7 +8,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state"
 	state2 "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/utils"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -37,7 +36,7 @@ func TestStorageUsedUpdateMigrationMigration(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, len(migratedPayload), len(payload))
-		require.Equal(t, uint64(48), migratedStatus.StorageUsed())
+		require.Equal(t, uint64(40), migratedStatus.StorageUsed())
 	})
 
 	t.Run("fix storage used if used to high", func(t *testing.T) {
@@ -49,27 +48,27 @@ func TestStorageUsedUpdateMigrationMigration(t *testing.T) {
 		migratedPayload, err := mig.Migrate(payload)
 		require.NoError(t, err)
 
-		migratedSize, _, err := utils.ReadUint64(migratedPayload[1].Value)
+		migratedStatus, err := state2.AccountStatusFromBytes(migratedPayload[0].Value)
 		require.NoError(t, err)
 
 		require.Equal(t, len(migratedPayload), len(payload))
-		require.Equal(t, uint64(48), migratedSize)
+		require.Equal(t, uint64(40), migratedStatus.StorageUsed())
 	})
 
 	t.Run("do not fix storage used if storage used ok", func(t *testing.T) {
 		status := state2.NewAccountStatus()
-		status.SetStorageUsed(55)
+		status.SetStorageUsed(40)
 		payload := []ledger.Payload{
 			{Key: createAccountPayloadKey(address1, state2.KeyAccountStatus), Value: status.ToBytes()},
 		}
 		migratedPayload, err := mig.Migrate(payload)
 		require.NoError(t, err)
 
-		migratedSize, _, err := utils.ReadUint64(migratedPayload[1].Value)
+		migratedStatus, err := state2.AccountStatusFromBytes(migratedPayload[0].Value)
 		require.NoError(t, err)
 
 		require.Equal(t, len(migratedPayload), len(payload))
-		require.Equal(t, uint64(48), migratedSize)
+		require.Equal(t, uint64(40), migratedStatus.StorageUsed())
 	})
 
 	t.Run("error is storage used does not exist", func(t *testing.T) {

@@ -40,6 +40,7 @@ func TestAccountStatusMigration(t *testing.T) {
 	require.True(t, newPayloads[2].Equals(&payloads[6]))
 	require.True(t, newPayloads[3].Equals(&payloads[7]))
 
+	// check address one status
 	expectedStatus := state.NewAccountStatus()
 	expectedStatus.SetFrozenFlag(true)
 	expectedStatus.SetPublicKeyCount(2)
@@ -49,5 +50,7 @@ func TestAccountStatusMigration(t *testing.T) {
 		Key:   createPayloadKeyWithLegacyController(address1, state.KeyAccountStatus, true),
 		Value: expectedStatus.ToBytes(),
 	}
+
+	// check address two status
 	require.True(t, newPayloads[4].Equals(expectedPayload))
 }

@@ -46,7 +46,7 @@ func NewAccountStatusMigration(logger zerolog.Logger) *AccountStatusMigration {
 	}
 }
 
-func (as *AccountStatusMigration) getStatus(owner []byte) fvmState.AccountStatus {
+func (as *AccountStatusMigration) getOrInitStatus(owner []byte) fvmState.AccountStatus {
 	st, exist := as.statuses[string(owner)]
 	if !exist {
 		return fvmState.NewAccountStatus()
@@ -75,40 +75,45 @@ func (as *AccountStatusMigration) Migrate(payload []ledger.Payload) ([]ledger.Pa
 
 		switch string(key) {
 		case KeyExists:
-			// in case there are cases that doesn't have other registers
-			st := as.getStatus(owner)
+			// in case an account doesn't have other registers
+			// we need to consturct an status anyway
+			st := as.getOrInitStatus(owner)
 			as.setStatus(owner, st)
 		case KeyPublicKeyCount:
-			// following the original way of decoding of value
+			// follow the original way of decoding the value
 			countInt := new(big.Int).SetBytes(p.Value)
 			count := countInt.Uint64()
-			status := as.getStatus(owner)
+			// update status
+			status := as.getOrInitStatus(owner)
 			status.SetPublicKeyCount(count)
 			as.setStatus(owner, status)
 		case KeyStorageUsed:
-			// following the original way of decoding of value
+			// follow the original way of decoding the value
 			if len(p.Value) < 8 {
 				return nil, fmt.Errorf("malsized storage used, owner: %s value: %s", hex.EncodeToString(owner), hex.EncodeToString(p.Value))
 			}
 			used := binary.BigEndian.Uint64(p.Value[:8])
-			status := as.getStatus(owner)
+			// update status
+			status := as.getOrInitStatus(owner)
 			status.SetStorageUsed(used)
 			as.setStatus(owner, status)
 		case KeyStorageIndex:
+			// follow the original way of decoding the value
 			if len(p.Value) < 8 {
 				return nil, fmt.Errorf("malsized storage index, owner: %s value: %s", hex.EncodeToString(owner), hex.EncodeToString(p.Value))
 			}
 			var index atree.StorageIndex
 			copy(index[:], p.Value[:8])
-			status := as.getStatus(owner)
+			// update status
+			status := as.getOrInitStatus(owner)
 			status.SetStorageIndex(index)
 			as.setStatus(owner, status)
 		case KeyAccountFrozen:
-			status := as.getStatus(owner)
+			status := as.getOrInitStatus(owner)
 			status.SetFrozenFlag(true)
 			as.setStatus(owner, status)
-
 		default: // else just append and continue
+			// collect actual public keys per accounts for a final sanity check
 			if strings.HasPrefix(string(key), KeyPrefixPublicKey) {
 				as.setKeyCount(owner, as.getKeyCount(owner)+1)
 			}
@@ -116,8 +121,9 @@ func (as *AccountStatusMigration) Migrate(payload []ledger.Payload) ([]ledger.Pa
 		}
 	}
 
+	// instead of removed registers add status to accounts
 	for owner, status := range as.statuses {
-		// sanity check on key counts (if they don't align might cause real issues)
+		// sanity check on key counts (if it doesn't match, it could cause real issues (e.g. key override))
 		if status.PublicKeyCount() != as.getKeyCount([]byte(owner)) {
 			return nil, fmt.Errorf("public key count doesn't match, owner: %s count from status: %d, count from registers: %d",
 				hex.EncodeToString([]byte(owner)),

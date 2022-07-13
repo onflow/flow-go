@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 	fvm "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/rs/zerolog"
@@ -202,8 +201,8 @@ Loop:
 		if err != nil {
 			return nil, err
 		}
-
-		payload[pIndex].Value = utils.Uint64ToBinary(used)
+		status.SetStorageUsed(used)
+		payload[pIndex].Value = status.ToBytes()
 	}
 
 	m.Log.Info().
