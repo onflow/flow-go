@@ -50,7 +50,6 @@ type ConnectionFactoryImpl struct {
 	ExecutionNodeGRPCTimeout  time.Duration
 	ConnectionsCache          *lru.Cache
 	CacheSize                 uint
-	lock                      sync.Mutex
 	AccessMetrics             module.AccessMetrics
 }
 
@@ -111,18 +110,6 @@ func (cf *ConnectionFactoryImpl) retrieveConnection(grpcAddress string, timeout 
 		}
 	}
 	if conn == nil || conn.GetState() == connectivity.Shutdown {
-		// this lock prevents a memory leak where a race condition may occur if 2 requests to a new connection at the
-		// same address occur. the second add would overwrite the first without closing the connection
-		cf.lock.Lock()
-		defer cf.lock.Unlock()
-		// Check if connection was created/refreshed by another thread
-		if res, ok := cf.ConnectionsCache.Get(grpcAddress); ok {
-			conn = res.(ConnectionCacheStore).ClientConn
-			if conn != nil && conn.GetState() != connectivity.Shutdown {
-				return conn, nil
-			}
-		}
-
 		// updates to the cache don't trigger evictions; this line closes connections before re-establishing new ones
 		if conn != nil {
 			conn.Close()
