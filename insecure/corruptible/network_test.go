@@ -404,6 +404,23 @@ func TestProcessAttackerMessage_ExecutionReceipt_PassThrough(t *testing.T) {
 		})
 }
 
+// TestEngineClosingChannel evaluates that corruptible network closes the channel whenever the corresponding
+// engine of that channel attempts on closing it.
+func TestEngineClosingChannel(t *testing.T) {
+	corruptibleNetwork, adapter := getCorruptibleNetworkNoAttacker(t)
+	_, channel := getMessageAndChannel()
+
+	// on invoking adapter.UnRegisterChannel(channel), it must return a nil, which means
+	// that the channel has been unregistered by the adapter successfully.
+	adapter.On("UnRegisterChannel", channel).Return(nil).Once()
+
+	err := corruptibleNetwork.EngineClosingChannel(channel)
+	require.NoError(t, err)
+
+	// adapter's UnRegisterChannel method must be called once.
+	mock.AssertExpectationsForObjects(t, adapter)
+}
+
 // ******************** HELPERS ****************************
 
 func getCorruptibleNetworkNoAttacker(t *testing.T, corruptedID ...*flow.Identity) (*Network, *mocknetwork.Adapter) {
@@ -435,6 +452,7 @@ func getCorruptibleNetworkNoAttacker(t *testing.T, corruptedID ...*flow.Identity
 		flowNetwork,
 		ccf)
 	require.NoError(t, err)
+
 	// return adapter so callers can set up test specific expectations
 	return corruptibleNetwork, adapter
 }

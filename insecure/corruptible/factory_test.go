@@ -72,33 +72,3 @@ func TestNewConduit_MissingEgressController(t *testing.T) {
 	require.ErrorContains(t, err, "missing a registered egress controller")
 	require.Nil(t, c)
 }
-
-// TestEngineClosingChannel evaluates that factory closes the channel whenever the corresponding engine of that channel attempts
-// on closing it.
-//func TestEngineClosingChannel(t *testing.T) {
-//	codec := cbor.NewCodec()
-//	me := testutil.LocalFixture(t, unittest.IdentityFixture())
-//	// corruptible conduit factory with no attacker registered.
-//	f := NewCorruptibleConduitFactory(
-//		unittest.Logger(),
-//		flow.BftTestnet,
-//		me,
-//		codec,
-//		"localhost:0")
-//
-//	adapter := &mocknetwork.Adapter{}
-//	err := f.RegisterAdapter(adapter)
-//	require.NoError(t, err)
-//
-//	channel := network.Channel("test-channel")
-//
-//	// on invoking adapter.UnRegisterChannel(channel), it must return a nil, which means
-//	// that the channel has been unregistered by the adapter successfully.
-//	adapter.On("UnRegisterChannel", channel).Return(nil).Once()
-//
-//	err = f.EngineClosingChannel(channel)
-//	require.NoError(t, err)
-//
-//	// adapter's UnRegisterChannel method must be called once.
-//	testifymock.AssertExpectationsForObjects(t, adapter)
-//}
