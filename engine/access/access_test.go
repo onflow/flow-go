@@ -71,8 +71,8 @@ func TestAccess(t *testing.T) {
 func (suite *Suite) SetupTest() {
 	suite.log = zerolog.New(os.Stderr)
 	suite.net = new(mocknetwork.Network)
-	suite.snapshot = new(protocol.Snapshot)
 	suite.state = new(protocol.State)
+	suite.snapshot = new(protocol.Snapshot)
 
 	suite.epochQuery = new(protocol.EpochQuery)
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()

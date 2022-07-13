@@ -51,7 +51,8 @@ func (b *BlockSignerDecoder) DecodeSignerIDs(header *flow.Header) (flow.Identifi
 	return signerIDs, nil
 }
 
-// NoopBlockSignerDecoder does not decode any signer indices and consistenlty return nil
+// NoopBlockSignerDecoder does not decode any signer indices and consistently returns
+// nil for the signing node IDs (auxiliary data)
 type NoopBlockSignerDecoder struct{}
 
 func NewNoopBlockSignerDecoder() *NoopBlockSignerDecoder {

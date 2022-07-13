@@ -137,7 +137,7 @@ func TransactionToMessage(tb flow.TransactionBody) *entities.Transaction {
 	}
 }
 
-func BlockHeaderToMessage(h *flow.Header, signerIDs []flow.Identifier) (*entities.BlockHeader, error) {
+func BlockHeaderToMessage(h *flow.Header, signerIDs flow.IdentifierList) (*entities.BlockHeader, error) {
 	id := h.ID()
 
 	t := timestamppb.New(h.Timestamp)
@@ -247,7 +247,7 @@ func MessagesToExecutionResults(m []*entities.ExecutionResult) ([]*flow.Executio
 	return execResults, nil
 }
 
-func BlockToMessage(h *flow.Block, signerIDs []flow.Identifier) (*entities.Block, error) {
+func BlockToMessage(h *flow.Block, signerIDs flow.IdentifierList) (*entities.Block, error) {
 
 	id := h.ID()
 

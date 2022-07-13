@@ -89,6 +89,7 @@ func NewBuilder(log zerolog.Logger,
 	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the Access API e.g. Ping->100, GetTransaction->300
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the Access API e.g. Ping->50, GetTransaction->10
 ) (*RPCEngineBuilder, error) {
+
 	log = log.With().Str("engine", "rpc").Logger()
 
 	if config.MaxMsgSize == 0 {
