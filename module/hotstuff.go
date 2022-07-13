@@ -47,5 +47,5 @@ type HotStuffFollower interface {
 	//
 	// Block proposals must be submitted in order, i.e. a proposal's parent must
 	// have been previously processed by the HotStuffFollower.
-	SubmitProposal(proposal *flow.Header, parentView uint64)
+	SubmitProposal(proposal *flow.Header, parentView uint64) (done <-chan struct{})
 }
