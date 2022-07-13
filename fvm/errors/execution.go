@@ -308,21 +308,21 @@ func (e *EncodingUnsupportedValueError) Code() ErrorCode {
 	return ErrCodeEncodingUnsupportedValue
 }
 
-// ScriptExecutionCancelledError indicates that Cadence Script execution
-// has been cancelled (e.g. request connection has been droped)
+// ExecutionCancelledError indicates that Cadence execution has been cancelled
+// (e.g. request connection has been droped)
 //
-// note: this error is used by scripts only and
-// won't be emitted for transactions since transaction execution has to be deterministic.
-type ScriptExecutionCancelledError struct {
+// note: this error is used by scripts only and won't be emitted for
+// transactions since transaction execution has to be deterministic.
+type ExecutionCancelledError struct {
 	err error
 }
 
-// NewScriptExecutionCancelledError construct a new ScriptExecutionCancelledError
-func NewScriptExecutionCancelledError(err error) *ScriptExecutionCancelledError {
-	return &ScriptExecutionCancelledError{err: err}
+// NewExecutionCancelledError construct a new ExecutionCancelledError
+func NewExecutionCancelledError(err error) *ExecutionCancelledError {
+	return &ExecutionCancelledError{err: err}
 }
 
-func (e *ScriptExecutionCancelledError) Error() string {
+func (e *ExecutionCancelledError) Error() string {
 	return fmt.Sprintf(
 		"%s script execution is cancelled: %s",
 		e.Code().String(),
@@ -331,24 +331,24 @@ func (e *ScriptExecutionCancelledError) Error() string {
 }
 
 // Code returns the error code for this error
-func (e *ScriptExecutionCancelledError) Code() ErrorCode {
-	return ErrCodeScriptExecutionCancelledError
+func (e *ExecutionCancelledError) Code() ErrorCode {
+	return ErrCodeExecutionCancelledError
 }
 
-// ScriptExecutionTimedOutError indicates that Cadence Script execution
-// has been taking more time than what is allowed.
+// ExecutionTimedOutError indicates that Cadence execution has been taking
+// more time than what is allowed.
 //
-// note: this error is used by scripts only and
-// won't be emitted for transactions since transaction execution has to be deterministic.
-type ScriptExecutionTimedOutError struct {
+// note: this error is used by scripts only and won't be emitted for
+// transactions since transaction execution has to be deterministic.
+type ExecutionTimedOutError struct {
 }
 
-// NewScriptExecutionTimedOutError construct a new ScriptExecutionTimedOutError
-func NewScriptExecutionTimedOutError() *ScriptExecutionTimedOutError {
-	return &ScriptExecutionTimedOutError{}
+// NewExecutionTimedOutError construct a new ExecutionTimedOutError
+func NewExecutionTimedOutError() *ExecutionTimedOutError {
+	return &ExecutionTimedOutError{}
 }
 
-func (e *ScriptExecutionTimedOutError) Error() string {
+func (e *ExecutionTimedOutError) Error() string {
 	return fmt.Sprintf(
 		"%s script execution is timed out and did not finish executing within the maximum execution time allowed",
 		e.Code().String(),
@@ -356,8 +356,8 @@ func (e *ScriptExecutionTimedOutError) Error() string {
 }
 
 // Code returns the error code for this error
-func (e *ScriptExecutionTimedOutError) Code() ErrorCode {
-	return ErrCodeScriptExecutionTimedOutError
+func (e *ExecutionTimedOutError) Code() ErrorCode {
+	return ErrCodeExecutionTimedOutError
 }
 
 // An CouldNotGetExecutionParameterFromStateError indicates that computation has exceeded its limit.

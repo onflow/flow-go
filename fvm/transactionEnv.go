@@ -1,6 +1,7 @@
 package fvm
 
 import (
+	"context"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -53,6 +54,7 @@ type TransactionEnv struct {
 	txID             flow.Identifier
 	traceSpan        opentracing.Span
 	authorizers      []runtime.Address
+	executionCtx     context.Context
 }
 
 func NewTransactionEnvironment(
@@ -93,6 +95,9 @@ func NewTransactionEnvironment(
 		txIndex:          txIndex,
 		txID:             tx.ID(),
 		traceSpan:        traceSpan,
+		// NOTE: To prevent non-deterministic transaction execution,
+		// transactionEnv's executionCtx must never cancel / timeout.
+		executionCtx: context.Background(),
 	}
 
 	env.contracts = handler.NewContractHandler(accounts,
@@ -735,6 +740,24 @@ func (e *TransactionEnv) GenerateUUID() (uint64, error) {
 }
 
 func (e *TransactionEnv) meterComputation(kind common.ComputationKind, intensity uint) error {
+	// this method is called on every unit of operation, so
+	// checking the context here is the most likely would capture
+	// timeouts or cancellation as soon as they happen, though
+	// we might revisit this when optimizing script execution
+	// by only checking on specific kind of meterComputation calls.
+	//
+	// TODO: in the future this context check should be done inside the cadence
+	select {
+	case <-e.executionCtx.Done():
+		err := e.executionCtx.Err()
+		if errors.Is(err, context.DeadlineExceeded) {
+			return errors.NewExecutionTimedOutError()
+		}
+		return errors.NewExecutionCancelledError(err)
+	default:
+		// continue
+	}
+
 	if e.sth.EnforceComputationLimits {
 		return e.sth.State().MeterComputation(kind, intensity)
 	}

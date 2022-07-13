@@ -62,8 +62,8 @@ const (
 	ErrCodeComputationLimitExceededError             ErrorCode = 1110
 	ErrCodeMemoryLimitExceededError                  ErrorCode = 1111
 	ErrCodeCouldNotDecodeExecutionParameterFromState ErrorCode = 1112
-	ErrCodeScriptExecutionCancelledError             ErrorCode = 1114
-	ErrCodeScriptExecutionTimedOutError              ErrorCode = 1113
+	ErrCodeExecutionCancelledError                   ErrorCode = 1114
+	ErrCodeExecutionTimedOutError                    ErrorCode = 1113
 
 	// accounts errors 1200 - 1250
 	// ErrCodeAccountError              ErrorCode = 1200 - reserved

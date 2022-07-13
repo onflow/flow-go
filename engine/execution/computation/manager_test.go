@@ -505,7 +505,7 @@ func TestExecuteScriptTimeout(t *testing.T) {
 
 	require.Error(t, err)
 	require.Nil(t, value)
-	require.Contains(t, err.Error(), fvmErrors.ErrCodeScriptExecutionTimedOutError.String())
+	require.Contains(t, err.Error(), fvmErrors.ErrCodeExecutionTimedOutError.String())
 }
 
 func TestExecuteScriptCancelled(t *testing.T) {
@@ -553,7 +553,7 @@ func TestExecuteScriptCancelled(t *testing.T) {
 	cancel()
 	wg.Wait()
 	require.Nil(t, value)
-	require.Contains(t, err.Error(), fvmErrors.ErrCodeScriptExecutionCancelledError.String())
+	require.Contains(t, err.Error(), fvmErrors.ErrCodeExecutionCancelledError.String())
 }
 
 func TestScriptStorageMutationsDiscarded(t *testing.T) {

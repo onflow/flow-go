@@ -48,7 +48,7 @@ type ScriptEnv struct {
 	logs          []string
 	rng           *rand.Rand
 	traceSpan     opentracing.Span
-	reqContext    context.Context
+	executionCtx  context.Context
 }
 
 func (e *ScriptEnv) Context() *Context {
@@ -82,7 +82,7 @@ func NewScriptEnvironment(
 		accountKeys:   accountKeys,
 		uuidGenerator: uuidGenerator,
 		programs:      programsHandler,
-		reqContext:    reqContext,
+		executionCtx:  reqContext,
 	}
 
 	env.contracts = handler.NewContractHandler(
@@ -559,28 +559,23 @@ func (e *ScriptEnv) GenerateUUID() (uint64, error) {
 	return uuid, err
 }
 
-func (e *ScriptEnv) checkContext() error {
-	// in the future this context check should be done inside the cadence
-	select {
-	case <-e.reqContext.Done():
-		err := e.reqContext.Err()
-		if errors.Is(err, context.DeadlineExceeded) {
-			return errors.NewScriptExecutionTimedOutError()
-		}
-		return errors.NewScriptExecutionCancelledError(err)
-	default:
-		return nil
-	}
-}
-
 func (e *ScriptEnv) meterComputation(kind common.ComputationKind, intensity uint) error {
 	// this method is called on every unit of operation, so
 	// checking the context here is the most likely would capture
 	// timeouts or cancellation as soon as they happen, though
 	// we might revisit this when optimizing script execution
 	// by only checking on specific kind of meterComputation calls.
-	if err := e.checkContext(); err != nil {
-		return err
+	//
+	// TODO: in the future this context check should be done inside the cadence
+	select {
+	case <-e.executionCtx.Done():
+		err := e.executionCtx.Err()
+		if errors.Is(err, context.DeadlineExceeded) {
+			return errors.NewExecutionTimedOutError()
+		}
+		return errors.NewExecutionCancelledError(err)
+	default:
+		// continue
 	}
 
 	if e.sth.EnforceComputationLimits {
