@@ -57,11 +57,10 @@ func New(
 	exeResults storage.ExecutionResults,
 	txResults storage.TransactionResults,
 	chainID flow.ChainID,
-	apiRatelimits map[string]int,  // the api rate limit (max calls per second) for each of the gRPC API e.g. Ping->100, ExecuteScriptAtBlockID->300
+	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the gRPC API e.g. Ping->100, ExecuteScriptAtBlockID->300
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the gRPC API e.g. Ping->50, ExecuteScriptAtBlockID->10
 ) (*Engine, error) {
 	log = log.With().Str("engine", "rpc").Logger()
-
 	if config.MaxMsgSize == 0 {
 		config.MaxMsgSize = grpcutils.DefaultMaxMsgSize
 	}
