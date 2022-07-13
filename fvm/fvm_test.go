@@ -1289,6 +1289,56 @@ func TestSettingExecutionWeights(t *testing.T) {
 		},
 	))
 
+	t.Run("transaction should not read context from the state if AllowContextOverrideByExecutionState if false", newVMTest().
+		withBootstrapProcedureOptions(
+			fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+			fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+			fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+			fvm.WithExecutionEffortWeights(
+				weightedMeter.ExecutionEffortWeights{
+					meter.ComputationKindCreateAccount: 1_000_000_000_000 << weightedMeter.MeterExecutionInternalPrecisionBytes,
+				},
+			),
+			fvm.WithExecutionMemoryWeights(
+				weightedMeter.ExecutionMemoryWeights{
+					common.MemoryKindBreakStatement: 1_000_000_000_000,
+				},
+			),
+			fvm.WithExecutionMemoryLimit(0),
+		).withContextOptions(
+		fvm.WithAllowContextOverrideByExecutionState(false),
+		fvm.WithMemoryLimit(math.MaxUint64),
+	).run(
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(`
+				transaction {
+                  prepare(signer: AuthAccount) {
+					while true {
+						AuthAccount(payer: signer)
+						break
+					}
+                  }
+                }
+			`)).
+				SetProposalKey(chain.ServiceAddress(), 0, 0).
+				AddAuthorizer(chain.ServiceAddress()).
+				SetPayer(chain.ServiceAddress()).
+				SetGasLimit(1_000)
+
+			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+			require.NoError(t, err)
+
+			tx := fvm.Transaction(txBody, 0)
+			err = vm.Run(ctx, tx, view, programs)
+			// tx would fail if ExecutionEffortWeights from the state were used due to computation limit
+			// tx would fail if ExecutionMemoryWeights from the state were used due to memory limit
+			// tx would fail if MemoryLimit from the state was used due to memory limit
+			require.NoError(t, err)
+			require.NoError(t, tx.Err)
+		},
+	))
+
 	t.Run("transaction should not use up more computation that the transaction body itself", newVMTest().withBootstrapProcedureOptions(
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),

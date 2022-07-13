@@ -250,6 +250,60 @@ func TestExecuteScript(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// Balance script used to swallow errors, which meant that even if the view was empty, a script that did nothing but get
+// the balance of an account would succeed and return 0.
+func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
+
+	logger := zerolog.Nop()
+
+	execCtx := fvm.NewContext(logger)
+
+	me := new(module.Local)
+	me.On("NodeID").Return(flow.ZeroID)
+
+	rt := fvm.NewInterpreterRuntime()
+
+	vm := fvm.NewVirtualMachine(rt)
+
+	view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		return nil, fmt.Errorf("error getting register")
+	})
+
+	scriptView := view.NewChild()
+
+	script := []byte(fmt.Sprintf(
+		`
+			pub fun main(): UFix64 {
+				return getAccount(%s).balance
+			}
+		`,
+		fvm.FungibleTokenAddress(execCtx.Chain).HexWithPrefix(),
+	))
+
+	eds := new(state_synchronization.ExecutionDataService)
+	edCache := new(state_synchronization.ExecutionDataCIDCache)
+
+	engine, err := New(logger,
+		metrics.NewNoopCollector(),
+		trace.NewNoopTracer(),
+		me,
+		nil,
+		vm,
+		execCtx,
+		DefaultProgramsCacheSize,
+		committer.NewNoopViewCommitter(),
+		scriptLogThreshold,
+		DefaultScriptExecutionTimeLimit,
+		nil,
+		eds,
+		edCache)
+	require.NoError(t, err)
+
+	header := unittest.BlockHeaderFixture()
+	_, err = engine.ExecuteScript(context.Background(), script, nil, &header, scriptView)
+	require.ErrorContains(t, err, "error getting register")
+}
+
 func TestExecuteScripPanicsAreHandled(t *testing.T) {
 
 	ctx := fvm.NewContext(zerolog.Nop())
