@@ -24,6 +24,9 @@ type Ledger interface {
 	// InitialState returns the initial state of the ledger
 	InitialState() State
 
+	// HasState returns true if the given state exists inside the ledger
+	HasState(state State) bool
+
 	// GetSingleValue returns value for a given key at specific state
 	GetSingleValue(query *QuerySingleValue) (value Value, err error)
 
@@ -350,5 +353,5 @@ type Reporter interface {
 	// Name returns the name of the reporter. Only used for logging.
 	Name() string
 	// Report accepts slice ledger payloads and reports the state of the ledger
-	Report(payloads []Payload) error
+	Report(payloads []Payload, statecommitment State) error
 }

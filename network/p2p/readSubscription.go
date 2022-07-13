@@ -15,6 +15,9 @@ import (
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
 )
 
+// readSubscriptionCB the callback called when a new message is received on the read subscription
+type readSubscriptionCB func(msg *message.Message, decodedMsgPayload interface{}, peerID peer.ID)
+
 // readSubscription reads the messages coming in on the subscription and calls the given callback until
 // the context of the subscription is cancelled. Additionally, it reports metrics
 type readSubscription struct {
@@ -22,15 +25,11 @@ type readSubscription struct {
 	log      zerolog.Logger
 	sub      *pubsub.Subscription
 	metrics  module.NetworkMetrics
-	callback func(msg *message.Message, peerID peer.ID)
+	callback readSubscriptionCB
 }
 
 // newReadSubscription reads the messages coming in on the subscription
-func newReadSubscription(ctx context.Context,
-	sub *pubsub.Subscription,
-	callback func(msg *message.Message, peerID peer.ID),
-	log zerolog.Logger,
-	metrics module.NetworkMetrics) *readSubscription {
+func newReadSubscription(ctx context.Context, sub *pubsub.Subscription, callback readSubscriptionCB, log zerolog.Logger, metrics module.NetworkMetrics) *readSubscription {
 
 	log = log.With().
 		Str("channel", sub.Topic()).
@@ -91,6 +90,6 @@ func (r *readSubscription) receiveLoop(wg *sync.WaitGroup) {
 		r.metrics.NetworkMessageReceived(msg.Size(), msg.ChannelID, msg.Type)
 
 		// call the callback
-		r.callback(msg, validatorData.From)
+		r.callback(msg, validatorData.DecodedMsgPayload, validatorData.From)
 	}
 }

@@ -105,7 +105,7 @@ func New(
 	}
 
 	// register the engine with the network layer and store the conduit
-	con, err := net.Register(engine.ChannelSyncCluster(chainID), e)
+	con, err := net.Register(network.ChannelSyncCluster(chainID), e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}

@@ -96,17 +96,19 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 					sender,
 					m.Body.ExecutionResultID,
 					m.Body.ChunkIndex)
+
 			case *flow.ExecutionReceipt:
 				finalState, err := m.ExecutionResult.FinalStateCommitment()
 				require.NoError(t, err)
-
 				tst.ReceiptState.Add(m)
-				t.Logf("execution receipts received from %s for block ID %x by executor ID %x with SC %x resultID %x\n",
+				t.Logf("execution receipts received from %s for block ID %x by executor ID %x with final state %x result ID %x chunks %d\n",
 					sender,
 					m.ExecutionResult.BlockID,
 					m.ExecutorID,
 					finalState,
-					m.ExecutionResult.ID())
+					m.ExecutionResult.ID(),
+					len(m.ExecutionResult.Chunks))
+
 			default:
 				t.Logf("other msg received from %s: %#v\n", sender, msg)
 				continue

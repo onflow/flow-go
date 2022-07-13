@@ -15,18 +15,17 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/testutil"
 	enginemock "github.com/onflow/flow-go/engine/testutil/mock"
 	"github.com/onflow/flow-go/engine/verification/assigner/blockconsumer"
 	"github.com/onflow/flow-go/model/chunks"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
+	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -57,7 +56,7 @@ func SetupChunkDataPackProvider(t *testing.T,
 	exeNode := testutil.GenericNodeFromParticipants(t, hub, exeIdentity, participants, chainID)
 	exeEngine := new(mocknetwork.Engine)
 
-	exeChunkDataConduit, err := exeNode.Net.Register(engine.ProvideChunks, exeEngine)
+	exeChunkDataConduit, err := exeNode.Net.Register(network.ProvideChunks, exeEngine)
 	assert.Nil(t, err)
 
 	replied := make(map[flow.Identifier]struct{})
@@ -178,8 +177,7 @@ func SetupMockConsensusNode(t *testing.T,
 	}
 
 	// creates a hasher for spock
-	hasher := crypto.NewBLSKMAC(encoding.SPOCKTag)
-
+	hasher := msig.NewBLSHasher(msig.SPOCKTag)
 	mu := &sync.Mutex{} // making testify mock thread-safe
 
 	conEngine.On("Process", testifymock.AnythingOfType("network.Channel"), testifymock.Anything, testifymock.Anything).
@@ -235,7 +233,7 @@ func SetupMockConsensusNode(t *testing.T,
 			wg.Done()
 		}).Return(nil)
 
-	_, err := conNode.Net.Register(engine.ReceiveApprovals, conEngine)
+	_, err := conNode.Net.Register(network.ReceiveApprovals, conEngine)
 	assert.Nil(t, err)
 
 	return &conNode, conEngine, wg

@@ -67,12 +67,16 @@ import (
 //                               +-------------+             +-------------+
 
 const (
-	// DefaultFetchTimeout is the default timeout for fetching ExecutionData from the db/network
-	DefaultFetchTimeout = 5 * time.Minute
+	// DefaultFetchTimeout is the default initial timeout for fetching ExecutionData from the
+	// db/network. The timeout is increased using an incremental backoff until FetchTimeout.
+	DefaultFetchTimeout = 10 * time.Second
+
+	// DefaultMaxFetchTimeout is the default timeout for fetching ExecutionData from the db/network
+	DefaultMaxFetchTimeout = 10 * time.Minute
 
 	// DefaultRetryDelay is the default initial delay used in the exponential backoff for failed
 	// ExecutionData download retries
-	DefaultRetryDelay = 10 * time.Second
+	DefaultRetryDelay = 1 * time.Second
 
 	// DefaultMaxRetryDelay is the default maximum delay used in the exponential backoff for failed
 	// ExecutionData download retries
@@ -97,8 +101,11 @@ type ExecutionDataConfig struct {
 	// unbounded memory use by the requester if it gets stuck fetching a specific height.
 	MaxSearchAhead uint64
 
-	// The timeout for fetching ExecutionData from the db/network
+	// The initial timeout for fetching ExecutionData from the db/network
 	FetchTimeout time.Duration
+
+	// The max timeout for fetching ExecutionData from the db/network
+	MaxFetchTimeout time.Duration
 
 	// Exponential backoff settings for download retries
 	RetryDelay    time.Duration
@@ -321,6 +328,12 @@ func (e *executionDataRequester) processSealedHeight(ctx irrecoverable.SignalerC
 	backoff = retry.WithCappedDuration(e.config.MaxRetryDelay, backoff)
 	backoff = retry.WithJitterPercent(15, backoff)
 
+	// bitswap always waits for either all data to be received or a timeout, even if it encountered an error.
+	// use an incremental backoff for the timeout so we do faster initial retries, then allow for more
+	// time in case data is large or there is network congestion.
+	timeout := retry.NewExponential(e.config.FetchTimeout)
+	timeout = retry.WithCappedDuration(e.config.MaxFetchTimeout, timeout)
+
 	attempt := 0
 	return retry.Do(ctx, backoff, func(context.Context) error {
 		if attempt > 0 {
@@ -335,7 +348,8 @@ func (e *executionDataRequester) processSealedHeight(ctx irrecoverable.SignalerC
 		attempt++
 
 		// download execution data for the block
-		err := e.processFetchRequest(ctx, blockID, height)
+		fetchTimeout, _ := timeout.Next()
+		err := e.processFetchRequest(ctx, blockID, height, fetchTimeout)
 
 		// don't retry if the blob was invalid
 		if isInvalidBlobError(err) {
@@ -346,7 +360,7 @@ func (e *executionDataRequester) processSealedHeight(ctx irrecoverable.SignalerC
 	})
 }
 
-func (e *executionDataRequester) processFetchRequest(ctx irrecoverable.SignalerContext, blockID flow.Identifier, height uint64) error {
+func (e *executionDataRequester) processFetchRequest(ctx irrecoverable.SignalerContext, blockID flow.Identifier, height uint64, fetchTimeout time.Duration) error {
 	logger := e.log.With().
 		Str("block_id", blockID.String()).
 		Uint64("height", height).
@@ -371,7 +385,7 @@ func (e *executionDataRequester) processFetchRequest(ctx irrecoverable.SignalerC
 
 	logger.Debug().Msg("downloading execution data")
 
-	_, err = e.fetchExecutionData(ctx, result.ExecutionDataID)
+	_, err = e.fetchExecutionData(ctx, result.ExecutionDataID, fetchTimeout)
 
 	e.metrics.ExecutionDataFetchFinished(time.Since(start), err == nil, height)
 
@@ -403,8 +417,8 @@ func (e *executionDataRequester) processFetchRequest(ctx irrecoverable.SignalerC
 }
 
 // fetchExecutionData fetches the ExecutionData by its ID, and times out if fetchTimeout is exceeded
-func (e *executionDataRequester) fetchExecutionData(signalerCtx irrecoverable.SignalerContext, executionDataID flow.Identifier) (*state_synchronization.ExecutionData, error) {
-	ctx, cancel := context.WithTimeout(signalerCtx, e.config.FetchTimeout)
+func (e *executionDataRequester) fetchExecutionData(signalerCtx irrecoverable.SignalerContext, executionDataID flow.Identifier, fetchTimeout time.Duration) (*state_synchronization.ExecutionData, error) {
+	ctx, cancel := context.WithTimeout(signalerCtx, fetchTimeout)
 	defer cancel()
 
 	// Get the data from the network

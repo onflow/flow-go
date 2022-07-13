@@ -55,6 +55,7 @@ type Engine struct {
 	mempool                *Mempool
 	execState              state.ExecutionState
 	metrics                module.ExecutionMetrics
+	maxCollectionHeight    uint64
 	tracer                 module.Tracer
 	extensiveLogging       bool
 	spockHasher            hash.Hasher
@@ -113,6 +114,7 @@ func New(
 		mempool:                mempool,
 		execState:              execState,
 		metrics:                metrics,
+		maxCollectionHeight:    0,
 		tracer:                 tracer,
 		extensiveLogging:       extLog,
 		syncFilter:             syncFilter,
@@ -124,7 +126,7 @@ func New(
 	}
 
 	// move to state syncing engine
-	syncConduit, err := net.Register(engine.SyncExecution, &eng)
+	syncConduit, err := net.Register(network.SyncExecution, &eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register execution blockSync engine: %w", err)
 	}
@@ -843,6 +845,13 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 						blockID)
 				}
 
+				// record collection max height metrics
+				blockHeight := executableBlock.Block.Header.Height
+				if blockHeight > e.maxCollectionHeight {
+					e.metrics.UpdateCollectionMaxHeight(blockHeight)
+					e.maxCollectionHeight = blockHeight
+				}
+
 				if completeCollection.IsCompleted() {
 					// already received transactions for this collection
 					continue
@@ -1031,6 +1040,12 @@ func (e *Engine) ExecuteScriptAtBlockID(ctx context.Context, script []byte, argu
 		return nil, fmt.Errorf("failed to get state commitment for block (%s): %w", blockID, err)
 	}
 
+	// return early if state with the given state commitment is not in memory
+	// and already purged. This reduces allocations for scripts targeting old blocks.
+	if !e.execState.HasState(stateCommit) {
+		return nil, fmt.Errorf("failed to execute script at block (%s): state commitment not found (%s). this error usually happens if the reference block for this script is not set to a recent block", blockID.String(), hex.EncodeToString(stateCommit[:]))
+	}
+
 	block, err := e.state.AtBlockID(blockID).Head()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get block (%s): %w", blockID, err)
@@ -1075,6 +1090,12 @@ func (e *Engine) GetAccount(ctx context.Context, addr flow.Address, blockID flow
 	stateCommit, err := e.execState.StateCommitmentByBlockID(ctx, blockID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get state commitment for block (%s): %w", blockID, err)
+	}
+
+	// return early if state with the given state commitment is not in memory
+	// and already purged. This reduces allocations for get accounts targeting old blocks.
+	if !e.execState.HasState(stateCommit) {
+		return nil, fmt.Errorf("failed to get account at block (%s): state commitment not found (%s). this error usually happens if the reference block for this script is not set to a recent block.", blockID.String(), hex.EncodeToString(stateCommit[:]))
 	}
 
 	block, err := e.state.AtBlockID(blockID).Head()

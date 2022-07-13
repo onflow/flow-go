@@ -74,12 +74,12 @@ func New(
 
 	var err error
 
-	eng.receiptCon, err = net.Register(engine.PushReceipts, &eng)
+	eng.receiptCon, err = net.Register(network.PushReceipts, &eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register receipt provider engine: %w", err)
 	}
 
-	chunksConduit, err := net.Register(engine.ProvideChunks, &eng)
+	chunksConduit, err := net.Register(network.ProvideChunks, &eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register chunk data pack provider engine: %w", err)
 	}
