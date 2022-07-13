@@ -2,11 +2,11 @@ package util
 
 import (
 	"context"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"reflect"
 	"sync"
 
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
 // AllReady calls Ready on all input components and returns a channel that is
