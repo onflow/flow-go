@@ -140,7 +140,7 @@ func (e AccountPublicKeyLimitError) Address() flow.Address {
 }
 
 func (e AccountPublicKeyLimitError) Error() string {
-	return fmt.Sprintf("%s account %s tried to increase number of public keys to %d but the limit is %d",
+	return fmt.Sprintf("%s account's (%s) public key count (%d) exceeded the limit (%d)",
 		e.Code().String(),
 		e.address,
 		e.counts,
