@@ -158,6 +158,7 @@ type NodeInfoPub struct {
 	Weight        uint64
 	NetworkPubKey encodable.NetworkPubKey
 	StakingPubKey encodable.StakingPubKey
+	StakingPoP    encodable.StakingPoP
 }
 
 // decodableNodeInfoPub provides backward-compatible decoding of old models
@@ -169,6 +170,7 @@ type decodableNodeInfoPub struct {
 	Weight        uint64
 	NetworkPubKey encodable.NetworkPubKey
 	StakingPubKey encodable.StakingPubKey
+	StakingPoP    encodable.StakingPoP
 	// Stake previously was used in place of the Weight field.
 	// Deprecated: supported in decoding for backward-compatibility
 	Stake uint64
@@ -193,6 +195,7 @@ func (info *NodeInfoPub) UnmarshalJSON(b []byte) error {
 	info.Weight = decodable.Weight
 	info.NetworkPubKey = decodable.NetworkPubKey
 	info.StakingPubKey = decodable.StakingPubKey
+	info.StakingPoP = decodable.StakingPoP
 	return nil
 }
 
@@ -231,6 +234,7 @@ type NodeInfo struct {
 	networkPrivKey crypto.PrivateKey
 	stakingPubKey  crypto.PublicKey
 	stakingPrivKey crypto.PrivateKey
+	stakingPoP     crypto.Signature
 }
 
 func NewPublicNodeInfo(
@@ -240,6 +244,7 @@ func NewPublicNodeInfo(
 	weight uint64,
 	networkKey crypto.PublicKey,
 	stakingKey crypto.PublicKey,
+	stakingPoP crypto.Signature,
 ) NodeInfo {
 	return NodeInfo{
 		NodeID:        nodeID,
@@ -248,6 +253,7 @@ func NewPublicNodeInfo(
 		Weight:        weight,
 		networkPubKey: networkKey,
 		stakingPubKey: stakingKey,
+		stakingPoP:    stakingPoP,
 	}
 }
 
@@ -258,7 +264,12 @@ func NewPrivateNodeInfo(
 	weight uint64,
 	networkKey crypto.PrivateKey,
 	stakingKey crypto.PrivateKey,
-) NodeInfo {
+) (NodeInfo, error) {
+	pop, err := crypto.BLSGeneratePOP(stakingKey)
+	if err != nil {
+		return NodeInfo{}, fmt.Errorf("failed to generate node info: %w", err)
+	}
+
 	return NodeInfo{
 		NodeID:         nodeID,
 		Role:           role,
@@ -268,7 +279,8 @@ func NewPrivateNodeInfo(
 		stakingPrivKey: stakingKey,
 		networkPubKey:  networkKey.PublicKey(),
 		stakingPubKey:  stakingKey.PublicKey(),
-	}
+		stakingPoP:     pop,
+	}, nil
 }
 
 // Type returns the type of the node info instance.
@@ -330,6 +342,7 @@ func (node NodeInfo) Public() NodeInfoPub {
 		Weight:        node.Weight,
 		NetworkPubKey: encodable.NetworkPubKey{PublicKey: node.NetworkPubKey()},
 		StakingPubKey: encodable.StakingPubKey{PublicKey: node.StakingPubKey()},
+		StakingPoP:    encodable.StakingPoP{Signature: node.stakingPoP},
 	}
 }
 
@@ -358,17 +371,23 @@ func (node NodeInfo) Identity() *flow.Identity {
 }
 
 // NodeInfoFromIdentity converts an identity to a public NodeInfo
+// WARNING: the staking PoP is dummy and not related to the identity public key
 func NodeInfoFromIdentity(identity *flow.Identity) NodeInfo {
+	dummyStakingPoP := make([]byte, crypto.SignatureLenBLSBLS12381)
 	return NewPublicNodeInfo(
 		identity.NodeID,
 		identity.Role,
 		identity.Address,
 		identity.Weight,
 		identity.NetworkPubKey,
-		identity.StakingPubKey)
+		identity.StakingPubKey,
+		dummyStakingPoP,
+	)
 }
 
-func PrivateNodeInfoFromIdentity(identity *flow.Identity, networkKey, stakingKey crypto.PrivateKey) NodeInfo {
+// PrivateNodeInfoFromIdentity builds a NodeInfo from a flow Identity.
+// WARNING: Nothing enforces that the output NodeInfo's keys are corresponding to the input Identity.
+func PrivateNodeInfoFromIdentity(identity *flow.Identity, networkKey, stakingKey crypto.PrivateKey) (NodeInfo, error) {
 	return NewPrivateNodeInfo(
 		identity.NodeID,
 		identity.Role,

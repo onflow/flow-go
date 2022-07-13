@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/onflow/flow-go/crypto"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/io"
@@ -64,10 +63,6 @@ func writeText(path string, data []byte) {
 	}
 
 	log.Info().Msgf("wrote file %v", path)
-}
-
-func pubKeyToString(key crypto.PublicKey) string {
-	return fmt.Sprintf("%x", key.Encode())
 }
 
 func filesInDir(dir string) ([]string, error) {

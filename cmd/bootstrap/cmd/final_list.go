@@ -239,14 +239,17 @@ func assembleInternalNodesWithoutWeight() []model.NodeInfo {
 
 		// validate every single internal node
 		nodeID := validateNodeID(internal.NodeID)
-		node := model.NewPrivateNodeInfo(
+		node, err := model.NewPrivateNodeInfo(
 			nodeID,
 			internal.Role,
 			internal.Address,
 			flow.DefaultInitialWeight,
 			internal.NetworkPrivKey,
-			internal.StakingPrivKey,
+			internal.StakingPrivKey.PrivateKey,
 		)
+		if err != nil {
+			panic(err)
+		}
 
 		nodes = append(nodes, node)
 	}
@@ -275,6 +278,7 @@ func createPublicNodeInfo(nodes []model.NodeInfoPub) []model.NodeInfo {
 		nodeID := validateNodeID(n.NodeID)
 		networkPubKey := validateNetworkPubKey(n.NetworkPubKey)
 		stakingPubKey := validateStakingPubKey(n.StakingPubKey)
+		stakingKeyPoP := validateStakingKeyPoP(n.StakingPoP)
 
 		// all nodes should have equal weight
 		node := model.NewPublicNodeInfo(
@@ -284,6 +288,7 @@ func createPublicNodeInfo(nodes []model.NodeInfoPub) []model.NodeInfo {
 			flow.DefaultInitialWeight,
 			networkPubKey,
 			stakingPubKey,
+			stakingKeyPoP,
 		)
 
 		publicInfoNodes = append(publicInfoNodes, node)

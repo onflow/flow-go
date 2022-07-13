@@ -1041,7 +1041,7 @@ func followerNodeInfos(confs []ConsensusFollowerConfig) ([]bootstrap.NodeInfo, e
 			"",              // no address
 			0,               // no weight
 			conf.NetworkingPrivKey,
-			dummyStakingKey,
+			dummyStakingKey.PrivateKey,
 		)
 
 		nodeInfos = append(nodeInfos, info)
@@ -1302,7 +1302,7 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 			addr,
 			conf.Weight,
 			networkKeys[i],
-			stakingKeys[i],
+			stakingKeys[i].PrivateKey,
 		)
 
 		containerConf := ContainerConfig{

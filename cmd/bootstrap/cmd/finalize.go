@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/fvm"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/dkg"
@@ -337,6 +338,7 @@ func readPartnerNodeInfos() []model.NodeInfo {
 		nodeID := validateNodeID(partner.NodeID)
 		networkPubKey := validateNetworkPubKey(partner.NetworkPubKey)
 		stakingPubKey := validateStakingPubKey(partner.StakingPubKey)
+		stakingPoP := validateStakingKeyPoP(partner.StakingPoP)
 		weight, valid := validateWeight(weights[partner.NodeID])
 		if !valid {
 			log.Error().Msgf("weights: %v", weights)
@@ -353,6 +355,7 @@ func readPartnerNodeInfos() []model.NodeInfo {
 			weight,
 			networkPubKey.PublicKey,
 			stakingPubKey.PublicKey,
+			stakingPoP,
 		)
 		nodes = append(nodes, node)
 	}
@@ -406,14 +409,17 @@ func readInternalNodeInfos() []model.NodeInfo {
 			log.Warn().Msgf("internal node (id=%x) has non-default weight (%d != %d)", internal.NodeID, weight, flow.DefaultInitialWeight)
 		}
 
-		node := model.NewPrivateNodeInfo(
+		node, err := model.NewPrivateNodeInfo(
 			nodeID,
 			internal.Role,
 			internal.Address,
 			weight,
 			internal.NetworkPrivKey,
-			internal.StakingPrivKey,
+			internal.StakingPrivKey.PrivateKey,
 		)
+		if err != nil {
+			log.Fatal().Err(err).Msg("creating the node info failed")
+		}
 
 		nodes = append(nodes, node)
 	}
@@ -551,6 +557,13 @@ func validateStakingPubKey(key encodable.StakingPubKey) encodable.StakingPubKey 
 		log.Fatal().Msg("StakingPubKey must not be nil")
 	}
 	return key
+}
+
+func validateStakingKeyPoP(pop encodable.StakingPoP) crypto.Signature {
+	if pop.Signature == nil {
+		log.Fatal().Msg("staking key proof of possession must not be nil")
+	}
+	return pop.Signature
 }
 
 func validateWeight(weight uint64) (uint64, bool) {

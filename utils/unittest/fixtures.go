@@ -959,8 +959,8 @@ func NodeConfigFixture(opts ...func(*flow.Identity)) bootstrap.NodeConfig {
 }
 
 func NodeInfoFixture(opts ...func(*flow.Identity)) bootstrap.NodeInfo {
-	opts = append(opts, WithKeys)
-	return bootstrap.NodeInfoFromIdentity(IdentityFixture(opts...))
+	nodes := NodeInfosFixture(1, opts...)
+	return nodes[0]
 }
 
 func NodeInfosFixture(n int, opts ...func(*flow.Identity)) []bootstrap.NodeInfo {
@@ -977,7 +977,10 @@ func PrivateNodeInfosFixture(n int, opts ...func(*flow.Identity)) []bootstrap.No
 	il := IdentityListFixture(n, opts...)
 	nodeInfos := make([]bootstrap.NodeInfo, 0, n)
 	for _, identity := range il {
-		nodeInfo := bootstrap.PrivateNodeInfoFromIdentity(identity, KeyFixture(crypto.ECDSAP256), KeyFixture(crypto.BLSBLS12381))
+		nodeInfo, err := bootstrap.PrivateNodeInfoFromIdentity(identity, KeyFixture(crypto.ECDSAP256), KeyFixture(crypto.BLSBLS12381))
+		if err != nil {
+			panic(err.Error())
+		}
 		nodeInfos = append(nodeInfos, nodeInfo)
 	}
 	return nodeInfos
@@ -2018,8 +2021,9 @@ func PrivateKeyFixture(algo crypto.SigningAlgorithm, seedLength int) crypto.Priv
 // PrivateKeyFixtureByIdentifier returns a private key for a given node.
 // given the same identifier, it will always return the same private key
 func PrivateKeyFixtureByIdentifier(algo crypto.SigningAlgorithm, seedLength int, id flow.Identifier) crypto.PrivateKey {
-	seed := append(id[:], id[:]...)
-	sk, err := crypto.GeneratePrivateKey(algo, seed[:seedLength])
+	seed := make([]byte, seedLength)
+	copy(seed, id[:])
+	sk, err := crypto.GeneratePrivateKey(algo, seed)
 	if err != nil {
 		panic(err)
 	}

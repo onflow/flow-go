@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -11,6 +12,7 @@ import (
 
 func RunWithSporkBootstrapDir(t testing.TB, f func(bootDir, partnerDir, partnerWeights, internalPrivDir, configPath string)) {
 	dir := unittest.TempDir(t)
+	fmt.Println(dir)
 	defer os.RemoveAll(dir)
 
 	// make sure constraints are satisfied, 2/3's of con and col nodes are internal

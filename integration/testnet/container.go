@@ -99,7 +99,7 @@ func NewContainerConfig(nodeName string, conf NodeConfig, networkKey, stakingKey
 		GetPrivateNodeInfoAddress(nodeName),
 		conf.Weight,
 		networkKey,
-		stakingKey,
+		stakingKey.PrivateKey,
 	)
 
 	containerConf := ContainerConfig{
