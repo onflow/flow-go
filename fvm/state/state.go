@@ -347,9 +347,6 @@ func IsFVMStateKey(owner, key string) bool {
 	// 		- address, "storage_used"
 	// 		- address, "frozen"
 
-	if key == KeyPublicKeyCount {
-		return true
-	}
 	if bytes.HasPrefix([]byte(key), []byte("public_key_")) {
 		return true
 	}
@@ -360,12 +357,6 @@ func IsFVMStateKey(owner, key string) bool {
 		return true
 	}
 	if key == KeyAccountStatus {
-		return true
-	}
-	if key == KeyStorageUsed {
-		return true
-	}
-	if key == KeyStorageIndex {
 		return true
 	}
 
