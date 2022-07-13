@@ -211,9 +211,9 @@ func (suite *ConsensusSuite) TestProtocolEvents_CommittedEpoch() {
 	suite.committee.EpochCommittedPhaseStarted(suite.currentEpochCounter, &firstBlockOfCommittedPhase)
 	// wait for the protocol event to be processed (async)
 	assert.Eventually(suite.T(), func() bool {
-		_, err := suite.committee.IdentityByEpoch(randUint64(201, 300), unittest.IdentifierFixture())
-		return !errors.Is(err, model.ErrViewForUnknownEpoch)
-	}, time.Second, time.Millisecond)
+		_, err := suite.committee.IdentitiesByEpoch(randUint64(201, 300))
+		return err != nil
+	}, 5*time.Second, 50*time.Millisecond)
 
 	suite.Assert().Len(suite.committee.epochs, 2)
 	suite.AssertStoredEpochCounterRange(suite.currentEpochCounter, suite.currentEpochCounter+1)
@@ -240,9 +240,9 @@ func (suite *ConsensusSuite) TestProtocolEvents_EpochFallback() {
 	suite.committee.EpochEmergencyFallbackTriggered()
 	// wait for the protocol event to be processed (async)
 	assert.Eventually(suite.T(), func() bool {
-		_, err := suite.committee.IdentityByEpoch(randUint64(201, 10_000), unittest.IdentifierFixture())
-		return !errors.Is(err, model.ErrViewForUnknownEpoch)
-	}, time.Second, time.Millisecond)
+		_, err := suite.committee.IdentitiesByEpoch(randUint64(201, 300))
+		return err != nil
+	}, 5*time.Second, 50*time.Millisecond)
 
 	suite.Assert().Len(suite.committee.epochs, 2)
 	suite.AssertStoredEpochCounterRange(suite.currentEpochCounter, suite.currentEpochCounter+1)
