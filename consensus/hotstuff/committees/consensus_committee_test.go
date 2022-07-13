@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/mapfunc"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/state/protocol/seed"
@@ -82,7 +83,7 @@ func (suite *ConsensusSuite) TearDownTest() {
 func (suite *ConsensusSuite) CreateAndStartCommittee() {
 	committee, err := NewConsensusCommittee(suite.state, suite.myID)
 	require.NoError(suite.T(), err)
-	ctx, cancel, errCh := unittest.IrrecoverableContextWithCancel(context.Background())
+	ctx, cancel, errCh := irrecoverable.WithSignallerAndCancel(context.Background())
 	committee.Start(ctx)
 	go unittest.FailOnIrrecoverableError(suite.T(), ctx.Done(), errCh)
 
@@ -156,6 +157,7 @@ func (suite *ConsensusSuite) TestConstruction_PreviousEpoch() {
 // TestConstruction_UncommittedNextEpoch tests construction with an uncommitted next epoch.
 // Only the current epoch should be cached after construction.
 func (suite *ConsensusSuite) TestConstruction_UncommittedNextEpoch() {
+	suite.phase = flow.EpochPhaseSetup
 	curEpoch := newMockEpoch(suite.currentEpochCounter, unittest.IdentityListFixture(10), 101, 200, unittest.SeedFixture(32), true)
 	nextEpoch := newMockEpoch(suite.currentEpochCounter+1, unittest.IdentityListFixture(10), 201, 300, unittest.SeedFixture(32), false)
 	suite.epochs.Add(curEpoch)
@@ -617,7 +619,7 @@ func TestRemoveOldEpochs(t *testing.T) {
 	com, err := NewConsensusCommittee(state, me)
 	require.Nil(t, err)
 
-	ctx, cancel, errCh := unittest.IrrecoverableContextWithCancel(context.Background())
+	ctx, cancel, errCh := irrecoverable.WithSignallerAndCancel(context.Background())
 	com.Start(ctx)
 	go unittest.FailOnIrrecoverableError(t, ctx.Done(), errCh)
 	defer cancel()
