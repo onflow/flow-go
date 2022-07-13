@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -306,6 +307,12 @@ func (suite *ConsensusSuite) TestIdentitiesByBlock() {
 		require.NoError(t, err)
 		require.Equal(t, realIdentity, actual)
 	})
+	t.Run("should propagate unexpected errors", func(t *testing.T) {
+		mockErr := errors.New("unexpected")
+		suite.snapshot.On("Identity", mock.Anything).Return(nil, mockErr)
+		_, err := suite.committee.IdentityByBlock(blockID, unittest.IdentifierFixture())
+		assert.ErrorIs(t, err, mockErr)
+	})
 }
 
 // TestIdentitiesByEpoch tests that identities can be queried by epoch.
@@ -406,6 +413,7 @@ func (suite *ConsensusSuite) TestIdentitiesByEpoch() {
 			require.True(t, errors.Is(err, model.ErrViewForUnknownEpoch))
 		})
 	})
+
 }
 
 // TestThresholds tests that the weight threshold methods return the
