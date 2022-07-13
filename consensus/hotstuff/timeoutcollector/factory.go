@@ -40,6 +40,8 @@ func (f *TimeoutCollectorFactory) Create(view uint64) (hotstuff.TimeoutCollector
 	return NewTimeoutCollector(view, f.notifier, f.collectorNotifier, processor), nil
 }
 
+// TimeoutProcessorFactory implements hotstuff.TimeoutProcessorFactory, it is responsible for creating timeout processor
+// for given view.
 type TimeoutProcessorFactory struct {
 	committee   hotstuff.Replicas
 	notifier    hotstuff.TimeoutCollectorConsumer
