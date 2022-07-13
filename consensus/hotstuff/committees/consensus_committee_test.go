@@ -191,6 +191,9 @@ func (suite *ConsensusSuite) TestConstruction_EpochFallbackTriggered() {
 	suite.AssertStoredEpochCounterRange(suite.currentEpochCounter, suite.currentEpochCounter+1)
 }
 
+// TestProtocolEvents_CommittedEpoch tests that protocol events notifying of a newly
+// committed epoch are handled correctly. A committed epoch should be cached, and
+// repeated events should be no-ops.
 func (suite *ConsensusSuite) TestProtocolEvents_CommittedEpoch() {
 	curEpoch := newMockEpoch(suite.currentEpochCounter, unittest.IdentityListFixture(10), 101, 200, unittest.SeedFixture(32), true)
 	suite.epochs.Add(curEpoch)
@@ -222,6 +225,9 @@ func (suite *ConsensusSuite) TestProtocolEvents_CommittedEpoch() {
 
 }
 
+// TestProtocolEvents_EpochFallback tests that protocol events notifying of epoch
+// fallback are handled correctly. Epoch fallback triggering should result in a
+// fallback epoch being injected, and repeated events should be no-ops.
 func (suite *ConsensusSuite) TestProtocolEvents_EpochFallback() {
 	curEpoch := newMockEpoch(suite.currentEpochCounter, unittest.IdentityListFixture(10), 101, 200, unittest.SeedFixture(32), true)
 	suite.epochs.Add(curEpoch)
