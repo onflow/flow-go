@@ -156,7 +156,7 @@ type handler struct {
 	blocks             storage.Blocks
 	headers            storage.Headers
 	state              protocol.State
-	sgnIdcsDecoder     hotstuff.BlockSignerDecoder
+	signerDecoder     hotstuff.BlockSignerDecoder
 	events             storage.Events
 	exeResults         storage.ExecutionResults
 	transactionResults storage.TransactionResults

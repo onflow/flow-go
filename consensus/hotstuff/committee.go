@@ -49,6 +49,8 @@ type Committee interface {
 	DKG(blockID flow.Identifier) (DKG, error)
 }
 
+// BlockSignerDecoder defines how to convert the SignerIndices field within a particular
+// block header to the identifiers of the nodes which signed the block. 
 type BlockSignerDecoder interface {
 	// DecodeSignerIDs decodes the signer indices from the given block header into full node IDs.
 	// Expected Error returns during normal operations:

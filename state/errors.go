@@ -94,7 +94,7 @@ func IsNoValidChildBlockError(err error) bool {
 // UnknownBlockError is a sentinel error indicating that a certain block
 // has not been ingested yet.
 type UnknownBlockError struct {
-	err error
+	blockID flow.Identifier
 }
 
 func NewUnknownBlockErrorf(msg string, args ...interface{}) error {

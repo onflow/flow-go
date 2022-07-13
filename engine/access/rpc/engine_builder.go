@@ -24,7 +24,7 @@ type RPCEngineBuilder struct {
 	*Engine
 
 	router         *apiproxy.FlowAccessAPIRouter // this is set through `WithRouting`; or nil if not explicitly specified
-	sgnIdcsDecoder hotstuff.BlockSignerDecoder
+	signerDecoder hotstuff.BlockSignerDecoder
 }
 
 // WithRouting specifies that the given router should be used as primary access API.

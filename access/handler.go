@@ -18,7 +18,7 @@ import (
 type Handler struct {
 	api            API
 	chain          flow.Chain
-	sgnIdcsDecoder hotstuff.BlockSignerDecoder
+	signerDecoder hotstuff.BlockSignerDecoder
 }
 
 // HandlerOption is used to hand over optional constructor parameters
