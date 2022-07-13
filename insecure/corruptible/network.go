@@ -85,8 +85,11 @@ func NewCorruptibleNetwork(
 	corruptibleNetwork.ComponentManager = component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			corruptibleNetwork.flowNetwork.Start(ctx)
+			<-corruptibleNetwork.flowNetwork.Ready()
 
 			ready()
+
+			<-corruptibleNetwork.flowNetwork.Done()
 		}).
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			corruptibleNetwork.start(ctx, address)
