@@ -14,32 +14,40 @@ import (
 )
 
 func TestAccountStatusMigration(t *testing.T) {
-	mig := AccountStatusMigration{
-		Logger: zerolog.Logger{},
-	}
+	mig := NewAccountStatusMigration(zerolog.Logger{})
 
 	address1 := flow.HexToAddress("0x1")
 	address2 := flow.HexToAddress("0x2")
 
 	payloads := []ledger.Payload{
-		{Key: createPayloadKeyWithLegacyController(address1, state.KeyStorageUsed, true), Value: utils.Uint64ToBinary(1)},
+		{Key: createPayloadKeyWithLegacyController(address1, KeyStorageUsed, true), Value: utils.Uint64ToBinary(12)},
 		{Key: createPayloadKeyWithLegacyController(address1, "other registers", true), Value: utils.Uint64ToBinary(2)},
 		{Key: createPayloadKeyWithLegacyController(address2, "other registers2", true), Value: utils.Uint64ToBinary(3)},
 		{Key: createPayloadKeyWithLegacyController(address1, KeyExists, true), Value: []byte{1}},
 		{Key: createPayloadKeyWithLegacyController(address1, KeyAccountFrozen, true), Value: []byte{1}},
+		{Key: createPayloadKeyWithLegacyController(address1, KeyPublicKeyCount, true), Value: utils.Uint64ToBinary(2)},
+		{Key: createPayloadKeyWithLegacyController(address1, KeyPrefixPublicKey+"0", true), Value: []byte{1}},
+		{Key: createPayloadKeyWithLegacyController(address1, KeyPrefixPublicKey+"1", true), Value: []byte{2}},
+		{Key: createPayloadKeyWithLegacyController(address1, KeyStorageIndex, true), Value: []byte{1, 0, 0, 0, 0, 0, 0, 0}},
 	}
 
 	newPayloads, err := mig.Migrate(payloads)
 	require.NoError(t, err)
-	require.Equal(t, 4, len(newPayloads)) // no more frozen register
+	require.Equal(t, 5, len(newPayloads))
 
-	require.True(t, newPayloads[0].Equals(&payloads[0]))
-	require.True(t, newPayloads[1].Equals(&payloads[1]))
-	require.True(t, newPayloads[2].Equals(&payloads[2]))
+	require.True(t, newPayloads[0].Equals(&payloads[1]))
+	require.True(t, newPayloads[1].Equals(&payloads[2]))
+	require.True(t, newPayloads[2].Equals(&payloads[6]))
+	require.True(t, newPayloads[3].Equals(&payloads[7]))
 
+	expectedStatus := state.NewAccountStatus()
+	expectedStatus.SetFrozenFlag(true)
+	expectedStatus.SetPublicKeyCount(2)
+	expectedStatus.SetStorageUsed(12)
+	expectedStatus.SetStorageIndex([8]byte{1, 0, 0, 0, 0, 0, 0, 0})
 	expectedPayload := &ledger.Payload{
 		Key:   createPayloadKeyWithLegacyController(address1, state.KeyAccountStatus, true),
-		Value: state.NewAccountStatus().ToBytes(),
+		Value: expectedStatus.ToBytes(),
 	}
-	require.True(t, newPayloads[3].Equals(expectedPayload))
+	require.True(t, newPayloads[4].Equals(expectedPayload))
 }
