@@ -370,21 +370,6 @@ func (node NodeInfo) Identity() *flow.Identity {
 	return identity
 }
 
-// NodeInfoFromIdentity converts an identity to a public NodeInfo
-// WARNING: the staking PoP is dummy and not related to the identity public key
-func NodeInfoFromIdentity(identity *flow.Identity) NodeInfo {
-	dummyStakingPoP := make([]byte, crypto.SignatureLenBLSBLS12381)
-	return NewPublicNodeInfo(
-		identity.NodeID,
-		identity.Role,
-		identity.Address,
-		identity.Weight,
-		identity.NetworkPubKey,
-		identity.StakingPubKey,
-		dummyStakingPoP,
-	)
-}
-
 // PrivateNodeInfoFromIdentity builds a NodeInfo from a flow Identity.
 // WARNING: Nothing enforces that the output NodeInfo's keys are corresponding to the input Identity.
 func PrivateNodeInfoFromIdentity(identity *flow.Identity, networkKey, stakingKey crypto.PrivateKey) (NodeInfo, error) {

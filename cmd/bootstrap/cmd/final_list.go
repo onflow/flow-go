@@ -277,8 +277,7 @@ func createPublicNodeInfo(nodes []model.NodeInfoPub) []model.NodeInfo {
 		// validate every single partner node
 		nodeID := validateNodeID(n.NodeID)
 		networkPubKey := validateNetworkPubKey(n.NetworkPubKey)
-		stakingPubKey := validateStakingPubKey(n.StakingPubKey)
-		stakingKeyPoP := validateStakingKeyPoP(n.StakingPoP)
+		stakingPubKey, stakingKeyPoP := validateStakingPubKey(n.StakingPubKey, n.StakingPoP)
 
 		// all nodes should have equal weight
 		node := model.NewPublicNodeInfo(

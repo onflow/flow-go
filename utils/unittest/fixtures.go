@@ -963,12 +963,32 @@ func NodeInfoFixture(opts ...func(*flow.Identity)) bootstrap.NodeInfo {
 	return nodes[0]
 }
 
+// NodeInfoFromIdentity converts an identity to a public NodeInfo
+// WARNING: the function replaces the staking key from the identity by a freshly generated one.
+func NodeInfoFromIdentity(identity *flow.Identity) bootstrap.NodeInfo {
+	stakingSK := StakingPrivKeyFixture()
+	stakingPoP, err := crypto.BLSGeneratePOP(stakingSK)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	return bootstrap.NewPublicNodeInfo(
+		identity.NodeID,
+		identity.Role,
+		identity.Address,
+		identity.Weight,
+		identity.NetworkPubKey,
+		stakingSK.PublicKey(),
+		stakingPoP,
+	)
+}
+
 func NodeInfosFixture(n int, opts ...func(*flow.Identity)) []bootstrap.NodeInfo {
 	opts = append(opts, WithKeys)
 	il := IdentityListFixture(n, opts...)
 	nodeInfos := make([]bootstrap.NodeInfo, 0, n)
 	for _, identity := range il {
-		nodeInfos = append(nodeInfos, bootstrap.NodeInfoFromIdentity(identity))
+		nodeInfos = append(nodeInfos, NodeInfoFromIdentity(identity))
 	}
 	return nodeInfos
 }

@@ -337,8 +337,7 @@ func readPartnerNodeInfos() []model.NodeInfo {
 		// validate every single partner node
 		nodeID := validateNodeID(partner.NodeID)
 		networkPubKey := validateNetworkPubKey(partner.NetworkPubKey)
-		stakingPubKey := validateStakingPubKey(partner.StakingPubKey)
-		stakingPoP := validateStakingKeyPoP(partner.StakingPoP)
+		stakingPubKey, stakingPoP := validateStakingPubKey(partner.StakingPubKey, partner.StakingPoP)
 		weight, valid := validateWeight(weights[partner.NodeID])
 		if !valid {
 			log.Error().Msgf("weights: %v", weights)
@@ -552,18 +551,23 @@ func validateNetworkPubKey(key encodable.NetworkPubKey) encodable.NetworkPubKey 
 	return key
 }
 
-func validateStakingPubKey(key encodable.StakingPubKey) encodable.StakingPubKey {
+func validateStakingPubKey(key encodable.StakingPubKey, pop encodable.StakingPoP) (encodable.StakingPubKey, crypto.Signature) {
 	if key.PublicKey == nil {
 		log.Fatal().Msg("StakingPubKey must not be nil")
 	}
-	return key
-}
-
-func validateStakingKeyPoP(pop encodable.StakingPoP) crypto.Signature {
 	if pop.Signature == nil {
 		log.Fatal().Msg("staking key proof of possession must not be nil")
 	}
-	return pop.Signature
+
+	valid, err := crypto.BLSVerifyPOP(key.PublicKey, pop.Signature)
+	if err != nil {
+		log.Fatal().Err(err).Msg("verifying staking key PoP failed")
+	}
+	if !valid {
+		log.Fatal().Err(err).Msg("saking key PoP is invalid")
+	}
+
+	return key, pop.Signature
 }
 
 func validateWeight(weight uint64) (uint64, bool) {
