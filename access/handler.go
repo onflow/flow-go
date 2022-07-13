@@ -16,20 +16,23 @@ import (
 )
 
 type Handler struct {
-	api   API
-	chain flow.Chain
-	// TODO: update to Replicas API once active PaceMaker is merged
-	committee hotstuff.Committee
+	api            API
+	chain          flow.Chain
+	sgnIdcsDecoder hotstuff.BlockSignerDecoder
 }
 
 type HandlerOption func(*Handler)
 
-func NewHandler(api API, chain flow.Chain, committee hotstuff.Committee) *Handler {
-	return &Handler{
-		api:       api,
-		chain:     chain,
-		committee: committee,
+func NewHandler(api API, chain flow.Chain, options ...HandlerOption) *Handler {
+	h := &Handler{
+		api:            api,
+		chain:          chain,
+		sgnIdcsDecoder: &signature.NoopBlockSignerDecoder{},
 	}
+	for _, opt := range options {
+		opt(h)
+	}
+	return h
 }
 
 // Ping the Access API server for a response.
@@ -486,7 +489,7 @@ func (h *Handler) GetExecutionResultForBlockID(ctx context.Context, req *access.
 }
 
 func (h *Handler) blockResponse(block *flow.Block, fullResponse bool) (*access.BlockResponse, error) {
-	signerIDs, err := signature.DecodeSignerIDs(h.committee, block.Header)
+	signerIDs, err := h.sgnIdcsDecoder.DecodeSignerIDs(block.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -506,7 +509,7 @@ func (h *Handler) blockResponse(block *flow.Block, fullResponse bool) (*access.B
 }
 
 func (h *Handler) blockHeaderResponse(header *flow.Header) (*access.BlockHeaderResponse, error) {
-	signerIDs, err := signature.DecodeSignerIDs(h.committee, header)
+	signerIDs, err := h.sgnIdcsDecoder.DecodeSignerIDs(header)
 	if err != nil {
 		return nil, err
 	}
@@ -555,4 +558,12 @@ func blockEventsToMessage(block flow.BlockEvents) (*access.EventsResponse_Result
 		BlockTimestamp: timestamp,
 		Events:         eventMessages,
 	}, nil
+}
+
+// WithBlockSignerDecoder configures the Handler to decode signer indices
+// via the provided hotstuff.BlockSignerDecoder
+func WithBlockSignerDecoder(sgnIdcsDecoder hotstuff.BlockSignerDecoder) func(*Handler) {
+	return func(handler *Handler) {
+		handler.sgnIdcsDecoder = sgnIdcsDecoder
+	}
 }

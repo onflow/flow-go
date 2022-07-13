@@ -49,6 +49,15 @@ type Committee interface {
 	DKG(blockID flow.Identifier) (DKG, error)
 }
 
+type BlockSignerDecoder interface {
+	// DecodeSignerIDs decodes the signer indices from the given block header into full node IDs.
+	// Expected Error returns during normal operations:
+	//  * state.UnknownBlockError if block has not been ingested yet
+	//  * signature.InvalidSignerIndicesError if signer indices included in the header do
+	//    not encode a valid subset of the consensus committee
+	DecodeSignerIDs(header *flow.Header) (flow.IdentifierList, error)
+}
+
 type DKG interface {
 	protocol.DKG
 }

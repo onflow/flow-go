@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"net"
 	"net/http"
 	"sync"
@@ -193,7 +194,7 @@ func NewBuilder(log zerolog.Logger,
 		return nil, fmt.Errorf("failed to initialize hotstuff.Committee abstractiono: %w", err)
 	}
 
-	builder := NewRPCEngineBuilder(eng, committee)
+	builder := NewRPCEngineBuilder(eng, signature.NewBlockSignerDecoder(committee))
 	if rpcMetricsEnabled {
 		builder.WithMetrics()
 	}

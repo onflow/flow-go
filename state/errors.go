@@ -90,3 +90,23 @@ func (e NoValidChildBlockError) Error() string {
 func IsNoValidChildBlockError(err error) bool {
 	return errors.As(err, &NoValidChildBlockError{})
 }
+
+// UnknownBlockError is a sentinel error indicating that a certain block
+// has not been ingested yet.
+type UnknownBlockError struct {
+	err error
+}
+
+func NewUnknownBlockErrorf(msg string, args ...interface{}) error {
+	return UnknownBlockError{
+		err: fmt.Errorf(msg, args...),
+	}
+}
+
+func (e UnknownBlockError) Unwrap() error { return e.err }
+func (e UnknownBlockError) Error() string { return e.err.Error() }
+
+func IsUnknownBlockError(err error) bool {
+	var e UnknownBlockError
+	return errors.As(err, &e)
+}

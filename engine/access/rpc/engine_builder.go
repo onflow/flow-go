@@ -13,10 +13,10 @@ import (
 )
 
 // NewRPCEngineBuilder helps to build a new RPC engine.
-func NewRPCEngineBuilder(engine *Engine, committee hotstuff.Committee) *RPCEngineBuilder {
+func NewRPCEngineBuilder(engine *Engine, sgnIdcsDecoder hotstuff.BlockSignerDecoder) *RPCEngineBuilder {
 	builder := &RPCEngineBuilder{}
 	builder.Engine = engine
-	builder.localAPIServer = access.NewHandler(builder.backend, builder.chain, committee)
+	builder.localAPIServer = access.NewHandler(builder.backend, builder.chain, access.WithBlockSignerDecoder(sgnIdcsDecoder))
 	return builder
 }
 
