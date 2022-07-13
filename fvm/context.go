@@ -13,20 +13,22 @@ import (
 
 // A Context defines a set of execution parameters used by the virtual machine.
 type Context struct {
-	Chain                        flow.Chain
-	Blocks                       Blocks
-	Metrics                      handler.MetricsReporter
-	Tracer                       module.Tracer
-	ComputationLimit             uint64
-	MemoryLimit                  uint64
-	MaxStateKeySize              uint64
-	MaxStateValueSize            uint64
-	MaxStateInteractionSize      uint64
-	EventCollectionByteSizeLimit uint64
-	MaxNumOfTxRetries            uint8
-	BlockHeader                  *flow.Header
-	ServiceAccountEnabled        bool
-	// Depricated: RestrictContractDeployment is deprecated use SetIsContractDeploymentRestrictedTransaction instead.
+	Chain   flow.Chain
+	Blocks  Blocks
+	Metrics handler.MetricsReporter
+	Tracer  module.Tracer
+	// AllowContextOverrideByExecutionState is a flag telling the fvm to override certain parts of the context from the state
+	AllowContextOverrideByExecutionState bool
+	ComputationLimit                     uint64
+	MemoryLimit                          uint64
+	MaxStateKeySize                      uint64
+	MaxStateValueSize                    uint64
+	MaxStateInteractionSize              uint64
+	EventCollectionByteSizeLimit         uint64
+	MaxNumOfTxRetries                    uint8
+	BlockHeader                          *flow.Header
+	ServiceAccountEnabled                bool
+	// Depricated: RestrictedDeploymentEnabled is deprecated use SetIsContractDeploymentRestrictedTransaction instead.
 	// Can be removed after all networks are migrated to SetIsContractDeploymentRestrictedTransaction
 	RestrictContractDeployment    bool
 	RestrictContractRemoval       bool
@@ -71,26 +73,27 @@ const (
 
 func defaultContext(logger zerolog.Logger) Context {
 	return Context{
-		Chain:                         flow.Mainnet.Chain(),
-		Blocks:                        nil,
-		Metrics:                       &handler.NoopMetricsReporter{},
-		Tracer:                        nil,
-		ComputationLimit:              DefaultComputationLimit,
-		MemoryLimit:                   DefaultMemoryLimit,
-		MaxStateKeySize:               state.DefaultMaxKeySize,
-		MaxStateValueSize:             state.DefaultMaxValueSize,
-		MaxStateInteractionSize:       state.DefaultMaxInteractionSize,
-		EventCollectionByteSizeLimit:  DefaultEventCollectionByteSizeLimit,
-		MaxNumOfTxRetries:             DefaultMaxNumOfTxRetries,
-		BlockHeader:                   nil,
-		ServiceAccountEnabled:         true,
-		RestrictContractDeployment:    true,
-		RestrictContractRemoval:       true,
-		CadenceLoggingEnabled:         false,
-		EventCollectionEnabled:        true,
-		ServiceEventCollectionEnabled: false,
-		AccountFreezeEnabled:          true,
-		ExtensiveTracing:              false,
+		Chain:                                flow.Mainnet.Chain(),
+		Blocks:                               nil,
+		Metrics:                              &handler.NoopMetricsReporter{},
+		Tracer:                               nil,
+		AllowContextOverrideByExecutionState: true,
+		ComputationLimit:                     DefaultComputationLimit,
+		MemoryLimit:                          DefaultMemoryLimit,
+		MaxStateKeySize:                      state.DefaultMaxKeySize,
+		MaxStateValueSize:                    state.DefaultMaxValueSize,
+		MaxStateInteractionSize:              state.DefaultMaxInteractionSize,
+		EventCollectionByteSizeLimit:         DefaultEventCollectionByteSizeLimit,
+		MaxNumOfTxRetries:                    DefaultMaxNumOfTxRetries,
+		BlockHeader:                          nil,
+		ServiceAccountEnabled:                true,
+		RestrictContractDeployment:           true,
+		RestrictContractRemoval:              true,
+		CadenceLoggingEnabled:                false,
+		EventCollectionEnabled:               true,
+		ServiceEventCollectionEnabled:        false,
+		AccountFreezeEnabled:                 true,
+		ExtensiveTracing:                     false,
 		TransactionProcessors: []TransactionProcessor{
 			NewTransactionVerifier(AccountKeyWeightThreshold),
 			NewTransactionSequenceNumberChecker(),
@@ -119,6 +122,14 @@ func WithChain(chain flow.Chain) Option {
 func WithGasLimit(limit uint64) Option {
 	return func(ctx Context) Context {
 		ctx.ComputationLimit = limit
+		return ctx
+	}
+}
+
+// WithAllowContextOverrideByExecutionState sets if certain context parameters get loaded from the state or not
+func WithAllowContextOverrideByExecutionState(load bool) Option {
+	return func(ctx Context) Context {
+		ctx.AllowContextOverrideByExecutionState = load
 		return ctx
 	}
 }
