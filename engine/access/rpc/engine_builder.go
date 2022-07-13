@@ -15,16 +15,16 @@ import (
 // NewRPCEngineBuilder helps to build a new RPC engine.
 func NewRPCEngineBuilder(engine *Engine) *RPCEngineBuilder {
 	return &RPCEngineBuilder{
-		Engine:         engine,
-		sgnIdcsDecoder: signature.NewNoopBlockSignerDecoder(),
+		Engine:               engine,
+		signerIndicesDecoder: signature.NewNoopBlockSignerDecoder(),
 	}
 }
 
 type RPCEngineBuilder struct {
 	*Engine
 
-	router         *apiproxy.FlowAccessAPIRouter // this is set through `WithRouting`; or nil if not explicitly specified
-	signerDecoder hotstuff.BlockSignerDecoder
+	router               *apiproxy.FlowAccessAPIRouter // this is set through `WithRouting`; or nil if not explicitly specified
+	signerIndicesDecoder hotstuff.BlockSignerDecoder
 }
 
 // WithRouting specifies that the given router should be used as primary access API.
@@ -37,8 +37,8 @@ func (builder *RPCEngineBuilder) WithRouting(router *apiproxy.FlowAccessAPIRoute
 // WithBlockSignerDecoder specifies that signer indices in block headers should be translated
 // to full node IDs with the given decoder.
 // Returns self-reference for chaining.
-func (builder *RPCEngineBuilder) WithBlockSignerDecoder(sgnIdcsDecoder hotstuff.BlockSignerDecoder) *RPCEngineBuilder {
-	builder.sgnIdcsDecoder = sgnIdcsDecoder
+func (builder *RPCEngineBuilder) WithBlockSignerDecoder(signerIndicesDecoder hotstuff.BlockSignerDecoder) *RPCEngineBuilder {
+	builder.signerIndicesDecoder = signerIndicesDecoder
 	return builder
 }
 
@@ -68,7 +68,7 @@ func (builder *RPCEngineBuilder) WithMetrics() *RPCEngineBuilder {
 }
 
 func (builder *RPCEngineBuilder) Build() *Engine {
-	var localAPIServer accessproto.AccessAPIServer = access.NewHandler(builder.backend, builder.chain, access.WithBlockSignerDecoder(builder.sgnIdcsDecoder))
+	var localAPIServer accessproto.AccessAPIServer = access.NewHandler(builder.backend, builder.chain, access.WithBlockSignerDecoder(builder.signerIndicesDecoder))
 
 	if builder.router != nil {
 		builder.router.SetLocalAPI(localAPIServer)

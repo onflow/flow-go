@@ -16,9 +16,9 @@ import (
 )
 
 type Handler struct {
-	api            API
-	chain          flow.Chain
-	signerDecoder hotstuff.BlockSignerDecoder
+	api                  API
+	chain                flow.Chain
+	signerIndicesDecoder hotstuff.BlockSignerDecoder
 }
 
 // HandlerOption is used to hand over optional constructor parameters
@@ -26,9 +26,9 @@ type HandlerOption func(*Handler)
 
 func NewHandler(api API, chain flow.Chain, options ...HandlerOption) *Handler {
 	h := &Handler{
-		api:            api,
-		chain:          chain,
-		sgnIdcsDecoder: &signature.NoopBlockSignerDecoder{},
+		api:                  api,
+		chain:                chain,
+		signerIndicesDecoder: &signature.NoopBlockSignerDecoder{},
 	}
 	for _, opt := range options {
 		opt(h)
@@ -490,7 +490,7 @@ func (h *Handler) GetExecutionResultForBlockID(ctx context.Context, req *access.
 }
 
 func (h *Handler) blockResponse(block *flow.Block, fullResponse bool) (*access.BlockResponse, error) {
-	signerIDs, err := h.sgnIdcsDecoder.DecodeSignerIDs(block.Header)
+	signerIDs, err := h.signerIndicesDecoder.DecodeSignerIDs(block.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -510,7 +510,7 @@ func (h *Handler) blockResponse(block *flow.Block, fullResponse bool) (*access.B
 }
 
 func (h *Handler) blockHeaderResponse(header *flow.Header) (*access.BlockHeaderResponse, error) {
-	signerIDs, err := h.sgnIdcsDecoder.DecodeSignerIDs(header)
+	signerIDs, err := h.signerIndicesDecoder.DecodeSignerIDs(header)
 	if err != nil {
 		return nil, err
 	}
@@ -563,8 +563,8 @@ func blockEventsToMessage(block flow.BlockEvents) (*access.EventsResponse_Result
 
 // WithBlockSignerDecoder configures the Handler to decode signer indices
 // via the provided hotstuff.BlockSignerDecoder
-func WithBlockSignerDecoder(sgnIdcsDecoder hotstuff.BlockSignerDecoder) func(*Handler) {
+func WithBlockSignerDecoder(signerIndicesDecoder hotstuff.BlockSignerDecoder) func(*Handler) {
 	return func(handler *Handler) {
-		handler.sgnIdcsDecoder = sgnIdcsDecoder
+		handler.signerIndicesDecoder = signerIndicesDecoder
 	}
 }

@@ -55,7 +55,7 @@ func New(
 	exeResults storage.ExecutionResults,
 	txResults storage.TransactionResults,
 	chainID flow.ChainID,
-	sgnIdcsDecoder hotstuff.BlockSignerDecoder,
+	signerIndicesDecoder hotstuff.BlockSignerDecoder,
 	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the gRPC API e.g. Ping->100, ExecuteScriptAtBlockID->300
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the gRPC API e.g. Ping->50, ExecuteScriptAtBlockID->10
 ) *Engine {
@@ -92,16 +92,16 @@ func New(
 		log:  log,
 		unit: engine.NewUnit(),
 		handler: &handler{
-			engine:             e,
-			chain:              chainID,
-			blocks:             blocks,
-			headers:            headers,
-			state:              state,
-			sgnIdcsDecoder:     sgnIdcsDecoder,
-			events:             events,
-			exeResults:         exeResults,
-			transactionResults: txResults,
-			log:                log,
+			engine:               e,
+			chain:                chainID,
+			blocks:               blocks,
+			headers:              headers,
+			state:                state,
+			signerIndicesDecoder: signerIndicesDecoder,
+			events:               events,
+			exeResults:           exeResults,
+			transactionResults:   txResults,
+			log:                  log,
 		},
 		server: server,
 		config: config,
@@ -151,16 +151,16 @@ func (e *Engine) serve() {
 
 // handler implements a subset of the Observation API.
 type handler struct {
-	engine             ingestion.IngestRPC
-	chain              flow.ChainID
-	blocks             storage.Blocks
-	headers            storage.Headers
-	state              protocol.State
-	signerDecoder     hotstuff.BlockSignerDecoder
-	events             storage.Events
-	exeResults         storage.ExecutionResults
-	transactionResults storage.TransactionResults
-	log                zerolog.Logger
+	engine               ingestion.IngestRPC
+	chain                flow.ChainID
+	blocks               storage.Blocks
+	headers              storage.Headers
+	state                protocol.State
+	signerIndicesDecoder hotstuff.BlockSignerDecoder
+	events               storage.Events
+	exeResults           storage.ExecutionResults
+	transactionResults   storage.TransactionResults
+	log                  zerolog.Logger
 }
 
 var _ execution.ExecutionAPIServer = &handler{}
@@ -558,7 +558,7 @@ func (h *handler) GetBlockHeaderByID(
 }
 
 func (h *handler) blockHeaderResponse(header *flow.Header) (*execution.BlockHeaderResponse, error) {
-	signerIDs, err := h.sgnIdcsDecoder.DecodeSignerIDs(header)
+	signerIDs, err := h.signerIndicesDecoder.DecodeSignerIDs(header)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode signer indices to Identifiers for block %v: %w", header.ID(), err)
 	}

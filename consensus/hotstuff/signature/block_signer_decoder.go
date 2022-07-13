@@ -38,6 +38,8 @@ func (b *BlockSignerDecoder) DecodeSignerIDs(header *flow.Header) (flow.Identifi
 	id := header.ID()
 	members, err := b.Identities(id)
 	if err != nil {
+		// TODO: this potentially needs to be updated when we implement and document proper error handling for
+		//       `hotstuff.Committee` and underlying code (such as `protocol.Snapshot`)
 		if errors.Is(err, storage.ErrNotFound) {
 			return nil, state.NewUnknownBlockErrorf("block %v has not been processed yet: %w", id, err)
 		}
