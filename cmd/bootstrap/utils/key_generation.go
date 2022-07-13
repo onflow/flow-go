@@ -118,30 +118,24 @@ func GenerateNetworkingKeys(n int, seeds [][]byte) ([]crypto.PrivateKey, error) 
 	return GenerateKeys(crypto.ECDSAP256, n, seeds)
 }
 
-func GenerateStakingKey(seed []byte) (crypto.PrivateKey, crypto.Signature, error) {
+func GenerateStakingKey(seed []byte) (crypto.PrivateKey, error) {
 	keys, err := GenerateKeys(crypto.BLSBLS12381, 1, [][]byte{seed})
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	pop, err := crypto.BLSGeneratePOP(keys[0])
-	if err != nil {
-		return nil, nil, err
-	}
-	return keys[0], pop, nil
+	return keys[0], nil
 }
 
-func GenerateStakingKeys(n int, seeds [][]byte) ([]crypto.PrivateKey, []crypto.Signature, error) {
+func GenerateStakingKeys(n int, seeds [][]byte) ([]crypto.PrivateKey, error) {
 	keys := make([]crypto.PrivateKey, 0, n)
-	pops := make([]crypto.Signature, 0, n)
 	for i := 0; i < n; i++ {
-		key, pop, err := GenerateStakingKey(seeds[i])
+		key, err := GenerateStakingKey(seeds[i])
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
-		pops = append(pops, pop)
 		keys = append(keys, key)
 	}
-	return keys, pops, nil
+	return keys, nil
 }
 
 func GenerateKeys(algo crypto.SigningAlgorithm, n int, seeds [][]byte) ([]crypto.PrivateKey, error) {

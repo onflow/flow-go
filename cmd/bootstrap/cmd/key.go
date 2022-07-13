@@ -79,7 +79,7 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 	validateAddressFormat(flagAddress)
 
 	// generate staking and network keys
-	networkKey, stakingKey, _, secretsDBKey, err := generateKeys()
+	networkKey, stakingKey, secretsDBKey, err := generateKeys()
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not generate staking or network keys")
 	}
@@ -119,30 +119,30 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 	}
 }
 
-func generateKeys() (crypto.PrivateKey, crypto.PrivateKey, crypto.Signature, []byte, error) {
+func generateKeys() (crypto.PrivateKey, crypto.PrivateKey, []byte, error) {
 
 	log.Debug().Msg("will generate networking key")
 	networkKey, err := utils.GenerateNetworkingKey(flagNetworkSeed)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("could not generate networking key: %w", err)
+		return nil, nil, nil, fmt.Errorf("could not generate networking key: %w", err)
 	}
 	log.Info().Msg("generated networking key")
 
 	log.Debug().Msg("will generate staking key")
-	stakingKey, stakingKeyPoP, err := utils.GenerateStakingKey(flagStakingSeed)
+	stakingKey, err := utils.GenerateStakingKey(flagStakingSeed)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("could not generate staking key: %w", err)
+		return nil, nil, nil, fmt.Errorf("could not generate staking key: %w", err)
 	}
 	log.Info().Msg("generated staking key")
 
 	log.Debug().Msg("will generate db encryption key")
 	secretsDBKey, err := utils.GenerateSecretsDBEncryptionKey()
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("could not generate secrets db encryption key: %w", err)
+		return nil, nil, nil, fmt.Errorf("could not generate secrets db encryption key: %w", err)
 	}
 	log.Info().Msg("generated db encryption key")
 
-	return networkKey, stakingKey, stakingKeyPoP, secretsDBKey, nil
+	return networkKey, stakingKey, secretsDBKey, nil
 }
 
 func generateMachineAccountKey() (crypto.PrivateKey, error) {
