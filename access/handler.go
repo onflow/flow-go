@@ -21,6 +21,7 @@ type Handler struct {
 	sgnIdcsDecoder hotstuff.BlockSignerDecoder
 }
 
+// HandlerOption is used to hand over optional constructor parameters
 type HandlerOption func(*Handler)
 
 func NewHandler(api API, chain flow.Chain, options ...HandlerOption) *Handler {

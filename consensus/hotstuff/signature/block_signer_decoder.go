@@ -3,12 +3,12 @@ package signature
 import (
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/state"
-	"github.com/onflow/flow-go/storage"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/state"
+	"github.com/onflow/flow-go/storage"
 )
 
 // BlockSignerDecoder is a wrapper around the `hotstuff.Committee`, which implements
@@ -53,6 +53,10 @@ func (b *BlockSignerDecoder) DecodeSignerIDs(header *flow.Header) (flow.Identifi
 
 // NoopBlockSignerDecoder does not decode any signer indices and consistenlty return nil
 type NoopBlockSignerDecoder struct{}
+
+func NewNoopBlockSignerDecoder() *NoopBlockSignerDecoder {
+	return &NoopBlockSignerDecoder{}
+}
 
 func (b *NoopBlockSignerDecoder) DecodeSignerIDs(_ *flow.Header) (flow.IdentifierList, error) {
 	return nil, nil
