@@ -146,6 +146,12 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 
 func (e *Engine) process(originID flow.Identifier, input interface{}) error {
 	switch v := input.(type) {
+	case *messages.BlockResponse:
+		e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageBlockResponse)
+		defer e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockResponse)
+		e.unit.Lock()
+		defer e.unit.Unlock()
+		return e.onBlockResponse(originID, v)
 	case *events.SyncedBlock:
 		e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageSyncedBlock)
 		defer e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageSyncedBlock)
@@ -157,7 +163,7 @@ func (e *Engine) process(originID flow.Identifier, input interface{}) error {
 		defer e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockProposal)
 		e.unit.Lock()
 		defer e.unit.Unlock()
-		return e.onBlockProposal(originID, v)
+		return e.onBlockProposal(originID, v, false)
 	default:
 		return fmt.Errorf("invalid event type (%T)", input)
 	}
@@ -176,11 +182,27 @@ func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBl
 		Header:  synced.Block.Header,
 		Payload: synced.Block.Payload,
 	}
-	return e.onBlockProposal(originID, proposal)
+	return e.onBlockProposal(originID, proposal, false)
 }
 
-// onBlockProposal handles incoming block proposals.
-func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
+func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockResponse) error {
+	for i, block := range res.Blocks {
+		proposal := &messages.BlockProposal{
+			Header:  block.Header,
+			Payload: block.Payload,
+		}
+
+		// process block proposal with a wait
+		if err := e.onBlockProposal(originID, proposal, true); err != nil {
+			return fmt.Errorf("fail to process the block at index %v in a range block response that contains %v blocks: %w", i, len(res.Blocks), err)
+		}
+	}
+
+	return nil
+}
+
+// onBlockProposal handles incoming block proposals. inRangeBlockResponse will determine whether or not we should wait in processBlockAndDescendants
+func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal, inRangeBlockResponse bool) error {
 
 	span, ctx, _ := e.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.FollowerOnBlockProposal)
 	defer span.Finish()
@@ -295,7 +317,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 
 	// at this point, we should be able to connect the proposal to the finalized
 	// state and should process it to see whether to forward to hotstuff or not
-	err = e.processBlockAndDescendants(ctx, proposal)
+	err = e.processBlockAndDescendants(ctx, proposal, inRangeBlockResponse)
 	if err != nil {
 		return fmt.Errorf("could not process block proposal: %w", err)
 	}
@@ -313,7 +335,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 // The function assumes that `proposal` is connected to the finalized state. By induction,
 // any children are therefore also connected to the finalized state and can be processed as well.
 // No errors are expected during normal operations.
-func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *messages.BlockProposal) error {
+func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *messages.BlockProposal, inRangeBlockResponse bool) error {
 
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.FollowerProcessBlockProposal)
 	defer span.Finish()
@@ -369,10 +391,15 @@ func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *messa
 	log.Info().Msg("forwarding block proposal to hotstuff")
 
 	// submit the model to follower for processing
-	e.follower.SubmitProposal(header, parent.View)
+	if inRangeBlockResponse {
+		<-e.follower.SubmitProposal(header, parent.View)
+	} else {
+		// ignore returned channel to avoid waiting
+		e.follower.SubmitProposal(header, parent.View)
+	}
 
 	// check for any descendants of the block to process
-	err = e.processPendingChildren(ctx, header)
+	err = e.processPendingChildren(ctx, header, inRangeBlockResponse)
 	if err != nil {
 		return fmt.Errorf("could not process pending children: %w", err)
 	}
@@ -383,7 +410,7 @@ func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *messa
 // processPendingChildren checks if there are proposals connected to the given
 // parent block that was just processed; if this is the case, they should now
 // all be validly connected to the finalized state and we should process them.
-func (e *Engine) processPendingChildren(ctx context.Context, header *flow.Header) error {
+func (e *Engine) processPendingChildren(ctx context.Context, header *flow.Header, inRangeBlockResponse bool) error {
 
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.FollowerProcessPendingChildren)
 	defer span.Finish()
@@ -403,7 +430,7 @@ func (e *Engine) processPendingChildren(ctx context.Context, header *flow.Header
 			Header:  child.Header,
 			Payload: child.Payload,
 		}
-		err := e.processBlockAndDescendants(ctx, proposal)
+		err := e.processBlockAndDescendants(ctx, proposal, inRangeBlockResponse)
 		if err != nil {
 			result = multierror.Append(result, err)
 		}

@@ -141,7 +141,7 @@ func (suite *Suite) TestHandleProposal() {
 	// we do not have any children cached
 	suite.cache.On("ByParentID", block.ID()).Return(nil, false)
 	// the proposal should be forwarded to the follower
-	suite.follower.On("SubmitProposal", block.Header, parent.Header.View).Once()
+	suite.follower.On("SubmitProposal", block.Header, parent.Header.View).Once().Return(make(<-chan struct{}))
 
 	// submit the block
 	proposal := unittest.ProposalFromBlock(&block)
@@ -207,8 +207,8 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 	suite.headers.On("ByBlockID", parent.ID()).Return(parent.Header, nil)
 	suite.headers.On("ByBlockID", block.ID()).Return(block.Header, nil).Once()
 	// should submit to follower
-	suite.follower.On("SubmitProposal", block.Header, parent.Header.View).Once()
-	suite.follower.On("SubmitProposal", child.Header, block.Header.View).Once()
+	suite.follower.On("SubmitProposal", block.Header, parent.Header.View).Once().Return(make(<-chan struct{}))
+	suite.follower.On("SubmitProposal", child.Header, block.Header.View).Once().Return(make(<-chan struct{}))
 
 	// we have one pending child cached
 	pending := []*flow.PendingBlock{
