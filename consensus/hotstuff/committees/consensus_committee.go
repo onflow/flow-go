@@ -111,7 +111,7 @@ type Consensus struct {
 	me                      flow.Identifier             // the node ID of this node
 	mu                      sync.RWMutex                // protects access to epochs
 	epochs                  map[uint64]*staticEpochInfo // cache of initial committee & leader selection per epoch
-	committedEpochsCh       chan protocol.Epoch         // protocol events for newly committed epochs
+	committedEpochsCh       chan *flow.Header           // protocol events for newly committed epochs (the first block of the epoch is passed over the channel)
 	epochEmergencyFallback  chan struct{}               // protocol event for epoch emergency fallback
 	handleEpochFallbackOnce sync.Once                   // ensure we only inject fallback epoch once
 	events.Noop                                         // implements protocol.Consumer
@@ -128,7 +128,7 @@ func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus
 		state:                  state,
 		me:                     me,
 		epochs:                 make(map[uint64]*staticEpochInfo),
-		committedEpochsCh:      make(chan protocol.Epoch, 1),
+		committedEpochsCh:      make(chan *flow.Header, 1),
 		epochEmergencyFallback: make(chan struct{}, 1),
 	}
 
@@ -311,7 +311,7 @@ func (c *Consensus) DKG(view uint64) (hotstuff.DKG, error) {
 
 // handleProtocolEvents processes queued Epoch events `EpochCommittedPhaseStarted`
 // and `EpochEmergencyFallbackTriggered`. This function permanently utilizes a worker
-// routine until the `Component` terminates.    
+// routine until the `Component` terminates.
 // When we observe a new epoch being committed, we compute
 // the leader selection and cache static info for the epoch. When we observe
 // epoch emergency fallback being triggered, we inject a fallback epoch.
@@ -322,7 +322,8 @@ func (c *Consensus) handleProtocolEvents(ctx irrecoverable.SignalerContext, read
 		select {
 		case <-ctx.Done():
 			return
-		case epoch := <-c.committedEpochsCh:
+		case block := <-c.committedEpochsCh:
+			epoch := c.state.AtBlockID(block.ID()).Epochs().Next()
 			_, err := c.prepareEpoch(epoch)
 			if err != nil {
 				ctx.Throw(err)
@@ -338,8 +339,7 @@ func (c *Consensus) handleProtocolEvents(ctx irrecoverable.SignalerContext, read
 
 // EpochCommittedPhaseStarted informs the `committee.Consensus` that the block starting the Epoch Committed Phase has been finalized.
 func (c *Consensus) EpochCommittedPhaseStarted(_ uint64, first *flow.Header) {
-	nextEpoch := c.state.AtBlockID(first.ID()).Epochs().Next()
-	c.committedEpochsCh <- nextEpoch
+	c.committedEpochsCh <- first
 }
 
 // EpochEmergencyFallbackTriggered passes the protocol event to the worker thread.
