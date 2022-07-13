@@ -133,7 +133,7 @@ type ReadyFunc func()
 type ComponentWorker func(ctx irrecoverable.SignalerContext, ready ReadyFunc)
 
 // NoopWorker is a worker routine which is immediately ready, does nothing, and
-// exits when the context is done. It is
+// exits when the context is done.
 func NoopWorker(ctx irrecoverable.SignalerContext, ready ReadyFunc) {
 	ready()
 	<-ctx.Done()
