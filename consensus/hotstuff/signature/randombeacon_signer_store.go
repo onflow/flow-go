@@ -36,7 +36,7 @@ func NewEpochAwareRandomBeaconKeyStore(epochLookup module.EpochLookup, keys stor
 //  - (nil, error) if there is any exception
 func (s *EpochAwareRandomBeaconKeyStore) ByView(view uint64) (crypto.PrivateKey, error) {
 	// fetching the epoch by view, if epoch is found, then DKG must have been completed
-	epoch, err := s.epochLookup.EpochForView(view)
+	epoch, err := s.epochLookup.EpochForViewWithFallback(view)
 	if err != nil {
 		return nil, fmt.Errorf("could not get epoch by view %v: %w", view, err)
 	}
