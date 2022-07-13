@@ -369,19 +369,19 @@ func (c *Consensus) onEpochEmergencyFallbackTriggered() (retErr error) {
 		c.mu.RLock()
 		// sanity check: current epoch must be cached already
 		currentEpoch, ok := c.epochs[currentEpochCounter]
-		c.mu.RUnlock()
 		if !ok {
+			c.mu.RUnlock()
 			retErr = fmt.Errorf("epoch fallback: could not find current epoch (counter=%d) info", currentEpochCounter)
 			return
 		}
 		// sanity check: next epoch must never be committed, therefore must not be cached
-		c.mu.RLock()
 		_, ok = c.epochs[currentEpochCounter+1]
-		c.mu.RUnlock()
 		if ok {
+			c.mu.RUnlock()
 			retErr = fmt.Errorf("epoch fallback: next epoch (counter=%d) is cached contrary to expectation", currentEpochCounter+1)
 			return
 		}
+		c.mu.RUnlock()
 
 		fallbackEpoch, err := newEmergencyFallbackEpoch(currentEpoch)
 		if err != nil {
