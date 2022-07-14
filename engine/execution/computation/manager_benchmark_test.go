@@ -92,19 +92,11 @@ func BenchmarkComputeBlock(b *testing.B) {
 	programsCache, err := NewProgramsCache(1000)
 	require.NoError(b, err)
 
-	eds := new(state_synchronization.ExecutionDataService)
-	eds.On("Add", mock.Anything, mock.Anything).Return(flow.ZeroID, nil, nil)
-
-	eCache := new(state_synchronization.ExecutionDataCIDCache)
-	eCache.On("Insert", mock.AnythingOfType("*flow.Header"), mock.AnythingOfType("state_synchronization.BlobTree"))
-
 	engine := &Manager{
 		blockComputer: blockComputer,
 		tracer:        trace.NewNoopTracer(),
 		me:            me,
 		programsCache: programsCache,
-		eds:           eds,
-		edCache:       eCache,
 	}
 
 	view := delta.NewView(ledger.Get)

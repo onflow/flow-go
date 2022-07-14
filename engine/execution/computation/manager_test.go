@@ -34,6 +34,7 @@ import (
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
+	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
@@ -119,18 +120,10 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	programsCache, err := NewProgramsCache(10)
 	require.NoError(t, err)
 
-	eds := new(state_synchronization.ExecutionDataService)
-	eds.On("Add", mock.Anything, mock.Anything).Return(flow.ZeroID, nil, nil)
-
-	eCache := new(state_synchronization.ExecutionDataCIDCache)
-	eCache.On("Insert", mock.AnythingOfType("*flow.Header"), mock.AnythingOfType("state_synchronization.BlobTree"))
-
 	engine := &Manager{
 		blockComputer: blockComputer,
 		me:            me,
 		programsCache: programsCache,
-		eds:           eds,
-		edCache:       eCache,
 		tracer:        trace.NewNoopTracer(),
 	}
 
@@ -170,19 +163,11 @@ func TestComputeBlock_Uploader(t *testing.T) {
 
 	fakeUploader := &FakeUploader{}
 
-	eds := new(state_synchronization.ExecutionDataService)
-	eds.On("Add", mock.Anything, mock.Anything).Return(flow.ZeroID, nil, nil)
-
-	eCache := new(state_synchronization.ExecutionDataCIDCache)
-	eCache.On("Insert", mock.AnythingOfType("*flow.Header"), mock.AnythingOfType("state_synchronization.BlobTree"))
-
 	manager := &Manager{
 		blockComputer: blockComputer,
 		me:            me,
 		programsCache: programsCache,
 		uploaders:     []uploader.Uploader{fakeUploader},
-		eds:           eds,
-		edCache:       eCache,
 		tracer:        trace.NewNoopTracer(),
 	}
 
@@ -226,8 +211,16 @@ func TestExecuteScript(t *testing.T) {
 		fvm.FungibleTokenAddress(execCtx.Chain).HexWithPrefix(),
 	))
 
-	eds := new(state_synchronization.ExecutionDataService)
-	edCache := new(state_synchronization.ExecutionDataCIDCache)
+	bservice := unittest.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+	trackerStorage := new(mocktracker.Storage)
+
+	prov := provider.NewProvider(
+		zerolog.Nop,
+		metrics.NewNoopCollector(),
+		execution_data.DefaultSerializer,
+		bservice,
+		trackerStorage,
+	)
 
 	engine, err := New(logger,
 		metrics.NewNoopCollector(),
@@ -241,8 +234,8 @@ func TestExecuteScript(t *testing.T) {
 		scriptLogThreshold,
 		DefaultScriptExecutionTimeLimit,
 		nil,
-		eds,
-		edCache)
+		prov,
+	)
 	require.NoError(t, err)
 
 	header := unittest.BlockHeaderFixture()
@@ -280,8 +273,16 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 		fvm.FungibleTokenAddress(execCtx.Chain).HexWithPrefix(),
 	))
 
-	eds := new(state_synchronization.ExecutionDataService)
-	edCache := new(state_synchronization.ExecutionDataCIDCache)
+	bservice := unittest.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+	trackerStorage := new(mocktracker.Storage)
+
+	prov := provider.NewProvider(
+		zerolog.Nop,
+		metrics.NewNoopCollector(),
+		execution_data.DefaultSerializer,
+		bservice,
+		trackerStorage,
+	)
 
 	engine, err := New(logger,
 		metrics.NewNoopCollector(),
@@ -295,8 +296,7 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 		scriptLogThreshold,
 		DefaultScriptExecutionTimeLimit,
 		nil,
-		eds,
-		edCache)
+		prov)
 	require.NoError(t, err)
 
 	header := unittest.BlockHeaderFixture()
@@ -315,8 +315,16 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 
 	header := unittest.BlockHeaderFixture()
 
-	eds := new(state_synchronization.ExecutionDataService)
-	edCache := new(state_synchronization.ExecutionDataCIDCache)
+	bservice := unittest.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+	trackerStorage := new(mocktracker.Storage)
+
+	prov := provider.NewProvider(
+		zerolog.Nop,
+		metrics.NewNoopCollector(),
+		execution_data.DefaultSerializer,
+		bservice,
+		trackerStorage,
+	)
 
 	manager, err := New(log,
 		metrics.NewNoopCollector(),
@@ -330,8 +338,7 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 		scriptLogThreshold,
 		DefaultScriptExecutionTimeLimit,
 		nil,
-		eds,
-		edCache)
+		prov)
 	require.NoError(t, err)
 
 	_, err = manager.ExecuteScript(context.Background(), []byte("whatever"), nil, &header, noopView())
@@ -352,8 +359,16 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 
 	header := unittest.BlockHeaderFixture()
 
-	eds := new(state_synchronization.ExecutionDataService)
-	edCache := new(state_synchronization.ExecutionDataCIDCache)
+	bservice := unittest.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+	trackerStorage := new(mocktracker.Storage)
+
+	prov := provider.NewProvider(
+		zerolog.Nop,
+		metrics.NewNoopCollector(),
+		execution_data.DefaultSerializer,
+		bservice,
+		trackerStorage,
+	)
 
 	manager, err := New(log,
 		metrics.NewNoopCollector(),
@@ -367,8 +382,7 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 		1*time.Millisecond,
 		DefaultScriptExecutionTimeLimit,
 		nil,
-		eds,
-		edCache)
+		prov)
 	require.NoError(t, err)
 
 	_, err = manager.ExecuteScript(context.Background(), []byte("whatever"), nil, &header, noopView())
@@ -389,8 +403,16 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 
 	header := unittest.BlockHeaderFixture()
 
-	eds := new(state_synchronization.ExecutionDataService)
-	edCache := new(state_synchronization.ExecutionDataCIDCache)
+	bservice := unittest.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+	trackerStorage := new(mocktracker.Storage)
+
+	prov := provider.NewProvider(
+		zerolog.Nop,
+		metrics.NewNoopCollector(),
+		execution_data.DefaultSerializer,
+		bservice,
+		trackerStorage,
+	)
 
 	manager, err := New(log,
 		metrics.NewNoopCollector(),
@@ -404,8 +426,7 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 		1*time.Second,
 		DefaultScriptExecutionTimeLimit,
 		nil,
-		eds,
-		edCache)
+		prov)
 	require.NoError(t, err)
 
 	_, err = manager.ExecuteScript(context.Background(), []byte("whatever"), nil, &header, noopView())
