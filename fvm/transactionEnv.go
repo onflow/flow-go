@@ -120,8 +120,11 @@ func NewTransactionEnvironment(
 		env.seedRNG(ctx.BlockHeader)
 	}
 
+	var err error
 	// set the execution parameters from the state
-	err := env.setExecutionParameters()
+	if ctx.AllowContextOverrideByExecutionState {
+		err = env.setExecutionParameters()
+	}
 
 	return env, err
 }
@@ -443,13 +446,8 @@ func (e *TransactionEnv) GetStorageCapacity(address common.Address) (value uint6
 	accountStorageCapacity := AccountStorageCapacityInvocation(e, e.traceSpan)
 	result, invokeErr := accountStorageCapacity(address)
 
-	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, storage capacity will be 0.
-	// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
-	// 2. There will also be an error in case the accounts balance times megabytesPerFlow constant overflows,
-	//		which shouldn't happen unless the the price of storage is reduced at least 100 fold
-	// 3. Any other error indicates a bug in our implementation. How can we reliably check the Cadence error?
 	if invokeErr != nil {
-		return 0, nil
+		return 0, errors.HandleRuntimeError(invokeErr)
 	}
 
 	return storageMBUFixToBytesUInt(result), nil
@@ -476,9 +474,8 @@ func (e *TransactionEnv) GetAccountBalance(address common.Address) (value uint64
 	accountBalance := AccountBalanceInvocation(e, e.traceSpan)
 	result, invokeErr := accountBalance(address)
 
-	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, balance will be 0.
 	if invokeErr != nil {
-		return 0, nil
+		return 0, errors.HandleRuntimeError(invokeErr)
 	}
 	return result.ToGoValue().(uint64), nil
 }
@@ -497,11 +494,8 @@ func (e *TransactionEnv) GetAccountAvailableBalance(address common.Address) (val
 	accountAvailableBalance := AccountAvailableBalanceInvocation(e, e.traceSpan)
 	result, invokeErr := accountAvailableBalance(address)
 
-	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, available balance will be 0.
-	// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
-	// 2. Any other error indicates a bug in our implementation. How can we reliably check the Cadence error?
 	if invokeErr != nil {
-		return 0, nil
+		return 0, errors.HandleRuntimeError(invokeErr)
 	}
 	return result.ToGoValue().(uint64), nil
 }

@@ -48,6 +48,7 @@ Specify the number of nodes for each role:
 ```sh
 make -e COLLECTION=2 CONSENSUS=5 EXECUTION=3 VERIFICATION=2 ACCESS=2 init
 ```
+*NOTE: number of execution\consensus nodes should be no less than 2. It is to avoid seals being created in case of execution forks.*
 
 Specify the number of collector clusters:
 
