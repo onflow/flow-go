@@ -313,7 +313,7 @@ func GetMessageAuthConfig(v interface{}) (MsgAuthConfig, error) {
 		return authorizationConfigs[ExecutionReceipt], nil
 	case *flow.ResultApproval:
 		return authorizationConfigs[ResultApproval], nil
-		
+
 	// data exchange for execution of blocks
 	case *messages.ChunkDataRequest:
 		return authorizationConfigs[ChunkDataRequest], nil
@@ -347,7 +347,7 @@ func GetMessageAuthConfig(v interface{}) (MsgAuthConfig, error) {
 
 // GetAllMessageAuthConfigs returns all the configured message auth configurations.
 func GetAllMessageAuthConfigs() []MsgAuthConfig {
-	configs := make([]MsgAuthConfig, 0)
+	configs := make([]MsgAuthConfig, len(authorizationConfigs))
 	for _, config := range authorizationConfigs {
 		configs = append(configs, config)
 	}
