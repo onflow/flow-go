@@ -19,6 +19,7 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	legacyaccess "github.com/onflow/flow-go/access/legacy"
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
@@ -90,6 +91,7 @@ func New(log zerolog.Logger,
 	rpcMetricsEnabled bool,
 	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the Access API e.g. Ping->100, GetTransaction->300
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the Access API e.g. Ping->50, GetTransaction->10
+	signerIndicesDecoder hotstuff.BlockSignerDecoder,
 ) (*Engine, error) {
 
 	log = log.With().Str("engine", "rpc").Logger()
@@ -188,12 +190,12 @@ func New(log zerolog.Logger,
 
 	accessproto.RegisterAccessAPIServer(
 		eng.unsecureGrpcServer,
-		access.NewHandler(backend, chainID.Chain()),
+		access.NewHandler(backend, chainID.Chain(), access.WithBlockSignerDecoder(signerIndicesDecoder)),
 	)
 
 	accessproto.RegisterAccessAPIServer(
 		eng.secureGrpcServer,
-		access.NewHandler(backend, chainID.Chain()),
+		access.NewHandler(backend, chainID.Chain(), access.WithBlockSignerDecoder(signerIndicesDecoder)),
 	)
 
 	if rpcMetricsEnabled {

@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/access"
 	hsmock "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	hotsig "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/ingestion"
@@ -620,8 +621,8 @@ func (suite *Suite) TestGetSealedTransaction() {
 		handler := access.NewHandler(backend, suite.chainID.Chain())
 
 		rpcEng, err := rpc.New(suite.log, suite.state, rpc.Config{}, nil, nil, blocks, headers, collections, transactions,
-			receipts, results, suite.chainID, metrics, metrics, 0, 0, false, false, nil, nil)
-		rpcEng := rpcEngBuilder.WithLegacy().Build()
+			receipts, results, suite.chainID, metrics, metrics, 0, 0, false, false, nil, nil,
+			hotsig.NewNoopBlockSignerDecoder())
 		require.NoError(suite.T(), err)
 
 		// create the ingest engine
