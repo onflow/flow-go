@@ -313,13 +313,7 @@ func GetMessageAuthConfig(v interface{}) (MsgAuthConfig, error) {
 		return authorizationConfigs[ExecutionReceipt], nil
 	case *flow.ResultApproval:
 		return authorizationConfigs[ResultApproval], nil
-
-	// execution state synchronization
-	case *messages.ExecutionStateSyncRequest:
-		return authorizationConfigs[ExecutionStateSyncRequest], nil
-	case *messages.ExecutionStateDelta:
-		return authorizationConfigs[ExecutionStateDelta], nil
-
+		
 	// data exchange for execution of blocks
 	case *messages.ChunkDataRequest:
 		return authorizationConfigs[ChunkDataRequest], nil
