@@ -10,7 +10,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 
-	"github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution_data"
 	"github.com/onflow/flow-go/module/metrics"
@@ -34,7 +33,7 @@ func init() {
 }
 
 func run(*cobra.Command, []string) {
-	bs, ds := initBlobservice()
+	bs, ds := initBlobstore()
 	defer ds.Close()
 
 	logger := zerolog.New(os.Stdout)
