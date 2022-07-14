@@ -2,7 +2,6 @@ package epochs
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -37,9 +36,6 @@ func (s *StaticEpochTransitionSuite) SetupTest() {
 // successful DKG).
 // This is equivalent to runTestEpochJoinAndLeave, without any committee changes.
 func (s *StaticEpochTransitionSuite) TestStaticEpochTransition() {
-
-	// TODO investigate sealing segment error associated with retrieving snapshot near genesis
-	time.Sleep(10 * time.Second)
 
 	s.TimedLogf("waiting for EpochSetup phase of first epoch to begin")
 	s.WaitForPhase(s.ctx, flow.EpochPhaseSetup)
