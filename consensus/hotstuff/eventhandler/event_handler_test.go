@@ -453,9 +453,9 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_Vote_NotNextLeader() {
 	require.Equal(es.T(), proposal.Block.BlockID, blockID)
 }
 
-// TestOnQCConstructed_HappyPath tests that building a QC for current view triggers view change. We are not leader for next
+// TestOnReceiveQc_HappyPath tests that building a QC for current view triggers view change. We are not leader for next
 // round, so no proposal is expected.
-func (es *EventHandlerSuite) TestOnQCConstructed_HappyPath() {
+func (es *EventHandlerSuite) TestOnReceiveQc_HappyPath() {
 	// voting block exists
 	es.forks.proposals[es.votingProposal.Block.BlockID] = es.votingProposal
 
@@ -479,8 +479,8 @@ func (es *EventHandlerSuite) TestOnQCConstructed_HappyPath() {
 	es.communicator.AssertNotCalled(es.T(), "BroadcastProposalWithDelay")
 }
 
-// TestOnQCConstructed_FutureView tests that building a QC for future view triggers view change
-func (es *EventHandlerSuite) TestOnQCConstructed_FutureView() {
+// TestOnReceiveQc_FutureView tests that building a QC for future view triggers view change
+func (es *EventHandlerSuite) TestOnReceiveQc_FutureView() {
 	// voting block exists
 	curView := es.paceMaker.CurView()
 
@@ -527,9 +527,9 @@ func (es *EventHandlerSuite) TestOnQCConstructed_FutureView() {
 	require.Equal(es.T(), endView, es.paceMaker.CurView(), "incorrect view change")
 }
 
-// TestOnQCConstructed_NextLeaderProposes tests that after receiving a valid proposal for cur view, and I'm the next leader,
+// TestOnReceiveQc_NextLeaderProposes tests that after receiving a valid proposal for cur view, and I'm the next leader,
 // a QC can be built for the block, triggered view change, and I will propose
-func (es *EventHandlerSuite) TestOnQCConstructed_NextLeaderProposes() {
+func (es *EventHandlerSuite) TestOnReceiveQc_NextLeaderProposes() {
 	proposal := createProposal(es.initView, es.initView-1)
 	qc := createQC(proposal.Block)
 	es.voteAggregator.On("AddBlock", proposal).Return(nil).Once()
@@ -560,12 +560,12 @@ func (es *EventHandlerSuite) TestOnQCConstructed_NextLeaderProposes() {
 }
 
 // TestOnTCConstructed_HappyPath tests that building a TC for current view triggers view change
-func (es *EventHandlerSuite) TestOnTCConstructed_HappyPath() {
+func (es *EventHandlerSuite) TestOnReceiveTc_HappyPath() {
 	// voting block exists
 	es.forks.proposals[es.votingProposal.Block.BlockID] = es.votingProposal
 
-	// a qc is built
-	tc := helper.MakeTC(helper.WithTCView(es.initView), helper.WithTCNewestQC(es.qc))
+	// a tc is built
+	tc := helper.MakeTC(helper.WithTCView(es.initView), helper.WithTCNewestQC(es.votingProposal.Block.QC))
 
 	// expect a view change
 	es.endView++
@@ -577,7 +577,7 @@ func (es *EventHandlerSuite) TestOnTCConstructed_HappyPath() {
 
 // TestOnTCConstructed_NextLeaderProposes tests that after receiving TC and advancing view we as next leader create a proposal
 // and broadcast it
-func (es *EventHandlerSuite) TestOnTCConstructed_NextLeaderProposes() {
+func (es *EventHandlerSuite) TestOnReceiveTc_NextLeaderProposes() {
 	es.committee.leaders[es.tc.View+1] = struct{}{}
 	es.endView++
 	err := es.eventhandler.OnReceiveTc(es.tc)
@@ -612,12 +612,53 @@ func (es *EventHandlerSuite) TestOnTimeout() {
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
 
 	lastCall := es.communicator.Calls[len(es.communicator.Calls)-1]
-	// the last call is BroadcastProposal
+	// the last call is BroadcastTimeout
 	require.Equal(es.T(), "BroadcastTimeout", lastCall.Method)
 	timeoutObject, ok := lastCall.Arguments[0].(*model.TimeoutObject)
 	require.True(es.T(), ok)
 	// it should broadcast a TO with same view as endView
 	require.Equal(es.T(), es.endView, timeoutObject.View)
+}
+
+// TestOnTimeout_SanityChecks tests a specific scenario where pacemaker have seen both QC and TC for previous view
+// and EventHandler tries to produce a timeout object, such timeout object is invalid if both QC and TC is present, we
+// need to make sure that EventHandler filters out TC for last view if we know about QC for same view.
+func (es *EventHandlerSuite) TestOnTimeout_SanityChecks() {
+
+	es.timeoutAggregator.On("AddTimeout", mock.Anything).Return().Once()
+
+	// voting block exists
+	es.forks.proposals[es.votingProposal.Block.BlockID] = es.votingProposal
+
+	// a tc is built
+	tc := helper.MakeTC(helper.WithTCView(es.initView), helper.WithTCNewestQC(es.votingProposal.Block.QC))
+
+	// expect a view change
+	es.endView++
+
+	err := es.eventhandler.OnReceiveTc(tc)
+	require.NoError(es.T(), err, "TC should trigger a view change and start of new view")
+	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
+
+	// receive a QC for the same view as the TC
+	qc := helper.MakeQC(helper.WithQCView(tc.View))
+	err = es.eventhandler.OnReceiveQc(qc)
+	require.NoError(es.T(), err)
+	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "QC shouldn't trigger view change")
+	require.Equal(es.T(), tc, es.paceMaker.LastViewTC(), "invalid last view TC")
+	require.Equal(es.T(), qc, es.paceMaker.NewestQC(), "invalid newest QC")
+
+	err = es.eventhandler.OnLocalTimeout()
+	require.NoError(es.T(), err)
+
+	lastCall := es.communicator.Calls[len(es.communicator.Calls)-1]
+	// the last call is BroadcastTimeout
+	require.Equal(es.T(), "BroadcastTimeout", lastCall.Method)
+	timeoutObject, ok := lastCall.Arguments[0].(*model.TimeoutObject)
+	require.True(es.T(), ok)
+	require.Equal(es.T(), es.endView, timeoutObject.View)
+	require.Equal(es.T(), qc, timeoutObject.NewestQC)
+	require.Nil(es.T(), timeoutObject.LastViewTC)
 }
 
 // Test100Timeout tests that receiving 100 TCs for increasing views advances rounds

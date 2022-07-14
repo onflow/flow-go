@@ -223,7 +223,7 @@ func (s *ActivePaceMakerTestSuite) TestProcessQC_IgnoreOldQC() {
 	require.NotEqual(s.T(), qc, s.paceMaker.NewestQC())
 }
 
-// TestProcessQC_UpdateNewestQC
+// TestProcessQC_UpdateNewestQC tests that ActivePaceMaker tracks the newest QC even if it has advanced past this view.
 func (s *ActivePaceMakerTestSuite) TestProcessQC_UpdateNewestQC() {
 	s.persist.On("PutLivenessData", mock.Anything).Return(nil).Once()
 	s.notifier.On("OnStartingTimeout", mock.Anything).Return().Once()
