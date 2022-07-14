@@ -20,7 +20,11 @@ func WritePartnerFiles(nodeInfos []model.NodeInfo, bootDir string) (string, stri
 	nodePubInfos := make([]model.NodeInfoPub, len(nodeInfos))
 	weights := make(map[flow.Identifier]uint64)
 	for i, node := range nodeInfos {
-		nodePubInfos[i] = node.Public()
+		var err error
+		nodePubInfos[i], err = node.Public()
+		if err != nil {
+			return "", "", fmt.Errorf("could not read public info: %w", err)
+		}
 		weights[node.NodeID] = node.Weight
 	}
 

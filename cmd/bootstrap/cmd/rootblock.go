@@ -100,7 +100,11 @@ func rootBlock(cmd *cobra.Command, args []string) {
 
 	log.Info().Msg("assembling network and staking keys")
 	stakingNodes := mergeNodeInfos(internalNodes, partnerNodes)
-	writeJSON(model.PathNodeInfosPub, model.ToPublicNodeInfoList(stakingNodes))
+	publicInfo, err := model.ToPublicNodeInfoList(stakingNodes)
+	if err != nil {
+		log.Fatal().Msg("failed to read public node info")
+	}
+	writeJSON(model.PathNodeInfosPub, publicInfo)
 	log.Info().Msg("")
 
 	log.Info().Msg("running DKG for consensus nodes")

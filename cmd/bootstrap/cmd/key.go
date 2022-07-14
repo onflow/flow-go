@@ -97,11 +97,16 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 		log.Fatal().Err(err).Msg("could not access private keys")
 	}
 
+	public, err := nodeInfo.Public()
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not access public keys")
+	}
+
 	// write files
 	writeText(model.PathNodeID, []byte(nodeInfo.NodeID.String()))
 	writeJSON(fmt.Sprintf(model.PathNodeInfoPriv, nodeInfo.NodeID), private)
 	writeText(fmt.Sprintf(model.PathSecretsEncryptionKey, nodeInfo.NodeID), secretsDBKey)
-	writeJSON(fmt.Sprintf(model.PathNodeInfoPub, nodeInfo.NodeID), nodeInfo.Public())
+	writeJSON(fmt.Sprintf(model.PathNodeInfoPub, nodeInfo.NodeID), public)
 
 	// write machine account info
 	if role == flow.RoleCollection || role == flow.RoleConsensus {

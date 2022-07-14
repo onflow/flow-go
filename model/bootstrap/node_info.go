@@ -308,6 +308,17 @@ func (node NodeInfo) StakingPubKey() crypto.PublicKey {
 	return node.stakingPrivKey.PublicKey()
 }
 
+func (node NodeInfo) StakingPoP() (crypto.Signature, error) {
+	if node.stakingPoP != nil {
+		return node.stakingPoP, nil
+	}
+	pop, err := crypto.BLSGeneratePOP(node.stakingPrivKey)
+	if err != nil {
+		return nil, fmt.Errorf("staking PoP generation failed: %w", err)
+	}
+	return pop, nil
+}
+
 func (node NodeInfo) PrivateKeys() (*NodePrivateKeys, error) {
 	if node.Type() != NodeInfoTypePrivate {
 		return nil, ErrMissingPrivateInfo
@@ -334,7 +345,12 @@ func (node NodeInfo) Private() (NodeInfoPriv, error) {
 }
 
 // Public returns the canonical public encodable structure
-func (node NodeInfo) Public() NodeInfoPub {
+func (node NodeInfo) Public() (NodeInfoPub, error) {
+	stakingPoP, err := node.StakingPoP()
+	if err != nil {
+		return NodeInfoPub{}, fmt.Errorf("failed to generate staking PoP: %w", err)
+	}
+
 	return NodeInfoPub{
 		Role:          node.Role,
 		Address:       node.Address,
@@ -342,19 +358,25 @@ func (node NodeInfo) Public() NodeInfoPub {
 		Weight:        node.Weight,
 		NetworkPubKey: encodable.NetworkPubKey{PublicKey: node.NetworkPubKey()},
 		StakingPubKey: encodable.StakingPubKey{PublicKey: node.StakingPubKey()},
-		StakingPoP:    encodable.StakingPoP{Signature: node.stakingPoP},
-	}
+		StakingPoP:    encodable.StakingPoP{Signature: stakingPoP},
+	}, nil
 }
 
 // PartnerPublic returns the public data for a partner node.
-func (node NodeInfo) PartnerPublic() PartnerNodeInfoPub {
+func (node NodeInfo) PartnerPublic() (PartnerNodeInfoPub, error) {
+
+	stakingPoP, err := node.StakingPoP()
+	if err != nil {
+		return PartnerNodeInfoPub{}, fmt.Errorf("failed to generate staking PoP: %w", err)
+	}
 	return PartnerNodeInfoPub{
 		Role:          node.Role,
 		Address:       node.Address,
 		NodeID:        node.NodeID,
 		NetworkPubKey: encodable.NetworkPubKey{PublicKey: node.NetworkPubKey()},
 		StakingPubKey: encodable.StakingPubKey{PublicKey: node.StakingPubKey()},
-	}
+		StakingPoP:    encodable.StakingPoP{Signature: stakingPoP},
+	}, nil
 }
 
 // Identity returns the node info as a public Flow identity.
@@ -412,10 +434,14 @@ func ToIdentityList(nodes []NodeInfo) flow.IdentityList {
 	return il
 }
 
-func ToPublicNodeInfoList(nodes []NodeInfo) []NodeInfoPub {
+func ToPublicNodeInfoList(nodes []NodeInfo) ([]NodeInfoPub, error) {
 	pub := make([]NodeInfoPub, 0, len(nodes))
 	for _, node := range nodes {
-		pub = append(pub, node.Public())
+		info, err := node.Public()
+		if err != nil {
+			return nil, fmt.Errorf("could not read public info: %w", err)
+		}
+		pub = append(pub, info)
 	}
-	return pub
+	return pub, nil
 }

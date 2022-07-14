@@ -44,7 +44,8 @@ func TestNodeConfigEncodingJSON(t *testing.T) {
 
 func TestNodeInfoPubEncodingJSON(t *testing.T) {
 	t.Run("normal node info", func(t *testing.T) {
-		conf := unittest.NodeInfoFixture().Public()
+		conf, err := unittest.NodeInfoFixture().Public()
+		require.NoError(t, err)
 		enc, err := json.Marshal(conf)
 		require.NoError(t, err)
 		var dec bootstrap.NodeInfoPub

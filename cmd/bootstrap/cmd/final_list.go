@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"bytes"
+	"fmt"
+
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd"
@@ -65,7 +68,11 @@ func finalList(cmd *cobra.Command, args []string) {
 	validateNodes(localNodes, registeredNodes)
 
 	// write node-config.json with the new list of nodes to be used for the `finalize` command
-	writeJSON(model.PathFinallist, model.ToPublicNodeInfoList(localNodes))
+	pubInfo, err := model.ToPublicNodeInfoList(localNodes)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to read public info")
+	}
+	writeJSON(model.PathFinallist, pubInfo)
 }
 
 func validateNodes(localNodes []model.NodeInfo, registeredNodes []model.NodeInfo) {
@@ -125,27 +132,43 @@ func validateNodes(localNodes []model.NodeInfo, registeredNodes []model.NodeInfo
 		// flow localNodes contain private key info
 		if matchingNode.NetworkPubKey().String() != "" {
 			// check networking pubkey match
-			matchNodeKey := matchingNode.NetworkPubKey().String()
-			registeredNodeKey := registeredNode.NetworkPubKey().String()
+			matchNodeKey := matchingNode.NetworkPubKey()
+			registeredNodeKey := registeredNode.NetworkPubKey()
 
-			if matchNodeKey != registeredNodeKey {
+			if !matchNodeKey.Equals(registeredNodeKey) {
 				log.Error().
-					Str("registered network key", registeredNodeKey).
-					Str("network key", matchNodeKey).
+					Str("registered network key", registeredNodeKey.String()).
+					Str("network key", matchNodeKey.String()).
 					Msg("networking keys do not match")
 			}
 		}
 
 		// flow localNodes contain privatekey info
 		if matchingNode.StakingPubKey().String() != "" {
-			matchNodeKey := matchingNode.StakingPubKey().String()
-			registeredNodeKey := registeredNode.StakingPubKey().String()
+			matchNodeKey := matchingNode.StakingPubKey()
+			registeredNodeKey := registeredNode.StakingPubKey()
 
-			if matchNodeKey != registeredNodeKey {
+			if !matchNodeKey.Equals(registeredNodeKey) {
 				log.Error().
-					Str("registered staking key", registeredNodeKey).
-					Str("staking key", matchNodeKey).
+					Str("registered staking key", registeredNodeKey.String()).
+					Str("staking key", matchNodeKey.String()).
 					Msg("staking keys do not match")
+			}
+
+			matchingPoP, err := matchingNode.StakingPoP()
+			if err != nil {
+				log.Error().Msgf("error reading matching PoP: %s", err.Error())
+			}
+			registeredPoP, err := registeredNode.StakingPoP()
+			if err != nil {
+				log.Error().Msgf("error reading registered PoP: %s", err.Error())
+			}
+
+			if !bytes.Equal(matchingPoP, registeredPoP) {
+				log.Error().
+					Str("registered staking PoP", fmt.Sprintf("%x", registeredPoP)).
+					Str("staking PoP", fmt.Sprintf("%x", matchingPoP)).
+					Msg("staking PoP do not match")
 			}
 		}
 	}
