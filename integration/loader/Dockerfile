@@ -48,7 +48,7 @@ RUN --mount=type=cache,sharing=locked,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=ssh \
     cd integration && \
-    GO111MODULE=on CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build --tags relic -ldflags "-extldflags -static" -o ./app ./${TARGET}
+    GO111MODULE=on CGO_ENABLED=1 go build --tags relic -ldflags "-extldflags -static" -o ./app ./${TARGET}
 
 RUN mv /app/integration/app /app/app
 

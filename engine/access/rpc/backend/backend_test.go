@@ -620,7 +620,7 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, nil)
 
 	exeEventReq := execproto.GetTransactionByIndexRequest{
 		BlockId: blockId[:],
@@ -658,6 +658,7 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 
 	result, err := backend.GetTransactionResultByIndex(ctx, blockId, index)
 	suite.checkResponse(result, err)
+	suite.Assert().Equal(result.BlockHeight, block.Header.Height)
 
 	suite.assertAllExpectations()
 }
@@ -682,7 +683,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, nil)
 
 	exeEventReq := execproto.GetTransactionsByBlockIDRequest{
 		BlockId: blockId[:],
@@ -765,7 +766,8 @@ func (suite *Suite) TestTransactionStatusTransition() {
 
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, nil)
+	connFactory.On("InvalidateExecutionAPIClient", mock.Anything).Return(false)
 
 	exeEventReq := execproto.GetTransactionResultRequest{
 		BlockId:       blockID[:],
@@ -1231,7 +1233,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, nil)
 
 	// create the expected results from execution node and access node
 	exeResults := make([]*execproto.GetEventsForBlockIDsResponse_Result, len(blockHeaders))
@@ -1864,7 +1866,7 @@ func (suite *Suite) TestGetAccount() {
 	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, nil)
 
 	// create the handler with the mock
 	backend := New(
@@ -1926,7 +1928,7 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, nil)
 
 	// create the expected execution API request
 	blockID := h.ID()
@@ -2159,7 +2161,8 @@ func (suite *Suite) TestExecuteScriptOnExecutionNode() {
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
 	connFactory.On("GetExecutionAPIClient", mock.Anything).
-		Return(suite.execClient, &mockCloser{}, nil)
+		Return(suite.execClient, nil)
+	connFactory.On("InvalidateExecutionAPIClient", mock.Anything).Return(false)
 
 	// create the handler with the mock
 	backend := New(
@@ -2259,7 +2262,8 @@ func (suite *Suite) setupReceipts(block *flow.Block) ([]*flow.ExecutionReceipt, 
 func (suite *Suite) setupConnectionFactory() ConnectionFactory {
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, nil)
+	connFactory.On("InvalidateExecutionAPIClient", mock.Anything).Return(false)
 	return connFactory
 }
 

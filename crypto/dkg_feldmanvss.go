@@ -1,3 +1,4 @@
+//go:build relic
 // +build relic
 
 package crypto
@@ -236,11 +237,11 @@ func (s *feldmanVSSstate) generateShares(seed []byte) error {
 	s.vA = make([]pointG2, s.threshold+1)
 	s.y = make([]pointG2, s.size)
 	randZrStar(&s.a[0]) // non zero a[0]
-	genScalarMultG2(&s.vA[0], &s.a[0])
+	generatorScalarMultG2(&s.vA[0], &s.a[0])
 	for i := 1; i < s.threshold+1; i++ {
 		C.bn_new_wrapper((*C.bn_st)(&s.a[i]))
 		randZr(&s.a[i])
-		genScalarMultG2(&s.vA[i], &s.a[i])
+		generatorScalarMultG2(&s.vA[i], &s.a[i])
 	}
 
 	// compute the shares

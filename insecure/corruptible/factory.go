@@ -11,7 +11,6 @@ import (
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
-	grpcinsecure "google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
@@ -25,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 const networkingProtocolTCP = "tcp"
@@ -36,18 +36,20 @@ const networkingProtocolTCP = "tcp"
 // The attacker can asynchronously dictate the conduit factory to send messages on behalf of the node this factory resides on.
 type ConduitFactory struct {
 	component.Component
+	mu                    sync.Mutex
 	cm                    *component.ComponentManager
 	logger                zerolog.Logger
 	codec                 network.Codec
 	me                    module.Local
 	adapter               network.Adapter
-	attackerObserveClient insecure.Attacker_ObserveClient
 	server                *grpc.Server // touch point of attack network to this factory.
 	address               net.Addr
 	ctx                   context.Context
 	receiptHasher         hash.Hasher
 	spockHasher           hash.Hasher
 	approvalHasher        hash.Hasher
+	attackerInboundStream insecure.CorruptibleConduitFactory_ConnectAttackerServer // inbound stream to attacker
+	incomingMessageChan   chan *insecure.Message
 }
 
 func NewCorruptibleConduitFactory(
@@ -62,12 +64,13 @@ func NewCorruptibleConduitFactory(
 	}
 
 	factory := &ConduitFactory{
-		me:             me,
-		codec:          codec,
-		logger:         logger.With().Str("module", "corruptible-conduit-factory").Logger(),
-		receiptHasher:  utils.NewExecutionReceiptHasher(),
-		spockHasher:    utils.NewSPOCKHasher(),
-		approvalHasher: verutils.NewResultApprovalHasher(),
+		me:                  me,
+		codec:               codec,
+		logger:              logger.With().Str("module", "corruptible-conduit-factory").Logger(),
+		receiptHasher:       utils.NewExecutionReceiptHasher(),
+		spockHasher:         utils.NewSPOCKHasher(),
+		approvalHasher:      verutils.NewResultApprovalHasher(),
+		incomingMessageChan: make(chan *insecure.Message),
 	}
 
 	cm := component.NewComponentManagerBuilder().
@@ -89,7 +92,7 @@ func NewCorruptibleConduitFactory(
 }
 
 // ServerAddress returns address of the gRPC server that is running by this corrupted conduit factory.
-func (c ConduitFactory) ServerAddress() string {
+func (c *ConduitFactory) ServerAddress() string {
 	return c.address.String()
 }
 
@@ -158,13 +161,6 @@ func (c *ConduitFactory) ProcessAttackerMessage(stream insecure.CorruptibleCondu
 	for {
 		select {
 		case <-c.cm.ShutdownSignal():
-			if c.attackerObserveClient != nil {
-				_, err := c.attackerObserveClient.CloseAndRecv()
-				if err != nil {
-					c.logger.Fatal().Err(err).Msg("could not close processing stream from attacker")
-					return err
-				}
-			}
 			return nil
 		default:
 			msg, err := stream.Recv()
@@ -186,10 +182,19 @@ func (c *ConduitFactory) ProcessAttackerMessage(stream insecure.CorruptibleCondu
 
 // processAttackerMessage dispatches the attacker message on the Flow network on behalf of this node.
 func (c *ConduitFactory) processAttackerMessage(msg *insecure.Message) error {
+	lg := c.logger.With().
+		Str("protocol", insecure.ProtocolStr(msg.Protocol)).
+		Uint32("target_num", msg.TargetNum).
+		Str("channel", string(msg.ChannelID)).Logger()
+
 	event, err := c.codec.Decode(msg.Payload)
 	if err != nil {
+		lg.Err(err).Msg("could not decode attacker's message")
 		return fmt.Errorf("could not decode message: %w", err)
 	}
+
+	lg = c.logger.With().
+		Str("flow_protocol_event_type", fmt.Sprintf("%T", event)).Logger()
 
 	switch e := event.(type) {
 	case *flow.ExecutionReceipt:
@@ -198,6 +203,9 @@ func (c *ConduitFactory) processAttackerMessage(msg *insecure.Message) error {
 			// CCF, and the receipt fields must be filled out locally.
 			receipt, err := c.generateExecutionReceipt(&e.ExecutionResult)
 			if err != nil {
+				lg.Err(err).
+					Hex("result_id", logging.ID(e.ExecutionResult.ID())).
+					Msg("could not generate receipt for attacker's dictated result")
 				return fmt.Errorf("could not generate execution receipt for attacker's result: %w", err)
 			}
 			event = receipt // swaps event with the receipt.
@@ -209,56 +217,62 @@ func (c *ConduitFactory) processAttackerMessage(msg *insecure.Message) error {
 			// CCF, and the approval fields must be filled out locally.
 			approval, err := c.generateResultApproval(&e.Body.Attestation)
 			if err != nil {
+				lg.Err(err).
+					Hex("result_id", logging.ID(e.Body.ExecutionResultID)).
+					Hex("block_id", logging.ID(e.Body.BlockID)).
+					Uint64("chunk_index", e.Body.ChunkIndex).
+					Msg("could not generate result approval for attacker's dictated attestation")
 				return fmt.Errorf("could not generate result approval for attacker's attestation: %w", err)
 			}
 			event = approval // swaps event with the receipt.
 		}
 	}
 
+	lg = lg.With().
+		Str("event", fmt.Sprintf("%+v", event)).
+		Logger()
+
 	targetIds, err := flow.ByteSlicesToIds(msg.TargetIDs)
 	if err != nil {
+		lg.Err(err).Msg("could not convert target ids from byte to identifiers for attacker's dictated message")
 		return fmt.Errorf("could not convert target ids from byte to identifiers: %w", err)
 	}
 
+	lg = lg.With().Str("target_ids", fmt.Sprintf("%v", msg.TargetIDs)).Logger()
 	err = c.sendOnNetwork(event, network.Channel(msg.ChannelID), msg.Protocol, uint(msg.TargetNum), targetIds...)
 	if err != nil {
+		lg.Err(err).Msg("could not send attacker message to the network")
 		return fmt.Errorf("could not send attacker message to the network: %w", err)
 	}
+
+	lg.Info().Msg("incoming attacker's message dispatched on flow network")
 
 	return nil
 }
 
-// RegisterAttacker is a gRPC end-point for this conduit factory that lets an attacker register itself to it, so that the attacker can
+// ConnectAttacker is a gRPC end-point for this conduit factory that lets an attacker register itself to it, so that the attacker can
 // control it.
 // Registering an attacker on a conduit is an exactly-once immutable operation, any second attempt after a successful registration returns an error.
-func (c *ConduitFactory) RegisterAttacker(_ context.Context, in *insecure.AttackerRegisterMessage) (*empty.Empty, error) {
-	select {
-	case <-c.cm.ShutdownSignal():
-		return nil, fmt.Errorf("conduit factory has been shut down")
-	default:
-		return &empty.Empty{}, c.registerAttacker(in.Address)
+func (c *ConduitFactory) ConnectAttacker(_ *empty.Empty, stream insecure.CorruptibleConduitFactory_ConnectAttackerServer) error {
+	c.mu.Lock()
+	c.logger.Info().Msg("attacker registration called arrived")
+	if c.attackerInboundStream != nil {
+		c.mu.Unlock()
+		return fmt.Errorf("could not register a new network adapter, one already exists")
 	}
-}
+	c.attackerInboundStream = stream
 
-func (c *ConduitFactory) registerAttacker(address string) error {
-	if c.attackerObserveClient != nil {
-		c.logger.Error().Str("address", address).Msg("attacker double-register detected")
-		return fmt.Errorf("illegal state: trying to register an attacker (%s) while one already exists", address)
-	}
+	c.mu.Unlock()
+	c.logger.Info().Msg("attacker registered successfully")
 
-	clientConn, err := grpc.Dial(address,
-		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
-	if err != nil {
-		return fmt.Errorf("could not establish a client connection to attacker: %w", err)
-	}
-
-	attackerClient := insecure.NewAttackerClient(clientConn)
-	c.attackerObserveClient, err = attackerClient.Observe(c.ctx)
-	if err != nil {
-		return fmt.Errorf("could not establish an observe stream to the attacker: %w", err)
-	}
-
-	c.logger.Info().Str("address", address).Msg("attacker registered successfully")
+	// WARNING: this method call should not return through the entire lifetime of this
+	// corruptible conduit factory.
+	// This is a client streaming gRPC implementation, and the input stream's lifecycle
+	// is tightly coupled with the lifecycle of this function call.
+	// Once it returns, the client stream is closed forever.
+	// Hence, we block the call and wait till a component shutdown.
+	<-c.cm.ShutdownSignal()
+	c.logger.Info().Msg("component is shutting down, closing attacker's inbound stream ")
 
 	return nil
 }
@@ -274,9 +288,18 @@ func (c *ConduitFactory) HandleIncomingEvent(
 	num uint32,
 	targetIds ...flow.Identifier) error {
 
-	if c.attackerObserveClient == nil {
+	lg := c.logger.With().
+		Hex("corrupted_id", logging.ID(c.me.NodeID())).
+		Str("channel", string(channel)).
+		Str("protocol", protocol.String()).
+		Uint32("target_num", num).
+		Str("target_ids", fmt.Sprintf("%v", targetIds)).
+		Str("flow_protocol_event", fmt.Sprintf("%T", event)).Logger()
+
+	if !c.AttackerRegistered() {
 		// no attacker yet registered, hence sending message on the network following the
 		// correct expected behavior.
+		lg.Info().Msg("no attacker registered, passing through event")
 		return c.sendOnNetwork(event, channel, protocol, uint(num), targetIds...)
 	}
 
@@ -285,11 +308,12 @@ func (c *ConduitFactory) HandleIncomingEvent(
 		return fmt.Errorf("could not convert event to message: %w", err)
 	}
 
-	err = c.attackerObserveClient.Send(msg)
+	err = c.attackerInboundStream.Send(msg)
 	if err != nil {
 		return fmt.Errorf("could not send message to attacker to observe: %w", err)
 	}
 
+	lg.Info().Msg("event sent to attacker")
 	return nil
 }
 
@@ -353,4 +377,12 @@ func (c *ConduitFactory) generateExecutionReceipt(result *flow.ExecutionResult) 
 func (c *ConduitFactory) generateResultApproval(attestation *flow.Attestation) (*flow.ResultApproval, error) {
 	// TODO: fill spock secret with dictated spock data from attacker.
 	return verifier.GenerateResultApproval(c.me, c.approvalHasher, c.spockHasher, attestation, []byte{})
+}
+
+// AttackerRegistered returns whether an attacker has registered on this CCF or not.
+func (c *ConduitFactory) AttackerRegistered() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return c.attackerInboundStream != nil
 }

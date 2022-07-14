@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/protobuf/ptypes/empty"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -94,7 +95,16 @@ func TestFactoryHandleIncomingEvent_AttackerObserve(t *testing.T) {
 		cboreCodec,
 		"localhost:0")
 	attacker := newMockAttackerObserverClient()
-	f.attackerObserveClient = attacker
+
+	attackerRegistered := sync.WaitGroup{}
+	attackerRegistered.Add(1)
+	go func() {
+		attackerRegistered.Done()
+
+		err := f.ConnectAttacker(&empty.Empty{}, attacker) // blocking call
+		require.NoError(t, err)
+	}()
+	unittest.RequireReturnsBefore(t, attackerRegistered.Wait, 1*time.Second, "could not register attacker on time")
 
 	event := &message.TestMessage{Text: "this is a test message"}
 	targetIds := unittest.IdentifierListFixture(10)

@@ -55,6 +55,7 @@ type Engine struct {
 	mempool                *Mempool
 	execState              state.ExecutionState
 	metrics                module.ExecutionMetrics
+	maxCollectionHeight    uint64
 	tracer                 module.Tracer
 	extensiveLogging       bool
 	spockHasher            hash.Hasher
@@ -113,6 +114,7 @@ func New(
 		mempool:                mempool,
 		execState:              execState,
 		metrics:                metrics,
+		maxCollectionHeight:    0,
 		tracer:                 tracer,
 		extensiveLogging:       extLog,
 		syncFilter:             syncFilter,
@@ -124,7 +126,7 @@ func New(
 	}
 
 	// move to state syncing engine
-	syncConduit, err := net.Register(engine.SyncExecution, &eng)
+	syncConduit, err := net.Register(network.SyncExecution, &eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register execution blockSync engine: %w", err)
 	}
@@ -717,7 +719,7 @@ func (e *Engine) onBlockExecuted(executed *entity.ExecutableBlock, finalState fl
 			}
 
 			// remove the executed block
-			executionQueues.Rem(executed.ID())
+			executionQueues.Remove(executed.ID())
 
 			return nil
 		})
@@ -759,7 +761,7 @@ func (e *Engine) executeBlockIfComplete(eb *entity.ExecutableBlock) bool {
 	// 		Hex("delta_start_state", delta.ExecutableBlock.StartState).
 	// 		Msg("can not apply the state delta, the start state does not match")
 	//
-	// 	e.syncDeltas.Rem(eb.Block.ID())
+	// 	e.syncDeltas.Remove(eb.Block.ID())
 	// }
 
 	// if don't have the delta, then check if everything is ready for executing
@@ -843,6 +845,13 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 						blockID)
 				}
 
+				// record collection max height metrics
+				blockHeight := executableBlock.Block.Header.Height
+				if blockHeight > e.maxCollectionHeight {
+					e.metrics.UpdateCollectionMaxHeight(blockHeight)
+					e.maxCollectionHeight = blockHeight
+				}
+
 				if completeCollection.IsCompleted() {
 					// already received transactions for this collection
 					continue
@@ -861,7 +870,7 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 			// this also prevents from executing the same block twice, because the second
 			// time when the collection arrives, it will not be found in the blockByCollectionID
 			// index.
-			backdata.Rem(collID)
+			backdata.Remove(collID)
 
 			return nil
 		},
@@ -998,6 +1007,15 @@ func (e *Engine) matchOrRequestCollections(
 
 		guarantors, err := protocol.FindGuarantors(e.state, guarantee)
 		if err != nil {
+			// execution node executes certified blocks, which means there is a quorum of consensus nodes who
+			// have validated the block payload. And that validation includes checking the guarantors are correct.
+			// Based on that assumption, failing to find guarantors for guarantees contained in an incorporated block
+			// should be treated as fatal error
+			e.log.Fatal().Err(err).Msgf("failed to find guarantors for guarantee %v at block %v, height %v",
+				guarantee.ID(),
+				executableBlock.ID(),
+				executableBlock.Height(),
+			)
 			return fmt.Errorf("could not find guarantors: %w", err)
 		}
 		// queue the collection to be requested from one of the guarantors
@@ -1020,6 +1038,12 @@ func (e *Engine) ExecuteScriptAtBlockID(ctx context.Context, script []byte, argu
 	stateCommit, err := e.execState.StateCommitmentByBlockID(ctx, blockID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get state commitment for block (%s): %w", blockID, err)
+	}
+
+	// return early if state with the given state commitment is not in memory
+	// and already purged. This reduces allocations for scripts targeting old blocks.
+	if !e.execState.HasState(stateCommit) {
+		return nil, fmt.Errorf("failed to execute script at block (%s): state commitment not found (%s). this error usually happens if the reference block for this script is not set to a recent block", blockID.String(), hex.EncodeToString(stateCommit[:]))
 	}
 
 	block, err := e.state.AtBlockID(blockID).Head()
@@ -1066,6 +1090,12 @@ func (e *Engine) GetAccount(ctx context.Context, addr flow.Address, blockID flow
 	stateCommit, err := e.execState.StateCommitmentByBlockID(ctx, blockID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get state commitment for block (%s): %w", blockID, err)
+	}
+
+	// return early if state with the given state commitment is not in memory
+	// and already purged. This reduces allocations for get accounts targeting old blocks.
+	if !e.execState.HasState(stateCommit) {
+		return nil, fmt.Errorf("failed to get account at block (%s): state commitment not found (%s). this error usually happens if the reference block for this script is not set to a recent block.", blockID.String(), hex.EncodeToString(stateCommit[:]))
 	}
 
 	block, err := e.state.AtBlockID(blockID).Head()

@@ -48,6 +48,7 @@ Specify the number of nodes for each role:
 ```sh
 make -e COLLECTION=2 CONSENSUS=5 EXECUTION=3 VERIFICATION=2 ACCESS=2 init
 ```
+*NOTE: number of execution\consensus nodes should be no less than 2. It is to avoid seals being created in case of execution forks.*
 
 Specify the number of collector clusters:
 
@@ -89,21 +90,36 @@ You can view log output from all nodes:
 make logs
 ```
 
-## Metrics
+## Observabilitty
+You can view realtime metrics, logs, and traces while the network is running:
 
-You can view realtime metrics while the network is running:
-
-- Prometheus: http://localhost:9090/
-- Traces (Jaeger): http://localhost:16686/
 - Grafana: http://localhost:3000/
-  - Username: `admin`
-  - Password: `admin`
+
+### Metrics
+Metrics are available through the Prometheus backend.
+
+Following dashboards are preinstalled:
+- Localnet: http://localhost:3000/d/RamSJj4Mz/localnet-general?orgId=1&refresh=30s
 
 Here's an example of a Prometheus query that filters by the `consensus` role:
 
 ```
-avg(rate(consensus_finalized_blocks{role="consensus"}[2m]))
+avg(rate(consensus_compliance_finalized_blocks_total{role="consensus"}[$__interval]))
 ```
+
+## Traces
+Traces are available through the Tempo backend.
+You can to traces either by searching for logs that have a `traceID` label, clicking on them and pressing "Open in Tempo" button: 
+```
+{role="execution"} | json | __error__ != "JSONParserErr" | timeSpentInMS > 10 | traceID != ""
+```
+
+Or by using the grafana's Search feature in explore:
+- http://localhost:3000/explore?orgId=1&left=%7B%22datasource%22:%22Tempo%22,%22queries%22:%5B%7B%22refId%22:%22A%22,%22queryType%22:%22clear%22%7D%5D,%22range%22:%7B%22from%22:%22now-1h%22,%22to%22:%22now%22%7D%7D
+
+## Logs
+Logs are available through the Loki backend.  You can use them either through the Logs/TimeSeries panels or through the explore:
+- http://localhost:3000/explore?orgId=1&left=%7B%22datasource%22:%22Loki%22,%22queries%22:%5B%7B%22refId%22:%22A%22,%22expr%22:%22%22,%22queryType%22:%22range%22%7D%5D,%22range%22:%7B%22from%22:%22now-1h%22,%22to%22:%22now%22%7D%7D
 
 ## Loader
 

@@ -2,7 +2,9 @@ package computation
 
 import (
 	"context"
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
@@ -115,6 +117,7 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 
 	engine := &Manager{
 		blockComputer: blockComputer,
+		tracer:        trace.NewNoopTracer(),
 		me:            me,
 		programsCache: programsCache,
 		eds:           eds,
@@ -145,6 +148,18 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 	hasValidEventValue(t, returnedComputationResult.Events[0][4], 2)
 }
 
+type blockProvider struct {
+	blocks map[uint64]*flow.Block
+}
+
+func (b blockProvider) ByHeightFrom(height uint64, _ *flow.Header) (*flow.Header, error) {
+	block, has := b.blocks[height]
+	if has {
+		return block.Header, nil
+	}
+	return nil, fmt.Errorf("block for height (%d) is not available", height)
+}
+
 // TestPrograms_TestBlockForks tests the functionality of
 // programsCache under contract deployment and contract updates on
 // different block forks
@@ -160,11 +175,14 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 //         -> Block121 (emit event - version should be 2)
 //             -> Block1211 (emit event - version should be 2)
 func TestPrograms_TestBlockForks(t *testing.T) {
-	// setup
+	block := unittest.BlockFixture()
 	rt := fvm.NewInterpreterRuntime()
-	chain := flow.Mainnet.Chain()
+	chain := flow.Emulator.Chain()
 	vm := fvm.NewVirtualMachine(rt)
-	execCtx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain))
+	execCtx := fvm.NewContext(zerolog.Nop(),
+		fvm.WithBlockHeader(block.Header),
+		fvm.WithBlocks(blockProvider{map[uint64]*flow.Block{0: &block}}),
+		fvm.WithChain(chain))
 
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
@@ -192,6 +210,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 
 	engine := &Manager{
 		blockComputer: blockComputer,
+		tracer:        trace.NewNoopTracer(),
 		me:            me,
 		programsCache: programsCache,
 		eds:           eds,
@@ -387,8 +406,9 @@ func createTestBlockAndRun(t *testing.T, engine *Manager, parentBlock *flow.Bloc
 
 	block := &flow.Block{
 		Header: &flow.Header{
-			ParentID: parentBlock.ID(),
-			View:     parentBlock.Header.Height + 1,
+			ParentID:  parentBlock.ID(),
+			View:      parentBlock.Header.Height + 1,
+			Timestamp: time.Now(),
 		},
 		Payload: &flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{&guarantee},
@@ -407,6 +427,11 @@ func createTestBlockAndRun(t *testing.T, engine *Manager, parentBlock *flow.Bloc
 	}
 	returnedComputationResult, err := engine.ComputeBlock(context.Background(), executableBlock, view)
 	require.NoError(t, err)
+
+	for _, txResult := range returnedComputationResult.TransactionResults {
+		require.Empty(t, txResult.ErrorMessage)
+	}
+
 	return block, returnedComputationResult
 }
 

@@ -102,9 +102,14 @@ func NewTransactionEnvironment(
 				// If the contract deployment bool is not set by the state
 				// fallback to the default value set by the configuration
 				// after the contract deployment bool is set by the state on all chains, this logic can be simplified
-				return ctx.RestrictedDeploymentEnabled
+				return ctx.RestrictContractDeployment
 			}
 			return enabled
+		},
+		func() bool {
+			// TODO read this from the chain similar to the contract deployment
+			// but for now we would honor the fallback context flag
+			return ctx.RestrictContractRemoval
 		},
 		env.GetAccountsAuthorizedForContractUpdate,
 		env.GetAccountsAuthorizedForContractRemoval,
@@ -115,53 +120,79 @@ func NewTransactionEnvironment(
 		env.seedRNG(ctx.BlockHeader)
 	}
 
-	err := env.setMeteringWeights()
+	var err error
+	// set the execution parameters from the state
+	if ctx.AllowContextOverrideByExecutionState {
+		err = env.setExecutionParameters()
+	}
 
 	return env, err
 }
 
-func (e *TransactionEnv) setMeteringWeights() error {
-	var m *weighted.Meter
+func (e *TransactionEnv) setExecutionParameters() error {
+	// Check that the service account exists because all the settings are stored in it
+	serviceAddress := e.Context().Chain.ServiceAddress()
+	service := runtime.Address(serviceAddress)
+
+	// set the property if no error, but if the error is a fatal error then return it
+	setIfOk := func(prop string, err error, setter func()) (fatal error) {
+		err, fatal = errors.SplitErrorTypes(err)
+		if fatal != nil {
+			// this is a fatal error. return it
+			e.ctx.Logger.
+				Error().
+				Err(fatal).
+				Msgf("error getting %s", prop)
+			return fatal
+		}
+		if err != nil {
+			// this is a general error.
+			// could be that no setting was present in the state,
+			// or that the setting was not parseable,
+			// or some other deterministic thing.
+			e.ctx.Logger.
+				Debug().
+				Err(err).
+				Msgf("could not set %s. Using defaults", prop)
+			return nil
+		}
+		// everything is ok. do the setting
+		setter()
+		return nil
+	}
+
 	var ok bool
+	var m *weighted.Meter
 	// only set the weights if the meter is a weighted.Meter
 	if m, ok = e.sth.State().Meter().(*weighted.Meter); !ok {
 		return nil
 	}
 
-	computationWeights, err := getExecutionEffortWeights(e, e.accounts)
-	err, fatal := errors.SplitErrorTypes(err)
-	if fatal != nil {
-		e.ctx.Logger.
-			Error().
-			Err(fatal).
-			Msg("error getting execution effort weights")
-		return fatal
-	}
+	computationWeights, err := GetExecutionEffortWeights(e, service)
+	err = setIfOk(
+		"execution effort weights",
+		err,
+		func() { m.SetComputationWeights(computationWeights) })
 	if err != nil {
-		e.ctx.Logger.
-			Info().
-			Err(err).
-			Msg("could not set execution effort weights. Using defaults")
-	} else {
-		m.SetComputationWeights(computationWeights)
+		return err
 	}
 
-	memoryWeights, err := getExecutionMemoryWeights(e, e.accounts)
-	err, fatal = errors.SplitErrorTypes(err)
-	if fatal != nil {
-		e.ctx.Logger.
-			Error().
-			Err(fatal).
-			Msg("error getting execution memory weights")
-		return fatal
-	}
+	memoryWeights, err := GetExecutionMemoryWeights(e, service)
+	err = setIfOk(
+		"execution memory weights",
+		err,
+		func() { m.SetMemoryWeights(memoryWeights) })
 	if err != nil {
-		e.ctx.Logger.
-			Info().
-			Err(err).
-			Msg("could not set execution memory weights. Using defaults")
-	} else {
-		m.SetMemoryWeights(memoryWeights)
+		return err
+	}
+
+	memoryLimit, err := GetExecutionMemoryLimit(e, service)
+	err = setIfOk(
+		"execution memory limit",
+		err,
+		func() { m.SetTotalMemoryLimit(memoryLimit) })
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -415,13 +446,8 @@ func (e *TransactionEnv) GetStorageCapacity(address common.Address) (value uint6
 	accountStorageCapacity := AccountStorageCapacityInvocation(e, e.traceSpan)
 	result, invokeErr := accountStorageCapacity(address)
 
-	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, storage capacity will be 0.
-	// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
-	// 2. There will also be an error in case the accounts balance times megabytesPerFlow constant overflows,
-	//		which shouldn't happen unless the the price of storage is reduced at least 100 fold
-	// 3. Any other error indicates a bug in our implementation. How can we reliably check the Cadence error?
 	if invokeErr != nil {
-		return 0, nil
+		return 0, errors.HandleRuntimeError(invokeErr)
 	}
 
 	return storageMBUFixToBytesUInt(result), nil
@@ -448,9 +474,8 @@ func (e *TransactionEnv) GetAccountBalance(address common.Address) (value uint64
 	accountBalance := AccountBalanceInvocation(e, e.traceSpan)
 	result, invokeErr := accountBalance(address)
 
-	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, balance will be 0.
 	if invokeErr != nil {
-		return 0, nil
+		return 0, errors.HandleRuntimeError(invokeErr)
 	}
 	return result.ToGoValue().(uint64), nil
 }
@@ -469,11 +494,8 @@ func (e *TransactionEnv) GetAccountAvailableBalance(address common.Address) (val
 	accountAvailableBalance := AccountAvailableBalanceInvocation(e, e.traceSpan)
 	result, invokeErr := accountAvailableBalance(address)
 
-	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, available balance will be 0.
-	// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
-	// 2. Any other error indicates a bug in our implementation. How can we reliably check the Cadence error?
 	if invokeErr != nil {
-		return 0, nil
+		return 0, errors.HandleRuntimeError(invokeErr)
 	}
 	return result.ToGoValue().(uint64), nil
 }
@@ -738,11 +760,15 @@ func (e *TransactionEnv) MeterMemory(usage common.MemoryUsage) error {
 	return e.meterMemory(usage.Kind, uint(usage.Amount))
 }
 
-func (e *TransactionEnv) MemoryUsed() uint64 {
-	return uint64(e.sth.State().TotalMemoryUsed())
+func (e *TransactionEnv) MemoryEstimate() uint64 {
+	return uint64(e.sth.State().TotalMemoryEstimate())
 }
 
 func (e *TransactionEnv) SetAccountFrozen(address common.Address, frozen bool) error {
+
+	if !e.ctx.AccountFreezeEnabled {
+		return errors.NewOperationNotSupportedError("SetAccountFrozen")
+	}
 
 	flowAddress := flow.Address(address)
 
