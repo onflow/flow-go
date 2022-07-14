@@ -627,15 +627,6 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 		Height:      parent.Height + 1,
 		Timestamp:   timestamp,
 		PayloadHash: payload.Hash(),
-
-		// the following fields should be set by the custom function as needed
-		// NOTE: we could abstract all of this away into an interface{} field,
-		// but that would be over the top as we will probably always use hotstuff
-		View:               0,
-		ParentVoterIndices: nil,
-		ParentVoterSigData: nil,
-		ProposerID:         flow.ZeroID,
-		ProposerSigData:    nil,
 	}
 
 	// apply the custom fields setter of the consensus algorithm

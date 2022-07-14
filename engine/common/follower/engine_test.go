@@ -155,7 +155,7 @@ func (suite *Suite) TestHandleProposalSkipProposalThreshold() {
 
 	// mock latest finalized state
 	final := unittest.BlockHeaderFixture()
-	suite.snapshot.On("Head").Return(&final, nil)
+	suite.snapshot.On("Head").Return(final, nil)
 
 	originID := unittest.IdentifierFixture()
 	block := unittest.BlockFixture()

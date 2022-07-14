@@ -90,10 +90,10 @@ func (cs *ComplianceSuite) TestBroadcastProposalWithDelay() {
 	parent := unittest.BlockHeaderFixture()
 	parent.ChainID = "test"
 	parent.Height = 10
-	cs.headerDB[parent.ID()] = &parent
+	cs.headerDB[parent.ID()] = parent
 
 	// create a block with the parent and store the payload with correct ID
-	block := unittest.BlockWithParentFixture(&parent)
+	block := unittest.BlockWithParentFixture(parent)
 	block.Header.ProposerID = cs.myID
 	cs.payloadDB[block.ID()] = block.Payload
 
@@ -217,12 +217,12 @@ func (cs *ComplianceSuite) TestProcessUnsupportedMessageType() {
 // Tests the whole processing pipeline.
 func (cs *ComplianceSuite) TestOnFinalizedBlock() {
 	finalizedBlock := unittest.BlockHeaderFixture()
-	cs.head = &finalizedBlock
+	cs.head = finalizedBlock
 
 	*cs.pending = modulemock.PendingBlockBuffer{}
 	cs.pending.On("PruneByView", finalizedBlock.View).Return(nil).Once()
 	cs.pending.On("Size").Return(uint(0)).Once()
-	cs.engine.OnFinalizedBlock(model.BlockFromFlow(&finalizedBlock, finalizedBlock.View-1))
+	cs.engine.OnFinalizedBlock(model.BlockFromFlow(finalizedBlock, finalizedBlock.View-1))
 
 	require.Eventually(cs.T(),
 		func() bool {
