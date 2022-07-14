@@ -241,8 +241,8 @@ func initializeMessageAuthConfigsMap() {
 			return new(messages.EntityResponse)
 		},
 		Config: map[channels.Channel]flow.RoleList{
-			channels.ProvideApprovalsByChunk:  {flow.RoleVerification},
 			channels.ProvideReceiptsByBlockID: {flow.RoleExecution},
+			channels.ProvideCollections:       {flow.RoleCollection},
 		},
 	}
 
