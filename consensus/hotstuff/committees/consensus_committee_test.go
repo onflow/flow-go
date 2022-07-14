@@ -212,7 +212,8 @@ func (suite *ConsensusSuite) TestProtocolEvents_CommittedEpoch() {
 	// wait for the protocol event to be processed (async)
 	assert.Eventually(suite.T(), func() bool {
 		_, err := suite.committee.IdentitiesByEpoch(randUint64(201, 300))
-		return err != nil
+		fmt.Println(err)
+		return err == nil
 	}, 5*time.Second, 50*time.Millisecond)
 
 	suite.Assert().Len(suite.committee.epochs, 2)
@@ -241,7 +242,7 @@ func (suite *ConsensusSuite) TestProtocolEvents_EpochFallback() {
 	// wait for the protocol event to be processed (async)
 	assert.Eventually(suite.T(), func() bool {
 		_, err := suite.committee.IdentitiesByEpoch(randUint64(201, 300))
-		return err != nil
+		return err == nil
 	}, 5*time.Second, 50*time.Millisecond)
 
 	suite.Assert().Len(suite.committee.epochs, 2)
