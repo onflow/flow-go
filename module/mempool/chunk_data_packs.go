@@ -17,9 +17,9 @@ type ChunkDataPacks interface {
 	// false if it was already in the mempool.
 	Add(cdp *flow.ChunkDataPack) bool
 
-	// Rem will remove the given ChunkDataPack from the memory pool; it will
+	// Remove will remove the given ChunkDataPack from the memory pool; it will
 	// return true if the ChunkDataPack was known and removed.
-	Rem(chunkID flow.Identifier) bool
+	Remove(chunkID flow.Identifier) bool
 
 	// ByID retrieve the chunk datapacke with the given chunk ID from the memory
 	// pool. It will return false if it was not found in the mempool.

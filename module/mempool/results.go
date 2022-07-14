@@ -14,8 +14,8 @@ type Results interface {
 	// false if it was already in the mempool.
 	Add(result *flow.ExecutionResult) bool
 
-	// Rem will attempt to remove the result from the memory pool.
-	Rem(resultID flow.Identifier) bool
+	// Remove will attempt to remove the result from the memory pool.
+	Remove(resultID flow.Identifier) bool
 
 	// ByID retrieve the execution result with the given ID from the memory pool.
 	// It will return false if it was not found in the mempool.

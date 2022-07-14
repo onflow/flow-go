@@ -47,7 +47,7 @@ func TestFinalizer(t *testing.T) {
 			require.Nil(t, err)
 			// clear the mempool
 			for _, tx := range pool.All() {
-				pool.Rem(tx.ID())
+				pool.Remove(tx.ID())
 			}
 		}
 
