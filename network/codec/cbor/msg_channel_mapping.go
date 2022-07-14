@@ -19,7 +19,7 @@ func initializeChannelToMsgCodesMap() {
 	ChannelToMsgCodes = make(map[network.Channel][]uint8)
 
 	// consensus
-	ChannelToMsgCodes[channels.ConsensusCommittee] = []uint8{CodeBlockProposal, CodeBlockVote}
+	ChannelToMsgCodes[channels.ConsensusCommittee] = []uint8{CodeBlockProposal, CodeBlockVote, CodeTimeoutObject}
 
 	// protocol state sync
 	ChannelToMsgCodes[channels.SyncCommittee] = []uint8{CodeSyncRequest, CodeSyncResponse, CodeRangeRequest, CodeBatchRequest, CodeBlockResponse}

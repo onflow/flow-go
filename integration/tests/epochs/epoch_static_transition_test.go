@@ -10,9 +10,11 @@ import (
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestEpochStaticTransition(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_TODO, "active-pacemaker")
 	suite.Run(t, new(StaticEpochTransitionSuite))
 }
 

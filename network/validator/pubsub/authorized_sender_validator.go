@@ -101,7 +101,10 @@ func getRoles(channel network.Channel, msgTypeCode uint8) (flow.RoleList, error)
 	}
 
 	// cluster channels have a dynamic channel name
-	if msgTypeCode == cborcodec.CodeClusterBlockProposal || msgTypeCode == cborcodec.CodeClusterBlockVote || msgTypeCode == cborcodec.CodeClusterBlockResponse {
+	if msgTypeCode == cborcodec.CodeClusterBlockProposal ||
+		msgTypeCode == cborcodec.CodeClusterBlockVote ||
+		msgTypeCode == cborcodec.CodeClusterBlockResponse ||
+		msgTypeCode == cborcodec.CodeClusterTimeoutObject {
 		return channels.ClusterChannelRoles(channel), nil
 	}
 

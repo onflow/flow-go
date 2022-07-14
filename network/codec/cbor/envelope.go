@@ -8,6 +8,7 @@ const (
 	// consensus
 	CodeBlockProposal
 	CodeBlockVote
+	CodeTimeoutObject
 
 	// protocol state sync
 	CodeSyncRequest
@@ -20,6 +21,7 @@ const (
 	CodeClusterBlockProposal
 	CodeClusterBlockVote
 	CodeClusterBlockResponse
+	CodeClusterTimeoutObject
 
 	// collections, guarantees & transactions
 	CodeCollectionGuarantee

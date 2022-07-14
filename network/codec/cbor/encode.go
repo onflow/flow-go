@@ -21,6 +21,8 @@ func switchv2code(v interface{}) (uint8, error) {
 		code = CodeBlockProposal
 	case *messages.BlockVote:
 		code = CodeBlockVote
+	case *messages.TimeoutObject:
+		code = CodeTimeoutObject
 
 	// protocol state sync
 	case *messages.SyncRequest:
@@ -41,6 +43,8 @@ func switchv2code(v interface{}) (uint8, error) {
 		code = CodeClusterBlockVote
 	case *messages.ClusterBlockResponse:
 		code = CodeClusterBlockResponse
+	case *messages.ClusterTimeoutObject:
+		code = CodeClusterTimeoutObject
 
 	// collections, guarantees & transactions
 	case *flow.CollectionGuarantee:

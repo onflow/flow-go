@@ -20,6 +20,8 @@ func switchenv2v(code uint8) (interface{}, error) {
 		v = &messages.BlockProposal{}
 	case CodeBlockVote:
 		v = &messages.BlockVote{}
+	case CodeTimeoutObject:
+		v = &messages.TimeoutObject{}
 
 	// cluster consensus
 	case CodeClusterBlockProposal:
@@ -28,6 +30,8 @@ func switchenv2v(code uint8) (interface{}, error) {
 		v = &messages.ClusterBlockVote{}
 	case CodeClusterBlockResponse:
 		v = &messages.ClusterBlockResponse{}
+	case CodeClusterTimeoutObject:
+		v = &messages.ClusterTimeoutObject{}
 
 	// protocol state sync
 	case CodeSyncRequest:
@@ -103,6 +107,8 @@ func switchenv2what(code uint8) (string, error) {
 		what = "CodeBlockProposal"
 	case CodeBlockVote:
 		what = "CodeBlockVote"
+	case CodeTimeoutObject:
+		what = "CodeTimeoutObject"
 
 	// cluster consensus
 	case CodeClusterBlockProposal:
@@ -111,6 +117,8 @@ func switchenv2what(code uint8) (string, error) {
 		what = "CodeClusterBlockVote"
 	case CodeClusterBlockResponse:
 		what = "CodeClusterBlockResponse"
+	case CodeClusterTimeoutObject:
+		what = "CodeClusterTimeoutObject"
 
 	// protocol state sync
 	case CodeSyncRequest:
