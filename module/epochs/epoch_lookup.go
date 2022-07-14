@@ -99,5 +99,5 @@ func (l *EpochLookup) EpochForViewWithFallback(view uint64) (uint64, error) {
 	}
 
 	// HAPPY PATH logic
-	return l.EpochForViewWithFallback(view)
+	return l.EpochForView(view)
 }
