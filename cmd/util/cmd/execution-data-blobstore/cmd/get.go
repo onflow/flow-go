@@ -12,8 +12,8 @@ import (
 
 	"github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/execution_data"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/network/compressor"
 )
 
@@ -39,13 +39,7 @@ func run(*cobra.Command, []string) {
 
 	logger := zerolog.New(os.Stdout)
 
-	eds := state_synchronization.NewExecutionDataService(
-		cbor.NewCodec(),
-		compressor.NewLz4Compressor(),
-		bs,
-		metrics.NewNoopCollector(),
-		logger,
-	)
+	eds := execution_data.NewExecutionDataStore(bs, execution_data.DefaultSerializer)
 
 	b, err := hex.DecodeString(flagID)
 	if err != nil {

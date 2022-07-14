@@ -24,10 +24,10 @@ import (
 	"github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	exedatamock "github.com/onflow/flow-go/module/execution_data/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization"
-	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	"github.com/onflow/flow-go/module/state_synchronization/requester"
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/network/compressor"
@@ -41,10 +41,10 @@ import (
 type ExecutionDataRequesterSuite struct {
 	suite.Suite
 
-	blobservice *mocknetwork.BlobService
-	datastore   datastore.Batching
-	db          *badger.DB
-	eds         *syncmock.ExecutionDataService
+	blobstore  blobs.Blobstore
+	datastore  datastore.Batching
+	db         *badger.DB
+	downloader *exedatamock.Downloader
 
 	run edTestRun
 
@@ -59,7 +59,7 @@ func TestExecutionDataRequesterSuite(t *testing.T) {
 
 func (suite *ExecutionDataRequesterSuite) SetupTest() {
 	suite.datastore = dssync.MutexWrap(datastore.NewMapDatastore())
-	suite.blobservice = synctest.MockBlobService(blockstore.NewBlockstore(suite.datastore))
+	suite.blobstore = blobs.NewBlobstore(suite.datastore)
 
 	suite.run = edTestRun{
 		"",
@@ -89,15 +89,15 @@ type edTestRun struct {
 
 type testExecutionDataCallback func(*state_synchronization.ExecutionData) (*state_synchronization.ExecutionData, error)
 
-func mockExecutionDataService(edStore map[flow.Identifier]*testExecutionDataServiceEntry) *syncmock.ExecutionDataService {
-	eds := new(syncmock.ExecutionDataService)
+func mockDownloader(edStore map[flow.Identifier]*testExecutionDataServiceEntry) *exedatamock.Downloader {
+	downloader := new(exedatamock.Downloader)
 
-	get := func(id flow.Identifier) (*state_synchronization.ExecutionData, error) {
+	get := func(id flow.Identifier) (*execution_data.BlockExecutionData, error) {
 		ed, has := edStore[id]
 
 		// return not found
 		if !has {
-			return nil, &state_synchronization.BlobNotFoundError{}
+			return nil, execution_data.NewBlobNotFoundError(flow.IdToCid(id))
 		}
 
 		// use a callback. this is useful for injecting a pause or custom error behavior
@@ -114,7 +114,7 @@ func mockExecutionDataService(edStore map[flow.Identifier]*testExecutionDataServ
 		return ed.ExecutionData, nil
 	}
 
-	eds.On("Get", mock.Anything, mock.AnythingOfType("flow.Identifier")).
+	eds.On("Download", mock.Anything, mock.AnythingOfType("flow.Identifier")).
 		Return(
 			func(ctx context.Context, id flow.Identifier) *state_synchronization.ExecutionData {
 				ed, _ := get(id)
@@ -125,10 +125,6 @@ func mockExecutionDataService(edStore map[flow.Identifier]*testExecutionDataServ
 				return err
 			},
 		).
-		Maybe() // Maybe() needed to get call count
-
-	eds.On("Add", mock.Anything, mock.AnythingOfType("*state_synchronization.ExecutionData")).
-		Return(flow.ZeroID, nil, nil).
 		Maybe() // Maybe() needed to get call count
 
 	noop := module.NoopReadyDoneAware{}
@@ -182,7 +178,7 @@ func (suite *ExecutionDataRequesterSuite) TestRequesterProcessesBlocks() {
 				suite.db = db
 
 				suite.datastore = dssync.MutexWrap(datastore.NewMapDatastore())
-				suite.blobservice = synctest.MockBlobService(blockstore.NewBlockstore(suite.datastore))
+				suite.blobstore = blobs.NewBlobstore(suite.datastore)
 
 				testData := suite.generateTestData(run.blockCount, run.specialBlocks(run.blockCount))
 				edr, fd := suite.prepareRequesterTest(testData)
@@ -200,7 +196,7 @@ func (suite *ExecutionDataRequesterSuite) TestRequesterProcessesBlocks() {
 // restart, without skipping any blocks
 func (suite *ExecutionDataRequesterSuite) TestRequesterResumesAfterRestart() {
 	suite.datastore = dssync.MutexWrap(datastore.NewMapDatastore())
-	suite.blobservice = synctest.MockBlobService(blockstore.NewBlockstore(suite.datastore))
+	suite.blobstore = blobs.NewBlobstore(suite.datastore)
 
 	testData := suite.generateTestData(suite.run.blockCount, suite.run.specialBlocks(suite.run.blockCount))
 
@@ -249,7 +245,7 @@ func (suite *ExecutionDataRequesterSuite) TestRequesterCatchesUp() {
 		suite.db = db
 
 		suite.datastore = dssync.MutexWrap(datastore.NewMapDatastore())
-		suite.blobservice = synctest.MockBlobService(blockstore.NewBlockstore(suite.datastore))
+		suite.blobstore = blobs.NewBlobstore(suite.datastore)
 
 		testData := suite.generateTestData(suite.run.blockCount, suite.run.specialBlocks(suite.run.blockCount))
 
@@ -301,7 +297,7 @@ func (suite *ExecutionDataRequesterSuite) TestRequesterHalts() {
 
 		suite.run.blockCount = 10
 		suite.datastore = dssync.MutexWrap(datastore.NewMapDatastore())
-		suite.blobservice = synctest.MockBlobService(blockstore.NewBlockstore(suite.datastore))
+		suite.blobstore = blobs.NewBlobstore(suite.datastore)
 
 		// generate a block that will return a malformed blob error. causing the requester to halt
 		generate, expectedErr := generateBlocksWithHaltingError(suite.run.blockCount)
@@ -404,7 +400,7 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 	)
 	state := suite.mockProtocolState(cfg.blocksByHeight)
 
-	suite.eds = mockExecutionDataService(cfg.executionDataEntries)
+	suite.downloader = mockDownloader(cfg.executionDataEntries)
 
 	finalizationDistributor := pubsub.NewFinalizationDistributor()
 	processedHeight := bstorage.NewConsumerProgress(suite.db, module.ConsumeProgressExecutionDataRequesterBlockHeight)
@@ -487,7 +483,7 @@ func (suite *ExecutionDataRequesterSuite) runRequesterTestPauseResume(edr state_
 	unittest.RequireNeverClosedWithin(suite.T(), testDone, 500*time.Millisecond, "finished unexpectedly")
 
 	// confirm the expected number of downloads were attempted
-	suite.eds.AssertNumberOfCalls(suite.T(), "Get", expectedDownloads)
+	suite.downloader.AssertNumberOfCalls(suite.T(), "Download", expectedDownloads)
 
 	suite.T().Log("Resuming")
 	resume()
@@ -643,13 +639,7 @@ func (suite *ExecutionDataRequesterSuite) generateTestData(blockCount int, speci
 	endHeight := uint64(blockCount) - 1
 
 	// instantiate ExecutionDataService to generate correct CIDs
-	eds := state_synchronization.NewExecutionDataService(
-		cbor.NewCodec(),
-		compressor.NewLz4Compressor(),
-		suite.blobservice,
-		metrics.NewNoopCollector(),
-		zerolog.New(os.Stdout).With().Timestamp().Logger(),
-	)
+	eds := execution_data.NewExecutionDataStore(suite.blobstore, execution_data.DefaultSerializer)
 
 	var previousBlock *flow.Block
 	var previousResult *flow.ExecutionResult
@@ -675,7 +665,7 @@ func (suite *ExecutionDataRequesterSuite) generateTestData(blockCount int, speci
 
 		ed := synctest.ExecutionDataFixture(block.ID())
 
-		cid, _, err := eds.Add(context.Background(), ed)
+		cid, err := eds.Add(context.Background(), ed)
 		require.NoError(suite.T(), err)
 
 		result := buildResult(block, cid, previousResult)

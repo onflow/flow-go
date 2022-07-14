@@ -18,9 +18,9 @@ import (
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/network/compressor"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -146,7 +146,7 @@ func (s *ExecutionStateSyncSuite) TestHappyPath() {
 
 	// start an execution data service using the Access Node's execution data db
 	an := s.net.ContainerByID(s.bridgeID)
-	eds, ctx := s.nodeExecutionDataService(an)
+	eds := s.nodeExecutionDataStore(an)
 
 	// setup storage objects needed to get the execution data id
 	db, err := an.DB()
@@ -174,17 +174,7 @@ func (s *ExecutionStateSyncSuite) TestHappyPath() {
 	}
 }
 
-func (s *ExecutionStateSyncSuite) nodeExecutionDataService(node *testnet.Container) (state_synchronization.ExecutionDataService, irrecoverable.SignalerContext) {
-	ctx, errChan := irrecoverable.WithSignaler(s.ctx)
-	go func() {
-		select {
-		case <-s.ctx.Done():
-			return
-		case err := <-errChan:
-			s.T().Errorf("irrecoverable error: %v", err)
-		}
-	}()
-
+func (s *ExecutionStateSyncSuite) nodeExecutionDataStore(node *testnet.Container) execution_data.ExecutionDataStore {
 	ds, err := badgerds.NewDatastore(node.ExecutionDataDBPath(), &badgerds.DefaultOptions)
 	require.NoError(s.T(), err, "could not get execution datastore")
 
@@ -195,14 +185,5 @@ func (s *ExecutionStateSyncSuite) nodeExecutionDataService(node *testnet.Contain
 		}
 	}()
 
-	blobService := utils.NewLocalBlobService(ds, utils.WithHashOnRead(true))
-	blobService.Start(ctx)
-
-	return state_synchronization.NewExecutionDataService(
-		cbor.NewCodec(),
-		compressor.NewLz4Compressor(),
-		blobService,
-		metrics.NewNoopCollector(),
-		zerolog.New(os.Stdout).With().Str("test", "execution-state-sync").Logger(),
-	), ctx
+	store := execution_data.NewExecutionDataStore(blobs.NewBlobstore(ds), execution_data.DefaultSerializer)
 }
