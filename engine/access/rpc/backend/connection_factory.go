@@ -19,8 +19,8 @@ import (
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
-// the default timeout used when making a GRPC request to a collection node or an execution node
-const defaultClientTimeout = 3 * time.Second
+// DefaultClientTimeout is used when making a GRPC request to a collection node or an execution node
+const DefaultClientTimeout = 3 * time.Second
 
 // ConnectionFactory is used to create an access api client
 type ConnectionFactory interface {
@@ -51,6 +51,7 @@ type ConnectionFactoryImpl struct {
 	ConnectionsCache          *lru.Cache
 	CacheSize                 uint
 	AccessMetrics             module.AccessMetrics
+	mutex                     sync.Mutex
 }
 
 type ConnectionCacheStore struct {
@@ -62,7 +63,7 @@ type ConnectionCacheStore struct {
 func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.Duration) (*grpc.ClientConn, error) {
 
 	if timeout == 0 {
-		timeout = defaultClientTimeout
+		timeout = DefaultClientTimeout
 	}
 
 	keepaliveParams := keepalive.ClientParameters{
@@ -88,34 +89,36 @@ func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.D
 
 func (cf *ConnectionFactoryImpl) retrieveConnection(grpcAddress string, timeout time.Duration) (*grpc.ClientConn, error) {
 	var conn *grpc.ClientConn
-	clientMutex := new(sync.Mutex)
-	store := ConnectionCacheStore{
-		ClientConn: nil,
-		mutex:      clientMutex,
-	}
-	if prev, ok, _ := cf.ConnectionsCache.PeekOrAdd(grpcAddress, store); ok {
-		clientMutex = prev.(ConnectionCacheStore).mutex
-	}
-	// we lock this mutex to prevent a scenario where the connection is not good, which will result in
-	// re-establishing the connection for this address. if the mutex is not locked, we may attempt to re-establish
-	// the connection multiple times which would result in cache thrashing.
-	clientMutex.Lock()
-	defer clientMutex.Unlock()
+	var clientMutex *sync.Mutex
+	var store *ConnectionCacheStore
 
-	// get again to update the LRU cache
+	cf.mutex.Lock()
 	if res, ok := cf.ConnectionsCache.Get(grpcAddress); ok {
-		conn = res.(ConnectionCacheStore).ClientConn
+		store = res.(*ConnectionCacheStore)
+		clientMutex = store.mutex
+		conn = store.ClientConn
 		if cf.AccessMetrics != nil {
 			cf.AccessMetrics.ConnectionFromPoolRetrieved()
 		}
+	} else {
+		clientMutex = new(sync.Mutex)
+		store = &ConnectionCacheStore{
+			ClientConn: nil,
+			mutex:      clientMutex,
+		}
+		cf.ConnectionsCache.Add(grpcAddress, store)
 	}
+	clientMutex.Lock()
+	defer clientMutex.Unlock()
+	cf.mutex.Unlock()
+
 	if conn == nil || conn.GetState() == connectivity.Shutdown {
 		// updates to the cache don't trigger evictions; this line closes connections before re-establishing new ones
 		if conn != nil {
 			conn.Close()
 		}
 		var err error
-		conn, err = cf.addConnection(grpcAddress, timeout, clientMutex)
+		conn, err = cf.addConnection(grpcAddress, timeout, store)
 		if err != nil {
 			return nil, err
 		}
@@ -123,18 +126,14 @@ func (cf *ConnectionFactoryImpl) retrieveConnection(grpcAddress string, timeout 
 	return conn, nil
 }
 
-func (cf *ConnectionFactoryImpl) addConnection(grpcAddress string, timeout time.Duration, mutex *sync.Mutex) (*grpc.ClientConn, error) {
+func (cf *ConnectionFactoryImpl) addConnection(grpcAddress string, timeout time.Duration, store *ConnectionCacheStore) (*grpc.ClientConn, error) {
 	conn, err := cf.createConnection(grpcAddress, timeout)
 	if err != nil {
 		return nil, err
 	}
 
-	store := ConnectionCacheStore{
-		ClientConn: conn,
-		mutex:      mutex,
-	}
+	store.ClientConn = conn
 
-	cf.ConnectionsCache.Add(grpcAddress, store)
 	if cf.AccessMetrics != nil {
 		cf.AccessMetrics.TotalConnectionsInPool(uint(cf.ConnectionsCache.Len()), cf.CacheSize)
 	}
@@ -184,7 +183,7 @@ func (cf *ConnectionFactoryImpl) InvalidateExecutionAPIClient(address string) {
 func (cf *ConnectionFactoryImpl) invalidateAPIClient(address string, port uint) {
 	grpcAddress, _ := getGRPCAddress(address, port)
 	if res, ok := cf.ConnectionsCache.Get(grpcAddress); ok {
-		store := res.(ConnectionCacheStore)
+		store := res.(*ConnectionCacheStore)
 		store.mutex.Lock()
 		if store.ClientConn != nil {
 			conn := store.ClientConn
