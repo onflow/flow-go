@@ -438,6 +438,19 @@ func getCorruptibleNetworkNoAttacker(t *testing.T, corruptedID ...*flow.Identity
 	//corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress("localhost:0"))
 	flowNetwork := &mocknetwork.Network{}
 	flowNetwork.On("Start", mock.Anything).Return()
+
+	ready := make(chan struct{})
+	close(ready)
+	flowNetwork.On("Ready", mock.Anything).Return(func() <-chan struct{} {
+		return ready
+	})
+
+	done := make(chan struct{})
+	close(done)
+	flowNetwork.On("Done", mock.Anything).Return(func() <-chan struct{} {
+		return done
+	})
+
 	ccf := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet)
 
 	// set up adapter, so we can check if that it called the expected method
@@ -460,10 +473,10 @@ func getCorruptibleNetworkNoAttacker(t *testing.T, corruptedID ...*flow.Identity
 }
 
 func getMessageAndChannel() (*message.TestMessage, network.Channel) {
-	message := &message.TestMessage{Text: "this is a test message"}
+	msg := &message.TestMessage{Text: "this is a test msg"}
 	channel := network.Channel("test-channel")
 
-	return message, channel
+	return msg, channel
 }
 
 // withCorruptibleNetwork creates and starts a corruptible network, runs the "run" function and then
