@@ -252,8 +252,19 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 		committer := committer.NewLedgerViewCommitter(led, trace.NewNoopTracer())
 		programs := programs.NewEmptyPrograms()
 
+		bservice := unittest.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+		trackerStorage := new(mocktracker.Storage)
+
+		prov := provider.NewProvider(
+			zerolog.Nop,
+			metrics.NewNoopCollector(),
+			execution_data.DefaultSerializer,
+			bservice,
+			trackerStorage,
+		)
+
 		// create BlockComputer
-		bc, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), log, committer)
+		bc, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), log, committer, prov)
 		require.NoError(t, err)
 
 		completeColls := make(map[flow.Identifier]*entity.CompleteCollection)
