@@ -783,6 +783,8 @@ func readCheckpointV5(f *os.File) ([]*trie.MTrie, error) {
 }
 
 // ReadLastTrieRootHashFromCheckpoint returns last trie's root hash from checkpoint file f.
+// All returned errors indicate that the given checkpoint file is eiter corrupted or
+// incompatible.  As the function is side-effect free, all failures are simple a no-op.
 func ReadLastTrieRootHashFromCheckpoint(f *os.File) (hash.Hash, error) {
 
 	// read checkpoint version
