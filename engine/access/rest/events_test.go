@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/engine/access/rest/util"
+
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -84,7 +86,7 @@ func TestGetEvents(t *testing.T) {
 			description:      "Get invalid - too big interval",
 			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", "0", "5000", nil),
 			expectedStatus:   http.StatusBadRequest,
-			expectedResponse: `{"code":400,"message":"height range 5000 exceeds maximum allowed of 50"}`,
+			expectedResponse: `{"code":400,"message":"height range 5000 exceeds maximum allowed of 250"}`,
 		},
 		{
 			description:      "Get invalid - can not provide all params",
@@ -194,8 +196,9 @@ func testBlockEventResponse(events []flow.BlockEvents) string {
 				"type": "%s",
 				"transaction_id": "%s",
 				"transaction_index": "%d",
-				"event_index": "%d"
-			}`, ev.Type, ev.TransactionID, ev.TransactionIndex, ev.EventIndex)
+				"event_index": "%d",
+				"payload": "%s"
+			}`, ev.Type, ev.TransactionID, ev.TransactionIndex, ev.EventIndex, util.ToBase64(ev.Payload))
 		}
 
 		res[i] = fmt.Sprintf(`{

@@ -4,16 +4,16 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"testing"
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p/conduit"
-	"github.com/onflow/flow-go/state/protocol"
 )
 
 // Network is a mocked Network layer made for testing engine's behavior.
@@ -25,8 +25,7 @@ type Network struct {
 	mocknetwork.Network
 	ctx context.Context
 	sync.Mutex
-	state          protocol.State                               // used to represent full protocol state of the attached node.
-	me             module.Local                                 // used to represent information of the attached node.
+	myId           flow.Identifier                              // used to represent information of the attached node.
 	hub            *Hub                                         // used to attach Network layers of nodes together.
 	engines        map[network.Channel]network.MessageProcessor // used to keep track of attached engines of the node.
 	seenEventIDs   sync.Map                                     // used to keep track of event IDs seen by attached engines.
@@ -34,32 +33,39 @@ type Network struct {
 	conduitFactory network.ConduitFactory
 }
 
+func WithConduitFactory(factory network.ConduitFactory) func(*Network) {
+	return func(n *Network) {
+		n.conduitFactory = factory
+	}
+}
+
 // NewNetwork create a mocked Network.
 // The committee has the identity of the node already, so only `committee` is needed
 // in order for a mock hub to find each other.
-func NewNetwork(state protocol.State, me module.Local, hub *Hub) (*Network, error) {
+func NewNetwork(t testing.TB, myId flow.Identifier, hub *Hub, opts ...func(*Network)) *Network {
 	net := &Network{
 		ctx:            context.Background(),
-		state:          state,
-		me:             me,
+		myId:           myId,
 		hub:            hub,
 		engines:        make(map[network.Channel]network.MessageProcessor),
 		qCD:            make(chan struct{}),
 		conduitFactory: conduit.NewDefaultConduitFactory(),
 	}
 
-	if err := net.conduitFactory.RegisterAdapter(net); err != nil {
-		return nil, fmt.Errorf("could not register adapter to the conduit factory: %w", err)
+	for _, opt := range opts {
+		opt(net)
 	}
+
+	require.NoError(t, net.conduitFactory.RegisterAdapter(net))
 
 	// AddNetwork the Network to a hub so that Networks can find each other.
 	hub.AddNetwork(net)
-	return net, nil
+	return net
 }
 
 // GetID returns the identity of the attached node.
 func (n *Network) GetID() flow.Identifier {
-	return n.me.NodeID()
+	return n.myId
 }
 
 // Register registers an Engine of the attached node to the channel via a Conduit, and returns the

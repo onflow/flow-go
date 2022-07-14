@@ -8,11 +8,11 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/bootstrap"
+	modulecompliance "github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 
-	"github.com/onflow/flow-go-sdk/client"
+	client "github.com/onflow/flow-go-sdk/access/grpc"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
-
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -21,7 +21,6 @@ import (
 	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/collection/epochmgr"
 	"github.com/onflow/flow-go/engine/collection/epochmgr/factories"
 	"github.com/onflow/flow-go/engine/collection/ingest"
@@ -42,6 +41,7 @@ import (
 	epochpool "github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/synchronization"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
@@ -68,9 +68,10 @@ func main() {
 		startupTimeString                      string
 		startupTime                            time.Time
 
-		followerState protocol.MutableState
-		ingestConf    = ingest.DefaultConfig()
-		rpcConf       rpc.Config
+		followerState           protocol.MutableState
+		ingestConf              = ingest.DefaultConfig()
+		rpcConf                 rpc.Config
+		clusterComplianceConfig modulecompliance.Config
 
 		pools                   *epochpool.TransactionPools // epoch-scoped transaction pools
 		followerBuffer          *buffer.PendingBlocks       // pending block cache for follower
@@ -89,6 +90,8 @@ func main() {
 		flowClientConfigs  []*common.FlowClientConfig
 		insecureAccessAPI  bool
 		accessNodeIDS      []string
+		apiRatelimits      map[string]int
+		apiBurstlimits     map[string]int
 	)
 
 	nodeBuilder := cmd.FlowNode(flow.RoleCollection.String())
@@ -111,8 +114,6 @@ func main() {
 			"expiry buffer for inbound transactions")
 		flags.UintVar(&ingestConf.PropagationRedundancy, "ingest-tx-propagation-redundancy", 10,
 			"how many additional cluster members we propagate transactions to")
-		flags.Uint64Var(&ingestConf.MaxAddressIndex, "ingest-max-address-index", flow.DefaultMaxAddressIndex,
-			"the maximum address index allowed in transactions")
 		flags.UintVar(&builderExpiryBuffer, "builder-expiry-buffer", builder.DefaultExpiryBuffer,
 			"expiry buffer for transactions in proposed collections")
 		flags.Float64Var(&builderPayerRateLimit, "builder-rate-limit", builder.DefaultMaxPayerTransactionRate, // no rate limiting
@@ -140,11 +141,15 @@ func main() {
 			"additional fraction of replica timeout that the primary will wait for votes")
 		flags.DurationVar(&blockRateDelay, "block-rate-delay", 250*time.Millisecond,
 			"the delay to broadcast block proposal in order to control block production rate")
+		flags.Uint64Var(&clusterComplianceConfig.SkipNewProposalsThreshold,
+			"cluster-compliance-skip-proposals-threshold", modulecompliance.DefaultConfig().SkipNewProposalsThreshold, "threshold at which new proposals are discarded rather than cached, if their height is this much above local finalized height (cluster compliance engine)")
 		flags.StringVar(&startupTimeString, "hotstuff-startup-time", cmd.NotSet, "specifies date and time (in ISO 8601 format) after which the consensus participant may enter the first view (e.g (e.g 1996-04-24T15:04:05-07:00))")
 
 		// epoch qc contract flags
 		flags.BoolVar(&insecureAccessAPI, "insecure-access-api", false, "required if insecure GRPC connection should be used")
 		flags.StringSliceVar(&accessNodeIDS, "access-node-ids", []string{}, fmt.Sprintf("array of access node IDs sorted in priority order where the first ID in this array will get the first connection attempt and each subsequent ID after serves as a fallback. Minimum length %d. Use '*' for all IDs in protocol state.", common.DefaultAccessNodeIDSMinimum))
+		flags.StringToIntVar(&apiRatelimits, "api-rate-limits", map[string]int{}, "per second rate limits for GRPC API methods e.g. Ping=300,SendTransaction=500 etc. note limits apply globally to all clients.")
+		flags.StringToIntVar(&apiBurstlimits, "api-burst-limits", map[string]int{}, "burst limits for gRPC API methods e.g. Ping=100,SendTransaction=100 etc. note limits apply globally to all clients.")
 
 	}).ValidateFlags(func() error {
 		if startupTimeString != cmd.NotSet {
@@ -205,7 +210,7 @@ func main() {
 			return nil
 		}).
 		Module("main chain sync core", func(node *cmd.NodeConfig) error {
-			mainChainSyncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
+			mainChainSyncCore, err = synchronization.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector())
 			return err
 		}).
 		Module("machine account config", func(node *cmd.NodeConfig) error {
@@ -306,6 +311,7 @@ func main() {
 				followerCore,
 				mainChainSyncCore,
 				node.Tracer,
+				modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
@@ -357,7 +363,14 @@ func main() {
 			return ing, err
 		}).
 		Component("transaction ingress rpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			server := rpc.New(rpcConf, ing, node.Logger, node.RootChainID)
+			server := rpc.New(
+				rpcConf,
+				ing,
+				node.Logger,
+				node.RootChainID,
+				apiRatelimits,
+				apiBurstlimits,
+			)
 			return server, nil
 		}).
 		Component("collection provider engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -366,7 +379,7 @@ func main() {
 				return coll, err
 			}
 			return provider.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
-				engine.ProvideCollections,
+				network.ProvideCollections,
 				filter.HasRole(flow.RoleAccess, flow.RoleExecution),
 				retrieve,
 			)
@@ -425,6 +438,7 @@ func main() {
 				node.Metrics.Mempool,
 				node.State,
 				node.Storage.Transactions,
+				modulecompliance.WithSkipNewProposalsThreshold(clusterComplianceConfig.SkipNewProposalsThreshold),
 			)
 			if err != nil {
 				return nil, err
@@ -435,7 +449,7 @@ func main() {
 				node.Metrics.Engine,
 				node.Network,
 				node.Me,
-				synchronization.DefaultConfig(),
+				node.SyncCoreConfig,
 			)
 			if err != nil {
 				return nil, err
@@ -526,7 +540,7 @@ func main() {
 }
 
 // createQCContractClient creates QC contract client
-func createQCContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap.NodeMachineAccountInfo, flowClient *client.Client) (module.QCContractClient, error) {
+func createQCContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap.NodeMachineAccountInfo, flowClient *client.Client, anID flow.Identifier) (module.QCContractClient, error) {
 
 	var qcContractClient module.QCContractClient
 
@@ -541,10 +555,14 @@ func createQCContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap.
 	if err != nil {
 		return nil, fmt.Errorf("could not decode private key from hex: %w", err)
 	}
-	txSigner := sdkcrypto.NewInMemorySigner(sk, machineAccountInfo.HashAlgorithm)
+
+	txSigner, err := sdkcrypto.NewInMemorySigner(sk, machineAccountInfo.HashAlgorithm)
+	if err != nil {
+		return nil, fmt.Errorf("could not create in-memory signer: %w", err)
+	}
 
 	// create actual qc contract client, all flags and machine account info file found
-	qcContractClient = epochs.NewQCContractClient(node.Logger, flowClient, node.Me.NodeID(), machineAccountInfo.Address, machineAccountInfo.KeyIndex, qcContractAddress, txSigner)
+	qcContractClient = epochs.NewQCContractClient(node.Logger, flowClient, anID, node.Me.NodeID(), machineAccountInfo.Address, machineAccountInfo.KeyIndex, qcContractAddress, txSigner)
 
 	return qcContractClient, nil
 }
@@ -559,7 +577,7 @@ func createQCContractClients(node *cmd.NodeConfig, machineAccountInfo *bootstrap
 			return nil, fmt.Errorf("failed to create flow client for qc contract client with options: %s %w", flowClientOpts, err)
 		}
 
-		qcClient, err := createQCContractClient(node, machineAccountInfo, flowClient)
+		qcClient, err := createQCContractClient(node, machineAccountInfo, flowClient, opt.AccessNodeID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create qc contract client with flow client options: %s %w", flowClientOpts, err)
 		}

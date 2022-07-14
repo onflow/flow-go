@@ -137,7 +137,7 @@ func testProcessAssignChunkHappyPath(t *testing.T, chunkNum int, assignedNum int
 	mockResultsByIDs(s.results, []*flow.ExecutionResult{result})
 	mockBlocksStorage(s.blocks, s.headers, block)
 	mockPendingChunksAdd(t, s.pendingChunks, statuses, true)
-	mockPendingChunksRem(t, s.pendingChunks, statuses, true)
+	mockPendingChunksRemove(t, s.pendingChunks, statuses, true)
 	mockPendingChunksGet(s.pendingChunks, statuses)
 	mockStateAtBlockIDForIdentities(s.state, block.ID(), agrees.Union(disagrees))
 
@@ -201,7 +201,7 @@ func TestChunkResponse_RemovingStatusFails(t *testing.T) {
 
 	chunkLocatorID := statuses[0].ChunkLocatorID()
 	// trying to remove the pending status fails.
-	mockPendingChunksRem(t, s.pendingChunks, statuses, false)
+	mockPendingChunksRemove(t, s.pendingChunks, statuses, false)
 
 	chunkDataPacks, _ := verifiableChunksFixture(t, statuses, block, result, collMap)
 
@@ -235,7 +235,7 @@ func TestProcessAssignChunkSealedAfterRequest(t *testing.T) {
 	// mocks resources on fetcher engine side.
 	mockResultsByIDs(s.results, []*flow.ExecutionResult{result})
 	mockPendingChunksAdd(t, s.pendingChunks, statuses, true)
-	mockPendingChunksRem(t, s.pendingChunks, statuses, true)
+	mockPendingChunksRemove(t, s.pendingChunks, statuses, true)
 	mockPendingChunksGet(s.pendingChunks, statuses)
 	mockStateAtBlockIDForIdentities(s.state, block.ID(), agrees.Union(disagrees))
 
@@ -395,7 +395,7 @@ func testInvalidChunkDataResponse(t *testing.T,
 
 	// none of the subsequent calls on the pipeline path should happen upon validation fails.
 	s.results.AssertNotCalled(t, "ByID")
-	s.pendingChunks.AssertNotCalled(t, "Rem")
+	s.pendingChunks.AssertNotCalled(t, "Remove")
 }
 
 // TestChunkResponse_MissingStatus evaluates that if the fetcher engine receives a chunk data pack response for which
@@ -432,7 +432,7 @@ func TestChunkResponse_MissingStatus(t *testing.T) {
 	// none of the subsequent calls on the pipeline path should happen.
 	s.results.AssertNotCalled(t, "ByID")
 	s.blocks.AssertNotCalled(t, "ByID")
-	s.pendingChunks.AssertNotCalled(t, "Rem")
+	s.pendingChunks.AssertNotCalled(t, "Remove")
 	s.state.AssertNotCalled(t, "AtBlockID")
 }
 
@@ -573,13 +573,13 @@ func mockPendingChunksAdd(t *testing.T, pendingChunks *mempool.ChunkStatuses, li
 		}).Return(added).Times(len(list))
 }
 
-// mockPendingChunksRem mocks the remove method of pending chunks for expecting only the specified list of chunk statuses.
+// mockPendingChunksRemove mocks the remove method of pending chunks for expecting only the specified list of chunk statuses.
 // Each chunk status should be removed only once.
 // It should return the specified added boolean variable as the result of mocking.
-func mockPendingChunksRem(t *testing.T, pendingChunks *mempool.ChunkStatuses, list []*verification.ChunkStatus, removed bool) {
+func mockPendingChunksRemove(t *testing.T, pendingChunks *mempool.ChunkStatuses, list []*verification.ChunkStatus, removed bool) {
 	mu := &sync.Mutex{}
 
-	pendingChunks.On("Rem", mock.Anything, mock.Anything).
+	pendingChunks.On("Remove", mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			// to provide mutual exclusion under concurrent invocations.
 			mu.Lock()

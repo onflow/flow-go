@@ -202,7 +202,7 @@ func (s *State) TotalComputationUsed() uint {
 }
 
 // ComputationIntensities returns computation intensities
-func (s *State) ComputationIntensities() meter.MeteredIntensities {
+func (s *State) ComputationIntensities() meter.MeteredComputationIntensities {
 	return s.meter.ComputationIntensities()
 }
 
@@ -212,18 +212,18 @@ func (s *State) TotalComputationLimit() uint {
 }
 
 // MeterMemory meters memory usage
-func (s *State) MeterMemory(kind common.ComputationKind, intensity uint) error {
+func (s *State) MeterMemory(kind common.MemoryKind, intensity uint) error {
 	return s.meter.MeterMemory(kind, intensity)
 }
 
 // MemoryIntensities returns computation intensities
-func (s *State) MemoryIntensities() meter.MeteredIntensities {
+func (s *State) MemoryIntensities() meter.MeteredMemoryIntensities {
 	return s.meter.MemoryIntensities()
 }
 
-// TotalMemoryUsed returns total memory used
-func (s *State) TotalMemoryUsed() uint {
-	return s.meter.TotalMemoryUsed()
+// TotalMemoryEstimate returns total memory used
+func (s *State) TotalMemoryEstimate() uint {
+	return s.meter.TotalMemoryEstimate()
 }
 
 // TotalMemoryLimit returns total memory limit
@@ -248,7 +248,7 @@ func (s *State) MergeState(other *State, enforceLimit bool) error {
 		return errors.NewStateMergeFailure(err)
 	}
 
-	err = s.meter.MergeMeter(other.meter)
+	err = s.meter.MergeMeter(other.meter, enforceLimit)
 	if err != nil {
 		return err
 	}
@@ -340,14 +340,14 @@ func IsFVMStateKey(owner, controller, key string) bool {
 	}
 	// check account level keys
 	// cases:
-	// 		- address, address, "public_key_count"
-	// 		- address, address, "public_key_%d" (index)
-	// 		- address, address, "contract_names"
-	// 		- address, address, "code.%s" (contract name)
+	// 		- address, "", "public_key_count"
+	// 		- address, "", "public_key_%d" (index)
+	// 		- address, "", "contract_names"
+	// 		- address, "", "code.%s" (contract name)
 	// 		- address, "", exists
 	// 		- address, "", "storage_used"
 	// 		- address, "", "frozen"
-	if owner == controller {
+	if len(controller) == 0 {
 		if key == KeyPublicKeyCount {
 			return true
 		}
@@ -360,19 +360,13 @@ func IsFVMStateKey(owner, controller, key string) bool {
 		if bytes.HasPrefix([]byte(key), []byte(KeyCode)) {
 			return true
 		}
-	}
-
-	if len(controller) == 0 {
-		if key == KeyExists {
+		if key == KeyAccountStatus {
 			return true
 		}
 		if key == KeyStorageUsed {
 			return true
 		}
 		if key == KeyStorageIndex {
-			return true
-		}
-		if key == KeyAccountFrozen {
 			return true
 		}
 	}

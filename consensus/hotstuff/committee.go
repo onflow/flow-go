@@ -6,7 +6,7 @@ import (
 )
 
 // Committee accounts for the fact that we might have multiple HotStuff instances
-// (collector committees and main consensus committee). Each hostuff instance is supposed to
+// (collector committees and main consensus committee). Each HotStuff instance is supposed to
 // have a dedicated Committee state.
 // A Committee provides subset of the protocol.State, which is restricted to exactly those
 // nodes that participate in the current HotStuff instance: the state of all legitimate HotStuff
@@ -17,14 +17,13 @@ import (
 // Given a collector block, some logic is required to find the main consensus block
 // for determining the valid collector-HotStuff participants.
 type Committee interface {
-
 	// Identities returns a IdentityList with legitimate HotStuff participants for the specified block.
-	// The list of participants is filtered by the provided selector. The returned list of HotStuff participants
+	// The returned list of HotStuff participants
 	//   * contains nodes that are allowed to sign the specified block (legitimate participants with NON-ZERO WEIGHT)
 	//   * is ordered in the canonical order
 	//   * contains no duplicates.
-	// The list of all legitimate HotStuff participants for the specified block can be obtained by using `filter.Any`
-	Identities(blockID flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error)
+	// TODO: document possible error returns -> https://github.com/dapperlabs/flow-go/issues/6327
+	Identities(blockID flow.Identifier) (flow.IdentityList, error)
 
 	// Identity returns the full Identity for specified HotStuff participant.
 	// The node must be a legitimate HotStuff participant with NON-ZERO WEIGHT at the specified block.
@@ -49,6 +48,18 @@ type Committee interface {
 
 	// DKG returns the DKG info for the given block.
 	DKG(blockID flow.Identifier) (DKG, error)
+}
+
+// BlockSignerDecoder defines how to convert the SignerIndices field within a particular
+// block header to the identifiers of the nodes which signed the block.
+type BlockSignerDecoder interface {
+	// DecodeSignerIDs decodes the signer indices from the given block header into full node IDs.
+	// Expected Error returns during normal operations:
+	//  * state.UnknownBlockError if block has not been ingested yet
+	//    TODO: this sentinel could be changed to `ErrViewForUnknownEpoch` once we merge the active pacemaker
+	//  * signature.InvalidSignerIndicesError if signer indices included in the header do
+	//    not encode a valid subset of the consensus committee
+	DecodeSignerIDs(header *flow.Header) (flow.IdentifierList, error)
 }
 
 type DKG interface {

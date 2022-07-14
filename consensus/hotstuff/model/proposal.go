@@ -44,7 +44,7 @@ func ProposalToFlow(proposal *Proposal) *flow.Header {
 		PayloadHash:        block.PayloadHash,
 		Timestamp:          block.Timestamp,
 		View:               block.View,
-		ParentVoterIDs:     block.QC.SignerIDs,
+		ParentVoterIndices: block.QC.SignerIndices,
 		ParentVoterSigData: block.QC.SigData,
 		ProposerID:         block.ProposerID,
 		ProposerSigData:    proposal.SigData,

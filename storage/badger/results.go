@@ -20,6 +20,8 @@ type ExecutionResults struct {
 	cache *Cache
 }
 
+var _ storage.ExecutionResults = (*ExecutionResults)(nil)
+
 func NewExecutionResults(collector module.CacheMetrics, db *badger.DB) *ExecutionResults {
 
 	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
@@ -151,4 +153,8 @@ func (r *ExecutionResults) ByBlockID(blockID flow.Identifier) (*flow.ExecutionRe
 	tx := r.db.NewTransaction(false)
 	defer tx.Discard()
 	return r.byBlockID(blockID)(tx)
+}
+
+func (r *ExecutionResults) RemoveIndexByBlockID(blockID flow.Identifier) error {
+	return r.db.Update(operation.SkipNonExist(operation.RemoveExecutionResultIndex(blockID)))
 }

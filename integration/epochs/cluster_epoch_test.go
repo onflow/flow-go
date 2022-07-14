@@ -16,7 +16,6 @@ import (
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
-	emulatormod "github.com/onflow/flow-go/module/emulator"
 
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
@@ -25,7 +24,10 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/utils/unittest"
+
+	"github.com/onflow/flow-go/integration/utils"
 )
 
 // Suite tests the quorum certificate voting process against the
@@ -35,7 +37,7 @@ type Suite struct {
 
 	env            templates.Environment
 	blockchain     *emulator.Blockchain
-	emulatorClient *emulatormod.EmulatorClient
+	emulatorClient *utils.EmulatorClient
 
 	// Quorum Certificate deployed account and address
 	qcAddress    sdk.Address
@@ -50,7 +52,7 @@ func (s *Suite) SetupTest() {
 	var err error
 	s.blockchain, err = emulator.NewBlockchain(emulator.WithStorageLimitEnabled(false))
 	s.Require().NoError(err)
-	s.emulatorClient = emulatormod.NewEmulatorClient(s.blockchain)
+	s.emulatorClient = utils.NewEmulatorClient(s.blockchain)
 
 	// deploy epoch qc contract
 	s.deployEpochQCContract()
@@ -91,7 +93,7 @@ func (s *Suite) CreateClusterList(clusterCount, nodesPerCluster int) (flow.Clust
 	clusterAssignment := unittest.ClusterAssignment(uint(clusterCount), nodes)
 
 	// create `ClusterList` object from nodes and assignment
-	clusterList, err := flow.NewClusterList(clusterAssignment, nodes)
+	clusterList, err := factory.NewClusterList(clusterAssignment, nodes)
 	s.Require().NoError(err)
 
 	return clusterList, nodes
@@ -109,9 +111,12 @@ func (s *Suite) PublishVoter() {
 		SetPayer(s.blockchain.ServiceKey().Address).
 		AddAuthorizer(s.qcAddress)
 
+	signer, err := s.blockchain.ServiceKey().Signer()
+	require.NoError(s.T(), err)
+
 	s.SignAndSubmit(publishVoterTx,
 		[]sdk.Address{s.blockchain.ServiceKey().Address, s.qcAddress},
-		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), s.qcSigner})
+		[]sdkcrypto.Signer{signer, s.qcSigner})
 }
 
 // StartVoting starts the voting in the EpochQCContract with the admin resource
@@ -163,9 +168,12 @@ func (s *Suite) StartVoting(clustering flow.ClusterList, clusterCount, nodesPerC
 	err = startVotingTx.AddArgument(cadence.NewArray(clusterNodeWeights))
 	require.NoError(s.T(), err)
 
+	signer, err := s.blockchain.ServiceKey().Signer()
+	require.NoError(s.T(), err)
+
 	s.SignAndSubmit(startVotingTx,
 		[]sdk.Address{s.blockchain.ServiceKey().Address, s.qcAddress},
-		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), s.qcSigner})
+		[]sdkcrypto.Signer{signer, s.qcSigner})
 }
 
 // CreateVoterResource creates the Voter resource in cadence for a cluster node
@@ -192,9 +200,12 @@ func (s *Suite) CreateVoterResource(address sdk.Address, nodeID flow.Identifier,
 	err = registerVoterTx.AddArgument(cdcStakingPubKey)
 	require.NoError(s.T(), err)
 
+	signer, err := s.blockchain.ServiceKey().Signer()
+	require.NoError(s.T(), err)
+
 	s.SignAndSubmit(registerVoterTx,
 		[]sdk.Address{s.blockchain.ServiceKey().Address, address},
-		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), nodeSigner})
+		[]sdkcrypto.Signer{signer, nodeSigner})
 }
 
 func (s *Suite) StopVoting() {
@@ -206,9 +217,12 @@ func (s *Suite) StopVoting() {
 		SetPayer(s.blockchain.ServiceKey().Address).
 		AddAuthorizer(s.qcAddress)
 
+	signer, err := s.blockchain.ServiceKey().Signer()
+	require.NoError(s.T(), err)
+
 	s.SignAndSubmit(tx,
 		[]sdk.Address{s.blockchain.ServiceKey().Address, s.qcAddress},
-		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), s.qcSigner})
+		[]sdkcrypto.Signer{signer, s.qcSigner})
 }
 
 func (s *Suite) NodeHasVoted(nodeID flow.Identifier) bool {

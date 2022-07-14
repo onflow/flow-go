@@ -110,8 +110,8 @@ func (m *icrSealsMachine) GetUnknown(t *rapid.T) {
 
 }
 
-// Rem is a conditional action that removes a known element from the icrSeals
-func (m *icrSealsMachine) Rem(t *rapid.T) {
+// Remove is a conditional action that removes a known element from the icrSeals
+func (m *icrSealsMachine) Remove(t *rapid.T) {
 	n := len(m.state)
 	// skip if the store is empty
 	if n == 0 {
@@ -120,7 +120,7 @@ func (m *icrSealsMachine) Rem(t *rapid.T) {
 	i := rapid.IntRange(0, n-1).Draw(t, "i").(int)
 
 	s := m.state[i]
-	ok := m.icrs.Rem(s.ID())
+	ok := m.icrs.Remove(s.ID())
 	require.True(t, ok)
 
 	// remove m[i], we don't care about ordering here
@@ -129,9 +129,9 @@ func (m *icrSealsMachine) Rem(t *rapid.T) {
 
 }
 
-// RemUnknown is an action that removes an unknown element from the icrSeals
-// This mostly tests Rem has no insertion side-effects
-func (m *icrSealsMachine) RemUnknown(t *rapid.T) {
+// RemoveUnknown is an action that removes an unknown element from the icrSeals
+// This mostly tests Remove has no insertion side-effects
+func (m *icrSealsMachine) RemoveUnknown(t *rapid.T) {
 	n := len(m.state)
 	// skip if the store is empty
 	if n == 0 {
@@ -151,7 +151,7 @@ func (m *icrSealsMachine) RemUnknown(t *rapid.T) {
 	}
 
 	if unknown {
-		removed := m.icrs.Rem(seal.ID())
+		removed := m.icrs.Remove(seal.ID())
 		require.False(t, removed)
 	}
 	// no modification of state
@@ -189,7 +189,7 @@ func TestIncorporatedResultSeals(t *testing.T) {
 		require.True(t, ok)
 		require.Equal(t, seal, actual)
 
-		deleted := pool.Rem(seal.ID())
+		deleted := pool.Remove(seal.ID())
 		require.True(t, deleted)
 
 		_, ok = pool.ByID(seal.ID())

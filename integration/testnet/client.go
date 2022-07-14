@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/onflow/cadence"
+
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go-sdk/crypto"
@@ -41,16 +42,19 @@ func NewClientWithKey(accessAddr string, accountAddr sdk.Address, key sdkcrypto.
 
 	flowClient, err := client.New(accessAddr, grpc.WithInsecure()) //nolint:staticcheck
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not create new flow client: %w", err)
 	}
 
 	acc, err := flowClient.GetAccount(context.Background(), accountAddr)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not get the account %x: %w", accountAddr, err)
 	}
 	accountKey := acc.Keys[0]
 
-	mySigner := crypto.NewInMemorySigner(key, accountKey.HashAlgo)
+	mySigner, err := crypto.NewInMemorySigner(key, accountKey.HashAlgo)
+	if err != nil {
+		return nil, fmt.Errorf("could not create a signer: %w", err)
+	}
 
 	tc := &Client{
 		client:         flowClient,
@@ -70,7 +74,7 @@ func NewClient(addr string, chain flow.Chain) (*Client, error) {
 	key := unittest.ServiceAccountPrivateKey
 	privateKey, err := sdkcrypto.DecodePrivateKey(sdkcrypto.SignatureAlgorithm(key.SignAlgo), key.PrivateKey.Encode())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not decode private key: %w", err)
 	}
 	// Uncomment for debugging keys
 
@@ -318,13 +322,16 @@ func (c *Client) CreateAccount(
 ) (sdk.Address, error) {
 
 	payerKey := payerAccount.Keys[0]
-	tx := templates.CreateAccount([]*sdk.AccountKey{accountKey}, nil, payer)
+	tx, err := templates.CreateAccount([]*sdk.AccountKey{accountKey}, nil, payer)
+	if err != nil {
+		return sdk.Address{}, fmt.Errorf("failed cusnctruct create account transaction %w", err)
+	}
 	tx.SetGasLimit(1000).
 		SetReferenceBlockID(latestBlockID).
 		SetProposalKey(payer, 0, payerKey.SequenceNumber).
 		SetPayer(payer)
 
-	err := c.SignAndSendTransaction(ctx, tx)
+	err = c.SignAndSendTransaction(ctx, tx)
 	if err != nil {
 		return sdk.Address{}, fmt.Errorf("failed to sign and send create account transaction %w", err)
 	}

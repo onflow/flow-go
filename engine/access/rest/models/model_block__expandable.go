@@ -9,7 +9,6 @@
 package models
 
 type BlockExpandable struct {
-	Payload string `json:"payload,omitempty"`
-
+	Payload         string `json:"payload,omitempty"`
 	ExecutionResult string `json:"execution_result,omitempty"`
 }
