@@ -22,7 +22,7 @@ func TestTerminateOnFullDisk(t *testing.T) {
 	// sad path
 	t.Run("panic on full disk", func(t *testing.T) {
 		// imitate badgerDB error wrapping
-		badgerDiskFullError := syscall.ENOSPC
+		badgerDiskFullError := fmt.Errorf("this is intended to mimic an internal Badger error wrapping an out-of-disk system error: %w", syscall.ENOSPC)
 		defer func() {
 			if rec := recover(); rec == nil {
 				require.Fail(t, "code should panic")
