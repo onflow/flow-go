@@ -63,7 +63,7 @@ func New(timeoutController *timeout.Controller,
 // updateLivenessData updates the current view, qc, tc. Currently, the calling code
 // ensures that the view number is STRICTLY monotonously increasing. The method
 // updateLivenessData panics as a last resort if ActivePaceMaker is modified to violate this condition.
-// No errors are expected, any error should be treated as exception
+// No errors are expected, any error should be treated as exception.
 func (p *ActivePaceMaker) updateLivenessData(newView uint64, qc *flow.QuorumCertificate, tc *flow.TimeoutCertificate) error {
 	if newView <= p.livenessData.CurrentView {
 		// This should never happen: in the current implementation, it is trivially apparent that
@@ -79,6 +79,22 @@ func (p *ActivePaceMaker) updateLivenessData(newView uint64, qc *flow.QuorumCert
 		p.livenessData.NewestQC = qc
 	}
 	p.livenessData.LastViewTC = tc
+	err := p.persist.PutLivenessData(p.livenessData)
+	if err != nil {
+		return fmt.Errorf("could not persist liveness data: %w", err)
+	}
+
+	return nil
+}
+
+// updateNewestQC updates the highest QC tracked by view. This method does nothing if stored QC is newer.
+// No errors are expected, any error should be treated as exception.
+func (p *ActivePaceMaker) updateNewestQC(qc *flow.QuorumCertificate) error {
+	if p.livenessData.NewestQC.View >= qc.View {
+		return nil
+	}
+
+	p.livenessData.NewestQC = qc
 	err := p.persist.PutLivenessData(p.livenessData)
 	if err != nil {
 		return fmt.Errorf("could not persist liveness data: %w", err)
@@ -105,6 +121,10 @@ func (p *ActivePaceMaker) TimeoutChannel() <-chan time.Time {
 // No errors are expected, any error should be treated as exception
 func (p *ActivePaceMaker) ProcessQC(qc *flow.QuorumCertificate) (*model.NewViewEvent, error) {
 	if qc.View < p.CurView() {
+		err := p.updateNewestQC(qc)
+		if err != nil {
+			return nil, fmt.Errorf("could not update tracked newest QC: %w", err)
+		}
 		return nil, nil
 	}
 

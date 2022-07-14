@@ -215,8 +215,36 @@ func (s *ActivePaceMakerTestSuite) TestProcessQC_InvalidatesLastViewTC() {
 
 // TestProcessQC_IgnoreOldQC tests that ActivePaceMaker ignores old QC and doesn't advance round
 func (s *ActivePaceMakerTestSuite) TestProcessQC_IgnoreOldQC() {
-	nve, err := s.paceMaker.ProcessQC(QC(s.livenessData.CurrentView - 1))
+	qc := QC(s.livenessData.CurrentView - 1)
+	nve, err := s.paceMaker.ProcessQC(qc)
 	require.NoError(s.T(), err)
 	require.Nil(s.T(), nve)
 	require.Equal(s.T(), s.livenessData.CurrentView, s.paceMaker.CurView())
+	require.NotEqual(s.T(), qc, s.paceMaker.NewestQC())
+}
+
+// TestProcessQC_UpdateNewestQC
+func (s *ActivePaceMakerTestSuite) TestProcessQC_UpdateNewestQC() {
+	s.persist.On("PutLivenessData", mock.Anything).Return(nil).Once()
+	s.notifier.On("OnStartingTimeout", mock.Anything).Return().Once()
+	s.notifier.On("OnTcTriggeredViewChange", mock.Anything, mock.Anything).Return().Once()
+	tc := helper.MakeTC(helper.WithTCView(s.livenessData.CurrentView+10),
+		helper.WithTCNewestQC(s.livenessData.NewestQC))
+	nve, err := s.paceMaker.ProcessTC(tc)
+	require.NoError(s.T(), err)
+	require.NotNil(s.T(), nve)
+
+	qc := QC(s.livenessData.NewestQC.View + 5)
+
+	expectedLivenessData := &hotstuff.LivenessData{
+		CurrentView: s.livenessData.CurrentView,
+		LastViewTC:  s.livenessData.LastViewTC,
+		NewestQC:    qc,
+	}
+	s.persist.On("PutLivenessData", expectedLivenessData).Return(nil).Once()
+
+	nve, err = s.paceMaker.ProcessQC(qc)
+	require.NoError(s.T(), err)
+	require.Nil(s.T(), nve)
+	require.Equal(s.T(), qc, s.paceMaker.NewestQC())
 }
