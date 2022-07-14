@@ -28,7 +28,7 @@ func TestHeights(t *testing.T) {
 	for height := uint64(2); height <= 4; height++ {
 		block := unittest.BlockHeaderFixture()
 		block.Height = height
-		heights.BlockFinalized(&block)
+		heights.BlockFinalized(block)
 	}
 
 	// ensure callbacks were invoked correctly
