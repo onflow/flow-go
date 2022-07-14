@@ -137,10 +137,11 @@ func TransactionToMessage(tb flow.TransactionBody) *entities.Transaction {
 	}
 }
 
-func BlockHeaderToMessage(h *flow.Header) (*entities.BlockHeader, error) {
+func BlockHeaderToMessage(h *flow.Header, signerIDs flow.IdentifierList) (*entities.BlockHeader, error) {
 	id := h.ID()
 
 	t := timestamppb.New(h.Timestamp)
+	parentVoterIds := IdentifiersToMessages(signerIDs)
 
 	return &entities.BlockHeader{
 		Id:                 id[:],
@@ -150,6 +151,7 @@ func BlockHeaderToMessage(h *flow.Header) (*entities.BlockHeader, error) {
 		Timestamp:          t,
 		View:               h.View,
 		ParentVoterIndices: h.ParentVoterIndices,
+		ParentVoterIds:     parentVoterIds,
 		ParentVoterSigData: h.ParentVoterSigData,
 		ProposerId:         h.ProposerID[:],
 		ProposerSigData:    h.ProposerSigData,
@@ -245,7 +247,7 @@ func MessagesToExecutionResults(m []*entities.ExecutionResult) ([]*flow.Executio
 	return execResults, nil
 }
 
-func BlockToMessage(h *flow.Block) (*entities.Block, error) {
+func BlockToMessage(h *flow.Block, signerIDs flow.IdentifierList) (*entities.Block, error) {
 
 	id := h.ID()
 
@@ -260,7 +262,7 @@ func BlockToMessage(h *flow.Block) (*entities.Block, error) {
 		return nil, err
 	}
 
-	blockHeader, err := BlockHeaderToMessage(h.Header)
+	blockHeader, err := BlockHeaderToMessage(h.Header, signerIDs)
 	if err != nil {
 		return nil, err
 	}
