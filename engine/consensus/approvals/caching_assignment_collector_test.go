@@ -16,7 +16,7 @@ import (
 type CachingAssignmentCollectorTestSuite struct {
 	suite.Suite
 
-	executedBlock flow.Header
+	executedBlock *flow.Header
 	result        *flow.ExecutionResult
 	collector     *CachingAssignmentCollector
 }
@@ -31,7 +31,7 @@ func (s *CachingAssignmentCollectorTestSuite) SetupTest() {
 		result.BlockID = s.executedBlock.ID()
 	})
 	s.collector = NewCachingAssignmentCollector(AssignmentCollectorBase{
-		executedBlock: &s.executedBlock,
+		executedBlock: s.executedBlock,
 		result:        s.result,
 		resultID:      s.result.ID(),
 	})

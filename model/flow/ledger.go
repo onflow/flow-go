@@ -99,8 +99,11 @@ type StateCommitment hash.Hash
 // although it can represent a valid state commitment.
 var DummyStateCommitment = StateCommitment(hash.DummyHash)
 
-// ToStateCommitment converts a byte slice into a StateComitment.
+// ToStateCommitment converts a byte slice into a StateCommitment.
 // It returns an error if the slice has an invalid length.
+// The returned error indicates that the given byte slice is not a
+// valid root hash of an execution state.  As the function is
+// side-effect free, all failures are simply a no-op.
 func ToStateCommitment(stateBytes []byte) (StateCommitment, error) {
 	var state StateCommitment
 	if len(stateBytes) != len(state) {
