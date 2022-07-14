@@ -1035,14 +1035,17 @@ func followerNodeInfos(confs []ConsensusFollowerConfig) ([]bootstrap.NodeInfo, e
 	dummyStakingKey := unittest.StakingPrivKeyFixture()
 
 	for _, conf := range confs {
-		info := bootstrap.NewPrivateNodeInfo(
+		info, err := bootstrap.NewPrivateNodeInfo(
 			conf.NodeID,
 			flow.RoleAccess, // use Access role
 			"",              // no address
 			0,               // no weight
 			conf.NetworkingPrivKey,
-			dummyStakingKey.PrivateKey,
+			dummyStakingKey,
 		)
+		if err != nil {
+			return nil, err
+		}
 
 		nodeInfos = append(nodeInfos, info)
 	}
@@ -1296,14 +1299,17 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 		addr := fmt.Sprintf("%s:%d", name, DefaultFlowPort)
 		roleCounter[conf.Role]++
 
-		info := bootstrap.NewPrivateNodeInfo(
+		info, err := bootstrap.NewPrivateNodeInfo(
 			conf.Identifier,
 			conf.Role,
 			addr,
 			conf.Weight,
 			networkKeys[i],
-			stakingKeys[i].PrivateKey,
+			stakingKeys[i],
 		)
+		if err != nil {
+			return nil, err
+		}
 
 		containerConf := ContainerConfig{
 			NodeInfo:              info,

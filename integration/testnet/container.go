@@ -92,15 +92,19 @@ func GetPrivateNodeInfoAddress(nodeName string) string {
 	return fmt.Sprintf("%s:%d", nodeName, DefaultFlowPort)
 }
 
-func NewContainerConfig(nodeName string, conf NodeConfig, networkKey, stakingKey crypto.PrivateKey) ContainerConfig {
-	info := bootstrap.NewPrivateNodeInfo(
+func NewContainerConfig(nodeName string, conf NodeConfig, networkKey, stakingKey crypto.PrivateKey,
+) (ContainerConfig, error) {
+	info, err := bootstrap.NewPrivateNodeInfo(
 		conf.Identifier,
 		conf.Role,
 		GetPrivateNodeInfoAddress(nodeName),
 		conf.Weight,
 		networkKey,
-		stakingKey.PrivateKey,
+		stakingKey,
 	)
+	if err != nil {
+		return ContainerConfig{}, err
+	}
 
 	containerConf := ContainerConfig{
 		NodeInfo:              info,
@@ -113,7 +117,7 @@ func NewContainerConfig(nodeName string, conf NodeConfig, networkKey, stakingKey
 		Corrupted:             conf.Corrupted,
 	}
 
-	return containerConf
+	return containerConf, nil
 }
 
 // ImageName returns the Docker image name for the given config.
