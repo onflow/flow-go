@@ -53,7 +53,7 @@ func (c ChainID) getChainCodeWord() uint64 {
 	case Testnet:
 		return invalidCodeTestNetwork
 	case Stagingnet:
-		return invalidCodeCanaryNetwork
+		return invalidCodeStagingNetwork
 	case Emulator, Localnet, Benchnet, BftTestnet:
 		return invalidCodeTransientNetwork
 	default:
