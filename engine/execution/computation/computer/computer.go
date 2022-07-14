@@ -3,7 +3,7 @@ package computer
 import (
 	"context"
 	"fmt"
-	"runtime"
+	"math"
 	"sync"
 	"time"
 
@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/utils/debug"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -65,6 +66,8 @@ func SystemChunkContext(vmCtx fvm.Context, logger zerolog.Logger) fvm.Context {
 		fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(logger)),
 		fvm.WithMaxStateInteractionSize(SystemChunkLedgerIntractionLimit),
 		fvm.WithEventCollectionSizeLimit(SystemChunkEventCollectionMaxSize),
+		fvm.WithAllowContextOverrideByExecutionState(false), // disable reading the memory limit (and computation/memory weights) from the state
+		fvm.WithMemoryLimit(math.MaxUint64),                 // and set the memory limit to the maximum
 	)
 }
 
@@ -211,6 +214,9 @@ func (e *blockComputer) executeBlock(
 	}
 
 	wg.Wait()
+
+	e.log.Debug().Hex("block_id", logging.Entity(block)).Msg("all views committed")
+
 	res.StateReads = stateView.(*delta.View).ReadsCount()
 
 	return res, nil
@@ -320,12 +326,7 @@ func (e *blockComputer) executeTransaction(
 	isSystemChunk bool,
 ) error {
 	startedAt := time.Now()
-
-	var memAllocBefore uint64
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
-	memAllocBefore = m.TotalAlloc
-
+	memAllocBefore := debug.GetHeapAllocsBytes()
 	txID := txBody.ID()
 
 	// we capture two spans one for tx-based view and one for the current context (block-based) view
@@ -394,8 +395,7 @@ func (e *blockComputer) executeTransaction(
 	res.AddTransactionResult(&txResult)
 	res.AddComputationUsed(tx.ComputationUsed)
 
-	runtime.ReadMemStats(&m)
-	memAllocAfter := m.TotalAlloc
+	memAllocAfter := debug.GetHeapAllocsBytes()
 
 	lg := e.log.With().
 		Hex("tx_id", txResult.TransactionID[:]).

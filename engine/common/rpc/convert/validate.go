@@ -27,7 +27,7 @@ func Address(rawAddress []byte, chain flow.Chain) (flow.Address, error) {
 }
 
 func BlockID(blockID []byte) (flow.Identifier, error) {
-	if len(blockID) == 0 {
+	if len(blockID) != flow.IdentifierLen {
 		return flow.ZeroID, status.Error(codes.InvalidArgument, "invalid block id")
 	}
 	return flow.HashToID(blockID), nil

@@ -3,7 +3,6 @@ package wal
 import (
 	"fmt"
 	"sort"
-	"time"
 
 	prometheusWAL "github.com/m4ksio/wal/wal"
 	"github.com/prometheus/client_golang/prometheus"
@@ -13,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/utils/io"
 )
 
 const SegmentSize = 32 * 1024 * 1024
@@ -24,10 +22,7 @@ type DiskWAL struct {
 	forestCapacity int
 	pathByteSize   int
 	log            zerolog.Logger
-	// disk size reading can be time consuming, so limit how often its read
-	diskUpdateLimiter *time.Ticker
-	metrics           module.WALMetrics
-	dir               string
+	dir            string
 }
 
 // TODO use real logger and metrics, but that would require passing them to Trie storage
@@ -37,14 +32,12 @@ func NewDiskWAL(logger zerolog.Logger, reg prometheus.Registerer, metrics module
 		return nil, err
 	}
 	return &DiskWAL{
-		wal:               w,
-		paused:            false,
-		forestCapacity:    forestCapacity,
-		pathByteSize:      pathByteSize,
-		log:               logger,
-		diskUpdateLimiter: time.NewTicker(5 * time.Second),
-		metrics:           metrics,
-		dir:               dir,
+		wal:            w,
+		paused:         false,
+		forestCapacity: forestCapacity,
+		pathByteSize:   pathByteSize,
+		log:            logger,
+		dir:            dir,
 	}, nil
 }
 
@@ -69,23 +62,7 @@ func (w *DiskWAL) RecordUpdate(update *ledger.TrieUpdate) error {
 		return fmt.Errorf("error while recording update in LedgerWAL: %w", err)
 	}
 
-	select {
-	case <-w.diskUpdateLimiter.C:
-		diskSize, err := w.DiskSize()
-		if err != nil {
-			w.log.Warn().Err(err).Msg("error while checking forest disk size")
-		} else {
-			w.metrics.DiskSize(diskSize)
-		}
-	default: //don't block
-	}
-
 	return nil
-}
-
-// DiskSize returns the amount of disk space used by the storage (in bytes)
-func (w *DiskWAL) DiskSize() (uint64, error) {
-	return io.DirSize(w.dir)
 }
 
 func (w *DiskWAL) RecordDelete(rootHash ledger.RootHash) error {

@@ -15,18 +15,18 @@ require (
 	github.com/ipfs/go-ipfs-blockstore v0.2.0
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/onflow/cadence v0.24.2-0.20220627202951-5a06fec82b4a
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220620142725-49b5accb2a84
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220513155751-c4c1f8d59f83
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220628221832-3d206c1d4790
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220628221832-3d206c1d4790
 	github.com/onflow/flow-emulator v0.33.2
 	github.com/onflow/flow-ft/lib/go/templates v0.2.0
 	github.com/onflow/flow-go v0.25.13-0.20220609230330-ac8d2d78c212
 	github.com/onflow/flow-go-sdk v0.26.5-0.20220629191626-900f9f91bffc
-	github.com/onflow/flow-go/crypto v0.24.3
+	github.com/onflow/flow-go/crypto v0.24.4
 	github.com/onflow/flow/protobuf/go/flow v0.3.1
-	github.com/openhistogram/circonusllhist v0.3.0
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/prometheus/client_golang v1.12.1
 	github.com/rs/zerolog v1.26.1
+	github.com/sethvargo/go-retry v0.2.3
 	github.com/stretchr/testify v1.7.5
 	go.uber.org/atomic v1.9.0
 	google.golang.org/grpc v1.45.0
@@ -231,7 +231,6 @@ require (
 	github.com/raulk/clock v1.1.0 // indirect
 	github.com/raulk/go-watchdog v1.2.0 // indirect
 	github.com/rivo/uniseg v0.2.1-0.20211004051800-57c86be7915a // indirect
-	github.com/sethvargo/go-retry v0.2.3 // indirect
 	github.com/shirou/gopsutil/v3 v3.22.2 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572 // indirect
