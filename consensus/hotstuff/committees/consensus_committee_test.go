@@ -212,7 +212,6 @@ func (suite *ConsensusSuite) TestProtocolEvents_CommittedEpoch() {
 	// wait for the protocol event to be processed (async)
 	assert.Eventually(suite.T(), func() bool {
 		_, err := suite.committee.IdentitiesByEpoch(randUint64(201, 300))
-		fmt.Println(err)
 		return err == nil
 	}, 5*time.Second, 50*time.Millisecond)
 
