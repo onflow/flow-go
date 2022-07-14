@@ -68,6 +68,120 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 	})
 }
 
+// TestPartialTrieGet gets payloads from existent and non-existent paths.
+func TestPartialTrieGet(t *testing.T) {
+
+	pathByteSize := 32
+	withForest(t, pathByteSize, 10, func(t *testing.T, f *mtrie.Forest) {
+
+		path1 := utils.PathByUint16(0)
+		payload1 := utils.LightPayload('A', 'a')
+
+		path2 := utils.PathByUint16(1)
+		payload2 := utils.LightPayload('B', 'b')
+
+		paths := []ledger.Path{path1, path2}
+		payloads := []*ledger.Payload{payload1, payload2}
+
+		u := &ledger.TrieUpdate{RootHash: f.GetEmptyRootHash(), Paths: paths, Payloads: payloads}
+		rootHash, err := f.Update(u)
+		require.NoError(t, err, "error updating trie")
+
+		r := &ledger.TrieRead{RootHash: rootHash, Paths: paths}
+		bp, err := f.Proofs(r)
+		require.NoError(t, err, "error getting batch proof")
+
+		psmt, err := NewPSMT(rootHash, bp)
+		require.NoError(t, err, "error building partial trie")
+		ensureRootHash(t, rootHash, psmt)
+
+		t.Run("non-existent key", func(t *testing.T) {
+			path3 := utils.PathByUint16(2)
+			path4 := utils.PathByUint16(4)
+
+			nonExistentPaths := []ledger.Path{path3, path4}
+			retPayloads, err := psmt.Get(nonExistentPaths)
+			require.Nil(t, retPayloads)
+
+			e, ok := err.(*ErrMissingPath)
+			require.True(t, ok)
+			assert.Equal(t, 2, len(e.Paths))
+			require.Equal(t, path3, e.Paths[0])
+			require.Equal(t, path4, e.Paths[1])
+		})
+
+		t.Run("existent key", func(t *testing.T) {
+			retPayloads, err := psmt.Get(paths)
+			require.NoError(t, err)
+			require.Equal(t, len(paths), len(retPayloads))
+			require.Equal(t, payload1, retPayloads[0])
+			require.Equal(t, payload2, retPayloads[1])
+		})
+
+		t.Run("mix of existent and non-existent keys", func(t *testing.T) {
+			path3 := utils.PathByUint16(2)
+			path4 := utils.PathByUint16(4)
+
+			retPayloads, err := psmt.Get([]ledger.Path{path1, path2, path3, path4})
+			require.Nil(t, retPayloads)
+
+			e, ok := err.(*ErrMissingPath)
+			require.True(t, ok)
+			assert.Equal(t, 2, len(e.Paths))
+			require.Equal(t, path3, e.Paths[0])
+			require.Equal(t, path4, e.Paths[1])
+		})
+	})
+}
+
+// TestPartialTrieGetSinglePayload gets single payload from existent/non-existent path.
+func TestPartialTrieGetSinglePayload(t *testing.T) {
+
+	pathByteSize := 32
+	withForest(t, pathByteSize, 10, func(t *testing.T, f *mtrie.Forest) {
+
+		path1 := utils.PathByUint16(0)
+		payload1 := utils.LightPayload('A', 'a')
+
+		path2 := utils.PathByUint16(1)
+		payload2 := utils.LightPayload('B', 'b')
+
+		paths := []ledger.Path{path1, path2}
+		payloads := []*ledger.Payload{payload1, payload2}
+
+		u := &ledger.TrieUpdate{RootHash: f.GetEmptyRootHash(), Paths: paths, Payloads: payloads}
+		rootHash, err := f.Update(u)
+		require.NoError(t, err, "error updating trie")
+
+		r := &ledger.TrieRead{RootHash: rootHash, Paths: paths}
+		bp, err := f.Proofs(r)
+		require.NoError(t, err, "error getting batch proof")
+
+		psmt, err := NewPSMT(rootHash, bp)
+		require.NoError(t, err, "error building partial trie")
+		ensureRootHash(t, rootHash, psmt)
+
+		retPayload, err := psmt.GetSinglePayload(path1)
+		require.NoError(t, err)
+		require.Equal(t, payload1, retPayload)
+
+		retPayload, err = psmt.GetSinglePayload(path2)
+		require.NoError(t, err)
+		require.Equal(t, payload2, retPayload)
+
+		path3 := utils.PathByUint16(2)
+
+		retPayload, err = psmt.GetSinglePayload(path3)
+		require.Nil(t, retPayload)
+
+		var errMissingPath *ErrMissingPath
+		require.ErrorAs(t, err, &errMissingPath)
+		missingPath := err.(*ErrMissingPath)
+		require.Equal(t, 1, len(missingPath.Paths))
+		require.Equal(t, path3, missingPath.Paths[0])
+	})
+}
+
 func TestPartialTrieLeafUpdates(t *testing.T) {
 
 	pathByteSize := 32

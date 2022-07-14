@@ -12,14 +12,12 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/crypto"
-
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
-	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/collection/epochmgr"
 	"github.com/onflow/flow-go/engine/collection/epochmgr/factories"
 	collectioningest "github.com/onflow/flow-go/engine/collection/ingest"
@@ -66,10 +64,12 @@ import (
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/signature"
 	state_synchronization "github.com/onflow/flow-go/module/state_synchronization/mock"
 	chainsync "github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/module/validation"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/protocol"
@@ -152,8 +152,7 @@ func GenericNodeWithStateFixture(t testing.TB,
 	chainID flow.ChainID) testmock.GenericNode {
 
 	me := LocalFixture(t, identity)
-	net, err := stub.NewNetwork(stateFixture.State, me, hub)
-	require.NoError(t, err)
+	net := stub.NewNetwork(t, identity.NodeID, hub)
 
 	parentCtx, cancel := context.WithCancel(context.Background())
 	ctx, _ := irrecoverable.WithSignaler(parentCtx)
@@ -260,7 +259,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		coll, err := collections.ByID(collID)
 		return coll, err
 	}
-	providerEngine, err := provider.New(node.Log, node.Metrics, node.Net, node.Me, node.State, engine.ProvideCollections, selector, retrieve)
+	providerEngine, err := provider.New(node.Log, node.Metrics, node.Net, node.Me, node.State, network.ProvideCollections, selector, retrieve)
 	require.NoError(t, err)
 
 	pusherEngine, err := pusher.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, collections, transactions)
@@ -377,15 +376,13 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.Nil(t, err)
 
 	// request receipts from execution nodes
-	receiptRequester, err := requester.New(node.Log, node.Metrics, node.Net, node.Me, node.State, engine.RequestReceiptsByBlockID, filter.Any, func() flow.Entity { return &flow.ExecutionReceipt{} })
+	receiptRequester, err := requester.New(node.Log, node.Metrics, node.Net, node.Me, node.State, network.RequestReceiptsByBlockID, filter.Any, func() flow.Entity { return &flow.ExecutionReceipt{} })
 	require.Nil(t, err)
 
-	assigner, err := chunks.NewChunkAssigner(chunks.DefaultChunkAssignmentAlpha, node.State)
+	assigner, err := chunks.NewChunkAssigner(flow.DefaultChunkAssignmentAlpha, node.State)
 	require.Nil(t, err)
 
 	receiptValidator := validation.NewReceiptValidator(node.State, node.Headers, node.Index, resultsDB, node.Seals)
-
-	sealingConfig := sealing.DefaultConfig()
 
 	sealingEngine, err := sealing.NewEngine(
 		node.Log,
@@ -404,7 +401,8 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Seals,
 		assigner,
 		seals,
-		sealingConfig)
+		unittest.NewSealingConfigs(flow.DefaultRequiredApprovalsForSealConstruction),
+	)
 	require.NoError(t, err)
 
 	matchingConfig := matching.DefaultConfig()
@@ -522,20 +520,19 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.NoError(t, err)
 
 	execState := executionState.NewExecutionState(
-		ls, commitsStorage, node.Blocks, node.Headers, collectionsStorage, chunkDataPackStorage, results, receipts, myReceipts, eventsStorage, serviceEventsStorage, txResultStorage, node.PublicDB, node.Tracer,
+		ls, commitsStorage, node.Blocks, node.Headers, collectionsStorage, chunkDataPackStorage, results, myReceipts, eventsStorage, serviceEventsStorage, txResultStorage, node.PublicDB, node.Tracer,
 	)
 
 	requestEngine, err := requester.New(
 		node.Log, node.Metrics, node.Net, node.Me, node.State,
-		engine.RequestCollections,
+		network.RequestCollections,
 		filter.HasRole(flow.RoleCollection),
 		func() flow.Entity { return &flow.Collection{} },
 	)
 	require.NoError(t, err)
 
-	metrics := metrics.NewNoopCollector()
 	pusherEngine, err := executionprovider.New(
-		node.Log, node.Tracer, node.Net, node.State, node.Me, execState, metrics, checkAuthorizedAtBlock, 10, 10,
+		node.Log, node.Tracer, node.Net, node.State, node.Me, execState, metricsCollector, checkAuthorizedAtBlock, 10, 10,
 	)
 	require.NoError(t, err)
 
@@ -569,6 +566,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		computation.DefaultProgramsCacheSize,
 		committer,
 		computation.DefaultScriptLogThreshold,
+		computation.DefaultScriptExecutionTimeLimit,
 		nil,
 		eds,
 		edCache,
@@ -579,7 +577,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		Manager: computationEngine,
 	}
 
-	syncCore, err := chainsync.New(node.Log, chainsync.DefaultConfig())
+	syncCore, err := chainsync.New(node.Log, chainsync.DefaultConfig(), metrics.NewChainSyncCollector())
 	require.NoError(t, err)
 
 	deltas, err := ingestion.NewDeltas(1000)
@@ -680,12 +678,14 @@ func getRoot(t *testing.T, node *testmock.GenericNode) (*flow.Header, *flow.Quor
 	require.NoError(t, err)
 
 	signerIDs := signers.NodeIDs()
+	signerIndices, err := signature.EncodeSignersToIndices(signerIDs, signerIDs)
+	require.NoError(t, err)
 
 	rootQC := &flow.QuorumCertificate{
-		View:      rootHead.View,
-		BlockID:   rootHead.ID(),
-		SignerIDs: signerIDs,
-		SigData:   unittest.SignatureFixture(),
+		View:          rootHead.View,
+		BlockID:       rootHead.ID(),
+		SignerIndices: signerIndices,
+		SigData:       unittest.SignatureFixture(),
 	}
 
 	return rootHead, rootQC
@@ -696,8 +696,8 @@ type RoundRobinLeaderSelection struct {
 	me         flow.Identifier
 }
 
-func (s *RoundRobinLeaderSelection) Identities(blockID flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
-	return s.identities.Filter(selector), nil
+func (s *RoundRobinLeaderSelection) Identities(blockID flow.Identifier) (flow.IdentityList, error) {
+	return s.identities, nil
 }
 
 func (s *RoundRobinLeaderSelection) Identity(blockID flow.Identifier, participantID flow.Identifier) (*flow.Identity, error) {

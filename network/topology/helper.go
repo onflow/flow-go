@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -26,7 +26,7 @@ func MockStateForCollectionNodes(t *testing.T, collectorIds flow.IdentityList, c
 	epochQuery := new(mockprotocol.EpochQuery)
 	epoch := new(mockprotocol.Epoch)
 	assignments := unittest.ClusterAssignment(clusterNum, collectorIds)
-	clusters, err := flow.NewClusterList(assignments, collectorIds)
+	clusters, err := factory.NewClusterList(assignments, collectorIds)
 	require.NoError(t, err)
 
 	epoch.On("Clustering").Return(clusters, nil)
@@ -39,7 +39,7 @@ func MockStateForCollectionNodes(t *testing.T, collectorIds flow.IdentityList, c
 
 // connectednessByChannel verifies that the subgraph of nodes subscribed to a channel is connected.
 func connectednessByChannel(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList, ids flow.IdentityList, channel network.Channel) {
-	roles, ok := engine.RolesByChannel(channel)
+	roles, ok := network.RolesByChannel(channel)
 	require.True(t, ok)
 	Connected(t, adjMap, ids, filter.HasRole(roles...))
 }
@@ -81,7 +81,7 @@ func MockSubscriptionManager(t *testing.T, ids flow.IdentityList) []network.Subs
 		sm.On("Register", mock.Anything, mock.Anything).Return(err)
 		sm.On("Unregister", mock.Anything).Return(err)
 		sm.On("GetEngine", mock.Anything).Return(err)
-		sm.On("Channels").Return(engine.ChannelsByRole(id.Role))
+		sm.On("Channels").Return(network.ChannelsByRole(id.Role))
 		sms[i] = sm
 	}
 

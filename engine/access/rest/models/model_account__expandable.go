@@ -9,7 +9,6 @@
 package models
 
 type AccountExpandable struct {
-	Keys string `json:"keys,omitempty"`
-
+	Keys      string `json:"keys,omitempty"`
 	Contracts string `json:"contracts,omitempty"`
 }

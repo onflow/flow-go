@@ -33,3 +33,23 @@ curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"
 curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "read-blocks", "data": { "block": 24998900 }}'
 ```
 
+### To get identity by peer id
+```
+curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "get-latest-identity", "data": { "peer_id": "QmNqszdfyEZmMCXcnoUdBDWboFvVLF5reyKPuiqFQT77Vw" }}'
+```
+
+
+### To get transactions for ranges (only available to staked access and execution nodes)
+```
+curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "get-transactions", "data": { "start-height": 340, "end-height": 343 }}'
+```
+
+### To set required approvals for sealing
+```
+curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-required-approvals-for-sealing", "data": 1}'
+```
+
+### To get required apporvals for sealing
+```
+curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "get-required-approvals-for-sealing"}'
+```

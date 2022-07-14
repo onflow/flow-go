@@ -12,7 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
-	"github.com/onflow/flow-go/model/events"
+	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
@@ -99,7 +99,7 @@ func New(
 	}
 
 	// register the engine with the network layer and store the conduit
-	con, err := net.Register(engine.SyncCommittee, e)
+	con, err := net.Register(network.SyncCommittee, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
@@ -306,12 +306,9 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 			e.log.Debug().Uint64("height", block.Header.Height).Msg("block handler rejected")
 			continue
 		}
-		synced := &events.SyncedBlock{
-			OriginID: originID,
-			Block:    block,
-		}
-		e.comp.SubmitLocal(synced)
 	}
+
+	e.comp.SubmitLocal(res)
 }
 
 // checkLoop will regularly scan for items that need requesting.
@@ -373,7 +370,7 @@ func (e *Engine) pollHeight() {
 }
 
 // sendRequests sends a request for each range and batch using consensus participants from last finalized snapshot.
-func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []flow.Range, batches []flow.Batch) {
+func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []chainsync.Range, batches []chainsync.Batch) {
 	var errs *multierror.Error
 
 	for _, ran := range ranges {

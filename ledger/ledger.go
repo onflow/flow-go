@@ -24,6 +24,12 @@ type Ledger interface {
 	// InitialState returns the initial state of the ledger
 	InitialState() State
 
+	// HasState returns true if the given state exists inside the ledger
+	HasState(state State) bool
+
+	// GetSingleValue returns value for a given key at specific state
+	GetSingleValue(query *QuerySingleValue) (value Value, err error)
+
 	// Get returns values for the given slice of keys at specific state
 	Get(query *Query) (values []Value, err error)
 
@@ -45,7 +51,7 @@ func NewEmptyQuery(sc State) (*Query, error) {
 	return &Query{state: sc}, nil
 }
 
-// NewQuery constructs a new ledger  query
+// NewQuery constructs a new ledger query
 func NewQuery(sc State, keys []Key) (*Query, error) {
 	return &Query{state: sc, keys: keys}, nil
 }
@@ -68,6 +74,27 @@ func (q *Query) State() State {
 // SetState sets the state part of the query
 func (q *Query) SetState(s State) {
 	q.state = s
+}
+
+// QuerySingleValue contains ledger query for a single value
+type QuerySingleValue struct {
+	state State
+	key   Key
+}
+
+// NewQuerySingleValue constructs a new ledger query for a single value
+func NewQuerySingleValue(sc State, key Key) (*QuerySingleValue, error) {
+	return &QuerySingleValue{state: sc, key: key}, nil
+}
+
+// Key returns key of the query
+func (q *QuerySingleValue) Key() Key {
+	return q.key
+}
+
+// State returns the state part of the query
+func (q *QuerySingleValue) State() State {
+	return q.state
 }
 
 // Update holds all data needed for a ledger update
@@ -326,5 +353,5 @@ type Reporter interface {
 	// Name returns the name of the reporter. Only used for logging.
 	Name() string
 	// Report accepts slice ledger payloads and reports the state of the ledger
-	Report(payloads []Payload) error
+	Report(payloads []Payload, statecommitment State) error
 }

@@ -8,13 +8,14 @@
  */
 package models
 
+// TransactionStatus : This value indicates the state of the transaction execution. Only sealed and expired are final and immutable states.
 type TransactionStatus string
 
 // List of TransactionStatus
 const (
-	PENDING   TransactionStatus = "Pending"
-	FINALIZED TransactionStatus = "Finalized"
-	EXECUTED  TransactionStatus = "Executed"
-	SEALED    TransactionStatus = "Sealed"
-	EXPIRED   TransactionStatus = "Expired"
+	PENDING_TransactionStatus   TransactionStatus = "Pending"
+	FINALIZED_TransactionStatus TransactionStatus = "Finalized"
+	EXECUTED_TransactionStatus  TransactionStatus = "Executed"
+	SEALED_TransactionStatus    TransactionStatus = "Sealed"
+	EXPIRED_TransactionStatus   TransactionStatus = "Expired"
 )

@@ -13,6 +13,8 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-libp2p-core/routing"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
+	kbucket "github.com/libp2p/go-libp2p-kbucket"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
 
@@ -159,10 +161,18 @@ func (n *Node) GetIPPort() (string, string, error) {
 	return IPPortFromMultiAddress(n.host.Network().ListenAddresses()...)
 }
 
+func (n *Node) RoutingTable() *kbucket.RoutingTable {
+	return n.routing.(*dht.IpfsDHT).RoutingTable()
+}
+
+func (n *Node) ListPeers(topic string) []peer.ID {
+	return n.pubSub.ListPeers(topic)
+}
+
 // Subscribe subscribes the node to the given topic and returns the subscription
 // Currently only one subscriber is allowed per topic.
 // NOTE: A node will receive its own published messages.
-func (n *Node) Subscribe(topic flownet.Topic, validators ...validator.MessageValidator) (*pubsub.Subscription, error) {
+func (n *Node) Subscribe(topic flownet.Topic, codec flownet.Codec, peerFilter peerFilterFunc, validators ...validator.MessageValidator) (*pubsub.Subscription, error) {
 	n.Lock()
 	defer n.Unlock()
 
@@ -171,7 +181,7 @@ func (n *Node) Subscribe(topic flownet.Topic, validators ...validator.MessageVal
 	tp, found := n.topics[topic]
 	var err error
 	if !found {
-		topicValidator := validator.TopicValidator(validators...)
+		topicValidator := validator.TopicValidator(n.logger, codec, peerFilter, validators...)
 		if err := n.pubSub.RegisterTopicValidator(
 			topic.String(), topicValidator, pubsub.WithValidatorInline(true),
 		); err != nil {

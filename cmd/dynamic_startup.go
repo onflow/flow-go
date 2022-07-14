@@ -13,13 +13,12 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/sethvargo/go-retry"
 
-	"github.com/onflow/flow-go-sdk/client"
+	client "github.com/onflow/flow-go-sdk/access/grpc"
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
-	"github.com/onflow/flow-go/model/bootstrap"
-	badgerstate "github.com/onflow/flow-go/state/protocol/badger"
-
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/state/protocol"
+	badgerstate "github.com/onflow/flow-go/state/protocol/badger"
 	utilsio "github.com/onflow/flow-go/utils/io"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -56,12 +55,6 @@ func GetSnapshot(ctx context.Context, client *client.Client) (*inmem.Snapshot, e
 // If not check the snapshot at the specified interval until we reach the target epoch and phase.
 func GetSnapshotAtEpochAndPhase(ctx context.Context, log zerolog.Logger, startupEpoch uint64, startupEpochPhase flow.EpochPhase, retryInterval time.Duration, getSnapshot GetProtocolSnapshot) (protocol.Snapshot, error) {
 	start := time.Now()
-	var snapshot protocol.Snapshot
-
-	constRetry, err := retry.NewConstant(retryInterval)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create retry mechanism: %w", err)
-	}
 
 	log = log.With().
 		Uint64("target_epoch_counter", startupEpoch).
@@ -70,7 +63,11 @@ func GetSnapshotAtEpochAndPhase(ctx context.Context, log zerolog.Logger, startup
 
 	log.Info().Msg("starting dynamic startup - waiting until target epoch/phase to start...")
 
-	err = retry.Do(ctx, constRetry, func(ctx context.Context) error {
+	var snapshot protocol.Snapshot
+	var err error
+
+	backoff := retry.NewConstant(retryInterval)
+	err = retry.Do(ctx, backoff, func(ctx context.Context) error {
 		snapshot, err = getSnapshot(ctx)
 		if err != nil {
 			err = fmt.Errorf("failed to get protocol snapshot: %w", err)
@@ -174,7 +171,7 @@ func DynamicStartPreInit(nodeConfig *NodeConfig) error {
 	}
 
 	// get flow client with secure client connection to download protocol snapshot from access node
-	config, err := common.NewFlowClientConfig(nodeConfig.DynamicStartupANAddress, nodeConfig.DynamicStartupANPubkey, false)
+	config, err := common.NewFlowClientConfig(nodeConfig.DynamicStartupANAddress, nodeConfig.DynamicStartupANPubkey, flow.ZeroID, false)
 	if err != nil {
 		return fmt.Errorf("failed to create flow client config for node dynamic startup pre-init: %w", err)
 	}

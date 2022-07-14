@@ -96,8 +96,23 @@ func NewTransactionEnvironment(
 	}
 
 	env.contracts = handler.NewContractHandler(accounts,
-		ctx.RestrictedDeploymentEnabled,
-		env.GetAuthorizedAccountsForContractUpdates,
+		func() bool {
+			enabled, defined := env.GetIsContractDeploymentRestricted()
+			if !defined {
+				// If the contract deployment bool is not set by the state
+				// fallback to the default value set by the configuration
+				// after the contract deployment bool is set by the state on all chains, this logic can be simplified
+				return ctx.RestrictContractDeployment
+			}
+			return enabled
+		},
+		func() bool {
+			// TODO read this from the chain similar to the contract deployment
+			// but for now we would honor the fallback context flag
+			return ctx.RestrictContractRemoval
+		},
+		env.GetAccountsAuthorizedForContractUpdate,
+		env.GetAccountsAuthorizedForContractRemoval,
 		env.useContractAuditVoucher,
 	)
 
@@ -105,38 +120,81 @@ func NewTransactionEnvironment(
 		env.seedRNG(ctx.BlockHeader)
 	}
 
-	err := env.setMeteringWeights()
+	var err error
+	// set the execution parameters from the state
+	if ctx.AllowContextOverrideByExecutionState {
+		err = env.setExecutionParameters()
+	}
 
 	return env, err
 }
 
-func (e *TransactionEnv) setMeteringWeights() error {
-	var m *weighted.Meter
+func (e *TransactionEnv) setExecutionParameters() error {
+	// Check that the service account exists because all the settings are stored in it
+	serviceAddress := e.Context().Chain.ServiceAddress()
+	service := runtime.Address(serviceAddress)
+
+	// set the property if no error, but if the error is a fatal error then return it
+	setIfOk := func(prop string, err error, setter func()) (fatal error) {
+		err, fatal = errors.SplitErrorTypes(err)
+		if fatal != nil {
+			// this is a fatal error. return it
+			e.ctx.Logger.
+				Error().
+				Err(fatal).
+				Msgf("error getting %s", prop)
+			return fatal
+		}
+		if err != nil {
+			// this is a general error.
+			// could be that no setting was present in the state,
+			// or that the setting was not parseable,
+			// or some other deterministic thing.
+			e.ctx.Logger.
+				Debug().
+				Err(err).
+				Msgf("could not set %s. Using defaults", prop)
+			return nil
+		}
+		// everything is ok. do the setting
+		setter()
+		return nil
+	}
+
 	var ok bool
+	var m *weighted.Meter
 	// only set the weights if the meter is a weighted.Meter
 	if m, ok = e.sth.State().Meter().(*weighted.Meter); !ok {
 		return nil
 	}
 
-	computationWeights, memoryWeights, err := getExecutionWeights(e, e.accounts)
-	err, fatal := errors.SplitErrorTypes(err)
-	if fatal != nil {
-		e.ctx.Logger.
-			Error().
-			Err(fatal).
-			Msg("error getting execution weights")
-		return fatal
-	}
+	computationWeights, err := GetExecutionEffortWeights(e, service)
+	err = setIfOk(
+		"execution effort weights",
+		err,
+		func() { m.SetComputationWeights(computationWeights) })
 	if err != nil {
-		e.ctx.Logger.
-			Info().
-			Err(err).
-			Msg("could not set execution weights. Using defaults")
-		return nil
+		return err
 	}
 
-	m.SetComputationWeights(computationWeights)
-	m.SetMemoryWeights(memoryWeights)
+	memoryWeights, err := GetExecutionMemoryWeights(e, service)
+	err = setIfOk(
+		"execution memory weights",
+		err,
+		func() { m.SetMemoryWeights(memoryWeights) })
+	if err != nil {
+		return err
+	}
+
+	memoryLimit, err := GetExecutionMemoryLimit(e, service)
+	err = setIfOk(
+		"execution memory limit",
+		err,
+		func() { m.SetTotalMemoryLimit(memoryLimit) })
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -168,35 +226,84 @@ func (e *TransactionEnv) isTraceable() bool {
 	return e.ctx.Tracer != nil && e.traceSpan != nil
 }
 
-// GetAuthorizedAccountsForContractUpdates returns a list of addresses that
-// are authorized to update/deploy contracts
+// GetAccountsAuthorizedForContractUpdate returns a list of addresses authorized to update/deploy contracts
+func (e *TransactionEnv) GetAccountsAuthorizedForContractUpdate() []common.Address {
+	return e.GetAuthorizedAccounts(
+		cadence.Path{
+			Domain:     blueprints.ContractDeploymentAuthorizedAddressesPathDomain,
+			Identifier: blueprints.ContractDeploymentAuthorizedAddressesPathIdentifier,
+		})
+}
+
+// GetAccountsAuthorizedForContractRemoval returns a list of addresses authorized to remove contracts
+func (e *TransactionEnv) GetAccountsAuthorizedForContractRemoval() []common.Address {
+	return e.GetAuthorizedAccounts(
+		cadence.Path{
+			Domain:     blueprints.ContractRemovalAuthorizedAddressesPathDomain,
+			Identifier: blueprints.ContractRemovalAuthorizedAddressesPathIdentifier,
+		})
+}
+
+// GetAuthorizedAccounts returns a list of addresses authorized by the service account.
+// Used to determine which accounts are permitted to deploy, update, or remove contracts.
 //
 // It reads a storage path from service account and parse the addresses.
-// if any issue occurs on the process (missing registers, stored value properly not set)
-// it gracefully handle it and falls back to default behaviour (only service account be authorized)
-func (e *TransactionEnv) GetAuthorizedAccountsForContractUpdates() []common.Address {
+// If any issue occurs on the process (missing registers, stored value properly not set),
+// it gracefully handles it and falls back to default behaviour (only service account be authorized).
+func (e *TransactionEnv) GetAuthorizedAccounts(path cadence.Path) []common.Address {
 	// set default to service account only
 	service := runtime.Address(e.ctx.Chain.ServiceAddress())
 	defaultAccounts := []runtime.Address{service}
 
 	value, err := e.vm.Runtime.ReadStored(
 		service,
-		cadence.Path{
-			Domain:     blueprints.ContractDeploymentAuthorizedAddressesPathDomain,
-			Identifier: blueprints.ContractDeploymentAuthorizedAddressesPathIdentifier,
-		},
+		path,
 		runtime.Context{Interface: e},
 	)
+
+	const warningMsg = "failed to read contract authorized accounts from service account. using default behaviour instead."
+
 	if err != nil {
-		e.ctx.Logger.Warn().Msg("failed to read contract deployment authorized accounts from service account. using default behaviour instead.")
+		e.ctx.Logger.Warn().Msg(warningMsg)
 		return defaultAccounts
 	}
 	addresses, ok := utils.CadenceValueToAddressSlice(value)
 	if !ok {
-		e.ctx.Logger.Warn().Msg("failed to parse contract deployment authorized accounts from service account. using default behaviour instead.")
+		e.ctx.Logger.Warn().Msg(warningMsg)
 		return defaultAccounts
 	}
 	return addresses
+}
+
+// GetIsContractDeploymentRestricted returns if contract deployment restriction is defined in the state and the value of it
+func (e *TransactionEnv) GetIsContractDeploymentRestricted() (restricted bool, defined bool) {
+	restricted, defined = false, false
+	service := runtime.Address(e.ctx.Chain.ServiceAddress())
+
+	value, err := e.vm.Runtime.ReadStored(
+		service,
+		cadence.Path{
+			Domain:     blueprints.IsContractDeploymentRestrictedPathDomain,
+			Identifier: blueprints.IsContractDeploymentRestrictedPathIdentifier,
+		},
+		runtime.Context{Interface: e},
+	)
+	if err != nil {
+		e.ctx.Logger.
+			Debug().
+			Msg("Failed to read IsContractDeploymentRestricted from the service account. Using value from context instead.")
+		return restricted, defined
+	}
+	restrictedCadence, ok := value.(cadence.Bool)
+	if !ok {
+		e.ctx.Logger.
+			Debug().
+			Msg("Failed to parse IsContractDeploymentRestricted from the service account. Using value from context instead.")
+		return restricted, defined
+	}
+	defined = true
+	restricted = restrictedCadence.ToGoValue().(bool)
+	return restricted, defined
 }
 
 func (e *TransactionEnv) useContractAuditVoucher(address runtime.Address, code []byte) (bool, error) {
@@ -339,13 +446,8 @@ func (e *TransactionEnv) GetStorageCapacity(address common.Address) (value uint6
 	accountStorageCapacity := AccountStorageCapacityInvocation(e, e.traceSpan)
 	result, invokeErr := accountStorageCapacity(address)
 
-	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, storage capacity will be 0.
-	// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
-	// 2. There will also be an error in case the accounts balance times megabytesPerFlow constant overflows,
-	//		which shouldn't happen unless the the price of storage is reduced at least 100 fold
-	// 3. Any other error indicates a bug in our implementation. How can we reliably check the Cadence error?
 	if invokeErr != nil {
-		return 0, nil
+		return 0, errors.HandleRuntimeError(invokeErr)
 	}
 
 	return storageMBUFixToBytesUInt(result), nil
@@ -372,9 +474,8 @@ func (e *TransactionEnv) GetAccountBalance(address common.Address) (value uint64
 	accountBalance := AccountBalanceInvocation(e, e.traceSpan)
 	result, invokeErr := accountBalance(address)
 
-	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, balance will be 0.
 	if invokeErr != nil {
-		return 0, nil
+		return 0, errors.HandleRuntimeError(invokeErr)
 	}
 	return result.ToGoValue().(uint64), nil
 }
@@ -393,11 +494,8 @@ func (e *TransactionEnv) GetAccountAvailableBalance(address common.Address) (val
 	accountAvailableBalance := AccountAvailableBalanceInvocation(e, e.traceSpan)
 	result, invokeErr := accountAvailableBalance(address)
 
-	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, available balance will be 0.
-	// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
-	// 2. Any other error indicates a bug in our implementation. How can we reliably check the Cadence error?
 	if invokeErr != nil {
-		return 0, nil
+		return 0, errors.HandleRuntimeError(invokeErr)
 	}
 	return result.ToGoValue().(uint64), nil
 }
@@ -651,7 +749,26 @@ func (e *TransactionEnv) ComputationUsed() uint64 {
 	return uint64(e.sth.State().TotalComputationUsed())
 }
 
+func (e *TransactionEnv) meterMemory(kind common.MemoryKind, intensity uint) error {
+	if e.sth.EnforceMemoryLimits() {
+		return e.sth.State().MeterMemory(kind, intensity)
+	}
+	return nil
+}
+
+func (e *TransactionEnv) MeterMemory(usage common.MemoryUsage) error {
+	return e.meterMemory(usage.Kind, uint(usage.Amount))
+}
+
+func (e *TransactionEnv) MemoryEstimate() uint64 {
+	return uint64(e.sth.State().TotalMemoryEstimate())
+}
+
 func (e *TransactionEnv) SetAccountFrozen(address common.Address, frozen bool) error {
+
+	if !e.ctx.AccountFreezeEnabled {
+		return errors.NewOperationNotSupportedError("SetAccountFrozen")
+	}
 
 	flowAddress := flow.Address(address)
 
@@ -678,7 +795,7 @@ func (e *TransactionEnv) DecodeArgument(b []byte, _ cadence.Type) (cadence.Value
 		defer sp.Finish()
 	}
 
-	v, err := jsoncdc.Decode(b)
+	v, err := jsoncdc.Decode(e, b)
 	if err != nil {
 		err = errors.NewInvalidArgumentErrorf("argument is not json decodable: %w", err)
 		return nil, fmt.Errorf("decodeing argument failed: %w", err)
@@ -721,7 +838,6 @@ func (e *TransactionEnv) VerifySignature(
 	}
 
 	valid, err := crypto.VerifySignatureFromRuntime(
-		e.ctx.SignatureVerifier,
 		signature,
 		tag,
 		signedData,
@@ -823,6 +939,9 @@ func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 	}
 
 	err = e.meterComputation(meter.ComputationKindCreateAccount, 1)
+	if err != nil {
+		return address, err
+	}
 
 	e.sth.DisableAllLimitEnforcements() // don't enforce limit during account creation
 	defer e.sth.EnableAllLimitEnforcements()
@@ -1142,5 +1261,10 @@ func (e *TransactionEnv) BLSAggregatePublicKeys(keys []*runtime.PublicKey) (*run
 	return crypto.AggregatePublicKeys(keys)
 }
 
-func (e *TransactionEnv) ResourceOwnerChanged(_ *interpreter.CompositeValue, _ common.Address, _ common.Address) {
+func (e *TransactionEnv) ResourceOwnerChanged(
+	*interpreter.Interpreter,
+	*interpreter.CompositeValue,
+	common.Address,
+	common.Address,
+) {
 }

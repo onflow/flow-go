@@ -58,51 +58,58 @@ func extractExecutionState(
 	}
 
 	var migrations []ledger.Migration
-	var rs []ledger.Reporter
+	var preCheckpointReporters, postCheckpointReporters []ledger.Reporter
+	newState := ledger.State(targetHash)
 
 	if migrate {
 		storageUsedUpdateMigration := mgr.StorageUsedUpdateMigration{
 			Log:       log,
 			OutputDir: outputDir,
 		}
-
-		orderedMapMigration := mgr.OrderedMapMigration{
-			Log:       log,
-			OutputDir: dir,
-		}
+		accountStatusMigration := mgr.AccountStatusMigration{Logger: log}
+		legacyControllerMigration := mgr.LegacyControllerMigration{Logger: log}
 
 		migrations = []ledger.Migration{
-			orderedMapMigration.Migrate,
+			accountStatusMigration.Migrate,
+			legacyControllerMigration.Migrate,
 			storageUsedUpdateMigration.Migrate,
 			mgr.PruneMigration,
 		}
 
 	}
-
 	// generating reports at the end, so that the checkpoint file can be used
 	// for sporking as soon as it's generated.
 	if report {
 		log.Info().Msgf("preparing reporter files")
 		reportFileWriterFactory := reporters.NewReportFileWriterFactory(outputDir, log)
 
-		rs = []ledger.Reporter{
-			&reporters.EpochCounterReporter{
-				Log:   log,
-				Chain: chain,
-			},
+		preCheckpointReporters = []ledger.Reporter{
+			// report epoch counter which is needed for finalizing root block
+			reporters.NewExportReporter(log,
+				chain,
+				func() flow.StateCommitment { return targetHash },
+			),
+		}
+
+		postCheckpointReporters = []ledger.Reporter{
 			&reporters.AccountReporter{
 				Log:   log,
 				Chain: chain,
 				RWF:   reportFileWriterFactory,
 			},
 			reporters.NewFungibleTokenTracker(log, reportFileWriterFactory, chain, []string{reporters.FlowTokenTypeID(chain)}),
+			&reporters.AtreeReporter{
+				Log: log,
+				RWF: reportFileWriterFactory,
+			},
 		}
 	}
 
-	newState, err := led.ExportCheckpointAt(
-		ledger.State(targetHash),
+	migratedState, err := led.ExportCheckpointAt(
+		newState,
 		migrations,
-		rs,
+		preCheckpointReporters,
+		postCheckpointReporters,
 		complete.DefaultPathFinderVersion,
 		outputDir,
 		bootstrap.FilenameWALRootCheckpoint,
@@ -113,8 +120,8 @@ func extractExecutionState(
 
 	log.Info().Msgf(
 		"New state commitment for the exported state is: %s (base64: %s)",
-		newState.String(),
-		newState.Base64(),
+		migratedState.String(),
+		migratedState.Base64(),
 	)
 
 	return nil

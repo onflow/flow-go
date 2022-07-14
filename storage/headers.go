@@ -20,17 +20,17 @@ type Headers interface {
 	// for finalized blocks.
 	ByHeight(height uint64) (*flow.Header, error)
 
-	// Find all children for the given parent block. The returned headers might
-	// be unfinalized; if there is more than one, at least one of them has to
+	// ByParentID finds all children for the given parent block. The returned headers
+	// might be unfinalized; if there is more than one, at least one of them has to
 	// be unfinalized.
 	ByParentID(parentID flow.Identifier) ([]*flow.Header, error)
 
-	// Indexes block ID by chunk ID
+	// IndexByChunkID indexes block ID by chunk ID.
 	IndexByChunkID(headerID, chunkID flow.Identifier) error
 
-	// Indexes block ID by chunk ID in a given batch
+	// BatchIndexByChunkID indexes block ID by chunk ID in a given batch.
 	BatchIndexByChunkID(headerID, chunkID flow.Identifier, batch BatchStorage) error
 
-	// Finds the ID of the block corresponding to given chunk ID
+	// IDByChunkID finds the ID of the block corresponding to given chunk ID.
 	IDByChunkID(chunkID flow.Identifier) (flow.Identifier, error)
 }

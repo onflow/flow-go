@@ -1,14 +1,19 @@
 package unittest
 
 import (
+	"encoding/json"
 	"io/ioutil"
+	"math"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network"
+	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
@@ -22,7 +27,7 @@ type SkipReason int
 
 const (
 	TEST_FLAKY               SkipReason = iota + 1 // flaky
-	TEST_WIP                                       // not fully implemented / broken
+	TEST_TODO                                      // not fully implemented or broken and needs to be fixed
 	TEST_REQUIRES_GCP_ACCESS                       // requires the environment to be configured with GCP credentials
 	TEST_DEPRECATED                                // uses code that has been deprecated / disabled
 	TEST_LONG_RUNNING                              // long running
@@ -33,24 +38,84 @@ func (s SkipReason) String() string {
 	switch s {
 	case TEST_FLAKY:
 		return "TEST_FLAKY"
-	case TEST_WIP:
-		return "TEST_WIP"
+	case TEST_TODO:
+		return "TEST_TODO"
 	case TEST_REQUIRES_GCP_ACCESS:
 		return "TEST_REQUIRES_GCP_ACCESS"
 	case TEST_DEPRECATED:
 		return "TEST_DEPRECATED"
 	case TEST_LONG_RUNNING:
-		return "TEST_LONG"
+		return "TEST_LONG_RUNNING"
 	case TEST_RESOURCE_INTENSIVE:
 		return "TEST_RESOURCE_INTENSIVE"
 	}
 	return "UNKNOWN"
 }
 
+func (s SkipReason) MarshalJSON() ([]byte, error) {
+	return json.Marshal(s.String())
+}
+
+func parseSkipReason(reason string) SkipReason {
+	switch reason {
+	case "TEST_FLAKY":
+		return TEST_FLAKY
+	case "TEST_TODO":
+		return TEST_TODO
+	case "TEST_REQUIRES_GCP_ACCESS":
+		return TEST_REQUIRES_GCP_ACCESS
+	case "TEST_DEPRECATED":
+		return TEST_DEPRECATED
+	case "TEST_LONG_RUNNING":
+		return TEST_LONG_RUNNING
+	case "TEST_RESOURCE_INTENSIVE":
+		return TEST_RESOURCE_INTENSIVE
+	default:
+		return 0
+	}
+}
+
+func ParseSkipReason(output string) (SkipReason, bool) {
+	// match output like:
+	// "    test_file.go:123: SKIP [TEST_REASON]: message\n"
+	r := regexp.MustCompile(`(?s)^\s+[a-zA-Z0-9_\-]+\.go:[0-9]+: SKIP \[([A-Z_]+)]: .*$`)
+	matches := r.FindStringSubmatch(output)
+
+	if len(matches) == 2 {
+		skipReason := parseSkipReason(matches[1])
+		if skipReason != 0 {
+			return skipReason, true
+		}
+	}
+
+	return 0, false
+}
+
 func SkipUnless(t *testing.T, reason SkipReason, message string) {
 	t.Helper()
 	if os.Getenv(reason.String()) == "" {
-		t.Skip(message)
+		t.Skipf("SKIP [%s]: %s", reason.String(), message)
+	}
+}
+
+type SkipBenchmarkReason int
+
+const (
+	BENCHMARK_EXPERIMENT SkipBenchmarkReason = iota + 1
+)
+
+func (s SkipBenchmarkReason) String() string {
+	switch s {
+	case BENCHMARK_EXPERIMENT:
+		return "BENCHMARK_EXPERIMENT"
+	}
+	return "UNKNOWN"
+}
+
+func SkipBenchmarkUnless(b *testing.B, reason SkipBenchmarkReason, message string) {
+	b.Helper()
+	if os.Getenv(reason.String()) == "" {
+		b.Skip(message)
 	}
 }
 
@@ -92,6 +157,13 @@ func AssertClosesBefore(t assert.TestingT, done <-chan struct{}, duration time.D
 		assert.Fail(t, "channel did not return in time", msgAndArgs...)
 	case <-done:
 		return
+	}
+}
+
+func AssertFloatEqual(t *testing.T, expected, actual float64, message string) {
+	tolerance := .00001
+	if !(math.Abs(expected-actual) < tolerance) {
+		assert.Equal(t, expected, actual, message)
 	}
 }
 
@@ -307,4 +379,9 @@ func Concurrently(n int, f func(int)) {
 // AssertEqualBlocksLenAndOrder asserts that both a segment of blocks have the same len and blocks are in the same order
 func AssertEqualBlocksLenAndOrder(t *testing.T, expectedBlocks, actualSegmentBlocks []*flow.Block) {
 	assert.Equal(t, flow.GetIDs(expectedBlocks), flow.GetIDs(actualSegmentBlocks))
+}
+
+// NetworkCodec returns cbor codec
+func NetworkCodec() network.Codec {
+	return cborcodec.NewCodec()
 }

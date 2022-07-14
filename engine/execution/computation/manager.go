@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ipfs/go-cid"
@@ -25,7 +26,9 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/state_synchronization"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/utils/debug"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -43,7 +46,7 @@ type VirtualMachine interface {
 }
 
 type ComputationManager interface {
-	ExecuteScript([]byte, [][]byte, *flow.Header, state.View) ([]byte, error)
+	ExecuteScript(context.Context, []byte, [][]byte, *flow.Header, state.View) ([]byte, error)
 	ComputeBlock(
 		ctx context.Context,
 		block *entity.ExecutableBlock,
@@ -53,23 +56,29 @@ type ComputationManager interface {
 }
 
 var DefaultScriptLogThreshold = 1 * time.Second
+var DefaultScriptExecutionTimeLimit = 10 * time.Second
 
 const MaxScriptErrorMessageSize = 1000 // 1000 chars
 
 // Manager manages computation and execution
 type Manager struct {
-	log                zerolog.Logger
-	metrics            module.ExecutionMetrics
-	me                 module.Local
-	protoState         protocol.State
-	vm                 VirtualMachine
-	vmCtx              fvm.Context
-	blockComputer      computer.BlockComputer
-	programsCache      *ProgramsCache
-	scriptLogThreshold time.Duration
-	uploaders          []uploader.Uploader
-	eds                state_synchronization.ExecutionDataService
-	edCache            state_synchronization.ExecutionDataCIDCache
+	log                      zerolog.Logger
+	tracer                   module.Tracer
+	metrics                  module.ExecutionMetrics
+	me                       module.Local
+	protoState               protocol.State
+	vm                       VirtualMachine
+	vmCtx                    fvm.Context
+	blockComputer            computer.BlockComputer
+	programsCache            *ProgramsCache
+	scriptLogThreshold       time.Duration
+	scriptExecutionTimeLimit time.Duration
+	uploaders                []uploader.Uploader
+	eds                      state_synchronization.ExecutionDataService
+	edCache                  state_synchronization.ExecutionDataCIDCache
+
+	rngLock *sync.Mutex
+	rng     *rand.Rand
 }
 
 func New(
@@ -83,6 +92,7 @@ func New(
 	programsCacheSize uint,
 	committer computer.ViewCommitter,
 	scriptLogThreshold time.Duration,
+	scriptExecutionTimeLimit time.Duration,
 	uploaders []uploader.Uploader,
 	eds state_synchronization.ExecutionDataService,
 	edCache state_synchronization.ExecutionDataCIDCache,
@@ -108,18 +118,23 @@ func New(
 	}
 
 	e := Manager{
-		log:                log,
-		metrics:            metrics,
-		me:                 me,
-		protoState:         protoState,
-		vm:                 vm,
-		vmCtx:              vmCtx,
-		blockComputer:      blockComputer,
-		programsCache:      programsCache,
-		scriptLogThreshold: scriptLogThreshold,
-		uploaders:          uploaders,
-		eds:                eds,
-		edCache:            edCache,
+		log:                      log,
+		tracer:                   tracer,
+		metrics:                  metrics,
+		me:                       me,
+		protoState:               protoState,
+		vm:                       vm,
+		vmCtx:                    vmCtx,
+		blockComputer:            blockComputer,
+		programsCache:            programsCache,
+		scriptLogThreshold:       scriptLogThreshold,
+		scriptExecutionTimeLimit: scriptExecutionTimeLimit,
+		uploaders:                uploaders,
+		eds:                      eds,
+		edCache:                  edCache,
+
+		rngLock: &sync.Mutex{},
+		rng:     rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 
 	return &e, nil
@@ -133,24 +148,37 @@ func (e *Manager) getChildProgramsOrEmpty(blockID flow.Identifier) *programs.Pro
 	return blockPrograms.ChildPrograms()
 }
 
-func (e *Manager) ExecuteScript(code []byte, arguments [][]byte, blockHeader *flow.Header, view state.View) ([]byte, error) {
+func (e *Manager) ExecuteScript(
+	ctx context.Context,
+	code []byte,
+	arguments [][]byte,
+	blockHeader *flow.Header,
+	view state.View,
+) ([]byte, error) {
 
 	startedAt := time.Now()
+	memAllocBefore := debug.GetHeapAllocsBytes()
 
 	// allocate a random ID to be able to track this script when its done,
 	// scripts might not be unique so we use this extra tracker to follow their logs
 	// TODO: this is a temporary measure, we could remove this in the future
-	trackerID := rand.Uint32()
-	e.log.Info().Hex("script_hex", code).Uint32("trackerID", trackerID).Msg("script is sent for execution")
+	if e.log.Debug().Enabled() {
+		e.rngLock.Lock()
+		trackerID := e.rng.Uint32()
+		e.rngLock.Unlock()
 
-	defer func() {
-		e.log.Info().Uint32("trackerID", trackerID).Msg("script execution is complete")
-	}()
+		trackedLogger := e.log.With().Hex("script_hex", code).Uint32("trackerID", trackerID).Logger()
+		trackedLogger.Debug().Msg("script is sent for execution")
+		defer func() {
+			trackedLogger.Debug().Msg("script execution is complete")
+		}()
+	}
 
+	requestCtx, cancel := context.WithTimeout(ctx, e.scriptExecutionTimeLimit)
+	defer cancel()
+
+	script := fvm.NewScriptWithContextAndArgs(code, requestCtx, arguments...)
 	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlockHeader(blockHeader))
-
-	script := fvm.Script(code).WithArguments(arguments...)
-
 	programs := e.getChildProgramsOrEmpty(blockHeader.ID())
 
 	err := func() (err error) {
@@ -161,13 +189,13 @@ func (e *Manager) ExecuteScript(code []byte, arguments [][]byte, blockHeader *fl
 
 			prepareLog := func() *zerolog.Event {
 
-				args := make([]string, 0)
+				args := make([]string, 0, len(arguments))
 				for _, a := range arguments {
 					args = append(args, hex.EncodeToString(a))
 				}
 				return e.log.Error().
 					Hex("script_hex", code).
-					Str("args", strings.Join(args[:], ","))
+					Str("args", strings.Join(args, ","))
 			}
 
 			elapsed := time.Since(start)
@@ -212,7 +240,8 @@ func (e *Manager) ExecuteScript(code []byte, arguments [][]byte, blockHeader *fl
 		return nil, fmt.Errorf("failed to encode runtime value: %w", err)
 	}
 
-	e.metrics.ExecutionScriptExecuted(time.Since(startedAt), script.GasUsed)
+	memAllocAfter := debug.GetHeapAllocsBytes()
+	e.metrics.ExecutionScriptExecuted(time.Since(startedAt), script.GasUsed, memAllocAfter-memAllocBefore, script.MemoryEstimate)
 
 	return encodedValue, nil
 }
@@ -245,6 +274,8 @@ func (e *Manager) ComputeBlock(
 		return nil, fmt.Errorf("failed to execute block: %w", err)
 	}
 
+	e.log.Debug().Hex("block_id", logging.Entity(block.Block)).Msg("block result computed")
+
 	toInsert := blockPrograms
 
 	// if we have item from cache and there were no changes
@@ -255,11 +286,16 @@ func (e *Manager) ComputeBlock(
 
 	e.programsCache.Set(block.ID(), toInsert)
 
+	e.log.Debug().Hex("block_id", logging.Entity(block.Block)).Msg("programs cache updated")
+
 	group, uploadCtx := errgroup.WithContext(ctx)
 	var rootID flow.Identifier
 	var blobTree [][]cid.Cid
 
 	group.Go(func() error {
+		span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXEAddToExecutionDataService)
+		defer span.Finish()
+
 		var collections []*flow.Collection
 		for _, collection := range result.ExecutableBlock.Collections() {
 			collections = append(collections, &flow.Collection{
@@ -285,6 +321,9 @@ func (e *Manager) ComputeBlock(
 			uploader := uploader
 
 			group.Go(func() error {
+				span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXEUploadCollections)
+				defer span.Finish()
+
 				return uploader.Upload(result)
 			})
 		}
@@ -301,6 +340,7 @@ func (e *Manager) ComputeBlock(
 		Msg("computed block result")
 
 	e.edCache.Insert(block.Block.Header, blobTree)
+	e.log.Info().Hex("block_id", logging.Entity(block.Block)).Hex("execution_data_id", rootID[:]).Msg("execution data ID computed")
 	result.ExecutionDataID = rootID
 
 	return result, nil

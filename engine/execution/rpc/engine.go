@@ -10,14 +10,15 @@ import (
 	"unicode/utf8"
 
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow/protobuf/go/flow/execution"
-
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	"github.com/onflow/flow-go/model/flow"
@@ -53,9 +54,12 @@ func New(
 	events storage.Events,
 	exeResults storage.ExecutionResults,
 	txResults storage.TransactionResults,
-	chainID flow.ChainID) *Engine {
+	chainID flow.ChainID,
+	signerIndicesDecoder hotstuff.BlockSignerDecoder,
+	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the gRPC API e.g. Ping->100, ExecuteScriptAtBlockID->300
+	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the gRPC API e.g. Ping->50, ExecuteScriptAtBlockID->10
+) *Engine {
 	log = log.With().Str("engine", "rpc").Logger()
-
 	if config.MaxMsgSize == 0 {
 		config.MaxMsgSize = grpcutils.DefaultMaxMsgSize
 	}
@@ -65,10 +69,22 @@ func New(
 		grpc.MaxSendMsgSize(config.MaxMsgSize),
 	}
 
+	var interceptors []grpc.UnaryServerInterceptor // ordered list of interceptors
 	// if rpc metrics is enabled, add the grpc metrics interceptor as a server option
 	if config.RpcMetricsEnabled {
-		serverOptions = append(serverOptions, grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor))
+		interceptors = append(interceptors, grpc_prometheus.UnaryServerInterceptor)
 	}
+
+	if len(apiRatelimits) > 0 {
+		// create a rate limit interceptor
+		rateLimitInterceptor := rpc.NewRateLimiterInterceptor(log, apiRatelimits, apiBurstLimits).UnaryServerInterceptor
+		// append the rate limit interceptor to the list of interceptors
+		interceptors = append(interceptors, rateLimitInterceptor)
+	}
+
+	// create a chained unary interceptor
+	chainedInterceptors := grpc.ChainUnaryInterceptor(interceptors...)
+	serverOptions = append(serverOptions, chainedInterceptors)
 
 	server := grpc.NewServer(serverOptions...)
 
@@ -76,15 +92,16 @@ func New(
 		log:  log,
 		unit: engine.NewUnit(),
 		handler: &handler{
-			engine:             e,
-			chain:              chainID,
-			blocks:             blocks,
-			headers:            headers,
-			state:              state,
-			events:             events,
-			exeResults:         exeResults,
-			transactionResults: txResults,
-			log:                log,
+			engine:               e,
+			chain:                chainID,
+			blocks:               blocks,
+			headers:              headers,
+			state:                state,
+			signerIndicesDecoder: signerIndicesDecoder,
+			events:               events,
+			exeResults:           exeResults,
+			transactionResults:   txResults,
+			log:                  log,
 		},
 		server: server,
 		config: config,
@@ -134,21 +151,22 @@ func (e *Engine) serve() {
 
 // handler implements a subset of the Observation API.
 type handler struct {
-	engine             ingestion.IngestRPC
-	chain              flow.ChainID
-	blocks             storage.Blocks
-	headers            storage.Headers
-	state              protocol.State
-	events             storage.Events
-	exeResults         storage.ExecutionResults
-	transactionResults storage.TransactionResults
-	log                zerolog.Logger
+	engine               ingestion.IngestRPC
+	chain                flow.ChainID
+	blocks               storage.Blocks
+	headers              storage.Headers
+	state                protocol.State
+	signerIndicesDecoder hotstuff.BlockSignerDecoder
+	events               storage.Events
+	exeResults           storage.ExecutionResults
+	transactionResults   storage.TransactionResults
+	log                  zerolog.Logger
 }
 
 var _ execution.ExecutionAPIServer = &handler{}
 
 // Ping responds to requests when the server is up.
-func (h *handler) Ping(ctx context.Context, req *execution.PingRequest) (*execution.PingResponse, error) {
+func (h *handler) Ping(_ context.Context, _ *execution.PingRequest) (*execution.PingResponse, error) {
 	return &execution.PingResponse{}, nil
 }
 
@@ -367,6 +385,82 @@ func (h *handler) GetTransactionResultByIndex(
 	}, nil
 }
 
+func (h *handler) GetTransactionResultsByBlockID(
+	_ context.Context,
+	req *execution.GetTransactionsByBlockIDRequest,
+) (*execution.GetTransactionResultsResponse, error) {
+
+	reqBlockID := req.GetBlockId()
+	blockID, err := convert.BlockID(reqBlockID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get all tx results
+	txResults, err := h.transactionResults.ByBlockID(blockID)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, status.Error(codes.NotFound, "transaction results not found")
+		}
+
+		return nil, status.Errorf(codes.Internal, "failed to get transaction result: %v", err)
+	}
+
+	// get all events for a block
+	blockEvents, err := h.events.ByBlockID(blockID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get events for block: %v", err)
+	}
+
+	responseTxResults := make([]*execution.GetTransactionResultResponse, len(txResults))
+
+	eventsByTxIndex := make(map[uint32][]flow.Event, len(txResults)) //we will have at most as many buckets as tx results
+
+	// re-partition events by tx index
+	// it's not documented but events are stored indexed by (blockID, event.TransactionID, event.TransactionIndex, event.EventIndex)
+	// hence they should keep order within a transaction, so we don't sort resulting events slices
+	for _, event := range blockEvents {
+		eventsByTxIndex[event.TransactionIndex] = append(eventsByTxIndex[event.TransactionIndex], event)
+	}
+
+	// match tx results with events
+	for index, txResult := range txResults {
+		var statusCode uint32 = 0
+		errMsg := ""
+
+		txIndex := uint32(index)
+
+		if txResult.ErrorMessage != "" {
+			cadenceErrMessage := txResult.ErrorMessage
+			if !utf8.ValidString(cadenceErrMessage) {
+				h.log.Warn().
+					Str("block_id", blockID.String()).
+					Uint32("index", txIndex).
+					Str("error_mgs", fmt.Sprintf("%q", cadenceErrMessage)).
+					Msg("invalid character in Cadence error message")
+				// convert non UTF-8 string to a UTF-8 string for safe GRPC marshaling
+				cadenceErrMessage = strings.ToValidUTF8(txResult.ErrorMessage, "?")
+			}
+
+			statusCode = 1 // for now a statusCode of 1 indicates an error and 0 indicates no error
+			errMsg = cadenceErrMessage
+		}
+
+		events := convert.EventsToMessages(eventsByTxIndex[txIndex])
+
+		responseTxResults[index] = &execution.GetTransactionResultResponse{
+			StatusCode:   statusCode,
+			ErrorMessage: errMsg,
+			Events:       events,
+		}
+	}
+
+	// compose a response
+	return &execution.GetTransactionResultsResponse{
+		TransactionResults: responseTxResults,
+	}, nil
+}
+
 // eventResult creates EventsResponse_Result from flow.Event for the given blockID
 func (h *handler) eventResult(blockID flow.Identifier,
 	flowEvents []flow.Event) (*execution.GetEventsForBlockIDsResponse_Result, error) {
@@ -427,7 +521,7 @@ func (h *handler) GetAccountAtBlockID(
 
 // GetLatestBlockHeader gets the latest sealed or finalized block header.
 func (h *handler) GetLatestBlockHeader(
-	ctx context.Context,
+	_ context.Context,
 	req *execution.GetLatestBlockHeaderRequest,
 ) (*execution.BlockHeaderResponse, error) {
 	var header *flow.Header
@@ -440,16 +534,16 @@ func (h *handler) GetLatestBlockHeader(
 		// get the finalized header from state
 		header, err = h.state.Final().Head()
 	}
-
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "not found: %v", err)
 	}
-	return blockHeaderResponse(header)
+
+	return h.blockHeaderResponse(header)
 }
 
 // GetBlockHeaderByID gets a block header by ID.
 func (h *handler) GetBlockHeaderByID(
-	ctx context.Context,
+	_ context.Context,
 	req *execution.GetBlockHeaderByIDRequest,
 ) (*execution.BlockHeaderResponse, error) {
 	id, err := convert.BlockID(req.GetId())
@@ -460,12 +554,16 @@ func (h *handler) GetBlockHeaderByID(
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "not found: %v", err)
 	}
-
-	return blockHeaderResponse(header)
+	return h.blockHeaderResponse(header)
 }
 
-func blockHeaderResponse(header *flow.Header) (*execution.BlockHeaderResponse, error) {
-	msg, err := convert.BlockHeaderToMessage(header)
+func (h *handler) blockHeaderResponse(header *flow.Header) (*execution.BlockHeaderResponse, error) {
+	signerIDs, err := h.signerIndicesDecoder.DecodeSignerIDs(header)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode signer indices to Identifiers for block %v: %w", header.ID(), err)
+	}
+
+	msg, err := convert.BlockHeaderToMessage(header, signerIDs)
 	if err != nil {
 		return nil, err
 	}

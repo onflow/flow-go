@@ -18,7 +18,7 @@ jobs:
       - name: Set benchmark repetitions
         # reducing repetition will speed up execution,
         # but will be more inaccurate at detecting change
-        run: echo "::set-output name=benchmark_repetitions::7"
+        run: echo "::set-output name=benchmark_repetitions::10"
         id: settings
 
       - name: Checkout
@@ -29,22 +29,22 @@ jobs:
       - name: Setup go
         uses: actions/setup-go@v2
         with:
-          # 1.17 to get shuffle on bench tests
-          go-version: "^1.17"
+          # 1.17 min to get shuffle on bench tests
+          go-version: "^1.18"
 
       - name: Build relic
-        run: make crypto/relic/build
+        run: make crypto_setup_gopath
 
       - name: Run benchmark on current branch
         run: |
-          (for i in {1..${{ steps.settings.outputs.benchmark_repetitions }}}; do go test ./fvm --bench . --tags relic -shuffle=on; done) | tee new.txt
+          (for i in {1..${{ steps.settings.outputs.benchmark_repetitions }}}; do go test ./fvm --bench . --tags relic -shuffle=on --benchmem --run ^$; done) | tee new.txt
 
       - name: Checkout base branch
         run: git checkout ${{ github.event.pull_request.base.sha }}
 
       - name: Run benchmark on base branch
         run: |
-          (for i in {1..${{ steps.settings.outputs.benchmark_repetitions }}}; do go test ./fvm --bench . --tags relic -shuffle=on; done) | tee old.txt
+          (for i in {1..${{ steps.settings.outputs.benchmark_repetitions }}}; do go test ./fvm --bench . --tags relic -shuffle=on --benchmem --run ^$; done) | tee old.txt
 
       # see https://trstringer.com/github-actions-multiline-strings/ to see why this part is complex
       - name: Use benchstat for comparison
@@ -73,12 +73,17 @@ jobs:
 
             This branch with compared with the base branch ${{  github.event.pull_request.base.label }} commit ${{ github.event.pull_request.base.sha }}
 
-            The command `(for i in {1..N}; do go test ./fvm --bench . --tags relic -shuffle=on; done)` was used.
+            The command `(for i in {1..N}; do go test ./fvm --bench . --tags relic -shuffle=on --benchmem --run ^$; done)` was used.
 
             Bench tests were run a total of ${{ steps.settings.outputs.benchmark_repetitions }} times on each branch.
 
-            ## Results
+            <details>
+            <summary>Collapsed results for better readability</summary>
+            <p>
 
             ${{ env.BENCHSTAT }}
+            
+            </p>
+            </details>  
             
           edit-mode: replace
