@@ -19,7 +19,6 @@ const (
 	ClusterBlockVote          = "ClusterBlockVote"
 	ClusterBlockResponse      = "ClusterBlockResponse"
 	CollectionGuarantee       = "CollectionGuarantee"
-	Transaction               = "Transaction"
 	TransactionBody           = "TransactionBody"
 	ExecutionReceipt          = "ExecutionReceipt"
 	ResultApproval            = "ResultApproval"
