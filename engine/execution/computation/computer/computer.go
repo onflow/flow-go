@@ -221,6 +221,9 @@ func (e *blockComputer) executeBlock(
 	}
 
 	wg.Wait()
+
+	e.log.Debug().Hex("block_id", logging.Entity(block)).Msg("all views committed")
+
 	res.StateReads = stateView.(*delta.View).ReadsCount()
 
 	executionData := generateExecutionData(res, collections, systemCol)
