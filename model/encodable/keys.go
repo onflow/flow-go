@@ -128,31 +128,6 @@ func (pub *StakingPubKey) UnmarshalJSON(b []byte) error {
 	return err
 }
 
-// StakingPoP wraps a PoP and allows it to be JSON encoded and decoded.
-type StakingPoP struct {
-	crypto.Signature
-}
-
-func (pop StakingPoP) MarshalJSON() ([]byte, error) {
-	if pop.Signature == nil {
-		return json.Marshal(nil)
-	}
-	return json.Marshal(toHex(pop.Signature))
-}
-
-func (pop *StakingPoP) UnmarshalJSON(b []byte) error {
-	bz, err := fromJSONHex(b)
-	if err != nil {
-		return err
-	}
-
-	if len(bz) == 0 {
-		return nil
-	}
-	pop.Signature = bz
-	return err
-}
-
 // StakingPrivKey wraps a private key and allows it to be JSON encoded and decoded. It is not defined in the
 // crypto package since the crypto package should not know about the different key types. More importantly, private
 // keys should not be automatically encodable/serializable to prevent accidental secret sharing. The bootstrapping

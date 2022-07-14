@@ -77,7 +77,7 @@ func addFinalizeCmdFlags() {
 		"containing the output from the `keygen` command for internal nodes")
 	finalizeCmd.Flags().StringVar(&flagPartnerNodeInfoDir, "partner-dir", "", "path to directory "+
 		"containing one JSON file starting with node-info.pub.<NODE_ID>.json for every partner node (fields "+
-		" in the JSON file: Role, Address, NodeID, NetworkPubKey, StakingPubKey)")
+		" in the JSON file: Role, Address, NodeID, NetworkPubKey, StakingPubKey, StakingKeyPoP)")
 	// Deprecated: remove this flag
 	finalizeCmd.Flags().StringVar(&deprecatedFlagPartnerStakes, "partner-stakes", "", "deprecated: use partner-weights instead")
 	finalizeCmd.Flags().StringVar(&flagPartnerWeights, "partner-weights", "", "path to a JSON file containing "+
@@ -551,15 +551,15 @@ func validateNetworkPubKey(key encodable.NetworkPubKey) encodable.NetworkPubKey 
 	return key
 }
 
-func validateStakingPubKey(key encodable.StakingPubKey, pop encodable.StakingPoP) (encodable.StakingPubKey, crypto.Signature) {
+func validateStakingPubKey(key encodable.StakingPubKey, pop []byte) (encodable.StakingPubKey, []byte) {
 	if key.PublicKey == nil {
 		log.Fatal().Msg("StakingPubKey must not be nil")
 	}
-	if pop.Signature == nil {
+	if pop == nil {
 		log.Fatal().Msg("staking key proof of possession must not be nil")
 	}
 
-	valid, err := crypto.BLSVerifyPOP(key.PublicKey, pop.Signature)
+	valid, err := crypto.BLSVerifyPOP(key.PublicKey, pop)
 	if err != nil {
 		log.Fatal().Err(err).Msg("verifying staking key PoP failed")
 	}
@@ -567,7 +567,7 @@ func validateStakingPubKey(key encodable.StakingPubKey, pop encodable.StakingPoP
 		log.Fatal().Err(err).Msg("saking key PoP is invalid")
 	}
 
-	return key, pop.Signature
+	return key, pop
 }
 
 func validateWeight(weight uint64) (uint64, bool) {
