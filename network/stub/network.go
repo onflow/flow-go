@@ -57,7 +57,19 @@ func NewNetwork(t testing.TB, myId flow.Identifier, hub *Hub, opts ...func(*Netw
 		opt(net)
 	}
 
+	// mocks the Start, Ready, and Done behavior of the network.
 	net.On("Start", mock.Anything).Return()
+	ready := make(chan struct{})
+	close(ready)
+	net.On("Ready", mock.Anything).Return(func() <-chan struct{} {
+		return ready
+	})
+
+	done := make(chan struct{})
+	close(done)
+	net.On("Done", mock.Anything).Return(func() <-chan struct{} {
+		return done
+	})
 
 	require.NoError(t, net.conduitFactory.RegisterAdapter(net))
 
