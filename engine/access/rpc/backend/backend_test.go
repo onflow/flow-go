@@ -598,6 +598,132 @@ func (suite *Suite) TestGetCollection() {
 	suite.assertAllExpectations()
 }
 
+// TestGetTransactionResultByIndex tests that the request is forwarded to EN
+func (suite *Suite) TestGetTransactionResultByIndex() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
+	ctx := context.Background()
+	block := unittest.BlockFixture()
+	blockId := block.ID()
+	index := uint32(0)
+
+	suite.snapshot.On("Head").Return(block.Header, nil)
+
+	// block storage returns the corresponding block
+	suite.blocks.
+		On("ByID", blockId).
+		Return(&block, nil)
+
+	_, fixedENIDs := suite.setupReceipts(&block)
+	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
+	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
+
+	// create a mock connection factory
+	connFactory := new(backendmock.ConnectionFactory)
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, nil)
+
+	exeEventReq := execproto.GetTransactionByIndexRequest{
+		BlockId: blockId[:],
+		Index:   index,
+	}
+
+	exeEventResp := execproto.GetTransactionResultResponse{
+		Events: nil,
+	}
+
+	backend := New(
+		suite.state,
+		nil,
+		nil,
+		suite.blocks,
+		suite.headers,
+		suite.collections,
+		suite.transactions,
+		suite.receipts,
+		suite.results,
+		suite.chainID,
+		metrics.NewNoopCollector(),
+		connFactory, // the connection factory should be used to get the execution node client
+		false,
+		DefaultMaxHeightRange,
+		nil,
+		flow.IdentifierList(fixedENIDs.NodeIDs()).Strings(),
+		suite.log,
+		DefaultSnapshotHistoryLimit,
+	)
+	suite.execClient.
+		On("GetTransactionResultByIndex", ctx, &exeEventReq).
+		Return(&exeEventResp, nil).
+		Once()
+
+	result, err := backend.GetTransactionResultByIndex(ctx, blockId, index)
+	suite.checkResponse(result, err)
+	suite.Assert().Equal(result.BlockHeight, block.Header.Height)
+
+	suite.assertAllExpectations()
+}
+
+func (suite *Suite) TestGetTransactionResultsByBlockID() {
+	head := unittest.BlockHeaderFixture()
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+	suite.snapshot.On("Head").Return(&head, nil)
+
+	ctx := context.Background()
+	block := unittest.BlockFixture()
+	blockId := block.ID()
+
+	// block storage returns the corresponding block
+	suite.blocks.
+		On("ByID", blockId).
+		Return(&block, nil)
+
+	_, fixedENIDs := suite.setupReceipts(&block)
+	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
+	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
+
+	// create a mock connection factory
+	connFactory := new(backendmock.ConnectionFactory)
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, nil)
+
+	exeEventReq := execproto.GetTransactionsByBlockIDRequest{
+		BlockId: blockId[:],
+	}
+
+	exeEventResp := execproto.GetTransactionResultsResponse{
+		TransactionResults: []*execproto.GetTransactionResultResponse{{}},
+	}
+
+	backend := New(
+		suite.state,
+		nil,
+		nil,
+		suite.blocks,
+		suite.headers,
+		suite.collections,
+		suite.transactions,
+		suite.receipts,
+		suite.results,
+		suite.chainID,
+		metrics.NewNoopCollector(),
+		connFactory, // the connection factory should be used to get the execution node client
+		false,
+		DefaultMaxHeightRange,
+		nil,
+		flow.IdentifierList(fixedENIDs.NodeIDs()).Strings(),
+		suite.log,
+		DefaultSnapshotHistoryLimit,
+	)
+	suite.execClient.
+		On("GetTransactionResultsByBlockID", ctx, &exeEventReq).
+		Return(&exeEventResp, nil).
+		Once()
+
+	result, err := backend.GetTransactionResultsByBlockID(ctx, blockId)
+	suite.checkResponse(result, err)
+
+	suite.assertAllExpectations()
+}
+
 // TestTransactionStatusTransition tests that the status of transaction changes from Finalized to Sealed
 // when the protocol state is updated
 func (suite *Suite) TestTransactionStatusTransition() {
@@ -640,7 +766,8 @@ func (suite *Suite) TestTransactionStatusTransition() {
 
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, nil)
+	connFactory.On("InvalidateExecutionAPIClient", mock.Anything).Return(false)
 
 	exeEventReq := execproto.GetTransactionResultRequest{
 		BlockId:       blockID[:],
@@ -1106,7 +1233,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, nil)
 
 	// create the expected results from execution node and access node
 	exeResults := make([]*execproto.GetEventsForBlockIDsResponse_Result, len(blockHeaders))
@@ -1739,7 +1866,7 @@ func (suite *Suite) TestGetAccount() {
 	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, nil)
 
 	// create the handler with the mock
 	backend := New(
@@ -1801,7 +1928,7 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, nil)
 
 	// create the expected execution API request
 	blockID := h.ID()
@@ -1959,6 +2086,18 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 			require.ElementsMatch(suite.T(), actualList, expectedENs)
 		}
 	}
+	// if we don't find sufficient receipts, executionNodesForBlockID should return a list of random ENs
+	suite.Run("insufficient receipts return random ENs in state", func() {
+		// return no receipts at all attempts
+		attempt1Receipts = flow.ExecutionReceiptList{}
+		attempt2Receipts = flow.ExecutionReceiptList{}
+		attempt3Receipts = flow.ExecutionReceiptList{}
+		suite.state.On("AtBlockID", mock.Anything).Return(suite.snapshot)
+		actualList, err := executionNodesForBlockID(context.Background(), block.ID(), suite.receipts, suite.state, suite.log)
+		require.NoError(suite.T(), err)
+		require.Equal(suite.T(), len(actualList), maxExecutionNodesCnt)
+	})
+
 	// if no preferred or fixed ENs are specified, the ExecutionNodesForBlockID function should
 	// return the exe node list without a filter
 	suite.Run("no preferred or fixed ENs", func() {
@@ -2022,7 +2161,8 @@ func (suite *Suite) TestExecuteScriptOnExecutionNode() {
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
 	connFactory.On("GetExecutionAPIClient", mock.Anything).
-		Return(suite.execClient, &mockCloser{}, nil)
+		Return(suite.execClient, nil)
+	connFactory.On("InvalidateExecutionAPIClient", mock.Anything).Return(false)
 
 	// create the handler with the mock
 	backend := New(
@@ -2122,7 +2262,8 @@ func (suite *Suite) setupReceipts(block *flow.Block) ([]*flow.ExecutionReceipt, 
 func (suite *Suite) setupConnectionFactory() ConnectionFactory {
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, nil)
+	connFactory.On("InvalidateExecutionAPIClient", mock.Anything).Return(false)
 	return connFactory
 }
 

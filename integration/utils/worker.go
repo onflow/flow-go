@@ -1,42 +1,65 @@
 package utils
 
 import (
+	"context"
+	"sync"
 	"time"
 )
+
+type workFunc func(workerID int)
 
 type Worker struct {
 	workerID int
 	interval time.Duration
-	work     func(workerID int)
-	ticker   *time.Ticker
-	quit     chan struct{}
+	work     workFunc
+
+	ctx    context.Context
+	cancel context.CancelFunc
+
+	wg *sync.WaitGroup
 }
 
-func NewWorker(workerID int, interval time.Duration, work func(workerID int)) Worker {
+func NewWorker(workerID int, interval time.Duration, work workFunc) Worker {
+	ctx, cancel := context.WithCancel(context.Background())
+
 	return Worker{
 		workerID: workerID,
 		interval: interval,
 		work:     work,
+
+		ctx:    ctx,
+		cancel: cancel,
+
+		wg: &sync.WaitGroup{},
 	}
 }
 
 func (w *Worker) Start() {
-	w.ticker = time.NewTicker(w.interval)
-	w.quit = make(chan struct{})
+	w.wg.Add(1)
 
 	go func() {
-		for {
+		defer w.wg.Done()
+
+		t := time.NewTicker(w.interval)
+		defer t.Stop()
+		for ; ; <-t.C {
 			select {
-			case <-w.ticker.C:
-				go w.work(w.workerID)
-			case <-w.quit:
-				w.ticker.Stop()
+			case <-w.ctx.Done():
 				return
+			default:
 			}
+
+			w.wg.Add(1)
+			go func() {
+				defer w.wg.Done()
+				w.work(w.workerID)
+			}()
 		}
 	}()
 }
 
 func (w *Worker) Stop() {
-	close(w.quit)
+	w.cancel()
+	// After this no new workers will be spawn and last worker have finished
+	w.wg.Wait()
 }

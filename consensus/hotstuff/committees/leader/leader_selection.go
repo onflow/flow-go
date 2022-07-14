@@ -25,7 +25,7 @@ func (err InvalidViewError) Error() string {
 	)
 }
 
-// IsInvalidViwError returns whether or not the input error is an invalid view error.
+// IsInvalidViewError returns whether or not the input error is an invalid view error.
 func IsInvalidViewError(err error) bool {
 	return errors.As(err, &InvalidViewError{})
 }
@@ -87,7 +87,7 @@ func (l LeaderSelection) newInvalidViewError(view uint64) InvalidViewError {
 // firstView - the start view of the epoch, the generated leader selections start from this view.
 // rng - the deterministic source of randoms
 // count - the number of leader selections to be pre-generated and cached.
-// identities - the identities that contain the stake info, which is used as weight for the chance of
+// identities - the identities that contain the weight info, which is used as probability for
 //							the identity to be selected as leader.
 func ComputeLeaderSelection(
 	firstView uint64,
@@ -102,7 +102,7 @@ func ComputeLeaderSelection(
 
 	weights := make([]uint64, 0, len(identities))
 	for _, id := range identities {
-		weights = append(weights, id.Stake)
+		weights = append(weights, id.Weight)
 	}
 
 	leaders, err := weightedRandomSelection(rng, count, weights)
@@ -119,7 +119,7 @@ func ComputeLeaderSelection(
 
 // weightedRandomSelection - given a random source source and a given count, pre-generate the indices of leader.
 // The chance to be selected as leader is proportional to its weight.
-// If an identity has 0 stake (weight is 0), it won't be selected as leader.
+// If an identity has 0 weight, it won't be selected as leader.
 // This algorithm is essentially Fitness proportionate selection:
 // See https://en.wikipedia.org/wiki/Fitness_proportionate_selection
 func weightedRandomSelection(

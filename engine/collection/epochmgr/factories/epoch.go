@@ -64,7 +64,7 @@ func (factory *EpochComponentsFactory) Create(
 		return
 	}
 
-	// if we are not a staked participant in this epoch, return a sentinel
+	// if we are not an authorized participant in this epoch, return a sentinel
 	identities, err := epoch.InitialIdentities()
 	if err != nil {
 		err = fmt.Errorf("could not get initial identities for epoch: %w", err)
@@ -72,7 +72,7 @@ func (factory *EpochComponentsFactory) Create(
 	}
 	_, exists := identities.ByNodeID(factory.me.NodeID())
 	if !exists {
-		err = fmt.Errorf("%w (node_id=%x, epoch=%d)", epochmgr.ErrUnstakedForEpoch, factory.me.NodeID(), counter)
+		err = fmt.Errorf("%w (node_id=%x, epoch=%d)", epochmgr.ErrNotAuthorizedForEpoch, factory.me.NodeID(), counter)
 		return
 	}
 
@@ -153,6 +153,8 @@ func (factory *EpochComponentsFactory) Create(
 		err = fmt.Errorf("could not create hotstuff: %w", err)
 		return
 	}
+
+	hotstuffModules.FinalizationDistributor.AddOnBlockFinalizedConsumer(proposalEng.OnFinalizedBlock)
 
 	// attach dependencies to the proposal engine
 	proposal = proposalEng.

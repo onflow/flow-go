@@ -3,9 +3,8 @@ package cmd
 import (
 	"encoding/hex"
 	"os"
-	"regexp"
-
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -21,11 +20,11 @@ import (
 const finalizeHappyPathLogs = "^deterministic bootstrapping random seed" +
 	"collecting partner network and staking keys" +
 	`read \d+ partner node configuration files` +
-	`read \d+ stakes for partner nodes` +
+	`read \d+ weights for partner nodes` +
 	"generating internal private networking and staking keys" +
 	`read \d+ internal private node-info files` +
 	`read internal node configurations` +
-	`read \d+ stakes for internal nodes` +
+	`read \d+ weights for internal nodes` +
 	`checking constraints on consensus/cluster nodes` +
 	`assembling network and staking keys` +
 	`reading root block data` +
@@ -60,13 +59,13 @@ func TestFinalize_HappyPath(t *testing.T) {
 	rootHeight := uint64(12332)
 	epochCounter := uint64(2)
 
-	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerStakes, internalPrivDir, configPath string) {
+	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerWeights, internalPrivDir, configPath string) {
 
 		flagOutdir = bootDir
 
 		flagConfig = configPath
 		flagPartnerNodeInfoDir = partnerDir
-		flagPartnerStakes = partnerStakes
+		flagPartnerWeights = partnerWeights
 		flagInternalNodePrivInfoDir = internalPrivDir
 
 		flagFastKG = true
@@ -107,13 +106,13 @@ func TestFinalize_Deterministic(t *testing.T) {
 	rootHeight := uint64(1000)
 	epochCounter := uint64(0)
 
-	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerStakes, internalPrivDir, configPath string) {
+	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerWeights, internalPrivDir, configPath string) {
 
 		flagOutdir = bootDir
 
 		flagConfig = configPath
 		flagPartnerNodeInfoDir = partnerDir
-		flagPartnerStakes = partnerStakes
+		flagPartnerWeights = partnerWeights
 		flagInternalNodePrivInfoDir = internalPrivDir
 
 		flagFastKG = true
@@ -182,13 +181,13 @@ func TestFinalize_SameSeedDifferentStateCommits(t *testing.T) {
 	rootHeight := uint64(1000)
 	epochCounter := uint64(0)
 
-	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerStakes, internalPrivDir, configPath string) {
+	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerWeights, internalPrivDir, configPath string) {
 
 		flagOutdir = bootDir
 
 		flagConfig = configPath
 		flagPartnerNodeInfoDir = partnerDir
-		flagPartnerStakes = partnerStakes
+		flagPartnerWeights = partnerWeights
 		flagInternalNodePrivInfoDir = internalPrivDir
 
 		flagFastKG = true
@@ -288,13 +287,13 @@ func TestFinalize_InvalidRandomSeedLength(t *testing.T) {
 	// invalid length execution logs
 	expectedLogs := regexp.MustCompile("random seed provided length is not valid")
 
-	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerStakes, internalPrivDir, configPath string) {
+	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerWeights, internalPrivDir, configPath string) {
 
 		flagOutdir = bootDir
 
 		flagConfig = configPath
 		flagPartnerNodeInfoDir = partnerDir
-		flagPartnerStakes = partnerStakes
+		flagPartnerWeights = partnerWeights
 		flagInternalNodePrivInfoDir = internalPrivDir
 
 		flagFastKG = true

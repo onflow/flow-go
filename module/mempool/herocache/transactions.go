@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
@@ -16,12 +17,15 @@ type Transactions struct {
 }
 
 // NewTransactions implements a transactions mempool based on hero cache.
-func NewTransactions(limit uint32, logger zerolog.Logger) *Transactions {
+func NewTransactions(limit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics) *Transactions {
 	t := &Transactions{
-		c: stdmap.NewBackendWithBackData(herocache.NewCache(limit,
-			herocache.DefaultOversizeFactor,
-			heropool.LRUEjection,
-			logger.With().Str("mempool", "transactions").Logger())),
+		c: stdmap.NewBackend(
+			stdmap.WithBackData(
+				herocache.NewCache(limit,
+					herocache.DefaultOversizeFactor,
+					heropool.LRUEjection,
+					logger.With().Str("mempool", "transactions").Logger(),
+					collector))),
 	}
 
 	return t
@@ -78,9 +82,9 @@ func (t Transactions) Size() uint {
 	return t.c.Size()
 }
 
-// Rem removes transaction from mempool.
-func (t *Transactions) Rem(id flow.Identifier) bool {
-	return t.c.Rem(id)
+// Remove removes transaction from mempool.
+func (t *Transactions) Remove(id flow.Identifier) bool {
+	return t.c.Remove(id)
 }
 
 // Hash will return a fingerprint hash representing the contents of the

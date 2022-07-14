@@ -4,13 +4,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/consensus/hotstuff/signature"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/signature"
 )
 
 // CombinedSignerV3 creates votes for the main consensus.
@@ -41,9 +39,9 @@ func NewCombinedSignerV3(
 
 	sc := &CombinedSignerV3{
 		staking:        staking,
-		stakingHasher:  crypto.NewBLSKMAC(encoding.ConsensusVoteTag),
+		stakingHasher:  signature.NewBLSHasher(signature.ConsensusVoteTag),
 		beaconKeyStore: beaconKeyStore,
-		beaconHasher:   crypto.NewBLSKMAC(encoding.RandomBeaconTag),
+		beaconHasher:   signature.NewBLSHasher(signature.RandomBeaconTag),
 	}
 	return sc
 }
@@ -107,7 +105,7 @@ func (c *CombinedSignerV3) genSigData(block *model.Block) ([]byte, error) {
 				return nil, fmt.Errorf("could not generate staking signature: %w", err)
 			}
 
-			return signature.EncodeSingleSig(hotstuff.SigTypeStaking, stakingSig), nil
+			return signature.EncodeSingleSig(encoding.SigTypeStaking, stakingSig), nil
 		}
 		return nil, fmt.Errorf("could not get random beacon private key for view %d: %w", block.View, err)
 	}
@@ -119,5 +117,5 @@ func (c *CombinedSignerV3) genSigData(block *model.Block) ([]byte, error) {
 		return nil, fmt.Errorf("could not generate beacon signature: %w", err)
 	}
 
-	return signature.EncodeSingleSig(hotstuff.SigTypeRandomBeacon, beaconShare), nil
+	return signature.EncodeSingleSig(encoding.SigTypeRandomBeacon, beaconShare), nil
 }

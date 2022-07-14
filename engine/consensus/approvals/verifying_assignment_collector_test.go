@@ -229,9 +229,9 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult() {
 // by one or another reason
 func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIdentity() {
 
-	s.Run("verifier-not-staked", func() {
+	s.Run("verifier zero-weight", func() {
 		identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-		identity.Stake = 0 // invalid stake
+		identity.Weight = 0 // zero weight
 
 		state := &protocol.State{}
 		state.On("AtBlockID", mock.Anything).Return(
@@ -401,8 +401,21 @@ func (s *AssignmentCollectorTestSuite) TestCheckEmergencySealing() {
 		},
 	).Return(true, nil).Once()
 
-	err = s.collector.CheckEmergencySealing(&tracker.NoopSealingTracker{}, DefaultEmergencySealingThreshold+s.IncorporatedBlock.Height)
+	err = s.collector.CheckEmergencySealing(&tracker.NoopSealingTracker{}, DefaultEmergencySealingThresholdForFinalization+s.IncorporatedBlock.Height)
 	require.NoError(s.T(), err)
 
+	s.SealsPL.AssertExpectations(s.T())
+}
+
+// test that when
+func (s *AssignmentCollectorTestSuite) TestCheckEmergencySealingNotEnoughFinalizedBlocks() {
+	err := s.collector.ProcessIncorporatedResult(s.IncorporatedResult)
+	require.NoError(s.T(), err)
+
+	err = s.collector.CheckEmergencySealing(&tracker.NoopSealingTracker{}, DefaultEmergencySealingThresholdForVerification+s.IncorporatedBlock.Height)
+	require.NoError(s.T(), err)
+
+	// SealsPL.Add is not being called, because there isn't enough finalized blocks to trigger
+	// emergency sealing
 	s.SealsPL.AssertExpectations(s.T())
 }

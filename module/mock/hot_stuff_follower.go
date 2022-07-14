@@ -45,6 +45,17 @@ func (_m *HotStuffFollower) Ready() <-chan struct{} {
 }
 
 // SubmitProposal provides a mock function with given fields: proposal, parentView
-func (_m *HotStuffFollower) SubmitProposal(proposal *flow.Header, parentView uint64) {
-	_m.Called(proposal, parentView)
+func (_m *HotStuffFollower) SubmitProposal(proposal *flow.Header, parentView uint64) <-chan struct{} {
+	ret := _m.Called(proposal, parentView)
+
+	var r0 <-chan struct{}
+	if rf, ok := ret.Get(0).(func(*flow.Header, uint64) <-chan struct{}); ok {
+		r0 = rf(proposal, parentView)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan struct{})
+		}
+	}
+
+	return r0
 }

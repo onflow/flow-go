@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -19,6 +21,7 @@ type NewCollectorFactoryMethod = func(view uint64, workers hotstuff.Workers) (ho
 // This structure is concurrently safe.
 type VoteCollectors struct {
 	*component.ComponentManager
+	log                zerolog.Logger
 	lock               sync.RWMutex
 	lowestRetainedView uint64                            // lowest view, for which we still retain a VoteCollector and process votes
 	collectors         map[uint64]hotstuff.VoteCollector // view -> VoteCollector
@@ -28,7 +31,7 @@ type VoteCollectors struct {
 
 var _ hotstuff.VoteCollectors = (*VoteCollectors)(nil)
 
-func NewVoteCollectors(lowestRetainedView uint64, workerPool hotstuff.Workerpool, factoryMethod NewCollectorFactoryMethod) *VoteCollectors {
+func NewVoteCollectors(logger zerolog.Logger, lowestRetainedView uint64, workerPool hotstuff.Workerpool, factoryMethod NewCollectorFactoryMethod) *VoteCollectors {
 	// Component manager for wrapped worker pool
 	componentBuilder := component.NewComponentManagerBuilder()
 	componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
@@ -38,6 +41,7 @@ func NewVoteCollectors(lowestRetainedView uint64, workerPool hotstuff.Workerpool
 	})
 
 	return &VoteCollectors{
+		log:                logger,
 		ComponentManager:   componentBuilder.Build(),
 		lowestRetainedView: lowestRetainedView,
 		collectors:         make(map[uint64]hotstuff.VoteCollector),
@@ -114,6 +118,8 @@ func (v *VoteCollectors) PruneUpToView(lowestRetainedView uint64) {
 		return
 	}
 
+	sizeBefore := len(v.collectors)
+
 	// to optimize the pruning of large view-ranges, we compare:
 	//  * the number of views for which we have collectors: len(v.collectors)
 	//  * the number of views that need to be pruned: view-v.lowestRetainedView
@@ -129,5 +135,13 @@ func (v *VoteCollectors) PruneUpToView(lowestRetainedView uint64) {
 			delete(v.collectors, w)
 		}
 	}
+	from := v.lowestRetainedView
 	v.lowestRetainedView = lowestRetainedView
+
+	v.log.Debug().
+		Uint64("prior_lowest_retained_view", from).
+		Uint64("lowest_retained_view", lowestRetainedView).
+		Int("prior_size", sizeBefore).
+		Int("size", len(v.collectors)).
+		Msgf("pruned vote collectors")
 }

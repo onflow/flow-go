@@ -41,3 +41,29 @@ func CadenceValueToAddressSlice(value cadence.Value) (addresses []common.Address
 	}
 	return addresses, true
 }
+
+// CadenceValueToWeights converts a cadence value to a map of weights used for metering
+func CadenceValueToWeights(value cadence.Value) (map[uint]uint64, bool) {
+	result := make(map[uint]uint64)
+
+	dict, ok := value.(cadence.Dictionary)
+	if !ok {
+		return nil, false
+	}
+
+	for _, p := range dict.Pairs {
+		key, ok := p.Key.(cadence.UInt64)
+		if !ok {
+			return nil, false
+		}
+
+		value, ok := p.Value.(cadence.UInt64)
+		if !ok {
+			return nil, false
+		}
+
+		result[uint(key.ToGoValue().(uint64))] = uint64(value)
+	}
+
+	return result, true
+}

@@ -64,7 +64,7 @@ func generateVote(c *cobra.Command, args []string) {
 		NodeID:        nodeID,
 		Address:       nodeInfo.Address,
 		Role:          nodeInfo.Role,
-		Stake:         1000,
+		Weight:        flow.DefaultInitialWeight,
 		StakingPubKey: stakingPrivKey.PublicKey(),
 		NetworkPubKey: nodeInfo.NetworkPrivKey.PrivateKey.PublicKey(),
 	}
@@ -100,5 +100,5 @@ func generateVote(c *cobra.Command, args []string) {
 		log.Fatal().Err(err).Msg("could not write vote to file")
 	}
 
-	log.Info().Msg("successfully generated vote file")
+	log.Info().Msgf("node %v successfully generated vote file for block %v", nodeID, rootBlock.ID())
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/state/protocol"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
@@ -187,7 +188,7 @@ func TestIdentities(t *testing.T) {
 			filters := []flow.IdentityFilter{
 				filter.HasRole(flow.RoleCollection),
 				filter.HasNodeID(identities.SamplePct(0.1).NodeIDs()...),
-				filter.HasStake(true),
+				filter.HasWeight(true),
 			}
 
 			for _, filterfunc := range filters {
@@ -212,7 +213,7 @@ func TestClusters(t *testing.T) {
 	setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 	commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
 	setup.Assignments = unittest.ClusterAssignment(uint(nClusters), collectors)
-	clusterQCs := unittest.QuorumCertificatesFixtures(uint(nClusters))
+	clusterQCs := unittest.QuorumCertificatesFromAssignments(setup.Assignments)
 	commit.ClusterQCs = flow.ClusterQCVoteDatasFromQCs(clusterQCs)
 	seal.ResultID = result.ID()
 
@@ -220,7 +221,7 @@ func TestClusters(t *testing.T) {
 	require.NoError(t, err)
 
 	util.RunWithBootstrapState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.State) {
-		expectedClusters, err := flow.NewClusterList(setup.Assignments, collectors)
+		expectedClusters, err := factory.NewClusterList(setup.Assignments, collectors)
 		require.NoError(t, err)
 		actualClusters, err := state.Final().Epochs().Current().Clustering()
 		require.NoError(t, err)
@@ -694,7 +695,7 @@ func TestQuorumCertificate(t *testing.T) {
 			qc, err := state.AtBlockID(block1.ID()).QuorumCertificate()
 			assert.Nil(t, err)
 			// should have signatures from valid child (block 2)
-			assert.Equal(t, block2.Header.ParentVoterIDs, qc.SignerIDs)
+			assert.Equal(t, block2.Header.ParentVoterIndices, qc.SignerIndices)
 			assert.Equal(t, block2.Header.ParentVoterSigData, qc.SigData)
 			// should have view matching block1 view
 			assert.Equal(t, block1.Header.View, qc.View)
@@ -947,8 +948,8 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 
 					// should contain single next epoch identity with 0 weight
 					nextEpochIdentity := identities.Filter(filter.HasNodeID(addedAtEpoch2.NodeID))[0]
-					assert.Equal(t, uint64(0), nextEpochIdentity.Stake) // should have 0 weight
-					nextEpochIdentity.Stake = addedAtEpoch2.Stake
+					assert.Equal(t, uint64(0), nextEpochIdentity.Weight) // should have 0 weight
+					nextEpochIdentity.Weight = addedAtEpoch2.Weight
 					assert.Equal(t, addedAtEpoch2, nextEpochIdentity) // should be equal besides weight
 				})
 			}
@@ -968,9 +969,9 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 
 			// should contain single previous epoch identity with 0 weight
 			lastEpochIdentity := identities.Filter(filter.HasNodeID(removedAtEpoch2.NodeID))[0]
-			assert.Equal(t, uint64(0), lastEpochIdentity.Stake) // should have 0 weight
-			lastEpochIdentity.Stake = removedAtEpoch2.Stake     // overwrite weight
-			assert.Equal(t, removedAtEpoch2, lastEpochIdentity) // should be equal besides weight
+			assert.Equal(t, uint64(0), lastEpochIdentity.Weight) // should have 0 weight
+			lastEpochIdentity.Weight = removedAtEpoch2.Weight    // overwrite weight
+			assert.Equal(t, removedAtEpoch2, lastEpochIdentity)  // should be equal besides weight
 		})
 
 		t.Run("should not include previous epoch after staking phase", func(t *testing.T) {
@@ -995,9 +996,9 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 					for _, expected := range epoch3Identities {
 						actual, exists := identities.ByNodeID(expected.NodeID)
 						require.True(t, exists)
-						assert.Equal(t, uint64(0), actual.Stake) // should have 0 weight
-						actual.Stake = expected.Stake            // overwrite weight
-						assert.Equal(t, expected, actual)        // should be equal besides weight
+						assert.Equal(t, uint64(0), actual.Weight) // should have 0 weight
+						actual.Weight = expected.Weight           // overwrite weight
+						assert.Equal(t, expected, actual)         // should be equal besides weight
 					}
 				})
 			}

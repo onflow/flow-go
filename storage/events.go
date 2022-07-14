@@ -14,6 +14,9 @@ type Events interface {
 	// ByBlockIDTransactionID returns the events for the given block ID and transaction ID
 	ByBlockIDTransactionID(blockID flow.Identifier, transactionID flow.Identifier) ([]flow.Event, error)
 
+	// ByBlockIDTransactionIndex returns the events for the transaction at given index in a given block
+	ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint32) ([]flow.Event, error)
+
 	// ByBlockIDEventType returns the events for the given block ID and event type
 	ByBlockIDEventType(blockID flow.Identifier, eventType flow.EventType) ([]flow.Event, error)
 }

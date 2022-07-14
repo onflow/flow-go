@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/herocache"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -17,7 +18,7 @@ func TestTransactionPool(t *testing.T) {
 	tx1 := unittest.TransactionBodyFixture()
 	tx2 := unittest.TransactionBodyFixture()
 
-	transactions := herocache.NewTransactions(1000, unittest.Logger())
+	transactions := herocache.NewTransactions(1000, unittest.Logger(), metrics.NewNoopCollector())
 
 	t.Run("should be able to add first", func(t *testing.T) {
 		added := transactions.Add(&tx1)
@@ -41,7 +42,7 @@ func TestTransactionPool(t *testing.T) {
 	})
 
 	t.Run("should be able to remove second", func(t *testing.T) {
-		ok := transactions.Rem(tx2.ID())
+		ok := transactions.Remove(tx2.ID())
 		assert.True(t, ok)
 	})
 
@@ -62,7 +63,7 @@ func TestTransactionPool(t *testing.T) {
 func TestConcurrentWriteAndRead(t *testing.T) {
 	total := 100
 	txs := unittest.TransactionBodyListFixture(total)
-	transactions := herocache.NewTransactions(uint32(total), unittest.Logger())
+	transactions := herocache.NewTransactions(uint32(total), unittest.Logger(), metrics.NewNoopCollector())
 
 	wg := sync.WaitGroup{}
 	wg.Add(total)
@@ -98,7 +99,7 @@ func TestConcurrentWriteAndRead(t *testing.T) {
 func TestAllReturnsInOrder(t *testing.T) {
 	total := 100
 	txs := unittest.TransactionBodyListFixture(total)
-	transactions := herocache.NewTransactions(uint32(total), unittest.Logger())
+	transactions := herocache.NewTransactions(uint32(total), unittest.Logger(), metrics.NewNoopCollector())
 
 	// storing all transactions
 	for i := 0; i < total; i++ {

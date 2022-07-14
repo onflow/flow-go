@@ -10,14 +10,15 @@ import (
 // HotstuffModules is a helper structure to encapsulate dependencies to create
 // a hotStuff participant.
 type HotstuffModules struct {
-	Notifier             hotstuff.Consumer            // observer for hotstuff events
-	Committee            hotstuff.Committee           // consensus committee
-	Signer               hotstuff.Signer              // signer of proposal & votes
-	Persist              hotstuff.Persister           // last state of consensus participant
-	QCCreatedDistributor *pubsub.QCCreatedDistributor // observer for qc created event, used by leader
-	Forks                hotstuff.Forks               // information about multiple forks
-	Validator            hotstuff.Validator           // validator of proposals & votes
-	Aggregator           hotstuff.VoteAggregator      // aggregator of votes, used by leader
+	Notifier                hotstuff.Consumer               // observer for hotstuff events
+	Committee               hotstuff.Committee              // consensus committee
+	Signer                  hotstuff.Signer                 // signer of proposal & votes
+	Persist                 hotstuff.Persister              // last state of consensus participant
+	FinalizationDistributor *pubsub.FinalizationDistributor // observer for finalization events, used by compliance engine
+	QCCreatedDistributor    *pubsub.QCCreatedDistributor    // observer for qc created event, used by leader
+	Forks                   hotstuff.Forks                  // information about multiple forks
+	Validator               hotstuff.Validator              // validator of proposals & votes
+	Aggregator              hotstuff.VoteAggregator         // aggregator of votes, used by leader
 }
 
 type ParticipantConfig struct {

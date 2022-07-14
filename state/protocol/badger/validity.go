@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/state"
@@ -86,12 +87,12 @@ func verifyEpochSetup(setup *flow.EpochSetup, verifyNetworkAddress bool) error {
 		}
 	}
 
-	// there should be no nodes with zero stake
+	// there should be no nodes with zero weight
 	// TODO: we might want to remove the following as we generally want to allow nodes with
 	// zero weight in the protocol state.
 	for _, participant := range setup.Participants {
-		if participant.Stake == 0 {
-			return fmt.Errorf("node with zero stake (%x)", participant.NodeID)
+		if participant.Weight == 0 {
+			return fmt.Errorf("node with zero weight (%x)", participant.NodeID)
 		}
 	}
 
@@ -103,7 +104,7 @@ func verifyEpochSetup(setup *flow.EpochSetup, verifyNetworkAddress bool) error {
 	// STEP 3: sanity checks for individual roles
 	// IMPORTANT: here we remove all nodes with zero weight, as they are allowed to partake
 	// in communication but not in respective node functions
-	activeParticipants := setup.Participants.Filter(filter.HasStake(true))
+	activeParticipants := setup.Participants.Filter(filter.HasWeight(true))
 
 	// we need at least one node of each role
 	roles := make(map[flow.Role]uint)
@@ -134,7 +135,7 @@ func verifyEpochSetup(setup *flow.EpochSetup, verifyNetworkAddress bool) error {
 	}
 
 	// the collection cluster assignments need to be valid
-	_, err := flow.NewClusterList(setup.Assignments, activeParticipants.Filter(filter.HasRole(flow.RoleCollection)))
+	_, err := factory.NewClusterList(setup.Assignments, activeParticipants.Filter(filter.HasRole(flow.RoleCollection)))
 	if err != nil {
 		return fmt.Errorf("invalid cluster assignments: %w", err)
 	}

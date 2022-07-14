@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
+	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -28,7 +29,7 @@ func createAggregationData(t *testing.T, signersNumber int) (
 	msgLen := 100
 	msg := make([]byte, msgLen)
 	tag := "random_tag"
-	hasher := crypto.NewBLSKMAC(tag)
+	hasher := msig.NewBLSHasher(tag)
 
 	// create keys, identities and signatures
 	ids := make([]*flow.Identity, 0, signersNumber)
@@ -107,7 +108,7 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 				// ignore weight as comparing against expected weight is not thread safe
 				assert.NoError(t, err)
 			}(i, sig)
-			expectedWeight += ids[i+subSet].Stake
+			expectedWeight += ids[i+subSet].Weight
 		}
 
 		wg.Wait()
@@ -127,7 +128,7 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 		for i, sig := range sigs[:subSet] {
 			weight, err := aggregator.TrustedAdd(ids[i].NodeID, sig)
 			assert.NoError(t, err)
-			expectedWeight += ids[i].Stake
+			expectedWeight += ids[i].Weight
 			assert.Equal(t, expectedWeight, weight)
 			// test TotalWeight
 			assert.Equal(t, expectedWeight, aggregator.TotalWeight())
@@ -166,7 +167,7 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 		// add signatures
 		for i, sig := range sigs {
 			weight, err := aggregator.TrustedAdd(ids[i].NodeID, sig)
-			expectedWeight += ids[i].Stake
+			expectedWeight += ids[i].Weight
 			assert.Equal(t, expectedWeight, weight)
 			require.NoError(t, err)
 		}
@@ -203,7 +204,7 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 		for i, sig := range sigs {
 			weight, err := aggregator.TrustedAdd(ids[i].NodeID, sig)
 			require.NoError(t, err)
-			expectedWeight += ids[i].Stake
+			expectedWeight += ids[i].Weight
 			assert.Equal(t, expectedWeight, weight)
 		}
 		signers, agg, err := aggregator.Aggregate()

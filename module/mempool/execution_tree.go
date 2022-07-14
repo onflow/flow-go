@@ -29,6 +29,9 @@ type ExecutionTree interface {
 	// level by using the block header as input.
 	AddReceipt(receipt *flow.ExecutionReceipt, block *flow.Header) (bool, error)
 
+	// HasReceipt returns true if the given receipt is already present in the mempool.
+	HasReceipt(receipt *flow.ExecutionReceipt) bool
+
 	// ReachableReceipts returns a slice of ExecutionReceipt, whose result
 	// is computationally reachable from resultID. Context:
 	// * Conceptually, the Execution results form a tree, which we refer to as

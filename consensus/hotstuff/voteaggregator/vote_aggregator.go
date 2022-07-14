@@ -28,12 +28,14 @@ const defaultVoteQueueCapacity = 1000
 // that is why implementation relies on dependency injection.
 type VoteAggregator struct {
 	*component.ComponentManager
-	log                 zerolog.Logger
-	notifier            hotstuff.Consumer
-	lowestRetainedView  counters.StrictMonotonousCounter // lowest view, for which we still process votes
-	collectors          hotstuff.VoteCollectors
-	queuedVotesNotifier engine.Notifier
-	queuedVotes         *fifoqueue.FifoQueue
+	log                        zerolog.Logger
+	notifier                   hotstuff.Consumer
+	lowestRetainedView         counters.StrictMonotonousCounter // lowest view, for which we still process votes
+	collectors                 hotstuff.VoteCollectors
+	queuedVotesNotifier        engine.Notifier
+	finalizationEventsNotifier engine.Notifier
+	finalizedView              counters.StrictMonotonousCounter // cache the last finalized view to queue up the pruning work, and unblock the caller who's delivering the finalization event.
+	queuedVotes                *fifoqueue.FifoQueue
 }
 
 var _ hotstuff.VoteAggregator = (*VoteAggregator)(nil)
@@ -55,12 +57,14 @@ func NewVoteAggregator(
 	}
 
 	aggregator := &VoteAggregator{
-		log:                 log,
-		notifier:            notifier,
-		lowestRetainedView:  counters.NewMonotonousCounter(lowestRetainedView),
-		collectors:          collectors,
-		queuedVotes:         queuedVotes,
-		queuedVotesNotifier: engine.NewNotifier(),
+		log:                        log,
+		notifier:                   notifier,
+		lowestRetainedView:         counters.NewMonotonousCounter(lowestRetainedView),
+		finalizedView:              counters.NewMonotonousCounter(lowestRetainedView),
+		collectors:                 collectors,
+		queuedVotes:                queuedVotes,
+		queuedVotesNotifier:        engine.NewNotifier(),
+		finalizationEventsNotifier: engine.NewNotifier(),
 	}
 
 	// manager for own worker routines plus the internal collectors
@@ -92,6 +96,10 @@ func NewVoteAggregator(
 		cancel()
 		// wait for it to stop
 		<-collectors.Done()
+	})
+	componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		ready()
+		aggregator.finalizationProcessingLoop(ctx)
 	})
 
 	aggregator.ComponentManager = componentBuilder.Build()
@@ -264,5 +272,28 @@ func (va *VoteAggregator) InvalidBlock(proposal *model.Proposal) error {
 func (va *VoteAggregator) PruneUpToView(lowestRetainedView uint64) {
 	if va.lowestRetainedView.Set(lowestRetainedView) {
 		va.collectors.PruneUpToView(lowestRetainedView)
+	}
+}
+
+// OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
+//  (1) Informs sealing.Core about finalization of respective block.
+// CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
+// from external nodes cannot be considered as inputs to this function
+func (va *VoteAggregator) OnFinalizedBlock(block *model.Block) {
+	if va.finalizedView.Set(block.View) {
+		va.finalizationEventsNotifier.Notify()
+	}
+}
+
+// finalizationProcessingLoop is a separate goroutine that performs processing of finalization events
+func (va *VoteAggregator) finalizationProcessingLoop(ctx context.Context) {
+	finalizationNotifier := va.finalizationEventsNotifier.Channel()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-finalizationNotifier:
+			va.PruneUpToView(va.finalizedView.Value())
+		}
 	}
 }

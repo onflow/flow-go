@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -21,7 +22,8 @@ func TestArrayBackData_SingleBucket(t *testing.T) {
 	bd := NewCache(uint32(limit),
 		1,
 		heropool.LRUEjection,
-		unittest.Logger())
+		unittest.Logger(),
+		metrics.NewNoopCollector())
 
 	entities := unittest.EntityListFixture(uint(limit))
 
@@ -53,7 +55,8 @@ func TestArrayBackData_Adjust(t *testing.T) {
 	bd := NewCache(uint32(limit),
 		8,
 		heropool.LRUEjection,
-		unittest.Logger())
+		unittest.Logger(),
+		metrics.NewNoopCollector())
 
 	entities := unittest.EntityListFixture(uint(limit))
 
@@ -131,7 +134,8 @@ func TestArrayBackData_WriteHeavy(t *testing.T) {
 	bd := NewCache(uint32(limit),
 		8,
 		heropool.LRUEjection,
-		unittest.Logger())
+		unittest.Logger(),
+		metrics.NewNoopCollector())
 
 	entities := unittest.EntityListFixture(uint(limit))
 
@@ -154,7 +158,8 @@ func TestArrayBackData_LRU_Ejection(t *testing.T) {
 	bd := NewCache(uint32(limit),
 		8,
 		heropool.LRUEjection,
-		unittest.Logger())
+		unittest.Logger(),
+		metrics.NewNoopCollector())
 
 	entities := unittest.EntityListFixture(items)
 
@@ -178,7 +183,8 @@ func TestArrayBackData_Random_Ejection(t *testing.T) {
 	bd := NewCache(uint32(limit),
 		8,
 		heropool.RandomEjection,
-		unittest.Logger())
+		unittest.Logger(),
+		metrics.NewNoopCollector())
 
 	entities := unittest.EntityListFixture(items)
 
@@ -198,7 +204,8 @@ func TestArrayBackData_AddDuplicate(t *testing.T) {
 	bd := NewCache(uint32(limit),
 		8,
 		heropool.LRUEjection,
-		unittest.Logger())
+		unittest.Logger(),
+		metrics.NewNoopCollector())
 
 	entities := unittest.EntityListFixture(uint(limit))
 
@@ -221,7 +228,8 @@ func TestArrayBackData_Clear(t *testing.T) {
 	bd := NewCache(uint32(limit),
 		8,
 		heropool.LRUEjection,
-		unittest.Logger())
+		unittest.Logger(),
+		metrics.NewNoopCollector())
 
 	entities := unittest.EntityListFixture(uint(limit))
 
@@ -276,7 +284,8 @@ func TestArrayBackData_All(t *testing.T) {
 			bd := NewCache(tc.limit,
 				8,
 				tc.ejectionMode,
-				unittest.Logger())
+				unittest.Logger(),
+				metrics.NewNoopCollector())
 			entities := unittest.EntityListFixture(uint(tc.items))
 
 			testAddEntities(t, bd, entities)
@@ -302,8 +311,8 @@ func TestArrayBackData_All(t *testing.T) {
 	}
 }
 
-// TestArrayBackData_Rem checks correctness of removing elements from Cache.
-func TestArrayBackData_Rem(t *testing.T) {
+// TestArrayBackData_Remove checks correctness of removing elements from Cache.
+func TestArrayBackData_Remove(t *testing.T) {
 	tt := []struct {
 		limit uint32
 		items uint32
@@ -338,7 +347,12 @@ func TestArrayBackData_Rem(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(fmt.Sprintf("%d-limit-%d-items-%dfrom-%dcount", tc.limit, tc.items, tc.from, tc.count), func(t *testing.T) {
-			bd := NewCache(tc.limit, 8, heropool.RandomEjection, unittest.Logger())
+			bd := NewCache(
+				tc.limit,
+				8,
+				heropool.RandomEjection,
+				unittest.Logger(),
+				metrics.NewNoopCollector())
 			entities := unittest.EntityListFixture(uint(tc.items))
 
 			testAddEntities(t, bd, entities)
@@ -402,7 +416,7 @@ func testRemoveAtRandom(t *testing.T, bd *Cache, entities []*unittest.MockEntity
 	for removedCount := 0; removedCount < count; {
 		unittest.RequireReturnsBefore(t, func() {
 			index := rand.Int() % len(entities)
-			expected, removed := bd.Rem(entities[index].ID())
+			expected, removed := bd.Remove(entities[index].ID())
 			if !removed {
 				return
 			}
@@ -417,7 +431,7 @@ func testRemoveAtRandom(t *testing.T, bd *Cache, entities []*unittest.MockEntity
 // testRemoveRange is a test helper that removes specified range of entities from Cache.
 func testRemoveRange(t *testing.T, bd *Cache, entities []*unittest.MockEntity, from int, to int) {
 	for i := from; i < to; i++ {
-		expected, removed := bd.Rem(entities[i].ID())
+		expected, removed := bd.Remove(entities[i].ID())
 		require.True(t, removed)
 		require.Equal(t, entities[i], expected)
 		// size sanity check after removal
@@ -429,7 +443,7 @@ func testRemoveRange(t *testing.T, bd *Cache, entities []*unittest.MockEntity, f
 func testCheckRangeRemoved(t *testing.T, bd *Cache, entities []*unittest.MockEntity, from int, to int) {
 	for i := from; i < to; i++ {
 		// both removal and retrieval must fail
-		expected, removed := bd.Rem(entities[i].ID())
+		expected, removed := bd.Remove(entities[i].ID())
 		require.False(t, removed)
 		require.Nil(t, expected)
 

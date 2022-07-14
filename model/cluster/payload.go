@@ -21,7 +21,7 @@ type Payload struct {
 	// state (staking, etc.) when validating the containing block.
 	//
 	// The root block of a cluster chain has an empty reference block ID, as it
-	// is created in advance of its members (necessarily) being staked network
+	// is created in advance of its members (necessarily) being authorized network
 	// members. It is invalid for any non-root block to have an empty reference
 	// block ID.
 	ReferenceBlockID flow.Identifier

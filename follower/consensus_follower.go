@@ -9,12 +9,14 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd"
-	access "github.com/onflow/flow-go/cmd/access/node_builder"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/module/util"
 )
 
@@ -31,13 +33,16 @@ type ConsensusFollower interface {
 
 // Config contains the configurable fields for a `ConsensusFollower`.
 type Config struct {
-	networkPrivKey crypto.PrivateKey   // the network private key of this node
-	bootstrapNodes []BootstrapNodeInfo // the bootstrap nodes to use
-	bindAddr       string              // address to bind on
-	db             *badger.DB          // the badger DB storage to use for the protocol state
-	dataDir        string              // directory to store the protocol state (if the badger storage is not provided)
-	bootstrapDir   string              // path to the bootstrap directory
-	logLevel       string              // log level
+	networkPrivKey   crypto.PrivateKey       // the network private key of this node
+	bootstrapNodes   []BootstrapNodeInfo     // the bootstrap nodes to use
+	bindAddr         string                  // address to bind on
+	db               *badger.DB              // the badger DB storage to use for the protocol state
+	dataDir          string                  // directory to store the protocol state (if the badger storage is not provided)
+	bootstrapDir     string                  // path to the bootstrap directory
+	logLevel         string                  // log level
+	exposeMetrics    bool                    // whether to expose metrics
+	syncConfig       *synchronization.Config // sync core configuration
+	complianceConfig *compliance.Config      // follower engine configuration
 }
 
 type Option func(c *Config)
@@ -73,6 +78,24 @@ func WithDB(db *badger.DB) Option {
 	}
 }
 
+func WithExposeMetrics(expose bool) Option {
+	return func(c *Config) {
+		c.exposeMetrics = expose
+	}
+}
+
+func WithSyncCoreConfig(config *synchronization.Config) Option {
+	return func(c *Config) {
+		c.syncConfig = config
+	}
+}
+
+func WithComplianceConfig(config *compliance.Config) Option {
+	return func(c *Config) {
+		c.complianceConfig = config
+	}
+}
+
 // BootstrapNodeInfo contains the details about the upstream bootstrap peer the consensus follower uses
 type BootstrapNodeInfo struct {
 	Host             string // ip or hostname
@@ -93,12 +116,12 @@ func bootstrapIdentities(bootstrapNodes []BootstrapNodeInfo) flow.IdentityList {
 	return ids
 }
 
-func getAccessNodeOptions(config *Config) []access.Option {
+func getFollowerServiceOptions(config *Config) []FollowerOption {
 	ids := bootstrapIdentities(config.bootstrapNodes)
-	return []access.Option{
-		access.WithBootStrapPeers(ids...),
-		access.WithBaseOptions(getBaseOptions(config)),
-		access.WithNetworkKey(config.networkPrivKey),
+	return []FollowerOption{
+		WithBootStrapPeers(ids...),
+		WithBaseOptions(getBaseOptions(config)),
+		WithNetworkKey(config.networkPrivKey),
 	}
 }
 
@@ -122,13 +145,21 @@ func getBaseOptions(config *Config) []cmd.Option {
 	if config.db != nil {
 		options = append(options, cmd.WithDB(config.db))
 	}
+	if config.exposeMetrics {
+		options = append(options, cmd.WithMetricsEnabled(config.exposeMetrics))
+	}
+	if config.syncConfig != nil {
+		options = append(options, cmd.WithSyncCoreConfig(*config.syncConfig))
+	}
+	if config.complianceConfig != nil {
+		options = append(options, cmd.WithComplianceConfig(*config.complianceConfig))
+	}
 
 	return options
 }
 
-func buildAccessNode(accessNodeOptions []access.Option) (*access.UnstakedAccessNodeBuilder, error) {
-	anb := access.FlowAccessNode(accessNodeOptions...)
-	nodeBuilder := access.NewUnstakedAccessNodeBuilder(anb)
+func buildConsensusFollower(opts []FollowerOption) (*FollowerServiceBuilder, error) {
+	nodeBuilder := FlowConsensusFollowerService(opts...)
 
 	if err := nodeBuilder.Initialize(); err != nil {
 		return nil, err
@@ -157,14 +188,15 @@ func NewConsensusFollower(
 		bootstrapNodes: bootstapIdentities,
 		bindAddr:       bindAddr,
 		logLevel:       "info",
+		exposeMetrics:  false,
 	}
 
 	for _, opt := range opts {
 		opt(config)
 	}
 
-	accessNodeOptions := getAccessNodeOptions(config)
-	anb, err := buildAccessNode(accessNodeOptions)
+	accessNodeOptions := getFollowerServiceOptions(config)
+	anb, err := buildConsensusFollower(accessNodeOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -182,11 +214,11 @@ func NewConsensusFollower(
 }
 
 // onBlockFinalized relays the block finalization event to all registered consumers.
-func (cf *ConsensusFollowerImpl) onBlockFinalized(finalizedBlockID flow.Identifier) {
+func (cf *ConsensusFollowerImpl) onBlockFinalized(finalizedBlock *model.Block) {
 	cf.consumersMu.RLock()
 	for _, consumer := range cf.consumers {
 		cf.consumersMu.RUnlock()
-		consumer(finalizedBlockID)
+		consumer(finalizedBlock)
 		cf.consumersMu.RLock()
 	}
 	cf.consumersMu.RUnlock()

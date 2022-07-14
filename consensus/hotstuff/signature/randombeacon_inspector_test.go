@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -51,7 +50,7 @@ func (rs *randomBeaconSuite) SetupTest() {
 	rs.signers = make([]int, 0, rs.n)
 
 	// hasher
-	rs.kmac = crypto.NewBLSKMAC(encoding.RandomBeaconTag)
+	rs.kmac = signature.NewBLSHasher(signature.RandomBeaconTag)
 	rs.thresholdSignatureMessage = []byte("random_message")
 
 	// fill the signers list and shuffle it

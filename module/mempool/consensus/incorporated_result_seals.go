@@ -87,9 +87,9 @@ func (ir *IncorporatedResultSeals) Limit() uint {
 	return ir.seals.Limit()
 }
 
-// Rem removes an IncorporatedResultSeal from the mempool
-func (ir *IncorporatedResultSeals) Rem(id flow.Identifier) bool {
-	return ir.seals.Rem(id)
+// Remove removes an IncorporatedResultSeal from the mempool
+func (ir *IncorporatedResultSeals) Remove(id flow.Identifier) bool {
+	return ir.seals.Remove(id)
 }
 
 // Size returns the number of items in the mempool
