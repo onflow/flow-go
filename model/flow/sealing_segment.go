@@ -31,9 +31,10 @@ import (
 //
 // ROOT SEALING SEGMENTS:
 // Root sealing segments are sealing segments which contain the root block:
+// * the root block is a self-sealing block with an empty payload
 // * the root block must be the first block (least height) in the segment
 // * no blocks in the segment may contain any seals (by the minimality requirement)
-// * it is possible (but not necessary) for root sealing segments to contain only 1 self-sealing block
+// * it is possible (but not necessary) for root sealing segments to contain only the root block
 //
 // Example 1 - one self-sealing root block
 //   ROOT
