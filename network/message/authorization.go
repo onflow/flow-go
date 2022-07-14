@@ -307,8 +307,6 @@ func GetMessageAuthConfig(v interface{}) (MsgAuthConfig, error) {
 		return authorizationConfigs[CollectionGuarantee], nil
 	case *flow.TransactionBody:
 		return authorizationConfigs[TransactionBody], nil
-	case *flow.Transaction:
-		return authorizationConfigs[Transaction], nil
 
 	// core messages for execution & verification
 	case *flow.ExecutionReceipt:
