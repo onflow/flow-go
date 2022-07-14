@@ -8,14 +8,13 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/routing"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/onflow/flow/protobuf/go/flow/access"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
-	"github.com/onflow/flow/protobuf/go/flow/access"
-
-	"github.com/onflow/flow-go/crypto"
-
 	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/consensus/hotstuff/signature"
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
@@ -227,6 +226,7 @@ func (builder *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.rpcMetricsEnabled,
 				builder.apiRatelimits,
 				builder.apiBurstlimits,
+				signature.NewBlockSignerDecoder(builder.Committee),
 			)
 			if err != nil {
 				return nil, err
