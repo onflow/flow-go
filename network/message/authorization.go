@@ -21,12 +21,12 @@ type MsgAuthConfig struct {
 	Config map[channels.Channel]flow.RoleList
 }
 
-// IsAuthorized checks if the specified role is authorized to send the message on the provided channel and
+// EnsureAuthorized checks if the specified role is authorized to send the message on the provided channel and
 // asserts that the message is authorized to be sent on the channel.
 // Expected error returns during normal operations:
 //  * ErrUnauthorizedMessageOnChannel: the channel is not included in the message's list of authorized channels
 //  * ErrUnauthorizedRole: the role is not included in the message's list of authorized roles for the provided channel
-func (m MsgAuthConfig) IsAuthorized(role flow.Role, channel channels.Channel) error {
+func (m MsgAuthConfig) EnsureAuthorized(role flow.Role, channel channels.Channel) error {
 	authorizedRoles, ok := m.Config[channel]
 	if !ok {
 		return ErrUnauthorizedMessageOnChannel

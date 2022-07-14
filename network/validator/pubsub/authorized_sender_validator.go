@@ -114,7 +114,7 @@ func isAuthorizedSender(identity *flow.Identity, channel channels.Channel, msg i
 		channel = channels.Channel(prefix)
 	}
 
-	if err := conf.IsAuthorized(identity.Role, channel); err != nil {
+	if err := conf.EnsureAuthorized(identity.Role, channel); err != nil {
 		return conf.Name, err
 	}
 
