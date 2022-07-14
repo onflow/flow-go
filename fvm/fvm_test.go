@@ -1596,7 +1596,14 @@ func TestStorageCapacity(t *testing.T) {
 			fvm.WithStorageMBPerFLOW(10_0000_0000),
 			fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		).
-		run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+		run(func(
+			t *testing.T,
+			vm *fvm.VirtualMachine,
+			chain flow.Chain,
+			ctx fvm.Context,
+			view state.View,
+			programs *programs.Programs,
+		) {
 			service := chain.ServiceAddress()
 			signer := createAccount(t, vm, chain, ctx, view, programs)
 			target := createAccount(t, vm, chain, ctx, view, programs)
@@ -1667,7 +1674,8 @@ func TestStorageCapacity(t *testing.T) {
 			require.Len(t, tx.Logs, 1)
 			assert.Equal(t, tx.Logs[0], "1")
 		}),
-
+	)
+}
 
 func TestScriptContractMutationsFailure(t *testing.T) {
 	t.Parallel()
