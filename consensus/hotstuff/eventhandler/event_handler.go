@@ -16,6 +16,21 @@ import (
 // EventHandler is the main handler for individual events that trigger state transition.
 // It exposes API to handle one event at a time synchronously. The caller is
 // responsible for running the event loop to ensure that.
+// EventHandler is implemented in event driven way, it reacts to incoming events and performs certain actions.
+// It doesn't perform any actions on its own. There are 3 main responsibilities of EventHandler, vote, propose,
+// timeout. There are specific scenarios that lead to each of those actions.
+//  - create vote: voting logic is triggered by OnReceiveProposal, after receiving proposal we have all required information
+//  to create a valid vote. Compliance engine makes sure that we receive proposal which parents are known.
+//  Creating a vote can be triggered ONLY by receiving proposal.
+//  - create timeout: creating model.TimeoutObject[TO] is triggered by OnLocalTimeout, after reaching deadline for current round
+//  EventHandler gets notified about it and has to create a model.TimeoutObject and broadcast it to other replicas.
+//  Creating a TO can be triggered ONLY by reaching round deadline.
+//  - create a proposal: proposing logic is more complicated, to create a proposal we need to obtain a QC or TC, naturally
+//  this triggers proposing logic and tries to create a proposal. There is another case, where receiving a QC or TC triggers
+//  proposing logic, but we can't create a proposal since we are missing parent block referred by the newest QC.
+//  Based on that OnReceiveProposal can trigger proposing logic as welll, but only when receiving proposal for view lower than active
+//  view. To summarize, to make a valid proposal for view N we need to have a QC or TC for N-1 and receive proposal with blockID
+//  NewestQC.BlockID.
 type EventHandler struct {
 	log               zerolog.Logger
 	paceMaker         hotstuff.PaceMaker
@@ -105,6 +120,12 @@ func (e *EventHandler) OnReceiveTc(tc *flow.TimeoutCertificate) error {
 	defer e.notifier.OnEventProcessed()
 
 	log.Debug().Msg("received TC")
+
+	// ignore stale qc
+	if tc.View <= e.forks.FinalizedView() {
+		log.Debug().Msg("stale tc")
+		return nil
+	}
 
 	nve, err := e.paceMaker.ProcessTC(tc)
 	if err != nil {
