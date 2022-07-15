@@ -307,8 +307,11 @@ func (e *TransactionEnv) GetIsContractDeploymentRestricted() (restricted bool, d
 }
 
 func (e *TransactionEnv) useContractAuditVoucher(address runtime.Address, code []byte) (bool, error) {
-	useVoucher := UseContractAuditVoucherInvocation(e, e.traceSpan)
-	return useVoucher(address, string(code[:]))
+	return InvokeUseContractAuditVoucherContract(
+		e,
+		e.traceSpan,
+		address,
+		string(code[:]))
 }
 
 func (e *TransactionEnv) isAuthorizerServiceAccount() bool {
@@ -443,9 +446,10 @@ func (e *TransactionEnv) GetStorageCapacity(address common.Address) (value uint6
 		return value, fmt.Errorf("get storage capacity failed: %w", err)
 	}
 
-	accountStorageCapacity := AccountStorageCapacityInvocation(e, e.traceSpan)
-	result, invokeErr := accountStorageCapacity(address)
-
+	result, invokeErr := InvokeAccountStorageCapacityContract(
+		e,
+		e.traceSpan,
+		address)
 	if invokeErr != nil {
 		return 0, errors.HandleRuntimeError(invokeErr)
 	}
@@ -471,9 +475,7 @@ func (e *TransactionEnv) GetAccountBalance(address common.Address) (value uint64
 		return value, fmt.Errorf("get account balance failed: %w", err)
 	}
 
-	accountBalance := AccountBalanceInvocation(e, e.traceSpan)
-	result, invokeErr := accountBalance(address)
-
+	result, invokeErr := InvokeAccountBalanceContract(e, e.traceSpan, address)
 	if invokeErr != nil {
 		return 0, errors.HandleRuntimeError(invokeErr)
 	}
@@ -491,8 +493,10 @@ func (e *TransactionEnv) GetAccountAvailableBalance(address common.Address) (val
 		return value, fmt.Errorf("get account available balance failed: %w", err)
 	}
 
-	accountAvailableBalance := AccountAvailableBalanceInvocation(e, e.traceSpan)
-	result, invokeErr := accountAvailableBalance(address)
+	result, invokeErr := InvokeAccountAvailableBalanceContract(
+		e,
+		e.traceSpan,
+		address)
 
 	if invokeErr != nil {
 		return 0, errors.HandleRuntimeError(invokeErr)
@@ -957,9 +961,11 @@ func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 	}
 
 	if e.ctx.ServiceAccountEnabled {
-		setupNewAccount := SetupNewAccountInvocation(e, e.traceSpan)
-		_, invokeErr := setupNewAccount(flowAddress, payer)
-
+		_, invokeErr := InvokeSetupNewAccountContract(
+			e,
+			e.traceSpan,
+			flowAddress,
+			payer)
 		if invokeErr != nil {
 			return address, errors.HandleRuntimeError(invokeErr)
 		}
