@@ -510,7 +510,7 @@ func (lg *ContLoadGenerator) sendTx(workerID int, tx *flowsdk.Transaction) (<-ch
 	log.Trace().Msg("sending transaction")
 
 	// Add watcher before sending the transaction to avoid race condition
-	ch := lg.follower.CompleteChanByID(tx.ID())
+	ch := lg.follower.Follow(tx.ID())
 
 	err := lg.flowClient.SendTransaction(context.Background(), *tx)
 	if err != nil {
