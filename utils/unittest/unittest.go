@@ -1,6 +1,7 @@
 package unittest
 
 import (
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"math"
@@ -406,4 +407,13 @@ func CrashTest(t *testing.T, scenario func(*testing.T), expectedErrorMsg string,
 	// expect logger.Fatal() message to be pushed to stdout
 	outStr := string(outBytes)
 	require.Contains(t, outStr, expectedErrorMsg)
+}
+
+func NoIrrecoverableError(t *testing.T, ctx context.Context, errChan <-chan error) {
+	select {
+	case <-ctx.Done():
+		return
+	case err := <-errChan:
+		require.NoError(t, err, "unexpected irrecoverable error")
+	}
 }

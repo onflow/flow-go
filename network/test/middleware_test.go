@@ -118,25 +118,21 @@ func (m *MiddlewareTestSuite) SetupTest() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	m.mwCancel = cancel
+
 	var errChan <-chan error
 	m.mwCtx, errChan = irrecoverable.WithSignaler(ctx)
 
-	mwCtx := m.mwCtx
-	go func() {
-		select {
-		case err := <-errChan:
-			m.T().Error("middlewares encountered fatal error", err)
-		case <-mwCtx.Done():
-			return
-		}
-	}()
+	go unittest.NoIrrecoverableError(m.T(), m.mwCtx, errChan)
 
 	for i, mw := range m.mws {
 		mw.SetOverlay(m.ov[i])
 		mw.Start(m.mwCtx)
 		<-mw.Ready()
-	}
 
+		pm := mw.PeerManager()
+		pm.Start(m.mwCtx)
+		<-pm.Ready()
+	}
 }
 
 // TestUpdateNodeAddresses tests that the UpdateNodeAddresses method correctly updates
@@ -158,6 +154,11 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	).Return(nil)
 	newMw.SetOverlay(overlay)
 	newMw.Start(m.mwCtx)
+	<-newMw.Ready()
+
+	pm := newMw.PeerManager()
+	pm.Start(m.mwCtx)
+	<-pm.Ready()
 
 	idList := flow.IdentityList(append(m.ids, newId))
 

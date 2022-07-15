@@ -17,6 +17,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
@@ -82,6 +83,9 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 	ctx, cancel := context.WithCancel(context.Background())
 	suite.cancel = cancel
 
+	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
+	go unittest.NoIrrecoverableError(suite.T(), ctx, errChan)
+
 	ids, mws, networks, _ := GenerateIDsMiddlewaresNetworks(
 		ctx,
 		suite.T(),
@@ -106,6 +110,12 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 		suite.Require().NoError(err)
 		<-blobService.Ready()
 		suite.blobServices = append(suite.blobServices, blobService)
+	}
+
+	for _, mw := range mws {
+		pm := mw.PeerManager()
+		pm.Start(signalerCtx)
+		<-pm.Ready()
 	}
 
 	// let nodes connect to each other only after they are all listening on Bitswap

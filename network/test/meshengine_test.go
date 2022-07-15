@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/observable"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
@@ -32,10 +33,11 @@ import (
 // of engines over a complete graph
 type MeshEngineTestSuite struct {
 	suite.Suite
-	ConduitWrapper                   // used as a wrapper around conduit methods
-	nets           []network.Network // used to keep track of the networks
-	ids            flow.IdentityList // used to keep track of the identifiers associated with networks
-	obs            chan string       // used to keep track of Protect events tagged by pubsub messages
+	ConduitWrapper                      // used as a wrapper around conduit methods
+	nets           []network.Network    // used to keep track of the networks
+	mws            []network.Middleware // used to keep track of the middlewares
+	ids            flow.IdentityList    // used to keep track of the identifiers associated with networks
+	obs            chan string          // used to keep track of Protect events tagged by pubsub messages
 	cancel         context.CancelFunc
 }
 
@@ -63,7 +65,10 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 	ctx, cancel := context.WithCancel(context.Background())
 	suite.cancel = cancel
 
-	suite.ids, _, suite.nets, obs = GenerateIDsMiddlewaresNetworks(
+	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
+	go unittest.NoIrrecoverableError(suite.T(), ctx, errChan)
+
+	suite.ids, suite.mws, suite.nets, obs = GenerateIDsMiddlewaresNetworks(
 		ctx,
 		suite.T(),
 		count,
@@ -72,6 +77,12 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 		unittest.NetworkCodec(),
 		WithIdentityOpts(unittest.WithAllRoles()),
 	)
+
+	for _, mw := range suite.mws {
+		pm := mw.PeerManager()
+		pm.Start(signalerCtx)
+		<-pm.Ready()
+	}
 
 	for _, observableConnMgr := range obs {
 		observableConnMgr.Subscribe(&ob)
@@ -83,6 +94,7 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 func (suite *MeshEngineTestSuite) TearDownTest() {
 	suite.cancel()
 	stopNetworks(suite.T(), suite.nets, 3*time.Second)
+	stopMiddlewares(suite.T(), suite.mws, 3*time.Second)
 }
 
 // TestAllToAll_Publish evaluates the network of mesh engines against allToAllScenario scenario.

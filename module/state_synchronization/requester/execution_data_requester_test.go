@@ -440,7 +440,7 @@ func (suite *ExecutionDataRequesterSuite) runRequesterTestHalts(edr state_synchr
 	defer cancel()
 
 	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go irrecoverableNotExpected(suite.T(), ctx, errChan)
+	go unittest.NoIrrecoverableError(suite.T(), ctx, errChan)
 
 	testDone := make(chan struct{})
 	fetchedExecutionData := cfg.FetchedExecutionData()
@@ -469,7 +469,7 @@ func (suite *ExecutionDataRequesterSuite) runRequesterTestPauseResume(edr state_
 	ctx, cancel := context.WithCancel(context.Background())
 
 	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go irrecoverableNotExpected(suite.T(), ctx, errChan)
+	go unittest.NoIrrecoverableError(suite.T(), ctx, errChan)
 
 	testDone := make(chan struct{})
 	fetchedExecutionData := cfg.FetchedExecutionData()
@@ -507,7 +507,7 @@ func (suite *ExecutionDataRequesterSuite) runRequesterTest(edr state_synchroniza
 	ctx, cancel := context.WithCancel(context.Background())
 
 	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go irrecoverableNotExpected(suite.T(), ctx, errChan)
+	go unittest.NoIrrecoverableError(suite.T(), ctx, errChan)
 
 	// wait for all notifications
 	testDone := make(chan struct{})
@@ -744,15 +744,6 @@ func buildResult(block *flow.Block, cid flow.Identifier, previousResult *flow.Ex
 	}
 
 	return unittest.ExecutionResultFixture(opts...)
-}
-
-func irrecoverableNotExpected(t *testing.T, ctx context.Context, errChan <-chan error) {
-	select {
-	case <-ctx.Done():
-		return
-	case err := <-errChan:
-		assert.NoError(t, err, "unexpected irrecoverable error")
-	}
 }
 
 func verifyFetchedExecutionData(t *testing.T, actual receivedExecutionData, cfg *fetchTestRun) {

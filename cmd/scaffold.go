@@ -409,6 +409,19 @@ func (fnb *FlowNodeBuilder) EnqueueAdminServerInit() {
 	}
 }
 
+func (fnb *FlowNodeBuilder) EnqueuePeerManager() {
+	fnb.Component("peer manager", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		pm := fnb.Middleware.PeerManager()
+
+		// if a peer manager was not configured, do nothing
+		if pm == nil {
+			return &module.NoopReadyDoneAware{}, nil
+		}
+
+		return pm, nil
+	})
+}
+
 func (fnb *FlowNodeBuilder) RegisterBadgerMetrics() error {
 	return metrics.RegisterBadgerMetrics()
 }
@@ -1376,6 +1389,11 @@ func (fnb *FlowNodeBuilder) onStart() error {
 	}
 
 	fnb.EnqueueAdminServerInit()
+
+	// Peer Manager must be started after all other components to ensure the network does not start
+	// up before the components are initialized. This is critical for any nodes running bitswap since
+	// bitswap will only learn about peers that connect after it is initialized.
+	fnb.EnqueuePeerManager()
 
 	// run all modules
 	for _, f := range fnb.modules {

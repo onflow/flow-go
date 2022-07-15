@@ -312,23 +312,25 @@ func (m *Middleware) start(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to create peer manager: %w", err)
 		}
-
-		select {
-		case <-m.peerManager.Ready():
-			m.log.Debug().Msg("peer manager successfully started")
-		case <-time.After(30 * time.Second):
-			return fmt.Errorf("could not start peer manager")
-		}
 	}
 
 	return nil
 }
 
+// PeerManager returns the peer manager used by the middleware.
+// IMPORTANT: the peer manager is set when the middleware is started. Calling this method before
+// the middleware is started will return nil.
+func (m *Middleware) PeerManager() network.PeerManager {
+	return m.peerManager
+}
+
 // stop will end the execution of the middleware and wait for it to end.
 func (m *Middleware) stop() {
+	// TODO: does middleware need to stop the peer manager before the network?
+	// if not, we don't need to wait here since it will be stopped as a regular component
 	mgr, found := m.peerMgr()
 	if found {
-		// stops peer manager
+		// wait for peer manager to stop
 		<-mgr.Done()
 		m.log.Debug().Msg("peer manager successfully stopped")
 	}

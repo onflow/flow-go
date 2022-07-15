@@ -22,6 +22,7 @@ import (
 	"google.golang.org/grpc/credentials"
 
 	"github.com/onflow/flow-go/admin/commands"
+	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
@@ -682,9 +683,13 @@ func (builder *FlowAccessNodeBuilder) Initialize() error {
 	// enqueue the regular network
 	builder.EnqueueNetworkInit()
 
-	builder.AdminCommand("get-transactions", func(conf *cmd.NodeConfig) commands.AdminCommand {
-		return storageCommands.NewGetTransactionsCommand(conf.State, conf.Storage.Payloads, conf.Storage.Collections)
-	})
+	builder.
+		AdminCommand("get-transactions", func(conf *cmd.NodeConfig) commands.AdminCommand {
+			return storageCommands.NewGetTransactionsCommand(conf.State, conf.Storage.Payloads, conf.Storage.Collections)
+		}).
+		AdminCommand("read-execution-data", func(conf *cmd.NodeConfig) commands.AdminCommand {
+			return stateSyncCommands.NewReadExecutionDataCommand(builder.ExecutionDataService)
+		})
 
 	// if this is an access node that supports public followers, enqueue the public network
 	if builder.supportsObserver {
