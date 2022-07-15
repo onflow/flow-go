@@ -253,8 +253,8 @@ type EventHandlerSuite struct {
 	safetyRules       *SafetyRules
 	notifier          hotstuff.Consumer
 
-	initView       uint64
-	endView        uint64
+	initView       uint64 // the current view at the beginning of the test case
+	endView        uint64 // the expected current view at the end of the test case
 	parentProposal *model.Proposal
 	votingProposal *model.Proposal
 	qc             *flow.QuorumCertificate

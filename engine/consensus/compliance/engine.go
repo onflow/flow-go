@@ -352,7 +352,7 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 	return nil
 }
 
-// BroadcastTimeout submits a cluster timeout object to all collection nodes in our cluster
+// BroadcastTimeout submits a timeout object to all collection nodes in our cluster
 func (e *Engine) BroadcastTimeout(timeout *model.TimeoutObject) error {
 	logContext := e.log.With().
 		Uint64("timeout_newest_qc_view", timeout.NewestQC.View).

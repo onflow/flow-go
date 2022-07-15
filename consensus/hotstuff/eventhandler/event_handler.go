@@ -287,8 +287,8 @@ func (e *EventHandler) processPendingBlocks() error {
 	}
 }
 
-// startNewView will only be called when there is a view change from pacemaker.
-// It reads the current view, and check if it needs to propose or vote in this view.
+// proposeForNewView will only be called when there is a view change from pacemaker.
+// It reads the current view, and generates a proposal if we are the leader. 
 // No errors are expected during normal operation.
 func (e *EventHandler) startNewView() error {
 
@@ -322,7 +322,7 @@ func (e *EventHandler) startNewView() error {
 		if !found {
 			// we don't know anything about block referenced by our newest QC, in this case we can't
 			// create a valid proposal since we can't guarantee validity of block payload.
-			log.Debug().
+			log.Warn().
 				Uint64("qc_view", newestQC.View).
 				Hex("block_id", newestQC.BlockID[:]).Msg("no parent found for newest QC, can't propose")
 			return nil
@@ -405,6 +405,15 @@ func (e *EventHandler) processBlockForCurrentView(proposal *model.Proposal) erro
 	}
 	// leader (node ID) for next view
 	nextLeader, err := e.committee.LeaderForView(curView + 1)
+	if errors.Is(err, model.ErrViewForUnknownEpoch) {
+		// We are attempting process a block in an unknown epoch
+		// This should never happen, because:
+		// * the compliance layer ensures proposals are passed to the event loop strictly after their parent
+		// * the protocol state ensures that, before incorporating the first block of an epoch E, 
+		//    either E is known or we have triggered epoch fallback mode - in either case the epoch for the
+		//    current epoch is known
+		return fmt.Errorf("attempting to process a block for current view in unknown epoch: %v", err.Error())
+	}
 	if err != nil {
 		return fmt.Errorf("failed to determine primary for next view %d: %w", curView+1, err)
 	}
