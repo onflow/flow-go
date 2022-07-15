@@ -93,6 +93,7 @@ func initPaceMaker(t require.TestingT, livenessData *hotstuff.LivenessData) hots
 	return pm
 }
 
+// Committee mocks hotstuff.DynamicCommittee and allows to easily control leader for some view.
 type Committee struct {
 	mocks.DynamicCommittee
 	// to mock I'm the leader of a certain view, add the view into the keys of leaders field
@@ -307,11 +308,7 @@ func (es *EventHandlerSuite) SetupTest() {
 	es.initView = livenessData.CurrentView
 	es.endView = livenessData.CurrentView
 	// voting block is a block for the current view, which will trigger view change
-	es.votingProposal = helper.MakeProposal(
-		helper.WithBlock(
-			helper.MakeBlock(
-				helper.WithBlockView(es.paceMaker.CurView()),
-				helper.WithParentBlock(es.parentProposal.Block))))
+	es.votingProposal = createProposal(es.paceMaker.CurView(), es.parentProposal.Block.View)
 	es.qc = helper.MakeQC(helper.WithQCBlock(es.votingProposal.Block))
 
 	// create a TC that will trigger view change for current view, based on newest QC
@@ -342,7 +339,7 @@ func (es *EventHandlerSuite) TestStartNewView_ParentProposalNotFound() {
 
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
 	es.forks.AssertCalled(es.T(), "GetProposal", newestQC.BlockID)
-	es.communicator.AssertNotCalled(es.T(), "BroadcastProposalWithDelay")
+	es.communicator.AssertNotCalled(es.T(), "BroadcastProposalWithDelay", mock.Anything, mock.Anything)
 }
 
 // TestOnReceiveProposal_StaleProposal test that proposals lower than finalized view are not processed at all
@@ -453,6 +450,78 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_Vote_NotNextLeader() {
 	require.Equal(es.T(), proposal.Block.BlockID, blockID)
 }
 
+// TestOnReceiveProposal_ProposeAfterReceivingTC tests a scenario where we have received TC which advances to view where we are
+// leader but no proposal can be created because we don't have parent proposal. After receiving missing parent proposal we have
+// all available data to construct a valid proposal. We need to ensure this.
+func (es *EventHandlerSuite) TestOnReceiveProposal_ProposeAfterReceivingQC() {
+
+	qc := es.qc
+
+	// first process QC this should advance view
+	err := es.eventhandler.OnReceiveQc(qc)
+	require.NoError(es.T(), err)
+	require.Equal(es.T(), qc.View+1, es.paceMaker.CurView(), "expect a view change")
+	es.communicator.AssertNotCalled(es.T(), "BroadcastProposalWithDelay", mock.Anything, mock.Anything)
+
+	es.voteAggregator.On("AddBlock", es.votingProposal).Return(nil).Once()
+
+	// we are leader for current view
+	es.committee.leaders[es.paceMaker.CurView()] = struct{}{}
+
+	// processing this proposal shouldn't trigger view change since we have already seen QC.
+	// we have used QC to advance rounds, but no proposal was made because we were missing parent block
+	// when we have received parent block we can try proposing again.
+	err = es.eventhandler.OnReceiveProposal(es.votingProposal)
+	require.NoError(es.T(), err)
+
+	require.Equal(es.T(), qc.View+1, es.paceMaker.CurView(), "expect a view change")
+
+	lastCall := es.communicator.Calls[len(es.communicator.Calls)-1]
+	// the last call is BroadcastProposal
+	require.Equal(es.T(), "BroadcastProposalWithDelay", lastCall.Method)
+	header, ok := lastCall.Arguments[0].(*flow.Header)
+	require.True(es.T(), ok)
+	// it should broadcast a header as the same as current view
+	require.Equal(es.T(), es.paceMaker.CurView(), header.View)
+}
+
+// TestOnReceiveProposal_ProposeAfterReceivingTC tests a scenario where we have received TC which advances to view where we are
+// leader but no proposal can be created because we don't have parent proposal. After receiving missing parent proposal we have
+// all available data to construct a valid proposal. We need to ensure this.
+func (es *EventHandlerSuite) TestOnReceiveProposal_ProposeAfterReceivingTC() {
+
+	// TC contains a QC.BlockID == es.votingProposal
+	tc := helper.MakeTC(helper.WithTCView(es.votingProposal.Block.View+1),
+		helper.WithTCNewestQC(es.qc))
+
+	// first process TC this should advance view
+	err := es.eventhandler.OnReceiveTc(tc)
+	require.NoError(es.T(), err)
+	require.Equal(es.T(), tc.View+1, es.paceMaker.CurView(), "expect a view change")
+	es.communicator.AssertNotCalled(es.T(), "BroadcastProposalWithDelay", mock.Anything, mock.Anything)
+
+	es.voteAggregator.On("AddBlock", es.votingProposal).Return(nil).Once()
+
+	// we are leader for current view
+	es.committee.leaders[es.paceMaker.CurView()] = struct{}{}
+
+	// processing this proposal shouldn't trigger view change, since we have already seen QC.
+	// we have used QC to advance rounds, but no proposal was made because we were missing parent block
+	// when we have received parent block we can try proposing again.
+	err = es.eventhandler.OnReceiveProposal(es.votingProposal)
+	require.NoError(es.T(), err)
+
+	require.Equal(es.T(), tc.View+1, es.paceMaker.CurView(), "expect a view change")
+
+	lastCall := es.communicator.Calls[len(es.communicator.Calls)-1]
+	// the last call is BroadcastProposal
+	require.Equal(es.T(), "BroadcastProposalWithDelay", lastCall.Method)
+	header, ok := lastCall.Arguments[0].(*flow.Header)
+	require.True(es.T(), ok)
+	// it should broadcast a header as the same as current view
+	require.Equal(es.T(), es.paceMaker.CurView(), header.View)
+}
+
 // TestOnReceiveQc_HappyPath tests that building a QC for current view triggers view change. We are not leader for next
 // round, so no proposal is expected.
 func (es *EventHandlerSuite) TestOnReceiveQc_HappyPath() {
@@ -476,7 +545,7 @@ func (es *EventHandlerSuite) TestOnReceiveQc_HappyPath() {
 	require.NoError(es.T(), err, "if a vote can trigger a QC to be built,"+
 		"and the QC triggered a view change, then start new view")
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
-	es.communicator.AssertNotCalled(es.T(), "BroadcastProposalWithDelay")
+	es.communicator.AssertNotCalled(es.T(), "BroadcastProposalWithDelay", mock.Anything, mock.Anything)
 }
 
 // TestOnReceiveQc_FutureView tests that building a QC for future view triggers view change
@@ -818,6 +887,20 @@ func (es *EventHandlerSuite) TestCreateProposal_SanityChecks() {
 	require.Equal(es.T(), tc.NewestQC, es.paceMaker.NewestQC())
 	require.Equal(es.T(), tc, es.paceMaker.LastViewTC())
 	require.Equal(es.T(), tc.View+1, es.paceMaker.CurView(), "incorrect view change")
+}
+
+// TestOnReceiveProposal_ProposalForActiveView tests that when receiving proposal for active we don't attempt to create a proposal
+// Receiving proposal can trigger proposing logic only in case we have received missing block for past views.
+func (es *EventHandlerSuite) TestOnReceiveProposal_ProposalForActiveView() {
+	es.voteAggregator.On("AddBlock", mock.Anything).Return(nil)
+
+	// receive proposal where we are leader, meaning that we have produced this proposal
+	es.committee.leaders[es.votingProposal.Block.View] = struct{}{}
+
+	err := es.eventhandler.OnReceiveProposal(es.votingProposal)
+	require.NoError(es.T(), err)
+
+	es.communicator.AssertNotCalled(es.T(), "BroadcastProposalWithDelay", mock.Anything, mock.Anything)
 }
 
 func createBlock(view uint64) *model.Block {

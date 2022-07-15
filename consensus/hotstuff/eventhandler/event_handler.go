@@ -177,12 +177,12 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 		return fmt.Errorf("failed processing current block: %w", err)
 	}
 
-	// we don't call proposeForNewView() which will trigger proposing logic because to make a proposal
-	// we need to construct a QC or TC, both QC and TC will be delivered in dedicated callback
-	// (see OnQCCreated and OnTCCreated). When obtaining QC or TC for active view EventHandler calls
-	// proposeForNewView() which will initiate proposing logic.
+	// nothing to do if this proposal is for current view
+	if proposal.Block.View == e.paceMaker.CurView() {
+		return nil
+	}
 
-	return nil
+	return e.proposeForNewView()
 }
 
 // TimeoutChannel returns the channel for subscribing the waiting timeout on receiving
