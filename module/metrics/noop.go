@@ -112,6 +112,7 @@ func (nc *NoopCollector) OnChunkConsumerJobDone(uint64)                         
 func (nc *NoopCollector) OnChunkDataPackResponseReceivedFromNetworkByRequester()               {}
 func (nc *NoopCollector) TotalConnectionsInPool(connectionCount uint, connectionPoolSize uint) {}
 func (nc *NoopCollector) ConnectionFromPoolRetrieved()                                         {}
+func (nc *NoopCollector) ConnectionAddedToPool()                                               {}
 func (nc *NoopCollector) StartBlockReceivedToExecuted(blockID flow.Identifier)                 {}
 func (nc *NoopCollector) FinishBlockReceivedToExecuted(blockID flow.Identifier)                {}
 func (nc *NoopCollector) ExecutionComputationUsedPerBlock(computation uint64)                  {}

@@ -6,8 +6,9 @@ import (
 )
 
 type AccessCollector struct {
-	connectionReused      prometheus.Counter
-	connectionAddedToPool *prometheus.GaugeVec
+	connectionReused  prometheus.Counter
+	connectionsInPool *prometheus.GaugeVec
+	connectionAdded   prometheus.Counter
 }
 
 func NewAccessCollector() *AccessCollector {
@@ -18,12 +19,18 @@ func NewAccessCollector() *AccessCollector {
 			Subsystem: subsystemConnectionPool,
 			Help:      "counter for the number of times connections get reused",
 		}),
-		connectionAddedToPool: promauto.NewGaugeVec(prometheus.GaugeOpts{
-			Name:      "connection_added",
+		connectionsInPool: promauto.NewGaugeVec(prometheus.GaugeOpts{
+			Name:      "connections_in_pool",
 			Namespace: namespaceAccess,
 			Subsystem: subsystemConnectionPool,
 			Help:      "counter for the number of connections in the pool against max number tne pool can hold",
 		}, []string{"result"}),
+		connectionAdded: promauto.NewCounter(prometheus.CounterOpts{
+			Name:      "connection_added",
+			Namespace: namespaceAccess,
+			Subsystem: subsystemConnectionPool,
+			Help:      "counter for the number of times connections are added",
+		}),
 	}
 
 	return ac
@@ -34,6 +41,10 @@ func (ac *AccessCollector) ConnectionFromPoolRetrieved() {
 }
 
 func (ac *AccessCollector) TotalConnectionsInPool(connectionCount uint, connectionPoolSize uint) {
-	ac.connectionAddedToPool.WithLabelValues("connections").Set(float64(connectionCount))
-	ac.connectionAddedToPool.WithLabelValues("pool_size").Set(float64(connectionPoolSize))
+	ac.connectionsInPool.WithLabelValues("connections").Set(float64(connectionCount))
+	ac.connectionsInPool.WithLabelValues("pool_size").Set(float64(connectionPoolSize))
+}
+
+func (ac *AccessCollector) ConnectionAddedToPool() {
+	ac.connectionAdded.Inc()
 }
