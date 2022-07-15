@@ -360,7 +360,7 @@ func (cs *ComplianceCoreSuite) TestOnSubmitVote() {
 // TestOnSubmitTimeout tests that submitting messages.ClusterTimeoutObject adds model.TimeoutObject into
 // TimeoutAggregator.
 func (cs *ComplianceCoreSuite) TestOnSubmitTimeout() {
-	// create a vote
+	// create a timeout
 	originID := unittest.IdentifierFixture()
 	timeout := messages.ClusterTimeoutObject{
 		View:       rand.Uint64(),
@@ -380,9 +380,6 @@ func (cs *ComplianceCoreSuite) TestOnSubmitTimeout() {
 	// execute the timeout submission
 	err := cs.core.OnTimeoutObject(originID, &timeout)
 	require.NoError(cs.T(), err, "timeout object should pass")
-
-	// check that submit vote was called with correct parameters
-	cs.hotstuff.AssertExpectations(cs.T())
 }
 
 func (cs *ComplianceCoreSuite) TestProposalBufferingOrder() {

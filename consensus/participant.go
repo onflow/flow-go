@@ -54,6 +54,7 @@ func NewParticipant(
 
 	// prune vote aggregator to initial view
 	modules.VoteAggregator.PruneUpToView(finalized.View)
+	modules.TimeoutAggregator.PruneUpToView(finalized.View)
 
 	// recover the hotstuff state, mainly to recover all pending blocks in Forks
 	err := recovery.Participant(log, modules.Forks, modules.VoteAggregator, modules.Validator, finalized, pending)

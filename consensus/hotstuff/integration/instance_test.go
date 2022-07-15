@@ -68,7 +68,7 @@ type Instance struct {
 	forks             *forks.Forks
 	voteAggregator    *voteaggregator.VoteAggregator
 	timeoutAggregator *timeoutaggregator.TimeoutAggregator
-	voter             *safetyrules.SafetyRules
+	safetyRules             *safetyrules.SafetyRules
 	validator         *validator.Validator
 
 	// main logic
