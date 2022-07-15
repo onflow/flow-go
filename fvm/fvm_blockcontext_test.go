@@ -1551,12 +1551,12 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 
 	chain, vm := createChainAndVm(flow.Mainnet)
 
-	header := flow.Header{Height: 42}
+	header := &flow.Header{Height: 42}
 
 	ctx := fvm.NewContext(
 		zerolog.Nop(),
 		fvm.WithChain(chain),
-		fvm.WithBlockHeader(&header),
+		fvm.WithBlockHeader(header),
 		fvm.WithCadenceLogging(true),
 	)
 

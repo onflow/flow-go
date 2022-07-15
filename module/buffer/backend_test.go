@@ -25,13 +25,13 @@ func (suite *BackendSuite) SetupTest() {
 
 func (suite *BackendSuite) Item() *item {
 	parent := unittest.BlockHeaderFixture()
-	return suite.ItemWithParent(&parent)
+	return suite.ItemWithParent(parent)
 }
 
 func (suite *BackendSuite) ItemWithParent(parent *flow.Header) *item {
 	header := unittest.BlockHeaderWithParentFixture(parent)
 	return &item{
-		header:   &header,
+		header:   header,
 		payload:  unittest.IdentifierFixture(),
 		originID: unittest.IdentifierFixture(),
 	}
