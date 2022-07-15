@@ -39,7 +39,7 @@ consensus-tests:
 
 .PHONY: epochs-tests
 epochs-tests:
-	GO111MODULE=on go test $(if $(VERBOSE),-v,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/epochs/... -run TestEpochStaticTransition/TestStaticEpochTransition
+	GO111MODULE=on go test $(if $(VERBOSE),-v,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/epochs/...
 
 .PHONY: ghost-tests
 ghost-tests:

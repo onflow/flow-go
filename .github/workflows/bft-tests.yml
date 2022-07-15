@@ -10,7 +10,7 @@ on:
     - cron: '0 */1 * * *' # every 1 hour
   push:
     branches:
-      - '**/*6313*'
+      - '**/*bft*'
 
 env:
   GO_VERSION: 1.18
@@ -48,7 +48,7 @@ jobs:
       fail-fast: false
       matrix:
         test-category:
-          - integration-epochs
+          - integration-bft
     env:
       TEST_CATEGORY: ${{ matrix.test-category }}
     runs-on: ubuntu-latest
