@@ -1,6 +1,7 @@
 package reporters
 
 import (
+	"fmt"
 	"runtime"
 	"sync"
 
@@ -149,7 +150,14 @@ func (r *ResourceUUIDReporter) iterateChildren(tr trace, addr flow.Address, valu
 	// we could pass nil to the IsResourceKinded method
 	inter := &interpreter.Interpreter{}
 	if compValue.IsResourceKinded(nil) {
-		uuid := uint64(compValue.GetField(inter, nil, "uuid").(interpreter.UInt64Value))
+		var uuid uint64
+		uuidData := compValue.GetField(inter, nil, "uuid")
+		uuidValue, ok := uuidData.(interpreter.UInt64Value)
+		if ok {
+			uuid = uint64(uuidValue)
+		}
+		fmt.Println("uuid", uuid)
+		// uuid := uint64(compValue.GetField(inter, nil, "uuid").(interpreter.UInt64Value))
 		r.rw.Write(ResourcePoint{
 			Path:    tr.String(),
 			Address: addr.Hex(),
