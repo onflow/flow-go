@@ -1,6 +1,7 @@
 package eventhandler
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -115,7 +116,7 @@ func (e *EventHandler) OnReceiveTc(tc *flow.TimeoutCertificate) error {
 	}
 
 	log.Debug().Msg("TC triggered view change, starting new view now")
-	return e.startNewView()
+	return e.proposeForNewView()
 }
 
 // OnReceiveProposal processes a block proposal received from another HotStuff
@@ -176,10 +177,10 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 		return fmt.Errorf("failed processing current block: %w", err)
 	}
 
-	// we don't call startNewView() which will trigger proposing logic because to make a proposal
+	// we don't call proposeForNewView() which will trigger proposing logic because to make a proposal
 	// we need to construct a QC or TC, both QC and TC will be delivered in dedicated callback
 	// (see OnQCCreated and OnTCCreated). When obtaining QC or TC for active view EventHandler calls
-	// startNewView() which will initiate proposing logic.
+	// proposeForNewView() which will initiate proposing logic.
 
 	return nil
 }
@@ -238,7 +239,7 @@ func (e *EventHandler) Start() error {
 	if err != nil {
 		return fmt.Errorf("could not process pending blocks: %w", err)
 	}
-	err = e.startNewView()
+	err = e.proposeForNewView()
 	if err != nil {
 		return fmt.Errorf("could not start new view: %w", err)
 	}
@@ -288,9 +289,9 @@ func (e *EventHandler) processPendingBlocks() error {
 }
 
 // proposeForNewView will only be called when there is a view change from pacemaker.
-// It reads the current view, and generates a proposal if we are the leader. 
+// It reads the current view, and generates a proposal if we are the leader.
 // No errors are expected during normal operation.
-func (e *EventHandler) startNewView() error {
+func (e *EventHandler) proposeForNewView() error {
 
 	// track the start time
 	start := time.Now()
@@ -409,10 +410,10 @@ func (e *EventHandler) processBlockForCurrentView(proposal *model.Proposal) erro
 		// We are attempting process a block in an unknown epoch
 		// This should never happen, because:
 		// * the compliance layer ensures proposals are passed to the event loop strictly after their parent
-		// * the protocol state ensures that, before incorporating the first block of an epoch E, 
+		// * the protocol state ensures that, before incorporating the first block of an epoch E,
 		//    either E is known or we have triggered epoch fallback mode - in either case the epoch for the
 		//    current epoch is known
-		return fmt.Errorf("attempting to process a block for current view in unknown epoch: %v", err.Error())
+		return fmt.Errorf("attempting to process a block for current view in unknown epoch")
 	}
 	if err != nil {
 		return fmt.Errorf("failed to determine primary for next view %d: %w", curView+1, err)
@@ -497,5 +498,5 @@ func (e *EventHandler) processQC(qc *flow.QuorumCertificate) error {
 	log.Debug().Msg("QC triggered view change, starting new view now")
 
 	// current view has changed, go to new view
-	return e.startNewView()
+	return e.proposeForNewView()
 }

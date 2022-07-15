@@ -37,7 +37,7 @@ type TestPaceMaker struct {
 
 var _ hotstuff.PaceMaker = (*TestPaceMaker)(nil)
 
-func NewTestPaceMaker(t require.TestingT, timeoutController *timeout.Controller,
+func NewTestPaceMaker(timeoutController *timeout.Controller,
 	notifier hotstuff.Consumer,
 	persist hotstuff.Persister,
 ) *TestPaceMaker {
@@ -84,7 +84,7 @@ func initPaceMaker(t require.TestingT, livenessData *hotstuff.LivenessData) hots
 	persist := &mocks.Persister{}
 	persist.On("PutLivenessData", mock.Anything).Return(nil).Maybe()
 	persist.On("GetLivenessData").Return(livenessData, nil).Once()
-	pm := NewTestPaceMaker(t, timeout.NewController(tc), notifier, persist)
+	pm := NewTestPaceMaker(timeout.NewController(tc), notifier, persist)
 	notifier.On("OnStartingTimeout", mock.Anything).Return()
 	notifier.On("OnQcTriggeredViewChange", mock.Anything, mock.Anything).Return()
 	notifier.On("OnTcTriggeredViewChange", mock.Anything, mock.Anything).Return()
@@ -407,7 +407,7 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_NoVote_ParentProposalNotFound
 
 	// no vote for this proposal, no parent found
 	err := es.eventhandler.OnReceiveProposal(proposal)
-	require.NoError(es.T(), err)
+	require.Error(es.T(), err)
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
 	es.voteAggregator.AssertCalled(es.T(), "AddBlock", proposal)
 }
@@ -723,6 +723,9 @@ func (es *EventHandlerSuite) TestLeaderBuild100Blocks() {
 
 // TestFollowerFollows100Blocks tests scenario where follower receives 100 proposals one after another
 func (es *EventHandlerSuite) TestFollowerFollows100Blocks() {
+	// add parent proposal otherwise we can't propose
+	parentProposal := createProposal(es.initView, es.initView-1)
+	es.forks.proposals[parentProposal.Block.BlockID] = parentProposal
 	for i := 0; i < 100; i++ {
 		// create each proposal as if they are created by some leader
 		proposal := createProposal(es.initView+uint64(i)+1, es.initView+uint64(i))
@@ -733,7 +736,7 @@ func (es *EventHandlerSuite) TestFollowerFollows100Blocks() {
 		es.endView++
 	}
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
-	require.Equal(es.T(), 100, len(es.forks.proposals)-1)
+	require.Equal(es.T(), 100, len(es.forks.proposals)-2)
 }
 
 // TestFollowerReceives100Forks tests scenario where follower receives 100 forks built on top of the same block

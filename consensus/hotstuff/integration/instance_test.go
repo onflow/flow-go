@@ -3,7 +3,6 @@ package integration
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/module/util"
 	"sync"
 	"time"
 
@@ -34,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	module "github.com/onflow/flow-go/module/mock"
 	msig "github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -69,7 +69,7 @@ type Instance struct {
 	forks             *forks.Forks
 	voteAggregator    *voteaggregator.VoteAggregator
 	timeoutAggregator *timeoutaggregator.TimeoutAggregator
-	safetyRules             *safetyrules.SafetyRules
+	safetyRules       *safetyrules.SafetyRules
 	validator         *validator.Validator
 
 	// main logic
@@ -406,7 +406,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	in.persist.On("GetSafetyData", mock.Anything).Return(safetyData, nil).Once()
 
 	// initialize the safety rules
-	in.voter, err = safetyrules.New(in.signer, in.persist, in.committee)
+	in.safetyRules, err = safetyrules.New(in.signer, in.persist, in.committee)
 	require.NoError(t, err)
 
 	// initialize the event handler
@@ -420,7 +420,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		in.committee,
 		in.voteAggregator,
 		in.timeoutAggregator,
-		in.voter,
+		in.safetyRules,
 		notifier,
 	)
 	require.NoError(t, err)

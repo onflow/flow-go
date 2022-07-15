@@ -16,7 +16,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// NewVoteAggregator creates new VoteAggregator and recover the Forks' state with all pending block
+// NewVoteAggregator creates new VoteAggregator and subscribes for finalization events
 func NewVoteAggregator(
 	log zerolog.Logger,
 	lowestRetainedView uint64,
