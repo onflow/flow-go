@@ -432,6 +432,18 @@ func stopNetworks(t *testing.T, nets []network.Network, duration time.Duration) 
 		"could not stop the networks")
 }
 
+func stopMiddlewares(t *testing.T, mws []network.Middleware, duration time.Duration) {
+
+	// casts mws instances into ReadyDoneAware components
+	comps := make([]module.ReadyDoneAware, 0, len(mws))
+	for _, net := range mws {
+		comps = append(comps, net)
+	}
+
+	unittest.RequireCloseBefore(t, util.AllDone(comps...), duration,
+		"could not stop the middlewares")
+}
+
 // networkPayloadFixture creates a blob of random bytes with the given size (in bytes) and returns it.
 // The primary goal of utilizing this helper function is to apply stress tests on the network layer by
 // sending large messages to transmit.

@@ -11,7 +11,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/module"
@@ -278,7 +277,7 @@ func (suite *ComponentConsumerSuite) runTest(
 	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
 
 	// use global context so we listen for errors until the test is finished
-	go irrecoverableNotExpected(suite.T(), testCtx, errChan)
+	go unittest.NoIrrecoverableError(suite.T(), testCtx, errChan)
 
 	consumer.Start(signalCtx)
 	unittest.RequireCloseBefore(suite.T(), consumer.Ready(), 100*time.Millisecond, "timeout waiting for the consumer to be ready")
@@ -288,13 +287,4 @@ func (suite *ComponentConsumerSuite) runTest(
 	// shutdown
 	cancel()
 	unittest.RequireCloseBefore(suite.T(), consumer.Done(), 100*time.Millisecond, "timeout waiting for the consumer to be done")
-}
-
-func irrecoverableNotExpected(t *testing.T, ctx context.Context, errChan <-chan error) {
-	select {
-	case <-ctx.Done():
-		return
-	case err := <-errChan:
-		require.NoError(t, err, "unexpected irrecoverable error")
-	}
 }
