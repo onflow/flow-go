@@ -1069,7 +1069,7 @@ func (e *Engine) ExecuteScriptAtBlockID(ctx context.Context, script []byte, argu
 	return e.computationManager.ExecuteScript(ctx, script, arguments, block, blockView)
 }
 
-func (e *Engine) GetRegisterAtBlockID(ctx context.Context, owner, controller, key []byte, blockID flow.Identifier) ([]byte, error) {
+func (e *Engine) GetRegisterAtBlockID(ctx context.Context, owner, key []byte, blockID flow.Identifier) ([]byte, error) {
 
 	stateCommit, err := e.execState.StateCommitmentByBlockID(ctx, blockID)
 	if err != nil {
@@ -1078,9 +1078,9 @@ func (e *Engine) GetRegisterAtBlockID(ctx context.Context, owner, controller, ke
 
 	blockView := e.execState.NewView(stateCommit)
 
-	data, err := blockView.Get(string(owner), string(controller), string(key))
+	data, err := blockView.Get(string(owner), string(key))
 	if err != nil {
-		return nil, fmt.Errorf("failed to get the register (owner : %s, controller: %s, key: %s): %w", hex.EncodeToString(owner), hex.EncodeToString(owner), string(key), err)
+		return nil, fmt.Errorf("failed to get the register (owner : %s, key: %s): %w", hex.EncodeToString(owner), string(key), err)
 	}
 
 	return data, nil

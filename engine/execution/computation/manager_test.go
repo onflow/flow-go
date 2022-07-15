@@ -265,7 +265,7 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 
 	vm := fvm.NewVirtualMachine(rt)
 
-	view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+	view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 		return nil, fmt.Errorf("error getting register")
 	})
 
@@ -464,7 +464,7 @@ func (f *FakeUploader) Upload(computationResult *execution.ComputationResult) er
 }
 
 func noopView() *delta.View {
-	return delta.NewView(func(_, _, _ string) (flow.RegisterValue, error) {
+	return delta.NewView(func(_, _ string) (flow.RegisterValue, error) {
 		return nil, nil
 	})
 }
