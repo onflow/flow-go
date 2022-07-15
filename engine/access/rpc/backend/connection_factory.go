@@ -10,6 +10,7 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
+	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
@@ -51,11 +52,13 @@ type ConnectionFactoryImpl struct {
 	ConnectionsCache          *lru.Cache
 	CacheSize                 uint
 	AccessMetrics             module.AccessMetrics
+	Log                       zerolog.Logger
 	mutex                     sync.Mutex
 }
 
 type ConnectionCacheStore struct {
 	ClientConn *grpc.ClientConn
+	Address    string
 	mutex      *sync.Mutex
 }
 
@@ -67,7 +70,9 @@ func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.D
 	}
 
 	keepaliveParams := keepalive.ClientParameters{
-		Time:    10 * time.Second,
+		// how long the client will wait before sending a keepalive to the server if there is no activity
+		Time: 10 * time.Second,
+		// how long the client will wait for a response from the keepalive before closing
 		Timeout: timeout,
 	}
 
@@ -89,53 +94,39 @@ func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.D
 
 func (cf *ConnectionFactoryImpl) retrieveConnection(grpcAddress string, timeout time.Duration) (*grpc.ClientConn, error) {
 	var conn *grpc.ClientConn
-	var clientMutex *sync.Mutex
 	var store *ConnectionCacheStore
 
 	cf.mutex.Lock()
 	if res, ok := cf.ConnectionsCache.Get(grpcAddress); ok {
 		store = res.(*ConnectionCacheStore)
-		clientMutex = store.mutex
 		conn = store.ClientConn
 		if cf.AccessMetrics != nil {
 			cf.AccessMetrics.ConnectionFromPoolRetrieved()
 		}
 	} else {
-		clientMutex = new(sync.Mutex)
 		store = &ConnectionCacheStore{
 			ClientConn: nil,
-			mutex:      clientMutex,
+			Address:    grpcAddress,
+			mutex:      new(sync.Mutex),
 		}
+		cf.Log.Debug().Str("grpc_conn_added", grpcAddress).Msg("adding grpc connection to pool")
 		cf.ConnectionsCache.Add(grpcAddress, store)
+		cf.AccessMetrics.ConnectionAddedToPool()
 	}
-	clientMutex.Lock()
-	defer clientMutex.Unlock()
 	cf.mutex.Unlock()
+	store.mutex.Lock()
+	defer store.mutex.Unlock()
 
 	if conn == nil || conn.GetState() == connectivity.Shutdown {
-		// updates to the cache don't trigger evictions; this line closes connections before re-establishing new ones
-		if conn != nil {
-			conn.Close()
-		}
 		var err error
-		conn, err = cf.addConnection(grpcAddress, timeout, store)
+		conn, err = cf.createConnection(grpcAddress, timeout)
 		if err != nil {
 			return nil, err
 		}
-	}
-	return conn, nil
-}
-
-func (cf *ConnectionFactoryImpl) addConnection(grpcAddress string, timeout time.Duration, store *ConnectionCacheStore) (*grpc.ClientConn, error) {
-	conn, err := cf.createConnection(grpcAddress, timeout)
-	if err != nil {
-		return nil, err
-	}
-
-	store.ClientConn = conn
-
-	if cf.AccessMetrics != nil {
-		cf.AccessMetrics.TotalConnectionsInPool(uint(cf.ConnectionsCache.Len()), cf.CacheSize)
+		store.ClientConn = conn
+		if cf.AccessMetrics != nil {
+			cf.AccessMetrics.TotalConnectionsInPool(uint(cf.ConnectionsCache.Len()), cf.CacheSize)
+		}
 	}
 	return conn, nil
 }
@@ -184,13 +175,13 @@ func (cf *ConnectionFactoryImpl) invalidateAPIClient(address string, port uint) 
 	grpcAddress, _ := getGRPCAddress(address, port)
 	if res, ok := cf.ConnectionsCache.Get(grpcAddress); ok {
 		store := res.(*ConnectionCacheStore)
+		conn := store.ClientConn
 		store.mutex.Lock()
-		if store.ClientConn != nil {
-			conn := store.ClientConn
-			conn.Close()
-			store.ClientConn = nil
-		}
+		store.ClientConn = nil
 		store.mutex.Unlock()
+		// allow time for any existing requests to finish before closing the connection
+		time.Sleep(DefaultClientTimeout)
+		conn.Close()
 	}
 }
 

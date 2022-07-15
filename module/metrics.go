@@ -372,6 +372,9 @@ type AccessMetrics interface {
 
 	// ConnectionFromPoolRetrieved tracks the number of times a connection to a collection/execution node is retrieved from the connection pool
 	ConnectionFromPoolRetrieved()
+
+	// ConnectionAddedToPool tracks the number of times a collection/execution node is added to the connection pool
+	ConnectionAddedToPool()
 }
 
 type ExecutionMetrics interface {
