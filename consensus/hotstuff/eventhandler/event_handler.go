@@ -223,7 +223,7 @@ func (e *EventHandler) OnLocalTimeout() error {
 	// broadcast timeout to participants
 	err = e.communicator.BroadcastTimeout(timeout)
 	if err != nil {
-		log.Warn().Err(err).Msg("could not forward vote")
+		log.Warn().Err(err).Msg("could not forward timeout")
 	}
 
 	log.Debug().Msg("local timeout processed")
@@ -436,8 +436,7 @@ func (e *EventHandler) ownVote(proposal *model.Proposal, curView uint64, nextLea
 		// we don't have parent for this proposal, we can't vote since we can't guarantee validity of proposals
 		// payload. Strictly speaking this shouldn't ever happen because compliance engine makes sure that we
 		// receive proposals with valid parents.
-		log.Warn().Msg("won't vote for proposal, no parent block for this proposal")
-		return nil
+		return fmt.Errorf("won't vote for proposal, no parent block for this proposal")
 	}
 
 	// safetyRules performs all the checks to decide whether to vote for this block or not.

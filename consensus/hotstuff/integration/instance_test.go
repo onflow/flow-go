@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/module/util"
 	"sync"
 	"time"
 
@@ -431,11 +432,12 @@ func (in *Instance) Run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
 		cancel()
-		<-in.voteAggregator.Done()
+		<-util.AllDone(in.voteAggregator, in.timeoutAggregator)
 	}()
 	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
 	in.voteAggregator.Start(signalerCtx)
-	<-in.voteAggregator.Ready()
+	in.timeoutAggregator.Start(signalerCtx)
+	<-util.AllReady(in.voteAggregator, in.timeoutAggregator)
 
 	// start the event handler
 	err := in.handler.Start()
@@ -482,10 +484,17 @@ func (in *Instance) Run() error {
 				}
 			case *model.Vote:
 				in.voteAggregator.AddVote(m)
+			case *model.TimeoutObject:
+				in.timeoutAggregator.AddTimeout(m)
 			case *flow.QuorumCertificate:
 				err := in.handler.OnReceiveQc(m)
 				if err != nil {
-					return fmt.Errorf("could not process created qc: %w", err)
+					return fmt.Errorf("could not process received qc: %w", err)
+				}
+			case *flow.TimeoutCertificate:
+				err := in.handler.OnReceiveTc(m)
+				if err != nil {
+					return fmt.Errorf("could not process received tc: %w", err)
 				}
 			}
 		}
