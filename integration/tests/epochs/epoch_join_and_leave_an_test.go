@@ -3,9 +3,10 @@ package epochs
 import (
 	"testing"
 
+	"github.com/stretchr/testify/suite"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/suite"
 )
 
 func TestEpochJoinAndLeaveAN(t *testing.T) {
