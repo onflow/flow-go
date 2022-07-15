@@ -17,10 +17,10 @@ var (
 	// has not been set up yet.
 	ErrNextEpochNotSetup = fmt.Errorf("next epoch has not yet been set up")
 
-	// ErrEpochNotCommitted is a sentinel error returned when the epoch has
-	// not been committed and information is queried that is only accessible
+	// ErrNextEpochNotCommitted is a sentinel error returned when the next epoch
+	// has not been committed and information is queried that is only accessible
 	// in the EpochCommitted phase.
-	ErrEpochNotCommitted = fmt.Errorf("queried info from EpochCommit event before it was emitted")
+	ErrNextEpochNotCommitted = fmt.Errorf("queried info from EpochCommit event before it was emitted")
 
 	// ErrSealingSegmentBelowRootBlock is a sentinel error returned for queries
 	// for a sealing segment below the root block.

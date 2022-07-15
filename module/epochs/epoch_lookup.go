@@ -90,7 +90,7 @@ func (l *EpochLookup) EpochForViewWithFallback(view uint64) (uint64, error) {
 	}
 	if view > currentFinalView {
 		_, err := next.DKG() // either of the following errors indicates that we have transitioned into EECC
-		if errors.Is(err, protocol.ErrEpochNotCommitted) || errors.Is(err, protocol.ErrNextEpochNotSetup) {
+		if errors.Is(err, protocol.ErrNextEpochNotCommitted) || errors.Is(err, protocol.ErrNextEpochNotSetup) {
 			return current.Counter()
 		}
 		if err != nil {
