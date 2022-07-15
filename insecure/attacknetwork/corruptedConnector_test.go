@@ -51,12 +51,12 @@ func TestConnectorHappyPath_Send(t *testing.T) {
 			// received message should have an exact match on the relevant fields.
 			// Note: only fields filled by test fixtures are checked, as some others
 			// are filled by gRPC on the fly, which are not relevant to the test's sanity.
-			require.Equal(t, receivedMsg.Payload, msg.Payload)
-			require.Equal(t, receivedMsg.Protocol, msg.Protocol)
-			require.Equal(t, receivedMsg.OriginID, msg.OriginID)
-			require.Equal(t, receivedMsg.TargetNum, msg.TargetNum)
-			require.Equal(t, receivedMsg.TargetIDs, msg.TargetIDs)
-			require.Equal(t, receivedMsg.ChannelID, msg.ChannelID)
+			require.Equal(t, receivedMsg.EgressMessage.Payload, msg.EgressMessage.Payload)
+			require.Equal(t, receivedMsg.EgressMessage.Protocol, msg.EgressMessage.Protocol)
+			require.Equal(t, receivedMsg.EgressMessage.OriginID, msg.EgressMessage.OriginID)
+			require.Equal(t, receivedMsg.EgressMessage.TargetNum, msg.EgressMessage.TargetNum)
+			require.Equal(t, receivedMsg.EgressMessage.TargetIDs, msg.EgressMessage.TargetIDs)
+			require.Equal(t, receivedMsg.EgressMessage.ChannelID, msg.EgressMessage.ChannelID)
 
 			close(sentMsgReceived)
 		}()
@@ -100,12 +100,12 @@ func TestConnectorHappyPath_Receive(t *testing.T) {
 				// received message by attacker should have an exact match on the relevant fields as sent by ccf.
 				// Note: only fields filled by test fixtures are checked, as some others
 				// are filled by gRPC on the fly, which are not relevant to the test's sanity.
-				require.Equal(t, receivedMsg.Payload, msg.Payload)
-				require.Equal(t, receivedMsg.Protocol, msg.Protocol)
-				require.Equal(t, receivedMsg.OriginID, msg.OriginID)
-				require.Equal(t, receivedMsg.TargetNum, msg.TargetNum)
-				require.Equal(t, receivedMsg.TargetIDs, msg.TargetIDs)
-				require.Equal(t, receivedMsg.ChannelID, msg.ChannelID)
+				require.Equal(t, receivedMsg.EgressMessage.Payload, msg.EgressMessage.Payload)
+				require.Equal(t, receivedMsg.EgressMessage.Protocol, msg.EgressMessage.Protocol)
+				require.Equal(t, receivedMsg.EgressMessage.OriginID, msg.EgressMessage.OriginID)
+				require.Equal(t, receivedMsg.EgressMessage.TargetNum, msg.EgressMessage.TargetNum)
+				require.Equal(t, receivedMsg.EgressMessage.TargetIDs, msg.EgressMessage.TargetIDs)
+				require.Equal(t, receivedMsg.EgressMessage.ChannelID, msg.EgressMessage.ChannelID)
 
 				close(sentMsgReceived)
 			})

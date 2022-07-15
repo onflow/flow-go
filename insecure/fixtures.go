@@ -38,14 +38,19 @@ func MessageFixture(t *testing.T, codec network.Codec, protocol Protocol, conten
 	payload, err := codec.Encode(content)
 	require.NoError(t, err)
 
-	// creates message that goes over gRPC.
-	m := &Message{
+	// creates egress message that goes over gRPC.
+
+	egressMsg := &EgressMessage{
 		ChannelID: "test-channel",
 		OriginID:  originId[:],
 		TargetNum: targetNum,
 		TargetIDs: flow.IdsToBytes(targetIds),
 		Payload:   payload,
 		Protocol:  protocol,
+	}
+
+	m := &Message{
+		EgressMessage: egressMsg,
 	}
 
 	// creates corresponding event of that message that

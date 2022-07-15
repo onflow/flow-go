@@ -115,17 +115,17 @@ func (a *AttackNetwork) Observe(message *insecure.Message) {
 // processMessageFromCorruptedNode processes incoming messages arrived from corruptible conduits by passing them
 // to the orchestrator.
 func (a *AttackNetwork) processMessageFromCorruptedNode(message *insecure.Message) error {
-	event, err := a.codec.Decode(message.Payload)
+	event, err := a.codec.Decode(message.EgressMessage.Payload)
 	if err != nil {
 		return fmt.Errorf("could not decode observed payload: %w", err)
 	}
 
-	sender, err := flow.ByteSliceToId(message.OriginID)
+	sender, err := flow.ByteSliceToId(message.EgressMessage.OriginID)
 	if err != nil {
 		return fmt.Errorf("could not convert origin id to flow identifier: %w", err)
 	}
 
-	targetIds, err := flow.ByteSlicesToIds(message.TargetIDs)
+	targetIds, err := flow.ByteSlicesToIds(message.EgressMessage.TargetIDs)
 	if err != nil {
 		return fmt.Errorf("could not convert target ids to flow identifiers: %w", err)
 	}
@@ -136,10 +136,10 @@ func (a *AttackNetwork) processMessageFromCorruptedNode(message *insecure.Messag
 
 	err = a.orchestrator.HandleEventFromCorruptedNode(&insecure.Event{
 		CorruptedNodeId:   sender,
-		Channel:           network.Channel(message.ChannelID),
+		Channel:           network.Channel(message.EgressMessage.ChannelID),
 		FlowProtocolEvent: event,
-		Protocol:          message.Protocol,
-		TargetNum:         message.TargetNum,
+		Protocol:          message.EgressMessage.Protocol,
+		TargetNum:         message.EgressMessage.TargetNum,
 		TargetIds:         targetIds,
 	})
 	if err != nil {
@@ -183,12 +183,16 @@ func (a *AttackNetwork) eventToMessage(corruptedId flow.Identifier,
 		return nil, fmt.Errorf("could not encode event: %w", err)
 	}
 
-	return &insecure.Message{
+	egressMsg := &insecure.EgressMessage{
 		ChannelID: channel.String(),
 		OriginID:  corruptedId[:],
 		TargetNum: num,
 		TargetIDs: flow.IdsToBytes(targetIds),
 		Payload:   payload,
 		Protocol:  protocol,
+	}
+
+	return &insecure.Message{
+		EgressMessage: egressMsg,
 	}, nil
 }
