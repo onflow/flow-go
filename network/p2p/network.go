@@ -62,7 +62,6 @@ type Network struct {
 	codec                       network.Codec
 	me                          module.Local
 	mw                          network.Middleware
-	top                         network.Topology // used to determine fanout connections
 	metrics                     module.NetworkMetrics
 	receiveCache                *netcache.ReceiveCache // used to deduplicate incoming messages
 	queue                       network.MessageQueue
@@ -127,7 +126,6 @@ func NewNetwork(
 		me:                          me,
 		mw:                          mw,
 		receiveCache:                receiveCache,
-		top:                         top,
 		metrics:                     metrics,
 		subscriptionManager:         sm,
 		identityProvider:            identityProvider,
@@ -321,21 +319,6 @@ func (n *Network) Identities() flow.IdentityList {
 
 func (n *Network) Identity(pid peer.ID) (*flow.Identity, bool) {
 	return n.identityProvider.ByPeerID(pid)
-}
-
-// Topology returns the identities of a uniform subset of nodes in protocol state using the topology provided earlier.
-// Independent invocations of Topology on different nodes collectively constructs a connected network graph.
-func (n *Network) Topology() (flow.IdentityList, error) {
-	n.Lock()
-	defer n.Unlock()
-
-	subscribedChannels := n.subscriptionManager.Channels()
-
-	top, err := n.top.GenerateFanout(n.Identities(), subscribedChannels)
-	if err != nil {
-		return nil, fmt.Errorf("could not generate topology: %w, subscribed: %d", err, len(subscribedChannels))
-	}
-	return top, nil
 }
 
 func (n *Network) Receive(nodeID flow.Identifier, msg *message.Message, decodedMsgPayload interface{}) error {
