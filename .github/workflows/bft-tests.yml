@@ -6,8 +6,6 @@ name: BFT Tests
 # this workflow should be disabled in Github when not needed: https://docs.github.com/en/actions/managing-workflow-runs/disabling-and-enabling-a-workflow
 
 on:
-  schedule:
-    - cron: '0 */1 * * *' # every 1 hour
   push:
     branches:
       - '**/*bft*'
