@@ -97,7 +97,9 @@ func NewScriptEnvironment(
 		env.seedRNG(fvmContext.BlockHeader)
 	}
 
-	env.setExecutionParameters()
+	if fvmContext.AllowContextOverrideByExecutionState {
+		env.setExecutionParameters()
+	}
 
 	return env
 }
@@ -141,7 +143,7 @@ func (e *ScriptEnv) setExecutionParameters() {
 		return
 	}
 
-	computationWeights, err := getExecutionEffortWeights(e, service)
+	computationWeights, err := GetExecutionEffortWeights(e, service)
 	err = setIfOk(
 		"execution effort weights",
 		err,
@@ -150,7 +152,7 @@ func (e *ScriptEnv) setExecutionParameters() {
 		return
 	}
 
-	memoryWeights, err := getExecutionMemoryWeights(e, service)
+	memoryWeights, err := GetExecutionMemoryWeights(e, service)
 	err = setIfOk(
 		"execution memory weights",
 		err,
@@ -159,7 +161,7 @@ func (e *ScriptEnv) setExecutionParameters() {
 		return
 	}
 
-	memoryLimit, err := getExecutionMemoryLimit(e, service)
+	memoryLimit, err := GetExecutionMemoryLimit(e, service)
 	err = setIfOk(
 		"execution memory limit",
 		err,
@@ -289,13 +291,8 @@ func (e *ScriptEnv) GetStorageCapacity(address common.Address) (value uint64, er
 	accountStorageCapacity := AccountStorageCapacityInvocation(e, e.traceSpan)
 	result, invokeErr := accountStorageCapacity(address)
 
-	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, storage capacity will be 0.
-	// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
-	// 2. There will also be an error in case the accounts balance times megabytesPerFlow constant overflows,
-	//		which shouldn't happen unless the the price of storage is reduced at least 100 fold
-	// 3. Any other error indicates a bug in our implementation. How can we reliably check the Cadence error?
 	if invokeErr != nil {
-		return 0, nil
+		return 0, errors.HandleRuntimeError(invokeErr)
 	}
 
 	// Return type is actually a UFix64 with the unit of megabytes so some conversion is necessary
@@ -317,9 +314,8 @@ func (e *ScriptEnv) GetAccountBalance(address common.Address) (value uint64, err
 	accountBalance := AccountBalanceInvocation(e, e.traceSpan)
 	result, invokeErr := accountBalance(address)
 
-	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, balance will be 0.
 	if invokeErr != nil {
-		return 0, nil
+		return 0, errors.HandleRuntimeError(invokeErr)
 	}
 	return result.ToGoValue().(uint64), nil
 }
@@ -338,11 +334,8 @@ func (e *ScriptEnv) GetAccountAvailableBalance(address common.Address) (value ui
 	accountAvailableBalance := AccountAvailableBalanceInvocation(e, e.traceSpan)
 	result, invokeErr := accountAvailableBalance(address)
 
-	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, available balance will be 0.
-	// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
-	// 2. Any other error indicates a bug in our implementation. How can we reliably check the Cadence error?
 	if invokeErr != nil {
-		return 0, nil
+		return 0, errors.HandleRuntimeError(invokeErr)
 	}
 	return result.ToGoValue().(uint64), nil
 }
@@ -615,8 +608,8 @@ func (e *ScriptEnv) MeterMemory(usage common.MemoryUsage) error {
 	return e.meterMemory(usage.Kind, uint(usage.Amount))
 }
 
-func (e *ScriptEnv) MemoryUsed() uint64 {
-	return uint64(e.sth.State().TotalMemoryUsed())
+func (e *ScriptEnv) MemoryEstimate() uint64 {
+	return uint64(e.sth.State().TotalMemoryEstimate())
 }
 
 func (e *ScriptEnv) DecodeArgument(b []byte, t cadence.Type) (cadence.Value, error) {

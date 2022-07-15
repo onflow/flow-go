@@ -22,20 +22,20 @@ import (
 	"github.com/onflow/flow-go-sdk/test"
 
 	"github.com/onflow/flow-go/crypto"
-
+	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/flow"
-	emulatormod "github.com/onflow/flow-go/module/emulator"
+	"github.com/onflow/flow-go/module/dkg"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type ClientSuite struct {
 	suite.Suite
 
-	contractClient *Client
+	contractClient *dkg.Client
 
 	env            templates.Environment
 	blockchain     *emulator.Blockchain
-	emulatorClient *emulatormod.EmulatorClient
+	emulatorClient *utils.EmulatorClient
 
 	dkgAddress    sdk.Address
 	dkgAccountKey *sdk.AccountKey
@@ -53,12 +53,12 @@ func (s *ClientSuite) SetupTest() {
 	require.NoError(s.T(), err)
 
 	s.blockchain = blockchain
-	s.emulatorClient = emulatormod.NewEmulatorClient(blockchain)
+	s.emulatorClient = utils.NewEmulatorClient(blockchain)
 
 	// deploy contract
 	s.deployDKGContract()
 
-	s.contractClient = NewClient(zerolog.Nop(), s.emulatorClient, flow.ZeroID, s.dkgSigner, s.dkgAddress.String(), s.dkgAddress.String(), 0)
+	s.contractClient = dkg.NewClient(zerolog.Nop(), s.emulatorClient, flow.ZeroID, s.dkgSigner, s.dkgAddress.String(), s.dkgAddress.String(), 0)
 }
 
 func (s *ClientSuite) deployDKGContract() {
@@ -186,7 +186,7 @@ func (s *ClientSuite) TestSubmitResult() {
 	require.NoError(s.T(), err)
 }
 
-func (s *ClientSuite) prepareDKG(participants []flow.Identifier) []*Client {
+func (s *ClientSuite) prepareDKG(participants []flow.Identifier) []*dkg.Client {
 
 	// set up the admin account
 	s.setUpAdmin()
@@ -217,9 +217,9 @@ func (s *ClientSuite) prepareDKG(participants []flow.Identifier) []*Client {
 	}
 
 	// create clients for each participant
-	clients := make([]*Client, len(participants))
+	clients := make([]*dkg.Client, len(participants))
 	for index := range participants {
-		clients[index] = NewClient(zerolog.Nop(), s.emulatorClient, flow.ZeroID, signers[index], s.dkgAddress.String(), addresses[index].String(), 0)
+		clients[index] = dkg.NewClient(zerolog.Nop(), s.emulatorClient, flow.ZeroID, signers[index], s.dkgAddress.String(), addresses[index].String(), 0)
 	}
 
 	return clients

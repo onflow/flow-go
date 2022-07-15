@@ -26,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/meter/weighted"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -363,12 +364,55 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assertEventHashesMatch(t, collectionCount+1, result)
 	})
 
+	t.Run("system transaction does not read memory limit from state", func(t *testing.T) {
+
+		weighted.DefaultMemoryWeights = weighted.ExecutionMemoryWeights{
+			0: 1, // single weight set to 1
+		}
+		execCtx := fvm.NewContext(
+			zerolog.Nop(),
+			fvm.WithMemoryLimit(10), // the context memory limit is set to 10
+		)
+
+		rt := &testRuntime{
+			executeTransaction: func(script runtime.Script, r runtime.Context) error {
+				err := r.Interface.MeterMemory(common.MemoryUsage{
+					Kind:   0,
+					Amount: 11,
+				})
+				require.NoError(t, err) // should fail if limit is taken from the default context
+
+				return nil
+			},
+			readStored: func(address common.Address, path cadence.Path, r runtime.Context) (cadence.Value, error) {
+				require.Fail(t, "system chunk should not read context from the state")
+				return nil, nil
+			},
+		}
+
+		vm := fvm.NewVirtualMachine(rt)
+
+		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
+		require.NoError(t, err)
+
+		block := generateBlock(0, 0, rag)
+
+		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			return nil, nil
+		})
+
+		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
+		assert.NoError(t, err)
+		assert.Len(t, result.StateSnapshots, 1) // system chunk
+	})
+
 	t.Run("succeeding transactions store programs", func(t *testing.T) {
 
 		execCtx := fvm.NewContext(zerolog.Nop())
 
+		address := common.Address{0x1}
 		contractLocation := common.AddressLocation{
-			Address: common.Address{0x1},
+			Address: address,
 			Name:    "Test",
 		}
 
@@ -407,6 +451,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
+		err = view.Set(string(address.Bytes()), "", state.KeyAccountStatus, []byte{1})
+		require.NoError(t, err)
+
 		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, collectionCount+1) // +1 system chunk
@@ -423,8 +470,10 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			),
 		)
 
+		address := common.Address{0x1}
+
 		contractLocation := common.AddressLocation{
-			Address: common.Address{0x1},
+			Address: address,
 			Name:    "Test",
 		}
 
@@ -476,6 +525,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
+
+		err = view.Set(string(address.Bytes()), "", state.KeyAccountStatus, []byte{1})
+		require.NoError(t, err)
 
 		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
 		require.NoError(t, err)
@@ -594,7 +646,7 @@ func (f *FixedAddressGenerator) AddressCount() uint64 {
 	panic("not implemented")
 }
 
-func Test_FreezeAccountChecksAreIncluded(t *testing.T) {
+func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 
 	address := flow.HexToAddress("1234")
 	fag := &FixedAddressGenerator{Address: address}
@@ -633,11 +685,11 @@ func Test_FreezeAccountChecksAreIncluded(t *testing.T) {
 
 	registerTouches := view.Interactions().RegisterTouches()
 
-	// make sure check for frozen account has been registered
+	// make sure check for account status has been registered
 	id := flow.RegisterID{
 		Owner:      string(address.Bytes()),
 		Controller: "",
-		Key:        state.KeyAccountFrozen,
+		Key:        state.KeyAccountStatus,
 	}
 
 	require.Contains(t, registerTouches, id.String())

@@ -245,7 +245,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 	header := unittest.BlockHeaderFixture()
 	header.PayloadHash = payload.Hash()
 	block := flow.Block{
-		Header:  &header,
+		Header:  header,
 		Payload: &payload,
 	}
 	blockID := block.ID()
@@ -354,7 +354,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 	verifiableChunkData = verification.VerifiableChunkData{
 		IsSystemChunk: system,
 		Chunk:         &chunk,
-		Header:        &header,
+		Header:        header,
 		Result:        &result,
 		ChunkDataPack: &chunkDataPack,
 		EndState:      flow.StateCommitment(endState),

@@ -12,12 +12,12 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/verification/utils"
 	chmodels "github.com/onflow/flow-go/model/chunks"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
@@ -65,7 +65,7 @@ func New(
 		me:             me,
 		chVerif:        chVerif,
 		approvalHasher: utils.NewResultApprovalHasher(),
-		spockHasher:    crypto.NewBLSKMAC(encoding.SPOCKTag),
+		spockHasher:    signature.NewBLSHasher(signature.SPOCKTag),
 		approvals:      approvals,
 	}
 

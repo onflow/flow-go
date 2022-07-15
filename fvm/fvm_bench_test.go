@@ -270,7 +270,7 @@ type txWeights struct {
 	TXHash                string `json:"txHash"`
 	LedgerInteractionUsed uint64 `json:"ledgerInteractionUsed"`
 	ComputationUsed       uint   `json:"computationUsed"`
-	MemoryUsed            uint   `json:"memoryUsed"`
+	MemoryEstimate        uint   `json:"memoryEstimate"`
 }
 
 type txSuccessfulLog struct {
@@ -888,7 +888,7 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 						pre {
 							BatchNFT.sets[setID] != nil: "Cannot borrow Set: The Set doesn't exist"
 						}
-						return &BatchNFT.sets[setID] as &Set
+						return (&BatchNFT.sets[setID] as &Set?)!
 					}
 
 					pub fun startNewSeries(): UInt32 {
@@ -969,12 +969,12 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 					}
 
 					pub fun borrowNFT(id: UInt64): &NonFungibleToken.NFT {
-						return &self.ownedNFTs[id] as &NonFungibleToken.NFT
+						return (&self.ownedNFTs[id] as &NonFungibleToken.NFT?)!
 					}
 
 					pub fun borrowTestToken(id: UInt64): &BatchNFT.NFT? {
 						if self.ownedNFTs[id] != nil {
-							let ref = &self.ownedNFTs[id] as auth &NonFungibleToken.NFT
+							let ref = (&self.ownedNFTs[id] as auth &NonFungibleToken.NFT?)!
 							return ref as! &BatchNFT.NFT
 						} else {
 							return nil
