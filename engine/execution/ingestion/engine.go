@@ -436,7 +436,7 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 	log := e.log.With().Hex("block_id", blockID[:]).Logger()
 
 	span, _, _ := e.tracer.StartBlockSpan(ctx, blockID, trace.EXEHandleBlock)
-	defer span.Finish()
+	defer span.End()
 
 	executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, blockID)
 	if err != nil {
@@ -568,7 +568,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 	startedAt := time.Now()
 
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.EXEExecuteBlock)
-	defer span.Finish()
+	defer span.End()
 
 	view := e.execState.NewView(*executableBlock.StartState)
 
@@ -812,7 +812,7 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 	collID := collection.ID()
 
 	span, _, _ := e.tracer.StartCollectionSpan(context.Background(), collID, trace.EXEHandleCollection)
-	defer span.Finish()
+	defer span.End()
 
 	lg := e.log.With().Hex("collection_id", collID[:]).Logger()
 
@@ -1116,7 +1116,7 @@ func (e *Engine) handleComputationResult(
 ) (flow.StateCommitment, *flow.ExecutionReceipt, error) {
 
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.EXEHandleComputationResult)
-	defer span.Finish()
+	defer span.End()
 
 	e.log.Debug().
 		Hex("block_id", logging.Entity(result.ExecutableBlock)).
@@ -1148,7 +1148,7 @@ func (e *Engine) saveExecutionResults(
 ) (*flow.ExecutionReceipt, error) {
 
 	span, childCtx := e.tracer.StartSpanFromContext(ctx, trace.EXESaveExecutionResults)
-	defer span.Finish()
+	defer span.End()
 
 	originalState := startState
 

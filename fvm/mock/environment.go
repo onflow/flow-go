@@ -6,6 +6,8 @@ import (
 	atree "github.com/onflow/atree"
 	ast "github.com/onflow/cadence/runtime/ast"
 
+	attribute "go.opentelemetry.io/otel/attribute"
+
 	cadence "github.com/onflow/cadence"
 
 	common "github.com/onflow/cadence/runtime/common"
@@ -15,8 +17,6 @@ import (
 	interpreter "github.com/onflow/cadence/runtime/interpreter"
 
 	mock "github.com/stretchr/testify/mock"
-
-	opentracing "github.com/opentracing/opentracing-go"
 
 	runtime "github.com/onflow/cadence/runtime"
 
@@ -627,9 +627,9 @@ func (_m *Environment) ProgramLog(_a0 string) error {
 	return r0
 }
 
-// RecordTrace provides a mock function with given fields: operation, location, duration, logs
-func (_m *Environment) RecordTrace(operation string, location common.Location, duration time.Duration, logs []opentracing.LogRecord) {
-	_m.Called(operation, location, duration, logs)
+// RecordTrace provides a mock function with given fields: operation, location, duration, attrs
+func (_m *Environment) RecordTrace(operation string, location common.Location, duration time.Duration, attrs []attribute.KeyValue) {
+	_m.Called(operation, location, duration, attrs)
 }
 
 // RemoveAccountContractCode provides a mock function with given fields: address, name

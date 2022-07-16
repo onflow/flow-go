@@ -13,8 +13,8 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/opentracing/opentracing-go"
-	traceLog "github.com/opentracing/opentracing-go/log"
+	"go.opentelemetry.io/otel/attribute"
+	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/errors"
@@ -85,7 +85,7 @@ type commonEnv struct {
 	metrics       *handler.MetricsHandler
 	logs          []string
 	rng           *rand.Rand
-	traceSpan     opentracing.Span
+	traceSpan     otelTrace.Span
 }
 
 // TODO(patrick): rm once Meter object has been refactored
@@ -130,7 +130,7 @@ func (env *commonEnv) seedRNG(header *flow.Header) {
 func (env *commonEnv) UnsafeRandom() (uint64, error) {
 	if env.isTraceable() && env.ctx.ExtensiveTracing {
 		sp := env.ctx.Tracer.StartSpanFromParent(env.traceSpan, trace.FVMEnvUnsafeRandom)
-		defer sp.Finish()
+		defer sp.End()
 	}
 
 	if env.rng == nil {
@@ -150,7 +150,7 @@ func (env *commonEnv) isTraceable() bool {
 func (env *commonEnv) GenerateUUID() (uint64, error) {
 	if env.isTraceable() && env.ctx.ExtensiveTracing {
 		sp := env.ctx.Tracer.StartSpanFromParent(env.traceSpan, trace.FVMEnvGenerateUUID)
-		defer sp.Finish()
+		defer sp.End()
 	}
 
 	if env.uuidGenerator == nil {
@@ -173,7 +173,7 @@ func (env *commonEnv) GenerateUUID() (uint64, error) {
 func (env *commonEnv) GetCurrentBlockHeight() (uint64, error) {
 	if env.isTraceable() && env.ctx.ExtensiveTracing {
 		sp := env.ctx.Tracer.StartSpanFromParent(env.traceSpan, trace.FVMEnvGetCurrentBlockHeight)
-		defer sp.Finish()
+		defer sp.End()
 	}
 
 	err := env.Meter(meter.ComputationKindGetCurrentBlockHeight, 1)
@@ -191,7 +191,7 @@ func (env *commonEnv) GetCurrentBlockHeight() (uint64, error) {
 func (env *commonEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, error) {
 	if env.isTraceable() {
 		sp := env.ctx.Tracer.StartSpanFromParent(env.traceSpan, trace.FVMEnvGetBlockAtHeight)
-		defer sp.Finish()
+		defer sp.End()
 	}
 
 	err := env.Meter(meter.ComputationKindGetBlockAtHeight, 1)
@@ -223,12 +223,12 @@ func (env *commonEnv) GetValue(owner, key []byte) ([]byte, error) {
 	if env.isTraceable() {
 		sp := env.ctx.Tracer.StartSpanFromParent(env.traceSpan, trace.FVMEnvGetValue)
 		defer func() {
-			sp.LogFields(
-				traceLog.String("owner", hex.EncodeToString(owner)),
-				traceLog.String("key", string(key)),
-				traceLog.Int("valueByteSize", valueByteSize),
+			sp.SetAttributes(
+				attribute.String("owner", hex.EncodeToString(owner)),
+				attribute.String("key", string(key)),
+				attribute.Int("valueByteSize", valueByteSize),
 			)
-			sp.Finish()
+			sp.End()
 		}()
 	}
 
@@ -252,11 +252,11 @@ func (env *commonEnv) GetValue(owner, key []byte) ([]byte, error) {
 func (env *commonEnv) SetValue(owner, key, value []byte) error {
 	if env.isTraceable() {
 		sp := env.ctx.Tracer.StartSpanFromParent(env.traceSpan, trace.FVMEnvSetValue)
-		sp.LogFields(
-			traceLog.String("owner", hex.EncodeToString(owner)),
-			traceLog.String("key", string(key)),
+		sp.SetAttributes(
+			attribute.String("owner", hex.EncodeToString(owner)),
+			attribute.String("key", string(key)),
 		)
-		defer sp.Finish()
+		defer sp.End()
 	}
 	err := env.Meter(meter.ComputationKindSetValue, uint(len(value)))
 	if err != nil {
@@ -277,7 +277,7 @@ func (env *commonEnv) SetValue(owner, key, value []byte) error {
 func (env *commonEnv) ValueExists(owner, key []byte) (exists bool, err error) {
 	if env.isTraceable() {
 		sp := env.ctx.Tracer.StartSpanFromParent(env.traceSpan, trace.FVMEnvValueExists)
-		defer sp.Finish()
+		defer sp.End()
 	}
 
 	err = env.Meter(meter.ComputationKindValueExists, 1)
@@ -296,7 +296,7 @@ func (env *commonEnv) ValueExists(owner, key []byte) (exists bool, err error) {
 func (env *commonEnv) GetStorageUsed(address common.Address) (value uint64, err error) {
 	if env.isTraceable() {
 		sp := env.ctx.Tracer.StartSpanFromParent(env.traceSpan, trace.FVMEnvGetStorageUsed)
-		defer sp.Finish()
+		defer sp.End()
 	}
 
 	err = env.Meter(meter.ComputationKindGetStorageUsed, 1)
@@ -322,7 +322,7 @@ func storageMBUFixToBytesUInt(result cadence.Value) uint64 {
 func (env *commonEnv) GetAccountContractNames(address runtime.Address) ([]string, error) {
 	if env.isTraceable() {
 		sp := env.ctx.Tracer.StartSpanFromParent(env.traceSpan, trace.FVMEnvGetAccountContractNames)
-		defer sp.Finish()
+		defer sp.End()
 	}
 
 	err := env.Meter(meter.ComputationKindGetAccountContractNames, 1)
@@ -343,7 +343,7 @@ func (env *commonEnv) GetAccountContractNames(address runtime.Address) ([]string
 func (env *commonEnv) GetCode(location runtime.Location) ([]byte, error) {
 	if env.isTraceable() {
 		sp := env.ctx.Tracer.StartSpanFromParent(env.traceSpan, trace.FVMEnvGetCode)
-		defer sp.Finish()
+		defer sp.End()
 	}
 
 	err := env.Meter(meter.ComputationKindGetCode, 1)
@@ -374,7 +374,7 @@ func (env *commonEnv) GetCode(location runtime.Location) ([]byte, error) {
 func (env *commonEnv) GetAccountContractCode(address runtime.Address, name string) (code []byte, err error) {
 	if env.isTraceable() {
 		sp := env.ctx.Tracer.StartSpanFromParent(env.traceSpan, trace.FVMEnvGetAccountContractCode)
-		defer sp.Finish()
+		defer sp.End()
 	}
 
 	err = env.Meter(meter.ComputationKindGetAccountContractCode, 1)
@@ -396,7 +396,7 @@ func (env *commonEnv) GetAccountContractCode(address runtime.Address, name strin
 func (env *commonEnv) GetProgram(location common.Location) (*interpreter.Program, error) {
 	if env.isTraceable() {
 		sp := env.ctx.Tracer.StartSpanFromParent(env.traceSpan, trace.FVMEnvGetProgram)
-		defer sp.Finish()
+		defer sp.End()
 	}
 
 	err := env.Meter(meter.ComputationKindGetProgram, 1)
@@ -424,7 +424,7 @@ func (env *commonEnv) GetProgram(location common.Location) (*interpreter.Program
 func (env *commonEnv) SetProgram(location common.Location, program *interpreter.Program) error {
 	if env.isTraceable() {
 		sp := env.ctx.Tracer.StartSpanFromParent(env.traceSpan, trace.FVMEnvSetProgram)
-		defer sp.Finish()
+		defer sp.End()
 	}
 
 	err := env.Meter(meter.ComputationKindSetProgram, 1)
@@ -451,7 +451,7 @@ func (env *commonEnv) Hash(
 ) ([]byte, error) {
 	if env.isTraceable() {
 		sp := env.ctx.Tracer.StartSpanFromParent(env.traceSpan, trace.FVMEnvHash)
-		defer sp.Finish()
+		defer sp.End()
 	}
 
 	err := env.Meter(meter.ComputationKindHash, 1)
@@ -466,7 +466,7 @@ func (env *commonEnv) Hash(
 func (env *commonEnv) DecodeArgument(b []byte, _ cadence.Type) (cadence.Value, error) {
 	if env.isTraceable() && env.ctx.ExtensiveTracing {
 		sp := env.ctx.Tracer.StartSpanFromParent(env.traceSpan, trace.FVMEnvDecodeArgument)
-		defer sp.Finish()
+		defer sp.End()
 	}
 
 	v, err := jsoncdc.Decode(env, b)
@@ -478,20 +478,15 @@ func (env *commonEnv) DecodeArgument(b []byte, _ cadence.Type) (cadence.Value, e
 	return v, err
 }
 
-func (env *commonEnv) RecordTrace(operation string, location common.Location, duration time.Duration, logs []opentracing.LogRecord) {
+func (env *commonEnv) RecordTrace(operation string, location common.Location, duration time.Duration, attrs []attribute.KeyValue) {
 	if !env.isTraceable() {
 		return
 	}
 	if location != nil {
-		if logs == nil {
-			logs = make([]opentracing.LogRecord, 0, 1)
-		}
-		logs = append(logs, opentracing.LogRecord{Timestamp: time.Now(),
-			Fields: []traceLog.Field{traceLog.String("location", location.String())},
-		})
+		attrs = append(attrs, attribute.String("location", location.String()))
 	}
 	spanName := trace.FVMCadenceTrace.Child(operation)
-	env.ctx.Tracer.RecordSpanFromParent(env.traceSpan, spanName, duration, logs)
+	env.ctx.Tracer.RecordSpanFromParent(env.traceSpan, spanName, duration, attrs)
 }
 
 func (env *commonEnv) ProgramParsed(location common.Location, duration time.Duration) {
