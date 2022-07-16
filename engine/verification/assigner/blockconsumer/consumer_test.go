@@ -122,7 +122,7 @@ func withConsumer(
 
 		processedHeight := bstorage.NewConsumerProgress(db, module.ConsumeProgressVerificationBlockHeight)
 		collector := &metrics.NoopCollector{}
-		tracer := &trace.NoopTracer{}
+		tracer := trace.NewNoopTracer()
 		participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
 		s := testutil.CompleteStateFixture(t, collector, tracer, rootSnapshot)

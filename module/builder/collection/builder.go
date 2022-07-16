@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/opentracing/opentracing-go"
+	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
@@ -323,11 +323,11 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// TODO (ramtin): enable this again
 	// b.tracer.FinishSpan(parentID, trace.COLBuildOnCreateHeader)
 
-	span, ctx, _ := b.tracer.StartCollectionSpan(context.Background(), proposal.ID(), trace.COLBuildOn, opentracing.StartTime(startTime))
-	defer span.Finish()
+	span, ctx, _ := b.tracer.StartCollectionSpan(context.Background(), proposal.ID(), trace.COLBuildOn, otelTrace.WithTimestamp(startTime))
+	defer span.End()
 
 	dbInsertSpan, _ := b.tracer.StartSpanFromContext(ctx, trace.COLBuildOnDBInsert)
-	defer dbInsertSpan.Finish()
+	defer dbInsertSpan.End()
 
 	// finally we insert the block in a write transaction
 	err = operation.RetryOnConflict(b.db.Update, procedure.InsertClusterBlock(&proposal))

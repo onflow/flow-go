@@ -1,7 +1,7 @@
 package fvm
 
 import (
-	"github.com/opentracing/opentracing-go"
+	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime/common"
@@ -22,7 +22,7 @@ var deductTransactionFeesInvocationArgumentTypes = []sema.Type{
 // the service account.
 func InvokeDeductTransactionFeesContract(
 	env Environment,
-	traceSpan opentracing.Span,
+	traceSpan otelTrace.Span,
 	payer flow.Address,
 	inclusionEffort uint64,
 	executionEffort uint64,
@@ -56,7 +56,7 @@ var setupNewAccountInvocationArgumentTypes = []sema.Type{
 // the service account.
 func InvokeSetupNewAccountContract(
 	env Environment,
-	traceSpan opentracing.Span,
+	traceSpan otelTrace.Span,
 	flowAddress flow.Address,
 	payer common.Address,
 ) (cadence.Value, error) {
@@ -86,7 +86,7 @@ var accountAvailableBalanceInvocationArgumentTypes = []sema.Type{
 // contract on the storage fees contract.
 func InvokeAccountAvailableBalanceContract(
 	env Environment,
-	traceSpan opentracing.Span,
+	traceSpan otelTrace.Span,
 	address common.Address,
 ) (cadence.Value, error) {
 
@@ -113,7 +113,7 @@ var accountBalanceInvocationArgumentTypes = []sema.Type{
 // on the service account.
 func InvokeAccountBalanceContract(
 	env Environment,
-	traceSpan opentracing.Span,
+	traceSpan otelTrace.Span,
 	address common.Address,
 ) (cadence.Value, error) {
 
@@ -139,7 +139,7 @@ var accountStorageCapacityInvocationArgumentTypes = []sema.Type{
 // contract on the storage fees contract.
 func InvokeAccountStorageCapacityContract(
 	env Environment,
-	traceSpan opentracing.Span,
+	traceSpan otelTrace.Span,
 	address common.Address,
 ) (cadence.Value, error) {
 
@@ -167,7 +167,7 @@ var useContractAuditVoucherInvocationArgumentTypes = []sema.Type{
 // deployment audit voucher contract.
 func InvokeUseContractAuditVoucherContract(
 	env Environment,
-	traceSpan opentracing.Span,
+	traceSpan otelTrace.Span,
 	address common.Address,
 	code string) (bool, error) {
 
