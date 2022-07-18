@@ -63,14 +63,13 @@ jobs:
         run: make docker-build-flow
       - name: Run tests
         if: github.actor != 'bors[bot]'
-        run: cd integration || make epochs-tests-VN
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
-        if: success() || failure()
+        run: make epochs-tests-VN
+        workspace: ./integration
       - name: Run tests (Bors)
         if: github.actor == 'bors[bot]'
         uses: nick-invision/retry@v2
         with:
           timeout_minutes: 15
           max_attempts: 2
-          command: cd integration || make epochs-tests-VN
+          command: make epochs-tests-VN
+          workspace: ./integration
