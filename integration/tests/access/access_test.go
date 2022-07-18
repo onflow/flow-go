@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"testing"
 	"time"
@@ -14,6 +15,9 @@ import (
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
 
+	"github.com/onflow/flow-go/cmd/bootstrap/cmd"
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -92,6 +96,30 @@ func (suite *AccessSuite) SetupTest() {
 	accessName := "access_1"
 	accessPort := suite.net.AccessPorts["access-api-port"]
 	accessPublicKey := hex.EncodeToString(suite.net.BootstrapData.StakedConfs[6].NetworkPubKey().Encode())
+
+	writeObserverPrivateKey := func(observerName string) {
+		// make the observer private key for named observer
+		// only used for localnet, not for use with production
+		networkSeed := cmd.GenerateRandomSeed(crypto.KeyGenSeedMinLenECDSASecp256k1)
+		networkKey, err := utils.GeneratePublicNetworkingKey(networkSeed)
+		if err != nil {
+			panic(err)
+		}
+
+		// hex encode
+		keyBytes := networkKey.Encode()
+		output := make([]byte, hex.EncodedLen(len(keyBytes)))
+		hex.Encode(output, keyBytes)
+
+		// write to file
+		outputFile := fmt.Sprintf("%s/private-root-information/%s_key", suite.net.BootstrapDir, observerName)
+		err = ioutil.WriteFile(outputFile, output, 0600)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	writeObserverPrivateKey(observerName)
 
 	suite.net.AddContainer(suite.ctx, observerName, &container.Config{
 		Image: "gcr.io/flow-container-registry/observer:latest",
