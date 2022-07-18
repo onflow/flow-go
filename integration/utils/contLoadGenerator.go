@@ -16,6 +16,7 @@ import (
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/access"
 	"github.com/onflow/flow-go-sdk/crypto"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type LoadType string
@@ -26,12 +27,21 @@ const (
 	CompHeavyLoadType     LoadType = "computation-heavy"
 	EventHeavyLoadType    LoadType = "event-heavy"
 	LedgerHeavyLoadType   LoadType = "ledger-heavy"
+	ConstExecCostLoadType LoadType = "const-exec"
 )
 
 const slowTransactionThreshold = 30 * time.Second
 
 var accountCreationBatchSize = 750 // a higher number would hit max gRPC message size
 const tokensPerTransfer = 0.01     // flow testnets only have 10e6 total supply, so we choose a small amount here
+
+// ConstExecParam hosts all parameters for const-exec load type
+type ConstExecParam struct {
+	MaxTxSizeInByte uint
+	AuthAccountNum  uint
+	ArgSizeInByte   uint
+	PayerKeyCount   uint
+}
 
 // ContLoadGenerator creates a continuous load of transactions to the network
 // by creating many accounts and transfer flow tokens between them
@@ -53,6 +63,7 @@ type ContLoadGenerator struct {
 	loadType             LoadType
 	follower             TxFollower
 	availableAccountsLo  int
+	constExecParam       ConstExecParam
 }
 
 // NewContLoadGenerator returns a new ContLoadGenerator
@@ -70,6 +81,7 @@ func NewContLoadGenerator(
 	accountMultiplier int,
 	loadType LoadType,
 	feedbackEnabled bool,
+	constExecParam ConstExecParam,
 ) (*ContLoadGenerator, error) {
 	// Create "enough" accounts to prevent sequence number collisions.
 	numberOfAccounts := tps * accountMultiplier
@@ -89,6 +101,39 @@ func NewContLoadGenerator(
 		return nil, err
 	}
 
+	// check and cap params for const-exec mode
+	if loadType == ConstExecCostLoadType {
+		if constExecParam.MaxTxSizeInByte > flow.DefaultMaxTransactionByteSize {
+			errMsg := fmt.Sprintf("MaxTxSizeInByte(%d) is larger than DefaultMaxTransactionByteSize."+
+				"Resetting it back to DefaultMaxTransactionByteSize(%d).",
+				constExecParam.MaxTxSizeInByte,
+				flow.DefaultMaxTransactionByteSize)
+			log.Error().Msg(errMsg)
+
+			return nil, errors.New(errMsg)
+		}
+
+		// accounts[0] will be used as the proposer\payer
+		if constExecParam.AuthAccountNum > uint(numberOfAccounts-1) {
+			errMsg := fmt.Sprintf("Number of authorizer(%d) is larger than max possible(%d). Resetting it back to %d.",
+				constExecParam.AuthAccountNum,
+				numberOfAccounts-1,
+				numberOfAccounts-1)
+			log.Error().Msg(errMsg)
+
+			return nil, errors.New(errMsg)
+		}
+
+		if constExecParam.ArgSizeInByte > flow.DefaultMaxTransactionByteSize {
+			errMsg := fmt.Sprintf("ArgSizeInByte(%d) is larger than DefaultMaxTransactionByteSize."+
+				"Resetting it back to DefaultMaxTransactionByteSize / 2(%d).",
+				constExecParam.ArgSizeInByte,
+				flow.DefaultMaxTransactionByteSize/2)
+			log.Error().Msg(errMsg)
+			return nil, errors.New(errMsg)
+		}
+	}
+
 	lGen := &ContLoadGenerator{
 		log:                  log,
 		loaderMetrics:        loaderMetrics,
@@ -104,6 +149,7 @@ func NewContLoadGenerator(
 		follower:             follower,
 		loadType:             loadType,
 		availableAccountsLo:  numberOfAccounts,
+		constExecParam:       constExecParam,
 	}
 
 	return lGen, nil
