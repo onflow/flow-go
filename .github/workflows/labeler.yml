@@ -1,0 +1,38 @@
+name: labeler
+
+on: [pull_request]
+
+jobs:
+  labeler:
+    runs-on: ubuntu-latest
+    name: Label the PR size
+    steps:
+      - name: Check PR size
+        run: |
+          echo "Retrieving PR ${{ github.event.pull_request.number }} info"
+          GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}"
+          GITHUB_API_HEADER="Accept: application/vnd.github.v3+json"
+          echo "Checking PR api.github.com/repos/$GITHUB_REPOSITORY/pulls/${{ github.event.pull_request.number }}"
+          BODY=$(curl -sSL -H "Authorization: token $GITHUB_TOKEN" -H "$GITHUB_API_HEADER" "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/pulls/${{ github.event.pull_request.number }}")
+          echo "Retrieving code modification info"
+          ADDITIONS=$(echo "$BODY" | jq '.additions')
+          DELETIONS=$(echo "$BODY" | jq '.deletions')
+          echo "Storing PR code modification info"
+          echo "PRSIZEINFO<<EOF" >> $GITHUB_ENV
+          echo "This PR has $((ADDITIONS + DELETIONS)) lines of change." >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+          
+      - name: Create or update comment
+        uses: peter-evans/create-or-update-comment@v1
+        with:
+          comment-id: ${{ steps.fc.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            ## Checking PR size
+            ${{ env.PRSIZEINFO }}
+          edit-mode: replace
+
+      # if [ "$fail_if_xl" == "true" ]; then
+      #   echoerr "Pr is xl, please, short this!!"
+      #   exit 1
+      # fi
