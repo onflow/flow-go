@@ -132,6 +132,7 @@ func NewBuilder(log zerolog.Logger,
 	// wrap the unsecured server with an HTTP proxy server to serve HTTP clients
 	httpServer := NewHTTPServer(unsecureGrpcServer, config.HTTPListenAddr)
 
+	// TODO: when cache size is set to 0, handle case where we do not use cache
 	cacheSize := config.ConnectionPoolSize
 	if cacheSize == 0 {
 		cacheSize = backend.DefaultConnectionPoolSize

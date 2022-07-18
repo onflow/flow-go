@@ -196,7 +196,7 @@ func (s *CachedClient) Close() {
 	conn := s.ClientConn
 	s.ClientConn = nil
 	s.mutex.Unlock()
-	if conn != nil {
+	if conn == nil {
 		return
 	}
 	// allow time for any existing requests to finish before closing the connection
