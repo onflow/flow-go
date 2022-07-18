@@ -309,7 +309,10 @@ func (e *EventHandler) processPendingBlocks() error {
 	}
 }
 
-// proposeForNewView will only be called when there is a view change from pacemaker.
+// proposeForNewView will only be called when we may able to propose a block, after processing a new event.
+// * after entering a new view as a result of processing a QC or TC, then we may propose for the newly entered view
+// * after receiving a proposal (but not changing view), if that proposal is referenced by our highest known QC, 
+//    and the proposal was previously unknown, then we can propose a block in the current view
 // It reads the current view, and generates a proposal if we are the leader.
 // No errors are expected during normal operation.
 func (e *EventHandler) proposeForNewView() error {
