@@ -20,7 +20,9 @@ import (
 	"github.com/dapperlabs/testingdock"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/network"
 	dockerclient "github.com/docker/docker/client"
+	"github.com/docker/go-connections/nat"
 	"github.com/onflow/cadence"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -672,7 +674,6 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 			nodeContainer.AddFlag("insecure-access-api", "false")
 			nodeContainer.AddFlag("access-node-ids", strings.Join(accessNodeIDS, ","))
 		}
-
 	}
 
 	rootProtocolSnapshotPath := filepath.Join(bootstrapDir, bootstrap.PathRootProtocolStateSnapshot)
@@ -748,6 +749,46 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 		[]consensus_follower.BootstrapNodeInfo{bootstrapNodeInfo}, opts...)
 
 	net.ConsensusFollowers[followerConf.NodeID] = follower
+}
+
+func (net *FlowNetwork) AddContainer(ctx context.Context, containerName string, conf *container.Config) error {
+	tmpdir, _ := ioutil.TempDir(TmpRoot, "flow-integration-node")
+	tmpLedgerDir, _ := ioutil.TempDir(tmpdir, "flow-integration-trie")
+	tmpExeDataDir, err := ioutil.TempDir(tmpdir, "execution-data")
+
+	flowDataDir := filepath.Join(tmpdir, DefaultFlowDataDir)
+	nodeBootstrapDir := filepath.Join(tmpdir, DefaultBootstrapDir)
+	flowProfilerDir := filepath.Join(flowDataDir, "./profiler")
+
+	_ = io.CopyDirectory(net.BootstrapDir, nodeBootstrapDir)
+
+	container, err := net.cli.ContainerCreate(ctx, conf,
+		&container.HostConfig{
+			AutoRemove: false,
+			Binds: []string{
+				fmt.Sprintf("%s:%s:rw", flowDataDir, "/data"),
+				fmt.Sprintf("%s:%s:rw", flowProfilerDir, "/profiler"),
+				fmt.Sprintf("%s:%s:ro", nodeBootstrapDir, "/bootstrap"),
+				fmt.Sprintf("%s:%s:rw", tmpLedgerDir, DefaultExecutionRootDir),
+				fmt.Sprintf("%s:%s:rw", tmpExeDataDir, DefaultExecutionDataServiceDir),
+			},
+			PortBindings: nat.PortMap{
+				"9001": []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: "9001"}},
+			}},
+		&network.NetworkingConfig{},
+		containerName,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	err = net.cli.ContainerStart(ctx, container.ID, types.ContainerStartOptions{})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // AddNode creates a node container with the given config and adds it to the

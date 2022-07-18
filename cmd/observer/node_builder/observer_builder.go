@@ -64,7 +64,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/utils/io"
 
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
@@ -1024,15 +1023,17 @@ func (builder *ObserverServiceBuilder) initMiddleware(nodeID flow.Identifier,
 }
 
 func loadNetworkingKey(path string) (crypto.PrivateKey, error) {
-	data, err := io.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("could not read networking key (path=%s): %w", path, err)
-	}
+	// data, err := io.ReadFile(path)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("could not read networking key (path=%s): %w", path, err)
+	// }
 
-	keyBytes, err := hex.DecodeString(strings.Trim(string(data), "\n "))
-	if err != nil {
-		return nil, fmt.Errorf("could not hex decode networking key (path=%s): %w", path, err)
-	}
+	keyBytes, _ := hex.DecodeString("46e41e870d39f37ce97aad267bccce1045c655fd70d4788a9d391e58bcbd915f")
+
+	// keyBytes, err := hex.DecodeString(strings.Trim(string(data), "\n "))
+	// if err != nil {
+	// 	return nil, fmt.Errorf("could not hex decode networking key (path=%s): %w", path, err)
+	// }
 
 	networkingKey, err := crypto.DecodePrivateKey(crypto.ECDSASecp256k1, keyBytes)
 	if err != nil {

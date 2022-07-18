@@ -2,11 +2,13 @@ package access
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"net"
 	"testing"
 	"time"
 
+	"github.com/docker/docker/api/types/container"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -84,6 +86,35 @@ func (suite *AccessSuite) SetupTest() {
 	// start the network
 	suite.T().Logf("starting flow network with docker containers")
 	suite.ctx, suite.cancel = context.WithCancel(context.Background())
+
+	// observer node
+	observerName := "observer_1"
+	accessName := "access_1"
+	accessPort := suite.net.AccessPorts["access-api-port"]
+	accessPublicKey := hex.EncodeToString(suite.net.BootstrapData.StakedConfs[6].NetworkPubKey().Encode())
+
+	suite.net.AddContainer(suite.ctx, observerName, &container.Config{
+		Image: "gcr.io/flow-container-registry/observer:latest",
+		Cmd: []string{
+			fmt.Sprintf("--bootstrap-node-addresses=%s:%s", accessName, accessPort),
+			fmt.Sprintf("--bootstrap-node-public-keys=%s", accessPublicKey),
+			fmt.Sprintf("--observer-networking-key-path=/bootstrap/private-root-information/%s_key", observerName),
+			fmt.Sprintf("--bind=0.0.0.0:0"),
+			fmt.Sprintf("--rpc-addr=%s:%s", observerName, "9000"),
+			fmt.Sprintf("--secure-rpc-addr=%s:%s", observerName, "9001"),
+			fmt.Sprintf("--http-addr=%s:%s", observerName, "8000"),
+			"--bootstrapdir=/bootstrap",
+			"--datadir=/data/protocol",
+			"--secretsdir=/data/secrets",
+			"--loglevel=DEBUG",
+			fmt.Sprintf("--profiler-enabled=%t", false),
+			fmt.Sprintf("--tracer-enabled=%t", false),
+			"--profiler-dir=/profiler",
+			"--profiler-interval=2m",
+		},
+	})
+
+	fmt.Println(accessPublicKey)
 	suite.net.Start(suite.ctx)
 }
 
