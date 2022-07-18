@@ -11,9 +11,8 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/signature"
+	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
@@ -39,9 +38,9 @@ var _ hotstuff.Verifier = (*CombinedVerifier)(nil)
 func NewCombinedVerifier(committee hotstuff.Replicas, packer hotstuff.Packer) *CombinedVerifier {
 	return &CombinedVerifier{
 		committee:           committee,
-		stakingHasher:       crypto.NewBLSKMAC(encoding.ConsensusVoteTag),
-		timeoutObjectHasher: crypto.NewBLSKMAC(encoding.ConsensusTimeoutTag),
-		beaconHasher:        crypto.NewBLSKMAC(encoding.RandomBeaconTag),
+		stakingHasher:       msig.NewBLSHasher(msig.ConsensusVoteTag),
+		timeoutObjectHasher: msig.NewBLSHasher(msig.ConsensusTimeoutTag),
+		beaconHasher:        msig.NewBLSHasher(msig.RandomBeaconTag),
 		packer:              packer,
 	}
 }
@@ -61,9 +60,9 @@ func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, vie
 	msg := MakeVoteMessage(view, blockID)
 
 	// split the two signatures from the vote
-	stakingSig, beaconShare, err := signature.DecodeDoubleSig(sigData)
+	stakingSig, beaconShare, err := msig.DecodeDoubleSig(sigData)
 	if err != nil {
-		if errors.Is(err, signature.ErrInvalidSignatureFormat) {
+		if errors.Is(err, msig.ErrInvalidSignatureFormat) {
 			return model.NewInvalidFormatErrorf("could not split signature for block %v: %w", blockID, err)
 		}
 		return fmt.Errorf("unexpected internal error while splitting signature for block %v: %w", blockID, err)

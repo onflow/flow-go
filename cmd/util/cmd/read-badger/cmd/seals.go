@@ -14,7 +14,7 @@ func init() {
 	rootCmd.AddCommand(sealsCmd)
 
 	sealsCmd.Flags().StringVarP(&flagSealID, "id", "i", "", "the id of the seal")
-	sealsCmd.Flags().StringVarP(&flagBlockID, "block-id", "b", "", "the block id of which to query the seal")
+	sealsCmd.Flags().StringVarP(&flagBlockID, "block-id", "b", "", "the sealed block id of which to query the seal for")
 }
 
 var sealsCmd = &cobra.Command{
@@ -57,7 +57,7 @@ var sealsCmd = &cobra.Command{
 			}
 
 			log.Info().Msgf("getting seal by block id: %v", blockID)
-			seal, err := storages.Seals.ByBlockID(blockID)
+			seal, err := storages.Seals.FinalizedSealForBlock(blockID)
 			if err != nil {
 				log.Error().Err(err).Msgf("could not get seal for block id: %v", blockID)
 				return

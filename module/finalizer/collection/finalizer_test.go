@@ -47,7 +47,7 @@ func TestFinalizer(t *testing.T) {
 			require.Nil(t, err)
 			// clear the mempool
 			for _, tx := range pool.All() {
-				pool.Rem(tx.ID())
+				pool.Remove(tx.ID())
 			}
 		}
 
@@ -57,7 +57,7 @@ func TestFinalizer(t *testing.T) {
 			require.NoError(t, err)
 			state, err = cluster.Bootstrap(db, stateRoot)
 			require.NoError(t, err)
-			err = db.Update(operation.InsertHeader(refBlock.ID(), &refBlock))
+			err = db.Update(operation.InsertHeader(refBlock.ID(), refBlock))
 			require.NoError(t, err)
 		}
 

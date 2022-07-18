@@ -97,7 +97,7 @@ func (suite *ConsensusSuite) CommitEpoch(epoch protocol.Epoch) {
 	firstBlockOfCommittedPhase := unittest.BlockHeaderFixture()
 	suite.state.On("AtBlockID", firstBlockOfCommittedPhase.ID()).Return(suite.snapshot)
 	suite.epochs.Add(epoch)
-	suite.committee.EpochCommittedPhaseStarted(1, &firstBlockOfCommittedPhase)
+	suite.committee.EpochCommittedPhaseStarted(1, firstBlockOfCommittedPhase)
 
 	// get the first view, to test when the epoch has been processed
 	firstView, err := epoch.FirstView()
@@ -208,7 +208,7 @@ func (suite *ConsensusSuite) TestProtocolEvents_CommittedEpoch() {
 	firstBlockOfCommittedPhase := unittest.BlockHeaderFixture()
 	suite.state.On("AtBlockID", firstBlockOfCommittedPhase.ID()).Return(suite.snapshot)
 	suite.epochs.Add(nextEpoch)
-	suite.committee.EpochCommittedPhaseStarted(suite.currentEpochCounter, &firstBlockOfCommittedPhase)
+	suite.committee.EpochCommittedPhaseStarted(suite.currentEpochCounter, firstBlockOfCommittedPhase)
 	// wait for the protocol event to be processed (async)
 	assert.Eventually(suite.T(), func() bool {
 		_, err := suite.committee.IdentitiesByEpoch(randUint64(201, 300))
@@ -219,9 +219,9 @@ func (suite *ConsensusSuite) TestProtocolEvents_CommittedEpoch() {
 	suite.AssertStoredEpochCounterRange(suite.currentEpochCounter, suite.currentEpochCounter+1)
 
 	// should handle multiple deliveries of the protocol event
-	suite.committee.EpochCommittedPhaseStarted(suite.currentEpochCounter, &firstBlockOfCommittedPhase)
-	suite.committee.EpochCommittedPhaseStarted(suite.currentEpochCounter, &firstBlockOfCommittedPhase)
-	suite.committee.EpochCommittedPhaseStarted(suite.currentEpochCounter, &firstBlockOfCommittedPhase)
+	suite.committee.EpochCommittedPhaseStarted(suite.currentEpochCounter, firstBlockOfCommittedPhase)
+	suite.committee.EpochCommittedPhaseStarted(suite.currentEpochCounter, firstBlockOfCommittedPhase)
+	suite.committee.EpochCommittedPhaseStarted(suite.currentEpochCounter, firstBlockOfCommittedPhase)
 
 	suite.Assert().Len(suite.committee.epochs, 2)
 	suite.AssertStoredEpochCounterRange(suite.currentEpochCounter, suite.currentEpochCounter+1)
@@ -641,7 +641,7 @@ func TestRemoveOldEpochs(t *testing.T) {
 		currentEpochPhase = flow.EpochPhaseCommitted
 		firstBlockOfCommittedPhase := unittest.BlockHeaderFixture()
 		state.On("AtBlockID", firstBlockOfCommittedPhase.ID()).Return(snapshot)
-		com.EpochCommittedPhaseStarted(currentEpochCounter, &firstBlockOfCommittedPhase)
+		com.EpochCommittedPhaseStarted(currentEpochCounter, firstBlockOfCommittedPhase)
 		// wait for the protocol event to be processed (async)
 		require.Eventually(t, func() bool {
 			_, err := com.IdentityByEpoch(randUint64(int(firstView), int(epochFinalView)), unittest.IdentifierFixture())

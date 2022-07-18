@@ -25,7 +25,7 @@ func TestStorageUsedUpdateMigrationMigration(t *testing.T) {
 
 	t.Run("fix storage used", func(t *testing.T) {
 		payload := []ledger.Payload{
-			{Key: createAccountPayloadKey(address1, state2.KeyExists), Value: []byte{1}},
+			{Key: createAccountPayloadKey(address1, state2.KeyAccountStatus), Value: []byte{1}},
 			{Key: createAccountPayloadKey(address1, state2.KeyStorageUsed), Value: utils.Uint64ToBinary(1)},
 		}
 		migratedPayload, err := mig.Migrate(payload)
@@ -35,12 +35,12 @@ func TestStorageUsedUpdateMigrationMigration(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, len(migratedPayload), len(payload))
-		require.Equal(t, uint64(55), migratedSize)
+		require.Equal(t, uint64(48), migratedSize)
 	})
 
 	t.Run("fix storage used if used to high", func(t *testing.T) {
 		payload := []ledger.Payload{
-			{Key: createAccountPayloadKey(address1, state2.KeyExists), Value: []byte{1}},
+			{Key: createAccountPayloadKey(address1, state2.KeyAccountStatus), Value: []byte{1}},
 			{Key: createAccountPayloadKey(address1, state2.KeyStorageUsed), Value: utils.Uint64ToBinary(10000)},
 		}
 		migratedPayload, err := mig.Migrate(payload)
@@ -50,12 +50,12 @@ func TestStorageUsedUpdateMigrationMigration(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, len(migratedPayload), len(payload))
-		require.Equal(t, uint64(55), migratedSize)
+		require.Equal(t, uint64(48), migratedSize)
 	})
 
 	t.Run("do not fix storage used if storage used ok", func(t *testing.T) {
 		payload := []ledger.Payload{
-			{Key: createAccountPayloadKey(address1, state2.KeyExists), Value: []byte{1}},
+			{Key: createAccountPayloadKey(address1, state2.KeyAccountStatus), Value: []byte{1}},
 			{Key: createAccountPayloadKey(address1, state2.KeyStorageUsed), Value: utils.Uint64ToBinary(55)},
 		}
 		migratedPayload, err := mig.Migrate(payload)
@@ -65,12 +65,12 @@ func TestStorageUsedUpdateMigrationMigration(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, len(migratedPayload), len(payload))
-		require.Equal(t, uint64(55), migratedSize)
+		require.Equal(t, uint64(48), migratedSize)
 	})
 
 	t.Run("error is storage used does not exist", func(t *testing.T) {
 		payload := []ledger.Payload{
-			{Key: createAccountPayloadKey(address1, state2.KeyExists), Value: []byte{1}},
+			{Key: createAccountPayloadKey(address1, state2.KeyAccountStatus), Value: []byte{1}},
 		}
 		_, err := mig.Migrate(payload)
 		require.Error(t, err)
@@ -81,7 +81,6 @@ func createAccountPayloadKey(a flow.Address, key string) ledger.Key {
 	return ledger.Key{
 		KeyParts: []ledger.KeyPart{
 			ledger.NewKeyPart(state.KeyPartOwner, a.Bytes()),
-			ledger.NewKeyPart(state.KeyPartController, []byte("")),
 			ledger.NewKeyPart(state.KeyPartKey, []byte(key)),
 		},
 	}

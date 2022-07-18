@@ -316,7 +316,7 @@ func (e *Engine) handleValidatedChunkDataPack(ctx context.Context,
 	status *verification.ChunkStatus,
 	chunkDataPack *flow.ChunkDataPack) (bool, error) {
 
-	removed := e.pendingChunks.Rem(status.ChunkIndex, status.ExecutionResult.ID())
+	removed := e.pendingChunks.Remove(status.ChunkIndex, status.ExecutionResult.ID())
 	if !removed {
 		// we deduplicate the chunk data responses at this point, reaching here means a
 		// duplicate chunk data response is under process concurrently, so we give up
@@ -481,7 +481,7 @@ func (e *Engine) NotifyChunkDataPackSealed(chunkIndex uint64, resultID flow.Iden
 	lg = lg.With().
 		Uint64("block_height", status.BlockHeight).
 		Hex("result_id", logging.ID(status.ExecutionResult.ID())).Logger()
-	removed := e.pendingChunks.Rem(chunkIndex, resultID)
+	removed := e.pendingChunks.Remove(chunkIndex, resultID)
 
 	e.chunkConsumerNotifier.Notify(chunkLocatorID)
 	lg.Info().

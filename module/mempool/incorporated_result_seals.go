@@ -21,8 +21,8 @@ type IncorporatedResultSeals interface {
 	// Limit returns the size limit of the mempool
 	Limit() uint
 
-	// Rem removes an IncorporatedResultSeal from the mempool
-	Rem(incorporatedResultID flow.Identifier) bool
+	// Remove removes an IncorporatedResultSeal from the mempool
+	Remove(incorporatedResultID flow.Identifier) bool
 
 	// Size returns the number of items in the mempool
 	Size() uint

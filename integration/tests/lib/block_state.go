@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 )
 
-const blockStateTimeout = 60 * time.Second
+const blockStateTimeout = 120 * time.Second
 
 type BlockState struct {
 	sync.RWMutex
@@ -52,12 +52,33 @@ func (bs *BlockState) Add(t *testing.T, b *messages.BlockProposal) {
 	bs.processAncestors(t, b, confirmsHeight)
 }
 
+func (bs *BlockState) WaitForBlockById(t *testing.T, blockId flow.Identifier) *messages.BlockProposal {
+	var blockProposal *messages.BlockProposal
+
+	require.Eventually(t, func() bool {
+		bs.RLock() // avoiding concurrent map access
+		defer bs.RUnlock()
+
+		if block, ok := bs.blocksByID[blockId]; !ok {
+			t.Logf("%v pending for block id: %x\n", time.Now().UTC(), blockId)
+			return false
+		} else {
+			blockProposal = block
+			return true
+		}
+
+	}, blockStateTimeout, 100*time.Millisecond,
+		fmt.Sprintf("did not receive requested block id (%x) within %v seconds", blockId, blockStateTimeout))
+
+	return blockProposal
+}
+
 // processAncestors checks whether ancestors of block are within the confirming height, and finalizes
 // them if that is the case.
 // It also processes the seals of blocks being finalized.
 func (bs *BlockState) processAncestors(t *testing.T, b *messages.BlockProposal, confirmsHeight uint64) {
 	// puts this block proposal and all ancestors into `finalizedByHeight`
-	t.Logf("new height arrived: %d\n", b.Header.Height)
+	t.Logf("%v new height arrived: %d\n", time.Now().UTC(), b.Header.Height)
 	ancestor, ok := b, true
 	for ancestor.Header.Height > bs.highestFinalized {
 		heightDistance := b.Header.Height - ancestor.Header.Height
@@ -76,7 +97,8 @@ func (bs *BlockState) processAncestors(t *testing.T, b *messages.BlockProposal, 
 				if finalized.Header.Height > bs.highestFinalized { // updates highestFinalized height
 					bs.highestFinalized = finalized.Header.Height
 				}
-				t.Logf("height %d finalized %d, highest finalized %d \n",
+				t.Logf("%v height %d finalized %d, highest finalized %d \n",
+					time.Now().UTC(),
 					b.Header.Height,
 					finalized.Header.Height,
 					bs.highestFinalized)
@@ -93,8 +115,8 @@ func (bs *BlockState) processAncestors(t *testing.T, b *messages.BlockProposal, 
 					}
 				}
 			} else {
-				t.Logf("fork detected: view distance (%d) between received block and ancestor is not same as their height distance (%d)\n",
-					viewDistance, heightDistance)
+				t.Logf("%v fork detected: view distance (%d) between received block and ancestor is not same as their height distance (%d)\n",
+					time.Now().UTC(), viewDistance, heightDistance)
 			}
 
 		}
@@ -118,7 +140,7 @@ func (bs *BlockState) WaitForHighestFinalizedProgress(t *testing.T) *messages.Bl
 		bs.RLock() // avoiding concurrent map access
 		defer bs.RUnlock()
 
-		t.Logf("checking highest finalized: %d, highest proposed: %d\n", bs.highestFinalized, bs.highestProposed)
+		t.Logf("%v checking highest finalized: %d, highest proposed: %d\n", time.Now().UTC(), bs.highestFinalized, bs.highestProposed)
 		return bs.highestFinalized > currentFinalized
 	}, blockStateTimeout, 100*time.Millisecond,
 		fmt.Sprintf("did not receive progress on highest finalized height (%v) from (%v) within %v seconds",
@@ -180,7 +202,7 @@ func (bs *BlockState) WaitForSealed(t *testing.T, height uint64) *messages.Block
 	require.Eventually(t,
 		func() bool {
 			if bs.highestSealed != nil {
-				t.Logf("waiting for sealed height (%d/%d)", bs.highestSealed.Header.Height, height)
+				t.Logf("%v waiting for sealed height (%d/%d), last finalized %d", time.Now().UTC(), bs.highestSealed.Header.Height, height, bs.highestFinalized)
 			}
 			return bs.highestSealed != nil && bs.highestSealed.Header.Height >= height
 		},
@@ -203,7 +225,7 @@ func (bs *BlockState) WaitForSealedView(t *testing.T, view uint64) *messages.Blo
 	require.Eventually(t,
 		func() bool {
 			if bs.highestSealed != nil {
-				t.Logf("waiting for sealed view (%d/%d)", bs.highestSealed.Header.View, view)
+				t.Logf("%v waiting for sealed view (%d/%d)", time.Now().UTC(), bs.highestSealed.Header.View, view)
 			}
 			return bs.highestSealed != nil && bs.highestSealed.Header.View >= view
 		},

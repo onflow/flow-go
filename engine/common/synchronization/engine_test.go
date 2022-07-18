@@ -70,7 +70,7 @@ func (ss *SyncSuite) SetupTest() {
 
 	// generate a header for the final state
 	header := unittest.BlockHeaderFixture()
-	ss.head = &header
+	ss.head = header
 
 	// create maps to enable block returns
 	ss.heights = make(map[uint64]*flow.Block)
@@ -489,7 +489,7 @@ func (ss *SyncSuite) TestProcessingMultipleItems() {
 			Height: uint64(1000 + i),
 		}
 		ss.core.On("HandleHeight", mock.Anything, msg.Height).Once()
-		require.NoError(ss.T(), ss.e.Process(engine.SyncCommittee, originID, msg))
+		require.NoError(ss.T(), ss.e.Process(netint.SyncCommittee, originID, msg))
 	}
 
 	finalHeight := ss.head.Height
@@ -504,7 +504,7 @@ func (ss *SyncSuite) TestProcessingMultipleItems() {
 		ss.core.On("HandleHeight", mock.Anything, msg.Height).Once()
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil)
 
-		require.NoError(ss.T(), ss.e.Process(engine.SyncCommittee, originID, msg))
+		require.NoError(ss.T(), ss.e.Process(netint.SyncCommittee, originID, msg))
 	}
 
 	// give at least some time to process items
@@ -518,13 +518,13 @@ func (ss *SyncSuite) TestProcessingMultipleItems() {
 func (ss *SyncSuite) TestOnFinalizedBlock() {
 	finalizedBlock := unittest.BlockHeaderWithParentFixture(ss.head)
 	// change head
-	ss.head = &finalizedBlock
+	ss.head = finalizedBlock
 
 	err := ss.e.finalizedHeader.updateHeader()
 	require.NoError(ss.T(), err)
 	actualHeader := ss.e.finalizedHeader.Get()
 	require.ElementsMatch(ss.T(), ss.e.participantsProvider.Identifiers(), ss.participants[1:].NodeIDs())
-	require.Equal(ss.T(), actualHeader, &finalizedBlock)
+	require.Equal(ss.T(), actualHeader, finalizedBlock)
 }
 
 // TestProcessUnsupportedMessageType tests that Process and ProcessLocal correctly handle a case where invalid message type

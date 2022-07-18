@@ -41,7 +41,7 @@ func (m *viewsMachine) BlockFinalized(t *rapid.T) {
 
 	block := unittest.BlockHeaderFixture()
 	block.View = view
-	m.views.BlockFinalized(&block)
+	m.views.BlockFinalized(block)
 
 	// increase the number of expected calls and remove those callbacks from our model
 	for indexedView, nCallbacks := range m.callbacks {
