@@ -42,9 +42,8 @@ epochs-tests:
 	GO111MODULE=on go test $(if $(VERBOSE),-v,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/epochs/...
 
 .PHONY: epochs-tests-VN
-epochs-tests:
+epochs-tests-VN:
 	GO111MODULE=on go test -v $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/epochs/... -run TestEpochJoinAndLeaveVN
-
 
 .PHONY: ghost-tests
 ghost-tests:
