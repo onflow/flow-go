@@ -14,7 +14,7 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/btcsuite/btcd/btcec"
+	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/onflow/flow-go/crypto/hash"
 )
 
@@ -251,12 +251,12 @@ func (a *ecdsaAlgo) decodePublicKeyCompressed(pkBytes []byte) (PublicKey, error)
 		goPubKey.Y = y
 
 	} else if a.curve == btcec.S256() {
-		pk, err := btcec.ParsePubKey(pkBytes, btcec.S256())
+		pk, err := btcec.ParsePubKey(pkBytes)
 		if err != nil {
 			return nil, invalidInputsErrorf("Key %x can't be interpreted as %v", pkBytes, a.algo.String())
 		}
 		// This assertion never fails
-		goPubKey = (*goecdsa.PublicKey)(pk)
+		goPubKey = pk.ToECDSA()
 	} else {
 		return nil, invalidInputsErrorf("the input curve is not supported")
 	}
@@ -356,7 +356,10 @@ func (pk *PubKeyECDSA) Size() int {
 // The expected input is a public key (x,y).
 func (pk *PubKeyECDSA) EncodeCompressed() []byte {
 	if pk.alg.curve == btcec.S256() {
-		return (*btcec.PublicKey)(pk.goPubKey).SerializeCompressed()
+		var x, y btcec.FieldVal
+		x.SetByteSlice(pk.goPubKey.X.Bytes())
+		y.SetByteSlice(pk.goPubKey.Y.Bytes())
+		return btcec.NewPublicKey(&x, &y).SerializeCompressed()
 	}
 	return elliptic.MarshalCompressed(pk.goPubKey, pk.goPubKey.X, pk.goPubKey.Y)
 }
