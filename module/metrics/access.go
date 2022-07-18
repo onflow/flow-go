@@ -6,9 +6,13 @@ import (
 )
 
 type AccessCollector struct {
-	connectionReused  prometheus.Counter
-	connectionsInPool *prometheus.GaugeVec
-	connectionAdded   prometheus.Counter
+	connectionReused      prometheus.Counter
+	connectionsInPool     *prometheus.GaugeVec
+	connectionAdded       prometheus.Counter
+	connectionEstablished prometheus.Counter
+	connectionInvalidated prometheus.Counter
+	connectionUpdated     prometheus.Counter
+	connectionEvicted     prometheus.Counter
 }
 
 func NewAccessCollector() *AccessCollector {
@@ -29,14 +33,38 @@ func NewAccessCollector() *AccessCollector {
 			Name:      "connection_added",
 			Namespace: namespaceAccess,
 			Subsystem: subsystemConnectionPool,
-			Help:      "counter for the number of times connections are added",
+			Help:      "counter for the number of times connections are added to the pool",
+		}),
+		connectionEstablished: promauto.NewCounter(prometheus.CounterOpts{
+			Name:      "connection_established",
+			Namespace: namespaceAccess,
+			Subsystem: subsystemConnectionPool,
+			Help:      "counter for the number of times connections are established",
+		}),
+		connectionInvalidated: promauto.NewCounter(prometheus.CounterOpts{
+			Name:      "connection_invalidated",
+			Namespace: namespaceAccess,
+			Subsystem: subsystemConnectionPool,
+			Help:      "counter for the number of times connections are invalidated",
+		}),
+		connectionUpdated: promauto.NewCounter(prometheus.CounterOpts{
+			Name:      "connection_updated",
+			Namespace: namespaceAccess,
+			Subsystem: subsystemConnectionPool,
+			Help:      "counter for the number of times existing connections from the pool are updated",
+		}),
+		connectionEvicted: promauto.NewCounter(prometheus.CounterOpts{
+			Name:      "connection_evicted",
+			Namespace: namespaceAccess,
+			Subsystem: subsystemConnectionPool,
+			Help:      "counter for the number of times a cached connection is evicted from the connection pool",
 		}),
 	}
 
 	return ac
 }
 
-func (ac *AccessCollector) ConnectionFromPoolRetrieved() {
+func (ac *AccessCollector) ConnectionFromPoolReused() {
 	ac.connectionReused.Inc()
 }
 
@@ -47,4 +75,20 @@ func (ac *AccessCollector) TotalConnectionsInPool(connectionCount uint, connecti
 
 func (ac *AccessCollector) ConnectionAddedToPool() {
 	ac.connectionAdded.Inc()
+}
+
+func (ac *AccessCollector) NewConnectionEstablished() {
+	ac.connectionEstablished.Inc()
+}
+
+func (ac *AccessCollector) ConnectionFromPoolInvalidated() {
+	ac.connectionInvalidated.Inc()
+}
+
+func (ac *AccessCollector) ConnectionFromPoolUpdated() {
+	ac.connectionUpdated.Inc()
+}
+
+func (ac *AccessCollector) ConnectionFromPoolEvicted() {
+	ac.connectionEvicted.Inc()
 }

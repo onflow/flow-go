@@ -137,11 +137,12 @@ func NewBuilder(log zerolog.Logger,
 		cacheSize = backend.DefaultConnectionPoolSize
 	}
 	cache, err := lru.NewWithEvict(int(cacheSize), func(_, evictedValue interface{}) {
-		// allow time for any existing requests to finish before closing the connection
-		time.Sleep(backend.DefaultClientTimeout)
-		store := evictedValue.(*backend.ConnectionCacheStore)
+		store := evictedValue.(*backend.CachedClient)
+		store.Close()
 		log.Debug().Str("grpc_conn_evicted", store.Address).Msg("closing grpc connection evicted from pool")
-		store.ClientConn.Close()
+		if accessMetrics != nil {
+			accessMetrics.ConnectionFromPoolEvicted()
+		}
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize connection pool cache: %w", err)
