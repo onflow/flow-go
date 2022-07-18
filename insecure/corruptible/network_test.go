@@ -69,12 +69,12 @@ func TestHandleOutgoingEvent_AttackerObserve(t *testing.T) {
 	}, 100*time.Millisecond, "mock attack could not receive incoming message on time")
 
 	// checks content of the received message matches what has been sent.
-	require.ElementsMatch(t, receivedMsg.EgressMessage.TargetIDs, flow.IdsToBytes(targetIds))
-	require.Equal(t, receivedMsg.EgressMessage.TargetNum, uint32(3))
-	require.Equal(t, receivedMsg.EgressMessage.Protocol, insecure.Protocol_MULTICAST)
-	require.Equal(t, receivedMsg.EgressMessage.ChannelID, string(channel))
+	require.ElementsMatch(t, receivedMsg.Egress.TargetIDs, flow.IdsToBytes(targetIds))
+	require.Equal(t, receivedMsg.Egress.TargetNum, uint32(3))
+	require.Equal(t, receivedMsg.Egress.Protocol, insecure.Protocol_MULTICAST)
+	require.Equal(t, receivedMsg.Egress.ChannelID, string(channel))
 
-	decodedEvent, err := codec.Decode(receivedMsg.EgressMessage.Payload)
+	decodedEvent, err := codec.Decode(receivedMsg.Egress.Payload)
 	require.NoError(t, err)
 	require.Equal(t, msg, decodedEvent)
 }
@@ -162,8 +162,8 @@ func TestProcessAttackerMessage(t *testing.T) {
 				Text: fmt.Sprintf("this is a test message: %d", rand.Int()),
 			})
 
-			params := []interface{}{network.Channel(msg.EgressMessage.ChannelID), event.FlowProtocolEvent, uint(3)}
-			targetIds, err := flow.ByteSlicesToIds(msg.EgressMessage.TargetIDs)
+			params := []interface{}{network.Channel(msg.Egress.ChannelID), event.FlowProtocolEvent, uint(3)}
+			targetIds, err := flow.ByteSlicesToIds(msg.Egress.TargetIDs)
 			require.NoError(t, err)
 
 			for _, id := range targetIds {
@@ -208,8 +208,8 @@ func TestProcessAttackerMessage_ResultApproval_Dictated(t *testing.T) {
 				},
 			})
 
-			params := []interface{}{network.Channel(msg.EgressMessage.ChannelID), mock.Anything}
-			targetIds, err := flow.ByteSlicesToIds(msg.EgressMessage.TargetIDs)
+			params := []interface{}{network.Channel(msg.Egress.ChannelID), mock.Anything}
+			targetIds, err := flow.ByteSlicesToIds(msg.Egress.TargetIDs)
 			require.NoError(t, err)
 			for _, id := range targetIds {
 				params = append(params, id)
@@ -274,8 +274,8 @@ func TestProcessAttackerMessage_ResultApproval_PassThrough(t *testing.T) {
 			passThroughApproval := unittest.ResultApprovalFixture()
 			msg, _, _ := insecure.MessageFixture(t, cbor.NewCodec(), insecure.Protocol_PUBLISH, passThroughApproval)
 
-			params := []interface{}{network.Channel(msg.EgressMessage.ChannelID), mock.Anything}
-			targetIds, err := flow.ByteSlicesToIds(msg.EgressMessage.TargetIDs)
+			params := []interface{}{network.Channel(msg.Egress.ChannelID), mock.Anything}
+			targetIds, err := flow.ByteSlicesToIds(msg.Egress.TargetIDs)
 			require.NoError(t, err)
 			for _, id := range targetIds {
 				params = append(params, id)
@@ -323,8 +323,8 @@ func TestProcessAttackerMessage_ExecutionReceipt_Dictated(t *testing.T) {
 				ExecutionResult: dictatedResult,
 			})
 
-			params := []interface{}{network.Channel(msg.EgressMessage.ChannelID), mock.Anything}
-			targetIds, err := flow.ByteSlicesToIds(msg.EgressMessage.TargetIDs)
+			params := []interface{}{network.Channel(msg.Egress.ChannelID), mock.Anything}
+			targetIds, err := flow.ByteSlicesToIds(msg.Egress.TargetIDs)
 			require.NoError(t, err)
 			for _, id := range targetIds {
 				params = append(params, id)
@@ -378,8 +378,8 @@ func TestProcessAttackerMessage_ExecutionReceipt_PassThrough(t *testing.T) {
 			passThroughReceipt := unittest.ExecutionReceiptFixture()
 			msg, _, _ := insecure.MessageFixture(t, cbor.NewCodec(), insecure.Protocol_PUBLISH, passThroughReceipt)
 
-			params := []interface{}{network.Channel(msg.EgressMessage.ChannelID), mock.Anything}
-			targetIds, err := flow.ByteSlicesToIds(msg.EgressMessage.TargetIDs)
+			params := []interface{}{network.Channel(msg.Egress.ChannelID), mock.Anything}
+			targetIds, err := flow.ByteSlicesToIds(msg.Egress.TargetIDs)
 			require.NoError(t, err)
 			for _, id := range targetIds {
 				params = append(params, id)

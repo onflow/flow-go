@@ -152,11 +152,11 @@ func (n *Network) ProcessAttackerMessage(stream insecure.CorruptibleConduitFacto
 // processAttackerMessage dispatches the attacker message on the Flow network on behalf of this node.
 func (n *Network) processAttackerMessage(msg *insecure.Message) error {
 	lg := n.logger.With().
-		Str("protocol", insecure.ProtocolStr(msg.EgressMessage.Protocol)).
-		Uint32("target_num", msg.EgressMessage.TargetNum).
-		Str("channel", msg.EgressMessage.ChannelID).Logger()
+		Str("protocol", insecure.ProtocolStr(msg.Egress.Protocol)).
+		Uint32("target_num", msg.Egress.TargetNum).
+		Str("channel", msg.Egress.ChannelID).Logger()
 
-	event, err := n.codec.Decode(msg.EgressMessage.Payload)
+	event, err := n.codec.Decode(msg.Egress.Payload)
 	if err != nil {
 		lg.Err(err).Msg("could not decode attacker's message")
 		return fmt.Errorf("could not decode message: %w", err)
@@ -201,14 +201,14 @@ func (n *Network) processAttackerMessage(msg *insecure.Message) error {
 		Str("event", fmt.Sprintf("%+v", event)).
 		Logger()
 
-	targetIds, err := flow.ByteSlicesToIds(msg.EgressMessage.TargetIDs)
+	targetIds, err := flow.ByteSlicesToIds(msg.Egress.TargetIDs)
 	if err != nil {
 		lg.Err(err).Msg("could not convert target ids from byte to identifiers for attacker's dictated message")
 		return fmt.Errorf("could not convert target ids from byte to identifiers: %w", err)
 	}
 
-	lg = lg.With().Str("target_ids", fmt.Sprintf("%v", msg.EgressMessage.TargetIDs)).Logger()
-	err = n.conduitFactory.SendOnFlowNetwork(event, flownet.Channel(msg.EgressMessage.ChannelID), msg.EgressMessage.Protocol, uint(msg.EgressMessage.TargetNum), targetIds...)
+	lg = lg.With().Str("target_ids", fmt.Sprintf("%v", msg.Egress.TargetIDs)).Logger()
+	err = n.conduitFactory.SendOnFlowNetwork(event, flownet.Channel(msg.Egress.ChannelID), msg.Egress.Protocol, uint(msg.Egress.TargetNum), targetIds...)
 	if err != nil {
 		lg.Err(err).Msg("could not send attacker message to the network")
 		return fmt.Errorf("could not send attacker message to the network: %w", err)
@@ -284,8 +284,8 @@ func (n *Network) eventToMessage(
 	}
 
 	msg := &insecure.Message{
-		EgressMessage:  egressMsg,
-		IngressMessage: nil,
+		Egress:  egressMsg,
+		Ingress: nil,
 	}
 
 	return msg, nil

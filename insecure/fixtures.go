@@ -50,7 +50,7 @@ func MessageFixture(t *testing.T, codec network.Codec, protocol Protocol, conten
 	}
 
 	m := &Message{
-		EgressMessage: egressMsg,
+		Egress: egressMsg,
 	}
 
 	// creates corresponding event of that message that

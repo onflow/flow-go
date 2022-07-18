@@ -17,8 +17,8 @@ service CorruptibleConduitFactory {
 
 // wrapper message that stores both egress and ingress messages
 message Message {
-  EgressMessage EgressMessage = 1;
-  IngressMessage IngressMessage = 2;
+  EgressMessage Egress = 1;
+  IngressMessage Ingress = 2;
 }
 
 // EgressMessage represents the message exchanged between the CorruptibleConduitFactory and Attacker services.

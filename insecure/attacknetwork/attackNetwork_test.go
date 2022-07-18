@@ -136,16 +136,16 @@ func testAttackNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegr
 func matchEventForMessage(t *testing.T, events []*insecure.Event, message *insecure.Message, corruptedId flow.Identifier) {
 	codec := cbor.NewCodec()
 
-	require.Equal(t, corruptedId[:], message.EgressMessage.OriginID[:])
+	require.Equal(t, corruptedId[:], message.Egress.OriginID[:])
 
 	for _, event := range events {
 		if event.CorruptedNodeId == corruptedId {
-			require.Equal(t, event.Channel.String(), message.EgressMessage.ChannelID)
-			require.Equal(t, event.Protocol, message.EgressMessage.Protocol)
-			require.Equal(t, flow.IdsToBytes(event.TargetIds), message.EgressMessage.TargetIDs)
-			require.Equal(t, event.TargetNum, message.EgressMessage.TargetNum)
+			require.Equal(t, event.Channel.String(), message.Egress.ChannelID)
+			require.Equal(t, event.Protocol, message.Egress.Protocol)
+			require.Equal(t, flow.IdsToBytes(event.TargetIds), message.Egress.TargetIDs)
+			require.Equal(t, event.TargetNum, message.Egress.TargetNum)
 
-			content, err := codec.Decode(message.EgressMessage.Payload)
+			content, err := codec.Decode(message.Egress.Payload)
 			require.NoError(t, err)
 
 			require.Equal(t, event.FlowProtocolEvent, content)
