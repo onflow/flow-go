@@ -6,11 +6,11 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/utils/unittest"
+	_ "github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestEpochJoinAndLeaveVN(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_FLAKY, "epochs join/leave tests should be run on an machine with adequate resources")
+	// unittest.SkipUnless(t, unittest.TEST_FLAKY, "epochs join/leave tests should be run on an machine with adequate resources")
 	suite.Run(t, new(EpochJoinAndLeaveVNSuite))
 	// this is a dummy update TODO: remove this before merging anything to master. AJM
 }
