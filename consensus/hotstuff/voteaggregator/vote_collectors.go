@@ -7,9 +7,9 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/mempool"
 )
 
 // NewCollectorFactoryMethod is a factory method to generate a VoteCollector for concrete view
@@ -56,7 +56,7 @@ func NewVoteCollectors(logger zerolog.Logger, lowestRetainedView uint64, workerP
 //  -  (collector, false, nil) if the collector can be found by the view
 //  -  (nil, false, error) if running into any exception creating the vote collector state machine
 // Expected error returns during normal operations:
-//  * model.BelowPrunedThresholdError - in case view is lower than lowestRetainedView
+//  * mempool.BelowPrunedThresholdError - in case view is lower than lowestRetainedView
 func (v *VoteCollectors) GetOrCreateCollector(view uint64) (hotstuff.VoteCollector, bool, error) {
 	cachedCollector, hasCachedCollector, err := v.getCollector(view)
 	if err != nil {
@@ -90,12 +90,12 @@ func (v *VoteCollectors) GetOrCreateCollector(view uint64) (hotstuff.VoteCollect
 // getCollector retrieves hotstuff.VoteCollector from local cache in concurrent safe way.
 // Performs check for lowestRetainedView.
 // Expected error returns during normal operations:
-//  * mempool.DecreasingPruningHeightError - in case view is lower than lowestRetainedView
+//  * mempool.BelowPrunedThresholdError - in case view is lower than lowestRetainedView
 func (v *VoteCollectors) getCollector(view uint64) (hotstuff.VoteCollector, bool, error) {
 	v.lock.RLock()
 	defer v.lock.RUnlock()
 	if view < v.lowestRetainedView {
-		return nil, false, model.NewBelowPrunedThresholdErrorf("cannot retrieve collector for pruned view %d (lowest retained view %d)", view, v.lowestRetainedView)
+		return nil, false, mempool.NewBelowPrunedThresholdErrorf("cannot retrieve collector for pruned view %d (lowest retained view %d)", view, v.lowestRetainedView)
 	}
 
 	clr, found := v.collectors[view]

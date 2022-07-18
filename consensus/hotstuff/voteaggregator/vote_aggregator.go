@@ -164,7 +164,7 @@ func (va *VoteAggregator) processQueuedVote(vote *model.Vote) error {
 
 	if err != nil {
 		// ignore if our routine is outdated and some other one has pruned collectors
-		if mempool.IsDecreasingPruningHeightError(err) {
+		if mempool.IsBelowPrunedThresholdError(err) {
 			return nil
 		}
 		return fmt.Errorf("could not get collector for view %d: %w",
@@ -213,11 +213,11 @@ func (va *VoteAggregator) AddVote(vote *model.Vote) {
 // It also verifies the proposer vote of a block, and return whether the proposer signature is valid.
 // Expected error returns during normal operations:
 // * model.InvalidBlockError if the proposer's vote for its own block is invalid
-// * mempool.DecreasingPruningHeightError if the block's view has already been pruned
+// * mempool.BelowPrunedThresholdError if the block's view has already been pruned
 func (va *VoteAggregator) AddBlock(block *model.Proposal) error {
 	// check if the block is for a view that has already been pruned (and is thus stale)
 	if block.Block.View < va.lowestRetainedView.Value() {
-		return mempool.NewDecreasingPruningHeightErrorf("block proposal for view %d is stale, lowestRetainedView is %d", block.Block.View, va.lowestRetainedView.Value())
+		return mempool.NewBelowPrunedThresholdErrorf("block proposal for view %d is stale, lowestRetainedView is %d", block.Block.View, va.lowestRetainedView.Value())
 	}
 
 	collector, created, err := va.collectors.GetOrCreateCollector(block.Block.View)
@@ -243,7 +243,7 @@ func (va *VoteAggregator) AddBlock(block *model.Proposal) error {
 // InvalidBlock notifies the VoteAggregator about an invalid proposal, so that it
 // can process votes for the invalid block and slash the voters. Expected error
 // returns during normal operations:
-// * mempool.DecreasingPruningHeightError if proposal's view has already been pruned
+// * mempool.BelowPrunedThresholdError if proposal's view has already been pruned
 func (va *VoteAggregator) InvalidBlock(proposal *model.Proposal) error {
 	slashingVoteConsumer := func(vote *model.Vote) {
 		if proposal.Block.BlockID == vote.BlockID {
@@ -255,7 +255,7 @@ func (va *VoteAggregator) InvalidBlock(proposal *model.Proposal) error {
 	collector, _, err := va.collectors.GetOrCreateCollector(block.View)
 	if err != nil {
 		// ignore if our routine is outdated and some other one has pruned collectors
-		if mempool.IsDecreasingPruningHeightError(err) {
+		if mempool.IsBelowPrunedThresholdError(err) {
 			return nil
 		}
 		return fmt.Errorf("could not retrieve vote collector for view %d: %w", block.View, err)
