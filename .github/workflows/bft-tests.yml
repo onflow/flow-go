@@ -64,7 +64,7 @@ jobs:
       - name: Run tests
         if: github.actor != 'bors[bot]'
         run: make epochs-tests-VN
-        workspace: ./integration
+        working-directory: ./integration
       - name: Run tests (Bors)
         if: github.actor == 'bors[bot]'
         uses: nick-invision/retry@v2
@@ -72,4 +72,4 @@ jobs:
           timeout_minutes: 15
           max_attempts: 2
           command: make epochs-tests-VN
-          workspace: ./integration
+          working-directory: ./integration
