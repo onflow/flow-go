@@ -97,7 +97,9 @@ func NewScriptEnvironment(
 		env.seedRNG(fvmContext.BlockHeader)
 	}
 
-	env.setExecutionParameters()
+	if fvmContext.AllowContextOverrideByExecutionState {
+		env.setExecutionParameters()
+	}
 
 	return env
 }
@@ -286,16 +288,12 @@ func (e *ScriptEnv) GetStorageCapacity(address common.Address) (value uint64, er
 		return 0, fmt.Errorf("get storage capacity failed: %w", err)
 	}
 
-	accountStorageCapacity := AccountStorageCapacityInvocation(e, e.traceSpan)
-	result, invokeErr := accountStorageCapacity(address)
-
-	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, storage capacity will be 0.
-	// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
-	// 2. There will also be an error in case the accounts balance times megabytesPerFlow constant overflows,
-	//		which shouldn't happen unless the the price of storage is reduced at least 100 fold
-	// 3. Any other error indicates a bug in our implementation. How can we reliably check the Cadence error?
+	result, invokeErr := InvokeAccountStorageCapacityContract(
+		e,
+		e.traceSpan,
+		address)
 	if invokeErr != nil {
-		return 0, nil
+		return 0, errors.HandleRuntimeError(invokeErr)
 	}
 
 	// Return type is actually a UFix64 with the unit of megabytes so some conversion is necessary
@@ -314,12 +312,9 @@ func (e *ScriptEnv) GetAccountBalance(address common.Address) (value uint64, err
 		return 0, fmt.Errorf("get account balance failed: %w", err)
 	}
 
-	accountBalance := AccountBalanceInvocation(e, e.traceSpan)
-	result, invokeErr := accountBalance(address)
-
-	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, balance will be 0.
+	result, invokeErr := InvokeAccountBalanceContract(e, e.traceSpan, address)
 	if invokeErr != nil {
-		return 0, nil
+		return 0, errors.HandleRuntimeError(invokeErr)
 	}
 	return result.ToGoValue().(uint64), nil
 }
@@ -335,14 +330,13 @@ func (e *ScriptEnv) GetAccountAvailableBalance(address common.Address) (value ui
 		return 0, fmt.Errorf("get account available balance failed: %w", err)
 	}
 
-	accountAvailableBalance := AccountAvailableBalanceInvocation(e, e.traceSpan)
-	result, invokeErr := accountAvailableBalance(address)
+	result, invokeErr := InvokeAccountAvailableBalanceContract(
+		e,
+		e.traceSpan,
+		address)
 
-	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, available balance will be 0.
-	// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
-	// 2. Any other error indicates a bug in our implementation. How can we reliably check the Cadence error?
 	if invokeErr != nil {
-		return 0, nil
+		return 0, errors.HandleRuntimeError(invokeErr)
 	}
 	return result.ToGoValue().(uint64), nil
 }

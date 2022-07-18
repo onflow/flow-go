@@ -27,9 +27,10 @@ import (
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	uploaderCommands "github.com/onflow/flow-go/admin/commands/uploader"
 	"github.com/onflow/flow-go/consensus"
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
-	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
+	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
@@ -180,6 +181,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		executionDataServiceCollector module.ExecutionDataServiceMetrics
 		executionState                state.ExecutionState
 		followerState                 protocol.MutableState
+		committee                     hotstuff.Committee
 		ledgerStorage                 *ledger.Ledger
 		events                        *storage.Events
 		serviceEvents                 *storage.ServiceEvents
@@ -681,12 +683,13 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			// initialize consensus committee's membership state
 			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
 			// Note: node.Me.NodeID() is not part of the consensus committee
-			committee, err := committees.NewConsensusCommittee(node.State, node.Me.NodeID())
+			var err error
+			committee, err = committees.NewConsensusCommittee(node.State, node.Me.NodeID())
 			if err != nil {
 				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
 			}
 
-			packer := hotsignature.NewConsensusSigDataPacker(committee)
+			packer := signature.NewConsensusSigDataPacker(committee)
 			// initialize the verifier for the protocol consensus
 			verifier := verification.NewCombinedVerifier(committee, packer)
 
@@ -777,7 +780,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			return syncEngine, nil
 		}).
 		Component("grpc server", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-			rpcEng := rpc.New(
+			return rpc.New(
 				node.Logger,
 				e.exeConf.rpcConf,
 				ingestionEng,
@@ -788,10 +791,10 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				results,
 				txResults,
 				node.RootChainID,
+				signature.NewBlockSignerDecoder(committee),
 				e.exeConf.apiRatelimits,
 				e.exeConf.apiBurstlimits,
-			)
-			return rpcEng, nil
+			), nil
 		})
 }
 
