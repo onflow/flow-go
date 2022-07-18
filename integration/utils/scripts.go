@@ -91,13 +91,13 @@ func LedgerHeavyScript(favContractAddress flowsdk.Address) []byte {
 //go:embed scripts/constExecCostTransaction.cdc
 var constExecTransactionTemplate string
 
-func generateCadenceCommentWithLen(commentLen uint) string {
+func generateRandomStringWithLen(commentLen uint) string {
 	const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	bytes := make([]byte, commentLen)
 	for i := range bytes {
 		bytes[i] = letterBytes[rand.Intn(len(letterBytes))]
 	}
-	return "//" + string(bytes)
+	return string(bytes)
 }
 
 func generateAuthAccountParamList(authAccountNum uint) string {
@@ -110,7 +110,7 @@ func generateAuthAccountParamList(authAccountNum uint) string {
 
 // ConstExecCostTransaction returns a transaction script for constant execution size (0)
 func ConstExecCostTransaction(numOfAuthorizer, commentSizeInByte uint) []byte {
-	commentStr := generateCadenceCommentWithLen(commentSizeInByte)
+	commentStr := generateRandomStringWithLen(commentSizeInByte)
 	authAccountListStr := generateAuthAccountParamList(numOfAuthorizer)
 
 	// the transaction template has two `%s`: #1 is for comment; #2 is for AuthAccount param list
