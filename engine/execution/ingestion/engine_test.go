@@ -178,6 +178,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		false,
 		checkAuthorizedAtBlock,
 		false,
+		nil,
 	)
 	require.NoError(t, err)
 
@@ -1265,6 +1266,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 		false,
 		checkAuthorizedAtBlock,
 		false,
+		nil
 	)
 
 	require.NoError(t, err)

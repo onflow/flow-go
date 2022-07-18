@@ -64,12 +64,12 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(nil, nil, nil, nil).
 			Times(2 + 1) // 2 txs in collection + system chunk
 
-		metrics := new(modulemock.ExecutionMetrics)
-		metrics.On("ExecutionCollectionExecuted", mock.Anything, mock.Anything, mock.Anything).
+		exemetrics := new(modulemock.ExecutionMetrics)
+		exemetrics.On("ExecutionCollectionExecuted", mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).
 			Times(2) // 1 collection + system collection
 
-		metrics.On("ExecutionTransactionExecuted", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		exemetrics.On("ExecutionTransactionExecuted", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).
 			Times(2 + 1) // 2 txs in collection + system chunk tx
 
@@ -84,7 +84,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			trackerStorage,
 		)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, metrics, trace.NewNoopTracer(), zerolog.Nop(), committer, prov)
+		exe, err := computer.NewBlockComputer(vm, execCtx, exemetrics, trace.NewNoopTracer(), zerolog.Nop(), committer, prov)
 		require.NoError(t, err)
 
 		// create a block with 1 collection with 2 transactions

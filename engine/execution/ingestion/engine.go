@@ -645,7 +645,9 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		e.log.Err(err).Msg("failed in process block's children")
 	}
 
-	e.executionDataPruner.NotifyFulfilledHeight(executableBlock.Height())
+	if e.executionDataPruner != nil {
+		e.executionDataPruner.NotifyFulfilledHeight(executableBlock.Height())
+	}
 }
 
 // we've executed the block, now we need to check:

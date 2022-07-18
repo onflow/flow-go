@@ -12,8 +12,6 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
-	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network/compressor"
 )
 
 var (
@@ -47,7 +45,7 @@ func run(*cobra.Command, []string) {
 
 	edID := flow.HashToID(b)
 
-	ed, err := eds.Get(context.Background(), edID)
+	ed, err := eds.GetExecutionData(context.Background(), edID)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("failed to get execution data")
 	}

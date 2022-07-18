@@ -627,7 +627,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		// create the ingest engine
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, blocks, headers, collections,
-			transactions, results, receipts, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, rpcEng)
+			transactions, results, receipts, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, rpcEng, nil)
 		require.NoError(suite.T(), err)
 
 		background, cancel := context.WithCancel(context.Background())
@@ -725,7 +725,7 @@ func (suite *Suite) TestExecuteScript() {
 		suite.net.On("Register", network.ReceiveReceipts, mock.Anything).Return(conduit, nil).Once()
 		// create the ingest engine
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, blocks, headers, collections,
-			transactions, results, receipts, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, nil)
+			transactions, results, receipts, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, nil, nil)
 		require.NoError(suite.T(), err)
 
 		// create a block and a seal pointing to that block

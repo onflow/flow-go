@@ -109,7 +109,7 @@ func (suite *Suite) SetupTest() {
 
 	eng, err := New(log, net, suite.proto.state, suite.me, suite.request, suite.blocks, suite.headers, suite.collections,
 		suite.transactions, suite.results, suite.receipts, metrics.NewNoopCollector(), collectionsToMarkFinalized, collectionsToMarkExecuted,
-		blocksToMarkExecuted, rpcEng)
+		blocksToMarkExecuted, rpcEng, nil)
 	require.NoError(suite.T(), err)
 
 	// stops requestMissingCollections from executing in processBackground worker
