@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/cadence"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/module/metrics"
 
@@ -363,18 +364,7 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 	return nil
 }
 
-func (lg *ContLoadGenerator) sendAddKeyTx(workerID int) {
-	log := lg.log.With().Int("workerID", workerID).Logger()
-
-	// TODO move this as a configurable parameter
-	numberOfKeysToAdd := 40
-
-	log.Trace().Msg("getting next available account")
-
-	acc := <-lg.availableAccounts
-	defer func() { lg.availableAccounts <- acc }()
-
-	log.Trace().Msg("creating add proposer key script")
+func (lg *ContLoadGenerator) createAddKeyTx(accountAddress flowsdk.Address, numberOfKeysToAdd int) (*flowsdk.Transaction, error) {
 	cadenceKeys := make([]cadence.Value, numberOfKeysToAdd)
 	for i := 0; i < numberOfKeysToAdd; i++ {
 		cadenceKeys[i] = bytesToCadenceArray(lg.serviceAccount.accountKey.Encode())
@@ -384,12 +374,12 @@ func (lg *ContLoadGenerator) sendAddKeyTx(workerID int) {
 	addKeysScript, err := AddKeyToAccountScript()
 	if err != nil {
 		log.Error().Err(err).Msg("error getting add key to account script")
-		return
+		return nil, err
 	}
 
 	addKeysTx := flowsdk.NewTransaction().
 		SetScript(addKeysScript).
-		AddAuthorizer(*acc.address).
+		AddAuthorizer(accountAddress).
 		SetReferenceBlockID(lg.follower.BlockID()).
 		SetGasLimit(9999).
 		SetProposalKey(
@@ -402,6 +392,29 @@ func (lg *ContLoadGenerator) sendAddKeyTx(workerID int) {
 	err = addKeysTx.AddArgument(cadenceKeysArray)
 	if err != nil {
 		log.Error().Err(err).Msg("error constructing add keys to account transaction")
+		return nil, err
+	}
+
+	return addKeysTx, nil
+
+}
+
+func (lg *ContLoadGenerator) sendAddKeyTx(workerID int) {
+	log := lg.log.With().Int("workerID", workerID).Logger()
+
+	// TODO move this as a configurable parameter
+	numberOfKeysToAdd := 40
+
+	log.Trace().Msg("getting next available account")
+
+	acc := <-lg.availableAccounts
+	defer func() { lg.availableAccounts <- acc }()
+
+	log.Trace().Msg("creating add proposer key script")
+
+	addKeysTx, err := lg.createAddKeyTx(*acc.address, numberOfKeysToAdd)
+	if err != nil {
+		log.Error().Err(err).Msg("error creating AddKey transaction")
 		return
 	}
 
