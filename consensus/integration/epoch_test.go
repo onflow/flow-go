@@ -33,7 +33,15 @@ func TestUnweightedNode(t *testing.T) {
 
 	// add a consensus node to next epoch (it will have 0 weight in the current epoch)
 	nextEpochParticipantsData := createConsensusIdentities(t, 1)
-	nextEpochIdentities := unittest.CompleteIdentitySet(nextEpochParticipantsData.Identities()...)
+	// epoch 2 identities includes:
+	// * same collection node from epoch 1, so cluster QCs are consistent
+	// * 1 new consensus node, joining at epoch 2
+	// * random nodes with other roles
+	nextEpochIdentities := unittest.CompleteIdentitySet(
+		append(
+			rootSnapshot.Encodable().Identities.Filter(filter.HasRole(flow.RoleCollection)),
+			nextEpochParticipantsData.Identities()...)...,
+	)
 	rootSnapshot = withNextEpoch(
 		rootSnapshot,
 		nextEpochIdentities,

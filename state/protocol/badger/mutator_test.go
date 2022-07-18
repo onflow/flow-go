@@ -979,7 +979,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
 			err = state.Extend(context.Background(), qcBlock)
 			require.NoError(t, err)
-			assertEpochEmergencyFallbackTriggered(t, db)
+			assertEpochEmergencyFallbackTriggered(t, state)
 		})
 
 		// expect a setup event with wrong final view to trigger EECC without error
@@ -993,7 +993,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
 			err = state.Extend(context.Background(), qcBlock)
 			require.NoError(t, err)
-			assertEpochEmergencyFallbackTriggered(t, db)
+			assertEpochEmergencyFallbackTriggered(t, state)
 		})
 
 		// expect a setup event with empty seed to trigger EECC without error
@@ -1007,7 +1007,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
 			err = state.Extend(context.Background(), qcBlock)
 			require.NoError(t, err)
-			assertEpochEmergencyFallbackTriggered(t, db)
+			assertEpochEmergencyFallbackTriggered(t, state)
 		})
 	})
 }
@@ -1096,7 +1096,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
 			err = state.Extend(context.Background(), qcBlock)
 			require.NoError(t, err)
-			assertEpochEmergencyFallbackTriggered(t, db)
+			assertEpochEmergencyFallbackTriggered(t, state)
 		})
 
 		// expect a commit event with wrong cluster QCs to trigger EECC without error
@@ -1110,7 +1110,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
 			err = state.Extend(context.Background(), qcBlock)
 			require.NoError(t, err)
-			assertEpochEmergencyFallbackTriggered(t, db)
+			assertEpochEmergencyFallbackTriggered(t, state)
 		})
 
 		// expect a commit event with wrong dkg participants to trigger EECC without error
@@ -1125,7 +1125,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
 			err = state.Extend(context.Background(), qcBlock)
 			require.NoError(t, err)
-			assertEpochEmergencyFallbackTriggered(t, db)
+			assertEpochEmergencyFallbackTriggered(t, state)
 		})
 	})
 }
@@ -1244,7 +1244,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			err = state.Finalize(context.Background(), block1.ID())
 			require.NoError(t, err)
 
-			assertEpochEmergencyFallbackTriggered(t, db)
+			assertEpochEmergencyFallbackTriggered(t, state)
 
 			// block 2 will be the first block past the first epoch boundary
 			block2 := unittest.BlockWithParentFixture(block1.Header)
@@ -1343,7 +1343,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			err = state.Finalize(context.Background(), block4.ID())
 			require.NoError(t, err)
 
-			assertEpochEmergencyFallbackTriggered(t, db)
+			assertEpochEmergencyFallbackTriggered(t, state)
 
 			// block 5 will be the first block past the first epoch boundary
 			block5 := unittest.BlockWithParentFixture(block4.Header)
@@ -1438,7 +1438,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			err = state.Finalize(context.Background(), block4.ID())
 			require.NoError(t, err)
 
-			assertEpochEmergencyFallbackTriggered(t, db)
+			assertEpochEmergencyFallbackTriggered(t, state)
 
 			// block 5 is the first block past the current epoch boundary
 			block5 := unittest.BlockWithParentFixture(block4.Header)
@@ -1832,9 +1832,8 @@ func TestHeaderInvalidTimestamp(t *testing.T) {
 	})
 }
 
-func assertEpochEmergencyFallbackTriggered(t *testing.T, db *badger.DB) {
-	var triggered bool
-	err := db.View(operation.CheckEpochEmergencyFallbackTriggered(&triggered))
+func assertEpochEmergencyFallbackTriggered(t *testing.T, state realprotocol.State) {
+	triggered, err := state.Params().EpochFallbackTriggered()
 	require.NoError(t, err)
 	assert.True(t, triggered)
 }

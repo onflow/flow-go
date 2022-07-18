@@ -7,7 +7,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/module/mempool"
 )
 
 // TimeoutCollectors implements management of multiple timeout collectors indexed by view.
@@ -41,7 +41,7 @@ func NewTimeoutCollectors(log zerolog.Logger, lowestRetainedView uint64, collect
 //  -  (collector, false, nil) if the collector can be found by the view
 //  -  (nil, false, error) if running into any exception creating the timeout collector state machine
 // Expected error returns during normal operations:
-//  * model.BelowPrunedThresholdError if view is below the pruning threshold
+//  * mempool.BelowPrunedThresholdError if view is below the pruning threshold
 //  * model.ErrViewForUnknownEpoch if view is not yet pruned but no epoch containing the given view is known, this error
 // can be returned from factory method.
 func (t *TimeoutCollectors) GetOrCreateCollector(view uint64) (hotstuff.TimeoutCollector, bool, error) {
@@ -77,12 +77,12 @@ func (t *TimeoutCollectors) GetOrCreateCollector(view uint64) (hotstuff.TimeoutC
 // getCollector retrieves hotstuff.TimeoutCollector from local cache in concurrent safe way.
 // Performs check for lowestRetainedView.
 // Expected error returns during normal operations:
-//  * model.BelowPrunedThresholdError - in case view is lower than lowestRetainedView
+//  * mempool.BelowPrunedThresholdError - in case view is lower than lowestRetainedView
 func (t *TimeoutCollectors) getCollector(view uint64) (hotstuff.TimeoutCollector, bool, error) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 	if view < t.lowestRetainedView {
-		return nil, false, model.NewBelowPrunedThresholdErrorf("cannot retrieve collector for pruned view %d (lowest retained view %d)", view, t.lowestRetainedView)
+		return nil, false, mempool.NewBelowPrunedThresholdErrorf("cannot retrieve collector for pruned view %d (lowest retained view %d)", view, t.lowestRetainedView)
 	}
 
 	clr, found := t.collectors[view]

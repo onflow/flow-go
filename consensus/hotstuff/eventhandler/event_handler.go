@@ -187,7 +187,7 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 	// votes for it.
 	err = e.voteAggregator.AddBlock(proposal)
 	if err != nil {
-		if !mempool.IsDecreasingPruningHeightError(err) {
+		if !mempool.IsBelowPrunedThresholdError(err) {
 			return fmt.Errorf("could not add block (%v) to vote aggregator: %w", block.BlockID, err)
 		}
 	}
@@ -311,7 +311,7 @@ func (e *EventHandler) processPendingBlocks() error {
 
 // proposeForNewView will only be called when we may able to propose a block, after processing a new event.
 // * after entering a new view as a result of processing a QC or TC, then we may propose for the newly entered view
-// * after receiving a proposal (but not changing view), if that proposal is referenced by our highest known QC, 
+// * after receiving a proposal (but not changing view), if that proposal is referenced by our highest known QC,
 //    and the proposal was previously unknown, then we can propose a block in the current view
 // It reads the current view, and generates a proposal if we are the leader.
 // No errors are expected during normal operation.

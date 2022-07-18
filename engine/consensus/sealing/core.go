@@ -584,12 +584,12 @@ func (c *Core) prune(parentSpan opentracing.Span, finalized, lastSealed *flow.He
 	}
 
 	err = c.requestTracker.PruneUpToHeight(lastSealed.Height)
-	if err != nil && !mempool.IsDecreasingPruningHeightError(err) {
+	if err != nil && !mempool.IsBelowPrunedThresholdError(err) {
 		return fmt.Errorf("could not request tracker at block up to height %d: %w", lastSealed.Height, err)
 	}
 
 	err = c.sealsMempool.PruneUpToHeight(lastSealed.Height) // prune candidate seals mempool
-	if err != nil && !mempool.IsDecreasingPruningHeightError(err) {
+	if err != nil && !mempool.IsBelowPrunedThresholdError(err) {
 		return fmt.Errorf("could not prune seals mempool at block up to height %d: %w", lastSealed.Height, err)
 	}
 

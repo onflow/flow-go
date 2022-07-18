@@ -78,3 +78,11 @@ func Throw(ctx context.Context, err error) {
 	// Be spectacular on how this does not -but should- handle irrecoverables:
 	log.Fatalf("irrecoverable error signaler not found for context, please implement! Unhandled irrecoverable error %v", err)
 }
+
+// WithSignallerAndCancel returns an irrecoverable context, the cancel
+// function for the context, and the error channel for the context.
+func WithSignallerAndCancel(ctx context.Context) (SignalerContext, context.CancelFunc, <-chan error) {
+	parent, cancel := context.WithCancel(ctx)
+	irrecoverableCtx, errCh := WithSignaler(parent)
+	return irrecoverableCtx, cancel, errCh
+}

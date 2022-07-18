@@ -72,17 +72,16 @@ func IsSporkRootSnapshot(snapshot Snapshot) (bool, error) {
 	return true, nil
 }
 
-// IsEpochCommitted returns whether the epoch is committed.
-// No errors are expected during normal operations.
-func IsEpochCommitted(epoch Epoch) (bool, error) {
-	_, err := epoch.DKG()
-	// check for sentinel errors indicating un-setup or un-committed epoch
-	if errors.Is(err, ErrEpochNotCommitted) || errors.Is(err, ErrNextEpochNotSetup) {
+// PreviousEpochExists returns whether the previous epoch exists w.r.t. the given
+// state snapshot.
+// No errors are expected during normal operation.
+func PreviousEpochExists(snap Snapshot) (bool, error) {
+	_, err := snap.Epochs().Previous().Counter()
+	if errors.Is(err, ErrNoPreviousEpoch) {
 		return false, nil
 	}
-	// any other error is unexpected
 	if err != nil {
-		return false, fmt.Errorf("unexpected error while checking epoch committed status: %w", err)
+		return false, fmt.Errorf("unexpected error checking previous epoch exists: %w", err)
 	}
 	return true, nil
 }

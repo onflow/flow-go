@@ -140,6 +140,7 @@ type Node struct {
 	compliance        *compliance.Engine
 	sync              *synceng.Engine
 	hot               module.HotStuff
+	committee         *committees.Consensus
 	voteAggregator    hotstuff.VoteAggregator
 	timeoutAggregator hotstuff.TimeoutAggregator
 	state             *bprotocol.MutableState
@@ -442,6 +443,7 @@ func createNode(
 	// selector := filter.HasRole(flow.RoleConsensus)
 	committee, err := committees.NewConsensusCommittee(state, localID)
 	require.NoError(t, err)
+	consumer.AddConsumer(committee)
 
 	// initialize the block finalizer
 	final := finalizer.NewFinalizer(db, headersDB, fullState, trace.NewNoopTracer())
@@ -583,6 +585,7 @@ func createNode(
 	node.sync = sync
 	node.state = fullState
 	node.hot = hot
+	node.committee = committee
 	node.voteAggregator = hotstuffModules.VoteAggregator
 	node.timeoutAggregator = hotstuffModules.TimeoutAggregator
 	node.headers = headersDB

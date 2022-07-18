@@ -119,6 +119,7 @@ func main() {
 		dkgBrokerTunnel         *dkgmodule.BrokerTunnel
 		blockTimer              protocol.BlockTimer
 		finalizedHeader         *synceng.FinalizedHeaderCache
+		committee               *committees.Consensus
 		hotstuffModules         *consensus.HotstuffModules
 		dkgState                *bstorage.DKGState
 		safeBeaconKeys          *bstorage.SafeBeaconPrivateKeys
@@ -505,6 +506,11 @@ func main() {
 
 			return ing, err
 		}).
+		Component("hotstuff committee", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			committee, err = committees.NewConsensusCommittee(node.State, node.Me.NodeID())
+			node.ProtocolEvents.AddConsumer(committee)
+			return committee, err
+		}).
 		Component("hotstuff modules", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize the block finalizer
 			finalize := finalizer.NewFinalizer(
@@ -521,13 +527,8 @@ func main() {
 				)),
 			)
 
-			// initialize Main consensus committee's state
-			var committee hotstuff.DynamicCommittee
-			committee, err = committees.NewConsensusCommittee(node.State, node.Me.NodeID())
-			if err != nil {
-				return nil, fmt.Errorf("could not create committee state for main consensus: %w", err)
-			}
-			committee = committees.NewMetricsWrapper(committee, mainMetrics) // wrapper for measuring time spent determining consensus committee relations
+			// wrap Main consensus committee with metrics
+			wrappedCommittee := committees.NewMetricsWrapper(committee, mainMetrics) // wrapper for measuring time spent determining consensus committee relations
 
 			epochLookup := epochs.NewEpochLookup(node.State)
 			beaconKeyStore := hotsignature.NewEpochAwareRandomBeaconKeyStore(epochLookup, safeBeaconKeys)
@@ -571,8 +572,8 @@ func main() {
 			}
 
 			qcDistributor := pubsub.NewQCCreatedDistributor()
-			validator := consensus.NewValidator(mainMetrics, committee)
-			voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(committee, qcDistributor.OnQcConstructedFromVotes)
+			validator := consensus.NewValidator(mainMetrics, wrappedCommittee)
+			voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(wrappedCommittee, qcDistributor.OnQcConstructedFromVotes)
 			lowestViewForVoteProcessing := finalizedBlock.View + 1
 			voteAggregator, err := consensus.NewVoteAggregator(
 				node.Logger,
@@ -599,7 +600,7 @@ func main() {
 
 			hotstuffModules = &consensus.HotstuffModules{
 				Notifier:                    notifier,
-				Committee:                   committee,
+				Committee:                   wrappedCommittee,
 				Signer:                      signer,
 				Persist:                     persist,
 				QCCreatedDistributor:        qcDistributor,

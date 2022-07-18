@@ -18,6 +18,7 @@ import (
 func runNodes(signalerCtx irrecoverable.SignalerContext, nodes []*Node) {
 	for _, n := range nodes {
 		go func(n *Node) {
+			n.committee.Start(signalerCtx)
 			n.voteAggregator.Start(signalerCtx)
 			n.timeoutAggregator.Start(signalerCtx)
 			<-util.AllReady(n.voteAggregator, n.timeoutAggregator, n.compliance, n.sync)
@@ -29,7 +30,7 @@ func stopNodes(t *testing.T, cancel context.CancelFunc, nodes []*Node) {
 	stoppingNodes := make([]<-chan struct{}, 0)
 	cancel()
 	for _, n := range nodes {
-		stoppingNodes = append(stoppingNodes, util.AllDone(n.voteAggregator, n.timeoutAggregator, n.compliance, n.sync))
+		stoppingNodes = append(stoppingNodes, util.AllDone(n.committee, n.voteAggregator, n.timeoutAggregator, n.compliance, n.sync))
 	}
 	unittest.RequireCloseBefore(t, util.AllClosed(stoppingNodes...), time.Second, "requiring nodes to stop")
 }

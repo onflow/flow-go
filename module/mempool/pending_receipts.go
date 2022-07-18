@@ -25,6 +25,6 @@ type PendingReceipts interface {
 	// Monotonicity Requirement:
 	// The pruned height cannot decrease, as we cannot recover already pruned elements.
 	// If `height` is smaller than the previous value, the previous value is kept
-	// and the sentinel mempool.DecreasingPruningHeightError is returned.
+	// and the sentinel mempool.BelowPrunedThresholdError is returned.
 	PruneUpToHeight(height uint64) error
 }

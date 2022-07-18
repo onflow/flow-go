@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/mempool"
 )
 
 // defaultTimeoutAggregatorWorkers number of workers to dispatch events for timeout aggregator
@@ -141,7 +142,7 @@ func (t *TimeoutAggregator) processQueuedTimeout(timeoutObject *model.TimeoutObj
 	collector, _, err := t.collectors.GetOrCreateCollector(timeoutObject.View)
 	if err != nil {
 		// ignore if our routine is outdated and some other one has pruned collectors
-		if model.IsBelowPrunedThresholdError(err) {
+		if mempool.IsBelowPrunedThresholdError(err) {
 			return nil
 		}
 		if errors.Is(err, model.ErrViewForUnknownEpoch) {
