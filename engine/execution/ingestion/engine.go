@@ -719,7 +719,7 @@ func (e *Engine) onBlockExecuted(executed *entity.ExecutableBlock, finalState fl
 			}
 
 			// remove the executed block
-			executionQueues.Rem(executed.ID())
+			executionQueues.Remove(executed.ID())
 
 			return nil
 		})
@@ -761,7 +761,7 @@ func (e *Engine) executeBlockIfComplete(eb *entity.ExecutableBlock) bool {
 	// 		Hex("delta_start_state", delta.ExecutableBlock.StartState).
 	// 		Msg("can not apply the state delta, the start state does not match")
 	//
-	// 	e.syncDeltas.Rem(eb.Block.ID())
+	// 	e.syncDeltas.Remove(eb.Block.ID())
 	// }
 
 	// if don't have the delta, then check if everything is ready for executing
@@ -870,7 +870,7 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 			// this also prevents from executing the same block twice, because the second
 			// time when the collection arrives, it will not be found in the blockByCollectionID
 			// index.
-			backdata.Rem(collID)
+			backdata.Remove(collID)
 
 			return nil
 		},
@@ -1069,7 +1069,7 @@ func (e *Engine) ExecuteScriptAtBlockID(ctx context.Context, script []byte, argu
 	return e.computationManager.ExecuteScript(ctx, script, arguments, block, blockView)
 }
 
-func (e *Engine) GetRegisterAtBlockID(ctx context.Context, owner, controller, key []byte, blockID flow.Identifier) ([]byte, error) {
+func (e *Engine) GetRegisterAtBlockID(ctx context.Context, owner, key []byte, blockID flow.Identifier) ([]byte, error) {
 
 	stateCommit, err := e.execState.StateCommitmentByBlockID(ctx, blockID)
 	if err != nil {
@@ -1078,9 +1078,9 @@ func (e *Engine) GetRegisterAtBlockID(ctx context.Context, owner, controller, ke
 
 	blockView := e.execState.NewView(stateCommit)
 
-	data, err := blockView.Get(string(owner), string(controller), string(key))
+	data, err := blockView.Get(string(owner), string(key))
 	if err != nil {
-		return nil, fmt.Errorf("failed to get the register (owner : %s, controller: %s, key: %s): %w", hex.EncodeToString(owner), hex.EncodeToString(owner), string(key), err)
+		return nil, fmt.Errorf("failed to get the register (owner : %s, key: %s): %w", hex.EncodeToString(owner), string(key), err)
 	}
 
 	return data, nil

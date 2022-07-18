@@ -45,7 +45,7 @@ func TestGuaranteePool(t *testing.T) {
 	})
 
 	t.Run("should be able to remove second", func(t *testing.T) {
-		ok := pool.Rem(item2.ID())
+		ok := pool.Remove(item2.ID())
 		assert.True(t, ok)
 	})
 

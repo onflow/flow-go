@@ -13,16 +13,6 @@ import (
 	"github.com/onflow/flow-go/ledger/common/utils"
 )
 
-func createAccountPayloadKey(a flow.Address, key string) ledger.Key {
-	return ledger.Key{
-		KeyParts: []ledger.KeyPart{
-			ledger.NewKeyPart(0, a.Bytes()),
-			ledger.NewKeyPart(1, []byte("")),
-			ledger.NewKeyPart(2, []byte(key)),
-		},
-	}
-}
-
 func TestAccountStatusMigration(t *testing.T) {
 	mig := AccountStatusMigration{
 		Logger: zerolog.Logger{},
@@ -32,11 +22,11 @@ func TestAccountStatusMigration(t *testing.T) {
 	address2 := flow.HexToAddress("0x2")
 
 	payloads := []ledger.Payload{
-		{Key: createAccountPayloadKey(address1, state.KeyStorageUsed), Value: utils.Uint64ToBinary(1)},
-		{Key: createAccountPayloadKey(address1, "other registers"), Value: utils.Uint64ToBinary(2)},
-		{Key: createAccountPayloadKey(address2, "other registers2"), Value: utils.Uint64ToBinary(3)},
-		{Key: createAccountPayloadKey(address1, KeyExists), Value: []byte{1}},
-		{Key: createAccountPayloadKey(address1, KeyAccountFrozen), Value: []byte{1}},
+		{Key: createPayloadKeyWithLegacyController(address1, state.KeyStorageUsed, true), Value: utils.Uint64ToBinary(1)},
+		{Key: createPayloadKeyWithLegacyController(address1, "other registers", true), Value: utils.Uint64ToBinary(2)},
+		{Key: createPayloadKeyWithLegacyController(address2, "other registers2", true), Value: utils.Uint64ToBinary(3)},
+		{Key: createPayloadKeyWithLegacyController(address1, KeyExists, true), Value: []byte{1}},
+		{Key: createPayloadKeyWithLegacyController(address1, KeyAccountFrozen, true), Value: []byte{1}},
 	}
 
 	newPayloads, err := mig.Migrate(payloads)
@@ -48,7 +38,7 @@ func TestAccountStatusMigration(t *testing.T) {
 	require.True(t, newPayloads[2].Equals(&payloads[2]))
 
 	expectedPayload := &ledger.Payload{
-		Key:   createAccountPayloadKey(address1, state.KeyAccountStatus),
+		Key:   createPayloadKeyWithLegacyController(address1, state.KeyAccountStatus, true),
 		Value: state.NewAccountStatus().ToBytes(),
 	}
 	require.True(t, newPayloads[3].Equals(expectedPayload))

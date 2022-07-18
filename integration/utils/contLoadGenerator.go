@@ -276,7 +276,7 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 	<-ch
 
 	log := lg.log.With().Str("tx_id", createAccountTx.ID().String()).Logger()
-	result, err := lg.flowClient.GetTransactionResult(context.Background(), createAccountTx.ID())
+	result, err := WaitForTransactionResult(context.Background(), lg.flowClient, createAccountTx.ID())
 	if err != nil {
 		return fmt.Errorf("failed to get transactions result: %w", err)
 	}
@@ -510,7 +510,7 @@ func (lg *ContLoadGenerator) sendTx(workerID int, tx *flowsdk.Transaction) (<-ch
 	log.Trace().Msg("sending transaction")
 
 	// Add watcher before sending the transaction to avoid race condition
-	ch := lg.follower.CompleteChanByID(tx.ID())
+	ch := lg.follower.Follow(tx.ID())
 
 	err := lg.flowClient.SendTransaction(context.Background(), *tx)
 	if err != nil {
