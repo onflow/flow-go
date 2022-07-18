@@ -243,7 +243,6 @@ func (lg *ContLoadGenerator) Stop() {
 		lg.startTime = time.Time{}
 	}
 
-	lg.txTracker.Stop()
 	wg.Wait()
 	lg.workerStatsTracker.StopPrinting()
 	lg.log.Debug().Msg("stopping follower")
