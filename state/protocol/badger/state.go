@@ -380,7 +380,7 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot, verifyNetworkAddress 
 			setups = append(setups, setup)
 			status.NextEpoch.SetupID = setup.ID()
 			commit, err := protocol.ToEpochCommit(next)
-			if err != nil && !errors.Is(err, protocol.ErrEpochNotCommitted) {
+			if err != nil && !errors.Is(err, protocol.ErrNextEpochNotCommitted) {
 				return fmt.Errorf("could not get next epoch commit event: %w", err)
 			}
 			if err == nil {

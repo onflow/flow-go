@@ -6,8 +6,7 @@ import (
 
 // Params are parameters of the protocol state, divided into parameters of
 // this specific instance of the state (varies from node to node) and global
-// parameters of the state. All parameters are fixed after the protocol state
-// instance has been bootstrapped.
+// parameters of the state.
 type Params interface {
 	InstanceParams
 	GlobalParams
@@ -21,19 +20,21 @@ type InstanceParams interface {
 	// Root returns the root header of the current protocol state. This will be
 	// the head of the protocol state snapshot used to bootstrap this state and
 	// may differ from node to node for the same protocol state.
+	// No errors are expected during normal operation.
 	Root() (*flow.Header, error)
 
 	// Seal returns the root block seal of the current protocol state. This will be
 	// the seal for the root block used to bootstrap this state and may differ from
 	// node to node for the same protocol state.
+	// No errors are expected during normal operation.
 	Seal() (*flow.Seal, error)
 
 	// EpochFallbackTriggered returns whether epoch fallback mode (EECC) has been triggered.
 	// EECC is a permanent, spork-scoped state which is triggered when the next
 	// epoch fails to be committed in the allocated time. Once EECC is triggered,
 	// it will remain in effect until the next spork.
-	// TODO necessary?
-	//EpochFallbackTriggered() (bool, error)
+	// No errors are expected during normal operation.
+	EpochFallbackTriggered() (bool, error)
 }
 
 // GlobalParams represents protocol state parameters that do not vary between instances.
@@ -43,15 +44,18 @@ type GlobalParams interface {
 
 	// ChainID returns the chain ID for the current Flow network. The chain ID
 	// uniquely identifies a Flow network in perpetuity across epochs and sporks.
+	// No errors are expected during normal operation.
 	ChainID() (flow.ChainID, error)
 
 	// SporkID returns the unique identifier for this network within the current spork.
 	// This ID is determined at the beginning of a spork during bootstrapping and is
 	// part of the root protocol state snapshot.
+	// No errors are expected during normal operation.
 	SporkID() (flow.Identifier, error)
 
 	// ProtocolVersion returns the protocol version, the major software version
 	// of the protocol software.
+	// No errors are expected during normal operation.
 	ProtocolVersion() (uint, error)
 
 	// EpochCommitSafetyThreshold defines a deadline for sealing the EpochCommit
@@ -97,5 +101,7 @@ type GlobalParams interface {
 	//                /- Epoch Commitment Deadline
 	// EPOCH N        v        EPOCH N+1
 	// ...------------|------||-----...
+	//
+	// No errors are expected during normal operation.
 	EpochCommitSafetyThreshold() (uint64, error)
 }
