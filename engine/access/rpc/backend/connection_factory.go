@@ -183,7 +183,7 @@ func (cf *ConnectionFactoryImpl) InvalidateExecutionAPIClient(address string) {
 func (cf *ConnectionFactoryImpl) invalidateAPIClient(address string, port uint) {
 	grpcAddress, _ := getGRPCAddress(address, port)
 	if res, ok := cf.ConnectionsCache.Get(grpcAddress); ok {
-		store := res.(CachedClient)
+		store := res.(*CachedClient)
 		store.Close()
 		if cf.AccessMetrics != nil {
 			cf.AccessMetrics.ConnectionFromPoolInvalidated()
