@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -33,16 +34,16 @@ type ConsensusFollower interface {
 
 // Config contains the configurable fields for a `ConsensusFollower`.
 type Config struct {
-	networkPrivKey   crypto.PrivateKey       // the network private key of this node
-	bootstrapNodes   []BootstrapNodeInfo     // the bootstrap nodes to use
-	bindAddr         string                  // address to bind on
-	db               *badger.DB              // the badger DB storage to use for the protocol state
-	dataDir          string                  // directory to store the protocol state (if the badger storage is not provided)
-	bootstrapDir     string                  // path to the bootstrap directory
-	logLevel         string                  // log level
-	exposeMetrics    bool                    // whether to expose metrics
-	syncConfig       *synchronization.Config // sync core configuration
-	complianceConfig *compliance.Config      // follower engine configuration
+	networkPrivKey   crypto.PrivateKey   // the network private key of this node
+	bootstrapNodes   []BootstrapNodeInfo // the bootstrap nodes to use
+	bindAddr         string              // address to bind on
+	db               *badger.DB          // the badger DB storage to use for the protocol state
+	dataDir          string              // directory to store the protocol state (if the badger storage is not provided)
+	bootstrapDir     string              // path to the bootstrap directory
+	logLevel         string              // log level
+	exposeMetrics    bool                // whether to expose metrics
+	syncConfig       *chainsync.Config   // sync core configuration
+	complianceConfig *compliance.Config  // follower engine configuration
 }
 
 type Option func(c *Config)

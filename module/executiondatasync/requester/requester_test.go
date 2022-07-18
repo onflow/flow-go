@@ -221,7 +221,7 @@ func TestHandleFinalizedBlock(t *testing.T) {
 	finalizedHeader := unittest.BlockHeaderFixture()
 	finalizedHeader.PayloadHash = finalizedPayload.Hash()
 	finalizedBlock := &flow.Block{
-		Header:  &finalizedHeader,
+		Header:  finalizedHeader,
 		Payload: &finalizedPayload,
 	}
 	blocks.On("ByID", finalizedBlock.ID()).Return(finalizedBlock, nil)
@@ -335,7 +335,7 @@ func TestConsumer(t *testing.T) {
 	finalizedHeader := unittest.BlockHeaderFixture()
 	finalizedHeader.PayloadHash = finalizedPayload.Hash()
 	finalizedBlock := &flow.Block{
-		Header:  &finalizedHeader,
+		Header:  finalizedHeader,
 		Payload: &finalizedPayload,
 	}
 	blocks.On("ByID", finalizedBlock.ID()).Return(finalizedBlock, nil)
@@ -413,7 +413,7 @@ func TestConsumer(t *testing.T) {
 	finalizedHeader = unittest.BlockHeaderFixture()
 	finalizedHeader.PayloadHash = finalizedPayload.Hash()
 	finalizedBlock = &flow.Block{
-		Header:  &finalizedHeader,
+		Header:  finalizedHeader,
 		Payload: &finalizedPayload,
 	}
 	blocks.On("ByID", finalizedBlock.ID()).Return(finalizedBlock, nil)
@@ -502,7 +502,7 @@ func TestStaleReceipt(t *testing.T) {
 	finalizedHeader := unittest.BlockHeaderFixture()
 	finalizedHeader.PayloadHash = finalizedPayload.Hash()
 	finalizedBlock := &flow.Block{
-		Header:  &finalizedHeader,
+		Header:  finalizedHeader,
 		Payload: &finalizedPayload,
 	}
 	blocks.On("ByID", finalizedBlock.ID()).Return(finalizedBlock, nil)
@@ -628,7 +628,7 @@ func TestOversizedBlob(t *testing.T) {
 	finalizedHeader := unittest.BlockHeaderFixture()
 	finalizedHeader.PayloadHash = finalizedPayload.Hash()
 	finalizedBlock := &flow.Block{
-		Header:  &finalizedHeader,
+		Header:  finalizedHeader,
 		Payload: &finalizedPayload,
 	}
 	blocks.On("ByID", finalizedBlock.ID()).Return(finalizedBlock, nil)
@@ -786,7 +786,7 @@ func runWithSerializer(t *testing.T, serializer execution_data.Serializer) {
 	finalizedHeader := unittest.BlockHeaderFixture()
 	finalizedHeader.PayloadHash = finalizedPayload.Hash()
 	finalizedBlock := &flow.Block{
-		Header:  &finalizedHeader,
+		Header:  finalizedHeader,
 		Payload: &finalizedPayload,
 	}
 	blocks.On("ByID", finalizedBlock.ID()).Return(finalizedBlock, nil)
@@ -898,7 +898,7 @@ func TestMismatchedBlockID(t *testing.T) {
 	finalizedHeader := unittest.BlockHeaderFixture()
 	finalizedHeader.PayloadHash = finalizedPayload.Hash()
 	finalizedBlock := &flow.Block{
-		Header:  &finalizedHeader,
+		Header:  finalizedHeader,
 		Payload: &finalizedPayload,
 	}
 	blocks.On("ByID", finalizedBlock.ID()).Return(finalizedBlock, nil)

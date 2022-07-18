@@ -559,7 +559,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	trackerStorage := new(mocktracker.Storage)
 
 	prov := exedataprovider.NewProvider(
-		zerolog.Nop,
+		zerolog.Nop(),
 		metrics.NewNoopCollector(),
 		execution_data.DefaultSerializer,
 		bservice,

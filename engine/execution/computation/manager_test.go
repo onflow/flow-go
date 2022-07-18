@@ -9,6 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ipfs/go-datastore"
+	dssync "github.com/ipfs/go-datastore/sync"
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
@@ -23,6 +26,7 @@ import (
 	unittest2 "github.com/onflow/flow-go/engine/execution/state/unittest"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
+	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
@@ -34,6 +38,8 @@ import (
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/executiondatasync/provider"
 	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
@@ -114,11 +120,11 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
 
-	bservice := unittest.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 	trackerStorage := new(mocktracker.Storage)
 
 	prov := provider.NewProvider(
-		zerolog.Nop,
+		zerolog.Nop(),
 		metrics.NewNoopCollector(),
 		execution_data.DefaultSerializer,
 		bservice,
@@ -222,11 +228,11 @@ func TestExecuteScript(t *testing.T) {
 		fvm.FungibleTokenAddress(execCtx.Chain).HexWithPrefix(),
 	))
 
-	bservice := unittest.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 	trackerStorage := new(mocktracker.Storage)
 
 	prov := provider.NewProvider(
-		zerolog.Nop,
+		zerolog.Nop(),
 		metrics.NewNoopCollector(),
 		execution_data.DefaultSerializer,
 		bservice,
@@ -284,11 +290,11 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 		fvm.FungibleTokenAddress(execCtx.Chain).HexWithPrefix(),
 	))
 
-	bservice := unittest.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 	trackerStorage := new(mocktracker.Storage)
 
 	prov := provider.NewProvider(
-		zerolog.Nop,
+		zerolog.Nop(),
 		metrics.NewNoopCollector(),
 		execution_data.DefaultSerializer,
 		bservice,
@@ -326,11 +332,11 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 
 	header := unittest.BlockHeaderFixture()
 
-	bservice := unittest.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 	trackerStorage := new(mocktracker.Storage)
 
 	prov := provider.NewProvider(
-		zerolog.Nop,
+		zerolog.Nop(),
 		metrics.NewNoopCollector(),
 		execution_data.DefaultSerializer,
 		bservice,
@@ -370,11 +376,11 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 
 	header := unittest.BlockHeaderFixture()
 
-	bservice := unittest.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 	trackerStorage := new(mocktracker.Storage)
 
 	prov := provider.NewProvider(
-		zerolog.Nop,
+		zerolog.Nop(),
 		metrics.NewNoopCollector(),
 		execution_data.DefaultSerializer,
 		bservice,
@@ -414,11 +420,11 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 
 	header := unittest.BlockHeaderFixture()
 
-	bservice := unittest.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 	trackerStorage := new(mocktracker.Storage)
 
 	prov := provider.NewProvider(
-		zerolog.Nop,
+		zerolog.Nop(),
 		metrics.NewNoopCollector(),
 		execution_data.DefaultSerializer,
 		bservice,
@@ -518,7 +524,7 @@ func TestExecuteScriptTimeout(t *testing.T) {
 		timeout,
 		nil,
 		nil,
-		nil)
+	)
 
 	require.NoError(t, err)
 
@@ -557,7 +563,7 @@ func TestExecuteScriptCancelled(t *testing.T) {
 		timeout,
 		nil,
 		nil,
-		nil)
+	)
 
 	require.NoError(t, err)
 
@@ -608,7 +614,7 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 		timeout,
 		nil,
 		nil,
-		nil)
+	)
 	view := testutil.RootBootstrappedLedger(vm, ctx)
 	programs := programs.NewEmptyPrograms()
 	st := state.NewState(view)

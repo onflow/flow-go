@@ -1266,7 +1266,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 		false,
 		checkAuthorizedAtBlock,
 		false,
-		nil
+		nil,
 	)
 
 	require.NoError(t, err)
