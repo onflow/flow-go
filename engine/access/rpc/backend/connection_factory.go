@@ -198,7 +198,9 @@ func (s *CachedClient) Close() {
 	s.mutex.Unlock()
 	// allow time for any existing requests to finish before closing the connection
 	time.Sleep(s.timeout)
-	conn.Close()
+	if conn != nil {
+		conn.Close()
+	}
 }
 
 // getExecutionNodeAddress translates flow.Identity address to the GRPC address of the node by switching the port to the
