@@ -57,10 +57,15 @@ func (sk *PrKeyECDSA) signHash(h hash.Hash) (Signature, error) {
 
 // Sign signs an array of bytes
 //
-// The private key is read only while sha2 and sha3 hashers are
-// modified temporarily.
 // The resulting signature is the concatenation bytes(r)||bytes(s),
 // where r and s are padded to the curve order size.
+// The private key is read only while sha2 and sha3 hashers are
+// modified temporarily.
+//
+// The function returns:
+//  - (nil, invalidInputErrors) if the hasher is nil
+//  - (nil, error) if an unexpected error occurs
+//  - (signature, nil) otherwise
 func (sk *PrKeyECDSA) Sign(data []byte, alg hash.Hasher) (Signature, error) {
 	// no need to check the hasher output size as all supported hash algos
 	// have at least 32 bytes output
@@ -93,6 +98,11 @@ func (pk *PubKeyECDSA) verifyHash(sig Signature, h hash.Hash) (bool, error) {
 //
 // Public keys are read only, sha2 and sha3 hashers are
 // modified temporarily.
+//
+// The function returns:
+//  - (false, invalidInputErrors) if the hasher is nil
+//  - (false, error) if an unexpected error occurs
+//  - (validity, nil) otherwise
 func (pk *PubKeyECDSA) Verify(sig Signature, data []byte, alg hash.Hasher) (bool, error) {
 	// no need to check the hasher output size as all supported hash algos
 	// have at lease 32 bytes output
@@ -353,7 +363,6 @@ func (pk *PubKeyECDSA) Size() int {
 
 // EncodeCompressed returns a compressed encoding according to X9.62 section 4.3.6.
 // This compressed representation uses an extra byte to disambiguate sign.
-// The expected input is a public key (x,y).
 func (pk *PubKeyECDSA) EncodeCompressed() []byte {
 	if pk.alg.curve == btcec.S256() {
 		return (*btcec.PublicKey)(pk.goPubKey).SerializeCompressed()

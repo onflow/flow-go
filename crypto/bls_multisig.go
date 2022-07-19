@@ -42,6 +42,10 @@ var popKMAC = internalExpandMsgXOFKMAC128(blsPOPCipherSuite)
 // The KMAC hasher used in the function is guaranteed to be orthogonal to all hashers used
 // for signatures or SPoCK proofs. This means a specific domain tag is used to generate PoP
 // and is not used by any other application.
+//
+// The function returns:
+//  - (nil, invalidInputErrors) if the input key is not of type PrKeyBLSBLS12381
+//  - (pop, nil) otherwise
 func BLSGeneratePOP(sk PrivateKey) (Signature, error) {
 	_, ok := sk.(*PrKeyBLSBLS12381)
 	if !ok {
@@ -53,7 +57,11 @@ func BLSGeneratePOP(sk PrivateKey) (Signature, error) {
 
 // BLSVerifyPOP verifies a proof of possession (PoP) for the receiver public key.
 //
-// The function uses the same KMAC hasher used to generate the PoP.
+// The function internally uses the same KMAC hasher used to generate the PoP.
+//
+// The function returns:
+//  - (false, invalidInputErrors) if the input key is not of type PubKeyBLSBLS12381
+//  - (validity, nil) otherwise
 func BLSVerifyPOP(pk PublicKey, s Signature) (bool, error) {
 	_, ok := pk.(*PubKeyBLSBLS12381)
 	if !ok {
@@ -70,9 +78,14 @@ func BLSVerifyPOP(pk PublicKey, s Signature) (bool, error) {
 // The order of the signatures in the slice does not matter since the aggregation
 // is commutative. The slice should not be empty.
 // No subgroup membership check is performed on the input signatures.
-// Expected error returns during normal operations:
-//  - invalidInputsError if no signatures are provided (sigs is empty) or
-//    at least one signature fails to deserialize.
+//
+// The function retruns:
+//  - (nil, invalidInputsError) if:
+//		- no signatures are provided (input slice is empty)
+//      - Or a deserialization of at least one signature fails (input is an invalid serialization of a
+// 		compressed G1 element following https://github.com/zkcrypto/pairing/blob/master/src/bls12_381/README.md#serialization)
+//  - (nil, error) if an unexpected error occurs
+//  - (aggregated_signature, nil) otherwise
 func AggregateBLSSignatures(sigs []Signature) (Signature, error) {
 	// set BLS context
 	blsInstance.reInit()
@@ -115,8 +128,12 @@ func AggregateBLSSignatures(sigs []Signature) (Signature, error) {
 // The order of the keys in the slice does not matter since the aggregation
 // is commutative. The slice should not be empty.
 // No check is performed on the input private keys.
-// Expected error returns:
-//  - invalidInputsError if keys is empty or at least one key type is not BLS12-381.
+//
+// The function retruns:
+//  - (nil, invalidInputsError) if:
+//		- no keys are provided (input slice is empty)
+//      - Or at least one key is not of type PrKeyBLSBLS12381
+//  - (aggregated_key, nil) otherwise
 func AggregateBLSPrivateKeys(keys []PrivateKey) (PrivateKey, error) {
 	// set BLS context
 	blsInstance.reInit()
@@ -147,8 +164,12 @@ func AggregateBLSPrivateKeys(keys []PrivateKey) (PrivateKey, error) {
 // The order of the keys in the slice does not matter since the aggregation
 // is commutative. The slice should not be empty.
 // No check is performed on the input public keys.
-// Expected error returns:
-//  - invalidInputsError if keys is empty or at least one key type is not BLS12-381.
+//
+// The function retruns:
+//  - (nil, invalidInputsError) if:
+//		- no keys are provided (input slice is empty)
+//      - Or at least one key is not of type PubKeyBLSBLS12381
+//  - (aggregated_key, nil) otherwise
 func AggregateBLSPublicKeys(keys []PublicKey) (PublicKey, error) {
 	// set BLS context
 	blsInstance.reInit()
@@ -173,6 +194,8 @@ func AggregateBLSPublicKeys(keys []PublicKey) (PublicKey, error) {
 	return newPubKeyBLSBLS12381(&sum), nil
 }
 
+// NeutralBLSPublicKey returns a neutral public key which correcosponds to the point
+// at infinity in G2 (neutral element of G2).
 func NeutralBLSPublicKey() PublicKey {
 	// set BLS context
 	blsInstance.reInit()
@@ -190,9 +213,11 @@ func NeutralBLSPublicKey() PublicKey {
 // can still be called in different use cases.
 // The order of the keys to be removed in the slice does not matter since the removal
 // is commutative. The slice of keys to be removed can be empty.
-// No check is performed on the input public keys.
-// Expected error returns:
-//  - invalidInputsError if at least one key type is not BLS12-381.
+// No membership check is performed on the input public keys.
+//
+// The function retruns:
+//  - (nil, invalidInputsError) if at least one input key is not of type PubKeyBLSBLS12381
+//  - (remaining_key, nil) otherwise
 func RemoveBLSPublicKeys(aggKey PublicKey, keysToRemove []PublicKey) (PublicKey, error) {
 	// set BLS context
 	blsInstance.reInit()
@@ -238,12 +263,17 @@ func RemoveBLSPublicKeys(aggKey PublicKey, keysToRemove []PublicKey) (PublicKey,
 //
 // This is a special case function of VerifyBLSSignatureManyMessages, using a single
 // message and hasher.
+//
+// The function returns:
+//  - (false, invalidInputsError) if:
+//		- input key slice is empty
+//      - Or at least one key is not of type PubKeyBLSBLS12381
+//      - input hasher is nil or its output size is not 128 bytes
+//  - (false, error) if an unexpected error occurs
+//  - (validity, nil) otherwise
 func VerifyBLSSignatureOneMessage(pks []PublicKey, s Signature,
 	message []byte, kmac hash.Hasher) (bool, error) {
-	// check the public key list is non empty
-	if len(pks) == 0 {
-		return false, invalidInputsErrorf("verify signature one message failed because key list is empty")
-	}
+	// public key list must be non empty, this is checked internally by AggregateBLSPublicKeys
 	aggPk, err := AggregateBLSPublicKeys(pks)
 	if err != nil {
 		return false, fmt.Errorf("verify signature one message failed: %w", err)
@@ -264,6 +294,15 @@ func VerifyBLSSignatureOneMessage(pks []PublicKey, s Signature,
 // function has the same behavior as VerifyBLSSignatureOneMessage. If there is one input message and
 // input public key, the function has the same behavior as pk.Verify.
 // Membership check is performed on the input signature.
+//
+// The function returns:
+//  - (false, invalidInputsError) if:
+//      - size of keys is not matching the size of messages and hashers
+//		- input key slice is empty
+//      - Or at least one key is not of type PubKeyBLSBLS12381
+//      - at least one input hasher is nil or its output size is not 128 bytes
+//  - (false, error) if an unexpected error occurs
+//  - (validity, nil) otherwise
 func VerifyBLSSignatureManyMessages(pks []PublicKey, s Signature,
 	messages [][]byte, kmac []hash.Hasher) (bool, error) {
 
@@ -402,6 +441,15 @@ func VerifyBLSSignatureManyMessages(pks []PublicKey, s Signature,
 // keys (which is supposed to have happened outside this function using the library
 // key generation or bytes decode function).
 // An error is returned if the key slice is empty.
+//
+// The function returns:
+//  - ([]false, invalidInputsError) if:
+//      - size of keys is not matching the size of signatures
+//		- input key slice is empty
+//      - Or at least one key is not of type PubKeyBLSBLS12381
+//      - input hasher is nil or its output size is not 128 bytes
+//  - ([]false, error) if an unexpected error occurs
+//  - ([]validity, nil) otherwise
 func BatchVerifyBLSSignaturesOneMessage(pks []PublicKey, sigs []Signature,
 	message []byte, kmac hash.Hasher) ([]bool, error) {
 	// set BLS context
@@ -425,7 +473,7 @@ func BatchVerifyBLSSignaturesOneMessage(pks []PublicKey, sigs []Signature,
 		return verifBool, invalidInputsErrorf("verification requires a Hasher")
 	}
 
-	if kmac.Size() < expandMsgOutput {
+	if kmac.Size() != expandMsgOutput {
 		return verifBool, invalidInputsErrorf(
 			"hasher with at least %d output byte size is required, current size is %d",
 			expandMsgOutput,

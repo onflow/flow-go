@@ -104,6 +104,10 @@ func internalExpandMsgXOFKMAC128(key string) hash.Hasher {
 // It is recommended to use Sign with the hasher from NewExpandMsgXOFKMAC128. If not, the hasher used
 // must expand the message to 1024 bits. It is also recommended to use a hasher
 // with a domain separation tag.
+//
+// The function returns:
+//  - (nil, invalidInputErrors) if the hasher is nil or its output size is not 128 bytes
+//  - (signature, nil) otherwise
 func (sk *PrKeyBLSBLS12381) Sign(data []byte, kmac hash.Hasher) (Signature, error) {
 	if kmac == nil {
 		return nil, invalidInputsErrorf("hasher is empty")
@@ -139,7 +143,12 @@ func (sk *PrKeyBLSBLS12381) Sign(data []byte, kmac hash.Hasher) (Signature, erro
 // which includes a validity check.
 // The signature membership check in G1 is included in the verifcation.
 //
-// If the hasher used is KMAC128, the hasher is read only.
+// If the hasher used is ExpandMsgXOFKMAC128, the hasher is read only.
+//
+// The function returns:
+//  - (false, invalidInputErrors) if the hasher is nil or its output size is not 128 bytes
+//  - (false, error) if an unexpected error occurs
+//  - (validity, nil) otherwise
 func (pk *PubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) (bool, error) {
 	if len(s) != signatureLengthBLSBLS12381 {
 		return false, nil

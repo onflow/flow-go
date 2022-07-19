@@ -12,6 +12,15 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 )
 
+func TestKeyGenErrors(t *testing.T) {
+	seed := make([]byte, 50)
+	invalidSigAlgo := SigningAlgorithm(20)
+	sk, err := GeneratePrivateKey(invalidSigAlgo, seed)
+	assert.Nil(t, sk)
+	assert.Error(t, err)
+	assert.True(t, IsInvalidInputsError(err))
+}
+
 // tests sign and verify are consistent for multiple generated keys and messages
 func testGenSignVerify(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 	t.Logf("Testing Generation/Signature/Verification for %s", salg)
