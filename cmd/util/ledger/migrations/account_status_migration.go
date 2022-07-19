@@ -7,9 +7,9 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/onflow/atree"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/atree"
 	"github.com/onflow/flow-go/engine/execution/state"
 	fvmState "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"

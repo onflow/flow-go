@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 
 	"github.com/onflow/atree"
+
 	"github.com/onflow/flow-go/fvm/errors"
 )
 
