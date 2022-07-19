@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	flowsdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go-sdk/client"
-	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/stretchr/testify/require"
+
+	flowsdk "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestTxFollower creates new follower with a fixed block height and stops it.
@@ -18,13 +18,32 @@ func TestTxFollower(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	f, err := NewTxFollower(ctx,
-		&client.Client{},
+	f, err := NewTxFollower(
+		ctx,
+		nil,
 		WithBlockHeight(2),
 		WithInteval(1*time.Hour),
 	)
 	require.NoError(t, err)
 	f.Stop()
+}
+
+// TestTxFollowerFollowAfterStop creates new follower with a fixed block height and stops it.
+func TestTxFollowerFollowAfterStop(t *testing.T) {
+	// TODO(rbtz): test against a mock client, but for now we just expire
+	// the context so that the followere wont be able to progress.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	f, err := NewTxFollower(
+		ctx,
+		nil,
+		WithBlockHeight(2),
+		WithInteval(1*time.Hour),
+	)
+	require.NoError(t, err)
+	f.Stop()
+	unittest.AssertClosesBefore(t, f.Follow(flowsdk.Identifier{}), 1*time.Second)
 }
 
 // TestNopTxFollower creates a new follower with a fixed block height and
@@ -35,12 +54,13 @@ func TestNopTxFollower(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	f, err := NewNopTxFollower(ctx,
-		&client.Client{},
+	f, err := NewNopTxFollower(
+		ctx,
+		nil,
 		WithBlockHeight(1),
 		WithInteval(1*time.Hour),
 	)
 	require.NoError(t, err)
-	unittest.AssertClosesBefore(t, f.CompleteChanByID(flowsdk.Identifier{}), 1*time.Second)
+	unittest.AssertClosesBefore(t, f.Follow(flowsdk.Identifier{}), 1*time.Second)
 	f.Stop()
 }

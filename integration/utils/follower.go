@@ -6,15 +6,15 @@ import (
 	"time"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go-sdk/client"
-	"go.uber.org/atomic"
+	"github.com/onflow/flow-go-sdk/access"
+	"github.com/onflow/flow-go/module/metrics"
 
 	"github.com/rs/zerolog"
 )
 
 type TxFollower interface {
-	// CompleteChanByID returns a channel that is closed when the transaction is complete.
-	CompleteChanByID(ID flowsdk.Identifier) <-chan struct{}
+	// Follow returns a channel that is closed when the transaction is complete.
+	Follow(ID flowsdk.Identifier) <-chan struct{}
 
 	// Height returns the last acted upon block height.
 	Height() uint64
@@ -40,24 +40,27 @@ func WithInteval(interval time.Duration) followerOption {
 	return func(f *txFollowerImpl) { f.interval = interval }
 }
 
+func WithMetrics(m *metrics.LoaderCollector) followerOption {
+	return func(f *txFollowerImpl) { f.metrics = m }
+}
+
 type txFollowerImpl struct {
-	logger zerolog.Logger
+	logger  zerolog.Logger
+	metrics *metrics.LoaderCollector
 
 	ctx    context.Context
 	cancel context.CancelFunc
-	client *client.Client
+	client access.Client
 
 	interval time.Duration
 
-	inprogress *atomic.Int64
-
-	mu      *sync.RWMutex
-	height  uint64
-	blockID flowsdk.Identifier
-
-	txToChan sync.Map
-
 	stopped chan struct{}
+
+	// Following fields are protected by mu.
+	mu       *sync.RWMutex
+	height   uint64
+	blockID  flowsdk.Identifier
+	txToChan map[flowsdk.Identifier]txInfo
 }
 
 type txInfo struct {
@@ -68,7 +71,7 @@ type txInfo struct {
 
 // NewTxFollower creates a new follower that tracks the current block height
 // and can notify on transaction completion.
-func NewTxFollower(ctx context.Context, client *client.Client, opts ...followerOption) (TxFollower, error) {
+func NewTxFollower(ctx context.Context, client access.Client, opts ...followerOption) (TxFollower, error) {
 	newCtx, cancel := context.WithCancel(ctx)
 
 	f := &txFollowerImpl{
@@ -76,12 +79,12 @@ func NewTxFollower(ctx context.Context, client *client.Client, opts ...followerO
 		ctx:    newCtx,
 		cancel: cancel,
 		logger: zerolog.Nop(),
-		mu:     &sync.RWMutex{},
-
-		inprogress: atomic.NewInt64(0),
 
 		stopped:  make(chan struct{}),
 		interval: 100 * time.Millisecond,
+
+		mu:       &sync.RWMutex{},
+		txToChan: make(map[flowsdk.Identifier]txInfo),
 	}
 
 	for _, opt := range opts {
@@ -93,16 +96,15 @@ func NewTxFollower(ctx context.Context, client *client.Client, opts ...followerO
 		if err != nil {
 			return nil, err
 		}
-		f.height = hdr.Height
-		f.blockID = hdr.ID
+		f.updateFromBlockHeader(*hdr)
 	}
 
-	go f.follow()
+	go f.run()
 
 	return f, nil
 }
 
-func (f *txFollowerImpl) follow() {
+func (f *txFollowerImpl) run() {
 	t := time.NewTicker(f.interval)
 	defer t.Stop()
 	defer close(f.stopped)
@@ -133,15 +135,17 @@ Loop:
 			}
 			for _, tx := range col.TransactionIDs {
 				blockTxs++
-				if ch, loaded := f.txToChan.LoadAndDelete(tx.Hex()); loaded {
-					txi := ch.(txInfo)
 
+				if txi, loaded := f.loadAndDelete(tx); loaded {
+					duration := time.Since(txi.submisionTime)
 					f.logger.Trace().
-						Dur("duration", time.Since(txi.submisionTime)).
+						Dur("durationInMS", duration).
 						Hex("txID", tx.Bytes()).
-						Msg("returned tx to the pool")
+						Msg("returned account to the pool")
 					close(txi.C)
-					f.inprogress.Dec()
+					if f.metrics != nil {
+						f.metrics.TransactionExecuted(duration)
+					}
 				} else {
 					blockUnknownTxs++
 				}
@@ -163,26 +167,66 @@ Loop:
 			Uint64("txsTotalUnknown", totalUnknownTxs).
 			Uint64("txsInBlock", blockTxs).
 			Uint64("txsInBlockUnknown", blockUnknownTxs).
-			Int64("txsInProgress", f.inprogress.Load()).
+			Int("txsInProgress", f.InProgress()).
 			Msg("new block parsed")
 
-		f.mu.Lock()
-		f.height = block.Height
-		f.blockID = block.ID
-		f.mu.Unlock()
+		f.updateFromBlockHeader(block.BlockHeader)
 
 		lastBlockTime = time.Now()
 	}
 }
 
-func (f *txFollowerImpl) CompleteChanByID(ID flowsdk.Identifier) <-chan struct{} {
-	txi, loaded := f.txToChan.LoadOrStore(ID.Hex(), txInfo{submisionTime: time.Now(), C: make(chan struct{})})
-	if !loaded {
-		f.inprogress.Inc()
+// Follow returns a channel that will be closed when the transaction is completed.
+func (f *txFollowerImpl) Follow(txID flowsdk.Identifier) <-chan struct{} {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	select {
+	case <-f.ctx.Done():
+		// This channel is closed when the follower is stopped.
+		return f.stopped
+	default:
 	}
-	return txi.(txInfo).C
+
+	// Return existing follower if exists.
+	if txi, ok := f.txToChan[txID]; ok {
+		return txi.C
+	}
+
+	// Create new one.
+	ch := make(chan struct{})
+	f.txToChan[txID] = txInfo{submisionTime: time.Now(), C: ch}
+	return ch
 }
 
+func (f *txFollowerImpl) loadAndDelete(txID flowsdk.Identifier) (txInfo, bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	txi, ok := f.txToChan[txID]
+	if ok {
+		delete(f.txToChan, txID)
+	}
+	return txi, ok
+}
+
+func (f *txFollowerImpl) updateFromBlockHeader(block flowsdk.BlockHeader) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.height = block.Height
+	f.blockID = block.ID
+}
+
+// InProgress returns the number of transactions in progress.
+func (f *txFollowerImpl) InProgress() int {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	return len(f.txToChan)
+}
+
+// Height returns the latest block height.
 func (f *txFollowerImpl) Height() uint64 {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
@@ -190,6 +234,7 @@ func (f *txFollowerImpl) Height() uint64 {
 	return f.height
 }
 
+// BlockID returns the latest block ID.
 func (f *txFollowerImpl) BlockID() flowsdk.Identifier {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
@@ -197,31 +242,29 @@ func (f *txFollowerImpl) BlockID() flowsdk.Identifier {
 	return f.blockID
 }
 
+// Stop stops all followers, notifies existing watches, and returns.
 func (f *txFollowerImpl) Stop() {
 	f.cancel()
 	<-f.stopped
 
-	var toDelete []string
-	f.txToChan.Range(
-		func(key, value interface{}) bool {
-			close(value.(txInfo).C)
-			toDelete = append(toDelete, key.(string))
-			return true
-		},
-	)
-	for _, val := range toDelete {
-		f.txToChan.Delete(val)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	for _, v := range f.txToChan {
+		close(v.C)
 	}
+	f.txToChan = make(map[flowsdk.Identifier]txInfo)
 }
 
 type nopTxFollower struct {
-	txFollowerImpl
+	*txFollowerImpl
 
 	closedCh chan struct{}
 }
 
-// NewNopTxFollower creates a new follower that tracks the current block height and ID but does not notify on transaction completion.
-func NewNopTxFollower(ctx context.Context, client *client.Client, opts ...followerOption) (TxFollower, error) {
+// NewNopTxFollower creates a new follower that tracks the current block height and ID
+// but does not notify on transaction completion.
+func NewNopTxFollower(ctx context.Context, client access.Client, opts ...followerOption) (TxFollower, error) {
 	f, err := NewTxFollower(ctx, client, opts...)
 	if err != nil {
 		return nil, err
@@ -232,13 +275,13 @@ func NewNopTxFollower(ctx context.Context, client *client.Client, opts ...follow
 	close(closedCh)
 
 	nop := &nopTxFollower{
-		txFollowerImpl: *impl,
+		txFollowerImpl: impl,
 		closedCh:       closedCh,
 	}
 	return nop, nil
 }
 
-// CompleteChanByID always returns a closed channel.
-func (nop *nopTxFollower) CompleteChanByID(ID flowsdk.Identifier) <-chan struct{} {
+// Follow always returns a closed channel.
+func (nop *nopTxFollower) Follow(ID flowsdk.Identifier) <-chan struct{} {
 	return nop.closedCh
 }

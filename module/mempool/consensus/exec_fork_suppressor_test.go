@@ -133,11 +133,11 @@ func Test_Add(t *testing.T) {
 	})
 }
 
-// Test_Rem checks that ExecForkSuppressor.Rem()
+// Test_Remove checks that ExecForkSuppressor.Remove()
 //   * delegates the call to the underlying mempool
-func Test_Rem(t *testing.T) {
+func Test_Remove(t *testing.T) {
 	WithExecStateForkSuppressor(t, func(wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals, execForkActor *actormock.ExecForkActorMock) {
-		// element is in wrapped mempool: Rem should be called
+		// element is in wrapped mempool: Remove should be called
 		seal := unittest.IncorporatedResultSeal.Fixture()
 		wrappedMempool.On("Add", seal).Return(true, nil).Once()
 		wrappedMempool.On("ByID", seal.ID()).Return(seal, true)
@@ -146,16 +146,16 @@ func Test_Rem(t *testing.T) {
 		assert.True(t, added)
 
 		wrappedMempool.On("ByID", seal.ID()).Return(seal, true)
-		wrappedMempool.On("Rem", seal.ID()).Return(true).Once()
-		removed := wrapper.Rem(seal.ID())
+		wrappedMempool.On("Remove", seal.ID()).Return(true).Once()
+		removed := wrapper.Remove(seal.ID())
 		require.Equal(t, true, removed)
 		wrappedMempool.AssertExpectations(t)
 
-		// element _not_ in wrapped mempool: Rem might be called
+		// element _not_ in wrapped mempool: Remove might be called
 		seal = unittest.IncorporatedResultSeal.Fixture()
 		wrappedMempool.On("ByID", seal.ID()).Return(seal, false)
-		wrappedMempool.On("Rem", seal.ID()).Return(false).Maybe()
-		removed = wrapper.Rem(seal.ID())
+		wrappedMempool.On("Remove", seal.ID()).Return(false).Maybe()
+		removed = wrapper.Remove(seal.ID())
 		require.Equal(t, false, removed)
 		wrappedMempool.AssertExpectations(t)
 	})
@@ -280,10 +280,10 @@ func Test_ForkDetectionPersisted(t *testing.T) {
 	})
 }
 
-// Test_AddRem_SmokeTest tests a real system of stdmap.IncorporatedResultSeals mempool
+// Test_AddRemove_SmokeTest tests a real system of stdmap.IncorporatedResultSeals mempool
 // which is wrapped in an ExecForkSuppressor.
 // We add and remove lots of different seals.
-func Test_AddRem_SmokeTest(t *testing.T) {
+func Test_AddRemove_SmokeTest(t *testing.T) {
 	onExecFork := func([]*flow.IncorporatedResultSeal) {
 		assert.Fail(t, "no call to onExecFork expected ")
 	}
