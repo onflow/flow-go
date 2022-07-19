@@ -18,10 +18,10 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
 	recovery "github.com/onflow/flow-go/consensus/recovery/cluster"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	hotmetrics "github.com/onflow/flow-go/module/metrics/hotstuff"
+	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -126,7 +126,7 @@ func (f *HotStuffFactory) CreateModules(
 	}
 
 	timeoutCollectorDistributor := pubsub.NewTimeoutCollectorDistributor()
-	timeoutProcessorFactory := timeoutcollector.NewTimeoutProcessorFactory(timeoutCollectorDistributor, committee, validator, encoding.CollectorTimeoutTag)
+	timeoutProcessorFactory := timeoutcollector.NewTimeoutProcessorFactory(timeoutCollectorDistributor, committee, validator, msig.CollectorTimeoutTag)
 
 	timeoutAggregator, err := consensus.NewTimeoutAggregator(
 		f.log,

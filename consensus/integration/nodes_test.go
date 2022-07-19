@@ -31,7 +31,6 @@ import (
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/consensus/compliance"
 	"github.com/onflow/flow-go/model/bootstrap"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/order"
@@ -45,6 +44,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
+	msig "github.com/onflow/flow-go/module/signature"
 	synccore "github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -499,7 +499,7 @@ func createNode(
 	timeoutCollectorDistributor := pubsub.NewTimeoutCollectorDistributor()
 	timeoutCollectorDistributor.AddConsumer(logConsumer)
 
-	timeoutProcessorFactory := timeoutcollector.NewTimeoutProcessorFactory(timeoutCollectorDistributor, committee, validator, encoding.ConsensusTimeoutTag)
+	timeoutProcessorFactory := timeoutcollector.NewTimeoutProcessorFactory(timeoutCollectorDistributor, committee, validator, msig.ConsensusTimeoutTag)
 	timeoutCollectorsFactory := timeoutcollector.NewTimeoutCollectorFactory(notifier, timeoutCollectorDistributor, timeoutProcessorFactory)
 	timeoutCollectors := timeoutaggregator.NewTimeoutCollectors(log, livenessData.CurrentView, timeoutCollectorsFactory)
 

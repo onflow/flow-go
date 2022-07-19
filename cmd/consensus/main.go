@@ -42,7 +42,6 @@ import (
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -57,6 +56,7 @@ import (
 	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
+	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/module/updatable_configs"
 	"github.com/onflow/flow-go/module/util"
@@ -601,7 +601,7 @@ func main() {
 			}
 
 			timeoutCollectorDistributor := pubsub.NewTimeoutCollectorDistributor()
-			timeoutProcessorFactory := timeoutcollector.NewTimeoutProcessorFactory(timeoutCollectorDistributor, committee, validator, encoding.ConsensusTimeoutTag)
+			timeoutProcessorFactory := timeoutcollector.NewTimeoutProcessorFactory(timeoutCollectorDistributor, committee, validator, msig.ConsensusTimeoutTag)
 			timeoutAggregator, err := consensus.NewTimeoutAggregator(
 				node.Logger,
 				lowestViewForVoteProcessing,
