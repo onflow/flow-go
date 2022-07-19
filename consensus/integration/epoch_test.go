@@ -175,7 +175,6 @@ func TestEpochTransition_IdentitiesOverlap(t *testing.T) {
 // test consensus across an epoch boundary, where the identity table in the new
 // epoch is disjoint from the identity table in the first epoch.
 func TestEpochTransition_IdentitiesDisjoint(t *testing.T) {
-	unittest.LogVerbose()
 	// must finalize 8 blocks, we specify the epoch transition after 4 views
 	stopper := NewStopper(8, 0)
 	firstEpochConsensusParticipants := createConsensusIdentities(t, 3)

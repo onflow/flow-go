@@ -420,6 +420,13 @@ func (c *Consensus) staticEpochInfoByView(view uint64) (*staticEpochInfo, error)
 	}
 	c.mu.RUnlock()
 
+	c.mu.RLock()
+	fmt.Printf("********* epochs: %d", len(c.epochs))
+	for i, epoch := range c.epochs {
+		fmt.Printf("******* epoch %d, firstView: %d, finalView: %d", i, epoch.firstView, epoch.finalView)
+	}
+	c.mu.RUnlock()
+
 	return nil, model.ErrViewForUnknownEpoch
 }
 
