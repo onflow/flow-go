@@ -24,13 +24,13 @@ func ExportLedger(ledgerPath string, targetstate string, outputPath string) erro
 	if err != nil {
 		return fmt.Errorf("cannot create WAL: %w", err)
 	}
-	defer func() {
-		<-diskWal.Done()
-	}()
 	led, err := complete.NewLedger(diskWal, complete.DefaultCacheSize, &metrics.NoopCollector{}, log.Logger, 0)
 	if err != nil {
 		return fmt.Errorf("cannot create ledger from write-a-head logs and checkpoints: %w", err)
 	}
+	defer func() {
+		<-led.Done()
+	}()
 	stateBytes, err := hex.DecodeString(targetstate)
 	if err != nil {
 		return fmt.Errorf("failed to decode hex code of state: %w", err)

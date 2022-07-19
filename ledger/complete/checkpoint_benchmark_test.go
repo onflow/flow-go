@@ -284,7 +284,6 @@ func benchmarkNewCheckpointRandomData(b *testing.B, segmentCount int) {
 		b.Fatal(err)
 	}
 
-	<-wal1.Done()
 	<-led.Done()
 
 	wal2, err := wal.NewDiskWAL(

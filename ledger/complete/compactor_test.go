@@ -80,7 +80,7 @@ func TestCompactor(t *testing.T) {
 			// Run Compactor in background.
 			<-compactor.Ready()
 
-			rootHash := trie.EmptyTrieRootHash()
+			rootState := l.InitialState()
 
 			// Generate the tree and create WAL
 			for i := 0; i < size; i++ {
@@ -94,10 +94,10 @@ func TestCompactor(t *testing.T) {
 					values[i] = p.Value
 				}
 
-				update, err := ledger.NewUpdate(ledger.State(rootHash), keys, values)
+				update, err := ledger.NewUpdate(rootState, keys, values)
 				require.NoError(t, err)
 
-				rootHash, _, err := l.Set(update)
+				newState, _, err := l.Set(update)
 				require.NoError(t, err)
 
 				require.FileExists(t, path.Join(dir, realWAL.NumberToFilenamePart(i)))
@@ -108,7 +108,9 @@ func TestCompactor(t *testing.T) {
 					data[ks] = payloads[j]
 				}
 
-				savedData[ledger.RootHash(rootHash)] = data
+				savedData[ledger.RootHash(newState)] = data
+
+				rootState = newState
 			}
 
 			// wait for the bound-checking observer to confirm checkpoints have been made
@@ -138,8 +140,11 @@ func TestCompactor(t *testing.T) {
 			require.NoFileExists(t, path.Join(dir, "checkpoint.00000008"))
 			require.FileExists(t, path.Join(dir, "checkpoint.00000009"))
 
-			<-compactor.Done()
-			<-wal.Done()
+			ledgerDone := l.Done()
+			compactorDone := compactor.Done()
+
+			<-ledgerDone
+			<-compactorDone
 		})
 
 		time.Sleep(2 * time.Second)
@@ -203,15 +208,23 @@ func TestCompactor(t *testing.T) {
 				}
 			}
 
-			// check for
 			forestTries, err := l.Tries()
 			require.NoError(t, err)
+
+			forestTriesSet := make(map[ledger.RootHash]struct{})
+			for _, trie := range forestTries {
+				forestTriesSet[trie.RootHash()] = struct{}{}
+			}
 
 			forestTries2, err := l.Tries()
 			require.NoError(t, err)
 
-			// order might be different
-			require.Equal(t, len(forestTries), len(forestTries2))
+			forestTries2Set := make(map[ledger.RootHash]struct{})
+			for _, trie := range forestTries2 {
+				forestTries2Set[trie.RootHash()] = struct{}{}
+			}
+
+			require.Equal(t, forestTriesSet, forestTries2Set)
 		})
 
 	})
@@ -256,7 +269,6 @@ func TestCompactorAccuracy(t *testing.T) {
 			require.NoError(t, err)
 
 			fromBound := lastCheckpointNum + int(checkpointDistance)*2
-			lastCheckpointNum = fromBound
 
 			co := CompactorObserver{fromBound: fromBound, done: make(chan struct{})}
 			compactor.Subscribe(&co)
@@ -279,20 +291,26 @@ func TestCompactorAccuracy(t *testing.T) {
 				update, err := ledger.NewUpdate(ledger.State(rootHash), keys, values)
 				require.NoError(t, err)
 
-				_, _, err = l.Set(update)
+				newState, _, err := l.Set(update)
 				require.NoError(t, err)
+
+				rootHash = ledger.RootHash(newState)
 			}
 
 			// wait for the bound-checking observer to confirm checkpoints have been made
 			select {
 			case <-co.done:
 				// continue
-			case <-time.After(120 * time.Second):
+			case <-time.After(60 * time.Second):
 				assert.FailNow(t, "timed out")
 			}
 
-			<-compactor.Done()
-			<-wal.Done()
+			// Shutdown ledger and compactor
+			ledgerDone := l.Done()
+			compactorDone := compactor.Done()
+
+			<-ledgerDone
+			<-compactorDone
 
 			nums, err := checkpointer.Checkpoints()
 			require.NoError(t, err)

@@ -80,7 +80,6 @@ func Test_WAL(t *testing.T) {
 			savedData[string(state[:])] = data
 		}
 
-		<-diskWal.Done()
 		<-led.Done()
 
 		diskWal2, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metricsCollector, dir, size, pathfinder.PathByteSize, realWAL.SegmentSize)
@@ -112,7 +111,6 @@ func Test_WAL(t *testing.T) {
 			}
 		}
 
-		<-diskWal2.Done()
 		<-led2.Done()
 	})
 }

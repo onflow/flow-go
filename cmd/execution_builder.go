@@ -341,12 +341,6 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			}
 			return nil
 		}).
-		Component("Write-Ahead Log", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-			var err error
-			diskWAL, err = wal.NewDiskWAL(node.Logger.With().Str("subcomponent", "wal").Logger(),
-				node.MetricsRegisterer, collector, e.exeConf.triedir, int(e.exeConf.mTrieCacheSize), pathfinder.PathByteSize, wal.SegmentSize)
-			return diskWAL, err
-		}).
 		Component("execution state ledger", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 
 			// check if the execution database already exists
@@ -380,6 +374,14 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 						"bootstap has statecommitment: %x",
 						commit, node.RootSeal.FinalState)
 				}
+			}
+
+			// Ledger is responsible for starting and shutdowning DiskWAL component.
+			// This ensures that all WAL updates are completed before closing opened WAL segment.
+			diskWAL, err = wal.NewDiskWAL(node.Logger.With().Str("subcomponent", "wal").Logger(),
+				node.MetricsRegisterer, collector, e.exeConf.triedir, int(e.exeConf.mTrieCacheSize), pathfinder.PathByteSize, wal.SegmentSize)
+			if err != nil {
+				return nil, fmt.Errorf("failed to initialize wal: %w", err)
 			}
 
 			ledgerStorage, err = ledger.NewSyncLedger(diskWAL, int(e.exeConf.mTrieCacheSize), collector, node.Logger.With().Str("subcomponent",

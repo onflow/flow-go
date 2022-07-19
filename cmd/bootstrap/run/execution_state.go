@@ -41,14 +41,14 @@ func GenerateExecutionState(
 	if err != nil {
 		return flow.DummyStateCommitment, err
 	}
-	defer func() {
-		<-diskWal.Done()
-	}()
 
 	ledgerStorage, err := ledger.NewLedger(diskWal, 100, metricsCollector, zerolog.Nop(), ledger.DefaultPathFinderVersion)
 	if err != nil {
 		return flow.DummyStateCommitment, err
 	}
+	defer func() {
+		<-ledgerStorage.Done()
+	}()
 
 	return bootstrap.NewBootstrapper(
 		zerolog.Nop()).BootstrapLedger(

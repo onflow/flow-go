@@ -43,9 +43,6 @@ func extractExecutionState(
 	if err != nil {
 		return fmt.Errorf("cannot create disk WAL: %w", err)
 	}
-	defer func() {
-		<-diskWal.Done()
-	}()
 
 	led, err := complete.NewLedger(
 		diskWal,
@@ -56,6 +53,9 @@ func extractExecutionState(
 	if err != nil {
 		return fmt.Errorf("cannot create ledger from write-a-head logs and checkpoints: %w", err)
 	}
+	defer func() {
+		<-led.Done()
+	}()
 
 	var migrations []ledger.Migration
 	var preCheckpointReporters, postCheckpointReporters []ledger.Reporter

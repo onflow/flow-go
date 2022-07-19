@@ -120,7 +120,6 @@ func TestExtractExecutionState(t *testing.T) {
 				blocksInOrder[i] = blockID
 			}
 
-			<-diskWal.Done()
 			<-f.Done()
 			err = db.Close()
 			require.NoError(t, err)
@@ -181,7 +180,6 @@ func TestExtractExecutionState(t *testing.T) {
 						require.Error(t, err)
 					}
 
-					<-diskWal.Done()
 					<-storage.Done()
 				})
 			}

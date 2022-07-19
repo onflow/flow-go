@@ -16,8 +16,8 @@ import (
 )
 
 type WALTrieUpdate struct {
-	Update  *ledger.TrieUpdate
-	Resultc chan<- error
+	Update   *ledger.TrieUpdate
+	ResultCh chan<- error
 }
 
 type Compactor struct {
@@ -25,8 +25,9 @@ type Compactor struct {
 	wal                *realWAL.DiskWAL
 	ledger             *Ledger
 	logger             zerolog.Logger
-	stopc              chan struct{}
-	trieUpdatec        <-chan *WALTrieUpdate
+	stopCh             chan chan struct{}
+	trieUpdateCh       <-chan *WALTrieUpdate
+	trieUpdateDoneCh   chan<- struct{}
 	lm                 *lifecycle.LifecycleManager
 	observers          map[observable.Observer]struct{}
 	checkpointDistance uint
@@ -43,9 +44,14 @@ func NewCompactor(l *Ledger, w *realWAL.DiskWAL, checkpointDistance uint, checkp
 		return nil, err
 	}
 
-	trieUpdatec := l.TrieUpdateChan()
-	if trieUpdatec == nil {
+	trieUpdateCh := l.TrieUpdateChan()
+	if trieUpdateCh == nil {
 		return nil, errors.New("failed to get valid trie update channel from ledger")
+	}
+
+	trieUpdateDoneCh := l.TrieUpdateDoneChan()
+	if trieUpdateDoneCh == nil {
+		return nil, errors.New("failed to get valid trie update done channel from ledger")
 	}
 
 	return &Compactor{
@@ -53,8 +59,9 @@ func NewCompactor(l *Ledger, w *realWAL.DiskWAL, checkpointDistance uint, checkp
 		wal:                w,
 		ledger:             l,
 		logger:             logger,
-		stopc:              make(chan struct{}),
-		trieUpdatec:        trieUpdatec,
+		stopCh:             make(chan chan struct{}),
+		trieUpdateCh:       trieUpdateCh,
+		trieUpdateDoneCh:   l.trieUpdateDoneCh,
 		observers:          make(map[observable.Observer]struct{}),
 		lm:                 lifecycle.NewLifecycleManager(),
 		checkpointDistance: checkpointDistance,
@@ -81,10 +88,20 @@ func (c *Compactor) Ready() <-chan struct{} {
 
 func (c *Compactor) Done() <-chan struct{} {
 	c.lm.OnStop(func() {
+		// Notify observers
 		for observer := range c.observers {
 			observer.OnComplete()
 		}
-		c.stopc <- struct{}{}
+
+		// Signal Compactor goroutine to stop
+		doneCh := make(chan struct{})
+		c.stopCh <- doneCh
+
+		// Wait for Compactor goroutine to stop
+		<-doneCh
+
+		// Close trieUpdateDoneCh to signal trie updates are finished
+		close(c.trieUpdateDoneCh)
 	})
 	return c.lm.Stopped()
 }
@@ -121,10 +138,11 @@ Loop:
 	for {
 		select {
 
-		case <-c.stopc:
+		case doneCh := <-c.stopCh:
+			defer close(doneCh)
 			break Loop
 
-		case update := <-c.trieUpdatec:
+		case update := <-c.trieUpdateCh:
 			// RecordUpdate returns the segment number the record was written to.
 			// Returned segment number can be
 			// - the same as previous segment number (same segment), or
@@ -132,7 +150,7 @@ Loop:
 			segmentNum, skipped, err := c.wal.RecordUpdate(update.Update)
 
 			if err != nil || skipped || segmentNum == activeSegmentNum {
-				update.Resultc <- err
+				update.ResultCh <- err
 				continue
 			}
 
@@ -148,7 +166,7 @@ Loop:
 
 			if nextCheckpointNum > prevSegmentNum {
 				// Not enough segments for checkpointing
-				update.Resultc <- nil
+				update.ResultCh <- nil
 				continue
 			}
 
@@ -165,7 +183,7 @@ Loop:
 			}
 
 			// Send WAL update result after ledger state snapshot is done.
-			update.Resultc <- nil
+			update.ResultCh <- nil
 
 			// Try to checkpoint
 			if checkpointSem.TryAcquire(1) {
@@ -193,13 +211,16 @@ Loop:
 		}
 	}
 
-	// Drain and record remaining trie update in the channel.
-	for update := range c.trieUpdatec {
+	// Drain and process remaining trie updates in channel.
+	for update := range c.trieUpdateCh {
 		_, _, err := c.wal.RecordUpdate(update.Update)
-		update.Resultc <- err
+		select {
+		case update.ResultCh <- err:
+		default:
+		}
 	}
 
-	// TODO: wait for checkpointing goroutine?
+	// Don't wait for checkpointing to finish because it might take too long.
 }
 
 func (c *Compactor) checkpoint(tries []*trie.MTrie, checkpointNum int) error {

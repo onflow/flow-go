@@ -43,12 +43,11 @@ func benchmarkStorage(steps int, b *testing.B) {
 
 	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, steps+1, pathfinder.PathByteSize, wal.SegmentSize)
 	require.NoError(b, err)
-	defer func() {
-		<-diskWal.Done()
-	}()
 
 	led, err := complete.NewLedger(diskWal, steps+1, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
-	defer led.Done()
+	defer func() {
+		<-led.Done()
+	}()
 	if err != nil {
 		b.Fatal("can't create a new complete ledger")
 	}
@@ -151,12 +150,11 @@ func BenchmarkTrieUpdate(b *testing.B) {
 
 	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, 101, pathfinder.PathByteSize, wal.SegmentSize)
 	require.NoError(b, err)
-	defer func() {
-		<-diskWal.Done()
-	}()
 
 	led, err := complete.NewLedger(diskWal, 101, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
-	defer led.Done()
+	defer func() {
+		<-led.Done()
+	}()
 	if err != nil {
 		b.Fatal("can't create a new complete ledger")
 	}
@@ -199,12 +197,11 @@ func BenchmarkTrieRead(b *testing.B) {
 
 	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, 101, pathfinder.PathByteSize, wal.SegmentSize)
 	require.NoError(b, err)
-	defer func() {
-		<-diskWal.Done()
-	}()
 
 	led, err := complete.NewLedger(diskWal, 101, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
-	defer led.Done()
+	defer func() {
+		<-led.Done()
+	}()
 	if err != nil {
 		b.Fatal("can't create a new complete ledger")
 	}
@@ -256,12 +253,11 @@ func BenchmarkLedgerGetOneValue(b *testing.B) {
 
 	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, 101, pathfinder.PathByteSize, wal.SegmentSize)
 	require.NoError(b, err)
-	defer func() {
-		<-diskWal.Done()
-	}()
 
 	led, err := complete.NewLedger(diskWal, 101, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
-	defer led.Done()
+	defer func() {
+		<-led.Done()
+	}()
 	if err != nil {
 		b.Fatal("can't create a new complete ledger")
 	}
@@ -330,12 +326,11 @@ func BenchmarkTrieProve(b *testing.B) {
 
 	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, 101, pathfinder.PathByteSize, wal.SegmentSize)
 	require.NoError(b, err)
-	defer func() {
-		<-diskWal.Done()
-	}()
 
 	led, err := complete.NewLedger(diskWal, 101, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
-	defer led.Done()
+	defer func() {
+		<-led.Done()
+	}()
 	if err != nil {
 		b.Fatal("can't create a new complete ledger")
 	}

@@ -39,7 +39,8 @@ type Ledger struct {
 	wal               realWAL.LedgerWAL
 	metrics           module.LedgerMetrics
 	logger            zerolog.Logger
-	trieUpdatec       chan *WALTrieUpdate
+	trieUpdateCh      chan *WALTrieUpdate
+	trieUpdateDoneCh  chan struct{}
 	pathFinderVersion uint8
 }
 
@@ -100,27 +101,52 @@ func NewSyncLedger(
 		return nil, err
 	}
 
-	l.trieUpdatec = make(chan *WALTrieUpdate, defaultTrieUpdateChanSize)
+	l.trieUpdateCh = make(chan *WALTrieUpdate, defaultTrieUpdateChanSize)
+	l.trieUpdateDoneCh = make(chan struct{})
 	return l, nil
 }
 
+// TrieUpdateChan returns a channel which is used to receive trie updates that needs to be logged in WALs.
+// This channel is closed when ledger component shutdowns down.
 func (l *Ledger) TrieUpdateChan() <-chan *WALTrieUpdate {
-	return l.trieUpdatec
+	return l.trieUpdateCh
+}
+
+// TrieUpdateDoneChan returns a channel which is closed when there are no more WAL updates.
+// This is used to signal that it is safe to shutdown WAL component (closing opened WAL segment).
+func (l *Ledger) TrieUpdateDoneChan() chan<- struct{} {
+	return l.trieUpdateDoneCh
 }
 
 // Ready implements interface module.ReadyDoneAware
 // it starts the EventLoop's internal processing loop.
 func (l *Ledger) Ready() <-chan struct{} {
 	ready := make(chan struct{})
-	close(ready)
+	go func() {
+		defer close(ready)
+		// Start WAL component.
+		<-l.wal.Ready()
+	}()
 	return ready
 }
 
 // Done implements interface module.ReadyDoneAware
-// it closes all the open write-ahead log files.
 func (l *Ledger) Done() <-chan struct{} {
 	done := make(chan struct{})
-	close(done)
+	go func() {
+		defer close(done)
+		if l.trieUpdateCh != nil {
+			// Compactor is running in parallel.
+			// Ledger is responsible for closing trieUpdateCh channel,
+			// so Compactor can drain and process remaining updates.
+			close(l.trieUpdateCh)
+
+			// Wait for Compactor to finish all trie updates before closing WAL component.
+			<-l.trieUpdateDoneCh
+		}
+		// Shut down WAL component.
+		<-l.wal.Done()
+	}()
 	return done
 }
 
@@ -224,13 +250,13 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *
 
 	walChan := make(chan error)
 
-	if l.trieUpdatec == nil {
+	if l.trieUpdateCh == nil {
 		go func() {
 			_, _, err := l.wal.RecordUpdate(trieUpdate)
 			walChan <- err
 		}()
 	} else {
-		l.trieUpdatec <- &WALTrieUpdate{Update: trieUpdate, Resultc: walChan}
+		l.trieUpdateCh <- &WALTrieUpdate{Update: trieUpdate, ResultCh: walChan}
 	}
 
 	newTrie, err := l.forest.NewTrie(trieUpdate)

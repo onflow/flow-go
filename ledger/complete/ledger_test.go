@@ -448,7 +448,6 @@ func Test_WAL(t *testing.T) {
 			savedData[string(state[:])] = data
 		}
 
-		<-diskWal.Done()
 		<-led.Done()
 
 		diskWal2, err := wal.NewDiskWAL(zerolog.Nop(), nil, metricsCollector, dir, size, pathfinder.PathByteSize, wal.SegmentSize)
@@ -485,7 +484,6 @@ func Test_WAL(t *testing.T) {
 		s := led2.ForestSize()
 		assert.Equal(t, s, size)
 
-		<-diskWal2.Done()
 		<-led2.Done()
 	})
 }
@@ -595,7 +593,7 @@ func TestLedgerFunctionality(t *testing.T) {
 				}
 				state = newState
 			}
-			<-diskWal.Done()
+			<-led.Done()
 		})
 	}
 }
@@ -641,8 +639,8 @@ func Test_ExportCheckpointAt(t *testing.T) {
 					assert.Equal(t, v, retValues[i])
 				}
 
-				<-diskWal.Done()
-				<-diskWal2.Done()
+				<-led.Done()
+				<-led2.Done()
 			})
 		})
 	})
@@ -683,8 +681,8 @@ func Test_ExportCheckpointAt(t *testing.T) {
 				assert.Equal(t, retValues[0], ledger.Value([]byte{'C'}))
 				assert.Equal(t, retValues[1], ledger.Value([]byte{'B'}))
 
-				<-diskWal.Done()
-				<-diskWal2.Done()
+				<-led.Done()
+				<-led2.Done()
 			})
 		})
 	})
@@ -725,8 +723,8 @@ func Test_ExportCheckpointAt(t *testing.T) {
 				assert.Equal(t, retValues[0], ledger.Value([]byte{'D'}))
 				assert.Equal(t, retValues[1], ledger.Value([]byte{'B'}))
 
-				<-diskWal.Done()
-				<-diskWal2.Done()
+				<-led.Done()
+				<-led2.Done()
 			})
 		})
 	})
