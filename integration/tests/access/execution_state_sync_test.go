@@ -27,6 +27,7 @@ import (
 )
 
 func TestExecutionStateSync(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_TODO, "active-pacemaker")
 	suite.Run(t, new(ExecutionStateSyncSuite))
 }
 
