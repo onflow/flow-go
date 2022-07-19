@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -40,7 +41,7 @@ type Engine struct {
 	me       module.Local
 	state    protocol.State
 	con      network.Conduit
-	channel  network.Channel
+	channel  channels.Channel
 	selector flow.IdentityFilter
 	create   CreateFunc
 	handle   HandleFunc
@@ -52,7 +53,7 @@ type Engine struct {
 // within the set obtained by applying the provided selector filter. The options allow customization of the parameters
 // related to the batch and retry logic.
 func New(log zerolog.Logger, metrics module.EngineMetrics, net network.Network, me module.Local, state protocol.State,
-	channel network.Channel, selector flow.IdentityFilter, create CreateFunc, options ...OptionFunc) (*Engine, error) {
+	channel channels.Channel, selector flow.IdentityFilter, create CreateFunc, options ...OptionFunc) (*Engine, error) {
 
 	// initialize the default config
 	cfg := Config{
@@ -113,7 +114,7 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net network.Network, 
 	}
 
 	// register the engine with the network layer and store the conduit
-	con, err := net.Register(network.Channel(channel), e)
+	con, err := net.Register(channels.Channel(channel), e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
@@ -162,7 +163,7 @@ func (e *Engine) SubmitLocal(message interface{}) {
 // Submit submits the given message from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, message interface{}) {
+func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, message interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(channel, originID, message)
 		if err != nil {
@@ -180,7 +181,7 @@ func (e *Engine) ProcessLocal(message interface{}) error {
 
 // Process processes the given message from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(channel network.Channel, originID flow.Identifier, message interface{}) error {
+func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	return e.unit.Do(func() error {
 		return e.process(originID, message)
 	})
