@@ -326,7 +326,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuild
 			builder.FollowerCore,
 			builder.SyncCore,
 			node.Tracer,
-			compliance.WithSkipNewProposalsThreshold(builder.ComplianceConfig.SkipNewProposalsThreshold),
+			follower.WithComplianceOptions(compliance.WithSkipNewProposalsThreshold(builder.ComplianceConfig.SkipNewProposalsThreshold)),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create follower engine: %w", err)
@@ -711,7 +711,9 @@ func (builder *FlowAccessNodeBuilder) enqueueRelayNetwork() {
 			node.Network,
 			builder.AccessNodeConfig.PublicNetworkConfig.Network,
 			node.Logger,
-			[]channels.Channel{channels.ReceiveBlocks},
+			map[channels.Channel]channels.Channel{
+				channels.ReceiveBlocks: channels.PublicReceiveBlocks,
+			},
 		)
 		node.Network = relayNet
 		return relayNet, nil

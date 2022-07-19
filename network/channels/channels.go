@@ -101,6 +101,7 @@ func Channels() ChannelList {
 func PublicChannels() ChannelList {
 	return ChannelList{
 		PublicSyncCommittee,
+		PublicReceiveBlocks,
 	}
 }
 
@@ -149,6 +150,8 @@ const (
 	ProvideApprovalsByChunk  = RequestApprovalsByChunk
 
 	// Public network channels
+	PublicPushBlocks    = Channel("public-push-blocks")
+	PublicReceiveBlocks = PublicPushBlocks
 	PublicSyncCommittee = Channel("public-sync-committee")
 
 	// Execution data service
