@@ -40,7 +40,7 @@ type Engine struct {
 	con            network.Conduit
 	sync           module.BlockRequester
 	tracer         module.Tracer
-	channel        network.Channel
+	channel        channels.Channel
 }
 
 type Option func(*Engine)
@@ -55,7 +55,7 @@ func WithComplianceOptions(opts ...compliance.Opt) Option {
 }
 
 // WithChannel sets the channel the follower engine will use to receive blocks.
-func WithChannel(channel network.Channel) Option {
+func WithChannel(channel channels.Channel) Option {
 	return func(e *Engine) {
 		e.channel = channel
 	}

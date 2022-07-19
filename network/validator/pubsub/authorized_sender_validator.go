@@ -64,7 +64,6 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel channels.Channel, get
 			log.Error().
 				Err(err).
 				Str("peer_id", from.String()).
-				Str("peer_node_id", identity.NodeID.String()).
 				Str("role", identity.Role.String()).
 				Str("peer_node_id", identity.NodeID.String()).
 				Str("message_type", msgType).
