@@ -11,7 +11,7 @@ echo "test category (run-tests):" $TEST_CATEGORY>&2
 
 # run tests and process results
 
-if [[ $TEST_CATEGORY =~ integration-(bft|ghost|mvp|network|epochs|access|collection|consensus|execution|verification)$ ]]
+if [[ $TEST_CATEGORY =~ integration-(bft|ghost|mvp|network|epochs|access|collection|consensus|execution|verification|observer)$ ]]
 then
   echo "killing and removing orphaned containers from previous run">&2
     # kill and remove orphaned containers from previous run

@@ -32,6 +32,7 @@ jobs:
           - integration-consensus
           - integration-execution
           - integration-verification
+          - integration-observer
     env:
       TEST_CATEGORY: ${{ matrix.test-category }}
       COMMIT_SHA: ${{ github.sha }}

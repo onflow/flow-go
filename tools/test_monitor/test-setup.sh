@@ -11,7 +11,7 @@ make crypto_setup_gopath
 
 echo "test category (test-setup):" $TEST_CATEGORY>&2
 
-case $TEST_CATEGORY in integration-ghost|integration-mvp|integration-network|integration-epochs|integration-access|integration-collection|integration-consensus|integration-execution|integration-verification)
+case $TEST_CATEGORY in integration-ghost|integration-mvp|integration-network|integration-epochs|integration-access|integration-collection|integration-consensus|integration-execution|integration-verification|integration-observer)
   echo "running make docker-build-flow">&2
   make docker-build-flow
  ;;

@@ -13,6 +13,7 @@ status = [
   "Integration Tests (integration-consensus)",
   "Integration Tests (integration-execution)",
   "Integration Tests (integration-verification)",
+  "Integration Tests (integration-observer)",
   "Generate Flaky Test Summary (unit)",
   "Generate Flaky Test Summary (unit-crypto)",
   "Generate Flaky Test Summary (unit-integration)",
@@ -25,6 +26,7 @@ status = [
   "Generate Flaky Test Summary (integration-consensus)",
   "Generate Flaky Test Summary (integration-execution)",
   "Generate Flaky Test Summary (integration-verification)",
+  "Generate Flaky Test Summary (integration-observer)",
   "Generate Skipped Test Summary (unit)",
   "Generate Skipped Test Summary (unit-crypto)",
   "Generate Skipped Test Summary (unit-integration)",
@@ -37,6 +39,7 @@ status = [
   "Generate Skipped Test Summary (integration-consensus)",
   "Generate Skipped Test Summary (integration-execution)",
   "Generate Skipped Test Summary (integration-verification)",
+  "Generate Skipped Test Summary (integration-observer)",
 ]
 
 delete_merged_branches = true

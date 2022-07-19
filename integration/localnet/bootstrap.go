@@ -666,16 +666,6 @@ func openAndTruncate(filename string) (*os.File, error) {
 // Observer functions
 //
 
-func getAccessGatewayPublicKey(flowNodeContainerConfigs []testnet.ContainerConfig) (string, error) {
-	for _, container := range flowNodeContainerConfigs {
-		if container.ContainerName == DefaultAccessGatewayName {
-			// remove the "0x"..0000 portion of the key
-			return container.NetworkPubKey().String()[2:], nil
-		}
-	}
-	return "", fmt.Errorf("Unable to find public key for Access Gateway expected in container '%s'", DefaultAccessGatewayName)
-}
-
 func writeObserverPrivateKey(observerName string) {
 	// make the observer private key for named observer
 	// only used for localnet, not for use with production
@@ -712,7 +702,7 @@ func prepareObserverServices(dockerServices Services, flowNodeContainerConfigs [
 		panic(fmt.Sprintf("No more than %d observers are permitted within localnet", DefaultMaxObservers))
 	}
 
-	agPublicKey, err := getAccessGatewayPublicKey(flowNodeContainerConfigs)
+	agPublicKey, err := testnet.GetAccessGatewayPublicKey(flowNodeContainerConfigs)
 	if err != nil {
 		panic(err)
 	}
