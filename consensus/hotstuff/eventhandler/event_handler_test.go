@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 const (
@@ -95,27 +96,31 @@ func initPaceMaker(t require.TestingT, livenessData *hotstuff.LivenessData) hots
 
 // Committee mocks hotstuff.DynamicCommittee and allows to easily control leader for some view.
 type Committee struct {
-	mocks.DynamicCommittee
+	*mocks.Replicas
 	// to mock I'm the leader of a certain view, add the view into the keys of leaders field
 	leaders map[uint64]struct{}
 }
 
-func NewCommittee() *Committee {
-	return &Committee{
-		leaders: make(map[uint64]struct{}),
+func NewCommittee(t *testing.T) *Committee {
+	committee := &Committee{
+		Replicas: mocks.NewReplicas(t),
+		leaders:  make(map[uint64]struct{}),
 	}
-}
+	self := unittest.IdentityFixture(unittest.WithNodeID(flow.Identifier{0x01}))
+	committee.On("LeaderForView", mock.Anything).Return(func(view uint64) flow.Identifier {
+		_, isLeader := committee.leaders[view]
+		if isLeader {
+			return self.NodeID
+		}
+		return flow.Identifier{0x00}
+	}, func(view uint64) error {
+		return nil
+	}).Maybe()
 
-func (c *Committee) LeaderForView(view uint64) (flow.Identifier, error) {
-	_, isLeader := c.leaders[view]
-	if isLeader {
-		return flow.Identifier{0x01}, nil
-	}
-	return flow.Identifier{0x00}, nil
-}
+	committee.On("Self").Return(self.NodeID).Maybe()
+	committee.On("IdentityByEpoch", mock.Anything, self.NodeID).Return(self, nil).Maybe()
 
-func (c *Committee) Self() flow.Identifier {
-	return flow.Identifier{0x01}
+	return committee
 }
 
 // The SafetyRules mock will not vote for any block unless the block's ID exists in votable field's key
@@ -283,7 +288,7 @@ func (es *EventHandlerSuite) SetupTest() {
 	es.communicator.On("BroadcastProposalWithDelay", mock.Anything, mock.Anything).Return(nil).Maybe()
 	es.communicator.On("SendVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	es.communicator.On("BroadcastTimeout", mock.Anything).Return(nil).Maybe()
-	es.committee = NewCommittee()
+	es.committee = NewCommittee(es.T())
 	es.voteAggregator = mocks.NewVoteAggregator(es.T())
 	es.timeoutAggregator = mocks.NewTimeoutAggregator(es.T())
 	es.safetyRules = NewSafetyRules(es.T())
@@ -887,6 +892,29 @@ func (es *EventHandlerSuite) TestCreateProposal_SanityChecks() {
 	require.Equal(es.T(), tc.NewestQC, es.paceMaker.NewestQC())
 	require.Equal(es.T(), tc, es.paceMaker.LastViewTC())
 	require.Equal(es.T(), tc.View+1, es.paceMaker.CurView(), "incorrect view change")
+}
+
+// TestCreateProposal_ProposerEjected tests that ejected proposer doesn't try to create proposal in case he is ejected in current epoch
+func (es *EventHandlerSuite) TestCreateProposal_ProposerEjected() {
+	es.voteAggregator.On("AddBlock", mock.Anything).Return(nil)
+
+	self := es.committee.Self()
+
+	*es.committee.Replicas = *mocks.NewReplicas(es.T())
+	es.committee.On("LeaderForView", es.qc.View+1).Return(self, nil)
+	es.committee.On("Self").Return(self)
+	es.committee.On("IdentityByEpoch", es.qc.View+1, self).Return(nil, model.NewInvalidSignerError(fmt.Errorf(""))).Once()
+
+	// I'm the next leader
+	es.committee.leaders[es.qc.View+1] = struct{}{}
+
+	err := es.eventhandler.OnReceiveProposal(es.votingProposal)
+	require.NoError(es.T(), err)
+
+	err = es.eventhandler.OnReceiveQc(es.qc)
+	require.NoError(es.T(), err)
+
+	es.communicator.AssertNumberOfCalls(es.T(), "BroadcastProposalWithDelay", 0)
 }
 
 // TestOnReceiveProposal_ProposalForActiveView tests that when receiving proposal for active we don't attempt to create a proposal

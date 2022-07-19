@@ -338,6 +338,18 @@ func (e *EventHandler) proposeForNewView() error {
 	if e.committee.Self() == currentLeader {
 		log.Debug().Msg("generating block proposal as leader")
 
+		// TODO(active-pacemaker): SafetyRules checks identity using proposal.BlockID, here we can check only by view ?
+		// check if we are eligible to propose
+		_, err = e.committee.IdentityByEpoch(curView, e.committee.Self())
+		if err != nil {
+			if model.IsInvalidSignerError(err) {
+				// we are ejected at this epoch
+				log.Warn().Err(err).Msgf("can't propose at view %d, we are ejected", curView)
+				return nil
+			}
+			return fmt.Errorf("internal error retrieving Identity of self proposer at view %d: %w", curView, err)
+		}
+
 		// as the leader of the current view,
 		// build the block proposal for the current view
 		newestQC := e.paceMaker.NewestQC()
