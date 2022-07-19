@@ -1455,7 +1455,7 @@ func TestStorageUsed(t *testing.T) {
 	require.NoError(t, err)
 
 	simpleView := utils.NewSimpleView()
-	status := state.NewAccountStatus(state.InitValueForStorageIndex)
+	status := state.NewAccountStatus()
 	status.SetStorageUsed(5)
 	err = simpleView.Set(string(address), state.KeyAccountStatus, status.ToBytes())
 	require.NoError(t, err)

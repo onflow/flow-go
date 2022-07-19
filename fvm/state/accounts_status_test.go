@@ -12,7 +12,7 @@ import (
 
 func TestAccountStatus(t *testing.T) {
 
-	s := state.NewAccountStatus(state.InitValueForStorageIndex)
+	s := state.NewAccountStatus()
 	require.False(t, s.IsAccountFrozen())
 
 	t.Run("test frozen flag set/reset", func(t *testing.T) {

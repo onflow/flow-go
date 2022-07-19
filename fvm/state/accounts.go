@@ -23,10 +23,6 @@ const (
 	MaxPublicKeyCount = math.MaxUint64
 )
 
-var (
-	InitValueForStorageIndex = atree.StorageIndex{0, 0, 0, 0, 0, 0, 0, 1}
-)
-
 type Accounts interface {
 	Exists(address flow.Address) (bool, error)
 	Get(address flow.Address) (*flow.Account, error)
@@ -159,7 +155,7 @@ func (a *StatefulAccounts) Create(publicKeys []flow.AccountPublicKey, newAddress
 		return errors.NewAccountAlreadyExistsError(newAddress)
 	}
 
-	accountStatus := NewAccountStatus(InitValueForStorageIndex)
+	accountStatus := NewAccountStatus()
 	accountStatus.SetStorageUsed(uint64(RegisterSize(newAddress, KeyAccountStatus, accountStatus.ToBytes())))
 
 	err = a.setAccountStatus(newAddress, accountStatus)

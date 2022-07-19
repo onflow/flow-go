@@ -40,10 +40,14 @@ const (
 )
 
 // NewAccountStatus returns a new AccountStatus
-func NewAccountStatus(storageIndex atree.StorageIndex) *AccountStatus {
-	var as AccountStatus
-	as.SetStorageIndex(storageIndex)
-	return &as
+// sets the storage index to the init value
+func NewAccountStatus() *AccountStatus {
+	return &AccountStatus{
+		0,                      // initial empty flags
+		0, 0, 0, 0, 0, 0, 0, 0, // init value for storage used
+		0, 0, 0, 0, 0, 0, 0, 1, // init value for storage index
+		0, 0, 0, 0, 0, 0, 0, 0, // init value for public key counts
+	}
 }
 
 // ToBytes converts AccountStatus to a byte slice

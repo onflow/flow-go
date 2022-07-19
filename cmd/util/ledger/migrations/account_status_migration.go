@@ -49,7 +49,7 @@ func NewAccountStatusMigration(logger zerolog.Logger) *AccountStatusMigration {
 func (as *AccountStatusMigration) getOrInitStatus(owner []byte) *fvmState.AccountStatus {
 	st, exist := as.statuses[string(owner)]
 	if !exist {
-		return fvmState.NewAccountStatus(fvmState.InitValueForStorageIndex)
+		return fvmState.NewAccountStatus()
 	}
 	return st
 }
