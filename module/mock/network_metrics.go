@@ -110,8 +110,13 @@ func (_m *NetworkMetrics) RoutingTablePeerRemoved() {
 	_m.Called()
 }
 
-// NewNetworkMetrics creates a new instance of NetworkMetrics. It also registers the testing.TB interface on the mock and a cleanup function to assert the mocks expectations.
-func NewNetworkMetrics(t testing.TB) *NetworkMetrics {
+type NewNetworkMetricsT interface {
+	mock.TestingT
+	Cleanup(func())
+}
+
+// NewNetworkMetrics creates a new instance of NetworkMetrics. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
+func NewNetworkMetrics(t NewNetworkMetricsT) *NetworkMetrics {
 	mock := &NetworkMetrics{}
 	mock.Mock.Test(t)
 
