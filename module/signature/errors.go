@@ -109,9 +109,46 @@ func IsInsufficientSignaturesError(err error) bool {
 	return errors.As(err, &e)
 }
 
-// IsDecodeSignerIndicesError returns whether err is about decoding signer indices
-func IsDecodeSignerIndicesError(err error) bool {
-	return errors.Is(err, ErrIllegallyPaddedBitVector) ||
-		errors.Is(err, ErrIncompatibleBitVectorLength) ||
-		errors.Is(err, ErrInvalidChecksum)
+/* ********************** InvalidSignerIndicesError ********************** */
+
+// InvalidSignerIndicesError indicates that a bit vector does not encode a valid set of signers
+type InvalidSignerIndicesError struct {
+	err error
+}
+
+func NewInvalidSignerIndicesErrorf(msg string, args ...interface{}) error {
+	return InvalidSignerIndicesError{
+		err: fmt.Errorf(msg, args...),
+	}
+}
+
+func (e InvalidSignerIndicesError) Error() string { return e.err.Error() }
+func (e InvalidSignerIndicesError) Unwrap() error { return e.err }
+
+// IsInvalidSignerIndicesError returns whether err is an InvalidSignerIndicesError
+func IsInvalidSignerIndicesError(err error) bool {
+	var e InvalidSignerIndicesError
+	return errors.As(err, &e)
+}
+
+/* ********************** InvalidSignerIndicesError ********************** */
+
+// InvalidSigTypesError indicates that the given data not encode valid signature types
+type InvalidSigTypesError struct {
+	err error
+}
+
+func NewInvalidSigTypesErrorf(msg string, args ...interface{}) error {
+	return InvalidSigTypesError{
+		err: fmt.Errorf(msg, args...),
+	}
+}
+
+func (e InvalidSigTypesError) Error() string { return e.err.Error() }
+func (e InvalidSigTypesError) Unwrap() error { return e.err }
+
+// IsInvalidSigTypesError returns whether err is an InvalidSigTypesError
+func IsInvalidSigTypesError(err error) bool {
+	var e InvalidSigTypesError
+	return errors.As(err, &e)
 }

@@ -22,6 +22,8 @@ import (
 	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/epochs"
+	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/state/cluster"
 
 	fvmMock "github.com/onflow/flow-go/fvm/mock"
 	"github.com/onflow/flow-go/model/flow"
@@ -127,11 +129,12 @@ func (c CompleteExecutionReceiptList) resultOf(t *testing.T, chunkID flow.Identi
 
 // CompleteExecutionReceiptBuilder is a test helper struct that specifies the parameters to build a CompleteExecutionReceipt.
 type CompleteExecutionReceiptBuilder struct {
-	resultsCount  int // number of execution results in the container block.
-	executorCount int // number of times each execution result is copied in a block (by different receipts).
-	chunksCount   int // number of chunks in each execution result.
-	chain         flow.Chain
-	executorIDs   flow.IdentifierList // identifier of execution nodes in the test.
+	resultsCount     int // number of execution results in the container block.
+	executorCount    int // number of times each execution result is copied in a block (by different receipts).
+	chunksCount      int // number of chunks in each execution result.
+	chain            flow.Chain
+	executorIDs      flow.IdentifierList // identifier of execution nodes in the test.
+	clusterCommittee flow.IdentityList
 }
 
 type CompleteExecutionReceiptBuilderOpt func(builder *CompleteExecutionReceiptBuilder)
@@ -166,20 +169,15 @@ func WithExecutorIDs(executorIDs flow.IdentifierList) CompleteExecutionReceiptBu
 	}
 }
 
-// CompleteExecutionReceiptFixture returns complete execution receipt with an
-// execution receipt referencing the block collections.
-//
-// chunks determines the number of chunks inside each receipt.
-// The output is an execution result with chunks+1 chunks, where the last chunk accounts
-// for the system chunk.
-// TODO: remove this function once new verification architecture is in place.
-func CompleteExecutionReceiptFixture(t *testing.T, chunks int, chain flow.Chain, root *flow.Header) *CompleteExecutionReceipt {
-	return CompleteExecutionReceiptChainFixture(t, root, 1, WithChunksCount(chunks), WithChain(chain))[0]
+func WithClusterCommittee(clusterCommittee flow.IdentityList) CompleteExecutionReceiptBuilderOpt {
+	return func(builder *CompleteExecutionReceiptBuilder) {
+		builder.clusterCommittee = clusterCommittee
+	}
 }
 
 // ExecutionResultFixture is a test helper that returns an execution result for the reference block header as well as the execution receipt data
 // for that result.
-func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refBlkHeader *flow.Header) (*flow.ExecutionResult,
+func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refBlkHeader *flow.Header, clusterCommittee flow.IdentityList) (*flow.ExecutionResult,
 	*ExecutionReceiptData) {
 
 	// setups up the first collection of block consists of three transactions
@@ -196,7 +194,13 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 	transactions := []*flow.TransactionBody{tx1, tx2, tx3}
 	collection := flow.Collection{Transactions: transactions}
 	collections := []*flow.Collection{&collection}
+	clusterChainID := cluster.CanonicalClusterID(1, clusterCommittee)
+
 	guarantee := unittest.CollectionGuaranteeFixture(unittest.WithCollection(&collection), unittest.WithCollRef(refBlkHeader.ParentID))
+	guarantee.ChainID = clusterChainID
+	indices, err := signature.EncodeSignersToIndices(clusterCommittee.NodeIDs(), clusterCommittee.NodeIDs())
+	require.NoError(t, err)
+	guarantee.SignerIndices = indices
 	guarantees := []*flow.CollectionGuarantee{guarantee}
 
 	metricsCollector := &metrics.NoopCollector{}
@@ -265,6 +269,9 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 
 			collection := flow.Collection{Transactions: []*flow.TransactionBody{tx}}
 			guarantee := unittest.CollectionGuaranteeFixture(unittest.WithCollection(&collection), unittest.WithCollRef(refBlkHeader.ParentID))
+			guarantee.SignerIndices = indices
+			guarantee.ChainID = clusterChainID
+
 			collections = append(collections, &collection)
 			guarantees = append(guarantees, guarantee)
 
@@ -432,7 +439,7 @@ func ExecutionReceiptsFromParentBlockFixture(t *testing.T, parent *flow.Header, 
 func ExecutionResultFromParentBlockFixture(t *testing.T, parent *flow.Header, builder *CompleteExecutionReceiptBuilder) (*flow.ExecutionResult,
 	*ExecutionReceiptData) {
 	refBlkHeader := unittest.BlockHeaderWithParentFixture(parent)
-	return ExecutionResultFixture(t, builder.chunksCount, builder.chain, &refBlkHeader)
+	return ExecutionResultFixture(t, builder.chunksCount, builder.chain, refBlkHeader, builder.clusterCommittee)
 }
 
 // ContainerBlockFixture builds and returns a block that contains input execution receipts.

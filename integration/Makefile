@@ -6,10 +6,7 @@ COVER_PROFILE := cover.out
 integration-test: access-tests ghost-tests mvp-tests execution-tests verification-tests collection-tests epochs-tests network-tests consensus-tests
 
 .PHONY: ci-integration-test
-# TODO(active-pacemaker): disable ci-integration tests because they largely depend on working EventHandler and TimeoutAggregator
-# ci-integration-test: access-tests ghost-tests mvp-tests epochs-tests consensus-tests execution-tests verification-tests network-tests collection-tests
-ci-integration-test:
-	exit 0
+ci-integration-test: access-tests ghost-tests mvp-tests epochs-tests consensus-tests execution-tests verification-tests network-tests collection-tests
 
 .PHONY: benchmark
 benchmark:
@@ -63,5 +60,11 @@ verification-tests:
 .PHONY: network-tests
 network-tests:
 	GO111MODULE=on go test $(if $(VERBOSE),-v,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/network/...
+
+# BFT tests need to be run sequentially (-p 1) due to interference between different Docker networks when tests are run in parallel
+.PHONY: bft-tests
+bft-tests:
+	GO111MODULE=on go test $(if $(VERBOSE),-v,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/bft/... -p 1
+
 
 ############################################################################################

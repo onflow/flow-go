@@ -64,6 +64,7 @@ var (
 
 // TestTransactionsPerSecondBenchmark measures the average number of transactions executed per second by an execution node
 func TestTransactionsPerSecondBenchmark(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_TODO, "this test setups localnet but service account can't create address for it")
 	suite.Run(t, new(TransactionsPerSecondSuite))
 }
 
@@ -228,7 +229,8 @@ func (gs *TransactionsPerSecondSuite) CreateAccountAndTransfer(keyIndex int) (fl
 		FromPrivateKey(myPrivateKey).
 		SetHashAlgo(crypto.SHA3_256).
 		SetWeight(flowsdk.AccountKeyWeightThreshold)
-	mySigner := crypto.NewInMemorySigner(myPrivateKey, accountKey.HashAlgo)
+	mySigner, err := crypto.NewInMemorySigner(myPrivateKey, accountKey.HashAlgo)
+	handle(err)
 
 	// Generate the account creation transaction
 	createAccountTx, err := templates.CreateAccount([]*flowsdk.AccountKey{accountKey}, nil, gs.rootAcctAddr)
@@ -384,7 +386,10 @@ func ServiceAccountWithKey(flowClient *client.Client, key string) (flowsdk.Addre
 		panic(err)
 	}
 
-	signer := crypto.NewInMemorySigner(privateKey, accountKey.HashAlgo)
+	signer, err := crypto.NewInMemorySigner(privateKey, accountKey.HashAlgo)
+	if err != nil {
+		panic(err)
+	}
 
 	return addr, accountKey, signer
 }

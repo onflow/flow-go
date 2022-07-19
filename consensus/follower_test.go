@@ -354,5 +354,5 @@ func (mc *MockConsensus) extendBlock(blockView uint64, parent *flow.Header) *flo
 		nextBlock.LastViewTC.SignerIndices = signerIndices
 		nextBlock.LastViewTC.NewestQC.SignerIndices = signerIndices
 	}
-	return &nextBlock
+	return nextBlock
 }

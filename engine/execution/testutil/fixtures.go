@@ -69,6 +69,29 @@ func UpdateContractUnathorizedDeploymentTransaction(contractName string, contrac
 		AddAuthorizer(authorizer)
 }
 
+func RemoveContractDeploymentTransaction(contractName string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
+	return flow.NewTransactionBody().
+		SetScript([]byte(fmt.Sprintf(`transaction {
+              prepare(signer: AuthAccount, service: AuthAccount) {
+                signer.contracts.remove(name: "%s")
+              }
+            }`, contractName)),
+		).
+		AddAuthorizer(authorizer).
+		AddAuthorizer(chain.ServiceAddress())
+}
+
+func RemoveContractUnathorizedDeploymentTransaction(contractName string, authorizer flow.Address) *flow.TransactionBody {
+	return flow.NewTransactionBody().
+		SetScript([]byte(fmt.Sprintf(`transaction {
+              prepare(signer: AuthAccount) {
+                signer.contracts.remove(name: "%s")
+              }
+            }`, contractName)),
+		).
+		AddAuthorizer(authorizer)
+}
+
 func CreateUnauthorizedContractDeploymentTransaction(contractName string, contract string, authorizer flow.Address) *flow.TransactionBody {
 	encoded := hex.EncodeToString([]byte(contract))
 
@@ -297,7 +320,7 @@ func BytesToCadenceArray(l []byte) cadence.Array {
 		values[i] = cadence.NewUInt8(b)
 	}
 
-	return cadence.NewArray(values)
+	return cadence.NewArray(values).WithType(cadence.NewVariableSizedArrayType(cadence.NewUInt8Type()))
 }
 
 // CreateAccountCreationTransaction creates a transaction which will create a new account.

@@ -88,9 +88,10 @@ func PreviousEpochExists(snap Snapshot) (bool, error) {
 
 // FindGuarantors decodes the signer indices from the guarantee, and finds the guarantor identifiers from protocol state
 // Expected Error returns during normal operations:
-//  * signature.ErrIncompatibleBitVectorLength indicates that `signerIndices` has the wrong length
-//  * signature.ErrIllegallyPaddedBitVector is the vector is padded with bits other than 0
-//  * signature.ErrInvalidChecksum if the input is shorter than the expected checksum contained in the guarantee.SignerIndices
+//  * signature.InvalidSignerIndicesError if `signerIndices` does not encode a valid set of collection guarantors
+//  * storage.ErrNotFound if the guarantee's ReferenceBlockID is not found
+//  * protocol.ErrEpochNotCommitted if epoch has not been committed yet
+//  * protocol.ErrClusterNotFound if cluster is not found by the given chainID
 func FindGuarantors(state State, guarantee *flow.CollectionGuarantee) ([]flow.Identifier, error) {
 	snapshot := state.AtBlockID(guarantee.ReferenceBlockID)
 	epochs := snapshot.Epochs()
@@ -98,10 +99,8 @@ func FindGuarantors(state State, guarantee *flow.CollectionGuarantee) ([]flow.Id
 	cluster, err := epoch.ClusterByChainID(guarantee.ChainID)
 
 	if err != nil {
-		// protocol state must have validated the block that contains the guarantee, so the cluster
-		// must be found, otherwise, it's an internal error
 		return nil, fmt.Errorf(
-			"internal error retrieving collector clusters for guarantee (ReferenceBlockID: %v, ChainID: %v): %w",
+			"fail to retrieve collector clusters for guarantee (ReferenceBlockID: %v, ChainID: %v): %w",
 			guarantee.ReferenceBlockID, guarantee.ChainID, err)
 	}
 

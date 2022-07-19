@@ -74,7 +74,7 @@ func (e *Engine) OnFinalizedBlock(block *model.Block) {
 func (e *Engine) checkLastSealed(finalizedID flow.Identifier) error {
 	// TODO: better to query seals from protocol state,
 	// switch to state.Final().LastSealed() when available
-	seal, err := e.sealsDB.ByBlockID(finalizedID)
+	seal, err := e.sealsDB.HighestInFork(finalizedID)
 	if err != nil {
 		return fmt.Errorf("could not get the last sealed for the finalized block: %w", err)
 	}

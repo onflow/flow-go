@@ -125,7 +125,7 @@ func (i *TransactionInvoker) Process(
 			}
 		}
 
-		location := common.TransactionLocation(proc.ID[:])
+		location := common.TransactionLocation(proc.ID)
 
 		err := vm.Runtime.ExecuteTransaction(
 			runtime.Script{
@@ -165,7 +165,7 @@ func (i *TransactionInvoker) Process(
 
 	// read computationUsed from the environment. This will be used to charge fees.
 	computationUsed := env.ComputationUsed()
-	memoryUsed := env.MemoryUsed()
+	memoryEstimate := env.MemoryEstimate()
 
 	// log te execution intensities here, so tha they do not contain data from storage limit checks and
 	// transaction deduction, because the payer is not charged for those.
@@ -247,7 +247,7 @@ func (i *TransactionInvoker) Process(
 	// if tx failed this will only contain fee deduction logs
 	proc.Logs = append(proc.Logs, env.Logs()...)
 	proc.ComputationUsed = proc.ComputationUsed + computationUsed
-	proc.MemoryUsed = proc.MemoryUsed + memoryUsed
+	proc.MemoryEstimate = proc.MemoryEstimate + memoryEstimate
 
 	// based on the contract updates we decide how to clean up the programs
 	// for failed transactions we also do the same as
@@ -274,11 +274,15 @@ func (i *TransactionInvoker) deductTransactionFees(
 		computationUsed = uint64(sth.State().TotalComputationLimit())
 	}
 
-	deductTxFees := DeductTransactionFeesInvocation(env, proc.TraceSpan)
-	// Hardcoded inclusion effort (of 1.0 UFix). Eventually this will be dynamic.
-	// Execution effort will be connected to computation used.
+	// Hardcoded inclusion effort (of 1.0 UFix). Eventually this will be
+	// dynamic.	Execution effort will be connected to computation used.
 	inclusionEffort := uint64(100_000_000)
-	_, err = deductTxFees(proc.Transaction.Payer, inclusionEffort, computationUsed)
+	_, err = InvokeDeductTransactionFeesContract(
+		env,
+		proc.TraceSpan,
+		proc.Transaction.Payer,
+		inclusionEffort,
+		computationUsed)
 
 	if err != nil {
 		return errors.NewTransactionFeeDeductionFailedError(proc.Transaction.Payer, err)
@@ -307,7 +311,7 @@ var setAccountFrozenFunctionType = &sema.FunctionType{
 func valueDeclarations(ctx *Context, env Environment) []runtime.ValueDeclaration {
 	var predeclaredValues []runtime.ValueDeclaration
 
-	if ctx.AccountFreezeAvailable {
+	if ctx.AccountFreezeEnabled {
 		// TODO return the errors instead of panicing
 
 		setAccountFrozen := runtime.ValueDeclaration{
@@ -453,7 +457,7 @@ func (i *TransactionInvoker) logExecutionIntensities(sth *state.StateHolder, txH
 			Str("txHash", txHash).
 			Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
 			Uint("computationUsed", sth.State().TotalComputationUsed()).
-			Uint("memoryUsed", sth.State().TotalMemoryUsed()).
+			Uint("memoryEstimate", sth.State().TotalMemoryEstimate()).
 			Dict("computationIntensities", computation).
 			Dict("memoryIntensities", memory).
 			Msg("transaction execution data")

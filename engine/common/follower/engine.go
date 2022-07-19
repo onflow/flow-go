@@ -80,7 +80,7 @@ func New(
 		tracer:         tracer,
 	}
 
-	con, err := net.Register(engine.ReceiveBlocks, e)
+	con, err := net.Register(network.ReceiveBlocks, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine to network: %w", err)
 	}
@@ -145,6 +145,12 @@ func (e *Engine) Process(channel network.Channel, originID flow.Identifier, even
 
 func (e *Engine) process(originID flow.Identifier, input interface{}) error {
 	switch v := input.(type) {
+	case *messages.BlockResponse:
+		e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageBlockResponse)
+		defer e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockResponse)
+		e.unit.Lock()
+		defer e.unit.Unlock()
+		return e.onBlockResponse(originID, v)
 	case *events.SyncedBlock:
 		e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageSyncedBlock)
 		defer e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageSyncedBlock)
@@ -156,7 +162,7 @@ func (e *Engine) process(originID flow.Identifier, input interface{}) error {
 		defer e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockProposal)
 		e.unit.Lock()
 		defer e.unit.Unlock()
-		return e.onBlockProposal(originID, v)
+		return e.onBlockProposal(originID, v, false)
 	default:
 		return fmt.Errorf("invalid event type (%T)", input)
 	}
@@ -175,11 +181,27 @@ func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBl
 		Header:  synced.Block.Header,
 		Payload: synced.Block.Payload,
 	}
-	return e.onBlockProposal(originID, proposal)
+	return e.onBlockProposal(originID, proposal, false)
 }
 
-// onBlockProposal handles incoming block proposals.
-func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
+func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockResponse) error {
+	for i, block := range res.Blocks {
+		proposal := &messages.BlockProposal{
+			Header:  block.Header,
+			Payload: block.Payload,
+		}
+
+		// process block proposal with a wait
+		if err := e.onBlockProposal(originID, proposal, true); err != nil {
+			return fmt.Errorf("fail to process the block at index %v in a range block response that contains %v blocks: %w", i, len(res.Blocks), err)
+		}
+	}
+
+	return nil
+}
+
+// onBlockProposal handles incoming block proposals. inRangeBlockResponse will determine whether or not we should wait in processBlockAndDescendants
+func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal, inRangeBlockResponse bool) error {
 
 	span, ctx, _ := e.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.FollowerOnBlockProposal)
 	defer span.Finish()
@@ -269,7 +291,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 			Hex("ancestor_id", ancestorID[:]).
 			Msg("requesting missing ancestor for proposal")
 
-		e.sync.RequestBlock(ancestorID)
+		e.sync.RequestBlock(ancestorID, ancestorHeight)
 
 		return nil
 	}
@@ -284,7 +306,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 
 		log.Debug().Msg("requesting missing parent for proposal")
 
-		e.sync.RequestBlock(header.ParentID)
+		e.sync.RequestBlock(header.ParentID, header.Height-1)
 
 		return nil
 	}
@@ -294,7 +316,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 
 	// at this point, we should be able to connect the proposal to the finalized
 	// state and should process it to see whether to forward to hotstuff or not
-	err = e.processBlockProposal(ctx, proposal)
+	err = e.processBlockAndDescendants(ctx, proposal, inRangeBlockResponse)
 	if err != nil {
 		return fmt.Errorf("could not process block proposal: %w", err)
 	}
@@ -308,11 +330,11 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	return nil
 }
 
-// processBlockProposal processes blocks that are already known to connect to
-// the finalized state; if a parent of children is validly processed, it means
-// the children are also still on a valid chain and all missing links are there;
-// no need to do all the processing again.
-func (e *Engine) processBlockProposal(ctx context.Context, proposal *messages.BlockProposal) error {
+// processBlockAndDescendants processes `proposal` and its pending descendants recursively.
+// The function assumes that `proposal` is connected to the finalized state. By induction,
+// any children are therefore also connected to the finalized state and can be processed as well.
+// No errors are expected during normal operations.
+func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *messages.BlockProposal, inRangeBlockResponse bool) error {
 
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.FollowerProcessBlockProposal)
 	defer span.Finish()
@@ -342,19 +364,20 @@ func (e *Engine) processBlockProposal(ctx context.Context, proposal *messages.Bl
 	// it only checks the block header, since checking block body is expensive.
 	// The full block check is done by the consensus participants.
 	err := e.state.Extend(ctx, block)
-	// if the error is a known invalid extension of the protocol state, then
-	// the input is invalid
-	if state.IsInvalidExtensionError(err) {
-		return engine.NewInvalidInputErrorf("invalid extension of protocol state: %w", err)
-	}
-
-	// if the error is a known outdated extension of the protocol state, then
-	// the input is outdated
-	if state.IsOutdatedExtensionError(err) {
-		return engine.NewOutdatedInputErrorf("outdated extension of protocol state: %w", err)
-	}
-
 	if err != nil {
+		// block is outdated by the time we started processing it
+		// => some other node generating the proposal is probably behind is catching up.
+		if state.IsOutdatedExtensionError(err) {
+			log.Info().Err(err).Msg("dropped processing of abandoned fork; this might be an indicator that some consensus node is behind")
+			return nil
+		}
+		// the block is invalid; log as error as we desire honest participation
+		// ToDo: potential slashing
+		if state.IsInvalidExtensionError(err) {
+			log.Warn().Err(err).Msg("received invalid block from other node (potential slashing evidence?)")
+			return nil
+		}
+
 		return fmt.Errorf("could not extend protocol state: %w", err)
 	}
 
@@ -367,10 +390,15 @@ func (e *Engine) processBlockProposal(ctx context.Context, proposal *messages.Bl
 	log.Info().Msg("forwarding block proposal to hotstuff")
 
 	// submit the model to follower for processing
-	e.follower.SubmitProposal(header, parent.View)
+	if inRangeBlockResponse {
+		<-e.follower.SubmitProposal(header, parent.View)
+	} else {
+		// ignore returned channel to avoid waiting
+		e.follower.SubmitProposal(header, parent.View)
+	}
 
 	// check for any descendants of the block to process
-	err = e.processPendingChildren(ctx, header)
+	err = e.processPendingChildren(ctx, header, inRangeBlockResponse)
 	if err != nil {
 		return fmt.Errorf("could not process pending children: %w", err)
 	}
@@ -381,7 +409,7 @@ func (e *Engine) processBlockProposal(ctx context.Context, proposal *messages.Bl
 // processPendingChildren checks if there are proposals connected to the given
 // parent block that was just processed; if this is the case, they should now
 // all be validly connected to the finalized state and we should process them.
-func (e *Engine) processPendingChildren(ctx context.Context, header *flow.Header) error {
+func (e *Engine) processPendingChildren(ctx context.Context, header *flow.Header, inRangeBlockResponse bool) error {
 
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.FollowerProcessPendingChildren)
 	defer span.Finish()
@@ -401,7 +429,7 @@ func (e *Engine) processPendingChildren(ctx context.Context, header *flow.Header
 			Header:  child.Header,
 			Payload: child.Payload,
 		}
-		err := e.processBlockProposal(ctx, proposal)
+		err := e.processBlockAndDescendants(ctx, proposal, inRangeBlockResponse)
 		if err != nil {
 			result = multierror.Append(result, err)
 		}

@@ -12,7 +12,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -28,31 +30,32 @@ type SyncSuite struct {
 func (ss *SyncSuite) SetupTest() {
 	var err error
 
-	ss.core, err = New(zerolog.New(ioutil.Discard), DefaultConfig())
+	ss.core, err = New(zerolog.New(ioutil.Discard), DefaultConfig(), metrics.NewNoopCollector())
 	ss.Require().Nil(err)
 }
 
-func (ss *SyncSuite) QueuedStatus() *Status {
-	return &Status{
+func (ss *SyncSuite) QueuedStatus() *chainsync.Status {
+	return &chainsync.Status{
 		Queued: time.Now(),
 	}
 }
 
-func (ss *SyncSuite) RequestedStatus() *Status {
-	return &Status{
+func (ss *SyncSuite) RequestedStatus() *chainsync.Status {
+	return &chainsync.Status{
 		Queued:    time.Now().Add(-time.Second),
 		Requested: time.Now(),
 		Attempts:  1,
 	}
 }
 
-func (ss *SyncSuite) ReceivedStatus(header *flow.Header) *Status {
-	return &Status{
-		Queued:    time.Now().Add(-time.Second * 2),
-		Requested: time.Now().Add(-time.Second),
-		Attempts:  1,
-		Header:    header,
-		Received:  time.Now(),
+func (ss *SyncSuite) ReceivedStatus(header *flow.Header) *chainsync.Status {
+	return &chainsync.Status{
+		BlockHeight: header.Height,
+		Queued:      time.Now().Add(-time.Second * 2),
+		Requested:   time.Now().Add(-time.Second),
+		Attempts:    1,
+		Header:      header,
+		Received:    time.Now(),
 	}
 }
 
@@ -97,7 +100,7 @@ func (ss *SyncSuite) TestQueueByBlockID() {
 
 	// add all of them to engine
 	for _, blockID := range blockIDs {
-		ss.core.queueByBlockID(blockID)
+		ss.core.queueByBlockID(blockID, 0)
 	}
 
 	// check they are all in the map now
@@ -110,7 +113,7 @@ func (ss *SyncSuite) TestQueueByBlockID() {
 	// get current count and add all again
 	count := len(ss.core.blockIDs)
 	for _, blockID := range blockIDs {
-		ss.core.queueByBlockID(blockID)
+		ss.core.queueByBlockID(blockID, 0)
 	}
 
 	// check that operation was idempotent (size still the same)
@@ -128,15 +131,15 @@ func (ss *SyncSuite) TestRequestBlock() {
 	ss.core.blockIDs[received.ID()] = ss.RequestedStatus()
 
 	// queued status should stay the same
-	ss.core.RequestBlock(queuedID)
+	ss.core.RequestBlock(queuedID, 0)
 	assert.True(ss.T(), ss.core.blockIDs[queuedID].WasQueued())
 
 	// requested status should stay the same
-	ss.core.RequestBlock(requestedID)
+	ss.core.RequestBlock(requestedID, 0)
 	assert.True(ss.T(), ss.core.blockIDs[requestedID].WasRequested())
 
 	// received status should be re-queued by ID
-	ss.core.RequestBlock(received.ID())
+	ss.core.RequestBlock(received.ID(), 0)
 	assert.True(ss.T(), ss.core.blockIDs[received.ID()].WasQueued())
 	assert.False(ss.T(), ss.core.blockIDs[received.ID()].WasReceived())
 	assert.False(ss.T(), ss.core.heights[received.Height].WasQueued())
@@ -150,29 +153,29 @@ func (ss *SyncSuite) TestHandleBlock() {
 	requestedByID := unittest.BlockHeaderFixture()
 	ss.core.blockIDs[requestedByID.ID()] = ss.RequestedStatus()
 	received := unittest.BlockHeaderFixture()
-	ss.core.heights[received.Height] = ss.ReceivedStatus(&received)
-	ss.core.blockIDs[received.ID()] = ss.ReceivedStatus(&received)
+	ss.core.heights[received.Height] = ss.ReceivedStatus(received)
+	ss.core.blockIDs[received.ID()] = ss.ReceivedStatus(received)
 
 	// should ignore un-requested blocks
-	shouldProcess := ss.core.HandleBlock(&unrequested)
+	shouldProcess := ss.core.HandleBlock(unrequested)
 	ss.Assert().False(shouldProcess, "should not process un-requested block")
 	ss.Assert().NotContains(ss.core.heights, unrequested.Height)
 	ss.Assert().NotContains(ss.core.blockIDs, unrequested.ID())
 
 	// should mark queued blocks as received, and process them
-	shouldProcess = ss.core.HandleBlock(&queuedByHeight)
+	shouldProcess = ss.core.HandleBlock(queuedByHeight)
 	ss.Assert().True(shouldProcess, "should process queued block")
 	ss.Assert().True(ss.core.blockIDs[queuedByHeight.ID()].WasReceived(), "status should be reflected in block ID map")
 	ss.Assert().True(ss.core.heights[queuedByHeight.Height].WasReceived(), "status should be reflected in height map")
 
 	// should mark requested block as received, and process them
-	shouldProcess = ss.core.HandleBlock(&requestedByID)
+	shouldProcess = ss.core.HandleBlock(requestedByID)
 	ss.Assert().True(shouldProcess, "should process requested block")
 	ss.Assert().True(ss.core.blockIDs[requestedByID.ID()].WasReceived(), "status should be reflected in block ID map")
 	ss.Assert().True(ss.core.heights[requestedByID.Height].WasReceived(), "status should be reflected in height map")
 
 	// should leave received blocks, and not process them
-	shouldProcess = ss.core.HandleBlock(&received)
+	shouldProcess = ss.core.HandleBlock(received)
 	ss.Assert().False(shouldProcess, "should not process already received block")
 	ss.Assert().True(ss.core.blockIDs[received.ID()].WasReceived(), "status should remain reflected in block ID map")
 	ss.Assert().True(ss.core.heights[received.Height].WasReceived(), "status should remain reflected in height map")
@@ -186,15 +189,15 @@ func (ss *SyncSuite) TestHandleHeight() {
 	aboveOutsideTolerance := final.Height + uint64(ss.core.Config.Tolerance+1)
 
 	// a height lower than finalized should be a no-op
-	ss.core.HandleHeight(&final, lower)
+	ss.core.HandleHeight(final, lower)
 	ss.Assert().Len(ss.core.heights, 0)
 
 	// a height higher than finalized, but within tolerance, should be a no-op
-	ss.core.HandleHeight(&final, aboveWithinTolerance)
+	ss.core.HandleHeight(final, aboveWithinTolerance)
 	ss.Assert().Len(ss.core.heights, 0)
 
 	// a height higher than finalized and outside tolerance should queue missing heights
-	ss.core.HandleHeight(&final, aboveOutsideTolerance)
+	ss.core.HandleHeight(final, aboveOutsideTolerance)
 	ss.Assert().Len(ss.core.heights, int(aboveOutsideTolerance-final.Height))
 	for height := final.Height + 1; height <= aboveOutsideTolerance; height++ {
 		ss.Assert().Contains(ss.core.heights, height)
@@ -209,7 +212,7 @@ func (ss *SyncSuite) TestGetRequestableItems() {
 
 	// fill in a height status that should be skipped
 	skipHeight := uint64(rand.Uint64())
-	ss.core.heights[skipHeight] = &Status{
+	ss.core.heights[skipHeight] = &chainsync.Status{
 		Queued:    now,
 		Requested: now,
 		Attempts:  0,
@@ -217,7 +220,7 @@ func (ss *SyncSuite) TestGetRequestableItems() {
 
 	// fill in a height status that should be deleted
 	dropHeight := uint64(rand.Uint64())
-	ss.core.heights[dropHeight] = &Status{
+	ss.core.heights[dropHeight] = &chainsync.Status{
 		Queued:    now,
 		Requested: zero,
 		Attempts:  ss.core.Config.MaxAttempts,
@@ -225,7 +228,7 @@ func (ss *SyncSuite) TestGetRequestableItems() {
 
 	// fill in a height status that should be requested
 	reqHeight := uint64(rand.Uint64())
-	ss.core.heights[reqHeight] = &Status{
+	ss.core.heights[reqHeight] = &chainsync.Status{
 		Queued:    now,
 		Requested: zero,
 		Attempts:  0,
@@ -233,7 +236,7 @@ func (ss *SyncSuite) TestGetRequestableItems() {
 
 	// fill in a block ID that should be skipped
 	skipBlockID := unittest.IdentifierFixture()
-	ss.core.blockIDs[skipBlockID] = &Status{
+	ss.core.blockIDs[skipBlockID] = &chainsync.Status{
 		Queued:    now,
 		Requested: now,
 		Attempts:  0,
@@ -241,7 +244,7 @@ func (ss *SyncSuite) TestGetRequestableItems() {
 
 	// fill in a block ID that should be deleted
 	dropBlockID := unittest.IdentifierFixture()
-	ss.core.blockIDs[dropBlockID] = &Status{
+	ss.core.blockIDs[dropBlockID] = &chainsync.Status{
 		Queued:    now,
 		Requested: zero,
 		Attempts:  ss.core.Config.MaxAttempts,
@@ -249,7 +252,7 @@ func (ss *SyncSuite) TestGetRequestableItems() {
 
 	// fill in a block ID that should be requested
 	reqBlockID := unittest.IdentifierFixture()
-	ss.core.blockIDs[reqBlockID] = &Status{
+	ss.core.blockIDs[reqBlockID] = &chainsync.Status{
 		Queued:    now,
 		Requested: zero,
 		Attempts:  0,
@@ -286,21 +289,21 @@ func (ss *SyncSuite) TestGetRanges() {
 
 	ss.Run("contiguous", func() {
 		input := []uint64{1, 2, 3, 4, 5, 6, 7, 8}
-		expected := []flow.Range{{From: 1, To: 4}, {From: 5, To: 8}}
+		expected := []chainsync.Range{{From: 1, To: 4}, {From: 5, To: 8}}
 		ranges := ss.core.getRanges(input)
 		ss.Assert().Equal(expected, ranges)
 	})
 
 	ss.Run("non-contiguous", func() {
 		input := []uint64{1, 3}
-		expected := []flow.Range{{From: 1, To: 1}, {From: 3, To: 3}}
+		expected := []chainsync.Range{{From: 1, To: 1}, {From: 3, To: 3}}
 		ranges := ss.core.getRanges(input)
 		ss.Assert().Equal(expected, ranges)
 	})
 
 	ss.Run("with dupes", func() {
 		input := []uint64{1, 2, 2, 3, 3, 4}
-		expected := []flow.Range{{From: 1, To: 4}}
+		expected := []chainsync.Range{{From: 1, To: 4}}
 		ranges := ss.core.getRanges(input)
 		ss.Assert().Equal(expected, ranges)
 	})
@@ -313,14 +316,14 @@ func (ss *SyncSuite) TestGetBatches() {
 
 	ss.Run("less than max size", func() {
 		input := unittest.IdentifierListFixture(2)
-		expected := []flow.Batch{{BlockIDs: input}}
+		expected := []chainsync.Batch{{BlockIDs: input}}
 		batches := ss.core.getBatches(input)
 		ss.Assert().Equal(expected, batches)
 	})
 
 	ss.Run("greater than max size", func() {
 		input := unittest.IdentifierListFixture(6)
-		expected := []flow.Batch{{BlockIDs: input[:4]}, {BlockIDs: input[4:]}}
+		expected := []chainsync.Batch{{BlockIDs: input[:4]}, {BlockIDs: input[4:]}}
 		batches := ss.core.getBatches(input)
 		ss.Assert().Equal(expected, batches)
 	})
@@ -430,7 +433,7 @@ func (ss *SyncSuite) TestPrune() {
 	blockIDsBefore := len(ss.core.blockIDs)
 
 	// prune the pending requests
-	ss.core.prune(&final)
+	ss.core.prune(final)
 
 	assert.Equal(ss.T(), heightsBefore-len(prunableHeights), len(ss.core.heights))
 	assert.Equal(ss.T(), blockIDsBefore-len(prunableBlockIDs), len(ss.core.blockIDs))

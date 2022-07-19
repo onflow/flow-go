@@ -6,12 +6,10 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/signature"
+	msig "github.com/onflow/flow-go/module/signature"
 )
 
 // CombinedSigner creates votes for the main consensus.
@@ -45,10 +43,10 @@ func NewCombinedSigner(
 
 	sc := &CombinedSigner{
 		staking:             staking,
-		stakingHasher:       crypto.NewBLSKMAC(encoding.ConsensusVoteTag),
-		timeoutObjectHasher: crypto.NewBLSKMAC(encoding.ConsensusTimeoutTag),
+		stakingHasher:       msig.NewBLSHasher(msig.ConsensusVoteTag),
+		timeoutObjectHasher: msig.NewBLSHasher(msig.ConsensusTimeoutTag),
 		beaconKeyStore:      beaconKeyStore,
-		beaconHasher:        crypto.NewBLSKMAC(encoding.RandomBeaconTag),
+		beaconHasher:        msig.NewBLSHasher(msig.RandomBeaconTag),
 	}
 	return sc
 }
@@ -146,5 +144,5 @@ func (c *CombinedSigner) genSigData(block *model.Block) ([]byte, error) {
 		return nil, fmt.Errorf("could not generate beacon signature: %w", err)
 	}
 
-	return signature.EncodeDoubleSig(stakingSig, beaconShare), nil
+	return msig.EncodeDoubleSig(stakingSig, beaconShare), nil
 }

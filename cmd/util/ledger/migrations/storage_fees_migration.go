@@ -25,15 +25,14 @@ func StorageFeesMigration(payload []ledger.Payload) ([]ledger.Payload, error) {
 		// this is the storage used by the storage_used register we are about to add
 		storageUsedByStorageUsed := fvm.RegisterSize(
 			flow.BytesToAddress([]byte(s)),
-			false, "storage_used",
+			"storage_used",
 			make([]byte, 8))
 		u = u + uint64(storageUsedByStorageUsed)
 
 		newPayload = append(newPayload, ledger.Payload{
 			Key: registerIDToKey(flow.RegisterID{
-				Owner:      s,
-				Controller: "",
-				Key:        "storage_used",
+				Owner: s,
+				Key:   "storage_used",
 			}),
 			Value: utils.Uint64ToBinary(u),
 		})
@@ -59,7 +58,6 @@ func incrementStorageUsed(p ledger.Payload, used map[string]uint64) error {
 
 func registerSize(id flow.RegisterID, p ledger.Payload) int {
 	address := flow.BytesToAddress([]byte(id.Owner))
-	isController := len(id.Controller) > 0
 	key := id.Key
-	return fvm.RegisterSize(address, isController, key, p.Value)
+	return fvm.RegisterSize(address, key, p.Value)
 }

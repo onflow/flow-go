@@ -41,7 +41,7 @@ func ProposalFromFlow(header *flow.Header, parentView uint64) *Proposal {
 func ProposalToFlow(proposal *Proposal) *flow.Header {
 
 	block := proposal.Block
-	header := flow.Header{
+	header := &flow.Header{
 		ParentID:           block.QC.BlockID,
 		PayloadHash:        block.PayloadHash,
 		Timestamp:          block.Timestamp,
@@ -53,5 +53,5 @@ func ProposalToFlow(proposal *Proposal) *flow.Header {
 		LastViewTC:         proposal.LastViewTC,
 	}
 
-	return &header
+	return header
 }

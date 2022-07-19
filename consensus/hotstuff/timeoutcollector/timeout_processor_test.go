@@ -20,10 +20,9 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
-	"github.com/onflow/flow-go/module/signature"
+	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -342,7 +341,7 @@ func (s *TimeoutProcessorTestSuite) TestProcess_CreatingTC() {
 	// change tracker to require all except one signer to create TC
 	s.processor.tcTracker.minRequiredWeight = s.sigWeight * uint64(len(highQCViews))
 
-	signerIndices, err := signature.EncodeSignersToIndices(s.participants.NodeIDs(), signers.NodeIDs())
+	signerIndices, err := msig.EncodeSignersToIndices(s.participants.NodeIDs(), signers.NodeIDs())
 	require.NoError(s.T(), err)
 	expectedSig := crypto.Signature(unittest.RandomBytes(128))
 	s.validator.On("ValidateQC", mock.Anything).Return(nil)
@@ -505,7 +504,7 @@ func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 		lastViewTC = tc
 	}
 
-	aggregator, err := NewTimeoutSignatureAggregator(view, stakingSigners, encoding.CollectorTimeoutTag)
+	aggregator, err := NewTimeoutSignatureAggregator(view, stakingSigners, msig.CollectorTimeoutTag)
 	require.NoError(t, err)
 
 	notifier := mocks.NewTimeoutCollectorConsumer(t)
@@ -523,7 +522,7 @@ func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 
 	notifier.AssertExpectations(t)
 
-	aggregator, err = NewTimeoutSignatureAggregator(view+1, stakingSigners, encoding.CollectorTimeoutTag)
+	aggregator, err = NewTimeoutSignatureAggregator(view+1, stakingSigners, msig.CollectorTimeoutTag)
 	require.NoError(t, err)
 
 	notifier = mocks.NewTimeoutCollectorConsumer(t)
