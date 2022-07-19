@@ -4,8 +4,8 @@
 /protobuf/services/collection/** @jordanschalm
 
 # Consensus Stream
-/cmd/consensus/** @AlexHentschel @awishformore @zhangchiqing
-/engine/consensus/** @AlexHentschel @awishformore @zhangchiqing
+/cmd/consensus/** @AlexHentschel @zhangchiqing
+/engine/consensus/** @AlexHentschel @zhangchiqing
 
 # Execution Stream
 /cmd/execution/** @m4ksio @ramtinms
@@ -34,4 +34,10 @@
 /crypto/** @tarakby
 
 # Bootstrap and transit scripts
-/cmd/bootstrap/** @vishalchangrani @ljk662
+/cmd/bootstrap/** @vishalchangrani
+
+# Performance Stream
+/integration/localnet/** @SaveTheRbtz @simonhf @Kay-Zee @zhangchiqing @pattyshack @AndrewM-SDET
+/integration/loader/** @SaveTheRbtz @simonhf @Kay-Zee @pattyshack @AndrewM-SDET
+/integration/benchmark/** @SaveTheRbtz @simonhf @Kay-Zee @pattyshack @AndrewM-SDET
+/integration/utils/** @SaveTheRbtz @simonhf @Kay-Zee @pattyshack @AndrewM-SDET

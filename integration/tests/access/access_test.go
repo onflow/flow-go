@@ -17,6 +17,7 @@ import (
 )
 
 func TestAccess(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_TODO, "active-pacemaker")
 	suite.Run(t, new(AccessSuite))
 }
 
@@ -77,7 +78,7 @@ func (suite *AccessSuite) SetupTest() {
 	}
 
 	conf := testnet.NewNetworkConfig("access_api_test", nodeConfigs)
-	suite.net = testnet.PrepareFlowNetwork(suite.T(), conf)
+	suite.net = testnet.PrepareFlowNetwork(suite.T(), conf, flow.Localnet)
 
 	// start the network
 	suite.T().Logf("starting flow network with docker containers")

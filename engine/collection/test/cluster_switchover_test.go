@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/testutil"
 	testmock "github.com/onflow/flow-go/engine/testutil/mock"
 	model "github.com/onflow/flow-go/model/bootstrap"
@@ -18,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/util"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/cluster"
@@ -113,7 +113,7 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 		tc.root,
 	)
 	tc.sn = new(mocknetwork.Engine)
-	_, err = consensus.Net.Register(engine.ReceiveGuarantees, tc.sn)
+	_, err = consensus.Net.Register(network.ReceiveGuarantees, tc.sn)
 	require.NoError(tc.T(), err)
 
 	// create an epoch builder hooked to each collector's protocol state

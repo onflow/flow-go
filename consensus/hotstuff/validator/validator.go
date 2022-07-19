@@ -55,7 +55,7 @@ func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 	}
 	signers, err := signature.DecodeSignerIndicesToIdentities(allParticipants, tc.SignerIndices)
 	if err != nil {
-		if signature.IsDecodeSignerIndicesError(err) {
+		if signature.IsInvalidSignerIndicesError(err) {
 			return newInvalidTCError(tc, fmt.Errorf("invalid signer indices: %w", err))
 		}
 		// unexpected error
@@ -144,7 +144,7 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate) error {
 
 	signers, err := signature.DecodeSignerIndicesToIdentities(allParticipants, qc.SignerIndices)
 	if err != nil {
-		if signature.IsDecodeSignerIndicesError(err) {
+		if signature.IsInvalidSignerIndicesError(err) {
 			return newInvalidQCError(qc, fmt.Errorf("invalid signer indices: %w", err))
 		}
 		// unexpected error

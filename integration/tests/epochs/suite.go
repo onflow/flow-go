@@ -49,16 +49,15 @@ type Suite struct {
 	client      *testnet.Client
 
 	// Epoch config (lengths in views)
-	StakingAuctionLen          uint64
-	DKGPhaseLen                uint64
-	EpochLen                   uint64
-	EpochCommitSafetyThreshold uint64
+	StakingAuctionLen uint64
+	DKGPhaseLen       uint64
+	EpochLen          uint64
 }
 
 // SetupTest is run automatically by the testing framework before each test case.
 func (s *Suite) SetupTest() {
 	// ensure epoch lengths are set correctly
-	require.Greater(s.T(), s.EpochLen, s.StakingAuctionLen+s.DKGPhaseLen*3+s.EpochCommitSafetyThreshold)
+	require.Greater(s.T(), s.EpochLen, s.StakingAuctionLen+s.DKGPhaseLen*3)
 
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
@@ -107,7 +106,7 @@ func (s *Suite) SetupTest() {
 	netConf := testnet.NewNetworkConfigWithEpochConfig("epochs-tests", confs, s.StakingAuctionLen, s.DKGPhaseLen, s.EpochLen)
 
 	// initialize the network
-	s.net = testnet.PrepareFlowNetwork(s.T(), netConf)
+	s.net = testnet.PrepareFlowNetwork(s.T(), netConf, flow.Localnet)
 
 	// start the network
 
@@ -130,6 +129,12 @@ func (s *Suite) Ghost() *client.GhostClient {
 	return client
 }
 
+// TimedLogf logs the message using t.Log, but prefixes the current time.
+func (s *Suite) TimedLogf(msg string, args ...interface{}) {
+	args = append([]interface{}{time.Now().String()}, args...)
+	s.T().Logf("%s - "+msg, args...)
+}
+
 func (s *Suite) TearDownTest() {
 	s.log.Info().Msg("================> Start TearDownTest")
 	s.net.Remove()
@@ -140,16 +145,17 @@ func (s *Suite) TearDownTest() {
 // StakedNodeOperationInfo struct contains all the node information needed to
 // start a node after it is onboarded (staked and registered).
 type StakedNodeOperationInfo struct {
-	NodeID                  flow.Identifier
-	Role                    flow.Role
-	StakingAccountAddress   sdk.Address
-	FullAccountKey          *sdk.AccountKey
-	StakingAccountKey       sdkcrypto.PrivateKey
-	NetworkingKey           sdkcrypto.PrivateKey
-	StakingKey              sdkcrypto.PrivateKey
+	NodeID                flow.Identifier
+	Role                  flow.Role
+	StakingAccountAddress sdk.Address
+	FullAccountKey        *sdk.AccountKey
+	StakingAccountKey     sdkcrypto.PrivateKey
+	NetworkingKey         sdkcrypto.PrivateKey
+	StakingKey            sdkcrypto.PrivateKey
+	// machine account info defined only for consensus/collection nodes
 	MachineAccountAddress   sdk.Address
 	MachineAccountKey       sdkcrypto.PrivateKey
-	MachineAccountPublicKey sdk.AccountKey
+	MachineAccountPublicKey *sdk.AccountKey
 	ContainerName           string
 }
 
@@ -285,7 +291,7 @@ func (s *Suite) generateAccountKeys(role flow.Role) (
 	networkingKey,
 	stakingKey,
 	machineAccountKey crypto.PrivateKey,
-	machineAccountPubKey sdk.AccountKey,
+	machineAccountPubKey *sdk.AccountKey,
 ) {
 	operatorAccountKey = unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256)
 	networkingKey = unittest.NetworkingPrivKeyFixture()
@@ -295,7 +301,7 @@ func (s *Suite) generateAccountKeys(role flow.Role) (
 	if role == flow.RoleConsensus || role == flow.RoleCollection {
 		machineAccountKey = unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256)
 
-		machineAccountPubKey = sdk.AccountKey{
+		machineAccountPubKey = &sdk.AccountKey{
 			PublicKey: machineAccountKey.PublicKey(),
 			SigAlgo:   machineAccountKey.PublicKey().Algorithm(),
 			HashAlgo:  bootstrap.DefaultMachineAccountHashAlgo,
@@ -327,7 +333,8 @@ func (s *Suite) createStakingCollection(ctx context.Context, env templates.Envir
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
 
-	signer := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA2_256)
+	signer, err := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA2_256)
+	require.NoError(s.T(), err)
 
 	createStakingCollectionTx, err := utils.MakeCreateStakingCollectionTx(
 		env,
@@ -360,12 +367,13 @@ func (s *Suite) SubmitStakingCollectionRegisterNodeTx(
 	networkingKey string,
 	stakingKey string,
 	amount string,
-	machineKey sdk.AccountKey,
+	machineKey *sdk.AccountKey,
 ) (*sdk.TransactionResult, sdk.Address, error) {
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
 
-	signer := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA2_256)
+	signer, err := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA2_256)
+	require.NoError(s.T(), err)
 
 	registerNodeTx, err := utils.MakeStakingCollectionRegisterNodeTx(
 		env,
@@ -419,7 +427,8 @@ func (s *Suite) SubmitStakingCollectionCloseStakeTx(
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
 
-	signer := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA2_256)
+	signer, err := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA2_256)
+	require.NoError(s.T(), err)
 
 	closeStakeTx, err := utils.MakeStakingCollectionCloseStakeTx(
 		env,
@@ -759,13 +768,19 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 	}
 
 	// staking our new node and add get the corresponding container for that node
+	s.TimedLogf("staking joining node with role %s", role.String())
 	info, testContainer := s.StakeNewNode(s.ctx, env, role)
+	s.TimedLogf("successfully staked joining node: %s", info.NodeID)
 
 	// use admin transaction to remove node, this simulates a node leaving the network
+	s.TimedLogf("removing node %s with role %s", containerToReplace.Config.NodeID, role.String())
 	s.removeNodeFromProtocol(s.ctx, env, containerToReplace.Config.NodeID)
+	s.TimedLogf("successfully removed node: %s", containerToReplace.Config.NodeID)
 
 	// wait for epoch setup phase before we start our container and pause the old container
+	s.TimedLogf("waiting for EpochSetup phase of first epoch to begin")
 	s.WaitForPhase(s.ctx, flow.EpochPhaseSetup)
+	s.TimedLogf("successfully reached EpochSetup phase of first epoch")
 
 	// get latest snapshot and start new container
 	snapshot, err := s.client.GetLatestProtocolSnapshot(s.ctx)
@@ -773,13 +788,19 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 	testContainer.WriteRootSnapshot(snapshot)
 	testContainer.Container.Start(s.ctx)
 
-	currentEpochFinalView, err := snapshot.Epochs().Current().FinalView()
+	header, err := snapshot.Head()
+	require.NoError(s.T(), err)
+	s.TimedLogf("retrieved header after entering EpochSetup phase: height=%d, view=%d", header.Height, header.View)
+
+	epoch1FinalView, err := snapshot.Epochs().Current().FinalView()
 	require.NoError(s.T(), err)
 
 	// wait for 5 views after the start of the next epoch before we pause our container to replace
-	s.BlockState.WaitForSealedView(s.T(), currentEpochFinalView+5)
+	s.TimedLogf("waiting for sealed view %d before pausing container", epoch1FinalView+5)
+	s.BlockState.WaitForSealedView(s.T(), epoch1FinalView+5)
+	s.TimedLogf("observed sealed view %d -> pausing container", epoch1FinalView+5)
 
-	//make sure container to replace removed from smart contract state
+	// make sure container to replace removed from smart contract state
 	s.assertNodeNotApprovedOrProposed(s.ctx, env, containerToReplace.Config.NodeID)
 
 	// assert transition to second epoch happened as expected
@@ -790,13 +811,15 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 	require.NoError(s.T(), err)
 
 	// wait for 5 views after pausing our container to replace before we assert healthy network
-	s.BlockState.WaitForSealedView(s.T(), currentEpochFinalView+10)
+	s.TimedLogf("waiting for sealed view %d before asserting network health", epoch1FinalView+10)
+	s.BlockState.WaitForSealedView(s.T(), epoch1FinalView+10)
+	s.TimedLogf("observed sealed view %d -> asserting network health", epoch1FinalView+10)
 
 	// make sure the network is healthy after adding new node
 	checkNetworkHealth(s.ctx, env, snapshot, info)
 }
 
-// DynamicEpochTransitionSuite is the suite used for epoch transitions tests
+// DynamicEpochTransitionSuite  is the suite used for epoch transitions tests
 // with a dynamic identity table.
 type DynamicEpochTransitionSuite struct {
 	Suite
@@ -807,8 +830,7 @@ func (s *DynamicEpochTransitionSuite) SetupTest() {
 	// joining/leaving nodes
 	s.StakingAuctionLen = 200
 	s.DKGPhaseLen = 50
-	s.EpochLen = 400
-	s.EpochCommitSafetyThreshold = 20
+	s.EpochLen = 380
 
 	// run the generic setup, which starts up the network
 	s.Suite.SetupTest()

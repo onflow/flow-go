@@ -268,7 +268,7 @@ func (suite *Suite) TestRespondToPhaseChange() {
 	first := unittest.BlockHeaderFixture()
 	suite.state.On("AtBlockID", first.ID()).Return(suite.snap)
 
-	suite.engine.EpochSetupPhaseStarted(0, &first)
+	suite.engine.EpochSetupPhaseStarted(0, first)
 	unittest.AssertClosesBefore(suite.T(), called, time.Second)
 
 	suite.voter.AssertExpectations(suite.T())
@@ -298,7 +298,7 @@ func (suite *Suite) TestRespondToEpochTransition() {
 	// mock the epoch transition
 	suite.TransitionEpoch()
 	// notify the engine of the epoch transition
-	suite.engine.EpochTransition(suite.counter, &first)
+	suite.engine.EpochTransition(suite.counter, first)
 	unittest.AssertClosesBefore(suite.T(), done, time.Second)
 	suite.Assert().NotNil(expiryCallback)
 

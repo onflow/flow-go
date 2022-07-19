@@ -152,7 +152,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 
 	// set up synchronization module mock
 	cs.sync = &module.BlockRequester{}
-	cs.sync.On("RequestBlock", mock.Anything).Return(nil)
+	cs.sync.On("RequestBlock", mock.Anything, mock.AnythingOfType("uint64")).Return(nil)
 	cs.sync.On("Done", mock.Anything).Return(closed)
 
 	// set up no-op metrics mock
@@ -407,7 +407,7 @@ func (cs *ComplianceCoreSuite) TestProposalBufferingOrder() {
 	for _, block := range proposals {
 
 		// check that we request the ancestor block each time
-		cs.sync.On("RequestBlock", mock.Anything).Once().Run(
+		cs.sync.On("RequestBlock", mock.Anything, mock.AnythingOfType("uint64")).Once().Run(
 			func(args mock.Arguments) {
 				ancestorID := args.Get(0).(flow.Identifier)
 				assert.Equal(cs.T(), missing.Header.ID(), ancestorID, "should always request root block")

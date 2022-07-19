@@ -362,5 +362,5 @@ func (mc *MockConsensus) extendBlock(blockView uint64, parent *flow.Header) *flo
 			SigData:       unittest.SignatureFixture(),
 		}
 	}
-	return &nextBlock
+	return nextBlock
 }

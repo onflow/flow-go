@@ -14,7 +14,6 @@ import (
 
 	"github.com/onflow/flow-go/crypto/hash"
 
-	channels "github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -220,7 +219,7 @@ func (n *Network) runMiddleware(ctx irrecoverable.SignalerContext, ready compone
 }
 
 func (n *Network) handleRegisterEngineRequest(parent irrecoverable.SignalerContext, channel network.Channel, engine network.MessageProcessor) (network.Conduit, error) {
-	if !channels.Exists(channel) {
+	if !network.ChannelExists(channel) {
 		return nil, fmt.Errorf("unknown channel: %s, should be registered in topic map", channel)
 	}
 
@@ -339,15 +338,15 @@ func (n *Network) Topology() (flow.IdentityList, error) {
 	return top, nil
 }
 
-func (n *Network) Receive(nodeID flow.Identifier, msg *message.Message) error {
-	err := n.processNetworkMessage(nodeID, msg)
+func (n *Network) Receive(nodeID flow.Identifier, msg *message.Message, decodedMsgPayload interface{}) error {
+	err := n.processNetworkMessage(nodeID, msg, decodedMsgPayload)
 	if err != nil {
 		return fmt.Errorf("could not process message: %w", err)
 	}
 	return nil
 }
 
-func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message) error {
+func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message, decodedMsgPayload interface{}) error {
 	// checks the cache for deduplication and adds the message if not already present
 	if !n.receiveCache.Add(message.EventID) {
 		log := n.logger.With().
@@ -365,22 +364,16 @@ func (n *Network) processNetworkMessage(senderID flow.Identifier, message *messa
 		return nil
 	}
 
-	// Convert message payload to a known message type
-	decodedMessage, err := n.codec.Decode(message.Payload)
-	if err != nil {
-		return fmt.Errorf("could not decode event: %w", err)
-	}
-
 	// create queue message
 	qm := queue.QMessage{
-		Payload:  decodedMessage,
+		Payload:  decodedMsgPayload,
 		Size:     message.Size(),
 		Target:   network.Channel(message.ChannelID),
 		SenderID: senderID,
 	}
 
 	// insert the message in the queue
-	err = n.queue.Insert(qm)
+	err := n.queue.Insert(qm)
 	if err != nil {
 		return fmt.Errorf("failed to insert message in queue: %w", err)
 	}

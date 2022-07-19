@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
+	msig "github.com/onflow/flow-go/module/signature"
 )
 
 // signerInfo holds information about a signer, its public key and weight
@@ -81,7 +82,7 @@ func NewTimeoutSignatureAggregator(
 	}
 
 	return &TimeoutSignatureAggregator{
-		hasher:        crypto.NewBLSKMAC(dsTag), // concurrency safe
+		hasher:        msig.NewBLSHasher(dsTag), // concurrency safe
 		idToInfo:      idToInfo,
 		idToSignature: make(map[flow.Identifier]sigInfo),
 		view:          view,

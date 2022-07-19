@@ -3,7 +3,6 @@ package dns
 import (
 	"context"
 	"net"
-	"sync"
 	"time"
 	_ "unsafe" // for linking runtimeNano
 
@@ -31,15 +30,12 @@ func runtimeNano() int64
 //     - Detecting expired cached domain triggers async DNS lookup to refresh cached entry.
 // [1] https://en.wikipedia.org/wiki/Name_server#Caching_name_server
 type Resolver struct {
-	sync.Mutex
-	c              *cache
-	res            madns.BasicResolver // underlying resolver
-	collector      module.ResolverMetrics
-	processingIPs  map[string]struct{} // ongoing ip lookups through underlying resolver
-	processingTXTs map[string]struct{} // ongoing txt lookups through underlying resolver
-	ipRequests     chan *lookupIPRequest
-	txtRequests    chan *lookupTXTRequest
-	logger         zerolog.Logger
+	c           *cache
+	res         madns.BasicResolver // underlying resolver
+	collector   module.ResolverMetrics
+	ipRequests  chan *lookupIPRequest
+	txtRequests chan *lookupTXTRequest
+	logger      zerolog.Logger
 	component.Component
 	cm *component.ComponentManager
 }
@@ -79,14 +75,12 @@ const (
 // NewResolver is the factory function for creating an instance of this resolver.
 func NewResolver(logger zerolog.Logger, collector module.ResolverMetrics, dnsCache mempool.DNSCache, opts ...optFunc) *Resolver {
 	resolver := &Resolver{
-		logger:         logger.With().Str("component", "dns-resolver").Logger(),
-		res:            madns.DefaultResolver,
-		c:              newCache(dnsCache),
-		collector:      collector,
-		processingIPs:  map[string]struct{}{},
-		processingTXTs: map[string]struct{}{},
-		ipRequests:     make(chan *lookupIPRequest, ipAddrLookupQueueSize),
-		txtRequests:    make(chan *lookupTXTRequest, txtLookupQueueSize),
+		logger:      logger.With().Str("component", "dns-resolver").Logger(),
+		res:         madns.DefaultResolver,
+		c:           newCache(logger, dnsCache),
+		collector:   collector,
+		ipRequests:  make(chan *lookupIPRequest, ipAddrLookupQueueSize),
+		txtRequests: make(chan *lookupTXTRequest, txtLookupQueueSize),
 	}
 
 	cm := component.NewComponentManagerBuilder()
@@ -112,9 +106,13 @@ func NewResolver(logger zerolog.Logger, collector module.ResolverMetrics, dnsCac
 func (r *Resolver) processIPAddrLookups(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
+	r.logger.Trace().Msg("processing ip worker started")
+
 	for {
 		select {
 		case req := <-r.ipRequests:
+			lg := r.logger.With().Str("domain", req.domain).Logger()
+			lg.Trace().Msg("ip domain request picked for resolving")
 			_, err := r.lookupResolverForIPAddr(ctx, req.domain)
 			if err != nil {
 				// invalidates cached entry when hits error on resolving.
@@ -122,9 +120,11 @@ func (r *Resolver) processIPAddrLookups(ctx irrecoverable.SignalerContext, ready
 				if invalidated {
 					r.collector.OnDNSCacheInvalidated()
 				}
+				lg.Error().Err(err).Msg("resolving ip address faced an error")
 			}
-			r.doneResolvingIP(req.domain)
+			lg.Trace().Msg("ip domain resolved successfully")
 		case <-ctx.Done():
+			r.logger.Trace().Msg("processing ip worker terminated")
 			return
 		}
 	}
@@ -132,10 +132,13 @@ func (r *Resolver) processIPAddrLookups(ctx irrecoverable.SignalerContext, ready
 
 func (r *Resolver) processTxtLookups(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
+	r.logger.Trace().Msg("processing txt worker started")
 
 	for {
 		select {
 		case req := <-r.txtRequests:
+			lg := r.logger.With().Str("domain", req.txt).Logger()
+			lg.Trace().Msg("txt domain picked for resolving")
 			_, err := r.lookupResolverForTXTRecord(ctx, req.txt)
 			if err != nil {
 				// invalidates cached entry when hits error on resolving.
@@ -143,9 +146,11 @@ func (r *Resolver) processTxtLookups(ctx irrecoverable.SignalerContext, ready co
 				if invalidated {
 					r.collector.OnDNSCacheInvalidated()
 				}
+				lg.Error().Err(err).Msg("resolving txt domain faced an error")
 			}
-			r.doneResolvingTXT(req.txt)
+			lg.Trace().Msg("txt domain resolved successfully")
 		case <-ctx.Done():
+			r.logger.Trace().Msg("processing txt worker terminated")
 			return
 		}
 	}
@@ -167,24 +172,38 @@ func (r *Resolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAdd
 // An expired domain on cache is still addressed through the cache, however, a request is fired up asynchronously
 // through the underlying basic resolver to resolve it from the network.
 func (r *Resolver) lookupIPAddr(ctx context.Context, domain string) ([]net.IPAddr, error) {
-	addr, exists, fresh := r.c.resolveIPCache(domain)
+	result := r.c.resolveIPCache(domain)
 
-	if !exists {
+	lg := r.logger.With().
+		Str("domain", domain).
+		Bool("cache_hit", result.exists).
+		Bool("cache_fresh", result.fresh).
+		Bool("locked_for_resolving", result.locked).Logger()
+
+	lg.Trace().Msg("ip lookup request arrived")
+
+	if !result.exists {
 		r.collector.OnDNSCacheMiss()
 		return r.lookupResolverForIPAddr(ctx, domain)
 	}
 
-	if !fresh && r.shouldResolveIP(domain) && !util.CheckClosed(r.cm.ShutdownSignal()) {
+	if !result.fresh && result.locked {
+		lg.Trace().Msg("ip expired, but a resolving is in progress, returning expired one for now")
+		return result.addresses, nil
+	}
+
+	if !result.fresh && r.c.shouldResolveIP(domain) && !util.CheckClosed(r.cm.ShutdownSignal()) {
 		select {
 		case r.ipRequests <- &lookupIPRequest{domain}:
+			lg.Trace().Msg("ip lookup request queued for resolving")
 		default:
-			r.logger.Warn().Str("domain", domain).Msg("IP lookup request queue is full, dropping request")
+			lg.Warn().Msg("ip lookup request queue is full, dropping request")
 			r.collector.OnDNSLookupRequestDropped()
 		}
 	}
 
 	r.collector.OnDNSCacheHit()
-	return addr, nil
+	return result.addresses, nil
 }
 
 // lookupResolverForIPAddr queries the underlying resolver for the domain and updates the cache if query is successful.
@@ -195,7 +214,7 @@ func (r *Resolver) lookupResolverForIPAddr(ctx context.Context, domain string) (
 	}
 
 	r.c.updateIPCache(domain, addr) // updates cache
-
+	r.logger.Info().Str("ip_domain", domain).Msg("domain updated in cache")
 	return addr, nil
 }
 
@@ -216,24 +235,38 @@ func (r *Resolver) LookupTXT(ctx context.Context, txt string) ([]string, error) 
 
 // lookupIPAddr encapsulates the logic of resolving a txt through cache.
 func (r *Resolver) lookupTXT(ctx context.Context, txt string) ([]string, error) {
-	addr, exists, fresh := r.c.resolveTXTCache(txt)
+	result := r.c.resolveTXTCache(txt)
 
-	if !exists {
+	lg := r.logger.With().
+		Str("txt", txt).
+		Bool("cache_hit", result.exists).
+		Bool("cache_fresh", result.fresh).
+		Bool("locked_for_resolving", result.locked).Logger()
+
+	lg.Trace().Msg("txt lookup request arrived")
+
+	if !result.exists {
 		r.collector.OnDNSCacheMiss()
 		return r.lookupResolverForTXTRecord(ctx, txt)
 	}
 
-	if !fresh && r.shouldResolveTXT(txt) && !util.CheckClosed(r.cm.ShutdownSignal()) {
+	if !result.fresh && result.locked {
+		lg.Trace().Msg("txt expired, but a resolving is in progress, returning expired one for now")
+		return result.records, nil
+	}
+
+	if !result.fresh && r.c.shouldResolveTXT(txt) && !util.CheckClosed(r.cm.ShutdownSignal()) {
 		select {
 		case r.txtRequests <- &lookupTXTRequest{txt}:
+			lg.Trace().Msg("ip lookup request queued for resolving")
 		default:
-			r.logger.Warn().Str("txt", txt).Msg("TXT lookup request queue is full, dropping request")
+			lg.Warn().Msg("txt lookup request queue is full, dropping request")
 			r.collector.OnDNSLookupRequestDropped()
 		}
 	}
 
 	r.collector.OnDNSCacheHit()
-	return addr, nil
+	return result.records, nil
 }
 
 // lookupResolverForTXTRecord queries the underlying resolver for the domain and updates the cache if query is successful.
@@ -244,48 +277,6 @@ func (r *Resolver) lookupResolverForTXTRecord(ctx context.Context, txt string) (
 	}
 
 	r.c.updateTXTCache(txt, addr) // updates cache
-
+	r.logger.Info().Str("txt_domain", txt).Msg("domain updated in cache")
 	return addr, nil
-}
-
-// shouldResolveIP returns true if there is no other concurrent attempt ongoing for resolving the domain.
-func (r *Resolver) shouldResolveIP(domain string) bool {
-	r.Lock()
-	defer r.Unlock()
-
-	if _, ok := r.processingIPs[domain]; !ok {
-		r.processingIPs[domain] = struct{}{}
-		return true
-	}
-
-	return false
-}
-
-// doneResolvingIP cleans up tracking an ongoing concurrent attempt for resolving domain.
-func (r *Resolver) doneResolvingIP(domain string) {
-	r.Lock()
-	defer r.Unlock()
-
-	delete(r.processingIPs, domain)
-}
-
-// doneResolvingIP cleans up tracking an ongoing concurrent attempt for resolving txt.
-func (r *Resolver) doneResolvingTXT(txt string) {
-	r.Lock()
-	defer r.Unlock()
-
-	delete(r.processingTXTs, txt)
-}
-
-// shouldResolveIP returns true if there is no other concurrent attempt ongoing for resolving the txt.
-func (r *Resolver) shouldResolveTXT(txt string) bool {
-	r.Lock()
-	defer r.Unlock()
-
-	if _, ok := r.processingTXTs[txt]; !ok {
-		r.processingTXTs[txt] = struct{}{}
-		return true
-	}
-
-	return false
 }

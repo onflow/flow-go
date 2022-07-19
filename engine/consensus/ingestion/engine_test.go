@@ -43,7 +43,7 @@ func (s *IngestionSuite) SetupTest() {
 
 	// set up network module mock
 	s.net = &mocknetwork.Network{}
-	s.net.On("Register", engine.ReceiveGuarantees, mock.Anything).Return(
+	s.net.On("Register", netint.ReceiveGuarantees, mock.Anything).Return(
 		func(channel netint.Channel, engine netint.MessageProcessor) netint.Conduit {
 			return s.con
 		},
@@ -90,7 +90,7 @@ func (s *IngestionSuite) TestSubmittingMultipleEntries() {
 			}).Return(true)
 
 			// execute the vote submission
-			_ = s.ingest.Process(engine.ProvideCollections, originID, guarantee)
+			_ = s.ingest.Process(netint.ProvideCollections, originID, guarantee)
 		}
 		wg.Done()
 	}()

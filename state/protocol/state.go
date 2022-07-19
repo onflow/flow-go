@@ -45,6 +45,9 @@ type MutableState interface {
 	// still checking that the given block is a valid extension of the protocol
 	// state. Depending on implementation it might be a lighter version that checks only
 	// block header.
+	// Expected errors during normal operations:
+	//  * state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
+	//  * state.InvalidExtensionError if the candidate block is invalid
 	Extend(ctx context.Context, candidate *flow.Block) error
 
 	// Finalize finalizes the block with the given hash.

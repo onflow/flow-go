@@ -27,9 +27,9 @@ func (r *Receipts) Add(receipt *flow.ExecutionReceipt) bool {
 	return added
 }
 
-// Rem will remove a receipt by ID.
-func (r *Receipts) Rem(receiptID flow.Identifier) bool {
-	removed := r.Backend.Rem(receiptID)
+// Remove will remove a receipt by ID.
+func (r *Receipts) Remove(receiptID flow.Identifier) bool {
+	removed := r.Backend.Remove(receiptID)
 	return removed
 }
 

@@ -4,11 +4,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -36,7 +35,7 @@ func NewReceiptValidator(state protocol.State,
 		headers:         headers,
 		index:           index,
 		results:         results,
-		signatureHasher: crypto.NewBLSKMAC(encoding.ExecutionReceiptTag),
+		signatureHasher: signature.NewBLSHasher(signature.ExecutionReceiptTag),
 		seals:           seals,
 	}
 
@@ -210,7 +209,7 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 
 	// Get the latest sealed result on this fork and the corresponding block,
 	// whose result is sealed. This block is not necessarily finalized.
-	lastSeal, err := v.seals.ByBlockID(header.ParentID)
+	lastSeal, err := v.seals.HighestInFork(header.ParentID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve latest seal for fork with head %x: %w", header.ParentID, err)
 	}
