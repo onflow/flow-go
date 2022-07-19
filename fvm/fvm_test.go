@@ -2,7 +2,6 @@ package fvm_test
 
 import (
 	"crypto/rand"
-	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"math"
@@ -1455,11 +1454,10 @@ func TestStorageUsed(t *testing.T) {
 	address, err := hex.DecodeString("2a3c4c2581cef731")
 	require.NoError(t, err)
 
-	storageUsed := make([]byte, 8)
-	binary.BigEndian.PutUint64(storageUsed, 5)
-
 	simpleView := utils.NewSimpleView()
-	err = simpleView.Set(string(address), state.KeyStorageUsed, storageUsed)
+	status := state.NewAccountStatus()
+	status.SetStorageUsed(5)
+	err = simpleView.Set(string(address), state.KeyAccountStatus, status.ToBytes())
 	require.NoError(t, err)
 
 	script := fvm.Script(code)
