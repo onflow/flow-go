@@ -767,7 +767,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, nil)
-	connFactory.On("InvalidateExecutionAPIClient", mock.Anything)
+	connFactory.On("InvalidateExecutionAPIClient", mock.Anything).Return(false)
 
 	exeEventReq := execproto.GetTransactionResultRequest{
 		BlockId:       blockID[:],
@@ -2162,7 +2162,7 @@ func (suite *Suite) TestExecuteScriptOnExecutionNode() {
 	connFactory := new(backendmock.ConnectionFactory)
 	connFactory.On("GetExecutionAPIClient", mock.Anything).
 		Return(suite.execClient, nil)
-	connFactory.On("InvalidateExecutionAPIClient", mock.Anything)
+	connFactory.On("InvalidateExecutionAPIClient", mock.Anything).Return(false)
 
 	// create the handler with the mock
 	backend := New(
@@ -2263,7 +2263,7 @@ func (suite *Suite) setupConnectionFactory() ConnectionFactory {
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, nil)
-	connFactory.On("InvalidateExecutionAPIClient", mock.Anything)
+	connFactory.On("InvalidateExecutionAPIClient", mock.Anything).Return(false)
 	return connFactory
 }
 

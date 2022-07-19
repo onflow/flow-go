@@ -136,18 +136,12 @@ func New(log zerolog.Logger,
 	// wrap the unsecured server with an HTTP proxy server to serve HTTP clients
 	httpServer := NewHTTPServer(unsecureGrpcServer, config.HTTPListenAddr)
 
-	// TODO: when cache size is set to 0, handle case where we do not use cache
 	cacheSize := config.ConnectionPoolSize
 	if cacheSize == 0 {
 		cacheSize = backend.DefaultConnectionPoolSize
 	}
 	cache, err := lru.NewWithEvict(int(cacheSize), func(_, evictedValue interface{}) {
-		store := evictedValue.(*backend.CachedClient)
-		store.Close()
-		log.Debug().Str("grpc_conn_evicted", store.Address).Msg("closing grpc connection evicted from pool")
-		if accessMetrics != nil {
-			accessMetrics.ConnectionFromPoolEvicted()
-		}
+		evictedValue.(*grpc.ClientConn).Close()
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize connection pool cache: %w", err)
@@ -161,7 +155,6 @@ func New(log zerolog.Logger,
 		ConnectionsCache:          cache,
 		CacheSize:                 cacheSize,
 		AccessMetrics:             accessMetrics,
-		Log:                       log,
 	}
 
 	backend := backend.New(state,

@@ -13,33 +13,8 @@ type AccessMetrics struct {
 	mock.Mock
 }
 
-// ConnectionAddedToPool provides a mock function with given fields:
-func (_m *AccessMetrics) ConnectionAddedToPool() {
-	_m.Called()
-}
-
-// ConnectionFromPoolEvicted provides a mock function with given fields:
-func (_m *AccessMetrics) ConnectionFromPoolEvicted() {
-	_m.Called()
-}
-
-// ConnectionFromPoolInvalidated provides a mock function with given fields:
-func (_m *AccessMetrics) ConnectionFromPoolInvalidated() {
-	_m.Called()
-}
-
-// ConnectionFromPoolReused provides a mock function with given fields:
-func (_m *AccessMetrics) ConnectionFromPoolReused() {
-	_m.Called()
-}
-
-// ConnectionFromPoolUpdated provides a mock function with given fields:
-func (_m *AccessMetrics) ConnectionFromPoolUpdated() {
-	_m.Called()
-}
-
-// NewConnectionEstablished provides a mock function with given fields:
-func (_m *AccessMetrics) NewConnectionEstablished() {
+// ConnectionFromPoolRetrieved provides a mock function with given fields:
+func (_m *AccessMetrics) ConnectionFromPoolRetrieved() {
 	_m.Called()
 }
 
