@@ -451,7 +451,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		err = view.Set(string(address.Bytes()), state.KeyAccountStatus, []byte{1})
+		err = view.Set(string(address.Bytes()), state.KeyAccountStatus, state.NewAccountStatus(state.InitValueForStorageIndex).ToBytes())
 		require.NoError(t, err)
 
 		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
@@ -526,7 +526,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		err = view.Set(string(address.Bytes()), state.KeyAccountStatus, []byte{1})
+		err = view.Set(string(address.Bytes()), state.KeyAccountStatus, state.NewAccountStatus(state.InitValueForStorageIndex).ToBytes())
 		require.NoError(t, err)
 
 		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
