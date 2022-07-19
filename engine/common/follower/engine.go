@@ -40,6 +40,25 @@ type Engine struct {
 	con            network.Conduit
 	sync           module.BlockRequester
 	tracer         module.Tracer
+	channel        channels.Channel
+}
+
+type Option func(*Engine)
+
+// WithComplianceOptions sets options for the engine's compliance config
+func WithComplianceOptions(opts ...compliance.Opt) Option {
+	return func(e *Engine) {
+		for _, apply := range opts {
+			apply(&e.config)
+		}
+	}
+}
+
+// WithChannel sets the channel the follower engine will use to receive blocks.
+func WithChannel(channel channels.Channel) Option {
+	return func(e *Engine) {
+		e.channel = channel
+	}
 }
 
 func New(
@@ -56,18 +75,12 @@ func New(
 	follower module.HotStuffFollower,
 	sync module.BlockRequester,
 	tracer module.Tracer,
-	opts ...compliance.Opt,
+	opts ...Option,
 ) (*Engine, error) {
-
-	config := compliance.DefaultConfig()
-	for _, apply := range opts {
-		apply(&config)
-	}
-
 	e := &Engine{
 		unit:           engine.NewUnit(),
 		log:            log.With().Str("engine", "follower").Logger(),
-		config:         config,
+		config:         compliance.DefaultConfig(),
 		me:             me,
 		engMetrics:     engMetrics,
 		mempoolMetrics: mempoolMetrics,
@@ -79,9 +92,14 @@ func New(
 		follower:       follower,
 		sync:           sync,
 		tracer:         tracer,
+		channel:        channels.ReceiveBlocks,
 	}
 
-	con, err := net.Register(channels.ReceiveBlocks, e)
+	for _, apply := range opts {
+		apply(e)
+	}
+
+	con, err := net.Register(e.channel, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine to network: %w", err)
 	}
