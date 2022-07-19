@@ -135,7 +135,7 @@ func (a *StatefulAccounts) Exists(address flow.Address) (bool, error) {
 		return false, err
 	}
 
-	// account doesn't exist
+	// account doesn't exist if account status doesn't exist
 	if len(accStatusBytes) == 0 {
 		return false, nil
 	}
@@ -592,33 +592,20 @@ func (a *StatefulAccounts) setAccountStatus(address flow.Address, status *Accoun
 }
 
 func (a *StatefulAccounts) GetAccountFrozen(address flow.Address) (bool, error) {
-	accStatusBytes, err := a.GetValue(address, KeyAccountStatus)
+	status, err := a.getAccountStatus(address)
 	if err != nil {
 		return false, err
 	}
-	accStatus, err := AccountStatusFromBytes(accStatusBytes)
-	if err != nil {
-		return false, err
-	}
-	// TODO introduce this logic later
-	// // if account does not exist, frozen is not meaningful
-	// if !accStatus.AccountExists() {
-	// return false, errors.NewAccountNotFoundError(address)
-	// }
-	return accStatus.IsAccountFrozen(), nil
+	return status.IsAccountFrozen(), nil
 }
 
 func (a *StatefulAccounts) SetAccountFrozen(address flow.Address, frozen bool) error {
-	accStatusBytes, err := a.GetValue(address, KeyAccountStatus)
+	status, err := a.getAccountStatus(address)
 	if err != nil {
 		return err
 	}
-	accStatus, err := AccountStatusFromBytes(accStatusBytes)
-	if err != nil {
-		return err
-	}
-	accStatus.SetFrozenFlag(frozen)
-	return a.SetValue(address, KeyAccountStatus, accStatus.ToBytes())
+	status.SetFrozenFlag(frozen)
+	return a.setAccountStatus(address, status)
 }
 
 // handy function to error out if account is frozen
