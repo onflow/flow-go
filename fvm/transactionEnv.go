@@ -4,8 +4,6 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"math/rand"
-	"time"
 
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
@@ -35,23 +33,13 @@ var _ runtime.Interface = &TransactionEnv{}
 
 // TransactionEnv is a read-write environment used for executing flow transactions.
 type TransactionEnv struct {
-	vm               *VirtualMachine
-	ctx              Context
-	sth              *state.StateHolder
-	programs         *handler.ProgramsHandler
-	accounts         state.Accounts
-	uuidGenerator    *state.UUIDGenerator
-	contracts        *handler.ContractHandler
-	accountKeys      *handler.AccountKeyHandler
-	metrics          *handler.MetricsHandler
+	commonEnv
+
 	eventHandler     *handler.EventHandler
 	addressGenerator flow.AddressGenerator
-	rng              *rand.Rand
-	logs             []string
 	tx               *flow.TransactionBody
 	txIndex          uint32
 	txID             flow.Identifier
-	traceSpan        opentracing.Span
 	authorizers      []runtime.Address
 }
 
@@ -79,20 +67,25 @@ func NewTransactionEnvironment(
 	metrics := handler.NewMetricsHandler(ctx.Metrics)
 
 	env := &TransactionEnv{
-		vm:               vm,
-		ctx:              ctx,
-		sth:              sth,
-		metrics:          metrics,
-		programs:         programsHandler,
-		accounts:         accounts,
-		accountKeys:      accountKeys,
+		commonEnv: commonEnv{
+			ctx:           ctx,
+			sth:           sth,
+			vm:            vm,
+			programs:      programsHandler,
+			accounts:      accounts,
+			accountKeys:   accountKeys,
+			uuidGenerator: uuidGenerator,
+			metrics:       metrics,
+			logs:          nil,
+			rng:           nil,
+			traceSpan:     traceSpan,
+		},
+
 		addressGenerator: generator,
-		uuidGenerator:    uuidGenerator,
 		eventHandler:     eventHandler,
 		tx:               tx,
 		txIndex:          txIndex,
 		txID:             tx.ID(),
-		traceSpan:        traceSpan,
 	}
 
 	env.contracts = handler.NewContractHandler(accounts,
@@ -204,26 +197,6 @@ func (e *TransactionEnv) TxIndex() uint32 {
 
 func (e *TransactionEnv) TxID() flow.Identifier {
 	return e.txID
-}
-
-func (e *TransactionEnv) Context() *Context {
-	return &e.ctx
-}
-
-func (e *TransactionEnv) VM() *VirtualMachine {
-	return e.vm
-}
-
-func (e *TransactionEnv) seedRNG(header *flow.Header) {
-	// Seed the random number generator with entropy created from the block header ID. The random number generator will
-	// be used by the UnsafeRandom function.
-	id := header.ID()
-	source := rand.NewSource(int64(binary.BigEndian.Uint64(id[:])))
-	e.rng = rand.New(source)
-}
-
-func (e *TransactionEnv) isTraceable() bool {
-	return e.ctx.Tracer != nil && e.traceSpan != nil
 }
 
 // GetAccountsAuthorizedForContractUpdate returns a list of addresses authorized to update/deploy contracts
@@ -1196,81 +1169,4 @@ func (e *TransactionEnv) getSigningAccounts() []runtime.Address {
 		}
 	}
 	return e.authorizers
-}
-
-func (e *TransactionEnv) ImplementationDebugLog(message string) error {
-	e.ctx.Logger.Debug().Msgf("Cadence: %s", message)
-	return nil
-}
-
-func (e *TransactionEnv) RecordTrace(operation string, location common.Location, duration time.Duration, logs []opentracing.LogRecord) {
-	if !e.isTraceable() {
-		return
-	}
-	if location != nil {
-		if logs == nil {
-			logs = make([]opentracing.LogRecord, 0)
-		}
-		logs = append(logs, opentracing.LogRecord{Timestamp: time.Now(),
-			Fields: []traceLog.Field{traceLog.String("location", location.String())},
-		})
-	}
-
-	spanName := trace.FVMCadenceTrace.Child(operation)
-	e.ctx.Tracer.RecordSpanFromParent(e.traceSpan, spanName, duration, logs)
-}
-
-func (e *TransactionEnv) ProgramParsed(location common.Location, duration time.Duration) {
-	e.RecordTrace("parseProgram", location, duration, nil)
-	e.metrics.ProgramParsed(location, duration)
-}
-
-func (e *TransactionEnv) ProgramChecked(location common.Location, duration time.Duration) {
-	e.RecordTrace("checkProgram", location, duration, nil)
-	e.metrics.ProgramChecked(location, duration)
-}
-
-func (e *TransactionEnv) ProgramInterpreted(location common.Location, duration time.Duration) {
-	e.RecordTrace("interpretProgram", location, duration, nil)
-	e.metrics.ProgramInterpreted(location, duration)
-}
-
-func (e *TransactionEnv) ValueEncoded(duration time.Duration) {
-	e.RecordTrace("encodeValue", nil, duration, nil)
-	e.metrics.ValueEncoded(duration)
-}
-
-func (e *TransactionEnv) ValueDecoded(duration time.Duration) {
-	e.RecordTrace("decodeValue", nil, duration, nil)
-	e.metrics.ValueDecoded(duration)
-}
-
-// Commit commits changes and return a list of updated keys
-func (e *TransactionEnv) Commit() ([]programs.ContractUpdateKey, error) {
-	// commit changes and return a list of updated keys
-	err := e.programs.Cleanup()
-	if err != nil {
-		return nil, err
-	}
-	return e.contracts.Commit()
-}
-
-func (e *TransactionEnv) BLSVerifyPOP(pk *runtime.PublicKey, sig []byte) (bool, error) {
-	return crypto.VerifyPOP(pk, sig)
-}
-
-func (e *TransactionEnv) BLSAggregateSignatures(sigs [][]byte) ([]byte, error) {
-	return crypto.AggregateSignatures(sigs)
-}
-
-func (e *TransactionEnv) BLSAggregatePublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
-	return crypto.AggregatePublicKeys(keys)
-}
-
-func (e *TransactionEnv) ResourceOwnerChanged(
-	*interpreter.Interpreter,
-	*interpreter.CompositeValue,
-	common.Address,
-	common.Address,
-) {
 }

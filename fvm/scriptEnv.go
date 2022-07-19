@@ -5,11 +5,8 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"math/rand"
-	"time"
 
 	"github.com/onflow/atree"
-	"github.com/opentracing/opentracing-go"
 	traceLog "github.com/opentracing/opentracing-go/log"
 
 	"github.com/onflow/cadence"
@@ -36,27 +33,9 @@ var _ Environment = &ScriptEnv{}
 
 // ScriptEnv is a read-only mostly used for executing scripts.
 type ScriptEnv struct {
-	ctx           Context
-	sth           *state.StateHolder
-	vm            *VirtualMachine
-	accounts      state.Accounts
-	contracts     *handler.ContractHandler
-	programs      *handler.ProgramsHandler
-	accountKeys   *handler.AccountKeyHandler
-	metrics       *handler.MetricsHandler
-	uuidGenerator *state.UUIDGenerator
-	logs          []string
-	rng           *rand.Rand
-	traceSpan     opentracing.Span
-	reqContext    context.Context
-}
+	commonEnv
 
-func (e *ScriptEnv) Context() *Context {
-	return &e.ctx
-}
-
-func (e *ScriptEnv) VM() *VirtualMachine {
-	return e.vm
+	reqContext context.Context
 }
 
 func NewScriptEnvironment(
@@ -74,15 +53,19 @@ func NewScriptEnvironment(
 	metrics := handler.NewMetricsHandler(fvmContext.Metrics)
 
 	env := &ScriptEnv{
-		ctx:           fvmContext,
-		sth:           sth,
-		vm:            vm,
-		metrics:       metrics,
-		accounts:      accounts,
-		accountKeys:   accountKeys,
-		uuidGenerator: uuidGenerator,
-		programs:      programsHandler,
-		reqContext:    reqContext,
+		commonEnv: commonEnv{
+			ctx:           fvmContext,
+			sth:           sth,
+			vm:            vm,
+			programs:      programsHandler,
+			accounts:      accounts,
+			accountKeys:   accountKeys,
+			uuidGenerator: uuidGenerator,
+			logs:          nil,
+			rng:           nil,
+			metrics:       metrics,
+		},
+		reqContext: reqContext,
 	}
 
 	env.contracts = handler.NewContractHandler(
@@ -169,18 +152,6 @@ func (e *ScriptEnv) setExecutionParameters() {
 	if err != nil {
 		return
 	}
-}
-
-func (e *ScriptEnv) seedRNG(header *flow.Header) {
-	// Seed the random number generator with entropy created from the block header ID. The random number generator will
-	// be used by the UnsafeRandom function.
-	id := header.ID()
-	source := rand.NewSource(int64(binary.BigEndian.Uint64(id[:])))
-	e.rng = rand.New(source)
-}
-
-func (e *ScriptEnv) isTraceable() bool {
-	return e.ctx.Tracer != nil && e.traceSpan != nil
 }
 
 func (e *ScriptEnv) GetValue(owner, key []byte) ([]byte, error) {
@@ -831,62 +802,6 @@ func (e *ScriptEnv) GetSigningAccounts() ([]runtime.Address, error) {
 	return nil, errors.NewOperationNotSupportedError("GetSigningAccounts")
 }
 
-func (e *ScriptEnv) ImplementationDebugLog(message string) error {
-	e.ctx.Logger.Debug().Msgf("Cadence: %s", message)
-	return nil
-}
-
-func (e *ScriptEnv) RecordTrace(operation string, location common.Location, duration time.Duration, logs []opentracing.LogRecord) {
-	if !e.isTraceable() {
-		return
-	}
-	if location != nil {
-		if logs == nil {
-			logs = make([]opentracing.LogRecord, 0)
-		}
-		logs = append(logs, opentracing.LogRecord{Timestamp: time.Now(),
-			Fields: []traceLog.Field{traceLog.String("location", location.String())},
-		})
-	}
-	spanName := trace.FVMCadenceTrace.Child(operation)
-	e.ctx.Tracer.RecordSpanFromParent(e.traceSpan, spanName, duration, logs)
-}
-
-func (e *ScriptEnv) ProgramParsed(location common.Location, duration time.Duration) {
-	e.RecordTrace("parseProgram", location, duration, nil)
-	e.metrics.ProgramParsed(location, duration)
-}
-
-func (e *ScriptEnv) ProgramChecked(location common.Location, duration time.Duration) {
-	e.RecordTrace("checkProgram", location, duration, nil)
-	e.metrics.ProgramChecked(location, duration)
-}
-
-func (e *ScriptEnv) ProgramInterpreted(location common.Location, duration time.Duration) {
-	e.RecordTrace("interpretProgram", location, duration, nil)
-	e.metrics.ProgramInterpreted(location, duration)
-}
-
-func (e *ScriptEnv) ValueEncoded(duration time.Duration) {
-	e.RecordTrace("encodeValue", nil, duration, nil)
-	e.metrics.ValueEncoded(duration)
-}
-
-func (e *ScriptEnv) ValueDecoded(duration time.Duration) {
-	e.RecordTrace("decodeValue", nil, duration, nil)
-	e.metrics.ValueDecoded(duration)
-}
-
-// Commit commits changes and return a list of updated keys
-func (e *ScriptEnv) Commit() ([]programs.ContractUpdateKey, error) {
-	// commit changes and return a list of updated keys
-	err := e.programs.Cleanup()
-	if err != nil {
-		return nil, err
-	}
-	return e.contracts.Commit()
-}
-
 // AllocateStorageIndex allocates new storage index under the owner accounts to store a new register
 func (e *ScriptEnv) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
 	err := e.meterComputation(meter.ComputationKindAllocateStorageIndex, 1)
@@ -899,24 +814,4 @@ func (e *ScriptEnv) AllocateStorageIndex(owner []byte) (atree.StorageIndex, erro
 		return atree.StorageIndex{}, fmt.Errorf("storage address allocation failed: %w", err)
 	}
 	return v, nil
-}
-
-func (e *ScriptEnv) BLSVerifyPOP(pk *runtime.PublicKey, sig []byte) (bool, error) {
-	return crypto.VerifyPOP(pk, sig)
-}
-
-func (e *ScriptEnv) BLSAggregateSignatures(sigs [][]byte) ([]byte, error) {
-	return crypto.AggregateSignatures(sigs)
-}
-
-func (e *ScriptEnv) BLSAggregatePublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
-	return crypto.AggregatePublicKeys(keys)
-}
-
-func (e *ScriptEnv) ResourceOwnerChanged(
-	*interpreter.Interpreter,
-	*interpreter.CompositeValue,
-	common.Address,
-	common.Address,
-) {
 }
