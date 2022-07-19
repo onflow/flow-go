@@ -28,7 +28,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	consensuspubsub "github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
-	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
+	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/crypto"
@@ -137,6 +137,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			HistoricalAccessAddrs:     "",
 			CollectionClientTimeout:   3 * time.Second,
 			ExecutionClientTimeout:    3 * time.Second,
+			ConnectionPoolSize:        backend.DefaultConnectionPoolSize,
 			MaxHeightRange:            backend.DefaultMaxHeightRange,
 			PreferredExecutionNodeIDs: nil,
 			FixedExecutionNodeIDs:     nil,
@@ -277,7 +278,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerCore() *FlowAccessNodeBuilder
 		// state when the follower detects newly finalized blocks
 		final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, builder.FollowerState, node.Tracer)
 
-		packer := hotsignature.NewConsensusSigDataPacker(builder.Committee)
+		packer := signature.NewConsensusSigDataPacker(builder.Committee)
 		// initialize the verifier for the protocol consensus
 		verifier := verification.NewCombinedVerifier(builder.Committee, packer)
 
@@ -545,6 +546,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.StringVarP(&builder.rpcConf.HistoricalAccessAddrs, "historical-access-addr", "", defaultConfig.rpcConf.HistoricalAccessAddrs, "comma separated rpc addresses for historical access nodes")
 		flags.DurationVar(&builder.rpcConf.CollectionClientTimeout, "collection-client-timeout", defaultConfig.rpcConf.CollectionClientTimeout, "grpc client timeout for a collection node")
 		flags.DurationVar(&builder.rpcConf.ExecutionClientTimeout, "execution-client-timeout", defaultConfig.rpcConf.ExecutionClientTimeout, "grpc client timeout for an execution node")
+		flags.UintVar(&builder.rpcConf.ConnectionPoolSize, "connection-pool-size", defaultConfig.rpcConf.ConnectionPoolSize, "maximum number of connections allowed in the connection pool")
 		flags.UintVar(&builder.rpcConf.MaxHeightRange, "rpc-max-height-range", defaultConfig.rpcConf.MaxHeightRange, "maximum size for height range requests")
 		flags.StringSliceVar(&builder.rpcConf.PreferredExecutionNodeIDs, "preferred-execution-node-ids", defaultConfig.rpcConf.PreferredExecutionNodeIDs, "comma separated list of execution nodes ids to choose from when making an upstream call e.g. b4a4dbdcd443d...,fb386a6a... etc.")
 		flags.StringSliceVar(&builder.rpcConf.FixedExecutionNodeIDs, "fixed-execution-node-ids", defaultConfig.rpcConf.FixedExecutionNodeIDs, "comma separated list of execution nodes ids to choose from when making an upstream call if no matching preferred execution id is found e.g. b4a4dbdcd443d...,fb386a6a... etc.")
@@ -588,6 +590,9 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			if builder.executionDataConfig.MaxSearchAhead == 0 {
 				return errors.New("execution-data-max-search-ahead must be greater than 0")
 			}
+		}
+		if builder.rpcConf.ConnectionPoolSize == 0 {
+			return errors.New("connection-pool-size must be greater than 0")
 		}
 
 		return nil
@@ -826,8 +831,10 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return nil, err
 			}
 
-			engineBuilder.WithLegacy()
-			builder.RpcEng = engineBuilder.Build()
+			builder.RpcEng = engineBuilder.
+				WithLegacy().
+				WithBlockSignerDecoder(signature.NewBlockSignerDecoder(builder.Committee)).
+				Build()
 			return builder.RpcEng, nil
 		}).
 		Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {

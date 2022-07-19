@@ -25,9 +25,9 @@ import (
 type BaseApprovalsTestSuite struct {
 	suite.Suite
 
-	ParentBlock         flow.Header     // parent of sealing candidate
-	Block               flow.Header     // candidate for sealing
-	IncorporatedBlock   flow.Header     // block that incorporated result
+	ParentBlock         *flow.Header    // parent of sealing candidate
+	Block               *flow.Header    // candidate for sealing
+	IncorporatedBlock   *flow.Header    // block that incorporated result
 	VerID               flow.Identifier // for convenience, node id of first verifier
 	Chunks              flow.ChunkList  // list of chunks of execution result
 	ChunksAssignment    *chunks.Assignment
@@ -39,7 +39,7 @@ type BaseApprovalsTestSuite struct {
 
 func (s *BaseApprovalsTestSuite) SetupTest() {
 	s.ParentBlock = unittest.BlockHeaderFixture()
-	s.Block = unittest.BlockHeaderWithParentFixture(&s.ParentBlock)
+	s.Block = unittest.BlockHeaderWithParentFixture(s.ParentBlock)
 	verifiers := make(flow.IdentifierList, 0)
 	s.AuthorizedVerifiers = make(map[flow.Identifier]*flow.Identity)
 	s.ChunksAssignment = chunks.NewAssignment()
@@ -67,7 +67,7 @@ func (s *BaseApprovalsTestSuite) SetupTest() {
 	result.BlockID = s.Block.ID()
 	result.Chunks = s.Chunks
 
-	s.IncorporatedBlock = unittest.BlockHeaderWithParentFixture(&s.Block)
+	s.IncorporatedBlock = unittest.BlockHeaderWithParentFixture(s.Block)
 
 	// compose incorporated result
 	s.IncorporatedResult = unittest.IncorporatedResult.Fixture(
@@ -106,14 +106,14 @@ func (s *BaseAssignmentCollectorTestSuite) SetupTest() {
 	s.RequestTracker = NewRequestTracker(s.Headers, 1, 3)
 
 	s.FinalizedAtHeight = make(map[uint64]*flow.Header)
-	s.FinalizedAtHeight[s.ParentBlock.Height] = &s.ParentBlock
-	s.FinalizedAtHeight[s.Block.Height] = &s.Block
+	s.FinalizedAtHeight[s.ParentBlock.Height] = s.ParentBlock
+	s.FinalizedAtHeight[s.Block.Height] = s.Block
 
 	// setup blocks cache for protocol state
 	s.Blocks = make(map[flow.Identifier]*flow.Header)
-	s.Blocks[s.ParentBlock.ID()] = &s.ParentBlock
-	s.Blocks[s.Block.ID()] = &s.Block
-	s.Blocks[s.IncorporatedBlock.ID()] = &s.IncorporatedBlock
+	s.Blocks[s.ParentBlock.ID()] = s.ParentBlock
+	s.Blocks[s.Block.ID()] = s.Block
+	s.Blocks[s.IncorporatedBlock.ID()] = s.IncorporatedBlock
 	s.Snapshots = make(map[flow.Identifier]*protocol.Snapshot)
 
 	// setup identities for each block

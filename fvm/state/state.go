@@ -22,7 +22,7 @@ const (
 )
 
 type mapKey struct {
-	owner, controller, key string
+	owner, key string
 }
 
 // State represents the execution state
@@ -110,18 +110,18 @@ func (s *State) InteractionUsed() uint64 {
 	return s.TotalBytesRead + s.TotalBytesWritten
 }
 
-// Get returns a register value given owner, controller and key
-func (s *State) Get(owner, controller, key string, enforceLimit bool) (flow.RegisterValue, error) {
+// Get returns a register value given owner and key
+func (s *State) Get(owner, key string, enforceLimit bool) (flow.RegisterValue, error) {
 	var value []byte
 	var err error
 
 	if enforceLimit {
-		if err = s.checkSize(owner, controller, key, []byte{}); err != nil {
+		if err = s.checkSize(owner, key, []byte{}); err != nil {
 			return nil, err
 		}
 	}
 
-	if value, err = s.view.Get(owner, controller, key); err != nil {
+	if value, err = s.view.Get(owner, key); err != nil {
 		// wrap error into a fatal error
 		getError := errors.NewLedgerFailure(err)
 		// wrap with more info
@@ -129,10 +129,9 @@ func (s *State) Get(owner, controller, key string, enforceLimit bool) (flow.Regi
 	}
 
 	// if not part of recent updates count them as read
-	if _, ok := s.updateSize[mapKey{owner, controller, key}]; !ok {
+	if _, ok := s.updateSize[mapKey{owner, key}]; !ok {
 		s.ReadCounter++
-		s.TotalBytesRead += uint64(len(owner) +
-			len(controller) + len(key) + len(value))
+		s.TotalBytesRead += uint64(len(owner) + len(key) + len(value))
 	}
 
 	if enforceLimit {
@@ -143,14 +142,14 @@ func (s *State) Get(owner, controller, key string, enforceLimit bool) (flow.Regi
 }
 
 // Set updates state delta with a register update
-func (s *State) Set(owner, controller, key string, value flow.RegisterValue, enforceLimit bool) error {
+func (s *State) Set(owner, key string, value flow.RegisterValue, enforceLimit bool) error {
 	if enforceLimit {
-		if err := s.checkSize(owner, controller, key, value); err != nil {
+		if err := s.checkSize(owner, key, value); err != nil {
 			return err
 		}
 	}
 
-	if err := s.view.Set(owner, controller, key, value); err != nil {
+	if err := s.view.Set(owner, key, value); err != nil {
 		// wrap error into a fatal error
 		setError := errors.NewLedgerFailure(err)
 		// wrap with more info
@@ -167,13 +166,13 @@ func (s *State) Set(owner, controller, key string, value flow.RegisterValue, enf
 		s.updatedAddresses[address] = struct{}{}
 	}
 
-	mapKey := mapKey{owner, controller, key}
+	mapKey := mapKey{owner, key}
 	if old, ok := s.updateSize[mapKey]; ok {
 		s.WriteCounter--
 		s.TotalBytesWritten -= old
 	}
 
-	updateSize := uint64(len(owner) + len(controller) + len(key) + len(value))
+	updateSize := uint64(len(owner) + len(key) + len(value))
 	s.WriteCounter++
 	s.TotalBytesWritten += updateSize
 	s.updateSize[mapKey] = updateSize
@@ -182,13 +181,13 @@ func (s *State) Set(owner, controller, key string, value flow.RegisterValue, enf
 }
 
 // Delete deletes a register
-func (s *State) Delete(owner, controller, key string, enforceLimit bool) error {
-	return s.Set(owner, controller, key, nil, enforceLimit)
+func (s *State) Delete(owner, key string, enforceLimit bool) error {
+	return s.Set(owner, key, nil, enforceLimit)
 }
 
 // Touch touches a register
-func (s *State) Touch(owner, controller, key string) error {
-	return s.view.Touch(owner, controller, key)
+func (s *State) Touch(owner, key string) error {
+	return s.view.Touch(owner, key)
 }
 
 // MeterComputation meters computation usage
@@ -304,11 +303,11 @@ func (s *State) checkMaxInteraction() error {
 	return nil
 }
 
-func (s *State) checkSize(owner, controller, key string, value flow.RegisterValue) error {
-	keySize := uint64(len(owner) + len(controller) + len(key))
+func (s *State) checkSize(owner, key string, value flow.RegisterValue) error {
+	keySize := uint64(len(owner) + len(key))
 	valueSize := uint64(len(value))
 	if keySize > s.maxKeySizeAllowed {
-		return errors.NewStateKeySizeLimitError(owner, controller, key, keySize, s.maxKeySizeAllowed)
+		return errors.NewStateKeySizeLimitError(owner, key, keySize, s.maxKeySizeAllowed)
 	}
 	if valueSize > s.maxValueSizeAllowed {
 		return errors.NewStateValueSizeLimitError(value, valueSize, s.maxValueSizeAllowed)
@@ -329,46 +328,45 @@ func addressFromOwner(owner string) (flow.Address, bool) {
 // IsFVMStateKey returns true if the
 // key is controlled by the fvm env and
 // return false otherwise (key controlled by the cadence env)
-func IsFVMStateKey(owner, controller, key string) bool {
+func IsFVMStateKey(owner, key string) bool {
 
-	// check if is a service level key (owner and controller is empty)
+	// check if is a service level key (owner is empty)
 	// cases:
-	// 		- "", "", "uuid"
-	// 		- "", "", "account_address_state"
-	if len(owner) == 0 && len(controller) == 0 {
+	// 		- "", "uuid"
+	// 		- "", "account_address_state"
+	if len(owner) == 0 {
 		return true
 	}
 	// check account level keys
 	// cases:
-	// 		- address, "", "public_key_count"
-	// 		- address, "", "public_key_%d" (index)
-	// 		- address, "", "contract_names"
-	// 		- address, "", "code.%s" (contract name)
-	// 		- address, "", exists
-	// 		- address, "", "storage_used"
-	// 		- address, "", "frozen"
-	if len(controller) == 0 {
-		if key == KeyPublicKeyCount {
-			return true
-		}
-		if bytes.HasPrefix([]byte(key), []byte("public_key_")) {
-			return true
-		}
-		if key == KeyContractNames {
-			return true
-		}
-		if bytes.HasPrefix([]byte(key), []byte(KeyCode)) {
-			return true
-		}
-		if key == KeyAccountStatus {
-			return true
-		}
-		if key == KeyStorageUsed {
-			return true
-		}
-		if key == KeyStorageIndex {
-			return true
-		}
+	// 		- address, "public_key_count"
+	// 		- address, "public_key_%d" (index)
+	// 		- address, "contract_names"
+	// 		- address, "code.%s" (contract name)
+	// 		- address, exists
+	// 		- address, "storage_used"
+	// 		- address, "frozen"
+
+	if key == KeyPublicKeyCount {
+		return true
+	}
+	if bytes.HasPrefix([]byte(key), []byte("public_key_")) {
+		return true
+	}
+	if key == KeyContractNames {
+		return true
+	}
+	if bytes.HasPrefix([]byte(key), []byte(KeyCode)) {
+		return true
+	}
+	if key == KeyAccountStatus {
+		return true
+	}
+	if key == KeyStorageUsed {
+		return true
+	}
+	if key == KeyStorageIndex {
+		return true
 	}
 
 	return false

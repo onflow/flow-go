@@ -45,7 +45,7 @@ func TestExecutionForkWithDuplicateAssignedChunks(t *testing.T) {
 	mockResultsByIDs(s.results, []*flow.ExecutionResult{resultA, resultB})
 	mockBlocksStorage(s.blocks, s.headers, block)
 	mockPendingChunksAdd(t, s.pendingChunks, assignedChunkStatuses, true)
-	mockPendingChunksRem(t, s.pendingChunks, assignedChunkStatuses, true)
+	mockPendingChunksRemove(t, s.pendingChunks, assignedChunkStatuses, true)
 	mockPendingChunksGet(s.pendingChunks, assignedChunkStatuses)
 
 	// fetcher engine must create a chunk data request for each of chunk statusA and statusB

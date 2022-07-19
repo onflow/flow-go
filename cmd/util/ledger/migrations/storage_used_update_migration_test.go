@@ -35,7 +35,7 @@ func TestStorageUsedUpdateMigrationMigration(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, len(migratedPayload), len(payload))
-		require.Equal(t, uint64(52), migratedSize)
+		require.Equal(t, uint64(48), migratedSize)
 	})
 
 	t.Run("fix storage used if used to high", func(t *testing.T) {
@@ -50,7 +50,7 @@ func TestStorageUsedUpdateMigrationMigration(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, len(migratedPayload), len(payload))
-		require.Equal(t, uint64(52), migratedSize)
+		require.Equal(t, uint64(48), migratedSize)
 	})
 
 	t.Run("do not fix storage used if storage used ok", func(t *testing.T) {
@@ -65,7 +65,7 @@ func TestStorageUsedUpdateMigrationMigration(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, len(migratedPayload), len(payload))
-		require.Equal(t, uint64(52), migratedSize)
+		require.Equal(t, uint64(48), migratedSize)
 	})
 
 	t.Run("error is storage used does not exist", func(t *testing.T) {
@@ -81,7 +81,6 @@ func createAccountPayloadKey(a flow.Address, key string) ledger.Key {
 	return ledger.Key{
 		KeyParts: []ledger.KeyPart{
 			ledger.NewKeyPart(state.KeyPartOwner, a.Bytes()),
-			ledger.NewKeyPart(state.KeyPartController, []byte("")),
 			ledger.NewKeyPart(state.KeyPartKey, []byte(key)),
 		},
 	}
