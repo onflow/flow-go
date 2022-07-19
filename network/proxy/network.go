@@ -3,6 +3,7 @@ package proxy
 import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 )
 
 type ProxyNetwork struct {
@@ -20,7 +21,7 @@ func NewProxyNetwork(net network.Network, targetNodeID flow.Identifier) *ProxyNe
 }
 
 // Register registers an engine with the proxy network.
-func (n *ProxyNetwork) Register(channel network.Channel, engine network.Engine) (network.Conduit, error) {
+func (n *ProxyNetwork) Register(channel channels.Channel, engine network.Engine) (network.Conduit, error) {
 	con, err := n.Network.Register(channel, engine)
 
 	if err != nil {

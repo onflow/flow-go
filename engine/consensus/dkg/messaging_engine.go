@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/sethvargo/go-retry"
-
 	"github.com/rs/zerolog"
+	"github.com/sethvargo/go-retry"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -15,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/dkg"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 )
 
 // retryMax is the maximum number of times the engine will attempt to forward
@@ -56,7 +56,7 @@ func NewMessagingEngine(
 	}
 
 	var err error
-	eng.conduit, err = net.Register(network.DKGCommittee, &eng)
+	eng.conduit, err = net.Register(channels.DKGCommittee, &eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register dkg network engine: %w", err)
 	}
@@ -90,7 +90,7 @@ func (e *MessagingEngine) SubmitLocal(event interface{}) {
 }
 
 // Submit implements the network Engine interface
-func (e *MessagingEngine) Submit(_ network.Channel, originID flow.Identifier, event interface{}) {
+func (e *MessagingEngine) Submit(_ channels.Channel, originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.process(originID, event)
 		if engine.IsInvalidInputError(err) {
@@ -114,7 +114,7 @@ func (e *MessagingEngine) ProcessLocal(event interface{}) error {
 }
 
 // Process implements the network Engine interface
-func (e *MessagingEngine) Process(_ network.Channel, originID flow.Identifier, event interface{}) error {
+func (e *MessagingEngine) Process(_ channels.Channel, originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		return e.process(originID, event)
 	})
