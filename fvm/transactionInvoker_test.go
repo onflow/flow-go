@@ -68,7 +68,7 @@ func TestSafetyCheck(t *testing.T) {
 			err = view.Set(
 				string(contractAddress.Bytes()),
 				state.KeyAccountStatus,
-				state.NewAccountStatus(),
+				state.NewAccountStatus(state.InitValueForStorageIndex).ToBytes(),
 			)
 			require.NoError(t, err)
 
@@ -144,7 +144,7 @@ func TestSafetyCheck(t *testing.T) {
 		err = view.Set(
 			string(contractAddress.Bytes()),
 			state.KeyAccountStatus,
-			state.NewAccountStatus(),
+			state.NewAccountStatus(state.InitValueForStorageIndex).ToBytes(),
 		)
 		require.NoError(t, err)
 		err = view.Set(

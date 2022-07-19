@@ -34,27 +34,27 @@ const (
 // find any account with frozen flags.
 type AccountStatusMigration struct {
 	logger    zerolog.Logger
-	statuses  map[string]fvmState.AccountStatus
+	statuses  map[string]*fvmState.AccountStatus
 	keyCounts map[string]uint64
 }
 
 func NewAccountStatusMigration(logger zerolog.Logger) *AccountStatusMigration {
 	return &AccountStatusMigration{
 		logger:    logger,
-		statuses:  make(map[string]fvmState.AccountStatus),
+		statuses:  make(map[string]*fvmState.AccountStatus),
 		keyCounts: make(map[string]uint64),
 	}
 }
 
-func (as *AccountStatusMigration) getOrInitStatus(owner []byte) fvmState.AccountStatus {
+func (as *AccountStatusMigration) getOrInitStatus(owner []byte) *fvmState.AccountStatus {
 	st, exist := as.statuses[string(owner)]
 	if !exist {
-		return fvmState.NewAccountStatus()
+		return fvmState.NewAccountStatus(fvmState.InitValueForStorageIndex)
 	}
 	return st
 }
 
-func (as *AccountStatusMigration) setStatus(owner []byte, st fvmState.AccountStatus) {
+func (as *AccountStatusMigration) setStatus(owner []byte, st *fvmState.AccountStatus) {
 	as.statuses[string(owner)] = st
 }
 

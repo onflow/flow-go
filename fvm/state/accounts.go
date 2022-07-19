@@ -23,6 +23,10 @@ const (
 	MaxPublicKeyCount = math.MaxUint64
 )
 
+var (
+	InitValueForStorageIndex = atree.StorageIndex{0, 0, 0, 0, 0, 0, 0, 1}
+)
+
 type Accounts interface {
 	Exists(address flow.Address) (bool, error)
 	Get(address flow.Address) (*flow.Account, error)
@@ -73,13 +77,15 @@ func (a *StatefulAccounts) AllocateStorageIndex(address flow.Address) (atree.Sto
 	key := atree.SlabIndexToLedgerKey(index)
 	err = a.stateHolder.State().Set(string(address.Bytes()), string(key), []byte{}, false)
 	if err != nil {
-		return atree.StorageIndex{}, fmt.Errorf("failed to store empty value for newly allocated storage index: %w", err)
+		return atree.StorageIndex{}, fmt.Errorf("failed to allocate an storage index: %w", err)
 	}
 
 	// update the storageIndex bytes
 	status.SetStorageIndex(newIndexBytes)
-	a.setAccountStatus(address, status)
-
+	err = a.setAccountStatus(address, status)
+	if err != nil {
+		return atree.StorageIndex{}, fmt.Errorf("failed to allocate an storage index: %w", err)
+	}
 	return index, nil
 }
 
@@ -134,12 +140,13 @@ func (a *StatefulAccounts) Exists(address flow.Address) (bool, error) {
 		return false, nil
 	}
 
-	accStatus, err := AccountStatusFromBytes(accStatusBytes)
+	// check if we can construct account status from the value of this register
+	_, err = AccountStatusFromBytes(accStatusBytes)
 	if err != nil {
 		return false, err
 	}
 
-	return accStatus.AccountExists(), nil
+	return true, nil
 }
 
 // Create account sets all required registers on an address.
@@ -152,9 +159,8 @@ func (a *StatefulAccounts) Create(publicKeys []flow.AccountPublicKey, newAddress
 		return errors.NewAccountAlreadyExistsError(newAddress)
 	}
 
-	accountStatus := NewAccountStatus()
+	accountStatus := NewAccountStatus(InitValueForStorageIndex)
 	accountStatus.SetStorageUsed(uint64(RegisterSize(newAddress, KeyAccountStatus, accountStatus.ToBytes())))
-	accountStatus.SetStorageIndex(atree.StorageIndex{0, 0, 0, 0, 0, 0, 0, 1})
 
 	err = a.setAccountStatus(newAddress, accountStatus)
 	if err != nil {
@@ -568,7 +574,7 @@ func (a *StatefulAccounts) DeleteContract(contractName string, address flow.Addr
 	return a.setContractNames(contractNames, address)
 }
 
-func (a *StatefulAccounts) getAccountStatus(address flow.Address) (AccountStatus, error) {
+func (a *StatefulAccounts) getAccountStatus(address flow.Address) (*AccountStatus, error) {
 	statusBytes, err := a.GetValue(address, KeyAccountStatus)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load account status for the account (%s): %w", address.String(), err)
@@ -577,7 +583,7 @@ func (a *StatefulAccounts) getAccountStatus(address flow.Address) (AccountStatus
 	return AccountStatusFromBytes(statusBytes)
 }
 
-func (a *StatefulAccounts) setAccountStatus(address flow.Address, status AccountStatus) error {
+func (a *StatefulAccounts) setAccountStatus(address flow.Address, status *AccountStatus) error {
 	err := a.SetValue(address, KeyAccountStatus, status.ToBytes())
 	if err != nil {
 		return fmt.Errorf("failed to store the account status for account (%s): %w", address.String(), err)

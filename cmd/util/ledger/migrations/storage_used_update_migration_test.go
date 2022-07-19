@@ -23,7 +23,7 @@ func TestStorageUsedUpdateMigrationMigration(t *testing.T) {
 	address1 := flow.HexToAddress("0x1")
 
 	t.Run("fix storage used", func(t *testing.T) {
-		status := state2.NewAccountStatus()
+		status := state2.NewAccountStatus(state2.InitValueForStorageIndex)
 		status.SetStorageUsed(1)
 		payload := []ledger.Payload{
 			// TODO (ramtin) add more registers
@@ -40,7 +40,7 @@ func TestStorageUsedUpdateMigrationMigration(t *testing.T) {
 	})
 
 	t.Run("fix storage used if used to high", func(t *testing.T) {
-		status := state2.NewAccountStatus()
+		status := state2.NewAccountStatus(state2.InitValueForStorageIndex)
 		status.SetStorageUsed(10000)
 		payload := []ledger.Payload{
 			{Key: createAccountPayloadKey(address1, state2.KeyAccountStatus), Value: status.ToBytes()},
@@ -56,7 +56,7 @@ func TestStorageUsedUpdateMigrationMigration(t *testing.T) {
 	})
 
 	t.Run("do not fix storage used if storage used ok", func(t *testing.T) {
-		status := state2.NewAccountStatus()
+		status := state2.NewAccountStatus(state2.InitValueForStorageIndex)
 		status.SetStorageUsed(40)
 		payload := []ledger.Payload{
 			{Key: createAccountPayloadKey(address1, state2.KeyAccountStatus), Value: status.ToBytes()},

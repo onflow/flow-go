@@ -41,7 +41,7 @@ func TestAccountStatusMigration(t *testing.T) {
 	require.True(t, newPayloads[3].Equals(&payloads[7]))
 
 	// check address one status
-	expectedStatus := state.NewAccountStatus()
+	expectedStatus := state.NewAccountStatus(state.InitValueForStorageIndex)
 	expectedStatus.SetFrozenFlag(true)
 	expectedStatus.SetPublicKeyCount(2)
 	expectedStatus.SetStorageUsed(12)

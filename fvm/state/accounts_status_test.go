@@ -12,17 +12,14 @@ import (
 
 func TestAccountStatus(t *testing.T) {
 
-	s := state.NewAccountStatus()
-	require.True(t, s.AccountExists())
+	s := state.NewAccountStatus(state.InitValueForStorageIndex)
 	require.False(t, s.IsAccountFrozen())
 
 	t.Run("test frozen flag set/reset", func(t *testing.T) {
 		s.SetFrozenFlag(true)
-		require.True(t, s.AccountExists())
 		require.True(t, s.IsAccountFrozen())
 
 		s.SetFrozenFlag(false)
-		require.True(t, s.AccountExists())
 		require.False(t, s.IsAccountFrozen())
 	})
 
@@ -45,9 +42,9 @@ func TestAccountStatus(t *testing.T) {
 	})
 
 	t.Run("test serialization", func(t *testing.T) {
-		clone, err := state.AccountStatusFromBytes(s.ToBytes())
+		b := append([]byte(nil), s.ToBytes()...)
+		clone, err := state.AccountStatusFromBytes(b)
 		require.NoError(t, err)
-		require.Equal(t, s.AccountExists(), clone.AccountExists())
 		require.Equal(t, s.IsAccountFrozen(), clone.IsAccountFrozen())
 		require.Equal(t, s.StorageIndex(), clone.StorageIndex())
 		require.Equal(t, s.PublicKeyCount(), clone.PublicKeyCount())
