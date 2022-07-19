@@ -38,8 +38,7 @@ const (
 	maskFrozen byte = 0b1000_0000
 )
 
-// NewAccountStatus return a new AccountStatus
-
+// NewAccountStatus returns a new AccountStatus
 func NewAccountStatus(storageIndex atree.StorageIndex) *AccountStatus {
 	var as AccountStatus
 	as.SetStorageIndex(storageIndex)
