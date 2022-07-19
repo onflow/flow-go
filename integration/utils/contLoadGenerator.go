@@ -229,7 +229,7 @@ func (lg *ContLoadGenerator) Stop() {
 		f, err := os.OpenFile("avgTps.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err == nil {
 			totalTPSstring := fmt.Sprintf(
-				"\nTPS:%.4f, Time:%v, Txs:%v",
+				"\nInput TPS:%.4f, Time:%v, Txs:%v",
 				totalTPS,
 				lg.stopTime.Sub(lg.startTime),
 				lg.workerStatsTracker.TotalTxs())

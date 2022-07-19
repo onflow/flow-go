@@ -3,8 +3,12 @@ package main
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"flag"
+	"fmt"
+	"io"
 	"net"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -177,10 +181,14 @@ func main() {
 				return
 			}
 
+			preTestTransactionAverage := getPrometheusTotalTransactions()
 			lg.StartTime()
 			time.Sleep(c.duration)
 			lg.StopTime()
+			postTestTransactionAverage := getPrometheusTotalTransactions()
 
+			printPrometheusTPS(preTestTransactionAverage, postTestTransactionAverage, c.duration)
+			fmt.Println("TPS data finished writing to file.")
 			if lg != nil {
 				lg.Stop()
 			}
@@ -188,6 +196,69 @@ func main() {
 	}()
 
 	<-ctx.Done()
+}
+
+func getPrometheusTotalTransactions() float64 {
+	resp, err := http.Get("http://localhost:9090/api/v1/query?query=execution_runtime_total_executed_transactions")
+	if err != nil {
+		// error handling
+		println("Error getting prometheus data")
+		return -1
+	}
+
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Printf("Error reading response body, %v", err)
+		return -1
+	}
+
+	var result map[string]interface{}
+
+	err = json.Unmarshal([]byte(body), &result)
+	if err != nil {
+		fmt.Printf("Error unmarshaling json, %v", err)
+		return -1
+	}
+
+	totalTxs := 0
+	executionNodeCount := 0
+
+	resultMap := result["data"].(map[string]interface{})["result"].([]interface{})
+
+	for i, executionNodeMap := range resultMap {
+		executionNodeCount = i
+		nodeMap, _ := executionNodeMap.(map[string]interface{})
+		values := nodeMap["value"].([]interface{})
+		nodeTxsStr := values[1].(string)
+		nodeTxsInt, _ := strconv.Atoi(nodeTxsStr)
+		totalTxs = totalTxs + nodeTxsInt
+	}
+
+	if executionNodeCount == 0 {
+		println("No execution nodes found. No transactions.")
+		return 0
+	}
+
+	avgTps := float64(totalTxs) / float64(executionNodeCount)
+	return avgTps
+}
+
+func printPrometheusTPS(preCount float64, postCount float64, duration time.Duration) {
+	totalTxs := postCount - preCount
+	totalTPS := totalTxs / duration.Seconds()
+	f, err := os.OpenFile("avgTps.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err == nil {
+		totalTPSstring := fmt.Sprintf(
+			"\nOutput TPS:%.4f, Time:%v, Txs:%v",
+			totalTPS,
+			duration,
+			totalTxs)
+		f.Write([]byte(totalTPSstring))
+		f.Close()
+	} else {
+		fmt.Println(err)
+	}
 }
 
 func parseLoadCases(log zerolog.Logger, tpsFlag, tpsDurationsFlag *string) []LoadCase {
