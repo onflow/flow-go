@@ -61,12 +61,10 @@ func (a *AccountStatus) ToBytes() []byte {
 
 // AccountStatusFromBytes constructs an AccountStatus from the given byte slice
 func AccountStatusFromBytes(inp []byte) (*AccountStatus, error) {
-	var as AccountStatus
 	if len(inp) != accountStatusSize {
-		return &as, errors.NewValueErrorf(hex.EncodeToString(inp), "invalid account status size")
+		return nil, errors.NewValueErrorf(hex.EncodeToString(inp), "invalid account status size")
 	}
-	copy(as[:], inp)
-	return &as, nil
+	return (*AccountStatus)(inp), nil
 }
 
 // IsAccountFrozen returns true if account's frozen flag is set
@@ -75,17 +73,23 @@ func (a *AccountStatus) IsAccountFrozen() bool {
 }
 
 // SetFrozenFlag sets the frozen flag
-func (a *AccountStatus) SetFrozenFlag(frozen bool) {
+func (a *AccountStatus) SetFrozenFlag(frozen bool) *AccountStatus {
+	var ret AccountStatus
+	copy(ret[:], a[:])
 	if frozen {
-		a[flagIndex] = a[flagIndex] | maskFrozen
-		return
+		ret[flagIndex] = a[flagIndex] | maskFrozen
+		return &ret
 	}
-	a[flagIndex] = a[flagIndex] & (0xFF - maskFrozen)
+	ret[flagIndex] = a[flagIndex] & (0xFF - maskFrozen)
+	return &ret
 }
 
 // SetStorageUsed updates the storage used by the account
-func (a *AccountStatus) SetStorageUsed(used uint64) {
-	binary.BigEndian.PutUint64(a[storageUsedStartIndex:storageUsedStartIndex+storageUsedSize], used)
+func (a *AccountStatus) SetStorageUsed(used uint64) *AccountStatus {
+	var ret AccountStatus
+	copy(ret[:], a[:])
+	binary.BigEndian.PutUint64(ret[storageUsedStartIndex:storageUsedStartIndex+storageUsedSize], used)
+	return &ret
 }
 
 // StorageUsed returns the storage used by the account
@@ -94,8 +98,11 @@ func (a *AccountStatus) StorageUsed() uint64 {
 }
 
 // SetStorageIndex updates the storage index of the account
-func (a *AccountStatus) SetStorageIndex(index atree.StorageIndex) {
-	copy(a[storageIndexStartIndex:storageIndexStartIndex+storageIndexSize], index[:storageIndexSize])
+func (a *AccountStatus) SetStorageIndex(index atree.StorageIndex) *AccountStatus {
+	var ret AccountStatus
+	copy(ret[:], a[:])
+	copy(ret[storageIndexStartIndex:storageIndexStartIndex+storageIndexSize], index[:storageIndexSize])
+	return &ret
 }
 
 // StorageIndex returns the storage index of the account
@@ -106,8 +113,11 @@ func (a *AccountStatus) StorageIndex() atree.StorageIndex {
 }
 
 // SetPublicKeyCount updates the public key count of the account
-func (a *AccountStatus) SetPublicKeyCount(count uint64) {
-	binary.BigEndian.PutUint64(a[publicKeyCountsStartIndex:publicKeyCountsStartIndex+publicKeyCountsSize], count)
+func (a *AccountStatus) SetPublicKeyCount(count uint64) *AccountStatus {
+	var ret AccountStatus
+	copy(ret[:], a[:])
+	binary.BigEndian.PutUint64(ret[publicKeyCountsStartIndex:publicKeyCountsStartIndex+publicKeyCountsSize], count)
+	return &ret
 }
 
 // PublicKeyCount returns the public key count of the account

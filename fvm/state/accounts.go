@@ -77,7 +77,7 @@ func (a *StatefulAccounts) AllocateStorageIndex(address flow.Address) (atree.Sto
 	}
 
 	// update the storageIndex bytes
-	status.SetStorageIndex(newIndexBytes)
+	status = status.SetStorageIndex(newIndexBytes)
 	err = a.setAccountStatus(address, status)
 	if err != nil {
 		return atree.StorageIndex{}, fmt.Errorf("failed to allocate an storage index: %w", err)
@@ -197,7 +197,7 @@ func (a *StatefulAccounts) setPublicKeyCount(address flow.Address, count uint64)
 		return fmt.Errorf("failed to set public key count for account (%s): %w", address.String(), err)
 	}
 
-	status.SetPublicKeyCount(count)
+	status = status.SetPublicKeyCount(count)
 
 	err = a.setAccountStatus(address, status)
 	if err != nil {
@@ -400,7 +400,7 @@ func (a *StatefulAccounts) setStorageUsed(address flow.Address, used uint64) err
 		return fmt.Errorf("failed to set storage used: %w", err)
 	}
 
-	status.SetStorageUsed(used)
+	status = status.SetStorageUsed(used)
 
 	err = a.setAccountStatus(address, status)
 	if err != nil {
@@ -600,7 +600,7 @@ func (a *StatefulAccounts) SetAccountFrozen(address flow.Address, frozen bool) e
 	if err != nil {
 		return err
 	}
-	status.SetFrozenFlag(frozen)
+	status = status.SetFrozenFlag(frozen)
 	return a.setAccountStatus(address, status)
 }
 

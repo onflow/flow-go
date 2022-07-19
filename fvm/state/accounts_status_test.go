@@ -16,21 +16,21 @@ func TestAccountStatus(t *testing.T) {
 	require.False(t, s.IsAccountFrozen())
 
 	t.Run("test frozen flag set/reset", func(t *testing.T) {
-		s.SetFrozenFlag(true)
+		s = s.SetFrozenFlag(true)
 		require.True(t, s.IsAccountFrozen())
 
-		s.SetFrozenFlag(false)
+		s = s.SetFrozenFlag(false)
 		require.False(t, s.IsAccountFrozen())
 	})
 
 	t.Run("test setting values", func(t *testing.T) {
 		// set some values for side effect checks
-		s.SetFrozenFlag(true)
+		s = s.SetFrozenFlag(true)
 
 		index := atree.StorageIndex{1, 2, 3, 4, 5, 6, 7, 8}
-		s.SetStorageIndex(index)
-		s.SetPublicKeyCount(34)
-		s.SetStorageUsed(56)
+		s = s.SetStorageIndex(index)
+		s = s.SetPublicKeyCount(34)
+		s = s.SetStorageUsed(56)
 
 		require.Equal(t, uint64(56), s.StorageUsed())
 		returnedIndex := s.StorageIndex()
