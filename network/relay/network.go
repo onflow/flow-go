@@ -10,13 +10,14 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 )
 
 type RelayNetwork struct {
 	originNet      network.Network
 	destinationNet network.Network
 	logger         zerolog.Logger
-	channels       network.ChannelList
+	channels       channels.ChannelList
 }
 
 var _ network.Network = (*RelayNetwork)(nil)
@@ -25,7 +26,7 @@ func NewRelayNetwork(
 	originNetwork network.Network,
 	destinationNetwork network.Network,
 	logger zerolog.Logger,
-	channels []network.Channel,
+	channels []channels.Channel,
 ) *RelayNetwork {
 	return &RelayNetwork{
 		originNet:      originNetwork,
@@ -35,7 +36,7 @@ func NewRelayNetwork(
 	}
 }
 
-func (r *RelayNetwork) Register(channel network.Channel, messageProcessor network.MessageProcessor) (network.Conduit, error) {
+func (r *RelayNetwork) Register(channel channels.Channel, messageProcessor network.MessageProcessor) (network.Conduit, error) {
 	if !r.channels.Contains(channel) {
 		return r.originNet.Register(channel, messageProcessor)
 	}
@@ -69,7 +70,7 @@ func (r *RelayNetwork) Done() <-chan struct{} {
 	return util.AllDone(r.originNet, r.destinationNet)
 }
 
-func (r *RelayNetwork) RegisterBlobService(channel network.Channel, store datastore.Batching, opts ...network.BlobServiceOption) (network.BlobService, error) {
+func (r *RelayNetwork) RegisterBlobService(channel channels.Channel, store datastore.Batching, opts ...network.BlobServiceOption) (network.BlobService, error) {
 	return r.originNet.RegisterBlobService(channel, store, opts...)
 }
 

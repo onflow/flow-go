@@ -6,7 +6,7 @@ import (
 
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 )
 
 // Conduit implements a corruptible conduit that sends all incoming events to its registered controller (i.e., factory)
@@ -14,7 +14,7 @@ import (
 type Conduit struct {
 	ctx               context.Context
 	cancel            context.CancelFunc
-	channel           network.Channel
+	channel           channels.Channel
 	conduitController insecure.ConduitController
 }
 

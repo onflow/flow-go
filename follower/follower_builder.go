@@ -42,6 +42,7 @@ import (
 	"github.com/onflow/flow-go/module/upstream"
 	"github.com/onflow/flow-go/network"
 	netcache "github.com/onflow/flow-go/network/cache"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/converter"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
@@ -668,7 +669,7 @@ func (builder *FollowerServiceBuilder) enqueuePublicNetworkInit() {
 			return nil, err
 		}
 
-		builder.Network = converter.NewNetwork(net, network.SyncCommittee, network.PublicSyncCommittee)
+		builder.Network = converter.NewNetwork(net, channels.SyncCommittee, channels.PublicSyncCommittee)
 
 		builder.Logger.Info().Msgf("network will run on address: %s", builder.BindAddr)
 
