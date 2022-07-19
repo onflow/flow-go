@@ -33,8 +33,8 @@ func TestAccountStatusMigration(t *testing.T) {
 
 	newPayloads, err := mig.Migrate(payloads)
 	require.NoError(t, err)
-	require.Equal(t, 5, len(newPayloads))
 
+	require.Equal(t, 5, len(newPayloads))
 	require.True(t, newPayloads[0].Equals(&payloads[1]))
 	require.True(t, newPayloads[1].Equals(&payloads[2]))
 	require.True(t, newPayloads[2].Equals(&payloads[6]))

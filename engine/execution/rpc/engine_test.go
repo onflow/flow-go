@@ -55,13 +55,11 @@ func (suite *Suite) TestExecuteScriptAtBlockID() {
 
 	// setup dummy request/response
 	ctx := context.Background()
-	rawId := []byte("dummy ID")
-	mockIdentifier, err := convert.BlockID(rawId)
-	suite.Require().NoError(err)
+	mockIdentifier := unittest.IdentifierFixture()
 	script := []byte("dummy script")
 	arguments := [][]byte(nil)
 	executionReq := execution.ExecuteScriptAtBlockIDRequest{
-		BlockId: rawId[:],
+		BlockId: mockIdentifier[:],
 		Script:  script,
 	}
 	scriptExecValue := []byte{9, 10, 11}

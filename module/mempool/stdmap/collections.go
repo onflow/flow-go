@@ -25,9 +25,9 @@ func (c *Collections) Add(coll *flow.Collection) bool {
 	return added
 }
 
-// Rem removes a collection by ID from memory
-func (c *Collections) Rem(collID flow.Identifier) bool {
-	ok := c.Backend.Rem(collID)
+// Remove removes a collection by ID from memory
+func (c *Collections) Remove(collID flow.Identifier) bool {
+	ok := c.Backend.Remove(collID)
 	return ok
 }
 

@@ -279,7 +279,7 @@ func TestSafetyCheck(t *testing.T) {
 
 		view := utils.NewSimpleView()
 		header := unittest.BlockHeaderFixture()
-		context := fvm.NewContext(log, fvm.WithBlockHeader(&header))
+		context := fvm.NewContext(log, fvm.WithBlockHeader(header))
 
 		sth := state.NewStateHolder(state.NewState(view))
 
