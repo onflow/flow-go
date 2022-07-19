@@ -64,7 +64,7 @@ func (ss *SyncSuite) SetupTest() {
 
 	// generate a header for the final state
 	header := unittest.BlockHeaderFixture()
-	ss.head = &header
+	ss.head = header
 
 	// create maps to enable block returns
 	ss.heights = make(map[uint64]*clustermodel.Block)

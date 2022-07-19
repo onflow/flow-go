@@ -410,7 +410,7 @@ func MockLastSealedHeight(state *mockprotocol.State, height uint64) {
 	header := unittest.BlockHeaderFixture()
 	header.Height = height
 	state.On("Sealed").Return(snapshot)
-	snapshot.On("Head").Return(&header, nil)
+	snapshot.On("Head").Return(header, nil)
 }
 
 func NewVerificationHappyPathTest(t *testing.T,
