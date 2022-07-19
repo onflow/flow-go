@@ -15,8 +15,8 @@ require (
 	github.com/ipfs/go-ipfs-blockstore v0.2.0
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/onflow/cadence v0.24.2-0.20220719165617-0b2f52970906
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220628221832-3d206c1d4790
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220628221832-3d206c1d4790
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220719141424-653be1a34ee3
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220719141424-653be1a34ee3
 	github.com/onflow/flow-emulator v0.33.4-0.20220708171627-a9c955cd26c6
 	github.com/onflow/flow-ft/lib/go/templates v0.2.0
 	github.com/onflow/flow-go v0.25.13-0.20220708171206-7015f054a69f

@@ -354,7 +354,7 @@ func (*ErrorReturningRuntime) SetDebugger(_ *interpreter.Debugger) {
 	panic("SetDebugger not expected")
 }
 
-func (ErrorReturningRuntime) Storage(_ runtime.Context) (*runtime.Storage, *interpreter.Interpreter, error) {
+func (ErrorReturningRuntime) Storage(runtime.Context) (*runtime.Storage, *interpreter.Interpreter, error) {
 	panic("Storage not expected")
 }
 

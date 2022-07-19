@@ -341,6 +341,6 @@ func (t *TestReadStoredRuntime) ReadLinked(common.Address, cadence.Path, runtime
 	panic("not implemented")
 }
 
-func (*TestReadStoredRuntime) Storage(_ runtime.Context) (*runtime.Storage, *interpreter.Interpreter, error) {
+func (*TestReadStoredRuntime) Storage(runtime.Context) (*runtime.Storage, *interpreter.Interpreter, error) {
 	panic("not implemented")
 }
