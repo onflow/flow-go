@@ -81,20 +81,21 @@ type Middleware struct {
 	// goroutines to exit, because new goroutines could be started after we've already
 	// returned from wg.Wait(). We need to solve this the right way using ComponentManager
 	// and worker routines.
-	wg                         *sync.WaitGroup
-	libP2PNode                 *Node
-	libP2PNodeFactory          LibP2PFactoryFunc
-	preferredUnicasts          []unicast.ProtocolName
-	me                         flow.Identifier
-	metrics                    module.NetworkMetrics
-	rootBlockID                flow.Identifier
-	validators                 []network.MessageValidator
-	peerManagerFactory         PeerManagerFactoryFunc
-	peerManager                *PeerManager
-	unicastMessageTimeout      time.Duration
-	idTranslator               IDTranslator
-	previousProtocolStatePeers []peer.AddrInfo
-	codec                      network.Codec
+	wg                                   *sync.WaitGroup
+	libP2PNode                           *Node
+	libP2PNodeFactory                    LibP2PFactoryFunc
+	preferredUnicasts                    []unicast.ProtocolName
+	me                                   flow.Identifier
+	metrics                              module.NetworkMetrics
+	rootBlockID                          flow.Identifier
+	validators                           []network.MessageValidator
+	peerManagerFactory                   PeerManagerFactoryFunc
+	peerManager                          *PeerManager
+	unicastMessageTimeout                time.Duration
+	unicastAuthorizedSenderValidatorFunc validator.MessageValidator
+	idTranslator                         IDTranslator
+	previousProtocolStatePeers           []peer.AddrInfo
+	codec                                network.Codec
 	component.Component
 }
 
@@ -180,6 +181,9 @@ func NewMiddleware(
 		}).Build()
 
 	mw.Component = cm
+
+	unicastAuthorizedSenderValidatorFunc := validator.AuthorizedSenderValidator(log, channels.ProvideCollections, mw.ov.Identity)
+	mw.unicastAuthorizedSenderValidatorFunc = unicastAuthorizedSenderValidatorFunc
 
 	return mw
 }
@@ -504,7 +508,9 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 			m.log.Err(err).Msg("failed to read message")
 			return
 		}
-		
+
+		// TODO: authorized sender validation
+
 		// TODO: once we've implemented per topic message size limits per the TODO above,
 		// we can remove this check
 		maxSize := unicastMaxMsgSize(&msg)
