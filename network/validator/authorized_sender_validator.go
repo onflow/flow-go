@@ -23,18 +23,21 @@ var (
 // The MessageValidator returned will use the getIdentity to get the flow identity for the sender, asserting that the sender is a staked node and not ejected. Otherwise, the message is rejected.
 // The message is also authorized by checking that the sender is allowed to send the message on the channel.
 // If validation fails the message is rejected, and if the validation error is an expected error, slashing data is also collected.
-// Authorization config is defined in message.MsgAuthConfig
+// Authorization config is defined in message.MsgAuthConfig.
+// NOTE: isUnicast denotes if this validator is being used to validate unicast messages or pubsub. A message has to be explicitly
+// authorized to be sent via unicast.
 func AuthorizedSenderValidator(log zerolog.Logger, channel channels.Channel, getIdentity func(peer.ID) (*flow.Identity, bool), isUnicast bool) MessageValidator {
 	log = log.With().
 		Str("component", "authorized_sender_validator").
 		Str("network_channel", channel.String()).
+		Bool("unicast_message", isUnicast).
 		Logger()
 
 	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(log)
 
 	return func(ctx context.Context, from peer.ID, msg interface{}) (string, error) {
-		// NOTE: messages from unstaked nodes should be reject by the libP2P node topic validator
-		// before they reach message validators. If a message from a unstaked gets to this point
+		// NOTE: messages from unstaked nodes should be rejected by the libP2P node topic validator
+		// before they reach message validators. If a message from a unstaked peer gets to this point
 		// something terrible went wrong.
 		identity, ok := getIdentity(from)
 		if !ok {
@@ -51,6 +54,9 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel channels.Channel, get
 			return msgType, err
 		case errors.Is(err, message.ErrUnauthorizedMessageOnChannel) || errors.Is(err, message.ErrUnauthorizedRole):
 			slashingViolationsConsumer.OnUnAuthorizedSenderError(identity, from.String(), msgType, err)
+			return msgType, err
+		case errors.Is(err, message.ErrUnauthorizedUnicastOnChannel):
+			slashingViolationsConsumer.OnUnauthorizedUnicastError(identity, from.String(), msgType, err)
 			return msgType, err
 		case errors.Is(err, ErrSenderEjected):
 			slashingViolationsConsumer.OnSenderEjectedError(identity, from.String(), msgType, err)

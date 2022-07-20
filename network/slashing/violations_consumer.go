@@ -11,9 +11,10 @@ import (
 )
 
 const (
-	unAuthorizedSenderViolation = "unauthorized_sender"
-	unknownMsgTypeViolation     = "unknown_message_type"
-	senderEjectedViolation      = "sender_ejected"
+	unAuthorizedSenderViolation        = "unauthorized_sender"
+	unAuthorizedSenderUnicastViolation = "unauthorized_sender_unicast"
+	unknownMsgTypeViolation            = "unknown_message_type"
+	senderEjectedViolation             = "sender_ejected"
 )
 
 // SlashingViolationsConsumer is a struct that logs a message for any slashable offences.
@@ -27,7 +28,7 @@ func NewSlashingViolationsConsumer(log zerolog.Logger) *SlashingViolationsConsum
 	return &SlashingViolationsConsumer{log}
 }
 
-// OnUnAuthorizedSenderError logs a warning for unauthorized sender error
+// OnUnAuthorizedSenderError logs an error for unauthorized sender error
 func (c *SlashingViolationsConsumer) OnUnAuthorizedSenderError(identity *flow.Identity, peerID, msgType string, err error) {
 	c.log.Error().
 		Str("peer_id", peerID).
@@ -38,7 +39,7 @@ func (c *SlashingViolationsConsumer) OnUnAuthorizedSenderError(identity *flow.Id
 		Msg(fmt.Sprintf("potential slashable offense: %s", err))
 }
 
-// OnUnknownMsgTypeError logs a warning for unknown message type error
+// OnUnknownMsgTypeError logs an error for unknown message type error
 func (c *SlashingViolationsConsumer) OnUnknownMsgTypeError(identity *flow.Identity, peerID, msgType string, err error) {
 	c.log.Error().
 		Str("peer_id", peerID).
@@ -49,7 +50,7 @@ func (c *SlashingViolationsConsumer) OnUnknownMsgTypeError(identity *flow.Identi
 		Msg(fmt.Sprintf("potential slashable offense: %s", err))
 }
 
-// OnSenderEjectedError logs a warning for sender ejected error
+// OnSenderEjectedError logs an error for sender ejected error
 func (c *SlashingViolationsConsumer) OnSenderEjectedError(identity *flow.Identity, peerID, msgType string, err error) {
 	c.log.Error().
 		Str("peer_id", peerID).
@@ -57,5 +58,16 @@ func (c *SlashingViolationsConsumer) OnSenderEjectedError(identity *flow.Identit
 		Hex("sender_id", logging.ID(identity.NodeID)).
 		Str("message_type", msgType).
 		Str("offense", senderEjectedViolation).
+		Msg(fmt.Sprintf("potential slashable offense: %s", err))
+}
+
+// OnUnauthorizedUnicastError logs an error for an unauthorized message sent via unicast
+func (c *SlashingViolationsConsumer) OnUnauthorizedUnicastError(identity *flow.Identity, peerID, msgType string, err error) {
+	c.log.Error().
+		Str("peer_id", peerID).
+		Str("role", identity.Role.String()).
+		Hex("sender_id", logging.ID(identity.NodeID)).
+		Str("message_type", msgType).
+		Str("offense", unAuthorizedSenderUnicastViolation).
 		Msg(fmt.Sprintf("potential slashable offense: %s", err))
 }
