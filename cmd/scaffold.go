@@ -416,10 +416,10 @@ func (fnb *FlowNodeBuilder) EnqueueAdminServerInit() {
 
 func (fnb *FlowNodeBuilder) EnqueuePeerManager() {
 	fnb.Component("peer manager", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		pm := fnb.Middleware.PeerManager()
+		pm, ok := fnb.Middleware.PeerManager()
 
-		// if a peer manager was not configured, do nothing
-		if pm == nil {
+		// if a peer manager was not configured, return noop
+		if !ok {
 			return &module.NoopReadyDoneAware{}, nil
 		}
 
@@ -1021,14 +1021,14 @@ func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc, parentReady <-
 
 		// if this is a Component, use the Startable interface to start the component, otherwise
 		// Ready() will launch it.
-		component, isComponent := readyAware.(component.Component)
+		cmp, isComponent := readyAware.(component.Component)
 		if isComponent {
-			component.Start(ctx)
+			cmp.Start(ctx)
 		}
 
 		// Wait until the component is ready
 		if err := util.WaitClosed(ctx, readyAware.Ready()); err != nil {
-			// The context was cancelled. Continue to on to shutdown logic.
+			// The context was cancelled. Continue to shutdown logic.
 			logger.Warn().Msg("component startup aborted")
 
 			// Non-idempotent ReadyDoneAware components trigger shutdown by calling Done(). Don't

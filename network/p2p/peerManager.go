@@ -29,6 +29,7 @@ type Connector interface {
 var DefaultPeerUpdateInterval = 10 * time.Minute
 
 var _ network.PeerManager = (*PeerManager)(nil)
+var _ component.Component = (*PeerManager)(nil)
 
 // PeerManager adds and removes connections to peers periodically and on request
 type PeerManager struct {
@@ -63,6 +64,7 @@ func NewPeerManager(logger zerolog.Logger, peersProvider PeersProvider,
 		peerRequestQ:       make(chan struct{}, 1),
 		peerUpdateInterval: DefaultPeerUpdateInterval,
 	}
+
 	// apply options
 	for _, o := range options {
 		o(pm)
@@ -107,6 +109,12 @@ func (pm *PeerManager) updateLoop(ctx irrecoverable.SignalerContext) {
 		select {
 		case <-ctx.Done():
 			return
+		default:
+		}
+
+		select {
+		case <-ctx.Done():
+			return
 		case <-pm.peerRequestQ:
 			pm.updatePeers(ctx)
 		}
@@ -129,12 +137,6 @@ func (pm *PeerManager) periodicLoop(ctx irrecoverable.SignalerContext) {
 	}
 
 	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-		}
-
 		select {
 		case <-ctx.Done():
 			return
