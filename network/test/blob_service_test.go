@@ -12,6 +12,7 @@ import (
 	"github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
 
@@ -115,7 +116,9 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 	}
 
 	for _, mw := range mws {
-		pm := mw.PeerManager()
+		pm, ok := mw.PeerManager()
+		require.True(suite.T(), ok)
+
 		pm.Start(signalerCtx)
 		<-pm.Ready()
 	}
