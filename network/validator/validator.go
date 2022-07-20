@@ -7,9 +7,10 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 )
 
-// MessageValidator validates the given message with original sender `from` and returns an error if validation fails.
+// MessageValidator validates the given message with original sender `from` and returns an error if validation fails
+// else upon successful validation it should return the decoded message type string.
 // Note: contrarily to pubsub.ValidatorEx, the peerID parameter does not represent the bearer of the message, but its source.
-type MessageValidator func(ctx context.Context, from peer.ID, msg interface{}) error
+type MessageValidator func(ctx context.Context, from peer.ID, msg interface{}) (string, error)
 
 // PubSubMessageValidator validates the given message with original sender `from` and returns pubsub.ValidationResult.
 // Note: contrarily to pubsub.ValidatorEx, the peerID parameter does not represent the bearer of the message, but its source.
