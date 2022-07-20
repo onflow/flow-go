@@ -1,4 +1,4 @@
-import FlowEpoch from 0x%s
+import FlowEpoch from 0xEPOCHADDRESS
 
 transaction {
   prepare(serviceAccount: AuthAccount) {

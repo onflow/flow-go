@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
+	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -34,7 +35,8 @@ func DeployFlowTokenContractTransaction(service, fungibleToken, flowToken flow.A
 	contract := contracts.FlowToken(fungibleToken.HexWithPrefix())
 
 	return flow.NewTransactionBody().
-		SetScript([]byte(fmt.Sprintf(deployFlowTokenTransactionTemplate, hex.EncodeToString(contract)))).
+		SetScript([]byte(deployFlowTokenTransactionTemplate)).
+		AddArgument(jsoncdc.MustEncode(cadence.String(hex.EncodeToString(contract)))).
 		AddAuthorizer(flowToken).
 		AddAuthorizer(service)
 }
@@ -43,9 +45,13 @@ func DeployFlowTokenContractTransaction(service, fungibleToken, flowToken flow.A
 // token Minter resource and stores it in the service account. This Minter is
 // expected to be stored here by the epoch smart contracts.
 func CreateFlowTokenMinterTransaction(service, flowToken flow.Address) *flow.TransactionBody {
-
 	return flow.NewTransactionBody().
-		SetScript([]byte(fmt.Sprintf(createFlowTokenMinterTransactionTemplate, flowToken.HexWithPrefix()))).
+		SetScript([]byte(templates.ReplaceAddresses(
+			createFlowTokenMinterTransactionTemplate,
+			templates.Environment{
+				FlowTokenAddress: flowToken.Hex(),
+			})),
+		).
 		AddAuthorizer(service)
 }
 
@@ -59,7 +65,12 @@ func MintFlowTokenTransaction(
 	}
 
 	return flow.NewTransactionBody().
-		SetScript([]byte(fmt.Sprintf(mintFlowTokenTransactionTemplate, fungibleToken, flowToken))).
+		SetScript([]byte(templates.ReplaceAddresses(mintFlowTokenTransactionTemplate,
+			templates.Environment{
+				FlowTokenAddress:     flowToken.Hex(),
+				FungibleTokenAddress: fungibleToken.Hex(),
+			})),
+		).
 		AddArgument(initialSupplyArg).
 		AddAuthorizer(service)
 }

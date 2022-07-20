@@ -4,6 +4,8 @@ import (
 	_ "embed"
 	"fmt"
 
+	"github.com/onflow/flow-core-contracts/lib/go/templates"
+
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -25,7 +27,11 @@ func SystemChunkTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
 	}
 
 	tx := flow.NewTransactionBody().
-		SetScript([]byte(fmt.Sprintf(systemChunkTransactionTemplate, contracts.Epoch.Address))).
+		SetScript([]byte(templates.ReplaceAddresses(systemChunkTransactionTemplate,
+			templates.Environment{
+				EpochAddress: contracts.Epoch.Address.Hex(),
+			})),
+		).
 		AddAuthorizer(contracts.Epoch.Address).
 		SetGasLimit(SystemChunkTransactionGasLimit)
 

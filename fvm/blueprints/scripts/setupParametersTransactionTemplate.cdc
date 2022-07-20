@@ -1,4 +1,5 @@
-import FlowStorageFees, FlowServiceAccount from 0x%s
+import FlowStorageFees from 0xFLOWSTORAGEFEESADDRESS
+import FlowServiceAccount from 0xFLOWSERVICEADDRESS
 
 transaction(accountCreationFee: UFix64, minimumStorageReservation: UFix64, storageMegaBytesPerReservedFLOW: UFix64, restrictedAccountCreationEnabled: Bool) {
     prepare(service: AuthAccount) {

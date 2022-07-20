@@ -1,4 +1,4 @@
-import FlowToken from %s
+import FlowToken from 0xFLOWTOKENADDRESS
 
 transaction {
 	prepare(serviceAccount: AuthAccount) {

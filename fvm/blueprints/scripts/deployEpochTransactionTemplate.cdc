@@ -1,6 +1,15 @@
-import FlowClusterQC from 0x%s
+import FlowClusterQC from 0xQCADDRESS
 
-transaction(clusterWeights: [{String: UInt64}]) {
+transaction(
+    code: String,
+    currentEpochCounter: UInt64,
+    numViewsInEpoch: UInt64,
+    numViewsInStakingAuction: UInt64,
+    numViewsInDKGPhase: UInt64,
+    numCollectorClusters: UInt16,
+    FLOWsupplyIncreasePercentage: UFix64,
+    randomSource: String,
+    clusterWeights: [{String: UInt64}]) {
   prepare(serviceAccount: AuthAccount)	{
 
     // first, construct Cluster objects from cluster weights
@@ -13,14 +22,14 @@ transaction(clusterWeights: [{String: UInt64}]) {
 
 	serviceAccount.contracts.add(
 		name: "FlowEpoch",
-		code: "%s".decodeHex(),
-		currentEpochCounter: UInt64(%d),
-		numViewsInEpoch: UInt64(%d),
-		numViewsInStakingAuction: UInt64(%d),
-		numViewsInDKGPhase: UInt64(%d),
-		numCollectorClusters: UInt16(%d),
-		FLOWsupplyIncreasePercentage: UFix64(%d),
-		randomSource: %s,
+		code: code.decodeHex(),
+        currentEpochCounter: currentEpochCounter,
+        numViewsInEpoch: numViewsInEpoch,
+        numViewsInStakingAuction: numViewsInStakingAuction,
+        numViewsInDKGPhase: numViewsInDKGPhase,
+        numCollectorClusters: numCollectorClusters,
+        FLOWsupplyIncreasePercentage: FLOWsupplyIncreasePercentage,
+        randomSource: randomSource,
 		collectorClusters: clusters,
         // NOTE: clusterQCs and dkgPubKeys are empty because these initial values are not used
 		clusterQCs: [] as [FlowClusterQC.ClusterQC],
