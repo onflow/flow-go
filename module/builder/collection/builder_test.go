@@ -167,7 +167,7 @@ func (suite *BuilderSuite) ProtoStateRoot() *flow.Header {
 func (suite *BuilderSuite) ClearPool() {
 	// TODO use Clear()
 	for _, tx := range suite.pool.All() {
-		suite.pool.Rem(tx.ID())
+		suite.pool.Remove(tx.ID())
 	}
 }
 

@@ -61,13 +61,13 @@ func (_m *IngestRPC) GetAccount(ctx context.Context, address flow.Address, block
 	return r0, r1
 }
 
-// GetRegisterAtBlockID provides a mock function with given fields: ctx, owner, controller, key, blockID
-func (_m *IngestRPC) GetRegisterAtBlockID(ctx context.Context, owner []byte, controller []byte, key []byte, blockID flow.Identifier) ([]byte, error) {
-	ret := _m.Called(ctx, owner, controller, key, blockID)
+// GetRegisterAtBlockID provides a mock function with given fields: ctx, owner, key, blockID
+func (_m *IngestRPC) GetRegisterAtBlockID(ctx context.Context, owner []byte, key []byte, blockID flow.Identifier) ([]byte, error) {
+	ret := _m.Called(ctx, owner, key, blockID)
 
 	var r0 []byte
-	if rf, ok := ret.Get(0).(func(context.Context, []byte, []byte, []byte, flow.Identifier) []byte); ok {
-		r0 = rf(ctx, owner, controller, key, blockID)
+	if rf, ok := ret.Get(0).(func(context.Context, []byte, []byte, flow.Identifier) []byte); ok {
+		r0 = rf(ctx, owner, key, blockID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]byte)
@@ -75,8 +75,8 @@ func (_m *IngestRPC) GetRegisterAtBlockID(ctx context.Context, owner []byte, con
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, []byte, []byte, []byte, flow.Identifier) error); ok {
-		r1 = rf(ctx, owner, controller, key, blockID)
+	if rf, ok := ret.Get(1).(func(context.Context, []byte, []byte, flow.Identifier) error); ok {
+		r1 = rf(ctx, owner, key, blockID)
 	} else {
 		r1 = ret.Error(1)
 	}

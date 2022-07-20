@@ -68,8 +68,8 @@ func (_m *ChunkStatuses) Get(chunkIndex uint64, resultID flow.Identifier) (*veri
 	return r0, r1
 }
 
-// Rem provides a mock function with given fields: chunkIndex, resultID
-func (_m *ChunkStatuses) Rem(chunkIndex uint64, resultID flow.Identifier) bool {
+// Remove provides a mock function with given fields: chunkIndex, resultID
+func (_m *ChunkStatuses) Remove(chunkIndex uint64, resultID flow.Identifier) bool {
 	ret := _m.Called(chunkIndex, resultID)
 
 	var r0 bool

@@ -290,6 +290,18 @@ type TestInterpreterRuntime struct {
 	invokeContractFunction func(a common.AddressLocation, s string, values []cadence.Value, types []sema.Type, ctx runtime.Context) (cadence.Value, error)
 }
 
+func (t *TestInterpreterRuntime) NewScriptExecutor(script runtime.Script, context runtime.Context) runtime.Executor {
+	panic("NewScriptExecutor not defined")
+}
+
+func (t *TestInterpreterRuntime) NewTransactionExecutor(script runtime.Script, context runtime.Context) runtime.Executor {
+	panic("NewTransactionExecutor not defined")
+}
+
+func (t *TestInterpreterRuntime) NewContractFunctionExecutor(contractLocation common.AddressLocation, functionName string, arguments []cadence.Value, argumentTypes []sema.Type, context runtime.Context) runtime.Executor {
+	panic("NewContractFunctionExecutor not defined")
+}
+
 func (t *TestInterpreterRuntime) SetDebugger(debugger *interpreter.Debugger) {
 	panic("SetDebugger not defined")
 }
@@ -346,4 +358,8 @@ func (t *TestInterpreterRuntime) ReadStored(address common.Address, path cadence
 
 func (t *TestInterpreterRuntime) ReadLinked(common.Address, cadence.Path, runtime.Context) (cadence.Value, error) {
 	panic("ReadLinked not defined")
+}
+
+func (*TestInterpreterRuntime) Storage(runtime.Context) (*runtime.Storage, *interpreter.Interpreter, error) {
+	panic("not implemented")
 }
