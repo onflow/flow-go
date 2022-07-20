@@ -99,6 +99,7 @@ func newEmergencyFallbackEpoch(lastCommittedEpoch *staticEpochInfo) (*staticEpoc
 		randomSource:         lastCommittedEpoch.randomSource,
 		leaders:              leaders,
 		initialCommittee:     lastCommittedEpoch.initialCommittee,
+		initialCommitteeMap:  lastCommittedEpoch.initialCommitteeMap,
 		weightThresholdForQC: lastCommittedEpoch.weightThresholdForQC,
 		weightThresholdForTO: lastCommittedEpoch.weightThresholdForTO,
 		dkg:                  lastCommittedEpoch.dkg,

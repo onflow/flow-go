@@ -284,14 +284,15 @@ func (builder *ObserverServiceBuilder) buildSyncCore() *ObserverServiceBuilder {
 }
 
 func (builder *ObserverServiceBuilder) buildCommittee() *ObserverServiceBuilder {
-	builder.Module("committee", func(node *cmd.NodeConfig) error {
+	builder.Component("committee", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		// initialize consensus committee's membership state
-		// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
+		// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS committee
 		// Note: node.Me.NodeID() is not part of the consensus committee
 		committee, err := committees.NewConsensusCommittee(node.State, node.Me.NodeID())
+		node.ProtocolEvents.AddConsumer(committee)
 		builder.Committee = committee
 
-		return err
+		return committee, err
 	})
 
 	return builder
