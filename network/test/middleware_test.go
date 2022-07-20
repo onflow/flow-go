@@ -133,7 +133,9 @@ func (m *MiddlewareTestSuite) SetupTest() {
 		mw.Start(m.mwCtx)
 		<-mw.Ready()
 
-		pm := mw.PeerManager()
+		pm, ok := mw.PeerManager()
+		require.True(m.T(), ok)
+
 		pm.Start(m.mwCtx)
 		<-pm.Ready()
 	}
@@ -160,7 +162,9 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	newMw.Start(m.mwCtx)
 	<-newMw.Ready()
 
-	pm := newMw.PeerManager()
+	pm, ok := newMw.PeerManager()
+	require.True(m.T(), ok)
+
 	pm.Start(m.mwCtx)
 	<-pm.Ready()
 
