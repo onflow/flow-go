@@ -81,21 +81,20 @@ type Middleware struct {
 	// goroutines to exit, because new goroutines could be started after we've already
 	// returned from wg.Wait(). We need to solve this the right way using ComponentManager
 	// and worker routines.
-	wg                                   *sync.WaitGroup
-	libP2PNode                           *Node
-	libP2PNodeFactory                    LibP2PFactoryFunc
-	preferredUnicasts                    []unicast.ProtocolName
-	me                                   flow.Identifier
-	metrics                              module.NetworkMetrics
-	rootBlockID                          flow.Identifier
-	validators                           []network.MessageValidator
-	peerManagerFactory                   PeerManagerFactoryFunc
-	peerManager                          *PeerManager
-	unicastMessageTimeout                time.Duration
-	unicastAuthorizedSenderValidatorFunc validator.MessageValidator
-	idTranslator                         IDTranslator
-	previousProtocolStatePeers           []peer.AddrInfo
-	codec                                network.Codec
+	wg                         *sync.WaitGroup
+	libP2PNode                 *Node
+	libP2PNodeFactory          LibP2PFactoryFunc
+	preferredUnicasts          []unicast.ProtocolName
+	me                         flow.Identifier
+	metrics                    module.NetworkMetrics
+	rootBlockID                flow.Identifier
+	validators                 []network.MessageValidator
+	peerManagerFactory         PeerManagerFactoryFunc
+	peerManager                *PeerManager
+	unicastMessageTimeout      time.Duration
+	idTranslator               IDTranslator
+	previousProtocolStatePeers []peer.AddrInfo
+	codec                      network.Codec
 	component.Component
 }
 
@@ -181,9 +180,6 @@ func NewMiddleware(
 		}).Build()
 
 	mw.Component = cm
-
-	unicastAuthorizedSenderValidatorFunc := validator.AuthorizedSenderValidator(log, channels.ProvideCollections, mw.ov.Identity, true)
-	mw.unicastAuthorizedSenderValidatorFunc = unicastAuthorizedSenderValidatorFunc
 
 	return mw
 }
@@ -287,6 +283,13 @@ func (m *Middleware) UpdateNodeAddresses() {
 
 func (m *Middleware) SetOverlay(ov network.Overlay) {
 	m.ov = ov
+}
+
+// validateUnicastAuthorizedSender will validate messages sent via unicast stream.
+func (m *Middleware) validateUnicastAuthorizedSender(ctx context.Context, remotePeer peer.ID, channel channels.Channel, msg interface{}) error {
+	validate := validator.AuthorizedSenderValidator(m.log, channel, m.ov.Identity, true)
+	_, err := validate(ctx, remotePeer, msg)
+	return err
 }
 
 // start will start the middleware.
@@ -509,8 +512,6 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 			return
 		}
 
-		// TODO: authorized sender validation
-
 		// TODO: once we've implemented per topic message size limits per the TODO above,
 		// we can remove this check
 		maxSize := unicastMaxMsgSize(&msg)
@@ -529,7 +530,8 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 		m.wg.Add(1)
 		go func(msg *message.Message) {
 			defer m.wg.Done()
-			if decodedMsgPayload, err := m.codec.Decode(msg.Payload); err != nil {
+			decodedMsgPayload, err := m.codec.Decode(msg.Payload)
+			if err != nil {
 				m.log.
 					Warn().
 					Err(fmt.Errorf("could not decode message: %w", err)).
@@ -537,10 +539,24 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 					Hex("event_id", msg.EventID).
 					Str("event_type", msg.Type).
 					Str("channel", msg.ChannelID)
+				return
+			}
+
+			channel := channels.Channel(msg.ChannelID)
+			remotePeer := s.Conn().RemotePeer()
+			if err := m.validateUnicastAuthorizedSender(ctx, remotePeer, channel, decodedMsgPayload); err != nil {
+				m.log.
+					Error().
+					Err(err).
+					Hex("sender", msg.OriginID).
+					Hex("event_id", msg.EventID).
+					Str("event_type", msg.Type).
+					Str("channel", msg.ChannelID).
+					Msg("unicast authorized sender validation failed")
 			} else {
 				// log metrics with the channel name as OneToOne
 				m.metrics.NetworkMessageReceived(msg.Size(), metrics.ChannelOneToOne, msg.Type)
-				m.processAuthenticatedMessage(msg, decodedMsgPayload, s.Conn().RemotePeer())
+				m.processAuthenticatedMessage(msg, decodedMsgPayload, remotePeer)
 			}
 		}(&msg)
 	}

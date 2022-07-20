@@ -33,7 +33,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-const testChannel = channels.PublicSyncCommittee
+const testChannel = channels.TestNetworkChannel
 
 // libp2p emits a call to `Protect` with a topic-specific tag upon establishing each peering connection in a GossipSUb mesh, see:
 // https://github.com/libp2p/go-libp2p-pubsub/blob/master/tag_tracer.go

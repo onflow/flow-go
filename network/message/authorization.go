@@ -95,11 +95,11 @@ func initializeMessageAuthConfigsMap() {
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.SyncCommittee: {
 				AuthorizedRoles: flow.Roles(),
-				Unicast:         true,
+				Unicast:         false,
 			},
 			channels.SyncClusterPrefix: {
 				AuthorizedRoles: flow.RoleList{flow.RoleCollection},
-				Unicast:         true,
+				Unicast:         false,
 			},
 		},
 	}
@@ -127,11 +127,11 @@ func initializeMessageAuthConfigsMap() {
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.SyncCommittee: {
 				AuthorizedRoles: flow.Roles(),
-				Unicast:         true,
+				Unicast:         false,
 			},
 			channels.SyncClusterPrefix: {
 				AuthorizedRoles: flow.RoleList{flow.RoleCollection},
-				Unicast:         true,
+				Unicast:         false,
 			},
 		},
 	}
@@ -143,11 +143,11 @@ func initializeMessageAuthConfigsMap() {
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.SyncCommittee: {
 				AuthorizedRoles: flow.Roles(),
-				Unicast:         true,
+				Unicast:         false,
 			},
 			channels.SyncClusterPrefix: {
 				AuthorizedRoles: flow.RoleList{flow.RoleCollection},
-				Unicast:         true,
+				Unicast:         false,
 			},
 		},
 	}
@@ -350,11 +350,11 @@ func initializeMessageAuthConfigsMap() {
 		Config: map[channels.Channel]ChannelAuthConfig{
 			channels.TestNetworkChannel: {
 				AuthorizedRoles: flow.Roles(),
-				Unicast:         false,
+				Unicast:         true,
 			},
 			channels.TestMetricsChannel: {
 				AuthorizedRoles: flow.Roles(),
-				Unicast:         false,
+				Unicast:         true,
 			},
 		},
 	}

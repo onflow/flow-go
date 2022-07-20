@@ -231,6 +231,30 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ValidationFai
 	})
 }
 
+// TestValidatorCallback_Unicast checks that the call back returned from AuthorizedSenderValidator returns the expected validation error for
+// messages sent via unicast.
+func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_Unicast() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	identity, _ := unittest.IdentityWithNetworkingKeyFixture()
+	getIdentityFunc := s.getIdentity(identity)
+	pid, err := unittest.PeerIDFromFlowID(identity)
+	require.NoError(s.T(), err)
+
+	// sync requests are broadcast using multicast not unicast
+	validate := AuthorizedSenderValidator(unittest.Logger(), channels.SyncCommittee, getIdentityFunc, true)
+	msgType, err := validate(ctx, pid, &messages.SyncRequest{})
+	require.ErrorIs(s.T(), err, message.ErrUnauthorizedUnicastOnChannel)
+	require.Equal(s.T(), "SyncRequest", msgType)
+
+	// sync responses are sent via unicast to the requester
+	validate = AuthorizedSenderValidator(unittest.Logger(), channels.SyncCommittee, getIdentityFunc, true)
+	msgType, err = validate(ctx, pid, &messages.SyncResponse{})
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), "SyncResponse", msgType)
+}
+
 // initializeAuthorizationTestCases initializes happy and sad path test cases for checking authorized and unauthorized role message combinations.
 func (s *TestAuthorizedSenderValidatorSuite) initializeAuthorizationTestCases() {
 	for _, c := range message.GetAllMessageAuthConfigs() {
