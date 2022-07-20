@@ -33,6 +33,7 @@ func (co *CompactorObserver) OnNext(val interface{}) {
 	res, ok := val.(int)
 	if ok {
 		new := res
+		fmt.Printf("Compactor observer received checkpoint num %d\n", new)
 		if new >= co.fromBound {
 			co.done <- struct{}{}
 		}
