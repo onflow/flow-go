@@ -122,6 +122,7 @@ func (suite *AccessSuite) TestObserverConnection() {
 		AccessName:              "access_1",
 		AccessPublicNetworkPort: "9876",
 		AccessGRPCSecurePort:    "9001",
+		AutoRemove:              true,
 	})
 	defer shutdown()
 
@@ -135,9 +136,21 @@ func (suite *AccessSuite) TestObserverConnection() {
 
 	client := accessproto.NewAccessAPIClient(conn)
 
-	// ping the observer
+	// ping the observer while the access container is running
 	_, err = client.Ping(suite.ctx, &accessproto.PingRequest{})
 	if err != nil {
+		t.Failed()
+	}
+
+	// stop the upstream access container
+	accessContainer := suite.net.ContainerByName("access_1")
+	if err = suite.net.StopContainer(suite.ctx, accessContainer.ID); err != nil {
+		t.Failed()
+	}
+
+	// ping the observer when access container is stopped
+	_, err = client.Ping(suite.ctx, &accessproto.PingRequest{})
+	if err == nil {
 		t.Failed()
 	}
 }

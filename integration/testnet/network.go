@@ -762,6 +762,7 @@ type ObserverConfig struct {
 	AccessName              string
 	AccessPublicNetworkPort string
 	AccessGRPCSecurePort    string
+	AutoRemove              bool
 }
 
 func (net *FlowNetwork) AddObserver(ctx context.Context, conf *ObserverConfig) (shutdown func(), err error) {
@@ -836,7 +837,7 @@ func (net *FlowNetwork) AddObserver(ctx context.Context, conf *ObserverConfig) (
 			},
 		},
 		&container.HostConfig{
-			AutoRemove: false,
+			AutoRemove: conf.AutoRemove,
 			Binds: []string{
 				fmt.Sprintf("%s:%s:rw", flowDataDir, "/data"),
 				fmt.Sprintf("%s:%s:rw", flowProfilerDir, "/profiler"),
