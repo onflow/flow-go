@@ -21,7 +21,7 @@ type TimeoutCollectors struct {
 	lock               sync.RWMutex
 	lowestRetainedView uint64                               // lowest view, for which we still retain a TimeoutCollector and process timeouts
 	collectors         map[uint64]hotstuff.TimeoutCollector // view -> TimeoutCollector
-	collectorFactory   hotstuff.TimeoutCollectorFactory     // factory method for creating collectors
+	collectorFactory   hotstuff.TimeoutCollectorFactory     // factor for creating collectors
 }
 
 var _ hotstuff.TimeoutCollectors = (*TimeoutCollectors)(nil)

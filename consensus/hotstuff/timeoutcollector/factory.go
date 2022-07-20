@@ -16,7 +16,8 @@ type TimeoutCollectorFactory struct {
 
 var _ hotstuff.TimeoutCollectorFactory = (*TimeoutCollectorFactory)(nil)
 
-// NewTimeoutCollectorFactory creates new instance of TimeoutCollectorFactory
+// NewTimeoutCollectorFactory creates new instance of TimeoutCollectorFactory.
+// No error returns are expected during normal operations.  
 func NewTimeoutCollectorFactory(notifier hotstuff.Consumer,
 	collectorNotifier hotstuff.TimeoutCollectorConsumer,
 	createProcessor hotstuff.TimeoutProcessorFactory,
@@ -46,12 +47,13 @@ type TimeoutProcessorFactory struct {
 	committee   hotstuff.Replicas
 	notifier    hotstuff.TimeoutCollectorConsumer
 	validator   hotstuff.Validator
-	encodingTag string
+	domainSeparationTag string
 }
 
 var _ hotstuff.TimeoutProcessorFactory = (*TimeoutProcessorFactory)(nil)
 
-// NewTimeoutProcessorFactory creates new instance of TimeoutProcessorFactory
+// NewTimeoutProcessorFactory creates new instance of TimeoutProcessorFactory.
+// No error returns are expected during normal operations.  
 func NewTimeoutProcessorFactory(
 	notifier hotstuff.TimeoutCollectorConsumer,
 	committee hotstuff.Replicas,
