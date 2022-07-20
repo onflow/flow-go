@@ -1,5 +1,5 @@
-transaction {
+transaction(code: String, epochTokenPayout: UFix64, rewardCut: UFix64) {
   prepare(serviceAccount: AuthAccount) {
-	serviceAccount.contracts.add(name: "FlowIDTableStaking", code: "%s".decodeHex(), epochTokenPayout: UFix64(%d), rewardCut: UFix64(%d))
+	serviceAccount.contracts.add(name: "FlowIDTableStaking", code: code.decodeHex(), epochTokenPayout: epochTokenPayout, rewardCut: rewardCut)
   }
 }

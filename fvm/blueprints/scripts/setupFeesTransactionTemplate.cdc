@@ -1,4 +1,4 @@
-import FlowFees from 0x%s
+import FlowFees from 0xFLOWFEESADDRESS
 
 transaction(surgeFactor: UFix64, inclusionEffortCost: UFix64, executionEffortCost: UFix64) {
     prepare(service: AuthAccount) {

@@ -3,12 +3,9 @@ package blueprints
 import (
 	_ "embed"
 	"encoding/hex"
-	"fmt"
-
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/common"
-
 	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -90,6 +87,8 @@ func SetIsContractDeploymentRestrictedTransaction(serviceAccount flow.Address, r
 // TODO (ramtin) get rid of authorizers
 func DeployContractTransaction(address flow.Address, contract []byte, contractName string) *flow.TransactionBody {
 	return flow.NewTransactionBody().
-		SetScript([]byte(fmt.Sprintf(deployContractTransactionTemplate, contractName, hex.EncodeToString(contract)))).
+		SetScript([]byte(deployContractTransactionTemplate)).
+		AddArgument(jsoncdc.MustEncode(cadence.String(contractName))).
+		AddArgument(jsoncdc.MustEncode(cadence.String(hex.EncodeToString(contract)))).
 		AddAuthorizer(address)
 }

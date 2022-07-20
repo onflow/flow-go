@@ -1,7 +1,7 @@
-import FlowServiceAccount from 0x%s
-import FlowStorageFees from 0x%s
-import FungibleToken from 0x%s
-import FlowToken from 0x%s
+import FlowServiceAccount from 0xFLOWSERVICEADDRESS
+import FlowStorageFees from 0xFLOWSTORAGEFEESADDRESS
+import FungibleToken from 0xFUNGIBLETOKENADDRESS
+import FlowToken from 0xFLOWTOKENADDRESS
 
 // This transaction sets up storage on any auth accounts that were created before the storage fees.
 // This is used during bootstrapping a local environment

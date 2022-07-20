@@ -36,18 +36,22 @@ var deployLockedTokensTemplate string
 // DeployEpochTransaction returns the transaction body for the deploy epoch transaction
 func DeployEpochTransaction(service flow.Address, contract []byte, epochConfig epochs.EpochConfig) *flow.TransactionBody {
 	return flow.NewTransactionBody().
-		SetScript([]byte(fmt.Sprintf(
-			deployEpochTransactionTemplate,
-			service,
-			hex.EncodeToString(contract),
-			epochConfig.CurrentEpochCounter,
-			epochConfig.NumViewsInEpoch,
-			epochConfig.NumViewsInStakingAuction,
-			epochConfig.NumViewsInDKGPhase,
-			epochConfig.NumCollectorClusters,
-			epochConfig.FLOWsupplyIncreasePercentage,
-			epochConfig.RandomSource,
-		))).
+		SetScript([]byte(
+			templates.ReplaceAddresses(
+				deployEpochTransactionTemplate,
+				templates.Environment{
+					QuorumCertificateAddress: service.Hex(),
+				},
+			),
+		)).
+		AddArgument(jsoncdc.MustEncode(cadence.String(hex.EncodeToString(contract)))).
+		AddArgument(jsoncdc.MustEncode(epochConfig.CurrentEpochCounter)).
+		AddArgument(jsoncdc.MustEncode(epochConfig.NumViewsInEpoch)).
+		AddArgument(jsoncdc.MustEncode(epochConfig.NumViewsInStakingAuction)).
+		AddArgument(jsoncdc.MustEncode(epochConfig.NumViewsInDKGPhase)).
+		AddArgument(jsoncdc.MustEncode(epochConfig.NumCollectorClusters)).
+		AddArgument(jsoncdc.MustEncode(epochConfig.FLOWsupplyIncreasePercentage)).
+		AddArgument(jsoncdc.MustEncode(epochConfig.RandomSource)).
 		AddArgument(epochs.EncodeClusterAssignments(epochConfig.CollectorClusters)).
 		AddAuthorizer(service)
 }
@@ -66,11 +70,10 @@ func SetupAccountTransaction(
 // DeployIDTableStakingTransaction returns the transaction body for the deploy id table staking transaction
 func DeployIDTableStakingTransaction(service flow.Address, contract []byte, epochTokenPayout cadence.UFix64, rewardCut cadence.UFix64) *flow.TransactionBody {
 	return flow.NewTransactionBody().
-		SetScript([]byte(fmt.Sprintf(
-			deployIDTableStakingTransactionTemplate,
-			hex.EncodeToString(contract),
-			epochTokenPayout,
-			rewardCut))).
+		SetScript([]byte(deployIDTableStakingTransactionTemplate)).
+		AddArgument(jsoncdc.MustEncode(cadence.String(hex.EncodeToString(contract)))).
+		AddArgument(jsoncdc.MustEncode(epochTokenPayout)).
+		AddArgument(jsoncdc.MustEncode(rewardCut)).
 		AddAuthorizer(service)
 }
 
@@ -88,7 +91,13 @@ func FundAccountTransaction(
 	}
 
 	return flow.NewTransactionBody().
-		SetScript([]byte(fmt.Sprintf(fundAccountTemplate, fungibleToken, flowToken))).
+		SetScript([]byte(templates.ReplaceAddresses(
+			fundAccountTemplate,
+			templates.Environment{
+				FungibleTokenAddress: fungibleToken.Hex(),
+				FlowTokenAddress:     flowToken.Hex(),
+			},
+		))).
 		AddArgument(jsoncdc.MustEncode(cdcAmount)).
 		AddArgument(jsoncdc.MustEncode(cadence.NewAddress(nodeAddress))).
 		AddAuthorizer(service)
@@ -97,11 +106,11 @@ func FundAccountTransaction(
 // DeployLockedTokensTransaction returns the transaction body for the deploy locked tokens transaction
 func DeployLockedTokensTransaction(service flow.Address, contract []byte, publicKeys []cadence.Value) *flow.TransactionBody {
 	return flow.NewTransactionBody().
-		SetScript([]byte(fmt.Sprintf(
+		SetScript([]byte(
 			deployLockedTokensTemplate,
-			hex.EncodeToString(contract),
-		))).
+		)).
 		AddArgument(jsoncdc.MustEncode(cadence.NewArray(publicKeys))).
+		AddArgument(jsoncdc.MustEncode(cadence.String(hex.EncodeToString(contract)))).
 		AddAuthorizer(service)
 }
 
