@@ -7,6 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 )
 
 type Relayer struct {
@@ -18,13 +19,13 @@ type Relayer struct {
 // ignored. If a usecase arises, we should implement a mechanism to forward these messages to a handler.
 type noopProcessor struct{}
 
-func (n *noopProcessor) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+func (n *noopProcessor) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	return nil
 }
 
 var _ network.MessageProcessor = (*Relayer)(nil)
 
-func NewRelayer(destinationNetwork network.Network, channel network.Channel, processor network.MessageProcessor) (*Relayer, error) {
+func NewRelayer(destinationNetwork network.Network, channel channels.Channel, processor network.MessageProcessor) (*Relayer, error) {
 	conduit, err := destinationNetwork.Register(channel, &noopProcessor{})
 
 	if err != nil {
@@ -38,7 +39,7 @@ func NewRelayer(destinationNetwork network.Network, channel network.Channel, pro
 
 }
 
-func (r *Relayer) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+func (r *Relayer) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	g := new(errgroup.Group)
 
 	g.Go(func() error {

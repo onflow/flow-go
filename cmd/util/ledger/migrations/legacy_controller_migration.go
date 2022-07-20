@@ -28,7 +28,7 @@ func (lc *LegacyControllerMigration) Migrate(payload []ledger.Payload) ([]ledger
 
 		if len(controller) > 0 {
 			if bytes.Equal(owner, controller) &&
-				string(key) != fvmState.KeyPublicKeyCount && //  case - public key count
+				string(key) != KeyPublicKeyCount && //  case - public key count
 				!bytes.HasPrefix(key, []byte("public_key_")) && // case - public keys
 				string(key) != fvmState.KeyContractNames && // case - contract names
 				!bytes.HasPrefix(key, []byte(fvmState.KeyCode)) { // case - contracts

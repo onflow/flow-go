@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	module "github.com/onflow/flow-go/module/mock"
 	netint "github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storerr "github.com/onflow/flow-go/storage"
@@ -121,7 +122,7 @@ func (cs *ComplianceSuite) SetupTest() {
 	// set up network module mock
 	cs.net = &mocknetwork.Network{}
 	cs.net.On("Register", mock.Anything, mock.Anything).Return(
-		func(channel netint.Channel, engine netint.MessageProcessor) netint.Conduit {
+		func(channel channels.Channel, engine netint.MessageProcessor) netint.Conduit {
 			return cs.con
 		},
 		nil,
@@ -250,7 +251,7 @@ func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
 	originID := unittest.IdentifierFixture()
 	voteCount := 15
 
-	channel := netint.ChannelConsensusCluster(cs.clusterID)
+	channel := channels.ConsensusCluster(cs.clusterID)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
