@@ -157,7 +157,7 @@ func (a *AttackNetwork) Send(event *insecure.Event) error {
 		return fmt.Errorf("no connection available for corrupted conduit factory to node %x: ", event.CorruptedNodeId)
 	}
 
-	msg, err := a.eventToMessage(event.CorruptedNodeId, event.FlowProtocolEvent, event.Channel, event.Protocol, event.TargetNum, event.TargetIds...)
+	msg, err := a.eventToEgressMessage(event.CorruptedNodeId, event.FlowProtocolEvent, event.Channel, event.Protocol, event.TargetNum, event.TargetIds...)
 	if err != nil {
 		return fmt.Errorf("could not convert event to message: %w", err)
 	}
@@ -170,8 +170,8 @@ func (a *AttackNetwork) Send(event *insecure.Event) error {
 	return nil
 }
 
-// eventToMessage converts the given application layer event to a protobuf message that is meant to be sent to the corrupted node.
-func (a *AttackNetwork) eventToMessage(corruptedId flow.Identifier,
+// eventToEgressMessage converts the given application layer event to a protobuf message that is meant to be sent to the corrupted node.
+func (a *AttackNetwork) eventToEgressMessage(corruptedId flow.Identifier,
 	event interface{},
 	channel network.Channel,
 	protocol insecure.Protocol,
