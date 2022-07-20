@@ -214,7 +214,7 @@ func (s *CachedClient) Close() {
 		return
 	}
 	// allow time for any existing requests to finish before closing the connection
-	time.Sleep(s.timeout)
+	time.Sleep(s.timeout + 1*time.Second)
 	conn.Close()
 }
 
