@@ -231,7 +231,7 @@ func NewForks(t *testing.T, finalized uint64) *Forks {
 // BlockProducer mock will always make a valid block
 type BlockProducer struct{}
 
-func (b *BlockProducer) MakeBlockProposal(qc *flow.QuorumCertificate, view uint64, lastViewTC *flow.TimeoutCertificate) (*model.Proposal, error) {
+func (b *BlockProducer) MakeBlockProposal(view uint64, qc *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.Proposal, error) {
 	return &model.Proposal{
 		Block:      helper.MakeBlock(helper.WithBlockView(view), helper.WithBlockQC(qc)),
 		LastViewTC: lastViewTC,

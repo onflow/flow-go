@@ -17,7 +17,7 @@ type TimeoutCollectorFactory struct {
 var _ hotstuff.TimeoutCollectorFactory = (*TimeoutCollectorFactory)(nil)
 
 // NewTimeoutCollectorFactory creates new instance of TimeoutCollectorFactory.
-// No error returns are expected during normal operations.  
+// No error returns are expected during normal operations.
 func NewTimeoutCollectorFactory(notifier hotstuff.Consumer,
 	collectorNotifier hotstuff.TimeoutCollectorConsumer,
 	createProcessor hotstuff.TimeoutProcessorFactory,
@@ -44,27 +44,27 @@ func (f *TimeoutCollectorFactory) Create(view uint64) (hotstuff.TimeoutCollector
 // TimeoutProcessorFactory implements hotstuff.TimeoutProcessorFactory, it is responsible for creating timeout processor
 // for given view.
 type TimeoutProcessorFactory struct {
-	committee   hotstuff.Replicas
-	notifier    hotstuff.TimeoutCollectorConsumer
-	validator   hotstuff.Validator
+	committee           hotstuff.Replicas
+	notifier            hotstuff.TimeoutCollectorConsumer
+	validator           hotstuff.Validator
 	domainSeparationTag string
 }
 
 var _ hotstuff.TimeoutProcessorFactory = (*TimeoutProcessorFactory)(nil)
 
 // NewTimeoutProcessorFactory creates new instance of TimeoutProcessorFactory.
-// No error returns are expected during normal operations.  
+// No error returns are expected during normal operations.
 func NewTimeoutProcessorFactory(
 	notifier hotstuff.TimeoutCollectorConsumer,
 	committee hotstuff.Replicas,
 	validator hotstuff.Validator,
-	encodingTag string,
+	domainSeparationTag string,
 ) *TimeoutProcessorFactory {
 	return &TimeoutProcessorFactory{
-		committee:   committee,
-		notifier:    notifier,
-		validator:   validator,
-		encodingTag: encodingTag,
+		committee:           committee,
+		notifier:            notifier,
+		validator:           validator,
+		domainSeparationTag: domainSeparationTag,
 	}
 }
 
@@ -78,7 +78,7 @@ func (f *TimeoutProcessorFactory) Create(view uint64) (hotstuff.TimeoutProcessor
 		return nil, fmt.Errorf("error retrieving consensus participants: %w", err)
 	}
 
-	sigAggregator, err := NewTimeoutSignatureAggregator(view, allParticipants, f.encodingTag)
+	sigAggregator, err := NewTimeoutSignatureAggregator(view, allParticipants, f.domainSeparationTag)
 	if err != nil {
 		return nil, fmt.Errorf("could not create TimeoutSignatureAggregator at view %d: %w", view, err)
 	}

@@ -386,7 +386,7 @@ func (e *EventHandler) proposeForNewView() error {
 			lastViewTC = nil
 		}
 
-		proposal, err := e.blockProducer.MakeBlockProposal(newestQC, curView, lastViewTC)
+		proposal, err := e.blockProducer.MakeBlockProposal(curView, newestQC, lastViewTC)
 		if err != nil {
 			return fmt.Errorf("can not make block proposal for curView %v: %w", curView, err)
 		}

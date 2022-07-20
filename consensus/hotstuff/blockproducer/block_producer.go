@@ -30,9 +30,9 @@ func New(signer hotstuff.Signer, committee hotstuff.Replicas, builder module.Bui
 }
 
 // MakeBlockProposal builds a new HotStuff block proposal using the given view,
-// the given quorum certificate for its parent and [maybe] timeout certificate for last view(could be nil).
+// the given quorum certificate for its parent and [optionally] a timeout certificate for last view(could be nil).
 // No errors are expected during normal operation.
-func (bp *BlockProducer) MakeBlockProposal(qc *flow.QuorumCertificate, view uint64, lastViewTC *flow.TimeoutCertificate) (*model.Proposal, error) {
+func (bp *BlockProducer) MakeBlockProposal(view uint64, qc *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.Proposal, error) {
 	// the custom functions allows us to set some custom fields on the block;
 	// in hotstuff, we use this for view number and signature-related fields
 	setHotstuffFields := func(header *flow.Header) error {

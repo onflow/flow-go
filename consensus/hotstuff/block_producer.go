@@ -10,7 +10,7 @@ import (
 // BlockProducer assembles the new block proposal using the block payload, block header and the proposal vote.
 type BlockProducer interface {
 	// MakeBlockProposal builds a new HotStuff block proposal using the given view,
-	// the given quorum certificate for its parent and [maybe] timeout certificate for last view(could be nil).
+	// the given quorum certificate for its parent and [optionally] a timeout certificate for last view(could be nil).
 	// No errors are expected during normal operation.
-	MakeBlockProposal(qc *flow.QuorumCertificate, view uint64, lastViewTC *flow.TimeoutCertificate) (*model.Proposal, error)
+	MakeBlockProposal(view uint64, qc *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.Proposal, error)
 }

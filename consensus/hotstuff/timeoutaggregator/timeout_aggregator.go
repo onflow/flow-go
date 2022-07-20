@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
@@ -28,6 +29,7 @@ const defaultTimeoutQueueCapacity = 1000
 // It's safe to use in concurrent environment.
 type TimeoutAggregator struct {
 	*component.ComponentManager
+	notifications.NoopConsumer
 	log                    zerolog.Logger
 	notifier               hotstuff.Consumer
 	lowestRetainedView     counters.StrictMonotonousCounter // lowest view, for which we still process timeouts
@@ -196,7 +198,7 @@ func (t *TimeoutAggregator) PruneUpToView(lowestRetainedView uint64) {
 	t.collectors.PruneUpToView(lowestRetainedView)
 }
 
-// OnEnteringView implements the `OnEnteringView` callback from the `hotstuff.FinalizationConsumer`
+// OnEnteringView implements the `OnEnteringView` callback from the `hotstuff.Consumer`
 // We notify the enteringViewProcessingLoop worker, which then prunes up to the active view.
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function

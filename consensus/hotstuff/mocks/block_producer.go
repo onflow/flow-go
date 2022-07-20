@@ -16,7 +16,7 @@ type BlockProducer struct {
 }
 
 // MakeBlockProposal provides a mock function with given fields: qc, view, lastViewTC
-func (_m *BlockProducer) MakeBlockProposal(qc *flow.QuorumCertificate, view uint64, lastViewTC *flow.TimeoutCertificate) (*model.Proposal, error) {
+func (_m *BlockProducer) MakeBlockProposal(view uint64, qc *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.Proposal, error) {
 	ret := _m.Called(qc, view, lastViewTC)
 
 	var r0 *model.Proposal

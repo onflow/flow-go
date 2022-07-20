@@ -7,16 +7,15 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/timeoutaggregator"
 	"github.com/onflow/flow-go/consensus/hotstuff/timeoutcollector"
 	"github.com/onflow/flow-go/consensus/hotstuff/voteaggregator"
 	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
-	"github.com/onflow/flow-go/model/flow"
 )
 
-// NewVoteAggregator creates new VoteAggregator and subscribes for finalization events
+// NewVoteAggregator creates new VoteAggregator and subscribes for finalization events.
+// No error returns are expected during normal operations.
 func NewVoteAggregator(
 	log zerolog.Logger,
 	lowestRetainedView uint64,
@@ -38,20 +37,8 @@ func NewVoteAggregator(
 	return aggregator, nil
 }
 
-// timeoutAggregatorConsumerAdapter is an utilitity function that serves as adapter for hotstuff.Consumer which overrides
-// events and forwards them to `TimeoutAggregator`.
-type timeoutAggregatorConsumerAdapter struct {
-	notifications.NoopConsumer
-	aggregator *timeoutaggregator.TimeoutAggregator
-}
-
-func (t *timeoutAggregatorConsumerAdapter) OnEnteringView(viewNumber uint64, leader flow.Identifier) {
-	t.aggregator.OnEnteringView(viewNumber, leader)
-}
-
-var _ hotstuff.Consumer = (*timeoutAggregatorConsumerAdapter)(nil)
-
-// NewTimeoutAggregator creates new TimeoutAggregator and connects Hotstuff event source with event handler
+// NewTimeoutAggregator creates new TimeoutAggregator and connects Hotstuff event source with event handler.
+// No error returns are expected during normal operations.
 func NewTimeoutAggregator(log zerolog.Logger,
 	lowestRetainedView uint64,
 	notifier *pubsub.Distributor,
@@ -67,10 +54,7 @@ func NewTimeoutAggregator(log zerolog.Logger,
 	if err != nil {
 		return nil, fmt.Errorf("could not create timeout aggregator: %w", err)
 	}
-	adapter := &timeoutAggregatorConsumerAdapter{
-		aggregator: aggregator,
-	}
-	notifier.AddConsumer(adapter)
+	notifier.AddConsumer(aggregator)
 
 	return aggregator, nil
 }
