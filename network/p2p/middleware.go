@@ -326,8 +326,10 @@ func (m *Middleware) start(ctx context.Context) error {
 // PeerManager returns the peer manager used by the middleware.
 // IMPORTANT: the peer manager is set when the middleware is started. Calling this method before
 // the middleware is started will return nil.
-func (m *Middleware) PeerManager() network.PeerManager {
-	return m.peerManager
+func (m *Middleware) PeerManager() (network.PeerManager, bool) {
+	// returning a boolean along with the peerManager to simplify not set checks since
+	// a nil interface != nil
+	return m.peerManager, m.peerManager != nil
 }
 
 // stop will end the execution of the middleware and wait for it to end.
