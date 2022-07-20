@@ -57,8 +57,8 @@ func (_m *Identifiers) Has(id flow.Identifier) bool {
 	return r0
 }
 
-// Rem provides a mock function with given fields: id
-func (_m *Identifiers) Rem(id flow.Identifier) bool {
+// Remove provides a mock function with given fields: id
+func (_m *Identifiers) Remove(id flow.Identifier) bool {
 	ret := _m.Called(id)
 
 	var r0 bool

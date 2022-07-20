@@ -9,11 +9,6 @@ type WALMetrics struct {
 	mock.Mock
 }
 
-// DiskSize provides a mock function with given fields: _a0
-func (_m *WALMetrics) DiskSize(_a0 uint64) {
-	_m.Called(_a0)
-}
-
 type NewWALMetricsT interface {
 	mock.TestingT
 	Cleanup(func())

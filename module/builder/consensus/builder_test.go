@@ -498,7 +498,7 @@ func (bs *BuilderSuite) TestPayloadGuaranteeReferenceExpired() {
 	// create 4 expired guarantees
 	header := unittest.BlockHeaderFixture()
 	header.Height = bs.headers[bs.finalID].Height - 12
-	bs.headers[header.ID()] = &header
+	bs.headers[header.ID()] = header
 	expired := unittest.CollectionGuaranteesFixture(4, unittest.WithCollRef(header.ID()))
 
 	// add all guarantees to the pool

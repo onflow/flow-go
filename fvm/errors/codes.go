@@ -87,6 +87,7 @@ const (
 	ErrCodeAccountAlreadyExistsError         ErrorCode = 1203
 	ErrCodeFrozenAccountError                ErrorCode = 1204
 	ErrCodeAccountStorageNotInitializedError ErrorCode = 1205
+	ErrCodeAccountPublicKeyLimitError        ErrorCode = 1206
 
 	// contract errors 1250 - 1300
 	// ErrCodeContractError          ErrorCode = 1250 - reserved

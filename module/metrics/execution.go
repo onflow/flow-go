@@ -64,7 +64,6 @@ type ExecutionCollector struct {
 	numberOfAccounts                 prometheus.Gauge
 	totalChunkDataPackRequests       prometheus.Counter
 	stateSyncActive                  prometheus.Gauge
-	executionStateDiskUsage          prometheus.Gauge
 	blockDataUploadsInProgress       prometheus.Gauge
 	blockDataUploadsDuration         prometheus.Histogram
 	maxCollectionHeight              prometheus.Gauge
@@ -523,13 +522,6 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 			Help:      "the number of existing accounts on the network",
 		}),
 
-		executionStateDiskUsage: promauto.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespaceExecution,
-			Subsystem: subsystemMTrie,
-			Name:      "execution_state_disk_usage",
-			Help:      "the disk usage of execution state",
-		}),
-
 		maxCollectionHeight: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name:      "max_collection_height",
 			Namespace: namespaceExecution,
@@ -750,10 +742,6 @@ func (ec *ExecutionCollector) ExecutionSync(syncing bool) {
 
 func (ec *ExecutionCollector) RuntimeSetNumberOfAccounts(count uint64) {
 	ec.numberOfAccounts.Set(float64(count))
-}
-
-func (ec *ExecutionCollector) DiskSize(bytes uint64) {
-	ec.executionStateDiskUsage.Set(float64(bytes))
 }
 
 func (ec *ExecutionCollector) UpdateCollectionMaxHeight(height uint64) {

@@ -40,6 +40,9 @@ type ReadOnlyExecutionState interface {
 	// StateCommitmentByBlockID returns the final state commitment for the provided block ID.
 	StateCommitmentByBlockID(context.Context, flow.Identifier) (flow.StateCommitment, error)
 
+	// HasState returns true if the state with the given state commitment exists in memory
+	HasState(flow.StateCommitment) bool
+
 	// ChunkDataPackByChunkID retrieve a chunk data pack given the chunk ID.
 	ChunkDataPackByChunkID(context.Context, flow.Identifier) (*flow.ChunkDataPack, error)
 
@@ -70,9 +73,11 @@ type ExecutionState interface {
 }
 
 const (
-	KeyPartOwner      = uint16(0)
-	KeyPartController = uint16(1)
-	KeyPartKey        = uint16(2)
+	KeyPartOwner = uint16(0)
+	// @deprecated - controller was used only by the very first
+	// version of cadence for access controll which was retired later on
+	// KeyPartController = uint16(1)
+	KeyPartKey = uint16(2)
 )
 
 type state struct {
@@ -94,7 +99,6 @@ type state struct {
 func RegisterIDToKey(reg flow.RegisterID) ledger.Key {
 	return ledger.NewKey([]ledger.KeyPart{
 		ledger.NewKeyPart(KeyPartOwner, []byte(reg.Owner)),
-		ledger.NewKeyPart(KeyPartController, []byte(reg.Controller)),
 		ledger.NewKeyPart(KeyPartKey, []byte(reg.Key)),
 	})
 }
@@ -133,9 +137,9 @@ func NewExecutionState(
 
 }
 
-func makeSingleValueQuery(commitment flow.StateCommitment, owner, controller, key string) (*ledger.QuerySingleValue, error) {
+func makeSingleValueQuery(commitment flow.StateCommitment, owner, key string) (*ledger.QuerySingleValue, error) {
 	return ledger.NewQuerySingleValue(ledger.State(commitment),
-		RegisterIDToKey(flow.NewRegisterID(owner, controller, key)),
+		RegisterIDToKey(flow.NewRegisterID(owner, key)),
 	)
 }
 
@@ -169,18 +173,17 @@ func LedgerGetRegister(ldg ledger.Ledger, commitment flow.StateCommitment) delta
 
 	readCache := make(map[flow.RegisterID]flow.RegisterEntry)
 
-	return func(owner, controller, key string) (flow.RegisterValue, error) {
+	return func(owner, key string) (flow.RegisterValue, error) {
 		regID := flow.RegisterID{
-			Owner:      owner,
-			Controller: controller,
-			Key:        key,
+			Owner: owner,
+			Key:   key,
 		}
 
 		if value, ok := readCache[regID]; ok {
 			return value.Value, nil
 		}
 
-		query, err := makeSingleValueQuery(commitment, owner, controller, key)
+		query, err := makeSingleValueQuery(commitment, owner, key)
 
 		if err != nil {
 			return nil, fmt.Errorf("cannot create ledger query: %w", err)
@@ -298,6 +301,10 @@ func (s *state) GetProof(
 		return nil, fmt.Errorf("cannot get proof: %w", err)
 	}
 	return proof, nil
+}
+
+func (s *state) HasState(commitment flow.StateCommitment) bool {
+	return s.ls.HasState(ledger.State(commitment))
 }
 
 func (s *state) StateCommitmentByBlockID(ctx context.Context, blockID flow.Identifier) (flow.StateCommitment, error) {
