@@ -165,10 +165,14 @@ func (b *backendScripts) shouldLogScript(execTime time.Time, scriptHash [16]byte
 }
 
 func (b *backendScripts) tryExecuteScript(ctx context.Context, execNode *flow.Identity, req execproto.ExecuteScriptAtBlockIDRequest) ([]byte, error) {
-	execRPCClient, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
+	execRPCClient, conn, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to create client for execution node %s: %v", execNode.String(), err)
 	}
+	if conn != nil {
+		defer conn.Close()
+	}
+
 	execResp, err := execRPCClient.ExecuteScriptAtBlockID(ctx, &req)
 	if err != nil {
 		if status.Code(err) == codes.Unavailable {

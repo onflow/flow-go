@@ -25,9 +25,9 @@ const DefaultClientTimeout = 3 * time.Second
 
 // ConnectionFactory is used to create an access api client
 type ConnectionFactory interface {
-	GetAccessAPIClient(address string) (access.AccessAPIClient, error)
+	GetAccessAPIClient(address string) (access.AccessAPIClient, *grpc.ClientConn, error)
 	InvalidateAccessAPIClient(address string)
-	GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, error)
+	GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, *grpc.ClientConn, error)
 	InvalidateExecutionAPIClient(address string)
 }
 
@@ -36,11 +36,11 @@ type ProxyConnectionFactory struct {
 	targetAddress string
 }
 
-func (p *ProxyConnectionFactory) GetAccessAPIClient(address string) (access.AccessAPIClient, error) {
+func (p *ProxyConnectionFactory) GetAccessAPIClient(address string) (access.AccessAPIClient, *grpc.ClientConn, error) {
 	return p.ConnectionFactory.GetAccessAPIClient(p.targetAddress)
 }
 
-func (p *ProxyConnectionFactory) GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, error) {
+func (p *ProxyConnectionFactory) GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, *grpc.ClientConn, error) {
 	return p.ConnectionFactory.GetExecutionAPIClient(p.targetAddress)
 }
 
@@ -138,20 +138,27 @@ func (cf *ConnectionFactoryImpl) retrieveConnection(grpcAddress string, timeout 
 	return conn, nil
 }
 
-func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string) (access.AccessAPIClient, error) {
+func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string) (access.AccessAPIClient, *grpc.ClientConn, error) {
 
 	grpcAddress, err := getGRPCAddress(address, cf.CollectionGRPCPort)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	conn, err := cf.retrieveConnection(grpcAddress, cf.CollectionNodeGRPCTimeout)
+	var conn *grpc.ClientConn
+	if cf.ConnectionsCache != nil {
+		conn, err = cf.retrieveConnection(grpcAddress, cf.CollectionNodeGRPCTimeout)
+		if err != nil {
+			return nil, nil, err
+		}
+		return access.NewAccessAPIClient(conn), nil, err
+	}
+
+	conn, err = cf.createConnection(grpcAddress, cf.CollectionNodeGRPCTimeout)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-
-	accessAPIClient := access.NewAccessAPIClient(conn)
-	return accessAPIClient, nil
+	return access.NewAccessAPIClient(conn), conn, nil
 }
 
 func (cf *ConnectionFactoryImpl) InvalidateAccessAPIClient(address string) {
@@ -159,20 +166,27 @@ func (cf *ConnectionFactoryImpl) InvalidateAccessAPIClient(address string) {
 	cf.invalidateAPIClient(address, cf.CollectionGRPCPort)
 }
 
-func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, error) {
+func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, *grpc.ClientConn, error) {
 
 	grpcAddress, err := getGRPCAddress(address, cf.ExecutionGRPCPort)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	conn, err := cf.retrieveConnection(grpcAddress, cf.ExecutionNodeGRPCTimeout)
+	var conn *grpc.ClientConn
+	if cf.ConnectionsCache != nil {
+		conn, err = cf.retrieveConnection(grpcAddress, cf.ExecutionNodeGRPCTimeout)
+		if err != nil {
+			return nil, nil, err
+		}
+		return execution.NewExecutionAPIClient(conn), nil, nil
+	}
+
+	conn, err = cf.createConnection(grpcAddress, cf.ExecutionNodeGRPCTimeout)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-
-	executionAPIClient := execution.NewExecutionAPIClient(conn)
-	return executionAPIClient, nil
+	return execution.NewExecutionAPIClient(conn), conn, nil
 }
 
 func (cf *ConnectionFactoryImpl) InvalidateExecutionAPIClient(address string) {

@@ -144,9 +144,12 @@ func (b *backendTransactions) sendTransactionToCollector(ctx context.Context,
 	tx *flow.TransactionBody,
 	collectionNodeAddr string) error {
 
-	collectionRPC, err := b.connFactory.GetAccessAPIClient(collectionNodeAddr)
+	collectionRPC, conn, err := b.connFactory.GetAccessAPIClient(collectionNodeAddr)
 	if err != nil {
 		return fmt.Errorf("failed to connect to collection node at %s: %w", collectionNodeAddr, err)
+	}
+	if conn != nil {
+		defer conn.Close()
 	}
 
 	err = b.grpcTxSend(ctx, collectionRPC, tx)
@@ -704,10 +707,14 @@ func (b *backendTransactions) tryGetTransactionResult(
 	execNode *flow.Identity,
 	req execproto.GetTransactionResultRequest,
 ) (*execproto.GetTransactionResultResponse, error) {
-	execRPCClient, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
+	execRPCClient, conn, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
 		return nil, err
 	}
+	if conn != nil {
+		defer conn.Close()
+	}
+
 	resp, err := execRPCClient.GetTransactionResult(ctx, &req)
 	if err != nil {
 		if status.Code(err) == codes.Unavailable {
@@ -760,10 +767,14 @@ func (b *backendTransactions) tryGetTransactionResultsByBlockID(
 	execNode *flow.Identity,
 	req execproto.GetTransactionsByBlockIDRequest,
 ) (*execproto.GetTransactionResultsResponse, error) {
-	execRPCClient, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
+	execRPCClient, conn, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
 		return nil, err
 	}
+	if conn != nil {
+		defer conn.Close()
+	}
+
 	resp, err := execRPCClient.GetTransactionResultsByBlockID(ctx, &req)
 	if err != nil {
 		if status.Code(err) == codes.Unavailable {
@@ -817,10 +828,14 @@ func (b *backendTransactions) tryGetTransactionResultByIndex(
 	execNode *flow.Identity,
 	req execproto.GetTransactionByIndexRequest,
 ) (*execproto.GetTransactionResultResponse, error) {
-	execRPCClient, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
+	execRPCClient, conn, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
 		return nil, err
 	}
+	if conn != nil {
+		defer conn.Close()
+	}
+	
 	resp, err := execRPCClient.GetTransactionResultByIndex(ctx, &req)
 	if err != nil {
 		if status.Code(err) == codes.Unavailable {

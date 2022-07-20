@@ -36,11 +36,6 @@ func TestProxyAccessAPI(t *testing.T) {
 	connectionFactory := new(ConnectionFactoryImpl)
 	// set the collection grpc port
 	connectionFactory.CollectionGRPCPort = cn.port
-	// set the connection pool cache size
-	cache, _ := lru.NewWithEvict(5, func(_, evictedValue interface{}) {
-		evictedValue.(*CachedClient).Close()
-	})
-	connectionFactory.ConnectionsCache = cache
 	// set metrics reporting
 	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 
@@ -50,7 +45,8 @@ func TestProxyAccessAPI(t *testing.T) {
 	}
 
 	// get a collection API client
-	client, err := proxyConnectionFactory.GetAccessAPIClient("foo")
+	client, conn, err := proxyConnectionFactory.GetAccessAPIClient("foo")
+	defer conn.Close()
 	assert.NoError(t, err)
 
 	ctx := context.Background()
@@ -88,7 +84,7 @@ func TestProxyExecutionAPI(t *testing.T) {
 	}
 
 	// get an execution API client
-	client, err := proxyConnectionFactory.GetExecutionAPIClient("foo")
+	client, _, err := proxyConnectionFactory.GetExecutionAPIClient("foo")
 	assert.NoError(t, err)
 
 	ctx := context.Background()
@@ -126,7 +122,7 @@ func TestProxyAccessAPIConnectionReuse(t *testing.T) {
 	}
 
 	// get a collection API client
-	_, err := proxyConnectionFactory.GetAccessAPIClient("foo")
+	_, _, err := proxyConnectionFactory.GetAccessAPIClient("foo")
 	assert.Equal(t, connectionFactory.ConnectionsCache.Len(), 1)
 	assert.NoError(t, err)
 
@@ -171,7 +167,7 @@ func TestProxyExecutionAPIConnectionReuse(t *testing.T) {
 	}
 
 	// get an execution API client
-	_, err := proxyConnectionFactory.GetExecutionAPIClient("foo")
+	_, _, err := proxyConnectionFactory.GetExecutionAPIClient("foo")
 	assert.Equal(t, connectionFactory.ConnectionsCache.Len(), 1)
 	assert.NoError(t, err)
 
@@ -218,7 +214,7 @@ func TestExecutionNodeClientTimeout(t *testing.T) {
 	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 
 	// create the execution API client
-	client, err := connectionFactory.GetExecutionAPIClient(en.listener.Addr().String())
+	client, _, err := connectionFactory.GetExecutionAPIClient(en.listener.Addr().String())
 	assert.NoError(t, err)
 
 	ctx := context.Background()
@@ -259,7 +255,7 @@ func TestCollectionNodeClientTimeout(t *testing.T) {
 	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 
 	// create the collection API client
-	client, err := connectionFactory.GetAccessAPIClient(cn.listener.Addr().String())
+	client, _, err := connectionFactory.GetAccessAPIClient(cn.listener.Addr().String())
 	assert.NoError(t, err)
 
 	ctx := context.Background()
@@ -304,20 +300,20 @@ func TestConnectionPoolFull(t *testing.T) {
 	cn3Address := "foo3:123"
 
 	// get a collection API client
-	_, err := connectionFactory.GetAccessAPIClient(cn1Address)
+	_, _, err := connectionFactory.GetAccessAPIClient(cn1Address)
 	assert.Equal(t, connectionFactory.ConnectionsCache.Len(), 1)
 	assert.NoError(t, err)
 
-	_, err = connectionFactory.GetAccessAPIClient(cn2Address)
+	_, _, err = connectionFactory.GetAccessAPIClient(cn2Address)
 	assert.Equal(t, connectionFactory.ConnectionsCache.Len(), 2)
 	assert.NoError(t, err)
 
-	_, err = connectionFactory.GetAccessAPIClient(cn1Address)
+	_, _, err = connectionFactory.GetAccessAPIClient(cn1Address)
 	assert.Equal(t, connectionFactory.ConnectionsCache.Len(), 2)
 	assert.NoError(t, err)
 
 	// Expecting to replace cn2 because cn1 was accessed more recently
-	_, err = connectionFactory.GetAccessAPIClient(cn3Address)
+	_, _, err = connectionFactory.GetAccessAPIClient(cn3Address)
 	assert.Equal(t, connectionFactory.ConnectionsCache.Len(), 2)
 	assert.NoError(t, err)
 
@@ -371,7 +367,7 @@ func TestConnectionPoolStale(t *testing.T) {
 	}
 
 	// get a collection API client
-	client, err := proxyConnectionFactory.GetAccessAPIClient("foo")
+	client, _, err := proxyConnectionFactory.GetAccessAPIClient("foo")
 	assert.Equal(t, connectionFactory.ConnectionsCache.Len(), 1)
 	assert.NoError(t, err)
 	// close connection to simulate something "going wrong" with our stored connection
@@ -385,7 +381,7 @@ func TestConnectionPoolStale(t *testing.T) {
 	assert.Error(t, err)
 
 	// re-access, should replace stale connection in cache with new one
-	_, _ = proxyConnectionFactory.GetAccessAPIClient("foo")
+	_, _, _ = proxyConnectionFactory.GetAccessAPIClient("foo")
 	assert.Equal(t, connectionFactory.ConnectionsCache.Len(), 1)
 
 	var conn *grpc.ClientConn
