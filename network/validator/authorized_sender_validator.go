@@ -24,7 +24,7 @@ var (
 // The message is also authorized by checking that the sender is allowed to send the message on the channel.
 // If validation fails the message is rejected, and if the validation error is an expected error, slashing data is also collected.
 // Authorization config is defined in message.MsgAuthConfig
-func AuthorizedSenderValidator(log zerolog.Logger, channel channels.Channel, getIdentity func(peer.ID) (*flow.Identity, bool)) MessageValidator {
+func AuthorizedSenderValidator(log zerolog.Logger, channel channels.Channel, getIdentity func(peer.ID) (*flow.Identity, bool), isUnicast bool) MessageValidator {
 	log = log.With().
 		Str("component", "authorized_sender_validator").
 		Str("network_channel", channel.String()).
@@ -42,7 +42,7 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel channels.Channel, get
 			return "", ErrIdentityUnverified
 		}
 
-		msgType, err := isAuthorizedSender(identity, channel, msg)
+		msgType, err := isAuthorizedSender(identity, channel, msg, isUnicast)
 		switch {
 		case err == nil:
 			return msgType, nil
@@ -72,7 +72,7 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel channels.Channel, get
 // MessageValidator callback that returns pubsub.ValidationReject if validation fails and pubsub.ValidationAccept if validation passes.
 func AuthorizedSenderMessageValidator(log zerolog.Logger, channel channels.Channel, getIdentity func(peer.ID) (*flow.Identity, bool)) PubSubMessageValidator {
 	return func(ctx context.Context, from peer.ID, msg interface{}) pubsub.ValidationResult {
-		validate := AuthorizedSenderValidator(log, channel, getIdentity)
+		validate := AuthorizedSenderValidator(log, channel, getIdentity, false)
 
 		_, err := validate(ctx, from, msg)
 		if err != nil {
@@ -93,7 +93,7 @@ func AuthorizedSenderMessageValidator(log zerolog.Logger, channel channels.Chann
 //  * message.ErrUnknownMsgType if message auth config us not found for the msg
 //  * message.ErrUnauthorizedMessageOnChannel if msg is not authorized to be sent on channel
 //  * message.ErrUnauthorizedRole if sender role is not authorized to send msg
-func isAuthorizedSender(identity *flow.Identity, channel channels.Channel, msg interface{}) (string, error) {
+func isAuthorizedSender(identity *flow.Identity, channel channels.Channel, msg interface{}, isUnicast bool) (string, error) {
 	if identity.Ejected {
 		return "", ErrSenderEjected
 	}
@@ -109,7 +109,7 @@ func isAuthorizedSender(identity *flow.Identity, channel channels.Channel, msg i
 		channel = channels.Channel(prefix)
 	}
 
-	if err := conf.EnsureAuthorized(identity.Role, channel); err != nil {
+	if err := conf.EnsureAuthorized(identity.Role, channel, isUnicast); err != nil {
 		return conf.Name, err
 	}
 
