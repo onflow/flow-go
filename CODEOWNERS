@@ -37,7 +37,7 @@
 /cmd/bootstrap/** @vishalchangrani
 
 # Performance Stream
-/integration/localnet/** @SaveTheRbtz @simonhf @Kay-Zee @zhangchiqing @pattyshack
-/integration/loader/** @SaveTheRbtz @simonhf @Kay-Zee @pattyshack
-/integration/benchmark/** @SaveTheRbtz @simonhf @Kay-Zee @pattyshack
-/integration/utils/** @SaveTheRbtz @simonhf @Kay-Zee @pattyshack
+/integration/localnet/** @SaveTheRbtz @simonhf @Kay-Zee @zhangchiqing @pattyshack @AndrewM-SDET
+/integration/loader/** @SaveTheRbtz @simonhf @Kay-Zee @pattyshack @AndrewM-SDET
+/integration/benchmark/** @SaveTheRbtz @simonhf @Kay-Zee @pattyshack @AndrewM-SDET
+/integration/utils/** @SaveTheRbtz @simonhf @Kay-Zee @pattyshack @AndrewM-SDET

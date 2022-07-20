@@ -96,7 +96,7 @@ func createContainerBlock(options ...func(result *flow.ExecutionResult, assignme
 	// container block
 	header := unittest.BlockHeaderFixture()
 	block := &flow.Block{
-		Header: &header,
+		Header: header,
 		Payload: &flow.Payload{
 			Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
 			Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},

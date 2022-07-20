@@ -6,7 +6,6 @@ import (
 	legacyaccessproto "github.com/onflow/flow/protobuf/go/flow/legacy/access"
 
 	"github.com/onflow/flow-go/access"
-
 	legacyaccess "github.com/onflow/flow-go/access/legacy"
 )
 
@@ -29,7 +28,9 @@ func (builder *RPCEngineBuilder) WithNewHandler(handler accessproto.AccessAPICli
 	builder.handler = &Forwarder{UpstreamHandler: handler}
 }
 
-func (builder *RPCEngineBuilder) WithLegacy() {
+// WithLegacy specifies that a legacy access API should be instantiated
+// Returns self-reference for chaining.
+func (builder *RPCEngineBuilder) WithLegacy() *RPCEngineBuilder {
 	// Register legacy gRPC handlers for backwards compatibility, to be removed at a later date
 	legacyaccessproto.RegisterAccessAPIServer(
 		builder.unsecureGrpcServer,
@@ -39,14 +40,16 @@ func (builder *RPCEngineBuilder) WithLegacy() {
 		builder.secureGrpcServer,
 		legacyaccess.NewHandler(builder.backend, builder.chain),
 	)
+	return builder
 }
 
-func (builder *RPCEngineBuilder) WithMetrics() {
+// WithMetrics specifies the metrics should be collected.
+// Returns self-reference for chaining.
+func (builder *RPCEngineBuilder) WithMetrics() *RPCEngineBuilder {
 	// Not interested in legacy metrics, so initialize here
 	grpc_prometheus.EnableHandlingTimeHistogram()
 	grpc_prometheus.Register(builder.unsecureGrpcServer)
 	grpc_prometheus.Register(builder.secureGrpcServer)
-}
 
 func (builder *RPCEngineBuilder) withRegisterRPC() {
 	accessproto.RegisterAccessAPIServer(builder.unsecureGrpcServer, builder.handler)
@@ -54,6 +57,15 @@ func (builder *RPCEngineBuilder) withRegisterRPC() {
 }
 
 func (builder *RPCEngineBuilder) Build() *Engine {
-	builder.withRegisterRPC()
+	var localAPIServer accessproto.AccessAPIServer = access.NewHandler(builder.backend, builder.chain, access.WithBlockSignerDecoder(builder.signerIndicesDecoder))
+
+	if builder.router != nil {
+		builder.router.SetLocalAPI(localAPIServer)
+		localAPIServer = builder.router
+	}
+
+	accessproto.RegisterAccessAPIServer(builder.unsecureGrpcServer, localAPIServer)
+	accessproto.RegisterAccessAPIServer(builder.secureGrpcServer, localAPIServer)
+
 	return builder.Engine
 }

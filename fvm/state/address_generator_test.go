@@ -26,7 +26,7 @@ func Test_NewStateBoundAddressGenerator_GeneratingUpdatesState(t *testing.T) {
 	_, err := generator.NextAddress()
 	require.NoError(t, err)
 
-	stateBytes, err := view.Get("", "", "account_address_state")
+	stateBytes, err := view.Get("", "account_address_state")
 	require.NoError(t, err)
 
 	require.Equal(t, flow.BytesToAddress(stateBytes), flow.HexToAddress("01"))
@@ -34,7 +34,7 @@ func Test_NewStateBoundAddressGenerator_GeneratingUpdatesState(t *testing.T) {
 
 func Test_NewStateBoundAddressGenerator_UsesLedgerState(t *testing.T) {
 	view := utils.NewSimpleView()
-	err := view.Set("", "", "account_address_state", flow.HexToAddress("01").Bytes())
+	err := view.Set("", "account_address_state", flow.HexToAddress("01").Bytes())
 	require.NoError(t, err)
 
 	chain := flow.MonotonicEmulator.Chain()
@@ -44,7 +44,7 @@ func Test_NewStateBoundAddressGenerator_UsesLedgerState(t *testing.T) {
 	_, err = generator.NextAddress()
 	require.NoError(t, err)
 
-	stateBytes, err := view.Get("", "", "account_address_state")
+	stateBytes, err := view.Get("", "account_address_state")
 	require.NoError(t, err)
 
 	require.Equal(t, flow.BytesToAddress(stateBytes), flow.HexToAddress("02"))
