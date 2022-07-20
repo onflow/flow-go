@@ -137,7 +137,9 @@ func (c *Compactor) run() {
 	}
 
 	// Compute next checkpoint number.
-	// nextCheckpointNum is updated when checkpointing starts, fails to start, or fails.
+	// nextCheckpointNum is updated when
+	// - checkpointing starts, fails to start, or fails.
+	// - tries snapshot fails.
 	// NOTE: next checkpoint number must >= active segment num.
 	// We can't reuse mtrie state to checkpoint tries in older segments.
 	nextCheckpointNum := lastCheckpointNum + int(c.checkpointDistance)
@@ -163,7 +165,13 @@ Loop:
 				nextCheckpointNum = activeSegmentNum
 			}
 
-		case update := <-c.trieUpdateCh:
+		case update, ok := <-c.trieUpdateCh:
+			if !ok {
+				// trieUpdateCh channel is closed.
+				// Wait for stop signal from c.stopCh
+				continue
+			}
+
 			// RecordUpdate returns the segment number the record was written to.
 			// Returned segment number can be
 			// - the same as previous segment number (same segment), or
