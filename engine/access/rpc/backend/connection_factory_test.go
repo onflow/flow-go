@@ -70,11 +70,6 @@ func TestProxyExecutionAPI(t *testing.T) {
 	connectionFactory := new(ConnectionFactoryImpl)
 	// set the execution grpc port
 	connectionFactory.ExecutionGRPCPort = en.port
-	// set the connection pool cache size
-	cache, _ := lru.NewWithEvict(5, func(_, evictedValue interface{}) {
-		evictedValue.(*CachedClient).Close()
-	})
-	connectionFactory.ConnectionsCache = cache
 	// set metrics reporting
 	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 

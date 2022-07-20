@@ -835,7 +835,7 @@ func (b *backendTransactions) tryGetTransactionResultByIndex(
 	if conn != nil {
 		defer conn.Close()
 	}
-	
+
 	resp, err := execRPCClient.GetTransactionResultByIndex(ctx, &req)
 	if err != nil {
 		if status.Code(err) == codes.Unavailable {
