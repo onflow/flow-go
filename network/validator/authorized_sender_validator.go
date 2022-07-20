@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package validator
 
 import (
@@ -9,12 +7,11 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/slashing"
+	"github.com/rs/zerolog"
 )
 
 var (
@@ -75,7 +72,7 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel channels.Channel, get
 
 // AuthorizedSenderMessageValidator wraps the callback returned by AuthorizedSenderValidator and returns
 // MessageValidator callback that returns pubsub.ValidationReject if validation fails and pubsub.ValidationAccept if validation passes.
-func AuthorizedSenderMessageValidator(log zerolog.Logger, channel channels.Channel, getIdentity func(peer.ID) (*flow.Identity, bool)) MessageValidator {
+func AuthorizedSenderMessageValidator(log zerolog.Logger, channel channels.Channel, getIdentity func(peer.ID) (*flow.Identity, bool)) PubSubMessageValidator {
 	return func(ctx context.Context, from peer.ID, msg interface{}) pubsub.ValidationResult {
 		validate := AuthorizedSenderValidator(log, channel, getIdentity)
 

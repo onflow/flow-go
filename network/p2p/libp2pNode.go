@@ -16,12 +16,13 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	kbucket "github.com/libp2p/go-libp2p-kbucket"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/onflow/flow-go/network/validator"
 	"github.com/rs/zerolog"
 
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p/unicast"
-	validator "github.com/onflow/flow-go/network/validator/pubsub"
+	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
 )
 
 const (
@@ -173,7 +174,7 @@ func (n *Node) ListPeers(topic string) []peer.ID {
 // Subscribe subscribes the node to the given topic and returns the subscription
 // Currently only one subscriber is allowed per topic.
 // NOTE: A node will receive its own published messages.
-func (n *Node) Subscribe(topic channels.Topic, codec flownet.Codec, peerFilter peerFilterFunc, validators ...validator.MessageValidator) (*pubsub.Subscription, error) {
+func (n *Node) Subscribe(topic channels.Topic, codec flownet.Codec, peerFilter peerFilterFunc, validators ...validator.PubSubMessageValidator) (*pubsub.Subscription, error) {
 	n.Lock()
 	defer n.Unlock()
 
@@ -182,7 +183,7 @@ func (n *Node) Subscribe(topic channels.Topic, codec flownet.Codec, peerFilter p
 	tp, found := n.topics[topic]
 	var err error
 	if !found {
-		topicValidator := validator.TopicValidator(n.logger, codec, peerFilter, validators...)
+		topicValidator := flowpubsub.TopicValidator(n.logger, codec, peerFilter, validators...)
 		if err := n.pubSub.RegisterTopicValidator(
 			topic.String(), topicValidator, pubsub.WithValidatorInline(true),
 		); err != nil {
