@@ -28,7 +28,6 @@ import (
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/validator"
-	psValidator "github.com/onflow/flow-go/network/validator/pubsub"
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
@@ -505,7 +504,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 			m.log.Err(err).Msg("failed to read message")
 			return
 		}
-
+		
 		// TODO: once we've implemented per topic message size limits per the TODO above,
 		// we can remove this check
 		maxSize := unicastMaxMsgSize(&msg)
@@ -550,7 +549,7 @@ func (m *Middleware) Subscribe(channel channels.Channel) error {
 	topic := channels.TopicFromChannel(channel, m.rootBlockID)
 
 	var peerFilter peerFilterFunc
-	var validators []psValidator.MessageValidator
+	var validators []validator.PubSubMessageValidator
 	if channels.PublicChannels().Contains(channel) {
 		// NOTE: for public channels the callback used to check if a node is staked will
 		// return true for every node.
@@ -558,7 +557,7 @@ func (m *Middleware) Subscribe(channel channels.Channel) error {
 	} else {
 		// for channels used by the staked nodes, add the topic validator to filter out messages from non-staked nodes
 		validators = append(validators,
-			psValidator.AuthorizedSenderMessageValidator(m.log, channel, m.ov.Identity),
+			validator.AuthorizedSenderMessageValidator(m.log, channel, m.ov.Identity),
 		)
 
 		// NOTE: For non-public channels the libP2P node topic validator will reject
