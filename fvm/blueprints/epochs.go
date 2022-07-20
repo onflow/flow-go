@@ -63,7 +63,12 @@ func SetupAccountTransaction(
 	accountAddress flow.Address,
 ) *flow.TransactionBody {
 	return flow.NewTransactionBody().
-		SetScript([]byte(fmt.Sprintf(setupAccountTemplate, fungibleToken, flowToken))).
+		SetScript([]byte(templates.ReplaceAddresses(setupAccountTemplate,
+			templates.Environment{
+				FungibleTokenAddress: fungibleToken.Hex(),
+				FlowTokenAddress:     flowToken.Hex(),
+			},
+		))).
 		AddAuthorizer(accountAddress)
 }
 

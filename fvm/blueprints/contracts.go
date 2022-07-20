@@ -3,9 +3,11 @@ package blueprints
 import (
 	_ "embed"
 	"encoding/hex"
+
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/common"
+
 	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 )
