@@ -128,9 +128,20 @@ Loop:
 		getBlockByHeightDuration := time.Since(GetBlockByHeightTime)
 
 		var blockTxs, blockUnknownTxs uint64
+
+		for _, guaranteed := range block.CollectionGuarantees {
+			_, err := f.client.GetCollection(f.ctx, guaranteed.CollectionID)
+			if err != nil {
+				continue Loop // silently try again if not ready; can happen several dozen times
+			}
+		}
+
 		for _, guaranteed := range block.CollectionGuarantees {
 			col, err := f.client.GetCollection(f.ctx, guaranteed.CollectionID)
 			if err != nil {
+				f.logger.Error().
+					Uint64("blockHeight", block.Height).
+					Msg("GetCollection() error") // should never happen here
 				continue Loop
 			}
 			for _, tx := range col.TransactionIDs {
@@ -139,6 +150,7 @@ Loop:
 				if txi, loaded := f.loadAndDelete(tx); loaded {
 					duration := time.Since(txi.submisionTime)
 					f.logger.Trace().
+						Uint64("blockHeight", block.Height).
 						Dur("durationInMS", duration).
 						Hex("txID", tx.Bytes()).
 						Msg("returned account to the pool")
@@ -148,6 +160,10 @@ Loop:
 					}
 				} else {
 					blockUnknownTxs++
+					f.logger.Trace().
+						Uint64("blockHeight", block.Height).
+						Hex("txID", tx.Bytes()).
+						Msg("block unknown TX") // should never happen
 				}
 			}
 		}
