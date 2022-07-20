@@ -20,6 +20,11 @@ type WALTrieUpdate struct {
 	ResultCh chan<- error
 }
 
+type checkpointResult struct {
+	num int
+	err error
+}
+
 type Compactor struct {
 	checkpointer       *realWAL.Checkpointer
 	wal                *realWAL.DiskWAL
@@ -81,7 +86,7 @@ func (c *Compactor) Unsubscribe(observer observable.Observer) {
 // Ready periodically fires Run function, every `interval`
 func (c *Compactor) Ready() <-chan struct{} {
 	c.lm.OnStart(func() {
-		go c.start()
+		go c.run()
 	})
 	return c.lm.Started()
 }
@@ -106,29 +111,35 @@ func (c *Compactor) Done() <-chan struct{} {
 	return c.lm.Stopped()
 }
 
-func (c *Compactor) start() {
+func (c *Compactor) run() {
 
-	// Use checkpointSem to limit checkpointing goroutine to one.
-	// If checkpointing isn't finished, then wait before starting new checkpointing.
+	// checkpointSem is used to limit checkpointing to one.
+	// If previous checkpointing isn't finished when enough segments
+	// are finalized for next checkpointing, retry checkpointing
+	// again when next segment is finalized.
+	// This avoids having more tries in memory than needed.
 	checkpointSem := semaphore.NewWeighted(1)
 
-	// Get active segment number
+	checkpointResultCh := make(chan checkpointResult, 1)
+
+	// Get active segment number.
 	// activeSegmentNum is updated when record is written to a new segment.
 	_, activeSegmentNum, err := c.wal.Segments()
 	if err != nil {
-		// TODO: handle error
-		c.logger.Error().Err(err).Msg("error getting active segment number")
+		c.logger.Error().Err(err).Msg("compactor failed to get active segment number")
+		activeSegmentNum = -1
 	}
 
 	lastCheckpointNum, err := c.checkpointer.LatestCheckpoint()
 	if err != nil {
-		// TODO: handle error
-		c.logger.Error().Err(err).Msg("error getting last checkpoint number")
+		c.logger.Error().Err(err).Msg("compactor failed to get last checkpoint number")
+		lastCheckpointNum = -1
 	}
 
-	// Compute next checkpoint number
-	// nextCheckpointNum is updated when checkpointing goroutine starts.
-	// NOTE: next checkpoint number must be >= active segment num
+	// Compute next checkpoint number.
+	// nextCheckpointNum is updated when checkpointing starts, fails to start, or fails.
+	// NOTE: next checkpoint number must >= active segment num.
+	// We can't reuse mtrie state to checkpoint tries in older segments.
 	nextCheckpointNum := lastCheckpointNum + int(c.checkpointDistance)
 	if activeSegmentNum > nextCheckpointNum {
 		nextCheckpointNum = activeSegmentNum
@@ -142,6 +153,16 @@ Loop:
 			defer close(doneCh)
 			break Loop
 
+		case checkpointResult := <-checkpointResultCh:
+			if checkpointResult.err != nil {
+				c.logger.Error().Err(checkpointResult.err).Msgf(
+					"compactor failed to checkpoint %d", checkpointResult.num,
+				)
+
+				// Retry checkpointing after active segment is finalized.
+				nextCheckpointNum = activeSegmentNum
+			}
+
 		case update := <-c.trieUpdateCh:
 			// RecordUpdate returns the segment number the record was written to.
 			// Returned segment number can be
@@ -149,15 +170,26 @@ Loop:
 			// - incremented by 1 from previous segment number (new segment)
 			segmentNum, skipped, err := c.wal.RecordUpdate(update.Update)
 
+			if activeSegmentNum == -1 {
+				// Recover from failure to get active segment number outside loop
+				activeSegmentNum = segmentNum
+				if activeSegmentNum > nextCheckpointNum {
+					nextCheckpointNum = activeSegmentNum
+				}
+			}
+
 			if err != nil || skipped || segmentNum == activeSegmentNum {
 				update.ResultCh <- err
 				continue
 			}
 
+			// In the remaining code: segmentNum > activeSegmentNum
+
+			// active segment is finalized.
+
 			// Check new segment number is incremented by 1
 			if segmentNum != activeSegmentNum+1 {
-				// TODO: must handle error without panic before merging this code
-				panic(fmt.Sprintf("expected new segment numer %d, got %d", activeSegmentNum+1, segmentNum))
+				c.logger.Error().Msg(fmt.Sprintf("compactor got unexpected new segment numer %d, want %d", segmentNum, activeSegmentNum+1))
 			}
 
 			// Update activeSegmentNum
@@ -170,13 +202,14 @@ Loop:
 				continue
 			}
 
+			// In the remaining code: nextCheckpointNum == prevSegmentNum
+
 			// Enough segments are created for checkpointing
 
 			// Get forest from ledger before sending WAL update result
 			tries, err := c.ledger.Tries()
 			if err != nil {
-				// TODO: handle error
-				c.logger.Error().Err(err).Msg("error getting ledger tries")
+				c.logger.Error().Err(err).Msg("compactor failed to get ledger tries")
 				// Try again after active segment is finalized.
 				nextCheckpointNum = activeSegmentNum
 				continue
@@ -196,16 +229,14 @@ Loop:
 				go func() {
 					defer checkpointSem.Release(1)
 
-					err = c.checkpoint(tries, checkpointNum)
-					if err != nil {
-						c.logger.Error().Err(err).Msg("error checkpointing")
-					}
-					// TODO: retry if checkpointing fails.
+					err := c.checkpoint(tries, checkpointNum)
+
+					checkpointResultCh <- checkpointResult{checkpointNum, err}
 				}()
 			} else {
 				// Failed to get semaphore because checkpointing is running.
 				// Try again when active segment is finalized.
-				c.logger.Info().Msgf("checkpoint %d is delayed because prior checkpointing is ongoing", nextCheckpointNum)
+				c.logger.Info().Msgf("compactor delayed checkpoint %d because prior checkpointing is ongoing", nextCheckpointNum)
 				nextCheckpointNum = activeSegmentNum
 			}
 		}
@@ -246,7 +277,7 @@ func (c *Compactor) checkpoint(tries []*trie.MTrie, checkpointNum int) error {
 
 func createCheckpoint(checkpointer *realWAL.Checkpointer, logger zerolog.Logger, tries []*trie.MTrie, checkpointNum int) error {
 
-	logger.Info().Msgf("serializing checkpoint %d with %d tries", checkpointNum, len(tries))
+	logger.Info().Msgf("serializing checkpoint %d", checkpointNum)
 
 	startTime := time.Now()
 
@@ -268,7 +299,7 @@ func createCheckpoint(checkpointer *realWAL.Checkpointer, logger zerolog.Logger,
 	}
 
 	duration := time.Since(startTime)
-	logger.Info().Float64("total_time_s", duration.Seconds()).Msgf("created checkpoint %d with %d tries", checkpointNum, len(tries))
+	logger.Info().Float64("total_time_s", duration.Seconds()).Msgf("created checkpoint %d", checkpointNum)
 
 	return nil
 }
