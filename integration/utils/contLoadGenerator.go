@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"unsafe"
 
 	"time"
 
@@ -18,7 +17,6 @@ import (
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/access"
 	"github.com/onflow/flow-go-sdk/crypto"
-	flowCrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -484,47 +482,14 @@ func (lg *ContLoadGenerator) addKeysToProposerAccount(proposerPayerAccount *flow
 	return nil
 }
 
-func (lg *ContLoadGenerator) getConstExecCostTxSizeWithoutComment() uint {
-	authorizerListStr := generateAuthAccountParamList(lg.constExecParam.AuthAccountNum)
-	oneSignatureLen := uint(flow.AddressLength) + flowCrypto.SignatureLenECDSAP256 + 8 /* keyId is uint64 */
-
-	// The invariant part of one tx (tx without any parameters) will not be
-	// included here since the size of that part is small and we are not looking
-	// for byte-accurate size calculation here.
-	return lg.constExecParam.ArgSizeInByte +
-		uint(len(authorizerListStr)) +
-		uint(len(constExecTransactionTemplate)) +
-		lg.constExecParam.AuthAccountNum*oneSignatureLen +
-		lg.constExecParam.PayerKeyCount*oneSignatureLen
-}
-
 func (lg *ContLoadGenerator) sendConstExecCostTx(workerID int) {
 	log := lg.log.With().Int("workerID", workerID).Logger()
 
-	emptyTxEstimatedSize := uint(unsafe.Sizeof(flow.TransactionBody{}))
-
-	txSizeWithoutComment := lg.getConstExecCostTxSizeWithoutComment()
-	if lg.constExecParam.MaxTxSizeInByte < (txSizeWithoutComment + emptyTxEstimatedSize) {
-		log.Error().Msg(fmt.Sprintf("current tx size(%d) without comment "+
-			"is larger than max tx size configured(%d)",
-			txSizeWithoutComment, lg.constExecParam.MaxTxSizeInByte))
-		return
-	}
-
-	commentSizeInByte := lg.constExecParam.MaxTxSizeInByte - txSizeWithoutComment
-
-	log.Trace().Uint("Max Tx Size", lg.constExecParam.MaxTxSizeInByte).
-		Uint("Tx Arg Size", lg.constExecParam.ArgSizeInByte).
-		Uint("Num of Authorizers", lg.constExecParam.AuthAccountNum).
-		Uint("Num of payer keys", lg.constExecParam.PayerKeyCount).
-		Uint("Script comment length", commentSizeInByte).
-		Msg("Generating one const-exec transaction")
-
-	txScript := ConstExecCostTransaction(lg.constExecParam.AuthAccountNum, commentSizeInByte)
+	txScriptNoComment := ConstExecCostTransaction(lg.constExecParam.AuthAccountNum, 0)
 
 	tx := flowsdk.NewTransaction().
 		SetReferenceBlockID(lg.follower.BlockID()).
-		SetScript(txScript).
+		SetScript(txScriptNoComment).
 		SetGasLimit(10). // const-exec tx has empty transaction
 		SetProposalKey(*lg.accounts[0].address, 0, lg.accounts[0].seqNumber).
 		SetPayer(*lg.accounts[0].address)
@@ -560,6 +525,29 @@ func (lg *ContLoadGenerator) sendConstExecCostTx(workerID int) {
 			return
 		}
 	}
+
+	// calculate RLP-encoded binary size of the transaction without comment
+	txSizeWithoutComment := uint(len(tx.Encode()))
+	if txSizeWithoutComment > lg.constExecParam.MaxTxSizeInByte {
+		log.Error().Msg(fmt.Sprintf("current tx size(%d) without comment "+
+			"is larger than max tx size configured(%d)",
+			txSizeWithoutComment, lg.constExecParam.MaxTxSizeInByte))
+		return
+	}
+
+	// now adding comment to fulfill the final transaction size
+	commentSizeInByte := lg.constExecParam.MaxTxSizeInByte - txSizeWithoutComment
+	txScriptWithComment := ConstExecCostTransaction(lg.constExecParam.AuthAccountNum, commentSizeInByte)
+	tx = tx.SetScript(txScriptWithComment)
+
+	txSizeWithComment := uint(len(tx.Encode()))
+	log.Trace().Uint("Max Tx Size", lg.constExecParam.MaxTxSizeInByte).
+		Uint("Actual Tx Size", txSizeWithComment).
+		Uint("Tx Arg Size", lg.constExecParam.ArgSizeInByte).
+		Uint("Num of Authorizers", lg.constExecParam.AuthAccountNum).
+		Uint("Num of payer keys", lg.constExecParam.PayerKeyCount).
+		Uint("Script comment length", commentSizeInByte).
+		Msg("Generating one const-exec transaction")
 
 	log.Trace().Msg("Issuing tx")
 	ch, err := lg.sendTx(workerID, tx)
