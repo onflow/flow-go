@@ -2,13 +2,14 @@ package fvm
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/module/trace"
+
 	"github.com/opentracing/opentracing-go"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime/common"
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/trace"
 )
 
 type TransactionStorageLimiter struct{}
