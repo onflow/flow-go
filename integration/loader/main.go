@@ -55,7 +55,7 @@ func main() {
 	chainID := flowsdk.ChainID([]byte(*chainIDStr))
 
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	//defer cancel()
 
 	// parse log level and apply to logger
 	log := zerolog.New(os.Stderr).With().Timestamp().Logger().Output(zerolog.ConsoleWriter{Out: os.Stderr})
@@ -188,11 +188,12 @@ func main() {
 			postTestTransactionAverage := getPrometheusTotalTransactions()
 
 			printPrometheusTPS(preTestTransactionAverage, postTestTransactionAverage, c.duration)
-			fmt.Println("TPS data finished writing to file.")
 			if lg != nil {
 				lg.Stop()
 			}
 		}
+
+		cancel()
 	}()
 
 	<-ctx.Done()
