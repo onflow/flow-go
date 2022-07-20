@@ -182,7 +182,7 @@ func NewMiddleware(
 
 	mw.Component = cm
 
-	unicastAuthorizedSenderValidatorFunc := validator.AuthorizedSenderValidator(log, channels.ProvideCollections, mw.ov.Identity)
+	unicastAuthorizedSenderValidatorFunc := validator.AuthorizedSenderValidator(log, channels.ProvideCollections, mw.ov.Identity, true)
 	mw.unicastAuthorizedSenderValidatorFunc = unicastAuthorizedSenderValidatorFunc
 
 	return mw
