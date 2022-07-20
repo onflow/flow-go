@@ -245,8 +245,8 @@ func TestProcessAttackerMessage_ResultApproval_Dictated(t *testing.T) {
 				require.True(t, valid)
 
 				corruptedEventDispatchedOnFlowNetWg.Done()
+				//}).Return(nil).Once()
 			}).Return(nil).Once()
-
 			// imitates a gRPC call from orchestrator to ccf through attack network
 			require.NoError(t, stream.Send(msg))
 

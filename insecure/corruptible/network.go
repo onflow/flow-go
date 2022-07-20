@@ -141,16 +141,24 @@ func (n *Network) ProcessAttackerMessage(stream insecure.CorruptibleConduitFacto
 				n.logger.Fatal().Err(err).Msg("could not read attacker's stream")
 				return stream.SendAndClose(&empty.Empty{})
 			}
-			if err := n.processAttackerMessage(msg); err != nil {
-				n.logger.Fatal().Err(err).Msg("could not process attacker's message")
-				return stream.SendAndClose(&empty.Empty{})
+
+			// received ingress message
+			if msg.Ingress != nil {
+				// TODO implement ingress message processing
+			}
+			// received egress message
+			if msg.Egress != nil {
+				if err := n.processAttackerEgressMessage(msg); err != nil {
+					n.logger.Fatal().Err(err).Msg("could not process attacker's message")
+					return stream.SendAndClose(&empty.Empty{})
+				}
 			}
 		}
 	}
 }
 
-// processAttackerMessage dispatches the attacker message on the Flow network on behalf of this node.
-func (n *Network) processAttackerMessage(msg *insecure.Message) error {
+// processAttackerEgressMessage dispatches the attacker message on the Flow network on behalf of this node.
+func (n *Network) processAttackerEgressMessage(msg *insecure.Message) error {
 	lg := n.logger.With().
 		Str("protocol", insecure.ProtocolStr(msg.Egress.Protocol)).
 		Uint32("target_num", msg.Egress.TargetNum).
