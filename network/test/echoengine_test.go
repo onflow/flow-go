@@ -64,7 +64,9 @@ func (suite *EchoEngineTestSuite) SetupTest() {
 	)
 
 	for _, mw := range suite.mws {
-		pm := mw.PeerManager()
+		pm, ok := mw.PeerManager()
+		require.True(suite.T(), ok)
+
 		pm.Start(signalerCtx)
 		<-pm.Ready()
 	}
