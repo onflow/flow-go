@@ -10,8 +10,9 @@ import (
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/onflow/cadence"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/cadence"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -32,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/updatable_configs"
+	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/dsl"
@@ -2105,4 +2107,19 @@ func NewSealingConfigs(val uint) module.SealingConfigsSetter {
 		panic(err)
 	}
 	return instance
+}
+
+func PeerIDFromFlowID(identity *flow.Identity) (peer.ID, error) {
+	networkKey := identity.NetworkPubKey
+	peerPK, err := keyutils.LibP2PPublicKeyFromFlow(networkKey)
+	if err != nil {
+		return "", err
+	}
+
+	peerID, err := peer.IDFromPublicKey(peerPK)
+	if err != nil {
+		return "", err
+	}
+
+	return peerID, nil
 }
