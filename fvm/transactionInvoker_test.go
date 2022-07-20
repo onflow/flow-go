@@ -2,12 +2,8 @@ package fvm_test
 
 import (
 	"bytes"
-	"fmt"
-	"io/ioutil"
-	"sort"
 	"testing"
 
-	"github.com/fxamacker/cbor/v2"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
@@ -151,29 +147,4 @@ func (e *ErrorReturningRuntime) SetTracingEnabled(_ bool) {
 
 func (*ErrorReturningRuntime) SetDebugger(_ *interpreter.Debugger) {
 	panic("SetDebugger not expected")
-}
-
-func encodeContractNames(contractNames []string) ([]byte, error) {
-	sort.Strings(contractNames)
-	var buf bytes.Buffer
-	cborEncoder := cbor.NewEncoder(&buf)
-	err := cborEncoder.Encode(contractNames)
-	if err != nil {
-		return nil, fmt.Errorf("cannot encode contract names")
-	}
-	return buf.Bytes(), nil
-}
-
-func listFilesInDir(t *testing.T, dir string) []string {
-
-	fileInfos, err := ioutil.ReadDir(dir)
-	require.NoError(t, err)
-
-	names := make([]string, len(fileInfos))
-
-	for i, info := range fileInfos {
-		names[i] = info.Name()
-	}
-
-	return names
 }
