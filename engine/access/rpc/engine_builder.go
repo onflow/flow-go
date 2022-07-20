@@ -8,26 +8,25 @@ import (
 	"github.com/onflow/flow-go/access"
 
 	legacyaccess "github.com/onflow/flow-go/access/legacy"
-	"github.com/onflow/flow-go/apiproxy"
 )
-
-// NewRPCEngineBuilder helps to build a new RPC engine.
-func NewRPCEngineBuilder(engine *Engine) *RPCEngineBuilder {
-	builder := &RPCEngineBuilder{}
-	builder.Engine = engine
-	builder.localAPIServer = access.NewHandler(builder.backend, builder.chain)
-	return builder
-}
 
 type RPCEngineBuilder struct {
 	*Engine
 	// Use the parent interface instead of implementation, so that we can assign it to proxy.
-	localAPIServer accessproto.AccessAPIServer
+	handler accessproto.AccessAPIServer
 }
 
-func (builder *RPCEngineBuilder) WithRouting(router *apiproxy.FlowAccessAPIRouter) {
-	router.SetLocalAPI(builder.localAPIServer)
-	builder.localAPIServer = router
+// NewRPCEngineBuilder helps to build a new RPC engine.
+func NewRPCEngineBuilder(engine *Engine) *RPCEngineBuilder {
+	return &RPCEngineBuilder{
+		Engine: engine,
+		// default handler will use the engine.backend implementation
+		handler: access.NewHandler(engine.backend, engine.chain),
+	}
+}
+
+func (builder *RPCEngineBuilder) WithNewHandler(handler accessproto.AccessAPIClient) {
+	builder.handler = &Forwarder{UpstreamHandler: handler}
 }
 
 func (builder *RPCEngineBuilder) WithLegacy() {
@@ -50,8 +49,8 @@ func (builder *RPCEngineBuilder) WithMetrics() {
 }
 
 func (builder *RPCEngineBuilder) withRegisterRPC() {
-	accessproto.RegisterAccessAPIServer(builder.unsecureGrpcServer, builder.localAPIServer)
-	accessproto.RegisterAccessAPIServer(builder.secureGrpcServer, builder.localAPIServer)
+	accessproto.RegisterAccessAPIServer(builder.unsecureGrpcServer, builder.handler)
+	accessproto.RegisterAccessAPIServer(builder.secureGrpcServer, builder.handler)
 }
 
 func (builder *RPCEngineBuilder) Build() *Engine {

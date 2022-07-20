@@ -17,9 +17,11 @@ import (
 	"github.com/libp2p/go-libp2p-core/routing"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	p2ppubsub "github.com/libp2p/go-libp2p-pubsub"
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
-	"github.com/onflow/flow-go/apiproxy"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -64,6 +66,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow-go/utils/io"
 
 	"github.com/rs/zerolog"
@@ -962,11 +965,6 @@ func (builder *ObserverServiceBuilder) enqueueConnectWithStakedAN() {
 
 func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 	builder.Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		ids := builder.upstreamIdentities
-		proxy, err := apiproxy.NewFlowAccessAPIRouter(ids, builder.apiTimeout)
-		if err != nil {
-			return nil, err
-		}
 		engineBuilder, err := rpc.NewBuilder(
 			node.Logger,
 			node.State,
@@ -992,7 +990,27 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		if err != nil {
 			return nil, err
 		}
-		engineBuilder.WithRouting(proxy)
+
+		if len(builder.upstreamIdentities) == 0 {
+			panic("please specify an upstream identity")
+		}
+
+		identity := builder.upstreamIdentities[0]
+
+		tlsConfig, err := grpcutils.DefaultClientTLSConfig(identity.NetworkPubKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get default TLS client config using public flow networking key %s %w", identity.NetworkPubKey.String(), err)
+		}
+
+		conn, err := grpc.Dial(
+			identity.Address,
+			grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
+			grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
+			backend.WithClientUnaryInterceptor(time.Minute))
+
+		client := accessproto.NewAccessAPIClient(conn)
+
+		engineBuilder.WithNewHandler(client)
 		engineBuilder.WithLegacy()
 		builder.RpcEng = engineBuilder.Build()
 		return builder.RpcEng, nil
