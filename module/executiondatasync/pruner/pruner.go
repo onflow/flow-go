@@ -168,8 +168,8 @@ func (p *Pruner) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFu
 			height := h.(uint64)
 			if height > p.lastFulfilledHeight {
 				p.lastFulfilledHeight = height
-				p.checkPrune(ctx)
 			}
+			p.checkPrune(ctx)
 		case heightRangeTarget := <-p.heightRangeTargetChan:
 			p.heightRangeTarget = heightRangeTarget
 			p.checkPrune(ctx)
