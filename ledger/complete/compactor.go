@@ -1,6 +1,7 @@
 package complete
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -147,12 +148,15 @@ func (c *Compactor) run() {
 		nextCheckpointNum = activeSegmentNum
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+
 Loop:
 	for {
 		select {
 
 		case doneCh := <-c.stopCh:
 			defer close(doneCh)
+			cancel()
 			break Loop
 
 		case checkpointResult := <-checkpointResultCh:
@@ -237,7 +241,7 @@ Loop:
 				go func() {
 					defer checkpointSem.Release(1)
 
-					err := c.checkpoint(tries, checkpointNum)
+					err := c.checkpoint(ctx, tries, checkpointNum)
 
 					checkpointResultCh <- checkpointResult{checkpointNum, err}
 				}()
@@ -262,11 +266,18 @@ Loop:
 	// Don't wait for checkpointing to finish because it might take too long.
 }
 
-func (c *Compactor) checkpoint(tries []*trie.MTrie, checkpointNum int) error {
+func (c *Compactor) checkpoint(ctx context.Context, tries []*trie.MTrie, checkpointNum int) error {
 
 	err := createCheckpoint(c.checkpointer, c.logger, tries, checkpointNum)
 	if err != nil {
 		return fmt.Errorf("cannot create checkpoints: %w", err)
+	}
+
+	// Return if context is canceled.
+	select {
+	case <-ctx.Done():
+		return nil
+	default:
 	}
 
 	err = cleanupCheckpoints(c.checkpointer, int(c.checkpointsToKeep))
@@ -276,7 +287,15 @@ func (c *Compactor) checkpoint(tries []*trie.MTrie, checkpointNum int) error {
 
 	if checkpointNum > 0 {
 		for observer := range c.observers {
-			observer.OnNext(checkpointNum)
+			// Don't notify observer if context is canceled.
+			// observer.OnComplete() is called when Compactor starts shutting down,
+			// which may close channel that observer.OnNext() uses to send data.
+			select {
+			case <-ctx.Done():
+				return nil
+			default:
+				observer.OnNext(checkpointNum)
+			}
 		}
 	}
 
