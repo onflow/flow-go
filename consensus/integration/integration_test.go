@@ -130,7 +130,6 @@ func chainViews(t *testing.T, node *Node) []uint64 {
 	}
 
 	// reverse all views to start from lower view to higher view
-
 	low2high := make([]uint64, 0)
 	for i := len(views) - 1; i >= 0; i-- {
 		low2high = append(low2high, views[i])

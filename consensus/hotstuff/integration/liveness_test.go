@@ -1,11 +1,3 @@
-//go:build timesensitivetest
-// +build timesensitivetest
-
-// This file includes a few time sensitive tests. They might pass on your powerful local machine
-// but fail on slow CI machine.
-// For now, these tests are only for local. Run it with the build tag on:
-// > go test --tags=relic,timesensitivetest ./...
-
 package integration
 
 import (
@@ -29,11 +21,6 @@ const pmTimeout = 10 * time.Millisecond
 // still make progress and reach consensus
 func Test2TimeoutOutof7Instances(t *testing.T) {
 
-	// test parameters
-	// NOTE: block finalization seems to be rather slow on CI at the moment,
-	// needing around 1 minute on Travis for 1000 blocks and 10 minutes on
-	// TeamCity for 1000 blocks; in order to avoid test timeouts, we keep the
-	// number low here
 	numPass := 5
 	numFail := 2
 	finalView := uint64(30)
@@ -42,7 +29,7 @@ func Test2TimeoutOutof7Instances(t *testing.T) {
 	participants := unittest.IdentityListFixture(numPass + numFail)
 	instances := make([]*Instance, 0, numPass+numFail)
 	root := DefaultRoot()
-	timeouts, err := timeout.NewConfig(pmTimeout, pmTimeout, 0.5, 1.5, 0.85, 0)
+	timeouts, err := timeout.NewConfig(pmTimeout, pmTimeout, pmTimeout, 1.5, 0.85, 0)
 	require.NoError(t, err)
 
 	// set up five instances that work fully
@@ -67,7 +54,6 @@ func Test2TimeoutOutof7Instances(t *testing.T) {
 			WithStopCondition(ViewReached(finalView)),
 			WithOutgoingVotes(BlockAllVotes),
 			WithOutgoingProposals(BlockAllProposals),
-			WithIncomingProposals(BlockAllProposals),
 		)
 		instances = append(instances, in)
 	}
@@ -97,25 +83,20 @@ func Test2TimeoutOutof7Instances(t *testing.T) {
 	}
 }
 
-// If 1 node is down in a 4 nodes cluster, the rest of 3 nodes can
+// If 2 nodes are down in a 4 nodes cluster, the rest of 2 nodes can
 // still make progress, but no block will be finalized, because
 // finalization requires 2-direct chain and a QC
-func Test1TimeoutOutof4Instances(t *testing.T) {
+func Test2TimeoutOutof2Instances(t *testing.T) {
 
-	// test parameters
-	// NOTE: block finalization seems to be rather slow on CI at the moment,
-	// needing around 1 minute on Travis for 1000 blocks and 10 minutes on
-	// TeamCity for 1000 blocks; in order to avoid test timeouts, we keep the
-	// number low here
-	numPass := 3
-	numFail := 1
+	numPass := 2
+	numFail := 2
 	finalView := uint64(30)
 
 	// generate the 4 hotstuff participants
 	participants := unittest.IdentityListFixture(numPass + numFail)
 	instances := make([]*Instance, 0, numPass+numFail)
 	root := DefaultRoot()
-	timeouts, err := timeout.NewConfig(pmTimeout, pmTimeout, 0.5, 1.5, 0.85, 0)
+	timeouts, err := timeout.NewConfig(pmTimeout, pmTimeout, pmTimeout, 1.5, 0.85, 0)
 	require.NoError(t, err)
 
 	// set up three instances that work fully
@@ -139,8 +120,8 @@ func Test1TimeoutOutof4Instances(t *testing.T) {
 			WithTimeouts(timeouts),
 			WithStopCondition(ViewReached(finalView)),
 			WithOutgoingVotes(BlockAllVotes),
+			WithIncomingVotes(BlockAllVotes),
 			WithOutgoingProposals(BlockAllProposals),
-			WithIncomingProposals(BlockAllProposals),
 		)
 		instances = append(instances, in)
 	}
@@ -174,11 +155,6 @@ func Test1TimeoutOutof4Instances(t *testing.T) {
 // make progress and reach consensus
 func Test1TimeoutOutof5Instances(t *testing.T) {
 
-	// test parameters
-	// NOTE: block finalization seems to be rather slow on CI at the moment,
-	// needing around 1 minute on Travis for 1000 blocks and 10 minutes on
-	// TeamCity for 1000 blocks; in order to avoid test timeouts, we keep the
-	// number low here
 	numPass := 4
 	numFail := 1
 	finalView := uint64(30)
@@ -187,7 +163,7 @@ func Test1TimeoutOutof5Instances(t *testing.T) {
 	participants := unittest.IdentityListFixture(numPass + numFail)
 	instances := make([]*Instance, 0, numPass+numFail)
 	root := DefaultRoot()
-	timeouts, err := timeout.NewConfig(pmTimeout, pmTimeout, 0.5, 1.5, 0.85, 0)
+	timeouts, err := timeout.NewConfig(pmTimeout, pmTimeout, pmTimeout, 1.5, 0.85, 0)
 	require.NoError(t, err)
 
 	// set up instances that work fully

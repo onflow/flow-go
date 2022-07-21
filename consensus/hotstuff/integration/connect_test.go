@@ -58,7 +58,7 @@ func Connect(instances []*Instance) {
 
 					// check if we should block the incoming proposal
 					if receiver.blockPropIn(proposal) {
-						return nil
+						continue
 					}
 
 					receiver.ProcessBlock(proposal)
@@ -100,5 +100,23 @@ func Connect(instances []*Instance) {
 				return nil
 			},
 		)
+		sender.communicator.On("BroadcastTimeout", mock.Anything).Return(
+			func(timeoutObject *model.TimeoutObject) error {
+				// iterate through potential receivers
+				for _, receiver := range instances {
+
+					// we should skip ourselves always
+					if receiver.localID == sender.localID {
+						continue
+					}
+
+					if receiver.blockTimeoutObjectIn(timeoutObject) {
+						continue
+					}
+
+					receiver.queue <- timeoutObject
+				}
+				return nil
+			})
 	}
 }

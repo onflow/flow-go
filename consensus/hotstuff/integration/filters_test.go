@@ -50,3 +50,13 @@ func BlockProposalsBy(proposerID flow.Identifier) ProposalFilter {
 		return proposal.Block.ProposerID == proposerID
 	}
 }
+
+type TimeoutObjectFilter func(*model.TimeoutObject) bool
+
+func BlockAllTimeoutObjects(*model.TimeoutObject) bool {
+	return true
+}
+
+func BlockNoTimeoutObjects(*model.TimeoutObject) bool {
+	return false
+}
