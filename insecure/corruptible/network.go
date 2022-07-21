@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/network/channels"
 	"io"
 	"net"
 	"sync"
@@ -106,7 +107,7 @@ func NewCorruptibleNetwork(
 // Register serves as the typical network registration of the given message processor on the channel.
 // Except, it first wraps the given processor around a corruptible message processor, and then
 // registers the corruptible message processor to the original flow network.
-func (n *Network) Register(channel flownet.Channel, messageProcessor flownet.MessageProcessor) (flownet.Conduit, error) {
+func (n *Network) Register(channel channels.Channel, messageProcessor flownet.MessageProcessor) (flownet.Conduit, error) {
 	corruptibleProcessor := NewCorruptibleMessageProcessor(n.logger, messageProcessor)
 	// TODO: we can dissolve CCF and instead have a decorator pattern to turn a conduit into
 	// a corrupted one?
@@ -117,7 +118,7 @@ func (n *Network) Register(channel flownet.Channel, messageProcessor flownet.Mes
 	return conduit, nil
 }
 
-func (n *Network) RegisterBlobService(channel flownet.Channel, store datastore.Batching, opts ...flownet.BlobServiceOption) (flownet.BlobService,
+func (n *Network) RegisterBlobService(channel channels.Channel, store datastore.Batching, opts ...flownet.BlobServiceOption) (flownet.BlobService,
 	error) {
 	return n.flowNetwork.RegisterBlobService(channel, store, opts...)
 }
@@ -208,7 +209,7 @@ func (n *Network) processAttackerMessage(msg *insecure.Message) error {
 	}
 
 	lg = lg.With().Str("target_ids", fmt.Sprintf("%v", msg.TargetIDs)).Logger()
-	err = n.conduitFactory.SendOnFlowNetwork(event, flownet.Channel(msg.ChannelID), msg.Protocol, uint(msg.TargetNum), targetIds...)
+	err = n.conduitFactory.SendOnFlowNetwork(event, channels.Channel(msg.ChannelID), msg.Protocol, uint(msg.TargetNum), targetIds...)
 	if err != nil {
 		lg.Err(err).Msg("could not send attacker message to the network")
 		return fmt.Errorf("could not send attacker message to the network: %w", err)
@@ -255,14 +256,14 @@ func (n *Network) ServerAddress() string {
 
 // EngineClosingChannel is called by the conduits of this corruptible network to let it know that the corresponding
 // engine of the conduit is not going to use it anymore, so the channel can be closed safely.
-func (n *Network) EngineClosingChannel(channel flownet.Channel) error {
+func (n *Network) EngineClosingChannel(channel channels.Channel) error {
 	return n.conduitFactory.UnregisterChannel(channel)
 }
 
 // eventToMessage converts the given application layer event to a protobuf message that is meant to be sent to the attacker.
 func (n *Network) eventToMessage(
 	event interface{},
-	channel flownet.Channel,
+	channel channels.Channel,
 	protocol insecure.Protocol,
 	targetNum uint32,
 	targetIds ...flow.Identifier) (*insecure.Message, error) {
@@ -335,7 +336,7 @@ func (n *Network) ConnectAttacker(_ *empty.Empty, stream insecure.CorruptibleCon
 // of Flow to deliver to its targets.
 func (n *Network) HandleOutgoingEvent(
 	event interface{},
-	channel flownet.Channel,
+	channel channels.Channel,
 	protocol insecure.Protocol,
 	num uint32,
 	targetIds ...flow.Identifier) error {
