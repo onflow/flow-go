@@ -423,6 +423,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	timeoutProcessorFactory := mocks.NewTimeoutProcessorFactory(t)
 	timeoutProcessorFactory.On("Create", mock.Anything).Return(
 		func(view uint64) hotstuff.TimeoutProcessor {
+			// mock signature aggregator which doesn't perform any crypto operations and just tracks total weight
 			aggregator := &mocks.TimeoutSignatureAggregator{}
 			totalWeight := atomic.NewUint64(0)
 			newestView := atomic.NewUint64(0)
