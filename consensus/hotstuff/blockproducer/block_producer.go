@@ -20,6 +20,7 @@ var _ hotstuff.BlockProducer = (*BlockProducer)(nil)
 
 // New creates a new BlockProducer which wraps the chain compliance layer block builder
 // to provide hotstuff with block proposals.
+// No errors are expected during normal operation.
 func New(signer hotstuff.Signer, committee hotstuff.Replicas, builder module.Builder) (*BlockProducer, error) {
 	bp := &BlockProducer{
 		signer:    signer,
