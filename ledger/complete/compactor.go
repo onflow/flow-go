@@ -19,6 +19,7 @@ import (
 type WALTrieUpdate struct {
 	Update   *ledger.TrieUpdate
 	ResultCh chan<- error
+	DoneCh   <-chan struct{}
 }
 
 type checkpointResult struct {
@@ -177,7 +178,7 @@ Loop:
 			}
 
 			// RecordUpdate returns the segment number the record was written to.
-			// Returned segment number can be
+			// Returned segment number (>= 0) can be
 			// - the same as previous segment number (same segment), or
 			// - incremented by 1 from previous segment number (new segment)
 			segmentNum, skipped, err := c.wal.RecordUpdate(update.Update)
@@ -191,7 +192,7 @@ Loop:
 			}
 
 			if err != nil || skipped || segmentNum == activeSegmentNum {
-				update.ResultCh <- err
+				processUpdateResult(update, err)
 				continue
 			}
 
@@ -210,7 +211,7 @@ Loop:
 
 			if nextCheckpointNum > prevSegmentNum {
 				// Not enough segments for checkpointing
-				update.ResultCh <- nil
+				processUpdateResult(update, nil)
 				continue
 			}
 
@@ -218,17 +219,23 @@ Loop:
 
 			// Enough segments are created for checkpointing
 
-			// Get forest from ledger before sending WAL update result
+			// Get ledger snapshot before sending WAL update result.
+			// At this point, ledger snapshot contains tries up to
+			// last update (logged as last record in finalized segment)
+			// Ledger doesn't include new trie for this update
+			// until WAL result is sent back.
 			tries, err := c.ledger.Tries()
 			if err != nil {
 				c.logger.Error().Err(err).Msg("compactor failed to get ledger tries")
 				// Try again after active segment is finalized.
 				nextCheckpointNum = activeSegmentNum
+
+				processUpdateResult(update, nil)
 				continue
 			}
 
-			// Send WAL update result after ledger state snapshot is done.
-			update.ResultCh <- nil
+			// Send WAL update result after ledger state snapshot is taken.
+			processUpdateResult(update, nil)
 
 			// Try to checkpoint
 			if checkpointSem.TryAcquire(1) {
@@ -264,6 +271,17 @@ Loop:
 	}
 
 	// Don't wait for checkpointing to finish because it might take too long.
+}
+
+// processUpdateResult sends WAL update result using ResultCh channel
+// and waits for signal from DoneCh channel.
+// This ensures that WAL update and ledger state update are in sync.
+func processUpdateResult(update *WALTrieUpdate, updateResult error) {
+	// Send result of WAL update
+	update.ResultCh <- updateResult
+
+	// Wait for trie update to complete
+	<-update.DoneCh
 }
 
 func (c *Compactor) checkpoint(ctx context.Context, tries []*trie.MTrie, checkpointNum int) error {

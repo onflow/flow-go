@@ -426,3 +426,97 @@ func replaySegments(
 
 	return nil
 }
+
+func TestCompactorConcurrency(t *testing.T) {
+	numInsPerStep := 2
+	pathByteSize := 32
+	minPayloadByteSize := 2 << 15
+	maxPayloadByteSize := 2 << 16
+	size := 10
+	metricsCollector := &metrics.NoopCollector{}
+	checkpointDistance := uint(5)
+	checkpointsToKeep := uint(0) // keep all
+
+	unittest.RunWithTempDir(t, func(dir string) {
+
+		lastCheckpointNum := -1
+
+		rootHash := trie.EmptyTrieRootHash()
+
+		// Create DiskWAL and Ledger repeatedly to test rebuilding ledger state at restart.
+		for i := 0; i < 3; i++ {
+
+			wal, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, 32*1024)
+			require.NoError(t, err)
+
+			l, err := NewSyncLedger(wal, size*10, metricsCollector, zerolog.Logger{}, DefaultPathFinderVersion)
+			require.NoError(t, err)
+
+			checkpointer, err := wal.NewCheckpointer()
+			require.NoError(t, err)
+
+			// WAL segments are 32kB, so here we generate 2 keys 64kB each, times `size`
+			// so we should get at least `size` segments
+
+			compactor, err := NewCompactor(l, wal, checkpointDistance, checkpointsToKeep, zerolog.Nop())
+			require.NoError(t, err)
+
+			fromBound := lastCheckpointNum + int(checkpointDistance)*2
+
+			co := CompactorObserver{fromBound: fromBound, done: make(chan struct{})}
+			compactor.Subscribe(&co)
+
+			// Run Compactor in background.
+			<-compactor.Ready()
+
+			// Generate updates
+			var updates []*ledger.Update
+			for i := 0; i < size; i++ {
+
+				payloads := utils.RandomPayloads(numInsPerStep, minPayloadByteSize, maxPayloadByteSize)
+
+				keys := make([]ledger.Key, len(payloads))
+				values := make([]ledger.Value, len(payloads))
+				for i, p := range payloads {
+					keys[i] = p.Key
+					values[i] = p.Value
+				}
+
+				update, err := ledger.NewUpdate(ledger.State(rootHash), keys, values)
+				require.NoError(t, err)
+
+				updates = append(updates, update)
+			}
+
+			// Generate the tree and create WAL in parallel
+			for _, update := range updates {
+				go func(update *ledger.Update) {
+					_, _, err := l.Set(update)
+					require.NoError(t, err)
+				}(update)
+			}
+
+			// wait for the bound-checking observer to confirm checkpoints have been made
+			select {
+			case <-co.done:
+				// continue
+			case <-time.After(60 * time.Second):
+				assert.FailNow(t, "timed out")
+			}
+
+			// Shutdown ledger and compactor
+			ledgerDone := l.Done()
+			compactorDone := compactor.Done()
+
+			<-ledgerDone
+			<-compactorDone
+
+			nums, err := checkpointer.Checkpoints()
+			require.NoError(t, err)
+
+			for _, n := range nums {
+				testCheckpointedTriesMatchReplayedTriesFromSegments(t, checkpointer, n, dir)
+			}
+		}
+	})
+}

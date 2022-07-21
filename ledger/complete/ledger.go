@@ -248,30 +248,9 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *
 
 	l.metrics.UpdateCount()
 
-	walChan := make(chan error)
-
-	if l.trieUpdateCh == nil {
-		go func() {
-			_, _, err := l.wal.RecordUpdate(trieUpdate)
-			walChan <- err
-		}()
-	} else {
-		l.trieUpdateCh <- &WALTrieUpdate{Update: trieUpdate, ResultCh: walChan}
-	}
-
-	newTrie, err := l.forest.NewTrie(trieUpdate)
-	walError := <-walChan
-
+	newState, err = l.set(trieUpdate)
 	if err != nil {
-		return ledger.State(hash.DummyHash), nil, fmt.Errorf("cannot update state: %w", err)
-	}
-	if walError != nil {
-		return ledger.State(hash.DummyHash), nil, fmt.Errorf("error while writing LedgerWAL: %w", walError)
-	}
-
-	err = l.forest.AddTrie(newTrie)
-	if err != nil {
-		return ledger.State(hash.DummyHash), nil, fmt.Errorf("adding updated trie to forest failed: %w", err)
+		return ledger.State(hash.DummyHash), nil, err
 	}
 
 	// TODO update to proper value once https://github.com/onflow/flow-go/pull/3720 is merged
@@ -286,12 +265,45 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *
 	}
 
 	state := update.State()
-	newRootHash := newTrie.RootHash()
 	l.logger.Info().Hex("from", state[:]).
-		Hex("to", newRootHash[:]).
+		Hex("to", newState[:]).
 		Int("update_size", update.Size()).
 		Msg("ledger updated")
-	return ledger.State(newRootHash), trieUpdate, nil
+	return newState, trieUpdate, nil
+}
+
+func (l *Ledger) set(trieUpdate *ledger.TrieUpdate) (newState ledger.State, err error) {
+
+	resultCh := make(chan error)
+
+	if l.trieUpdateCh == nil {
+		go func() {
+			_, _, err := l.wal.RecordUpdate(trieUpdate)
+			resultCh <- err
+		}()
+	} else {
+		doneCh := make(chan struct{})
+		defer close(doneCh)
+
+		l.trieUpdateCh <- &WALTrieUpdate{Update: trieUpdate, ResultCh: resultCh, DoneCh: doneCh}
+	}
+
+	newTrie, err := l.forest.NewTrie(trieUpdate)
+	walError := <-resultCh
+
+	if err != nil {
+		return ledger.State(hash.DummyHash), fmt.Errorf("cannot update state: %w", err)
+	}
+	if walError != nil {
+		return ledger.State(hash.DummyHash), fmt.Errorf("error while writing LedgerWAL: %w", walError)
+	}
+
+	err = l.forest.AddTrie(newTrie)
+	if err != nil {
+		return ledger.State(hash.DummyHash), fmt.Errorf("failed to add new trie to forest: %w", err)
+	}
+
+	return ledger.State(newTrie.RootHash()), nil
 }
 
 // Prove provides proofs for a ledger query and errors (if any).
