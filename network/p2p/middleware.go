@@ -485,21 +485,16 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 	log.Info().Msg("incoming stream received")
 
+	success := false
+
 	remotePeer := s.Conn().RemotePeer()
 
 	// check if unicast stream creation is rate limited for peer
 	if !m.unicastStreamAllowed(remotePeer) {
 		log.Warn().Msg(UnicastStreamRateLimited)
-		// remove peer
-		//if err := m.libP2PNode.RemovePeer(remotePeer); err != nil {
-		//	log.Error().Err(err).Msg("failed to remove rate limited peer")
-		//	return
-		//}
 		m.onUnicastRateLimitedPeerFunc(remotePeer)
 		return
 	}
-
-	success := false
 
 	defer func() {
 		if success {

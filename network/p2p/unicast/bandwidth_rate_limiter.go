@@ -36,7 +36,6 @@ func (b *BandWidthRateLimiter) Allow(peerID peer.ID, msg *message.Message) bool 
 	if limiter == nil {
 		limiter = b.setNewLimiter(peerID)
 	}
-
 	return limiter.AllowN(time.Now(), msg.Size())
 }
 

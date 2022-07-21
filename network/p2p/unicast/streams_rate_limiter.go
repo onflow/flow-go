@@ -21,7 +21,6 @@ type StreamsRateLimiter struct {
 
 // NewStreamsRateLimiter returns a new StreamsRateLimiter.
 func NewStreamsRateLimiter(interval time.Duration, burst int) *StreamsRateLimiter {
-
 	return &StreamsRateLimiter{
 		lock:     sync.Mutex{},
 		limiters: make(map[peer.ID]*rate.Limiter),
@@ -37,7 +36,6 @@ func (s *StreamsRateLimiter) Allow(peerID peer.ID, _ *message.Message) bool {
 	if limiter == nil {
 		limiter = s.setNewLimiter(peerID)
 	}
-
 	return limiter.Allow()
 }
 
