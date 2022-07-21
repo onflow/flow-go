@@ -20,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 )
 
-// XXX
 var _ runtime.Interface = &ScriptEnv{}
 var _ Environment = &ScriptEnv{}
 
