@@ -7,25 +7,38 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	legacyaccess "github.com/onflow/flow-go/access/legacy"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 )
 
 type RPCEngineBuilder struct {
 	*Engine
-	// Use the parent interface instead of implementation, so that we can assign it to proxy.
-	handler accessproto.AccessAPIServer
+	handler              accessproto.AccessAPIServer // Use the parent interface instead of implementation, so that we can assign it to proxy.
+	signerIndicesDecoder hotstuff.BlockSignerDecoder
 }
 
 // NewRPCEngineBuilder helps to build a new RPC engine.
 func NewRPCEngineBuilder(engine *Engine) *RPCEngineBuilder {
+	decoder := signature.NewNoopBlockSignerDecoder()
 	return &RPCEngineBuilder{
-		Engine: engine,
+		Engine:               engine,
+		signerIndicesDecoder: decoder,
 		// default handler will use the engine.backend implementation
-		handler: access.NewHandler(engine.backend, engine.chain),
+		handler: access.NewHandler(engine.backend, engine.chain, access.WithBlockSignerDecoder(decoder)),
 	}
 }
 
-func (builder *RPCEngineBuilder) WithNewHandler(handler accessproto.AccessAPIClient) {
+// WithBlockSignerDecoder specifies that signer indices in block headers should be translated
+// to full node IDs with the given decoder.
+// Returns self-reference for chaining.
+func (builder *RPCEngineBuilder) WithBlockSignerDecoder(signerIndicesDecoder hotstuff.BlockSignerDecoder) *RPCEngineBuilder {
+	builder.signerIndicesDecoder = signerIndicesDecoder
+	return builder
+}
+
+func (builder *RPCEngineBuilder) WithNewHandler(handler accessproto.AccessAPIClient) *RPCEngineBuilder {
 	builder.handler = &Forwarder{UpstreamHandler: handler}
+	return builder
 }
 
 // WithLegacy specifies that a legacy access API should be instantiated

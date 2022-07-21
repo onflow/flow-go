@@ -1004,7 +1004,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return nil, fmt.Errorf("failed to get default TLS client config using public flow networking key %s %w", identity.NetworkPubKey.String(), err)
 		}
 
-		conn, err := grpc.Dial(
+		conn, _ := grpc.Dial(
 			identity.Address,
 			grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
 			grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
