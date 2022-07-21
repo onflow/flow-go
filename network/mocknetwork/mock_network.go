@@ -10,6 +10,7 @@ import (
 	protocol "github.com/libp2p/go-libp2p-core/protocol"
 	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
 	network "github.com/onflow/flow-go/network"
+	channels "github.com/onflow/flow-go/network/channels"
 	reflect "reflect"
 )
 
@@ -65,7 +66,7 @@ func (mr *MockNetworkMockRecorder) Ready() *gomock.Call {
 }
 
 // Register mocks base method
-func (m *MockNetwork) Register(arg0 network.Channel, arg1 network.MessageProcessor) (network.Conduit, error) {
+func (m *MockNetwork) Register(arg0 channels.Channel, arg1 network.MessageProcessor) (network.Conduit, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Register", arg0, arg1)
 	ret0, _ := ret[0].(network.Conduit)
@@ -80,7 +81,7 @@ func (mr *MockNetworkMockRecorder) Register(arg0, arg1 interface{}) *gomock.Call
 }
 
 // RegisterBlobService mocks base method
-func (m *MockNetwork) RegisterBlobService(arg0 network.Channel, arg1 go_datastore.Batching, arg2 ...network.BlobServiceOption) (network.BlobService, error) {
+func (m *MockNetwork) RegisterBlobService(arg0 channels.Channel, arg1 go_datastore.Batching, arg2 ...network.BlobServiceOption) (network.BlobService, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
 	for _, a := range arg2 {

@@ -58,7 +58,7 @@ func (c *ConduitFactory) RegisterEgressController(controller insecure.EgressCont
 
 // NewConduit creates a conduit on the specified channel.
 // Prior to creating any conduit, the factory requires an Adapter to be registered with it.
-func (c *ConduitFactory) NewConduit(ctx context.Context, channel network.Channel) (network.Conduit, error) {
+func (c *ConduitFactory) NewConduit(ctx context.Context, channel channels.Channel) (network.Conduit, error) {
 	if c.adapter == nil {
 		return nil, fmt.Errorf("could not create a new conduit, missing a registered network adapter")
 	}
