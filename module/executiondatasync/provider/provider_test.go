@@ -45,7 +45,7 @@ func getBlobservice(ds datastore.Batching) network.BlobService {
 
 func getProvider(blobService network.BlobService) *provider.Provider {
 	trackerStorage := new(mocktracker.Storage)
-	trackerStorage.On("Update", mock.AnythingOfType("UpdateFn")).Return(func(fn tracker.UpdateFn) error {
+	trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
 		return fn(func(uint64, ...cid.Cid) error { return nil })
 	})
 

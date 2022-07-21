@@ -12,7 +12,6 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -21,17 +20,16 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
-	"github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/blobs"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	exedatamock "github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/module/state_synchronization/requester"
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
-	"github.com/onflow/flow-go/network/compressor"
-	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/state/protocol"
 	statemock "github.com/onflow/flow-go/state/protocol/mock"
 	bstorage "github.com/onflow/flow-go/storage/badger"
@@ -77,7 +75,7 @@ type testExecutionDataServiceEntry struct {
 	// When set (and fn is unset), this error will be returned for any calls to Get for this ED
 	Err error
 	// Otherwise, the execution data will be returned directly with no error
-	ExecutionData *state_synchronization.ExecutionData
+	ExecutionData *execution_data.BlockExecutionData
 }
 
 type specialBlockGenerator func(int) map[uint64]testExecutionDataCallback
@@ -87,7 +85,7 @@ type edTestRun struct {
 	specialBlocks specialBlockGenerator
 }
 
-type testExecutionDataCallback func(*state_synchronization.ExecutionData) (*state_synchronization.ExecutionData, error)
+type testExecutionDataCallback func(*execution_data.BlockExecutionData) (*execution_data.BlockExecutionData, error)
 
 func mockDownloader(edStore map[flow.Identifier]*testExecutionDataServiceEntry) *exedatamock.Downloader {
 	downloader := new(exedatamock.Downloader)
@@ -114,9 +112,9 @@ func mockDownloader(edStore map[flow.Identifier]*testExecutionDataServiceEntry) 
 		return ed.ExecutionData, nil
 	}
 
-	eds.On("Download", mock.Anything, mock.AnythingOfType("flow.Identifier")).
+	downloader.On("Download", mock.Anything, mock.AnythingOfType("flow.Identifier")).
 		Return(
-			func(ctx context.Context, id flow.Identifier) *state_synchronization.ExecutionData {
+			func(ctx context.Context, id flow.Identifier) *execution_data.BlockExecutionData {
 				ed, _ := get(id)
 				return ed
 			},
@@ -128,11 +126,11 @@ func mockDownloader(edStore map[flow.Identifier]*testExecutionDataServiceEntry) 
 		Maybe() // Maybe() needed to get call count
 
 	noop := module.NoopReadyDoneAware{}
-	eds.On("Ready").
+	downloader.On("Ready").
 		Return(func() <-chan struct{} { return noop.Ready() }).
 		Maybe() // Maybe() needed to get call count
 
-	return eds
+	return downloader
 }
 
 func (suite *ExecutionDataRequesterSuite) mockProtocolState(blocksByHeight map[uint64]*flow.Block) *statemock.State {
@@ -325,12 +323,12 @@ func generateBlocksWithSomeMissed(blockCount int) map[uint64]testExecutionDataCa
 
 		failures := rand.Intn(3) + 1
 		attempts := 0
-		missing[i] = func(ed *state_synchronization.ExecutionData) (*state_synchronization.ExecutionData, error) {
+		missing[i] = func(ed *execution_data.BlockExecutionData) (*execution_data.BlockExecutionData, error) {
 			if attempts < failures*2 { // this func is run twice for every attempt by the mock (once for ExecutionData one for errors)
 				attempts++
 				// This should fail the first n fetch attempts
 				time.Sleep(time.Duration(rand.Intn(25)) * time.Millisecond)
-				return nil, &state_synchronization.BlobNotFoundError{}
+				return nil, &execution_data.BlobNotFoundError{}
 			}
 
 			return ed, nil
@@ -348,7 +346,7 @@ func generateBlocksWithRandomDelays(blockCount int) map[uint64]testExecutionData
 			continue
 		}
 
-		delays[i] = func(ed *state_synchronization.ExecutionData) (*state_synchronization.ExecutionData, error) {
+		delays[i] = func(ed *execution_data.BlockExecutionData) (*execution_data.BlockExecutionData, error) {
 			time.Sleep(time.Duration(rand.Intn(25)) * time.Millisecond)
 			return ed, nil
 		}
@@ -360,11 +358,11 @@ func generateBlocksWithRandomDelays(blockCount int) map[uint64]testExecutionData
 func generateBlocksWithHaltingError(blockCount int) (specialBlockGenerator, error) {
 	// return a MalformedDataError on the second to last block
 	height := uint64(blockCount - 5)
-	err := fmt.Errorf("halting error: %w", &state_synchronization.MalformedDataError{})
+	err := fmt.Errorf("halting error: %w", &execution_data.MalformedDataError{})
 
 	generate := func(int) map[uint64]testExecutionDataCallback {
 		return map[uint64]testExecutionDataCallback{
-			height: func(ed *state_synchronization.ExecutionData) (*state_synchronization.ExecutionData, error) {
+			height: func(ed *execution_data.BlockExecutionData) (*execution_data.BlockExecutionData, error) {
 				return nil, err
 			},
 		}
@@ -376,7 +374,7 @@ func generatePauseResume(pauseHeight uint64) (specialBlockGenerator, func()) {
 	pause := make(chan struct{})
 
 	blocks := map[uint64]testExecutionDataCallback{}
-	blocks[pauseHeight] = func(ed *state_synchronization.ExecutionData) (*state_synchronization.ExecutionData, error) {
+	blocks[pauseHeight] = func(ed *execution_data.BlockExecutionData) (*execution_data.BlockExecutionData, error) {
 		<-pause
 		return ed, nil
 	}
@@ -409,7 +407,7 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 	edr := requester.New(
 		zerolog.New(os.Stdout).With().Timestamp().Logger(),
 		metrics.NewNoopCollector(),
-		suite.eds,
+		suite.downloader,
 		processedHeight,
 		processedNotification,
 		state,
@@ -529,8 +527,8 @@ func (suite *ExecutionDataRequesterSuite) runRequesterTest(edr state_synchroniza
 	return fetchedExecutionData
 }
 
-func (suite *ExecutionDataRequesterSuite) consumeExecutionDataNotifications(cfg *fetchTestRun, done func(), fetchedExecutionData map[flow.Identifier]*state_synchronization.ExecutionData) func(ed *state_synchronization.ExecutionData) {
-	return func(ed *state_synchronization.ExecutionData) {
+func (suite *ExecutionDataRequesterSuite) consumeExecutionDataNotifications(cfg *fetchTestRun, done func(), fetchedExecutionData map[flow.Identifier]*execution_data.BlockExecutionData) func(ed *execution_data.BlockExecutionData) {
+	return func(ed *execution_data.BlockExecutionData) {
 		if _, has := fetchedExecutionData[ed.BlockID]; has {
 			suite.T().Errorf("duplicate execution data for block %s", ed.BlockID)
 			return
@@ -567,7 +565,7 @@ func (suite *ExecutionDataRequesterSuite) finalizeBlocks(cfg *fetchTestRun, fina
 	}
 }
 
-type receivedExecutionData map[flow.Identifier]*state_synchronization.ExecutionData
+type receivedExecutionData map[flow.Identifier]*execution_data.BlockExecutionData
 type fetchTestRun struct {
 	sealedCount              int
 	startHeight              uint64
@@ -577,14 +575,14 @@ type fetchTestRun struct {
 	resultsByID              map[flow.Identifier]*flow.ExecutionResult
 	resultsByBlockID         map[flow.Identifier]*flow.ExecutionResult
 	sealsByBlockID           map[flow.Identifier]*flow.Seal
-	executionDataByID        map[flow.Identifier]*state_synchronization.ExecutionData
+	executionDataByID        map[flow.Identifier]*execution_data.BlockExecutionData
 	executionDataEntries     map[flow.Identifier]*testExecutionDataServiceEntry
 	executionDataIDByBlockID map[flow.Identifier]flow.Identifier
 	expectedIrrecoverable    error
 
 	stopHeight           uint64
 	resumeHeight         uint64
-	fetchedExecutionData map[flow.Identifier]*state_synchronization.ExecutionData
+	fetchedExecutionData map[flow.Identifier]*execution_data.BlockExecutionData
 	waitTimeout          time.Duration
 
 	maxSearchAhead uint64
@@ -628,7 +626,7 @@ func (suite *ExecutionDataRequesterSuite) generateTestData(blockCount int, speci
 	resultsByID := map[flow.Identifier]*flow.ExecutionResult{}
 	resultsByBlockID := map[flow.Identifier]*flow.ExecutionResult{}
 	sealsByBlockID := map[flow.Identifier]*flow.Seal{}
-	executionDataByID := map[flow.Identifier]*state_synchronization.ExecutionData{}
+	executionDataByID := map[flow.Identifier]*execution_data.BlockExecutionData{}
 	executionDataIDByBlockID := map[flow.Identifier]flow.Identifier{}
 
 	sealedCount := blockCount - 4 // seals for blocks 1-96
@@ -665,7 +663,7 @@ func (suite *ExecutionDataRequesterSuite) generateTestData(blockCount int, speci
 
 		ed := synctest.ExecutionDataFixture(block.ID())
 
-		cid, err := eds.Add(context.Background(), ed)
+		cid, err := eds.AddExecutionData(context.Background(), ed)
 		require.NoError(suite.T(), err)
 
 		result := buildResult(block, cid, previousResult)

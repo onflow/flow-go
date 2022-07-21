@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/compliance"
@@ -85,7 +84,7 @@ func WithExposeMetrics(expose bool) Option {
 	}
 }
 
-func WithSyncCoreConfig(config *synchronization.Config) Option {
+func WithSyncCoreConfig(config *chainsync.Config) Option {
 	return func(c *Config) {
 		c.syncConfig = config
 	}

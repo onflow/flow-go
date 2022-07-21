@@ -14,9 +14,8 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	exedatamock "github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/state_synchronization"
-	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -27,7 +26,7 @@ type ExecutionDataReaderSuite struct {
 	suite.Suite
 
 	reader       *ExecutionDataReader
-	downloader   execution_data.Downloader
+	downloader   *exedatamock.Downloader
 	headers      *storagemock.Headers
 	results      *storagemock.ExecutionResults
 	seals        *storagemock.Seals
@@ -87,7 +86,7 @@ func (suite *ExecutionDataReaderSuite) reset() {
 		}),
 	)
 
-	suite.downloader = new(syncmock.ExecutionDataService)
+	suite.downloader = new(exedatamock.Downloader)
 	suite.reader = NewExecutionDataReader(
 		suite.downloader,
 		suite.headers,
