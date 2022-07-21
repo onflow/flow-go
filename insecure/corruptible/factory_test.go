@@ -2,8 +2,9 @@ package corruptible
 
 import (
 	"context"
-	"github.com/onflow/flow-go/network/channels"
 	"testing"
+
+	"github.com/onflow/flow-go/network/channels"
 
 	"github.com/stretchr/testify/require"
 

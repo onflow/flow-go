@@ -3,6 +3,7 @@ package corruptible
 import (
 	"context"
 	"fmt"
+
 	"github.com/onflow/flow-go/network/channels"
 
 	"github.com/rs/zerolog"

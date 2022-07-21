@@ -3,21 +3,24 @@ package corruptible
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/insecure"
-	"github.com/onflow/flow-go/module/irrecoverable"
-	"google.golang.org/grpc"
-	grpcinsecure "google.golang.org/grpc/credentials/insecure"
 	"net"
 	"testing"
 	"time"
+
+	"google.golang.org/grpc"
+	grpcinsecure "google.golang.org/grpc/credentials/insecure"
+
+	"github.com/onflow/flow-go/insecure"
+	"github.com/onflow/flow-go/module/irrecoverable"
+
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 )
 
 // corruptibleNetworkFixture creates a corruptible Network with a mock Adapter.
@@ -72,11 +75,11 @@ func corruptibleNetworkFixture(t *testing.T, corruptedID ...*flow.Identity) (*Ne
 // terminates the network.
 func withCorruptibleNetwork(t *testing.T,
 	run func(
-	flow.Identity,                                                   // identity of ccf
-	*Network,                                                        // corruptible network
-	*mocknetwork.Adapter,                                            // mock adapter that corrupted network uses to communicate with authorized flow nodes.
-	insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that attack network uses to send messages to this ccf.
-)) {
+		flow.Identity, // identity of ccf
+		*Network, // corruptible network
+		*mocknetwork.Adapter, // mock adapter that corrupted network uses to communicate with authorized flow nodes.
+		insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that attack network uses to send messages to this ccf.
+	)) {
 
 	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress("localhost:0"))
 

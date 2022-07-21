@@ -4,15 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/network/channels"
 	"io"
 	"net"
 	"sync"
-
-	"github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/engine/execution/utils"
-	verutils "github.com/onflow/flow-go/engine/verification/utils"
-	"github.com/onflow/flow-go/module"
 
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/ipfs/go-datastore"
@@ -20,14 +14,19 @@ import (
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 
+	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/engine/execution/utils"
+	verutils "github.com/onflow/flow-go/engine/verification/utils"
 	"github.com/onflow/flow-go/engine/verification/verifier"
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	flownet "github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/logging"
 )
 

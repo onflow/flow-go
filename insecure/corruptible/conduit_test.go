@@ -3,9 +3,10 @@ package corruptible
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/network/channels"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/network/channels"
 
 	"github.com/stretchr/testify/require"
 

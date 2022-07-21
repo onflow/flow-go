@@ -2,13 +2,17 @@ package corruptible
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/network/channels"
 	"math/rand"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/network/channels"
+
 	"github.com/golang/protobuf/ptypes/empty"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/insecure"
 	mockinsecure "github.com/onflow/flow-go/insecure/mock"
@@ -17,8 +21,6 @@ import (
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 )
 
 // TestHandleOutgoingEvent_AttackerObserve evaluates that the incoming messages to the corrupted network are routed to the
