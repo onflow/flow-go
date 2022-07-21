@@ -68,7 +68,6 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
@@ -461,7 +460,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			return executionDataPruner, err
 		}).
 		Component("provider engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-			bs, err := node.Network.RegisterBlobService(network.ExecutionDataService, executionDataDatastore)
+			bs, err := node.Network.RegisterBlobService(channels.ExecutionDataService, executionDataDatastore)
 			if err != nil {
 				return nil, fmt.Errorf("failed to register blob service: %w", err)
 			}
