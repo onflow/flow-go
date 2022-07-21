@@ -16,6 +16,7 @@ type CorruptibleConduitFactory interface {
 	// conduit is not going to use it anymore, so the channel can be closed safely.
 	UnregisterChannel(network.Channel) error
 
-	// RegisterEgressController sets the EgressController component of the factory.
+	// RegisterEgressController sets the EgressController component of the factory. All outgoing messages of the (slave) conduits that
+	// this factory creates are forwarded to the EgressController instead of being dispatched on the Flow network.
 	RegisterEgressController(EgressController) error
 }
