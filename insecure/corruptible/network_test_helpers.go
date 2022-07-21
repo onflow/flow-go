@@ -21,7 +21,7 @@ import (
 )
 
 // corruptibleNetworkFixture creates a corruptible Network with a mock Adapter.
-// By default, no attacker is registered on this corruptible network. 
+// By default, no attacker is registered on this corruptible network.
 func corruptibleNetworkFixture(t *testing.T, corruptedID ...*flow.Identity) (*Network, *mocknetwork.Adapter) {
 	// create corruptible network with no attacker registered
 	codec := cbor.NewCodec()
