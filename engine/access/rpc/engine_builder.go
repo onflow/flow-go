@@ -50,6 +50,7 @@ func (builder *RPCEngineBuilder) WithMetrics() *RPCEngineBuilder {
 	grpc_prometheus.EnableHandlingTimeHistogram()
 	grpc_prometheus.Register(builder.unsecureGrpcServer)
 	grpc_prometheus.Register(builder.secureGrpcServer)
+	return builder
 }
 
 func (builder *RPCEngineBuilder) withRegisterRPC() {
