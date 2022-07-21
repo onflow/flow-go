@@ -759,13 +759,13 @@ func (net *FlowNetwork) StopContainer(ctx context.Context, containerID string) e
 
 type ObserverConfig struct {
 	ObserverName            string
-	AccessName              string
-	AccessPublicNetworkPort string
-	AccessGRPCSecurePort    string
-	AutoRemove              bool
+	ObserverImage           string
+	AccessName              string // Does not change the access node.
+	AccessPublicNetworkPort string // Does not change the access node
+	AccessGRPCSecurePort    string // Does not change the access node
 }
 
-func (net *FlowNetwork) AddObserver(ctx context.Context, conf *ObserverConfig) (shutdown func(), err error) {
+func (net *FlowNetwork) AddObserver(ctx context.Context, conf *ObserverConfig) (stop func(), err error) {
 	// Find the public key for the access node
 	accessPublicKey := ""
 	for _, stakedConf := range net.BootstrapData.StakedConfs {
@@ -810,7 +810,7 @@ func (net *FlowNetwork) AddObserver(ctx context.Context, conf *ObserverConfig) (
 
 	container, err := net.cli.ContainerCreate(ctx,
 		&container.Config{
-			Image: "gcr.io/flow-container-registry/observer:latest",
+			Image: conf.ObserverImage,
 			Cmd: []string{
 				fmt.Sprintf("--bootstrap-node-addresses=%s:%s", conf.AccessName, conf.AccessPublicNetworkPort),
 				fmt.Sprintf("--bootstrap-node-public-keys=%s", accessPublicKey),
@@ -837,7 +837,7 @@ func (net *FlowNetwork) AddObserver(ctx context.Context, conf *ObserverConfig) (
 			},
 		},
 		&container.HostConfig{
-			AutoRemove: conf.AutoRemove,
+			AutoRemove: true,
 			Binds: []string{
 				fmt.Sprintf("%s:%s:rw", flowDataDir, "/data"),
 				fmt.Sprintf("%s:%s:rw", flowProfilerDir, "/profiler"),
@@ -851,7 +851,7 @@ func (net *FlowNetwork) AddObserver(ctx context.Context, conf *ObserverConfig) (
 		},
 		&network.NetworkingConfig{
 			EndpointsConfig: map[string]*network.EndpointSettings{
-				"access_api_test": {
+				net.config.Name: {
 					NetworkID: net.network.ID(),
 				},
 			},
@@ -868,9 +868,10 @@ func (net *FlowNetwork) AddObserver(ctx context.Context, conf *ObserverConfig) (
 		return nil, err
 	}
 
+	containerID := container.ID
 	return func() {
 		// shutdown func
-		net.StopContainer(ctx, container.ID)
+		net.StopContainer(ctx, containerID)
 	}, nil
 }
 

@@ -53,10 +53,7 @@ func (suite *AccessSuite) SetupTest() {
 	}()
 
 	nodeConfigs := []testnet.NodeConfig{
-		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.InfoLevel), func(nc *testnet.NodeConfig) {
-			nc.SupportsUnstakedNodes = true
-			nc.AdditionalFlags = append(nc.AdditionalFlags, "--loglevel=debug")
-		}),
+		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.InfoLevel)),
 	}
 
 	// need one dummy execution node (unused ghost)
@@ -111,46 +108,6 @@ func (suite *AccessSuite) TestAccessConnection() {
 
 	_, err = client.Ping(suite.ctx, &accessproto.PingRequest{})
 	if err != nil {
-		t.Failed()
-	}
-}
-
-func (suite *AccessSuite) TestObserverConnection() {
-	// create the observer node
-	shutdown, _ := suite.net.AddObserver(suite.ctx, &testnet.ObserverConfig{
-		ObserverName:            "observer_1",
-		AccessName:              "access_1",
-		AccessPublicNetworkPort: "9876",
-		AccessGRPCSecurePort:    "9001",
-		AutoRemove:              true,
-	})
-	defer shutdown()
-
-	t := suite.T()
-
-	// dial the observer node on the unsecure port
-	conn, err := grpc.Dial("0.0.0.0:9000", grpc.WithInsecure())
-	if err != nil {
-		t.Failed()
-	}
-
-	client := accessproto.NewAccessAPIClient(conn)
-
-	// ping the observer while the access container is running
-	_, err = client.Ping(suite.ctx, &accessproto.PingRequest{})
-	if err != nil {
-		t.Failed()
-	}
-
-	// stop the upstream access container
-	accessContainer := suite.net.ContainerByName("access_1")
-	if err = suite.net.StopContainer(suite.ctx, accessContainer.ID); err != nil {
-		t.Failed()
-	}
-
-	// ping the observer when access container is stopped
-	_, err = client.Ping(suite.ctx, &accessproto.PingRequest{})
-	if err == nil {
 		t.Failed()
 	}
 }
