@@ -12,7 +12,6 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1619,8 +1618,8 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 				require.Error(t, script.Err)
 				require.IsType(t, &errors.CadenceRuntimeError{}, script.Err)
 				// modifications to contracts are not supported in scripts
-				require.IsType(t, &errors.OperationNotSupportedError{},
-					script.Err.(*errors.CadenceRuntimeError).Unwrap().(*runtime.Error).Err.(interpreter.Error).Err.(interpreter.PositionedError).Err)
+				unsupportedOperationError := &errors.OperationNotSupportedError{}
+				require.ErrorAs(t, script.Err, &unsupportedOperationError)
 			},
 		),
 	)
@@ -1678,8 +1677,8 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 				require.Error(t, script.Err)
 				require.IsType(t, &errors.CadenceRuntimeError{}, script.Err)
 				// modifications to contracts are not supported in scripts
-				require.IsType(t, &errors.OperationNotSupportedError{},
-					script.Err.(*errors.CadenceRuntimeError).Unwrap().(*runtime.Error).Err.(interpreter.Error).Err.(interpreter.PositionedError).Err)
+				unsupportedOperationError := &errors.OperationNotSupportedError{}
+				require.ErrorAs(t, script.Err, &unsupportedOperationError)
 			},
 		),
 	)
@@ -1736,8 +1735,8 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 				require.Error(t, script.Err)
 				require.IsType(t, &errors.CadenceRuntimeError{}, script.Err)
 				// modifications to contracts are not supported in scripts
-				require.IsType(t, &errors.OperationNotSupportedError{},
-					script.Err.(*errors.CadenceRuntimeError).Unwrap().(*runtime.Error).Err.(interpreter.Error).Err.(interpreter.PositionedError).Err)
+				unsupportedOperationError := &errors.OperationNotSupportedError{}
+				require.ErrorAs(t, script.Err, &unsupportedOperationError)
 			},
 		),
 	)
@@ -1784,8 +1783,8 @@ func TestScriptAccountKeyMutationsFailure(t *testing.T) {
 				require.Error(t, script.Err)
 				require.IsType(t, &errors.CadenceRuntimeError{}, script.Err)
 				// modifications to public keys are not supported in scripts
-				require.IsType(t, &errors.OperationNotSupportedError{},
-					script.Err.(*errors.CadenceRuntimeError).Unwrap().(*runtime.Error).Err.(interpreter.Error).Err.(interpreter.PositionedError).Err)
+				unsupportedOperationError := &errors.OperationNotSupportedError{}
+				require.ErrorAs(t, script.Err, &unsupportedOperationError)
 			},
 		),
 	)
@@ -1820,8 +1819,8 @@ func TestScriptAccountKeyMutationsFailure(t *testing.T) {
 				require.Error(t, script.Err)
 				require.IsType(t, &errors.CadenceRuntimeError{}, script.Err)
 				// modifications to public keys are not supported in scripts
-				require.IsType(t, &errors.OperationNotSupportedError{},
-					script.Err.(*errors.CadenceRuntimeError).Unwrap().(*runtime.Error).Err.(interpreter.Error).Err.(interpreter.PositionedError).Err)
+				unsupportedOperationError := &errors.OperationNotSupportedError{}
+				require.ErrorAs(t, script.Err, &unsupportedOperationError)
 			},
 		),
 	)
