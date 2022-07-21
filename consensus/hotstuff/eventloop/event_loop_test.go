@@ -90,7 +90,7 @@ func (s *EventLoopTestSuite) Test_SubmitQC() {
 	s.eh.On("OnReceiveQc", qc).Run(func(args mock.Arguments) {
 		processed.Store(true)
 	}).Return(nil).Once()
-	s.eventLoop.SubmitTrustedQC(qc)
+	s.eventLoop.OnQcConstructedFromVotes(qc)
 	require.Eventually(s.T(), processed.Load, time.Millisecond*100, time.Millisecond*10)
 	s.eh.AssertExpectations(s.T())
 }
@@ -128,7 +128,7 @@ func TestEventLoop_Timeout(t *testing.T) {
 		defer wg.Done()
 		for !processed.Load() {
 			qc := unittest.QuorumCertificateFixture()
-			eventLoop.SubmitTrustedQC(qc)
+			eventLoop.OnQcConstructedFromVotes(qc)
 		}
 	}()
 

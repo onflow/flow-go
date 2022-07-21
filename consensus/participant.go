@@ -119,7 +119,7 @@ func NewParticipant(
 	}
 
 	// add observer, event loop needs to receive events from distributor
-	modules.QCCreatedDistributor.AddConsumer(loop.SubmitTrustedQC)
+	modules.QCCreatedDistributor.AddConsumer(loop)
 	modules.TimeoutCollectorDistributor.AddConsumer(loop)
 
 	return loop, nil
