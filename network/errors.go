@@ -1,6 +1,8 @@
 package network
 
-import "errors"
+import (
+	"errors"
+)
 
 var (
 	EmptyTargetList = errors.New("target list empty")

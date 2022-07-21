@@ -33,10 +33,10 @@ func (i *Identifiers) Has(id flow.Identifier) bool {
 	return i.Backend.Has(id)
 }
 
-// Rem removes the given identifier from the memory pool; it will
+// Remove removes the given identifier from the memory pool; it will
 // return true if the identifier was known and removed.
-func (i *Identifiers) Rem(id flow.Identifier) bool {
-	return i.Backend.Rem(id)
+func (i *Identifiers) Remove(id flow.Identifier) bool {
+	return i.Backend.Remove(id)
 }
 
 // All returns all identifiers stored in the mempool

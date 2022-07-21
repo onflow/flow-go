@@ -12,27 +12,6 @@ type Ledger struct {
 	mock.Mock
 }
 
-// DiskSize provides a mock function with given fields:
-func (_m *Ledger) DiskSize() (int64, error) {
-	ret := _m.Called()
-
-	var r0 int64
-	if rf, ok := ret.Get(0).(func() int64); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(int64)
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // Done provides a mock function with given fields:
 func (_m *Ledger) Done() <-chan struct{} {
 	ret := _m.Called()

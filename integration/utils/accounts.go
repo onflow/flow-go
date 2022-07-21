@@ -8,7 +8,7 @@ import (
 
 	flowsdk "github.com/onflow/flow-go-sdk"
 
-	"github.com/onflow/flow-go-sdk/client"
+	"github.com/onflow/flow-go-sdk/access"
 	"github.com/onflow/flow-go-sdk/crypto"
 )
 
@@ -19,6 +19,23 @@ type flowAccount struct {
 	seqNumber  uint64
 	signer     crypto.InMemorySigner
 	signerLock sync.Mutex
+}
+
+func (acc *flowAccount) signCreateAccountTx(createAccountTx *flowsdk.Transaction) error {
+	acc.signerLock.Lock()
+	defer acc.signerLock.Unlock()
+
+	err := createAccountTx.SignEnvelope(
+		*acc.address,
+		acc.accountKey.Index,
+		acc.signer,
+	)
+	if err != nil {
+		return err
+	}
+
+	acc.accountKey.SequenceNumber++
+	return nil
 }
 
 func (acc *flowAccount) signTx(tx *flowsdk.Transaction, keyID int) error {
@@ -43,7 +60,7 @@ func newFlowAccount(i int, address *flowsdk.Address, accountKey *flowsdk.Account
 	}
 }
 
-func loadServiceAccount(flowClient *client.Client,
+func loadServiceAccount(flowClient access.Client,
 	servAccAddress *flowsdk.Address,
 	servAccPrivKeyHex string) (*flowAccount, error) {
 

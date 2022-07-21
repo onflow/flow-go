@@ -53,7 +53,7 @@ func (f *combinedVoteProcessorFactoryBaseV3) Create(log zerolog.Logger, block *m
 		stakingKeys = append(stakingKeys, participant.StakingPubKey)
 	}
 
-	stakingSigAggtor, err := signature.NewWeightedSignatureAggregator(allParticipants, stakingKeys, msg, encoding.ConsensusVoteTag)
+	stakingSigAggtor, err := signature.NewWeightedSignatureAggregator(allParticipants, stakingKeys, msg, msig.ConsensusVoteTag)
 	if err != nil {
 		return nil, fmt.Errorf("could not create aggregator for staking signatures: %w", err)
 	}
@@ -73,7 +73,7 @@ func (f *combinedVoteProcessorFactoryBaseV3) Create(log zerolog.Logger, block *m
 		beaconKeys = append(beaconKeys, pk)
 	}
 
-	rbSigAggtor, err := signature.NewWeightedSignatureAggregator(allParticipants, beaconKeys, msg, encoding.RandomBeaconTag)
+	rbSigAggtor, err := signature.NewWeightedSignatureAggregator(allParticipants, beaconKeys, msg, msig.RandomBeaconTag)
 	if err != nil {
 		return nil, fmt.Errorf("could not create aggregator for thershold signatures: %w", err)
 	}

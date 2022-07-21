@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -290,8 +290,8 @@ SearchLoop:
 ReceiptLoop:
 	for time.Now().Before(deadline) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		err := ss.Execution().Send(ctx, network.PushReceipts, &receipt, ss.conIDs...)
-		err = ss.Execution2().Send(ctx, network.PushReceipts, &receipt2, ss.conIDs...)
+		err := ss.Execution().Send(ctx, channels.PushReceipts, &receipt, ss.conIDs...)
+		err = ss.Execution2().Send(ctx, channels.PushReceipts, &receipt2, ss.conIDs...)
 		cancel()
 		if err != nil {
 			ss.T().Logf("could not send execution receipt: %s\n", err)
@@ -338,7 +338,7 @@ ReceiptLoop:
 ApprovalLoop:
 	for time.Now().Before(deadline) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		err := ss.Verification().Send(ctx, network.PushApprovals, &approval, ss.conIDs...)
+		err := ss.Verification().Send(ctx, channels.PushApprovals, &approval, ss.conIDs...)
 		cancel()
 		if err != nil {
 			ss.T().Logf("could not send result approval: %s\n", err)
