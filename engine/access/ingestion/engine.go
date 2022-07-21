@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/executiondatasync/requester"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/network"
@@ -85,6 +86,8 @@ type Engine struct {
 	blocksToMarkExecuted       *stdmap.Times
 
 	rpcEngine *rpc.Engine
+
+	requester *requester.Requester
 }
 
 // New creates a new access ingestion engine
@@ -105,6 +108,7 @@ func New(
 	collectionsToMarkExecuted *stdmap.Times,
 	blocksToMarkExecuted *stdmap.Times,
 	rpcEngine *rpc.Engine,
+	requester *requester.Requester,
 ) (*Engine, error) {
 	executionReceiptsRawQueue, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultQueueCapacity),
@@ -161,6 +165,7 @@ func New(
 		collectionsToMarkExecuted:  collectionsToMarkExecuted,
 		blocksToMarkExecuted:       blocksToMarkExecuted,
 		rpcEngine:                  rpcEngine,
+		requester:                  requester,
 
 		// queue / notifier for execution receipts
 		executionReceiptsNotifier: engine.NewNotifier(),
@@ -417,6 +422,13 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, r *flow.Execut
 	err := e.executionReceipts.Store(r)
 	if err != nil {
 		return fmt.Errorf("failed to store execution receipt: %w", err)
+	}
+
+	// TODO: once the network API has been refactored to support multiple engines per channel,
+	// we should remove this and let the requester subscribe to the receipt broadcast channel
+	// itself.
+	if e.requester != nil {
+		e.requester.HandleReceipt(r)
 	}
 
 	block, err := e.blocks.ByID(r.ExecutionResult.BlockID)
