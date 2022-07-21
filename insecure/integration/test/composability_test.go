@@ -91,7 +91,7 @@ func TestCorruptibleConduitFrameworkHappyPath(t *testing.T) {
 
 }
 
-// withCorruptibleNetwork creates a real corruptible conduit factory (ccf), starts it, runs the "run" function, and then stops it.
+// withCorruptibleNetwork creates a real corruptible network, starts it, runs the "run" function, and then stops it.
 func withCorruptibleNetwork(t *testing.T, run func(*testing.T, flow.Identity, *corruptible.Network, *stub.Hub)) {
 	codec := cbor.NewCodec()
 	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress("localhost:0"))
