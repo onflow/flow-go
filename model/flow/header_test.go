@@ -26,7 +26,7 @@ func TestHeaderEncodingJSON(t *testing.T) {
 	require.NoError(t, err)
 	decodedID := decoded.ID()
 	assert.Equal(t, headerID, decodedID)
-	assert.Equal(t, header, decoded)
+	assert.Equal(t, *header, decoded)
 }
 
 func TestHeaderFingerprint(t *testing.T) {
@@ -45,7 +45,7 @@ func TestHeaderFingerprint(t *testing.T) {
 		ProposerID         flow.Identifier
 	}
 	rlp.NewMarshaler().MustUnmarshal(data, &decoded)
-	decHeader := flow.Header{
+	decHeader := &flow.Header{
 		ChainID:            decoded.ChainID,
 		ParentID:           decoded.ParentID,
 		Height:             decoded.Height,
@@ -56,11 +56,10 @@ func TestHeaderFingerprint(t *testing.T) {
 		ParentVoterSigData: decoded.ParentVoterSigData,
 		ProposerID:         decoded.ProposerID,
 		ProposerSigData:    header.ProposerSigData, // since this field is not encoded/decoded, just set it to the original
-		// value to pass test
 	}
 	decodedID := decHeader.ID()
 	assert.Equal(t, headerID, decodedID)
-	assert.Equal(t, header, decHeader)
+	assert.Equal(t, *header, *decHeader)
 }
 
 func TestHeaderEncodingMsgpack(t *testing.T) {
@@ -73,7 +72,7 @@ func TestHeaderEncodingMsgpack(t *testing.T) {
 	require.NoError(t, err)
 	decodedID := decoded.ID()
 	assert.Equal(t, headerID, decodedID)
-	assert.Equal(t, header, decoded)
+	assert.Equal(t, *header, decoded)
 }
 
 func TestHeaderEncodingCBOR(t *testing.T) {
@@ -86,7 +85,7 @@ func TestHeaderEncodingCBOR(t *testing.T) {
 	require.NoError(t, err)
 	decodedID := decoded.ID()
 	assert.Equal(t, headerID, decodedID)
-	assert.Equal(t, header, decoded)
+	assert.Equal(t, *header, decoded)
 }
 
 func TestNonUTCTimestampSameHashAsUTC(t *testing.T) {

@@ -110,7 +110,6 @@ func getPayloadType(p *ledger.Payload) payloadType {
 	if fvmState.IsFVMStateKey(
 		string(p.Key.KeyParts[0].Value),
 		string(p.Key.KeyParts[1].Value),
-		string(p.Key.KeyParts[2].Value),
 	) {
 		return fvmPayloadType
 	}

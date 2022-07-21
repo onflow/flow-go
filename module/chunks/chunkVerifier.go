@@ -127,9 +127,9 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 	// are not expanded and values are unknown.
 	unknownRegTouch := make(map[string]*ledger.Key)
 	var problematicTx flow.Identifier
-	getRegister := func(owner, controller, key string) (flow.RegisterValue, error) {
+	getRegister := func(owner, key string) (flow.RegisterValue, error) {
 		// check if register has been provided in the chunk data pack
-		registerID := flow.NewRegisterID(owner, controller, key)
+		registerID := flow.NewRegisterID(owner, key)
 
 		registerKey := executionState.RegisterIDToKey(registerID)
 
