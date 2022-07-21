@@ -208,14 +208,15 @@ func TestHandleFinalizedBlock(t *testing.T) {
 
 	r.Start(signalerCtx)
 
+	sealedBlock := unittest.BlockFixture()
 	bed := generateBlockExecutionData(t, 5, 10*execution_data.DefaultMaxBlobSize)
+	bed.BlockID = sealedBlock.ID()
 	blobstore := blobs.NewBlobstore(getDatastore())
 	eds := execution_data.NewExecutionDataStore(blobstore, execution_data.DefaultSerializer)
 	rootID, err := eds.AddExecutionData(context.Background(), bed)
 	require.NoError(t, err)
 	result := unittest.ExecutionResultFixture()
 	result.ExecutionDataID = rootID
-	sealedBlock := unittest.BlockFixture()
 	seal := unittest.Seal.Fixture(unittest.Seal.WithResult(result), unittest.Seal.WithBlock(sealedBlock.Header))
 	finalizedPayload := unittest.PayloadFixture(unittest.WithSeals(seal))
 	finalizedHeader := unittest.BlockHeaderFixture()
@@ -377,9 +378,10 @@ func TestConsumer(t *testing.T) {
 	<-r.Ready()
 
 	numCalls := atomic.NewInt32(0)
-	unsub, err := r.AddConsumer(func(blockHeight uint64, executionData *execution_data.BlockExecutionData) {
+	var executionData *execution_data.BlockExecutionData
+	unsub, err := r.AddConsumer(func(blockHeight uint64, ed *execution_data.BlockExecutionData) {
 		assert.Equal(t, blockHeight, sealedBlock.Header.Height)
-		goassert.DeepEqual(t, bed, executionData)
+		executionData = ed
 		numCalls.Add(1)
 	})
 	require.NoError(t, err)
@@ -400,10 +402,12 @@ func TestConsumer(t *testing.T) {
 	blobGetter.AssertExpectations(t)
 	blobService.AssertExpectations(t)
 	trackerStorage.AssertExpectations(t)
+	goassert.DeepEqual(t, bed, executionData)
 
 	sealedBlock = unittest.BlockFixture()
 	sealedBlock.Header.Height = 2
 	bed = generateBlockExecutionData(t, 5, 10*execution_data.DefaultMaxBlobSize)
+	bed.BlockID = sealedBlock.ID()
 	rootID, err = eds.AddExecutionData(context.Background(), bed)
 	require.NoError(t, err)
 	result = unittest.ExecutionResultFixture()
