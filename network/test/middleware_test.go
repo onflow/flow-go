@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ipfs/go-log"
+	"github.com/libp2p/go-libp2p-core/peer"
 	swarm "github.com/libp2p/go-libp2p-swarm"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/rs/zerolog"
@@ -202,7 +203,16 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Streams() {
 
 	// create a new staked identity
 	ids, libP2PNodes, _ := GenerateIDs(m.T(), logger, 1)
-	mws, providers := GenerateMiddlewares(m.T(), logger, ids, libP2PNodes, unittest.NetworkCodec(), WithUnicastRateLimiters(streamsRateLimiter, nil))
+
+	// the onUnicastRateLimitedPeerFunc call back we will use to keep track of how many times a rate limit happens
+	onRateLimit := func(peerID peer.ID) {
+		// we only expect messages from the first middleware on the test suite
+		fmt.Println("RATE LIMITED PEER: ", peerID)
+	}
+
+	// create middleware
+	opts := WithUnicastRateLimiters(streamsRateLimiter, nil, onRateLimit)
+	mws, providers := GenerateMiddlewares(m.T(), logger, ids, libP2PNodes, unittest.NetworkCodec(), opts)
 	require.Len(m.T(), ids, 1)
 	require.Len(m.T(), providers, 1)
 	require.Len(m.T(), mws, 1)
@@ -232,8 +242,8 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Streams() {
 	m.mws[0].UpdateNodeAddresses()
 	newMw.UpdateNodeAddresses()
 
+	// send 6 messages each second via unicast, 1 message will be rate limited
 	for i := 0; i < 6; i++ {
-		// now the message should send successfully
 		err := m.mws[0].SendDirect(msg, newId.NodeID)
 		require.NoError(m.T(), err)
 	}

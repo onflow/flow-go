@@ -178,8 +178,9 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 			p2p.NewIdentityProviderIDTranslator(idProviders[i]),
 			codec,
 			p2p.WithPeerManager(peerManagerFactory),
-			p2p.WithUnicastStreamsRateLimiter(o.streamsRateLimiter),
+			p2p.WithUnicastStreamRateLimiter(o.streamsRateLimiter),
 			p2p.WithUnicastBandwidthRateLimiter(o.bandwidthRateLimiter),
+			p2p.WithUnicastRateLimitedPeerFunc(o.onUnicastRateLimitedPeerFunc),
 		)
 	}
 	return mws, idProviders
@@ -275,13 +276,14 @@ func GenerateIDsAndMiddlewares(t *testing.T,
 }
 
 type optsConfig struct {
-	idOpts               []func(*flow.Identity)
-	dhtPrefix            string
-	dhtOpts              []dht.Option
-	peerManagerOpts      []p2p.Option
-	connectionGating     bool
-	streamsRateLimiter   unicast.RateLimiter
-	bandwidthRateLimiter unicast.RateLimiter
+	idOpts                       []func(*flow.Identity)
+	dhtPrefix                    string
+	dhtOpts                      []dht.Option
+	peerManagerOpts              []p2p.Option
+	connectionGating             bool
+	streamsRateLimiter           unicast.RateLimiter
+	bandwidthRateLimiter         unicast.RateLimiter
+	onUnicastRateLimitedPeerFunc func(peerID peer.ID)
 }
 
 func WithIdentityOpts(idOpts ...func(*flow.Identity)) func(*optsConfig) {
@@ -303,10 +305,11 @@ func WithPeerManagerOpts(peerManagerOpts ...p2p.Option) func(*optsConfig) {
 	}
 }
 
-func WithUnicastRateLimiters(streamsRateLimiter, bandwidthRateLimiter unicast.RateLimiter) func(*optsConfig) {
+func WithUnicastRateLimiters(streamsRateLimiter, bandwidthRateLimiter unicast.RateLimiter, onUnicastRateLimitedPeerFunc func(peerID peer.ID)) func(*optsConfig) {
 	return func(o *optsConfig) {
 		o.streamsRateLimiter = streamsRateLimiter
 		o.bandwidthRateLimiter = bandwidthRateLimiter
+		o.onUnicastRateLimitedPeerFunc = onUnicastRateLimitedPeerFunc
 	}
 }
 
