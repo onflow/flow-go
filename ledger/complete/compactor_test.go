@@ -52,7 +52,7 @@ func TestCompactor(t *testing.T) {
 	maxPayloadByteSize := 2 << 16
 	size := 10
 	metricsCollector := &metrics.NoopCollector{}
-	checkpointDistance := uint(2)
+	checkpointDistance := uint(3)
 	checkpointsToKeep := uint(1)
 
 	unittest.RunWithTempDir(t, func(dir string) {
@@ -76,7 +76,7 @@ func TestCompactor(t *testing.T) {
 			compactor, err := NewCompactor(l, wal, checkpointDistance, checkpointsToKeep, zerolog.Nop())
 			require.NoError(t, err)
 
-			co := CompactorObserver{fromBound: 9, done: make(chan struct{})}
+			co := CompactorObserver{fromBound: 8, done: make(chan struct{})}
 			compactor.Subscribe(&co)
 
 			// Run Compactor in background.
@@ -137,7 +137,7 @@ func TestCompactor(t *testing.T) {
 			from, to, err := checkpointer.NotCheckpointedSegments()
 			require.NoError(t, err)
 
-			assert.True(t, from == 10 && to == 10, "from: %v, to: %v", from, to) // Make sure there is no leftover
+			assert.True(t, from == 9 && to == 10, "from: %v, to: %v", from, to) // Make sure there is no leftover
 
 			require.NoFileExists(t, path.Join(dir, "checkpoint.00000000"))
 			require.NoFileExists(t, path.Join(dir, "checkpoint.00000001"))
@@ -147,8 +147,8 @@ func TestCompactor(t *testing.T) {
 			require.NoFileExists(t, path.Join(dir, "checkpoint.00000005"))
 			require.NoFileExists(t, path.Join(dir, "checkpoint.00000006"))
 			require.NoFileExists(t, path.Join(dir, "checkpoint.00000007"))
-			require.NoFileExists(t, path.Join(dir, "checkpoint.00000008"))
-			require.FileExists(t, path.Join(dir, "checkpoint.00000009"))
+			require.FileExists(t, path.Join(dir, "checkpoint.00000008"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000009"))
 
 			ledgerDone := l.Done()
 			compactorDone := compactor.Done()
@@ -169,7 +169,8 @@ func TestCompactor(t *testing.T) {
 
 				name := fileInfo.Name()
 
-				if name != "checkpoint.00000009" &&
+				if name != "checkpoint.00000008" &&
+					name != "00000009" &&
 					name != "00000010" {
 					err := os.Remove(path.Join(dir, name))
 					require.NoError(t, err)
