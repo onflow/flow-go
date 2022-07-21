@@ -3,6 +3,7 @@ package corruptible
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/network/channels"
 
 	"github.com/rs/zerolog"
 
@@ -81,14 +82,14 @@ func (c *ConduitFactory) NewConduit(ctx context.Context, channel channels.Channe
 
 // UnregisterChannel is called by the slave conduits of this factory to let it know that the corresponding engine of the
 // conduit is not going to use it anymore, so the channel can be closed safely.
-func (c *ConduitFactory) UnregisterChannel(channel network.Channel) error {
+func (c *ConduitFactory) UnregisterChannel(channel channels.Channel) error {
 	return c.adapter.UnRegisterChannel(channel)
 }
 
 // SendOnFlowNetwork dispatches the given event to the networking layer of the node in order to be delivered
 // through the specified protocol to the target identifiers.
 func (c *ConduitFactory) SendOnFlowNetwork(event interface{},
-	channel network.Channel,
+	channel channels.Channel,
 	protocol insecure.Protocol,
 	num uint, targetIds ...flow.Identifier) error {
 	switch protocol {

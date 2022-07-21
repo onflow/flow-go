@@ -2,6 +2,7 @@ package corruptible
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/network/channels"
 	"math/rand"
 	"sync"
 	"testing"
@@ -13,7 +14,6 @@ import (
 	mockinsecure "github.com/onflow/flow-go/insecure/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -54,7 +54,7 @@ func TestHandleOutgoingEvent_AttackerObserve(t *testing.T) {
 
 	targetIds := unittest.IdentifierListFixture(10)
 	msg := &message.TestMessage{Text: "this is a test msg"}
-	channel := network.Channel("test-channel")
+	channel := channels.Channel("test-channel")
 
 	go func() {
 		err := corruptibleNetwork.HandleOutgoingEvent(msg, channel, insecure.Protocol_MULTICAST, uint32(3), targetIds...)
@@ -85,7 +85,7 @@ func TestHandleOutgoingEvent_NoAttacker_UnicastOverNetwork(t *testing.T) {
 	corruptibleNetwork, adapter := corruptibleNetworkFixture(t)
 
 	msg := &message.TestMessage{Text: "this is a test msg"}
-	channel := network.Channel("test-channel")
+	channel := channels.Channel("test-channel")
 
 	targetId := unittest.IdentifierFixture()
 
@@ -105,7 +105,7 @@ func TestHandleOutgoingEvent_NoAttacker_PublishOverNetwork(t *testing.T) {
 	corruptibleNetwork, adapter := corruptibleNetworkFixture(t)
 
 	msg := &message.TestMessage{Text: "this is a test msg"}
-	channel := network.Channel("test-channel")
+	channel := channels.Channel("test-channel")
 
 	targetIds := unittest.IdentifierListFixture(10)
 	params := []interface{}{channel, msg}
@@ -129,7 +129,7 @@ func TestHandleOutgoingEvent_NoAttacker_MulticastOverNetwork(t *testing.T) {
 	corruptibleNetwork, adapter := corruptibleNetworkFixture(t)
 
 	msg := &message.TestMessage{Text: "this is a test msg"}
-	channel := network.Channel("test-channel")
+	channel := channels.Channel("test-channel")
 
 	targetIds := unittest.IdentifierListFixture(10)
 
@@ -162,7 +162,7 @@ func TestProcessAttackerMessage(t *testing.T) {
 				Text: fmt.Sprintf("this is a test message: %d", rand.Int()),
 			})
 
-			params := []interface{}{network.Channel(msg.ChannelID), event.FlowProtocolEvent, uint(3)}
+			params := []interface{}{channels.Channel(msg.ChannelID), event.FlowProtocolEvent, uint(3)}
 			targetIds, err := flow.ByteSlicesToIds(msg.TargetIDs)
 			require.NoError(t, err)
 
@@ -208,7 +208,7 @@ func TestProcessAttackerMessage_ResultApproval_Dictated(t *testing.T) {
 				},
 			})
 
-			params := []interface{}{network.Channel(msg.ChannelID), mock.Anything}
+			params := []interface{}{channels.Channel(msg.ChannelID), mock.Anything}
 			targetIds, err := flow.ByteSlicesToIds(msg.TargetIDs)
 			require.NoError(t, err)
 			for _, id := range targetIds {
@@ -274,7 +274,7 @@ func TestProcessAttackerMessage_ResultApproval_PassThrough(t *testing.T) {
 			passThroughApproval := unittest.ResultApprovalFixture()
 			msg, _, _ := insecure.MessageFixture(t, cbor.NewCodec(), insecure.Protocol_PUBLISH, passThroughApproval)
 
-			params := []interface{}{network.Channel(msg.ChannelID), mock.Anything}
+			params := []interface{}{channels.Channel(msg.ChannelID), mock.Anything}
 			targetIds, err := flow.ByteSlicesToIds(msg.TargetIDs)
 			require.NoError(t, err)
 			for _, id := range targetIds {
@@ -323,7 +323,7 @@ func TestProcessAttackerMessage_ExecutionReceipt_Dictated(t *testing.T) {
 				ExecutionResult: dictatedResult,
 			})
 
-			params := []interface{}{network.Channel(msg.ChannelID), mock.Anything}
+			params := []interface{}{channels.Channel(msg.ChannelID), mock.Anything}
 			targetIds, err := flow.ByteSlicesToIds(msg.TargetIDs)
 			require.NoError(t, err)
 			for _, id := range targetIds {
@@ -378,7 +378,7 @@ func TestProcessAttackerMessage_ExecutionReceipt_PassThrough(t *testing.T) {
 			passThroughReceipt := unittest.ExecutionReceiptFixture()
 			msg, _, _ := insecure.MessageFixture(t, cbor.NewCodec(), insecure.Protocol_PUBLISH, passThroughReceipt)
 
-			params := []interface{}{network.Channel(msg.ChannelID), mock.Anything}
+			params := []interface{}{channels.Channel(msg.ChannelID), mock.Anything}
 			targetIds, err := flow.ByteSlicesToIds(msg.TargetIDs)
 			require.NoError(t, err)
 			for _, id := range targetIds {
@@ -412,7 +412,7 @@ func TestProcessAttackerMessage_ExecutionReceipt_PassThrough(t *testing.T) {
 // engine of that channel attempts on closing it.
 func TestEngineClosingChannel(t *testing.T) {
 	corruptibleNetwork, adapter := corruptibleNetworkFixture(t)
-	channel := network.Channel("test-channel")
+	channel := channels.Channel("test-channel")
 
 	// on invoking adapter.UnRegisterChannel(channel), it must return a nil, which means
 	// that the channel has been unregistered by the adapter successfully.

@@ -14,7 +14,7 @@ import (
 type Conduit struct {
 	ctx              context.Context
 	cancel           context.CancelFunc
-	channel          network.Channel
+	channel          channels.Channel
 	egressController insecure.EgressController
 }
 
