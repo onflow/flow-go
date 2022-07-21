@@ -33,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	netcache "github.com/onflow/flow-go/network/cache"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/unicast"
@@ -319,7 +320,7 @@ func GenerateEngines(t *testing.T, nets []network.Network) []*MeshEngine {
 	count := len(nets)
 	engs := make([]*MeshEngine, count)
 	for i, n := range nets {
-		eng := NewMeshEngine(t, n, 100, network.TestNetworkChannel)
+		eng := NewMeshEngine(t, n, 100, channels.TestNetworkChannel)
 		engs[i] = eng
 	}
 	return engs

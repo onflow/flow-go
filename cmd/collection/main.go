@@ -41,7 +41,7 @@ import (
 	epochpool "github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
@@ -311,7 +311,7 @@ func main() {
 				followerCore,
 				mainChainSyncCore,
 				node.Tracer,
-				modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),
+				followereng.WithComplianceOptions(modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
@@ -379,7 +379,7 @@ func main() {
 				return coll, err
 			}
 			return provider.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
-				network.ProvideCollections,
+				channels.ProvideCollections,
 				filter.HasRole(flow.RoleAccess, flow.RoleExecution),
 				retrieve,
 			)

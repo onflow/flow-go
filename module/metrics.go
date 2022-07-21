@@ -378,8 +378,23 @@ type AccessMetrics interface {
 	// TotalConnectionsInPool updates the number connections to collection/execution nodes stored in the pool, and the size of the pool
 	TotalConnectionsInPool(connectionCount uint, connectionPoolSize uint)
 
-	// ConnectionFromPoolRetrieved tracks the number of times a connection to a collection/execution node is retrieved from the connection pool
-	ConnectionFromPoolRetrieved()
+	// ConnectionFromPoolReused tracks the number of times a connection to a collection/execution node is reused from the connection pool
+	ConnectionFromPoolReused()
+
+	// ConnectionAddedToPool tracks the number of times a collection/execution node is added to the connection pool
+	ConnectionAddedToPool()
+
+	// NewConnectionEstablished tracks the number of times a new grpc connection is established
+	NewConnectionEstablished()
+
+	// ConnectionFromPoolInvalidated tracks the number of times a cached grpc connection is invalidated and closed
+	ConnectionFromPoolInvalidated()
+
+	// ConnectionFromPoolUpdated tracks the number of times a cached connection is updated
+	ConnectionFromPoolUpdated()
+
+	// ConnectionFromPoolEvicted tracks the number of times a cached connection is evicted from the cache
+	ConnectionFromPoolEvicted()
 }
 
 type ExecutionMetrics interface {

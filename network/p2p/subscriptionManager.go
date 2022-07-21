@@ -5,25 +5,26 @@ import (
 	"sync"
 
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 )
 
 // ChannelSubscriptionManager manages subscriptions of engines running on the node to channels.
 // Each channel should be taken by at most a single engine.
 type ChannelSubscriptionManager struct {
 	mu      sync.RWMutex
-	engines map[network.Channel]network.MessageProcessor
+	engines map[channels.Channel]network.MessageProcessor
 	mw      network.Middleware
 }
 
 func NewChannelSubscriptionManager(mw network.Middleware) *ChannelSubscriptionManager {
 	return &ChannelSubscriptionManager{
-		engines: make(map[network.Channel]network.MessageProcessor),
+		engines: make(map[channels.Channel]network.MessageProcessor),
 		mw:      mw,
 	}
 }
 
 // Register registers an engine on the channel into the subscription manager.
-func (sm *ChannelSubscriptionManager) Register(channel network.Channel, engine network.MessageProcessor) error {
+func (sm *ChannelSubscriptionManager) Register(channel channels.Channel, engine network.MessageProcessor) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
@@ -46,7 +47,7 @@ func (sm *ChannelSubscriptionManager) Register(channel network.Channel, engine n
 }
 
 // Unregister removes the engine associated with a channel.
-func (sm *ChannelSubscriptionManager) Unregister(channel network.Channel) error {
+func (sm *ChannelSubscriptionManager) Unregister(channel channels.Channel) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
@@ -68,7 +69,7 @@ func (sm *ChannelSubscriptionManager) Unregister(channel network.Channel) error 
 }
 
 // GetEngine returns engine associated with a channel.
-func (sm *ChannelSubscriptionManager) GetEngine(channel network.Channel) (network.MessageProcessor, error) {
+func (sm *ChannelSubscriptionManager) GetEngine(channel channels.Channel) (network.MessageProcessor, error) {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 
@@ -80,11 +81,11 @@ func (sm *ChannelSubscriptionManager) GetEngine(channel network.Channel) (networ
 }
 
 // Channels returns all the channels registered in this subscription manager.
-func (sm *ChannelSubscriptionManager) Channels() network.ChannelList {
+func (sm *ChannelSubscriptionManager) Channels() channels.ChannelList {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 
-	channels := make(network.ChannelList, 0)
+	channels := make(channels.ChannelList, 0)
 	for channel := range sm.engines {
 		channels = append(channels, channel)
 	}

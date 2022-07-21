@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	netint "github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
 	protocolint "github.com/onflow/flow-go/state/protocol"
@@ -79,7 +80,7 @@ func (ss *SyncSuite) SetupTest() {
 	// set up the network module mock
 	ss.net = &mocknetwork.Network{}
 	ss.net.On("Register", mock.Anything, mock.Anything).Return(
-		func(channel netint.Channel, engine netint.MessageProcessor) netint.Conduit {
+		func(channel channels.Channel, engine netint.MessageProcessor) netint.Conduit {
 			return ss.con
 		},
 		nil,
@@ -489,7 +490,7 @@ func (ss *SyncSuite) TestProcessingMultipleItems() {
 			Height: uint64(1000 + i),
 		}
 		ss.core.On("HandleHeight", mock.Anything, msg.Height).Once()
-		require.NoError(ss.T(), ss.e.Process(netint.SyncCommittee, originID, msg))
+		require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, msg))
 	}
 
 	finalHeight := ss.head.Height
@@ -504,7 +505,7 @@ func (ss *SyncSuite) TestProcessingMultipleItems() {
 		ss.core.On("HandleHeight", mock.Anything, msg.Height).Once()
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil)
 
-		require.NoError(ss.T(), ss.e.Process(netint.SyncCommittee, originID, msg))
+		require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, msg))
 	}
 
 	// give at least some time to process items

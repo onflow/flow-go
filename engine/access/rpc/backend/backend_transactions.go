@@ -66,6 +66,7 @@ func (b *backendTransactions) SendTransaction(
 	// store the transaction locally
 	err = b.transactions.Store(tx)
 	if err != nil {
+		// TODO: why would this be InvalidArgument?
 		return status.Error(codes.InvalidArgument, fmt.Sprintf("failed to store transaction: %v", err))
 	}
 
@@ -151,7 +152,9 @@ func (b *backendTransactions) sendTransactionToCollector(ctx context.Context,
 
 	err = b.grpcTxSend(ctx, collectionRPC, tx)
 	if err != nil {
-		b.connFactory.InvalidateAccessAPIClient(collectionNodeAddr)
+		if status.Code(err) == codes.Unavailable {
+			b.connFactory.InvalidateAccessAPIClient(collectionNodeAddr)
+		}
 		return fmt.Errorf("failed to send transaction to collection node at %s: %v", collectionNodeAddr, err)
 	}
 	return nil
@@ -708,7 +711,9 @@ func (b *backendTransactions) tryGetTransactionResult(
 	}
 	resp, err := execRPCClient.GetTransactionResult(ctx, &req)
 	if err != nil {
-		b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
+		if status.Code(err) == codes.Unavailable {
+			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
+		}
 		return nil, err
 	}
 	return resp, err
@@ -762,7 +767,9 @@ func (b *backendTransactions) tryGetTransactionResultsByBlockID(
 	}
 	resp, err := execRPCClient.GetTransactionResultsByBlockID(ctx, &req)
 	if err != nil {
-		b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
+		if status.Code(err) == codes.Unavailable {
+			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
+		}
 		return nil, err
 	}
 	return resp, err
@@ -817,7 +824,9 @@ func (b *backendTransactions) tryGetTransactionResultByIndex(
 	}
 	resp, err := execRPCClient.GetTransactionResultByIndex(ctx, &req)
 	if err != nil {
-		b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
+		if status.Code(err) == codes.Unavailable {
+			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
+		}
 		return nil, err
 	}
 	return resp, err

@@ -53,13 +53,13 @@ cmd/util/util:
 .PHONY: unittest-main
 unittest-main:
 	# test all packages with Relic library enabled
-	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) --tags relic ./...
+	go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) --tags relic ./...
 
 .PHONY: install-mock-generators
 install-mock-generators:
 	cd ${GOPATH}; \
-    GO111MODULE=on go install github.com/vektra/mockery/v2@v2.13.0; \
-    GO111MODULE=on go install github.com/golang/mock/mockgen@v1.3.1;
+    go install github.com/vektra/mockery/v2@v2.13.0; \
+    go install github.com/golang/mock/mockgen@v1.3.1;
 
 ############################################################################################
 
@@ -67,10 +67,10 @@ install-mock-generators:
 install-tools: crypto_setup_tests crypto_setup_gopath check-go-version install-mock-generators
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.46.2; \
 	cd ${GOPATH}; \
-	GO111MODULE=on go install github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
-	GO111MODULE=on go install github.com/uber/prototool/cmd/prototool@v1.9.0; \
-	GO111MODULE=on go install github.com/gogo/protobuf/protoc-gen-gofast@latest; \
-	GO111MODULE=on go install golang.org/x/tools/cmd/stringer@master;
+	go install github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
+	go install github.com/uber/prototool/cmd/prototool@v1.9.0; \
+	go install github.com/gogo/protobuf/protoc-gen-gofast@latest; \
+	go install golang.org/x/tools/cmd/stringer@master;
 
 .PHONY: unittest
 unittest: unittest-main
@@ -80,7 +80,7 @@ unittest: unittest-main
 .PHONY: emulator-build
 emulator-build:
 	# test the fvm package compiles with Relic library disabled (required for the emulator build)
-	cd ./fvm && GO111MODULE=on go test ./... -run=NoTestHasThisPrefix
+	cd ./fvm && go test ./... -run=NoTestHasThisPrefix
 
 .PHONY: test
 test: generate-mocks emulator-build unittest
@@ -172,12 +172,12 @@ tidy:
 
 .PHONY: lint
 lint: tidy
-	# GO111MODULE=on revive -config revive.toml -exclude storage/ledger/trie ./...
+	# revive -config revive.toml -exclude storage/ledger/trie ./...
 	golangci-lint run -v --build-tags relic ./...
 
 .PHONY: fix-lint
 fix-lint:
-	# GO111MODULE=on revive -config revive.toml -exclude storage/ledger/trie ./...
+	# revive -config revive.toml -exclude storage/ledger/trie ./...
 	golangci-lint run -v --build-tags relic --fix ./...
 
 # Runs unit tests, SKIP FOR NOW linter, coverage

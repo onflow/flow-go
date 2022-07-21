@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -80,7 +80,7 @@ func NewRequestHandler(
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (r *RequestHandler) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+func (r *RequestHandler) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	err := r.process(originID, event)
 	if err != nil {
 		if engine.IsIncompatibleInputTypeError(err) {

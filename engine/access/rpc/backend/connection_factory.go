@@ -4,27 +4,31 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"sync"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
+	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/keepalive"
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
-// the default timeout used when making a GRPC request to a collection node or an execution node
-const defaultClientTimeout = 3 * time.Second
+// DefaultClientTimeout is used when making a GRPC request to a collection node or an execution node
+const DefaultClientTimeout = 3 * time.Second
 
 // ConnectionFactory is used to create an access api client
 type ConnectionFactory interface {
 	GetAccessAPIClient(address string) (access.AccessAPIClient, error)
-	InvalidateAccessAPIClient(address string) bool
+	InvalidateAccessAPIClient(address string)
 	GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, error)
-	InvalidateExecutionAPIClient(address string) bool
+	InvalidateExecutionAPIClient(address string)
 }
 
 type ProxyConnectionFactory struct {
@@ -48,13 +52,29 @@ type ConnectionFactoryImpl struct {
 	ConnectionsCache          *lru.Cache
 	CacheSize                 uint
 	AccessMetrics             module.AccessMetrics
+	Log                       zerolog.Logger
+	mutex                     sync.Mutex
+}
+
+type CachedClient struct {
+	ClientConn *grpc.ClientConn
+	Address    string
+	mutex      sync.Mutex
+	timeout    time.Duration
 }
 
 // createConnection creates new gRPC connections to remote node
 func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.Duration) (*grpc.ClientConn, error) {
 
 	if timeout == 0 {
-		timeout = defaultClientTimeout
+		timeout = DefaultClientTimeout
+	}
+
+	keepaliveParams := keepalive.ClientParameters{
+		// how long the client will wait before sending a keepalive to the server if there is no activity
+		Time: 10 * time.Second,
+		// how long the client will wait for a response from the keepalive before closing
+		Timeout: timeout,
 	}
 
 	// ClientConn's default KeepAlive on connections is indefinite, assuming the timeout isn't reached
@@ -64,7 +84,8 @@ func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.D
 	conn, err := grpc.Dial(
 		address,
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
-		grpc.WithInsecure(), //nolint:staticcheck
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithKeepaliveParams(keepaliveParams),
 		WithClientUnaryInterceptor(timeout))
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to address %s: %w", address, err)
@@ -74,24 +95,45 @@ func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.D
 
 func (cf *ConnectionFactoryImpl) retrieveConnection(grpcAddress string, timeout time.Duration) (*grpc.ClientConn, error) {
 	var conn *grpc.ClientConn
+	var store *CachedClient
+	cacheHit := false
+	cf.mutex.Lock()
 	if res, ok := cf.ConnectionsCache.Get(grpcAddress); ok {
-		conn = res.(*grpc.ClientConn)
+		cacheHit = true
+		store = res.(*CachedClient)
+		conn = store.ClientConn
+	} else {
+		store = &CachedClient{
+			ClientConn: nil,
+			Address:    grpcAddress,
+			timeout:    timeout,
+		}
+		cf.Log.Debug().Str("cached_client_added", grpcAddress).Msg("adding new cached client to pool")
+		cf.ConnectionsCache.Add(grpcAddress, store)
 		if cf.AccessMetrics != nil {
-			cf.AccessMetrics.ConnectionFromPoolRetrieved()
+			cf.AccessMetrics.ConnectionAddedToPool()
 		}
 	}
-	if conn == nil || conn.GetState() != connectivity.Ready {
-		// This line ensures that when a connection is renewed, the previously cached connection is evicted and closed
-		cf.ConnectionsCache.Remove(grpcAddress)
+	cf.mutex.Unlock()
+	store.mutex.Lock()
+	defer store.mutex.Unlock()
+
+	if conn == nil || conn.GetState() == connectivity.Shutdown {
 		var err error
 		conn, err = cf.createConnection(grpcAddress, timeout)
 		if err != nil {
 			return nil, err
 		}
-		cf.ConnectionsCache.Add(grpcAddress, conn)
+		store.ClientConn = conn
 		if cf.AccessMetrics != nil {
+			if cacheHit {
+				cf.AccessMetrics.ConnectionFromPoolUpdated()
+			}
+			cf.AccessMetrics.NewConnectionEstablished()
 			cf.AccessMetrics.TotalConnectionsInPool(uint(cf.ConnectionsCache.Len()), cf.CacheSize)
 		}
+	} else if cf.AccessMetrics != nil {
+		cf.AccessMetrics.ConnectionFromPoolReused()
 	}
 	return conn, nil
 }
@@ -112,12 +154,9 @@ func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string) (access.Acce
 	return accessAPIClient, nil
 }
 
-func (cf *ConnectionFactoryImpl) InvalidateAccessAPIClient(address string) bool {
-	grpcAddress, err := getGRPCAddress(address, cf.CollectionGRPCPort)
-	if err != nil {
-		return true
-	}
-	return cf.ConnectionsCache.Remove(grpcAddress)
+func (cf *ConnectionFactoryImpl) InvalidateAccessAPIClient(address string) {
+	cf.Log.Debug().Str("cached_access_client_invalidated", address).Msg("invalidating cached access client")
+	cf.invalidateAPIClient(address, cf.CollectionGRPCPort)
 }
 
 func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, error) {
@@ -136,12 +175,33 @@ func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (executio
 	return executionAPIClient, nil
 }
 
-func (cf *ConnectionFactoryImpl) InvalidateExecutionAPIClient(address string) bool {
-	grpcAddress, err := getGRPCAddress(address, cf.ExecutionGRPCPort)
-	if err != nil {
-		return true
+func (cf *ConnectionFactoryImpl) InvalidateExecutionAPIClient(address string) {
+	cf.Log.Debug().Str("cached_execution_client_invalidated", address).Msg("invalidating cached execution client")
+	cf.invalidateAPIClient(address, cf.ExecutionGRPCPort)
+}
+
+func (cf *ConnectionFactoryImpl) invalidateAPIClient(address string, port uint) {
+	grpcAddress, _ := getGRPCAddress(address, port)
+	if res, ok := cf.ConnectionsCache.Get(grpcAddress); ok {
+		store := res.(*CachedClient)
+		store.Close()
+		if cf.AccessMetrics != nil {
+			cf.AccessMetrics.ConnectionFromPoolInvalidated()
+		}
 	}
-	return cf.ConnectionsCache.Remove(grpcAddress)
+}
+
+func (s *CachedClient) Close() {
+	s.mutex.Lock()
+	conn := s.ClientConn
+	s.ClientConn = nil
+	s.mutex.Unlock()
+	if conn == nil {
+		return
+	}
+	// allow time for any existing requests to finish before closing the connection
+	time.Sleep(s.timeout)
+	conn.Close()
 }
 
 // getExecutionNodeAddress translates flow.Identity address to the GRPC address of the node by switching the port to the
