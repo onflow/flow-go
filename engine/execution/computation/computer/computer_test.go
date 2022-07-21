@@ -747,6 +747,10 @@ func (r *RandomAddressGenerator) AddressCount() uint64 {
 	panic("not implemented")
 }
 
+func (testRuntime) Storage(runtime.Context) (*runtime.Storage, *interpreter.Interpreter, error) {
+	panic("Storage not expected")
+}
+
 type FixedAddressGenerator struct {
 	Address flow.Address
 }
