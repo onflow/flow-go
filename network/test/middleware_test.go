@@ -309,16 +309,10 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	b := make([]byte, 600)
 	rand.Read(b)
 	msg, _ := createMessage(m.ids[0].NodeID, newId.NodeID, string(b))
-	msg2, _ := createMessage(m.ids[0].NodeID, newId.NodeID, "test")
 
 	// update the addresses
 	m.mws[0].UpdateNodeAddresses()
 	newMw.UpdateNodeAddresses()
-
-	for i := 0; i < 5; i++ {
-		err := m.mws[0].SendDirect(msg2, newId.NodeID)
-		require.NoError(m.T(), err)
-	}
 
 	err := m.mws[0].SendDirect(msg, newId.NodeID)
 	require.NoError(m.T(), err)
@@ -327,9 +321,9 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	cancel()
 	unittest.RequireCloseBefore(m.T(), newMw.Done(), 100*time.Millisecond, "could not stop middleware on time")
 
-	// expect 1 warning logged by the middleware unicast stream handler
+	// expect 1 warning logged by the middleware unicast bandwidth handler
 	// for the rate limited message.
-	//require.Equal(m.T(), uint64(1), rateLimits)
+	require.Equal(m.T(), uint64(1), rateLimits)
 }
 
 func (m *MiddlewareTestSuite) createOverlay(provider *UpdatableIDProvider) *mocknetwork.Overlay {
