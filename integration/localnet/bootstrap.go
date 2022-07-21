@@ -322,6 +322,7 @@ func prepareService(container testnet.ContainerConfig, i int, n int) Service {
 		Command: []string{
 			fmt.Sprintf("--nodeid=%s", container.NodeID),
 			"--bootstrapdir=/bootstrap",
+
 			"--datadir=/data/protocol",
 			"--secretsdir=/data/secret",
 			"--loglevel=DEBUG",
@@ -513,6 +514,8 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 		Command: []string{
 			fmt.Sprintf("--bootstrap-node-addresses=%s:%d", DefaultAccessGatewayName, AccessPubNetworkPort),
 			fmt.Sprintf("--bootstrap-node-public-keys=%s", agPublicKey),
+			fmt.Sprintf("--upstream-node-addresses=%s:%d", DefaultAccessGatewayName, SecuredRPCPort),
+			fmt.Sprintf("--upstream-node-public-keys=%s", agPublicKey),
 			fmt.Sprintf("--observer-networking-key-path=/bootstrap/private-root-information/%s_key", observerName),
 			fmt.Sprintf("--bind=0.0.0.0:0"),
 			fmt.Sprintf("--rpc-addr=%s:%d", observerName, RPCPort),
