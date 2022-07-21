@@ -145,6 +145,7 @@ func TestHandleReceipt(t *testing.T) {
 				assert.NoError(t, err)
 				blobCh <- blob
 			}
+			close(blobCh)
 			return blobCh
 		},
 	)
@@ -250,6 +251,7 @@ func TestHandleFinalizedBlock(t *testing.T) {
 				assert.NoError(t, err)
 				blobCh <- blob
 			}
+			close(blobCh)
 			return blobCh
 		},
 	)
@@ -364,6 +366,7 @@ func TestConsumer(t *testing.T) {
 				assert.NoError(t, err)
 				blobCh <- blob
 			}
+			close(blobCh)
 			return blobCh
 		},
 	)
@@ -534,6 +537,7 @@ func TestStaleReceipt(t *testing.T) {
 				assert.NoError(t, err)
 				blobCh <- blob
 			}
+			close(blobCh)
 			return blobCh
 		},
 	)
@@ -660,6 +664,7 @@ func TestOversizedBlob(t *testing.T) {
 				assert.NoError(t, err)
 				blobCh <- blob
 			}
+			close(blobCh)
 			return blobCh
 		},
 	)
@@ -818,6 +823,7 @@ func runWithSerializer(t *testing.T, serializer execution_data.Serializer) {
 				assert.NoError(t, err)
 				blobCh <- blob
 			}
+			close(blobCh)
 			return blobCh
 		},
 	).Maybe()
@@ -930,6 +936,7 @@ func TestMismatchedBlockID(t *testing.T) {
 				assert.NoError(t, err)
 				blobCh <- blob
 			}
+			close(blobCh)
 			return blobCh
 		},
 	)
