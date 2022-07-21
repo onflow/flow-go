@@ -244,14 +244,14 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		}
 		if blockFinalizedAtReferenceHeight.ID() != tx.ReferenceBlockID {
 			// the transaction references an orphaned block - it will never be valid
-			b.transactions.Rem(tx.ID())
+			b.transactions.Remove(tx.ID())
 			continue
 		}
 
 		// ensure the reference block is not too old
 		if refHeader.Height < minPossibleRefHeight {
 			// the transaction is expired, it will never be valid
-			b.transactions.Rem(tx.ID())
+			b.transactions.Remove(tx.ID())
 			continue
 		}
 
@@ -264,7 +264,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		// check that the transaction was not already included in finalized history.
 		if lookup.isFinalizedAncestor(txID) {
 			// remove from mempool, conflicts with finalized block will never be valid
-			b.transactions.Rem(txID)
+			b.transactions.Remove(txID)
 			continue
 		}
 
@@ -298,7 +298,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// build the payload from the transactions
 	payload := cluster.PayloadFromTransactions(minRefID, transactions...)
 
-	header := flow.Header{
+	header := &flow.Header{
 		ChainID:     parent.ChainID,
 		ParentID:    parentID,
 		Height:      parent.Height + 1,
@@ -310,13 +310,13 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	}
 
 	// set fields specific to the consensus algorithm
-	err = setter(&header)
+	err = setter(header)
 	if err != nil {
 		return nil, fmt.Errorf("could not set fields to header: %w", err)
 	}
 
 	proposal = cluster.Block{
-		Header:  &header,
+		Header:  header,
 		Payload: &payload,
 	}
 

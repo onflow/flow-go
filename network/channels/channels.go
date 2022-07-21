@@ -1,6 +1,6 @@
 // (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
 
-package network
+package channels
 
 import (
 	"fmt"
@@ -101,6 +101,7 @@ func Channels() ChannelList {
 func PublicChannels() ChannelList {
 	return ChannelList{
 		PublicSyncCommittee,
+		PublicReceiveBlocks,
 	}
 }
 
@@ -113,11 +114,11 @@ const (
 
 	// Channels for consensus protocols
 	ConsensusCommittee     = Channel("consensus-committee")
-	ConsensusClusterPrefix = "consensus-cluster" // dynamic channel, use ChannelConsensusCluster function
+	ConsensusClusterPrefix = "consensus-cluster" // dynamic channel, use ConsensusCluster function
 
 	// Channels for protocols actively synchronizing state across nodes
 	SyncCommittee     = Channel("sync-committee")
-	SyncClusterPrefix = "sync-cluster" // dynamic channel, use ChannelSyncCluster function
+	SyncClusterPrefix = "sync-cluster" // dynamic channel, use SyncCluster function
 	SyncExecution     = Channel("sync-execution")
 
 	// Channels for dkg communication
@@ -149,6 +150,8 @@ const (
 	ProvideApprovalsByChunk  = RequestApprovalsByChunk
 
 	// Public network channels
+	PublicPushBlocks    = Channel("public-push-blocks")
+	PublicReceiveBlocks = PublicPushBlocks
 	PublicSyncCommittee = Channel("public-sync-committee")
 
 	// Execution data service
@@ -262,14 +265,14 @@ func ChannelFromTopic(topic Topic) (Channel, bool) {
 	return "", false
 }
 
-// ChannelConsensusCluster returns a dynamic cluster consensus channel based on
+// ConsensusCluster returns a dynamic cluster consensus channel based on
 // the chain ID of the cluster in question.
-func ChannelConsensusCluster(clusterID flow.ChainID) Channel {
+func ConsensusCluster(clusterID flow.ChainID) Channel {
 	return Channel(fmt.Sprintf("%s-%s", ConsensusClusterPrefix, clusterID))
 }
 
-// ChannelSyncCluster returns a dynamic cluster sync channel based on the chain
+// SyncCluster returns a dynamic cluster sync channel based on the chain
 // ID of the cluster in question.
-func ChannelSyncCluster(clusterID flow.ChainID) Channel {
+func SyncCluster(clusterID flow.ChainID) Channel {
 	return Channel(fmt.Sprintf("%s-%s", SyncClusterPrefix, clusterID))
 }

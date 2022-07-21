@@ -31,9 +31,8 @@ func StorageFeesMigration(payload []ledger.Payload) ([]ledger.Payload, error) {
 
 		newPayload = append(newPayload, ledger.Payload{
 			Key: registerIDToKey(flow.RegisterID{
-				Owner:      s,
-				Controller: "",
-				Key:        "storage_used",
+				Owner: s,
+				Key:   "storage_used",
 			}),
 			Value: utils.Uint64ToBinary(u),
 		})

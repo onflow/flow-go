@@ -85,11 +85,10 @@ The following table lists all work streams and links to their home directory and
 
 At this point, you should be ready to build, test, and run Flow! 🎉
 
-Note: if there is error about "relic" or "crypto", trying force removing the relic build and reinstall the tools again:
+Note: Whenever the crypto module version imported by "go.mod" is updated to a version that was never locally imported before, the crypto dependency needs to be set-up. If not, you should notice errors about "relic" or "crypto". Run the following command to set-up the new module version:
 
 ```bash
-rm -rf crypto/relic
-make install-tools
+make crypto_setup_gopath
 ```
 
 ## Development Workflow
