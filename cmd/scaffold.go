@@ -868,6 +868,7 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 	fnb.FvmOptions = vmOpts
 }
 
+// handleModules initializes the given module.
 func (fnb *FlowNodeBuilder) handleModule(v namedModuleFunc) error {
 	err := v.fn(fnb.NodeConfig)
 	if err != nil {
@@ -878,6 +879,7 @@ func (fnb *FlowNodeBuilder) handleModule(v namedModuleFunc) error {
 	return nil
 }
 
+// handleModules initializes all modules that have been enqueued on this node builder.
 func (fnb *FlowNodeBuilder) handleModules() error {
 	for _, f := range fnb.modules {
 		if err := fnb.handleModule(f); err != nil {
