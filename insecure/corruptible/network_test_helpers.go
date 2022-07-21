@@ -20,7 +20,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func getCorruptibleNetworkNoAttacker(t *testing.T, corruptedID ...*flow.Identity) (*Network, *mocknetwork.Adapter) {
+// corruptibleNetworkFixture creates a corruptible Network with a mock Adapter.
+// By default, no attacker is registered on this corruptible network. 
+func corruptibleNetworkFixture(t *testing.T, corruptedID ...*flow.Identity) (*Network, *mocknetwork.Adapter) {
 	// create corruptible network with no attacker registered
 	codec := cbor.NewCodec()
 
@@ -70,11 +72,11 @@ func getCorruptibleNetworkNoAttacker(t *testing.T, corruptedID ...*flow.Identity
 // terminates the network.
 func withCorruptibleNetwork(t *testing.T,
 	run func(
-		flow.Identity, // identity of ccf
-		*Network, // corruptible network
-		*mocknetwork.Adapter, // mock adapter that corrupted network uses to communicate with authorized flow nodes.
-		insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that attack network uses to send messages to this ccf.
-	)) {
+	flow.Identity,                                                   // identity of ccf
+	*Network,                                                        // corruptible network
+	*mocknetwork.Adapter,                                            // mock adapter that corrupted network uses to communicate with authorized flow nodes.
+	insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that attack network uses to send messages to this ccf.
+)) {
 
 	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress("localhost:0"))
 
@@ -90,7 +92,7 @@ func withCorruptibleNetwork(t *testing.T,
 		}
 	}()
 
-	corruptibleNetwork, adapter := getCorruptibleNetworkNoAttacker(t, corruptedIdentity)
+	corruptibleNetwork, adapter := corruptibleNetworkFixture(t, corruptedIdentity)
 
 	// start corruptible network
 	corruptibleNetwork.Start(ccfCtx)
