@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ipfs/go-cid"
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/routing"
@@ -46,9 +45,6 @@ import (
 	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
-	"github.com/onflow/flow-go/module/executiondatasync/pruner"
-	exedatarequester "github.com/onflow/flow-go/module/executiondatasync/requester"
-	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
@@ -210,11 +206,10 @@ type FlowAccessNodeBuilder struct {
 	SyncEngineParticipantsProviderFactory func() id.IdentifierProvider
 
 	// engines
-	IngestEng                *ingestion.Engine
-	RequestEng               *requester.Engine
-	FollowerEng              *followereng.Engine
-	SyncEng                  *synceng.Engine
-	ExecutionDataRequesterV2 *exedatarequester.Requester
+	IngestEng   *ingestion.Engine
+	RequestEng  *requester.Engine
+	FollowerEng *followereng.Engine
+	SyncEng     *synceng.Engine
 }
 
 func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilder {
@@ -396,99 +391,6 @@ func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() *FlowAccessNodeBu
 	return builder
 }
 
-func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequesterV2() *FlowAccessNodeBuilder {
-	var executionDataDatastore *badger.Datastore
-	var trackerStorage tracker.Storage
-
-	builder.Module("execution data datastore", func(node *cmd.NodeConfig) error {
-		datastoreDir := filepath.Join(builder.executionDataDir, "blobstore")
-		err := os.MkdirAll(datastoreDir, 0700)
-		if err != nil {
-			return err
-		}
-		dsOpts := &badger.DefaultOptions
-		executionDataDatastore, err = badger.NewDatastore(datastoreDir, dsOpts)
-		if err != nil {
-			return err
-		}
-		builder.ShutdownFunc(executionDataDatastore.Close)
-		return nil
-	}).
-		Component("execution data requester", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			bs, err := node.Network.RegisterBlobService(network.ExecutionDataService, executionDataDatastore)
-			if err != nil {
-				return nil, fmt.Errorf("failed to register blob service: %w", err)
-			}
-			sealed, err := node.State.Sealed().Head()
-			if err != nil {
-				return nil, fmt.Errorf("cannot get the sealed block: %w", err)
-			}
-
-			trackerDir := filepath.Join(builder.executionDataDir, "tracker")
-			trackerStorage, err = tracker.OpenStorage(
-				trackerDir,
-				sealed.Height,
-				node.Logger,
-				tracker.WithPruneCallback(func(c cid.Cid) error {
-					// TODO: use a proper context here
-					return bs.DeleteBlob(context.TODO(), c)
-				}),
-			)
-			if err != nil {
-				return nil, err
-			}
-
-			var requesterMetrics module.ExecutionDataRequesterV2Metrics = metrics.NewNoopCollector()
-			if node.MetricsEnabled {
-				requesterMetrics = metrics.NewExecutionDataRequesterV2Collector()
-			}
-
-			builder.ExecutionDataRequesterV2, err = exedatarequester.NewRequester(
-				sealed.Height,
-				trackerStorage,
-				node.Storage.Blocks,
-				node.Storage.Results,
-				bs,
-				execution_data.DefaultSerializer,
-				builder.FinalizationDistributor,
-				node.Logger,
-				requesterMetrics,
-			)
-			return builder.ExecutionDataRequesterV2, err
-		}).
-		Component("execution data pruner", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			var prunerMetrics module.ExecutionDataPrunerMetrics = metrics.NewNoopCollector()
-			if node.MetricsEnabled {
-				prunerMetrics = metrics.NewExecutionDataPrunerCollector()
-			}
-
-			executionDataPruner, err := pruner.NewPruner(
-				node.Logger,
-				prunerMetrics,
-				trackerStorage,
-				pruner.WithPruneCallback(func(ctx context.Context) error {
-					return executionDataDatastore.CollectGarbage(ctx)
-				}),
-				pruner.WithHeightRangeTarget(builder.executionDataPrunerHeightRangeTarget),
-				pruner.WithThreshold(builder.executionDataPrunerThreshold),
-			)
-			if err != nil {
-				return nil, fmt.Errorf("could not create execution data pruner: %w", err)
-			}
-
-			_, err = builder.ExecutionDataRequesterV2.AddConsumer(func(blockHeight uint64, executionData *execution_data.BlockExecutionData) {
-				executionDataPruner.NotifyFulfilledHeight(blockHeight)
-			})
-			if err != nil {
-				return nil, fmt.Errorf("could not subscribe execution data pruner to requester notifications: %w", err)
-			}
-
-			return executionDataPruner, nil
-		})
-
-	return builder
-}
-
 func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessNodeBuilder {
 	var ds *badger.Datastore
 	var bs network.BlobService
@@ -615,7 +517,6 @@ func (builder *FlowAccessNodeBuilder) ParseFlags() error {
 
 func (builder *FlowAccessNodeBuilder) extraFlags() {
 	builder.ExtraFlags(func(flags *pflag.FlagSet) {
-		homedir, _ := os.UserHomeDir()
 		defaultConfig := DefaultAccessNodeConfig()
 
 		flags.UintVar(&builder.collectionGRPCPort, "collection-ingress-port", defaultConfig.collectionGRPCPort, "the grpc ingress port for all collection nodes")
@@ -654,11 +555,6 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.DurationVar(&builder.executionDataConfig.MaxFetchTimeout, "execution-data-max-fetch-timeout", defaultConfig.executionDataConfig.MaxFetchTimeout, "maximum timeout to use when fetching execution data from the network e.g. 300s")
 		flags.DurationVar(&builder.executionDataConfig.RetryDelay, "execution-data-retry-delay", defaultConfig.executionDataConfig.RetryDelay, "initial delay for exponential backoff when fetching execution data fails e.g. 10s")
 		flags.DurationVar(&builder.executionDataConfig.MaxRetryDelay, "execution-data-max-retry-delay", defaultConfig.executionDataConfig.MaxRetryDelay, "maximum delay for exponential backoff when fetching execution data fails e.g. 5m")
-
-		// Requester V2 config
-		flags.StringVar(&builder.executionDataDir, "execution-data-dir", filepath.Join(homedir, ".flow", "execution_data"), "directory to use for storing Execution Data")
-		flags.Uint64Var(&builder.executionDataPrunerHeightRangeTarget, "execution-data-height-range-target", 65000, "target height range size used to limit the amount of Execution Data kept on disk")
-		flags.Uint64Var(&builder.executionDataPrunerThreshold, "execution-data-height-range-threshold", 65000, "height threshold used to trigger Execution Data pruning")
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")
@@ -962,7 +858,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.CollectionsToMarkExecuted,
 				builder.BlocksToMarkExecuted,
 				builder.RpcEng,
-				builder.ExecutionDataRequesterV2,
 			)
 			if err != nil {
 				return nil, err
