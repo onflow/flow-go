@@ -55,6 +55,31 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		err := d.CheckLimits(env, []flow.Address{owner})
 		require.NoError(t, err, "Transaction with equal capacity than storage used should work")
 	})
+	t.Run("capacity = storage -> OK; many account", func(t *testing.T) {
+		env := &fvmmock.Environment{}
+		env.On("Context").Return(&fvm.Context{LimitAccountStorage: true, Chain: flow.Mainnet.Chain()})
+		env.On("GetStorageUsed", mock.Anything).Return(uint64(100), nil)
+		env.On("VM", mock.Anything).Return(&fvm.VirtualMachine{
+			Runtime: &TestInterpreterRuntime{
+				invokeContractFunction: func(a common.AddressLocation, s string, values []cadence.Value, types []sema.Type, ctx runtime.Context) (cadence.Value, error) {
+					return cadence.NewArray([]cadence.Value{
+						bytesToUFix64(100),
+					}), nil
+				},
+			},
+		}, nil)
+
+		d := &fvm.TransactionStorageLimiter{}
+		addresses := make([]flow.Address, 2*fvm.TransactionStorageLimiterScriptArgumentBatchSize+1)
+		for i := range addresses {
+			addresses[i] = owner
+		}
+
+		err := d.CheckLimits(env, addresses)
+		require.NoError(t, err, "Transaction with equal capacity than storage used should work")
+		// contract function invocations should be split into 3 calls
+		env.AssertNumberOfCalls(t, "VM", 3)
+	})
 	t.Run("capacity < storage -> Not OK", func(t *testing.T) {
 		env := &fvmmock.Environment{}
 		env.On("Context").Return(&fvm.Context{LimitAccountStorage: true, Chain: flow.Mainnet.Chain()})

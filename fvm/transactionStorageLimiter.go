@@ -19,7 +19,9 @@ func NewTransactionStorageLimiter() TransactionStorageLimiter {
 	return TransactionStorageLimiter{}
 }
 
-const transactionStorageLimiterBatchSize = 100
+// TransactionStorageLimiterScriptArgumentBatchSize is the number of accounts to check at once.
+// Using to many arguments at once might cause problems during InvokeAccountsStorageCapacity.
+const TransactionStorageLimiterScriptArgumentBatchSize = 100
 
 func (d TransactionStorageLimiter) CheckLimits(
 	env Environment,
@@ -35,10 +37,10 @@ func (d TransactionStorageLimiter) CheckLimits(
 		defer span.Finish()
 	}
 
-	n := len(addresses)/transactionStorageLimiterBatchSize + 1
+	n := len(addresses)/TransactionStorageLimiterScriptArgumentBatchSize + 1
 	for i := 0; i < n; i++ {
-		start := i * transactionStorageLimiterBatchSize
-		end := (i + 1) * transactionStorageLimiterBatchSize
+		start := i * TransactionStorageLimiterScriptArgumentBatchSize
+		end := (i + 1) * TransactionStorageLimiterScriptArgumentBatchSize
 		if end > len(addresses) {
 			end = len(addresses)
 		}
@@ -60,21 +62,18 @@ func (d TransactionStorageLimiter) batchCheckLimits(
 		commonAddresses[i] = common.Address(address)
 	}
 
-	accountsStorageCapacity := AccountsStorageCapacityInvocation(env, span)
-	result, invokeErr := accountsStorageCapacity(commonAddresses)
+	result, invokeErr := InvokeAccountsStorageCapacity(env, span, commonAddresses)
 
-	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, storage capacity will be 0.
-	// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
-	// 2. There will also be an error in case the accounts balance times megabytesPerFlow constant overflows,
-	//		which shouldn't happen unless the the price of storage is reduced at least 100 fold
-	// 3. Any other error indicates a bug in our implementation. How can we reliably check the Cadence error?
+	// This error only occurs in case of implementation errors. The InvokeAccountsStorageCapacity
+	// already handles cases where the default vault is missing.
 	if invokeErr != nil {
 		return invokeErr
 	}
 
+	// the resultArray elements are in the same order as the addresses and the addresses are deterministically sorted
 	resultArray, ok := result.(cadence.Array)
 	if !ok {
-		return fmt.Errorf("TODO err")
+		return fmt.Errorf("storage limit check failed: AccountsStorageCapacity did not return an array")
 	}
 
 	for i, value := range resultArray.Values {

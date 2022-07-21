@@ -157,37 +157,36 @@ func InvokeAccountStorageCapacityContract(
 	return invoker.Invoke(env, traceSpan)
 }
 
-// AccountsStorageCapacityInvocation prepares a function that calls get storage capacity on the storage fees contract
+// InvokeAccountsStorageCapacity prepares a function that calls get storage capacity on the storage fees contract
 // for multiple accounts at once
-func AccountsStorageCapacityInvocation(
+func InvokeAccountsStorageCapacity(
 	env Environment,
 	traceSpan opentracing.Span,
-) func(addresses []common.Address) (cadence.Value, error) {
-	return func(addresses []common.Address) (cadence.Value, error) {
-		arrayValues := make([]cadence.Value, len(addresses))
-		for i, address := range addresses {
-			arrayValues[i] = cadence.BytesToAddress(address.Bytes())
-		}
-		invoker := NewContractFunctionInvoker(
-			common.AddressLocation{
-				Address: common.Address(env.Context().Chain.ServiceAddress()),
-				Name:    systemcontracts.ContractStorageFees,
-			},
-			systemcontracts.ContractStorageFeesFunction_calculateAccountsCapacity,
-			[]cadence.Value{
-				cadence.NewArray(arrayValues),
-			},
-			[]sema.Type{
-				sema.NewConstantSizedType(
-					nil,
-					&sema.AddressType{},
-					int64(len(arrayValues)),
-				),
-			},
-			env.Context().Logger,
-		)
-		return invoker.Invoke(env, traceSpan)
+	addresses []common.Address,
+) (cadence.Value, error) {
+	arrayValues := make([]cadence.Value, len(addresses))
+	for i, address := range addresses {
+		arrayValues[i] = cadence.BytesToAddress(address.Bytes())
 	}
+	invoker := NewContractFunctionInvoker(
+		common.AddressLocation{
+			Address: common.Address(env.Context().Chain.ServiceAddress()),
+			Name:    systemcontracts.ContractStorageFees,
+		},
+		systemcontracts.ContractStorageFeesFunction_calculateAccountsCapacity,
+		[]cadence.Value{
+			cadence.NewArray(arrayValues),
+		},
+		[]sema.Type{
+			sema.NewConstantSizedType(
+				nil,
+				&sema.AddressType{},
+				int64(len(arrayValues)),
+			),
+		},
+		env.Context().Logger,
+	)
+	return invoker.Invoke(env, traceSpan)
 }
 
 var useContractAuditVoucherInvocationArgumentTypes = []sema.Type{
