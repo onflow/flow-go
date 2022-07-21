@@ -1126,7 +1126,7 @@ func (fnb *FlowNodeBuilder) OverrideComponent(name string, f ReadyDoneFactory) N
 func (fnb *FlowNodeBuilder) OverrideModule(name string, f BuilderFunc) NodeBuilder {
 	for i := 0; i < len(fnb.modules); i++ {
 		if fnb.modules[i].name == name {
-			// found component with the name, override it.
+			// found module with the name, override it.
 			fnb.modules[i] = namedModuleFunc{
 				fn:   f,
 				name: name,
@@ -1136,7 +1136,7 @@ func (fnb *FlowNodeBuilder) OverrideModule(name string, f BuilderFunc) NodeBuild
 		}
 	}
 
-	// no component found with the same name, hence just adding it.
+	// no module found with the same name, hence just adding it.
 	return fnb.Module(name, f)
 }
 
