@@ -53,21 +53,8 @@ func (builder *RPCEngineBuilder) WithMetrics() *RPCEngineBuilder {
 	return builder
 }
 
-func (builder *RPCEngineBuilder) withRegisterRPC() {
+func (builder *RPCEngineBuilder) Build() *Engine {
 	accessproto.RegisterAccessAPIServer(builder.unsecureGrpcServer, builder.handler)
 	accessproto.RegisterAccessAPIServer(builder.secureGrpcServer, builder.handler)
-}
-
-func (builder *RPCEngineBuilder) Build() *Engine {
-	var localAPIServer accessproto.AccessAPIServer = access.NewHandler(builder.backend, builder.chain, access.WithBlockSignerDecoder(builder.signerIndicesDecoder))
-
-	if builder.router != nil {
-		builder.router.SetLocalAPI(localAPIServer)
-		localAPIServer = builder.router
-	}
-
-	accessproto.RegisterAccessAPIServer(builder.unsecureGrpcServer, localAPIServer)
-	accessproto.RegisterAccessAPIServer(builder.secureGrpcServer, localAPIServer)
-
 	return builder.Engine
 }
