@@ -37,6 +37,20 @@ func (d TransactionStorageLimiter) CheckLimits(
 		defer span.Finish()
 	}
 
+	commonAddresses := make([]common.Address, len(addresses))
+	for i, address := range addresses {
+		commonAddresses[i] = common.Address(address)
+	}
+
+	usages := make([]uint64, len(commonAddresses))
+	for i, address := range commonAddresses {
+		u, err := env.GetStorageUsed(address)
+		if err != nil {
+			return fmt.Errorf("storage limit check failed: %w", err)
+		}
+		usages[i] = u
+	}
+
 	n := len(addresses)/TransactionStorageLimiterScriptArgumentBatchSize + 1
 	for i := 0; i < n; i++ {
 		start := i * TransactionStorageLimiterScriptArgumentBatchSize
@@ -45,7 +59,12 @@ func (d TransactionStorageLimiter) CheckLimits(
 			end = len(addresses)
 		}
 
-		err := d.batchCheckLimits(env, addresses[start:end], span)
+		err := d.batchCheckLimits(
+			env,
+			commonAddresses[start:end],
+			usages[start:end],
+			span,
+		)
 		if err != nil {
 			return err
 		}
@@ -55,14 +74,11 @@ func (d TransactionStorageLimiter) CheckLimits(
 
 func (d TransactionStorageLimiter) batchCheckLimits(
 	env Environment,
-	addresses []flow.Address,
+	addresses []common.Address,
+	usage []uint64,
 	span opentracing.Span) error {
-	commonAddresses := make([]common.Address, len(addresses))
-	for i, address := range addresses {
-		commonAddresses[i] = common.Address(address)
-	}
 
-	result, invokeErr := InvokeAccountsStorageCapacity(env, span, commonAddresses)
+	result, invokeErr := InvokeAccountsStorageCapacity(env, span, addresses)
 
 	// This error only occurs in case of implementation errors. The InvokeAccountsStorageCapacity
 	// already handles cases where the default vault is missing.
@@ -79,13 +95,8 @@ func (d TransactionStorageLimiter) batchCheckLimits(
 	for i, value := range resultArray.Values {
 		capacity := storageMBUFixToBytesUInt(value)
 
-		usage, err := env.GetStorageUsed(commonAddresses[i])
-		if err != nil {
-			return fmt.Errorf("storage limit check failed: %w", err)
-		}
-
-		if usage > capacity {
-			return errors.NewStorageCapacityExceededError(addresses[i], usage, capacity)
+		if usage[i] > capacity {
+			return errors.NewStorageCapacityExceededError(flow.BytesToAddress(addresses[i].Bytes()), usage[i], capacity)
 		}
 	}
 
