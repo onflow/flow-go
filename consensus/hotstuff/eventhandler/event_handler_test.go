@@ -1,6 +1,7 @@
 package eventhandler
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -698,7 +699,6 @@ func (es *EventHandlerSuite) TestOnTimeout() {
 // and EventHandler tries to produce a timeout object, such timeout object is invalid if both QC and TC is present, we
 // need to make sure that EventHandler filters out TC for last view if we know about QC for same view.
 func (es *EventHandlerSuite) TestOnTimeout_SanityChecks() {
-
 	es.timeoutAggregator.On("AddTimeout", mock.Anything).Return().Once()
 
 	// voting block exists
@@ -733,6 +733,26 @@ func (es *EventHandlerSuite) TestOnTimeout_SanityChecks() {
 	require.Equal(es.T(), es.endView, timeoutObject.View)
 	require.Equal(es.T(), qc, timeoutObject.NewestQC)
 	require.Nil(es.T(), timeoutObject.LastViewTC)
+}
+
+// TestOnTimeout_ReplicaEjected tests that EventHandler correctly handles possible errors from SafetyRules and doesn't broadcast
+// timeout objects when replica is ejected.
+func (es *EventHandlerSuite) TestOnTimeout_ReplicaEjected() {
+	es.Run("no-timeout", func() {
+		*es.safetyRules.SafetyRules = *mocks.NewSafetyRules(es.T())
+		es.safetyRules.On("ProduceTimeout", mock.Anything, mock.Anything, mock.Anything).Return(nil, model.NewNoTimeoutErrorf(""))
+		err := es.eventhandler.OnLocalTimeout()
+		require.NoError(es.T(), err, "should be handled as sentinel error")
+	})
+	es.Run("create-timeout-exception", func() {
+		*es.safetyRules.SafetyRules = *mocks.NewSafetyRules(es.T())
+		exception := errors.New("produce-timeout-exception")
+		es.safetyRules.On("ProduceTimeout", mock.Anything, mock.Anything, mock.Anything).Return(nil, exception)
+		err := es.eventhandler.OnLocalTimeout()
+		require.ErrorIs(es.T(), err, exception, "expect a wrapped exception")
+	})
+	es.timeoutAggregator.AssertNotCalled(es.T(), "AddTimeout", mock.Anything)
+	es.communicator.AssertNotCalled(es.T(), "BroadcastTimeout", mock.Anything)
 }
 
 // Test100Timeout tests that receiving 100 TCs for increasing views advances rounds

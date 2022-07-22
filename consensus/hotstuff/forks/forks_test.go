@@ -2,13 +2,14 @@ package forks
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	mockm "github.com/onflow/flow-go/module/mock"
-	"github.com/stretchr/testify/mock"
 )
 
 // denotion:

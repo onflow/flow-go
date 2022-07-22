@@ -236,6 +236,10 @@ func (e *EventHandler) OnLocalTimeout() error {
 
 	timeout, err := e.safetyRules.ProduceTimeout(curView, newestQC, lastViewTC)
 	if err != nil {
+		if model.IsNoTimeoutError(err) {
+			log.Warn().Err(err).Msgf("could not produce timeout at view %d, we are ejected", curView)
+			return nil
+		}
 		return fmt.Errorf("could not produce timeout: %w", err)
 	}
 

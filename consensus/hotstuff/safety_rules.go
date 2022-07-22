@@ -35,7 +35,10 @@ type SafetyRules interface {
 	// All other errors are unexpected and potential symptoms of uncovered edge cases or corrupted internal state (fatal).
 	ProduceVote(proposal *model.Proposal, curView uint64) (*model.Vote, error)
 	// ProduceTimeout takes current view, highest locally known QC and TC and decides whether to produce timeout for current view.
-	// When generating a timeout, the inputs are provided by node-internal components and should always result in a valid timeout.
-	// We don't expect any errors during normal operations. All errors are symptoms of internal bugs or state corruption.
+	// Returns:
+	//  * (timeout, nil): It is safe to timeout for current view using newestQC and lastViewTC.
+	//  * (nil, model.NoTimeoutError): If replica is ejected and is not allowed to produce a valid timeout object.
+	//    This is a sentinel error and _expected_ during normal operation.
+	// All other errors are unexpected and potential symptoms of uncovered edge cases or corrupted internal state (fatal).
 	ProduceTimeout(curView uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.TimeoutObject, error)
 }

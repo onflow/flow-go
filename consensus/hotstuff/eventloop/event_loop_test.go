@@ -2,7 +2,6 @@ package eventloop
 
 import (
 	"context"
-	"github.com/onflow/flow-go/model/flow"
 	"io/ioutil"
 	"sync"
 	"testing"
@@ -16,6 +15,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"

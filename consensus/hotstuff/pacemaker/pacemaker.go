@@ -87,7 +87,7 @@ func (p *ActivePaceMaker) updateLivenessData(newView uint64, qc *flow.QuorumCert
 	return nil
 }
 
-// updateNewestQC updates the highest QC tracked by view, iff `qc` has a larger view than 
+// updateNewestQC updates the highest QC tracked by view, iff `qc` has a larger view than
 // the QC stored in the PaceMaker's `livenessData`. Otherwise, this method is a no-op.
 // No errors are expected, any error should be treated as exception.
 func (p *ActivePaceMaker) updateNewestQC(qc *flow.QuorumCertificate) error {
