@@ -148,3 +148,7 @@ func (e *ErrorReturningRuntime) SetTracingEnabled(_ bool) {
 func (*ErrorReturningRuntime) SetDebugger(_ *interpreter.Debugger) {
 	panic("SetDebugger not expected")
 }
+
+func (ErrorReturningRuntime) Storage(runtime.Context) (*runtime.Storage, *interpreter.Interpreter, error) {
+	panic("Storage not expected")
+}
