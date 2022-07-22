@@ -95,6 +95,9 @@ func (c *Compactor) Ready() <-chan struct{} {
 
 func (c *Compactor) Done() <-chan struct{} {
 	c.lm.OnStop(func() {
+		// Close trieUpdateDoneCh to signal trie updates are finished
+		defer close(c.trieUpdateDoneCh)
+
 		// Notify observers
 		for observer := range c.observers {
 			observer.OnComplete()
@@ -106,9 +109,6 @@ func (c *Compactor) Done() <-chan struct{} {
 
 		// Wait for Compactor goroutine to stop
 		<-doneCh
-
-		// Close trieUpdateDoneCh to signal trie updates are finished
-		close(c.trieUpdateDoneCh)
 	})
 	return c.lm.Stopped()
 }
