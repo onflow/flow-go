@@ -32,17 +32,14 @@ func (suite *ObserverSuite) TearDownTest() {
 
 func (suite *ObserverSuite) SetupTest() {
 	nodeConfigs := []testnet.NodeConfig{
-		// access node with
+		// access node with unstaked nodes supported
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.InfoLevel), func(nc *testnet.NodeConfig) {
 			nc.SupportsUnstakedNodes = true
-			nc.AdditionalFlags = append(nc.AdditionalFlags, "--loglevel=debug")
 		}),
 		// need one dummy execution node (unused ghost)
 		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost()),
-
 		// need one dummy verification node (unused ghost)
 		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost()),
-
 		// need one controllable collection node (unused ghost)
 		testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost()),
 	}
@@ -65,7 +62,7 @@ func (suite *ObserverSuite) SetupTest() {
 	ctx := context.Background()
 	suite.net.Start(ctx)
 
-	stopObserver, err := suite.net.AddObserver(ctx, &testnet.ObserverConfig{
+	stop, err := suite.net.AddObserver(ctx, &testnet.ObserverConfig{
 		ObserverName:            "observer_1",
 		ObserverImage:           "gcr.io/flow-container-registry/observer:latest",
 		AccessName:              "access_1",
@@ -74,12 +71,15 @@ func (suite *ObserverSuite) SetupTest() {
 	})
 
 	if err != nil {
+		// this can happen occaisionally...
+		// usually it's because docker didn't remove the observer container during the previous test.
+		// the observer container is removed by an "AutoRemove" flag in AddObserver.
 		panic(err)
 	}
 
 	// set the teardown function
 	suite.teardown = func() {
-		stopObserver()
+		stop()
 		suite.net.Remove()
 	}
 }
@@ -88,26 +88,21 @@ func (suite *ObserverSuite) TestObserverConnection() {
 	ctx := context.Background()
 	t := suite.T()
 
-	// dial the observer node on the unsecure port
-	client, _ := suite.client("0.0.0.0:9000")
+	// get an observer client
+	observer, err := suite.getClient("0.0.0.0:9000")
+	assert.NoError(t, err)
 
 	// ping the observer while the access container is running
-	_, err := client.Ping(ctx, &accessproto.PingRequest{})
-	if err != nil {
-		t.Failed()
-	}
+	_, err = observer.Ping(ctx, &accessproto.PingRequest{})
+	assert.NoError(t, err)
 
 	// stop the upstream access container
-	accessContainer := suite.net.ContainerByName("access_1")
-	if err = suite.net.StopContainer(ctx, accessContainer.ID); err != nil {
-		t.Failed()
-	}
+	err = suite.net.StopContainerByName(ctx, "access_1")
+	assert.NoError(t, err)
 
 	// ping the observer when access container is stopped
-	_, err = client.Ping(ctx, &accessproto.PingRequest{})
-	if err == nil {
-		t.Failed()
-	}
+	_, err = observer.Ping(ctx, &accessproto.PingRequest{})
+	assert.Error(t, err)
 }
 
 func (suite *ObserverSuite) TestObserverWithoutAccess() {
@@ -115,18 +110,16 @@ func (suite *ObserverSuite) TestObserverWithoutAccess() {
 	ctx := context.Background()
 	t := suite.T()
 
-	// create a client for the observer
-	observer, _ := suite.client("0.0.0.0:9000")
-	rpcs := suite.rpcs()
+	// get an observer client
+	observer, err := suite.getClient("0.0.0.0:9000")
+	assert.NoError(t, err)
 
 	// stop the upstream access container
-	accessContainer := suite.net.ContainerByName("access_1")
-	if err := suite.net.StopContainer(ctx, accessContainer.ID); err != nil {
-		t.Failed()
-	}
+	err = suite.net.StopContainerByName(ctx, "access_1")
+	assert.NoError(t, err)
 
 	// verify that we receive errors from all rpcs
-	for _, rpc := range rpcs {
+	for _, rpc := range suite.getRPCs() {
 		t.Run(rpc.name, func(t *testing.T) {
 			err := rpc.call(ctx, observer)
 			assert.Error(t, err)
@@ -138,13 +131,15 @@ func (suite *ObserverSuite) TestObserverCompareRPCs() {
 	ctx := context.Background()
 	t := suite.T()
 
-	// create a client for the observer and access nodes
-	observer, _ := suite.client("0.0.0.0:9000")
-	access, _ := suite.client(fmt.Sprintf("0.0.0.0:%s", suite.net.AccessPorts[testnet.AccessNodeAPIPort]))
-	rpcs := suite.rpcs()
+	// get an observer and access client
+	observer, err := suite.getClient("0.0.0.0:9000")
+	assert.NoError(t, err)
+
+	access, err := suite.getClient(fmt.Sprintf("0.0.0.0:%s", suite.net.AccessPorts[testnet.AccessNodeAPIPort]))
+	assert.NoError(t, err)
 
 	// verify that both clients return the same errors
-	for _, rpc := range rpcs {
+	for _, rpc := range suite.getRPCs() {
 		t.Run(rpc.name, func(t *testing.T) {
 			accessErr := rpc.call(ctx, access)
 			observerErr := rpc.call(ctx, observer)
@@ -153,7 +148,7 @@ func (suite *ObserverSuite) TestObserverCompareRPCs() {
 	}
 }
 
-func (suite *ObserverSuite) client(address string) (accessproto.AccessAPIClient, error) {
+func (suite *ObserverSuite) getClient(address string) (accessproto.AccessAPIClient, error) {
 	// helper func to create an access client
 	conn, err := grpc.Dial("0.0.0.0:9000", grpc.WithInsecure())
 	if err != nil {
@@ -169,7 +164,7 @@ type RPCTest struct {
 	call func(ctx context.Context, client accessproto.AccessAPIClient) error
 }
 
-func (suite *ObserverSuite) rpcs() []RPCTest {
+func (suite *ObserverSuite) getRPCs() []RPCTest {
 	return []RPCTest{
 		{name: "Ping", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
 			_, err := client.Ping(ctx, &accessproto.PingRequest{})
