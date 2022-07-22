@@ -123,8 +123,8 @@ func (suite *ObserverSuite) TestObserverCompareRPCs() {
 	// verify that both clients return the same errors
 	for _, rpc := range rpcs {
 		t.Run(rpc.name, func(t *testing.T) {
-			accessErr := rpc.call(ctx, access) != nil
-			observerErr := rpc.call(ctx, observer) != nil
+			accessErr := rpc.call(ctx, access)
+			observerErr := rpc.call(ctx, observer)
 			assert.Equal(t, accessErr, observerErr)
 		})
 	}
