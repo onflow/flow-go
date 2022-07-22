@@ -111,26 +111,29 @@ func (s *feldmanVSSQualState) NextTimeout() error {
 	if !s.running {
 		return dkgInvalidStateTransitionErrorf("dkg protocol %d is not running", s.myIndex)
 	}
+
+	if s.complaintsTimeout {
+		return dkgInvalidStateTransitionErrorf("the next timeout should be to end DKG protocol")
+	}
+
 	// if leader is already disqualified, there is nothing to do
 	if s.disqualified {
-		if !s.sharesTimeout && !s.complaintsTimeout {
+		if !s.sharesTimeout {
 			s.sharesTimeout = true
 			return nil
-		} else if s.sharesTimeout && !s.complaintsTimeout {
+		} else {
 			s.complaintsTimeout = true
 			return nil
 		}
-		return dkgInvalidStateTransitionErrorf("the next timeout should be to end DKG protocol DISQ")
 	}
-	if !s.sharesTimeout && !s.complaintsTimeout {
+
+	if !s.sharesTimeout {
 		s.setSharesTimeout()
 		return nil
-	}
-	if s.sharesTimeout && !s.complaintsTimeout {
+	} else {
 		s.setComplaintsTimeout()
 		return nil
 	}
-	return dkgInvalidStateTransitionErrorf("the next timeout should be to end DKG protocol")
 }
 
 // End ends the protocol in the current participant
