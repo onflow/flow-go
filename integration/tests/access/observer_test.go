@@ -74,7 +74,6 @@ func (suite *ObserverSuite) SetupTest() {
 	})
 
 	if err != nil {
-		fmt.Println("BIG ERROR", err.Error())
 		panic(err)
 	}
 
@@ -108,6 +107,30 @@ func (suite *ObserverSuite) TestObserverConnection() {
 	_, err = client.Ping(ctx, &accessproto.PingRequest{})
 	if err == nil {
 		t.Failed()
+	}
+}
+
+func (suite *ObserverSuite) TestObserverWithoutAccess() {
+	// tests that observer returns errors when the access node is stopped
+	ctx := context.Background()
+	t := suite.T()
+
+	// create a client for the observer
+	observer, _ := suite.client("0.0.0.0:9000")
+	rpcs := suite.rpcs()
+
+	// stop the upstream access container
+	accessContainer := suite.net.ContainerByName("access_1")
+	if err := suite.net.StopContainer(ctx, accessContainer.ID); err != nil {
+		t.Failed()
+	}
+
+	// verify that we receive errors from all rpcs
+	for _, rpc := range rpcs {
+		t.Run(rpc.name, func(t *testing.T) {
+			err := rpc.call(ctx, observer)
+			assert.Error(t, err)
+		})
 	}
 }
 
