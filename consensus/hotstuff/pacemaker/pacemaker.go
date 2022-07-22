@@ -155,7 +155,15 @@ func (p *ActivePaceMaker) ProcessQC(qc *flow.QuorumCertificate) (*model.NewViewE
 // which may or may not have a value.
 // No errors are expected, any error should be treated as exception
 func (p *ActivePaceMaker) ProcessTC(tc *flow.TimeoutCertificate) (*model.NewViewEvent, error) {
-	if tc == nil || tc.View < p.CurView() {
+	if tc == nil {
+		return nil, nil
+	}
+
+	if tc.View < p.CurView() {
+		err := p.updateNewestQC(tc.NewestQC)
+		if err != nil {
+			return nil, fmt.Errorf("could not update tracked newest QC: %w", err)
+		}
 		return nil, nil
 	}
 
