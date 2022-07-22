@@ -3,6 +3,8 @@ package corruptible
 import (
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/network/channels"
+
 	"github.com/onflow/flow-go/model/flow"
 	flownet "github.com/onflow/flow-go/network"
 )
@@ -21,7 +23,7 @@ func NewCorruptibleMessageProcessor(logger zerolog.Logger, originalProcessor flo
 	}
 }
 
-func (m *MessageProcessor) Process(channel flownet.Channel, originID flow.Identifier, message interface{}) error {
+func (m *MessageProcessor) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	// TODO: instead of passing through the ingress traffic, process should
 	// relay it to the attacker.
 	return m.originalProcessor.Process(channel, originID, message)

@@ -8,25 +8,25 @@ import (
 	"net"
 	"sync"
 
-	"github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/engine/execution/utils"
-	verutils "github.com/onflow/flow-go/engine/verification/utils"
-	"github.com/onflow/flow-go/module"
-
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 
+	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/engine/execution/utils"
+	verutils "github.com/onflow/flow-go/engine/verification/utils"
 	"github.com/onflow/flow-go/engine/verification/verifier"
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	flownet "github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -106,7 +106,7 @@ func NewCorruptibleNetwork(
 // Register serves as the typical network registration of the given message processor on the channel.
 // Except, it first wraps the given processor around a corruptible message processor, and then
 // registers the corruptible message processor to the original flow network.
-func (n *Network) Register(channel flownet.Channel, messageProcessor flownet.MessageProcessor) (flownet.Conduit, error) {
+func (n *Network) Register(channel channels.Channel, messageProcessor flownet.MessageProcessor) (flownet.Conduit, error) {
 	corruptibleProcessor := NewCorruptibleMessageProcessor(n.logger, messageProcessor)
 	// TODO: we can dissolve CCF and instead have a decorator pattern to turn a conduit into
 	// a corrupted one?
@@ -117,7 +117,7 @@ func (n *Network) Register(channel flownet.Channel, messageProcessor flownet.Mes
 	return conduit, nil
 }
 
-func (n *Network) RegisterBlobService(channel flownet.Channel, store datastore.Batching, opts ...flownet.BlobServiceOption) (flownet.BlobService,
+func (n *Network) RegisterBlobService(channel channels.Channel, store datastore.Batching, opts ...flownet.BlobServiceOption) (flownet.BlobService,
 	error) {
 	return n.flowNetwork.RegisterBlobService(channel, store, opts...)
 }
@@ -216,7 +216,7 @@ func (n *Network) processAttackerEgressMessage(msg *insecure.Message) error {
 	}
 
 	lg = lg.With().Str("target_ids", fmt.Sprintf("%v", msg.Egress.TargetIDs)).Logger()
-	err = n.conduitFactory.SendOnFlowNetwork(event, flownet.Channel(msg.Egress.ChannelID), msg.Egress.Protocol, uint(msg.Egress.TargetNum), targetIds...)
+	err = n.conduitFactory.SendOnFlowNetwork(event, channels.Channel(msg.Egress.ChannelID), msg.Egress.Protocol, uint(msg.Egress.TargetNum), targetIds...)
 	if err != nil {
 		lg.Err(err).Msg("could not send attacker message to the network")
 		return fmt.Errorf("could not send attacker message to the network: %w", err)
@@ -263,14 +263,14 @@ func (n *Network) ServerAddress() string {
 
 // EngineClosingChannel is called by the conduits of this corruptible network to let it know that the corresponding
 // engine of the conduit is not going to use it anymore, so the channel can be closed safely.
-func (n *Network) EngineClosingChannel(channel flownet.Channel) error {
+func (n *Network) EngineClosingChannel(channel channels.Channel) error {
 	return n.conduitFactory.UnregisterChannel(channel)
 }
 
 // eventToMessage converts the given application layer event to a protobuf message that is meant to be sent to the attacker.
 func (n *Network) eventToMessage(
 	event interface{},
-	channel flownet.Channel,
+	channel channels.Channel,
 	protocol insecure.Protocol,
 	targetNum uint32,
 	targetIds ...flow.Identifier) (*insecure.Message, error) {
@@ -351,7 +351,7 @@ func (n *Network) ConnectAttacker(_ *empty.Empty, stream insecure.CorruptibleCon
 // of Flow to deliver to its targets.
 func (n *Network) HandleOutgoingEvent(
 	event interface{},
-	channel flownet.Channel,
+	channel channels.Channel,
 	protocol insecure.Protocol,
 	num uint32,
 	targetIds ...flow.Identifier) error {

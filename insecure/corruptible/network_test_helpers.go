@@ -3,24 +3,29 @@ package corruptible
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/insecure"
-	"github.com/onflow/flow-go/module/irrecoverable"
-	"google.golang.org/grpc"
-	grpcinsecure "google.golang.org/grpc/credentials/insecure"
 	"net"
 	"testing"
 	"time"
+
+	"google.golang.org/grpc"
+	grpcinsecure "google.golang.org/grpc/credentials/insecure"
+
+	"github.com/onflow/flow-go/insecure"
+	"github.com/onflow/flow-go/module/irrecoverable"
+
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 )
 
-func getCorruptibleNetworkNoAttacker(t *testing.T, corruptedID ...*flow.Identity) (*Network, *mocknetwork.Adapter) {
+// corruptibleNetworkFixture creates a corruptible Network with a mock Adapter.
+// By default, no attacker is registered on this corruptible network.
+func corruptibleNetworkFixture(t *testing.T, corruptedID ...*flow.Identity) (*Network, *mocknetwork.Adapter) {
 	// create corruptible network with no attacker registered
 	codec := cbor.NewCodec()
 
@@ -92,7 +97,7 @@ func withCorruptibleNetwork(t *testing.T,
 		}
 	}()
 
-	corruptibleNetwork, adapter := getCorruptibleNetworkNoAttacker(t, corruptedIdentity)
+	corruptibleNetwork, adapter := corruptibleNetworkFixture(t, corruptedIdentity)
 
 	// start corruptible network
 	corruptibleNetwork.Start(ccfCtx)

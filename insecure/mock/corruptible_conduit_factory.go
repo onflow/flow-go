@@ -5,8 +5,11 @@ package mockinsecure
 import (
 	context "context"
 
-	insecure "github.com/onflow/flow-go/insecure"
+	channels "github.com/onflow/flow-go/network/channels"
+
 	flow "github.com/onflow/flow-go/model/flow"
+
+	insecure "github.com/onflow/flow-go/insecure"
 
 	mock "github.com/stretchr/testify/mock"
 
@@ -19,11 +22,11 @@ type CorruptibleConduitFactory struct {
 }
 
 // NewConduit provides a mock function with given fields: _a0, _a1
-func (_m *CorruptibleConduitFactory) NewConduit(_a0 context.Context, _a1 network.Channel) (network.Conduit, error) {
+func (_m *CorruptibleConduitFactory) NewConduit(_a0 context.Context, _a1 channels.Channel) (network.Conduit, error) {
 	ret := _m.Called(_a0, _a1)
 
 	var r0 network.Conduit
-	if rf, ok := ret.Get(0).(func(context.Context, network.Channel) network.Conduit); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, channels.Channel) network.Conduit); ok {
 		r0 = rf(_a0, _a1)
 	} else {
 		if ret.Get(0) != nil {
@@ -32,7 +35,7 @@ func (_m *CorruptibleConduitFactory) NewConduit(_a0 context.Context, _a1 network
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, network.Channel) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, channels.Channel) error); ok {
 		r1 = rf(_a0, _a1)
 	} else {
 		r1 = ret.Error(1)
@@ -70,7 +73,7 @@ func (_m *CorruptibleConduitFactory) RegisterEgressController(_a0 insecure.Egres
 }
 
 // SendOnFlowNetwork provides a mock function with given fields: _a0, _a1, _a2, _a3, _a4
-func (_m *CorruptibleConduitFactory) SendOnFlowNetwork(_a0 interface{}, _a1 network.Channel, _a2 insecure.Protocol, _a3 uint, _a4 ...flow.Identifier) error {
+func (_m *CorruptibleConduitFactory) SendOnFlowNetwork(_a0 interface{}, _a1 channels.Channel, _a2 insecure.Protocol, _a3 uint, _a4 ...flow.Identifier) error {
 	_va := make([]interface{}, len(_a4))
 	for _i := range _a4 {
 		_va[_i] = _a4[_i]
@@ -81,7 +84,7 @@ func (_m *CorruptibleConduitFactory) SendOnFlowNetwork(_a0 interface{}, _a1 netw
 	ret := _m.Called(_ca...)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(interface{}, network.Channel, insecure.Protocol, uint, ...flow.Identifier) error); ok {
+	if rf, ok := ret.Get(0).(func(interface{}, channels.Channel, insecure.Protocol, uint, ...flow.Identifier) error); ok {
 		r0 = rf(_a0, _a1, _a2, _a3, _a4...)
 	} else {
 		r0 = ret.Error(0)
@@ -91,11 +94,11 @@ func (_m *CorruptibleConduitFactory) SendOnFlowNetwork(_a0 interface{}, _a1 netw
 }
 
 // UnregisterChannel provides a mock function with given fields: _a0
-func (_m *CorruptibleConduitFactory) UnregisterChannel(_a0 network.Channel) error {
+func (_m *CorruptibleConduitFactory) UnregisterChannel(_a0 channels.Channel) error {
 	ret := _m.Called(_a0)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(network.Channel) error); ok {
+	if rf, ok := ret.Get(0).(func(channels.Channel) error); ok {
 		r0 = rf(_a0)
 	} else {
 		r0 = ret.Error(0)

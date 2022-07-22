@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -136,7 +137,7 @@ func (a *AttackNetwork) processMessageFromCorruptedNode(message *insecure.Messag
 
 	err = a.orchestrator.HandleEventFromCorruptedNode(&insecure.Event{
 		CorruptedNodeId:   sender,
-		Channel:           network.Channel(message.Egress.ChannelID),
+		Channel:           channels.Channel(message.Egress.ChannelID),
 		FlowProtocolEvent: event,
 		Protocol:          message.Egress.Protocol,
 		TargetNum:         message.Egress.TargetNum,
@@ -173,7 +174,7 @@ func (a *AttackNetwork) Send(event *insecure.Event) error {
 // eventToEgressMessage converts the given application layer event to a protobuf message that is meant to be sent to the corrupted node.
 func (a *AttackNetwork) eventToEgressMessage(corruptedId flow.Identifier,
 	event interface{},
-	channel network.Channel,
+	channel channels.Channel,
 	protocol insecure.Protocol,
 	num uint32,
 	targetIds ...flow.Identifier) (*insecure.Message, error) {

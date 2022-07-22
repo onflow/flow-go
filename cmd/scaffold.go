@@ -855,12 +855,12 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 		fvm.WithBlocks(blockFinder),
 		fvm.WithAccountStorageLimit(true),
 	}
-	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Canary || fnb.RootChainID == flow.Mainnet {
+	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Stagingnet || fnb.RootChainID == flow.Mainnet {
 		vmOpts = append(vmOpts,
 			fvm.WithTransactionFeesEnabled(true),
 		)
 	}
-	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Canary || fnb.RootChainID == flow.Localnet || fnb.RootChainID == flow.Benchnet {
+	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Stagingnet || fnb.RootChainID == flow.Localnet || fnb.RootChainID == flow.Benchnet {
 		vmOpts = append(vmOpts,
 			fvm.WithContractDeploymentRestricted(false),
 		)
@@ -868,6 +868,7 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 	fnb.FvmOptions = vmOpts
 }
 
+// handleModules initializes the given module.
 func (fnb *FlowNodeBuilder) handleModule(v namedModuleFunc) error {
 	err := v.fn(fnb.NodeConfig)
 	if err != nil {
@@ -878,6 +879,7 @@ func (fnb *FlowNodeBuilder) handleModule(v namedModuleFunc) error {
 	return nil
 }
 
+// handleModules initializes all modules that have been enqueued on this node builder.
 func (fnb *FlowNodeBuilder) handleModules() error {
 	for _, f := range fnb.modules {
 		if err := fnb.handleModule(f); err != nil {
@@ -1124,7 +1126,7 @@ func (fnb *FlowNodeBuilder) OverrideComponent(name string, f ReadyDoneFactory) N
 func (fnb *FlowNodeBuilder) OverrideModule(name string, f BuilderFunc) NodeBuilder {
 	for i := 0; i < len(fnb.modules); i++ {
 		if fnb.modules[i].name == name {
-			// found component with the name, override it.
+			// found module with the name, override it.
 			fnb.modules[i] = namedModuleFunc{
 				fn:   f,
 				name: name,
@@ -1134,7 +1136,7 @@ func (fnb *FlowNodeBuilder) OverrideModule(name string, f BuilderFunc) NodeBuild
 		}
 	}
 
-	// no component found with the same name, hence just adding it.
+	// no module found with the same name, hence just adding it.
 	return fnb.Module(name, f)
 }
 

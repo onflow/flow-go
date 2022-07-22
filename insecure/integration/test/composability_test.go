@@ -16,7 +16,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	flownet "github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -54,7 +54,7 @@ func TestCorruptibleConduitFrameworkHappyPath(t *testing.T) {
 				}, 2*time.Second, 100*time.Millisecond, "registration of attacker on CCF could not be done one time")
 
 				originalEvent := &message.TestMessage{Text: "this is a test message"}
-				testChannel := flownet.Channel("test-channel")
+				testChannel := channels.Channel("test-channel")
 
 				// corrupted node network
 				corruptedEngine := &network.Engine{}
@@ -72,7 +72,7 @@ func TestCorruptibleConduitFrameworkHappyPath(t *testing.T) {
 
 				wg := &sync.WaitGroup{}
 				wg.Add(1)
-				honestEngine.OnProcess(func(channel flownet.Channel, originId flow.Identifier, event interface{}) error {
+				honestEngine.OnProcess(func(channel channels.Channel, originId flow.Identifier, event interface{}) error {
 					// implementing the process logic of the honest engine on reception of message from underlying network.
 					require.Equal(t, testChannel, channel)               // event must arrive at the channel set by orchestrator.
 					require.Equal(t, corruptedIdentity.NodeID, originId) // origin id of the message must be the corrupted node.
@@ -91,7 +91,7 @@ func TestCorruptibleConduitFrameworkHappyPath(t *testing.T) {
 
 }
 
-// withCorruptibleNetwork creates a real corruptible conduit factory (ccf), starts it, runs the "run" function, and then stops it.
+// withCorruptibleNetwork creates a real corruptible network, starts it, runs the "run" function, and then stops it.
 func withCorruptibleNetwork(t *testing.T, run func(*testing.T, flow.Identity, *corruptible.Network, *stub.Hub)) {
 	codec := cbor.NewCodec()
 	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress("localhost:0"))

@@ -7,18 +7,20 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/network/channels"
+
 	"github.com/golang/protobuf/ptypes/empty"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/insecure"
 	mockinsecure "github.com/onflow/flow-go/insecure/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 )
 
 // TestHandleOutgoingEvent_AttackerObserve evaluates that the incoming messages to the corrupted network are routed to the
@@ -54,7 +56,7 @@ func TestHandleOutgoingEvent_AttackerObserve(t *testing.T) {
 
 	targetIds := unittest.IdentifierListFixture(10)
 	msg := &message.TestMessage{Text: "this is a test msg"}
-	channel := network.Channel("test-channel")
+	channel := channels.Channel("test-channel")
 
 	go func() {
 		err := corruptibleNetwork.HandleOutgoingEvent(msg, channel, insecure.Protocol_MULTICAST, uint32(3), targetIds...)
@@ -82,10 +84,10 @@ func TestHandleOutgoingEvent_AttackerObserve(t *testing.T) {
 // TestHandleOutgoingEvent_NoAttacker_UnicastOverNetwork checks that outgoing unicast events to the corrupted network
 // are routed to the network adapter when no attacker is registered to the network.
 func TestHandleOutgoingEvent_NoAttacker_UnicastOverNetwork(t *testing.T) {
-	corruptibleNetwork, adapter := getCorruptibleNetworkNoAttacker(t)
+	corruptibleNetwork, adapter := corruptibleNetworkFixture(t)
 
 	msg := &message.TestMessage{Text: "this is a test msg"}
-	channel := network.Channel("test-channel")
+	channel := channels.Channel("test-channel")
 
 	targetId := unittest.IdentifierFixture()
 
@@ -102,10 +104,10 @@ func TestHandleOutgoingEvent_NoAttacker_UnicastOverNetwork(t *testing.T) {
 // TestHandleOutgoingEvent_NoAttacker_PublishOverNetwork checks that the outgoing publish events to the corrupted network
 // are routed to the network adapter when no attacker registered to the network.
 func TestHandleOutgoingEvent_NoAttacker_PublishOverNetwork(t *testing.T) {
-	corruptibleNetwork, adapter := getCorruptibleNetworkNoAttacker(t)
+	corruptibleNetwork, adapter := corruptibleNetworkFixture(t)
 
 	msg := &message.TestMessage{Text: "this is a test msg"}
-	channel := network.Channel("test-channel")
+	channel := channels.Channel("test-channel")
 
 	targetIds := unittest.IdentifierListFixture(10)
 	params := []interface{}{channel, msg}
@@ -126,10 +128,10 @@ func TestHandleOutgoingEvent_NoAttacker_PublishOverNetwork(t *testing.T) {
 // TestHandleOutgoingEvent_NoAttacker_MulticastOverNetwork checks that the outgoing multicast events to the corrupted network
 // are routed to the network adapter when no attacker registered to the network.
 func TestHandleOutgoingEvent_NoAttacker_MulticastOverNetwork(t *testing.T) {
-	corruptibleNetwork, adapter := getCorruptibleNetworkNoAttacker(t)
+	corruptibleNetwork, adapter := corruptibleNetworkFixture(t)
 
 	msg := &message.TestMessage{Text: "this is a test msg"}
-	channel := network.Channel("test-channel")
+	channel := channels.Channel("test-channel")
 
 	targetIds := unittest.IdentifierListFixture(10)
 
@@ -162,7 +164,7 @@ func TestProcessAttackerMessage(t *testing.T) {
 				Text: fmt.Sprintf("this is a test message: %d", rand.Int()),
 			})
 
-			params := []interface{}{network.Channel(msg.Egress.ChannelID), event.FlowProtocolEvent, uint(3)}
+			params := []interface{}{channels.Channel(msg.Egress.ChannelID), event.FlowProtocolEvent, uint(3)}
 			targetIds, err := flow.ByteSlicesToIds(msg.Egress.TargetIDs)
 			require.NoError(t, err)
 
@@ -208,7 +210,7 @@ func TestProcessAttackerMessage_ResultApproval_Dictated(t *testing.T) {
 				},
 			})
 
-			params := []interface{}{network.Channel(msg.Egress.ChannelID), mock.Anything}
+			params := []interface{}{channels.Channel(msg.Egress.ChannelID), mock.Anything}
 			targetIds, err := flow.ByteSlicesToIds(msg.Egress.TargetIDs)
 			require.NoError(t, err)
 			for _, id := range targetIds {
@@ -274,7 +276,7 @@ func TestProcessAttackerMessage_ResultApproval_PassThrough(t *testing.T) {
 			passThroughApproval := unittest.ResultApprovalFixture()
 			msg, _, _ := insecure.MessageFixture(t, cbor.NewCodec(), insecure.Protocol_PUBLISH, passThroughApproval)
 
-			params := []interface{}{network.Channel(msg.Egress.ChannelID), mock.Anything}
+			params := []interface{}{channels.Channel(msg.Egress.ChannelID), mock.Anything}
 			targetIds, err := flow.ByteSlicesToIds(msg.Egress.TargetIDs)
 			require.NoError(t, err)
 			for _, id := range targetIds {
@@ -323,7 +325,7 @@ func TestProcessAttackerMessage_ExecutionReceipt_Dictated(t *testing.T) {
 				ExecutionResult: dictatedResult,
 			})
 
-			params := []interface{}{network.Channel(msg.Egress.ChannelID), mock.Anything}
+			params := []interface{}{channels.Channel(msg.Egress.ChannelID), mock.Anything}
 			targetIds, err := flow.ByteSlicesToIds(msg.Egress.TargetIDs)
 			require.NoError(t, err)
 			for _, id := range targetIds {
@@ -378,7 +380,7 @@ func TestProcessAttackerMessage_ExecutionReceipt_PassThrough(t *testing.T) {
 			passThroughReceipt := unittest.ExecutionReceiptFixture()
 			msg, _, _ := insecure.MessageFixture(t, cbor.NewCodec(), insecure.Protocol_PUBLISH, passThroughReceipt)
 
-			params := []interface{}{network.Channel(msg.Egress.ChannelID), mock.Anything}
+			params := []interface{}{channels.Channel(msg.Egress.ChannelID), mock.Anything}
 			targetIds, err := flow.ByteSlicesToIds(msg.Egress.TargetIDs)
 			require.NoError(t, err)
 			for _, id := range targetIds {
@@ -411,8 +413,8 @@ func TestProcessAttackerMessage_ExecutionReceipt_PassThrough(t *testing.T) {
 // TestEngineClosingChannel evaluates that corruptible network closes the channel whenever the corresponding
 // engine of that channel attempts on closing it.
 func TestEngineClosingChannel(t *testing.T) {
-	corruptibleNetwork, adapter := getCorruptibleNetworkNoAttacker(t)
-	channel := network.Channel("test-channel")
+	corruptibleNetwork, adapter := corruptibleNetworkFixture(t)
+	channel := channels.Channel("test-channel")
 
 	// on invoking adapter.UnRegisterChannel(channel), it must return a nil, which means
 	// that the channel has been unregistered by the adapter successfully.
