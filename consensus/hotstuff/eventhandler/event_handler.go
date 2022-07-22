@@ -26,10 +26,10 @@ import (
 //  EventHandler gets notified about it and has to create a model.TimeoutObject and broadcast it to other replicas.
 //  Creating a TO can be triggered ONLY by reaching round deadline.
 //  - create a proposal: proposing logic is more complicated. Creating a proposal is triggered by the EventHandler receiving
-//  a QC or TC that induces a view change to a view where the replica is primary. As an edge case, the EventHandler 
+//  a QC or TC that induces a view change to a view where the replica is primary. As an edge case, the EventHandler
 //  can receive a QC or TC that triggers the view change, but we can't create a proposal in case we are missing parent block the newest QC refers to.
 //  In case we already have the QC, but are still missing the respective parent, OnReceiveProposal can trigger the proposing logic
-//  as welll, but only when receiving proposal for view lower than active view. 
+//  as welll, but only when receiving proposal for view lower than active view.
 //  To summarize, to make a valid proposal for view N we need to have a QC or TC for N-1 and know the proposal with blockID
 //  NewestQC.BlockID.
 type EventHandler struct {
@@ -95,13 +95,18 @@ func (e *EventHandler) OnReceiveQc(qc *flow.QuorumCertificate) error {
 
 	log.Debug().Msg("received QC")
 
-	// ignore stale qc
-	if qc.View <= e.forks.FinalizedView() {
-		log.Debug().Msg("stale qc")
+	newViewEvent, err := e.paceMaker.ProcessQC(qc)
+	if err != nil {
+		return fmt.Errorf("could not process QC: %w", err)
+	}
+	if newViewEvent == nil {
+		log.Debug().Msg("QC didn't trigger view change, nothing to do")
 		return nil
 	}
+	log.Debug().Msg("QC triggered view change, starting new view now")
 
-	return e.processQC(qc)
+	// current view has changed, go to new view
+	return e.proposeForNewViewIfPrimary()
 }
 
 // OnReceiveTc processes a valid tc constructed by internal timeout aggregator, discovered in TimeoutObject or
@@ -122,23 +127,18 @@ func (e *EventHandler) OnReceiveTc(tc *flow.TimeoutCertificate) error {
 
 	log.Debug().Msg("received TC")
 
-	// ignore stale qc
-	if tc.View <= e.forks.FinalizedView() {
-		log.Debug().Msg("stale tc")
-		return nil
-	}
-
 	newViewEvent, err := e.paceMaker.ProcessTC(tc)
 	if err != nil {
 		return fmt.Errorf("could not process TC for view %d: %w", tc.View, err)
 	}
-	if nve == nil {
+	if newViewEvent == nil {
 		log.Debug().Msg("TC didn't trigger view change, nothing to do")
 		return nil
 	}
-
 	log.Debug().Msg("TC triggered view change, starting new view now")
-	return e.proposeForNewView()
+
+	// current view has changed, go to new view
+	return e.proposeForNewViewIfPrimary()
 }
 
 // OnReceiveProposal processes a block proposal received from another HotStuff
@@ -203,7 +203,7 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 		return nil
 	}
 
-	return e.proposeForNewView()
+	return e.proposeForNewViewIfPrimary()
 }
 
 // TimeoutChannel returns the channel for subscribing the waiting timeout on receiving
@@ -260,7 +260,7 @@ func (e *EventHandler) Start() error {
 	if err != nil {
 		return fmt.Errorf("could not process pending blocks: %w", err)
 	}
-	err = e.proposeForNewView()
+	err = e.proposeForNewViewIfPrimary()
 	if err != nil {
 		return fmt.Errorf("could not start new view: %w", err)
 	}
@@ -309,7 +309,7 @@ func (e *EventHandler) processPendingBlocks() error {
 	}
 }
 
-// proposeForNewView will only be called when we may able to propose a block, after processing a new event.
+// proposeForNewViewIfPrimary will only be called when we may able to propose a block, after processing a new event.
 // * after entering a new view as a result of processing a QC or TC, then we may propose for the newly entered view
 // * after receiving a proposal (but not changing view), if that proposal is referenced by our highest known QC,
 //   and the proposal was previously unknown, then we can propose a block in the current view
@@ -336,93 +336,83 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 	if e.committee.Self() != currentLeader {
 		return nil
 	}
-		log.Debug().Msg("generating block proposal as leader")
+	log.Debug().Msg("generating block proposal as leader")
 
-		// TODO(active-pacemaker): SafetyRules checks identity using proposal.BlockID, here we can check only by view ?
-		// check if we are eligible to propose
-		_, err = e.committee.IdentityByEpoch(curView, e.committee.Self())
-		if err != nil {
-			if model.IsInvalidSignerError(err) {
-				// we are ejected at this epoch
-				log.Warn().Err(err).Msgf("can't propose at view %d, we are ejected", curView)
-				return nil
-			}
-			return fmt.Errorf("internal error retrieving Identity of self proposer at view %d: %w", curView, err)
-		}
-
-		// as the leader of the current view,
-		// build the block proposal for the current view
-		newestQC := e.paceMaker.NewestQC()
-		lastViewTC := e.paceMaker.LastViewTC()
-
-		_, found := e.forks.GetProposal(newestQC.BlockID)
-		if !found {
-			// we don't know anything about block referenced by our newest QC, in this case we can't
-			// create a valid proposal since we can't guarantee validity of block payload.
-			log.Warn().
-				Uint64("qc_view", newestQC.View).
-				Hex("block_id", newestQC.BlockID[:]).Msg("haven't synced the latest block yet; can't propose")
+	// TODO(active-pacemaker): SafetyRules checks identity using proposal.BlockID, here we can check only by view ?
+	// check if we are eligible to propose
+	_, err = e.committee.IdentityByEpoch(curView, e.committee.Self())
+	if err != nil {
+		if model.IsInvalidSignerError(err) {
+			// we are ejected at this epoch
+			log.Warn().Err(err).Msgf("can't propose at view %d, we are ejected", curView)
 			return nil
 		}
+		return fmt.Errorf("internal error retrieving Identity of self proposer at view %d: %w", curView, err)
+	}
 
-		// Sanity checks to make sure that resulting proposal is valid:
-		// * in its proposal, leader for view N needs to present evidence that has legitimately entered view N
-		// To do that he includes QC or TC for view N-1. Note that the PaceMaker advances to view N only after observing QC or TC from view N-1.
-		// moreover QC and TC are processed always together. As EventHandler is used strictly single-threaded without reentrancy,
-		// we must have a QC or TC for the prior view (curView-1). Failing one of these sanity checks
-		// is a symptom of state corruption or a severe implementation bug.
-		if newestQC.View+1 != curView {
-			if lastViewTC == nil {
-				return fmt.Errorf("possible state corruption, expected lastViewTC to be not nil")
-			}
-			if lastViewTC.View+1 != curView {
-				return fmt.Errorf("possible state corruption, don't have QC(view=%d) and TC(view=%d) for previous view(currentView=%d)",
-					newestQC.View, lastViewTC.View, curView)
-			}
-		} else {
-			// In case last view has ended with QC and TC, make sure that only QC is included,
-			// otherwise such proposal is invalid. This case is possible if TC has included QC with the same
-			// view as the TC itself, meaning that newestQC.View == lastViewTC.View
-			lastViewTC = nil
+	// as the leader of the current view,
+	// build the block proposal for the current view
+	newestQC := e.paceMaker.NewestQC()
+	lastViewTC := e.paceMaker.LastViewTC()
+
+	_, found := e.forks.GetProposal(newestQC.BlockID)
+	if !found {
+		// we don't know anything about block referenced by our newest QC, in this case we can't
+		// create a valid proposal since we can't guarantee validity of block payload.
+		log.Warn().
+			Uint64("qc_view", newestQC.View).
+			Hex("block_id", newestQC.BlockID[:]).Msg("haven't synced the latest block yet; can't propose")
+		return nil
+	}
+
+	// Sanity checks to make sure that resulting proposal is valid:
+	// * in its proposal, leader for view N needs to present evidence that has legitimately entered view N
+	// To do that he includes QC or TC for view N-1. Note that the PaceMaker advances to view N only after observing QC or TC from view N-1.
+	// moreover QC and TC are processed always together. As EventHandler is used strictly single-threaded without reentrancy,
+	// we must have a QC or TC for the prior view (curView-1). Failing one of these sanity checks
+	// is a symptom of state corruption or a severe implementation bug.
+	if newestQC.View+1 != curView {
+		if lastViewTC == nil {
+			return fmt.Errorf("possible state corruption, expected lastViewTC to be not nil")
 		}
-
-		proposal, err := e.blockProducer.MakeBlockProposal(curView, newestQC, lastViewTC)
-		if err != nil {
-			return fmt.Errorf("can not make block proposal for curView %v: %w", curView, err)
+		if lastViewTC.View+1 != curView {
+			return fmt.Errorf("possible state corruption, don't have QC(view=%d) and TC(view=%d) for previous view(currentView=%d)",
+				newestQC.View, lastViewTC.View, curView)
 		}
-		e.notifier.OnProposingBlock(proposal)
+	} else {
+		// In case last view has ended with QC and TC, make sure that only QC is included,
+		// otherwise such proposal is invalid. This case is possible if TC has included QC with the same
+		// view as the TC itself, meaning that newestQC.View == lastViewTC.View
+		lastViewTC = nil
+	}
 
-		block := proposal.Block
-		log.Debug().
-			Uint64("block_view", block.View).
-			Hex("block_id", block.BlockID[:]).
-			Uint64("parent_view", newestQC.View).
-			Hex("parent_id", newestQC.BlockID[:]).
-			Hex("signer", block.ProposerID[:]).
-			Msg("forwarding proposal to communicator for broadcasting")
+	proposal, err := e.blockProducer.MakeBlockProposal(curView, newestQC, lastViewTC)
+	if err != nil {
+		return fmt.Errorf("can not make block proposal for curView %v: %w", curView, err)
+	}
+	e.notifier.OnProposingBlock(proposal)
 
-		// broadcast the proposal
-		header := model.ProposalToFlow(proposal)
-		delay := e.paceMaker.BlockRateDelay()
-		elapsed := time.Since(start)
-		if elapsed > delay {
-			delay = 0
-		} else {
-			delay = delay - elapsed
-		}
-		err = e.communicator.BroadcastProposalWithDelay(header, delay)
-		if err != nil {
-			log.Warn().Err(err).Msg("could not forward proposal")
-		}
+	block := proposal.Block
+	log.Debug().
+		Uint64("block_view", block.View).
+		Hex("block_id", block.BlockID[:]).
+		Uint64("parent_view", newestQC.View).
+		Hex("parent_id", newestQC.BlockID[:]).
+		Hex("signer", block.ProposerID[:]).
+		Msg("forwarding proposal to communicator for broadcasting")
 
-		// We return here to correspond to the HotStuff state machine.
-		// Algorithmically, this return statement is optional:
-		//  * If this replica is the leader for the current view, there can be no valid proposal from any
-		//    other node. This replica's proposal is the only valid proposal.
-		//  * This replica's proposal got just sent out above. It will enter the HotStuff logic from the
-		//    EventLoop. In other words, the own proposal is not yet stored in Forks.
-		//    Hence, Forks cannot contain _any_ valid proposal for the current view.
-		//  Therefore, if this replica is the leader, the following code is a no-op.
+	// broadcast the proposal
+	header := model.ProposalToFlow(proposal)
+	delay := e.paceMaker.BlockRateDelay()
+	elapsed := time.Since(start)
+	if elapsed > delay {
+		delay = 0
+	} else {
+		delay = delay - elapsed
+	}
+	err = e.communicator.BroadcastProposalWithDelay(header, delay)
+	if err != nil {
+		log.Warn().Err(err).Msg("could not forward proposal")
 	}
 
 	return nil
@@ -511,28 +501,4 @@ func (e *EventHandler) ownVote(proposal *model.Proposal, curView uint64, nextLea
 		}
 	}
 	return nil
-}
-
-// processQC stores the QC and check whether the QC will trigger view change.
-// If triggered, then go to the new view.
-// No errors are expected during normal operation.
-func (e *EventHandler) processQC(qc *flow.QuorumCertificate) error {
-
-	log := e.log.With().
-		Uint64("block_view", qc.View).
-		Hex("block_id", qc.BlockID[:]).
-		Logger()
-
-	newViewEvent, err := e.paceMaker.ProcessQC(qc)
-	if err != nil {
-		return fmt.Errorf("could not process QC: %w", err)
-	}
-	if newViewEvent == nil {
-		log.Debug().Msg("QC didn't trigger view change, nothing to do")
-		return nil
-	}
-	log.Debug().Msg("QC triggered view change, starting new view now")
-
-	// current view has changed, go to new view
-	return e.proposeForNewView()
 }
