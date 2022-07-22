@@ -992,7 +992,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		if err != nil {
 			return nil, err
 		}
-		
+
 		/*
 			TODO:
 			The following code to setup the connection to the access node is temporary
