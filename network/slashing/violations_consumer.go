@@ -11,63 +11,54 @@ import (
 )
 
 const (
-	unAuthorizedSenderViolation        = "unauthorized_sender"
-	unAuthorizedSenderUnicastViolation = "unauthorized_sender_unicast"
-	unknownMsgTypeViolation            = "unknown_message_type"
-	senderEjectedViolation             = "sender_ejected"
+	unAuthorizedSenderViolation = "unauthorized_sender"
+	unknownMsgTypeViolation     = "unknown_message_type"
+	senderEjectedViolation      = "sender_ejected"
 )
 
-// SlashingViolationsConsumer is a struct that logs a message for any slashable offences.
+// Consumer is a struct that logs a message for any slashable offences.
 // This struct will be updated in the future when slashing is implemented.
-type SlashingViolationsConsumer struct {
+type Consumer struct {
 	log zerolog.Logger
 }
 
-// NewSlashingViolationsConsumer returns a new SlashingViolationsConsumer
-func NewSlashingViolationsConsumer(log zerolog.Logger) *SlashingViolationsConsumer {
-	return &SlashingViolationsConsumer{log}
+// NewSlashingViolationsConsumer returns a new Consumer
+func NewSlashingViolationsConsumer(log zerolog.Logger) *Consumer {
+	return &Consumer{log}
+}
+
+func (c *Consumer) logEvent(identity *flow.Identity, peerID, msgType, offense string, err error) {
+	e := c.log.Error().
+		Str("peer_id", peerID).
+		Str("offense", offense)
+
+	if msgType != "" {
+		e.Str("message_type", msgType)
+	}
+
+	if identity != nil {
+		e.Str("role", identity.Role.String()).Hex("sender_id", logging.ID(identity.NodeID))
+	}
+
+	e.Msg(fmt.Sprintf("potential slashable offense: %s", err))
 }
 
 // OnUnAuthorizedSenderError logs an error for unauthorized sender error
-func (c *SlashingViolationsConsumer) OnUnAuthorizedSenderError(identity *flow.Identity, peerID, msgType string, err error) {
-	c.log.Error().
-		Str("peer_id", peerID).
-		Str("role", identity.Role.String()).
-		Hex("sender_id", logging.ID(identity.NodeID)).
-		Str("message_type", msgType).
-		Str("offense", unAuthorizedSenderViolation).
-		Msg(fmt.Sprintf("potential slashable offense: %s", err))
+func (c *Consumer) OnUnAuthorizedSenderError(identity *flow.Identity, peerID, msgType string, err error) {
+	c.logEvent(identity, peerID, msgType, unAuthorizedSenderViolation, err)
 }
 
 // OnUnknownMsgTypeError logs an error for unknown message type error
-func (c *SlashingViolationsConsumer) OnUnknownMsgTypeError(identity *flow.Identity, peerID, msgType string, err error) {
-	c.log.Error().
-		Str("peer_id", peerID).
-		Str("role", identity.Role.String()).
-		Hex("sender_id", logging.ID(identity.NodeID)).
-		Str("message_type", msgType).
-		Str("offense", unknownMsgTypeViolation).
-		Msg(fmt.Sprintf("potential slashable offense: %s", err))
+func (c *Consumer) OnUnknownMsgTypeError(identity *flow.Identity, peerID, msgType string, err error) {
+	c.logEvent(identity, peerID, msgType, unknownMsgTypeViolation, err)
 }
 
 // OnSenderEjectedError logs an error for sender ejected error
-func (c *SlashingViolationsConsumer) OnSenderEjectedError(identity *flow.Identity, peerID, msgType string, err error) {
-	c.log.Error().
-		Str("peer_id", peerID).
-		Str("role", identity.Role.String()).
-		Hex("sender_id", logging.ID(identity.NodeID)).
-		Str("message_type", msgType).
-		Str("offense", senderEjectedViolation).
-		Msg(fmt.Sprintf("potential slashable offense: %s", err))
+func (c *Consumer) OnSenderEjectedError(identity *flow.Identity, peerID, msgType string, err error) {
+	c.logEvent(identity, peerID, msgType, senderEjectedViolation, err)
 }
 
-// OnUnauthorizedUnicastError logs an error for an unauthorized message sent via unicast
-func (c *SlashingViolationsConsumer) OnUnauthorizedUnicastError(identity *flow.Identity, peerID, msgType string, err error) {
-	c.log.Error().
-		Str("peer_id", peerID).
-		Str("role", identity.Role.String()).
-		Hex("sender_id", logging.ID(identity.NodeID)).
-		Str("message_type", msgType).
-		Str("offense", unAuthorizedSenderUnicastViolation).
-		Msg(fmt.Sprintf("potential slashable offense: %s", err))
+// SetLogger overrides the configured logger allowing the user to add more log context
+func (c *Consumer) SetLogger(logger zerolog.Logger) {
+	c.log = logger
 }
