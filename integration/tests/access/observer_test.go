@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -76,6 +77,8 @@ func (suite *ObserverSuite) SetupTest() {
 		// the observer container is removed by an "AutoRemove" flag in AddObserver.
 		panic(err)
 	}
+
+	time.Sleep(time.Second * 3) // needs breathing room for the observer to start listening
 
 	// set the teardown function
 	suite.teardown = func() {
@@ -150,7 +153,7 @@ func (suite *ObserverSuite) TestObserverCompareRPCs() {
 
 func (suite *ObserverSuite) getClient(address string) (accessproto.AccessAPIClient, error) {
 	// helper func to create an access client
-	conn, err := grpc.Dial("0.0.0.0:9000", grpc.WithInsecure())
+	conn, err := grpc.Dial(address, grpc.WithInsecure())
 	if err != nil {
 		return nil, err
 	}
