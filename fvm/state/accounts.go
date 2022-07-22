@@ -575,7 +575,9 @@ func (a *StatefulAccounts) getAccountStatus(address flow.Address) (*AccountStatu
 	if err != nil {
 		return nil, fmt.Errorf("failed to load account status for the account (%s): %w", address.String(), err)
 	}
-
+	if len(statusBytes) == 0 {
+		return nil, errors.NewAccountNotFoundError(address)
+	}
 	return AccountStatusFromBytes(statusBytes)
 }
 
