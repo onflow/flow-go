@@ -33,12 +33,14 @@ func getCorruptibleNetworkNoAttacker(t *testing.T, corruptedID ...*flow.Identity
 	flowNetwork := &mocknetwork.Network{}
 	flowNetwork.On("Start", mock.Anything).Return()
 
+	// mock flow network will pretend to be ready when required
 	ready := make(chan struct{})
 	close(ready)
 	flowNetwork.On("Ready", mock.Anything).Return(func() <-chan struct{} {
 		return ready
 	})
 
+	// mock flow network will pretend to be done when required
 	done := make(chan struct{})
 	close(done)
 	flowNetwork.On("Done", mock.Anything).Return(func() <-chan struct{} {
