@@ -88,6 +88,7 @@ func (suite *ObserverSuite) SetupTest() {
 }
 
 func (suite *ObserverSuite) TestObserverConnection() {
+	// tests that the observer can be pinged successfully but returns an error when the upstream access node is stopped
 	ctx := context.Background()
 	t := suite.T()
 
@@ -109,7 +110,7 @@ func (suite *ObserverSuite) TestObserverConnection() {
 }
 
 func (suite *ObserverSuite) TestObserverWithoutAccess() {
-	// tests that observer returns errors when the access node is stopped
+	// tests that the observer returns errors when the access node is stopped
 	ctx := context.Background()
 	t := suite.T()
 
