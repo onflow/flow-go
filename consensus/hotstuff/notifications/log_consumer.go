@@ -195,6 +195,7 @@ func (lc *LogConsumer) OnPartialTcCreated(view uint64, newestQC *flow.QuorumCert
 	lc.log.Debug().
 		Uint64("view", view).
 		Uint64("newest_qc_view", newestQC.View).
+		Hex("newest_qc_block_id", newestQC.BlockID[:]).		
 		Bool("has_last_view_tc", lastViewTC != nil).
 		Msg("partial TC constructed")
 }
