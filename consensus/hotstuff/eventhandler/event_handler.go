@@ -14,22 +14,23 @@ import (
 )
 
 // EventHandler is the main handler for individual events that trigger state transition.
-// It exposes API to handle one event at a time synchronously. The caller is
-// responsible for running the event loop to ensure that.
-// EventHandler is implemented in event driven way, it reacts to incoming events and performs certain actions.
+// It exposes API to handle one event at a time synchronously. EventHandler is *not concurrency safe*.
+// Please use the EventLoop to ensure that only a single go-routine executes the EventHandler's algorithms.
+// EventHandler is implemented in event-driven way, it reacts to incoming events and performs certain actions.
 // It doesn't perform any actions on its own. There are 3 main responsibilities of EventHandler, vote, propose,
 // timeout. There are specific scenarios that lead to each of those actions.
 //  - create vote: voting logic is triggered by OnReceiveProposal, after receiving proposal we have all required information
-//  to create a valid vote. Compliance engine makes sure that we receive proposal which parents are known.
+//  to create a valid vote. Compliance engine makes sure that we receive proposals, whose parents are known.
 //  Creating a vote can be triggered ONLY by receiving proposal.
-//  - create timeout: creating model.TimeoutObject[TO] is triggered by OnLocalTimeout, after reaching deadline for current round
+//  - create timeout: creating model.TimeoutObject[TO] is triggered by OnLocalTimeout, after reaching deadline for current round.
 //  EventHandler gets notified about it and has to create a model.TimeoutObject and broadcast it to other replicas.
 //  Creating a TO can be triggered ONLY by reaching round deadline.
-//  - create a proposal: proposing logic is more complicated, to create a proposal we need to obtain a QC or TC, naturally
-//  this triggers proposing logic and tries to create a proposal. There is another case, where receiving a QC or TC triggers
-//  proposing logic, but we can't create a proposal since we are missing parent block referred by the newest QC.
-//  Based on that OnReceiveProposal can trigger proposing logic as welll, but only when receiving proposal for view lower than active
-//  view. To summarize, to make a valid proposal for view N we need to have a QC or TC for N-1 and receive proposal with blockID
+//  - create a proposal: proposing logic is more complicated. Creating a proposal is triggered by the EventHandler receiving
+//  a QC or TC that induces a view change to a view where the replica is primary. As an edge case, the EventHandler 
+//  can receive a QC or TC that triggers the view change, but we can't create a proposal in case we are missing parent block the newest QC refers to.
+//  In case we already have the QC, but are still missing the respective parent, OnReceiveProposal can trigger the proposing logic
+//  as welll, but only when receiving proposal for view lower than active view. 
+//  To summarize, to make a valid proposal for view N we need to have a QC or TC for N-1 and know the proposal with blockID
 //  NewestQC.BlockID.
 type EventHandler struct {
 	log               zerolog.Logger
@@ -127,7 +128,7 @@ func (e *EventHandler) OnReceiveTc(tc *flow.TimeoutCertificate) error {
 		return nil
 	}
 
-	nve, err := e.paceMaker.ProcessTC(tc)
+	newViewEvent, err := e.paceMaker.ProcessTC(tc)
 	if err != nil {
 		return fmt.Errorf("could not process TC for view %d: %w", tc.View, err)
 	}
@@ -145,7 +146,6 @@ func (e *EventHandler) OnReceiveTc(tc *flow.TimeoutCertificate) error {
 // All inputs should be validated before feeding into this function. Assuming trusted data.
 // No errors are expected during normal operation.
 func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
-
 	block := proposal.Block
 	curView := e.paceMaker.CurView()
 
@@ -312,13 +312,11 @@ func (e *EventHandler) processPendingBlocks() error {
 // proposeForNewView will only be called when we may able to propose a block, after processing a new event.
 // * after entering a new view as a result of processing a QC or TC, then we may propose for the newly entered view
 // * after receiving a proposal (but not changing view), if that proposal is referenced by our highest known QC,
-//    and the proposal was previously unknown, then we can propose a block in the current view
+//   and the proposal was previously unknown, then we can propose a block in the current view
 // It reads the current view, and generates a proposal if we are the leader.
 // No errors are expected during normal operation.
-func (e *EventHandler) proposeForNewView() error {
-
-	// track the start time
-	start := time.Now()
+func (e *EventHandler) proposeForNewViewIfPrimary() error {
+	start := time.Now() // track the start time
 
 	curView := e.paceMaker.CurView()
 
@@ -335,7 +333,9 @@ func (e *EventHandler) proposeForNewView() error {
 		Msg("entering new view")
 	e.notifier.OnEnteringView(curView, currentLeader)
 
-	if e.committee.Self() == currentLeader {
+	if e.committee.Self() != currentLeader {
+		return nil
+	}
 		log.Debug().Msg("generating block proposal as leader")
 
 		// TODO(active-pacemaker): SafetyRules checks identity using proposal.BlockID, here we can check only by view ?
@@ -361,15 +361,15 @@ func (e *EventHandler) proposeForNewView() error {
 			// create a valid proposal since we can't guarantee validity of block payload.
 			log.Warn().
 				Uint64("qc_view", newestQC.View).
-				Hex("block_id", newestQC.BlockID[:]).Msg("no parent found for newest QC, can't propose")
+				Hex("block_id", newestQC.BlockID[:]).Msg("haven't synced the latest block yet; can't propose")
 			return nil
 		}
 
-		// perform sanity checks to make sure that resulted proposal is valid.
-		// to create proposal leader for view N needs to present evidence that has was allowed to.
-		// To do that he includes QC or TC for view N-1. Note that PaceMaker advances views only after observing QC or TC,
-		// moreover QC and TC are processed always together, keeping in mind that EventHandler is used strictly single-threaded without reentrancy
-		// we reach a conclusion that we must have a QC or TC with view equal to (curView-1). Failing one of these sanity checks
+		// Sanity checks to make sure that resulting proposal is valid:
+		// * in its proposal, leader for view N needs to present evidence that has legitimately entered view N
+		// To do that he includes QC or TC for view N-1. Note that the PaceMaker advances to view N only after observing QC or TC from view N-1.
+		// moreover QC and TC are processed always together. As EventHandler is used strictly single-threaded without reentrancy,
+		// we must have a QC or TC for the prior view (curView-1). Failing one of these sanity checks
 		// is a symptom of state corruption or a severe implementation bug.
 		if newestQC.View+1 != curView {
 			if lastViewTC == nil {
@@ -380,7 +380,7 @@ func (e *EventHandler) proposeForNewView() error {
 					newestQC.View, lastViewTC.View, curView)
 			}
 		} else {
-			// in case last view has ended with QC and TC, make sure that only QC is included
+			// In case last view has ended with QC and TC, make sure that only QC is included,
 			// otherwise such proposal is invalid. This case is possible if TC has included QC with the same
 			// view as the TC itself, meaning that newestQC.View == lastViewTC.View
 			lastViewTC = nil

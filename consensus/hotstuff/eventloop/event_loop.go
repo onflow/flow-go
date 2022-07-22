@@ -273,7 +273,7 @@ func (el *EventLoop) OnNewQcDiscovered(qc *flow.QuorumCertificate) {
 
 // OnNewTcDiscovered pushes already validated TCs that were submitted from TimeoutAggregator to the event handler
 func (el *EventLoop) OnNewTcDiscovered(tc *flow.TimeoutCertificate) {
-	el.OnTcConstructedFromTimeouts(tc)
+	el.onTrustedTC(tc)
 }
 
 // OnQcConstructedFromVotes implements hotstuff.QCCreatedConsumer and pushes received qc into processing pipeline.
