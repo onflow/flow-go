@@ -6,11 +6,12 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/network/channels"
+
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/utils/logging"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -28,7 +29,9 @@ import (
 //    corrupted VN.
 // 5. Any other incoming messages to the orchestrator are passed through, i.e., are sent as they are in the original Flow network without any tampering.
 type Orchestrator struct {
-	sync.Mutex
+	attackStateLock   sync.RWMutex // providing mutual exclusion for external reads to attack state.
+	receiptHandleLock sync.Mutex   // ensuring at most one receipt is handled at a time, to avoid corrupting two concurrent receipts.
+
 	logger zerolog.Logger
 	state  *attackState
 
@@ -60,9 +63,6 @@ func (o *Orchestrator) WithAttackNetwork(network insecure.AttackNetwork) {
 // the attack Orchestrator instead of dispatching them directly to the network.
 // The Orchestrator completely determines what the corrupted conduit should send to the network.
 func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error {
-	o.Lock()
-	defer o.Unlock()
-
 	switch event.FlowProtocolEvent.(type) {
 
 	case *flow.ExecutionReceipt:
@@ -91,9 +91,16 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error
 	default:
 		// Any other event is just passed through the network as it is.
 		err := o.network.Send(event)
+
 		if err != nil {
 			return fmt.Errorf("could not send rpc on channel: %w", err)
 		}
+		o.logger.Debug().
+			Hex("corrupted_node_id", logging.ID(event.CorruptedNodeId)).
+			Str("channel_id", string(event.Channel)).
+			Str("protocol", event.Protocol.String()).
+			Str("type", fmt.Sprintf("%T", event)).
+			Msg("miscellaneous event has passed through")
 	}
 
 	return nil
@@ -127,6 +134,10 @@ func (o *Orchestrator) corruptExecutionResult(receipt *flow.ExecutionReceipt) *f
 // If no attack has already been conducted, it corrupts the result of receipt and sends it to all corrupted execution nodes.
 // Otherwise, it just passes through the receipt to the sender.
 func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Event) error {
+	// ensuring at most one receipt is handled at a time, to avoid corrupting two concurrent receipts
+	o.receiptHandleLock.Lock()
+	defer o.receiptHandleLock.Unlock()
+
 	ok := o.corruptedNodeIds.Contains(receiptEvent.CorruptedNodeId)
 	if !ok {
 		return fmt.Errorf("sender of the event is not a corrupted node")
@@ -157,8 +168,8 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Event)
 		Uint32("targets_num", receiptEvent.TargetNum).
 		Str("target_ids", fmt.Sprintf("%v", receiptEvent.TargetIds)).Logger()
 
-	if o.state != nil {
-		// non-nil state means an execution result has already been corrupted.
+	if _, _, conducted := o.AttackState(); conducted {
+		// an attack has already been conducted
 		if receipt.ExecutionResult.ID() == o.state.originalResult.ID() {
 			// receipt contains the original result that has been corrupted.
 			// corrupted result must have already been sent to this node, so
@@ -171,7 +182,6 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Event)
 		if err != nil {
 			return fmt.Errorf("could not send rpc on channel: %w", err)
 		}
-
 		lg.Info().Msg("receipt event passed through")
 		return nil
 	}
@@ -200,13 +210,14 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Event)
 		if err != nil {
 			return fmt.Errorf("could not send rpc on channel: %w", err)
 		}
+		lg.Debug().
+			Hex("corrupted_result_id", logging.ID(corruptedResult.ID())).
+			Hex("corrupted_execution_id", logging.ID(corruptedExecutionId)).
+			Msg("corrupted result successfully sent to corrupted execution node")
 	}
 
 	// saves state of attack for further replies
-	o.state = &attackState{
-		originalResult:  &receipt.ExecutionResult,
-		corruptedResult: corruptedResult,
-	}
+	o.updateAttackState(&receipt.ExecutionResult, corruptedResult)
 	lg.Info().
 		Hex("corrupted_result_id", logging.ID(corruptedResult.ID())).
 		Msg("result successfully corrupted")
@@ -232,7 +243,8 @@ func (o *Orchestrator) handleChunkDataPackRequestEvent(chunkDataPackRequestEvent
 		return fmt.Errorf("wrong sender role for chunk data pack request: %s", corruptedIdentity.Role.String())
 	}
 
-	if o.state != nil {
+	if _, _, conducted := o.AttackState(); conducted {
+		// an attack has already been conducted
 		sent, err := o.replyWithAttestation(chunkDataPackRequestEvent)
 		if err != nil {
 			return fmt.Errorf("could not reply with attestation: %w", err)
@@ -266,9 +278,9 @@ func (o *Orchestrator) handleChunkDataPackRequestEvent(chunkDataPackRequestEvent
 // handleChunkDataPackResponseEvent wintermutes the chunk data pack reply if it belongs to a corrupted result, and is meant to
 // be sent to an honest verification node. Otherwise, it is passed through.
 func (o *Orchestrator) handleChunkDataPackResponseEvent(chunkDataPackReplyEvent *insecure.Event) error {
-	if o.state != nil {
-		cdpRep := chunkDataPackReplyEvent.FlowProtocolEvent.(*messages.ChunkDataResponse)
-
+	cdpRep := chunkDataPackReplyEvent.FlowProtocolEvent.(*messages.ChunkDataResponse)
+	if _, _, conducted := o.AttackState(); conducted {
+		// an attack has already been conducted
 		lg := o.logger.With().
 			Hex("chunk_id", logging.ID(cdpRep.ChunkDataPack.ChunkID)).
 			Hex("sender_id", logging.ID(chunkDataPackReplyEvent.CorruptedNodeId)).
@@ -299,6 +311,10 @@ func (o *Orchestrator) handleChunkDataPackResponseEvent(chunkDataPackReplyEvent 
 	if err != nil {
 		return fmt.Errorf("could not passed through chunk data reply: %w", err)
 	}
+	o.logger.Debug().
+		Hex("corrupted_id", logging.ID(chunkDataPackReplyEvent.CorruptedNodeId)).
+		Hex("chunk_id", logging.ID(cdpRep.ChunkDataPack.ID())).
+		Msg("chunk data pack response passed through")
 	return nil
 }
 
@@ -315,7 +331,8 @@ func (o *Orchestrator) handleResultApprovalEvent(resultApprovalEvent *insecure.E
 		Hex("sender_id", logging.ID(resultApprovalEvent.CorruptedNodeId)).
 		Str("target_ids", fmt.Sprintf("%v", resultApprovalEvent.TargetIds)).Logger()
 
-	if o.state != nil {
+	if _, _, conducted := o.AttackState(); conducted {
+		// an attack has already been conducted
 		if o.state.originalResult.ID() == approval.Body.ExecutionResultID {
 			lg.Info().Msg("wintermuting result approval for original un-corrupted execution result")
 			return nil
@@ -353,7 +370,7 @@ func (o *Orchestrator) replyWithAttestation(chunkDataPackRequestEvent *insecure.
 		consensusIds := o.allNodeIds.Filter(filter.HasRole(flow.RoleConsensus)).NodeIDs()
 		err = o.network.Send(&insecure.Event{
 			CorruptedNodeId: chunkDataPackRequestEvent.CorruptedNodeId,
-			Channel:         network.PushApprovals,
+			Channel:         channels.PushApprovals,
 			Protocol:        insecure.Protocol_PUBLISH,
 			TargetNum:       0,
 			TargetIds:       consensusIds,
@@ -382,8 +399,8 @@ func (o *Orchestrator) replyWithAttestation(chunkDataPackRequestEvent *insecure.
 // AttackState returns the corrupted and original execution results involved in this attack.
 // Boolean return value determines whether attack conducted.
 func (o *Orchestrator) AttackState() (flow.ExecutionResult, flow.ExecutionResult, bool) {
-	o.Lock()
-	defer o.Unlock()
+	o.attackStateLock.RLock()
+	defer o.attackStateLock.RUnlock()
 
 	if o.state == nil {
 		// no attack yet conducted.
@@ -391,4 +408,20 @@ func (o *Orchestrator) AttackState() (flow.ExecutionResult, flow.ExecutionResult
 	}
 
 	return *o.state.corruptedResult, *o.state.originalResult, true
+}
+
+func (o *Orchestrator) updateAttackState(originalResult *flow.ExecutionResult, corruptedResult *flow.ExecutionResult) {
+	o.attackStateLock.Lock()
+	defer o.attackStateLock.Unlock()
+
+	if o.state != nil {
+		// based on our testing assumptions, Wintermute attack must be conducted only once, extra attempts
+		// can be due to a bug.
+		panic("attempt on conducting an already conducted attack is not allowed")
+	}
+
+	o.state = &attackState{
+		originalResult:  originalResult,
+		corruptedResult: corruptedResult,
+	}
 }

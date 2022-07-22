@@ -111,7 +111,12 @@ func (nc *NoopCollector) OnBlockConsumerJobDone(uint64)                         
 func (nc *NoopCollector) OnChunkConsumerJobDone(uint64)                                        {}
 func (nc *NoopCollector) OnChunkDataPackResponseReceivedFromNetworkByRequester()               {}
 func (nc *NoopCollector) TotalConnectionsInPool(connectionCount uint, connectionPoolSize uint) {}
-func (nc *NoopCollector) ConnectionFromPoolRetrieved()                                         {}
+func (nc *NoopCollector) ConnectionFromPoolReused()                                            {}
+func (nc *NoopCollector) ConnectionAddedToPool()                                               {}
+func (nc *NoopCollector) NewConnectionEstablished()                                            {}
+func (nc *NoopCollector) ConnectionFromPoolInvalidated()                                       {}
+func (nc *NoopCollector) ConnectionFromPoolUpdated()                                           {}
+func (nc *NoopCollector) ConnectionFromPoolEvicted()                                           {}
 func (nc *NoopCollector) StartBlockReceivedToExecuted(blockID flow.Identifier)                 {}
 func (nc *NoopCollector) FinishBlockReceivedToExecuted(blockID flow.Identifier)                {}
 func (nc *NoopCollector) ExecutionComputationUsedPerBlock(computation uint64)                  {}
@@ -153,15 +158,16 @@ func (nc *NoopCollector) TransactionFinalized(txID flow.Identifier, when time.Ti
 func (nc *NoopCollector) TransactionExecuted(txID flow.Identifier, when time.Time)              {}
 func (nc *NoopCollector) TransactionExpired(txID flow.Identifier)                               {}
 func (nc *NoopCollector) TransactionSubmissionFailed()                                          {}
+func (nc *NoopCollector) UpdateExecutionReceiptMaxHeight(height uint64)                         {}
 func (nc *NoopCollector) ChunkDataPackRequested()                                               {}
 func (nc *NoopCollector) ExecutionSync(syncing bool)                                            {}
-func (nc *NoopCollector) DiskSize(uint64)                                                       {}
 func (nc *NoopCollector) ExecutionBlockDataUploadStarted()                                      {}
 func (nc *NoopCollector) ExecutionBlockDataUploadFinished(dur time.Duration)                    {}
 func (nc *NoopCollector) ExecutionDataAddStarted()                                              {}
 func (nc *NoopCollector) ExecutionDataAddFinished(time.Duration, bool, uint64)                  {}
 func (nc *NoopCollector) ExecutionDataGetStarted()                                              {}
 func (nc *NoopCollector) ExecutionDataGetFinished(time.Duration, bool, uint64)                  {}
+func (nc *NoopCollector) UpdateCollectionMaxHeight(height uint64)                               {}
 func (nc *NoopCollector) BucketAvailableSlots(uint64, uint64)                                   {}
 func (nc *NoopCollector) OnKeyPutSuccess()                                                      {}
 func (nc *NoopCollector) OnEntityEjectionDueToFullCapacity()                                    {}

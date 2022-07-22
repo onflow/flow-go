@@ -12,13 +12,10 @@ import (
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	lru "github.com/hashicorp/golang-lru"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
-	legacyaccessproto "github.com/onflow/flow/protobuf/go/flow/legacy/access"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
-	"github.com/onflow/flow-go/access"
-	legacyaccess "github.com/onflow/flow-go/access/legacy"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
@@ -70,8 +67,8 @@ type Engine struct {
 	restAPIAddress      net.Addr
 }
 
-// New returns a new RPC engine.
-func New(log zerolog.Logger,
+// NewBuilder returns a new RPC engine builder.
+func NewBuilder(log zerolog.Logger,
 	state protocol.State,
 	config Config,
 	collectionRPC accessproto.AccessAPIClient,
@@ -91,7 +88,7 @@ func New(log zerolog.Logger,
 	rpcMetricsEnabled bool,
 	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the Access API e.g. Ping->100, GetTransaction->300
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the Access API e.g. Ping->50, GetTransaction->10
-) (*Engine, error) {
+) (*RPCEngineBuilder, error) {
 
 	log = log.With().Str("engine", "rpc").Logger()
 
@@ -135,12 +132,18 @@ func New(log zerolog.Logger,
 	// wrap the unsecured server with an HTTP proxy server to serve HTTP clients
 	httpServer := NewHTTPServer(unsecureGrpcServer, config.HTTPListenAddr)
 
+	// TODO: when cache size is set to 0, handle case where we do not use cache
 	cacheSize := config.ConnectionPoolSize
 	if cacheSize == 0 {
 		cacheSize = backend.DefaultConnectionPoolSize
 	}
 	cache, err := lru.NewWithEvict(int(cacheSize), func(_, evictedValue interface{}) {
-		evictedValue.(*grpc.ClientConn).Close()
+		store := evictedValue.(*backend.CachedClient)
+		store.Close()
+		log.Debug().Str("grpc_conn_evicted", store.Address).Msg("closing grpc connection evicted from pool")
+		if accessMetrics != nil {
+			accessMetrics.ConnectionFromPoolEvicted()
+		}
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize connection pool cache: %w", err)
@@ -154,6 +157,7 @@ func New(log zerolog.Logger,
 		ConnectionsCache:          cache,
 		CacheSize:                 cacheSize,
 		AccessMetrics:             accessMetrics,
+		Log:                       log,
 	}
 
 	backend := backend.New(state,
@@ -187,34 +191,12 @@ func New(log zerolog.Logger,
 		chain:              chainID.Chain(),
 	}
 
-	accessproto.RegisterAccessAPIServer(
-		eng.unsecureGrpcServer,
-		access.NewHandler(backend, chainID.Chain()),
-	)
-
-	accessproto.RegisterAccessAPIServer(
-		eng.secureGrpcServer,
-		access.NewHandler(backend, chainID.Chain()),
-	)
-
+	builder := NewRPCEngineBuilder(eng)
 	if rpcMetricsEnabled {
-		// Not interested in legacy metrics, so initialize here
-		grpc_prometheus.EnableHandlingTimeHistogram()
-		grpc_prometheus.Register(unsecureGrpcServer)
-		grpc_prometheus.Register(secureGrpcServer)
+		builder.WithMetrics()
 	}
 
-	// Register legacy gRPC handlers for backwards compatibility, to be removed at a later date
-	legacyaccessproto.RegisterAccessAPIServer(
-		eng.unsecureGrpcServer,
-		legacyaccess.NewHandler(backend, chainID.Chain()),
-	)
-	legacyaccessproto.RegisterAccessAPIServer(
-		eng.secureGrpcServer,
-		legacyaccess.NewHandler(backend, chainID.Chain()),
-	)
-
-	return eng, nil
+	return builder, nil
 }
 
 // Ready returns a ready channel that is closed once the engine has fully

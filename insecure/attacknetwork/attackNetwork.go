@@ -2,40 +2,26 @@ package attacknetwork
 
 import (
 	"fmt"
-	"io"
-	"net"
 	"sync"
 
-	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
-	"google.golang.org/grpc"
 
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/logging"
-)
-
-type runtime string
-
-const (
-	networkingProtocolTCP = "tcp"
-	dockerLocalHost       = "host.docker.internal"
-	dockerRuntime         = runtime("docker")
-	localhostRuntime      = runtime("localhost")
 )
 
 // AttackNetwork implements a middleware for mounting an attack orchestrator and empowering it to communicate with the corrupted nodes.
 type AttackNetwork struct {
 	component.Component
-	rt                   runtime // denotes whether corrupted nodes are running in docker or localhost
 	cm                   *component.ComponentManager
+	orchestratorMutex    sync.Mutex // to ensure thread-safe calls into orchestrator.
 	logger               zerolog.Logger
-	address              string                      // address on which the orchestrator is reachable from corrupted nodes.
-	server               *grpc.Server                // touch point of corrupted nodes with the mounted orchestrator.
 	orchestrator         insecure.AttackOrchestrator // the mounted orchestrator that implements certain attack logic.
 	codec                network.Codec
 	corruptedNodeIds     flow.IdentityList                                    // identity of the corrupted nodes
@@ -44,22 +30,14 @@ type AttackNetwork struct {
 
 }
 
-// WithLocalHostRuntime denotes the attack network that corrupted nodes are running on the localhost.
-// This is typically the case for unit testing the attack network.
-func WithLocalHostRuntime(a *AttackNetwork) {
-	a.rt = localhostRuntime
-}
-
 func NewAttackNetwork(
 	logger zerolog.Logger,
-	address string,
 	codec network.Codec,
 	orchestrator insecure.AttackOrchestrator,
 	connector insecure.CorruptedNodeConnector,
-	corruptedNodeIds flow.IdentityList, opts ...func(*AttackNetwork)) (*AttackNetwork, error) {
+	corruptedNodeIds flow.IdentityList) (*AttackNetwork, error) {
 
 	attackNetwork := &AttackNetwork{
-		rt:                   dockerRuntime,
 		orchestrator:         orchestrator,
 		logger:               logger,
 		codec:                codec,
@@ -68,14 +46,12 @@ func NewAttackNetwork(
 		corruptedConnections: make(map[flow.Identifier]insecure.CorruptedNodeConnection),
 	}
 
-	for _, opt := range opts {
-		opt(attackNetwork)
-	}
+	connector.WithIncomingMessageHandler(attackNetwork.Observe)
 
 	// setting lifecycle management module.
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			err := attackNetwork.start(ctx, address)
+			err := attackNetwork.start(ctx)
 			if err != nil {
 				ctx.Throw(fmt.Errorf("could not start attackNetwork: %w", err))
 			}
@@ -97,42 +73,7 @@ func NewAttackNetwork(
 }
 
 // start triggers the sub-modules of attack network.
-func (a *AttackNetwork) start(ctx irrecoverable.SignalerContext, address string) error {
-	// starts up gRPC server of attack network at given address.
-	s := grpc.NewServer()
-	insecure.RegisterAttackerServer(s, a)
-	ln, err := net.Listen(networkingProtocolTCP, address)
-	if err != nil {
-		ctx.Throw(fmt.Errorf("could not listen on specified address: %w", err))
-	}
-	a.server = s
-	a.address = ln.Addr().String()
-
-	if a.rt == dockerRuntime {
-		// since corrupted nodes are running on docker, attacker registers itself
-		// with a docker local host address, hence being reachable from internal docker
-		// network.
-		_, port, err := net.SplitHostPort(a.address)
-		if err != nil {
-			return fmt.Errorf("could not split host and port for address: %s", a.address)
-		}
-		a.address = fmt.Sprintf("%s:%s", dockerLocalHost, port)
-	}
-
-	a.corruptedConnector.WithAttackerAddress(a.address)
-
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		wg.Done()
-		if err = s.Serve(ln); err != nil { // blocking call
-			ctx.Throw(fmt.Errorf("could not bind attackNetwork to the tcp listener: %w", err))
-		}
-	}()
-
-	// waits till gRPC server starts serving.
-	wg.Wait()
-
+func (a *AttackNetwork) start(ctx irrecoverable.SignalerContext) error {
 	// creates a connection to all corrupted nodes in the attack network.
 	for _, corruptedNodeId := range a.corruptedNodeIds {
 		connection, err := a.corruptedConnector.Connect(ctx, corruptedNodeId.NodeID)
@@ -161,41 +102,15 @@ func (a *AttackNetwork) stop() error {
 		}
 	}
 
-	// tears down the attack server itself.
-	a.server.Stop()
-
 	return errors.ErrorOrNil()
 }
 
-// ServerAddress returns the address on which the orchestrator is reachable from corrupted nodes.
-func (a AttackNetwork) ServerAddress() string {
-	return a.address
-}
-
-// Observe implements the gRPC interface of the attack network that is exposed to the corrupted conduits.
+// Observe is the inbound message handler of the attack network.
 // Instead of dispatching their messages to the networking layer of Flow, the conduits of corrupted nodes
-// dispatch the outgoing messages to the attack network by calling the Observe method of it remotely.
-func (a *AttackNetwork) Observe(stream insecure.Attacker_ObserveServer) error {
-	for {
-		select {
-		case <-a.cm.ShutdownSignal():
-			// attack network terminated, hence terminating this loop.
-			return nil
-		default:
-			msg, err := stream.Recv()
-			if err == io.EOF {
-				a.logger.Info().Msg("attack network closed processing stream")
-				return stream.SendAndClose(&empty.Empty{})
-			}
-			if err != nil {
-				return fmt.Errorf("could not read corrupted node's stream: %w", err)
-			}
-
-			if err = a.processMessageFromCorruptedNode(msg); err != nil {
-				a.logger.Fatal().Err(err).Msg("could not process message of corrupted node")
-				return stream.SendAndClose(&empty.Empty{})
-			}
-		}
+// dispatch the outgoing messages to the attack network by calling the InboundHandler method of it remotely.
+func (a *AttackNetwork) Observe(message *insecure.Message) {
+	if err := a.processMessageFromCorruptedNode(message); err != nil {
+		a.logger.Fatal().Err(err).Msg("could not process message of corrupted node")
 	}
 }
 
@@ -217,9 +132,13 @@ func (a *AttackNetwork) processMessageFromCorruptedNode(message *insecure.Messag
 		return fmt.Errorf("could not convert target ids to flow identifiers: %w", err)
 	}
 
+	// making sure events are sequentialized to orchestrator.
+	a.orchestratorMutex.Lock()
+	defer a.orchestratorMutex.Unlock()
+
 	err = a.orchestrator.HandleEventFromCorruptedNode(&insecure.Event{
 		CorruptedNodeId:   sender,
-		Channel:           network.Channel(message.ChannelID),
+		Channel:           channels.Channel(message.ChannelID),
 		FlowProtocolEvent: event,
 		Protocol:          message.Protocol,
 		TargetNum:         message.TargetNum,
@@ -256,7 +175,7 @@ func (a *AttackNetwork) Send(event *insecure.Event) error {
 // eventToMessage converts the given application layer event to a protobuf message that is meant to be sent to the corrupted node.
 func (a *AttackNetwork) eventToMessage(corruptedId flow.Identifier,
 	event interface{},
-	channel network.Channel,
+	channel channels.Channel,
 	protocol insecure.Protocol,
 	num uint32,
 	targetIds ...flow.Identifier) (*insecure.Message, error) {

@@ -192,17 +192,17 @@ func TestExtractExecutionState(t *testing.T) {
 func getSampleKeyValues(i int) ([]ledger.Key, []ledger.Value) {
 	switch i {
 	case 0:
-		return []ledger.Key{getKey("", "", "uuid"), getKey("", "", "account_address_state")},
+		return []ledger.Key{getKey("", "uuid"), getKey("", "account_address_state")},
 			[]ledger.Value{[]byte{'1'}, []byte{'A'}}
 	case 1:
-		return []ledger.Key{getKey("ADDRESS", "ADDRESS", "public_key_count"),
-				getKey("ADDRESS", "ADDRESS", "public_key_0"),
-				getKey("ADDRESS", "", "exists"),
-				getKey("ADDRESS", "", "storage_used")},
+		return []ledger.Key{getKey("ADDRESS", "public_key_count"),
+				getKey("ADDRESS", "public_key_0"),
+				getKey("ADDRESS", "exists"),
+				getKey("ADDRESS", "storage_used")},
 			[]ledger.Value{[]byte{1}, []byte("PUBLICKEYXYZ"), []byte{1}, []byte{100}}
 	case 2:
 		// TODO change the contract_names to CBOR encoding
-		return []ledger.Key{getKey("ADDRESS", "ADDRESS", "contract_names"), getKey("ADDRESS", "ADDRESS", "code.mycontract")},
+		return []ledger.Key{getKey("ADDRESS", "contract_names"), getKey("ADDRESS", "code.mycontract")},
 			[]ledger.Value{[]byte("mycontract"), []byte("CONTRACT Content")}
 	default:
 		keys := make([]ledger.Key, 0)
@@ -213,17 +213,16 @@ func getSampleKeyValues(i int) ([]ledger.Key, []ledger.Value) {
 			if err != nil {
 				panic(err)
 			}
-			keys = append(keys, getKey(string(address), "", "test"))
+			keys = append(keys, getKey(string(address), "test"))
 			values = append(values, getRandomCadenceValue())
 		}
 		return keys, values
 	}
 }
 
-func getKey(owner, controller, key string) ledger.Key {
+func getKey(owner, key string) ledger.Key {
 	return ledger.Key{KeyParts: []ledger.KeyPart{
 		{Type: uint16(0), Value: []byte(owner)},
-		{Type: uint16(1), Value: []byte(controller)},
 		{Type: uint16(2), Value: []byte(key)},
 	},
 	}

@@ -10,8 +10,8 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
+	msig "github.com/onflow/flow-go/module/signature"
 )
 
 // StakingVerifier is a verifier capable of verifying staking signature for each
@@ -25,7 +25,7 @@ var _ hotstuff.Verifier = (*StakingVerifier)(nil)
 // NewStakingVerifier creates a new single verifier with the given dependencies.
 func NewStakingVerifier() *StakingVerifier {
 	return &StakingVerifier{
-		stakingHasher: crypto.NewBLSKMAC(encoding.CollectorVoteTag),
+		stakingHasher: msig.NewBLSHasher(msig.CollectorVoteTag),
 	}
 }
 

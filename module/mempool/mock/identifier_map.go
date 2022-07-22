@@ -87,8 +87,8 @@ func (_m *IdentifierMap) Keys() ([]flow.Identifier, bool) {
 	return r0, r1
 }
 
-// Rem provides a mock function with given fields: key
-func (_m *IdentifierMap) Rem(key flow.Identifier) bool {
+// Remove provides a mock function with given fields: key
+func (_m *IdentifierMap) Remove(key flow.Identifier) bool {
 	ret := _m.Called(key)
 
 	var r0 bool
@@ -101,8 +101,8 @@ func (_m *IdentifierMap) Rem(key flow.Identifier) bool {
 	return r0
 }
 
-// RemIdFromKey provides a mock function with given fields: key, id
-func (_m *IdentifierMap) RemIdFromKey(key flow.Identifier, id flow.Identifier) error {
+// RemoveIdFromKey provides a mock function with given fields: key, id
+func (_m *IdentifierMap) RemoveIdFromKey(key flow.Identifier, id flow.Identifier) error {
 	ret := _m.Called(key, id)
 
 	var r0 error

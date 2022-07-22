@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	libp2pmsg "github.com/onflow/flow-go/model/libp2p/message"
-	flownet "github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -89,7 +89,7 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	topic := flownet.Topic("/flow/" + unittest.IdentifierFixture().String())
+	topic := channels.Topic("/flow/" + unittest.IdentifierFixture().String())
 	count := 5
 	golog.SetAllLoggers(golog.LevelFatal) // change this to Debug if libp2p logs are needed
 
@@ -156,7 +156,7 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 		}
 
 		// Subscribes to the test topic
-		s, err := n.Subscribe(topic, codec)
+		s, err := n.Subscribe(topic, codec, unittest.AllowAllPeerFilter())
 		require.NoError(t, err)
 
 		// kick off the reader
