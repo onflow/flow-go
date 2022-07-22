@@ -38,23 +38,19 @@ func (d TransactionStorageLimiter) CheckLimits(
 	}
 
 	commonAddresses := make([]common.Address, len(addresses))
-	for i, address := range addresses {
-		commonAddresses[i] = common.Address(address)
-	}
-
 	usages := make([]uint64, len(commonAddresses))
-	for i, address := range commonAddresses {
-		u, err := env.GetStorageUsed(address)
+	for i, address := range addresses {
+		c := common.Address(address)
+		commonAddresses[i] = c
+		u, err := env.GetStorageUsed(c)
 		if err != nil {
 			return fmt.Errorf("storage limit check failed: %w", err)
 		}
 		usages[i] = u
 	}
 
-	n := len(addresses)/TransactionStorageLimiterScriptArgumentBatchSize + 1
-	for i := 0; i < n; i++ {
-		start := i * TransactionStorageLimiterScriptArgumentBatchSize
-		end := (i + 1) * TransactionStorageLimiterScriptArgumentBatchSize
+	for start := 0; start < len(addresses); start += TransactionStorageLimiterScriptArgumentBatchSize {
+		end := start + TransactionStorageLimiterScriptArgumentBatchSize
 		if end > len(addresses) {
 			end = len(addresses)
 		}
