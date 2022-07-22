@@ -7,7 +7,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// TimeoutCollectorDistributor subscribes for events from hotstuff and distributes it to subscribers.
+// TimeoutCollectorDistributor ingests events from hotstuff and distributes it to subscribers.
 // Concurrently safe
 // TODO: investigate if this can be updated using atomics to prevent locking on mutex since we always add all consumers
 // before delivering events.
