@@ -44,7 +44,7 @@ func NewScriptEnvironment(
 	vm *VirtualMachine,
 	sth *state.StateHolder,
 	programs *programs.Programs,
-) *ScriptEnv {
+) (*ScriptEnv, error) {
 
 	accounts := state.NewAccounts(sth)
 	uuidGenerator := state.NewUUIDGenerator(sth)
@@ -83,14 +83,16 @@ func NewScriptEnvironment(
 		env.seedRNG(fvmContext.BlockHeader)
 	}
 
+	var err error
+	// set the execution parameters from the state
 	if fvmContext.AllowContextOverrideByExecutionState {
-		env.setExecutionParameters()
+		err = env.setExecutionParameters()
 	}
 
-	return env
+	return env, err
 }
 
-func (e *ScriptEnv) setExecutionParameters() {
+func (e *ScriptEnv) setExecutionParameters() error {
 	// Check that the service account exists because all the settings are stored in it
 	serviceAddress := e.Context().Chain.ServiceAddress()
 	service := runtime.Address(serviceAddress)
@@ -115,7 +117,7 @@ func (e *ScriptEnv) setExecutionParameters() {
 				Debug().
 				Err(err).
 				Msgf("could not set %s. Using defaults", prop)
-			return
+			return nil
 		}
 		// everything is ok. do the setting
 		setter()
@@ -126,7 +128,7 @@ func (e *ScriptEnv) setExecutionParameters() {
 	var m *weighted.Meter
 	// only set the weights if the meter is a weighted.Meter
 	if m, ok = e.sth.State().Meter().(*weighted.Meter); !ok {
-		return
+		return nil
 	}
 
 	computationWeights, err := GetExecutionEffortWeights(e, service)
@@ -135,7 +137,7 @@ func (e *ScriptEnv) setExecutionParameters() {
 		err,
 		func() { m.SetComputationWeights(computationWeights) })
 	if err != nil {
-		return
+		return err
 	}
 
 	memoryWeights, err := GetExecutionMemoryWeights(e, service)
@@ -144,7 +146,7 @@ func (e *ScriptEnv) setExecutionParameters() {
 		err,
 		func() { m.SetMemoryWeights(memoryWeights) })
 	if err != nil {
-		return
+		return err
 	}
 
 	memoryLimit, err := GetExecutionMemoryLimit(e, service)
@@ -153,8 +155,10 @@ func (e *ScriptEnv) setExecutionParameters() {
 		err,
 		func() { m.SetTotalMemoryLimit(memoryLimit) })
 	if err != nil {
-		return
+		return err
 	}
+
+	return nil
 }
 
 func (e *ScriptEnv) GetValue(owner, key []byte) ([]byte, error) {
