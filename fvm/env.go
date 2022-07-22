@@ -2,6 +2,7 @@ package fvm
 
 import (
 	"encoding/binary"
+	"fmt"
 	"math/rand"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/handler"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -27,9 +29,16 @@ type Environment interface {
 	runtime.Interface
 }
 
+// TODO(patrick): refactor this into an object after merging #2800
+type ComputationMeter interface {
+	Meter(common.ComputationKind, uint) error
+}
+
 // Parts of the environment that are common to all transaction and script
 // executions.
 type commonEnv struct {
+	ComputationMeter
+
 	ctx           Context
 	sth           *state.StateHolder
 	vm            *VirtualMachine
@@ -68,6 +77,25 @@ func (env *commonEnv) isTraceable() bool {
 func (env *commonEnv) ImplementationDebugLog(message string) error {
 	env.ctx.Logger.Debug().Msgf("Cadence: %s", message)
 	return nil
+}
+
+func (env *commonEnv) Hash(
+	data []byte,
+	tag string,
+	hashAlgorithm runtime.HashAlgorithm,
+) ([]byte, error) {
+	if env.isTraceable() {
+		sp := env.ctx.Tracer.StartSpanFromParent(env.traceSpan, trace.FVMEnvHash)
+		defer sp.Finish()
+	}
+
+	err := env.Meter(meter.ComputationKindHash, 1)
+	if err != nil {
+		return nil, fmt.Errorf("hash failed: %w", err)
+	}
+
+	hashAlgo := crypto.RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
+	return crypto.HashWithTag(hashAlgo, tag, data)
 }
 
 func (env *commonEnv) RecordTrace(operation string, location common.Location, duration time.Duration, logs []opentracing.LogRecord) {
