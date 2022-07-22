@@ -350,7 +350,7 @@ func (es *EventHandlerSuite) TestStartNewView_ParentProposalNotFound() {
 // TestOnReceiveProposal_StaleProposal test that proposals lower than finalized view are not processed at all
 // we are not interested in this data because we already performed finalization of that height.
 func (es *EventHandlerSuite) TestOnReceiveProposal_StaleProposal() {
-	proposal := createProposal(es.forks.FinalizedView(), es.forks.FinalizedView()-1)
+	proposal := createProposal(es.forks.FinalizedView()-1, es.forks.FinalizedView()-2)
 	err := es.eventhandler.OnReceiveProposal(proposal)
 	require.NoError(es.T(), err)
 	es.voteAggregator.AssertNotCalled(es.T(), "AddBlock", proposal)

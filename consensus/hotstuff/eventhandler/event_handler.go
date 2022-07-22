@@ -162,7 +162,7 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 	log.Debug().Msg("proposal forwarded from compliance engine")
 
 	// ignore stale proposals
-	if block.View <= e.forks.FinalizedView() {
+	if block.View < e.forks.FinalizedView() {
 		log.Debug().Msg("stale proposal")
 		return nil
 	}

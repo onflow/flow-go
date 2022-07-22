@@ -226,7 +226,7 @@ func (s *ActivePaceMakerTestSuite) TestProcessQC_IgnoreOldQC() {
 
 // TestProcessQC_UpdateNewestQC tests that ActivePaceMaker tracks the newest QC even if it has advanced past this view.
 // In this test, we feed a newer QC as part of a TC into the PaceMaker.
-func (s *ActivePaceMakerTestSuite) TestProcessTC_UpdateNewestQC() {
+func (s *ActivePaceMakerTestSuite) TestProcessQC_UpdateNewestQC() {
 	s.persist.On("PutLivenessData", mock.Anything).Return(nil).Once()
 	s.notifier.On("OnStartingTimeout", mock.Anything).Return().Once()
 	s.notifier.On("OnTcTriggeredViewChange", mock.Anything, mock.Anything).Return().Once()
