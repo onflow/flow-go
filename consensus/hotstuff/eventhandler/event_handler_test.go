@@ -119,7 +119,6 @@ func NewCommittee(t *testing.T) *Committee {
 	}).Maybe()
 
 	committee.On("Self").Return(self.NodeID).Maybe()
-	committee.On("IdentityByEpoch", mock.Anything, self.NodeID).Return(self, nil).Maybe()
 
 	return committee
 }
@@ -912,29 +911,6 @@ func (es *EventHandlerSuite) TestCreateProposal_SanityChecks() {
 	require.Equal(es.T(), tc.NewestQC, es.paceMaker.NewestQC())
 	require.Equal(es.T(), tc, es.paceMaker.LastViewTC())
 	require.Equal(es.T(), tc.View+1, es.paceMaker.CurView(), "incorrect view change")
-}
-
-// TestCreateProposal_ProposerEjected tests that ejected proposer doesn't try to create proposal in case he is ejected in current epoch
-func (es *EventHandlerSuite) TestCreateProposal_ProposerEjected() {
-	es.voteAggregator.On("AddBlock", mock.Anything).Return(nil)
-
-	self := es.committee.Self()
-
-	*es.committee.Replicas = *mocks.NewReplicas(es.T())
-	es.committee.On("LeaderForView", es.qc.View+1).Return(self, nil)
-	es.committee.On("Self").Return(self)
-	es.committee.On("IdentityByEpoch", es.qc.View+1, self).Return(nil, model.NewInvalidSignerError(fmt.Errorf(""))).Once()
-
-	// I'm the next leader
-	es.committee.leaders[es.qc.View+1] = struct{}{}
-
-	err := es.eventhandler.OnReceiveProposal(es.votingProposal)
-	require.NoError(es.T(), err)
-
-	err = es.eventhandler.OnReceiveQc(es.qc)
-	require.NoError(es.T(), err)
-
-	es.communicator.AssertNumberOfCalls(es.T(), "BroadcastProposalWithDelay", 0)
 }
 
 // TestOnReceiveProposal_ProposalForActiveView tests that when receiving proposal for active we don't attempt to create a proposal
