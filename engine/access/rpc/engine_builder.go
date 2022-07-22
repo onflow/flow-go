@@ -25,7 +25,7 @@ func NewRPCEngineBuilder(engine *Engine) *RPCEngineBuilder {
 	return &RPCEngineBuilder{
 		Engine:               engine,
 		signerIndicesDecoder: decoder,
-		handler: access.NewHandler(engine.backend, engine.chain, access.WithBlockSignerDecoder(decoder)),
+		handler:              access.NewHandler(engine.backend, engine.chain, access.WithBlockSignerDecoder(decoder)),
 	}
 }
 
