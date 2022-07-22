@@ -875,7 +875,7 @@ func (net *FlowNetwork) AddObserver(ctx context.Context, conf *ObserverConfig) (
 	containerID := container.ID
 	return func() {
 		// shutdown func
-		net.StopContainer(ctx, containerID)
+		net.cli.ContainerStop(ctx, containerID, nil)
 	}, nil
 }
 
