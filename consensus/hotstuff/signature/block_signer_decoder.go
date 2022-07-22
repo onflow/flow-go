@@ -35,15 +35,16 @@ func (b *BlockSignerDecoder) DecodeSignerIDs(header *flow.Header) (flow.Identifi
 		return []flow.Identifier{}, nil
 	}
 
-	id := header.ID()
-	members, err := b.Identities(id)
+	// The block header contains the signatures for the parents. Hence, we need to get the
+	// identities that were authorized to sign the parent block, to decode the signer indices.
+	members, err := b.Identities(header.ParentID)
 	if err != nil {
 		// TODO: this potentially needs to be updated when we implement and document proper error handling for
 		//       `hotstuff.Committee` and underlying code (such as `protocol.Snapshot`)
 		if errors.Is(err, storage.ErrNotFound) {
-			return nil, state.WrapAsUnknownBlockError(id, err)
+			return nil, state.WrapAsUnknownBlockError(header.ID(), err)
 		}
-		return nil, fmt.Errorf("fail to retrieve identities for block %v: %w", id, err)
+		return nil, fmt.Errorf("fail to retrieve identities for block %v: %w", header.ID(), err)
 	}
 	signerIDs, err := signature.DecodeSignerIndicesToIdentifiers(members.NodeIDs(), header.ParentVoterIndices)
 	if err != nil {

@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -57,7 +57,7 @@ func chunkDataPackRequestForReceipts(
 			for _, verId := range corVnIds {
 				event := &insecure.Event{
 					CorruptedNodeId:   verId,
-					Channel:           network.RequestChunks,
+					Channel:           channels.RequestChunks,
 					Protocol:          insecure.Protocol_PUBLISH,
 					TargetNum:         0,
 					TargetIds:         executorIds[result.ID()],
@@ -119,7 +119,7 @@ func receiptsWithSameResultFixture(
 func executionReceiptEvent(receipt *flow.ExecutionReceipt, targetIds flow.IdentifierList) *insecure.Event {
 	return &insecure.Event{
 		CorruptedNodeId:   receipt.ExecutorID,
-		Channel:           network.PushReceipts,
+		Channel:           channels.PushReceipts,
 		Protocol:          insecure.Protocol_UNICAST,
 		TargetIds:         targetIds,
 		FlowProtocolEvent: receipt,
@@ -150,7 +150,7 @@ func chunkDataPackResponseForReceipts(receipts []*flow.ExecutionReceipt, verIds 
 			for _, verId := range verIds {
 				event := &insecure.Event{
 					CorruptedNodeId:   receipt.ExecutorID,
-					Channel:           network.RequestChunks,
+					Channel:           channels.RequestChunks,
 					Protocol:          insecure.Protocol_PUBLISH,
 					TargetNum:         0,
 					TargetIds:         flow.IdentifierList{verId},

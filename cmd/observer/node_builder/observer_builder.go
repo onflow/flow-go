@@ -51,6 +51,7 @@ import (
 	consensus_follower "github.com/onflow/flow-go/module/upstream"
 	"github.com/onflow/flow-go/network"
 	netcache "github.com/onflow/flow-go/network/cache"
+	"github.com/onflow/flow-go/network/channels"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/network/converter"
@@ -361,7 +362,8 @@ func (builder *ObserverServiceBuilder) buildFollowerEngine() *ObserverServiceBui
 			builder.FollowerCore,
 			builder.SyncCore,
 			node.Tracer,
-			compliance.WithSkipNewProposalsThreshold(builder.ComplianceConfig.SkipNewProposalsThreshold),
+			follower.WithComplianceOptions(compliance.WithSkipNewProposalsThreshold(builder.ComplianceConfig.SkipNewProposalsThreshold)),
+			follower.WithChannel(channels.PublicReceiveBlocks),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create follower engine: %w", err)
@@ -465,7 +467,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionDataRequester() *ObserverSe
 		}).
 		Component("execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			var err error
-			bs, err = node.Network.RegisterBlobService(network.ExecutionDataService, ds)
+			bs, err = node.Network.RegisterBlobService(channels.ExecutionDataService, ds)
 			if err != nil {
 				return nil, fmt.Errorf("could not register blob service: %w", err)
 			}
@@ -937,7 +939,7 @@ func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
 			return nil, err
 		}
 
-		builder.Network = converter.NewNetwork(net, network.SyncCommittee, network.PublicSyncCommittee)
+		builder.Network = converter.NewNetwork(net, channels.SyncCommittee, channels.PublicSyncCommittee)
 
 		builder.Logger.Info().Msgf("network will run on address: %s", builder.BindAddr)
 
