@@ -3,7 +3,6 @@ package validator
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -25,21 +24,14 @@ var (
 // The message is also authorized by checking that the sender is allowed to send the message on the channel.
 // If validation fails the message is rejected, and if the validation error is an expected error, slashing data is also collected.
 // Authorization config is defined in message.MsgAuthConfig.
-func AuthorizedSenderValidator(log zerolog.Logger, channel channels.Channel, getIdentity func(peer.ID) (*flow.Identity, bool)) MessageValidator {
-	log = log.With().
-		Str("component", "authorized_sender_validator").
-		Str("network_channel", channel.String()).
-		Logger()
-
-	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(log)
-
+func AuthorizedSenderValidator(log zerolog.Logger, slashingViolationsConsumer slashing.ViolationsConsumer, channel channels.Channel, isUnicast bool, getIdentity func(peer.ID) (*flow.Identity, bool)) MessageValidator {
 	return func(ctx context.Context, from peer.ID, msg interface{}) (string, error) {
 		// NOTE: messages from unstaked nodes should be rejected by the libP2P node topic validator
 		// before they reach message validators. If a message from a unstaked peer gets to this point
 		// something terrible went wrong.
 		identity, ok := getIdentity(from)
 		if !ok {
-			log.Error().Str("peer_id", from.String()).Msg(fmt.Sprintf("rejecting message: %s", ErrIdentityUnverified))
+			slashingViolationsConsumer.OnUnAuthorizedSenderError(identity, from.String(), "", channel.String(), isUnicast, ErrIdentityUnverified)
 			return "", ErrIdentityUnverified
 		}
 
@@ -48,13 +40,13 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel channels.Channel, get
 		case err == nil:
 			return msgType, nil
 		case message.IsUnknownMsgTypeErr(err):
-			slashingViolationsConsumer.OnUnknownMsgTypeError(identity, from.String(), msgType, err)
+			slashingViolationsConsumer.OnUnknownMsgTypeError(identity, from.String(), msgType, channel.String(), isUnicast, err)
 			return msgType, err
 		case errors.Is(err, message.ErrUnauthorizedMessageOnChannel) || errors.Is(err, message.ErrUnauthorizedRole):
-			slashingViolationsConsumer.OnUnAuthorizedSenderError(identity, from.String(), msgType, err)
+			slashingViolationsConsumer.OnUnAuthorizedSenderError(identity, from.String(), msgType, channel.String(), isUnicast, err)
 			return msgType, err
 		case errors.Is(err, ErrSenderEjected):
-			slashingViolationsConsumer.OnSenderEjectedError(identity, from.String(), msgType, err)
+			slashingViolationsConsumer.OnSenderEjectedError(identity, from.String(), msgType, channel.String(), isUnicast, err)
 			return msgType, ErrSenderEjected
 		default:
 			log.Error().
@@ -63,6 +55,7 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel channels.Channel, get
 				Str("role", identity.Role.String()).
 				Str("peer_node_id", identity.NodeID.String()).
 				Str("message_type", msgType).
+				Bool("unicast_message", isUnicast).
 				Msg("unexpected error during message validation")
 			return msgType, err
 		}
@@ -71,9 +64,9 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel channels.Channel, get
 
 // AuthorizedSenderMessageValidator wraps the callback returned by AuthorizedSenderValidator and returns
 // MessageValidator callback that returns pubsub.ValidationReject if validation fails and pubsub.ValidationAccept if validation passes.
-func AuthorizedSenderMessageValidator(log zerolog.Logger, channel channels.Channel, getIdentity func(peer.ID) (*flow.Identity, bool)) PubSubMessageValidator {
+func AuthorizedSenderMessageValidator(log zerolog.Logger, slashingViolationsConsumer slashing.ViolationsConsumer, channel channels.Channel, isUnicast bool, getIdentity func(peer.ID) (*flow.Identity, bool)) PubSubMessageValidator {
 	return func(ctx context.Context, from peer.ID, msg interface{}) pubsub.ValidationResult {
-		validate := AuthorizedSenderValidator(log, channel, getIdentity)
+		validate := AuthorizedSenderValidator(log, slashingViolationsConsumer, channel, isUnicast, getIdentity)
 
 		_, err := validate(ctx, from, msg)
 		if err != nil {

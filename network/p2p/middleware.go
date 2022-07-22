@@ -317,7 +317,7 @@ func (m *Middleware) SetOverlay(ov network.Overlay) {
 
 // validateUnicastAuthorizedSender will validate messages sent via unicast stream.
 func (m *Middleware) validateUnicastAuthorizedSender(ctx context.Context, remotePeer peer.ID, channel channels.Channel, msg interface{}) error {
-	validate := validator.AuthorizedSenderValidator(m.log, channel, m.ov.Identity)
+	validate := validator.AuthorizedSenderValidator(m.log, m.slashingViolationsConsumer, channel, true, m.ov.Identity)
 	_, err := validate(ctx, remotePeer, msg)
 	return err
 }
@@ -492,13 +492,13 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 	remotePeer := s.Conn().RemotePeer()
 
-	// avoid decoding the message by checking if remotePeer is staked and not ejected
+	// checking if remotePeer is staked and not ejected to avoid decoding messages from unauthenticated peer
 	id, err := m.authenticateUnicastStream(remotePeer)
 	if errors.Is(err, validator.ErrIdentityUnverified) {
-		m.slashingViolationsConsumer.OnUnAuthorizedSenderError(id, remotePeer.String(), "", err)
+		m.slashingViolationsConsumer.OnUnAuthorizedSenderError(id, remotePeer.String(), "", "", true, err)
 		return
 	} else if errors.Is(err, validator.ErrSenderEjected) {
-		m.slashingViolationsConsumer.OnSenderEjectedError(id, remotePeer.String(), "", err)
+		m.slashingViolationsConsumer.OnSenderEjectedError(id, remotePeer.String(), "", "", true, err)
 		return
 	}
 
@@ -620,7 +620,7 @@ func (m *Middleware) Subscribe(channel channels.Channel) error {
 	} else {
 		// for channels used by the staked nodes, add the topic validator to filter out messages from non-staked nodes
 		validators = append(validators,
-			validator.AuthorizedSenderMessageValidator(m.log, channel, m.ov.Identity),
+			validator.AuthorizedSenderMessageValidator(m.log, m.slashingViolationsConsumer, channel, false, m.ov.Identity),
 		)
 
 		// NOTE: For non-public channels the libP2P node topic validator will reject
