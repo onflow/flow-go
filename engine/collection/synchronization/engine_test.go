@@ -49,7 +49,7 @@ type SyncSuite struct {
 	snapshot     *cluster.Snapshot
 	params       *cluster.Params
 	blocks       *storage.ClusterBlocks
-	comp         *mocknetwork.Engine
+	comp         *mocknetwork.MockEngine
 	core         *module.SyncCore
 	e            *Engine
 }
@@ -151,7 +151,7 @@ func (ss *SyncSuite) SetupTest() {
 	)
 
 	// set up compliance engine mock
-	ss.comp = &mocknetwork.Engine{}
+	ss.comp = &mocknetwork.MockEngine{}
 	ss.comp.On("SubmitLocal", mock.Anything).Return()
 
 	// set up sync core

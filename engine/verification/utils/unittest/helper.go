@@ -52,10 +52,10 @@ func SetupChunkDataPackProvider(t *testing.T,
 	completeERs CompleteExecutionReceiptList,
 	assignedChunkIDs flow.IdentifierList,
 	provider MockChunkDataProviderFunc) (*enginemock.GenericNode,
-	*mocknetwork.Engine, *sync.WaitGroup) {
+	*mocknetwork.MockEngine, *sync.WaitGroup) {
 
 	exeNode := testutil.GenericNodeFromParticipants(t, hub, exeIdentity, participants, chainID)
-	exeEngine := new(mocknetwork.Engine)
+	exeEngine := new(mocknetwork.MockEngine)
 
 	exeChunkDataConduit, err := exeNode.Net.Register(channels.ProvideChunks, exeEngine)
 	assert.Nil(t, err)
@@ -155,7 +155,7 @@ func SetupMockConsensusNode(t *testing.T,
 	othersIdentity flow.IdentityList,
 	completeERs CompleteExecutionReceiptList,
 	chainID flow.ChainID,
-	assignedChunkIDs flow.IdentifierList) (*enginemock.GenericNode, *mocknetwork.Engine, *sync.WaitGroup) {
+	assignedChunkIDs flow.IdentifierList) (*enginemock.GenericNode, *mocknetwork.MockEngine, *sync.WaitGroup) {
 
 	lg := log.With().Str("role", "mock-consensus").Logger()
 
@@ -169,7 +169,7 @@ func SetupMockConsensusNode(t *testing.T,
 	// mock the consensus node with a generic node and mocked engine to assert
 	// that the result approval is broadcast
 	conNode := testutil.GenericNodeFromParticipants(t, hub, conIdentity, othersIdentity, chainID)
-	conEngine := new(mocknetwork.Engine)
+	conEngine := new(mocknetwork.MockEngine)
 
 	// map form verIds --> result approval ID
 	resultApprovalSeen := make(map[flow.Identifier]map[flow.Identifier]struct{})

@@ -32,7 +32,7 @@ type FetcherEngineTestSuite struct {
 	log                   zerolog.Logger
 	metrics               *module.VerificationMetrics
 	tracer                *trace.NoopTracer
-	verifier              *mocknetwork.Engine                 // the verifier engine
+	verifier              *mocknetwork.MockEngine             // the verifier engine
 	state                 *protocol.State                     // used to verify the request origin
 	pendingChunks         *mempool.ChunkStatuses              // used to store all the pending chunks that assigned to this node
 	blocks                *storage.Blocks                     // used to for verifying collection ID.
@@ -49,7 +49,7 @@ func setupTest() *FetcherEngineTestSuite {
 		log:                   unittest.Logger(),
 		metrics:               &module.VerificationMetrics{},
 		tracer:                &trace.NoopTracer{},
-		verifier:              &mocknetwork.Engine{},
+		verifier:              &mocknetwork.MockEngine{},
 		state:                 &protocol.State{},
 		pendingChunks:         &mempool.ChunkStatuses{},
 		headers:               &storage.Headers{},
@@ -632,7 +632,7 @@ func mockPendingChunksGet(pendingChunks *mempool.ChunkStatuses, list []*verifica
 // mockVerifierEngine mocks verifier engine to expect receiving a matching chunk data pack with specified input.
 // Each chunk data pack should be passed only once.
 func mockVerifierEngine(t *testing.T,
-	verifier *mocknetwork.Engine,
+	verifier *mocknetwork.MockEngine,
 	verifiableChunks map[flow.Identifier]*verification.VerifiableChunkData) *sync.WaitGroup {
 	mu := sync.Mutex{}
 	wg := &sync.WaitGroup{}

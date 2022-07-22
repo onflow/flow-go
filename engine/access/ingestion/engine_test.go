@@ -44,7 +44,7 @@ type Suite struct {
 
 	me           *module.Local
 	request      *module.Requester
-	provider     *mocknetwork.Engine
+	provider     *mocknetwork.MockEngine
 	blocks       *storage.Blocks
 	headers      *storage.Headers
 	collections  *storage.Collections
@@ -87,7 +87,7 @@ func (suite *Suite) SetupTest() {
 		Once()
 	suite.request = new(module.Requester)
 
-	suite.provider = new(mocknetwork.Engine)
+	suite.provider = new(mocknetwork.MockEngine)
 	suite.blocks = new(storage.Blocks)
 	suite.headers = new(storage.Headers)
 	suite.collections = new(storage.Collections)

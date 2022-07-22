@@ -60,9 +60,9 @@ func (suite *Suite) TestHappyPath() {
 	chan2 := channels.Channel("test-chan-2")
 	chan3 := channels.Channel("test-chan-3")
 
-	engine1 := new(mocknetwork.Engine)
-	engine2 := new(mocknetwork.Engine)
-	engine3 := new(mocknetwork.Engine)
+	engine1 := new(mocknetwork.MockEngine)
+	engine2 := new(mocknetwork.MockEngine)
+	engine3 := new(mocknetwork.MockEngine)
 
 	con, err := suite.net.Register(chan1, engine1)
 	suite.Assert().Nil(err)

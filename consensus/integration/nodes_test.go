@@ -442,7 +442,7 @@ func createNode(
 	// initialize the block finalizer
 	final := finalizer.NewFinalizer(db, headersDB, fullState, trace.NewNoopTracer())
 
-	prov := &mocknetwork.Engine{}
+	prov := &mocknetwork.MockEngine{}
 	prov.On("SubmitLocal", mock.Anything).Return(nil)
 
 	syncCore, err := synccore.New(log, synccore.DefaultConfig(), metricsCollector)

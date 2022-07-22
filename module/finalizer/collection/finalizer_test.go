@@ -71,7 +71,7 @@ func TestFinalizer(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := new(mocknetwork.Engine)
+			prov := new(mocknetwork.MockEngine)
 			prov.On("SubmitLocal", mock.Anything)
 			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
 
@@ -84,7 +84,7 @@ func TestFinalizer(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := new(mocknetwork.Engine)
+			prov := new(mocknetwork.MockEngine)
 			prov.On("SubmitLocal", mock.Anything)
 			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
 
@@ -110,7 +110,7 @@ func TestFinalizer(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := new(mocknetwork.Engine)
+			prov := new(mocknetwork.MockEngine)
 			prov.On("SubmitLocal", mock.Anything)
 			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
 
@@ -129,7 +129,7 @@ func TestFinalizer(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := new(mocknetwork.Engine)
+			prov := new(mocknetwork.MockEngine)
 			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
 
 			// create a block with empty payload on genesis
@@ -154,7 +154,7 @@ func TestFinalizer(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := new(mocknetwork.Engine)
+			prov := new(mocknetwork.MockEngine)
 			prov.On("SubmitLocal", mock.Anything)
 			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
 
@@ -203,7 +203,7 @@ func TestFinalizer(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := new(mocknetwork.Engine)
+			prov := new(mocknetwork.MockEngine)
 			prov.On("SubmitLocal", mock.Anything)
 			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
 
@@ -264,7 +264,7 @@ func TestFinalizer(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := new(mocknetwork.Engine)
+			prov := new(mocknetwork.MockEngine)
 			prov.On("SubmitLocal", mock.Anything)
 			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
 
@@ -318,7 +318,7 @@ func TestFinalizer(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := new(mocknetwork.Engine)
+			prov := new(mocknetwork.MockEngine)
 			prov.On("SubmitLocal", mock.Anything)
 			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
 

@@ -60,7 +60,7 @@ type ComplianceCoreSuite struct {
 	snapshot       *protocol.Snapshot
 	con            *mocknetwork.Conduit
 	net            *mocknetwork.Network
-	prov           *mocknetwork.Engine
+	prov           *mocknetwork.MockEngine
 	pending        *module.PendingBlockBuffer
 	hotstuff       *module.HotStuff
 	sync           *module.BlockRequester
@@ -193,7 +193,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	)
 
 	// set up the provider engine
-	cs.prov = &mocknetwork.Engine{}
+	cs.prov = &mocknetwork.MockEngine{}
 	cs.prov.On("SubmitLocal", mock.Anything).Return()
 
 	// set up pending module mock

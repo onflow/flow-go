@@ -45,8 +45,8 @@ func (suite *Suite) TestDownstreamEngineFailure() {
 	id := unittest.IdentifierFixture()
 	event := getEvent()
 
-	engine1 := new(mocknetwork.Engine)
-	engine2 := new(mocknetwork.Engine)
+	engine1 := new(mocknetwork.MockEngine)
+	engine2 := new(mocknetwork.MockEngine)
 
 	suite.engine.RegisterEngine(engine1)
 	suite.engine.RegisterEngine(engine2)
@@ -96,7 +96,7 @@ func (suite *Suite) TestProcessUnknownChannel() {
 
 	unknownChannel := channels.Channel("unknown-chan")
 
-	engine := new(mocknetwork.Engine)
+	engine := new(mocknetwork.MockEngine)
 
 	suite.engine.RegisterEngine(engine)
 
@@ -113,10 +113,10 @@ func (suite *Suite) TestConcurrentEvents() {
 	const numEvents = 10
 	const numEngines = 5
 
-	var engines [numEngines]*mocknetwork.Engine
+	var engines [numEngines]*mocknetwork.MockEngine
 
 	for i := 0; i < numEngines; i++ {
-		engine := new(mocknetwork.Engine)
+		engine := new(mocknetwork.MockEngine)
 		suite.engine.RegisterEngine(engine)
 		engines[i] = engine
 	}

@@ -34,8 +34,8 @@ import (
 // mockComponents is a container for the mocked version of epoch components.
 type mockComponents struct {
 	state      *cluster.State
-	prop       *mocknetwork.Engine
-	sync       *mocknetwork.Engine
+	prop       *mocknetwork.MockEngine
+	sync       *mocknetwork.MockEngine
 	hotstuff   *module.HotStuff
 	aggregator *mockhotstuff.VoteAggregator
 }
@@ -44,8 +44,8 @@ func newMockComponents() *mockComponents {
 
 	components := &mockComponents{
 		state:      new(cluster.State),
-		prop:       new(mocknetwork.Engine),
-		sync:       new(mocknetwork.Engine),
+		prop:       new(mocknetwork.MockEngine),
+		sync:       new(mocknetwork.MockEngine),
 		hotstuff:   new(module.HotStuff),
 		aggregator: new(mockhotstuff.VoteAggregator),
 	}

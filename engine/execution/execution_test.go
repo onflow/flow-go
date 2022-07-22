@@ -138,7 +138,7 @@ func TestExecutionFlow(t *testing.T) {
 
 	// create collection node that can respond collections to execution node
 	// check collection node received the collection request from execution node
-	providerEngine := new(mocknetwork.Engine)
+	providerEngine := new(mocknetwork.MockEngine)
 	provConduit, _ := collectionNode.Net.Register(channels.ProvideCollections, providerEngine)
 	providerEngine.On("Process", mock.AnythingOfType("channels.Channel"), exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -175,7 +175,7 @@ func TestExecutionFlow(t *testing.T) {
 
 	// create verification engine that can create approvals and send to consensus nodes
 	// check the verification engine received the ER from execution node
-	verificationEngine := new(mocknetwork.Engine)
+	verificationEngine := new(mocknetwork.MockEngine)
 	_, _ = verificationNode.Net.Register(channels.ReceiveReceipts, verificationEngine)
 	verificationEngine.On("Process", mock.AnythingOfType("channels.Channel"), exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -190,7 +190,7 @@ func TestExecutionFlow(t *testing.T) {
 
 	// create consensus engine that accepts the result
 	// check the consensus engine has received the result from execution node
-	consensusEngine := new(mocknetwork.Engine)
+	consensusEngine := new(mocknetwork.MockEngine)
 	_, _ = consensusNode.Net.Register(channels.ReceiveReceipts, consensusEngine)
 	consensusEngine.On("Process", mock.AnythingOfType("channels.Channel"), exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -401,7 +401,7 @@ func TestFailedTxWillNotChangeStateCommitment(t *testing.T) {
 
 	receiptsReceived := atomic.Uint64{}
 
-	consensusEngine := new(mocknetwork.Engine)
+	consensusEngine := new(mocknetwork.MockEngine)
 	_, _ = consensusNode.Net.Register(channels.ReceiveReceipts, consensusEngine)
 	consensusEngine.On("Process", mock.AnythingOfType("channels.Channel"), mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -463,8 +463,8 @@ func TestFailedTxWillNotChangeStateCommitment(t *testing.T) {
 	consensusEngine.AssertExpectations(t)
 }
 
-func mockCollectionEngineToReturnCollections(t *testing.T, collectionNode *testmock.GenericNode, cols []*flow.Collection) *mocknetwork.Engine {
-	collectionEngine := new(mocknetwork.Engine)
+func mockCollectionEngineToReturnCollections(t *testing.T, collectionNode *testmock.GenericNode, cols []*flow.Collection) *mocknetwork.MockEngine {
+	collectionEngine := new(mocknetwork.MockEngine)
 	colConduit, _ := collectionNode.Net.Register(channels.RequestCollections, collectionEngine)
 
 	// make lookup
@@ -545,7 +545,7 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 
 	actualCalls := atomic.Uint64{}
 
-	verificationEngine := new(mocknetwork.Engine)
+	verificationEngine := new(mocknetwork.MockEngine)
 	_, _ = verification1Node.Net.Register(channels.ReceiveReceipts, verificationEngine)
 	_, _ = verification2Node.Net.Register(channels.ReceiveReceipts, verificationEngine)
 	verificationEngine.On("Process", mock.AnythingOfType("channels.Channel"), exeID.NodeID, mock.Anything).

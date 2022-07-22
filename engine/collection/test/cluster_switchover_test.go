@@ -40,7 +40,7 @@ type ClusterSwitchoverTestCase struct {
 	hub        *stub.Hub                 // mock network hub
 	root       protocol.Snapshot         // shared root snapshot
 	nodes      []testmock.CollectionNode // collection nodes
-	sn         *mocknetwork.Engine       // fake consensus node engine for receiving guarantees
+	sn         *mocknetwork.MockEngine   // fake consensus node engine for receiving guarantees
 	builder    *unittest.EpochBuilder    // utility for building epochs
 
 	// epoch counter -> cluster index -> transaction IDs
@@ -112,7 +112,7 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 		tc.identities.Filter(filter.HasRole(flow.RoleConsensus))[0],
 		tc.root,
 	)
-	tc.sn = new(mocknetwork.Engine)
+	tc.sn = new(mocknetwork.MockEngine)
 	_, err = consensus.Net.Register(channels.ReceiveGuarantees, tc.sn)
 	require.NoError(tc.T(), err)
 

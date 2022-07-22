@@ -41,7 +41,7 @@ func (suite *Suite) SetupTest() {
 	suite.con = new(mocknetwork.Conduit)
 	suite.targetNodeID = unittest.IdentifierFixture()
 	suite.proxyNet = proxy.NewProxyNetwork(suite.net, suite.targetNodeID)
-	suite.engine = new(mocknetwork.Engine)
+	suite.engine = new(mocknetwork.MockEngine)
 
 	net.On("Register", mock.AnythingOfType("channels.Channel"), mock.Anything).Return(suite.con, nil)
 }
