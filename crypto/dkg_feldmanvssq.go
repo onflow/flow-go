@@ -1,3 +1,4 @@
+//go:build relic
 // +build relic
 
 package crypto
@@ -7,7 +8,6 @@ package crypto
 import "C"
 
 import (
-	"errors"
 	"fmt"
 )
 
@@ -64,6 +64,14 @@ type complaint struct {
 //
 // An instance is run by a single participant and is usable for only one protocol.
 // In order to run the protocol again, a new instance needs to be created
+//
+// The function returns:
+// - (nil, InvalidInputsError) if:
+//    - size if not in [DKGMinSize, DKGMaxSize]
+//    - threshold is not in [MinimumThreshold, size-1]
+//    - myIndex is not in [0, size-1]
+//    - leaderIndex is not in [0, size-1]
+// - (dkgInstance, nil) otherwise
 func NewFeldmanVSSQual(size int, threshold int, myIndex int,
 	processor DKGProcessor, leaderIndex int) (DKGState, error) {
 
@@ -94,9 +102,14 @@ func (s *feldmanVSSQualState) init() {
 // the Feldman VSS Qual protocol.
 // The first call is a timeout for sharing the private shares.
 // The second call is a timeout for broadcasting the complaints.
+//
+// The returned erorr is :
+//    - dkgInvalidStateTransitionError if the DKG instance was not running.
+//    - dkgInvalidStateTransitionError if the DKG instance already called the 2 required timeouts.
+//    - nil otherwise.
 func (s *feldmanVSSQualState) NextTimeout() error {
 	if !s.running {
-		return fmt.Errorf("dkg protocol %d is not running", s.myIndex)
+		return dkgInvalidStateTransitionErrorf("dkg protocol %d is not running", s.myIndex)
 	}
 	// if leader is already disqualified, there is nothing to do
 	if s.disqualified {
@@ -115,7 +128,7 @@ func (s *feldmanVSSQualState) NextTimeout() error {
 		s.setComplaintsTimeout()
 		return nil
 	}
-	return errors.New("the next timeout should be to end DKG protocol")
+	return dkgInvalidStateTransitionErrorf("the next timeout should be to end DKG protocol")
 }
 
 // End ends the protocol in the current participant
@@ -127,15 +140,15 @@ func (s *feldmanVSSQualState) NextTimeout() error {
 // This is also a timeout to receiving all complaint answers
 // - the returned erorr is :
 //    - dkgFailureError if the leader was disqualified.
-//    - other error if Start() was not called, or NextTimeout() was not called twice
+//    - dkgInvalidStateTransition if Start() was not called, or NextTimeout() was not called twice
 //    - nil otherwise.
 func (s *feldmanVSSQualState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	if !s.running {
-		return nil, nil, nil, fmt.Errorf("dkg protocol %d is not running", s.myIndex)
+		return nil, nil, nil, dkgInvalidStateTransitionErrorf("dkg protocol %d is not running", s.myIndex)
 	}
 	if !s.sharesTimeout || !s.complaintsTimeout {
 		return nil, nil, nil,
-			fmt.Errorf("%d: two timeouts should be set before ending dkg", s.myIndex)
+			dkgInvalidStateTransitionErrorf("%d: two timeouts should be set before ending dkg", s.myIndex)
 	}
 	s.running = false
 	// check if a complaint has remained without an answer
@@ -178,9 +191,14 @@ const (
 
 // HandleBroadcastMsg processes a new broadcasted message received by the current participant.
 // orig is the message origin index
+//
+// The function returns:
+//  - dkgInvalidStateTransitionError if the instance is not running
+//  - invalidInputsError if `orig` is not valid (in [0, size-1])
+//  - nil otherwise
 func (s *feldmanVSSQualState) HandleBroadcastMsg(orig int, msg []byte) error {
 	if !s.running {
-		return errors.New("dkg is not running")
+		return dkgInvalidStateTransitionErrorf("dkg is not running")
 	}
 
 	if orig >= s.Size() || orig < 0 {
@@ -223,9 +241,14 @@ func (s *feldmanVSSQualState) HandleBroadcastMsg(orig int, msg []byte) error {
 
 // HandlePrivateMsg processes a new private message received by the current participant.
 // orig is the message origin index.
+//
+// The function returns:
+//  - dkgInvalidStateTransitionError if the instance is not running
+//  - invalidInputsError if `orig` is not valid (in [0, size-1])
+//  - nil otherwise
 func (s *feldmanVSSQualState) HandlePrivateMsg(orig int, msg []byte) error {
 	if !s.running {
-		return errors.New("dkg is not running")
+		return dkgInvalidStateTransitionErrorf("dkg is not running")
 	}
 	if orig >= s.Size() || orig < 0 {
 		return invalidInputsErrorf(
@@ -264,9 +287,14 @@ func (s *feldmanVSSQualState) HandlePrivateMsg(orig int, msg []byte) error {
 // for a reason outside of the DKG protocol
 // The caller should make sure all honest participants call this function,
 // otherwise, the protocol can be broken
+//
+// The function returns:
+//  - dkgInvalidStateTransitionError if the instance is not running
+//  - invalidInputsError if `orig` is not valid (in [0, size-1])
+//  - nil otherwise
 func (s *feldmanVSSQualState) ForceDisqualify(participant int) error {
 	if !s.running {
-		return errors.New("dkg is not running")
+		return dkgInvalidStateTransitionErrorf("dkg is not running")
 	}
 	if participant >= s.Size() || participant < 0 {
 		return invalidInputsErrorf(
@@ -279,6 +307,9 @@ func (s *feldmanVSSQualState) ForceDisqualify(participant int) error {
 	return nil
 }
 
+// The function does not check the call respects the machine
+// state transition of feldmanVSSQual. The calling function must make sure this call
+// is valid.
 func (s *feldmanVSSQualState) setSharesTimeout() {
 	s.sharesTimeout = true
 	// if verif vector is not received, disqualify the leader
@@ -299,6 +330,9 @@ func (s *feldmanVSSQualState) setSharesTimeout() {
 	}
 }
 
+// The function does not check the call respects the machine
+// state transition of feldmanVSSQual. The calling function must make sure this call
+// is valid.
 func (s *feldmanVSSQualState) setComplaintsTimeout() {
 	s.complaintsTimeout = true
 	// if more than t complaints are received, the leader is disqualified

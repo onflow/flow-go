@@ -715,11 +715,24 @@ func (proc *testDKGProcessor) invalidComplaintAnswerBroadcast(data []byte) {
 	}
 }
 
-func TestErrorTypes(t *testing.T) {
-	t.Run("dkgFailureError", func(t *testing.T) {
+func TestDKGErrorTypes(t *testing.T) {
+	t.Run("dkgFailureError sanity", func(t *testing.T) {
 		failureError := dkgFailureErrorf("some error")
 		otherError := fmt.Errorf("some error")
 		assert.True(t, IsDKGFailureError(failureError))
 		assert.False(t, IsDKGFailureError(otherError))
 	})
+
+	t.Run("dkgInvalidStateTransitionError sanity", func(t *testing.T) {
+		failureError := dkgInvalidStateTransitionErrorf("some error")
+		otherError := fmt.Errorf("some error")
+		assert.True(t, IsDKGInvalidStateTransitionError(failureError))
+		assert.False(t, IsDKGInvalidStateTransitionError(otherError))
+	})
+
+	t.Run("trigger state Transition errors", func(t *testing.T) {
+
+	}
+
+	// TODO: add tests for state transition errors
 }
