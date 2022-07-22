@@ -5,6 +5,7 @@ package p2p
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"sync"
@@ -16,6 +17,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/onflow/flow-go/network/slashing"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -95,6 +97,7 @@ type Middleware struct {
 	idTranslator               IDTranslator
 	previousProtocolStatePeers []peer.AddrInfo
 	codec                      network.Codec
+	slashingViolationsConsumer slashing.ViolationsConsumer
 	component.Component
 }
 
@@ -115,6 +118,12 @@ func WithPreferredUnicastProtocols(unicasts []unicast.ProtocolName) MiddlewareOp
 func WithPeerManager(peerManagerFunc PeerManagerFactoryFunc) MiddlewareOption {
 	return func(mw *Middleware) {
 		mw.peerManagerFactory = peerManagerFunc
+	}
+}
+
+func WithSlashingViolationsConsumer(consumer slashing.ViolationsConsumer) MiddlewareOption {
+	return func(mw *Middleware) {
+		mw.slashingViolationsConsumer = consumer
 	}
 }
 
@@ -191,15 +200,36 @@ func DefaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.Mes
 	}
 }
 
-// isStakedPeerFilter returns a peerFilterFunc that uses m.ov.Identity to get the identity
-// for a peer ID. If a identity is not found the peer is unstaked.
-func (m *Middleware) isStakedPeerFilter() peerFilterFunc {
-	f := func(id peer.ID) bool {
-		_, ok := m.ov.Identity(id)
-		return ok
+// stakedPeer uses m.ov.Identity to get the identity for a peer ID. If an identity is not found the peer is unstaked.
+func (m *Middleware) stakedPeer(peerID peer.ID) (*flow.Identity, bool) {
+	id, ok := m.ov.Identity(peerID)
+	return id, ok
+}
+
+// authenticateUnicastStream authenticates the peer attempting to send a message via unciast
+// stream. A peer must be a staked node and not ejected.
+// Expected errors during normal operations:
+//  * validator.ErrIdentityUnverified if identity of the peer cannot be found
+//  * validator.ErrSenderEjected if the peer is an ejected node
+func (m *Middleware) authenticateUnicastStream(peerID peer.ID) (*flow.Identity, error) {
+	identity, found := m.stakedPeer(peerID)
+	if !found {
+		return nil, validator.ErrIdentityUnverified
 	}
 
-	return f
+	if identity.Ejected {
+		return identity, validator.ErrSenderEjected
+	}
+
+	return identity, nil
+}
+
+// isStakedPeerFilter returns a peerFilterFunc that wraps the m.stakedPeer func
+func (m *Middleware) isStakedPeerFilter() peerFilterFunc {
+	return func(peerID peer.ID) bool {
+		_, ok := m.stakedPeer(peerID)
+		return ok
+	}
 }
 
 func (m *Middleware) NewBlobService(channel channels.Channel, ds datastore.Batching, opts ...network.BlobServiceOption) network.BlobService {
@@ -287,7 +317,7 @@ func (m *Middleware) SetOverlay(ov network.Overlay) {
 
 // validateUnicastAuthorizedSender will validate messages sent via unicast stream.
 func (m *Middleware) validateUnicastAuthorizedSender(ctx context.Context, remotePeer peer.ID, channel channels.Channel, msg interface{}) error {
-	validate := validator.AuthorizedSenderValidator(m.log, channel, m.ov.Identity, true)
+	validate := validator.AuthorizedSenderValidator(m.log, channel, m.ov.Identity)
 	_, err := validate(ctx, remotePeer, msg)
 	return err
 }
@@ -460,6 +490,18 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 	success := false
 
+	remotePeer := s.Conn().RemotePeer()
+
+	// avoid decoding the message by checking if remotePeer is staked and not ejected
+	id, err := m.authenticateUnicastStream(remotePeer)
+	if errors.Is(err, validator.ErrIdentityUnverified) {
+		m.slashingViolationsConsumer.OnUnAuthorizedSenderError(id, remotePeer.String(), "", err)
+		return
+	} else if errors.Is(err, validator.ErrSenderEjected) {
+		m.slashingViolationsConsumer.OnSenderEjectedError(id, remotePeer.String(), "", err)
+		return
+	}
+
 	defer func() {
 		if success {
 			err := s.Close()
@@ -484,7 +526,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 	deadline, _ := ctx.Deadline()
 
-	err := s.SetReadDeadline(deadline)
+	err = s.SetReadDeadline(deadline)
 	if err != nil {
 		log.Err(err).Msg("failed to set read deadline for stream")
 		return
@@ -543,7 +585,6 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 			}
 
 			channel := channels.Channel(msg.ChannelID)
-			remotePeer := s.Conn().RemotePeer()
 			if err := m.validateUnicastAuthorizedSender(ctx, remotePeer, channel, decodedMsgPayload); err != nil {
 				m.log.
 					Error().
