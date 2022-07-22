@@ -113,12 +113,14 @@ func (s *feldmanVSSQualState) NextTimeout() error {
 	}
 	// if leader is already disqualified, there is nothing to do
 	if s.disqualified {
-		if s.sharesTimeout {
-			s.complaintsTimeout = true
-		} else {
+		if !s.sharesTimeout && !s.complaintsTimeout {
 			s.sharesTimeout = true
+			return nil
+		} else if s.sharesTimeout && !s.complaintsTimeout {
+			s.complaintsTimeout = true
+			return nil
 		}
-		return nil
+		return dkgInvalidStateTransitionErrorf("the next timeout should be to end DKG protocol DISQ")
 	}
 	if !s.sharesTimeout && !s.complaintsTimeout {
 		s.setSharesTimeout()

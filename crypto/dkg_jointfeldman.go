@@ -222,7 +222,7 @@ func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 //  - nil otherwise
 func (s *JointFeldmanState) HandleBroadcastMsg(orig int, msg []byte) error {
 	if !s.jointRunning {
-		return dkgInvalidStateTransitionError("dkg protocol %d is not running", s.myIndex)
+		return dkgInvalidStateTransitionErrorf("dkg protocol %d is not running", s.myIndex)
 	}
 	for i := index(0); int(i) < s.size; i++ {
 		err := s.fvss[i].HandleBroadcastMsg(orig, msg)
@@ -242,7 +242,7 @@ func (s *JointFeldmanState) HandleBroadcastMsg(orig int, msg []byte) error {
 //  - nil otherwise
 func (s *JointFeldmanState) HandlePrivateMsg(orig int, msg []byte) error {
 	if !s.jointRunning {
-		return dkgInvalidStateTransitionError("dkg protocol %d is not running", s.myIndex)
+		return dkgInvalidStateTransitionErrorf("dkg protocol %d is not running", s.myIndex)
 	}
 	for i := index(0); int(i) < s.size; i++ {
 		err := s.fvss[i].HandlePrivateMsg(orig, msg)

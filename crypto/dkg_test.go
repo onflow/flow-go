@@ -715,12 +715,22 @@ func (proc *testDKGProcessor) invalidComplaintAnswerBroadcast(data []byte) {
 	}
 }
 
+// implements a dummy DKGProcessor
+type dummyTestDKGProcessor struct {
+}
+
+func (proc dummyTestDKGProcessor) PrivateSend(int, []byte)     {}
+func (proc dummyTestDKGProcessor) Broadcast([]byte)            {}
+func (proc dummyTestDKGProcessor) Disqualify(int, string)      {}
+func (proc dummyTestDKGProcessor) FlagMisbehavior(int, string) {}
+
 func TestDKGErrorTypes(t *testing.T) {
 	t.Run("dkgFailureError sanity", func(t *testing.T) {
 		failureError := dkgFailureErrorf("some error")
 		otherError := fmt.Errorf("some error")
 		assert.True(t, IsDKGFailureError(failureError))
 		assert.False(t, IsDKGFailureError(otherError))
+		assert.False(t, IsDKGFailureError(nil))
 	})
 
 	t.Run("dkgInvalidStateTransitionError sanity", func(t *testing.T) {
@@ -728,11 +738,73 @@ func TestDKGErrorTypes(t *testing.T) {
 		otherError := fmt.Errorf("some error")
 		assert.True(t, IsDKGInvalidStateTransitionError(failureError))
 		assert.False(t, IsDKGInvalidStateTransitionError(otherError))
+		assert.False(t, IsDKGInvalidStateTransitionError(nil))
+	})
+}
+
+func TestDKGTransitionErrors(t *testing.T) {
+	n := 5
+	threshold := 3
+	myIndex := 0
+	dealer := 1
+	seed := make([]byte, SeedMinLenDKG)
+
+	t.Run("feldman VSS", func(t *testing.T) {
+		state, err := NewFeldmanVSS(n, threshold, myIndex, dummyTestDKGProcessor{}, dealer)
+		require.NoError(t, err)
+		// calls before start
+		err = state.ForceDisqualify(1)
+		assert.True(t, IsDKGInvalidStateTransitionError(err))
+		err = state.HandlePrivateMsg(1, []byte{})
+		assert.True(t, IsDKGInvalidStateTransitionError(err))
+		err = state.HandleBroadcastMsg(1, []byte{})
+		assert.True(t, IsDKGInvalidStateTransitionError(err))
+		_, _, _, err = state.End()
+		assert.True(t, IsDKGInvalidStateTransitionError(err))
 	})
 
-	t.Run("trigger state Transition errors", func(t *testing.T) {
+	t.Run("Feldman VSS Qualif and joint-Feldman ", func(t *testing.T) {
+		stateFVSSQ, err := NewFeldmanVSSQual(n, threshold, myIndex, dummyTestDKGProcessor{}, dealer)
+		require.NoError(t, err)
+		stateJF, err := NewJointFeldman(n, threshold, myIndex, dummyTestDKGProcessor{})
+		require.NoError(t, err)
 
-	}
-
-	// TODO: add tests for state transition errors
+		for _, state := range []DKGState{stateFVSSQ, stateJF} {
+			// calls before start
+			err = state.ForceDisqualify(1)
+			assert.True(t, IsDKGInvalidStateTransitionError(err))
+			err = state.HandlePrivateMsg(1, []byte{})
+			assert.True(t, IsDKGInvalidStateTransitionError(err))
+			err = state.HandleBroadcastMsg(1, []byte{})
+			assert.True(t, IsDKGInvalidStateTransitionError(err))
+			_, _, _, err = state.End()
+			assert.True(t, IsDKGInvalidStateTransitionError(err))
+			err = state.NextTimeout()
+			assert.True(t, IsDKGInvalidStateTransitionError(err))
+			// after start
+			err = state.Start(seed)
+			require.NoError(t, err)
+			_, _, _, err = state.End()
+			assert.True(t, IsDKGInvalidStateTransitionError(err))
+			// after first timeout
+			err = state.NextTimeout()
+			require.NoError(t, err)
+			err = state.Start(seed)
+			assert.True(t, IsDKGInvalidStateTransitionError(err))
+			_, _, _, err = state.End()
+			assert.True(t, IsDKGInvalidStateTransitionError(err))
+			// after second timeout
+			err = state.NextTimeout()
+			require.NoError(t, err)
+			err = state.Start(seed)
+			assert.True(t, IsDKGInvalidStateTransitionError(err))
+			err = state.NextTimeout()
+			assert.True(t, IsDKGInvalidStateTransitionError(err))
+			// after end
+			_, _, _, err = state.End()
+			require.True(t, IsDKGFailureError(err))
+			err = state.NextTimeout()
+			assert.True(t, IsDKGInvalidStateTransitionError(err))
+		}
+	})
 }
