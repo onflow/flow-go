@@ -753,8 +753,12 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 	net.ConsensusFollowers[followerConf.NodeID] = follower
 }
 
-func (net *FlowNetwork) StopContainer(ctx context.Context, containerID string) error {
-	return net.cli.ContainerStop(ctx, containerID, nil)
+func (net *FlowNetwork) StopContainerByName(ctx context.Context, containerName string) error {
+	container := net.ContainerByName(containerName)
+	if container == nil {
+		return fmt.Errorf("%s container not found", containerName)
+	}
+	return net.cli.ContainerStop(ctx, container.ID, nil)
 }
 
 type ObserverConfig struct {
