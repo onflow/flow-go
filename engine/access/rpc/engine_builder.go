@@ -20,10 +20,11 @@ type RPCEngineBuilder struct {
 // NewRPCEngineBuilder helps to build a new RPC engine.
 func NewRPCEngineBuilder(engine *Engine) *RPCEngineBuilder {
 	decoder := signature.NewNoopBlockSignerDecoder()
+
+	// the default handler will use the engine.backend implementation
 	return &RPCEngineBuilder{
 		Engine:               engine,
 		signerIndicesDecoder: decoder,
-		// default handler will use the engine.backend implementation
 		handler: access.NewHandler(engine.backend, engine.chain, access.WithBlockSignerDecoder(decoder)),
 	}
 }
@@ -36,8 +37,8 @@ func (builder *RPCEngineBuilder) WithBlockSignerDecoder(signerIndicesDecoder hot
 	return builder
 }
 
-func (builder *RPCEngineBuilder) WithNewHandler(handler accessproto.AccessAPIClient) *RPCEngineBuilder {
-	builder.handler = &Forwarder{UpstreamHandler: handler}
+func (builder *RPCEngineBuilder) WithNewHandler(handler accessproto.AccessAPIServer) *RPCEngineBuilder {
+	builder.handler = handler
 	return builder
 }
 

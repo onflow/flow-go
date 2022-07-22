@@ -992,7 +992,12 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		if err != nil {
 			return nil, err
 		}
-
+		
+		/*
+			TODO:
+			The following code to setup the connection to the access node is temporary
+			The forwarding should allow for multiple upstream access nodes, allow for retries, and track metrics
+		*/
 		if len(builder.upstreamIdentities) == 0 {
 			panic("please specify an upstream identity")
 		}
@@ -1012,7 +1017,8 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 
 		client := accessproto.NewAccessAPIClient(conn)
 
-		engineBuilder.WithNewHandler(client)
+		// build the rpc engine
+		engineBuilder.WithNewHandler(&rpc.Forwarder{UpstreamHandler: client})
 		engineBuilder.WithLegacy()
 		builder.RpcEng = engineBuilder.Build()
 		return builder.RpcEng, nil
