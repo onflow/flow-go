@@ -225,8 +225,7 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 
 // chunkAssignments returns the list of chunks in the chunk list assigned to this verification node.
 func (e *Engine) chunkAssignments(ctx context.Context, result *flow.ExecutionResult, incorporatingBlock flow.Identifier) (flow.ChunkList, error) {
-	var span otelTrace.Span
-	span, _ = e.tracer.StartSpanFromContext(ctx, trace.VERMatchMyChunkAssignments)
+	span, _ := e.tracer.StartSpanFromContext(ctx, trace.VERMatchMyChunkAssignments)
 	defer span.End()
 
 	assignment, err := e.assigner.Assign(result, incorporatingBlock)

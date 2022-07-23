@@ -42,11 +42,10 @@ func NewContractFunctionInvoker(
 }
 
 func (i *ContractFunctionInvoker) Invoke(env Environment, parentTraceSpan otelTrace.Span) (cadence.Value, error) {
-	var span otelTrace.Span
 
 	ctx := env.Context()
 	if ctx.Tracer != nil && parentTraceSpan != nil {
-		span = ctx.Tracer.StartSpanFromParent(parentTraceSpan, trace.FVMInvokeContractFunction)
+		span := ctx.Tracer.StartSpanFromParent(parentTraceSpan, trace.FVMInvokeContractFunction)
 		span.SetAttributes(i.logSpanAttrs...)
 
 		defer span.End()
