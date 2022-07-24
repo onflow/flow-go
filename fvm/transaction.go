@@ -35,7 +35,6 @@ type TransactionProcedure struct {
 	ComputationUsed uint64
 	MemoryEstimate  uint64
 	Err             errors.Error
-	Retried         int
 	TraceSpan       opentracing.Span
 }
 

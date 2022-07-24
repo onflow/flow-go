@@ -1,12 +1,8 @@
 package fvm
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"path"
 	"strconv"
-	"time"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
@@ -17,7 +13,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/extralog"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -59,8 +54,6 @@ func (i *TransactionInvoker) Process(
 
 	var env *TransactionEnv
 	var txError error
-	retry := false
-	numberOfRetries := 0
 
 	parentState := sth.State()
 	childState := sth.NewChild()
@@ -94,74 +87,29 @@ func (i *TransactionInvoker) Process(
 	}
 	predeclaredValues := valueDeclarations(ctx, env)
 
-	for numberOfRetries = 0; numberOfRetries < int(ctx.MaxNumOfTxRetries); numberOfRetries++ {
-		if retry {
-			// rest state
-			sth.SetActiveState(parentState)
-			childState = sth.NewChild()
-			// force cleanup if retries
-			programs.ForceCleanup()
+	location := common.TransactionLocation(proc.ID)
 
-			i.logger.Warn().
-				Str("txHash", txIDStr).
-				Uint64("blockHeight", blockHeight).
-				Int("retries_count", numberOfRetries).
-				Uint64("ledger_interaction_used", sth.State().InteractionUsed()).
-				Msg("retrying transaction execution")
-
-			// reset error part of proc
-			// Warning right now the tx requires retry logic doesn't change
-			// anything on state, but we might want to revert the state changes (or not committing)
-			// if we decided to expand it further.
-			proc.Err = nil
-			proc.Logs = make([]string, 0)
-			proc.Events = make([]flow.Event, 0)
-			proc.ServiceEvents = make([]flow.Event, 0)
-
-			// reset env
-			env, err = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
-			if err != nil {
-				return fmt.Errorf("error creating new environment: %w", err)
-			}
+	err = vm.Runtime.ExecuteTransaction(
+		runtime.Script{
+			Source:    proc.Transaction.Script,
+			Arguments: proc.Transaction.Arguments,
+		},
+		runtime.Context{
+			Interface:         env,
+			Location:          location,
+			PredeclaredValues: predeclaredValues,
+		},
+	)
+	if err != nil {
+		var interactionLimiExceededErr *errors.LedgerIntractionLimitExceededError
+		if errors.As(err, &interactionLimiExceededErr) {
+			// If it is this special interaction limit error, just set it directly as the tx error
+			txError = err
+		} else {
+			// Otherwise, do what we use to do
+			txError = fmt.Errorf("transaction invocation failed when executing transaction: %w", errors.HandleRuntimeError(err))
 		}
-
-		location := common.TransactionLocation(proc.ID)
-
-		err := vm.Runtime.ExecuteTransaction(
-			runtime.Script{
-				Source:    proc.Transaction.Script,
-				Arguments: proc.Transaction.Arguments,
-			},
-			runtime.Context{
-				Interface:         env,
-				Location:          location,
-				PredeclaredValues: predeclaredValues,
-			},
-		)
-		if err != nil {
-			var interactionLimiExceededErr *errors.LedgerIntractionLimitExceededError
-			if errors.As(err, &interactionLimiExceededErr) {
-				// If it is this special interaction limit error, just set it directly as the tx error
-				txError = err
-			} else {
-				// Otherwise, do what we use to do
-				txError = fmt.Errorf("transaction invocation failed when executing transaction: %w", errors.HandleRuntimeError(err))
-			}
-		}
-
-		// break the loop
-		if !i.requiresRetry(err, proc) {
-			break
-		}
-
-		retry = true
-		proc.Retried++
 	}
-
-	// (for future use) panic if we tried several times and still failing because of checking issue
-	// if numberOfTries == maxNumberOfRetries {
-	// 	panic(err)
-	// }
 
 	// read computationUsed from the environment. This will be used to charge fees.
 	computationUsed := env.ComputationUsed()
@@ -403,43 +351,7 @@ func (i *TransactionInvoker) requiresRetry(err error, proc *TransactionProcedure
 		return false
 	}
 
-	i.dumpRuntimeError(&runtimeErr, proc)
 	return true
-}
-
-// logRuntimeError logs run time errors into a file
-// This is a temporary measure.
-func (i *TransactionInvoker) dumpRuntimeError(runtimeErr *runtime.Error, procedure *TransactionProcedure) {
-
-	codesJSON, err := json.Marshal(runtimeErr.Codes)
-	if err != nil {
-		i.logger.Error().Err(err).Msg("cannot marshal codes JSON")
-	}
-	programsJSON, err := json.Marshal(runtimeErr.Programs)
-	if err != nil {
-		i.logger.Error().Err(err).Msg("cannot marshal programs JSON")
-	}
-
-	t := time.Now().UnixNano()
-
-	codesPath := path.Join(extralog.ExtraLogDumpPath, fmt.Sprintf("%s-codes-%d", procedure.ID.String(), t))
-	programsPath := path.Join(extralog.ExtraLogDumpPath, fmt.Sprintf("%s-programs-%d", procedure.ID.String(), t))
-
-	err = ioutil.WriteFile(codesPath, codesJSON, 0700)
-	if err != nil {
-		i.logger.Error().Err(err).Msg("cannot write codes json")
-	}
-
-	err = ioutil.WriteFile(programsPath, programsJSON, 0700)
-	if err != nil {
-		i.logger.Error().Err(err).Msg("cannot write programs json")
-	}
-
-	i.logger.Error().
-		Str("txHash", procedure.ID.String()).
-		Str("codes", string(codesJSON)).
-		Str("programs", string(programsJSON)).
-		Msg("checking failed")
 }
 
 // logExecutionIntensities logs execution intensities of the transaction
