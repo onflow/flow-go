@@ -276,16 +276,16 @@ func (l *Ledger) set(trieUpdate *ledger.TrieUpdate) (newState ledger.State, err 
 
 	resultCh := make(chan error)
 
+	trieCh := make(chan *trie.MTrie, 1)
+	defer close(trieCh)
+
 	if l.trieUpdateCh == nil {
 		go func() {
 			_, _, err := l.wal.RecordUpdate(trieUpdate)
 			resultCh <- err
 		}()
 	} else {
-		doneCh := make(chan struct{})
-		defer close(doneCh)
-
-		l.trieUpdateCh <- &WALTrieUpdate{Update: trieUpdate, ResultCh: resultCh, DoneCh: doneCh}
+		l.trieUpdateCh <- &WALTrieUpdate{Update: trieUpdate, ResultCh: resultCh, TrieCh: trieCh}
 	}
 
 	newTrie, err := l.forest.NewTrie(trieUpdate)
@@ -302,6 +302,8 @@ func (l *Ledger) set(trieUpdate *ledger.TrieUpdate) (newState ledger.State, err 
 	if err != nil {
 		return ledger.State(hash.DummyHash), fmt.Errorf("failed to add new trie to forest: %w", err)
 	}
+
+	trieCh <- newTrie
 
 	return ledger.State(newTrie.RootHash()), nil
 }

@@ -395,9 +395,10 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			return ledger.NewCompactor(
 				ledgerStorage,
 				diskWAL,
+				node.Logger.With().Str("subcomponent", "checkpointer").Logger(),
+				uint(e.exeConf.mTrieCacheSize),
 				e.exeConf.checkpointDistance,
 				e.exeConf.checkpointsToKeep,
-				node.Logger.With().Str("subcomponent", "checkpointer").Logger(),
 			)
 		}).
 		Component("execution data service", func(node *NodeConfig) (module.ReadyDoneAware, error) {

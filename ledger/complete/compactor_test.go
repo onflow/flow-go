@@ -40,20 +40,25 @@ func (co *CompactorObserver) OnNext(val interface{}) {
 		}
 	}
 }
+
 func (co *CompactorObserver) OnError(err error) {}
 func (co *CompactorObserver) OnComplete() {
 	close(co.done)
 }
 
 func TestCompactor(t *testing.T) {
-	numInsPerStep := 2
-	pathByteSize := 32
-	minPayloadByteSize := 2 << 15
-	maxPayloadByteSize := 2 << 16
-	size := 10
+	const (
+		numInsPerStep      = 2
+		pathByteSize       = 32
+		minPayloadByteSize = 2 << 15
+		maxPayloadByteSize = 2 << 16
+		size               = 10
+		checkpointDistance = 3
+		checkpointsToKeep  = 1
+		forestCapacity     = size * 10
+	)
+
 	metricsCollector := &metrics.NoopCollector{}
-	checkpointDistance := uint(3)
-	checkpointsToKeep := uint(1)
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
@@ -64,7 +69,7 @@ func TestCompactor(t *testing.T) {
 
 		t.Run("creates checkpoints", func(t *testing.T) {
 
-			wal, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, 32*1024)
+			wal, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, forestCapacity, pathByteSize, 32*1024)
 			require.NoError(t, err)
 
 			l, err = NewSyncLedger(wal, size*10, metricsCollector, zerolog.Logger{}, DefaultPathFinderVersion)
@@ -73,7 +78,7 @@ func TestCompactor(t *testing.T) {
 			// WAL segments are 32kB, so here we generate 2 keys 64kB each, times `size`
 			// so we should get at least `size` segments
 
-			compactor, err := NewCompactor(l, wal, checkpointDistance, checkpointsToKeep, zerolog.Nop())
+			compactor, err := NewCompactor(l, wal, zerolog.Nop(), forestCapacity, checkpointDistance, checkpointsToKeep)
 			require.NoError(t, err)
 
 			co := CompactorObserver{fromBound: 8, done: make(chan struct{})}
@@ -246,14 +251,19 @@ func TestCompactor(t *testing.T) {
 // (from segment 0, ignoring prior checkpoints) to the checkpoint number.
 // This verifies that checkpointed tries are snapshopt of segments and at segment boundary.
 func TestCompactorAccuracy(t *testing.T) {
-	numInsPerStep := 2
-	pathByteSize := 32
-	minPayloadByteSize := 2 << 15
-	maxPayloadByteSize := 2 << 16
-	size := 10
+
+	const (
+		numInsPerStep      = 2
+		pathByteSize       = 32
+		minPayloadByteSize = 2 << 15
+		maxPayloadByteSize = 2 << 16
+		size               = 10
+		checkpointDistance = 5
+		checkpointsToKeep  = 0
+		forestCapacity     = size * 10
+	)
+
 	metricsCollector := &metrics.NoopCollector{}
-	checkpointDistance := uint(5)
-	checkpointsToKeep := uint(0)
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
@@ -264,7 +274,7 @@ func TestCompactorAccuracy(t *testing.T) {
 		// Create DiskWAL and Ledger repeatedly to test rebuilding ledger state at restart.
 		for i := 0; i < 3; i++ {
 
-			wal, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, 32*1024)
+			wal, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, forestCapacity, pathByteSize, 32*1024)
 			require.NoError(t, err)
 
 			l, err := NewSyncLedger(wal, size*10, metricsCollector, zerolog.Logger{}, DefaultPathFinderVersion)
@@ -276,7 +286,7 @@ func TestCompactorAccuracy(t *testing.T) {
 			// WAL segments are 32kB, so here we generate 2 keys 64kB each, times `size`
 			// so we should get at least `size` segments
 
-			compactor, err := NewCompactor(l, wal, checkpointDistance, checkpointsToKeep, zerolog.Nop())
+			compactor, err := NewCompactor(l, wal, zerolog.Nop(), forestCapacity, checkpointDistance, checkpointsToKeep)
 			require.NoError(t, err)
 
 			fromBound := lastCheckpointNum + int(checkpointDistance)*2
@@ -429,14 +439,18 @@ func replaySegments(
 }
 
 func TestCompactorConcurrency(t *testing.T) {
-	numInsPerStep := 2
-	pathByteSize := 32
-	minPayloadByteSize := 2 << 15
-	maxPayloadByteSize := 2 << 16
-	size := 10
+	const (
+		numInsPerStep      = 2
+		pathByteSize       = 32
+		minPayloadByteSize = 2 << 15
+		maxPayloadByteSize = 2 << 16
+		size               = 10
+		checkpointDistance = 5
+		checkpointsToKeep  = 0 // keep all
+		forestCapacity     = size * 10
+	)
+
 	metricsCollector := &metrics.NoopCollector{}
-	checkpointDistance := uint(5)
-	checkpointsToKeep := uint(0) // keep all
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
@@ -447,7 +461,7 @@ func TestCompactorConcurrency(t *testing.T) {
 		// Create DiskWAL and Ledger repeatedly to test rebuilding ledger state at restart.
 		for i := 0; i < 3; i++ {
 
-			wal, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, 32*1024)
+			wal, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, forestCapacity, pathByteSize, 32*1024)
 			require.NoError(t, err)
 
 			l, err := NewSyncLedger(wal, size*10, metricsCollector, zerolog.Logger{}, DefaultPathFinderVersion)
@@ -459,7 +473,7 @@ func TestCompactorConcurrency(t *testing.T) {
 			// WAL segments are 32kB, so here we generate 2 keys 64kB each, times `size`
 			// so we should get at least `size` segments
 
-			compactor, err := NewCompactor(l, wal, checkpointDistance, checkpointsToKeep, zerolog.Nop())
+			compactor, err := NewCompactor(l, wal, zerolog.Nop(), forestCapacity, checkpointDistance, checkpointsToKeep)
 			require.NoError(t, err)
 
 			fromBound := lastCheckpointNum + int(checkpointDistance)*2

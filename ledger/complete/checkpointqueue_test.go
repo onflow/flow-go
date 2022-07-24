@@ -1,0 +1,131 @@
+package complete
+
+import (
+	"math/rand"
+	"testing"
+
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/hash"
+	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
+	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
+	"github.com/stretchr/testify/require"
+)
+
+func TestEmptyCheckpointQueue(t *testing.T) {
+	const capacity = 10
+
+	q := NewCheckpointQueue(capacity)
+	require.Equal(t, 0, q.Count())
+
+	tries := q.Tries()
+	require.Equal(t, 0, len(tries))
+	require.Equal(t, 0, q.Count())
+
+	// savedTries contains all tries that are pushed to queue
+	var savedTries []*trie.MTrie
+
+	// Push tries to queue to fill out capacity
+	for i := 0; i < capacity; i++ {
+		trie, err := randomMTrie()
+		require.NoError(t, err)
+
+		q.Push(trie)
+
+		savedTries = append(savedTries, trie)
+
+		tr := q.Tries()
+		require.Equal(t, savedTries, tr)
+		require.Equal(t, len(savedTries), q.Count())
+	}
+
+	// Push more tries to queue to overwrite older elements
+	for i := 0; i < capacity; i++ {
+		trie, err := randomMTrie()
+		require.NoError(t, err)
+
+		q.Push(trie)
+
+		savedTries = append(savedTries, trie)
+
+		tr := q.Tries()
+		require.Equal(t, capacity, len(tr))
+		require.Equal(t, savedTries[len(savedTries)-capacity:], tr)
+		require.Equal(t, capacity, q.Count())
+	}
+}
+
+func TestCheckpointQueueWithInitialValues(t *testing.T) {
+	const capacity = 10
+
+	// Test CheckpointQueue with initial values.  Numbers of initial values
+	// are from 1 to capacity + 1.
+	for initialValueCount := 1; initialValueCount <= capacity+1; initialValueCount++ {
+
+		initialValues := make([]*trie.MTrie, initialValueCount)
+		for i := 0; i < len(initialValues); i++ {
+			tr, err := randomMTrie()
+			require.NoError(t, err)
+			initialValues[i] = tr
+		}
+
+		expectedCount := initialValueCount
+		expectedTries := initialValues
+		if initialValueCount > capacity {
+			expectedCount = capacity
+			expectedTries = initialValues[initialValueCount-capacity:]
+		}
+
+		q := NewCheckpointQueueWithValues(capacity, initialValues)
+		require.Equal(t, expectedCount, q.Count())
+
+		tries := q.Tries()
+		require.Equal(t, expectedTries, tries)
+		require.Equal(t, expectedCount, q.Count())
+
+		// savedTries contains all tries that are pushed to queue, including initial values.
+		savedTries := initialValues
+
+		// Push tries to queue to fill out remaining capacity.
+		if initialValueCount < capacity {
+			for i := 0; i < capacity-initialValueCount; i++ {
+				trie, err := randomMTrie()
+				require.NoError(t, err)
+
+				q.Push(trie)
+
+				savedTries = append(savedTries, trie)
+
+				tr := q.Tries()
+				require.Equal(t, savedTries, tr)
+				require.Equal(t, len(savedTries), q.Count())
+			}
+		}
+
+		// Push more tries to queue to overwrite older elements.
+		for i := 0; i < capacity; i++ {
+			trie, err := randomMTrie()
+			require.NoError(t, err)
+
+			q.Push(trie)
+
+			savedTries = append(savedTries, trie)
+
+			tr := q.Tries()
+			require.Equal(t, capacity, len(tr))
+			require.Equal(t, savedTries[len(savedTries)-capacity:], tr)
+			require.Equal(t, capacity, q.Count())
+		}
+	}
+}
+
+func randomMTrie() (*trie.MTrie, error) {
+	var randomPath ledger.Path
+	rand.Read(randomPath[:])
+
+	var randomHashValue hash.Hash
+	rand.Read(randomHashValue[:])
+
+	root := node.NewNode(256, nil, nil, randomPath, nil, randomHashValue)
+
+	return trie.NewMTrie(root, 1, 1)
+}

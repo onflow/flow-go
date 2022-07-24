@@ -19,7 +19,7 @@ import (
 type WALTrieUpdate struct {
 	Update   *ledger.TrieUpdate
 	ResultCh chan<- error
-	DoneCh   <-chan struct{}
+	TrieCh   <-chan *trie.MTrie
 }
 
 type checkpointResult struct {
@@ -31,6 +31,7 @@ type Compactor struct {
 	checkpointer       *realWAL.Checkpointer
 	wal                *realWAL.DiskWAL
 	ledger             *Ledger
+	checkpointQueue    *CheckpointQueue
 	logger             zerolog.Logger
 	stopCh             chan chan struct{}
 	trieUpdateCh       <-chan *WALTrieUpdate
@@ -41,7 +42,14 @@ type Compactor struct {
 	checkpointsToKeep  uint
 }
 
-func NewCompactor(l *Ledger, w *realWAL.DiskWAL, checkpointDistance uint, checkpointsToKeep uint, logger zerolog.Logger) (*Compactor, error) {
+func NewCompactor(
+	l *Ledger,
+	w *realWAL.DiskWAL,
+	logger zerolog.Logger,
+	checkpointCapacity uint,
+	checkpointDistance uint,
+	checkpointsToKeep uint,
+) (*Compactor, error) {
 	if checkpointDistance < 1 {
 		checkpointDistance = 1
 	}
@@ -61,10 +69,18 @@ func NewCompactor(l *Ledger, w *realWAL.DiskWAL, checkpointDistance uint, checkp
 		return nil, errors.New("failed to get valid trie update done channel from ledger")
 	}
 
+	tries, err := l.Tries()
+	if err != nil {
+		return nil, err
+	}
+
+	checkpointQueue := NewCheckpointQueueWithValues(checkpointCapacity, tries)
+
 	return &Compactor{
 		checkpointer:       checkpointer,
 		wal:                w,
 		ledger:             l,
+		checkpointQueue:    checkpointQueue,
 		logger:             logger,
 		stopCh:             make(chan chan struct{}),
 		trieUpdateCh:       trieUpdateCh,
@@ -180,15 +196,10 @@ Loop:
 			var checkpointNum int
 			var checkpointTries []*trie.MTrie
 			activeSegmentNum, checkpointNum, checkpointTries =
-				c.processTrieUpdate(update, activeSegmentNum, nextCheckpointNum)
+				c.processTrieUpdate(update, c.checkpointQueue, activeSegmentNum, nextCheckpointNum)
 
 			if checkpointTries == nil {
-				// Don't checkpoint yet because
-				// - not enough segments for checkpointing (nextCheckpointNum >= activeSegmentNum), or
-				// - failed to get ledger state snapshop (nextCheckpointNum < activeSegmentNum)
-				if nextCheckpointNum < activeSegmentNum {
-					nextCheckpointNum = activeSegmentNum
-				}
+				// Not enough segments for checkpointing (nextCheckpointNum >= activeSegmentNum)
 				continue
 			}
 
@@ -222,17 +233,6 @@ Loop:
 	}
 
 	// Don't wait for checkpointing to finish because it might take too long.
-}
-
-// processUpdateResult sends WAL update result using ResultCh channel
-// and waits for signal from DoneCh channel.
-// This ensures that WAL update and ledger state update are in sync.
-func processUpdateResult(update *WALTrieUpdate, updateResult error) {
-	// Send result of WAL update
-	update.ResultCh <- updateResult
-
-	// Wait for trie update to complete
-	<-update.DoneCh
 }
 
 func (c *Compactor) checkpoint(ctx context.Context, tries []*trie.MTrie, checkpointNum int) error {
@@ -324,10 +324,11 @@ func cleanupCheckpoints(checkpointer *realWAL.Checkpointer, checkpointsToKeep in
 }
 
 // processTrieUpdate writes trie update to WAL, updates activeSegmentNum,
-// and takes snapshot of ledger state for checkpointing if needed.
+// and gets tries from checkpointQueue for checkpointing if needed.
 // It also sends WAL update result and waits for trie update completion.
 func (c *Compactor) processTrieUpdate(
 	update *WALTrieUpdate,
+	checkpointQueue *CheckpointQueue,
 	activeSegmentNum int,
 	nextCheckpointNum int,
 ) (
@@ -342,8 +343,20 @@ func (c *Compactor) processTrieUpdate(
 	// - incremented by 1 from previous segment number (new segment)
 	segmentNum, skipped, updateErr := c.wal.RecordUpdate(update.Update)
 
-	// processUpdateResult must be called to ensure that ledger state update isn't blocked.
-	defer processUpdateResult(update, updateErr)
+	// This ensures that updated trie matches WAL update.
+	defer func(updateResult error) {
+		// Send result of WAL update
+		update.ResultCh <- updateResult
+
+		// Wait for updated trie
+		trie := <-update.TrieCh
+		if trie == nil {
+			c.logger.Error().Msg("compactor failed to get updated trie")
+			return
+		}
+
+		checkpointQueue.Push(trie)
+	}(updateErr)
 
 	if activeSegmentNum == -1 {
 		// Recover from failure to get active segment number at initialization.
@@ -376,16 +389,12 @@ func (c *Compactor) processTrieUpdate(
 
 	// Enough segments are created for checkpointing
 
-	// Get ledger snapshot before sending WAL update result.
-	// At this point, ledger snapshot contains tries up to
+	// Get tries from checkpoint queue.
+	// At this point, checkpoint queue contains tries up to
 	// last update (logged as last record in finalized segment)
-	// Ledger doesn't include new trie for this update
-	// until WAL result is sent back.
-	tries, err := c.ledger.Tries()
-	if err != nil {
-		c.logger.Error().Err(err).Msg("compactor failed to get ledger tries")
-		return activeSegmentNum, -1, nil
-	}
+	// It doesn't include trie for this update
+	// until updated trie is received and added to checkpointQueue.
+	tries := checkpointQueue.Tries()
 
 	checkpointNum = nextCheckpointNum
 
