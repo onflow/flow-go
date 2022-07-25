@@ -320,5 +320,34 @@ func TestEllipticUnmarshalSecp256k1(t *testing.T) {
 		require.Nil(t, y)
 
 	}
+}
 
+func BenchmarkECDSADecode(b *testing.B) {
+	// random message
+	seed := make([]byte, 50)
+	_, _ = rand.Read(seed)
+
+	for _, curve := range []SigningAlgorithm{ECDSASecp256k1, ECDSAP256} {
+		sk, _ := GeneratePrivateKey(curve, seed)
+		comp := sk.PublicKey().EncodeCompressed()
+		uncomp := sk.PublicKey().Encode()
+
+		b.Run("compressed point on "+curve.String(), func(b *testing.B) {
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				_, err := DecodePublicKeyCompressed(curve, comp)
+				require.NoError(b, err)
+			}
+			b.StopTimer()
+		})
+
+		b.Run("uncompressed point on "+curve.String(), func(b *testing.B) {
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				_, err := DecodePublicKey(curve, uncomp)
+				require.NoError(b, err)
+			}
+			b.StopTimer()
+		})
+	}
 }
