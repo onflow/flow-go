@@ -33,7 +33,7 @@ func (c *Consumer) logOffense(identity *flow.Identity, peerID, msgType, channel,
 		Str("offense", offense).
 		Str("message_type", msgType).
 		Str("channel", channel).
-		Bool("unicast_message", true)
+		Bool("unicast_message", isUnicast)
 
 	if identity != nil {
 		e = e.Str("role", identity.Role.String()).Hex("sender_id", logging.ID(identity.NodeID))
