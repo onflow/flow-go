@@ -44,18 +44,19 @@ func NewScriptEnvironment(
 	accountKeys := handler.NewAccountKeyHandler(accounts)
 	metrics := handler.NewMetricsHandler(fvmContext.Metrics)
 
+	ctx := &EnvContext{nestedContext{fvmContext}, nil}
 	env := &ScriptEnv{
 		commonEnv: commonEnv{
-			ctx:           fvmContext,
-			sth:           sth,
-			vm:            vm,
-			programs:      programsHandler,
-			accounts:      accounts,
-			accountKeys:   accountKeys,
-			uuidGenerator: uuidGenerator,
-			logs:          nil,
-			rng:           nil,
-			metrics:       metrics,
+			ctx:                   ctx,
+			ProgramLogger:         NewProgramLogger(ctx),
+			UnsafeRandomGenerator: NewUnsafeRandomGenerator(ctx),
+			sth:                   sth,
+			vm:                    vm,
+			programs:              programsHandler,
+			accounts:              accounts,
+			accountKeys:           accountKeys,
+			uuidGenerator:         uuidGenerator,
+			metrics:               metrics,
 		},
 		reqContext: reqContext,
 	}
@@ -71,10 +72,6 @@ func NewScriptEnvironment(
 		func() []common.Address { return []common.Address{} },
 		func() []common.Address { return []common.Address{} },
 		func(address runtime.Address, code []byte) (bool, error) { return false, nil })
-
-	if fvmContext.BlockHeader != nil {
-		env.seedRNG(fvmContext.BlockHeader)
-	}
 
 	var err error
 	// set the execution parameters from the state
@@ -291,22 +288,6 @@ func (e *ScriptEnv) ResolveLocation(
 	}
 
 	return resolvedLocations, nil
-}
-
-func (e *ScriptEnv) ProgramLog(message string) error {
-	if e.isTraceable() && e.ctx.ExtensiveTracing {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvProgramLog)
-		defer sp.Finish()
-	}
-
-	if e.ctx.CadenceLoggingEnabled {
-		e.logs = append(e.logs, message)
-	}
-	return nil
-}
-
-func (e *ScriptEnv) Logs() []string {
-	return e.logs
 }
 
 func (e *ScriptEnv) EmitEvent(_ cadence.Event) error {
