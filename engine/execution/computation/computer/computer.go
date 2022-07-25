@@ -284,7 +284,6 @@ func (e *blockComputer) executeSystemCollection(
 	}
 
 	err = e.executeTransaction(tx, colSpan, collectionView, programs, systemChunkCtx, collectionIndex, txIndex, res, true)
-	txIndex++
 
 	if err != nil {
 		return nil, err

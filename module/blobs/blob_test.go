@@ -4,8 +4,9 @@ import (
 	"crypto/rand"
 	"testing"
 
-	"github.com/onflow/flow-go/module/blobs"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/onflow/flow-go/module/blobs"
 )
 
 // TestBlobCIDLength tests that the CID length of a blob is equal to blobs.CidLength bytes.

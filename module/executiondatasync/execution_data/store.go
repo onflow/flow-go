@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/ipfs/go-cid"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 )

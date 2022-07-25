@@ -7,14 +7,15 @@ import (
 	"time"
 
 	"github.com/ipfs/go-cid"
+	"github.com/rs/zerolog"
+	"golang.org/x/sync/errgroup"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	"github.com/onflow/flow-go/network"
-	"github.com/rs/zerolog"
-	"golang.org/x/sync/errgroup"
 )
 
 type ProviderOption func(*Provider)
