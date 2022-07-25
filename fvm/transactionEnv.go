@@ -71,13 +71,14 @@ func NewTransactionEnvironment(
 				tracer,
 				ctx.BlockHeader,
 			),
-			ctx:           ctx,
-			sth:           sth,
-			vm:            vm,
-			programs:      programsHandler,
-			accounts:      accounts,
-			accountKeys:   accountKeys,
-			uuidGenerator: uuidGenerator,
+			ctx:            ctx,
+			sth:            sth,
+			vm:             vm,
+			programs:       programsHandler,
+			accounts:       accounts,
+			accountKeys:    accountKeys,
+			uuidGenerator:  uuidGenerator,
+			frozenAccounts: nil,
 		},
 
 		addressGenerator: generator,
@@ -471,6 +472,11 @@ func (e *TransactionEnv) SetAccountFrozen(address common.Address, frozen bool) e
 	if err != nil {
 		return fmt.Errorf("setting account frozen failed: %w", err)
 	}
+
+	if frozen {
+		e.frozenAccounts = append(e.frozenAccounts, address)
+	}
+
 	return nil
 }
 
