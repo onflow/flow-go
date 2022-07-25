@@ -30,8 +30,6 @@ type EventLoop struct {
 
 var _ hotstuff.EventLoop = (*EventLoop)(nil)
 var _ component.Component = (*EventLoop)(nil)
-var _ hotstuff.TimeoutCollectorConsumer = (*EventLoop)(nil)
-var _ hotstuff.QCCreatedConsumer = (*EventLoop)(nil)
 
 // NewEventLoop creates an instance of EventLoop.
 func NewEventLoop(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandler hotstuff.EventHandler, startTime time.Time) (*EventLoop, error) {

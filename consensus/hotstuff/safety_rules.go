@@ -34,7 +34,7 @@ type SafetyRules interface {
 	//    This is a sentinel error and _expected_ during normal operation.
 	// All other errors are unexpected and potential symptoms of uncovered edge cases or corrupted internal state (fatal).
 	ProduceVote(proposal *model.Proposal, curView uint64) (*model.Vote, error)
-	// ProduceTimeout takes current view, highest locally known QC and TC (optional, must be nil if and 
+	// ProduceTimeout takes current view, highest locally known QC and TC (optional, must be nil if and
 	// only if QC is for previous view) and decides whether to produce timeout for current view.
 	// Returns:
 	//  * (timeout, nil): It is safe to timeout for current view using newestQC and lastViewTC.

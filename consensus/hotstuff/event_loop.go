@@ -7,4 +7,6 @@ import (
 // EventLoop performs buffer and processing of incoming proposals and QCs.
 type EventLoop interface {
 	module.HotStuff
+	TimeoutCollectorConsumer
+	QCCreatedConsumer
 }
