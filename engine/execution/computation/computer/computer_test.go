@@ -451,7 +451,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		err = view.Set(string(address.Bytes()), state.KeyAccountStatus, []byte{1})
+		err = view.Set(string(address.Bytes()), state.KeyAccountStatus, state.NewAccountStatus().ToBytes())
 		require.NoError(t, err)
 
 		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
@@ -526,7 +526,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		err = view.Set(string(address.Bytes()), state.KeyAccountStatus, []byte{1})
+		err = view.Set(string(address.Bytes()), state.KeyAccountStatus, state.NewAccountStatus().ToBytes())
 		require.NoError(t, err)
 
 		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
@@ -624,6 +624,10 @@ func (r *RandomAddressGenerator) Bytes() []byte {
 
 func (r *RandomAddressGenerator) AddressCount() uint64 {
 	panic("not implemented")
+}
+
+func (testRuntime) Storage(runtime.Context) (*runtime.Storage, *interpreter.Interpreter, error) {
+	panic("Storage not expected")
 }
 
 type FixedAddressGenerator struct {

@@ -244,7 +244,8 @@ func (builder *FollowerServiceBuilder) buildFollowerEngine() *FollowerServiceBui
 			builder.FollowerCore,
 			builder.SyncCore,
 			node.Tracer,
-			compliance.WithSkipNewProposalsThreshold(builder.ComplianceConfig.SkipNewProposalsThreshold),
+			follower.WithComplianceOptions(compliance.WithSkipNewProposalsThreshold(builder.ComplianceConfig.SkipNewProposalsThreshold)),
+			follower.WithChannel(channels.PublicReceiveBlocks),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create follower engine: %w", err)

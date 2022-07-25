@@ -120,7 +120,11 @@ func (i ScriptInvoker) Process(
 	sth *state.StateHolder,
 	programs *programs.Programs,
 ) error {
-	env := NewScriptEnvironment(proc.RequestContext, ctx, vm, sth, programs)
+	env, err := NewScriptEnvironment(proc.RequestContext, ctx, vm, sth, programs)
+	if err != nil {
+		return err
+	}
+
 	location := common.ScriptLocation(proc.ID)
 	value, err := vm.Runtime.ExecuteScript(
 		runtime.Script{

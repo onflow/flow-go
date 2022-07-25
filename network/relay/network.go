@@ -17,7 +17,7 @@ type RelayNetwork struct {
 	originNet      network.Network
 	destinationNet network.Network
 	logger         zerolog.Logger
-	channels       channels.ChannelList
+	channels       map[channels.Channel]channels.Channel
 }
 
 var _ network.Network = (*RelayNetwork)(nil)
@@ -26,7 +26,7 @@ func NewRelayNetwork(
 	originNetwork network.Network,
 	destinationNetwork network.Network,
 	logger zerolog.Logger,
-	channels []channels.Channel,
+	channels map[channels.Channel]channels.Channel,
 ) *RelayNetwork {
 	return &RelayNetwork{
 		originNet:      originNetwork,
@@ -37,11 +37,13 @@ func NewRelayNetwork(
 }
 
 func (r *RelayNetwork) Register(channel channels.Channel, messageProcessor network.MessageProcessor) (network.Conduit, error) {
-	if !r.channels.Contains(channel) {
+	// Only relay configured channels
+	dstChannel, ok := r.channels[channel]
+	if !ok {
 		return r.originNet.Register(channel, messageProcessor)
 	}
 
-	relayer, err := NewRelayer(r.destinationNet, channel, messageProcessor)
+	relayer, err := NewRelayer(r.destinationNet, dstChannel, messageProcessor)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to register relayer on origin network: %w", err)

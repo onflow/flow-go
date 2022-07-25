@@ -66,6 +66,7 @@ func (b *backendTransactions) SendTransaction(
 	// store the transaction locally
 	err = b.transactions.Store(tx)
 	if err != nil {
+		// TODO: why would this be InvalidArgument?
 		return status.Error(codes.InvalidArgument, fmt.Sprintf("failed to store transaction: %v", err))
 	}
 
