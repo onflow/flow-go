@@ -7,10 +7,10 @@ import (
 )
 
 type Span interface {
-	// TODO(patrick/rbtz): switch to opentelemtry
+	// TODO(rbtz): switch to opentelemtry
 	opentracing.Span
 
-	// TODO(patrick/rbtz): remove once switched to opentelemtry (#2823)
+	// TODO(rbtz): remove once switched to opentelemtry (#2823)
 	End()
 
 	IsNoOp() bool
@@ -30,7 +30,7 @@ type realSpan struct {
 
 func (realSpan) IsNoOp() bool { return false }
 
-// TODO(patrick/rbtz): remove once switched to opentelemtry (#2823)
+// TODO(rbtz): remove once switched to opentelemtry (#2823)
 func (span *realSpan) End() {
 	span.Finish()
 }
