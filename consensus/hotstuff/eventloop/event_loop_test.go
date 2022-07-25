@@ -15,6 +15,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -36,7 +37,7 @@ type EventLoopTestSuite struct {
 }
 
 func (s *EventLoopTestSuite) SetupTest() {
-	s.eh = &mocks.EventHandler{}
+	s.eh = mocks.NewEventHandler(s.T())
 	s.eh.On("Start").Return(nil).Maybe()
 	s.eh.On("TimeoutChannel").Return(time.NewTimer(10 * time.Second).C).Maybe()
 	s.eh.On("OnLocalTimeout").Return(nil).Maybe()
@@ -80,19 +81,54 @@ func (s *EventLoopTestSuite) Test_SubmitProposal() {
 	}).Return(nil).Once()
 	s.eventLoop.SubmitProposal(proposal, proposal.View-1)
 	require.Eventually(s.T(), processed.Load, time.Millisecond*100, time.Millisecond*10)
-	s.eh.AssertExpectations(s.T())
 }
 
-// Test_SubmitQC tests that submitted QC is eventually sent to event handler for processing
+// Test_SubmitQC tests that submitted QC is eventually sent to `EventHandler.OnReceiveQc` for processing
 func (s *EventLoopTestSuite) Test_SubmitQC() {
-	qc := unittest.QuorumCertificateFixture()
-	processed := atomic.NewBool(false)
-	s.eh.On("OnReceiveQc", qc).Run(func(args mock.Arguments) {
-		processed.Store(true)
-	}).Return(nil).Once()
-	s.eventLoop.OnQcConstructedFromVotes(qc)
-	require.Eventually(s.T(), processed.Load, time.Millisecond*100, time.Millisecond*10)
-	s.eh.AssertExpectations(s.T())
+	// qcIngestionFunction is the archetype for EventLoop.OnQcConstructedFromVotes and EventLoop.OnNewQcDiscovered
+	type qcIngestionFunction func(*flow.QuorumCertificate)
+
+	testQCIngestionFunction := func(f qcIngestionFunction) {
+		qc := unittest.QuorumCertificateFixture()
+		processed := atomic.NewBool(false)
+		s.eh.On("OnReceiveQc", qc).Run(func(args mock.Arguments) {
+			processed.Store(true)
+		}).Return(nil).Once()
+		f(qc)
+		require.Eventually(s.T(), processed.Load, time.Millisecond*100, time.Millisecond*10)
+	}
+
+	s.Run("QCs handed to EventLoop.OnQcConstructedFromVotes are forwarded to EventHandler", func() {
+		testQCIngestionFunction(s.eventLoop.OnQcConstructedFromVotes)
+	})
+
+	s.Run("QCs handed to EventLoop.OnNewQcDiscovered are forwarded to EventHandler", func() {
+		testQCIngestionFunction(s.eventLoop.OnNewQcDiscovered)
+	})
+}
+
+// Test_SubmitTC tests that submitted TC is eventually sent to `EventHandler.OnReceiveTc` for processing
+func (s *EventLoopTestSuite) Test_SubmitTC() {
+	// tcIngestionFunction is the archetype for EventLoop.OnTcConstructedFromTimeouts and EventLoop.OnNewTcDiscovered
+	type tcIngestionFunction func(*flow.TimeoutCertificate)
+
+	testTCIngestionFunction := func(f tcIngestionFunction) {
+		tc := &flow.TimeoutCertificate{}
+		processed := atomic.NewBool(false)
+		s.eh.On("OnReceiveTc", tc).Run(func(args mock.Arguments) {
+			processed.Store(true)
+		}).Return(nil).Once()
+		f(tc)
+		require.Eventually(s.T(), processed.Load, time.Millisecond*100, time.Millisecond*10)
+	}
+
+	s.Run("QCs handed to EventLoop.OnTcConstructedFromTimeouts are forwarded to EventHandler", func() {
+		testTCIngestionFunction(s.eventLoop.OnTcConstructedFromTimeouts)
+	})
+
+	s.Run("QCs handed to EventLoop.OnNewTcDiscovered are forwarded to EventHandler", func() {
+		testTCIngestionFunction(s.eventLoop.OnNewTcDiscovered)
+	})
 }
 
 // TestEventLoop_Timeout tests that event loop delivers timeout events to event handler under pressure

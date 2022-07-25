@@ -30,8 +30,6 @@ type EventLoop struct {
 
 var _ hotstuff.EventLoop = (*EventLoop)(nil)
 var _ component.Component = (*EventLoop)(nil)
-var _ hotstuff.TimeoutCollectorConsumer = (*EventLoop)(nil)
-var _ hotstuff.QCCreatedConsumer = (*EventLoop)(nil)
 
 // NewEventLoop creates an instance of EventLoop.
 func NewEventLoop(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandler hotstuff.EventHandler, startTime time.Time) (*EventLoop, error) {
@@ -273,7 +271,7 @@ func (el *EventLoop) OnNewQcDiscovered(qc *flow.QuorumCertificate) {
 
 // OnNewTcDiscovered pushes already validated TCs that were submitted from TimeoutAggregator to the event handler
 func (el *EventLoop) OnNewTcDiscovered(tc *flow.TimeoutCertificate) {
-	el.OnTcConstructedFromTimeouts(tc)
+	el.onTrustedTC(tc)
 }
 
 // OnQcConstructedFromVotes implements hotstuff.QCCreatedConsumer and pushes received qc into processing pipeline.

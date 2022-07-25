@@ -1,6 +1,7 @@
 package eventhandler
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -118,7 +119,6 @@ func NewCommittee(t *testing.T) *Committee {
 	}).Maybe()
 
 	committee.On("Self").Return(self.NodeID).Maybe()
-	committee.On("IdentityByEpoch", mock.Anything, self.NodeID).Return(self, nil).Maybe()
 
 	return committee
 }
@@ -350,7 +350,7 @@ func (es *EventHandlerSuite) TestStartNewView_ParentProposalNotFound() {
 // TestOnReceiveProposal_StaleProposal test that proposals lower than finalized view are not processed at all
 // we are not interested in this data because we already performed finalization of that height.
 func (es *EventHandlerSuite) TestOnReceiveProposal_StaleProposal() {
-	proposal := createProposal(es.forks.FinalizedView(), es.forks.FinalizedView()-1)
+	proposal := createProposal(es.forks.FinalizedView()-1, es.forks.FinalizedView()-2)
 	err := es.eventhandler.OnReceiveProposal(proposal)
 	require.NoError(es.T(), err)
 	es.voteAggregator.AssertNotCalled(es.T(), "AddBlock", proposal)
@@ -698,7 +698,6 @@ func (es *EventHandlerSuite) TestOnTimeout() {
 // and EventHandler tries to produce a timeout object, such timeout object is invalid if both QC and TC is present, we
 // need to make sure that EventHandler filters out TC for last view if we know about QC for same view.
 func (es *EventHandlerSuite) TestOnTimeout_SanityChecks() {
-
 	es.timeoutAggregator.On("AddTimeout", mock.Anything).Return().Once()
 
 	// voting block exists
@@ -733,6 +732,26 @@ func (es *EventHandlerSuite) TestOnTimeout_SanityChecks() {
 	require.Equal(es.T(), es.endView, timeoutObject.View)
 	require.Equal(es.T(), qc, timeoutObject.NewestQC)
 	require.Nil(es.T(), timeoutObject.LastViewTC)
+}
+
+// TestOnTimeout_ReplicaEjected tests that EventHandler correctly handles possible errors from SafetyRules and doesn't broadcast
+// timeout objects when replica is ejected.
+func (es *EventHandlerSuite) TestOnTimeout_ReplicaEjected() {
+	es.Run("no-timeout", func() {
+		*es.safetyRules.SafetyRules = *mocks.NewSafetyRules(es.T())
+		es.safetyRules.On("ProduceTimeout", mock.Anything, mock.Anything, mock.Anything).Return(nil, model.NewNoTimeoutErrorf(""))
+		err := es.eventhandler.OnLocalTimeout()
+		require.NoError(es.T(), err, "should be handled as sentinel error")
+	})
+	es.Run("create-timeout-exception", func() {
+		*es.safetyRules.SafetyRules = *mocks.NewSafetyRules(es.T())
+		exception := errors.New("produce-timeout-exception")
+		es.safetyRules.On("ProduceTimeout", mock.Anything, mock.Anything, mock.Anything).Return(nil, exception)
+		err := es.eventhandler.OnLocalTimeout()
+		require.ErrorIs(es.T(), err, exception, "expect a wrapped exception")
+	})
+	es.timeoutAggregator.AssertNotCalled(es.T(), "AddTimeout", mock.Anything)
+	es.communicator.AssertNotCalled(es.T(), "BroadcastTimeout", mock.Anything)
 }
 
 // Test100Timeout tests that receiving 100 TCs for increasing views advances rounds
@@ -892,29 +911,6 @@ func (es *EventHandlerSuite) TestCreateProposal_SanityChecks() {
 	require.Equal(es.T(), tc.NewestQC, es.paceMaker.NewestQC())
 	require.Equal(es.T(), tc, es.paceMaker.LastViewTC())
 	require.Equal(es.T(), tc.View+1, es.paceMaker.CurView(), "incorrect view change")
-}
-
-// TestCreateProposal_ProposerEjected tests that ejected proposer doesn't try to create proposal in case he is ejected in current epoch
-func (es *EventHandlerSuite) TestCreateProposal_ProposerEjected() {
-	es.voteAggregator.On("AddBlock", mock.Anything).Return(nil)
-
-	self := es.committee.Self()
-
-	*es.committee.Replicas = *mocks.NewReplicas(es.T())
-	es.committee.On("LeaderForView", es.qc.View+1).Return(self, nil)
-	es.committee.On("Self").Return(self)
-	es.committee.On("IdentityByEpoch", es.qc.View+1, self).Return(nil, model.NewInvalidSignerError(fmt.Errorf(""))).Once()
-
-	// I'm the next leader
-	es.committee.leaders[es.qc.View+1] = struct{}{}
-
-	err := es.eventhandler.OnReceiveProposal(es.votingProposal)
-	require.NoError(es.T(), err)
-
-	err = es.eventhandler.OnReceiveQc(es.qc)
-	require.NoError(es.T(), err)
-
-	es.communicator.AssertNumberOfCalls(es.T(), "BroadcastProposalWithDelay", 0)
 }
 
 // TestOnReceiveProposal_ProposalForActiveView tests that when receiving proposal for active we don't attempt to create a proposal

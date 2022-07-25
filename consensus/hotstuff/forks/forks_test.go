@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -34,10 +33,10 @@ func TestLocked(t *testing.T) {
 	err = addBlocksToFinalizer(fin, blocks)
 	require.Nil(t, err)
 
-	assertFinalizedBlock(t, fin, 1, 2) // check if the finalized block has view 1, and its QC is 2
-	assertTheLockedBlock(t, fin, 2, 3)
-	// ^^^ the reason it's not called "assertLockedBlock" is to match
-	// its length with assertFinalizedBlock in order to align their arguments
+	requireFinalizedBlock(t, fin, 1, 2) // check if the finalized block has view 1, and its QC is 2
+	requireTheLockedBlock(t, fin, 2, 3)
+	// ^^^ the reason it's not called "requireLockedBlock" is to match
+	// its length with requireFinalizedBlock in order to align their arguments
 }
 
 // receives [1,2], [2,3], [3,4], [4,5], [4,6], [6,8]
@@ -59,8 +58,8 @@ func TestLocked2(t *testing.T) {
 	err = addBlocksToFinalizer(fin, blocks)
 	require.Nil(t, err)
 
-	assertFinalizedBlock(t, fin, 1, 2)
-	assertTheLockedBlock(t, fin, 3, 4)
+	requireFinalizedBlock(t, fin, 1, 2)
+	requireTheLockedBlock(t, fin, 3, 4)
 }
 
 // receives [1,2], [2,3], [3,4], [4,5], [4,6], [6,8], [8,10]
@@ -83,8 +82,8 @@ func TestLocked3(t *testing.T) {
 	err = addBlocksToFinalizer(fin, blocks)
 	require.Nil(t, err)
 
-	assertFinalizedBlock(t, fin, 1, 2)
-	assertTheLockedBlock(t, fin, 4, 6)
+	requireFinalizedBlock(t, fin, 1, 2)
+	requireTheLockedBlock(t, fin, 4, 6)
 }
 
 // receives [1,2], [2,3], [3,4], [4,5], [5,6]
@@ -105,8 +104,8 @@ func TestFinalizedDirect3builder(t *testing.T) {
 	err = addBlocksToFinalizer(fin, blocks)
 	require.Nil(t, err)
 
-	assertFinalizedBlock(t, fin, 2, 3)
-	assertTheLockedBlock(t, fin, 3, 4)
+	requireFinalizedBlock(t, fin, 2, 3)
+	requireTheLockedBlock(t, fin, 3, 4)
 }
 
 // receives [1,2], [2,3], [3,4], [4,5], [5,6], [6,7], [7,8], [8, 9]
@@ -130,8 +129,8 @@ func TestFinalizedDirect3builder2(t *testing.T) {
 	err = addBlocksToFinalizer(fin, blocks)
 	require.Nil(t, err)
 
-	assertFinalizedBlock(t, fin, 5, 6)
-	assertTheLockedBlock(t, fin, 6, 7)
+	requireFinalizedBlock(t, fin, 5, 6)
+	requireTheLockedBlock(t, fin, 6, 7)
 }
 
 // receives [1,2], [2,3], [3,4], [4,5], [5,7],
@@ -152,8 +151,8 @@ func TestFinalizedDirect2builderPlus1builder(t *testing.T) {
 	err = addBlocksToFinalizer(fin, blocks)
 	require.Nil(t, err)
 
-	assertFinalizedBlock(t, fin, 2, 3)
-	assertTheLockedBlock(t, fin, 3, 4)
+	requireFinalizedBlock(t, fin, 2, 3)
+	requireTheLockedBlock(t, fin, 3, 4)
 }
 
 // receives [1,2], [2,3], [3,4], [4,5], [4,6],
@@ -174,8 +173,8 @@ func TestUnfinalized(t *testing.T) {
 	err = addBlocksToFinalizer(fin, blocks)
 	require.Nil(t, err)
 
-	assertFinalizedBlock(t, fin, 1, 2)
-	assertTheLockedBlock(t, fin, 2, 3)
+	requireFinalizedBlock(t, fin, 1, 2)
+	requireTheLockedBlock(t, fin, 2, 3)
 }
 
 // receives [1,2], [2,3], [3,4], [4,5], [4,7],
@@ -196,8 +195,8 @@ func TestUnfinalized2(t *testing.T) {
 	err = addBlocksToFinalizer(fin, blocks)
 	require.Nil(t, err)
 
-	assertFinalizedBlock(t, fin, 1, 2)
-	assertTheLockedBlock(t, fin, 2, 3)
+	requireFinalizedBlock(t, fin, 1, 2)
+	requireTheLockedBlock(t, fin, 2, 3)
 }
 
 // Tolerable Forks that extend from locked block (1: might change locked block, 2: not change locked block)
@@ -221,8 +220,8 @@ func TestTolerableForksExtendsFromLockedBlock(t *testing.T) {
 	err = addBlocksToFinalizer(fin, blocks)
 	require.Nil(t, err)
 
-	assertFinalizedBlock(t, fin, 1, 2)
-	assertTheLockedBlock(t, fin, 3, 6)
+	requireFinalizedBlock(t, fin, 1, 2)
+	requireTheLockedBlock(t, fin, 3, 6)
 }
 
 // receives [1,2], [2,3], [3,4], [4,5], [4,6], [6,7], [7,8]
@@ -245,8 +244,8 @@ func TestTolerableForksExtendsFromLockedBlock2(t *testing.T) {
 	err = addBlocksToFinalizer(fin, blocks)
 	require.Nil(t, err)
 
-	assertFinalizedBlock(t, fin, 1, 2)
-	assertTheLockedBlock(t, fin, 4, 6)
+	requireFinalizedBlock(t, fin, 1, 2)
+	requireTheLockedBlock(t, fin, 4, 6)
 }
 
 // receives [1,2], [2,3], [3,4], [4,5], [3,6], [6,7], [7,8], [8,9]
@@ -270,8 +269,8 @@ func TestTolerableForksExtendsFromLockedBlock3(t *testing.T) {
 	err = addBlocksToFinalizer(fin, blocks)
 	require.Nil(t, err)
 
-	assertFinalizedBlock(t, fin, 3, 6)
-	assertTheLockedBlock(t, fin, 6, 7)
+	requireFinalizedBlock(t, fin, 3, 6)
+	requireTheLockedBlock(t, fin, 6, 7)
 }
 
 // receives [1,2], [2,3], [3,4], [4,5], [4,6], [6,7], [7,8], [8,9]
@@ -295,8 +294,8 @@ func TestTolerableForksExtendsFromLockedBlock4(t *testing.T) {
 	err = addBlocksToFinalizer(fin, blocks)
 	require.Nil(t, err)
 
-	assertFinalizedBlock(t, fin, 4, 6)
-	assertTheLockedBlock(t, fin, 6, 7)
+	requireFinalizedBlock(t, fin, 4, 6)
+	requireTheLockedBlock(t, fin, 6, 7)
 }
 
 // receives [1,2], [2,3], [3,4], [4,5], [4,6], [6,7], [7,8], [8,10]
@@ -320,8 +319,8 @@ func TestTolerableForksExtendsFromLockedBlock5(t *testing.T) {
 	err = addBlocksToFinalizer(fin, blocks)
 	require.Nil(t, err)
 
-	assertFinalizedBlock(t, fin, 3, 6)
-	assertTheLockedBlock(t, fin, 6, 7)
+	requireFinalizedBlock(t, fin, 3, 6)
+	requireTheLockedBlock(t, fin, 6, 7)
 }
 
 // receives [1,2], [2,3], [3,4], [4,5], [2,6]
@@ -342,8 +341,8 @@ func TestTolerableForksNotExtendsFromLockedBlock(t *testing.T) {
 	err = addBlocksToFinalizer(fin, blocks)
 	require.Nil(t, err)
 
-	assertFinalizedBlock(t, fin, 1, 2)
-	assertTheLockedBlock(t, fin, 2, 3)
+	requireFinalizedBlock(t, fin, 1, 2)
+	requireTheLockedBlock(t, fin, 2, 3)
 }
 
 // receives [1,2], [2,3], [3,4], [4,5], [2,6], [5,6]
@@ -366,8 +365,8 @@ func TestTolerableForksNotExtendsFromLockedBlock2(t *testing.T) {
 	err = addBlocksToFinalizer(fin, blocks)
 	require.Nil(t, err)
 
-	assertFinalizedBlock(t, fin, 2, 3)
-	assertTheLockedBlock(t, fin, 3, 4)
+	requireFinalizedBlock(t, fin, 2, 3)
+	requireTheLockedBlock(t, fin, 3, 4)
 	notifier.AssertExpectations(t)
 }
 
@@ -390,8 +389,8 @@ func TestTolerableForksNotExtendsFromLockedBlock3(t *testing.T) {
 	err = addBlocksToFinalizer(fin, blocks)
 	require.Nil(t, err)
 
-	assertFinalizedBlock(t, fin, 1, 2)
-	assertTheLockedBlock(t, fin, 2, 3)
+	requireFinalizedBlock(t, fin, 1, 2)
+	requireTheLockedBlock(t, fin, 2, 3)
 }
 
 // receives [1,2], [2,3], [3,4], [4,5], [2,6], [6,7],[7,8]
@@ -414,8 +413,8 @@ func TestTolerableForksNotExtendsFromLockedBlock4(t *testing.T) {
 	err = addBlocksToFinalizer(fin, blocks)
 	require.Nil(t, err)
 
-	assertFinalizedBlock(t, fin, 1, 2)
-	assertTheLockedBlock(t, fin, 2, 6)
+	requireFinalizedBlock(t, fin, 1, 2)
+	requireTheLockedBlock(t, fin, 2, 6)
 }
 
 // receives [1,2], [2,3], [2,3], [3,4], [3,4], [4,5], [4,5], [5,6], [5,6]
@@ -440,8 +439,8 @@ func TestDuplication(t *testing.T) {
 	err = addBlocksToFinalizer(fin, blocks)
 	require.Nil(t, err)
 
-	assertFinalizedBlock(t, fin, 2, 3)
-	assertTheLockedBlock(t, fin, 3, 4)
+	requireFinalizedBlock(t, fin, 2, 3)
+	requireTheLockedBlock(t, fin, 3, 4)
 }
 
 // receives [1,2], [2,3], [3,4], [4,5], [1,6]
@@ -462,8 +461,8 @@ func TestIgnoreBlocksBelowFinalizedView(t *testing.T) {
 	err = addBlocksToFinalizer(fin, blocks)
 	require.Nil(t, err)
 
-	assertFinalizedBlock(t, fin, 1, 2)
-	assertTheLockedBlock(t, fin, 2, 3)
+	requireFinalizedBlock(t, fin, 1, 2)
+	requireTheLockedBlock(t, fin, 2, 3)
 }
 
 // receives [1,2], [2,3], [3,4], [4,5], [3,6], [5,6'].
@@ -486,7 +485,7 @@ func TestDoubleProposal(t *testing.T) {
 	err = addBlocksToFinalizer(fin, blocks)
 	require.Nil(t, err)
 
-	assertFinalizedBlock(t, fin, 2, 3)
+	requireFinalizedBlock(t, fin, 2, 3)
 	notifier.AssertExpectations(t)
 }
 
@@ -534,9 +533,10 @@ func TestUntolerableForks2(t *testing.T) {
 	fin, _, _ := newFinalizer(t)
 
 	err = addBlocksToFinalizer(fin, blocks)
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
+// TestNotification tests that notifier gets correct notifications when incorporating block as well as finalization events.
 func TestNotification(t *testing.T) {
 	builder := NewBlockBuilder()
 	builder.Add(1, 2)
@@ -564,6 +564,28 @@ func TestNotification(t *testing.T) {
 	require.NoError(t, err)
 	notifier.AssertExpectations(t)
 	finalizationCallback.AssertExpectations(t)
+}
+
+// TestNewestView tests that Forks tracks the newest block view seen in received blocks.
+func TestNewestView(t *testing.T) {
+	builder := NewBlockBuilder()
+	builder.Add(1, 2)
+	builder.Add(2, 3)
+	builder.Add(3, 4)
+	builder.Add(4, 5)
+
+	blocks, err := builder.Blocks()
+	require.Nil(t, err)
+
+	fin, _, _ := newFinalizer(t)
+
+	genesis := makeGenesis()
+
+	require.Equal(t, fin.NewestView(), genesis.Block.View)
+
+	err = addBlocksToFinalizer(fin, blocks)
+	require.NoError(t, err)
+	require.Equal(t, fin.NewestView(), blocks[len(blocks)-1].Block.View)
 }
 
 // ========== internal functions ===============
@@ -596,13 +618,13 @@ func addBlocksToFinalizer(fin *Forks, proposals []*model.Proposal) error {
 }
 
 // check the view and QC's view of the locked block for the finalizer
-func assertTheLockedBlock(t *testing.T, fin *Forks, qc int, view int) {
-	assert.Equal(t, fin.LockedBlock().View, uint64(view), "locked block has wrong view")
-	assert.Equal(t, fin.LockedBlock().QC.View, uint64(qc), "locked block has wrong qc")
+func requireTheLockedBlock(t *testing.T, fin *Forks, qc int, view int) {
+	require.Equal(t, fin.LockedBlock().View, uint64(view), "locked block has wrong view")
+	require.Equal(t, fin.LockedBlock().QC.View, uint64(qc), "locked block has wrong qc")
 }
 
 // check the view and QC's view of the finalized block for the finalizer
-func assertFinalizedBlock(t *testing.T, fin *Forks, qc int, view int) {
-	assert.Equal(t, fin.FinalizedBlock().View, uint64(view), "finalized block has wrong view")
-	assert.Equal(t, fin.FinalizedBlock().QC.View, uint64(qc), "fianlized block has wrong qc")
+func requireFinalizedBlock(t *testing.T, fin *Forks, qc int, view int) {
+	require.Equal(t, fin.FinalizedBlock().View, uint64(view), "finalized block has wrong view")
+	require.Equal(t, fin.FinalizedBlock().QC.View, uint64(qc), "fianlized block has wrong qc")
 }

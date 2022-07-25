@@ -31,6 +31,31 @@ func (_m *EventLoop) Done() <-chan struct{} {
 	return r0
 }
 
+// OnNewQcDiscovered provides a mock function with given fields: certificate
+func (_m *EventLoop) OnNewQcDiscovered(certificate *flow.QuorumCertificate) {
+	_m.Called(certificate)
+}
+
+// OnNewTcDiscovered provides a mock function with given fields: certificate
+func (_m *EventLoop) OnNewTcDiscovered(certificate *flow.TimeoutCertificate) {
+	_m.Called(certificate)
+}
+
+// OnPartialTcCreated provides a mock function with given fields: view, newestQC, lastViewTC
+func (_m *EventLoop) OnPartialTcCreated(view uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) {
+	_m.Called(view, newestQC, lastViewTC)
+}
+
+// OnQcConstructedFromVotes provides a mock function with given fields: _a0
+func (_m *EventLoop) OnQcConstructedFromVotes(_a0 *flow.QuorumCertificate) {
+	_m.Called(_a0)
+}
+
+// OnTcConstructedFromTimeouts provides a mock function with given fields: certificate
+func (_m *EventLoop) OnTcConstructedFromTimeouts(certificate *flow.TimeoutCertificate) {
+	_m.Called(certificate)
+}
+
 // Ready provides a mock function with given fields:
 func (_m *EventLoop) Ready() <-chan struct{} {
 	ret := _m.Called()
@@ -55,11 +80,6 @@ func (_m *EventLoop) Start(_a0 irrecoverable.SignalerContext) {
 // SubmitProposal provides a mock function with given fields: proposal, parentView
 func (_m *EventLoop) SubmitProposal(proposal *flow.Header, parentView uint64) {
 	_m.Called(proposal, parentView)
-}
-
-// SubmitTrustedQC provides a mock function with given fields: qc
-func (_m *EventLoop) SubmitTrustedQC(qc *flow.QuorumCertificate) {
-	_m.Called(qc)
 }
 
 type NewEventLoopT interface {
