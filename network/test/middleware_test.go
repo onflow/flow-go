@@ -10,7 +10,6 @@ import (
 
 	"github.com/ipfs/go-log"
 	swarm "github.com/libp2p/go-libp2p-swarm"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/validator"
 	"github.com/rs/zerolog"
@@ -760,34 +759,6 @@ func createMessage(originID flow.Identifier, targetID flow.Identifier, msg strin
 	payload := &libp2pmessage.TestMessage{
 		Text: msg,
 	}
-
-	codec := unittest.NetworkCodec()
-	b, err := codec.Encode(payload)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	m := &message.Message{
-		ChannelID: testChannel.String(),
-		EventID:   []byte("1"),
-		OriginID:  originID[:],
-		TargetIDs: [][]byte{targetID[:]},
-		Payload:   b,
-	}
-
-	return m, payload
-}
-
-func createUnknownMessage(originID flow.Identifier, targetID flow.Identifier) (*message.Message, interface{}) {
-	type msg struct {
-		*messages.BlockProposal
-	}
-
-	// *validator.msg is not a known message type, but embeds *messages.BlockProposal which is
-	payload := &msg{&messages.BlockProposal{
-		Header:  nil,
-		Payload: nil,
-	}}
 
 	codec := unittest.NetworkCodec()
 	b, err := codec.Encode(payload)
