@@ -5,8 +5,6 @@ package mock
 import (
 	mock "github.com/stretchr/testify/mock"
 
-	testing "testing"
-
 	time "time"
 )
 
