@@ -121,12 +121,6 @@ func WithPeerManager(peerManagerFunc PeerManagerFactoryFunc) MiddlewareOption {
 	}
 }
 
-func WithSlashingViolationsConsumer(consumer slashing.ViolationsConsumer) MiddlewareOption {
-	return func(mw *Middleware) {
-		mw.slashingViolationsConsumer = consumer
-	}
-}
-
 // NewMiddleware creates a new middleware instance
 // libP2PNodeFactory is the factory used to create a LibP2PNode
 // flowID is this node's Flow ID
@@ -147,6 +141,7 @@ func NewMiddleware(
 	unicastMessageTimeout time.Duration,
 	idTranslator IDTranslator,
 	codec network.Codec,
+	slashingViolationsConsumer slashing.ViolationsConsumer,
 	opts ...MiddlewareOption,
 ) *Middleware {
 
@@ -156,17 +151,18 @@ func NewMiddleware(
 
 	// create the node entity and inject dependencies & config
 	mw := &Middleware{
-		log:                   log,
-		wg:                    &sync.WaitGroup{},
-		me:                    flowID,
-		libP2PNodeFactory:     libP2PNodeFactory,
-		metrics:               metrics,
-		rootBlockID:           rootBlockID,
-		validators:            DefaultValidators(log, flowID),
-		unicastMessageTimeout: unicastMessageTimeout,
-		peerManagerFactory:    nil,
-		idTranslator:          idTranslator,
-		codec:                 codec,
+		log:                        log,
+		wg:                         &sync.WaitGroup{},
+		me:                         flowID,
+		libP2PNodeFactory:          libP2PNodeFactory,
+		metrics:                    metrics,
+		rootBlockID:                rootBlockID,
+		validators:                 DefaultValidators(log, flowID),
+		unicastMessageTimeout:      unicastMessageTimeout,
+		peerManagerFactory:         nil,
+		idTranslator:               idTranslator,
+		codec:                      codec,
+		slashingViolationsConsumer: slashingViolationsConsumer,
 	}
 
 	for _, opt := range opts {

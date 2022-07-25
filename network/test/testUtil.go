@@ -16,6 +16,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/routing"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/onflow/flow-go/network/slashing"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -144,7 +145,7 @@ func GenerateIDs(
 }
 
 // GenerateMiddlewares creates and initializes middleware instances for all the identities
-func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.IdentityList, libP2PNodes []*p2p.Node, codec network.Codec, opts ...func(*optsConfig)) ([]network.Middleware, []*UpdatableIDProvider) {
+func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.IdentityList, libP2PNodes []*p2p.Node, codec network.Codec, consumer slashing.ViolationsConsumer, opts ...func(*optsConfig)) ([]network.Middleware, []*UpdatableIDProvider) {
 	metrics := metrics.NewNoopCollector()
 	mws := make([]network.Middleware, len(identities))
 	idProviders := make([]*UpdatableIDProvider, len(identities))
@@ -178,6 +179,7 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 			p2p.DefaultUnicastTimeout,
 			p2p.NewIdentityProviderIDTranslator(idProviders[i]),
 			codec,
+			consumer,
 			p2p.WithPeerManager(peerManagerFactory),
 		)
 	}
@@ -265,20 +267,22 @@ func GenerateIDsAndMiddlewares(t *testing.T,
 	n int,
 	logger zerolog.Logger,
 	codec network.Codec,
+	consumer slashing.ViolationsConsumer,
 	opts ...func(*optsConfig),
 ) (flow.IdentityList, []network.Middleware, []observable.Observable, []*UpdatableIDProvider) {
 
 	ids, libP2PNodes, protectObservables := GenerateIDs(t, logger, n, opts...)
-	mws, providers := GenerateMiddlewares(t, logger, ids, libP2PNodes, codec, opts...)
+	mws, providers := GenerateMiddlewares(t, logger, ids, libP2PNodes, codec, consumer, opts...)
 	return ids, mws, protectObservables, providers
 }
 
 type optsConfig struct {
-	idOpts           []func(*flow.Identity)
-	dhtPrefix        string
-	dhtOpts          []dht.Option
-	peerManagerOpts  []p2p.Option
-	connectionGating bool
+	idOpts                     []func(*flow.Identity)
+	dhtPrefix                  string
+	dhtOpts                    []dht.Option
+	peerManagerOpts            []p2p.Option
+	connectionGating           bool
+	slashingViolationsConsumer slashing.ViolationsConsumer
 }
 
 func WithIdentityOpts(idOpts ...func(*flow.Identity)) func(*optsConfig) {
@@ -300,6 +304,12 @@ func WithPeerManagerOpts(peerManagerOpts ...p2p.Option) func(*optsConfig) {
 	}
 }
 
+func WithSlashingViolationsConsumer(consumer slashing.ViolationsConsumer) func(*optsConfig) {
+	return func(o *optsConfig) {
+		o.slashingViolationsConsumer = consumer
+	}
+}
+
 func GenerateIDsMiddlewaresNetworks(
 	ctx context.Context,
 	t *testing.T,
@@ -307,9 +317,10 @@ func GenerateIDsMiddlewaresNetworks(
 	log zerolog.Logger,
 	tops []network.Topology,
 	codec network.Codec,
+	consumer slashing.ViolationsConsumer,
 	opts ...func(*optsConfig),
 ) (flow.IdentityList, []network.Middleware, []network.Network, []observable.Observable) {
-	ids, mws, observables, _ := GenerateIDsAndMiddlewares(t, n, log, codec, opts...)
+	ids, mws, observables, _ := GenerateIDsAndMiddlewares(t, n, log, codec, consumer, opts...)
 	sms := GenerateSubscriptionManagers(t, mws)
 	networks := GenerateNetworks(ctx, t, log, ids, mws, tops, sms)
 	return ids, mws, networks, observables

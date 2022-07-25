@@ -16,6 +16,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/hashicorp/go-multierror"
+	"github.com/onflow/flow-go/network/slashing"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
@@ -287,6 +288,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		p2p.WithPreferredUnicastProtocols(unicast.ToProtocolNames(fnb.PreferredUnicastProtocols)),
 	)
 
+	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(fnb.Logger)
 	fnb.Middleware = p2p.NewMiddleware(
 		fnb.Logger,
 		libP2PNodeFactory,
@@ -296,6 +298,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		fnb.BaseConfig.UnicastMessageTimeout,
 		fnb.IDTranslator,
 		fnb.CodecFactory(),
+		slashingViolationsConsumer,
 		mwOpts...,
 	)
 
