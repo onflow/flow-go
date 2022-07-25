@@ -48,7 +48,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/extralog"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
@@ -484,9 +483,10 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				return nil, fmt.Errorf("cannot create %s path for extra logs: %w", extraLogPath, err)
 			}
 
-			extralog.ExtraLogDumpPath = extraLogPath
-
-			options := []runtime.Option{runtime.WithTracingEnabled(e.exeConf.cadenceTracing)}
+			options := []runtime.Option{}
+			if e.exeConf.cadenceTracing {
+				options = append(options, runtime.WithTracingEnabled(true))
+			}
 			rt := fvm.NewInterpreterRuntime(options...)
 
 			vm := fvm.NewVirtualMachine(rt)
