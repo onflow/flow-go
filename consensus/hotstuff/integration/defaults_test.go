@@ -17,15 +17,3 @@ func DefaultRoot() *flow.Header {
 	}
 	return header
 }
-
-func DefaultStart() uint64 {
-	return 1
-}
-
-func DefaultPruned() uint64 {
-	return 0
-}
-
-func DefaultVoted() uint64 {
-	return 0
-}

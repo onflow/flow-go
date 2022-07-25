@@ -29,6 +29,9 @@ type Forks interface {
 	// FinalizedBlock returns the finalized block with the largest view number
 	FinalizedBlock() *model.Block
 
+	// NewestView returns the largest view number of all proposals that were added to Forks.
+	NewestView() uint64
+
 	// AddProposal adds the block proposal to Forks. This might cause an update of the finalized block
 	// and pruning of older blocks.
 	// Handles duplicated addition of blocks (at the potential cost of additional computation time).

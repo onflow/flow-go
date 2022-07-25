@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
+	"github.com/onflow/flow-go/consensus/hotstuff/timeoutcollector"
 	validatorImpl "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
@@ -20,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	hotmetrics "github.com/onflow/flow-go/module/metrics/hotstuff"
+	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -110,7 +112,7 @@ func (f *HotStuffFactory) CreateModules(
 	verifier := verification.NewStakingVerifier()
 	validator := validatorImpl.NewMetricsWrapper(validatorImpl.New(committee, verifier), metrics)
 	voteProcessorFactory := votecollector.NewStakingVoteProcessorFactory(committee, qcDistributor.OnQcConstructedFromVotes)
-	aggregator, err := consensus.NewVoteAggregator(
+	voteAggregator, err := consensus.NewVoteAggregator(
 		f.log,
 		// since we don't want to aggregate votes for finalized view,
 		// the lowest retained view starts with the next view of the last finalized view.
@@ -123,16 +125,32 @@ func (f *HotStuffFactory) CreateModules(
 		return nil, nil, err
 	}
 
+	timeoutCollectorDistributor := pubsub.NewTimeoutCollectorDistributor()
+	timeoutProcessorFactory := timeoutcollector.NewTimeoutProcessorFactory(timeoutCollectorDistributor, committee, validator, msig.CollectorTimeoutTag)
+
+	timeoutAggregator, err := consensus.NewTimeoutAggregator(
+		f.log,
+		finalizedBlock.View+1,
+		notifier,
+		timeoutProcessorFactory,
+		timeoutCollectorDistributor,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	return &consensus.HotstuffModules{
-		Forks:                   forks,
-		Validator:               validator,
-		Notifier:                notifier,
-		Committee:               committee,
-		Signer:                  signer,
-		Persist:                 persister.New(f.db, cluster.ChainID()),
-		Aggregator:              aggregator,
-		QCCreatedDistributor:    qcDistributor,
-		FinalizationDistributor: finalizationDistributor,
+		Forks:                       forks,
+		Validator:                   validator,
+		Notifier:                    notifier,
+		Committee:                   committee,
+		Signer:                      signer,
+		Persist:                     persister.New(f.db, cluster.ChainID()),
+		VoteAggregator:              voteAggregator,
+		TimeoutAggregator:           timeoutAggregator,
+		QCCreatedDistributor:        qcDistributor,
+		TimeoutCollectorDistributor: timeoutCollectorDistributor,
+		FinalizationDistributor:     finalizationDistributor,
 	}, metrics, nil
 }
 

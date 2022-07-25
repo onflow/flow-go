@@ -16,8 +16,11 @@ type BlockProducer struct {
 	builder   module.Builder
 }
 
+var _ hotstuff.BlockProducer = (*BlockProducer)(nil)
+
 // New creates a new BlockProducer which wraps the chain compliance layer block builder
 // to provide hotstuff with block proposals.
+// No errors are expected during normal operation.
 func New(signer hotstuff.Signer, committee hotstuff.Replicas, builder module.Builder) (*BlockProducer, error) {
 	bp := &BlockProducer{
 		signer:    signer,
@@ -27,8 +30,10 @@ func New(signer hotstuff.Signer, committee hotstuff.Replicas, builder module.Bui
 	return bp, nil
 }
 
-// MakeBlockProposal will build a proposal for the given view with the given QC
-func (bp *BlockProducer) MakeBlockProposal(qc *flow.QuorumCertificate, view uint64) (*model.Proposal, error) {
+// MakeBlockProposal builds a new HotStuff block proposal using the given view,
+// the given quorum certificate for its parent and [optionally] a timeout certificate for last view(could be nil).
+// No errors are expected during normal operation.
+func (bp *BlockProducer) MakeBlockProposal(view uint64, qc *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.Proposal, error) {
 	// the custom functions allows us to set some custom fields on the block;
 	// in hotstuff, we use this for view number and signature-related fields
 	setHotstuffFields := func(header *flow.Header) error {
@@ -36,6 +41,7 @@ func (bp *BlockProducer) MakeBlockProposal(qc *flow.QuorumCertificate, view uint
 		header.ParentVoterIndices = qc.SignerIndices
 		header.ParentVoterSigData = qc.SigData
 		header.ProposerID = bp.committee.Self()
+		header.LastViewTC = lastViewTC
 
 		// turn the header into a block header proposal as known by hotstuff
 		block := model.Block{

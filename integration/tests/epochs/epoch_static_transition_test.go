@@ -1,16 +1,17 @@
 package epochs
 
 import (
-	"github.com/onflow/flow-go/utils/unittest"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestEpochStaticTransition(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_TODO, "active-pacemaker")
 	suite.Run(t, new(StaticEpochTransitionSuite))
 }
 

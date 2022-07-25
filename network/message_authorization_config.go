@@ -46,6 +46,12 @@ var (
 			ConsensusCommittee: {flow.RoleConsensus},
 		},
 	}
+	timeoutObject = MsgAuthConfig{
+		String: "TimeoutObject",
+		config: map[Channel]flow.RoleList{
+			ConsensusCommittee: {flow.RoleConsensus},
+		},
+	}
 
 	// protocol state sync
 	syncRequest = MsgAuthConfig{
@@ -99,6 +105,12 @@ var (
 	}
 	clusterBlockResponse = MsgAuthConfig{
 		String: "ClusterBlockResponse",
+		config: map[Channel]flow.RoleList{
+			ConsensusClusterPrefix: {flow.RoleCollection},
+		},
+	}
+	clusterTimeoutObject = MsgAuthConfig{
+		String: "ClusterTimeoutObject",
 		config: map[Channel]flow.RoleList{
 			ConsensusClusterPrefix: {flow.RoleCollection},
 		},
@@ -227,6 +239,8 @@ func GetMessageAuthConfig(v interface{}) (MsgAuthConfig, error) {
 		return blockProposal, nil
 	case *messages.BlockVote:
 		return blockVote, nil
+	case *messages.TimeoutObject:
+		return timeoutObject, nil
 
 	// protocol state sync
 	case *messages.SyncRequest:
@@ -247,6 +261,8 @@ func GetMessageAuthConfig(v interface{}) (MsgAuthConfig, error) {
 		return clusterBlockVote, nil
 	case *messages.ClusterBlockResponse:
 		return clusterBlockResponse, nil
+	case *messages.ClusterTimeoutObject:
+		return clusterTimeoutObject, nil
 
 	// collections, guarantees & transactions
 	case *flow.CollectionGuarantee:

@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/cluster"
@@ -42,14 +43,15 @@ type ComplianceCoreSuite struct {
 	childrenDB map[flow.Identifier][]*cluster.PendingBlock
 
 	// mocked dependencies
-	state          *clusterstate.MutableState
-	snapshot       *clusterstate.Snapshot
-	metrics        *metrics.NoopCollector
-	headers        *storage.Headers
-	pending        *module.PendingClusterBlockBuffer
-	hotstuff       *module.HotStuff
-	sync           *module.BlockRequester
-	voteAggregator *hotstuff.VoteAggregator
+	state             *clusterstate.MutableState
+	snapshot          *clusterstate.Snapshot
+	metrics           *metrics.NoopCollector
+	headers           *storage.Headers
+	pending           *module.PendingClusterBlockBuffer
+	hotstuff          *module.HotStuff
+	sync              *module.BlockRequester
+	voteAggregator    *hotstuff.VoteAggregator
+	timeoutAggregator *hotstuff.TimeoutAggregator
 
 	// engine under test
 	core *Core
@@ -143,9 +145,10 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	}()
 
 	// set up hotstuff module mock
-	cs.hotstuff = &module.HotStuff{}
+	cs.hotstuff = module.NewHotStuff(cs.T())
 
-	cs.voteAggregator = &hotstuff.VoteAggregator{}
+	cs.voteAggregator = hotstuff.NewVoteAggregator(cs.T())
+	cs.timeoutAggregator = hotstuff.NewTimeoutAggregator(cs.T())
 
 	// set up synchronization module mock
 	cs.sync = &module.BlockRequester{}
@@ -165,6 +168,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 		cs.state,
 		cs.pending,
 		cs.voteAggregator,
+		cs.timeoutAggregator,
 	)
 	require.NoError(cs.T(), err, "engine initialization should pass")
 
@@ -351,6 +355,31 @@ func (cs *ComplianceCoreSuite) TestOnSubmitVote() {
 
 	// check that submit vote was called with correct parameters
 	cs.hotstuff.AssertExpectations(cs.T())
+}
+
+// TestOnSubmitTimeout tests that submitting messages.ClusterTimeoutObject adds model.TimeoutObject into
+// TimeoutAggregator.
+func (cs *ComplianceCoreSuite) TestOnSubmitTimeout() {
+	// create a timeout
+	originID := unittest.IdentifierFixture()
+	timeout := messages.ClusterTimeoutObject{
+		View:       rand.Uint64(),
+		NewestQC:   helper.MakeQC(),
+		LastViewTC: helper.MakeTC(),
+		SigData:    unittest.SignatureFixture(),
+	}
+
+	cs.timeoutAggregator.On("AddTimeout", &model.TimeoutObject{
+		View:       timeout.View,
+		NewestQC:   timeout.NewestQC,
+		LastViewTC: timeout.LastViewTC,
+		SignerID:   originID,
+		SigData:    timeout.SigData,
+	}).Return()
+
+	// execute the timeout submission
+	err := cs.core.OnTimeoutObject(originID, &timeout)
+	require.NoError(cs.T(), err, "timeout object should pass")
 }
 
 func (cs *ComplianceCoreSuite) TestProposalBufferingOrder() {

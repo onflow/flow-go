@@ -99,6 +99,7 @@ func newEmergencyFallbackEpoch(lastCommittedEpoch *staticEpochInfo) (*staticEpoc
 		randomSource:         lastCommittedEpoch.randomSource,
 		leaders:              leaders,
 		initialCommittee:     lastCommittedEpoch.initialCommittee,
+		initialCommitteeMap:  lastCommittedEpoch.initialCommitteeMap,
 		weightThresholdForQC: lastCommittedEpoch.weightThresholdForQC,
 		weightThresholdForTO: lastCommittedEpoch.weightThresholdForTO,
 		dkg:                  lastCommittedEpoch.dkg,
@@ -237,7 +238,7 @@ func (c *Consensus) IdentityByEpoch(view uint64, nodeID flow.Identifier) (*flow.
 	}
 	identity, ok := epochInfo.initialCommitteeMap[nodeID]
 	if !ok {
-		return nil, model.NewInvalidSignerErrorf("id %v is not a valid node id: %w", nodeID, err)
+		return nil, model.NewInvalidSignerErrorf("id %v is not a valid node id", nodeID)
 	}
 	return identity, nil
 }

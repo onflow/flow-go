@@ -156,7 +156,8 @@ func (s *ActivePaceMakerTestSuite) TestProcessTC_SkipIncreaseViewThroughTC() {
 
 // TestProcessTC_IgnoreOldTC tests that ActivePaceMaker ignores old TC and doesn't advance round.
 func (s *ActivePaceMakerTestSuite) TestProcessTC_IgnoreOldTC() {
-	nve, err := s.paceMaker.ProcessTC(helper.MakeTC(helper.WithTCView(s.livenessData.CurrentView - 1)))
+	nve, err := s.paceMaker.ProcessTC(helper.MakeTC(helper.WithTCView(s.livenessData.CurrentView-1),
+		helper.WithTCNewestQC(s.livenessData.NewestQC)))
 	require.NoError(s.T(), err)
 	require.Nil(s.T(), nve)
 	require.Equal(s.T(), s.livenessData.CurrentView, s.paceMaker.CurView())
@@ -215,8 +216,65 @@ func (s *ActivePaceMakerTestSuite) TestProcessQC_InvalidatesLastViewTC() {
 
 // TestProcessQC_IgnoreOldQC tests that ActivePaceMaker ignores old QC and doesn't advance round
 func (s *ActivePaceMakerTestSuite) TestProcessQC_IgnoreOldQC() {
-	nve, err := s.paceMaker.ProcessQC(QC(s.livenessData.CurrentView - 1))
+	qc := QC(s.livenessData.CurrentView - 1)
+	nve, err := s.paceMaker.ProcessQC(qc)
 	require.NoError(s.T(), err)
 	require.Nil(s.T(), nve)
 	require.Equal(s.T(), s.livenessData.CurrentView, s.paceMaker.CurView())
+	require.NotEqual(s.T(), qc, s.paceMaker.NewestQC())
+}
+
+// TestProcessQC_UpdateNewestQC tests that ActivePaceMaker tracks the newest QC even if it has advanced past this view.
+// In this test, we feed a newer QC as part of a TC into the PaceMaker.
+func (s *ActivePaceMakerTestSuite) TestProcessQC_UpdateNewestQC() {
+	s.persist.On("PutLivenessData", mock.Anything).Return(nil).Once()
+	s.notifier.On("OnStartingTimeout", mock.Anything).Return().Once()
+	s.notifier.On("OnTcTriggeredViewChange", mock.Anything, mock.Anything).Return().Once()
+	tc := helper.MakeTC(helper.WithTCView(s.livenessData.CurrentView+10),
+		helper.WithTCNewestQC(s.livenessData.NewestQC))
+	nve, err := s.paceMaker.ProcessTC(tc)
+	require.NoError(s.T(), err)
+	require.NotNil(s.T(), nve)
+
+	qc := QC(s.livenessData.NewestQC.View + 5)
+
+	expectedLivenessData := &hotstuff.LivenessData{
+		CurrentView: s.livenessData.CurrentView,
+		LastViewTC:  s.livenessData.LastViewTC,
+		NewestQC:    qc,
+	}
+	s.persist.On("PutLivenessData", expectedLivenessData).Return(nil).Once()
+
+	nve, err = s.paceMaker.ProcessQC(qc)
+	require.NoError(s.T(), err)
+	require.Nil(s.T(), nve)
+	require.Equal(s.T(), qc, s.paceMaker.NewestQC())
+}
+
+// TestProcessTC_UpdateNewestQC tests that ActivePaceMaker tracks the newest QC included in TC even if it has advanced past this view.
+func (s *ActivePaceMakerTestSuite) TestProcessTC_UpdateNewestQC() {
+	s.persist.On("PutLivenessData", mock.Anything).Return(nil).Once()
+	s.notifier.On("OnStartingTimeout", mock.Anything).Return().Once()
+	s.notifier.On("OnTcTriggeredViewChange", mock.Anything, mock.Anything).Return().Once()
+	tc := helper.MakeTC(helper.WithTCView(s.livenessData.CurrentView+10),
+		helper.WithTCNewestQC(s.livenessData.NewestQC))
+	nve, err := s.paceMaker.ProcessTC(tc)
+	require.NoError(s.T(), err)
+	require.NotNil(s.T(), nve)
+
+	qc := QC(s.livenessData.NewestQC.View + 5)
+	olderTC := helper.MakeTC(helper.WithTCView(s.paceMaker.CurView()-1),
+		helper.WithTCNewestQC(qc))
+
+	expectedLivenessData := &hotstuff.LivenessData{
+		CurrentView: s.livenessData.CurrentView,
+		LastViewTC:  s.livenessData.LastViewTC,
+		NewestQC:    qc,
+	}
+	s.persist.On("PutLivenessData", expectedLivenessData).Return(nil).Once()
+
+	nve, err = s.paceMaker.ProcessTC(olderTC)
+	require.NoError(s.T(), err)
+	require.Nil(s.T(), nve)
+	require.Equal(s.T(), qc, s.paceMaker.NewestQC())
 }

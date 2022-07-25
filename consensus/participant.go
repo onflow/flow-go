@@ -53,10 +53,11 @@ func NewParticipant(
 	}
 
 	// prune vote aggregator to initial view
-	modules.Aggregator.PruneUpToView(finalized.View)
+	modules.VoteAggregator.PruneUpToView(finalized.View)
+	modules.TimeoutAggregator.PruneUpToView(finalized.View)
 
 	// recover the hotstuff state, mainly to recover all pending blocks in Forks
-	err := recovery.Participant(log, modules.Forks, modules.Aggregator, modules.Validator, finalized, pending)
+	err := recovery.Participant(log, modules.Forks, modules.VoteAggregator, modules.Validator, finalized, pending)
 	if err != nil {
 		return nil, fmt.Errorf("could not recover hotstuff state: %w", err)
 	}
@@ -87,8 +88,8 @@ func NewParticipant(
 		return nil, fmt.Errorf("could not initialize block producer: %w", err)
 	}
 
-	// initialize the voter
-	voter, err := safetyrules.New(modules.Signer, modules.Persist, modules.Committee)
+	// initialize the safetyRules
+	safetyRules, err := safetyrules.New(modules.Signer, modules.Persist, modules.Committee)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize safety rules: %w", err)
 	}
@@ -102,9 +103,9 @@ func NewParticipant(
 		modules.Persist,
 		communicator,
 		modules.Committee,
-		modules.Aggregator,
-		voter,
-		modules.Validator,
+		modules.VoteAggregator,
+		modules.TimeoutAggregator,
+		safetyRules,
 		modules.Notifier,
 	)
 	if err != nil {
@@ -118,7 +119,8 @@ func NewParticipant(
 	}
 
 	// add observer, event loop needs to receive events from distributor
-	modules.QCCreatedDistributor.AddConsumer(loop.SubmitTrustedQC)
+	modules.QCCreatedDistributor.AddConsumer(loop)
+	modules.TimeoutCollectorDistributor.AddConsumer(loop)
 
 	return loop, nil
 }

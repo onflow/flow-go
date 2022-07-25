@@ -35,14 +35,16 @@ var _ component.Component = (*EventLoop)(nil)
 func NewEventLoop(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandler hotstuff.EventHandler, startTime time.Time) (*EventLoop, error) {
 	proposals := make(chan *model.Proposal)
 	quorumCertificates := make(chan *flow.QuorumCertificate, 1)
+	timeoutCertificates := make(chan *flow.TimeoutCertificate, 1)
 
 	el := &EventLoop{
-		log:                log,
-		eventHandler:       eventHandler,
-		metrics:            metrics,
-		proposals:          proposals,
-		quorumCertificates: quorumCertificates,
-		startTime:          startTime,
+		log:                 log,
+		eventHandler:        eventHandler,
+		metrics:             metrics,
+		proposals:           proposals,
+		quorumCertificates:  quorumCertificates,
+		timeoutCertificates: timeoutCertificates,
+		startTime:           startTime,
 	}
 
 	componentBuilder := component.NewComponentManagerBuilder()
@@ -177,7 +179,7 @@ func (el *EventLoop) loop(ctx context.Context) error {
 
 			processStart := time.Now()
 
-			err := el.eventHandler.OnQCConstructed(qc)
+			err := el.eventHandler.OnReceiveQc(qc)
 
 			// measure how long it takes for a QC to be processed
 			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeOnQC)
@@ -194,7 +196,7 @@ func (el *EventLoop) loop(ctx context.Context) error {
 
 			processStart := time.Now()
 
-			err := el.eventHandler.OnTCConstructed(tc)
+			err := el.eventHandler.OnReceiveTc(tc)
 
 			// measure how long it takes for a TC to be processed
 			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeOnTC)
@@ -206,7 +208,7 @@ func (el *EventLoop) loop(ctx context.Context) error {
 	}
 }
 
-// SubmitProposal pushes the received block to the blockheader channel
+// SubmitProposal pushes the received block to the proposals channel
 func (el *EventLoop) SubmitProposal(proposalHeader *flow.Header, parentView uint64) {
 	received := time.Now()
 
@@ -223,8 +225,8 @@ func (el *EventLoop) SubmitProposal(proposalHeader *flow.Header, parentView uint
 	el.metrics.HotStuffWaitDuration(time.Since(received), metrics.HotstuffEventTypeOnProposal)
 }
 
-// SubmitTrustedQC pushes the received QC to the quorumCertificates channel
-func (el *EventLoop) SubmitTrustedQC(qc *flow.QuorumCertificate) {
+// onTrustedQC pushes the received QC(which MUST be validated) to the quorumCertificates channel
+func (el *EventLoop) onTrustedQC(qc *flow.QuorumCertificate) {
 	received := time.Now()
 
 	select {
@@ -238,7 +240,8 @@ func (el *EventLoop) SubmitTrustedQC(qc *flow.QuorumCertificate) {
 	el.metrics.HotStuffWaitDuration(time.Since(received), metrics.HotstuffEventTypeOnQC)
 }
 
-func (el *EventLoop) SubmitTrustedTC(tc *flow.TimeoutCertificate) {
+// onTrustedTC pushes the received TC(which MUST be validated) to the timeoutCertificates channel
+func (el *EventLoop) onTrustedTC(tc *flow.TimeoutCertificate) {
 	received := time.Now()
 
 	select {
@@ -250,4 +253,28 @@ func (el *EventLoop) SubmitTrustedTC(tc *flow.TimeoutCertificate) {
 	// the wait duration is measured as how long it takes from a tc being
 	// received to event handler commencing the processing of the tc
 	el.metrics.HotStuffWaitDuration(time.Since(received), metrics.HotstuffEventTypeOnTC)
+}
+
+// OnTcConstructedFromTimeouts pushes the received TC to the timeoutCertificates channel
+func (el *EventLoop) OnTcConstructedFromTimeouts(tc *flow.TimeoutCertificate) {
+	el.onTrustedTC(tc)
+}
+
+func (el *EventLoop) OnPartialTcCreated(view uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) {
+	// TODO(active-pacemaker): implement handler to support Bracha timeouts.
+}
+
+// OnNewQcDiscovered pushes already validated QCs that were submitted from TimeoutAggregator to the event handler
+func (el *EventLoop) OnNewQcDiscovered(qc *flow.QuorumCertificate) {
+	el.onTrustedQC(qc)
+}
+
+// OnNewTcDiscovered pushes already validated TCs that were submitted from TimeoutAggregator to the event handler
+func (el *EventLoop) OnNewTcDiscovered(tc *flow.TimeoutCertificate) {
+	el.onTrustedTC(tc)
+}
+
+// OnQcConstructedFromVotes implements hotstuff.QCCreatedConsumer and pushes received qc into processing pipeline.
+func (el *EventLoop) OnQcConstructedFromVotes(qc *flow.QuorumCertificate) {
+	el.onTrustedQC(qc)
 }

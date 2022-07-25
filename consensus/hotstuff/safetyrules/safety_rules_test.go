@@ -61,6 +61,7 @@ func (s *SafetyRulesTestSuite) SetupTest() {
 	s.committee.On("Self").Return(s.ourIdentity.NodeID).Maybe()
 	s.committee.On("IdentityByBlock", mock.Anything, s.ourIdentity.NodeID).Return(s.ourIdentity, nil).Maybe()
 	s.committee.On("IdentityByBlock", s.proposal.Block.BlockID, s.proposal.Block.ProposerID).Return(s.proposerIdentity, nil).Maybe()
+	s.committee.On("IdentityByEpoch", mock.Anything, s.ourIdentity.NodeID).Return(s.ourIdentity, nil).Maybe()
 
 	s.safetyData = &hotstuff.SafetyData{
 		LockedOneChainView:      s.bootstrapBlock.View,
@@ -659,6 +660,41 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_AfterVote() {
 
 	s.persister.AssertExpectations(s.T())
 	s.signer.AssertExpectations(s.T())
+}
+
+// TestProduceTimeout_InvalidProposerIdentity tests that no timeout is created if there was an exception retrieving proposer identity
+// We are specifically testing that unexpected errors are handled correctly, i.e.
+// that SafetyRules does not erroneously wrap unexpected exceptions into the expected model.NoTimeoutError.
+func (s *SafetyRulesTestSuite) TestProduceTimeout_InvalidProposerIdentity() {
+	view := s.proposal.Block.View
+	newestQC := helper.MakeQC(helper.WithQCView(view - 1))
+	*s.committee = mocks.DynamicCommittee{}
+	exception := errors.New("invalid-signer-identity")
+	s.committee.On("IdentityByEpoch", view, s.ourIdentity.NodeID).Return(nil, exception).Once()
+	s.committee.On("Self").Return(s.ourIdentity.NodeID)
+
+	timeout, err := s.safety.ProduceTimeout(view, newestQC, nil)
+	require.Nil(s.T(), timeout)
+	require.ErrorIs(s.T(), err, exception)
+	require.False(s.T(), model.IsNoTimeoutError(err))
+	s.persister.AssertNotCalled(s.T(), "PutSafetyData")
+}
+
+// TestProduceTimeout_NodeEjected tests that no timeout is created if the replica is not authorized to create timeout.
+// Nodes have zero weight in the grace periods around the epochs where they are authorized to participate.
+// We don't want zero-weight nodes to participate in the first place, to avoid unnecessary traffic.
+// Note: this also covers ejected nodes. In both cases, the committee will return an `InvalidSignerError`.
+func (s *SafetyRulesTestSuite) TestProduceTimeout_NodeEjected() {
+	view := s.proposal.Block.View
+	newestQC := helper.MakeQC(helper.WithQCView(view - 1))
+	*s.committee = mocks.DynamicCommittee{}
+	s.committee.On("Self").Return(s.ourIdentity.NodeID)
+	s.committee.On("IdentityByEpoch", view, s.ourIdentity.NodeID).Return(nil, model.NewInvalidSignerErrorf("")).Maybe()
+
+	timeout, err := s.safety.ProduceTimeout(view, newestQC, nil)
+	require.Nil(s.T(), timeout)
+	require.True(s.T(), model.IsNoTimeoutError(err))
+	s.persister.AssertNotCalled(s.T(), "PutSafetyData")
 }
 
 func makeVote(block *model.Block) *model.Vote {

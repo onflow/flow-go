@@ -25,6 +25,8 @@ type EpochComponentsFactory struct {
 	sync     *SyncEngineFactory
 }
 
+var _ epochmgr.EpochComponentsFactory = (*EpochComponentsFactory)(nil)
+
 func NewEpochComponentsFactory(
 	me module.Local,
 	pools *epochs.TransactionPools,
@@ -55,6 +57,7 @@ func (factory *EpochComponentsFactory) Create(
 	sync network.Engine,
 	hotstuff module.HotStuff,
 	voteAggregator hotstuff.VoteAggregator,
+	timeoutAggregator hotstuff.TimeoutAggregator,
 	err error,
 ) {
 
@@ -127,9 +130,10 @@ func (factory *EpochComponentsFactory) Create(
 		err = fmt.Errorf("could not create consensus modules: %w", err)
 		return
 	}
-	voteAggregator = hotstuffModules.Aggregator
+	voteAggregator = hotstuffModules.VoteAggregator
+	timeoutAggregator = hotstuffModules.TimeoutAggregator
 
-	proposalEng, err := factory.proposal.Create(mutableState, headers, payloads, hotstuffModules.Aggregator)
+	proposalEng, err := factory.proposal.Create(mutableState, headers, payloads, hotstuffModules.VoteAggregator, hotstuffModules.TimeoutAggregator)
 	if err != nil {
 		err = fmt.Errorf("could not create proposal engine: %w", err)
 		return

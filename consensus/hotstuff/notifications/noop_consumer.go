@@ -11,6 +11,7 @@ import (
 type NoopConsumer struct{}
 
 var _ hotstuff.Consumer = (*NoopConsumer)(nil)
+var _ hotstuff.TimeoutCollectorConsumer = (*NoopConsumer)(nil)
 
 func NewNoopConsumer() *NoopConsumer {
 	nc := &NoopConsumer{}
@@ -39,7 +40,7 @@ func (c *NoopConsumer) OnProposingBlock(*model.Proposal) {}
 
 func (c *NoopConsumer) OnVoting(*model.Vote) {}
 
-func (c *NoopConsumer) OnQcConstructedFromVotes(curView uint64, qc *flow.QuorumCertificate) {}
+func (c *NoopConsumer) OnQcConstructedFromVotes(uint64, *flow.QuorumCertificate) {}
 
 func (*NoopConsumer) OnStartingTimeout(*model.TimerInfo) {}
 
@@ -56,3 +57,12 @@ func (*NoopConsumer) OnVoteForInvalidBlockDetected(*model.Vote, *model.Proposal)
 func (*NoopConsumer) OnDoubleTimeoutDetected(*model.TimeoutObject, *model.TimeoutObject) {}
 
 func (*NoopConsumer) OnInvalidTimeoutDetected(*model.TimeoutObject) {}
+
+func (c *NoopConsumer) OnTcConstructedFromTimeouts(*flow.TimeoutCertificate) {}
+
+func (c *NoopConsumer) OnPartialTcCreated(uint64, *flow.QuorumCertificate, *flow.TimeoutCertificate) {
+}
+
+func (c *NoopConsumer) OnNewQcDiscovered(*flow.QuorumCertificate) {}
+
+func (c *NoopConsumer) OnNewTcDiscovered(*flow.TimeoutCertificate) {}

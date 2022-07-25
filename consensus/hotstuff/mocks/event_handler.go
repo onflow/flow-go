@@ -31,20 +31,6 @@ func (_m *EventHandler) OnLocalTimeout() error {
 	return r0
 }
 
-// OnQCConstructed provides a mock function with given fields: qc
-func (_m *EventHandler) OnQCConstructed(qc *flow.QuorumCertificate) error {
-	ret := _m.Called(qc)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.QuorumCertificate) error); ok {
-		r0 = rf(qc)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // OnReceiveProposal provides a mock function with given fields: proposal
 func (_m *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 	ret := _m.Called(proposal)
@@ -59,8 +45,22 @@ func (_m *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 	return r0
 }
 
-// OnTCConstructed provides a mock function with given fields: tc
-func (_m *EventHandler) OnTCConstructed(tc *flow.TimeoutCertificate) error {
+// OnReceiveQc provides a mock function with given fields: qc
+func (_m *EventHandler) OnReceiveQc(qc *flow.QuorumCertificate) error {
+	ret := _m.Called(qc)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*flow.QuorumCertificate) error); ok {
+		r0 = rf(qc)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// OnReceiveTc provides a mock function with given fields: tc
+func (_m *EventHandler) OnReceiveTc(tc *flow.TimeoutCertificate) error {
 	ret := _m.Called(tc)
 
 	var r0 error

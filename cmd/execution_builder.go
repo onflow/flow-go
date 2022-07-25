@@ -27,7 +27,6 @@ import (
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	uploaderCommands "github.com/onflow/flow-go/admin/commands/uploader"
 	"github.com/onflow/flow-go/consensus"
-	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
@@ -181,7 +180,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		executionDataServiceCollector module.ExecutionDataServiceMetrics
 		executionState                state.ExecutionState
 		followerState                 protocol.MutableState
-		committee                     hotstuff.DynamicCommittee
+		committee                     *committees.Consensus
 		ledgerStorage                 *ledger.Ledger
 		events                        *storage.Events
 		serviceEvents                 *storage.ServiceEvents
@@ -671,6 +670,15 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 
 			return ingestionEng, err
 		}).
+		Component("consensus committee", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+			// initialize consensus committee's membership state
+			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
+			// Note: node.Me.NodeID() is not part of the consensus committee
+			var err error
+			committee, err = committees.NewConsensusCommittee(node.State, node.Me.NodeID())
+			node.ProtocolEvents.AddConsumer(committee)
+			return committee, err
+		}).
 		Component("follower engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
@@ -679,15 +687,6 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			// create a finalizer that handles updating the protocol
 			// state when the follower detects newly finalized blocks
 			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState, node.Tracer)
-
-			// initialize consensus committee's membership state
-			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
-			// Note: node.Me.NodeID() is not part of the consensus committee
-			var err error
-			committee, err = committees.NewConsensusCommittee(node.State, node.Me.NodeID())
-			if err != nil {
-				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
-			}
 
 			packer := signature.NewConsensusSigDataPacker(committee)
 			// initialize the verifier for the protocol consensus

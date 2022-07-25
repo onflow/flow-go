@@ -10,15 +10,17 @@ import (
 // HotstuffModules is a helper structure to encapsulate dependencies to create
 // a hotStuff participant.
 type HotstuffModules struct {
-	Notifier                hotstuff.Consumer               // observer for hotstuff events
-	Committee               hotstuff.DynamicCommittee       // consensus committee
-	Signer                  hotstuff.Signer                 // signer of proposal & votes
-	Persist                 hotstuff.Persister              // last state of consensus participant
-	FinalizationDistributor *pubsub.FinalizationDistributor // observer for finalization events, used by compliance engine
-	QCCreatedDistributor    *pubsub.QCCreatedDistributor    // observer for qc created event, used by leader
-	Forks                   hotstuff.Forks                  // information about multiple forks
-	Validator               hotstuff.Validator              // validator of proposals & votes
-	Aggregator              hotstuff.VoteAggregator         // aggregator of votes, used by leader
+	Notifier                    hotstuff.Consumer               // observer for hotstuff events
+	Committee                   hotstuff.DynamicCommittee       // consensus committee
+	Signer                      hotstuff.Signer                 // signer of proposal & votes
+	Persist                     hotstuff.Persister              // last state of consensus participant
+	FinalizationDistributor     *pubsub.FinalizationDistributor // observer for finalization events, used by compliance engine
+	QCCreatedDistributor        *pubsub.QCCreatedDistributor    // observer for qc created event, used by leader
+	TimeoutCollectorDistributor *pubsub.TimeoutCollectorDistributor
+	Forks                       hotstuff.Forks             // information about multiple forks
+	Validator                   hotstuff.Validator         // validator of proposals & votes
+	VoteAggregator              hotstuff.VoteAggregator    // aggregator of votes, used by leader
+	TimeoutAggregator           hotstuff.TimeoutAggregator // aggregator of `TimeoutObject`s, used by every replica
 }
 
 type ParticipantConfig struct {

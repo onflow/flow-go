@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gammazero/workerpool"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
@@ -31,7 +32,7 @@ type TimeoutCollectorsTestSuite struct {
 	suite.Suite
 
 	mockedCollectors map[uint64]*mocks.TimeoutCollector
-	factoryMethod    NewCollectorFactoryMethod
+	factoryMethod    *mocks.TimeoutCollectorFactory
 	collectors       *TimeoutCollectors
 	lowestView       uint64
 	workerPool       *workerpool.WorkerPool
@@ -41,12 +42,18 @@ func (s *TimeoutCollectorsTestSuite) SetupTest() {
 	s.lowestView = 1000
 	s.mockedCollectors = make(map[uint64]*mocks.TimeoutCollector)
 	s.workerPool = workerpool.New(2)
-	s.factoryMethod = func(view uint64) (hotstuff.TimeoutCollector, error) {
+	s.factoryMethod = mocks.NewTimeoutCollectorFactory(s.T())
+	s.factoryMethod.On("Create", mock.Anything).Return(func(view uint64) hotstuff.TimeoutCollector {
 		if collector, found := s.mockedCollectors[view]; found {
-			return collector, nil
+			return collector
 		}
-		return nil, fmt.Errorf("mocked collector %v not found: %w", view, factoryError)
-	}
+		return nil
+	}, func(view uint64) error {
+		if _, found := s.mockedCollectors[view]; found {
+			return nil
+		}
+		return fmt.Errorf("mocked collector %v not found: %w", view, factoryError)
+	}).Maybe()
 	s.collectors = NewTimeoutCollectors(unittest.Logger(), s.lowestView, s.factoryMethod)
 }
 
@@ -76,11 +83,9 @@ func (s *TimeoutCollectorsTestSuite) TestGetOrCreateCollector_ViewLowerThanLowes
 // TestGetOrCreateCollector_UnknownEpoch tests a scenario where caller tries to create a collector with view referring epoch
 // that we don't know about. This should result in sentinel error `
 func (s *TimeoutCollectorsTestSuite) TestGetOrCreateCollector_UnknownEpoch() {
-	factoryMethod := func(_ uint64) (hotstuff.TimeoutCollector, error) {
-		return nil, model.ErrViewForUnknownEpoch
-	}
-	collectors := NewTimeoutCollectors(unittest.Logger(), s.lowestView, factoryMethod)
-	collector, created, err := collectors.GetOrCreateCollector(s.lowestView + 100)
+	*s.factoryMethod = *mocks.NewTimeoutCollectorFactory(s.T())
+	s.factoryMethod.On("Create", mock.Anything).Return(nil, model.ErrViewForUnknownEpoch)
+	collector, created, err := s.collectors.GetOrCreateCollector(s.lowestView + 100)
 	require.Nil(s.T(), collector)
 	require.False(s.T(), created)
 	require.ErrorIs(s.T(), err, model.ErrViewForUnknownEpoch)

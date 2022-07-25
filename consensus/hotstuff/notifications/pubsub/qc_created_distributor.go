@@ -7,14 +7,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type OnQCCreatedConsumer = func(qc *flow.QuorumCertificate)
-
-// QCCreatedDistributor subscribes for qc created event from hotstuff and distributes it to subscribers
+// QCCreatedDistributor ingests events about QC creation from hotstuff and distributes them to subscribers.
 // Objects are concurrency safe.
 // NOTE: it can be refactored to work without lock since usually we never subscribe after startup. Mostly
 // list of observers is static.
 type QCCreatedDistributor struct {
-	qcCreatedConsumers []OnQCCreatedConsumer
+	qcCreatedConsumers []hotstuff.QCCreatedConsumer
 	lock               sync.RWMutex
 }
 
@@ -22,11 +20,11 @@ var _ hotstuff.QCCreatedConsumer = (*QCCreatedDistributor)(nil)
 
 func NewQCCreatedDistributor() *QCCreatedDistributor {
 	return &QCCreatedDistributor{
-		qcCreatedConsumers: make([]OnQCCreatedConsumer, 0),
+		qcCreatedConsumers: make([]hotstuff.QCCreatedConsumer, 0),
 	}
 }
 
-func (d *QCCreatedDistributor) AddConsumer(consumer OnQCCreatedConsumer) {
+func (d *QCCreatedDistributor) AddConsumer(consumer hotstuff.QCCreatedConsumer) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 	d.qcCreatedConsumers = append(d.qcCreatedConsumers, consumer)
@@ -36,6 +34,6 @@ func (d *QCCreatedDistributor) OnQcConstructedFromVotes(qc *flow.QuorumCertifica
 	d.lock.RLock()
 	defer d.lock.RUnlock()
 	for _, consumer := range d.qcCreatedConsumers {
-		consumer(qc)
+		consumer.OnQcConstructedFromVotes(qc)
 	}
 }

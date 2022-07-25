@@ -16,6 +16,7 @@ type LogConsumer struct {
 }
 
 var _ hotstuff.Consumer = (*LogConsumer)(nil)
+var _ hotstuff.TimeoutCollectorConsumer = (*LogConsumer)(nil)
 
 func NewLogConsumer(log zerolog.Logger) *LogConsumer {
 	lc := &LogConsumer{
@@ -180,4 +181,36 @@ func (lc *LogConsumer) logBasicBlockData(loggerEvent *zerolog.Event, block *mode
 			Hex("qc_id", logging.ID(block.QC.BlockID))
 	}
 	return loggerEvent
+}
+
+func (lc *LogConsumer) OnTcConstructedFromTimeouts(tc *flow.TimeoutCertificate) {
+	lc.log.Debug().
+		Uint64("tc_view", tc.View).
+		Uint64("newest_qc_view", tc.NewestQC.View).
+		Hex("newest_qc_block_id", tc.NewestQC.BlockID[:]).
+		Msg("TC constructed")
+}
+
+func (lc *LogConsumer) OnPartialTcCreated(view uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) {
+	lc.log.Debug().
+		Uint64("view", view).
+		Uint64("newest_qc_view", newestQC.View).
+		Hex("newest_qc_block_id", newestQC.BlockID[:]).
+		Bool("has_last_view_tc", lastViewTC != nil).
+		Msg("partial TC constructed")
+}
+
+func (lc *LogConsumer) OnNewQcDiscovered(qc *flow.QuorumCertificate) {
+	lc.log.Debug().
+		Uint64("qc_view", qc.View).
+		Hex("qc_block_id", qc.BlockID[:]).
+		Msg("new QC discovered")
+}
+
+func (lc *LogConsumer) OnNewTcDiscovered(tc *flow.TimeoutCertificate) {
+	lc.log.Debug().
+		Uint64("tc_view", tc.View).
+		Uint64("newest_qc_view", tc.NewestQC.View).
+		Hex("newest_qc_block_id", tc.NewestQC.BlockID[:]).
+		Msg("new TC discovered")
 }

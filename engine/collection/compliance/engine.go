@@ -8,6 +8,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
@@ -33,6 +34,9 @@ const defaultBlockQueueCapacity = 10000
 // defaultVoteQueueCapacity maximum capacity of block votes queue
 const defaultVoteQueueCapacity = 1000
 
+// defaultTimeoutObjectsQueueCapacity maximum capacity of timeout objects queue
+const defaultTimeoutObjectsQueueCapacity = 1000
+
 // Engine is a wrapper struct for `Core` which implements cluster consensus algorithm.
 // Engine is responsible for handling incoming messages, queueing for processing, broadcasting proposals.
 type Engine struct {
@@ -47,6 +51,7 @@ type Engine struct {
 	core                       *Core
 	pendingBlocks              engine.MessageStore
 	pendingVotes               engine.MessageStore
+	pendingTimeouts            engine.MessageStore
 	messageHandler             *engine.MessageHandler
 	finalizedView              counters.StrictMonotonousCounter
 	finalizationEventsNotifier engine.Notifier
@@ -54,6 +59,8 @@ type Engine struct {
 	stopHotstuff               context.CancelFunc
 	cluster                    flow.IdentityList // consensus participants in our cluster
 }
+
+var _ hotstuff.Communicator = (*Engine)(nil)
 
 func NewEngine(
 	log zerolog.Logger,
@@ -100,6 +107,15 @@ func NewEngine(
 	}
 	pendingVotes := &engine.FifoMessageStore{FifoQueue: votesQueue}
 
+	// FIFO queue for timeout objects
+	// TODO(active-pacemaker): update metrics
+	timeoutObjectsQueue, err := fifoqueue.NewFifoQueue(
+		fifoqueue.WithCapacity(defaultTimeoutObjectsQueueCapacity))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create queue for inbound timeout objects: %w", err)
+	}
+	pendingTimeouts := &engine.FifoMessageStore{FifoQueue: timeoutObjectsQueue}
+
 	// define message queueing behaviour
 	handler := engine.NewMessageHandler(
 		engineLog,
@@ -145,6 +161,17 @@ func NewEngine(
 			},
 			Store: pendingVotes,
 		},
+		engine.Pattern{
+			Match: func(msg *engine.Message) bool {
+				_, ok := msg.Payload.(*messages.ClusterTimeoutObject)
+				// TODO(active-pacemaker): update metrics
+				//if ok {
+				//core.metrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageClusterBlockVote)
+				//}
+				return ok
+			},
+			Store: pendingTimeouts,
+		},
 	)
 
 	eng := &Engine{
@@ -159,6 +186,7 @@ func NewEngine(
 		core:                       core,
 		pendingBlocks:              pendingBlocks,
 		pendingVotes:               pendingVotes,
+		pendingTimeouts:            pendingTimeouts,
 		messageHandler:             handler,
 		finalizationEventsNotifier: engine.NewNotifier(),
 		con:                        nil,
@@ -307,6 +335,15 @@ func (e *Engine) processAvailableMessages() error {
 			continue
 		}
 
+		msg, ok = e.pendingTimeouts.Get()
+		if ok {
+			err := e.core.OnTimeoutObject(msg.OriginID, msg.Payload.(*messages.ClusterTimeoutObject))
+			if err != nil {
+				return fmt.Errorf("could not handle timeout object: %w", err)
+			}
+			continue
+		}
+
 		// when there is no more messages in the queue, back to the loop to wait
 		// for the next incoming message to arrive.
 		return nil
@@ -340,6 +377,61 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 		}
 		e.metrics.MessageSent(metrics.EngineClusterCompliance, metrics.MessageClusterBlockVote)
 		log.Info().Msg("collection vote transmitted")
+	})
+
+	return nil
+}
+
+// BroadcastTimeout submits a cluster timeout object to all collection nodes in our cluster
+// No errors are expected during normal operation.
+func (e *Engine) BroadcastTimeout(timeout *model.TimeoutObject) error {
+	logContext := e.log.With().
+		Uint64("timeout_newest_qc_view", timeout.NewestQC.View).
+		Hex("timeout_newest_qc_block_id", timeout.NewestQC.BlockID[:]).
+		Uint64("timeout_view", timeout.View)
+
+	if timeout.LastViewTC != nil {
+		logContext.
+			Uint64("last_view_tc_view", timeout.LastViewTC.View).
+			Uint64("last_view_tc_newest_qc_view", timeout.LastViewTC.NewestQC.View)
+	}
+
+	log := logContext.Logger()
+
+	log.Info().Msg("processing timeout broadcast request from hotstuff")
+
+	// retrieve all collection nodes in our cluster
+	recipients, err := e.state.Final().Identities(filter.And(
+		filter.In(e.cluster),
+		filter.Not(filter.HasNodeID(e.me.NodeID())),
+	))
+	if err != nil {
+		return fmt.Errorf("could not get cluster members: %w", err)
+	}
+
+	e.unit.Launch(func() {
+		// create the proposal message for the collection
+		msg := &messages.ClusterTimeoutObject{
+			View:       timeout.View,
+			NewestQC:   timeout.NewestQC,
+			LastViewTC: timeout.LastViewTC,
+			SigData:    timeout.SigData,
+		}
+
+		err := e.con.Publish(msg, recipients.NodeIDs()...)
+		if errors.Is(err, network.EmptyTargetList) {
+			return
+		}
+		if err != nil {
+			log.Err(err).Msg("could not broadcast timeout")
+			return
+		}
+
+		log.Info().Msg("cluster timeout broadcast")
+
+		// TODO(active-pacemaker): update metrics
+		//e.metrics.MessageSent(metrics.EngineClusterCompliance, metrics.MessageClusterBlockProposal)
+		//e.core.collectionMetrics.ClusterBlockProposed(block)
 	})
 
 	return nil

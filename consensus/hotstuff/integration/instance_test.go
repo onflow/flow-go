@@ -20,9 +20,12 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/onflow/flow-go/consensus/hotstuff/safetyrules"
+	"github.com/onflow/flow-go/consensus/hotstuff/timeoutaggregator"
+	"github.com/onflow/flow-go/consensus/hotstuff/timeoutcollector"
 	"github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/voteaggregator"
 	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
@@ -30,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	module "github.com/onflow/flow-go/module/mock"
 	msig "github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -60,12 +64,13 @@ type Instance struct {
 	communicator *mocks.Communicator
 
 	// real dependencies
-	pacemaker  hotstuff.PaceMaker
-	producer   *blockproducer.BlockProducer
-	forks      *forks.Forks
-	aggregator *voteaggregator.VoteAggregator
-	voter      *safetyrules.SafetyRules
-	validator  *validator.Validator
+	pacemaker         hotstuff.PaceMaker
+	producer          *blockproducer.BlockProducer
+	forks             *forks.Forks
+	voteAggregator    *voteaggregator.VoteAggregator
+	timeoutAggregator *timeoutaggregator.TimeoutAggregator
+	safetyRules       *safetyrules.SafetyRules
+	validator         *validator.Validator
 
 	// main logic
 	handler *eventhandler.EventHandler
@@ -328,12 +333,12 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	}
 	rootBlockQC := &forks.BlockQC{Block: rootBlock, QC: rootQC}
 
-	livnessData := &hotstuff.LivenessData{
+	livenessData := &hotstuff.LivenessData{
 		CurrentView: rootQC.View + 1,
 		NewestQC:    rootQC,
 	}
 
-	in.persist.On("GetLivenessData").Return(livnessData, nil).Once()
+	in.persist.On("GetLivenessData").Return(livenessData, nil).Once()
 
 	// initialize the pacemaker
 	controller := timeout.NewController(cfg.Timeouts)
@@ -378,10 +383,20 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		}, nil)
 
 	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, notifier, voteProcessorFactory.Create)
-	voteCollectors := voteaggregator.NewVoteCollectors(log, DefaultPruned(), workerpool.New(2), createCollectorFactoryMethod)
+	voteCollectors := voteaggregator.NewVoteCollectors(log, livenessData.CurrentView, workerpool.New(2), createCollectorFactoryMethod)
 
 	// initialize the vote aggregator
-	in.aggregator, err = voteaggregator.NewVoteAggregator(log, notifier, DefaultPruned(), voteCollectors)
+	in.voteAggregator, err = voteaggregator.NewVoteAggregator(log, notifier, livenessData.CurrentView, voteCollectors)
+	require.NoError(t, err)
+
+	// initialize factories for timeout collector and timeout processor
+	collectorDistributor := pubsub.NewTimeoutCollectorDistributor()
+	createProcessorFactory := &mocks.TimeoutProcessorFactory{}
+	timeoutCollectorFactory := timeoutcollector.NewTimeoutCollectorFactory(notifier, collectorDistributor, createProcessorFactory)
+	timeoutCollectors := timeoutaggregator.NewTimeoutCollectors(log, livenessData.CurrentView, timeoutCollectorFactory)
+
+	// initialize the timeout aggregator
+	in.timeoutAggregator, err = timeoutaggregator.NewTimeoutAggregator(log, notifier, livenessData.CurrentView, timeoutCollectors)
 	require.NoError(t, err)
 
 	safetyData := &hotstuff.SafetyData{
@@ -391,11 +406,23 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	in.persist.On("GetSafetyData", mock.Anything).Return(safetyData, nil).Once()
 
 	// initialize the safety rules
-	in.voter, err = safetyrules.New(in.signer, in.persist, in.committee)
+	in.safetyRules, err = safetyrules.New(in.signer, in.persist, in.committee)
 	require.NoError(t, err)
 
 	// initialize the event handler
-	in.handler, err = eventhandler.NewEventHandler(log, in.pacemaker, in.producer, in.forks, in.persist, in.communicator, in.committee, in.aggregator, in.voter, in.validator, notifier)
+	in.handler, err = eventhandler.NewEventHandler(
+		log,
+		in.pacemaker,
+		in.producer,
+		in.forks,
+		in.persist,
+		in.communicator,
+		in.committee,
+		in.voteAggregator,
+		in.timeoutAggregator,
+		in.safetyRules,
+		notifier,
+	)
 	require.NoError(t, err)
 
 	return &in
@@ -405,11 +432,12 @@ func (in *Instance) Run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
 		cancel()
-		<-in.aggregator.Done()
+		<-util.AllDone(in.voteAggregator, in.timeoutAggregator)
 	}()
 	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
-	in.aggregator.Start(signalerCtx)
-	<-in.aggregator.Ready()
+	in.voteAggregator.Start(signalerCtx)
+	in.timeoutAggregator.Start(signalerCtx)
+	<-util.AllReady(in.voteAggregator, in.timeoutAggregator)
 
 	// start the event handler
 	err := in.handler.Start()
@@ -455,11 +483,18 @@ func (in *Instance) Run() error {
 					return fmt.Errorf("could not process proposal: %w", err)
 				}
 			case *model.Vote:
-				in.aggregator.AddVote(m)
+				in.voteAggregator.AddVote(m)
+			case *model.TimeoutObject:
+				in.timeoutAggregator.AddTimeout(m)
 			case *flow.QuorumCertificate:
-				err := in.handler.OnQCConstructed(m)
+				err := in.handler.OnReceiveQc(m)
 				if err != nil {
-					return fmt.Errorf("could not process created qc: %w", err)
+					return fmt.Errorf("could not process received qc: %w", err)
+				}
+			case *flow.TimeoutCertificate:
+				err := in.handler.OnReceiveTc(m)
+				if err != nil {
+					return fmt.Errorf("could not process received tc: %w", err)
 				}
 			}
 		}

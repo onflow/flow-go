@@ -34,11 +34,12 @@ var ErrNotAuthorizedForEpoch = fmt.Errorf("we are not an authorized participant 
 // EpochComponents represents all dependencies for running an epoch.
 type EpochComponents struct {
 	*component.ComponentManager
-	state      cluster.State
-	prop       network.Engine
-	sync       network.Engine
-	hotstuff   module.HotStuff
-	aggregator hotstuff.VoteAggregator
+	state             cluster.State
+	prop              network.Engine
+	sync              network.Engine
+	hotstuff          module.HotStuff
+	voteAggregator    hotstuff.VoteAggregator
+	timeoutAggregator hotstuff.TimeoutAggregator
 }
 
 var _ component.Component = (*EpochComponents)(nil)
@@ -48,37 +49,41 @@ func NewEpochComponents(
 	prop network.Engine,
 	sync network.Engine,
 	hotstuff module.HotStuff,
-	aggregator hotstuff.VoteAggregator,
+	voteAggregator hotstuff.VoteAggregator,
+	timeoutAggregator hotstuff.TimeoutAggregator,
 ) *EpochComponents {
 	components := &EpochComponents{
-		state:      state,
-		prop:       prop,
-		sync:       sync,
-		hotstuff:   hotstuff,
-		aggregator: aggregator,
+		state:             state,
+		prop:              prop,
+		sync:              sync,
+		hotstuff:          hotstuff,
+		voteAggregator:    voteAggregator,
+		timeoutAggregator: timeoutAggregator,
 	}
 
 	builder := component.NewComponentManagerBuilder()
 	// start new worker that will start child components and wait for them to finish
 	builder.AddWorker(func(parentCtx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 		// create a separate context that is not connected to parent, reason:
-		// we want to stop vote aggregator after event loop and compliance engine have shutdown
+		// we want to stop aggregators after event loop and compliance engine have shutdown
 		ctx, cancel := context.WithCancel(context.Background())
 		signalerCtx, _ := irrecoverable.WithSignaler(ctx)
-		// start aggregator, hotstuff will be started by compliance engine
-		aggregator.Start(signalerCtx)
+		// start vote and timeout aggregators, hotstuff will be started by compliance engine
+		voteAggregator.Start(signalerCtx)
+		timeoutAggregator.Start(signalerCtx)
 		// wait until all components start
-		<-util.AllReady(components.prop, components.sync, components.aggregator)
+		<-util.AllReady(components.prop, components.sync, components.voteAggregator, components.timeoutAggregator)
 		// signal that startup has finished and we are ready to go
 		ready()
 		// wait for shutdown to be commenced
 		<-parentCtx.Done()
 		// wait for compliance engine and event loop to shut down
 		<-util.AllDone(components.prop, components.sync)
-		// after event loop and engines were stopped proceed with stopping vote aggregator
+		// after event loop and engines were stopped proceed with stopping vote voteAggregator
 		cancel()
-		// wait until it stops
-		<-components.aggregator.Done()
+		// wait until aggregators stop
+		<-components.voteAggregator.Done()
+		<-components.timeoutAggregator.Done()
 	})
 	components.ComponentManager = builder.Build()
 
@@ -225,12 +230,12 @@ func (e *Engine) Done() <-chan struct{} {
 // Returns ErrNotAuthorizedForEpoch if this node is not authorized in the epoch.
 func (e *Engine) createEpochComponents(epoch protocol.Epoch) (*EpochComponents, error) {
 
-	state, prop, sync, hot, aggregator, err := e.factory.Create(epoch)
+	state, prop, sync, hot, voteAggregator, timeoutAggregator, err := e.factory.Create(epoch)
 	if err != nil {
 		return nil, fmt.Errorf("could not setup requirements for epoch (%d): %w", epoch, err)
 	}
 
-	components := NewEpochComponents(state, prop, sync, hot, aggregator)
+	components := NewEpochComponents(state, prop, sync, hot, voteAggregator, timeoutAggregator)
 	return components, err
 }
 

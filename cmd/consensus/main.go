@@ -26,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
 	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
+	"github.com/onflow/flow-go/consensus/hotstuff/timeoutcollector"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
@@ -55,8 +56,10 @@ import (
 	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
+	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/module/updatable_configs"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/module/validation"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
@@ -587,7 +590,8 @@ func main() {
 			validator := consensus.NewValidator(mainMetrics, wrappedCommittee)
 			voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(wrappedCommittee, qcDistributor.OnQcConstructedFromVotes)
 			lowestViewForVoteProcessing := finalizedBlock.View + 1
-			aggregator, err := consensus.NewVoteAggregator(node.Logger,
+			voteAggregator, err := consensus.NewVoteAggregator(
+				node.Logger,
 				lowestViewForVoteProcessing,
 				notifier,
 				voteProcessorFactory,
@@ -596,19 +600,34 @@ func main() {
 				return nil, fmt.Errorf("could not initialize vote aggregator: %w", err)
 			}
 
-			hotstuffModules = &consensus.HotstuffModules{
-				Notifier:                notifier,
-				Committee:               wrappedCommittee,
-				Signer:                  signer,
-				Persist:                 persist,
-				QCCreatedDistributor:    qcDistributor,
-				FinalizationDistributor: finalizationDistributor,
-				Forks:                   forks,
-				Validator:               validator,
-				Aggregator:              aggregator,
+			timeoutCollectorDistributor := pubsub.NewTimeoutCollectorDistributor()
+			timeoutProcessorFactory := timeoutcollector.NewTimeoutProcessorFactory(timeoutCollectorDistributor, committee, validator, msig.ConsensusTimeoutTag)
+			timeoutAggregator, err := consensus.NewTimeoutAggregator(
+				node.Logger,
+				lowestViewForVoteProcessing,
+				notifier,
+				timeoutProcessorFactory,
+				timeoutCollectorDistributor,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize timeout aggregator: %w", err)
 			}
 
-			return aggregator, nil
+			hotstuffModules = &consensus.HotstuffModules{
+				Notifier:                    notifier,
+				Committee:                   wrappedCommittee,
+				Signer:                      signer,
+				Persist:                     persist,
+				QCCreatedDistributor:        qcDistributor,
+				FinalizationDistributor:     finalizationDistributor,
+				TimeoutCollectorDistributor: timeoutCollectorDistributor,
+				Forks:                       forks,
+				Validator:                   validator,
+				VoteAggregator:              voteAggregator,
+				TimeoutAggregator:           timeoutAggregator,
+			}
+
+			return util.MergeReadyDone(voteAggregator, timeoutAggregator), nil
 		}).
 		Component("consensus compliance engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize the block builder
@@ -671,7 +690,8 @@ func main() {
 				mutableState,
 				proposals,
 				syncCore,
-				hotstuffModules.Aggregator,
+				hotstuffModules.VoteAggregator,
+				hotstuffModules.TimeoutAggregator,
 				modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),
 			)
 			if err != nil {

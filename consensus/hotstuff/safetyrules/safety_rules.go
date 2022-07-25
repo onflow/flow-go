@@ -116,10 +116,14 @@ func (r *SafetyRules) ProduceVote(proposal *model.Proposal, curView uint64) (*mo
 	return vote, nil
 }
 
-// ProduceTimeout takes current view, highest locally known QC and TC and decides whether to produce timeout for current view.
-//
-// When generating a timeout, the inputs are provided by node-internal components and should always result in a valid timeout.
-// We don't expect any errors during normal operations. All errors are symptoms of internal bugs or state corruption.
+// ProduceTimeout takes current view, highest locally known QC and TC (optional, must be nil if and
+// only if QC is for previous view) and decides whether to produce timeout for current view.
+// Returns:
+//  * (timeout, nil): It is safe to timeout for current view using newestQC and lastViewTC.
+//  * (nil, model.NoTimeoutError): If replica is not part of the authorized consensus committee (anymore) and
+//    therefore is not authorized to produce a valid timeout object. This sentinel error is _expected_ during
+//    normal operation, e.g. during the grace-period after Epoch switchover or after the replica self-ejected.
+// All other errors are unexpected and potential symptoms of uncovered edge cases or corrupted internal state (fatal).
 func (r *SafetyRules) ProduceTimeout(curView uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
 	lastTimeout := r.safetyData.LastTimeout
 	if lastTimeout != nil && lastTimeout.View == curView {
@@ -129,6 +133,15 @@ func (r *SafetyRules) ProduceTimeout(curView uint64, newestQC *flow.QuorumCertif
 	err := r.IsSafeToTimeout(curView, newestQC, lastViewTC)
 	if err != nil {
 		return nil, fmt.Errorf("local, trusted inputs failed safety rules: %w", err)
+	}
+
+	// Do not produce a timeout for view where we are not a valid committee member.
+	_, err = r.committee.IdentityByEpoch(curView, r.committee.Self())
+	if err != nil {
+		if model.IsInvalidSignerError(err) {
+			return nil, model.NewNoTimeoutErrorf("I am not authorized to timeout for view %d: %w", curView, err)
+		}
+		return nil, fmt.Errorf("could not get self identity: %w", err)
 	}
 
 	timeout, err := r.signer.CreateTimeout(curView, newestQC, lastViewTC)
