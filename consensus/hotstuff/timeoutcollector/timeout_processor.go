@@ -49,13 +49,20 @@ func NewNewestQCTracker() *NewestQCTracker {
 // Track updates local state of NewestQC if the provided instance is newer(by view)
 // Concurrently safe
 func (t *NewestQCTracker) Track(qc *flow.QuorumCertificate) {
-	NewestQC := t.NewestQC()
-	if NewestQC != nil && NewestQC.View >= qc.View {
-		return
-	}
-
-	if NewestQC == nil || NewestQC.View < qc.View {
-		t.newestQC.CAS(unsafe.Pointer(NewestQC), unsafe.Pointer(qc))
+	// to record the newest value that we have ever seen we need to use loop
+	// with CAS atomic operation to make sure that we always write the latest value
+	// in case of shared access to updated value.
+	for {
+		// take a snapshot
+		NewestQC := t.NewestQC()
+		// verify that our update makes sense
+		if NewestQC != nil && NewestQC.View >= qc.View {
+			return
+		}
+		// attempt to install new value, repeat in case of shared update.
+		if t.newestQC.CAS(unsafe.Pointer(NewestQC), unsafe.Pointer(qc)) {
+			return
+		}
 	}
 }
 
