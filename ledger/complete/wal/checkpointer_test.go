@@ -25,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	realWAL "github.com/onflow/flow-go/ledger/complete/wal"
+	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -53,6 +54,11 @@ func Test_WAL(t *testing.T) {
 		led, err := complete.NewLedger(diskWal, size*10, metricsCollector, logger, complete.DefaultPathFinderVersion)
 		require.NoError(t, err)
 
+		compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), uint(size), 1_000_000, 1)
+		require.NoError(t, err)
+
+		<-compactor.Ready()
+
 		var state = led.InitialState()
 
 		//saved data after updates
@@ -70,8 +76,6 @@ func Test_WAL(t *testing.T) {
 			state, _, err = led.Set(update)
 			require.NoError(t, err)
 
-			fmt.Printf("Updated with %x\n", state)
-
 			data := make(map[string]ledger.Value, len(keys))
 			for j, key := range keys {
 				data[string(encoding.EncodeKey(&key))] = values[j]
@@ -81,11 +85,14 @@ func Test_WAL(t *testing.T) {
 		}
 
 		<-led.Done()
+		<-compactor.Done()
 
 		diskWal2, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metricsCollector, dir, size, pathfinder.PathByteSize, realWAL.SegmentSize)
 		require.NoError(t, err)
 		led2, err := complete.NewLedger(diskWal2, (size*10)+10, metricsCollector, logger, complete.DefaultPathFinderVersion)
 		require.NoError(t, err)
+		compactor2 := fixtures.NewNoopCompactor(led2) // noop compactor is used because no write is needed.
+		<-compactor2.Ready()
 
 		// random map iteration order is a benefit here
 		for state, data := range savedData {
@@ -96,8 +103,6 @@ func Test_WAL(t *testing.T) {
 				require.NoError(t, err)
 				keys = append(keys, *key)
 			}
-
-			fmt.Printf("Querying with %x\n", state)
 
 			var ledgerState ledger.State
 			copy(ledgerState[:], state)
@@ -112,6 +117,7 @@ func Test_WAL(t *testing.T) {
 		}
 
 		<-led2.Done()
+		<-compactor2.Done()
 	})
 }
 

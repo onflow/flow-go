@@ -45,12 +45,18 @@ func benchmarkStorage(steps int, b *testing.B) {
 	require.NoError(b, err)
 
 	led, err := complete.NewLedger(diskWal, steps+1, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+	require.NoError(b, err)
+
+	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), uint(steps+1), 1_000_000, 1)
+	require.NoError(b, err)
+
+	<-compactor.Ready()
+
 	defer func() {
 		<-led.Done()
+		<-compactor.Done()
 	}()
-	if err != nil {
-		b.Fatal("can't create a new complete ledger")
-	}
+
 	totalUpdateTimeMS := 0
 	totalReadTimeMS := 0
 	totalProofTimeMS := 0
@@ -152,12 +158,17 @@ func BenchmarkTrieUpdate(b *testing.B) {
 	require.NoError(b, err)
 
 	led, err := complete.NewLedger(diskWal, 101, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+	require.NoError(b, err)
+
+	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), 101, 1_000_000, 1)
+	require.NoError(b, err)
+
+	<-compactor.Ready()
+
 	defer func() {
 		<-led.Done()
+		<-compactor.Done()
 	}()
-	if err != nil {
-		b.Fatal("can't create a new complete ledger")
-	}
 
 	state := led.InitialState()
 
@@ -199,12 +210,17 @@ func BenchmarkTrieRead(b *testing.B) {
 	require.NoError(b, err)
 
 	led, err := complete.NewLedger(diskWal, 101, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+	require.NoError(b, err)
+
+	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), 101, 1_000_000, 1)
+	require.NoError(b, err)
+
+	<-compactor.Ready()
+
 	defer func() {
 		<-led.Done()
+		<-compactor.Done()
 	}()
-	if err != nil {
-		b.Fatal("can't create a new complete ledger")
-	}
 
 	state := led.InitialState()
 
@@ -255,12 +271,17 @@ func BenchmarkLedgerGetOneValue(b *testing.B) {
 	require.NoError(b, err)
 
 	led, err := complete.NewLedger(diskWal, 101, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+	require.NoError(b, err)
+
+	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), 101, 1_000_000, 1)
+	require.NoError(b, err)
+
+	<-compactor.Ready()
+
 	defer func() {
 		<-led.Done()
+		<-compactor.Done()
 	}()
-	if err != nil {
-		b.Fatal("can't create a new complete ledger")
-	}
 
 	state := led.InitialState()
 
@@ -328,12 +349,17 @@ func BenchmarkTrieProve(b *testing.B) {
 	require.NoError(b, err)
 
 	led, err := complete.NewLedger(diskWal, 101, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+	require.NoError(b, err)
+
+	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), 101, 1_000_000, 1)
+	require.NoError(b, err)
+
+	<-compactor.Ready()
+
 	defer func() {
 		<-led.Done()
+		<-compactor.Done()
 	}()
-	if err != nil {
-		b.Fatal("can't create a new complete ledger")
-	}
 
 	state := led.InitialState()
 

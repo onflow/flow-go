@@ -128,6 +128,7 @@ type BasicBlockExecutor struct {
 	activeStateCommitment flow.StateCommitment
 	chain                 flow.Chain
 	serviceAccount        *TestBenchAccount
+	onStopFunc            func()
 }
 
 func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logger) *BasicBlockExecutor {
@@ -148,6 +149,14 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 
 	ledger, err := completeLedger.NewLedger(wal, 100, collector, logger, completeLedger.DefaultPathFinderVersion)
 	require.NoError(tb, err)
+
+	compactor := fixtures.NewNoopCompactor(ledger)
+	<-compactor.Ready()
+
+	onStopFunc := func() {
+		<-ledger.Done()
+		<-compactor.Done()
+	}
 
 	bootstrapper := bootstrapexec.NewBootstrapper(logger)
 
@@ -182,6 +191,7 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 		activeView:            view,
 		chain:                 chain,
 		serviceAccount:        serviceAccount,
+		onStopFunc:            onStopFunc,
 	}
 }
 
@@ -327,6 +337,9 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 		logger := zerolog.New(logE).Level(zerolog.DebugLevel)
 
 		blockExecutor := NewBasicBlockExecutor(b, chain, logger)
+		defer func() {
+			blockExecutor.onStopFunc()
+		}()
 		serviceAccount := blockExecutor.ServiceAccount(b)
 
 		// Create an account private key.
@@ -513,6 +526,9 @@ const TransferTxTemplate = `
 // BenchmarkRuntimeNFTBatchTransfer runs BenchRunNFTBatchTransfer with BasicBlockExecutor
 func BenchmarkRuntimeNFTBatchTransfer(b *testing.B) {
 	blockExecutor := NewBasicBlockExecutor(b, flow.Testnet.Chain(), zerolog.Nop())
+	defer func() {
+		blockExecutor.onStopFunc()
+	}()
 
 	// Create an account private key.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(3)

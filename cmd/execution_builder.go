@@ -376,15 +376,15 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				}
 			}
 
-			// Ledger is responsible for starting and shutdowning DiskWAL component.
-			// This ensures that all WAL updates are completed before closing opened WAL segment.
+			// DiskWal is a dependent component because we need to ensure
+			// that all WAL updates are completed before closing opened WAL segment.
 			diskWAL, err = wal.NewDiskWAL(node.Logger.With().Str("subcomponent", "wal").Logger(),
 				node.MetricsRegisterer, collector, e.exeConf.triedir, int(e.exeConf.mTrieCacheSize), pathfinder.PathByteSize, wal.SegmentSize)
 			if err != nil {
 				return nil, fmt.Errorf("failed to initialize wal: %w", err)
 			}
 
-			ledgerStorage, err = ledger.NewSyncLedger(diskWAL, int(e.exeConf.mTrieCacheSize), collector, node.Logger.With().Str("subcomponent",
+			ledgerStorage, err = ledger.NewLedger(diskWAL, int(e.exeConf.mTrieCacheSize), collector, node.Logger.With().Str("subcomponent",
 				"ledger").Logger(), ledger.DefaultPathFinderVersion)
 			return ledgerStorage, err
 		}).

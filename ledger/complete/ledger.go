@@ -40,7 +40,6 @@ type Ledger struct {
 	metrics           module.LedgerMetrics
 	logger            zerolog.Logger
 	trieUpdateCh      chan *WALTrieUpdate
-	trieUpdateDoneCh  chan struct{}
 	pathFinderVersion uint8
 }
 
@@ -70,6 +69,7 @@ func NewLedger(
 		metrics:           metrics,
 		logger:            logger,
 		pathFinderVersion: pathFinderVer,
+		trieUpdateCh:      make(chan *WALTrieUpdate, defaultTrieUpdateChanSize),
 	}
 
 	// pause records to prevent double logging trie removals
@@ -89,33 +89,10 @@ func NewLedger(
 	return storage, nil
 }
 
-func NewSyncLedger(
-	wal realWAL.LedgerWAL,
-	capacity int,
-	metrics module.LedgerMetrics,
-	log zerolog.Logger,
-	pathFinderVer uint8) (*Ledger, error) {
-
-	l, err := NewLedger(wal, capacity, metrics, log, pathFinderVer)
-	if err != nil {
-		return nil, err
-	}
-
-	l.trieUpdateCh = make(chan *WALTrieUpdate, defaultTrieUpdateChanSize)
-	l.trieUpdateDoneCh = make(chan struct{})
-	return l, nil
-}
-
 // TrieUpdateChan returns a channel which is used to receive trie updates that needs to be logged in WALs.
 // This channel is closed when ledger component shutdowns down.
 func (l *Ledger) TrieUpdateChan() <-chan *WALTrieUpdate {
 	return l.trieUpdateCh
-}
-
-// TrieUpdateDoneChan returns a channel which is closed when there are no more WAL updates.
-// This is used to signal that it is safe to shutdown WAL component (closing opened WAL segment).
-func (l *Ledger) TrieUpdateDoneChan() chan<- struct{} {
-	return l.trieUpdateDoneCh
 }
 
 // Ready implements interface module.ReadyDoneAware
@@ -135,17 +112,10 @@ func (l *Ledger) Done() <-chan struct{} {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		if l.trieUpdateCh != nil {
-			// Compactor is running in parallel.
-			// Ledger is responsible for closing trieUpdateCh channel,
-			// so Compactor can drain and process remaining updates.
-			close(l.trieUpdateCh)
 
-			// Wait for Compactor to finish all trie updates before closing WAL component.
-			<-l.trieUpdateDoneCh
-		}
-		// Shut down WAL component.
-		<-l.wal.Done()
+		// Ledger is responsible for closing trieUpdateCh channel,
+		// so Compactor can drain and process remaining updates.
+		close(l.trieUpdateCh)
 	}()
 	return done
 }
@@ -274,19 +244,12 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *
 
 func (l *Ledger) set(trieUpdate *ledger.TrieUpdate) (newState ledger.State, err error) {
 
-	resultCh := make(chan error)
+	resultCh := make(chan error, 1)
 
 	trieCh := make(chan *trie.MTrie, 1)
 	defer close(trieCh)
 
-	if l.trieUpdateCh == nil {
-		go func() {
-			_, _, err := l.wal.RecordUpdate(trieUpdate)
-			resultCh <- err
-		}()
-	} else {
-		l.trieUpdateCh <- &WALTrieUpdate{Update: trieUpdate, ResultCh: resultCh, TrieCh: trieCh}
-	}
+	l.trieUpdateCh <- &WALTrieUpdate{Update: trieUpdate, ResultCh: resultCh, TrieCh: trieCh}
 
 	newTrie, err := l.forest.NewTrie(trieUpdate)
 	walError := <-resultCh

@@ -84,6 +84,9 @@ func TestExtractExecutionState(t *testing.T) {
 			require.NoError(t, err)
 			f, err := complete.NewLedger(diskWal, size*10, metr, zerolog.Nop(), complete.DefaultPathFinderVersion)
 			require.NoError(t, err)
+			compactor, err := complete.NewCompactor(f, diskWal, zerolog.Nop(), uint(size), 1_000_000, 1)
+			require.NoError(t, err)
+			<-compactor.Ready()
 
 			var stateCommitment = f.InitialState()
 
@@ -121,6 +124,8 @@ func TestExtractExecutionState(t *testing.T) {
 			}
 
 			<-f.Done()
+			<-compactor.Done()
+
 			err = db.Close()
 			require.NoError(t, err)
 
@@ -150,6 +155,11 @@ func TestExtractExecutionState(t *testing.T) {
 
 					storage, err := complete.NewLedger(diskWal, 1000, metr, zerolog.Nop(), complete.DefaultPathFinderVersion)
 					require.NoError(t, err)
+
+					compactor, err := complete.NewCompactor(storage, diskWal, zerolog.Nop(), uint(size), 1_000_000, 1)
+					require.NoError(t, err)
+
+					<-compactor.Ready()
 
 					data := keysValuesByCommit[string(stateCommitment[:])]
 
@@ -181,6 +191,7 @@ func TestExtractExecutionState(t *testing.T) {
 					}
 
 					<-storage.Done()
+					<-compactor.Done()
 				})
 			}
 		})

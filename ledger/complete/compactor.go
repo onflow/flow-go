@@ -29,22 +29,20 @@ type checkpointResult struct {
 
 type Compactor struct {
 	checkpointer       *realWAL.Checkpointer
-	wal                *realWAL.DiskWAL
-	ledger             *Ledger
+	wal                realWAL.LedgerWAL
 	checkpointQueue    *CheckpointQueue
 	logger             zerolog.Logger
-	stopCh             chan chan struct{}
-	trieUpdateCh       <-chan *WALTrieUpdate
-	trieUpdateDoneCh   chan<- struct{}
 	lm                 *lifecycle.LifecycleManager
 	observers          map[observable.Observer]struct{}
 	checkpointDistance uint
 	checkpointsToKeep  uint
+	stopCh             chan chan struct{}
+	trieUpdateCh       <-chan *WALTrieUpdate
 }
 
 func NewCompactor(
 	l *Ledger,
-	w *realWAL.DiskWAL,
+	w realWAL.LedgerWAL,
 	logger zerolog.Logger,
 	checkpointCapacity uint,
 	checkpointDistance uint,
@@ -64,11 +62,6 @@ func NewCompactor(
 		return nil, errors.New("failed to get valid trie update channel from ledger")
 	}
 
-	trieUpdateDoneCh := l.TrieUpdateDoneChan()
-	if trieUpdateDoneCh == nil {
-		return nil, errors.New("failed to get valid trie update done channel from ledger")
-	}
-
 	tries, err := l.Tries()
 	if err != nil {
 		return nil, err
@@ -79,12 +72,10 @@ func NewCompactor(
 	return &Compactor{
 		checkpointer:       checkpointer,
 		wal:                w,
-		ledger:             l,
 		checkpointQueue:    checkpointQueue,
 		logger:             logger,
 		stopCh:             make(chan chan struct{}),
 		trieUpdateCh:       trieUpdateCh,
-		trieUpdateDoneCh:   l.trieUpdateDoneCh,
 		observers:          make(map[observable.Observer]struct{}),
 		lm:                 lifecycle.NewLifecycleManager(),
 		checkpointDistance: checkpointDistance,
@@ -111,20 +102,20 @@ func (c *Compactor) Ready() <-chan struct{} {
 
 func (c *Compactor) Done() <-chan struct{} {
 	c.lm.OnStop(func() {
-		// Close trieUpdateDoneCh to signal trie updates are finished
-		defer close(c.trieUpdateDoneCh)
-
-		// Notify observers
-		for observer := range c.observers {
-			observer.OnComplete()
-		}
-
 		// Signal Compactor goroutine to stop
 		doneCh := make(chan struct{})
 		c.stopCh <- doneCh
 
 		// Wait for Compactor goroutine to stop
 		<-doneCh
+
+		// Shut down WAL component.
+		<-c.wal.Done()
+
+		// Notify observers
+		for observer := range c.observers {
+			observer.OnComplete()
+		}
 	})
 	return c.lm.Stopped()
 }

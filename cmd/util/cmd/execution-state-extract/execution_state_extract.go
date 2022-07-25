@@ -53,8 +53,17 @@ func extractExecutionState(
 	if err != nil {
 		return fmt.Errorf("cannot create ledger from write-a-head logs and checkpoints: %w", err)
 	}
+
+	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), complete.DefaultCacheSize, 1_000_000, 1)
+	if err != nil {
+		return fmt.Errorf("cannot create compactor: %w", err)
+	}
+
+	<-compactor.Ready()
+
 	defer func() {
 		<-led.Done()
+		<-compactor.Done()
 	}()
 
 	var migrations []ledger.Migration

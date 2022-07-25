@@ -505,6 +505,11 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	ls, err := completeLedger.NewLedger(diskWal, 100, metricsCollector, node.Log.With().Str("compontent", "ledger").Logger(), completeLedger.DefaultPathFinderVersion)
 	require.NoError(t, err)
 
+	compactor, err := completeLedger.NewCompactor(ls, diskWal, zerolog.Nop(), 100, 1_000_000, 1)
+	require.NoError(t, err)
+
+	<-compactor.Ready() // Need to start compactor here because BootstrapLedger() updates ledger state.
+
 	genesisHead, err := node.State.Final().Head()
 	require.NoError(t, err)
 
@@ -666,7 +671,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		Collections:         collectionsStorage,
 		Finalizer:           finalizer,
 		MyExecutionReceipts: myReceipts,
-		DiskWAL:             diskWal,
+		Compactor:           compactor,
 	}
 }
 

@@ -72,7 +72,7 @@ func TestCompactor(t *testing.T) {
 			wal, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, forestCapacity, pathByteSize, 32*1024)
 			require.NoError(t, err)
 
-			l, err = NewSyncLedger(wal, size*10, metricsCollector, zerolog.Logger{}, DefaultPathFinderVersion)
+			l, err = NewLedger(wal, size*10, metricsCollector, zerolog.Logger{}, DefaultPathFinderVersion)
 			require.NoError(t, err)
 
 			// WAL segments are 32kB, so here we generate 2 keys 64kB each, times `size`
@@ -192,7 +192,7 @@ func TestCompactor(t *testing.T) {
 			wal2, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, 32*1024)
 			require.NoError(t, err)
 
-			l2, err = NewSyncLedger(wal2, size*10, metricsCollector, zerolog.Logger{}, DefaultPathFinderVersion)
+			l2, err = NewLedger(wal2, size*10, metricsCollector, zerolog.Logger{}, DefaultPathFinderVersion)
 			require.NoError(t, err)
 
 			<-wal2.Done()
@@ -277,7 +277,7 @@ func TestCompactorAccuracy(t *testing.T) {
 			wal, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, forestCapacity, pathByteSize, 32*1024)
 			require.NoError(t, err)
 
-			l, err := NewSyncLedger(wal, size*10, metricsCollector, zerolog.Logger{}, DefaultPathFinderVersion)
+			l, err := NewLedger(wal, size*10, metricsCollector, zerolog.Logger{}, DefaultPathFinderVersion)
 			require.NoError(t, err)
 
 			checkpointer, err := wal.NewCheckpointer()
@@ -464,7 +464,7 @@ func TestCompactorConcurrency(t *testing.T) {
 			wal, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, forestCapacity, pathByteSize, 32*1024)
 			require.NoError(t, err)
 
-			l, err := NewSyncLedger(wal, size*10, metricsCollector, zerolog.Logger{}, DefaultPathFinderVersion)
+			l, err := NewLedger(wal, size*10, metricsCollector, zerolog.Logger{}, DefaultPathFinderVersion)
 			require.NoError(t, err)
 
 			checkpointer, err := wal.NewCheckpointer()
