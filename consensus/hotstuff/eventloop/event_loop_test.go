@@ -113,8 +113,8 @@ func (s *EventLoopTestSuite) Test_SubmitTC() {
 	// tcIngestionFunction is the archetype for EventLoop.OnTcConstructedFromTimeouts and EventLoop.OnNewTcDiscovered
 	type tcIngestionFunction func(*flow.TimeoutCertificate)
 
-	testTCIngestionFunction := func(f tcIngestionFunction) {
-		tc := &flow.TimeoutCertificate{}
+	testTCIngestionFunction := func(f tcIngestionFunction, tcView uint64) {
+		tc := helper.MakeTC(helper.WithTCView(tcView))
 		processed := atomic.NewBool(false)
 		s.eh.On("OnReceiveTc", tc).Run(func(args mock.Arguments) {
 			processed.Store(true)
@@ -123,12 +123,48 @@ func (s *EventLoopTestSuite) Test_SubmitTC() {
 		require.Eventually(s.T(), processed.Load, time.Millisecond*100, time.Millisecond*10)
 	}
 
+	s.Run("TCs handed to EventLoop.OnTcConstructedFromTimeouts are forwarded to EventHandler", func() {
+		testTCIngestionFunction(s.eventLoop.OnTcConstructedFromTimeouts, 100)
+	})
+
+	s.Run("TCs handed to EventLoop.OnNewTcDiscovered are forwarded to EventHandler", func() {
+		testTCIngestionFunction(s.eventLoop.OnNewTcDiscovered, 101)
+	})
+}
+
+// Test_SubmitTC_IngestNewestQC tests that included QC in TC is eventually sent to `EventHandler.OnReceiveQc` for processing
+func (s *EventLoopTestSuite) Test_SubmitTC_IngestNewestQC() {
+	// tcIngestionFunction is the archetype for EventLoop.OnTcConstructedFromTimeouts and EventLoop.OnNewTcDiscovered
+	type tcIngestionFunction func(*flow.TimeoutCertificate)
+
+	testTCIngestionFunction := func(f tcIngestionFunction, tcView, qcView uint64) {
+		tc := helper.MakeTC(helper.WithTCView(tcView),
+			helper.WithTCNewestQC(helper.MakeQC(helper.WithQCView(qcView))))
+		processed := atomic.NewBool(false)
+		s.eh.On("OnReceiveQc", tc.NewestQC).Run(func(args mock.Arguments) {
+			processed.Store(true)
+		}).Return(nil).Once()
+		f(tc)
+		require.Eventually(s.T(), processed.Load, time.Millisecond*100, time.Millisecond*10)
+	}
+
+	// process initial TC, this will track the newest TC
+	s.eh.On("OnReceiveTc", mock.Anything).Return(nil).Once()
+	s.eventLoop.OnTcConstructedFromTimeouts(helper.MakeTC(
+		helper.WithTCView(100),
+		helper.WithTCNewestQC(
+			helper.MakeQC(
+				helper.WithQCView(80),
+			),
+		),
+	))
+
 	s.Run("QCs handed to EventLoop.OnTcConstructedFromTimeouts are forwarded to EventHandler", func() {
-		testTCIngestionFunction(s.eventLoop.OnTcConstructedFromTimeouts)
+		testTCIngestionFunction(s.eventLoop.OnTcConstructedFromTimeouts, 100, 99)
 	})
 
 	s.Run("QCs handed to EventLoop.OnNewTcDiscovered are forwarded to EventHandler", func() {
-		testTCIngestionFunction(s.eventLoop.OnNewTcDiscovered)
+		testTCIngestionFunction(s.eventLoop.OnNewTcDiscovered, 100, 100)
 	})
 }
 

@@ -25,8 +25,9 @@ type EventLoop struct {
 	eventHandler        hotstuff.EventHandler
 	metrics             module.HotstuffMetrics
 	proposals           chan *model.Proposal
-	timeoutCertificates chan *flow.TimeoutCertificate
-	lastSubmittedQc     *tracker.NewestQCTracker
+	newestSubmittedTc   *tracker.NewestTCTracker
+	newestSubmittedQc   *tracker.NewestQCTracker
+	tcSubmittedNotifier engine.Notifier
 	qcSubmittedNotifier engine.Notifier
 	startTime           time.Time
 }
@@ -37,16 +38,16 @@ var _ component.Component = (*EventLoop)(nil)
 // NewEventLoop creates an instance of EventLoop.
 func NewEventLoop(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandler hotstuff.EventHandler, startTime time.Time) (*EventLoop, error) {
 	proposals := make(chan *model.Proposal)
-	timeoutCertificates := make(chan *flow.TimeoutCertificate, 1)
 
 	el := &EventLoop{
 		log:                 log,
 		eventHandler:        eventHandler,
 		metrics:             metrics,
 		proposals:           proposals,
-		timeoutCertificates: timeoutCertificates,
+		tcSubmittedNotifier: engine.NewNotifier(),
 		qcSubmittedNotifier: engine.NewNotifier(),
-		lastSubmittedQc:     tracker.NewNewestQCTracker(),
+		newestSubmittedTc:   tracker.NewNewestTCTracker(),
+		newestSubmittedQc:   tracker.NewNewestQCTracker(),
 		startTime:           startTime,
 	}
 
@@ -87,6 +88,7 @@ func (el *EventLoop) loop(ctx context.Context) error {
 	// if hotstuff hits any unknown error, it will exit the loop
 
 	shutdownSignaled := ctx.Done()
+	timeoutCertificates := el.tcSubmittedNotifier.Channel()
 	quorumCertificates := el.qcSubmittedNotifier.Channel()
 
 	for {
@@ -184,7 +186,7 @@ func (el *EventLoop) loop(ctx context.Context) error {
 
 			processStart := time.Now()
 
-			err := el.eventHandler.OnReceiveQc(el.lastSubmittedQc.NewestQC())
+			err := el.eventHandler.OnReceiveQc(el.newestSubmittedQc.NewestQC())
 
 			// measure how long it takes for a QC to be processed
 			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeOnQC)
@@ -194,14 +196,14 @@ func (el *EventLoop) loop(ctx context.Context) error {
 			}
 
 			// if we have a new TC, process it
-		case tc := <-el.timeoutCertificates:
+		case <-timeoutCertificates:
 			// measure how long the event loop was idle waiting for an
 			// incoming event
 			el.metrics.HotStuffIdleDuration(time.Since(idleStart))
 
 			processStart := time.Now()
 
-			err := el.eventHandler.OnReceiveTc(tc)
+			err := el.eventHandler.OnReceiveTc(el.newestSubmittedTc.NewestTC())
 
 			// measure how long it takes for a TC to be processed
 			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeOnTC)
@@ -232,7 +234,7 @@ func (el *EventLoop) SubmitProposal(proposalHeader *flow.Header, parentView uint
 
 // onTrustedQC pushes the received QC(which MUST be validated) to the quorumCertificates channel
 func (el *EventLoop) onTrustedQC(qc *flow.QuorumCertificate) {
-	if el.lastSubmittedQc.Track(qc) {
+	if el.newestSubmittedQc.Track(qc) {
 		el.qcSubmittedNotifier.Notify()
 	}
 
@@ -244,17 +246,17 @@ func (el *EventLoop) onTrustedQC(qc *flow.QuorumCertificate) {
 
 // onTrustedTC pushes the received TC(which MUST be validated) to the timeoutCertificates channel
 func (el *EventLoop) onTrustedTC(tc *flow.TimeoutCertificate) {
-	received := time.Now()
+	//received := time.Now()
 
-	select {
-	case el.timeoutCertificates <- tc:
-	case <-el.ComponentManager.ShutdownSignal():
-		return
+	if el.newestSubmittedTc.Track(tc) {
+		el.tcSubmittedNotifier.Notify()
+	} else if el.newestSubmittedQc.Track(tc.NewestQC) {
+		el.qcSubmittedNotifier.Notify()
 	}
 
 	// the wait duration is measured as how long it takes from a tc being
 	// received to event handler commencing the processing of the tc
-	el.metrics.HotStuffWaitDuration(time.Since(received), metrics.HotstuffEventTypeOnTC)
+	//el.metrics.HotStuffWaitDuration(time.Since(received), metrics.HotstuffEventTypeOnTC)
 }
 
 // OnTcConstructedFromTimeouts pushes the received TC to the timeoutCertificates channel
