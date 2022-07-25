@@ -64,9 +64,9 @@ func AuthorizedSenderValidator(log zerolog.Logger, slashingViolationsConsumer sl
 
 // AuthorizedSenderMessageValidator wraps the callback returned by AuthorizedSenderValidator and returns
 // MessageValidator callback that returns pubsub.ValidationReject if validation fails and pubsub.ValidationAccept if validation passes.
-func AuthorizedSenderMessageValidator(log zerolog.Logger, slashingViolationsConsumer slashing.ViolationsConsumer, channel channels.Channel, isUnicast bool, getIdentity func(peer.ID) (*flow.Identity, bool)) PubSubMessageValidator {
+func AuthorizedSenderMessageValidator(log zerolog.Logger, slashingViolationsConsumer slashing.ViolationsConsumer, channel channels.Channel, getIdentity func(peer.ID) (*flow.Identity, bool)) PubSubMessageValidator {
 	return func(ctx context.Context, from peer.ID, msg interface{}) pubsub.ValidationResult {
-		validate := AuthorizedSenderValidator(log, slashingViolationsConsumer, channel, isUnicast, getIdentity)
+		validate := AuthorizedSenderValidator(log, slashingViolationsConsumer, channel, false, getIdentity)
 
 		_, err := validate(ctx, from, msg)
 		if err != nil {
