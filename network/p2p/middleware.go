@@ -488,7 +488,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 	remotePeer := s.Conn().RemotePeer()
 
-	// checking if remotePeer is staked and not ejected to avoid decoding messages from unauthenticated peer
+	// check if remotePeer is staked and not ejected to avoid decoding messages from unauthenticated peer
 	id, err := m.authenticateUnicastStream(remotePeer)
 	if errors.Is(err, validator.ErrIdentityUnverified) {
 		m.slashingViolationsConsumer.OnUnAuthorizedSenderError(id, remotePeer.String(), "", "", true, err)
