@@ -2,6 +2,7 @@ package passthrough
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -22,6 +23,7 @@ const (
 
 // dummyOrchestrator represents a simple orchestrator that passes through all incoming events.
 type dummyOrchestrator struct {
+	sync.Mutex
 	logger        zerolog.Logger
 	attackNetwork insecure.AttackNetwork
 	eventTracker  map[string]flow.IdentifierList

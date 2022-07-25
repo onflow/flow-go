@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -33,7 +34,7 @@ func MessageFixture(t *testing.T, codec network.Codec, protocol Protocol, conten
 		targetNum = uint32(3)
 	}
 
-	channel := network.Channel("test-channel")
+	channel := channels.Channel("test-channel")
 	// encodes event to create payload
 	payload, err := codec.Encode(content)
 	require.NoError(t, err)
@@ -59,7 +60,7 @@ func MessageFixture(t *testing.T, codec network.Codec, protocol Protocol, conten
 		TargetIds:         targetIds,
 	}
 
-	return m, e, unittest.IdentityFixture(unittest.WithNodeID(originId))
+	return m, e, unittest.IdentityFixture(unittest.WithNodeID(originId), unittest.WithAddress("localhost:0"))
 }
 
 // MessageFixtures creates and returns randomly generated gRCP messages and their corresponding protocol-level events.

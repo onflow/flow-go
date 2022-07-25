@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"sort"
-	"sync"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
@@ -15,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type RestrictedDeploymentEnabledFunc func() bool
+type RestrictionIsEnabledFunc func() bool
 type AuthorizedAccountsFunc func() []common.Address
 type UseContractAuditVoucherFunc func(address runtime.Address, code []byte) (bool, error)
 
@@ -27,18 +26,16 @@ type UseContractAuditVoucherFunc func(address runtime.Address, code []byte) (boo
 type ContractHandler struct {
 	accounts                     state.Accounts
 	draftUpdates                 map[programs.ContractUpdateKey]programs.ContractUpdate
-	restrictedDeploymentEnabled  RestrictedDeploymentEnabledFunc
+	restrictedDeploymentEnabled  RestrictionIsEnabledFunc
+	restrictedRemovalEnabled     RestrictionIsEnabledFunc
 	authorizedDeploymentAccounts AuthorizedAccountsFunc
 	authorizedRemovalAccounts    AuthorizedAccountsFunc
 	useContractAuditVoucher      UseContractAuditVoucherFunc
-	// handler doesn't have to be thread safe and right now
-	// is only used in a single thread but a mutex has been added
-	// here to prevent accidental multi-thread use in the future
-	lock sync.Mutex
 }
 
 func NewContractHandler(accounts state.Accounts,
-	restrictedDeploymentEnabled RestrictedDeploymentEnabledFunc,
+	restrictedDeploymentEnabled RestrictionIsEnabledFunc,
+	restrictedRemovalEnabled RestrictionIsEnabledFunc,
 	authorizedDeploymentAccounts AuthorizedAccountsFunc,
 	authorizedRemovalAccounts AuthorizedAccountsFunc,
 	useContractAuditVoucher UseContractAuditVoucherFunc,
@@ -47,6 +44,7 @@ func NewContractHandler(accounts state.Accounts,
 		accounts:                     accounts,
 		draftUpdates:                 make(map[programs.ContractUpdateKey]programs.ContractUpdate),
 		restrictedDeploymentEnabled:  restrictedDeploymentEnabled,
+		restrictedRemovalEnabled:     restrictedRemovalEnabled,
 		authorizedDeploymentAccounts: authorizedDeploymentAccounts,
 		authorizedRemovalAccounts:    authorizedRemovalAccounts,
 		useContractAuditVoucher:      useContractAuditVoucher,
@@ -102,9 +100,6 @@ func (h *ContractHandler) SetContract(
 		}
 	}
 
-	h.lock.Lock()
-	defer h.lock.Unlock()
-
 	contractUpdateKey := programs.ContractUpdateKey{
 		Address: flowAddress,
 		Name:    name,
@@ -130,9 +125,6 @@ func (h *ContractHandler) RemoveContract(
 	}
 
 	add := flow.Address(address)
-	// removes are stored in the draft updates with code value of nil
-	h.lock.Lock()
-	defer h.lock.Unlock()
 	uk := programs.ContractUpdateKey{Address: add, Name: name}
 	u := programs.ContractUpdate{ContractUpdateKey: uk}
 	h.draftUpdates[uk] = u
@@ -156,15 +148,14 @@ func (l contractUpdateList) Less(i, j int) bool {
 }
 
 func (h *ContractHandler) Commit() ([]programs.ContractUpdateKey, error) {
-
-	h.lock.Lock()
-	defer h.lock.Unlock()
-
 	updatedKeys := h.UpdateKeys()
 	updateList := make(contractUpdateList, 0)
 
-	for _, uk := range h.draftUpdates {
+	for k, uk := range h.draftUpdates {
 		updateList = append(updateList, uk)
+
+		// delete as we go to clear h.draftUpdates
+		delete(h.draftUpdates, k)
 	}
 	// sort does not need to be stable as the contract update key is unique
 	sort.Sort(updateList)
@@ -184,15 +175,10 @@ func (h *ContractHandler) Commit() ([]programs.ContractUpdateKey, error) {
 		}
 	}
 
-	// reset draft
-	h.draftUpdates = make(map[programs.ContractUpdateKey]programs.ContractUpdate)
 	return updatedKeys, nil
 }
 
 func (h *ContractHandler) Rollback() error {
-	h.lock.Lock()
-	defer h.lock.Unlock()
-
 	h.draftUpdates = make(map[programs.ContractUpdateKey]programs.ContractUpdate)
 	return nil
 }
@@ -201,37 +187,57 @@ func (h *ContractHandler) HasUpdates() bool {
 	return len(h.draftUpdates) > 0
 }
 
+type contractUpdateKeyList []programs.ContractUpdateKey
+
+func (l contractUpdateKeyList) Len() int      { return len(l) }
+func (l contractUpdateKeyList) Swap(i, j int) { l[i], l[j] = l[j], l[i] }
+func (l contractUpdateKeyList) Less(i, j int) bool {
+	switch bytes.Compare(l[i].Address[:], l[j].Address[:]) {
+	case -1:
+		return true
+	case 0:
+		return l[i].Name < l[j].Name
+	default:
+		return false
+	}
+}
+
 func (h *ContractHandler) UpdateKeys() []programs.ContractUpdateKey {
 	if len(h.draftUpdates) == 0 {
 		return nil
 	}
-	keys := make([]programs.ContractUpdateKey, 0, len(h.draftUpdates))
+	keys := make(contractUpdateKeyList, 0, len(h.draftUpdates))
 	for k := range h.draftUpdates {
 		keys = append(keys, k)
 	}
+
+	sort.Sort(keys)
 	return keys
 }
 
 func (h *ContractHandler) isAuthorizedForDeployment(signingAccounts []runtime.Address) bool {
-	return h.isAuthorized(signingAccounts, h.authorizedDeploymentAccounts)
+	if h.restrictedDeploymentEnabled() {
+		return h.isAuthorized(signingAccounts, h.authorizedDeploymentAccounts)
+	}
+	return true
 }
 
 func (h *ContractHandler) isAuthorizedForRemoval(signingAccounts []runtime.Address) bool {
-	return h.isAuthorized(signingAccounts, h.authorizedRemovalAccounts)
+	if h.restrictedRemovalEnabled() {
+		return h.isAuthorized(signingAccounts, h.authorizedRemovalAccounts)
+	}
+	return true
 }
 
 func (h *ContractHandler) isAuthorized(signingAccounts []runtime.Address, authorizedAccounts AuthorizedAccountsFunc) bool {
-	if h.restrictedDeploymentEnabled() {
-		accts := authorizedAccounts()
-		for _, authorized := range accts {
-			for _, signer := range signingAccounts {
-				if signer == authorized {
-					// a single authorized singer is enough
-					return true
-				}
+	accts := authorizedAccounts()
+	for _, authorized := range accts {
+		for _, signer := range signingAccounts {
+			if signer == authorized {
+				// a single authorized singer is enough
+				return true
 			}
 		}
-		return false
 	}
-	return true
+	return false
 }

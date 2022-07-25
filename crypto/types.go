@@ -55,12 +55,17 @@ const (
 	PubKeyLenBLSBLS12381        = 2 * fieldSize * (2 - serializationG2) // the length is divided by 2 if compression is on
 	KeyGenSeedMinLenBLSBLS12381 = PrKeyLenBLSBLS12381 + (securityBits / 8)
 	KeyGenSeedMaxLenBLSBLS12381 = maxScalarSize
-	// opSwUInputLenBLSBLS12381 is the input length of the optimized SwU map to G1
-	opSwUInputLenBLSBLS12381 = 2 * (fieldSize + (securityBits / 8))
-	// minimum output size as required by the chosen implementation of hash to curve
-	minHashSizeBLSBLS12381 = opSwUInputLenBLSBLS12381
-	// Cipher suite with all the settings
-	blsCipherSuite = "BLS_SIG_BLS12381G1_XOF:KMAC128_SSWU_RO_POP_"
+	// expandMsgOutput is the output length of the expand_message step as required by the hash_to_curve algorithm
+	expandMsgOutput = 2 * (fieldSize + (securityBits / 8))
+	// hash to curve suite ID of the form : CurveID_ || HashID_ || MapID_ || encodingVariant_
+	h2cSuiteID = "BLS12381G1_XOF:KMAC128_SSWU_RO_"
+	// scheme implemented as a countermasure for Rogue attacks of the form : SchemeTag_
+	schemeTag = "POP_"
+	// Cipher suite used for BLS signatures of the form : BLS_SIG_ || h2cSuiteID || SchemeTag_
+	blsSigCipherSuite = "BLS_SIG_" + h2cSuiteID + schemeTag
+	// Cipher suite used for BLS PoP of the form : BLS_POP_ || h2cSuiteID || SchemeTag_
+	// The PoP cipher suite is guaranteed to be different than all signature ciphersuites
+	blsPOPCipherSuite = "BLS_POP_" + h2cSuiteID + schemeTag
 
 	// ECDSA
 

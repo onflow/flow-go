@@ -57,7 +57,7 @@ type momentsRecord struct {
 	Moments int    `json:"moments"`
 }
 
-func (r *AccountReporter) Report(payload []ledger.Payload) error {
+func (r *AccountReporter) Report(payload []ledger.Payload, commit ledger.State) error {
 	rwa := r.RWF.ReportWriter("account_report")
 	rwc := r.RWF.ReportWriter("contract_report")
 	rwm := r.RWF.ReportWriter("moments_report")
@@ -145,6 +145,11 @@ func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
 	sth := state.NewStateHolder(st)
 	accounts := state.NewAccounts(sth)
 
+	env, err := fvm.NewScriptEnvironment(context.Background(), ctx, vm, sth, prog)
+	if err != nil {
+		panic(err)
+	}
+
 	return &balanceProcessor{
 		vm:       vm,
 		ctx:      ctx,
@@ -152,7 +157,7 @@ func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
 		accounts: accounts,
 		st:       st,
 		prog:     prog,
-		intf:     fvm.NewScriptEnvironment(context.Background(), ctx, vm, sth, prog),
+		intf:     env,
 	}
 }
 

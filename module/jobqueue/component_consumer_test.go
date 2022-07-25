@@ -139,8 +139,6 @@ func (suite *ComponentConsumerSuite) TestHappyPath() {
 	}
 
 	suite.Run("runs and notifies using pre-notifier", func() {
-		unittest.SkipUnless(suite.T(), unittest.TEST_FLAKY, "flaky test")
-
 		wg.Add(int(testJobsCount))
 		consumer, workSignal := suite.prepareTest(processor, nil, notifier, jobData)
 

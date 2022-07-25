@@ -6,9 +6,11 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"time"
 
 	"github.com/go-yaml/yaml"
@@ -180,45 +182,14 @@ func displayPortAssignments() {
 }
 
 func prepareCommonHostFolders() {
-	// Remove and recreate working folders
-	err := os.RemoveAll(BootstrapDir)
-	if err != nil && !os.IsNotExist(err) {
-		panic(err)
-	}
+	for _, dir := range []string{BootstrapDir, ProfilerDir, DataDir, TrieDir} {
+		if err := os.RemoveAll(dir); err != nil && !os.IsNotExist(err) {
+			panic(err)
+		}
 
-	err = os.Mkdir(BootstrapDir, 0755)
-	if err != nil {
-		panic(err)
-	}
-
-	err = os.RemoveAll(ProfilerDir)
-	if err != nil && !os.IsNotExist(err) {
-		panic(err)
-	}
-
-	err = os.Mkdir(ProfilerDir, 0755)
-	if err != nil && !os.IsExist(err) {
-		panic(err)
-	}
-
-	err = os.RemoveAll(DataDir)
-	if err != nil && !os.IsNotExist(err) {
-		panic(err)
-	}
-
-	err = os.Mkdir(DataDir, 0755)
-	if err != nil && !os.IsExist(err) {
-		panic(err)
-	}
-
-	err = os.RemoveAll(TrieDir)
-	if err != nil && !os.IsNotExist(err) {
-		panic(err)
-	}
-
-	err = os.Mkdir(TrieDir, 0755)
-	if err != nil && !os.IsExist(err) {
-		panic(err)
+		if err := os.Mkdir(dir, 0755); err != nil {
+			panic(err)
+		}
 	}
 }
 
@@ -269,6 +240,7 @@ type Service struct {
 	Environment []string `yaml:"environment,omitempty"`
 	Volumes     []string
 	Ports       []string `yaml:"ports,omitempty"`
+	Labels      map[string]string
 }
 
 // Build ...
@@ -317,21 +289,33 @@ func prepareFlowServices(services Services, containers []testnet.ContainerConfig
 	return services
 }
 
-func prepareService(container testnet.ContainerConfig, i int, n int) Service {
-
+func prepareServiceDirs(role string, nodeId string) (string, string) {
 	// create a data dir for the node
-	dataDir := "./" + filepath.Join(DataDir, container.Role.String(), container.NodeID.String())
+	dataDir := "./" + filepath.Join(DataDir, role)
+	if nodeId != "" {
+		dataDir = "./" + filepath.Join(DataDir, role, nodeId)
+	}
+
 	err := os.MkdirAll(dataDir, 0755)
 	if err != nil && !os.IsExist(err) {
 		panic(err)
 	}
 
 	// create the profiler dir for the node
-	profilerDir := "./" + filepath.Join(ProfilerDir, container.Role.String(), container.NodeID.String())
+	profilerDir := "./" + filepath.Join(ProfilerDir, role)
+	if nodeId != "" {
+		profilerDir = "./" + filepath.Join(ProfilerDir, role, nodeId)
+	}
 	err = os.MkdirAll(profilerDir, 0755)
 	if err != nil && !os.IsExist(err) {
 		panic(err)
 	}
+
+	return dataDir, profilerDir
+}
+
+func prepareService(container testnet.ContainerConfig, i int, n int) Service {
+	dataDir, profilerDir := prepareServiceDirs(container.Role.String(), container.NodeID.String())
 
 	service := Service{
 		Image: fmt.Sprintf("localnet-%s", container.Role),
@@ -352,14 +336,17 @@ func prepareService(container testnet.ContainerConfig, i int, n int) Service {
 			fmt.Sprintf("%s:/data:z", dataDir),
 		},
 		Environment: []string{
-			"JAEGER_AGENT_HOST=jaeger",
-			"JAEGER_AGENT_PORT=6831",
+			"JAEGER_ENDPOINT=http://tempo:14268/api/traces",
 			// NOTE: these env vars are not set by default, but can be set [1] to enable binstat logging:
 			// [1] https://docs.docker.com/compose/environment-variables/#pass-environment-variables-to-containers
 			"BINSTAT_ENABLE",
 			"BINSTAT_LEN_WHAT",
 			"BINSTAT_DMP_NAME",
 			"BINSTAT_DMP_PATH",
+		},
+		Labels: map[string]string{
+			"com.dapperlabs.role": container.Role.String(),
+			"com.dapperlabs.num":  fmt.Sprintf("%03d", i+1),
 		},
 	}
 
@@ -501,7 +488,7 @@ func prepareAccessService(container testnet.ContainerConfig, i int, n int) Servi
 		fmt.Sprintf("--secure-rpc-addr=%s:%d", container.ContainerName, SecuredRPCPort),
 		fmt.Sprintf("--http-addr=%s:%d", container.ContainerName, HTTPPort),
 		fmt.Sprintf("--collection-ingress-port=%d", RPCPort),
-		"--supports-unstaked-node=true",
+		"--supports-observer=true",
 		fmt.Sprintf("--public-network-address=%s:%d", container.ContainerName, AccessPubNetworkPort),
 		"--log-tx-time-to-finalized",
 		"--log-tx-time-to-executed",
@@ -515,6 +502,72 @@ func prepareAccessService(container testnet.ContainerConfig, i int, n int) Servi
 	}
 
 	return service
+}
+
+func prepareObserverService(i int, observerName string, agPublicKey string) Service {
+	// Observers have a unique naming scheme omitting node id being on the public network
+	dataDir, profilerDir := prepareServiceDirs(observerName, "")
+
+	observerService := Service{
+		Image: fmt.Sprintf("localnet-%s", DefaultObserverName),
+		Command: []string{
+			fmt.Sprintf("--bootstrap-node-addresses=%s:%d", DefaultAccessGatewayName, AccessPubNetworkPort),
+			fmt.Sprintf("--bootstrap-node-public-keys=%s", agPublicKey),
+			fmt.Sprintf("--observer-networking-key-path=/bootstrap/private-root-information/%s_key", observerName),
+			fmt.Sprintf("--bind=0.0.0.0:0"),
+			fmt.Sprintf("--rpc-addr=%s:%d", observerName, RPCPort),
+			fmt.Sprintf("--secure-rpc-addr=%s:%d", observerName, SecuredRPCPort),
+			fmt.Sprintf("--http-addr=%s:%d", observerName, HTTPPort),
+			"--bootstrapdir=/bootstrap",
+			"--datadir=/data/protocol",
+			"--secretsdir=/data/secret",
+			"--loglevel=DEBUG",
+			fmt.Sprintf("--profiler-enabled=%t", profiler),
+			fmt.Sprintf("--tracer-enabled=%t", tracing),
+			"--profiler-dir=/profiler",
+			"--profiler-interval=2m",
+		},
+		Volumes: []string{
+			fmt.Sprintf("%s:/bootstrap:z", BootstrapDir),
+			fmt.Sprintf("%s:/profiler:z", profilerDir),
+			fmt.Sprintf("%s:/data:z", dataDir),
+		},
+		Environment: []string{
+			"JAEGER_ENDPOINT=http://tempo:14268/api/traces",
+			"BINSTAT_ENABLE",
+			"BINSTAT_LEN_WHAT",
+			"BINSTAT_DMP_NAME",
+			"BINSTAT_DMP_PATH",
+		},
+	}
+	observerService.DependsOn = []string{}
+	if i == 0 {
+		observerService.Build = Build{
+			Context:    "../../",
+			Dockerfile: "cmd/Dockerfile",
+			Args: map[string]string{
+				"TARGET":  "./cmd/observer",
+				"VERSION": build.Semver(),
+				"COMMIT":  build.Commit(),
+				"GOARCH":  runtime.GOARCH,
+			},
+			Target: "production",
+		}
+	} else {
+		// remaining services of this role must depend on first service
+		observerService.DependsOn = append(observerService.DependsOn, fmt.Sprintf("%s_1", DefaultObserverName))
+	}
+	// observer services rely on the access gateway
+	observerService.DependsOn = append(observerService.DependsOn, DefaultAccessGatewayName)
+	observerService.Ports = []string{
+		// Flow API ports come in pairs, open and secure. While the guest port is always
+		// the same from the guest's perspective, the host port numbering accounts for the presence
+		// of multiple pairs of listeners on the host to avoid port collisions. Observer listener pairs
+		// are numbered just after the Access listeners on the host network by prior convention
+		fmt.Sprintf("%d:%d", (accessCount*2)+AccessAPIPort+(2*i), RPCPort),
+		fmt.Sprintf("%d:%d", (accessCount*2)+AccessAPIPort+(2*i)+1, SecuredRPCPort),
+	}
+	return observerService
 }
 
 func writeDockerComposeConfig(services Services) error {
@@ -538,48 +591,34 @@ func writeDockerComposeConfig(services Services) error {
 	return nil
 }
 
-// PrometheusServiceDiscovery ...
-type PrometheusServiceDiscovery []PrometheusTargetList
+// PrometheusServiceDiscovery is a list of prometheus targets
+type PrometheusServiceDiscovery []PrometheusTarget
 
-// PrometheusTargetList ...
-type PrometheusTargetList struct {
+// PrometheusTargetList defines addresses and labels for a prometheus target
+type PrometheusTarget struct {
 	Targets []string          `json:"targets"`
 	Labels  map[string]string `json:"labels"`
 }
 
-func newPrometheusTargetList(role flow.Role) PrometheusTargetList {
-	return PrometheusTargetList{
-		Targets: make([]string, 0),
-		Labels: map[string]string{
-			"job":  "flow",
-			"role": role.String(),
-		},
-	}
-}
-
 func prepareServiceDiscovery(containers []testnet.ContainerConfig) PrometheusServiceDiscovery {
-	targets := map[flow.Role]PrometheusTargetList{
-		flow.RoleCollection:   newPrometheusTargetList(flow.RoleCollection),
-		flow.RoleConsensus:    newPrometheusTargetList(flow.RoleConsensus),
-		flow.RoleExecution:    newPrometheusTargetList(flow.RoleExecution),
-		flow.RoleVerification: newPrometheusTargetList(flow.RoleVerification),
-		flow.RoleAccess:       newPrometheusTargetList(flow.RoleAccess),
-	}
+	counters := map[flow.Role]int{}
 
+	sd := PrometheusServiceDiscovery{}
 	for _, container := range containers {
-		containerAddr := fmt.Sprintf("%s:%d", container.ContainerName, MetricsPort)
-		containerTargets := targets[container.Role]
-		containerTargets.Targets = append(containerTargets.Targets, containerAddr)
-		targets[container.Role] = containerTargets
+		counters[container.Role]++
+		pt := PrometheusTarget{
+			Targets: []string{net.JoinHostPort(container.ContainerName, strconv.Itoa(MetricsPort))},
+			Labels: map[string]string{
+				"job":     "flow",
+				"role":    container.Role.String(),
+				"network": "localnet",
+				"num":     fmt.Sprintf("%03d", counters[container.Role]),
+			},
+		}
+		sd = append(sd, pt)
 	}
 
-	return PrometheusServiceDiscovery{
-		targets[flow.RoleCollection],
-		targets[flow.RoleConsensus],
-		targets[flow.RoleExecution],
-		targets[flow.RoleVerification],
-		targets[flow.RoleAccess],
-	}
+	return sd
 }
 
 func writePrometheusConfig(serviceDisc PrometheusServiceDiscovery) error {
@@ -623,33 +662,6 @@ func openAndTruncate(filename string) (*os.File, error) {
 // Observer functions
 //
 
-func prepareObserverProfilerFolder(observerName string) string {
-	// Create a profiler folder (on the host) for the named Observer
-	profilerDir := getObserverProfilerDir(observerName)
-	err := os.MkdirAll(profilerDir, 0755)
-	if err != nil && !os.IsExist(err) {
-		panic(err)
-	}
-	return profilerDir
-}
-
-func prepareObserverDataFolder(observerName string) string {
-	dataDir := getObserverDataDir(observerName)
-	err := os.MkdirAll(dataDir, 0755)
-	if err != nil && !os.IsExist(err) {
-		panic(err)
-	}
-	return dataDir
-}
-
-func getObserverProfilerDir(observerName string) string {
-	return "./" + filepath.Join(ProfilerDir, observerName)
-}
-
-func getObserverDataDir(observerName string) string {
-	return "./" + filepath.Join(DataDir, observerName)
-}
-
 func getAccessGatewayPublicKey(flowNodeContainerConfigs []testnet.ContainerConfig) (string, error) {
 	for _, container := range flowNodeContainerConfigs {
 		if container.ContainerName == DefaultAccessGatewayName {
@@ -664,7 +676,7 @@ func writeObserverPrivateKey(observerName string) {
 	// make the observer private key for named observer
 	// only used for localnet, not for use with production
 	networkSeed := cmd.GenerateRandomSeed(crypto.KeyGenSeedMinLenECDSASecp256k1)
-	networkKey, err := utils.GenerateUnstakedNetworkingKey(networkSeed)
+	networkKey, err := utils.GeneratePublicNetworkingKey(networkSeed)
 	if err != nil {
 		panic(err)
 	}
@@ -680,75 +692,6 @@ func writeObserverPrivateKey(observerName string) {
 	if err != nil {
 		panic(err)
 	}
-}
-
-func prepareObserverService(i int, observerName string, agPublicKey string, profilerDir string, dataDir string) Service {
-	observerService := Service{
-		Image: fmt.Sprintf("localnet-%s", DefaultObserverName),
-		Command: []string{
-			fmt.Sprintf("--staked=false"),
-			fmt.Sprintf("--bootstrap-node-addresses=%s:%d", DefaultAccessGatewayName, AccessPubNetworkPort),
-			fmt.Sprintf("--bootstrap-node-public-keys=%s", agPublicKey),
-			fmt.Sprintf("--observer-networking-key-path=/bootstrap/private-root-information/%s_key", observerName),
-			fmt.Sprintf("--bind=0.0.0.0:0"),
-			fmt.Sprintf("--rpc-addr=%s:%d", observerName, RPCPort),
-			fmt.Sprintf("--secure-rpc-addr=%s:%d", observerName, SecuredRPCPort),
-			fmt.Sprintf("--http-addr=%s:%d", observerName, HTTPPort),
-			fmt.Sprintf("--collection-ingress-port=%d", RPCPort),
-			"--log-tx-time-to-finalized",
-			"--log-tx-time-to-executed",
-			"--log-tx-time-to-finalized-executed",
-			"--bootstrapdir=/bootstrap",
-			"--datadir=/data/protocol",
-			"--secretsdir=/data/secret",
-			"--loglevel=DEBUG",
-			fmt.Sprintf("--profiler-enabled=%t", profiler),
-			fmt.Sprintf("--tracer-enabled=%t", tracing),
-			"--profiler-dir=/profiler",
-			"--profiler-interval=2m",
-		},
-		Volumes: []string{
-			fmt.Sprintf("%s:/bootstrap:z", BootstrapDir),
-			fmt.Sprintf("%s:/profiler:z", profilerDir),
-			fmt.Sprintf("%s:/data:z", dataDir),
-		},
-		Environment: []string{
-			"JAEGER_AGENT_HOST=jaeger",
-			"JAEGER_AGENT_PORT=6831",
-			"BINSTAT_ENABLE",
-			"BINSTAT_LEN_WHAT",
-			"BINSTAT_DMP_NAME",
-			"BINSTAT_DMP_PATH",
-		},
-	}
-	observerService.DependsOn = []string{}
-	if i == 0 {
-		observerService.Build = Build{
-			Context:    "../../",
-			Dockerfile: "cmd/Dockerfile",
-			Args: map[string]string{
-				"TARGET":  "./cmd/access", // hardcoded to access for now until we make it a separate cmd
-				"VERSION": build.Semver(),
-				"COMMIT":  build.Commit(),
-				"GOARCH":  runtime.GOARCH,
-			},
-			Target: "production",
-		}
-	} else {
-		// remaining services of this role must depend on first service
-		observerService.DependsOn = append(observerService.DependsOn, fmt.Sprintf("%s_1", DefaultObserverName))
-	}
-	// observer services rely on the access gateway
-	observerService.DependsOn = append(observerService.DependsOn, DefaultAccessGatewayName)
-	observerService.Ports = []string{
-		// Flow API ports come in pairs, open and secure. While the guest port is always
-		// the same from the guest's perspective, the host port numbering accounts for the presence
-		// of multiple pairs of listeners on the host to avoid port collisions. Observer listener pairs
-		// are numbered just after the Access listeners on the host network by prior convention
-		fmt.Sprintf("%d:%d", (accessCount*2)+AccessAPIPort+(2*i), RPCPort),
-		fmt.Sprintf("%d:%d", (accessCount*2)+AccessAPIPort+(2*i)+1, SecuredRPCPort),
-	}
-	return observerService
 }
 
 func prepareObserverServices(dockerServices Services, flowNodeContainerConfigs []testnet.ContainerConfig) Services {
@@ -772,9 +715,7 @@ func prepareObserverServices(dockerServices Services, flowNodeContainerConfigs [
 
 	for i := 0; i < observerCount; i++ {
 		observerName := fmt.Sprintf("%s_%d", DefaultObserverName, i+1)
-		profilerDir := prepareObserverProfilerFolder(observerName)
-		dataDir := prepareObserverDataFolder(observerName)
-		observerService := prepareObserverService(i, observerName, agPublicKey, profilerDir, dataDir)
+		observerService := prepareObserverService(i, observerName, agPublicKey)
 
 		// Add a docker container for this named Observer
 		dockerServices[observerName] = observerService

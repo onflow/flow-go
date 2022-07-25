@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
@@ -74,6 +75,7 @@ type Engine struct {
 	collections       storage.Collections
 	transactions      storage.Transactions
 	executionReceipts storage.ExecutionReceipts
+	maxReceiptHeight  uint64
 	executionResults  storage.ExecutionResults
 
 	// metrics
@@ -153,6 +155,7 @@ func New(
 		transactions:               transactions,
 		executionResults:           executionResults,
 		executionReceipts:          executionReceipts,
+		maxReceiptHeight:           0,
 		transactionMetrics:         transactionMetrics,
 		collectionsToMarkFinalized: collectionsToMarkFinalized,
 		collectionsToMarkExecuted:  collectionsToMarkExecuted,
@@ -178,7 +181,7 @@ func New(
 		Build()
 
 	// register engine with the execution receipt provider
-	_, err = net.Register(engine.ReceiveReceipts, e)
+	_, err = net.Register(channels.ReceiveReceipts, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register for results: %w", err)
 	}
@@ -323,7 +326,7 @@ func (e *Engine) SubmitLocal(event interface{}) {
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
+func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
 	err := e.process(originID, event)
 	if err != nil {
 		engine.LogError(e.log, err)
@@ -337,7 +340,7 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	return e.process(originID, event)
 }
 
@@ -413,7 +416,7 @@ func (e *Engine) trackFinalizedMetricForBlock(hb *model.Block) {
 
 	if ti, found := e.blocksToMarkExecuted.ByID(hb.BlockID); found {
 		e.trackExecutedMetricForBlock(block, ti)
-		e.blocksToMarkExecuted.Rem(hb.BlockID)
+		e.blocksToMarkExecuted.Remove(hb.BlockID)
 	}
 }
 
@@ -422,6 +425,16 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, r *flow.Execut
 	err := e.executionReceipts.Store(r)
 	if err != nil {
 		return fmt.Errorf("failed to store execution receipt: %w", err)
+	}
+
+	block, err := e.blocks.ByID(r.ExecutionResult.BlockID)
+	if err != nil {
+		return fmt.Errorf("failed to lookup block while handling receipt: %w", err)
+	}
+
+	if block.Header.Height > e.maxReceiptHeight {
+		e.transactionMetrics.UpdateExecutionReceiptMaxHeight(block.Header.Height)
+		e.maxReceiptHeight = block.Header.Height
 	}
 
 	e.trackExecutedMetricForReceipt(r)
@@ -479,14 +492,14 @@ func (e *Engine) handleCollection(originID flow.Identifier, entity flow.Entity) 
 		for _, t := range light.Transactions {
 			e.transactionMetrics.TransactionFinalized(t, ti)
 		}
-		e.collectionsToMarkFinalized.Rem(light.ID())
+		e.collectionsToMarkFinalized.Remove(light.ID())
 	}
 
 	if ti, found := e.collectionsToMarkExecuted.ByID(light.ID()); found {
 		for _, t := range light.Transactions {
 			e.transactionMetrics.TransactionExecuted(t, ti)
 		}
-		e.collectionsToMarkExecuted.Rem(light.ID())
+		e.collectionsToMarkExecuted.Remove(light.ID())
 	}
 
 	// FIX: we can't index guarantees here, as we might have more than one block

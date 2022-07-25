@@ -22,6 +22,7 @@ import (
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
 	netint "github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protint "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -185,7 +186,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	// set up network module mock
 	cs.net = &mocknetwork.Network{}
 	cs.net.On("Register", mock.Anything, mock.Anything).Return(
-		func(channel netint.Channel, engine netint.MessageProcessor) netint.Conduit {
+		func(channel channels.Channel, engine netint.MessageProcessor) netint.Conduit {
 			return cs.con
 		},
 		nil,
@@ -233,7 +234,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 
 	// set up synchronization module mock
 	cs.sync = &module.BlockRequester{}
-	cs.sync.On("RequestBlock", mock.Anything).Return(nil)
+	cs.sync.On("RequestBlock", mock.Anything, mock.Anything).Return(nil)
 	cs.sync.On("Done", mock.Anything).Return(closed)
 
 	// set up no-op metrics mock
@@ -449,7 +450,7 @@ func (cs *ComplianceCoreSuite) TestProposalBufferingOrder() {
 	for _, proposal := range proposals {
 
 		// check that we request the ancestor block each time
-		cs.sync.On("RequestBlock", mock.Anything).Once().Run(
+		cs.sync.On("RequestBlock", mock.Anything, mock.Anything).Once().Run(
 			func(args mock.Arguments) {
 				ancestorID := args.Get(0).(flow.Identifier)
 				assert.Equal(cs.T(), missing.Header.ID(), ancestorID, "should always request root block")

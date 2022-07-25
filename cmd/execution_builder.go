@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
 	"path/filepath"
 	goruntime "runtime"
 	"time"
@@ -24,14 +23,15 @@ import (
 
 	"github.com/onflow/flow-go/admin/commands"
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
+	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	uploaderCommands "github.com/onflow/flow-go/admin/commands/uploader"
 	"github.com/onflow/flow-go/consensus"
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
-	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
+	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
-	"github.com/onflow/flow-go/engine"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/provider"
 	"github.com/onflow/flow-go/engine/common/requester"
@@ -47,7 +47,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/extralog"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
@@ -64,6 +63,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	chainsync "github.com/onflow/flow-go/module/synchronization"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/state/protocol"
@@ -100,6 +100,8 @@ type ExecutionConfig struct {
 	gcpBucketName               string
 	s3BucketName                string
 	edsDatastoreTTL             time.Duration
+	apiRatelimits               map[string]int
+	apiBurstlimits              map[string]int
 }
 
 type ExecutionNodeBuilder struct {
@@ -158,6 +160,8 @@ func (e *ExecutionNodeBuilder) LoadFlags() {
 			flags.StringVar(&e.exeConf.s3BucketName, "s3-bucket-name", "", "S3 Bucket name for block data uploader")
 			flags.DurationVar(&e.exeConf.edsDatastoreTTL, "execution-data-service-datastore-ttl", 0,
 				"TTL for new blobs added to the execution data service blobstore")
+			flags.StringToIntVar(&e.exeConf.apiRatelimits, "api-rate-limits", map[string]int{}, "per second rate limits for GRPC API methods e.g. Ping=300,ExecuteScriptAtBlockID=500 etc. note limits apply globally to all clients.")
+			flags.StringToIntVar(&e.exeConf.apiBurstlimits, "api-burst-limits", map[string]int{}, "burst limits for gRPC API methods e.g. Ping=100,ExecuteScriptAtBlockID=100 etc. note limits apply globally to all clients.")
 		}).
 		ValidateFlags(func() error {
 			if e.exeConf.enableBlockDataUpload {
@@ -175,6 +179,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		executionDataServiceCollector module.ExecutionDataServiceMetrics
 		executionState                state.ExecutionState
 		followerState                 protocol.MutableState
+		committee                     hotstuff.Committee
 		ledgerStorage                 *ledger.Ledger
 		events                        *storage.Events
 		serviceEvents                 *storage.ServiceEvents
@@ -209,6 +214,9 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		}).
 		AdminCommand("set-uploader-enabled", func(config *NodeConfig) commands.AdminCommand {
 			return uploaderCommands.NewToggleUploaderCommand()
+		}).
+		AdminCommand("get-transactions", func(conf *NodeConfig) commands.AdminCommand {
+			return storageCommands.NewGetTransactionsCommand(conf.State, conf.Storage.Payloads, conf.Storage.Collections)
 		}).
 		Module("mutable follower state", func(node *NodeConfig) error {
 			// For now, we only support state implementations from package badger.
@@ -246,7 +254,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		}).
 		Module("sync core", func(node *NodeConfig) error {
 			var err error
-			syncCore, err = chainsync.New(node.Logger, node.SyncCoreConfig)
+			syncCore, err = chainsync.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector())
 			return err
 		}).
 		Module("execution receipts storage", func(node *NodeConfig) error {
@@ -416,7 +424,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			executionDataCIDCache = state_synchronization.NewExecutionDataCIDCache(executionDataCIDCacheSize)
 
 			bs, err := node.Network.RegisterBlobService(
-				engine.ExecutionDataService,
+				channels.ExecutionDataService,
 				ds,
 				p2p.WithBitswapOptions(
 					bitswap.WithTaskComparator(
@@ -451,7 +459,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			}
 
 			eds := state_synchronization.NewExecutionDataService(
-				&cbor.Codec{},
+				cbor.NewCodec(),
 				compressor.NewLz4Compressor(),
 				bs,
 				executionDataServiceCollector,
@@ -463,15 +471,10 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			return eds, nil
 		}).
 		Component("provider engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-			extraLogPath := path.Join(e.exeConf.triedir, "extralogs")
-			err := os.MkdirAll(extraLogPath, 0777)
-			if err != nil {
-				return nil, fmt.Errorf("cannot create %s path for extra logs: %w", extraLogPath, err)
+			options := []runtime.Option{}
+			if e.exeConf.cadenceTracing {
+				options = append(options, runtime.WithTracingEnabled(true))
 			}
-
-			extralog.ExtraLogDumpPath = extraLogPath
-
-			options := []runtime.Option{runtime.WithTracingEnabled(e.exeConf.cadenceTracing)}
 			rt := fvm.NewInterpreterRuntime(options...)
 
 			vm := fvm.NewVirtualMachine(rt)
@@ -605,7 +608,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Component("ingestion engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			var err error
 			collectionRequester, err = requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
-				engine.RequestCollections,
+				channels.RequestCollections,
 				filter.Any,
 				func() flow.Entity { return &flow.Collection{} },
 				// we are manually triggering batches in execution, but lets still send off a batch once a minute, as a safety net for the sake of retries
@@ -673,12 +676,13 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			// initialize consensus committee's membership state
 			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
 			// Note: node.Me.NodeID() is not part of the consensus committee
-			committee, err := committees.NewConsensusCommittee(node.State, node.Me.NodeID())
+			var err error
+			committee, err = committees.NewConsensusCommittee(node.State, node.Me.NodeID())
 			if err != nil {
 				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
 			}
 
-			packer := hotsignature.NewConsensusSigDataPacker(committee)
+			packer := signature.NewConsensusSigDataPacker(committee)
 			// initialize the verifier for the protocol consensus
 			verifier := verification.NewCombinedVerifier(committee, packer)
 
@@ -711,7 +715,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				followerCore,
 				syncCore,
 				node.Tracer,
-				compliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),
+				followereng.WithComplianceOptions(compliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
@@ -733,7 +737,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				node.Network,
 				node.Me,
 				node.State,
-				engine.ProvideReceiptsByBlockID,
+				channels.ProvideReceiptsByBlockID,
 				filter.HasRole(flow.RoleConsensus),
 				retrieve,
 			)
@@ -769,8 +773,21 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			return syncEngine, nil
 		}).
 		Component("grpc server", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-			rpcEng := rpc.New(node.Logger, e.exeConf.rpcConf, ingestionEng, node.Storage.Blocks, node.Storage.Headers, node.State, events, results, txResults, node.RootChainID)
-			return rpcEng, nil
+			return rpc.New(
+				node.Logger,
+				e.exeConf.rpcConf,
+				ingestionEng,
+				node.Storage.Blocks,
+				node.Storage.Headers,
+				node.State,
+				events,
+				results,
+				txResults,
+				node.RootChainID,
+				signature.NewBlockSignerDecoder(committee),
+				e.exeConf.apiRatelimits,
+				e.exeConf.apiBurstlimits,
+			), nil
 		})
 }
 

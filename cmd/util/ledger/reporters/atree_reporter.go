@@ -28,7 +28,7 @@ func (r *AtreeReporter) Name() string {
 	return "Atree Reporter"
 }
 
-func (r *AtreeReporter) Report(payloads []ledger.Payload) error {
+func (r *AtreeReporter) Report(payloads []ledger.Payload, commit ledger.State) error {
 	rwa := r.RWF.ReportWriter("atree_report")
 	defer rwa.Close()
 
@@ -104,17 +104,16 @@ const (
 )
 
 func getPayloadType(p *ledger.Payload) payloadType {
-	if len(p.Key.KeyParts) < 3 {
+	if len(p.Key.KeyParts) < 2 {
 		return unknownPayloadType
 	}
 	if fvmState.IsFVMStateKey(
 		string(p.Key.KeyParts[0].Value),
 		string(p.Key.KeyParts[1].Value),
-		string(p.Key.KeyParts[2].Value),
 	) {
 		return fvmPayloadType
 	}
-	if bytes.HasPrefix(p.Key.KeyParts[2].Value, []byte(atree.LedgerBaseStorageSlabPrefix)) {
+	if bytes.HasPrefix(p.Key.KeyParts[1].Value, []byte(atree.LedgerBaseStorageSlabPrefix)) {
 		return slabPayloadType
 	}
 	return storagePayloadType

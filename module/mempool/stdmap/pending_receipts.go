@@ -63,7 +63,7 @@ func removeReceipt(
 	byPreviousResultID map[flow.Identifier]receiptsSet) {
 
 	receiptID := receipt.ID()
-	entities.Rem(receiptID)
+	entities.Remove(receiptID)
 
 	index := indexByPreviousResultID(receipt)
 	siblings := byPreviousResultID[index]
@@ -122,8 +122,8 @@ func (r *PendingReceipts) Add(receipt *flow.ExecutionReceipt) bool {
 	return added
 }
 
-// Rem will remove a receipt by ID.
-func (r *PendingReceipts) Rem(receiptID flow.Identifier) bool {
+// Remove will remove a receipt by ID.
+func (r *PendingReceipts) Remove(receiptID flow.Identifier) bool {
 	removed := false
 	err := r.Backend.Run(func(backData mempool.BackData) error {
 		entity, ok := backData.ByID(receiptID)

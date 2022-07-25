@@ -29,6 +29,7 @@ type ExecutionDataReaderSuite struct {
 	eds          *syncmock.ExecutionDataService
 	headers      *storagemock.Headers
 	results      *storagemock.ExecutionResults
+	seals        *storagemock.Seals
 	fetchTimeout time.Duration
 
 	executionDataID flow.Identifier
@@ -50,7 +51,10 @@ func (suite *ExecutionDataReaderSuite) SetupTest() {
 	suite.executionDataID = unittest.IdentifierFixture()
 
 	parent := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(1))
-	suite.block = unittest.BlockWithParentFixture(&parent)
+	suite.block = unittest.BlockWithParentFixture(parent)
+	suite.blocksByHeight = map[uint64]*flow.Block{
+		suite.block.Header.Height: suite.block,
+	}
 
 	suite.executionData = synctest.ExecutionDataFixture(suite.block.ID())
 
@@ -65,19 +69,29 @@ func (suite *ExecutionDataReaderSuite) reset() {
 		unittest.WithExecutionDataID(suite.executionDataID),
 	)
 
-	suite.blocksByHeight = map[uint64]*flow.Block{
-		suite.block.Header.Height: suite.block,
-	}
+	seal := unittest.Seal.Fixture(
+		unittest.Seal.WithBlockID(suite.block.ID()),
+		unittest.Seal.WithResult(result),
+	)
+
 	suite.headers = synctest.MockBlockHeaderStorage(synctest.WithByHeight(suite.blocksByHeight))
-	suite.results = synctest.MockResultsStorage(synctest.WithByBlockID(map[flow.Identifier]*flow.ExecutionResult{
-		suite.block.ID(): result,
-	}))
+	suite.results = synctest.MockResultsStorage(
+		synctest.WithResultByID(map[flow.Identifier]*flow.ExecutionResult{
+			result.ID(): result,
+		}),
+	)
+	suite.seals = synctest.MockSealsStorage(
+		synctest.WithSealsByBlockID(map[flow.Identifier]*flow.Seal{
+			suite.block.ID(): seal,
+		}),
+	)
 
 	suite.eds = new(syncmock.ExecutionDataService)
 	suite.reader = NewExecutionDataReader(
 		suite.eds,
 		suite.headers,
 		suite.results,
+		suite.seals,
 		suite.fetchTimeout,
 		func() uint64 {
 			return suite.highestAvailableHeight()
@@ -133,12 +147,12 @@ func (suite *ExecutionDataReaderSuite) TestAtIndex() {
 		suite.reset()
 		suite.runTest(func() {
 			// return an error while getting the execution data
-			expecteErr := errors.New("expected error: get failed")
-			setExecutionDataGet(nil, expecteErr)
+			expectedErr := errors.New("expected error: get failed")
+			setExecutionDataGet(nil, expectedErr)
 
 			job, err := suite.reader.AtIndex(suite.block.Header.Height)
 			assert.Nil(suite.T(), job, "job should be nil")
-			assert.ErrorIs(suite.T(), err, expecteErr)
+			assert.ErrorIs(suite.T(), err, expectedErr)
 		})
 	})
 

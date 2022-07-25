@@ -32,7 +32,7 @@ func TestTimesPool(t *testing.T) {
 	})
 
 	t.Run("should be able to remove", func(t *testing.T) {
-		ok := pool.Rem(id)
+		ok := pool.Remove(id)
 		assert.True(t, ok)
 	})
 }

@@ -6,10 +6,10 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto/random"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/seed"
 )
@@ -71,8 +71,8 @@ func NewRandomizedTopology(nodeID flow.Identifier, logger zerolog.Logger, edgePr
 // Independent invocations of GenerateFanout on different nodes collaboratively must construct a cohesive
 // connected graph of nodes that enables them talking to each other. This should be done with a very high probability
 // in randomized topology.
-func (r RandomizedTopology) GenerateFanout(ids flow.IdentityList, channels network.ChannelList) (flow.IdentityList, error) {
-	myUniqueChannels := engine.UniqueChannels(channels)
+func (r RandomizedTopology) GenerateFanout(ids flow.IdentityList, channelList channels.ChannelList) (flow.IdentityList, error) {
+	myUniqueChannels := channels.UniqueChannels(channelList)
 	if len(myUniqueChannels) == 0 {
 		// no subscribed channel, hence skip topology creation
 		// we do not return an error at this state as invocation of MakeTopology may happen before
@@ -104,12 +104,12 @@ func (r RandomizedTopology) GenerateFanout(ids flow.IdentityList, channels netwo
 // subsetChannel returns a random subset of the identity list that is passed.
 // Returned identities should all subscribed to the specified `channel`.
 // Note: this method should not include identity of its executor.
-func (r RandomizedTopology) subsetChannel(ids flow.IdentityList, channel network.Channel) (flow.IdentityList, error) {
+func (r RandomizedTopology) subsetChannel(ids flow.IdentityList, channel channels.Channel) (flow.IdentityList, error) {
 	// excludes node itself
 	sampleSpace := ids.Filter(filter.Not(filter.HasNodeID(r.myNodeID)))
 
 	// samples a random graph based on whether channel is cluster-based or not.
-	if engine.IsClusterChannel(channel) {
+	if channels.IsClusterChannel(channel) {
 		return r.clusterChannelHandler(sampleSpace)
 	}
 	return r.nonClusterChannelHandler(sampleSpace, channel)
@@ -159,13 +159,13 @@ func (r RandomizedTopology) clusterChannelHandler(ids flow.IdentityList) (flow.I
 }
 
 // clusterChannelHandler returns a connected graph fanout of peers from `ids` that subscribed to `channel`.
-func (r RandomizedTopology) nonClusterChannelHandler(ids flow.IdentityList, channel network.Channel) (flow.IdentityList, error) {
-	if engine.IsClusterChannel(channel) {
+func (r RandomizedTopology) nonClusterChannelHandler(ids flow.IdentityList, channel channels.Channel) (flow.IdentityList, error) {
+	if channels.IsClusterChannel(channel) {
 		return nil, fmt.Errorf("could not handle cluster channel: %s", channel)
 	}
 
 	// extracts flow roles subscribed to topic.
-	roles, ok := engine.RolesByChannel(channel)
+	roles, ok := channels.RolesByChannel(channel)
 	if !ok {
 		return nil, fmt.Errorf("unknown topic with no subscribed roles: %s", channel)
 	}

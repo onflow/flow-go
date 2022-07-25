@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -65,7 +66,6 @@ func New(
 			Expiry:                 flow.DefaultTransactionExpiry,
 			ExpiryBuffer:           config.ExpiryBuffer,
 			MaxGasLimit:            config.MaxGasLimit,
-			MaxAddressIndex:        config.MaxAddressIndex,
 			CheckScriptsParse:      config.CheckScriptsParse,
 			MaxTransactionByteSize: config.MaxTransactionByteSize,
 			MaxCollectionByteSize:  config.MaxCollectionByteSize,
@@ -117,7 +117,7 @@ func New(
 		AddWorker(e.processQueuedTransactions).
 		Build()
 
-	conduit, err := net.Register(engine.PushTransactions, e)
+	conduit, err := net.Register(channels.PushTransactions, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
@@ -129,7 +129,7 @@ func New(
 // Process processes a transaction message from the network and enqueues the
 // message. Validation and ingestion is performed in the processQueuedTransactions
 // worker.
-func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	select {
 	case <-e.ComponentManager.ShutdownSignal():
 		e.log.Warn().Msgf("received message from %x after shut down", originID)

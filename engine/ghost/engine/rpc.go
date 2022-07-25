@@ -12,7 +12,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
-	jsoncodec "github.com/onflow/flow-go/network/codec/json"
+	"github.com/onflow/flow-go/network/channels"
+	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
@@ -47,7 +48,7 @@ func New(net network.Network, log zerolog.Logger, me module.Local, state protoco
 	// create a channel to buffer messages in case the consumer is slow
 	messages := make(chan ghost.FlowMessage, 1000)
 
-	codec := jsoncodec.NewCodec()
+	codec := cborcodec.NewCodec()
 
 	if config.MaxMsgSize == 0 {
 		config.MaxMsgSize = grpcutils.DefaultMaxMsgSize
@@ -80,20 +81,20 @@ func New(net network.Network, log zerolog.Logger, me module.Local, state protoco
 }
 
 // registerConduits registers for ALL channels and returns a map of engine id to conduit
-func registerConduits(net network.Network, state protocol.State, eng network.Engine) (map[network.Channel]network.Conduit, error) {
+func registerConduits(net network.Network, state protocol.State, eng network.Engine) (map[channels.Channel]network.Conduit, error) {
 
 	// create a list of all channels that don't change over time
-	channels := network.ChannelList{
-		engine.ConsensusCommittee,
-		engine.SyncCommittee,
-		engine.SyncExecution,
-		engine.PushTransactions,
-		engine.PushGuarantees,
-		engine.PushBlocks,
-		engine.PushReceipts,
-		engine.PushApprovals,
-		engine.RequestCollections,
-		engine.RequestChunks,
+	channelList := channels.ChannelList{
+		channels.ConsensusCommittee,
+		channels.SyncCommittee,
+		channels.SyncExecution,
+		channels.PushTransactions,
+		channels.PushGuarantees,
+		channels.PushBlocks,
+		channels.PushReceipts,
+		channels.PushApprovals,
+		channels.RequestCollections,
+		channels.RequestChunks,
 	}
 
 	// add channels that are dependent on protocol state and change over time
@@ -113,17 +114,17 @@ func registerConduits(net network.Network, state protocol.State, eng network.Eng
 		clusterID := cluster.RootBlock().Header.ChainID
 
 		// add the dynamic channels for the cluster
-		channels = append(
-			channels,
-			engine.ChannelConsensusCluster(clusterID),
-			engine.ChannelSyncCluster(clusterID),
+		channelList = append(
+			channelList,
+			channels.ConsensusCluster(clusterID),
+			channels.SyncCluster(clusterID),
 		)
 	}
 
-	conduitMap := make(map[network.Channel]network.Conduit, len(channels))
+	conduitMap := make(map[channels.Channel]network.Conduit, len(channelList))
 
 	// Register for ALL channels here and return a map of conduits
-	for _, e := range channels {
+	for _, e := range channelList {
 		c, err := net.Register(e, eng)
 		if err != nil {
 			return nil, fmt.Errorf("could not register collection provider engine: %w", err)
@@ -162,7 +163,7 @@ func (e *RPC) SubmitLocal(event interface{}) {
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *RPC) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
+func (e *RPC) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.process(originID, event)
 		if err != nil {
@@ -180,7 +181,7 @@ func (e *RPC) ProcessLocal(event interface{}) error {
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *RPC) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+func (e *RPC) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		return e.process(originID, event)
 	})

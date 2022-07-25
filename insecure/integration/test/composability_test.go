@@ -16,7 +16,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	flownet "github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -48,9 +48,14 @@ func TestCorruptibleConduitFrameworkHappyPath(t *testing.T) {
 				// implementing the corruption functionality of the orchestrator.
 				event.FlowProtocolEvent = corruptedEvent
 			}, func(t *testing.T) {
+
+				require.Eventually(t, func() bool {
+					return ccf.AttackerRegistered() // attacker's registration must be done on CCF prior to sending any messages.
+				}, 2*time.Second, 100*time.Millisecond, "registration of attacker on CCF could not be done one time")
+
 				hub := stub.NewNetworkHub()
 				originalEvent := &message.TestMessage{Text: "this is a test message"}
-				testChannel := flownet.Channel("test-channel")
+				testChannel := channels.Channel("test-channel")
 
 				// corrupted node network
 				corruptedEngine := &network.Engine{}
@@ -69,7 +74,7 @@ func TestCorruptibleConduitFrameworkHappyPath(t *testing.T) {
 
 				wg := &sync.WaitGroup{}
 				wg.Add(1)
-				honestEngine.OnProcess(func(channel flownet.Channel, originId flow.Identifier, event interface{}) error {
+				honestEngine.OnProcess(func(channel channels.Channel, originId flow.Identifier, event interface{}) error {
 					// implementing the process logic of the honest engine on reception of message from underlying network.
 					require.Equal(t, testChannel, channel)               // event must arrive at the channel set by orchestrator.
 					require.Equal(t, corruptedIdentity.NodeID, originId) // origin id of the message must be the corrupted node.
@@ -140,16 +145,14 @@ func withAttackOrchestrator(t *testing.T, corruptedIds flow.IdentityList, corrup
 	run func(t *testing.T)) {
 	codec := cbor.NewCodec()
 	o := &mockOrchestrator{eventCorrupter: corrupter}
-	connector := attacknetwork.NewCorruptedConnector(corruptedIds, corruptedPortMap)
+	connector := attacknetwork.NewCorruptedConnector(unittest.Logger(), corruptedIds, corruptedPortMap)
 
 	attackNetwork, err := attacknetwork.NewAttackNetwork(
 		unittest.Logger(),
-		"localhost:0",
 		codec,
 		o,
 		connector,
-		corruptedIds,
-		attacknetwork.WithLocalHostRuntime)
+		corruptedIds)
 	require.NoError(t, err)
 
 	// life-cycle management of attackNetwork.

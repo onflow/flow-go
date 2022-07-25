@@ -24,7 +24,7 @@ func TestReExecuteBlock(t *testing.T) {
 		// bootstrap to init highest executed height
 		bootstrapper := bootstrap.NewBootstrapper(unittest.Logger())
 		genesis := unittest.BlockHeaderFixture()
-		err := bootstrapper.BootstrapExecutionDatabase(db, unittest.StateCommitmentFixture(), &genesis)
+		err := bootstrapper.BootstrapExecutionDatabase(db, unittest.StateCommitmentFixture(), genesis)
 		require.NoError(t, err)
 
 		// create all modules
@@ -42,7 +42,7 @@ func TestReExecuteBlock(t *testing.T) {
 		transactions := bstorage.NewTransactions(metrics, db)
 		collections := bstorage.NewCollections(db, transactions)
 
-		err = headers.Store(&genesis)
+		err = headers.Store(genesis)
 		require.NoError(t, err)
 
 		// create execution state module
@@ -64,7 +64,7 @@ func TestReExecuteBlock(t *testing.T) {
 		require.NotNil(t, es)
 
 		// prepare data
-		header := unittest.BlockHeaderWithParentFixture(&genesis) // make sure the height is higher than genesis
+		header := unittest.BlockHeaderWithParentFixture(genesis) // make sure the height is higher than genesis
 		executionReceipt := unittest.ExecutionReceiptFixture()
 		executionReceipt.ExecutionResult.BlockID = header.ID()
 		cdp := make([]*flow.ChunkDataPack, 0, len(executionReceipt.ExecutionResult.Chunks))
@@ -78,13 +78,13 @@ func TestReExecuteBlock(t *testing.T) {
 		se := unittest.BlockEventsFixture(header, 8)
 		tes := unittest.TransactionResultsFixture(4)
 
-		err = headers.Store(&header)
+		err = headers.Store(header)
 		require.NoError(t, err)
 
 		// save execution results
 		err = es.SaveExecutionResults(
 			context.Background(),
-			&header,
+			header,
 			endState,
 			cdp,
 			executionReceipt,
@@ -119,7 +119,7 @@ func TestReExecuteBlock(t *testing.T) {
 		// re execute result
 		err = es.SaveExecutionResults(
 			context.Background(),
-			&header,
+			header,
 			endState,
 			cdp,
 			executionReceipt,
@@ -140,7 +140,7 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		// bootstrap to init highest executed height
 		bootstrapper := bootstrap.NewBootstrapper(unittest.Logger())
 		genesis := unittest.BlockHeaderFixture()
-		err := bootstrapper.BootstrapExecutionDatabase(db, unittest.StateCommitmentFixture(), &genesis)
+		err := bootstrapper.BootstrapExecutionDatabase(db, unittest.StateCommitmentFixture(), genesis)
 		require.NoError(t, err)
 
 		// create all modules
@@ -158,7 +158,7 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		transactions := bstorage.NewTransactions(metrics, db)
 		collections := bstorage.NewCollections(db, transactions)
 
-		err = headers.Store(&genesis)
+		err = headers.Store(genesis)
 		require.NoError(t, err)
 
 		// create execution state module
@@ -180,7 +180,7 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		require.NotNil(t, es)
 
 		// prepare data
-		header := unittest.BlockHeaderWithParentFixture(&genesis) // make sure the height is higher than genesis
+		header := unittest.BlockHeaderWithParentFixture(genesis) // make sure the height is higher than genesis
 		executionReceipt := unittest.ExecutionReceiptFixture()
 		executionReceipt.ExecutionResult.BlockID = header.ID()
 		cdp := make([]*flow.ChunkDataPack, 0, len(executionReceipt.ExecutionResult.Chunks))
@@ -194,13 +194,13 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		se := unittest.BlockEventsFixture(header, 8)
 		tes := unittest.TransactionResultsFixture(4)
 
-		err = headers.Store(&header)
+		err = headers.Store(header)
 		require.NoError(t, err)
 
 		// save execution results
 		err = es.SaveExecutionResults(
 			context.Background(),
-			&header,
+			header,
 			endState,
 			cdp,
 			executionReceipt,
@@ -244,7 +244,7 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		// re execute result
 		err = es.SaveExecutionResults(
 			context.Background(),
-			&header,
+			header,
 			endState2,
 			cdp2,
 			executionReceipt2,
