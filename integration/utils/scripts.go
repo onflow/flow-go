@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"encoding/hex"
 	"fmt"
+	"math/rand"
 	"strings"
 
 	"github.com/onflow/cadence"
@@ -85,6 +86,35 @@ var ledgerHeavyScriptTemplate string
 
 func LedgerHeavyScript(favContractAddress flowsdk.Address) []byte {
 	return []byte(fmt.Sprintf(ledgerHeavyScriptTemplate, favContractAddress))
+}
+
+//go:embed scripts/constExecCostTransaction.cdc
+var constExecTransactionTemplate string
+
+func generateRandomStringWithLen(commentLen uint) string {
+	const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	bytes := make([]byte, commentLen)
+	for i := range bytes {
+		bytes[i] = letterBytes[rand.Intn(len(letterBytes))]
+	}
+	return string(bytes)
+}
+
+func generateAuthAccountParamList(authAccountNum uint) string {
+	authAccountList := []string{}
+	for i := uint(0); i < authAccountNum; i++ {
+		authAccountList = append(authAccountList, fmt.Sprintf("acct%d: AuthAccount", i+1))
+	}
+	return strings.Join(authAccountList, ", ")
+}
+
+// ConstExecCostTransaction returns a transaction script for constant execution size (0)
+func ConstExecCostTransaction(numOfAuthorizer, commentSizeInByte uint) []byte {
+	commentStr := generateRandomStringWithLen(commentSizeInByte)
+	authAccountListStr := generateAuthAccountParamList(numOfAuthorizer)
+
+	// the transaction template has two `%s`: #1 is for comment; #2 is for AuthAccount param list
+	return []byte(fmt.Sprintf(constExecTransactionTemplate, commentStr, authAccountListStr))
 }
 
 func bytesToCadenceArray(l []byte) cadence.Array {
