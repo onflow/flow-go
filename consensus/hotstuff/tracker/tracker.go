@@ -46,3 +46,42 @@ func (t *NewestQCTracker) Track(qc *flow.QuorumCertificate) bool {
 func (t *NewestQCTracker) NewestQC() *flow.QuorumCertificate {
 	return (*flow.QuorumCertificate)(t.newestQC.Load())
 }
+
+// NewestTCTracker is a helper structure which keeps track of the highest QC(by view)
+// in concurrency safe way.
+type NewestTCTracker struct {
+	newestTC *atomic.UnsafePointer
+}
+
+func NewNewestTCTracker() *NewestTCTracker {
+	tracker := &NewestTCTracker{
+		newestTC: atomic.NewUnsafePointer(unsafe.Pointer(nil)),
+	}
+	return tracker
+}
+
+// Track updates local state of NewestTC if the provided instance is newer(by view)
+// Concurrently safe
+func (t *NewestTCTracker) Track(tc *flow.TimeoutCertificate) bool {
+	// to record the newest value that we have ever seen we need to use loop
+	// with CAS atomic operation to make sure that we always write the latest value
+	// in case of shared access to updated value.
+	for {
+		// take a snapshot
+		NewestQC := t.NewestTC()
+		// verify that our update makes sense
+		if NewestQC != nil && NewestQC.View >= tc.View {
+			return false
+		}
+		// attempt to install new value, repeat in case of shared update.
+		if t.newestTC.CAS(unsafe.Pointer(NewestQC), unsafe.Pointer(tc)) {
+			return true
+		}
+	}
+}
+
+// NewestTC returns the newest TC(by view) tracked.
+// Concurrently safe
+func (t *NewestTCTracker) NewestTC() *flow.TimeoutCertificate {
+	return (*flow.TimeoutCertificate)(t.newestTC.Load())
+}
