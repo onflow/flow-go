@@ -18,10 +18,6 @@ func NewTransactionStorageLimiter() TransactionStorageLimiter {
 	return TransactionStorageLimiter{}
 }
 
-// TransactionStorageLimiterScriptArgumentBatchSize is the number of accounts to check at once.
-// Using to many arguments at once might cause problems during InvokeAccountsStorageCapacity.
-const TransactionStorageLimiterScriptArgumentBatchSize = 100
-
 func (d TransactionStorageLimiter) CheckLimits(
 	env Environment,
 	addresses []flow.Address,
@@ -48,32 +44,7 @@ func (d TransactionStorageLimiter) CheckLimits(
 		usages[i] = u
 	}
 
-	for start := 0; start < len(addresses); start += TransactionStorageLimiterScriptArgumentBatchSize {
-		end := start + TransactionStorageLimiterScriptArgumentBatchSize
-		if end > len(addresses) {
-			end = len(addresses)
-		}
-
-		err := d.batchCheckLimits(
-			env,
-			commonAddresses[start:end],
-			usages[start:end],
-			span,
-		)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (d TransactionStorageLimiter) batchCheckLimits(
-	env Environment,
-	addresses []common.Address,
-	usage []uint64,
-	span otelTrace.Span) error {
-
-	result, invokeErr := InvokeAccountsStorageCapacity(env, span, addresses)
+	result, invokeErr := InvokeAccountsStorageCapacity(env, span, commonAddresses)
 
 	// This error only occurs in case of implementation errors. The InvokeAccountsStorageCapacity
 	// already handles cases where the default vault is missing.
@@ -90,8 +61,8 @@ func (d TransactionStorageLimiter) batchCheckLimits(
 	for i, value := range resultArray.Values {
 		capacity := storageMBUFixToBytesUInt(value)
 
-		if usage[i] > capacity {
-			return errors.NewStorageCapacityExceededError(flow.BytesToAddress(addresses[i].Bytes()), usage[i], capacity)
+		if usages[i] > capacity {
+			return errors.NewStorageCapacityExceededError(flow.BytesToAddress(addresses[i].Bytes()), usages[i], capacity)
 		}
 	}
 
