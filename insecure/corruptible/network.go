@@ -126,6 +126,7 @@ func (n *Network) RegisterPingService(pingProtocolID protocol.ID, pingInfoProvid
 	return n.flowNetwork.RegisterPingService(pingProtocolID, pingInfoProvider)
 }
 
+//
 func (n *Network) ProcessAttackerMessage(stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageServer) error {
 	for {
 		select {
@@ -301,14 +302,18 @@ func (n *Network) AttackerRegistered() bool {
 	return n.attackerInboundStream != nil
 }
 
-// ConnectAttacker is a BLOCKING gRPC end-point for this corruptible network that lets an attacker register itself to it,
+// ConnectAttacker is a Server Streaming gRPC end-point for this corruptible network that lets an attacker register itself to it,
 // so that the attacker can control its ingress and egress traffic flow.
+//
 // An attacker (i.e., client) remote call to this function will return immediately on the attacker's side. However,
 // here on the server (i.e., corruptible network) side, the call remains blocking through the lifecycle of the server.
 // The reason is the local gRPC stub on this corruptible network (i.e., server) acts as a broker between client call to
-// this server method. The broker returns the call on the client side immediately by creating the stream. However, that
-// stream is only alive through the lifecycle of the server. So, returning this method should only return when the server
-// is really shut down, hence closing the stream on the client side. 
+// this server method. The broker returns the call on the client side immediately by creating the stream from server to
+// the client, i.e., server streaming.
+// However, that stream is only alive through the lifecycle of the server. So, this method should only return when the server
+// is really shut down, hence closing the stream on the client side, as client should expect no more messages streamed from
+// server.
+//
 // Registering an attacker on a networking layer is an exactly-once immutable operation,
 // any second attempt after a successful registration returns an error.
 func (n *Network) ConnectAttacker(_ *empty.Empty, stream insecure.CorruptibleConduitFactory_ConnectAttackerServer) error {
