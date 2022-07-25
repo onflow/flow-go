@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/opentracing/opentracing-go"
 	traceLog "github.com/opentracing/opentracing-go/log"
+	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/errors"
@@ -478,20 +479,21 @@ func (env *commonEnv) DecodeArgument(b []byte, _ cadence.Type) (cadence.Value, e
 	return v, err
 }
 
-func (env *commonEnv) RecordTrace(operation string, location common.Location, duration time.Duration, logs []opentracing.LogRecord) {
-	if !env.isTraceable() {
-		return
-	}
-	if location != nil {
-		if logs == nil {
-			logs = make([]opentracing.LogRecord, 0, 1)
-		}
-		logs = append(logs, opentracing.LogRecord{Timestamp: time.Now(),
-			Fields: []traceLog.Field{traceLog.String("location", location.String())},
-		})
-	}
-	spanName := trace.FVMCadenceTrace.Child(operation)
-	env.ctx.Tracer.RecordSpanFromParent(env.traceSpan, spanName, duration, logs)
+func (env *commonEnv) RecordTrace(operation string, location common.Location, duration time.Duration, attrs []attribute.KeyValue) {
+	// TODO: add back in https://github.com/onflow/flow-go/pull/2823
+	//if !env.isTraceable() {
+	//	return
+	//}
+	//if location != nil {
+	//	if logs == nil {
+	//		logs = make([]opentracing.LogRecord, 0, 1)
+	//	}
+	//	logs = append(logs, opentracing.LogRecord{Timestamp: time.Now(),
+	//		Fields: []traceLog.Field{traceLog.String("location", location.String())},
+	//	})
+	//}
+	//spanName := trace.FVMCadenceTrace.Child(operation)
+	//env.ctx.Tracer.RecordSpanFromParent(env.traceSpan, spanName, duration, logs)
 }
 
 func (env *commonEnv) ProgramParsed(location common.Location, duration time.Duration) {
