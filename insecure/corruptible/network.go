@@ -126,7 +126,13 @@ func (n *Network) RegisterPingService(pingProtocolID protocol.ID, pingInfoProvid
 	return n.flowNetwork.RegisterPingService(pingProtocolID, pingInfoProvider)
 }
 
+// ProcessAttackerMessage is a Client Streaming gRPC end-point that allows a registered attacker to dictate messages to this corruptible
+// network.
+// The first call to this Client Streaming gRPC method creates the "stream" from attacker (i.e., client) to this corruptible network
+// (i.e., server), where attacker can send messages through that stream to the corruptible network.
 //
+// Messages sent from attacker to this corruptible network are considered dictated in the sense that they are sent on behalf
+// of this corruptible network instance on the original Flow network to other Flow nodes.
 func (n *Network) ProcessAttackerMessage(stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageServer) error {
 	for {
 		select {
@@ -302,7 +308,7 @@ func (n *Network) AttackerRegistered() bool {
 	return n.attackerInboundStream != nil
 }
 
-// ConnectAttacker is a Server Streaming gRPC end-point for this corruptible network that lets an attacker register itself to it,
+// ConnectAttacker is a blocking Server Streaming gRPC end-point for this corruptible network that lets an attacker register itself to it,
 // so that the attacker can control its ingress and egress traffic flow.
 //
 // An attacker (i.e., client) remote call to this function will return immediately on the attacker's side. However,
