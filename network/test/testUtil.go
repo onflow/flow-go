@@ -304,12 +304,6 @@ func WithPeerManagerOpts(peerManagerOpts ...p2p.Option) func(*optsConfig) {
 	}
 }
 
-func WithSlashingViolationsConsumer(consumer slashing.ViolationsConsumer) func(*optsConfig) {
-	return func(o *optsConfig) {
-		o.slashingViolationsConsumer = consumer
-	}
-}
-
 func GenerateIDsMiddlewaresNetworks(
 	ctx context.Context,
 	t *testing.T,

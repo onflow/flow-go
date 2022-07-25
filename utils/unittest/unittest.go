@@ -14,6 +14,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
+	"github.com/onflow/flow-go/network/slashing"
+	"github.com/rs/zerolog"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
@@ -384,4 +386,9 @@ func AssertEqualBlocksLenAndOrder(t *testing.T, expectedBlocks, actualSegmentBlo
 // NetworkCodec returns cbor codec
 func NetworkCodec() network.Codec {
 	return cborcodec.NewCodec()
+}
+
+// SlashingViolationsConsumer returns a slashing violations consumer
+func SlashingViolationsConsumer(logger zerolog.Logger) slashing.ViolationsConsumer {
+	return slashing.NewSlashingViolationsConsumer(logger)
 }
