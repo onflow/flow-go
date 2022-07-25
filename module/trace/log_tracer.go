@@ -20,6 +20,7 @@ const activeSpan spanKey = "activeSpan"
 // LogTracer is the implementation of the Tracer interface which passes
 // all the traces back to the passed logger and print them
 // this is mostly useful for debugging and testing
+// TODO(rbtz): make private
 type LogTracer struct {
 	log      zerolog.Logger
 	provider trace.TracerProvider

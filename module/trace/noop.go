@@ -11,6 +11,7 @@ import (
 )
 
 // NoopTracer is the implementation of the Tracer interface
+// TODO(rbtz): make private
 type NoopTracer struct {
 	tracer trace.Tracer
 }

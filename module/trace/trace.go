@@ -32,6 +32,7 @@ func (s SpanName) Child(subOp string) SpanName {
 }
 
 // Tracer is the implementation of the Tracer interface
+// TODO(rbtz): make private
 type Tracer struct {
 	tracer      trace.Tracer
 	shutdown    func(context.Context) error
