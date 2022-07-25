@@ -116,11 +116,13 @@ func (r *SafetyRules) ProduceVote(proposal *model.Proposal, curView uint64) (*mo
 	return vote, nil
 }
 
-// ProduceTimeout takes current view, highest locally known QC and TC and decides whether to produce timeout for current view.
+// ProduceTimeout takes current view, highest locally known QC and TC (optional, must be nil if and
+// only if QC is for previous view) and decides whether to produce timeout for current view.
 // Returns:
 //  * (timeout, nil): It is safe to timeout for current view using newestQC and lastViewTC.
-//  * (nil, model.NoTimeoutError): If replica is ejected and is not allowed to produce a valid timeout object.
-//    This is a sentinel error and _expected_ during normal operation.
+//  * (nil, model.NoTimeoutError): If replica is not part of the authorized consensus committee (anymore) and
+//    therefore is not authorized to produce a valid timeout object. This sentinel error is _expected_ during
+//    normal operation, e.g. during the grace-period after Epoch switchover or after the replica self-ejected.
 // All other errors are unexpected and potential symptoms of uncovered edge cases or corrupted internal state (fatal).
 func (r *SafetyRules) ProduceTimeout(curView uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
 	lastTimeout := r.safetyData.LastTimeout
@@ -135,10 +137,10 @@ func (r *SafetyRules) ProduceTimeout(curView uint64, newestQC *flow.QuorumCertif
 
 	// Do not produce a timeout for view where we are not a valid committee member.
 	_, err = r.committee.IdentityByEpoch(curView, r.committee.Self())
-	if model.IsInvalidSignerError(err) {
-		return nil, model.NewNoTimeoutErrorf("I am not authorized to timeout for view %d: %w", curView, err)
-	}
 	if err != nil {
+		if model.IsInvalidSignerError(err) {
+			return nil, model.NewNoTimeoutErrorf("I am not authorized to timeout for view %d: %w", curView, err)
+		}
 		return nil, fmt.Errorf("could not get self identity: %w", err)
 	}
 

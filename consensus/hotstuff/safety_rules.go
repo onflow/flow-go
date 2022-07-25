@@ -34,11 +34,13 @@ type SafetyRules interface {
 	//    This is a sentinel error and _expected_ during normal operation.
 	// All other errors are unexpected and potential symptoms of uncovered edge cases or corrupted internal state (fatal).
 	ProduceVote(proposal *model.Proposal, curView uint64) (*model.Vote, error)
-	// ProduceTimeout takes current view, highest locally known QC and TC and decides whether to produce timeout for current view.
+	// ProduceTimeout takes current view, highest locally known QC and TC (optional, must be nil if and 
+	// only if QC is for previous view) and decides whether to produce timeout for current view.
 	// Returns:
 	//  * (timeout, nil): It is safe to timeout for current view using newestQC and lastViewTC.
-	//  * (nil, model.NoTimeoutError): If replica is ejected and is not allowed to produce a valid timeout object.
-	//    This is a sentinel error and _expected_ during normal operation.
+	//  * (nil, model.NoTimeoutError): If replica is not part of the authorized consensus committee (anymore) and
+	//    therefore is not authorized to produce a valid timeout object. This sentinel error is _expected_ during
+	//    normal operation, e.g. during the grace-period after Epoch switchover or after the replica self-ejected.
 	// All other errors are unexpected and potential symptoms of uncovered edge cases or corrupted internal state (fatal).
 	ProduceTimeout(curView uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.TimeoutObject, error)
 }

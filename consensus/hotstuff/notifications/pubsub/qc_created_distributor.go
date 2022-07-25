@@ -7,7 +7,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// QCCreatedDistributor ingests events about QC creation from hotstuff and distributes it to subscribers.
+// QCCreatedDistributor ingests events about QC creation from hotstuff and distributes them to subscribers.
 // Objects are concurrency safe.
 // NOTE: it can be refactored to work without lock since usually we never subscribe after startup. Mostly
 // list of observers is static.
