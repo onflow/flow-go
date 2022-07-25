@@ -161,6 +161,7 @@ generate-mocks:
 	mockery --name '.*' --dir=insecure/ --case=underscore --output="./insecure/mock"  --outpkg="mockinsecure"
 	mockery --name '.*' --dir=./cmd/util/ledger/reporters --case=underscore --output="./cmd/util/ledger/reporters/mock" --outpkg="mock"
 	mockery --name 'Storage' --dir=module/executiondatasync/tracker --case=underscore --output="module/executiondatasync/tracker/mock" --outpkg="mocktracker"
+	mockery --name 'ViolationsConsumer' --dir=network/slashing --case=underscore --output="./network/mocknetwork" --outpkg="mocknetwork"
 
 # this ensures there is no unused dependency being added by accident
 .PHONY: tidy
