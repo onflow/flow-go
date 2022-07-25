@@ -157,7 +157,7 @@ func (e *ScriptEnv) setExecutionParameters() error {
 func (e *ScriptEnv) GetStorageCapacity(address common.Address) (value uint64, err error) {
 	if e.isTraceable() {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetStorageCapacity)
-		defer sp.Finish()
+		defer sp.End()
 	}
 
 	err = e.Meter(meter.ComputationKindGetStorageCapacity, 1)
@@ -181,7 +181,7 @@ func (e *ScriptEnv) GetStorageCapacity(address common.Address) (value uint64, er
 func (e *ScriptEnv) GetAccountBalance(address common.Address) (value uint64, err error) {
 	if e.isTraceable() {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetAccountBalance)
-		defer sp.Finish()
+		defer sp.End()
 	}
 
 	err = e.Meter(meter.ComputationKindGetAccountBalance, 1)
@@ -199,7 +199,7 @@ func (e *ScriptEnv) GetAccountBalance(address common.Address) (value uint64, err
 func (e *ScriptEnv) GetAccountAvailableBalance(address common.Address) (value uint64, err error) {
 	if e.isTraceable() {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetAccountBalance)
-		defer sp.Finish()
+		defer sp.End()
 	}
 
 	err = e.Meter(meter.ComputationKindGetAccountAvailableBalance, 1)
@@ -224,7 +224,7 @@ func (e *ScriptEnv) ResolveLocation(
 ) ([]runtime.ResolvedLocation, error) {
 	if e.isTraceable() && e.ctx.ExtensiveTracing {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvResolveLocation)
-		defer sp.Finish()
+		defer sp.End()
 	}
 
 	err := e.Meter(meter.ComputationKindResolveLocation, 1)
@@ -296,7 +296,7 @@ func (e *ScriptEnv) ResolveLocation(
 func (e *ScriptEnv) ProgramLog(message string) error {
 	if e.isTraceable() && e.ctx.ExtensiveTracing {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvProgramLog)
-		defer sp.Finish()
+		defer sp.End()
 	}
 
 	if e.ctx.CadenceLoggingEnabled {
@@ -364,7 +364,7 @@ func (e *ScriptEnv) VerifySignature(
 ) (bool, error) {
 	if e.isTraceable() {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvVerifySignature)
-		defer sp.Finish()
+		defer sp.End()
 	}
 
 	err := e.Meter(meter.ComputationKindVerifySignature, 1)
@@ -418,7 +418,7 @@ func (e *ScriptEnv) AddAccountKey(_ runtime.Address, _ *runtime.PublicKey, _ run
 func (e *ScriptEnv) GetAccountKey(address runtime.Address, index int) (*runtime.AccountKey, error) {
 	if e.isTraceable() {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetAccountKey)
-		defer sp.Finish()
+		defer sp.End()
 	}
 
 	err := e.Meter(meter.ComputationKindGetAccountKey, 1)

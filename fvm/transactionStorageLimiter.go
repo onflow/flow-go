@@ -2,8 +2,7 @@ package fvm
 
 import (
 	"fmt"
-
-	"github.com/opentracing/opentracing-go"
+	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime/common"
@@ -31,10 +30,10 @@ func (d TransactionStorageLimiter) CheckLimits(
 		return nil
 	}
 
-	var span opentracing.Span
+	var span otelTrace.Span
 	if te, ok := env.(*TransactionEnv); ok && te.isTraceable() {
 		span = te.ctx.Tracer.StartSpanFromParent(te.traceSpan, trace.FVMTransactionStorageUsedCheck)
-		defer span.Finish()
+		defer span.End()
 	}
 
 	commonAddresses := make([]common.Address, len(addresses))
@@ -72,7 +71,7 @@ func (d TransactionStorageLimiter) batchCheckLimits(
 	env Environment,
 	addresses []common.Address,
 	usage []uint64,
-	span opentracing.Span) error {
+	span otelTrace.Span) error {
 
 	result, invokeErr := InvokeAccountsStorageCapacity(env, span, addresses)
 
