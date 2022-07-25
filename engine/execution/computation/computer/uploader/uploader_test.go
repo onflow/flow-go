@@ -2,16 +2,12 @@ package uploader
 
 import (
 	"bytes"
-	"context"
 	"fmt"
-	"io/ioutil"
-	"os"
 	"runtime/debug"
 	"sync"
 	"testing"
 	"time"
 
-	"cloud.google.com/go/storage"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
@@ -174,42 +170,6 @@ func Test_AsyncUploader(t *testing.T) {
 		require.Equal(t, 1, callCount)
 	})
 
-}
-
-func Test_GCPBucketUploader(t *testing.T) {
-	testutils.SkipUnless(t, testutils.TEST_REQUIRES_GCP_ACCESS, "requires GCP Bucket setup")
-
-	bucketName := os.Getenv("FLOW_TEST_GCP_BUCKET_NAME")
-	if bucketName == "" {
-		t.Fatal("please set FLOW_TEST_GCP_BUCKET_NAME environmental variable")
-	}
-	uploader, err := NewGCPBucketUploader(context.Background(), bucketName, zerolog.Nop())
-	require.NoError(t, err)
-
-	cr := generateComputationResult(t)
-
-	buffer := &bytes.Buffer{}
-	err = WriteComputationResultsTo(cr, buffer)
-	require.NoError(t, err)
-
-	err = uploader.Upload(cr)
-
-	require.NoError(t, err)
-
-	// check uploaded object
-	client, err := storage.NewClient(context.Background())
-	require.NoError(t, err)
-	bucket := client.Bucket(bucketName)
-
-	objectName := GCPBlockDataObjectName(cr)
-
-	reader, err := bucket.Object(objectName).NewReader(context.Background())
-	require.NoError(t, err)
-
-	readBytes, err := ioutil.ReadAll(reader)
-	require.NoError(t, err)
-
-	require.Equal(t, buffer.Bytes(), readBytes)
 }
 
 type DummyUploader struct {
