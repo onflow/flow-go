@@ -2,6 +2,7 @@ package eventloop
 
 import (
 	"context"
+	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"io/ioutil"
 	"sync"
 	"testing"
@@ -88,8 +89,8 @@ func (s *EventLoopTestSuite) Test_SubmitQC() {
 	// qcIngestionFunction is the archetype for EventLoop.OnQcConstructedFromVotes and EventLoop.OnNewQcDiscovered
 	type qcIngestionFunction func(*flow.QuorumCertificate)
 
-	testQCIngestionFunction := func(f qcIngestionFunction) {
-		qc := unittest.QuorumCertificateFixture()
+	testQCIngestionFunction := func(f qcIngestionFunction, qcView uint64) {
+		qc := helper.MakeQC(helper.WithQCView(qcView))
 		processed := atomic.NewBool(false)
 		s.eh.On("OnReceiveQc", qc).Run(func(args mock.Arguments) {
 			processed.Store(true)
@@ -99,11 +100,11 @@ func (s *EventLoopTestSuite) Test_SubmitQC() {
 	}
 
 	s.Run("QCs handed to EventLoop.OnQcConstructedFromVotes are forwarded to EventHandler", func() {
-		testQCIngestionFunction(s.eventLoop.OnQcConstructedFromVotes)
+		testQCIngestionFunction(s.eventLoop.OnQcConstructedFromVotes, 100)
 	})
 
 	s.Run("QCs handed to EventLoop.OnNewQcDiscovered are forwarded to EventHandler", func() {
-		testQCIngestionFunction(s.eventLoop.OnNewQcDiscovered)
+		testQCIngestionFunction(s.eventLoop.OnNewQcDiscovered, 101)
 	})
 }
 

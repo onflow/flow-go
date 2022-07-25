@@ -9,6 +9,8 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/tracker"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
@@ -23,8 +25,9 @@ type EventLoop struct {
 	eventHandler        hotstuff.EventHandler
 	metrics             module.HotstuffMetrics
 	proposals           chan *model.Proposal
-	quorumCertificates  chan *flow.QuorumCertificate
 	timeoutCertificates chan *flow.TimeoutCertificate
+	lastSubmittedQc     *tracker.NewestQCTracker
+	qcSubmittedNotifier engine.Notifier
 	startTime           time.Time
 }
 
@@ -34,7 +37,6 @@ var _ component.Component = (*EventLoop)(nil)
 // NewEventLoop creates an instance of EventLoop.
 func NewEventLoop(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandler hotstuff.EventHandler, startTime time.Time) (*EventLoop, error) {
 	proposals := make(chan *model.Proposal)
-	quorumCertificates := make(chan *flow.QuorumCertificate, 1)
 	timeoutCertificates := make(chan *flow.TimeoutCertificate, 1)
 
 	el := &EventLoop{
@@ -42,8 +44,9 @@ func NewEventLoop(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandl
 		eventHandler:        eventHandler,
 		metrics:             metrics,
 		proposals:           proposals,
-		quorumCertificates:  quorumCertificates,
 		timeoutCertificates: timeoutCertificates,
+		qcSubmittedNotifier: engine.NewNotifier(),
+		lastSubmittedQc:     tracker.NewNewestQCTracker(),
 		startTime:           startTime,
 	}
 
@@ -84,6 +87,8 @@ func (el *EventLoop) loop(ctx context.Context) error {
 	// if hotstuff hits any unknown error, it will exit the loop
 
 	shutdownSignaled := ctx.Done()
+	quorumCertificates := el.qcSubmittedNotifier.Channel()
+
 	for {
 		// Giving timeout events the priority to be processed first
 		// This is to prevent attacks from malicious nodes that attempt
@@ -172,14 +177,14 @@ func (el *EventLoop) loop(ctx context.Context) error {
 				Msg("block proposal has been processed successfully")
 
 		// if we have a new QC, process it
-		case qc := <-el.quorumCertificates:
+		case <-quorumCertificates:
 			// measure how long the event loop was idle waiting for an
 			// incoming event
 			el.metrics.HotStuffIdleDuration(time.Since(idleStart))
 
 			processStart := time.Now()
 
-			err := el.eventHandler.OnReceiveQc(qc)
+			err := el.eventHandler.OnReceiveQc(el.lastSubmittedQc.NewestQC())
 
 			// measure how long it takes for a QC to be processed
 			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeOnQC)
@@ -227,17 +232,14 @@ func (el *EventLoop) SubmitProposal(proposalHeader *flow.Header, parentView uint
 
 // onTrustedQC pushes the received QC(which MUST be validated) to the quorumCertificates channel
 func (el *EventLoop) onTrustedQC(qc *flow.QuorumCertificate) {
-	received := time.Now()
-
-	select {
-	case el.quorumCertificates <- qc:
-	case <-el.ComponentManager.ShutdownSignal():
-		return
+	if el.lastSubmittedQc.Track(qc) {
+		el.qcSubmittedNotifier.Notify()
 	}
 
+	//received := time.Now()
 	// the wait duration is measured as how long it takes from a qc being
 	// received to event handler commencing the processing of the qc
-	el.metrics.HotStuffWaitDuration(time.Since(received), metrics.HotstuffEventTypeOnQC)
+	//el.metrics.HotStuffWaitDuration(time.Since(received), metrics.HotstuffEventTypeOnQC)
 }
 
 // onTrustedTC pushes the received TC(which MUST be validated) to the timeoutCertificates channel
