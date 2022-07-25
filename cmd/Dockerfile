@@ -58,7 +58,7 @@ RUN chmod a+x /app/app
 
 FROM golang:1.18-bullseye as debug
 
-RUN go get -u github.com/go-delve/delve/cmd/dlv
+RUN go install github.com/go-delve/delve/cmd/dlv@latest
 
 COPY --from=build-debug /app/app /bin/app
 
