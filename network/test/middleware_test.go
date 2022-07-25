@@ -538,16 +538,17 @@ func (m *MiddlewareTestSuite) TestUnicast_Authorization() {
 		// setup mock slashing violations consumer
 		slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(m.T())
 
+		// the message will be sent from the first middleware bootstrapped on the test suite
 		expectedSenderPeerID, err := unittest.PeerIDFromFlowID(m.ids[0])
 		require.NoError(m.T(), err)
 
-		// channel will allow us to wait until method call before shutting down middleware
+		// this ch will allow us to wait until the expected method call happens before shutting down middleware
 		ch := make(chan struct{})
 
 		var nilID *flow.Identity
 		slashingViolationsConsumer.On(
 			"OnUnAuthorizedSenderError",
-			nilID,
+			nilID, // because the peer will be unverified this identity will be nil
 			expectedSenderPeerID.String(),
 			"", // message will not be decoded before OnSenderEjectedError is logged, we won't log message type
 			"", // message will not be decoded before OnSenderEjectedError is logged, we won't log message type
@@ -575,7 +576,7 @@ func (m *MiddlewareTestSuite) TestUnicast_Authorization() {
 			return providers[0].Identities(filter.Any)
 		}, nil)
 
-		//NOTE: return false simulating unstaked node
+		//NOTE: return nil, false simulating unstaked node
 		overlay.On("Identity", mock.AnythingOfType("peer.ID")).Return(nil, false)
 		overlay.On("Receive",
 			m.ids[0].NodeID,
@@ -594,18 +595,19 @@ func (m *MiddlewareTestSuite) TestUnicast_Authorization() {
 		// needed to enable ID translation
 		m.providers[0].SetIdentities(idList)
 
-		// set the channel ID in the test message to a channel that TestMessage(s) is not allowed to be sent on ConsensusCommittee
 		msg, _ := createMessage(m.ids[0].NodeID, newId.NodeID, "hello")
 
 		// update the addresses
 		m.mws[0].UpdateNodeAddresses()
 
-		// now the message should send successfully
+		// send message via unicast
 		err = m.mws[0].SendDirect(msg, newId.NodeID)
 		require.NoError(m.T(), err)
 
+		// wait for slashing violations consumer mock to invoke run func and close ch if expected method call happens
 		unittest.RequireCloseBefore(m.T(), ch, 100*time.Millisecond, "slashing violations consumer mock not invoked on time")
 
+		// cleanup newMW resources
 		cancel()
 		unittest.RequireCloseBefore(m.T(), newMw.Done(), 100*time.Millisecond, "could not stop middleware on time")
 	})
@@ -618,15 +620,18 @@ func (m *MiddlewareTestSuite) TestUnicast_Authorization() {
 		ejectedID, _ := unittest.IdentityWithNetworkingKeyFixture()
 		ejectedID.Ejected = true
 
+		// the message will be sent from the first middleware bootstrapped on the test suite
+		// we are only mocking the returned identity from the overlay which will be the ejected
+		// identity created above. The peerID of the sender will stay the same.
 		expectedSenderPeerID, err := unittest.PeerIDFromFlowID(m.ids[0])
 		require.NoError(m.T(), err)
 
-		// channel will allow us to wait until method call before shutting down middleware
+		// this ch will allow us to wait until the expected method call happens before shutting down middleware
 		ch := make(chan struct{})
 
 		slashingViolationsConsumer.On(
 			"OnSenderEjectedError",
-			ejectedID,                     // we expect this identity to be called with the ejected ID
+			ejectedID,                     // we expect this method to be called with the ejected identity
 			expectedSenderPeerID.String(), // although we are returning a modified ejected identity we still expect this peer ID to be the peer ID of the real sender
 			"",                            // message will not be decoded before OnSenderEjectedError is logged, we won't log message type
 			"",                            // message will not be decoded before OnSenderEjectedError is logged, we won't log message type
@@ -672,18 +677,19 @@ func (m *MiddlewareTestSuite) TestUnicast_Authorization() {
 		// needed to enable ID translation
 		m.providers[0].SetIdentities(idList)
 
-		// set the channel ID in the test message to a channel that TestMessage(s) is not allowed to be sent on ConsensusCommittee
 		msg, _ := createMessage(m.ids[0].NodeID, newId.NodeID, "hello")
 
 		// update the addresses
 		m.mws[0].UpdateNodeAddresses()
 
-		// now the message should send successfully
+		// send message via unicast
 		err = m.mws[0].SendDirect(msg, newId.NodeID)
 		require.NoError(m.T(), err)
 
+		// wait for slashing violations consumer mock to invoke run func and close ch if expected method call happens
 		unittest.RequireCloseBefore(m.T(), ch, 100*time.Millisecond, "slashing violations consumer mock not invoked on time")
 
+		// clean up newMW resources
 		cancel()
 		unittest.RequireCloseBefore(m.T(), newMw.Done(), 100*time.Millisecond, "could not stop middleware on time")
 	})
@@ -695,13 +701,13 @@ func (m *MiddlewareTestSuite) TestUnicast_Authorization() {
 		expectedSenderPeerID, err := unittest.PeerIDFromFlowID(m.ids[0])
 		require.NoError(m.T(), err)
 
-		// channel will allow us to wait until method call before shutting down middleware
+		// this ch will allow us to wait until the expected method call happens before shutting down middleware
 		ch := make(chan struct{})
 
 		slashingViolationsConsumer.On(
 			"OnUnAuthorizedSenderError",
-			mock.Anything,                 // mock overlay always returns a random identity
-			expectedSenderPeerID.String(), // expected peer ID asserts we also receive the correct identity parameter
+			mock.Anything,                 // using default mock overlay always returns a random identity
+			expectedSenderPeerID.String(), // expected peer ID asserts we also would receive the correct identity parameter
 			message.TestMessage,
 			channels.ConsensusCommittee.String(),
 			true,
@@ -744,12 +750,14 @@ func (m *MiddlewareTestSuite) TestUnicast_Authorization() {
 		// update the addresses
 		m.mws[0].UpdateNodeAddresses()
 
-		// now the message should send successfully
+		// send message via unicast
 		err = m.mws[0].SendDirect(msg, newId.NodeID)
 		require.NoError(m.T(), err)
 
+		// wait for slashing violations consumer mock to invoke run func and close ch if expected method call happens
 		unittest.RequireCloseBefore(m.T(), ch, 100*time.Millisecond, "slashing violations consumer mock not invoked on time")
 
+		// cleanup newMW resources
 		cancel()
 		unittest.RequireCloseBefore(m.T(), newMw.Done(), 100*time.Millisecond, "could not stop middleware on time")
 	})
