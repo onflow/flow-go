@@ -106,7 +106,7 @@ type randomSerializer struct{}
 
 func (rs *randomSerializer) Serialize(w io.Writer, v interface{}) error {
 	data := make([]byte, 1024)
-	rand.Read(data)
+	_, _ = rand.Read(data)
 	_, err := w.Write(data)
 	return err
 }
@@ -138,7 +138,7 @@ func (cts *corruptedTailSerializer) Serialize(w io.Writer, v interface{}) error 
 			}
 
 			data := buf.Bytes()
-			rand.Read(data[len(data)-1024:])
+			_, _ = rand.Read(data[len(data)-1024:])
 
 			_, err = w.Write(data)
 			return err

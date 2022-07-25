@@ -81,7 +81,7 @@ func generateChunkExecutionData(t *testing.T, minSerializedSize uint64) *executi
 		}
 
 		v := make([]byte, size)
-		rand.Read(v)
+		_, _ = rand.Read(v)
 		ced.TrieUpdate.Payloads[0].Value = v
 		size *= 2
 	}
