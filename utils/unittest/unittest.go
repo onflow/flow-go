@@ -15,6 +15,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
+	"github.com/onflow/flow-go/network/slashing"
+	"github.com/rs/zerolog"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
@@ -406,4 +408,9 @@ func CrashTest(t *testing.T, scenario func(*testing.T), expectedErrorMsg string,
 	// expect logger.Fatal() message to be pushed to stdout
 	outStr := string(outBytes)
 	require.Contains(t, outStr, expectedErrorMsg)
+}
+
+// SlashingViolationsConsumer returns a slashing violations consumer
+func SlashingViolationsConsumer(logger zerolog.Logger) slashing.ViolationsConsumer {
+	return slashing.NewSlashingViolationsConsumer(logger)
 }

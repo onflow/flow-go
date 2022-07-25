@@ -103,7 +103,7 @@ func (m *MiddlewareTestSuite) SetupTest() {
 		log:  logger,
 	}
 
-	m.slashingViolationsConsumer = slashing.NewSlashingViolationsConsumer(m.logger)
+	m.slashingViolationsConsumer = unittest.SlashingViolationsConsumer(m.logger)
 
 	m.ids, m.mws, obs, m.providers = GenerateIDsAndMiddlewares(m.T(), m.size, logger, unittest.NetworkCodec(), m.slashingViolationsConsumer)
 
@@ -534,8 +534,12 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 // correctly authenticates peers and checks message authorization.
 //func (m *MiddlewareTestSuite) TestUnicast_Authorization() {
 //	m.Run("unstaked peer", func() {
+//		// setup mock slashing violations consumer
+//		slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(m.T())
+//		defer slashingViolationsConsumer.AssertExpectations(m.T())
+//
 //		ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1)
-//		mws, providers := GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, unittest.NetworkCodec())
+//		mws, providers := GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, unittest.NetworkCodec(), slashingViolationsConsumer)
 //		require.Len(m.T(), ids, 1)
 //		require.Len(m.T(), providers, 1)
 //		require.Len(m.T(), mws, 1)
