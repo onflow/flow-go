@@ -136,6 +136,7 @@ generate-mocks:
 	GO111MODULE=on mockery --name '.*' --dir=module/mempool --case=underscore --output="./module/mempool/mock" --outpkg="mempool"
 	GO111MODULE=on mockery --name '.*' --dir=module/component --case=underscore --output="./module/component/mock" --outpkg="component"
 	GO111MODULE=on mockery --name '.*' --dir=network --case=underscore --output="./network/mocknetwork" --outpkg="mocknetwork"
+	GO111MODULE=on mockery --name 'ViolationsConsumer' --dir=network/slashing --case=underscore --output="./network/mocknetwork" --outpkg="mocknetwork"
 	GO111MODULE=on mockery --name '.*' --dir=storage --case=underscore --output="./storage/mock" --outpkg="mock"
 	GO111MODULE=on mockery --name '.*' --dir="state/protocol" --case=underscore --output="state/protocol/mock" --outpkg="mock"
 	GO111MODULE=on mockery --name '.*' --dir="state/protocol/events" --case=underscore --output="./state/protocol/events/mock" --outpkg="mock"
