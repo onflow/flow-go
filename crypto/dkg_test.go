@@ -737,6 +737,7 @@ func TestDKGErrorTypes(t *testing.T) {
 		failureError := dkgInvalidStateTransitionErrorf("some error")
 		otherError := fmt.Errorf("some error")
 		assert.True(t, IsDKGInvalidStateTransitionError(failureError))
+		assert.True(t, IsInvalidInputsError(failureError))
 		assert.False(t, IsDKGInvalidStateTransitionError(otherError))
 		assert.False(t, IsDKGInvalidStateTransitionError(nil))
 	})

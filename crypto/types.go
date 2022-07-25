@@ -117,7 +117,16 @@ type Signature []byte
 // invalid inputs.
 type invalidInputsError struct {
 	error
+	subType invalidInputErrorSubType
 }
+
+type invalidInputErrorSubType int
+
+const (
+	Other invalidInputErrorSubType = 0
+	dkgInvalidStateTransition
+	aggregationEmptyList
+)
 
 // invalidInputsErrorf constructs a new invalidInputsError
 func invalidInputsErrorf(msg string, args ...interface{}) error {

@@ -80,29 +80,25 @@ func IsDKGFailureError(err error) bool {
 	return errors.As(err, &target)
 }
 
-// invalidStateTransition is an error returned when a participant
-// triggers an invalid state transition in the local DKG instance.
-// Such a failure can only happen if the API is misued by not respecting
-// the state machine conditions.
-type dkgInvalidStateTransition struct {
-	error
-}
-
-// dkgInvalidStateTransitionErrorf constructs a new dkgInvalidStateTransition
+// dkgInvalidStateTransitionErrorf constructs a new invalidInputsError (API misuse)
 func dkgInvalidStateTransitionErrorf(msg string, args ...interface{}) error {
-	return &dkgInvalidStateTransition{
-		error: fmt.Errorf(msg, args...),
+	return &invalidInputsError{
+		error:   fmt.Errorf(msg, args...),
+		subType: dkgInvalidStateTransition,
 	}
 }
 
 // IsDkgInvalidStateTransitionError checks if the input error is of a dkgInvalidStateTransition type.
-// invalidStateTransition is an error returned when a participant
+// invalidStateTransition is a subtype of invalidInputsError, returned when a participant
 // triggers an invalid state transition in the local DKG instance.
 // Such a failure can only happen if the API is misued by not respecting
 // the state machine conditions.
 func IsDKGInvalidStateTransitionError(err error) bool {
-	var target *dkgInvalidStateTransition
-	return errors.As(err, &target)
+	var target *invalidInputsError
+	if !errors.As(err, &target) {
+		return false
+	}
+	return target.subType == dkgInvalidStateTransition
 }
 
 // index is the node index type used as participants ID
