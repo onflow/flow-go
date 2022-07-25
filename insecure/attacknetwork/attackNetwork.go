@@ -29,6 +29,8 @@ type AttackNetwork struct {
 	corruptedConnector   insecure.CorruptedNodeConnector                      // connection generator to corrupted nodes.
 }
 
+var _ insecure.AttackNetwork = &AttackNetwork{}
+
 func NewAttackNetwork(
 	logger zerolog.Logger,
 	codec network.Codec,
