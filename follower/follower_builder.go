@@ -12,6 +12,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/routing"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	p2ppubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/onflow/flow-go/network/slashing"
 
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
@@ -699,7 +700,7 @@ func (builder *FollowerServiceBuilder) initMiddleware(nodeID flow.Identifier,
 	networkMetrics module.NetworkMetrics,
 	factoryFunc p2p.LibP2PFactoryFunc,
 	validators ...network.MessageValidator) network.Middleware {
-
+	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(builder.Logger)
 	builder.Middleware = p2p.NewMiddleware(
 		builder.Logger,
 		factoryFunc,
@@ -709,6 +710,7 @@ func (builder *FollowerServiceBuilder) initMiddleware(nodeID flow.Identifier,
 		p2p.DefaultUnicastTimeout,
 		builder.IDTranslator,
 		builder.CodecFactory(),
+		slashingViolationsConsumer,
 		p2p.WithMessageValidators(validators...),
 		// no peer manager
 		// use default identifier provider

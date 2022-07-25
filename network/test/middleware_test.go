@@ -10,6 +10,7 @@ import (
 
 	"github.com/ipfs/go-log"
 	swarm "github.com/libp2p/go-libp2p-swarm"
+	"github.com/onflow/flow-go/network/slashing"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -75,6 +76,8 @@ type MiddlewareTestSuite struct {
 
 	mwCancel context.CancelFunc
 	mwCtx    irrecoverable.SignalerContext
+
+	slashingViolationsConsumer slashing.ViolationsConsumer
 }
 
 // TestMiddlewareTestSuit runs all the test methods in this test suit
@@ -100,7 +103,9 @@ func (m *MiddlewareTestSuite) SetupTest() {
 		log:  logger,
 	}
 
-	m.ids, m.mws, obs, m.providers = GenerateIDsAndMiddlewares(m.T(), m.size, logger, unittest.NetworkCodec())
+	m.slashingViolationsConsumer = slashing.NewSlashingViolationsConsumer(m.logger)
+
+	m.ids, m.mws, obs, m.providers = GenerateIDsAndMiddlewares(m.T(), m.size, logger, unittest.NetworkCodec(), m.slashingViolationsConsumer)
 
 	for _, observableConnMgr := range obs {
 		observableConnMgr.Subscribe(&ob)
@@ -144,7 +149,7 @@ func (m *MiddlewareTestSuite) SetupTest() {
 func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	// create a new staked identity
 	ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1)
-	mws, providers := GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, unittest.NetworkCodec())
+	mws, providers := GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, unittest.NetworkCodec(), m.slashingViolationsConsumer)
 	require.Len(m.T(), ids, 1)
 	require.Len(m.T(), providers, 1)
 	require.Len(m.T(), mws, 1)
@@ -524,6 +529,50 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 	// assert that the new message is not received by the target node
 	unittest.RequireNeverReturnBefore(m.T(), msgRcvdFun, 2*time.Second, "message received unexpectedly")
 }
+
+// TestUnicast_Authorization tests that the middleware handleIncoming stream unicast callback
+// correctly authenticates peers and checks message authorization.
+//func (m *MiddlewareTestSuite) TestUnicast_Authorization() {
+//	m.Run("unstaked peer", func() {
+//		ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1)
+//		mws, providers := GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, unittest.NetworkCodec())
+//		require.Len(m.T(), ids, 1)
+//		require.Len(m.T(), providers, 1)
+//		require.Len(m.T(), mws, 1)
+//		newId := ids[0]
+//		newMw := mws[0]
+//
+//		overlay := m.createOverlay(providers[0])
+//		overlay.On("Receive",
+//			m.ids[0].NodeID,
+//			mock.AnythingOfType("*message.Message"),
+//		).Return(nil)
+//		newMw.SetOverlay(overlay)
+//		newMw.Start(m.mwCtx)
+//
+//		idList := flow.IdentityList(append(m.ids, newId))
+//
+//		// needed to enable ID translation
+//		m.providers[0].SetIdentities(idList)
+//
+//		msg, _ := createMessage(m.ids[0].NodeID, newId.NodeID, "hello")
+//
+//		// update the addresses
+//		m.mws[0].UpdateNodeAddresses()
+//
+//		// now the message should send successfully
+//		err := m.mws[0].SendDirect(msg, newId.NodeID)
+//		require.NoError(m.T(), err)
+//	})
+//
+//	m.Run("ejected peer", func() {
+//
+//	})
+//
+//	m.Run("unauthorized peer", func() {
+//
+//	})
+//}
 
 func createMessage(originID flow.Identifier, targetID flow.Identifier, msg string) (*message.Message, interface{}) {
 	payload := &libp2pmessage.TestMessage{
