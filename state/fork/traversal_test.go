@@ -23,7 +23,7 @@ type TraverseSuite struct {
 	byID     map[flow.Identifier]*flow.Header
 	byHeight map[uint64]*flow.Header
 	headers  *mockstorage.Headers
-	genesis  flow.Header
+	genesis  *flow.Header
 }
 
 func (s *TraverseSuite) SetupTest() {
@@ -46,16 +46,16 @@ func (s *TraverseSuite) SetupTest() {
 	// populate the mocked header storage with genesis and 10 child blocks
 	genesis := unittest.BlockHeaderFixture()
 	genesis.Height = 0
-	s.byID[genesis.ID()] = &genesis
-	s.byHeight[genesis.Height] = &genesis
+	s.byID[genesis.ID()] = genesis
+	s.byHeight[genesis.Height] = genesis
 	s.genesis = genesis
 
-	parent := &genesis
+	parent := genesis
 	for i := 0; i < 10; i++ {
 		child := unittest.BlockHeaderWithParentFixture(parent)
-		s.byID[child.ID()] = &child
-		s.byHeight[child.Height] = &child
-		parent = &child
+		s.byID[child.ID()] = child
+		s.byHeight[child.Height] = child
+		parent = child
 	}
 }
 
@@ -506,13 +506,13 @@ func (s *TraverseSuite) TestTraverse_OnDifferentForkThanTerminalBlock() {
 	noopVisitor := func(header *flow.Header) error { return nil }
 
 	// make other fork
-	otherForkHead := &s.genesis
+	otherForkHead := s.genesis
 	otherForkByHeight := make(map[uint64]*flow.Header)
 	for i := 0; i < 10; i++ {
 		child := unittest.BlockHeaderWithParentFixture(otherForkHead)
-		s.byID[child.ID()] = &child
-		otherForkByHeight[child.Height] = &child
-		otherForkHead = &child
+		s.byID[child.ID()] = child
+		otherForkByHeight[child.Height] = child
+		otherForkHead = child
 	}
 	terminalBlockID := otherForkByHeight[2].ID()
 

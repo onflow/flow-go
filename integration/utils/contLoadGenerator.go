@@ -10,12 +10,14 @@ import (
 
 	"github.com/onflow/cadence"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/module/metrics"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/access"
 	"github.com/onflow/flow-go-sdk/crypto"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type LoadType string
@@ -26,12 +28,21 @@ const (
 	CompHeavyLoadType     LoadType = "computation-heavy"
 	EventHeavyLoadType    LoadType = "event-heavy"
 	LedgerHeavyLoadType   LoadType = "ledger-heavy"
+	ConstExecCostLoadType LoadType = "const-exec" // for an empty transactions with various tx arguments
 )
 
 const slowTransactionThreshold = 30 * time.Second
 
 var accountCreationBatchSize = 750 // a higher number would hit max gRPC message size
 const tokensPerTransfer = 0.01     // flow testnets only have 10e6 total supply, so we choose a small amount here
+
+// ConstExecParam hosts all parameters for const-exec load type
+type ConstExecParam struct {
+	MaxTxSizeInByte uint
+	AuthAccountNum  uint
+	ArgSizeInByte   uint
+	PayerKeyCount   uint
+}
 
 // ContLoadGenerator creates a continuous load of transactions to the network
 // by creating many accounts and transfer flow tokens between them
@@ -53,6 +64,7 @@ type ContLoadGenerator struct {
 	loadType             LoadType
 	follower             TxFollower
 	availableAccountsLo  int
+	constExecParam       ConstExecParam
 }
 
 // NewContLoadGenerator returns a new ContLoadGenerator
@@ -70,6 +82,7 @@ func NewContLoadGenerator(
 	accountMultiplier int,
 	loadType LoadType,
 	feedbackEnabled bool,
+	constExecParam ConstExecParam,
 ) (*ContLoadGenerator, error) {
 	// Create "enough" accounts to prevent sequence number collisions.
 	numberOfAccounts := tps * accountMultiplier
@@ -89,6 +102,36 @@ func NewContLoadGenerator(
 		return nil, err
 	}
 
+	// check and cap params for const-exec mode
+	if loadType == ConstExecCostLoadType {
+		if constExecParam.MaxTxSizeInByte > flow.DefaultMaxTransactionByteSize {
+			errMsg := fmt.Sprintf("MaxTxSizeInByte(%d) is larger than DefaultMaxTransactionByteSize(%d).",
+				constExecParam.MaxTxSizeInByte,
+				flow.DefaultMaxTransactionByteSize)
+			log.Error().Msg(errMsg)
+
+			return nil, errors.New(errMsg)
+		}
+
+		// accounts[0] will be used as the proposer\payer
+		if constExecParam.AuthAccountNum > uint(numberOfAccounts-1) {
+			errMsg := fmt.Sprintf("Number of authorizer(%d) is larger than max possible(%d).",
+				constExecParam.AuthAccountNum,
+				numberOfAccounts-1)
+			log.Error().Msg(errMsg)
+
+			return nil, errors.New(errMsg)
+		}
+
+		if constExecParam.ArgSizeInByte > flow.DefaultMaxTransactionByteSize {
+			errMsg := fmt.Sprintf("ArgSizeInByte(%d) is larger than DefaultMaxTransactionByteSize(%d).",
+				constExecParam.ArgSizeInByte,
+				flow.DefaultMaxTransactionByteSize)
+			log.Error().Msg(errMsg)
+			return nil, errors.New(errMsg)
+		}
+	}
+
 	lGen := &ContLoadGenerator{
 		log:                  log,
 		loaderMetrics:        loaderMetrics,
@@ -104,6 +147,7 @@ func NewContLoadGenerator(
 		follower:             follower,
 		loadType:             loadType,
 		availableAccountsLo:  numberOfAccounts,
+		constExecParam:       constExecParam,
 	}
 
 	return lGen, nil
@@ -126,10 +170,22 @@ func (lg *ContLoadGenerator) Init() error {
 			return err
 		}
 	}
-	err := lg.setupFavContract()
-	if err != nil {
-		lg.log.Error().Err(err).Msg("failed to setup fav contract")
-		return err
+	if lg.loadType != ConstExecCostLoadType {
+		err := lg.setupFavContract()
+		if err != nil {
+			lg.log.Error().Err(err).Msg("failed to setup fav contract")
+			return err
+		}
+	} else {
+		lg.log.Info().Int("numberOfAccountsCreated", len(lg.accounts)).
+			Msg("new accounts created. Grabbing the first as the proposer/payer " +
+				"and adding multiple keys to that account")
+
+		err := lg.addKeysToProposerAccount(lg.accounts[0])
+		if err != nil {
+			lg.log.Error().Msg("failed to create add-key transaction for const-exec")
+			return err
+		}
 	}
 
 	return nil
@@ -182,6 +238,8 @@ func (lg *ContLoadGenerator) Start() {
 			worker = NewWorker(i, 1*time.Second, lg.sendTokenTransferTx)
 		case TokenAddKeysLoadType:
 			worker = NewWorker(i, 1*time.Second, lg.sendAddKeyTx)
+		case ConstExecCostLoadType:
+			worker = NewWorker(i, 1*time.Second, lg.sendConstExecCostTx)
 		// other types
 		default:
 			worker = NewWorker(i, 1*time.Second, lg.sendFavContractTx)
@@ -317,20 +375,9 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 	return nil
 }
 
-func (lg *ContLoadGenerator) sendAddKeyTx(workerID int) {
-	log := lg.log.With().Int("workerID", workerID).Logger()
-
-	// TODO move this as a configurable parameter
-	numberOfKeysToAdd := 40
-
-	log.Trace().Msg("getting next available account")
-
-	acc := <-lg.availableAccounts
-	defer func() { lg.availableAccounts <- acc }()
-
-	log.Trace().Msg("creating add proposer key script")
+func (lg *ContLoadGenerator) createAddKeyTx(accountAddress flowsdk.Address, numberOfKeysToAdd uint) (*flowsdk.Transaction, error) {
 	cadenceKeys := make([]cadence.Value, numberOfKeysToAdd)
-	for i := 0; i < numberOfKeysToAdd; i++ {
+	for i := uint(0); i < numberOfKeysToAdd; i++ {
 		cadenceKeys[i] = bytesToCadenceArray(lg.serviceAccount.accountKey.Encode())
 	}
 	cadenceKeysArray := cadence.NewArray(cadenceKeys)
@@ -338,12 +385,12 @@ func (lg *ContLoadGenerator) sendAddKeyTx(workerID int) {
 	addKeysScript, err := AddKeyToAccountScript()
 	if err != nil {
 		log.Error().Err(err).Msg("error getting add key to account script")
-		return
+		return nil, err
 	}
 
 	addKeysTx := flowsdk.NewTransaction().
 		SetScript(addKeysScript).
-		AddAuthorizer(*acc.address).
+		AddAuthorizer(accountAddress).
 		SetReferenceBlockID(lg.follower.BlockID()).
 		SetGasLimit(9999).
 		SetProposalKey(
@@ -356,6 +403,29 @@ func (lg *ContLoadGenerator) sendAddKeyTx(workerID int) {
 	err = addKeysTx.AddArgument(cadenceKeysArray)
 	if err != nil {
 		log.Error().Err(err).Msg("error constructing add keys to account transaction")
+		return nil, err
+	}
+
+	return addKeysTx, nil
+
+}
+
+func (lg *ContLoadGenerator) sendAddKeyTx(workerID int) {
+	log := lg.log.With().Int("workerID", workerID).Logger()
+
+	// TODO move this as a configurable parameter
+	numberOfKeysToAdd := uint(40)
+
+	log.Trace().Msg("getting next available account")
+
+	acc := <-lg.availableAccounts
+	defer func() { lg.availableAccounts <- acc }()
+
+	log.Trace().Msg("creating add proposer key script")
+
+	addKeysTx, err := lg.createAddKeyTx(*acc.address, numberOfKeysToAdd)
+	if err != nil {
+		log.Error().Err(err).Msg("error creating AddKey transaction")
 		return
 	}
 
@@ -378,6 +448,116 @@ func (lg *ContLoadGenerator) sendAddKeyTx(workerID int) {
 		return
 	}
 	<-ch
+}
+
+func (lg *ContLoadGenerator) addKeysToProposerAccount(proposerPayerAccount *flowAccount) error {
+	if proposerPayerAccount == nil {
+		return errors.New("proposerPayerAccount is nil")
+	}
+
+	addKeysToPayerTx, err := lg.createAddKeyTx(*lg.accounts[0].address, lg.constExecParam.PayerKeyCount)
+	if err != nil {
+		lg.log.Error().Msg("failed to create add-key transaction for const-exec")
+		return err
+	}
+	addKeysToPayerTx.SetReferenceBlockID(lg.follower.BlockID()).
+		SetProposalKey(*lg.accounts[0].address, 0, lg.accounts[0].seqNumber).
+		SetPayer(*lg.accounts[0].address)
+
+	lg.log.Info().Msg("signing the add-key transaction for const-exec")
+	err = lg.accounts[0].signTx(addKeysToPayerTx, 0)
+	if err != nil {
+		lg.log.Error().Err(err).Msg("error signing the add-key transaction for const-exec")
+		return err
+	}
+
+	lg.log.Info().Msg("issuing the add-key transaction for const-exec")
+	ch, err := lg.sendTx(0, addKeysToPayerTx)
+	if err != nil {
+		return err
+	}
+	<-ch
+
+	lg.log.Info().Msg("the add-key transaction for const-exec is done")
+	return nil
+}
+
+func (lg *ContLoadGenerator) sendConstExecCostTx(workerID int) {
+	log := lg.log.With().Int("workerID", workerID).Logger()
+
+	txScriptNoComment := ConstExecCostTransaction(lg.constExecParam.AuthAccountNum, 0)
+
+	tx := flowsdk.NewTransaction().
+		SetReferenceBlockID(lg.follower.BlockID()).
+		SetScript(txScriptNoComment).
+		SetGasLimit(10). // const-exec tx has empty transaction
+		SetProposalKey(*lg.accounts[0].address, 0, lg.accounts[0].seqNumber).
+		SetPayer(*lg.accounts[0].address)
+	lg.accounts[0].seqNumber += 1
+
+	txArgStr := generateRandomStringWithLen(lg.constExecParam.ArgSizeInByte)
+	txArg, err := cadence.NewString(txArgStr)
+	if err != nil {
+		log.Trace().Msg("Failed to generate cadence String parameter. Using empty string.")
+	}
+	tx.AddArgument(txArg)
+
+	// Add authorizers. lg.accounts[0] used as proposer\payer
+	log.Trace().Msg("Adding tx authorizers")
+	for i := uint(1); i < lg.constExecParam.AuthAccountNum+1; i++ {
+		tx = tx.AddAuthorizer(*lg.accounts[i].address)
+	}
+
+	log.Trace().Msg("Authorizers signing tx")
+	for i := uint(1); i < lg.constExecParam.AuthAccountNum+1; i++ {
+		err := lg.accounts[i].signPayload(tx, 0)
+		if err != nil {
+			log.Error().Err(err).Msg("error signing payload")
+			return
+		}
+	}
+
+	log.Trace().Msg("Payer signing tx")
+	for i := uint(0); i < lg.constExecParam.PayerKeyCount; i++ {
+		err = lg.accounts[0].signTx(tx, int(i))
+		if err != nil {
+			log.Error().Err(err).Msg("error signing transaction")
+			return
+		}
+	}
+
+	// calculate RLP-encoded binary size of the transaction without comment
+	txSizeWithoutComment := uint(len(tx.Encode()))
+	if txSizeWithoutComment > lg.constExecParam.MaxTxSizeInByte {
+		log.Error().Msg(fmt.Sprintf("current tx size(%d) without comment "+
+			"is larger than max tx size configured(%d)",
+			txSizeWithoutComment, lg.constExecParam.MaxTxSizeInByte))
+		return
+	}
+
+	// now adding comment to fulfill the final transaction size
+	commentSizeInByte := lg.constExecParam.MaxTxSizeInByte - txSizeWithoutComment
+	txScriptWithComment := ConstExecCostTransaction(lg.constExecParam.AuthAccountNum, commentSizeInByte)
+	tx = tx.SetScript(txScriptWithComment)
+
+	txSizeWithComment := uint(len(tx.Encode()))
+	log.Trace().Uint("Max Tx Size", lg.constExecParam.MaxTxSizeInByte).
+		Uint("Actual Tx Size", txSizeWithComment).
+		Uint("Tx Arg Size", lg.constExecParam.ArgSizeInByte).
+		Uint("Num of Authorizers", lg.constExecParam.AuthAccountNum).
+		Uint("Num of payer keys", lg.constExecParam.PayerKeyCount).
+		Uint("Script comment length", commentSizeInByte).
+		Msg("Generating one const-exec transaction")
+
+	log.Trace().Msg("Issuing tx")
+	ch, err := lg.sendTx(workerID, tx)
+	if err != nil {
+		log.Error().Err(err).Msg("const-exec tx failed")
+		return
+	}
+	<-ch
+
+	log.Trace().Msg("const-exec tx suceeded")
 }
 
 func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
@@ -510,7 +690,7 @@ func (lg *ContLoadGenerator) sendTx(workerID int, tx *flowsdk.Transaction) (<-ch
 	log.Trace().Msg("sending transaction")
 
 	// Add watcher before sending the transaction to avoid race condition
-	ch := lg.follower.CompleteChanByID(tx.ID())
+	ch := lg.follower.Follow(tx.ID())
 
 	err := lg.flowClient.SendTransaction(context.Background(), *tx)
 	if err != nil {

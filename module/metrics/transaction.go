@@ -187,7 +187,7 @@ func (tc *TransactionCollector) TransactionFinalized(txID flow.Identifier, when 
 
 	// remove transaction timing from mempool if finalized and executed
 	if !t.Finalized.IsZero() && !t.Executed.IsZero() {
-		tc.transactionTimings.Rem(txID)
+		tc.transactionTimings.Remove(txID)
 	}
 }
 
@@ -209,7 +209,7 @@ func (tc *TransactionCollector) TransactionExecuted(txID flow.Identifier, when t
 
 	// remove transaction timing from mempool if finalized and executed
 	if !t.Finalized.IsZero() && !t.Executed.IsZero() {
-		tc.transactionTimings.Rem(txID)
+		tc.transactionTimings.Remove(txID)
 	}
 }
 
@@ -273,7 +273,7 @@ func (tc *TransactionCollector) TransactionExpired(txID flow.Identifier) {
 		return
 	}
 	tc.transactionSubmission.WithLabelValues("expired").Inc()
-	tc.transactionTimings.Rem(txID)
+	tc.transactionTimings.Remove(txID)
 }
 
 func (tc *TransactionCollector) UpdateExecutionReceiptMaxHeight(height uint64) {

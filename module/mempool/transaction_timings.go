@@ -22,6 +22,6 @@ type TransactionTimings interface {
 	// All returns all transaction timings from the mempool.
 	All() []*flow.TransactionTiming
 
-	// Rem removes the transaction timing with the given ID.
-	Rem(txID flow.Identifier) bool
+	// Remove removes the transaction timing with the given ID.
+	Remove(txID flow.Identifier) bool
 }

@@ -25,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/meter/weighted"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -76,7 +77,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		// create a block with 1 collection with 2 transactions
 		block := generateBlock(1, 2, rag)
 
-		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
@@ -114,7 +115,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(nil, nil, nil, nil).
 			Once() // just system chunk
 
-		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
@@ -157,7 +158,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		opts := append(baseOpts, contextOptions...)
 		ctx := fvm.NewContext(zerolog.Nop(), opts...)
-		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
@@ -225,7 +226,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(nil, nil, nil, nil).
 			Times(collectionCount + 1)
 
-		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
@@ -345,7 +346,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
 		require.NoError(t, err)
 
-		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
@@ -360,6 +361,48 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		require.Equal(t, serviceEventB.EventType.ID(), string(result.ServiceEvents[1].Type))
 
 		assertEventHashesMatch(t, collectionCount+1, result)
+	})
+
+	t.Run("system transaction does not read memory limit from state", func(t *testing.T) {
+
+		weighted.DefaultMemoryWeights = weighted.ExecutionMemoryWeights{
+			0: 1, // single weight set to 1
+		}
+		execCtx := fvm.NewContext(
+			zerolog.Nop(),
+			fvm.WithMemoryLimit(10), // the context memory limit is set to 10
+		)
+
+		rt := &testRuntime{
+			executeTransaction: func(script runtime.Script, r runtime.Context) error {
+				err := r.Interface.MeterMemory(common.MemoryUsage{
+					Kind:   0,
+					Amount: 11,
+				})
+				require.NoError(t, err) // should fail if limit is taken from the default context
+
+				return nil
+			},
+			readStored: func(address common.Address, path cadence.Path, r runtime.Context) (cadence.Value, error) {
+				require.Fail(t, "system chunk should not read context from the state")
+				return nil, nil
+			},
+		}
+
+		vm := fvm.NewVirtualMachine(rt)
+
+		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
+		require.NoError(t, err)
+
+		block := generateBlock(0, 0, rag)
+
+		view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
+			return nil, nil
+		})
+
+		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
+		assert.NoError(t, err)
+		assert.Len(t, result.StateSnapshots, 1) // system chunk
 	})
 
 	t.Run("succeeding transactions store programs", func(t *testing.T) {
@@ -403,11 +446,11 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		const transactionCount = 2
 		block := generateBlock(collectionCount, transactionCount, rag)
 
-		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
-		err = view.Set(string(address.Bytes()), "", state.KeyAccountStatus, []byte{1})
+		err = view.Set(string(address.Bytes()), state.KeyAccountStatus, state.NewAccountStatus().ToBytes())
 		require.NoError(t, err)
 
 		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
@@ -478,11 +521,11 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		block := generateBlock(collectionCount, transactionCount, rag)
 
-		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
-		err = view.Set(string(address.Bytes()), "", state.KeyAccountStatus, []byte{1})
+		err = view.Set(string(address.Bytes()), state.KeyAccountStatus, state.NewAccountStatus().ToBytes())
 		require.NoError(t, err)
 
 		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
@@ -582,6 +625,10 @@ func (r *RandomAddressGenerator) AddressCount() uint64 {
 	panic("not implemented")
 }
 
+func (testRuntime) Storage(runtime.Context) (*runtime.Storage, *interpreter.Interpreter, error) {
+	panic("Storage not expected")
+}
+
 type FixedAddressGenerator struct {
 	Address flow.Address
 }
@@ -616,8 +663,8 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 	key, err := unittest.AccountKeyDefaultFixture()
 	require.NoError(t, err)
 
-	view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
-		return ledger.Get(owner, controller, key)
+	view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
+		return ledger.Get(owner, key)
 	})
 	sth := state.NewStateHolder(state.NewState(view))
 	accounts := state.NewAccounts(sth)
@@ -643,9 +690,8 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 
 	// make sure check for account status has been registered
 	id := flow.RegisterID{
-		Owner:      string(address.Bytes()),
-		Controller: "",
-		Key:        state.KeyAccountStatus,
+		Owner: string(address.Bytes()),
+		Key:   state.KeyAccountStatus,
 	}
 
 	require.Contains(t, registerTouches, id.String())

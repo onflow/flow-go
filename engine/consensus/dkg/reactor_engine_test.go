@@ -106,7 +106,7 @@ func (suite *ReactorEngineSuite_SetupPhase) SetupTest() {
 	suite.blocksByView = make(map[uint64]*flow.Header)
 	for view := suite.dkgStartView; view <= suite.dkgPhase3FinalView; view += dkg.DefaultPollStep {
 		header := unittest.BlockHeaderFixture(unittest.HeaderWithView(view))
-		suite.blocksByView[view] = &header
+		suite.blocksByView[view] = header
 	}
 	suite.firstBlock = suite.blocksByView[100]
 
@@ -345,7 +345,7 @@ func (suite *ReactorEngineSuite_CommittedPhase) SetupTest() {
 	epochQuery.Add(nextEpoch)
 
 	firstBlock := unittest.BlockHeaderFixture(unittest.HeaderWithView(100))
-	suite.firstBlock = &firstBlock
+	suite.firstBlock = firstBlock
 
 	suite.snap = new(protocol.Snapshot)
 	suite.snap.On("Epochs").Return(epochQuery)

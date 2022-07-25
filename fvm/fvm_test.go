@@ -2,7 +2,6 @@ package fvm_test
 
 import (
 	"crypto/rand"
-	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"math"
@@ -13,7 +12,6 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1289,6 +1287,56 @@ func TestSettingExecutionWeights(t *testing.T) {
 		},
 	))
 
+	t.Run("transaction should not read context from the state if AllowContextOverrideByExecutionState if false", newVMTest().
+		withBootstrapProcedureOptions(
+			fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+			fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+			fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+			fvm.WithExecutionEffortWeights(
+				weightedMeter.ExecutionEffortWeights{
+					meter.ComputationKindCreateAccount: 1_000_000_000_000 << weightedMeter.MeterExecutionInternalPrecisionBytes,
+				},
+			),
+			fvm.WithExecutionMemoryWeights(
+				weightedMeter.ExecutionMemoryWeights{
+					common.MemoryKindBreakStatement: 1_000_000_000_000,
+				},
+			),
+			fvm.WithExecutionMemoryLimit(0),
+		).withContextOptions(
+		fvm.WithAllowContextOverrideByExecutionState(false),
+		fvm.WithMemoryLimit(math.MaxUint64),
+	).run(
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(`
+				transaction {
+                  prepare(signer: AuthAccount) {
+					while true {
+						AuthAccount(payer: signer)
+						break
+					}
+                  }
+                }
+			`)).
+				SetProposalKey(chain.ServiceAddress(), 0, 0).
+				AddAuthorizer(chain.ServiceAddress()).
+				SetPayer(chain.ServiceAddress()).
+				SetGasLimit(1_000)
+
+			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+			require.NoError(t, err)
+
+			tx := fvm.Transaction(txBody, 0)
+			err = vm.Run(ctx, tx, view, programs)
+			// tx would fail if ExecutionEffortWeights from the state were used due to computation limit
+			// tx would fail if ExecutionMemoryWeights from the state were used due to memory limit
+			// tx would fail if MemoryLimit from the state was used due to memory limit
+			require.NoError(t, err)
+			require.NoError(t, tx.Err)
+		},
+	))
+
 	t.Run("transaction should not use up more computation that the transaction body itself", newVMTest().withBootstrapProcedureOptions(
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
@@ -1405,11 +1453,10 @@ func TestStorageUsed(t *testing.T) {
 	address, err := hex.DecodeString("2a3c4c2581cef731")
 	require.NoError(t, err)
 
-	storageUsed := make([]byte, 8)
-	binary.BigEndian.PutUint64(storageUsed, 5)
-
 	simpleView := utils.NewSimpleView()
-	err = simpleView.Set(string(address), "", state.KeyStorageUsed, storageUsed)
+	status := state.NewAccountStatus()
+	status.SetStorageUsed(5)
+	err = simpleView.Set(string(address), state.KeyAccountStatus, status.ToBytes())
 	require.NoError(t, err)
 
 	script := fvm.Script(code)
@@ -1571,8 +1618,8 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 				require.Error(t, script.Err)
 				require.IsType(t, &errors.CadenceRuntimeError{}, script.Err)
 				// modifications to contracts are not supported in scripts
-				require.IsType(t, &errors.OperationNotSupportedError{},
-					script.Err.(*errors.CadenceRuntimeError).Unwrap().(*runtime.Error).Err.(interpreter.Error).Err.(interpreter.PositionedError).Err)
+				unsupportedOperationError := &errors.OperationNotSupportedError{}
+				require.ErrorAs(t, script.Err, &unsupportedOperationError)
 			},
 		),
 	)
@@ -1630,8 +1677,8 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 				require.Error(t, script.Err)
 				require.IsType(t, &errors.CadenceRuntimeError{}, script.Err)
 				// modifications to contracts are not supported in scripts
-				require.IsType(t, &errors.OperationNotSupportedError{},
-					script.Err.(*errors.CadenceRuntimeError).Unwrap().(*runtime.Error).Err.(interpreter.Error).Err.(interpreter.PositionedError).Err)
+				unsupportedOperationError := &errors.OperationNotSupportedError{}
+				require.ErrorAs(t, script.Err, &unsupportedOperationError)
 			},
 		),
 	)
@@ -1688,8 +1735,8 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 				require.Error(t, script.Err)
 				require.IsType(t, &errors.CadenceRuntimeError{}, script.Err)
 				// modifications to contracts are not supported in scripts
-				require.IsType(t, &errors.OperationNotSupportedError{},
-					script.Err.(*errors.CadenceRuntimeError).Unwrap().(*runtime.Error).Err.(interpreter.Error).Err.(interpreter.PositionedError).Err)
+				unsupportedOperationError := &errors.OperationNotSupportedError{}
+				require.ErrorAs(t, script.Err, &unsupportedOperationError)
 			},
 		),
 	)
@@ -1736,8 +1783,8 @@ func TestScriptAccountKeyMutationsFailure(t *testing.T) {
 				require.Error(t, script.Err)
 				require.IsType(t, &errors.CadenceRuntimeError{}, script.Err)
 				// modifications to public keys are not supported in scripts
-				require.IsType(t, &errors.OperationNotSupportedError{},
-					script.Err.(*errors.CadenceRuntimeError).Unwrap().(*runtime.Error).Err.(interpreter.Error).Err.(interpreter.PositionedError).Err)
+				unsupportedOperationError := &errors.OperationNotSupportedError{}
+				require.ErrorAs(t, script.Err, &unsupportedOperationError)
 			},
 		),
 	)
@@ -1772,8 +1819,8 @@ func TestScriptAccountKeyMutationsFailure(t *testing.T) {
 				require.Error(t, script.Err)
 				require.IsType(t, &errors.CadenceRuntimeError{}, script.Err)
 				// modifications to public keys are not supported in scripts
-				require.IsType(t, &errors.OperationNotSupportedError{},
-					script.Err.(*errors.CadenceRuntimeError).Unwrap().(*runtime.Error).Err.(interpreter.Error).Err.(interpreter.PositionedError).Err)
+				unsupportedOperationError := &errors.OperationNotSupportedError{}
+				require.ErrorAs(t, script.Err, &unsupportedOperationError)
 			},
 		),
 	)

@@ -62,31 +62,13 @@ func (_m *ConnectionFactory) GetExecutionAPIClient(address string) (execution.Ex
 }
 
 // InvalidateAccessAPIClient provides a mock function with given fields: address
-func (_m *ConnectionFactory) InvalidateAccessAPIClient(address string) bool {
-	ret := _m.Called(address)
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func(string) bool); ok {
-		r0 = rf(address)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	return r0
+func (_m *ConnectionFactory) InvalidateAccessAPIClient(address string) {
+	_m.Called(address)
 }
 
 // InvalidateExecutionAPIClient provides a mock function with given fields: address
-func (_m *ConnectionFactory) InvalidateExecutionAPIClient(address string) bool {
-	ret := _m.Called(address)
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func(string) bool); ok {
-		r0 = rf(address)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	return r0
+func (_m *ConnectionFactory) InvalidateExecutionAPIClient(address string) {
+	_m.Called(address)
 }
 
 type NewConnectionFactoryT interface {

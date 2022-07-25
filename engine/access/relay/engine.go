@@ -8,28 +8,29 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 )
 
 // Relay engine relays all the messages that are received to the given network for the corresponding channel
 type Engine struct {
-	unit     *engine.Unit                        // used to manage concurrency & shutdown
-	log      zerolog.Logger                      // used to log relevant actions with context
-	conduits map[network.Channel]network.Conduit // conduits for unstaked network
+	unit     *engine.Unit                         // used to manage concurrency & shutdown
+	log      zerolog.Logger                       // used to log relevant actions with context
+	conduits map[channels.Channel]network.Conduit // conduits for unstaked network
 }
 
 func New(
 	log zerolog.Logger,
-	channels network.ChannelList,
+	channelList channels.ChannelList,
 	net network.Network,
 	unstakedNet network.Network,
 ) (*Engine, error) {
 	e := &Engine{
 		unit:     engine.NewUnit(),
 		log:      log.With().Str("engine", "relay").Logger(),
-		conduits: make(map[network.Channel]network.Conduit),
+		conduits: make(map[channels.Channel]network.Conduit),
 	}
 
-	for _, channel := range channels {
+	for _, channel := range channelList {
 		_, err := net.Register(channel, e)
 		if err != nil {
 			return nil, fmt.Errorf("could not register relay engine on channel: %w", err)
@@ -76,7 +77,7 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
+func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(channel, originID, event)
 		if err != nil {
@@ -88,13 +89,13 @@ func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event
 // Process processes the given event from the node with the given origin ID
 // in a blocking manner. It returns the potential processing error when
 // done.
-func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		return e.process(channel, originID, event)
 	})
 }
 
-func (e *Engine) process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+func (e *Engine) process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	conduit, ok := e.conduits[channel]
 
 	if !ok {
