@@ -117,11 +117,15 @@ func (n *Network) Register(channel channels.Channel, messageProcessor flownet.Me
 	return conduit, nil
 }
 
+// RegisterBlobService directly invokes the corresponding method on the underlying Flow network instance. It does not perform
+// any corruption and passes everything through as it is.
 func (n *Network) RegisterBlobService(channel channels.Channel, store datastore.Batching, opts ...flownet.BlobServiceOption) (flownet.BlobService,
 	error) {
 	return n.flowNetwork.RegisterBlobService(channel, store, opts...)
 }
 
+// RegisterPingService directly invokes the corresponding method on the underlying Flow network instance. It does not perform
+// any corruption and passes everything through as it is.
 func (n *Network) RegisterPingService(pingProtocolID protocol.ID, pingInfoProvider flownet.PingInfoProvider) (flownet.PingService, error) {
 	return n.flowNetwork.RegisterPingService(pingProtocolID, pingInfoProvider)
 }
