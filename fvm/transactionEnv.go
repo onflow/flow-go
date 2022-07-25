@@ -59,19 +59,21 @@ func NewTransactionEnvironment(
 	accountKeys := handler.NewAccountKeyHandler(accounts)
 	metrics := handler.NewMetricsHandler(ctx.Metrics)
 
+	envCtx := &EnvContext{nestedContext{ctx}, traceSpan}
 	env := &TransactionEnv{
 		commonEnv: commonEnv{
-			ctx:           ctx,
-			sth:           sth,
-			vm:            vm,
-			programs:      programsHandler,
-			accounts:      accounts,
-			accountKeys:   accountKeys,
-			uuidGenerator: uuidGenerator,
-			metrics:       metrics,
-			logs:          nil,
-			rng:           nil,
-			traceSpan:     traceSpan,
+			ctx:                   envCtx,
+			ProgramLogger:         NewProgramLogger(envCtx),
+			UnsafeRandomGenerator: NewUnsafeRandomGenerator(envCtx),
+			sth:                   sth,
+			vm:                    vm,
+			programs:              programsHandler,
+			accounts:              accounts,
+			accountKeys:           accountKeys,
+			uuidGenerator:         uuidGenerator,
+			metrics:               metrics,
+			// TODO(patrick): switch to EnvContext's start span api.
+			traceSpan: traceSpan,
 		},
 
 		addressGenerator: generator,
@@ -105,10 +107,6 @@ func NewTransactionEnvironment(
 		env.GetAccountsAuthorizedForContractRemoval,
 		env.useContractAuditVoucher,
 	)
-
-	if ctx.BlockHeader != nil {
-		env.seedRNG(ctx.BlockHeader)
-	}
 
 	var err error
 	// set the execution parameters from the state
@@ -432,22 +430,6 @@ func (e *TransactionEnv) ResolveLocation(
 	}
 
 	return resolvedLocations, nil
-}
-
-func (e *TransactionEnv) ProgramLog(message string) error {
-	if e.isTraceable() && e.ctx.ExtensiveTracing {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvProgramLog)
-		defer sp.Finish()
-	}
-
-	if e.ctx.CadenceLoggingEnabled {
-		e.logs = append(e.logs, message)
-	}
-	return nil
-}
-
-func (e *TransactionEnv) Logs() []string {
-	return e.logs
 }
 
 func (e *TransactionEnv) EmitEvent(event cadence.Event) error {

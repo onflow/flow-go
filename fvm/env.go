@@ -1,10 +1,8 @@
 package fvm
 
 import (
-	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"math/rand"
 	"time"
 
 	"github.com/onflow/atree"
@@ -71,10 +69,15 @@ type AccountInterface interface {
 // Parts of the environment that are common to all transaction and script
 // executions.
 type commonEnv struct {
+	// TODO(patrick): convert ctx to anonymous field once the rest of env
+	// is broken up into coherent pieces.
+	ctx *EnvContext
+	*ProgramLogger
+	*UnsafeRandomGenerator
+
 	MeterInterface
 	AccountInterface
 
-	ctx           Context
 	sth           *state.StateHolder
 	vm            *VirtualMachine
 	programs      *handler.ProgramsHandler
@@ -83,9 +86,9 @@ type commonEnv struct {
 	contracts     *handler.ContractHandler
 	uuidGenerator *state.UUIDGenerator
 	metrics       *handler.MetricsHandler
-	logs          []string
-	rng           *rand.Rand
-	traceSpan     opentracing.Span
+	// TODO(patrick): switch to EnvContext's start span api.
+
+	traceSpan opentracing.Span
 }
 
 // TODO(patrick): rm once Meter object has been refactored
@@ -108,41 +111,16 @@ func (env *commonEnv) MemoryEstimate() uint64 {
 	return uint64(env.sth.State().TotalMemoryEstimate())
 }
 
+// TODO(patrick): rm once ctx becomes an anonymous field.
 func (env *commonEnv) Context() *Context {
-	return &env.ctx
+	return env.ctx.Context()
 }
 
 func (env *commonEnv) VM() *VirtualMachine {
 	return env.vm
 }
 
-func (env *commonEnv) seedRNG(header *flow.Header) {
-	// Seed the random number generator with entropy created from the block
-	// header ID. The random number generator will be used by the UnsafeRandom
-	// function.
-	id := header.ID()
-	source := rand.NewSource(int64(binary.BigEndian.Uint64(id[:])))
-	env.rng = rand.New(source)
-}
-
-// UnsafeRandom returns a random uint64, where the process of random number derivation is not cryptographically
-// secure.
-func (env *commonEnv) UnsafeRandom() (uint64, error) {
-	if env.isTraceable() && env.ctx.ExtensiveTracing {
-		sp := env.ctx.Tracer.StartSpanFromParent(env.traceSpan, trace.FVMEnvUnsafeRandom)
-		defer sp.Finish()
-	}
-
-	if env.rng == nil {
-		return 0, errors.NewOperationNotSupportedError("UnsafeRandom")
-	}
-
-	// TODO (ramtin) return errors this assumption that this always succeeds might not be true
-	buf := make([]byte, 8)
-	_, _ = env.rng.Read(buf) // Always succeeds, no need to check error
-	return binary.LittleEndian.Uint64(buf), nil
-}
-
+// TODO(patrick): switch to EnvContext's start span api.
 func (env *commonEnv) isTraceable() bool {
 	return env.ctx.Tracer != nil && env.traceSpan != nil
 }
