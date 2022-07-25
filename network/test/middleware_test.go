@@ -10,7 +10,9 @@ import (
 
 	"github.com/ipfs/go-log"
 	swarm "github.com/libp2p/go-libp2p-swarm"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network/slashing"
+	"github.com/onflow/flow-go/network/validator"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -532,56 +534,260 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 
 // TestUnicast_Authorization tests that the middleware handleIncoming stream unicast callback
 // correctly authenticates peers and checks message authorization.
-//func (m *MiddlewareTestSuite) TestUnicast_Authorization() {
-//	m.Run("unstaked peer", func() {
-//		// setup mock slashing violations consumer
-//		slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(m.T())
-//		defer slashingViolationsConsumer.AssertExpectations(m.T())
-//
-//		ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1)
-//		mws, providers := GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, unittest.NetworkCodec(), slashingViolationsConsumer)
-//		require.Len(m.T(), ids, 1)
-//		require.Len(m.T(), providers, 1)
-//		require.Len(m.T(), mws, 1)
-//		newId := ids[0]
-//		newMw := mws[0]
-//
-//		overlay := m.createOverlay(providers[0])
-//		overlay.On("Receive",
-//			m.ids[0].NodeID,
-//			mock.AnythingOfType("*message.Message"),
-//		).Return(nil)
-//		newMw.SetOverlay(overlay)
-//		newMw.Start(m.mwCtx)
-//
-//		idList := flow.IdentityList(append(m.ids, newId))
-//
-//		// needed to enable ID translation
-//		m.providers[0].SetIdentities(idList)
-//
-//		msg, _ := createMessage(m.ids[0].NodeID, newId.NodeID, "hello")
-//
-//		// update the addresses
-//		m.mws[0].UpdateNodeAddresses()
-//
-//		// now the message should send successfully
-//		err := m.mws[0].SendDirect(msg, newId.NodeID)
-//		require.NoError(m.T(), err)
-//	})
-//
-//	m.Run("ejected peer", func() {
-//
-//	})
-//
-//	m.Run("unauthorized peer", func() {
-//
-//	})
-//}
+func (m *MiddlewareTestSuite) TestUnicast_Authorization() {
+	m.Run("unstaked peer", func() {
+		// setup mock slashing violations consumer
+		slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(m.T())
+
+		expectedSenderPeerID, err := unittest.PeerIDFromFlowID(m.ids[0])
+		require.NoError(m.T(), err)
+
+		// channel will allow us to wait until method call before shutting down middleware
+		ch := make(chan struct{})
+
+		var nilID *flow.Identity
+		slashingViolationsConsumer.On(
+			"OnUnAuthorizedSenderError",
+			nilID,
+			expectedSenderPeerID.String(),
+			"", // message will not be decoded before OnSenderEjectedError is logged, we won't log message type
+			"", // message will not be decoded before OnSenderEjectedError is logged, we won't log message type
+			true,
+			validator.ErrIdentityUnverified,
+		).Once().Run(func(args mockery.Arguments) {
+			close(ch)
+		})
+
+		defer slashingViolationsConsumer.AssertExpectations(m.T())
+
+		ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1)
+		mws, providers := GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, unittest.NetworkCodec(), slashingViolationsConsumer)
+		require.Len(m.T(), ids, 1)
+		require.Len(m.T(), providers, 1)
+		require.Len(m.T(), mws, 1)
+		newId := ids[0]
+		newMw := mws[0]
+
+		overlay := &mocknetwork.Overlay{}
+		overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
+			return providers[0].Identities(filter.Any)
+		})
+		overlay.On("Topology").Maybe().Return(func() flow.IdentityList {
+			return providers[0].Identities(filter.Any)
+		}, nil)
+
+		//NOTE: return false simulating unstaked node
+		overlay.On("Identity", mock.AnythingOfType("peer.ID")).Return(nil, false)
+		overlay.On("Receive",
+			m.ids[0].NodeID,
+			mock.AnythingOfType("*message.Message"),
+		).Return(nil)
+
+		newMw.SetOverlay(overlay)
+
+		ctx, cancel := context.WithCancel(m.mwCtx)
+
+		mwCtx, _ := irrecoverable.WithSignaler(ctx)
+		newMw.Start(mwCtx)
+
+		idList := flow.IdentityList(append(m.ids, newId))
+
+		// needed to enable ID translation
+		m.providers[0].SetIdentities(idList)
+
+		// set the channel ID in the test message to a channel that TestMessage(s) is not allowed to be sent on ConsensusCommittee
+		msg, _ := createMessage(m.ids[0].NodeID, newId.NodeID, "hello")
+
+		// update the addresses
+		m.mws[0].UpdateNodeAddresses()
+
+		// now the message should send successfully
+		err = m.mws[0].SendDirect(msg, newId.NodeID)
+		require.NoError(m.T(), err)
+
+		unittest.RequireCloseBefore(m.T(), ch, 100*time.Millisecond, "slashing violations consumer mock not invoked on time")
+
+		cancel()
+		unittest.RequireCloseBefore(m.T(), newMw.Done(), 100*time.Millisecond, "could not stop middleware on time")
+	})
+
+	m.Run("ejected peer", func() {
+		// setup mock slashing violations consumer
+		slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(m.T())
+
+		//NOTE: setup ejected identity
+		ejectedID, _ := unittest.IdentityWithNetworkingKeyFixture()
+		ejectedID.Ejected = true
+
+		expectedSenderPeerID, err := unittest.PeerIDFromFlowID(m.ids[0])
+		require.NoError(m.T(), err)
+
+		// channel will allow us to wait until method call before shutting down middleware
+		ch := make(chan struct{})
+
+		slashingViolationsConsumer.On(
+			"OnSenderEjectedError",
+			ejectedID,                     // we expect this identity to be called with the ejected ID
+			expectedSenderPeerID.String(), // although we are returning a modified ejected identity we still expect this peer ID to be the peer ID of the real sender
+			"",                            // message will not be decoded before OnSenderEjectedError is logged, we won't log message type
+			"",                            // message will not be decoded before OnSenderEjectedError is logged, we won't log message type
+			true,
+			validator.ErrSenderEjected,
+		).Once().Run(func(args mockery.Arguments) {
+			close(ch)
+		})
+
+		defer slashingViolationsConsumer.AssertExpectations(m.T())
+
+		ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1)
+		mws, providers := GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, unittest.NetworkCodec(), slashingViolationsConsumer)
+		require.Len(m.T(), ids, 1)
+		require.Len(m.T(), providers, 1)
+		require.Len(m.T(), mws, 1)
+		newId := ids[0]
+		newMw := mws[0]
+
+		overlay := &mocknetwork.Overlay{}
+		overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
+			return providers[0].Identities(filter.Any)
+		})
+		overlay.On("Topology").Maybe().Return(func() flow.IdentityList {
+			return providers[0].Identities(filter.Any)
+		}, nil)
+		//NOTE: return ejected identity causing validation to fail
+		overlay.On("Identity", mock.AnythingOfType("peer.ID")).Return(ejectedID, true)
+		overlay.On("Receive",
+			m.ids[0].NodeID,
+			mock.AnythingOfType("*message.Message"),
+		).Return(nil)
+
+		newMw.SetOverlay(overlay)
+
+		ctx, cancel := context.WithCancel(m.mwCtx)
+
+		mwCtx, _ := irrecoverable.WithSignaler(ctx)
+		newMw.Start(mwCtx)
+
+		idList := flow.IdentityList(append(m.ids, newId))
+
+		// needed to enable ID translation
+		m.providers[0].SetIdentities(idList)
+
+		// set the channel ID in the test message to a channel that TestMessage(s) is not allowed to be sent on ConsensusCommittee
+		msg, _ := createMessage(m.ids[0].NodeID, newId.NodeID, "hello")
+
+		// update the addresses
+		m.mws[0].UpdateNodeAddresses()
+
+		// now the message should send successfully
+		err = m.mws[0].SendDirect(msg, newId.NodeID)
+		require.NoError(m.T(), err)
+
+		unittest.RequireCloseBefore(m.T(), ch, 100*time.Millisecond, "slashing violations consumer mock not invoked on time")
+
+		cancel()
+		unittest.RequireCloseBefore(m.T(), newMw.Done(), 100*time.Millisecond, "could not stop middleware on time")
+	})
+
+	m.Run("unauthorized peer", func() {
+		// setup mock slashing violations consumer
+		slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(m.T())
+
+		expectedSenderPeerID, err := unittest.PeerIDFromFlowID(m.ids[0])
+		require.NoError(m.T(), err)
+
+		// channel will allow us to wait until method call before shutting down middleware
+		ch := make(chan struct{})
+
+		slashingViolationsConsumer.On(
+			"OnUnAuthorizedSenderError",
+			mock.Anything,                 // mock overlay always returns a random identity
+			expectedSenderPeerID.String(), // expected peer ID asserts we also receive the correct identity parameter
+			message.TestMessage,
+			channels.ConsensusCommittee.String(),
+			true,
+			message.ErrUnauthorizedMessageOnChannel,
+		).Once().Run(func(args mockery.Arguments) {
+			close(ch)
+		})
+
+		defer slashingViolationsConsumer.AssertExpectations(m.T())
+
+		ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1)
+		mws, providers := GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, unittest.NetworkCodec(), slashingViolationsConsumer)
+		require.Len(m.T(), ids, 1)
+		require.Len(m.T(), providers, 1)
+		require.Len(m.T(), mws, 1)
+		newId := ids[0]
+		newMw := mws[0]
+
+		overlay := m.createOverlay(providers[0])
+		overlay.On("Receive",
+			m.ids[0].NodeID,
+			mock.AnythingOfType("*message.Message"),
+		).Return(nil)
+		newMw.SetOverlay(overlay)
+
+		ctx, cancel := context.WithCancel(m.mwCtx)
+
+		mwCtx, _ := irrecoverable.WithSignaler(ctx)
+		newMw.Start(mwCtx)
+
+		idList := flow.IdentityList(append(m.ids, newId))
+
+		// needed to enable ID translation
+		m.providers[0].SetIdentities(idList)
+
+		//NOTE: set the channel ID in the test message to a channel that TestMessage(s) is not allowed to be sent on ConsensusCommittee
+		msg, _ := createMessage(m.ids[0].NodeID, newId.NodeID, "hello")
+		msg.ChannelID = channels.ConsensusCommittee.String()
+
+		// update the addresses
+		m.mws[0].UpdateNodeAddresses()
+
+		// now the message should send successfully
+		err = m.mws[0].SendDirect(msg, newId.NodeID)
+		require.NoError(m.T(), err)
+
+		unittest.RequireCloseBefore(m.T(), ch, 100*time.Millisecond, "slashing violations consumer mock not invoked on time")
+
+		cancel()
+		unittest.RequireCloseBefore(m.T(), newMw.Done(), 100*time.Millisecond, "could not stop middleware on time")
+	})
+}
 
 func createMessage(originID flow.Identifier, targetID flow.Identifier, msg string) (*message.Message, interface{}) {
 	payload := &libp2pmessage.TestMessage{
 		Text: msg,
 	}
+
+	codec := unittest.NetworkCodec()
+	b, err := codec.Encode(payload)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	m := &message.Message{
+		ChannelID: testChannel.String(),
+		EventID:   []byte("1"),
+		OriginID:  originID[:],
+		TargetIDs: [][]byte{targetID[:]},
+		Payload:   b,
+	}
+
+	return m, payload
+}
+
+func createUnknownMessage(originID flow.Identifier, targetID flow.Identifier) (*message.Message, interface{}) {
+	type msg struct {
+		*messages.BlockProposal
+	}
+
+	// *validator.msg is not a known message type, but embeds *messages.BlockProposal which is
+	payload := &msg{&messages.BlockProposal{
+		Header:  nil,
+		Payload: nil,
+	}}
 
 	codec := unittest.NetworkCodec()
 	b, err := codec.Encode(payload)
