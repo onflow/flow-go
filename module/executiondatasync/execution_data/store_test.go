@@ -52,7 +52,7 @@ func generateChunkExecutionData(t *testing.T, minSerializedSize uint64) *executi
 		}
 
 		v := make([]byte, size)
-		rand.Read(v)
+		_, _ = rand.Read(v)
 		ced.TrieUpdate.Payloads[0].Value = v
 		size *= 2
 	}
@@ -187,7 +187,7 @@ func TestGetIncompleteData(t *testing.T) {
 	t.Logf("%d blobs in blob tree", len(cids))
 
 	cidToDelete := cids[rand.Intn(len(cids))]
-	blobstore.DeleteBlob(context.Background(), cidToDelete)
+	require.NoError(t, blobstore.DeleteBlob(context.Background(), cidToDelete))
 
 	_, err = eds.GetExecutionData(context.Background(), rootID)
 	var blobNotFoundError *execution_data.BlobNotFoundError

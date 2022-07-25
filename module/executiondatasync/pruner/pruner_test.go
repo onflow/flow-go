@@ -119,7 +119,7 @@ func TestUpdateThreshold(t *testing.T) {
 		return nil
 	}).Once()
 
-	pruner.SetThreshold(4)
+	require.NoError(t, pruner.SetThreshold(4))
 	unittest.AssertClosesBefore(t, pruned, time.Second)
 	trackerStorage.AssertExpectations(t)
 
@@ -159,7 +159,7 @@ func TestUpdateHeightRangeTarget(t *testing.T) {
 		return nil
 	}).Once()
 
-	pruner.SetHeightRangeTarget(5)
+	require.NoError(t, pruner.SetHeightRangeTarget(5))
 	unittest.AssertClosesBefore(t, pruned, time.Second)
 	trackerStorage.AssertExpectations(t)
 

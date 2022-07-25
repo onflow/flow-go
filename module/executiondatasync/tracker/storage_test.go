@@ -36,12 +36,12 @@ func TestPrune(t *testing.T) {
 	c3 := randomCid()
 	c4 := randomCid()
 
-	storage.Update(func(tbf TrackBlobsFn) error {
+	require.NoError(t, storage.Update(func(tbf TrackBlobsFn) error {
 		require.NoError(t, tbf(1, c1, c2))
 		require.NoError(t, tbf(2, c3, c4))
 
 		return nil
-	})
+	}))
 	require.NoError(t, storage.Prune(1))
 
 	assert.Len(t, expectedPrunedCIDs, 0)

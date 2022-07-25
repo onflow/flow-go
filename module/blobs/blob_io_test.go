@@ -23,6 +23,6 @@ func TestEmptyWrite(t *testing.T) {
 	close(blobCh)
 	assert.Panics(t, func() {
 		var buf [8]byte
-		bcw.Write(buf[:])
+		_, _ = bcw.Write(buf[:])
 	})
 }

@@ -75,7 +75,6 @@ const (
 	subsystemExeDataRequester       = "requester"
 	subsystemExeDataProvider        = "provider"
 	subsystemExeDataPruner          = "pruner"
-	subsystemExecutionDataService   = "execution_data_service"
 	subsystemExecutionDataRequester = "execution_data_requester"
 )
 
