@@ -19,9 +19,11 @@ import (
 	"github.com/libp2p/go-libp2p-core/routing"
 	"golang.org/x/time/rate"
 
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 )
 
@@ -173,12 +175,14 @@ func (s *blobServiceSession) GetBlobs(ctx context.Context, ks []cid.Cid) <-chan 
 type rateLimitedBlockStore struct {
 	blockstore.Blockstore
 	limiter *rate.Limiter
+	metrics module.RateLimitedBlockstoreMetrics
 }
 
 func newRateLimitedBlockStore(bs blockstore.Blockstore, r float64, b int) *rateLimitedBlockStore {
 	return &rateLimitedBlockStore{
 		Blockstore: bs,
 		limiter:    rate.NewLimiter(rate.Limit(r), b),
+		metrics:    metrics.NewRateLimitedBlockstoreCollector(),
 	}
 }
 
@@ -192,6 +196,8 @@ func (r *rateLimitedBlockStore) Get(ctx context.Context, c cid.Cid) (blocks.Bloc
 	if err != nil {
 		return nil, err
 	}
+
+	r.metrics.BytesRead(size)
 
 	return r.Blockstore.Get(ctx, c)
 }

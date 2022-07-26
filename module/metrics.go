@@ -321,6 +321,10 @@ type LedgerMetrics interface {
 type WALMetrics interface {
 }
 
+type RateLimitedBlockstoreMetrics interface {
+	BytesRead(int)
+}
+
 type ExecutionDataServiceMetrics interface {
 	ExecutionDataAddStarted()
 
