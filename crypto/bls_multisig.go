@@ -84,7 +84,8 @@ func BLSVerifyPOP(pk PublicKey, s Signature) (bool, error) {
 //  - (nil, invalidInputsError):
 //		- (nil, aggregationEmptyListError) : if no signatures are provided (input slice is empty)
 //      - Or a deserialization of at least one signature fails (input is an invalid serialization of a
-// 		compressed G1 element following https://github.com/zkcrypto/pairing/blob/master/src/bls12_381/README.md#serialization)
+// 		compressed G1 element following [zcash]
+//     https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-)
 //  - (nil, error) if an unexpected error occurs
 //  - (aggregated_signature, nil) otherwise
 func AggregateBLSSignatures(sigs []Signature) (Signature, error) {
@@ -526,19 +527,19 @@ func BatchVerifyBLSSignaturesOneMessage(pks []PublicKey, sigs []Signature,
 	return verifBool, nil
 }
 
-// aggregationEmptyListErrorf constructs a new invalidInputsError (API misuse)
-// for the case of empty lists passed into aggregation functions.
-func aggregationEmptyListErrorf(msg string, args ...interface{}) error {
+// invalidSerializationErrorf constructs a new invalidInputsError (API misuse)
+// for the case of failure to deserialize an input byte slice.
+func invalidSerializationErrorf(msg string, args ...interface{}) error {
 	return &invalidInputsError{
 		error:   fmt.Errorf(msg, args...),
 		subType: dkgInvalidStateTransition,
 	}
 }
 
-// IsAggregationEmptyListError checks if the input error is of a aggregationEmptyList error type.
-// aggregationEmptyList is a subtype of invalidInputsError, returned when a BLS
-// aggregation function is called with an empty list which is not allowed in some cases.
-func IsAggregationEmptyListError(err error) bool {
+// IsInvalidSerializationError checks if the input error is of a invalidSerialization error type.
+// invalidSerializationErrorf is a subtype of invalidInputsError, returned when an input
+// byte slice fails to decode.
+func IsInvalidSerializationError(err error) bool {
 	var target *invalidInputsError
-	return errors.As(err, &target) && target.subType == aggregationEmptyList
+	return errors.As(err, &target) && target.subType == invalidSerialization
 }

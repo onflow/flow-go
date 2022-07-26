@@ -98,7 +98,7 @@ func internalExpandMsgXOFKMAC128(key string) hash.Hasher {
 // Sign signs an array of bytes using the private key
 //
 // Signature is compressed [zcash]
-// https://github.com/zkcrypto/pairing/blob/master/src/bls12_381/README.md#serialization
+// https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-
 // The private key is read only.
 // If the hasher used is KMAC128, the hasher is read only.
 // It is recommended to use Sign with the hasher from NewExpandMsgXOFKMAC128. If not, the hasher used
@@ -370,7 +370,7 @@ func (pk *PubKeyBLSBLS12381) Size() int {
 
 // Encode returns a byte encoding of the public key.
 // The encoding is a compressed encoding of the point
-// [zcash] https://github.com/zkcrypto/pairing/blob/master/src/bls12_381/README.md#serialization
+// [zcash] https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-
 func (a *PubKeyBLSBLS12381) EncodeCompressed() []byte {
 	if serializationG2 != compressed {
 		panic("library is not configured to use compressed public key serialization")
