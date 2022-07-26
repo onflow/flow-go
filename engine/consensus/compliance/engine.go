@@ -167,6 +167,7 @@ func NewEngine(
 		metrics:                    core.metrics,
 		headers:                    core.headers,
 		payloads:                   core.payloads,
+		pendingBlockResponses:      pendingBlockResponses,
 		pendingBlocks:              pendingBlocks,
 		pendingVotes:               pendingVotes,
 		state:                      core.state,
