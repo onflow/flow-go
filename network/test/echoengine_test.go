@@ -52,7 +52,6 @@ func (suite *EchoEngineTestSuite) SetupTest() {
 		suite.T(),
 		count,
 		logger,
-		nil,
 		unittest.NetworkCodec(),
 	)
 }
