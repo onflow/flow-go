@@ -1016,8 +1016,8 @@ func (builder *ObserverServiceBuilder) initUpstreamClient() (accessproto.AccessA
 		// TLS
 		tlsConfig, err := grpcutils.DefaultClientTLSConfig(identity.NetworkPubKey)
 		if err != nil {
-			multierror.Append(err, 
-				fmt.Errorf("failed to get default TLS client config using public flow networking key %s %w", 
+			errs = multierror.Append(err,
+				fmt.Errorf("failed to get default TLS client config using public flow networking key %s %w",
 					identity.NetworkPubKey.String(), err),
 			)
 			continue
@@ -1031,7 +1031,7 @@ func (builder *ObserverServiceBuilder) initUpstreamClient() (accessproto.AccessA
 			backend.WithClientUnaryInterceptor(time.Minute))
 
 		if err != nil {
-			multierror.Append(err, errs)
+			errs = multierror.Append(err, errs)
 			continue
 		}
 
