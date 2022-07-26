@@ -15,12 +15,11 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
 
-	"github.com/onflow/flow-go/utils/unittest"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 )
 
@@ -88,7 +87,7 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 	)
 	suite.networks = networks
 
-	blobExchangeChannel := network.Channel("blob-exchange")
+	blobExchangeChannel := channels.Channel("blob-exchange")
 
 	for i, net := range networks {
 		ds := sync.MutexWrap(datastore.NewMapDatastore())

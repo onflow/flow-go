@@ -1295,8 +1295,11 @@ func TestAccountBalanceFields(t *testing.T) {
 					}
 				`, address)))
 
-				view = delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
-					return nil, fmt.Errorf("error getting register %s, %s", flow.BytesToAddress([]byte(owner)).Hex(), key)
+				view = delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
+					if key == state.KeyAccountStatus {
+						return nil, fmt.Errorf("error getting register %s, %s", flow.BytesToAddress([]byte(owner)).Hex(), key)
+					}
+					return nil, nil
 				})
 
 				err := vm.Run(ctx, script, view, programs)
@@ -1336,7 +1339,7 @@ func TestAccountBalanceFields(t *testing.T) {
 
 				assert.NoError(t, err)
 				assert.NoError(t, script.Err)
-				assert.Equal(t, cadence.UFix64(9999_2550), script.Value)
+				assert.Equal(t, cadence.UFix64(9999_3120), script.Value)
 			}),
 	)
 
@@ -1494,8 +1497,11 @@ func TestGetStorageCapacity(t *testing.T) {
 					}
 				`, address)))
 
-				view = delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
-					return nil, fmt.Errorf("error getting register %s, %s", flow.BytesToAddress([]byte(owner)).Hex(), key)
+				view = delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
+					if key == state.KeyAccountStatus {
+						return nil, fmt.Errorf("error getting register %s, %s", flow.BytesToAddress([]byte(owner)).Hex(), key)
+					}
+					return nil, nil
 				})
 
 				err := vm.Run(ctx, script, view, programs)

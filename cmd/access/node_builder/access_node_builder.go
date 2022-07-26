@@ -56,6 +56,7 @@ import (
 	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/network"
 	netcache "github.com/onflow/flow-go/network/cache"
+	"github.com/onflow/flow-go/network/channels"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/network/p2p"
@@ -137,6 +138,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			HistoricalAccessAddrs:     "",
 			CollectionClientTimeout:   3 * time.Second,
 			ExecutionClientTimeout:    3 * time.Second,
+			ConnectionPoolSize:        backend.DefaultConnectionPoolSize,
 			MaxHeightRange:            backend.DefaultMaxHeightRange,
 			PreferredExecutionNodeIDs: nil,
 			FixedExecutionNodeIDs:     nil,
@@ -324,7 +326,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuild
 			builder.FollowerCore,
 			builder.SyncCore,
 			node.Tracer,
-			compliance.WithSkipNewProposalsThreshold(builder.ComplianceConfig.SkipNewProposalsThreshold),
+			follower.WithComplianceOptions(compliance.WithSkipNewProposalsThreshold(builder.ComplianceConfig.SkipNewProposalsThreshold)),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create follower engine: %w", err)
@@ -428,7 +430,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 		}).
 		Component("execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			var err error
-			bs, err = node.Network.RegisterBlobService(network.ExecutionDataService, ds)
+			bs, err = node.Network.RegisterBlobService(channels.ExecutionDataService, ds)
 			if err != nil {
 				return nil, fmt.Errorf("could not register blob service: %w", err)
 			}
@@ -545,6 +547,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.StringVarP(&builder.rpcConf.HistoricalAccessAddrs, "historical-access-addr", "", defaultConfig.rpcConf.HistoricalAccessAddrs, "comma separated rpc addresses for historical access nodes")
 		flags.DurationVar(&builder.rpcConf.CollectionClientTimeout, "collection-client-timeout", defaultConfig.rpcConf.CollectionClientTimeout, "grpc client timeout for a collection node")
 		flags.DurationVar(&builder.rpcConf.ExecutionClientTimeout, "execution-client-timeout", defaultConfig.rpcConf.ExecutionClientTimeout, "grpc client timeout for an execution node")
+		flags.UintVar(&builder.rpcConf.ConnectionPoolSize, "connection-pool-size", defaultConfig.rpcConf.ConnectionPoolSize, "maximum number of connections allowed in the connection pool")
 		flags.UintVar(&builder.rpcConf.MaxHeightRange, "rpc-max-height-range", defaultConfig.rpcConf.MaxHeightRange, "maximum size for height range requests")
 		flags.StringSliceVar(&builder.rpcConf.PreferredExecutionNodeIDs, "preferred-execution-node-ids", defaultConfig.rpcConf.PreferredExecutionNodeIDs, "comma separated list of execution nodes ids to choose from when making an upstream call e.g. b4a4dbdcd443d...,fb386a6a... etc.")
 		flags.StringSliceVar(&builder.rpcConf.FixedExecutionNodeIDs, "fixed-execution-node-ids", defaultConfig.rpcConf.FixedExecutionNodeIDs, "comma separated list of execution nodes ids to choose from when making an upstream call if no matching preferred execution id is found e.g. b4a4dbdcd443d...,fb386a6a... etc.")
@@ -588,6 +591,9 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			if builder.executionDataConfig.MaxSearchAhead == 0 {
 				return errors.New("execution-data-max-search-ahead must be greater than 0")
 			}
+		}
+		if builder.rpcConf.ConnectionPoolSize == 0 {
+			return errors.New("connection-pool-size must be greater than 0")
 		}
 
 		return nil
@@ -705,7 +711,9 @@ func (builder *FlowAccessNodeBuilder) enqueueRelayNetwork() {
 			node.Network,
 			builder.AccessNodeConfig.PublicNetworkConfig.Network,
 			node.Logger,
-			[]network.Channel{network.ReceiveBlocks},
+			map[channels.Channel]channels.Channel{
+				channels.ReceiveBlocks: channels.PublicReceiveBlocks,
+			},
 		)
 		node.Network = relayNet
 		return relayNet, nil
@@ -841,7 +849,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Network,
 				node.Me,
 				node.State,
-				network.RequestCollections,
+				channels.RequestCollections,
 				filter.HasRole(flow.RoleCollection),
 				func() flow.Entity { return &flow.Collection{} },
 			)

@@ -34,15 +34,15 @@ func (s *blockSignerDecoderSuite) SetupTest() {
 	// the default header fixture creates signerIDs for a committee of 10 nodes, so we prepare a committee same as that
 	s.allConsensus = unittest.IdentityListFixture(40, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical)
 
-	// mock consensus committee
-	s.committee = new(hotstuff.Committee)
-	s.committee.On("Identities", mock.Anything).Return(s.allConsensus, nil)
-
 	// prepare valid test block:
 	voterIndices, err := signature.EncodeSignersToIndices(s.allConsensus.NodeIDs(), s.allConsensus.NodeIDs())
 	require.NoError(s.T(), err)
 	s.block = unittest.BlockFixture()
 	s.block.Header.ParentVoterIndices = voterIndices
+
+	// mock consensus committee
+	s.committee = new(hotstuff.Committee)
+	s.committee.On("Identities", s.block.Header.ParentID).Return(s.allConsensus, nil)
 
 	s.decoder = NewBlockSignerDecoder(s.committee)
 }
