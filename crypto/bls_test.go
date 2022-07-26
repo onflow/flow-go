@@ -215,6 +215,10 @@ func TestBLSPOP(t *testing.T) {
 	})
 }
 
+// BLS multi-signature
+// signature aggregation sanity check
+//
+// Aggregate n signatures of the same message under different keys, and compare
 // it against the signature of the message under an aggregated private key.
 // Verify the aggregated signature using the multi-signature verification with
 // one message.
