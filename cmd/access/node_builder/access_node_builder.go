@@ -13,8 +13,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/routing"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	"github.com/onflow/flow-go/network/slashing"
-	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
@@ -60,6 +58,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	relaynet "github.com/onflow/flow-go/network/relay"
+	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/state/protocol"
@@ -68,6 +67,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/grpcutils"
+	"github.com/onflow/flow/protobuf/go/flow/access"
 )
 
 // AccessNodeBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node.

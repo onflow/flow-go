@@ -18,6 +18,8 @@ import (
 	"github.com/libp2p/go-libp2p-core/routing"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	p2ppubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/rs/zerolog"
+	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
@@ -70,9 +72,6 @@ import (
 	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow-go/utils/io"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
-
-	"github.com/rs/zerolog"
-	"github.com/spf13/pflag"
 )
 
 // ObserverBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node

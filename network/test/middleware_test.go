@@ -10,13 +10,10 @@ import (
 
 	"github.com/ipfs/go-log"
 	swarm "github.com/libp2p/go-libp2p-swarm"
-	"github.com/onflow/flow-go/network/slashing"
-	"github.com/onflow/flow-go/network/validator"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	mockery "github.com/stretchr/testify/mock"
-
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -32,6 +29,8 @@ import (
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/slashing"
+	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
