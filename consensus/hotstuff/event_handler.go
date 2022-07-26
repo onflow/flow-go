@@ -7,6 +7,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+type PartialTcCreated struct {
+	View       uint64
+	NewestQC   *flow.QuorumCertificate
+	LastViewTC *flow.TimeoutCertificate
+}
+
 // EventHandler runs a state machine to process proposals, QC and local timeouts.
 type EventHandler interface {
 
@@ -30,6 +36,8 @@ type EventHandler interface {
 	// OnLocalTimeout will handle local timeout event by creating TimeoutObject and broadcasting it.
 	// No errors are expected during normal operation.
 	OnLocalTimeout() error
+
+	OnPartialTcCreated(partialTC *PartialTcCreated) error
 
 	// TimeoutChannel returns a channel that sends a signal on timeout.
 	TimeoutChannel() <-chan time.Time

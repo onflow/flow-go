@@ -25,6 +25,7 @@ type EventLoop struct {
 	eventHandler        hotstuff.EventHandler
 	metrics             module.HotstuffMetrics
 	proposals           chan *model.Proposal
+	partialTcCreated    chan *hotstuff.PartialTcCreated
 	newestSubmittedTc   *tracker.NewestTCTracker
 	newestSubmittedQc   *tracker.NewestQCTracker
 	tcSubmittedNotifier engine.Notifier
@@ -38,6 +39,10 @@ var _ component.Component = (*EventLoop)(nil)
 // NewEventLoop creates an instance of EventLoop.
 func NewEventLoop(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandler hotstuff.EventHandler, startTime time.Time) (*EventLoop, error) {
 	proposals := make(chan *model.Proposal)
+	// we will use a buffered channel to avoid blocking of caller
+	// we will create at most one partial TC per view and only in recovery path
+	// since we don't expect a large number of messages we are using a buffered channel.
+	partialTcCreated := make(chan *hotstuff.PartialTcCreated, 10)
 
 	el := &EventLoop{
 		log:                 log,
@@ -48,6 +53,7 @@ func NewEventLoop(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandl
 		qcSubmittedNotifier: engine.NewNotifier(),
 		newestSubmittedTc:   tracker.NewNewestTCTracker(),
 		newestSubmittedQc:   tracker.NewNewestQCTracker(),
+		partialTcCreated:    partialTcCreated,
 		startTime:           startTime,
 	}
 
@@ -105,7 +111,7 @@ func (el *EventLoop) loop(ctx context.Context) error {
 		case <-shutdownSignaled:
 			return nil
 
-		// if we receive a time out, process it and log errors
+		// if we receive a timeout, process it and log errors
 		case <-timeoutChannel:
 
 			processStart := time.Now()
@@ -211,6 +217,13 @@ func (el *EventLoop) loop(ctx context.Context) error {
 			if err != nil {
 				return fmt.Errorf("could not process TC: %w", err)
 			}
+
+		case ev := <-el.partialTcCreated:
+			err := el.eventHandler.OnPartialTcCreated(ev)
+
+			if err != nil {
+				return fmt.Errorf("could no tporcess partial created TC event: %w", err)
+			}
 		}
 	}
 }
@@ -265,7 +278,18 @@ func (el *EventLoop) OnTcConstructedFromTimeouts(tc *flow.TimeoutCertificate) {
 }
 
 func (el *EventLoop) OnPartialTcCreated(view uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) {
-	// TODO(active-pacemaker): implement handler to support Bracha timeouts.
+
+	event := &hotstuff.PartialTcCreated{
+		View:       view,
+		NewestQC:   newestQC,
+		LastViewTC: lastViewTC,
+	}
+
+	select {
+	case el.partialTcCreated <- event:
+	case <-el.ComponentManager.ShutdownSignal():
+		return
+	}
 }
 
 // OnNewQcDiscovered pushes already validated QCs that were submitted from TimeoutAggregator to the event handler

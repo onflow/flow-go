@@ -257,6 +257,25 @@ func (e *EventHandler) OnLocalTimeout() error {
 	return nil
 }
 
+func (e *EventHandler) OnPartialTcCreated(partialTC *hotstuff.PartialTcCreated) error {
+	err := e.OnReceiveQc(partialTC.NewestQC)
+	if err != nil {
+		return fmt.Errorf("could not process QC: %w", err)
+	}
+	if partialTC.LastViewTC != nil {
+		err = e.OnReceiveTc(partialTC.LastViewTC)
+		if err != nil {
+			return fmt.Errorf("could not process TC: %w", err)
+		}
+	}
+
+	if e.paceMaker.CurView() != partialTC.View {
+		return nil
+	}
+
+	return e.OnLocalTimeout()
+}
+
 // Start starts the event handler.
 // No errors are expected during normal operation.
 func (e *EventHandler) Start() error {
