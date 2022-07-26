@@ -940,7 +940,7 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 		middleware := builder.initMiddleware(builder.NodeID, builder.PublicNetworkConfig.Metrics, libP2PFactory, msgValidators...)
 
 		// topology returns empty list since peers are not known upfront
-		top := topology.EmptyListTopology{}
+		top := topology.EmptyTopology{}
 
 		var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
 		if builder.HeroCacheMetricsEnable {
