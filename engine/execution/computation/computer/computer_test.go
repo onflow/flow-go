@@ -554,6 +554,18 @@ type testRuntime struct {
 	readStored         func(common.Address, cadence.Path, runtime.Context) (cadence.Value, error)
 }
 
+func (e *testRuntime) NewScriptExecutor(script runtime.Script, c runtime.Context) runtime.Executor {
+	panic("NewScriptExecutor not expected")
+}
+
+func (e *testRuntime) NewTransactionExecutor(script runtime.Script, c runtime.Context) runtime.Executor {
+	panic("NewTransactionExecutor not expected")
+}
+
+func (e *testRuntime) NewContractFunctionExecutor(contractLocation common.AddressLocation, functionName string, arguments []interpreter.Value, argumentTypes []sema.Type, context runtime.Context) runtime.Executor {
+	panic("NewContractFunctionExecutor not expected")
+}
+
 var _ runtime.Runtime = &testRuntime{}
 
 func (e *testRuntime) SetInvalidatedResourceValidationEnabled(_ bool) {
