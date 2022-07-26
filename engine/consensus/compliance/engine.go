@@ -49,6 +49,7 @@ type Engine struct {
 	prov                       network.Engine
 	core                       *Core
 	pendingBlocks              engine.MessageStore
+	pendingBlockResponses      engine.MessageStore
 	pendingVotes               engine.MessageStore
 	messageHandler             *engine.MessageHandler
 	finalizedView              counters.StrictMonotonousCounter
@@ -64,6 +65,19 @@ func NewEngine(
 	prov network.Engine,
 	core *Core) (*Engine, error) {
 
+	blockResponseQueue, err := fifoqueue.NewFifoQueue(
+		fifoqueue.WithCapacity(defaultBlockQueueCapacity),
+		fifoqueue.WithLengthObserver(func(len int) { core.mempool.MempoolEntries(metrics.ResourceBlockResponseQueue, uint(len)) }),
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create queue for block responses: %w", err)
+	}
+
+	pendingBlockResponses := &engine.FifoMessageStore{
+		FifoQueue: blockResponseQueue,
+	}
+
 	// FIFO queue for block proposals
 	blocksQueue, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultBlockQueueCapacity),
@@ -72,6 +86,7 @@ func NewEngine(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for inbound receipts: %w", err)
 	}
+
 	pendingBlocks := &engine.FifoMessageStore{
 		FifoQueue: blocksQueue,
 	}
@@ -90,6 +105,16 @@ func NewEngine(
 	handler := engine.NewMessageHandler(
 		log.With().Str("compliance", "engine").Logger(),
 		engine.NewNotifier(),
+		engine.Pattern{
+			Match: func(msg *engine.Message) bool {
+				_, ok := msg.Payload.(*messages.BlockResponse)
+				if ok {
+					core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockResponse)
+				}
+				return ok
+			},
+			Store: pendingBlockResponses,
+		},
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.BlockProposal)
@@ -266,9 +291,26 @@ func (e *Engine) processAvailableMessages() error {
 	for {
 		// TODO prioritization
 		// eg: msg := engine.SelectNextMessage()
-		msg, ok := e.pendingBlocks.Get()
+		msg, ok := e.pendingBlockResponses.Get()
 		if ok {
-			err := e.core.OnBlockProposal(msg.OriginID, msg.Payload.(*messages.BlockProposal))
+			blockResponse := msg.Payload.(*messages.BlockResponse)
+			for _, block := range blockResponse.Blocks {
+				// process each block
+				err := e.core.OnBlockProposal(msg.OriginID, &messages.BlockProposal{
+					Header:  block.Header,
+					Payload: block.Payload,
+				}, true)
+
+				if err != nil {
+					return fmt.Errorf("could not handle block proposal: %w", err)
+				}
+			}
+			continue
+		}
+
+		msg, ok = e.pendingBlocks.Get()
+		if ok {
+			err := e.core.OnBlockProposal(msg.OriginID, msg.Payload.(*messages.BlockProposal), true)
 			if err != nil {
 				return fmt.Errorf("could not handle block proposal: %w", err)
 			}

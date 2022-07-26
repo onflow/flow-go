@@ -93,7 +93,7 @@ func NewCore(
 }
 
 // OnBlockProposal handles incoming block proposals.
-func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
+func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal, inBlockRangeResponse bool) error {
 
 	var traceID string
 
@@ -224,7 +224,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 	// execution of the entire recursion, which might include processing the
 	// proposal's pending children. There is another span within
 	// processBlockProposal that measures the time spent for a single proposal.
-	err = c.processBlockAndDescendants(proposal)
+	err = c.processBlockAndDescendants(proposal, inBlockRangeResponse)
 	c.mempool.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
 	if err != nil {
 		return fmt.Errorf("could not process block proposal: %w", err)
@@ -243,11 +243,11 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 // its pending proposals for its children. By induction, any children connected
 // to a valid proposal are validly connected to the finalized state and can be
 // processed as well.
-func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal) error {
+func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal, inRangeBlockResponse bool) error {
 	blockID := proposal.Header.ID()
 
 	// process block itself
-	err := c.processBlockProposal(proposal)
+	err := c.processBlockProposal(proposal, inRangeBlockResponse)
 	// child is outdated by the time we started processing it
 	// => node was probably behind and is catching up. Log as warning
 	if engine.IsOutdatedInputError(err) {
@@ -277,7 +277,7 @@ func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal) erro
 			Header:  child.Header,
 			Payload: child.Payload,
 		}
-		cpr := c.processBlockAndDescendants(childProposal)
+		cpr := c.processBlockAndDescendants(childProposal, inRangeBlockResponse)
 		if cpr != nil {
 			// unexpected error: potentially corrupted internal state => abort processing and escalate error
 			return cpr
@@ -292,7 +292,7 @@ func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal) erro
 
 // processBlockProposal processes the given block proposal. The proposal must connect to
 // the finalized state.
-func (c *Core) processBlockProposal(proposal *messages.BlockProposal) error {
+func (c *Core) processBlockProposal(proposal *messages.BlockProposal, inRangeBlockResponse bool) error {
 	startTime := time.Now()
 	defer c.complianceMetrics.BlockProposalDuration(time.Since(startTime))
 
@@ -343,7 +343,12 @@ func (c *Core) processBlockProposal(proposal *messages.BlockProposal) error {
 
 	// submit the model to hotstuff for processing
 	log.Info().Msg("forwarding block proposal to hotstuff")
-	c.hotstuff.SubmitProposal(header, parent.View)
+
+	if inRangeBlockResponse {
+		<-c.hotstuff.SubmitProposal(header, parent.View)
+	} else {
+		c.hotstuff.SubmitProposal(header, parent.View)
+	}
 
 	return nil
 }
