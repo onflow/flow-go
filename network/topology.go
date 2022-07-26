@@ -2,7 +2,6 @@ package network
 
 import (
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/channels"
 )
 
 // Topology provides a subset of nodes which a given node should directly connect to for 1-k messaging.
