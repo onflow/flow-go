@@ -527,19 +527,19 @@ func BatchVerifyBLSSignaturesOneMessage(pks []PublicKey, sigs []Signature,
 	return verifBool, nil
 }
 
-// invalidSerializationErrorf constructs a new invalidInputsError (API misuse)
-// for the case of failure to deserialize an input byte slice.
-func invalidSerializationErrorf(msg string, args ...interface{}) error {
+// aggregationEmptyListErrorf constructs a new invalidInputsError (API misuse)
+// for the case of empty lists passed into aggregation functions.
+func aggregationEmptyListErrorf(msg string, args ...interface{}) error {
 	return &invalidInputsError{
 		error:   fmt.Errorf(msg, args...),
 		subType: dkgInvalidStateTransition,
 	}
 }
 
-// IsInvalidSerializationError checks if the input error is of a invalidSerialization error type.
-// invalidSerializationErrorf is a subtype of invalidInputsError, returned when an input
-// byte slice fails to decode.
-func IsInvalidSerializationError(err error) bool {
+// IsAggregationEmptyListError checks if the input error is of a aggregationEmptyList error type.
+// aggregationEmptyList is a subtype of invalidInputsError, returned when a BLS
+// aggregation function is called with an empty list which is not allowed in some cases.
+func IsAggregationEmptyListError(err error) bool {
 	var target *invalidInputsError
-	return errors.As(err, &target) && target.subType == invalidSerialization
+	return errors.As(err, &target) && target.subType == aggregationEmptyList
 }

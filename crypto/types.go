@@ -123,15 +123,20 @@ type invalidInputsError struct {
 type invalidInputErrorSubType int
 
 const (
-	Other invalidInputErrorSubType = 0
+	// the default subtye, when the invalid input error is not specific
+	generic invalidInputErrorSubType = 0
+	// DKG error when an invalid state transition is called
 	dkgInvalidStateTransition
+	// BLS error when a call to a BLS multi-signature function is not allowed with an empty list
+	// of keys or signatures.
 	aggregationEmptyList
 )
 
 // invalidInputsErrorf constructs a new invalidInputsError
 func invalidInputsErrorf(msg string, args ...interface{}) error {
 	return &invalidInputsError{
-		error: fmt.Errorf(msg, args...),
+		subType: generic,
+		error:   fmt.Errorf(msg, args...),
 	}
 }
 
