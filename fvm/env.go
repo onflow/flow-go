@@ -11,8 +11,8 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/opentracing/opentracing-go"
-	traceLog "github.com/opentracing/opentracing-go/log"
+	"go.opentelemetry.io/otel/attribute"
+	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/errors"
@@ -86,9 +86,9 @@ type commonEnv struct {
 	contracts     *handler.ContractHandler
 	uuidGenerator *state.UUIDGenerator
 	metrics       *handler.MetricsHandler
-	// TODO(patrick): switch to EnvContext's start span api.
 
-	traceSpan opentracing.Span
+	// TODO(patrick): switch to EnvContext's start span api.
+	traceSpan otelTrace.Span
 }
 
 // TODO(patrick): rm once Meter object has been refactored
@@ -191,12 +191,11 @@ func (env *commonEnv) GetValue(owner, key []byte) ([]byte, error) {
 	var valueByteSize int
 	span := env.ctx.StartSpanFromRoot(trace.FVMEnvGetValue)
 	defer func() {
-		if !span.IsNoOp() {
-			// TODO(rbtz): migrate
-			span.LogFields(
-				traceLog.String("owner", hex.EncodeToString(owner)),
-				traceLog.String("key", string(key)),
-				traceLog.Int("valueByteSize", valueByteSize),
+		if !trace.IsSampled(span) {
+			span.SetAttributes(
+				attribute.String("owner", hex.EncodeToString(owner)),
+				attribute.String("key", string(key)),
+				attribute.Int("valueByteSize", valueByteSize),
 			)
 		}
 		span.End()
@@ -221,11 +220,10 @@ func (env *commonEnv) GetValue(owner, key []byte) ([]byte, error) {
 // TODO disable SetValue for scripts, right now the view changes are discarded
 func (env *commonEnv) SetValue(owner, key, value []byte) error {
 	span := env.ctx.StartSpanFromRoot(trace.FVMEnvSetValue)
-	if !span.IsNoOp() {
-		// TODO(rbtz): migrate
-		span.LogFields(
-			traceLog.String("owner", hex.EncodeToString(owner)),
-			traceLog.String("key", string(key)),
+	if !trace.IsSampled(span) {
+		span.SetAttributes(
+			attribute.String("owner", hex.EncodeToString(owner)),
+			attribute.String("key", string(key)),
 		)
 	}
 	defer span.End()
@@ -423,20 +421,15 @@ func (env *commonEnv) DecodeArgument(b []byte, _ cadence.Type) (cadence.Value, e
 	return v, err
 }
 
-func (env *commonEnv) RecordTrace(operation string, location common.Location, duration time.Duration, logs []opentracing.LogRecord) {
+func (env *commonEnv) RecordTrace(operation string, location common.Location, duration time.Duration, attrs []attribute.KeyValue) {
 	if !env.isTraceable() {
 		return
 	}
 	if location != nil {
-		if logs == nil {
-			logs = make([]opentracing.LogRecord, 0, 1)
-		}
-		logs = append(logs, opentracing.LogRecord{Timestamp: time.Now(),
-			Fields: []traceLog.Field{traceLog.String("location", location.String())},
-		})
+		attrs = append(attrs, attribute.String("location", location.String()))
 	}
 	spanName := trace.FVMCadenceTrace.Child(operation)
-	env.ctx.Tracer.RecordSpanFromParent(env.traceSpan, spanName, duration, logs)
+	env.ctx.Tracer.RecordSpanFromParent(env.traceSpan, spanName, duration, attrs)
 }
 
 func (env *commonEnv) ProgramParsed(location common.Location, duration time.Duration) {
