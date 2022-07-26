@@ -24,8 +24,6 @@ func Factory(name Name) (FactoryFunction, error) {
 		return FullyConnectedTopologyFactory(), nil
 	case FixedList:
 		return FixedListTopologyFactory(), nil
-	case Randomized:
-		return RandomizedTopologyFactory(), nil
 	case TopicBased:
 		return TopicBasedTopologyFactory(), nil
 	default:
