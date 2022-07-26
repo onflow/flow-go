@@ -995,6 +995,9 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		}
 
 		client, err := builder.initUpstreamClient()
+		if err != nil {
+			return nil, err
+		}
 
 		// build the rpc engine
 		engineBuilder.WithNewHandler(&rpc.Forwarder{UpstreamHandler: client})
