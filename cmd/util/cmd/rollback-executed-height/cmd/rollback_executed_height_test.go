@@ -111,6 +111,22 @@ func TestReExecuteBlock(t *testing.T) {
 			header.ID(),
 		)
 
+		require.NoError(t, err)
+
+		// remove again, to make sure missing entires are handled properly
+		err = removeForBlockID(
+			batch,
+			headers,
+			commits,
+			txResults,
+			results,
+			chunkDataPacks,
+			myReceipts,
+			events,
+			serviceEvents,
+			header.ID(),
+		)
+
 		err2 := batch.Flush()
 
 		require.NoError(t, err)
