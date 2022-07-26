@@ -28,7 +28,7 @@ func NewFixedListTopology(nodeID flow.Identifier) FixedListTopology {
 	}
 }
 
-func (r FixedListTopology) Fanout(ids flow.IdentityList, _ network.ChannelList) (flow.IdentityList, error) {
+func (r FixedListTopology) Fanout(ids flow.IdentityList) (flow.IdentityList, error) {
 	return ids.Filter(filter.HasNodeID(r.fixedNodeID)), nil
 }
 
@@ -36,6 +36,6 @@ func (r FixedListTopology) Fanout(ids flow.IdentityList, _ network.ChannelList) 
 type EmptyListTopology struct {
 }
 
-func (r EmptyListTopology) Fanout(_ flow.IdentityList, _ network.ChannelList) (flow.IdentityList, error) {
+func (r EmptyListTopology) Fanout(ids flow.IdentityList) (flow.IdentityList, error) {
 	return flow.IdentityList{}, nil
 }

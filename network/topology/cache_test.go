@@ -58,7 +58,7 @@ func TestCache_GenerateFanout_Error(t *testing.T) {
 
 	// returning error on fanout generation should invalidate cache
 	// same error should be returned.
-	fanout, err := cache.Fanout(ids, network.ChannelList{})
+	fanout, err := cache.Fanout(ids)
 	require.Error(t, err)
 	require.Nil(t, fanout)
 	require.Equal(t, cache.idsFP, flow.Identifier{})
@@ -88,7 +88,7 @@ func TestCache_InputChange_IDs(t *testing.T) {
 
 	// cache content should change once input ids list to Fanout changes.
 	// drops last id in the list to imitate a change.
-	newFanout, err := cache.Fanout(ids[:len(ids)-1], channels)
+	newFanout, err := cache.Fanout(ids[:len(ids)-1])
 	require.NoError(t, err)
 	require.Equal(t, cache.idsFP, ids[:len(ids)-1].Fingerprint())
 	// channels input did not change, hence channels fingerprint should not be changed.
@@ -122,7 +122,7 @@ func TestCache_InputChange_Channels(t *testing.T) {
 	// cache content should change once input channels to Fanout changes.
 	// adds a new channel to the list of channels imitate a change.
 	channels = append(channels, "channel3")
-	newFanout, err := cache.Fanout(ids, channels)
+	newFanout, err := cache.Fanout(ids)
 	require.NoError(t, err)
 	// ids fingerprint in the cache should not change, since the original input did not change.
 	require.Equal(t, cache.idsFP, ids.Fingerprint())
@@ -154,7 +154,7 @@ func TestCache_TopicBased(t *testing.T) {
 	// Testing deterministic behavior
 	//
 	// Over consecutive invocations of cache with the same input, the same output should be returned.
-	prevFanout, err := cache.Fanout(ids, channels)
+	prevFanout, err := cache.Fanout(ids)
 	require.NoError(t, err)
 	require.NotEmpty(t, prevFanout)
 	// requires same fanout as long as the input is the same.
@@ -164,7 +164,7 @@ func TestCache_TopicBased(t *testing.T) {
 	//
 	// Evicts one identity from ids list and cache should be invalidated and updated with a new fanout.
 	ids = ids[:len(ids)-1]
-	newFanout, err := cache.Fanout(ids, channels)
+	newFanout, err := cache.Fanout(ids)
 	require.NoError(t, err)
 	require.NotEmpty(t, newFanout)
 	require.NotEqual(t, newFanout, prevFanout)
@@ -177,7 +177,7 @@ func TestCache_TopicBased(t *testing.T) {
 	// Cache should be invalidated and updated with a new fanout.
 	prevFanout = newFanout.Copy()
 	channels = channels[:1]
-	newFanout, err = cache.Fanout(ids, channels)
+	newFanout, err = cache.Fanout(ids)
 	require.NoError(t, err)
 	require.NotEmpty(t, newFanout)
 	require.NotEqual(t, newFanout, prevFanout)
@@ -194,7 +194,7 @@ func requireDeterministicBehavior(t *testing.T, cache *Cache, fanout flow.Identi
 	// Over consecutive invocations of cache with the same (new) input, the same
 	// (new) output should be returned.
 	for i := 0; i < 100; i++ {
-		newFanout, err := cache.Fanout(ids, channels)
+		newFanout, err := cache.Fanout(ids)
 		require.NoError(t, err)
 		require.NotEmpty(t, newFanout)
 

@@ -15,7 +15,7 @@ type Topology struct {
 }
 
 // GenerateFanout provides a mock function with given fields: ids, channels
-func (_m *Topology) Fanout(ids flow.IdentityList, channels network.ChannelList) (flow.IdentityList, error) {
+func (_m *Topology) Fanout(ids flow.IdentityList) (flow.IdentityList, error) {
 	ret := _m.Called(ids, channels)
 
 	var r0 flow.IdentityList
