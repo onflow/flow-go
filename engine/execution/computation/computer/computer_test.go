@@ -78,7 +78,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		// create a block with 1 collection with 2 transactions
 		block := generateBlock(1, 2, rag)
 
-		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
@@ -116,7 +116,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(nil, nil, nil, nil).
 			Once() // just system chunk
 
-		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
@@ -159,7 +159,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		opts := append(baseOpts, contextOptions...)
 		ctx := fvm.NewContext(zerolog.Nop(), opts...)
-		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
@@ -227,7 +227,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(nil, nil, nil, nil).
 			Times(collectionCount + 1)
 
-		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
@@ -347,7 +347,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
 		require.NoError(t, err)
 
-		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
@@ -397,7 +397,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		block := generateBlock(0, 0, rag)
 
-		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
@@ -447,11 +447,11 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		const transactionCount = 2
 		block := generateBlock(collectionCount, transactionCount, rag)
 
-		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
-		err = view.Set(string(address.Bytes()), "", state.KeyAccountStatus, []byte{1})
+		err = view.Set(string(address.Bytes()), state.KeyAccountStatus, state.NewAccountStatus().ToBytes())
 		require.NoError(t, err)
 
 		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
@@ -522,11 +522,11 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		block := generateBlock(collectionCount, transactionCount, rag)
 
-		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
-		err = view.Set(string(address.Bytes()), "", state.KeyAccountStatus, []byte{1})
+		err = view.Set(string(address.Bytes()), state.KeyAccountStatus, state.NewAccountStatus().ToBytes())
 		require.NoError(t, err)
 
 		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
@@ -552,6 +552,18 @@ type testRuntime struct {
 	executeScript      func(runtime.Script, runtime.Context) (cadence.Value, error)
 	executeTransaction func(runtime.Script, runtime.Context) error
 	readStored         func(common.Address, cadence.Path, runtime.Context) (cadence.Value, error)
+}
+
+func (e *testRuntime) NewScriptExecutor(script runtime.Script, c runtime.Context) runtime.Executor {
+	panic("NewScriptExecutor not expected")
+}
+
+func (e *testRuntime) NewTransactionExecutor(script runtime.Script, c runtime.Context) runtime.Executor {
+	panic("NewTransactionExecutor not expected")
+}
+
+func (e *testRuntime) NewContractFunctionExecutor(contractLocation common.AddressLocation, functionName string, arguments []interpreter.Value, argumentTypes []sema.Type, context runtime.Context) runtime.Executor {
+	panic("NewContractFunctionExecutor not expected")
 }
 
 var _ runtime.Runtime = &testRuntime{}
@@ -626,6 +638,10 @@ func (r *RandomAddressGenerator) AddressCount() uint64 {
 	panic("not implemented")
 }
 
+func (testRuntime) Storage(runtime.Context) (*runtime.Storage, *interpreter.Interpreter, error) {
+	panic("Storage not expected")
+}
+
 type FixedAddressGenerator struct {
 	Address flow.Address
 }
@@ -660,8 +676,8 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 	key, err := unittest.AccountKeyDefaultFixture()
 	require.NoError(t, err)
 
-	view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
-		return ledger.Get(owner, controller, key)
+	view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
+		return ledger.Get(owner, key)
 	})
 	sth := state.NewStateHolder(state.NewState(view))
 	accounts := state.NewAccounts(sth)
@@ -687,9 +703,8 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 
 	// make sure check for account status has been registered
 	id := flow.RegisterID{
-		Owner:      string(address.Bytes()),
-		Controller: "",
-		Key:        state.KeyAccountStatus,
+		Owner: string(address.Bytes()),
+		Key:   state.KeyAccountStatus,
 	}
 
 	require.Contains(t, registerTouches, id.String())

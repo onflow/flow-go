@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/chunks"
@@ -166,9 +167,9 @@ func (e *Engine) processAssignedChunkWithTracing(chunk *flow.Chunk, result *flow
 
 	span, _, isSampled := e.tracer.StartBlockSpan(e.unit.Ctx(), result.BlockID, trace.VERProcessAssignedChunk)
 	if isSampled {
-		span.SetTag("collection_index", chunk.CollectionIndex)
+		span.SetAttributes(attribute.Int("collection_index", int(chunk.CollectionIndex)))
 	}
-	defer span.Finish()
+	defer span.End()
 
 	requested, blockHeight, err := e.processAssignedChunk(chunk, result, chunkLocatorID)
 
@@ -253,7 +254,7 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, response *verific
 		Logger()
 
 	span, ctx, _ := e.tracer.StartBlockSpan(context.Background(), status.ExecutionResult.BlockID, trace.VERFetcherHandleChunkDataPack)
-	defer span.Finish()
+	defer span.End()
 
 	processed, err := e.handleChunkDataPackWithTracing(ctx, originID, status, response.Cdp)
 	if IsChunkDataPackValidationError(err) {

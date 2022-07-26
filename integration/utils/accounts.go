@@ -38,6 +38,17 @@ func (acc *flowAccount) signCreateAccountTx(createAccountTx *flowsdk.Transaction
 	return nil
 }
 
+func (acc *flowAccount) signPayload(tx *flowsdk.Transaction, keyID int) error {
+	acc.signerLock.Lock()
+	defer acc.signerLock.Unlock()
+	err := tx.SignPayload(*acc.address, keyID, acc.signer)
+	if err != nil {
+		return err
+	}
+	acc.seqNumber++
+	return nil
+}
+
 func (acc *flowAccount) signTx(tx *flowsdk.Transaction, keyID int) error {
 	acc.signerLock.Lock()
 	defer acc.signerLock.Unlock()

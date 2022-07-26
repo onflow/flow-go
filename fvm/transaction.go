@@ -5,7 +5,7 @@ import (
 	"runtime/debug"
 	"strings"
 
-	"github.com/opentracing/opentracing-go"
+	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -35,11 +35,10 @@ type TransactionProcedure struct {
 	ComputationUsed uint64
 	MemoryEstimate  uint64
 	Err             errors.Error
-	Retried         int
-	TraceSpan       opentracing.Span
+	TraceSpan       otelTrace.Span
 }
 
-func (proc *TransactionProcedure) SetTraceSpan(traceSpan opentracing.Span) {
+func (proc *TransactionProcedure) SetTraceSpan(traceSpan otelTrace.Span) {
 	proc.TraceSpan = traceSpan
 }
 

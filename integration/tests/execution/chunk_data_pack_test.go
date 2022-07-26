@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/ledger/partial"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -68,7 +68,7 @@ func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 	// TODO clear messages
 
 	// send a ChunkDataRequest from Ghost node
-	err = gs.Ghost().Send(context.Background(), network.PushReceipts,
+	err = gs.Ghost().Send(context.Background(), channels.PushReceipts,
 		&messages.ChunkDataRequest{ChunkID: chunkID, Nonce: rand.Uint64()},
 		[]flow.Identifier{gs.exe1ID}...)
 	require.NoError(gs.T(), err)
