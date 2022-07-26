@@ -7,7 +7,8 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/opentracing/opentracing-go"
+
+	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/crypto"
@@ -43,7 +44,7 @@ func NewTransactionEnvironment(
 	programs *programs.Programs,
 	tx *flow.TransactionBody,
 	txIndex uint32,
-	traceSpan opentracing.Span,
+	traceSpan otelTrace.Span,
 	eventHandlerOptions ...handler.FlowEventHandlerOption,
 ) (*TransactionEnv, error) {
 
@@ -523,7 +524,6 @@ func (e *TransactionEnv) ValidatePublicKey(pk *runtime.PublicKey) error {
 // Block Environment Functions
 
 func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.Address, err error) {
-
 	defer e.ctx.StartSpanFromRoot(trace.FVMEnvCreateAccount).End()
 
 	err = e.Meter(meter.ComputationKindCreateAccount, 1)

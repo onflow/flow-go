@@ -8,9 +8,9 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
-	"github.com/opentracing/opentracing-go"
-	traceLog "github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel/attribute"
+	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/handler"
 
@@ -56,13 +56,13 @@ func (i *TransactionInvoker) Process(
 ) (processErr error) {
 
 	txIDStr := proc.ID.String()
-	var span opentracing.Span
+	var span otelTrace.Span
 	if ctx.Tracer != nil && proc.TraceSpan != nil {
 		span = ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMExecuteTransaction)
-		span.LogFields(
-			traceLog.String("transaction_id", txIDStr),
+		span.SetAttributes(
+			attribute.String("transaction_id", txIDStr),
 		)
-		defer span.Finish()
+		defer span.End()
 	}
 
 	var blockHeight uint64
