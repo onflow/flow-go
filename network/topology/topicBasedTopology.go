@@ -50,7 +50,7 @@ func NewTopicBasedTopology(nodeID flow.Identifier, logger zerolog.Logger, state 
 // of the messages (i.e., publish and multicast).
 // Independent invocations of GenerateFanout on different nodes collaboratively must construct a cohesive
 // connected graph of nodes that enables them talking to each other.
-func (t TopicBasedTopology) GenerateFanout(ids flow.IdentityList, channels network.ChannelList) (flow.IdentityList, error) {
+func (t TopicBasedTopology) Fanout(ids flow.IdentityList, channels network.ChannelList) (flow.IdentityList, error) {
 	myUniqueChannels := network.UniqueChannels(channels)
 	if len(myUniqueChannels) == 0 {
 		// no subscribed channel, hence skip topology creation

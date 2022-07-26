@@ -28,7 +28,7 @@ func TestCache_GenerateFanout_HappyPath(t *testing.T) {
 	ids := unittest.IdentityListFixture(100)
 	fanout := ids.Sample(10)
 	channels := network.ChannelList{"Channel1", "Channel2", "Channel3"}
-	top.On("GenerateFanout", ids, channels).Return(fanout, nil).Once()
+	top.On("Fanout", ids, channels).Return(fanout, nil).Once()
 
 	cache := NewCache(log, top)
 
@@ -42,13 +42,13 @@ func TestCache_GenerateFanout_HappyPath(t *testing.T) {
 	mock.AssertExpectationsForObjects(t, top)
 }
 
-// TestCache_GenerateFanout_Error evaluates that returning error by underlying topology on GenerateFanout, results in
+// TestCache_GenerateFanout_Error evaluates that returning error by underlying topology on Fanout, results in
 // cache to invalidate itself.
 func TestCache_GenerateFanout_Error(t *testing.T) {
 	// mocks underlying topology returning a fanout
 	top := &mocknetwork.Topology{}
 	ids := unittest.IdentityListFixture(100)
-	top.On("GenerateFanout", mock.Anything, mock.Anything).Return(nil, fmt.Errorf("fanout-generation-error")).Once()
+	top.On("Fanout", mock.Anything, mock.Anything).Return(nil, fmt.Errorf("fanout-generation-error")).Once()
 
 	// assumes cache holding some fanout
 	cache := NewCache(zerolog.Nop(), top)
@@ -58,7 +58,7 @@ func TestCache_GenerateFanout_Error(t *testing.T) {
 
 	// returning error on fanout generation should invalidate cache
 	// same error should be returned.
-	fanout, err := cache.GenerateFanout(ids, network.ChannelList{})
+	fanout, err := cache.Fanout(ids, network.ChannelList{})
 	require.Error(t, err)
 	require.Nil(t, fanout)
 	require.Equal(t, cache.idsFP, flow.Identifier{})
@@ -69,7 +69,7 @@ func TestCache_GenerateFanout_Error(t *testing.T) {
 	mock.AssertExpectationsForObjects(t, top)
 }
 
-// TestCache_InputChange_IDs evaluates that if identity list input to GenerateFanout changes,
+// TestCache_InputChange_IDs evaluates that if identity list input to Fanout changes,
 // the cache is invalidated and updated.
 func TestCache_InputChange_IDs(t *testing.T) {
 	// mocks underlying topology returning a fanout
@@ -77,7 +77,7 @@ func TestCache_InputChange_IDs(t *testing.T) {
 	ids := unittest.IdentityListFixture(100)
 	fanout := ids.Sample(10)
 	channels := network.ChannelList{"channel1", "channel2"}
-	top.On("GenerateFanout", mock.Anything, channels).Return(fanout, nil).Once()
+	top.On("Fanout", mock.Anything, channels).Return(fanout, nil).Once()
 
 	// assumes cache holding some fanout for the same
 	// ids and channels defined above.
@@ -86,9 +86,9 @@ func TestCache_InputChange_IDs(t *testing.T) {
 	cache.idsFP = ids.Fingerprint()
 	cache.chansFP = channels.ID()
 
-	// cache content should change once input ids list to GenerateFanout changes.
+	// cache content should change once input ids list to Fanout changes.
 	// drops last id in the list to imitate a change.
-	newFanout, err := cache.GenerateFanout(ids[:len(ids)-1], channels)
+	newFanout, err := cache.Fanout(ids[:len(ids)-1], channels)
 	require.NoError(t, err)
 	require.Equal(t, cache.idsFP, ids[:len(ids)-1].Fingerprint())
 	// channels input did not change, hence channels fingerprint should not be changed.
@@ -102,7 +102,7 @@ func TestCache_InputChange_IDs(t *testing.T) {
 	mock.AssertExpectationsForObjects(t, top)
 }
 
-// TestCache_InputChange_Channels evaluates that if channel list input to GenerateFanout changes,
+// TestCache_InputChange_Channels evaluates that if channel list input to Fanout changes,
 // the cache is invalidated and updated.
 func TestCache_InputChange_Channels(t *testing.T) {
 	// mocks underlying topology returning a fanout
@@ -110,7 +110,7 @@ func TestCache_InputChange_Channels(t *testing.T) {
 	ids := unittest.IdentityListFixture(100)
 	fanout := ids.Sample(10)
 	channels := network.ChannelList{"channel1", "channel2"}
-	top.On("GenerateFanout", ids, mock.Anything).Return(fanout, nil).Once()
+	top.On("Fanout", ids, mock.Anything).Return(fanout, nil).Once()
 
 	// assumes cache holding some fanout for the same
 	// ids and channels defined above.
@@ -119,10 +119,10 @@ func TestCache_InputChange_Channels(t *testing.T) {
 	cache.idsFP = ids.Fingerprint()
 	cache.chansFP = channels.ID()
 
-	// cache content should change once input channels to GenerateFanout changes.
+	// cache content should change once input channels to Fanout changes.
 	// adds a new channel to the list of channels imitate a change.
 	channels = append(channels, "channel3")
-	newFanout, err := cache.GenerateFanout(ids, channels)
+	newFanout, err := cache.Fanout(ids, channels)
 	require.NoError(t, err)
 	// ids fingerprint in the cache should not change, since the original input did not change.
 	require.Equal(t, cache.idsFP, ids.Fingerprint())
@@ -154,7 +154,7 @@ func TestCache_TopicBased(t *testing.T) {
 	// Testing deterministic behavior
 	//
 	// Over consecutive invocations of cache with the same input, the same output should be returned.
-	prevFanout, err := cache.GenerateFanout(ids, channels)
+	prevFanout, err := cache.Fanout(ids, channels)
 	require.NoError(t, err)
 	require.NotEmpty(t, prevFanout)
 	// requires same fanout as long as the input is the same.
@@ -164,7 +164,7 @@ func TestCache_TopicBased(t *testing.T) {
 	//
 	// Evicts one identity from ids list and cache should be invalidated and updated with a new fanout.
 	ids = ids[:len(ids)-1]
-	newFanout, err := cache.GenerateFanout(ids, channels)
+	newFanout, err := cache.Fanout(ids, channels)
 	require.NoError(t, err)
 	require.NotEmpty(t, newFanout)
 	require.NotEqual(t, newFanout, prevFanout)
@@ -177,7 +177,7 @@ func TestCache_TopicBased(t *testing.T) {
 	// Cache should be invalidated and updated with a new fanout.
 	prevFanout = newFanout.Copy()
 	channels = channels[:1]
-	newFanout, err = cache.GenerateFanout(ids, channels)
+	newFanout, err = cache.Fanout(ids, channels)
 	require.NoError(t, err)
 	require.NotEmpty(t, newFanout)
 	require.NotEqual(t, newFanout, prevFanout)
@@ -194,7 +194,7 @@ func requireDeterministicBehavior(t *testing.T, cache *Cache, fanout flow.Identi
 	// Over consecutive invocations of cache with the same (new) input, the same
 	// (new) output should be returned.
 	for i := 0; i < 100; i++ {
-		newFanout, err := cache.GenerateFanout(ids, channels)
+		newFanout, err := cache.Fanout(ids, channels)
 		require.NoError(t, err)
 		require.NotEmpty(t, newFanout)
 

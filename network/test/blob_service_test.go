@@ -34,9 +34,9 @@ type conditionalTopology struct {
 
 var _ network.Topology = (*conditionalTopology)(nil)
 
-func (t *conditionalTopology) GenerateFanout(ids flow.IdentityList, channels network.ChannelList) (flow.IdentityList, error) {
+func (t *conditionalTopology) Fanout(ids flow.IdentityList, channels network.ChannelList) (flow.IdentityList, error) {
 	if t.condition() {
-		return t.top.GenerateFanout(ids, channels)
+		return t.top.Fanout(ids, channels)
 	} else {
 		return flow.IdentityList{}, nil
 	}

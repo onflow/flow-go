@@ -70,7 +70,7 @@ func NewRandomizedTopology(nodeID flow.Identifier, logger zerolog.Logger, edgePr
 // Independent invocations of GenerateFanout on different nodes collaboratively must construct a cohesive
 // connected graph of nodes that enables them talking to each other. This should be done with a very high probability
 // in randomized topology.
-func (r RandomizedTopology) GenerateFanout(ids flow.IdentityList, channels network.ChannelList) (flow.IdentityList, error) {
+func (r RandomizedTopology) Fanout(ids flow.IdentityList, channels network.ChannelList) (flow.IdentityList, error) {
 	myUniqueChannels := network.UniqueChannels(channels)
 	if len(myUniqueChannels) == 0 {
 		// no subscribed channel, hence skip topology creation

@@ -23,6 +23,6 @@ func NewFullyConnectedTopology() network.Topology {
 	return &FullyConnectedTopology{}
 }
 
-func (f *FullyConnectedTopology) GenerateFanout(ids flow.IdentityList, _ network.ChannelList) (flow.IdentityList, error) {
+func (f *FullyConnectedTopology) Fanout(ids flow.IdentityList, _ network.ChannelList) (flow.IdentityList, error) {
 	return ids, nil
 }
