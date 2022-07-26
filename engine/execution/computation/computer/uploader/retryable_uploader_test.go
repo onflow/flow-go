@@ -5,11 +5,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	stateSynchronizationMock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/rs/zerolog"
 
 	"github.com/stretchr/testify/mock"
 

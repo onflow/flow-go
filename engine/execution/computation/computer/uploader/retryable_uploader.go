@@ -133,10 +133,10 @@ func (b *BadgerRetryableUploader) Upload(computationResult *execution.Computatio
 }
 
 func (b *BadgerRetryableUploader) RetryUpload() error {
-	executionDataIDs, err := b.uploadStatusStore.GetAllIDs()
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to load list of un-uploaded ComputationResult from local DB")
-		return err
+	executionDataIDs, retErr := b.uploadStatusStore.GetAllIDs()
+	if retErr != nil {
+		log.Error().Err(retErr).Msg("Failed to load list of un-uploaded ComputationResult from local DB")
+		return retErr
 	}
 
 	for _, executionDataID := range executionDataIDs {
@@ -145,7 +145,7 @@ func (b *BadgerRetryableUploader) RetryUpload() error {
 		if cr_err != nil {
 			log.Error().Err(cr_err).Msg(
 				fmt.Sprintf("Failed to load ComputationResult from local DB with ID %s", executionDataID))
-			err = cr_err
+			retErr = cr_err
 			continue
 		}
 
@@ -162,7 +162,7 @@ func (b *BadgerRetryableUploader) RetryUpload() error {
 			if cr_err = b.uploader.Upload(retComputationResult); cr_err != nil {
 				log.Error().Err(cr_err).Msg(
 					fmt.Sprintf("Failed to update ComputationResult with ID %s", executionDataID))
-				err = cr_err
+				retErr = cr_err
 			}
 
 			b.metrics.ExecutionComputationResultUploadRetried()
@@ -170,7 +170,7 @@ func (b *BadgerRetryableUploader) RetryUpload() error {
 	}
 
 	// return latest occurred error
-	return err
+	return retErr
 }
 
 func (b *BadgerRetryableUploader) reconstructComputationResultFromEDS(
