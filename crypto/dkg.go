@@ -89,16 +89,13 @@ func dkgInvalidStateTransitionErrorf(msg string, args ...interface{}) error {
 }
 
 // IsDkgInvalidStateTransitionError checks if the input error is of a dkgInvalidStateTransition type.
-// invalidStateTransition is a subtype of invalidInputsError, returned when a participant
+// invalidStateTransition is a subtype of invalidInputsError, returned when a caller
 // triggers an invalid state transition in the local DKG instance.
 // Such a failure can only happen if the API is misued by not respecting
 // the state machine conditions.
 func IsDKGInvalidStateTransitionError(err error) bool {
 	var target *invalidInputsError
-	if !errors.As(err, &target) {
-		return false
-	}
-	return target.subType == dkgInvalidStateTransition
+	return errors.As(err, &target) && target.subType == dkgInvalidStateTransition
 }
 
 // index is the node index type used as participants ID

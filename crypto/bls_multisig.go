@@ -4,6 +4,7 @@
 package crypto
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/crypto/hash"
@@ -80,8 +81,8 @@ func BLSVerifyPOP(pk PublicKey, s Signature) (bool, error) {
 // No subgroup membership check is performed on the input signatures.
 //
 // The function retruns:
-//  - (nil, invalidInputsError) if:
-//		- no signatures are provided (input slice is empty)
+//  - (nil, invalidInputsError):
+//		- (nil, aggregationEmptyListError) : if no signatures are provided (input slice is empty)
 //      - Or a deserialization of at least one signature fails (input is an invalid serialization of a
 // 		compressed G1 element following https://github.com/zkcrypto/pairing/blob/master/src/bls12_381/README.md#serialization)
 //  - (nil, error) if an unexpected error occurs
@@ -92,7 +93,7 @@ func AggregateBLSSignatures(sigs []Signature) (Signature, error) {
 
 	// check for empty list
 	if len(sigs) == 0 {
-		return nil, invalidInputsErrorf("signature list should not be empty")
+		return nil, aggregationEmptyListErrorf("signature list should not be empty")
 	}
 
 	// flatten the shares (required by the C layer)
@@ -130,9 +131,8 @@ func AggregateBLSSignatures(sigs []Signature) (Signature, error) {
 // No check is performed on the input private keys.
 //
 // The function retruns:
-//  - (nil, invalidInputsError) if:
-//		- no keys are provided (input slice is empty)
-//      - Or at least one key is not of type PrKeyBLSBLS12381
+//  - (nil, invalidInputsError) if at least one key is not of type PrKeyBLSBLS12381
+//  - (nil, invalidInputsError/aggregationEmptyListError): if no keys are provided (input slice is empty)
 //  - (aggregated_key, nil) otherwise
 func AggregateBLSPrivateKeys(keys []PrivateKey) (PrivateKey, error) {
 	// set BLS context
@@ -140,7 +140,7 @@ func AggregateBLSPrivateKeys(keys []PrivateKey) (PrivateKey, error) {
 
 	// check for empty list
 	if len(keys) == 0 {
-		return nil, invalidInputsErrorf("keys list should not be empty")
+		return nil, aggregationEmptyListErrorf("keys list should not be empty")
 	}
 
 	scalars := make([]scalar, 0, len(keys))
@@ -166,9 +166,8 @@ func AggregateBLSPrivateKeys(keys []PrivateKey) (PrivateKey, error) {
 // No check is performed on the input public keys.
 //
 // The function retruns:
-//  - (nil, invalidInputsError) if:
-//		- no keys are provided (input slice is empty)
-//      - Or at least one key is not of type PubKeyBLSBLS12381
+//  - (nil, invalidInputsError) if at least one key is not of type PubKeyBLSBLS12381
+//  - (nil, invalidInputsError/aggregationEmptyListError) no keys are provided (input slice is empty)
 //  - (aggregated_key, nil) otherwise
 func AggregateBLSPublicKeys(keys []PublicKey) (PublicKey, error) {
 	// set BLS context
@@ -176,7 +175,7 @@ func AggregateBLSPublicKeys(keys []PublicKey) (PublicKey, error) {
 
 	// check for empty list
 	if len(keys) == 0 {
-		return nil, invalidInputsErrorf("keys list should not be empty")
+		return nil, aggregationEmptyListErrorf("keys list should not be empty")
 	}
 
 	points := make([]pointG2, 0, len(keys))
@@ -266,9 +265,9 @@ func RemoveBLSPublicKeys(aggKey PublicKey, keysToRemove []PublicKey) (PublicKey,
 //
 // The function returns:
 //  - (false, invalidInputsError) if:
-//		- input key slice is empty
 //      - Or at least one key is not of type PubKeyBLSBLS12381
 //      - input hasher is nil or its output size is not 128 bytes
+//  - (nil, invalidInputsError/aggregationEmptyListError) if input key slice is empty
 //  - (false, error) if an unexpected error occurs
 //  - (validity, nil) otherwise
 func VerifyBLSSignatureOneMessage(pks []PublicKey, s Signature,
@@ -298,9 +297,9 @@ func VerifyBLSSignatureOneMessage(pks []PublicKey, s Signature,
 // The function returns:
 //  - (false, invalidInputsError) if:
 //      - size of keys is not matching the size of messages and hashers
-//		- input key slice is empty
 //      - Or at least one key is not of type PubKeyBLSBLS12381
 //      - at least one input hasher is nil or its output size is not 128 bytes
+//  - (false, invalidInputsError/aggregationEmptyListError) if input key slice is empty
 //  - (false, error) if an unexpected error occurs
 //  - (validity, nil) otherwise
 func VerifyBLSSignatureManyMessages(pks []PublicKey, s Signature,
@@ -315,7 +314,7 @@ func VerifyBLSSignatureManyMessages(pks []PublicKey, s Signature,
 	}
 	// check the list lengths
 	if len(pks) == 0 {
-		return false, invalidInputsErrorf("key list is empty")
+		return false, aggregationEmptyListErrorf("key list is empty")
 	}
 	if len(pks) != len(messages) || len(kmac) != len(messages) {
 		return false, invalidInputsErrorf(
@@ -445,9 +444,9 @@ func VerifyBLSSignatureManyMessages(pks []PublicKey, s Signature,
 // The function returns:
 //  - ([]false, invalidInputsError) if:
 //      - size of keys is not matching the size of signatures
-//		- input key slice is empty
 //      - Or at least one key is not of type PubKeyBLSBLS12381
 //      - input hasher is nil or its output size is not 128 bytes
+//  - ([]false, invalidInputsError/aggregationEmptyListError) if input key slice is empty
 //  - ([]false, error) if an unexpected error occurs
 //  - ([]validity, nil) otherwise
 func BatchVerifyBLSSignaturesOneMessage(pks []PublicKey, sigs []Signature,
@@ -457,7 +456,7 @@ func BatchVerifyBLSSignaturesOneMessage(pks []PublicKey, sigs []Signature,
 
 	// empty list check
 	if len(pks) == 0 {
-		return []bool{}, invalidInputsErrorf("key list should not be empty")
+		return []bool{}, aggregationEmptyListErrorf("key list should not be empty")
 	}
 
 	if len(pks) != len(sigs) {
@@ -525,4 +524,21 @@ func BatchVerifyBLSSignaturesOneMessage(pks []PublicKey, sigs []Signature,
 	}
 
 	return verifBool, nil
+}
+
+// aggregationEmptyListErrorf constructs a new invalidInputsError (API misuse)
+// for the case of empty lists passed into aggregation functions.
+func aggregationEmptyListErrorf(msg string, args ...interface{}) error {
+	return &invalidInputsError{
+		error:   fmt.Errorf(msg, args...),
+		subType: dkgInvalidStateTransition,
+	}
+}
+
+// IsAggregationEmptyListError checks if the input error is of a aggregationEmptyList error type.
+// aggregationEmptyList is a subtype of invalidInputsError, returned when a BLS
+// aggregation function is called with an empty list which is not allowed in some cases.
+func IsAggregationEmptyListError(err error) bool {
+	var target *invalidInputsError
+	return errors.As(err, &target) && target.subType == aggregationEmptyList
 }

@@ -5,6 +5,7 @@ package crypto
 
 import (
 	"crypto/rand"
+	"fmt"
 	mrand "math/rand"
 	"testing"
 	"time"
@@ -221,144 +222,7 @@ func TestBLSPOP(t *testing.T) {
 // it against the signature of the message under an aggregated private key.
 // Verify the aggregated signature using the multi-signature verification with
 // one message.
-func TestAggregateSignatures(t *testing.T) {
-	// random message
-	input := make([]byte, 100)
-	_, err := rand.Read(input)
-	require.NoError(t, err)
-	// hasher
-	kmac := NewExpandMsgXOFKMAC128("test tag")
-	// number of signatures to aggregate
-	r := time.Now().UnixNano()
-	mrand.Seed(r)
-	t.Logf("math rand seed is %d", r)
-	sigsNum := mrand.Intn(100) + 1
-	sigs := make([]Signature, 0, sigsNum)
-	sks := make([]PrivateKey, 0, sigsNum)
-	pks := make([]PublicKey, 0, sigsNum)
-	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
-	var aggSig, expectedSig Signature
-
-	// create the signatures
-	for i := 0; i < sigsNum; i++ {
-		sk := randomSK(t, seed)
-		s, err := sk.Sign(input, kmac)
-		require.NoError(t, err)
-		sigs = append(sigs, s)
-		sks = append(sks, sk)
-		pks = append(pks, sk.PublicKey())
-	}
-
-	// all signatures are valid
-	t.Run("all valid signatures", func(t *testing.T) {
-		// aggregate private keys
-		aggSk, err := AggregateBLSPrivateKeys(sks)
-		require.NoError(t, err)
-		expectedSig, err := aggSk.Sign(input, kmac)
-		require.NoError(t, err)
-		// aggregate signatures
-		aggSig, err := AggregateBLSSignatures(sigs)
-		require.NoError(t, err)
-		// First check: check the signatures are equal
-		assert.Equal(t, aggSig, expectedSig,
-			"incorrect signature %s, should be %s, private keys are %s, input is %x",
-			aggSig, expectedSig, sks, input)
-		// Second check: Verify the aggregated signature
-		valid, err := VerifyBLSSignatureOneMessage(pks, aggSig, input, kmac)
-		require.NoError(t, err)
-		assert.True(t, valid,
-			"Verification of %s failed, signature should be %s private keys are %s, input is %x",
-			aggSig, expectedSig, sks, input)
-	})
-
-	// check if one signature is not correct
-	t.Run("one invalid signature", func(t *testing.T) {
-		input[0] ^= 1
-		randomIndex := mrand.Intn(sigsNum)
-		sigs[randomIndex], err = sks[randomIndex].Sign(input, kmac)
-		input[0] ^= 1
-		aggSig, err = AggregateBLSSignatures(sigs)
-		require.NoError(t, err)
-		assert.NotEqual(t, aggSig, expectedSig,
-			"signature %s shouldn't be %s private keys are %s, input is %x",
-			aggSig, expectedSig, sks, input)
-		valid, err := VerifyBLSSignatureOneMessage(pks, aggSig, input, kmac)
-		require.NoError(t, err)
-		assert.False(t, valid,
-			"verification of signature %s should fail, it shouldn't be %s private keys are %s, input is %x",
-			aggSig, expectedSig, sks, input)
-		sigs[randomIndex], err = sks[randomIndex].Sign(input, kmac)
-	})
-
-	// check if one the public keys is not correct
-	t.Run("one invalid public key", func(t *testing.T) {
-		randomIndex := mrand.Intn(sigsNum)
-		newSk := randomSK(t, seed)
-		sks[randomIndex] = newSk
-		pks[randomIndex] = newSk.PublicKey()
-		aggSk, err := AggregateBLSPrivateKeys(sks)
-		require.NoError(t, err)
-		expectedSig, err = aggSk.Sign(input, kmac)
-		require.NoError(t, err)
-		assert.NotEqual(t, aggSig, expectedSig,
-			"signature %s shouldn't be %s, private keys are %s, input is %x, wrong key is of index %d",
-			aggSig, expectedSig, sks, input, randomIndex)
-		valid, err := VerifyBLSSignatureOneMessage(pks, aggSig, input, kmac)
-		require.NoError(t, err)
-		assert.False(t, valid,
-			"signature %s should fail, shouldn't be %s, private keys are %s, input is %x, wrong key is of index %d",
-			aggSig, expectedSig, sks, input, randomIndex)
-	})
-
-	t.Run("invalid inputs", func(t *testing.T) {
-		// test aggregating an empty signature list
-		aggSig, err = AggregateBLSSignatures(sigs[:0])
-		assert.Error(t, err)
-		assert.True(t, IsInvalidInputsError(err))
-		assert.Nil(t, aggSig)
-
-		// test verification with an empty key list
-		result, err := VerifyBLSSignatureOneMessage(pks[:0], aggSig, input, kmac)
-		assert.Error(t, err)
-		assert.True(t, IsInvalidInputsError(err))
-		assert.False(t, result)
-
-		// test with a signature of a wrong length
-		shortSig := sigs[0][:signatureLengthBLSBLS12381-1]
-		aggSig, err = AggregateBLSSignatures([]Signature{shortSig})
-		assert.Error(t, err)
-		assert.True(t, IsInvalidInputsError(err))
-		assert.Nil(t, aggSig)
-
-		// test with an invalid signature of a correct length
-		invalidSig := BLSInvalidSignature()
-		aggSig, err = AggregateBLSSignatures([]Signature{invalidSig})
-		assert.Error(t, err)
-		assert.True(t, IsInvalidInputsError(err))
-		assert.Nil(t, aggSig)
-
-		// test the empty key list
-		aggSk, err := AggregateBLSPrivateKeys(sks[:0])
-		assert.Error(t, err)
-		assert.True(t, IsInvalidInputsError(err))
-		assert.Nil(t, aggSk)
-
-		// test with an invalid key type
-		sk := invalidSK(t)
-		aggSk, err = AggregateBLSPrivateKeys([]PrivateKey{sk})
-		assert.Error(t, err)
-		assert.True(t, IsInvalidInputsError(err))
-		assert.Nil(t, aggSk)
-	})
-}
-
-// BLS multi-signature
-// public keys aggregation sanity check
-//
-// Aggregate n public keys and their respective private keys and compare
-// the public key of the aggregated private key is equal to the aggregated
-// public key
-func TestAggregatePubKeys(t *testing.T) {
+func TestBLSAggregatePubKeys(t *testing.T) {
 	r := time.Now().UnixNano()
 	mrand.Seed(r)
 	t.Logf("math rand seed is %d", r)
@@ -389,21 +253,21 @@ func TestAggregatePubKeys(t *testing.T) {
 			aggPk, expectedPk, pks)
 	})
 
-	// aggregate with the neutral key
+	// aggregate an empty list
 	t.Run("empty list", func(t *testing.T) {
 		// private keys
 		aggSk, err := AggregateBLSPrivateKeys(sks[:0])
 		assert.Error(t, err)
-		assert.True(t, IsInvalidInputsError(err))
+		assert.True(t, IsAggregationEmptyListError(err))
 		assert.Nil(t, aggSk)
 		// public keys
 		aggPk, err := AggregateBLSPublicKeys(pks[:0])
 		assert.Error(t, err)
-		assert.True(t, IsInvalidInputsError(err))
+		assert.True(t, IsAggregationEmptyListError(err))
 		assert.Nil(t, aggPk)
 	})
 
-	// aggregate an empty list
+	// aggregate with the neutral key
 	t.Run("neutral list", func(t *testing.T) {
 		// aggregate the neutral key with a non neutral key
 		keys := []PublicKey{pks[0], NeutralBLSPublicKey()}
@@ -432,7 +296,7 @@ func TestAggregatePubKeys(t *testing.T) {
 
 // BLS multi-signature
 // public keys removal sanity check
-func TestRemovePubKeys(t *testing.T) {
+func TestBLSRemovePubKeys(t *testing.T) {
 	r := time.Now().UnixNano()
 	mrand.Seed(r)
 	t.Logf("math rand seed is %d", r)
@@ -531,7 +395,7 @@ func TestRemovePubKeys(t *testing.T) {
 // Verify n signatures of the same message under different keys using the fast
 // batch verification technique and compares the result to verifying each signature
 // separately.
-func TestBatchVerify(t *testing.T) {
+func TestBLSBatchVerify(t *testing.T) {
 	r := time.Now().UnixNano()
 	mrand.Seed(r)
 	t.Logf("math rand seed is %d", r)
@@ -626,7 +490,7 @@ func TestBatchVerify(t *testing.T) {
 	t.Run("empty list", func(t *testing.T) {
 		valid, err := BatchVerifyBLSSignaturesOneMessage(pks[:0], sigs[:0], input, kmac)
 		require.Error(t, err)
-		assert.True(t, IsInvalidInputsError(err))
+		assert.True(t, IsAggregationEmptyListError(err))
 		assert.Equal(t, valid, []bool{},
 			"verification should fail with empty list key, got %v", valid)
 	})
@@ -736,7 +600,7 @@ func BenchmarkBatchVerify(b *testing.B) {
 // Aggregate n signatures of distinct messages under different keys,
 // and verify the aggregated signature using the multi-signature verification with
 // many message.
-func TestAggregateSignaturesManyMessages(t *testing.T) {
+func TestBLSAggregateSignaturesManyMessages(t *testing.T) {
 	r := time.Now().UnixNano()
 	mrand.Seed(r)
 	t.Logf("math rand seed is %d", r)
@@ -822,7 +686,7 @@ func TestAggregateSignaturesManyMessages(t *testing.T) {
 	t.Run("empty list", func(t *testing.T) {
 		valid, err := VerifyBLSSignatureManyMessages(inputPks[:0], aggSig, inputMsgs, inputKmacs)
 		assert.Error(t, err)
-		assert.True(t, IsInvalidInputsError(err))
+		assert.True(t, IsAggregationEmptyListError(err))
 		assert.False(t, valid,
 			"verification should fail with an empty key list")
 	})
@@ -858,6 +722,17 @@ func TestAggregateSignaturesManyMessages(t *testing.T) {
 		assert.True(t, IsInvalidInputsError(err))
 		assert.False(t, valid, "verification should fail with nil hasher")
 		inputPks[0] = tmpPK
+	})
+}
+
+func TestBLSErrorTypes(t *testing.T) {
+	t.Run("aggregateEmptyListError sanity", func(t *testing.T) {
+		failureError := aggregationEmptyListErrorf("some error")
+		otherError := fmt.Errorf("some error")
+		assert.True(t, IsAggregationEmptyListError(failureError))
+		assert.True(t, IsInvalidInputsError(failureError))
+		assert.False(t, IsAggregationEmptyListError(otherError))
+		assert.False(t, IsAggregationEmptyListError(nil))
 	})
 }
 
