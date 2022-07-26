@@ -54,7 +54,7 @@ require (
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/multiformats/go-multihash v0.1.0
 	github.com/onflow/atree v0.4.0
-	github.com/onflow/cadence v0.24.2-0.20220719165617-0b2f52970906
+	github.com/onflow/cadence v0.24.2-0.20220721211505-358c81a7d0a4
 	github.com/onflow/flow v0.3.2
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220719141424-653be1a34ee3
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220719141424-653be1a34ee3
@@ -73,7 +73,7 @@ require (
 	github.com/spf13/cobra v1.3.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.10.1
-	github.com/stretchr/testify v1.7.5
+	github.com/stretchr/testify v1.8.0
 	github.com/uber/jaeger-client-go v2.29.1+incompatible
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/vmihailenco/msgpack/v4 v4.3.11
@@ -82,7 +82,7 @@ require (
 	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20220412211240-33da011f77ad
+	golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f
 	golang.org/x/text v0.3.7
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
 	google.golang.org/api v0.70.0
@@ -115,7 +115,7 @@ require (
 	github.com/aws/smithy-go v1.8.0 // indirect
 	github.com/benbjohnson/clock v1.3.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/bits-and-blooms/bitset v1.2.2 // indirect
+	github.com/bits-and-blooms/bitset v1.3.0 // indirect
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
@@ -149,7 +149,7 @@ require (
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0 // indirect
-	github.com/go-test/deep v1.0.5 // indirect
+	github.com/go-test/deep v1.0.8 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
 	github.com/golang/glog v1.0.0 // indirect
@@ -183,7 +183,7 @@ require (
 	github.com/jung-kurt/gofpdf v1.0.3-0.20190309125859-24315acbbda5 // indirect
 	github.com/kevinburke/go-bindata v3.22.0+incompatible // indirect
 	github.com/klauspost/compress v1.15.1 // indirect
-	github.com/klauspost/cpuid/v2 v2.0.14 // indirect
+	github.com/klauspost/cpuid/v2 v2.1.0 // indirect
 	github.com/koron/go-ssdp v0.0.2 // indirect
 	github.com/libp2p/go-buffer-pool v0.0.2 // indirect
 	github.com/libp2p/go-cidranger v1.1.0 // indirect
@@ -285,7 +285,7 @@ require (
 	golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b // indirect
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
 	golang.org/x/tools v0.1.11 // indirect
-	golang.org/x/xerrors v0.0.0-20220411194840-2f41105eb62f // indirect
+	golang.org/x/xerrors v0.0.0-20220609144429-65e65417b02f // indirect
 	gonum.org/v1/gonum v0.8.2 // indirect
 	gonum.org/v1/plot v0.0.0-20190515093506-e2840ee46a6b // indirect
 	google.golang.org/appengine v1.6.7 // indirect

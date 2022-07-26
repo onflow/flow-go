@@ -89,6 +89,18 @@ type ErrorReturningRuntime struct {
 	TxErrors []error
 }
 
+func (e *ErrorReturningRuntime) NewScriptExecutor(script runtime.Script, context runtime.Context) runtime.Executor {
+	panic("NewScriptExecutor not expected")
+}
+
+func (e *ErrorReturningRuntime) NewTransactionExecutor(script runtime.Script, context runtime.Context) runtime.Executor {
+	panic("NewTransactionExecutor not expected")
+}
+
+func (e *ErrorReturningRuntime) NewContractFunctionExecutor(contractLocation common.AddressLocation, functionName string, arguments []interpreter.Value, argumentTypes []sema.Type, context runtime.Context) runtime.Executor {
+	panic("NewContractFunctionExecutor not expected")
+}
+
 func (e *ErrorReturningRuntime) SetInvalidatedResourceValidationEnabled(_ bool) {
 	panic("SetInvalidatedResourceValidationEnabled not expected")
 }
