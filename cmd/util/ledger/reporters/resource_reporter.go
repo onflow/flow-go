@@ -22,7 +22,7 @@ import (
 const ConstantSizeReporterReportPrefix = "constant_size_report"
 
 var numberOfCompositeTypes uint64
-var numberOfCompositeTypesWithConstantChildren uint64
+var numberOfCompositeTypesWithConstantSizeChildren uint64
 
 type ConstantSizeReporter struct {
 	log      zerolog.Logger
@@ -39,11 +39,11 @@ func NewConstantSizeReporter(logger zerolog.Logger, rwf ReportWriterFactory) *Co
 }
 
 func (r *ConstantSizeReporter) Name() string {
-	return "Constant Size Reporter"
+	return "Resource Reporter"
 }
 
 func (r *ConstantSizeReporter) Report(payloads []ledger.Payload, commit ledger.State) error {
-	r.rw = r.rwf.ReportWriter(ResourceUUIDReporterReportPrefix)
+	r.rw = r.rwf.ReportWriter(ConstantSizeReporterReportPrefix)
 	defer r.rw.Close()
 
 	wg := &sync.WaitGroup{}
@@ -80,7 +80,7 @@ func (r *ConstantSizeReporter) Report(payloads []ledger.Payload, commit ledger.S
 
 	wg.Wait()
 
-	r.log.Info().Msgf(">>>>>> %d of %d", numberOfCompositeTypesWithConstantChildren, numberOfCompositeTypes)
+	r.log.Info().Msgf(">>>>>> %d of %d", numberOfCompositeTypesWithConstantSizeChildren, numberOfCompositeTypes)
 
 	err := r.progress.Finish()
 	if err != nil {
@@ -122,7 +122,7 @@ func (r *ConstantSizeReporter) worker(
 						if composite, ok := v.(*interpreter.CompositeValue); ok {
 							atomic.AddUint64(&numberOfCompositeTypes, 1)
 							if allFieldsAreConstantSize(r.log, inter, composite) {
-								atomic.AddUint64(&numberOfCompositeTypesWithConstantChildren, 1)
+								atomic.AddUint64(&numberOfCompositeTypesWithConstantSizeChildren, 1)
 							}
 						}
 
@@ -162,22 +162,17 @@ func IsConstantSize(logger zerolog.Logger, inter *interpreter.Interpreter, value
 	switch value.(type) {
 	case *interpreter.CompositeValue:
 		return allFieldsAreConstantSize(logger, inter, value.(*interpreter.CompositeValue))
-	case *interpreter.DictionaryValue:
-		return false
-	case *interpreter.ArrayValue:
-		return false
-	case *interpreter.StringValue, interpreter.IntValue, interpreter.UIntValue,
+	case *interpreter.DictionaryValue, *interpreter.ArrayValue, *interpreter.StringValue,
+		interpreter.IntValue, interpreter.UIntValue,
 		*interpreter.SomeValue, interpreter.PathValue, *interpreter.CapabilityValue,
 		interpreter.LinkValue, interpreter.TypeValue:
 		return false
-	case interpreter.AddressValue:
-		return true
-	case interpreter.BoolValue, interpreter.CharacterValue, interpreter.NilValue, interpreter.VoidValue,
+	case interpreter.BoolValue, interpreter.CharacterValue, interpreter.AddressValue,
+		interpreter.NilValue, interpreter.VoidValue,
 		interpreter.Int8Value, interpreter.Int16Value, interpreter.Int32Value, interpreter.Int64Value, interpreter.Int128Value, interpreter.Int256Value,
 		interpreter.UInt8Value, interpreter.UInt16Value, interpreter.UInt32Value, interpreter.UInt64Value, interpreter.UInt128Value, interpreter.UInt256Value,
 		interpreter.Word8Value, interpreter.Word16Value, interpreter.Word32Value, interpreter.Word64Value, interpreter.Fix64Value, interpreter.UFix64Value:
 		return true
-
 	default:
 		logger.Warn().Msgf("unknown type found %T", value)
 		return false
