@@ -50,6 +50,12 @@ func TestEmptyCheckpointQueue(t *testing.T) {
 
 		tr := q.Tries()
 		require.Equal(t, capacity, len(tr))
+
+		// After queue reaches capacity in previous loop,
+		// queue overwrites older elements with new insertions,
+		// and element count is its capacity value.
+		// savedTries contains all elements inserted from previous loop and current loop, so
+		// tr (queue snapshot) matches the last C elements in savedTries (where C is capacity).
 		require.Equal(t, savedTries[len(savedTries)-capacity:], tr)
 		require.Equal(t, capacity, q.Count())
 	}

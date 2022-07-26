@@ -16,17 +16,31 @@ import (
 	"github.com/onflow/flow-go/module/observable"
 )
 
+// WALTrieUpdate is a message communicated through channel between Ledger and Compactor.
 type WALTrieUpdate struct {
-	Update   *ledger.TrieUpdate
-	ResultCh chan<- error
-	TrieCh   <-chan *trie.MTrie
+	Update   *ledger.TrieUpdate // Update data needs to be encoded and saved in WAL.
+	ResultCh chan<- error       // ResultCh channel is used to send WAL update result from Compactor to Ledger.
+	TrieCh   <-chan *trie.MTrie // TrieCh channel is used to send new trie from Ledger to Compactor.
 }
 
+// checkpointResult is a message to communicate checkpointing number and error if any.
 type checkpointResult struct {
 	num int
 	err error
 }
 
+// Compactor is a long-running goroutine responsible for:
+// - writing WAL record from trie update,
+// - starting checkpointing async when enough segments are finalized.
+//
+// Compactor communicates with Ledger through channels
+// to ensure that by the end of any trie update processing,
+// update is written to WAL and new trie is pushed to trie queue.
+//
+// Compactor stores pointers to tries in ledger state in a fix-sized
+// checkpointing queue (FIFO).  Checkpointing queue is decoupled from
+// main ledger state to allow separate optimizaiton, etc.
+// NOTE: ledger state and checkpointing queue may contain different tries.
 type Compactor struct {
 	checkpointer       *realWAL.Checkpointer
 	wal                realWAL.LedgerWAL
