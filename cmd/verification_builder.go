@@ -359,7 +359,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				followerCore,
 				syncCore,
 				node.Tracer,
-				compliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),
+				follower.WithComplianceOptions(compliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)

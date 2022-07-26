@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
 	"path/filepath"
 	goruntime "runtime"
 	"time"
@@ -48,7 +47,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/extralog"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
@@ -65,7 +63,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	chainsync "github.com/onflow/flow-go/module/synchronization"
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/state/protocol"
@@ -426,7 +424,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			executionDataCIDCache = state_synchronization.NewExecutionDataCIDCache(executionDataCIDCacheSize)
 
 			bs, err := node.Network.RegisterBlobService(
-				network.ExecutionDataService,
+				channels.ExecutionDataService,
 				ds,
 				p2p.WithBitswapOptions(
 					bitswap.WithTaskComparator(
@@ -473,15 +471,10 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			return eds, nil
 		}).
 		Component("provider engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-			extraLogPath := path.Join(e.exeConf.triedir, "extralogs")
-			err := os.MkdirAll(extraLogPath, 0777)
-			if err != nil {
-				return nil, fmt.Errorf("cannot create %s path for extra logs: %w", extraLogPath, err)
+			options := []runtime.Option{}
+			if e.exeConf.cadenceTracing {
+				options = append(options, runtime.WithTracingEnabled(true))
 			}
-
-			extralog.ExtraLogDumpPath = extraLogPath
-
-			options := []runtime.Option{runtime.WithTracingEnabled(e.exeConf.cadenceTracing)}
 			rt := fvm.NewInterpreterRuntime(options...)
 
 			vm := fvm.NewVirtualMachine(rt)
@@ -615,7 +608,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Component("ingestion engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			var err error
 			collectionRequester, err = requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
-				network.RequestCollections,
+				channels.RequestCollections,
 				filter.Any,
 				func() flow.Entity { return &flow.Collection{} },
 				// we are manually triggering batches in execution, but lets still send off a batch once a minute, as a safety net for the sake of retries
@@ -722,7 +715,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				followerCore,
 				syncCore,
 				node.Tracer,
-				compliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),
+				followereng.WithComplianceOptions(compliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
@@ -744,7 +737,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				node.Network,
 				node.Me,
 				node.State,
-				network.ProvideReceiptsByBlockID,
+				channels.ProvideReceiptsByBlockID,
 				filter.HasRole(flow.RoleConsensus),
 				retrieve,
 			)
