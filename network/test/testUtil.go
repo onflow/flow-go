@@ -276,12 +276,11 @@ func GenerateIDsAndMiddlewares(t *testing.T,
 }
 
 type optsConfig struct {
-	idOpts                     []func(*flow.Identity)
-	dhtPrefix                  string
-	dhtOpts                    []dht.Option
-	peerManagerOpts            []p2p.Option
-	connectionGating           bool
-	slashingViolationsConsumer slashing.ViolationsConsumer
+	idOpts           []func(*flow.Identity)
+	dhtPrefix        string
+	dhtOpts          []dht.Option
+	peerManagerOpts  []p2p.Option
+	connectionGating bool
 }
 
 func WithIdentityOpts(idOpts ...func(*flow.Identity)) func(*optsConfig) {
