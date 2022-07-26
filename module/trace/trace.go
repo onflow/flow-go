@@ -126,6 +126,21 @@ func (t *Tracer) Done() <-chan struct{} {
 	return done
 }
 
+func (t *Tracer) startEntitySpan(
+	ctx context.Context,
+	entityID flow.Identifier,
+	entityType string,
+	spanName SpanName,
+	opts ...trace.SpanStartOption,
+) (trace.Span, context.Context, bool) {
+	if !entityID.IsSampled(t.sensitivity) {
+		return NoopSpan, ctx, false
+	}
+
+	ctx, rootSpan := t.entityRootSpan(ctx, entityID, entityType)
+	return t.StartSpanFromParent(rootSpan, spanName, opts...), ctx, true
+}
+
 // entityRootSpan returns the root span for the given entity from the cache
 // and if not exist it would construct it and cache it and return it
 // This should be used mostly for the very first span created for an entity on the service
@@ -164,12 +179,7 @@ func (t *Tracer) StartBlockSpan(
 	spanName SpanName,
 	opts ...trace.SpanStartOption,
 ) (trace.Span, context.Context, bool) {
-	if !blockID.IsSampled(t.sensitivity) {
-		return NoopSpan, ctx, false
-	}
-
-	ctx, rootSpan := t.entityRootSpan(ctx, blockID, EntityTypeBlock)
-	return t.StartSpanFromParent(rootSpan, spanName, opts...), ctx, true
+	return t.startEntitySpan(ctx, blockID, EntityTypeBlock, spanName, opts...)
 }
 
 func (t *Tracer) StartCollectionSpan(
@@ -178,12 +188,7 @@ func (t *Tracer) StartCollectionSpan(
 	spanName SpanName,
 	opts ...trace.SpanStartOption,
 ) (trace.Span, context.Context, bool) {
-	if !collectionID.IsSampled(t.sensitivity) {
-		return NoopSpan, ctx, false
-	}
-
-	ctx, rootSpan := t.entityRootSpan(ctx, collectionID, EntityTypeCollection)
-	return t.StartSpanFromParent(rootSpan, spanName, opts...), ctx, true
+	return t.startEntitySpan(ctx, collectionID, EntityTypeCollection, spanName, opts...)
 }
 
 // StartTransactionSpan starts a span that will be aggregated under the given transaction.
@@ -194,12 +199,7 @@ func (t *Tracer) StartTransactionSpan(
 	spanName SpanName,
 	opts ...trace.SpanStartOption,
 ) (trace.Span, context.Context, bool) {
-	if !transactionID.IsSampled(t.sensitivity) {
-		return NoopSpan, ctx, false
-	}
-
-	ctx, rootSpan := t.entityRootSpan(ctx, transactionID, EntityTypeTransaction)
-	return t.StartSpanFromParent(rootSpan, spanName, opts...), ctx, true
+	return t.startEntitySpan(ctx, transactionID, EntityTypeTransaction, spanName, opts...)
 }
 
 func (t *Tracer) StartSpanFromContext(
