@@ -348,11 +348,11 @@ func (c *Compactor) processTrieUpdate(
 	// - incremented by 1 from previous segment number (new segment)
 	segmentNum, skipped, updateErr := c.wal.RecordUpdate(update.Update)
 
-	// This ensures that updated trie matches WAL update.
-	defer func(updateResult error) {
-		// Send result of WAL update
-		update.ResultCh <- updateResult
+	// Send result of WAL update
+	update.ResultCh <- updateErr
 
+	// This ensures that updated trie matches WAL update.
+	defer func() {
 		// Wait for updated trie
 		trie := <-update.TrieCh
 		if trie == nil {
@@ -361,7 +361,7 @@ func (c *Compactor) processTrieUpdate(
 		}
 
 		checkpointQueue.Push(trie)
-	}(updateErr)
+	}()
 
 	if activeSegmentNum == -1 {
 		// Recover from failure to get active segment number at initialization.
