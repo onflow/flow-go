@@ -103,9 +103,7 @@ func NewTracer(
 // Ready returns a channel that will close when the network stack is ready.
 func (t *Tracer) Ready() <-chan struct{} {
 	ready := make(chan struct{})
-	go func() {
-		close(ready)
-	}()
+	close(ready)
 	return ready
 }
 
