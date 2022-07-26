@@ -300,17 +300,6 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 	)
 
 	subscriptionManager := p2p.NewChannelSubscriptionManager(fnb.Middleware)
-
-	topologyFactory, err := topology.Factory(topology.Name(fnb.TopologyProtocolName))
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve topology factory for %s: %w", fnb.TopologyProtocolName, err)
-	}
-	top, err := topologyFactory(fnb.NodeID, fnb.Logger, fnb.State, fnb.TopologyEdgeProbability)
-	if err != nil {
-		return nil, fmt.Errorf("could not create topology: %w", err)
-	}
-	topologyCache := topology.NewCache(fnb.Logger, top)
-
 	var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
 	if fnb.HeroCacheMetricsEnable {
 		heroCacheCollector = metrics.NetworkReceiveCacheMetricsFactory(fnb.MetricsRegisterer)
@@ -320,7 +309,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		fnb.Logger,
 		heroCacheCollector)
 
-	err = node.Metrics.Mempool.Register(metrics.ResourceNetworkingReceiveCache, receiveCache.Size)
+	err := node.Metrics.Mempool.Register(metrics.ResourceNetworkingReceiveCache, receiveCache.Size)
 	if err != nil {
 		return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
 	}
@@ -330,7 +319,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		fnb.CodecFactory(),
 		fnb.Me,
 		func() (network.Middleware, error) { return fnb.Middleware, nil },
-		topologyCache,
+		topology.NewFullyConnectedTopology(),
 		subscriptionManager,
 		fnb.Metrics.Network,
 		fnb.IdentityProvider,
