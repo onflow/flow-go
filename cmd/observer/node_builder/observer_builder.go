@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -993,29 +994,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return nil, err
 		}
 
-		/*
-			TODO:
-			The following code to setup the connection to the access node is temporary
-			The forwarding should allow for multiple upstream access nodes, allow for retries, and track metrics
-		*/
-		if len(builder.upstreamIdentities) == 0 {
-			panic("please specify an upstream identity")
-		}
-
-		identity := builder.upstreamIdentities[0]
-
-		tlsConfig, err := grpcutils.DefaultClientTLSConfig(identity.NetworkPubKey)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get default TLS client config using public flow networking key %s %w", identity.NetworkPubKey.String(), err)
-		}
-
-		conn, _ := grpc.Dial(
-			identity.Address,
-			grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
-			grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
-			backend.WithClientUnaryInterceptor(time.Minute))
-
-		client := accessproto.NewAccessAPIClient(conn)
+		client, err := builder.initUpstreamClient()
 
 		// build the rpc engine
 		engineBuilder.WithNewHandler(&rpc.Forwarder{UpstreamHandler: client})
@@ -1023,6 +1002,45 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		builder.RpcEng = engineBuilder.Build()
 		return builder.RpcEng, nil
 	})
+}
+
+func (builder *ObserverServiceBuilder) initUpstreamClient() (accessproto.AccessAPIClient, error) {
+	// config must prove at least one upstream identity
+	if len(builder.upstreamIdentities) == 0 {
+		return nil, errors.New("please specify an upstream identity")
+	}
+
+	var errs *multierror.Error
+
+	for _, identity := range builder.upstreamIdentities {
+		// TLS
+		tlsConfig, err := grpcutils.DefaultClientTLSConfig(identity.NetworkPubKey)
+		if err != nil {
+			multierror.Append(err, 
+				fmt.Errorf("failed to get default TLS client config using public flow networking key %s %w", 
+					identity.NetworkPubKey.String(), err),
+			)
+			continue
+		}
+
+		// connect to the upstream access node
+		conn, err := grpc.Dial(
+			identity.Address,
+			grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
+			grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
+			backend.WithClientUnaryInterceptor(time.Minute))
+
+		if err != nil {
+			multierror.Append(err, errs)
+			continue
+		}
+
+		// return the client and ignore previous errors
+		client := accessproto.NewAccessAPIClient(conn)
+		return client, nil
+	}
+
+	return nil, errs.ErrorOrNil()
 }
 
 // initMiddleware creates the network.Middleware implementation with the libp2p factory function, metrics, peer update
