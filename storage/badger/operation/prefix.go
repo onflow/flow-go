@@ -72,6 +72,11 @@ const (
 	codeDKGStarted       = 64 // flag that the DKG for an epoch has been started
 	codeDKGEnded         = 65 // flag that the DKG for an epoch has ended (stores end state)
 
+	// code for ComputationResult storage
+	// NOTE: for now only GCP uploader is supported. When other uploader (AWS e.g.) needs to
+	//		 be supported, we will need to define new code.
+	codeComputationResults = 66
+
 	// job queue consumers and producers
 	codeJobConsumerProcessed = 70
 	codeJobQueue             = 71
