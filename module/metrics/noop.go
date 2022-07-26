@@ -147,6 +147,8 @@ func (nc *NoopCollector) ReadDuration(duration time.Duration)                   
 func (nc *NoopCollector) ReadDurationPerItem(duration time.Duration)                            {}
 func (nc *NoopCollector) ExecutionCollectionRequestSent()                                       {}
 func (nc *NoopCollector) ExecutionCollectionRequestRetried()                                    {}
+func (nc *NoopCollector) ExecutionComputationResultUploaded()                                   {}
+func (nc *NoopCollector) ExecutionComputationResultUploadRetried()                              {}
 func (nc *NoopCollector) RuntimeTransactionParsed(dur time.Duration)                            {}
 func (nc *NoopCollector) RuntimeTransactionChecked(dur time.Duration)                           {}
 func (nc *NoopCollector) RuntimeTransactionInterpreted(dur time.Duration)                       {}
