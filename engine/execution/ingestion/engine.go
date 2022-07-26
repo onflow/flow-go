@@ -36,6 +36,14 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+var uploadEnabled = true
+
+func SetUploaderEnabled(enabled bool) {
+	uploadEnabled = enabled
+
+	log.Info().Msgf("Ingestion Engine: changed uploadEnabled to %v", enabled)
+}
+
 // An Engine receives and saves incoming blocks.
 type Engine struct {
 	psEvents.Noop // satisfy protocol events consumer interface
@@ -141,6 +149,12 @@ func New(
 // successfully started.
 func (e *Engine) Ready() <-chan struct{} {
 	if !e.pauseExecution {
+		if uploadEnabled {
+			if err := e.computationManager.RetryUpload(); err != nil {
+				e.log.Warn().Msg("failed to re-upload all ComputationResults")
+			}
+		}
+
 		err := e.reloadUnexecutedBlocks()
 		if err != nil {
 			e.log.Fatal().Err(err).Msg("failed to load all unexecuted blocks")

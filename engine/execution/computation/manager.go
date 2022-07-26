@@ -37,7 +37,7 @@ var uploadEnabled = true
 func SetUploaderEnabled(enabled bool) {
 	uploadEnabled = enabled
 
-	log.Info().Msgf("changed uploadEnabled to %v", enabled)
+	log.Info().Msgf("ComputationManager: changed uploadEnabled to %v", enabled)
 }
 
 type VirtualMachine interface {
@@ -53,6 +53,7 @@ type ComputationManager interface {
 		view state.View,
 	) (*execution.ComputationResult, error)
 	GetAccount(addr flow.Address, header *flow.Header, view state.View) (*flow.Account, error)
+	RetryUpload() error
 }
 
 var DefaultScriptLogThreshold = 1 * time.Second
@@ -317,6 +318,16 @@ func (e *Manager) ComputeBlock(
 	})
 
 	if uploadEnabled {
+		// RetryableAsyncUploader depends on the rootID from EDS to keep track of upload
+		// status in BadgerDB, so we will need to wait for the previous EDS goroutine to
+		// complete then to retrieve rootID. Since we don't wait for all uploaders to complete
+		// uploading here, it should have minimal performance impact here.
+		err = group.Wait()
+		if err != nil {
+			return nil, fmt.Errorf("failed to upload block result to EDS: %w", err)
+		}
+		result.ExecutionDataID = rootID
+
 		for _, uploader := range e.uploaders {
 			uploader := uploader
 
@@ -357,4 +368,15 @@ func (e *Manager) GetAccount(address flow.Address, blockHeader *flow.Header, vie
 	}
 
 	return account, nil
+}
+
+func (e *Manager) RetryUpload() (err error) {
+	for _, u := range e.uploaders {
+		switch u.(type) {
+		case uploader.RetryableUploader:
+			retryableUploader := u.(uploader.RetryableUploader)
+			err = retryableUploader.RetryUpload()
+		}
+	}
+	return err
 }

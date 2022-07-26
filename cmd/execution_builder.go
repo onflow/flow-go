@@ -186,6 +186,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		txResults                     *storage.TransactionResults
 		results                       *storage.ExecutionResults
 		myReceipts                    *storage.MyExecutionReceipts
+		computationResultUploadStatus *storage.ComputationResultUploadStatus
 		providerEngine                *exeprovider.Engine
 		checkerEng                    *checker.Engine
 		syncCore                      *chainsync.Core
@@ -265,70 +266,6 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Module("pending block cache", func(node *NodeConfig) error {
 			pendingBlocks = buffer.NewPendingBlocks() // for following main chain consensus
 			return nil
-		}).
-		Component("GCP block data uploader", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-			if e.exeConf.enableBlockDataUpload && e.exeConf.gcpBucketName != "" {
-				logger := node.Logger.With().Str("component_name", "gcp_block_data_uploader").Logger()
-				gcpBucketUploader, err := uploader.NewGCPBucketUploader(
-					context.Background(),
-					e.exeConf.gcpBucketName,
-					logger,
-				)
-				if err != nil {
-					return nil, fmt.Errorf("cannot create GCP Bucket uploader: %w", err)
-				}
-
-				asyncUploader := uploader.NewAsyncUploader(
-					gcpBucketUploader,
-					blockdataUploaderRetryTimeout,
-					blockDataUploaderMaxRetry,
-					logger,
-					collector,
-				)
-
-				blockDataUploaders = append(blockDataUploaders, asyncUploader)
-
-				return asyncUploader, nil
-			}
-
-			// Since we don't have conditional component creation, we just use Noop one.
-			// It's functions will be once per startup/shutdown - non-measurable performance penalty
-			// blockDataUploader will stay nil and disable calling uploader at all
-			return &module.NoopReadyDoneAware{}, nil
-		}).
-		Component("S3 block data uploader", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-			if e.exeConf.enableBlockDataUpload && e.exeConf.s3BucketName != "" {
-				logger := node.Logger.With().Str("component_name", "s3_block_data_uploader").Logger()
-
-				ctx := context.Background()
-				config, err := awsconfig.LoadDefaultConfig(ctx)
-				if err != nil {
-					return nil, fmt.Errorf("failed to load AWS configuration: %w", err)
-				}
-
-				client := s3.NewFromConfig(config)
-				s3Uploader := uploader.NewS3Uploader(
-					ctx,
-					client,
-					e.exeConf.s3BucketName,
-					logger,
-				)
-				asyncUploader := uploader.NewAsyncUploader(
-					s3Uploader,
-					blockdataUploaderRetryTimeout,
-					blockDataUploaderMaxRetry,
-					logger,
-					collector,
-				)
-				blockDataUploaders = append(blockDataUploaders, asyncUploader)
-
-				return asyncUploader, nil
-			}
-
-			// Since we don't have conditional component creation, we just use Noop one.
-			// It's functions will be once per startup/shutdown - non-measurable performance penalty
-			// blockDataUploader will stay nil and disable calling uploader at all
-			return &module.NoopReadyDoneAware{}, nil
 		}).
 		Module("state deltas mempool", func(node *NodeConfig) error {
 			var err error
@@ -469,6 +406,86 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			executionDataService = eds
 
 			return eds, nil
+		}).
+		Component("GCP block data uploader", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+			// Since RetryableAsyncUploader relies on executionDataService so we should create
+			// it after execution data service is fully setup.
+			if e.exeConf.enableBlockDataUpload && e.exeConf.gcpBucketName != "" {
+				logger := node.Logger.With().Str("component_name", "gcp_block_data_uploader").Logger()
+				gcpBucketUploader, err := uploader.NewGCPBucketUploader(
+					context.Background(),
+					e.exeConf.gcpBucketName,
+					logger,
+				)
+				if err != nil {
+					return nil, fmt.Errorf("cannot create GCP Bucket uploader: %w", err)
+				}
+
+				asyncUploader := uploader.NewAsyncUploader(
+					gcpBucketUploader,
+					blockdataUploaderRetryTimeout,
+					blockDataUploaderMaxRetry,
+					logger,
+					collector,
+				)
+
+				// Setting up RetryableUploader for GCP uploader
+				computationResultUploadStatus = storage.NewComputationResultUploadStatus(node.DB)
+				retryableUploader := uploader.NewBadgerRetryableUploader(
+					asyncUploader,
+					node.Storage.Blocks,
+					storage.NewCommits(node.Metrics.Cache, node.DB),
+					storage.NewTransactionResults(node.Metrics.Cache, node.DB, e.exeConf.transactionResultsCacheSize),
+					computationResultUploadStatus,
+					executionDataService,
+					collector)
+
+				blockDataUploaders = append(blockDataUploaders, retryableUploader)
+
+				return retryableUploader, nil
+			}
+
+			// Since we don't have conditional component creation, we just use Noop one.
+			// It's functions will be once per startup/shutdown - non-measurable performance penalty
+			// blockDataUploader will stay nil and disable calling uploader at all
+			return &module.NoopReadyDoneAware{}, nil
+		}).
+		Component("S3 block data uploader", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+			if e.exeConf.enableBlockDataUpload && e.exeConf.s3BucketName != "" {
+				logger := node.Logger.With().Str("component_name", "s3_block_data_uploader").Logger()
+
+				ctx := context.Background()
+				config, err := awsconfig.LoadDefaultConfig(ctx)
+				if err != nil {
+					return nil, fmt.Errorf("failed to load AWS configuration: %w", err)
+				}
+
+				client := s3.NewFromConfig(config)
+				s3Uploader := uploader.NewS3Uploader(
+					ctx,
+					client,
+					e.exeConf.s3BucketName,
+					logger,
+				)
+				asyncUploader := uploader.NewAsyncUploader(
+					s3Uploader,
+					blockdataUploaderRetryTimeout,
+					blockDataUploaderMaxRetry,
+					logger,
+					collector,
+				)
+
+				// We are not enabling RetryableUploader for S3 uploader for now. When we need upload
+				// retry for multiple uploaders, we will need to use different BadgerDB key prefix.
+				blockDataUploaders = append(blockDataUploaders, asyncUploader)
+
+				return asyncUploader, nil
+			}
+
+			// Since we don't have conditional component creation, we just use Noop one.
+			// It's functions will be once per startup/shutdown - non-measurable performance penalty
+			// blockDataUploader will stay nil and disable calling uploader at all
+			return &module.NoopReadyDoneAware{}, nil
 		}).
 		Component("provider engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			options := []runtime.Option{}
