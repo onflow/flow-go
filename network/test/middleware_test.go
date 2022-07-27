@@ -13,14 +13,13 @@ import (
 	"github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p-core/peer"
 	swarm "github.com/libp2p/go-libp2p-swarm"
-	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	mockery "github.com/stretchr/testify/mock"
-
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"golang.org/x/time/rate"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -34,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -89,7 +89,7 @@ func TestMiddlewareTestSuite(t *testing.T) {
 
 // SetupTest initiates the test setups prior to each test
 func (m *MiddlewareTestSuite) SetupTest() {
-	logger := zerolog.New(os.Stderr).Level(zerolog.WarnLevel)
+	logger := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 	log.SetAllLoggers(log.LevelError)
 	m.logger = logger
 
@@ -184,18 +184,21 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 }
 
 func (m *MiddlewareTestSuite) TestUnicastRateLimit_Streams() {
-	// interval at which to rate limit streams (per second)
-	interval := time.Second
-	// amount of streams allowed per interval 5 streams/sec
+	// limiter limit will be set to 5 events/sec the 6th event per interval will be rate limited
+	limit := rate.Limit(6)
+
+	// burst per interval
 	burst := 5
 
 	// setup streams rate limiter
-	streamsRateLimiter := unicast.NewStreamsRateLimiter(interval, burst)
+	streamsRateLimiter := unicast.NewStreamsRateLimiter(limit, burst)
 
 	// create a new staked identity
 	ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1)
 
 	// the onUnicastRateLimitedPeerFunc call back we will use to keep track of how many times a rate limit happens
+	// after 5 rate limits we will close ch.
+	ch := make(chan struct{})
 	var rateLimits uint64
 	onRateLimit := func(peerID peer.ID) {
 		// we only expect messages from the first middleware on the test suite
@@ -205,6 +208,11 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Streams() {
 
 		// update hook calls
 		atomic.AddUint64(&rateLimits, 1)
+
+		// close ch after 3 rate limits
+		if rateLimits == uint64(3) {
+			close(ch)
+		}
 	}
 
 	// create middleware
@@ -237,36 +245,51 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Streams() {
 
 	// update the addresses
 	m.mws[0].UpdateNodeAddresses()
-	newMw.UpdateNodeAddresses()
 
-	// send 6 messages each second via unicast, 1 message will be rate limited
-	for i := 0; i < 6; i++ {
-		err := m.mws[0].SendDirect(msg, newId.NodeID)
-		require.NoError(m.T(), err)
+	// send burst of 6 messages each second via unicast, 1 message will be rate limited every second for 3 seconds
+	// a total of 3 messages will be rate limited
+	tick := 0
+	for range time.Tick(time.Second) {
+		tick++
+
+		for i := 0; i <= 5; i++ {
+			err := m.mws[0].SendDirect(msg, newId.NodeID)
+			require.NoError(m.T(), err)
+		}
+
+		// exit tick range loop after 3 seconds
+		if tick == 3 {
+			break
+		}
 	}
+
+	// wait for all rate limits before shutting down middleware
+	unittest.RequireCloseBefore(m.T(), ch, 100*time.Millisecond, "could not stop on rate limit test ch on time")
 
 	// shutdown our middleware so that each message can be processed
 	cancel()
 	unittest.RequireCloseBefore(m.T(), newMw.Done(), 100*time.Millisecond, "could not stop middleware on time")
 
-	// expect 1 warning logged by the middleware unicast stream handler
-	// for the rate limited message.
-	require.Equal(m.T(), uint64(1), rateLimits)
+	// expect our rate limited peer callback to be invoked 3 times
+	require.Equal(m.T(), uint64(3), rateLimits)
 }
 
 func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
-	// interval at which to rate limit streams (per second)
-	interval := time.Second
-	// bytes allowed per interval (500bytes/sec)
-	burst := 500
+	// limiter limit will be set up to 1000 bytes/sec
+	limit := rate.Limit(1000)
+
+	// burst per interval
+	burst := 1000
 
 	// setup bandwidth rate limiter
-	bandwidthRateLimiter := unicast.NewBandWidthRateLimiter(interval, burst)
+	bandWidthRateLimiter := unicast.NewBandWidthRateLimiter(limit, burst)
 
 	// create a new staked identity
 	ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1)
 
 	// the onUnicastRateLimitedPeerFunc call back we will use to keep track of how many times a rate limit happens
+	// after 5 rate limits we will close ch.
+	ch := make(chan struct{})
 	var rateLimits uint64
 	onRateLimit := func(peerID peer.ID) {
 		// we only expect messages from the first middleware on the test suite
@@ -277,11 +300,14 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 		// update hook calls
 		atomic.AddUint64(&rateLimits, 1)
 
-		fmt.Println(peerID)
+		// close ch after 3 rate limits
+		if rateLimits == uint64(3) {
+			close(ch)
+		}
 	}
 
 	// create middleware
-	opts := WithUnicastRateLimiters(nil, bandwidthRateLimiter, onRateLimit)
+	opts := WithUnicastRateLimiters(nil, bandWidthRateLimiter, onRateLimit)
 	mws, providers := GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, unittest.NetworkCodec(), opts)
 	require.Len(m.T(), ids, 1)
 	require.Len(m.T(), providers, 1)
@@ -306,24 +332,42 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	// needed to enable ID translation
 	m.providers[0].SetIdentities(idList)
 
-	b := make([]byte, 600)
+	// create message with about 400bytes (300 random bytes + 100bytes message info)
+	b := make([]byte, 300)
 	rand.Read(b)
 	msg, _ := createMessage(m.ids[0].NodeID, newId.NodeID, string(b))
 
 	// update the addresses
 	m.mws[0].UpdateNodeAddresses()
-	newMw.UpdateNodeAddresses()
 
-	err := m.mws[0].SendDirect(msg, newId.NodeID)
-	require.NoError(m.T(), err)
+	// send 3 messages with a size around 400 bytes each second via unicast, 1 message will be rate limited every second for 3 seconds
+	// as the total number of bytes per interval will be 1200 exceeding the configured limit of 1000.
+	// a total of 3 messages will be rate limited
+	tick := 0
+	for range time.Tick(time.Second) {
+		tick++
+
+		// send the message 3 times
+		for i := 0; i < 3; i++ {
+			err := m.mws[0].SendDirect(msg, newId.NodeID)
+			require.NoError(m.T(), err)
+		}
+
+		// exit tick range loop after 3 seconds
+		if tick == 3 {
+			break
+		}
+	}
+
+	// wait for all rate limits before shutting down middleware
+	unittest.RequireCloseBefore(m.T(), ch, 100*time.Millisecond, "could not stop on rate limit test ch on time")
 
 	// shutdown our middleware so that each message can be processed
 	cancel()
 	unittest.RequireCloseBefore(m.T(), newMw.Done(), 100*time.Millisecond, "could not stop middleware on time")
 
-	// expect 1 warning logged by the middleware unicast bandwidth handler
-	// for the rate limited message.
-	require.Equal(m.T(), uint64(1), rateLimits)
+	// expect our rate limited peer callback to be invoked 3 times
+	require.Equal(m.T(), uint64(3), rateLimits)
 }
 
 func (m *MiddlewareTestSuite) createOverlay(provider *UpdatableIDProvider) *mocknetwork.Overlay {

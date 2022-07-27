@@ -602,20 +602,24 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 // unicast stream using the configured Middleware.unicastStreamRateLimiter.
 // If no unicastStreamRateLimiter is configured rate limiting is skipped.
 func (m *Middleware) unicastStreamAllowed(peerID peer.ID) bool {
-	if m.unicastStreamRateLimiter != nil {
-		return m.unicastStreamRateLimiter.Allow(peerID, nil)
+	if m.unicastStreamRateLimiter == nil {
+		// no rate limiter configured allow all messages
+		return true
 	}
-	return true
+
+	return m.unicastStreamRateLimiter.Allow(peerID, nil)
 }
 
 // unicastBandwidthAllowed will check if the peer is able to send a message
 // of size msg.Size() using the configured Middleware.unicastBandwidthRateLimiter.
 // If no unicastBandwidthRateLimiter is configured rate limiting is skipped.
 func (m *Middleware) unicastBandwidthAllowed(peerID peer.ID, msg *message.Message) bool {
-	if m.unicastBandwidthRateLimiter != nil {
-		return m.unicastBandwidthRateLimiter.Allow(peerID, msg)
+	if m.unicastBandwidthRateLimiter == nil {
+		// no rate limiter configured allow all messages
+		return true
 	}
-	return true
+
+	return m.unicastBandwidthRateLimiter.Allow(peerID, msg)
 }
 
 // Subscribe subscribes the middleware to a channel.

@@ -14,16 +14,16 @@ import (
 type BandWidthRateLimiter struct {
 	lock     sync.Mutex
 	limiters map[peer.ID]*rate.Limiter
-	interval time.Duration
+	limit    rate.Limit
 	burst    int
 }
 
 // NewBandWidthRateLimiter returns a new BandWidthRateLimiter.
-func NewBandWidthRateLimiter(interval time.Duration, burst int) *BandWidthRateLimiter {
+func NewBandWidthRateLimiter(limit rate.Limit, burst int) *BandWidthRateLimiter {
 	return &BandWidthRateLimiter{
 		lock:     sync.Mutex{},
 		limiters: make(map[peer.ID]*rate.Limiter),
-		interval: interval,
+		limit:    limit,
 		burst:    burst,
 	}
 }
@@ -43,6 +43,6 @@ func (b *BandWidthRateLimiter) Allow(peerID peer.ID, msg *message.Message) bool 
 func (b *BandWidthRateLimiter) setNewLimiter(peerID peer.ID) *rate.Limiter {
 	b.lock.Lock()
 	defer b.lock.Unlock()
-	b.limiters[peerID] = rate.NewLimiter(rate.Every(b.interval), b.burst)
+	b.limiters[peerID] = rate.NewLimiter(b.limit, b.burst)
 	return b.limiters[peerID]
 }

@@ -2,7 +2,6 @@ package unicast
 
 import (
 	"sync"
-	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/onflow/flow-go/network/message"
@@ -15,16 +14,16 @@ import (
 type StreamsRateLimiter struct {
 	lock     sync.Mutex
 	limiters map[peer.ID]*rate.Limiter
-	interval time.Duration
+	limit    rate.Limit
 	burst    int
 }
 
 // NewStreamsRateLimiter returns a new StreamsRateLimiter.
-func NewStreamsRateLimiter(interval time.Duration, burst int) *StreamsRateLimiter {
+func NewStreamsRateLimiter(limit rate.Limit, burst int) *StreamsRateLimiter {
 	return &StreamsRateLimiter{
 		lock:     sync.Mutex{},
 		limiters: make(map[peer.ID]*rate.Limiter),
-		interval: interval,
+		limit:    limit,
 		burst:    burst,
 	}
 }
@@ -36,6 +35,7 @@ func (s *StreamsRateLimiter) Allow(peerID peer.ID, _ *message.Message) bool {
 	if limiter == nil {
 		limiter = s.setNewLimiter(peerID)
 	}
+
 	return limiter.Allow()
 }
 
@@ -43,6 +43,6 @@ func (s *StreamsRateLimiter) Allow(peerID peer.ID, _ *message.Message) bool {
 func (s *StreamsRateLimiter) setNewLimiter(peerID peer.ID) *rate.Limiter {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	s.limiters[peerID] = rate.NewLimiter(rate.Every(s.interval), s.burst)
+	s.limiters[peerID] = rate.NewLimiter(s.limit, s.burst)
 	return s.limiters[peerID]
 }
