@@ -66,7 +66,7 @@ func NewEngine(
 	core *Core) (*Engine, error) {
 
 	blockResponseQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultBlockQueueCapacity),
+		fifoqueue.WithCapacity(defaultRangeResponseQueueCapacity),
 		fifoqueue.WithLengthObserver(func(len int) { core.mempool.MempoolEntries(metrics.ResourceBlockResponseQueue, uint(len)) }),
 	)
 
