@@ -124,8 +124,8 @@ func (c *Compactor) Done() <-chan struct{} {
 		<-doneCh
 
 		// Shut down WAL component.
-		// only shut down wal after compactor has been shut down, in case there 
-		// is still writing to WAL files. 
+		// only shut down wal after compactor has been shut down, in case there
+		// is still writing to WAL files.
 		<-c.wal.Done()
 
 		// Notify observers
@@ -231,6 +231,7 @@ Loop:
 	}
 
 	// Drain and process remaining trie updates in channel.
+	c.logger.Info().Msg("Starting draining trie update channel in compactor on shutdown")
 	for update := range c.trieUpdateCh {
 		_, _, err := c.wal.RecordUpdate(update.Update)
 		select {
@@ -238,6 +239,7 @@ Loop:
 		default:
 		}
 	}
+	c.logger.Info().Msg("Finished draining trie update channel in compactor on shutdown")
 
 	// Don't wait for checkpointing to finish because it might take too long.
 }
