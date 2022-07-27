@@ -124,6 +124,8 @@ func (c *Compactor) Done() <-chan struct{} {
 		<-doneCh
 
 		// Shut down WAL component.
+		// only shut down wal after compactor has been shut down, in case there 
+		// is still writing to WAL files. 
 		<-c.wal.Done()
 
 		// Notify observers
