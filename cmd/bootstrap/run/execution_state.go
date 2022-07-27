@@ -1,6 +1,8 @@
 package run
 
 import (
+	"math"
+
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto"
@@ -36,19 +38,25 @@ func GenerateExecutionState(
 	chain flow.Chain,
 	bootstrapOptions ...fvm.BootstrapProcedureOption,
 ) (flow.StateCommitment, error) {
+	const (
+		capacity           = 100
+		checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
+		checkpointsToKeep  = 1
+	)
+
 	metricsCollector := &metrics.NoopCollector{}
 
-	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metricsCollector, dbDir, 100, pathfinder.PathByteSize, wal.SegmentSize)
+	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metricsCollector, dbDir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
 	if err != nil {
 		return flow.DummyStateCommitment, err
 	}
 
-	ledgerStorage, err := ledger.NewLedger(diskWal, 100, metricsCollector, zerolog.Nop(), ledger.DefaultPathFinderVersion)
+	ledgerStorage, err := ledger.NewLedger(diskWal, capacity, metricsCollector, zerolog.Nop(), ledger.DefaultPathFinderVersion)
 	if err != nil {
 		return flow.DummyStateCommitment, err
 	}
 
-	compactor, err := complete.NewCompactor(ledgerStorage, diskWal, zerolog.Nop(), 100, 1_000_000, 1)
+	compactor, err := complete.NewCompactor(ledgerStorage, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep)
 	if err != nil {
 		return flow.DummyStateCommitment, err
 	}

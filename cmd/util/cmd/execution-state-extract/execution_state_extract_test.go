@@ -2,6 +2,7 @@ package extract
 
 import (
 	"crypto/rand"
+	"math"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -74,6 +75,11 @@ func TestExtractExecutionState(t *testing.T) {
 
 		withDirs(t, func(datadir, execdir, _ string) {
 
+			const (
+				checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
+				checkpointsToKeep  = 1
+			)
+
 			db := common.InitStorage(datadir)
 			commits := badger.NewCommits(metr, db)
 
@@ -84,7 +90,7 @@ func TestExtractExecutionState(t *testing.T) {
 			require.NoError(t, err)
 			f, err := complete.NewLedger(diskWal, size*10, metr, zerolog.Nop(), complete.DefaultPathFinderVersion)
 			require.NoError(t, err)
-			compactor, err := complete.NewCompactor(f, diskWal, zerolog.Nop(), uint(size), 1_000_000, 1)
+			compactor, err := complete.NewCompactor(f, diskWal, zerolog.Nop(), uint(size), checkpointDistance, checkpointsToKeep)
 			require.NoError(t, err)
 			<-compactor.Ready()
 
@@ -156,7 +162,11 @@ func TestExtractExecutionState(t *testing.T) {
 					storage, err := complete.NewLedger(diskWal, 1000, metr, zerolog.Nop(), complete.DefaultPathFinderVersion)
 					require.NoError(t, err)
 
-					compactor, err := complete.NewCompactor(storage, diskWal, zerolog.Nop(), uint(size), 1_000_000, 1)
+					const (
+						checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
+						checkpointsToKeep  = 1
+					)
+					compactor, err := complete.NewCompactor(storage, diskWal, zerolog.Nop(), uint(size), checkpointDistance, checkpointsToKeep)
 					require.NoError(t, err)
 
 					<-compactor.Ready()

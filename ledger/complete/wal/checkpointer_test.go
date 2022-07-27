@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math"
 	"math/rand"
 	"os"
 	"path"
@@ -30,23 +31,31 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-var (
+const (
 	numInsPerStep      = 2
 	keyNumberOfParts   = 10
 	keyPartMinByteSize = 1
 	keyPartMaxByteSize = 100
 	valueMaxByteSize   = 2 << 16 //16kB
 	size               = 10
-	metricsCollector   = &metrics.NoopCollector{}
-	logger             = zerolog.Logger{}
 	segmentSize        = 32 * 1024
 	pathByteSize       = 32
 	pathFinderVersion  = uint8(complete.DefaultPathFinderVersion)
 )
 
+var (
+	logger           = zerolog.Logger{}
+	metricsCollector = &metrics.NoopCollector{}
+)
+
 func Test_WAL(t *testing.T) {
 
 	unittest.RunWithTempDir(t, func(dir string) {
+
+		const (
+			checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
+			checkpointsToKeep  = 1
+		)
 
 		diskWal, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metricsCollector, dir, size, pathfinder.PathByteSize, realWAL.SegmentSize)
 		require.NoError(t, err)
@@ -54,7 +63,7 @@ func Test_WAL(t *testing.T) {
 		led, err := complete.NewLedger(diskWal, size*10, metricsCollector, logger, complete.DefaultPathFinderVersion)
 		require.NoError(t, err)
 
-		compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), uint(size), 1_000_000, 1)
+		compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), size, checkpointDistance, checkpointsToKeep)
 		require.NoError(t, err)
 
 		<-compactor.Ready()
