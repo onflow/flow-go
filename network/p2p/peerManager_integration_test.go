@@ -3,6 +3,7 @@ package p2p_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/onflow/flow-go/network/p2p"
@@ -29,7 +30,7 @@ func TestPeerManager_Integration(t *testing.T) {
 	idTranslator, err := p2p.NewFixedTableIdentityTranslator(identities)
 	require.NoError(t, err)
 
-	_ = p2p.NewPeerManager(unittest.Logger(), func() peer.IDSlice {
+	peerManager := p2p.NewPeerManager(unittest.Logger(), func() peer.IDSlice {
 		peers := peer.IDSlice{}
 		for _, id := range othersId {
 			peerId, err := idTranslator.GetPeerID(id.NodeID)
@@ -41,4 +42,7 @@ func TestPeerManager_Integration(t *testing.T) {
 	}, connector)
 
 	require.Empty(t, thisNode.Host().Network().Peers())
+	peerManager.ForceUpdatePeers()
+	time.Sleep(10 * time.Second)
+	require.Len(t, thisNode.Host().Network().Peers(), count-1)
 }
