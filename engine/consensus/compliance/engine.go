@@ -113,7 +113,7 @@ func NewEngine(
 				}
 				return ok
 			},
-			Store: pendingBlockResponses,
+			Store: pendingRangeResponses,
 		},
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
