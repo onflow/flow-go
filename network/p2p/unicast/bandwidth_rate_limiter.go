@@ -5,8 +5,9 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/onflow/flow-go/network/message"
 	"golang.org/x/time/rate"
+
+	"github.com/onflow/flow-go/network/message"
 )
 
 // BandWidthRateLimiter unicast rate limiter that limits the bandwidth that can be sent
