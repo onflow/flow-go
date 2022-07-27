@@ -2,7 +2,6 @@ package fvm
 
 import (
 	"fmt"
-	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime/common"
@@ -10,6 +9,7 @@ import (
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
+	otelTrace "go.opentelemetry.io/otel/trace"
 )
 
 type TransactionStorageLimiter struct{}
