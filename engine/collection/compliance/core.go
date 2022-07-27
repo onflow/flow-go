@@ -301,7 +301,8 @@ func (c *Core) processBlockProposal(proposal *messages.ClusterBlockProposal) err
 
 	// submit the model to hotstuff for processing
 	log.Info().Msg("forwarding block proposal to hotstuff")
-	<-c.hotstuff.SubmitProposal(header, parent.View)
+	// TODO: wait for the returned callback channel if we are processing blocks from range response
+	c.hotstuff.SubmitProposal(header, parent.View)
 
 	return nil
 }
