@@ -249,6 +249,13 @@ func (l *Ledger) set(trieUpdate *ledger.TrieUpdate) (newState ledger.State, err 
 	trieCh := make(chan *trie.MTrie, 1)
 	defer close(trieCh)
 
+	// These run concurrently in two goroutines:     
+	// 1. writing the trie update to WAL (in Compactor goroutine)
+	// 2. creating a new trie from the trie update (in this goroutine)
+	// Since writing to WAL is running concurrently, we use resultCh to wait for WAL update result from Compactor.
+	// Compactor also needs new trie created here 
+	// because Compactor caches new trie to minimize memory foot-print while checkpointing,
+	// `trieCh` is used to send created trie to Compactor. 
 	l.trieUpdateCh <- &WALTrieUpdate{Update: trieUpdate, ResultCh: resultCh, TrieCh: trieCh}
 
 	newTrie, err := l.forest.NewTrie(trieUpdate)
