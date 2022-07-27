@@ -159,7 +159,11 @@ func (el *EventLoop) loop(ctx context.Context) error {
 			processStart := time.Now()
 
 			err := el.eventHandler.OnReceiveProposal(p.Proposal)
-			close(p.done) // done processing the proposal
+			// done processing the proposal, notify the caller (usually the compliance engine) that
+			// this block has been processed. If the block is valid, protocol state should have it stored.
+			// useful when the caller is processing a range of blocks, and waiting for the current block
+			// to be processed by hotstuff before processing the next block.
+			close(p.done)
 
 			// measure how long it takes for a proposal to be processed
 			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeOnProposal)
