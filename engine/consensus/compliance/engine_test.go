@@ -153,6 +153,8 @@ func (cs *ComplianceSuite) TestBroadcastProposalWithDelay() {
 // TestSubmittingMultipleVotes tests that we can send multiple votes and they
 // are queued and processed in expected way
 func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
+	cs.hotstuff.On("Done", mock.Anything).Return(doneChan())
+
 	// create a vote
 	originID := unittest.IdentifierFixture()
 	voteCount := 15
