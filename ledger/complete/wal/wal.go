@@ -49,6 +49,9 @@ func (w *DiskWAL) UnpauseRecord() {
 	w.paused = false
 }
 
+// RecordUpdate writes the trie update to the write ahead log on disk.
+// if write ahead logging is not paused, it returns the file num (write ahead log) that the trie update was written to.
+// if write ahead logging is enabled, the second returned value is false, otherwise it's true, meaning WAL is disabled.
 func (w *DiskWAL) RecordUpdate(update *ledger.TrieUpdate) (segmentNum int, skipped bool, err error) {
 	if w.paused {
 		return 0, true, nil
