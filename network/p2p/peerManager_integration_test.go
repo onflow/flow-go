@@ -20,13 +20,25 @@ func TestPeerManager_Integration(t *testing.T) {
 	defer stopNodes(t, nodes)
 
 	thisNode := nodes[0]
-	thisId := identities[0]
+	// thisId := identities[0]
 	othersId := identities[1:]
 
 	connector, err := p2p.NewLibp2pConnector(unittest.Logger(), thisNode.Host(), p2p.ConnectionPruningEnabled)
 	require.NoError(t, err)
 
-	peerManager := p2p.NewPeerManager(unittest.Logger(), func() peer.IDSlice {
+	idTranslator, err := p2p.NewFixedTableIdentityTranslator(identities)
+	require.NoError(t, err)
 
-	})
+	_ = p2p.NewPeerManager(unittest.Logger(), func() peer.IDSlice {
+		peers := peer.IDSlice{}
+		for _, id := range othersId {
+			peerId, err := idTranslator.GetPeerID(id.NodeID)
+			require.NoError(t, err)
+			peers = append(peers, peerId)
+		}
+
+		return peers
+	}, connector)
+
+	require.Empty(t, thisNode.Host().Network().Peers())
 }
