@@ -16,7 +16,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// libp2pConnector is a libp2p based Connector implementation to connect and disconnect from peers
+// Libp2pConnector is a libp2p based Connector implementation to connect and disconnect from peers
 type Libp2pConnector struct {
 	backoffConnector *discovery.BackoffConnector
 	host             host.Host
