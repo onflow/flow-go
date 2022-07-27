@@ -296,7 +296,7 @@ func (e *Engine) processAvailableMessages() error {
 		if ok {
 			blockResponse := msg.Payload.(*messages.BlockResponse)
 			for _, block := range blockResponse.Blocks {
-				// process each block
+				// process each block and indicate it's from a range of blocks
 				err := e.core.OnBlockProposal(msg.OriginID, &messages.BlockProposal{
 					Header:  block.Header,
 					Payload: block.Payload,
