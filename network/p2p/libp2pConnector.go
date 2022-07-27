@@ -16,6 +16,11 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+const (
+	ConnectionPruningEnabled  = true
+	ConnectionPruningDisabled = false
+)
+
 // Libp2pConnector is a libp2p based Connector implementation to connect and disconnect from peers
 type Libp2pConnector struct {
 	backoffConnector *discovery.BackoffConnector
@@ -60,16 +65,16 @@ func WithConnectionPruning(enable bool) ConnectorOption {
 	}
 }
 
-func NewLibp2pConnector(host host.Host, log zerolog.Logger, options ...ConnectorOption) (*Libp2pConnector, error) {
+func NewLibp2pConnector(log zerolog.Logger, host host.Host, pruning bool, options ...ConnectorOption) (*Libp2pConnector, error) {
 	connector, err := defaultLibp2pBackoffConnector(host)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create libP2P connector: %w", err)
 	}
 	libP2PConnector := &Libp2pConnector{
+		log:              log,
 		backoffConnector: connector,
 		host:             host,
-		log:              log,
-		pruneConnections: true,
+		pruneConnections: pruning,
 	}
 
 	for _, o := range options {
@@ -86,7 +91,9 @@ func (l *Libp2pConnector) UpdatePeers(ctx context.Context, peerIDs peer.IDSlice)
 
 	if l.pruneConnections {
 		// disconnect from any other peers not in pInfos
-		l.trimAllConnectionsExcept(peerIDs)
+		// Note: by default almost on all roles, we run on a full topology,
+		// this trimming only affects evicted peers from protocol state.
+		l.pruneAllConnectionsExcept(peerIDs)
 	}
 }
 
@@ -108,10 +115,10 @@ func (l *Libp2pConnector) connectToPeers(ctx context.Context, peerIDs peer.IDSli
 	l.backoffConnector.Connect(ctx, peerCh)
 }
 
-// trimAllConnectionsExcept trims all connections of the node from peers not part of peerIDs.
+// pruneAllConnectionsExcept trims all connections of the node from peers not part of peerIDs.
 // A node would have created such extra connections earlier when the identity list may have been different, or
 // it may have been target of such connections from node which have now been excluded.
-func (l *Libp2pConnector) trimAllConnectionsExcept(peerIDs peer.IDSlice) {
+func (l *Libp2pConnector) pruneAllConnectionsExcept(peerIDs peer.IDSlice) {
 
 	// convert the peerInfos to a peer.ID -> bool map
 	peersToKeep := make(map[peer.ID]bool, len(peerIDs))

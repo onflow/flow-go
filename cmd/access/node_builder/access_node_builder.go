@@ -1026,7 +1026,9 @@ func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 	validators ...network.MessageValidator) network.Middleware {
 
 	// disable connection pruning for the access node which supports the observer
-	peerManagerFactory := p2p.PeerManagerFactory([]p2p.Option{p2p.WithInterval(builder.PeerUpdateInterval)}, p2p.WithConnectionPruning(false))
+	peerManagerFactory := p2p.PeerManagerFactory(
+		p2p.ConnectionPruningDisabled,
+		[]p2p.Option{p2p.WithInterval(builder.PeerUpdateInterval)})
 
 	builder.Middleware = p2p.NewMiddleware(
 		builder.Logger.With().Bool("staked", false).Logger(),

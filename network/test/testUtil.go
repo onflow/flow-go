@@ -166,7 +166,7 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 
 		idProviders[i] = NewUpdatableIDProvider(identities)
 
-		peerManagerFactory := p2p.PeerManagerFactory(o.peerManagerOpts)
+		peerManagerFactory := p2p.PeerManagerFactory(p2p.ConnectionPruningEnabled, o.peerManagerOpts)
 
 		// creating middleware of nodes
 		mws[i] = p2p.NewMiddleware(logger,

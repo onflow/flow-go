@@ -49,8 +49,7 @@ type PeersProvider func() peer.IDSlice
 
 // NewPeerManager creates a new peer manager which calls the peersProvider callback to get a list of peers to connect to
 // and it uses the connector to actually connect or disconnect from peers.
-func NewPeerManager(logger zerolog.Logger, peersProvider PeersProvider,
-	connector Connector, options ...Option) *PeerManager {
+func NewPeerManager(logger zerolog.Logger, peersProvider PeersProvider, connector Connector, options ...Option) *PeerManager {
 	pm := &PeerManager{
 		unit:               engine.NewUnit(),
 		logger:             logger,
@@ -72,9 +71,9 @@ type PeerManagerFactoryFunc func(host host.Host, peersProvider PeersProvider, lo
 
 // PeerManagerFactory generates a PeerManagerFunc that produces the default PeerManager with the given peer manager
 // options and that uses the LibP2PConnector with the given LibP2P connector options
-func PeerManagerFactory(peerManagerOptions []Option, connectorOptions ...ConnectorOption) PeerManagerFactoryFunc {
+func PeerManagerFactory(connectionPruning bool, peerManagerOptions []Option, connectorOptions ...ConnectorOption) PeerManagerFactoryFunc {
 	return func(host host.Host, peersProvider PeersProvider, logger zerolog.Logger) (*PeerManager, error) {
-		connector, err := NewLibp2pConnector(host, logger, connectorOptions...)
+		connector, err := NewLibp2pConnector(logger, host, connectionPruning, connectorOptions...)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create libp2pConnector: %w", err)
 		}
