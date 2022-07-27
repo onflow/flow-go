@@ -190,10 +190,11 @@ func (f *Forest) Read(r *ledger.TrieRead) ([]ledger.Value, error) {
 	return orderedValues, nil
 }
 
-// Update updates the Values for the registers, adds updated tries to forest,
-// and returns rootHash and error (if any).
+// Update creates a new trie by updating Values for registers in the parent trie,
+// adds new trie to forest, and returns rootHash and error (if any).
 // In case there are multiple updates to the same register, Update will persist
 // the latest written value.
+// Note: Update adds new trie to forest, unlike NewTrie().
 func (f *Forest) Update(u *ledger.TrieUpdate) (ledger.RootHash, error) {
 	t, err := f.NewTrie(u)
 	if err != nil {
@@ -208,9 +209,11 @@ func (f *Forest) Update(u *ledger.TrieUpdate) (ledger.RootHash, error) {
 	return t.RootHash(), nil
 }
 
-// NewTrie updates the Values for the registers and returns updated trie and error (if any).
-// In case there are multiple updates to the same register, Update will persist the latest
-// written value.
+// NewTrie creates a new trie by updating Values for registers in the parent trie,
+// and returns new trie and error (if any).
+// In case there are multiple updates to the same register, NewTrie will persist
+// the latest written value.
+// Note: NewTrie doesn't add new trie to forest, unlike Update().
 func (f *Forest) NewTrie(u *ledger.TrieUpdate) (*trie.MTrie, error) {
 
 	parentTrie, err := f.GetTrie(u.RootHash)

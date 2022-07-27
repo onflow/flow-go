@@ -1041,3 +1041,34 @@ func TestValueSizesWithDuplicatedKeys(t *testing.T) {
 		require.Equal(t, expectedValueSizes[i], retValueSizes[i])
 	}
 }
+
+func TestNow(t *testing.T) {
+
+	metricsCollector := &metrics.NoopCollector{}
+	forest, err := NewForest(5, metricsCollector, nil)
+	require.NoError(t, err)
+	rootHash := forest.GetEmptyRootHash()
+
+	p1 := pathByUint8s([]uint8{uint8(53), uint8(74)})
+	v1 := payloadBySlices([]byte{'A'}, []byte{'A'})
+
+	paths := []ledger.Path{p1}
+	payloads := []*ledger.Payload{v1}
+	update := &ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads}
+	updatedRoot, err := forest.Update(update)
+	size := forest.Size()
+	require.NoError(t, err)
+	require.Equal(t, 2, size)
+
+	read := &ledger.TrieRead{RootHash: updatedRoot, Paths: paths}
+	retValues, err := forest.Read(read)
+	require.NoError(t, err)
+	require.Equal(t, retValues[0], payloads[0].Value)
+
+	update = &ledger.TrieUpdate{RootHash: updatedRoot, Paths: nil, Payloads: nil}
+	updatedRoot2, err := forest.Update(update)
+	size = forest.Size()
+	require.NoError(t, err)
+	require.Equal(t, updatedRoot, updatedRoot2)
+	require.Equal(t, 2, size)
+}
