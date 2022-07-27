@@ -8,9 +8,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
-	"github.com/uber/jaeger-client-go"
+	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -99,16 +98,14 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 
 	span, _, isSampled := c.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.CONCompOnBlockProposal)
 	if isSampled {
-		span.LogFields(log.Uint64("view", proposal.Header.View))
-		span.LogFields(log.String("origin_id", originID.String()))
-
-		// set proposer as a tag so we can filter based on proposer
-		span.SetTag("proposer", proposal.Header.ProposerID.String())
-		if sc, ok := span.Context().(jaeger.SpanContext); ok {
-			traceID = sc.TraceID().String()
-		}
+		span.SetAttributes(
+			attribute.Int64("view", int64(proposal.Header.View)),
+			attribute.String("origin_id", originID.String()),
+			attribute.String("proposer", proposal.Header.ProposerID.String()),
+		)
+		traceID = span.SpanContext().TraceID().String()
 	}
-	defer span.Finish()
+	defer span.End()
 
 	header := proposal.Header
 	log := c.log.With().
@@ -298,9 +295,11 @@ func (c *Core) processBlockProposal(proposal *messages.BlockProposal, inRangeBlo
 
 	span, ctx, isSampled := c.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.ConCompProcessBlockProposal)
 	if isSampled {
-		span.SetTag("proposer", proposal.Header.ProposerID.String())
+		span.SetAttributes(
+			attribute.String("proposer", proposal.Header.ProposerID.String()),
+		)
 	}
-	defer span.Finish()
+	defer span.End()
 
 	header := proposal.Header
 	log := c.log.With().
@@ -361,9 +360,11 @@ func (c *Core) OnBlockVote(originID flow.Identifier, vote *messages.BlockVote) e
 
 	span, _, isSampled := c.tracer.StartBlockSpan(context.Background(), vote.BlockID, trace.CONCompOnBlockVote)
 	if isSampled {
-		span.LogFields(log.String("origin_id", originID.String()))
+		span.SetAttributes(
+			attribute.String("origin_id", originID.String()),
+		)
 	}
-	defer span.Finish()
+	defer span.End()
 
 	v := &model.Vote{
 		View:     vote.View,

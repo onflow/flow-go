@@ -457,7 +457,7 @@ func withConsumers(t *testing.T,
 	withBlockConsumer func(*blockconsumer.BlockConsumer, []*flow.Block, *sync.WaitGroup, *sync.WaitGroup),
 	ops ...CompleteExecutionReceiptBuilderOpt) {
 
-	tracer := &trace.NoopTracer{}
+	tracer := trace.NewNoopTracer()
 
 	// bootstraps system with one node of each role.
 	s, verID, participants := bootstrapSystem(t, tracer, authorized)
