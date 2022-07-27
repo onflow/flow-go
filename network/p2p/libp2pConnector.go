@@ -57,15 +57,7 @@ func IsUnconvertibleIdentitiesError(err error) bool {
 	return errors.As(err, &errUnconvertableIdentitiesError)
 }
 
-type ConnectorOption func(connector *Libp2pConnector)
-
-func WithConnectionPruning(enable bool) ConnectorOption {
-	return func(connector *Libp2pConnector) {
-		connector.pruneConnections = false
-	}
-}
-
-func NewLibp2pConnector(log zerolog.Logger, host host.Host, pruning bool, options ...ConnectorOption) (*Libp2pConnector, error) {
+func NewLibp2pConnector(log zerolog.Logger, host host.Host, pruning bool) (*Libp2pConnector, error) {
 	connector, err := defaultLibp2pBackoffConnector(host)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create libP2P connector: %w", err)
@@ -77,9 +69,6 @@ func NewLibp2pConnector(log zerolog.Logger, host host.Host, pruning bool, option
 		pruneConnections: pruning,
 	}
 
-	for _, o := range options {
-		o(libP2PConnector)
-	}
 	return libP2PConnector, nil
 }
 

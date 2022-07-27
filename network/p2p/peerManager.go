@@ -71,9 +71,9 @@ type PeerManagerFactoryFunc func(host host.Host, peersProvider PeersProvider, lo
 
 // PeerManagerFactory generates a PeerManagerFunc that produces the default PeerManager with the given peer manager
 // options and that uses the LibP2PConnector with the given LibP2P connector options
-func PeerManagerFactory(connectionPruning bool, peerManagerOptions []Option, connectorOptions ...ConnectorOption) PeerManagerFactoryFunc {
+func PeerManagerFactory(connectionPruning bool, peerManagerOptions []Option) PeerManagerFactoryFunc {
 	return func(host host.Host, peersProvider PeersProvider, logger zerolog.Logger) (*PeerManager, error) {
-		connector, err := NewLibp2pConnector(logger, host, connectionPruning, connectorOptions...)
+		connector, err := NewLibp2pConnector(logger, host, connectionPruning)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create libp2pConnector: %w", err)
 		}
