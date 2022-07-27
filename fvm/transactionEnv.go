@@ -58,7 +58,6 @@ func NewTransactionEnvironment(
 		ctx.EventCollectionByteSizeLimit,
 	)
 	accountKeys := handler.NewAccountKeyHandler(accounts)
-	metrics := handler.NewMetricsHandler(ctx.Metrics)
 
 	envCtx := NewEnvContext(ctx, traceSpan)
 	env := &TransactionEnv{
@@ -72,7 +71,6 @@ func NewTransactionEnvironment(
 			accounts:              accounts,
 			accountKeys:           accountKeys,
 			uuidGenerator:         uuidGenerator,
-			metrics:               metrics,
 		},
 
 		addressGenerator: generator,

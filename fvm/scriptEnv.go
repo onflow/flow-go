@@ -42,7 +42,6 @@ func NewScriptEnvironment(
 	uuidGenerator := state.NewUUIDGenerator(sth)
 	programsHandler := handler.NewProgramsHandler(programs, sth)
 	accountKeys := handler.NewAccountKeyHandler(accounts)
-	metrics := handler.NewMetricsHandler(fvmContext.Metrics)
 
 	ctx := NewEnvContext(fvmContext, nil)
 	env := &ScriptEnv{
@@ -56,7 +55,6 @@ func NewScriptEnvironment(
 			accounts:              accounts,
 			accountKeys:           accountKeys,
 			uuidGenerator:         uuidGenerator,
-			metrics:               metrics,
 		},
 		reqContext: reqContext,
 	}
