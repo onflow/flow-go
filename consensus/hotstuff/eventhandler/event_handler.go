@@ -257,6 +257,9 @@ func (e *EventHandler) OnLocalTimeout() error {
 	return nil
 }
 
+// OnPartialTcCreated handles notification produces by aggregation logic. If event was delivered for current view
+// it will result in producing of model.TimeoutObject and subsequent broadcast to the consensus committee.
+// No errors are expected during normal operation.
 func (e *EventHandler) OnPartialTcCreated(partialTC *hotstuff.PartialTcCreated) error {
 	err := e.OnReceiveQc(partialTC.NewestQC)
 	if err != nil {
