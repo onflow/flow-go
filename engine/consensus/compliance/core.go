@@ -347,7 +347,12 @@ func (c *Core) processBlockProposal(proposal *messages.BlockProposal, inRangeBlo
 	// otherwise processing the next block might fail because the current block hasn't been added
 	// to protocol state yet.
 	if inRangeBlockResponse {
-		<-c.hotstuff.SubmitProposal(header, parent.View)
+		select {
+		case <-c.hotstuff.SubmitProposal(header, parent.View):
+			break
+		case <-c.hotstuff.Done():
+			break
+		}
 	} else {
 		c.hotstuff.SubmitProposal(header, parent.View)
 	}
