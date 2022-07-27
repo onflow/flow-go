@@ -61,6 +61,9 @@ type Middleware interface {
 // Overlay represents the interface that middleware uses to interact with the
 // overlay network layer.
 type Overlay interface {
+	// Topology returns an identity list of nodes which this node should be directly connected to as peers
+	Topology() (flow.IdentityList, error)
+
 	// Identities returns a list of all Flow identities on the network
 	Identities() flow.IdentityList
 

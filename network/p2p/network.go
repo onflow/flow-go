@@ -67,11 +67,13 @@ type Network struct {
 	queue                       network.MessageQueue
 	subscriptionManager         network.SubscriptionManager // used to keep track of subscribed channels
 	conduitFactory              network.ConduitFactory
+	topology                    network.Topology
 	registerEngineRequests      chan *registerEngineRequest
 	registerBlobServiceRequests chan *registerBlobServiceRequest
 }
 
-var _ network.Network = (*Network)(nil)
+var _ network.Network = &Network{}
+var _ network.Overlay = &Network{}
 
 type registerEngineRequest struct {
 	channel          channels.Channel
@@ -107,7 +109,7 @@ func NewNetwork(
 	codec network.Codec,
 	me module.Local,
 	mwFactory func() (network.Middleware, error),
-	top network.Topology,
+	topology network.Topology,
 	sm network.SubscriptionManager,
 	metrics module.NetworkMetrics,
 	identityProvider id.IdentityProvider,
@@ -129,6 +131,7 @@ func NewNetwork(
 		metrics:                     metrics,
 		subscriptionManager:         sm,
 		identityProvider:            identityProvider,
+		topology:                    topology,
 		conduitFactory:              conduit.NewDefaultConduitFactory(),
 		registerEngineRequests:      make(chan *registerEngineRequest),
 		registerBlobServiceRequests: make(chan *registerBlobServiceRequest),
@@ -529,6 +532,10 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 	}
 
 	n.metrics.MessageProcessingFinished(qm.Target.String(), time.Since(startTimestamp))
+}
+
+func (n *Network) Topology() (flow.IdentityList, error) {
+	return n.topology.Fanout(n.Identities()), nil
 }
 
 func EventId(channel channels.Channel, payload []byte) (hash.Hash, error) {
