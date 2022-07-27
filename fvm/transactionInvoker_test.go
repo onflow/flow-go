@@ -97,7 +97,7 @@ func (e *ErrorReturningRuntime) NewTransactionExecutor(script runtime.Script, co
 	panic("NewTransactionExecutor not expected")
 }
 
-func (e *ErrorReturningRuntime) NewContractFunctionExecutor(contractLocation common.AddressLocation, functionName string, arguments []interpreter.Value, argumentTypes []sema.Type, context runtime.Context) runtime.Executor {
+func (e *ErrorReturningRuntime) NewContractFunctionExecutor(contractLocation common.AddressLocation, functionName string, arguments []cadence.Value, argumentTypes []sema.Type, context runtime.Context) runtime.Executor {
 	panic("NewContractFunctionExecutor not expected")
 }
 
@@ -149,7 +149,7 @@ func (e *ErrorReturningRuntime) ReadLinked(_ common.Address, _ cadence.Path, _ r
 	panic("ReadLinked not expected")
 }
 
-func (e *ErrorReturningRuntime) InvokeContractFunction(_ common.AddressLocation, _ string, _ []interpreter.Value, _ []sema.Type, _ runtime.Context) (cadence.Value, error) {
+func (e *ErrorReturningRuntime) InvokeContractFunction(_ common.AddressLocation, _ string, _ []cadence.Value, _ []sema.Type, _ runtime.Context) (cadence.Value, error) {
 	panic("InvokeContractFunction not expected")
 }
 
