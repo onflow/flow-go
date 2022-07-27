@@ -287,7 +287,7 @@ var _ runtime.Runtime = &TestInterpreterRuntime{}
 
 type TestInterpreterRuntime struct {
 	readStored             func(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error)
-	invokeContractFunction func(a common.AddressLocation, s string, values []interpreter.Value, types []sema.Type, ctx runtime.Context) (cadence.Value, error)
+	invokeContractFunction func(a common.AddressLocation, s string, values []cadence.Value, types []sema.Type, ctx runtime.Context) (cadence.Value, error)
 }
 
 func (t *TestInterpreterRuntime) NewScriptExecutor(script runtime.Script, context runtime.Context) runtime.Executor {
@@ -298,7 +298,7 @@ func (t *TestInterpreterRuntime) NewTransactionExecutor(script runtime.Script, c
 	panic("NewTransactionExecutor not defined")
 }
 
-func (t *TestInterpreterRuntime) NewContractFunctionExecutor(contractLocation common.AddressLocation, functionName string, arguments []interpreter.Value, argumentTypes []sema.Type, context runtime.Context) runtime.Executor {
+func (t *TestInterpreterRuntime) NewContractFunctionExecutor(contractLocation common.AddressLocation, functionName string, arguments []cadence.Value, argumentTypes []sema.Type, context runtime.Context) runtime.Executor {
 	panic("NewContractFunctionExecutor not defined")
 }
 
@@ -314,7 +314,7 @@ func (t *TestInterpreterRuntime) ExecuteTransaction(runtime.Script, runtime.Cont
 	panic("ExecuteTransaction not defined")
 }
 
-func (t *TestInterpreterRuntime) InvokeContractFunction(a common.AddressLocation, s string, values []interpreter.Value, types []sema.Type, ctx runtime.Context) (cadence.Value, error) {
+func (t *TestInterpreterRuntime) InvokeContractFunction(a common.AddressLocation, s string, values []cadence.Value, types []sema.Type, ctx runtime.Context) (cadence.Value, error) {
 	if t.invokeContractFunction == nil {
 		panic("InvokeContractFunction not defined")
 	}
