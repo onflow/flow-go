@@ -82,7 +82,7 @@ func (s *CombinedVoteProcessorV2TestSuite) SetupTest() {
 		onQCCreated:       s.onQCCreated,
 		packer:            s.packer,
 		minRequiredWeight: s.minRequiredWeight,
-		done:              *atomic.NewBool(false),
+		done:              atomic.NewBool(false),
 	}
 }
 
@@ -301,7 +301,7 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_BuildQCError() {
 			onQCCreated:       s.onQCCreated,
 			packer:            packer,
 			minRequiredWeight: s.minRequiredWeight,
-			done:              *atomic.NewBool(false),
+			done:              atomic.NewBool(false),
 		}
 	}
 
@@ -557,7 +557,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 			onQCCreated:       onQCCreated,
 			packer:            pcker,
 			minRequiredWeight: minRequiredWeight,
-			done:              *atomic.NewBool(false),
+			done:              atomic.NewBool(false),
 		}
 
 		votes := make([]*model.Vote, 0, stakingSignersCount+beaconSignersCount)
@@ -710,7 +710,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T)
 			onQCCreated:       onQCCreated,
 			packer:            pcker,
 			minRequiredWeight: minRequiredWeight,
-			done:              *atomic.NewBool(false),
+			done:              atomic.NewBool(false),
 		}
 
 		votes := make([]*model.Vote, 0, stakingSignersCount+beaconSignersCount)

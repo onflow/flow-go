@@ -45,7 +45,7 @@ func (s *StakingVoteProcessorTestSuite) SetupTest() {
 		stakingSigAggtor:  s.stakingAggregator,
 		onQCCreated:       s.onQCCreated,
 		minRequiredWeight: s.minRequiredWeight,
-		done:              *atomic.NewBool(false),
+		done:              atomic.NewBool(false),
 		allParticipants:   s.allParticipants,
 	}
 }

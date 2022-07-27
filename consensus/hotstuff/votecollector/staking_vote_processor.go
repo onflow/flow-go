@@ -62,7 +62,7 @@ func (f *stakingVoteProcessorFactoryBase) Create(log zerolog.Logger, block *mode
 		stakingSigAggtor:  stakingSigAggtor,
 		onQCCreated:       f.onQCCreated,
 		minRequiredWeight: minRequiredWeight,
-		done:              *atomic.NewBool(false),
+		done:              atomic.NewBool(false),
 		allParticipants:   allParticipants,
 	}, nil
 }
@@ -79,7 +79,7 @@ type StakingVoteProcessor struct {
 	stakingSigAggtor  hotstuff.WeightedSignatureAggregator
 	onQCCreated       hotstuff.OnQCCreated
 	minRequiredWeight uint64
-	done              atomic.Bool
+	done              *atomic.Bool
 	allParticipants   flow.IdentityList
 }
 

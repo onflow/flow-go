@@ -106,7 +106,7 @@ type CombinedVoteProcessorV2 struct {
 	onQCCreated       hotstuff.OnQCCreated
 	packer            hotstuff.Packer
 	minRequiredWeight uint64
-	done              atomic.Bool
+	done              *atomic.Bool
 }
 
 var _ hotstuff.VerifyingVoteProcessor = (*CombinedVoteProcessorV2)(nil)
@@ -127,7 +127,7 @@ func NewCombinedVoteProcessor(log zerolog.Logger,
 		onQCCreated:       onQCCreated,
 		packer:            packer,
 		minRequiredWeight: minRequiredWeight,
-		done:              *atomic.NewBool(false),
+		done:              atomic.NewBool(false),
 	}
 }
 

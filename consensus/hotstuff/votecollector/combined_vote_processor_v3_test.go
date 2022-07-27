@@ -96,7 +96,7 @@ func (s *CombinedVoteProcessorV3TestSuite) SetupTest() {
 		onQCCreated:       s.onQCCreated,
 		packer:            s.packer,
 		minRequiredWeight: s.minRequiredWeight,
-		done:              *atomic.NewBool(false),
+		done:              atomic.NewBool(false),
 	}
 }
 
@@ -289,7 +289,7 @@ func (s *CombinedVoteProcessorV3TestSuite) TestProcess_BuildQCError() {
 			onQCCreated:       s.onQCCreated,
 			packer:            packer,
 			minRequiredWeight: s.minRequiredWeight,
-			done:              *atomic.NewBool(false),
+			done:              atomic.NewBool(false),
 		}
 	}
 
@@ -604,7 +604,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 			onQCCreated:       onQCCreated,
 			packer:            pcker,
 			minRequiredWeight: minRequiredWeight,
-			done:              *atomic.NewBool(false),
+			done:              atomic.NewBool(false),
 		}
 
 		votes := make([]*model.Vote, 0, stakingSignersCount+beaconSignersCount)
@@ -705,7 +705,7 @@ func TestCombinedVoteProcessorV3_OnlyRandomBeaconSigners(testifyT *testing.T) {
 		onQCCreated:       func(qc *flow.QuorumCertificate) { /* no op */ },
 		packer:            packer,
 		minRequiredWeight: 70,
-		done:              *atomic.NewBool(false),
+		done:              atomic.NewBool(false),
 	}
 
 	// The `stakingAggregator` is empty, i.e. it returns ans InsufficientSignaturesError when we call `Aggregate()` on it.
@@ -845,7 +845,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCLiveness(testifyT *testing.T)
 			onQCCreated:       onQCCreated,
 			packer:            pcker,
 			minRequiredWeight: minRequiredWeight,
-			done:              *atomic.NewBool(false),
+			done:              atomic.NewBool(false),
 		}
 
 		votes := make([]*model.Vote, 0, stakingSignersCount+beaconSignersCount)
