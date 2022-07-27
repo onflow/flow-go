@@ -534,8 +534,8 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 	n.metrics.MessageProcessingFinished(qm.Target.String(), time.Since(startTimestamp))
 }
 
-func (n *Network) Topology() (flow.IdentityList, error) {
-	return n.topology.Fanout(n.Identities()), nil
+func (n *Network) Topology() flow.IdentityList {
+	return n.topology.Fanout(n.Identities())
 }
 
 func EventId(channel channels.Channel, payload []byte) (hash.Hash, error) {
