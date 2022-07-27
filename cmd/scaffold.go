@@ -858,7 +858,7 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 		fvm.WithBlocks(blockFinder),
 		fvm.WithAccountStorageLimit(true),
 	}
-	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Stagingnet || fnb.RootChainID == flow.Mainnet {
+	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Stagingnet || fnb.RootChainID == flow.Localnet || fnb.RootChainID == flow.Benchnet || fnb.RootChainID == flow.Mainnet {
 		vmOpts = append(vmOpts,
 			fvm.WithTransactionFeesEnabled(true),
 		)
