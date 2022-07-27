@@ -44,7 +44,7 @@ type checkpointResult struct {
 type Compactor struct {
 	checkpointer       *realWAL.Checkpointer
 	wal                realWAL.LedgerWAL
-	checkpointQueue    *CheckpointQueue
+	trieQueue          *realWAL.TrieQueue
 	logger             zerolog.Logger
 	lm                 *lifecycle.LifecycleManager
 	observers          map[observable.Observer]struct{}
@@ -81,12 +81,12 @@ func NewCompactor(
 		return nil, err
 	}
 
-	checkpointQueue := NewCheckpointQueueWithValues(checkpointCapacity, tries)
+	trieQueue := realWAL.NewTrieQueueWithValues(checkpointCapacity, tries)
 
 	return &Compactor{
 		checkpointer:       checkpointer,
 		wal:                w,
-		checkpointQueue:    checkpointQueue,
+		trieQueue:          trieQueue,
 		logger:             logger,
 		stopCh:             make(chan chan struct{}),
 		trieUpdateCh:       trieUpdateCh,
@@ -201,7 +201,7 @@ Loop:
 			var checkpointNum int
 			var checkpointTries []*trie.MTrie
 			activeSegmentNum, checkpointNum, checkpointTries =
-				c.processTrieUpdate(update, c.checkpointQueue, activeSegmentNum, nextCheckpointNum)
+				c.processTrieUpdate(update, c.trieQueue, activeSegmentNum, nextCheckpointNum)
 
 			if checkpointTries == nil {
 				// Not enough segments for checkpointing (nextCheckpointNum >= activeSegmentNum)
@@ -329,11 +329,11 @@ func cleanupCheckpoints(checkpointer *realWAL.Checkpointer, checkpointsToKeep in
 }
 
 // processTrieUpdate writes trie update to WAL, updates activeSegmentNum,
-// and gets tries from checkpointQueue for checkpointing if needed.
+// and gets tries from trieQueue for checkpointing if needed.
 // It also sends WAL update result and waits for trie update completion.
 func (c *Compactor) processTrieUpdate(
 	update *WALTrieUpdate,
-	checkpointQueue *CheckpointQueue,
+	trieQueue *realWAL.TrieQueue,
 	activeSegmentNum int,
 	nextCheckpointNum int,
 ) (
@@ -360,7 +360,7 @@ func (c *Compactor) processTrieUpdate(
 			return
 		}
 
-		checkpointQueue.Push(trie)
+		trieQueue.Push(trie)
 	}()
 
 	if activeSegmentNum == -1 {
@@ -398,8 +398,8 @@ func (c *Compactor) processTrieUpdate(
 	// At this point, checkpoint queue contains tries up to
 	// last update (logged as last record in finalized segment)
 	// It doesn't include trie for this update
-	// until updated trie is received and added to checkpointQueue.
-	tries := checkpointQueue.Tries()
+	// until updated trie is received and added to trieQueue.
+	tries := trieQueue.Tries()
 
 	checkpointNum = nextCheckpointNum
 

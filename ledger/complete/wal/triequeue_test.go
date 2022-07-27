@@ -1,4 +1,4 @@
-package complete
+package wal
 
 import (
 	"math/rand"
@@ -12,10 +12,10 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 )
 
-func TestEmptyCheckpointQueue(t *testing.T) {
+func TestEmptyTrieQueue(t *testing.T) {
 	const capacity = 10
 
-	q := NewCheckpointQueue(capacity)
+	q := NewTrieQueue(capacity)
 	require.Equal(t, 0, q.Count())
 
 	tries := q.Tries()
@@ -61,10 +61,10 @@ func TestEmptyCheckpointQueue(t *testing.T) {
 	}
 }
 
-func TestCheckpointQueueWithInitialValues(t *testing.T) {
+func TestTrieQueueWithInitialValues(t *testing.T) {
 	const capacity = 10
 
-	// Test CheckpointQueue with initial values.  Numbers of initial values
+	// Test TrieQueue with initial values.  Numbers of initial values
 	// are from 1 to capacity + 1.
 	for initialValueCount := 1; initialValueCount <= capacity+1; initialValueCount++ {
 
@@ -82,7 +82,7 @@ func TestCheckpointQueueWithInitialValues(t *testing.T) {
 			expectedTries = initialValues[initialValueCount-capacity:]
 		}
 
-		q := NewCheckpointQueueWithValues(capacity, initialValues)
+		q := NewTrieQueueWithValues(capacity, initialValues)
 		require.Equal(t, expectedCount, q.Count())
 
 		tries := q.Tries()

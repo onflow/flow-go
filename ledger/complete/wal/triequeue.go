@@ -1,31 +1,36 @@
-package complete
+package wal
 
 import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 )
 
-// CheckpointQueue is a fix-sized FIFO queue of MTrie.
-// CheckpointQueue is intentionally not threadsafe given its limited use case.
-// CheckpointQueue is not a general purpose queue to avoid incurring overhead
+// IMPORTANT:  TrieQueue is in the wal package to prevent it
+// from being used for other purposes and getting modified
+// (to prevent introducing side-effects to checkpointing).
+
+// TrieQueue is a fix-sized FIFO queue of MTrie.
+// It is only used by Compactor for checkpointing, and
+// it is intentionally not threadsafe given its limited use case.
+// It is not a general purpose queue to avoid incurring overhead
 // for features not needed for its limited use case.
-type CheckpointQueue struct {
+type TrieQueue struct {
 	ts       []*trie.MTrie
 	capacity int
 	tail     int // element index to write to
 	count    int // number of elements (count <= capacity)
 }
 
-// NewCheckpointQueue returns a new CheckpointQueue with given capacity.
-func NewCheckpointQueue(capacity uint) *CheckpointQueue {
-	return &CheckpointQueue{
+// NewTrieQueue returns a new TrieQueue with given capacity.
+func NewTrieQueue(capacity uint) *TrieQueue {
+	return &TrieQueue{
 		ts:       make([]*trie.MTrie, capacity),
 		capacity: int(capacity),
 	}
 }
 
-// NewCheckpointQueueWithValues returns a new CheckpointQueue with given capacity and initial values.
-func NewCheckpointQueueWithValues(capacity uint, tries []*trie.MTrie) *CheckpointQueue {
-	q := NewCheckpointQueue(capacity)
+// NewTrieQueueWithValues returns a new TrieQueue with given capacity and initial values.
+func NewTrieQueueWithValues(capacity uint, tries []*trie.MTrie) *TrieQueue {
+	q := NewTrieQueue(capacity)
 
 	start := 0
 	if len(tries) > q.capacity {
@@ -39,7 +44,7 @@ func NewCheckpointQueueWithValues(capacity uint, tries []*trie.MTrie) *Checkpoin
 }
 
 // Push pushes trie to queue.  If queue is full, it overwrites the oldest element.
-func (q *CheckpointQueue) Push(t *trie.MTrie) {
+func (q *TrieQueue) Push(t *trie.MTrie) {
 	q.ts[q.tail] = t
 	q.tail = (q.tail + 1) % q.capacity
 	if !q.isFull() {
@@ -49,7 +54,7 @@ func (q *CheckpointQueue) Push(t *trie.MTrie) {
 
 // Tries returns elements in queue, starting from the oldest element
 // to the newest element.
-func (q *CheckpointQueue) Tries() []*trie.MTrie {
+func (q *TrieQueue) Tries() []*trie.MTrie {
 	if q.count == 0 {
 		return nil
 	}
@@ -66,7 +71,7 @@ func (q *CheckpointQueue) Tries() []*trie.MTrie {
 			head := q.tail - q.count
 			copy(tries, q.ts[head:q.tail])
 		} else { // q.tail < q.count, data is wrapped around the slice.
-			// This branch isn't used until CheckpointQueue supports Pop (removing oldest element).
+			// This branch isn't used until TrieQueue supports Pop (removing oldest element).
 			// At this time, there is no reason to implement Pop, so this branch is here to prevent future bug.
 			head := q.capacity - q.count + q.tail
 			n := copy(tries, q.ts[head:])
@@ -78,10 +83,10 @@ func (q *CheckpointQueue) Tries() []*trie.MTrie {
 }
 
 // Count returns element count.
-func (q *CheckpointQueue) Count() int {
+func (q *TrieQueue) Count() int {
 	return q.count
 }
 
-func (q *CheckpointQueue) isFull() bool {
+func (q *TrieQueue) isFull() bool {
 	return q.count == q.capacity
 }
