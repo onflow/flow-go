@@ -336,9 +336,9 @@ func prepareService(container testnet.ContainerConfig, i int, n int) Service {
 			fmt.Sprintf("%s:/data:z", dataDir),
 		},
 		Environment: []string{
-			"JAEGER_ENDPOINT=http://tempo:14268/api/traces",
-			// NOTE: these env vars are not set by default, but can be set [1] to enable binstat logging:
-			// [1] https://docs.docker.com/compose/environment-variables/#pass-environment-variables-to-containers
+			// https://github.com/open-telemetry/opentelemetry-specification/blob/v1.12.0/specification/protocol/exporter.md
+			"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4317",
+			"OTEL_EXPORTER_OTLP_TRACES_INSECURE=true",
 			"BINSTAT_ENABLE",
 			"BINSTAT_LEN_WHAT",
 			"BINSTAT_DMP_NAME",
@@ -533,7 +533,9 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 			fmt.Sprintf("%s:/data:z", dataDir),
 		},
 		Environment: []string{
-			"JAEGER_ENDPOINT=http://tempo:14268/api/traces",
+			// https://github.com/open-telemetry/opentelemetry-specification/blob/v1.12.0/specification/protocol/exporter.md
+			"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4317",
+			"OTEL_EXPORTER_OTLP_TRACES_INSECURE=true",
 			"BINSTAT_ENABLE",
 			"BINSTAT_LEN_WHAT",
 			"BINSTAT_DMP_NAME",

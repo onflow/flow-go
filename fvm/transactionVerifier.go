@@ -3,7 +3,7 @@ package fvm
 import (
 	"fmt"
 
-	"github.com/opentracing/opentracing-go/log"
+	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/errors"
@@ -55,10 +55,10 @@ func (v *TransactionVerifier) verifyTransaction(
 ) error {
 	if ctx.Tracer != nil && proc.TraceSpan != nil {
 		span := ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMVerifyTransaction)
-		span.LogFields(
-			log.String("transaction.ID", proc.ID.String()),
+		span.SetAttributes(
+			attribute.String("transaction.ID", proc.ID.String()),
 		)
-		defer span.Finish()
+		defer span.End()
 	}
 
 	tx := proc.Transaction
