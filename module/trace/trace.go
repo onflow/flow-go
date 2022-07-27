@@ -31,6 +31,10 @@ func (s SpanName) Child(subOp string) SpanName {
 	return SpanName(string(s) + "." + subOp)
 }
 
+func IsSampled(span trace.Span) bool {
+	return span.SpanContext().IsSampled()
+}
+
 // Tracer is the implementation of the Tracer interface
 // TODO(rbtz): make private
 type Tracer struct {
@@ -40,9 +44,6 @@ type Tracer struct {
 	spanCache   *lru.Cache
 	chainID     string
 	sensitivity uint
-
-	noopSpan trace.Span
-	noopCtx  context.Context
 }
 
 // NewTracer creates a new OpenTelemetry-based tracer.
@@ -89,8 +90,6 @@ func NewTracer(
 		return nil, err
 	}
 
-	// Noop span is used to short-circuit tracing when entity is not sampled.
-	noopCtx, noopSpan := trace.NewNoopTracerProvider().Tracer("noop").Start(context.Background(), "noop")
 	return &Tracer{
 		tracer:      tracerProvider.Tracer(""),
 		shutdown:    tracerProvider.Shutdown,
@@ -98,18 +97,13 @@ func NewTracer(
 		spanCache:   spanCache,
 		sensitivity: sensitivity,
 		chainID:     chainID,
-
-		noopSpan: noopSpan,
-		noopCtx:  noopCtx,
 	}, nil
 }
 
 // Ready returns a channel that will close when the network stack is ready.
 func (t *Tracer) Ready() <-chan struct{} {
 	ready := make(chan struct{})
-	go func() {
-		close(ready)
-	}()
+	close(ready)
 	return ready
 }
 
@@ -128,6 +122,21 @@ func (t *Tracer) Done() <-chan struct{} {
 		close(done)
 	}()
 	return done
+}
+
+func (t *Tracer) startEntitySpan(
+	ctx context.Context,
+	entityID flow.Identifier,
+	entityType string,
+	spanName SpanName,
+	opts ...trace.SpanStartOption,
+) (trace.Span, context.Context, bool) {
+	if !entityID.IsSampled(t.sensitivity) {
+		return NoopSpan, ctx, false
+	}
+
+	ctx, rootSpan := t.entityRootSpan(ctx, entityID, entityType)
+	return t.StartSpanFromParent(rootSpan, spanName, opts...), ctx, true
 }
 
 // entityRootSpan returns the root span for the given entity from the cache
@@ -168,12 +177,7 @@ func (t *Tracer) StartBlockSpan(
 	spanName SpanName,
 	opts ...trace.SpanStartOption,
 ) (trace.Span, context.Context, bool) {
-	if !blockID.IsSampled(t.sensitivity) {
-		return t.noopSpan, t.noopCtx, false
-	}
-
-	ctx, rootSpan := t.entityRootSpan(ctx, blockID, EntityTypeBlock)
-	return t.StartSpanFromParent(rootSpan, spanName, opts...), ctx, true
+	return t.startEntitySpan(ctx, blockID, EntityTypeBlock, spanName, opts...)
 }
 
 func (t *Tracer) StartCollectionSpan(
@@ -182,12 +186,7 @@ func (t *Tracer) StartCollectionSpan(
 	spanName SpanName,
 	opts ...trace.SpanStartOption,
 ) (trace.Span, context.Context, bool) {
-	if !collectionID.IsSampled(t.sensitivity) {
-		return t.noopSpan, t.noopCtx, false
-	}
-
-	ctx, rootSpan := t.entityRootSpan(ctx, collectionID, EntityTypeCollection)
-	return t.StartSpanFromParent(rootSpan, spanName, opts...), ctx, true
+	return t.startEntitySpan(ctx, collectionID, EntityTypeCollection, spanName, opts...)
 }
 
 // StartTransactionSpan starts a span that will be aggregated under the given transaction.
@@ -198,12 +197,7 @@ func (t *Tracer) StartTransactionSpan(
 	spanName SpanName,
 	opts ...trace.SpanStartOption,
 ) (trace.Span, context.Context, bool) {
-	if !transactionID.IsSampled(t.sensitivity) {
-		return t.noopSpan, t.noopCtx, false
-	}
-
-	ctx, rootSpan := t.entityRootSpan(ctx, transactionID, EntityTypeTransaction)
-	return t.StartSpanFromParent(rootSpan, spanName, opts...), ctx, true
+	return t.startEntitySpan(ctx, transactionID, EntityTypeTransaction, spanName, opts...)
 }
 
 func (t *Tracer) StartSpanFromContext(
@@ -220,8 +214,8 @@ func (t *Tracer) StartSpanFromParent(
 	operationName SpanName,
 	opts ...trace.SpanStartOption,
 ) trace.Span {
-	if !parentSpan.SpanContext().IsSampled() {
-		return t.noopSpan
+	if !IsSampled(parentSpan) {
+		return NoopSpan
 	}
 	ctx := trace.ContextWithSpan(context.Background(), parentSpan)
 	_, span := t.tracer.Start(ctx, string(operationName), opts...)
@@ -235,7 +229,7 @@ func (t *Tracer) RecordSpanFromParent(
 	attrs []attribute.KeyValue,
 	opts ...trace.SpanStartOption,
 ) {
-	if !parentSpan.SpanContext().IsSampled() {
+	if !IsSampled(parentSpan) {
 		return
 	}
 	end := time.Now()

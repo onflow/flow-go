@@ -10,18 +10,17 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// NoopTracer is the implementation of the Tracer interface
+var (
+	NoopSpan trace.Span = trace.SpanFromContext(context.Background())
+)
+
+// NoopTracer is the implementation of the Tracer interface.
 // TODO(rbtz): make private
-type NoopTracer struct {
-	tracer trace.Tracer
-}
+type NoopTracer struct{}
 
 // NewTracer creates a new tracer.
 func NewNoopTracer() *NoopTracer {
-	t := &NoopTracer{
-		tracer: trace.NewNoopTracerProvider().Tracer("noop"),
-	}
-	return t
+	return &NoopTracer{}
 }
 
 // Ready returns a channel that will close when the network stack is ready.
@@ -44,8 +43,7 @@ func (t *NoopTracer) StartBlockSpan(
 	spanName SpanName,
 	opts ...trace.SpanStartOption,
 ) (trace.Span, context.Context, bool) {
-	ctx, span := t.tracer.Start(ctx, "", opts...)
-	return span, ctx, false
+	return NoopSpan, ctx, false
 }
 
 func (t *NoopTracer) StartCollectionSpan(
@@ -54,8 +52,7 @@ func (t *NoopTracer) StartCollectionSpan(
 	spanName SpanName,
 	opts ...trace.SpanStartOption,
 ) (trace.Span, context.Context, bool) {
-	ctx, span := t.tracer.Start(ctx, "", opts...)
-	return span, ctx, false
+	return NoopSpan, ctx, false
 }
 
 func (t *NoopTracer) StartTransactionSpan(
@@ -64,8 +61,7 @@ func (t *NoopTracer) StartTransactionSpan(
 	spanName SpanName,
 	opts ...trace.SpanStartOption,
 ) (trace.Span, context.Context, bool) {
-	ctx, span := t.tracer.Start(ctx, "", opts...)
-	return span, ctx, false
+	return NoopSpan, ctx, false
 }
 
 func (t *NoopTracer) StartSpanFromContext(
@@ -73,8 +69,7 @@ func (t *NoopTracer) StartSpanFromContext(
 	operationName SpanName,
 	opts ...trace.SpanStartOption,
 ) (trace.Span, context.Context) {
-	ctx, span := t.tracer.Start(ctx, "", opts...)
-	return span, ctx
+	return NoopSpan, ctx
 }
 
 func (t *NoopTracer) StartSpanFromParent(
@@ -82,8 +77,7 @@ func (t *NoopTracer) StartSpanFromParent(
 	operationName SpanName,
 	opts ...trace.SpanStartOption,
 ) trace.Span {
-	_, span := t.tracer.Start(context.Background(), "", opts...)
-	return span
+	return NoopSpan
 }
 
 func (t *NoopTracer) RecordSpanFromParent(

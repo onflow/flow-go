@@ -303,57 +303,6 @@ func valueDeclarations(ctx *Context, env Environment) []runtime.ValueDeclaration
 	return predeclaredValues
 }
 
-// requiresRetry returns true for transactions that has to be rerun
-// this is an additional check which was introduced
-func (i *TransactionInvoker) requiresRetry(err error, proc *TransactionProcedure) bool {
-	// if no error no retry
-	if err == nil {
-		return false
-	}
-
-	// Only consider runtime errors,
-	// in particular only consider parsing/checking errors
-	var runtimeErr runtime.Error
-	if !errors.As(err, &runtimeErr) {
-		return false
-	}
-
-	var parsingCheckingError *runtime.ParsingCheckingError
-	if !errors.As(err, &parsingCheckingError) {
-		return false
-	}
-
-	// Only consider errors in deployed contracts.
-
-	checkerError, ok := parsingCheckingError.Err.(*sema.CheckerError)
-	if !ok {
-		return false
-	}
-
-	var foundImportedProgramError bool
-
-	for _, checkingErr := range checkerError.Errors {
-		importedProgramError, ok := checkingErr.(*sema.ImportedProgramError)
-		if !ok {
-			continue
-		}
-
-		_, ok = importedProgramError.Location.(common.AddressLocation)
-		if !ok {
-			continue
-		}
-
-		foundImportedProgramError = true
-		break
-	}
-
-	if !foundImportedProgramError {
-		return false
-	}
-
-	return true
-}
-
 // logExecutionIntensities logs execution intensities of the transaction
 func (i *TransactionInvoker) logExecutionIntensities(sth *state.StateHolder, txHash string) {
 	if i.logger.Debug().Enabled() {
