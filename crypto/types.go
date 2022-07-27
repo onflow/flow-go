@@ -117,26 +117,12 @@ type Signature []byte
 // invalid inputs.
 type invalidInputsError struct {
 	error
-	subType invalidInputErrorSubType
 }
-
-type invalidInputErrorSubType int
-
-const (
-	// the default subtye, when the invalid input error is not specific
-	generic invalidInputErrorSubType = 0
-	// DKG error when an invalid state transition is called
-	dkgInvalidStateTransition
-	// BLS error when a call to a BLS multi-signature function is not allowed with an empty list
-	// of keys or signatures.
-	aggregationEmptyList
-)
 
 // invalidInputsErrorf constructs a new invalidInputsError
 func invalidInputsErrorf(msg string, args ...interface{}) error {
 	return &invalidInputsError{
-		subType: generic,
-		error:   fmt.Errorf(msg, args...),
+		error: fmt.Errorf(msg, args...),
 	}
 }
 

@@ -527,12 +527,19 @@ func BatchVerifyBLSSignaturesOneMessage(pks []PublicKey, sigs []Signature,
 	return verifBool, nil
 }
 
+type aggregationEmptyListError struct {
+	error
+}
+
+func (e aggregationEmptyListError) Unwrap() error {
+	return e.error
+}
+
 // aggregationEmptyListErrorf constructs a new invalidInputsError (API misuse)
 // for the case of empty lists passed into aggregation functions.
 func aggregationEmptyListErrorf(msg string, args ...interface{}) error {
-	return &invalidInputsError{
-		error:   fmt.Errorf(msg, args...),
-		subType: dkgInvalidStateTransition,
+	return &aggregationEmptyListError{
+		error: invalidInputsErrorf(msg, args...),
 	}
 }
 
@@ -541,5 +548,5 @@ func aggregationEmptyListErrorf(msg string, args ...interface{}) error {
 // aggregation function is called with an empty list which is not allowed in some cases.
 func IsAggregationEmptyListError(err error) bool {
 	var target *invalidInputsError
-	return errors.As(err, &target) && target.subType == aggregationEmptyList
+	return errors.As(err, &target)
 }

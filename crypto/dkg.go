@@ -80,11 +80,18 @@ func IsDKGFailureError(err error) bool {
 	return errors.As(err, &target)
 }
 
+type dkgInvalidStateTransitionError struct {
+	error
+}
+
+func (e dkgInvalidStateTransitionError) Unwrap() error {
+	return e.error
+}
+
 // dkgInvalidStateTransitionErrorf constructs a new invalidInputsError (API misuse)
 func dkgInvalidStateTransitionErrorf(msg string, args ...interface{}) error {
-	return &invalidInputsError{
-		error:   fmt.Errorf(msg, args...),
-		subType: dkgInvalidStateTransition,
+	return &dkgInvalidStateTransitionError{
+		error: invalidInputsErrorf(msg, args...),
 	}
 }
 
@@ -95,7 +102,7 @@ func dkgInvalidStateTransitionErrorf(msg string, args ...interface{}) error {
 // the state machine conditions.
 func IsDKGInvalidStateTransitionError(err error) bool {
 	var target *invalidInputsError
-	return errors.As(err, &target) && target.subType == dkgInvalidStateTransition
+	return errors.As(err, &target)
 }
 
 // index is the node index type used as participants ID
