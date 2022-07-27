@@ -44,7 +44,7 @@ func NewScriptEnvironment(
 	accountKeys := handler.NewAccountKeyHandler(accounts)
 	metrics := handler.NewMetricsHandler(fvmContext.Metrics)
 
-	ctx := &EnvContext{nestedContext{fvmContext}, nil}
+	ctx := NewEnvContext(fvmContext, nil)
 	env := &ScriptEnv{
 		commonEnv: commonEnv{
 			ctx:                   ctx,
@@ -160,8 +160,8 @@ func (e *ScriptEnv) GetStorageCapacity(address common.Address) (value uint64, er
 	}
 
 	result, invokeErr := InvokeAccountStorageCapacityContract(
+		e.ctx,
 		e,
-		e.traceSpan,
 		address)
 	if invokeErr != nil {
 		return 0, errors.HandleRuntimeError(invokeErr)
@@ -180,7 +180,7 @@ func (e *ScriptEnv) GetAccountBalance(address common.Address) (value uint64, err
 		return 0, fmt.Errorf("get account balance failed: %w", err)
 	}
 
-	result, invokeErr := InvokeAccountBalanceContract(e, e.traceSpan, address)
+	result, invokeErr := InvokeAccountBalanceContract(e.ctx, e, address)
 	if invokeErr != nil {
 		return 0, errors.HandleRuntimeError(invokeErr)
 	}
@@ -196,8 +196,8 @@ func (e *ScriptEnv) GetAccountAvailableBalance(address common.Address) (value ui
 	}
 
 	result, invokeErr := InvokeAccountAvailableBalanceContract(
+		e.ctx,
 		e,
-		e.traceSpan,
 		address)
 
 	if invokeErr != nil {
