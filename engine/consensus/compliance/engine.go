@@ -27,6 +27,9 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+// defaultRangeResponseQueueCapacity maximum capacity of block range responses queue
+const defaultRangeResponseQueueCapacity = 100
+
 // defaultBlockQueueCapacity maximum capacity of block proposals queue
 const defaultBlockQueueCapacity = 10000
 
@@ -49,7 +52,7 @@ type Engine struct {
 	prov                       network.Engine
 	core                       *Core
 	pendingBlocks              engine.MessageStore
-	pendingBlockResponses      engine.MessageStore
+	pendingRangeResponses      engine.MessageStore
 	pendingVotes               engine.MessageStore
 	messageHandler             *engine.MessageHandler
 	finalizedView              counters.StrictMonotonousCounter
@@ -65,7 +68,7 @@ func NewEngine(
 	prov network.Engine,
 	core *Core) (*Engine, error) {
 
-	blockResponseQueue, err := fifoqueue.NewFifoQueue(
+	rangeResponseQueue, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultRangeResponseQueueCapacity),
 		fifoqueue.WithLengthObserver(func(len int) { core.mempool.MempoolEntries(metrics.ResourceBlockResponseQueue, uint(len)) }),
 	)
@@ -74,8 +77,8 @@ func NewEngine(
 		return nil, fmt.Errorf("failed to create queue for block responses: %w", err)
 	}
 
-	pendingBlockResponses := &engine.FifoMessageStore{
-		FifoQueue: blockResponseQueue,
+	pendingRangeResponses := &engine.FifoMessageStore{
+		FifoQueue: rangeResponseQueue,
 	}
 
 	// FIFO queue for block proposals
@@ -167,7 +170,7 @@ func NewEngine(
 		metrics:                    core.metrics,
 		headers:                    core.headers,
 		payloads:                   core.payloads,
-		pendingBlockResponses:      pendingBlockResponses,
+		pendingRangeResponses:      pendingRangeResponses,
 		pendingBlocks:              pendingBlocks,
 		pendingVotes:               pendingVotes,
 		state:                      core.state,
@@ -292,7 +295,7 @@ func (e *Engine) processAvailableMessages() error {
 	for {
 		// TODO prioritization
 		// eg: msg := engine.SelectNextMessage()
-		msg, ok := e.pendingBlockResponses.Get()
+		msg, ok := e.pendingRangeResponses.Get()
 		if ok {
 			blockResponse := msg.Payload.(*messages.BlockResponse)
 			for _, block := range blockResponse.Blocks {
