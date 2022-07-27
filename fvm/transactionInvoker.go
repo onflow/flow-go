@@ -8,9 +8,9 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
-	"github.com/opentracing/opentracing-go"
-	traceLog "github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel/attribute"
+	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -38,13 +38,13 @@ func (i *TransactionInvoker) Process(
 ) (processErr error) {
 
 	txIDStr := proc.ID.String()
-	var span opentracing.Span
+	var span otelTrace.Span
 	if ctx.Tracer != nil && proc.TraceSpan != nil {
 		span = ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMExecuteTransaction)
-		span.LogFields(
-			traceLog.String("transaction_id", txIDStr),
+		span.SetAttributes(
+			attribute.String("transaction_id", txIDStr),
 		)
-		defer span.Finish()
+		defer span.End()
 	}
 
 	var blockHeight uint64
@@ -301,57 +301,6 @@ func valueDeclarations(ctx *Context, env Environment) []runtime.ValueDeclaration
 		predeclaredValues = append(predeclaredValues, setAccountFrozen)
 	}
 	return predeclaredValues
-}
-
-// requiresRetry returns true for transactions that has to be rerun
-// this is an additional check which was introduced
-func (i *TransactionInvoker) requiresRetry(err error, proc *TransactionProcedure) bool {
-	// if no error no retry
-	if err == nil {
-		return false
-	}
-
-	// Only consider runtime errors,
-	// in particular only consider parsing/checking errors
-	var runtimeErr runtime.Error
-	if !errors.As(err, &runtimeErr) {
-		return false
-	}
-
-	var parsingCheckingError *runtime.ParsingCheckingError
-	if !errors.As(err, &parsingCheckingError) {
-		return false
-	}
-
-	// Only consider errors in deployed contracts.
-
-	checkerError, ok := parsingCheckingError.Err.(*sema.CheckerError)
-	if !ok {
-		return false
-	}
-
-	var foundImportedProgramError bool
-
-	for _, checkingErr := range checkerError.Errors {
-		importedProgramError, ok := checkingErr.(*sema.ImportedProgramError)
-		if !ok {
-			continue
-		}
-
-		_, ok = importedProgramError.Location.(common.AddressLocation)
-		if !ok {
-			continue
-		}
-
-		foundImportedProgramError = true
-		break
-	}
-
-	if !foundImportedProgramError {
-		return false
-	}
-
-	return true
 }
 
 // logExecutionIntensities logs execution intensities of the transaction

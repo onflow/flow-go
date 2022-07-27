@@ -4,16 +4,18 @@ import (
 	"context"
 	"time"
 
-	"github.com/opentracing/opentracing-go"
+	"go.opentelemetry.io/otel/attribute"
+	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
 
-type TraceSpan opentracing.Span
-
-var _ Tracer = &trace.OpenTracer{}
-var _ Tracer = &trace.NoopTracer{}
+var (
+	_ Tracer = &trace.Tracer{}
+	_ Tracer = &trace.NoopTracer{}
+	_ Tracer = &trace.LogTracer{}
+)
 
 // Tracer interface for tracers in flow. Uses open tracing span definitions
 type Tracer interface {
@@ -26,7 +28,8 @@ type Tracer interface {
 		ctx context.Context,
 		blockID flow.Identifier,
 		spanName trace.SpanName,
-		opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context, bool)
+		opts ...otelTrace.SpanStartOption,
+	) (otelTrace.Span, context.Context, bool)
 
 	// StartCollectionSpan starts an span for a collection, built as a child of rootSpan
 	// it also returns the context including this span which can be used for nested calls.
@@ -35,7 +38,8 @@ type Tracer interface {
 		ctx context.Context,
 		collectionID flow.Identifier,
 		spanName trace.SpanName,
-		opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context, bool)
+		opts ...otelTrace.SpanStartOption,
+	) (otelTrace.Span, context.Context, bool)
 
 	// StartTransactionSpan starts an span for a transaction, built as a child of rootSpan
 	// it also returns the context including this span which can be used for nested calls.
@@ -44,34 +48,37 @@ type Tracer interface {
 		ctx context.Context,
 		transactionID flow.Identifier,
 		spanName trace.SpanName,
-		opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context, bool)
+		opts ...otelTrace.SpanStartOption,
+	) (otelTrace.Span, context.Context, bool)
 
 	StartSpanFromContext(
 		ctx context.Context,
 		operationName trace.SpanName,
-		opts ...opentracing.StartSpanOption,
-	) (opentracing.Span, context.Context)
+		opts ...otelTrace.SpanStartOption,
+	) (otelTrace.Span, context.Context)
 
 	StartSpanFromParent(
-		span opentracing.Span,
+		parentSpan otelTrace.Span,
 		operationName trace.SpanName,
-		opts ...opentracing.StartSpanOption,
-	) opentracing.Span
+		opts ...otelTrace.SpanStartOption,
+	) otelTrace.Span
 
 	// RecordSpanFromParent records an span at finish time
 	// start time will be computed by reducing time.Now() - duration
 	RecordSpanFromParent(
-		span opentracing.Span,
+		parentSpan otelTrace.Span,
 		operationName trace.SpanName,
 		duration time.Duration,
-		logs []opentracing.LogRecord,
-		opts ...opentracing.StartSpanOption,
+		attrs []attribute.KeyValue,
+		opts ...otelTrace.SpanStartOption,
 	)
 
 	// WithSpanFromContext encapsulates executing a function within an span, i.e., it starts a span with the specified SpanName from the context,
 	// executes the function f, and finishes the span once the function returns.
-	WithSpanFromContext(ctx context.Context,
+	WithSpanFromContext(
+		ctx context.Context,
 		operationName trace.SpanName,
 		f func(),
-		opts ...opentracing.StartSpanOption)
+		opts ...otelTrace.SpanStartOption,
+	)
 }

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/opentracing/opentracing-go"
+	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter/id"
@@ -141,8 +141,8 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		return nil, fmt.Errorf("could not assemble proposal: %w", err)
 	}
 
-	span, ctx, _ := b.tracer.StartBlockSpan(context.Background(), proposal.ID(), trace.CONBuilderBuildOn, opentracing.StartTime(startTime))
-	defer span.Finish()
+	span, ctx, _ := b.tracer.StartBlockSpan(context.Background(), proposal.ID(), trace.CONBuilderBuildOn, otelTrace.WithTimestamp(startTime))
+	defer span.End()
 
 	err = b.state.Extend(ctx, proposal)
 	if err != nil {
