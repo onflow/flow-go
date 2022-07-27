@@ -3,8 +3,6 @@ package fvm
 import (
 	"fmt"
 
-	otelTrace "go.opentelemetry.io/otel/trace"
-
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime/common"
 
@@ -20,6 +18,7 @@ func NewTransactionStorageLimiter() TransactionStorageLimiter {
 }
 
 func (d TransactionStorageLimiter) CheckLimits(
+	ctx *EnvContext,
 	env Environment,
 	addresses []flow.Address,
 ) error {
@@ -27,11 +26,7 @@ func (d TransactionStorageLimiter) CheckLimits(
 		return nil
 	}
 
-	var span otelTrace.Span
-	if te, ok := env.(*TransactionEnv); ok && te.isTraceable() {
-		span = te.ctx.Tracer.StartSpanFromParent(te.traceSpan, trace.FVMTransactionStorageUsedCheck)
-		defer span.End()
-	}
+	defer ctx.StartSpanFromRoot(trace.FVMTransactionStorageUsedCheck).End()
 
 	commonAddresses := make([]common.Address, len(addresses))
 	usages := make([]uint64, len(commonAddresses))
@@ -45,7 +40,7 @@ func (d TransactionStorageLimiter) CheckLimits(
 		usages[i] = u
 	}
 
-	result, invokeErr := InvokeAccountsStorageCapacity(env, span, commonAddresses)
+	result, invokeErr := InvokeAccountsStorageCapacity(ctx, env, commonAddresses)
 
 	// This error only occurs in case of implementation errors. The InvokeAccountsStorageCapacity
 	// already handles cases where the default vault is missing.
