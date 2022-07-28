@@ -851,22 +851,22 @@ func (net *FlowNetwork) AddObserver(ctx context.Context, t *testing.T, conf *Obs
 				"--profiler-interval=2m",
 			},
 			ExposedPorts: nat.PortSet{
-				nat.Port(observerUnsecurePort): struct{}{},
-				nat.Port(observerSecurePort):   struct{}{},
-				nat.Port(observerHttpPort):     struct{}{},
+				"9000": struct{}{},
+				"9001": struct{}{},
+				"8000": struct{}{},
 			},
 		},
 		&container.HostConfig{
-			AutoRemove: false,
+			AutoRemove: true,
 			Binds: []string{
 				fmt.Sprintf("%s:%s:rw", flowDataDir, "/data"),
 				fmt.Sprintf("%s:%s:rw", flowProfilerDir, "/profiler"),
 				fmt.Sprintf("%s:%s:ro", nodeBootstrapDir, "/bootstrap"),
 			},
 			PortBindings: nat.PortMap{
-				nat.Port(observerUnsecurePort): []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: "9000"}},
-				nat.Port(observerSecurePort):   []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: "9001"}},
-				nat.Port(observerHttpPort):     []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: "8000"}},
+				"9000": []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: observerUnsecurePort}},
+				"9001": []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: observerSecurePort}},
+				"8000": []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: observerHttpPort}},
 			},
 		},
 		&network.NetworkingConfig{

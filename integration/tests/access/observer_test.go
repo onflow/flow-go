@@ -157,7 +157,7 @@ func (suite *ObserverSuite) getAccessClient() (accessproto.AccessAPIClient, erro
 }
 
 func (suite *ObserverSuite) getObserverClient() (accessproto.AccessAPIClient, error) {
-	return suite.getClient(fmt.Sprintf("0.0.0.0:%s", suite.net.AccessPorts[testnet.ObserverNodeAPIPort]))
+	return suite.getClient(fmt.Sprintf("0.0.0.0:%s", suite.net.ObserverPorts[testnet.ObserverNodeAPIPort]))
 }
 
 func (suite *ObserverSuite) getClient(address string) (accessproto.AccessAPIClient, error) {
