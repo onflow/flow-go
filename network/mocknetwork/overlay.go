@@ -69,6 +69,22 @@ func (_m *Overlay) Receive(nodeID flow.Identifier, msg *message.Message, decoded
 	return r0
 }
 
+// Topology provides a mock function with given fields:
+func (_m *Overlay) Topology() flow.IdentityList {
+	ret := _m.Called()
+
+	var r0 flow.IdentityList
+	if rf, ok := ret.Get(0).(func() flow.IdentityList); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(flow.IdentityList)
+		}
+	}
+
+	return r0
+}
+
 type NewOverlayT interface {
 	mock.TestingT
 	Cleanup(func())
