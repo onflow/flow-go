@@ -42,9 +42,8 @@ func NewScriptEnvironment(
 	uuidGenerator := state.NewUUIDGenerator(sth)
 	programsHandler := handler.NewProgramsHandler(programs, sth)
 	accountKeys := handler.NewAccountKeyHandler(accounts)
-	metrics := handler.NewMetricsHandler(fvmContext.Metrics)
 
-	ctx := &EnvContext{nestedContext{fvmContext}, nil}
+	ctx := NewEnvContext(fvmContext, nil)
 	env := &ScriptEnv{
 		commonEnv: commonEnv{
 			ctx:                   ctx,
@@ -56,7 +55,6 @@ func NewScriptEnvironment(
 			accounts:              accounts,
 			accountKeys:           accountKeys,
 			uuidGenerator:         uuidGenerator,
-			metrics:               metrics,
 		},
 		reqContext: reqContext,
 	}
@@ -152,10 +150,7 @@ func (e *ScriptEnv) setExecutionParameters() error {
 }
 
 func (e *ScriptEnv) GetStorageCapacity(address common.Address) (value uint64, err error) {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetStorageCapacity)
-		defer sp.Finish()
-	}
+	defer e.ctx.StartSpanFromRoot(trace.FVMEnvGetStorageCapacity).End()
 
 	err = e.Meter(meter.ComputationKindGetStorageCapacity, 1)
 	if err != nil {
@@ -163,8 +158,8 @@ func (e *ScriptEnv) GetStorageCapacity(address common.Address) (value uint64, er
 	}
 
 	result, invokeErr := InvokeAccountStorageCapacityContract(
+		e.ctx,
 		e,
-		e.traceSpan,
 		address)
 	if invokeErr != nil {
 		return 0, errors.HandleRuntimeError(invokeErr)
@@ -176,17 +171,14 @@ func (e *ScriptEnv) GetStorageCapacity(address common.Address) (value uint64, er
 }
 
 func (e *ScriptEnv) GetAccountBalance(address common.Address) (value uint64, err error) {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetAccountBalance)
-		defer sp.Finish()
-	}
+	defer e.ctx.StartSpanFromRoot(trace.FVMEnvGetAccountBalance).End()
 
 	err = e.Meter(meter.ComputationKindGetAccountBalance, 1)
 	if err != nil {
 		return 0, fmt.Errorf("get account balance failed: %w", err)
 	}
 
-	result, invokeErr := InvokeAccountBalanceContract(e, e.traceSpan, address)
+	result, invokeErr := InvokeAccountBalanceContract(e.ctx, e, address)
 	if invokeErr != nil {
 		return 0, errors.HandleRuntimeError(invokeErr)
 	}
@@ -194,10 +186,7 @@ func (e *ScriptEnv) GetAccountBalance(address common.Address) (value uint64, err
 }
 
 func (e *ScriptEnv) GetAccountAvailableBalance(address common.Address) (value uint64, err error) {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetAccountBalance)
-		defer sp.Finish()
-	}
+	defer e.ctx.StartSpanFromRoot(trace.FVMEnvGetAccountBalance).End()
 
 	err = e.Meter(meter.ComputationKindGetAccountAvailableBalance, 1)
 	if err != nil {
@@ -205,8 +194,8 @@ func (e *ScriptEnv) GetAccountAvailableBalance(address common.Address) (value ui
 	}
 
 	result, invokeErr := InvokeAccountAvailableBalanceContract(
+		e.ctx,
 		e,
-		e.traceSpan,
 		address)
 
 	if invokeErr != nil {
@@ -219,10 +208,7 @@ func (e *ScriptEnv) ResolveLocation(
 	identifiers []runtime.Identifier,
 	location runtime.Location,
 ) ([]runtime.ResolvedLocation, error) {
-	if e.isTraceable() && e.ctx.ExtensiveTracing {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvResolveLocation)
-		defer sp.Finish()
-	}
+	defer e.ctx.StartExtensiveTracingSpanFromRoot(trace.FVMEnvResolveLocation).End()
 
 	err := e.Meter(meter.ComputationKindResolveLocation, 1)
 	if err != nil {
@@ -343,10 +329,7 @@ func (e *ScriptEnv) VerifySignature(
 	signatureAlgorithm runtime.SignatureAlgorithm,
 	hashAlgorithm runtime.HashAlgorithm,
 ) (bool, error) {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvVerifySignature)
-		defer sp.Finish()
-	}
+	defer e.ctx.StartSpanFromRoot(trace.FVMEnvVerifySignature).End()
 
 	err := e.Meter(meter.ComputationKindVerifySignature, 1)
 	if err != nil {
@@ -397,10 +380,7 @@ func (e *ScriptEnv) AddAccountKey(_ runtime.Address, _ *runtime.PublicKey, _ run
 }
 
 func (e *ScriptEnv) GetAccountKey(address runtime.Address, index int) (*runtime.AccountKey, error) {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetAccountKey)
-		defer sp.Finish()
-	}
+	defer e.ctx.StartSpanFromRoot(trace.FVMEnvGetAccountKey).End()
 
 	err := e.Meter(meter.ComputationKindGetAccountKey, 1)
 	if err != nil {

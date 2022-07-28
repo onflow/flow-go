@@ -30,7 +30,7 @@ func stopNodes(t *testing.T, cancel context.CancelFunc, nodes []*Node) {
 	for _, n := range nodes {
 		stoppingNodes = append(stoppingNodes, util.AllDone(n.aggregator, n.compliance, n.sync))
 	}
-	unittest.RequireCloseBefore(t, util.AllClosed(stoppingNodes...), time.Second, "requiring nodes to stop")
+	unittest.RequireCloseBefore(t, util.AllClosed(stoppingNodes...), time.Minute, "requiring nodes to stop")
 }
 
 // happy path: with 3 nodes, they can reach consensus
