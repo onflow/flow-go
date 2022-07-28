@@ -547,6 +547,6 @@ func aggregationEmptyListErrorf(msg string, args ...interface{}) error {
 // aggregationEmptyList is a subtype of invalidInputsError, returned when a BLS
 // aggregation function is called with an empty list which is not allowed in some cases.
 func IsAggregationEmptyListError(err error) bool {
-	var target *invalidInputsError
+	var target *aggregationEmptyListError
 	return errors.As(err, &target)
 }

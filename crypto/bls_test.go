@@ -864,10 +864,12 @@ func TestBLSAggregateSignaturesManyMessages(t *testing.T) {
 
 func TestBLSErrorTypes(t *testing.T) {
 	t.Run("aggregateEmptyListError sanity", func(t *testing.T) {
-		failureError := aggregationEmptyListErrorf("some error")
+		err := aggregationEmptyListErrorf("")
+		invInpError := invalidInputsErrorf("")
 		otherError := fmt.Errorf("some error")
-		assert.True(t, IsAggregationEmptyListError(failureError))
-		assert.True(t, IsInvalidInputsError(failureError))
+		assert.True(t, IsAggregationEmptyListError(err))
+		assert.True(t, IsInvalidInputsError(err))
+		assert.False(t, IsAggregationEmptyListError(invInpError))
 		assert.False(t, IsAggregationEmptyListError(otherError))
 		assert.False(t, IsAggregationEmptyListError(nil))
 	})

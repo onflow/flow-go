@@ -101,7 +101,7 @@ func dkgInvalidStateTransitionErrorf(msg string, args ...interface{}) error {
 // Such a failure can only happen if the API is misued by not respecting
 // the state machine conditions.
 func IsDKGInvalidStateTransitionError(err error) bool {
-	var target *invalidInputsError
+	var target *dkgInvalidStateTransitionError
 	return errors.As(err, &target)
 }
 
