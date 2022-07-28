@@ -68,13 +68,13 @@ func (t *NewestTCTracker) Track(tc *flow.TimeoutCertificate) bool {
 	// in case of shared access to updated value.
 	for {
 		// take a snapshot
-		NewestQC := t.NewestTC()
+		NewestTC := t.NewestTC()
 		// verify that our update makes sense
-		if NewestQC != nil && NewestQC.View >= tc.View {
+		if NewestTC != nil && NewestTC.View >= tc.View {
 			return false
 		}
 		// attempt to install new value, repeat in case of shared update.
-		if t.newestTC.CAS(unsafe.Pointer(NewestQC), unsafe.Pointer(tc)) {
+		if t.newestTC.CAS(unsafe.Pointer(NewestTC), unsafe.Pointer(tc)) {
 			return true
 		}
 	}
