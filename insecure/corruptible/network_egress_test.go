@@ -84,7 +84,7 @@ func TestHandleOutgoingEvent_AttackerObserve(t *testing.T) {
 // TestHandleOutgoingEvent_NoAttacker_UnicastOverNetwork checks that outgoing unicast events to the corrupted network
 // are routed to the network adapter when no attacker is registered to the network.
 func TestHandleOutgoingEvent_NoAttacker_UnicastOverNetwork(t *testing.T) {
-	corruptibleNetwork, adapter := corruptibleNetworkFixture(t)
+	corruptibleNetwork, adapter := corruptibleNetworkFixture(t, unittest.Logger())
 
 	msg := &message.TestMessage{Text: "this is a test msg"}
 	channel := channels.Channel("test-channel")
@@ -104,7 +104,7 @@ func TestHandleOutgoingEvent_NoAttacker_UnicastOverNetwork(t *testing.T) {
 // TestHandleOutgoingEvent_NoAttacker_PublishOverNetwork checks that the outgoing publish events to the corrupted network
 // are routed to the network adapter when no attacker registered to the network.
 func TestHandleOutgoingEvent_NoAttacker_PublishOverNetwork(t *testing.T) {
-	corruptibleNetwork, adapter := corruptibleNetworkFixture(t)
+	corruptibleNetwork, adapter := corruptibleNetworkFixture(t, unittest.Logger())
 
 	msg := &message.TestMessage{Text: "this is a test msg"}
 	channel := channels.Channel("test-channel")
@@ -128,7 +128,7 @@ func TestHandleOutgoingEvent_NoAttacker_PublishOverNetwork(t *testing.T) {
 // TestHandleOutgoingEvent_NoAttacker_MulticastOverNetwork checks that the outgoing multicast events to the corrupted network
 // are routed to the network adapter when no attacker registered to the network.
 func TestHandleOutgoingEvent_NoAttacker_MulticastOverNetwork(t *testing.T) {
-	corruptibleNetwork, adapter := corruptibleNetworkFixture(t)
+	corruptibleNetwork, adapter := corruptibleNetworkFixture(t, unittest.Logger())
 
 	msg := &message.TestMessage{Text: "this is a test msg"}
 	channel := channels.Channel("test-channel")
@@ -149,9 +149,9 @@ func TestHandleOutgoingEvent_NoAttacker_MulticastOverNetwork(t *testing.T) {
 	mock.AssertExpectationsForObjects(t, adapter)
 }
 
-// TestProcessAttackerMessage evaluates that corrupted network relays the messages to its underlying flow network.
-func TestProcessAttackerMessage(t *testing.T) {
-	withCorruptibleNetwork(t,
+// TestProcessAttackerMessage checks that a corrupted network relays the messages to its underlying flow network.
+func TestProcessAttackerMessage_MessageSentOnFlowNetwork(t *testing.T) {
+	withCorruptibleNetwork(t, unittest.Logger(),
 		func(
 			corruptedId flow.Identity, // identity of ccf
 			corruptibleNetwork *Network,
@@ -188,11 +188,10 @@ func TestProcessAttackerMessage(t *testing.T) {
 		})
 }
 
-// TestProcessAttackerMessage_ResultApproval_Dictated checks that when corruptible network receives a result approval with
-// empty signature field,
-// it fills its related fields with its own credentials (e.g., signature), and passes it through the Flow network.
+// TestProcessAttackerMessage_ResultApproval_Dictated checks that when a corruptible network receives a result approval with an
+// empty signature field, it fills its related fields with its own credentials (e.g., signature), and passes it through the Flow network.
 func TestProcessAttackerMessage_ResultApproval_Dictated(t *testing.T) {
-	withCorruptibleNetwork(t,
+	withCorruptibleNetwork(t, unittest.Logger(),
 		func(
 			corruptedId flow.Identity, // identity of ccf
 			corruptibleNetwork *Network,
@@ -261,11 +260,11 @@ func TestProcessAttackerMessage_ResultApproval_Dictated(t *testing.T) {
 		})
 }
 
-// TestProcessAttackerMessage_ResultApproval_PassThrough evaluates that when corrupted network
+// TestProcessAttackerMessage_ResultApproval_PassThrough checks that when a corrupted network
 // receives a completely filled result approval,
 // it fills its related fields with its own credentials (e.g., signature), and passes it through the Flow network.
 func TestProcessAttackerMessage_ResultApproval_PassThrough(t *testing.T) {
-	withCorruptibleNetwork(t,
+	withCorruptibleNetwork(t, unittest.Logger(),
 		func(
 			corruptedId flow.Identity, // identity of ccf
 			corruptibleNetwork *Network,
@@ -306,10 +305,10 @@ func TestProcessAttackerMessage_ResultApproval_PassThrough(t *testing.T) {
 		})
 }
 
-// TestProcessAttackerMessage_ExecutionReceipt_Dictated evaluates that when corrupted network receives an execution receipt with
+// TestProcessAttackerMessage_ExecutionReceipt_Dictated checks that when a corrupted network receives an execution receipt with
 // empty signature field, it fills its related fields with its own credentials (e.g., signature), and passes it through the Flow network.
 func TestProcessAttackerMessage_ExecutionReceipt_Dictated(t *testing.T) {
-	withCorruptibleNetwork(t,
+	withCorruptibleNetwork(t, unittest.Logger(),
 		func(
 			corruptedId flow.Identity, // identity of ccf
 			corruptibleNetwork *Network,
@@ -366,10 +365,10 @@ func TestProcessAttackerMessage_ExecutionReceipt_Dictated(t *testing.T) {
 		})
 }
 
-// TestProcessAttackerMessage_ExecutionReceipt_PassThrough evaluates that when corrupted network
+// TestProcessAttackerMessage_ExecutionReceipt_PassThrough checks that when a corrupted network
 // receives a completely filled execution receipt, it treats it as a pass-through event and passes it as it is on the Flow network.
 func TestProcessAttackerMessage_ExecutionReceipt_PassThrough(t *testing.T) {
-	withCorruptibleNetwork(t,
+	withCorruptibleNetwork(t, unittest.Logger(),
 		func(
 			corruptedId flow.Identity, // identity of ccf
 			corruptibleNetwork *Network,
@@ -408,21 +407,4 @@ func TestProcessAttackerMessage_ExecutionReceipt_PassThrough(t *testing.T) {
 				1*time.Second,
 				"attacker's message was not dispatched on flow network on time")
 		})
-}
-
-// TestEngineClosingChannel evaluates that corruptible network closes the channel whenever the corresponding
-// engine of that channel attempts on closing it.
-func TestEngineClosingChannel(t *testing.T) {
-	corruptibleNetwork, adapter := corruptibleNetworkFixture(t)
-	channel := channels.Channel("test-channel")
-
-	// on invoking adapter.UnRegisterChannel(channel), it must return a nil, which means
-	// that the channel has been unregistered by the adapter successfully.
-	adapter.On("UnRegisterChannel", channel).Return(nil).Once()
-
-	err := corruptibleNetwork.EngineClosingChannel(channel)
-	require.NoError(t, err)
-
-	// adapter's UnRegisterChannel method must be called once.
-	mock.AssertExpectationsForObjects(t, adapter)
 }

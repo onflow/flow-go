@@ -127,32 +127,63 @@ func (n *Network) RegisterPingService(pingProtocolID protocol.ID, pingInfoProvid
 }
 
 func (n *Network) ProcessAttackerMessage(stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageServer) error {
+	fmt.Println("corruptible/network>ProcessAttackerMessage>1 ")
+
 	for {
+		fmt.Println("corruptible/network>ProcessAttackerMessage>2>start of endless for loop")
 		select {
 		case <-n.ComponentManager.ShutdownSignal():
+			fmt.Println("corruptible/network>ProcessAttackerMessage>3>n.ComponentManager.ShutdownSignal(")
 			return nil
 		default:
+			fmt.Println("corruptible/network>ProcessAttackerMessage>4>default")
 			msg, err := stream.Recv()
+			fmt.Println("corruptible/network>ProcessAttackerMessage>4.1>default")
 			if err == io.EOF || errors.Is(stream.Context().Err(), context.Canceled) {
+				fmt.Println("corruptible/network>ProcessAttackerMessage>5>")
 				n.logger.Info().Msg("attacker closed processing stream")
 				return stream.SendAndClose(&empty.Empty{})
 			}
 			if err != nil {
+				fmt.Println("corruptible/network>ProcessAttackerMessage>6>")
 				n.logger.Fatal().Err(err).Msg("could not read attacker's stream")
 				return stream.SendAndClose(&empty.Empty{})
 			}
 
+			// this should never happen - one of them (and only one) should be non-nil
+			// can't have a message with nil for both ingress and egress
+			if msg.Egress == nil && msg.Ingress == nil {
+				fmt.Println("corruptible/network>ProcessAttackerMessage>7>")
+				fmt.Println("corruptible/network>ProcessAttackerMessage>10>msg.Egress == nil && msg.Ingress == nil")
+				n.logger.Fatal().Err(err).Msg("could not process attacker's message - both ingress and egress messages can't be nil")
+				return stream.SendAndClose(&empty.Empty{})
+			}
+
+			// this should never happen - one of them (and only one) should be not nil
+			// can't have a message with not nil for both ingress and egress
+			if msg.Egress != nil && msg.Ingress != nil {
+				fmt.Println("corruptible/netowrk>ProcessAttackerMessage>8>")
+				n.logger.Fatal().Err(err).Msg("could not process attacker's message - both ingress and egress messages can't be filled")
+				//err := status.Error(codes.InvalidArgument, "can't have egress and ingress messages both be not nil")
+				//return err
+				return stream.SendAndClose(&empty.Empty{})
+				//stream.SendMsg(errors.New("bar"))
+			}
+			fmt.Println("corruptible/netowrk>ProcessAttackerMessage>9>")
 			// received ingress message
 			if msg.Ingress != nil {
+				fmt.Println("corruptible/netowrk>ProcessAttackerMessage>10>")
 				// TODO implement ingress message processing
 			}
 			// received egress message
 			if msg.Egress != nil {
+				fmt.Println("corruptible/netowrk>ProcessAttackerMessage>11>")
 				if err := n.processAttackerEgressMessage(msg); err != nil {
 					n.logger.Fatal().Err(err).Msg("could not process attacker's message")
 					return stream.SendAndClose(&empty.Empty{})
 				}
 			}
+			fmt.Println("corruptible/netowrk>ProcessAttackerMessage>100 ")
 		}
 	}
 }

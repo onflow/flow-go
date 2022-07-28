@@ -3,6 +3,7 @@ package corruptible
 import (
 	"context"
 	"fmt"
+	"github.com/rs/zerolog"
 	"net"
 	"testing"
 	"time"
@@ -25,7 +26,7 @@ import (
 
 // corruptibleNetworkFixture creates a corruptible Network with a mock Adapter.
 // By default, no attacker is registered on this corruptible network.
-func corruptibleNetworkFixture(t *testing.T, corruptedID ...*flow.Identity) (*Network, *mocknetwork.Adapter) {
+func corruptibleNetworkFixture(t *testing.T, logger zerolog.Logger, corruptedID ...*flow.Identity) (*Network, *mocknetwork.Adapter) {
 	// create corruptible network with no attacker registered
 	codec := cbor.NewCodec()
 
@@ -51,16 +52,34 @@ func corruptibleNetworkFixture(t *testing.T, corruptedID ...*flow.Identity) (*Ne
 	flowNetwork.On("Done", mock.Anything).Return(func() <-chan struct{} {
 		return done
 	})
+	//logger, loggerHook := unittest.HookedLogger()
+	ccf := NewCorruptibleConduitFactory(logger, flow.BftTestnet)
 
-	ccf := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet)
+	//calls := 0
+	//ccf2, err2 := NewCorruptibleNetwork(
+	//	//unittest.Logger(),
+	//	unittest.HookedLogger(&calls),
+	//	flow.BftTestnet,
+	//	"localhost:0",
+	//	testutil.LocalFixture(t, corruptedIdentity),
+	//	codec,
+	//	flowNetwork,
+	//	ccf)
 
 	// set up adapter, so we can check that it called the expected method
 	adapter := &mocknetwork.Adapter{}
 	err := ccf.RegisterAdapter(adapter)
 	require.NoError(t, err)
 
+	//logger.Log()
+	//logger = logger.With().
+	//	Str("component", "corrupted_network").
+	//	Logger()
+
 	corruptibleNetwork, err := NewCorruptibleNetwork(
-		unittest.Logger(),
+		//unittest.Logger(),
+		//unittest.HookedLogger2(&calls),
+		logger,
 		flow.BftTestnet,
 		"localhost:0",
 		testutil.LocalFixture(t, corruptedIdentity),
@@ -75,7 +94,7 @@ func corruptibleNetworkFixture(t *testing.T, corruptedID ...*flow.Identity) (*Ne
 
 // withCorruptibleNetwork creates and starts a corruptible network, runs the "run" function and then
 // terminates the network.
-func withCorruptibleNetwork(t *testing.T,
+func withCorruptibleNetwork(t *testing.T, logger zerolog.Logger,
 	run func(
 		flow.Identity, // identity of ccf
 		*Network, // corruptible network
@@ -97,11 +116,13 @@ func withCorruptibleNetwork(t *testing.T,
 		}
 	}()
 
-	corruptibleNetwork, adapter := corruptibleNetworkFixture(t, corruptedIdentity)
+	corruptibleNetwork, adapter := corruptibleNetworkFixture(t, logger, corruptedIdentity)
 
 	// start corruptible network
 	corruptibleNetwork.Start(ccfCtx)
+	t.Logf("withCorruptibleNetwork>1")
 	unittest.RequireCloseBefore(t, corruptibleNetwork.Ready(), 1*time.Second, "could not start corruptible network on time")
+	t.Logf("withCorruptibleNetwork>2")
 
 	// extracting port that ccf gRPC server is running on
 	_, ccfPortStr, err := net.SplitHostPort(corruptibleNetwork.ServerAddress())
@@ -112,13 +133,16 @@ func withCorruptibleNetwork(t *testing.T,
 	gRpcClient, err := grpc.Dial(
 		fmt.Sprintf("localhost:%s", ccfPortStr),
 		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
+	t.Logf("withCorruptibleNetwork>3")
 	require.NoError(t, err)
 
 	client := insecure.NewCorruptibleConduitFactoryClient(gRpcClient)
 	stream, err := client.ProcessAttackerMessage(context.Background())
 	require.NoError(t, err)
 
+	t.Logf("withCorruptibleNetwork>4-about to call custom run()")
 	run(*corruptedIdentity, corruptibleNetwork, adapter, stream)
+	t.Logf("withCorruptibleNetwork>5-just called custom run()")
 
 	// terminates attackNetwork
 	cancel()
