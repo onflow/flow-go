@@ -2,7 +2,6 @@ package eventloop
 
 import (
 	"context"
-	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"io/ioutil"
 	"sync"
 	"testing"
@@ -14,6 +13,8 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
@@ -166,6 +167,25 @@ func (s *EventLoopTestSuite) Test_SubmitTC_IngestNewestQC() {
 	s.Run("QCs handed to EventLoop.OnNewTcDiscovered are forwarded to EventHandler", func() {
 		testTCIngestionFunction(s.eventLoop.OnNewTcDiscovered, 100, 100)
 	})
+}
+
+// Test_OnPartialTcCreated tests that event loop delivers partialTcCreated events to event handler.
+func (s *EventLoopTestSuite) Test_OnPartialTcCreated() {
+	view := uint64(1000)
+	newestQC := helper.MakeQC(helper.WithQCView(view - 10))
+	lastViewTC := helper.MakeTC(helper.WithTCView(view-1), helper.WithTCNewestQC(newestQC))
+
+	processed := atomic.NewBool(false)
+	partialTcCreated := &hotstuff.PartialTcCreated{
+		View:       view,
+		NewestQC:   newestQC,
+		LastViewTC: lastViewTC,
+	}
+	s.eh.On("OnPartialTcCreated", partialTcCreated).Run(func(args mock.Arguments) {
+		processed.Store(true)
+	}).Return(nil).Once()
+	s.eventLoop.OnPartialTcCreated(view, newestQC, lastViewTC)
+	require.Eventually(s.T(), processed.Load, time.Millisecond*100, time.Millisecond*10)
 }
 
 // TestEventLoop_Timeout tests that event loop delivers timeout events to event handler under pressure
