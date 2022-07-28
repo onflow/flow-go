@@ -953,6 +953,7 @@ func (es *EventHandlerSuite) TestOnPartialTcCreated_ProducedTimeout() {
 	require.Equal(es.T(), partialTc.View, timeoutObject.View)
 }
 
+// TestOnPartialTcCreated_NotActiveView tests that we don't create timeout object if partial TC was delivered for non-current view.
 func (es *EventHandlerSuite) TestOnPartialTcCreated_NotActiveView() {
 	partialTc := &hotstuff.PartialTcCreated{
 		View:     es.initView - 1,

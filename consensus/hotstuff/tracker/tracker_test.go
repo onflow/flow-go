@@ -57,7 +57,7 @@ func TestNewestQCTracker_Track(t *testing.T) {
 	}
 }
 
-// TestNewNewestQCTracker checks that new instance returns nil tracked value.
+// TestNewNewestTCTracker checks that new instance returns nil tracked value.
 func TestNewNewestTCTracker(t *testing.T) {
 	tracker := NewNewestTCTracker()
 	require.Nil(t, tracker.NewestTC())

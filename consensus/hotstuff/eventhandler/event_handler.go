@@ -261,10 +261,12 @@ func (e *EventHandler) OnLocalTimeout() error {
 // it will result in producing of model.TimeoutObject and subsequent broadcast to the consensus committee.
 // No errors are expected during normal operation.
 func (e *EventHandler) OnPartialTcCreated(partialTC *hotstuff.PartialTcCreated) error {
+	// process QC, this might trigger view change and any related logic(proposing, voting)
 	err := e.OnReceiveQc(partialTC.NewestQC)
 	if err != nil {
 		return fmt.Errorf("could not process QC: %w", err)
 	}
+	// process TC, this might trigger view change and any related logic(proposing, voting)
 	if partialTC.LastViewTC != nil {
 		err = e.OnReceiveTc(partialTC.LastViewTC)
 		if err != nil {
@@ -272,6 +274,7 @@ func (e *EventHandler) OnPartialTcCreated(partialTC *hotstuff.PartialTcCreated) 
 		}
 	}
 
+	// by definition, we are allowed to produce timeout object if we have received partial TC for current view
 	if e.paceMaker.CurView() != partialTC.View {
 		return nil
 	}

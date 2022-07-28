@@ -139,6 +139,7 @@ func (el *EventLoop) loop(ctx context.Context) error {
 			continue
 
 		case ev := <-el.partialTcCreated:
+			// TODO(active-pacemaker): measure how long it takes for event to be processed
 			err := el.eventHandler.OnPartialTcCreated(ev)
 
 			if err != nil {
@@ -243,6 +244,7 @@ func (el *EventLoop) loop(ctx context.Context) error {
 		case ev := <-el.partialTcCreated:
 			err := el.eventHandler.OnPartialTcCreated(ev)
 
+			// TODO(active-pacemaker): measure how long it takes for event to be processed
 			if err != nil {
 				return fmt.Errorf("could no process partial created TC event: %w", err)
 			}
@@ -308,6 +310,8 @@ func (el *EventLoop) OnPartialTcCreated(view uint64, newestQC *flow.QuorumCertif
 		NewestQC:   newestQC,
 		LastViewTC: lastViewTC,
 	}
+
+	// TODO(active-pacemaker): maybe measure how long it takes for event to be processed
 
 	select {
 	case el.partialTcCreated <- event:

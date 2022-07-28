@@ -8,7 +8,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// NewestQCTracker is a helper structure which keeps track of the highest QC(by view)
+// NewestQCTracker is a helper structure which keeps track of the newest QC(by view)
 // in concurrency safe way.
 type NewestQCTracker struct {
 	newestQC *atomic.UnsafePointer
@@ -42,12 +42,12 @@ func (t *NewestQCTracker) Track(qc *flow.QuorumCertificate) bool {
 }
 
 // NewestQC returns the newest QC(by view) tracked.
-// Concurrently safe
+// Concurrently safe.
 func (t *NewestQCTracker) NewestQC() *flow.QuorumCertificate {
 	return (*flow.QuorumCertificate)(t.newestQC.Load())
 }
 
-// NewestTCTracker is a helper structure which keeps track of the highest QC(by view)
+// NewestTCTracker is a helper structure which keeps track of the newest TC(by view)
 // in concurrency safe way.
 type NewestTCTracker struct {
 	newestTC *atomic.UnsafePointer
@@ -61,7 +61,7 @@ func NewNewestTCTracker() *NewestTCTracker {
 }
 
 // Track updates local state of NewestTC if the provided instance is newer(by view)
-// Concurrently safe
+// Concurrently safe.
 func (t *NewestTCTracker) Track(tc *flow.TimeoutCertificate) bool {
 	// to record the newest value that we have ever seen we need to use loop
 	// with CAS atomic operation to make sure that we always write the latest value
@@ -81,7 +81,7 @@ func (t *NewestTCTracker) Track(tc *flow.TimeoutCertificate) bool {
 }
 
 // NewestTC returns the newest TC(by view) tracked.
-// Concurrently safe
+// Concurrently safe.
 func (t *NewestTCTracker) NewestTC() *flow.TimeoutCertificate {
 	return (*flow.TimeoutCertificate)(t.newestTC.Load())
 }
