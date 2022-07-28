@@ -41,17 +41,14 @@ func TestEngineClosingChannel(t *testing.T) {
 // TestProcessAttackerMessage_EmptyEgressIngressMessage checks that corruptible network returns an error
 // if both egress and ingress messages are nil.
 func TestProcessAttackerMessage_EmptyEgressIngressMessage(t *testing.T) {
-	//var loggerHook unittest.LoggerHook
-	//logger, loggerHook := unittest.HookedLogger()
 	logger, _ := unittest.HookedLogger()
 
 	if os.Getenv("BE_CRASHER") == "1" {
-		//os.Exit(1)
 		withCorruptibleNetwork(t, logger,
 			func(
 				corruptedId flow.Identity, // identity of ccf
 				corruptibleNetwork *Network,
-				adapter *mocknetwork.Adapter, // mock adapter that ccf uses to communicate with authorized flow nodes.
+				adapter *mocknetwork.Adapter,                                           // mock adapter that ccf uses to communicate with authorized flow nodes.
 				stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that attack network uses to send messages to this ccf.
 			) {
 				// creates a corrupted event that attacker is sending on the flow network through the
@@ -82,19 +79,6 @@ func TestProcessAttackerMessage_EmptyEgressIngressMessage(t *testing.T) {
 				require.NoError(t, stream.Send(msg))
 				t.Logf("TestProcessAttackerMessage_EmptyEgressIngressMessage>2")
 
-				//msg.Ingress = nil
-				//msg.Egress = nil
-				//
-				//require.NoError(t, stream.Send(msg))
-				//
-				//msg.Ingress = nil
-				//msg.Egress = nil
-				//
-				//require.NoError(t, stream.Send(msg))
-				//require.NoError(t, stream.Send(msg))
-				//require.NoError(t, stream.Send(msg))
-				//require.NoError(t, stream.Context().Err())
-
 				unittest.RequireReturnsBefore(
 					t,
 					corruptedEventDispatchedOnFlowNetWg.Wait,
@@ -107,40 +91,13 @@ func TestProcessAttackerMessage_EmptyEgressIngressMessage(t *testing.T) {
 	// Start the actual test in a different subprocess
 	cmd := exec.Command(os.Args[0], "-test.run=TestProcessAttackerMessage_EmptyEgressIngressMessage")
 	cmd.Env = append(os.Environ(), "BE_CRASHER=1")
-	//stdout, err := cmd.StdoutPipe()
 
-	//require.NoError(t, err)
-	//stderr, err := cmd.StderrPipe()
-	//require.NoError(t, err)
-
-	// expect error from run
-	//err = cmd.Run()
 	outBytes, err := cmd.Output()
+	// expect error from run
 	require.Error(t, err)
 	require.Contains(t, "exit status 1", err.Error())
+
+	// expect log.fatal() message to be pushed to stdout
 	outStr := string(outBytes)
 	require.Contains(t, outStr, "both ingress and egress messages can't be nil")
-	//if err := cmd.Start(); err != nil {
-	//	t.Fatal(err)
-	//}
-
-	// Check that the log fatal message is what we expected
-	//gotBytes, err := ioutil.ReadAll(stderr)
-	//require.NoError(t, err)
-	//got := string(gotBytes)
-	//require.Equal(t, "", got)
-
-	//stdoutBytes, err := ioutil.ReadAll(stdout)
-	//require.NoError(t, err)
-	//stdoutStr := string(stdoutBytes)
-	//require.Contains(t, stdoutStr, "both ingress and egress messages can't be nil")
-
-	//require.Contains(t, loggerHook.Logs(), "both ingress and egress messages can't be nil")
-
-	// Check that the program exited
-	//err = cmd.Wait()
-	//require.Contains(t, "exit status 1", err.Error())
-	//if e, ok := err.(*exec.ExitError); !ok || e.Success() {
-	//	t.Fatalf("Process ran with err %v, want exit status 1", err)
-	//}
 }
