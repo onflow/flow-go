@@ -18,35 +18,31 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestStoreAndRetrieveComputationResult(t *testing.T) {
+func TestUpsertAndRetrieveComputationResult(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		expected := generateComputationResult(t)
 		crStorage := bstorage.NewComputationResultUploadStatus(db)
 		crId := expected.ExecutableBlock.ID()
 
-		// True case
+		// True case - insert
 		testUploadStatus := true
-		err := crStorage.Store(crId, testUploadStatus)
+		err := crStorage.Upsert(crId, testUploadStatus)
 		require.NoError(t, err)
 
 		actualUploadStatus, err := crStorage.ByID(crId)
 		require.NoError(t, err)
 
-		assert.Equal(t, actualUploadStatus, actualUploadStatus)
+		assert.Equal(t, testUploadStatus, actualUploadStatus)
 
-		// remove it first
-		err = crStorage.Remove(crId)
-		require.NoError(t, err)
-
-		// False case
+		// False case - update
 		testUploadStatus = false
-		err = crStorage.Store(crId, testUploadStatus)
+		err = crStorage.Upsert(crId, testUploadStatus)
 		require.NoError(t, err)
 
 		actualUploadStatus, err = crStorage.ByID(crId)
 		require.NoError(t, err)
 
-		assert.Equal(t, actualUploadStatus, actualUploadStatus)
+		assert.Equal(t, testUploadStatus, actualUploadStatus)
 	})
 }
 
@@ -58,7 +54,7 @@ func TestRemoveComputationResults(t *testing.T) {
 			crStorage := bstorage.NewComputationResultUploadStatus(db)
 
 			testUploadStatus := true
-			err := crStorage.Store(crId, testUploadStatus)
+			err := crStorage.Upsert(crId, testUploadStatus)
 			require.NoError(t, err)
 
 			_, err = crStorage.ByID(crId)
@@ -88,7 +84,7 @@ func TestListComputationResults(t *testing.T) {
 			for _, cr := range expected {
 				crId := cr.ExecutableBlock.ID()
 				expectedIDs[crId.String()] = true
-				err := crStorage.Store(crId, true)
+				err := crStorage.Upsert(crId, true)
 				require.NoError(t, err)
 			}
 

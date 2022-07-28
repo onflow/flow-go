@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -439,6 +440,9 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 					computationResultUploadStatus,
 					executionDataService,
 					collector)
+				if retryableUploader == nil {
+					return nil, errors.New("failed to create ComputationResult upload status store")
+				}
 
 				blockDataUploaders = append(blockDataUploaders, retryableUploader)
 

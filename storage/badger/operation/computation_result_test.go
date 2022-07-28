@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
@@ -17,14 +18,14 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestInsertAndRetrieveComputationResultUpdateStatus(t *testing.T) {
+func TesUpdateAndRetrieveComputationResultUpdateStatus(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		expected := generateComputationResult(t)
 		expectedId := expected.ExecutableBlock.ID()
 
-		t.Run("Insert and Retrieve ComputationResult", func(t *testing.T) {
-			// True case
-			testUploadStatusVal := true
+		t.Run("Update existing ComputationResult", func(t *testing.T) {
+			// insert as False
+			testUploadStatusVal := false
 
 			err := db.Update(InsertComputationResultUploadStatus(expectedId, testUploadStatusVal))
 			require.NoError(t, err)
@@ -35,20 +36,24 @@ func TestInsertAndRetrieveComputationResultUpdateStatus(t *testing.T) {
 
 			assert.Equal(t, testUploadStatusVal, actualUploadStatus)
 
-			// remove for next test
-			err = db.Update(RemoveComputationResultUploadStatus(expectedId))
+			// update to True
+			testUploadStatusVal = true
+			err = db.Update(UpdateComputationResultUploadStatus(expectedId, testUploadStatusVal))
 			require.NoError(t, err)
 
-			// False case
-			testUploadStatusVal = false
-
-			err = db.Update(InsertComputationResultUploadStatus(expectedId, testUploadStatusVal))
-			require.NoError(t, err)
-
+			// check if value is updated
 			err = db.View(GetComputationResultUploadStatus(expectedId, &actualUploadStatus))
 			require.NoError(t, err)
 
 			assert.Equal(t, testUploadStatusVal, actualUploadStatus)
+		})
+
+		t.Run("Update non-existed ComputationResult", func(t *testing.T) {
+			testUploadStatusVal := true
+			randomFlowID := flow.Identifier{}
+			err := db.Update(UpdateComputationResultUploadStatus(randomFlowID, testUploadStatusVal))
+			require.Error(t, err)
+			require.Equal(t, err, storage.ErrNotFound)
 		})
 	})
 }

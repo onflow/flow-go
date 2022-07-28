@@ -16,6 +16,7 @@ type ToggleUploaderCommand struct{}
 
 func (t *ToggleUploaderCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 	enabled := req.ValidatorData.(bool)
+	// TODO(tony.zhang): unify these duplicated flags
 	computation.SetUploaderEnabled(enabled)
 	ingestion.SetUploaderEnabled(enabled)
 	return "ok", nil

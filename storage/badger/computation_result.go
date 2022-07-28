@@ -1,9 +1,12 @@
 package badger
 
 import (
+	"errors"
+
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
@@ -17,10 +20,18 @@ func NewComputationResultUploadStatus(db *badger.DB) *ComputationResultUploadSta
 	}
 }
 
-func (c *ComputationResultUploadStatus) Store(computationResultID flow.Identifier,
+func (c *ComputationResultUploadStatus) Upsert(executionDataId flow.Identifier,
 	wasUploadCompleted bool) error {
+	_, err := c.ByID(executionDataId)
+	if errors.Is(err, storage.ErrNotFound) {
+		return operation.RetryOnConflict(c.db.Update,
+			operation.InsertComputationResultUploadStatus(executionDataId, wasUploadCompleted))
+	} else if err != nil {
+		return err
+	}
+
 	return operation.RetryOnConflict(c.db.Update,
-		operation.InsertComputationResultUploadStatus(computationResultID, wasUploadCompleted))
+		operation.UpdateComputationResultUploadStatus(executionDataId, wasUploadCompleted))
 }
 
 func (c *ComputationResultUploadStatus) GetAllIDs() ([]flow.Identifier, error) {

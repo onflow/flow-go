@@ -10,8 +10,8 @@ import (
 //  - true as upload completed
 //
 type ComputationResultUploadStatus interface {
-	// Store inserts ComputationResult into persistent storage with given ID.
-	Store(computationResultID flow.Identifier, wasUploadCompleted bool) error
+	// Upsert inserts or updates ComputationResult into persistent storage with given ID.
+	Upsert(computationResultID flow.Identifier, wasUploadCompleted bool) error
 
 	// GetAllIDs returns all IDs of stored ComputationResult upload status.
 	GetAllIDs() ([]flow.Identifier, error)

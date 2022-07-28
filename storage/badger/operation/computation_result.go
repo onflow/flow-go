@@ -12,6 +12,12 @@ func InsertComputationResultUploadStatus(computationResultID flow.Identifier,
 	return insert(makePrefix(codeComputationResults, computationResultID), wasUploadCompleted)
 }
 
+// UpdateComputationResult updates given existing instance of ComputationResult in local BadgerDB.
+func UpdateComputationResultUploadStatus(computationResultID flow.Identifier,
+	wasUploadCompleted bool) func(*badger.Txn) error {
+	return update(makePrefix(codeComputationResults, computationResultID), wasUploadCompleted)
+}
+
 // RemoveComputationResult removes an instance of ComputationResult with given ID.
 func RemoveComputationResultUploadStatus(
 	computationResultID flow.Identifier) func(*badger.Txn) error {

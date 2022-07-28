@@ -2,7 +2,6 @@ package uploader
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/rs/zerolog/log"
 
@@ -23,7 +22,7 @@ type RetryableUploader interface {
 
 // BadgerRetryableUploader is the BadgerDB based implementation to RetryableUploader
 type BadgerRetryableUploader struct {
-	uploader           Uploader
+	uploader           *AsyncUploader
 	execDataService    state_synchronization.ExecutionDataService
 	unit               *engine.Unit
 	metrics            module.ExecutionMetrics
@@ -34,7 +33,7 @@ type BadgerRetryableUploader struct {
 }
 
 func NewBadgerRetryableUploader(
-	uploader Uploader,
+	uploader *AsyncUploader,
 	blocks storage.Blocks,
 	commits storage.Commits,
 	transactionResults storage.TransactionResults,
@@ -42,46 +41,42 @@ func NewBadgerRetryableUploader(
 	execDataService state_synchronization.ExecutionDataService,
 	metrics module.ExecutionMetrics) *BadgerRetryableUploader {
 
-	// check storage\eds interface params
+	// check params
+	if uploader == nil {
+		log.Error().Msg("nil uploader passed in")
+		return nil
+	}
 	if blocks == nil || commits == nil || transactionResults == nil ||
 		uploadStatusStore == nil || execDataService == nil {
-		panic("Not all storage parameters are valid")
+		log.Error().Msg("not all storage parameters are valid")
+		return nil
 	}
 
-	// NOTE: only AsyncUploader is supported for now.
-	switch uploader.(type) {
-	case *AsyncUploader:
-		// When Uploade() is successful, the stored ComputationResult in BadgerDB will be removed.
-		onCompleteCB := func(computationResult *execution.ComputationResult, err error) {
-			if err != nil {
-				log.Warn().Msg(fmt.Sprintf("ComputationResults upload failed with ID %s",
-					computationResult.ExecutionDataID))
-				return
-			}
-
-			if computationResult == nil {
-				log.Warn().Msg("nil ComputationResult parameter")
-				return
-			}
-
-			// Removing existing upload status from BadgerDB
-			if err = uploadStatusStore.Remove(computationResult.ExecutionDataID); err != nil {
-				log.Warn().Msg(fmt.Sprintf(
-					"ComputationResults with ID %s failed to be removed on local storage. ERR: %s ",
-					computationResult.ExecutionDataID.String(), err.Error()))
-			}
-			// Store upload status as Done(true) anyway
-			if err := uploadStatusStore.Store(computationResult.ExecutionDataID,
-				true /*upload complete*/); err != nil {
-				log.Warn().Msg(fmt.Sprintf(
-					"ComputationResults with ID %s failed to be stored on local disk. ERR: %s ",
-					computationResult.ExecutionDataID.String(), err.Error()))
-			}
-
-			metrics.ExecutionComputationResultUploaded()
+	// When Upload() is successful, the stored ComputationResult in BadgerDB will be removed.
+	onCompleteCB := func(computationResult *execution.ComputationResult, err error) {
+		if computationResult == nil {
+			log.Warn().Msg("nil ComputationResult parameter")
+			return
 		}
-		uploader.(*AsyncUploader).SetOnCompleteCallback(onCompleteCB)
+
+		if err != nil {
+			log.Warn().Msgf("ComputationResults upload failed with ID %s",
+				computationResult.ExecutionDataID)
+			return
+		}
+
+		// Update upload status as Done(true)
+		if err := uploadStatusStore.Upsert(computationResult.ExecutionDataID,
+			true /*upload complete*/); err != nil {
+			log.Warn().Msgf(
+				"ComputationResults with ID %s failed to be updated on local disk. ERR: %s ",
+				computationResult.ExecutionDataID.String(), err.Error())
+		}
+
+		metrics.ExecutionComputationResultUploaded()
 	}
+
+	uploader.SetOnCompleteCallback(onCompleteCB)
 
 	return &BadgerRetryableUploader{
 		uploader:           uploader,
@@ -96,21 +91,11 @@ func NewBadgerRetryableUploader(
 }
 
 func (b *BadgerRetryableUploader) Ready() <-chan struct{} {
-	switch b.uploader.(type) {
-	case module.ReadyDoneAware:
-		readyDoneAwareUploader := b.uploader.(module.ReadyDoneAware)
-		return readyDoneAwareUploader.Ready()
-	}
-	return b.unit.Ready()
+	return b.uploader.Ready()
 }
 
 func (b *BadgerRetryableUploader) Done() <-chan struct{} {
-	switch b.uploader.(type) {
-	case module.ReadyDoneAware:
-		readyDoneAwareUploader := b.uploader.(module.ReadyDoneAware)
-		return readyDoneAwareUploader.Done()
-	}
-	return b.unit.Done()
+	return b.uploader.Done()
 }
 
 func (b *BadgerRetryableUploader) Upload(computationResult *execution.ComputationResult) error {
@@ -120,13 +105,9 @@ func (b *BadgerRetryableUploader) Upload(computationResult *execution.Computatio
 
 	// Before upload we store ComputationResult upload status to BadgerDB as false before upload is done.
 	// It will be marked as true when upload completes.
-	_, err := b.uploadStatusStore.ByID(computationResult.ExecutionDataID)
-	if err == storage.ErrNotFound {
-		if err := b.uploadStatusStore.Store(computationResult.ExecutionDataID, false /*not completed*/); err != nil {
-			log.Warn().Msg(
-				fmt.Sprintf("failed to store ComputationResult into local DB with ID %s",
-					computationResult.ExecutionDataID))
-		}
+	if err := b.uploadStatusStore.Upsert(computationResult.ExecutionDataID, false /*not completed*/); err != nil {
+		log.Warn().Msgf("failed to store ComputationResult into local DB with ID %s",
+			computationResult.ExecutionDataID)
 	}
 
 	return b.uploader.Upload(computationResult)
@@ -143,8 +124,8 @@ func (b *BadgerRetryableUploader) RetryUpload() error {
 		// Load stored ComputationResult upload status from BadgerDB
 		wasUploadCompleted, cr_err := b.uploadStatusStore.ByID(executionDataID)
 		if cr_err != nil {
-			log.Error().Err(cr_err).Msg(
-				fmt.Sprintf("Failed to load ComputationResult from local DB with ID %s", executionDataID))
+			log.Error().Err(cr_err).Msgf(
+				"Failed to load ComputationResult from local DB with ID %s", executionDataID)
 			retErr = cr_err
 			continue
 		}
@@ -153,15 +134,15 @@ func (b *BadgerRetryableUploader) RetryUpload() error {
 			retComputationResult, err := b.reconstructComputationResultFromEDS(executionDataID)
 			if err != nil {
 				err = cr_err
-				log.Error().Err(err).Msg(
-					fmt.Sprintf("failed to reconstruct ComputationResult with ID %s", executionDataID))
+				log.Error().Err(err).Msgf(
+					"failed to reconstruct ComputationResult with ID %s", executionDataID)
 				continue
 			}
 
 			// Do Upload
 			if cr_err = b.uploader.Upload(retComputationResult); cr_err != nil {
-				log.Error().Err(cr_err).Msg(
-					fmt.Sprintf("Failed to update ComputationResult with ID %s", executionDataID))
+				log.Error().Err(cr_err).Msgf(
+					"Failed to update ComputationResult with ID %s", executionDataID)
 				retErr = cr_err
 			}
 
@@ -179,23 +160,23 @@ func (b *BadgerRetryableUploader) reconstructComputationResultFromEDS(
 	// retrieving ExecutionData from EDS
 	executionData, err := b.execDataService.Get(b.unit.Ctx(), executionDataID)
 	if executionData == nil || err != nil {
-		log.Error().Err(err).Msg(
-			fmt.Sprintf("failed to retrieve BlockData from EDS with ID %s", executionDataID))
+		log.Error().Err(err).Msgf(
+			"failed to retrieve BlockData from EDS with ID %s", executionDataID.String())
 		return nil, err
 	}
 
 	// grabbing TrieUpdates from ExecutionData
 	trieUpdates := executionData.TrieUpdates
 	if trieUpdates == nil {
-		log.Warn().Msg(
-			fmt.Sprintf("EDS returns nil trieUpdates for entry with ID %s", executionDataID))
+		log.Warn().Msgf(
+			"EDS returns nil trieUpdates for entry with ID %s", executionDataID.String())
 	}
 
 	// grabbing events from ExecutionData
 	events := executionData.Events
 	if events == nil {
-		log.Warn().Msg(
-			fmt.Sprintf("EDS returns nil events for entry with ID %s", executionDataID))
+		log.Warn().Msgf(
+			"EDS returns nil events for entry with ID %s", executionDataID.String())
 	}
 
 	blockID := executionData.BlockID
@@ -203,15 +184,18 @@ func (b *BadgerRetryableUploader) reconstructComputationResultFromEDS(
 	// retrieving Block from local BadgerDB
 	block, err := b.blocks.ByID(blockID)
 	if err != nil {
-		log.Warn().Msg(
-			fmt.Sprintf("failed to retrieve Block with BlockID %s. Error: %s", blockID, err.Error()))
+		log.Warn().Msgf(
+			"failed to retrieve Block with BlockID %s. Error: %s", blockID.String(), err.Error())
 	}
 
 	// grabbing collections from ExecutionData and collection guarantees from block
 	// NOTE: we are assuming collection array stored on EDS has the same size\order
 	//		 as the guarantees array stored in local storage.
 	collections := executionData.Collections
-	guarantees := block.Payload.Guarantees
+	guarantees := make([]*flow.CollectionGuarantee, 0)
+	if block != nil && block.Payload != nil {
+		guarantees = block.Payload.Guarantees
+	}
 
 	completeCollections := make(map[flow.Identifier]*entity.CompleteCollection)
 	if len(collections) == len(guarantees) {
@@ -222,8 +206,8 @@ func (b *BadgerRetryableUploader) reconstructComputationResultFromEDS(
 			}
 		}
 	} else {
-		log.Warn().Msg(
-			fmt.Sprintf("sizes of collection array and guarantee array don't match. BlockID %s", blockID))
+		log.Warn().Msgf(
+			"sizes of collection array and guarantee array don't match. BlockID %s", blockID.String())
 	}
 
 	executableBlock := &entity.ExecutableBlock{
@@ -234,15 +218,14 @@ func (b *BadgerRetryableUploader) reconstructComputationResultFromEDS(
 	// retrieving TransactionResults from BadgerDB
 	transactionResults, err := b.transactionResults.ByBlockID(blockID)
 	if err != nil {
-		log.Warn().Msg(
-			fmt.Sprintf("failed to retrieve TransactionResults with BlockID %s. Error: %s", blockID, err.Error()))
+		log.Warn().Msgf(
+			"failed to retrieve TransactionResults with BlockID %s. Error: %s", blockID.String(), err.Error())
 	}
 
 	// retrieving CommitStatement from BadgerDB
 	endState, err := b.commits.ByBlockID(blockID)
 	if err != nil {
-		log.Warn().Msg(
-			fmt.Sprintf("failed to retrieve StateCommitment with BlockID %s. Error: %s", blockID, err.Error()))
+		log.Warn().Msgf("failed to retrieve StateCommitment with BlockID %s. Error: %s", blockID.String(), err.Error())
 	}
 	stateCommitments := []flow.StateCommitment{
 		endState,

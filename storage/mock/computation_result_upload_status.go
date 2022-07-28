@@ -70,8 +70,8 @@ func (_m *ComputationResultUploadStatus) Remove(computationResultID flow.Identif
 	return r0
 }
 
-// Store provides a mock function with given fields: computationResultID, wasUploadCompleted
-func (_m *ComputationResultUploadStatus) Store(computationResultID flow.Identifier, wasUploadCompleted bool) error {
+// Upsert provides a mock function with given fields: computationResultID, wasUploadCompleted
+func (_m *ComputationResultUploadStatus) Upsert(computationResultID flow.Identifier, wasUploadCompleted bool) error {
 	ret := _m.Called(computationResultID, wasUploadCompleted)
 
 	var r0 error

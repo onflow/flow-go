@@ -38,6 +38,7 @@ func NewAsyncUploader(uploader Uploader,
 
 // AsyncUploader wraps up another Uploader instance and make its upload asynchronous
 type AsyncUploader struct {
+	module.ReadyDoneAware
 	unit                *engine.Unit
 	uploader            Uploader
 	log                 zerolog.Logger
