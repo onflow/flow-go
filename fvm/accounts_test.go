@@ -1285,7 +1285,7 @@ func TestAccountBalanceFields(t *testing.T) {
 			fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())),
 			fvm.WithCadenceLogging(true),
 		).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, _ state.View, programs *programs.Programs) {
 				address := chain.ServiceAddress()
 
 				script := fvm.Script([]byte(fmt.Sprintf(`
@@ -1295,8 +1295,11 @@ func TestAccountBalanceFields(t *testing.T) {
 					}
 				`, address)))
 
-				view = delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
-					return nil, fmt.Errorf("error getting register %s, %s", flow.BytesToAddress([]byte(owner)).Hex(), key)
+				view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
+					if key == state.KeyAccountStatus {
+						return nil, fmt.Errorf("error getting register %s, %s", flow.BytesToAddress([]byte(owner)).Hex(), key)
+					}
+					return nil, nil
 				})
 
 				err := vm.Run(ctx, script, view, programs)
@@ -1495,7 +1498,10 @@ func TestGetStorageCapacity(t *testing.T) {
 				`, address)))
 
 				view = delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
-					return nil, fmt.Errorf("error getting register %s, %s", flow.BytesToAddress([]byte(owner)).Hex(), key)
+					if key == state.KeyAccountStatus {
+						return nil, fmt.Errorf("error getting register %s, %s", flow.BytesToAddress([]byte(owner)).Hex(), key)
+					}
+					return nil, nil
 				})
 
 				err := vm.Run(ctx, script, view, programs)

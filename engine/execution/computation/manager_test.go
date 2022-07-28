@@ -581,7 +581,8 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 	programs := programs.NewEmptyPrograms()
 	st := state.NewState(view)
 	sth := state.NewStateHolder(st)
-	env := fvm.NewScriptEnvironment(context.Background(), ctx, vm, sth, programs)
+	env, err := fvm.NewScriptEnvironment(context.Background(), ctx, vm, sth, programs)
+	require.NoError(t, err)
 
 	// Create an account private key.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)

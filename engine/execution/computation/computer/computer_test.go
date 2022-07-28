@@ -554,6 +554,18 @@ type testRuntime struct {
 	readStored         func(common.Address, cadence.Path, runtime.Context) (cadence.Value, error)
 }
 
+func (e *testRuntime) NewScriptExecutor(script runtime.Script, c runtime.Context) runtime.Executor {
+	panic("NewScriptExecutor not expected")
+}
+
+func (e *testRuntime) NewTransactionExecutor(script runtime.Script, c runtime.Context) runtime.Executor {
+	panic("NewTransactionExecutor not expected")
+}
+
+func (e *testRuntime) NewContractFunctionExecutor(contractLocation common.AddressLocation, functionName string, arguments []cadence.Value, argumentTypes []sema.Type, context runtime.Context) runtime.Executor {
+	panic("NewContractFunctionExecutor not expected")
+}
+
 var _ runtime.Runtime = &testRuntime{}
 
 func (e *testRuntime) SetInvalidatedResourceValidationEnabled(_ bool) {
@@ -568,7 +580,7 @@ func (e *testRuntime) SetResourceOwnerChangeHandlerEnabled(_ bool) {
 	panic("SetResourceOwnerChangeHandlerEnabled not expected")
 }
 
-func (e *testRuntime) InvokeContractFunction(_ common.AddressLocation, _ string, _ []interpreter.Value, _ []sema.Type, _ runtime.Context) (cadence.Value, error) {
+func (e *testRuntime) InvokeContractFunction(_ common.AddressLocation, _ string, _ []cadence.Value, _ []sema.Type, _ runtime.Context) (cadence.Value, error) {
 	panic("InvokeContractFunction not expected")
 }
 
@@ -624,6 +636,10 @@ func (r *RandomAddressGenerator) Bytes() []byte {
 
 func (r *RandomAddressGenerator) AddressCount() uint64 {
 	panic("not implemented")
+}
+
+func (testRuntime) Storage(runtime.Context) (*runtime.Storage, *interpreter.Interpreter, error) {
+	panic("Storage not expected")
 }
 
 type FixedAddressGenerator struct {

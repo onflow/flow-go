@@ -55,7 +55,7 @@ func NewFinalizer(db *badger.DB,
 func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 
 	span, ctx, _ := f.tracer.StartBlockSpan(context.Background(), blockID, trace.CONFinalizerFinalizeBlock)
-	defer span.Finish()
+	defer span.End()
 
 	// STEP ONE: This is an idempotent operation. In case we are trying to
 	// finalize a block that is already below finalized height, we want to do
