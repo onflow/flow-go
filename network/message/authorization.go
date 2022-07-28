@@ -80,8 +80,9 @@ func initializeMessageAuthConfigsMap() {
 			return new(messages.SyncResponse)
 		},
 		Config: map[channels.Channel]flow.RoleList{
-			channels.SyncCommittee:     {flow.RoleConsensus},
-			channels.SyncClusterPrefix: {flow.RoleCollection},
+			channels.PublicSyncCommittee: {flow.RoleAccess},
+			channels.SyncCommittee:       {flow.RoleConsensus},
+			channels.SyncClusterPrefix:   {flow.RoleCollection},
 		},
 	}
 	authorizationConfigs[RangeRequest] = MsgAuthConfig{
@@ -110,7 +111,8 @@ func initializeMessageAuthConfigsMap() {
 			return new(messages.BlockResponse)
 		},
 		Config: map[channels.Channel]flow.RoleList{
-			channels.SyncCommittee: {flow.RoleConsensus},
+			channels.PublicSyncCommittee: {flow.RoleAccess},
+			channels.SyncCommittee:       {flow.RoleConsensus},
 		},
 	}
 
