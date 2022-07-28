@@ -92,20 +92,26 @@ func TestState_InteractionMeasuring(t *testing.T) {
 	meter := metering.NewMeter(math.MaxUint64, math.MaxUint64)
 	st := state.NewState(view, meter)
 
+	addr := "address"
 	key := "key1"
 	value := createByteArray(1)
-	err := st.Set("address", key, value, true)
-	keySize := uint64(len("address") + len(key))
-	size := keySize + uint64(len(value))
+	err := st.Set(addr, key, value, true)
+	keySize := uint64(len(addr) + len(key))
+	numWritten := keySize + uint64(len(value))
 	require.NoError(t, err)
-	require.Equal(t, uint64(0), st.ReadCounter)
 	require.Equal(t, uint64(0), st.TotalBytesRead)
-	require.Equal(t, uint64(1), st.WriteCounter)
-	require.Equal(t, size, st.TotalBytesWritten)
+	require.Equal(t, numWritten, st.TotalBytesWritten)
+
+	// unlimited write shouldn't count against TotalBytesWritten
+	noLimitKey := "no-limit-key"
+	err = st.Set(addr, noLimitKey, createByteArray(1000), false)
+	require.NoError(t, err)
+	require.Equal(t, uint64(0), st.TotalBytesRead)
+	require.Equal(t, numWritten, st.TotalBytesWritten)
 
 	// should read from the delta
 	// should not impact totalBytesRead
-	v, err := st.Get("address", key, true)
+	v, err := st.Get(addr, key, true)
 	require.NoError(t, err)
 	require.Equal(t, v, value)
 	require.Equal(t, uint64(0), st.TotalBytesRead)
@@ -113,9 +119,15 @@ func TestState_InteractionMeasuring(t *testing.T) {
 	// non existing key
 	// should be counted towards reading from the ledger
 	key2 := "key2"
-	_, err = st.Get("address", key2, true)
+	numRead := keySize
+	_, err = st.Get(addr, key2, true)
 	require.NoError(t, err)
-	require.Equal(t, keySize, st.TotalBytesRead)
+	require.Equal(t, numRead, st.TotalBytesRead)
+
+	// unlimited read shouldn't count against TotalBytesRead
+	_, err = st.Get(addr, noLimitKey, false)
+	require.NoError(t, err)
+	require.Equal(t, numRead, st.TotalBytesRead)
 }
 
 func TestState_MaxValueSize(t *testing.T) {

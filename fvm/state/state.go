@@ -35,8 +35,6 @@ type State struct {
 	maxKeySizeAllowed     uint64
 	maxValueSizeAllowed   uint64
 	maxInteractionAllowed uint64
-	ReadCounter           uint64
-	WriteCounter          uint64
 	TotalBytesRead        uint64
 	TotalBytesWritten     uint64
 }
@@ -119,13 +117,12 @@ func (s *State) Get(owner, key string, enforceLimit bool) (flow.RegisterValue, e
 		return nil, fmt.Errorf("failed to read key %s on account %s: %w", PrintableKey(key), hex.EncodeToString([]byte(owner)), getError)
 	}
 
-	// if not part of recent updates count them as read
-	if _, ok := s.updateSize[mapKey{owner, key}]; !ok {
-		s.ReadCounter++
-		s.TotalBytesRead += uint64(len(owner) + len(key) + len(value))
-	}
-
 	if enforceLimit {
+		// if not part of recent updates count them as read
+		if _, ok := s.updateSize[mapKey{owner, key}]; !ok {
+			s.TotalBytesRead += uint64(len(owner) + len(key) + len(value))
+		}
+
 		return value, s.checkMaxInteraction()
 	}
 
@@ -147,26 +144,23 @@ func (s *State) Set(owner, key string, value flow.RegisterValue, enforceLimit bo
 		return fmt.Errorf("failed to update key %s on account %s: %w", PrintableKey(key), hex.EncodeToString([]byte(owner)), setError)
 	}
 
-	if enforceLimit {
-		if err := s.checkMaxInteraction(); err != nil {
-			return err
-		}
-	}
-
 	if address, isAddress := addressFromOwner(owner); isAddress {
 		s.updatedAddresses[address] = struct{}{}
 	}
 
-	mapKey := mapKey{owner, key}
-	if old, ok := s.updateSize[mapKey]; ok {
-		s.WriteCounter--
-		s.TotalBytesWritten -= old
-	}
+	if enforceLimit {
+		updateSize := uint64(len(owner) + len(key) + len(value))
+		mapKey := mapKey{owner, key}
+		// NOTE: to avoid uint64 underflow, we need to update TotalBytesWritten
+		// in two separate step.
+		s.TotalBytesWritten -= s.updateSize[mapKey]
+		s.TotalBytesWritten += updateSize
+		s.updateSize[mapKey] = updateSize
 
-	updateSize := uint64(len(owner) + len(key) + len(value))
-	s.WriteCounter++
-	s.TotalBytesWritten += updateSize
-	s.updateSize[mapKey] = updateSize
+		if err := s.checkMaxInteraction(); err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
@@ -255,8 +249,6 @@ func (s *State) MergeState(other *State, enforceLimit bool) error {
 	}
 
 	// update ledger interactions
-	s.ReadCounter += other.ReadCounter
-	s.WriteCounter += other.WriteCounter
 	s.TotalBytesRead += other.TotalBytesRead
 	s.TotalBytesWritten += other.TotalBytesWritten
 
