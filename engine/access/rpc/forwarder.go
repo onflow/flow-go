@@ -7,6 +7,47 @@ import (
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 )
 
+type HandlerMetrics interface {
+	Record(handlerName, rpcName string, err, fallback bool)
+}
+
+type Handler[Request any, Response any] func(ctx context.Context, r Request) (Response, error)
+
+type ObserverHandler[Request any, Response any] struct {
+	HandlerMetrics
+	Name            string
+	ForwardOnly     bool
+	ForwardFallback bool
+	Upstream        Handler[Request, Response]
+	Local           Handler[Request, Response]
+}
+
+func (handler *ObserverHandler[Request, Response]) Call(ctx context.Context, r Request) (Response, error) {
+	if handler.ForwardOnly {
+		return handler.callUpstream(ctx, r, false)
+	}
+
+	res, err := handler.callLocal(ctx, r)
+
+	if err != nil && handler.ForwardFallback {
+		return handler.callUpstream(ctx, r, false)
+	}
+
+	return res, err
+}
+
+func (handler *ObserverHandler[Request, Response]) callUpstream(ctx context.Context, r Request, fallback bool) (Response, error) {
+	res, err := handler.Upstream(ctx, r)
+	handler.Record("upstream", handler.Name, err != nil, true)
+	return res, err
+}
+
+func (handler *ObserverHandler[Request, Response]) callLocal(ctx context.Context, r Request) (Response, error) {
+	res, err := handler.Local(ctx, r)
+	handler.Record("local", handler.Name, err != nil, false)
+	return res, err
+}
+
 type Forwarder struct {
 	UpstreamHandler accessproto.AccessAPIClient
 }
