@@ -639,6 +639,7 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 	edCache.On("Insert", mock.AnythingOfType("*flow.Header"), mock.AnythingOfType("BlobTree"))
 
 	engine := &Manager{
+		tracer:        trace.NewNoopTracer(),
 		blockComputer: blockComputer,
 		me:            me,
 		programsCache: programsCache,
