@@ -3,7 +3,6 @@ package fvm
 import (
 	"encoding/hex"
 	"fmt"
-	"time"
 
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
@@ -12,7 +11,6 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"go.opentelemetry.io/otel/attribute"
-	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/errors"
@@ -85,10 +83,6 @@ type commonEnv struct {
 	accountKeys   *handler.AccountKeyHandler
 	contracts     *handler.ContractHandler
 	uuidGenerator *state.UUIDGenerator
-	metrics       *handler.MetricsHandler
-
-	// TODO(patrick): switch to EnvContext's start span api.
-	traceSpan otelTrace.Span
 }
 
 // TODO(patrick): rm once Meter object has been refactored
@@ -118,11 +112,6 @@ func (env *commonEnv) Context() *Context {
 
 func (env *commonEnv) VM() *VirtualMachine {
 	return env.vm
-}
-
-// TODO(patrick): switch to EnvContext's start span api.
-func (env *commonEnv) isTraceable() bool {
-	return env.ctx.Tracer != nil && env.traceSpan != nil
 }
 
 func (env *commonEnv) GenerateUUID() (uint64, error) {
@@ -419,42 +408,6 @@ func (env *commonEnv) DecodeArgument(b []byte, _ cadence.Type) (cadence.Value, e
 	}
 
 	return v, err
-}
-
-func (env *commonEnv) RecordTrace(operation string, location common.Location, duration time.Duration, attrs []attribute.KeyValue) {
-	if !env.isTraceable() {
-		return
-	}
-	if location != nil {
-		attrs = append(attrs, attribute.String("location", location.String()))
-	}
-	spanName := trace.FVMCadenceTrace.Child(operation)
-	env.ctx.Tracer.RecordSpanFromParent(env.traceSpan, spanName, duration, attrs)
-}
-
-func (env *commonEnv) ProgramParsed(location common.Location, duration time.Duration) {
-	env.RecordTrace("parseProgram", location, duration, nil)
-	env.metrics.ProgramParsed(location, duration)
-}
-
-func (env *commonEnv) ProgramChecked(location common.Location, duration time.Duration) {
-	env.RecordTrace("checkProgram", location, duration, nil)
-	env.metrics.ProgramChecked(location, duration)
-}
-
-func (env *commonEnv) ProgramInterpreted(location common.Location, duration time.Duration) {
-	env.RecordTrace("interpretProgram", location, duration, nil)
-	env.metrics.ProgramInterpreted(location, duration)
-}
-
-func (env *commonEnv) ValueEncoded(duration time.Duration) {
-	env.RecordTrace("encodeValue", nil, duration, nil)
-	env.metrics.ValueEncoded(duration)
-}
-
-func (env *commonEnv) ValueDecoded(duration time.Duration) {
-	env.RecordTrace("decodeValue", nil, duration, nil)
-	env.metrics.ValueDecoded(duration)
 }
 
 // Commit commits changes and return a list of updated keys

@@ -163,7 +163,7 @@ func (i *TransactionInvoker) Process(
 		// so we don't error from computation/memory limits on this part.
 		// We cannot charge the user for this part, since fee deduction already happened.
 		sth.DisableAllLimitEnforcements()
-		txError = NewTransactionStorageLimiter().CheckLimits(env, sth.State().UpdatedAddresses())
+		txError = NewTransactionStorageLimiter().CheckLimits(env.ctx, env, sth.State().UpdatedAddresses())
 		sth.EnableAllLimitEnforcements()
 	}
 
@@ -244,8 +244,8 @@ func (i *TransactionInvoker) deductTransactionFees(
 	// dynamic.	Execution effort will be connected to computation used.
 	inclusionEffort := uint64(100_000_000)
 	_, err = InvokeDeductTransactionFeesContract(
+		env.ctx,
 		env,
-		proc.TraceSpan,
 		proc.Transaction.Payer,
 		inclusionEffort,
 		computationUsed)
