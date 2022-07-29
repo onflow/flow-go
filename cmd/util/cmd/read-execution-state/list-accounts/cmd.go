@@ -13,7 +13,7 @@ import (
 
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
-	"github.com/onflow/flow-go/fvm/meter/weighted"
+	metering "github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
@@ -99,7 +99,7 @@ func run(*cobra.Command, []string) {
 		return values[0], nil
 	})
 
-	meter := weighted.NewMeter(math.MaxUint64, math.MaxUint64)
+	meter := metering.NewMeter(math.MaxUint64, math.MaxUint64)
 	sth := state.NewStateHolder(state.NewState(ldg, meter))
 	accounts := state.NewAccounts(sth)
 	finalGenerator := state.NewStateBoundAddressGenerator(sth, chain)
