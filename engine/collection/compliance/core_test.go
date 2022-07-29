@@ -27,6 +27,12 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+func doneChan() <-chan struct{} {
+	c := make(chan struct{})
+	close(c)
+	return c
+}
+
 func TestComplianceCore(t *testing.T) {
 	suite.Run(t, new(ComplianceCoreSuite))
 }
@@ -188,7 +194,7 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalValidParent() {
 	// store the data for retrieval
 	cs.headerDB[block.Header.ParentID] = cs.head
 
-	cs.hotstuff.On("SubmitProposal", proposal.Header, cs.head.Header.View).Return()
+	cs.hotstuff.On("SubmitProposal", proposal.Header, cs.head.Header.View).Return(doneChan())
 
 	// it should be processed without error
 	err := cs.core.OnBlockProposal(originID, proposal)
@@ -230,7 +236,7 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalValidAncestor() {
 	cs.headerDB[parent.ID()] = &parent
 	cs.headerDB[ancestor.ID()] = &ancestor
 
-	cs.hotstuff.On("SubmitProposal", block.Header, parent.Header.View).Return()
+	cs.hotstuff.On("SubmitProposal", block.Header, parent.Header.View).Return(doneChan())
 
 	// it should be processed without error
 	err := cs.core.OnBlockProposal(originID, proposal)
@@ -313,10 +319,10 @@ func (cs *ComplianceCoreSuite) TestProcessBlockAndDescendants() {
 	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending2)
 	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending3)
 
-	cs.hotstuff.On("SubmitProposal", parent.Header, cs.head.Header.View).Return().Once()
-	cs.hotstuff.On("SubmitProposal", block1.Header, parent.Header.View).Return().Once()
-	cs.hotstuff.On("SubmitProposal", block2.Header, parent.Header.View).Return().Once()
-	cs.hotstuff.On("SubmitProposal", block3.Header, parent.Header.View).Return().Once()
+	cs.hotstuff.On("SubmitProposal", parent.Header, cs.head.Header.View).Return(doneChan()).Once()
+	cs.hotstuff.On("SubmitProposal", block1.Header, parent.Header.View).Return(doneChan()).Once()
+	cs.hotstuff.On("SubmitProposal", block2.Header, parent.Header.View).Return(doneChan()).Once()
+	cs.hotstuff.On("SubmitProposal", block3.Header, parent.Header.View).Return(doneChan()).Once()
 
 	// execute the connected children handling
 	err := cs.core.processBlockAndDescendants(proposal)
@@ -414,7 +420,7 @@ func (cs *ComplianceCoreSuite) TestProposalBufferingOrder() {
 			index++
 			cs.headerDB[header.ID()] = proposalsLookup[header.ID()]
 		},
-	)
+	).Return(doneChan())
 
 	missingProposal := &messages.ClusterBlockProposal{
 		Header:  missing.Header,
