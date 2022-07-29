@@ -43,6 +43,10 @@ func (tc *TrieCache) Purge() {
 	tc.lock.Lock()
 	defer tc.lock.Unlock()
 
+	if tc.count == 0 {
+		return
+	}
+
 	toEvict := 0
 	for i := 0; i < tc.capacity; i++ {
 		toEvict = (tc.tail + i) % tc.capacity
