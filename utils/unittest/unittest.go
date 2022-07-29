@@ -389,13 +389,13 @@ func NetworkCodec() network.Codec {
 
 // CrashTest safely tests functions that crash (as the expected behavior) by checking that running the function creates an error and
 // an expected error message.
-func CrashTest(t *testing.T, scenario func(), expectedErrorMsg string) {
+func CrashTest(t *testing.T, scenario func(t2 *testing.T), expectedErrorMsg string, testName string) {
 	if os.Getenv("CRASH_TEST") == "1" {
-		scenario()
+		scenario(t)
 		return
 	}
 
-	cmd := exec.Command(os.Args[0], "-test.run=CrashTest")
+	cmd := exec.Command(os.Args[0], "-test.run="+testName)
 	cmd.Env = append(os.Environ(), "CRASH_TEST=1")
 
 	outBytes, err := cmd.Output()
