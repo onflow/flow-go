@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestTrieCache(t *testing.T) {
@@ -149,6 +150,26 @@ func TestEvictCallBack(t *testing.T) {
 	tc.Push(trie3)
 
 	require.True(t, called)
+}
+
+func TestConcurrentAccess(t *testing.T) {
+
+	const worker = 50
+	const capacity = 100 // large enough to not worry evicts
+
+	tc := NewTrieCache(capacity, nil)
+
+	unittest.Concurrently(worker, func(i int) {
+		trie, err := randomMTrie()
+		require.NoError(t, err)
+		tc.Push(trie)
+
+		ret, found := tc.Get(trie.RootHash())
+		require.True(t, found)
+		require.Equal(t, trie, ret)
+	})
+
+	require.Equal(t, worker, tc.Count())
 }
 
 func randomMTrie() (*trie.MTrie, error) {
