@@ -4,12 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"go.uber.org/atomic"
 	"sync"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -17,8 +17,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
-
-var executionForkErr = fmt.Errorf("forked execution state detected") // sentinel error
 
 // ExecForkSuppressor is a wrapper around a conventional mempool.IncorporatedResultSeals
 // mempool. It implements the following mitigation strategy for execution forks:

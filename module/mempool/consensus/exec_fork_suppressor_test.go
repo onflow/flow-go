@@ -1,9 +1,6 @@
 package consensus
 
 import (
-	"github.com/onflow/flow-go/module/mempool/stdmap"
-	mockstorage "github.com/onflow/flow-go/storage/mock"
-	"go.uber.org/atomic"
 	"os"
 	"testing"
 
@@ -11,11 +8,14 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	actormock "github.com/onflow/flow-go/module/mempool/consensus/mock"
 	poolmock "github.com/onflow/flow-go/module/mempool/mock"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
+	mockstorage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
