@@ -160,7 +160,7 @@ func TestProcessAttackerMessage_MessageSentOnFlowNetwork(t *testing.T) {
 		) {
 			// creates a corrupted event that attacker is sending on the flow network through the
 			// corrupted conduit factory.
-			msg, event, _ := insecure.MessageFixture(t, cbor.NewCodec(), insecure.Protocol_MULTICAST, &message.TestMessage{
+			msg, event, _ := insecure.EgressMessageFixture(t, cbor.NewCodec(), insecure.Protocol_MULTICAST, &message.TestMessage{
 				Text: fmt.Sprintf("this is a test message: %d", rand.Int()),
 			})
 
@@ -203,7 +203,7 @@ func TestProcessAttackerMessage_ResultApproval_Dictated(t *testing.T) {
 			// corrupted result approval dictated by attacker needs to only have the attestation field, as the rest will be
 			// filled up by the CCF.
 			dictatedAttestation := *unittest.AttestationFixture()
-			msg, _, _ := insecure.MessageFixture(t, cbor.NewCodec(), insecure.Protocol_PUBLISH, &flow.ResultApproval{
+			msg, _, _ := insecure.EgressMessageFixture(t, cbor.NewCodec(), insecure.Protocol_PUBLISH, &flow.ResultApproval{
 				Body: flow.ResultApprovalBody{
 					Attestation: dictatedAttestation,
 				},
@@ -273,7 +273,7 @@ func TestProcessAttackerMessage_ResultApproval_PassThrough(t *testing.T) {
 		) {
 
 			passThroughApproval := unittest.ResultApprovalFixture()
-			msg, _, _ := insecure.MessageFixture(t, cbor.NewCodec(), insecure.Protocol_PUBLISH, passThroughApproval)
+			msg, _, _ := insecure.EgressMessageFixture(t, cbor.NewCodec(), insecure.Protocol_PUBLISH, passThroughApproval)
 
 			params := []interface{}{channels.Channel(msg.Egress.ChannelID), mock.Anything}
 			targetIds, err := flow.ByteSlicesToIds(msg.Egress.TargetIDs)
@@ -320,7 +320,7 @@ func TestProcessAttackerMessage_ExecutionReceipt_Dictated(t *testing.T) {
 			// corrupted execution receipt dictated by attacker needs to only have the result field, as the rest will be
 			// filled up by the CCF.
 			dictatedResult := *unittest.ExecutionResultFixture()
-			msg, _, _ := insecure.MessageFixture(t, cbor.NewCodec(), insecure.Protocol_PUBLISH, &flow.ExecutionReceipt{
+			msg, _, _ := insecure.EgressMessageFixture(t, cbor.NewCodec(), insecure.Protocol_PUBLISH, &flow.ExecutionReceipt{
 				ExecutionResult: dictatedResult,
 			})
 
@@ -377,7 +377,7 @@ func TestProcessAttackerMessage_ExecutionReceipt_PassThrough(t *testing.T) {
 		) {
 
 			passThroughReceipt := unittest.ExecutionReceiptFixture()
-			msg, _, _ := insecure.MessageFixture(t, cbor.NewCodec(), insecure.Protocol_PUBLISH, passThroughReceipt)
+			msg, _, _ := insecure.EgressMessageFixture(t, cbor.NewCodec(), insecure.Protocol_PUBLISH, passThroughReceipt)
 
 			params := []interface{}{channels.Channel(msg.Egress.ChannelID), mock.Anything}
 			targetIds, err := flow.ByteSlicesToIds(msg.Egress.TargetIDs)

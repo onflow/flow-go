@@ -163,7 +163,7 @@ func (n *Network) ProcessAttackerMessage(stream insecure.CorruptibleConduitFacto
 			// can't have a message with not nil for both ingress and egress
 			if msg.Egress != nil && msg.Ingress != nil {
 				fmt.Println("corruptible/netowrk>ProcessAttackerMessage>8>")
-				n.logger.Fatal().Err(err).Msg("could not process attacker's message - both ingress and egress messages can't be filled")
+				n.logger.Fatal().Err(err).Msg("could not process attacker's message - both ingress and egress messages can't be set")
 				//err := status.Error(codes.InvalidArgument, "can't have egress and ingress messages both be not nil")
 				//return err
 				return stream.SendAndClose(&empty.Empty{})

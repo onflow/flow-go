@@ -41,7 +41,7 @@ func TestConnectorHappyPath_Send(t *testing.T) {
 		}()
 
 		// goroutine checks mock ccf for receiving the message sent over the connection.
-		msg, _, _ := insecure.MessageFixture(t, cbor.NewCodec(), insecure.Protocol_MULTICAST, &message.TestMessage{
+		msg, _, _ := insecure.EgressMessageFixture(t, cbor.NewCodec(), insecure.Protocol_MULTICAST, &message.TestMessage{
 			Text: fmt.Sprintf("this is a test message from attacker to ccf: %d", rand.Int()),
 		})
 		sentMsgReceived := make(chan struct{})
@@ -87,7 +87,7 @@ func TestConnectorHappyPath_Receive(t *testing.T) {
 		_, ccfPortStr, err := net.SplitHostPort(ccf.ServerAddress())
 		require.NoError(t, err)
 
-		msg, _, _ := insecure.MessageFixture(t, cbor.NewCodec(), insecure.Protocol_MULTICAST, &message.TestMessage{
+		msg, _, _ := insecure.EgressMessageFixture(t, cbor.NewCodec(), insecure.Protocol_MULTICAST, &message.TestMessage{
 			Text: fmt.Sprintf("this is a test message from ccf to attacker: %d", rand.Int()),
 		})
 
