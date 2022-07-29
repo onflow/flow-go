@@ -79,12 +79,11 @@ func (p *AutoProfiler) start() {
 	p.log.Info().Msg("starting profile trace")
 
 	for k, v := range map[string]profileFunc{
-		"goroutine":    newProfileFunc("goroutine"),
-		"threadcreate": newProfileFunc("threadcreate"),
-		"heap":         p.pprofHeap,
-		"block":        p.pprofBlock,
-		"mutex":        p.pprofMutex,
-		"cpu":          p.pprofCpu,
+		"goroutine": newProfileFunc("goroutine"),
+		"heap":      p.pprofHeap,
+		"block":     p.pprofBlock,
+		"mutex":     p.pprofMutex,
+		"cpu":       p.pprofCpu,
 	} {
 		err := p.pprof(k, v)
 		if err != nil {
