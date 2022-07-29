@@ -17,16 +17,16 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 )
 
-func TestBuffer(t *testing.T) {
+func TestTrieCache(t *testing.T) {
 	const capacity = 10
 
-	b := NewBuffer(capacity, nil)
-	require.Equal(t, 0, b.Count())
+	tc := NewTrieCache(capacity, nil)
+	require.Equal(t, 0, tc.Count())
 
-	tries := b.Tries()
+	tries := tc.Tries()
 	require.Equal(t, 0, len(tries))
-	require.Equal(t, 0, b.Count())
-	require.Equal(t, 0, len(b.lookup))
+	require.Equal(t, 0, tc.Count())
+	require.Equal(t, 0, len(tc.lookup))
 
 	// savedTries contains all tries that are pushed to queue
 	var savedTries []*trie.MTrie
@@ -36,21 +36,21 @@ func TestBuffer(t *testing.T) {
 		trie, err := randomMTrie()
 		require.NoError(t, err)
 
-		b.Push(trie)
+		tc.Push(trie)
 
 		savedTries = append(savedTries, trie)
 
-		tr := b.Tries()
+		tr := tc.Tries()
 		require.Equal(t, savedTries, tr)
-		require.Equal(t, len(savedTries), b.Count())
-		require.Equal(t, len(savedTries), len(b.lookup))
+		require.Equal(t, len(savedTries), tc.Count())
+		require.Equal(t, len(savedTries), len(tc.lookup))
 
-		retTrie, found := b.Get(trie.RootHash())
+		retTrie, found := tc.Get(trie.RootHash())
 		require.Equal(t, retTrie, trie)
 		require.True(t, found)
 
 		// check last added trie functionality
-		retTrie = b.LastAddedTrie()
+		retTrie = tc.LastAddedTrie()
 		require.Equal(t, retTrie, trie)
 	}
 
@@ -59,11 +59,11 @@ func TestBuffer(t *testing.T) {
 		trie, err := randomMTrie()
 		require.NoError(t, err)
 
-		b.Push(trie)
+		tc.Push(trie)
 
 		savedTries = append(savedTries, trie)
 
-		tr := b.Tries()
+		tr := tc.Tries()
 		require.Equal(t, capacity, len(tr))
 
 		// After queue reaches capacity in previous loop,
@@ -72,29 +72,29 @@ func TestBuffer(t *testing.T) {
 		// savedTries contains all elements inserted from previous loop and current loop, so
 		// tr (queue snapshot) matches the last C elements in savedTries (where C is capacity).
 		require.Equal(t, savedTries[len(savedTries)-capacity:], tr)
-		require.Equal(t, capacity, b.Count())
-		require.Equal(t, capacity, len(b.lookup))
+		require.Equal(t, capacity, tc.Count())
+		require.Equal(t, capacity, len(tc.lookup))
 
 		// check the trie is lookable
-		retTrie, found := b.Get(trie.RootHash())
+		retTrie, found := tc.Get(trie.RootHash())
 		require.Equal(t, retTrie, trie)
 		require.True(t, found)
 
 		// check the last evicted value is not kept
-		retTrie, found = b.Get(savedTries[len(savedTries)-capacity-1].RootHash())
+		retTrie, found = tc.Get(savedTries[len(savedTries)-capacity-1].RootHash())
 		require.Nil(t, retTrie)
 		require.False(t, found)
 
 		// check last added trie functionality
-		retTrie = b.LastAddedTrie()
+		retTrie = tc.LastAddedTrie()
 		require.Equal(t, retTrie, trie)
 	}
 
 	// test purge functionality
-	b.Purge()
-	require.Equal(t, 0, b.Count())
-	require.Equal(t, 0, b.tail)
-	require.Equal(t, 0, len(b.lookup))
+	tc.Purge()
+	require.Equal(t, 0, tc.Count())
+	require.Equal(t, 0, tc.tail)
+	require.Equal(t, 0, len(tc.lookup))
 }
 
 func TestEvictCallBack(t *testing.T) {
@@ -104,19 +104,19 @@ func TestEvictCallBack(t *testing.T) {
 	require.NoError(t, err)
 
 	called := false
-	b := NewBuffer(capacity, func(tree *trie.MTrie) {
+	tc := NewTrieCache(capacity, func(tree *trie.MTrie) {
 		called = true
 		require.Equal(t, trie1, tree)
 	})
-	b.Push(trie1)
+	tc.Push(trie1)
 
 	trie2, err := randomMTrie()
 	require.NoError(t, err)
-	b.Push(trie2)
+	tc.Push(trie2)
 
 	trie3, err := randomMTrie()
 	require.NoError(t, err)
-	b.Push(trie3)
+	tc.Push(trie3)
 
 	require.True(t, called)
 }

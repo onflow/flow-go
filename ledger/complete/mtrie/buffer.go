@@ -9,22 +9,28 @@ import (
 
 type OnTreeEvictedFunc func(tree *trie.MTrie)
 
-type Buffer struct {
+// TrieCache caches tries into memory, it acts as a fifo queue
+// so when it reaches to the capacity it would evict the oldest trie
+// from the cache.
+//
+// Under the hood it uses a circular buffer
+// of mtrie pointers and a map of rootHash to cache index for fast lookup
+type TrieCache struct {
 	tries         []*trie.MTrie
 	lookup        map[ledger.RootHash]int // index to item
-	lock          sync.Mutex
+	lock          sync.RWMutex
 	capacity      int
 	tail          int // element index to write to
 	count         int // number of elements (count <= capacity)
 	onTreeEvicted OnTreeEvictedFunc
 }
 
-// NewBuffer returns a new Buffer with given capacity.
-func NewBuffer(capacity uint, onTreeEvicted OnTreeEvictedFunc) *Buffer {
-	return &Buffer{
+// NewTrieCache returns a new TrieCache with given capacity.
+func NewTrieCache(capacity uint, onTreeEvicted OnTreeEvictedFunc) *TrieCache {
+	return &TrieCache{
 		tries:         make([]*trie.MTrie, capacity),
 		lookup:        make(map[ledger.RootHash]int, capacity),
-		lock:          sync.Mutex{},
+		lock:          sync.RWMutex{},
 		capacity:      int(capacity),
 		tail:          0,
 		count:         0,
@@ -33,43 +39,50 @@ func NewBuffer(capacity uint, onTreeEvicted OnTreeEvictedFunc) *Buffer {
 }
 
 // Purge removes all mtries stored in the buffer
-func (b *Buffer) Purge() {
-	b.lock.Lock()
-	defer b.lock.Unlock()
+func (tc *TrieCache) Purge() {
+	tc.lock.Lock()
+	defer tc.lock.Unlock()
 
-	b.tail = 0
-	b.count = 0
-	b.tries = make([]*trie.MTrie, b.capacity)
-	b.lookup = make(map[ledger.RootHash]int, b.capacity)
+	tc.tail = 0
+	tc.count = 0
+	for i := 0; i < tc.capacity; i++ {
+		if tc.onTreeEvicted != nil {
+			if tc.tries[i] != nil {
+				tc.onTreeEvicted(tc.tries[i])
+			}
+		}
+		tc.tries[i] = nil
+	}
+	tc.lookup = make(map[ledger.RootHash]int, tc.capacity)
 }
 
 // Tries returns elements in queue, starting from the oldest element
 // to the newest element.
-func (b *Buffer) Tries() []*trie.MTrie {
-	b.lock.Lock()
-	defer b.lock.Unlock()
+func (tc *TrieCache) Tries() []*trie.MTrie {
+	tc.lock.RLock()
+	defer tc.lock.RUnlock()
 
-	if b.count == 0 {
+	if tc.count == 0 {
 		return nil
 	}
 
-	tries := make([]*trie.MTrie, b.count)
+	tries := make([]*trie.MTrie, tc.count)
 
-	if b.isFull() {
+	if tc.isFull() {
 		// If queue is full, tail points to the oldest element.
-		head := b.tail
-		n := copy(tries, b.tries[head:])
-		copy(tries[n:], b.tries[:b.tail])
+		head := tc.tail
+		n := copy(tries, tc.tries[head:])
+		copy(tries[n:], tc.tries[:tc.tail])
 	} else {
-		if b.tail >= b.count { // Data isn't wrapped around the slice.
-			head := b.tail - b.count
-			copy(tries, b.tries[head:b.tail])
+		if tc.tail >= tc.count { // Data isn't wrapped around the slice.
+			head := tc.tail - tc.count
+			copy(tries, tc.tries[head:tc.tail])
 		} else { // q.tail < q.count, data is wrapped around the slice.
 			// This branch isn't used until TrieQueue supports Pop (removing oldest element).
 			// At this time, there is no reason to implement Pop, so this branch is here to prevent future bug.
-			head := b.capacity - b.count + b.tail
-			n := copy(tries, b.tries[head:])
-			copy(tries[n:], b.tries[:b.tail])
+			head := tc.capacity - tc.count + tc.tail
+			n := copy(tries, tc.tries[head:])
+			copy(tries[n:], tc.tries[:tc.tail])
 		}
 	}
 
@@ -77,54 +90,60 @@ func (b *Buffer) Tries() []*trie.MTrie {
 }
 
 // Push pushes trie to queue.  If queue is full, it overwrites the oldest element.
-func (b *Buffer) Push(t *trie.MTrie) {
-	b.lock.Lock()
-	defer b.lock.Unlock()
+func (tc *TrieCache) Push(t *trie.MTrie) {
+	tc.lock.Lock()
+	defer tc.lock.Unlock()
 
-	if b.isFull() {
-		oldtrie := b.tries[b.tail]
-		if b.onTreeEvicted != nil {
-			b.onTreeEvicted(oldtrie)
+	if tc.isFull() {
+		oldtrie := tc.tries[tc.tail]
+		if tc.onTreeEvicted != nil {
+			tc.onTreeEvicted(oldtrie)
 		}
-		delete(b.lookup, oldtrie.RootHash())
+		delete(tc.lookup, oldtrie.RootHash())
 	}
-	b.tries[b.tail] = t
-	b.lookup[t.RootHash()] = b.tail
-	b.tail = (b.tail + 1) % b.capacity
-	if !b.isFull() {
-		b.count++
+	tc.tries[tc.tail] = t
+	tc.lookup[t.RootHash()] = tc.tail
+	tc.tail = (tc.tail + 1) % tc.capacity
+	if !tc.isFull() {
+		tc.count++
 	}
 }
 
-// LastAddedTrie returns the last trie added to the buffer
-func (b *Buffer) LastAddedTrie() *trie.MTrie {
-	if b.count == 0 {
+// LastAddedTrie returns the last trie added to the cache
+func (tc *TrieCache) LastAddedTrie() *trie.MTrie {
+	tc.lock.RLock()
+	defer tc.lock.RUnlock()
+
+	if tc.count == 0 {
 		return nil
 	}
-	indx := b.tail - 1
+	indx := tc.tail - 1
 	if indx < 0 {
-		indx = b.capacity - 1
+		indx = tc.capacity - 1
 	}
-	return b.tries[indx]
+	return tc.tries[indx]
 }
 
 // Get returns the trie by rootHash, if not exist will return nil and false
-func (b *Buffer) Get(rootHash ledger.RootHash) (*trie.MTrie, bool) {
-	b.lock.Lock()
-	defer b.lock.Unlock()
+func (tc *TrieCache) Get(rootHash ledger.RootHash) (*trie.MTrie, bool) {
+	tc.lock.RLock()
+	defer tc.lock.RUnlock()
 
-	idx, found := b.lookup[rootHash]
+	idx, found := tc.lookup[rootHash]
 	if !found {
 		return nil, false
 	}
-	return b.tries[idx], true
+	return tc.tries[idx], true
 }
 
-// Count returns number of items stored in the buffer
-func (b *Buffer) Count() int {
-	return b.count
+// Count returns number of items stored in the cache
+func (tc *TrieCache) Count() int {
+	tc.lock.RLock()
+	defer tc.lock.RUnlock()
+
+	return tc.count
 }
 
-func (b *Buffer) isFull() bool {
-	return b.count == b.capacity
+func (tc *TrieCache) isFull() bool {
+	return tc.count == tc.capacity
 }

@@ -24,7 +24,7 @@ type Forest struct {
 	// tries stores all MTries in the forest. It is NOT a CACHE in the conventional sense:
 	// there is no mechanism to load a trie from disk in case of a cache miss. Missing a
 	// needed trie in the forest might cause a fatal application logic error.
-	tries          *Buffer
+	tries          *TrieCache
 	forestCapacity int
 	onTreeEvicted  func(tree *trie.MTrie)
 	metrics        module.LedgerMetrics
@@ -33,20 +33,11 @@ type Forest struct {
 // NewForest returns a new instance of memory forest.
 //
 // CAUTION on forestCapacity: the specified capacity MUST be SUFFICIENT to store all needed MTries in the forest.
-// If more tries are added than the capacity, the Least Recently Used trie is removed (evicted) from the Forest.
-// THIS IS A ROUGH HEURISTIC as it might evict tries that are still needed.
+// If more tries are added than the capacity, the Least Recently Added trie is removed (evicted) from the Forest (FIFO queue).
 // Make sure you chose a sufficiently large forestCapacity, such that, when reaching the capacity, the
-// Least Recently Used trie will never be needed again.
+// Least Recently Added trie will never be needed again.
 func NewForest(forestCapacity int, metrics module.LedgerMetrics, onTreeEvicted func(tree *trie.MTrie)) (*Forest, error) {
-	// init LRU cache as a SHORTCUT for a usage-related storage eviction policy
-	var err error
-	// TODO(RAMTIN) update forestCapacity to uint
-	cache := NewBuffer(uint(forestCapacity), onTreeEvicted)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create forest cache: %w", err)
-	}
-
-	forest := &Forest{tries: cache,
+	forest := &Forest{tries: NewTrieCache(uint(forestCapacity), onTreeEvicted),
 		forestCapacity: forestCapacity,
 		onTreeEvicted:  onTreeEvicted,
 		metrics:        metrics,
@@ -54,7 +45,7 @@ func NewForest(forestCapacity int, metrics module.LedgerMetrics, onTreeEvicted f
 
 	// add trie with no allocated registers
 	emptyTrie := trie.NewEmptyMTrie()
-	err = forest.AddTrie(emptyTrie)
+	err := forest.AddTrie(emptyTrie)
 	if err != nil {
 		return nil, fmt.Errorf("adding empty trie to forest failed: %w", err)
 	}
