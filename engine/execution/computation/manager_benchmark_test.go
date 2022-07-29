@@ -74,11 +74,27 @@ func mustFundAccounts(b *testing.B, vm *fvm.VirtualMachine, ledger state.View, e
 func BenchmarkComputeBlock(b *testing.B) {
 	b.StopTimer()
 
+	tracer, err := trace.NewTracer(zerolog.Nop(), "", "", 4)
+	require.NoError(b, err)
+
 	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime())
 
 	chain := flow.Emulator.Chain()
-	execCtx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain))
-	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
+	execCtx := fvm.NewContext(
+		zerolog.Nop(),
+		fvm.WithChain(chain),
+		fvm.WithAccountStorageLimit(true),
+		fvm.WithTransactionFeesEnabled(true),
+		fvm.WithTracer(tracer),
+	)
+	ledger := testutil.RootBootstrappedLedger(
+		vm,
+		execCtx,
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+		fvm.WithTransactionFee(fvm.DefaultTransactionFees),
+		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+	)
 	accs := createAccounts(b, vm, ledger, 1000)
 	mustFundAccounts(b, vm, ledger, execCtx, accs)
 
@@ -86,7 +102,7 @@ func BenchmarkComputeBlock(b *testing.B) {
 	me.On("NodeID").Return(flow.ZeroID)
 
 	// TODO(rbtz): add real ledger
-	blockComputer, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
+	blockComputer, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), tracer, zerolog.Nop(), committer.NewNoopViewCommitter())
 	require.NoError(b, err)
 
 	programsCache, err := NewProgramsCache(1000)
@@ -100,7 +116,7 @@ func BenchmarkComputeBlock(b *testing.B) {
 
 	engine := &Manager{
 		blockComputer: blockComputer,
-		tracer:        trace.NewNoopTracer(),
+		tracer:        tracer,
 		me:            me,
 		programsCache: programsCache,
 		eds:           eds,
