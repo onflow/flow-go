@@ -55,30 +55,12 @@ func corruptibleNetworkFixture(t *testing.T, logger zerolog.Logger, corruptedID 
 	//logger, loggerHook := unittest.HookedLogger()
 	ccf := NewCorruptibleConduitFactory(logger, flow.BftTestnet)
 
-	//calls := 0
-	//ccf2, err2 := NewCorruptibleNetwork(
-	//	//unittest.Logger(),
-	//	unittest.HookedLogger(&calls),
-	//	flow.BftTestnet,
-	//	"localhost:0",
-	//	testutil.LocalFixture(t, corruptedIdentity),
-	//	codec,
-	//	flowNetwork,
-	//	ccf)
-
 	// set up adapter, so we can check that it called the expected method
 	adapter := &mocknetwork.Adapter{}
 	err := ccf.RegisterAdapter(adapter)
 	require.NoError(t, err)
 
-	//logger.Log()
-	//logger = logger.With().
-	//	Str("component", "corrupted_network").
-	//	Logger()
-
 	corruptibleNetwork, err := NewCorruptibleNetwork(
-		//unittest.Logger(),
-		//unittest.HookedLogger2(&calls),
 		logger,
 		flow.BftTestnet,
 		"localhost:0",
@@ -120,9 +102,7 @@ func withCorruptibleNetwork(t *testing.T, logger zerolog.Logger,
 
 	// start corruptible network
 	corruptibleNetwork.Start(ccfCtx)
-	t.Logf("withCorruptibleNetwork>1")
 	unittest.RequireCloseBefore(t, corruptibleNetwork.Ready(), 1*time.Second, "could not start corruptible network on time")
-	t.Logf("withCorruptibleNetwork>2")
 
 	// extracting port that ccf gRPC server is running on
 	_, ccfPortStr, err := net.SplitHostPort(corruptibleNetwork.ServerAddress())
@@ -133,16 +113,13 @@ func withCorruptibleNetwork(t *testing.T, logger zerolog.Logger,
 	gRpcClient, err := grpc.Dial(
 		fmt.Sprintf("localhost:%s", ccfPortStr),
 		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
-	t.Logf("withCorruptibleNetwork>3")
 	require.NoError(t, err)
 
 	client := insecure.NewCorruptibleConduitFactoryClient(gRpcClient)
 	stream, err := client.ProcessAttackerMessage(context.Background())
 	require.NoError(t, err)
 
-	t.Logf("withCorruptibleNetwork>4-about to call custom run()")
 	run(*corruptedIdentity, corruptibleNetwork, adapter, stream)
-	t.Logf("withCorruptibleNetwork>5-just called custom run()")
 
 	// terminates attackNetwork
 	cancel()
