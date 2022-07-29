@@ -56,7 +56,7 @@ const (
 	ErrCodeStorageCapacityExceeded  ErrorCode = 1103
 	//  Deprecated: ErrCodeGasLimitExceededError  ErrorCode = 1104
 	ErrCodeEventLimitExceededError                   ErrorCode = 1105
-	ErrCodeLedgerIntractionLimitExceededError        ErrorCode = 1106
+	ErrCodeLedgerInteractionLimitExceededError       ErrorCode = 1106
 	ErrCodeStateKeySizeLimitError                    ErrorCode = 1107
 	ErrCodeStateValueSizeLimitError                  ErrorCode = 1108
 	ErrCodeTransactionFeeDeductionFailedError        ErrorCode = 1109
