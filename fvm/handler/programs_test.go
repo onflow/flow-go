@@ -12,7 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/meter/weighted"
+	"github.com/onflow/flow-go/fvm/meter"
 	programsStorage "github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -115,7 +115,7 @@ func Test_Programs(t *testing.T) {
 
 	sth := state.NewStateHolder(state.NewState(
 		mainView,
-		weighted.NewMeter(math.MaxUint64, math.MaxUint64)))
+		meter.NewMeter(math.MaxUint64, math.MaxUint64)))
 
 	rt := fvm.NewInterpreterRuntime()
 	vm := fvm.NewVirtualMachine(rt)
