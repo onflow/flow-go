@@ -1,10 +1,7 @@
 package mtrie
 
 import (
-	"errors"
 	"fmt"
-
-	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
@@ -27,7 +24,7 @@ type Forest struct {
 	// tries stores all MTries in the forest. It is NOT a CACHE in the conventional sense:
 	// there is no mechanism to load a trie from disk in case of a cache miss. Missing a
 	// needed trie in the forest might cause a fatal application logic error.
-	tries          *lru.Cache
+	tries          *Buffer
 	forestCapacity int
 	onTreeEvicted  func(tree *trie.MTrie)
 	metrics        module.LedgerMetrics
@@ -42,19 +39,9 @@ type Forest struct {
 // Least Recently Used trie will never be needed again.
 func NewForest(forestCapacity int, metrics module.LedgerMetrics, onTreeEvicted func(tree *trie.MTrie)) (*Forest, error) {
 	// init LRU cache as a SHORTCUT for a usage-related storage eviction policy
-	var cache *lru.Cache
 	var err error
-	if onTreeEvicted != nil {
-		cache, err = lru.NewWithEvict(forestCapacity, func(key interface{}, value interface{}) {
-			trie, ok := value.(*trie.MTrie)
-			if !ok {
-				panic(fmt.Sprintf("cache contains item of type %T", value))
-			}
-			onTreeEvicted(trie)
-		})
-	} else {
-		cache, err = lru.New(forestCapacity)
-	}
+	// TODO(RAMTIN) update forestCapacity to uint
+	cache := NewBuffer(uint(forestCapacity), onTreeEvicted)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create forest cache: %w", err)
 	}
@@ -333,11 +320,7 @@ func (f *Forest) HasTrie(rootHash ledger.RootHash) bool {
 // warning, use this function for read-only operation
 func (f *Forest) GetTrie(rootHash ledger.RootHash) (*trie.MTrie, error) {
 	// if in memory
-	if ent, found := f.tries.Get(rootHash); found {
-		trie, ok := ent.(*trie.MTrie)
-		if !ok {
-			return nil, fmt.Errorf("forest contains an element of a wrong type")
-		}
+	if trie, found := f.tries.Get(rootHash); found {
 		return trie, nil
 	}
 	return nil, fmt.Errorf("trie with the given rootHash %s not found", rootHash)
@@ -345,21 +328,7 @@ func (f *Forest) GetTrie(rootHash ledger.RootHash) (*trie.MTrie, error) {
 
 // GetTries returns list of currently cached tree root hashes
 func (f *Forest) GetTries() ([]*trie.MTrie, error) {
-	// ToDo needs concurrency safety
-	keys := f.tries.Keys()
-	tries := make([]*trie.MTrie, len(keys))
-	for i, key := range keys {
-		t, ok := f.tries.Get(key)
-		if !ok {
-			return nil, errors.New("concurrent Forest modification")
-		}
-		trie, ok := t.(*trie.MTrie)
-		if !ok {
-			return nil, errors.New("forest contains an element of a wrong type")
-		}
-		tries[i] = trie
-	}
-	return tries, nil
+	return f.tries.Tries(), nil
 }
 
 // AddTries adds a trie to the forest
@@ -381,27 +350,14 @@ func (f *Forest) AddTrie(newTrie *trie.MTrie) error {
 
 	// TODO: check Thread safety
 	rootHash := newTrie.RootHash()
-	if storedTrie, found := f.tries.Get(rootHash); found {
-		trie, ok := storedTrie.(*trie.MTrie)
-		if !ok {
-			return fmt.Errorf("forest contains an element of a wrong type")
-		}
-		if trie.Equals(newTrie) {
-			return nil
-		}
-		return fmt.Errorf("forest already contains a tree with same root hash but other properties")
+	if _, found := f.tries.Get(rootHash); found {
+		// do no op
+		return nil
 	}
-	f.tries.Add(rootHash, newTrie)
-	f.metrics.ForestNumberOfTrees(uint64(f.tries.Len()))
+	f.tries.Push(newTrie)
+	f.metrics.ForestNumberOfTrees(uint64(f.tries.Count()))
 
 	return nil
-}
-
-// RemoveTrie removes a trie to the forest
-func (f *Forest) RemoveTrie(rootHash ledger.RootHash) {
-	// TODO remove from the file as well
-	f.tries.Remove(rootHash)
-	f.metrics.ForestNumberOfTrees(uint64(f.tries.Len()))
 }
 
 // GetEmptyRootHash returns the rootHash of empty Trie
@@ -411,14 +367,25 @@ func (f *Forest) GetEmptyRootHash() ledger.RootHash {
 
 // MostRecentTouchedRootHash returns the rootHash of the most recently touched trie
 func (f *Forest) MostRecentTouchedRootHash() (ledger.RootHash, error) {
-	keys := f.tries.Keys()
-	if len(keys) > 0 {
-		return keys[len(keys)-1].(ledger.RootHash), nil
+	trie := f.tries.LastAddedTrie()
+	if trie != nil {
+		return trie.RootHash(), nil
 	}
 	return ledger.RootHash(hash.DummyHash), fmt.Errorf("no trie is stored in the forest")
 }
 
+// PurgeCacheExcept removes all tries in the memory except the one with the given root hash
+func (f *Forest) PurgeCacheExcept(rootHash ledger.RootHash) error {
+	trie, found := f.tries.Get(rootHash)
+	if !found {
+		return fmt.Errorf("trie with the given root hash not found")
+	}
+	f.tries.Purge()
+	f.tries.Push(trie)
+	return nil
+}
+
 // Size returns the number of active tries in this store
 func (f *Forest) Size() int {
-	return f.tries.Len()
+	return f.tries.Count()
 }

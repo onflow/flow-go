@@ -100,7 +100,6 @@ func (w *DiskWAL) ReplayOnForest(forest *mtrie.Forest) error {
 			return err
 		},
 		func(rootHash ledger.RootHash) error {
-			forest.RemoveTrie(rootHash)
 			return nil
 		},
 	)

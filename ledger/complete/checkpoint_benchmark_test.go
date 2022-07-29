@@ -145,7 +145,6 @@ func BenchmarkLoadCheckpointAndWALs(b *testing.B) {
 			return err
 		},
 		func(rootHash ledger.RootHash) error {
-			forest.RemoveTrie(rootHash)
 			return nil
 		},
 	)

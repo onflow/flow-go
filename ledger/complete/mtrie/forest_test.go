@@ -41,10 +41,6 @@ func TestTrieOperations(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, retnt.RootHash(), updatedTrie.RootHash())
 	require.Equal(t, 2, forest.Size())
-
-	// Remove trie
-	forest.RemoveTrie(updatedTrie.RootHash())
-	require.Equal(t, 1, forest.Size())
 }
 
 // TestTrieUpdate updates the empty trie with some values and verifies that the
