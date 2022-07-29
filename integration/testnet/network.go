@@ -550,8 +550,6 @@ func AsGhost() func(config *NodeConfig) {
 			panic("a node cannot be both corrupted and ghost at the same time")
 		}
 		config.Ghost = true
-		// using the fully-connected topology to ensure a ghost node is always connected to all other nodes in the network,
-		config.AdditionalFlags = append(config.AdditionalFlags, "--topology=fully-connected")
 	}
 }
 
