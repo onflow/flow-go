@@ -3,6 +3,7 @@ module github.com/onflow/flow-go
 go 1.18
 
 require (
+	cloud.google.com/go/compute v1.6.1
 	cloud.google.com/go/storage v1.16.0
 	github.com/antihax/optional v1.0.0
 	github.com/aws/aws-sdk-go-v2/config v1.8.0
@@ -98,7 +99,6 @@ require (
 
 require (
 	cloud.google.com/go v0.100.2 // indirect
-	cloud.google.com/go/compute v1.6.1 // indirect
 	cloud.google.com/go/iam v0.3.0 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78 // indirect
 	github.com/Microsoft/go-winio v0.4.16 // indirect

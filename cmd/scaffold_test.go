@@ -1,10 +1,12 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	gcemd "cloud.google.com/go/compute/metadata"
 	"github.com/hashicorp/go-multierror"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/profiler"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -627,4 +631,66 @@ func (c *testComponent) Ready() <-chan struct{} {
 
 func (c *testComponent) Done() <-chan struct{} {
 	return c.done
+}
+
+func TestCreateUploader(t *testing.T) {
+	t.Parallel()
+
+	t.Run("create defualt uploader", func(t *testing.T) {
+		t.Parallel()
+		nb := FlowNode("scaffold_uploader")
+
+		testClient1 := gcemd.NewClient(nil)
+		uploader1, err := nb.createUploader(testClient1)
+		require.NoError(t, err)
+		require.NotNil(t, uploader1)
+	})
+
+	t.Run("create mocked uploader", func(t *testing.T) {
+		t.Parallel()
+		nb := FlowNode("scaffold_uploader")
+
+		testClient1 := gcemd.NewClient(nil)
+		uploader1, err := nb.createUploader(testClient1)
+		require.NoError(t, err)
+		require.NotNil(t, uploader1)
+
+		mockHttp := &http.Client{
+			Transport: &mockRoundTripper{
+				DoFunc: func(req *http.Request) (*http.Response, error) {
+					switch req.URL.Path {
+					case "/computeMetadata/v1/project/project-id":
+						return &http.Response{
+							StatusCode: 200,
+							Body:       ioutil.NopCloser(bytes.NewBufferString("test-project-id")),
+						}, nil
+					default:
+						return &http.Response{StatusCode: 403}, nil
+					}
+				},
+			},
+		}
+		testClient2 := gcemd.NewClient(mockHttp)
+		uploader2, err := nb.createUploader(testClient2)
+		require.NoError(t, err)
+		require.NotNil(t, uploader2)
+
+		uploaderImpl, ok := uploader2.(*profiler.UploaderImpl)
+		require.True(t, ok)
+
+		assert.Equal(t, "test-project-id", uploaderImpl.Deployment.ProjectId)
+		assert.Equal(t, "unknown-scaffold_uploader", uploaderImpl.Deployment.Target)
+		assert.Equal(t, "unknown", uploaderImpl.Deployment.Labels["instance"])
+		assert.Equal(t, "undefined-undefined", uploaderImpl.Deployment.Labels["version"])
+	})
+}
+
+// mockRoundTripper is the mock client
+type mockRoundTripper struct {
+	DoFunc func(req *http.Request) (*http.Response, error)
+}
+
+//
+func (m *mockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	return m.DoFunc(req)
 }

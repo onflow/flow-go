@@ -20,6 +20,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
+	gcemd "cloud.google.com/go/compute/metadata"
+
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/admin/commands/common"
@@ -530,12 +532,58 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 	}
 }
 
+func (fnb *FlowNodeBuilder) createUploader(client *gcemd.Client) (profiler.Uploader, error) {
+	projectID, err := client.ProjectID()
+	if err != nil {
+		fnb.Logger.Warn().Err(err).Msg("could not get CGE project ID")
+		projectID = "unknown"
+	}
+
+	instance, err := client.InstanceID()
+	if err != nil {
+		fnb.Logger.Warn().Err(err).Msg("could not get CGE instance ID")
+		instance = "unknown"
+	}
+
+	chainID := fnb.RootChainID.String()
+	if chainID == "" {
+		chainID = "unknown"
+	}
+
+	params := profiler.Params{
+		ProjectID: projectID,
+		ChainID:   chainID,
+		Role:      fnb.NodeConfig.NodeRole,
+		Version:   build.Semver(),
+		Commit:    build.Commit(),
+		Instance:  instance,
+	}
+
+	fnb.Logger.Info().Msgf("creating pprof profile uploader with params: %+v", params)
+
+	return profiler.NewUploader(fnb.Logger, params)
+}
+
 func (fnb *FlowNodeBuilder) initProfiler() {
 	// note: by default the Golang heap profiling rate is on and can be set even if the profiler is NOT enabled
 	runtime.MemProfileRate = fnb.BaseConfig.profilerMemProfileRate
 
+	var err error
+	var uploader profiler.Uploader
+	if gcemd.OnGCE() {
+		gcemdClient := gcemd.NewClient(nil)
+		uploader, err = fnb.createUploader(gcemdClient)
+		if err != nil {
+			fnb.Logger.Warn().Err(err).Msg("failed to create pprof uploader, falling back to noop")
+		}
+	} else {
+		fnb.Logger.Info().Msg("not running on GCE, setting pprof uploader to noop")
+		uploader = &profiler.NoopUploader{}
+	}
+
 	profiler, err := profiler.New(
 		fnb.Logger,
+		uploader,
 		fnb.BaseConfig.profilerDir,
 		fnb.BaseConfig.profilerInterval,
 		fnb.BaseConfig.profilerDuration,
