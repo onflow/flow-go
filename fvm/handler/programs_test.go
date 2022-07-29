@@ -3,6 +3,7 @@ package handler_test
 import (
 	"encoding/hex"
 	"fmt"
+	"math"
 	"testing"
 
 	"github.com/onflow/cadence/runtime/common"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/meter/weighted"
 	programsStorage "github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -111,7 +113,9 @@ func Test_Programs(t *testing.T) {
 		return nil, nil
 	})
 
-	sth := state.NewStateHolder(state.NewState(mainView))
+	sth := state.NewStateHolder(state.NewState(
+		mainView,
+		weighted.NewMeter(math.MaxUint64, math.MaxUint64)))
 
 	rt := fvm.NewInterpreterRuntime()
 	vm := fvm.NewVirtualMachine(rt)
