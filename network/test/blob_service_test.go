@@ -84,7 +84,7 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 		logger,
 		unittest.NetworkCodec(),
 		WithDHT("blob_service_test", p2p.AsServer()),
-		WithPeerManagerOpts(p2p.WithInterval(time.Second)),
+		WithPeerUpdateInterval(time.Second),
 	)
 	suite.networks = networks
 

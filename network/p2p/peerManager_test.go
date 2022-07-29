@@ -63,7 +63,7 @@ func (suite *PeerManagerTestSuite) TestUpdatePeers() {
 		Return(nil)
 
 	// create the peer manager (but don't start it)
-	pm := p2p.NewPeerManager(suite.log, func() peer.IDSlice {
+	pm := p2p.NewPeerManager(suite.log, p2p.DefaultPeerUpdateInterval, func() peer.IDSlice {
 		return pids
 	}, connector)
 
@@ -136,9 +136,9 @@ func (suite *PeerManagerTestSuite) TestPeriodicPeerUpdate() {
 	}).Return(nil)
 
 	peerUpdateInterval := 10 * time.Millisecond
-	pm := p2p.NewPeerManager(suite.log, func() peer.IDSlice {
+	pm := p2p.NewPeerManager(suite.log, peerUpdateInterval, func() peer.IDSlice {
 		return pids
-	}, connector, p2p.WithInterval(peerUpdateInterval))
+	}, connector)
 
 	unittest.RequireCloseBefore(suite.T(), pm.Ready(), 2*time.Second, "could not start peer manager")
 
@@ -146,7 +146,7 @@ func (suite *PeerManagerTestSuite) TestPeriodicPeerUpdate() {
 		"UpdatePeers is not running on UpdateIntervals")
 }
 
-// TestOnDemandPeerUpdate tests that the a peer update can be requested on demand and in between the periodic runs
+// TestOnDemandPeerUpdate tests that the peer update can be requested on demand and in between the periodic runs
 func (suite *PeerManagerTestSuite) TestOnDemandPeerUpdate() {
 	// create some test ids
 	pids := suite.generatePeerIDs(10)
@@ -172,9 +172,9 @@ func (suite *PeerManagerTestSuite) TestOnDemandPeerUpdate() {
 		}
 	}).Return(nil)
 
-	pm := p2p.NewPeerManager(suite.log, func() peer.IDSlice {
+	pm := p2p.NewPeerManager(suite.log, peerUpdateInterval, func() peer.IDSlice {
 		return pids
-	}, connector, p2p.WithInterval(peerUpdateInterval))
+	}, connector)
 	unittest.RequireCloseBefore(suite.T(), pm.Ready(), 2*time.Second, "could not start peer manager")
 
 	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 1*time.Second,
@@ -204,9 +204,9 @@ func (suite *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
 
 	connector.On("UpdatePeers", mock.Anything, mock.Anything).Return(nil).
 		WaitUntil(connectPeerGate) // blocks call for connectPeerGate channel
-	pm := p2p.NewPeerManager(suite.log, func() peer.IDSlice {
+	pm := p2p.NewPeerManager(suite.log, peerUpdateInterval, func() peer.IDSlice {
 		return pids
-	}, connector, p2p.WithInterval(peerUpdateInterval))
+	}, connector)
 
 	// start the peer manager
 	// this should trigger the first update and which will block on the ConnectPeers to return

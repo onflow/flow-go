@@ -46,7 +46,7 @@ func TestPeerManager_Integration(t *testing.T) {
 	idTranslator, err := p2p.NewFixedTableIdentityTranslator(identities)
 	require.NoError(t, err)
 
-	peerManager := p2p.NewPeerManager(unittest.Logger(), func() peer.IDSlice {
+	peerManager := p2p.NewPeerManager(unittest.Logger(), p2p.DefaultPeerUpdateInterval, func() peer.IDSlice {
 		// peerManager is furnished with a full topology that connects to all nodes
 		// in the othersId.
 		peers := peer.IDSlice{}

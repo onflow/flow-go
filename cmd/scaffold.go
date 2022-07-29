@@ -278,9 +278,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		mwOpts = append(mwOpts, p2p.WithMessageValidators(fnb.MsgValidators...))
 	}
 
-	peerManagerFactory := p2p.PeerManagerFactory(
-		fnb.NetworkConnectionPruning,
-		[]p2p.Option{p2p.WithInterval(fnb.PeerUpdateInterval)})
+	peerManagerFactory := p2p.PeerManagerFactory(fnb.NetworkConnectionPruning, fnb.PeerUpdateInterval)
 	mwOpts = append(mwOpts,
 		p2p.WithPeerManager(peerManagerFactory),
 		p2p.WithPreferredUnicastProtocols(unicast.ToProtocolNames(fnb.PreferredUnicastProtocols)),

@@ -105,7 +105,7 @@ func GenerateIDs(
 	libP2PNodes := make([]*p2p.Node, n)
 	tagObservables := make([]observable.Observable, n)
 
-	o := &optsConfig{}
+	o := &optsConfig{peerUpdateInterval: p2p.DefaultPeerUpdateInterval}
 	for _, opt := range opts {
 		opt(o)
 	}
@@ -148,7 +148,7 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 	mws := make([]network.Middleware, len(identities))
 	idProviders := make([]*UpdatableIDProvider, len(identities))
 
-	o := &optsConfig{}
+	o := &optsConfig{peerUpdateInterval: p2p.DefaultPeerUpdateInterval}
 	for _, opt := range opts {
 		opt(o)
 	}
@@ -166,7 +166,7 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 
 		idProviders[i] = NewUpdatableIDProvider(identities)
 
-		peerManagerFactory := p2p.PeerManagerFactory(p2p.ConnectionPruningEnabled, o.peerManagerOpts)
+		peerManagerFactory := p2p.PeerManagerFactory(p2p.ConnectionPruningEnabled, o.peerUpdateInterval)
 
 		// creating middleware of nodes
 		mws[i] = p2p.NewMiddleware(logger,
@@ -257,11 +257,11 @@ func GenerateIDsAndMiddlewares(t *testing.T,
 }
 
 type optsConfig struct {
-	idOpts           []func(*flow.Identity)
-	dhtPrefix        string
-	dhtOpts          []dht.Option
-	peerManagerOpts  []p2p.Option
-	connectionGating bool
+	idOpts             []func(*flow.Identity)
+	dhtPrefix          string
+	dhtOpts            []dht.Option
+	peerUpdateInterval time.Duration
+	connectionGating   bool
 }
 
 func WithIdentityOpts(idOpts ...func(*flow.Identity)) func(*optsConfig) {
@@ -277,9 +277,9 @@ func WithDHT(prefix string, dhtOpts ...dht.Option) func(*optsConfig) {
 	}
 }
 
-func WithPeerManagerOpts(peerManagerOpts ...p2p.Option) func(*optsConfig) {
+func WithPeerUpdateInterval(interval time.Duration) func(*optsConfig) {
 	return func(o *optsConfig) {
-		o.peerManagerOpts = peerManagerOpts
+		o.peerUpdateInterval = interval
 	}
 }
 
