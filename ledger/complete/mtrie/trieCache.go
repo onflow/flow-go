@@ -74,22 +74,15 @@ func (tc *TrieCache) Tries() []*trie.MTrie {
 
 	tries := make([]*trie.MTrie, tc.count)
 
-	if tc.isFull() {
-		// If queue is full, tail points to the oldest element.
-		head := tc.tail
+	if tc.tail >= tc.count { // Data isn't wrapped around the slice.
+		head := tc.tail - tc.count
+		copy(tries, tc.tries[head:tc.tail])
+	} else { // q.tail < q.count, data is wrapped around the slice.
+		// This branch isn't used until TrieQueue supports Pop (removing oldest element).
+		// At this time, there is no reason to implement Pop, so this branch is here to prevent future bug.
+		head := tc.capacity - tc.count + tc.tail
 		n := copy(tries, tc.tries[head:])
 		copy(tries[n:], tc.tries[:tc.tail])
-	} else {
-		if tc.tail >= tc.count { // Data isn't wrapped around the slice.
-			head := tc.tail - tc.count
-			copy(tries, tc.tries[head:tc.tail])
-		} else { // q.tail < q.count, data is wrapped around the slice.
-			// This branch isn't used until TrieQueue supports Pop (removing oldest element).
-			// At this time, there is no reason to implement Pop, so this branch is here to prevent future bug.
-			head := tc.capacity - tc.count + tc.tail
-			n := copy(tries, tc.tries[head:])
-			copy(tries[n:], tc.tries[:tc.tail])
-		}
 	}
 
 	return tries
@@ -100,7 +93,8 @@ func (tc *TrieCache) Push(t *trie.MTrie) {
 	tc.lock.Lock()
 	defer tc.lock.Unlock()
 
-	if tc.isFull() {
+	// if its full
+	if tc.count == tc.capacity {
 		oldtrie := tc.tries[tc.tail]
 		if tc.onTreeEvicted != nil {
 			tc.onTreeEvicted(oldtrie)
@@ -147,8 +141,4 @@ func (tc *TrieCache) Count() int {
 	defer tc.lock.RUnlock()
 
 	return tc.count
-}
-
-func (tc *TrieCache) isFull() bool {
-	return tc.count == tc.capacity
 }
