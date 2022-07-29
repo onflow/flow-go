@@ -29,7 +29,6 @@ jobs:
       - name: Setup go
         uses: actions/setup-go@v2
         with:
-          # 1.17 min to get shuffle on bench tests
           go-version: "^1.18"
 
       - name: Build relic
@@ -50,7 +49,7 @@ jobs:
       - name: Use benchstat for comparison
         run: |
           export PATH=$PATH:$(go env GOPATH)/bin
-          GO111MODULE=off go get golang.org/x/perf/cmd/benchstat
+          go install golang.org/x/perf/cmd/benchstat@latest
           echo "BENCHSTAT<<EOF" >> $GITHUB_ENV
           echo "$(benchstat -html -sort delta old.txt new.txt | sed  '/<title/,/<\/style>/d' | sed 's/<!doctype html>//g')" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV

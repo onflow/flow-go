@@ -1,6 +1,7 @@
 package fvm_test
 
 import (
+	"math"
 	"strings"
 	"testing"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/meter/weighted"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
@@ -18,7 +20,10 @@ import (
 
 func TestTransactionVerification(t *testing.T) {
 	ledger := utils.NewSimpleView()
-	sth := state.NewStateHolder(state.NewState(ledger))
+	sth := state.NewStateHolder(state.NewState(
+		ledger,
+		weighted.NewMeter(math.MaxUint64, math.MaxUint64),
+	))
 	accounts := state.NewAccounts(sth)
 
 	// create 2 accounts
