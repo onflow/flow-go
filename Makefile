@@ -477,6 +477,46 @@ tool-remove-execution-fork: docker-build-remove-execution-fork
 check-go-version:
 	go version | grep '1.1[6-9]'
 
+# Hacky script to reverse multi-line Golang statements and strip comments.
+# Note: Is there an easier way? Maybe with gofmt somehow? Or another tool?
+#
+# Why? For easier grepping, e.g. grepping without flow-go-wide:
+# $ find . -type f | egrep "\.go" | xargs egrep "\.Msg\(.+?\)" | wc -l # e.g. 100s of matches missing
+#    1100
+# $ find . -type f | egrep "\.go" | xargs egrep -i "executed failed"   # e.g. statement context missing
+# ./engine/execution/computation/computer/computer.go:                    Msg("transaction executed failed")
+#
+# E.g. same greps with make flow-go-wide:
+# $ make flow-go-wide | egrep "\.Msg\(.+?\)" | wc -l                    # e.g. 100s more matches
+#    1369
+# $ make flow-go-wide | egrep -i "executed failed"                      # e.g. full statement context
+# ./engine/execution/computation/computer/computer.go:            lg.Info().Str("error_message", txResult.ErrorMessage).Uint16("error_code", uint16(tx.Err.Code())).Msg("transaction executed failed")
+FLOW_GO_WIDE=' \
+	use strict; \
+	while(my $$file_name = <STDIN>){ \
+		chomp($$file_name); \
+		die sprintf qq[ERROR: file does not exist: %s\n], $$file_name if(not -e $$file_name); \
+		$$_ = `cat $$file_name`;                                                    if(0){ "hint: grab all lines from flow-go .go file"; } \
+		s~\s*//.*$$~~gm;                                                            if(0){ "hint: remove rest of line comments AKA // ..." } \
+		s~[ \t]*/\*.*?\*/~~gs;                                                      if(0){ "hint: remove anywhere comments AKA /* ... */"; } \
+		s~^(\s*[0-9a-zA-Z]+\:)[ \t]+~$$1 ~gm;                                       if(0){ "hint: remove whitespace after colon in key value pairs e.g. {<nl>FlowTokenAddress:      flowTokenAddress.HexWithPrefix(),<nl>"; } \
+		while(s~([\=\:\,\(][ \t]*\`[^\r\n\`]*)[\r\n]+[ \t]*(.*?\`)~$$1<nl>$$2~gs){} if(0){ "hint: collapse back tick blocks into a single line with <nl> for new lines"; } \
+		s~(\bfunc\b[^\{]+?\{)[ \t]*([\n\r]+)~$$1 // inside func$$2~gs;              if(0){ "hint: markup the inside of a function so the regexes below with '{' do not match for functions"; } \
+		while(s~\{[ \t]*[\n\r]+[ \t]*([^\n\r]*[\,])[ \t]*([\r\n])~{$$1$$2~gs){}     if(0){ "hint: join parameters to curly open brackets e.g. epochConfig := epochs.EpochConfig{<nl>EpochTokenPayout: cadence.UFix64(0),<nl>"; } \
+		while(s~\([ \t]*[\n\r]+[ \t]*([^\n\r]*[\,])[ \t]*([\r\n])~($$1$$2~gs){}     if(0){ "hint: join parameters to round open brackets e.g. rootQC := constructRootQC(<nl>block,<nl>"; } \
+		while(s~\,[ \t]*[\n\r]+[ \t]*([^\n\r]*[\)\}])~,$$1$$2~gs){}                 if(0){ "hint: ending comma line to next ending open round or curly brackets line e.g. identities flow.IdentityList,<nl>) (commit flow.StateCommitment) {"; } \
+		s~\.[ \t]*[\r\n]+\s+~.~gs;                                                  if(0){ "hint: join trailing dot to next line, e.g. return flow.NewTransactionBody().<nl>SetScript([]byte(fmt.Sprintf("; } \
+		s~"[ \t]*\+[ \t]*[\n\r]+\s*"~"+"~gs;                                        if(0){ "hint: remove line breaks around double quote continuations"; } \
+		s~[\n\r]+~\n~gs;                                                            if(0){ "hint: remove blank lines"; } \
+		s~(\,)([^ \t\r\n])~$$1 $$2~gs;                                              if(0){ "hint: insert spaces after commas if necessary"; } \
+		s~^(.*)$$~$$file_name: $$1~gm;                                              if(0){ "hint: insert file name at start of each line"; } \
+		printf qq[%s], $$_; \
+	}'
+
+.PHONY: flow-go-wide
+flow-go-wide:
+	@find . -type f | egrep "\.go" | perl -e $(FLOW_GO_WIDE)
+
 #----------------------------------------------------------------------
 # CD COMMANDS
 #----------------------------------------------------------------------
