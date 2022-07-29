@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -12,6 +13,7 @@ import (
 
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/fvm/meter/weighted"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
@@ -97,7 +99,8 @@ func run(*cobra.Command, []string) {
 		return values[0], nil
 	})
 
-	sth := state.NewStateHolder(state.NewState(ldg))
+	meter := weighted.NewMeter(math.MaxUint64, math.MaxUint64)
+	sth := state.NewStateHolder(state.NewState(ldg, meter))
 	accounts := state.NewAccounts(sth)
 	finalGenerator := state.NewStateBoundAddressGenerator(sth, chain)
 	finalState := finalGenerator.Bytes()

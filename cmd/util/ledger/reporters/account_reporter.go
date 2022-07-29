@@ -17,6 +17,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/meter/weighted"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
@@ -66,7 +67,8 @@ func (r *AccountReporter) Report(payload []ledger.Payload, commit ledger.State) 
 	defer rwm.Close()
 
 	l := migrations.NewView(payload)
-	st := state.NewState(l, state.WithMaxInteractionSizeAllowed(math.MaxUint64))
+	meter := weighted.NewMeter(math.MaxUint64, math.MaxUint64)
+	st := state.NewState(l, meter, state.WithMaxInteractionSizeAllowed(math.MaxUint64))
 	sth := state.NewStateHolder(st)
 	gen := state.NewStateBoundAddressGenerator(sth, r.Chain)
 
@@ -141,7 +143,8 @@ func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
 	prog := programs.NewEmptyPrograms()
 
 	v := view.NewChild()
-	st := state.NewState(v, state.WithMaxInteractionSizeAllowed(math.MaxUint64))
+	meter := weighted.NewMeter(math.MaxUint64, math.MaxUint64)
+	st := state.NewState(v, meter, state.WithMaxInteractionSizeAllowed(math.MaxUint64))
 	sth := state.NewStateHolder(st)
 	accounts := state.NewAccounts(sth)
 

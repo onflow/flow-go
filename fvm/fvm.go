@@ -2,6 +2,7 @@ package fvm
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
@@ -45,10 +46,11 @@ func NewVirtualMachine(rt runtime.Runtime) *VirtualMachine {
 
 // Run runs a procedure against a ledger in the given context.
 func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, programs *programs.Programs) (err error) {
-	st := state.NewState(v,
-		state.WithMeter(weighted.NewMeter(
+	st := state.NewState(
+		v,
+		weighted.NewMeter(
 			uint(proc.ComputationLimit(ctx)),
-			uint(proc.MemoryLimit(ctx)))),
+			uint(proc.MemoryLimit(ctx))),
 		state.WithMaxKeySizeAllowed(ctx.MaxStateKeySize),
 		state.WithMaxValueSizeAllowed(ctx.MaxStateValueSize),
 		state.WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize))
@@ -64,7 +66,9 @@ func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, program
 
 // GetAccount returns an account by address or an error if none exists.
 func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.View, programs *programs.Programs) (*flow.Account, error) {
-	st := state.NewState(v,
+	st := state.NewState(
+		v,
+		weighted.NewMeter(math.MaxUint64, math.MaxUint64),
 		state.WithMaxKeySizeAllowed(ctx.MaxStateKeySize),
 		state.WithMaxValueSizeAllowed(ctx.MaxStateValueSize),
 		state.WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize))
