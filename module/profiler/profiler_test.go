@@ -1,4 +1,4 @@
-package debug_test
+package profiler_test
 
 import (
 	"os"
@@ -8,7 +8,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/utils/debug"
+	"github.com/onflow/flow-go/module/profiler"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -16,7 +16,7 @@ func TestProfiler(t *testing.T) {
 	t.Parallel()
 	t.Run("profilerEnabled", func(t *testing.T) {
 		unittest.RunWithTempDir(t, func(tempDir string) {
-			p, err := debug.NewAutoProfiler(zerolog.Nop(), tempDir, time.Millisecond*100, time.Millisecond*100, true)
+			p, err := profiler.New(zerolog.Nop(), tempDir, time.Millisecond*100, time.Millisecond*100, true)
 			require.NoError(t, err)
 
 			unittest.AssertClosesBefore(t, p.Ready(), 5*time.Second)

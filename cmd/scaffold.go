@@ -38,6 +38,7 @@ import (
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/profiler"
 	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/module/util"
@@ -57,7 +58,6 @@ import (
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	sutil "github.com/onflow/flow-go/storage/util"
-	"github.com/onflow/flow-go/utils/debug"
 	"github.com/onflow/flow-go/utils/io"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -534,7 +534,7 @@ func (fnb *FlowNodeBuilder) initProfiler() {
 	// note: by default the Golang heap profiling rate is on and can be set even if the profiler is NOT enabled
 	runtime.MemProfileRate = fnb.BaseConfig.profilerMemProfileRate
 
-	profiler, err := debug.NewAutoProfiler(
+	profiler, err := profiler.New(
 		fnb.Logger,
 		fnb.BaseConfig.profilerDir,
 		fnb.BaseConfig.profilerInterval,
@@ -857,11 +857,7 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 		fvm.WithChain(fnb.RootChainID.Chain()),
 		fvm.WithBlocks(blockFinder),
 		fvm.WithAccountStorageLimit(true),
-	}
-	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Stagingnet || fnb.RootChainID == flow.Mainnet {
-		vmOpts = append(vmOpts,
-			fvm.WithTransactionFeesEnabled(true),
-		)
+		fvm.WithTransactionFeesEnabled(true),
 	}
 	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Stagingnet || fnb.RootChainID == flow.Localnet || fnb.RootChainID == flow.Benchnet {
 		vmOpts = append(vmOpts,

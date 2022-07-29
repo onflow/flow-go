@@ -2,6 +2,7 @@ package fvm_test
 
 import (
 	"bytes"
+	"math"
 	"testing"
 
 	"github.com/onflow/cadence"
@@ -13,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
@@ -40,6 +42,7 @@ func TestSafetyCheck(t *testing.T) {
 
 		sth := state.NewStateHolder(state.NewState(
 			view,
+			meter.NewMeter(math.MaxUint64, math.MaxUint64),
 			state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
 			state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
 			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
@@ -72,6 +75,7 @@ func TestSafetyCheck(t *testing.T) {
 
 		sth := state.NewStateHolder(state.NewState(
 			view,
+			meter.NewMeter(math.MaxUint64, math.MaxUint64),
 			state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
 			state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
 			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
@@ -87,6 +91,18 @@ func TestSafetyCheck(t *testing.T) {
 
 type ErrorReturningRuntime struct {
 	TxErrors []error
+}
+
+func (e *ErrorReturningRuntime) NewScriptExecutor(script runtime.Script, context runtime.Context) runtime.Executor {
+	panic("NewScriptExecutor not expected")
+}
+
+func (e *ErrorReturningRuntime) NewTransactionExecutor(script runtime.Script, context runtime.Context) runtime.Executor {
+	panic("NewTransactionExecutor not expected")
+}
+
+func (e *ErrorReturningRuntime) NewContractFunctionExecutor(contractLocation common.AddressLocation, functionName string, arguments []cadence.Value, argumentTypes []sema.Type, context runtime.Context) runtime.Executor {
+	panic("NewContractFunctionExecutor not expected")
 }
 
 func (e *ErrorReturningRuntime) SetInvalidatedResourceValidationEnabled(_ bool) {
@@ -137,7 +153,7 @@ func (e *ErrorReturningRuntime) ReadLinked(_ common.Address, _ cadence.Path, _ r
 	panic("ReadLinked not expected")
 }
 
-func (e *ErrorReturningRuntime) InvokeContractFunction(_ common.AddressLocation, _ string, _ []interpreter.Value, _ []sema.Type, _ runtime.Context) (cadence.Value, error) {
+func (e *ErrorReturningRuntime) InvokeContractFunction(_ common.AddressLocation, _ string, _ []cadence.Value, _ []sema.Type, _ runtime.Context) (cadence.Value, error) {
 	panic("InvokeContractFunction not expected")
 }
 
