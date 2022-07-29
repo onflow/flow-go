@@ -387,9 +387,12 @@ func NetworkCodec() network.Codec {
 	return cborcodec.NewCodec()
 }
 
-func CrashTest(t *testing.T, scenario func()) {
+// CrashTest safely tests functions that crash (as the expected behavior) by checking that running the function creates an error and
+// an expected error message.
+func CrashTest(t *testing.T, scenario func(), expectedErrorMsg string) {
 	if os.Getenv("CRASH_TEST") == "1" {
 		scenario()
+		return
 	}
 
 	cmd := exec.Command(os.Args[0], "-test.run=CrashTest")
@@ -402,5 +405,5 @@ func CrashTest(t *testing.T, scenario func()) {
 
 	// expect log.fatal() message to be pushed to stdout
 	outStr := string(outBytes)
-	require.Contains(t, outStr, "both ingress and egress messages can't be nil")
+	require.Contains(t, outStr, expectedErrorMsg)
 }
