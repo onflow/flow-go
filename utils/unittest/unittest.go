@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"math"
 	"os"
+	"os/exec"
 	"regexp"
 	"strings"
 	"sync"
@@ -384,4 +385,22 @@ func AssertEqualBlocksLenAndOrder(t *testing.T, expectedBlocks, actualSegmentBlo
 // NetworkCodec returns cbor codec
 func NetworkCodec() network.Codec {
 	return cborcodec.NewCodec()
+}
+
+func CrashTest(t *testing.T, scenario func()) {
+	if os.Getenv("CRASH_TEST") == "1" {
+		scenario()
+	}
+
+	cmd := exec.Command(os.Args[0], "-test.run=CrashTest")
+	cmd.Env = append(os.Environ(), "CRASH_TEST=1")
+
+	outBytes, err := cmd.Output()
+	// expect error from run
+	require.Error(t, err)
+	require.Contains(t, "exit status 1", err.Error())
+
+	// expect log.fatal() message to be pushed to stdout
+	outStr := string(outBytes)
+	require.Contains(t, outStr, "both ingress and egress messages can't be nil")
 }
