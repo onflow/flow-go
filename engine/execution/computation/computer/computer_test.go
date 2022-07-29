@@ -3,6 +3,7 @@ package computer_test
 import (
 	"context"
 	"fmt"
+	"math"
 	"math/rand"
 	"testing"
 
@@ -26,7 +27,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/meter/weighted"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -366,7 +367,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	t.Run("system transaction does not read memory limit from state", func(t *testing.T) {
 
-		weighted.DefaultMemoryWeights = weighted.ExecutionMemoryWeights{
+		meter.DefaultMemoryWeights = meter.ExecutionMemoryWeights{
 			0: 1, // single weight set to 1
 		}
 		execCtx := fvm.NewContext(
@@ -562,7 +563,7 @@ func (e *testRuntime) NewTransactionExecutor(script runtime.Script, c runtime.Co
 	panic("NewTransactionExecutor not expected")
 }
 
-func (e *testRuntime) NewContractFunctionExecutor(contractLocation common.AddressLocation, functionName string, arguments []interpreter.Value, argumentTypes []sema.Type, context runtime.Context) runtime.Executor {
+func (e *testRuntime) NewContractFunctionExecutor(contractLocation common.AddressLocation, functionName string, arguments []cadence.Value, argumentTypes []sema.Type, context runtime.Context) runtime.Executor {
 	panic("NewContractFunctionExecutor not expected")
 }
 
@@ -580,7 +581,7 @@ func (e *testRuntime) SetResourceOwnerChangeHandlerEnabled(_ bool) {
 	panic("SetResourceOwnerChangeHandlerEnabled not expected")
 }
 
-func (e *testRuntime) InvokeContractFunction(_ common.AddressLocation, _ string, _ []interpreter.Value, _ []sema.Type, _ runtime.Context) (cadence.Value, error) {
+func (e *testRuntime) InvokeContractFunction(_ common.AddressLocation, _ string, _ []cadence.Value, _ []sema.Type, _ runtime.Context) (cadence.Value, error) {
 	panic("InvokeContractFunction not expected")
 }
 
@@ -679,7 +680,7 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 	view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 		return ledger.Get(owner, key)
 	})
-	sth := state.NewStateHolder(state.NewState(view))
+	sth := state.NewStateHolder(state.NewState(view, meter.NewMeter(math.MaxUint64, math.MaxUint64)))
 	accounts := state.NewAccounts(sth)
 
 	// account creation, signing of transaction and bootstrapping ledger should not be required for this test

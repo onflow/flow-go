@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/meter/weighted"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
@@ -58,9 +57,8 @@ func NewTransactionEnvironment(
 		ctx.EventCollectionByteSizeLimit,
 	)
 	accountKeys := handler.NewAccountKeyHandler(accounts)
-	metrics := handler.NewMetricsHandler(ctx.Metrics)
 
-	envCtx := &EnvContext{nestedContext{ctx}, traceSpan}
+	envCtx := NewEnvContext(ctx, traceSpan)
 	env := &TransactionEnv{
 		commonEnv: commonEnv{
 			ctx:                   envCtx,
@@ -72,9 +70,6 @@ func NewTransactionEnvironment(
 			accounts:              accounts,
 			accountKeys:           accountKeys,
 			uuidGenerator:         uuidGenerator,
-			metrics:               metrics,
-			// TODO(patrick): switch to EnvContext's start span api.
-			traceSpan: traceSpan,
 		},
 
 		addressGenerator: generator,
@@ -151,9 +146,9 @@ func (e *TransactionEnv) setExecutionParameters() error {
 	}
 
 	var ok bool
-	var m *weighted.Meter
-	// only set the weights if the meter is a weighted.Meter
-	if m, ok = e.sth.State().Meter().(*weighted.Meter); !ok {
+	var m *meter.WeightedMeter
+	// only set the weights if the meter is a meter.WeightedMeter
+	if m, ok = e.sth.State().Meter().(*meter.WeightedMeter); !ok {
 		return nil
 	}
 
@@ -277,8 +272,8 @@ func (e *TransactionEnv) GetIsContractDeploymentRestricted() (restricted bool, d
 
 func (e *TransactionEnv) useContractAuditVoucher(address runtime.Address, code []byte) (bool, error) {
 	return InvokeUseContractAuditVoucherContract(
+		e.ctx,
 		e,
-		e.traceSpan,
 		address,
 		string(code[:]))
 }
@@ -305,8 +300,8 @@ func (e *TransactionEnv) GetStorageCapacity(address common.Address) (value uint6
 	}
 
 	result, invokeErr := InvokeAccountStorageCapacityContract(
+		e.ctx,
 		e,
-		e.traceSpan,
 		address)
 	if invokeErr != nil {
 		return 0, errors.HandleRuntimeError(invokeErr)
@@ -323,7 +318,7 @@ func (e *TransactionEnv) GetAccountBalance(address common.Address) (value uint64
 		return value, fmt.Errorf("get account balance failed: %w", err)
 	}
 
-	result, invokeErr := InvokeAccountBalanceContract(e, e.traceSpan, address)
+	result, invokeErr := InvokeAccountBalanceContract(e.ctx, e, address)
 	if invokeErr != nil {
 		return 0, errors.HandleRuntimeError(invokeErr)
 	}
@@ -339,8 +334,8 @@ func (e *TransactionEnv) GetAccountAvailableBalance(address common.Address) (val
 	}
 
 	result, invokeErr := InvokeAccountAvailableBalanceContract(
+		e.ctx,
 		e,
-		e.traceSpan,
 		address)
 
 	if invokeErr != nil {
@@ -544,8 +539,8 @@ func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 
 	if e.ctx.ServiceAccountEnabled {
 		_, invokeErr := InvokeSetupNewAccountContract(
+			e.ctx,
 			e,
-			e.traceSpan,
 			flowAddress,
 			payer)
 		if invokeErr != nil {

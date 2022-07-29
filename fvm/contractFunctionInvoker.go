@@ -3,12 +3,10 @@ package fvm
 import (
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
-	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
 
 	"github.com/onflow/flow-go/module/trace"
@@ -17,7 +15,7 @@ import (
 type ContractFunctionInvoker struct {
 	contractLocation common.AddressLocation
 	functionName     string
-	arguments        []interpreter.Value
+	arguments        []cadence.Value
 	argumentTypes    []sema.Type
 	logger           zerolog.Logger
 	logSpanAttrs     []attribute.KeyValue
@@ -26,7 +24,7 @@ type ContractFunctionInvoker struct {
 func NewContractFunctionInvoker(
 	contractLocation common.AddressLocation,
 	functionName string,
-	arguments []interpreter.Value,
+	arguments []cadence.Value,
 	argumentTypes []sema.Type,
 	logger zerolog.Logger) *ContractFunctionInvoker {
 	return &ContractFunctionInvoker{
@@ -41,17 +39,13 @@ func NewContractFunctionInvoker(
 	}
 }
 
-func (i *ContractFunctionInvoker) Invoke(env Environment, parentTraceSpan otelTrace.Span) (cadence.Value, error) {
+func (i *ContractFunctionInvoker) Invoke(envCtx *EnvContext, env Environment) (cadence.Value, error) {
 
-	ctx := env.Context()
-	if ctx.Tracer != nil && parentTraceSpan != nil {
-		span := ctx.Tracer.StartSpanFromParent(parentTraceSpan, trace.FVMInvokeContractFunction)
-		span.SetAttributes(i.logSpanAttrs...)
+	span := envCtx.StartSpanFromRoot(trace.FVMInvokeContractFunction)
+	span.SetAttributes(i.logSpanAttrs...)
+	defer span.End()
 
-		defer span.End()
-	}
-
-	predeclaredValues := valueDeclarations(ctx, env)
+	predeclaredValues := valueDeclarations(envCtx.Context(), env)
 
 	value, err := env.VM().Runtime.InvokeContractFunction(
 		i.contractLocation,

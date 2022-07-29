@@ -1,4 +1,4 @@
-package debug
+package profiler
 
 import (
 	"context"
@@ -34,7 +34,8 @@ type AutoProfiler struct {
 	duration time.Duration
 }
 
-func NewAutoProfiler(log zerolog.Logger, dir string, interval time.Duration, duration time.Duration, enabled bool) (*AutoProfiler, error) {
+// New creates a new AutoProfiler instance performing profiling every interval for duration.
+func New(log zerolog.Logger, dir string, interval time.Duration, duration time.Duration, enabled bool) (*AutoProfiler, error) {
 	SetProfilerEnabled(enabled)
 
 	err := os.MkdirAll(dir, os.ModePerm)
@@ -79,8 +80,8 @@ func (p *AutoProfiler) start() {
 
 	for k, v := range map[string]profileFunc{
 		"goroutine":    newProfileFunc("goroutine"),
-		"heap":         newProfileFunc("heap"),
 		"threadcreate": newProfileFunc("threadcreate"),
+		"heap":         p.pprofHeap,
 		"block":        p.pprofBlock,
 		"mutex":        p.pprofMutex,
 		"cpu":          p.pprofCpu,
@@ -114,6 +115,13 @@ func newProfileFunc(name string) profileFunc {
 	return func(w io.Writer) error {
 		return pprof.Lookup(name).WriteTo(w, 0)
 	}
+}
+
+func (p *AutoProfiler) pprofHeap(w io.Writer) error {
+	// Forces the GC before taking each of the heap profiles and improves the profile accuracy.
+	// Autoprofiler runs very infrequently so performance impact is minimal.
+	runtime.GC()
+	return newProfileFunc("heap")(w)
 }
 
 func (p *AutoProfiler) pprofBlock(w io.Writer) error {
