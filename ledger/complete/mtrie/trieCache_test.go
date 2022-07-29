@@ -90,11 +90,41 @@ func TestTrieCache(t *testing.T) {
 		require.Equal(t, retTrie, trie)
 	}
 
-	// test purge functionality
+}
+
+func TestPurge(t *testing.T) {
+	const capacity = 5
+
+	trie1, err := randomMTrie()
+	require.NoError(t, err)
+	trie2, err := randomMTrie()
+	require.NoError(t, err)
+	trie3, err := randomMTrie()
+	require.NoError(t, err)
+
+	called := 0
+	tc := NewTrieCache(capacity, func(tree *trie.MTrie) {
+		switch called {
+		case 0:
+			require.Equal(t, trie1, tree)
+		case 1:
+			require.Equal(t, trie2, tree)
+		case 2:
+			require.Equal(t, trie3, tree)
+		}
+		called++
+
+	})
+	tc.Push(trie1)
+	tc.Push(trie2)
+	tc.Push(trie3)
+
 	tc.Purge()
 	require.Equal(t, 0, tc.Count())
 	require.Equal(t, 0, tc.tail)
 	require.Equal(t, 0, len(tc.lookup))
+
+	require.Equal(t, 3, called)
 }
 
 func TestEvictCallBack(t *testing.T) {

@@ -43,16 +43,18 @@ func (tc *TrieCache) Purge() {
 	tc.lock.Lock()
 	defer tc.lock.Unlock()
 
-	tc.tail = 0
-	tc.count = 0
+	toEvict := 0
 	for i := 0; i < tc.capacity; i++ {
+		toEvict = (tc.tail + i) % tc.capacity
 		if tc.onTreeEvicted != nil {
-			if tc.tries[i] != nil {
-				tc.onTreeEvicted(tc.tries[i])
+			if tc.tries[toEvict] != nil {
+				tc.onTreeEvicted(tc.tries[toEvict])
 			}
 		}
-		tc.tries[i] = nil
+		tc.tries[toEvict] = nil
 	}
+	tc.tail = 0
+	tc.count = 0
 	tc.lookup = make(map[ledger.RootHash]int, tc.capacity)
 }
 
@@ -100,13 +102,12 @@ func (tc *TrieCache) Push(t *trie.MTrie) {
 			tc.onTreeEvicted(oldtrie)
 		}
 		delete(tc.lookup, oldtrie.RootHash())
+		tc.count-- // so when we increment at the end of method we don't go beyond capacity
 	}
 	tc.tries[tc.tail] = t
 	tc.lookup[t.RootHash()] = tc.tail
 	tc.tail = (tc.tail + 1) % tc.capacity
-	if !tc.isFull() {
-		tc.count++
-	}
+	tc.count++
 }
 
 // LastAddedTrie returns the last trie added to the cache
