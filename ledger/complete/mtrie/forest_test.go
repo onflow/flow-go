@@ -1068,3 +1068,38 @@ func TestNow(t *testing.T) {
 	require.Equal(t, updatedRoot, updatedRoot2)
 	require.Equal(t, 2, size)
 }
+
+func TestPurgeCacheExcept(t *testing.T) {
+	forest, err := NewForest(5, &metrics.NoopCollector{}, nil)
+	require.NoError(t, err)
+
+	nt := trie.NewEmptyMTrie()
+	p1 := pathByUint8s([]uint8{uint8(53), uint8(74)})
+	v1 := payloadBySlices([]byte{'A'}, []byte{'A'})
+
+	updatedTrie1, _, err := trie.NewTrieWithUpdatedRegisters(nt, []ledger.Path{p1}, []ledger.Payload{*v1}, true)
+	require.NoError(t, err)
+
+	err = forest.AddTrie(updatedTrie1)
+	require.NoError(t, err)
+
+	p2 := pathByUint8s([]uint8{uint8(12), uint8(34)})
+	v2 := payloadBySlices([]byte{'B'}, []byte{'B'})
+
+	updatedTrie2, _, err := trie.NewTrieWithUpdatedRegisters(nt, []ledger.Path{p2}, []ledger.Payload{*v2}, true)
+	require.NoError(t, err)
+
+	err = forest.AddTrie(updatedTrie2)
+	require.NoError(t, err)
+
+	require.Equal(t, 3, forest.tries.Count())
+	forest.PurgeCacheExcept(updatedTrie2.RootHash())
+
+	require.Equal(t, 1, forest.tries.Count())
+	ret, err := forest.GetTrie(updatedTrie2.RootHash())
+	require.NoError(t, err)
+	require.Equal(t, ret, updatedTrie2)
+
+	_, err = forest.GetTrie(updatedTrie1.RootHash())
+	require.Error(t, err)
+}
