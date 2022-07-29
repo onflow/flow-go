@@ -2,6 +2,7 @@ package reporters
 
 import (
 	"fmt"
+	"math"
 	"runtime"
 	"strings"
 	"sync"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/meter/weighted"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
@@ -137,7 +139,8 @@ func (r *FungibleTokenTracker) worker(
 	for j := range jobs {
 
 		view := migrations.NewView(j.payloads)
-		st := state.NewState(view)
+		meter := weighted.NewMeter(math.MaxUint64, math.MaxUint64)
+		st := state.NewState(view, meter)
 		sth := state.NewStateHolder(st)
 		accounts := state.NewAccounts(sth)
 		storage := cadenceRuntime.NewStorage(
