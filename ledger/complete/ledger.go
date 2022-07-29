@@ -32,7 +32,7 @@ const defaultTrieUpdateChanSize = 500
 // Ledger is fork-aware which means any update can be applied at any previous state which forms a tree of tries (forest).
 // The forest is in memory but all changes (e.g. register updates) are captured inside write-ahead-logs for crash recovery reasons.
 // In order to limit the memory usage and maintain the performance storage only keeps a limited number of
-// tries and purge the old ones (LRU-based); in other words, Ledger is not designed to be used
+// tries and purge the old ones (FIFO-based); in other words, Ledger is not designed to be used
 // for archival usage but make it possible for other software components to reconstruct very old tries using write-ahead logs.
 type Ledger struct {
 	forest            *mtrie.Forest
