@@ -1,8 +1,6 @@
 package fvm
 
 import (
-	otelTrace "go.opentelemetry.io/otel/trace"
-
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/sema"
@@ -20,8 +18,8 @@ var deductTransactionFeesInvocationArgumentTypes = []sema.Type{
 // InvokeDeductTransactionFeesContract executes the fee deduction contract on
 // the service account.
 func InvokeDeductTransactionFeesContract(
+	envCtx *EnvContext,
 	env Environment,
-	traceSpan otelTrace.Span,
 	payer flow.Address,
 	inclusionEffort uint64,
 	executionEffort uint64,
@@ -43,7 +41,7 @@ func InvokeDeductTransactionFeesContract(
 		deductTransactionFeesInvocationArgumentTypes,
 		env.Context().Logger,
 	)
-	return invoker.Invoke(env, traceSpan)
+	return invoker.Invoke(envCtx, env)
 }
 
 var setupNewAccountInvocationArgumentTypes = []sema.Type{
@@ -54,8 +52,8 @@ var setupNewAccountInvocationArgumentTypes = []sema.Type{
 // InvokeSetupNewAccountContract executes the new account setup contract on
 // the service account.
 func InvokeSetupNewAccountContract(
+	envCtx *EnvContext,
 	env Environment,
-	traceSpan otelTrace.Span,
 	flowAddress flow.Address,
 	payer common.Address,
 ) (cadence.Value, error) {
@@ -74,7 +72,7 @@ func InvokeSetupNewAccountContract(
 		setupNewAccountInvocationArgumentTypes,
 		env.Context().Logger,
 	)
-	return invoker.Invoke(env, traceSpan)
+	return invoker.Invoke(envCtx, env)
 }
 
 var accountAvailableBalanceInvocationArgumentTypes = []sema.Type{
@@ -84,8 +82,8 @@ var accountAvailableBalanceInvocationArgumentTypes = []sema.Type{
 // InvokeAccountAvailableBalanceContract executes the get available balance
 // contract on the storage fees contract.
 func InvokeAccountAvailableBalanceContract(
+	envCtx *EnvContext,
 	env Environment,
-	traceSpan otelTrace.Span,
 	address common.Address,
 ) (cadence.Value, error) {
 
@@ -101,7 +99,7 @@ func InvokeAccountAvailableBalanceContract(
 		accountAvailableBalanceInvocationArgumentTypes,
 		env.Context().Logger,
 	)
-	return invoker.Invoke(env, traceSpan)
+	return invoker.Invoke(envCtx, env)
 }
 
 var accountBalanceInvocationArgumentTypes = []sema.Type{
@@ -111,8 +109,8 @@ var accountBalanceInvocationArgumentTypes = []sema.Type{
 // InvokeAccountBalanceContract executes the get available balance contract
 // on the service account.
 func InvokeAccountBalanceContract(
+	envCtx *EnvContext,
 	env Environment,
-	traceSpan otelTrace.Span,
 	address common.Address,
 ) (cadence.Value, error) {
 
@@ -127,7 +125,7 @@ func InvokeAccountBalanceContract(
 		accountBalanceInvocationArgumentTypes,
 		env.Context().Logger,
 	)
-	return invoker.Invoke(env, traceSpan)
+	return invoker.Invoke(envCtx, env)
 }
 
 var accountStorageCapacityInvocationArgumentTypes = []sema.Type{
@@ -137,8 +135,8 @@ var accountStorageCapacityInvocationArgumentTypes = []sema.Type{
 // InvokeAccountStorageCapacityContract executes the get storage capacity
 // contract on the storage fees contract.
 func InvokeAccountStorageCapacityContract(
+	envCtx *EnvContext,
 	env Environment,
-	traceSpan otelTrace.Span,
 	address common.Address,
 ) (cadence.Value, error) {
 
@@ -154,14 +152,14 @@ func InvokeAccountStorageCapacityContract(
 		accountStorageCapacityInvocationArgumentTypes,
 		env.Context().Logger,
 	)
-	return invoker.Invoke(env, traceSpan)
+	return invoker.Invoke(envCtx, env)
 }
 
 // InvokeAccountsStorageCapacity prepares a function that calls get storage capacity on the storage fees contract
 // for multiple accounts at once
 func InvokeAccountsStorageCapacity(
+	envCtx *EnvContext,
 	env Environment,
-	traceSpan otelTrace.Span,
 	addresses []common.Address,
 ) (cadence.Value, error) {
 	arrayValues := make([]cadence.Value, len(addresses))
@@ -186,7 +184,7 @@ func InvokeAccountsStorageCapacity(
 		},
 		env.Context().Logger,
 	)
-	return invoker.Invoke(env, traceSpan)
+	return invoker.Invoke(envCtx, env)
 }
 
 var useContractAuditVoucherInvocationArgumentTypes = []sema.Type{
@@ -197,8 +195,8 @@ var useContractAuditVoucherInvocationArgumentTypes = []sema.Type{
 // InvokeUseContractAuditVoucherContract executes the use a contract
 // deployment audit voucher contract.
 func InvokeUseContractAuditVoucherContract(
+	envCtx *EnvContext,
 	env Environment,
-	traceSpan otelTrace.Span,
 	address common.Address,
 	code string) (bool, error) {
 
@@ -215,7 +213,7 @@ func InvokeUseContractAuditVoucherContract(
 		useContractAuditVoucherInvocationArgumentTypes,
 		env.Context().Logger,
 	)
-	resultCdc, err := invoker.Invoke(env, traceSpan)
+	resultCdc, err := invoker.Invoke(envCtx, env)
 	if err != nil {
 		return false, err
 	}
