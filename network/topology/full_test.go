@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestEmptyTopology checks that FullyConnectedTopology always returns the input list as the fanout.
+// TestFullTopology checks that FullyConnectedTopology always returns the input list as the fanout.
 func TestFullTopology(t *testing.T) {
 	ids := unittest.IdentityListFixture(10)
 	top := topology.NewFullyConnectedTopology()
