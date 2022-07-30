@@ -1,4 +1,4 @@
-package fvm
+package environment
 
 import (
 	"time"
@@ -11,24 +11,31 @@ import (
 )
 
 type ProgramLogger struct {
-	ctx *EnvContext
+	tracer *Tracer
 
-	logs     []string
+	cadenceLoggingEnabled bool
+	logs                  []string
+
 	reporter handler.MetricsReporter
 }
 
-func NewProgramLogger(ctx *EnvContext) *ProgramLogger {
+func NewProgramLogger(
+	tracer *Tracer,
+	reporter handler.MetricsReporter,
+	cadenceLoggingEnabled bool,
+) *ProgramLogger {
 	return &ProgramLogger{
-		ctx:      ctx,
-		logs:     nil,
-		reporter: ctx.Metrics,
+		tracer:                tracer,
+		cadenceLoggingEnabled: cadenceLoggingEnabled,
+		logs:                  nil,
+		reporter:              reporter,
 	}
 }
 
 func (logger *ProgramLogger) ProgramLog(message string) error {
-	defer logger.ctx.StartExtensiveTracingSpanFromRoot(trace.FVMEnvProgramLog).End()
+	defer logger.tracer.StartExtensiveTracingSpanFromRoot(trace.FVMEnvProgramLog).End()
 
-	if logger.ctx.CadenceLoggingEnabled {
+	if logger.cadenceLoggingEnabled {
 		logger.logs = append(logger.logs, message)
 	}
 	return nil
@@ -42,7 +49,7 @@ func (logger *ProgramLogger) RecordTrace(operation string, location common.Locat
 	if location != nil {
 		attrs = append(attrs, attribute.String("location", location.String()))
 	}
-	logger.ctx.RecordSpanFromRoot(
+	logger.tracer.RecordSpanFromRoot(
 		trace.FVMCadenceTrace.Child(operation),
 		duration,
 		attrs)
