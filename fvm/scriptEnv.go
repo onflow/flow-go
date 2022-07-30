@@ -157,7 +157,6 @@ func (e *ScriptEnv) GetStorageCapacity(address common.Address) (value uint64, er
 	}
 
 	result, invokeErr := InvokeAccountStorageCapacityContract(
-		e.ctx,
 		e,
 		address)
 	if invokeErr != nil {
@@ -177,7 +176,7 @@ func (e *ScriptEnv) GetAccountBalance(address common.Address) (value uint64, err
 		return 0, fmt.Errorf("get account balance failed: %w", err)
 	}
 
-	result, invokeErr := InvokeAccountBalanceContract(e.ctx, e, address)
+	result, invokeErr := InvokeAccountBalanceContract(e, address)
 	if invokeErr != nil {
 		return 0, errors.HandleRuntimeError(invokeErr)
 	}
@@ -193,7 +192,6 @@ func (e *ScriptEnv) GetAccountAvailableBalance(address common.Address) (value ui
 	}
 
 	result, invokeErr := InvokeAccountAvailableBalanceContract(
-		e.ctx,
 		e,
 		address)
 

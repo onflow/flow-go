@@ -39,13 +39,13 @@ func NewContractFunctionInvoker(
 	}
 }
 
-func (i *ContractFunctionInvoker) Invoke(envCtx *EnvContext, env Environment) (cadence.Value, error) {
+func (i *ContractFunctionInvoker) Invoke(env Environment) (cadence.Value, error) {
 
-	span := envCtx.StartSpanFromRoot(trace.FVMInvokeContractFunction)
+	span := env.StartSpanFromRoot(trace.FVMInvokeContractFunction)
 	span.SetAttributes(i.logSpanAttrs...)
 	defer span.End()
 
-	predeclaredValues := valueDeclarations(envCtx.Context(), env)
+	predeclaredValues := valueDeclarations(env)
 
 	value, err := env.VM().Runtime.InvokeContractFunction(
 		i.contractLocation,
