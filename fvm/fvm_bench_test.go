@@ -340,13 +340,19 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 		defer func() {
 			blockExecutor.onStopFunc()
 		}()
-		serviceAccount := blockExecutor.ServiceAccount(b)
 
 		// Create an account private key.
 		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 		require.NoError(b, err)
 
 		accounts := blockExecutor.SetupAccounts(b, privateKeys)
+
+		addrs := []flow.Address{}
+		for _, account := range accounts {
+			addrs = append(addrs, account.Address)
+		}
+		// fund all accounts so not to run into storage problems
+		fundAccounts(b, blockExecutor, cadence.UFix64(10_0000_0000), addrs...)
 
 		accounts[0].DeployContract(b, blockExecutor, "TestContract", `
 			access(all) contract TestContract {
@@ -361,9 +367,11 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 			}
 			`)
 
-		serviceAccount.AddArrayToStorage(b, blockExecutor, []string{longString, longString, longString, longString, longString})
+		accounts[0].AddArrayToStorage(b, blockExecutor, []string{longString, longString, longString, longString, longString})
 
 		btx := []byte(tx)
+
+		benchmarkAccount := &accounts[0]
 
 		b.ResetTimer() // setup done, lets start measuring
 		for i := 0; i < b.N; i++ {
@@ -371,11 +379,11 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 			for j := 0; j < transactionsPerBlock; j++ {
 				txBody := flow.NewTransactionBody().
 					SetScript(btx).
-					AddAuthorizer(serviceAccount.Address).
-					SetProposalKey(serviceAccount.Address, 0, serviceAccount.RetAndIncSeqNumber()).
-					SetPayer(serviceAccount.Address)
+					AddAuthorizer(benchmarkAccount.Address).
+					SetProposalKey(benchmarkAccount.Address, 0, benchmarkAccount.RetAndIncSeqNumber()).
+					SetPayer(benchmarkAccount.Address)
 
-				err = testutil.SignEnvelope(txBody, serviceAccount.Address, serviceAccount.PrivateKey)
+				err = testutil.SignEnvelope(txBody, benchmarkAccount.Address, benchmarkAccount.PrivateKey)
 				require.NoError(b, err)
 
 				transactions[j] = txBody
@@ -439,35 +447,50 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 		benchTransaction(b, templateTx(100, `getAccount(signer.address).storageCapacity`))
 	})
 	b.Run("get signer vault", func(b *testing.B) {
-		benchTransaction(b, templateTx(100, `let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)!`))
+		benchTransaction(
+			b,
+			templateTx(100, `let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)!`),
+		)
 	})
 	b.Run("get signer receiver", func(b *testing.B) {
-		benchTransaction(b, templateTx(100, `let receiverRef =  getAccount(signer.address)
+		benchTransaction(
+			b,
+			templateTx(100, `let receiverRef =  getAccount(signer.address)
 				.getCapability(/public/flowTokenReceiver)
-				.borrow<&{FungibleToken.Receiver}>()!`))
+				.borrow<&{FungibleToken.Receiver}>()!`),
+		)
 	})
 	b.Run("transfer tokens", func(b *testing.B) {
-		benchTransaction(b, templateTx(100, `
-			let receiverRef =  getAccount(signer.address)
-				.getCapability(/public/flowTokenReceiver)
-				.borrow<&{FungibleToken.Receiver}>()!
-			
-			let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)!
+		benchTransaction(
+			b,
+			templateTx(100, `
+				let receiverRef =  getAccount(signer.address)
+					.getCapability(/public/flowTokenReceiver)
+					.borrow<&{FungibleToken.Receiver}>()!
 
-			receiverRef.deposit(from: <-vaultRef.withdraw(amount: 0.00001))
-			`))
+				let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)!
+
+				receiverRef.deposit(from: <-vaultRef.withdraw(amount: 0.00001))
+			`),
+		)
 	})
 	b.Run("load and save empty string on signers address", func(b *testing.B) {
-		benchTransaction(b, templateTx(100, `
+		benchTransaction(
+			b,
+			templateTx(100, `
 				signer.load<String>(from: /storage/testpath)
 				signer.save("", to: /storage/testpath)
-			`))
+			`),
+		)
 	})
 	b.Run("load and save long string on signers address", func(b *testing.B) {
-		benchTransaction(b, templateTx(100, fmt.Sprintf(`
+		benchTransaction(
+			b,
+			templateTx(100, fmt.Sprintf(`
 				signer.load<String>(from: /storage/testpath)
 				signer.save("%s", to: /storage/testpath)
-			`, longString)))
+			`, longString)),
+		)
 	})
 	b.Run("create new account", func(b *testing.B) {
 		benchTransaction(b, templateTx(50, `let acct = AuthAccount(payer: signer)`))
@@ -479,24 +502,30 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 		benchTransaction(b, templateTx(100, `TestContract.emit()`))
 	})
 	b.Run("borrow array from storage", func(b *testing.B) {
-		benchTransaction(b, templateTx(100, `
-			let strings = signer.borrow<&[String]>(from: /storage/test)!
-			var i = 0
-			while (i < strings.length) {
-			  log(strings[i])
-			  i = i +1
-			}
-		`))
+		benchTransaction(
+			b,
+			templateTx(100, `
+				let strings = signer.borrow<&[String]>(from: /storage/test)!
+				var i = 0
+				while (i < strings.length) {
+				  log(strings[i])
+				  i = i +1
+				}
+			`),
+		)
 	})
 	b.Run("copy array from storage", func(b *testing.B) {
-		benchTransaction(b, templateTx(100, `
-			let strings = signer.copy<[String]>(from: /storage/test)!
-			var i = 0
-			while (i < strings.length) {
-			  log(strings[i])
-			  i = i +1
-			}
-		`))
+		benchTransaction(
+			b,
+			templateTx(100, `
+				let strings = signer.copy<[String]>(from: /storage/test)!
+				var i = 0
+				while (i < strings.length) {
+				  log(strings[i])
+				  i = i +1
+				}
+			`),
+		)
 	})
 }
 

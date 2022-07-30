@@ -101,7 +101,7 @@ func (i *TransactionInvoker) Process(
 		},
 	)
 	if err != nil {
-		var interactionLimiExceededErr *errors.LedgerIntractionLimitExceededError
+		var interactionLimiExceededErr *errors.LedgerInteractionLimitExceededError
 		if errors.As(err, &interactionLimiExceededErr) {
 			// If it is this special interaction limit error, just set it directly as the tx error
 			txError = err
