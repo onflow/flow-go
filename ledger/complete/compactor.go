@@ -39,8 +39,11 @@ type checkpointResult struct {
 //
 // Compactor stores pointers to tries in ledger state in a fix-sized
 // checkpointing queue (FIFO).  Checkpointing queue is decoupled from
-// main ledger state to allow separate optimizaiton, etc.
-// NOTE: ledger state and checkpointing queue may contain different tries.
+// main ledger state to allow separate optimization and looser coupling, etc.
+// CAUTION: If the forest LRU Cache is used for main state,
+// then ledger state and checkpointing queue may contain different tries.
+// This will be resolved automaticaly after the forest LRU Cache
+// (code outside checkpointing) is replaced by something like a FIFO queue.
 type Compactor struct {
 	checkpointer       *realWAL.Checkpointer
 	wal                realWAL.LedgerWAL
@@ -54,6 +57,15 @@ type Compactor struct {
 	trieUpdateCh       <-chan *WALTrieUpdate
 }
 
+// NewCompactor creates new Compactor which writes WAL record and triggers
+// checkpointing asynchronously when enough segments are finalized.
+// The checkpointDistance is a flag that specifies how many segments need to
+// be finalized to trigger checkpointing.  However, if a prior checkpointing
+// is already running and not finished, then more segments than specified
+// could be accumulated for the new checkpointing (to reduce memory).
+// All returned errors indicate that Compactor can't be created.
+// Since failure to create Compactor will end up blocking ledger updates,
+// the caller should handle all returned errors as unrecoverable.
 func NewCompactor(
 	l *Ledger,
 	w realWAL.LedgerWAL,
@@ -71,16 +83,20 @@ func NewCompactor(
 		return nil, err
 	}
 
+	// Get trieUpdateCh channel to communicate trieUpdate, WAL result, and new trie
+	// created from the update.
 	trieUpdateCh := l.TrieUpdateChan()
 	if trieUpdateCh == nil {
 		return nil, errors.New("failed to get valid trie update channel from ledger")
 	}
 
+	// Get all tries from ledger state.
 	tries, err := l.Tries()
 	if err != nil {
 		return nil, err
 	}
 
+	// Create trieQueue with initial values from ledger state.
 	trieQueue := realWAL.NewTrieQueueWithValues(checkpointCapacity, tries)
 
 	return &Compactor{
@@ -97,16 +113,18 @@ func NewCompactor(
 	}, nil
 }
 
+// Subscribe subscribes observer to Compactor.
 func (c *Compactor) Subscribe(observer observable.Observer) {
 	var void struct{}
 	c.observers[observer] = void
 }
 
+// Unsubscribe unsubscribes observer to Compactor.
 func (c *Compactor) Unsubscribe(observer observable.Observer) {
 	delete(c.observers, observer)
 }
 
-// Ready periodically fires Run function, every `interval`
+// Ready returns channel which would be closed when Compactor goroutine starts.
 func (c *Compactor) Ready() <-chan struct{} {
 	c.lm.OnStart(func() {
 		go c.run()
@@ -114,6 +132,7 @@ func (c *Compactor) Ready() <-chan struct{} {
 	return c.lm.Started()
 }
 
+// Done returns channel which would be closed when Compactor goroutine exits.
 func (c *Compactor) Done() <-chan struct{} {
 	c.lm.OnStop(func() {
 		// Signal Compactor goroutine to stop
@@ -136,6 +155,8 @@ func (c *Compactor) Done() <-chan struct{} {
 	return c.lm.Stopped()
 }
 
+// run writes WAL records from trie updates and starts checkpointing
+// asynchronously when enough segments are finalized.
 func (c *Compactor) run() {
 
 	// checkpointSem is used to limit checkpointing to one.
@@ -147,7 +168,7 @@ func (c *Compactor) run() {
 
 	checkpointResultCh := make(chan checkpointResult, 1)
 
-	// Get active segment number.
+	// Get active segment number (opened segment that new records write to).
 	// activeSegmentNum is updated when record is written to a new segment.
 	_, activeSegmentNum, err := c.wal.Segments()
 	if err != nil {
@@ -162,11 +183,8 @@ func (c *Compactor) run() {
 	}
 
 	// Compute next checkpoint number.
-	// nextCheckpointNum is updated when
-	// - checkpointing starts, fails to start, or fails.
-	// - tries snapshot fails.
+	// nextCheckpointNum is updated when checkpointing starts, fails to start, or fails.
 	// NOTE: next checkpoint number must >= active segment num.
-	// We can't reuse mtrie state to checkpoint tries in older segments.
 	nextCheckpointNum := lastCheckpointNum + int(c.checkpointDistance)
 	if activeSegmentNum > nextCheckpointNum {
 		nextCheckpointNum = activeSegmentNum
@@ -189,7 +207,7 @@ Loop:
 					"compactor failed to checkpoint %d", checkpointResult.num,
 				)
 
-				// Retry checkpointing after active segment is finalized.
+				// Retry checkpointing when active segment is finalized.
 				nextCheckpointNum = activeSegmentNum
 			}
 
@@ -244,6 +262,11 @@ Loop:
 	// Don't wait for checkpointing to finish because it might take too long.
 }
 
+// checkpoint creates checkpoint of tries snapshot,
+// deletes prior checkpoint files (if needed), and notifies observers.
+// Errors indicate that checkpoint file can't be created or prior checkpoints can't be removed.
+// Caller should handle returned errors by retrying checkpointing when appropriate.
+// Since this function is only for checkpointing, Compactor isn't affected by returned error.
 func (c *Compactor) checkpoint(ctx context.Context, tries []*trie.MTrie, checkpointNum int) error {
 
 	err := createCheckpoint(c.checkpointer, c.logger, tries, checkpointNum)
@@ -280,6 +303,9 @@ func (c *Compactor) checkpoint(ctx context.Context, tries []*trie.MTrie, checkpo
 	return nil
 }
 
+// createCheckpoint creates checkpoint with given checkpointNum and tries.
+// Errors indicate that checkpoint file can't be created.
+// Caller should handle returned errors by retrying checkpointing when appropriate.
 func createCheckpoint(checkpointer *realWAL.Checkpointer, logger zerolog.Logger, tries []*trie.MTrie, checkpointNum int) error {
 
 	logger.Info().Msgf("serializing checkpoint %d", checkpointNum)
@@ -309,6 +335,8 @@ func createCheckpoint(checkpointer *realWAL.Checkpointer, logger zerolog.Logger,
 	return nil
 }
 
+// cleanupCheckpoints deletes prior checkpoint files if needed.
+// Since the function is side-effect free, all failures are simply a no-op.
 func cleanupCheckpoints(checkpointer *realWAL.Checkpointer, checkpointsToKeep int) error {
 	// Don't list checkpoints if we keep them all
 	if checkpointsToKeep == 0 {
@@ -333,8 +361,9 @@ func cleanupCheckpoints(checkpointer *realWAL.Checkpointer, checkpointsToKeep in
 }
 
 // processTrieUpdate writes trie update to WAL, updates activeSegmentNum,
-// and gets tries from trieQueue for checkpointing if needed.
-// It also sends WAL update result and waits for trie update completion.
+// and returns tries for checkpointing if needed.
+// It sends WAL update result, receives updated trie, and pushes updated trie to trieQueue.
+// When this function returns, WAL update is in sync with trieQueue update.
 func (c *Compactor) processTrieUpdate(
 	update *WALTrieUpdate,
 	trieQueue *realWAL.TrieQueue,
@@ -400,7 +429,7 @@ func (c *Compactor) processTrieUpdate(
 
 	// Get tries from checkpoint queue.
 	// At this point, checkpoint queue contains tries up to
-	// last update (logged as last record in finalized segment)
+	// last update (last record in finalized segment)
 	// It doesn't include trie for this update
 	// until updated trie is received and added to trieQueue.
 	tries := trieQueue.Tries()

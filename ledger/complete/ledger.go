@@ -200,8 +200,8 @@ func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 	return values, err
 }
 
-// Set updates the ledger given an update
-// it returns the state after update and errors (if any)
+// Set updates the ledger given an update.
+// It returns the state after update and errors (if any)
 func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *ledger.TrieUpdate, err error) {
 	start := time.Now()
 
@@ -244,17 +244,21 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *
 
 func (l *Ledger) set(trieUpdate *ledger.TrieUpdate) (newState ledger.State, err error) {
 
+	// resultCh is a buffered channel to receive WAL update result.
 	resultCh := make(chan error, 1)
 
+	// trieCh is a buffered channel to send updated trie.
+	// trieCh can be closed without sending updated trie to indicate failure to update trie.
 	trieCh := make(chan *trie.MTrie, 1)
 	defer close(trieCh)
 
-	// These run concurrently in two goroutines:
+	// There are two goroutines:
 	// 1. writing the trie update to WAL (in Compactor goroutine)
 	// 2. creating a new trie from the trie update (in this goroutine)
-	// Since writing to WAL is running concurrently, we use resultCh to wait for WAL update result from Compactor.
-	// Compactor also needs new trie created here
-	// because Compactor caches new trie to minimize memory foot-print while checkpointing,
+	// Since writing to WAL is running concurrently, we use resultCh
+	// to receive WAL update result from Compactor.
+	// Compactor also needs new trie created here because Compactor
+	// caches new trie to minimize memory foot-print while checkpointing.
 	// `trieCh` is used to send created trie to Compactor.
 	l.trieUpdateCh <- &WALTrieUpdate{Update: trieUpdate, ResultCh: resultCh, TrieCh: trieCh}
 
