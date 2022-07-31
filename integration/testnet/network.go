@@ -466,6 +466,7 @@ type NodeConfig struct {
 	AdditionalFlags       []string
 	Debug                 bool
 	SupportsUnstakedNodes bool // only applicable to Access node
+	Observer              bool
 }
 
 func NewNodeConfig(role flow.Role, opts ...func(*NodeConfig)) NodeConfig {
@@ -474,6 +475,7 @@ func NewNodeConfig(role flow.Role, opts ...func(*NodeConfig)) NodeConfig {
 		Weight:     flow.DefaultInitialWeight,
 		Identifier: unittest.IdentifierFixture(), // default random ID
 		LogLevel:   zerolog.DebugLevel,           // log at debug by default
+		Observer:   false,
 	}
 
 	for _, apply := range opts {
@@ -551,20 +553,12 @@ func AsBootstrap() func(config *NodeConfig) {
 
 func AsObserver() func(config *NodeConfig) {
 	return func(config *NodeConfig) {
+		config.Observer = true
 		config.AdditionalFlags = append(config.AdditionalFlags, "--topology=fully-connected")
 		config.AdditionalFlags = append(config.AdditionalFlags,
 			fmt.Sprintf("--bootstrap-node-addresses=%s:%d", DefaultAccessGatewayName, AccessPubNetworkPort))
 		config.AdditionalFlags = append(config.AdditionalFlags,
 			fmt.Sprintf("--bind=0.0.0.0:0"))
-		//observerName := fmt.Sprintf("%s_%d", DefaultObserverName, 1)
-		//config.AdditionalFlags = append(config.AdditionalFlags,
-		//	fmt.Sprintf("--observer-networking-key-path=/bootstrap/private-root-information/%s_key", observerName))
-		//agPublicKey, err := GetAccessGatewayPublicKeyString("0xffffffff")
-		//if err != nil {
-		//	panic(err)
-		//}
-		//config.AdditionalFlags = append(config.AdditionalFlags,
-		//	fmt.Sprintf("--bootstrap-node-public-keys=%s", agPublicKey))
 	}
 }
 
