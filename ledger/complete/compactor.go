@@ -203,12 +203,14 @@ Loop:
 
 		case checkpointResult := <-checkpointResultCh:
 			if checkpointResult.err != nil {
-				c.logger.Error().Err(checkpointResult.err).Msgf(
-					"compactor failed to checkpoint %d", checkpointResult.num,
+				c.logger.Error().Err(checkpointResult.err).Msg(
+					"compactor failed to create or remove checkpoint",
 				)
-
-				// Retry checkpointing when active segment is finalized.
-				nextCheckpointNum = activeSegmentNum
+				var createError *createCheckpointError
+				if errors.As(checkpointResult.err, &createError) {
+					// Retry checkpointing when active segment is finalized.
+					nextCheckpointNum = activeSegmentNum
+				}
 			}
 
 		case update, ok := <-c.trieUpdateCh:
@@ -271,7 +273,7 @@ func (c *Compactor) checkpoint(ctx context.Context, tries []*trie.MTrie, checkpo
 
 	err := createCheckpoint(c.checkpointer, c.logger, tries, checkpointNum)
 	if err != nil {
-		return fmt.Errorf("cannot create checkpoints: %w", err)
+		return &createCheckpointError{num: checkpointNum, err: err}
 	}
 
 	// Return if context is canceled.
@@ -283,7 +285,7 @@ func (c *Compactor) checkpoint(ctx context.Context, tries []*trie.MTrie, checkpo
 
 	err = cleanupCheckpoints(c.checkpointer, int(c.checkpointsToKeep))
 	if err != nil {
-		return fmt.Errorf("cannot cleanup checkpoints: %w", err)
+		return &removeCheckpointError{err: err}
 	}
 
 	if checkpointNum > 0 {
@@ -438,3 +440,26 @@ func (c *Compactor) processTrieUpdate(
 
 	return activeSegmentNum, checkpointNum, tries
 }
+
+// createCheckpointError creates a checkpoint creation error.
+type createCheckpointError struct {
+	num int
+	err error
+}
+
+func (e *createCheckpointError) Error() string {
+	return fmt.Sprintf("cannot create checkpoint %d: %s", e.num, e.err)
+}
+
+func (e *createCheckpointError) Unwrap() error { return e.err }
+
+// removeCheckpointError creates a checkpoint removal error.
+type removeCheckpointError struct {
+	err error
+}
+
+func (e *removeCheckpointError) Error() string {
+	return fmt.Sprintf("cannot cleanup checkpoints: %s", e.err)
+}
+
+func (e *removeCheckpointError) Unwrap() error { return e.err }
