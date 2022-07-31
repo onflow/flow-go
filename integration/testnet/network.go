@@ -551,20 +551,20 @@ func AsBootstrap() func(config *NodeConfig) {
 
 func AsObserver() func(config *NodeConfig) {
 	return func(config *NodeConfig) {
-		observerName := fmt.Sprintf("%s_%d", DefaultObserverName, 1)
 		config.AdditionalFlags = append(config.AdditionalFlags, "--topology=fully-connected")
-		config.AdditionalFlags = append(config.AdditionalFlags,
-			fmt.Sprintf("--bootstrap-node-addresses=%s:%d", DefaultAccessGatewayName, AccessPubNetworkPort))
-		config.AdditionalFlags = append(config.AdditionalFlags,
-			fmt.Sprintf("--observer-networking-key-path=/bootstrap/private-root-information/%s_key", observerName))
-		config.AdditionalFlags = append(config.AdditionalFlags,
-			fmt.Sprintf("--bind=0.0.0.0:0"))
-		agPublicKey, err := GetAccessGatewayPublicKeyString("0xffffffff")
-		if err != nil {
-			panic(err)
-		}
-		config.AdditionalFlags = append(config.AdditionalFlags,
-			fmt.Sprintf("--bootstrap-node-public-keys=%s", agPublicKey))
+		//config.AdditionalFlags = append(config.AdditionalFlags,
+		//	fmt.Sprintf("--bootstrap-node-addresses=%s:%d", DefaultAccessGatewayName, AccessPubNetworkPort))
+		//observerName := fmt.Sprintf("%s_%d", DefaultObserverName, 1)
+		//config.AdditionalFlags = append(config.AdditionalFlags,
+		//	fmt.Sprintf("--observer-networking-key-path=/bootstrap/private-root-information/%s_key", observerName))
+		//config.AdditionalFlags = append(config.AdditionalFlags,
+		//	fmt.Sprintf("--bind=0.0.0.0:0"))
+		//agPublicKey, err := GetAccessGatewayPublicKeyString("0xffffffff")
+		//if err != nil {
+		//	panic(err)
+		//}
+		//config.AdditionalFlags = append(config.AdditionalFlags,
+		//	fmt.Sprintf("--bootstrap-node-public-keys=%s", agPublicKey))
 	}
 }
 
