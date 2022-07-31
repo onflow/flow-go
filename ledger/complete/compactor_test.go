@@ -625,7 +625,10 @@ func triesUpToSegment(dir string, to int, capacity int) ([]*trie.MTrie, error) {
 		func(update *ledger.TrieUpdate) error {
 			t, err := forest.NewTrie(update)
 			if err == nil {
-				forest.AddTrie(t)
+				err = forest.AddTrie(t)
+				if err != nil {
+					return err
+				}
 				tries.Push(t)
 			}
 			return err
