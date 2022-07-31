@@ -61,22 +61,13 @@ func (q *TrieQueue) Tries() []*trie.MTrie {
 
 	tries := make([]*trie.MTrie, q.count)
 
-	if q.isFull() {
-		// If queue is full, tail points to the oldest element.
-		head := q.tail
+	if q.tail >= q.count { // Data isn't wrapped around the slice.
+		head := q.tail - q.count
+		copy(tries, q.ts[head:q.tail])
+	} else { // q.tail < q.count, data is wrapped around the slice.
+		head := q.capacity - q.count + q.tail
 		n := copy(tries, q.ts[head:])
 		copy(tries[n:], q.ts[:q.tail])
-	} else {
-		if q.tail >= q.count { // Data isn't wrapped around the slice.
-			head := q.tail - q.count
-			copy(tries, q.ts[head:q.tail])
-		} else { // q.tail < q.count, data is wrapped around the slice.
-			// This branch isn't used until TrieQueue supports Pop (removing oldest element).
-			// At this time, there is no reason to implement Pop, so this branch is here to prevent future bug.
-			head := q.capacity - q.count + q.tail
-			n := copy(tries, q.ts[head:])
-			copy(tries[n:], q.ts[:q.tail])
-		}
 	}
 
 	return tries
