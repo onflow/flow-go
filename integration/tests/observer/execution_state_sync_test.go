@@ -1,4 +1,4 @@
-package access
+package observer
 
 import (
 	"context"
@@ -120,6 +120,14 @@ func (s *ExecutionStateSyncSuite) buildNetworkConfig() {
 		ghostNode,
 		// TODO: add observer
 	}
+
+	// Add an access node for observer access
+	bsConfig := testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.InfoLevel), testnet.AsBootstrap())
+	net = append(net, bsConfig)
+
+	// Add an observer node
+	obsConfig := testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.InfoLevel), testnet.AsObserver())
+	net = append(net, obsConfig)
 
 	conf := testnet.NewNetworkConfig("execution state sync test", net)
 	s.net = testnet.PrepareFlowNetwork(s.T(), conf, flow.Localnet)
