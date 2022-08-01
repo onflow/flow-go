@@ -98,7 +98,7 @@ func Test_Add(t *testing.T) {
 
 			// IncorporatedResultSeal (2):
 			// the value for IncorporatedResultSeal.IncorporatedResult.IncorporatedBlockID is randomly
-			// generated and therefore, will be different than for irSeal1
+			// generated and therefore, will be different from for irSeal1
 			irSeal2 := unittest.IncorporatedResultSeal.Fixture(unittest.IncorporatedResultSeal.WithResult(result))
 			require.False(t, irSeal1.ID() == irSeal2.ID()) // incorporated in different block => different seal ID expected
 			wrappedMempool.On("Add", irSeal2).Return(true, nil).Once()
@@ -169,6 +169,7 @@ func Test_RejectInvalidSeals(t *testing.T) {
 // The expected behaviour is:
 //  * clear the wrapped mempool
 //  * reject addition of all further entities (even valid seals)
+// This logic has to be executed for all queries(`ByID`, `All`)
 func Test_ConflictingResults(t *testing.T) {
 	assertConflictingResult := func(t *testing.T, action func(irSeals []*flow.IncorporatedResultSeal, conflictingSeal *flow.IncorporatedResultSeal, wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals)) {
 		WithExecStateForkSuppressor(t, func(wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals, execForkActor *actormock.ExecForkActorMock) {
@@ -343,6 +344,9 @@ func Test_AddRemove_SmokeTest(t *testing.T) {
 	})
 }
 
+// Test_ConflictingSeal_SmokeTest tests a real system where we combine stdmap.IncorporatedResultSeals, consensus.IncorporatedResultSeals and
+// ExecForkSuppressor. We wrap stdmap.IncorporatedResultSeals with consensus.IncorporatedResultSeals which is wrapped with ExecForkSuppressor.
+// Test adding conflicting seals with different number of matching receipts.
 func Test_ConflictingSeal_SmokeTest(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		executingForkDetected := atomic.NewBool(false)

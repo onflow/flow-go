@@ -151,12 +151,16 @@ func (s *ExecForkSuppressor) All() []*flow.IncorporatedResultSeal {
 	s.mutex.RLock()
 	seals := s.seals.All()
 	s.mutex.RUnlock()
+
+	// index seals retrieved from underlying mepool by blockID to check
+	// for conflicting seals
 	sealsByBlockID := make(map[flow.Identifier]sealsList, 0)
 	for _, seal := range seals {
 		sealsPerBlock := sealsByBlockID[seal.Seal.BlockID]
 		sealsByBlockID[seal.Seal.BlockID] = append(sealsPerBlock, seal)
 	}
 
+	// check for conflicting seals
 	return s.filterConflictingSeals(sealsByBlockID)
 }
 
@@ -187,7 +191,7 @@ func (s *ExecForkSuppressor) ByID(identifier flow.Identifier) (*flow.Incorporate
 	}
 	s.mutex.RUnlock()
 
-	// check for conflicting Seals
+	// check for conflicting seals
 	seals := s.filterConflictingSeals(map[flow.Identifier]sealsList{seal.Seal.BlockID: sealsPerBlock})
 	if len(seals) == 0 {
 		return nil, false
