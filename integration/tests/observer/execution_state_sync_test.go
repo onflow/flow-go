@@ -226,10 +226,11 @@ func (s *ExecutionStateSyncSuite) startObserver(ctx context.Context) {
 		panic(err)
 	}
 
-	time.Sleep(time.Second * 3) // needs breathing room for the observer to start listening
+	time.Sleep(time.Second * 5) // needs breathing room for the observer to start listening
 
 	// extend the teardown function removing observer first
 	s.cancelObserver = func() {
-		stop()
+		//stop()
 	}
+	stop()
 }
