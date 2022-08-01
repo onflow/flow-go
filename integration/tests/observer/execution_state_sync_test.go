@@ -3,14 +3,14 @@ package observer
 import (
 	"context"
 	"fmt"
-	"os"
-	"testing"
-
 	badgerds "github.com/ipfs/go-ds-badger2"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"os"
+	"testing"
+	"time"
 
 	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/testnet"
@@ -62,6 +62,8 @@ func (s *ExecutionStateSyncSuite) SetupTest() {
 	s.net.Start(s.ctx)
 
 	s.Track(s.T(), s.ctx, s.Ghost())
+
+	s.startObserver(s.ctx)
 }
 
 func (s *ExecutionStateSyncSuite) TearDownTest() {
@@ -118,16 +120,7 @@ func (s *ExecutionStateSyncSuite) buildNetworkConfig() {
 		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel)),
 		bridgeANConfig,
 		ghostNode,
-		// TODO: add observer
 	}
-
-	// Add an access node for observer access
-	bsConfig := testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.InfoLevel), testnet.AsBootstrap())
-	net = append(net, bsConfig)
-
-	// Add an extra observer node for testing
-	obsConfig := testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.InfoLevel), testnet.AsObserver())
-	net = append(net, obsConfig)
 
 	conf := testnet.NewNetworkConfig("execution state sync test", net)
 	s.net = testnet.PrepareFlowNetwork(s.T(), conf, flow.Localnet)
@@ -213,4 +206,30 @@ func (s *ExecutionStateSyncSuite) getTestExecutionDataServiceNode(node *testnet.
 		metrics.NewNoopCollector(),
 		zerolog.New(os.Stdout).With().Str("test", "execution-state-sync").Logger(),
 	), ctx
+}
+
+func (s *ExecutionStateSyncSuite) startObserver(ctx context.Context) {
+	stop, err := s.net.AddObserver(ctx, &testnet.ObserverConfig{
+		ObserverName:            "observer_1",
+		ObserverImage:           "gcr.io/flow-container-registry/observer:latest",
+		AccessName:              "access_1",
+		AccessPublicNetworkPort: fmt.Sprint(testnet.AccessNodePublicNetworkPort),
+		AccessGRPCSecurePort:    fmt.Sprint(testnet.DefaultSecureGRPCPort),
+	})
+
+	if err != nil {
+		// this can happen occaisionally...
+		// usually it's because docker didn't remove the observer container during the previous test.
+		// the observer container is removed by an "AutoRemove" flag in AddObserver.
+		panic(err)
+	}
+
+	time.Sleep(time.Second * 3) // needs breathing room for the observer to start listening
+
+	// extend the teardown function removing observer first
+	saved := s.cancel
+	s.cancel = func() {
+		stop()
+		saved()
+	}
 }
