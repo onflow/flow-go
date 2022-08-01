@@ -6,14 +6,14 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/fvm/meter/weighted"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 )
 
 func TestUUIDs_GetAndSetUUID(t *testing.T) {
 	view := utils.NewSimpleView()
-	meter := weighted.NewMeter(math.MaxUint64, math.MaxUint64)
+	meter := meter.NewMeter(math.MaxUint64, math.MaxUint64)
 	sth := state.NewStateHolder(state.NewState(view, meter))
 	uuidsA := state.NewUUIDGenerator(sth)
 
@@ -34,7 +34,7 @@ func TestUUIDs_GetAndSetUUID(t *testing.T) {
 
 func Test_GenerateUUID(t *testing.T) {
 	view := utils.NewSimpleView()
-	meter := weighted.NewMeter(math.MaxUint64, math.MaxUint64)
+	meter := meter.NewMeter(math.MaxUint64, math.MaxUint64)
 	sth := state.NewStateHolder(state.NewState(view, meter))
 	genA := state.NewUUIDGenerator(sth)
 

@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/meter/weighted"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
@@ -147,9 +146,9 @@ func (e *TransactionEnv) setExecutionParameters() error {
 	}
 
 	var ok bool
-	var m *weighted.Meter
-	// only set the weights if the meter is a weighted.Meter
-	if m, ok = e.sth.State().Meter().(*weighted.Meter); !ok {
+	var m *meter.WeightedMeter
+	// only set the weights if the meter is a meter.WeightedMeter
+	if m, ok = e.sth.State().Meter().(*meter.WeightedMeter); !ok {
 		return nil
 	}
 

@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/fvm/programs"
 
 	"github.com/onflow/flow-go/fvm/handler"
-	"github.com/onflow/flow-go/fvm/meter/weighted"
+	"github.com/onflow/flow-go/fvm/meter"
 	stateMock "github.com/onflow/flow-go/fvm/mock/state"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
@@ -23,7 +23,7 @@ import (
 func TestContract_ChildMergeFunctionality(t *testing.T) {
 	sth := state.NewStateHolder(state.NewState(
 		utils.NewSimpleView(),
-		weighted.NewMeter(math.MaxUint64, math.MaxUint64)))
+		meter.NewMeter(math.MaxUint64, math.MaxUint64)))
 	accounts := state.NewAccounts(sth)
 	address := flow.HexToAddress("01")
 	rAdd := runtime.Address(address)
@@ -99,7 +99,7 @@ func TestContract_ChildMergeFunctionality(t *testing.T) {
 func TestContract_AuthorizationFunctionality(t *testing.T) {
 	sth := state.NewStateHolder(state.NewState(
 		utils.NewSimpleView(),
-		weighted.NewMeter(math.MaxUint64, math.MaxUint64)))
+		meter.NewMeter(math.MaxUint64, math.MaxUint64)))
 	accounts := state.NewAccounts(sth)
 
 	authAdd := flow.HexToAddress("01")
@@ -220,7 +220,7 @@ func TestContract_DeploymentVouchers(t *testing.T) {
 
 	sth := state.NewStateHolder(state.NewState(
 		utils.NewSimpleView(),
-		weighted.NewMeter(math.MaxUint64, math.MaxUint64)))
+		meter.NewMeter(math.MaxUint64, math.MaxUint64)))
 	accounts := state.NewAccounts(sth)
 
 	addressWithVoucher := flow.HexToAddress("01")
@@ -279,7 +279,7 @@ func TestContract_ContractUpdate(t *testing.T) {
 
 	sth := state.NewStateHolder(state.NewState(
 		utils.NewSimpleView(),
-		weighted.NewMeter(math.MaxUint64, math.MaxUint64)))
+		meter.NewMeter(math.MaxUint64, math.MaxUint64)))
 	accounts := state.NewAccounts(sth)
 
 	flowAddress := flow.HexToAddress("01")
@@ -387,7 +387,7 @@ func TestContract_ContractRemoval(t *testing.T) {
 
 	sth := state.NewStateHolder(state.NewState(
 		utils.NewSimpleView(),
-		weighted.NewMeter(math.MaxUint64, math.MaxUint64)))
+		meter.NewMeter(math.MaxUint64, math.MaxUint64)))
 	accounts := state.NewAccounts(sth)
 
 	flowAddress := flow.HexToAddress("01")

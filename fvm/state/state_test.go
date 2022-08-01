@@ -9,14 +9,14 @@ import (
 
 	"github.com/onflow/atree"
 
-	"github.com/onflow/flow-go/fvm/meter/weighted"
+	metering "github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 )
 
 func TestState_ChildMergeFunctionality(t *testing.T) {
 	view := utils.NewSimpleView()
-	meter := weighted.NewMeter(math.MaxUint64, math.MaxUint64)
+	meter := metering.NewMeter(math.MaxUint64, math.MaxUint64)
 	st := state.NewState(view, meter)
 
 	t.Run("test read from parent state (backoff)", func(t *testing.T) {
@@ -89,7 +89,7 @@ func TestState_ChildMergeFunctionality(t *testing.T) {
 
 func TestState_InteractionMeasuring(t *testing.T) {
 	view := utils.NewSimpleView()
-	meter := weighted.NewMeter(math.MaxUint64, math.MaxUint64)
+	meter := metering.NewMeter(math.MaxUint64, math.MaxUint64)
 	st := state.NewState(view, meter)
 
 	key := "key1"
@@ -120,7 +120,7 @@ func TestState_InteractionMeasuring(t *testing.T) {
 
 func TestState_MaxValueSize(t *testing.T) {
 	view := utils.NewSimpleView()
-	meter := weighted.NewMeter(math.MaxUint64, math.MaxUint64)
+	meter := metering.NewMeter(math.MaxUint64, math.MaxUint64)
 	st := state.NewState(view, meter, state.WithMaxValueSizeAllowed(6))
 
 	// update should pass
@@ -136,7 +136,7 @@ func TestState_MaxValueSize(t *testing.T) {
 
 func TestState_MaxKeySize(t *testing.T) {
 	view := utils.NewSimpleView()
-	meter := weighted.NewMeter(math.MaxUint64, math.MaxUint64)
+	meter := metering.NewMeter(math.MaxUint64, math.MaxUint64)
 	st := state.NewState(view, meter, state.WithMaxKeySizeAllowed(4))
 
 	// read
@@ -159,7 +159,7 @@ func TestState_MaxKeySize(t *testing.T) {
 
 func TestState_MaxInteraction(t *testing.T) {
 	view := utils.NewSimpleView()
-	meter := weighted.NewMeter(math.MaxUint64, math.MaxUint64)
+	meter := metering.NewMeter(math.MaxUint64, math.MaxUint64)
 	st := state.NewState(view, meter, state.WithMaxInteractionSizeAllowed(12))
 
 	// read - interaction 2
@@ -177,7 +177,7 @@ func TestState_MaxInteraction(t *testing.T) {
 	require.Equal(t, st.InteractionUsed(), uint64(14))
 	require.Error(t, err)
 
-	meter = weighted.NewMeter(math.MaxUint64, math.MaxUint64)
+	meter = metering.NewMeter(math.MaxUint64, math.MaxUint64)
 	st = state.NewState(view, meter, state.WithMaxInteractionSizeAllowed(6))
 	stChild := st.NewChild()
 
