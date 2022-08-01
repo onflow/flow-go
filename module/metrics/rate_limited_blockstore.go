@@ -1,9 +1,10 @@
 package metrics
 
 import (
-	"github.com/onflow/flow-go/module"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+
+	"github.com/onflow/flow-go/module"
 )
 
 type RateLimitedBlockstoreCollector struct {
