@@ -26,7 +26,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestExecutionStateSync(t *testing.T) {
+func _TestExecutionStateSync(t *testing.T) {
 	suite.Run(t, new(ExecutionStateSyncSuite))
 }
 
@@ -128,7 +128,7 @@ func (s *ExecutionStateSyncSuite) buildNetworkConfig() {
 
 // TestHappyPath tests that Execution Nodes generate execution data, and Access Nodes are able to
 // successfully sync the data
-func (s *ExecutionStateSyncSuite) TestHappyPath() {
+func (s *ExecutionStateSyncSuite) _TestHappyPath() {
 	// Let the network run for this many blocks
 	runBlocks := uint64(20)
 
