@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/errors"
-	basicMeter "github.com/onflow/flow-go/fvm/meter/basic"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
@@ -27,7 +27,7 @@ func makeTwoAccounts(t *testing.T, aPubKeys []flow.AccountPublicKey, bPubKeys []
 	ledger := utils.NewSimpleView()
 	sth := state.NewStateHolder(state.NewState(
 		ledger,
-		state.WithMeter(basicMeter.NewMeter(math.MaxUint64, math.MaxUint64))),
+		meter.NewMeter(math.MaxUint64, math.MaxUint64)),
 	)
 
 	a := flow.HexToAddress("1234")
@@ -267,7 +267,10 @@ func TestAccountFreezing(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, tx.Err)
 
-		accountsService := state.NewAccounts(state.NewStateHolder(state.NewState(ledger)))
+		accountsService := state.NewAccounts(state.NewStateHolder(state.NewState(
+			ledger,
+			meter.NewMeter(math.MaxUint64, math.MaxUint64),
+		)))
 
 		frozen, err := accountsService.GetAccountFrozen(address)
 		require.NoError(t, err)
@@ -295,7 +298,10 @@ func TestAccountFreezing(t *testing.T) {
 		require.NoError(t, err)
 		require.Error(t, tx.Err)
 
-		accountsService = state.NewAccounts(state.NewStateHolder(state.NewState(ledger)))
+		accountsService = state.NewAccounts(state.NewStateHolder(state.NewState(
+			ledger,
+			meter.NewMeter(math.MaxUint64, math.MaxUint64),
+		)))
 
 		frozen, err = accountsService.GetAccountFrozen(serviceAddress)
 		require.NoError(t, err)

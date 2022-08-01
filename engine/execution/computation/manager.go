@@ -287,7 +287,7 @@ func (e *Manager) ComputeBlock(
 
 			group.Go(func() error {
 				span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXEUploadCollections)
-				defer span.Finish()
+				defer span.End()
 
 				return uploader.Upload(result)
 			})
