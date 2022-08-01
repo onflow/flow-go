@@ -26,13 +26,11 @@ import (
 //   * Even after a restart, the sealing should not resume.
 //   * We rely on human intervention to resolve the conflict.
 // The ExecForkSuppressor implements this mitigation strategy as follows:
-//   * For each candidate seal inserted into the mempool, inspect the state
-//     transition for the respective block.
-//   * If this is the first seal for a block, store the seal as an archetype
-//     for the state transition into the internal map `sealsForBlock`.
-//   * If the mempool already knows about a state transition for a block,
-//     and a second seal for the same block is inserted, check whether
-//     the seal has the same state transition.
+//   * For each candidate seal inserted into the mempool, indexes seal
+//     by respective blockID, storing all seals in the internal map `sealsForBlock`.
+//   * Whenever client perform any query, we check if there are conflicting seals.
+//   * We pick first seal available for a block and check whether
+//     the seal has the same state transition as other seals included for same block.
 //   * If conflicting state transitions for the same block are detected,
 //     ExecForkSuppressor sets an internal flag and thereafter
 //     reports the mempool as empty, which will lead to the respective
@@ -55,6 +53,8 @@ var _ mempool.IncorporatedResultSeals = (*ExecForkSuppressor)(nil)
 
 // sealSet is a set of seals; internally represented as a map from sealID -> to seal
 type sealSet map[flow.Identifier]*flow.IncorporatedResultSeal
+
+// sealsList is a list of seals
 type sealsList []*flow.IncorporatedResultSeal
 
 func NewExecStateForkSuppressor(seals mempool.IncorporatedResultSeals, onExecFork ExecForkActor, db *badger.DB, log zerolog.Logger) (*ExecForkSuppressor, error) {
@@ -81,7 +81,8 @@ func NewExecStateForkSuppressor(seals mempool.IncorporatedResultSeals, onExecFor
 	return &wrapper, nil
 }
 
-// Add adds the given seal to the mempool. Return value indicates whether or not seal was added to mempool.
+// Add adds the given seal to the mempool. Return value indicates whether seal was added to the mempool.
+// Internally indexes every added seal by blockID. Expects that underlying mempool never eject items.
 // Error returns:
 //   * engine.InvalidInputError (sentinel error)
 //     In case a seal fails one of the required consistency checks;
@@ -108,7 +109,12 @@ func (s *ExecForkSuppressor) Add(newSeal *flow.IncorporatedResultSeal) (bool, er
 	}
 	blockID := newSeal.Seal.BlockID
 
-	// STEP 3: add newSeal to the wrapped mempool
+	// This mempool allows adding multiple seals for same blockID even if they have different state transition.
+	// When builder logic tries to query such seals we will check whenever we have an execution fork. The main reason for
+	// detecting forks at query time(not at adding time) is ability to add extra logic in underlying mempools. For instance
+	// we could filter seals comming from underlying mempool by some criteria.
+
+	// STEP 2: add newSeal to the wrapped mempool
 	added, err := s.seals.Add(newSeal) // internally de-duplicates
 	if err != nil {
 		return added, fmt.Errorf("failed to add seal to wrapped mempool: %w", err)
@@ -117,14 +123,8 @@ func (s *ExecForkSuppressor) Add(newSeal *flow.IncorporatedResultSeal) (bool, er
 		return false, nil
 	}
 
-	// STEP 4: add newSeal to secondary index of this wrapper
-	// CAUTION: the following edge case needs to be considered:
-	//  * the mempool only holds a single other seal (denominated as `otherSeal`) for this block
-	//  * upon adding the new seal, the mempool might decide to eject otherSeal
-	//  * during the ejection, we will delete the entire set from the `sealsForBlock`
-	//    because at this time, it only held otherSeal, which was ejected
-	// Therefore, the value for `found` in the line below might
-	// be different than the value in the earlier call above.
+	// STEP 3: add newSeal to secondary index of this wrapper
+	// CAUTION: We expect that underlying mempool NEVER ejects seals because it breaks liveness.
 	blockSeals, found := s.sealsForBlock[blockID]
 	if !found {
 		// no other seal for this block was in mempool before => create a set for the seals for this block
@@ -144,7 +144,9 @@ func (s *ExecForkSuppressor) Add(newSeal *flow.IncorporatedResultSeal) (bool, er
 	return true, nil
 }
 
-// All returns all the IncorporatedResultSeals in the mempool
+// All returns all the IncorporatedResultSeals in the mempool.
+// Note: This call might crash if the block of the seal has multiple seals in mempool for conflicting
+// incorporated results.
 func (s *ExecForkSuppressor) All() []*flow.IncorporatedResultSeal {
 	s.mutex.RLock()
 	seals := s.seals.All()
@@ -158,7 +160,12 @@ func (s *ExecForkSuppressor) All() []*flow.IncorporatedResultSeal {
 	return s.filterConflictingSeals(sealsByBlockID)
 }
 
-// ByID returns an IncorporatedResultSeal by its ID
+// ByID returns an IncorporatedResultSeal by its ID.
+// The IncorporatedResultSeal's ID is the same as IncorporatedResult's ID,
+// so this call essentially is to find the seal for the incorporated result in the mempool.
+// Note: This call might crash if the block of the seal has multiple seals in mempool for conflicting
+// incorporated results. Usually the builder will call this method to find a seal for an incorporated
+// result, so the builder might crash if multiple conflicting seals exist.
 func (s *ExecForkSuppressor) ByID(identifier flow.Identifier) (*flow.IncorporatedResultSeal, bool) {
 	s.mutex.RLock()
 	seal, found := s.seals.ByID(identifier)
@@ -167,9 +174,9 @@ func (s *ExecForkSuppressor) ByID(identifier flow.Identifier) (*flow.Incorporate
 		s.mutex.RUnlock()
 		return seal, found
 	}
-	sealsForBlock, found := s.sealsForBlock[seal.Seal.BlockID]
+	sealsForBlock := s.sealsForBlock[seal.Seal.BlockID]
 	// if there are no other seals for this block previously seen - then no possible execution forks
-	if !found || len(sealsForBlock) == 1 {
+	if len(sealsForBlock) == 1 {
 		s.mutex.RUnlock()
 		return seal, true
 	}
@@ -358,6 +365,11 @@ func storeExecutionForkEvidence(conflictingSeals []*flow.IncorporatedResultSeal,
 	return err
 }
 
+// filterConflictingSeals performs filtering of provided seals by checking if there are conflicting seals for same block.
+// For every block we check if first seal has same state transitions as others. Multiple seals for same block are allowed
+// but their state transitions should be the same. Upon detecting seal with inconsistent state transition we will clear our mempool,
+// stop accepting new seals and querying old seals and store execution fork evidence into DB. Creator of mempool will be notified
+// by callback.
 func (s *ExecForkSuppressor) filterConflictingSeals(sealsByBlockID map[flow.Identifier]sealsList) sealsList {
 	var result sealsList
 	for _, sealsInBlock := range sealsByBlockID {
@@ -371,13 +383,14 @@ func (s *ExecForkSuppressor) filterConflictingSeals(sealsByBlockID map[flow.Iden
 					conflictingSeals = append(conflictingSeals, otherSeal)
 				}
 			}
+			// check if inconsistent state transition detected
 			if len(conflictingSeals) > 0 {
 				s.execForkDetected.Store(true)
 				s.Clear()
 				conflictingSeals = append(sealsList{candidateSeal}, conflictingSeals...)
 				err := storeExecutionForkEvidence(conflictingSeals, s.db)
 				if err != nil {
-					panic("failed to update execution-fork-detected flag")
+					panic("failed to store execution fork evidence")
 				}
 				s.onExecFork(conflictingSeals)
 				return nil
