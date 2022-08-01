@@ -3,7 +3,6 @@ package access
 import (
 	"context"
 	"fmt"
-	"os"
 	"testing"
 
 	badgerds "github.com/ipfs/go-ds-badger2"
@@ -15,13 +14,10 @@ import (
 	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
-	"github.com/onflow/flow-go/integration/utils"
-	"github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network/compressor"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -166,7 +162,7 @@ func (s *ExecutionStateSyncSuite) TestHappyPath() {
 
 		s.T().Logf("getting execution data for height %d, block %s, execution_data %s", header.Height, header.ID(), result.ExecutionDataID)
 
-		ed, err := eds.Get(ctx, result.ExecutionDataID)
+		ed, err := eds.GetExecutionData(s.ctx, result.ExecutionDataID)
 		assert.NoError(s.T(), err, "could not get execution data for height %v", i)
 
 		s.T().Logf("got execution data for height %d", i)
@@ -185,5 +181,5 @@ func (s *ExecutionStateSyncSuite) nodeExecutionDataStore(node *testnet.Container
 		}
 	}()
 
-	store := execution_data.NewExecutionDataStore(blobs.NewBlobstore(ds), execution_data.DefaultSerializer)
+	return execution_data.NewExecutionDataStore(blobs.NewBlobstore(ds), execution_data.DefaultSerializer)
 }
