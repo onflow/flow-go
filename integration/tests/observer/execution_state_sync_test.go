@@ -65,11 +65,13 @@ func (s *ExecutionStateSyncSuite) SetupTest() {
 	s.startObserver(s.ctx)
 
 	s.Track(s.T(), s.ctx, s.Ghost())
+
+	s.cancelObserver()
 }
 
 func (s *ExecutionStateSyncSuite) TearDownTest() {
 	s.log.Info().Msg("================> Start TearDownTest")
-	s.cancelObserver()
+	//s.cancelObserver()
 	s.net.Remove()
 	s.cancel()
 	s.log.Info().Msgf("================> Finish TearDownTest")
@@ -230,7 +232,6 @@ func (s *ExecutionStateSyncSuite) startObserver(ctx context.Context) {
 
 	// extend the teardown function removing observer first
 	s.cancelObserver = func() {
-		//stop()
+		stop()
 	}
-	stop()
 }
