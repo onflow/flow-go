@@ -26,7 +26,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func _TestExecutionStateSync(t *testing.T) {
+func TestExecutionStateSync(t *testing.T) {
 	suite.Run(t, new(ExecutionStateSyncSuite))
 }
 
@@ -40,8 +40,9 @@ type ExecutionStateSyncSuite struct {
 	ghostID  flow.Identifier
 
 	// root context for the current test
-	ctx    context.Context
-	cancel context.CancelFunc
+	ctx            context.Context
+	cancel         context.CancelFunc
+	cancelObserver context.CancelFunc
 
 	net *testnet.FlowNetwork
 }
@@ -61,13 +62,14 @@ func (s *ExecutionStateSyncSuite) SetupTest() {
 	// start the network
 	s.net.Start(s.ctx)
 
-	s.Track(s.T(), s.ctx, s.Ghost())
-
 	s.startObserver(s.ctx)
+
+	s.Track(s.T(), s.ctx, s.Ghost())
 }
 
 func (s *ExecutionStateSyncSuite) TearDownTest() {
 	s.log.Info().Msg("================> Start TearDownTest")
+	s.cancelObserver()
 	s.net.Remove()
 	s.cancel()
 	s.log.Info().Msgf("================> Finish TearDownTest")
@@ -128,7 +130,7 @@ func (s *ExecutionStateSyncSuite) buildNetworkConfig() {
 
 // TestHappyPath tests that Execution Nodes generate execution data, and Access Nodes are able to
 // successfully sync the data
-func (s *ExecutionStateSyncSuite) _TestHappyPath() {
+func (s *ExecutionStateSyncSuite) TestHappyPath() {
 	// Let the network run for this many blocks
 	runBlocks := uint64(20)
 
@@ -227,9 +229,7 @@ func (s *ExecutionStateSyncSuite) startObserver(ctx context.Context) {
 	time.Sleep(time.Second * 3) // needs breathing room for the observer to start listening
 
 	// extend the teardown function removing observer first
-	saved := s.cancel
-	s.cancel = func() {
+	s.cancelObserver = func() {
 		stop()
-		saved()
 	}
 }
