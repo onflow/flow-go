@@ -52,7 +52,6 @@ func corruptibleNetworkFixture(t *testing.T, logger zerolog.Logger, corruptedID 
 	flowNetwork.On("Done", mock.Anything).Return(func() <-chan struct{} {
 		return done
 	})
-	//logger, loggerHook := unittest.HookedLogger()
 	ccf := NewCorruptibleConduitFactory(logger, flow.BftTestnet)
 
 	// set up adapter, so we can check that it called the expected method
