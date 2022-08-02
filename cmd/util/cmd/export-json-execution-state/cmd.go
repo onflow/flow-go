@@ -140,7 +140,6 @@ func ExportLedger(ledgerPath string, targetstate string, outputPath string, full
 				return err
 			},
 			func(rootHash ledger.RootHash) error {
-				forest.RemoveTrie(rootHash)
 				return nil
 			},
 		)
