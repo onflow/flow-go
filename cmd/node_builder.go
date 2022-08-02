@@ -167,6 +167,17 @@ type BaseConfig struct {
 	// ComplianceConfig configures either the compliance engine (consensus nodes)
 	// or the follower engine (all other node roles)
 	ComplianceConfig compliance.Config
+
+	// EnableUnicastRateLimits denotes whether the p2p middleware should enable the stream creation and bandwith unicast rate limiters.
+	EnableUnicastRateLimits bool
+	// UnicastStreamCreationRateLimit amount of unicast streams that can be created by a peer per second.
+	UnicastStreamCreationRateLimit int
+	// UnicastStreamCreationBurstLimit amount of unicast streams that can be created by a peer at once.
+	UnicastStreamCreationBurstLimit int
+	// UnicastBandwidthRateLimit bandwidth size in bytes a peer is allowed to send via unicast streams per second.
+	UnicastBandwidthRateLimit int
+	// UnicastStreamCreationBurstLimit bandwidth size in bytes a peer is allowed to send via unicast streams at once.
+	UnicastBandwidthBurstLimit int
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of

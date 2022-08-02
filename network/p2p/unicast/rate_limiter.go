@@ -33,7 +33,7 @@ func (r *rateLimitedPeers) removeRateLimitedPeer(peerID string) {
 	r.Delete(peerID)
 }
 
-// isRateLimited returns true if an entry for the peerID provided exists. 
+// isRateLimited returns true if an entry for the peerID provided exists.
 func (r *rateLimitedPeers) isRateLimited(peerID string) bool {
 	_, ok := r.Load(peerID)
 	return ok

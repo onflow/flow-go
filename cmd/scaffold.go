@@ -20,6 +20,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
+	"golang.org/x/time/rate"
 
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
@@ -173,6 +174,14 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.MaxRequests, "sync-max-requests", defaultConfig.SyncCoreConfig.MaxRequests, "the maximum number of requests we send during each scanning period")
 
 	fnb.flags.Uint64Var(&fnb.BaseConfig.ComplianceConfig.SkipNewProposalsThreshold, "compliance-skip-proposals-threshold", defaultConfig.ComplianceConfig.SkipNewProposalsThreshold, "threshold at which new proposals are discarded rather than cached, if their height is this much above local finalized height")
+
+	// unicast stream handler rate limits
+	fnb.flags.BoolVar(&fnb.BaseConfig.EnableUnicastRateLimits, "enable-unicast-rate-limits", false, "set to true to enable the unicast stream creation and bandwidth rate limiters")
+	fnb.flags.IntVar(&fnb.BaseConfig.UnicastStreamCreationRateLimit, "unicast-stream-rate-limit", 0, "amount of unicast streams that can be created by a single peer per second")
+	fnb.flags.IntVar(&fnb.BaseConfig.UnicastStreamCreationBurstLimit, "unicast-stream-burst-limit", 0, "amount of unicast streams that can be created by a single peer at once")
+	fnb.flags.IntVar(&fnb.BaseConfig.UnicastBandwidthRateLimit, "unicast-bandwidth-rate-limit", 0, "bandwidth size in bytes a peer is allowed to send via unicast streams per second")
+	fnb.flags.IntVar(&fnb.BaseConfig.UnicastBandwidthBurstLimit, "unicast-bandwidth-burst-limit", 0, "bandwidth size in bytes a peer is allowed to send via unicast streams at once")
+
 }
 
 func (fnb *FlowNodeBuilder) EnqueuePingService() {
@@ -265,6 +274,11 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		myAddr = fnb.BaseConfig.BindAddr
 	}
 
+	var mwOpts []p2p.MiddlewareOption
+	if len(fnb.MsgValidators) > 0 {
+		mwOpts = append(mwOpts, p2p.WithMessageValidators(fnb.MsgValidators...))
+	}
+
 	idProviderPeerFilter := func(pid peer.ID) bool {
 		_, found := fnb.IdentityProvider.ByPeerID(pid)
 		return found
@@ -274,6 +288,24 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 
 	// add rate limiter peer filter func
 	connGaterInterceptSecureFilters := p2p.PeerFilters{idProviderPeerFilter}
+
+	// setup unicast rate limiters if enabled
+	if fnb.BaseConfig.EnableUnicastRateLimits {
+		unicastStreamsRateLimiter := unicast.NewStreamsRateLimiter(rate.Limit(fnb.BaseConfig.UnicastStreamCreationRateLimit), fnb.BaseConfig.UnicastStreamCreationBurstLimit)
+		unicastBandwidthRateLimiter := unicast.NewBandWidthRateLimiter(rate.Limit(fnb.BaseConfig.UnicastBandwidthRateLimit), fnb.BaseConfig.UnicastBandwidthBurstLimit)
+
+		// add rate limiters to mw opts
+		mwOpts = append(mwOpts,
+			p2p.WithUnicastStreamRateLimiter(unicastStreamsRateLimiter),
+			p2p.WithUnicastBandwidthRateLimiter(unicastBandwidthRateLimiter),
+		)
+
+		// add IsRateLimited peerFilters to conn gater intercept secure peer filters list
+		connGaterInterceptSecureFilters = append(connGaterInterceptSecureFilters,
+			unicastStreamsRateLimiter.IsRateLimited,
+			unicastBandwidthRateLimiter.IsRateLimited,
+		)
+	}
 
 	libP2PNodeFactory := p2p.DefaultLibP2PNodeFactory(
 		fnb.Logger,
@@ -287,11 +319,6 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		fnb.Resolver,
 		fnb.BaseConfig.NodeRole,
 	)
-
-	var mwOpts []p2p.MiddlewareOption
-	if len(fnb.MsgValidators) > 0 {
-		mwOpts = append(mwOpts, p2p.WithMessageValidators(fnb.MsgValidators...))
-	}
 
 	// run peer manager with the specified interval and let it also prune connections
 	peerManagerFactory := p2p.PeerManagerFactory([]p2p.Option{p2p.WithInterval(fnb.PeerUpdateInterval)})
