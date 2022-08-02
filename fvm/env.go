@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"go.opentelemetry.io/otel/attribute"
+	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/errors"
@@ -26,9 +27,16 @@ import (
 // Environment accepts a context and a virtual machine instance and provides
 // cadence runtime interface methods to the runtime.
 type Environment interface {
+	// TODO(patrick): stop exposing Context()
 	Context() *Context
+
 	VM() *VirtualMachine
 	runtime.Interface
+
+	// TODO(patrick): we should probably make this non-optional
+	AccountFreezeEnabled() bool
+
+	StartSpanFromRoot(name trace.SpanName) otelTrace.Span
 }
 
 // TODO(patrick): refactor this into an object.
@@ -108,6 +116,14 @@ func (env *commonEnv) MemoryEstimate() uint64 {
 // TODO(patrick): rm once ctx becomes an anonymous field.
 func (env *commonEnv) Context() *Context {
 	return env.ctx.Context()
+}
+
+func (env *commonEnv) AccountFreezeEnabled() bool {
+	return env.ctx.AccountFreezeEnabled
+}
+
+func (env *commonEnv) StartSpanFromRoot(name trace.SpanName) otelTrace.Span {
+	return env.ctx.StartSpanFromRoot(name)
 }
 
 func (env *commonEnv) VM() *VirtualMachine {
