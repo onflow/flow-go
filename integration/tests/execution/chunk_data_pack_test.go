@@ -68,7 +68,7 @@ func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 	// TODO clear messages
 
 	// send a ChunkDataRequest from Ghost node
-	err = gs.Ghost().Send(context.Background(), channels.PushReceipts,
+	err = gs.Ghost().Send(context.Background(), channels.RequestChunks,
 		&messages.ChunkDataRequest{ChunkID: chunkID, Nonce: rand.Uint64()},
 		[]flow.Identifier{gs.exe1ID}...)
 	require.NoError(gs.T(), err)
