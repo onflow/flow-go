@@ -261,7 +261,7 @@ func (m *Middleware) topologyPeers() (peer.IDSlice, error) {
 
 	allPeers := m.peerIDs(identities.NodeIDs())
 	filteredPeers := make([]peer.ID, 0)
-	
+
 	// if we have some filters configured filter our peers
 	if len(m.peerManagerFilters) > 0 {
 		// filter peers through peerManagerFilters
