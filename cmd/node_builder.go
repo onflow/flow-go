@@ -168,8 +168,8 @@ type BaseConfig struct {
 	// or the follower engine (all other node roles)
 	ComplianceConfig compliance.Config
 
-	// EnableUnicastRateLimits denotes whether the p2p middleware should enable the stream creation and bandwith unicast rate limiters.
-	EnableUnicastRateLimits bool
+	// UnicastRateLimitDryRun will disable connection disconnects and gating when unicast rate limiters are configured
+	UnicastRateLimitDryRun bool
 	// UnicastStreamCreationRateLimit amount of unicast streams that can be created by a peer per second.
 	UnicastStreamCreationRateLimit int
 	// UnicastStreamCreationBurstLimit amount of unicast streams that can be created by a peer at once.

@@ -176,11 +176,10 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.Uint64Var(&fnb.BaseConfig.ComplianceConfig.SkipNewProposalsThreshold, "compliance-skip-proposals-threshold", defaultConfig.ComplianceConfig.SkipNewProposalsThreshold, "threshold at which new proposals are discarded rather than cached, if their height is this much above local finalized height")
 
 	// unicast stream handler rate limits
-	fnb.flags.BoolVar(&fnb.BaseConfig.EnableUnicastRateLimits, "enable-unicast-rate-limits", false, "set to true to enable the unicast stream creation and bandwidth rate limiters")
 	fnb.flags.IntVar(&fnb.BaseConfig.UnicastStreamCreationRateLimit, "unicast-stream-rate-limit", 0, "amount of unicast streams that can be created by a single peer per second")
 	fnb.flags.IntVar(&fnb.BaseConfig.UnicastStreamCreationBurstLimit, "unicast-stream-burst-limit", 0, "amount of unicast streams that can be created by a single peer at once")
 	fnb.flags.IntVar(&fnb.BaseConfig.UnicastBandwidthRateLimit, "unicast-bandwidth-rate-limit", 0, "bandwidth size in bytes a peer is allowed to send via unicast streams per second")
-	fnb.flags.IntVar(&fnb.BaseConfig.UnicastBandwidthBurstLimit, "unicast-bandwidth-burst-limit", 0, "bandwidth size in bytes a peer is allowed to send via unicast streams at once")
+	fnb.flags.BoolVar(&fnb.BaseConfig.UnicastRateLimitDryRun, "unicast-rate-limit-dry-run", true, "disable peer disconnects and connections gating when rate limiting peers")
 
 }
 
@@ -289,22 +288,26 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 	// add rate limiter peer filter func
 	connGaterInterceptSecureFilters := p2p.PeerFilters{idProviderPeerFilter}
 
-	// setup unicast rate limiters if enabled
-	if fnb.BaseConfig.EnableUnicastRateLimits {
+	// setup unicast rate limiters
+	if fnb.BaseConfig.UnicastStreamCreationRateLimit > 0 && fnb.BaseConfig.UnicastStreamCreationBurstLimit > 0 {
 		unicastStreamsRateLimiter := unicast.NewStreamsRateLimiter(rate.Limit(fnb.BaseConfig.UnicastStreamCreationRateLimit), fnb.BaseConfig.UnicastStreamCreationBurstLimit)
+		mwOpts = append(mwOpts, p2p.WithUnicastStreamRateLimiter(unicastStreamsRateLimiter))
+
+		if !fnb.BaseConfig.UnicastRateLimitDryRun {
+			// add IsRateLimited peerFilters to conn gater intercept secure peer filters list
+			connGaterInterceptSecureFilters = append(connGaterInterceptSecureFilters, unicastStreamsRateLimiter.IsRateLimited)
+
+		}
+	}
+
+	if fnb.BaseConfig.UnicastBandwidthRateLimit > 0 && fnb.BaseConfig.UnicastBandwidthBurstLimit > 0 {
 		unicastBandwidthRateLimiter := unicast.NewBandWidthRateLimiter(rate.Limit(fnb.BaseConfig.UnicastBandwidthRateLimit), fnb.BaseConfig.UnicastBandwidthBurstLimit)
+		mwOpts = append(mwOpts, p2p.WithUnicastStreamRateLimiter(unicastBandwidthRateLimiter))
 
-		// add rate limiters to mw opts
-		mwOpts = append(mwOpts,
-			p2p.WithUnicastStreamRateLimiter(unicastStreamsRateLimiter),
-			p2p.WithUnicastBandwidthRateLimiter(unicastBandwidthRateLimiter),
-		)
-
-		// add IsRateLimited peerFilters to conn gater intercept secure peer filters list
-		connGaterInterceptSecureFilters = append(connGaterInterceptSecureFilters,
-			unicastStreamsRateLimiter.IsRateLimited,
-			unicastBandwidthRateLimiter.IsRateLimited,
-		)
+		if !fnb.BaseConfig.UnicastRateLimitDryRun {
+			// add IsRateLimited peerFilters to conn gater intercept secure peer filters list
+			connGaterInterceptSecureFilters = append(connGaterInterceptSecureFilters, unicastBandwidthRateLimiter.IsRateLimited)
+		}
 	}
 
 	libP2PNodeFactory := p2p.DefaultLibP2PNodeFactory(
