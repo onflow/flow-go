@@ -6,6 +6,7 @@ package mtrie
 // test across boundry
 
 import (
+	"fmt"
 	"math/rand"
 	"testing"
 
@@ -51,7 +52,8 @@ func TestTrieCache(t *testing.T) {
 		require.True(t, found)
 
 		// check last added trie functionality
-		retTrie = tc.LastAddedTrie()
+		retTrie, ok := tc.LastAddedTrie()
+		require.True(t, ok)
 		require.Equal(t, retTrie, trie)
 	}
 
@@ -87,7 +89,8 @@ func TestTrieCache(t *testing.T) {
 		require.False(t, found)
 
 		// check last added trie functionality
-		retTrie = tc.LastAddedTrie()
+		retTrie, ok := tc.LastAddedTrie()
+		require.True(t, ok)
 		require.Equal(t, retTrie, trie)
 	}
 
@@ -122,7 +125,6 @@ func TestPurge(t *testing.T) {
 
 	tc.Purge()
 	require.Equal(t, 0, tc.Count())
-	require.Equal(t, 0, tc.tail)
 	require.Equal(t, 0, len(tc.lookup))
 
 	require.Equal(t, 3, called)
@@ -182,4 +184,97 @@ func randomMTrie() (*trie.MTrie, error) {
 	root := node.NewNode(256, nil, nil, randomPath, nil, randomHashValue)
 
 	return trie.NewMTrie(root, 1, 1)
+}
+
+func TestTrieCacheUpdate(t *testing.T) {
+	for n := 0; n < 10; n++ {
+		// prepare n tries to be pushed to the cache
+		tries := make([]*trie.MTrie, 0, n)
+		for j := 0; j < n; j++ {
+			r, err := randomMTrie()
+			require.NoError(t, err)
+			tries = append(tries, r)
+		}
+
+		// prepare the trie cache to be tested
+		evicted := make([]*trie.MTrie, 0)
+		onEvicted := func(m *trie.MTrie) {
+			evicted = append(evicted, m)
+		}
+
+		c := NewTrieCache(5, onEvicted)
+
+		// pushing n tries in total
+		for j := 0; j < n; j++ {
+			// verify LastAddedTrie
+			old, ok := c.LastAddedTrie()
+			if j == 0 {
+				// before pushing, there is no last added trie
+				require.False(t, ok)
+				require.Nil(t, old)
+			} else {
+				require.True(t, ok)
+				require.Equal(t, tries[j-1], old)
+			}
+
+			// push each trie to the queue
+			c.Push(tries[j])
+			// verify Push
+			if j < 5 {
+				// no old item was evicted
+				require.Equal(t, []*trie.MTrie{}, evicted)
+				require.Equal(t, j+1, c.Count())
+			} else {
+				// check evicted
+				require.Len(t, evicted, j-5+1)
+				require.Equal(t, tries[:j-5+1], evicted)
+				require.Equal(t, 5, c.Count())
+			}
+
+			// verify Get method, verify that each pushed item that hasn't been ejected must exist
+			// since n items needs to be pushed and j items have been pushed,
+			// no matter how many to push, if there are no more than 5 (capacity) have been pushed,
+			// then all pushed j items, must exist, the rest are not
+			if j < 5 {
+				for g, p := range tries {
+					found, ok := c.Get(p.RootHash())
+					if g <= j {
+						require.True(t, ok, fmt.Sprintf("%v (n) tries to push, %v (j)-th tries pushed, %v-th trie to veirfy", n, j, g))
+						require.Equal(t, p, found)
+					} else {
+						require.False(t, ok, fmt.Sprintf("%v (n) tries to push, %v (j)-th tries pushed, %v-th trie to veirfy", n, j, g))
+						require.Nil(t, found)
+					}
+				}
+			} else {
+
+				// if there are more than 5 (capacity) was pushed, then some item must have been pushed,
+				// only the last 5 items still exist.
+
+				for g, p := range tries {
+					found, ok := c.Get(p.RootHash())
+					hasBeenPushed := g <= j
+					isLast5 := g > j-5
+					if hasBeenPushed && isLast5 {
+						require.True(t, ok, fmt.Sprintf("%v (n) tries to push, %v (j)-th tries pushed, %v-th trie to veirfy", n, j, g))
+						require.Equal(t, p, found)
+					} else {
+						require.False(t, ok, fmt.Sprintf("%v (n) tries to push, %v (j)-th tries pushed, %v-th trie to veirfy", n, j, g))
+						require.Nil(t, found)
+					}
+				}
+			}
+		}
+
+		// verify purging the cache
+		toBeEvicted := c.Tries()
+		evicted = make([]*trie.MTrie, 0) // reset before Purge
+		c.Purge()
+		require.Equal(t, 0, c.Count())
+		if len(toBeEvicted) == 0 {
+			require.Len(t, evicted, 0)
+		} else {
+			require.Equal(t, toBeEvicted, evicted)
+		}
+	}
 }

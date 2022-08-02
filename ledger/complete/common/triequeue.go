@@ -1,6 +1,8 @@
 package common
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 )
 
@@ -21,16 +23,23 @@ type TrieQueue struct {
 }
 
 // NewTrieQueue returns a new TrieQueue with given capacity.
-func NewTrieQueue(capacity uint) *TrieQueue {
+func NewTrieQueue(capacity uint) (*TrieQueue, error) {
+	if capacity == 0 {
+		return nil, fmt.Errorf("capacity can not be 0")
+	}
+
 	return &TrieQueue{
 		ts:       make([]*trie.MTrie, capacity),
 		capacity: int(capacity),
-	}
+	}, nil
 }
 
 // NewTrieQueueWithValues returns a new TrieQueue with given capacity and initial values.
-func NewTrieQueueWithValues(capacity uint, tries []*trie.MTrie) *TrieQueue {
-	q := NewTrieQueue(capacity)
+func NewTrieQueueWithValues(capacity uint, tries []*trie.MTrie) (*TrieQueue, error) {
+	q, err := NewTrieQueue(capacity)
+	if err != nil {
+		return nil, err
+	}
 
 	start := 0
 	if len(tries) > q.capacity {
@@ -40,16 +49,33 @@ func NewTrieQueueWithValues(capacity uint, tries []*trie.MTrie) *TrieQueue {
 	q.count = n
 	q.tail = q.count % q.capacity
 
-	return q
+	return q, nil
 }
 
-// Push pushes trie to queue.  If queue is full, it overwrites the oldest element.
-func (q *TrieQueue) Push(t *trie.MTrie) {
+// Push pushes trie to queue and return the overwritten element, and whether any old element.
+// was ejected.
+// If queue is full, it overwrites and ejects the oldest element.
+// It return (nil, false) if no item was ejected.
+// It returns(*trie.Mtrie, true) if an old trie was ejected by the pushing of the input trie
+func (q *TrieQueue) Push(t *trie.MTrie) (*trie.MTrie, bool) {
+
+	old := q.ts[q.tail]
+	wasFull := q.isFull()
+
 	q.ts[q.tail] = t
 	q.tail = (q.tail + 1) % q.capacity
 	if !q.isFull() {
 		q.count++
 	}
+
+	// if was full, then there must be an old trie being ejected,
+	// otherwise, no trie was ejected.
+	if wasFull {
+		return old, true
+	}
+
+	return nil, false
+
 }
 
 // Tries returns elements in queue, starting from the oldest element
@@ -80,4 +106,24 @@ func (q *TrieQueue) Count() int {
 
 func (q *TrieQueue) isFull() bool {
 	return q.count == q.capacity
+}
+
+// LastAddedTrie returns the last added trie.
+// It returns (nil, false) if there was no last added trie, happens when first trie was added
+// It returns (trie, true) if there was last added trie
+func (q *TrieQueue) LastAddedTrie() (*trie.MTrie, bool) {
+	if q.count == 0 {
+		return nil, false
+	}
+
+	lastIndex := q.tail - 1
+	if lastIndex < 0 {
+		lastIndex = q.capacity - 1
+	}
+	return q.ts[lastIndex], true
+}
+
+// Capacity returns the max number of items can be stored in the queue
+func (q *TrieQueue) Capacity() int {
+	return q.capacity
 }

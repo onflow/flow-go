@@ -15,7 +15,8 @@ import (
 func TestEmptyTrieQueue(t *testing.T) {
 	const capacity = 10
 
-	q := NewTrieQueue(capacity)
+	q, err := NewTrieQueue(capacity)
+	require.NoError(t, err)
 	require.Equal(t, 0, q.Count())
 
 	tries := q.Tries()
@@ -82,7 +83,8 @@ func TestTrieQueueWithInitialValues(t *testing.T) {
 			expectedTries = initialValues[initialValueCount-capacity:]
 		}
 
-		q := NewTrieQueueWithValues(capacity, initialValues)
+		q, err := NewTrieQueueWithValues(capacity, initialValues)
+		require.NoError(t, err)
 		require.Equal(t, expectedCount, q.Count())
 
 		tries := q.Tries()
@@ -135,4 +137,61 @@ func randomMTrie() (*trie.MTrie, error) {
 	root := node.NewNode(256, nil, nil, randomPath, nil, randomHashValue)
 
 	return trie.NewMTrie(root, 1, 1)
+}
+
+func TestCapacity(t *testing.T) {
+	for c := 0; c < 10; c++ {
+		q1, err1 := NewTrieQueue(uint(c))
+		q2, err2 := NewTrieQueueWithValues(uint(c), []*trie.MTrie{})
+		if c == 0 {
+			require.Error(t, err1)
+			require.Error(t, err2)
+		} else {
+			require.NoError(t, err1)
+			require.NoError(t, err2)
+			require.Equal(t, c, q1.Capacity())
+			require.Equal(t, c, q2.Capacity())
+		}
+	}
+}
+
+func TestLastLastAddedTrie(t *testing.T) {
+
+	for n := 0; n < 10; n++ {
+		q, err := NewTrieQueue(5)
+		require.NoError(t, err)
+		// prepare n tries
+		tries := make([]*trie.MTrie, 0, n)
+		for j := 0; j <= n; j++ {
+			r, err := randomMTrie()
+			require.NoError(t, err)
+			tries = append(tries, r)
+		}
+
+		// pushing n tries in total
+		for j := 0; j <= n; j++ {
+			// verify LastAddedTrie
+			old, ok := q.LastAddedTrie()
+			if j == 0 {
+				// before pushing, there is no last added trie
+				require.False(t, ok)
+				require.Nil(t, old)
+			} else {
+				require.True(t, ok)
+				require.Equal(t, tries[j-1], old)
+			}
+
+			// push each trie to the queue
+			old, ok = q.Push(tries[j])
+			// verify Push
+			if j < 5 {
+				// no old item was evicted
+				require.False(t, ok)
+				require.Nil(t, old)
+			} else {
+				require.True(t, ok)
+				require.Equal(t, tries[j-5], old)
+			}
+		}
+	}
 }

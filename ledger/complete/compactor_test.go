@@ -627,7 +627,7 @@ func triesUpToSegment(dir string, to int, capacity int) ([]*trie.MTrie, error) {
 	}
 
 	// TrieQueue is used to store last n tries from segment files in order (n = capacity)
-	tries := common.NewTrieQueueWithValues(uint(capacity), initialTries)
+	tries, _ := common.NewTrieQueueWithValues(uint(capacity), initialTries)
 
 	err = replaySegments(
 		dir,

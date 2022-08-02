@@ -358,8 +358,8 @@ func (f *Forest) GetEmptyRootHash() ledger.RootHash {
 
 // MostRecentTouchedRootHash returns the rootHash of the most recently touched trie
 func (f *Forest) MostRecentTouchedRootHash() (ledger.RootHash, error) {
-	trie := f.tries.LastAddedTrie()
-	if trie != nil {
+	trie, ok := f.tries.LastAddedTrie()
+	if ok {
 		return trie.RootHash(), nil
 	}
 	return ledger.RootHash(hash.DummyHash), fmt.Errorf("no trie is stored in the forest")
