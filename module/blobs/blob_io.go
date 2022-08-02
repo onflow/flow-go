@@ -32,8 +32,8 @@ func (bw *BlobChannelWriter) CidsSent() []cid.Cid {
 }
 
 // Write writes len(data) bytes from data to the underlying blob channel. It returns the number of bytes written
-// from data (0 <= n <= len(data)) and any error encountered that caused the write to stop early. It will always
-// return a non-nil error if it returns n < len(data)
+// from data (0 <= n <= len(data)) or ErrBlobChannelWriterClosed if the Blob Channel Writer was already previously
+// closed via a call to Close. It will always return a non-nil error if it returns n < len(data).
 func (bw *BlobChannelWriter) Write(data []byte) (int, error) {
 	if bw.closed {
 		return 0, ErrBlobChannelWriterClosed

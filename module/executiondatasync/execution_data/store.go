@@ -27,6 +27,7 @@ type ExecutionDataStore interface {
 
 type ExecutionDataStoreOption func(*store)
 
+// WithMaxBlobSize configures the maximum blob size of the store
 func WithMaxBlobSize(size int) ExecutionDataStoreOption {
 	return func(s *store) {
 		s.maxBlobSize = size
@@ -39,6 +40,7 @@ type store struct {
 	maxBlobSize int
 }
 
+// NewExecutionDataStore creates a new Execution Data Store.
 func NewExecutionDataStore(blobstore blobs.Blobstore, serializer Serializer, opts ...ExecutionDataStoreOption) *store {
 	s := &store{
 		blobstore:   blobstore,
@@ -71,6 +73,10 @@ func (s *store) AddExecutionData(ctx context.Context, executionData *BlockExecut
 	buf := new(bytes.Buffer)
 	if err := s.serializer.Serialize(buf, executionDataRoot); err != nil {
 		return flow.ZeroID, fmt.Errorf("could not serialize execution data root: %w", err)
+	}
+
+	if buf.Len() > s.maxBlobSize {
+		return flow.ZeroID, errors.New("root blob exceeds blob size limit")
 	}
 
 	rootBlob := blobs.NewBlob(buf.Bytes())
@@ -151,7 +157,7 @@ func (s *store) GetExecutionData(ctx context.Context, rootID flow.Identifier) (*
 
 	executionDataRoot, ok := rootData.(*BlockExecutionDataRoot)
 	if !ok {
-		return nil, NewMalformedDataError(fmt.Errorf("root blob does not deserialize to a BlockExecutionDataRoot"))
+		return nil, NewMalformedDataError(fmt.Errorf("root blob does not deserialize to a BlockExecutionDataRoot, got %T instead", rootData))
 	}
 
 	blockExecutionData := &BlockExecutionData{

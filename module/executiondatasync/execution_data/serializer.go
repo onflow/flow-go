@@ -26,11 +26,10 @@ func init() {
 	}.DecMode()
 
 	if err != nil {
-		codec = &cbor.Codec{}
-	} else {
-		codec = cbor.NewCodec(cbor.WithDecMode(decMode))
+		panic(err)
 	}
 
+	codec = cbor.NewCodec(cbor.WithDecMode(decMode))
 	DefaultSerializer = NewSerializer(codec, compressor.NewLz4Compressor())
 }
 

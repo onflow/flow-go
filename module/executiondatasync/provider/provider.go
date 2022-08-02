@@ -26,7 +26,7 @@ func WithBlobSizeLimit(size int) ProviderOption {
 	}
 }
 
-// Provider is used to provide execution data blobs over the blob service.
+// Provider is used to provide execution data blobs over the network via a blob service.
 type Provider struct {
 	logger      zerolog.Logger
 	metrics     module.ExecutionDataProviderMetrics

@@ -24,8 +24,15 @@ func (e *BlobSizeLimitExceededError) Error() string {
 	return fmt.Sprintf("blob %v exceeds maximum blob size", e.cid.String())
 }
 
+// Downloader is used to download execution data blobs from the network via a blob service.
 type Downloader interface {
 	module.ReadyDoneAware
+
+	// Download downloads and returns a Block Execution Data from the network.
+	// The returned error will be:
+	// - MalformedDataError if some level of the blob tree cannot be properly deserialized
+	// - BlobNotFoundError if some CID in the blob tree could not be found from the blob service
+	// - BlobSizeLimitExceededError if some blob in the blob tree exceeds the maximum allowed size
 	Download(ctx context.Context, executionDataID flow.Identifier) (*BlockExecutionData, error)
 }
 
@@ -209,6 +216,8 @@ func (d *downloader) retrieveBlobs(parent context.Context, blobGetter network.Bl
 			cidCounts[c] += 1
 		}
 
+		// for each cid, find the corresponding blob from the incoming blob channel and send it to
+		// the outgoing blob channel in the proper order
 		for _, c := range cids {
 			blob, ok := cachedBlobs[c]
 
