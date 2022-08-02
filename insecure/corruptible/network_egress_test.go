@@ -27,7 +27,7 @@ import (
 // registered attacker if one exists.
 func TestHandleOutgoingEvent_AttackerObserve(t *testing.T) {
 	codec := cbor.NewCodec()
-	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress("localhost:0"))
+	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DEFAULT_ADDRESS))
 	flowNetwork := &mocknetwork.Network{}
 	ccf := &mockinsecure.CorruptibleConduitFactory{}
 	ccf.On("RegisterEgressController", mock.Anything).Return(nil)
@@ -35,7 +35,7 @@ func TestHandleOutgoingEvent_AttackerObserve(t *testing.T) {
 	corruptibleNetwork, err := NewCorruptibleNetwork(
 		unittest.Logger(),
 		flow.BftTestnet,
-		"localhost:0",
+		insecure.DEFAULT_ADDRESS,
 		testutil.LocalFixture(t, corruptedIdentity),
 		codec,
 		flowNetwork,
@@ -254,8 +254,7 @@ func TestProcessAttackerMessage_ResultApproval_Dictated(t *testing.T) {
 			unittest.RequireReturnsBefore(
 				t,
 				corruptedEventDispatchedOnFlowNetWg.Wait,
-				//1*time.Second,
-				1000*time.Second,
+				1*time.Second,
 				"attacker's message was not dispatched on flow network on time")
 		})
 }

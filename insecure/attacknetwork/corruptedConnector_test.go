@@ -135,7 +135,7 @@ func TestConnectorHappyPath_Receive(t *testing.T) {
 // withMockCorruptibleConduitFactory creates and starts a mock corruptible conduit factory. This mock factory only runs the gRPC server part of an
 // actual corruptible conduit factory, and then executes the run function on it.
 func withMockCorruptibleConduitFactory(t *testing.T, run func(flow.Identity, irrecoverable.SignalerContext, *mockCorruptibleConduitFactory)) {
-	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress("localhost:0"))
+	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DEFAULT_ADDRESS))
 
 	// life-cycle management of corruptible conduit factory.
 	ctx, cancel := context.WithCancel(context.Background())
