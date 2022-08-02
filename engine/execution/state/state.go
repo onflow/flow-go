@@ -44,7 +44,7 @@ type ReadOnlyExecutionState interface {
 	HasState(flow.StateCommitment) bool
 
 	// ChunkDataPackByChunkID retrieve a chunk data pack given the chunk ID.
-	ChunkDataPackByChunkID(context.Context, flow.Identifier) (*flow.ChunkDataPack, error)
+	ChunkDataPackByChunkID(flow.Identifier) (*flow.ChunkDataPack, error)
 
 	GetExecutionResultID(context.Context, flow.Identifier) (flow.Identifier, error)
 
@@ -311,7 +311,7 @@ func (s *state) StateCommitmentByBlockID(ctx context.Context, blockID flow.Ident
 	return s.commits.ByBlockID(blockID)
 }
 
-func (s *state) ChunkDataPackByChunkID(ctx context.Context, chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
+func (s *state) ChunkDataPackByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
 	chunkDataPack, err := s.chunkDataPacks.ByChunkID(chunkID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve stored chunk data pack: %w", err)
