@@ -31,6 +31,12 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState, l *ledger.Ledger)
 			diskWal := &fixtures.NoopWAL{}
 			ls, err := ledger.NewLedger(diskWal, 100, metricsCollector, zerolog.Nop(), ledger.DefaultPathFinderVersion)
 			require.NoError(t, err)
+			compactor := fixtures.NewNoopCompactor(ls)
+			<-compactor.Ready()
+			defer func() {
+				<-ls.Done()
+				<-compactor.Done()
+			}()
 
 			ctrl := gomock.NewController(t)
 
