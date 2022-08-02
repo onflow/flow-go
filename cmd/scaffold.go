@@ -284,29 +284,31 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 	}
 
 	connGaterPeerDialFilters := p2p.PeerFilters{idProviderPeerFilter}
-
-	// add rate limiter peer filter func
 	connGaterInterceptSecureFilters := p2p.PeerFilters{idProviderPeerFilter}
 
-	// setup unicast rate limiters
+	peerManagerFilters := p2p.PeerFilters{}
+
+	// setup unicast stream rate limiter
 	if fnb.BaseConfig.UnicastStreamCreationRateLimit > 0 && fnb.BaseConfig.UnicastStreamCreationBurstLimit > 0 {
 		unicastStreamsRateLimiter := unicast.NewStreamsRateLimiter(rate.Limit(fnb.BaseConfig.UnicastStreamCreationRateLimit), fnb.BaseConfig.UnicastStreamCreationBurstLimit)
 		mwOpts = append(mwOpts, p2p.WithUnicastStreamRateLimiter(unicastStreamsRateLimiter))
 
 		if !fnb.BaseConfig.UnicastRateLimitDryRun {
-			// add IsRateLimited peerFilters to conn gater intercept secure peer filters list
+			// add IsRateLimited peerFilters to conn gater intercept secure peer and peer manager filters list
 			connGaterInterceptSecureFilters = append(connGaterInterceptSecureFilters, unicastStreamsRateLimiter.IsRateLimited)
-
+			peerManagerFilters = append(peerManagerFilters, unicastStreamsRateLimiter.IsRateLimited)
 		}
 	}
 
+	// setup unicast bandwidth rate limiter
 	if fnb.BaseConfig.UnicastBandwidthRateLimit > 0 && fnb.BaseConfig.UnicastBandwidthBurstLimit > 0 {
 		unicastBandwidthRateLimiter := unicast.NewBandWidthRateLimiter(rate.Limit(fnb.BaseConfig.UnicastBandwidthRateLimit), fnb.BaseConfig.UnicastBandwidthBurstLimit)
 		mwOpts = append(mwOpts, p2p.WithUnicastStreamRateLimiter(unicastBandwidthRateLimiter))
 
 		if !fnb.BaseConfig.UnicastRateLimitDryRun {
-			// add IsRateLimited peerFilters to conn gater intercept secure peer filters list
+			// add IsRateLimited peerFilters to conn gater intercept secure peer and peer manager filters list
 			connGaterInterceptSecureFilters = append(connGaterInterceptSecureFilters, unicastBandwidthRateLimiter.IsRateLimited)
+			peerManagerFilters = append(peerManagerFilters, unicastBandwidthRateLimiter.IsRateLimited)
 		}
 	}
 
@@ -329,6 +331,11 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		p2p.WithPeerManager(peerManagerFactory),
 		p2p.WithPreferredUnicastProtocols(unicast.ToProtocolNames(fnb.PreferredUnicastProtocols)),
 	)
+
+	// add peer manager filters to middle ware via options if any are available
+	if len(peerManagerFilters) > 0 {
+		mwOpts = append(mwOpts, p2p.WithPeerManagerFilters(peerManagerFilters))
+	}
 
 	fnb.Middleware = p2p.NewMiddleware(
 		fnb.Logger,

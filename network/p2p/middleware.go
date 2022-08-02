@@ -95,6 +95,7 @@ type Middleware struct {
 	validators                   []network.MessageValidator
 	peerManagerFactory           PeerManagerFactoryFunc
 	peerManager                  *PeerManager
+	peerManagerFilters           PeerFilters
 	unicastMessageTimeout        time.Duration
 	idTranslator                 IDTranslator
 	previousProtocolStatePeers   []peer.AddrInfo
@@ -122,6 +123,14 @@ func WithPreferredUnicastProtocols(unicasts []unicast.ProtocolName) MiddlewareOp
 func WithPeerManager(peerManagerFunc PeerManagerFactoryFunc) MiddlewareOption {
 	return func(mw *Middleware) {
 		mw.peerManagerFactory = peerManagerFunc
+	}
+}
+
+// WithPeerManagerFilters sets a list of p2p.PeerFilter funcs that are used to
+// filter out peers provided by the peer manager PeersProvider.
+func WithPeerManagerFilters(peerManagerFilters PeerFilters) MiddlewareOption {
+	return func(mw *Middleware) {
+		mw.peerManagerFilters = peerManagerFilters
 	}
 }
 
@@ -246,7 +255,8 @@ func (m *Middleware) NewPingService(pingProtocol protocol.ID, provider network.P
 }
 
 // topologyPeers callback used by the peer manager to get the list of peer ID's
-// which this node should be directly connected to as peers.
+// which this node should be directly connected to as peers. The returned list of
+// peer ID's is filtered through each of the configured m.peerManagerFilters funcs.
 // No errors are expected during normal operation.
 func (m *Middleware) topologyPeers() (peer.IDSlice, error) {
 	identities, err := m.ov.Topology()
@@ -254,7 +264,26 @@ func (m *Middleware) topologyPeers() (peer.IDSlice, error) {
 		return nil, err
 	}
 
-	return m.peerIDs(identities.NodeIDs()), nil
+	peerIDS := m.peerIDs(identities.NodeIDs())
+	allowedPeers := make([]peer.ID, 0)
+
+	// filter peers through peerManagerFilters
+	for _, pid := range peerIDS {
+		peerAllowed := true
+
+		for _, f := range m.peerManagerFilters {
+			if !f(pid) {
+				peerAllowed = false
+				break
+			}
+		}
+
+		if peerAllowed {
+			allowedPeers = append(allowedPeers, pid)
+		}
+	}
+
+	return allowedPeers, nil
 }
 
 func (m *Middleware) peerIDs(flowIDs flow.IdentifierList) peer.IDSlice {
