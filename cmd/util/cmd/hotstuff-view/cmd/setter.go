@@ -12,6 +12,7 @@ var (
 	flagView uint64
 )
 
+// TODO: will be removed after active pacemaker is implemented
 var SetterCmd = &cobra.Command{
 	Use:   "set",
 	Short: "set hotstuff view",
