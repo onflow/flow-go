@@ -18,13 +18,13 @@ type ExecutionState struct {
 	mock.Mock
 }
 
-// ChunkDataPackByChunkID provides a mock function with given fields: _a0, _a1
-func (_m *ExecutionState) ChunkDataPackByChunkID(_a0 context.Context, _a1 flow.Identifier) (*flow.ChunkDataPack, error) {
-	ret := _m.Called(_a0, _a1)
+// ChunkDataPackByChunkID provides a mock function with given fields: _a0
+func (_m *ExecutionState) ChunkDataPackByChunkID(_a0 flow.Identifier) (*flow.ChunkDataPack, error) {
+	ret := _m.Called(_a0)
 
 	var r0 *flow.ChunkDataPack
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) *flow.ChunkDataPack); ok {
-		r0 = rf(_a0, _a1)
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.ChunkDataPack); ok {
+		r0 = rf(_a0)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.ChunkDataPack)
@@ -32,8 +32,8 @@ func (_m *ExecutionState) ChunkDataPackByChunkID(_a0 context.Context, _a1 flow.I
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier) error); ok {
-		r1 = rf(_a0, _a1)
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(_a0)
 	} else {
 		r1 = ret.Error(1)
 	}
