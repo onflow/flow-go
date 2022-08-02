@@ -3,11 +3,11 @@ package observer
 import (
 	"context"
 
-	"github.com/grpc-ecosystem/go-grpc-middleware/providers/zerolog/v2"
+	"github.com/rs/zerolog"
 )
 
 type RPCHandlerMetrics interface {
-	Record(handler, rpc string, err, fallback bool)
+	RecordRPC(handler, rpc string, err, fallback bool)
 }
 
 type RPCHandler[Request any, Response any] func(ctx context.Context, r Request) (Response, error)
@@ -40,22 +40,22 @@ func (h *Handler[Request, Response]) Call(ctx context.Context, r Request) (Respo
 func (h *Handler[Request, Response]) callUpstream(ctx context.Context, r Request, fallback bool) (Response, error) {
 	res, err := h.Upstream(ctx, r)
 	h.log("upstream", h.Name, err, fallback)
-	h.Metrics.Record("upstream", h.Name, err != nil, fallback)
+	h.Metrics.RecordRPC("upstream", h.Name, err != nil, fallback)
 	return res, err
 }
 
 func (h *Handler[Request, Response]) callObserver(ctx context.Context, r Request) (Response, error) {
 	res, err := h.Observer(ctx, r)
 	h.log("observer", h.Name, err, false)
-	h.Metrics.Record("observer", h.Name, err != nil, false)
+	h.Metrics.RecordRPC("observer", h.Name, err != nil, false)
 	return res, err
 }
 
 func (h *Handler[Request, Response]) log(handler, rpc string, err error, fallback bool) {
 	if err != nil {
-		h.Logger.Err(err).Str("handler", handler).Str("rpc", rpc).Bool("fallback", fallback)
+		h.Logger.Error().Err(err).Str("handler", handler).Str("rpc", rpc).Bool("fallback", fallback)
 		return
 	}
 
-	h.Logger.Str("handler", handler).Str("rpc", rpc).Bool("fallback", fallback)
+	h.Logger.Info().Str("handler", handler).Str("rpc", rpc).Bool("fallback", fallback)
 }

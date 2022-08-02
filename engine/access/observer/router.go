@@ -3,9 +3,9 @@ package observer
 import (
 	"context"
 
-	"github.com/grpc-ecosystem/go-grpc-middleware/providers/zerolog/v2"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/rs/zerolog"
 )
 
 type Router struct {

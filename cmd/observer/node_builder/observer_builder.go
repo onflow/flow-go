@@ -1000,8 +1000,14 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return nil, err
 		}
 
+		handler := observer.NewRouter(
+			nil,
+			&observer.Forwarder{UpstreamHandler: client},
+			builder.Logger,
+			metrics.NewObserverCollector(),
+		)
 		// build the rpc engine
-		engineBuilder.WithNewHandler(&observer.Forwarder{UpstreamHandler: client})
+		engineBuilder.WithNewHandler(handler)
 		engineBuilder.WithLegacy()
 		builder.RpcEng = engineBuilder.Build()
 		return builder.RpcEng, nil
