@@ -43,7 +43,12 @@ func runSet(*cobra.Command, []string) {
 
 	reader := NewReader(pers)
 
-	log.Info().Msgf("setting hotstuff view to %v", flagView)
+	currentView, err := reader.GetHotstuffView()
+	if err != nil {
+		log.Fatal().Err(err).Msgf("could not get current view")
+	}
+
+	log.Info().Msgf("current view: %v, setting hotstuff view to %v", currentView, flagView)
 
 	err = reader.SetHotstuffView(flagView)
 	if err != nil {
