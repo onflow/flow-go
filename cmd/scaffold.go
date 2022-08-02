@@ -129,6 +129,12 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.DurationVar(&fnb.BaseConfig.UnicastMessageTimeout, "unicast-timeout", defaultConfig.UnicastMessageTimeout, "how long a unicast transmission can take to complete")
 	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", defaultConfig.metricsPort, "port for /metrics endpoint")
 	fnb.flags.BoolVar(&fnb.BaseConfig.profilerEnabled, "profiler-enabled", defaultConfig.profilerEnabled, "whether to enable the auto-profiler")
+	// Note: for autoupload to work forllowing should be true:
+	// * -profiler-enabled=true.
+	// * -profile-uploader-enabled=true.
+	// * node is running in GCE.
+	// * server or user has https://www.googleapis.com/auth/monitoring.write scope.
+	fnb.flags.BoolVar(&fnb.BaseConfig.uploaderEnabled, "profile-uploader-enabled", defaultConfig.uploaderEnabled, "whether to enable automatic profile upload to Google Cloud Profiler")
 	fnb.flags.StringVar(&fnb.BaseConfig.profilerDir, "profiler-dir", defaultConfig.profilerDir, "directory to create auto-profiler profiles")
 	fnb.flags.DurationVar(&fnb.BaseConfig.profilerInterval, "profiler-interval", defaultConfig.profilerInterval,
 		"the interval between auto-profiler runs")
@@ -570,7 +576,7 @@ func (fnb *FlowNodeBuilder) initProfiler() {
 
 	var err error
 	var uploader profiler.Uploader
-	if gcemd.OnGCE() {
+	if fnb.BaseConfig.uploaderEnabled && gcemd.OnGCE() {
 		gcemdClient := gcemd.NewClient(nil)
 		uploader, err = fnb.createUploader(gcemdClient)
 		if err != nil {
