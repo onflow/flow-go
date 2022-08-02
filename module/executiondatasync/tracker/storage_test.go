@@ -19,6 +19,7 @@ func randomCid() cid.Cid {
 	return blobs.NewBlob(data).Cid()
 }
 
+// TestPrune tests that pruning works as expected
 func TestPrune(t *testing.T) {
 	expectedPrunedCIDs := make(map[cid.Cid]struct{})
 	storage, err := OpenStorage("/tmp/prune_test", 0, zerolog.Nop(), WithPruneCallback(func(c cid.Cid) error {
@@ -29,6 +30,8 @@ func TestPrune(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
+	// c1 and c2 are for height 1, and c3 and c4 are for height 2
+	// after pruning up to height 1, only c1 and c2 should be pruned
 	c1 := randomCid()
 	expectedPrunedCIDs[c1] = struct{}{}
 	c2 := randomCid()

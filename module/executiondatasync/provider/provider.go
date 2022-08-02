@@ -3,6 +3,7 @@ package provider
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -76,16 +77,19 @@ func (p *Provider) storeBlobs(parent context.Context, blockHeight uint64, blobCh
 			totalSize += uint64(len(blob.RawData()))
 		}
 
-		cidArr := zerolog.Arr()
-		for _, cid := range cids {
-			cidArr = cidArr.Str(cid.String())
+		if p.logger.Debug().Enabled() {
+			cidArr := zerolog.Arr()
+			for _, cid := range cids {
+				cidArr = cidArr.Str(cid.String())
+			}
+			p.logger.Debug().Array("cids", cidArr).Uint64("height", blockHeight).Msg("storing blobs")
 		}
-		p.logger.Debug().Array("cids", cidArr).Uint64("height", blockHeight).Msg("storing blobs")
 
 		err := p.storage.Update(func(trackBlobs tracker.TrackBlobsFn) error {
 			ctx, cancel := context.WithCancel(parent)
 			defer cancel()
 
+			// track new blobs so that they can be pruned later
 			if err := trackBlobs(blockHeight, cids...); err != nil {
 				return fmt.Errorf("failed to track blobs: %w", err)
 			}
@@ -184,6 +188,10 @@ func (p *Provider) addExecutionDataRoot(
 	buf := new(bytes.Buffer)
 	if err := p.serializer.Serialize(buf, edRoot); err != nil {
 		return flow.ZeroID, fmt.Errorf("failed to serialize execution data root: %w", err)
+	}
+
+	if buf.Len() > p.maxBlobSize {
+		return flow.ZeroID, errors.New("execution data root blob exceeds maximum allowed size")
 	}
 
 	rootBlob := blobs.NewBlob(buf.Bytes())

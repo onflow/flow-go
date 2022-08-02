@@ -401,6 +401,7 @@ func (s *storage) Prune(height uint64) error {
 				return fmt.Errorf("malformed blob record key %v: %w", blobRecordKey, err)
 			}
 
+			// iteration occurs in key order, so block heights are guaranteed to be ascending
 			if blockHeight > height {
 				break
 			}
@@ -429,7 +430,10 @@ func (s *storage) Prune(height uint64) error {
 					"inconsistency detected: latest height recorded for Cid %s is %d, but blob record exists at height %d",
 					blobCid.String(), latestHeight, blockHeight,
 				)
-			} else if latestHeight == blockHeight {
+			}
+
+			// the current block height is the last to reference this CID
+			if latestHeight == blockHeight {
 				if err := s.pruneCallback(blobCid); err != nil {
 					return err
 				}
