@@ -19,6 +19,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
+	"google.golang.org/api/option"
 
 	gcemd "cloud.google.com/go/compute/metadata"
 
@@ -538,7 +539,7 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 	}
 }
 
-func (fnb *FlowNodeBuilder) createUploader(client *gcemd.Client) (profiler.Uploader, error) {
+func (fnb *FlowNodeBuilder) createUploader(client *gcemd.Client, opts ...option.ClientOption) (profiler.Uploader, error) {
 	projectID, err := client.ProjectID()
 	if err != nil {
 		fnb.Logger.Warn().Err(err).Msg("could not get CGE project ID")
@@ -567,7 +568,7 @@ func (fnb *FlowNodeBuilder) createUploader(client *gcemd.Client) (profiler.Uploa
 
 	fnb.Logger.Info().Msgf("creating pprof profile uploader with params: %+v", params)
 
-	return profiler.NewUploader(fnb.Logger, params)
+	return profiler.NewUploader(fnb.Logger, params, opts...)
 }
 
 func (fnb *FlowNodeBuilder) initProfiler() {

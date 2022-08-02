@@ -18,6 +18,9 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/api/option"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -640,20 +643,20 @@ func TestCreateUploader(t *testing.T) {
 		t.Parallel()
 		nb := FlowNode("scaffold_uploader")
 
-		testClient1 := gcemd.NewClient(nil)
-		uploader1, err := nb.createUploader(testClient1)
+		testClient := gcemd.NewClient(nil)
+		uploader, err := nb.createUploader(
+			testClient,
+
+			option.WithoutAuthentication(),
+			option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
+		)
 		require.NoError(t, err)
-		require.NotNil(t, uploader1)
+		require.NotNil(t, uploader)
 	})
 
 	t.Run("create mocked uploader", func(t *testing.T) {
 		t.Parallel()
 		nb := FlowNode("scaffold_uploader")
-
-		testClient1 := gcemd.NewClient(nil)
-		uploader1, err := nb.createUploader(testClient1)
-		require.NoError(t, err)
-		require.NotNil(t, uploader1)
 
 		mockHttp := &http.Client{
 			Transport: &mockRoundTripper{
@@ -670,12 +673,18 @@ func TestCreateUploader(t *testing.T) {
 				},
 			},
 		}
-		testClient2 := gcemd.NewClient(mockHttp)
-		uploader2, err := nb.createUploader(testClient2)
-		require.NoError(t, err)
-		require.NotNil(t, uploader2)
 
-		uploaderImpl, ok := uploader2.(*profiler.UploaderImpl)
+		testClient := gcemd.NewClient(mockHttp)
+		uploader, err := nb.createUploader(
+			testClient,
+
+			option.WithoutAuthentication(),
+			option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, uploader)
+
+		uploaderImpl, ok := uploader.(*profiler.UploaderImpl)
 		require.True(t, ok)
 
 		assert.Equal(t, "test-project-id", uploaderImpl.Deployment.ProjectId)
@@ -685,12 +694,10 @@ func TestCreateUploader(t *testing.T) {
 	})
 }
 
-// mockRoundTripper is the mock client
 type mockRoundTripper struct {
 	DoFunc func(req *http.Request) (*http.Response, error)
 }
 
-//
 func (m *mockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return m.DoFunc(req)
 }

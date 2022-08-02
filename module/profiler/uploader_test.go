@@ -9,8 +9,10 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/api/option"
 	pb "google.golang.org/genproto/googleapis/devtools/cloudprofiler/v2"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func TestProfilerUpload(t *testing.T) {
@@ -22,7 +24,13 @@ func TestProfilerUpload(t *testing.T) {
 		Commit:    "commit",
 		Instance:  "instance",
 	}
-	uploader, err := NewUploader(zerolog.Nop(), params)
+	uploader, err := NewUploader(
+		zerolog.Nop(),
+		params,
+
+		option.WithoutAuthentication(),
+		option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
+	)
 	require.NoError(t, err)
 
 	uploaderImpl, ok := uploader.(*UploaderImpl)

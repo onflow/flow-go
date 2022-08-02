@@ -46,12 +46,10 @@ type UploaderImpl struct {
 	Deployment *pb.Deployment
 }
 
-func NewUploader(log zerolog.Logger, params Params) (Uploader, error) {
+func NewUploader(log zerolog.Logger, params Params, opts ...option.ClientOption) (Uploader, error) {
 	log = log.With().Str("component", "profile_uploader").Logger()
 
-	connPool, err := gtransport.DialPool(
-		context.Background(),
-
+	defaultOpts := []option.ClientOption{
 		option.WithEndpoint(apiAddress),
 		option.WithScopes(scope),
 		option.WithUserAgent("OfflinePprofUploader"),
@@ -61,6 +59,12 @@ func NewUploader(log zerolog.Logger, params Params) (Uploader, error) {
 				grpc.MaxCallSendMsgSize(maxMsgSize),
 			),
 		),
+	}
+	opts = append(defaultOpts, opts...)
+
+	connPool, err := gtransport.DialPool(
+		context.Background(),
+		opts...,
 	)
 	if err != nil {
 		return &NoopUploader{}, fmt.Errorf("failed to create connection pool: %w", err)
