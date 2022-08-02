@@ -21,6 +21,15 @@ func (r *Reader) SetHotstuffView(view uint64) error {
 		return fmt.Errorf("hotstuff view is not allowed to set to 0, please specify --view")
 	}
 
+	// ensure we don't set the view lower than the current view, because this may cause this node to violate protocol rules
+	currentView, err := r.GetHotstuffView()
+	if err != nil {
+		return err
+	}
+	if view < currentView {
+		return fmt.Error("hotstuff view cannot be lower than current view (%d)", currentView)
+	}
+
 	err := r.persister.PutStarted(view)
 	if err != nil {
 		return fmt.Errorf("could not put hotstuff view %v: %w", view, err)
