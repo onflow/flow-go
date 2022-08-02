@@ -766,6 +766,22 @@ func (_m *Environment) SetValue(owner []byte, key []byte, value []byte) error {
 	return r0
 }
 
+// StartExtensiveTracingSpanFromRoot provides a mock function with given fields: name
+func (_m *Environment) StartExtensiveTracingSpanFromRoot(name trace.SpanName) oteltrace.Span {
+	ret := _m.Called(name)
+
+	var r0 oteltrace.Span
+	if rf, ok := ret.Get(0).(func(trace.SpanName) oteltrace.Span); ok {
+		r0 = rf(name)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(oteltrace.Span)
+		}
+	}
+
+	return r0
+}
+
 // StartSpanFromRoot provides a mock function with given fields: name
 func (_m *Environment) StartSpanFromRoot(name trace.SpanName) oteltrace.Span {
 	ret := _m.Called(name)
