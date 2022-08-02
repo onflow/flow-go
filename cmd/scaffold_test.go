@@ -644,7 +644,7 @@ func TestCreateUploader(t *testing.T) {
 		nb := FlowNode("scaffold_uploader")
 
 		testClient := gcemd.NewClient(nil)
-		uploader, err := nb.createUploader(
+		uploader, err := nb.createGCEProfileUploader(
 			testClient,
 
 			option.WithoutAuthentication(),
@@ -675,7 +675,7 @@ func TestCreateUploader(t *testing.T) {
 		}
 
 		testClient := gcemd.NewClient(mockHttp)
-		uploader, err := nb.createUploader(
+		uploader, err := nb.createGCEProfileUploader(
 			testClient,
 
 			option.WithoutAuthentication(),

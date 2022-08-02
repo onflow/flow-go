@@ -14,14 +14,13 @@ import (
 	"strings"
 	"time"
 
+	gcemd "cloud.google.com/go/compute/metadata"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/hashicorp/go-multierror"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 	"google.golang.org/api/option"
-
-	gcemd "cloud.google.com/go/compute/metadata"
 
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
@@ -130,12 +129,12 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.DurationVar(&fnb.BaseConfig.UnicastMessageTimeout, "unicast-timeout", defaultConfig.UnicastMessageTimeout, "how long a unicast transmission can take to complete")
 	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", defaultConfig.metricsPort, "port for /metrics endpoint")
 	fnb.flags.BoolVar(&fnb.BaseConfig.profilerEnabled, "profiler-enabled", defaultConfig.profilerEnabled, "whether to enable the auto-profiler")
-	// Note: for autoupload to work forllowing should be true:
-	// * -profiler-enabled=true.
-	// * -profile-uploader-enabled=true.
-	// * node is running in GCE.
-	// * server or user has https://www.googleapis.com/auth/monitoring.write scope.
-	fnb.flags.BoolVar(&fnb.BaseConfig.uploaderEnabled, "profile-uploader-enabled", defaultConfig.uploaderEnabled, "whether to enable automatic profile upload to Google Cloud Profiler")
+	fnb.flags.BoolVar(&fnb.BaseConfig.uploaderEnabled, "profile-uploader-enabled", defaultConfig.uploaderEnabled,
+		"whether to enable automatic profile upload to Google Cloud Profiler. "+
+			"For autoupload to work forllowing should be true: "+
+			"1) both -profiler-enabled=true and -profile-uploader-enabled=true need to be set. "+
+			"2) node is running in GCE. "+
+			"3) server or user has https://www.googleapis.com/auth/monitoring.write scope. ")
 	fnb.flags.StringVar(&fnb.BaseConfig.profilerDir, "profiler-dir", defaultConfig.profilerDir, "directory to create auto-profiler profiles")
 	fnb.flags.DurationVar(&fnb.BaseConfig.profilerInterval, "profiler-interval", defaultConfig.profilerInterval,
 		"the interval between auto-profiler runs")
@@ -539,7 +538,7 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 	}
 }
 
-func (fnb *FlowNodeBuilder) createUploader(client *gcemd.Client, opts ...option.ClientOption) (profiler.Uploader, error) {
+func (fnb *FlowNodeBuilder) createGCEProfileUploader(client *gcemd.Client, opts ...option.ClientOption) (profiler.Uploader, error) {
 	projectID, err := client.ProjectID()
 	if err != nil {
 		fnb.Logger.Warn().Err(err).Msg("could not get CGE project ID")
@@ -554,6 +553,7 @@ func (fnb *FlowNodeBuilder) createUploader(client *gcemd.Client, opts ...option.
 
 	chainID := fnb.RootChainID.String()
 	if chainID == "" {
+		fnb.Logger.Warn().Msg("RootChainID is not set, using default value")
 		chainID = "unknown"
 	}
 
@@ -565,26 +565,28 @@ func (fnb *FlowNodeBuilder) createUploader(client *gcemd.Client, opts ...option.
 		Commit:    build.Commit(),
 		Instance:  instance,
 	}
-
 	fnb.Logger.Info().Msgf("creating pprof profile uploader with params: %+v", params)
 
 	return profiler.NewUploader(fnb.Logger, params, opts...)
+}
+
+func (fnb *FlowNodeBuilder) createProfileUploader() (profiler.Uploader, error) {
+	switch {
+	case fnb.BaseConfig.uploaderEnabled && gcemd.OnGCE():
+		return fnb.createGCEProfileUploader(gcemd.NewClient(nil))
+	default:
+		fnb.Logger.Info().Msg("not running on GCE, setting pprof uploader to noop")
+		return &profiler.NoopUploader{}, nil
+	}
 }
 
 func (fnb *FlowNodeBuilder) initProfiler() {
 	// note: by default the Golang heap profiling rate is on and can be set even if the profiler is NOT enabled
 	runtime.MemProfileRate = fnb.BaseConfig.profilerMemProfileRate
 
-	var err error
-	var uploader profiler.Uploader
-	if fnb.BaseConfig.uploaderEnabled && gcemd.OnGCE() {
-		gcemdClient := gcemd.NewClient(nil)
-		uploader, err = fnb.createUploader(gcemdClient)
-		if err != nil {
-			fnb.Logger.Warn().Err(err).Msg("failed to create pprof uploader, falling back to noop")
-		}
-	} else {
-		fnb.Logger.Info().Msg("not running on GCE, setting pprof uploader to noop")
+	uploader, err := fnb.createProfileUploader()
+	if err != nil {
+		fnb.Logger.Warn().Err(err).Msg("failed to create pprof uploader, falling back to noop")
 		uploader = &profiler.NoopUploader{}
 	}
 
