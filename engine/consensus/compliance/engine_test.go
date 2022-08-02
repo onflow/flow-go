@@ -104,7 +104,7 @@ func (cs *ComplianceSuite) TestBroadcastProposalWithDelay() {
 	block.Header.ChainID = ""
 	block.Header.Height = 0
 
-	cs.hotstuff.On("SubmitProposal", block.Header, parent.View).Return().Once()
+	cs.hotstuff.On("SubmitProposal", block.Header, parent.View).Return(doneChan()).Once()
 
 	// submit to broadcast proposal
 	err := cs.engine.BroadcastProposalWithDelay(block.Header, 0)
@@ -153,6 +153,8 @@ func (cs *ComplianceSuite) TestBroadcastProposalWithDelay() {
 // TestSubmittingMultipleVotes tests that we can send multiple votes and they
 // are queued and processed in expected way
 func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
+	cs.hotstuff.On("Done", mock.Anything).Return(doneChan())
+
 	// create a vote
 	originID := unittest.IdentifierFixture()
 	voteCount := 15
@@ -186,7 +188,7 @@ func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
 
 		// store the data for retrieval
 		cs.headerDB[block.Header.ParentID] = cs.head
-		cs.hotstuff.On("SubmitProposal", block.Header, cs.head.View).Return()
+		cs.hotstuff.On("SubmitProposal", block.Header, cs.head.View).Return(doneChan())
 		_ = cs.engine.Process(channels.ConsensusCommittee, originID, proposal)
 		wg.Done()
 	}()

@@ -30,14 +30,12 @@ func runtimeNano() int64
 //     - Detecting expired cached domain triggers async DNS lookup to refresh cached entry.
 // [1] https://en.wikipedia.org/wiki/Name_server#Caching_name_server
 type Resolver struct {
-	c              *cache
-	res            madns.BasicResolver // underlying resolver
-	collector      module.ResolverMetrics
-	processingIPs  map[string]struct{} // ongoing ip lookups through underlying resolver
-	processingTXTs map[string]struct{} // ongoing txt lookups through underlying resolver
-	ipRequests     chan *lookupIPRequest
-	txtRequests    chan *lookupTXTRequest
-	logger         zerolog.Logger
+	c           *cache
+	res         madns.BasicResolver // underlying resolver
+	collector   module.ResolverMetrics
+	ipRequests  chan *lookupIPRequest
+	txtRequests chan *lookupTXTRequest
+	logger      zerolog.Logger
 	component.Component
 	cm *component.ComponentManager
 }
