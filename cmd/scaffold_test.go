@@ -642,15 +642,24 @@ func TestCreateUploader(t *testing.T) {
 	t.Run("create defualt uploader", func(t *testing.T) {
 		t.Parallel()
 		nb := FlowNode("scaffold_uploader")
-
-		testClient := gcemd.NewClient(nil)
+		mockHttp := &http.Client{
+			Transport: &mockRoundTripper{
+				DoFunc: func(req *http.Request) (*http.Response, error) {
+					return &http.Response{
+						StatusCode: 403,
+						Body:       ioutil.NopCloser(bytes.NewBufferString("")),
+					}, nil
+				},
+			},
+		}
+		testClient := gcemd.NewClient(mockHttp)
 		uploader, err := nb.createGCEProfileUploader(
 			testClient,
 
 			option.WithoutAuthentication(),
 			option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
 		)
-		require.NoError(t, err)
+		require.ErrorContains(t, err, "403")
 		require.NotNil(t, uploader)
 	})
 
@@ -667,8 +676,13 @@ func TestCreateUploader(t *testing.T) {
 							StatusCode: 200,
 							Body:       ioutil.NopCloser(bytes.NewBufferString("test-project-id")),
 						}, nil
+					case "/computeMetadata/v1/instance/id":
+						return &http.Response{
+							StatusCode: 200,
+							Body:       ioutil.NopCloser(bytes.NewBufferString("test-instance-id")),
+						}, nil
 					default:
-						return &http.Response{StatusCode: 403}, nil
+						return nil, fmt.Errorf("unexpected request: %s", req.URL.Path)
 					}
 				},
 			},
@@ -689,7 +703,7 @@ func TestCreateUploader(t *testing.T) {
 
 		assert.Equal(t, "test-project-id", uploaderImpl.Deployment.ProjectId)
 		assert.Equal(t, "unknown-scaffold_uploader", uploaderImpl.Deployment.Target)
-		assert.Equal(t, "unknown", uploaderImpl.Deployment.Labels["instance"])
+		assert.Equal(t, "test-instance-id", uploaderImpl.Deployment.Labels["instance"])
 		assert.Equal(t, "undefined-undefined", uploaderImpl.Deployment.Labels["version"])
 	})
 }

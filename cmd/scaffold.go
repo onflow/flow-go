@@ -541,14 +541,12 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 func (fnb *FlowNodeBuilder) createGCEProfileUploader(client *gcemd.Client, opts ...option.ClientOption) (profiler.Uploader, error) {
 	projectID, err := client.ProjectID()
 	if err != nil {
-		fnb.Logger.Warn().Err(err).Msg("could not get CGE project ID")
-		projectID = "unknown"
+		return &profiler.NoopUploader{}, fmt.Errorf("failed to get project ID: %w", err)
 	}
 
 	instance, err := client.InstanceID()
 	if err != nil {
-		fnb.Logger.Warn().Err(err).Msg("could not get CGE instance ID")
-		instance = "unknown"
+		return &profiler.NoopUploader{}, fmt.Errorf("failed to get instance ID: %w", err)
 	}
 
 	chainID := fnb.RootChainID.String()
