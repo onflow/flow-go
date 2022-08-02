@@ -38,7 +38,7 @@ func TestConnectorHappyPath_Send(t *testing.T) {
 			<-ccf.attackerRegMsg
 			close(attackerRegistered)
 		}()
-		
+
 		// goroutine checks mock ccf for receiving the message sent over the connection.
 		msg, _, _ := insecure.EgressMessageFixture(t, unittest.NetworkCodec(), insecure.Protocol_MULTICAST, &message.TestMessage{
 			Text: fmt.Sprintf("this is a test message from attacker to ccf: %d", rand.Int()),
