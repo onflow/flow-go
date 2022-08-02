@@ -32,6 +32,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/engine/access/observer"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/common/follower"
@@ -1000,7 +1001,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		}
 
 		// build the rpc engine
-		engineBuilder.WithNewHandler(&rpc.Forwarder{UpstreamHandler: client})
+		engineBuilder.WithNewHandler(&observer.Forwarder{UpstreamHandler: client})
 		engineBuilder.WithLegacy()
 		builder.RpcEng = engineBuilder.Build()
 		return builder.RpcEng, nil
