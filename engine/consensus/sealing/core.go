@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/gammazero/workerpool"
-	"github.com/opentracing/opentracing-go"
-	"github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel/attribute"
+	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
@@ -304,7 +304,7 @@ func (c *Core) processIncorporatedResult(incRes *flow.IncorporatedResult) error 
 func (c *Core) ProcessIncorporatedResult(result *flow.IncorporatedResult) error {
 
 	span, _, _ := c.tracer.StartBlockSpan(context.Background(), result.Result.BlockID, trace.CONSealingProcessIncorporatedResult)
-	defer span.Finish()
+	defer span.End()
 
 	err := c.processIncorporatedResult(result)
 	// We expect only engine.OutdatedInputError. If we encounter UnverifiableInputError or InvalidInputError, we
@@ -354,10 +354,12 @@ func (c *Core) ProcessApproval(approval *flow.ResultApproval) error {
 
 	span, _, isSampled := c.tracer.StartBlockSpan(context.Background(), approval.Body.BlockID, trace.CONSealingProcessApproval)
 	if isSampled {
-		span.LogFields(log.String("approverId", approval.Body.ApproverID.String()))
-		span.LogFields(log.Uint64("chunkIndex", approval.Body.ChunkIndex))
+		span.SetAttributes(
+			attribute.String("approverId", approval.Body.ApproverID.String()),
+			attribute.Int64("chunkIndex", int64(approval.Body.ChunkIndex)),
+		)
 	}
-	defer span.Finish()
+	defer span.End()
 
 	startTime := time.Now()
 	err := c.processApproval(approval)
@@ -503,7 +505,7 @@ func (c *Core) processPendingApprovals(collector approvals.AssignmentCollectorSt
 func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 
 	processFinalizedBlockSpan, _, _ := c.tracer.StartBlockSpan(context.Background(), finalizedBlockID, trace.CONSealingProcessFinalizedBlock)
-	defer processFinalizedBlockSpan.Finish()
+	defer processFinalizedBlockSpan.End()
 
 	// STEP 0: Collect auxiliary information
 	// ------------------------------------------------------------------------
@@ -545,14 +547,14 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 	checkEmergencySealingSpan := c.tracer.StartSpanFromParent(processFinalizedBlockSpan, trace.CONSealingCheckForEmergencySealableBlocks)
 	// check if there are stale results qualified for emergency sealing
 	err = c.checkEmergencySealing(sealingObservation, lastBlockWithFinalizedSeal.Height, finalized.Height)
-	checkEmergencySealingSpan.Finish()
+	checkEmergencySealingSpan.End()
 	if err != nil {
 		return fmt.Errorf("could not check emergency sealing at block %v", finalizedBlockID)
 	}
 
 	requestPendingApprovalsSpan := c.tracer.StartSpanFromParent(processFinalizedBlockSpan, trace.CONSealingRequestingPendingApproval)
 	err = c.requestPendingApprovals(sealingObservation, lastBlockWithFinalizedSeal.Height, finalized.Height)
-	requestPendingApprovalsSpan.Finish()
+	requestPendingApprovalsSpan.End()
 	if err != nil {
 		return fmt.Errorf("internal error while requesting pending approvals: %w", err)
 	}
@@ -574,9 +576,9 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 // Furthermore, it  removes obsolete entries from AssignmentCollectorTree, RequestTracker
 // and IncorporatedResultSeals mempool.
 // We do _not_ expect any errors during normal operations.
-func (c *Core) prune(parentSpan opentracing.Span, finalized, lastSealed *flow.Header) error {
+func (c *Core) prune(parentSpan otelTrace.Span, finalized, lastSealed *flow.Header) error {
 	pruningSpan := c.tracer.StartSpanFromParent(parentSpan, trace.CONSealingPruning)
-	defer pruningSpan.Finish()
+	defer pruningSpan.End()
 
 	err := c.collectorTree.FinalizeForkAtLevel(finalized, lastSealed) // stop collecting approvals for orphan collectors
 	if err != nil {
