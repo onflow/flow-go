@@ -532,7 +532,6 @@ func Test_WAL(t *testing.T) {
 			assert.NoError(t, err)
 			state, _, err = led.Set(update)
 			require.NoError(t, err)
-			fmt.Printf("Updated with %x\n", state)
 
 			data := make(map[string]ledger.Value, len(keys))
 			for j, key := range keys {
@@ -580,10 +579,6 @@ func Test_WAL(t *testing.T) {
 				assert.True(t, data[string(encKey)].Equals(registerValue))
 			}
 		}
-
-		// test deletion
-		s := led2.ForestSize()
-		assert.Equal(t, s, size)
 
 		<-led2.Done()
 		<-compactor2.Done()

@@ -32,7 +32,7 @@ const defaultTrieUpdateChanSize = 500
 // Ledger is fork-aware which means any update can be applied at any previous state which forms a tree of tries (forest).
 // The forest is in memory but all changes (e.g. register updates) are captured inside write-ahead-logs for crash recovery reasons.
 // In order to limit the memory usage and maintain the performance storage only keeps a limited number of
-// tries and purge the old ones (LRU-based); in other words, Ledger is not designed to be used
+// tries and purge the old ones (FIFO-based); in other words, Ledger is not designed to be used
 // for archival usage but make it possible for other software components to reconstruct very old tries using write-ahead logs.
 type Ledger struct {
 	forest            *mtrie.Forest
@@ -53,12 +53,7 @@ func NewLedger(
 
 	logger := log.With().Str("ledger", "complete").Logger()
 
-	forest, err := mtrie.NewForest(capacity, metrics, func(evictedTrie *trie.MTrie) {
-		err := wal.RecordDelete(evictedTrie.RootHash())
-		if err != nil {
-			logger.Error().Err(err).Msg("failed to save delete record in wal")
-		}
-	})
+	forest, err := mtrie.NewForest(capacity, metrics, nil)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create forest: %w", err)
 	}
@@ -358,7 +353,7 @@ func (l *Ledger) ExportCheckpointAt(
 			Str("hash", rh.String()).
 			Msgf("Most recently touched root hash.")
 		return ledger.State(hash.DummyHash),
-			fmt.Errorf("cannot get try at the given state commitment: %w", err)
+			fmt.Errorf("cannot get trie at the given state commitment: %w", err)
 	}
 
 	// clean up tries to release memory
@@ -505,20 +500,7 @@ func (l *Ledger) keepOnlyOneTrie(state ledger.State) error {
 	// don't write things to WALs
 	l.wal.PauseRecord()
 	defer l.wal.UnpauseRecord()
-
-	allTries, err := l.forest.GetTries()
-	if err != nil {
-		return err
-	}
-
-	targetRootHash := ledger.RootHash(state)
-	for _, trie := range allTries {
-		trieRootHash := trie.RootHash()
-		if trieRootHash != targetRootHash {
-			l.forest.RemoveTrie(trieRootHash)
-		}
-	}
-	return nil
+	return l.forest.PurgeCacheExcept(ledger.RootHash(state))
 }
 
 func runReport(r ledger.Reporter, p []ledger.Payload, commit ledger.State, l zerolog.Logger) error {
