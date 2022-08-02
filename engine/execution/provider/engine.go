@@ -167,7 +167,7 @@ func (e *Engine) onChunkDataRequest(
 	// increases collector metric
 	e.metrics.ChunkDataPackRequested()
 
-	chunkDataPack, err := e.execState.ChunkDataPackByChunkID(ctx, chunkID)
+	chunkDataPack, err := e.execState.ChunkDataPackByChunkID(chunkID)
 	// we might be behind when we don't have the requested chunk.
 	// if this happen, log it and return nil
 	if errors.Is(err, storage.ErrNotFound) {
