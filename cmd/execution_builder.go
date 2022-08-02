@@ -177,40 +177,38 @@ func (e *ExecutionNodeBuilder) LoadFlags() {
 
 func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 	var (
-		collector                            module.ExecutionMetrics
-		executionState                       state.ExecutionState
-		followerState                        protocol.MutableState
-		committee                            hotstuff.Committee
-		ledgerStorage                        *ledger.Ledger
-		events                               *storage.Events
-		serviceEvents                        *storage.ServiceEvents
-		txResults                            *storage.TransactionResults
-		results                              *storage.ExecutionResults
-		myReceipts                           *storage.MyExecutionReceipts
-		providerEngine                       *exeprovider.Engine
-		checkerEng                           *checker.Engine
-		syncCore                             *chainsync.Core
-		pendingBlocks                        *buffer.PendingBlocks // used in follower engine
-		deltas                               *ingestion.Deltas
-		syncEngine                           *synchronization.Engine
-		followerEng                          *followereng.Engine // to sync blocks from consensus nodes
-		computationManager                   *computation.Manager
-		collectionRequester                  *requester.Engine
-		ingestionEng                         *ingestion.Engine
-		finalizationDistributor              *pubsub.FinalizationDistributor
-		finalizedHeader                      *synchronization.FinalizedHeaderCache
-		checkAuthorizedAtBlock               func(blockID flow.Identifier) (bool, error)
-		diskWAL                              *wal.DiskWAL
-		blockDataUploaders                   []uploader.Uploader
-		blockDataUploaderMaxRetry            uint64 = 5
-		blockdataUploaderRetryTimeout               = 1 * time.Second
-		executionDataStore                   execution_data.ExecutionDataStore
-		executionDataDatastore               *badger.Datastore
-		executionDataPruner                  *pruner.Pruner
-		executionDataBlobstore               blobs.Blobstore
-		executionDataTracker                 tracker.Storage
-		executionDataPrunerHeightRangeTarget uint64
-		executionDataPrunerThreshold         uint64
+		collector                     module.ExecutionMetrics
+		executionState                state.ExecutionState
+		followerState                 protocol.MutableState
+		committee                     hotstuff.Committee
+		ledgerStorage                 *ledger.Ledger
+		events                        *storage.Events
+		serviceEvents                 *storage.ServiceEvents
+		txResults                     *storage.TransactionResults
+		results                       *storage.ExecutionResults
+		myReceipts                    *storage.MyExecutionReceipts
+		providerEngine                *exeprovider.Engine
+		checkerEng                    *checker.Engine
+		syncCore                      *chainsync.Core
+		pendingBlocks                 *buffer.PendingBlocks // used in follower engine
+		deltas                        *ingestion.Deltas
+		syncEngine                    *synchronization.Engine
+		followerEng                   *followereng.Engine // to sync blocks from consensus nodes
+		computationManager            *computation.Manager
+		collectionRequester           *requester.Engine
+		ingestionEng                  *ingestion.Engine
+		finalizationDistributor       *pubsub.FinalizationDistributor
+		finalizedHeader               *synchronization.FinalizedHeaderCache
+		checkAuthorizedAtBlock        func(blockID flow.Identifier) (bool, error)
+		diskWAL                       *wal.DiskWAL
+		blockDataUploaders            []uploader.Uploader
+		blockDataUploaderMaxRetry     uint64 = 5
+		blockdataUploaderRetryTimeout        = 1 * time.Second
+		executionDataStore            execution_data.ExecutionDataStore
+		executionDataDatastore        *badger.Datastore
+		executionDataPruner           *pruner.Pruner
+		executionDataBlobstore        blobs.Blobstore
+		executionDataTracker          tracker.Storage
 	)
 
 	e.FlowNodeBuilder.
@@ -452,8 +450,8 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				pruner.WithPruneCallback(func(ctx context.Context) error {
 					return executionDataDatastore.CollectGarbage(ctx)
 				}),
-				pruner.WithHeightRangeTarget(executionDataPrunerHeightRangeTarget),
-				pruner.WithThreshold(executionDataPrunerThreshold),
+				pruner.WithHeightRangeTarget(e.exeConf.executionDataPrunerHeightRangeTarget),
+				pruner.WithThreshold(e.exeConf.executionDataPrunerThreshold),
 			)
 			return executionDataPruner, err
 		}).
