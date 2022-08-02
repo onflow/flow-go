@@ -8,7 +8,7 @@ import (
 	"github.com/rs/zerolog"
 
 	errors "github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/meter/weighted"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -48,7 +48,7 @@ func NewVirtualMachine(rt runtime.Runtime) *VirtualMachine {
 func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, programs *programs.Programs) (err error) {
 	st := state.NewState(
 		v,
-		weighted.NewMeter(
+		meter.NewMeter(
 			uint(proc.ComputationLimit(ctx)),
 			uint(proc.MemoryLimit(ctx))),
 		state.WithMaxKeySizeAllowed(ctx.MaxStateKeySize),
@@ -68,7 +68,7 @@ func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, program
 func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.View, programs *programs.Programs) (*flow.Account, error) {
 	st := state.NewState(
 		v,
-		weighted.NewMeter(math.MaxUint64, math.MaxUint64),
+		meter.NewMeter(math.MaxUint64, math.MaxUint64),
 		state.WithMaxKeySizeAllowed(ctx.MaxStateKeySize),
 		state.WithMaxValueSizeAllowed(ctx.MaxStateValueSize),
 		state.WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize))

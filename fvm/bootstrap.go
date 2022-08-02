@@ -9,7 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/errors"
-	weightedMeter "github.com/onflow/flow-go/fvm/meter/weighted"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -42,8 +42,8 @@ type BootstrapProcedure struct {
 	restrictedContractDeployment *bool
 
 	transactionFees        BootstrapProcedureFeeParameters
-	executionEffortWeights weightedMeter.ExecutionEffortWeights
-	executionMemoryWeights weightedMeter.ExecutionMemoryWeights
+	executionEffortWeights meter.ExecutionEffortWeights
+	executionMemoryWeights meter.ExecutionMemoryWeights
 	// executionMemoryLimit of 0 means that it won't be set in the state. The FVM will use the default value from the context.
 	executionMemoryLimit uint64
 
@@ -149,14 +149,14 @@ func WithTransactionFee(fees BootstrapProcedureFeeParameters) BootstrapProcedure
 	}
 }
 
-func WithExecutionEffortWeights(weights weightedMeter.ExecutionEffortWeights) BootstrapProcedureOption {
+func WithExecutionEffortWeights(weights meter.ExecutionEffortWeights) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
 		bp.executionEffortWeights = weights
 		return bp
 	}
 }
 
-func WithExecutionMemoryWeights(weights weightedMeter.ExecutionMemoryWeights) BootstrapProcedureOption {
+func WithExecutionMemoryWeights(weights meter.ExecutionMemoryWeights) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
 		bp.executionMemoryWeights = weights
 		return bp

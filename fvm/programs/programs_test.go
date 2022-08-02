@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/fvm/meter/weighted"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 )
@@ -24,7 +24,7 @@ func Test_Programs(t *testing.T) {
 
 	newState := state.NewState(
 		utils.NewSimpleView(),
-		weighted.NewMeter(math.MaxUint64, math.MaxUint64))
+		meter.NewMeter(math.MaxUint64, math.MaxUint64))
 
 	addressLocation := common.AddressLocation{
 		Address: common.MustBytesToAddress([]byte{2, 3, 4}),

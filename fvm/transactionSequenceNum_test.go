@@ -8,7 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/meter/weighted"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
@@ -21,7 +21,7 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		ledger := utils.NewSimpleView()
 		sth := state.NewStateHolder(state.NewState(
 			ledger,
-			weighted.NewMeter(math.MaxUint64, math.MaxUint64),
+			meter.NewMeter(math.MaxUint64, math.MaxUint64),
 		))
 		accounts := state.NewAccounts(sth)
 
@@ -49,7 +49,7 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		ledger := utils.NewSimpleView()
 		sth := state.NewStateHolder(state.NewState(
 			ledger,
-			weighted.NewMeter(math.MaxUint64, math.MaxUint64),
+			meter.NewMeter(math.MaxUint64, math.MaxUint64),
 		))
 		accounts := state.NewAccounts(sth)
 
@@ -79,7 +79,7 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		ledger := utils.NewSimpleView()
 		sth := state.NewStateHolder(state.NewState(
 			ledger,
-			weighted.NewMeter(math.MaxUint64, math.MaxUint64),
+			meter.NewMeter(math.MaxUint64, math.MaxUint64),
 		))
 		accounts := state.NewAccounts(sth)
 
