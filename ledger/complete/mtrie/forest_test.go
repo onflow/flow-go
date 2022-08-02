@@ -1091,9 +1091,10 @@ func TestPurgeCacheExcept(t *testing.T) {
 
 	err = forest.AddTrie(updatedTrie2)
 	require.NoError(t, err)
-
 	require.Equal(t, 3, forest.tries.Count())
-	forest.PurgeCacheExcept(updatedTrie2.RootHash())
+
+	err = forest.PurgeCacheExcept(updatedTrie2.RootHash())
+	require.NoError(t, err)
 
 	require.Equal(t, 1, forest.tries.Count())
 	ret, err := forest.GetTrie(updatedTrie2.RootHash())
@@ -1104,7 +1105,9 @@ func TestPurgeCacheExcept(t *testing.T) {
 	require.Error(t, err)
 
 	// test purge when only a single target trie exist there
-	forest.PurgeCacheExcept(updatedTrie1.RootHash())
+	err = forest.PurgeCacheExcept(updatedTrie1.RootHash())
+	require.Error(t, err)
+
 	ret, err = forest.GetTrie(updatedTrie2.RootHash())
 	require.NoError(t, err)
 	require.Equal(t, ret, updatedTrie2)
@@ -1113,6 +1116,6 @@ func TestPurgeCacheExcept(t *testing.T) {
 	require.Error(t, err)
 
 	// purge with non existing trie
-	forest.PurgeCacheExcept(updatedTrie2.RootHash())
+	err = forest.PurgeCacheExcept(updatedTrie2.RootHash())
 	require.Error(t, err)
 }
