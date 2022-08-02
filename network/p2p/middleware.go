@@ -69,11 +69,6 @@ var (
 	allowAll = func(_ peer.ID) bool { return true }
 )
 
-// peerFilterFunc is a func type that will be used in the TopicValidator to filter
-// peers by ID and drop messages from unwanted peers before message payload decoding
-// happens.
-type peerFilterFunc func(id peer.ID) bool
-
 // Middleware handles the input & output on the direct connections we have to
 // our neighbours on the peer-to-peer network.
 type Middleware struct {
@@ -237,7 +232,7 @@ func DefaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.Mes
 
 // isStakedPeerFilter returns a peerFilterFunc that uses m.ov.Identity to get the identity
 // for a peer ID. If a identity is not found the peer is unstaked.
-func (m *Middleware) isStakedPeerFilter() peerFilterFunc {
+func (m *Middleware) isStakedPeerFilter() PeerFilter {
 	f := func(id peer.ID) bool {
 		_, ok := m.ov.Identity(id)
 		return ok
@@ -264,26 +259,31 @@ func (m *Middleware) topologyPeers() (peer.IDSlice, error) {
 		return nil, err
 	}
 
-	peerIDS := m.peerIDs(identities.NodeIDs())
-	allowedPeers := make([]peer.ID, 0)
+	allPeers := m.peerIDs(identities.NodeIDs())
+	filteredPeers := make([]peer.ID, 0)
+	
+	// if we have some filters configured filter our peers
+	if len(m.peerManagerFilters) > 0 {
+		// filter peers through peerManagerFilters
+		for _, pid := range allPeers {
+			peerAllowed := true
 
-	// filter peers through peerManagerFilters
-	for _, pid := range peerIDS {
-		peerAllowed := true
+			for _, f := range m.peerManagerFilters {
+				if !f(pid) {
+					peerAllowed = false
+					break
+				}
+			}
 
-		for _, f := range m.peerManagerFilters {
-			if !f(pid) {
-				peerAllowed = false
-				break
+			if peerAllowed {
+				filteredPeers = append(filteredPeers, pid)
 			}
 		}
 
-		if peerAllowed {
-			allowedPeers = append(allowedPeers, pid)
-		}
+		return filteredPeers, nil
 	}
 
-	return allowedPeers, nil
+	return allPeers, nil
 }
 
 func (m *Middleware) peerIDs(flowIDs flow.IdentifierList) peer.IDSlice {
@@ -658,7 +658,7 @@ func (m *Middleware) Subscribe(channel channels.Channel) error {
 
 	topic := channels.TopicFromChannel(channel, m.rootBlockID)
 
-	var peerFilter peerFilterFunc
+	var peerFilter PeerFilter
 	var validators []psValidator.MessageValidator
 	if channels.PublicChannels().Contains(channel) {
 		// NOTE: for public channels the callback used to check if a node is staked will
