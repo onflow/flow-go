@@ -13,10 +13,10 @@ type RPCHandlerMetrics interface {
 type RPCHandler[Request any, Response any] func(ctx context.Context, r Request) (Response, error)
 
 type Handler[Request any, Response any] struct {
-	RPCHandlerMetrics
+	Metrics RPCHandlerMetrics
+	Logger  zerolog.Logger
 
-	Name         string // rpc name
-	Logger       zerolog.Logger
+	Name         string                        // rpc name
 	ForwardOnly  bool                          // call upstream only
 	ForwardRetry bool                          // call upstream after observer fails
 	Upstream     RPCHandler[Request, Response] // upstream access handler
@@ -40,14 +40,14 @@ func (h *Handler[Request, Response]) Call(ctx context.Context, r Request) (Respo
 func (h *Handler[Request, Response]) callUpstream(ctx context.Context, r Request, fallback bool) (Response, error) {
 	res, err := h.Upstream(ctx, r)
 	h.log("upstream", h.Name, err, fallback)
-	h.Record("upstream", h.Name, err != nil, fallback)
+	h.Metrics.Record("upstream", h.Name, err != nil, fallback)
 	return res, err
 }
 
 func (h *Handler[Request, Response]) callObserver(ctx context.Context, r Request) (Response, error) {
 	res, err := h.Observer(ctx, r)
 	h.log("observer", h.Name, err, false)
-	h.Record("observer", h.Name, err != nil, false)
+	h.Metrics.Record("observer", h.Name, err != nil, false)
 	return res, err
 }
 
