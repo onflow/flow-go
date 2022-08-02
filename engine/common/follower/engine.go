@@ -223,7 +223,7 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal, inRangeBlockResponse bool) error {
 
 	span, ctx, _ := e.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.FollowerOnBlockProposal)
-	defer span.Finish()
+	defer span.End()
 
 	header := proposal.Header
 
@@ -356,7 +356,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *messages.BlockProposal, inRangeBlockResponse bool) error {
 
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.FollowerProcessBlockProposal)
-	defer span.Finish()
+	defer span.End()
 
 	header := proposal.Header
 
@@ -431,7 +431,7 @@ func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *messa
 func (e *Engine) processPendingChildren(ctx context.Context, header *flow.Header, inRangeBlockResponse bool) error {
 
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.FollowerProcessPendingChildren)
-	defer span.Finish()
+	defer span.End()
 
 	blockID := header.ID()
 

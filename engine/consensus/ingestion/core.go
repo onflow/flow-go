@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/engine"
@@ -61,9 +62,11 @@ func (e *Core) OnGuarantee(originID flow.Identifier, guarantee *flow.CollectionG
 
 	span, _, isSampled := e.tracer.StartCollectionSpan(context.Background(), guarantee.CollectionID, trace.CONIngOnCollectionGuarantee)
 	if isSampled {
-		span.LogKV("originID", originID.String())
+		span.SetAttributes(
+			attribute.String("originID", originID.String()),
+		)
 	}
-	defer span.Finish()
+	defer span.End()
 
 	guaranteeID := guarantee.ID()
 

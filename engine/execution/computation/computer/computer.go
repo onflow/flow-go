@@ -7,10 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/opentracing/opentracing-go"
-	"github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
-	"github.com/uber/jaeger-client-go"
+	"go.opentelemetry.io/otel/attribute"
+	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
@@ -101,9 +100,9 @@ func (e *blockComputer) ExecuteBlock(
 
 	span, _, isSampled := e.tracer.StartBlockSpan(ctx, block.ID(), trace.EXEComputeBlock)
 	if isSampled {
-		span.LogFields(log.Int("collection_counts", len(block.CompleteCollections)))
+		span.SetAttributes(attribute.Int("collection_counts", len(block.CompleteCollections)))
 	}
-	defer span.Finish()
+	defer span.End()
 
 	results, err := e.executeBlock(span, block, stateView, program)
 	if err != nil {
@@ -116,7 +115,7 @@ func (e *blockComputer) ExecuteBlock(
 }
 
 func (e *blockComputer) executeBlock(
-	blockSpan opentracing.Span,
+	blockSpan otelTrace.Span,
 	block *entity.ExecutableBlock,
 	stateView state.View,
 	programs *programs.Programs,
@@ -223,7 +222,7 @@ func (e *blockComputer) executeBlock(
 }
 
 func (e *blockComputer) executeSystemCollection(
-	blockSpan opentracing.Span,
+	blockSpan otelTrace.Span,
 	collectionIndex int,
 	txIndex uint32,
 	systemChunkCtx fvm.Context,
@@ -233,7 +232,7 @@ func (e *blockComputer) executeSystemCollection(
 ) (uint32, error) {
 
 	colSpan := e.tracer.StartSpanFromParent(blockSpan, trace.EXEComputeSystemCollection)
-	defer colSpan.Finish()
+	defer colSpan.End()
 
 	tx, err := blueprints.SystemChunkTransaction(e.vmCtx.Chain)
 	if err != nil {
@@ -266,7 +265,7 @@ func (e *blockComputer) executeSystemCollection(
 }
 
 func (e *blockComputer) executeCollection(
-	blockSpan opentracing.Span,
+	blockSpan otelTrace.Span,
 	collectionIndex int,
 	txIndex uint32,
 	blockCtx fvm.Context,
@@ -286,11 +285,11 @@ func (e *blockComputer) executeCollection(
 	computationUsedUpToNow := res.ComputationUsed
 	colSpan := e.tracer.StartSpanFromParent(blockSpan, trace.EXEComputeCollection)
 	defer func() {
-		colSpan.SetTag("collection.txCount", len(collection.Transactions))
-		colSpan.LogFields(
-			log.String("collection.hash", collection.Guarantee.CollectionID.String()),
+		colSpan.SetAttributes(
+			attribute.Int("collection.txCount", len(collection.Transactions)),
+			attribute.String("collection.hash", collection.Guarantee.CollectionID.String()),
 		)
-		colSpan.Finish()
+		colSpan.End()
 	}()
 
 	txCtx := fvm.NewContextFromParent(blockCtx, fvm.WithMetricsReporter(e.metrics), fvm.WithTracer(e.tracer))
@@ -316,7 +315,7 @@ func (e *blockComputer) executeCollection(
 
 func (e *blockComputer) executeTransaction(
 	txBody *flow.TransactionBody,
-	colSpan opentracing.Span,
+	colSpan otelTrace.Span,
 	collectionView state.View,
 	programs *programs.Programs,
 	ctx fvm.Context,
@@ -331,20 +330,20 @@ func (e *blockComputer) executeTransaction(
 
 	// we capture two spans one for tx-based view and one for the current context (block-based) view
 	txSpan := e.tracer.StartSpanFromParent(colSpan, trace.EXEComputeTransaction)
-	txSpan.LogFields(log.String("tx_id", txID.String()))
-	txSpan.LogFields(log.Uint32("tx_index", txIndex))
-	txSpan.LogFields(log.Int("col_index", collectionIndex))
-	defer txSpan.Finish()
+	txSpan.SetAttributes(
+		attribute.String("tx_id", txID.String()),
+		attribute.Int64("tx_index", int64(txIndex)),
+		attribute.Int("col_index", collectionIndex),
+	)
+	defer txSpan.End()
 
 	var traceID string
 	txInternalSpan, _, isSampled := e.tracer.StartTransactionSpan(context.Background(), txID, trace.EXERunTransaction)
 	if isSampled {
-		txInternalSpan.LogFields(log.String("tx_id", txID.String()))
-		if sc, ok := txInternalSpan.Context().(jaeger.SpanContext); ok {
-			traceID = sc.TraceID().String()
-		}
+		txInternalSpan.SetAttributes(attribute.String("tx_id", txID.String()))
+		traceID = txInternalSpan.SpanContext().TraceID().String()
 	}
-	defer txInternalSpan.Finish()
+	defer txInternalSpan.End()
 
 	e.log.Info().
 		Str("tx_id", txID.String()).
@@ -379,7 +378,7 @@ func (e *blockComputer) executeTransaction(
 	}
 
 	postProcessSpan := e.tracer.StartSpanFromParent(txSpan, trace.EXEPostProcessTransaction)
-	defer postProcessSpan.Finish()
+	defer postProcessSpan.End()
 
 	// always merge the view, fvm take cares of reverting changes
 	// of failed transaction invocation
@@ -429,11 +428,11 @@ func (e *blockComputer) executeTransaction(
 
 func (e *blockComputer) mergeView(
 	parent, child state.View,
-	parentSpan opentracing.Span,
+	parentSpan otelTrace.Span,
 	mergeSpanName trace.SpanName) error {
 
 	mergeSpan := e.tracer.StartSpanFromParent(parentSpan, mergeSpanName)
-	defer mergeSpan.Finish()
+	defer mergeSpan.End()
 
 	return parent.MergeView(child)
 }
@@ -444,7 +443,7 @@ type blockCommitter struct {
 	state     flow.StateCommitment
 	views     chan state.View
 	closeOnce sync.Once
-	blockSpan opentracing.Span
+	blockSpan otelTrace.Span
 
 	res *execution.ComputationResult
 }
@@ -462,7 +461,7 @@ func (bc *blockCommitter) Run() {
 		bc.res.TrieUpdates = append(bc.res.TrieUpdates, trieUpdate)
 
 		bc.state = stateCommit
-		span.Finish()
+		span.End()
 	}
 }
 
@@ -478,7 +477,7 @@ type eventHasher struct {
 	tracer    module.Tracer
 	data      chan flow.EventsList
 	closeOnce sync.Once
-	blockSpan opentracing.Span
+	blockSpan otelTrace.Span
 
 	res *execution.ComputationResult
 }
@@ -493,7 +492,7 @@ func (eh *eventHasher) Run() {
 
 		eh.res.EventsHashes = append(eh.res.EventsHashes, rootHash)
 
-		span.Finish()
+		span.End()
 	}
 }
 

@@ -12,7 +12,6 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,7 +23,6 @@ import (
 	fvmCrypto "github.com/onflow/flow-go/fvm/crypto"
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
-	weightedMeter "github.com/onflow/flow-go/fvm/meter/weighted"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
@@ -998,8 +996,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithExecutionEffortWeights(
-			weightedMeter.ExecutionEffortWeights{
-				common.ComputationKindLoop: 100_000 << weightedMeter.MeterExecutionInternalPrecisionBytes,
+			meter.ExecutionEffortWeights{
+				common.ComputationKindLoop: 100_000 << meter.MeterExecutionInternalPrecisionBytes,
 			},
 		),
 	).run(
@@ -1032,7 +1030,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 	))
 
 	memoryWeights := make(map[common.MemoryKind]uint64)
-	for k, v := range weightedMeter.DefaultMemoryWeights {
+	for k, v := range meter.DefaultMemoryWeights {
 		memoryWeights[k] = v
 	}
 	memoryWeights[common.MemoryKindBoolValue] = 20_000_000_000
@@ -1118,7 +1116,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 	))
 
 	memoryWeights = make(map[common.MemoryKind]uint64)
-	for k, v := range weightedMeter.DefaultMemoryWeights {
+	for k, v := range meter.DefaultMemoryWeights {
 		memoryWeights[k] = v
 	}
 	memoryWeights[common.MemoryKindBreakStatement] = 1_000_000
@@ -1190,8 +1188,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithExecutionEffortWeights(
-			weightedMeter.ExecutionEffortWeights{
-				meter.ComputationKindCreateAccount: (fvm.DefaultComputationLimit + 1) << weightedMeter.MeterExecutionInternalPrecisionBytes,
+			meter.ExecutionEffortWeights{
+				meter.ComputationKindCreateAccount: (fvm.DefaultComputationLimit + 1) << meter.MeterExecutionInternalPrecisionBytes,
 			},
 		),
 	).run(
@@ -1224,8 +1222,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithExecutionEffortWeights(
-			weightedMeter.ExecutionEffortWeights{
-				meter.ComputationKindCreateAccount: 100_000_000 << weightedMeter.MeterExecutionInternalPrecisionBytes,
+			meter.ExecutionEffortWeights{
+				meter.ComputationKindCreateAccount: 100_000_000 << meter.MeterExecutionInternalPrecisionBytes,
 			},
 		),
 	).run(
@@ -1259,8 +1257,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithExecutionEffortWeights(
-			weightedMeter.ExecutionEffortWeights{
-				meter.ComputationKindCreateAccount: 100_000_000 << weightedMeter.MeterExecutionInternalPrecisionBytes,
+			meter.ExecutionEffortWeights{
+				meter.ComputationKindCreateAccount: 100_000_000 << meter.MeterExecutionInternalPrecisionBytes,
 			},
 		),
 	).run(
@@ -1294,12 +1292,12 @@ func TestSettingExecutionWeights(t *testing.T) {
 			fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 			fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 			fvm.WithExecutionEffortWeights(
-				weightedMeter.ExecutionEffortWeights{
-					meter.ComputationKindCreateAccount: 1_000_000_000_000 << weightedMeter.MeterExecutionInternalPrecisionBytes,
+				meter.ExecutionEffortWeights{
+					meter.ComputationKindCreateAccount: 1_000_000_000_000 << meter.MeterExecutionInternalPrecisionBytes,
 				},
 			),
 			fvm.WithExecutionMemoryWeights(
-				weightedMeter.ExecutionMemoryWeights{
+				meter.ExecutionMemoryWeights{
 					common.MemoryKindBreakStatement: 1_000_000_000_000,
 				},
 			),
@@ -1344,8 +1342,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithTransactionFee(fvm.DefaultTransactionFees),
 		fvm.WithExecutionEffortWeights(
-			weightedMeter.ExecutionEffortWeights{
-				common.ComputationKindStatement:          1 << weightedMeter.MeterExecutionInternalPrecisionBytes,
+			meter.ExecutionEffortWeights{
+				common.ComputationKindStatement:          1 << meter.MeterExecutionInternalPrecisionBytes,
 				common.ComputationKindLoop:               0,
 				common.ComputationKindFunctionInvocation: 0,
 			},
@@ -1619,8 +1617,8 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 				require.Error(t, script.Err)
 				require.IsType(t, &errors.CadenceRuntimeError{}, script.Err)
 				// modifications to contracts are not supported in scripts
-				require.IsType(t, &errors.OperationNotSupportedError{},
-					script.Err.(*errors.CadenceRuntimeError).Unwrap().(*runtime.Error).Err.(interpreter.Error).Err.(interpreter.PositionedError).Err)
+				unsupportedOperationError := &errors.OperationNotSupportedError{}
+				require.ErrorAs(t, script.Err, &unsupportedOperationError)
 			},
 		),
 	)
@@ -1678,8 +1676,8 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 				require.Error(t, script.Err)
 				require.IsType(t, &errors.CadenceRuntimeError{}, script.Err)
 				// modifications to contracts are not supported in scripts
-				require.IsType(t, &errors.OperationNotSupportedError{},
-					script.Err.(*errors.CadenceRuntimeError).Unwrap().(*runtime.Error).Err.(interpreter.Error).Err.(interpreter.PositionedError).Err)
+				unsupportedOperationError := &errors.OperationNotSupportedError{}
+				require.ErrorAs(t, script.Err, &unsupportedOperationError)
 			},
 		),
 	)
@@ -1736,8 +1734,8 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 				require.Error(t, script.Err)
 				require.IsType(t, &errors.CadenceRuntimeError{}, script.Err)
 				// modifications to contracts are not supported in scripts
-				require.IsType(t, &errors.OperationNotSupportedError{},
-					script.Err.(*errors.CadenceRuntimeError).Unwrap().(*runtime.Error).Err.(interpreter.Error).Err.(interpreter.PositionedError).Err)
+				unsupportedOperationError := &errors.OperationNotSupportedError{}
+				require.ErrorAs(t, script.Err, &unsupportedOperationError)
 			},
 		),
 	)
@@ -1784,8 +1782,8 @@ func TestScriptAccountKeyMutationsFailure(t *testing.T) {
 				require.Error(t, script.Err)
 				require.IsType(t, &errors.CadenceRuntimeError{}, script.Err)
 				// modifications to public keys are not supported in scripts
-				require.IsType(t, &errors.OperationNotSupportedError{},
-					script.Err.(*errors.CadenceRuntimeError).Unwrap().(*runtime.Error).Err.(interpreter.Error).Err.(interpreter.PositionedError).Err)
+				unsupportedOperationError := &errors.OperationNotSupportedError{}
+				require.ErrorAs(t, script.Err, &unsupportedOperationError)
 			},
 		),
 	)
@@ -1820,8 +1818,8 @@ func TestScriptAccountKeyMutationsFailure(t *testing.T) {
 				require.Error(t, script.Err)
 				require.IsType(t, &errors.CadenceRuntimeError{}, script.Err)
 				// modifications to public keys are not supported in scripts
-				require.IsType(t, &errors.OperationNotSupportedError{},
-					script.Err.(*errors.CadenceRuntimeError).Unwrap().(*runtime.Error).Err.(interpreter.Error).Err.(interpreter.PositionedError).Err)
+				unsupportedOperationError := &errors.OperationNotSupportedError{}
+				require.ErrorAs(t, script.Err, &unsupportedOperationError)
 			},
 		),
 	)
