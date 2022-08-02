@@ -54,7 +54,7 @@ func TestCorruptibleConduitFrameworkHappyPath(t *testing.T) {
 				}, 2*time.Second, 100*time.Millisecond, "registration of attacker on CCF could not be done one time")
 
 				originalEvent := &message.TestMessage{Text: "this is a test message"}
-				testChannel := channels.Channel("test-channel")
+				testChannel := channels.TestNetworkChannel
 
 				// corrupted node network
 				corruptedEngine := &network.Engine{}

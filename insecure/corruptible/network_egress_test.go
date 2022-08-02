@@ -56,7 +56,7 @@ func TestHandleOutgoingEvent_AttackerObserve(t *testing.T) {
 
 	targetIds := unittest.IdentifierListFixture(10)
 	msg := &message.TestMessage{Text: "this is a test msg"}
-	channel := channels.Channel("test-channel")
+	channel := channels.TestNetworkChannel
 
 	go func() {
 		err := corruptibleNetwork.HandleOutgoingEvent(msg, channel, insecure.Protocol_MULTICAST, uint32(3), targetIds...)
@@ -87,7 +87,7 @@ func TestHandleOutgoingEvent_NoAttacker_UnicastOverNetwork(t *testing.T) {
 	corruptibleNetwork, adapter := corruptibleNetworkFixture(t, unittest.Logger())
 
 	msg := &message.TestMessage{Text: "this is a test msg"}
-	channel := channels.Channel("test-channel")
+	channel := channels.TestNetworkChannel
 
 	targetId := unittest.IdentifierFixture()
 
@@ -107,7 +107,7 @@ func TestHandleOutgoingEvent_NoAttacker_PublishOverNetwork(t *testing.T) {
 	corruptibleNetwork, adapter := corruptibleNetworkFixture(t, unittest.Logger())
 
 	msg := &message.TestMessage{Text: "this is a test msg"}
-	channel := channels.Channel("test-channel")
+	channel := channels.TestNetworkChannel
 
 	targetIds := unittest.IdentifierListFixture(10)
 	params := []interface{}{channel, msg}
@@ -131,7 +131,7 @@ func TestHandleOutgoingEvent_NoAttacker_MulticastOverNetwork(t *testing.T) {
 	corruptibleNetwork, adapter := corruptibleNetworkFixture(t, unittest.Logger())
 
 	msg := &message.TestMessage{Text: "this is a test msg"}
-	channel := channels.Channel("test-channel")
+	channel := channels.TestNetworkChannel
 
 	targetIds := unittest.IdentifierListFixture(10)
 

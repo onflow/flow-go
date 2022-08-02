@@ -36,7 +36,7 @@ func EgressMessageFixture(t *testing.T, codec network.Codec, protocol Protocol, 
 		targetNum = uint32(3)
 	}
 
-	channel := channels.Channel("test-channel")
+	channel := channels.TestNetworkChannel
 	// encodes event to create payload
 	payload, err := codec.Encode(content)
 	require.NoError(t, err)
@@ -44,7 +44,7 @@ func EgressMessageFixture(t *testing.T, codec network.Codec, protocol Protocol, 
 	// creates egress message that goes over gRPC.
 
 	egressMsg := &EgressMessage{
-		ChannelID: "test-channel",
+		ChannelID: channels.TestNetworkChannel.String(),
 		OriginID:  originId[:],
 		TargetNum: targetNum,
 		TargetIDs: flow.IdsToBytes(targetIds),
@@ -90,14 +90,14 @@ func IngressMessageFixture(t *testing.T, codec network.Codec, protocol Protocol,
 		targetNum = uint32(3)
 	}
 
-	channel := channels.Channel("test-channel")
+	channel := channels.TestNetworkChannel
 	// encodes event to create payload
 	payload, err := codec.Encode(content)
 	require.NoError(t, err)
 
 	// creates ingress message that goes over gRPC.
 	ingressMsg := &IngressMessage{
-		ChannelID: "test-channel",
+		ChannelID: channels.TestNetworkChannel.String(),
 		OriginID:  originId[:],
 		Payload:   payload,
 	}

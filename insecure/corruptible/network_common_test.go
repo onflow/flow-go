@@ -23,7 +23,7 @@ import (
 // engine of that channel attempts on closing it.
 func TestEngineClosingChannel(t *testing.T) {
 	corruptibleNetwork, adapter := corruptibleNetworkFixture(t, unittest.Logger())
-	channel := channels.Channel("test-channel")
+	channel := channels.TestNetworkChannel
 
 	// on invoking adapter.UnRegisterChannel(channel), it must return a nil, which means
 	// that the channel has been unregistered by the adapter successfully.
