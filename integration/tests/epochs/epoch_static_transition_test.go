@@ -7,11 +7,9 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestEpochStaticTransition(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "active-pacemaker")
 	suite.Run(t, new(StaticEpochTransitionSuite))
 }
 
@@ -26,7 +24,7 @@ func (s *StaticEpochTransitionSuite) SetupTest() {
 	// staking phase for this test
 	s.StakingAuctionLen = 10
 	s.DKGPhaseLen = 50
-	s.EpochLen = 200
+	s.EpochLen = 300
 
 	// run the generic setup, which starts up the network
 	s.Suite.SetupTest()
@@ -38,8 +36,6 @@ func (s *StaticEpochTransitionSuite) SetupTest() {
 // successful DKG).
 // This is equivalent to runTestEpochJoinAndLeave, without any committee changes.
 func (s *StaticEpochTransitionSuite) TestStaticEpochTransition() {
-	unittest.SkipUnless(s.T(), unittest.TEST_TODO, "active-pacemaker, missing next epoch")
-
 	s.TimedLogf("waiting for EpochSetup phase of first epoch to begin")
 	s.WaitForPhase(s.ctx, flow.EpochPhaseSetup)
 	s.TimedLogf("successfully reached EpochSetup phase of first epoch")

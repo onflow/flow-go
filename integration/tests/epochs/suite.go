@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -56,8 +57,13 @@ type Suite struct {
 
 // SetupTest is run automatically by the testing framework before each test case.
 func (s *Suite) SetupTest() {
+	chainID := flow.Localnet
+	safetyThreshold, err := protocol.DefaultEpochCommitSafetyThreshold(chainID)
+	require.NoError(s.T(), err)
+
+	minEpochLength := s.StakingAuctionLen + s.DKGPhaseLen*3 + 20
 	// ensure epoch lengths are set correctly
-	require.Greater(s.T(), s.EpochLen, s.StakingAuctionLen+s.DKGPhaseLen*3)
+	require.Greater(s.T(), s.EpochLen, minEpochLength+safetyThreshold, "epoch too short")
 
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
@@ -79,8 +85,8 @@ func (s *Suite) SetupTest() {
 	consensusConfigs := []func(config *testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
-		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 1)),
-		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 1)),
+		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 0)),
+		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 0)),
 		testnet.WithLogLevel(zerolog.WarnLevel),
 	}
 
@@ -106,7 +112,7 @@ func (s *Suite) SetupTest() {
 	netConf := testnet.NewNetworkConfigWithEpochConfig("epochs-tests", confs, s.StakingAuctionLen, s.DKGPhaseLen, s.EpochLen)
 
 	// initialize the network
-	s.net = testnet.PrepareFlowNetwork(s.T(), netConf, flow.Localnet)
+	s.net = testnet.PrepareFlowNetwork(s.T(), netConf, chainID)
 
 	// start the network
 
@@ -830,7 +836,7 @@ func (s *DynamicEpochTransitionSuite) SetupTest() {
 	// joining/leaving nodes
 	s.StakingAuctionLen = 200
 	s.DKGPhaseLen = 50
-	s.EpochLen = 380
+	s.EpochLen = 500
 
 	// run the generic setup, which starts up the network
 	s.Suite.SetupTest()
