@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"math/rand"
 	"os"
 	"strconv"
 	"strings"
@@ -12,13 +11,9 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
-	"github.com/onflow/flow-go/ledger/common/utils"
-	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/ledger/complete/wal"
@@ -150,7 +145,6 @@ func BenchmarkLoadCheckpointAndWALs(b *testing.B) {
 			return err
 		},
 		func(rootHash ledger.RootHash) error {
-			forest.RemoveTrie(rootHash)
 			return nil
 		},
 	)
@@ -204,172 +198,4 @@ func hasCheckpointInDir(dir string) (bool, error) {
 	}
 
 	return false, nil
-}
-
-func BenchmarkNewCheckpointRandom5Seg(b *testing.B) { benchmarkNewCheckpointRandomData(b, 5) }
-
-func BenchmarkNewCheckpointRandom10Seg(b *testing.B) { benchmarkNewCheckpointRandomData(b, 10) }
-
-func BenchmarkNewCheckpointRandom20Seg(b *testing.B) { benchmarkNewCheckpointRandomData(b, 20) }
-
-func BenchmarkNewCheckpointRandom30Seg(b *testing.B) { benchmarkNewCheckpointRandomData(b, 30) }
-
-func BenchmarkNewCheckpointRandom40Seg(b *testing.B) { benchmarkNewCheckpointRandomData(b, 40) }
-
-// benchmarkCheckpointCreate benchmarks checkpoint file creation.
-// This benchmark creates segmentCount+1 WAL segments.  It also creates two checkpoint files:
-// - checkpoint file A from segment 0, and
-// - checkpoint file B from checkpoint file A and all segments after segment 0.
-// This benchmark measures the creation of checkpoint file B:
-// - loading checkpoint file A
-// - replaying all segments after segment 0
-// - creating checkpoint file B
-// Because payload data is random, number of segments created can differ from segmentCount.
-func benchmarkNewCheckpointRandomData(b *testing.B, segmentCount int) {
-
-	const (
-		updatePerSegment = 75  // 75 updates for 1 segment by approximation.
-		kvBatchCount     = 500 // Each update has 500 new payloads.
-	)
-
-	if segmentCount < 1 {
-		segmentCount = 1
-	}
-
-	kvOpts := randKeyValueOptions{
-		keyNumberOfParts:   3,
-		keyPartMinByteSize: 1,
-		keyPartMaxByteSize: 50,
-		valueMinByteSize:   50,
-		valueMaxByteSize:   1024 * 1.5,
-	}
-	updateCount := (segmentCount + 1) * updatePerSegment
-
-	seed := uint64(0x9E3779B97F4A7C15) // golden ratio
-	rand.Seed(int64(seed))
-
-	dir, err := os.MkdirTemp("", "test-mtrie-")
-	defer os.RemoveAll(dir)
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	wal1, err := wal.NewDiskWAL(
-		zerolog.Nop(),
-		nil,
-		metrics.NewNoopCollector(),
-		dir,
-		500,
-		pathfinder.PathByteSize,
-		wal.SegmentSize)
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	led, err := complete.NewLedger(
-		wal1,
-		500,
-		&metrics.NoopCollector{},
-		zerolog.Logger{},
-		complete.DefaultPathFinderVersion,
-	)
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	state := led.InitialState()
-
-	_, err = updateLedgerWithRandomData(led, state, updateCount, kvBatchCount, kvOpts)
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	<-wal1.Done()
-	<-led.Done()
-
-	wal2, err := wal.NewDiskWAL(
-		zerolog.Nop(),
-		nil,
-		metrics.NewNoopCollector(),
-		dir,
-		500,
-		pathfinder.PathByteSize,
-		wal.SegmentSize,
-	)
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	checkpointer, err := wal2.NewCheckpointer()
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	// Create checkpoint with only one segment as the base checkpoint for the next step.
-	err = checkpointer.Checkpoint(0, func() (io.WriteCloser, error) {
-		return checkpointer.CheckpointWriter(0)
-	})
-	require.NoError(b, err)
-
-	// Create checkpoint with remaining segments
-	_, to, err := wal2.Segments()
-	require.NoError(b, err)
-
-	if to == 1 {
-		fmt.Printf("skip creating second checkpoint file because to segment is 1\n")
-		return
-	}
-
-	start := time.Now()
-	b.ResetTimer()
-
-	err = checkpointer.Checkpoint(to-1, func() (io.WriteCloser, error) {
-		return checkpointer.CheckpointWriter(to)
-	})
-
-	b.StopTimer()
-	elapsed := time.Since(start)
-
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	b.ReportMetric(float64(elapsed/time.Millisecond), "newcheckpoint_rand_time_(ms)")
-	b.ReportAllocs()
-}
-
-type randKeyValueOptions struct {
-	keyNumberOfParts   int
-	keyPartMinByteSize int
-	keyPartMaxByteSize int
-	valueMinByteSize   int
-	valueMaxByteSize   int
-}
-
-func updateLedgerWithRandomData(
-	led ledger.Ledger,
-	state ledger.State,
-	updateCount int,
-	kvBatchCount int,
-	kvOpts randKeyValueOptions,
-) (ledger.State, error) {
-
-	for i := 0; i < updateCount; i++ {
-		keys := utils.RandomUniqueKeys(kvBatchCount, kvOpts.keyNumberOfParts, kvOpts.keyPartMinByteSize, kvOpts.keyPartMaxByteSize)
-		values := utils.RandomValues(kvBatchCount, kvOpts.valueMinByteSize, kvOpts.valueMaxByteSize)
-
-		update, err := ledger.NewUpdate(state, keys, values)
-		if err != nil {
-			return ledger.State(hash.DummyHash), err
-		}
-
-		newState, _, err := led.Set(update)
-		if err != nil {
-			return ledger.State(hash.DummyHash), err
-		}
-
-		state = newState
-	}
-
-	return state, nil
 }

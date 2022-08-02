@@ -3,6 +3,6 @@
 FROM golang:1.18-buster
 RUN apt-get update
 RUN apt-get -y install cmake zip
-RUN go install github.com/axw/gocov/gocov
-RUN go install github.com/matm/gocov-html
+RUN go install github.com/axw/gocov/gocov@latest
+RUN go install github.com/matm/gocov-html@latest
 WORKDIR /go/src/flow
