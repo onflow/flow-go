@@ -15,7 +15,6 @@ import (
 	mockinsecure "github.com/onflow/flow-go/insecure/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -31,7 +30,7 @@ func TestAttackNetworkObserve_MultipleConcurrentMessages(t *testing.T) {
 // decodes the messages into events and relays them to its registered orchestrator.
 func testAttackNetworkObserve(t *testing.T, concurrencyDegree int) {
 	// creates event fixtures and their corresponding messages.
-	messages, events, corruptedIds := insecure.EgressMessageFixtures(t, cbor.NewCodec(), insecure.Protocol_MULTICAST, concurrencyDegree)
+	messages, events, corruptedIds := insecure.EgressMessageFixtures(t, unittest.NetworkCodec(), insecure.Protocol_MULTICAST, concurrencyDegree)
 
 	withMockOrchestrator(
 		t,
@@ -91,7 +90,7 @@ func TestAttackNetworkPublish_ConcurrentMessages(t *testing.T) {
 // By a corrupted node here, we mean a node that runs with a corruptible conduit factory.
 func testAttackNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegree int) {
 	// creates event fixtures and their corresponding messages.
-	_, events, corruptedIds := insecure.EgressMessageFixtures(t, cbor.NewCodec(), protocol, concurrencyDegree)
+	_, events, corruptedIds := insecure.EgressMessageFixtures(t, unittest.NetworkCodec(), protocol, concurrencyDegree)
 
 	withMockOrchestrator(t,
 		corruptedIds,
@@ -134,7 +133,7 @@ func testAttackNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegr
 // mackEventForMessage fails the test if given message is not meant to be sent on behalf of the corrupted id, or it does not correspond to any
 // of the given events.
 func matchEventForMessage(t *testing.T, events []*insecure.Event, message *insecure.Message, corruptedId flow.Identifier) {
-	codec := cbor.NewCodec()
+	codec := unittest.NetworkCodec()
 
 	require.Equal(t, corruptedId[:], message.Egress.OriginID[:])
 
@@ -174,7 +173,7 @@ func withMockOrchestrator(t *testing.T,
 
 			attackNetwork, err := NewAttackNetwork(
 				unittest.Logger(),
-				cbor.NewCodec(),
+				unittest.NetworkCodec(),
 				orchestrator,
 				connector,
 				corruptedIds)

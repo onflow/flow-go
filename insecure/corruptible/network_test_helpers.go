@@ -19,7 +19,6 @@ import (
 
 	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -28,7 +27,7 @@ import (
 // By default, no attacker is registered on this corruptible network.
 func corruptibleNetworkFixture(t *testing.T, logger zerolog.Logger, corruptedID ...*flow.Identity) (*Network, *mocknetwork.Adapter) {
 	// create corruptible network with no attacker registered
-	codec := cbor.NewCodec()
+	codec := unittest.NetworkCodec()
 
 	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DEFAULT_ADDRESS))
 	// some tests will want to create corruptible network with a specific ID

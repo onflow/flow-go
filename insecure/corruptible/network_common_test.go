@@ -6,7 +6,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/stretchr/testify/mock"
@@ -57,7 +56,7 @@ func ProcessAttackerMessage_EmptyEgressIngressMessage_Exit(t *testing.T) {
 		) {
 			// creates a corrupted event that attacker is sending on the flow network through the
 			// corrupted conduit factory.
-			msg, event, _ := insecure.EgressMessageFixture(t, cbor.NewCodec(), insecure.Protocol_MULTICAST, &message.TestMessage{
+			msg, event, _ := insecure.EgressMessageFixture(t, unittest.NetworkCodec(), insecure.Protocol_MULTICAST, &message.TestMessage{
 				Text: fmt.Sprintf("this is a test message: %d", rand.Int()),
 			})
 
@@ -110,11 +109,11 @@ func ProcessAttackerMessage_NotEmptyEgressIngressMessage_Exit(t *testing.T) {
 		) {
 			// creates a corrupted event that attacker is sending on the flow network through the
 			// corrupted conduit factory.
-			msg, event, _ := insecure.EgressMessageFixture(t, cbor.NewCodec(), insecure.Protocol_MULTICAST, &message.TestMessage{
+			msg, event, _ := insecure.EgressMessageFixture(t, unittest.NetworkCodec(), insecure.Protocol_MULTICAST, &message.TestMessage{
 				Text: fmt.Sprintf("this is a test message: %d", rand.Int()),
 			})
 
-			msg2, _, _ := insecure.IngressMessageFixture(t, cbor.NewCodec(), insecure.Protocol_MULTICAST, &message.TestMessage{
+			msg2, _, _ := insecure.IngressMessageFixture(t, unittest.NetworkCodec(), insecure.Protocol_MULTICAST, &message.TestMessage{
 				Text: fmt.Sprintf("this is a test message: %d", rand.Int()),
 			})
 

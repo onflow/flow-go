@@ -18,7 +18,6 @@ import (
 	mockinsecure "github.com/onflow/flow-go/insecure/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
-	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -26,7 +25,7 @@ import (
 // TestHandleOutgoingEvent_AttackerObserve evaluates that the incoming messages to the corrupted network are routed to the
 // registered attacker if one exists.
 func TestHandleOutgoingEvent_AttackerObserve(t *testing.T) {
-	codec := cbor.NewCodec()
+	codec := unittest.NetworkCodec()
 	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DEFAULT_ADDRESS))
 	flowNetwork := &mocknetwork.Network{}
 	ccf := &mockinsecure.CorruptibleConduitFactory{}
@@ -155,12 +154,12 @@ func TestProcessAttackerMessage_MessageSentOnFlowNetwork(t *testing.T) {
 		func(
 			corruptedId flow.Identity, // identity of ccf
 			corruptibleNetwork *Network,
-			adapter *mocknetwork.Adapter, // mock adapter that ccf uses to communicate with authorized flow nodes.
+			adapter *mocknetwork.Adapter,                                           // mock adapter that ccf uses to communicate with authorized flow nodes.
 			stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that attack network uses to send messages to this ccf.
 		) {
 			// creates a corrupted event that attacker is sending on the flow network through the
 			// corrupted conduit factory.
-			msg, event, _ := insecure.EgressMessageFixture(t, cbor.NewCodec(), insecure.Protocol_MULTICAST, &message.TestMessage{
+			msg, event, _ := insecure.EgressMessageFixture(t, unittest.NetworkCodec(), insecure.Protocol_MULTICAST, &message.TestMessage{
 				Text: fmt.Sprintf("this is a test message: %d", rand.Int()),
 			})
 
@@ -195,7 +194,7 @@ func TestProcessAttackerMessage_ResultApproval_Dictated(t *testing.T) {
 		func(
 			corruptedId flow.Identity, // identity of ccf
 			corruptibleNetwork *Network,
-			adapter *mocknetwork.Adapter, // mock adapter that ccf uses to communicate with authorized flow nodes.
+			adapter *mocknetwork.Adapter,                                           // mock adapter that ccf uses to communicate with authorized flow nodes.
 			stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that attack network uses to send messages to this ccf.
 		) {
 			// creates a corrupted result approval that attacker is sending on the flow network through the
@@ -203,7 +202,7 @@ func TestProcessAttackerMessage_ResultApproval_Dictated(t *testing.T) {
 			// corrupted result approval dictated by attacker needs to only have the attestation field, as the rest will be
 			// filled up by the CCF.
 			dictatedAttestation := *unittest.AttestationFixture()
-			msg, _, _ := insecure.EgressMessageFixture(t, cbor.NewCodec(), insecure.Protocol_PUBLISH, &flow.ResultApproval{
+			msg, _, _ := insecure.EgressMessageFixture(t, unittest.NetworkCodec(), insecure.Protocol_PUBLISH, &flow.ResultApproval{
 				Body: flow.ResultApprovalBody{
 					Attestation: dictatedAttestation,
 				},
@@ -267,12 +266,12 @@ func TestProcessAttackerMessage_ResultApproval_PassThrough(t *testing.T) {
 		func(
 			corruptedId flow.Identity, // identity of ccf
 			corruptibleNetwork *Network,
-			adapter *mocknetwork.Adapter, // mock flow network that ccf uses to communicate with authorized flow nodes.
+			adapter *mocknetwork.Adapter,                                           // mock flow network that ccf uses to communicate with authorized flow nodes.
 			stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that attack network uses to send messages to this ccf.
 		) {
 
 			passThroughApproval := unittest.ResultApprovalFixture()
-			msg, _, _ := insecure.EgressMessageFixture(t, cbor.NewCodec(), insecure.Protocol_PUBLISH, passThroughApproval)
+			msg, _, _ := insecure.EgressMessageFixture(t, unittest.NetworkCodec(), insecure.Protocol_PUBLISH, passThroughApproval)
 
 			params := []interface{}{channels.Channel(msg.Egress.ChannelID), mock.Anything}
 			targetIds, err := flow.ByteSlicesToIds(msg.Egress.TargetIDs)
@@ -311,7 +310,7 @@ func TestProcessAttackerMessage_ExecutionReceipt_Dictated(t *testing.T) {
 		func(
 			corruptedId flow.Identity, // identity of ccf
 			corruptibleNetwork *Network,
-			adapter *mocknetwork.Adapter, // mock flow network that ccf uses to communicate with authorized flow nodes.
+			adapter *mocknetwork.Adapter,                                           // mock flow network that ccf uses to communicate with authorized flow nodes.
 			stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that attack network uses to send messages to this ccf.
 		) {
 			// creates a corrupted execution receipt that attacker is sending on the flow network through the
@@ -319,7 +318,7 @@ func TestProcessAttackerMessage_ExecutionReceipt_Dictated(t *testing.T) {
 			// corrupted execution receipt dictated by attacker needs to only have the result field, as the rest will be
 			// filled up by the CCF.
 			dictatedResult := *unittest.ExecutionResultFixture()
-			msg, _, _ := insecure.EgressMessageFixture(t, cbor.NewCodec(), insecure.Protocol_PUBLISH, &flow.ExecutionReceipt{
+			msg, _, _ := insecure.EgressMessageFixture(t, unittest.NetworkCodec(), insecure.Protocol_PUBLISH, &flow.ExecutionReceipt{
 				ExecutionResult: dictatedResult,
 			})
 
@@ -371,12 +370,12 @@ func TestProcessAttackerMessage_ExecutionReceipt_PassThrough(t *testing.T) {
 		func(
 			corruptedId flow.Identity, // identity of ccf
 			corruptibleNetwork *Network,
-			adapter *mocknetwork.Adapter, // mock flow network that ccf uses to communicate with authorized flow nodes.
+			adapter *mocknetwork.Adapter,                                           // mock flow network that ccf uses to communicate with authorized flow nodes.
 			stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that attack network uses to send messages to this ccf.
 		) {
 
 			passThroughReceipt := unittest.ExecutionReceiptFixture()
-			msg, _, _ := insecure.EgressMessageFixture(t, cbor.NewCodec(), insecure.Protocol_PUBLISH, passThroughReceipt)
+			msg, _, _ := insecure.EgressMessageFixture(t, unittest.NetworkCodec(), insecure.Protocol_PUBLISH, passThroughReceipt)
 
 			params := []interface{}{channels.Channel(msg.Egress.ChannelID), mock.Anything}
 			targetIds, err := flow.ByteSlicesToIds(msg.Egress.TargetIDs)

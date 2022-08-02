@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/network"
@@ -93,7 +92,7 @@ func TestCorruptibleConduitFrameworkHappyPath(t *testing.T) {
 
 // withCorruptibleNetwork creates a real corruptible network, starts it, runs the "run" function, and then stops it.
 func withCorruptibleNetwork(t *testing.T, run func(*testing.T, flow.Identity, *corruptible.Network, *stub.Hub)) {
-	codec := cbor.NewCodec()
+	codec := unittest.NetworkCodec()
 	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DEFAULT_ADDRESS))
 
 	// life-cycle management of attackNetwork.
@@ -149,7 +148,7 @@ func withCorruptibleNetwork(t *testing.T, run func(*testing.T, flow.Identity, *c
 // It then starts the attack network, executes the "run" function, and stops the attack network afterwards.
 func withAttackOrchestrator(t *testing.T, corruptedIds flow.IdentityList, corruptedPortMap map[flow.Identifier]string, corrupter func(*insecure.Event),
 	run func(t *testing.T)) {
-	codec := cbor.NewCodec()
+	codec := unittest.NetworkCodec()
 	o := &mockOrchestrator{eventCorrupter: corrupter}
 	connector := attacknetwork.NewCorruptedConnector(unittest.Logger(), corruptedIds, corruptedPortMap)
 

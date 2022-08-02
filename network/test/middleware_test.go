@@ -26,7 +26,6 @@ import (
 	"github.com/onflow/flow-go/module/observable"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
@@ -386,7 +385,7 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_SendDirect() {
 		Text: string(payload),
 	}
 
-	codec := cbor.NewCodec()
+	codec := unittest.NetworkCodec()
 	encodedEvent, err := codec.Encode(event)
 	require.NoError(m.T(), err)
 
@@ -416,7 +415,7 @@ func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 	// set the message type to a known large message type
 	msg.Type = "messages.ChunkDataResponse"
 
-	codec := cbor.NewCodec()
+	codec := unittest.NetworkCodec()
 	encodedEvent, err := codec.Encode(event)
 	require.NoError(m.T(), err)
 
@@ -463,7 +462,7 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_Publish() {
 		Text: string(payload),
 	}
 
-	codec := cbor.NewCodec()
+	codec := unittest.NetworkCodec()
 	encodedEvent, err := codec.Encode(event)
 	require.NoError(m.T(), err)
 
