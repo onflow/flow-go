@@ -21,7 +21,6 @@ var SetterCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(SetterCmd)
-
 	SetterCmd.Flags().Uint64Var(&flagView, "view", 0, "hotstuff view")
 }
 
