@@ -275,7 +275,7 @@ func (e *Engine) BroadcastExecutionReceipt(ctx context.Context, receipt *flow.Ex
 	}
 
 	span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXEBroadcastExecutionReceipt)
-	defer span.Finish()
+	defer span.End()
 
 	e.log.Debug().
 		Hex("block_id", logging.ID(receipt.ExecutionResult.BlockID)).

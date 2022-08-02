@@ -1,32 +1,25 @@
 package fvm
 
 import (
-	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 
-	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/opentracing/opentracing-go"
-	traceLog "github.com/opentracing/opentracing-go/log"
+
+	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/meter/weighted"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
-	"github.com/onflow/flow-go/storage"
 )
 
 var _ runtime.Interface = &TransactionEnv{}
@@ -50,7 +43,7 @@ func NewTransactionEnvironment(
 	programs *programs.Programs,
 	tx *flow.TransactionBody,
 	txIndex uint32,
-	traceSpan opentracing.Span,
+	traceSpan otelTrace.Span,
 ) (*TransactionEnv, error) {
 
 	accounts := state.NewAccounts(sth)
@@ -64,21 +57,19 @@ func NewTransactionEnvironment(
 		ctx.EventCollectionByteSizeLimit,
 	)
 	accountKeys := handler.NewAccountKeyHandler(accounts)
-	metrics := handler.NewMetricsHandler(ctx.Metrics)
 
+	envCtx := NewEnvContext(ctx, traceSpan)
 	env := &TransactionEnv{
 		commonEnv: commonEnv{
-			ctx:           ctx,
-			sth:           sth,
-			vm:            vm,
-			programs:      programsHandler,
-			accounts:      accounts,
-			accountKeys:   accountKeys,
-			uuidGenerator: uuidGenerator,
-			metrics:       metrics,
-			logs:          nil,
-			rng:           nil,
-			traceSpan:     traceSpan,
+			ctx:                   envCtx,
+			ProgramLogger:         NewProgramLogger(envCtx),
+			UnsafeRandomGenerator: NewUnsafeRandomGenerator(envCtx),
+			sth:                   sth,
+			vm:                    vm,
+			programs:              programsHandler,
+			accounts:              accounts,
+			accountKeys:           accountKeys,
+			uuidGenerator:         uuidGenerator,
 		},
 
 		addressGenerator: generator,
@@ -87,6 +78,10 @@ func NewTransactionEnvironment(
 		txIndex:          txIndex,
 		txID:             tx.ID(),
 	}
+
+	// TODO(patrick): rm this hack
+	env.MeterInterface = env
+	env.AccountInterface = env
 
 	env.contracts = handler.NewContractHandler(accounts,
 		func() bool {
@@ -108,10 +103,6 @@ func NewTransactionEnvironment(
 		env.GetAccountsAuthorizedForContractRemoval,
 		env.useContractAuditVoucher,
 	)
-
-	if ctx.BlockHeader != nil {
-		env.seedRNG(ctx.BlockHeader)
-	}
 
 	var err error
 	// set the execution parameters from the state
@@ -155,9 +146,9 @@ func (e *TransactionEnv) setExecutionParameters() error {
 	}
 
 	var ok bool
-	var m *weighted.Meter
-	// only set the weights if the meter is a weighted.Meter
-	if m, ok = e.sth.State().Meter().(*weighted.Meter); !ok {
+	var m *meter.WeightedMeter
+	// only set the weights if the meter is a meter.WeightedMeter
+	if m, ok = e.sth.State().Meter().(*meter.WeightedMeter); !ok {
 		return nil
 	}
 
@@ -282,7 +273,6 @@ func (e *TransactionEnv) GetIsContractDeploymentRestricted() (restricted bool, d
 func (e *TransactionEnv) useContractAuditVoucher(address runtime.Address, code []byte) (bool, error) {
 	return InvokeUseContractAuditVoucherContract(
 		e,
-		e.traceSpan,
 		address,
 		string(code[:]))
 }
@@ -300,128 +290,16 @@ func (e *TransactionEnv) isAuthorizer(address runtime.Address) bool {
 	return false
 }
 
-func (e *TransactionEnv) GetValue(owner, key []byte) ([]byte, error) {
-	var valueByteSize int
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetValue)
-		defer func() {
-			sp.LogFields(
-				traceLog.String("owner", hex.EncodeToString(owner)),
-				traceLog.String("key", string(key)),
-				traceLog.Int("valueByteSize", valueByteSize),
-			)
-			sp.Finish()
-		}()
-	}
-
-	v, err := e.accounts.GetValue(
-		flow.BytesToAddress(owner),
-		string(key),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("get value failed: %w", err)
-	}
-	valueByteSize = len(v)
-
-	err = e.meterComputation(meter.ComputationKindGetValue, uint(valueByteSize))
-	if err != nil {
-		return nil, fmt.Errorf("get value failed: %w", err)
-	}
-	return v, nil
-}
-
-func (e *TransactionEnv) SetValue(owner, key, value []byte) error {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvSetValue)
-		sp.LogFields(
-			traceLog.String("owner", hex.EncodeToString(owner)),
-			traceLog.String("key", string(key)),
-		)
-		defer sp.Finish()
-	}
-
-	err := e.meterComputation(meter.ComputationKindSetValue, uint(len(value)))
-	if err != nil {
-		return fmt.Errorf("set value failed: %w", err)
-	}
-
-	err = e.accounts.SetValue(
-		flow.BytesToAddress(owner),
-		string(key),
-		value,
-	)
-	if err != nil {
-		return fmt.Errorf("set value failed: %w", err)
-	}
-	return nil
-}
-
-func (e *TransactionEnv) ValueExists(owner, key []byte) (exists bool, err error) {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvValueExists)
-		defer sp.Finish()
-	}
-
-	err = e.meterComputation(meter.ComputationKindValueExists, 1)
-	if err != nil {
-		return false, fmt.Errorf("checking value existence failed: %w", err)
-	}
-
-	v, err := e.GetValue(owner, key)
-	if err != nil {
-		return false, fmt.Errorf("checking value existence failed: %w", err)
-	}
-
-	return len(v) > 0, nil
-}
-
-// AllocateStorageIndex allocates new storage index under the owner accounts to store a new register
-func (e *TransactionEnv) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
-	err := e.meterComputation(meter.ComputationKindAllocateStorageIndex, 1)
-	if err != nil {
-		return atree.StorageIndex{}, fmt.Errorf("allocate storage index failed: %w", err)
-	}
-
-	v, err := e.accounts.AllocateStorageIndex(flow.BytesToAddress(owner))
-	if err != nil {
-		return atree.StorageIndex{}, fmt.Errorf("storage address allocation failed: %w", err)
-	}
-	return v, nil
-}
-
-func (e *TransactionEnv) GetStorageUsed(address common.Address) (value uint64, err error) {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetStorageUsed)
-		defer sp.Finish()
-	}
-
-	err = e.meterComputation(meter.ComputationKindGetStorageUsed, 1)
-	if err != nil {
-		return value, fmt.Errorf("get storage used failed: %w", err)
-	}
-
-	value, err = e.accounts.GetStorageUsed(flow.Address(address))
-	if err != nil {
-		return value, fmt.Errorf("get storage used failed: %w", err)
-	}
-
-	return value, nil
-}
-
 func (e *TransactionEnv) GetStorageCapacity(address common.Address) (value uint64, err error) {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetStorageCapacity)
-		defer sp.Finish()
-	}
+	defer e.ctx.StartSpanFromRoot(trace.FVMEnvGetStorageCapacity).End()
 
-	err = e.meterComputation(meter.ComputationKindGetStorageCapacity, 1)
+	err = e.Meter(meter.ComputationKindGetStorageCapacity, 1)
 	if err != nil {
 		return value, fmt.Errorf("get storage capacity failed: %w", err)
 	}
 
 	result, invokeErr := InvokeAccountStorageCapacityContract(
 		e,
-		e.traceSpan,
 		address)
 	if invokeErr != nil {
 		return 0, errors.HandleRuntimeError(invokeErr)
@@ -430,25 +308,15 @@ func (e *TransactionEnv) GetStorageCapacity(address common.Address) (value uint6
 	return storageMBUFixToBytesUInt(result), nil
 }
 
-// storageMBUFixToBytesUInt converts the return type of storage capacity which is a UFix64 with the unit of megabytes to
-// UInt with the unit of bytes
-func storageMBUFixToBytesUInt(result cadence.Value) uint64 {
-	// Divide the unsigned int by (1e8 (the scale of Fix64) / 1e6 (for mega)) to get bytes (rounded down)
-	return result.ToGoValue().(uint64) / 100
-}
-
 func (e *TransactionEnv) GetAccountBalance(address common.Address) (value uint64, err error) {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetAccountBalance)
-		defer sp.Finish()
-	}
+	defer e.ctx.StartSpanFromRoot(trace.FVMEnvGetAccountBalance).End()
 
-	err = e.meterComputation(meter.ComputationKindGetAccountBalance, 1)
+	err = e.Meter(meter.ComputationKindGetAccountBalance, 1)
 	if err != nil {
 		return value, fmt.Errorf("get account balance failed: %w", err)
 	}
 
-	result, invokeErr := InvokeAccountBalanceContract(e, e.traceSpan, address)
+	result, invokeErr := InvokeAccountBalanceContract(e, address)
 	if invokeErr != nil {
 		return 0, errors.HandleRuntimeError(invokeErr)
 	}
@@ -456,19 +324,15 @@ func (e *TransactionEnv) GetAccountBalance(address common.Address) (value uint64
 }
 
 func (e *TransactionEnv) GetAccountAvailableBalance(address common.Address) (value uint64, err error) {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetAccountBalance)
-		defer sp.Finish()
-	}
+	defer e.ctx.StartSpanFromRoot(trace.FVMEnvGetAccountBalance).End()
 
-	err = e.meterComputation(meter.ComputationKindGetAccountAvailableBalance, 1)
+	err = e.Meter(meter.ComputationKindGetAccountAvailableBalance, 1)
 	if err != nil {
 		return value, fmt.Errorf("get account available balance failed: %w", err)
 	}
 
 	result, invokeErr := InvokeAccountAvailableBalanceContract(
 		e,
-		e.traceSpan,
 		address)
 
 	if invokeErr != nil {
@@ -481,12 +345,9 @@ func (e *TransactionEnv) ResolveLocation(
 	identifiers []runtime.Identifier,
 	location runtime.Location,
 ) ([]runtime.ResolvedLocation, error) {
-	if e.isTraceable() && e.ctx.ExtensiveTracing {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvResolveLocation)
-		defer sp.Finish()
-	}
+	defer e.ctx.StartExtensiveTracingSpanFromRoot(trace.FVMEnvResolveLocation).End()
 
-	err := e.meterComputation(meter.ComputationKindResolveLocation, 1)
+	err := e.Meter(meter.ComputationKindResolveLocation, 1)
 	if err != nil {
 		return nil, fmt.Errorf("resolve location failed: %w", err)
 	}
@@ -552,128 +413,10 @@ func (e *TransactionEnv) ResolveLocation(
 	return resolvedLocations, nil
 }
 
-func (e *TransactionEnv) GetCode(location runtime.Location) ([]byte, error) {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetCode)
-		defer sp.Finish()
-	}
-
-	err := e.meterComputation(meter.ComputationKindGetCode, 1)
-	if err != nil {
-		return nil, fmt.Errorf("get code failed: %w", err)
-	}
-
-	contractLocation, ok := location.(common.AddressLocation)
-	if !ok {
-		return nil, errors.NewInvalidLocationErrorf(location, "expecting an AddressLocation, but other location types are passed")
-	}
-
-	address := flow.Address(contractLocation.Address)
-
-	err = e.accounts.CheckAccountNotFrozen(address)
-	if err != nil {
-		return nil, fmt.Errorf("get code failed: %w", err)
-	}
-
-	add, err := e.contracts.GetContract(contractLocation.Address, contractLocation.Name)
-	if err != nil {
-		return nil, fmt.Errorf("get code failed: %w", err)
-	}
-
-	return add, nil
-}
-
-func (e *TransactionEnv) GetAccountContractNames(address runtime.Address) ([]string, error) {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetAccountContractNames)
-		defer sp.Finish()
-	}
-
-	err := e.meterComputation(meter.ComputationKindGetAccountContractNames, 1)
-	if err != nil {
-		return nil, fmt.Errorf("get account contract names failed: %w", err)
-	}
-
-	a := flow.Address(address)
-
-	freezeError := e.accounts.CheckAccountNotFrozen(a)
-	if freezeError != nil {
-		return nil, fmt.Errorf("get account contract names failed: %w", freezeError)
-	}
-
-	return e.accounts.GetContractNames(a)
-}
-
-func (e *TransactionEnv) GetProgram(location common.Location) (*interpreter.Program, error) {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetProgram)
-		defer sp.Finish()
-	}
-
-	err := e.meterComputation(meter.ComputationKindGetProgram, 1)
-	if err != nil {
-		return nil, fmt.Errorf("get program failed: %w", err)
-	}
-
-	if addressLocation, ok := location.(common.AddressLocation); ok {
-		address := flow.Address(addressLocation.Address)
-
-		freezeError := e.accounts.CheckAccountNotFrozen(address)
-		if freezeError != nil {
-			return nil, fmt.Errorf("get program failed: %w", freezeError)
-		}
-	}
-
-	program, has := e.programs.Get(location)
-	if has {
-		return program, nil
-	}
-
-	return nil, nil
-}
-
-func (e *TransactionEnv) SetProgram(location common.Location, program *interpreter.Program) error {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvSetProgram)
-		defer sp.Finish()
-	}
-
-	err := e.meterComputation(meter.ComputationKindSetProgram, 1)
-	if err != nil {
-		return fmt.Errorf("set program failed: %w", err)
-	}
-
-	err = e.programs.Set(location, program)
-	if err != nil {
-		return fmt.Errorf("set program failed: %w", err)
-	}
-	return nil
-}
-
-func (e *TransactionEnv) ProgramLog(message string) error {
-	if e.isTraceable() && e.ctx.ExtensiveTracing {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvProgramLog)
-		defer sp.Finish()
-	}
-
-	if e.ctx.CadenceLoggingEnabled {
-		e.logs = append(e.logs, message)
-	}
-	return nil
-}
-
-func (e *TransactionEnv) Logs() []string {
-	return e.logs
-}
-
 func (e *TransactionEnv) EmitEvent(event cadence.Event) error {
-	// only trace when extensive tracing
-	if e.isTraceable() && e.ctx.ExtensiveTracing {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvEmitEvent)
-		defer sp.Finish()
-	}
+	defer e.ctx.StartExtensiveTracingSpanFromRoot(trace.FVMEnvEmitEvent).End()
 
-	err := e.meterComputation(meter.ComputationKindEmitEvent, 1)
+	err := e.Meter(meter.ComputationKindEmitEvent, 1)
 	if err != nil {
 		return fmt.Errorf("emit event failed: %w", err)
 	}
@@ -689,41 +432,11 @@ func (e *TransactionEnv) ServiceEvents() []flow.Event {
 	return e.eventHandler.ServiceEvents()
 }
 
-func (e *TransactionEnv) GenerateUUID() (uint64, error) {
-	if e.isTraceable() && e.ctx.ExtensiveTracing {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGenerateUUID)
-		defer sp.Finish()
-	}
-
-	err := e.meterComputation(meter.ComputationKindGenerateUUID, 1)
-	if err != nil {
-		return 0, fmt.Errorf("generate uuid failed: %w", err)
-	}
-
-	if e.uuidGenerator == nil {
-		return 0, errors.NewOperationNotSupportedError("GenerateUUID")
-	}
-
-	uuid, err := e.uuidGenerator.GenerateUUID()
-	if err != nil {
-		return 0, fmt.Errorf("generate uuid failed: %w", err)
-	}
-	return uuid, err
-}
-
-func (e *TransactionEnv) meterComputation(kind common.ComputationKind, intensity uint) error {
+func (e *TransactionEnv) Meter(kind common.ComputationKind, intensity uint) error {
 	if e.sth.EnforceComputationLimits {
 		return e.sth.State().MeterComputation(kind, intensity)
 	}
 	return nil
-}
-
-func (e *TransactionEnv) MeterComputation(kind common.ComputationKind, intensity uint) error {
-	return e.meterComputation(kind, intensity)
-}
-
-func (e *TransactionEnv) ComputationUsed() uint64 {
-	return uint64(e.sth.State().TotalComputationUsed())
 }
 
 func (e *TransactionEnv) meterMemory(kind common.MemoryKind, intensity uint) error {
@@ -731,14 +444,6 @@ func (e *TransactionEnv) meterMemory(kind common.MemoryKind, intensity uint) err
 		return e.sth.State().MeterMemory(kind, intensity)
 	}
 	return nil
-}
-
-func (e *TransactionEnv) MeterMemory(usage common.MemoryUsage) error {
-	return e.meterMemory(usage.Kind, uint(usage.Amount))
-}
-
-func (e *TransactionEnv) MemoryEstimate() uint64 {
-	return uint64(e.sth.State().TotalMemoryEstimate())
 }
 
 func (e *TransactionEnv) SetAccountFrozen(address common.Address, frozen bool) error {
@@ -766,36 +471,6 @@ func (e *TransactionEnv) SetAccountFrozen(address common.Address, frozen bool) e
 	return nil
 }
 
-func (e *TransactionEnv) DecodeArgument(b []byte, _ cadence.Type) (cadence.Value, error) {
-	if e.isTraceable() && e.ctx.ExtensiveTracing {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvDecodeArgument)
-		defer sp.Finish()
-	}
-
-	v, err := jsoncdc.Decode(e, b)
-	if err != nil {
-		err = errors.NewInvalidArgumentErrorf("argument is not json decodable: %w", err)
-		return nil, fmt.Errorf("decodeing argument failed: %w", err)
-	}
-
-	return v, err
-}
-
-func (e *TransactionEnv) Hash(data []byte, tag string, hashAlgorithm runtime.HashAlgorithm) ([]byte, error) {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvHash)
-		defer sp.Finish()
-	}
-
-	err := e.meterComputation(meter.ComputationKindHash, 1)
-	if err != nil {
-		return nil, fmt.Errorf("hash failed: %w", err)
-	}
-
-	hashAlgo := crypto.RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
-	return crypto.HashWithTag(hashAlgo, tag, data)
-}
-
 func (e *TransactionEnv) VerifySignature(
 	signature []byte,
 	tag string,
@@ -804,12 +479,9 @@ func (e *TransactionEnv) VerifySignature(
 	signatureAlgorithm runtime.SignatureAlgorithm,
 	hashAlgorithm runtime.HashAlgorithm,
 ) (bool, error) {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvVerifySignature)
-		defer sp.Finish()
-	}
+	defer e.ctx.StartSpanFromRoot(trace.FVMEnvVerifySignature).End()
 
-	err := e.meterComputation(meter.ComputationKindVerifySignature, 1)
+	err := e.Meter(meter.ComputationKindVerifySignature, 1)
 	if err != nil {
 		return false, fmt.Errorf("verify signature failed: %w", err)
 	}
@@ -831,7 +503,7 @@ func (e *TransactionEnv) VerifySignature(
 }
 
 func (e *TransactionEnv) ValidatePublicKey(pk *runtime.PublicKey) error {
-	err := e.meterComputation(meter.ComputationKindValidatePublicKey, 1)
+	err := e.Meter(meter.ComputationKindValidatePublicKey, 1)
 	if err != nil {
 		return fmt.Errorf("validate public key failed: %w", err)
 	}
@@ -841,81 +513,10 @@ func (e *TransactionEnv) ValidatePublicKey(pk *runtime.PublicKey) error {
 
 // Block Environment Functions
 
-// GetCurrentBlockHeight returns the current block height.
-func (e *TransactionEnv) GetCurrentBlockHeight() (uint64, error) {
-	if e.isTraceable() && e.ctx.ExtensiveTracing {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetCurrentBlockHeight)
-		defer sp.Finish()
-	}
-
-	err := e.meterComputation(meter.ComputationKindGetCurrentBlockHeight, 1)
-	if err != nil {
-		return 0, fmt.Errorf("get current block height failed: %w", err)
-	}
-
-	if e.ctx.BlockHeader == nil {
-		return 0, errors.NewOperationNotSupportedError("GetCurrentBlockHeight")
-	}
-	return e.ctx.BlockHeader.Height, nil
-}
-
-// UnsafeRandom returns a random uint64, where the process of random number derivation is not cryptographically
-// secure.
-func (e *TransactionEnv) UnsafeRandom() (uint64, error) {
-	if e.isTraceable() && e.ctx.ExtensiveTracing {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvUnsafeRandom)
-		defer sp.Finish()
-	}
-
-	if e.rng == nil {
-		return 0, errors.NewOperationNotSupportedError("UnsafeRandom")
-	}
-
-	// TODO (ramtin) return errors this assumption that this always succeeds might not be true
-	buf := make([]byte, 8)
-	_, _ = e.rng.Read(buf) // Always succeeds, no need to check error
-	return binary.LittleEndian.Uint64(buf), nil
-}
-
-// GetBlockAtHeight returns the block at the given height.
-func (e *TransactionEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, error) {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetBlockAtHeight)
-		defer sp.Finish()
-	}
-
-	err := e.meterComputation(meter.ComputationKindGetBlockAtHeight, 1)
-	if err != nil {
-		return runtime.Block{}, false, fmt.Errorf("get block at height failed: %w", err)
-	}
-
-	if e.ctx.Blocks == nil {
-		return runtime.Block{}, false, errors.NewOperationNotSupportedError("GetBlockAtHeight")
-	}
-
-	if e.ctx.BlockHeader != nil && height == e.ctx.BlockHeader.Height {
-		return runtimeBlockFromHeader(e.ctx.BlockHeader), true, nil
-	}
-
-	header, err := e.ctx.Blocks.ByHeightFrom(height, e.ctx.BlockHeader)
-	// TODO (ramtin): remove dependency on storage and move this if condition to blockfinder
-	if errors.Is(err, storage.ErrNotFound) {
-		return runtime.Block{}, false, nil
-	} else if err != nil {
-		return runtime.Block{}, false, fmt.Errorf("get block at height failed for height %v: %w", height, err)
-	}
-
-	return runtimeBlockFromHeader(header), true, nil
-}
-
 func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.Address, err error) {
+	defer e.ctx.StartSpanFromRoot(trace.FVMEnvCreateAccount).End()
 
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvCreateAccount)
-		defer sp.Finish()
-	}
-
-	err = e.meterComputation(meter.ComputationKindCreateAccount, 1)
+	err = e.Meter(meter.ComputationKindCreateAccount, 1)
 	if err != nil {
 		return address, err
 	}
@@ -936,7 +537,6 @@ func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 	if e.ctx.ServiceAccountEnabled {
 		_, invokeErr := InvokeSetupNewAccountContract(
 			e,
-			e.traceSpan,
 			flowAddress,
 			payer)
 		if invokeErr != nil {
@@ -953,12 +553,9 @@ func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 // This function returns an error if the specified account does not exist or
 // if the key insertion fails.
 func (e *TransactionEnv) AddEncodedAccountKey(address runtime.Address, publicKey []byte) error {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvAddAccountKey)
-		defer sp.Finish()
-	}
+	defer e.ctx.StartSpanFromRoot(trace.FVMEnvAddAccountKey).End()
 
-	err := e.meterComputation(meter.ComputationKindAddEncodedAccountKey, 1)
+	err := e.Meter(meter.ComputationKindAddEncodedAccountKey, 1)
 	if err != nil {
 		return fmt.Errorf("add encoded account key failed: %w", err)
 	}
@@ -985,12 +582,9 @@ func (e *TransactionEnv) AddEncodedAccountKey(address runtime.Address, publicKey
 // This function returns an error if the specified account does not exist, the
 // provided key is invalid, or if key revoking fails.
 func (e *TransactionEnv) RevokeEncodedAccountKey(address runtime.Address, index int) (publicKey []byte, err error) {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvRemoveAccountKey)
-		defer sp.Finish()
-	}
+	defer e.ctx.StartSpanFromRoot(trace.FVMEnvRemoveAccountKey).End()
 
-	err = e.meterComputation(meter.ComputationKindRevokeEncodedAccountKey, 1)
+	err = e.Meter(meter.ComputationKindRevokeEncodedAccountKey, 1)
 	if err != nil {
 		return publicKey, fmt.Errorf("revoke encoded account key failed: %w", err)
 	}
@@ -1021,12 +615,9 @@ func (e *TransactionEnv) AddAccountKey(
 	*runtime.AccountKey,
 	error,
 ) {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvAddAccountKey)
-		defer sp.Finish()
-	}
+	defer e.ctx.StartSpanFromRoot(trace.FVMEnvAddAccountKey).End()
 
-	err := e.meterComputation(meter.ComputationKindAddAccountKey, 1)
+	err := e.Meter(meter.ComputationKindAddAccountKey, 1)
 	if err != nil {
 		return nil, fmt.Errorf("add account key failed: %w", err)
 	}
@@ -1045,12 +636,9 @@ func (e *TransactionEnv) AddAccountKey(
 // An error is returned if the specified account does not exist, the provided index is not valid,
 // or if the key retrieval fails.
 func (e *TransactionEnv) GetAccountKey(address runtime.Address, keyIndex int) (*runtime.AccountKey, error) {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetAccountKey)
-		defer sp.Finish()
-	}
+	defer e.ctx.StartSpanFromRoot(trace.FVMEnvGetAccountKey).End()
 
-	err := e.meterComputation(meter.ComputationKindGetAccountKey, 1)
+	err := e.Meter(meter.ComputationKindGetAccountKey, 1)
 	if err != nil {
 		return nil, fmt.Errorf("get account key failed: %w", err)
 	}
@@ -1069,12 +657,9 @@ func (e *TransactionEnv) GetAccountKey(address runtime.Address, keyIndex int) (*
 // An error is returned if the specified account does not exist, the provided index is not valid,
 // or if the key revoking fails.
 func (e *TransactionEnv) RevokeAccountKey(address runtime.Address, keyIndex int) (*runtime.AccountKey, error) {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvRemoveAccountKey)
-		defer sp.Finish()
-	}
+	defer e.ctx.StartSpanFromRoot(trace.FVMEnvRemoveAccountKey).End()
 
-	err := e.meterComputation(meter.ComputationKindRevokeAccountKey, 1)
+	err := e.Meter(meter.ComputationKindRevokeAccountKey, 1)
 	if err != nil {
 		return nil, fmt.Errorf("revoke account key failed: %w", err)
 	}
@@ -1083,12 +668,9 @@ func (e *TransactionEnv) RevokeAccountKey(address runtime.Address, keyIndex int)
 }
 
 func (e *TransactionEnv) UpdateAccountContractCode(address runtime.Address, name string, code []byte) (err error) {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvUpdateAccountContractCode)
-		defer sp.Finish()
-	}
+	defer e.ctx.StartSpanFromRoot(trace.FVMEnvUpdateAccountContractCode).End()
 
-	err = e.meterComputation(meter.ComputationKindUpdateAccountContractCode, 1)
+	err = e.Meter(meter.ComputationKindUpdateAccountContractCode, 1)
 	if err != nil {
 		return fmt.Errorf("update account contract code failed: %w", err)
 	}
@@ -1106,35 +688,10 @@ func (e *TransactionEnv) UpdateAccountContractCode(address runtime.Address, name
 	return nil
 }
 
-func (e *TransactionEnv) GetAccountContractCode(address runtime.Address, name string) (code []byte, err error) {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetAccountContractCode)
-		defer sp.Finish()
-	}
-
-	err = e.meterComputation(meter.ComputationKindGetAccountContractCode, 1)
-	if err != nil {
-		return nil, fmt.Errorf("get account contract code failed: %w", err)
-	}
-
-	code, err = e.GetCode(common.AddressLocation{
-		Address: address,
-		Name:    name,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("get account contract code failed: %w", err)
-	}
-
-	return code, nil
-}
-
 func (e *TransactionEnv) RemoveAccountContractCode(address runtime.Address, name string) (err error) {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvRemoveAccountContractCode)
-		defer sp.Finish()
-	}
+	defer e.ctx.StartSpanFromRoot(trace.FVMEnvRemoveAccountContractCode).End()
 
-	err = e.meterComputation(meter.ComputationKindRemoveAccountContractCode, 1)
+	err = e.Meter(meter.ComputationKindRemoveAccountContractCode, 1)
 	if err != nil {
 		return fmt.Errorf("remove account contract code failed: %w", err)
 	}
@@ -1153,10 +710,7 @@ func (e *TransactionEnv) RemoveAccountContractCode(address runtime.Address, name
 }
 
 func (e *TransactionEnv) GetSigningAccounts() ([]runtime.Address, error) {
-	if e.isTraceable() && e.ctx.ExtensiveTracing {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetSigningAccounts)
-		defer sp.Finish()
-	}
+	defer e.ctx.StartExtensiveTracingSpanFromRoot(trace.FVMEnvGetSigningAccounts).End()
 	return e.getSigningAccounts(), nil
 }
 
