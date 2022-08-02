@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/encoding"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/partial/ptrie"
 )
@@ -28,7 +27,7 @@ func NewLedger(proof ledger.Proof, s ledger.State, pathFinderVer uint8) (*Ledger
 	if len(proof) < 1 {
 		return nil, fmt.Errorf("at least a proof is needed to be able to contruct a partial trie")
 	}
-	batchProof, err := encoding.DecodeTrieBatchProof(proof)
+	batchProof, err := ledger.DecodeTrieBatchProof(proof)
 	if err != nil {
 		return nil, fmt.Errorf("decoding proof failed: %w", err)
 	}

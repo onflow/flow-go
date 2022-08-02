@@ -10,7 +10,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/encoding"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
@@ -253,7 +252,7 @@ func (l *Ledger) Prove(query *ledger.Query) (proof ledger.Proof, err error) {
 		return nil, fmt.Errorf("could not get proofs: %w", err)
 	}
 
-	proofToGo := encoding.EncodeTrieBatchProof(batchProof)
+	proofToGo := ledger.EncodeTrieBatchProof(batchProof)
 
 	if len(paths) > 0 {
 		l.metrics.ProofSize(uint32(len(proofToGo) / len(paths)))

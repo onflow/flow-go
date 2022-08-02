@@ -12,7 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/ledger"
 	prf "github.com/onflow/flow-go/ledger/common/proof"
-	"github.com/onflow/flow-go/ledger/common/utils"
+	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/ledger/partial/ptrie"
 	"github.com/onflow/flow-go/module/metrics"
@@ -326,11 +326,11 @@ func TestLeafInsert(t *testing.T) {
 	require.NoError(t, err)
 
 	// path: 000...0000000100000000
-	p1 := utils.PathByUint16LeftPadded(256)
+	p1 := testutils.PathByUint16LeftPadded(256)
 	v1 := payloadBySlices([]byte{'A'}, []byte{'A'})
 
 	// path: 000...0000000100000001
-	p2 := utils.PathByUint16LeftPadded(257)
+	p2 := testutils.PathByUint16LeftPadded(257)
 	v2 := payloadBySlices([]byte{'B'}, []byte{'B'})
 
 	paths := []ledger.Path{p1, p2}
@@ -761,8 +761,8 @@ func TestRandomUpdateReadProofValueSizes(t *testing.T) {
 	latestPayloadByPath := make(map[ledger.Path]*ledger.Payload) // map store
 
 	for e := 0; e < rep; e++ {
-		paths := utils.RandomPathsRandLen(maxNumPathsPerStep)
-		payloads := utils.RandomPayloads(len(paths), minPayloadByteSize, maxPayloadByteSize)
+		paths := testutils.RandomPathsRandLen(maxNumPathsPerStep)
+		payloads := testutils.RandomPayloads(len(paths), minPayloadByteSize, maxPayloadByteSize)
 
 		// update map store with key values
 		// we use this at the end of each step to check all existing keys
@@ -772,7 +772,7 @@ func TestRandomUpdateReadProofValueSizes(t *testing.T) {
 
 		// test reading for non-existing keys
 		nonExistingPaths := make([]ledger.Path, 0)
-		otherPaths := utils.RandomPathsRandLen(maxNumPathsPerStep)
+		otherPaths := testutils.RandomPathsRandLen(maxNumPathsPerStep)
 		for _, p := range otherPaths {
 			if _, ok := latestPayloadByPath[p]; !ok {
 				nonExistingPaths = append(nonExistingPaths, p)
@@ -939,11 +939,11 @@ func TestValueSizesOrder(t *testing.T) {
 
 	// path: 01111101...
 	p1 := pathByUint8s([]uint8{uint8(125), uint8(23)})
-	v1 := utils.RandomPayload(1, 100)
+	v1 := testutils.RandomPayload(1, 100)
 
 	// path: 10110010...
 	p2 := pathByUint8s([]uint8{uint8(178), uint8(152)})
-	v2 := utils.RandomPayload(1, 100)
+	v2 := testutils.RandomPayload(1, 100)
 
 	paths := []ledger.Path{p1, p2}
 	payloads := []*ledger.Payload{v1, v2}
@@ -976,11 +976,11 @@ func TestMixGetValueSizes(t *testing.T) {
 
 	// path: 01111101...
 	p1 := pathByUint8s([]uint8{uint8(125), uint8(23)})
-	v1 := utils.RandomPayload(1, 100)
+	v1 := testutils.RandomPayload(1, 100)
 
 	// path: 10110010...
 	p2 := pathByUint8s([]uint8{uint8(178), uint8(152)})
-	v2 := utils.RandomPayload(1, 100)
+	v2 := testutils.RandomPayload(1, 100)
 
 	paths := []ledger.Path{p1, p2}
 	payloads := []*ledger.Payload{v1, v2}
@@ -1015,11 +1015,11 @@ func TestValueSizesWithDuplicatedKeys(t *testing.T) {
 
 	// path: 01111101...
 	p1 := pathByUint8s([]uint8{uint8(125), uint8(23)})
-	v1 := utils.RandomPayload(1, 100)
+	v1 := testutils.RandomPayload(1, 100)
 
 	// path: 10110010...
 	p2 := pathByUint8s([]uint8{uint8(178), uint8(152)})
-	v2 := utils.RandomPayload(1, 100)
+	v2 := testutils.RandomPayload(1, 100)
 
 	// same path as p1
 	p3 := pathByUint8s([]uint8{uint8(125), uint8(23)})

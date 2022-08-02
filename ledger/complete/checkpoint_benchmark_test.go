@@ -17,7 +17,7 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
-	"github.com/onflow/flow-go/ledger/common/utils"
+	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
@@ -355,8 +355,8 @@ func updateLedgerWithRandomData(
 ) (ledger.State, error) {
 
 	for i := 0; i < updateCount; i++ {
-		keys := utils.RandomUniqueKeys(kvBatchCount, kvOpts.keyNumberOfParts, kvOpts.keyPartMinByteSize, kvOpts.keyPartMaxByteSize)
-		values := utils.RandomValues(kvBatchCount, kvOpts.valueMinByteSize, kvOpts.valueMaxByteSize)
+		keys := testutils.RandomUniqueKeys(kvBatchCount, kvOpts.keyNumberOfParts, kvOpts.keyPartMinByteSize, kvOpts.keyPartMaxByteSize)
+		values := testutils.RandomValues(kvBatchCount, kvOpts.valueMinByteSize, kvOpts.valueMaxByteSize)
 
 		update, err := ledger.NewUpdate(state, keys, values)
 		if err != nil {

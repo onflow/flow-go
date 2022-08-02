@@ -1,4 +1,4 @@
-package encoding_test
+package ledger_test
 
 import (
 	"encoding/binary"
@@ -8,14 +8,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/encoding"
 	"github.com/onflow/flow-go/ledger/common/hash"
-	"github.com/onflow/flow-go/ledger/common/utils"
+	"github.com/onflow/flow-go/ledger/common/testutils"
 )
 
 // TestKeyPartSerialization tests encoding and decoding functionality of a ledger key part
 func TestKeyPartSerialization(t *testing.T) {
-	kp := utils.KeyPartFixture(1, "key part 1")
+	kp := testutils.KeyPartFixture(1, "key part 1")
 
 	encodedV0 := []byte{
 		0x00, 0x00, // version 0
@@ -32,43 +31,43 @@ func TestKeyPartSerialization(t *testing.T) {
 	}
 
 	t.Run("encoding", func(t *testing.T) {
-		encoded := encoding.EncodeKeyPart(&kp)
+		encoded := ledger.EncodeKeyPart(&kp)
 		require.Equal(t, encodedV1, encoded)
 	})
 
 	t.Run("decoding", func(t *testing.T) {
 		// decode key part encoded in version 0
-		decodedkp, err := encoding.DecodeKeyPart(encodedV0)
+		decodedkp, err := ledger.DecodeKeyPart(encodedV0)
 		require.NoError(t, err)
 		require.Equal(t, kp, *decodedkp)
 
 		// decode key part encoded in version 1
-		decodedkp, err = encoding.DecodeKeyPart(encodedV1)
+		decodedkp, err = ledger.DecodeKeyPart(encodedV1)
 		require.NoError(t, err)
 		require.Equal(t, kp, *decodedkp)
 	})
 
 	t.Run("roundtrip", func(t *testing.T) {
-		encoded := encoding.EncodeKeyPart(&kp)
-		newkp, err := encoding.DecodeKeyPart(encoded)
+		encoded := ledger.EncodeKeyPart(&kp)
+		newkp, err := ledger.DecodeKeyPart(encoded)
 		require.NoError(t, err)
 		require.Equal(t, kp, *newkp)
 
 		// wrong type decoding
-		_, err = encoding.DecodeKey(encoded)
+		_, err = ledger.DecodeKey(encoded)
 		require.Error(t, err)
 
 		// test wrong version decoding
-		binary.BigEndian.PutUint16(encoded, encoding.PayloadVersion+1)
-		_, err = encoding.DecodeKeyPart(encoded)
+		binary.BigEndian.PutUint16(encoded, ledger.PayloadVersion+1)
+		_, err = ledger.DecodeKeyPart(encoded)
 		require.Error(t, err)
 	})
 }
 
 // TestKeySerialization tests encoding and decoding functionality of a ledger key
 func TestKeySerialization(t *testing.T) {
-	kp1 := utils.KeyPartFixture(1, "key part 1")
-	kp2 := utils.KeyPartFixture(22, "key part 2")
+	kp1 := testutils.KeyPartFixture(1, "key part 1")
+	kp2 := testutils.KeyPartFixture(22, "key part 2")
 	k := ledger.NewKey([]ledger.KeyPart{kp1, kp2})
 
 	encodedV0 := []byte{
@@ -96,25 +95,25 @@ func TestKeySerialization(t *testing.T) {
 	}
 
 	t.Run("encoding", func(t *testing.T) {
-		encoded := encoding.EncodeKey(&k)
+		encoded := ledger.EncodeKey(&k)
 		require.Equal(t, encodedV1, encoded)
 	})
 
 	t.Run("decoding", func(t *testing.T) {
 		// decode key encoded in version 0
-		decodedk, err := encoding.DecodeKey(encodedV0)
+		decodedk, err := ledger.DecodeKey(encodedV0)
 		require.NoError(t, err)
 		require.Equal(t, k, *decodedk)
 
 		// decode key encoded in version 1
-		decodedk, err = encoding.DecodeKey(encodedV1)
+		decodedk, err = ledger.DecodeKey(encodedV1)
 		require.NoError(t, err)
 		require.Equal(t, k, *decodedk)
 	})
 
 	t.Run("roundtrip", func(t *testing.T) {
-		encoded := encoding.EncodeKey(&k)
-		newk, err := encoding.DecodeKey(encoded)
+		encoded := ledger.EncodeKey(&k)
+		newk, err := ledger.DecodeKey(encoded)
 		require.NoError(t, err)
 		require.Equal(t, k, *newk)
 	})
@@ -137,25 +136,25 @@ func TestValueSerialization(t *testing.T) {
 	}
 
 	t.Run("encoding", func(t *testing.T) {
-		encoded := encoding.EncodeValue(v)
+		encoded := ledger.EncodeValue(v)
 		require.Equal(t, encodedV1, encoded)
 	})
 
 	t.Run("decoding", func(t *testing.T) {
 		// decode key encoded in version 0
-		decodedv, err := encoding.DecodeValue(encodedV0)
+		decodedv, err := ledger.DecodeValue(encodedV0)
 		require.NoError(t, err)
 		require.Equal(t, v, decodedv)
 
 		// decode key encoded in version 1
-		decodedv, err = encoding.DecodeValue(encodedV1)
+		decodedv, err = ledger.DecodeValue(encodedV1)
 		require.NoError(t, err)
 		require.Equal(t, v, decodedv)
 	})
 
 	t.Run("roundtrip", func(t *testing.T) {
-		encoded := encoding.EncodeValue(v)
-		newV, err := encoding.DecodeValue(encoded)
+		encoded := ledger.EncodeValue(v)
+		newV, err := ledger.DecodeValue(encoded)
 		require.NoError(t, err)
 		require.Equal(t, v, newV)
 	})
@@ -200,25 +199,25 @@ func TestPayloadSerialization(t *testing.T) {
 	}
 
 	t.Run("encoding", func(t *testing.T) {
-		encoded := encoding.EncodePayload(p)
+		encoded := ledger.EncodePayload(p)
 		require.Equal(t, encodedV1, encoded)
 	})
 
 	t.Run("decoding", func(t *testing.T) {
 		// decode payload encoded in version 0
-		decodedp, err := encoding.DecodePayload(encodedV0)
+		decodedp, err := ledger.DecodePayload(encodedV0)
 		require.NoError(t, err)
 		require.Equal(t, p, decodedp)
 
 		// decode payload encoded in version 1
-		decodedp, err = encoding.DecodePayload(encodedV1)
+		decodedp, err = ledger.DecodePayload(encodedV1)
 		require.NoError(t, err)
 		require.Equal(t, p, decodedp)
 	})
 
 	t.Run("roundtrip", func(t *testing.T) {
-		encoded := encoding.EncodePayload(p)
-		newp, err := encoding.DecodePayload(encoded)
+		encoded := ledger.EncodePayload(p)
+		newp, err := ledger.DecodePayload(encoded)
 		require.NoError(t, err)
 		require.Equal(t, p, newp)
 	})
@@ -232,11 +231,11 @@ func TestNilPayloadWithoutPrefixSerialization(t *testing.T) {
 		buf := []byte{1, 2, 3}
 
 		// Test encoded payload data length
-		encodedPayloadLen := encoding.EncodedPayloadLengthWithoutPrefix(nil, encoding.PayloadVersion)
+		encodedPayloadLen := ledger.EncodedPayloadLengthWithoutPrefix(nil, ledger.PayloadVersion)
 		require.Equal(t, 0, encodedPayloadLen)
 
 		// Encode payload and append to buffer
-		encoded := encoding.EncodeAndAppendPayloadWithoutPrefix(buf, nil, encoding.PayloadVersion)
+		encoded := ledger.EncodeAndAppendPayloadWithoutPrefix(buf, nil, ledger.PayloadVersion)
 		// Test original input data isn't modified
 		require.Equal(t, buf, encoded)
 		// Test returned encoded data reuses input data
@@ -245,13 +244,13 @@ func TestNilPayloadWithoutPrefixSerialization(t *testing.T) {
 
 	t.Run("decoding", func(t *testing.T) {
 		// Decode and copy payload (excluding prefix)
-		newp, err := encoding.DecodePayloadWithoutPrefix([]byte{}, false, encoding.PayloadVersion)
+		newp, err := ledger.DecodePayloadWithoutPrefix([]byte{}, false, ledger.PayloadVersion)
 		require.NoError(t, err)
 		require.Nil(t, newp)
 
 		// Zerocopy option has no effect for nil payload, but test it anyway.
 		// Decode payload (excluding prefix) with zero copy
-		newp, err = encoding.DecodePayloadWithoutPrefix([]byte{}, true, encoding.PayloadVersion)
+		newp, err = ledger.DecodePayloadWithoutPrefix([]byte{}, true, ledger.PayloadVersion)
 		require.NoError(t, err)
 		require.Nil(t, newp)
 	})
@@ -293,26 +292,26 @@ func TestPayloadWithoutPrefixSerialization(t *testing.T) {
 
 	t.Run("encoding", func(t *testing.T) {
 		// encode payload without prefix using version 0
-		encoded := encoding.EncodeAndAppendPayloadWithoutPrefix(nil, p, 0)
-		encodedPayloadLen := encoding.EncodedPayloadLengthWithoutPrefix(p, 0)
+		encoded := ledger.EncodeAndAppendPayloadWithoutPrefix(nil, p, 0)
+		encodedPayloadLen := ledger.EncodedPayloadLengthWithoutPrefix(p, 0)
 		require.Equal(t, len(encodedV0), encodedPayloadLen)
 		require.Equal(t, encodedV0, encoded)
 
 		// encode payload without prefix using version 1
-		encoded = encoding.EncodeAndAppendPayloadWithoutPrefix(nil, p, 1)
-		encodedPayloadLen = encoding.EncodedPayloadLengthWithoutPrefix(p, 1)
+		encoded = ledger.EncodeAndAppendPayloadWithoutPrefix(nil, p, 1)
+		encodedPayloadLen = ledger.EncodedPayloadLengthWithoutPrefix(p, 1)
 		require.Equal(t, len(encodedV1), encodedPayloadLen)
 		require.Equal(t, encodedV1, encoded)
 	})
 
 	t.Run("decoding", func(t *testing.T) {
 		// decode payload without prefix encoding in verison 0
-		decodedp, err := encoding.DecodePayloadWithoutPrefix(encodedV0, true, 0)
+		decodedp, err := ledger.DecodePayloadWithoutPrefix(encodedV0, true, 0)
 		require.NoError(t, err)
 		require.Equal(t, p, decodedp)
 
 		// decode payload without prefix encoding in verison 1
-		decodedp, err = encoding.DecodePayloadWithoutPrefix(encodedV1, true, 1)
+		decodedp, err = ledger.DecodePayloadWithoutPrefix(encodedV1, true, 1)
 		require.NoError(t, err)
 		require.Equal(t, p, decodedp)
 	})
@@ -349,8 +348,8 @@ func TestPayloadWithoutPrefixSerialization(t *testing.T) {
 			copy(buffer, bufPrefix)
 
 			// Encode payload and append to buffer
-			encoded := encoding.EncodeAndAppendPayloadWithoutPrefix(buffer, p, encoding.PayloadVersion)
-			encodedPayloadLen := encoding.EncodedPayloadLengthWithoutPrefix(p, encoding.PayloadVersion)
+			encoded := ledger.EncodeAndAppendPayloadWithoutPrefix(buffer, p, ledger.PayloadVersion)
+			encodedPayloadLen := ledger.EncodedPayloadLengthWithoutPrefix(p, ledger.PayloadVersion)
 			// Test encoded data size
 			require.Equal(t, len(encoded), bufPrefixLen+encodedPayloadLen)
 			// Test if original input data is modified
@@ -364,7 +363,7 @@ func TestPayloadWithoutPrefixSerialization(t *testing.T) {
 			}
 
 			// Decode payload (excluding prefix)
-			decodedp, err := encoding.DecodePayloadWithoutPrefix(encoded[bufPrefixLen:], tc.zeroCopy, encoding.PayloadVersion)
+			decodedp, err := ledger.DecodePayloadWithoutPrefix(encoded[bufPrefixLen:], tc.zeroCopy, ledger.PayloadVersion)
 			require.NoError(t, err)
 			require.Equal(t, p, decodedp)
 
@@ -396,12 +395,12 @@ func TestTrieProofSerialization(t *testing.T) {
 	copy(interim2[:], interim2Bytes)
 
 	p := &ledger.TrieProof{
-		Payload:   utils.LightPayload8('A', 'A'),
+		Payload:   testutils.LightPayload8('A', 'A'),
 		Interims:  []hash.Hash{interim1, interim2},
 		Inclusion: true,
 		Flags:     []byte{byte(130), byte(0)},
 		Steps:     7,
-		Path:      utils.PathByUint16(330),
+		Path:      testutils.PathByUint16(330),
 	}
 
 	encodedV0 := []byte{
@@ -438,20 +437,20 @@ func TestTrieProofSerialization(t *testing.T) {
 	}
 
 	t.Run("encoding", func(t *testing.T) {
-		encoded := encoding.EncodeTrieProof(p)
+		encoded := ledger.EncodeTrieProof(p)
 		require.Equal(t, encodedV0, encoded)
 	})
 
 	t.Run("decoding", func(t *testing.T) {
-		decodedp, err := encoding.DecodeTrieProof(encodedV0)
+		decodedp, err := ledger.DecodeTrieProof(encodedV0)
 		require.NoError(t, err)
 		require.True(t, decodedp.Equals(p))
 	})
 
 	t.Run("roundtrip", func(t *testing.T) {
-		p, _ := utils.TrieProofFixture()
-		encoded := encoding.EncodeTrieProof(p)
-		newp, err := encoding.DecodeTrieProof(encoded)
+		p, _ := testutils.TrieProofFixture()
+		encoded := ledger.EncodeTrieProof(p)
+		newp, err := ledger.DecodeTrieProof(encoded)
 		require.NoError(t, err)
 		require.True(t, newp.Equals(p))
 	})
@@ -467,12 +466,12 @@ func TestBatchProofSerialization(t *testing.T) {
 	copy(interim2[:], interim2Bytes)
 
 	p := &ledger.TrieProof{
-		Payload:   utils.LightPayload8('A', 'A'),
+		Payload:   testutils.LightPayload8('A', 'A'),
 		Interims:  []hash.Hash{interim1, interim2},
 		Inclusion: true,
 		Flags:     []byte{byte(130), byte(0)},
 		Steps:     7,
-		Path:      utils.PathByUint16(330),
+		Path:      testutils.PathByUint16(330),
 	}
 
 	bp := &ledger.TrieBatchProof{
@@ -521,20 +520,20 @@ func TestBatchProofSerialization(t *testing.T) {
 	encodedV0 = append(encodedV0, encodedProofV0...)
 
 	t.Run("encoding", func(t *testing.T) {
-		encoded := encoding.EncodeTrieBatchProof(bp)
+		encoded := ledger.EncodeTrieBatchProof(bp)
 		require.Equal(t, encodedV0, encoded)
 	})
 
 	t.Run("decoding", func(t *testing.T) {
-		decodedbp, err := encoding.DecodeTrieBatchProof(encodedV0)
+		decodedbp, err := ledger.DecodeTrieBatchProof(encodedV0)
 		require.NoError(t, err)
 		require.True(t, decodedbp.Equals(bp))
 	})
 
 	t.Run("roundtrip", func(t *testing.T) {
-		bp, _ = utils.TrieBatchProofFixture()
-		encoded := encoding.EncodeTrieBatchProof(bp)
-		newbp, err := encoding.DecodeTrieBatchProof(encoded)
+		bp, _ = testutils.TrieBatchProofFixture()
+		encoded := ledger.EncodeTrieBatchProof(bp)
+		newbp, err := ledger.DecodeTrieBatchProof(encoded)
 		require.NoError(t, err)
 		require.True(t, newbp.Equals(bp))
 	})
@@ -543,19 +542,19 @@ func TestBatchProofSerialization(t *testing.T) {
 // TestTrieUpdateSerialization tests encoding and decoding functionality of a trie update
 func TestTrieUpdateSerialization(t *testing.T) {
 
-	p1 := utils.PathByUint16(1)
+	p1 := testutils.PathByUint16(1)
 	kp1 := ledger.NewKeyPart(uint16(1), []byte("key 1 part 1"))
 	kp2 := ledger.NewKeyPart(uint16(22), []byte("key 1 part 2"))
 	k1 := ledger.NewKey([]ledger.KeyPart{kp1, kp2})
 	pl1 := ledger.NewPayload(k1, []byte{'A'})
 
-	p2 := utils.PathByUint16(2)
+	p2 := testutils.PathByUint16(2)
 	kp3 := ledger.NewKeyPart(uint16(1), []byte("key 2 part 1"))
 	k2 := ledger.NewKey([]ledger.KeyPart{kp3})
 	pl2 := ledger.NewPayload(k2, []byte{'B'})
 
 	tu := &ledger.TrieUpdate{
-		RootHash: utils.RootHashFixture(),
+		RootHash: testutils.RootHashFixture(),
 		Paths:    []ledger.Path{p1, p2},
 		Payloads: []*ledger.Payload{pl1, pl2},
 	}
@@ -600,19 +599,19 @@ func TestTrieUpdateSerialization(t *testing.T) {
 	}
 
 	t.Run("encoding", func(t *testing.T) {
-		encoded := encoding.EncodeTrieUpdate(tu)
+		encoded := ledger.EncodeTrieUpdate(tu)
 		require.Equal(t, encodedV0, encoded)
 	})
 
 	t.Run("decoding", func(t *testing.T) {
-		decodedtu, err := encoding.DecodeTrieUpdate(encodedV0)
+		decodedtu, err := ledger.DecodeTrieUpdate(encodedV0)
 		require.NoError(t, err)
 		require.True(t, decodedtu.Equals(tu))
 	})
 
 	t.Run("roundtrip", func(t *testing.T) {
-		encoded := encoding.EncodeTrieUpdate(tu)
-		decodedtu, err := encoding.DecodeTrieUpdate(encoded)
+		encoded := ledger.EncodeTrieUpdate(tu)
+		decodedtu, err := ledger.DecodeTrieUpdate(encoded)
 		require.NoError(t, err)
 		require.True(t, decodedtu.Equals(tu))
 	})
