@@ -16,6 +16,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/hashicorp/go-multierror"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
@@ -264,12 +265,24 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		myAddr = fnb.BaseConfig.BindAddr
 	}
 
+	idProviderPeerFilter := func(pid peer.ID) bool {
+		_, found := fnb.IdentityProvider.ByPeerID(pid)
+		return found
+	}
+
+	connGaterPeerDialFilters := p2p.PeerFilters{idProviderPeerFilter}
+
+	// add rate limiter peer filter func
+	connGaterInterceptSecureFilters := p2p.PeerFilters{idProviderPeerFilter}
+
 	libP2PNodeFactory := p2p.DefaultLibP2PNodeFactory(
 		fnb.Logger,
 		myAddr,
 		fnb.NetworkKey,
 		fnb.SporkID,
 		fnb.IdentityProvider,
+		connGaterPeerDialFilters,
+		connGaterInterceptSecureFilters,
 		fnb.Metrics.Network,
 		fnb.Resolver,
 		fnb.BaseConfig.NodeRole,

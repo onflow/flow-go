@@ -140,7 +140,9 @@ func nodeFixture(
 		})
 
 	if parameters.peerFilter != nil {
-		connGater := p2p.NewConnGater(parameters.logger, parameters.peerFilter)
+		// use peerFilter provided for intercepting both incoming and outgoing connections
+		filters := []p2p.PeerFilter{parameters.peerFilter}
+		connGater := p2p.NewConnGater(parameters.logger, filters, filters)
 		builder.SetConnectionGater(connGater)
 	}
 

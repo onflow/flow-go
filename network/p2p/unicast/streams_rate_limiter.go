@@ -1,8 +1,6 @@
 package unicast
 
 import (
-	"sync"
-
 	"golang.org/x/time/rate"
 
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -10,41 +8,40 @@ import (
 	"github.com/onflow/flow-go/network/message"
 )
 
-// StreamsRateLimiter unicast rate limiter that limits the amount of streams that can
+// StreamsRateLimiterImpl unicast rate limiter that limits the amount of streams that can
 // be created per some configured interval. A new stream is created each time a libP2P
 // node sends a direct message.
-type StreamsRateLimiter struct {
-	lock     sync.Mutex
-	limiters map[peer.ID]*rate.Limiter
-	limit    rate.Limit
-	burst    int
+type StreamsRateLimiterImpl struct {
+	*rateLimitedPeers
+	*limiters
+	limit rate.Limit
+	burst int
 }
 
-// NewStreamsRateLimiter returns a new StreamsRateLimiter.
-func NewStreamsRateLimiter(limit rate.Limit, burst int) *StreamsRateLimiter {
-	return &StreamsRateLimiter{
-		lock:     sync.Mutex{},
-		limiters: make(map[peer.ID]*rate.Limiter),
-		limit:    limit,
-		burst:    burst,
+// NewStreamsRateLimiter returns a new StreamsRateLimiterImpl.
+func NewStreamsRateLimiter(limit rate.Limit, burst int) *StreamsRateLimiterImpl {
+	return &StreamsRateLimiterImpl{
+		rateLimitedPeers: new(rateLimitedPeers),
+		limiters:         new(limiters),
+		limit:            limit,
+		burst:            burst,
 	}
 }
 
 // Allow checks the cached limiter for the peer and returns limiter.Allow().
 // If a limiter is not cached for a one is created.
-func (s *StreamsRateLimiter) Allow(peerID peer.ID, _ *message.Message) bool {
-	limiter := s.limiters[peerID]
-	if limiter == nil {
-		limiter = s.setNewLimiter(peerID)
+func (s *StreamsRateLimiterImpl) Allow(peerID peer.ID, _ *message.Message) bool {
+	limiter := s.getOrStoreLimiter(peerID.String(), rate.NewLimiter(s.limit, s.burst))
+	if !limiter.Allow() {
+		s.storeRateLimitedPeer(peerID.String())
+		return false
+	} else {
+		s.removeRateLimitedPeer(peerID.String())
+		return true
 	}
-
-	return limiter.Allow()
 }
 
-// setNewLimiter creates and caches a new limiter for the provided peer.
-func (s *StreamsRateLimiter) setNewLimiter(peerID peer.ID) *rate.Limiter {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	s.limiters[peerID] = rate.NewLimiter(s.limit, s.burst)
-	return s.limiters[peerID]
+// IsRateLimited returns true is a peer is currently rate limited.
+func (s *StreamsRateLimiterImpl) IsRateLimited(peerID peer.ID) bool {
+	return s.isRateLimited(peerID.String())
 }

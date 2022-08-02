@@ -9,7 +9,6 @@ import (
 	libp2p "github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/connmgr"
 	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/routing"
 	"github.com/libp2p/go-libp2p-core/transport"
 	discovery "github.com/libp2p/go-libp2p-discovery"
@@ -42,6 +41,8 @@ func DefaultLibP2PNodeFactory(
 	flowKey fcrypto.PrivateKey,
 	sporkId flow.Identifier,
 	idProvider id.IdentityProvider,
+	connGaterPeerDialFilters,
+	connGaterInterceptSecureFilters PeerFilters,
 	metrics module.NetworkMetrics,
 	resolver madns.BasicResolver,
 	role string,
@@ -49,11 +50,7 @@ func DefaultLibP2PNodeFactory(
 
 	return func(ctx context.Context) (*Node, error) {
 		connManager := NewConnManager(log, metrics)
-		connGater := NewConnGater(log, func(pid peer.ID) bool {
-			_, found := idProvider.ByPeerID(pid)
-
-			return found
-		})
+		connGater := NewConnGater(log, connGaterPeerDialFilters, connGaterInterceptSecureFilters)
 
 		builder := NewNodeBuilder(log, address, flowKey, sporkId).
 			SetBasicResolver(resolver).
