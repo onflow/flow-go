@@ -1,4 +1,4 @@
-package wal
+package common
 
 import (
 	"math/rand"
