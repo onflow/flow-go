@@ -1,16 +1,12 @@
 package fvm
 
 import (
-	"fmt"
-
-	"github.com/opentracing/opentracing-go"
-	traceLog "github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
 
 	"github.com/onflow/flow-go/module/trace"
@@ -19,16 +15,16 @@ import (
 type ContractFunctionInvoker struct {
 	contractLocation common.AddressLocation
 	functionName     string
-	arguments        []interpreter.Value
+	arguments        []cadence.Value
 	argumentTypes    []sema.Type
 	logger           zerolog.Logger
-	logSpanFields    []traceLog.Field
+	logSpanAttrs     []attribute.KeyValue
 }
 
 func NewContractFunctionInvoker(
 	contractLocation common.AddressLocation,
 	functionName string,
-	arguments []interpreter.Value,
+	arguments []cadence.Value,
 	argumentTypes []sema.Type,
 	logger zerolog.Logger) *ContractFunctionInvoker {
 	return &ContractFunctionInvoker{
@@ -37,23 +33,19 @@ func NewContractFunctionInvoker(
 		arguments:        arguments,
 		argumentTypes:    argumentTypes,
 		logger:           logger,
-		logSpanFields:    []traceLog.Field{traceLog.String("transaction.ContractFunctionCall", fmt.Sprintf("%s.%s", contractLocation.String(), functionName))},
+		logSpanAttrs: []attribute.KeyValue{
+			attribute.String("transaction.ContractFunctionCall", contractLocation.String()+"."+functionName),
+		},
 	}
 }
 
-func (i *ContractFunctionInvoker) Invoke(env Environment, parentTraceSpan opentracing.Span) (cadence.Value, error) {
-	var span opentracing.Span
+func (i *ContractFunctionInvoker) Invoke(env Environment) (cadence.Value, error) {
 
-	ctx := env.Context()
-	if ctx.Tracer != nil && parentTraceSpan != nil {
-		span = ctx.Tracer.StartSpanFromParent(parentTraceSpan, trace.FVMInvokeContractFunction)
-		span.LogFields(
-			i.logSpanFields...,
-		)
-		defer span.Finish()
-	}
+	span := env.StartSpanFromRoot(trace.FVMInvokeContractFunction)
+	span.SetAttributes(i.logSpanAttrs...)
+	defer span.End()
 
-	predeclaredValues := valueDeclarations(ctx, env)
+	predeclaredValues := valueDeclarations(env)
 
 	value, err := env.VM().Runtime.InvokeContractFunction(
 		i.contractLocation,

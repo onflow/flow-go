@@ -49,20 +49,26 @@ func (w *DiskWAL) UnpauseRecord() {
 	w.paused = false
 }
 
-func (w *DiskWAL) RecordUpdate(update *ledger.TrieUpdate) error {
+// RecordUpdate writes the trie update to the write ahead log on disk.
+// if write ahead logging is not paused, it returns the file num (write ahead log) that the trie update was written to.
+// if write ahead logging is enabled, the second returned value is false, otherwise it's true, meaning WAL is disabled.
+func (w *DiskWAL) RecordUpdate(update *ledger.TrieUpdate) (segmentNum int, skipped bool, err error) {
 	if w.paused {
-		return nil
+		return 0, true, nil
 	}
 
 	bytes := EncodeUpdate(update)
 
-	_, err := w.wal.Log(bytes)
+	locations, err := w.wal.Log(bytes)
 
 	if err != nil {
-		return fmt.Errorf("error while recording update in LedgerWAL: %w", err)
+		return 0, false, fmt.Errorf("error while recording update in LedgerWAL: %w", err)
+	}
+	if len(locations) != 1 {
+		return 0, false, fmt.Errorf("error while recording update in LedgerWAL: got %d location, expect 1 location", len(locations))
 	}
 
-	return nil
+	return locations[0].Segment, false, nil
 }
 
 func (w *DiskWAL) RecordDelete(rootHash ledger.RootHash) error {
@@ -94,7 +100,6 @@ func (w *DiskWAL) ReplayOnForest(forest *mtrie.Forest) error {
 			return err
 		},
 		func(rootHash ledger.RootHash) error {
-			forest.RemoveTrie(rootHash)
 			return nil
 		},
 	)
@@ -314,7 +319,7 @@ type LedgerWAL interface {
 	NewCheckpointer() (*Checkpointer, error)
 	PauseRecord()
 	UnpauseRecord()
-	RecordUpdate(update *ledger.TrieUpdate) error
+	RecordUpdate(update *ledger.TrieUpdate) (int, bool, error)
 	RecordDelete(rootHash ledger.RootHash) error
 	ReplayOnForest(forest *mtrie.Forest) error
 	Segments() (first, last int, err error)

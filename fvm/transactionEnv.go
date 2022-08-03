@@ -7,14 +7,14 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/opentracing/opentracing-go"
+
+	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/meter/weighted"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
@@ -43,7 +43,7 @@ func NewTransactionEnvironment(
 	programs *programs.Programs,
 	tx *flow.TransactionBody,
 	txIndex uint32,
-	traceSpan opentracing.Span,
+	traceSpan otelTrace.Span,
 ) (*TransactionEnv, error) {
 
 	accounts := state.NewAccounts(sth)
@@ -57,9 +57,8 @@ func NewTransactionEnvironment(
 		ctx.EventCollectionByteSizeLimit,
 	)
 	accountKeys := handler.NewAccountKeyHandler(accounts)
-	metrics := handler.NewMetricsHandler(ctx.Metrics)
 
-	envCtx := &EnvContext{nestedContext{ctx}, traceSpan}
+	envCtx := NewEnvContext(ctx, traceSpan)
 	env := &TransactionEnv{
 		commonEnv: commonEnv{
 			ctx:                   envCtx,
@@ -71,9 +70,6 @@ func NewTransactionEnvironment(
 			accounts:              accounts,
 			accountKeys:           accountKeys,
 			uuidGenerator:         uuidGenerator,
-			metrics:               metrics,
-			// TODO(patrick): switch to EnvContext's start span api.
-			traceSpan: traceSpan,
 		},
 
 		addressGenerator: generator,
@@ -150,9 +146,9 @@ func (e *TransactionEnv) setExecutionParameters() error {
 	}
 
 	var ok bool
-	var m *weighted.Meter
-	// only set the weights if the meter is a weighted.Meter
-	if m, ok = e.sth.State().Meter().(*weighted.Meter); !ok {
+	var m *meter.WeightedMeter
+	// only set the weights if the meter is a meter.WeightedMeter
+	if m, ok = e.sth.State().Meter().(*meter.WeightedMeter); !ok {
 		return nil
 	}
 
@@ -277,7 +273,6 @@ func (e *TransactionEnv) GetIsContractDeploymentRestricted() (restricted bool, d
 func (e *TransactionEnv) useContractAuditVoucher(address runtime.Address, code []byte) (bool, error) {
 	return InvokeUseContractAuditVoucherContract(
 		e,
-		e.traceSpan,
 		address,
 		string(code[:]))
 }
@@ -296,10 +291,7 @@ func (e *TransactionEnv) isAuthorizer(address runtime.Address) bool {
 }
 
 func (e *TransactionEnv) GetStorageCapacity(address common.Address) (value uint64, err error) {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetStorageCapacity)
-		defer sp.Finish()
-	}
+	defer e.StartSpanFromRoot(trace.FVMEnvGetStorageCapacity).End()
 
 	err = e.Meter(meter.ComputationKindGetStorageCapacity, 1)
 	if err != nil {
@@ -308,7 +300,6 @@ func (e *TransactionEnv) GetStorageCapacity(address common.Address) (value uint6
 
 	result, invokeErr := InvokeAccountStorageCapacityContract(
 		e,
-		e.traceSpan,
 		address)
 	if invokeErr != nil {
 		return 0, errors.HandleRuntimeError(invokeErr)
@@ -318,17 +309,14 @@ func (e *TransactionEnv) GetStorageCapacity(address common.Address) (value uint6
 }
 
 func (e *TransactionEnv) GetAccountBalance(address common.Address) (value uint64, err error) {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetAccountBalance)
-		defer sp.Finish()
-	}
+	defer e.StartSpanFromRoot(trace.FVMEnvGetAccountBalance).End()
 
 	err = e.Meter(meter.ComputationKindGetAccountBalance, 1)
 	if err != nil {
 		return value, fmt.Errorf("get account balance failed: %w", err)
 	}
 
-	result, invokeErr := InvokeAccountBalanceContract(e, e.traceSpan, address)
+	result, invokeErr := InvokeAccountBalanceContract(e, address)
 	if invokeErr != nil {
 		return 0, errors.HandleRuntimeError(invokeErr)
 	}
@@ -336,10 +324,7 @@ func (e *TransactionEnv) GetAccountBalance(address common.Address) (value uint64
 }
 
 func (e *TransactionEnv) GetAccountAvailableBalance(address common.Address) (value uint64, err error) {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetAccountBalance)
-		defer sp.Finish()
-	}
+	defer e.StartSpanFromRoot(trace.FVMEnvGetAccountBalance).End()
 
 	err = e.Meter(meter.ComputationKindGetAccountAvailableBalance, 1)
 	if err != nil {
@@ -348,7 +333,6 @@ func (e *TransactionEnv) GetAccountAvailableBalance(address common.Address) (val
 
 	result, invokeErr := InvokeAccountAvailableBalanceContract(
 		e,
-		e.traceSpan,
 		address)
 
 	if invokeErr != nil {
@@ -361,10 +345,7 @@ func (e *TransactionEnv) ResolveLocation(
 	identifiers []runtime.Identifier,
 	location runtime.Location,
 ) ([]runtime.ResolvedLocation, error) {
-	if e.isTraceable() && e.ctx.ExtensiveTracing {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvResolveLocation)
-		defer sp.Finish()
-	}
+	defer e.StartExtensiveTracingSpanFromRoot(trace.FVMEnvResolveLocation).End()
 
 	err := e.Meter(meter.ComputationKindResolveLocation, 1)
 	if err != nil {
@@ -433,11 +414,7 @@ func (e *TransactionEnv) ResolveLocation(
 }
 
 func (e *TransactionEnv) EmitEvent(event cadence.Event) error {
-	// only trace when extensive tracing
-	if e.isTraceable() && e.ctx.ExtensiveTracing {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvEmitEvent)
-		defer sp.Finish()
-	}
+	defer e.StartExtensiveTracingSpanFromRoot(trace.FVMEnvEmitEvent).End()
 
 	err := e.Meter(meter.ComputationKindEmitEvent, 1)
 	if err != nil {
@@ -502,10 +479,7 @@ func (e *TransactionEnv) VerifySignature(
 	signatureAlgorithm runtime.SignatureAlgorithm,
 	hashAlgorithm runtime.HashAlgorithm,
 ) (bool, error) {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvVerifySignature)
-		defer sp.Finish()
-	}
+	defer e.StartSpanFromRoot(trace.FVMEnvVerifySignature).End()
 
 	err := e.Meter(meter.ComputationKindVerifySignature, 1)
 	if err != nil {
@@ -540,11 +514,7 @@ func (e *TransactionEnv) ValidatePublicKey(pk *runtime.PublicKey) error {
 // Block Environment Functions
 
 func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.Address, err error) {
-
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvCreateAccount)
-		defer sp.Finish()
-	}
+	defer e.StartSpanFromRoot(trace.FVMEnvCreateAccount).End()
 
 	err = e.Meter(meter.ComputationKindCreateAccount, 1)
 	if err != nil {
@@ -567,7 +537,6 @@ func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 	if e.ctx.ServiceAccountEnabled {
 		_, invokeErr := InvokeSetupNewAccountContract(
 			e,
-			e.traceSpan,
 			flowAddress,
 			payer)
 		if invokeErr != nil {
@@ -584,10 +553,7 @@ func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 // This function returns an error if the specified account does not exist or
 // if the key insertion fails.
 func (e *TransactionEnv) AddEncodedAccountKey(address runtime.Address, publicKey []byte) error {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvAddAccountKey)
-		defer sp.Finish()
-	}
+	defer e.StartSpanFromRoot(trace.FVMEnvAddAccountKey).End()
 
 	err := e.Meter(meter.ComputationKindAddEncodedAccountKey, 1)
 	if err != nil {
@@ -616,10 +582,7 @@ func (e *TransactionEnv) AddEncodedAccountKey(address runtime.Address, publicKey
 // This function returns an error if the specified account does not exist, the
 // provided key is invalid, or if key revoking fails.
 func (e *TransactionEnv) RevokeEncodedAccountKey(address runtime.Address, index int) (publicKey []byte, err error) {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvRemoveAccountKey)
-		defer sp.Finish()
-	}
+	defer e.StartSpanFromRoot(trace.FVMEnvRemoveAccountKey).End()
 
 	err = e.Meter(meter.ComputationKindRevokeEncodedAccountKey, 1)
 	if err != nil {
@@ -652,10 +615,7 @@ func (e *TransactionEnv) AddAccountKey(
 	*runtime.AccountKey,
 	error,
 ) {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvAddAccountKey)
-		defer sp.Finish()
-	}
+	defer e.StartSpanFromRoot(trace.FVMEnvAddAccountKey).End()
 
 	err := e.Meter(meter.ComputationKindAddAccountKey, 1)
 	if err != nil {
@@ -676,10 +636,7 @@ func (e *TransactionEnv) AddAccountKey(
 // An error is returned if the specified account does not exist, the provided index is not valid,
 // or if the key retrieval fails.
 func (e *TransactionEnv) GetAccountKey(address runtime.Address, keyIndex int) (*runtime.AccountKey, error) {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetAccountKey)
-		defer sp.Finish()
-	}
+	defer e.StartSpanFromRoot(trace.FVMEnvGetAccountKey).End()
 
 	err := e.Meter(meter.ComputationKindGetAccountKey, 1)
 	if err != nil {
@@ -700,10 +657,7 @@ func (e *TransactionEnv) GetAccountKey(address runtime.Address, keyIndex int) (*
 // An error is returned if the specified account does not exist, the provided index is not valid,
 // or if the key revoking fails.
 func (e *TransactionEnv) RevokeAccountKey(address runtime.Address, keyIndex int) (*runtime.AccountKey, error) {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvRemoveAccountKey)
-		defer sp.Finish()
-	}
+	defer e.StartSpanFromRoot(trace.FVMEnvRemoveAccountKey).End()
 
 	err := e.Meter(meter.ComputationKindRevokeAccountKey, 1)
 	if err != nil {
@@ -714,10 +668,7 @@ func (e *TransactionEnv) RevokeAccountKey(address runtime.Address, keyIndex int)
 }
 
 func (e *TransactionEnv) UpdateAccountContractCode(address runtime.Address, name string, code []byte) (err error) {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvUpdateAccountContractCode)
-		defer sp.Finish()
-	}
+	defer e.StartSpanFromRoot(trace.FVMEnvUpdateAccountContractCode).End()
 
 	err = e.Meter(meter.ComputationKindUpdateAccountContractCode, 1)
 	if err != nil {
@@ -738,10 +689,7 @@ func (e *TransactionEnv) UpdateAccountContractCode(address runtime.Address, name
 }
 
 func (e *TransactionEnv) RemoveAccountContractCode(address runtime.Address, name string) (err error) {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvRemoveAccountContractCode)
-		defer sp.Finish()
-	}
+	defer e.StartSpanFromRoot(trace.FVMEnvRemoveAccountContractCode).End()
 
 	err = e.Meter(meter.ComputationKindRemoveAccountContractCode, 1)
 	if err != nil {
@@ -762,10 +710,7 @@ func (e *TransactionEnv) RemoveAccountContractCode(address runtime.Address, name
 }
 
 func (e *TransactionEnv) GetSigningAccounts() ([]runtime.Address, error) {
-	if e.isTraceable() && e.ctx.ExtensiveTracing {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetSigningAccounts)
-		defer sp.Finish()
-	}
+	defer e.StartExtensiveTracingSpanFromRoot(trace.FVMEnvGetSigningAccounts).End()
 	return e.getSigningAccounts(), nil
 }
 

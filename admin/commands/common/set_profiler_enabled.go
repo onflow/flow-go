@@ -6,7 +6,7 @@ import (
 
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
-	"github.com/onflow/flow-go/utils/debug"
+	"github.com/onflow/flow-go/module/profiler"
 )
 
 var _ commands.AdminCommand = (*SetProfilerEnabledCommand)(nil)
@@ -15,7 +15,7 @@ type SetProfilerEnabledCommand struct{}
 
 func (s *SetProfilerEnabledCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 	enabled := req.ValidatorData.(bool)
-	debug.SetProfilerEnabled(enabled)
+	profiler.SetProfilerEnabled(enabled)
 	return "ok", nil
 }
 
