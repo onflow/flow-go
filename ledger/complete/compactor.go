@@ -10,6 +10,7 @@ import (
 	"golang.org/x/sync/semaphore"
 
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/complete/common"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	realWAL "github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/module/lifecycle"
@@ -47,7 +48,7 @@ type checkpointResult struct {
 type Compactor struct {
 	checkpointer       *realWAL.Checkpointer
 	wal                realWAL.LedgerWAL
-	trieQueue          *realWAL.TrieQueue
+	trieQueue          *common.TrieQueue
 	logger             zerolog.Logger
 	lm                 *lifecycle.LifecycleManager
 	observers          map[observable.Observer]struct{}
@@ -368,7 +369,7 @@ func cleanupCheckpoints(checkpointer *realWAL.Checkpointer, checkpointsToKeep in
 // When this function returns, WAL update is in sync with trieQueue update.
 func (c *Compactor) processTrieUpdate(
 	update *WALTrieUpdate,
-	trieQueue *realWAL.TrieQueue,
+	trieQueue *common.TrieQueue,
 	activeSegmentNum int,
 	nextCheckpointNum int,
 ) (

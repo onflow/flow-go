@@ -1,4 +1,4 @@
-package wal
+package common
 
 import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
