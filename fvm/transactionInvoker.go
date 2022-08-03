@@ -218,8 +218,8 @@ func (i *TransactionInvoker) deductTransactionFees(
 		return nil
 	}
 
-	if computationUsed > uint64(sth.State().TotalComputationLimit()) {
-		computationUsed = uint64(sth.State().TotalComputationLimit())
+	if computationUsed > uint64(sth.State().TotalEnforcedComputationLimit()) {
+		computationUsed = uint64(sth.State().TotalEnforcedComputationLimit())
 	}
 
 	// Hardcoded inclusion effort (of 1.0 UFix). Eventually this will be
@@ -306,18 +306,18 @@ func valueDeclarations(env Environment) []runtime.ValueDeclaration {
 func (i *TransactionInvoker) logExecutionIntensities(sth *state.StateHolder, txHash string) {
 	if i.logger.Debug().Enabled() {
 		computation := zerolog.Dict()
-		for s, u := range sth.State().ComputationIntensities() {
+		for s, u := range sth.State().EnforcedComputationIntensities() {
 			computation.Uint(strconv.FormatUint(uint64(s), 10), u)
 		}
 		memory := zerolog.Dict()
-		for s, u := range sth.State().MemoryIntensities() {
+		for s, u := range sth.State().EnforcedMemoryIntensities() {
 			memory.Uint(strconv.FormatUint(uint64(s), 10), u)
 		}
 		i.logger.Info().
 			Str("txHash", txHash).
 			Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
-			Uint("computationUsed", sth.State().TotalComputationUsed()).
-			Uint("memoryEstimate", sth.State().TotalMemoryEstimate()).
+			Uint("computationUsed", sth.State().TotalEnforcedComputationUsed()).
+			Uint("memoryEstimate", sth.State().TotalEnforcedMemoryEstimate()).
 			Dict("computationIntensities", computation).
 			Dict("memoryIntensities", memory).
 			Msg("transaction execution data")

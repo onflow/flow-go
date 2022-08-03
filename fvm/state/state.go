@@ -186,19 +186,19 @@ func (s *State) MeterComputation(kind common.ComputationKind, intensity uint) er
 	return s.meter.MeterComputation(kind, intensity)
 }
 
-// TotalComputationUsed returns total computation used
-func (s *State) TotalComputationUsed() uint {
-	return s.meter.TotalComputationUsed()
+// TotalEnforcedComputationUsed returns total computation used
+func (s *State) TotalEnforcedComputationUsed() uint {
+	return s.meter.TotalEnforcedComputationUsed()
 }
 
 // ComputationIntensities returns computation intensities
-func (s *State) ComputationIntensities() meter.MeteredComputationIntensities {
-	return s.meter.ComputationIntensities()
+func (s *State) EnforcedComputationIntensities() meter.MeteredComputationIntensities {
+	return s.meter.EnforcedComputationIntensities()
 }
 
-// TotalComputationLimit returns total computation limit
-func (s *State) TotalComputationLimit() uint {
-	return s.meter.TotalComputationLimit()
+// TotalEnforcedComputationLimit returns total computation limit
+func (s *State) TotalEnforcedComputationLimit() uint {
+	return s.meter.TotalEnforcedComputationLimit()
 }
 
 // MeterMemory meters memory usage
@@ -207,18 +207,13 @@ func (s *State) MeterMemory(kind common.MemoryKind, intensity uint) error {
 }
 
 // MemoryIntensities returns computation intensities
-func (s *State) MemoryIntensities() meter.MeteredMemoryIntensities {
-	return s.meter.MemoryIntensities()
+func (s *State) EnforcedMemoryIntensities() meter.MeteredMemoryIntensities {
+	return s.meter.EnforcedMemoryIntensities()
 }
 
-// TotalMemoryEstimate returns total memory used
-func (s *State) TotalMemoryEstimate() uint {
-	return s.meter.TotalMemoryEstimate()
-}
-
-// TotalMemoryLimit returns total memory limit
-func (s *State) TotalMemoryLimit() uint {
-	return s.meter.TotalMemoryLimit()
+// TotalEnforcedMemoryEstimate returns total memory used
+func (s *State) TotalEnforcedMemoryEstimate() uint {
+	return s.meter.TotalEnforcedMemoryEstimate()
 }
 
 // NewChild generates a new child state

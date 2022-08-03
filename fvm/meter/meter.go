@@ -42,21 +42,72 @@ type MeteredComputationIntensities map[common.ComputationKind]uint
 type MeteredMemoryIntensities map[common.MemoryKind]uint
 
 type Meter interface {
-	// merge child funcionality
+	// NewChild construct a new Meter instance with the same limits as parent
 	NewChild() Meter
+
+	// MergeMeter merges the input meter into the current meter and checks for
+	// the limits.
 	MergeMeter(child Meter, enforceLimits bool) error
 
-	// computation metering
-	MeterComputation(kind common.ComputationKind, intensity uint) error
-	ComputationIntensities() MeteredComputationIntensities
-	TotalComputationUsed() uint
-	TotalComputationLimit() uint
+	// Observer keeps track of all usage
+	Observer() *WeightedMeter
 
-	// memory metering
+	// Enforcer only keeps track of enforceable usage
+	Enforcer() *WeightedMeter
+
+	//
+	// Computation metering
+	//
+
+	// MeterComputation captures computation usage and returns an error if it
+	// goes beyond the limit.
+	MeterComputation(kind common.ComputationKind, intensity uint) error
+
+	// EnforcedComputationIntensities returns all the measured computational
+	// intensities, as measured by the observer meter.
+	ObservedComputationIntensities() MeteredComputationIntensities
+
+	// EnforcedComputationIntensities returns all the measured computational
+	// intensities, as measured by the enforcer meter.
+	EnforcedComputationIntensities() MeteredComputationIntensities
+
+	// TotalEnforcedComputationUsed returns the total computation used, as
+	// measured by the observer meter.
+	TotalObservedComputationUsed() uint
+
+	// TotalEnforcedComputationUsed returns the total computation used, as
+	// measured by the enforcer meter.
+	TotalEnforcedComputationUsed() uint
+
+	// TotalEnforcedComputationLimit returns the total computation limit.
+	TotalEnforcedComputationLimit() uint
+
+	//
+	// Memory metering
+	//
+
+	// MeterMemory captures memory usage and returns an error if it goes
+	// beyond the limit.
 	MeterMemory(kind common.MemoryKind, intensity uint) error
-	MemoryIntensities() MeteredMemoryIntensities
-	TotalMemoryEstimate() uint
-	TotalMemoryLimit() uint
+
+	// ObservedMemoryIntensities returns all the measured memory intensities,
+	// as measured by the observer meter.
+	ObservedMemoryIntensities() MeteredMemoryIntensities
+
+	// EnforcedMemoryIntensities returns all the measured memory intensities,
+	// as measured by the enforcer meter.
+	EnforcedMemoryIntensities() MeteredMemoryIntensities
+
+	// TotalObservedMemoryEstimate returns the total memory used, as measured
+	// by the observer meter.
+	TotalObservedMemoryEstimate() uint
+
+	// TotalEnforcedMemoryEstimate returns the total memory used, as measured
+	// by the enforcer meter.
+	TotalEnforcedMemoryEstimate() uint
+
+	// TotalEnforcedMemoryLimit returns the total memory limit.
+	TotalEnforcedMemoryLimit() uint
 
 	// TODO(patrick): make these non-optional arguments to NewMeter
 	SetComputationWeights(weights ExecutionEffortWeights)

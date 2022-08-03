@@ -1,6 +1,8 @@
 package meter
 
 import (
+	"fmt"
+
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/errors"
@@ -264,9 +266,11 @@ type WeightedMeter struct {
 
 type WeightedMeterOptions func(*WeightedMeter)
 
-// NewMeter constructs a new Meter
-func NewMeter(computationLimit, memoryLimit uint, options ...WeightedMeterOptions) Meter {
-
+func newWeightedMeter(
+	computationLimit uint,
+	memoryLimit uint,
+	options ...WeightedMeterOptions,
+) *WeightedMeter {
 	m := &WeightedMeter{
 		computationLimit:       uint64(computationLimit) << MeterExecutionInternalPrecisionBytes,
 		memoryLimit:            uint64(memoryLimit),
@@ -283,6 +287,12 @@ func NewMeter(computationLimit, memoryLimit uint, options ...WeightedMeterOption
 	return m
 }
 
+// NewMeter constructs a new Meter
+func NewMeter(computationLimit, memoryLimit uint, options ...WeightedMeterOptions) Meter {
+	return newWeightedMeter(computationLimit, memoryLimit, options...)
+}
+
+// TODO(patrick): make this non-optional
 // WithComputationWeights sets the weights for computation intensities
 func WithComputationWeights(weights ExecutionEffortWeights) WeightedMeterOptions {
 	return func(m *WeightedMeter) {
@@ -290,6 +300,7 @@ func WithComputationWeights(weights ExecutionEffortWeights) WeightedMeterOptions
 	}
 }
 
+// TODO(patrick): make this non-optional
 // WithMemoryWeights sets the weights for the memory intensities
 func WithMemoryWeights(weights ExecutionMemoryWeights) WeightedMeterOptions {
 	return func(m *WeightedMeter) {
@@ -297,8 +308,7 @@ func WithMemoryWeights(weights ExecutionMemoryWeights) WeightedMeterOptions {
 	}
 }
 
-// NewChild construct a new Meter instance with the same limits as parent
-func (m *WeightedMeter) NewChild() Meter {
+func (m *WeightedMeter) newChild() *WeightedMeter {
 	return &WeightedMeter{
 		computationLimit:       m.computationLimit,
 		memoryLimit:            m.memoryLimit,
@@ -309,39 +319,42 @@ func (m *WeightedMeter) NewChild() Meter {
 	}
 }
 
-// MergeMeter merges the input meter into the current meter and checks for the limits
-func (m *WeightedMeter) MergeMeter(child Meter, enforceLimits bool) error {
+func (m *WeightedMeter) NewChild() Meter {
+	return m.newChild()
+}
 
-	var childComputationUsed uint64
-	if basic, ok := child.(*WeightedMeter); ok {
-		childComputationUsed = basic.computationUsed
-	} else {
-		childComputationUsed = uint64(child.TotalComputationUsed()) << MeterExecutionInternalPrecisionBytes
+func (m *WeightedMeter) MergeMeter(childMeter Meter, enforceLimits bool) error {
+	child, ok := childMeter.(*WeightedMeter)
+	if !ok {
+		return fmt.Errorf("cannot merge meter. child must be a weighted meter")
 	}
-	m.computationUsed = m.computationUsed + childComputationUsed
+
+	m.computationUsed = m.computationUsed + child.computationUsed
 	if enforceLimits && m.computationUsed > m.computationLimit {
-		return errors.NewComputationLimitExceededError(uint64(m.TotalComputationLimit()))
+		return errors.NewComputationLimitExceededError(uint64(m.TotalEnforcedComputationLimit()))
 	}
 
-	for key, intensity := range child.ComputationIntensities() {
+	for key, intensity := range child.computationIntensities {
 		m.computationIntensities[key] += intensity
 	}
 
-	var childMemoryEstimate uint64
-	if basic, ok := child.(*WeightedMeter); ok {
-		childMemoryEstimate = basic.memoryEstimate
-	} else {
-		childMemoryEstimate = uint64(child.TotalMemoryEstimate())
-	}
-	m.memoryEstimate = m.memoryEstimate + childMemoryEstimate
+	m.memoryEstimate = m.memoryEstimate + child.memoryEstimate
 	if enforceLimits && m.memoryEstimate > m.memoryLimit {
-		return errors.NewMemoryLimitExceededError(uint64(m.TotalMemoryLimit()))
+		return errors.NewMemoryLimitExceededError(uint64(m.TotalEnforcedMemoryLimit()))
 	}
 
-	for key, intensity := range child.MemoryIntensities() {
+	for key, intensity := range child.memoryIntensities {
 		m.memoryIntensities[key] += intensity
 	}
 	return nil
+}
+
+func (m *WeightedMeter) Observer() *WeightedMeter {
+	return m
+}
+
+func (m *WeightedMeter) Enforcer() *WeightedMeter {
+	return m
 }
 
 // SetComputationWeights sets the computation weights
@@ -349,7 +362,6 @@ func (m *WeightedMeter) SetComputationWeights(weights ExecutionEffortWeights) {
 	m.computationWeights = weights
 }
 
-// MeterComputation captures computation usage and returns an error if it goes beyond the limit
 func (m *WeightedMeter) MeterComputation(kind common.ComputationKind, intensity uint) error {
 	m.computationIntensities[kind] += intensity
 	w, ok := m.computationWeights[kind]
@@ -358,23 +370,32 @@ func (m *WeightedMeter) MeterComputation(kind common.ComputationKind, intensity 
 	}
 	m.computationUsed += w * uint64(intensity)
 	if m.computationUsed > m.computationLimit {
-		return errors.NewComputationLimitExceededError(uint64(m.TotalComputationLimit()))
+		return errors.NewComputationLimitExceededError(uint64(m.TotalEnforcedComputationLimit()))
 	}
 	return nil
 }
 
-// ComputationIntensities returns all the measured computational intensities
-func (m *WeightedMeter) ComputationIntensities() MeteredComputationIntensities {
+func (m *WeightedMeter) ObservedComputationIntensities() MeteredComputationIntensities {
 	return m.computationIntensities
 }
 
-// TotalComputationUsed returns the total computation used
-func (m *WeightedMeter) TotalComputationUsed() uint {
+func (m *WeightedMeter) EnforcedComputationIntensities() MeteredComputationIntensities {
+	return m.computationIntensities
+}
+
+func (m *WeightedMeter) totalComputationUsed() uint {
 	return uint(m.computationUsed >> MeterExecutionInternalPrecisionBytes)
 }
 
-// TotalComputationLimit returns the total computation limit
-func (m *WeightedMeter) TotalComputationLimit() uint {
+func (m *WeightedMeter) TotalObservedComputationUsed() uint {
+	return m.totalComputationUsed()
+}
+
+func (m *WeightedMeter) TotalEnforcedComputationUsed() uint {
+	return m.totalComputationUsed()
+}
+
+func (m *WeightedMeter) TotalEnforcedComputationLimit() uint {
 	return uint(m.computationLimit >> MeterExecutionInternalPrecisionBytes)
 }
 
@@ -383,7 +404,6 @@ func (m *WeightedMeter) SetMemoryWeights(weights ExecutionMemoryWeights) {
 	m.memoryWeights = weights
 }
 
-// MeterMemory captures memory usage and returns an error if it goes beyond the limit
 func (m *WeightedMeter) MeterMemory(kind common.MemoryKind, intensity uint) error {
 	m.memoryIntensities[kind] += intensity
 	w, ok := m.memoryWeights[kind]
@@ -392,23 +412,32 @@ func (m *WeightedMeter) MeterMemory(kind common.MemoryKind, intensity uint) erro
 	}
 	m.memoryEstimate += w * uint64(intensity)
 	if m.memoryEstimate > m.memoryLimit {
-		return errors.NewMemoryLimitExceededError(uint64(m.TotalMemoryLimit()))
+		return errors.NewMemoryLimitExceededError(uint64(m.TotalEnforcedMemoryLimit()))
 	}
 	return nil
 }
 
-// MemoryIntensities returns all the measured memory intensities
-func (m *WeightedMeter) MemoryIntensities() MeteredMemoryIntensities {
+func (m *WeightedMeter) ObservedMemoryIntensities() MeteredMemoryIntensities {
 	return m.memoryIntensities
 }
 
-// TotalMemoryEstimate returns the total memory used
-func (m *WeightedMeter) TotalMemoryEstimate() uint {
+func (m *WeightedMeter) EnforcedMemoryIntensities() MeteredMemoryIntensities {
+	return m.memoryIntensities
+}
+
+func (m *WeightedMeter) totalMemoryEstimate() uint {
 	return uint(m.memoryEstimate)
 }
 
-// TotalMemoryLimit returns the total memory limit
-func (m *WeightedMeter) TotalMemoryLimit() uint {
+func (m *WeightedMeter) TotalObservedMemoryEstimate() uint {
+	return m.totalMemoryEstimate()
+}
+
+func (m *WeightedMeter) TotalEnforcedMemoryEstimate() uint {
+	return m.totalMemoryEstimate()
+}
+
+func (m *WeightedMeter) TotalEnforcedMemoryLimit() uint {
 	return uint(m.memoryLimit)
 }
 

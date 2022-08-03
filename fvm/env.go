@@ -101,7 +101,7 @@ func (env *commonEnv) MeterComputation(kind common.ComputationKind, intensity ui
 
 // TODO(patrick): rm once Meter object has been refactored
 func (env *commonEnv) ComputationUsed() uint64 {
-	return uint64(env.sth.State().TotalComputationUsed())
+	return uint64(env.sth.State().TotalEnforcedComputationUsed())
 }
 
 // TODO(patrick): rm once Meter object has been refactored
@@ -111,7 +111,7 @@ func (env *commonEnv) MeterMemory(usage common.MemoryUsage) error {
 
 // TODO(patrick): rm once Meter object has been refactored
 func (env *commonEnv) MemoryEstimate() uint64 {
-	return uint64(env.sth.State().TotalMemoryEstimate())
+	return uint64(env.sth.State().TotalEnforcedMemoryEstimate())
 }
 
 // TODO(patrick): rm once ctx becomes an anonymous field.
