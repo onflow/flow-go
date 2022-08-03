@@ -32,6 +32,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/engine/access/apiproxy"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/common/follower"
@@ -994,56 +995,14 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return nil, err
 		}
 
-		client, err := builder.initUpstreamClient()
-		if err != nil {
-			return nil, err
-		}
+		s, _ := apiproxy.NewFlowAccessAPIRouter(builder.upstreamIdentities, time.Second*10)
 
 		// build the rpc engine
-		engineBuilder.WithNewHandler(&rpc.Forwarder{UpstreamHandler: client})
+		engineBuilder.WithNewHandler(s)
 		engineBuilder.WithLegacy()
 		builder.RpcEng = engineBuilder.Build()
 		return builder.RpcEng, nil
 	})
-}
-
-func (builder *ObserverServiceBuilder) initUpstreamClient() (accessproto.AccessAPIClient, error) {
-	// config must prove at least one upstream identity
-	if len(builder.upstreamIdentities) == 0 {
-		return nil, errors.New("please specify an upstream identity")
-	}
-
-	var errs *multierror.Error
-
-	for _, identity := range builder.upstreamIdentities {
-		// TLS
-		tlsConfig, err := grpcutils.DefaultClientTLSConfig(identity.NetworkPubKey)
-		if err != nil {
-			errs = multierror.Append(err,
-				fmt.Errorf("failed to get default TLS client config using public flow networking key %s %w",
-					identity.NetworkPubKey.String(), err),
-			)
-			continue
-		}
-
-		// connect to the upstream access node
-		conn, err := grpc.Dial(
-			identity.Address,
-			grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
-			grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
-			backend.WithClientUnaryInterceptor(time.Minute))
-
-		if err != nil {
-			errs = multierror.Append(err, errs)
-			continue
-		}
-
-		// return the client and ignore previous errors
-		client := accessproto.NewAccessAPIClient(conn)
-		return client, nil
-	}
-
-	return nil, errs.ErrorOrNil()
 }
 
 // initMiddleware creates the network.Middleware implementation with the libp2p factory function, metrics, peer update
