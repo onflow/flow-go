@@ -1,4 +1,4 @@
-package checkpoint
+package complete
 
 import (
 	"testing"
