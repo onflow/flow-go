@@ -26,6 +26,8 @@ const (
 	globalStatePrunedHeight               // latest pruned block height
 )
 
+const cidsPerBatch = 16 // number of cids to track per batch
+
 func retryOnConflict(db *badger.DB, fn func(txn *badger.Txn) error) error {
 	for {
 		err := db.Update(fn)
@@ -315,7 +317,7 @@ func (s *storage) trackBlob(txn *badger.Txn, blockHeight uint64, c cid.Cid) erro
 }
 
 func (s *storage) trackBlobs(blockHeight uint64, cids ...cid.Cid) error {
-	cidsPerBatch := 16
+	cidsPerBatch := cidsPerBatch
 	maxCidsPerBatch := getBatchItemCountLimit(s.db, 2, blobRecordKeyLength+latestHeightKeyLength+8)
 	if maxCidsPerBatch < cidsPerBatch {
 		cidsPerBatch = maxCidsPerBatch
