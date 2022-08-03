@@ -1,12 +1,14 @@
 package fvm_test
 
 import (
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
@@ -17,7 +19,10 @@ import (
 func TestTransactionSequenceNumProcess(t *testing.T) {
 	t.Run("sequence number update (happy path)", func(t *testing.T) {
 		ledger := utils.NewSimpleView()
-		sth := state.NewStateHolder(state.NewState(ledger))
+		sth := state.NewStateHolder(state.NewState(
+			ledger,
+			meter.NewMeter(math.MaxUint64, math.MaxUint64),
+		))
 		accounts := state.NewAccounts(sth)
 
 		// create an account
@@ -42,7 +47,10 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 	})
 	t.Run("invalid sequence number", func(t *testing.T) {
 		ledger := utils.NewSimpleView()
-		sth := state.NewStateHolder(state.NewState(ledger))
+		sth := state.NewStateHolder(state.NewState(
+			ledger,
+			meter.NewMeter(math.MaxUint64, math.MaxUint64),
+		))
 		accounts := state.NewAccounts(sth)
 
 		// create an account
@@ -69,7 +77,10 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 	})
 	t.Run("invalid address", func(t *testing.T) {
 		ledger := utils.NewSimpleView()
-		sth := state.NewStateHolder(state.NewState(ledger))
+		sth := state.NewStateHolder(state.NewState(
+			ledger,
+			meter.NewMeter(math.MaxUint64, math.MaxUint64),
+		))
 		accounts := state.NewAccounts(sth)
 
 		// create an account

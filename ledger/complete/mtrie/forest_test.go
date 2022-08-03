@@ -41,10 +41,6 @@ func TestTrieOperations(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, retnt.RootHash(), updatedTrie.RootHash())
 	require.Equal(t, 2, forest.Size())
-
-	// Remove trie
-	forest.RemoveTrie(updatedTrie.RootHash())
-	require.Equal(t, 1, forest.Size())
 }
 
 // TestTrieUpdate updates the empty trie with some values and verifies that the
@@ -1040,4 +1036,87 @@ func TestValueSizesWithDuplicatedKeys(t *testing.T) {
 	for i := range read.Paths {
 		require.Equal(t, expectedValueSizes[i], retValueSizes[i])
 	}
+}
+
+func TestNow(t *testing.T) {
+
+	metricsCollector := &metrics.NoopCollector{}
+	forest, err := NewForest(5, metricsCollector, nil)
+	require.NoError(t, err)
+	rootHash := forest.GetEmptyRootHash()
+
+	p1 := pathByUint8s([]uint8{uint8(53), uint8(74)})
+	v1 := payloadBySlices([]byte{'A'}, []byte{'A'})
+
+	paths := []ledger.Path{p1}
+	payloads := []*ledger.Payload{v1}
+	update := &ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads}
+	updatedRoot, err := forest.Update(update)
+	size := forest.Size()
+	require.NoError(t, err)
+	require.Equal(t, 2, size)
+
+	read := &ledger.TrieRead{RootHash: updatedRoot, Paths: paths}
+	retValues, err := forest.Read(read)
+	require.NoError(t, err)
+	require.Equal(t, retValues[0], payloads[0].Value)
+
+	update = &ledger.TrieUpdate{RootHash: updatedRoot, Paths: nil, Payloads: nil}
+	updatedRoot2, err := forest.Update(update)
+	size = forest.Size()
+	require.NoError(t, err)
+	require.Equal(t, updatedRoot, updatedRoot2)
+	require.Equal(t, 2, size)
+}
+
+func TestPurgeCacheExcept(t *testing.T) {
+	forest, err := NewForest(5, &metrics.NoopCollector{}, nil)
+	require.NoError(t, err)
+
+	nt := trie.NewEmptyMTrie()
+	p1 := pathByUint8s([]uint8{uint8(53), uint8(74)})
+	v1 := payloadBySlices([]byte{'A'}, []byte{'A'})
+
+	updatedTrie1, _, err := trie.NewTrieWithUpdatedRegisters(nt, []ledger.Path{p1}, []ledger.Payload{*v1}, true)
+	require.NoError(t, err)
+
+	err = forest.AddTrie(updatedTrie1)
+	require.NoError(t, err)
+
+	p2 := pathByUint8s([]uint8{uint8(12), uint8(34)})
+	v2 := payloadBySlices([]byte{'B'}, []byte{'B'})
+
+	updatedTrie2, _, err := trie.NewTrieWithUpdatedRegisters(nt, []ledger.Path{p2}, []ledger.Payload{*v2}, true)
+	require.NoError(t, err)
+
+	err = forest.AddTrie(updatedTrie2)
+	require.NoError(t, err)
+	require.Equal(t, 3, forest.tries.Count())
+
+	err = forest.PurgeCacheExcept(updatedTrie2.RootHash())
+	require.NoError(t, err)
+	require.Equal(t, 1, forest.tries.Count())
+
+	ret, err := forest.GetTrie(updatedTrie2.RootHash())
+	require.NoError(t, err)
+	require.Equal(t, ret, updatedTrie2)
+
+	_, err = forest.GetTrie(updatedTrie1.RootHash())
+	require.Error(t, err)
+
+	// test purge with non existing trie
+	err = forest.PurgeCacheExcept(updatedTrie1.RootHash())
+	require.Error(t, err)
+
+	ret, err = forest.GetTrie(updatedTrie2.RootHash())
+	require.NoError(t, err)
+	require.Equal(t, ret, updatedTrie2)
+
+	_, err = forest.GetTrie(updatedTrie1.RootHash())
+	require.Error(t, err)
+
+	// test purge when only a single target trie exist there
+	err = forest.PurgeCacheExcept(updatedTrie2.RootHash())
+	require.NoError(t, err)
+	require.Equal(t, 1, forest.tries.Count())
 }

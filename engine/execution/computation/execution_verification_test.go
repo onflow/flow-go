@@ -643,6 +643,13 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 	ledger, err := completeLedger.NewLedger(wal, 100, collector, logger, completeLedger.DefaultPathFinderVersion)
 	require.NoError(t, err)
 
+	compactor := fixtures.NewNoopCompactor(ledger)
+	<-compactor.Ready()
+	defer func() {
+		<-ledger.Done()
+		<-compactor.Done()
+	}()
+
 	bootstrapper := bootstrapexec.NewBootstrapper(logger)
 
 	initialCommit, err := bootstrapper.BootstrapLedger(
