@@ -16,7 +16,7 @@ type checkpointRunner interface {
 	runCheckpoint(ctx context.Context, checkpointTries []*trie.MTrie, checkpointNum int) error
 }
 
-// Trigger takes checkpointing related configs and decide when to trigger checkpointing,
+// Trigger takes checkpointing related configs and decides when to trigger checkpointing,
 // if triggered, it will use the checkpointRunner to create checkpoint.
 // It ensures only one checkpoint is being created at any time.
 type Trigger struct {
@@ -34,10 +34,13 @@ func NewTrigger(
 	activeSegmentNum int,
 	checkpointedSegumentNum int,
 	checkpointDistance uint,
-	checkpointsToKeep int,
 	checkpointed func(checkpointNum int),
 	runner checkpointRunner,
 ) *Trigger {
+	notNil := checkpointed
+	if notNil == nil {
+		notNil = func(int) {} // noop
+	}
 	return &Trigger{
 		logger:                  logger,
 		activeSegmentNum:        activeSegmentNum,
@@ -45,8 +48,13 @@ func NewTrigger(
 		checkpointDistance:      checkpointDistance,
 		isRunning:               atomic.NewBool(false),
 		runner:                  runner,
-		checkpointed:            checkpointed,
+		checkpointed:            notNil,
 	}
+}
+
+// WithCallback takes callback to notify when checkpointing is completed.
+func (t *Trigger) WithCallback(checkpointed func(checkpointNum int)) {
+	t.checkpointed = checkpointed
 }
 
 // NotifyTrieUpdateWrittenToWAL takes segmentNum that a trieUpdate is written to, and a trieQueue to
@@ -55,7 +63,7 @@ func NewTrigger(
 // Assumptions:
 // 1. this method is not concurrent-safe, must be called sequentially
 // 2. the latestTries must contain all the trie nodes up to the trie update without the trie from this trie update.
-func (t *Trigger) NotifyTrieUpdateWrittenToWAL(ctx context.Context, segmentNum int, latestTries common.TrieQueue) error {
+func (t *Trigger) NotifyTrieUpdateWrittenToWAL(ctx context.Context, segmentNum int, latestTries *common.TrieQueue) error {
 	isWritingToNewSegmentFile, err := t.isWritingToNewSegmentFile(segmentNum)
 	if err != nil {
 		return fmt.Errorf("could not determine whether the trie update was written to a new segment file: %w", err)
