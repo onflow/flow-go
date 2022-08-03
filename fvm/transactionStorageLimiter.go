@@ -18,7 +18,6 @@ func NewTransactionStorageLimiter() TransactionStorageLimiter {
 }
 
 func (d TransactionStorageLimiter) CheckLimits(
-	ctx *EnvContext,
 	env Environment,
 	addresses []flow.Address,
 ) error {
@@ -26,7 +25,7 @@ func (d TransactionStorageLimiter) CheckLimits(
 		return nil
 	}
 
-	defer ctx.StartSpanFromRoot(trace.FVMTransactionStorageUsedCheck).End()
+	defer env.StartSpanFromRoot(trace.FVMTransactionStorageUsedCheck).End()
 
 	commonAddresses := make([]common.Address, len(addresses))
 	usages := make([]uint64, len(commonAddresses))
@@ -40,7 +39,7 @@ func (d TransactionStorageLimiter) CheckLimits(
 		usages[i] = u
 	}
 
-	result, invokeErr := InvokeAccountsStorageCapacity(ctx, env, commonAddresses)
+	result, invokeErr := InvokeAccountsStorageCapacity(env, commonAddresses)
 
 	// This error only occurs in case of implementation errors. The InvokeAccountsStorageCapacity
 	// already handles cases where the default vault is missing.
