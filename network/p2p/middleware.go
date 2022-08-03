@@ -64,7 +64,7 @@ const (
 var (
 	_ network.Middleware = (*Middleware)(nil)
 
-	// allowAll is a peerFilterFunc that will always return true for all peer ids.
+	// allowAll is a PeerFilter that will always return true for all peer ids.
 	// This filter is used to allow communication by all roles on public network channels.
 	allowAll = func(_ peer.ID) bool { return true }
 )
