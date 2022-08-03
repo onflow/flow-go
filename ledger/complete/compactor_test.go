@@ -16,6 +16,7 @@ import (
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/utils"
+	"github.com/onflow/flow-go/ledger/complete/common"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	realWAL "github.com/onflow/flow-go/ledger/complete/wal"
@@ -625,7 +626,7 @@ func triesUpToSegment(dir string, to int, capacity int) ([]*trie.MTrie, error) {
 	}
 
 	// TrieQueue is used to store last n tries from segment files in order (n = capacity)
-	tries := realWAL.NewTrieQueueWithValues(uint(capacity), initialTries)
+	tries := common.NewTrieQueueWithValues(uint(capacity), initialTries)
 
 	err = replaySegments(
 		dir,

@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
+
+	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 )
 
 type checkpointRunner interface {
@@ -25,6 +26,24 @@ type Trigger struct {
 	isRunning               *atomic.Bool            // an atomic.Bool for whether checkpointing is currently running.
 	runner                  checkpointRunner        // for running checkpointing
 	checkpointed            func(checkpointNum int) // to report checkpointing completion
+}
+
+func NewTrigger(
+	logger zerolog.Logger,
+	activeSegmentNum int,
+	checkpointedSegumentNum int,
+	checkpointDistance uint,
+	runner checkpointRunner,
+	checkpointed func(checkpointNum int),
+) *Trigger {
+	return &Trigger{
+		logger:                  logger,
+		activeSegmentNum:        activeSegmentNum,
+		checkpointedSegumentNum: atomic.NewInt32(int32(checkpointedSegumentNum)),
+		checkpointDistance:      checkpointDistance,
+		runner:                  runner,
+		checkpointed:            checkpointed,
+	}
 }
 
 // NotifyTrieUpdateWrittenToWAL takes segmentNum that a trieUpdate is written to, and a trieQueue to

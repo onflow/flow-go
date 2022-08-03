@@ -98,7 +98,7 @@ func NewCompactor(
 	}
 
 	// Create trieQueue with initial values from ledger state.
-	trieQueue := realWAL.NewTrieQueueWithValues(checkpointCapacity, tries)
+	trieQueue := common.NewTrieQueueWithValues(checkpointCapacity, tries)
 
 	return &Compactor{
 		checkpointer:       checkpointer,
