@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math"
 	"math/rand"
 	"os"
 	"path"
@@ -25,33 +26,47 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	realWAL "github.com/onflow/flow-go/ledger/complete/wal"
+	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-var (
+const (
 	numInsPerStep      = 2
 	keyNumberOfParts   = 10
 	keyPartMinByteSize = 1
 	keyPartMaxByteSize = 100
 	valueMaxByteSize   = 2 << 16 //16kB
 	size               = 10
-	metricsCollector   = &metrics.NoopCollector{}
-	logger             = zerolog.Logger{}
 	segmentSize        = 32 * 1024
 	pathByteSize       = 32
 	pathFinderVersion  = uint8(complete.DefaultPathFinderVersion)
+)
+
+var (
+	logger           = zerolog.Logger{}
+	metricsCollector = &metrics.NoopCollector{}
 )
 
 func Test_WAL(t *testing.T) {
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
+		const (
+			checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
+			checkpointsToKeep  = 1
+		)
+
 		diskWal, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metricsCollector, dir, size, pathfinder.PathByteSize, realWAL.SegmentSize)
 		require.NoError(t, err)
 
 		led, err := complete.NewLedger(diskWal, size*10, metricsCollector, logger, complete.DefaultPathFinderVersion)
 		require.NoError(t, err)
+
+		compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), size, checkpointDistance, checkpointsToKeep)
+		require.NoError(t, err)
+
+		<-compactor.Ready()
 
 		var state = led.InitialState()
 
@@ -70,8 +85,6 @@ func Test_WAL(t *testing.T) {
 			state, _, err = led.Set(update)
 			require.NoError(t, err)
 
-			fmt.Printf("Updated with %x\n", state)
-
 			data := make(map[string]ledger.Value, len(keys))
 			for j, key := range keys {
 				data[string(encoding.EncodeKey(&key))] = values[j]
@@ -80,13 +93,15 @@ func Test_WAL(t *testing.T) {
 			savedData[string(state[:])] = data
 		}
 
-		<-diskWal.Done()
 		<-led.Done()
+		<-compactor.Done()
 
 		diskWal2, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metricsCollector, dir, size, pathfinder.PathByteSize, realWAL.SegmentSize)
 		require.NoError(t, err)
 		led2, err := complete.NewLedger(diskWal2, (size*10)+10, metricsCollector, logger, complete.DefaultPathFinderVersion)
 		require.NoError(t, err)
+		compactor2 := fixtures.NewNoopCompactor(led2) // noop compactor is used because no write is needed.
+		<-compactor2.Ready()
 
 		// random map iteration order is a benefit here
 		for state, data := range savedData {
@@ -97,8 +112,6 @@ func Test_WAL(t *testing.T) {
 				require.NoError(t, err)
 				keys = append(keys, *key)
 			}
-
-			fmt.Printf("Querying with %x\n", state)
 
 			var ledgerState ledger.State
 			copy(ledgerState[:], state)
@@ -112,8 +125,8 @@ func Test_WAL(t *testing.T) {
 			}
 		}
 
-		<-diskWal2.Done()
 		<-led2.Done()
+		<-compactor2.Done()
 	})
 }
 
@@ -148,7 +161,7 @@ func Test_Checkpointing(t *testing.T) {
 				trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, pathFinderVersion)
 				require.NoError(t, err)
 
-				err = wal.RecordUpdate(trieUpdate)
+				_, _, err = wal.RecordUpdate(trieUpdate)
 				require.NoError(t, err)
 
 				rootHash, err := f.Update(trieUpdate)
@@ -277,7 +290,7 @@ func Test_Checkpointing(t *testing.T) {
 			trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, pathFinderVersion)
 			require.NoError(t, err)
 
-			err = wal4.RecordUpdate(trieUpdate)
+			_, _, err = wal4.RecordUpdate(trieUpdate)
 			require.NoError(t, err)
 
 			rootHash, err = f.Update(trieUpdate)
@@ -448,7 +461,7 @@ func TestCheckpointFileError(t *testing.T) {
 		trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, pathFinderVersion)
 		require.NoError(t, err)
 
-		err = wal.RecordUpdate(trieUpdate)
+		_, _, err = wal.RecordUpdate(trieUpdate)
 		require.NoError(t, err)
 
 		// some buffer time of the checkpointer to run
