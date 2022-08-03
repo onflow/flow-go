@@ -17,6 +17,8 @@ type Decoder struct {
 }
 
 // Decode will decode the next CBOR value from the stream.
+// Expected error returns during normal operations:
+//  * codec.UnknownMsgCodeErr if message code byte does not match any of the configured message codes.
 func (d *Decoder) Decode() (interface{}, error) {
 
 	// read from stream and extract code
@@ -30,7 +32,7 @@ func (d *Decoder) Decode() (interface{}, error) {
 
 	msgInterface, what, err := codec.InterfaceFromMessageCode(data[0])
 	if err != nil {
-		return nil, fmt.Errorf("could not determine interface from code: %w", err)
+		return nil, err
 	}
 
 	// unmarshal the payload

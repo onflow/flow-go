@@ -17,8 +17,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-core/protocol"
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
@@ -26,11 +24,13 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/codec"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/validator"
 	_ "github.com/onflow/flow-go/utils/binstat"
+	"github.com/rs/zerolog"
 )
 
 const (
@@ -499,6 +499,12 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 	} else if errors.Is(err, validator.ErrSenderEjected) {
 		m.slashingViolationsConsumer.OnSenderEjectedError(id, remotePeer.String(), "", "", true, err)
 		return
+	} else if err != nil {
+		m.log.
+			Error().
+			Err(err).
+			Msg("unexpected unicast authorized sender validation error")
+		return
 	}
 
 	defer func() {
@@ -571,11 +577,17 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 		m.wg.Add(1)
 		go func(msg *message.Message) {
 			defer m.wg.Done()
+			channel := channels.Channel(msg.ChannelID)
+
 			decodedMsgPayload, err := m.codec.Decode(msg.Payload)
-			if err != nil {
+			if codec.IsErrUnknownMsgCode(err) {
+				// slash peer if message contains unknown message code byte
+				m.slashingViolationsConsumer.OnUnknownMsgTypeError(id, remotePeer.String(), "", channel.String(), true, err)
+				return
+			} else if err != nil {
 				m.log.
 					Warn().
-					Err(fmt.Errorf("could not decode message: %w", err)).
+					Err(fmt.Errorf("unexpected error while decoding message: %w", err)).
 					Hex("sender", msg.OriginID).
 					Hex("event_id", msg.EventID).
 					Str("event_type", msg.Type).
@@ -583,7 +595,6 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 				return
 			}
 
-			channel := channels.Channel(msg.ChannelID)
 			if err := m.validateUnicastAuthorizedSender(ctx, remotePeer, channel, decodedMsgPayload); err != nil {
 				m.log.
 					Error().

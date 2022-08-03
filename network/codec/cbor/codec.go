@@ -82,6 +82,8 @@ func (c *Codec) Encode(v interface{}) ([]byte, error) {
 // NOTE: 'what' is the 'code' name for debugging / instrumentation.
 // NOTE: 'envelope' contains 'code' & serialized / encoded 'v'.
 // i.e.  1st byte is 'code' and remaining bytes are CBOR encoded 'v'.
+// Expected error returns during normal operations:
+//  * codec.UnknownMsgCodeErr if message code byte does not match any of the configured message codes.
 func (c *Codec) Decode(data []byte) (interface{}, error) {
 
 	// decode the envelope
@@ -91,7 +93,7 @@ func (c *Codec) Decode(data []byte) (interface{}, error) {
 
 	msgInterface, what, err := codec.InterfaceFromMessageCode(data[0])
 	if err != nil {
-		return nil, fmt.Errorf("could not determine interface from code: %w", err)
+		return nil, err
 	}
 
 	// unmarshal the payload
