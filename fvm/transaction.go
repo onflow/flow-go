@@ -47,9 +47,9 @@ func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state
 	defer func() {
 		if r := recover(); r != nil {
 
-			if strings.Contains(fmt.Sprintf("%v", r), errors.ErrCodeLedgerIntractionLimitExceededError.String()) {
+			if strings.Contains(fmt.Sprintf("%v", r), errors.ErrCodeLedgerInteractionLimitExceededError.String()) {
 				ctx.Logger.Error().Str("trace", string(debug.Stack())).Msg("VM LedgerIntractionLimitExceeded panic")
-				proc.Err = errors.NewLedgerIntractionLimitExceededError(state.DefaultMaxInteractionSize, state.DefaultMaxInteractionSize)
+				proc.Err = errors.NewLedgerInteractionLimitExceededError(state.DefaultMaxInteractionSize, state.DefaultMaxInteractionSize)
 				return
 			}
 

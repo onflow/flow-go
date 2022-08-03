@@ -7,7 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/meter/weighted"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/utils"
 )
 
@@ -16,7 +16,7 @@ func GetExecutionEffortWeights(
 	env Environment,
 	service runtime.Address,
 ) (
-	computationWeights weighted.ExecutionEffortWeights,
+	computationWeights meter.ExecutionEffortWeights,
 	err error,
 ) {
 	value, err := env.VM().Runtime.ReadStored(
@@ -46,8 +46,8 @@ func GetExecutionEffortWeights(
 	// In case the network is stuck because of a transaction using an FVM feature that has 0 weight
 	// (or is not metered at all), the defaults can be changed and the network restarted
 	// instead of trying to change the weights with a transaction.
-	computationWeights = make(weighted.ExecutionEffortWeights, len(weighted.DefaultComputationWeights))
-	for k, v := range weighted.DefaultComputationWeights {
+	computationWeights = make(meter.ExecutionEffortWeights, len(meter.DefaultComputationWeights))
+	for k, v := range meter.DefaultComputationWeights {
 		computationWeights[k] = v
 	}
 	for k, v := range computationWeightsRaw {
@@ -62,7 +62,7 @@ func GetExecutionMemoryWeights(
 	env Environment,
 	service runtime.Address,
 ) (
-	memoryWeights weighted.ExecutionMemoryWeights,
+	memoryWeights meter.ExecutionMemoryWeights,
 	err error,
 ) {
 	value, err := env.VM().Runtime.ReadStored(
@@ -92,8 +92,8 @@ func GetExecutionMemoryWeights(
 	// In case the network is stuck because of a transaction using an FVM feature that has 0 weight
 	// (or is not metered at all), the defaults can be changed and the network restarted
 	// instead of trying to change the weights with a transaction.
-	memoryWeights = make(weighted.ExecutionMemoryWeights, len(weighted.DefaultMemoryWeights))
-	for k, v := range weighted.DefaultMemoryWeights {
+	memoryWeights = make(meter.ExecutionMemoryWeights, len(meter.DefaultMemoryWeights))
+	for k, v := range meter.DefaultMemoryWeights {
 		memoryWeights[k] = v
 	}
 	for k, v := range memoryWeightsRaw {

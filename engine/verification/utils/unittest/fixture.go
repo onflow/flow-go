@@ -221,7 +221,14 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 
 		led, err := completeLedger.NewLedger(w, 100, metricsCollector, zerolog.Nop(), completeLedger.DefaultPathFinderVersion)
 		require.NoError(t, err)
-		defer led.Done()
+
+		compactor := fixtures.NewNoopCompactor(led)
+		<-compactor.Ready()
+
+		defer func() {
+			<-led.Done()
+			<-compactor.Done()
+		}()
 
 		// set 0 clusters to pass n_collectors >= n_clusters check
 		epochConfig := epochs.DefaultEpochConfig()
