@@ -135,12 +135,12 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 
 	// there are two possibilities if the proposal is neither already pending
 	// processing in the cache, nor has already been processed:
-	// 1) the proposal is unverifiable because parent is also unknown
+	// 1) the proposal is unverifiable because the parent is unknown
 	// => we cache the proposal
 	// 2) the proposal is connected to finalized state through an unbroken chain
 	// => we verify the proposal and forward it to hotstuff if valid
 
-	// if the parent is a pending block (unknown block), we cache this block as well.
+	// if the parent is a pending block (disconnected from the incorporated state), we cache this block as well.
 	// we don't have to request its parent block or its ancestor again, because as a
 	// pending block, its parent block must have been requested.
 	// if there was problem requesting its parent or ancestors, the sync engine's forward
