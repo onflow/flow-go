@@ -2,11 +2,10 @@ package complete_test
 
 import (
 	"bytes"
-	"encoding/hex"
 	"errors"
 	"fmt"
+	"math"
 	"math/rand"
-	"sync"
 	"testing"
 	"time"
 
@@ -43,6 +42,13 @@ func TestLedger_Update(t *testing.T) {
 		l, err := complete.NewLedger(wal, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 		require.NoError(t, err)
 
+		compactor := fixtures.NewNoopCompactor(l)
+		<-compactor.Ready()
+		defer func() {
+			<-l.Done()
+			<-compactor.Done()
+		}()
+
 		// create empty update
 		currentState := l.InitialState()
 		up, err := ledger.NewEmptyUpdate(currentState)
@@ -61,6 +67,13 @@ func TestLedger_Update(t *testing.T) {
 		wal := &fixtures.NoopWAL{}
 		led, err := complete.NewLedger(wal, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 		require.NoError(t, err)
+
+		compactor := fixtures.NewNoopCompactor(led)
+		<-compactor.Ready()
+		defer func() {
+			<-led.Done()
+			<-compactor.Done()
+		}()
 
 		curSC := led.InitialState()
 
@@ -91,6 +104,13 @@ func TestLedger_Get(t *testing.T) {
 		led, err := complete.NewLedger(wal, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 		require.NoError(t, err)
 
+		compactor := fixtures.NewNoopCompactor(led)
+		<-compactor.Ready()
+		defer func() {
+			<-led.Done()
+			<-compactor.Done()
+		}()
+
 		curSC := led.InitialState()
 		q, err := ledger.NewEmptyQuery(curSC)
 		require.NoError(t, err)
@@ -106,6 +126,13 @@ func TestLedger_Get(t *testing.T) {
 
 		led, err := complete.NewLedger(wal, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 		require.NoError(t, err)
+
+		compactor := fixtures.NewNoopCompactor(led)
+		<-compactor.Ready()
+		defer func() {
+			<-led.Done()
+			<-compactor.Done()
+		}()
 
 		curS := led.InitialState()
 
@@ -134,6 +161,13 @@ func TestLedger_GetSingleValue(t *testing.T) {
 		complete.DefaultPathFinderVersion,
 	)
 	require.NoError(t, err)
+
+	compactor := fixtures.NewNoopCompactor(led)
+	<-compactor.Ready()
+	defer func() {
+		<-led.Done()
+		<-compactor.Done()
+	}()
 
 	state := led.InitialState()
 
@@ -225,6 +259,13 @@ func TestLedgerValueSizes(t *testing.T) {
 		)
 		require.NoError(t, err)
 
+		compactor := fixtures.NewNoopCompactor(led)
+		<-compactor.Ready()
+		defer func() {
+			<-led.Done()
+			<-compactor.Done()
+		}()
+
 		curState := led.InitialState()
 		q, err := ledger.NewEmptyQuery(curState)
 		require.NoError(t, err)
@@ -245,6 +286,13 @@ func TestLedgerValueSizes(t *testing.T) {
 			complete.DefaultPathFinderVersion,
 		)
 		require.NoError(t, err)
+
+		compactor := fixtures.NewNoopCompactor(led)
+		<-compactor.Ready()
+		defer func() {
+			<-led.Done()
+			<-compactor.Done()
+		}()
 
 		curState := led.InitialState()
 		q := utils.QueryFixture()
@@ -269,6 +317,13 @@ func TestLedgerValueSizes(t *testing.T) {
 			complete.DefaultPathFinderVersion,
 		)
 		require.NoError(t, err)
+
+		compactor := fixtures.NewNoopCompactor(led)
+		<-compactor.Ready()
+		defer func() {
+			<-led.Done()
+			<-compactor.Done()
+		}()
 
 		curState := led.InitialState()
 		u := utils.UpdateFixture()
@@ -300,6 +355,13 @@ func TestLedgerValueSizes(t *testing.T) {
 			complete.DefaultPathFinderVersion,
 		)
 		require.NoError(t, err)
+
+		compactor := fixtures.NewNoopCompactor(led)
+		<-compactor.Ready()
+		defer func() {
+			<-led.Done()
+			<-compactor.Done()
+		}()
 
 		curState := led.InitialState()
 		u := utils.UpdateFixture()
@@ -345,6 +407,13 @@ func TestLedger_Proof(t *testing.T) {
 		led, err := complete.NewLedger(wal, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 		require.NoError(t, err)
 
+		compactor := fixtures.NewNoopCompactor(led)
+		<-compactor.Ready()
+		defer func() {
+			<-led.Done()
+			<-compactor.Done()
+		}()
+
 		curSC := led.InitialState()
 		q, err := ledger.NewEmptyQuery(curSC)
 		require.NoError(t, err)
@@ -363,6 +432,13 @@ func TestLedger_Proof(t *testing.T) {
 
 		led, err := complete.NewLedger(wal, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 		require.NoError(t, err)
+
+		compactor := fixtures.NewNoopCompactor(led)
+		<-compactor.Ready()
+		defer func() {
+			<-led.Done()
+			<-compactor.Done()
+		}()
 
 		curS := led.InitialState()
 		q := utils.QueryFixture()
@@ -384,6 +460,13 @@ func TestLedger_Proof(t *testing.T) {
 		wal := &fixtures.NoopWAL{}
 		led, err := complete.NewLedger(wal, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 		require.NoError(t, err)
+
+		compactor := fixtures.NewNoopCompactor(led)
+		<-compactor.Ready()
+		defer func() {
+			<-led.Done()
+			<-compactor.Done()
+		}()
 
 		curS := led.InitialState()
 
@@ -408,12 +491,17 @@ func TestLedger_Proof(t *testing.T) {
 }
 
 func Test_WAL(t *testing.T) {
-	numInsPerStep := 2
-	keyNumberOfParts := 10
-	keyPartMinByteSize := 1
-	keyPartMaxByteSize := 100
-	valueMaxByteSize := 2 << 16 //16kB
-	size := 10
+	const (
+		numInsPerStep      = 2
+		keyNumberOfParts   = 10
+		keyPartMinByteSize = 1
+		keyPartMaxByteSize = 100
+		valueMaxByteSize   = 2 << 16 //16kB
+		size               = 10
+		checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
+		checkpointsToKeep  = 1
+	)
+
 	metricsCollector := &metrics.NoopCollector{}
 	logger := zerolog.Logger{}
 
@@ -425,6 +513,11 @@ func Test_WAL(t *testing.T) {
 		// cache size intentionally is set to size to test deletion
 		led, err := complete.NewLedger(diskWal, size, metricsCollector, logger, complete.DefaultPathFinderVersion)
 		require.NoError(t, err)
+
+		compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), size, checkpointDistance, checkpointsToKeep)
+		require.NoError(t, err)
+
+		<-compactor.Ready()
 
 		var state = led.InitialState()
 
@@ -439,7 +532,6 @@ func Test_WAL(t *testing.T) {
 			assert.NoError(t, err)
 			state, _, err = led.Set(update)
 			require.NoError(t, err)
-			fmt.Printf("Updated with %x\n", state)
 
 			data := make(map[string]ledger.Value, len(keys))
 			for j, key := range keys {
@@ -450,14 +542,19 @@ func Test_WAL(t *testing.T) {
 			savedData[string(state[:])] = data
 		}
 
-		<-diskWal.Done()
 		<-led.Done()
+		<-compactor.Done()
 
 		diskWal2, err := wal.NewDiskWAL(zerolog.Nop(), nil, metricsCollector, dir, size, pathfinder.PathByteSize, wal.SegmentSize)
 		require.NoError(t, err)
 
 		led2, err := complete.NewLedger(diskWal2, size+10, metricsCollector, logger, complete.DefaultPathFinderVersion)
 		require.NoError(t, err)
+
+		compactor2, err := complete.NewCompactor(led2, diskWal2, zerolog.Nop(), uint(size), checkpointDistance, checkpointsToKeep)
+		require.NoError(t, err)
+
+		<-compactor2.Ready()
 
 		// random map iteration order is a benefit here
 		for state, data := range savedData {
@@ -483,16 +580,17 @@ func Test_WAL(t *testing.T) {
 			}
 		}
 
-		// test deletion
-		s := led2.ForestSize()
-		assert.Equal(t, s, size)
-
-		<-diskWal2.Done()
 		<-led2.Done()
+		<-compactor2.Done()
 	})
 }
 
 func TestLedgerFunctionality(t *testing.T) {
+	const (
+		checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
+		checkpointsToKeep  = 1
+	)
+
 	rand.Seed(time.Now().UnixNano())
 	// You can manually increase this for more coverage
 	experimentRep := 2
@@ -516,6 +614,10 @@ func TestLedgerFunctionality(t *testing.T) {
 			require.NoError(t, err)
 			led, err := complete.NewLedger(diskWal, activeTries, metricsCollector, logger, complete.DefaultPathFinderVersion)
 			assert.NoError(t, err)
+			compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), uint(activeTries), checkpointDistance, checkpointsToKeep)
+			require.NoError(t, err)
+			<-compactor.Ready()
+
 			state := led.InitialState()
 			for i := 0; i < steps; i++ {
 				// add new keys
@@ -597,7 +699,8 @@ func TestLedgerFunctionality(t *testing.T) {
 				}
 				state = newState
 			}
-			<-diskWal.Done()
+			<-led.Done()
+			<-compactor.Done()
 		})
 	}
 }
@@ -612,10 +715,19 @@ func Test_ExportCheckpointAt(t *testing.T) {
 		unittest.RunWithTempDir(t, func(dbDir string) {
 			unittest.RunWithTempDir(t, func(dir2 string) {
 
-				diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dbDir, 100, pathfinder.PathByteSize, wal.SegmentSize)
+				const (
+					capacity           = 100
+					checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
+					checkpointsToKeep  = 1
+				)
+
+				diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dbDir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
 				require.NoError(t, err)
-				led, err := complete.NewLedger(diskWal, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+				led, err := complete.NewLedger(diskWal, capacity, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 				require.NoError(t, err)
+				compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep)
+				require.NoError(t, err)
+				<-compactor.Ready()
 
 				state := led.InitialState()
 				u := utils.UpdateFixture()
@@ -628,10 +740,13 @@ func Test_ExportCheckpointAt(t *testing.T) {
 				require.NoError(t, err)
 				assert.Equal(t, newState, state)
 
-				diskWal2, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir2, 100, pathfinder.PathByteSize, wal.SegmentSize)
+				diskWal2, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir2, capacity, pathfinder.PathByteSize, wal.SegmentSize)
 				require.NoError(t, err)
-				led2, err := complete.NewLedger(diskWal2, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+				led2, err := complete.NewLedger(diskWal2, capacity, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 				require.NoError(t, err)
+				compactor2, err := complete.NewCompactor(led2, diskWal2, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep)
+				require.NoError(t, err)
+				<-compactor2.Ready()
 
 				q, err := ledger.NewQuery(state, u.Keys())
 				require.NoError(t, err)
@@ -643,8 +758,10 @@ func Test_ExportCheckpointAt(t *testing.T) {
 					assert.Equal(t, v, retValues[i])
 				}
 
-				<-diskWal.Done()
-				<-diskWal2.Done()
+				<-led.Done()
+				<-compactor.Done()
+				<-led2.Done()
+				<-compactor2.Done()
 			})
 		})
 	})
@@ -656,10 +773,19 @@ func Test_ExportCheckpointAt(t *testing.T) {
 		unittest.RunWithTempDir(t, func(dbDir string) {
 			unittest.RunWithTempDir(t, func(dir2 string) {
 
-				diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dbDir, 100, pathfinder.PathByteSize, wal.SegmentSize)
+				const (
+					capacity           = 100
+					checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
+					checkpointsToKeep  = 1
+				)
+
+				diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dbDir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
 				require.NoError(t, err)
-				led, err := complete.NewLedger(diskWal, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+				led, err := complete.NewLedger(diskWal, capacity, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 				require.NoError(t, err)
+				compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep)
+				require.NoError(t, err)
+				<-compactor.Ready()
 
 				state := led.InitialState()
 				u := utils.UpdateFixture()
@@ -671,10 +797,13 @@ func Test_ExportCheckpointAt(t *testing.T) {
 				newState, err := led.ExportCheckpointAt(state, []ledger.Migration{migrationByValue}, []ledger.Reporter{}, []ledger.Reporter{}, complete.DefaultPathFinderVersion, dir2, "root.checkpoint")
 				require.NoError(t, err)
 
-				diskWal2, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir2, 100, pathfinder.PathByteSize, wal.SegmentSize)
+				diskWal2, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir2, capacity, pathfinder.PathByteSize, wal.SegmentSize)
 				require.NoError(t, err)
-				led2, err := complete.NewLedger(diskWal2, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+				led2, err := complete.NewLedger(diskWal2, capacity, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 				require.NoError(t, err)
+				compactor2, err := complete.NewCompactor(led2, diskWal2, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep)
+				require.NoError(t, err)
+				<-compactor2.Ready()
 
 				q, err := ledger.NewQuery(newState, u.Keys())
 				require.NoError(t, err)
@@ -685,8 +814,10 @@ func Test_ExportCheckpointAt(t *testing.T) {
 				assert.Equal(t, retValues[0], ledger.Value([]byte{'C'}))
 				assert.Equal(t, retValues[1], ledger.Value([]byte{'B'}))
 
-				<-diskWal.Done()
-				<-diskWal2.Done()
+				<-led.Done()
+				<-compactor.Done()
+				<-led2.Done()
+				<-compactor2.Done()
 			})
 		})
 	})
@@ -698,10 +829,19 @@ func Test_ExportCheckpointAt(t *testing.T) {
 		unittest.RunWithTempDir(t, func(dbDir string) {
 			unittest.RunWithTempDir(t, func(dir2 string) {
 
-				diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dbDir, 100, pathfinder.PathByteSize, wal.SegmentSize)
+				const (
+					capacity           = 100
+					checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
+					checkpointsToKeep  = 1
+				)
+
+				diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dbDir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
 				require.NoError(t, err)
-				led, err := complete.NewLedger(diskWal, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+				led, err := complete.NewLedger(diskWal, capacity, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 				require.NoError(t, err)
+				compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep)
+				require.NoError(t, err)
+				<-compactor.Ready()
 
 				state := led.InitialState()
 				u := utils.UpdateFixture()
@@ -713,10 +853,13 @@ func Test_ExportCheckpointAt(t *testing.T) {
 				newState, err := led.ExportCheckpointAt(state, []ledger.Migration{migrationByKey}, []ledger.Reporter{}, []ledger.Reporter{}, complete.DefaultPathFinderVersion, dir2, "root.checkpoint")
 				require.NoError(t, err)
 
-				diskWal2, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir2, 100, pathfinder.PathByteSize, wal.SegmentSize)
+				diskWal2, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir2, capacity, pathfinder.PathByteSize, wal.SegmentSize)
 				require.NoError(t, err)
-				led2, err := complete.NewLedger(diskWal2, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+				led2, err := complete.NewLedger(diskWal2, capacity, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 				require.NoError(t, err)
+				compactor2, err := complete.NewCompactor(led2, diskWal2, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep)
+				require.NoError(t, err)
+				<-compactor2.Ready()
 
 				q, err := ledger.NewQuery(newState, u.Keys())
 				require.NoError(t, err)
@@ -727,91 +870,61 @@ func Test_ExportCheckpointAt(t *testing.T) {
 				assert.Equal(t, retValues[0], ledger.Value([]byte{'D'}))
 				assert.Equal(t, retValues[1], ledger.Value([]byte{'B'}))
 
-				<-diskWal.Done()
-				<-diskWal2.Done()
+				<-led.Done()
+				<-compactor.Done()
+				<-led2.Done()
+				<-compactor2.Done()
 			})
 		})
 	})
 }
 
-func TestWALUpdateIsRunInParallel(t *testing.T) {
+func TestWALUpdateFailuresBubbleUp(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
 
-	// The idea of this test is - WAL update should be run in parallel
-	// so we block it until we can find a new trie with expected state
-	// this doesn't really proves WAL update is run in parallel, but at least
-	// checks if its run after the trie update
+		const (
+			capacity           = 100
+			checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
+			checkpointsToKeep  = 1
+		)
 
-	wg := sync.WaitGroup{}
-	wg.Add(1)
+		theError := fmt.Errorf("error error")
 
-	w := &LongRunningDummyWAL{
-		updateFn: func(update *ledger.TrieUpdate) error {
-			wg.Wait() //wg will let work after the trie has been updated
-			return nil
-		},
-	}
+		metricsCollector := &metrics.NoopCollector{}
 
-	led, err := complete.NewLedger(w, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
-	require.NoError(t, err)
-
-	key := ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(0, []byte{1, 2, 3})})
-
-	values := []ledger.Value{[]byte{1, 2, 3}}
-	update, err := ledger.NewUpdate(led.InitialState(), []ledger.Key{key}, values)
-	require.NoError(t, err)
-
-	// this state should correspond to fresh state with given update
-	decoded, err := hex.DecodeString("097b7f74413bc03200889c34c6979eacbad58345ef7c0c65e8057a071440df75")
-	var expectedState ledger.State
-	copy(expectedState[:], decoded)
-	require.NoError(t, err)
-
-	query, err := ledger.NewQuery(expectedState, []ledger.Key{key})
-	require.NoError(t, err)
-
-	go func() {
-		newState, _, err := led.Set(update)
+		diskWAL, err := wal.NewDiskWAL(zerolog.Nop(), nil, metricsCollector, dir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
 		require.NoError(t, err)
-		require.Equal(t, newState, expectedState)
-	}()
 
-	require.Eventually(t, func() bool {
-		retrievedValues, err := led.Get(query)
-		if err != nil {
-			return false
+		w := &CustomUpdateWAL{
+			DiskWAL: diskWAL,
+			updateFn: func(update *ledger.TrieUpdate) (int, bool, error) {
+				return 0, false, theError
+			},
 		}
 
+		led, err := complete.NewLedger(w, capacity, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 		require.NoError(t, err)
-		require.Equal(t, values, retrievedValues)
 
-		wg.Done()
+		compactor, err := complete.NewCompactor(led, w, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep)
+		require.NoError(t, err)
 
-		return true
-	}, 500*time.Millisecond, 5*time.Millisecond)
-}
+		<-compactor.Ready()
 
-func TestWALUpdateFailuresBubbleUp(t *testing.T) {
+		defer func() {
+			<-led.Done()
+			<-compactor.Done()
+		}()
 
-	theError := fmt.Errorf("error error")
+		key := ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(0, []byte{1, 2, 3})})
 
-	w := &LongRunningDummyWAL{
-		updateFn: func(update *ledger.TrieUpdate) error {
-			return theError
-		},
-	}
+		values := []ledger.Value{[]byte{1, 2, 3}}
+		update, err := ledger.NewUpdate(led.InitialState(), []ledger.Key{key}, values)
+		require.NoError(t, err)
 
-	led, err := complete.NewLedger(w, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
-	require.NoError(t, err)
-
-	key := ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(0, []byte{1, 2, 3})})
-
-	values := []ledger.Value{[]byte{1, 2, 3}}
-	update, err := ledger.NewUpdate(led.InitialState(), []ledger.Key{key}, values)
-	require.NoError(t, err)
-
-	_, _, err = led.Set(update)
-	require.Error(t, err)
-	require.True(t, errors.Is(err, theError))
+		_, _, err = led.Set(update)
+		require.Error(t, err)
+		require.True(t, errors.Is(err, theError))
+	})
 }
 
 func valuesMatches(expected []ledger.Value, got []ledger.Value) bool {
@@ -847,12 +960,12 @@ func migrationByValue(p []ledger.Payload) ([]ledger.Payload, error) {
 	return ret, nil
 }
 
-type LongRunningDummyWAL struct {
-	fixtures.NoopWAL
-	updateFn func(update *ledger.TrieUpdate) error
+type CustomUpdateWAL struct {
+	*wal.DiskWAL
+	updateFn func(update *ledger.TrieUpdate) (int, bool, error)
 }
 
-func (w *LongRunningDummyWAL) RecordUpdate(update *ledger.TrieUpdate) error {
+func (w *CustomUpdateWAL) RecordUpdate(update *ledger.TrieUpdate) (int, bool, error) {
 	return w.updateFn(update)
 }
 
