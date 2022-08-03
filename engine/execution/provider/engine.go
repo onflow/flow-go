@@ -132,10 +132,9 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 }
 
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	ctx := context.Background()
 	switch v := event.(type) {
 	case *messages.ChunkDataRequest:
-		e.onChunkDataRequest(ctx, originID, v)
+		e.onChunkDataRequest(originID, v)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
@@ -146,12 +145,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // onChunkDataRequest receives a request for the chunk data pack associated with chunkID from the
 // requester `originID`. If such a chunk data pack is available in the execution state, it is sent to the
 // requester.
-func (e *Engine) onChunkDataRequest(
-	ctx context.Context,
-	originID flow.Identifier,
-	req *messages.ChunkDataRequest,
-) {
-
+func (e *Engine) onChunkDataRequest(originID flow.Identifier, req *messages.ChunkDataRequest) {
 	processStart := time.Now()
 
 	// extracts list of verifier nodes id
