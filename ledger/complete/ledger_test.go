@@ -836,8 +836,12 @@ func noOpMigration(p []ledger.Payload) ([]ledger.Payload, error) {
 func migrationByValue(p []ledger.Payload) ([]ledger.Payload, error) {
 	ret := make([]ledger.Payload, 0, len(p))
 	for _, p := range p {
-		if p.Value.Equals([]byte{'A'}) {
-			pp := ledger.Payload{Key: p.Key, Value: ledger.Value([]byte{'C'})}
+		if p.Value().Equals([]byte{'A'}) {
+			k, err := p.Key()
+			if err != nil {
+				return nil, err
+			}
+			pp := *ledger.NewPayload(k, ledger.Value([]byte{'C'}))
 			ret = append(ret, pp)
 		} else {
 			ret = append(ret, p)
@@ -858,8 +862,12 @@ func (w *LongRunningDummyWAL) RecordUpdate(update *ledger.TrieUpdate) error {
 func migrationByKey(p []ledger.Payload) ([]ledger.Payload, error) {
 	ret := make([]ledger.Payload, 0, len(p))
 	for _, p := range p {
-		if p.Key.String() == "/1/1/22/2" {
-			pp := ledger.Payload{Key: p.Key, Value: ledger.Value([]byte{'D'})}
+		k, err := p.Key()
+		if err != nil {
+			return nil, err
+		}
+		if k.String() == "/1/1/22/2" {
+			pp := *ledger.NewPayload(k, ledger.Value([]byte{'D'}))
 			ret = append(ret, pp)
 		} else {
 			ret = append(ret, p)

@@ -137,7 +137,7 @@ func valueSizes(sizes []int, paths []ledger.Path, head *node.Node) {
 			if *head.Path() == p {
 				payload := head.Payload()
 				if payload != nil {
-					sizes[i] = payload.Value.Size()
+					sizes[i] = payload.Value().Size()
 				}
 				// NOTE: break isn't used here because precondition
 				// doesn't require paths being deduplicated.
@@ -674,6 +674,15 @@ func (mt *MTrie) Equals(o *MTrie) bool {
 	return o.RootHash() == mt.RootHash()
 }
 
+// serializablePayload is used to serialize ledger.Payload in JSON.
+// JSON encoder only serializes exported fields and ledger.Payload's
+// key and value fields are not exported.  So it is necessary to
+// use serializablePayload for JSON encoding.
+type serializablePayload struct {
+	Key   ledger.Key
+	Value ledger.Value
+}
+
 // DumpAsJSON dumps the trie key value pairs to a file having each key value pair as a json row
 func (mt *MTrie) DumpAsJSON(w io.Writer) error {
 
@@ -692,7 +701,14 @@ func (mt *MTrie) DumpAsJSON(w io.Writer) error {
 func dumpAsJSON(n *node.Node, encoder *json.Encoder) error {
 	if n.IsLeaf() {
 		if n != nil {
-			err := encoder.Encode(n.Payload())
+			p := n.Payload()
+			k, err := p.Key()
+			if err != nil {
+				return err
+			}
+			v := p.Value()
+			sp := serializablePayload{Key: k, Value: v}
+			err = encoder.Encode(sp)
 			if err != nil {
 				return err
 			}

@@ -92,13 +92,14 @@ func (l *led) Set(owner, key string, value flow.RegisterValue) error {
 	keyparts := []ledger.KeyPart{ledger.NewKeyPart(0, []byte(owner)),
 		ledger.NewKeyPart(2, []byte(key))}
 	fk := fullKey(owner, key)
-	l.payloads[fk] = ledger.Payload{Key: ledger.NewKey(keyparts), Value: ledger.Value(value)}
+	l.payloads[fk] = *ledger.NewPayload(ledger.NewKey(keyparts), ledger.Value(value))
 	return nil
 }
 
 func (l *led) Get(owner, key string) (flow.RegisterValue, error) {
 	fk := fullKey(owner, key)
-	return flow.RegisterValue(l.payloads[fk].Value), nil
+	p := l.payloads[fk]
+	return flow.RegisterValue(p.Value()), nil
 }
 
 func (l *led) Delete(owner, key string) error {
@@ -122,8 +123,12 @@ func (l *led) Payloads() []ledger.Payload {
 func newLed(payloads []ledger.Payload) *led {
 	mapping := make(map[string]ledger.Payload)
 	for _, p := range payloads {
-		fk := fullKey(string(p.Key.KeyParts[0].Value),
-			string(p.Key.KeyParts[1].Value))
+		k, err := p.Key()
+		if err != nil {
+			panic(err)
+		}
+		fk := fullKey(string(k.KeyParts[0].Value),
+			string(k.KeyParts[1].Value))
 		mapping[fk] = p
 	}
 

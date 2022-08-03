@@ -41,14 +41,14 @@ func QueryFixture() *l.Query {
 func LightPayload(key uint16, value uint16) *l.Payload {
 	k := l.Key{KeyParts: []l.KeyPart{{Type: 0, Value: utils.Uint16ToBinary(key)}}}
 	v := l.Value(utils.Uint16ToBinary(value))
-	return &l.Payload{Key: k, Value: v}
+	return l.NewPayload(k, v)
 }
 
 // LightPayload8 returns a payload with 1 byte key and 1 byte value
 func LightPayload8(key uint8, value uint8) *l.Payload {
 	k := l.Key{KeyParts: []l.KeyPart{{Type: 0, Value: []byte{key}}}}
 	v := l.Value([]byte{value})
-	return &l.Payload{Key: k, Value: v}
+	return l.NewPayload(k, v)
 }
 
 // PathByUint8 returns a path (32 bytes) given a uint8
@@ -172,7 +172,7 @@ func RandomPayload(minByteSize int, maxByteSize int) *l.Payload {
 	valuedata := make([]byte, valueByteSize)
 	rand.Read(valuedata)
 	value := l.Value(valuedata)
-	return &l.Payload{Key: key, Value: value}
+	return l.NewPayload(key, value)
 }
 
 // RandomPayloads returns n random payloads

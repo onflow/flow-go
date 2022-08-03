@@ -68,7 +68,7 @@ func TestTrieUpdate(t *testing.T) {
 	read := &ledger.TrieRead{RootHash: updatedRoot, Paths: paths}
 	retValues, err := forest.Read(read)
 	require.NoError(t, err)
-	require.Equal(t, retValues[0], payloads[0].Value)
+	require.Equal(t, retValues[0], payloads[0].Value())
 }
 
 // TestLeftEmptyInsert tests inserting a new value into an empty sub-trie:
@@ -124,7 +124,7 @@ func TestLeftEmptyInsert(t *testing.T) {
 	retValues, err := forest.Read(read)
 	require.NoError(t, err)
 	for i := range paths {
-		require.Equal(t, retValues[i], payloads[i].Value)
+		require.Equal(t, retValues[i], payloads[i].Value())
 	}
 }
 
@@ -182,7 +182,7 @@ func TestRightEmptyInsert(t *testing.T) {
 	retValues, err := forest.Read(read)
 	require.NoError(t, err)
 	for i := range paths {
-		require.Equal(t, retValues[i], payloads[i].Value)
+		require.Equal(t, retValues[i], payloads[i].Value())
 	}
 }
 
@@ -238,7 +238,7 @@ func TestExpansionInsert(t *testing.T) {
 	retValues, err := forest.Read(read)
 	require.NoError(t, err)
 	for i := range paths {
-		require.Equal(t, retValues[i], payloads[i].Value)
+		require.Equal(t, retValues[i], payloads[i].Value())
 	}
 }
 
@@ -306,7 +306,7 @@ func TestFullHouseInsert(t *testing.T) {
 	retValues, err := forest.Read(read)
 	require.NoError(t, err)
 	for i := range paths {
-		require.Equal(t, retValues[i], payloads[i].Value)
+		require.Equal(t, retValues[i], payloads[i].Value())
 	}
 }
 
@@ -348,7 +348,7 @@ func TestLeafInsert(t *testing.T) {
 	retValues, err := forest.Read(read)
 	require.NoError(t, err)
 	for i := range paths {
-		require.Equal(t, retValues[i], payloads[i].Value)
+		require.Equal(t, retValues[i], payloads[i].Value())
 	}
 }
 
@@ -385,7 +385,7 @@ func TestOverrideValue(t *testing.T) {
 	read := &ledger.TrieRead{RootHash: updatedRoot, Paths: paths}
 	retValues, err := forest.Read(read)
 	require.NoError(t, err)
-	require.Equal(t, retValues[0], payloads[0].Value)
+	require.Equal(t, retValues[0], payloads[0].Value())
 
 }
 
@@ -418,7 +418,7 @@ func TestDuplicateOverride(t *testing.T) {
 	read := &ledger.TrieRead{RootHash: updatedRoot, Paths: paths}
 	retValues, err := forest.Read(read)
 	require.NoError(t, err)
-	require.Equal(t, retValues[0], v2.Value)
+	require.Equal(t, retValues[0], v2.Value())
 
 }
 
@@ -442,7 +442,7 @@ func TestReadSafety(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, data, 1)
-	require.Equal(t, v0.Value, data[0])
+	require.Equal(t, v0.Value(), data[0])
 
 	// modify returned slice
 	data[0] = []byte("new value")
@@ -451,7 +451,7 @@ func TestReadSafety(t *testing.T) {
 	data2, err := forest.Read(read)
 	require.NoError(t, err)
 	require.Len(t, data2, 1)
-	require.Equal(t, v0.Value, data2[0])
+	require.Equal(t, v0.Value(), data2[0])
 }
 
 // TestReadOrder tests that payloads from reading a trie are delivered in the order as specified by the paths
@@ -476,15 +476,15 @@ func TestReadOrder(t *testing.T) {
 	retValues, err := forest.Read(read)
 	require.NoError(t, err)
 	require.Equal(t, len(read.Paths), len(retValues))
-	require.Equal(t, retValues[0], payloads[0].Value)
-	require.Equal(t, retValues[1], payloads[1].Value)
+	require.Equal(t, retValues[0], payloads[0].Value())
+	require.Equal(t, retValues[1], payloads[1].Value())
 
 	read = &ledger.TrieRead{RootHash: testRoot, Paths: []ledger.Path{p2, p1}}
 	retValues, err = forest.Read(read)
 	require.NoError(t, err)
 	require.Equal(t, len(read.Paths), len(retValues))
-	require.Equal(t, retValues[1], payloads[0].Value)
-	require.Equal(t, retValues[0], payloads[1].Value)
+	require.Equal(t, retValues[1], payloads[0].Value())
+	require.Equal(t, retValues[0], payloads[1].Value())
 }
 
 // TestMixRead tests reading a mixture of set and unset registers.
@@ -523,7 +523,7 @@ func TestMixRead(t *testing.T) {
 	retValues, err := forest.Read(read)
 	require.NoError(t, err)
 	for i := range paths {
-		require.Equal(t, retValues[i], expectedPayloads[i].Value)
+		require.Equal(t, retValues[i], expectedPayloads[i].Value())
 	}
 }
 
@@ -552,7 +552,7 @@ func TestReadWithDuplicatedKeys(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, len(read.Paths), len(retValues))
 	for i := range paths {
-		require.Equal(t, retValues[i], expectedPayloads[i].Value)
+		require.Equal(t, retValues[i], expectedPayloads[i].Value())
 	}
 }
 
@@ -620,7 +620,7 @@ func TestReadSinglePayload(t *testing.T) {
 		if payload.IsEmpty() {
 			require.Equal(t, 0, len(retValues[0]))
 		} else {
-			require.Equal(t, payload.Value, retValues[0])
+			require.Equal(t, payload.Value(), retValues[0])
 		}
 	}
 
@@ -632,7 +632,7 @@ func TestReadSinglePayload(t *testing.T) {
 		if payload.IsEmpty() {
 			require.Equal(t, 0, len(retValue))
 		} else {
-			require.Equal(t, payload.Value, retValue)
+			require.Equal(t, payload.Value(), retValue)
 		}
 	}
 }
@@ -679,21 +679,21 @@ func TestForkingUpdates(t *testing.T) {
 	retValues, err := forest.Read(read) // reading from original Trie
 	require.NoError(t, err)
 	for i := range paths {
-		require.Equal(t, retValues[i], payloads[i].Value)
+		require.Equal(t, retValues[i], payloads[i].Value())
 	}
 
 	readA := &ledger.TrieRead{RootHash: updatedRootA, Paths: pathsA}
 	retValues, err = forest.Read(readA) // reading from updatedTrieA
 	require.NoError(t, err)
 	for i := range paths {
-		require.Equal(t, retValues[i], payloadsA[i].Value)
+		require.Equal(t, retValues[i], payloadsA[i].Value())
 	}
 
 	readB := &ledger.TrieRead{RootHash: updatedRootB, Paths: pathsB}
 	retValues, err = forest.Read(readB) // reading from updatedTrieB
 	require.NoError(t, err)
 	for i := range paths {
-		require.Equal(t, retValues[i], payloadsB[i].Value)
+		require.Equal(t, retValues[i], payloadsB[i].Value())
 	}
 }
 
@@ -730,14 +730,14 @@ func TestIdenticalUpdateAppliedTwice(t *testing.T) {
 	retValuesA, err := forest.Read(read)
 	require.NoError(t, err)
 	for i := range paths {
-		require.Equal(t, retValuesA[i], payloads[i].Value)
+		require.Equal(t, retValuesA[i], payloads[i].Value())
 	}
 
 	read = &ledger.TrieRead{RootHash: updatedRootB, Paths: paths}
 	retValuesB, err := forest.Read(read)
 	require.NoError(t, err)
 	for i := range paths {
-		require.Equal(t, retValuesB[i], payloads[i].Value)
+		require.Equal(t, retValuesB[i], payloads[i].Value())
 	}
 }
 
@@ -803,7 +803,7 @@ func TestRandomUpdateReadProofValueSizes(t *testing.T) {
 		retValues, err = forest.Read(read)
 		require.NoError(t, err, "error reading")
 		for i := range payloads {
-			require.Equal(t, retValues[i], payloads[i].Value)
+			require.Equal(t, retValues[i], payloads[i].Value())
 		}
 
 		// test value sizes for existing keys
@@ -811,7 +811,7 @@ func TestRandomUpdateReadProofValueSizes(t *testing.T) {
 		require.NoError(t, err, "error value sizes")
 		require.Equal(t, len(read.Paths), len(retValueSizes))
 		for i := range payloads {
-			require.Equal(t, payloads[i].Value.Size(), retValueSizes[i])
+			require.Equal(t, payloads[i].Value().Size(), retValueSizes[i])
 		}
 
 		// test proof (mix of existing and non existing keys)
@@ -854,7 +854,7 @@ func TestRandomUpdateReadProofValueSizes(t *testing.T) {
 		retValues, err = forest.Read(read)
 		require.NoError(t, err)
 		for i, v := range allPayloads {
-			assert.Equal(t, retValues[i], v.Value)
+			assert.Equal(t, retValues[i], v.Value())
 		}
 
 		// check value sizes for all existing paths
@@ -862,7 +862,7 @@ func TestRandomUpdateReadProofValueSizes(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, len(read.Paths), len(retValueSizes))
 		for i, v := range allPayloads {
-			assert.Equal(t, v.Value.Size(), retValueSizes[i])
+			assert.Equal(t, v.Value().Size(), retValueSizes[i])
 		}
 	}
 }
@@ -922,7 +922,7 @@ func TestProofGenerationInclusion(t *testing.T) {
 func payloadBySlices(keydata []byte, valuedata []byte) *ledger.Payload {
 	key := ledger.Key{KeyParts: []ledger.KeyPart{{Type: 0, Value: keydata}}}
 	value := ledger.Value(valuedata)
-	return &ledger.Payload{Key: key, Value: value}
+	return ledger.NewPayload(key, value)
 }
 
 func pathByUint8s(inputs []uint8) ledger.Path {
@@ -956,16 +956,16 @@ func TestValueSizesOrder(t *testing.T) {
 	retValueSizes, err := forest.ValueSizes(read)
 	require.NoError(t, err)
 	require.Equal(t, len(read.Paths), len(retValueSizes))
-	require.Equal(t, v1.Value.Size(), retValueSizes[0])
-	require.Equal(t, v2.Value.Size(), retValueSizes[1])
+	require.Equal(t, v1.Value().Size(), retValueSizes[0])
+	require.Equal(t, v2.Value().Size(), retValueSizes[1])
 
 	// Get value sizes for paths {p2, p1}
 	read = &ledger.TrieRead{RootHash: baseRoot, Paths: []ledger.Path{p2, p1}}
 	retValueSizes, err = forest.ValueSizes(read)
 	require.NoError(t, err)
 	require.Equal(t, len(read.Paths), len(retValueSizes))
-	require.Equal(t, v2.Value.Size(), retValueSizes[0])
-	require.Equal(t, v1.Value.Size(), retValueSizes[1])
+	require.Equal(t, v2.Value().Size(), retValueSizes[0])
+	require.Equal(t, v1.Value().Size(), retValueSizes[1])
 }
 
 // TestMixGetValueSizes tests value sizes of a mix of set and unset registers.
@@ -995,7 +995,7 @@ func TestMixGetValueSizes(t *testing.T) {
 	p4 := pathByUint8s([]uint8{uint8(23), uint8(82)})
 
 	readPaths := []ledger.Path{p1, p2, p3, p4}
-	expectedValueSizes := []int{v1.Value.Size(), v2.Value.Size(), 0, 0}
+	expectedValueSizes := []int{v1.Value().Size(), v2.Value().Size(), 0, 0}
 
 	read := &ledger.TrieRead{RootHash: baseRoot, Paths: readPaths}
 	retValueSizes, err := forest.ValueSizes(read)
@@ -1031,7 +1031,7 @@ func TestValueSizesWithDuplicatedKeys(t *testing.T) {
 	require.NoError(t, err)
 
 	readPaths := []ledger.Path{p1, p2, p3}
-	expectedValueSizes := []int{v1.Value.Size(), v2.Value.Size(), v1.Value.Size()}
+	expectedValueSizes := []int{v1.Value().Size(), v2.Value().Size(), v1.Value().Size()}
 
 	read := &ledger.TrieRead{RootHash: baseRoot, Paths: readPaths}
 	retValueSizes, err := forest.ValueSizes(read)

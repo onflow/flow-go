@@ -29,19 +29,19 @@ func TestPayloadEquals(t *testing.T) {
 	})
 
 	t.Run("empty vs non-empty", func(t *testing.T) {
-		p := &Payload{
-			Key:   Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02}}}},
-			Value: []byte{0x03, 0x04},
-		}
+		p := NewPayload(
+			Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02}}}},
+			[]byte{0x03, 0x04},
+		)
 		require.False(t, emptyPayload.Equals(p))
 		require.False(t, p.Equals(emptyPayload))
 	})
 
 	t.Run("nil vs non-empty", func(t *testing.T) {
-		p := &Payload{
-			Key:   Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02}}}},
-			Value: []byte{0x03, 0x04},
-		}
+		p := NewPayload(
+			Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02}}}},
+			[]byte{0x03, 0x04},
+		)
 		require.False(t, nilPayload.Equals(p))
 		require.False(t, p.Equals(nilPayload))
 	})
@@ -49,28 +49,28 @@ func TestPayloadEquals(t *testing.T) {
 	t.Run("different key same value", func(t *testing.T) {
 		value := []byte{0x03, 0x04}
 
-		p := &Payload{
-			Key:   Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02}}}},
-			Value: value,
-		}
+		p := NewPayload(
+			Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02}}}},
+			value,
+		)
 		// p1.Key.KeyParts[0].Type is different
-		p1 := &Payload{
-			Key:   Key{KeyParts: []KeyPart{{2, []byte{0x01, 0x02}}}},
-			Value: value,
-		}
+		p1 := NewPayload(
+			Key{KeyParts: []KeyPart{{2, []byte{0x01, 0x02}}}},
+			value,
+		)
 		// p2.Key.KeyParts[0].Value is different
-		p2 := &Payload{
-			Key:   Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02, 0x03}}}},
-			Value: value,
-		}
+		p2 := NewPayload(
+			Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02, 0x03}}}},
+			value,
+		)
 		// len(p3.Key.KeyParts) is different
-		p3 := &Payload{
-			Key: Key{KeyParts: []KeyPart{
+		p3 := NewPayload(
+			Key{KeyParts: []KeyPart{
 				{1, []byte{0x01, 0x02}},
 				{2, []byte{0x03, 0x04}}},
 			},
-			Value: value,
-		}
+			value,
+		)
 		require.False(t, p.Equals(p1))
 		require.False(t, p.Equals(p2))
 		require.False(t, p.Equals(p3))
@@ -79,28 +79,28 @@ func TestPayloadEquals(t *testing.T) {
 	t.Run("different key empty value", func(t *testing.T) {
 		value := []byte{}
 
-		p := &Payload{
-			Key:   Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02}}}},
-			Value: value,
-		}
+		p := NewPayload(
+			Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02}}}},
+			value,
+		)
 		// p1.Key.KeyParts[0].Type is different
-		p1 := &Payload{
-			Key:   Key{KeyParts: []KeyPart{{2, []byte{0x01, 0x02}}}},
-			Value: value,
-		}
+		p1 := NewPayload(
+			Key{KeyParts: []KeyPart{{2, []byte{0x01, 0x02}}}},
+			value,
+		)
 		// p2.Key.KeyParts[0].Value is different
-		p2 := &Payload{
-			Key:   Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02, 0x03}}}},
-			Value: value,
-		}
+		p2 := NewPayload(
+			Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02, 0x03}}}},
+			value,
+		)
 		// len(p3.Key.KeyParts) is different
-		p3 := &Payload{
-			Key: Key{KeyParts: []KeyPart{
+		p3 := NewPayload(
+			Key{KeyParts: []KeyPart{
 				{1, []byte{0x01, 0x02}},
 				{2, []byte{0x03, 0x04}}},
 			},
-			Value: value,
-		}
+			value,
+		)
 		require.False(t, p.Equals(p1))
 		require.False(t, p.Equals(p2))
 		require.False(t, p.Equals(p3))
@@ -109,29 +109,30 @@ func TestPayloadEquals(t *testing.T) {
 	t.Run("same key different value", func(t *testing.T) {
 		key := Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02}}}}
 
-		p := &Payload{
-			Key:   key,
-			Value: []byte{0x03, 0x04},
-		}
+		p := NewPayload(
+			key,
+			[]byte{0x03, 0x04},
+		)
 		// p1.Value is nil
-		p1 := &Payload{
-			Key: key,
-		}
+		p1 := NewPayload(
+			key,
+			nil,
+		)
 		// p2.Value is empty
-		p2 := &Payload{
-			Key:   key,
-			Value: []byte{},
-		}
+		p2 := NewPayload(
+			key,
+			[]byte{},
+		)
 		// p3.Value length is different
-		p3 := &Payload{
-			Key:   key,
-			Value: []byte{0x03},
-		}
+		p3 := NewPayload(
+			key,
+			[]byte{0x03},
+		)
 		// p4.Value data is different
-		p4 := &Payload{
-			Key:   key,
-			Value: []byte{0x03, 0x05},
-		}
+		p4 := NewPayload(
+			key,
+			[]byte{0x03, 0x05},
+		)
 		require.False(t, p.Equals(p1))
 		require.False(t, p.Equals(p2))
 		require.False(t, p.Equals(p3))
@@ -139,14 +140,14 @@ func TestPayloadEquals(t *testing.T) {
 	})
 
 	t.Run("same key same value", func(t *testing.T) {
-		p1 := &Payload{
-			Key:   Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02}}}},
-			Value: []byte{0x03, 0x04},
-		}
-		p2 := &Payload{
-			Key:   Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02}}}},
-			Value: []byte{0x03, 0x04},
-		}
+		p1 := NewPayload(
+			Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02}}}},
+			[]byte{0x03, 0x04},
+		)
+		p2 := NewPayload(
+			Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02}}}},
+			[]byte{0x03, 0x04},
+		)
 		require.True(t, p1.Equals(p2))
 		require.True(t, p2.Equals(p1))
 	})
@@ -175,19 +176,19 @@ func TestPayloadValuEquals(t *testing.T) {
 	})
 
 	t.Run("empty vs non-empty", func(t *testing.T) {
-		p := &Payload{
-			Key:   Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02}}}},
-			Value: []byte{0x03, 0x04},
-		}
+		p := NewPayload(
+			Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02}}}},
+			[]byte{0x03, 0x04},
+		)
 		require.False(t, emptyPayload.ValueEquals(p))
 		require.False(t, p.ValueEquals(emptyPayload))
 	})
 
 	t.Run("nil vs non-empty", func(t *testing.T) {
-		p := &Payload{
-			Key:   Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02}}}},
-			Value: []byte{0x03, 0x04},
-		}
+		p := NewPayload(
+			Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02}}}},
+			[]byte{0x03, 0x04},
+		)
 		require.False(t, nilPayload.ValueEquals(p))
 		require.False(t, p.ValueEquals(nilPayload))
 	})
@@ -195,28 +196,28 @@ func TestPayloadValuEquals(t *testing.T) {
 	t.Run("different key same value", func(t *testing.T) {
 		value := []byte{0x03, 0x04}
 
-		p := &Payload{
-			Key:   Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02}}}},
-			Value: value,
-		}
+		p := NewPayload(
+			Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02}}}},
+			value,
+		)
 		// p1.Key.KeyParts[0].Type is different
-		p1 := &Payload{
-			Key:   Key{KeyParts: []KeyPart{{2, []byte{0x01, 0x02}}}},
-			Value: value,
-		}
+		p1 := NewPayload(
+			Key{KeyParts: []KeyPart{{2, []byte{0x01, 0x02}}}},
+			value,
+		)
 		// p2.Key.KeyParts[0].Value is different
-		p2 := &Payload{
-			Key:   Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02, 0x03}}}},
-			Value: value,
-		}
+		p2 := NewPayload(
+			Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02, 0x03}}}},
+			value,
+		)
 		// len(p3.Key.KeyParts) is different
-		p3 := &Payload{
-			Key: Key{KeyParts: []KeyPart{
+		p3 := NewPayload(
+			Key{KeyParts: []KeyPart{
 				{1, []byte{0x01, 0x02}},
 				{2, []byte{0x03, 0x04}}},
 			},
-			Value: value,
-		}
+			value,
+		)
 		require.True(t, p.ValueEquals(p1))
 		require.True(t, p.ValueEquals(p2))
 		require.True(t, p.ValueEquals(p3))
@@ -225,28 +226,28 @@ func TestPayloadValuEquals(t *testing.T) {
 	t.Run("different key empty value", func(t *testing.T) {
 		value := []byte{}
 
-		p := &Payload{
-			Key:   Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02}}}},
-			Value: value,
-		}
+		p := NewPayload(
+			Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02}}}},
+			value,
+		)
 		// p1.Key.KeyParts[0].Type is different
-		p1 := &Payload{
-			Key:   Key{KeyParts: []KeyPart{{2, []byte{0x01, 0x02}}}},
-			Value: value,
-		}
+		p1 := NewPayload(
+			Key{KeyParts: []KeyPart{{2, []byte{0x01, 0x02}}}},
+			value,
+		)
 		// p2.Key.KeyParts[0].Value is different
-		p2 := &Payload{
-			Key:   Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02, 0x03}}}},
-			Value: value,
-		}
+		p2 := NewPayload(
+			Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02, 0x03}}}},
+			value,
+		)
 		// len(p3.Key.KeyParts) is different
-		p3 := &Payload{
-			Key: Key{KeyParts: []KeyPart{
+		p3 := NewPayload(
+			Key{KeyParts: []KeyPart{
 				{1, []byte{0x01, 0x02}},
 				{2, []byte{0x03, 0x04}}},
 			},
-			Value: value,
-		}
+			value,
+		)
 		require.True(t, p.ValueEquals(p1))
 		require.True(t, p.ValueEquals(p2))
 		require.True(t, p.ValueEquals(p3))
@@ -255,29 +256,30 @@ func TestPayloadValuEquals(t *testing.T) {
 	t.Run("same key different value", func(t *testing.T) {
 		key := Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02}}}}
 
-		p := &Payload{
-			Key:   key,
-			Value: []byte{0x03, 0x04},
-		}
+		p := NewPayload(
+			key,
+			[]byte{0x03, 0x04},
+		)
 		// p1.Value is nil
-		p1 := &Payload{
-			Key: key,
-		}
+		p1 := NewPayload(
+			key,
+			nil,
+		)
 		// p2.Value is empty
-		p2 := &Payload{
-			Key:   key,
-			Value: []byte{},
-		}
+		p2 := NewPayload(
+			key,
+			[]byte{},
+		)
 		// p3.Value length is different
-		p3 := &Payload{
-			Key:   key,
-			Value: []byte{0x03},
-		}
+		p3 := NewPayload(
+			key,
+			[]byte{0x03},
+		)
 		// p4.Value data is different
-		p4 := &Payload{
-			Key:   key,
-			Value: []byte{0x03, 0x05},
-		}
+		p4 := NewPayload(
+			key,
+			[]byte{0x03, 0x05},
+		)
 		require.False(t, p.ValueEquals(p1))
 		require.False(t, p.ValueEquals(p2))
 		require.False(t, p.ValueEquals(p3))
@@ -285,14 +287,14 @@ func TestPayloadValuEquals(t *testing.T) {
 	})
 
 	t.Run("same key same value", func(t *testing.T) {
-		p1 := &Payload{
-			Key:   Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02}}}},
-			Value: []byte{0x03, 0x04},
-		}
-		p2 := &Payload{
-			Key:   Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02}}}},
-			Value: []byte{0x03, 0x04},
-		}
+		p1 := NewPayload(
+			Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02}}}},
+			[]byte{0x03, 0x04},
+		)
+		p2 := NewPayload(
+			Key{KeyParts: []KeyPart{{1, []byte{0x01, 0x02}}}},
+			[]byte{0x03, 0x04},
+		)
 		require.True(t, p1.ValueEquals(p2))
 		require.True(t, p2.ValueEquals(p1))
 	})

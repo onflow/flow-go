@@ -360,14 +360,18 @@ func encodePayload(p *Payload, version uint16) []byte {
 
 func encodeAndAppendPayload(buffer []byte, p *Payload, version uint16) []byte {
 
+	// Error isn't checked here because encoded key will be used directly
+	// in later commit and no error will be returned.
+	k, _ := p.Key()
+
 	// encode encoded key size
-	buffer = utils.AppendUint32(buffer, uint32(encodedKeyLength(&p.Key, version)))
+	buffer = utils.AppendUint32(buffer, uint32(encodedKeyLength(&k, version)))
 
 	// encode key
-	buffer = encodeAndAppendKey(buffer, &p.Key, version)
+	buffer = encodeAndAppendKey(buffer, &k, version)
 
 	// encode encoded value size
-	encodedValueLen := encodedValueLength(p.Value, version)
+	encodedValueLen := encodedValueLength(p.Value(), version)
 	switch version {
 	case 0:
 		// In version 0, encoded value length is encoded as 8 bytes.
@@ -378,7 +382,7 @@ func encodeAndAppendPayload(buffer []byte, p *Payload, version uint16) []byte {
 	}
 
 	// encode value
-	buffer = encodeAndAppendValue(buffer, p.Value, version)
+	buffer = encodeAndAppendValue(buffer, p.Value(), version)
 
 	return buffer
 }
@@ -387,17 +391,22 @@ func encodedPayloadLength(p *Payload, version uint16) int {
 	if p == nil {
 		return 0
 	}
+
+	// Error isn't checked here because encoded key will be used directly
+	// in later commit and no error will be returned.
+	k, _ := p.Key()
+
 	switch version {
 	case 0:
 		// In version 0, payload is encoded as:
 		//   encode key length (4 bytes) + encoded key +
 		//   encoded value length (8 bytes) + encode value
-		return 4 + encodedKeyLength(&p.Key, version) + 8 + encodedValueLength(p.Value, version)
+		return 4 + encodedKeyLength(&k, version) + 8 + encodedValueLength(p.Value(), version)
 	default:
 		// In version 1 and later, payload is encoded as:
 		//   encode key length (4 bytes) + encoded key +
 		//   encoded value length (4 bytes) + encode value
-		return 4 + encodedKeyLength(&p.Key, version) + 4 + encodedValueLength(p.Value, version)
+		return 4 + encodedKeyLength(&k, version) + 4 + encodedValueLength(p.Value(), version)
 	}
 }
 
@@ -478,12 +487,12 @@ func decodePayload(inp []byte, zeroCopy bool, version uint16) (*Payload, error) 
 	}
 
 	if zeroCopy {
-		return &Payload{Key: *key, Value: encValue}, nil
+		return NewPayload(*key, encValue), nil
 	}
 
 	v := make([]byte, len(encValue))
 	copy(v, encValue)
-	return &Payload{Key: *key, Value: v}, nil
+	return NewPayload(*key, v), nil
 }
 
 // EncodeTrieUpdate encodes a trie update struct

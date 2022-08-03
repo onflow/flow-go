@@ -53,11 +53,21 @@ func TestLegacyControllerMigration(t *testing.T) {
 	address2 := flow.HexToAddress("0x2")
 
 	payloads := []ledger.Payload{
-		{Key: createPayloadKeyWithLegacyController(address1, KeyStorageUsed, false), Value: utils.Uint64ToBinary(1)},
-		{Key: createPayloadKeyWithLegacyController(address1, fvmstate.ContractKey("CoreContract"), true), Value: utils.Uint64ToBinary(2)},
-		{Key: createPayloadKeyWithLegacyController(address1, fvmstate.KeyContractNames, true), Value: utils.Uint64ToBinary(3)},
-		{Key: createPayloadKeyWithLegacyController(address2, fvmstate.KeyPublicKey(1), true), Value: utils.Uint64ToBinary(4)},
-		{Key: createPayloadKeyWithLegacyController(address2, KeyPublicKeyCount, true), Value: utils.Uint64ToBinary(4)},
+		*ledger.NewPayload(
+			createPayloadKeyWithLegacyController(address1, KeyStorageUsed, false),
+			utils.Uint64ToBinary(1)),
+		*ledger.NewPayload(
+			createPayloadKeyWithLegacyController(address1, fvmstate.ContractKey("CoreContract"), true),
+			utils.Uint64ToBinary(2)),
+		*ledger.NewPayload(
+			createPayloadKeyWithLegacyController(address1, fvmstate.KeyContractNames, true),
+			utils.Uint64ToBinary(3)),
+		*ledger.NewPayload(
+			createPayloadKeyWithLegacyController(address2, fvmstate.KeyPublicKey(1), true),
+			utils.Uint64ToBinary(4)),
+		*ledger.NewPayload(
+			createPayloadKeyWithLegacyController(address2, KeyPublicKeyCount, true),
+			utils.Uint64ToBinary(4)),
 	}
 
 	expectedKeys := []ledger.Key{

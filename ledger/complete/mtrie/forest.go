@@ -132,7 +132,7 @@ func (f *Forest) ReadSingleValue(r *ledger.TrieReadSingleValue) (ledger.Value, e
 	}
 
 	payload := trie.ReadSinglePayload(r.Path)
-	return payload.Value.DeepCopy(), nil
+	return payload.Value().DeepCopy(), nil
 }
 
 // Read reads values for an slice of paths and returns values and error (if any)
@@ -152,7 +152,7 @@ func (f *Forest) Read(r *ledger.TrieRead) ([]ledger.Value, error) {
 	// call ReadSinglePayload if there is only one path
 	if len(r.Paths) == 1 {
 		payload := trie.ReadSinglePayload(r.Paths[0])
-		return []ledger.Value{payload.Value.DeepCopy()}, nil
+		return []ledger.Value{payload.Value().DeepCopy()}, nil
 	}
 
 	// deduplicate keys:
@@ -180,7 +180,7 @@ func (f *Forest) Read(r *ledger.TrieRead) ([]ledger.Value, error) {
 		payload := payloads[i]
 		indices := pathOrgIndex[p]
 		for _, j := range indices {
-			orderedValues[j] = payload.Value.DeepCopy()
+			orderedValues[j] = payload.Value().DeepCopy()
 		}
 		totalPayloadSize += len(indices) * payload.Size()
 	}

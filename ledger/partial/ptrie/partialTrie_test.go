@@ -195,6 +195,9 @@ func TestPartialTrieLeafUpdates(t *testing.T) {
 		payload2 := testutils.LightPayload('C', 'c')
 		updatedPayload2 := testutils.LightPayload('D', 'd')
 
+		path3 := testutils.PathByUint16(2)
+		payload3 := testutils.LightPayload('E', 'e')
+
 		paths := []ledger.Path{path1, path2}
 		payloads := []*ledger.Payload{payload1, payload2}
 
@@ -217,6 +220,13 @@ func TestPartialTrieLeafUpdates(t *testing.T) {
 		_, err = psmt.Update(paths, payloads)
 		require.NoError(t, err, "error updating psmt")
 		ensureRootHash(t, rootHash, psmt)
+
+		// Update on non-existent leafs
+		_, err = psmt.Update([]ledger.Path{path3}, []*ledger.Payload{payload3})
+		missingPathErr, ok := err.(*ErrMissingPath)
+		require.True(t, ok)
+		require.Equal(t, 1, len(missingPathErr.Paths))
+		require.Equal(t, path3, missingPathErr.Paths[0])
 	})
 
 }

@@ -201,8 +201,8 @@ func Test_Compactor(t *testing.T) {
 				require.NoError(t, err)
 
 				for i, path := range paths {
-					require.Equal(t, data[path].Value, values[i])
-					require.Equal(t, data[path].Value, values2[i])
+					require.Equal(t, data[path].Value(), values[i])
+					require.Equal(t, data[path].Value(), values2[i])
 				}
 			}
 

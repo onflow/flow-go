@@ -754,7 +754,7 @@ func TestValueSizes(t *testing.T) {
 
 		sizes := newTrie.UnsafeValueSizes(pathsToGetValueSize)
 		require.Equal(t, len(pathsToGetValueSize), len(sizes))
-		require.Equal(t, payload1.Value.Size(), sizes[0])
+		require.Equal(t, payload1.Value().Size(), sizes[0])
 		require.Equal(t, 0, sizes[1])
 	})
 
@@ -799,9 +799,9 @@ func TestValueSizes(t *testing.T) {
 		for i, p := range pathsToGetValueSize {
 			switch p {
 			case path1:
-				require.Equal(t, payload1.Value.Size(), sizes[i])
+				require.Equal(t, payload1.Value().Size(), sizes[i])
 			case path2:
-				require.Equal(t, payload2.Value.Size(), sizes[i])
+				require.Equal(t, payload2.Value().Size(), sizes[i])
 			default:
 				// Test value size for non-existent path
 				require.Equal(t, 0, sizes[i])
@@ -812,7 +812,7 @@ func TestValueSizes(t *testing.T) {
 		pathsToGetValueSize = []ledger.Path{path1}
 		sizes = newTrie.UnsafeValueSizes(pathsToGetValueSize)
 		require.Equal(t, len(pathsToGetValueSize), len(sizes))
-		require.Equal(t, payload1.Value.Size(), sizes[0])
+		require.Equal(t, payload1.Value().Size(), sizes[0])
 
 		// Test value size for a single non-existent path
 		pathsToGetValueSize = []ledger.Path{testutils.PathByUint16(3 << 12)}
@@ -850,9 +850,9 @@ func TestValueSizesWithDuplicatePaths(t *testing.T) {
 	for i, p := range pathsToGetValueSize {
 		switch p {
 		case path1:
-			require.Equal(t, payload1.Value.Size(), sizes[i])
+			require.Equal(t, payload1.Value().Size(), sizes[i])
 		case path2:
-			require.Equal(t, payload2.Value.Size(), sizes[i])
+			require.Equal(t, payload2.Value().Size(), sizes[i])
 		default:
 			// Test payload size for non-existent path
 			require.Equal(t, 0, sizes[i])
@@ -924,7 +924,10 @@ func TestTrieAllocatedRegCountRegSize(t *testing.T) {
 
 		path1, _ := ledger.ToPath(oldPath[:])
 		path1[1] = 1
-		payload1 := ledger.Payload{Key: ledger.Key{KeyParts: []ledger.KeyPart{{Type: 0, Value: []byte{0x00, byte(i)}}}}}
+		payload1 := *ledger.NewPayload(
+			ledger.Key{KeyParts: []ledger.KeyPart{{Type: 0, Value: []byte{0x00, byte(i)}}}},
+			nil,
+		)
 
 		path2, _ := ledger.ToPath(oldPath[:])
 		path2[1] = 2

@@ -28,7 +28,7 @@ func TestLeafNodeV4Decoding(t *testing.T) {
 	// Leaf node with empty payload (not nil)
 	// EmptyPayload() not used because decoded playload's value is empty slice (not nil)
 	path2 := testutils.PathByUint8(1)
-	payload2 := &ledger.Payload{Value: []byte{}}
+	payload2 := ledger.NewPayload(ledger.Key{}, []byte{})
 	hashValue2 := hash.Hash([32]byte{2, 2, 2})
 	leafNodeEmptyPayload := node.NewNode(255, nil, nil, ledger.Path(path2), payload2, hashValue2)
 

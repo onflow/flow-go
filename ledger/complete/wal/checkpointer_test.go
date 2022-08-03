@@ -251,9 +251,9 @@ func Test_Checkpointing(t *testing.T) {
 				require.NoError(t, err)
 
 				for i, path := range paths {
-					require.Equal(t, data[path].Value, values1[i])
-					require.Equal(t, data[path].Value, values2[i])
-					require.Equal(t, data[path].Value, values3[i])
+					require.Equal(t, data[path].Value(), values1[i])
+					require.Equal(t, data[path].Value(), values2[i])
+					require.Equal(t, data[path].Value(), values3[i])
 				}
 			}
 		})

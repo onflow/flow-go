@@ -209,8 +209,18 @@ func ToPath(pathBytes []byte) (Path, error) {
 
 // Payload is the smallest immutable storable unit in ledger
 type Payload struct {
-	Key   Key
-	Value Value
+	key   Key
+	value Value
+}
+
+// Key returns payload key.
+func (p *Payload) Key() (Key, error) {
+	return p.key, nil
+}
+
+// Value returns payload value.
+func (p *Payload) Value() Value {
+	return p.value
 }
 
 // Size returns the size of the payload
@@ -218,30 +228,35 @@ func (p *Payload) Size() int {
 	if p == nil {
 		return 0
 	}
-	return p.Key.Size() + p.Value.Size()
+	return p.key.Size() + p.value.Size()
 }
 
 // IsEmpty returns true if payload is nil or value is empty
 func (p *Payload) IsEmpty() bool {
-	return p == nil || p.Value.Size() == 0
+	return p == nil || p.value.Size() == 0
 }
 
 // TODO fix me
 func (p *Payload) String() string {
 	// TODO improve this key, values
-	return p.Key.String() + " " + p.Value.String()
+	return p.key.String() + " " + p.value.String()
+}
+
+// KeyString returns key's string representation.
+func (p *Payload) KeyString() string {
+	return p.key.String()
 }
 
 // Equals compares this payload to another payload
 // A nil payload is equivalent to an empty payload.
 func (p *Payload) Equals(other *Payload) bool {
-	if p == nil || (len(p.Key.KeyParts) == 0 && len(p.Value) == 0) {
-		return other == nil || (len(other.Key.KeyParts) == 0 && len(other.Value) == 0)
+	if p == nil || (len(p.key.KeyParts) == 0 && len(p.value) == 0) {
+		return other == nil || (len(other.key.KeyParts) == 0 && len(other.value) == 0)
 	}
 	if other == nil {
 		return false
 	}
-	if p.Key.Equals(&other.Key) && p.Value.Equals(other.Value) {
+	if p.key.Equals(&other.key) && p.value.Equals(other.value) {
 		return true
 	}
 	return false
@@ -264,7 +279,7 @@ func (p *Payload) ValueEquals(other *Payload) bool {
 		return true
 	}
 	// Compare values since both payloads are not empty.
-	return p.Value.Equals(other.Value)
+	return p.value.Equals(other.value)
 }
 
 // DeepCopy returns a deep copy of the payload
@@ -272,14 +287,14 @@ func (p *Payload) DeepCopy() *Payload {
 	if p == nil {
 		return nil
 	}
-	k := p.Key.DeepCopy()
-	v := p.Value.DeepCopy()
-	return &Payload{Key: k, Value: v}
+	k := p.key.DeepCopy()
+	v := p.value.DeepCopy()
+	return &Payload{key: k, value: v}
 }
 
 // NewPayload returns a new payload
 func NewPayload(key Key, value Value) *Payload {
-	return &Payload{Key: key, Value: value}
+	return &Payload{key: key, value: value}
 }
 
 // EmptyPayload returns an empty payload

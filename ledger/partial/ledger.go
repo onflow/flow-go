@@ -80,7 +80,7 @@ func (l *Ledger) GetSingleValue(query *ledger.QuerySingleValue) (value ledger.Va
 		}
 		return nil, err
 	}
-	return payload.Value, err
+	return payload.Value(), err
 }
 
 // Get read the values of the given keys at the given state
@@ -133,7 +133,21 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *
 
 	newRootHash, err := l.ptrie.Update(trieUpdate.Paths, trieUpdate.Payloads)
 	if err != nil {
-		// Returned error type is ledger.ErrMissingKeys
+		if pErr, ok := err.(*ptrie.ErrMissingPath); ok {
+			//store mappings and restore keys from missing paths
+			pathToKey := make(map[ledger.Path]ledger.Key)
+
+			for i, key := range update.Keys() {
+				path := trieUpdate.Paths[i]
+				pathToKey[path] = key
+			}
+
+			keys := make([]ledger.Key, len(pErr.Paths))
+			for i, path := range pErr.Paths {
+				keys[i] = pathToKey[path]
+			}
+			return ledger.DummyState, nil, &ledger.ErrMissingKeys{Keys: keys}
+		}
 		return ledger.DummyState, nil, err
 	}
 
