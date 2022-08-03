@@ -1,4 +1,4 @@
-package checkpoint
+package complete
 
 import (
 	"context"
@@ -7,17 +7,18 @@ import (
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/ledger/complete/common"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 )
 
+// checkpointRunner abstraction for the runner, so that easy to test Trigger
 type checkpointRunner interface {
 	runCheckpoint(ctx context.Context, checkpointTries []*trie.MTrie, checkpointNum int) error
 }
 
-type TrieQueue interface {
-	Tries() []*trie.MTrie
-}
-
+// Trigger takes checkpointing related configs and decide when to trigger checkpointing,
+// if triggered, it will use the checkpointRunner to create checkpoint.
+// It ensures only one checkpoint is being created at any time.
 type Trigger struct {
 	logger                  zerolog.Logger
 	activeSegmentNum        int                     // the num of the segment that the previous trie update was written to, is used to detect whether trie update is written to a new segment.
@@ -33,14 +34,16 @@ func NewTrigger(
 	activeSegmentNum int,
 	checkpointedSegumentNum int,
 	checkpointDistance uint,
-	runner checkpointRunner,
+	checkpointsToKeep int,
 	checkpointed func(checkpointNum int),
+	runner checkpointRunner,
 ) *Trigger {
 	return &Trigger{
 		logger:                  logger,
 		activeSegmentNum:        activeSegmentNum,
 		checkpointedSegumentNum: atomic.NewInt32(int32(checkpointedSegumentNum)),
 		checkpointDistance:      checkpointDistance,
+		isRunning:               atomic.NewBool(false),
 		runner:                  runner,
 		checkpointed:            checkpointed,
 	}
@@ -52,7 +55,7 @@ func NewTrigger(
 // Assumptions:
 // 1. this method is not concurrent-safe, must be called sequentially
 // 2. the latestTries must contain all the trie nodes up to the trie update without the trie from this trie update.
-func (t *Trigger) NotifyTrieUpdateWrittenToWAL(ctx context.Context, segmentNum int, latestTries TrieQueue) error {
+func (t *Trigger) NotifyTrieUpdateWrittenToWAL(ctx context.Context, segmentNum int, latestTries common.TrieQueue) error {
 	isWritingToNewSegmentFile, err := t.isWritingToNewSegmentFile(segmentNum)
 	if err != nil {
 		return fmt.Errorf("could not determine whether the trie update was written to a new segment file: %w", err)
