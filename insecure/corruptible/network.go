@@ -117,15 +117,26 @@ func (n *Network) Register(channel channels.Channel, messageProcessor flownet.Me
 	return conduit, nil
 }
 
+// RegisterBlobService directly invokes the corresponding method on the underlying Flow network instance. It does not perform
+// any corruption and passes everything through as it is.
 func (n *Network) RegisterBlobService(channel channels.Channel, store datastore.Batching, opts ...flownet.BlobServiceOption) (flownet.BlobService,
 	error) {
 	return n.flowNetwork.RegisterBlobService(channel, store, opts...)
 }
 
+// RegisterPingService directly invokes the corresponding method on the underlying Flow network instance. It does not perform
+// any corruption and passes everything through as it is.
 func (n *Network) RegisterPingService(pingProtocolID protocol.ID, pingInfoProvider flownet.PingInfoProvider) (flownet.PingService, error) {
 	return n.flowNetwork.RegisterPingService(pingProtocolID, pingInfoProvider)
 }
 
+// ProcessAttackerMessage is a Client Streaming gRPC end-point that allows a registered attacker to dictate messages to this corruptible
+// network.
+// The first call to this Client Streaming gRPC method creates the "stream" from attacker (i.e., client) to this corruptible network
+// (i.e., server), where attacker can send messages through that stream to the corruptible network.
+//
+// Messages sent from attacker to this corruptible network are considered dictated in the sense that they are sent on behalf
+// of this corruptible network instance on the original Flow network to other Flow nodes.
 func (n *Network) ProcessAttackerMessage(stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageServer) error {
 	for {
 		select {
@@ -330,8 +341,18 @@ func (n *Network) AttackerRegistered() bool {
 	return n.attackerInboundStream != nil
 }
 
-// ConnectAttacker is a gRPC end-point for this corruptible network that lets an attacker register itself to it, so that the attacker can
-// control its ingress and egress traffic flow.
+// ConnectAttacker is a blocking Server Streaming gRPC end-point for this corruptible network that lets an attacker register itself to it,
+// so that the attacker can control its ingress and egress traffic flow.
+//
+// An attacker (i.e., client) remote call to this function will return immediately on the attacker's side. However,
+// here on the server (i.e., corruptible network) side, the call remains blocking through the lifecycle of the server.
+// The reason is the local gRPC stub on this corruptible network (i.e., server) acts as a broker between client call to
+// this server method. The broker returns the call on the client side immediately by creating the stream from server to
+// the client, i.e., server streaming.
+// However, that stream is only alive through the lifecycle of the server. So, this method should only return when the server
+// is really shut down, hence closing the stream on the client side, as client should expect no more messages streamed from
+// server.
+//
 // Registering an attacker on a networking layer is an exactly-once immutable operation,
 // any second attempt after a successful registration returns an error.
 func (n *Network) ConnectAttacker(_ *empty.Empty, stream insecure.CorruptibleConduitFactory_ConnectAttackerServer) error {
