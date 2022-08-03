@@ -146,7 +146,7 @@ func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string) (access.Acce
 	}
 
 	var conn *grpc.ClientConn
-	if cf.ConnectionsCache != nil {
+	if cf.CacheSize > 0 {
 		conn, err = cf.retrieveConnection(grpcAddress, cf.CollectionNodeGRPCTimeout)
 		if err != nil {
 			return nil, nil, err
@@ -174,7 +174,7 @@ func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (executio
 	}
 
 	var conn *grpc.ClientConn
-	if cf.ConnectionsCache != nil {
+	if cf.CacheSize > 0 {
 		conn, err = cf.retrieveConnection(grpcAddress, cf.ExecutionNodeGRPCTimeout)
 		if err != nil {
 			return nil, nil, err

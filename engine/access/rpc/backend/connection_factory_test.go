@@ -104,10 +104,12 @@ func TestProxyAccessAPIConnectionReuse(t *testing.T) {
 	// set the collection grpc port
 	connectionFactory.CollectionGRPCPort = cn.port
 	// set the connection pool cache size
-	cache, _ := lru.NewWithEvict(5, func(_, evictedValue interface{}) {
+	cacheSize := 5
+	cache, _ := lru.NewWithEvict(cacheSize, func(_, evictedValue interface{}) {
 		evictedValue.(*CachedClient).Close()
 	})
 	connectionFactory.ConnectionsCache = cache
+	connectionFactory.CacheSize = uint(cacheSize)
 	// set metrics reporting
 	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 
@@ -149,10 +151,12 @@ func TestProxyExecutionAPIConnectionReuse(t *testing.T) {
 	// set the execution grpc port
 	connectionFactory.ExecutionGRPCPort = en.port
 	// set the connection pool cache size
-	cache, _ := lru.NewWithEvict(5, func(_, evictedValue interface{}) {
+	cacheSize := 5
+	cache, _ := lru.NewWithEvict(cacheSize, func(_, evictedValue interface{}) {
 		evictedValue.(*CachedClient).Close()
 	})
 	connectionFactory.ConnectionsCache = cache
+	connectionFactory.CacheSize = uint(cacheSize)
 	// set metrics reporting
 	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 
@@ -201,10 +205,12 @@ func TestExecutionNodeClientTimeout(t *testing.T) {
 	// set the execution grpc client timeout
 	connectionFactory.ExecutionNodeGRPCTimeout = timeout
 	// set the connection pool cache size
-	cache, _ := lru.NewWithEvict(5, func(_, evictedValue interface{}) {
+	cacheSize := 5
+	cache, _ := lru.NewWithEvict(cacheSize, func(_, evictedValue interface{}) {
 		evictedValue.(*CachedClient).Close()
 	})
 	connectionFactory.ConnectionsCache = cache
+	connectionFactory.CacheSize = uint(cacheSize)
 	// set metrics reporting
 	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 
@@ -242,10 +248,12 @@ func TestCollectionNodeClientTimeout(t *testing.T) {
 	// set the collection grpc client timeout
 	connectionFactory.CollectionNodeGRPCTimeout = timeout
 	// set the connection pool cache size
-	cache, _ := lru.NewWithEvict(5, func(_, evictedValue interface{}) {
+	cacheSize := 5
+	cache, _ := lru.NewWithEvict(cacheSize, func(_, evictedValue interface{}) {
 		evictedValue.(*CachedClient).Close()
 	})
 	connectionFactory.ConnectionsCache = cache
+	connectionFactory.CacheSize = uint(cacheSize)
 	// set metrics reporting
 	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 
@@ -283,10 +291,12 @@ func TestConnectionPoolFull(t *testing.T) {
 	// set the collection grpc port
 	connectionFactory.CollectionGRPCPort = cn1.port
 	// set the connection pool cache size
-	cache, _ := lru.NewWithEvict(2, func(_, evictedValue interface{}) {
+	cacheSize := 2
+	cache, _ := lru.NewWithEvict(cacheSize, func(_, evictedValue interface{}) {
 		evictedValue.(*CachedClient).Close()
 	})
 	connectionFactory.ConnectionsCache = cache
+	connectionFactory.CacheSize = uint(cacheSize)
 	// set metrics reporting
 	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 
@@ -348,11 +358,12 @@ func TestConnectionPoolStale(t *testing.T) {
 	// set the collection grpc port
 	connectionFactory.CollectionGRPCPort = cn.port
 	// set the connection pool cache size
-
-	cache, _ := lru.NewWithEvict(5, func(_, evictedValue interface{}) {
+	cacheSize := 5
+	cache, _ := lru.NewWithEvict(cacheSize, func(_, evictedValue interface{}) {
 		evictedValue.(*CachedClient).Close()
 	})
 	connectionFactory.ConnectionsCache = cache
+	connectionFactory.CacheSize = uint(cacheSize)
 	// set metrics reporting
 	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 
