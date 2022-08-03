@@ -1001,7 +1001,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		}
 
 		handler := observer.NewRouter(
-			nil,
+			&observer.Forwarder{}, // empty implementation
 			&observer.Forwarder{UpstreamHandler: client},
 			builder.Logger,
 			metrics.NewObserverCollector(),
