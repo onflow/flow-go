@@ -230,7 +230,7 @@ func DefaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.Mes
 	}
 }
 
-// isStakedPeerFilter returns a peerFilterFunc that uses m.ov.Identity to get the identity
+// isStakedPeerFilter returns a PeerFilter that uses m.ov.Identity to get the identity
 // for a peer ID. If a identity is not found the peer is unstaked.
 func (m *Middleware) isStakedPeerFilter() PeerFilter {
 	f := func(id peer.ID) bool {
@@ -521,7 +521,6 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 	// check if unicast stream creation is rate limited for peer
 	if !m.unicastStreamAllowed(remotePeer) {
-		log.Warn().Msg(UnicastStreamRateLimited)
 		m.onUnicastRateLimitedPeerFunc(remotePeer)
 		return
 	}
