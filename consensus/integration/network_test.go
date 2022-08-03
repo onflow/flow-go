@@ -3,6 +3,7 @@ package integration_test
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -20,6 +21,7 @@ type Hub struct {
 	networks   map[flow.Identifier]*Network
 	filter     BlockOrDelayFunc
 	identities flow.IdentityList
+	lock       sync.Mutex
 }
 
 // NewNetworkHub creates and returns a new Hub instance.
@@ -124,7 +126,9 @@ func (n *Network) unicast(event interface{}, channel network.Channel, targetID f
 	}
 
 	sender, receiver := n.node, net.node
+	n.hub.lock.Lock()
 	block, delay := n.hub.filter(channel, event, sender, receiver)
+	n.hub.lock.Unlock()
 	// block the message
 	if block {
 		return nil

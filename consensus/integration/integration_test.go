@@ -161,3 +161,19 @@ func blockNodes(denyList ...*Node) BlockOrDelayFunc {
 		return notBlock, 0
 	}
 }
+
+// blockNodesFirstMessages blocks n incoming messages to given nodes
+func blockNodesFirstMessages(n uint64, denyList ...*Node) BlockOrDelayFunc {
+	blackList := make(map[flow.Identifier]uint64, len(denyList))
+	for _, node := range denyList {
+		blackList[node.id.ID()] = n
+	}
+	return func(channel network.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+		count, ok := blackList[receiver.id.ID()]
+		if ok && count > 0 {
+			blackList[receiver.id.ID()] = count - 1
+			return true, 0
+		}
+		return false, 0
+	}
+}
