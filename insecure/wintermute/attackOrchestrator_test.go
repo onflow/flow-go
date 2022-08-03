@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -180,15 +180,15 @@ func testConcurrentExecutionReceipts(t *testing.T,
 	wintermuteOrchestrator.WithAttackNetwork(mockAttackNetwork)
 
 	// imitates sending events from corrupted execution nodes to the attacker orchestrator.
-	corruptedEnEventSendWG := sync.WaitGroup{}
-	corruptedEnEventSendWG.Add(len(eventMap))
+	corruptedEnEventSendWG := &sync.WaitGroup{}
+	l := len(eventMap)
+	corruptedEnEventSendWG.Add(l)
 	for _, event := range eventMap {
 		event := event // suppress loop variable
 
 		go func() {
 			err := wintermuteOrchestrator.HandleEventFromCorruptedNode(event)
 			require.NoError(t, err)
-
 			corruptedEnEventSendWG.Done()
 		}()
 	}
@@ -247,7 +247,7 @@ func mockAttackNetworkForCorruptedExecutionResult(
 			seen[event.CorruptedNodeId] = struct{}{}
 
 			// make sure message being sent on correct channel
-			require.Equal(t, network.PushReceipts, event.Channel)
+			require.Equal(t, channels.PushReceipts, event.Channel)
 
 			corruptedResult, ok := event.FlowProtocolEvent.(*flow.ExecutionReceipt)
 			require.True(t, ok)

@@ -61,7 +61,7 @@ func NewSignatureAggregatorSameMessage(
 
 	return &SignatureAggregatorSameMessage{
 		message:          message,
-		hasher:           crypto.NewBLSKMAC(dsTag),
+		hasher:           NewBLSHasher(dsTag),
 		n:                len(publicKeys),
 		publicKeys:       publicKeys,
 		indexToSignature: make(map[int]string),

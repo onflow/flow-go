@@ -3,6 +3,7 @@ package handler_test
 import (
 	"encoding/hex"
 	"fmt"
+	"math"
 	"testing"
 
 	"github.com/onflow/cadence/runtime/common"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/meter"
 	programsStorage "github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -107,11 +109,13 @@ func Test_Programs(t *testing.T) {
 		).AddAuthorizer(address)
 	}
 
-	mainView := delta.NewView(func(_, _, _ string) (flow.RegisterValue, error) {
+	mainView := delta.NewView(func(_, _ string) (flow.RegisterValue, error) {
 		return nil, nil
 	})
 
-	sth := state.NewStateHolder(state.NewState(mainView))
+	sth := state.NewStateHolder(state.NewState(
+		mainView,
+		meter.NewMeter(math.MaxUint64, math.MaxUint64)))
 
 	rt := fvm.NewInterpreterRuntime()
 	vm := fvm.NewVirtualMachine(rt)
@@ -184,12 +188,12 @@ func Test_Programs(t *testing.T) {
 		procCallA := fvm.Transaction(callTx("A", addressA), 1)
 
 		loadedCode := false
-		viewExecA := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		viewExecA := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			if key == state.ContractKey("A") {
 				loadedCode = true
 			}
 
-			return mainView.Peek(owner, controller, key)
+			return mainView.Peek(owner, key)
 		})
 
 		err = vm.Run(context, procCallA, viewExecA, programs)
@@ -219,11 +223,11 @@ func Test_Programs(t *testing.T) {
 		require.NoError(t, err)
 
 		// execute transaction again, this time make sure it doesn't load code
-		viewExecA2 := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		viewExecA2 := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			//this time we fail if a read of code occurs
 			require.NotEqual(t, key, state.ContractKey("A"))
 
-			return mainView.Peek(owner, controller, key)
+			return mainView.Peek(owner, key)
 		})
 
 		procCallA = fvm.Transaction(callTx("A", addressA), 2)
@@ -290,7 +294,7 @@ func Test_Programs(t *testing.T) {
 
 		idsA, valuesA := deltaA.Delta().RegisterUpdates()
 		for i, id := range idsA {
-			v, has := deltaB.Delta().Get(id.Owner, id.Controller, id.Key)
+			v, has := deltaB.Delta().Get(id.Owner, id.Key)
 			require.True(t, has)
 
 			require.Equal(t, valuesA[i], v)
@@ -313,12 +317,12 @@ func Test_Programs(t *testing.T) {
 		// rerun transaction
 
 		// execute transaction again, this time make sure it doesn't load code
-		viewExecB2 := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		viewExecB2 := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			//this time we fail if a read of code occurs
 			require.NotEqual(t, key, state.ContractKey("A"))
 			require.NotEqual(t, key, state.ContractKey("B"))
 
-			return mainView.Peek(owner, controller, key)
+			return mainView.Peek(owner, key)
 		})
 
 		procCallB = fvm.Transaction(callTx("B", addressB), 5)
@@ -340,9 +344,9 @@ func Test_Programs(t *testing.T) {
 		// at this point programs cache should contain data for contract A
 		// only because contract B has been called
 
-		viewExecA := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		viewExecA := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 			require.NotEqual(t, key, state.ContractKey("A"))
-			return mainView.Peek(owner, controller, key)
+			return mainView.Peek(owner, key)
 		})
 
 		// run a TX using contract A

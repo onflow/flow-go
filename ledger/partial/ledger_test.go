@@ -20,8 +20,18 @@ import (
 
 func TestFunctionalityWithCompleteTrie(t *testing.T) {
 
-	l, err := complete.NewLedger(&fixtures.NoopWAL{}, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+	w := &fixtures.NoopWAL{}
+
+	l, err := complete.NewLedger(w, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 	require.NoError(t, err)
+
+	compactor := fixtures.NewNoopCompactor(l)
+	<-compactor.Ready()
+
+	defer func() {
+		<-l.Done()
+		<-compactor.Done()
+	}()
 
 	// create empty update
 	state := l.InitialState()
@@ -111,9 +121,9 @@ func TestProofsForEmptyRegisters(t *testing.T) {
 
 	view := delta.NewView(executionState.LedgerGetRegister(l, flow.StateCommitment(emptyState)))
 
-	registerID := flow.NewRegisterID("b", "o", "nk")
+	registerID := flow.NewRegisterID("b", "nk")
 
-	v, err := view.Get(registerID.Owner, registerID.Controller, registerID.Key)
+	v, err := view.Get(registerID.Owner, registerID.Key)
 	require.NoError(t, err)
 	require.Empty(t, v)
 

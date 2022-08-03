@@ -1,6 +1,7 @@
 package herocache_test
 
 import (
+	"net"
 	"sync"
 	"testing"
 
@@ -12,8 +13,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest/network"
 )
 
-// TestDNSCache_Concurrent checks the correctness of cache under concurrent insertions.
-func TestDNSCache_Concurrent(t *testing.T) {
+// TestDNSCache_HappyPath checks the correctness storing and retrieving from dns cache.
+func TestDNSCache_HappyPath(t *testing.T) {
 	total := 700             // total entries to store (i.e., 700 ip domains and 700 txt records)
 	sizeLimit := uint32(500) // cache size limit (i.e., 500 ip domains and 500 txt records)
 
@@ -28,7 +29,7 @@ func TestDNSCache_Concurrent(t *testing.T) {
 	require.Equal(t, uint(0), txts)
 
 	// adding 700 txt records and 700 ip domains to cache
-	testConcurrentAddToCache(t, cache, ipFixtures, txtFixtures)
+	testAddToCache(t, cache, ipFixtures, txtFixtures)
 
 	// cache must be full up to its limit
 	ips, txts = cache.Size()
@@ -37,6 +38,113 @@ func TestDNSCache_Concurrent(t *testing.T) {
 
 	// only 500 txt records and 500 ip domains must be retrievable
 	testRetrievalMatchCount(t, cache, ipFixtures, txtFixtures, int(sizeLimit))
+}
+
+// TestDNSCache_Update checks the correctness of updating dns records.
+func TestDNSCache_Update(t *testing.T) {
+	ipFixture := []net.IPAddr{network.NetIPAddrFixture()}
+	ipDomain := "ip-domain"
+
+	txtFixture := []string{network.TxtIPFixture()}
+	txtDomain := "txt-domain"
+
+	cache := herocache.NewDNSCache(10,
+		unittest.Logger(),
+		metrics.NewNoopCollector(),
+		metrics.NewNoopCollector())
+
+	// adding records to dns cache
+	require.True(t, cache.PutIpDomain(ipDomain, ipFixture, int64(0)))
+	require.True(t, cache.PutTxtRecord(txtDomain, txtFixture, int64(0)))
+
+	// locking both txt and ip records before updating
+	// to later check an update unlocks them.
+	locked, err := cache.LockIPDomain(ipDomain)
+	require.NoError(t, err)
+	require.True(t, locked)
+	locked, err = cache.LockTxtRecord(txtDomain)
+	require.NoError(t, err)
+	require.True(t, locked)
+
+	// updating ip record
+	updatedIpFixture := []net.IPAddr{network.NetIPAddrFixture()}
+	updatedIpTimestamp := int64(10)
+	require.NoError(t, cache.UpdateIPDomain(ipDomain, updatedIpFixture, updatedIpTimestamp))
+
+	// updating txt record
+	updatedTxtFixture := []string{network.TxtIPFixture()}
+	updatedTxtTimestamp := int64(12)
+	require.NoError(t, cache.UpdateTxtRecord(txtDomain, updatedTxtFixture, updatedTxtTimestamp))
+
+	// sanity checking of the updated records
+	// updated ip record
+	ipRecord, ok := cache.GetDomainIp(ipDomain)
+	require.True(t, ok)
+	require.Equal(t, ipRecord.Addresses, updatedIpFixture)
+	require.Equal(t, ipRecord.Domain, ipDomain)
+	require.False(t, ipRecord.Locked) // an update must unlock it.
+	require.Equal(t, ipRecord.Timestamp, updatedIpTimestamp)
+
+	// updated txt record
+	txtRecord, ok := cache.GetTxtRecord(txtDomain)
+	require.True(t, ok)
+	require.Equal(t, txtRecord.Records, updatedTxtFixture)
+	require.Equal(t, txtRecord.Txt, txtDomain)
+	require.False(t, txtRecord.Locked) // an update must unlock it.
+	require.Equal(t, txtRecord.Timestamp, updatedTxtTimestamp)
+}
+
+// TestDNSCache_Lock evaluates that locking a txt (or ip) record can be done successfully once, and
+// attempts to lock and already locked record fail.
+// It also evaluates that a locked record can be retrieved successfully.
+func TestDNSCache_Lock(t *testing.T) {
+	ipFixture := []net.IPAddr{network.NetIPAddrFixture()}
+	ipDomain := "ip-domain"
+
+	txtFixture := []string{network.TxtIPFixture()}
+	txtDomain := "txt-domain"
+
+	cache := herocache.NewDNSCache(
+		10,
+		unittest.Logger(),
+		metrics.NewNoopCollector(),
+		metrics.NewNoopCollector())
+
+	// adding records to dns cache
+	require.True(t, cache.PutIpDomain(ipDomain, ipFixture, int64(0)))
+	require.True(t, cache.PutTxtRecord(txtDomain, txtFixture, int64(0)))
+
+	// locks ip record
+	locked, err := cache.LockIPDomain(ipDomain)
+	require.NoError(t, err)
+	require.True(t, locked) // first locking attempt must go through
+	locked, err = cache.LockIPDomain(ipDomain)
+	require.NoError(t, err)
+	require.False(t, locked) // other locking attempts must fail
+
+	// locks txt record
+	locked, err = cache.LockTxtRecord(txtDomain)
+	require.NoError(t, err)
+	require.True(t, locked) // first locking attempt must go through
+	locked, err = cache.LockTxtRecord(txtDomain)
+	require.NoError(t, err)
+	require.False(t, locked) // other locking attempts must fail
+
+	// locked ip record must be retrievable
+	ipRecord, ok := cache.GetDomainIp(ipDomain)
+	require.True(t, ok)
+	require.Equal(t, ipRecord.Addresses, ipFixture)
+	require.Equal(t, ipRecord.Domain, ipDomain)
+	require.True(t, ipRecord.Locked)
+	require.Equal(t, ipRecord.Timestamp, int64(0))
+
+	// locked txt record must be retrievable
+	txtRecord, ok := cache.GetTxtRecord(txtDomain)
+	require.True(t, ok)
+	require.Equal(t, txtRecord.Records, txtFixture)
+	require.Equal(t, txtRecord.Txt, txtDomain)
+	require.True(t, txtRecord.Locked)
+	require.Equal(t, txtRecord.Timestamp, int64(0))
 }
 
 // TestDNSCache_LRU checks the correctness of cache against LRU ejection.
@@ -56,7 +164,7 @@ func TestDNSCache_LRU(t *testing.T) {
 
 	// adding 700 txt and 700 ip domains to cache
 	for _, fixture := range ipFixtures {
-		require.True(t, cache.PutDomainIp(fixture.Domain, fixture.Result, fixture.TimeStamp))
+		require.True(t, cache.PutIpDomain(fixture.Domain, fixture.Result, fixture.TimeStamp))
 	}
 
 	for _, fixture := range txtFixtures {
@@ -73,11 +181,11 @@ func TestDNSCache_LRU(t *testing.T) {
 		if i < total-int(sizeLimit) {
 			// old dns entries must be ejected
 			// ip
-			ip, _, ok := cache.GetDomainIp(ipFixtures[i].Domain)
+			ipRecord, ok := cache.GetDomainIp(ipFixtures[i].Domain)
 			require.False(t, ok)
-			require.Nil(t, ip)
+			require.Nil(t, ipRecord)
 			// txt records
-			txt, _, ok := cache.GetTxtRecord(txtFixtures[i].Txt)
+			txt, ok := cache.GetTxtRecord(txtFixtures[i].Txt)
 			require.False(t, ok)
 			require.Nil(t, txt)
 
@@ -86,20 +194,20 @@ func TestDNSCache_LRU(t *testing.T) {
 
 		// new dns entries must be persisted
 		// ip
-		ip, ts, ok := cache.GetDomainIp(ipFixtures[i].Domain)
+		ipRecord, ok := cache.GetDomainIp(ipFixtures[i].Domain)
 		require.True(t, ok)
-		require.Equal(t, ipFixtures[i].Result, ip)
-		require.Equal(t, ipFixtures[i].TimeStamp, ts)
+		require.Equal(t, ipFixtures[i].Result, ipRecord.Addresses)
+		require.Equal(t, ipFixtures[i].TimeStamp, ipRecord.Timestamp)
 		// txt records
-		txt, ts, ok := cache.GetTxtRecord(txtFixtures[i].Txt)
+		txtRecord, ok := cache.GetTxtRecord(txtFixtures[i].Txt)
 		require.True(t, ok)
-		require.Equal(t, txtFixtures[i].Records, txt)
-		require.Equal(t, txtFixtures[i].TimeStamp, ts)
+		require.Equal(t, txtFixtures[i].Records, txtRecord.Records)
+		require.Equal(t, txtFixtures[i].TimeStamp, txtRecord.Timestamp)
 	}
 }
 
-// testConcurrentAddToCache is a test helper that concurrently adds ip and txt records concurrently to the cache.
-func testConcurrentAddToCache(t *testing.T,
+// testAddToCache is a test helper that adds ip and txt records to the cache.
+func testAddToCache(t *testing.T,
 	cache *herocache.DNSCache,
 	ipTestCases map[string]*network.IpLookupTestCase,
 	txtTestCases map[string]*network.TxtLookupTestCase) {
@@ -108,7 +216,7 @@ func testConcurrentAddToCache(t *testing.T,
 	wg.Add(len(ipTestCases) + len(txtTestCases))
 
 	for _, fixture := range ipTestCases {
-		require.True(t, cache.PutDomainIp(fixture.Domain, fixture.Result, fixture.TimeStamp))
+		require.True(t, cache.PutIpDomain(fixture.Domain, fixture.Result, fixture.TimeStamp))
 	}
 
 	for _, fixture := range txtTestCases {
@@ -116,8 +224,8 @@ func testConcurrentAddToCache(t *testing.T,
 	}
 }
 
-// TestDNSCache_Rem checks the correctness of cache against removal.
-func TestDNSCache_Rem(t *testing.T) {
+// TestDNSCache_Remove checks the correctness of cache against removal.
+func TestDNSCache_Remove(t *testing.T) {
 	total := 30              // total entries to store (i.e., 700 ip domains and 700 txt records)
 	sizeLimit := uint32(500) // cache size limit (i.e., 500 ip domains and 500 txt records)
 
@@ -133,7 +241,7 @@ func TestDNSCache_Rem(t *testing.T) {
 
 	// adding 700 txt records and 700 ip domains to cache
 	for _, fixture := range ipFixtures {
-		require.True(t, cache.PutDomainIp(fixture.Domain, fixture.Result, fixture.TimeStamp))
+		require.True(t, cache.PutIpDomain(fixture.Domain, fixture.Result, fixture.TimeStamp))
 	}
 
 	for _, fixture := range txtFixtures {
@@ -162,28 +270,28 @@ func TestDNSCache_Rem(t *testing.T) {
 		if i == 0 {
 			// removed entries must no longer exist.
 			// ip
-			ip, _, ok := cache.GetDomainIp(ipFixtures[i].Domain)
+			ipRecord, ok := cache.GetDomainIp(ipFixtures[i].Domain)
 			require.False(t, ok)
-			require.Nil(t, ip)
+			require.Nil(t, ipRecord)
 			// txt records
-			txt, _, ok := cache.GetTxtRecord(txtFixtures[i].Txt)
+			txtRecord, ok := cache.GetTxtRecord(txtFixtures[i].Txt)
 			require.False(t, ok)
-			require.Nil(t, txt)
+			require.Nil(t, txtRecord)
 
 			continue
 		}
 
 		// other entries must be existing.
 		// ip
-		ip, ts, ok := cache.GetDomainIp(ipFixtures[i].Domain)
+		ipRecord, ok := cache.GetDomainIp(ipFixtures[i].Domain)
 		require.True(t, ok)
-		require.Equal(t, ipFixtures[i].Result, ip)
-		require.Equal(t, ipFixtures[i].TimeStamp, ts)
+		require.Equal(t, ipFixtures[i].Result, ipRecord.Addresses)
+		require.Equal(t, ipFixtures[i].TimeStamp, ipRecord.Timestamp)
 		// txt records
-		txt, ts, ok := cache.GetTxtRecord(txtFixtures[i].Txt)
+		txtRecord, ok := cache.GetTxtRecord(txtFixtures[i].Txt)
 		require.True(t, ok)
-		require.Equal(t, txtFixtures[i].Records, txt)
-		require.Equal(t, txtFixtures[i].TimeStamp, ts)
+		require.Equal(t, txtFixtures[i].Records, txtRecord.Records)
+		require.Equal(t, txtFixtures[i].TimeStamp, txtRecord.Timestamp)
 	}
 }
 
@@ -198,14 +306,14 @@ func testRetrievalMatchCount(t *testing.T,
 	// checking ip domains
 	actualCount := 0
 	for _, tc := range ipTestCases {
-		addresses, timestamp, ok := cache.GetDomainIp(tc.Domain)
+		ipRecord, ok := cache.GetDomainIp(tc.Domain)
 		if !ok {
 			continue
 		}
 		require.True(t, ok)
 
-		require.Equal(t, tc.TimeStamp, timestamp)
-		require.Equal(t, tc.Result, addresses)
+		require.Equal(t, tc.TimeStamp, ipRecord.Timestamp)
+		require.Equal(t, tc.Result, ipRecord.Addresses)
 		actualCount++
 	}
 	require.Equal(t, count, actualCount)
@@ -213,14 +321,14 @@ func testRetrievalMatchCount(t *testing.T,
 	// checking txt records
 	actualCount = 0
 	for _, tc := range txtTestCases {
-		records, timestamp, ok := cache.GetTxtRecord(tc.Txt)
+		txtRecord, ok := cache.GetTxtRecord(tc.Txt)
 		if !ok {
 			continue
 		}
 		require.True(t, ok)
 
-		require.Equal(t, tc.TimeStamp, timestamp)
-		require.Equal(t, tc.Records, records)
+		require.Equal(t, tc.TimeStamp, txtRecord.Timestamp)
+		require.Equal(t, tc.Records, txtRecord.Records)
 		actualCount++
 	}
 	require.Equal(t, count, actualCount)

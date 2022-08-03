@@ -221,7 +221,14 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 
 		led, err := completeLedger.NewLedger(w, 100, metricsCollector, zerolog.Nop(), completeLedger.DefaultPathFinderVersion)
 		require.NoError(t, err)
-		defer led.Done()
+
+		compactor := fixtures.NewNoopCompactor(led)
+		<-compactor.Ready()
+
+		defer func() {
+			<-led.Done()
+			<-compactor.Done()
+		}()
 
 		// set 0 clusters to pass n_collectors >= n_clusters check
 		epochConfig := epochs.DefaultEpochConfig()
@@ -439,7 +446,7 @@ func ExecutionReceiptsFromParentBlockFixture(t *testing.T, parent *flow.Header, 
 func ExecutionResultFromParentBlockFixture(t *testing.T, parent *flow.Header, builder *CompleteExecutionReceiptBuilder) (*flow.ExecutionResult,
 	*ExecutionReceiptData) {
 	refBlkHeader := unittest.BlockHeaderWithParentFixture(parent)
-	return ExecutionResultFixture(t, builder.chunksCount, builder.chain, &refBlkHeader, builder.clusterCommittee)
+	return ExecutionResultFixture(t, builder.chunksCount, builder.chain, refBlkHeader, builder.clusterCommittee)
 }
 
 // ContainerBlockFixture builds and returns a block that contains input execution receipts.

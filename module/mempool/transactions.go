@@ -17,9 +17,9 @@ type Transactions interface {
 	// return false if it was already in the mempool.
 	Add(tx *flow.TransactionBody) bool
 
-	// Rem will remove the given transaction from the memory pool; it will
+	// Remove will remove the given transaction from the memory pool; it will
 	// will return true if the transaction was known and removed.
-	Rem(txID flow.Identifier) bool
+	Remove(txID flow.Identifier) bool
 
 	// ByID retrieve the transaction with the given ID from the memory
 	// pool. It will return false if it was not found in the mempool.

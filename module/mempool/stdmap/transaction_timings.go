@@ -70,7 +70,7 @@ func (t *TransactionTimings) All() []*flow.TransactionTiming {
 	return txs
 }
 
-// Rem removes the transaction timing with the given ID.
-func (t *TransactionTimings) Rem(txID flow.Identifier) bool {
-	return t.Backend.Rem(txID)
+// Remove removes the transaction timing with the given ID.
+func (t *TransactionTimings) Remove(txID flow.Identifier) bool {
+	return t.Backend.Remove(txID)
 }

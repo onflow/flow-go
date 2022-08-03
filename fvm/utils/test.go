@@ -38,7 +38,7 @@ func (v *SimpleView) MergeView(o state.View) error {
 	}
 
 	for _, item := range other.Ledger.Registers {
-		err := v.Ledger.Set(item.Key.Owner, item.Key.Controller, item.Key.Key, item.Value)
+		err := v.Ledger.Set(item.Key.Owner, item.Key.Key, item.Value)
 		if err != nil {
 			return fmt.Errorf("can not merge: %w", err)
 		}
@@ -54,12 +54,12 @@ func (v *SimpleView) DropDelta() {
 	v.Ledger.Registers = make(map[string]flow.RegisterEntry)
 }
 
-func (v *SimpleView) Set(owner, controller, key string, value flow.RegisterValue) error {
-	return v.Ledger.Set(owner, controller, key, value)
+func (v *SimpleView) Set(owner, key string, value flow.RegisterValue) error {
+	return v.Ledger.Set(owner, key, value)
 }
 
-func (v *SimpleView) Get(owner, controller, key string) (flow.RegisterValue, error) {
-	value, err := v.Ledger.Get(owner, controller, key)
+func (v *SimpleView) Get(owner, key string) (flow.RegisterValue, error) {
+	value, err := v.Ledger.Get(owner, key)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +68,7 @@ func (v *SimpleView) Get(owner, controller, key string) (flow.RegisterValue, err
 	}
 
 	if v.Parent != nil {
-		return v.Parent.Get(owner, controller, key)
+		return v.Parent.Get(owner, key)
 	}
 
 	return nil, nil
@@ -93,12 +93,12 @@ func (v *SimpleView) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue)
 	return ids, values
 }
 
-func (v *SimpleView) Touch(owner, controller, key string) error {
-	return v.Ledger.Touch(owner, controller, key)
+func (v *SimpleView) Touch(owner, key string) error {
+	return v.Ledger.Touch(owner, key)
 }
 
-func (v *SimpleView) Delete(owner, controller, key string) error {
-	return v.Ledger.Delete(owner, controller, key)
+func (v *SimpleView) Delete(owner, key string) error {
+	return v.Ledger.Delete(owner, key)
 }
 
 // A MapLedger is a naive ledger storage implementation backed by a simple map.
@@ -119,38 +119,37 @@ func NewMapLedger() *MapLedger {
 	}
 }
 
-func (m *MapLedger) Set(owner, controller, key string, value flow.RegisterValue) error {
-	k := fullKey(owner, controller, key)
+func (m *MapLedger) Set(owner, key string, value flow.RegisterValue) error {
+	k := fullKey(owner, key)
 	m.RegisterTouches[k] = true
 	m.RegisterUpdated[k] = true
 	m.Registers[k] = flow.RegisterEntry{
 		Key: flow.RegisterID{
-			Owner:      owner,
-			Controller: controller,
-			Key:        key,
+			Owner: owner,
+			Key:   key,
 		},
 		Value: value,
 	}
 	return nil
 }
 
-func (m *MapLedger) Get(owner, controller, key string) (flow.RegisterValue, error) {
-	k := fullKey(owner, controller, key)
+func (m *MapLedger) Get(owner, key string) (flow.RegisterValue, error) {
+	k := fullKey(owner, key)
 	m.RegisterTouches[k] = true
 	return m.Registers[k].Value, nil
 }
 
-func (m *MapLedger) Touch(owner, controller, key string) error {
-	m.RegisterTouches[fullKey(owner, controller, key)] = true
+func (m *MapLedger) Touch(owner, key string) error {
+	m.RegisterTouches[fullKey(owner, key)] = true
 	return nil
 }
 
-func (m *MapLedger) Delete(owner, controller, key string) error {
-	delete(m.RegisterTouches, fullKey(owner, controller, key))
+func (m *MapLedger) Delete(owner, key string) error {
+	delete(m.RegisterTouches, fullKey(owner, key))
 	return nil
 }
 
-func fullKey(owner, controller, key string) string {
+func fullKey(owner, key string) string {
 	// https://en.wikipedia.org/wiki/C0_and_C1_control_codes#Field_separators
-	return strings.Join([]string{owner, controller, key}, "\x1F")
+	return strings.Join([]string{owner, key}, "\x1F")
 }

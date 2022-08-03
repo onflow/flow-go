@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
 	"path/filepath"
 	goruntime "runtime"
 	"time"
@@ -27,9 +26,10 @@ import (
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	uploaderCommands "github.com/onflow/flow-go/admin/commands/uploader"
 	"github.com/onflow/flow-go/consensus"
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
-	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
+	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
@@ -47,7 +47,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/extralog"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
@@ -64,7 +63,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	chainsync "github.com/onflow/flow-go/module/synchronization"
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/state/protocol"
@@ -180,6 +179,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		executionDataServiceCollector module.ExecutionDataServiceMetrics
 		executionState                state.ExecutionState
 		followerState                 protocol.MutableState
+		committee                     hotstuff.Committee
 		ledgerStorage                 *ledger.Ledger
 		events                        *storage.Events
 		serviceEvents                 *storage.ServiceEvents
@@ -341,12 +341,6 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			}
 			return nil
 		}).
-		Component("Write-Ahead Log", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-			var err error
-			diskWAL, err = wal.NewDiskWAL(node.Logger.With().Str("subcomponent", "wal").Logger(),
-				node.MetricsRegisterer, collector, e.exeConf.triedir, int(e.exeConf.mTrieCacheSize), pathfinder.PathByteSize, wal.SegmentSize)
-			return diskWAL, err
-		}).
 		Component("execution state ledger", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 
 			// check if the execution database already exists
@@ -382,23 +376,28 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				}
 			}
 
+			// DiskWal is a dependent component because we need to ensure
+			// that all WAL updates are completed before closing opened WAL segment.
+			diskWAL, err = wal.NewDiskWAL(node.Logger.With().Str("subcomponent", "wal").Logger(),
+				node.MetricsRegisterer, collector, e.exeConf.triedir, int(e.exeConf.mTrieCacheSize), pathfinder.PathByteSize, wal.SegmentSize)
+			if err != nil {
+				return nil, fmt.Errorf("failed to initialize wal: %w", err)
+			}
+
 			ledgerStorage, err = ledger.NewLedger(diskWAL, int(e.exeConf.mTrieCacheSize), collector, node.Logger.With().Str("subcomponent",
 				"ledger").Logger(), ledger.DefaultPathFinderVersion)
 			return ledgerStorage, err
 		}).
 		Component("execution state ledger WAL compactor", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 
-			checkpointer, err := ledgerStorage.Checkpointer()
-			if err != nil {
-				return nil, fmt.Errorf("cannot create checkpointer: %w", err)
-			}
-			compactor := wal.NewCompactor(checkpointer,
-				10*time.Second,
+			return ledger.NewCompactor(
+				ledgerStorage,
+				diskWAL,
+				node.Logger.With().Str("subcomponent", "checkpointer").Logger(),
+				uint(e.exeConf.mTrieCacheSize),
 				e.exeConf.checkpointDistance,
 				e.exeConf.checkpointsToKeep,
-				node.Logger.With().Str("subcomponent", "checkpointer").Logger())
-
-			return compactor, nil
+			)
 		}).
 		Component("execution data service", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			err := os.MkdirAll(e.exeConf.executionDataDir, 0700)
@@ -424,7 +423,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			executionDataCIDCache = state_synchronization.NewExecutionDataCIDCache(executionDataCIDCacheSize)
 
 			bs, err := node.Network.RegisterBlobService(
-				network.ExecutionDataService,
+				channels.ExecutionDataService,
 				ds,
 				p2p.WithBitswapOptions(
 					bitswap.WithTaskComparator(
@@ -471,15 +470,10 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			return eds, nil
 		}).
 		Component("provider engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-			extraLogPath := path.Join(e.exeConf.triedir, "extralogs")
-			err := os.MkdirAll(extraLogPath, 0777)
-			if err != nil {
-				return nil, fmt.Errorf("cannot create %s path for extra logs: %w", extraLogPath, err)
+			options := []runtime.Option{}
+			if e.exeConf.cadenceTracing {
+				options = append(options, runtime.WithTracingEnabled(true))
 			}
-
-			extralog.ExtraLogDumpPath = extraLogPath
-
-			options := []runtime.Option{runtime.WithTracingEnabled(e.exeConf.cadenceTracing)}
 			rt := fvm.NewInterpreterRuntime(options...)
 
 			vm := fvm.NewVirtualMachine(rt)
@@ -613,7 +607,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Component("ingestion engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			var err error
 			collectionRequester, err = requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
-				network.RequestCollections,
+				channels.RequestCollections,
 				filter.Any,
 				func() flow.Entity { return &flow.Collection{} },
 				// we are manually triggering batches in execution, but lets still send off a batch once a minute, as a safety net for the sake of retries
@@ -681,12 +675,13 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			// initialize consensus committee's membership state
 			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
 			// Note: node.Me.NodeID() is not part of the consensus committee
-			committee, err := committees.NewConsensusCommittee(node.State, node.Me.NodeID())
+			var err error
+			committee, err = committees.NewConsensusCommittee(node.State, node.Me.NodeID())
 			if err != nil {
 				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
 			}
 
-			packer := hotsignature.NewConsensusSigDataPacker(committee)
+			packer := signature.NewConsensusSigDataPacker(committee)
 			// initialize the verifier for the protocol consensus
 			verifier := verification.NewCombinedVerifier(committee, packer)
 
@@ -719,7 +714,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				followerCore,
 				syncCore,
 				node.Tracer,
-				compliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),
+				followereng.WithComplianceOptions(compliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
@@ -741,7 +736,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				node.Network,
 				node.Me,
 				node.State,
-				network.ProvideReceiptsByBlockID,
+				channels.ProvideReceiptsByBlockID,
 				filter.HasRole(flow.RoleConsensus),
 				retrieve,
 			)
@@ -777,7 +772,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			return syncEngine, nil
 		}).
 		Component("grpc server", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-			rpcEng := rpc.New(
+			return rpc.New(
 				node.Logger,
 				e.exeConf.rpcConf,
 				ingestionEng,
@@ -788,10 +783,10 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				results,
 				txResults,
 				node.RootChainID,
+				signature.NewBlockSignerDecoder(committee),
 				e.exeConf.apiRatelimits,
 				e.exeConf.apiBurstlimits,
-			)
-			return rpcEng, nil
+			), nil
 		})
 }
 

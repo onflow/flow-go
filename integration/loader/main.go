@@ -14,9 +14,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus/push"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go-sdk/client"
+	client "github.com/onflow/flow-go-sdk/access/grpc"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/integration/utils"
@@ -32,7 +33,7 @@ type LoadCase struct {
 
 func main() {
 	sleep := flag.Duration("sleep", 0, "duration to sleep before benchmarking starts")
-	loadTypeFlag := flag.String("load-type", "token-transfer", "type of loads (\"token-transfer\", \"add-keys\", \"computation-heavy\", \"event-heavy\", \"ledger-heavy\")")
+	loadTypeFlag := flag.String("load-type", "token-transfer", "type of loads (\"token-transfer\", \"add-keys\", \"computation-heavy\", \"event-heavy\", \"ledger-heavy\", \"const-exec\")")
 	tpsFlag := flag.String("tps", "1", "transactions per second (TPS) to send, accepts a comma separated list of values if used in conjunction with `tps-durations`")
 	tpsDurationsFlag := flag.String("tps-durations", "0", "duration that each load test will run, accepts a comma separted list that will be applied to multiple values of the `tps` flag (defaults to infinite if not provided, meaning only the first tps case will be tested; additional values will be ignored)")
 	chainIDStr := flag.String("chain", string(flowsdk.Emulator), "chain ID")
@@ -42,9 +43,13 @@ func main() {
 	metricport := flag.Uint("metricport", 8080, "port for /metrics endpoint")
 	pushgateway := flag.String("pushgateway", "127.0.0.1:9091", "host:port for pushgateway")
 	profilerEnabled := flag.Bool("profiler-enabled", false, "whether to enable the auto-profiler")
-	trackTxsFlag := flag.Bool("track-txs", false, "track individual transaction timings (adds significant overhead)")
+	_ = flag.Bool("track-txs", false, "deprecated")
 	accountMultiplierFlag := flag.Int("account-multiplier", 50, "number of accounts to create per load tps")
 	feedbackEnabled := flag.Bool("feedback-enabled", true, "wait for trannsaction execution before submitting new transaction")
+	maxConstExecTxSizeInBytes := flag.Uint("const-exec-max-tx-size", flow.DefaultMaxTransactionByteSize/10, "max byte size of constant exec transaction size to generate")
+	authAccNumInConstExecTx := flag.Uint("const-exec-num-authorizer", 1, "num of authorizer for each constant exec transaction to generate")
+	argSizeInByteInConstExecTx := flag.Uint("const-exec-arg-size", 100, "byte size of tx argument for each constant exec transaction to generate")
+	payerKeyCountInConstExecTx := flag.Uint("const-exec-payer-key-count", 2, "num of payer keys for each constant exec transaction to generate")
 	flag.Parse()
 
 	chainID := flowsdk.ChainID([]byte(*chainIDStr))
@@ -121,7 +126,7 @@ func main() {
 	}
 
 	loadedAccessAddr := accessNodeAddrs[0]
-	flowClient, err := client.New(loadedAccessAddr, grpc.WithInsecure()) //nolint:staticcheck
+	flowClient, err := client.NewClient(loadedAccessAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatal().Err(err).Msgf("unable to initialize Flow client")
 	}
@@ -130,7 +135,7 @@ func main() {
 	if len(accessNodeAddrs) > 1 {
 		supervisorAccessAddr = accessNodeAddrs[1]
 	}
-	supervisorClient, err := client.New(supervisorAccessAddr, grpc.WithInsecure()) //nolint:staticcheck
+	supervisorClient, err := client.NewClient(supervisorAccessAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatal().Err(err).Msgf("unable to initialize Flow supervisor client")
 	}
@@ -155,11 +160,16 @@ func main() {
 					&serviceAccountAddress,
 					&fungibleTokenAddress,
 					&flowTokenAddress,
-					*trackTxsFlag,
 					c.tps,
 					*accountMultiplierFlag,
 					utils.LoadType(*loadTypeFlag),
 					*feedbackEnabled,
+					utils.ConstExecParam{
+						MaxTxSizeInByte: *maxConstExecTxSizeInBytes,
+						AuthAccountNum:  *authAccNumInConstExecTx,
+						ArgSizeInByte:   *argSizeInByteInConstExecTx,
+						PayerKeyCount:   *payerKeyCountInConstExecTx,
+					},
 				)
 				if err != nil {
 					log.Fatal().Err(err).Msgf("unable to create new cont load generator")

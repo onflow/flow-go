@@ -72,7 +72,7 @@ func (s *VoteAggregatorTestSuite) TearDownTest() {
 func (s *VoteAggregatorTestSuite) TestOnFinalizedBlock() {
 	finalizedBlock := unittest.BlockHeaderFixture(unittest.HeaderWithView(100))
 	s.collectors.On("PruneUpToView", finalizedBlock.View).Once()
-	s.aggregator.OnFinalizedBlock(model.BlockFromFlow(&finalizedBlock, finalizedBlock.View-1))
+	s.aggregator.OnFinalizedBlock(model.BlockFromFlow(finalizedBlock, finalizedBlock.View-1))
 	require.Eventually(s.T(),
 		func() bool {
 			return s.collectors.AssertCalled(s.T(), "PruneUpToView", finalizedBlock.View)
