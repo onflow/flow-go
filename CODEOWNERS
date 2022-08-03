@@ -37,6 +37,10 @@
 /cmd/bootstrap/** @vishalchangrani
 
 # Performance Stream
+/utils/binstat/** @SaveTheRbtz @simonhf @Kay-Zee @pattyshack
+/module/profiler/** @SaveTheRbtz @simonhf @Kay-Zee @pattyshack
+/module/trace/** @SaveTheRbtz @simonhf @Kay-Zee @pattyshack
+/module/tracer.go @SaveTheRbtz @simonhf @Kay-Zee @pattyshack
 /integration/localnet/** @SaveTheRbtz @simonhf @Kay-Zee @zhangchiqing @pattyshack @AndrewM-SDET
 /integration/loader/** @SaveTheRbtz @simonhf @Kay-Zee @pattyshack @AndrewM-SDET
 /integration/benchmark/** @SaveTheRbtz @simonhf @Kay-Zee @pattyshack @AndrewM-SDET
