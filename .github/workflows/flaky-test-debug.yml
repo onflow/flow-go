@@ -1,8 +1,6 @@
 name: Flaky Test Debug
 
 on:
-  schedule:
-    - cron: '0 */1 * * *' # every 1 hour
   push:
     branches:
       - '**/*flaky-test*'
