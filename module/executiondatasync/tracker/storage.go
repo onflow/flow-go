@@ -72,6 +72,21 @@ func makeLatestHeightKey(c cid.Cid) []byte {
 	return latestHeightKey
 }
 
+func makeUint64Value(v uint64) []byte {
+	value := make([]byte, 8)
+	binary.LittleEndian.PutUint64(value, v)
+	return value
+}
+
+func getUint64Value(item *badger.Item) (uint64, error) {
+	value, err := item.ValueCopy(nil)
+	if err != nil {
+		return 0, err
+	}
+
+	return binary.LittleEndian.Uint64(value), nil
+}
+
 // getBatchItemCountLimit returns the maximum number of items that can be included in a single batch
 // transaction based on the number / total size of updates per item.
 func getBatchItemCountLimit(db *badger.DB, writeCountPerItem int64, writeSizePerItem int64) int {
@@ -217,12 +232,10 @@ func (s *storage) init(startHeight uint64) error {
 
 func (s *storage) bootstrap(startHeight uint64) error {
 	fulfilledHeightKey := makeGlobalStateKey(globalStateFulfilledHeight)
-	fulfilledHeightValue := make([]byte, 8)
-	binary.LittleEndian.PutUint64(fulfilledHeightValue, startHeight)
+	fulfilledHeightValue := makeUint64Value(startHeight)
 
 	prunedHeightKey := makeGlobalStateKey(globalStatePrunedHeight)
-	prunedHeightValue := make([]byte, 8)
-	binary.LittleEndian.PutUint64(prunedHeightValue, startHeight)
+	prunedHeightValue := makeUint64Value(startHeight)
 
 	return s.db.Update(func(txn *badger.Txn) error {
 		if err := txn.Set(fulfilledHeightKey, fulfilledHeightValue); err != nil {
@@ -245,8 +258,7 @@ func (s *storage) Update(f UpdateFn) error {
 
 func (s *storage) SetFulfilledHeight(height uint64) error {
 	fulfilledHeightKey := makeGlobalStateKey(globalStateFulfilledHeight)
-	fulfilledHeightValue := make([]byte, 8)
-	binary.LittleEndian.PutUint64(fulfilledHeightValue, height)
+	fulfilledHeightValue := makeUint64Value(height)
 
 	return s.db.Update(func(txn *badger.Txn) error {
 		if err := txn.Set(fulfilledHeightKey, fulfilledHeightValue); err != nil {
@@ -267,12 +279,10 @@ func (s *storage) GetFulfilledHeight() (uint64, error) {
 			return fmt.Errorf("failed to find fulfilled height entry: %w", err)
 		}
 
-		fulfilledHeightValue, err := item.ValueCopy(nil)
+		fulfilledHeight, err = getUint64Value(item)
 		if err != nil {
 			return fmt.Errorf("failed to retrieve fulfilled height value: %w", err)
 		}
-
-		fulfilledHeight = binary.LittleEndian.Uint64(fulfilledHeightValue)
 
 		return nil
 	}); err != nil {
@@ -294,20 +304,18 @@ func (s *storage) trackBlob(txn *badger.Txn, blockHeight uint64, c cid.Cid) erro
 			return fmt.Errorf("failed to get latest height: %w", err)
 		}
 	} else {
-		value, err := item.ValueCopy(nil)
+		latestHeight, err := getUint64Value(item)
 		if err != nil {
 			return fmt.Errorf("failed to retrieve latest height value: %w", err)
 		}
 
 		// don't update the latest height if there is already a higher block height containing this blob
-		latestHeight := binary.LittleEndian.Uint64(value)
 		if latestHeight >= blockHeight {
 			return nil
 		}
 	}
 
-	latestHeightValue := make([]byte, 8)
-	binary.LittleEndian.PutUint64(latestHeightValue, blockHeight)
+	latestHeightValue := makeUint64Value(blockHeight)
 
 	if err := txn.Set(latestHeightKey, latestHeightValue); err != nil {
 		return fmt.Errorf("failed to set latest height value: %w", err)
@@ -419,13 +427,12 @@ func (s *storage) Prune(height uint64) error {
 				return fmt.Errorf("failed to get latest height entry for Cid %s: %w", blobCid.String(), err)
 			}
 
-			latestHeightValue, err := latestHeightItem.ValueCopy(nil)
+			latestHeight, err := getUint64Value(latestHeightItem)
 			if err != nil {
 				return fmt.Errorf("failed to retrieve latest height value for Cid %s: %w", blobCid.String(), err)
 			}
 
 			// a blob is only removable if it is not referenced by any blob tree at a higher height
-			latestHeight := binary.LittleEndian.Uint64(latestHeightValue)
 			if latestHeight < blockHeight {
 				// this should never happen
 				return fmt.Errorf(
@@ -472,8 +479,7 @@ func (s *storage) Prune(height uint64) error {
 
 func (s *storage) setPrunedHeight(height uint64) error {
 	prunedHeightKey := makeGlobalStateKey(globalStatePrunedHeight)
-	prunedHeightValue := make([]byte, 8)
-	binary.LittleEndian.PutUint64(prunedHeightValue, height)
+	prunedHeightValue := makeUint64Value(height)
 
 	return s.db.Update(func(txn *badger.Txn) error {
 		if err := txn.Set(prunedHeightKey, prunedHeightValue); err != nil {
@@ -494,12 +500,10 @@ func (s *storage) GetPrunedHeight() (uint64, error) {
 			return fmt.Errorf("failed to find pruned height entry: %w", err)
 		}
 
-		prunedHeightValue, err := item.ValueCopy(nil)
+		prunedHeight, err = getUint64Value(item)
 		if err != nil {
 			return fmt.Errorf("failed to retrieve pruned height value: %w", err)
 		}
-
-		prunedHeight = binary.LittleEndian.Uint64(prunedHeightValue)
 
 		return nil
 	}); err != nil {
