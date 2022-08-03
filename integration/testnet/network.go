@@ -1019,12 +1019,13 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 			nodeContainer.AddFlag("triedir", DefaultExecutionRootDir)
 
-			tmpExeDataDir := filepath.Join(tmpdir, "execution-data")
+			exeDataDir := filepath.Join(tmpdir, "execution-data")
+			err = os.Mkdir(exeDataDir, 0700)
 			require.NoError(t, err)
 
 			opts.HostConfig.Binds = append(
 				opts.HostConfig.Binds,
-				fmt.Sprintf("%s:%s:rw", tmpExeDataDir, DefaultExecutionDataServiceDir),
+				fmt.Sprintf("%s:%s:rw", exeDataDir, DefaultExecutionDataServiceDir),
 			)
 
 			nodeContainer.AddFlag("execution-data-dir", DefaultExecutionDataServiceDir)
