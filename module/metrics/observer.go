@@ -16,7 +16,7 @@ func NewObserverCollector() *ObserverCollector {
 		rpcs: promauto.NewCounterVec(prometheus.CounterOpts{
 			Namespace: namespaceObserver,
 			Subsystem: subsystemRouter,
-			Name:      "rpc-counter",
+			Name:      "rpc_counter",
 			Help:      "tracking error/success rate of each rpc",
 		}, []string{"rpc", "handler", "error", "fallback"}),
 	}
