@@ -25,6 +25,7 @@ type ObserverSuite struct {
 	suite.Suite
 	net      *testnet.FlowNetwork
 	teardown func()
+	local    map[string]struct{}
 }
 
 func (suite *ObserverSuite) TearDownTest() {
@@ -32,6 +33,19 @@ func (suite *ObserverSuite) TearDownTest() {
 }
 
 func (suite *ObserverSuite) SetupTest() {
+	suite.local = map[string]struct{}{
+		"Ping":                           {},
+		"GetLatestBlockHeader":           {},
+		"GetBlockHeaderByID":             {},
+		"GetBlockHeaderByHeight":         {},
+		"GetLatestBlock":                 {},
+		"GetBlockByID":                   {},
+		"GetBlockByHeight":               {},
+		"GetCollectionByID":              {},
+		"GetNetworkParameters":           {},
+		"GetLatestProtocolStateSnapshot": {},
+	}
+
 	nodeConfigs := []testnet.NodeConfig{
 		// access node with unstaked nodes supported
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.InfoLevel), func(nc *testnet.NodeConfig) {
@@ -99,14 +113,6 @@ func (suite *ObserverSuite) TestObserverConnection() {
 	// ping the observer while the access container is running
 	_, err = observer.Ping(ctx, &accessproto.PingRequest{})
 	assert.NoError(t, err)
-
-	// stop the upstream access container
-	err = suite.net.StopContainerByName(ctx, "access_1")
-	assert.NoError(t, err)
-
-	// ping the observer when access container is stopped
-	_, err = observer.Ping(ctx, &accessproto.PingRequest{})
-	assert.Error(t, err)
 }
 
 func (suite *ObserverSuite) TestObserverWithoutAccess() {
@@ -124,6 +130,9 @@ func (suite *ObserverSuite) TestObserverWithoutAccess() {
 
 	// verify that we receive errors from all rpcs
 	for _, rpc := range suite.getRPCs() {
+		if _, local := suite.local[rpc.name]; local {
+			continue
+		}
 		t.Run(rpc.name, func(t *testing.T) {
 			err := rpc.call(ctx, observer)
 			assert.Error(t, err)
@@ -144,6 +153,9 @@ func (suite *ObserverSuite) TestObserverCompareRPCs() {
 
 	// verify that both clients return the same errors
 	for _, rpc := range suite.getRPCs() {
+		if _, local := suite.local[rpc.name]; local {
+			continue
+		}
 		t.Run(rpc.name, func(t *testing.T) {
 			accessErr := rpc.call(ctx, access)
 			observerErr := rpc.call(ctx, observer)

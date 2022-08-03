@@ -990,7 +990,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return nil, err
 		}
 
-		proxy, _ := apiproxy.NewFlowAccessAPIRouter(builder.upstreamIdentities, time.Second*10)
+		proxy, _ := apiproxy.NewFlowAccessAPIRouter(builder.upstreamIdentities, builder.apiTimeout)
 		proxy.SetLocalAPI(engineBuilder.Handler())
 
 		// build the rpc engine

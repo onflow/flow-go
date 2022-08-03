@@ -189,7 +189,9 @@ func (h *FlowAccessAPIRouter) GetCollectionByID(context context.Context, req *ac
 }
 
 func (h *FlowAccessAPIRouter) SendTransaction(context context.Context, req *access.SendTransactionRequest) (*access.SendTransactionResponse, error) {
-	return h.upstream.SendTransaction(context, req)
+	res, err := h.upstream.SendTransaction(context, req)
+	// logs
+	return res, err 
 }
 
 func (h *FlowAccessAPIRouter) GetTransaction(context context.Context, req *access.GetTransactionRequest) (*access.TransactionResponse, error) {
