@@ -341,6 +341,11 @@ func TestCompactorSkipCheckpointing(t *testing.T) {
 		<-l.Done()
 		<-compactor.Done()
 
+		first, last, err := wal.Segments()
+		require.NoError(t, err)
+
+		segmentCount := last - first + 1
+
 		checkpointer, err := wal.NewCheckpointer()
 		require.NoError(t, err)
 
@@ -349,7 +354,7 @@ func TestCompactorSkipCheckpointing(t *testing.T) {
 
 		// Check that there are gaps between checkpoints (some checkpoints are skipped)
 		firstNum, lastNum := nums[0], nums[len(nums)-1]
-		require.True(t, len(nums) < lastNum-firstNum+1)
+		require.True(t, (len(nums) < lastNum-firstNum+1) || (len(nums) < segmentCount))
 	})
 }
 
