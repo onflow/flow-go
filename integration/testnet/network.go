@@ -1019,7 +1019,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 			nodeContainer.AddFlag("triedir", DefaultExecutionRootDir)
 
-			tmpExeDataDir, err := ioutil.TempDir(tmpdir, "execution-data")
+			tmpExeDataDir := filepath.Join(tmpdir, "execution-data")
 			require.NoError(t, err)
 
 			opts.HostConfig.Binds = append(

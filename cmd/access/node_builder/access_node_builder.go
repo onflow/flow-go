@@ -399,12 +399,13 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 
 	builder.
 		Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
-			err := os.MkdirAll(builder.executionDataDir, 0700)
+			datastoreDir := filepath.Join(builder.executionDataDir, "blobstore")
+			err := os.MkdirAll(datastoreDir, 0700)
 			if err != nil {
 				return err
 			}
 
-			ds, err = badger.NewDatastore(builder.executionDataDir, &badger.DefaultOptions)
+			ds, err = badger.NewDatastore(datastoreDir, &badger.DefaultOptions)
 			if err != nil {
 				return err
 			}

@@ -3,6 +3,7 @@ package access
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"testing"
 
 	badgerds "github.com/ipfs/go-ds-badger2"
@@ -171,7 +172,7 @@ func (s *ExecutionStateSyncSuite) TestHappyPath() {
 }
 
 func (s *ExecutionStateSyncSuite) nodeExecutionDataStore(node *testnet.Container) execution_data.ExecutionDataStore {
-	ds, err := badgerds.NewDatastore(node.ExecutionDataDBPath(), &badgerds.DefaultOptions)
+	ds, err := badgerds.NewDatastore(filepath.Join(node.ExecutionDataDBPath(), "blobstore"), &badgerds.DefaultOptions)
 	require.NoError(s.T(), err, "could not get execution datastore")
 
 	go func() {
