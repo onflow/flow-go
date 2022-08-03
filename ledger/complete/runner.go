@@ -17,11 +17,11 @@ type runner struct {
 	checkpointsToKeep int // the max number of checkpoint files to keep on disk in order to prevent too many checkpoint files filling disk.
 }
 
-func NewRunner(logger zerolog.Logger, checkpointer *realWAL.Checkpointer, checkpointsToKeep int) *runner {
+func NewRunner(logger zerolog.Logger, checkpointer *realWAL.Checkpointer, checkpointsToKeep uint) *runner {
 	return &runner{
 		logger:            logger,
 		checkpointer:      checkpointer,
-		checkpointsToKeep: checkpointsToKeep,
+		checkpointsToKeep: int(checkpointsToKeep),
 	}
 }
 
