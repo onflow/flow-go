@@ -17,6 +17,14 @@ type runner struct {
 	checkpointsToKeep int // the max number of checkpoint files to keep on disk in order to prevent too many checkpoint files filling disk.
 }
 
+func NewRunner(logger zerolog.Logger, checkpointer *realWAL.Checkpointer, checkpointsToKeep int) *runner {
+	return &runner{
+		logger:            logger,
+		checkpointer:      checkpointer,
+		checkpointsToKeep: checkpointsToKeep,
+	}
+}
+
 func (r *runner) runCheckpoint(ctx context.Context, checkpointTries []*trie.MTrie, checkpointNum int) error {
 	err := r.createCheckpoint(r.checkpointer, r.logger, checkpointTries, checkpointNum)
 	if err != nil {
@@ -30,6 +38,8 @@ func (r *runner) runCheckpoint(ctx context.Context, checkpointTries []*trie.MTri
 	return nil
 }
 
+// createCheckpoint creates the checkpoint with the given tries with the given checkpointNum in the name of
+// the generated checkpoint file
 func (r *runner) createCheckpoint(checkpointer *realWAL.Checkpointer, logger zerolog.Logger, tries []*trie.MTrie, checkpointNum int) error {
 	if len(tries) == 0 {
 		return nil
