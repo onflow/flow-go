@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -41,7 +40,7 @@ func TestConnectorHappyPath_Send(t *testing.T) {
 		}()
 
 		// goroutine checks mock ccf for receiving the message sent over the connection.
-		msg, _, _ := insecure.MessageFixture(t, cbor.NewCodec(), insecure.Protocol_MULTICAST, &message.TestMessage{
+		msg, _, _ := insecure.EgressMessageFixture(t, unittest.NetworkCodec(), insecure.Protocol_MULTICAST, &message.TestMessage{
 			Text: fmt.Sprintf("this is a test message from attacker to ccf: %d", rand.Int()),
 		})
 		sentMsgReceived := make(chan struct{})
@@ -51,12 +50,12 @@ func TestConnectorHappyPath_Send(t *testing.T) {
 			// received message should have an exact match on the relevant fields.
 			// Note: only fields filled by test fixtures are checked, as some others
 			// are filled by gRPC on the fly, which are not relevant to the test's sanity.
-			require.Equal(t, receivedMsg.Payload, msg.Payload)
-			require.Equal(t, receivedMsg.Protocol, msg.Protocol)
-			require.Equal(t, receivedMsg.OriginID, msg.OriginID)
-			require.Equal(t, receivedMsg.TargetNum, msg.TargetNum)
-			require.Equal(t, receivedMsg.TargetIDs, msg.TargetIDs)
-			require.Equal(t, receivedMsg.ChannelID, msg.ChannelID)
+			require.Equal(t, receivedMsg.Egress.Payload, msg.Egress.Payload)
+			require.Equal(t, receivedMsg.Egress.Protocol, msg.Egress.Protocol)
+			require.Equal(t, receivedMsg.Egress.OriginID, msg.Egress.OriginID)
+			require.Equal(t, receivedMsg.Egress.TargetNum, msg.Egress.TargetNum)
+			require.Equal(t, receivedMsg.Egress.TargetIDs, msg.Egress.TargetIDs)
+			require.Equal(t, receivedMsg.Egress.ChannelID, msg.Egress.ChannelID)
 
 			close(sentMsgReceived)
 		}()
@@ -87,7 +86,7 @@ func TestConnectorHappyPath_Receive(t *testing.T) {
 		_, ccfPortStr, err := net.SplitHostPort(ccf.ServerAddress())
 		require.NoError(t, err)
 
-		msg, _, _ := insecure.MessageFixture(t, cbor.NewCodec(), insecure.Protocol_MULTICAST, &message.TestMessage{
+		msg, _, _ := insecure.EgressMessageFixture(t, unittest.NetworkCodec(), insecure.Protocol_MULTICAST, &message.TestMessage{
 			Text: fmt.Sprintf("this is a test message from ccf to attacker: %d", rand.Int()),
 		})
 
@@ -100,12 +99,12 @@ func TestConnectorHappyPath_Receive(t *testing.T) {
 				// received message by attacker should have an exact match on the relevant fields as sent by ccf.
 				// Note: only fields filled by test fixtures are checked, as some others
 				// are filled by gRPC on the fly, which are not relevant to the test's sanity.
-				require.Equal(t, receivedMsg.Payload, msg.Payload)
-				require.Equal(t, receivedMsg.Protocol, msg.Protocol)
-				require.Equal(t, receivedMsg.OriginID, msg.OriginID)
-				require.Equal(t, receivedMsg.TargetNum, msg.TargetNum)
-				require.Equal(t, receivedMsg.TargetIDs, msg.TargetIDs)
-				require.Equal(t, receivedMsg.ChannelID, msg.ChannelID)
+				require.Equal(t, receivedMsg.Egress.Payload, msg.Egress.Payload)
+				require.Equal(t, receivedMsg.Egress.Protocol, msg.Egress.Protocol)
+				require.Equal(t, receivedMsg.Egress.OriginID, msg.Egress.OriginID)
+				require.Equal(t, receivedMsg.Egress.TargetNum, msg.Egress.TargetNum)
+				require.Equal(t, receivedMsg.Egress.TargetIDs, msg.Egress.TargetIDs)
+				require.Equal(t, receivedMsg.Egress.ChannelID, msg.Egress.ChannelID)
 
 				close(sentMsgReceived)
 			})
@@ -135,7 +134,7 @@ func TestConnectorHappyPath_Receive(t *testing.T) {
 // withMockCorruptibleConduitFactory creates and starts a mock corruptible conduit factory. This mock factory only runs the gRPC server part of an
 // actual corruptible conduit factory, and then executes the run function on it.
 func withMockCorruptibleConduitFactory(t *testing.T, run func(flow.Identity, irrecoverable.SignalerContext, *mockCorruptibleConduitFactory)) {
-	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress("localhost:0"))
+	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DEFAULT_ADDRESS))
 
 	// life-cycle management of corruptible conduit factory.
 	ctx, cancel := context.WithCancel(context.Background())

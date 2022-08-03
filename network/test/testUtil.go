@@ -225,17 +225,17 @@ func GenerateNetworks(
 			metrics.NewNoopCollector())
 
 		// create the network
-		net, err := p2p.NewNetwork(
-			log,
-			cbor.NewCodec(),
-			me,
-			func() (network.Middleware, error) { return mws[i], nil },
-			tops[i],
-			sms[i],
-			metrics.NewNoopCollector(),
-			id.NewFixedIdentityProvider(ids),
-			receiveCache,
-		)
+		net, err := p2p.NewNetwork(&p2p.NetworkParameters{
+			Logger:              log,
+			Codec:               cbor.NewCodec(),
+			Me:                  me,
+			MiddlewareFactory:   func() (network.Middleware, error) { return mws[i], nil },
+			Topology:            tops[i],
+			SubscriptionManager: sms[i],
+			Metrics:             metrics.NewNoopCollector(),
+			IdentityProvider:    id.NewFixedIdentityProvider(ids),
+			ReceiveCache:        receiveCache,
+		})
 		require.NoError(t, err)
 
 		nets = append(nets, net)

@@ -14,10 +14,12 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// MessageFixture creates and returns a randomly generated gRPC message that is sent between a corruptible conduit and the attack network.
+const DEFAULT_ADDRESS = "localhost:0"
+
+// EgressMessageFixture creates and returns a randomly generated gRPC egress message that is sent between a corruptible conduit and the attack network.
 // It also generates and returns the corresponding application-layer event of that message, which is sent between the attack network and the
 // orchestrator.
-func MessageFixture(t *testing.T, codec network.Codec, protocol Protocol, content interface{}) (*Message, *Event, *flow.Identity) {
+func EgressMessageFixture(t *testing.T, codec network.Codec, protocol Protocol, content interface{}) (*Message, *Event, *flow.Identity) {
 	// fixture for content of message
 	originId := unittest.IdentifierFixture()
 
@@ -34,19 +36,24 @@ func MessageFixture(t *testing.T, codec network.Codec, protocol Protocol, conten
 		targetNum = uint32(3)
 	}
 
-	channel := channels.Channel("test-channel")
+	channel := channels.TestNetworkChannel
 	// encodes event to create payload
 	payload, err := codec.Encode(content)
 	require.NoError(t, err)
 
-	// creates message that goes over gRPC.
-	m := &Message{
-		ChannelID: "test-channel",
+	// creates egress message that goes over gRPC.
+
+	egressMsg := &EgressMessage{
+		ChannelID: channels.TestNetworkChannel.String(),
 		OriginID:  originId[:],
 		TargetNum: targetNum,
 		TargetIDs: flow.IdsToBytes(targetIds),
 		Payload:   payload,
 		Protocol:  protocol,
+	}
+
+	m := &Message{
+		Egress: egressMsg,
 	}
 
 	// creates corresponding event of that message that
@@ -60,20 +67,70 @@ func MessageFixture(t *testing.T, codec network.Codec, protocol Protocol, conten
 		TargetIds:         targetIds,
 	}
 
-	return m, e, unittest.IdentityFixture(unittest.WithNodeID(originId), unittest.WithAddress("localhost:0"))
+	return m, e, unittest.IdentityFixture(unittest.WithNodeID(originId), unittest.WithAddress(DEFAULT_ADDRESS))
 }
 
-// MessageFixtures creates and returns randomly generated gRCP messages and their corresponding protocol-level events.
+// IngressMessageFixture creates and returns a randomly generated gRPC ingress message that is sent between a corruptible conduit and the attack network.
+// It also generates and returns the corresponding application-layer event of that message, which is sent between the attack network and the
+// orchestrator.
+func IngressMessageFixture(t *testing.T, codec network.Codec, protocol Protocol, content interface{}) (*Message, *Event, *flow.Identity) {
+	// fixture for content of message
+	originId := unittest.IdentifierFixture()
+
+	var targetIds flow.IdentifierList
+	targetNum := uint32(0)
+
+	if protocol == Protocol_UNICAST {
+		targetIds = unittest.IdentifierListFixture(1)
+	} else {
+		targetIds = unittest.IdentifierListFixture(10)
+	}
+
+	if protocol == Protocol_MULTICAST {
+		targetNum = uint32(3)
+	}
+
+	channel := channels.TestNetworkChannel
+	// encodes event to create payload
+	payload, err := codec.Encode(content)
+	require.NoError(t, err)
+
+	// creates ingress message that goes over gRPC.
+	ingressMsg := &IngressMessage{
+		ChannelID: channels.TestNetworkChannel.String(),
+		OriginID:  originId[:],
+		Payload:   payload,
+	}
+
+	m := &Message{
+		Ingress: ingressMsg,
+	}
+
+	// creates corresponding event of that message that
+	// is sent by attack network to orchestrator.
+	e := &Event{
+		CorruptedNodeId:   originId,
+		Channel:           channel,
+		FlowProtocolEvent: content,
+		Protocol:          protocol,
+		TargetNum:         targetNum,
+		TargetIds:         targetIds,
+	}
+
+	return m, e, unittest.IdentityFixture(unittest.WithNodeID(originId), unittest.WithAddress(DEFAULT_ADDRESS))
+}
+
+// EgressMessageFixtures creates and returns randomly generated gRCP messages and their corresponding protocol-level events.
 // The messages are sent between a corruptible conduit and the attack network.
 // The events are the corresponding protocol-level representation of messages.
-func MessageFixtures(t *testing.T, codec network.Codec, protocol Protocol, count int) ([]*Message, []*Event,
+func EgressMessageFixtures(t *testing.T, codec network.Codec, protocol Protocol, count int) ([]*Message, []*Event,
 	flow.IdentityList) {
 	msgs := make([]*Message, count)
 	events := make([]*Event, count)
 	identities := flow.IdentityList{}
 
 	for i := 0; i < count; i++ {
-		m, e, id := MessageFixture(t, codec, protocol, &message.TestMessage{
+		m, e, id := EgressMessageFixture(t, codec, protocol, &message.TestMessage{
 			Text: fmt.Sprintf("this is a test message: %d", rand.Int()),
 		})
 
