@@ -207,18 +207,52 @@ func ToPath(pathBytes []byte) (Path, error) {
 	return path, nil
 }
 
+// encKey represents an encoded ledger key.
+type encKey []byte
+
+// Size returns the byte size of the encoded key.
+func (k encKey) Size() int {
+	return len(k)
+}
+
+// String returns the string representation of the encoded key.
+func (k encKey) String() string {
+	return hex.EncodeToString(k)
+}
+
+// Equals compares this encoded key to another encoded key.
+// A nil encoded key is equivalent to an empty encoded key.
+func (k encKey) Equals(other encKey) bool {
+	return bytes.Equal(k, other)
+}
+
+// DeepCopy returns a deep copy of the encoded key.
+func (k encKey) DeepCopy() encKey {
+	newK := make([]byte, len(k))
+	copy(newK, k)
+	return newK
+}
+
 // Payload is the smallest immutable storable unit in ledger
 type Payload struct {
-	key   Key
-	value Value
+	// encKey is key encoded using PayloadVersion.
+	// Version and type data are not encoded to save 3 bytes.
+	encKey encKey
+	value  Value
 }
 
 // Key returns payload key.
+// CAUTION: do not modify returned key because it shares underlying data with payload key.
 func (p *Payload) Key() (Key, error) {
-	return p.key, nil
+	k, err := decodeKey(p.encKey, true, PayloadVersion)
+	if err != nil {
+		return Key{}, err
+	}
+	return *k, nil
 }
 
 // Value returns payload value.
+// CAUTION: do not modify returned value because it shares underlying data with payload value.
 func (p *Payload) Value() Value {
 	return p.value
 }
@@ -228,7 +262,7 @@ func (p *Payload) Size() int {
 	if p == nil {
 		return 0
 	}
-	return p.key.Size() + p.value.Size()
+	return p.encKey.Size() + p.value.Size()
 }
 
 // IsEmpty returns true if payload is nil or value is empty
@@ -239,27 +273,19 @@ func (p *Payload) IsEmpty() bool {
 // TODO fix me
 func (p *Payload) String() string {
 	// TODO improve this key, values
-	return p.key.String() + " " + p.value.String()
-}
-
-// KeyString returns key's string representation.
-func (p *Payload) KeyString() string {
-	return p.key.String()
+	return p.encKey.String() + " " + p.value.String()
 }
 
 // Equals compares this payload to another payload
 // A nil payload is equivalent to an empty payload.
 func (p *Payload) Equals(other *Payload) bool {
-	if p == nil || (len(p.key.KeyParts) == 0 && len(p.value) == 0) {
-		return other == nil || (len(other.key.KeyParts) == 0 && len(other.value) == 0)
+	if p == nil || (p.encKey.Size() == 0 && p.value.Size() == 0) {
+		return other == nil || (other.encKey.Size() == 0 && other.value.Size() == 0)
 	}
 	if other == nil {
 		return false
 	}
-	if p.key.Equals(&other.key) && p.value.Equals(other.value) {
-		return true
-	}
-	return false
+	return p.encKey.Equals(other.encKey) && p.value.Equals(other.value)
 }
 
 // ValueEquals compares this payload value to another payload value.
@@ -287,14 +313,15 @@ func (p *Payload) DeepCopy() *Payload {
 	if p == nil {
 		return nil
 	}
-	k := p.key.DeepCopy()
+	k := p.encKey.DeepCopy()
 	v := p.value.DeepCopy()
-	return &Payload{key: k, value: v}
+	return &Payload{encKey: k, value: v}
 }
 
 // NewPayload returns a new payload
 func NewPayload(key Key, value Value) *Payload {
-	return &Payload{key: key, value: value}
+	ek := encodeKey(&key, PayloadVersion)
+	return &Payload{encKey: ek, value: value}
 }
 
 // EmptyPayload returns an empty payload

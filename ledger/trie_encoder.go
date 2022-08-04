@@ -15,6 +15,9 @@ import (
 // the newer version of data. New code handling new data version
 // should be updated to also support backward compatibility if needed.
 const (
+	// CAUTION: if payload key encoding is changed, convertEncodedPayloadKey()
+	// must be modified to convert encoded payload key from one version to
+	// another version.
 	PayloadVersion        = uint16(1)
 	TrieUpdateVersion     = uint16(0) // Use payload version 0 encoding
 	TrieProofVersion      = uint16(0) // Use payload version 0 encoding
@@ -335,7 +338,6 @@ func EncodePayload(p *Payload) []byte {
 
 	// append encoded payload content
 	buffer = append(buffer, encodePayload(p, PayloadVersion)...)
-
 	return buffer
 }
 
@@ -358,17 +360,24 @@ func encodePayload(p *Payload, version uint16) []byte {
 	return encodeAndAppendPayload(buffer, p, version)
 }
 
+// convertEncodedPayloadKey returns encoded payload key in toVersion
+// converted from encoded payload key in fromVersion.
+func convertEncodedPayloadKey(key []byte, fromVersion uint16, toVersion uint16) []byte {
+	// No conversion is needed for now because
+	// payload key encoding version 0 is the same as version 1.
+	return key
+}
+
 func encodeAndAppendPayload(buffer []byte, p *Payload, version uint16) []byte {
 
-	// Error isn't checked here because encoded key will be used directly
-	// in later commit and no error will be returned.
-	k, _ := p.Key()
+	// convert payload encoded key from PayloadVersion to version.
+	encKey := convertEncodedPayloadKey(p.encKey, PayloadVersion, version)
 
 	// encode encoded key size
-	buffer = utils.AppendUint32(buffer, uint32(encodedKeyLength(&k, version)))
+	buffer = utils.AppendUint32(buffer, uint32(len(encKey)))
 
-	// encode key
-	buffer = encodeAndAppendKey(buffer, &k, version)
+	// append encoded key
+	buffer = append(buffer, encKey...)
 
 	// encode encoded value size
 	encodedValueLen := encodedValueLength(p.Value(), version)
@@ -452,16 +461,13 @@ func decodePayload(inp []byte, zeroCopy bool, version uint16) (*Payload, error) 
 	}
 
 	// read encoded key
-	encKey, rest, err := utils.ReadSlice(rest, int(encKeySize))
+	ek, rest, err := utils.ReadSlice(rest, int(encKeySize))
 	if err != nil {
 		return nil, fmt.Errorf("error decoding payload: %w", err)
 	}
 
-	// decode the key
-	key, err := decodeKey(encKey, zeroCopy, version)
-	if err != nil {
-		return nil, fmt.Errorf("error decoding payload: %w", err)
-	}
+	// convert payload encoded key from version to PayloadVersion.
+	encKey := convertEncodedPayloadKey(ek, version, PayloadVersion)
 
 	// read encoded value size
 	var encValueSize int
@@ -487,12 +493,14 @@ func decodePayload(inp []byte, zeroCopy bool, version uint16) (*Payload, error) 
 	}
 
 	if zeroCopy {
-		return NewPayload(*key, encValue), nil
+		return &Payload{encKey, encValue}, nil
 	}
 
+	k := make([]byte, len(encKey))
+	copy(k, encKey)
 	v := make([]byte, len(encValue))
 	copy(v, encValue)
-	return NewPayload(*key, v), nil
+	return &Payload{k, v}, nil
 }
 
 // EncodeTrieUpdate encodes a trie update struct

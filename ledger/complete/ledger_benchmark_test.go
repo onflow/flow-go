@@ -136,7 +136,7 @@ func benchmarkStorage(steps int, b *testing.B) {
 func BenchmarkTrieUpdate(b *testing.B) {
 	// key updates per iteration
 	numInsPerStep := 10000
-	keyNumberOfParts := 10
+	keyNumberOfParts := 3
 	keyPartMinByteSize := 1
 	keyPartMaxByteSize := 100
 	valueMaxByteSize := 32
