@@ -22,63 +22,20 @@ import (
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
-// NewFlowAccessAPIRouter creates a backend access API that forwards some requests to an upstream node.
-// It is used by Observer services, Blockchain Data Service, etc.
-// Make sure that this is just for observation and not a staked participant in the flow network.
-// This means that observers see a copy of the data but there is no interaction to ensure integrity from the root block.
-func NewFlowAccessAPIRouter(accessNodeAddressAndPort flow.IdentityList, timeout time.Duration) (*FlowAccessAPIRouter, error) {
-	ret := &FlowAccessAPIRouter{}
-	err := ret.upstream.setFlowAccessAPI(accessNodeAddressAndPort, timeout)
-	if err != nil {
-		return nil, err
-	}
-	return ret, nil
-}
-
-// setFlowAccessAPI sets a backend access API that forwards some requests to an upstream node.
-// It is used by Observer services, Blockchain Data Service, etc.
-// Make sure that this is just for observation and not a staked participant in the flow network.
-// This means that observers see a copy of the data but there is no interaction to ensure integrity from the root block.
-func (ret *FlowAccessAPIForwarder) setFlowAccessAPI(accessNodeAddressAndPort flow.IdentityList, timeout time.Duration) error {
-	ret.timeout = timeout
-	ret.ids = accessNodeAddressAndPort
-	ret.upstream = make([]access.AccessAPIClient, accessNodeAddressAndPort.Count())
-	ret.connections = make([]*grpc.ClientConn, accessNodeAddressAndPort.Count())
-	for i, identity := range accessNodeAddressAndPort {
-		// Store the faultTolerantClient setup parameters such as address, public, key and timeout, so that
-		// we can refresh the API on connection loss
-		ret.ids[i] = identity
-
-		// We fail on any single error on startup, so that
-		// we identify bootstrapping errors early
-		err := ret.reconnectingClient(i)
-		if err != nil {
-			return err
-		}
-	}
-
-	ret.roundRobin = 0
-	return nil
-}
-
 // FlowAccessAPIRouter is a structure that represents the routing proxy algorithm.
 // It splits requests between a local and a remote API service.
 type FlowAccessAPIRouter struct {
-	zerolog.Logger
-	*metrics.ObserverCollector
-	access.AccessAPIServer
-	upstream FlowAccessAPIForwarder
-}
+	Logger   zerolog.Logger
+	Metrics  *metrics.ObserverCollector
+	Upstream *FlowAccessAPIForwarder
 
-// SetLocalAPI sets the local backend that responds to block related calls
-// Everything else is forwarded to a selected upstream node
-func (h *FlowAccessAPIRouter) SetLocalAPI(local access.AccessAPIServer) {
-	h.AccessAPIServer = local
+	// local observer
+	access.AccessAPIServer
 }
 
 func (h *FlowAccessAPIRouter) log(rpc, handler string, err error) {
 	code := status.Code(err)
-	h.RecordRPC(handler, rpc, code)
+	h.Metrics.RecordRPC(handler, rpc, code)
 
 	if err != nil {
 		h.Logger.Error().Err(err).Str("handler", handler).Str("grpc_method", rpc).Str("grpc_code", code.String())
@@ -221,73 +178,73 @@ func (h *FlowAccessAPIRouter) GetCollectionByID(context context.Context, req *ac
 }
 
 func (h *FlowAccessAPIRouter) SendTransaction(context context.Context, req *access.SendTransactionRequest) (*access.SendTransactionResponse, error) {
-	res, err := h.upstream.SendTransaction(context, req)
+	res, err := h.Upstream.SendTransaction(context, req)
 	h.log("upstream", "SendTransaction", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetTransaction(context context.Context, req *access.GetTransactionRequest) (*access.TransactionResponse, error) {
-	res, err := h.upstream.GetTransaction(context, req)
+	res, err := h.Upstream.GetTransaction(context, req)
 	h.log("upstream", "GetTransaction", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetTransactionResult(context context.Context, req *access.GetTransactionRequest) (*access.TransactionResultResponse, error) {
-	res, err := h.upstream.GetTransactionResult(context, req)
+	res, err := h.Upstream.GetTransactionResult(context, req)
 	h.log("upstream", "GetTransactionResult", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetTransactionResultByIndex(context context.Context, req *access.GetTransactionByIndexRequest) (*access.TransactionResultResponse, error) {
-	res, err := h.upstream.GetTransactionResultByIndex(context, req)
+	res, err := h.Upstream.GetTransactionResultByIndex(context, req)
 	h.log("upstream", "GetTransactionResultByIndex", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetAccount(context context.Context, req *access.GetAccountRequest) (*access.GetAccountResponse, error) {
-	res, err := h.upstream.GetAccount(context, req)
+	res, err := h.Upstream.GetAccount(context, req)
 	h.log("upstream", "GetAccount", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetAccountAtLatestBlock(context context.Context, req *access.GetAccountAtLatestBlockRequest) (*access.AccountResponse, error) {
-	res, err := h.upstream.GetAccountAtLatestBlock(context, req)
+	res, err := h.Upstream.GetAccountAtLatestBlock(context, req)
 	h.log("upstream", "GetAccountAtLatestBlock", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetAccountAtBlockHeight(context context.Context, req *access.GetAccountAtBlockHeightRequest) (*access.AccountResponse, error) {
-	res, err := h.upstream.GetAccountAtBlockHeight(context, req)
+	res, err := h.Upstream.GetAccountAtBlockHeight(context, req)
 	h.log("upstream", "GetAccountAtBlockHeight", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) ExecuteScriptAtLatestBlock(context context.Context, req *access.ExecuteScriptAtLatestBlockRequest) (*access.ExecuteScriptResponse, error) {
-	res, err := h.upstream.ExecuteScriptAtLatestBlock(context, req)
+	res, err := h.Upstream.ExecuteScriptAtLatestBlock(context, req)
 	h.log("upstream", "ExecuteScriptAtLatestBlock", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) ExecuteScriptAtBlockID(context context.Context, req *access.ExecuteScriptAtBlockIDRequest) (*access.ExecuteScriptResponse, error) {
-	res, err := h.upstream.ExecuteScriptAtBlockID(context, req)
+	res, err := h.Upstream.ExecuteScriptAtBlockID(context, req)
 	h.log("upstream", "ExecuteScriptAtBlockID", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) ExecuteScriptAtBlockHeight(context context.Context, req *access.ExecuteScriptAtBlockHeightRequest) (*access.ExecuteScriptResponse, error) {
-	res, err := h.upstream.ExecuteScriptAtBlockHeight(context, req)
+	res, err := h.Upstream.ExecuteScriptAtBlockHeight(context, req)
 	h.log("upstream", "ExecuteScriptAtBlockHeight", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetEventsForHeightRange(context context.Context, req *access.GetEventsForHeightRangeRequest) (*access.EventsResponse, error) {
-	res, err := h.upstream.GetEventsForHeightRange(context, req)
+	res, err := h.Upstream.GetEventsForHeightRange(context, req)
 	h.log("upstream", "GetEventsForHeightRange", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetEventsForBlockIDs(context context.Context, req *access.GetEventsForBlockIDsRequest) (*access.EventsResponse, error) {
-	res, err := h.upstream.GetEventsForBlockIDs(context, req)
+	res, err := h.Upstream.GetEventsForBlockIDs(context, req)
 	h.log("upstream", "GetEventsForBlockIDs", err)
 	return res, err
 }
@@ -305,7 +262,7 @@ func (h *FlowAccessAPIRouter) GetLatestProtocolStateSnapshot(context context.Con
 }
 
 func (h *FlowAccessAPIRouter) GetExecutionResultForBlockID(context context.Context, req *access.GetExecutionResultForBlockIDRequest) (*access.ExecutionResultForBlockIDResponse, error) {
-	res, err := h.upstream.GetExecutionResultForBlockID(context, req)
+	res, err := h.Upstream.GetExecutionResultForBlockID(context, req)
 	h.log("upstream", "GetExecutionResultForBlockID", err)
 	return res, err
 }
@@ -318,6 +275,38 @@ type FlowAccessAPIForwarder struct {
 	upstream    []access.AccessAPIClient
 	connections []*grpc.ClientConn
 	timeout     time.Duration
+}
+
+func NewFlowAccessAPIForwarder(identities flow.IdentityList, timeout time.Duration) (*FlowAccessAPIForwarder, error) {
+	forwarder := &FlowAccessAPIForwarder{}
+	err := forwarder.setFlowAccessAPI(identities, timeout)
+	return forwarder, err
+}
+
+// setFlowAccessAPI sets a backend access API that forwards some requests to an upstream node.
+// It is used by Observer services, Blockchain Data Service, etc.
+// Make sure that this is just for observation and not a staked participant in the flow network.
+// This means that observers see a copy of the data but there is no interaction to ensure integrity from the root block.
+func (ret *FlowAccessAPIForwarder) setFlowAccessAPI(accessNodeAddressAndPort flow.IdentityList, timeout time.Duration) error {
+	ret.timeout = timeout
+	ret.ids = accessNodeAddressAndPort
+	ret.upstream = make([]access.AccessAPIClient, accessNodeAddressAndPort.Count())
+	ret.connections = make([]*grpc.ClientConn, accessNodeAddressAndPort.Count())
+	for i, identity := range accessNodeAddressAndPort {
+		// Store the faultTolerantClient setup parameters such as address, public, key and timeout, so that
+		// we can refresh the API on connection loss
+		ret.ids[i] = identity
+
+		// We fail on any single error on startup, so that
+		// we identify bootstrapping errors early
+		err := ret.reconnectingClient(i)
+		if err != nil {
+			return err
+		}
+	}
+
+	ret.roundRobin = 0
+	return nil
 }
 
 // Ping pings the service. It is special in the sense that it responds successful,
