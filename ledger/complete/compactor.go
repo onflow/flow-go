@@ -101,9 +101,6 @@ func NewCompactor(
 	}, nil
 }
 
-func (c *Compactor) checkpointed(checkpointNum int) {
-}
-
 // Subscribe subscribes observer to Compactor.
 func (c *Compactor) Subscribe(observer observable.Observer) {
 	var void struct{}
@@ -165,7 +162,7 @@ func createTrigger(logger zerolog.Logger, wal realWAL.LedgerWAL, checkpointsToKe
 	}
 
 	runner := NewRunner(logger, checkpointer, checkpointsToKeep)
-	trigger := NewTrigger(logger, activeSegmentNum, lastCheckpointNum, checkpointDistance, nil, runner)
+	trigger := NewTrigger(logger, activeSegmentNum, lastCheckpointNum, checkpointDistance, runner, nil)
 	return trigger, nil
 }
 

@@ -11,9 +11,9 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 )
 
-// checkpointRunner abstraction for the runner, so that easy to test Trigger
-type checkpointRunner interface {
-	runCheckpoint(ctx context.Context, checkpointTries []*trie.MTrie, checkpointNum int) error
+// CheckpointRunner abstraction for the runner, so that easy to test Trigger
+type CheckpointRunner interface {
+	RunCheckpoint(ctx context.Context, checkpointTries []*trie.MTrie, checkpointNum int) error
 }
 
 // Trigger takes checkpointing related configs and decides when to trigger checkpointing,
@@ -25,7 +25,7 @@ type Trigger struct {
 	checkpointedSegumentNum *atomic.Int32           // the highest segment num that has been checkpointed
 	checkpointDistance      uint                    // the total number of segment (write-ahead log) to trigger checkpointing
 	isRunning               *atomic.Bool            // an atomic.Bool for whether checkpointing is currently running.
-	runner                  checkpointRunner        // for running checkpointing
+	runner                  CheckpointRunner        // for running checkpointing
 	checkpointed            func(checkpointNum int) // to report checkpointing completion
 }
 
@@ -34,8 +34,8 @@ func NewTrigger(
 	activeSegmentNum int,
 	checkpointedSegumentNum int,
 	checkpointDistance uint,
+	runner CheckpointRunner,
 	checkpointed func(checkpointNum int),
-	runner checkpointRunner,
 ) *Trigger {
 	notNil := checkpointed
 	if notNil == nil {
@@ -100,7 +100,7 @@ func (t *Trigger) NotifyTrieUpdateWrittenToWAL(ctx context.Context, segmentNum i
 
 	// running checkpointing in background
 	go func() {
-		err := t.runner.runCheckpoint(ctx, tries, checkpointNum)
+		err := t.runner.RunCheckpoint(ctx, tries, checkpointNum)
 		if err != nil {
 			t.logger.Error().Err(err).Msgf("critical: fail to run checkpointing")
 		}
@@ -112,7 +112,6 @@ func (t *Trigger) NotifyTrieUpdateWrittenToWAL(ctx context.Context, segmentNum i
 		if checkpointNum > 0 {
 			t.checkpointed(checkpointNum)
 		}
-
 	}()
 
 	return nil
@@ -137,6 +136,7 @@ func (t *Trigger) isWritingToNewSegmentFile(segmentNum int) (bool, error) {
 
 // checkpointDistance defines how many segment files to trigger a checkpoint
 func (t *Trigger) hasEnoughSegmentsToTriggerCheckpoint(segmentNum int) bool {
-	segmentNumToTriggerCheckpoint := int(t.checkpointedSegumentNum.Load()) + int(t.checkpointDistance)
+	last := t.checkpointedSegumentNum.Load()
+	segmentNumToTriggerCheckpoint := int(last) + int(t.checkpointDistance)
 	return segmentNum >= segmentNumToTriggerCheckpoint
 }

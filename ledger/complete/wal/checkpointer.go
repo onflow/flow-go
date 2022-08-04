@@ -255,6 +255,10 @@ func (c *Checkpointer) CheckpointWriter(to int) (io.WriteCloser, error) {
 	return CreateCheckpointWriterForFile(c.dir, NumberToFilename(to), &c.wal.log)
 }
 
+func (c *Checkpointer) CheckpointPathByNumber(to int) string {
+	return path.Join(c.dir, NumberToFilename(to))
+}
+
 // CreateCheckpointWriterForFile returns a file writer that will write to a temporary file and then move it to the checkpoint folder by renaming it.
 func CreateCheckpointWriterForFile(dir, filename string, logger *zerolog.Logger) (io.WriteCloser, error) {
 

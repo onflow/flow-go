@@ -146,6 +146,7 @@ generate-mocks:
 	mockery --name '.*' --dir=fvm --case=underscore --output="./fvm/mock" --outpkg="mock"
 	mockery --name '.*' --dir=fvm/state --case=underscore --output="./fvm/mock/state" --outpkg="mock"
 	mockery --name '.*' --dir=ledger --case=underscore --output="./ledger/mock" --outpkg="mock"
+	mockery --name '.*' --dir=ledger/complete --case=underscore --output="./ledger/complete/mock" --outpkg="mock"
 	mockery --name 'SubscriptionManager' --dir=network/ --case=underscore --output="./network/mocknetwork" --outpkg="mocknetwork"
 	mockery --name 'Vertex' --dir="./module/forest" --case=underscore --output="./module/forest/mock" --outpkg="mock"
 	mockery --name '.*' --dir="./consensus/hotstuff" --case=underscore --output="./consensus/hotstuff/mocks" --outpkg="mocks"
