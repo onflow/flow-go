@@ -317,13 +317,9 @@ func prepareServiceDirs(role string, nodeId string) (string, string) {
 func prepareService(container testnet.ContainerConfig, i int, n int) Service {
 	dataDir, profilerDir := prepareServiceDirs(container.Role.String(), container.NodeID.String())
 
-	service := defaultService(container.Role.String(), i)
+	service := defaultService(container.Role.String(), dataDir, profilerDir, i)
 	service.Command = append(service.Command, []string{
 		fmt.Sprintf("--nodeid=%s", container.NodeID),
-	}...)
-	service.Volumes = append(service.Volumes, []string{
-		fmt.Sprintf("%s:/profiler:z", profilerDir),
-		fmt.Sprintf("%s:/data:z", dataDir),
 	}...)
 
 	if i == 0 {
@@ -463,7 +459,7 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 	// Observers have a unique naming scheme omitting node id being on the public network
 	dataDir, profilerDir := prepareServiceDirs(observerName, "")
 
-	observerService := defaultService(DefaultObserverName, i)
+	observerService := defaultService(DefaultObserverName, dataDir, profilerDir, i)
 	observerService.Command = append(observerService.Command, []string{
 		fmt.Sprintf("--bootstrap-node-addresses=%s:%d", DefaultAccessGatewayName, AccessPubNetworkPort),
 		fmt.Sprintf("--bootstrap-node-public-keys=%s", agPublicKey),
@@ -474,10 +470,6 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 		fmt.Sprintf("--rpc-addr=%s:%d", observerName, RPCPort),
 		fmt.Sprintf("--secure-rpc-addr=%s:%d", observerName, SecuredRPCPort),
 		fmt.Sprintf("--http-addr=%s:%d", observerName, HTTPPort),
-	}...)
-	observerService.Volumes = append(observerService.Volumes, []string{
-		fmt.Sprintf("%s:/profiler:z", profilerDir),
-		fmt.Sprintf("%s:/data:z", dataDir),
 	}...)
 
 	// observer services rely on the access gateway
@@ -493,7 +485,7 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 	return observerService
 }
 
-func defaultService(role string, i int) Service {
+func defaultService(role, dataDir, profilerDir string, i int) Service {
 	num := fmt.Sprintf("%03d", i+1)
 	service := Service{
 		Image: fmt.Sprintf("localnet-%s", role),
@@ -509,6 +501,8 @@ func defaultService(role string, i int) Service {
 		},
 		Volumes: []string{
 			fmt.Sprintf("%s:/bootstrap:z", BootstrapDir),
+			fmt.Sprintf("%s:/profiler:z", profilerDir),
+			fmt.Sprintf("%s:/data:z", dataDir),
 		},
 		Environment: []string{
 			// https://github.com/open-telemetry/opentelemetry-specification/blob/v1.12.0/specification/protocol/exporter.md
