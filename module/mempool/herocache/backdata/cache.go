@@ -201,6 +201,12 @@ func (c Cache) Size() uint {
 	return uint(c.entities.Size())
 }
 
+// Head returns the tail of used items. Assuming no ejection happened and pool never goes beyond limit, Head returns
+// the first inserted element.
+func (c Cache) Head() (flow.Entity, bool) {
+	return c.entities.Head()
+}
+
 // All returns all entities stored in the backdata.
 func (c Cache) All() map[flow.Identifier]flow.Entity {
 	defer c.logTelemetry()
