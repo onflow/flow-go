@@ -77,14 +77,15 @@ func (h *FlowAccessAPIRouter) SetLocalAPI(local access.AccessAPIServer) {
 }
 
 func (h *FlowAccessAPIRouter) log(rpc, handler string, err error) {
-	h.RecordRPC(handler, rpc, err != nil)
+	code := status.Code(err)
+	h.RecordRPC(handler, rpc, code)
 
 	if err != nil {
-		h.Logger.Error().Err(err).Str("handler", handler).Str("rpc", rpc)
+		h.Logger.Error().Err(err).Str("handler", handler).Str("grpc_method", rpc).Str("grpc_code", code.String())
 		return
 	}
 
-	h.Logger.Info().Str("handler", handler).Str("rpc", rpc).Msg("successfully handled RPC")
+	h.Logger.Info().Str("handler", handler).Str("grpc_method", rpc).Str("grpc_code", code.String())
 }
 
 // reconnectingClient returns an active client, or

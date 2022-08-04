@@ -1,10 +1,9 @@
 package metrics
 
 import (
-	"strconv"
-
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	"google.golang.org/grpc/codes"
 )
 
 type ObserverCollector struct {
@@ -16,16 +15,16 @@ func NewObserverCollector() *ObserverCollector {
 		rpcs: promauto.NewCounterVec(prometheus.CounterOpts{
 			Namespace: namespaceObserver,
 			Subsystem: subsystemRouter,
-			Name:      "rpc_counter",
-			Help:      "tracking error/success rate of each rpc",
-		}, []string{"handler", "rpc", "error"}),
+			Name:      "handler_grpc_counter",
+			Help:      "tracking error/success rate of each rpc for the observer service",
+		}, []string{"handler", "grpc_method", "grpc_code"}),
 	}
 }
 
-func (oc *ObserverCollector) RecordRPC(handler, rpc string, err bool) {
+func (oc *ObserverCollector) RecordRPC(handler, rpc string, code codes.Code) {
 	oc.rpcs.With(prometheus.Labels{
-		"handler": handler,
-		"rpc":     rpc,
-		"error":   strconv.FormatBool(err),
+		"handler":     handler,
+		"grpc_method": rpc,
+		"grpc_code":   code.String(),
 	}).Inc()
 }
