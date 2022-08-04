@@ -70,8 +70,8 @@ func (hook LoggerHook) Logs() string {
 func (hook LoggerHook) Run(_ *zerolog.Event, level zerolog.Level, msg string) {
 	hook.logs.WriteString(msg)
 
-	// for tests that need to test log.fatal(), this is useful because the parent test process will read from stdout
-	// to determine if the test sub-process (that generated the log.fatal() call) called log.fatal() with the expected message
+	// for tests that need to test logger.Fatal(), this is useful because the parent test process will read from stdout
+	// to determine if the test sub-process (that generated the logger.Fatal() call) called logger.Fatal() with the expected message
 	if level == zerolog.FatalLevel {
 		fmt.Println(msg)
 	}

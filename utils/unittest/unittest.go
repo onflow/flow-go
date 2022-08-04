@@ -403,7 +403,7 @@ func CrashTest(t *testing.T, scenario func(t2 *testing.T), expectedErrorMsg stri
 	require.Error(t, err)
 	require.Contains(t, "exit status 1", err.Error())
 
-	// expect log.fatal() message to be pushed to stdout
+	// expect logger.Fatal() message to be pushed to stdout
 	outStr := string(outBytes)
 	require.Contains(t, outStr, expectedErrorMsg)
 }
