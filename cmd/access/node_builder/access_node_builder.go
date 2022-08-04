@@ -591,9 +591,6 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 				return errors.New("execution-data-max-search-ahead must be greater than 0")
 			}
 		}
-		if builder.rpcConf.ConnectionPoolSize == 0 {
-			return errors.New("connection-pool-size must be greater than 0")
-		}
 
 		return nil
 	})
