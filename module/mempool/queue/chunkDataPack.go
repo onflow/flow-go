@@ -48,14 +48,20 @@ func (c *ChunkDataPackRequestQueue) Push(chunkId flow.Identifier, requesterId fl
 	return c.cache.Add(req.id, req)
 }
 
-func (c ChunkDataPackRequestQueue) Pop() (flow.Identifier, flow.Identifier, bool) {
-	//TODO implement me
-	panic("implement me")
+func (c *ChunkDataPackRequestQueue) Pop() (flow.Identifier, flow.Identifier, bool) {
+	head, ok := c.cache.Head()
+	if !ok {
+		// cache is empty, and there is no head yet to pop.
+		return flow.Identifier{}, flow.Identifier{}, false
+	}
+
+	c.cache.Remove(head.ID())
+	request := head.(chunkDataPackRequest)
+	return request.requesterId, request.chunkId, true
 }
 
 func (c ChunkDataPackRequestQueue) Size() uint {
-	//TODO implement me
-	panic("implement me")
+	return c.cache.Size()
 }
 
 type chunkDataPackRequest struct {
