@@ -157,9 +157,11 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 		Hex("proposer_id", block.ProposerID[:]).
 		Logger()
 
+	log.Debug().Msg("proposal forwarded from compliance engine")
+
 	e.notifier.OnReceiveProposal(curView, proposal)
 	defer e.notifier.OnEventProcessed()
-	log.Debug().Msg("proposal forwarded from compliance engine")
+	log.Debug().Msg("proposal processed from compliance engine")
 
 	// ignore stale proposals
 	if block.View < e.forks.FinalizedView() {
@@ -334,12 +336,21 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 		Hex("leader_id", currentLeader[:]).Logger()
 	log.Debug().
 		Uint64("finalized_view", e.forks.FinalizedView()).
-		Msg("entering new view")
+		Msg("proposing for current view")
 	e.notifier.OnEnteringView(curView, currentLeader)
 
 	if e.committee.Self() != currentLeader {
 		return nil
 	}
+
+	// check if there is proposal for current view, if there is then nothing to do for us
+	for _, p := range e.forks.GetProposalsForView(curView) {
+		if p.Block.ProposerID == e.committee.Self() {
+			log.Debug().Msg("already proposed for current view")
+			return nil
+		}
+	}
+
 	log.Debug().Msg("generating block proposal as leader")
 
 	// as the leader of the current view,
@@ -383,6 +394,24 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 		return fmt.Errorf("can not make block proposal for curView %v: %w", curView, err)
 	}
 	e.notifier.OnProposingBlock(proposal)
+
+	// we want to store created proposal in forks to make sure that we don't create more proposals for
+	// current view. Due to asynchronous nature of our design it's possible that after creating proposal
+	// we will be asked to propose again for same view.
+	err = e.forks.AddProposal(proposal)
+	if err != nil {
+		return fmt.Errorf("could not add newly created proposal (%v): %w", proposal.Block.BlockID, err)
+	}
+
+	// notify vote aggregator about a new block, so that it can start verifying
+	// votes for it, this is possible in case we are two leaders in a row.
+	err = e.voteAggregator.AddBlock(proposal)
+	if err != nil {
+		// we specifically don't handle sentinel error here since it should be impossible to receive
+		// mempool.BelowPrunedThresholdError since we are creating proposal for view which has to be higher
+		// than latest pruned view.
+		return fmt.Errorf("could not add newly created proposal (%v) to vote aggregator: %w", proposal.Block.BlockID, err)
+	}
 
 	block := proposal.Block
 	log.Debug().
