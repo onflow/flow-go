@@ -246,6 +246,9 @@ type Payload struct {
 // migration and reporting (known callers) should abort.
 // CAUTION: do not modify returned key because it shares underlying data with payload key.
 func (p *Payload) Key() (Key, error) {
+	if p == nil || len(p.encKey) == 0 {
+		return Key{}, nil
+	}
 	k, err := decodeKey(p.encKey, true, PayloadVersion)
 	if err != nil {
 		return Key{}, err

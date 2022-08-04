@@ -83,7 +83,9 @@ func TestLegacyControllerMigration(t *testing.T) {
 	require.Equal(t, len(payloads), len(newPayloads))
 
 	for i, p := range newPayloads {
-		require.Equal(t, expectedKeys[i], p.Key)
+		k, err := p.Key()
+		require.NoError(t, err)
+		require.Equal(t, expectedKeys[i], k)
 	}
 
 }
