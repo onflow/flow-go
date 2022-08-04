@@ -115,7 +115,7 @@ func NewEpochLookup(state protocol.State) (*EpochLookup, error) {
 	}
 
 	lookup.Component = component.NewComponentManagerBuilder().
-		AddWorker(nil). // TODO
+		AddWorker(lookup.handleProtocolEvents).
 		Build()
 
 	final := state.Final()
