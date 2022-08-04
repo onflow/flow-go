@@ -322,13 +322,6 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 				in.finalizer.Calls = nil
 			}
 
-			// check on stop condition
-			// TODO: we can remove that once the single instance stop
-			// recursively calling into itself
-			if in.stop(&in) {
-				return errStopCondition
-			}
-
 			return nil
 		},
 	)
@@ -573,7 +566,6 @@ func (in *Instance) Run() error {
 				}
 			}
 		}
-
 	}
 }
 

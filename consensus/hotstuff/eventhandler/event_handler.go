@@ -403,16 +403,6 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 		return fmt.Errorf("could not add newly created proposal (%v): %w", proposal.Block.BlockID, err)
 	}
 
-	// notify vote aggregator about a new block, so that it can start verifying
-	// votes for it, this is possible in case we are two leaders in a row.
-	err = e.voteAggregator.AddBlock(proposal)
-	if err != nil {
-		// we specifically don't handle sentinel error here since it should be impossible to receive
-		// mempool.BelowPrunedThresholdError since we are creating proposal for view which has to be higher
-		// than latest pruned view.
-		return fmt.Errorf("could not add newly created proposal (%v) to vote aggregator: %w", proposal.Block.BlockID, err)
-	}
-
 	block := proposal.Block
 	log.Debug().
 		Uint64("block_view", block.View).

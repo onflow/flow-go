@@ -810,7 +810,7 @@ func (es *EventHandlerSuite) TestLeaderBuild100Blocks() {
 	}
 
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
-	require.Equal(es.T(), totalView, len(es.forks.proposals)-1)
+	require.Equal(es.T(), totalView, (len(es.forks.proposals)-1)/2)
 	es.voteAggregator.AssertExpectations(es.T())
 }
 
