@@ -279,6 +279,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		node.Tracer,
 		node.Metrics,
 		pusherEngine,
+		node.Log,
 	)
 	require.NoError(t, err)
 
