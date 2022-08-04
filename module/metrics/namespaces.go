@@ -40,7 +40,7 @@ const (
 
 // Observer subsystem
 const (
-	subsystemRouter = "router"
+	subsystemObserverGRPC = "observer_grpc"
 )
 
 // Collection subsystem
