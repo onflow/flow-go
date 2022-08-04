@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 
+	"github.com/fxamacker/cbor/v2"
 	cryptoHash "github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/ledger/common/bitutils"
 	"github.com/onflow/flow-go/ledger/common/hash"
@@ -239,6 +241,65 @@ type Payload struct {
 	// Version and type data are not encoded to save 3 bytes.
 	encKey encKey
 	value  Value
+}
+
+// serializablePayload is used to serialize ledger.Payload.
+// Encoder only serializes exported fields and ledger.Payload's
+// key and value fields are not exported.  So it is necessary to
+// use serializablePayload for encoding.
+type serializablePayload struct {
+	Key   Key
+	Value Value
+}
+
+// MarshalJSON returns JSON encoding of p.
+func (p Payload) MarshalJSON() ([]byte, error) {
+	k, err := p.Key()
+	if err != nil {
+		return nil, err
+	}
+	sp := serializablePayload{Key: k, Value: p.value}
+	return json.Marshal(sp)
+}
+
+// UnmarshalJSON unmarshals a JSON value of payload.
+func (p *Payload) UnmarshalJSON(b []byte) error {
+	if p == nil {
+		return errors.New("UnmarshalJSON on nil payload")
+	}
+	var sp serializablePayload
+	if err := json.Unmarshal(b, &sp); err != nil {
+		return err
+	}
+	p.encKey = encodeKey(&sp.Key, PayloadVersion)
+	p.value = make([]byte, len(sp.Value))
+	copy(p.value, sp.Value)
+	return nil
+}
+
+// MarshalCBOR returns CBOR encoding of p.
+func (p Payload) MarshalCBOR() ([]byte, error) {
+	k, err := p.Key()
+	if err != nil {
+		return nil, err
+	}
+	sp := serializablePayload{Key: k, Value: p.value}
+	return cbor.Marshal(sp)
+}
+
+// UnmarshalCBOR unmarshals a CBOR value of payload.
+func (p *Payload) UnmarshalCBOR(b []byte) error {
+	if p == nil {
+		return errors.New("UnmarshalCBOR on nil payload")
+	}
+	var sp serializablePayload
+	if err := cbor.Unmarshal(b, &sp); err != nil {
+		return err
+	}
+	p.encKey = encodeKey(&sp.Key, PayloadVersion)
+	p.value = make([]byte, len(sp.Value))
+	copy(p.value, sp.Value)
+	return nil
 }
 
 // Key returns payload key.
