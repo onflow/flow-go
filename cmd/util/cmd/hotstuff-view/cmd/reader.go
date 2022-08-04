@@ -27,10 +27,10 @@ func (r *Reader) SetHotstuffView(view uint64) error {
 		return err
 	}
 	if view < currentView {
-		return fmt.Error("hotstuff view %v cannot be lower than current view (%d)", view, currentView)
+		return fmt.Errorf("hotstuff view %v cannot be lower than current view (%d)", view, currentView)
 	}
 
-	err := r.persister.PutStarted(view)
+	err = r.persister.PutStarted(view)
 	if err != nil {
 		return fmt.Errorf("could not put hotstuff view %v: %w", view, err)
 	}
