@@ -63,7 +63,7 @@ network-tests:
 
 .PHONY: observer-tests
 observer-tests:
-	GO111MODULE=on go test $(if $(VERBOSE),-v,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/observer/...
+	go test $(if $(VERBOSE),-v,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/observer/...
 
 # BFT tests need to be run sequentially (-p 1) due to interference between different Docker networks when tests are run in parallel
 .PHONY: bft-tests
