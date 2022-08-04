@@ -85,7 +85,7 @@ func (i *TransactionInvoker) Process(
 	if err != nil {
 		return fmt.Errorf("error creating new environment: %w", err)
 	}
-	predeclaredValues := valueDeclarations(ctx, env)
+	predeclaredValues := valueDeclarations(env)
 
 	location := common.TransactionLocation(proc.ID)
 
@@ -101,7 +101,7 @@ func (i *TransactionInvoker) Process(
 		},
 	)
 	if err != nil {
-		var interactionLimiExceededErr *errors.LedgerIntractionLimitExceededError
+		var interactionLimiExceededErr *errors.LedgerInteractionLimitExceededError
 		if errors.As(err, &interactionLimiExceededErr) {
 			// If it is this special interaction limit error, just set it directly as the tx error
 			txError = err
@@ -227,7 +227,6 @@ func (i *TransactionInvoker) deductTransactionFees(
 	inclusionEffort := uint64(100_000_000)
 	_, err = InvokeDeductTransactionFeesContract(
 		env,
-		proc.TraceSpan,
 		proc.Transaction.Payer,
 		inclusionEffort,
 		computationUsed)
@@ -256,10 +255,10 @@ var setAccountFrozenFunctionType = &sema.FunctionType{
 	},
 }
 
-func valueDeclarations(ctx *Context, env Environment) []runtime.ValueDeclaration {
+func valueDeclarations(env Environment) []runtime.ValueDeclaration {
 	var predeclaredValues []runtime.ValueDeclaration
 
-	if ctx.AccountFreezeEnabled {
+	if env.AccountFreezeEnabled() {
 		// TODO return the errors instead of panicing
 
 		setAccountFrozen := runtime.ValueDeclaration{

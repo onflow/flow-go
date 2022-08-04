@@ -3,7 +3,6 @@ package fvm
 import (
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
-	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
@@ -40,17 +39,13 @@ func NewContractFunctionInvoker(
 	}
 }
 
-func (i *ContractFunctionInvoker) Invoke(env Environment, parentTraceSpan otelTrace.Span) (cadence.Value, error) {
+func (i *ContractFunctionInvoker) Invoke(env Environment) (cadence.Value, error) {
 
-	ctx := env.Context()
-	if ctx.Tracer != nil && parentTraceSpan != nil {
-		span := ctx.Tracer.StartSpanFromParent(parentTraceSpan, trace.FVMInvokeContractFunction)
-		span.SetAttributes(i.logSpanAttrs...)
+	span := env.StartSpanFromRoot(trace.FVMInvokeContractFunction)
+	span.SetAttributes(i.logSpanAttrs...)
+	defer span.End()
 
-		defer span.End()
-	}
-
-	predeclaredValues := valueDeclarations(ctx, env)
+	predeclaredValues := valueDeclarations(env)
 
 	value, err := env.VM().Runtime.InvokeContractFunction(
 		i.contractLocation,
