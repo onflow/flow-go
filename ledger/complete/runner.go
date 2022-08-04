@@ -17,6 +17,8 @@ type runner struct {
 	checkpointsToKeep int // the max number of checkpoint files to keep on disk in order to prevent too many checkpoint files filling disk.
 }
 
+var _ CheckpointRunner = (*runner)(nil)
+
 func NewRunner(logger zerolog.Logger, checkpointer *realWAL.Checkpointer, checkpointsToKeep uint) *runner {
 	return &runner{
 		logger:            logger,
@@ -25,7 +27,7 @@ func NewRunner(logger zerolog.Logger, checkpointer *realWAL.Checkpointer, checkp
 	}
 }
 
-func (r *runner) runCheckpoint(ctx context.Context, checkpointTries []*trie.MTrie, checkpointNum int) error {
+func (r *runner) RunCheckpoint(ctx context.Context, checkpointTries []*trie.MTrie, checkpointNum int) error {
 	err := r.createCheckpoint(r.checkpointer, r.logger, checkpointTries, checkpointNum)
 	if err != nil {
 		return fmt.Errorf("cannot create checkpoints: %w", err)
@@ -74,7 +76,8 @@ func (r *runner) createCheckpoint(checkpointer *realWAL.Checkpointer, logger zer
 	}
 
 	duration := time.Since(startTime)
-	lg.Info().Float64("total_time_s", duration.Seconds()).Msgf("created checkpoint %d", checkpointNum)
+	lg.Info().Float64("total_time_s", duration.Seconds()).Msgf("created checkpoint %d at %v", checkpointNum,
+		checkpointer.CheckpointPathByNumber(checkpointNum))
 
 	return nil
 }
@@ -88,6 +91,8 @@ func (r *runner) cleanupCheckpoints() error {
 	checkpointsToRemove := findCheckpointsToRemove(checkpoints, r.checkpointsToKeep)
 
 	for _, checkpointNum := range checkpointsToRemove {
+		r.logger.Info().Msgf("removing checkpoint %v at %v", checkpointNum, r.checkpointer.CheckpointPathByNumber(checkpointNum))
+
 		err := r.checkpointer.RemoveCheckpoint(checkpointNum)
 		if err != nil {
 			return fmt.Errorf("cannot remove checkpoint %d: %w", checkpointNum, err)
@@ -100,6 +105,11 @@ func (r *runner) cleanupCheckpoints() error {
 // findCheckpointsToRemove takes a list of checkpoint file nums, and count for how many checkpoint files to keep,
 // it returns the checkpoint file nums to be removed, which are the oldest checkpoint files.
 func findCheckpointsToRemove(checkpoints []int, checkpointToKeep int) []int {
+	// 0 means remove nothing and keep all
+	if checkpointToKeep == 0 {
+		return nil
+	}
+
 	if len(checkpoints) <= checkpointToKeep {
 		return nil
 	}

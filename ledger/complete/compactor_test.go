@@ -405,10 +405,10 @@ func TestCompactorAccuracy(t *testing.T) {
 			wal, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, forestCapacity, pathByteSize, 32*1024)
 			require.NoError(t, err)
 
-			l, err := NewLedger(wal, forestCapacity, metricsCollector, zerolog.Logger{}, DefaultPathFinderVersion)
+			l, err := NewLedger(wal, forestCapacity, metricsCollector, unittest.Logger(), DefaultPathFinderVersion)
 			require.NoError(t, err)
 
-			compactor, err := NewCompactor(l, wal, zerolog.Nop(), forestCapacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+			compactor, err := NewCompactor(l, wal, unittest.Logger(), forestCapacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
 			require.NoError(t, err)
 
 			fromBound := lastCheckpointNum + (size / 2)
@@ -460,6 +460,7 @@ func TestCompactorAccuracy(t *testing.T) {
 
 			nums, err := checkpointer.Checkpoints()
 			require.NoError(t, err)
+			require.True(t, len(nums) > 0, "should have checkpoint, but got no checkpoint")
 
 			for _, n := range nums {
 				// TODO:  After the LRU Cache (outside of checkpointing code) is replaced
@@ -613,7 +614,7 @@ func TestCompactorConcurrency(t *testing.T) {
 		wal, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, forestCapacity, pathByteSize, 32*1024)
 		require.NoError(t, err)
 
-		l, err := NewLedger(wal, forestCapacity, metricsCollector, zerolog.Logger{}, DefaultPathFinderVersion)
+		l, err := NewLedger(wal, forestCapacity, metricsCollector, unittest.Logger(), DefaultPathFinderVersion)
 		require.NoError(t, err)
 
 		compactor, err := NewCompactor(l, wal, zerolog.Nop(), forestCapacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
