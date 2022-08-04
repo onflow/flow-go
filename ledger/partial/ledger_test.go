@@ -20,8 +20,18 @@ import (
 
 func TestFunctionalityWithCompleteTrie(t *testing.T) {
 
-	l, err := complete.NewLedger(&fixtures.NoopWAL{}, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+	w := &fixtures.NoopWAL{}
+
+	l, err := complete.NewLedger(w, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 	require.NoError(t, err)
+
+	compactor := fixtures.NewNoopCompactor(l)
+	<-compactor.Ready()
+
+	defer func() {
+		<-l.Done()
+		<-compactor.Done()
+	}()
 
 	// create empty update
 	state := l.InitialState()

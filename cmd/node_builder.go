@@ -147,6 +147,7 @@ type BaseConfig struct {
 	UnicastMessageTimeout           time.Duration
 	DNSCacheTTL                     time.Duration
 	profilerEnabled                 bool
+	uploaderEnabled                 bool
 	profilerDir                     string
 	profilerInterval                time.Duration
 	profilerDuration                time.Duration
@@ -239,6 +240,7 @@ func DefaultBaseConfig() *BaseConfig {
 		UnicastMessageTimeout:           p2p.DefaultUnicastTimeout,
 		metricsPort:                     8080,
 		profilerEnabled:                 false,
+		uploaderEnabled:                 false,
 		profilerDir:                     "profiler",
 		profilerInterval:                15 * time.Minute,
 		profilerDuration:                10 * time.Second,

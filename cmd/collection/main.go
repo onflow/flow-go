@@ -57,6 +57,7 @@ func main() {
 		maxCollectionByteSize                  uint64
 		maxCollectionTotalGas                  uint64
 		builderExpiryBuffer                    uint
+		builderPayerRateLimitDryRun            bool
 		builderPayerRateLimit                  float64
 		builderUnlimitedPayers                 []string
 		hotstuffTimeout                        time.Duration
@@ -116,6 +117,8 @@ func main() {
 			"how many additional cluster members we propagate transactions to")
 		flags.UintVar(&builderExpiryBuffer, "builder-expiry-buffer", builder.DefaultExpiryBuffer,
 			"expiry buffer for transactions in proposed collections")
+		flags.BoolVar(&builderPayerRateLimitDryRun, "builder-rate-limit-dry-run", false,
+			"determines whether rate limit configuration should be enforced (false), or only logged (true)")
 		flags.Float64Var(&builderPayerRateLimit, "builder-rate-limit", builder.DefaultMaxPayerTransactionRate, // no rate limiting
 			"rate limit for each payer (transactions/collection)")
 		flags.StringSliceVar(&builderUnlimitedPayers, "builder-unlimited-payers", []string{}, // no unlimited payers
@@ -418,10 +421,12 @@ func main() {
 				node.Tracer,
 				colMetrics,
 				push,
+				node.Logger,
 				builder.WithMaxCollectionSize(maxCollectionSize),
 				builder.WithMaxCollectionByteSize(maxCollectionByteSize),
 				builder.WithMaxCollectionTotalGas(maxCollectionTotalGas),
 				builder.WithExpiryBuffer(builderExpiryBuffer),
+				builder.WithRateLimitDryRun(builderPayerRateLimitDryRun),
 				builder.WithMaxPayerTransactionRate(builderPayerRateLimit),
 				builder.WithUnlimitedPayers(unlimitedPayers...),
 			)

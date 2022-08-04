@@ -271,6 +271,14 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 
 	f, _ := completeLedger.NewLedger(&fixtures.NoopWAL{}, 1000, metricsCollector, zerolog.Nop(), completeLedger.DefaultPathFinderVersion)
 
+	compactor := fixtures.NewNoopCompactor(f)
+	<-compactor.Ready()
+
+	defer func() {
+		<-f.Done()
+		<-compactor.Done()
+	}()
+
 	keys := executionState.RegisterIDSToKeys(ids)
 	update, err := ledger.NewUpdate(
 		f.InitialState(),
