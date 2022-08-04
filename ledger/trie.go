@@ -242,6 +242,8 @@ type Payload struct {
 }
 
 // Key returns payload key.
+// Error indicates that ledger.Key can't be created from payload key, so
+// migration and reporting (known callers) should abort.
 // CAUTION: do not modify returned key because it shares underlying data with payload key.
 func (p *Payload) Key() (Key, error) {
 	k, err := decodeKey(p.encKey, true, PayloadVersion)
