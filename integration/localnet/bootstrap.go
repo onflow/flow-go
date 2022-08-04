@@ -317,40 +317,24 @@ func prepareServiceDirs(role string, nodeId string) (string, string) {
 func prepareService(container testnet.ContainerConfig, i int, n int) Service {
 	dataDir, profilerDir := prepareServiceDirs(container.Role.String(), container.NodeID.String())
 
-	service := Service{
-		Image: fmt.Sprintf("localnet-%s", container.Role),
-		Command: []string{
-			fmt.Sprintf("--nodeid=%s", container.NodeID),
-			"--bootstrapdir=/bootstrap",
-			"--datadir=/data/protocol",
-			"--secretsdir=/data/secret",
-			"--loglevel=DEBUG",
-			fmt.Sprintf("--profiler-enabled=%t", profiler),
-			fmt.Sprintf("--tracer-enabled=%t", tracing),
-			"--profiler-dir=/profiler",
-			"--profiler-interval=2m",
-		},
-		Volumes: []string{
-			fmt.Sprintf("%s:/bootstrap:z", BootstrapDir),
-			fmt.Sprintf("%s:/profiler:z", profilerDir),
-			fmt.Sprintf("%s:/data:z", dataDir),
-		},
-		Environment: []string{
-			// https://github.com/open-telemetry/opentelemetry-specification/blob/v1.12.0/specification/protocol/exporter.md
-			"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4317",
-			"OTEL_EXPORTER_OTLP_TRACES_INSECURE=true",
-			"BINSTAT_ENABLE",
-			"BINSTAT_LEN_WHAT",
-			"BINSTAT_DMP_NAME",
-			"BINSTAT_DMP_PATH",
-		},
-		Labels: map[string]string{
-			"com.dapperlabs.role": container.Role.String(),
-			"com.dapperlabs.num":  fmt.Sprintf("%03d", i+1),
-		},
+	service := defaultService(container.Role.String(), i)
+	service.Command = []string{
+		fmt.Sprintf("--nodeid=%s", container.NodeID),
+		"--bootstrapdir=/bootstrap",
+		"--datadir=/data/protocol",
+		"--secretsdir=/data/secret",
+		"--loglevel=DEBUG",
+		fmt.Sprintf("--profiler-enabled=%t", profiler),
+		fmt.Sprintf("--tracer-enabled=%t", tracing),
+		"--profiler-dir=/profiler",
+		"--profiler-interval=2m",
+		fmt.Sprintf("--admin-addr=:%v", AdminToolPort),
 	}
-
-	service.Command = append(service.Command, fmt.Sprintf("--admin-addr=:%v", AdminToolPort))
+	service.Volumes = []string{
+		fmt.Sprintf("%s:/bootstrap:z", BootstrapDir),
+		fmt.Sprintf("%s:/profiler:z", profilerDir),
+		fmt.Sprintf("%s:/data:z", dataDir),
+	}
 
 	// only specify build config for first service of each role
 	if i == 0 {
@@ -508,41 +492,30 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 	// Observers have a unique naming scheme omitting node id being on the public network
 	dataDir, profilerDir := prepareServiceDirs(observerName, "")
 
-	observerService := Service{
-		Image: fmt.Sprintf("localnet-%s", DefaultObserverName),
-		Command: []string{
-			fmt.Sprintf("--bootstrap-node-addresses=%s:%d", DefaultAccessGatewayName, AccessPubNetworkPort),
-			fmt.Sprintf("--bootstrap-node-public-keys=%s", agPublicKey),
-			fmt.Sprintf("--upstream-node-addresses=%s:%d", DefaultAccessGatewayName, SecuredRPCPort),
-			fmt.Sprintf("--upstream-node-public-keys=%s", agPublicKey),
-			fmt.Sprintf("--observer-networking-key-path=/bootstrap/private-root-information/%s_key", observerName),
-			fmt.Sprintf("--bind=0.0.0.0:0"),
-			fmt.Sprintf("--rpc-addr=%s:%d", observerName, RPCPort),
-			fmt.Sprintf("--secure-rpc-addr=%s:%d", observerName, SecuredRPCPort),
-			fmt.Sprintf("--http-addr=%s:%d", observerName, HTTPPort),
-			"--bootstrapdir=/bootstrap",
-			"--datadir=/data/protocol",
-			"--secretsdir=/data/secret",
-			"--loglevel=DEBUG",
-			fmt.Sprintf("--profiler-enabled=%t", profiler),
-			fmt.Sprintf("--tracer-enabled=%t", tracing),
-			"--profiler-dir=/profiler",
-			"--profiler-interval=2m",
-		},
-		Volumes: []string{
-			fmt.Sprintf("%s:/bootstrap:z", BootstrapDir),
-			fmt.Sprintf("%s:/profiler:z", profilerDir),
-			fmt.Sprintf("%s:/data:z", dataDir),
-		},
-		Environment: []string{
-			// https://github.com/open-telemetry/opentelemetry-specification/blob/v1.12.0/specification/protocol/exporter.md
-			"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4317",
-			"OTEL_EXPORTER_OTLP_TRACES_INSECURE=true",
-			"BINSTAT_ENABLE",
-			"BINSTAT_LEN_WHAT",
-			"BINSTAT_DMP_NAME",
-			"BINSTAT_DMP_PATH",
-		},
+	observerService := defaultService(DefaultObserverName, i)
+	observerService.Command = []string{
+		fmt.Sprintf("--bootstrap-node-addresses=%s:%d", DefaultAccessGatewayName, AccessPubNetworkPort),
+		fmt.Sprintf("--bootstrap-node-public-keys=%s", agPublicKey),
+		fmt.Sprintf("--upstream-node-addresses=%s:%d", DefaultAccessGatewayName, SecuredRPCPort),
+		fmt.Sprintf("--upstream-node-public-keys=%s", agPublicKey),
+		fmt.Sprintf("--observer-networking-key-path=/bootstrap/private-root-information/%s_key", observerName),
+		fmt.Sprintf("--bind=0.0.0.0:0"),
+		fmt.Sprintf("--rpc-addr=%s:%d", observerName, RPCPort),
+		fmt.Sprintf("--secure-rpc-addr=%s:%d", observerName, SecuredRPCPort),
+		fmt.Sprintf("--http-addr=%s:%d", observerName, HTTPPort),
+		"--bootstrapdir=/bootstrap",
+		"--datadir=/data/protocol",
+		"--secretsdir=/data/secret",
+		"--loglevel=DEBUG",
+		fmt.Sprintf("--profiler-enabled=%t", profiler),
+		fmt.Sprintf("--tracer-enabled=%t", tracing),
+		"--profiler-dir=/profiler",
+		"--profiler-interval=2m",
+	}
+	observerService.Volumes = []string{
+		fmt.Sprintf("%s:/bootstrap:z", BootstrapDir),
+		fmt.Sprintf("%s:/profiler:z", profilerDir),
+		fmt.Sprintf("%s:/data:z", dataDir),
 	}
 	observerService.DependsOn = []string{}
 	if i == 0 {
@@ -572,6 +545,27 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 		fmt.Sprintf("%d:%d", (accessCount*2)+AccessAPIPort+(2*i)+1, SecuredRPCPort),
 	}
 	return observerService
+}
+
+func defaultService(role string, i int) Service {
+	num := fmt.Sprintf("%03d", i+1)
+	return Service{
+		Image: fmt.Sprintf("localnet-%s", role),
+		Environment: []string{
+			// https://github.com/open-telemetry/opentelemetry-specification/blob/v1.12.0/specification/protocol/exporter.md
+			"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4317",
+			"OTEL_EXPORTER_OTLP_TRACES_INSECURE=true",
+			fmt.Sprintf("OTEL_RESOURCE_ATTRIBUTES=network=localnet,role=%s,num=%s", role, num),
+			"BINSTAT_ENABLE",
+			"BINSTAT_LEN_WHAT",
+			"BINSTAT_DMP_NAME",
+			"BINSTAT_DMP_PATH",
+		},
+		Labels: map[string]string{
+			"com.dapperlabs.role": role,
+			"com.dapperlabs.num":  num,
+		},
+	}
 }
 
 func writeDockerComposeConfig(services Services) error {
