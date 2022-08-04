@@ -433,7 +433,7 @@ func (e *TransactionEnv) ServiceEvents() []flow.Event {
 }
 
 func (e *TransactionEnv) Meter(kind common.ComputationKind, intensity uint) error {
-	if e.sth.EnforceComputationLimits {
+	if e.sth.EnforceComputationLimits() {
 		return e.sth.State().MeterComputation(kind, intensity)
 	}
 	return nil

@@ -305,7 +305,7 @@ func (e *ScriptEnv) Meter(kind common.ComputationKind, intensity uint) error {
 		return err
 	}
 
-	if e.sth.EnforceComputationLimits {
+	if e.sth.EnforceComputationLimits() {
 		return e.sth.State().MeterComputation(kind, intensity)
 	}
 	return nil
