@@ -318,47 +318,18 @@ func prepareService(container testnet.ContainerConfig, i int, n int) Service {
 	dataDir, profilerDir := prepareServiceDirs(container.Role.String(), container.NodeID.String())
 
 	service := defaultService(container.Role.String(), i)
-	service.Command = []string{
+	service.Command = append(service.Command, []string{
 		fmt.Sprintf("--nodeid=%s", container.NodeID),
-		"--bootstrapdir=/bootstrap",
-		"--datadir=/data/protocol",
-		"--secretsdir=/data/secret",
-		"--loglevel=DEBUG",
-		fmt.Sprintf("--profiler-enabled=%t", profiler),
-		fmt.Sprintf("--tracer-enabled=%t", tracing),
-		"--profiler-dir=/profiler",
-		"--profiler-interval=2m",
-		fmt.Sprintf("--admin-addr=:%v", AdminToolPort),
-	}
-	service.Volumes = []string{
-		fmt.Sprintf("%s:/bootstrap:z", BootstrapDir),
+	}...)
+	service.Volumes = append(service.Volumes, []string{
 		fmt.Sprintf("%s:/profiler:z", profilerDir),
 		fmt.Sprintf("%s:/data:z", dataDir),
-	}
+	}...)
 
-	// only specify build config for first service of each role
 	if i == 0 {
-		service.Build = Build{
-			Context:    "../../",
-			Dockerfile: "cmd/Dockerfile",
-			Args: map[string]string{
-				"TARGET":  fmt.Sprintf("./cmd/%s", container.Role.String()),
-				"VERSION": build.Semver(),
-				"COMMIT":  build.Commit(),
-				"GOARCH":  runtime.GOARCH,
-			},
-			Target: "production",
-		}
-
 		// bring up access node before any other nodes
 		if container.Role == flow.RoleConsensus || container.Role == flow.RoleCollection {
-			service.DependsOn = []string{"access_1"}
-		}
-
-	} else {
-		// remaining services of this role must depend on first service
-		service.DependsOn = []string{
-			fmt.Sprintf("%s_1", container.Role),
+			service.DependsOn = append(service.DependsOn, []string{"access_1"}...)
 		}
 	}
 
@@ -493,7 +464,7 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 	dataDir, profilerDir := prepareServiceDirs(observerName, "")
 
 	observerService := defaultService(DefaultObserverName, i)
-	observerService.Command = []string{
+	observerService.Command = append(observerService.Command, []string{
 		fmt.Sprintf("--bootstrap-node-addresses=%s:%d", DefaultAccessGatewayName, AccessPubNetworkPort),
 		fmt.Sprintf("--bootstrap-node-public-keys=%s", agPublicKey),
 		fmt.Sprintf("--upstream-node-addresses=%s:%d", DefaultAccessGatewayName, SecuredRPCPort),
@@ -503,37 +474,12 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 		fmt.Sprintf("--rpc-addr=%s:%d", observerName, RPCPort),
 		fmt.Sprintf("--secure-rpc-addr=%s:%d", observerName, SecuredRPCPort),
 		fmt.Sprintf("--http-addr=%s:%d", observerName, HTTPPort),
-		"--bootstrapdir=/bootstrap",
-		"--datadir=/data/protocol",
-		"--secretsdir=/data/secret",
-		"--loglevel=DEBUG",
-		fmt.Sprintf("--profiler-enabled=%t", profiler),
-		fmt.Sprintf("--tracer-enabled=%t", tracing),
-		"--profiler-dir=/profiler",
-		"--profiler-interval=2m",
-	}
-	observerService.Volumes = []string{
-		fmt.Sprintf("%s:/bootstrap:z", BootstrapDir),
+	}...)
+	observerService.Volumes = append(observerService.Volumes, []string{
 		fmt.Sprintf("%s:/profiler:z", profilerDir),
 		fmt.Sprintf("%s:/data:z", dataDir),
-	}
-	observerService.DependsOn = []string{}
-	if i == 0 {
-		observerService.Build = Build{
-			Context:    "../../",
-			Dockerfile: "cmd/Dockerfile",
-			Args: map[string]string{
-				"TARGET":  "./cmd/observer",
-				"VERSION": build.Semver(),
-				"COMMIT":  build.Commit(),
-				"GOARCH":  runtime.GOARCH,
-			},
-			Target: "production",
-		}
-	} else {
-		// remaining services of this role must depend on first service
-		observerService.DependsOn = append(observerService.DependsOn, fmt.Sprintf("%s_1", DefaultObserverName))
-	}
+	}...)
+
 	// observer services rely on the access gateway
 	observerService.DependsOn = append(observerService.DependsOn, DefaultAccessGatewayName)
 	observerService.Ports = []string{
@@ -549,8 +495,21 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 
 func defaultService(role string, i int) Service {
 	num := fmt.Sprintf("%03d", i+1)
-	return Service{
+	service := Service{
 		Image: fmt.Sprintf("localnet-%s", role),
+		Command: []string{
+			"--bootstrapdir=/bootstrap",
+			"--datadir=/data/protocol",
+			"--secretsdir=/data/secret",
+			"--loglevel=DEBUG",
+			fmt.Sprintf("--profiler-enabled=%t", profiler),
+			fmt.Sprintf("--tracer-enabled=%t", tracing),
+			"--profiler-dir=/profiler",
+			"--profiler-interval=2m",
+		},
+		Volumes: []string{
+			fmt.Sprintf("%s:/bootstrap:z", BootstrapDir),
+		},
 		Environment: []string{
 			// https://github.com/open-telemetry/opentelemetry-specification/blob/v1.12.0/specification/protocol/exporter.md
 			"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4317",
@@ -566,6 +525,28 @@ func defaultService(role string, i int) Service {
 			"com.dapperlabs.num":  num,
 		},
 	}
+
+	if i == 0 {
+		// only specify build config for first service of each role
+		service.Build = Build{
+			Context:    "../../",
+			Dockerfile: "cmd/Dockerfile",
+			Args: map[string]string{
+				"TARGET":  fmt.Sprintf("./cmd/%s", role),
+				"VERSION": build.Semver(),
+				"COMMIT":  build.Commit(),
+				"GOARCH":  runtime.GOARCH,
+			},
+			Target: "production",
+		}
+	} else {
+		// remaining services of this role must depend on first service
+		service.DependsOn = []string{
+			fmt.Sprintf("%s_1", role),
+		}
+	}
+
+	return service
 }
 
 func writeDockerComposeConfig(services Services) error {
