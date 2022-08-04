@@ -491,10 +491,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 	// check if remotePeer is staked and not ejected to avoid decoding messages from unauthenticated peer
 	id, err := m.authenticateUnicastStream(remotePeer)
 	if errors.Is(err, validator.ErrIdentityUnverified) {
-		m.log.
-			Error().
-			Err(err).
-			Msg("unicast authorized sender validation failed")
+		m.slashingViolationsConsumer.OnUnAuthorizedSenderError(id, remotePeer.String(), "", "", true, err)
 		return
 	} else if errors.Is(err, validator.ErrSenderEjected) {
 		m.slashingViolationsConsumer.OnSenderEjectedError(id, remotePeer.String(), "", "", true, err)
@@ -623,7 +620,7 @@ func (m *Middleware) Subscribe(channel channels.Channel) error {
 
 	var peerFilter peerFilterFunc
 	var validators []validator.PubSubMessageValidator
-	if channels.PublicChannels().Contains(channel) {
+	if channels.IsPublicChannel(channel) {
 		// NOTE: for public channels the callback used to check if a node is staked will
 		// return true for every node.
 		peerFilter = allowAll

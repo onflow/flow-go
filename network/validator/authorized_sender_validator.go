@@ -26,6 +26,11 @@ var (
 // Authorization config is defined in message.MsgAuthConfig.
 func AuthorizedSenderValidator(log zerolog.Logger, slashingViolationsConsumer slashing.ViolationsConsumer, channel channels.Channel, isUnicast bool, getIdentity func(peer.ID) (*flow.Identity, bool)) MessageValidator {
 	return func(ctx context.Context, from peer.ID, msg interface{}) (string, error) {
+		// skip validation if channel is a public channel
+		if channels.IsPublicChannel(channel) {
+			return "", nil
+		}
+
 		// NOTE: messages from unstaked nodes should be rejected by the libP2P node topic validator
 		// before they reach message validators. If a message from a unstaked peer gets to this point
 		// something terrible went wrong.
