@@ -95,7 +95,7 @@ func (cache *epochRangeCache) add(epoch epochRange) error {
 // EpochLookup implements the EpochLookup interface using protocol state to match views to epochs.
 type EpochLookup struct {
 	state                    protocol.State
-	mu                       *sync.RWMutex
+	mu                       sync.RWMutex
 	epochs                   epochRangeCache
 	committedEpochsCh        chan *flow.Header // protocol events for newly committed epochs (the first block of the epoch is passed over the channel)
 	epochFallbackIsTriggered *atomic.Bool      // true when epoch fallback is triggered
