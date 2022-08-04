@@ -135,6 +135,11 @@ func NewBuilder(log zerolog.Logger,
 	var cache *lru.Cache
 	cacheSize := config.ConnectionPoolSize
 	if cacheSize > 0 {
+		// it was observed that eviction issues were occurring when the pool size was less than number of ENs + LNs
+		if cacheSize < 249 {
+			log.Debug().Msg("defaulting the connection pool size to 250")
+			cacheSize = 250
+		}
 		var err error
 		cache, err = lru.NewWithEvict(int(cacheSize), func(_, evictedValue interface{}) {
 			store := evictedValue.(*backend.CachedClient)
