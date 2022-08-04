@@ -777,7 +777,7 @@ func (b *backendTransactions) tryGetTransactionResultsByBlockID(
 
 	resp, err := execRPCClient.GetTransactionResultsByBlockID(ctx, &req)
 	if err != nil {
-		if status.Code(err) == codes.Unavailable && conn == nil  {
+		if status.Code(err) == codes.Unavailable && conn == nil {
 			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
 		}
 		return nil, err
@@ -838,7 +838,7 @@ func (b *backendTransactions) tryGetTransactionResultByIndex(
 
 	resp, err := execRPCClient.GetTransactionResultByIndex(ctx, &req)
 	if err != nil {
-		if status.Code(err) == codes.Unavailable && conn == nil  {
+		if status.Code(err) == codes.Unavailable && conn == nil {
 			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
 		}
 		return nil, err
