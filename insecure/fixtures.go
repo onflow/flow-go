@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-const DEFAULT_ADDRESS = "localhost:0"
+const DefaultAddress = "localhost:0"
 
 // EgressMessageFixture creates and returns a randomly generated gRPC egress message that is sent between a corruptible conduit and the attack network.
 // It also generates and returns the corresponding application-layer event of that message, which is sent between the attack network and the
@@ -67,7 +67,7 @@ func EgressMessageFixture(t *testing.T, codec network.Codec, protocol Protocol, 
 		TargetIds:         targetIds,
 	}
 
-	return m, e, unittest.IdentityFixture(unittest.WithNodeID(originId), unittest.WithAddress(DEFAULT_ADDRESS))
+	return m, e, unittest.IdentityFixture(unittest.WithNodeID(originId), unittest.WithAddress(DefaultAddress))
 }
 
 // IngressMessageFixture creates and returns a randomly generated gRPC ingress message that is sent between a corruptible conduit and the attack network.
@@ -117,7 +117,7 @@ func IngressMessageFixture(t *testing.T, codec network.Codec, protocol Protocol,
 		TargetIds:         targetIds,
 	}
 
-	return m, e, unittest.IdentityFixture(unittest.WithNodeID(originId), unittest.WithAddress(DEFAULT_ADDRESS))
+	return m, e, unittest.IdentityFixture(unittest.WithNodeID(originId), unittest.WithAddress(DefaultAddress))
 }
 
 // EgressMessageFixtures creates and returns randomly generated gRCP messages and their corresponding protocol-level events.

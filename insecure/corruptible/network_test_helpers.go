@@ -31,7 +31,7 @@ func corruptibleNetworkFixture(t *testing.T, logger zerolog.Logger, corruptedID 
 	// create corruptible network with no attacker registered
 	codec := unittest.NetworkCodec()
 
-	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DEFAULT_ADDRESS))
+	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DefaultAddress))
 	// some tests will want to create corruptible network with a specific ID
 	if len(corruptedID) > 0 {
 		corruptedIdentity = corruptedID[0]
@@ -63,7 +63,7 @@ func corruptibleNetworkFixture(t *testing.T, logger zerolog.Logger, corruptedID 
 	corruptibleNetwork, err := NewCorruptibleNetwork(
 		logger,
 		flow.BftTestnet,
-		insecure.DEFAULT_ADDRESS,
+		insecure.DefaultAddress,
 		testutil.LocalFixture(t, corruptedIdentity),
 		codec,
 		flowNetwork,
@@ -84,7 +84,7 @@ func withCorruptibleNetwork(t *testing.T, logger zerolog.Logger,
 		insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that attack network uses to send messages to this ccf.
 	)) {
 
-	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DEFAULT_ADDRESS))
+	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DefaultAddress))
 
 	// life-cycle management of corruptible network
 	ctx, cancel := context.WithCancel(context.Background())

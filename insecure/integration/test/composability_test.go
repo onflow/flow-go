@@ -93,7 +93,7 @@ func TestCorruptibleConduitFrameworkHappyPath(t *testing.T) {
 // withCorruptibleNetwork creates a real corruptible network, starts it, runs the "run" function, and then stops it.
 func withCorruptibleNetwork(t *testing.T, run func(*testing.T, flow.Identity, *corruptible.Network, *stub.Hub)) {
 	codec := unittest.NetworkCodec()
-	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DEFAULT_ADDRESS))
+	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DefaultAddress))
 
 	// life-cycle management of attackNetwork.
 	ctx, cancel := context.WithCancel(context.Background())
@@ -112,7 +112,7 @@ func withCorruptibleNetwork(t *testing.T, run func(*testing.T, flow.Identity, *c
 	corruptibleNetwork, err := corruptible.NewCorruptibleNetwork(
 		unittest.Logger(),
 		flow.BftTestnet,
-		insecure.DEFAULT_ADDRESS,
+		insecure.DefaultAddress,
 		testutil.LocalFixture(t, corruptedIdentity),
 		codec,
 		flowNetwork,
