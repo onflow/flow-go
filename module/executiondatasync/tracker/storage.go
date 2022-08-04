@@ -143,14 +143,14 @@ type Storage interface {
 
 	GetPrunedHeight() (uint64, error)
 
-	// Prune removes all data from storage corresponding to
-	// block heights up to and including the given height,
+	// PruneUpToHeight removes all data from storage corresponding
+	// to block heights up to and including the given height,
 	// and updates the latest pruned height value.
 	// It locks the Storage and ensures that no other writes
 	// can occur during the pruning.
 	// It is up to the caller to ensure that this is never
 	// called with a value higher than the fulfilled height.
-	Prune(height uint64) error
+	PruneUpToHeight(height uint64) error
 }
 
 // The storage component tracks the following information:
@@ -215,7 +215,7 @@ func (s *storage) init(startHeight uint64) error {
 		}
 
 		// replay pruning in case it was interrupted during previous shutdown
-		if err := s.Prune(prunedHeight); err != nil {
+		if err := s.PruneUpToHeight(prunedHeight); err != nil {
 			return fmt.Errorf("failed to replay pruning: %w", err)
 		}
 	} else if errors.Is(fulfilledHeightErr, badger.ErrKeyNotFound) && errors.Is(prunedHeightErr, badger.ErrKeyNotFound) {
@@ -383,7 +383,7 @@ func (s *storage) batchDeleteItemLimit() int {
 	return itemsPerBatch
 }
 
-func (s *storage) Prune(height uint64) error {
+func (s *storage) PruneUpToHeight(height uint64) error {
 	blobRecordPrefix := []byte{prefixBlobRecord}
 	itemsPerBatch := s.batchDeleteItemLimit()
 	var batch []*deleteInfo

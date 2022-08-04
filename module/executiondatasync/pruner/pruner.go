@@ -182,13 +182,13 @@ func (p *Pruner) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFu
 }
 
 func (p *Pruner) checkPrune(ctx irrecoverable.SignalerContext) {
-	if p.lastFulfilledHeight-p.lastPrunedHeight > p.heightRangeTarget+p.threshold {
+	if p.lastFulfilledHeight > p.heightRangeTarget+p.threshold+p.lastPrunedHeight {
 		pruneHeight := p.lastFulfilledHeight - p.heightRangeTarget
 
 		p.logger.Info().Uint64("prune_height", pruneHeight).Msg("pruning storage")
 		start := time.Now()
 
-		if err := p.storage.Prune(pruneHeight); err != nil {
+		if err := p.storage.PruneUpToHeight(pruneHeight); err != nil {
 			ctx.Throw(fmt.Errorf("failed to prune: %w", err))
 		}
 

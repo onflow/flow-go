@@ -48,7 +48,7 @@ func TestPrune(t *testing.T) {
 
 		return nil
 	}))
-	require.NoError(t, storage.Prune(1))
+	require.NoError(t, storage.PruneUpToHeight(1))
 
 	prunedHeight, err := storage.GetPrunedHeight()
 	require.NoError(t, err)
@@ -98,7 +98,7 @@ func TestPruneNonLatestHeight(t *testing.T) {
 
 		return nil
 	}))
-	require.NoError(t, storage.Prune(1))
+	require.NoError(t, storage.PruneUpToHeight(1))
 
 	prunedHeight, err := storage.GetPrunedHeight()
 	require.NoError(t, err)
