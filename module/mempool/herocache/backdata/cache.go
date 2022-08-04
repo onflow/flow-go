@@ -229,6 +229,20 @@ func (c Cache) Identifiers() flow.IdentifierList {
 	return ids
 }
 
+func (c Cache) FirstXElements(x uint32) []flow.Entity {
+	defer c.logTelemetry()
+
+	entitiesList := c.entities.FirstXElements(x)
+	entities := make([]flow.Entity, len(entitiesList))
+
+	total := len(entitiesList)
+	for i := 0; i < total; i++ {
+		entities[i] = entitiesList[i].Entity()
+	}
+
+	return entities
+}
+
 // Entities returns the list of entities stored in the backdata.
 func (c Cache) Entities() []flow.Entity {
 	defer c.logTelemetry()

@@ -43,4 +43,7 @@ type BackData interface {
 
 	// Hash returns the merkle root hash of all entities.
 	Hash() flow.Identifier
+
+	// FirstXElements returns the first x elements stored in the backdata.
+	FirstXElements(uint32) []flow.Entity
 }

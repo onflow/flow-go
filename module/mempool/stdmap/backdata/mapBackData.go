@@ -82,6 +82,10 @@ func (b MapBackData) All() map[flow.Identifier]flow.Entity {
 	return entities
 }
 
+func (b MapBackData) FirstXElements(_ uint32) []flow.Entity {
+	panic("map back data is not ordered list, hence, cannot query on FirstXElements")
+}
+
 // Identifiers returns the list of identifiers of entities stored in the backdata.
 func (b MapBackData) Identifiers() flow.IdentifierList {
 	ids := make(flow.IdentifierList, len(b.entities))

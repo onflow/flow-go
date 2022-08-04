@@ -122,16 +122,25 @@ func (p Pool) Get(entityIndex EIndex) (flow.Identifier, flow.Entity, uint64) {
 
 // All returns all stored entities in this pool.
 func (p Pool) All() []PoolEntity {
-	all := make([]PoolEntity, p.size)
+	return p.FirstXElements(p.size)
+}
+
+// FirstXElements returns the first x elements started from the head of the pool.
+func (p Pool) FirstXElements(x uint32) []PoolEntity {
+	if x > p.size {
+		x = p.size
+	}
+
+	elements := make([]PoolEntity, x)
 	next := p.used.head
 
-	for i := uint32(0); i < p.size; i++ {
+	for i := uint32(0); i < x; i++ {
 		e := p.poolEntities[next.getSliceIndex()]
-		all[i] = e.PoolEntity
+		elements[i] = e.PoolEntity
 		next = e.node.next
 	}
 
-	return all
+	return elements
 }
 
 // sliceIndexForEntity returns a slice index which hosts the next entity to be added to the list.

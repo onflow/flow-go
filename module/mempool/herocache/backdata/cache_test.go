@@ -311,6 +311,54 @@ func TestArrayBackData_All(t *testing.T) {
 	}
 }
 
+// TestArrayBackData_FirstXElements checks correctness of FirstXElements method in returning all stored entities in it.
+func TestArrayBackData_FirstXElements(t *testing.T) {
+	tt := []struct {
+		limit        uint32
+		items        uint32
+		ejectionMode heropool.EjectionMode
+	}{
+		{ // mempool has the limit of 1000, but we put 100.
+			limit:        1000,
+			items:        100,
+			ejectionMode: heropool.LRUEjection,
+		},
+		{ // mempool has the limit of 1000, and we put exactly 1000 items.
+			limit:        1000,
+			items:        1000,
+			ejectionMode: heropool.LRUEjection,
+		},
+		{ // mempool has the limit of 1000, and we put 10K items with LRU ejection.
+			limit:        1000,
+			items:        10_000,
+			ejectionMode: heropool.LRUEjection,
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(fmt.Sprintf("%d-limit-%d-items-%s-ejection", tc.limit, tc.items, tc.ejectionMode), func(t *testing.T) {
+			bd := NewCache(tc.limit,
+				8,
+				tc.ejectionMode,
+				unittest.Logger(),
+				metrics.NewNoopCollector())
+			entities := unittest.EntityListFixture(uint(tc.items))
+
+			testAddEntities(t, bd, entities)
+
+			// in LRU ejection mode we match All items based on a from index (i.e., last "from" items).
+			from := int(tc.items) - int(tc.limit)
+			if from < 0 {
+				// we are below limit, hence we start matching from index 0
+				from = 0
+			}
+			testEntitiesMatchFrom(t, bd.FirstXElements(50), entities, from)
+			testIdentifiersMatchFrom(t, bd.Identifiers(), entities, from)
+			
+		})
+	}
+}
+
 // TestArrayBackData_Remove checks correctness of removing elements from Cache.
 func TestArrayBackData_Remove(t *testing.T) {
 	tt := []struct {
