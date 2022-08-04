@@ -601,6 +601,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 					Str("event_type", msg.Type).
 					Str("channel", msg.ChannelID).
 					Msg("unicast authorized sender validation failed")
+				return
 			} else {
 				// log metrics with the channel name as OneToOne
 				m.metrics.NetworkMessageReceived(msg.Size(), metrics.ChannelOneToOne, msg.Type)
