@@ -374,6 +374,11 @@ func TestArrayBackData_Remove(t *testing.T) {
 // testAddEntities is a test helper that checks entities are added successfully to the Cache.
 // and each entity is retrievable right after it is written to backdata.
 func testAddEntities(t *testing.T, bd *Cache, entities []*unittest.MockEntity) {
+	// initially, head should be undefined
+	e, ok := bd.Head()
+	require.False(t, ok)
+	require.Nil(t, e)
+
 	// adding elements
 	for i, e := range entities {
 		// adding each element must be successful.
@@ -383,6 +388,11 @@ func testAddEntities(t *testing.T, bd *Cache, entities []*unittest.MockEntity) {
 			// when we are below limit the size of
 			// Cache should be incremented by each addition.
 			require.Equal(t, bd.Size(), uint(i+1))
+
+			// in case cache is not full, the head should retrieve the first added entity.
+			tailEntity, tailExists := bd.Head()
+			require.True(t, tailExists)
+			require.Equal(t, tailEntity.ID(), entities[0].ID())
 		} else {
 			// when we cross the limit, the ejection kicks in, and
 			// size must be steady at the limit.
