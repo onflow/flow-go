@@ -1,5 +1,7 @@
 package corruptible
 
+// This test file covers corruptible network tests that are not ingress or egress specific, including error conditions.
+
 import (
 	"fmt"
 	"github.com/onflow/flow-go/insecure"
@@ -15,8 +17,6 @@ import (
 	"testing"
 	"time"
 )
-
-// This test file covers corruptible network tests that are not ingress or egress specific, including error conditions.
 
 // TestEngineClosingChannel evaluates that corruptible network closes the channel whenever the corresponding
 // engine of that channel attempts on closing it.

@@ -1,5 +1,7 @@
 package corruptible
 
+// This file has helper function that are only used for testing.
+
 import (
 	"context"
 	"fmt"
