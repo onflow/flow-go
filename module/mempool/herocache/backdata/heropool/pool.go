@@ -134,6 +134,16 @@ func (p Pool) All() []PoolEntity {
 	return all
 }
 
+// Head returns the tail of used items. Assuming no ejection happened and pool never goes beyond limit, Head returns
+// the first inserted element.
+func (p Pool) Head() (flow.Entity, bool) {
+	if p.used.head.isUndefined() {
+		return nil, false
+	}
+	e := p.poolEntities[p.used.head.getSliceIndex()]
+	return e.Entity(), true
+}
+
 // sliceIndexForEntity returns a slice index which hosts the next entity to be added to the list.
 // The boolean returned value determines whether an ejection happened to make one slot free or not.
 func (p *Pool) sliceIndexForEntity() (EIndex, bool) {
