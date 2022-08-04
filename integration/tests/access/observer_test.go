@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
@@ -128,16 +129,36 @@ func (suite *ObserverSuite) TestObserverWithoutAccess() {
 	err = suite.net.StopContainerByName(ctx, "access_1")
 	assert.NoError(t, err)
 
-	// verify that we receive errors from all rpcs
-	for _, rpc := range suite.getRPCs() {
-		if _, local := suite.local[rpc.name]; local {
-			continue
+	t.Run("HandledByUpstream", func(t *testing.T) {
+		// verify that we receive errors from all rpcs handled upstream
+		for _, rpc := range suite.getRPCs() {
+			if _, local := suite.local[rpc.name]; local {
+				continue
+			}
+			t.Run(rpc.name, func(t *testing.T) {
+				err := rpc.call(ctx, observer)
+				assert.Error(t, err)
+			})
 		}
-		t.Run(rpc.name, func(t *testing.T) {
-			err := rpc.call(ctx, observer)
-			assert.Error(t, err)
-		})
-	}
+	})
+
+	t.Run("HandledByObserver", func(t *testing.T) {
+		// verify that we receive not found errors or no error from all rpcs handled locally
+		for _, rpc := range suite.getRPCs() {
+			if _, local := suite.local[rpc.name]; !local {
+				continue
+			}
+			t.Run(rpc.name, func(t *testing.T) {
+				err := rpc.call(ctx, observer)
+				if err == nil {
+					return
+				}
+				code := grpc.Code(err)
+				assert.Equal(t, codes.NotFound, code)
+			})
+		}
+	})
+
 }
 
 func (suite *ObserverSuite) TestObserverCompareRPCs() {
@@ -191,7 +212,9 @@ func (suite *ObserverSuite) getRPCs() []RPCTest {
 			return err
 		}},
 		{name: "GetBlockHeaderByID", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.GetBlockHeaderByID(ctx, &accessproto.GetBlockHeaderByIDRequest{})
+			_, err := client.GetBlockHeaderByID(ctx, &accessproto.GetBlockHeaderByIDRequest{
+				Id: make([]byte, 32),
+			})
 			return err
 		}},
 		{name: "GetBlockHeaderByHeight", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
@@ -203,7 +226,7 @@ func (suite *ObserverSuite) getRPCs() []RPCTest {
 			return err
 		}},
 		{name: "GetBlockByID", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.GetBlockByID(ctx, &accessproto.GetBlockByIDRequest{})
+			_, err := client.GetBlockByID(ctx, &accessproto.GetBlockByIDRequest{Id: make([]byte, 32)})
 			return err
 		}},
 		{name: "GetBlockByHeight", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
@@ -211,7 +234,7 @@ func (suite *ObserverSuite) getRPCs() []RPCTest {
 			return err
 		}},
 		{name: "GetCollectionByID", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
-			_, err := client.GetCollectionByID(ctx, &accessproto.GetCollectionByIDRequest{})
+			_, err := client.GetCollectionByID(ctx, &accessproto.GetCollectionByIDRequest{Id: make([]byte, 32)})
 			return err
 		}},
 		{name: "SendTransaction", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
