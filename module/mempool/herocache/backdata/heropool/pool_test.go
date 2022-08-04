@@ -391,6 +391,11 @@ func testInitialization(t *testing.T, pool *Pool, _ []*unittest.MockEntity) {
 
 // testAddingEntities evaluates health of pool for storing new elements.
 func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.MockEntity, ejectionMode EjectionMode) {
+	// initially head must be empty
+	e, ok := pool.Head()
+	require.False(t, ok)
+	require.Nil(t, e)
+
 	// adding elements
 	for i, e := range entitiesToBeAdded {
 		// adding each element must be successful.
@@ -399,12 +404,24 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 		if i < len(pool.poolEntities) {
 			// in case of no over limit, size of entities linked list should be incremented by each addition.
 			require.Equal(t, pool.Size(), uint32(i+1))
+
+			// in case pool is not full, the head should retrieve the first added entity.
+			tailEntity, tailExists := pool.Head()
+			require.True(t, tailExists)
+			require.Equal(t, tailEntity.ID(), entitiesToBeAdded[0].ID())
 		}
 
 		if ejectionMode == LRUEjection {
 			// under LRU ejection mode, new entity should be placed at index i in back data
 			_, entity, _ := pool.Get(EIndex(i % len(pool.poolEntities)))
 			require.Equal(t, e, entity)
+
+			if i >= len(pool.poolEntities) {
+				// when pool is full and with LRU ejection, the head should move forward with each element added.
+				tailEntity, tailExists := pool.Head()
+				require.True(t, tailExists)
+				require.Equal(t, tailEntity.ID(), entitiesToBeAdded[i-len(pool.poolEntities)].ID())
+			}
 		}
 
 		// underlying linked-lists sanity check
