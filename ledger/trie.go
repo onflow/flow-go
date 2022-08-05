@@ -266,15 +266,14 @@ func (p Payload) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON unmarshals a JSON value of payload.
 func (p *Payload) UnmarshalJSON(b []byte) error {
 	if p == nil {
-		return errors.New("UnmarshalJSON on nil payload")
+		return errors.New("UnmarshalJSON on nil Payload")
 	}
 	var sp serializablePayload
 	if err := json.Unmarshal(b, &sp); err != nil {
 		return err
 	}
 	p.encKey = encodeKey(&sp.Key, PayloadVersion)
-	p.value = make([]byte, len(sp.Value))
-	copy(p.value, sp.Value)
+	p.value = sp.Value
 	return nil
 }
 
@@ -298,8 +297,7 @@ func (p *Payload) UnmarshalCBOR(b []byte) error {
 		return err
 	}
 	p.encKey = encodeKey(&sp.Key, PayloadVersion)
-	p.value = make([]byte, len(sp.Value))
-	copy(p.value, sp.Value)
+	p.value = sp.Value
 	return nil
 }
 
@@ -321,6 +319,9 @@ func (p *Payload) Key() (Key, error) {
 // Value returns payload value.
 // CAUTION: do not modify returned value because it shares underlying data with payload value.
 func (p *Payload) Value() Value {
+	if p == nil {
+		return Value{}
+	}
 	return p.value
 }
 
