@@ -46,7 +46,9 @@ func TestChunkDataPackRequestQueue_Sequential(t *testing.T) {
 	}
 
 	// once queue meets the size limit, any extra push should fail.
-	require.False(t, q.Push(unittest.IdentifierFixture(), unittest.IdentifierFixture()))
+	for i := 0; i < 100; i++ {
+		require.False(t, q.Push(unittest.IdentifierFixture(), unittest.IdentifierFixture()))
+	}
 
 	// pop-ing requests sequentially.
 	for i, req := range requests {
@@ -103,11 +105,17 @@ func TestChunkDataPackRequestQueue_Concurrent(t *testing.T) {
 			pushWG.Done()
 		}()
 	}
-
 	unittest.RequireReturnsBefore(t, pushWG.Wait, 100*time.Millisecond, "could not push all requests on time")
 
 	// once queue meets the size limit, any extra push should fail.
-	require.False(t, q.Push(unittest.IdentifierFixture(), unittest.IdentifierFixture()))
+	pushWG.Add(sizeLimit)
+	for i := 0; i < sizeLimit; i++ {
+		go func() {
+			require.False(t, q.Push(unittest.IdentifierFixture(), unittest.IdentifierFixture()))
+			pushWG.Done()
+		}()
+	}
+	unittest.RequireReturnsBefore(t, pushWG.Wait, 100*time.Millisecond, "could not push all requests on time")
 
 	popWG := &sync.WaitGroup{}
 	popWG.Add(sizeLimit)
