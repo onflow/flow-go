@@ -166,8 +166,10 @@ func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string) (access.Acce
 }
 
 func (cf *ConnectionFactoryImpl) InvalidateAccessAPIClient(address string) {
-	cf.Log.Debug().Str("cached_access_client_invalidated", address).Msg("invalidating cached access client")
-	cf.invalidateAPIClient(address, cf.CollectionGRPCPort)
+	if cf.ConnectionsCache != nil {
+		cf.Log.Debug().Str("cached_access_client_invalidated", address).Msg("invalidating cached access client")
+		cf.invalidateAPIClient(address, cf.CollectionGRPCPort)
+	}
 }
 
 func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, io.Closer, error) {
@@ -197,8 +199,10 @@ func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (executio
 }
 
 func (cf *ConnectionFactoryImpl) InvalidateExecutionAPIClient(address string) {
-	cf.Log.Debug().Str("cached_execution_client_invalidated", address).Msg("invalidating cached execution client")
-	cf.invalidateAPIClient(address, cf.ExecutionGRPCPort)
+	if cf.ConnectionsCache != nil {
+		cf.Log.Debug().Str("cached_execution_client_invalidated", address).Msg("invalidating cached execution client")
+		cf.invalidateAPIClient(address, cf.ExecutionGRPCPort)
+	}
 }
 
 func (cf *ConnectionFactoryImpl) invalidateAPIClient(address string, port uint) {
