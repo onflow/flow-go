@@ -52,7 +52,13 @@ func (i *TransactionInvoker) Process(
 		blockHeight = ctx.BlockHeader.Height
 	}
 
-	var env *TransactionEnv
+	// NOTE: The environment (and the meter limits) must be initialized before
+	// any child state is created.
+	env, err := NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
+	if err != nil {
+		return fmt.Errorf("error creating new environment: %w", err)
+	}
+
 	var txError error
 
 	parentState := sth.State()
@@ -75,16 +81,12 @@ func (i *TransactionInvoker) Process(
 			proc.Events = make([]flow.Event, 0)
 			proc.ServiceEvents = make([]flow.Event, 0)
 		}
-		if mergeError := parentState.MergeState(childState, sth.EnforceInteractionLimits()); mergeError != nil {
+		if mergeError := parentState.MergeState(childState, sth.EnforceLimits()); mergeError != nil {
 			processErr = fmt.Errorf("transaction invocation failed when merging state: %w", mergeError)
 		}
 		sth.SetActiveState(parentState)
 	}()
 
-	env, err := NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
-	if err != nil {
-		return fmt.Errorf("error creating new environment: %w", err)
-	}
 	predeclaredValues := valueDeclarations(env)
 
 	location := common.TransactionLocation(proc.ID)

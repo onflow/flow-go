@@ -58,7 +58,7 @@ func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state
 	}()
 
 	if proc.Transaction.Payer == ctx.Chain.ServiceAddress() {
-		st.SetPayerIsServiceAccount()
+		ctx.DisableMemoryAndInteractionLimits = true
 	}
 
 	for _, p := range ctx.TransactionProcessors {

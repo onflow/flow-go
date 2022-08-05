@@ -30,18 +30,19 @@ type Context struct {
 	ServiceAccountEnabled                bool
 	// Depricated: RestrictedDeploymentEnabled is deprecated use SetIsContractDeploymentRestrictedTransaction instead.
 	// Can be removed after all networks are migrated to SetIsContractDeploymentRestrictedTransaction
-	RestrictContractDeployment    bool
-	RestrictContractRemoval       bool
-	LimitAccountStorage           bool
-	TransactionFeesEnabled        bool
-	CadenceLoggingEnabled         bool
-	EventCollectionEnabled        bool
-	ServiceEventCollectionEnabled bool
-	AccountFreezeEnabled          bool
-	ExtensiveTracing              bool
-	TransactionProcessors         []TransactionProcessor
-	ScriptProcessors              []ScriptProcessor
-	Logger                        zerolog.Logger
+	RestrictContractDeployment        bool
+	RestrictContractRemoval           bool
+	LimitAccountStorage               bool
+	TransactionFeesEnabled            bool
+	CadenceLoggingEnabled             bool
+	EventCollectionEnabled            bool
+	ServiceEventCollectionEnabled     bool
+	AccountFreezeEnabled              bool
+	ExtensiveTracing                  bool
+	TransactionProcessors             []TransactionProcessor
+	ScriptProcessors                  []ScriptProcessor
+	Logger                            zerolog.Logger
+	DisableMemoryAndInteractionLimits bool
 }
 
 // NewContext initializes a new execution context with the provided options.
@@ -102,7 +103,8 @@ func defaultContext(logger zerolog.Logger) Context {
 		ScriptProcessors: []ScriptProcessor{
 			NewScriptInvoker(),
 		},
-		Logger: logger,
+		Logger:                            logger,
+		DisableMemoryAndInteractionLimits: false,
 	}
 }
 
@@ -317,6 +319,15 @@ func WithAccountStorageLimit(enabled bool) Option {
 func WithTransactionFeesEnabled(enabled bool) Option {
 	return func(ctx Context) Context {
 		ctx.TransactionFeesEnabled = enabled
+		return ctx
+	}
+}
+
+// WithMemoryAndInteractionLimitsDisabled sets memory and interaction limits to
+// MaxUint64, effectively disabling these limits.
+func WithMemoryAndInteractionLimitsDisabled() Option {
+	return func(ctx Context) Context {
+		ctx.DisableMemoryAndInteractionLimits = true
 		return ctx
 	}
 }

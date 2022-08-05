@@ -93,6 +93,9 @@ type commonEnv struct {
 	accountKeys   *handler.AccountKeyHandler
 	contracts     *handler.ContractHandler
 	uuidGenerator *state.UUIDGenerator
+
+	// TODO(patrick): rm once fully refactored
+	fullEnv Environment
 }
 
 // TODO(patrick): rm once Meter object has been refactored

@@ -1,15 +1,18 @@
 package state
 
+import (
+	"math"
+)
+
 // StateHolder provides active states
 // and facilitates common state management operations
 // in order to make services such as accounts not worry about
 // the state it is recommended that such services wraps
 // a state manager instead of a state itself.
 type StateHolder struct {
-	enforceLimits         bool
-	payerIsServiceAccount bool
-	startState            *State
-	activeState           *State
+	enforceLimits bool
+	startState    *State
+	activeState   *State
 }
 
 // NewStateHolder constructs a new state manager
@@ -31,9 +34,11 @@ func (s *StateHolder) SetActiveState(st *State) {
 	s.activeState = st
 }
 
-// SetPayerIsServiceAccount sets if the payer is the service account
-func (s *StateHolder) SetPayerIsServiceAccount() {
-	s.payerIsServiceAccount = true
+// DisableMemoryAndInteractionLimits sets the memory and interaction limits to
+// MaxUint64, effectively disabling these limits
+func (s *StateHolder) DisableMemoryAndInteractionLimits() {
+	s.activeState.SetTotalMemoryLimit(math.MaxUint64)
+	s.activeState.SetTotalInteractionLimit(math.MaxUint64)
 }
 
 // NewChild constructs a new child of active state
@@ -56,18 +61,7 @@ func (s *StateHolder) DisableAllLimitEnforcements() {
 	s.enforceLimits = false
 }
 
-// EnforceComputationLimits returns if the computation limits should be enforced
-// or not.
-func (s *StateHolder) EnforceComputationLimits() bool {
+// EnforceLimits returns if limits should be enforced or not
+func (s *StateHolder) EnforceLimits() bool {
 	return s.enforceLimits
-}
-
-// EnforceInteractionLimits returns if the interaction limits should be enforced or not
-func (s *StateHolder) EnforceInteractionLimits() bool {
-	return !s.payerIsServiceAccount && s.enforceLimits
-}
-
-// EnforceMemoryLimits returns if the memory limits should be enforced or not
-func (s *StateHolder) EnforceMemoryLimits() bool {
-	return !s.payerIsServiceAccount && s.enforceLimits
 }

@@ -91,7 +91,7 @@ func WithMaxValueSizeAllowed(limit uint64) func(st *State) *State {
 // WithMaxInteractionSizeAllowed sets limit on total byte interaction with ledger
 func WithMaxInteractionSizeAllowed(limit uint64) func(st *State) *State {
 	return func(st *State) *State {
-		st.maxInteractionAllowed = limit
+		st.SetTotalInteractionLimit(limit)
 		return st
 	}
 }
@@ -181,6 +181,10 @@ func (s *State) Touch(owner, key string) error {
 	return s.view.Touch(owner, key)
 }
 
+func (s *State) SetTotalInteractionLimit(limit uint64) {
+	s.maxInteractionAllowed = limit
+}
+
 // MeterComputation meters computation usage
 func (s *State) MeterComputation(kind common.ComputationKind, intensity uint) error {
 	return s.meter.MeterComputation(kind, intensity)
@@ -199,6 +203,10 @@ func (s *State) ComputationIntensities() meter.MeteredComputationIntensities {
 // TotalComputationLimit returns total computation limit
 func (s *State) TotalComputationLimit() uint {
 	return s.meter.TotalComputationLimit()
+}
+
+func (s *State) SetTotalMemoryLimit(limit uint64) {
+	s.meter.SetTotalMemoryLimit(limit)
 }
 
 // MeterMemory meters memory usage
