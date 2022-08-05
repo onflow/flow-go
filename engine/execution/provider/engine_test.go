@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/state/protocol"
 	_ "github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -141,49 +142,64 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		execState.AssertExpectations(t)
 		chunkConduit.AssertExpectations(t)
 	})
-	//
-	//t.Run("un-authorized (not found origin) origin", func(t *testing.T) {
-	//	ps := new(mockprotocol.State)
-	//	ss := new(mockprotocol.Snapshot)
-	//
-	//	execState := new(state.ExecutionState)
-	//	chunkConduit := mocknetwork.Conduit{}
-	//
-	//	e := Engine{
-	//		state:                  ps,
-	//		unit:                   engine.NewUnit(),
-	//		execState:              execState,
-	//		metrics:                metrics.NewNoopCollector(),
-	//		chunksConduit:          &chunkConduit,
-	//		checkAuthorizedAtBlock: func(_ flow.Identifier) (bool, error) { return true, nil }}
-	//
-	//	originID := unittest.IdentifierFixture()
-	//	chunkID := unittest.IdentifierFixture()
-	//	blockID := unittest.IdentifierFixture()
-	//	chunkDataPack := unittest.ChunkDataPackFixture(chunkID)
-	//
-	//	ps.On("AtBlockID", blockID).Return(ss)
-	//	ss.On("Identity", originID).Return(nil, protocol.IdentityNotFoundError{})
-	//	execState.On("ChunkDataPackByChunkID", mock.Anything).Return(chunkDataPack, nil)
-	//	execState.On("GetBlockIDByChunkID", chunkID).Return(blockID, nil)
-	//
-	//	req := &messages.ChunkDataRequest{
-	//		ChunkID: chunkID,
-	//		Nonce:   rand.Uint64(),
-	//	}
-	//	// submit using non-existing origin ID
-	//	unittest.RequireCloseBefore(t, e.Ready(), 100*time.Millisecond, "could not start engine")
-	//	e.onChunkDataRequest(originID, req)
-	//	unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
-	//
-	//	// no chunk data pack response should be sent to a request coming from a non-existing origin ID
-	//	chunkConduit.AssertNotCalled(t, "Unicast")
-	//
-	//	ps.AssertExpectations(t)
-	//	ss.AssertExpectations(t)
-	//	execState.AssertExpectations(t)
-	//	chunkConduit.AssertExpectations(t)
-	//})
+
+	t.Run("un-authorized (not found origin) origin", func(t *testing.T) {
+		ps := new(mockprotocol.State)
+		ss := new(mockprotocol.Snapshot)
+		net := new(mocknetwork.Network)
+		chunkConduit := &mocknetwork.Conduit{}
+		net.On("Register", channels.PushReceipts, mock.Anything).Return(&mocknetwork.Conduit{}, nil)
+		net.On("Register", channels.ProvideChunks, mock.Anything).Return(chunkConduit, nil)
+		execState := new(state.ExecutionState)
+
+		e, err := New(
+			unittest.Logger(),
+			trace.NewNoopTracer(),
+			net,
+			ps,
+			execState,
+			metrics.NewNoopCollector(),
+			func(_ flow.Identifier) (bool, error) { return true, nil },
+			queue.NewChunkDataPackRequestQueue(10, unittest.Logger(), metrics.NewNoopCollector()),
+			DefaultChunkDataPackQueryTimeout,
+			DefaultChunkDataPackDeliveryTimeout,
+			DefaultChunkDataPackProcessInterval,
+			DefaultChunkDataPackRequestWorker)
+		require.NoError(t, err)
+
+		originID := unittest.IdentifierFixture()
+		chunkID := unittest.IdentifierFixture()
+		blockID := unittest.IdentifierFixture()
+		chunkDataPack := unittest.ChunkDataPackFixture(chunkID)
+
+		ps.On("AtBlockID", blockID).Return(ss)
+		ss.On("Identity", originID).Return(nil, protocol.IdentityNotFoundError{})
+		execState.On("ChunkDataPackByChunkID", mock.Anything).Return(chunkDataPack, nil)
+		execState.On("GetBlockIDByChunkID", chunkID).Return(blockID, nil)
+
+		req := &messages.ChunkDataRequest{
+			ChunkID: chunkID,
+			Nonce:   rand.Uint64(),
+		}
+		cancelCtx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		ctx, _ := irrecoverable.WithSignaler(cancelCtx)
+		e.Start(ctx)
+		// submit using non-existing origin ID
+		unittest.RequireCloseBefore(t, e.Ready(), 100*time.Millisecond, "could not start engine")
+		require.NoError(t, e.Process(channels.RequestChunks, originID, req))
+		time.Sleep(1 * time.Second)
+		cancel()
+		unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
+
+		// no chunk data pack response should be sent to a request coming from a non-existing origin ID
+		chunkConduit.AssertNotCalled(t, "Unicast")
+
+		ps.AssertExpectations(t)
+		ss.AssertExpectations(t)
+		execState.AssertExpectations(t)
+		chunkConduit.AssertExpectations(t)
+	})
 	//
 	//t.Run("non-existent chunk", func(t *testing.T) {
 	//	ps := new(mockprotocol.State)
