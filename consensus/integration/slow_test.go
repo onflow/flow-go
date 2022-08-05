@@ -14,7 +14,7 @@ import (
 
 // TestMessagesLost verifies if a node lost some messages, it's still able to catch up.
 func TestMessagesLost(t *testing.T) {
-
+	unittest.SkipUnless(t, unittest.TEST_TODO, "active-pacemaker, needs some liveness logic to broadcast missing entries")
 	stopper := NewStopper(50, 0)
 	participantsData := createConsensusIdentities(t, 5)
 	rootSnapshot := createRootSnapshot(t, participantsData)
