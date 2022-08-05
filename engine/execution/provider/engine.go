@@ -7,6 +7,9 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/mempool"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -28,21 +31,31 @@ type ProviderEngine interface {
 	BroadcastExecutionReceipt(context.Context, *flow.ExecutionReceipt) error
 }
 
+const (
+	DefaultChunkDataPackRequestWorker   = 100
+	DefaultChunkDataPackProcessInterval = 10 * time.Millisecond
+	DefaultChunkDataPackQueryTimeout    = 10 * time.Second
+	DefaultChunkDataPackDeliveryTimeout = 10 * time.Second
+)
+
 // An Engine provides means of accessing data about execution state and broadcasts execution receipts to nodes in the network.
 // Also generates and saves execution receipts
 type Engine struct {
-	unit                   *engine.Unit
-	log                    zerolog.Logger
-	tracer                 module.Tracer
-	receiptCon             network.Conduit
-	state                  protocol.State
-	execState              state.ReadOnlyExecutionState
-	me                     module.Local
-	chunksConduit          network.Conduit
-	metrics                module.ExecutionMetrics
-	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
-	chdpQueryTimeout       time.Duration
-	chdpDeliveryTimeout    time.Duration
+	component.Component
+	cm *component.ComponentManager
+
+	log                        zerolog.Logger
+	tracer                     module.Tracer
+	receiptCon                 network.Conduit
+	state                      protocol.State
+	execState                  state.ReadOnlyExecutionState
+	chunksConduit              network.Conduit
+	metrics                    module.ExecutionMetrics
+	chdpRequestsQueue          mempool.ChunkDataPackRequestQueue
+	checkAuthorizedAtBlock     func(blockID flow.Identifier) (bool, error)
+	chdpQueryTimeout           time.Duration
+	chdpDeliveryTimeout        time.Duration
+	chdpRequestProcessInterval time.Duration
 }
 
 func New(
@@ -50,110 +63,121 @@ func New(
 	tracer module.Tracer,
 	net network.Network,
 	state protocol.State,
-	me module.Local,
 	execState state.ReadOnlyExecutionState,
 	metrics module.ExecutionMetrics,
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error),
-	chdpQueryTimeout uint,
-	chdpDeliveryTimeout uint,
+	chunkDataPackRequestQueue mempool.ChunkDataPackRequestQueue,
+	chdpQueryTimeout time.Duration,
+	chdpDeliveryTimeout time.Duration,
+	chdpRequestProcessInterval time.Duration,
+	chdpRequestWorkers uint,
 ) (*Engine, error) {
 
 	log := logger.With().Str("engine", "receipts").Logger()
 
-	eng := Engine{
-		unit:                   engine.NewUnit(),
-		log:                    log,
-		tracer:                 tracer,
-		state:                  state,
-		me:                     me,
-		execState:              execState,
-		metrics:                metrics,
-		checkAuthorizedAtBlock: checkAuthorizedAtBlock,
-		chdpQueryTimeout:       time.Duration(chdpQueryTimeout) * time.Second,
-		chdpDeliveryTimeout:    time.Duration(chdpDeliveryTimeout) * time.Second,
+	engine := Engine{
+		log:                        log,
+		tracer:                     tracer,
+		state:                      state,
+		execState:                  execState,
+		metrics:                    metrics,
+		checkAuthorizedAtBlock:     checkAuthorizedAtBlock,
+		chdpQueryTimeout:           chdpQueryTimeout,
+		chdpDeliveryTimeout:        chdpDeliveryTimeout,
+		chdpRequestProcessInterval: chdpRequestProcessInterval,
+		chdpRequestsQueue:          chunkDataPackRequestQueue,
 	}
 
 	var err error
 
-	eng.receiptCon, err = net.Register(channels.PushReceipts, &eng)
+	engine.receiptCon, err = net.Register(channels.PushReceipts, &engine)
 	if err != nil {
 		return nil, fmt.Errorf("could not register receipt provider engine: %w", err)
 	}
 
-	chunksConduit, err := net.Register(channels.ProvideChunks, &eng)
+	chunksConduit, err := net.Register(channels.ProvideChunks, &engine)
 	if err != nil {
 		return nil, fmt.Errorf("could not register chunk data pack provider engine: %w", err)
 	}
-	eng.chunksConduit = chunksConduit
+	engine.chunksConduit = chunksConduit
 
-	return &eng, nil
-}
+	cm := component.NewComponentManagerBuilder()
+	for i := uint(0); i < chdpRequestWorkers; i++ {
+		cm.AddWorker(engine.processChunkDataPackRequestWorker)
+	}
 
-func (e *Engine) SubmitLocal(event interface{}) {
-	e.unit.Launch(func() {
-		err := e.ProcessLocal(event)
-		if err != nil {
-			engine.LogError(e.log, err)
-		}
-	})
-}
+	engine.cm = cm.Build()
+	engine.Component = engine.cm
 
-func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
-	e.unit.Launch(func() {
-		err := e.Process(channel, originID, event)
-		if err != nil {
-			engine.LogError(e.log, err)
-		}
-	})
-}
-
-func (e *Engine) ProcessLocal(event interface{}) error {
-	return e.unit.Do(func() error {
-		return e.process(e.me.NodeID(), event)
-	})
+	return &engine, nil
 }
 
 // Ready returns a channel that will close when the engine has
 // successfully started.
 func (e *Engine) Ready() <-chan struct{} {
-	return e.unit.Ready()
+	return e.cm.Ready()
 }
 
 // Done returns a channel that will close when the engine has
 // successfully stopped.
 func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done()
+	return e.cm.Done()
+}
+
+func (e *Engine) processChunkDataPackRequestWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+	ticker := time.NewTicker(e.chdpRequestProcessInterval)
+	e.log.Debug().Msg("process chunk data pack request worker started")
+
+	for {
+		select {
+		case <-ticker.C:
+			request, exists := e.chdpRequestsQueue.Pop()
+			if !exists {
+				e.log.Trace().Msg("worker did not find any chunk data pack request, passing this cycle")
+				continue
+			}
+			lg := e.log.With().
+				Hex("chunk_id", logging.ID(request.ChunkId)).
+				Hex("origin_id", logging.ID(request.RequesterId)).Logger()
+			lg.Trace().Msg("chunk data pack request picked for processing")
+			e.onChunkDataRequest(request)
+			lg.Trace().Msg("chunk data pack request processed")
+		case <-ctx.Done():
+			e.log.Trace().Msg("processing chunk data pack request worker terminated")
+			return
+		}
+	}
 }
 
 func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
-	return e.unit.Do(func() error {
-		return e.process(originID, event)
-	})
+	return e.process(originID, event)
 }
 
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch v := event.(type) {
 	case *messages.ChunkDataRequest:
-		e.onChunkDataRequest(originID, v)
+		pushed := e.chdpRequestsQueue.Push(v.ChunkID, originID)
+		e.log.Info().
+			Hex("chunk_id", logging.ID(v.ChunkID)).
+			Hex("origin_id", logging.ID(originID)).
+			Bool("enqueued", pushed).
+			Msg("chunk data pack request received")
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
-
 	return nil
 }
 
 // onChunkDataRequest receives a request for the chunk data pack associated with chunkID from the
 // requester `originID`. If such a chunk data pack is available in the execution state, it is sent to the
 // requester.
-func (e *Engine) onChunkDataRequest(originID flow.Identifier, req *messages.ChunkDataRequest) {
+func (e *Engine) onChunkDataRequest(request *mempool.ChunkDataPackRequest) {
 	processStart := time.Now()
 
-	// extracts list of verifier nodes id
-	chunkID := req.ChunkID
-
 	lg := e.log.With().
-		Hex("origin_id", logging.ID(originID)).
-		Hex("chunk_id", logging.ID(chunkID)).
+		Hex("origin_id", logging.ID(request.RequesterId)).
+		Hex("chunk_id", logging.ID(request.ChunkId)).
 		Logger()
 
 	lg.Info().Msg("received chunk data pack request")
@@ -161,7 +185,7 @@ func (e *Engine) onChunkDataRequest(originID flow.Identifier, req *messages.Chun
 	// increases collector metric
 	e.metrics.ChunkDataPackRequested()
 
-	chunkDataPack, err := e.execState.ChunkDataPackByChunkID(chunkID)
+	chunkDataPack, err := e.execState.ChunkDataPackByChunkID(request.ChunkId)
 	// we might be behind when we don't have the requested chunk.
 	// if this happen, log it and return nil
 	if errors.Is(err, storage.ErrNotFound) {
@@ -177,7 +201,7 @@ func (e *Engine) onChunkDataRequest(originID flow.Identifier, req *messages.Chun
 		return
 	}
 
-	_, err = e.ensureAuthorized(chunkDataPack.ChunkID, originID)
+	_, err = e.ensureAuthorized(chunkDataPack.ChunkID, request.RequesterId)
 	if err != nil {
 		lg.Error().
 			Err(err).
@@ -197,38 +221,38 @@ func (e *Engine) onChunkDataRequest(originID flow.Identifier, req *messages.Chun
 		lg.Warn().Msgf("chunk data pack query takes longer than %v secs", e.chdpQueryTimeout.Seconds())
 	}
 
-	lg.Debug().Msg("chunk data pack response lunched to dispatch")
+	lg.Info().Msg("chunk data pack response lunched to dispatch")
 
 	// sends requested chunk data pack to the requester
-	e.unit.Launch(func() {
-		deliveryStart := time.Now()
 
-		err := e.chunksConduit.Unicast(response, originID)
+	deliveryStart := time.Now()
 
-		sinceDeliver := time.Since(deliveryStart)
-		lg = lg.With().Dur("since_deliver", sinceDeliver).Logger()
+	err = e.chunksConduit.Unicast(response, request.RequesterId)
 
-		if sinceDeliver > e.chdpDeliveryTimeout {
-			lg.Warn().Msgf("chunk data pack response delivery takes longer than %v secs", e.chdpDeliveryTimeout.Seconds())
-		}
+	sinceDeliver := time.Since(deliveryStart)
+	lg = lg.With().Dur("since_deliver", sinceDeliver).Logger()
 
-		if err != nil {
-			lg.Warn().
-				Err(err).
-				Msg("could not send requested chunk data pack to origin ID")
-			return
-		}
+	if sinceDeliver > e.chdpDeliveryTimeout {
+		lg.Warn().Msgf("chunk data pack response delivery takes longer than %v secs", e.chdpDeliveryTimeout.Seconds())
+	}
 
-		if response.ChunkDataPack.Collection != nil {
-			// logging collection id of non-system chunks.
-			// A system chunk has both the collection and collection id set to nil.
-			lg = lg.With().
-				Hex("collection_id", logging.ID(response.ChunkDataPack.Collection.ID())).
-				Logger()
-		}
+	if err != nil {
+		lg.Warn().
+			Err(err).
+			Msg("could not send requested chunk data pack to origin ID")
+		return
+	}
 
-		lg.Info().Msg("chunk data pack request successfully replied")
-	})
+	if response.ChunkDataPack.Collection != nil {
+		// logging collection id of non-system chunks.
+		// A system chunk has both the collection and collection id set to nil.
+		lg = lg.With().
+			Hex("collection_id", logging.ID(response.ChunkDataPack.Collection.ID())).
+			Logger()
+	}
+
+	lg.Info().Msg("chunk data pack request successfully replied")
+
 }
 
 func (e *Engine) ensureAuthorized(chunkID flow.Identifier, originID flow.Identifier) (*flow.Identity, error) {
