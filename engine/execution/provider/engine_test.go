@@ -1,7 +1,6 @@
 package provider
 
 import (
-	"context"
 	"errors"
 	"math/rand"
 	"testing"
@@ -45,7 +44,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		ps.On("AtBlockID", blockID).Return(ss)
 		ss.On("Identity", originID).Return(unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution)), nil)
-		execState.On("ChunkDataPackByChunkID", mock.Anything, mock.Anything).Return(chunkDataPack, nil)
+		execState.On("ChunkDataPackByChunkID", mock.Anything).Return(chunkDataPack, nil)
 		execState.On("GetBlockIDByChunkID", chunkID).Return(blockID, nil)
 
 		req := &messages.ChunkDataRequest{
@@ -54,7 +53,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		}
 		// submit using origin ID with invalid role
 		unittest.RequireCloseBefore(t, e.Ready(), 100*time.Millisecond, "could not start engine")
-		e.onChunkDataRequest(context.Background(), originID, req)
+		e.onChunkDataRequest(originID, req)
 		unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
 
 		// no chunk data pack response should be sent to an invalid role's request
@@ -88,7 +87,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		ps.On("AtBlockID", blockID).Return(ss)
 		ss.On("Identity", originID).Return(unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution), unittest.WithWeight(0)), nil)
-		execState.On("ChunkDataPackByChunkID", mock.Anything, mock.Anything).Return(chunkDataPack, nil)
+		execState.On("ChunkDataPackByChunkID", mock.Anything).Return(chunkDataPack, nil)
 		execState.On("GetBlockIDByChunkID", chunkID).Return(blockID, nil)
 
 		req := &messages.ChunkDataRequest{
@@ -97,7 +96,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		}
 		// submit using origin ID with zero weight
 		unittest.RequireCloseBefore(t, e.Ready(), 100*time.Millisecond, "could not start engine")
-		e.onChunkDataRequest(context.Background(), originID, req)
+		e.onChunkDataRequest(originID, req)
 		unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
 
 		// no chunk data pack response should be sent to a request coming from 0-weight node
@@ -131,7 +130,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		ps.On("AtBlockID", blockID).Return(ss)
 		ss.On("Identity", originID).Return(nil, protocol.IdentityNotFoundError{})
-		execState.On("ChunkDataPackByChunkID", mock.Anything, mock.Anything).Return(chunkDataPack, nil)
+		execState.On("ChunkDataPackByChunkID", mock.Anything).Return(chunkDataPack, nil)
 		execState.On("GetBlockIDByChunkID", chunkID).Return(blockID, nil)
 
 		req := &messages.ChunkDataRequest{
@@ -140,7 +139,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		}
 		// submit using non-existing origin ID
 		unittest.RequireCloseBefore(t, e.Ready(), 100*time.Millisecond, "could not start engine")
-		e.onChunkDataRequest(context.Background(), originID, req)
+		e.onChunkDataRequest(originID, req)
 		unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
 
 		// no chunk data pack response should be sent to a request coming from a non-existing origin ID
@@ -159,7 +158,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		execState := new(state.ExecutionState)
 		chunkConduit := mocknetwork.Conduit{}
 
-		execState.On("ChunkDataPackByChunkID", mock.Anything, mock.Anything).Return(nil, errors.New("not found!"))
+		execState.On("ChunkDataPackByChunkID", mock.Anything).Return(nil, errors.New("not found!"))
 
 		e := Engine{
 			state:                  ps,
@@ -179,7 +178,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		}
 
 		unittest.RequireCloseBefore(t, e.Ready(), 100*time.Millisecond, "could not start engine")
-		e.onChunkDataRequest(context.Background(), originIdentity.NodeID, req)
+		e.onChunkDataRequest(originIdentity.NodeID, req)
 		unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
 
 		// no chunk data pack response should be sent to a request coming from a non-existing origin ID
@@ -225,7 +224,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			Return(nil)
 
 		execState.On("GetBlockIDByChunkID", chunkID).Return(blockID, nil)
-		execState.On("ChunkDataPackByChunkID", mock.Anything, chunkID).Return(chunkDataPack, nil)
+		execState.On("ChunkDataPackByChunkID", chunkID).Return(chunkDataPack, nil)
 
 		req := &messages.ChunkDataRequest{
 			ChunkID: chunkID,
@@ -233,7 +232,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		}
 
 		unittest.RequireCloseBefore(t, e.Ready(), 100*time.Millisecond, "could not start engine")
-		e.onChunkDataRequest(context.Background(), originIdentity.NodeID, req)
+		e.onChunkDataRequest(originIdentity.NodeID, req)
 		unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
 
 		ps.AssertExpectations(t)
@@ -282,7 +281,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			}).
 			Return(nil).Once()
 
-		execState.On("ChunkDataPackByChunkID", mock.Anything, chunkID).Return(chunkDataPack, nil).Twice()
+		execState.On("ChunkDataPackByChunkID", chunkID).Return(chunkDataPack, nil).Twice()
 
 		req := &messages.ChunkDataRequest{
 			ChunkID: chunkID,
@@ -292,9 +291,9 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		unittest.RequireCloseBefore(t, e.Ready(), 100*time.Millisecond, "could not start engine")
 
 		// an authorized request followed by an unauthorized one
-		e.onChunkDataRequest(context.Background(), originIdentity.NodeID, req)
+		e.onChunkDataRequest(originIdentity.NodeID, req)
 		currentAuthorizedState = false
-		e.onChunkDataRequest(context.Background(), originIdentity.NodeID, req)
+		e.onChunkDataRequest(originIdentity.NodeID, req)
 
 		unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
 
