@@ -76,14 +76,7 @@ func TestAccountFreezing(t *testing.T) {
 		tx.AddAuthorizer(chain.ServiceAddress())
 		proc := fvm.Transaction(&tx, 0)
 
-		context := fvm.NewContext(log, fvm.WithAccountFreezeEnabled(false), fvm.WithChain(chain))
-
-		err = txInvoker.Process(vm, &context, proc, st, programsStorage)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "cannot find")
-		require.Contains(t, err.Error(), "setAccountFrozen")
-
-		context = fvm.NewContext(log, fvm.WithAccountFreezeEnabled(true), fvm.WithChain(chain))
+		context := fvm.NewContext(log, fvm.WithChain(chain))
 
 		err = txInvoker.Process(vm, &context, proc, st, programsStorage)
 		require.NoError(t, err)

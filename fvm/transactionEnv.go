@@ -452,10 +452,6 @@ func (e *TransactionEnv) meterMemory(kind common.MemoryKind, intensity uint) err
 
 func (e *TransactionEnv) SetAccountFrozen(address common.Address, frozen bool) error {
 
-	if !e.ctx.AccountFreezeEnabled {
-		return errors.NewOperationNotSupportedError("SetAccountFrozen")
-	}
-
 	flowAddress := flow.Address(address)
 
 	if flowAddress == e.ctx.Chain.ServiceAddress() {
