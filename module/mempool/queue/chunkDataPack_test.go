@@ -1,7 +1,9 @@
 package queue
 
 import (
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/metrics"
@@ -89,50 +91,51 @@ func TestChunkDataPackRequestQueue_Concurrent(t *testing.T) {
 	require.False(t, ok)
 	require.Nil(t, request)
 
+	pushWG := &sync.WaitGroup{}
+	pushWG.Add(sizeLimit)
+
 	requests := chunkDataRequestListFixture(sizeLimit)
-	// pushing requests sequentially.
-	for i, req := range requests {
-		require.True(t, q.Push(req.ChunkId, req.RequesterId))
-
-		// duplicate push should fail
-		require.False(t, q.Push(req.ChunkId, req.RequesterId))
-
-		// head should always point to the first element
-		head, ok := q.Head()
-		require.True(t, ok)
-		require.Equal(t, head.ChunkId, requests[0].ChunkId)
-		require.Equal(t, head.RequesterId, requests[0].RequesterId)
-
-		require.Equal(t, q.Size(), uint(i+1))
+	// pushing requests concurrently.
+	for _, req := range requests {
+		req := req // suppress loop variable
+		go func() {
+			require.True(t, q.Push(req.ChunkId, req.RequesterId))
+			pushWG.Done()
+		}()
 	}
+
+	unittest.RequireReturnsBefore(t, pushWG.Wait, 100*time.Millisecond, "could not push all requests on time")
 
 	// once queue meets the size limit, any extra push should fail.
 	require.False(t, q.Push(unittest.IdentifierFixture(), unittest.IdentifierFixture()))
 
-	// pop-ing requests sequentially.
-	for i, req := range requests {
-		popedReq, ok := q.Pop()
-		require.True(t, ok)
-		require.Equal(t, req.RequesterId, popedReq.RequesterId)
-		require.Equal(t, req.ChunkId, popedReq.ChunkId)
+	popWG := &sync.WaitGroup{}
+	popWG.Add(sizeLimit)
+	matchLock := &sync.Mutex{}
 
-		if i < len(requests)-1 {
-			// queue is not empty yet.
-			// head should be updated per pop (next element).
-			head, ok := q.Head()
-			require.True(t, ok, i)
-			require.Equal(t, head.ChunkId, requests[i+1].ChunkId)
-			require.Equal(t, head.RequesterId, requests[i+1].RequesterId)
-		} else {
-			// queue is empty,
-			// head should be nil.
-			head, ok := q.Head()
-			require.False(t, ok)
-			require.Nil(t, head)
-		}
+	// pop-ing requests concurrently.
+	for i := 0; i < sizeLimit; i++ {
+		go func() {
+			popedReq, ok := q.Pop()
 
-		require.Equal(t, q.Size(), uint(len(requests)-i-1))
+			matchLock.Lock()
+			matchAndRemove(t, requests, popedReq)
+			matchLock.Unlock()
+
+			require.True(t, ok)
+			popWG.Done()
+		}()
 	}
+	unittest.RequireReturnsBefore(t, popWG.Wait, 100*time.Millisecond, "could not pop all requests on time")
+
+	// queue is empty,
+	// head should be nil.
+	head, ok := q.Head()
+	require.False(t, ok)
+	require.Nil(t, head)
+
+	// queue must be empty after pop-ing all
+	require.Zero(t, q.Size())
 }
 
 func chunkDataRequestListFixture(count int) []*mempool.ChunkDataPackRequest {
@@ -152,6 +155,7 @@ func matchAndRemove(t *testing.T, requests []*mempool.ChunkDataPackRequest, req 
 		if r.ChunkId == req.ChunkId && r.RequesterId == req.RequesterId {
 			// removes the matched request from the list
 			requests = append(requests[:i], requests[i+1:]...)
+			return
 		}
 	}
 
