@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"math/rand"
 	"testing"
 	"time"
@@ -200,45 +201,61 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		execState.AssertExpectations(t)
 		chunkConduit.AssertExpectations(t)
 	})
-	//
-	//t.Run("non-existent chunk", func(t *testing.T) {
-	//	ps := new(mockprotocol.State)
-	//	ss := new(mockprotocol.Snapshot)
-	//
-	//	execState := new(state.ExecutionState)
-	//	chunkConduit := mocknetwork.Conduit{}
-	//
-	//	execState.On("ChunkDataPackByChunkID", mock.Anything).Return(nil, errors.New("not found!"))
-	//
-	//	e := Engine{
-	//		state:                  ps,
-	//		unit:                   engine.NewUnit(),
-	//		execState:              execState,
-	//		chunksConduit:          &chunkConduit,
-	//		metrics:                metrics.NewNoopCollector(),
-	//		checkAuthorizedAtBlock: func(_ flow.Identifier) (bool, error) { return true, nil }}
-	//
-	//	originIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-	//
-	//	chunkID := unittest.IdentifierFixture()
-	//
-	//	req := &messages.ChunkDataRequest{
-	//		ChunkID: chunkID,
-	//		Nonce:   rand.Uint64(),
-	//	}
-	//
-	//	unittest.RequireCloseBefore(t, e.Ready(), 100*time.Millisecond, "could not start engine")
-	//	e.onChunkDataRequest(originIdentity.NodeID, req)
-	//	unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
-	//
-	//	// no chunk data pack response should be sent to a request coming from a non-existing origin ID
-	//	chunkConduit.AssertNotCalled(t, "Unicast")
-	//
-	//	ps.AssertExpectations(t)
-	//	ss.AssertExpectations(t)
-	//	execState.AssertExpectations(t)
-	//	chunkConduit.AssertExpectations(t)
-	//})
+
+	t.Run("non-existent chunk", func(t *testing.T) {
+		ps := new(mockprotocol.State)
+		ss := new(mockprotocol.Snapshot)
+		net := new(mocknetwork.Network)
+		chunkConduit := &mocknetwork.Conduit{}
+		net.On("Register", channels.PushReceipts, mock.Anything).Return(&mocknetwork.Conduit{}, nil)
+		net.On("Register", channels.ProvideChunks, mock.Anything).Return(chunkConduit, nil)
+
+		execState := new(state.ExecutionState)
+		execState.On("ChunkDataPackByChunkID", mock.Anything).Return(nil, errors.New("not found!"))
+
+		e, err := New(
+			unittest.Logger(),
+			trace.NewNoopTracer(),
+			net,
+			ps,
+			execState,
+			metrics.NewNoopCollector(),
+			func(_ flow.Identifier) (bool, error) { return true, nil },
+			queue.NewChunkDataPackRequestQueue(10, unittest.Logger(), metrics.NewNoopCollector()),
+			DefaultChunkDataPackQueryTimeout,
+			DefaultChunkDataPackDeliveryTimeout,
+			DefaultChunkDataPackProcessInterval,
+			DefaultChunkDataPackRequestWorker)
+		require.NoError(t, err)
+
+		originIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+
+		chunkID := unittest.IdentifierFixture()
+
+		req := &messages.ChunkDataRequest{
+			ChunkID: chunkID,
+			Nonce:   rand.Uint64(),
+		}
+
+		cancelCtx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		ctx, _ := irrecoverable.WithSignaler(cancelCtx)
+		e.Start(ctx)
+		// submit using non-existing origin ID
+		unittest.RequireCloseBefore(t, e.Ready(), 100*time.Millisecond, "could not start engine")
+		require.NoError(t, e.Process(channels.RequestChunks, originIdentity.NodeID, req))
+		time.Sleep(1 * time.Second)
+		cancel()
+		unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
+
+		// no chunk data pack response should be sent to a request coming from a non-existing origin ID
+		chunkConduit.AssertNotCalled(t, "Unicast")
+
+		ps.AssertExpectations(t)
+		ss.AssertExpectations(t)
+		execState.AssertExpectations(t)
+		chunkConduit.AssertExpectations(t)
+	})
 	//
 	//t.Run("success", func(t *testing.T) {
 	//	ps := new(mockprotocol.State)
