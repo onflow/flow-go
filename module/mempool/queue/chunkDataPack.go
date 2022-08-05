@@ -41,32 +41,51 @@ func (c *ChunkDataPackRequestQueue) Push(chunkId flow.Identifier, requesterId fl
 		Hex("chunk_id", logging.ID(chunkId)).
 		Hex("requester_id", logging.ID(requesterId)).Logger()
 
-	if c.cache.Size() > c.sizeLimit {
+	if c.cache.Size() >= c.sizeLimit {
 		lg.Debug().Msg("cannot push chunk data pack request to queue, queue is full")
 		return false
 	}
 
 	req := chunkDataPackRequest{
-		requesterId: requesterId,
-		chunkId:     chunkId,
-		id:          identifierOf(chunkId, requesterId),
+		ChunkDataPackRequest: mempool.ChunkDataPackRequest{
+			ChunkId:     chunkId,
+			RequesterId: requesterId,
+		},
+		id: identifierOf(chunkId, requesterId),
 	}
+
 	return c.cache.Add(req.id, req)
 }
 
-func (c *ChunkDataPackRequestQueue) Pop() (flow.Identifier, flow.Identifier, bool) {
+// Head returns the head of queue.
+// Boolean return value determines whether there is a head available.
+func (c *ChunkDataPackRequestQueue) Head() (*mempool.ChunkDataPackRequest, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	head, ok := c.cache.Head()
+	if !ok {
+		// cache is empty, and there is no head.
+		return nil, false
+	}
+
+	request := head.(chunkDataPackRequest)
+	return &mempool.ChunkDataPackRequest{RequesterId: request.RequesterId, ChunkId: request.ChunkId}, true
+}
+
+func (c *ChunkDataPackRequestQueue) Pop() (*mempool.ChunkDataPackRequest, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	head, ok := c.cache.Head()
 	if !ok {
 		// cache is empty, and there is no head yet to pop.
-		return flow.Identifier{}, flow.Identifier{}, false
+		return nil, false
 	}
 
 	c.cache.Remove(head.ID())
 	request := head.(chunkDataPackRequest)
-	return request.requesterId, request.chunkId, true
+	return &mempool.ChunkDataPackRequest{RequesterId: request.RequesterId, ChunkId: request.ChunkId}, true
 }
 
 func (c *ChunkDataPackRequestQueue) Size() uint {
@@ -77,8 +96,7 @@ func (c *ChunkDataPackRequestQueue) Size() uint {
 }
 
 type chunkDataPackRequest struct {
-	chunkId     flow.Identifier
-	requesterId flow.Identifier
+	mempool.ChunkDataPackRequest
 	// caching identifier to avoid cpu overhead
 	// per query.
 	id flow.Identifier
@@ -95,5 +113,5 @@ func (c chunkDataPackRequest) Checksum() flow.Identifier {
 }
 
 func identifierOf(chunkId flow.Identifier, requesterId flow.Identifier) flow.Identifier {
-	return flow.MakeID(chunkDataPackRequest{requesterId: requesterId, chunkId: chunkId})
+	return flow.MakeID(append(chunkId[:], requesterId[:]...))
 }

@@ -107,8 +107,21 @@ type ChunkDataPackRequestQueue interface {
 
 	// Pop removes and returns the head of queue, and updates the head to the next element.
 	// Boolean return value determines whether pop is successful, i.e., poping an empty queue returns false.
-	Pop() (flow.Identifier, flow.Identifier, bool)
+	// First returned value is chunk id.
+	// Second returned value is requester id.
+	Pop() (*ChunkDataPackRequest, bool)
+
+	// Head returns the head of queue.
+	// Boolean return value determines whether there is a head available.
+	// First returned value is chunk id.
+	// Second returned value is requester id.
+	Head() (*ChunkDataPackRequest, bool)
 
 	// Size returns total chunk data pack requests stored in queue.
 	Size() uint
+}
+
+type ChunkDataPackRequest struct {
+	ChunkId     flow.Identifier
+	RequesterId flow.Identifier
 }
