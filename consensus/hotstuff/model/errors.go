@@ -14,7 +14,6 @@ var (
 	// outside of all cached epochs. This can happen when a query is made for a view in the
 	// next epoch, if that epoch is not committed yet. This can also happen when an
 	// old epoch is queried (>3 in the past), even if that epoch does exist in storage.
-	// TODO move out of hotstuff
 	ErrViewForUnknownEpoch = fmt.Errorf("by-view query for unknown epoch")
 )
 
