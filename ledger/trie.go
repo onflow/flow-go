@@ -240,6 +240,9 @@ func (k encKey) DeepCopy() encKey {
 type Payload struct {
 	// encKey is key encoded using PayloadVersion.
 	// Version and type data are not encoded to save 3 bytes.
+	// NOTE: encKey translates to Key{} when encKey is
+	//       one of these three values:
+	//       nil, []byte{}, []byte{0,0}.
 	encKey encKey
 	value  Value
 }
