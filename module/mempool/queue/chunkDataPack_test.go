@@ -27,6 +27,7 @@ func TestChunkDataPackRequestQueue_Sequential(t *testing.T) {
 	require.Nil(t, request)
 
 	requests := chunkDataRequestListFixture(sizeLimit)
+	// pushing requests sequentially.
 	for i, req := range requests {
 		require.True(t, q.Push(req.ChunkId, req.RequesterId))
 
@@ -44,6 +45,31 @@ func TestChunkDataPackRequestQueue_Sequential(t *testing.T) {
 
 	// once queue meets the size limit, any extra push should fail.
 	require.False(t, q.Push(unittest.IdentifierFixture(), unittest.IdentifierFixture()))
+
+	// pop-ing requests sequentially.
+	for i, req := range requests {
+		popedReq, ok := q.Pop()
+		require.True(t, ok)
+		require.Equal(t, req.RequesterId, popedReq.RequesterId)
+		require.Equal(t, req.ChunkId, popedReq.ChunkId)
+
+		if i < len(requests)-1 {
+			// queue is not empty yet.
+			// head should be updated per pop (next element).
+			head, ok := q.Head()
+			require.True(t, ok, i)
+			require.Equal(t, head.ChunkId, requests[i+1].ChunkId)
+			require.Equal(t, head.RequesterId, requests[i+1].RequesterId)
+		} else {
+			// queue is empty,
+			// head should be nil.
+			head, ok := q.Head()
+			require.False(t, ok)
+			require.Nil(t, head)
+		}
+
+		require.Equal(t, q.Size(), uint(len(requests)-i-1))
+	}
 }
 
 func chunkDataRequestListFixture(count int) []*mempool.ChunkDataPackRequest {
