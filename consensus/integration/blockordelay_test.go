@@ -20,55 +20,19 @@ func blockNodesFirstMessages(n uint64, denyList ...*Node) BlockOrDelayFunc {
 		blackList[node.id.ID()] = n
 	}
 	return func(channel network.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+		// filter only consensus messages
+		switch event.(type) {
+		case *messages.BlockProposal:
+		case *messages.BlockVote:
+		case *messages.BlockResponse:
+		case *messages.TimeoutObject:
+		default:
+			return false, 0
+		}
 		count, ok := blackList[receiver.id.ID()]
 		if ok && count > 0 {
 			blackList[receiver.id.ID()] = count - 1
 			return true, 0
-		}
-		return false, 0
-	}
-}
-
-// block all messages sent by or received by a list of denied nodes for the first N messages
-func blockNodesForFirstNMessages(n int, denyList ...*Node) BlockOrDelayFunc {
-	denyDict := make(map[flow.Identifier]*Node, len(denyList))
-	for _, n := range denyList {
-		denyDict[n.id.ID()] = n
-	}
-
-	sent, received := 0, 0
-
-	return func(channel network.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
-		block, notBlock := true, false
-
-		switch m := event.(type) {
-		case *messages.BlockProposal:
-		case *messages.BlockVote:
-		case *messages.BlockResponse:
-			log := receiver.log.With().Int("blocks", len(m.Blocks)).Uint64("first", m.Blocks[0].Header.View).
-				Uint64("last", m.Blocks[len(m.Blocks)-1].Header.View).Logger()
-			log.Info().Msg("receives BlockResponse")
-		case *messages.SyncRequest:
-		case *messages.SyncResponse:
-		case *messages.RangeRequest:
-		case *messages.BatchRequest:
-		default:
-			return notBlock, 0
-		}
-
-		if _, ok := denyDict[sender.id.ID()]; ok {
-			if sent >= n {
-				return notBlock, 0
-			}
-			sent++
-			return block, 0
-		}
-		if _, ok := denyDict[receiver.id.ID()]; ok {
-			if received >= n {
-				return notBlock, 0
-			}
-			received++
-			return block, 0
 		}
 		return false, 0
 	}
