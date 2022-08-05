@@ -59,7 +59,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-const hotstuffTimeout = 100 * time.Millisecond
+const hotstuffTimeout = 50 * time.Millisecond
 
 // RandomBeaconNodeInfo stores information about participation in DKG process for consensus node
 // contains private + public keys and participant index

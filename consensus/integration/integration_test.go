@@ -49,7 +49,7 @@ func Test3Nodes(t *testing.T) {
 
 	runNodes(signalerCtx, nodes)
 
-	unittest.AssertClosesBefore(t, stopper.stopped, 30*time.Second)
+	unittest.RequireCloseBefore(t, stopper.stopped, 30*time.Second, "expect to stop before timeout")
 
 	allViews := allFinalizedViews(t, nodes)
 	assertSafety(t, allViews)
@@ -72,7 +72,7 @@ func Test5Nodes(t *testing.T) {
 
 	runNodes(signalerCtx, nodes)
 
-	<-stopper.stopped
+	unittest.RequireCloseBefore(t, stopper.stopped, 30*time.Second, "expect to stop before timeout")
 
 	header, err := nodes[0].state.Final().Head()
 	require.NoError(t, err)
@@ -159,21 +159,5 @@ func blockNodes(denyList ...*Node) BlockOrDelayFunc {
 			return block, 0
 		}
 		return notBlock, 0
-	}
-}
-
-// blockNodesFirstMessages blocks n incoming messages to given nodes
-func blockNodesFirstMessages(n uint64, denyList ...*Node) BlockOrDelayFunc {
-	blackList := make(map[flow.Identifier]uint64, len(denyList))
-	for _, node := range denyList {
-		blackList[node.id.ID()] = n
-	}
-	return func(channel network.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
-		count, ok := blackList[receiver.id.ID()]
-		if ok && count > 0 {
-			blackList[receiver.id.ID()] = count - 1
-			return true, 0
-		}
-		return false, 0
 	}
 }

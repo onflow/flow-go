@@ -1,6 +1,3 @@
-//go:build timesensitivetest
-// +build timesensitivetest
-
 package integration_test
 
 import (
@@ -9,11 +6,28 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/network"
 )
 
 // This file includes functions to simulate network conditions.
 // The network conditions are simulated by defining whether a message sent to a receiver should be
 // blocked or delayed.
+
+// blockNodesFirstMessages blocks n incoming messages to given nodes
+func blockNodesFirstMessages(n uint64, denyList ...*Node) BlockOrDelayFunc {
+	blackList := make(map[flow.Identifier]uint64, len(denyList))
+	for _, node := range denyList {
+		blackList[node.id.ID()] = n
+	}
+	return func(channel network.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+		count, ok := blackList[receiver.id.ID()]
+		if ok && count > 0 {
+			blackList[receiver.id.ID()] = count - 1
+			return true, 0
+		}
+		return false, 0
+	}
+}
 
 // block all messages sent by or received by a list of denied nodes for the first N messages
 func blockNodesForFirstNMessages(n int, denyList ...*Node) BlockOrDelayFunc {
@@ -24,7 +38,7 @@ func blockNodesForFirstNMessages(n int, denyList ...*Node) BlockOrDelayFunc {
 
 	sent, received := 0, 0
 
-	return func(channelID string, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+	return func(channel network.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 		block, notBlock := true, false
 
 		switch m := event.(type) {
@@ -62,7 +76,7 @@ func blockNodesForFirstNMessages(n int, denyList ...*Node) BlockOrDelayFunc {
 
 func blockReceiverMessagesByPercentage(percent int) BlockOrDelayFunc {
 	rand.Seed(time.Now().UnixNano())
-	return func(channelID string, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+	return func(channel network.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 		block := rand.Intn(100) <= percent
 		return block, 0
 	}
@@ -70,7 +84,7 @@ func blockReceiverMessagesByPercentage(percent int) BlockOrDelayFunc {
 
 func delayReceiverMessagesByRange(low time.Duration, high time.Duration) BlockOrDelayFunc {
 	rand.Seed(time.Now().UnixNano())
-	return func(channelID string, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+	return func(channel network.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 		rng := high - low
 		delay := int64(low) + rand.Int63n(int64(rng))
 		return false, time.Duration(delay)
