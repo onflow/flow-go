@@ -25,9 +25,7 @@ type Context struct {
 	MaxStateValueSize                    uint64
 	MaxStateInteractionSize              uint64
 	EventCollectionByteSizeLimit         uint64
-	MaxNumOfTxRetries                    uint8
 	BlockHeader                          *flow.Header
-	ServiceAccountEnabled                bool
 	// Depricated: RestrictedDeploymentEnabled is deprecated use SetIsContractDeploymentRestrictedTransaction instead.
 	// Can be removed after all networks are migrated to SetIsContractDeploymentRestrictedTransaction
 	RestrictContractDeployment    bool
@@ -68,7 +66,6 @@ const (
 	DefaultComputationLimit             = 100_000        // 100K
 	DefaultMemoryLimit                  = math.MaxUint64 //
 	DefaultEventCollectionByteSizeLimit = 256_000        // 256KB
-	DefaultMaxNumOfTxRetries            = 3
 )
 
 func defaultContext(logger zerolog.Logger) Context {
@@ -84,9 +81,7 @@ func defaultContext(logger zerolog.Logger) Context {
 		MaxStateValueSize:                    state.DefaultMaxValueSize,
 		MaxStateInteractionSize:              state.DefaultMaxInteractionSize,
 		EventCollectionByteSizeLimit:         DefaultEventCollectionByteSizeLimit,
-		MaxNumOfTxRetries:                    DefaultMaxNumOfTxRetries,
 		BlockHeader:                          nil,
-		ServiceAccountEnabled:                true,
 		RestrictContractDeployment:           true,
 		RestrictContractRemoval:              true,
 		CadenceLoggingEnabled:                false,
@@ -256,14 +251,6 @@ func WithTracer(tr module.Tracer) Option {
 func WithTransactionProcessors(processors ...TransactionProcessor) Option {
 	return func(ctx Context) Context {
 		ctx.TransactionProcessors = processors
-		return ctx
-	}
-}
-
-// WithServiceAccount enables or disables calls to the Flow service account.
-func WithServiceAccount(enabled bool) Option {
-	return func(ctx Context) Context {
-		ctx.ServiceAccountEnabled = enabled
 		return ctx
 	}
 }

@@ -403,49 +403,6 @@ func TestHashing(t *testing.T) {
 	}
 }
 
-func TestWithServiceAccount(t *testing.T) {
-
-	t.Parallel()
-
-	chain, vm := createChainAndVm(flow.Mainnet)
-
-	ctxA := fvm.NewContext(
-		zerolog.Nop(),
-		fvm.WithChain(chain),
-		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvoker(zerolog.Nop()),
-		),
-	)
-
-	view := utils.NewSimpleView()
-
-	txBody := flow.NewTransactionBody().
-		SetScript([]byte(`transaction { prepare(signer: AuthAccount) { AuthAccount(payer: signer) } }`)).
-		AddAuthorizer(chain.ServiceAddress())
-
-	t.Run("With service account enabled", func(t *testing.T) {
-		tx := fvm.Transaction(txBody, 0)
-
-		err := vm.Run(ctxA, tx, view, programs.NewEmptyPrograms())
-		require.NoError(t, err)
-
-		// transaction should fail on non-bootstrapped ledger
-		require.Error(t, tx.Err)
-	})
-
-	t.Run("With service account disabled", func(t *testing.T) {
-		ctxB := fvm.NewContextFromParent(ctxA, fvm.WithServiceAccount(false))
-
-		tx := fvm.Transaction(txBody, 0)
-
-		err := vm.Run(ctxB, tx, view, programs.NewEmptyPrograms())
-		require.NoError(t, err)
-
-		// transaction should succeed on non-bootstrapped ledger
-		assert.NoError(t, tx.Err)
-	})
-}
-
 func TestEventLimits(t *testing.T) {
 
 	t.Parallel()

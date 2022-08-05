@@ -537,14 +537,12 @@ func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 		return address, fmt.Errorf("create account failed: %w", err)
 	}
 
-	if e.ctx.ServiceAccountEnabled {
-		_, invokeErr := InvokeSetupNewAccountContract(
-			e,
-			flowAddress,
-			payer)
-		if invokeErr != nil {
-			return address, errors.HandleRuntimeError(invokeErr)
-		}
+	_, invokeErr := InvokeSetupNewAccountContract(
+		e,
+		flowAddress,
+		payer)
+	if invokeErr != nil {
+		return address, errors.HandleRuntimeError(invokeErr)
 	}
 
 	e.ctx.Metrics.RuntimeSetNumberOfAccounts(e.addressGenerator.AddressCount())

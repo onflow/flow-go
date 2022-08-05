@@ -24,19 +24,17 @@ func getAccount(
 		return nil, err
 	}
 
-	if ctx.ServiceAccountEnabled {
-		env, err := NewScriptEnvironment(context.Background(), ctx, vm, sth, programs)
-		if err != nil {
-			return nil, err
-		}
-
-		balance, err := env.GetAccountBalance(common.Address(address))
-		if err != nil {
-			return nil, err
-		}
-
-		account.Balance = balance
+	env, err := NewScriptEnvironment(context.Background(), ctx, vm, sth, programs)
+	if err != nil {
+		return nil, err
 	}
+
+	balance, err := env.GetAccountBalance(common.Address(address))
+	if err != nil {
+		return nil, err
+	}
+
+	account.Balance = balance
 
 	return account, nil
 }
