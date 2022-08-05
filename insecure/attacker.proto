@@ -23,6 +23,7 @@ message Message {
 }
 
 // EgressMessage represents the message exchanged between the CorruptibleConduitFactory and Attacker services.
+// OriginID for EgressMessage represents the corrupted node id where the message is coming from.
 message EgressMessage {
   string ChannelID = 1;
   bytes OriginID = 2;
@@ -32,10 +33,12 @@ message EgressMessage {
   Protocol protocol = 6;
 }
 
+// OriginID for IngressMessage represents the node id where the message is coming from - that node could be corrupted or honest.
 message IngressMessage {
   string ChannelID = 1;
   bytes OriginID = 2;
-  bytes Payload = 3;
+  bytes TargetID = 3;
+  bytes Payload = 4;
 }
 
 enum Protocol {

@@ -54,6 +54,8 @@ type Network struct {
 }
 
 var _ flownet.Network = &Network{}
+var _ insecure.EgressController = &Network{}
+var _ insecure.IngressController = &Network{}
 
 func NewCorruptibleNetwork(
 	logger zerolog.Logger,
@@ -291,8 +293,8 @@ func (n *Network) EngineClosingChannel(channel channels.Channel) error {
 	return n.conduitFactory.UnregisterChannel(channel)
 }
 
-// eventToMessage converts the given application layer event to a protobuf message that is meant to be sent to the attacker.
-func (n *Network) eventToMessage(
+// eventToEgressMessage converts the given application layer event to a protobuf message that is meant to be sent to the attacker.
+func (n *Network) eventToEgressMessage(
 	event interface{},
 	channel channels.Channel,
 	protocol insecure.Protocol,
@@ -316,8 +318,28 @@ func (n *Network) eventToMessage(
 	}
 
 	msg := &insecure.Message{
-		Egress:  egressMsg,
-		Ingress: nil,
+		Egress: egressMsg,
+	}
+
+	return msg, nil
+}
+
+func (n *Network) eventToIngressMessage(event interface{}, channel channels.Channel, originId flow.Identifier) (*insecure.Message, error) {
+	payload, err := n.codec.Encode(event)
+	if err != nil {
+		return nil, fmt.Errorf("could not encode event: %w", err)
+	}
+
+	ingressMsg := &insecure.IngressMessage{
+		ChannelID: channel.String(),
+		OriginID:  originId[:],
+		//TODO need to process TargetID
+		//TargetID:
+		Payload: payload,
+	}
+
+	msg := &insecure.Message{
+		Ingress: ingressMsg,
 	}
 
 	return msg, nil
@@ -405,7 +427,7 @@ func (n *Network) HandleOutgoingEvent(
 		return n.conduitFactory.SendOnFlowNetwork(event, channel, protocol, uint(num), targetIds...)
 	}
 
-	msg, err := n.eventToMessage(event, channel, protocol, num, targetIds...)
+	msg, err := n.eventToEgressMessage(event, channel, protocol, num, targetIds...)
 	if err != nil {
 		return fmt.Errorf("could not convert event to message: %w", err)
 	}
@@ -417,4 +439,31 @@ func (n *Network) HandleOutgoingEvent(
 
 	lg.Info().Msg("event sent to attacker")
 	return nil
+}
+
+func (n *Network) HandleIncomingEvent(channel channels.Channel, originId flow.Identifier, event interface{}) bool {
+	lg := n.logger.With().
+		Hex("corrupted_id", logging.ID(n.me.NodeID())).
+		Str("channel", string(channel)).
+		Str("origin_id", fmt.Sprintf("%v", originId)).
+		Str("flow_protocol_event", fmt.Sprintf("%T", event)).Logger()
+
+	if !n.AttackerRegistered() {
+		// no attacker registered, so return to message processor to pass back to flow network
+		lg.Info().Msg("no attacker registered, passing through event")
+		return false
+	}
+
+	msg, err := n.eventToIngressMessage(event, channel, originId)
+	if err != nil {
+		n.logger.Fatal().Msgf("could not convert event to message: %s", err)
+	}
+
+	err = n.attackerInboundStream.Send(msg)
+	if err != nil {
+		n.logger.Fatal().Msgf("could not send message to attacker to observe: %s", err)
+	}
+
+	lg.Info().Msg("event sent to attacker")
+	return true
 }

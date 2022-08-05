@@ -39,12 +39,12 @@ func TestEngineClosingChannel(t *testing.T) {
 // and exits if both egress and ingress messages are nil.
 func TestProcessAttackerMessage_EmptyEgressIngressMessage_Exit(t *testing.T) {
 	f := func(t *testing.T) {
-		ProcessAttackerMessage_EmptyEgressIngressMessage_Exit(t)
+		processAttackerMessage_EmptyEgressIngressMessage_Exit(t)
 	}
 	unittest.CrashTest(t, f, "both ingress and egress messages can't be nil", "TestProcessAttackerMessage_EmptyEgressIngressMessage_Exit")
 }
 
-func ProcessAttackerMessage_EmptyEgressIngressMessage_Exit(t *testing.T) {
+func processAttackerMessage_EmptyEgressIngressMessage_Exit(t *testing.T) {
 	logger, _ := unittest.HookedLogger()
 
 	withCorruptibleNetwork(t, logger,
@@ -92,12 +92,12 @@ func ProcessAttackerMessage_EmptyEgressIngressMessage_Exit(t *testing.T) {
 // and exits if both egress and ingress messages are NOT nil.
 func TestProcessAttackerMessage_NotEmptyEgressIngressMessage_Exit(t *testing.T) {
 	f := func(t *testing.T) {
-		ProcessAttackerMessage_NotEmptyEgressIngressMessage_Exit(t)
+		processAttackerMessage_NotEmptyEgressIngressMessage_Exit(t)
 	}
 	unittest.CrashTest(t, f, "both ingress and egress messages can't be set", "TestProcessAttackerMessage_NotEmptyEgressIngressMessage_Exit")
 }
 
-func ProcessAttackerMessage_NotEmptyEgressIngressMessage_Exit(t *testing.T) {
+func processAttackerMessage_NotEmptyEgressIngressMessage_Exit(t *testing.T) {
 	logger, _ := unittest.HookedLogger()
 
 	withCorruptibleNetwork(t, logger,
