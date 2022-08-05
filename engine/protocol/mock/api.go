@@ -108,52 +108,6 @@ func (_m *API) GetBlockHeaderByID(ctx context.Context, id flow.Identifier) (*flo
 	return r0, r1
 }
 
-// GetExecutionResultByBlockID provides a mock function with given fields: ctx, blockID
-func (_m *API) GetExecutionResultByBlockID(ctx context.Context, blockID flow.Identifier) (*flow.ExecutionResult, error) {
-	ret := _m.Called(ctx, blockID)
-
-	var r0 *flow.ExecutionResult
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) *flow.ExecutionResult); ok {
-		r0 = rf(ctx, blockID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.ExecutionResult)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier) error); ok {
-		r1 = rf(ctx, blockID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// GetExecutionResultByID provides a mock function with given fields: ctx, id
-func (_m *API) GetExecutionResultByID(ctx context.Context, id flow.Identifier) (*flow.ExecutionResult, error) {
-	ret := _m.Called(ctx, id)
-
-	var r0 *flow.ExecutionResult
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) *flow.ExecutionResult); ok {
-		r0 = rf(ctx, id)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.ExecutionResult)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier) error); ok {
-		r1 = rf(ctx, id)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // GetLatestBlock provides a mock function with given fields: ctx, isSealed
 func (_m *API) GetLatestBlock(ctx context.Context, isSealed bool) (*flow.Block, error) {
 	ret := _m.Called(ctx, isSealed)
