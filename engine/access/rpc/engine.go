@@ -137,7 +137,7 @@ func NewBuilder(log zerolog.Logger,
 	if cacheSize > 0 {
 		// it was observed that eviction issues were occurring when the pool size was less than number of ENs + LNs
 		if cacheSize < backend.DefaultConnectionPoolSize {
-			log.Debug().Msg("connection pool size below threshold, setting pool size to default value ")
+			log.Warn().Msg("connection pool size below threshold, setting pool size to default value ")
 			cacheSize = backend.DefaultConnectionPoolSize
 		}
 		var err error

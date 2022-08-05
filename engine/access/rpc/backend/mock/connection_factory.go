@@ -7,7 +7,7 @@ import (
 
 	execution "github.com/onflow/flow/protobuf/go/flow/execution"
 
-	grpc "google.golang.org/grpc"
+	io "io"
 
 	mock "github.com/stretchr/testify/mock"
 )
@@ -18,7 +18,7 @@ type ConnectionFactory struct {
 }
 
 // GetAccessAPIClient provides a mock function with given fields: address
-func (_m *ConnectionFactory) GetAccessAPIClient(address string) (access.AccessAPIClient, *grpc.ClientConn, error) {
+func (_m *ConnectionFactory) GetAccessAPIClient(address string) (access.AccessAPIClient, io.Closer, error) {
 	ret := _m.Called(address)
 
 	var r0 access.AccessAPIClient
@@ -30,12 +30,12 @@ func (_m *ConnectionFactory) GetAccessAPIClient(address string) (access.AccessAP
 		}
 	}
 
-	var r1 *grpc.ClientConn
-	if rf, ok := ret.Get(1).(func(string) *grpc.ClientConn); ok {
+	var r1 io.Closer
+	if rf, ok := ret.Get(1).(func(string) io.Closer); ok {
 		r1 = rf(address)
 	} else {
 		if ret.Get(1) != nil {
-			r1 = ret.Get(1).(*grpc.ClientConn)
+			r1 = ret.Get(1).(io.Closer)
 		}
 	}
 
@@ -50,7 +50,7 @@ func (_m *ConnectionFactory) GetAccessAPIClient(address string) (access.AccessAP
 }
 
 // GetExecutionAPIClient provides a mock function with given fields: address
-func (_m *ConnectionFactory) GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, *grpc.ClientConn, error) {
+func (_m *ConnectionFactory) GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, io.Closer, error) {
 	ret := _m.Called(address)
 
 	var r0 execution.ExecutionAPIClient
@@ -62,12 +62,12 @@ func (_m *ConnectionFactory) GetExecutionAPIClient(address string) (execution.Ex
 		}
 	}
 
-	var r1 *grpc.ClientConn
-	if rf, ok := ret.Get(1).(func(string) *grpc.ClientConn); ok {
+	var r1 io.Closer
+	if rf, ok := ret.Get(1).(func(string) io.Closer); ok {
 		r1 = rf(address)
 	} else {
 		if ret.Get(1) != nil {
-			r1 = ret.Get(1).(*grpc.ClientConn)
+			r1 = ret.Get(1).(io.Closer)
 		}
 	}
 

@@ -153,17 +153,17 @@ func (b *backendAccounts) getAccountFromAnyExeNode(ctx context.Context, execNode
 }
 
 func (b *backendAccounts) tryGetAccount(ctx context.Context, execNode *flow.Identity, req execproto.GetAccountAtBlockIDRequest) (*execproto.GetAccountAtBlockIDResponse, error) {
-	execRPCClient, conn, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
+	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
 		return nil, err
 	}
-	if conn != nil {
-		defer conn.Close()
+	if closer != nil {
+		defer closer.Close()
 	}
 
 	resp, err := execRPCClient.GetAccountAtBlockID(ctx, &req)
 	if err != nil {
-		if status.Code(err) == codes.Unavailable && conn == nil {
+		if status.Code(err) == codes.Unavailable && closer == nil {
 			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
 		}
 		return nil, err

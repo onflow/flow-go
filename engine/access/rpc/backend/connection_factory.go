@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"sync"
 	"time"
@@ -25,9 +26,9 @@ const DefaultClientTimeout = 3 * time.Second
 
 // ConnectionFactory is used to create an access api client
 type ConnectionFactory interface {
-	GetAccessAPIClient(address string) (access.AccessAPIClient, *grpc.ClientConn, error)
+	GetAccessAPIClient(address string) (access.AccessAPIClient, io.Closer, error)
 	InvalidateAccessAPIClient(address string)
-	GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, *grpc.ClientConn, error)
+	GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, io.Closer, error)
 	InvalidateExecutionAPIClient(address string)
 }
 
@@ -36,11 +37,11 @@ type ProxyConnectionFactory struct {
 	targetAddress string
 }
 
-func (p *ProxyConnectionFactory) GetAccessAPIClient(address string) (access.AccessAPIClient, *grpc.ClientConn, error) {
+func (p *ProxyConnectionFactory) GetAccessAPIClient(address string) (access.AccessAPIClient, io.Closer, error) {
 	return p.ConnectionFactory.GetAccessAPIClient(p.targetAddress)
 }
 
-func (p *ProxyConnectionFactory) GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, *grpc.ClientConn, error) {
+func (p *ProxyConnectionFactory) GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, io.Closer, error) {
 	return p.ConnectionFactory.GetExecutionAPIClient(p.targetAddress)
 }
 
@@ -138,7 +139,7 @@ func (cf *ConnectionFactoryImpl) retrieveConnection(grpcAddress string, timeout 
 	return conn, nil
 }
 
-func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string) (access.AccessAPIClient, *grpc.ClientConn, error) {
+func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string) (access.AccessAPIClient, io.Closer, error) {
 
 	grpcAddress, err := getGRPCAddress(address, cf.CollectionGRPCPort)
 	if err != nil {
@@ -158,7 +159,10 @@ func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string) (access.Acce
 	if err != nil {
 		return nil, nil, err
 	}
-	return access.NewAccessAPIClient(conn), conn, nil
+
+	accessAPIClient := access.NewAccessAPIClient(conn)
+	closer := io.Closer(conn)
+	return accessAPIClient, closer, nil
 }
 
 func (cf *ConnectionFactoryImpl) InvalidateAccessAPIClient(address string) {
@@ -166,7 +170,7 @@ func (cf *ConnectionFactoryImpl) InvalidateAccessAPIClient(address string) {
 	cf.invalidateAPIClient(address, cf.CollectionGRPCPort)
 }
 
-func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, *grpc.ClientConn, error) {
+func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, io.Closer, error) {
 
 	grpcAddress, err := getGRPCAddress(address, cf.ExecutionGRPCPort)
 	if err != nil {
@@ -186,7 +190,10 @@ func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (executio
 	if err != nil {
 		return nil, nil, err
 	}
-	return execution.NewExecutionAPIClient(conn), conn, nil
+
+	executionAPIClient := execution.NewExecutionAPIClient(conn)
+	closer := io.Closer(conn)
+	return executionAPIClient, closer, nil
 }
 
 func (cf *ConnectionFactoryImpl) InvalidateExecutionAPIClient(address string) {

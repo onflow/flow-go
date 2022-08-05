@@ -144,17 +144,17 @@ func (b *backendTransactions) sendTransactionToCollector(ctx context.Context,
 	tx *flow.TransactionBody,
 	collectionNodeAddr string) error {
 
-	collectionRPC, conn, err := b.connFactory.GetAccessAPIClient(collectionNodeAddr)
+	collectionRPC, closer, err := b.connFactory.GetAccessAPIClient(collectionNodeAddr)
 	if err != nil {
 		return fmt.Errorf("failed to connect to collection node at %s: %w", collectionNodeAddr, err)
 	}
-	if conn != nil {
-		defer conn.Close()
+	if closer != nil {
+		defer closer.Close()
 	}
 
 	err = b.grpcTxSend(ctx, collectionRPC, tx)
 	if err != nil {
-		if status.Code(err) == codes.Unavailable && conn == nil {
+		if status.Code(err) == codes.Unavailable && closer == nil {
 			b.connFactory.InvalidateAccessAPIClient(collectionNodeAddr)
 		}
 		return fmt.Errorf("failed to send transaction to collection node at %s: %v", collectionNodeAddr, err)
@@ -707,17 +707,17 @@ func (b *backendTransactions) tryGetTransactionResult(
 	execNode *flow.Identity,
 	req execproto.GetTransactionResultRequest,
 ) (*execproto.GetTransactionResultResponse, error) {
-	execRPCClient, conn, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
+	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
 		return nil, err
 	}
-	if conn != nil {
-		defer conn.Close()
+	if closer != nil {
+		defer closer.Close()
 	}
 
 	resp, err := execRPCClient.GetTransactionResult(ctx, &req)
 	if err != nil {
-		if status.Code(err) == codes.Unavailable && conn == nil {
+		if status.Code(err) == codes.Unavailable && closer == nil {
 			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
 		}
 		return nil, err
@@ -767,17 +767,17 @@ func (b *backendTransactions) tryGetTransactionResultsByBlockID(
 	execNode *flow.Identity,
 	req execproto.GetTransactionsByBlockIDRequest,
 ) (*execproto.GetTransactionResultsResponse, error) {
-	execRPCClient, conn, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
+	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
 		return nil, err
 	}
-	if conn != nil {
-		defer conn.Close()
+	if closer != nil {
+		defer closer.Close()
 	}
 
 	resp, err := execRPCClient.GetTransactionResultsByBlockID(ctx, &req)
 	if err != nil {
-		if status.Code(err) == codes.Unavailable && conn == nil {
+		if status.Code(err) == codes.Unavailable && closer == nil {
 			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
 		}
 		return nil, err
@@ -828,17 +828,17 @@ func (b *backendTransactions) tryGetTransactionResultByIndex(
 	execNode *flow.Identity,
 	req execproto.GetTransactionByIndexRequest,
 ) (*execproto.GetTransactionResultResponse, error) {
-	execRPCClient, conn, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
+	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
 		return nil, err
 	}
-	if conn != nil {
-		defer conn.Close()
+	if closer != nil {
+		defer closer.Close()
 	}
 
 	resp, err := execRPCClient.GetTransactionResultByIndex(ctx, &req)
 	if err != nil {
-		if status.Code(err) == codes.Unavailable && conn == nil {
+		if status.Code(err) == codes.Unavailable && closer == nil {
 			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
 		}
 		return nil, err
