@@ -318,14 +318,14 @@ func prepareService(container testnet.ContainerConfig, i int, n int) Service {
 	dataDir, profilerDir := prepareServiceDirs(container.Role.String(), container.NodeID.String())
 
 	service := defaultService(container.Role.String(), dataDir, profilerDir, i)
-	service.Command = append(service.Command, []string{
+	service.Command = append(service.Command,
 		fmt.Sprintf("--nodeid=%s", container.NodeID),
-	}...)
+	)
 
 	if i == 0 {
 		// bring up access node before any other nodes
 		if container.Role == flow.RoleConsensus || container.Role == flow.RoleCollection {
-			service.DependsOn = append(service.DependsOn, []string{"access_1"}...)
+			service.DependsOn = append(service.DependsOn, "access_1")
 		}
 	}
 
@@ -460,7 +460,7 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 	dataDir, profilerDir := prepareServiceDirs(observerName, "")
 
 	observerService := defaultService(DefaultObserverName, dataDir, profilerDir, i)
-	observerService.Command = append(observerService.Command, []string{
+	observerService.Command = append(observerService.Command,
 		fmt.Sprintf("--bootstrap-node-addresses=%s:%d", DefaultAccessGatewayName, AccessPubNetworkPort),
 		fmt.Sprintf("--bootstrap-node-public-keys=%s", agPublicKey),
 		fmt.Sprintf("--upstream-node-addresses=%s:%d", DefaultAccessGatewayName, SecuredRPCPort),
@@ -470,7 +470,7 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 		fmt.Sprintf("--rpc-addr=%s:%d", observerName, RPCPort),
 		fmt.Sprintf("--secure-rpc-addr=%s:%d", observerName, SecuredRPCPort),
 		fmt.Sprintf("--http-addr=%s:%d", observerName, HTTPPort),
-	}...)
+	)
 
 	// observer services rely on the access gateway
 	observerService.DependsOn = append(observerService.DependsOn, DefaultAccessGatewayName)
