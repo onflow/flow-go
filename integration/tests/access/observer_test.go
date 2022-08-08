@@ -63,7 +63,7 @@ func (suite *ObserverSuite) SetupTest() {
 	ctx := context.Background()
 	suite.net.Start(ctx)
 
-	stop, err := suite.net.AddObserver(ctx, suite.T(), &testnet.ObserverConfig{
+	stop, err := suite.net.AddObserver(suite.T(), ctx, &testnet.ObserverConfig{
 		ObserverName:            "observer_1",
 		ObserverImage:           "gcr.io/flow-container-registry/observer:latest",
 		AccessName:              "access_1",

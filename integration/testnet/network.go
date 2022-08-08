@@ -777,7 +777,7 @@ type ObserverConfig struct {
 	AccessGRPCSecurePort    string // Does not change the access node
 }
 
-func (net *FlowNetwork) AddObserver(ctx context.Context, t *testing.T, conf *ObserverConfig) (stop func(), err error) {
+func (net *FlowNetwork) AddObserver(t *testing.T, ctx context.Context, conf *ObserverConfig) (stop func(), err error) {
 	// Find the public key for the access node
 	accessPublicKey := ""
 	for _, stakedConf := range net.BootstrapData.StakedConfs {
