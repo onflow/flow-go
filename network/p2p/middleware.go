@@ -199,8 +199,7 @@ func DefaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.Mes
 
 // stakedPeer uses m.ov.Identity to get the identity for a peer ID. If an identity is not found the peer is unstaked.
 func (m *Middleware) stakedPeer(peerID peer.ID) (*flow.Identity, bool) {
-	id, ok := m.ov.Identity(peerID)
-	return id, ok
+	return m.ov.Identity(peerID)
 }
 
 // authenticateUnicastStream authenticates the peer attempting to send a message via unciast
