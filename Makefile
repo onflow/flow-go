@@ -472,10 +472,17 @@ PHONY: tool-remove-execution-fork
 tool-remove-execution-fork: docker-build-remove-execution-fork
 	docker container create --name remove-execution-fork $(CONTAINER_REGISTRY)/remove-execution-fork:latest;docker container cp remove-execution-fork:/bin/app ./remove-execution-fork;docker container rm remove-execution-fork
 
-# Check if the go version is 1.16 or higher. flow-go only supports go 1.16 and up.
 .PHONY: check-go-version
 check-go-version:
-	go version | grep '1.1[6-9]'
+	@bash -c '\
+		MINGOVERSION=1.18; \
+		function ver { printf "%d%03d%03d%03d" $$(echo "$$1" | tr . " "); }; \
+		GOVER=$$(go version | sed -rne "s/.* go([0-9.]+).*/\1/p" ); \
+		if [ "$$(ver $$GOVER)" -lt "$$(ver $$MINGOVERSION)" ]; then \
+			echo "go $$GOVER is too old. flow-go only supports go $$MINGOVERSION and up."; \
+			exit 1; \
+		fi; \
+		'
 
 #----------------------------------------------------------------------
 # CD COMMANDS
