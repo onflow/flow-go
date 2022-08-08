@@ -23,8 +23,8 @@ func TestNewNewestQCTracker(t *testing.T) {
 // is indeed expected. This test will run multiple times.
 func TestNewestQCTracker_Track(t *testing.T) {
 	tracker := NewNewestQCTracker()
-	samples := 20
-	times := 20
+	samples := 20 // number of concurrent updates per test case
+	times := 20   // number of times we run the test case
 
 	// setup initial value
 	tracker.Track(helper.MakeQC(helper.WithQCView(0)))

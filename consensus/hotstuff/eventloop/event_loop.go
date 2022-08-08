@@ -43,6 +43,7 @@ func NewEventLoop(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandl
 	// engine. We assume that we should be able to process proposals faster than compliance engine feeds them, worst case
 	// we will fill the buffer and block compliance engine worker but that should happen only if compliance engine receives
 	// large number of blocks in short period of time(when catching up for instance).
+	// TODO(active-pacemaker) add metrics for length of inbound channels
 	proposals := make(chan *model.Proposal, 1000)
 	// we will use a buffered channel to avoid blocking of caller
 	// we will create at most one partial TC per view and only in recovery path

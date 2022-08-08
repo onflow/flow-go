@@ -953,7 +953,10 @@ func (es *EventHandlerSuite) TestOnPartialTcCreated_ProducedTimeout() {
 	require.Equal(es.T(), partialTc.View, timeoutObject.View)
 }
 
-// TestOnPartialTcCreated_NotActiveView tests that we don't create timeout object if partial TC was delivered for non-current view.
+// TestOnPartialTcCreated_NotActiveView tests that we don't create timeout object if partial TC was delivered for a past, non-current view.
+// NOTE: it is not possible to receive a partial timeout for a FUTURE view, unless the partial timeout contains
+// either a QC/TC allowing us to enter that view, therefore that case is not covered here. 
+// See TestOnPartialTcCreated_QcAndTcProcessing instead.
 func (es *EventHandlerSuite) TestOnPartialTcCreated_NotActiveView() {
 	partialTc := &hotstuff.PartialTcCreated{
 		View:     es.initView - 1,
@@ -970,7 +973,10 @@ func (es *EventHandlerSuite) TestOnPartialTcCreated_NotActiveView() {
 }
 
 // TestOnPartialTcCreated_QcAndTcProcessing tests that EventHandler processes QC and TC included in hotstuff.PartialTcCreated
-// data structure.
+// data structure. This tests cases like the following example:
+// * the pacemaker is in view 10
+// * we observe a partial timeout for view 11 with a QC for view 10
+// * we should change to view 11 using the QC, then broadcast a timeout for view 11
 func (es *EventHandlerSuite) TestOnPartialTcCreated_QcAndTcProcessing() {
 
 	testOnPartialTcCreated := func(partialTc *hotstuff.PartialTcCreated) {
