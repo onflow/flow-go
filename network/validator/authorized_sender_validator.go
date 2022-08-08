@@ -54,6 +54,8 @@ func AuthorizedSenderValidator(log zerolog.Logger, slashingViolationsConsumer sl
 			slashingViolationsConsumer.OnSenderEjectedError(identity, from.String(), msgType, channel.String(), isUnicast, err)
 			return msgType, ErrSenderEjected
 		default:
+			// this condition should never happen and indicates there's a bug
+			// don't crash as a result of external inputs since that creates a DoS vector
 			log.Error().
 				Err(err).
 				Str("peer_id", from.String()).
