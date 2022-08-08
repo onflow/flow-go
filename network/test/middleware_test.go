@@ -64,7 +64,8 @@ func (co *tagsObserver) OnComplete() {
 type MiddlewareTestSuite struct {
 	suite.Suite
 	sync.RWMutex
-	size      int                  // used to determine number of middlewares under test
+	size      int // used to determine number of middlewares under test
+	nodes     []*p2p.Node
 	mws       []network.Middleware // used to keep track of middlewares under test
 	ov        []*mocknetwork.Overlay
 	obs       chan string // used to keep track of Protect events tagged by pubsub messages
@@ -100,7 +101,7 @@ func (m *MiddlewareTestSuite) SetupTest() {
 		log:  logger,
 	}
 
-	m.ids, m.mws, obs, m.providers = GenerateIDsAndMiddlewares(m.T(), m.size, logger, unittest.NetworkCodec())
+	m.ids, m.nodes, m.mws, obs, m.providers = GenerateIDsAndMiddlewares(m.T(), m.size, logger, unittest.NetworkCodec())
 
 	for _, observableConnMgr := range obs {
 		observableConnMgr.Subscribe(&ob)
@@ -128,13 +129,9 @@ func (m *MiddlewareTestSuite) SetupTest() {
 		mw.SetOverlay(m.ov[i])
 		mw.Start(m.mwCtx)
 		<-mw.Ready()
-
-		pm, ok := mw.PeerManager()
-		require.True(m.T(), ok)
-
-		pm.Start(m.mwCtx)
-		<-pm.Ready()
 	}
+
+	StartNodes(m.mwCtx, m.T(), m.nodes, 100*time.Millisecond)
 }
 
 // TestUpdateNodeAddresses tests that the UpdateNodeAddresses method correctly updates
@@ -158,11 +155,8 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	newMw.Start(m.mwCtx)
 	<-newMw.Ready()
 
-	pm, ok := newMw.PeerManager()
-	require.True(m.T(), ok)
-
-	pm.Start(m.mwCtx)
-	<-pm.Ready()
+	// start up nodes and peer managers
+	StartNodes(m.mwCtx, m.T(), libP2PNodes, 100*time.Millisecond)
 
 	idList := flow.IdentityList(append(m.ids, newId))
 
@@ -557,9 +551,11 @@ func (m *MiddlewareTestSuite) stopMiddlewares() {
 
 	for i := 0; i < m.size; i++ {
 		unittest.RequireCloseBefore(m.T(), m.mws[i].Done(), 100*time.Millisecond, "could not stop middleware on time")
+		unittest.RequireCloseBefore(m.T(), m.nodes[i].Done(), 100*time.Millisecond, "could not stop libp2p node on time")
 	}
 
 	m.mws = nil
+	m.nodes = nil
 	m.ov = nil
 	m.ids = nil
 	m.size = 0

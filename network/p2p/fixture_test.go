@@ -17,11 +17,12 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/unicast"
@@ -101,7 +102,6 @@ func withLogger(logger zerolog.Logger) nodeFixtureParameterOption {
 // It returns the node and its identity.
 func nodeFixture(
 	t *testing.T,
-	ctx context.Context,
 	sporkID flow.Identifier,
 	dhtPrefix string,
 	opts ...nodeFixtureParameterOption,
@@ -144,7 +144,7 @@ func nodeFixture(
 		builder.SetConnectionGater(connGater)
 	}
 
-	n, err := builder.Build(ctx)
+	n, err := builder.Build()
 	require.NoError(t, err)
 
 	err = n.WithDefaultUnicastProtocol(parameters.handlerFunc, parameters.unicasts)
@@ -162,17 +162,38 @@ func nodeFixture(
 	return n, *identity
 }
 
-// stopNodes stop all nodes in the input slice
-func stopNodes(t *testing.T, nodes []*p2p.Node) {
-	for _, n := range nodes {
-		stopNode(t, n)
+// startNodes start all nodes in the input slice using the provided context, timing out if nodes are
+// not all Ready() before duration expires
+func startNodes(t *testing.T, ctx irrecoverable.SignalerContext, nodes []*p2p.Node, timeout time.Duration) {
+	rdas := make([]module.ReadyDoneAware, 0, len(nodes))
+	for _, node := range nodes {
+		node.Start(ctx)
+		rdas = append(rdas, node)
+	}
+	unittest.RequireComponentsReadyBefore(t, timeout, rdas...)
+}
+
+// startNode start a single node using the provided context, timing out if nodes are not all Ready()
+// before duration expires
+func startNode(t *testing.T, ctx irrecoverable.SignalerContext, node *p2p.Node, timeout time.Duration) {
+	node.Start(ctx)
+	unittest.RequireComponentsReadyBefore(t, timeout, node)
+}
+
+// stopNodes stops all nodes in the input slice using the provided cancel func, timing out if nodes are
+// not all Done() before duration expires
+func stopNodes(t *testing.T, nodes []*p2p.Node, cancel context.CancelFunc, timeout time.Duration) {
+	cancel()
+	for _, node := range nodes {
+		unittest.RequireComponentsReadyBefore(t, timeout, node)
 	}
 }
 
-func stopNode(t *testing.T, node *p2p.Node) {
-	done, err := node.Stop()
-	assert.NoError(t, err)
-	unittest.RequireCloseBefore(t, done, 1*time.Second, "could not stop node on ime")
+// stopNode stops a single node using the provided cancel func, timing out if nodes are not all Done()
+// before duration expires
+func stopNode(t *testing.T, node *p2p.Node, cancel context.CancelFunc, timeout time.Duration) {
+	cancel()
+	unittest.RequireComponentsReadyBefore(t, timeout, node)
 }
 
 // generateNetworkingKey is a test helper that generates a ECDSA flow key pair.
@@ -224,25 +245,20 @@ func acceptAndHang(t *testing.T, l net.Listener) {
 
 // nodesFixture is a test fixture that creates a number of libp2p nodes with the given callback function for stream handling.
 // It returns the nodes and their identities.
-func nodesFixture(t *testing.T, ctx context.Context, sporkID flow.Identifier, dhtPrefix string, count int, opts ...nodeFixtureParameterOption) ([]*p2p.Node,
-	flow.IdentityList) {
-	// keeps track of errors on creating a node
-	var err error
+func nodesFixture(
+	t *testing.T,
+	sporkID flow.Identifier,
+	dhtPrefix string,
+	count int,
+	opts ...nodeFixtureParameterOption,
+) ([]*p2p.Node, flow.IdentityList) {
 	var nodes []*p2p.Node
-
-	defer func() {
-		if err != nil && nodes != nil {
-			// stops all nodes upon an error in starting even one single node
-			stopNodes(t, nodes)
-			t.Fail()
-		}
-	}()
 
 	// creating nodes
 	var identities flow.IdentityList
 	for i := 0; i < count; i++ {
 		// create a node on localhost with a random port assigned by the OS
-		node, identity := nodeFixture(t, ctx, sporkID, dhtPrefix, opts...)
+		node, identity := nodeFixture(t, sporkID, dhtPrefix, opts...)
 		nodes = append(nodes, node)
 		identities = append(identities, &identity)
 	}

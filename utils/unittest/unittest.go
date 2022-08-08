@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"math"
+	"math/rand"
 	"os"
 	"os/exec"
 	"regexp"
@@ -409,11 +410,24 @@ func CrashTest(t *testing.T, scenario func(*testing.T), expectedErrorMsg string,
 	require.Contains(t, outStr, expectedErrorMsg)
 }
 
-func NoIrrecoverableError(t *testing.T, ctx context.Context, errChan <-chan error) {
+func NoIrrecoverableError(t *testing.T, ctx context.Context, errChan <-chan error, msgAndArgs ...interface{}) {
 	select {
 	case <-ctx.Done():
 		return
 	case err := <-errChan:
-		require.NoError(t, err, "unexpected irrecoverable error")
+		if len(msgAndArgs) == 0 {
+			require.NoError(t, err, "unexpected irrecoverable error")
+		} else {
+			require.NoError(t, err, msgAndArgs...)
+		}
 	}
+}
+
+func GenerateRandomStringWithLen(commentLen uint) string {
+	const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	bytes := make([]byte, commentLen)
+	for i := range bytes {
+		bytes[i] = letterBytes[rand.Intn(len(letterBytes))]
+	}
+	return string(bytes)
 }

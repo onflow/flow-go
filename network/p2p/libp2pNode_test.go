@@ -3,6 +3,7 @@ package p2p_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -11,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -51,16 +53,21 @@ func TestMultiAddress(t *testing.T) {
 // TestSingleNodeLifeCycle evaluates correct lifecycle translation from start to stop the node
 func TestSingleNodeLifeCycle(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+
+	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
+	go unittest.NoIrrecoverableError(t, ctx, errChan)
 
 	node, _ := nodeFixture(
 		t,
-		ctx,
 		unittest.IdentifierFixture(),
 		"test_single_node_life_cycle",
 	)
 
-	stopNode(t, node)
+	node.Start(signalCtx)
+	unittest.RequireComponentsReadyBefore(t, 100*time.Millisecond, node)
+
+	cancel()
+	unittest.RequireComponentsReadyBefore(t, 100*time.Millisecond, node)
 }
 
 // TestGetPeerInfo evaluates the deterministic translation between the nodes address and
@@ -90,11 +97,14 @@ func TestGetPeerInfo(t *testing.T) {
 func TestAddPeers(t *testing.T) {
 	count := 3
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+
+	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
+	go unittest.NoIrrecoverableError(t, ctx, errChan)
 
 	// create nodes
-	nodes, identities := nodesFixture(t, ctx, unittest.IdentifierFixture(), "test_add_peers", count)
-	defer stopNodes(t, nodes)
+	nodes, identities := nodesFixture(t, unittest.IdentifierFixture(), "test_add_peers", count)
+	startNodes(t, signalCtx, nodes, 100*time.Millisecond)
+	defer stopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	// add the remaining nodes to the first node as its set of peers
 	for _, identity := range identities[1:] {
@@ -111,13 +121,17 @@ func TestAddPeers(t *testing.T) {
 func TestRemovePeers(t *testing.T) {
 	count := 3
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+
+	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
+	go unittest.NoIrrecoverableError(t, ctx, errChan)
 
 	// create nodes
-	nodes, identities := nodesFixture(t, ctx, unittest.IdentifierFixture(), "test_remove_peers", count)
+	nodes, identities := nodesFixture(t, unittest.IdentifierFixture(), "test_remove_peers", count)
 	peerInfos, errs := p2p.PeerInfosFromIDs(identities)
 	assert.Len(t, errs, 0)
-	defer stopNodes(t, nodes)
+
+	startNodes(t, signalCtx, nodes, 100*time.Millisecond)
+	defer stopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	// add nodes two and three to the first node as its peers
 	for _, pInfo := range peerInfos[1:] {
@@ -136,25 +150,32 @@ func TestRemovePeers(t *testing.T) {
 
 func TestConnGater(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+
+	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
+	go unittest.NoIrrecoverableError(t, ctx, errChan)
 
 	sporkID := unittest.IdentifierFixture()
 
 	node1Peers := make(map[peer.ID]struct{})
-	node1, identity1 := nodeFixture(t, ctx, sporkID, "test_conn_gater", withPeerFilter(func(pid peer.ID) bool {
+	node1, identity1 := nodeFixture(t, sporkID, "test_conn_gater", withPeerFilter(func(pid peer.ID) bool {
 		_, ok := node1Peers[pid]
 		return ok
 	}))
-	defer stopNode(t, node1)
+
+	startNode(t, signalCtx, node1, 100*time.Millisecond)
+	defer stopNode(t, node1, cancel, 100*time.Millisecond)
+
 	node1Info, err := p2p.PeerAddressInfo(identity1)
 	assert.NoError(t, err)
 
 	node2Peers := make(map[peer.ID]struct{})
-	node2, identity2 := nodeFixture(t, ctx, sporkID, "test_conn_gater", withPeerFilter(func(pid peer.ID) bool {
+	node2, identity2 := nodeFixture(t, sporkID, "test_conn_gater", withPeerFilter(func(pid peer.ID) bool {
 		_, ok := node2Peers[pid]
 		return ok
 	}))
-	defer stopNode(t, node2)
+	startNode(t, signalCtx, node2, 100*time.Millisecond)
+	defer stopNode(t, node2, cancel, 100*time.Millisecond)
+
 	node2Info, err := p2p.PeerAddressInfo(identity2)
 	assert.NoError(t, err)
 

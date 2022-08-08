@@ -773,8 +773,6 @@ func (builder *ObserverServiceBuilder) Initialize() error {
 
 	builder.InitIDProviders()
 
-	builder.enqueueMiddleware()
-
 	builder.enqueuePublicNetworkInit()
 
 	builder.enqueueConnectWithStakedAN()
@@ -823,9 +821,10 @@ func (builder *ObserverServiceBuilder) validateParams() error {
 // * The passed in private key as the libp2p key
 // * No connection gater
 // * No connection manager
+// * No peer manager
 // * Default libp2p pubsub options
 func (builder *ObserverServiceBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2p.LibP2PFactoryFunc {
-	return func(ctx context.Context) (*p2p.Node, error) {
+	return func() (*p2p.Node, error) {
 		var pis []peer.AddrInfo
 
 		for _, b := range builder.bootstrapIdentities {
@@ -853,7 +852,7 @@ func (builder *ObserverServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 				)
 			}).
 			SetPubSub(p2ppubsub.NewGossipSub).
-			Build(ctx)
+			Build()
 
 		if err != nil {
 			return nil, err
@@ -888,28 +887,6 @@ func (builder *ObserverServiceBuilder) initObserverLocal() func(node *cmd.NodeCo
 	}
 }
 
-// enqueueMiddleware enqueues the creation of the network middleware
-// this needs to be done before sync engine participants module
-func (builder *ObserverServiceBuilder) enqueueMiddleware() {
-	builder.
-		Module("network middleware", func(node *cmd.NodeConfig) error {
-
-			// NodeID for the observer on the observer network
-			observerNodeID := node.NodeID
-
-			// Networking key
-			observerNetworkKey := node.NetworkKey
-
-			libP2PFactory := builder.initLibP2PFactory(observerNetworkKey)
-
-			msgValidators := publicNetworkMsgValidators(node.Logger, node.IdentityProvider, observerNodeID)
-
-			builder.initMiddleware(observerNodeID, node.Metrics.Network, libP2PFactory, msgValidators...)
-
-			return nil
-		})
-}
-
 // Build enqueues the sync engine and the follower engine for the observer.
 // Currently, the observer only runs the follower engine.
 func (builder *ObserverServiceBuilder) Build() (cmd.Node, error) {
@@ -922,36 +899,52 @@ func (builder *ObserverServiceBuilder) Build() (cmd.Node, error) {
 
 // enqueuePublicNetworkInit enqueues the observer network component initialized for the observer
 func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
+	var libp2pNode *p2p.Node
+	builder.
+		Component("public libp2p node", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			libP2PFactory := builder.initLibP2PFactory(node.NetworkKey)
 
-	builder.Component("public network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
-		if builder.HeroCacheMetricsEnable {
-			heroCacheCollector = metrics.NetworkReceiveCacheMetricsFactory(builder.MetricsRegisterer)
-		}
-		receiveCache := netcache.NewHeroReceiveCache(builder.NetworkReceivedMessageCacheSize,
-			builder.Logger,
-			heroCacheCollector)
+			var err error
+			libp2pNode, err = libP2PFactory()
+			if err != nil {
+				return nil, fmt.Errorf("could not create public network: %w", err)
+			}
 
-		err := node.Metrics.Mempool.Register(metrics.ResourceNetworkingReceiveCache, receiveCache.Size)
-		if err != nil {
-			return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
-		}
+			return libp2pNode, nil
+		}).
+		Component("public network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+			if builder.HeroCacheMetricsEnable {
+				heroCacheCollector = metrics.NetworkReceiveCacheMetricsFactory(builder.MetricsRegisterer)
+			}
+			receiveCache := netcache.NewHeroReceiveCache(builder.NetworkReceivedMessageCacheSize,
+				builder.Logger,
+				heroCacheCollector)
 
-		// topology is nil since it is automatically managed by libp2p
-		net, err := builder.initNetwork(builder.Me, builder.Metrics.Network, builder.Middleware, nil, receiveCache)
-		if err != nil {
-			return nil, err
-		}
+			err := node.Metrics.Mempool.Register(metrics.ResourceNetworkingReceiveCache, receiveCache.Size)
+			if err != nil {
+				return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
+			}
 
-		builder.Network = converter.NewNetwork(net, channels.SyncCommittee, channels.PublicSyncCommittee)
+			msgValidators := publicNetworkMsgValidators(node.Logger, node.IdentityProvider, node.NodeID)
 
-		builder.Logger.Info().Msgf("network will run on address: %s", builder.BindAddr)
+			builder.initMiddleware(node.NodeID, node.Metrics.Network, libp2pNode, msgValidators...)
 
-		idEvents := gadgets.NewIdentityDeltas(builder.Middleware.UpdateNodeAddresses)
-		builder.ProtocolEvents.AddConsumer(idEvents)
+			// topology is nil since it is automatically managed by libp2p
+			net, err := builder.initNetwork(builder.Me, builder.Metrics.Network, builder.Middleware, nil, receiveCache)
+			if err != nil {
+				return nil, err
+			}
 
-		return builder.Network, nil
-	})
+			builder.Network = converter.NewNetwork(net, channels.SyncCommittee, channels.PublicSyncCommittee)
+
+			builder.Logger.Info().Msgf("network will run on address: %s", builder.BindAddr)
+
+			idEvents := gadgets.NewIdentityDeltas(builder.Middleware.UpdateNodeAddresses)
+			builder.ProtocolEvents.AddConsumer(idEvents)
+
+			return builder.Network, nil
+		})
 }
 
 // enqueueConnectWithStakedAN enqueues the upstream connector component which connects the libp2p host of the observer
@@ -1050,12 +1043,12 @@ func (builder *ObserverServiceBuilder) initUpstreamClient() (accessproto.AccessA
 // interval, and validators. The network.Middleware is then passed into the initNetwork function.
 func (builder *ObserverServiceBuilder) initMiddleware(nodeID flow.Identifier,
 	networkMetrics module.NetworkMetrics,
-	factoryFunc p2p.LibP2PFactoryFunc,
+	libp2pNode *p2p.Node,
 	validators ...network.MessageValidator) network.Middleware {
 
 	builder.Middleware = p2p.NewMiddleware(
 		builder.Logger,
-		factoryFunc,
+		libp2pNode,
 		nodeID,
 		networkMetrics,
 		builder.SporkID,
@@ -1063,7 +1056,6 @@ func (builder *ObserverServiceBuilder) initMiddleware(nodeID flow.Identifier,
 		builder.IDTranslator,
 		builder.CodecFactory(),
 		p2p.WithMessageValidators(validators...),
-		// no peer manager
 		// use default identifier provider
 	)
 
