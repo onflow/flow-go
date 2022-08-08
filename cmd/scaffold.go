@@ -107,8 +107,8 @@ type FlowNodeBuilder struct {
 	modules                  []namedModuleFunc
 	components               []namedComponentFunc
 	postShutdownFns          []func() error
-	preInitFns               []BuilderFunc
-	postInitFns              []BuilderFunc
+	preInitFns               []InitBuilderFunc
+	postInitFns              []InitBuilderFunc
 	extraFlagCheck           func() error
 	adminCommandBootstrapper *admin.CommandRunnerBootstrapper
 	adminCommands            map[string]func(config *NodeConfig) commands.AdminCommand
@@ -1185,12 +1185,12 @@ func (fnb *FlowNodeBuilder) RestartableComponent(name string, f ReadyDoneFactory
 	return fnb
 }
 
-func (fnb *FlowNodeBuilder) PreInit(f BuilderFunc) NodeBuilder {
+func (fnb *FlowNodeBuilder) PreInit(f InitBuilderFunc) NodeBuilder {
 	fnb.preInitFns = append(fnb.preInitFns, f)
 	return fnb
 }
 
-func (fnb *FlowNodeBuilder) PostInit(f BuilderFunc) NodeBuilder {
+func (fnb *FlowNodeBuilder) PostInit(f InitBuilderFunc) NodeBuilder {
 	fnb.postInitFns = append(fnb.postInitFns, f)
 	return fnb
 }
@@ -1408,12 +1408,12 @@ func (fnb *FlowNodeBuilder) handleFatal(err error) {
 	fnb.Logger.Fatal().Err(err).Msg("unhandled irrecoverable error")
 }
 
-func (fnb *FlowNodeBuilder) handlePreInit(f BuilderFunc) error {
-	return f(fnb.NodeConfig)
+func (fnb *FlowNodeBuilder) handlePreInit(f InitBuilderFunc) error {
+	return f(fnb.NodeConfig, fnb.Storage)
 }
 
-func (fnb *FlowNodeBuilder) handlePostInit(f BuilderFunc) error {
-	return f(fnb.NodeConfig)
+func (fnb *FlowNodeBuilder) handlePostInit(f InitBuilderFunc) error {
+	return f(fnb.NodeConfig, fnb.Storage)
 }
 
 func (fnb *FlowNodeBuilder) extraFlagsValidation() error {

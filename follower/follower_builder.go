@@ -598,8 +598,8 @@ func (builder *FollowerServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 // initObserverLocal initializes the observer's ID, network key and network address
 // Currently, it reads a node-info.priv.json like any other node.
 // TODO: read the node ID from the special bootstrap files
-func (builder *FollowerServiceBuilder) initObserverLocal() func(node *cmd.NodeConfig) error {
-	return func(node *cmd.NodeConfig) error {
+func (builder *FollowerServiceBuilder) initObserverLocal() func(node *cmd.NodeConfig, storage cmd.Storage) error {
+	return func(node *cmd.NodeConfig, storage cmd.Storage) error {
 		// for an observer, set the identity here explicitly since it will not be found in the protocol state
 		self := &flow.Identity{
 			NodeID:        node.NodeID,
