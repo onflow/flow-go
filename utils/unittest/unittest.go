@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"math"
 	"os"
+	"os/exec"
 	"regexp"
 	"strings"
 	"sync"
@@ -384,4 +385,25 @@ func AssertEqualBlocksLenAndOrder(t *testing.T, expectedBlocks, actualSegmentBlo
 // NetworkCodec returns cbor codec
 func NetworkCodec() network.Codec {
 	return cborcodec.NewCodec()
+}
+
+// CrashTest safely tests functions that crash (as the expected behavior) by checking that running the function creates an error and
+// an expected error message.
+func CrashTest(t *testing.T, scenario func(*testing.T), expectedErrorMsg string, testName string) {
+	if os.Getenv("CRASH_TEST") == "1" {
+		scenario(t)
+		return
+	}
+
+	cmd := exec.Command(os.Args[0], "-test.run="+testName)
+	cmd.Env = append(os.Environ(), "CRASH_TEST=1")
+
+	outBytes, err := cmd.Output()
+	// expect error from run
+	require.Error(t, err)
+	require.Contains(t, "exit status 1", err.Error())
+
+	// expect logger.Fatal() message to be pushed to stdout
+	outStr := string(outBytes)
+	require.Contains(t, outStr, expectedErrorMsg)
 }
