@@ -116,7 +116,7 @@ func testAttackNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegr
 			for _, event := range events {
 				event := event
 				go func() {
-					err := attackNetwork.Send(event)
+					err := attackNetwork.SendEgress(event)
 					require.NoError(t, err)
 
 					attackNetworkSendWG.Done()
@@ -132,7 +132,7 @@ func testAttackNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegr
 
 // mackEventForMessage fails the test if given message is not meant to be sent on behalf of the corrupted id, or it does not correspond to any
 // of the given events.
-func matchEventForMessage(t *testing.T, events []*insecure.Event, message *insecure.Message, corruptedId flow.Identifier) {
+func matchEventForMessage(t *testing.T, events []*insecure.EgressEvent, message *insecure.Message, corruptedId flow.Identifier) {
 	codec := unittest.NetworkCodec()
 
 	require.Equal(t, corruptedId[:], message.Egress.OriginID[:])
@@ -221,17 +221,17 @@ func withMockOrchestrator(t *testing.T,
 
 // mockOrchestratorHandlingEvent mocks the given orchestrator to receive each of the given events exactly once. The returned wait group is
 // released when individual events are seen by orchestrator exactly once.
-func mockOrchestratorHandlingEvent(t *testing.T, orchestrator *mockinsecure.AttackOrchestrator, events []*insecure.Event) *sync.WaitGroup {
+func mockOrchestratorHandlingEvent(t *testing.T, orchestrator *mockinsecure.AttackOrchestrator, events []*insecure.EgressEvent) *sync.WaitGroup {
 	orchestratorWG := &sync.WaitGroup{}
 	orchestratorWG.Add(len(events)) // keeps track of total events that orchestrator receives
 
 	mu := sync.Mutex{}
-	seen := make(map[*insecure.Event]struct{}) // keeps track of unique events received by orchestrator
+	seen := make(map[*insecure.EgressEvent]struct{}) // keeps track of unique events received by orchestrator
 	orchestrator.On("HandleEventFromCorruptedNode", mock.Anything).Run(func(args mock.Arguments) {
 		mu.Lock()
 		defer mu.Unlock()
 
-		e, ok := args[0].(*insecure.Event)
+		e, ok := args[0].(*insecure.EgressEvent)
 		require.True(t, ok)
 
 		// event should not be seen before.

@@ -49,7 +49,7 @@ func NewDummyOrchestrator(logger zerolog.Logger) *dummyOrchestrator {
 // In this dummy orchestrator, the incoming event is passed through without any changes.
 // Passing through means that the orchestrator returns the events as they are to the original corrupted nodes so they
 // dispatch them on the Flow network.
-func (d *dummyOrchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error {
+func (d *dummyOrchestrator) HandleEventFromCorruptedNode(event *insecure.EgressEvent) error {
 	lg := d.logger.With().
 		Hex("corrupted_id", logging.ID(event.CorruptedNodeId)).
 		Str("channel", event.Channel.String()).
@@ -69,7 +69,7 @@ func (d *dummyOrchestrator) HandleEventFromCorruptedNode(event *insecure.Event) 
 		d.eventTracker[typeResultApproval] = append(d.eventTracker[typeResultApproval], e.ID())
 	}
 
-	err := d.attackNetwork.Send(event)
+	err := d.attackNetwork.SendEgress(event)
 	if err != nil {
 		// dummy orchestrator is used for testing and upon error we want it to crash.
 		lg.Fatal().Err(err).Msg("could not pass through incoming event")

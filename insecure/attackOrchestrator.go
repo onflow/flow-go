@@ -9,7 +9,7 @@ type AttackOrchestrator interface {
 	//
 	// Note: as a design assumption, this method is invoked sequentially by the AttackNetwork to pass the
 	// events of corrupted nodes. Hence, no extra concurrency-safe consideration is needed.
-	HandleEventFromCorruptedNode(*Event) error
+	HandleEventFromCorruptedNode(*EgressEvent) error
 
 	WithAttackNetwork(AttackNetwork)
 }

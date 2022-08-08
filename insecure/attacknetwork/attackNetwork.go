@@ -137,7 +137,7 @@ func (a *AttackNetwork) processMessageFromCorruptedNode(message *insecure.Messag
 	a.orchestratorMutex.Lock()
 	defer a.orchestratorMutex.Unlock()
 
-	err = a.orchestrator.HandleEventFromCorruptedNode(&insecure.Event{
+	err = a.orchestrator.HandleEventFromCorruptedNode(&insecure.EgressEvent{
 		CorruptedNodeId:   sender,
 		Channel:           channels.Channel(message.Egress.ChannelID),
 		FlowProtocolEvent: event,
@@ -152,8 +152,8 @@ func (a *AttackNetwork) processMessageFromCorruptedNode(message *insecure.Messag
 	return nil
 }
 
-// Send enforces dissemination of given event via its encapsulated corrupted node networking layer through the Flow network
-func (a *AttackNetwork) Send(event *insecure.Event) error {
+// SendEgress enforces dissemination of given event via its encapsulated corrupted node networking layer through the Flow network
+func (a *AttackNetwork) SendEgress(event *insecure.EgressEvent) error {
 
 	connection, ok := a.corruptedConnections[event.CorruptedNodeId]
 	if !ok {
