@@ -54,17 +54,17 @@ func (cache *epochRangeCache) combinedRange() (firstView uint64, finalView uint6
 // Adding the same epoch multiple times is a no-op.
 // Guarantees ordering and alignment properties of epochRangeCache are preserved.
 // No errors are expected during normal operation.
-func (cache *epochRangeCache) add(epoch epochRange) error {
+func (cache *epochRangeCache) add(epoch *epochRange) error {
 
 	latestCachedEpoch := cache.latest()
 	// initial case - no epoch ranges are stored yet
 	if latestCachedEpoch == nil {
-		cache[2] = &epoch
+		cache[2] = epoch
 		return nil
 	}
 
 	// adding the same epoch multiple times is a no-op
-	if *latestCachedEpoch == epoch {
+	if *latestCachedEpoch == *epoch {
 		return nil
 	}
 
@@ -81,7 +81,7 @@ func (cache *epochRangeCache) add(epoch epochRange) error {
 	// insert new epoch range, shifting existing epochs left
 	cache[0] = cache[1] // ejects oldest epoch
 	cache[1] = cache[2]
-	cache[2] = &epoch
+	cache[2] = epoch
 
 	return nil
 }
@@ -172,7 +172,7 @@ func (lookup *EpochLookup) cacheEpoch(epoch protocol.Epoch) error {
 		return err
 	}
 
-	cachedEpoch := epochRange{
+	cachedEpoch := &epochRange{
 		counter:   counter,
 		firstView: firstView,
 		finalView: finalView,
