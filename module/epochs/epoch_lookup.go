@@ -22,12 +22,6 @@ type epochRange struct {
 	finalView uint64
 }
 
-func (epoch epochRange) equals(other epochRange) bool {
-	return epoch.counter == other.counter &&
-		epoch.firstView == other.firstView &&
-		epoch.finalView == other.finalView
-}
-
 // epochRangeCache stores at most the 3 latest epoch ranges.
 // Ranges are ordered by counter (ascending) and right-aligned.
 // Not safe for concurrent use.
@@ -70,7 +64,7 @@ func (cache *epochRangeCache) add(epoch epochRange) error {
 	}
 
 	// adding the same epoch multiple times is a no-op
-	if latestCachedEpoch.equals(epoch) {
+	if *latestCachedEpoch == epoch {
 		return nil
 	}
 
