@@ -56,9 +56,6 @@ type Middleware interface {
 	// NewPingService creates a new PingService for the given ping protocol ID.
 	NewPingService(pingProtocol protocol.ID, provider PingInfoProvider) PingService
 
-	// PeerManager returns the peer manager configured for the middleware.
-	PeerManager() (PeerManager, bool)
-
 	IsConnected(nodeID flow.Identifier) (bool, error)
 }
 

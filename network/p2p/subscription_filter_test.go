@@ -13,6 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -101,15 +102,18 @@ func TestFilterSubscribe(t *testing.T) {
 // TestCanSubscribe tests that the subscription filter blocks a node from subscribing
 // to channel that its role shouldn't subscribe to
 func TestCanSubscribe(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
+	go unittest.NoIrrecoverableError(t, ctx, errChan)
+
 	identity, privateKey := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleCollection))
 	sporkId := unittest.IdentifierFixture()
 
 	collectionNode := createNode(t, identity.NodeID, privateKey, sporkId, zerolog.Nop(), withSubscriptionFilter(subscriptionFilter(identity, flow.IdentityList{identity})))
-	defer func() {
-		done, err := collectionNode.Stop()
-		require.NoError(t, err)
-		unittest.RequireCloseBefore(t, done, 1*time.Second, "could not stop collection node on time")
-	}()
+
+	startNode(t, signalCtx, collectionNode, 100*time.Millisecond)
+	defer stopNode(t, collectionNode, cancel, 1*time.Second)
 
 	goodTopic := channels.TopicFromChannel(channels.ProvideCollections, sporkId)
 	_, err := collectionNode.Subscribe(goodTopic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter())

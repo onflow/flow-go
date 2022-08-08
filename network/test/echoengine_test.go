@@ -17,10 +17,10 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -51,12 +51,9 @@ func (suite *EchoEngineTestSuite) SetupTest() {
 	ctx, cancel := context.WithCancel(context.Background())
 	suite.cancel = cancel
 
-	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(suite.T(), ctx, errChan)
-
 	// both nodes should be of the same role to get connected on epidemic dissemination
-	suite.ids, suite.mws, suite.nets, _ = GenerateIDsMiddlewaresNetworks(
-		ctx,
+	var nodes []*p2p.Node
+	suite.ids, nodes, suite.mws, suite.nets, _ = GenerateIDsMiddlewaresNetworks(
 		suite.T(),
 		count,
 		logger,
@@ -65,13 +62,8 @@ func (suite *EchoEngineTestSuite) SetupTest() {
 		mocknetwork.NewViolationsConsumer(suite.T()),
 	)
 
-	for _, mw := range suite.mws {
-		pm, ok := mw.PeerManager()
-		require.True(suite.T(), ok)
-
-		pm.Start(signalerCtx)
-		<-pm.Ready()
-	}
+	errChan := StartNetworks(ctx, suite.T(), nodes, suite.nets, 100*time.Millisecond)
+	go unittest.NoIrrecoverableError(suite.T(), ctx, errChan)
 }
 
 // TearDownTest closes the networks within a specified timeout

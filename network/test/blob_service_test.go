@@ -12,13 +12,11 @@ import (
 	"github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
@@ -85,11 +83,7 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 	ctx, cancel := context.WithCancel(context.Background())
 	suite.cancel = cancel
 
-	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(suite.T(), ctx, errChan)
-
-	ids, mws, networks, _ := GenerateIDsMiddlewaresNetworks(
-		ctx,
+	ids, nodes, mws, networks, _ := GenerateIDsMiddlewaresNetworks(
 		suite.T(),
 		suite.numNodes,
 		logger,
@@ -100,6 +94,9 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 		WithPeerManagerOpts(p2p.WithInterval(time.Second)),
 	)
 	suite.networks = networks
+
+	errChan := StartNetworks(ctx, suite.T(), nodes, networks, 100*time.Millisecond)
+	go unittest.NoIrrecoverableError(suite.T(), ctx, errChan)
 
 	blobExchangeChannel := channels.Channel("blob-exchange")
 
@@ -113,14 +110,6 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 		suite.Require().NoError(err)
 		<-blobService.Ready()
 		suite.blobServices = append(suite.blobServices, blobService)
-	}
-
-	for _, mw := range mws {
-		pm, ok := mw.PeerManager()
-		require.True(suite.T(), ok)
-
-		pm.Start(signalerCtx)
-		<-pm.Ready()
 	}
 
 	// let nodes connect to each other only after they are all listening on Bitswap

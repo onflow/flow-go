@@ -2,6 +2,7 @@ package p2p_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
@@ -34,28 +36,43 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	ctx1, cancel1 := context.WithCancel(ctx)
+	signalCtx1, errChan1 := irrecoverable.WithSignaler(ctx1)
+	go unittest.NoIrrecoverableError(t, ctx1, errChan1, fmt.Sprintf("unexpected irrecoverable on errchan1"))
+
+	ctx2, cancel2 := context.WithCancel(ctx)
+	signalCtx2, errChan2 := irrecoverable.WithSignaler(ctx2)
+	go unittest.NoIrrecoverableError(t, ctx2, errChan2, fmt.Sprintf("unexpected irrecoverable on errchan2"))
+
+	ctx2a, cancel2a := context.WithCancel(ctx)
+	signalCtx2a, errChan2a := irrecoverable.WithSignaler(ctx2a)
+	go unittest.NoIrrecoverableError(t, ctx2a, errChan2a, fmt.Sprintf("unexpected irrecoverable on errchan2a"))
+
 	// create and start node 1 on localhost and random port
 	node1key := generateNetworkingKey(t)
 	sporkId := unittest.IdentifierFixture()
 
 	node1, id1 := nodeFixture(t,
-		ctx,
 		sporkId,
 		"test_crosstalk_prevention_on_network_key_change",
 		withNetworkingPrivateKey(node1key),
 	)
-	defer stopNode(t, node1)
+
+	startNode(t, signalCtx1, node1, 100*time.Millisecond)
+	defer stopNode(t, node1, cancel1, 100*time.Millisecond)
+
 	t.Logf(" %s node started on %s", id1.NodeID.String(), id1.Address)
 	t.Logf("libp2p ID for %s: %s", id1.NodeID.String(), node1.Host().ID())
 
 	// create and start node 2 on localhost and random port
 	node2key := generateNetworkingKey(t)
 	node2, id2 := nodeFixture(t,
-		ctx,
 		sporkId,
 		"test_crosstalk_prevention_on_network_key_change",
 		withNetworkingPrivateKey(node2key),
 	)
+	startNode(t, signalCtx2, node2, 100*time.Millisecond)
+
 	peerInfo2, err := p2p.PeerAddressInfo(id2)
 	require.NoError(t, err)
 
@@ -65,19 +82,20 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 	// Simulate a hard-spoon: node1 is on the old chain, but node2 is moved from the old chain to the new chain
 
 	// stop node 2 and start it again with a different networking key but on the same IP and port
-	stopNode(t, node2)
+	stopNode(t, node2, cancel2, 100*time.Millisecond)
 
 	// start node2 with the same name, ip and port but with the new key
 	node2keyNew := generateNetworkingKey(t)
 	assert.False(t, node2key.Equals(node2keyNew))
 	node2, id2New := nodeFixture(t,
-		ctx,
 		sporkId,
 		"test_crosstalk_prevention_on_network_key_change",
 		withNetworkingPrivateKey(node2keyNew),
 		withNetworkingAddress(id2.Address),
 	)
-	defer stopNode(t, node2)
+
+	startNode(t, signalCtx2a, node2, 100*time.Millisecond)
+	defer stopNode(t, node2, cancel2a, 100*time.Millisecond)
 
 	// make sure the node2 indeed came up on the old ip and port
 	assert.Equal(t, id2New.Address, id2.Address)
@@ -94,34 +112,50 @@ func TestOneToOneCrosstalkPrevention(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	ctx1, cancel1 := context.WithCancel(ctx)
+	signalCtx1, errChan1 := irrecoverable.WithSignaler(ctx1)
+	go unittest.NoIrrecoverableError(t, ctx1, errChan1, fmt.Sprintf("unexpected irrecoverable on errchan1"))
+
+	ctx2, cancel2 := context.WithCancel(ctx)
+	signalCtx2, errChan2 := irrecoverable.WithSignaler(ctx2)
+	go unittest.NoIrrecoverableError(t, ctx2, errChan2, fmt.Sprintf("unexpected irrecoverable on errchan2"))
+
+	ctx2a, cancel2a := context.WithCancel(ctx)
+	signalCtx2a, errChan2a := irrecoverable.WithSignaler(ctx2a)
+	go unittest.NoIrrecoverableError(t, ctx2a, errChan2a, fmt.Sprintf("unexpected irrecoverable on errchan2a"))
+
 	sporkId1 := unittest.IdentifierFixture()
 
 	// create and start node 1 on localhost and random port
-	node1, id1 := nodeFixture(t, ctx, sporkId1, "test_one_to_one_crosstalk_prevention")
+	node1, id1 := nodeFixture(t, sporkId1, "test_one_to_one_crosstalk_prevention")
 
-	defer stopNode(t, node1)
+	startNode(t, signalCtx1, node1, 100*time.Millisecond)
+	defer stopNode(t, node1, cancel1, 100*time.Millisecond)
+
 	peerInfo1, err := p2p.PeerAddressInfo(id1)
 	require.NoError(t, err)
 
 	// create and start node 2 on localhost and random port
-	node2, id2 := nodeFixture(t, ctx, sporkId1, "test_one_to_one_crosstalk_prevention")
+	node2, id2 := nodeFixture(t, sporkId1, "test_one_to_one_crosstalk_prevention")
+
+	startNode(t, signalCtx2, node2, 100*time.Millisecond)
 
 	// create stream from node 2 to node 1
 	testOneToOneMessagingSucceeds(t, node2, peerInfo1)
 
 	// Simulate a hard-spoon: node1 is on the old chain, but node2 is moved from the old chain to the new chain
 	// stop node 2 and start it again with a different libp2p protocol id to listen for
-	stopNode(t, node2)
+	stopNode(t, node2, cancel2, time.Second)
 
 	// start node2 with the same address and root key but different root block id
 	node2, id2New := nodeFixture(t,
-		ctx,
 		unittest.IdentifierFixture(), // update the flow root id for node 2. node1 is still listening on the old protocol
 		"test_one_to_one_crosstalk_prevention",
 		withNetworkingAddress(id2.Address),
 	)
 
-	defer stopNode(t, node2)
+	startNode(t, signalCtx2a, node2, 100*time.Millisecond)
+	defer stopNode(t, node2, cancel2a, 100*time.Millisecond)
 
 	// make sure the node2 indeed came up on the old ip and port
 	assert.Equal(t, id2New.Address, id2.Address)
@@ -137,27 +171,36 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	ctx1, cancel1 := context.WithCancel(ctx)
+	signalCtx1, errChan1 := irrecoverable.WithSignaler(ctx1)
+	go unittest.NoIrrecoverableError(t, ctx1, errChan1, fmt.Sprintf("unexpected irrecoverable on errchan1"))
+
+	ctx2, cancel2 := context.WithCancel(ctx)
+	signalCtx2, errChan2 := irrecoverable.WithSignaler(ctx2)
+	go unittest.NoIrrecoverableError(t, ctx2, errChan2, fmt.Sprintf("unexpected irrecoverable on errchan2"))
+
 	// root id before spork
 	previousSporkId := unittest.IdentifierFixture()
 
 	// create and start node 1 on localhost and random port
 	node1, _ := nodeFixture(t,
-		ctx,
 		previousSporkId,
 		"test_one_to_k_crosstalk_prevention",
 	)
 
-	defer stopNode(t, node1)
+	startNode(t, signalCtx1, node1, 100*time.Millisecond)
+	defer stopNode(t, node1, cancel1, 100*time.Millisecond)
 
 	// create and start node 2 on localhost and random port with the same root block ID
 	node2, id2 := nodeFixture(t,
-		ctx,
 		previousSporkId,
 		"test_one_to_k_crosstalk_prevention",
 	)
 
+	startNode(t, signalCtx2, node2, 100*time.Millisecond)
+	defer stopNode(t, node2, cancel2, 100*time.Millisecond)
+
 	pInfo2, err := p2p.PeerAddressInfo(id2)
-	defer stopNode(t, node2)
 	require.NoError(t, err)
 
 	// spork topic is derived by suffixing the channel with the root block ID
