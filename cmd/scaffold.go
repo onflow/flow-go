@@ -263,44 +263,64 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 		return cf, nil
 	})
+
+	fnb.Component("libp2p node", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		myAddr := fnb.NodeConfig.Me.Address()
+		if fnb.BaseConfig.BindAddr != NotSet {
+			myAddr = fnb.BaseConfig.BindAddr
+		}
+
+		libP2PNodeFactory := p2p.DefaultLibP2PNodeFactory(
+			fnb.Logger,
+			myAddr,
+			fnb.NetworkKey,
+			fnb.SporkID,
+			fnb.IdentityProvider,
+			fnb.Metrics.Network,
+			fnb.Resolver,
+			fnb.BaseConfig.NodeRole,
+			// run peer manager with the specified interval and let it also prune connections
+			p2p.PeerManagerFactory([]p2p.Option{p2p.WithInterval(fnb.PeerUpdateInterval)}),
+		)
+
+		libp2pNode, err := libP2PNodeFactory()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create libp2p node: %w", err)
+		}
+		fnb.LibP2PNode = libp2pNode
+
+		return libp2pNode, nil
+	})
+
 	fnb.Component(NetworkComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		return fnb.InitFlowNetworkWithConduitFactory(node, fnb.ConduitFactory)
+		return fnb.InitFlowNetworkWithConduitFactory(node, fnb.LibP2PNode, fnb.ConduitFactory)
+	})
+
+	fnb.Component("peer manager", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		// TODO: make this component start after its dependencies are ready. This will require a dependable type of component
+		// Depends on:
+		// * middleware
+		// * network
+		// * bitswap
+		return fnb.LibP2PNode.PeerManagerComponent(), nil
 	})
 }
 
-func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, cf network.ConduitFactory) (network.Network, error) {
-	myAddr := fnb.NodeConfig.Me.Address()
-	if fnb.BaseConfig.BindAddr != NotSet {
-		myAddr = fnb.BaseConfig.BindAddr
-	}
-
-	libP2PNodeFactory := p2p.DefaultLibP2PNodeFactory(
-		fnb.Logger,
-		myAddr,
-		fnb.NetworkKey,
-		fnb.SporkID,
-		fnb.IdentityProvider,
-		fnb.Metrics.Network,
-		fnb.Resolver,
-		fnb.BaseConfig.NodeRole,
-	)
+func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, libp2pNode *p2p.Node, cf network.ConduitFactory) (network.Network, error) {
 
 	var mwOpts []p2p.MiddlewareOption
 	if len(fnb.MsgValidators) > 0 {
 		mwOpts = append(mwOpts, p2p.WithMessageValidators(fnb.MsgValidators...))
 	}
 
-	// run peer manager with the specified interval and let it also prune connections
-	peerManagerFactory := p2p.PeerManagerFactory([]p2p.Option{p2p.WithInterval(fnb.PeerUpdateInterval)})
 	mwOpts = append(mwOpts,
-		p2p.WithPeerManager(peerManagerFactory),
 		p2p.WithPreferredUnicastProtocols(unicast.ToProtocolNames(fnb.PreferredUnicastProtocols)),
 	)
 
 	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(fnb.Logger)
 	fnb.Middleware = p2p.NewMiddleware(
 		fnb.Logger,
-		libP2PNodeFactory,
+		libp2pNode,
 		fnb.Me.NodeID(),
 		fnb.Metrics.Network,
 		fnb.Metrics.Bitswap,
@@ -412,19 +432,6 @@ func (fnb *FlowNodeBuilder) EnqueueAdminServerInit() {
 			return command_runner, nil
 		})
 	}
-}
-
-func (fnb *FlowNodeBuilder) EnqueuePeerManager() {
-	fnb.Component("peer manager", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		pm, ok := fnb.Middleware.PeerManager()
-
-		// if a peer manager was not configured, return noop
-		if !ok {
-			return &module.NoopReadyDoneAware{}, nil
-		}
-
-		return pm, nil
-	})
 }
 
 func (fnb *FlowNodeBuilder) RegisterBadgerMetrics() error {
@@ -1396,11 +1403,6 @@ func (fnb *FlowNodeBuilder) onStart() error {
 	}
 
 	fnb.EnqueueAdminServerInit()
-
-	// Peer Manager must be started after all other components to ensure the network does not start
-	// up before the components are initialized. This is critical for any nodes running bitswap since
-	// bitswap will only learn about peers that connect after it is initialized.
-	fnb.EnqueuePeerManager()
 
 	// run all modules
 	for _, f := range fnb.modules {

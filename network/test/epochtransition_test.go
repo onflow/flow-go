@@ -179,8 +179,7 @@ func (suite *MutableIdentityTableSuite) addNodes(count int) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// create the ids, middlewares and networks
-	ids, mws, nets, _ := GenerateIDsMiddlewaresNetworks(
-		ctx,
+	ids, nodes, mws, nets, _ := GenerateIDsMiddlewaresNetworks(
 		suite.T(),
 		count,
 		suite.logger,
@@ -189,6 +188,9 @@ func (suite *MutableIdentityTableSuite) addNodes(count int) {
 		mocknetwork.NewViolationsConsumer(suite.T()),
 	)
 	suite.cancels = append(suite.cancels, cancel)
+
+	errChan := StartNetworks(ctx, suite.T(), nodes, nets, 100*time.Millisecond)
+	go unittest.NoIrrecoverableError(suite.T(), ctx, errChan)
 
 	// create the engines for the new nodes
 	engines := GenerateEngines(suite.T(), nets)

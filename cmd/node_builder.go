@@ -163,6 +163,7 @@ type BaseConfig struct {
 	HeroCacheMetricsEnable          bool
 	SyncCoreConfig                  chainsync.Config
 	CodecFactory                    func() network.Codec
+	LibP2PNode                      *p2p.Node
 	// ComplianceConfig configures either the compliance engine (consensus nodes)
 	// or the follower engine (all other node roles)
 	ComplianceConfig compliance.Config

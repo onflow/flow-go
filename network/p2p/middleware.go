@@ -80,15 +80,12 @@ type Middleware struct {
 	// and worker routines.
 	wg                         *sync.WaitGroup
 	libP2PNode                 *Node
-	libP2PNodeFactory          LibP2PFactoryFunc
 	preferredUnicasts          []unicast.ProtocolName
 	me                         flow.Identifier
 	metrics                    module.NetworkMetrics
 	bitswapMetrics             module.BitswapMetrics
 	rootBlockID                flow.Identifier
 	validators                 []network.MessageValidator
-	peerManagerFactory         PeerManagerFactoryFunc
-	peerManager                *PeerManager
 	unicastMessageTimeout      time.Duration
 	idTranslator               IDTranslator
 	previousProtocolStatePeers []peer.AddrInfo
@@ -111,26 +108,18 @@ func WithPreferredUnicastProtocols(unicasts []unicast.ProtocolName) MiddlewareOp
 	}
 }
 
-func WithPeerManager(peerManagerFunc PeerManagerFactoryFunc) MiddlewareOption {
-	return func(mw *Middleware) {
-		mw.peerManagerFactory = peerManagerFunc
-	}
-}
-
 // NewMiddleware creates a new middleware instance
 // libP2PNodeFactory is the factory used to create a LibP2PNode
 // flowID is this node's Flow ID
 // metrics is the interface to report network related metrics
-// peerUpdateInterval is the interval when the PeerManager's peer update runs
 // unicastMessageTimeout is the timeout used for unicast messages
 // connectionGating if set to True, restricts this node to only talk to other nodes which are part of the identity list
-// managePeerConnections if set to True, enables the default PeerManager which continuously updates the node's peer connections
 // validators are the set of the different message validators that each inbound messages is passed through
 // During normal operations any error returned by Middleware.start is considered to be catastrophic
 // and will be thrown by the irrecoverable.SignalerContext causing the node to crash.
 func NewMiddleware(
 	log zerolog.Logger,
-	libP2PNodeFactory LibP2PFactoryFunc,
+	libP2PNode *Node,
 	flowID flow.Identifier,
 	met module.NetworkMetrics,
 	bitswapMet module.BitswapMetrics,
@@ -151,13 +140,12 @@ func NewMiddleware(
 		log:                        log,
 		wg:                         &sync.WaitGroup{},
 		me:                         flowID,
-		libP2PNodeFactory:          libP2PNodeFactory,
+		libP2PNode:                 libP2PNode,
 		metrics:                    met,
 		bitswapMetrics:             bitswapMet,
 		rootBlockID:                rootBlockID,
 		validators:                 DefaultValidators(log, flowID),
 		unicastMessageTimeout:      unicastMessageTimeout,
-		peerManagerFactory:         nil,
 		idTranslator:               idTranslator,
 		codec:                      codec,
 		slashingViolationsConsumer: slashingViolationsConsumer,
@@ -179,7 +167,9 @@ func NewMiddleware(
 			ready()
 
 			<-ctx.Done()
-			mw.stop()
+
+			// wait for the readConnection and readSubscription routines to stop
+			mw.wg.Wait()
 		}).Build()
 
 	mw.Component = cm
@@ -299,61 +289,19 @@ func (m *Middleware) start(ctx context.Context) error {
 		return fmt.Errorf("could not start middleware: overlay must be configured by calling SetOverlay before middleware can be started")
 	}
 
-	libP2PNode, err := m.libP2PNodeFactory(ctx)
-	if err != nil {
-		return fmt.Errorf("could not create libp2p node: %w", err)
-	}
-
-	m.libP2PNode = libP2PNode
-	err = m.libP2PNode.WithDefaultUnicastProtocol(m.handleIncomingStream, m.preferredUnicasts)
+	err := m.libP2PNode.WithDefaultUnicastProtocol(m.handleIncomingStream, m.preferredUnicasts)
 	if err != nil {
 		return fmt.Errorf("could not register preferred unicast protocols on libp2p node: %w", err)
 	}
 
 	m.UpdateNodeAddresses()
 
-	// create and use a peer manager if a peer manager factory was passed in during initialization
-	if m.peerManagerFactory != nil {
-		m.peerManager, err = m.peerManagerFactory(m.libP2PNode.host, m.topologyPeers, m.log)
-		if err != nil {
-			return fmt.Errorf("failed to create peer manager: %w", err)
-		}
+	err = m.libP2PNode.WithPeersProvider(m.topologyPeers)
+	if err != nil {
+		return fmt.Errorf("failed to add libp2p node peers provider: %w", err)
 	}
 
 	return nil
-}
-
-// PeerManager returns the peer manager used by the middleware.
-// IMPORTANT: the peer manager is set when the middleware is started. Calling this method before
-// the middleware is started will return nil.
-func (m *Middleware) PeerManager() (network.PeerManager, bool) {
-	// returning a boolean along with the peerManager to simplify not set checks since
-	// a nil interface != nil
-	return m.peerManager, m.peerManager != nil
-}
-
-// stop will end the execution of the middleware and wait for it to end.
-func (m *Middleware) stop() {
-	// TODO: does middleware need to stop the peer manager before the network?
-	// if not, we don't need to wait here since it will be stopped as a regular component
-	mgr, found := m.peerMgr()
-	if found {
-		// wait for peer manager to stop
-		<-mgr.Done()
-		m.log.Debug().Msg("peer manager successfully stopped")
-	}
-
-	// stops libp2p
-	done, err := m.libP2PNode.Stop()
-	if err != nil {
-		m.log.Error().Err(err).Msg("could not stop libp2p node")
-	} else {
-		<-done
-		m.log.Debug().Msg("libp2p node successfully stopped")
-	}
-
-	// wait for the readConnection and readSubscription routines to stop
-	m.wg.Wait()
 }
 
 // SendDirect sends msg on a 1-1 direct connection to the target ID. It models a guaranteed delivery asynchronous
@@ -579,7 +527,7 @@ func (m *Middleware) Subscribe(channel channels.Channel) error {
 	go rs.receiveLoop(m.wg)
 
 	// update peers to add some nodes interested in the same topic as direct peers
-	m.peerManagerUpdate()
+	m.libP2PNode.RequestPeerUpdate()
 
 	return nil
 }
@@ -597,7 +545,7 @@ func (m *Middleware) Unsubscribe(channel channels.Channel) error {
 	}
 
 	// update peers to remove nodes subscribed to channel
-	m.peerManagerUpdate()
+	m.libP2PNode.RequestPeerUpdate()
 
 	return nil
 }
@@ -768,20 +716,4 @@ func (m *Middleware) unicastMaxMsgDuration(msg *message.Message) time.Duration {
 	default:
 		return m.unicastMessageTimeout
 	}
-}
-
-// peerManagerUpdate request an update from the peer manager to connect to new peers and disconnect from unwanted peers
-func (m *Middleware) peerManagerUpdate() {
-	mgr, found := m.peerMgr()
-	if found {
-		mgr.RequestPeerUpdate()
-	}
-}
-
-// peerMgr returns the PeerManager and true if this middleware was started with one, (nil, false) otherwise
-func (m *Middleware) peerMgr() (*PeerManager, bool) {
-	if m.peerManager != nil {
-		return m.peerManager, true
-	}
-	return nil, false
 }
