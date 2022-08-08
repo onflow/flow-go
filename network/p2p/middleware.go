@@ -607,7 +607,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 			// if message channel is not public perform authorized sender validation
 			if !channels.IsPublicChannel(channel) {
-				err := m.validateUnicastAuthorizedSender(ctx, remotePeer, channel, decodedMsgPayload);
+				err := m.validateUnicastAuthorizedSender(ctx, remotePeer, channel, decodedMsgPayload)
 				if err != nil {
 					m.log.
 						Error().
