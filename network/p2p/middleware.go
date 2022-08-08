@@ -490,13 +490,21 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 	// check if remotePeer is staked and not ejected to avoid decoding messages from unauthenticated peer
 	id, err := m.authenticateUnicastStream(remotePeer)
+	// collect slashing information for unstaked peers to use for metrics
 	if errors.Is(err, validator.ErrIdentityUnverified) {
 		m.slashingViolationsConsumer.OnUnAuthorizedSenderError(id, remotePeer.String(), "", "", true, err)
 		return
-	} else if errors.Is(err, validator.ErrSenderEjected) {
+	}
+
+	// collect slashing information if peer is ejected
+	if errors.Is(err, validator.ErrSenderEjected) {
 		m.slashingViolationsConsumer.OnSenderEjectedError(id, remotePeer.String(), "", "", true, err)
 		return
-	} else if err != nil {
+	}
+
+	// unexpected error condition. this indicates there's a bug
+	// don't crash as a result of external inputs since that creates a DoS vector
+	if err != nil {
 		m.log.
 			Error().
 			Err(err).
@@ -577,11 +585,16 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 			channel := channels.Channel(msg.ChannelID)
 
 			decodedMsgPayload, err := m.codec.Decode(msg.Payload)
+			// collect slashing information for messages sent with unknown an message code byte
 			if codec.IsErrUnknownMsgCode(err) {
 				// slash peer if message contains unknown message code byte
 				m.slashingViolationsConsumer.OnUnknownMsgTypeError(id, remotePeer.String(), "", channel.String(), true, err)
 				return
-			} else if err != nil {
+			}
+
+			// unexpected error condition. this indicates there's a bug
+			// don't crash as a result of external inputs since that creates a DoS vector
+			if err != nil {
 				m.log.
 					Warn().
 					Err(fmt.Errorf("unexpected error while decoding message: %w", err)).
@@ -592,6 +605,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 				return
 			}
 
+			// perform authorized sender validation
 			if err := m.validateUnicastAuthorizedSender(ctx, remotePeer, channel, decodedMsgPayload); err != nil {
 				m.log.
 					Error().
@@ -602,11 +616,11 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 					Str("channel", msg.ChannelID).
 					Msg("unicast authorized sender validation failed")
 				return
-			} else {
-				// log metrics with the channel name as OneToOne
-				m.metrics.NetworkMessageReceived(msg.Size(), metrics.ChannelOneToOne, msg.Type)
-				m.processAuthenticatedMessage(msg, decodedMsgPayload, remotePeer)
 			}
+
+			// log metrics with the channel name as OneToOne
+			m.metrics.NetworkMessageReceived(msg.Size(), metrics.ChannelOneToOne, msg.Type)
+			m.processAuthenticatedMessage(msg, decodedMsgPayload, remotePeer)
 		}(&msg)
 	}
 
