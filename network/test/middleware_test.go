@@ -551,7 +551,7 @@ func (m *MiddlewareTestSuite) TestUnicast_Authorization() {
 			nilID, // because the peer will be unverified this identity will be nil
 			expectedSenderPeerID.String(),
 			"", // message will not be decoded before OnSenderEjectedError is logged, we won't log message type
-			"", // message will not be decoded before OnSenderEjectedError is logged, we won't log message type
+			"", // message will not be decoded before OnSenderEjectedError is logged, we won't log peer ID
 			true,
 			validator.ErrIdentityUnverified,
 		).Once().Run(func(args mockery.Arguments) {
@@ -576,7 +576,7 @@ func (m *MiddlewareTestSuite) TestUnicast_Authorization() {
 			return providers[0].Identities(filter.Any)
 		}, nil)
 
-		//NOTE: return nil, false simulating unstaked node
+		//NOTE: return (nil, false) simulating unstaked node
 		overlay.On("Identity", mock.AnythingOfType("peer.ID")).Return(nil, false)
 		overlay.On("Receive",
 			m.ids[0].NodeID,
@@ -634,7 +634,7 @@ func (m *MiddlewareTestSuite) TestUnicast_Authorization() {
 			ejectedID,                     // we expect this method to be called with the ejected identity
 			expectedSenderPeerID.String(), // although we are returning a modified ejected identity we still expect this peer ID to be the peer ID of the real sender
 			"",                            // message will not be decoded before OnSenderEjectedError is logged, we won't log message type
-			"",                            // message will not be decoded before OnSenderEjectedError is logged, we won't log message type
+			"",                            // message will not be decoded before OnSenderEjectedError is logged, we won't log peer ID
 			true,
 			validator.ErrSenderEjected,
 		).Once().Run(func(args mockery.Arguments) {
