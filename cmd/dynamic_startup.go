@@ -146,7 +146,7 @@ func ValidateDynamicStartupFlags(accessPublicKey, accessAddress string, startPha
 // 2. Target epoch == "current", wait until target phase == current phase before setting root snapshot
 // 3. Target epoch > current epoch (in future), wait until target epoch and target phase is reached before
 // setting root snapshot
-func DynamicStartPreInit(nodeConfig *NodeConfig) error {
+func DynamicStartPreInit(nodeConfig *NodeConfig, storage Storage) error {
 	ctx := context.Background()
 
 	log := nodeConfig.Logger.With().Str("component", "dynamic-startup").Logger()
@@ -213,6 +213,24 @@ func DynamicStartPreInit(nodeConfig *NodeConfig) error {
 
 	// set the root snapshot in the config - we will use this later to bootstrap
 	nodeConfig.RootSnapshot = snapshot
+
+	// set the FullBlockHeight to be rootHeight+TransactionExpiry.
+	// this is useful for dynamically bootstrapped access node, they will request missing collections. In order to ensure all txs
+	// from the missing collections can be verified, we must ensure they are referening to known blocks.
+	// That's why we set the full block height to be rootHeight + TransactionExpiry, so that we only request missing collections
+	// in blocks above that height.
+	root, err := snapshot.Head()
+	if err != nil {
+		return fmt.Errorf("fail to get the root block %v", err)
+	}
+
+	firstFullHeight := root.Height + flow.DefaultTransactionExpiry
+	err = storage.Blocks.UpdateLastFullBlockHeight(firstFullHeight)
+	if err != nil {
+		return fmt.Errorf("fail to update last full block height (root height %v, firstFullHeight %v) : %w",
+			root.Height, firstFullHeight, err)
+	}
+
 	return nil
 }
 
