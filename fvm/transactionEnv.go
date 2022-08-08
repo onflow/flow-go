@@ -57,19 +57,27 @@ func NewTransactionEnvironment(
 		ctx.EventCollectionByteSizeLimit,
 	)
 	accountKeys := handler.NewAccountKeyHandler(accounts)
+	tracer := NewTracer(ctx.Tracer, traceSpan, ctx.ExtensiveTracing)
 
-	envCtx := NewEnvContext(ctx, traceSpan)
 	env := &TransactionEnv{
 		commonEnv: commonEnv{
-			ctx:                   envCtx,
-			ProgramLogger:         NewProgramLogger(envCtx),
-			UnsafeRandomGenerator: NewUnsafeRandomGenerator(envCtx),
-			sth:                   sth,
-			vm:                    vm,
-			programs:              programsHandler,
-			accounts:              accounts,
-			accountKeys:           accountKeys,
-			uuidGenerator:         uuidGenerator,
+			Tracer: tracer,
+			ProgramLogger: NewProgramLogger(
+				tracer,
+				ctx.Metrics,
+				ctx.CadenceLoggingEnabled,
+			),
+			UnsafeRandomGenerator: NewUnsafeRandomGenerator(
+				tracer,
+				ctx.BlockHeader,
+			),
+			ctx:           ctx,
+			sth:           sth,
+			vm:            vm,
+			programs:      programsHandler,
+			accounts:      accounts,
+			accountKeys:   accountKeys,
+			uuidGenerator: uuidGenerator,
 		},
 
 		addressGenerator: generator,
