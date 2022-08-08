@@ -23,7 +23,6 @@ import (
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -50,20 +49,18 @@ type Suite struct {
 	client      *testnet.Client
 
 	// Epoch config (lengths in views)
-	StakingAuctionLen uint64
-	DKGPhaseLen       uint64
-	EpochLen          uint64
+	StakingAuctionLen          uint64
+	DKGPhaseLen                uint64
+	EpochLen                   uint64
+	EpochCommitSafetyThreshold uint64
 }
 
 // SetupTest is run automatically by the testing framework before each test case.
 func (s *Suite) SetupTest() {
-	chainID := flow.Localnet
-	safetyThreshold, err := protocol.DefaultEpochCommitSafetyThreshold(chainID)
-	require.NoError(s.T(), err)
 
 	minEpochLength := s.StakingAuctionLen + s.DKGPhaseLen*3 + 20
 	// ensure epoch lengths are set correctly
-	require.Greater(s.T(), s.EpochLen, minEpochLength+safetyThreshold, "epoch too short")
+	require.Greater(s.T(), s.EpochLen, minEpochLength+s.EpochCommitSafetyThreshold, "epoch too short")
 
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
@@ -109,10 +106,10 @@ func (s *Suite) SetupTest() {
 		ghostNode,
 	}
 
-	netConf := testnet.NewNetworkConfigWithEpochConfig("epochs-tests", confs, s.StakingAuctionLen, s.DKGPhaseLen, s.EpochLen)
+	netConf := testnet.NewNetworkConfigWithEpochConfig("epochs-tests", confs, s.StakingAuctionLen, s.DKGPhaseLen, s.EpochLen, s.EpochCommitSafetyThreshold)
 
 	// initialize the network
-	s.net = testnet.PrepareFlowNetwork(s.T(), netConf, chainID)
+	s.net = testnet.PrepareFlowNetwork(s.T(), netConf, flow.Localnet)
 
 	// start the network
 
@@ -837,6 +834,7 @@ func (s *DynamicEpochTransitionSuite) SetupTest() {
 	s.StakingAuctionLen = 200
 	s.DKGPhaseLen = 50
 	s.EpochLen = 500
+	s.EpochCommitSafetyThreshold = 50
 
 	// run the generic setup, which starts up the network
 	s.Suite.SetupTest()
