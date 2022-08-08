@@ -95,6 +95,9 @@ type commonEnv struct {
 	uuidGenerator *state.UUIDGenerator
 
 	frozenAccounts []common.Address
+
+	// TODO(patrick): rm once fully refactored
+	fullEnv Environment
 }
 
 // TODO(patrick): rm once Meter object has been refactored
