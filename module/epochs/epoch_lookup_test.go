@@ -2,7 +2,6 @@ package epochs
 
 import (
 	"context"
-	"math/rand"
 	"testing"
 	"time"
 
@@ -218,14 +217,14 @@ func testEpochForViewWithFallback(t *testing.T, lookup *EpochLookup, state proto
 
 	t.Run("should be able to query within any committed epoch", func(t *testing.T) {
 		for _, epoch := range epochs {
-			counter, err := lookup.EpochForViewWithFallback(randUint64(epoch.firstView, epoch.finalView))
+			counter, err := lookup.EpochForViewWithFallback(unittest.Uint64InRange(epoch.firstView, epoch.finalView))
 			assert.NoError(t, err)
 			assert.Equal(t, epoch.counter, counter)
 		}
 	})
 
 	t.Run("should return ErrViewForUnknownEpoch below earliest epoch", func(t *testing.T) {
-		_, err := lookup.EpochForViewWithFallback(randUint64(0, epochs[0].firstView-1))
+		_, err := lookup.EpochForViewWithFallback(unittest.Uint64InRange(0, epochs[0].firstView-1))
 		assert.ErrorIs(t, err, model.ErrViewForUnknownEpoch)
 	})
 
@@ -253,9 +252,4 @@ func newMockEpoch(counter, firstView, finalView uint64) *mockprotocol.Epoch {
 	epoch.On("FinalView").Return(finalView, nil)
 	epoch.On("Counter").Return(counter, nil)
 	return epoch
-}
-
-// randUint64 returns a uint64 in [min,max]
-func randUint64(min, max uint64) uint64 {
-	return min + uint64(rand.Intn(int(max)+1-int(min)))
 }
