@@ -605,20 +605,23 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 				return
 			}
 
-			// perform authorized sender validation
-			if err := m.validateUnicastAuthorizedSender(ctx, remotePeer, channel, decodedMsgPayload); err != nil {
-				m.log.
-					Error().
-					Err(err).
-					Hex("sender", msg.OriginID).
-					Hex("event_id", msg.EventID).
-					Str("event_type", msg.Type).
-					Str("channel", msg.ChannelID).
-					Msg("unicast authorized sender validation failed")
-				return
+			// if message channel is not public perform authorized sender validation
+			if !channels.IsPublicChannel(channel) {
+				err := m.validateUnicastAuthorizedSender(ctx, remotePeer, channel, decodedMsgPayload);
+				if err != nil {
+					m.log.
+						Error().
+						Err(err).
+						Hex("sender", msg.OriginID).
+						Hex("event_id", msg.EventID).
+						Str("event_type", msg.Type).
+						Str("channel", msg.ChannelID).
+						Msg("unicast authorized sender validation failed")
+					return
+				}
 			}
 
-			// log metrics with the channel name as OneToOne
+			// message decoding and validation was successful now log metrics with the channel name as OneToOne and process message
 			m.metrics.NetworkMessageReceived(msg.Size(), metrics.ChannelOneToOne, msg.Type)
 			m.processAuthenticatedMessage(msg, decodedMsgPayload, remotePeer)
 		}(&msg)
