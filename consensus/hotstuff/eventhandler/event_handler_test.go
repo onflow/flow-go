@@ -955,7 +955,7 @@ func (es *EventHandlerSuite) TestOnPartialTcCreated_ProducedTimeout() {
 
 // TestOnPartialTcCreated_NotActiveView tests that we don't create timeout object if partial TC was delivered for a past, non-current view.
 // NOTE: it is not possible to receive a partial timeout for a FUTURE view, unless the partial timeout contains
-// either a QC/TC allowing us to enter that view, therefore that case is not covered here. 
+// either a QC/TC allowing us to enter that view, therefore that case is not covered here.
 // See TestOnPartialTcCreated_QcAndTcProcessing instead.
 func (es *EventHandlerSuite) TestOnPartialTcCreated_NotActiveView() {
 	partialTc := &hotstuff.PartialTcCreated{
