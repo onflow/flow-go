@@ -3,7 +3,6 @@ package fvm_test
 import (
 	"encoding/hex"
 	"fmt"
-	"math"
 	"testing"
 
 	"github.com/onflow/cadence/runtime"
@@ -27,7 +26,7 @@ func makeTwoAccounts(t *testing.T, aPubKeys []flow.AccountPublicKey, bPubKeys []
 	ledger := utils.NewSimpleView()
 	sth := state.NewStateHolder(state.NewState(
 		ledger,
-		meter.NewMeter(math.MaxUint64, math.MaxUint64)),
+		meter.NewMeter(meter.DefaultParameters())),
 	)
 
 	a := flow.HexToAddress("1234")
@@ -269,7 +268,7 @@ func TestAccountFreezing(t *testing.T) {
 
 		accountsService := state.NewAccounts(state.NewStateHolder(state.NewState(
 			ledger,
-			meter.NewMeter(math.MaxUint64, math.MaxUint64),
+			meter.NewMeter(meter.DefaultParameters()),
 		)))
 
 		frozen, err := accountsService.GetAccountFrozen(address)
@@ -300,7 +299,7 @@ func TestAccountFreezing(t *testing.T) {
 
 		accountsService = state.NewAccounts(state.NewStateHolder(state.NewState(
 			ledger,
-			meter.NewMeter(math.MaxUint64, math.MaxUint64),
+			meter.NewMeter(meter.DefaultParameters()),
 		)))
 
 		frozen, err = accountsService.GetAccountFrozen(serviceAddress)
