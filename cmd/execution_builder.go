@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
 	"path/filepath"
 	goruntime "runtime"
 	"time"
@@ -473,12 +472,6 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				bs,
 				executionDataTracker,
 			)
-
-			extraLogPath := path.Join(e.exeConf.triedir, "extralogs")
-			err = os.MkdirAll(extraLogPath, 0777)
-			if err != nil {
-				return nil, fmt.Errorf("cannot create %s path for extra logs: %w", extraLogPath, err)
-			}
 
 			options := []runtime.Option{}
 			if e.exeConf.cadenceTracing {

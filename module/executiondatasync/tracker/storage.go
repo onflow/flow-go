@@ -407,6 +407,8 @@ func (s *storage) PruneUpToHeight(height uint64) error {
 		})
 		defer it.Close()
 
+		// iterate over blob records, calling pruneCallback for any CIDs that should be pruned
+		// and cleaning up the corresponding tracker records
 		for it.Seek(blobRecordPrefix); it.ValidForPrefix(blobRecordPrefix); it.Next() {
 			blobRecordItem := it.Item()
 			blobRecordKey := blobRecordItem.Key()
@@ -446,7 +448,8 @@ func (s *storage) PruneUpToHeight(height uint64) error {
 				)
 			}
 
-			// the current block height is the last to reference this CID
+			// the current block height is the last to reference this CID, prune the CID and remove
+			// all tracker records
 			if latestHeight == blockHeight {
 				if err := s.pruneCallback(blobCid); err != nil {
 					return err
@@ -454,6 +457,7 @@ func (s *storage) PruneUpToHeight(height uint64) error {
 				dInfo.deleteLatestHeightRecord = true
 			}
 
+			// remove tracker records for pruned heights
 			batch = append(batch, dInfo)
 			if len(batch) == itemsPerBatch {
 				if err := s.batchDelete(batch); err != nil {

@@ -79,6 +79,8 @@ func (d *downloader) Done() <-chan struct{} {
 func (d *downloader) Download(ctx context.Context, executionDataID flow.Identifier) (*BlockExecutionData, error) {
 	blobGetter := d.blobService.GetSession(ctx)
 
+	// First, download the root execution data record which contains a list of chunk execution data
+	// blobs included in the original record.
 	edRoot, err := d.getExecutionDataRoot(ctx, executionDataID, blobGetter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get execution data root: %w", err)
@@ -86,6 +88,7 @@ func (d *downloader) Download(ctx context.Context, executionDataID flow.Identifi
 
 	g, gCtx := errgroup.WithContext(ctx)
 
+	// Next, download each of the chunk execution data blobs
 	chunkExecutionDatas := make([]*ChunkExecutionData, len(edRoot.ChunkExecutionDataIDs))
 	for i, chunkDataID := range edRoot.ChunkExecutionDataIDs {
 		i := i
@@ -112,6 +115,7 @@ func (d *downloader) Download(ctx context.Context, executionDataID flow.Identifi
 		return nil, err
 	}
 
+	// Finally, recombine data into original record.
 	bed := &BlockExecutionData{
 		BlockID:             edRoot.BlockID,
 		ChunkExecutionDatas: chunkExecutionDatas,
@@ -149,7 +153,7 @@ func (d *downloader) getExecutionDataRoot(
 
 	edRoot, ok := v.(*BlockExecutionDataRoot)
 	if !ok {
-		return nil, NewMalformedDataError(fmt.Errorf("execution data root blob does not deserialize to a BlockExecutionDataRoot"))
+		return nil, NewMalformedDataError(fmt.Errorf("execution data root blob does not deserialize to a BlockExecutionDataRoot, got %T instead", v))
 	}
 
 	return edRoot, nil
@@ -162,6 +166,8 @@ func (d *downloader) getChunkExecutionData(
 ) (*ChunkExecutionData, error) {
 	cids := []cid.Cid{chunkExecutionDataID}
 
+	// iteratively process each level of the blob tree until a ChunkExecutionData is returned or an
+	// error is encountered
 	for i := 0; ; i++ {
 		v, err := d.getBlobs(ctx, blobGetter, cids)
 		if err != nil {
@@ -197,7 +203,7 @@ func (d *downloader) getBlobs(ctx context.Context, blobGetter network.BlobGetter
 	return v, nil
 }
 
-// retrieveBlobs retrieves the blobs for the given CIDs with the given BlobGetter.
+// retrieveBlobs asynchronously retrieves the blobs for the given CIDs with the given BlobGetter.
 func (d *downloader) retrieveBlobs(parent context.Context, blobGetter network.BlobGetter, cids []cid.Cid) (<-chan blobs.Blob, <-chan error) {
 	blobsOut := make(chan blobs.Blob, len(cids))
 	errCh := make(chan error, 1)
