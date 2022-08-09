@@ -82,7 +82,7 @@ func TestDelay(t *testing.T) {
 	cleanupNodes(nodes)
 }
 
-// TestOneNodeBehind verify that if a node always committee still can reach consensus.
+// TestOneNodeBehind verify that if a node is always behind, committee still can reach consensus.
 func TestOneNodeBehind(t *testing.T) {
 	stopper := NewStopper(50, 0)
 	participantsData := createConsensusIdentities(t, 3)
@@ -120,6 +120,7 @@ func TestTimeoutRebroadcast(t *testing.T) {
 	rootSnapshot := createRootSnapshot(t, participantsData)
 	nodes, hub := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
 
+	// nodeID -> view -> numTimeoutMessages
 	blockedTimeoutObjectsTracker := make(map[flow.Identifier]map[uint64]uint64)
 	hub.WithFilter(func(channelID network.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 		switch m := event.(type) {
@@ -138,7 +139,7 @@ func TestTimeoutRebroadcast(t *testing.T) {
 			}
 			blocked := blockedPerView[m.View] + 1
 			blockedPerView[m.View] = blocked
-			return blocked%2 == 1, 0
+			return blocked == 1, 0
 		}
 		// no block or delay to other nodes
 		return false, 0

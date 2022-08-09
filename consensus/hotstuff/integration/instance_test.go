@@ -594,6 +594,7 @@ func (in *Instance) OnTcConstructedFromTimeouts(tc *flow.TimeoutCertificate) {
 }
 
 func (in *Instance) OnPartialTcCreated(view uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) {
+	// TODO(active-pacemaker): implement handler to support Bracha timeouts.
 }
 
 func (in *Instance) OnNewQcDiscovered(qc *flow.QuorumCertificate) {

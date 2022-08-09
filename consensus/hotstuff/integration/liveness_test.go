@@ -83,10 +83,10 @@ func Test2TimeoutOutof7Instances(t *testing.T) {
 	}
 }
 
-// If 2 nodes are down in a 4 nodes cluster, the rest of 2 nodes can
-// still make progress, but no block will be finalized, because
-// finalization requires 2-direct chain and a QC
-func Test2TimeoutOutof2Instances(t *testing.T) {
+// 2 nodes in a 4-node cluster are configured to be able only to send timeout messages (no voting or proposing).
+// The other 2 unconstrained nodes should be able to make progress through the recovery path by creating TCs
+// for every round, but no block will be finalized, because finalization requires direct 1-chain and QC.
+func Test2TimeoutOutof4Instances(t *testing.T) {
 
 	numPass := 2
 	numFail := 2
@@ -99,7 +99,7 @@ func Test2TimeoutOutof2Instances(t *testing.T) {
 	timeouts, err := timeout.NewConfig(pmTimeout, pmTimeout, pmTimeout, 1.5, 0.85, 0)
 	require.NoError(t, err)
 
-	// set up three instances that work fully
+	// set up two instances that work fully
 	for n := 0; n < numPass; n++ {
 		in := NewInstance(t,
 			WithRoot(root),
