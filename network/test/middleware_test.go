@@ -549,8 +549,8 @@ func (m *MiddlewareTestSuite) TestUnicast_Authorization() {
 		expectedViolation := &slashing.Violation{
 			Identity:  nilID, // because the peer will be unverified this identity will be nil
 			PeerID:    expectedSenderPeerID.String(),
-			MsgType:   "", // message will not be decoded before OnSenderEjectedError is logged, we won't log message type
-			Channel:   "", // message will not be decoded before OnSenderEjectedError is logged, we won't log peer ID
+			MsgType:   "",                          // message will not be decoded before OnSenderEjectedError is logged, we won't log message type
+			Channel:   channels.TestNetworkChannel, // message will not be decoded before OnSenderEjectedError is logged, we won't log peer ID
 			IsUnicast: true,
 			Err:       validator.ErrIdentityUnverified,
 		}
@@ -636,7 +636,7 @@ func (m *MiddlewareTestSuite) TestUnicast_Authorization() {
 			Identity:  ejectedID,                     // we expect this method to be called with the ejected identity
 			PeerID:    expectedSenderPeerID.String(), // although we are returning a modified ejected identity we still expect this peer ID to be the peer ID of the real sender
 			MsgType:   "",                            // message will not be decoded before OnSenderEjectedError is logged, we won't log message type
-			Channel:   "",                            // message will not be decoded before OnSenderEjectedError is logged, we won't log peer ID
+			Channel:   channels.TestNetworkChannel,   // message will not be decoded before OnSenderEjectedError is logged, we won't log peer ID
 			IsUnicast: true,
 			Err:       validator.ErrSenderEjected,
 		}
@@ -802,9 +802,6 @@ func (m *MiddlewareTestSuite) TestUnicast_Authorization() {
 		).Once().Run(func(args mockery.Arguments) {
 			defer close(ch)
 			actualViolation := args.Get(0).(*slashing.Violation)
-			// because we are using the default overlay a random identity is returned
-			// so we wait until we get the arguments before checking them.
-			expectedViolation.Identity = actualViolation.Identity
 			require.Equal(m.T(), expectedViolation, actualViolation)
 		})
 
