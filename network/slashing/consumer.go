@@ -24,7 +24,7 @@ type Consumer struct {
 
 // NewSlashingViolationsConsumer returns a new Consumer
 func NewSlashingViolationsConsumer(log zerolog.Logger) *Consumer {
-	return &Consumer{log}
+	return &Consumer{log.With().Str("module", "network_slashing_consumer").Logger()}
 }
 
 func (c *Consumer) logOffense(identity *flow.Identity, peerID, msgType, channel, offense string, isUnicast bool, err error) {
