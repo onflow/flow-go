@@ -3,6 +3,7 @@ package fvm
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/cadence/runtime/stdlib"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
@@ -349,7 +350,7 @@ func (e *ScriptEnv) VerifySignature(
 	return valid, nil
 }
 
-func (e *ScriptEnv) ValidatePublicKey(pk *runtime.PublicKey) error {
+func (e *ScriptEnv) ValidatePublicKey(pk *stdlib.PublicKey) error {
 	err := e.Meter(meter.ComputationKindValidatePublicKey, 1)
 	if err != nil {
 		return fmt.Errorf("validate public key failed: %w", err)
@@ -372,11 +373,11 @@ func (e *ScriptEnv) RevokeEncodedAccountKey(_ runtime.Address, _ int) (publicKey
 	return nil, errors.NewOperationNotSupportedError("RevokeEncodedAccountKey")
 }
 
-func (e *ScriptEnv) AddAccountKey(_ runtime.Address, _ *runtime.PublicKey, _ runtime.HashAlgorithm, _ int) (*runtime.AccountKey, error) {
+func (e *ScriptEnv) AddAccountKey(_ runtime.Address, _ *stdlib.PublicKey, _ runtime.HashAlgorithm, _ int) (*stdlib.AccountKey, error) {
 	return nil, errors.NewOperationNotSupportedError("AddAccountKey")
 }
 
-func (e *ScriptEnv) GetAccountKey(address runtime.Address, index int) (*runtime.AccountKey, error) {
+func (e *ScriptEnv) GetAccountKey(address runtime.Address, index int) (*stdlib.AccountKey, error) {
 	defer e.StartSpanFromRoot(trace.FVMEnvGetAccountKey).End()
 
 	err := e.Meter(meter.ComputationKindGetAccountKey, 1)
@@ -395,7 +396,7 @@ func (e *ScriptEnv) GetAccountKey(address runtime.Address, index int) (*runtime.
 	return nil, errors.NewOperationNotSupportedError("GetAccountKey")
 }
 
-func (e *ScriptEnv) RevokeAccountKey(_ runtime.Address, _ int) (*runtime.AccountKey, error) {
+func (e *ScriptEnv) RevokeAccountKey(_ runtime.Address, _ int) (*stdlib.AccountKey, error) {
 	return nil, errors.NewOperationNotSupportedError("RevokeAccountKey")
 }
 

@@ -3,6 +3,7 @@ package crypto
 import (
 	"encoding/hex"
 	"fmt"
+	"github.com/onflow/cadence/runtime/stdlib"
 
 	"github.com/onflow/cadence/runtime"
 
@@ -250,7 +251,7 @@ func VerifySignatureFromTransaction(
 }
 
 // VerifyPOP verifies a proof of possession (PoP) for the receiver public key; currently only works for BLS
-func VerifyPOP(pk *runtime.PublicKey, s crypto.Signature) (bool, error) {
+func VerifyPOP(pk *stdlib.PublicKey, s crypto.Signature) (bool, error) {
 
 	key, err := crypto.DecodePublicKey(crypto.BLSBLS12381, pk.PublicKey)
 	if err != nil {
@@ -285,7 +286,7 @@ func AggregateSignatures(sigs [][]byte) (crypto.Signature, error) {
 }
 
 // AggregatePublicKeys aggregate multiple public keys into one; currently only works for BLS
-func AggregatePublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
+func AggregatePublicKeys(keys []*stdlib.PublicKey) (*stdlib.PublicKey, error) {
 	pks := make([]crypto.PublicKey, 0, len(keys))
 	for _, key := range keys {
 		// TODO: avoid validating the public keys again since Cadence makes sure runtime keys have been validated.
@@ -307,7 +308,7 @@ func AggregatePublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) 
 		panic(fmt.Errorf("aggregate BLS public keys failed with unexpected error %w", err))
 	}
 
-	return &runtime.PublicKey{
+	return &stdlib.PublicKey{
 		PublicKey: pk.Encode(),
 		SignAlgo:  CryptoToRuntimeSigningAlgorithm(crypto.BLSBLS12381),
 	}, nil

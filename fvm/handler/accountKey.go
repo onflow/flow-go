@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/hex"
 	"fmt"
+	"github.com/onflow/cadence/runtime/stdlib"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/sema"
@@ -22,7 +23,7 @@ type AccountKeyHandler struct {
 }
 
 // NewAccountPublicKey construct an account public key given a runtime public key.
-func NewAccountPublicKey(publicKey *runtime.PublicKey,
+func NewAccountPublicKey(publicKey *stdlib.PublicKey,
 	hashAlgo sema.HashAlgorithm,
 	keyIndex int,
 	weight int,
@@ -69,11 +70,11 @@ func NewAccountKeyHandler(accounts state.Accounts) *AccountKeyHandler {
 // This function returns an error if the specified account does not exist or
 // if the key insertion fails.
 func (h *AccountKeyHandler) AddAccountKey(address runtime.Address,
-	publicKey *runtime.PublicKey,
+	publicKey *stdlib.PublicKey,
 	hashAlgo runtime.HashAlgorithm,
 	weight int,
 ) (
-	*runtime.AccountKey,
+	*stdlib.AccountKey,
 	error,
 ) {
 	accountAddress := flow.Address(address)
@@ -102,7 +103,7 @@ func (h *AccountKeyHandler) AddAccountKey(address runtime.Address,
 		return nil, fmt.Errorf("adding account key failed: %w", err)
 	}
 
-	return &runtime.AccountKey{
+	return &stdlib.AccountKey{
 		KeyIndex:  accountPublicKey.Index,
 		PublicKey: publicKey,
 		HashAlgo:  hashAlgo,
@@ -118,7 +119,7 @@ func (h *AccountKeyHandler) AddAccountKey(address runtime.Address,
 // An error is returned if the specified account does not exist, the provided index is not valid,
 // or if the key revoking fails.
 // TODO (ramtin) do we have to return runtime.AccountKey for this method or can be separated into another method
-func (h *AccountKeyHandler) RevokeAccountKey(address runtime.Address, keyIndex int) (*runtime.AccountKey, error) {
+func (h *AccountKeyHandler) RevokeAccountKey(address runtime.Address, keyIndex int) (*stdlib.AccountKey, error) {
 	accountAddress := flow.Address(address)
 
 	ok, err := h.accounts.Exists(accountAddress)
@@ -169,9 +170,9 @@ func (h *AccountKeyHandler) RevokeAccountKey(address runtime.Address, keyIndex i
 		return nil, fmt.Errorf("revoking account key failed: %w", err)
 	}
 
-	return &runtime.AccountKey{
+	return &stdlib.AccountKey{
 		KeyIndex: publicKey.Index,
-		PublicKey: &runtime.PublicKey{
+		PublicKey: &stdlib.PublicKey{
 			PublicKey: publicKey.PublicKey.Encode(),
 			SignAlgo:  signAlgo,
 		},
@@ -186,7 +187,7 @@ func (h *AccountKeyHandler) RevokeAccountKey(address runtime.Address, keyIndex i
 // This function returns a nil key with no errors, if a key doesn't exist at the given index.
 // An error is returned if the specified account does not exist, the provided index is not valid,
 // or if the key retrieval fails.
-func (h *AccountKeyHandler) GetAccountKey(address runtime.Address, keyIndex int) (*runtime.AccountKey, error) {
+func (h *AccountKeyHandler) GetAccountKey(address runtime.Address, keyIndex int) (*stdlib.AccountKey, error) {
 	accountAddress := flow.Address(address)
 
 	ok, err := h.accounts.Exists(accountAddress)
@@ -231,9 +232,9 @@ func (h *AccountKeyHandler) GetAccountKey(address runtime.Address, keyIndex int)
 		return nil, fmt.Errorf("getting account key failed: %w", err)
 	}
 
-	return &runtime.AccountKey{
+	return &stdlib.AccountKey{
 		KeyIndex: publicKey.Index,
-		PublicKey: &runtime.PublicKey{
+		PublicKey: &stdlib.PublicKey{
 			PublicKey: publicKey.PublicKey.Encode(),
 			SignAlgo:  signAlgo,
 		},

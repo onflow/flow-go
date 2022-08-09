@@ -2,6 +2,7 @@ package fvm
 
 import (
 	"fmt"
+	"github.com/onflow/cadence/runtime/stdlib"
 	"strconv"
 
 	"github.com/onflow/cadence/runtime"
@@ -85,7 +86,7 @@ func (i *TransactionInvoker) Process(
 	if err != nil {
 		return fmt.Errorf("error creating new environment: %w", err)
 	}
-	predeclaredValues := valueDeclarations(env)
+	//predeclaredValues := valueDeclarations(env)
 
 	location := common.TransactionLocation(proc.ID)
 
@@ -95,9 +96,8 @@ func (i *TransactionInvoker) Process(
 			Arguments: proc.Transaction.Arguments,
 		},
 		runtime.Context{
-			Interface:         env,
-			Location:          location,
-			PredeclaredValues: predeclaredValues,
+			Interface: env,
+			Location:  location,
 		},
 	)
 	if err != nil {
@@ -255,17 +255,16 @@ var setAccountFrozenFunctionType = &sema.FunctionType{
 	},
 }
 
-func valueDeclarations(env Environment) []runtime.ValueDeclaration {
-	var predeclaredValues []runtime.ValueDeclaration
+func valueDeclarations(env Environment) []stdlib.StandardLibraryValue {
+	var predeclaredValues []stdlib.StandardLibraryValue
 
 	if env.AccountFreezeEnabled() {
 		// TODO return the errors instead of panicing
 
-		setAccountFrozen := runtime.ValueDeclaration{
+		setAccountFrozen := stdlib.StandardLibraryValue{
 			Name:           "setAccountFrozen",
 			Type:           setAccountFrozenFunctionType,
 			Kind:           common.DeclarationKindFunction,
-			IsConstant:     true,
 			ArgumentLabels: nil,
 			Value: interpreter.NewUnmeteredHostFunctionValue(
 				func(invocation interpreter.Invocation) interpreter.Value {

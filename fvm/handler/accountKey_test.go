@@ -3,6 +3,7 @@ package handler
 import (
 	errors2 "errors"
 	"fmt"
+	"github.com/onflow/cadence/runtime/stdlib"
 	"testing"
 	"unicode/utf8"
 
@@ -72,7 +73,7 @@ func TestAddEncodedAccountKey_error_handling_produces_valid_utf8(t *testing.T) {
 func TestNewAccountKey_error_handling_produces_valid_utf8_and_sign_algo(t *testing.T) {
 
 	invalidSignAlgo := runtime.SignatureAlgorithm(254)
-	publicKey := &runtime.PublicKey{
+	publicKey := &stdlib.PublicKey{
 		PublicKey: nil,
 		SignAlgo:  invalidSignAlgo,
 	}
@@ -101,7 +102,7 @@ func TestNewAccountKey_error_handling_produces_valid_utf8_and_sign_algo(t *testi
 
 func TestNewAccountKey_error_handling_produces_valid_utf8_and_hash_algo(t *testing.T) {
 
-	publicKey := &runtime.PublicKey{
+	publicKey := &stdlib.PublicKey{
 		PublicKey: nil,
 		SignAlgo:  runtime.SignatureAlgorithmECDSA_P256,
 	}
@@ -132,7 +133,7 @@ func TestNewAccountKey_error_handling_produces_valid_utf8_and_hash_algo(t *testi
 
 func TestNewAccountKey_error_handling_produces_valid_utf8(t *testing.T) {
 
-	publicKey := &runtime.PublicKey{
+	publicKey := &stdlib.PublicKey{
 		PublicKey: []byte{0xc3, 0x28}, //some invalid UTF8
 		SignAlgo:  runtime.SignatureAlgorithmECDSA_P256,
 	}

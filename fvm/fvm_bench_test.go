@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	runtime2 "github.com/onflow/cadence/runtime"
 	"io"
 	"math/rand"
 	"strings"
@@ -88,7 +89,7 @@ func (account *TestBenchAccount) AddArrayToStorage(b *testing.B, blockExec TestB
 	txBody := flow.NewTransactionBody().
 		SetScript([]byte(`
 		transaction(list: [String]) {
-		  prepare(acct: AuthAccount) {
+		  prepare(acct: AuthAccount) {	
 			acct.load<[String]>(from: /storage/test)
 			acct.save(list, to: /storage/test)
 		  }
@@ -132,7 +133,7 @@ type BasicBlockExecutor struct {
 }
 
 func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logger) *BasicBlockExecutor {
-	rt := fvm.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime(runtime2.Config{})
 	vm := fvm.NewVirtualMachine(rt)
 
 	opts := []fvm.Option{

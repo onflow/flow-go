@@ -2,8 +2,7 @@ package fvm
 
 import (
 	"fmt"
-
-	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/stdlib"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
@@ -88,11 +87,11 @@ func (f *NoopBlockFinder) ByHeightFrom(_ uint64, _ *flow.Header) (*flow.Header, 
 	return nil, nil
 }
 
-func runtimeBlockFromHeader(header *flow.Header) runtime.Block {
-	return runtime.Block{
+func runtimeBlockFromHeader(header *flow.Header) stdlib.Block {
+	return stdlib.Block{
 		Height:    header.Height,
 		View:      header.View,
-		Hash:      runtime.BlockHash(header.ID()),
+		Hash:      stdlib.BlockHash(header.ID()),
 		Timestamp: header.Timestamp.UnixNano(),
 	}
 }

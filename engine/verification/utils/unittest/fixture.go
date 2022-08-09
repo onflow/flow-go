@@ -2,6 +2,7 @@ package verificationtest
 
 import (
 	"context"
+	runtime2 "github.com/onflow/cadence/runtime"
 	"math/rand"
 	"testing"
 
@@ -242,7 +243,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 		)
 		require.NoError(t, err)
 
-		rt := fvm.NewInterpreterRuntime()
+		rt := fvm.NewInterpreterRuntime(runtime2.Config{})
 
 		vm := fvm.NewVirtualMachine(rt)
 

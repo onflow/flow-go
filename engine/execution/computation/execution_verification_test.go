@@ -3,6 +3,7 @@ package computation
 import (
 	"context"
 	"fmt"
+	runtime2 "github.com/onflow/cadence/runtime"
 	"testing"
 
 	"github.com/onflow/cadence"
@@ -621,7 +622,7 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 	txs [][]*flow.TransactionBody,
 	opts []fvm.Option,
 	bootstrapOpts []fvm.BootstrapProcedureOption) *execution.ComputationResult {
-	rt := fvm.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime(runtime2.Config{})
 	vm := fvm.NewVirtualMachine(rt)
 
 	logger := zerolog.Nop()

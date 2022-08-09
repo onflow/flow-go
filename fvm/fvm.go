@@ -21,14 +21,9 @@ type Procedure interface {
 	MemoryLimit(ctx Context) uint64
 }
 
-func NewInterpreterRuntime(options ...runtime.Option) runtime.Runtime {
-
-	defaultOptions := []runtime.Option{
-		runtime.WithContractUpdateValidationEnabled(true),
-	}
-
+func NewInterpreterRuntime(config runtime.Config) runtime.Runtime {
 	return runtime.NewInterpreterRuntime(
-		append(defaultOptions, options...)...,
+		config,
 	)
 }
 

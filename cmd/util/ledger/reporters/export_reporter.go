@@ -3,6 +3,7 @@ package reporters
 import (
 	"encoding/json"
 	"fmt"
+	runtime2 "github.com/onflow/cadence/runtime"
 	"io/ioutil"
 
 	"github.com/rs/zerolog"
@@ -64,8 +65,8 @@ func (e *ExportReporter) Report(payload []ledger.Payload, commit ledger.State) e
 			Err(err).
 			Msg("error running GetCurrentEpochCounter script")
 
-			// write the report with ReportSucceeded = false, so that the ansbile script can
-			// detect the failure
+		// write the report with ReportSucceeded = false, so that the ansbile script can
+		// detect the failure
 		_ = ioutil.WriteFile("export_report.json", failedReport, 0644)
 		// Safely exit and move on to next reporter so we do not block other reporters
 		return nil
@@ -107,7 +108,7 @@ func (e *ExportReporter) Report(payload []ledger.Payload, commit ledger.State) e
 func ExecuteCurrentEpochScript(c flow.Chain, payload []ledger.Payload) (*fvm.ScriptProcedure, flow.Address, error) {
 	l := migrations.NewView(payload)
 	prog := programs.NewEmptyPrograms()
-	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime())
+	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime(runtime2.Config{}))
 	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(c))
 
 	sc, err := systemcontracts.SystemContractsForChain(c.ChainID())

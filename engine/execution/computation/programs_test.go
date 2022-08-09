@@ -3,6 +3,7 @@ package computation
 import (
 	"context"
 	"fmt"
+	runtime2 "github.com/onflow/cadence/runtime"
 	"testing"
 	"time"
 
@@ -31,7 +32,7 @@ import (
 )
 
 func TestPrograms_TestContractUpdates(t *testing.T) {
-	rt := fvm.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime(runtime2.Config{})
 	chain := flow.Mainnet.Chain()
 	vm := fvm.NewVirtualMachine(rt)
 	execCtx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain))
@@ -176,7 +177,7 @@ func (b blockProvider) ByHeightFrom(height uint64, _ *flow.Header) (*flow.Header
 //             -> Block1211 (emit event - version should be 2)
 func TestPrograms_TestBlockForks(t *testing.T) {
 	block := unittest.BlockFixture()
-	rt := fvm.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime(runtime2.Config{})
 	chain := flow.Emulator.Chain()
 	vm := fvm.NewVirtualMachine(rt)
 	execCtx := fvm.NewContext(zerolog.Nop(),

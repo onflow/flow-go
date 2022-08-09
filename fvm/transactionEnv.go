@@ -2,6 +2,7 @@ package fvm
 
 import (
 	"fmt"
+	"github.com/onflow/cadence/runtime/stdlib"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
@@ -502,7 +503,7 @@ func (e *TransactionEnv) VerifySignature(
 	return valid, nil
 }
 
-func (e *TransactionEnv) ValidatePublicKey(pk *runtime.PublicKey) error {
+func (e *TransactionEnv) ValidatePublicKey(pk *stdlib.PublicKey) error {
 	err := e.Meter(meter.ComputationKindValidatePublicKey, 1)
 	if err != nil {
 		return fmt.Errorf("validate public key failed: %w", err)
@@ -608,11 +609,11 @@ func (e *TransactionEnv) RevokeEncodedAccountKey(address runtime.Address, index 
 // if the key insertion fails.
 func (e *TransactionEnv) AddAccountKey(
 	address runtime.Address,
-	publicKey *runtime.PublicKey,
+	publicKey *stdlib.PublicKey,
 	hashAlgo runtime.HashAlgorithm,
 	weight int,
 ) (
-	*runtime.AccountKey,
+	*stdlib.AccountKey,
 	error,
 ) {
 	defer e.StartSpanFromRoot(trace.FVMEnvAddAccountKey).End()
@@ -635,7 +636,7 @@ func (e *TransactionEnv) AddAccountKey(
 // This function returns a nil key with no errors, if a key doesn't exist at the given index.
 // An error is returned if the specified account does not exist, the provided index is not valid,
 // or if the key retrieval fails.
-func (e *TransactionEnv) GetAccountKey(address runtime.Address, keyIndex int) (*runtime.AccountKey, error) {
+func (e *TransactionEnv) GetAccountKey(address runtime.Address, keyIndex int) (*stdlib.AccountKey, error) {
 	defer e.StartSpanFromRoot(trace.FVMEnvGetAccountKey).End()
 
 	err := e.Meter(meter.ComputationKindGetAccountKey, 1)
@@ -656,7 +657,7 @@ func (e *TransactionEnv) GetAccountKey(address runtime.Address, keyIndex int) (*
 // This function returns a nil key with no errors, if a key doesn't exist at the given index.
 // An error is returned if the specified account does not exist, the provided index is not valid,
 // or if the key revoking fails.
-func (e *TransactionEnv) RevokeAccountKey(address runtime.Address, keyIndex int) (*runtime.AccountKey, error) {
+func (e *TransactionEnv) RevokeAccountKey(address runtime.Address, keyIndex int) (*stdlib.AccountKey, error) {
 	defer e.StartSpanFromRoot(trace.FVMEnvRemoveAccountKey).End()
 
 	err := e.Meter(meter.ComputationKindRevokeAccountKey, 1)

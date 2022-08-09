@@ -3,6 +3,7 @@ package fvm
 import (
 	"encoding/hex"
 	"fmt"
+	"github.com/onflow/cadence/runtime/stdlib"
 
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
@@ -55,17 +56,17 @@ type AccountInterface interface {
 
 	AddAccountKey(
 		address runtime.Address,
-		publicKey *runtime.PublicKey,
+		publicKey *stdlib.PublicKey,
 		hashAlgo runtime.HashAlgorithm,
 		weight int,
 	) (
-		*runtime.AccountKey,
+		*stdlib.AccountKey,
 		error,
 	)
 
-	GetAccountKey(address runtime.Address, keyIndex int) (*runtime.AccountKey, error)
+	GetAccountKey(address runtime.Address, keyIndex int) (*stdlib.AccountKey, error)
 
-	RevokeAccountKey(address runtime.Address, keyIndex int) (*runtime.AccountKey, error)
+	RevokeAccountKey(address runtime.Address, keyIndex int) (*stdlib.AccountKey, error)
 
 	AddEncodedAccountKey(address runtime.Address, publicKey []byte) error
 
@@ -170,16 +171,16 @@ func (env *commonEnv) GetCurrentBlockHeight() (uint64, error) {
 }
 
 // GetBlockAtHeight returns the block at the given height.
-func (env *commonEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, error) {
+func (env *commonEnv) GetBlockAtHeight(height uint64) (stdlib.Block, bool, error) {
 	defer env.StartSpanFromRoot(trace.FVMEnvGetBlockAtHeight).End()
 
 	err := env.Meter(meter.ComputationKindGetBlockAtHeight, 1)
 	if err != nil {
-		return runtime.Block{}, false, fmt.Errorf("get block at height failed: %w", err)
+		return stdlib.Block{}, false, fmt.Errorf("get block at height failed: %w", err)
 	}
 
 	if env.ctx.Blocks == nil {
-		return runtime.Block{}, false, errors.NewOperationNotSupportedError("GetBlockAtHeight")
+		return stdlib.Block{}, false, errors.NewOperationNotSupportedError("GetBlockAtHeight")
 	}
 
 	if env.ctx.BlockHeader != nil && height == env.ctx.BlockHeader.Height {
@@ -189,9 +190,9 @@ func (env *commonEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, erro
 	header, err := env.ctx.Blocks.ByHeightFrom(height, env.ctx.BlockHeader)
 	// TODO (ramtin): remove dependency on storage and move this if condition to blockfinder
 	if errors.Is(err, storage.ErrNotFound) {
-		return runtime.Block{}, false, nil
+		return stdlib.Block{}, false, nil
 	} else if err != nil {
-		return runtime.Block{}, false, fmt.Errorf("get block at height failed for height %v: %w", height, err)
+		return stdlib.Block{}, false, fmt.Errorf("get block at height failed for height %v: %w", height, err)
 	}
 
 	return runtimeBlockFromHeader(header), true, nil
@@ -441,7 +442,7 @@ func (env *commonEnv) Commit() ([]programs.ContractUpdateKey, error) {
 	return env.contracts.Commit()
 }
 
-func (commonEnv) BLSVerifyPOP(pk *runtime.PublicKey, sig []byte) (bool, error) {
+func (commonEnv) BLSVerifyPOP(pk *stdlib.PublicKey, sig []byte) (bool, error) {
 	return crypto.VerifyPOP(pk, sig)
 }
 
@@ -450,8 +451,8 @@ func (commonEnv) BLSAggregateSignatures(sigs [][]byte) ([]byte, error) {
 }
 
 func (commonEnv) BLSAggregatePublicKeys(
-	keys []*runtime.PublicKey,
-) (*runtime.PublicKey, error) {
+	keys []*stdlib.PublicKey,
+) (*stdlib.PublicKey, error) {
 
 	return crypto.AggregatePublicKeys(keys)
 }

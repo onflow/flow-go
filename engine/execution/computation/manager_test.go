@@ -46,7 +46,7 @@ import (
 var scriptLogThreshold = 1 * time.Second
 
 func TestComputeBlockWithStorage(t *testing.T) {
-	rt := fvm.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime(runtime.Config{})
 
 	chain := flow.Mainnet.Chain()
 
@@ -215,7 +215,7 @@ func TestExecuteScript(t *testing.T) {
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
 
-	rt := fvm.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime(runtime.Config{})
 
 	vm := fvm.NewVirtualMachine(rt)
 
@@ -269,7 +269,7 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
 
-	rt := fvm.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime(runtime.Config{})
 
 	vm := fvm.NewVirtualMachine(rt)
 
@@ -486,7 +486,7 @@ func TestExecuteScriptTimeout(t *testing.T) {
 		trace.NewNoopTracer(),
 		nil,
 		nil,
-		fvm.NewVirtualMachine(fvm.NewInterpreterRuntime()),
+		fvm.NewVirtualMachine(fvm.NewInterpreterRuntime(runtime.Config{})),
 		fvm.NewContext(zerolog.Nop()),
 		DefaultProgramsCacheSize,
 		committer.NewNoopViewCommitter(),
@@ -525,7 +525,7 @@ func TestExecuteScriptCancelled(t *testing.T) {
 		trace.NewNoopTracer(),
 		nil,
 		nil,
-		fvm.NewVirtualMachine(fvm.NewInterpreterRuntime()),
+		fvm.NewVirtualMachine(fvm.NewInterpreterRuntime(runtime.Config{})),
 		fvm.NewContext(zerolog.Nop()),
 		DefaultProgramsCacheSize,
 		committer.NewNoopViewCommitter(),
@@ -567,7 +567,7 @@ func TestExecuteScriptCancelled(t *testing.T) {
 func TestScriptStorageMutationsDiscarded(t *testing.T) {
 
 	timeout := 1 * time.Millisecond
-	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime())
+	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime(runtime.Config{}))
 	chain := flow.Mainnet.Chain()
 	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain))
 	manager, _ := New(

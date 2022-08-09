@@ -20,9 +20,9 @@ import (
 
 	oteltrace "go.opentelemetry.io/otel/trace"
 
-	runtime "github.com/onflow/cadence/runtime"
-
 	sema "github.com/onflow/cadence/runtime/sema"
+
+	stdlib "github.com/onflow/cadence/runtime/stdlib"
 
 	time "time"
 
@@ -49,20 +49,20 @@ func (_m *Environment) AccountFreezeEnabled() bool {
 }
 
 // AddAccountKey provides a mock function with given fields: address, publicKey, hashAlgo, weight
-func (_m *Environment) AddAccountKey(address common.Address, publicKey *runtime.PublicKey, hashAlgo sema.HashAlgorithm, weight int) (*runtime.AccountKey, error) {
+func (_m *Environment) AddAccountKey(address common.Address, publicKey *stdlib.PublicKey, hashAlgo sema.HashAlgorithm, weight int) (*stdlib.AccountKey, error) {
 	ret := _m.Called(address, publicKey, hashAlgo, weight)
 
-	var r0 *runtime.AccountKey
-	if rf, ok := ret.Get(0).(func(common.Address, *runtime.PublicKey, sema.HashAlgorithm, int) *runtime.AccountKey); ok {
+	var r0 *stdlib.AccountKey
+	if rf, ok := ret.Get(0).(func(common.Address, *stdlib.PublicKey, sema.HashAlgorithm, int) *stdlib.AccountKey); ok {
 		r0 = rf(address, publicKey, hashAlgo, weight)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*runtime.AccountKey)
+			r0 = ret.Get(0).(*stdlib.AccountKey)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(common.Address, *runtime.PublicKey, sema.HashAlgorithm, int) error); ok {
+	if rf, ok := ret.Get(1).(func(common.Address, *stdlib.PublicKey, sema.HashAlgorithm, int) error); ok {
 		r1 = rf(address, publicKey, hashAlgo, weight)
 	} else {
 		r1 = ret.Error(1)
@@ -109,20 +109,20 @@ func (_m *Environment) AllocateStorageIndex(owner []byte) (atree.StorageIndex, e
 }
 
 // BLSAggregatePublicKeys provides a mock function with given fields: keys
-func (_m *Environment) BLSAggregatePublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
+func (_m *Environment) BLSAggregatePublicKeys(keys []*stdlib.PublicKey) (*stdlib.PublicKey, error) {
 	ret := _m.Called(keys)
 
-	var r0 *runtime.PublicKey
-	if rf, ok := ret.Get(0).(func([]*runtime.PublicKey) *runtime.PublicKey); ok {
+	var r0 *stdlib.PublicKey
+	if rf, ok := ret.Get(0).(func([]*stdlib.PublicKey) *stdlib.PublicKey); ok {
 		r0 = rf(keys)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*runtime.PublicKey)
+			r0 = ret.Get(0).(*stdlib.PublicKey)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func([]*runtime.PublicKey) error); ok {
+	if rf, ok := ret.Get(1).(func([]*stdlib.PublicKey) error); ok {
 		r1 = rf(keys)
 	} else {
 		r1 = ret.Error(1)
@@ -155,18 +155,18 @@ func (_m *Environment) BLSAggregateSignatures(sigs [][]byte) ([]byte, error) {
 }
 
 // BLSVerifyPOP provides a mock function with given fields: pk, s
-func (_m *Environment) BLSVerifyPOP(pk *runtime.PublicKey, s []byte) (bool, error) {
+func (_m *Environment) BLSVerifyPOP(pk *stdlib.PublicKey, s []byte) (bool, error) {
 	ret := _m.Called(pk, s)
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(*runtime.PublicKey, []byte) bool); ok {
+	if rf, ok := ret.Get(0).(func(*stdlib.PublicKey, []byte) bool); ok {
 		r0 = rf(pk, s)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(*runtime.PublicKey, []byte) error); ok {
+	if rf, ok := ret.Get(1).(func(*stdlib.PublicKey, []byte) error); ok {
 		r1 = rf(pk, s)
 	} else {
 		r1 = ret.Error(1)
@@ -361,15 +361,15 @@ func (_m *Environment) GetAccountContractNames(address common.Address) ([]string
 }
 
 // GetAccountKey provides a mock function with given fields: address, index
-func (_m *Environment) GetAccountKey(address common.Address, index int) (*runtime.AccountKey, error) {
+func (_m *Environment) GetAccountKey(address common.Address, index int) (*stdlib.AccountKey, error) {
 	ret := _m.Called(address, index)
 
-	var r0 *runtime.AccountKey
-	if rf, ok := ret.Get(0).(func(common.Address, int) *runtime.AccountKey); ok {
+	var r0 *stdlib.AccountKey
+	if rf, ok := ret.Get(0).(func(common.Address, int) *stdlib.AccountKey); ok {
 		r0 = rf(address, index)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*runtime.AccountKey)
+			r0 = ret.Get(0).(*stdlib.AccountKey)
 		}
 	}
 
@@ -384,14 +384,14 @@ func (_m *Environment) GetAccountKey(address common.Address, index int) (*runtim
 }
 
 // GetBlockAtHeight provides a mock function with given fields: height
-func (_m *Environment) GetBlockAtHeight(height uint64) (runtime.Block, bool, error) {
+func (_m *Environment) GetBlockAtHeight(height uint64) (stdlib.Block, bool, error) {
 	ret := _m.Called(height)
 
-	var r0 runtime.Block
-	if rf, ok := ret.Get(0).(func(uint64) runtime.Block); ok {
+	var r0 stdlib.Block
+	if rf, ok := ret.Get(0).(func(uint64) stdlib.Block); ok {
 		r0 = rf(height)
 	} else {
-		r0 = ret.Get(0).(runtime.Block)
+		r0 = ret.Get(0).(stdlib.Block)
 	}
 
 	var r1 bool
@@ -693,15 +693,15 @@ func (_m *Environment) ResourceOwnerChanged(_a0 *interpreter.Interpreter, resour
 }
 
 // RevokeAccountKey provides a mock function with given fields: address, index
-func (_m *Environment) RevokeAccountKey(address common.Address, index int) (*runtime.AccountKey, error) {
+func (_m *Environment) RevokeAccountKey(address common.Address, index int) (*stdlib.AccountKey, error) {
 	ret := _m.Called(address, index)
 
-	var r0 *runtime.AccountKey
-	if rf, ok := ret.Get(0).(func(common.Address, int) *runtime.AccountKey); ok {
+	var r0 *stdlib.AccountKey
+	if rf, ok := ret.Get(0).(func(common.Address, int) *stdlib.AccountKey); ok {
 		r0 = rf(address, index)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*runtime.AccountKey)
+			r0 = ret.Get(0).(*stdlib.AccountKey)
 		}
 	}
 
@@ -850,11 +850,11 @@ func (_m *Environment) VM() *fvm.VirtualMachine {
 }
 
 // ValidatePublicKey provides a mock function with given fields: key
-func (_m *Environment) ValidatePublicKey(key *runtime.PublicKey) error {
+func (_m *Environment) ValidatePublicKey(key *stdlib.PublicKey) error {
 	ret := _m.Called(key)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*runtime.PublicKey) error); ok {
+	if rf, ok := ret.Get(0).(func(*stdlib.PublicKey) error); ok {
 		r0 = rf(key)
 	} else {
 		r0 = ret.Error(0)

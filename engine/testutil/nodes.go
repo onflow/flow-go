@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	runtime2 "github.com/onflow/cadence/runtime"
 	"math"
 	"path/filepath"
 	"testing"
@@ -548,7 +549,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	)
 	require.NoError(t, err)
 
-	rt := fvm.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime(runtime2.Config{})
 
 	vm := fvm.NewVirtualMachine(rt)
 
@@ -842,7 +843,7 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.VerifierEngine == nil {
-		rt := fvm.NewInterpreterRuntime()
+		rt := fvm.NewInterpreterRuntime(runtime2.Config{})
 
 		vm := fvm.NewVirtualMachine(rt)
 

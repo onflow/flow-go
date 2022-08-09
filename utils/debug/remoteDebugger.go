@@ -2,6 +2,7 @@ package debug
 
 import (
 	"github.com/onflow/cadence"
+	runtime2 "github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm"
@@ -20,7 +21,7 @@ type RemoteDebugger struct {
 func NewRemoteDebugger(grpcAddress string,
 	chain flow.Chain,
 	logger zerolog.Logger) *RemoteDebugger {
-	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime())
+	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime(runtime2.Config{}))
 
 	// no signature processor here
 	// TODO Maybe we add fee-deduction step as well

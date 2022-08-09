@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	runtime2 "github.com/onflow/cadence/runtime"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -192,7 +193,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 		Component("verifier engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			var err error
 
-			rt := fvm.NewInterpreterRuntime()
+			rt := fvm.NewInterpreterRuntime(runtime2.Config{})
 			vm := fvm.NewVirtualMachine(rt)
 			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
 			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, node.Logger)

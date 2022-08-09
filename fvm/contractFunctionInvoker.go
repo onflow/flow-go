@@ -45,7 +45,7 @@ func (i *ContractFunctionInvoker) Invoke(env Environment) (cadence.Value, error)
 	span.SetAttributes(i.logSpanAttrs...)
 	defer span.End()
 
-	predeclaredValues := valueDeclarations(env)
+	//predeclaredValues := valueDeclarations(env)
 
 	value, err := env.VM().Runtime.InvokeContractFunction(
 		i.contractLocation,
@@ -53,8 +53,7 @@ func (i *ContractFunctionInvoker) Invoke(env Environment) (cadence.Value, error)
 		i.arguments,
 		i.argumentTypes,
 		runtime.Context{
-			Interface:         env,
-			PredeclaredValues: predeclaredValues,
+			Interface: env,
 		},
 	)
 

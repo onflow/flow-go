@@ -470,11 +470,11 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			return eds, nil
 		}).
 		Component("provider engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-			options := []runtime.Option{}
-			if e.exeConf.cadenceTracing {
-				options = append(options, runtime.WithTracingEnabled(true))
-			}
-			rt := fvm.NewInterpreterRuntime(options...)
+			//options := []runtime.Option{}
+			//if e.exeConf.cadenceTracing {
+			//	options = append(options, runtime.WithTracingEnabled(true))
+			//}
+			rt := fvm.NewInterpreterRuntime(runtime.Config{})
 
 			vm := fvm.NewVirtualMachine(rt)
 
