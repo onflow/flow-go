@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -388,6 +387,6 @@ func NetworkCodec() network.Codec {
 }
 
 // SlashingViolationsConsumer returns a slashing violations consumer
-func SlashingViolationsConsumer(logger zerolog.Logger) slashing.ViolationsConsumer {
-	return slashing.NewSlashingViolationsConsumer(logger)
+func SlashingViolationsConsumer() slashing.ViolationsConsumer {
+	return slashing.NewSlashingViolationsConsumer(Logger())
 }
