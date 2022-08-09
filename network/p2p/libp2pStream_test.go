@@ -29,11 +29,10 @@ import (
 // TestStreamClosing tests 1-1 communication with streams closed using libp2p2 handler.FullClose
 func TestStreamClosing(t *testing.T) {
 	count := 10
-
 	ctx, cancel := context.WithCancel(context.Background())
 
 	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(t, ctx, errChan)
+	go unittest.NoIrrecoverableError(ctx, t, errChan)
 
 	var msgRegex = regexp.MustCompile("^hello[0-9]")
 
@@ -143,11 +142,10 @@ func TestCreateStream_WithPreferredGzipUnicast(t *testing.T) {
 // To check that the streams are of "preferred" type, it evaluates the protocol id of established stream against the input `protocolID`.
 func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []unicast.ProtocolName, protocolID core.ProtocolID) {
 	count := 2
-
 	ctx, cancel := context.WithCancel(context.Background())
 
 	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(t, ctx, errChan)
+	go unittest.NoIrrecoverableError(ctx, t, errChan)
 
 	nodes, identities := nodesFixture(t,
 		sporkId,
@@ -206,7 +204,7 @@ func TestCreateStream_FallBack(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(t, ctx, errChan)
+	go unittest.NoIrrecoverableError(ctx, t, errChan)
 
 	// Creates two nodes: one with preferred gzip, and other one with default protocol
 	sporkId := unittest.IdentifierFixture()
@@ -273,7 +271,7 @@ func TestCreateStreamIsConcurrencySafe(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(t, ctx, errChan)
+	go unittest.NoIrrecoverableError(ctx, t, errChan)
 
 	// create two nodes
 	nodes, identities := nodesFixture(t, unittest.IdentifierFixture(), "test_create_stream_is_concurrency_safe", 2)
@@ -319,11 +317,11 @@ func TestNoBackoffWhenCreatingStream(t *testing.T) {
 	// setup per node contexts so they can be stopped independently
 	ctx1, cancel1 := context.WithCancel(ctx)
 	signalCtx1, errChan1 := irrecoverable.WithSignaler(ctx1)
-	go unittest.NoIrrecoverableError(t, ctx1, errChan1)
+	go unittest.NoIrrecoverableError(ctx1, t, errChan1)
 
 	ctx2, cancel2 := context.WithCancel(ctx)
 	signalCtx2, errChan2 := irrecoverable.WithSignaler(ctx2)
-	go unittest.NoIrrecoverableError(t, ctx2, errChan2)
+	go unittest.NoIrrecoverableError(ctx2, t, errChan2)
 
 	count := 2
 	// Creates nodes
@@ -396,7 +394,7 @@ func testUnicastOverStream(t *testing.T, opts ...nodeFixtureParameterOption) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(t, ctx, errChan)
+	go unittest.NoIrrecoverableError(ctx, t, errChan)
 
 	count := 2
 	ch := make(chan string, count) // we expect two messages during test, one from node1->node2 and vice versa.
@@ -430,7 +428,7 @@ func TestUnicastOverStream_Fallback(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(t, ctx, errChan)
+	go unittest.NoIrrecoverableError(ctx, t, errChan)
 
 	ch := make(chan string, 2) // we expect two messages during test, one from node1->node2 and vice versa.
 
@@ -537,7 +535,7 @@ func TestCreateStreamTimeoutWithUnresponsiveNode(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(t, ctx, errChan)
+	go unittest.NoIrrecoverableError(ctx, t, errChan)
 
 	// creates a regular node
 	nodes, identities := nodesFixture(t,
@@ -580,7 +578,7 @@ func TestCreateStreamIsConcurrent(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(t, ctx, errChan)
+	go unittest.NoIrrecoverableError(ctx, t, errChan)
 
 	// create two regular node
 	goodNodes, goodNodeIds := nodesFixture(t,
@@ -634,7 +632,7 @@ func TestConnectionGating(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(t, ctx, errChan)
+	go unittest.NoIrrecoverableError(ctx, t, errChan)
 
 	sporkID := unittest.IdentifierFixture()
 

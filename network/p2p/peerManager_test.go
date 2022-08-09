@@ -56,7 +56,7 @@ func (suite *PeerManagerTestSuite) TestUpdatePeers() {
 	defer cancel()
 
 	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(suite.T(), ctx, errChan)
+	go unittest.NoIrrecoverableError(ctx, suite.T(), errChan)
 
 	// create some test ids
 	pids := suite.generatePeerIDs(10)
@@ -131,7 +131,7 @@ func (suite *PeerManagerTestSuite) TestPeriodicPeerUpdate() {
 	defer cancel()
 
 	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(suite.T(), ctx, errChan)
+	go unittest.NoIrrecoverableError(ctx, suite.T(), errChan)
 
 	// create some test ids
 	pids := suite.generatePeerIDs(10)
@@ -173,7 +173,7 @@ func (suite *PeerManagerTestSuite) TestOnDemandPeerUpdate() {
 	defer cancel()
 
 	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(suite.T(), ctx, errChan)
+	go unittest.NoIrrecoverableError(ctx, suite.T(), errChan)
 
 	// create some test ids
 	pids := suite.generatePeerIDs(10)
@@ -227,7 +227,7 @@ func (suite *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
 	defer cancel()
 
 	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(suite.T(), ctx, errChan)
+	go unittest.NoIrrecoverableError(ctx, suite.T(), errChan)
 
 	// create some test ids
 	pids := suite.generatePeerIDs(10)
