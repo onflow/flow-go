@@ -115,7 +115,7 @@ func (suite *BuilderSuite) SetupTest() {
 		suite.Assert().True(added)
 	}
 
-	suite.builder, _ = builder.NewBuilder(suite.db, tracer, suite.headers, suite.headers, suite.payloads, suite.pool)
+	suite.builder, _ = builder.NewBuilder(suite.db, tracer, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger())
 }
 
 // runs after each test finishes
@@ -467,7 +467,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 
 	// use a mempool with 2000 transactions, one per block
 	suite.pool = herocache.NewTransactions(2000, unittest.Logger(), metrics.NewNoopCollector())
-	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionSize(10000))
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), builder.WithMaxCollectionSize(10000))
 
 	// get a valid reference block ID
 	final, err := suite.protoState.Final().Head()
@@ -547,7 +547,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 
 func (suite *BuilderSuite) TestBuildOn_MaxCollectionSize() {
 	// set the max collection size to 1
-	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionSize(1))
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), builder.WithMaxCollectionSize(1))
 
 	// build a block
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
@@ -565,7 +565,7 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionSize() {
 
 func (suite *BuilderSuite) TestBuildOn_MaxCollectionByteSize() {
 	// set the max collection byte size to 400 (each tx is about 150 bytes)
-	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionByteSize(400))
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), builder.WithMaxCollectionByteSize(400))
 
 	// build a block
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
@@ -583,7 +583,7 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionByteSize() {
 
 func (suite *BuilderSuite) TestBuildOn_MaxCollectionTotalGas() {
 	// set the max gas to 20,000
-	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionTotalGas(20000))
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), builder.WithMaxCollectionTotalGas(20000))
 
 	// build a block
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
@@ -620,7 +620,7 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 
 	// reset the pool and builder
 	suite.pool = herocache.NewTransactions(10, unittest.Logger(), metrics.NewNoopCollector())
-	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool)
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger())
 
 	// insert a transaction referring genesis (now expired)
 	tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) {
@@ -662,7 +662,7 @@ func (suite *BuilderSuite) TestBuildOn_EmptyMempool() {
 
 	// start with an empty mempool
 	suite.pool = herocache.NewTransactions(1000, unittest.Logger(), metrics.NewNoopCollector())
-	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool)
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger())
 
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
 	suite.Require().NoError(err)
@@ -689,7 +689,7 @@ func (suite *BuilderSuite) TestBuildOn_NoRateLimiting() {
 	suite.ClearPool()
 
 	// create builder with no rate limit and max 10 tx/collection
-	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool,
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(),
 		builder.WithMaxCollectionSize(10),
 		builder.WithMaxPayerTransactionRate(0),
 	)
@@ -730,7 +730,7 @@ func (suite *BuilderSuite) TestBuildOn_RateLimitNonPayer() {
 	suite.ClearPool()
 
 	// create builder with 5 tx/payer and max 10 tx/collection
-	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool,
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(),
 		builder.WithMaxCollectionSize(10),
 		builder.WithMaxPayerTransactionRate(5),
 	)
@@ -774,7 +774,7 @@ func (suite *BuilderSuite) TestBuildOn_HighRateLimit() {
 	suite.ClearPool()
 
 	// create builder with 5 tx/payer and max 10 tx/collection
-	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool,
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(),
 		builder.WithMaxCollectionSize(10),
 		builder.WithMaxPayerTransactionRate(5),
 	)
@@ -812,7 +812,7 @@ func (suite *BuilderSuite) TestBuildOn_LowRateLimit() {
 	suite.ClearPool()
 
 	// create builder with .5 tx/payer and max 10 tx/collection
-	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool,
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(),
 		builder.WithMaxCollectionSize(10),
 		builder.WithMaxPayerTransactionRate(.5),
 	)
@@ -854,7 +854,7 @@ func (suite *BuilderSuite) TestBuildOn_UnlimitedPayer() {
 	// create builder with 5 tx/payer and max 10 tx/collection
 	// configure an unlimited payer
 	payer := unittest.RandomAddressFixture()
-	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool,
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(),
 		builder.WithMaxCollectionSize(10),
 		builder.WithMaxPayerTransactionRate(5),
 		builder.WithUnlimitedPayers(payer),
@@ -882,6 +882,46 @@ func (suite *BuilderSuite) TestBuildOn_UnlimitedPayer() {
 		suite.Assert().NoError(err)
 		suite.Assert().Len(built.Payload.Collection.Transactions, 10)
 
+	}
+}
+
+// TestBuildOn_RateLimitDryRun tests that rate limiting rules aren't enforced
+// if dry-run is enabled.
+func (suite *BuilderSuite) TestBuildOn_RateLimitDryRun() {
+
+	// start with an empty mempool
+	suite.ClearPool()
+
+	// create builder with 5 tx/payer and max 10 tx/collection
+	// configure an unlimited payer
+	payer := unittest.RandomAddressFixture()
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(),
+		builder.WithMaxCollectionSize(10),
+		builder.WithMaxPayerTransactionRate(5),
+		builder.WithRateLimitDryRun(true),
+	)
+
+	// fill the pool with 100 transactions from the same payer
+	create := func() *flow.TransactionBody {
+		tx := unittest.TransactionBodyFixture()
+		tx.ReferenceBlockID = suite.ProtoStateRoot().ID()
+		tx.Payer = payer
+		return &tx
+	}
+	suite.FillPool(100, create)
+
+	// rate-limiting should not be applied, since dry-run setting is enabled
+	parentID := suite.genesis.ID()
+	for i := 0; i < 10; i++ {
+		header, err := suite.builder.BuildOn(parentID, noopSetter)
+		suite.Require().NoError(err)
+		parentID = header.ID()
+
+		// each collection should be full with 10 transactions
+		var built model.Block
+		err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
+		suite.Assert().NoError(err)
+		suite.Assert().Len(built.Payload.Collection.Transactions, 10)
 	}
 }
 
@@ -959,7 +999,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		}
 
 		// create the builder
-		suite.builder, _ = builder.NewBuilder(suite.db, tracer, suite.headers, suite.headers, suite.payloads, suite.pool)
+		suite.builder, _ = builder.NewBuilder(suite.db, tracer, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger())
 	}
 
 	// create a block history to test performance against

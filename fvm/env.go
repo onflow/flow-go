@@ -76,11 +76,12 @@ type AccountInterface interface {
 // Parts of the environment that are common to all transaction and script
 // executions.
 type commonEnv struct {
-	// TODO(patrick): convert ctx to anonymous field once the rest of env
-	// is broken up into coherent pieces.
-	ctx *EnvContext
+	*Tracer
 	*ProgramLogger
 	*UnsafeRandomGenerator
+
+	// TODO(patrick): rm
+	ctx Context
 
 	MeterInterface
 	AccountInterface
@@ -114,21 +115,12 @@ func (env *commonEnv) MemoryEstimate() uint64 {
 	return uint64(env.sth.State().TotalMemoryEstimate())
 }
 
-// TODO(patrick): rm once ctx becomes an anonymous field.
 func (env *commonEnv) Context() *Context {
-	return env.ctx.Context()
+	return &env.ctx
 }
 
 func (env *commonEnv) AccountFreezeEnabled() bool {
 	return env.ctx.AccountFreezeEnabled
-}
-
-func (env *commonEnv) StartSpanFromRoot(name trace.SpanName) otelTrace.Span {
-	return env.ctx.StartSpanFromRoot(name)
-}
-
-func (env *commonEnv) StartExtensiveTracingSpanFromRoot(name trace.SpanName) otelTrace.Span {
-	return env.ctx.StartExtensiveTracingSpanFromRoot(name)
 }
 
 func (env *commonEnv) VM() *VirtualMachine {
