@@ -599,7 +599,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 			// don't crash as a result of external inputs since that creates a DoS vector
 			if err != nil {
 				m.log.
-					Warn().
+					Error().
 					Err(fmt.Errorf("unexpected error while decoding message: %w", err)).
 					Hex("sender", msg.OriginID).
 					Hex("event_id", msg.EventID).
