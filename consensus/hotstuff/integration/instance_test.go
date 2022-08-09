@@ -32,6 +32,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/voteaggregator"
 	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	module "github.com/onflow/flow-go/module/mock"
@@ -419,21 +420,14 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 			// mock signature aggregator which doesn't perform any crypto operations and just tracks total weight
 			aggregator := &mocks.TimeoutSignatureAggregator{}
 			totalWeight := atomic.NewUint64(0)
-			newestView := atomic.NewUint64(0)
+			newestView := counters.NewMonotonousCounter(0)
 			aggregator.On("View").Return(view).Maybe()
 			aggregator.On("TotalWeight").Return(func() uint64 {
 				return totalWeight.Load()
 			}).Maybe()
 			aggregator.On("VerifyAndAdd", mock.Anything, mock.Anything, mock.Anything).Return(
 				func(signerID flow.Identifier, _ crypto.Signature, newestQCView uint64) uint64 {
-					for {
-						nv := newestView.Load()
-						if nv < newestQCView {
-							newestView.CAS(nv, newestQCView)
-						} else {
-							break
-						}
-					}
+					newestView.Set(newestQCView)
 					identity, ok := in.participants.ByNodeID(signerID)
 					require.True(t, ok)
 					return totalWeight.Add(identity.Weight)
@@ -443,7 +437,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 				[]flow.Identifier(in.participants.NodeIDs()),
 				func() []uint64 {
 					newestQCViews := make([]uint64, 0, len(in.participants))
-					newestQCView := newestView.Load()
+					newestQCView := newestView.Value()
 					for range in.participants {
 						newestQCViews = append(newestQCViews, newestQCView)
 					}
