@@ -15,13 +15,14 @@ import (
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
-	"github.com/onflow/flow-go/module/mempool"
-	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/rs/zerolog"
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/spf13/pflag"
+
+	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/mempool/queue"
 
 	"github.com/onflow/flow-go/admin/commands"
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
