@@ -17,6 +17,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/onflow/flow-go/network/codec"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -26,7 +27,6 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/codec"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/slashing"
@@ -582,52 +582,10 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 		}
 
 		m.wg.Add(1)
-		go func(msg *message.Message) {
+		go func() {
 			defer m.wg.Done()
-			channel := channels.Channel(msg.ChannelID)
-
-			decodedMsgPayload, err := m.codec.Decode(msg.Payload)
-			// collect slashing information for messages sent with unknown an message code byte
-			if codec.IsErrUnknownMsgCode(err) {
-				// slash peer if message contains unknown message code byte
-				violation := &slashing.Violation{Identity: id, PeerID: remotePeer.String(), Channel: channel, IsUnicast: true, Err: err}
-				m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
-				return
-			}
-
-			// unexpected error condition. this indicates there's a bug
-			// don't crash as a result of external inputs since that creates a DoS vector
-			if err != nil {
-				m.log.
-					Error().
-					Err(fmt.Errorf("unexpected error while decoding message: %w", err)).
-					Hex("sender", msg.OriginID).
-					Hex("event_id", msg.EventID).
-					Str("event_type", msg.Type).
-					Str("channel", msg.ChannelID)
-				return
-			}
-
-			// if message channel is not public perform authorized sender validation
-			if !channels.IsPublicChannel(channel) {
-				err := m.validateUnicastAuthorizedSender(ctx, remotePeer, channel, decodedMsgPayload)
-				if err != nil {
-					m.log.
-						Error().
-						Err(err).
-						Hex("sender", msg.OriginID).
-						Hex("event_id", msg.EventID).
-						Str("event_type", msg.Type).
-						Str("channel", msg.ChannelID).
-						Msg("unicast authorized sender validation failed")
-					return
-				}
-			}
-
-			// message decoding and validation was successful now log metrics with the channel name as OneToOne and process message
-			m.metrics.NetworkMessageReceived(msg.Size(), metrics.ChannelOneToOne, msg.Type)
-			m.processAuthenticatedMessage(msg, decodedMsgPayload, remotePeer)
-		}(&msg)
+			m.processUnicastStreamMessage(ctx, id, remotePeer, &msg)
+		}()
 	}
 
 	success = true
@@ -690,6 +648,54 @@ func (m *Middleware) Unsubscribe(channel channels.Channel) error {
 	m.peerManagerUpdate()
 
 	return nil
+}
+
+// processUnicastStreamMessage will decode, perform authorized sender validation and process a message
+// sent via unicast stream. This func should be invoked in a separate goroutine to avoid creating a message decoding bottleneck.
+func (m *Middleware) processUnicastStreamMessage(ctx context.Context, identity *flow.Identity, remotePeer peer.ID, msg *message.Message) {
+	channel := channels.Channel(msg.ChannelID)
+
+	decodedMsgPayload, err := m.codec.Decode(msg.Payload)
+	// collect slashing information for messages sent with unknown an message code byte
+	if codec.IsErrUnknownMsgCode(err) {
+		// slash peer if message contains unknown message code byte
+		violation := &slashing.Violation{Identity: identity, PeerID: remotePeer.String(), Channel: channel, IsUnicast: true, Err: err}
+		m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
+		return
+	}
+
+	// unexpected error condition. this indicates there's a bug
+	// don't crash as a result of external inputs since that creates a DoS vector
+	if err != nil {
+		m.log.
+			Error().
+			Err(fmt.Errorf("unexpected error while decoding message: %w", err)).
+			Hex("sender", msg.OriginID).
+			Hex("event_id", msg.EventID).
+			Str("event_type", msg.Type).
+			Str("channel", msg.ChannelID)
+		return
+	}
+
+	// if message channel is not public perform authorized sender validation
+	if !channels.IsPublicChannel(channel) {
+		err := m.validateUnicastAuthorizedSender(ctx, remotePeer, channel, decodedMsgPayload)
+		if err != nil {
+			m.log.
+				Error().
+				Err(err).
+				Hex("sender", msg.OriginID).
+				Hex("event_id", msg.EventID).
+				Str("event_type", msg.Type).
+				Str("channel", msg.ChannelID).
+				Msg("unicast authorized sender validation failed")
+			return
+		}
+	}
+
+	// message decoding and validation was successful now log metrics with the channel name as OneToOne and process message
+	m.metrics.NetworkMessageReceived(msg.Size(), metrics.ChannelOneToOne, msg.Type)
+	m.processAuthenticatedMessage(msg, decodedMsgPayload, remotePeer)
 }
 
 // processAuthenticatedMessage processes a message and a source (indicated by its peer ID) and eventually passes it to the overlay
