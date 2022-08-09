@@ -355,13 +355,14 @@ func NewConsensusFollowerConfig(t *testing.T, networkingPrivKey crypto.PrivateKe
 
 // NetworkConfig is the config for the network.
 type NetworkConfig struct {
-	Nodes                 []NodeConfig
-	ConsensusFollowers    []ConsensusFollowerConfig
-	Name                  string
-	NClusters             uint
-	ViewsInDKGPhase       uint64
-	ViewsInStakingAuction uint64
-	ViewsInEpoch          uint64
+	Nodes                      []NodeConfig
+	ConsensusFollowers         []ConsensusFollowerConfig
+	Name                       string
+	NClusters                  uint
+	ViewsInDKGPhase            uint64
+	ViewsInStakingAuction      uint64
+	ViewsInEpoch               uint64
+	EpochCommitSafetyThreshold uint64
 }
 
 type NetworkConfigOpt func(*NetworkConfig)
@@ -383,14 +384,15 @@ func NewNetworkConfig(name string, nodes []NodeConfig, opts ...NetworkConfigOpt)
 	return c
 }
 
-func NewNetworkConfigWithEpochConfig(name string, nodes []NodeConfig, viewsInStakingAuction, viewsInDKGPhase, viewsInEpoch uint64, opts ...NetworkConfigOpt) NetworkConfig {
+func NewNetworkConfigWithEpochConfig(name string, nodes []NodeConfig, viewsInStakingAuction, viewsInDKGPhase, viewsInEpoch, safetyThreshold uint64, opts ...NetworkConfigOpt) NetworkConfig {
 	c := NetworkConfig{
-		Nodes:                 nodes,
-		Name:                  name,
-		NClusters:             1, // default to 1 cluster
-		ViewsInStakingAuction: viewsInStakingAuction,
-		ViewsInDKGPhase:       viewsInDKGPhase,
-		ViewsInEpoch:          viewsInEpoch,
+		Nodes:                      nodes,
+		Name:                       name,
+		NClusters:                  1, // default to 1 cluster
+		ViewsInStakingAuction:      viewsInStakingAuction,
+		ViewsInDKGPhase:            viewsInDKGPhase,
+		ViewsInEpoch:               viewsInEpoch,
+		EpochCommitSafetyThreshold: safetyThreshold,
 	}
 
 	for _, apply := range opts {
@@ -415,6 +417,12 @@ func WithViewsInEpoch(views uint64) func(*NetworkConfig) {
 func WithViewsInDKGPhase(views uint64) func(*NetworkConfig) {
 	return func(config *NetworkConfig) {
 		config.ViewsInDKGPhase = views
+	}
+}
+
+func WithEpochCommitSafetyThreshold(threshold uint64) func(*NetworkConfig) {
+	return func(config *NetworkConfig) {
+		config.EpochCommitSafetyThreshold = threshold
 	}
 }
 
@@ -1245,7 +1253,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		return nil, fmt.Errorf("generating root seal failed: %w", err)
 	}
 
-	snapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)
+	snapshot, err := inmem.SnapshotFromBootstrapStateWithParams(root, result, seal, qc, flow.DefaultProtocolVersion, networkConf.EpochCommitSafetyThreshold)
 	if err != nil {
 		return nil, fmt.Errorf("could not create bootstrap state snapshot: %w", err)
 	}
