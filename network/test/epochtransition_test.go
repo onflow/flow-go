@@ -184,7 +184,7 @@ func (suite *MutableIdentityTableSuite) addNodes(count int) {
 		suite.logger,
 		nil,
 		unittest.NetworkCodec(),
-		unittest.SlashingViolationsConsumer(suite.logger),
+		unittest.SlashingViolationsConsumer(),
 	)
 	suite.cancels = append(suite.cancels, cancel)
 

@@ -70,7 +70,7 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 		logger,
 		nil,
 		unittest.NetworkCodec(),
-		unittest.SlashingViolationsConsumer(logger),
+		unittest.SlashingViolationsConsumer(),
 		WithIdentityOpts(unittest.WithAllRoles()),
 	)
 

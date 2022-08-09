@@ -55,7 +55,7 @@ func (suite *EchoEngineTestSuite) SetupTest() {
 		logger,
 		nil,
 		unittest.NetworkCodec(),
-		unittest.SlashingViolationsConsumer(logger),
+		unittest.SlashingViolationsConsumer(),
 	)
 }
 

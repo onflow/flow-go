@@ -89,7 +89,7 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 		logger,
 		tops,
 		unittest.NetworkCodec(),
-		unittest.SlashingViolationsConsumer(logger),
+		unittest.SlashingViolationsConsumer(),
 		WithDHT("blob_service_test", p2p.AsServer()),
 		WithPeerManagerOpts(p2p.WithInterval(time.Second)),
 	)
