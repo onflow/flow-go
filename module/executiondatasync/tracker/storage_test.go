@@ -20,7 +20,8 @@ func randomCid() cid.Cid {
 	return blobs.NewBlob(data).Cid()
 }
 
-// TestPrune tests that pruning works as expected
+// TestPrune tests that when a height is pruned, all CIDs appearing at or below the pruned
+// height, and their associated tracking data, should be removed from the database.
 func TestPrune(t *testing.T) {
 	expectedPrunedCIDs := make(map[cid.Cid]struct{})
 	storageDir, err := ioutil.TempDir("/tmp", "prune_test")
@@ -80,6 +81,8 @@ func TestPrune(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// TestPruneNonLatestHeight test that when pruning a height at which a CID exists,
+// if that CID also exists at another height above the pruned height, the CID should not be pruned.
 func TestPruneNonLatestHeight(t *testing.T) {
 	storageDir, err := ioutil.TempDir("/tmp", "prune_test")
 	require.NoError(t, err)
@@ -89,6 +92,8 @@ func TestPruneNonLatestHeight(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
+	// c1 and c2 appear both at height 1 and 2
+	// therefore, when pruning up to height 1, both c1 and c2 should be retained
 	c1 := randomCid()
 	c2 := randomCid()
 

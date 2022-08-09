@@ -162,8 +162,7 @@ func TestMalformedData(t *testing.T) {
 		rootID, err := malformedEds.AddExecutionData(context.Background(), bed)
 		require.NoError(t, err)
 		_, err = defaultEds.GetExecutionData(context.Background(), rootID)
-		var malformedDataErr *execution_data.MalformedDataError
-		assert.ErrorAs(t, err, &malformedDataErr)
+		assert.True(t, execution_data.IsMalformedDataError(err))
 	}
 
 	numChunks := 5

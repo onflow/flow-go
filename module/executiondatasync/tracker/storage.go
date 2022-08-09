@@ -131,6 +131,8 @@ type Storage interface {
 	// height, but it will only be tracked once per height.
 	Update(UpdateFn) error
 
+	// GetFulfilledHeight returns the current fulfilled height.
+	// No errors are expected during normal operation.
 	GetFulfilledHeight() (uint64, error)
 
 	// SetFulfilledHeight updates the fulfilled height value,
@@ -139,8 +141,11 @@ type Storage interface {
 	// has been downloaded.
 	// It is up to the caller to ensure that this is never
 	// called with a value lower than the pruned height.
+	// No errors are expected during normal operation
 	SetFulfilledHeight(height uint64) error
 
+	// GetPrunedHeight returns the current pruned height.
+	// No errors are expected during normal operation.
 	GetPrunedHeight() (uint64, error)
 
 	// PruneUpToHeight removes all data from storage corresponding

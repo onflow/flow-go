@@ -241,6 +241,12 @@ func (e *MalformedDataError) Error() string {
 
 func (e *MalformedDataError) Unwrap() error { return e.err }
 
+// IsMalformedDataError returns whether an error is MalformedDataError
+func IsMalformedDataError(err error) bool {
+	var malformedDataErr *MalformedDataError
+	return errors.As(err, &malformedDataErr)
+}
+
 // BlobNotFoundError is returned when a blob could not be found.
 type BlobNotFoundError struct {
 	cid cid.Cid

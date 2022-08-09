@@ -28,18 +28,18 @@ const (
 // * Threshold: The number of block heights that we can exceed
 //   the height range target by before pruning is triggered. This
 //   controls the frequency of pruning.
-// The Pruner consumes a stream of fulfilled height notifications,
-// and triggers pruning once the difference between the fulfilled
+// The Pruner consumes a stream of tracked height notifications,
+// and triggers pruning once the difference between the tracked
 // height and the last pruned height reaches the height range
 // target + threshold.
+// A height is considered fulfilled once it has both been executed,
+// tracked, and sealed.
 type Pruner struct {
 	storage       tracker.Storage
 	pruneCallback func(ctx context.Context) error
 
 	// channels used to send new fulfilled heights and config changes to the worker thread
-	// fulfilledHeights uses an unbounded channel to ensure NotifyFulfilledHeight is not blocking
-	fulfilledHeightsIn    chan<- interface{}
-	fulfilledHeightsOut   <-chan interface{}
+	fulfilledHeights      chan uint64
 	thresholdChan         chan uint64
 	heightRangeTargetChan chan uint64
 
@@ -98,15 +98,14 @@ func NewPruner(logger zerolog.Logger, metrics module.ExecutionDataPrunerMetrics,
 		return nil, fmt.Errorf("failed to get fulfilled height: %w", err)
 	}
 
-	fulfilledHeightsIn, fulfilledHeightsOut := util.UnboundedChannel()
-	fulfilledHeightsIn <- fulfilledHeight
+	fulfilledHeights := make(chan uint64, 32)
+	fulfilledHeights <- fulfilledHeight
 
 	p := &Pruner{
 		logger:                logger.With().Str("component", "execution_data_pruner").Logger(),
 		storage:               storage,
 		pruneCallback:         func(ctx context.Context) error { return nil },
-		fulfilledHeightsIn:    fulfilledHeightsIn,
-		fulfilledHeightsOut:   fulfilledHeightsOut,
+		fulfilledHeights:      fulfilledHeights,
 		thresholdChan:         make(chan uint64),
 		heightRangeTargetChan: make(chan uint64),
 		lastFulfilledHeight:   fulfilledHeight,
@@ -133,7 +132,7 @@ func (p *Pruner) NotifyFulfilledHeight(height uint64) {
 		return
 	}
 
-	p.fulfilledHeightsIn <- height
+	p.fulfilledHeights <- height
 }
 
 // SetHeightRangeTarget updates the Pruner's height range target.
@@ -165,8 +164,7 @@ func (p *Pruner) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFu
 		select {
 		case <-ctx.Done():
 			return
-		case h := <-p.fulfilledHeightsOut:
-			height := h.(uint64)
+		case height := <-p.fulfilledHeights:
 			if height > p.lastFulfilledHeight {
 				p.lastFulfilledHeight = height
 			}
