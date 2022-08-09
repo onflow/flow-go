@@ -715,7 +715,7 @@ func (m *MiddlewareTestSuite) TestUnicast_Authorization() {
 			MsgType:   message.TestMessage,
 			Channel:   channels.ConsensusCommittee,
 			IsUnicast: true,
-			Err:       validator.ErrIdentityUnverified,
+			Err:       message.ErrUnauthorizedMessageOnChannel,
 		}
 
 		slashingViolationsConsumer.On(
