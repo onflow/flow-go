@@ -5,7 +5,6 @@ package p2p
 import (
 	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"sync"
@@ -190,24 +189,6 @@ func DefaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.Mes
 		validator.ValidateNotSender(flowID),   // validator to filter out messages sent by this node itself
 		validator.ValidateTarget(log, flowID), // validator to filter out messages not intended for this node
 	}
-}
-
-// authenticateUnicastStream authenticates the peer attempting to send a message via unciast
-// stream. A peer must be a staked node and not ejected.
-// Expected errors during normal operations:
-//  * validator.ErrIdentityUnverified if identity of the peer cannot be found
-//  * validator.ErrSenderEjected if the peer is an ejected node
-func (m *Middleware) authenticateUnicastStream(peerID peer.ID) (*flow.Identity, error) {
-	identity, found := m.ov.Identity(peerID)
-	if !found {
-		return nil, validator.ErrIdentityUnverified
-	}
-
-	if identity.Ejected {
-		return identity, validator.ErrSenderEjected
-	}
-
-	return identity, nil
 }
 
 // isProtocolParticipant returns a PeerFilter that returns true if a peer is a staked node.
@@ -478,32 +459,6 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 	remotePeer := s.Conn().RemotePeer()
 
-	// check if remotePeer is staked and not ejected to avoid decoding messages from unauthenticated peer
-	id, err := m.authenticateUnicastStream(remotePeer)
-	// collect slashing information for unstaked peers to use for metrics
-	if errors.Is(err, validator.ErrIdentityUnverified) {
-		violation := &slashing.Violation{Identity: id, PeerID: remotePeer.String(), IsUnicast: true, Err: err}
-		m.slashingViolationsConsumer.OnUnAuthorizedSenderError(violation)
-		return
-	}
-
-	// collect slashing information if peer is ejected
-	if errors.Is(err, validator.ErrSenderEjected) {
-		violation := &slashing.Violation{Identity: id, PeerID: remotePeer.String(), IsUnicast: true, Err: err}
-		m.slashingViolationsConsumer.OnSenderEjectedError(violation)
-		return
-	}
-
-	// unexpected error condition. this indicates there's a bug
-	// don't crash as a result of external inputs since that creates a DoS vector
-	if err != nil {
-		m.log.
-			Error().
-			Err(err).
-			Msg("unexpected unicast authorized sender validation error")
-		return
-	}
-
 	defer func() {
 		if success {
 			err := s.Close()
@@ -528,7 +483,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 	deadline, _ := ctx.Deadline()
 
-	err = s.SetReadDeadline(deadline)
+	err := s.SetReadDeadline(deadline)
 	if err != nil {
 		log.Err(err).Msg("failed to set read deadline for stream")
 		return
@@ -574,7 +529,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 		m.wg.Add(1)
 		go func() {
 			defer m.wg.Done()
-			m.processUnicastStreamMessage(ctx, id, remotePeer, &msg)
+			m.processUnicastStreamMessage(ctx, remotePeer, &msg)
 		}()
 	}
 
@@ -642,14 +597,14 @@ func (m *Middleware) Unsubscribe(channel channels.Channel) error {
 
 // processUnicastStreamMessage will decode, perform authorized sender validation and process a message
 // sent via unicast stream. This func should be invoked in a separate goroutine to avoid creating a message decoding bottleneck.
-func (m *Middleware) processUnicastStreamMessage(ctx context.Context, identity *flow.Identity, remotePeer peer.ID, msg *message.Message) {
+func (m *Middleware) processUnicastStreamMessage(ctx context.Context, remotePeer peer.ID, msg *message.Message) {
 	channel := channels.Channel(msg.ChannelID)
 
 	decodedMsgPayload, err := m.codec.Decode(msg.Payload)
 	// collect slashing information for messages sent with unknown an message code byte
 	if codec.IsErrUnknownMsgCode(err) {
 		// slash peer if message contains unknown message code byte
-		violation := &slashing.Violation{Identity: identity, PeerID: remotePeer.String(), Channel: channel, IsUnicast: true, Err: err}
+		violation := &slashing.Violation{PeerID: remotePeer.String(), Channel: channel, IsUnicast: true, Err: err}
 		m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
 		return
 	}
