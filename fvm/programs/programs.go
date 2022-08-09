@@ -53,7 +53,7 @@ func (p *Programs) ChildPrograms() *Programs {
 
 // Get returns stored program, state which contains changes which correspond to loading this program,
 // and boolean indicating if the value was found
-func (p *Programs) Get(location common.Location) (*interpreter.Program, *state.State, bool) {
+func (p *Programs) Get(location common.AddressLocation) (*interpreter.Program, *state.State, bool) {
 	entry, parent := p.get(location)
 	if entry != nil {
 		return entry.Program, entry.State, true
@@ -66,14 +66,14 @@ func (p *Programs) Get(location common.Location) (*interpreter.Program, *state.S
 	return nil, nil, false
 }
 
-func (p *Programs) get(location common.Location) (*ProgramEntry, *Programs) {
+func (p *Programs) get(location common.AddressLocation) (*ProgramEntry, *Programs) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
 	return p.programs[location.ID()], p.parent
 }
 
-func (p *Programs) Set(location common.Location, program *interpreter.Program, state *state.State) {
+func (p *Programs) Set(location common.AddressLocation, program *interpreter.Program, state *state.State) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -126,14 +126,5 @@ func (p *Programs) Cleanup(changedContracts []ContractUpdateKey) {
 	if len(changedContracts) > 0 {
 		p.unsafeForceCleanup()
 		return
-	}
-
-	// However, if none of the programs were changed
-	// we remove all the non AddressLocation data
-	// (those are temporary tx related entries)
-	for id, entry := range p.programs {
-		if _, is := entry.Location.(common.AddressLocation); !is {
-			delete(p.programs, id)
-		}
 	}
 }

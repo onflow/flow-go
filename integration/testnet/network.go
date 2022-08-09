@@ -80,6 +80,12 @@ const (
 	ColNodeAPIPort = "col-ingress-port"
 	// ExeNodeAPIPort is the name used for the execution node API port.
 	ExeNodeAPIPort = "exe-api-port"
+	// ObserverNodeAPIPort is the name used for the observer node API port.
+	ObserverNodeAPIPort = "observer-api-port"
+	// ObserverNodeAPISecurePort is the name used for the secure observer API port.
+	ObserverNodeAPISecurePort = "observer-api-secure-port"
+	// ObserverNodeAPIProxyPort is the name used for the observer node API HTTP proxy port.
+	ObserverNodeAPIProxyPort = "observer-api-http-proxy-port"
 	// AccessNodeAPIPort is the name used for the access node API port.
 	AccessNodeAPIPort = "access-api-port"
 	// AccessNodeAPISecurePort is the name used for the secure access API port.
@@ -143,6 +149,7 @@ type FlowNetwork struct {
 	Containers                  map[string]*Container
 	ConsensusFollowers          map[flow.Identifier]consensus_follower.ConsensusFollower
 	CorruptedPortMapping        map[flow.Identifier]string // port binding for corrupted containers.
+	ObserverPorts               map[string]string
 	AccessPorts                 map[string]string
 	AccessPortsByContainerName  map[string]string
 	MetricsPortsByContainerName map[string]string
@@ -631,6 +638,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 		log:                         logger,
 		Containers:                  make(map[string]*Container, nNodes),
 		ConsensusFollowers:          make(map[flow.Identifier]consensus_follower.ConsensusFollower, len(networkConf.ConsensusFollowers)),
+		ObserverPorts:               make(map[string]string),
 		AccessPorts:                 make(map[string]string),
 		AccessPortsByContainerName:  make(map[string]string),
 		MetricsPortsByContainerName: make(map[string]string),
@@ -769,7 +777,7 @@ type ObserverConfig struct {
 	AccessGRPCSecurePort    string // Does not change the access node
 }
 
-func (net *FlowNetwork) AddObserver(ctx context.Context, conf *ObserverConfig) (stop func(), err error) {
+func (net *FlowNetwork) AddObserver(t *testing.T, ctx context.Context, conf *ObserverConfig) (stop func(), err error) {
 	// Find the public key for the access node
 	accessPublicKey := ""
 	for _, stakedConf := range net.BootstrapData.StakedConfs {
@@ -812,6 +820,14 @@ func (net *FlowNetwork) AddObserver(ctx context.Context, conf *ObserverConfig) (
 
 	_ = io.CopyDirectory(net.BootstrapDir, nodeBootstrapDir)
 
+	observerUnsecurePort := testingdock.RandomPort(t)
+	observerSecurePort := testingdock.RandomPort(t)
+	observerHttpPort := testingdock.RandomPort(t)
+
+	net.ObserverPorts[ObserverNodeAPIPort] = observerUnsecurePort
+	net.ObserverPorts[ObserverNodeAPISecurePort] = observerSecurePort
+	net.ObserverPorts[ObserverNodeAPIProxyPort] = observerHttpPort
+
 	container, err := net.cli.ContainerCreate(ctx,
 		&container.Config{
 			Image: conf.ObserverImage,
@@ -835,9 +851,9 @@ func (net *FlowNetwork) AddObserver(ctx context.Context, conf *ObserverConfig) (
 				"--profiler-interval=2m",
 			},
 			ExposedPorts: nat.PortSet{
-				nat.Port("9000"): struct{}{},
-				nat.Port("9001"): struct{}{},
-				nat.Port("8000"): struct{}{},
+				"9000": struct{}{},
+				"9001": struct{}{},
+				"8000": struct{}{},
 			},
 		},
 		&container.HostConfig{
@@ -848,9 +864,9 @@ func (net *FlowNetwork) AddObserver(ctx context.Context, conf *ObserverConfig) (
 				fmt.Sprintf("%s:%s:ro", nodeBootstrapDir, "/bootstrap"),
 			},
 			PortBindings: nat.PortMap{
-				"9000": []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: "9000"}},
-				"9001": []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: "9001"}},
-				"8000": []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: "8000"}},
+				"9000": []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: observerUnsecurePort}},
+				"9001": []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: observerSecurePort}},
+				"8000": []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: observerHttpPort}},
 			},
 		},
 		&network.NetworkingConfig{
