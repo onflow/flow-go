@@ -5,10 +5,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/require"
 )
 
 func TestChunkDataPackRequestQueue_Sequential(t *testing.T) {
@@ -158,12 +159,12 @@ func chunkDataRequestListFixture(count int) []*mempool.ChunkDataPackRequest {
 	return list
 }
 
-func matchAndRemove(t *testing.T, requests []*mempool.ChunkDataPackRequest, req *mempool.ChunkDataPackRequest) {
+func matchAndRemove(t *testing.T, requests []*mempool.ChunkDataPackRequest, req *mempool.ChunkDataPackRequest) []*mempool.ChunkDataPackRequest {
 	for i, r := range requests {
 		if r.ChunkId == req.ChunkId && r.RequesterId == req.RequesterId {
 			// removes the matched request from the list
 			requests = append(requests[:i], requests[i+1:]...)
-			return
+			return requests
 		}
 	}
 

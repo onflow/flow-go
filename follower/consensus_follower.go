@@ -201,10 +201,10 @@ func NewConsensusFollower(
 		return nil, err
 	}
 
-	cf := &ConsensusFollowerImpl{logger: anb.Logger}
-	anb.BaseConfig.NodeRole = "consensus_follower"
+	cf := &ConsensusFollowerImpl{logger: anb.FlowNodeBuilder.Logger}
+	anb.FlowNodeBuilder.BaseConfig.NodeRole = "consensus_follower"
 	anb.FinalizationDistributor.AddOnBlockFinalizedConsumer(cf.onBlockFinalized)
-	cf.NodeConfig = anb.NodeConfig
+	cf.NodeConfig = anb.FlowNodeBuilder.NodeConfig
 	cf.Component, err = anb.Build()
 	if err != nil {
 		return nil, err

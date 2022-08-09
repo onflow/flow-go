@@ -94,7 +94,7 @@ type ExecutionConfig struct {
 	pauseExecution              bool
 	scriptLogThreshold          time.Duration
 	scriptExecutionTimeLimit    time.Duration
-	chdpQueryTimeout            uint
+	chunkDataPackQueryTimeout   time.Duration
 	chdpDeliveryTimeout         uint
 	enableBlockDataUpload       bool
 	gcpBucketName               string
@@ -149,7 +149,7 @@ func (e *ExecutionNodeBuilder) LoadFlags() {
 			flags.IntVar(&e.exeConf.syncThreshold, "sync-threshold", 100,
 				"the maximum number of sealed and unexecuted blocks before triggering state syncing")
 			flags.BoolVar(&e.exeConf.extensiveLog, "extensive-logging", false, "extensive logging logs tx contents and block headers")
-			flags.UintVar(&e.exeConf.chdpQueryTimeout, "chunk-data-pack-query-timeout-sec", 10,
+			flags.UintVar(&e.exeConf.chunkDataPackQueryTimeout, "chunk-data-pack-query-timeout-sec", 10,
 				"number of seconds to determine a chunk data pack query being slow")
 			flags.UintVar(&e.exeConf.chdpDeliveryTimeout, "chunk-data-pack-delivery-timeout-sec", 10,
 				"number of seconds to determine a chunk data pack response delivery being slow")
@@ -539,7 +539,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				executionState,
 				collector,
 				checkAuthorizedAtBlock,
-				e.exeConf.chdpQueryTimeout,
+				e.exeConf.chunkDataPackQueryTimeout,
 				e.exeConf.chdpDeliveryTimeout,
 			)
 			if err != nil {

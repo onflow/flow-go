@@ -7,10 +7,11 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool"
-	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution/state"
@@ -27,7 +28,7 @@ import (
 )
 
 type ProviderEngine interface {
-	network.Engine
+	network.MessageProcessor
 	BroadcastExecutionReceipt(context.Context, *flow.ExecutionReceipt) error
 }
 

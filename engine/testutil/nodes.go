@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/module/mempool/queue"
+
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
@@ -543,7 +545,18 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.NoError(t, err)
 
 	pusherEngine, err := executionprovider.New(
-		node.Log, node.Tracer, node.Net, node.State, node.Me, execState, metricsCollector, checkAuthorizedAtBlock, 10, 10,
+		node.Log,
+		node.Tracer,
+		node.Net,
+		node.State,
+		execState,
+		metricsCollector,
+		checkAuthorizedAtBlock,
+		queue.NewChunkDataPackRequestQueue(uint32(1000), unittest.Logger(), metrics.NewNoopCollector()),
+		executionprovider.DefaultChunkDataPackQueryTimeout,
+		executionprovider.DefaultChunkDataPackDeliveryTimeout,
+		executionprovider.DefaultChunkDataPackProcessInterval,
+		executionprovider.DefaultChunkDataPackRequestWorker,
 	)
 	require.NoError(t, err)
 
