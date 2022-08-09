@@ -679,7 +679,7 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 	view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 		return ledger.Get(owner, key)
 	})
-	sth := state.NewStateHolder(state.NewState(view, meter.NewMeter(meter.DefaultParameters())))
+	sth := state.NewStateHolder(state.NewState(view, meter.NewMeter(meter.DefaultParameters()), state.DefaultParameters()))
 	accounts := state.NewAccounts(sth)
 
 	// account creation, signing of transaction and bootstrapping ledger should not be required for this test

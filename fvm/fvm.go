@@ -51,9 +51,11 @@ func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, program
 			meter.DefaultParameters().
 				WithComputationLimit(uint(proc.ComputationLimit(ctx))).
 				WithMemoryLimit(proc.MemoryLimit(ctx))),
-		state.WithMaxKeySizeAllowed(ctx.MaxStateKeySize),
-		state.WithMaxValueSizeAllowed(ctx.MaxStateValueSize),
-		state.WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize))
+		state.DefaultParameters().
+			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
+			WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
+			WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize),
+	)
 	sth := state.NewStateHolder(st)
 
 	err = proc.Run(vm, ctx, sth, programs)
@@ -69,9 +71,11 @@ func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.
 	st := state.NewState(
 		v,
 		meter.NewMeter(meter.DefaultParameters()),
-		state.WithMaxKeySizeAllowed(ctx.MaxStateKeySize),
-		state.WithMaxValueSizeAllowed(ctx.MaxStateValueSize),
-		state.WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize))
+		state.DefaultParameters().
+			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
+			WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
+			WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize),
+	)
 
 	sth := state.NewStateHolder(st)
 	account, err := getAccount(vm, ctx, sth, programs, address)
