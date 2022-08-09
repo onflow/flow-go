@@ -55,7 +55,7 @@ func TestSingleNodeLifeCycle(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(t, ctx, errChan)
+	go unittest.NoIrrecoverableError(ctx, t, errChan)
 
 	node, _ := nodeFixture(
 		t,
@@ -67,7 +67,7 @@ func TestSingleNodeLifeCycle(t *testing.T) {
 	unittest.RequireComponentsReadyBefore(t, 100*time.Millisecond, node)
 
 	cancel()
-	unittest.RequireComponentsReadyBefore(t, 100*time.Millisecond, node)
+	unittest.RequireComponentsDoneBefore(t, 100*time.Millisecond, node)
 }
 
 // TestGetPeerInfo evaluates the deterministic translation between the nodes address and
@@ -99,7 +99,7 @@ func TestAddPeers(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(t, ctx, errChan)
+	go unittest.NoIrrecoverableError(ctx, t, errChan)
 
 	// create nodes
 	nodes, identities := nodesFixture(t, unittest.IdentifierFixture(), "test_add_peers", count)
@@ -123,7 +123,7 @@ func TestRemovePeers(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(t, ctx, errChan)
+	go unittest.NoIrrecoverableError(ctx, t, errChan)
 
 	// create nodes
 	nodes, identities := nodesFixture(t, unittest.IdentifierFixture(), "test_remove_peers", count)
@@ -152,7 +152,7 @@ func TestConnGater(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(t, ctx, errChan)
+	go unittest.NoIrrecoverableError(ctx, t, errChan)
 
 	sporkID := unittest.IdentifierFixture()
 

@@ -222,6 +222,7 @@ func (builder *LibP2PNodeBuilder) Build() (*Node, error) {
 
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			var err error
 			node.routing, err = builder.routingFactory(ctx, host)
 
 			if err != nil {
@@ -247,7 +248,7 @@ func (builder *LibP2PNodeBuilder) Build() (*Node, error) {
 			ready()
 			<-ctx.Done()
 
-			err := node.stop()
+			err = node.stop()
 			if err != nil {
 				// ignore context cancellation errors
 				if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {

@@ -38,15 +38,15 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 
 	ctx1, cancel1 := context.WithCancel(ctx)
 	signalCtx1, errChan1 := irrecoverable.WithSignaler(ctx1)
-	go unittest.NoIrrecoverableError(t, ctx1, errChan1, fmt.Sprintf("unexpected irrecoverable on errchan1"))
+	go unittest.NoIrrecoverableError(ctx1, t, errChan1, fmt.Sprintf("unexpected irrecoverable on errchan1"))
 
 	ctx2, cancel2 := context.WithCancel(ctx)
 	signalCtx2, errChan2 := irrecoverable.WithSignaler(ctx2)
-	go unittest.NoIrrecoverableError(t, ctx2, errChan2, fmt.Sprintf("unexpected irrecoverable on errchan2"))
+	go unittest.NoIrrecoverableError(ctx2, t, errChan2, fmt.Sprintf("unexpected irrecoverable on errchan2"))
 
 	ctx2a, cancel2a := context.WithCancel(ctx)
 	signalCtx2a, errChan2a := irrecoverable.WithSignaler(ctx2a)
-	go unittest.NoIrrecoverableError(t, ctx2a, errChan2a, fmt.Sprintf("unexpected irrecoverable on errchan2a"))
+	go unittest.NoIrrecoverableError(ctx2a, t, errChan2a, fmt.Sprintf("unexpected irrecoverable on errchan2a"))
 
 	// create and start node 1 on localhost and random port
 	node1key := generateNetworkingKey(t)
@@ -114,15 +114,15 @@ func TestOneToOneCrosstalkPrevention(t *testing.T) {
 
 	ctx1, cancel1 := context.WithCancel(ctx)
 	signalCtx1, errChan1 := irrecoverable.WithSignaler(ctx1)
-	go unittest.NoIrrecoverableError(t, ctx1, errChan1, fmt.Sprintf("unexpected irrecoverable on errchan1"))
+	go unittest.NoIrrecoverableError(ctx1, t, errChan1, fmt.Sprintf("unexpected irrecoverable on errchan1"))
 
 	ctx2, cancel2 := context.WithCancel(ctx)
 	signalCtx2, errChan2 := irrecoverable.WithSignaler(ctx2)
-	go unittest.NoIrrecoverableError(t, ctx2, errChan2, fmt.Sprintf("unexpected irrecoverable on errchan2"))
+	go unittest.NoIrrecoverableError(ctx2, t, errChan2, fmt.Sprintf("unexpected irrecoverable on errchan2"))
 
 	ctx2a, cancel2a := context.WithCancel(ctx)
 	signalCtx2a, errChan2a := irrecoverable.WithSignaler(ctx2a)
-	go unittest.NoIrrecoverableError(t, ctx2a, errChan2a, fmt.Sprintf("unexpected irrecoverable on errchan2a"))
+	go unittest.NoIrrecoverableError(ctx2a, t, errChan2a, fmt.Sprintf("unexpected irrecoverable on errchan2a"))
 
 	sporkId1 := unittest.IdentifierFixture()
 
@@ -173,11 +173,11 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 
 	ctx1, cancel1 := context.WithCancel(ctx)
 	signalCtx1, errChan1 := irrecoverable.WithSignaler(ctx1)
-	go unittest.NoIrrecoverableError(t, ctx1, errChan1, fmt.Sprintf("unexpected irrecoverable on errchan1"))
+	go unittest.NoIrrecoverableError(ctx1, t, errChan1, fmt.Sprintf("unexpected irrecoverable on errchan1"))
 
 	ctx2, cancel2 := context.WithCancel(ctx)
 	signalCtx2, errChan2 := irrecoverable.WithSignaler(ctx2)
-	go unittest.NoIrrecoverableError(t, ctx2, errChan2, fmt.Sprintf("unexpected irrecoverable on errchan2"))
+	go unittest.NoIrrecoverableError(ctx2, t, errChan2, fmt.Sprintf("unexpected irrecoverable on errchan2"))
 
 	// root id before spork
 	previousSporkId := unittest.IdentifierFixture()

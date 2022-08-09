@@ -96,7 +96,7 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 	suite.networks = networks
 
 	errChan := StartNetworks(ctx, suite.T(), nodes, networks, 100*time.Millisecond)
-	go unittest.NoIrrecoverableError(suite.T(), ctx, errChan)
+	go unittest.NoIrrecoverableError(ctx, suite.T(), errChan)
 
 	blobExchangeChannel := channels.Channel("blob-exchange")
 

@@ -434,7 +434,7 @@ func (suite *ExecutionDataRequesterSuite) runRequesterTestHalts(edr state_synchr
 	defer cancel()
 
 	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(suite.T(), ctx, errChan)
+	go unittest.NoIrrecoverableError(ctx, suite.T(), errChan)
 
 	testDone := make(chan struct{})
 	fetchedExecutionData := cfg.FetchedExecutionData()
@@ -463,7 +463,7 @@ func (suite *ExecutionDataRequesterSuite) runRequesterTestPauseResume(edr state_
 	ctx, cancel := context.WithCancel(context.Background())
 
 	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(suite.T(), ctx, errChan)
+	go unittest.NoIrrecoverableError(ctx, suite.T(), errChan)
 
 	testDone := make(chan struct{})
 	fetchedExecutionData := cfg.FetchedExecutionData()
@@ -501,7 +501,7 @@ func (suite *ExecutionDataRequesterSuite) runRequesterTest(edr state_synchroniza
 	ctx, cancel := context.WithCancel(context.Background())
 
 	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(suite.T(), ctx, errChan)
+	go unittest.NoIrrecoverableError(ctx, suite.T(), errChan)
 
 	// wait for all notifications
 	testDone := make(chan struct{})
