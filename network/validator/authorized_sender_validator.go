@@ -39,19 +39,20 @@ func AuthorizedSenderValidator(log zerolog.Logger, slashingViolationsConsumer sl
 		}
 
 		msgType, err := isAuthorizedSender(identity, channel, msg)
+
 		switch {
 		case err == nil:
 			return msgType, nil
 		case message.IsUnknownMsgTypeErr(err):
-			violation := &slashing.Violation{Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, IsUnicast: isUnicast, Err: ErrIdentityUnverified}
+			violation := &slashing.Violation{Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, IsUnicast: isUnicast, Err: err}
 			slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
 			return msgType, err
 		case errors.Is(err, message.ErrUnauthorizedMessageOnChannel) || errors.Is(err, message.ErrUnauthorizedRole):
-			violation := &slashing.Violation{Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, IsUnicast: isUnicast, Err: ErrIdentityUnverified}
+			violation := &slashing.Violation{Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, IsUnicast: isUnicast, Err: err}
 			slashingViolationsConsumer.OnUnAuthorizedSenderError(violation)
 			return msgType, err
 		case errors.Is(err, ErrSenderEjected):
-			violation := &slashing.Violation{Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, IsUnicast: isUnicast, Err: ErrIdentityUnverified}
+			violation := &slashing.Violation{Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, IsUnicast: isUnicast, Err: err}
 			slashingViolationsConsumer.OnSenderEjectedError(violation)
 			return msgType, ErrSenderEjected
 		default:
