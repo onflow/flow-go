@@ -30,7 +30,7 @@ func NewSlashingViolationsConsumer(log zerolog.Logger) *Consumer {
 func (c *Consumer) logOffense(identity *flow.Identity, peerID, msgType, channel, offense string, isUnicast bool, err error) {
 	e := c.log.Error().
 		Str("peer_id", peerID).
-		Str("offense", offense).
+		Str("networking_offense", offense).
 		Str("message_type", msgType).
 		Str("channel", channel).
 		Bool("unicast_message", isUnicast)
