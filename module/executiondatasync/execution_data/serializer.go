@@ -34,6 +34,10 @@ func init() {
 }
 
 // header codes to distinguish between different types of data
+// these codes provide simple versioning of execution state data blobs and indicate how the data
+// should be deserialized into their original form. Therefore, each input format must have a unique
+// code, and the codes must never be reused. This allows for libraries that can accurately decode
+// the data without juggling software versions.
 const (
 	codeRecursiveCIDs = iota + 1
 	codeExecutionDataRoot

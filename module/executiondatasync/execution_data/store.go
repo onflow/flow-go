@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/module/blobs"
 )
 
-// ExecutionDataStore handles adding / getting execution data to / from a blobstore
+// ExecutionDataStore handles adding / getting execution data to / from a local blobstore
 type ExecutionDataStore interface {
 	// GetExecutionData gets the BlockExecutionData for the given root ID from the blobstore.
 	// The returned error will be:

@@ -71,6 +71,11 @@ func (d *downloader) Done() <-chan struct{} {
 	return d.blobService.Done()
 }
 
+// Download downloads a blob tree identified by executionDataID from the network and returns the deserialized BlockExecutionData struct
+// During normal operation, the returned error will be:
+// - MalformedDataError if some level of the blob tree cannot be properly deserialized
+// - BlobNotFoundError if some CID in the blob tree could not be found from the blob service
+// - BlobSizeLimitExceededError if some blob in the blob tree exceeds the maximum allowed size
 func (d *downloader) Download(ctx context.Context, executionDataID flow.Identifier) (*BlockExecutionData, error) {
 	blobGetter := d.blobService.GetSession(ctx)
 
