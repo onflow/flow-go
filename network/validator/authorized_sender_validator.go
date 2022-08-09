@@ -33,7 +33,8 @@ func AuthorizedSenderValidator(log zerolog.Logger, slashingViolationsConsumer sl
 		// something terrible went wrong.
 		identity, ok := getIdentity(from)
 		if !ok {
-			slashingViolationsConsumer.OnUnAuthorizedSenderError(identity, from.String(), "", channel.String(), isUnicast, ErrIdentityUnverified)
+			violation := &slashing.Violation{Identity: identity, PeerID: from.String(), Channel: channel, IsUnicast: isUnicast, Err: ErrIdentityUnverified}
+			slashingViolationsConsumer.OnUnAuthorizedSenderError(violation)
 			return "", ErrIdentityUnverified
 		}
 
@@ -42,13 +43,16 @@ func AuthorizedSenderValidator(log zerolog.Logger, slashingViolationsConsumer sl
 		case err == nil:
 			return msgType, nil
 		case message.IsUnknownMsgTypeErr(err):
-			slashingViolationsConsumer.OnUnknownMsgTypeError(identity, from.String(), msgType, channel.String(), isUnicast, err)
+			violation := &slashing.Violation{Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, IsUnicast: isUnicast, Err: ErrIdentityUnverified}
+			slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
 			return msgType, err
 		case errors.Is(err, message.ErrUnauthorizedMessageOnChannel) || errors.Is(err, message.ErrUnauthorizedRole):
-			slashingViolationsConsumer.OnUnAuthorizedSenderError(identity, from.String(), msgType, channel.String(), isUnicast, err)
+			violation := &slashing.Violation{Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, IsUnicast: isUnicast, Err: ErrIdentityUnverified}
+			slashingViolationsConsumer.OnUnAuthorizedSenderError(violation)
 			return msgType, err
 		case errors.Is(err, ErrSenderEjected):
-			slashingViolationsConsumer.OnSenderEjectedError(identity, from.String(), msgType, channel.String(), isUnicast, err)
+			violation := &slashing.Violation{Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, IsUnicast: isUnicast, Err: ErrIdentityUnverified}
+			slashingViolationsConsumer.OnSenderEjectedError(violation)
 			return msgType, ErrSenderEjected
 		default:
 			// this condition should never happen and indicates there's a bug
