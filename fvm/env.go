@@ -102,7 +102,7 @@ func (env *commonEnv) MeterComputation(kind common.ComputationKind, intensity ui
 
 // TODO(patrick): rm once Meter object has been refactored
 func (env *commonEnv) ComputationUsed() uint64 {
-	return uint64(env.sth.State().TotalComputationUsed())
+	return uint64(env.sth.TotalComputationUsed())
 }
 
 // TODO(patrick): rm once Meter object has been refactored
@@ -112,7 +112,7 @@ func (env *commonEnv) MeterMemory(usage common.MemoryUsage) error {
 
 // TODO(patrick): rm once Meter object has been refactored
 func (env *commonEnv) MemoryEstimate() uint64 {
-	return uint64(env.sth.State().TotalMemoryEstimate())
+	return uint64(env.sth.TotalMemoryEstimate())
 }
 
 func (env *commonEnv) Context() *Context {
