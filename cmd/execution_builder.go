@@ -15,6 +15,8 @@ import (
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
+	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/rs/zerolog"
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/host"
@@ -73,35 +75,38 @@ import (
 )
 
 type ExecutionConfig struct {
-	rpcConf                     rpc.Config
-	triedir                     string
-	executionDataDir            string
-	mTrieCacheSize              uint32
-	transactionResultsCacheSize uint
-	checkpointDistance          uint
-	checkpointsToKeep           uint
-	stateDeltasLimit            uint
-	cadenceExecutionCache       uint
-	cadenceTracing              bool
-	chdpCacheSize               uint
-	requestInterval             time.Duration
-	preferredExeNodeIDStr       string
-	syncByBlocks                bool
-	syncFast                    bool
-	syncThreshold               int
-	extensiveLog                bool
-	extensiveTracing            bool
-	pauseExecution              bool
-	scriptLogThreshold          time.Duration
-	scriptExecutionTimeLimit    time.Duration
-	chunkDataPackQueryTimeout   time.Duration
-	chdpDeliveryTimeout         uint
-	enableBlockDataUpload       bool
-	gcpBucketName               string
-	s3BucketName                string
-	edsDatastoreTTL             time.Duration
-	apiRatelimits               map[string]int
-	apiBurstlimits              map[string]int
+	rpcConf                        rpc.Config
+	triedir                        string
+	executionDataDir               string
+	mTrieCacheSize                 uint32
+	transactionResultsCacheSize    uint
+	checkpointDistance             uint
+	checkpointsToKeep              uint
+	stateDeltasLimit               uint
+	cadenceExecutionCache          uint
+	cadenceTracing                 bool
+	chunkDataPackCacheSize         uint
+	chunkDataPackRequestsCacheSize uint32
+	requestInterval                time.Duration
+	preferredExeNodeIDStr          string
+	syncByBlocks                   bool
+	syncFast                       bool
+	syncThreshold                  int
+	extensiveLog                   bool
+	extensiveTracing               bool
+	pauseExecution                 bool
+	scriptLogThreshold             time.Duration
+	scriptExecutionTimeLimit       time.Duration
+	chunkDataPackQueryTimeout      time.Duration
+	chunkDataPackDeliveryTimeout   time.Duration
+	chunkDataPackProcessInterval   time.Duration
+	chunkDataPackRequestWorkers    uint
+	enableBlockDataUpload          bool
+	gcpBucketName                  string
+	s3BucketName                   string
+	edsDatastoreTTL                time.Duration
+	apiRatelimits                  map[string]int
+	apiBurstlimits                 map[string]int
 }
 
 type ExecutionNodeBuilder struct {
@@ -135,7 +140,8 @@ func (e *ExecutionNodeBuilder) LoadFlags() {
 				"cache size for Cadence execution")
 			flags.BoolVar(&e.exeConf.extensiveTracing, "extensive-tracing", false, "adds high-overhead tracing to execution")
 			flags.BoolVar(&e.exeConf.cadenceTracing, "cadence-tracing", false, "enables cadence runtime level tracing")
-			flags.UintVar(&e.exeConf.chdpCacheSize, "chdp-cache", storage.DefaultCacheSize, "cache size for Chunk Data Packs")
+			flags.UintVar(&e.exeConf.chunkDataPackCacheSize, "chdp-cache", storage.DefaultCacheSize, "cache size for storing actual chunk data packs")
+			flags.Uint32Var(&e.exeConf.chunkDataPackRequestsCacheSize, "chdp-request-cache", mempool.DefaultChunkDataPackRequestQueueSize, "cache size for chunk data pack requests")
 			flags.DurationVar(&e.exeConf.requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
 			flags.DurationVar(&e.exeConf.scriptLogThreshold, "script-log-threshold", computation.DefaultScriptLogThreshold,
 				"threshold for logging script execution")
@@ -149,10 +155,13 @@ func (e *ExecutionNodeBuilder) LoadFlags() {
 			flags.IntVar(&e.exeConf.syncThreshold, "sync-threshold", 100,
 				"the maximum number of sealed and unexecuted blocks before triggering state syncing")
 			flags.BoolVar(&e.exeConf.extensiveLog, "extensive-logging", false, "extensive logging logs tx contents and block headers")
-			flags.UintVar(&e.exeConf.chunkDataPackQueryTimeout, "chunk-data-pack-query-timeout-sec", 10,
-				"number of seconds to determine a chunk data pack query being slow")
-			flags.UintVar(&e.exeConf.chdpDeliveryTimeout, "chunk-data-pack-delivery-timeout-sec", 10,
-				"number of seconds to determine a chunk data pack response delivery being slow")
+			flags.DurationVar(&e.exeConf.chunkDataPackQueryTimeout, "chunk-data-pack-query-timeout", exeprovider.DefaultChunkDataPackQueryTimeout,
+				"timeout duration to determine a chunk data pack query being slow")
+			flags.DurationVar(&e.exeConf.chunkDataPackDeliveryTimeout, "chunk-data-pack-delivery-timeout", exeprovider.DefaultChunkDataPackDeliveryTimeout,
+				"timeout duration to determine a chunk data pack response delivery being slow")
+			flags.DurationVar(&e.exeConf.chunkDataPackProcessInterval, "chunk-data-pack-process-interval", exeprovider.DefaultChunkDataPackProcessInterval,
+				"time intervals on which workers check chunk data pack queue")
+			flags.UintVar(&e.exeConf.chunkDataPackRequestWorkers, "chunk-data-pack-workers", exeprovider.DefaultChunkDataPackRequestWorker, "number of workers to process chunk data pack requests")
 			flags.BoolVar(&e.exeConf.pauseExecution, "pause-execution", false, "pause the execution. when set to true, no block will be executed, "+
 				"but still be able to serve queries")
 			flags.BoolVar(&e.exeConf.enableBlockDataUpload, "enable-blockdata-upload", false, "enable uploading block data to Cloud Bucket")
@@ -506,7 +515,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			}
 			computationManager = manager
 
-			chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache, node.DB, node.Storage.Collections, e.exeConf.chdpCacheSize)
+			chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache, node.DB, node.Storage.Collections, e.exeConf.chunkDataPackCacheSize)
 			stateCommitments := storage.NewCommits(node.Metrics.Cache, node.DB)
 
 			// Needed for gRPC server, make sure to assign to main scoped vars
@@ -530,17 +539,24 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				node.Tracer,
 			)
 
+			var chunkDataPackRequestQueueMetrics module.HeroCacheMetrics = metrics.NewNoopCollector()
+			if e.FlowNodeBuilder.HeroCacheMetricsEnable {
+				chunkDataPackRequestQueueMetrics = metrics.ChunkDataPackRequestQueueMetricsFactory(e.FlowNodeBuilder.MetricsRegisterer)
+			}
+			chdpReqQueue := queue.NewChunkDataPackRequestQueue(e.exeConf.chunkDataPackRequestsCacheSize, node.Logger, chunkDataPackRequestQueueMetrics)
 			providerEngine, err = exeprovider.New(
 				node.Logger,
 				node.Tracer,
 				node.Network,
 				node.State,
-				node.Me,
 				executionState,
 				collector,
 				checkAuthorizedAtBlock,
+				chdpReqQueue,
 				e.exeConf.chunkDataPackQueryTimeout,
-				e.exeConf.chdpDeliveryTimeout,
+				e.exeConf.chunkDataPackDeliveryTimeout,
+				e.exeConf.chunkDataPackProcessInterval,
+				e.exeConf.chunkDataPackRequestWorkers,
 			)
 			if err != nil {
 				return nil, err
