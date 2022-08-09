@@ -229,11 +229,17 @@ func NewForks(t *testing.T, finalized uint64) *Forks {
 }
 
 // BlockProducer mock will always make a valid block
-type BlockProducer struct{}
+type BlockProducer struct {
+	proposerID flow.Identifier
+}
 
 func (b *BlockProducer) MakeBlockProposal(view uint64, qc *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.Proposal, error) {
 	return &model.Proposal{
-		Block:      helper.MakeBlock(helper.WithBlockView(view), helper.WithBlockQC(qc)),
+		Block: helper.MakeBlock(
+			helper.WithBlockView(view),
+			helper.WithBlockQC(qc),
+			helper.WithBlockProposer(b.proposerID),
+		),
 		LastViewTC: lastViewTC,
 	}, nil
 }
@@ -279,16 +285,16 @@ func (es *EventHandlerSuite) SetupTest() {
 		NewestQC:    newestQC,
 	}
 
+	es.committee = NewCommittee(es.T())
 	es.paceMaker = initPaceMaker(es.T(), livenessData)
 	es.forks = NewForks(es.T(), finalized)
 	es.persist = mocks.NewPersister(es.T())
 	es.persist.On("PutStarted", mock.Anything).Return(nil).Maybe()
-	es.blockProducer = &BlockProducer{}
+	es.blockProducer = &BlockProducer{proposerID: es.committee.Self()}
 	es.communicator = mocks.NewCommunicator(es.T())
 	es.communicator.On("BroadcastProposalWithDelay", mock.Anything, mock.Anything).Return(nil).Maybe()
 	es.communicator.On("SendVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	es.communicator.On("BroadcastTimeout", mock.Anything).Return(nil).Maybe()
-	es.committee = NewCommittee(es.T())
 	es.voteAggregator = mocks.NewVoteAggregator(es.T())
 	es.timeoutAggregator = mocks.NewTimeoutAggregator(es.T())
 	es.safetyRules = NewSafetyRules(es.T())
@@ -633,6 +639,32 @@ func (es *EventHandlerSuite) TestOnReceiveQc_NextLeaderProposes() {
 	es.voteAggregator.AssertCalled(es.T(), "AddBlock", proposal)
 }
 
+// TestOnReceiveQc_ProposeOnce tests that after constructing proposal we don't attempt to create another
+// proposal for same view.
+func (es *EventHandlerSuite) TestOnReceiveQc_ProposeOnce() {
+	// once per OnReceiveProposal call
+	es.voteAggregator.On("AddBlock", es.votingProposal).Return(nil).Twice()
+
+	// I'm the next leader
+	es.committee.leaders[es.initView+1] = struct{}{}
+
+	es.endView++
+
+	err := es.eventhandler.OnReceiveProposal(es.votingProposal)
+	require.NoError(es.T(), err)
+
+	// constructing QC triggers making block proposal
+	err = es.eventhandler.OnReceiveQc(es.qc)
+	require.NoError(es.T(), err)
+
+	// receiving same proposal again triggers proposing logic
+	err = es.eventhandler.OnReceiveProposal(es.votingProposal)
+	require.NoError(es.T(), err)
+
+	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
+	es.communicator.AssertNumberOfCalls(es.T(), "BroadcastProposalWithDelay", 1)
+}
+
 // TestOnTCConstructed_HappyPath tests that building a TC for current view triggers view change
 func (es *EventHandlerSuite) TestOnReceiveTc_HappyPath() {
 	// voting block exists
@@ -883,6 +915,36 @@ func (es *EventHandlerSuite) TestStart_PendingBlocksRecovery() {
 	err := es.eventhandler.Start()
 	require.NoError(es.T(), err)
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
+}
+
+// TestStart_ProposeOnce tests that after starting event handler we don't create proposal in case we have already proposed
+// for this view.
+func (es *EventHandlerSuite) TestStart_ProposeOnce() {
+	es.voteAggregator.On("AddBlock", es.votingProposal).Return(nil).Once()
+
+	// I'm the next leader
+	es.committee.leaders[es.initView+1] = struct{}{}
+
+	es.endView++
+
+	err := es.eventhandler.OnReceiveProposal(es.votingProposal)
+	require.NoError(es.T(), err)
+
+	// constructing QC triggers making block proposal
+	err = es.eventhandler.OnReceiveQc(es.qc)
+	require.NoError(es.T(), err)
+
+	es.communicator.AssertNumberOfCalls(es.T(), "BroadcastProposalWithDelay", 1)
+
+	es.forks.On("NewestView").Return(es.endView).Once()
+
+	// Start triggers proposing logic, make sure that we don't propose again.
+	err = es.eventhandler.Start()
+	require.NoError(es.T(), err)
+
+	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
+	// assert that broadcast wasn't trigger again
+	es.communicator.AssertNumberOfCalls(es.T(), "BroadcastProposalWithDelay", 1)
 }
 
 // TestCreateProposal_SanityChecks tests that proposing logic performs sanity checks when creating new block proposal.
