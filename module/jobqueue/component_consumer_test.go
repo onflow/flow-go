@@ -277,7 +277,7 @@ func (suite *ComponentConsumerSuite) runTest(
 	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
 
 	// use global context so we listen for errors until the test is finished
-	go unittest.NoIrrecoverableError(suite.T(), testCtx, errChan)
+	go unittest.NoIrrecoverableError(testCtx, suite.T(), errChan)
 
 	consumer.Start(signalCtx)
 	unittest.RequireCloseBefore(suite.T(), consumer.Ready(), 100*time.Millisecond, "timeout waiting for the consumer to be ready")

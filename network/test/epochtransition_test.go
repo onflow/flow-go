@@ -187,7 +187,7 @@ func (suite *MutableIdentityTableSuite) addNodes(count int) {
 	suite.cancels = append(suite.cancels, cancel)
 
 	errChan := StartNetworks(ctx, suite.T(), nodes, nets, 100*time.Millisecond)
-	go unittest.NoIrrecoverableError(suite.T(), ctx, errChan)
+	go unittest.NoIrrecoverableError(ctx, suite.T(), errChan)
 
 	// create the engines for the new nodes
 	engines := GenerateEngines(suite.T(), nets)

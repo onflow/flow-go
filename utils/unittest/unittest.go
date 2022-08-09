@@ -410,7 +410,8 @@ func CrashTest(t *testing.T, scenario func(*testing.T), expectedErrorMsg string,
 	require.Contains(t, outStr, expectedErrorMsg)
 }
 
-func NoIrrecoverableError(t *testing.T, ctx context.Context, errChan <-chan error, msgAndArgs ...interface{}) {
+// NoIrrecoverableError requires that no irrecoverable errors are thrown on the provided error channel.
+func NoIrrecoverableError(ctx context.Context, t *testing.T, errChan <-chan error, msgAndArgs ...interface{}) {
 	select {
 	case <-ctx.Done():
 		return
@@ -423,6 +424,7 @@ func NoIrrecoverableError(t *testing.T, ctx context.Context, errChan <-chan erro
 	}
 }
 
+// GenerateRandomStringWithLen returns a string of random alpha characters of the provided length
 func GenerateRandomStringWithLen(commentLen uint) string {
 	const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	bytes := make([]byte, commentLen)

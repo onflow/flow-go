@@ -197,7 +197,7 @@ func (suite *ExecutionDataReaderSuite) runTest(fn func()) {
 	defer cancel()
 
 	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(suite.T(), ctx, errChan)
+	go unittest.NoIrrecoverableError(ctx, suite.T(), errChan)
 
 	suite.reader.AddContext(signalCtx)
 

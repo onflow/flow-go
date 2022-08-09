@@ -75,7 +75,7 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 	)
 
 	errChan := StartNetworks(ctx, suite.T(), nodes, suite.nets, 100*time.Millisecond)
-	go unittest.NoIrrecoverableError(suite.T(), ctx, errChan)
+	go unittest.NoIrrecoverableError(ctx, suite.T(), errChan)
 
 	for _, observableConnMgr := range obs {
 		observableConnMgr.Subscribe(&ob)

@@ -26,7 +26,7 @@ func TestFindPeerWithDHT(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(t, ctx, errChan)
+	go unittest.NoIrrecoverableError(ctx, t, errChan)
 
 	count := 10
 	golog.SetAllLoggers(golog.LevelFatal) // change this to Debug if libp2p logs are needed
@@ -38,7 +38,6 @@ func TestFindPeerWithDHT(t *testing.T) {
 	dhtClientNodes, _ := nodesFixture(t, sporkId, "dht_test", count-2, withDHTOptions(p2p.AsClient()))
 
 	nodes := append(dhtServerNodes, dhtClientNodes...)
-
 	startNodes(t, signalCtx, nodes, 100*time.Millisecond)
 	defer stopNodes(t, nodes, cancel, 100*time.Millisecond)
 
@@ -94,7 +93,7 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(t, ctx, errChan)
+	go unittest.NoIrrecoverableError(ctx, t, errChan)
 
 	topic := channels.Topic("/flow/" + unittest.IdentifierFixture().String())
 	count := 5

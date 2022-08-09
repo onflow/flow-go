@@ -105,7 +105,7 @@ func TestCanSubscribe(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(t, ctx, errChan)
+	go unittest.NoIrrecoverableError(ctx, t, errChan)
 
 	identity, privateKey := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleCollection))
 	sporkId := unittest.IdentifierFixture()

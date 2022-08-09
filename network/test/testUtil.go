@@ -159,7 +159,6 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 	for i := 0; i < total; i++ {
 		// casts libP2PNode instance to a local variable to avoid closure
 		node := libP2PNodes[i]
-
 		nodeId := identities[i].NodeID
 
 		idProviders[i] = NewUpdatableIDProvider(identities)

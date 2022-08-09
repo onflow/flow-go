@@ -952,7 +952,7 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 			var err error
 			libp2pNode, err = libP2PFactory()
 			if err != nil {
-				return nil, fmt.Errorf("could not create public network: %w", err)
+				return nil, fmt.Errorf("could not create public libp2p node: %w", err)
 			}
 
 			return libp2pNode, nil

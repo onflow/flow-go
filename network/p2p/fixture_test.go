@@ -185,7 +185,7 @@ func startNode(t *testing.T, ctx irrecoverable.SignalerContext, node *p2p.Node, 
 func stopNodes(t *testing.T, nodes []*p2p.Node, cancel context.CancelFunc, timeout time.Duration) {
 	cancel()
 	for _, node := range nodes {
-		unittest.RequireComponentsReadyBefore(t, timeout, node)
+		unittest.RequireComponentsDoneBefore(t, timeout, node)
 	}
 }
 
@@ -193,7 +193,7 @@ func stopNodes(t *testing.T, nodes []*p2p.Node, cancel context.CancelFunc, timeo
 // before duration expires
 func stopNode(t *testing.T, node *p2p.Node, cancel context.CancelFunc, timeout time.Duration) {
 	cancel()
-	unittest.RequireComponentsReadyBefore(t, timeout, node)
+	unittest.RequireComponentsDoneBefore(t, timeout, node)
 }
 
 // generateNetworkingKey is a test helper that generates a ECDSA flow key pair.

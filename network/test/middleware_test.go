@@ -123,7 +123,7 @@ func (m *MiddlewareTestSuite) SetupTest() {
 	var errChan <-chan error
 	m.mwCtx, errChan = irrecoverable.WithSignaler(ctx)
 
-	go unittest.NoIrrecoverableError(m.T(), m.mwCtx, errChan)
+	go unittest.NoIrrecoverableError(m.mwCtx, m.T(), errChan)
 
 	for i, mw := range m.mws {
 		mw.SetOverlay(m.ov[i])

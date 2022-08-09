@@ -26,7 +26,7 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(t, ctx, errChan)
+	go unittest.NoIrrecoverableError(ctx, t, errChan)
 
 	// create a hooked logger
 	var hook unittest.LoggerHook
@@ -104,7 +104,7 @@ func TestTopicValidator_PublicChannel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(t, ctx, errChan)
+	go unittest.NoIrrecoverableError(ctx, t, errChan)
 
 	sporkId := unittest.IdentifierFixture()
 	logger := unittest.Logger()
@@ -164,7 +164,7 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(t, ctx, errChan)
+	go unittest.NoIrrecoverableError(ctx, t, errChan)
 
 	// create a hooked logger
 	var hook unittest.LoggerHook
@@ -273,7 +273,7 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(t, ctx, errChan)
+	go unittest.NoIrrecoverableError(ctx, t, errChan)
 
 	// create a hooked logger
 	var hook unittest.LoggerHook
@@ -348,7 +348,7 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(t, ctx, errChan)
+	go unittest.NoIrrecoverableError(ctx, t, errChan)
 
 	// create a hooked logger
 	var hook unittest.LoggerHook
@@ -445,7 +445,7 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(t, ctx, errChan)
+	go unittest.NoIrrecoverableError(ctx, t, errChan)
 
 	sporkId := unittest.IdentifierFixture()
 

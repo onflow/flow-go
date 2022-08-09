@@ -291,7 +291,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	})
 
 	fnb.Component(NetworkComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		return fnb.InitFlowNetworkWithConduitFactory(node, fnb.LibP2PNode, fnb.ConduitFactory)
+		return fnb.InitFlowNetworkWithConduitFactory(node, fnb.ConduitFactory)
 	})
 
 	fnb.Component("peer manager", func(node *NodeConfig) (module.ReadyDoneAware, error) {
@@ -304,7 +304,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	})
 }
 
-func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, libp2pNode *p2p.Node, cf network.ConduitFactory) (network.Network, error) {
+func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, cf network.ConduitFactory) (network.Network, error) {
 
 	var mwOpts []p2p.MiddlewareOption
 	if len(fnb.MsgValidators) > 0 {
@@ -317,7 +317,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 
 	fnb.Middleware = p2p.NewMiddleware(
 		fnb.Logger,
-		libp2pNode,
+		fnb.LibP2PNode,
 		fnb.Me.NodeID(),
 		fnb.Metrics.Network,
 		fnb.SporkID,

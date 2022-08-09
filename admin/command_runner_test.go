@@ -76,7 +76,7 @@ func (suite *CommandRunnerSuite) SetupCommandRunner(opts ...CommandRunnerOption)
 	suite.cancel = cancel
 
 	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go unittest.NoIrrecoverableError(suite.T(), ctx, errChan)
+	go unittest.NoIrrecoverableError(ctx, suite.T(), errChan)
 
 	suite.grpcAddressSock = fmt.Sprintf("%s/%s-flow-node-admin.sock", os.TempDir(), unittest.GenerateRandomStringWithLen(16))
 	opts = append(opts, WithGRPCAddress(suite.grpcAddressSock))
