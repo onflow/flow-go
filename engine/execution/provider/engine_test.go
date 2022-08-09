@@ -326,65 +326,76 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		chunkConduit.AssertExpectations(t)
 	})
 
-	//t.Run("reply to chunk data pack request only when authorized", func(t *testing.T) {
-	//
-	//	ps := new(mockprotocol.State)
-	//	ss := new(mockprotocol.Snapshot)
-	//	chunkConduit := new(mocknetwork.Conduit)
-	//
-	//	execState := new(state.ExecutionState)
-	//
-	//	currentAuthorizedState := true
-	//	checkAuthorizedAtBlock := func(_ flow.Identifier) (bool, error) { return currentAuthorizedState, nil }
-	//
-	//	e := Engine{
-	//		state:                  ps,
-	//		unit:                   engine.NewUnit(),
-	//		chunksConduit:          chunkConduit,
-	//		execState:              execState,
-	//		metrics:                metrics.NewNoopCollector(),
-	//		checkAuthorizedAtBlock: checkAuthorizedAtBlock,
-	//	}
-	//
-	//	originIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-	//
-	//	chunkID := unittest.IdentifierFixture()
-	//	chunkDataPack := unittest.ChunkDataPackFixture(chunkID)
-	//	blockID := unittest.IdentifierFixture()
-	//
-	//	execState.On("GetBlockIDByChunkID", chunkID).Return(blockID, nil)
-	//	ps.On("AtBlockID", blockID).Return(ss)
-	//
-	//	ss.On("Identity", originIdentity.NodeID).Return(originIdentity, nil).Once()
-	//	chunkConduit.On("Unicast", mock.Anything, originIdentity.NodeID).
-	//		Run(func(args mock.Arguments) {
-	//			res, ok := args[0].(*messages.ChunkDataResponse)
-	//			require.True(t, ok)
-	//
-	//			actualChunkID := res.ChunkDataPack.ChunkID
-	//			assert.Equal(t, chunkID, actualChunkID)
-	//		}).
-	//		Return(nil).Once()
-	//
-	//	execState.On("ChunkDataPackByChunkID", chunkID).Return(chunkDataPack, nil).Twice()
-	//
-	//	req := &messages.ChunkDataRequest{
-	//		ChunkID: chunkID,
-	//		Nonce:   rand.Uint64(),
-	//	}
-	//
-	//	unittest.RequireCloseBefore(t, e.Ready(), 100*time.Millisecond, "could not start engine")
-	//
-	//	// an authorized request followed by an unauthorized one
-	//	e.onChunkDataRequest(originIdentity.NodeID, req)
-	//	currentAuthorizedState = false
-	//	e.onChunkDataRequest(originIdentity.NodeID, req)
-	//
-	//	unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
-	//
-	//	ps.AssertExpectations(t)
-	//	ss.AssertExpectations(t)
-	//	execState.AssertExpectations(t)
-	//	chunkConduit.AssertExpectations(t)
-	//})
+	t.Run("reply to chunk data pack request only when authorized", func(t *testing.T) {
+		currentAuthorizedState := true
+
+		ps := new(mockprotocol.State)
+		ss := new(mockprotocol.Snapshot)
+		net := new(mocknetwork.Network)
+		chunkConduit := &mocknetwork.Conduit{}
+		execState := new(state.ExecutionState)
+
+		net.On("Register", channels.PushReceipts, mock.Anything).Return(&mocknetwork.Conduit{}, nil)
+		net.On("Register", channels.ProvideChunks, mock.Anything).Return(chunkConduit, nil)
+
+		e, err := New(
+			unittest.Logger(),
+			trace.NewNoopTracer(),
+			net,
+			ps,
+			execState,
+			metrics.NewNoopCollector(),
+			func(_ flow.Identifier) (bool, error) { return currentAuthorizedState, nil },
+			queue.NewChunkDataPackRequestQueue(10, unittest.Logger(), metrics.NewNoopCollector()),
+			DefaultChunkDataPackQueryTimeout,
+			DefaultChunkDataPackDeliveryTimeout,
+			DefaultChunkDataPackProcessInterval,
+			DefaultChunkDataPackRequestWorker)
+		require.NoError(t, err)
+
+		originIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+
+		chunkID := unittest.IdentifierFixture()
+		chunkDataPack := unittest.ChunkDataPackFixture(chunkID)
+		blockID := unittest.IdentifierFixture()
+
+		execState.On("GetBlockIDByChunkID", chunkID).Return(blockID, nil)
+		ps.On("AtBlockID", blockID).Return(ss)
+
+		ss.On("Identity", originIdentity.NodeID).Return(originIdentity, nil).Once()
+		chunkConduit.On("Unicast", mock.Anything, originIdentity.NodeID).
+			Run(func(args mock.Arguments) {
+				res, ok := args[0].(*messages.ChunkDataResponse)
+				require.True(t, ok)
+
+				actualChunkID := res.ChunkDataPack.ChunkID
+				assert.Equal(t, chunkID, actualChunkID)
+			}).
+			Return(nil).Once()
+
+		execState.On("ChunkDataPackByChunkID", chunkID).Return(chunkDataPack, nil).Twice()
+
+		req := &messages.ChunkDataRequest{
+			ChunkID: chunkID,
+			Nonce:   rand.Uint64(),
+		}
+
+		cancelCtx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		ctx, _ := irrecoverable.WithSignaler(cancelCtx)
+		e.Start(ctx)
+		// submit using non-existing origin ID
+		unittest.RequireCloseBefore(t, e.Ready(), 100*time.Millisecond, "could not start engine")
+		require.NoError(t, e.Process(channels.RequestChunks, originIdentity.NodeID, req))
+		time.Sleep(1 * time.Second)
+		currentAuthorizedState = false
+		require.NoError(t, e.Process(channels.RequestChunks, originIdentity.NodeID, req))
+		cancel()
+		unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
+
+		ps.AssertExpectations(t)
+		ss.AssertExpectations(t)
+		execState.AssertExpectations(t)
+		chunkConduit.AssertExpectations(t)
+	})
 }
