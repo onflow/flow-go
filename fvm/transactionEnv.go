@@ -44,6 +44,7 @@ func NewTransactionEnvironment(
 	tx *flow.TransactionBody,
 	txIndex uint32,
 	traceSpan otelTrace.Span,
+	setMeterParameters bool,
 ) (*TransactionEnv, error) {
 
 	accounts := state.NewAccounts(sth)
@@ -114,7 +115,7 @@ func NewTransactionEnvironment(
 
 	var err error
 	// set the execution parameters from the state
-	if ctx.AllowContextOverrideByExecutionState {
+	if setMeterParameters && ctx.AllowContextOverrideByExecutionState {
 		err = env.setExecutionParameters()
 	}
 

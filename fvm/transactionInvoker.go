@@ -52,9 +52,6 @@ func (i *TransactionInvoker) Process(
 		blockHeight = ctx.BlockHeader.Height
 	}
 
-	var env *TransactionEnv
-	var txError error
-
 	parentState := sth.State()
 	childState := sth.NewChild()
 
@@ -81,13 +78,22 @@ func (i *TransactionInvoker) Process(
 		sth.SetActiveState(parentState)
 	}()
 
-	env, err := NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
+	env, err := NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span, true)
 	if err != nil {
 		return fmt.Errorf("error creating new environment: %w", err)
 	}
+
+	// TODO(patrick): make env reusable on error
+	errEnv, err := NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span, false)
+	if err != nil {
+		return fmt.Errorf("error creating new environment: %w", err)
+	}
+
 	predeclaredValues := valueDeclarations(env)
 
 	location := common.TransactionLocation(proc.ID)
+
+	var txError error
 
 	err = vm.Runtime.ExecuteTransaction(
 		runtime.Script{
@@ -165,10 +171,7 @@ func (i *TransactionInvoker) Process(
 			Msg("transaction executed with error")
 
 		// reset env
-		env, err = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
-		if err != nil {
-			return fmt.Errorf("error creating new environment: %w", err)
-		}
+		env = errEnv
 
 		// try to deduct fees again, to get the fee deduction events
 		feesError = i.deductTransactionFees(env, proc, sth, computationUsed)
@@ -188,7 +191,7 @@ func (i *TransactionInvoker) Process(
 				Uint64("blockHeight", blockHeight).
 				Msg("transaction fee deduction executed with error")
 
-			return feesError
+			txError = feesError
 		}
 	}
 
