@@ -36,6 +36,7 @@ import (
 const NotSet = "not set"
 
 type BuilderFunc func(nodeConfig *NodeConfig) error
+type InitBuilderFunc func(nodeConfig *NodeConfig, storage Storage) error
 type ReadyDoneFactory func(node *NodeConfig) (module.ReadyDoneAware, error)
 
 // NodeBuilder declares the initialization methods needed to bootstrap up a Flow node
@@ -105,12 +106,12 @@ type NodeBuilder interface {
 
 	// PreInit registers a new PreInit function.
 	// PreInit functions run before the protocol state is initialized or any other modules or components are initialized
-	PreInit(f BuilderFunc) NodeBuilder
+	PreInit(f InitBuilderFunc) NodeBuilder
 
 	// PostInit registers a new PreInit function.
 	// PostInit functions run after the protocol state has been initialized but before any other modules or components
 	// are initialized
-	PostInit(f BuilderFunc) NodeBuilder
+	PostInit(f InitBuilderFunc) NodeBuilder
 
 	// RegisterBadgerMetrics registers all badger related metrics
 	RegisterBadgerMetrics() error
