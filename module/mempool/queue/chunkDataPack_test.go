@@ -170,4 +170,5 @@ func matchAndRemove(t *testing.T, requests []*mempool.ChunkDataPackRequest, req 
 
 	// no request found in the list to match
 	require.Fail(t, "could not find a match for request")
+	return nil
 }
