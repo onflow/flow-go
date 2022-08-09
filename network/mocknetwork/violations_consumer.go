@@ -3,7 +3,7 @@
 package mocknetwork
 
 import (
-	flow "github.com/onflow/flow-go/model/flow"
+	slashing "github.com/onflow/flow-go/network/slashing"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -12,19 +12,19 @@ type ViolationsConsumer struct {
 	mock.Mock
 }
 
-// OnSenderEjectedError provides a mock function with given fields: identity, peerID, msgType, channel, isUnicast, err
-func (_m *ViolationsConsumer) OnSenderEjectedError(identity *flow.Identity, peerID string, msgType string, channel string, isUnicast bool, err error) {
-	_m.Called(identity, peerID, msgType, channel, isUnicast, err)
+// OnSenderEjectedError provides a mock function with given fields: violation
+func (_m *ViolationsConsumer) OnSenderEjectedError(violation *slashing.Violation) {
+	_m.Called(violation)
 }
 
-// OnUnAuthorizedSenderError provides a mock function with given fields: identity, peerID, msgType, channel, isUnicast, err
-func (_m *ViolationsConsumer) OnUnAuthorizedSenderError(identity *flow.Identity, peerID string, msgType string, channel string, isUnicast bool, err error) {
-	_m.Called(identity, peerID, msgType, channel, isUnicast, err)
+// OnUnAuthorizedSenderError provides a mock function with given fields: violation
+func (_m *ViolationsConsumer) OnUnAuthorizedSenderError(violation *slashing.Violation) {
+	_m.Called(violation)
 }
 
-// OnUnknownMsgTypeError provides a mock function with given fields: identity, peerID, msgType, channel, isUnicast, err
-func (_m *ViolationsConsumer) OnUnknownMsgTypeError(identity *flow.Identity, peerID string, msgType string, channel string, isUnicast bool, err error) {
-	_m.Called(identity, peerID, msgType, channel, isUnicast, err)
+// OnUnknownMsgTypeError provides a mock function with given fields: violation
+func (_m *ViolationsConsumer) OnUnknownMsgTypeError(violation *slashing.Violation) {
+	_m.Called(violation)
 }
 
 type NewViolationsConsumerT interface {

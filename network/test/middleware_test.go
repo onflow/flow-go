@@ -546,14 +546,17 @@ func (m *MiddlewareTestSuite) TestUnicast_Authorization() {
 		ch := make(chan struct{})
 
 		var nilID *flow.Identity
+		expectedViolation := &slashing.Violation{
+			Identity:  nilID, // because the peer will be unverified this identity will be nil
+			PeerID:    expectedSenderPeerID.String(),
+			MsgType:   "", // message will not be decoded before OnSenderEjectedError is logged, we won't log message type
+			Channel:   "", // message will not be decoded before OnSenderEjectedError is logged, we won't log peer ID
+			IsUnicast: true,
+			Err:       validator.ErrIdentityUnverified,
+		}
 		slashingViolationsConsumer.On(
 			"OnUnAuthorizedSenderError",
-			nilID, // because the peer will be unverified this identity will be nil
-			expectedSenderPeerID.String(),
-			"", // message will not be decoded before OnSenderEjectedError is logged, we won't log message type
-			"", // message will not be decoded before OnSenderEjectedError is logged, we won't log peer ID
-			true,
-			validator.ErrIdentityUnverified,
+			expectedViolation,
 		).Once().Run(func(args mockery.Arguments) {
 			close(ch)
 		})
@@ -629,14 +632,17 @@ func (m *MiddlewareTestSuite) TestUnicast_Authorization() {
 		// this ch will allow us to wait until the expected method call happens before shutting down middleware
 		ch := make(chan struct{})
 
+		expectedViolation := &slashing.Violation{
+			Identity:  ejectedID,                     // we expect this method to be called with the ejected identity
+			PeerID:    expectedSenderPeerID.String(), // although we are returning a modified ejected identity we still expect this peer ID to be the peer ID of the real sender
+			MsgType:   "",                            // message will not be decoded before OnSenderEjectedError is logged, we won't log message type
+			Channel:   "",                            // message will not be decoded before OnSenderEjectedError is logged, we won't log peer ID
+			IsUnicast: true,
+			Err:       validator.ErrSenderEjected,
+		}
 		slashingViolationsConsumer.On(
 			"OnSenderEjectedError",
-			ejectedID,                     // we expect this method to be called with the ejected identity
-			expectedSenderPeerID.String(), // although we are returning a modified ejected identity we still expect this peer ID to be the peer ID of the real sender
-			"",                            // message will not be decoded before OnSenderEjectedError is logged, we won't log message type
-			"",                            // message will not be decoded before OnSenderEjectedError is logged, we won't log peer ID
-			true,
-			validator.ErrSenderEjected,
+			expectedViolation,
 		).Once().Run(func(args mockery.Arguments) {
 			close(ch)
 		})
@@ -704,16 +710,24 @@ func (m *MiddlewareTestSuite) TestUnicast_Authorization() {
 		// this ch will allow us to wait until the expected method call happens before shutting down middleware
 		ch := make(chan struct{})
 
+		expectedViolation := &slashing.Violation{
+			PeerID:    expectedSenderPeerID.String(), // expected peer ID asserts we also would receive the correct identity parameter
+			MsgType:   message.TestMessage,
+			Channel:   channels.ConsensusCommittee,
+			IsUnicast: true,
+			Err:       validator.ErrIdentityUnverified,
+		}
+
 		slashingViolationsConsumer.On(
 			"OnUnAuthorizedSenderError",
-			mock.Anything,                 // using default mock overlay always returns a random identity
-			expectedSenderPeerID.String(), // expected peer ID asserts we also would receive the correct identity parameter
-			message.TestMessage,
-			channels.ConsensusCommittee.String(),
-			true,
-			message.ErrUnauthorizedMessageOnChannel,
+			mock.AnythingOfType("*slashing.Violation"),
 		).Once().Run(func(args mockery.Arguments) {
-			close(ch)
+			defer close(ch)
+			actualViolation := args.Get(0).(*slashing.Violation)
+			// because we are using the default overlay a random identity is returned
+			// so we wait until we get the arguments before checking them.
+			expectedViolation.Identity = actualViolation.Identity
+			require.Equal(m.T(), expectedViolation, actualViolation)
 		})
 
 		defer slashingViolationsConsumer.AssertExpectations(m.T())
@@ -772,18 +786,26 @@ func (m *MiddlewareTestSuite) TestUnicast_Authorization() {
 		// this ch will allow us to wait until the expected method call happens before shutting down middleware
 		ch := make(chan struct{})
 
-		invalidMessageCode := byte('Z')
+		invalidMessageCode := byte('X')
+
+		expectedViolation := &slashing.Violation{
+			PeerID:    expectedSenderPeerID.String(), // expected peer ID asserts we also would receive the correct identity parameter
+			MsgType:   "",
+			Channel:   channels.TestNetworkChannel,
+			IsUnicast: true,
+			Err:       codec.NewUnknownMsgCodeErr(invalidMessageCode),
+		}
 
 		slashingViolationsConsumer.On(
 			"OnUnknownMsgTypeError",
-			mock.Anything,                 // using default mock overlay always returns a random identity
-			expectedSenderPeerID.String(), // expected peer ID asserts we also would receive the correct identity parameter
-			"",
-			channels.TestNetworkChannel.String(),
-			true,
-			codec.NewUnknownMsgCodeErr(invalidMessageCode),
+			mock.AnythingOfType("*slashing.Violation"),
 		).Once().Run(func(args mockery.Arguments) {
-			close(ch)
+			defer close(ch)
+			actualViolation := args.Get(0).(*slashing.Violation)
+			// because we are using the default overlay a random identity is returned
+			// so we wait until we get the arguments before checking them.
+			expectedViolation.Identity = actualViolation.Identity
+			require.Equal(m.T(), expectedViolation, actualViolation)
 		})
 
 		defer slashingViolationsConsumer.AssertExpectations(m.T())

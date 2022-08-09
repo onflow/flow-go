@@ -6,8 +6,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/utils/logging"
-
-	"github.com/onflow/flow-go/model/flow"
 )
 
 const (
@@ -27,32 +25,32 @@ func NewSlashingViolationsConsumer(log zerolog.Logger) *Consumer {
 	return &Consumer{log.With().Str("module", "network_slashing_consumer").Logger()}
 }
 
-func (c *Consumer) logOffense(identity *flow.Identity, peerID, msgType, channel, offense string, isUnicast bool, err error) {
+func (c *Consumer) logOffense(networkOffense string, violation *Violation) {
 	e := c.log.Error().
-		Str("peer_id", peerID).
-		Str("networking_offense", offense).
-		Str("message_type", msgType).
-		Str("channel", channel).
-		Bool("unicast_message", isUnicast)
+		Str("peer_id", violation.PeerID).
+		Str("networking_offense", networkOffense).
+		Str("message_type", violation.MsgType).
+		Str("channel", violation.Channel.String()).
+		Bool("unicast_message", violation.IsUnicast)
 
-	if identity != nil {
-		e = e.Str("role", identity.Role.String()).Hex("sender_id", logging.ID(identity.NodeID))
+	if violation.Identity != nil {
+		e = e.Str("role", violation.Identity.Role.String()).Hex("sender_id", logging.ID(violation.Identity.NodeID))
 	}
 
-	e.Msg(fmt.Sprintf("potential slashable offense: %s", err))
+	e.Msg(fmt.Sprintf("potential slashable offense: %s", violation.Err))
 }
 
 // OnUnAuthorizedSenderError logs an error for unauthorized sender error
-func (c *Consumer) OnUnAuthorizedSenderError(identity *flow.Identity, peerID, msgType, channel string, isUnicast bool, err error) {
-	c.logOffense(identity, peerID, msgType, channel, unAuthorizedSenderViolation, isUnicast, err)
+func (c *Consumer) OnUnAuthorizedSenderError(violation *Violation) {
+	c.logOffense(unAuthorizedSenderViolation, violation)
 }
 
 // OnUnknownMsgTypeError logs an error for unknown message type error
-func (c *Consumer) OnUnknownMsgTypeError(identity *flow.Identity, peerID, msgType, channel string, isUnicast bool, err error) {
-	c.logOffense(identity, peerID, msgType, channel, unknownMsgTypeViolation, isUnicast, err)
+func (c *Consumer) OnUnknownMsgTypeError(violation *Violation) {
+	c.logOffense(unknownMsgTypeViolation, violation)
 }
 
 // OnSenderEjectedError logs an error for sender ejected error
-func (c *Consumer) OnSenderEjectedError(identity *flow.Identity, peerID, msgType, channel string, isUnicast bool, err error) {
-	c.logOffense(identity, peerID, msgType, channel, senderEjectedViolation, isUnicast, err)
+func (c *Consumer) OnSenderEjectedError(violation *Violation) {
+	c.logOffense(senderEjectedViolation, violation)
 }

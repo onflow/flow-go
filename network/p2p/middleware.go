@@ -492,13 +492,15 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 	id, err := m.authenticateUnicastStream(remotePeer)
 	// collect slashing information for unstaked peers to use for metrics
 	if errors.Is(err, validator.ErrIdentityUnverified) {
-		m.slashingViolationsConsumer.OnUnAuthorizedSenderError(id, remotePeer.String(), "", "", true, err)
+		violation := &slashing.Violation{Identity: id, PeerID: remotePeer.String(), IsUnicast: true, Err: err}
+		m.slashingViolationsConsumer.OnUnAuthorizedSenderError(violation)
 		return
 	}
 
 	// collect slashing information if peer is ejected
 	if errors.Is(err, validator.ErrSenderEjected) {
-		m.slashingViolationsConsumer.OnSenderEjectedError(id, remotePeer.String(), "", "", true, err)
+		violation := &slashing.Violation{Identity: id, PeerID: remotePeer.String(), IsUnicast: true, Err: err}
+		m.slashingViolationsConsumer.OnSenderEjectedError(violation)
 		return
 	}
 
@@ -588,7 +590,8 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 			// collect slashing information for messages sent with unknown an message code byte
 			if codec.IsErrUnknownMsgCode(err) {
 				// slash peer if message contains unknown message code byte
-				m.slashingViolationsConsumer.OnUnknownMsgTypeError(id, remotePeer.String(), "", channel.String(), true, err)
+				violation := &slashing.Violation{Identity: id, PeerID: remotePeer.String(), Channel: channel, IsUnicast: true, Err: err}
+				m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
 				return
 			}
 
