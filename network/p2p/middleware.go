@@ -68,11 +68,6 @@ var (
 	allowAll = func(_ peer.ID) bool { return true }
 )
 
-// peerFilterFunc is a func type that will be used in the TopicValidator to filter
-// peers by ID and drop messages from unwanted peers before message payload decoding
-// happens.
-type peerFilterFunc func(id peer.ID) bool
-
 // Middleware handles the input & output on the direct connections we have to
 // our neighbours on the peer-to-peer network.
 type Middleware struct {
@@ -197,18 +192,13 @@ func DefaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.Mes
 	}
 }
 
-// stakedPeer uses m.ov.Identity to get the identity for a peer ID. If an identity is not found the peer is unstaked.
-func (m *Middleware) stakedPeer(peerID peer.ID) (*flow.Identity, bool) {
-	return m.ov.Identity(peerID)
-}
-
 // authenticateUnicastStream authenticates the peer attempting to send a message via unciast
 // stream. A peer must be a staked node and not ejected.
 // Expected errors during normal operations:
 //  * validator.ErrIdentityUnverified if identity of the peer cannot be found
 //  * validator.ErrSenderEjected if the peer is an ejected node
 func (m *Middleware) authenticateUnicastStream(peerID peer.ID) (*flow.Identity, error) {
-	identity, found := m.stakedPeer(peerID)
+	identity, found := m.ov.Identity(peerID)
 	if !found {
 		return nil, validator.ErrIdentityUnverified
 	}
@@ -220,10 +210,10 @@ func (m *Middleware) authenticateUnicastStream(peerID peer.ID) (*flow.Identity, 
 	return identity, nil
 }
 
-// isStakedPeerFilter returns a peerFilterFunc that wraps the m.stakedPeer func
-func (m *Middleware) isStakedPeerFilter() peerFilterFunc {
+// isProtocolParticipant returns a PeerFilter that returns true if a peer is a staked node.
+func (m *Middleware) isProtocolParticipant() PeerFilter {
 	return func(peerID peer.ID) bool {
-		_, ok := m.stakedPeer(peerID)
+		_, ok := m.ov.Identity(peerID)
 		return ok
 	}
 }
@@ -597,7 +587,7 @@ func (m *Middleware) Subscribe(channel channels.Channel) error {
 
 	topic := channels.TopicFromChannel(channel, m.rootBlockID)
 
-	var peerFilter peerFilterFunc
+	var peerFilter PeerFilter
 	var validators []validator.PubSubMessageValidator
 	if channels.IsPublicChannel(channel) {
 		// NOTE: for public channels the callback used to check if a node is staked will
@@ -611,7 +601,7 @@ func (m *Middleware) Subscribe(channel channels.Channel) error {
 
 		// NOTE: For non-public channels the libP2P node topic validator will reject
 		// messages from unstaked nodes.
-		peerFilter = m.isStakedPeerFilter()
+		peerFilter = m.isProtocolParticipant()
 	}
 
 	s, err := m.libP2PNode.Subscribe(topic, m.codec, peerFilter, validators...)

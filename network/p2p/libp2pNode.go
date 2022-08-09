@@ -174,7 +174,7 @@ func (n *Node) ListPeers(topic string) []peer.ID {
 // Subscribe subscribes the node to the given topic and returns the subscription
 // Currently only one subscriber is allowed per topic.
 // NOTE: A node will receive its own published messages.
-func (n *Node) Subscribe(topic channels.Topic, codec flownet.Codec, peerFilter peerFilterFunc, validators ...validator.PubSubMessageValidator) (*pubsub.Subscription, error) {
+func (n *Node) Subscribe(topic channels.Topic, codec flownet.Codec, peerFilter PeerFilter, validators ...validator.PubSubMessageValidator) (*pubsub.Subscription, error) {
 	n.Lock()
 	defer n.Unlock()
 
