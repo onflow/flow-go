@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/ipfs/go-log"
-	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -23,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )

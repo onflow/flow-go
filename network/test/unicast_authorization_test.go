@@ -5,10 +5,16 @@ import (
 	"testing"
 	"time"
 
+	mockery "github.com/stretchr/testify/mock"
+
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec"
 	"github.com/onflow/flow-go/network/message"
-	mockery "github.com/stretchr/testify/mock"
+
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -18,10 +24,6 @@ import (
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 )
 
 // UnicastAuthorizationTestSuite tests that messages sent via unicast that are unauthenticated or unauthorized are correctly rejected. Each test on the test suite
