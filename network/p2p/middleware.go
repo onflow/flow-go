@@ -283,9 +283,9 @@ func (m *Middleware) SetOverlay(ov network.Overlay) {
 }
 
 // validateUnicastAuthorizedSender will validate messages sent via unicast stream.
-func (m *Middleware) validateUnicastAuthorizedSender(ctx context.Context, remotePeer peer.ID, channel channels.Channel, msg interface{}) error {
+func (m *Middleware) validateUnicastAuthorizedSender(remotePeer peer.ID, channel channels.Channel, msg interface{}) error {
 	validate := validator.AuthorizedSenderValidator(m.log, m.slashingViolationsConsumer, channel, true, m.ov.Identity)
-	_, err := validate(ctx, remotePeer, msg)
+	_, err := validate(remotePeer, msg)
 	return err
 }
 
@@ -624,7 +624,7 @@ func (m *Middleware) processUnicastStreamMessage(ctx context.Context, remotePeer
 
 	// if message channel is not public perform authorized sender validation
 	if !channels.IsPublicChannel(channel) {
-		err := m.validateUnicastAuthorizedSender(ctx, remotePeer, channel, decodedMsgPayload)
+		err := m.validateUnicastAuthorizedSender(remotePeer, channel, decodedMsgPayload)
 		if err != nil {
 			m.log.
 				Error().
