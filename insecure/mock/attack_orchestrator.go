@@ -26,8 +26,8 @@ func (_m *AttackOrchestrator) HandleEventFromCorruptedNode(_a0 *insecure.EgressE
 	return r0
 }
 
-// WithAttackNetwork provides a mock function with given fields: _a0
-func (_m *AttackOrchestrator) WithAttackNetwork(_a0 insecure.AttackNetwork) {
+// RegisterAttackNetwork provides a mock function with given fields: _a0
+func (_m *AttackOrchestrator) RegisterAttackNetwork(_a0 insecure.AttackNetwork) {
 	_m.Called(_a0)
 }
 

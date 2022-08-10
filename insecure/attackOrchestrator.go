@@ -11,5 +11,5 @@ type AttackOrchestrator interface {
 	// events of corrupted nodes. Hence, no extra concurrency-safe consideration is needed.
 	HandleEventFromCorruptedNode(*EgressEvent) error
 
-	WithAttackNetwork(AttackNetwork)
+	RegisterAttackNetwork(AttackNetwork)
 }

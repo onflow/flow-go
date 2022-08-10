@@ -86,7 +86,7 @@ func (a *AttackNetworkFactory) start(ctx irrecoverable.SignalerContext) error {
 	}
 
 	// registers attack network for orchestrator.
-	a.orchestrator.WithAttackNetwork(a)
+	a.orchestrator.RegisterAttackNetwork(a)
 
 	return nil
 }

@@ -180,7 +180,7 @@ func withMockOrchestrator(t *testing.T,
 			require.NoError(t, err)
 
 			// mocks registering attackNetwork as the attack network functionality for orchestrator.
-			orchestrator.On("WithAttackNetwork", attackNetwork).Return().Once()
+			orchestrator.On("RegisterAttackNetwork", attackNetwork).Return().Once()
 
 			// life-cycle management of attackNetwork.
 			ctx, cancel := context.WithCancel(context.Background())
