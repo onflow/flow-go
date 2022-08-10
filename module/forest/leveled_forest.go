@@ -7,6 +7,25 @@ import (
 	"github.com/onflow/flow-go/module/mempool"
 )
 
+// InvalidVertexError indicates that a proposed vertex is invalid for insertion to the forest.
+type InvalidVertexError struct {
+	// Vertex is the invalid vertex
+	Vertex Vertex
+	// msg provides additional context
+	msg string
+}
+
+func (err InvalidVertexError) Error() string {
+	return fmt.Sprintf("invalid vertex %s: %s", VertexToString(err.Vertex), err.msg)
+}
+
+func NewInvalidVertexErrorf(vertex Vertex, msg string, args ...interface{}) InvalidVertexError {
+	return InvalidVertexError{
+		Vertex: vertex,
+		msg:    fmt.Sprintf(msg, args...),
+	}
+}
+
 // LevelledForest contains multiple trees (which is a potentially disconnected planar graph).
 // Each vertexContainer in the graph has a level (view) and a hash. A vertexContainer can only have one parent
 // with strictly smaller level (view). A vertexContainer can have multiple children, all with
@@ -98,7 +117,7 @@ func (f *LevelledForest) PruneUpToLevel(level uint64) error {
 	return nil
 }
 
-// HasVertex returns true iff full vertex exists
+// HasVertex returns true iff full vertex exists.
 func (f *LevelledForest) HasVertex(id flow.Identifier) bool {
 	container, exists := f.vertices[id]
 	return exists && !f.isEmptyContainer(container)
@@ -200,7 +219,6 @@ func (f *LevelledForest) registerWithParent(vertexContainer *vertexContainer) {
 
 // getOrCreateVertexContainer returns the vertexContainer if there exists one
 // or creates a new vertexContainer and adds it to the internal data structures.
-// It errors if a vertex with same id but different Level is already known TODO this is false
 // (i.e. there exists an empty or full container with the same id but different level).
 func (f *LevelledForest) getOrCreateVertexContainer(id flow.Identifier, level uint64) *vertexContainer {
 	container, exists := f.vertices[id] // try to find vertex container with same ID
@@ -220,7 +238,8 @@ func (f *LevelledForest) getOrCreateVertexContainer(id flow.Identifier, level ui
 // (1) The vertex's level is below the lowest level in the forest
 // (2) The vertex is equal to a vertex which already exists in the forest
 // (3) The vertex is a new vertex with a consistent parent (as defined in verifyParent)
-// TODO error docs
+// Error returns:
+// * InvalidVertexError if the input vertex is invalid for insertion to the forest.
 func (f *LevelledForest) VerifyVertex(vertex Vertex) error {
 	if vertex.Level() < f.LowestLevel {
 		return nil
@@ -252,9 +271,12 @@ func (f *LevelledForest) VerifyVertex(vertex Vertex) error {
 // ID, Level, and Parent (both parent ID and parent Level)
 //
 // (3) return value (false, error)
-// errors if the vertices' IDs are identical but they differ
+// errors if the vertices' IDs are identical, but they differ
 // in any of the _relevant_ fields (as defined in (2)).
-// TODO error docs
+//
+// Error returns:
+// * InvalidVertexError if the input vertex has the same ID, but different
+//   fields compared to some vertex already stored in the forest
 func (f *LevelledForest) isEquivalentToStoredVertex(vertex Vertex) (bool, error) {
 	storedVertex, haveStoredVertex := f.GetVertex(vertex.VertexID())
 	if !haveStoredVertex {
@@ -264,18 +286,20 @@ func (f *LevelledForest) isEquivalentToStoredVertex(vertex Vertex) (bool, error)
 	// found vertex in storage with identical ID
 	// => we expect all other (relevant) fields to be identical
 	if vertex.Level() != storedVertex.Level() { // view number
-		return false, fmt.Errorf("conflicting vertices with ID %v", vertex.VertexID())
+		return false, NewInvalidVertexErrorf(vertex, "level conflicts with stored vertex with same id (%d!=%d)", vertex.Level(), storedVertex.Level())
 	}
+	// the vertex is at or below the lowest retained level, so we can't check the parent (it's pruned)
 	if vertex.Level() <= f.LowestLevel {
 		return true, nil
 	}
-	newParentId, newParentView := vertex.Parent()
-	storedParentId, storedParentView := storedVertex.Parent()
+
+	newParentId, newParentLevel := vertex.Parent()
+	storedParentId, storedParentLevel := storedVertex.Parent()
 	if newParentId != storedParentId { // qc.blockID
-		return false, fmt.Errorf("conflicting vertices with ID %v", vertex.VertexID())
+		return false, NewInvalidVertexErrorf(vertex, "parent ID conflicts with stored parent (%x!=%x)", newParentId, storedParentId)
 	}
-	if newParentView != storedParentView { // qc.view
-		return false, fmt.Errorf("conflicting vertices with ID %v", vertex.VertexID())
+	if newParentLevel != storedParentLevel { // qc.view
+		return false, NewInvalidVertexErrorf(vertex, "parent level conflicts with stored parent (%d!=%d)", newParentLevel, storedParentLevel)
 	}
 	// all _relevant_ fields identical
 	return true, nil
@@ -285,21 +309,22 @@ func (f *LevelledForest) isEquivalentToStoredVertex(vertex Vertex) (bool, error)
 // An error is raised if
 // * there is a parent with the same id but different view;
 // * the parent's level is _not_ smaller than the vertex's level
-// TODO error docs
+//
+// Error returns:
+// * InvalidVertexError if the input vertex's parent information is internally
+//   inconsistent or inconsistent with a parent vertex already stored in the forest.
 func (f *LevelledForest) verifyParent(vertex Vertex) error {
 	// verify parent
 	parentID, parentLevel := vertex.Parent()
 	if !(vertex.Level() > parentLevel) {
-		return fmt.Errorf("parent vertex's level (%d) must be smaller than the vertex's level (%d)", parentLevel, vertex.Level())
+		return NewInvalidVertexErrorf(vertex, "vertex parent level (%d) must be smaller than proposed vertex level (%d)", parentLevel, vertex.Level())
 	}
-	parentVertex, haveParentStored := f.GetVertex(parentID)
+	storedParent, haveParentStored := f.GetVertex(parentID)
 	if !haveParentStored {
 		return nil
 	}
-	if parentVertex.Level() != parentLevel {
-		return fmt.Errorf("parent vertex of %v has different level (%d) than the stored vertex (%d)",
-			vertex.VertexID(), parentLevel, parentVertex.Level(),
-		)
+	if storedParent.Level() != parentLevel {
+		return NewInvalidVertexErrorf(vertex, "parent level conflicts with stored parent (%d!=%d)", parentLevel, storedParent.Level())
 	}
 	return nil
 }

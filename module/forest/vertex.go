@@ -1,6 +1,8 @@
 package forest
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -11,6 +13,12 @@ type Vertex interface {
 	Level() uint64
 	// Parent returns the parent's (level, ID)
 	Parent() (flow.Identifier, uint64)
+}
+
+// VertexToString returns a string representation of the vertex.
+func VertexToString(v Vertex) string {
+	parentID, parentLevel := v.Parent()
+	return fmt.Sprintf("<id=%x level=%d parent_id=%d parent_level=%d>", v.VertexID(), v.Level(), parentID, parentLevel)
 }
 
 // VertexIterator is a stateful iterator for VertexList.
