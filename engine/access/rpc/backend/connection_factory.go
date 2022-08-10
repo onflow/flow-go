@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"sync"
 	"time"
@@ -25,9 +26,9 @@ const DefaultClientTimeout = 3 * time.Second
 
 // ConnectionFactory is used to create an access api client
 type ConnectionFactory interface {
-	GetAccessAPIClient(address string) (access.AccessAPIClient, error)
+	GetAccessAPIClient(address string) (access.AccessAPIClient, io.Closer, error)
 	InvalidateAccessAPIClient(address string)
-	GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, error)
+	GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, io.Closer, error)
 	InvalidateExecutionAPIClient(address string)
 }
 
@@ -36,11 +37,17 @@ type ProxyConnectionFactory struct {
 	targetAddress string
 }
 
-func (p *ProxyConnectionFactory) GetAccessAPIClient(address string) (access.AccessAPIClient, error) {
+type noopCloser struct{}
+
+func (c *noopCloser) Close() error {
+	return nil
+}
+
+func (p *ProxyConnectionFactory) GetAccessAPIClient(address string) (access.AccessAPIClient, io.Closer, error) {
 	return p.ConnectionFactory.GetAccessAPIClient(p.targetAddress)
 }
 
-func (p *ProxyConnectionFactory) GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, error) {
+func (p *ProxyConnectionFactory) GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, io.Closer, error) {
 	return p.ConnectionFactory.GetExecutionAPIClient(p.targetAddress)
 }
 
@@ -138,46 +145,70 @@ func (cf *ConnectionFactoryImpl) retrieveConnection(grpcAddress string, timeout 
 	return conn, nil
 }
 
-func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string) (access.AccessAPIClient, error) {
+func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string) (access.AccessAPIClient, io.Closer, error) {
 
 	grpcAddress, err := getGRPCAddress(address, cf.CollectionGRPCPort)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	conn, err := cf.retrieveConnection(grpcAddress, cf.CollectionNodeGRPCTimeout)
+	var conn *grpc.ClientConn
+	if cf.ConnectionsCache != nil {
+		conn, err = cf.retrieveConnection(grpcAddress, cf.CollectionNodeGRPCTimeout)
+		if err != nil {
+			return nil, nil, err
+		}
+		return access.NewAccessAPIClient(conn), &noopCloser{}, err
+	}
+
+	conn, err = cf.createConnection(grpcAddress, cf.CollectionNodeGRPCTimeout)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	accessAPIClient := access.NewAccessAPIClient(conn)
-	return accessAPIClient, nil
+	closer := io.Closer(conn)
+	return accessAPIClient, closer, nil
 }
 
 func (cf *ConnectionFactoryImpl) InvalidateAccessAPIClient(address string) {
-	cf.Log.Debug().Str("cached_access_client_invalidated", address).Msg("invalidating cached access client")
-	cf.invalidateAPIClient(address, cf.CollectionGRPCPort)
+	if cf.ConnectionsCache != nil {
+		cf.Log.Debug().Str("cached_access_client_invalidated", address).Msg("invalidating cached access client")
+		cf.invalidateAPIClient(address, cf.CollectionGRPCPort)
+	}
 }
 
-func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, error) {
+func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, io.Closer, error) {
 
 	grpcAddress, err := getGRPCAddress(address, cf.ExecutionGRPCPort)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	conn, err := cf.retrieveConnection(grpcAddress, cf.ExecutionNodeGRPCTimeout)
+	var conn *grpc.ClientConn
+	if cf.ConnectionsCache != nil {
+		conn, err = cf.retrieveConnection(grpcAddress, cf.ExecutionNodeGRPCTimeout)
+		if err != nil {
+			return nil, nil, err
+		}
+		return execution.NewExecutionAPIClient(conn), &noopCloser{}, nil
+	}
+
+	conn, err = cf.createConnection(grpcAddress, cf.ExecutionNodeGRPCTimeout)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	executionAPIClient := execution.NewExecutionAPIClient(conn)
-	return executionAPIClient, nil
+	closer := io.Closer(conn)
+	return executionAPIClient, closer, nil
 }
 
 func (cf *ConnectionFactoryImpl) InvalidateExecutionAPIClient(address string) {
-	cf.Log.Debug().Str("cached_execution_client_invalidated", address).Msg("invalidating cached execution client")
-	cf.invalidateAPIClient(address, cf.ExecutionGRPCPort)
+	if cf.ConnectionsCache != nil {
+		cf.Log.Debug().Str("cached_execution_client_invalidated", address).Msg("invalidating cached execution client")
+		cf.invalidateAPIClient(address, cf.ExecutionGRPCPort)
+	}
 }
 
 func (cf *ConnectionFactoryImpl) invalidateAPIClient(address string, port uint) {
@@ -200,7 +231,7 @@ func (s *CachedClient) Close() {
 		return
 	}
 	// allow time for any existing requests to finish before closing the connection
-	time.Sleep(s.timeout)
+	time.Sleep(s.timeout + 1*time.Second)
 	conn.Close()
 }
 

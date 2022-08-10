@@ -110,7 +110,13 @@ func executionData(t *testing.T, s *serializer, minSerializedSize uint64) (*Exec
 
 		v := make([]byte, size)
 		rand.Read(v)
-		ed.TrieUpdates[0].Payloads[0].Value = v
+
+		p := ed.TrieUpdates[0].Payloads[0]
+
+		k, err := p.Key()
+		require.NoError(t, err)
+
+		ed.TrieUpdates[0].Payloads[0] = ledger.NewPayload(k, v)
 		size *= 2
 	}
 }

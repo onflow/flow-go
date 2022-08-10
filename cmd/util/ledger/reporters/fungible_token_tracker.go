@@ -97,7 +97,11 @@ func (r *FungibleTokenTracker) Report(payloads []ledger.Payload, commit ledger.S
 	payloadsByOwner := make(map[flow.Address][]ledger.Payload)
 
 	for _, pay := range payloads {
-		owner := flow.BytesToAddress(pay.Key.KeyParts[0].Value)
+		k, err := pay.Key()
+		if err != nil {
+			return nil
+		}
+		owner := flow.BytesToAddress(k.KeyParts[0].Value)
 		if len(owner) > 0 { // ignoring payloads without ownership (fvm ones)
 			m, ok := payloadsByOwner[owner]
 			if !ok {
