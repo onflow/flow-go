@@ -390,9 +390,9 @@ func testAddEntities(t *testing.T, bd *Cache, entities []*unittest.MockEntity) {
 			require.Equal(t, bd.Size(), uint(i+1))
 
 			// in case cache is not full, the head should retrieve the first added entity.
-			tailEntity, tailExists := bd.Head()
-			require.True(t, tailExists)
-			require.Equal(t, tailEntity.ID(), entities[0].ID())
+			headEntity, headExists := bd.Head()
+			require.True(t, headExists)
+			require.Equal(t, headEntity.ID(), entities[0].ID())
 		} else {
 			// when we cross the limit, the ejection kicks in, and
 			// size must be steady at the limit.
