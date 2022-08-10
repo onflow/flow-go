@@ -39,7 +39,10 @@ const (
 	// DefaultChunkDataPackProcessInterval is the default time interval that a free worker checks head of the chunk data pack
 	// requests queue for new chunk data packs.
 	DefaultChunkDataPackProcessInterval = 10 * time.Millisecond
-	DefaultChunkDataPackQueryTimeout    = 10 * time.Second
+	// DefaultChunkDataPackQueryTimeout is the default timeout value for querying a chunk data pack from storage.
+	DefaultChunkDataPackQueryTimeout = 10 * time.Second
+	// DefaultChunkDataPackDeliveryTimeout is the default timeout value for delivery of a chunk data pack to a verification
+	// node.
 	DefaultChunkDataPackDeliveryTimeout = 10 * time.Second
 )
 
