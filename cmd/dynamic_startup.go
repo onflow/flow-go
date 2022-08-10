@@ -232,6 +232,13 @@ func DynamicStartPreInit(nodeConfig *NodeConfig, storage Storage) error {
 			root.Height, firstFullHeight, err)
 	}
 
+	log.Info().
+		Str("root_id", root.ID().String()).
+		Uint64("root_height", root.Height).
+		Uint64("transaction_expiry", flow.DefaultTransactionExpiry).
+		Uint64("last_full_block_height", firstFullHeight).
+		Msg("dynamic-bootstrap pre-init complete")
+
 	return nil
 }
 
