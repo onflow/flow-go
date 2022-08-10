@@ -5,24 +5,28 @@ import (
 	"math/rand"
 
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
 
 type UnsafeRandomGenerator struct {
-	ctx *EnvContext
-	rng *rand.Rand
+	tracer *Tracer
+	rng    *rand.Rand
 }
 
-func NewUnsafeRandomGenerator(ctx *EnvContext) *UnsafeRandomGenerator {
+func NewUnsafeRandomGenerator(
+	tracer *Tracer,
+	blockHeader *flow.Header,
+) *UnsafeRandomGenerator {
 	gen := &UnsafeRandomGenerator{
-		ctx: ctx,
+		tracer: tracer,
 	}
 
-	if ctx.BlockHeader != nil {
+	if blockHeader != nil {
 		// Seed the random number generator with entropy created from the block
 		// header ID. The random number generator will be used by the
 		// UnsafeRandom function.
-		id := ctx.BlockHeader.ID()
+		id := blockHeader.ID()
 		source := rand.NewSource(int64(binary.BigEndian.Uint64(id[:])))
 		gen.rng = rand.New(source)
 	}
@@ -33,7 +37,7 @@ func NewUnsafeRandomGenerator(ctx *EnvContext) *UnsafeRandomGenerator {
 // UnsafeRandom returns a random uint64, where the process of random number
 // derivation is not cryptographically secure.
 func (gen *UnsafeRandomGenerator) UnsafeRandom() (uint64, error) {
-	defer gen.ctx.StartExtensiveTracingSpanFromRoot(trace.FVMEnvUnsafeRandom).End()
+	defer gen.tracer.StartExtensiveTracingSpanFromRoot(trace.FVMEnvUnsafeRandom).End()
 
 	if gen.rng == nil {
 		return 0, errors.NewOperationNotSupportedError("UnsafeRandom")
