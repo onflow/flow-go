@@ -11,7 +11,6 @@ import (
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/meter/noop"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -42,10 +41,10 @@ type State struct {
 	TotalBytesWritten     uint64
 }
 
-func defaultState(view View) *State {
+func defaultState(view View, meter meter.Meter) *State {
 	return &State{
 		view:                  view,
-		meter:                 noop.NewMeter(),
+		meter:                 meter,
 		updatedAddresses:      make(map[flow.Address]struct{}),
 		updateSize:            make(map[mapKey]uint64),
 		maxKeySizeAllowed:     DefaultMaxKeySize,
@@ -65,8 +64,8 @@ func (s *State) Meter() meter.Meter {
 type StateOption func(st *State) *State
 
 // NewState constructs a new state
-func NewState(view View, opts ...StateOption) *State {
-	ctx := defaultState(view)
+func NewState(view View, meter meter.Meter, opts ...StateOption) *State {
+	ctx := defaultState(view, meter)
 	for _, applyOption := range opts {
 		ctx = applyOption(ctx)
 	}
@@ -93,14 +92,6 @@ func WithMaxValueSizeAllowed(limit uint64) func(st *State) *State {
 func WithMaxInteractionSizeAllowed(limit uint64) func(st *State) *State {
 	return func(st *State) *State {
 		st.maxInteractionAllowed = limit
-		return st
-	}
-}
-
-// WithMeter sets the meter
-func WithMeter(m meter.Meter) func(st *State) *State {
-	return func(st *State) *State {
-		st.meter = m
 		return st
 	}
 }
@@ -232,8 +223,9 @@ func (s *State) TotalMemoryLimit() uint {
 
 // NewChild generates a new child state
 func (s *State) NewChild() *State {
-	return NewState(s.view.NewChild(),
-		WithMeter(s.meter.NewChild()),
+	return NewState(
+		s.view.NewChild(),
+		s.meter.NewChild(),
 		WithMaxKeySizeAllowed(s.maxKeySizeAllowed),
 		WithMaxValueSizeAllowed(s.maxValueSizeAllowed),
 		WithMaxInteractionSizeAllowed(s.maxInteractionAllowed),
@@ -298,7 +290,7 @@ func (s *State) UpdatedAddresses() []flow.Address {
 
 func (s *State) checkMaxInteraction() error {
 	if s.InteractionUsed() > s.maxInteractionAllowed {
-		return errors.NewLedgerIntractionLimitExceededError(s.InteractionUsed(), s.maxInteractionAllowed)
+		return errors.NewLedgerInteractionLimitExceededError(s.InteractionUsed(), s.maxInteractionAllowed)
 	}
 	return nil
 }
@@ -339,17 +331,11 @@ func IsFVMStateKey(owner, key string) bool {
 	}
 	// check account level keys
 	// cases:
-	// 		- address, "public_key_count"
-	// 		- address, "public_key_%d" (index)
 	// 		- address, "contract_names"
 	// 		- address, "code.%s" (contract name)
-	// 		- address, exists
-	// 		- address, "storage_used"
-	// 		- address, "frozen"
+	// 		- address, "public_key_%d" (index)
+	// 		- address, "a.s" (account status)
 
-	if key == KeyPublicKeyCount {
-		return true
-	}
 	if bytes.HasPrefix([]byte(key), []byte("public_key_")) {
 		return true
 	}
@@ -360,12 +346,6 @@ func IsFVMStateKey(owner, key string) bool {
 		return true
 	}
 	if key == KeyAccountStatus {
-		return true
-	}
-	if key == KeyStorageUsed {
-		return true
-	}
-	if key == KeyStorageIndex {
 		return true
 	}
 

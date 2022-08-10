@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"path/filepath"
 	"testing"
 	"time"
@@ -69,7 +70,7 @@ import (
 	chainsync "github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/module/validation"
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/protocol"
@@ -259,7 +260,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		coll, err := collections.ByID(collID)
 		return coll, err
 	}
-	providerEngine, err := provider.New(node.Log, node.Metrics, node.Net, node.Me, node.State, network.ProvideCollections, selector, retrieve)
+	providerEngine, err := provider.New(node.Log, node.Metrics, node.Net, node.Me, node.State, channels.ProvideCollections, selector, retrieve)
 	require.NoError(t, err)
 
 	pusherEngine, err := pusher.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, collections, transactions)
@@ -278,6 +279,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		node.Tracer,
 		node.Metrics,
 		pusherEngine,
+		node.Log,
 	)
 	require.NoError(t, err)
 
@@ -376,7 +378,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.Nil(t, err)
 
 	// request receipts from execution nodes
-	receiptRequester, err := requester.New(node.Log, node.Metrics, node.Net, node.Me, node.State, network.RequestReceiptsByBlockID, filter.Any, func() flow.Entity { return &flow.ExecutionReceipt{} })
+	receiptRequester, err := requester.New(node.Log, node.Metrics, node.Net, node.Me, node.State, channels.RequestReceiptsByBlockID, filter.Any, func() flow.Entity { return &flow.ExecutionReceipt{} })
 	require.Nil(t, err)
 
 	assigner, err := chunks.NewChunkAssigner(flow.DefaultChunkAssignmentAlpha, node.State)
@@ -499,11 +501,21 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	metricsCollector := &metrics.NoopCollector{}
 
-	diskWal, err := wal.NewDiskWAL(node.Log.With().Str("subcomponent", "wal").Logger(), nil, metricsCollector, dbDir, 100, pathfinder.PathByteSize, wal.SegmentSize)
+	const (
+		capacity           = 100
+		checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
+		checkpointsToKeep  = 1
+	)
+	diskWal, err := wal.NewDiskWAL(node.Log.With().Str("subcomponent", "wal").Logger(), nil, metricsCollector, dbDir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
 	require.NoError(t, err)
 
-	ls, err := completeLedger.NewLedger(diskWal, 100, metricsCollector, node.Log.With().Str("compontent", "ledger").Logger(), completeLedger.DefaultPathFinderVersion)
+	ls, err := completeLedger.NewLedger(diskWal, capacity, metricsCollector, node.Log.With().Str("compontent", "ledger").Logger(), completeLedger.DefaultPathFinderVersion)
 	require.NoError(t, err)
+
+	compactor, err := completeLedger.NewCompactor(ls, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep)
+	require.NoError(t, err)
+
+	<-compactor.Ready() // Need to start compactor here because BootstrapLedger() updates ledger state.
 
 	genesisHead, err := node.State.Final().Head()
 	require.NoError(t, err)
@@ -525,7 +537,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	requestEngine, err := requester.New(
 		node.Log, node.Metrics, node.Net, node.Me, node.State,
-		network.RequestCollections,
+		channels.RequestCollections,
 		filter.HasRole(flow.RoleCollection),
 		func() flow.Entity { return &flow.Collection{} },
 	)
@@ -666,7 +678,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		Collections:         collectionsStorage,
 		Finalizer:           finalizer,
 		MyExecutionReceipts: myReceipts,
-		DiskWAL:             diskWal,
+		Compactor:           compactor,
 	}
 }
 

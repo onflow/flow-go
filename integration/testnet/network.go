@@ -14,19 +14,23 @@ import (
 	"testing"
 	"time"
 
+	cmd2 "github.com/onflow/flow-go/cmd/bootstrap/cmd"
 	"github.com/onflow/flow-go/cmd/bootstrap/dkg"
 	"github.com/onflow/flow-go/insecure/cmd"
 
 	"github.com/dapperlabs/testingdock"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/network"
 	dockerclient "github.com/docker/docker/client"
+	"github.com/docker/go-connections/nat"
 	"github.com/onflow/cadence"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go-sdk/crypto"
+	crypto2 "github.com/onflow/flow-go/crypto"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
@@ -76,6 +80,12 @@ const (
 	ColNodeAPIPort = "col-ingress-port"
 	// ExeNodeAPIPort is the name used for the execution node API port.
 	ExeNodeAPIPort = "exe-api-port"
+	// ObserverNodeAPIPort is the name used for the observer node API port.
+	ObserverNodeAPIPort = "observer-api-port"
+	// ObserverNodeAPISecurePort is the name used for the secure observer API port.
+	ObserverNodeAPISecurePort = "observer-api-secure-port"
+	// ObserverNodeAPIProxyPort is the name used for the observer node API HTTP proxy port.
+	ObserverNodeAPIProxyPort = "observer-api-http-proxy-port"
 	// AccessNodeAPIPort is the name used for the access node API port.
 	AccessNodeAPIPort = "access-api-port"
 	// AccessNodeAPISecurePort is the name used for the secure access API port.
@@ -139,6 +149,7 @@ type FlowNetwork struct {
 	Containers                  map[string]*Container
 	ConsensusFollowers          map[flow.Identifier]consensus_follower.ConsensusFollower
 	CorruptedPortMapping        map[flow.Identifier]string // port binding for corrupted containers.
+	ObserverPorts               map[string]string
 	AccessPorts                 map[string]string
 	AccessPortsByContainerName  map[string]string
 	MetricsPortsByContainerName map[string]string
@@ -627,6 +638,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 		log:                         logger,
 		Containers:                  make(map[string]*Container, nNodes),
 		ConsensusFollowers:          make(map[flow.Identifier]consensus_follower.ConsensusFollower, len(networkConf.ConsensusFollowers)),
+		ObserverPorts:               make(map[string]string),
 		AccessPorts:                 make(map[string]string),
 		AccessPortsByContainerName:  make(map[string]string),
 		MetricsPortsByContainerName: make(map[string]string),
@@ -672,7 +684,6 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 			nodeContainer.AddFlag("insecure-access-api", "false")
 			nodeContainer.AddFlag("access-node-ids", strings.Join(accessNodeIDS, ","))
 		}
-
 	}
 
 	rootProtocolSnapshotPath := filepath.Join(bootstrapDir, bootstrap.PathRootProtocolStateSnapshot)
@@ -748,6 +759,140 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 		[]consensus_follower.BootstrapNodeInfo{bootstrapNodeInfo}, opts...)
 
 	net.ConsensusFollowers[followerConf.NodeID] = follower
+}
+
+func (net *FlowNetwork) StopContainerByName(ctx context.Context, containerName string) error {
+	container := net.ContainerByName(containerName)
+	if container == nil {
+		return fmt.Errorf("%s container not found", containerName)
+	}
+	return net.cli.ContainerStop(ctx, container.ID, nil)
+}
+
+type ObserverConfig struct {
+	ObserverName            string
+	ObserverImage           string
+	AccessName              string // Does not change the access node.
+	AccessPublicNetworkPort string // Does not change the access node
+	AccessGRPCSecurePort    string // Does not change the access node
+}
+
+func (net *FlowNetwork) AddObserver(t *testing.T, ctx context.Context, conf *ObserverConfig) (stop func(), err error) {
+	// Find the public key for the access node
+	accessPublicKey := ""
+	for _, stakedConf := range net.BootstrapData.StakedConfs {
+		if stakedConf.ContainerName == conf.AccessName {
+			accessPublicKey = hex.EncodeToString(stakedConf.NetworkPubKey().Encode())
+		}
+	}
+	if accessPublicKey == "" {
+		panic(fmt.Sprintf("failed to find the staked conf for access node with container name '%s'", conf.AccessName))
+	}
+
+	// Copy of writeObserverPrivateKey in localnet bootstrap.go
+	func() {
+		// make the observer private key for named observer
+		// only used for localnet, not for use with production
+		networkSeed := cmd2.GenerateRandomSeed(crypto2.KeyGenSeedMinLenECDSASecp256k1)
+		networkKey, err := utils.GeneratePublicNetworkingKey(networkSeed)
+		if err != nil {
+			panic(err)
+		}
+
+		// hex encode
+		keyBytes := networkKey.Encode()
+		output := make([]byte, hex.EncodedLen(len(keyBytes)))
+		hex.Encode(output, keyBytes)
+
+		// write to file
+		outputFile := fmt.Sprintf("%s/private-root-information/%s_key", net.BootstrapDir, conf.ObserverName)
+		err = ioutil.WriteFile(outputFile, output, 0600)
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	// Setup directories
+	tmpdir, _ := ioutil.TempDir(TmpRoot, "flow-integration-node")
+	flowDataDir := filepath.Join(tmpdir, DefaultFlowDataDir)
+	nodeBootstrapDir := filepath.Join(tmpdir, DefaultBootstrapDir)
+	flowProfilerDir := filepath.Join(flowDataDir, "./profiler")
+
+	_ = io.CopyDirectory(net.BootstrapDir, nodeBootstrapDir)
+
+	observerUnsecurePort := testingdock.RandomPort(t)
+	observerSecurePort := testingdock.RandomPort(t)
+	observerHttpPort := testingdock.RandomPort(t)
+
+	net.ObserverPorts[ObserverNodeAPIPort] = observerUnsecurePort
+	net.ObserverPorts[ObserverNodeAPISecurePort] = observerSecurePort
+	net.ObserverPorts[ObserverNodeAPIProxyPort] = observerHttpPort
+
+	container, err := net.cli.ContainerCreate(ctx,
+		&container.Config{
+			Image: conf.ObserverImage,
+			Cmd: []string{
+				fmt.Sprintf("--bootstrap-node-addresses=%s:%s", conf.AccessName, conf.AccessPublicNetworkPort),
+				fmt.Sprintf("--bootstrap-node-public-keys=%s", accessPublicKey),
+				fmt.Sprintf("--upstream-node-addresses=%s:%s", conf.AccessName, conf.AccessGRPCSecurePort),
+				fmt.Sprintf("--upstream-node-public-keys=%s", accessPublicKey),
+				fmt.Sprintf("--observer-networking-key-path=/bootstrap/private-root-information/%s_key", conf.ObserverName),
+				fmt.Sprintf("--bind=0.0.0.0:0"),
+				fmt.Sprintf("--rpc-addr=%s:%s", conf.ObserverName, "9000"),
+				fmt.Sprintf("--secure-rpc-addr=%s:%s", conf.ObserverName, "9001"),
+				fmt.Sprintf("--http-addr=%s:%s", conf.ObserverName, "8000"),
+				"--bootstrapdir=/bootstrap",
+				"--datadir=/data/protocol",
+				"--secretsdir=/data/secrets",
+				"--loglevel=DEBUG",
+				fmt.Sprintf("--profiler-enabled=%t", false),
+				fmt.Sprintf("--tracer-enabled=%t", false),
+				"--profiler-dir=/profiler",
+				"--profiler-interval=2m",
+			},
+			ExposedPorts: nat.PortSet{
+				"9000": struct{}{},
+				"9001": struct{}{},
+				"8000": struct{}{},
+			},
+		},
+		&container.HostConfig{
+			AutoRemove: true,
+			Binds: []string{
+				fmt.Sprintf("%s:%s:rw", flowDataDir, "/data"),
+				fmt.Sprintf("%s:%s:rw", flowProfilerDir, "/profiler"),
+				fmt.Sprintf("%s:%s:ro", nodeBootstrapDir, "/bootstrap"),
+			},
+			PortBindings: nat.PortMap{
+				"9000": []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: observerUnsecurePort}},
+				"9001": []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: observerSecurePort}},
+				"8000": []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: observerHttpPort}},
+			},
+		},
+		&network.NetworkingConfig{
+			EndpointsConfig: map[string]*network.EndpointSettings{
+				net.config.Name: {
+					NetworkID: net.network.ID(),
+				},
+			},
+		},
+		conf.ObserverName,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = net.cli.ContainerStart(ctx, container.ID, types.ContainerStartOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	containerID := container.ID
+	return func() {
+		// shutdown func
+		net.cli.ContainerStop(ctx, containerID, nil)
+	}, nil
 }
 
 // AddNode creates a node container with the given config and adds it to the
@@ -871,7 +1016,6 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			// net.MetricsPortsByContainerName[nodeContainer.Name()] = hostMetricsPort
 
 			nodeContainer.AddFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
-
 			nodeContainer.Ports[ExeNodeAPIPort] = hostPort
 			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckExecutionGRPC(hostPort))
 			net.AccessPorts[ExeNodeAPIPort] = hostPort
@@ -913,6 +1057,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			nodeContainer.bindPort(hostSecureGRPCPort, containerSecureGRPCPort)
 			nodeContainer.AddFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
 			nodeContainer.AddFlag("http-addr", fmt.Sprintf("%s:8000", nodeContainer.Name()))
+
 			// uncomment line below to point the access node exclusively to a single collection node
 			// nodeContainer.AddFlag("static-collection-ingress-addr", "collection_1:9000")
 			nodeContainer.AddFlag("collection-ingress-port", "9000")
