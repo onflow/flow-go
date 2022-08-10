@@ -148,9 +148,7 @@ func (b *backendTransactions) sendTransactionToCollector(ctx context.Context,
 	if err != nil {
 		return fmt.Errorf("failed to connect to collection node at %s: %w", collectionNodeAddr, err)
 	}
-	if closer != nil {
-		defer closer.Close()
-	}
+	defer closer.Close()
 
 	err = b.grpcTxSend(ctx, collectionRPC, tx)
 	if err != nil {
@@ -711,9 +709,7 @@ func (b *backendTransactions) tryGetTransactionResult(
 	if err != nil {
 		return nil, err
 	}
-	if closer != nil {
-		defer closer.Close()
-	}
+	defer closer.Close()
 
 	resp, err := execRPCClient.GetTransactionResult(ctx, &req)
 	if err != nil {
@@ -771,9 +767,7 @@ func (b *backendTransactions) tryGetTransactionResultsByBlockID(
 	if err != nil {
 		return nil, err
 	}
-	if closer != nil {
-		defer closer.Close()
-	}
+	defer closer.Close()
 
 	resp, err := execRPCClient.GetTransactionResultsByBlockID(ctx, &req)
 	if err != nil {
@@ -832,9 +826,7 @@ func (b *backendTransactions) tryGetTransactionResultByIndex(
 	if err != nil {
 		return nil, err
 	}
-	if closer != nil {
-		defer closer.Close()
-	}
+	defer closer.Close()
 
 	resp, err := execRPCClient.GetTransactionResultByIndex(ctx, &req)
 	if err != nil {

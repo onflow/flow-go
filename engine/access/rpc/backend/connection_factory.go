@@ -37,6 +37,12 @@ type ProxyConnectionFactory struct {
 	targetAddress string
 }
 
+type noopCloser struct{}
+
+func (c *noopCloser) Close() error {
+	return nil
+}
+
 func (p *ProxyConnectionFactory) GetAccessAPIClient(address string) (access.AccessAPIClient, io.Closer, error) {
 	return p.ConnectionFactory.GetAccessAPIClient(p.targetAddress)
 }
@@ -152,7 +158,7 @@ func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string) (access.Acce
 		if err != nil {
 			return nil, nil, err
 		}
-		return access.NewAccessAPIClient(conn), nil, err
+		return access.NewAccessAPIClient(conn), &noopCloser{}, err
 	}
 
 	conn, err = cf.createConnection(grpcAddress, cf.CollectionNodeGRPCTimeout)
@@ -185,7 +191,7 @@ func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (executio
 		if err != nil {
 			return nil, nil, err
 		}
-		return execution.NewExecutionAPIClient(conn), nil, nil
+		return execution.NewExecutionAPIClient(conn), &noopCloser{}, nil
 	}
 
 	conn, err = cf.createConnection(grpcAddress, cf.ExecutionNodeGRPCTimeout)

@@ -211,9 +211,7 @@ func (b *backendEvents) tryGetEvents(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
-	if closer != nil {
-		defer closer.Close()
-	}
+	defer closer.Close()
 
 	resp, err := execRPCClient.GetEventsForBlockIDs(ctx, &req)
 	if err != nil {

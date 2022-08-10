@@ -157,9 +157,7 @@ func (b *backendAccounts) tryGetAccount(ctx context.Context, execNode *flow.Iden
 	if err != nil {
 		return nil, err
 	}
-	if closer != nil {
-		defer closer.Close()
-	}
+	defer closer.Close()
 
 	resp, err := execRPCClient.GetAccountAtBlockID(ctx, &req)
 	if err != nil {

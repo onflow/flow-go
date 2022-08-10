@@ -169,9 +169,7 @@ func (b *backendScripts) tryExecuteScript(ctx context.Context, execNode *flow.Id
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to create client for execution node %s: %v", execNode.String(), err)
 	}
-	if closer != nil {
-		defer closer.Close()
-	}
+	defer closer.Close()
 
 	execResp, err := execRPCClient.ExecuteScriptAtBlockID(ctx, &req)
 	if err != nil {

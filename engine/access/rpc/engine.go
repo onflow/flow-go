@@ -135,7 +135,9 @@ func NewBuilder(log zerolog.Logger,
 	var cache *lru.Cache
 	cacheSize := config.ConnectionPoolSize
 	if cacheSize > 0 {
-		// it was observed that eviction issues were occurring when the pool size was less than number of ENs + LNs
+		// TODO: remove this fallback after fixing issues with evictions
+		// It was observed that evictions cause connection errors for in flight requests. This works around
+		// the issue by forcing hte pool size to be greater than the number of ENs + LNs
 		if cacheSize < backend.DefaultConnectionPoolSize {
 			log.Warn().Msg("connection pool size below threshold, setting pool size to default value ")
 			cacheSize = backend.DefaultConnectionPoolSize
