@@ -410,11 +410,15 @@ func (i *TransactionInvoker) requiresRetry(err error, proc *TransactionProcedure
 // logRuntimeError logs run time errors into a file
 // This is a temporary measure.
 func (i *TransactionInvoker) dumpRuntimeError(runtimeErr *runtime.Error, procedure *TransactionProcedure) {
+	// linter produces some false-positive results for marshaling logic, specifically:
+	// SA1026: trying to marshal unsupported type map...
 
+	//nolint
 	codesJSON, err := json.Marshal(runtimeErr.Codes)
 	if err != nil {
 		i.logger.Error().Err(err).Msg("cannot marshal codes JSON")
 	}
+	//nolint
 	programsJSON, err := json.Marshal(runtimeErr.Programs)
 	if err != nil {
 		i.logger.Error().Err(err).Msg("cannot marshal programs JSON")
