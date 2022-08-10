@@ -201,8 +201,8 @@ func (c Cache) Size() uint {
 	return uint(c.entities.Size())
 }
 
-// Head returns the tail of used items. Assuming no ejection happened and pool never goes beyond limit, Head returns
-// the first inserted element.
+// Head returns the head of queue.
+// Boolean return value determines whether there is a head available.
 func (c Cache) Head() (flow.Entity, bool) {
 	return c.entities.Head()
 }
