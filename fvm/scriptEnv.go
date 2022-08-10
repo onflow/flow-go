@@ -41,19 +41,27 @@ func NewScriptEnvironment(
 	uuidGenerator := state.NewUUIDGenerator(sth)
 	programsHandler := handler.NewProgramsHandler(programs, sth)
 	accountKeys := handler.NewAccountKeyHandler(accounts)
+	tracer := NewTracer(fvmContext.Tracer, nil, fvmContext.ExtensiveTracing)
 
-	ctx := NewEnvContext(fvmContext, nil)
 	env := &ScriptEnv{
 		commonEnv: commonEnv{
-			ctx:                   ctx,
-			ProgramLogger:         NewProgramLogger(ctx),
-			UnsafeRandomGenerator: NewUnsafeRandomGenerator(ctx),
-			sth:                   sth,
-			vm:                    vm,
-			programs:              programsHandler,
-			accounts:              accounts,
-			accountKeys:           accountKeys,
-			uuidGenerator:         uuidGenerator,
+			Tracer: tracer,
+			ProgramLogger: NewProgramLogger(
+				tracer,
+				fvmContext.Metrics,
+				fvmContext.CadenceLoggingEnabled,
+			),
+			UnsafeRandomGenerator: NewUnsafeRandomGenerator(
+				tracer,
+				fvmContext.BlockHeader,
+			),
+			ctx:           fvmContext,
+			sth:           sth,
+			vm:            vm,
+			programs:      programsHandler,
+			accounts:      accounts,
+			accountKeys:   accountKeys,
+			uuidGenerator: uuidGenerator,
 		},
 		reqContext: reqContext,
 	}
@@ -111,18 +119,13 @@ func (e *ScriptEnv) setExecutionParameters() error {
 		return nil
 	}
 
-	var ok bool
-	var m *meter.WeightedMeter
-	// only set the weights if the meter is a meter.WeightedMeter
-	if m, ok = e.sth.State().Meter().(*meter.WeightedMeter); !ok {
-		return nil
-	}
+	meter := e.sth.State().Meter()
 
 	computationWeights, err := GetExecutionEffortWeights(e, service)
 	err = setIfOk(
 		"execution effort weights",
 		err,
-		func() { m.SetComputationWeights(computationWeights) })
+		func() { meter.SetComputationWeights(computationWeights) })
 	if err != nil {
 		return err
 	}
@@ -131,7 +134,7 @@ func (e *ScriptEnv) setExecutionParameters() error {
 	err = setIfOk(
 		"execution memory weights",
 		err,
-		func() { m.SetMemoryWeights(memoryWeights) })
+		func() { meter.SetMemoryWeights(memoryWeights) })
 	if err != nil {
 		return err
 	}
@@ -140,7 +143,7 @@ func (e *ScriptEnv) setExecutionParameters() error {
 	err = setIfOk(
 		"execution memory limit",
 		err,
-		func() { m.SetTotalMemoryLimit(memoryLimit) })
+		func() { meter.SetTotalMemoryLimit(memoryLimit) })
 	if err != nil {
 		return err
 	}
@@ -149,7 +152,7 @@ func (e *ScriptEnv) setExecutionParameters() error {
 }
 
 func (e *ScriptEnv) GetStorageCapacity(address common.Address) (value uint64, err error) {
-	defer e.ctx.StartSpanFromRoot(trace.FVMEnvGetStorageCapacity).End()
+	defer e.StartSpanFromRoot(trace.FVMEnvGetStorageCapacity).End()
 
 	err = e.Meter(meter.ComputationKindGetStorageCapacity, 1)
 	if err != nil {
@@ -157,7 +160,6 @@ func (e *ScriptEnv) GetStorageCapacity(address common.Address) (value uint64, er
 	}
 
 	result, invokeErr := InvokeAccountStorageCapacityContract(
-		e.ctx,
 		e,
 		address)
 	if invokeErr != nil {
@@ -170,14 +172,14 @@ func (e *ScriptEnv) GetStorageCapacity(address common.Address) (value uint64, er
 }
 
 func (e *ScriptEnv) GetAccountBalance(address common.Address) (value uint64, err error) {
-	defer e.ctx.StartSpanFromRoot(trace.FVMEnvGetAccountBalance).End()
+	defer e.StartSpanFromRoot(trace.FVMEnvGetAccountBalance).End()
 
 	err = e.Meter(meter.ComputationKindGetAccountBalance, 1)
 	if err != nil {
 		return 0, fmt.Errorf("get account balance failed: %w", err)
 	}
 
-	result, invokeErr := InvokeAccountBalanceContract(e.ctx, e, address)
+	result, invokeErr := InvokeAccountBalanceContract(e, address)
 	if invokeErr != nil {
 		return 0, errors.HandleRuntimeError(invokeErr)
 	}
@@ -185,7 +187,7 @@ func (e *ScriptEnv) GetAccountBalance(address common.Address) (value uint64, err
 }
 
 func (e *ScriptEnv) GetAccountAvailableBalance(address common.Address) (value uint64, err error) {
-	defer e.ctx.StartSpanFromRoot(trace.FVMEnvGetAccountBalance).End()
+	defer e.StartSpanFromRoot(trace.FVMEnvGetAccountBalance).End()
 
 	err = e.Meter(meter.ComputationKindGetAccountAvailableBalance, 1)
 	if err != nil {
@@ -193,7 +195,6 @@ func (e *ScriptEnv) GetAccountAvailableBalance(address common.Address) (value ui
 	}
 
 	result, invokeErr := InvokeAccountAvailableBalanceContract(
-		e.ctx,
 		e,
 		address)
 
@@ -207,7 +208,7 @@ func (e *ScriptEnv) ResolveLocation(
 	identifiers []runtime.Identifier,
 	location runtime.Location,
 ) ([]runtime.ResolvedLocation, error) {
-	defer e.ctx.StartExtensiveTracingSpanFromRoot(trace.FVMEnvResolveLocation).End()
+	defer e.StartExtensiveTracingSpanFromRoot(trace.FVMEnvResolveLocation).End()
 
 	err := e.Meter(meter.ComputationKindResolveLocation, 1)
 	if err != nil {
@@ -307,7 +308,7 @@ func (e *ScriptEnv) Meter(kind common.ComputationKind, intensity uint) error {
 		return err
 	}
 
-	if e.sth.EnforceComputationLimits {
+	if e.sth.EnforceComputationLimits() {
 		return e.sth.State().MeterComputation(kind, intensity)
 	}
 	return nil
@@ -328,7 +329,7 @@ func (e *ScriptEnv) VerifySignature(
 	signatureAlgorithm runtime.SignatureAlgorithm,
 	hashAlgorithm runtime.HashAlgorithm,
 ) (bool, error) {
-	defer e.ctx.StartSpanFromRoot(trace.FVMEnvVerifySignature).End()
+	defer e.StartSpanFromRoot(trace.FVMEnvVerifySignature).End()
 
 	err := e.Meter(meter.ComputationKindVerifySignature, 1)
 	if err != nil {
@@ -379,7 +380,7 @@ func (e *ScriptEnv) AddAccountKey(_ runtime.Address, _ *runtime.PublicKey, _ run
 }
 
 func (e *ScriptEnv) GetAccountKey(address runtime.Address, index int) (*runtime.AccountKey, error) {
-	defer e.ctx.StartSpanFromRoot(trace.FVMEnvGetAccountKey).End()
+	defer e.StartSpanFromRoot(trace.FVMEnvGetAccountKey).End()
 
 	err := e.Meter(meter.ComputationKindGetAccountKey, 1)
 	if err != nil {

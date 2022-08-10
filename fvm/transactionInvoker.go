@@ -103,7 +103,7 @@ func (i *TransactionInvoker) Process(
 	if err != nil {
 		return fmt.Errorf("error creating new environment: %w", err)
 	}
-	predeclaredValues := valueDeclarations(ctx, env)
+	predeclaredValues := valueDeclarations(env)
 
 	location := common.TransactionLocation(proc.ID)
 
@@ -163,7 +163,7 @@ func (i *TransactionInvoker) Process(
 		// so we don't error from computation/memory limits on this part.
 		// We cannot charge the user for this part, since fee deduction already happened.
 		sth.DisableAllLimitEnforcements()
-		txError = NewTransactionStorageLimiter().CheckLimits(env.ctx, env, sth.State().UpdatedAddresses())
+		txError = NewTransactionStorageLimiter().CheckLimits(env, sth.State().UpdatedAddresses())
 		sth.EnableAllLimitEnforcements()
 	}
 
@@ -244,7 +244,6 @@ func (i *TransactionInvoker) deductTransactionFees(
 	// dynamic.	Execution effort will be connected to computation used.
 	inclusionEffort := uint64(100_000_000)
 	_, err = InvokeDeductTransactionFeesContract(
-		env.ctx,
 		env,
 		proc.Transaction.Payer,
 		inclusionEffort,
@@ -274,10 +273,10 @@ var setAccountFrozenFunctionType = &sema.FunctionType{
 	},
 }
 
-func valueDeclarations(ctx *Context, env Environment) []runtime.ValueDeclaration {
+func valueDeclarations(env Environment) []runtime.ValueDeclaration {
 	var predeclaredValues []runtime.ValueDeclaration
 
-	if ctx.AccountFreezeEnabled {
+	if env.AccountFreezeEnabled() {
 		// TODO return the errors instead of panicing
 
 		setAccountFrozen := runtime.ValueDeclaration{

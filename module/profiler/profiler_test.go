@@ -16,7 +16,7 @@ func TestProfiler(t *testing.T) {
 	t.Parallel()
 	t.Run("profilerEnabled", func(t *testing.T) {
 		unittest.RunWithTempDir(t, func(tempDir string) {
-			p, err := profiler.New(zerolog.Nop(), tempDir, time.Millisecond*100, time.Millisecond*100, true)
+			p, err := profiler.New(zerolog.Nop(), &profiler.NoopUploader{}, tempDir, time.Millisecond*100, time.Millisecond*100, true)
 			require.NoError(t, err)
 
 			unittest.AssertClosesBefore(t, p.Ready(), 5*time.Second)

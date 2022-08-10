@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"go.opentelemetry.io/otel/attribute"
+	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/errors"
@@ -26,9 +27,17 @@ import (
 // Environment accepts a context and a virtual machine instance and provides
 // cadence runtime interface methods to the runtime.
 type Environment interface {
+	// TODO(patrick): stop exposing Context()
 	Context() *Context
+
 	VM() *VirtualMachine
 	runtime.Interface
+
+	// TODO(patrick): we should probably make this non-optional
+	AccountFreezeEnabled() bool
+
+	StartSpanFromRoot(name trace.SpanName) otelTrace.Span
+	StartExtensiveTracingSpanFromRoot(name trace.SpanName) otelTrace.Span
 }
 
 // TODO(patrick): refactor this into an object.
@@ -67,11 +76,12 @@ type AccountInterface interface {
 // Parts of the environment that are common to all transaction and script
 // executions.
 type commonEnv struct {
-	// TODO(patrick): convert ctx to anonymous field once the rest of env
-	// is broken up into coherent pieces.
-	ctx *EnvContext
+	*Tracer
 	*ProgramLogger
 	*UnsafeRandomGenerator
+
+	// TODO(patrick): rm
+	ctx Context
 
 	MeterInterface
 	AccountInterface
@@ -105,9 +115,12 @@ func (env *commonEnv) MemoryEstimate() uint64 {
 	return uint64(env.sth.State().TotalMemoryEstimate())
 }
 
-// TODO(patrick): rm once ctx becomes an anonymous field.
 func (env *commonEnv) Context() *Context {
-	return env.ctx.Context()
+	return &env.ctx
+}
+
+func (env *commonEnv) AccountFreezeEnabled() bool {
+	return env.ctx.AccountFreezeEnabled
 }
 
 func (env *commonEnv) VM() *VirtualMachine {
@@ -115,7 +128,7 @@ func (env *commonEnv) VM() *VirtualMachine {
 }
 
 func (env *commonEnv) GenerateUUID() (uint64, error) {
-	defer env.ctx.StartExtensiveTracingSpanFromRoot(trace.FVMEnvGenerateUUID).End()
+	defer env.StartExtensiveTracingSpanFromRoot(trace.FVMEnvGenerateUUID).End()
 
 	if env.uuidGenerator == nil {
 		return 0, errors.NewOperationNotSupportedError("GenerateUUID")
@@ -135,7 +148,7 @@ func (env *commonEnv) GenerateUUID() (uint64, error) {
 
 // GetCurrentBlockHeight returns the current block height.
 func (env *commonEnv) GetCurrentBlockHeight() (uint64, error) {
-	defer env.ctx.StartExtensiveTracingSpanFromRoot(trace.FVMEnvGetCurrentBlockHeight).End()
+	defer env.StartExtensiveTracingSpanFromRoot(trace.FVMEnvGetCurrentBlockHeight).End()
 
 	err := env.Meter(meter.ComputationKindGetCurrentBlockHeight, 1)
 	if err != nil {
@@ -150,7 +163,7 @@ func (env *commonEnv) GetCurrentBlockHeight() (uint64, error) {
 
 // GetBlockAtHeight returns the block at the given height.
 func (env *commonEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, error) {
-	defer env.ctx.StartSpanFromRoot(trace.FVMEnvGetBlockAtHeight).End()
+	defer env.StartSpanFromRoot(trace.FVMEnvGetBlockAtHeight).End()
 
 	err := env.Meter(meter.ComputationKindGetBlockAtHeight, 1)
 	if err != nil {
@@ -178,7 +191,7 @@ func (env *commonEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, erro
 
 func (env *commonEnv) GetValue(owner, key []byte) ([]byte, error) {
 	var valueByteSize int
-	span := env.ctx.StartSpanFromRoot(trace.FVMEnvGetValue)
+	span := env.StartSpanFromRoot(trace.FVMEnvGetValue)
 	defer func() {
 		if !trace.IsSampled(span) {
 			span.SetAttributes(
@@ -208,7 +221,7 @@ func (env *commonEnv) GetValue(owner, key []byte) ([]byte, error) {
 
 // TODO disable SetValue for scripts, right now the view changes are discarded
 func (env *commonEnv) SetValue(owner, key, value []byte) error {
-	span := env.ctx.StartSpanFromRoot(trace.FVMEnvSetValue)
+	span := env.StartSpanFromRoot(trace.FVMEnvSetValue)
 	if !trace.IsSampled(span) {
 		span.SetAttributes(
 			attribute.String("owner", hex.EncodeToString(owner)),
@@ -234,7 +247,7 @@ func (env *commonEnv) SetValue(owner, key, value []byte) error {
 }
 
 func (env *commonEnv) ValueExists(owner, key []byte) (exists bool, err error) {
-	defer env.ctx.StartSpanFromRoot(trace.FVMEnvValueExists).End()
+	defer env.StartSpanFromRoot(trace.FVMEnvValueExists).End()
 
 	err = env.Meter(meter.ComputationKindValueExists, 1)
 	if err != nil {
@@ -250,7 +263,7 @@ func (env *commonEnv) ValueExists(owner, key []byte) (exists bool, err error) {
 }
 
 func (env *commonEnv) GetStorageUsed(address common.Address) (value uint64, err error) {
-	defer env.ctx.StartSpanFromRoot(trace.FVMEnvGetStorageUsed).End()
+	defer env.StartSpanFromRoot(trace.FVMEnvGetStorageUsed).End()
 
 	err = env.Meter(meter.ComputationKindGetStorageUsed, 1)
 	if err != nil {
@@ -273,7 +286,7 @@ func storageMBUFixToBytesUInt(result cadence.Value) uint64 {
 }
 
 func (env *commonEnv) GetAccountContractNames(address runtime.Address) ([]string, error) {
-	defer env.ctx.StartSpanFromRoot(trace.FVMEnvGetAccountContractNames).End()
+	defer env.StartSpanFromRoot(trace.FVMEnvGetAccountContractNames).End()
 
 	err := env.Meter(meter.ComputationKindGetAccountContractNames, 1)
 	if err != nil {
@@ -291,7 +304,7 @@ func (env *commonEnv) GetAccountContractNames(address runtime.Address) ([]string
 }
 
 func (env *commonEnv) GetCode(location runtime.Location) ([]byte, error) {
-	defer env.ctx.StartSpanFromRoot(trace.FVMEnvGetCode).End()
+	defer env.StartSpanFromRoot(trace.FVMEnvGetCode).End()
 
 	err := env.Meter(meter.ComputationKindGetCode, 1)
 	if err != nil {
@@ -319,7 +332,7 @@ func (env *commonEnv) GetCode(location runtime.Location) ([]byte, error) {
 }
 
 func (env *commonEnv) GetAccountContractCode(address runtime.Address, name string) (code []byte, err error) {
-	defer env.ctx.StartSpanFromRoot(trace.FVMEnvGetAccountContractCode).End()
+	defer env.StartSpanFromRoot(trace.FVMEnvGetAccountContractCode).End()
 
 	err = env.Meter(meter.ComputationKindGetAccountContractCode, 1)
 	if err != nil {
@@ -338,7 +351,7 @@ func (env *commonEnv) GetAccountContractCode(address runtime.Address, name strin
 }
 
 func (env *commonEnv) GetProgram(location common.Location) (*interpreter.Program, error) {
-	defer env.ctx.StartSpanFromRoot(trace.FVMEnvGetProgram).End()
+	defer env.StartSpanFromRoot(trace.FVMEnvGetProgram).End()
 
 	err := env.Meter(meter.ComputationKindGetProgram, 1)
 	if err != nil {
@@ -363,7 +376,7 @@ func (env *commonEnv) GetProgram(location common.Location) (*interpreter.Program
 }
 
 func (env *commonEnv) SetProgram(location common.Location, program *interpreter.Program) error {
-	defer env.ctx.StartSpanFromRoot(trace.FVMEnvSetProgram).End()
+	defer env.StartSpanFromRoot(trace.FVMEnvSetProgram).End()
 
 	err := env.Meter(meter.ComputationKindSetProgram, 1)
 	if err != nil {
@@ -387,7 +400,7 @@ func (env *commonEnv) Hash(
 	tag string,
 	hashAlgorithm runtime.HashAlgorithm,
 ) ([]byte, error) {
-	defer env.ctx.StartSpanFromRoot(trace.FVMEnvHash).End()
+	defer env.StartSpanFromRoot(trace.FVMEnvHash).End()
 
 	err := env.Meter(meter.ComputationKindHash, 1)
 	if err != nil {
@@ -399,7 +412,7 @@ func (env *commonEnv) Hash(
 }
 
 func (env *commonEnv) DecodeArgument(b []byte, _ cadence.Type) (cadence.Value, error) {
-	defer env.ctx.StartExtensiveTracingSpanFromRoot(trace.FVMEnvDecodeArgument).End()
+	defer env.StartExtensiveTracingSpanFromRoot(trace.FVMEnvDecodeArgument).End()
 
 	v, err := jsoncdc.Decode(env, b)
 	if err != nil {

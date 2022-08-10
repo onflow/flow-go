@@ -156,6 +156,13 @@ func TestComputeBlock_Uploader(t *testing.T) {
 	ledger, err := complete.NewLedger(&fixtures.NoopWAL{}, 10, noopCollector, zerolog.Nop(), complete.DefaultPathFinderVersion)
 	require.NoError(t, err)
 
+	compactor := fixtures.NewNoopCompactor(ledger)
+	<-compactor.Ready()
+	defer func() {
+		<-ledger.Done()
+		<-compactor.Done()
+	}()
+
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
 

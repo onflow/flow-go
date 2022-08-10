@@ -27,12 +27,15 @@ func TestStorageUsedUpdateMigrationMigration(t *testing.T) {
 		status.SetStorageUsed(1)
 		payload := []ledger.Payload{
 			// TODO (ramtin) add more registers
-			{Key: createAccountPayloadKey(address1, state2.KeyAccountStatus), Value: status.ToBytes()},
+			*ledger.NewPayload(
+				createAccountPayloadKey(address1, state2.KeyAccountStatus),
+				status.ToBytes(),
+			),
 		}
 		migratedPayload, err := mig.Migrate(payload)
 		require.NoError(t, err)
 
-		migratedStatus, err := state2.AccountStatusFromBytes(migratedPayload[0].Value)
+		migratedStatus, err := state2.AccountStatusFromBytes(migratedPayload[0].Value())
 		require.NoError(t, err)
 
 		require.Equal(t, len(migratedPayload), len(payload))
@@ -43,12 +46,15 @@ func TestStorageUsedUpdateMigrationMigration(t *testing.T) {
 		status := state2.NewAccountStatus()
 		status.SetStorageUsed(10000)
 		payload := []ledger.Payload{
-			{Key: createAccountPayloadKey(address1, state2.KeyAccountStatus), Value: status.ToBytes()},
+			*ledger.NewPayload(
+				createAccountPayloadKey(address1, state2.KeyAccountStatus),
+				status.ToBytes(),
+			),
 		}
 		migratedPayload, err := mig.Migrate(payload)
 		require.NoError(t, err)
 
-		migratedStatus, err := state2.AccountStatusFromBytes(migratedPayload[0].Value)
+		migratedStatus, err := state2.AccountStatusFromBytes(migratedPayload[0].Value())
 		require.NoError(t, err)
 
 		require.Equal(t, len(migratedPayload), len(payload))
@@ -59,12 +65,15 @@ func TestStorageUsedUpdateMigrationMigration(t *testing.T) {
 		status := state2.NewAccountStatus()
 		status.SetStorageUsed(40)
 		payload := []ledger.Payload{
-			{Key: createAccountPayloadKey(address1, state2.KeyAccountStatus), Value: status.ToBytes()},
+			*ledger.NewPayload(
+				createAccountPayloadKey(address1, state2.KeyAccountStatus),
+				status.ToBytes(),
+			),
 		}
 		migratedPayload, err := mig.Migrate(payload)
 		require.NoError(t, err)
 
-		migratedStatus, err := state2.AccountStatusFromBytes(migratedPayload[0].Value)
+		migratedStatus, err := state2.AccountStatusFromBytes(migratedPayload[0].Value())
 		require.NoError(t, err)
 
 		require.Equal(t, len(migratedPayload), len(payload))
@@ -73,7 +82,10 @@ func TestStorageUsedUpdateMigrationMigration(t *testing.T) {
 
 	t.Run("error is storage used does not exist", func(t *testing.T) {
 		payload := []ledger.Payload{
-			{Key: createAccountPayloadKey(address1, state2.KeyAccountStatus), Value: []byte{1}},
+			*ledger.NewPayload(
+				createAccountPayloadKey(address1, state2.KeyAccountStatus),
+				[]byte{1},
+			),
 		}
 		_, err := mig.Migrate(payload)
 		require.Error(t, err)
