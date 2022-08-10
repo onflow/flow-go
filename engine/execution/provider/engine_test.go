@@ -75,7 +75,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		// submit using origin ID with invalid role
 		unittest.RequireCloseBefore(t, e.Ready(), 100*time.Millisecond, "could not start engine")
 		require.NoError(t, e.Process(channels.RequestChunks, originID, req))
-		time.Sleep(1 * time.Second)
+		time.Sleep(1 * time.Second) // waits enough so that request is picked from queue.
 		cancel()
 		unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
 
@@ -133,7 +133,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		// submit using origin ID with zero weight
 		unittest.RequireCloseBefore(t, e.Ready(), 100*time.Millisecond, "could not start engine")
 		require.NoError(t, e.Process(channels.RequestChunks, originID, req))
-		time.Sleep(1 * time.Second)
+		time.Sleep(1 * time.Second) // waits enough so that request is picked from queue.
 		cancel()
 		unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
 
@@ -191,7 +191,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		// submit using non-existing origin ID
 		unittest.RequireCloseBefore(t, e.Ready(), 100*time.Millisecond, "could not start engine")
 		require.NoError(t, e.Process(channels.RequestChunks, originID, req))
-		time.Sleep(1 * time.Second)
+		time.Sleep(1 * time.Second) // waits enough so that request is picked from queue.
 		cancel()
 		unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
 
@@ -246,7 +246,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		// submit using non-existing origin ID
 		unittest.RequireCloseBefore(t, e.Ready(), 100*time.Millisecond, "could not start engine")
 		require.NoError(t, e.Process(channels.RequestChunks, originIdentity.NodeID, req))
-		time.Sleep(1 * time.Second)
+		time.Sleep(1 * time.Second) // waits enough so that request is picked from queue.
 		cancel()
 		unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
 
@@ -317,7 +317,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		// submit using non-existing origin ID
 		unittest.RequireCloseBefore(t, e.Ready(), 100*time.Millisecond, "could not start engine")
 		require.NoError(t, e.Process(channels.RequestChunks, originIdentity.NodeID, req))
-		time.Sleep(1 * time.Second)
+		time.Sleep(1 * time.Second) // waits enough so that request is picked from queue.
 		cancel()
 		unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
 
@@ -364,6 +364,9 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		ps.On("AtBlockID", blockID).Return(ss)
 
 		ss.On("Identity", originIdentity.NodeID).Return(originIdentity, nil).Once()
+
+		// channel tracking for the first chunk data pack request responded.
+		responded := make(chan struct{})
 		chunkConduit.On("Unicast", mock.Anything, originIdentity.NodeID).
 			Run(func(args mock.Arguments) {
 				res, ok := args[0].(*messages.ChunkDataResponse)
@@ -371,6 +374,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 				actualChunkID := res.ChunkDataPack.ChunkID
 				assert.Equal(t, chunkID, actualChunkID)
+				close(responded)
 			}).
 			Return(nil).Once()
 
@@ -388,9 +392,14 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		// submit using non-existing origin ID
 		unittest.RequireCloseBefore(t, e.Ready(), 100*time.Millisecond, "could not start engine")
 		require.NoError(t, e.Process(channels.RequestChunks, originIdentity.NodeID, req))
-		time.Sleep(1 * time.Second)
+		time.Sleep(1 * time.Second) // waits enough so that request is picked from queue.
+
+		// waits till first chunk data pack is replied and then makes the requester unauthorized.
+		unittest.RequireCloseBefore(t, responded, 1*time.Second, "could not get first chunk data pack responded")
 		currentAuthorizedState = false
+
 		require.NoError(t, e.Process(channels.RequestChunks, originIdentity.NodeID, req))
+		time.Sleep(1 * time.Second) // waits enough so that request is picked from queue.
 		cancel()
 		unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
 
