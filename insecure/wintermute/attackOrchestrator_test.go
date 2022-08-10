@@ -238,13 +238,13 @@ func mockAttackNetworkForCorruptedExecutionResult(
 			require.True(t, ok)
 
 			// make sure sender is a corrupted execution node.
-			ok = corruptedExecutionIds.Contains(event.CorruptedNodeId)
+			ok = corruptedExecutionIds.Contains(event.OriginId)
 			require.True(t, ok)
 
 			// makes sure sender is unique
-			_, ok = seen[event.CorruptedNodeId]
+			_, ok = seen[event.OriginId]
 			require.False(t, ok)
-			seen[event.CorruptedNodeId] = struct{}{}
+			seen[event.OriginId] = struct{}{}
 
 			// make sure message being sent on correct channel
 			require.Equal(t, channels.PushReceipts, event.Channel)
@@ -557,8 +557,8 @@ func TestPassingThroughMiscellaneousEvents(t *testing.T) {
 	// creates a block event fixture that is out of the context of
 	// the wintermute attack.
 	miscellaneousEvent := &insecure.EgressEvent{
-		CorruptedNodeId:   corruptedIds.Sample(1)[0],
-		Channel:           "test_channel",
+		OriginId:          corruptedIds.Sample(1)[0],
+		Channel:           channels.TestNetworkChannel,
 		Protocol:          insecure.Protocol_MULTICAST,
 		TargetNum:         3,
 		TargetIds:         unittest.IdentifierListFixture(10),
@@ -631,8 +631,8 @@ func TestPassingThrough_ResultApproval(t *testing.T) {
 	require.NotEqual(t, wintermuteOrchestrator.state.originalResult.ID(), approval.ID())
 	require.NotEqual(t, wintermuteOrchestrator.state.corruptedResult.ID(), approval.ID())
 	approvalEvent := &insecure.EgressEvent{
-		CorruptedNodeId:   corruptedIds.Sample(1)[0],
-		Channel:           "test_channel",
+		OriginId:          corruptedIds.Sample(1)[0],
+		Channel:           channels.TestNetworkChannel,
 		Protocol:          insecure.Protocol_MULTICAST,
 		TargetNum:         3,
 		TargetIds:         unittest.IdentifierListFixture(10),
@@ -703,11 +703,11 @@ func TestWintermute_ResultApproval(t *testing.T) {
 
 	// generates a result approval event for one of the chunks of the original result.
 	approvalEvent := &insecure.EgressEvent{
-		CorruptedNodeId: corruptedIds.Sample(1)[0],
-		Channel:         "test_channel",
-		Protocol:        insecure.Protocol_MULTICAST,
-		TargetNum:       3,
-		TargetIds:       unittest.IdentifierListFixture(10),
+		OriginId:  corruptedIds.Sample(1)[0],
+		Channel:   channels.TestNetworkChannel,
+		Protocol:  insecure.Protocol_MULTICAST,
+		TargetNum: 3,
+		TargetIds: unittest.IdentifierListFixture(10),
 		FlowProtocolEvent: unittest.ResultApprovalFixture(
 			unittest.WithExecutionResultID(originalResult.ID()),
 			unittest.WithChunk(0)),

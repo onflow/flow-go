@@ -51,7 +51,7 @@ func NewDummyOrchestrator(logger zerolog.Logger) *dummyOrchestrator {
 // dispatch them on the Flow network.
 func (d *dummyOrchestrator) HandleEventFromCorruptedNode(event *insecure.EgressEvent) error {
 	lg := d.logger.With().
-		Hex("corrupted_id", logging.ID(event.CorruptedNodeId)).
+		Hex("corrupted_id", logging.ID(event.OriginId)).
 		Str("channel", event.Channel.String()).
 		Str("protocol", event.Protocol.String()).
 		Uint32("target_num", event.TargetNum).

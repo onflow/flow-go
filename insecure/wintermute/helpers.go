@@ -56,7 +56,7 @@ func chunkDataPackRequestForReceipts(
 			// creates a request event per verification node
 			for _, verId := range corVnIds {
 				event := &insecure.EgressEvent{
-					CorruptedNodeId:   verId,
+					OriginId:          verId,
 					Channel:           channels.RequestChunks,
 					Protocol:          insecure.Protocol_PUBLISH,
 					TargetNum:         0,
@@ -118,7 +118,7 @@ func receiptsWithSameResultFixture(
 // executionReceiptEvent creates the attack network event of the corresponding execution receipt.
 func executionReceiptEvent(receipt *flow.ExecutionReceipt, targetIds flow.IdentifierList) *insecure.EgressEvent {
 	return &insecure.EgressEvent{
-		CorruptedNodeId:   receipt.ExecutorID,
+		OriginId:          receipt.ExecutorID,
 		Channel:           channels.PushReceipts,
 		Protocol:          insecure.Protocol_UNICAST,
 		TargetIds:         targetIds,
@@ -149,7 +149,7 @@ func chunkDataPackResponseForReceipts(receipts []*flow.ExecutionReceipt, verIds 
 			// creates a request event per verification node
 			for _, verId := range verIds {
 				event := &insecure.EgressEvent{
-					CorruptedNodeId:   receipt.ExecutorID,
+					OriginId:          receipt.ExecutorID,
 					Channel:           channels.RequestChunks,
 					Protocol:          insecure.Protocol_PUBLISH,
 					TargetNum:         0,
@@ -210,7 +210,7 @@ func orchestratorOutputSanityCheck(
 			if len(event.ExecutorSignature.Bytes()) != 0 {
 				// a receipt with a non-empty signature is a pass-through receipt.
 				// makes sure sender is a corrupted execution node.
-				ok := corrEnIds.Contains(outputEvent.CorruptedNodeId)
+				ok := corrEnIds.Contains(outputEvent.OriginId)
 				require.True(t, ok)
 				// uses union to avoid adding duplicate.
 				passThroughReceipts = passThroughReceipts.Union(flow.IdentifierList{event.ID()})
@@ -222,7 +222,7 @@ func orchestratorOutputSanityCheck(
 					dictatedResults[resultId] = flow.IdentifierList{}
 				}
 				// uses union to avoid adding duplicate.
-				dictatedResults[resultId] = dictatedResults[resultId].Union(flow.IdentifierList{outputEvent.CorruptedNodeId})
+				dictatedResults[resultId] = dictatedResults[resultId].Union(flow.IdentifierList{outputEvent.OriginId})
 			}
 		}
 	}

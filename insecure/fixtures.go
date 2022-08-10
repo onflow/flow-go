@@ -59,7 +59,7 @@ func EgressMessageFixture(t *testing.T, codec network.Codec, protocol Protocol, 
 	// creates corresponding event of that message that
 	// is sent by attack network to orchestrator.
 	e := &EgressEvent{
-		CorruptedNodeId:   originId,
+		OriginId:          originId,
 		Channel:           channel,
 		FlowProtocolEvent: content,
 		Protocol:          protocol,
@@ -109,7 +109,7 @@ func IngressMessageFixture(t *testing.T, codec network.Codec, protocol Protocol,
 	// creates corresponding event of that message that
 	// is sent by attack network to orchestrator.
 	e := &EgressEvent{
-		CorruptedNodeId:   originId,
+		OriginId:          originId,
 		Channel:           channel,
 		FlowProtocolEvent: content,
 		Protocol:          protocol,
