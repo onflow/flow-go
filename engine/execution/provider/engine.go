@@ -132,17 +132,21 @@ func (e *Engine) Done() <-chan struct{} {
 	return e.cm.Done()
 }
 
+// processChunkDataPackRequestWorker encapsulates the logic of a single (concurrent) worker that picks a chunk data pack
+// request from this engine's queue and processes it.
 func (e *Engine) processChunkDataPackRequestWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 	ticker := time.NewTicker(e.chdpRequestProcessInterval)
-	e.log.Debug().Msg("process chunk data pack request worker started")
+	e.log.Debug().
+		Dur("process_inveral", e.chdpRequestProcessInterval).
+		Msg("process chunk data pack request worker started")
 
 	for {
 		select {
 		case <-ticker.C:
 			request, exists := e.chdpRequestsQueue.Pop()
 			if !exists {
-				e.log.Trace().Msg("worker did not find any chunk data pack request, passing this cycle")
+				e.log.Trace().Msg("worker did not find any chunk data pack request, sleeping till next cycle")
 				continue
 			}
 			lg := e.log.With().
@@ -177,9 +181,8 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	return nil
 }
 
-// onChunkDataRequest receives a request for the chunk data pack associated with chunkID from the
-// requester `originID`. If such a chunk data pack is available in the execution state, it is sent to the
-// requester.
+// onChunkDataRequest receives a request for a chunk data pack,
+// and if such a chunk data pack is available in the execution state, it is sent to the requester node.
 func (e *Engine) onChunkDataRequest(request *mempool.ChunkDataPackRequest) {
 	processStart := time.Now()
 
@@ -187,13 +190,12 @@ func (e *Engine) onChunkDataRequest(request *mempool.ChunkDataPackRequest) {
 		Hex("origin_id", logging.ID(request.RequesterId)).
 		Hex("chunk_id", logging.ID(request.ChunkId)).
 		Logger()
-
 	lg.Info().Msg("received chunk data pack request")
 
 	// increases collector metric
 	e.metrics.ChunkDataPackRequested()
-
 	chunkDataPack, err := e.execState.ChunkDataPackByChunkID(request.ChunkId)
+
 	// we might be behind when we don't have the requested chunk.
 	// if this happen, log it and return nil
 	if errors.Is(err, storage.ErrNotFound) {
@@ -228,11 +230,9 @@ func (e *Engine) onChunkDataRequest(request *mempool.ChunkDataPackRequest) {
 	if sinceProcess > e.chdpQueryTimeout {
 		lg.Warn().Msgf("chunk data pack query takes longer than %v secs", e.chdpQueryTimeout.Seconds())
 	}
-
 	lg.Info().Msg("chunk data pack response lunched to dispatch")
 
 	// sends requested chunk data pack to the requester
-
 	deliveryStart := time.Now()
 
 	err = e.chunksConduit.Unicast(response, request.RequesterId)
@@ -241,13 +241,13 @@ func (e *Engine) onChunkDataRequest(request *mempool.ChunkDataPackRequest) {
 	lg = lg.With().Dur("since_deliver", sinceDeliver).Logger()
 
 	if sinceDeliver > e.chdpDeliveryTimeout {
-		lg.Warn().Msgf("chunk data pack response delivery takes longer than %v secs", e.chdpDeliveryTimeout.Seconds())
+		lg.Warn().Msgf("chunk data pack response delivery has taken longer than %v secs", e.chdpDeliveryTimeout.Seconds())
 	}
 
 	if err != nil {
 		lg.Warn().
 			Err(err).
-			Msg("could not send requested chunk data pack to origin ID")
+			Msg("could not send requested chunk data pack to requester")
 		return
 	}
 
@@ -260,7 +260,6 @@ func (e *Engine) onChunkDataRequest(request *mempool.ChunkDataPackRequest) {
 	}
 
 	lg.Info().Msg("chunk data pack request successfully replied")
-
 }
 
 func (e *Engine) ensureAuthorized(chunkID flow.Identifier, originID flow.Identifier) (*flow.Identity, error) {
