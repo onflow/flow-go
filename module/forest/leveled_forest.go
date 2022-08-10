@@ -1,6 +1,7 @@
 package forest
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -17,6 +18,11 @@ type InvalidVertexError struct {
 
 func (err InvalidVertexError) Error() string {
 	return fmt.Sprintf("invalid vertex %s: %s", VertexToString(err.Vertex), err.msg)
+}
+
+func IsInvalidVertexError(err error) bool {
+	var target InvalidVertexError
+	return errors.As(err, &target)
 }
 
 func NewInvalidVertexErrorf(vertex Vertex, msg string, args ...interface{}) InvalidVertexError {

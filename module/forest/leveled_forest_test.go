@@ -362,6 +362,12 @@ func TestLevelledForest_PruneAtLevel(t *testing.T) {
 	assert.True(t, mempool.IsBelowPrunedThresholdError(err))
 }
 
+func TestIsInvalidVertexError(t *testing.T) {
+	vertex := NewVertexMock("A", 1, "B", 0)
+	err := NewInvalidVertexErrorf(vertex, "some error")
+	assert.True(t, IsInvalidVertexError(err))
+}
+
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~ Helper Functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
 
 func populateNewForest(t *testing.T) *LevelledForest {

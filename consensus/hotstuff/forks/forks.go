@@ -27,12 +27,17 @@ type Forks struct {
 
 var _ hotstuff.Forks = (*Forks)(nil)
 
-// TODO document
+// ancestryChain encapsulates a block, its parent (oneChain) and its grand-parent (twoChain).
+// Given a chain structure like:
+//   b <~ b' <~ b*
+//
+// This data structure looks like:
+//   twoChain   oneChain     block
+//   [b<-qc_b]  [b'<-qc_b']  [b*]
 type ancestryChain struct {
-	block      *BlockContainer
-	oneChain   *BlockQC
-	twoChain   *BlockQC
-	threeChain *BlockQC // TODO remove
+	block    *BlockContainer
+	oneChain *BlockQC
+	twoChain *BlockQC
 }
 
 // ErrPrunedAncestry is a sentinel error: cannot resolve ancestry of block due to pruning
@@ -52,9 +57,10 @@ func New(trustedRoot *BlockQC, finalizationCallback module.Finalizer, notifier h
 		newestView:           trustedRoot.Block.View,
 	}
 
-	// CAUTION: instead of a proposal, we use a normal block (without `SigData` and `LastViewTC`, which would be
-	// possibly included in a full proposal). Per convention, we consider the root block as already and enter a
-	// higher view. Therefore, the root block's proposer signature and TC are irrelevant for consensus.
+	// CAUTION: instead of a proposal, we use a normal block (without `SigData` and `LastViewTC`,
+	// which would be possibly included in a full proposal). Per convention, we consider the
+	// root block as already committed and enter a higher view.
+	// Therefore, the root block's proposer signature and TC are irrelevant for consensus.
 	trustedRootProposal := &model.Proposal{
 		Block: trustedRoot.Block,
 	}
@@ -169,6 +175,7 @@ func (f *Forks) AddProposal(proposal *model.Proposal) error {
 // This means there are two Quorums for conflicting blocks at the same view.
 // Per Lemma 1 from the HotStuff paper https://arxiv.org/abs/1803.05069v6, two
 // conflicting QCs can exist if and only if of the Byzantine threshold is exceeded.
+// Returns model.ByzantineThresholdExceededError if input QC conflicts with an existing QC.
 func (f *Forks) checkForConflictingQCs(qc *flow.QuorumCertificate) error {
 	it := f.forest.GetVerticesAtLevel(qc.View)
 	for it.HasNext() {
@@ -194,7 +201,7 @@ func (f *Forks) checkForConflictingQCs(qc *flow.QuorumCertificate) error {
 }
 
 // checkForDoubleProposal checks if Proposal is a double proposal. In case it is,
-// notifier.OnDoubleProposeDetected is triggered
+// notifier.OnDoubleProposeDetected is triggered.
 func (f *Forks) checkForDoubleProposal(container *BlockContainer) {
 	block := container.Proposal.Block
 	it := f.forest.GetVerticesAtLevel(block.View)
@@ -207,17 +214,22 @@ func (f *Forks) checkForDoubleProposal(container *BlockContainer) {
 }
 
 // updateConsensusState updates consensus state.
+// TODO improve doc
 // Calling this method with previously-processed blocks leaves the consensus state invariant.
 // UNVALIDATED: assumes that relevant block properties are consistent with previous blocks
+// TODO error doc
 func (f *Forks) updateConsensusState(blockContainer *BlockContainer) error {
 	ancestryChain, err := f.getThreeChain(blockContainer)
-	// We expect that getThreeChain might error with a ErrorPrunedAncestry. This error indicates that the
-	// 3-chain of this block reaches _beyond_ the last finalized block. It is straight forward to show:
+	// We expect that getThreeChain might error with a ErrPrunedAncestry. This error indicates that the
+	// 2-chain of this block reaches _beyond_ the last finalized block. It is straight forward to show:
 	// Lemma: Let B be a block whose 3-chain reaches beyond the last finalized block
 	//        => B will not update the locked or finalized block
 	if errors.Is(err, ErrPrunedAncestry) { // blockContainer's 3-chain reaches beyond the last finalized block
 		// based on Lemma from above, we can skip attempting to update locked or finalized block
 		return nil
+	}
+	if model.IsMissingBlockError(err) {
+		return fmt.Errorf("unexpected missing block while updating consensus state: %s", err.Error())
 	}
 	if err != nil { // otherwise, there is an unknown error that we need to escalate to the higher-level application logic
 		return fmt.Errorf("retrieving 3-chain ancestry failed: %w", err)
@@ -231,8 +243,14 @@ func (f *Forks) updateConsensusState(blockContainer *BlockContainer) error {
 	return nil
 }
 
-// getThreeChain returns the three chain or a ErrorPrunedAncestry sentinel error
-// to indicate that the 3-chain from blockContainer is (partially) pruned
+// getThreeChain returns the 2-chain for the input block container b.
+// See ancestryChain for documentation on the structure of the 2-chain.
+// Returns ErrPrunedAncestry if any part of the 2-chain is below the last pruned view.
+// Error returns:
+// * ErrPrunedAncestry if any part of the 2-chain is below the last pruned view.
+// * model.MissingBlockError if any block in the 2-chain does not exist in the forest
+//   (but is above the pruned view)
+// * generic error in case of unexpected bug or internal state corruption
 func (f *Forks) getThreeChain(blockContainer *BlockContainer) (*ancestryChain, error) {
 	ancestryChain := ancestryChain{block: blockContainer}
 
@@ -245,17 +263,17 @@ func (f *Forks) getThreeChain(blockContainer *BlockContainer) (*ancestryChain, e
 	if err != nil {
 		return nil, err
 	}
-	ancestryChain.threeChain, err = f.getNextAncestryLevel(ancestryChain.twoChain.Block)
-	if err != nil {
-		return nil, err
-	}
 	return &ancestryChain, nil
 }
 
-// getNextAncestryLevel parent from forest. Returns QCBlock for the parent,
+// getNextAncestryLevel retrieves parent from forest. Returns QCBlock for the parent,
 // i.e. the parent block itself and the qc pointing to the parent, i.e. block.QC().
-// If the block's parent is below the pruned view, it will error with an ErrorPrunedAncestry.
 // UNVALIDATED: expects block to pass Forks.VerifyProposal(block)
+// Error returns:
+// * ErrPrunedAncestry if the input block's parent is below the pruned view.
+// * model.MissingBlockError if the parent block does not exist in the forest
+//   (but is above the pruned view)
+// * generic error in case of unexpected bug or internal state corruption
 func (f *Forks) getNextAncestryLevel(block *model.Block) (*BlockQC, error) {
 	// The finalizer prunes all blocks in forest which are below the most recently finalized block.
 	// Hence, we have a pruned ancestry if and only if either of the following conditions applies:
@@ -275,12 +293,14 @@ func (f *Forks) getNextAncestryLevel(block *model.Block) (*BlockQC, error) {
 	if !parentBlockKnown {
 		return nil, model.MissingBlockError{View: block.QC.View, BlockID: block.QC.BlockID}
 	}
-	newBlock := parentVertex.(*BlockContainer).Proposal.Block
-	if newBlock.BlockID != block.QC.BlockID || newBlock.View != block.QC.View {
-		return nil, fmt.Errorf("mismatch between finalized block and QC")
+	parentBlock := parentVertex.(*BlockContainer).Proposal.Block
+	// sanity check consistency between input block and parent
+	if parentBlock.BlockID != block.QC.BlockID || parentBlock.View != block.QC.View {
+		return nil, fmt.Errorf("parent/child mismatch while getting ancestry level: child: (id=%x, view=%d, qc.view=%d, qc.block_id=%x) parent: (id=%x, view=%d)",
+			block.BlockID, block.View, block.QC.View, block.QC.BlockID, parentBlock.BlockID, parentBlock.View)
 	}
 
-	blockQC := BlockQC{Block: newBlock, QC: block.QC}
+	blockQC := BlockQC{Block: parentBlock, QC: block.QC}
 
 	return &blockQC, nil
 }
@@ -299,12 +319,14 @@ func (f *Forks) updateLockedQc(ancestryChain *ancestryChain) {
 	f.lastLocked = ancestryChain.twoChain
 }
 
-// TODO remove?
-// updateFinalizedBlockQc updates `lastFinalizedBlockQC`
-// We use the finalization rule from 'Event-driven HotStuff Protocol' where the condition is:
-//    * Consider the set S of all blocks that have a DIRECT 2-chain on top of it PLUS any 1-chain
-//    * The 'Last finalized Proposal' is the block in S with the _highest view number_ (newest);
+// updateFinalizedBlockQc updates `lastFinalizedBlockQC` if the input ancestryChain
+// allows finalizing the lowest block in the chain (b).
+// If b cannot be finalized, this is a no-op.
 // Calling this method with previously-processed blocks leaves consensus state invariant.
+// We use the finalization rule from DiemBFT v4 where the condition is:
+//    * Consider the set S of all blocks that have a DIRECT 1-chain on top of it PLUS any 1-chain
+//    * The 'Last finalized Proposal' is the block in S with the _highest view number_ (newest);
+// TODO error docs
 func (f *Forks) updateFinalizedBlockQc(ancestryChain *ancestryChain) error {
 	// Note: we assume that all stored blocks pass Forks.VerifyProposal(block);
 	//       specifically, that Proposal's ViewNumber is strictly monotonously
@@ -312,12 +334,12 @@ func (f *Forks) updateFinalizedBlockQc(ancestryChain *ancestryChain) error {
 	// We denote:
 	//  * a DIRECT 1-chain as '<-'
 	//  * a general 1-chain as '<~' (direct or indirect)
-	// The rule from 'Event-driven HotStuff' for finalizing block b is
-	//     b <- b' <- b'' <~ b*     (aka a DIRECT 2-chain PLUS any 1-chain)
-	// where b* is the input block to this method.
-	// Hence, we can finalize b, if and only the viewNumber of b'' is exactly 2 higher than the view of b
-	b := ancestryChain.threeChain // note that b is actually not the block itself here but rather the QC pointing to it
-	if ancestryChain.oneChain.Block.View != b.Block.View+2 {
+	// The rule from 'Diem BFT' for finalizing block b is
+	//     b <- b' <~ b*     (aka a DIRECT 1-chain PLUS any 1-chain)
+	// where b* is the head block of the input ancestryChain
+	// Hence, we can finalize b, if and only the viewNumber of b' is exactly 1 higher than the view of b
+	b := ancestryChain.twoChain // note that b is actually not the block itself here but rather the QC pointing to it
+	if ancestryChain.oneChain.Block.View != b.Block.View+1 {
 		return nil
 	}
 	return f.finalizeUpToBlock(b.QC)
@@ -325,7 +347,7 @@ func (f *Forks) updateFinalizedBlockQc(ancestryChain *ancestryChain) error {
 
 // finalizeUpToBlock finalizes all blocks up to (and including) the block pointed to by `qc`.
 // Finalization starts with the child of `lastFinalizedBlockQC` (explicitly checked);
-// and calls OnFinalizedBlock on the newly finalized blocks in the respective order
+// and calls OnFinalizedBlock on the newly finalized blocks in increasing height order.
 // Error returns:
 // * model.ByzantineThresholdExceededError if we are finalizing a block which is invalid to finalize.
 //   This either indicates a critical internal bug / data corruption, or that the network Byzantine
@@ -342,8 +364,8 @@ func (f *Forks) finalizeUpToBlock(qc *flow.QuorumCertificate) error {
 		// Sanity check: the previously last Finalized Proposal must be an ancestor of `block`
 		if f.lastFinalized.Block.BlockID != qc.BlockID {
 			return model.ByzantineThresholdExceededError{Evidence: fmt.Sprintf(
-				"finalizing blocks at conflicting forks: %v and %v",
-				qc.BlockID, f.lastFinalized.Block.BlockID,
+				"finalizing blocks with view %d at conflicting forks: %x and %x",
+				qc.View, qc.BlockID, f.lastFinalized.Block.BlockID,
 			)}
 		}
 		return nil
@@ -351,7 +373,10 @@ func (f *Forks) finalizeUpToBlock(qc *flow.QuorumCertificate) error {
 	// Have: qc.View > f.lastFinalizedBlockQC.View => finalizing new block
 
 	// get Proposal and finalize everything up to the block's parent
-	blockVertex, _ := f.forest.GetVertex(qc.BlockID) // require block to resolve parent
+	blockVertex, ok := f.forest.GetVertex(qc.BlockID) // require block to resolve parent
+	if !ok {
+		return fmt.Errorf("failed to get parent while finalizing blocks (qc.view=%d, qc.block_id=%x)", qc.View, qc.BlockID)
+	}
 	blockContainer := blockVertex.(*BlockContainer)
 	block := blockContainer.Proposal.Block
 	err := f.finalizeUpToBlock(block.QC) // finalize Parent, i.e. the block pointed to by the block's QC
@@ -385,9 +410,12 @@ func (f *Forks) finalizeUpToBlock(qc *flow.QuorumCertificate) error {
 	return nil
 }
 
-// VerifyProposal checks a block for validity.
-// TODO consolidate with UnverifiedAddProposal
-// TODO error docs
+// VerifyProposal checks a block for internal consistency and consistency with
+// the current forest state. See forest.VerifyVertex for more detail.
+// Error returns:
+// * model.MissingBlockError if the parent of the input proposal does not exist in the forest
+//   (but is above the pruned view)
+// * generic error in case of unexpected bug or internal state corruption
 func (f *Forks) VerifyProposal(proposal *model.Proposal) error {
 	block := proposal.Block
 	if block.View < f.forest.LowestLevel {
@@ -395,8 +423,11 @@ func (f *Forks) VerifyProposal(proposal *model.Proposal) error {
 	}
 	blockContainer := &BlockContainer{Proposal: proposal}
 	err := f.forest.VerifyVertex(blockContainer)
+	if forest.IsInvalidVertexError(err) {
+		return fmt.Errorf("cannot add proposal %x to forest: %s", block.BlockID, err.Error())
+	}
 	if err != nil {
-		return fmt.Errorf("invalid block: %w", err)
+		return fmt.Errorf("unexpected error verifying proposal vertex: %w", err)
 	}
 
 	// omit checking existence of parent if block at lowest non-pruned view number
