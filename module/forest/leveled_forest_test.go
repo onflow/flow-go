@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/forest/mock"
@@ -78,17 +79,15 @@ func TestVertexIteratorOnEmpty(t *testing.T) {
 func TestLevelledForest_AddVertex(t *testing.T) {
 	F := NewLevelledForest(0)
 	v := NewVertexMock("A", 3, "Genesis", 0)
-	if err := F.VerifyVertex(v); err != nil {
-		assert.Fail(t, err.Error())
-	}
+	err := F.VerifyVertex(v)
+	require.NoError(t, err)
 	F.AddVertex(v)
 	assert.True(t, F.HasVertex(string2Identifier("A")))
 
 	// Adding Vertex twice should be fine
 	v = NewVertexMock("A", 3, "Genesis", 0)
-	if err := F.VerifyVertex(v); err != nil {
-		assert.Fail(t, err.Error())
-	}
+	err = F.VerifyVertex(v)
+	require.NoError(t, err)
 	F.AddVertex(v)
 	assert.True(t, F.HasVertex(string2Identifier("A")))
 }
@@ -136,15 +135,18 @@ func TestLevelledForest_VerifyVertex(t *testing.T) {
 
 	// KNOWN vertex but with wrong level number
 	err := F.VerifyVertex(NewVertexMock("D", 10, "C", 2))
-	assert.True(t, err != nil, err.Error())
+	assert.Error(t, err)
+	assert.True(t, mempool.IsBelowPrunedThresholdError(err))
 
 	// KNOWN vertex whose PARENT references a known vertex but with mismatching level
 	err = F.VerifyVertex(NewVertexMock("D", 10, "C", 10))
-	assert.True(t, err != nil, err.Error())
+	assert.Error(t, err)
+	assert.True(t, mempool.IsBelowPrunedThresholdError(err))
 
 	// adding unknown vertex whose PARENT references a known vertex but with mismatching level
 	err = F.VerifyVertex(NewVertexMock("F", 4, "Genesis", 10))
-	assert.True(t, err != nil, err.Error())
+	assert.Error(t, err)
+	assert.True(t, mempool.IsBelowPrunedThresholdError(err))
 }
 
 // TestLevelledForest_HasVertex test that vertices as correctly reported as contained in Forest
