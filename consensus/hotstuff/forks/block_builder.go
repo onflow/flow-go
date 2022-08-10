@@ -8,6 +8,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// TODO make this a test file?
+
 // BlockView specifies the data to create a block
 type BlockView struct {
 	View uint64 // the view of the block to be created

@@ -18,7 +18,7 @@ type Forks struct {
 
 	finalizationCallback module.Finalizer
 	newestView           uint64   // newestView is the highest view of block proposal stored in Forks
-	lastLocked           *BlockQC // lastLocked is the QC that POINTS TO the the most recently locked block
+	lastLocked           *BlockQC // lastLocked is the QC that POINTS TO the most recently locked block TODO remove
 	lastFinalized        *BlockQC // lastFinalized is the QC that POINTS TO the most recently finalized locked block
 }
 
@@ -39,7 +39,7 @@ func New(trustedRoot *BlockQC, finalizationCallback module.Finalizer, notifier h
 		return nil, model.NewConfigurationErrorf("invalid root: root qc is not pointing to root block")
 	}
 
-	fnlzr := Forks{
+	forks := Forks{
 		notifier:             notifier,
 		finalizationCallback: finalizationCallback,
 		forest:               *forest.NewLevelledForest(trustedRoot.Block.View),
@@ -56,16 +56,15 @@ func New(trustedRoot *BlockQC, finalizationCallback module.Finalizer, notifier h
 	}
 
 	// verify and add root block to levelled forest
-	err := fnlzr.VerifyProposal(trustedRootProposal)
+	err := forks.VerifyProposal(trustedRootProposal)
 	if err != nil {
 		return nil, fmt.Errorf("invalid root block: %w", err)
 	}
-	fnlzr.forest.AddVertex(&BlockContainer{Proposal: trustedRootProposal})
-	fnlzr.notifier.OnBlockIncorporated(trustedRoot.Block)
-	return &fnlzr, nil
+	forks.forest.AddVertex(&BlockContainer{Proposal: trustedRootProposal})
+	forks.notifier.OnBlockIncorporated(trustedRoot.Block)
+	return &forks, nil
 }
 
-func (f *Forks) LockedBlock() *model.Block    { return f.lastLocked.Block }
 func (f *Forks) FinalizedBlock() *model.Block { return f.lastFinalized.Block }
 func (f *Forks) FinalizedView() uint64        { return f.lastFinalized.Block.View }
 func (f *Forks) NewestView() uint64           { return f.newestView }
@@ -108,28 +107,6 @@ func (f *Forks) IsProcessingNeeded(block *model.Block) bool {
 		return false
 	}
 	return true
-}
-
-// IsSafeBlock returns true if block is safe to vote for
-// (according to the definition in https://arxiv.org/abs/1803.05069v6).
-// NO MODIFICATION of consensus state (read only)
-// UNVALIDATED: expects block to pass Forks.VerifyBlock(block)
-func (f *Forks) IsSafeBlock(block *model.Block) bool {
-	// According to the paper, a block is considered a safe block if
-	//  * it extends from locked block (safety rule),
-	//  * or the view of the parent block is higher than the view number of locked block (liveness rule).
-	// The two rules can be boiled down to the following:
-	// 1. If block.QC.View is higher than locked view, it definitely is a safe block.
-	// 2. If block.QC.View is lower than locked view, it definitely is not a safe block.
-	// 3. If block.QC.View equals to locked view: parent must be the locked block.
-	qc := block.QC
-	if qc.View > f.lastLocked.Block.View {
-		return true
-	}
-	if (qc.View == f.lastLocked.Block.View) && (qc.BlockID == f.lastLocked.Block.BlockID) {
-		return true
-	}
-	return false
 }
 
 // UnverifiedAddProposal adds `proposal` to the consensus state.
@@ -304,6 +281,7 @@ func (f *Forks) getNextAncestryLevel(block *model.Block) (*BlockQC, error) {
 	return &blockQC, nil
 }
 
+// TODO remove?
 // updateLockedBlock updates `lastLockedBlockQC`
 // We use the locking rule from 'Event-driven HotStuff Protocol' where the condition is:
 //    * Consider the set S of all blocks that have a INDIRECT 2-chain on top of it
@@ -317,6 +295,7 @@ func (f *Forks) updateLockedQc(ancestryChain *ancestryChain) {
 	f.lastLocked = ancestryChain.twoChain
 }
 
+// TODO remove?
 // updateFinalizedBlockQc updates `lastFinalizedBlockQC`
 // We use the finalization rule from 'Event-driven HotStuff Protocol' where the condition is:
 //    * Consider the set S of all blocks that have a DIRECT 2-chain on top of it PLUS any 1-chain
@@ -393,6 +372,7 @@ func (f *Forks) finalizeUpToBlock(qc *flow.QuorumCertificate) error {
 	return nil
 }
 
+// TODO consolidate with UnverifiedAddProposal
 // VerifyProposal checks block for validity
 func (f *Forks) VerifyProposal(proposal *model.Proposal) error {
 	block := proposal.Block
