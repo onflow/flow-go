@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TestChunkDataPackRequestQueue_Sequential evaluates correctness of queue implementation against sequential push and pop.
 func TestChunkDataPackRequestQueue_Sequential(t *testing.T) {
 	sizeLimit := 100
 	q := NewChunkDataPackRequestQueue(uint32(sizeLimit), unittest.Logger(), metrics.NewNoopCollector())
@@ -49,6 +50,15 @@ func TestChunkDataPackRequestQueue_Sequential(t *testing.T) {
 	// once queue meets the size limit, any extra push should fail.
 	for i := 0; i < 100; i++ {
 		require.False(t, q.Push(unittest.IdentifierFixture(), unittest.IdentifierFixture()))
+
+		// head should still point to the first element
+		head, ok := q.Head()
+		require.True(t, ok)
+		require.Equal(t, head.ChunkId, requests[0].ChunkId)
+		require.Equal(t, head.RequesterId, requests[0].RequesterId)
+
+		// size should not change
+		require.Equal(t, q.Size(), uint(sizeLimit))
 	}
 
 	// pop-ing requests sequentially.
@@ -77,6 +87,7 @@ func TestChunkDataPackRequestQueue_Sequential(t *testing.T) {
 	}
 }
 
+// TestChunkDataPackRequestQueue_Sequential evaluates correctness of queue implementation against concurrent push and pop.
 func TestChunkDataPackRequestQueue_Concurrent(t *testing.T) {
 	sizeLimit := 100
 	q := NewChunkDataPackRequestQueue(uint32(sizeLimit), unittest.Logger(), metrics.NewNoopCollector())
@@ -126,12 +137,12 @@ func TestChunkDataPackRequestQueue_Concurrent(t *testing.T) {
 	for i := 0; i < sizeLimit; i++ {
 		go func() {
 			popedReq, ok := q.Pop()
+			require.True(t, ok)
 
 			matchLock.Lock()
 			matchAndRemove(t, requests, popedReq)
 			matchLock.Unlock()
 
-			require.True(t, ok)
 			popWG.Done()
 		}()
 	}
@@ -159,6 +170,8 @@ func chunkDataRequestListFixture(count int) []*mempool.ChunkDataPackRequest {
 	return list
 }
 
+// matchAndRemove checks existence of the request in the "requests" array, and if a match is found, it is removed.
+// If no match is found for a request, it fails the test. 
 func matchAndRemove(t *testing.T, requests []*mempool.ChunkDataPackRequest, req *mempool.ChunkDataPackRequest) []*mempool.ChunkDataPackRequest {
 	for i, r := range requests {
 		if r.ChunkId == req.ChunkId && r.RequesterId == req.RequesterId {
