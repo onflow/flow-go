@@ -37,12 +37,17 @@ func (h *FlowAccessAPIRouter) log(handler, rpc string, err error) {
 	code := status.Code(err)
 	h.Metrics.RecordRPC(handler, rpc, code)
 
+	logger := h.Logger.With().
+		Str("handler", handler).
+		Str("grpc_method", rpc).
+		Str("grpc_code", code.String())
+
 	if err != nil {
-		h.Logger.Error().Err(err).Str("handler", handler).Str("grpc_method", rpc).Str("grpc_code", code.String())
+		logger.Error().Err(err).Msg("request failed")
 		return
 	}
 
-	h.Logger.Info().Str("handler", handler).Str("grpc_method", rpc).Str("grpc_code", code.String())
+	logger.Info().Msg("request succeeded")
 }
 
 // reconnectingClient returns an active client, or
