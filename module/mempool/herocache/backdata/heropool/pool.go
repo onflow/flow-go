@@ -134,7 +134,7 @@ func (p Pool) All() []PoolEntity {
 	return all
 }
 
-// Head returns the tail of used items. Assuming no ejection happened and pool never goes beyond limit, Head returns
+// Head returns the head of used items. Assuming no ejection happened and pool never goes beyond limit, Head returns
 // the first inserted element.
 func (p Pool) Head() (flow.Entity, bool) {
 	if p.used.head.isUndefined() {
