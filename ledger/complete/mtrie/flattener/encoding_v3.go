@@ -6,7 +6,6 @@ import (
 	"io"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/encoding"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
@@ -136,7 +135,7 @@ func ReadNodeFromCheckpointV3AndEarlier(reader io.Reader, getNode getNodeFunc) (
 		}
 
 		// Decode payload (payload data isn't copied).
-		payload, err := encoding.DecodePayload(encPayload)
+		payload, err := ledger.DecodePayload(encPayload)
 		if err != nil {
 			return nil, 0, 0, fmt.Errorf("failed to decode payload of serialized node in v3: %w", err)
 		}

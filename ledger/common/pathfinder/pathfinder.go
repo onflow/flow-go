@@ -91,7 +91,7 @@ func QueryToTrieRead(q *ledger.Query, version uint8) (*ledger.TrieRead, error) {
 func PayloadsToValues(payloads []*ledger.Payload) ([]ledger.Value, error) {
 	ret := make([]ledger.Value, len(payloads))
 	for i, p := range payloads {
-		ret[i] = p.Value
+		ret[i] = p.Value()
 	}
 	return ret, nil
 }
@@ -100,7 +100,11 @@ func PayloadsToValues(payloads []*ledger.Payload) ([]ledger.Value, error) {
 func PathsFromPayloads(payloads []ledger.Payload, version uint8) ([]ledger.Path, error) {
 	paths := make([]ledger.Path, len(payloads))
 	for i, pay := range payloads {
-		p, err := KeyToPath(pay.Key, version)
+		k, err := pay.Key()
+		if err != nil {
+			return nil, err
+		}
+		p, err := KeyToPath(k, version)
 		if err != nil {
 			return nil, err
 		}
@@ -115,7 +119,7 @@ func UpdateToPayloads(update *ledger.Update) ([]*ledger.Payload, error) {
 	values := update.Values()
 	payloads := make([]*ledger.Payload, len(keys))
 	for i := range keys {
-		payload := &ledger.Payload{Key: keys[i], Value: values[i]}
+		payload := ledger.NewPayload(keys[i], values[i])
 		payloads[i] = payload
 	}
 	return payloads, nil
