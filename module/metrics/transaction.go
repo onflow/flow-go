@@ -280,9 +280,8 @@ func (tc *TransactionCollector) TransactionExpired(txID flow.Identifier) {
 }
 
 func (tc *TransactionCollector) UpdateExecutionReceiptMaxHeight(height uint64) {
-	if height <= tc.maxReceiptHeightValue {
-		return
+	if height > tc.maxReceiptHeightValue {
+		tc.maxReceiptHeightValue = height
+		tc.maxReceiptHeight.Set(float64(height))
 	}
-
-	tc.maxReceiptHeight.Set(float64(height))
 }
