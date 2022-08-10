@@ -6,56 +6,51 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/trace"
 )
 
-// NOTE: This dummy struct is used to avoid naming collision between
-// Context() and anonymous field in EnvContext
-type nestedContext struct {
-	Context
+type Tracer struct {
+	module.Tracer
+
+	rootSpan         otelTrace.Span
+	extensiveTracing bool
 }
 
-type EnvContext struct {
-	nestedContext
-
-	rootSpan otelTrace.Span
+func NewTracer(
+	tracer module.Tracer,
+	root otelTrace.Span,
+	extensiveTracing bool) *Tracer {
+	return &Tracer{tracer, root, extensiveTracing}
 }
 
-func NewEnvContext(ctx Context, root otelTrace.Span) *EnvContext {
-	return &EnvContext{nestedContext{ctx}, root}
+func (tracer *Tracer) isTraceable() bool {
+	return tracer.Tracer != nil && tracer.rootSpan != nil
 }
 
-func (ctx *EnvContext) Context() *Context {
-	return &ctx.nestedContext.Context
-}
-
-func (ctx *EnvContext) isTraceable() bool {
-	return ctx.Tracer != nil && ctx.rootSpan != nil
-}
-
-func (ctx *EnvContext) StartSpanFromRoot(name trace.SpanName) otelTrace.Span {
-	if ctx.isTraceable() {
-		return ctx.Tracer.StartSpanFromParent(ctx.rootSpan, name)
+func (tracer *Tracer) StartSpanFromRoot(name trace.SpanName) otelTrace.Span {
+	if tracer.isTraceable() {
+		return tracer.Tracer.StartSpanFromParent(tracer.rootSpan, name)
 	}
 
 	return trace.NoopSpan
 }
 
-func (ctx *EnvContext) StartExtensiveTracingSpanFromRoot(name trace.SpanName) otelTrace.Span {
-	if ctx.isTraceable() && ctx.ExtensiveTracing {
-		return ctx.Tracer.StartSpanFromParent(ctx.rootSpan, name)
+func (tracer *Tracer) StartExtensiveTracingSpanFromRoot(name trace.SpanName) otelTrace.Span {
+	if tracer.isTraceable() && tracer.extensiveTracing {
+		return tracer.Tracer.StartSpanFromParent(tracer.rootSpan, name)
 	}
 
 	return trace.NoopSpan
 }
 
-func (ctx *EnvContext) RecordSpanFromRoot(
+func (tracer *Tracer) RecordSpanFromRoot(
 	spanName trace.SpanName,
 	duration time.Duration,
 	attrs []attribute.KeyValue,
 ) {
-	if !ctx.isTraceable() {
+	if !tracer.isTraceable() {
 		return
 	}
-	ctx.Tracer.RecordSpanFromParent(ctx.rootSpan, spanName, duration, attrs)
+	tracer.Tracer.RecordSpanFromParent(tracer.rootSpan, spanName, duration, attrs)
 }

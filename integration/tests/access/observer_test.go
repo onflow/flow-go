@@ -78,7 +78,7 @@ func (suite *ObserverSuite) SetupTest() {
 	ctx := context.Background()
 	suite.net.Start(ctx)
 
-	stop, err := suite.net.AddObserver(ctx, &testnet.ObserverConfig{
+	stop, err := suite.net.AddObserver(suite.T(), ctx, &testnet.ObserverConfig{
 		ObserverName:            "observer_1",
 		ObserverImage:           "gcr.io/flow-container-registry/observer:latest",
 		AccessName:              "access_1",
@@ -108,7 +108,7 @@ func (suite *ObserverSuite) TestObserverConnection() {
 	t := suite.T()
 
 	// get an observer client
-	observer, err := suite.getClient("0.0.0.0:9000")
+	observer, err := suite.getObserverClient()
 	assert.NoError(t, err)
 
 	// ping the observer while the access container is running
@@ -122,7 +122,7 @@ func (suite *ObserverSuite) TestObserverWithoutAccess() {
 	t := suite.T()
 
 	// get an observer client
-	observer, err := suite.getClient("0.0.0.0:9000")
+	observer, err := suite.getObserverClient()
 	assert.NoError(t, err)
 
 	// stop the upstream access container
@@ -166,10 +166,10 @@ func (suite *ObserverSuite) TestObserverCompareRPCs() {
 	t := suite.T()
 
 	// get an observer and access client
-	observer, err := suite.getClient("0.0.0.0:9000")
+	observer, err := suite.getObserverClient()
 	assert.NoError(t, err)
 
-	access, err := suite.getClient(fmt.Sprintf("0.0.0.0:%s", suite.net.AccessPorts[testnet.AccessNodeAPIPort]))
+	access, err := suite.getAccessClient()
 	assert.NoError(t, err)
 
 	// verify that both clients return the same errors
@@ -183,6 +183,14 @@ func (suite *ObserverSuite) TestObserverCompareRPCs() {
 			assert.Equal(t, accessErr, observerErr)
 		})
 	}
+}
+
+func (suite *ObserverSuite) getAccessClient() (accessproto.AccessAPIClient, error) {
+	return suite.getClient(fmt.Sprintf("0.0.0.0:%s", suite.net.AccessPorts[testnet.AccessNodeAPIPort]))
+}
+
+func (suite *ObserverSuite) getObserverClient() (accessproto.AccessAPIClient, error) {
+	return suite.getClient(fmt.Sprintf("0.0.0.0:%s", suite.net.ObserverPorts[testnet.ObserverNodeAPIPort]))
 }
 
 func (suite *ObserverSuite) getClient(address string) (accessproto.AccessAPIClient, error) {
