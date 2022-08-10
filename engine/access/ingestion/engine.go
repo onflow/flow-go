@@ -432,11 +432,11 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, r *flow.Execut
 		return fmt.Errorf("failed to store execution receipt: %w", err)
 	}
 
-	e.trackExecutedMetricsForReceipt(r)
+	e.trackExecutionReceiptMetrics(r)
 	return nil
 }
 
-func (e *Engine) trackExecutedMetricsForReceipt(r *flow.ExecutionReceipt) {
+func (e *Engine) trackExecutionReceiptMetrics(r *flow.ExecutionReceipt) {
 	// TODO add actual execution time to execution receipt?
 	now := time.Now().UTC()
 
