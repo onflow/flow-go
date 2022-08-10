@@ -29,6 +29,8 @@ type dummyOrchestrator struct {
 	eventTracker  map[string]flow.IdentifierList
 }
 
+var _ insecure.AttackOrchestrator = &dummyOrchestrator{}
+
 func NewDummyOrchestrator(logger zerolog.Logger) *dummyOrchestrator {
 	return &dummyOrchestrator{
 		logger: logger.With().Str("component", "dummy-orchestrator").Logger(),
@@ -79,7 +81,11 @@ func (d *dummyOrchestrator) HandleEventFromCorruptedNode(event *insecure.EgressE
 	return nil
 }
 
-func (d *dummyOrchestrator) WithAttackNetwork(attackNetwork insecure.AttackNetwork) {
+func (d *dummyOrchestrator) HandleEventToCorruptedNode(event *insecure.IngressEvent) error {
+	panic("Unimplemented")
+}
+
+func (d *dummyOrchestrator) RegisterAttackNetwork(attackNetwork insecure.AttackNetwork) {
 	d.attackNetwork = attackNetwork
 }
 

@@ -41,6 +41,8 @@ type Orchestrator struct {
 	network insecure.AttackNetwork
 }
 
+var _ insecure.AttackOrchestrator = &Orchestrator{}
+
 func NewOrchestrator(logger zerolog.Logger, corruptedNodeIds flow.IdentifierList, allIds flow.IdentityList) *Orchestrator {
 	o := &Orchestrator{
 		logger:           logger.With().Str("component", "wintermute-orchestrator").Logger(),
@@ -52,8 +54,8 @@ func NewOrchestrator(logger zerolog.Logger, corruptedNodeIds flow.IdentifierList
 	return o
 }
 
-// WithAttackNetwork sets the attack network of the orchestrator.
-func (o *Orchestrator) WithAttackNetwork(network insecure.AttackNetwork) {
+// RegisterAttackNetwork sets the attack network of the orchestrator.
+func (o *Orchestrator) RegisterAttackNetwork(network insecure.AttackNetwork) {
 	o.network = network
 }
 
@@ -104,6 +106,10 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.EgressEvent)
 	}
 
 	return nil
+}
+
+func (o *Orchestrator) HandleEventToCorruptedNode(event *insecure.IngressEvent) error {
+	panic("unimplemented")
 }
 
 // corruptExecutionResult creates a corrupted version of the input receipt by tampering its content so that
