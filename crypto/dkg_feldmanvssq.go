@@ -1,3 +1,4 @@
+//go:build relic
 // +build relic
 
 package crypto
@@ -196,13 +197,14 @@ func (s *feldmanVSSQualState) HandleBroadcastMsg(orig int, msg []byte) error {
 		return nil
 	}
 
-	if len(msg) == 0 {
-		s.processor.FlagMisbehavior(orig, "received message is empty")
+	// if leader is already disqualified, ignore the message
+	if s.disqualified {
 		return nil
 	}
 
-	// if leader is already disqualified, ignore the message
-	if s.disqualified {
+	if len(msg) == 0 {
+		s.disqualified = true
+		s.processor.Disqualify(orig, "received broadcast is empty")
 		return nil
 	}
 
@@ -214,8 +216,9 @@ func (s *feldmanVSSQualState) HandleBroadcastMsg(orig int, msg []byte) error {
 	case feldmanVSSComplaintAnswer:
 		s.receiveComplaintAnswer(index(orig), msg[1:])
 	default:
-		s.processor.FlagMisbehavior(orig,
-			fmt.Sprintf("invalid message header, got %d",
+		s.disqualified = true
+		s.processor.Disqualify(orig,
+			fmt.Sprintf("invalid broadcast header, got %d",
 				dkgMsgTag(msg[0])))
 	}
 	return nil
@@ -240,22 +243,20 @@ func (s *feldmanVSSQualState) HandlePrivateMsg(orig int, msg []byte) error {
 		return nil
 	}
 
-	if len(msg) == 0 {
-		s.processor.FlagMisbehavior(orig, "received message is empty")
-		return nil
-	}
-
 	// if leader is already disqualified, ignore the message
 	if s.disqualified {
 		return nil
 	}
 
-	if dkgMsgTag(msg[0]) == feldmanVSSShare {
+	if len(msg) == 0 {
+		s.processor.FlagMisbehavior(orig, "private message is empty")
+		return nil
+	}
+
+	if len(msg) > 0 && dkgMsgTag(msg[0]) == feldmanVSSShare {
 		s.receiveShare(index(orig), msg[1:])
 	} else {
-		s.processor.FlagMisbehavior(orig,
-			fmt.Sprintf("invalid message header, got %d",
-				dkgMsgTag(msg[0])))
+		s.receiveShare(index(orig), msg[:0])
 	}
 	return nil
 }
@@ -332,6 +333,10 @@ func (s *feldmanVSSQualState) receiveShare(origin index, data []byte) {
 			"private share was already received")
 		return
 	}
+
+	// at this point, tag private share is received
+	s.xReceived = true
+
 	if (len(data)) != shareSize {
 		s.processor.FlagMisbehavior(int(origin),
 			fmt.Sprintf("invalid share size, expects %d, got %d",
@@ -347,7 +352,7 @@ func (s *feldmanVSSQualState) receiveShare(origin index, data []byte) {
 			fmt.Sprintf("invalid share value %x", data))
 		return
 	}
-	s.xReceived = true
+
 	if s.vAReceived {
 		result := s.verifyShare()
 		if result {

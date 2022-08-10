@@ -184,12 +184,6 @@ func (s *feldmanVSSstate) HandlePrivateMsg(orig int, msg []byte) error {
 			orig)
 	}
 
-	if len(msg) == 0 {
-		// Ideally, the upper layer should stop sebsequent messages from sender
-		s.processor.FlagMisbehavior(orig, "the private message is empty")
-		return nil
-	}
-
 	// In case a private message is received by the origin participant,
 	// the message is just ignored
 	if s.myIndex == index(orig) {
@@ -197,12 +191,10 @@ func (s *feldmanVSSstate) HandlePrivateMsg(orig int, msg []byte) error {
 	}
 
 	// msg = |tag| Data |
-	if dkgMsgTag(msg[0]) == feldmanVSSShare {
+	if len(msg) > 0 && dkgMsgTag(msg[0]) == feldmanVSSShare {
 		s.receiveShare(index(orig), msg[1:])
 	} else {
-		s.processor.FlagMisbehavior(orig,
-			fmt.Sprintf("the private message header is invalid, got %d",
-				dkgMsgTag(msg[0])))
+		s.receiveShare(index(orig), msg[:0])
 	}
 	return nil
 }
