@@ -147,14 +147,14 @@ func (s *feldmanVSSstate) HandleBroadcastMsg(orig int, msg []byte) error {
 			orig)
 	}
 
-	if len(msg) == 0 {
-		s.processor.FlagMisbehavior(orig, "the received message is empty")
-		return nil
-	}
-
 	// In case a message is received by the origin participant,
 	// the message is just ignored
 	if s.myIndex == index(orig) {
+		return nil
+	}
+
+	if len(msg) == 0 {
+		s.processor.Disqualify(orig, "the received broadcast is empty")
 		return nil
 	}
 
@@ -162,8 +162,8 @@ func (s *feldmanVSSstate) HandleBroadcastMsg(orig int, msg []byte) error {
 	if dkgMsgTag(msg[0]) == feldmanVSSVerifVec {
 		s.receiveVerifVector(index(orig), msg[1:])
 	} else {
-		s.processor.FlagMisbehavior(orig,
-			fmt.Sprintf("the message header is invalid, got %d",
+		s.processor.Disqualify(orig,
+			fmt.Sprintf("the broadcast header is invalid, got %d",
 				dkgMsgTag(msg[0])))
 	}
 	return nil
@@ -176,6 +176,7 @@ func (s *feldmanVSSstate) HandlePrivateMsg(orig int, msg []byte) error {
 	if !s.running {
 		return errors.New("dkg is not running")
 	}
+
 	if orig >= s.Size() || orig < 0 {
 		return invalidInputsErrorf(
 			"wrong origin, should be positive less than %d, got %d",
@@ -184,7 +185,8 @@ func (s *feldmanVSSstate) HandlePrivateMsg(orig int, msg []byte) error {
 	}
 
 	if len(msg) == 0 {
-		s.processor.FlagMisbehavior(orig, "the received message is empty")
+		// Ideally, the upper layer should stop sebsequent messages from sender
+		s.processor.FlagMisbehavior(orig, "the private message is empty")
 		return nil
 	}
 
@@ -199,7 +201,7 @@ func (s *feldmanVSSstate) HandlePrivateMsg(orig int, msg []byte) error {
 		s.receiveShare(index(orig), msg[1:])
 	} else {
 		s.processor.FlagMisbehavior(orig,
-			fmt.Sprintf("the message header is invalid, got %d",
+			fmt.Sprintf("the private message header is invalid, got %d",
 				dkgMsgTag(msg[0])))
 	}
 	return nil
@@ -287,7 +289,11 @@ func (s *feldmanVSSstate) receiveShare(origin index, data []byte) {
 		return
 	}
 
+	// at this point, tag the private message as received
+	s.xReceived = true
+
 	if (len(data)) != shareSize {
+		s.validKey = false
 		s.processor.FlagMisbehavior(int(origin),
 			fmt.Sprintf("invalid share size, expects %d, got %d",
 				shareSize, len(data)))
@@ -299,12 +305,12 @@ func (s *feldmanVSSstate) receiveShare(origin index, data []byte) {
 		(*C.uchar)(&data[0]),
 		PrKeyLenBLSBLS12381,
 	) != valid {
+		s.validKey = false
 		s.processor.FlagMisbehavior(int(origin),
 			fmt.Sprintf("invalid share value %x", data))
 		return
 	}
 
-	s.xReceived = true
 	if s.vAReceived {
 		s.validKey = s.verifyShare()
 	}
@@ -316,13 +322,17 @@ func (s *feldmanVSSstate) receiveVerifVector(origin index, data []byte) {
 	if origin != s.leaderIndex {
 		return
 	}
+
 	if s.vAReceived {
 		s.processor.FlagMisbehavior(int(origin),
 			"verification vector was already received")
 		return
 	}
+
 	if verifVectorSize*(s.threshold+1) != len(data) {
-		s.processor.FlagMisbehavior(int(origin),
+		s.vAReceived = true
+		s.validKey = false
+		s.processor.Disqualify(int(origin),
 			fmt.Sprintf("invalid verification vector size, expects %d, got %d",
 				verifVectorSize*(s.threshold+1), len(data)))
 		return
@@ -331,8 +341,13 @@ func (s *feldmanVSSstate) receiveVerifVector(origin index, data []byte) {
 	s.vA = make([]pointG2, s.threshold+1)
 	err := readVerifVector(s.vA, data)
 	if err != nil {
-		s.processor.FlagMisbehavior(int(origin),
-			fmt.Sprintf("reading the verification vector failed: %s", err))
+		if IsInvalidInputsError(err) { // case where vector format is invalid
+			s.vAReceived = true
+			s.validKey = false
+			s.processor.Disqualify(int(origin),
+				fmt.Sprintf("reading the verification vector failed: %s", err))
+		}
+		// verification vector should not be tagged as received if unexpected error
 		return
 	}
 
