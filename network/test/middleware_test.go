@@ -590,6 +590,7 @@ func (m *MiddlewareTestSuite) TestUnicast_Authorization() {
 
 		mwCtx, _ := irrecoverable.WithSignaler(ctx)
 		newMw.Start(mwCtx)
+		<-newMw.Ready()
 
 		idList := flow.IdentityList(append(m.ids, newId))
 
@@ -673,6 +674,7 @@ func (m *MiddlewareTestSuite) TestUnicast_Authorization() {
 
 		mwCtx, _ := irrecoverable.WithSignaler(ctx)
 		newMw.Start(mwCtx)
+		<-newMw.Ready()
 
 		idList := flow.IdentityList(append(m.ids, newId))
 
@@ -745,6 +747,7 @@ func (m *MiddlewareTestSuite) TestUnicast_Authorization() {
 
 		mwCtx, _ := irrecoverable.WithSignaler(ctx)
 		newMw.Start(mwCtx)
+		<-newMw.Ready()
 
 		idList := flow.IdentityList(append(m.ids, newId))
 
@@ -818,6 +821,7 @@ func (m *MiddlewareTestSuite) TestUnicast_Authorization() {
 
 		mwCtx, _ := irrecoverable.WithSignaler(ctx)
 		newMw.Start(mwCtx)
+		<-newMw.Ready()
 
 		idList := flow.IdentityList(append(m.ids, newId))
 
