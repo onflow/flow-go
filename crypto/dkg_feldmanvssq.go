@@ -248,11 +248,6 @@ func (s *feldmanVSSQualState) HandlePrivateMsg(orig int, msg []byte) error {
 		return nil
 	}
 
-	if len(msg) == 0 {
-		s.processor.FlagMisbehavior(orig, "private message is empty")
-		return nil
-	}
-
 	if len(msg) > 0 && dkgMsgTag(msg[0]) == feldmanVSSShare {
 		s.receiveShare(index(orig), msg[1:])
 	} else {
@@ -291,7 +286,7 @@ func (s *feldmanVSSQualState) setSharesTimeout() {
 	}
 	// if share is not received, make a complaint
 	if !s.xReceived {
-		s.buildAndBroadcastCpomplaint()
+		s.buildAndBroadcastComplaint()
 	}
 }
 
@@ -333,6 +328,7 @@ func (s *feldmanVSSQualState) receiveShare(origin index, data []byte) {
 	s.xReceived = true
 
 	if (len(data)) != shareSize {
+		s.buildAndBroadcastComplaint()
 		s.processor.FlagMisbehavior(int(origin),
 			fmt.Sprintf("invalid share size, expects %d, got %d",
 				shareSize, len(data)))
@@ -343,18 +339,17 @@ func (s *feldmanVSSQualState) receiveShare(origin index, data []byte) {
 		(*C.uchar)(&data[0]),
 		PrKeyLenBLSBLS12381,
 	) != valid {
+		s.buildAndBroadcastComplaint()
 		s.processor.FlagMisbehavior(int(origin),
 			fmt.Sprintf("invalid share value %x", data))
 		return
 	}
 
 	if s.vAReceived {
-		result := s.verifyShare()
-		if result {
-			return
+		if !s.verifyShare() {
+			// otherwise, build a complaint
+			s.buildAndBroadcastComplaint()
 		}
-		// otherwise, build a complaint
-		s.buildAndBroadcastCpomplaint()
 	}
 }
 
@@ -413,23 +408,31 @@ func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) {
 	}
 	// check the private share
 	if s.xReceived {
-		result := s.verifyShare()
-		if result {
-			return
+		if !s.verifyShare() {
+			s.buildAndBroadcastComplaint()
 		}
-		// otherwise complain
-		s.buildAndBroadcastCpomplaint()
 	}
 }
 
 // build a complaint against the leader, add it to the local
 // complaints map and broadcast it
-func (s *feldmanVSSQualState) buildAndBroadcastCpomplaint() {
+func (s *feldmanVSSQualState) buildAndBroadcastComplaint() {
 	s.complaints[s.myIndex] = &complaint{
 		received:       true,
 		answerReceived: false,
 	}
 	data := []byte{byte(feldmanVSSComplaint), byte(s.leaderIndex)}
+	s.processor.Broadcast(data)
+}
+
+// build a complaint answer, add it to the local
+// complaint map and broadcast it
+func (s *feldmanVSSQualState) buildAndBroadcastComplaintAnswer(complainee index) {
+	data := make([]byte, complaintAnswerSize+1)
+	data[0] = byte(feldmanVSSComplaintAnswer)
+	data[1] = byte(complainee)
+	zrPolynomialImage(data[2:], s.a, complainee+1, nil)
+	s.complaints[complainee].answerReceived = true
 	s.processor.Broadcast(data)
 }
 
@@ -496,12 +499,7 @@ func (s *feldmanVSSQualState) receiveComplaint(origin index, data []byte) {
 		}
 		// if the complainee is the current participant, prepare an answer
 		if s.myIndex == s.leaderIndex {
-			data := make([]byte, complaintAnswerSize+1)
-			data[0] = byte(feldmanVSSComplaintAnswer)
-			data[1] = byte(origin)
-			zrPolynomialImage(data[2:], s.a, origin+1, nil)
-			s.complaints[origin].answerReceived = true
-			s.processor.Broadcast(data)
+			s.buildAndBroadcastComplaintAnswer(origin)
 		}
 		return
 	}
