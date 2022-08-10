@@ -132,7 +132,11 @@ func (p *Pruner) NotifyFulfilledHeight(height uint64) {
 		return
 	}
 
-	p.fulfilledHeights <- height
+	select {
+	case p.fulfilledHeights <- height:
+	default:
+	}
+
 }
 
 // SetHeightRangeTarget updates the Pruner's height range target.
