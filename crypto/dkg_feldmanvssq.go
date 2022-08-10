@@ -291,12 +291,7 @@ func (s *feldmanVSSQualState) setSharesTimeout() {
 	}
 	// if share is not received, make a complaint
 	if !s.xReceived {
-		s.complaints[s.myIndex] = &complaint{
-			received:       true,
-			answerReceived: false,
-		}
-		data := []byte{byte(feldmanVSSComplaint), byte(s.leaderIndex)}
-		s.processor.Broadcast(data)
+		s.buildAndBroadcastCpomplaint()
 	}
 }
 
@@ -358,14 +353,8 @@ func (s *feldmanVSSQualState) receiveShare(origin index, data []byte) {
 		if result {
 			return
 		}
-		// otherwise, build a complaint to broadcast and add it to the local
-		// complaint map
-		s.complaints[s.myIndex] = &complaint{
-			received:       true,
-			answerReceived: false,
-		}
-		data := []byte{byte(feldmanVSSComplaint), byte(s.leaderIndex)}
-		s.processor.Broadcast(data)
+		// otherwise, build a complaint
+		s.buildAndBroadcastCpomplaint()
 	}
 }
 
@@ -428,15 +417,20 @@ func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) {
 		if result {
 			return
 		}
-		// otherwise, build a complaint to broadcast and add it to the local
-		// complaints map
-		s.complaints[s.myIndex] = &complaint{
-			received:       true,
-			answerReceived: false,
-		}
-		data := []byte{byte(feldmanVSSComplaint), byte(s.leaderIndex)}
-		s.processor.Broadcast(data)
+		// otherwise complain
+		s.buildAndBroadcastCpomplaint()
 	}
+}
+
+// build a complaint against the leader, add it to the local
+// complaints map and broadcast it
+func (s *feldmanVSSQualState) buildAndBroadcastCpomplaint() {
+	s.complaints[s.myIndex] = &complaint{
+		received:       true,
+		answerReceived: false,
+	}
+	data := []byte{byte(feldmanVSSComplaint), byte(s.leaderIndex)}
+	s.processor.Broadcast(data)
 }
 
 // assuming a complaint and its answer were both received, this function returns:
