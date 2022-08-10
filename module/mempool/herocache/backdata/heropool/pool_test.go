@@ -406,9 +406,9 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 			require.Equal(t, pool.Size(), uint32(i+1))
 
 			// in case pool is not full, the head should retrieve the first added entity.
-			tailEntity, tailExists := pool.Head()
-			require.True(t, tailExists)
-			require.Equal(t, tailEntity.ID(), entitiesToBeAdded[0].ID())
+			headEntity, headExists := pool.Head()
+			require.True(t, headExists)
+			require.Equal(t, headEntity.ID(), entitiesToBeAdded[0].ID())
 		}
 
 		if ejectionMode == LRUEjection {
@@ -420,7 +420,7 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 				// when pool is full and with LRU ejection, the head should move forward with each element added.
 				tailEntity, tailExists := pool.Head()
 				require.True(t, tailExists)
-				require.Equal(t, tailEntity.ID(), entitiesToBeAdded[i-len(pool.poolEntities)].ID())
+				require.Equal(t, tailEntity.ID(), entitiesToBeAdded[i+1-len(pool.poolEntities)].ID()))
 			}
 		}
 
