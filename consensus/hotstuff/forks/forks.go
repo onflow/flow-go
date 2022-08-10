@@ -12,20 +12,8 @@ import (
 	"github.com/onflow/flow-go/module/mempool"
 )
 
-// Forks enforces structural validity of the consensus state and implements
-// finalization rules as defined in DiemBFT v4:
-// https://developers.diem.com/papers/diem-consensus-state-machine-replication-in-the-diem-blockchain/2021-08-17.pdf
-// Forks is NOT safe for concurrent use by multiple goroutines.
-type Forks struct {
-	notifier hotstuff.FinalizationConsumer
-	forest   forest.LevelledForest
-
-	finalizationCallback module.Finalizer
-	newestView           uint64   // newestView is the highest view of block proposal stored in Forks
-	lastFinalized        *BlockQC // lastFinalized is the QC that POINTS TO the most recently finalized locked block
-}
-
-var _ hotstuff.Forks = (*Forks)(nil)
+// ErrPrunedAncestry is a sentinel error: cannot resolve ancestry of block due to pruning
+var ErrPrunedAncestry = errors.New("cannot resolve pruned ancestor")
 
 // ancestryChain encapsulates a block, its parent (oneChain) and its grand-parent (twoChain).
 // Given a chain structure like:
@@ -40,8 +28,20 @@ type ancestryChain struct {
 	twoChain *BlockQC
 }
 
-// ErrPrunedAncestry is a sentinel error: cannot resolve ancestry of block due to pruning
-var ErrPrunedAncestry = errors.New("cannot resolve pruned ancestor")
+// Forks enforces structural validity of the consensus state and implements
+// finalization rules as defined in DiemBFT v4:
+// https://developers.diem.com/papers/diem-consensus-state-machine-replication-in-the-diem-blockchain/2021-08-17.pdf
+// Forks is NOT safe for concurrent use by multiple goroutines.
+type Forks struct {
+	notifier hotstuff.FinalizationConsumer
+	forest   forest.LevelledForest
+
+	finalizationCallback module.Finalizer
+	newestView           uint64   // newestView is the highest view of block proposal stored in Forks
+	lastFinalized        *BlockQC // lastFinalized is the QC that POINTS TO the most recently finalized locked block
+}
+
+var _ hotstuff.Forks = (*Forks)(nil)
 
 func New(trustedRoot *BlockQC, finalizationCallback module.Finalizer, notifier hotstuff.FinalizationConsumer) (*Forks, error) {
 	if (trustedRoot.Block.BlockID != trustedRoot.QC.BlockID) || (trustedRoot.Block.View != trustedRoot.QC.View) {
@@ -220,7 +220,8 @@ func (f *Forks) VerifyProposal(proposal *model.Proposal) error {
 // This means there are two Quorums for conflicting blocks at the same view.
 // Per Lemma 1 from the HotStuff paper https://arxiv.org/abs/1803.05069v6, two
 // conflicting QCs can exist if and only if the Byzantine threshold is exceeded.
-// Returns model.ByzantineThresholdExceededError if input QC conflicts with an existing QC.
+// Error returns:
+// * model.ByzantineThresholdExceededError if input QC conflicts with an existing QC.
 func (f *Forks) checkForConflictingQCs(qc *flow.QuorumCertificate) error {
 	it := f.forest.GetVerticesAtLevel(qc.View)
 	for it.HasNext() {
