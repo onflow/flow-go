@@ -9,7 +9,7 @@ import "os"
 // TestCrashTest_ErrorMessage tests that CrashTest() can check a function that crashed without any messages.
 func TestCrashTest_NoMessage(t *testing.T) {
 	f := func(t *testing.T) {
-		Crash_NoMessage()
+		crash_NoMessage()
 	}
 
 	CrashTest(t, f, "", "TestCrashTest_NoMessage")
@@ -18,7 +18,7 @@ func TestCrashTest_NoMessage(t *testing.T) {
 // TestCrashTest_ErrorMessage tests that CrashTest() can read standard messages from stdout before a crash.
 func TestCrashTest_ErrorMessage(t *testing.T) {
 	f := func(t *testing.T) {
-		Crash_ErrorMessage()
+		crash_ErrorMessage()
 	}
 	CrashTest(t, f, "about to crash", "TestCrashTest_ErrorMessage")
 }
@@ -27,21 +27,21 @@ func TestCrashTest_ErrorMessage(t *testing.T) {
 // assumes that the logger uses a hook to send fatal messages to stdout.
 func TestCrashTest_Logger(t *testing.T) {
 	f := func(t *testing.T) {
-		Crash_LoggerFatal()
+		crash_LoggerFatal()
 	}
 	CrashTest(t, f, "fatal crash from logger", "TestCrashTest_Logger")
 }
 
-func Crash_NoMessage() {
+func crash_NoMessage() {
 	os.Exit(1)
 }
 
-func Crash_ErrorMessage() {
+func crash_ErrorMessage() {
 	fmt.Println("about to crash... crashing in 3...2...1...")
 	os.Exit(1)
 }
 
-func Crash_LoggerFatal() {
+func crash_LoggerFatal() {
 	// hook sends fatal messages to stdout, so they can be checked by CrashTest()
 	logger, _ := HookedLogger()
 

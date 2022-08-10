@@ -175,7 +175,7 @@ func (n *Network) ProcessAttackerMessage(stream insecure.CorruptibleConduitFacto
 			// received egress message
 			if msg.Egress != nil {
 				if err := n.processAttackerEgressMessage(msg); err != nil {
-					n.logger.Fatal().Err(err).Msg("could not process attacker's message")
+					n.logger.Fatal().Err(err).Msg("could not process attacker's egress message")
 					return stream.SendAndClose(&empty.Empty{})
 				}
 			}
@@ -192,8 +192,8 @@ func (n *Network) processAttackerEgressMessage(msg *insecure.Message) error {
 
 	event, err := n.codec.Decode(msg.Egress.Payload)
 	if err != nil {
-		lg.Err(err).Msg("could not decode attacker's message")
-		return fmt.Errorf("could not decode message: %w", err)
+		lg.Err(err).Msg("could not decode attacker's egress message")
+		return fmt.Errorf("could not decode egress message: %w", err)
 	}
 
 	lg = n.logger.With().
@@ -237,15 +237,15 @@ func (n *Network) processAttackerEgressMessage(msg *insecure.Message) error {
 
 	targetIds, err := flow.ByteSlicesToIds(msg.Egress.TargetIDs)
 	if err != nil {
-		lg.Err(err).Msg("could not convert target ids from byte to identifiers for attacker's dictated message")
+		lg.Err(err).Msg("could not convert target ids from byte to identifiers for attacker's dictated egress message")
 		return fmt.Errorf("could not convert target ids from byte to identifiers: %w", err)
 	}
 
 	lg = lg.With().Str("target_ids", fmt.Sprintf("%v", msg.Egress.TargetIDs)).Logger()
 	err = n.conduitFactory.SendOnFlowNetwork(event, channels.Channel(msg.Egress.ChannelID), msg.Egress.Protocol, uint(msg.Egress.TargetNum), targetIds...)
 	if err != nil {
-		lg.Err(err).Msg("could not send attacker message to the network")
-		return fmt.Errorf("could not send attacker message to the network: %w", err)
+		lg.Err(err).Msg("could not send attacker egress message to the network")
+		return fmt.Errorf("could not send attacker egress message to the network: %w", err)
 	}
 
 	lg.Info().Msg("incoming attacker's message dispatched on flow network")

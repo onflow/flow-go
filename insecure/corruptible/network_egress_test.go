@@ -26,7 +26,7 @@ import (
 // registered attacker if one exists.
 func TestHandleOutgoingEvent_AttackerObserve(t *testing.T) {
 	codec := unittest.NetworkCodec()
-	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DEFAULT_ADDRESS))
+	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DefaultAddress))
 	flowNetwork := &mocknetwork.Network{}
 	ccf := &mockinsecure.CorruptibleConduitFactory{}
 	ccf.On("RegisterEgressController", mock.Anything).Return(nil)
@@ -34,7 +34,7 @@ func TestHandleOutgoingEvent_AttackerObserve(t *testing.T) {
 	corruptibleNetwork, err := NewCorruptibleNetwork(
 		unittest.Logger(),
 		flow.BftTestnet,
-		insecure.DEFAULT_ADDRESS,
+		insecure.DefaultAddress,
 		testutil.LocalFixture(t, corruptedIdentity),
 		codec,
 		flowNetwork,
@@ -154,7 +154,7 @@ func TestProcessAttackerMessage_MessageSentOnFlowNetwork(t *testing.T) {
 		func(
 			corruptedId flow.Identity, // identity of ccf
 			corruptibleNetwork *Network,
-			adapter *mocknetwork.Adapter,                                           // mock adapter that ccf uses to communicate with authorized flow nodes.
+			adapter *mocknetwork.Adapter, // mock adapter that ccf uses to communicate with authorized flow nodes.
 			stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that attack network uses to send messages to this ccf.
 		) {
 			// creates a corrupted event that attacker is sending on the flow network through the
@@ -194,7 +194,7 @@ func TestProcessAttackerMessage_ResultApproval_Dictated(t *testing.T) {
 		func(
 			corruptedId flow.Identity, // identity of ccf
 			corruptibleNetwork *Network,
-			adapter *mocknetwork.Adapter,                                           // mock adapter that ccf uses to communicate with authorized flow nodes.
+			adapter *mocknetwork.Adapter, // mock adapter that ccf uses to communicate with authorized flow nodes.
 			stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that attack network uses to send messages to this ccf.
 		) {
 			// creates a corrupted result approval that attacker is sending on the flow network through the
@@ -266,7 +266,7 @@ func TestProcessAttackerMessage_ResultApproval_PassThrough(t *testing.T) {
 		func(
 			corruptedId flow.Identity, // identity of ccf
 			corruptibleNetwork *Network,
-			adapter *mocknetwork.Adapter,                                           // mock flow network that ccf uses to communicate with authorized flow nodes.
+			adapter *mocknetwork.Adapter, // mock flow network that ccf uses to communicate with authorized flow nodes.
 			stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that attack network uses to send messages to this ccf.
 		) {
 
@@ -310,7 +310,7 @@ func TestProcessAttackerMessage_ExecutionReceipt_Dictated(t *testing.T) {
 		func(
 			corruptedId flow.Identity, // identity of ccf
 			corruptibleNetwork *Network,
-			adapter *mocknetwork.Adapter,                                           // mock flow network that ccf uses to communicate with authorized flow nodes.
+			adapter *mocknetwork.Adapter, // mock flow network that ccf uses to communicate with authorized flow nodes.
 			stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that attack network uses to send messages to this ccf.
 		) {
 			// creates a corrupted execution receipt that attacker is sending on the flow network through the
@@ -370,7 +370,7 @@ func TestProcessAttackerMessage_ExecutionReceipt_PassThrough(t *testing.T) {
 		func(
 			corruptedId flow.Identity, // identity of ccf
 			corruptibleNetwork *Network,
-			adapter *mocknetwork.Adapter,                                           // mock flow network that ccf uses to communicate with authorized flow nodes.
+			adapter *mocknetwork.Adapter, // mock flow network that ccf uses to communicate with authorized flow nodes.
 			stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that attack network uses to send messages to this ccf.
 		) {
 
