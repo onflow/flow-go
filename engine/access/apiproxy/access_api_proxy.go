@@ -40,7 +40,8 @@ func (h *FlowAccessAPIRouter) log(handler, rpc string, err error) {
 	logger := h.Logger.With().
 		Str("handler", handler).
 		Str("grpc_method", rpc).
-		Str("grpc_code", code.String())
+		Str("grpc_code", code.String()).
+		Logger()
 
 	if err != nil {
 		logger.Error().Err(err).Msg("request failed")
