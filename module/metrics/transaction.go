@@ -7,6 +7,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
 )
@@ -28,7 +29,7 @@ type TransactionCollector struct {
 	maxReceiptHeight           prometheus.Gauge
 
 	// used to skip heights that are lower than the current max height
-	maxReceiptHeightValue uint64
+	maxReceiptHeightValue counters.StrictMonotonousCounter
 }
 
 func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log zerolog.Logger,
@@ -121,6 +122,7 @@ func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log 
 			Subsystem: subsystemIngestion,
 			Help:      "gauge to track the maximum block height of execution receipts received",
 		}),
+		maxReceiptHeightValue: counters.NewMonotonousCounter(0),
 	}
 
 	return tc
@@ -280,8 +282,7 @@ func (tc *TransactionCollector) TransactionExpired(txID flow.Identifier) {
 }
 
 func (tc *TransactionCollector) UpdateExecutionReceiptMaxHeight(height uint64) {
-	if height > tc.maxReceiptHeightValue {
-		tc.maxReceiptHeightValue = height
+	if tc.maxReceiptHeightValue.Set(height) {
 		tc.maxReceiptHeight.Set(float64(height))
 	}
 }
