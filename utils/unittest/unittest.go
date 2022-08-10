@@ -21,7 +21,6 @@ import (
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
-	"github.com/onflow/flow-go/network/slashing"
 )
 
 type SkipReason int
@@ -385,11 +384,6 @@ func AssertEqualBlocksLenAndOrder(t *testing.T, expectedBlocks, actualSegmentBlo
 // NetworkCodec returns cbor codec
 func NetworkCodec() network.Codec {
 	return cborcodec.NewCodec()
-}
-
-// SlashingViolationsConsumer returns a slashing violations consumer
-func SlashingViolationsConsumer() slashing.ViolationsConsumer {
-	return slashing.NewSlashingViolationsConsumer(Logger())
 }
 
 // CrashTest safely tests functions that crash (as the expected behavior) by checking that running the function creates an error and

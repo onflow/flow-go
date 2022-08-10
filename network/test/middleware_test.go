@@ -104,7 +104,7 @@ func (m *MiddlewareTestSuite) SetupTest() {
 		log:  logger,
 	}
 
-	m.slashingViolationsConsumer = unittest.SlashingViolationsConsumer()
+	m.slashingViolationsConsumer = mocknetwork.NewViolationsConsumer(m.T())
 
 	m.ids, m.mws, obs, m.providers = GenerateIDsAndMiddlewares(m.T(), m.size, logger, unittest.NetworkCodec(), m.slashingViolationsConsumer)
 
