@@ -12,7 +12,8 @@ import (
 	"github.com/onflow/flow-go/module/mempool"
 )
 
-// Forks implements HotStuff finalization logic as defined in DiemBFT v4
+// Forks enforces structural validity of the consensus state and implements
+// finalization rules as defined in DiemBFT v4:
 // https://developers.diem.com/papers/diem-consensus-state-machine-replication-in-the-diem-blockchain/2021-08-17.pdf
 // Forks is NOT safe for concurrent use by multiple goroutines.
 type Forks struct {
@@ -21,7 +22,6 @@ type Forks struct {
 
 	finalizationCallback module.Finalizer
 	newestView           uint64   // newestView is the highest view of block proposal stored in Forks
-	lastLocked           *BlockQC // lastLocked is the QC that POINTS TO the most recently locked block TODO remove
 	lastFinalized        *BlockQC // lastFinalized is the QC that POINTS TO the most recently finalized locked block
 }
 
@@ -52,7 +52,6 @@ func New(trustedRoot *BlockQC, finalizationCallback module.Finalizer, notifier h
 		notifier:             notifier,
 		finalizationCallback: finalizationCallback,
 		forest:               *forest.NewLevelledForest(trustedRoot.Block.View),
-		lastLocked:           trustedRoot,
 		lastFinalized:        trustedRoot,
 		newestView:           trustedRoot.Block.View,
 	}
@@ -99,6 +98,27 @@ func (f *Forks) GetProposalsForView(view uint64) []*model.Proposal {
 	return l
 }
 
+// AddProposal adds proposal to the consensus state. Performs verification to make sure that we don't
+// add invalid proposals into consensus state.
+// Expected errors during normal operations:
+//  * model.ByzantineThresholdExceededError - new block results in conflicting finalized blocks
+func (f *Forks) AddProposal(proposal *model.Proposal) error {
+	err := f.VerifyProposal(proposal)
+	if model.IsMissingBlockError(err) {
+		return fmt.Errorf("cannot add proposal with missing parent: %s", err.Error())
+	}
+	if err != nil {
+		// technically, this not strictly required. However, we leave this as a sanity check for now
+		return fmt.Errorf("cannot add invalid proposal to Forks: %w", err)
+	}
+	err = f.UnverifiedAddProposal(proposal)
+	if err != nil {
+		return fmt.Errorf("error storing proposal in Forks: %w", err)
+	}
+
+	return nil
+}
+
 // IsKnownBlock checks whether block is known.
 // UNVALIDATED: expects block to pass Forks.VerifyProposal(block)
 func (f *Forks) IsKnownBlock(block *model.Block) bool {
@@ -110,7 +130,7 @@ func (f *Forks) IsKnownBlock(block *model.Block) bool {
 // only considering the block's height and hash.
 // Returns false if any of the following conditions applies
 //  * block view is _below_ the most recently finalized block
-//  * known block
+//  * the block already exists in the consensus state
 // UNVALIDATED: expects block to pass Forks.VerifyProposal(block)
 func (f *Forks) IsProcessingNeeded(block *model.Block) bool {
 	if block.View < f.lastFinalized.Block.View || f.IsKnownBlock(block) {
@@ -119,17 +139,23 @@ func (f *Forks) IsProcessingNeeded(block *model.Block) bool {
 	return true
 }
 
-// UnverifiedAddProposal adds `proposal` to the consensus state.
+// UnverifiedAddProposal adds `proposal` to the consensus state and updates the
+// latest finalized block, if possible.
 // Calling this method with previously-processed blocks leaves the consensus state invariant
 // (though, it will potentially cause some duplicate processing).
 // UNVALIDATED: expects block to pass Forks.VerifyProposal(block)
+// Error returns:
+// * model.ByzantineThresholdExceededError if proposal's QC conflicts with an existing QC.
+// * generic error in case of unexpected bug or internal state corruption
 func (f *Forks) UnverifiedAddProposal(proposal *model.Proposal) error {
 	if !f.IsProcessingNeeded(proposal.Block) {
 		return nil
 	}
 	blockContainer := &BlockContainer{Proposal: proposal}
 	block := blockContainer.Proposal.Block
-	if err := f.checkForConflictingQCs(block.QC); err != nil {
+
+	err := f.checkForConflictingQCs(block.QC)
+	if err != nil {
 		return err
 	}
 	f.checkForDoubleProposal(blockContainer)
@@ -137,10 +163,12 @@ func (f *Forks) UnverifiedAddProposal(proposal *model.Proposal) error {
 	if f.newestView < block.View {
 		f.newestView = block.View
 	}
-	err := f.updateConsensusState(blockContainer)
+
+	err = f.updateFinalizedBlockQC(blockContainer)
 	if err != nil {
 		return fmt.Errorf("updating consensus state failed: %w", err)
 	}
+	// TODO(active-pacemaker) we can remove MakeValid when QC validation occurs in compliance layer
 	err = f.finalizationCallback.MakeValid(block.BlockID)
 	if err != nil {
 		return fmt.Errorf("MakeValid fails in other component: %w", err)
@@ -149,20 +177,37 @@ func (f *Forks) UnverifiedAddProposal(proposal *model.Proposal) error {
 	return nil
 }
 
-// AddProposal adds proposal to the consensus state. Performs verification to make sure that we don't
-// add invalid proposals into consensus state.
-// Expected errors during normal operations:
-//  * model.ByzantineThresholdExceededError - new block results in conflicting finalized blocks
-func (f *Forks) AddProposal(proposal *model.Proposal) error {
-	if err := f.VerifyProposal(proposal); err != nil {
-		// technically, this not strictly required. However, we leave this as a sanity check for now
-		return fmt.Errorf("cannot add invalid proposal to Forks: %w", err)
+// VerifyProposal checks a block for internal consistency and consistency with
+// the current forest state. See forest.VerifyVertex for more detail.
+// Error returns:
+// * model.MissingBlockError if the parent of the input proposal does not exist in the forest
+//   (but is above the pruned view)
+// * generic error in case of unexpected bug or internal state corruption
+func (f *Forks) VerifyProposal(proposal *model.Proposal) error {
+	block := proposal.Block
+	if block.View < f.forest.LowestLevel {
+		return nil
 	}
-	err := f.UnverifiedAddProposal(proposal)
+	blockContainer := &BlockContainer{Proposal: proposal}
+	err := f.forest.VerifyVertex(blockContainer)
+	if forest.IsInvalidVertexError(err) {
+		return fmt.Errorf("cannot add proposal %x to forest: %s", block.BlockID, err.Error())
+	}
 	if err != nil {
-		return fmt.Errorf("error storing proposal in Forks: %w", err)
+		return fmt.Errorf("unexpected error verifying proposal vertex: %w", err)
 	}
 
+	// omit checking existence of parent if block at lowest non-pruned view number
+	if (block.View == f.forest.LowestLevel) || (block.QC.View < f.forest.LowestLevel) {
+		return nil
+	}
+	// for block whose parents are _not_ below the pruning height, we expect the parent to be known.
+	if _, isParentKnown := f.forest.GetVertex(block.QC.BlockID); !isParentKnown { // we are missing the parent
+		return model.MissingBlockError{
+			View:    block.QC.View,
+			BlockID: block.QC.BlockID,
+		}
+	}
 	return nil
 }
 
@@ -174,7 +219,7 @@ func (f *Forks) AddProposal(proposal *model.Proposal) error {
 //     * q1.BlockID != q2.BlockID
 // This means there are two Quorums for conflicting blocks at the same view.
 // Per Lemma 1 from the HotStuff paper https://arxiv.org/abs/1803.05069v6, two
-// conflicting QCs can exist if and only if of the Byzantine threshold is exceeded.
+// conflicting QCs can exist if and only if the Byzantine threshold is exceeded.
 // Returns model.ByzantineThresholdExceededError if input QC conflicts with an existing QC.
 func (f *Forks) checkForConflictingQCs(qc *flow.QuorumCertificate) error {
 	it := f.forest.GetVerticesAtLevel(qc.View)
@@ -200,8 +245,9 @@ func (f *Forks) checkForConflictingQCs(qc *flow.QuorumCertificate) error {
 	return nil
 }
 
-// checkForDoubleProposal checks if Proposal is a double proposal. In case it is,
-// notifier.OnDoubleProposeDetected is triggered.
+// checkForDoubleProposal checks if the input proposal is a double proposal.
+// A double proposal occurs when two proposals with the same view exist in Forks.
+// If there is a double proposal, notifier.OnDoubleProposeDetected is triggered.
 func (f *Forks) checkForDoubleProposal(container *BlockContainer) {
 	block := container.Proposal.Block
 	it := f.forest.GetVerticesAtLevel(block.View)
@@ -213,37 +259,54 @@ func (f *Forks) checkForDoubleProposal(container *BlockContainer) {
 	}
 }
 
-// updateConsensusState updates consensus state.
-// TODO improve doc
+// updateFinalizedBlockQC updates the latest finalized block, if possible.
+// This function should be called every time a new block is added to Forks.
+// If the new block is the head of a 2-chain satisfying the finalization rule,
+// then we update Forks.lastFinalizedBlockQC to the new latest finalized block.
 // Calling this method with previously-processed blocks leaves the consensus state invariant.
 // UNVALIDATED: assumes that relevant block properties are consistent with previous blocks
-// TODO error doc
-func (f *Forks) updateConsensusState(blockContainer *BlockContainer) error {
-	ancestryChain, err := f.getThreeChain(blockContainer)
-	// We expect that getThreeChain might error with a ErrPrunedAncestry. This error indicates that the
+// Error returns:
+// * model.ByzantineThresholdExceededError if we are finalizing a block which is invalid to finalize.
+//   This either indicates a critical internal bug / data corruption, or that the network Byzantine
+//   threshold was exceeded, breaking the safety guarantees of HotStuff.
+// * generic error in case of unexpected bug or internal state corruption
+func (f *Forks) updateFinalizedBlockQC(blockContainer *BlockContainer) error {
+	ancestryChain, err := f.getTwoChain(blockContainer)
+	// We expect that getTwoChain might error with a ErrPrunedAncestry. This error indicates that the
 	// 2-chain of this block reaches _beyond_ the last finalized block. It is straight forward to show:
-	// Lemma: Let B be a block whose 3-chain reaches beyond the last finalized block
+	// Lemma: Let B be a block whose 2-chain reaches beyond the last finalized block
 	//        => B will not update the locked or finalized block
-	if errors.Is(err, ErrPrunedAncestry) { // blockContainer's 3-chain reaches beyond the last finalized block
+	if errors.Is(err, ErrPrunedAncestry) {
+		// blockContainer's 2-chain reaches beyond the last finalized block
 		// based on Lemma from above, we can skip attempting to update locked or finalized block
 		return nil
 	}
 	if model.IsMissingBlockError(err) {
+		// we are missing some un-pruned ancestry of blockContainer -> indicates corrupted internal state
 		return fmt.Errorf("unexpected missing block while updating consensus state: %s", err.Error())
 	}
-	if err != nil { // otherwise, there is an unknown error that we need to escalate to the higher-level application logic
-		return fmt.Errorf("retrieving 3-chain ancestry failed: %w", err)
+	if err != nil {
+		return fmt.Errorf("retrieving 2-chain ancestry failed: %w", err)
 	}
 
-	f.updateLockedQc(ancestryChain)
-	err = f.updateFinalizedBlockQc(ancestryChain)
-	if err != nil {
-		return fmt.Errorf("updating finalized block failed: %w", err)
+	// Note: we assume that all stored blocks pass Forks.VerifyProposal(block);
+	//       specifically, that Proposal's ViewNumber is strictly monotonously
+	//       increasing which is enforced by LevelledForest.VerifyVertex(...)
+	// We denote:
+	//  * a DIRECT 1-chain as '<-'
+	//  * a general 1-chain as '<~' (direct or indirect)
+	// The rule from 'Diem BFT' for finalizing block b is
+	//     b <- b' <~ b*     (aka a DIRECT 1-chain PLUS any 1-chain)
+	// where b* is the head block of the ancestryChain
+	// Hence, we can finalize b, if and only the viewNumber of b' is exactly 1 higher than the view of b
+	b := ancestryChain.twoChain
+	if ancestryChain.oneChain.Block.View != b.Block.View+1 {
+		return nil
 	}
-	return nil
+	return f.finalizeUpToBlock(b.QC)
 }
 
-// getThreeChain returns the 2-chain for the input block container b.
+// getTwoChain returns the 2-chain for the input block container b.
 // See ancestryChain for documentation on the structure of the 2-chain.
 // Returns ErrPrunedAncestry if any part of the 2-chain is below the last pruned view.
 // Error returns:
@@ -251,7 +314,7 @@ func (f *Forks) updateConsensusState(blockContainer *BlockContainer) error {
 // * model.MissingBlockError if any block in the 2-chain does not exist in the forest
 //   (but is above the pruned view)
 // * generic error in case of unexpected bug or internal state corruption
-func (f *Forks) getThreeChain(blockContainer *BlockContainer) (*ancestryChain, error) {
+func (f *Forks) getTwoChain(blockContainer *BlockContainer) (*ancestryChain, error) {
 	ancestryChain := ancestryChain{block: blockContainer}
 
 	var err error
@@ -303,46 +366,6 @@ func (f *Forks) getNextAncestryLevel(block *model.Block) (*BlockQC, error) {
 	blockQC := BlockQC{Block: parentBlock, QC: block.QC}
 
 	return &blockQC, nil
-}
-
-// TODO remove?
-// updateLockedBlock updates `lastLockedBlockQC`
-// We use the locking rule from 'Event-driven HotStuff Protocol' where the condition is:
-//    * Consider the set S of all blocks that have a INDIRECT 2-chain on top of it
-//    * The 'Locked Proposal' is the block in S with the _highest view number_ (newest);
-// Calling this method with previously-processed blocks leaves consensus state invariant.
-func (f *Forks) updateLockedQc(ancestryChain *ancestryChain) {
-	if ancestryChain.twoChain.Block.View <= f.lastLocked.Block.View {
-		return
-	}
-	// update qc to newer block with any 2-chain on top of it:
-	f.lastLocked = ancestryChain.twoChain
-}
-
-// updateFinalizedBlockQc updates `lastFinalizedBlockQC` if the input ancestryChain
-// allows finalizing the lowest block in the chain (b).
-// If b cannot be finalized, this is a no-op.
-// Calling this method with previously-processed blocks leaves consensus state invariant.
-// We use the finalization rule from DiemBFT v4 where the condition is:
-//    * Consider the set S of all blocks that have a DIRECT 1-chain on top of it PLUS any 1-chain
-//    * The 'Last finalized Proposal' is the block in S with the _highest view number_ (newest);
-// TODO error docs
-func (f *Forks) updateFinalizedBlockQc(ancestryChain *ancestryChain) error {
-	// Note: we assume that all stored blocks pass Forks.VerifyProposal(block);
-	//       specifically, that Proposal's ViewNumber is strictly monotonously
-	//       increasing which is enforced by LevelledForest.VerifyVertex(...)
-	// We denote:
-	//  * a DIRECT 1-chain as '<-'
-	//  * a general 1-chain as '<~' (direct or indirect)
-	// The rule from 'Diem BFT' for finalizing block b is
-	//     b <- b' <~ b*     (aka a DIRECT 1-chain PLUS any 1-chain)
-	// where b* is the head block of the input ancestryChain
-	// Hence, we can finalize b, if and only the viewNumber of b' is exactly 1 higher than the view of b
-	b := ancestryChain.twoChain // note that b is actually not the block itself here but rather the QC pointing to it
-	if ancestryChain.oneChain.Block.View != b.Block.View+1 {
-		return nil
-	}
-	return f.finalizeUpToBlock(b.QC)
 }
 
 // finalizeUpToBlock finalizes all blocks up to (and including) the block pointed to by `qc`.
@@ -407,39 +430,5 @@ func (f *Forks) finalizeUpToBlock(qc *flow.QuorumCertificate) error {
 
 	// notify less important components about finalized block
 	f.notifier.OnFinalizedBlock(block)
-	return nil
-}
-
-// VerifyProposal checks a block for internal consistency and consistency with
-// the current forest state. See forest.VerifyVertex for more detail.
-// Error returns:
-// * model.MissingBlockError if the parent of the input proposal does not exist in the forest
-//   (but is above the pruned view)
-// * generic error in case of unexpected bug or internal state corruption
-func (f *Forks) VerifyProposal(proposal *model.Proposal) error {
-	block := proposal.Block
-	if block.View < f.forest.LowestLevel {
-		return nil
-	}
-	blockContainer := &BlockContainer{Proposal: proposal}
-	err := f.forest.VerifyVertex(blockContainer)
-	if forest.IsInvalidVertexError(err) {
-		return fmt.Errorf("cannot add proposal %x to forest: %s", block.BlockID, err.Error())
-	}
-	if err != nil {
-		return fmt.Errorf("unexpected error verifying proposal vertex: %w", err)
-	}
-
-	// omit checking existence of parent if block at lowest non-pruned view number
-	if (block.View == f.forest.LowestLevel) || (block.QC.View < f.forest.LowestLevel) {
-		return nil
-	}
-	// for block whose parents are _not_ below the pruning height, we expect the parent to be known.
-	if _, isParentKnown := f.forest.GetVertex(block.QC.BlockID); !isParentKnown { // we are missing the parent
-		return model.MissingBlockError{
-			View:    block.QC.View,
-			BlockID: block.QC.BlockID,
-		}
-	}
 	return nil
 }
