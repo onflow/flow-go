@@ -58,6 +58,11 @@ type Meter interface {
 	TotalMemoryEstimate() uint
 	TotalMemoryLimit() uint
 
+	// TODO(patrick): make these non-optional arguments to NewMeter
+	SetComputationWeights(weights ExecutionEffortWeights)
+	SetMemoryWeights(weights ExecutionMemoryWeights)
+	SetTotalMemoryLimit(limit uint64)
+
 	// TODO move storage metering to here
 	// MeterStorageRead(byteSize uint) error
 	// MeterStorageWrite(byteSize uint) error
