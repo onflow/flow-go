@@ -115,9 +115,8 @@ func (p *Provider) storeBlobs(parent context.Context, blockHeight uint64, blobCh
 
 // Provide adds the block execution data for a newly executed (generally not sealed or finalized) block to the blob store for distribution using Bitswap.
 // It computes and returns the root CID of the execution data blob tree.
-// This function returns once the root CID has been computed, and all blobs are queued for storage
-// in the Bitswap Blobstore. Storage operations are performed asynchronously and may continue after
-// this function returns.
+// This function returns once the root CID has been computed, and all blobs are successfully stored
+// in the Bitswap Blobstore.
 func (p *Provider) Provide(ctx context.Context, blockHeight uint64, executionData *execution_data.BlockExecutionData) (flow.Identifier, error) {
 	rootID, errCh, err := p.provide(ctx, blockHeight, executionData)
 	storeErr, ok := <-errCh
