@@ -21,10 +21,12 @@ type BlockView struct {
 	QCVersion int
 }
 
+// QCIndex returns a unique identifier for the block's QC.
 func (bv *BlockView) QCIndex() string {
 	return fmt.Sprintf("%v-%v", bv.QCView, bv.QCVersion)
 }
 
+// BlockIndex returns a unique identifier for the block.
 func (bv *BlockView) BlockIndex() string {
 	return fmt.Sprintf("%v-%v", bv.View, bv.BlockVersion)
 }
@@ -48,6 +50,11 @@ func (f *BlockBuilder) Add(qcView uint64, blockView uint64) {
 	})
 }
 
+// GenesisBlock returns the genesis block, which is always finalized.
+func (f *BlockBuilder) GenesisBlock() *model.Block {
+	return makeGenesis().Block
+}
+
 // [3,4] denotes a block of view 4, with a qc of view 3.
 // [3,4'] denotes a block of view 4, with a qc of view 3, but has a different BlockID than [3,4]
 // [3,4'] can be created by AddVersioned(3, 4, 0, 1)
@@ -61,6 +68,7 @@ func (f *BlockBuilder) AddVersioned(qcView uint64, blockView uint64, qcVersion i
 	})
 }
 
+// Blocks returns a list of all blocks added to the BlockBuilder, and a genesis block.
 func (f *BlockBuilder) Blocks() ([]*model.Proposal, error) {
 	blocks := make([]*model.Proposal, 0, len(f.blockViews))
 

@@ -16,11 +16,29 @@ import (
 // A block is denoted as [<qc_number>, <block_view_number>].
 // For example, [1,2] means: a block of view 2 has a QC for view 1.
 
+// receives [1,2], [2,3]
+// it should not finalize any block
+func TestFinalize_1Chain(t *testing.T) {
+	builder := NewBlockBuilder()
+	builder.Add(1, 2)
+	builder.Add(2, 3)
+
+	blocks, err := builder.Blocks()
+	require.Nil(t, err)
+
+	forks, _ := newForks(t)
+
+	err = addBlocksToForks(forks, blocks)
+	require.Nil(t, err)
+
+	requireNoBlocksFinalized(t, forks)
+}
+
 // receives [1,2], [2,3], [3,4]
 // it should finalize [1,2]
-func TestLocked(t *testing.T) {
+func TestFinalize_Direct2Chain(t *testing.T) {
 	builder := NewBlockBuilder()
-	builder.Add(1, 2) // creates a block of view 2, with a QC of view 1
+	builder.Add(1, 2)
 	builder.Add(2, 3)
 	builder.Add(3, 4)
 
@@ -32,11 +50,49 @@ func TestLocked(t *testing.T) {
 	err = addBlocksToForks(forks, blocks)
 	require.Nil(t, err)
 
-	requireFinalizedBlock(t, forks, 1, 2)
+	requireLatestFinalizedBlock(t, forks, 1, 2)
+}
+
+// receives [1,2], [2,3], [3,5]
+// it should finalize [1,2]
+func TestFinalize_DirectIndirect2Chain(t *testing.T) {
+	builder := NewBlockBuilder()
+	builder.Add(1, 2)
+	builder.Add(2, 3)
+	builder.Add(3, 5)
+
+	blocks, err := builder.Blocks()
+	require.Nil(t, err)
+
+	forks, _ := newForks(t)
+
+	err = addBlocksToForks(forks, blocks)
+	require.Nil(t, err)
+
+	requireLatestFinalizedBlock(t, forks, 1, 2)
+}
+
+// receives [1,2], [2,4], [4,5]
+// it should not finalize any blocks
+func TestFinalize_IndirectDirect2Chain(t *testing.T) {
+	builder := NewBlockBuilder()
+	builder.Add(1, 2)
+	builder.Add(2, 4)
+	builder.Add(4, 5)
+
+	blocks, err := builder.Blocks()
+	require.Nil(t, err)
+
+	forks, _ := newForks(t)
+
+	err = addBlocksToForks(forks, blocks)
+	require.Nil(t, err)
+
+	requireNoBlocksFinalized(t, forks)
 }
 
 // receives [1,2], [2,3], [3,4], [4,5], [4,6], [6,8]
-// it should finalize [1,2], it should lock [3,4].
+// it should finalize [1,2]
 func TestLocked2(t *testing.T) {
 	builder := NewBlockBuilder()
 	builder.Add(1, 2)
@@ -54,7 +110,7 @@ func TestLocked2(t *testing.T) {
 	err = addBlocksToForks(forks, blocks)
 	require.Nil(t, err)
 
-	requireFinalizedBlock(t, forks, 1, 2)
+	requireLatestFinalizedBlock(t, forks, 1, 2)
 }
 
 // receives [1,2], [2,3], [3,4], [4,5], [4,6], [6,8], [8,10]
@@ -77,7 +133,7 @@ func TestLocked3(t *testing.T) {
 	err = addBlocksToForks(forks, blocks)
 	require.Nil(t, err)
 
-	requireFinalizedBlock(t, forks, 1, 2)
+	requireLatestFinalizedBlock(t, forks, 1, 2)
 }
 
 // receives [1,2], [2,3], [3,4], [4,5], [5,6]
@@ -98,7 +154,7 @@ func TestFinalizedDirect3builder(t *testing.T) {
 	err = addBlocksToForks(forks, blocks)
 	require.Nil(t, err)
 
-	requireFinalizedBlock(t, forks, 2, 3)
+	requireLatestFinalizedBlock(t, forks, 2, 3)
 }
 
 // receives [1,2], [2,3], [3,4], [4,5], [5,6], [6,7], [7,8], [8, 9]
@@ -122,7 +178,7 @@ func TestFinalizedDirect3builder2(t *testing.T) {
 	err = addBlocksToForks(forks, blocks)
 	require.Nil(t, err)
 
-	requireFinalizedBlock(t, forks, 5, 6)
+	requireLatestFinalizedBlock(t, forks, 5, 6)
 }
 
 // receives [1,2], [2,3], [3,4], [4,5], [5,7],
@@ -143,7 +199,7 @@ func TestFinalizedDirect2builderPlus1builder(t *testing.T) {
 	err = addBlocksToForks(forks, blocks)
 	require.Nil(t, err)
 
-	requireFinalizedBlock(t, forks, 2, 3)
+	requireLatestFinalizedBlock(t, forks, 2, 3)
 }
 
 // receives [1,2], [2,3], [3,4], [4,5], [4,6],
@@ -164,7 +220,7 @@ func TestUnfinalized(t *testing.T) {
 	err = addBlocksToForks(forks, blocks)
 	require.Nil(t, err)
 
-	requireFinalizedBlock(t, forks, 1, 2)
+	requireLatestFinalizedBlock(t, forks, 1, 2)
 }
 
 // receives [1,2], [2,3], [3,4], [4,5], [4,7],
@@ -185,7 +241,7 @@ func TestUnfinalized2(t *testing.T) {
 	err = addBlocksToForks(forks, blocks)
 	require.Nil(t, err)
 
-	requireFinalizedBlock(t, forks, 1, 2)
+	requireLatestFinalizedBlock(t, forks, 1, 2)
 }
 
 // Tolerable Forks that extend from locked block (1: might change locked block, 2: not change locked block)
@@ -209,7 +265,7 @@ func TestTolerableForksExtendsFromLockedBlock(t *testing.T) {
 	err = addBlocksToForks(forks, blocks)
 	require.Nil(t, err)
 
-	requireFinalizedBlock(t, forks, 1, 2)
+	requireLatestFinalizedBlock(t, forks, 1, 2)
 }
 
 // receives [1,2], [2,3], [3,4], [4,5], [4,6], [6,7], [7,8]
@@ -232,7 +288,7 @@ func TestTolerableForksExtendsFromLockedBlock2(t *testing.T) {
 	err = addBlocksToForks(forks, blocks)
 	require.Nil(t, err)
 
-	requireFinalizedBlock(t, forks, 1, 2)
+	requireLatestFinalizedBlock(t, forks, 1, 2)
 }
 
 // receives [1,2], [2,3], [3,4], [4,5], [3,6], [6,7], [7,8], [8,9]
@@ -256,7 +312,7 @@ func TestTolerableForksExtendsFromLockedBlock3(t *testing.T) {
 	err = addBlocksToForks(forks, blocks)
 	require.Nil(t, err)
 
-	requireFinalizedBlock(t, forks, 3, 6)
+	requireLatestFinalizedBlock(t, forks, 3, 6)
 }
 
 // receives [1,2], [2,3], [3,4], [4,5], [4,6], [6,7], [7,8], [8,9]
@@ -280,7 +336,7 @@ func TestTolerableForksExtendsFromLockedBlock4(t *testing.T) {
 	err = addBlocksToForks(forks, blocks)
 	require.Nil(t, err)
 
-	requireFinalizedBlock(t, forks, 4, 6)
+	requireLatestFinalizedBlock(t, forks, 4, 6)
 }
 
 // receives [1,2], [2,3], [3,4], [4,5], [4,6], [6,7], [7,8], [8,10]
@@ -304,7 +360,7 @@ func TestTolerableForksExtendsFromLockedBlock5(t *testing.T) {
 	err = addBlocksToForks(forks, blocks)
 	require.Nil(t, err)
 
-	requireFinalizedBlock(t, forks, 3, 6)
+	requireLatestFinalizedBlock(t, forks, 3, 6)
 }
 
 // receives [1,2], [2,3], [3,4], [4,5], [2,6]
@@ -325,7 +381,7 @@ func TestTolerableForksNotExtendsFromLockedBlock(t *testing.T) {
 	err = addBlocksToForks(forks, blocks)
 	require.Nil(t, err)
 
-	requireFinalizedBlock(t, forks, 1, 2)
+	requireLatestFinalizedBlock(t, forks, 1, 2)
 }
 
 // receives [1,2], [2,3], [3,4], [4,5], [2,6], [5,6]
@@ -348,7 +404,7 @@ func TestTolerableForksNotExtendsFromLockedBlock2(t *testing.T) {
 	err = addBlocksToForks(forks, blocks)
 	require.Nil(t, err)
 
-	requireFinalizedBlock(t, forks, 2, 3)
+	requireLatestFinalizedBlock(t, forks, 2, 3)
 	notifier.AssertExpectations(t)
 }
 
@@ -371,7 +427,7 @@ func TestTolerableForksNotExtendsFromLockedBlock3(t *testing.T) {
 	err = addBlocksToForks(forks, blocks)
 	require.Nil(t, err)
 
-	requireFinalizedBlock(t, forks, 1, 2)
+	requireLatestFinalizedBlock(t, forks, 1, 2)
 }
 
 // receives [1,2], [2,3], [3,4], [4,5], [2,6], [6,7],[7,8]
@@ -394,7 +450,7 @@ func TestTolerableForksNotExtendsFromLockedBlock4(t *testing.T) {
 	err = addBlocksToForks(forks, blocks)
 	require.Nil(t, err)
 
-	requireFinalizedBlock(t, forks, 1, 2)
+	requireLatestFinalizedBlock(t, forks, 1, 2)
 }
 
 // receives [1,2], [2,3], [2,3], [3,4], [3,4], [4,5], [4,5], [5,6], [5,6]
@@ -419,7 +475,7 @@ func TestDuplication(t *testing.T) {
 	err = addBlocksToForks(forks, blocks)
 	require.Nil(t, err)
 
-	requireFinalizedBlock(t, forks, 2, 3)
+	requireLatestFinalizedBlock(t, forks, 2, 3)
 }
 
 // receives [1,2], [2,3], [3,4], [4,5], [1,6]
@@ -440,7 +496,7 @@ func TestIgnoreBlocksBelowFinalizedView(t *testing.T) {
 	err = addBlocksToForks(forks, blocks)
 	require.Nil(t, err)
 
-	requireFinalizedBlock(t, forks, 1, 2)
+	requireLatestFinalizedBlock(t, forks, 1, 2)
 }
 
 // receives [1,2], [2,3], [3,4], [4,5], [3,6], [5,6'].
@@ -463,7 +519,7 @@ func TestDoubleProposal(t *testing.T) {
 	err = addBlocksToForks(forks, blocks)
 	require.Nil(t, err)
 
-	requireFinalizedBlock(t, forks, 2, 3)
+	requireLatestFinalizedBlock(t, forks, 2, 3)
 	notifier.AssertExpectations(t)
 }
 
@@ -595,8 +651,15 @@ func addBlocksToForks(forks *Forks, proposals []*model.Proposal) error {
 	return nil
 }
 
-// check the view and QC's view of the finalized block for the finalizer
-func requireFinalizedBlock(t *testing.T, forks *Forks, qc int, view int) {
+// requireLatestFinalizedBlock asserts that the latest finalized block has the given view and qc view.
+func requireLatestFinalizedBlock(t *testing.T, forks *Forks, qcView int, view int) {
 	require.Equal(t, forks.FinalizedBlock().View, uint64(view), "finalized block has wrong view")
-	require.Equal(t, forks.FinalizedBlock().QC.View, uint64(qc), "finalized block has wrong qc")
+	require.Equal(t, forks.FinalizedBlock().QC.View, uint64(qcView), "finalized block has wrong qc")
+}
+
+// requireNoBlocksFinalized asserts that no blocks have been finalized (genesis is latest finalized block).
+func requireNoBlocksFinalized(t *testing.T, forks *Forks) {
+	genesis := makeGenesis()
+	require.Equal(t, forks.FinalizedBlock().View, genesis.Block.View)
+	require.Equal(t, forks.FinalizedBlock().View, genesis.QC.View)
 }
