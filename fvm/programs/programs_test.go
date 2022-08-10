@@ -20,7 +20,10 @@ func Test_Programs(t *testing.T) {
 		Program:     &ast.Program{},
 		Elaboration: nil,
 	}
-	someLocation := common.IdentifierLocation("some")
+	someLocation := common.AddressLocation{
+		Address: common.MustBytesToAddress([]byte{6, 6, 6}),
+		Name:    "blah",
+	}
 
 	newState := state.NewState(
 		utils.NewSimpleView(),
@@ -32,8 +35,10 @@ func Test_Programs(t *testing.T) {
 	}
 
 	t.Run("cleanup without changed programs", func(t *testing.T) {
-
-		parentLocation := common.IdentifierLocation("parent")
+		parentLocation := common.AddressLocation{
+			Address: common.MustBytesToAddress([]byte{3, 4, 5}),
+			Name:    "parent",
+		}
 
 		parent := NewEmptyPrograms()
 
@@ -58,8 +63,8 @@ func Test_Programs(t *testing.T) {
 		programs.Cleanup(nil)
 
 		retrieved, _, has = programs.Get(someLocation)
-		require.Nil(t, retrieved)
-		require.False(t, has)
+		require.NotNil(t, retrieved)
+		require.True(t, has)
 
 		retrieved, _, has = programs.Get(addressLocation)
 		require.NotNil(t, retrieved)
@@ -71,8 +76,10 @@ func Test_Programs(t *testing.T) {
 	})
 
 	t.Run("cleanup with changed programs", func(t *testing.T) {
-
-		parentLocation := common.IdentifierLocation("parent")
+		parentLocation := common.AddressLocation{
+			Address: common.MustBytesToAddress([]byte{3, 4, 5}),
+			Name:    "parent",
+		}
 
 		parent := NewEmptyPrograms()
 		parent.Set(parentLocation, &interpreter.Program{}, newState)

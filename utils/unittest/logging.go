@@ -2,6 +2,7 @@ package unittest
 
 import (
 	"flag"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -66,6 +67,12 @@ func (hook LoggerHook) Logs() string {
 }
 
 // Run implements zerolog.Hook and appends the log message to the log.
-func (hook LoggerHook) Run(_ *zerolog.Event, _ zerolog.Level, msg string) {
+func (hook LoggerHook) Run(_ *zerolog.Event, level zerolog.Level, msg string) {
 	hook.logs.WriteString(msg)
+
+	// for tests that need to test logger.Fatal(), this is useful because the parent test process will read from stdout
+	// to determine if the test sub-process (that generated the logger.Fatal() call) called logger.Fatal() with the expected message
+	if level == zerolog.FatalLevel {
+		fmt.Println(msg)
+	}
 }
