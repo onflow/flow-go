@@ -2,9 +2,9 @@ package unittest
 
 import (
 	"fmt"
+	"os"
 	"testing"
 )
-import "os"
 
 // TestCrashTest_ErrorMessage tests that CrashTest() can check a function that crashed without any messages.
 func TestCrashTest_NoMessage(t *testing.T) {

@@ -340,9 +340,16 @@ func main() {
 			return nil
 		}).
 		Module("block seals mempool", func(node *cmd.NodeConfig) error {
-			// use a custom ejector so we don't eject seals that would break
+			// use a custom ejector, so we don't eject seals that would break
 			// the chain of seals
-			seals, err = consensusMempools.NewExecStateForkSuppressor(consensusMempools.LogForkAndCrash(node.Logger), node.DB, node.Logger, sealLimit)
+			rawMempool := stdmap.NewIncorporatedResultSeals(sealLimit)
+			multipleReceiptsFilterMempool := consensusMempools.NewIncorporatedResultSeals(rawMempool, node.Storage.Receipts)
+			seals, err = consensusMempools.NewExecStateForkSuppressor(
+				multipleReceiptsFilterMempool,
+				consensusMempools.LogForkAndCrash(node.Logger),
+				node.DB,
+				node.Logger,
+			)
 			if err != nil {
 				return fmt.Errorf("failed to wrap seals mempool into ExecStateForkSuppressor: %w", err)
 			}
@@ -625,7 +632,7 @@ func main() {
 				node.Storage.Results,
 				node.Storage.Receipts,
 				guarantees,
-				consensusMempools.NewIncorporatedResultSeals(seals, node.Storage.Receipts),
+				seals,
 				receipts,
 				node.Tracer,
 				builder.WithBlockTimer(blockTimer),
