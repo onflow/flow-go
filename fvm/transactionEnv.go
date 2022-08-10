@@ -57,19 +57,27 @@ func NewTransactionEnvironment(
 		ctx.EventCollectionByteSizeLimit,
 	)
 	accountKeys := handler.NewAccountKeyHandler(accounts)
+	tracer := NewTracer(ctx.Tracer, traceSpan, ctx.ExtensiveTracing)
 
-	envCtx := NewEnvContext(ctx, traceSpan)
 	env := &TransactionEnv{
 		commonEnv: commonEnv{
-			ctx:                   envCtx,
-			ProgramLogger:         NewProgramLogger(envCtx),
-			UnsafeRandomGenerator: NewUnsafeRandomGenerator(envCtx),
-			sth:                   sth,
-			vm:                    vm,
-			programs:              programsHandler,
-			accounts:              accounts,
-			accountKeys:           accountKeys,
-			uuidGenerator:         uuidGenerator,
+			Tracer: tracer,
+			ProgramLogger: NewProgramLogger(
+				tracer,
+				ctx.Metrics,
+				ctx.CadenceLoggingEnabled,
+			),
+			UnsafeRandomGenerator: NewUnsafeRandomGenerator(
+				tracer,
+				ctx.BlockHeader,
+			),
+			ctx:           ctx,
+			sth:           sth,
+			vm:            vm,
+			programs:      programsHandler,
+			accounts:      accounts,
+			accountKeys:   accountKeys,
+			uuidGenerator: uuidGenerator,
 		},
 
 		addressGenerator: generator,
@@ -145,18 +153,13 @@ func (e *TransactionEnv) setExecutionParameters() error {
 		return nil
 	}
 
-	var ok bool
-	var m *meter.WeightedMeter
-	// only set the weights if the meter is a meter.WeightedMeter
-	if m, ok = e.sth.State().Meter().(*meter.WeightedMeter); !ok {
-		return nil
-	}
+	meter := e.sth.State().Meter()
 
 	computationWeights, err := GetExecutionEffortWeights(e, service)
 	err = setIfOk(
 		"execution effort weights",
 		err,
-		func() { m.SetComputationWeights(computationWeights) })
+		func() { meter.SetComputationWeights(computationWeights) })
 	if err != nil {
 		return err
 	}
@@ -165,7 +168,7 @@ func (e *TransactionEnv) setExecutionParameters() error {
 	err = setIfOk(
 		"execution memory weights",
 		err,
-		func() { m.SetMemoryWeights(memoryWeights) })
+		func() { meter.SetMemoryWeights(memoryWeights) })
 	if err != nil {
 		return err
 	}
@@ -174,7 +177,7 @@ func (e *TransactionEnv) setExecutionParameters() error {
 	err = setIfOk(
 		"execution memory limit",
 		err,
-		func() { m.SetTotalMemoryLimit(memoryLimit) })
+		func() { meter.SetTotalMemoryLimit(memoryLimit) })
 	if err != nil {
 		return err
 	}
@@ -433,7 +436,7 @@ func (e *TransactionEnv) ServiceEvents() []flow.Event {
 }
 
 func (e *TransactionEnv) Meter(kind common.ComputationKind, intensity uint) error {
-	if e.sth.EnforceComputationLimits {
+	if e.sth.EnforceComputationLimits() {
 		return e.sth.State().MeterComputation(kind, intensity)
 	}
 	return nil
