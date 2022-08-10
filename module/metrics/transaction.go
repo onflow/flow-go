@@ -26,6 +26,9 @@ type TransactionCollector struct {
 	scriptSize                 prometheus.Histogram
 	transactionSize            prometheus.Histogram
 	maxReceiptHeight           prometheus.Gauge
+
+	// used to skip heights that are lower than the current max height
+	maxReceiptHeightValue uint64
 }
 
 func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log zerolog.Logger,
@@ -277,5 +280,9 @@ func (tc *TransactionCollector) TransactionExpired(txID flow.Identifier) {
 }
 
 func (tc *TransactionCollector) UpdateExecutionReceiptMaxHeight(height uint64) {
+	if height <= tc.maxReceiptHeightValue {
+		return
+	}
+
 	tc.maxReceiptHeight.Set(float64(height))
 }
