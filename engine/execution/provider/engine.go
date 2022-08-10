@@ -35,7 +35,9 @@ type ProviderEngine interface {
 const (
 	// DefaultChunkDataPackRequestWorker is the default number of concurrent workers processing chunk data pack requests on
 	// execution nodes.
-	DefaultChunkDataPackRequestWorker   = 100
+	DefaultChunkDataPackRequestWorker = 100
+	// DefaultChunkDataPackProcessInterval is the default time interval that a free worker checks head of the chunk data pack
+	// requests queue for new chunk data packs.
 	DefaultChunkDataPackProcessInterval = 10 * time.Millisecond
 	DefaultChunkDataPackQueryTimeout    = 10 * time.Second
 	DefaultChunkDataPackDeliveryTimeout = 10 * time.Second
