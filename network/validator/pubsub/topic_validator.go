@@ -110,7 +110,7 @@ func TopicValidator(log zerolog.Logger, codec network.Codec, peerFilter func(pee
 
 		result := pubsub.ValidationAccept
 		for _, validator := range validators {
-			switch res := validator(ctx, from, decodedMsgPayload); res {
+			switch res := validator(from, decodedMsgPayload); res {
 			case pubsub.ValidationReject:
 				return res
 			case pubsub.ValidationIgnore:

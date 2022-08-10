@@ -1,7 +1,6 @@
 package validator
 
 import (
-	"context"
 	"errors"
 
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -27,7 +26,7 @@ type GetIdentityFunc func(peer.ID) (*flow.Identity, bool)
 // If validation fails the message is rejected, and if the validation error is an expected error, slashing data is also collected.
 // Authorization config is defined in message.MsgAuthConfig.
 func AuthorizedSenderValidator(log zerolog.Logger, slashingViolationsConsumer slashing.ViolationsConsumer, channel channels.Channel, isUnicast bool, getIdentity GetIdentityFunc) MessageValidator {
-	return func(ctx context.Context, from peer.ID, msg interface{}) (string, error) {
+	return func(from peer.ID, msg interface{}) (string, error) {
 		// NOTE: messages from unstaked nodes should be rejected by the libP2P node topic validator
 		// before they reach message validators. If a message from a unstaked peer gets to this point
 		// something terrible went wrong.
@@ -74,10 +73,10 @@ func AuthorizedSenderValidator(log zerolog.Logger, slashingViolationsConsumer sl
 // AuthorizedSenderMessageValidator wraps the callback returned by AuthorizedSenderValidator and returns
 // MessageValidator callback that returns pubsub.ValidationReject if validation fails and pubsub.ValidationAccept if validation passes.
 func AuthorizedSenderMessageValidator(log zerolog.Logger, slashingViolationsConsumer slashing.ViolationsConsumer, channel channels.Channel, getIdentity GetIdentityFunc) PubSubMessageValidator {
-	return func(ctx context.Context, from peer.ID, msg interface{}) pubsub.ValidationResult {
+	return func(from peer.ID, msg interface{}) pubsub.ValidationResult {
 		validate := AuthorizedSenderValidator(log, slashingViolationsConsumer, channel, false, getIdentity)
 
-		_, err := validate(ctx, from, msg)
+		_, err := validate(from, msg)
 		if err != nil {
 			return pubsub.ValidationReject
 		}
