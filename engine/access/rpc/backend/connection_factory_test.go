@@ -119,9 +119,10 @@ func TestProxyAccessAPIConnectionReuse(t *testing.T) {
 	}
 
 	// get a collection API client
-	_, _, err := proxyConnectionFactory.GetAccessAPIClient("foo")
+	_, closer, err := proxyConnectionFactory.GetAccessAPIClient("foo")
 	assert.Equal(t, connectionFactory.ConnectionsCache.Len(), 1)
 	assert.NoError(t, err)
+	assert.Nil(t, closer.Close())
 
 	var conn *grpc.ClientConn
 	res, ok := connectionFactory.ConnectionsCache.Get(proxyConnectionFactory.targetAddress)
@@ -166,9 +167,10 @@ func TestProxyExecutionAPIConnectionReuse(t *testing.T) {
 	}
 
 	// get an execution API client
-	_, _, err := proxyConnectionFactory.GetExecutionAPIClient("foo")
+	_, closer, err := proxyConnectionFactory.GetExecutionAPIClient("foo")
 	assert.Equal(t, connectionFactory.ConnectionsCache.Len(), 1)
 	assert.NoError(t, err)
+	assert.Nil(t, closer.Close())
 
 	var conn *grpc.ClientConn
 	res, ok := connectionFactory.ConnectionsCache.Get(proxyConnectionFactory.targetAddress)
