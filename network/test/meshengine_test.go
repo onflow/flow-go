@@ -13,6 +13,7 @@ import (
 
 	"github.com/ipfs/go-log"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -70,7 +71,7 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 		logger,
 		nil,
 		unittest.NetworkCodec(),
-		unittest.SlashingViolationsConsumer(),
+		mocknetwork.NewViolationsConsumer(suite.T()),
 		WithIdentityOpts(unittest.WithAllRoles()),
 	)
 

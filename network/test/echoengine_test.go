@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ipfs/go-log"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -55,7 +56,7 @@ func (suite *EchoEngineTestSuite) SetupTest() {
 		logger,
 		nil,
 		unittest.NetworkCodec(),
-		unittest.SlashingViolationsConsumer(),
+		mocknetwork.NewViolationsConsumer(suite.T()),
 	)
 }
 
