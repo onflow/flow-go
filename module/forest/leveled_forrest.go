@@ -13,6 +13,7 @@ import (
 // A LevelledForest provides the ability to prune all vertices up to a specific level.
 // A tree whose root is below the pruning threshold might decompose into multiple
 // disconnected subtrees as a result of pruning.
+// LevelledForest is NOT safe for concurrent use by multiple goroutines.
 type LevelledForest struct {
 	vertices        VertexSet
 	verticesAtLevel map[uint64]VertexList
@@ -49,6 +50,7 @@ func NewLevelledForest(lowestLevel uint64) *LevelledForest {
 }
 
 // PruneUpToLevel prunes all blocks UP TO but NOT INCLUDING `level`
+// TODO error docs:
 func (f *LevelledForest) PruneUpToLevel(level uint64) error {
 	if level < f.LowestLevel {
 		return fmt.Errorf("new lowest level %d cannot be smaller than previous last retained level %d", level, f.LowestLevel)
@@ -115,7 +117,7 @@ func (f *LevelledForest) GetVertex(id flow.Identifier) (Vertex, bool) {
 	return container.vertex, true
 }
 
-// GetSize returns the total number of vertices above the pruned lowest level.
+// GetSize returns the total number of vertices above the lowest pruned level.
 // Note this call is not concurrent-safe, caller is responsible to ensure concurrency safety.
 func (f *LevelledForest) GetSize() uint64 {
 	return f.size
@@ -125,13 +127,13 @@ func (f *LevelledForest) GetSize() uint64 {
 // An empty VertexIterator is returned, if no vertices are known whose parent is `id` , `level`
 func (f *LevelledForest) GetChildren(id flow.Identifier) VertexIterator {
 	container := f.vertices[id]
-	// if vertex does not exists, container is the default zero value for vertexContainer, which contains a nil-slice for its children
+	// if vertex does not exist, container is the default zero value for vertexContainer, which contains a nil-slice for its children
 	return newVertexIterator(container.children) // VertexIterator gracefully handles nil slices
 }
 
 // GetNumberOfChildren returns number of children of given vertex
 func (f *LevelledForest) GetNumberOfChildren(id flow.Identifier) int {
-	container := f.vertices[id] // if vertex does not exists, container is the default zero value for vertexContainer, which contains a nil-slice for its children
+	container := f.vertices[id] // if vertex does not exist, container is the default zero value for vertexContainer, which contains a nil-slice for its children
 	num := 0
 	for _, child := range container.children {
 		if child.vertex != nil {
@@ -141,17 +143,17 @@ func (f *LevelledForest) GetNumberOfChildren(id flow.Identifier) int {
 	return num
 }
 
-// GetVerticesAtLevel returns a VertexIterator to iterate over the Vertices at the specified height
-// An empty VertexIterator is returned, if no vertices are known at the specified `level`
+// GetVerticesAtLevel returns a VertexIterator to iterate over the Vertices at the specified level.
+// An empty VertexIterator is returned, if no vertices are known at the specified level.
 func (f *LevelledForest) GetVerticesAtLevel(level uint64) VertexIterator {
 	return newVertexIterator(f.verticesAtLevel[level]) // go returns the zero value for a missing level. Here, a nil slice
 }
 
-// GetNumberOfVerticesAtLevel returns number of vertices at given level
+// GetNumberOfVerticesAtLevel returns number of full vertices at given level
 func (f *LevelledForest) GetNumberOfVerticesAtLevel(level uint64) int {
 	num := 0
 	for _, container := range f.verticesAtLevel[level] {
-		if container.vertex != nil {
+		if !f.isEmptyContainer(container) {
 			num++
 		}
 	}
@@ -196,7 +198,7 @@ func (f *LevelledForest) registerWithParent(vertexContainer *vertexContainer) {
 
 // getOrCreateVertexContainer returns the vertexContainer if there exists one
 // or creates a new vertexContainer and adds it to the internal data structures.
-// It errors if a vertex with same id but different Level is already known
+// It errors if a vertex with same id but different Level is already known TODO this is false
 // (i.e. there exists an empty or full container with the same id but different level).
 func (f *LevelledForest) getOrCreateVertexContainer(id flow.Identifier, level uint64) *vertexContainer {
 	container, exists := f.vertices[id] // try to find vertex container with same ID
@@ -206,14 +208,17 @@ func (f *LevelledForest) getOrCreateVertexContainer(id flow.Identifier, level ui
 			level: level,
 		}
 		f.vertices[container.id] = container
-		vtcs := f.verticesAtLevel[container.level]                   // returns nil slice if not yet present
-		f.verticesAtLevel[container.level] = append(vtcs, container) // append works on nil slices: creates slice with capacity 2
+		vertices := f.verticesAtLevel[container.level]                   // returns nil slice if not yet present
+		f.verticesAtLevel[container.level] = append(vertices, container) // append works on nil slices: creates slice with capacity 2
 	}
 	return container
 }
 
-// VerifyVertex verifies that vertex satisfies the following conditions
-// (1)
+// VerifyVertex verifies that vertex satisfies ANY of the following conditions:
+// (1) The vertex's level is below the lowest level in the forest
+// (2) The vertex is equal to a vertex which already exists in the forest
+// (3) The vertex is a new vertex with a consistent parent (as defined in verifyParent)
+// TODO error docs
 func (f *LevelledForest) VerifyVertex(vertex Vertex) error {
 	if vertex.Level() < f.LowestLevel {
 		return nil
@@ -234,9 +239,8 @@ func (f *LevelledForest) VerifyVertex(vertex Vertex) error {
 	return f.verifyParent(vertex)
 }
 
-// isEquivalentToStoredVertex
-// evaluates whether a vertex is equivalent to already stored vertex.
-// for vertices at pruning level, parents are ignored
+// isEquivalentToStoredVertex evaluates whether a vertex is equivalent to already stored vertex.
+// For vertices at pruning level, parents are ignored.
 //
 // (1) return value (false, nil)
 // Two vertices are _not equivalent_ if they have different IDs (Hashes).
@@ -248,6 +252,7 @@ func (f *LevelledForest) VerifyVertex(vertex Vertex) error {
 // (3) return value (false, error)
 // errors if the vertices' IDs are identical but they differ
 // in any of the _relevant_ fields (as defined in (2)).
+// TODO error docs
 func (f *LevelledForest) isEquivalentToStoredVertex(vertex Vertex) (bool, error) {
 	storedVertex, haveStoredVertex := f.GetVertex(vertex.VertexID())
 	if !haveStoredVertex {
@@ -278,6 +283,7 @@ func (f *LevelledForest) isEquivalentToStoredVertex(vertex Vertex) (bool, error)
 // An error is raised if
 // * there is a parent with the same id but different view;
 // * the parent's level is _not_ smaller than the vertex's level
+// TODO error docs
 func (f *LevelledForest) verifyParent(vertex Vertex) error {
 	// verify parent
 	parentID, parentLevel := vertex.Parent()

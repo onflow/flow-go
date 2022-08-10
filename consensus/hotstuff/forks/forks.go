@@ -11,7 +11,9 @@ import (
 	"github.com/onflow/flow-go/module/forest"
 )
 
-// Forks implements HotStuff finalization logic
+// Forks implements HotStuff finalization logic as defined in DiemBFT v4
+// https://developers.diem.com/papers/diem-consensus-state-machine-replication-in-the-diem-blockchain/2021-08-17.pdf
+// Forks is NOT safe for concurrent use by multiple goroutines.
 type Forks struct {
 	notifier hotstuff.FinalizationConsumer
 	forest   forest.LevelledForest
@@ -24,11 +26,12 @@ type Forks struct {
 
 var _ hotstuff.Forks = (*Forks)(nil)
 
+// TODO document
 type ancestryChain struct {
 	block      *BlockContainer
 	oneChain   *BlockQC
 	twoChain   *BlockQC
-	threeChain *BlockQC
+	threeChain *BlockQC // TODO remove
 }
 
 // ErrPrunedAncestry is a sentinel error: cannot resolve ancestry of block due to pruning
@@ -90,18 +93,18 @@ func (f *Forks) GetProposalsForView(view uint64) []*model.Proposal {
 }
 
 // IsKnownBlock checks whether block is known.
-// UNVALIDATED: expects block to pass Forks.VerifyBlock(block)
+// UNVALIDATED: expects block to pass Forks.VerifyProposal(block)
 func (f *Forks) IsKnownBlock(block *model.Block) bool {
 	_, hasBlock := f.forest.GetVertex(block.BlockID)
 	return hasBlock
 }
 
-// IsProcessingNeeded performs basic checks whether or not block needs processing
-// only considering the block's height and hash
+// IsProcessingNeeded performs basic checks to determine whether block needs processing,
+// only considering the block's height and hash.
 // Returns false if any of the following conditions applies
 //  * block view is _below_ the most recently finalized block
 //  * known block
-// UNVALIDATED: expects block to pass Forks.VerifyBlock(block)
+// UNVALIDATED: expects block to pass Forks.VerifyProposal(block)
 func (f *Forks) IsProcessingNeeded(block *model.Block) bool {
 	if block.View < f.lastFinalized.Block.View || f.IsKnownBlock(block) {
 		return false
@@ -112,7 +115,7 @@ func (f *Forks) IsProcessingNeeded(block *model.Block) bool {
 // UnverifiedAddProposal adds `proposal` to the consensus state.
 // Calling this method with previously-processed blocks leaves the consensus state invariant
 // (though, it will potentially cause some duplicate processing).
-// UNVALIDATED: expects block to pass Forks.VerifyBlock(block)
+// UNVALIDATED: expects block to pass Forks.VerifyProposal(block)
 func (f *Forks) UnverifiedAddProposal(proposal *model.Proposal) error {
 	if !f.IsProcessingNeeded(proposal.Block) {
 		return nil
@@ -164,7 +167,7 @@ func (f *Forks) AddProposal(proposal *model.Proposal) error {
 //     * q1.BlockID != q2.BlockID
 // This means there are two Quorums for conflicting blocks at the same view.
 // Per Lemma 1 from the HotStuff paper https://arxiv.org/abs/1803.05069v6, two
-// conflicting QCs can exists if and onluy of the Byzantine threshold is exceeded.
+// conflicting QCs can exist if and only if of the Byzantine threshold is exceeded.
 func (f *Forks) checkForConflictingQCs(qc *flow.QuorumCertificate) error {
 	it := f.forest.GetVerticesAtLevel(qc.View)
 	for it.HasNext() {
@@ -251,7 +254,7 @@ func (f *Forks) getThreeChain(blockContainer *BlockContainer) (*ancestryChain, e
 // getNextAncestryLevel parent from forest. Returns QCBlock for the parent,
 // i.e. the parent block itself and the qc pointing to the parent, i.e. block.QC().
 // If the block's parent is below the pruned view, it will error with an ErrorPrunedAncestry.
-// UNVALIDATED: expects block to pass Forks.VerifyBlock(block)
+// UNVALIDATED: expects block to pass Forks.VerifyProposal(block)
 func (f *Forks) getNextAncestryLevel(block *model.Block) (*BlockQC, error) {
 	// The finalizer prunes all blocks in forest which are below the most recently finalized block.
 	// Hence, we have a pruned ancestry if and only if either of the following conditions applies:
@@ -372,8 +375,9 @@ func (f *Forks) finalizeUpToBlock(qc *flow.QuorumCertificate) error {
 	return nil
 }
 
+// VerifyProposal checks a block for validity.
 // TODO consolidate with UnverifiedAddProposal
-// VerifyProposal checks block for validity
+// TODO error docs
 func (f *Forks) VerifyProposal(proposal *model.Proposal) error {
 	block := proposal.Block
 	if block.View < f.forest.LowestLevel {
