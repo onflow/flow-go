@@ -159,7 +159,7 @@ func (e *ExecutionNodeBuilder) LoadFlags() {
 			flags.BoolVar(&e.exeConf.enableBlockDataUpload, "enable-blockdata-upload", false, "enable uploading block data to Cloud Bucket")
 			flags.StringVar(&e.exeConf.gcpBucketName, "gcp-bucket-name", "", "GCP Bucket name for block data uploader")
 			flags.StringVar(&e.exeConf.s3BucketName, "s3-bucket-name", "", "S3 Bucket name for block data uploader")
-			flags.Uint64Var(&e.exeConf.executionDataPrunerHeightRangeTarget, "execution-data-height-range-target", 800_000, "target height range size used to limit the amount of Execution Data kept on disk")
+			flags.Uint64Var(&e.exeConf.executionDataPrunerHeightRangeTarget, "execution-data-height-range-target", 0, "target height range size used to limit the amount of Execution Data kept on disk")
 			flags.Uint64Var(&e.exeConf.executionDataPrunerThreshold, "execution-data-height-range-threshold", 100_000, "height threshold used to trigger Execution Data pruning")
 			flags.StringToIntVar(&e.exeConf.apiRatelimits, "api-rate-limits", map[string]int{}, "per second rate limits for GRPC API methods e.g. Ping=300,ExecuteScriptAtBlockID=500 etc. note limits apply globally to all clients.")
 			flags.StringToIntVar(&e.exeConf.apiBurstlimits, "api-burst-limits", map[string]int{}, "burst limits for gRPC API methods e.g. Ping=100,ExecuteScriptAtBlockID=100 etc. note limits apply globally to all clients.")
@@ -435,6 +435,11 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			)
 			if err != nil {
 				return nil, err
+			}
+
+			// by default, pruning is disabled
+			if e.exeConf.executionDataPrunerHeightRangeTarget == 0 {
+				return &module.NoopReadyDoneAware{}, nil
 			}
 
 			var prunerMetrics module.ExecutionDataPrunerMetrics = metrics.NewNoopCollector()
