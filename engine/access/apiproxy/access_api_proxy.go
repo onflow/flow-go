@@ -33,7 +33,7 @@ type FlowAccessAPIRouter struct {
 	access.AccessAPIServer
 }
 
-func (h *FlowAccessAPIRouter) log(rpc, handler string, err error) {
+func (h *FlowAccessAPIRouter) log(handler, rpc string, err error) {
 	code := status.Code(err)
 	h.Metrics.RecordRPC(handler, rpc, code)
 
