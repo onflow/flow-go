@@ -581,10 +581,8 @@ func (m *MiddlewareTestSuite) TestUnicast_Authorization() {
 
 		//NOTE: return (nil, false) simulating unstaked node
 		overlay.On("Identity", mock.AnythingOfType("peer.ID")).Return(nil, false)
-		overlay.On("Receive",
-			m.ids[0].NodeID,
-			mock.AnythingOfType("*message.Message"),
-		).Return(nil)
+		// message will be rejected so assert overlay never receives it
+		defer overlay.AssertNotCalled(m.T(), "Receive", m.ids[0].NodeID, mock.AnythingOfType("*message.Message"))
 
 		newMw.SetOverlay(overlay)
 
@@ -666,10 +664,8 @@ func (m *MiddlewareTestSuite) TestUnicast_Authorization() {
 		}, nil)
 		//NOTE: return ejected identity causing validation to fail
 		overlay.On("Identity", mock.AnythingOfType("peer.ID")).Return(ejectedID, true)
-		overlay.On("Receive",
-			m.ids[0].NodeID,
-			mock.AnythingOfType("*message.Message"),
-		).Return(nil)
+		// message will be rejected so assert overlay never receives it
+		defer overlay.AssertNotCalled(m.T(), "Receive", m.ids[0].NodeID, mock.AnythingOfType("*message.Message"))
 
 		newMw.SetOverlay(overlay)
 
@@ -741,10 +737,8 @@ func (m *MiddlewareTestSuite) TestUnicast_Authorization() {
 		newMw := mws[0]
 
 		overlay := m.createOverlay(providers[0])
-		overlay.On("Receive",
-			m.ids[0].NodeID,
-			mock.AnythingOfType("*message.Message"),
-		).Return(nil)
+		// message will be rejected so assert overlay never receives it
+		defer overlay.AssertNotCalled(m.T(), "Receive", m.ids[0].NodeID, mock.AnythingOfType("*message.Message"))
 		newMw.SetOverlay(overlay)
 
 		ctx, cancel := context.WithCancel(m.mwCtx)
@@ -816,10 +810,8 @@ func (m *MiddlewareTestSuite) TestUnicast_Authorization() {
 		newMw := mws[0]
 
 		overlay := m.createOverlay(providers[0])
-		overlay.On("Receive",
-			m.ids[0].NodeID,
-			mock.AnythingOfType("*message.Message"),
-		).Return(nil)
+		// message will be rejected so assert overlay never receives it
+		defer overlay.AssertNotCalled(m.T(), "Receive", m.ids[0].NodeID, mock.AnythingOfType("*message.Message"))
 		newMw.SetOverlay(overlay)
 
 		ctx, cancel := context.WithCancel(m.mwCtx)
