@@ -77,9 +77,6 @@ type Engine struct {
 	executionReceipts storage.ExecutionReceipts
 	executionResults  storage.ExecutionResults
 
-	// keep track of the highest finalized block height seen by the engine (used for metrics)
-	highestFinalizedHeight uint64
-
 	// metrics
 	transactionMetrics         module.TransactionMetrics
 	collectionsToMarkFinalized *stdmap.Times
@@ -358,10 +355,6 @@ func (e *Engine) processFinalizedBlock(blockID flow.Identifier) error {
 		return fmt.Errorf("failed to lookup block: %w", err)
 	}
 
-	if block.Header.Height > e.highestFinalizedHeight {
-		e.highestFinalizedHeight = block.Header.Height
-	}
-
 	// Notify rpc handler of new finalized block height
 	e.rpcEngine.SubmitLocal(block)
 
@@ -421,6 +414,7 @@ func (e *Engine) trackFinalizedMetricForBlock(hb *model.Block) {
 
 	if ti, found := e.blocksToMarkExecuted.ByID(hb.BlockID); found {
 		e.trackExecutedMetricForBlock(block, ti)
+		e.transactionMetrics.UpdateExecutionReceiptMaxHeight(block.Header.Height)
 		e.blocksToMarkExecuted.Remove(hb.BlockID)
 	}
 }
@@ -445,12 +439,6 @@ func (e *Engine) trackExecutionReceiptMetrics(r *flow.ExecutionReceipt) {
 
 	if errors.Is(err, storage.ErrNotFound) {
 		e.blocksToMarkExecuted.Add(r.ExecutionResult.BlockID, now)
-
-		// execution receipts are received as they are sent by ENs, which may be before the block
-		// is finalized and processed through the sync engine. When that happens, just use the
-		// latest finalized height.
-		e.transactionMetrics.UpdateExecutionReceiptMaxHeight(e.highestFinalizedHeight)
-
 		return
 	}
 
