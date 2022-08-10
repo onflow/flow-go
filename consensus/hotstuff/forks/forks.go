@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/forest"
+	"github.com/onflow/flow-go/module/mempool"
 )
 
 // Forks implements HotStuff finalization logic as defined in DiemBFT v4
@@ -322,9 +323,14 @@ func (f *Forks) updateFinalizedBlockQc(ancestryChain *ancestryChain) error {
 	return f.finalizeUpToBlock(b.QC)
 }
 
-// finalizeUpToBlock finalizes all blocks up to (and including) the block pointed to by `blockQC`.
+// finalizeUpToBlock finalizes all blocks up to (and including) the block pointed to by `qc`.
 // Finalization starts with the child of `lastFinalizedBlockQC` (explicitly checked);
 // and calls OnFinalizedBlock on the newly finalized blocks in the respective order
+// Error returns:
+// * model.ByzantineThresholdExceededError if we are finalizing a block which is invalid to finalize.
+//   This either indicates a critical internal bug / data corruption, or that the network Byzantine
+//   threshold was exceeded, breaking the safety guarantees of HotStuff.
+// * generic error in case of bug or internal state corruption
 func (f *Forks) finalizeUpToBlock(qc *flow.QuorumCertificate) error {
 	if qc.View < f.lastFinalized.Block.View {
 		return model.ByzantineThresholdExceededError{Evidence: fmt.Sprintf(
@@ -360,11 +366,15 @@ func (f *Forks) finalizeUpToBlock(qc *flow.QuorumCertificate) error {
 	// finalize block itself:
 	f.lastFinalized = &BlockQC{Block: block, QC: qc}
 	err = f.forest.PruneUpToLevel(block.View)
+	if mempool.IsBelowPrunedThresholdError(err) {
+		// we should never see this error because we finalize blocks in strictly increasing view order
+		return fmt.Errorf("unexpected error pruning forest, indicates corrupted state: %s", err.Error())
+	}
 	if err != nil {
-		return fmt.Errorf("pruning levelled forest failed: %w", err)
+		return fmt.Errorf("unexpected error while pruning forest: %w", err)
 	}
 
-	// notify other critical components about finalized block
+	// notify other critical components about finalized block - all errors returned are considered critical
 	err = f.finalizationCallback.MakeFinal(blockContainer.VertexID())
 	if err != nil {
 		return fmt.Errorf("finalization error in other component: %w", err)

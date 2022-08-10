@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/mempool"
 )
 
 // LevelledForest contains multiple trees (which is a potentially disconnected planar graph).
@@ -49,11 +50,12 @@ func NewLevelledForest(lowestLevel uint64) *LevelledForest {
 	}
 }
 
-// PruneUpToLevel prunes all blocks UP TO but NOT INCLUDING `level`
-// TODO error docs:
+// PruneUpToLevel prunes all blocks UP TO but NOT INCLUDING `level`.
+// Error returns:
+// * mempool.BelowPrunedThresholdError if input level is below the lowest retained level
 func (f *LevelledForest) PruneUpToLevel(level uint64) error {
 	if level < f.LowestLevel {
-		return fmt.Errorf("new lowest level %d cannot be smaller than previous last retained level %d", level, f.LowestLevel)
+		return mempool.NewBelowPrunedThresholdErrorf("new lowest level %d cannot be smaller than previous last retained level %d", level, f.LowestLevel)
 	}
 	if len(f.vertices) == 0 {
 		f.LowestLevel = level
