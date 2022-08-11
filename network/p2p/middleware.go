@@ -297,7 +297,7 @@ func (m *Middleware) start(ctx context.Context) error {
 	// create and use a peer manager if a peer manager factory was passed in during initialization
 	if m.peerManagerFactory != nil {
 		m.peerManager, err = m.peerManagerFactory(m.libP2PNode.host, func() peer.IDSlice {
-			return m.peerIDs(m.ov.Topology().NodeIDs())
+			return m.topologyPeers()
 		}, m.log)
 		if err != nil {
 			return fmt.Errorf("failed to create peer manager: %w", err)
@@ -312,6 +312,12 @@ func (m *Middleware) start(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// topologyPeers callback used by the peer manager to get the list of peer ID's
+// which this node should be directly connected to as peers.
+func (m *Middleware) topologyPeers() peer.IDSlice {
+	return m.peerIDs(m.ov.Topology().NodeIDs())
 }
 
 // stop will end the execution of the middleware and wait for it to end.
