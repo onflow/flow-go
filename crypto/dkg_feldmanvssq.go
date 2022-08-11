@@ -203,7 +203,9 @@ func (s *feldmanVSSQualState) HandleBroadcastMsg(orig int, msg []byte) error {
 	}
 
 	if len(msg) == 0 {
-		s.disqualified = true
+		if index(orig) == s.leaderIndex {
+			s.disqualified = true
+		}
 		s.processor.Disqualify(orig, "received broadcast is empty")
 		return nil
 	}
@@ -216,7 +218,9 @@ func (s *feldmanVSSQualState) HandleBroadcastMsg(orig int, msg []byte) error {
 	case feldmanVSSComplaintAnswer:
 		s.receiveComplaintAnswer(index(orig), msg[1:])
 	default:
-		s.disqualified = true
+		if index(orig) == s.leaderIndex {
+			s.disqualified = true
+		}
 		s.processor.Disqualify(orig,
 			fmt.Sprintf("invalid broadcast header, got %d",
 				dkgMsgTag(msg[0])))
