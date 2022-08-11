@@ -108,9 +108,11 @@ func NewEngine(
 	pendingVotes := &engine.FifoMessageStore{FifoQueue: votesQueue}
 
 	// FIFO queue for timeout objects
-	// TODO(active-pacemaker): update metrics
 	timeoutObjectsQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultTimeoutObjectsQueueCapacity))
+		fifoqueue.WithCapacity(defaultTimeoutObjectsQueueCapacity),
+		fifoqueue.WithLengthObserver(func(len int) {
+			core.mempoolMetrics.MempoolEntries(metrics.ResourceClusterTimeoutObjectQueue, uint(len))
+		}))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for inbound timeout objects: %w", err)
 	}
@@ -164,10 +166,9 @@ func NewEngine(
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.ClusterTimeoutObject)
-				// TODO(active-pacemaker): update metrics
-				//if ok {
-				//core.metrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageClusterBlockVote)
-				//}
+				if ok {
+					core.metrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageClusterTimeoutObject)
+				}
 				return ok
 			},
 			Store: pendingTimeouts,
@@ -429,9 +430,7 @@ func (e *Engine) BroadcastTimeout(timeout *model.TimeoutObject) error {
 
 		log.Info().Msg("cluster timeout broadcast")
 
-		// TODO(active-pacemaker): update metrics
-		//e.metrics.MessageSent(metrics.EngineClusterCompliance, metrics.MessageClusterBlockProposal)
-		//e.core.collectionMetrics.ClusterBlockProposed(block)
+		e.metrics.MessageSent(metrics.EngineClusterCompliance, metrics.MessageClusterTimeoutObject)
 	})
 
 	return nil

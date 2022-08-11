@@ -80,30 +80,33 @@ const (
 	ResourceNetworkingDnsIpCache         = "networking_dns_ip_cache"            // networking layer
 	ResourceNetworkingDnsTxtCache        = "networking_dns_txt_cache"           // networking layer
 
-	ResourceClusterBlockProposalQueue = "cluster_compliance_proposal_queue" // collection node, compliance engine
-	ResourceClusterBlockVoteQueue     = "cluster_compliance_vote_queue"     // collection node, compliance engine
-	ResourceTransactionIngestQueue    = "ingest_transaction_queue"          // collection node, ingest engine
-	ResourceBeaconKey                 = "beacon-key"                        // consensus node, DKG engine
-	ResourceApprovalQueue             = "sealing_approval_queue"            // consensus node, sealing engine
-	ResourceReceiptQueue              = "sealing_receipt_queue"             // consensus node, sealing engine
-	ResourceApprovalResponseQueue     = "sealing_approval_response_queue"   // consensus node, sealing engine
-	ResourceBlockProposalQueue        = "compliance_proposal_queue"         // consensus node, compliance engine
-	ResourceBlockVoteQueue            = "compliance_vote_queue"             // consensus node, compliance engine
-	ResourceCollectionGuaranteesQueue = "ingestion_col_guarantee_queue"     // consensus node, ingestion engine
-	ResourceTimeoutAggregatorQueue    = "timeout_aggregator_queue"          // consensus node, timeout aggregator
-	ResourceVoteAggregatorQueue       = "vote_aggregator_queue"             // consensus node, vote aggregator
-	ResourceChunkDataPack             = "chunk_data_pack"                   // execution node
-	ResourceEvents                    = "events"                            // execution node
-	ResourceServiceEvents             = "service_events"                    // execution node
-	ResourceTransactionResults        = "transaction_results"               // execution node
-	ResourceTransactionResultIndices  = "transaction_result_indices"        // execution node
-	ResourceTransactionResultByBlock  = "transaction_result_by_block"       // execution node
+	ResourceClusterBlockProposalQueue = "cluster_compliance_proposal_queue"       // collection node, compliance engine
+	ResourceClusterBlockVoteQueue     = "cluster_compliance_vote_queue"           // collection node, compliance engine
+	ResourceClusterTimeoutObjectQueue = "cluster_compliance_timeout_object_queue" // collection node, compliance engine
+	ResourceTransactionIngestQueue    = "ingest_transaction_queue"                // collection node, ingest engine
+	ResourceBeaconKey                 = "beacon-key"                              // consensus node, DKG engine
+	ResourceApprovalQueue             = "sealing_approval_queue"                  // consensus node, sealing engine
+	ResourceReceiptQueue              = "sealing_receipt_queue"                   // consensus node, sealing engine
+	ResourceApprovalResponseQueue     = "sealing_approval_response_queue"         // consensus node, sealing engine
+	ResourceBlockProposalQueue        = "compliance_proposal_queue"               // consensus node, compliance engine
+	ResourceBlockVoteQueue            = "compliance_vote_queue"                   // consensus node, compliance engine
+	ResourceTimeoutObjectQueue        = "compliance_timeout_object_queue"         // consensus node, compliance engine
+	ResourceCollectionGuaranteesQueue = "ingestion_col_guarantee_queue"           // consensus node, ingestion engine
+	ResourceTimeoutAggregatorQueue    = "timeout_aggregator_queue"                // consensus node, timeout aggregator
+	ResourceVoteAggregatorQueue       = "vote_aggregator_queue"                   // consensus node, vote aggregator
+	ResourceChunkDataPack             = "chunk_data_pack"                         // execution node
+	ResourceEvents                    = "events"                                  // execution node
+	ResourceServiceEvents             = "service_events"                          // execution node
+	ResourceTransactionResults        = "transaction_results"                     // execution node
+	ResourceTransactionResultIndices  = "transaction_result_indices"              // execution node
+	ResourceTransactionResultByBlock  = "transaction_result_by_block"             // execution node
 )
 
 const (
 	MessageCollectionGuarantee  = "guarantee"
 	MessageBlockProposal        = "proposal"
 	MessageBlockVote            = "vote"
+	MessageTimeoutObject        = "timeout_object"
 	MessageExecutionReceipt     = "receipt"
 	MessageResultApproval       = "approval"
 	MessageSyncRequest          = "ping"
@@ -114,6 +117,7 @@ const (
 	MessageSyncedBlock          = "synced_block"
 	MessageClusterBlockProposal = "cluster_proposal"
 	MessageClusterBlockVote     = "cluster_vote"
+	MessageClusterTimeoutObject = "cluster_timeout_object"
 	MessageClusterBlockResponse = "cluster_block_response"
 	MessageSyncedClusterBlock   = "synced_cluster_block"
 	MessageTransaction          = "transaction"
