@@ -93,10 +93,10 @@ func (m *MiddlewareTestSuite) SetupTest() {
 	peerChannel := make(chan string)
 	ob := tagsObserver{
 		tags: peerChannel,
-		log:  unittest.Logger(),
+		log:  m.logger,
 	}
 
-	m.ids, m.mws, obs, m.providers = GenerateIDsAndMiddlewares(m.T(), m.size, unittest.Logger(), unittest.NetworkCodec())
+	m.ids, m.mws, obs, m.providers = GenerateIDsAndMiddlewares(m.T(), m.size, m.logger, unittest.NetworkCodec())
 
 	for _, observableConnMgr := range obs {
 		observableConnMgr.Subscribe(&ob)
