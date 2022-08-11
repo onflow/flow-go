@@ -15,7 +15,7 @@ service CorruptibleConduitFactory {
   rpc ProcessAttackerMessage(stream Message) returns (google.protobuf.Empty) {}
 }
 
-// Message represents the messages exchanged between the CorruptibleNetwork and Attacker services.
+// Message represents the messages exchanged between the CorruptibleNetwork (server) and Orchestrator (client).
 // This is a wrapper for both egress and ingress messages.
 message Message {
   EgressMessage Egress = 1;
@@ -32,10 +32,12 @@ message EgressMessage {
   Protocol protocol = 6;
 }
 
+// OriginID for IngressMessage represents the node id where the message is coming from - that node could be corrupted or honest.
 message IngressMessage {
   string ChannelID = 1;
   bytes OriginID = 2;
-  bytes Payload = 3;
+  bytes TargetID = 3;
+  bytes Payload = 4;
 }
 
 enum Protocol {
