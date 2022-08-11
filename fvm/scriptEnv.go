@@ -120,7 +120,7 @@ func (e *ScriptEnv) setExecutionParameters() error {
 		return nil
 	}
 
-	meter := e.sth.State().Meter()
+	meter := e.sth.Meter()
 
 	computationWeights, err := GetExecutionEffortWeights(e, service)
 	err = setIfOk(
@@ -310,14 +310,14 @@ func (e *ScriptEnv) Meter(kind common.ComputationKind, intensity uint) error {
 	}
 
 	if e.sth.EnforceComputationLimits() {
-		return e.sth.State().MeterComputation(kind, intensity)
+		return e.sth.MeterComputation(kind, intensity)
 	}
 	return nil
 }
 
 func (e *ScriptEnv) meterMemory(kind common.MemoryKind, intensity uint) error {
 	if e.sth.EnforceMemoryLimits() {
-		return e.sth.State().MeterMemory(kind, intensity)
+		return e.sth.MeterMemory(kind, intensity)
 	}
 	return nil
 }
