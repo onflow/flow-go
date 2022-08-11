@@ -85,8 +85,8 @@ func (d *dummyOrchestrator) HandleEventToCorruptedNode(event *insecure.IngressEv
 	panic("Unimplemented")
 }
 
-func (d *dummyOrchestrator) RegisterAttackNetwork(attackNetwork insecure.OrchestratorNetwork) {
-	d.orchestratorNetwork = attackNetwork
+func (d *dummyOrchestrator) RegisterAttackNetwork(orchestratorNetwork insecure.OrchestratorNetwork) {
+	d.orchestratorNetwork = orchestratorNetwork
 }
 
 // mustSeenFlowProtocolEvent checks the dummy orchestrator has passed through the flow protocol events with given ids. It fails
