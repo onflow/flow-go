@@ -84,11 +84,11 @@ load:
 
 .PHONY: tpsTest
 tpsTest:
-	go run --tags relic ../loader -log-level info -account-multiplier 100 -tps 25 -tps-durations 15s
+	go run --tags relic ../benchmark -log-level info -tps 25 -tps-durations 600s
 
-.PHONY: end2endTest
+.PHONY: tpsTestCI
 end2endTest:
 	make init
 	make start
-	go run --tags relic ../loader -log-level info -tps 25 -tps-durations 15s
+	go run --tags relic ../benchmark -ci-run -gitSha $(COMMIT_SHA)
 	make stop

@@ -3,8 +3,12 @@ package main
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"flag"
+	"fmt"
+	"io"
 	"net"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -31,11 +35,21 @@ type LoadCase struct {
 	duration time.Duration
 }
 
+type dataSlice struct {
+	gitSha              string
+	startTime           time.Time
+	endTime             time.Time
+	inputTps            float64
+	outputTps           float64
+	proStartTransaction float64
+	proEndTransaction   float64
+}
+
 func main() {
 	sleep := flag.Duration("sleep", 0, "duration to sleep before benchmarking starts")
 	loadTypeFlag := flag.String("load-type", "token-transfer", "type of loads (\"token-transfer\", \"add-keys\", \"computation-heavy\", \"event-heavy\", \"ledger-heavy\", \"const-exec\")")
-	tpsFlag := flag.String("tps", "1", "transactions per second (TPS) to send, accepts a comma separated list of values if used in conjunction with `tps-durations`")
-	tpsDurationsFlag := flag.String("tps-durations", "0", "duration that each load test will run, accepts a comma separted list that will be applied to multiple values of the `tps` flag (defaults to infinite if not provided, meaning only the first tps case will be tested; additional values will be ignored)")
+	tpsFlag := flag.String("tps", "300", "transactions per second (TPS) to send, accepts a comma separated list of values if used in conjunction with `tps-durations`")
+	tpsDurationsFlag := flag.String("tps-durations", "600", "duration that each load test will run, accepts a comma separted list that will be applied to multiple values of the `tps` flag (defaults to infinite if not provided, meaning only the first tps case will be tested; additional values will be ignored)")
 	chainIDStr := flag.String("chain", string(flowsdk.Emulator), "chain ID")
 	access := flag.String("access", net.JoinHostPort("127.0.0.1", "3569"), "access node address")
 	serviceAccountPrivateKeyHex := flag.String("servPrivHex", unittest.ServiceAccountPrivateKeyHex, "service account private key hex")
@@ -43,13 +57,17 @@ func main() {
 	metricport := flag.Uint("metricport", 8080, "port for /metrics endpoint")
 	pushgateway := flag.String("pushgateway", "127.0.0.1:9091", "host:port for pushgateway")
 	profilerEnabled := flag.Bool("profiler-enabled", false, "whether to enable the auto-profiler")
-	_ = flag.Bool("track-txs", false, "deprecated")
 	accountMultiplierFlag := flag.Int("account-multiplier", 50, "number of accounts to create per load tps")
 	feedbackEnabled := flag.Bool("feedback-enabled", true, "wait for trannsaction execution before submitting new transaction")
 	maxConstExecTxSizeInBytes := flag.Uint("const-exec-max-tx-size", flow.DefaultMaxTransactionByteSize/10, "max byte size of constant exec transaction size to generate")
 	authAccNumInConstExecTx := flag.Uint("const-exec-num-authorizer", 1, "num of authorizer for each constant exec transaction to generate")
 	argSizeInByteInConstExecTx := flag.Uint("const-exec-arg-size", 100, "byte size of tx argument for each constant exec transaction to generate")
 	payerKeyCountInConstExecTx := flag.Uint("const-exec-payer-key-count", 2, "num of payer keys for each constant exec transaction to generate")
+
+	ciFlag := flag.Bool("ci-run", false, "whether or not the run is part of CI")
+	leadTime := flag.Int("leadTime", 30, "the amount of time (in seconds) before data slices are started")
+	sliceSize := flag.Int("sliceSize", 120, "the amount of time (in seconds) that each slice covers")
+	gitSha := flag.String("gitSha", "", "the git hash of the run, used for BigQuery result tracking")
 	flag.Parse()
 
 	chainID := flowsdk.ChainID([]byte(*chainIDStr))
@@ -181,12 +199,12 @@ func main() {
 				lg.Start()
 			}
 
-			// if the duration is 0, we run this case forever
-			if c.duration.Nanoseconds() == 0 {
-				return
-			}
-
+			testStartTime := time.Now()
 			time.Sleep(c.duration)
+			testEndTime := time.Now()
+
+			dataSlices := calculateTpsSlices(testStartTime, testEndTime, *leadTime, *sliceSize, *gitSha, lg)
+			prepareDataForBigQuery(dataSlices, *ciFlag)
 
 			if lg != nil {
 				lg.Stop()
@@ -197,6 +215,125 @@ func main() {
 	}()
 
 	<-ctx.Done()
+}
+
+func calculateTpsSlices(start, end time.Time, leadTime, sliceTime int, commit string, lg *utils.ContLoadGenerator) []dataSlice {
+	//remove the lead time on both start and end, this should remove spin-up and spin-down times
+	currentTime := start.Add(time.Duration(leadTime))
+	endTime := end.Add(-1 * time.Duration(leadTime))
+	sliceDuration := time.Duration(sliceTime)
+
+	slices := make([]dataSlice, 0)
+
+	for ; currentTime.Add(sliceDuration).Before(endTime); currentTime = currentTime.Add(sliceDuration) {
+		sliceEndTime := currentTime.Add(sliceDuration)
+
+		inputTps := lg.AvgTpsBetween(currentTime, sliceEndTime)
+		proStart := getPrometheusTransactionAtTime(currentTime)
+		proEnd := getPrometheusTransactionAtTime(sliceEndTime)
+
+		outputTps := (proEnd - proStart) / float64(sliceTime)
+
+		slice := dataSlice{
+			gitSha:              commit,
+			startTime:           currentTime,
+			endTime:             currentTime.Add(time.Duration(sliceTime)),
+			inputTps:            inputTps,
+			outputTps:           outputTps,
+			proStartTransaction: proStart,
+			proEndTransaction:   proEnd}
+		slices = append(slices, slice)
+	}
+
+	return slices
+}
+
+func prepareDataForBigQuery(slices []dataSlice, ci bool) {
+	jsonText, err := json.Marshal(slices)
+	if err != nil {
+		println("Error converting slice data to json")
+	}
+
+	// if we are uploading to BigQuery then we need a copy of the json file
+	// that is newline delimited json
+	if ci {
+		jsonString := string(jsonText)
+		// remove the surrounding curly braces
+		jsonString = jsonString[1 : len(jsonString)-1]
+		// remove existing whitespace to prepare to add required newlines.
+		jsonString = strings.ReplaceAll(jsonString, "\n", "")
+		jsonString = strings.ReplaceAll(jsonString, "\t", "")
+		// end of object commas will be replaced with newlines
+		jsonString = strings.ReplaceAll(jsonString, "},", "}\n")
+
+		// output tps-bq-results
+		f, err := os.OpenFile("tps-bq-results.json", os.O_CREATE, 0644)
+		if err == nil {
+			f.Write([]byte(jsonString))
+			f.Close()
+		} else {
+			fmt.Println(err)
+		}
+	}
+
+	// output human-readable json blob
+	timestamp := time.Now()
+	fileName := fmt.Sprintf("tps-results-%v.json", timestamp)
+	f, err := os.OpenFile(fileName, os.O_CREATE, 0644)
+	if err == nil {
+		f.Write(jsonText)
+		f.Close()
+	} else {
+		fmt.Println(err)
+	}
+}
+
+func getPrometheusTransactionAtTime(time time.Time) float64 {
+	url := fmt.Sprintf("http://localhost:9090/api/v1/query?query=execution_runtime_total_executed_transactions&time=%v", time.Unix())
+
+	resp, err := http.Get(url)
+	if err != nil {
+		// error handling
+		println("Error getting prometheus data")
+		return -1
+	}
+
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Printf("Error reading response body, %v", err)
+		return -1
+	}
+
+	var result map[string]interface{}
+
+	err = json.Unmarshal([]byte(body), &result)
+	if err != nil {
+		fmt.Printf("Error unmarshaling json, %v", err)
+		return -1
+	}
+
+	totalTxs := 0
+	executionNodeCount := 0
+
+	resultMap := result["data"].(map[string]interface{})["result"].([]interface{})
+
+	for i, executionNodeMap := range resultMap {
+		executionNodeCount = i
+		nodeMap, _ := executionNodeMap.(map[string]interface{})
+		values := nodeMap["value"].([]interface{})
+		nodeTxsStr := values[1].(string)
+		nodeTxsInt, _ := strconv.Atoi(nodeTxsStr)
+		totalTxs = totalTxs + nodeTxsInt
+	}
+
+	if executionNodeCount == 0 {
+		println("No execution nodes found. No transactions.")
+		return 0
+	}
+
+	avgTps := float64(totalTxs) / float64(executionNodeCount)
+	return avgTps
 }
 
 func parseLoadCases(log zerolog.Logger, tpsFlag, tpsDurationsFlag *string) []LoadCase {

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"sync"
 
 	"time"
@@ -257,14 +256,6 @@ func (lg *ContLoadGenerator) Start() {
 	lg.workerStatsTracker.StartPrinting(1 * time.Second)
 }
 
-func (lg *ContLoadGenerator) StartTime() {
-	lg.startTime = time.Now()
-}
-
-func (lg *ContLoadGenerator) StopTime() {
-	lg.stopTime = time.Now()
-}
-
 func (lg *ContLoadGenerator) Stop() {
 	defer lg.log.Debug().Msg("stopped generator")
 
@@ -282,29 +273,14 @@ func (lg *ContLoadGenerator) Stop() {
 		}()
 	}
 
-	if !lg.startTime.IsZero() {
-		totalTPS := lg.workerStatsTracker.AvgTPSBetween(lg.startTime, lg.stopTime)
-		f, err := os.OpenFile("avgTps.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if err == nil {
-			totalTPSstring := fmt.Sprintf(
-				"\nInput TPS:%.4f, Time:%v, Txs:%v",
-				totalTPS,
-				lg.stopTime.Sub(lg.startTime),
-				lg.workerStatsTracker.TotalTxs())
-			f.Write([]byte(totalTPSstring))
-			f.Close()
-		} else {
-			fmt.Println(err)
-		}
-
-		//reset start time to prevent wonky averages where stop is called multiple times.
-		lg.startTime = time.Time{}
-	}
-
 	wg.Wait()
 	lg.workerStatsTracker.StopPrinting()
 	lg.log.Debug().Msg("stopping follower")
 	lg.follower.Stop()
+}
+
+func (lg *ContLoadGenerator) AvgTpsBetween(start, stop time.Time) float64 {
+	return lg.workerStatsTracker.AvgTPSBetween(start, stop)
 }
 
 func (lg *ContLoadGenerator) createAccounts(num int) error {
