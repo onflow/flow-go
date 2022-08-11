@@ -254,15 +254,11 @@ func (fnb *FlowNodeBuilder) EnqueueResolver() {
 }
 
 func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
-	fnb.Component(ConduitFactoryComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		cf := conduit.NewDefaultConduitFactory()
-		fnb.ConduitFactory = cf
-		node.Logger.Info().Hex("node_id", logging.ID(node.NodeID)).Msg("default conduit factory initiated")
-
-		return cf, nil
-	})
 	fnb.Component(NetworkComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		return fnb.InitFlowNetworkWithConduitFactory(node, fnb.ConduitFactory)
+		cf := conduit.NewDefaultConduitFactory()
+		fnb.Logger.Info().Hex("node_id", logging.ID(fnb.NodeID)).Msg("default conduit factory initiated")
+
+		return fnb.InitFlowNetworkWithConduitFactory(node, cf)
 	})
 }
 
@@ -334,17 +330,18 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 	}
 
 	// creates network instance
-	net, err := p2p.NewNetwork(fnb.Logger,
-		fnb.CodecFactory(),
-		fnb.Me,
-		func() (network.Middleware, error) { return fnb.Middleware, nil },
-		topologyCache,
-		subscriptionManager,
-		fnb.Metrics.Network,
-		fnb.IdentityProvider,
-		receiveCache,
-		p2p.WithConduitFactory(cf),
-	)
+	net, err := p2p.NewNetwork(&p2p.NetworkParameters{
+		Logger:              fnb.Logger,
+		Codec:               fnb.CodecFactory(),
+		Me:                  fnb.Me,
+		MiddlewareFactory:   func() (network.Middleware, error) { return fnb.Middleware, nil },
+		Topology:            topologyCache,
+		SubscriptionManager: subscriptionManager,
+		Metrics:             fnb.Metrics.Network,
+		IdentityProvider:    fnb.IdentityProvider,
+		ReceiveCache:        receiveCache,
+		Options:             []p2p.NetworkOptFunction{p2p.WithConduitFactory(cf)},
+	})
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize network: %w", err)
 	}
@@ -922,6 +919,7 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 	fnb.FvmOptions = vmOpts
 }
 
+// handleModules initializes the given module.
 func (fnb *FlowNodeBuilder) handleModule(v namedModuleFunc) error {
 	err := v.fn(fnb.NodeConfig)
 	if err != nil {
@@ -929,6 +927,17 @@ func (fnb *FlowNodeBuilder) handleModule(v namedModuleFunc) error {
 	}
 
 	fnb.Logger.Info().Str("module", v.name).Msg("module initialization complete")
+	return nil
+}
+
+// handleModules initializes all modules that have been enqueued on this node builder.
+func (fnb *FlowNodeBuilder) handleModules() error {
+	for _, f := range fnb.modules {
+		if err := fnb.handleModule(f); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -1163,6 +1172,25 @@ func (fnb *FlowNodeBuilder) OverrideComponent(name string, f ReadyDoneFactory) N
 	return fnb.Component(name, f)
 }
 
+// OverrideModule adds given builder function to the modules set of the node builder. If a builder function with that name
+// already exists, it will be overridden.
+func (fnb *FlowNodeBuilder) OverrideModule(name string, f BuilderFunc) NodeBuilder {
+	for i := 0; i < len(fnb.modules); i++ {
+		if fnb.modules[i].name == name {
+			// found module with the name, override it.
+			fnb.modules[i] = namedModuleFunc{
+				fn:   f,
+				name: name,
+			}
+
+			return fnb
+		}
+	}
+
+	// no module found with the same name, hence just adding it.
+	return fnb.Module(name, f)
+}
+
 // RestartableComponent adds a new component to the node that conforms to the ReadyDoneAware
 // interface, and calls the provided error handler when an irrecoverable error is encountered.
 // Use RestartableComponent if the component is not critical to the node's safe operation and
@@ -1378,10 +1406,8 @@ func (fnb *FlowNodeBuilder) onStart() error {
 	fnb.EnqueueAdminServerInit()
 
 	// run all modules
-	for _, f := range fnb.modules {
-		if err := fnb.handleModule(f); err != nil {
-			return err
-		}
+	if err := fnb.handleModules(); err != nil {
+		return fmt.Errorf("could not handle modules: %w", err)
 	}
 
 	// run all components
