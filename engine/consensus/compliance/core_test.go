@@ -422,11 +422,7 @@ func (cs *ComplianceCoreSuite) TestOnSubmitVote() {
 	}).Return()
 
 	// execute the vote submission
-	err := cs.core.OnBlockVote(originID, &vote)
-	require.NoError(cs.T(), err, "block vote should pass")
-
-	// check that submit vote was called with correct parameters
-	cs.hotstuff.AssertExpectations(cs.T())
+	cs.core.OnBlockVote(originID, &vote)
 }
 
 // TestOnSubmitTimeout tests that submitting messages.TimeoutObject adds model.TimeoutObject into
@@ -450,8 +446,7 @@ func (cs *ComplianceCoreSuite) TestOnSubmitTimeout() {
 	}).Return()
 
 	// execute the timeout submission
-	err := cs.core.OnTimeoutObject(originID, &timeout)
-	require.NoError(cs.T(), err, "timeout object should pass")
+	cs.core.OnTimeoutObject(originID, &timeout)
 }
 
 func (cs *ComplianceCoreSuite) TestProposalBufferingOrder() {
