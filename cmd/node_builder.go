@@ -191,7 +191,6 @@ type NodeConfig struct {
 	Resolver          madns.BasicResolver
 	Middleware        network.Middleware
 	Network           network.Network
-	ConduitFactory    network.ConduitFactory
 	PingService       network.PingService
 	MsgValidators     []network.MessageValidator
 	FvmOptions        []fvm.Option
