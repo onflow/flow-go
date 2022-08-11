@@ -212,7 +212,7 @@ func GenerateNetworks(
 			Codec:               cbor.NewCodec(),
 			Me:                  me,
 			MiddlewareFactory:   func() (network.Middleware, error) { return mws[i], nil },
-			Topology:            tops[i],
+			Topology:            unittest.NetworkTopology(),
 			SubscriptionManager: sms[i],
 			Metrics:             metrics.NewNoopCollector(),
 			IdentityProvider:    id.NewFixedIdentityProvider(ids),

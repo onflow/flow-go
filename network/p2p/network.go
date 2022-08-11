@@ -130,7 +130,7 @@ func NewNetwork(param *NetworkParameters) (*Network, error) {
 		me:                          param.Me,
 		mw:                          mw,
 		receiveCache:                param.ReceiveCache,
-		top:                         param.Topology,
+		topology:                    param.Topology,
 		metrics:                     param.Metrics,
 		subscriptionManager:         param.SubscriptionManager,
 		identityProvider:            param.IdentityProvider,
