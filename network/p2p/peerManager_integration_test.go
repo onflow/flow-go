@@ -31,10 +31,10 @@ func TestPeerManager_Integration(t *testing.T) {
 	defer stopNodes(t, nodes)
 
 	thisNode := nodes[0]
-	othersId := identities[1:]
+	topologyPeers := identities[1:]
 
 	// adds address of all other nodes into the peer store of this node, so that it can dial them.
-	info, invalid := p2p.PeerInfosFromIDs(othersId)
+	info, invalid := p2p.PeerInfosFromIDs(topologyPeers)
 	require.Empty(t, invalid)
 	for _, i := range info {
 		thisNode.Host().Peerstore().SetAddrs(i.ID, i.Addrs, peerstore.PermanentAddrTTL)
@@ -49,9 +49,9 @@ func TestPeerManager_Integration(t *testing.T) {
 
 	peerManager := p2p.NewPeerManager(unittest.Logger(), p2p.DefaultPeerUpdateInterval, func() peer.IDSlice {
 		// peerManager is furnished with a full topology that connects to all nodes
-		// in the othersId.
+		// in the topologyPeers.
 		peers := peer.IDSlice{}
-		for _, id := range othersId {
+		for _, id := range topologyPeers {
 			peerId, err := idTranslator.GetPeerID(id.NodeID)
 			require.NoError(t, err)
 			peers = append(peers, peerId)
@@ -67,17 +67,17 @@ func TestPeerManager_Integration(t *testing.T) {
 	// after a forced update all other nodes must be added to the peer store of this node.
 	require.Len(t, thisNode.Host().Network().Peers(), count-1)
 	// after a forced update there must be a connection between this node and other nodes
-	connectedToAll(t, thisNode.Host(), idTranslator, othersId.NodeIDs())
+	connectedToAll(t, thisNode.Host(), idTranslator, topologyPeers.NodeIDs())
 
 	// kicks one node out of the othersIds; this imitates evicting, ejecting, or unstaking a node
-	evictedId := othersId[0] // evicted one
-	othersId = othersId[1:]  // updates otherIds list
+	evictedId := topologyPeers[0]     // evicted one
+	topologyPeers = topologyPeers[1:] // updates otherIds list
 	peerManager.ForceUpdatePeers()
 	time.Sleep(1 * time.Second)
 	// after a forced update, the evicted one should be excluded from the peer store.
 	require.Len(t, thisNode.Host().Network().Peers(), count-2)
 	// there must be a connection between this node and other nodes (except evicted one).
-	connectedToAll(t, thisNode.Host(), idTranslator, othersId.NodeIDs())
+	connectedToAll(t, thisNode.Host(), idTranslator, topologyPeers.NodeIDs())
 
 	// there must be no connection between this node and evicted one
 	peerId, err := idTranslator.GetPeerID(evictedId.NodeID)
