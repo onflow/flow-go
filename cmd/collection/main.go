@@ -474,6 +474,7 @@ func main() {
 				node.DB,
 				node.State,
 				createMetrics,
+				node.Metrics.Mempool,
 				opts...,
 			)
 			if err != nil {

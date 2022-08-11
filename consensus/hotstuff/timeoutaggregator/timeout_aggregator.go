@@ -14,9 +14,11 @@ import (
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/metrics"
 )
 
 // defaultTimeoutAggregatorWorkers number of workers to dispatch events for timeout aggregator
@@ -46,11 +48,14 @@ var _ component.Component = (*TimeoutAggregator)(nil)
 // No errors are expected during normal operations.
 func NewTimeoutAggregator(log zerolog.Logger,
 	notifier hotstuff.Consumer,
+	mempoolMetrics module.MempoolMetrics,
 	lowestRetainedView uint64,
 	collectors hotstuff.TimeoutCollectors,
 ) (*TimeoutAggregator, error) {
-	// TODO(active-pacemaker): add metrics to track size of timeouts queue
-	queuedTimeouts, err := fifoqueue.NewFifoQueue(fifoqueue.WithCapacity(defaultTimeoutQueueCapacity))
+	queuedTimeouts, err := fifoqueue.NewFifoQueue(fifoqueue.WithCapacity(defaultTimeoutQueueCapacity),
+		fifoqueue.WithLengthObserver(func(len int) {
+			mempoolMetrics.MempoolEntries(metrics.ResourceTimeoutAggregatorQueue, uint(len))
+		}))
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize timeouts queue")
 	}

@@ -31,6 +31,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/util"
@@ -382,11 +383,13 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 			)
 		}, nil)
 
+	mempoolMetrics := metrics.NewNoopCollector()
+
 	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, notifier, voteProcessorFactory.Create)
 	voteCollectors := voteaggregator.NewVoteCollectors(log, livenessData.CurrentView, workerpool.New(2), createCollectorFactoryMethod)
 
 	// initialize the vote aggregator
-	in.voteAggregator, err = voteaggregator.NewVoteAggregator(log, notifier, livenessData.CurrentView, voteCollectors)
+	in.voteAggregator, err = voteaggregator.NewVoteAggregator(log, notifier, mempoolMetrics, livenessData.CurrentView, voteCollectors)
 	require.NoError(t, err)
 
 	// initialize factories for timeout collector and timeout processor
@@ -396,7 +399,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	timeoutCollectors := timeoutaggregator.NewTimeoutCollectors(log, livenessData.CurrentView, timeoutCollectorFactory)
 
 	// initialize the timeout aggregator
-	in.timeoutAggregator, err = timeoutaggregator.NewTimeoutAggregator(log, notifier, livenessData.CurrentView, timeoutCollectors)
+	in.timeoutAggregator, err = timeoutaggregator.NewTimeoutAggregator(log, notifier, mempoolMetrics, livenessData.CurrentView, timeoutCollectors)
 	require.NoError(t, err)
 
 	safetyData := &hotstuff.SafetyData{

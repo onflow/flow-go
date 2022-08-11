@@ -30,12 +30,13 @@ import (
 type HotStuffMetricsFunc func(chainID flow.ChainID) module.HotstuffMetrics
 
 type HotStuffFactory struct {
-	log           zerolog.Logger
-	me            module.Local
-	db            *badger.DB
-	protoState    protocol.State
-	createMetrics HotStuffMetricsFunc
-	opts          []consensus.Option
+	log            zerolog.Logger
+	me             module.Local
+	db             *badger.DB
+	protoState     protocol.State
+	createMetrics  HotStuffMetricsFunc
+	mempoolMetrics module.MempoolMetrics
+	opts           []consensus.Option
 }
 
 func NewHotStuffFactory(
@@ -44,16 +45,18 @@ func NewHotStuffFactory(
 	db *badger.DB,
 	protoState protocol.State,
 	createMetrics HotStuffMetricsFunc,
+	mempoolMetrics module.MempoolMetrics,
 	opts ...consensus.Option,
 ) (*HotStuffFactory, error) {
 
 	factory := &HotStuffFactory{
-		log:           log,
-		me:            me,
-		db:            db,
-		protoState:    protoState,
-		createMetrics: createMetrics,
-		opts:          opts,
+		log:            log,
+		me:             me,
+		db:             db,
+		protoState:     protoState,
+		createMetrics:  createMetrics,
+		mempoolMetrics: mempoolMetrics,
+		opts:           opts,
 	}
 	return factory, nil
 }
@@ -114,6 +117,7 @@ func (f *HotStuffFactory) CreateModules(
 	voteProcessorFactory := votecollector.NewStakingVoteProcessorFactory(committee, qcDistributor.OnQcConstructedFromVotes)
 	voteAggregator, err := consensus.NewVoteAggregator(
 		f.log,
+		f.mempoolMetrics,
 		// since we don't want to aggregate votes for finalized view,
 		// the lowest retained view starts with the next view of the last finalized view.
 		finalizedBlock.View+1,
@@ -130,6 +134,7 @@ func (f *HotStuffFactory) CreateModules(
 
 	timeoutAggregator, err := consensus.NewTimeoutAggregator(
 		f.log,
+		f.mempoolMetrics,
 		finalizedBlock.View+1,
 		notifier,
 		timeoutProcessorFactory,

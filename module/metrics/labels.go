@@ -90,6 +90,8 @@ const (
 	ResourceBlockProposalQueue        = "compliance_proposal_queue"         // consensus node, compliance engine
 	ResourceBlockVoteQueue            = "compliance_vote_queue"             // consensus node, compliance engine
 	ResourceCollectionGuaranteesQueue = "ingestion_col_guarantee_queue"     // consensus node, ingestion engine
+	ResourceTimeoutAggregatorQueue    = "timeout_aggregator_queue"          // consensus node, timeout aggregator
+	ResourceVoteAggregatorQueue       = "vote_aggregator_queue"             // consensus node, vote aggregator
 	ResourceChunkDataPack             = "chunk_data_pack"                   // execution node
 	ResourceEvents                    = "events"                            // execution node
 	ResourceServiceEvents             = "service_events"                    // execution node

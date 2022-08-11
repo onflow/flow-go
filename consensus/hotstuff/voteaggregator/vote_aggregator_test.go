@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -52,7 +53,7 @@ func (s *VoteAggregatorTestSuite) SetupTest() {
 	s.collectors.On("Ready").Return(ready).Once()
 	s.collectors.On("Done").Return(done).Once()
 
-	s.aggregator, err = NewVoteAggregator(unittest.Logger(), s.consumer, 0, s.collectors)
+	s.aggregator, err = NewVoteAggregator(unittest.Logger(), s.consumer, metrics.NewNoopCollector(), 0, s.collectors)
 	require.NoError(s.T(), err)
 
 	ctx, cancel := context.WithCancel(context.Background())

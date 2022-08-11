@@ -592,6 +592,7 @@ func main() {
 			lowestViewForVoteProcessing := finalizedBlock.View + 1
 			voteAggregator, err := consensus.NewVoteAggregator(
 				node.Logger,
+				node.Metrics.Mempool,
 				lowestViewForVoteProcessing,
 				notifier,
 				voteProcessorFactory,
@@ -604,6 +605,7 @@ func main() {
 			timeoutProcessorFactory := timeoutcollector.NewTimeoutProcessorFactory(timeoutCollectorDistributor, committee, validator, msig.ConsensusTimeoutTag)
 			timeoutAggregator, err := consensus.NewTimeoutAggregator(
 				node.Logger,
+				node.Metrics.Mempool,
 				lowestViewForVoteProcessing,
 				notifier,
 				timeoutProcessorFactory,
