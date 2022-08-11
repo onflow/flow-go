@@ -35,16 +35,13 @@ func (suite *ObserverSuite) TearDownTest() {
 
 func (suite *ObserverSuite) SetupTest() {
 	suite.local = map[string]struct{}{
-		"Ping":                           {},
-		"GetLatestBlockHeader":           {},
-		"GetBlockHeaderByID":             {},
-		"GetBlockHeaderByHeight":         {},
-		"GetLatestBlock":                 {},
-		"GetBlockByID":                   {},
-		"GetBlockByHeight":               {},
-		"GetCollectionByID":              {},
-		"GetNetworkParameters":           {},
-		"GetLatestProtocolStateSnapshot": {},
+		"Ping":                   {},
+		"GetLatestBlockHeader":   {},
+		"GetBlockHeaderByID":     {},
+		"GetBlockHeaderByHeight": {},
+		"GetLatestBlock":         {},
+		"GetBlockByID":           {},
+		"GetBlockByHeight":       {},
 	}
 
 	nodeConfigs := []testnet.NodeConfig{
@@ -150,9 +147,6 @@ func (suite *ObserverSuite) TestObserverWithoutAccess() {
 			}
 			t.Run(rpc.name, func(t *testing.T) {
 				err := rpc.call(ctx, observer)
-				if err == nil {
-					return
-				}
 				code := grpc.Code(err)
 				assert.Equal(t, codes.NotFound, code)
 			})
