@@ -137,7 +137,7 @@ func valueSizes(sizes []int, paths []ledger.Path, head *node.Node) {
 			if *head.Path() == p {
 				payload := head.Payload()
 				if payload != nil {
-					sizes[i] = payload.Value.Size()
+					sizes[i] = payload.Value().Size()
 				}
 				// NOTE: break isn't used here because precondition
 				// doesn't require paths being deduplicated.

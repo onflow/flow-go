@@ -70,8 +70,12 @@ func (as *AccountStatusMigration) Migrate(payload []ledger.Payload) ([]ledger.Pa
 	newPayloads := make([]ledger.Payload, 0, len(payload))
 
 	for _, p := range payload {
-		owner := p.Key.KeyParts[0].Value
-		key := p.Key.KeyParts[2].Value
+		k, err := p.Key()
+		if err != nil {
+			return nil, err
+		}
+		owner := k.KeyParts[0].Value
+		key := k.KeyParts[2].Value
 
 		switch string(key) {
 		case KeyExists:
@@ -81,7 +85,7 @@ func (as *AccountStatusMigration) Migrate(payload []ledger.Payload) ([]ledger.Pa
 			as.setStatus(owner, st)
 		case KeyPublicKeyCount:
 			// follow the original way of decoding the value
-			countInt := new(big.Int).SetBytes(p.Value)
+			countInt := new(big.Int).SetBytes(p.Value())
 			count := countInt.Uint64()
 			// update status
 			status := as.getOrInitStatus(owner)
@@ -89,21 +93,21 @@ func (as *AccountStatusMigration) Migrate(payload []ledger.Payload) ([]ledger.Pa
 			as.setStatus(owner, status)
 		case KeyStorageUsed:
 			// follow the original way of decoding the value
-			if len(p.Value) < 8 {
-				return nil, fmt.Errorf("malsized storage used, owner: %s value: %s", hex.EncodeToString(owner), hex.EncodeToString(p.Value))
+			if len(p.Value()) < 8 {
+				return nil, fmt.Errorf("malsized storage used, owner: %s value: %s", hex.EncodeToString(owner), hex.EncodeToString(p.Value()))
 			}
-			used := binary.BigEndian.Uint64(p.Value[:8])
+			used := binary.BigEndian.Uint64(p.Value()[:8])
 			// update status
 			status := as.getOrInitStatus(owner)
 			status.SetStorageUsed(used)
 			as.setStatus(owner, status)
 		case KeyStorageIndex:
 			// follow the original way of decoding the value
-			if len(p.Value) < 8 {
-				return nil, fmt.Errorf("malsized storage index, owner: %s value: %s", hex.EncodeToString(owner), hex.EncodeToString(p.Value))
+			if len(p.Value()) < 8 {
+				return nil, fmt.Errorf("malsized storage index, owner: %s value: %s", hex.EncodeToString(owner), hex.EncodeToString(p.Value()))
 			}
 			var index atree.StorageIndex
-			copy(index[:], p.Value[:8])
+			copy(index[:], p.Value()[:8])
 			// update status
 			status := as.getOrInitStatus(owner)
 			status.SetStorageIndex(index)

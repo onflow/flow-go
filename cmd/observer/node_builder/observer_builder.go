@@ -11,16 +11,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/routing"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	p2ppubsub "github.com/libp2p/go-libp2p-pubsub"
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/cmd"
@@ -32,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/engine/access/apiproxy"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/common/follower"
@@ -68,7 +65,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow-go/utils/io"
 
 	"github.com/rs/zerolog"
@@ -992,56 +988,25 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return nil, err
 		}
 
-		client, err := builder.initUpstreamClient()
+		// upstream access node forwarder
+		forwarder, err := apiproxy.NewFlowAccessAPIForwarder(builder.upstreamIdentities, builder.apiTimeout)
 		if err != nil {
 			return nil, err
 		}
 
+		proxy := &apiproxy.FlowAccessAPIRouter{
+			Logger:          builder.Logger,
+			Metrics:         metrics.NewObserverCollector(),
+			Upstream:        forwarder,
+			AccessAPIServer: engineBuilder.Handler(),
+		}
+
 		// build the rpc engine
-		engineBuilder.WithNewHandler(&rpc.Forwarder{UpstreamHandler: client})
+		engineBuilder.WithNewHandler(proxy)
 		engineBuilder.WithLegacy()
 		builder.RpcEng = engineBuilder.Build()
 		return builder.RpcEng, nil
 	})
-}
-
-func (builder *ObserverServiceBuilder) initUpstreamClient() (accessproto.AccessAPIClient, error) {
-	// config must prove at least one upstream identity
-	if len(builder.upstreamIdentities) == 0 {
-		return nil, errors.New("please specify an upstream identity")
-	}
-
-	var errs *multierror.Error
-
-	for _, identity := range builder.upstreamIdentities {
-		// TLS
-		tlsConfig, err := grpcutils.DefaultClientTLSConfig(identity.NetworkPubKey)
-		if err != nil {
-			errs = multierror.Append(err,
-				fmt.Errorf("failed to get default TLS client config using public flow networking key %s %w",
-					identity.NetworkPubKey.String(), err),
-			)
-			continue
-		}
-
-		// connect to the upstream access node
-		conn, err := grpc.Dial(
-			identity.Address,
-			grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
-			grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
-			backend.WithClientUnaryInterceptor(time.Minute))
-
-		if err != nil {
-			errs = multierror.Append(err, errs)
-			continue
-		}
-
-		// return the client and ignore previous errors
-		client := accessproto.NewAccessAPIClient(conn)
-		return client, nil
-	}
-
-	return nil, errs.ErrorOrNil()
 }
 
 // initMiddleware creates the network.Middleware implementation with the libp2p factory function, metrics, peer update

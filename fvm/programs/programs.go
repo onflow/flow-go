@@ -16,6 +16,11 @@ type ContractUpdateKey struct {
 	Name    string
 }
 
+type ModifiedSets struct {
+	ContractUpdateKeys []ContractUpdateKey
+	FrozenAccounts     []common.Address
+}
+
 type ContractUpdate struct {
 	ContractUpdateKey
 	Code []byte
@@ -93,29 +98,7 @@ func (p *Programs) HasChanges() bool {
 	return len(p.programs) > 0 || p.cleaned
 }
 
-func (p *Programs) unsafeForceCleanup() {
-	p.cleaned = true
-
-	// Stop using parent's data to prevent
-	// infinite chaining of objects
-	p.parent = nil
-
-	// start with empty storage
-	p.programs = make(map[common.LocationID]*ProgramEntry)
-}
-
-// ForceCleanup is used to force a complete cleanup
-// It exists temporarily to facilitate a temporary measure which can retry
-// a transaction in case checking fails
-// It should be gone when the extra retry is gone
-func (p *Programs) ForceCleanup() {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-
-	p.unsafeForceCleanup()
-}
-
-func (p *Programs) Cleanup(changedContracts []ContractUpdateKey) {
+func (p *Programs) Cleanup(modifiedSets ModifiedSets) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -123,8 +106,17 @@ func (p *Programs) Cleanup(changedContracts []ContractUpdateKey) {
 	// and invalidate only affected ones, possibly setting them to
 	// nil so they will override parent's data, but for now
 	// just throw everything away and use a special flag for this
-	if len(changedContracts) > 0 {
-		p.unsafeForceCleanup()
+	if len(modifiedSets.ContractUpdateKeys) > 0 ||
+		len(modifiedSets.FrozenAccounts) > 0 {
+
+		p.cleaned = true
+
+		// Stop using parent's data to prevent
+		// infinite chaining of objects
+		p.parent = nil
+
+		// start with empty storage
+		p.programs = make(map[common.LocationID]*ProgramEntry)
 		return
 	}
 }

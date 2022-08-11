@@ -547,7 +547,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.StringVarP(&builder.rpcConf.HistoricalAccessAddrs, "historical-access-addr", "", defaultConfig.rpcConf.HistoricalAccessAddrs, "comma separated rpc addresses for historical access nodes")
 		flags.DurationVar(&builder.rpcConf.CollectionClientTimeout, "collection-client-timeout", defaultConfig.rpcConf.CollectionClientTimeout, "grpc client timeout for a collection node")
 		flags.DurationVar(&builder.rpcConf.ExecutionClientTimeout, "execution-client-timeout", defaultConfig.rpcConf.ExecutionClientTimeout, "grpc client timeout for an execution node")
-		flags.UintVar(&builder.rpcConf.ConnectionPoolSize, "connection-pool-size", defaultConfig.rpcConf.ConnectionPoolSize, "maximum number of connections allowed in the connection pool")
+		flags.UintVar(&builder.rpcConf.ConnectionPoolSize, "connection-pool-size", defaultConfig.rpcConf.ConnectionPoolSize, "maximum number of connections allowed in the connection pool, size of 0 disables the connection pooling, and anything less than the default size will be overridden to use the default size")
 		flags.UintVar(&builder.rpcConf.MaxHeightRange, "rpc-max-height-range", defaultConfig.rpcConf.MaxHeightRange, "maximum size for height range requests")
 		flags.StringSliceVar(&builder.rpcConf.PreferredExecutionNodeIDs, "preferred-execution-node-ids", defaultConfig.rpcConf.PreferredExecutionNodeIDs, "comma separated list of execution nodes ids to choose from when making an upstream call e.g. b4a4dbdcd443d...,fb386a6a... etc.")
 		flags.StringSliceVar(&builder.rpcConf.FixedExecutionNodeIDs, "fixed-execution-node-ids", defaultConfig.rpcConf.FixedExecutionNodeIDs, "comma separated list of execution nodes ids to choose from when making an upstream call if no matching preferred execution id is found e.g. b4a4dbdcd443d...,fb386a6a... etc.")
@@ -591,9 +591,6 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			if builder.executionDataConfig.MaxSearchAhead == 0 {
 				return errors.New("execution-data-max-search-ahead must be greater than 0")
 			}
-		}
-		if builder.rpcConf.ConnectionPoolSize == 0 {
-			return errors.New("connection-pool-size must be greater than 0")
 		}
 
 		return nil
@@ -946,7 +943,7 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 		middleware := builder.initMiddleware(builder.NodeID, builder.PublicNetworkConfig.Metrics, libP2PFactory, msgValidators...)
 
 		// topology returns empty list since peers are not known upfront
-		top := topology.EmptyListTopology{}
+		top := topology.EmptyTopology{}
 
 		var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
 		if builder.HeroCacheMetricsEnable {
@@ -1024,7 +1021,9 @@ func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 	validators ...network.MessageValidator) network.Middleware {
 
 	// disable connection pruning for the access node which supports the observer
-	peerManagerFactory := p2p.PeerManagerFactory([]p2p.Option{p2p.WithInterval(builder.PeerUpdateInterval)}, p2p.WithConnectionPruning(false))
+	peerManagerFactory := p2p.PeerManagerFactory(
+		p2p.ConnectionPruningDisabled,
+		builder.PeerUpdateInterval)
 
 	builder.Middleware = p2p.NewMiddleware(
 		builder.Logger.With().Bool("staked", false).Logger(),
