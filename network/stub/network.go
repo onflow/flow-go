@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -56,6 +57,20 @@ func NewNetwork(t testing.TB, myId flow.Identifier, hub *Hub, opts ...func(*Netw
 	for _, opt := range opts {
 		opt(net)
 	}
+
+	// mocks the Start, Ready, and Done behavior of the network.
+	net.On("Start", mock.Anything).Return()
+	ready := make(chan struct{})
+	close(ready)
+	net.On("Ready", mock.Anything).Return(func() <-chan struct{} {
+		return ready
+	})
+
+	done := make(chan struct{})
+	close(done)
+	net.On("Done", mock.Anything).Return(func() <-chan struct{} {
+		return done
+	})
 
 	require.NoError(t, net.conduitFactory.RegisterAdapter(net))
 

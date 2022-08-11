@@ -615,20 +615,18 @@ func (builder *ObserverServiceBuilder) initNetwork(nodeID module.Local,
 	receiveCache *netcache.ReceiveCache,
 ) (*p2p.Network, error) {
 
-	codec := cborcodec.NewCodec()
-
 	// creates network instance
-	net, err := p2p.NewNetwork(
-		builder.FlowNodeBuilder.Logger,
-		codec,
-		nodeID,
-		func() (network.Middleware, error) { return builder.FlowNodeBuilder.Middleware, nil },
-		topology,
-		p2p.NewChannelSubscriptionManager(middleware),
-		networkMetrics,
-		builder.FlowNodeBuilder.IdentityProvider,
-		receiveCache,
-	)
+	net, err := p2p.NewNetwork(&p2p.NetworkParameters{
+		Codec:               cborcodec.NewCodec(),
+		Me:                  nodeID,
+		MiddlewareFactory:   func() (network.Middleware, error) { return builder.Middleware, nil },
+		Topology:            topology,
+		SubscriptionManager: p2p.NewChannelSubscriptionManager(middleware),
+		Metrics:             networkMetrics,
+		IdentityProvider:    builder.IdentityProvider,
+		ReceiveCache:        receiveCache,
+	})
+		Logger:              builder.Logger,
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize network: %w", err)
 	}
