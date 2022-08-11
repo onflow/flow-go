@@ -11,7 +11,7 @@ type AttackOrchestrator interface {
 	// events of corrupted nodes. Hence, no extra concurrency-safe consideration is needed.
 	HandleEventFromCorruptedNode(*EgressEvent) error
 
-	RegisterAttackNetwork(OrchestratorNetwork)
+	Register(OrchestratorNetwork)
 
 	// HandleEventToCorruptedNode implements the logic of processing an incoming event to a corrupted node.
 	// Note: as a design assumption, this method is invoked sequentially by the OrchestratorNetwork to pass the

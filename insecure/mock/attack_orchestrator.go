@@ -40,8 +40,8 @@ func (_m *AttackOrchestrator) HandleEventToCorruptedNode(event *insecure.Ingress
 	return r0
 }
 
-// RegisterAttackNetwork provides a mock function with given fields: _a0
-func (_m *AttackOrchestrator) RegisterAttackNetwork(_a0 insecure.OrchestratorNetwork) {
+// Register provides a mock function with given fields: _a0
+func (_m *AttackOrchestrator) Register(_a0 insecure.OrchestratorNetwork) {
 	_m.Called(_a0)
 }
 
