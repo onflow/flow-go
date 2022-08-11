@@ -171,7 +171,7 @@ func chunkDataRequestListFixture(count int) []*mempool.ChunkDataPackRequest {
 }
 
 // matchAndRemove checks existence of the request in the "requests" array, and if a match is found, it is removed.
-// If no match is found for a request, it fails the test. 
+// If no match is found for a request, it fails the test.
 func matchAndRemove(t *testing.T, requests []*mempool.ChunkDataPackRequest, req *mempool.ChunkDataPackRequest) []*mempool.ChunkDataPackRequest {
 	for i, r := range requests {
 		if r.ChunkId == req.ChunkId && r.RequesterId == req.RequesterId {

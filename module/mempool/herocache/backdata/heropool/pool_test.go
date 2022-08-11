@@ -420,7 +420,7 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 				// when pool is full and with LRU ejection, the head should move forward with each element added.
 				tailEntity, tailExists := pool.Head()
 				require.True(t, tailExists)
-				require.Equal(t, tailEntity.ID(), entitiesToBeAdded[i+1-len(pool.poolEntities)].ID()))
+				require.Equal(t, tailEntity.ID(), entitiesToBeAdded[i+1-len(pool.poolEntities)].ID())
 			}
 		}
 

@@ -617,6 +617,7 @@ func (builder *ObserverServiceBuilder) initNetwork(nodeID module.Local,
 
 	// creates network instance
 	net, err := p2p.NewNetwork(&p2p.NetworkParameters{
+		Logger:              builder.FlowNodeBuilder.Logger,
 		Codec:               cborcodec.NewCodec(),
 		Me:                  nodeID,
 		MiddlewareFactory:   func() (network.Middleware, error) { return builder.Middleware, nil },
@@ -626,7 +627,7 @@ func (builder *ObserverServiceBuilder) initNetwork(nodeID module.Local,
 		IdentityProvider:    builder.IdentityProvider,
 		ReceiveCache:        receiveCache,
 	})
-		Logger:              builder.Logger,
+
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize network: %w", err)
 	}
