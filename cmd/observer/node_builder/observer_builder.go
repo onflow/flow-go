@@ -60,7 +60,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/validator"
-	flowprotocol "github.com/onflow/flow-go/state/protocol"
+	stateprotocol "github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
@@ -157,7 +157,7 @@ type ObserverServiceBuilder struct {
 
 	// components
 	LibP2PNode              *p2p.Node
-	FollowerState           flowprotocol.MutableState
+	FollowerState           stateprotocol.MutableState
 	SyncCore                *synchronization.Core
 	RpcEng                  *rpc.Engine
 	FinalizationDistributor *pubsub.FinalizationDistributor

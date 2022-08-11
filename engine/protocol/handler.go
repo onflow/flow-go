@@ -144,39 +144,3 @@ func (h *Handler) blockHeaderResponse(header *flow.Header) (*access.BlockHeaderR
 		Block: msg,
 	}, nil
 }
-
-func executionResultToMessages(er *flow.ExecutionResult) (*access.ExecutionResultForBlockIDResponse, error) {
-	execResult, err := convert.ExecutionResultToMessage(er)
-	if err != nil {
-		return nil, err
-	}
-	return &access.ExecutionResultForBlockIDResponse{ExecutionResult: execResult}, nil
-}
-
-func blockEventsToMessages(blocks []flow.BlockEvents) ([]*access.EventsResponse_Result, error) {
-	results := make([]*access.EventsResponse_Result, len(blocks))
-
-	for i, block := range blocks {
-		event, err := blockEventsToMessage(block)
-		if err != nil {
-			return nil, err
-		}
-		results[i] = event
-	}
-
-	return results, nil
-}
-
-func blockEventsToMessage(block flow.BlockEvents) (*access.EventsResponse_Result, error) {
-	eventMessages := make([]*entities.Event, len(block.Events))
-	for i, event := range block.Events {
-		eventMessages[i] = convert.EventToMessage(event)
-	}
-	timestamp := timestamppb.New(block.BlockTimestamp)
-	return &access.EventsResponse_Result{
-		BlockId:        block.BlockID[:],
-		BlockHeight:    block.BlockHeight,
-		BlockTimestamp: timestamp,
-		Events:         eventMessages,
-	}, nil
-}
