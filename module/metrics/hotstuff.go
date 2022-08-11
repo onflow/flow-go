@@ -11,11 +11,11 @@ import (
 
 // HotStuff Metrics
 const (
-	HotstuffEventTypeTimeout    = "timeout"
-	HotstuffEventTypeOnProposal = "onproposal"
-	HotstuffEventTypeOnVote     = "onvote"
-	HotstuffEventTypeOnQC       = "onqc"
-	HotstuffEventTypeOnTC       = "ontc"
+	HotstuffEventTypeTimeout     = "timeout"
+	HotstuffEventTypeOnProposal  = "onproposal"
+	HotstuffEventTypeOnQC        = "onqc"
+	HotstuffEventTypeOnTC        = "ontc"
+	HotstuffEventTypeOnPartialTc = "onpartialtc"
 )
 
 // HotstuffCollector implements only the metrics emitted by the HotStuff core logic.
