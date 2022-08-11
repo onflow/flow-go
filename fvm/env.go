@@ -76,11 +76,12 @@ type AccountInterface interface {
 // Parts of the environment that are common to all transaction and script
 // executions.
 type commonEnv struct {
-	// TODO(patrick): convert ctx to anonymous field once the rest of env
-	// is broken up into coherent pieces.
-	ctx *EnvContext
+	*Tracer
 	*ProgramLogger
 	*UnsafeRandomGenerator
+
+	// TODO(patrick): rm
+	ctx Context
 
 	MeterInterface
 	AccountInterface
@@ -92,6 +93,8 @@ type commonEnv struct {
 	accountKeys   *handler.AccountKeyHandler
 	contracts     *handler.ContractHandler
 	uuidGenerator *state.UUIDGenerator
+
+	frozenAccounts []common.Address
 }
 
 // TODO(patrick): rm once Meter object has been refactored
@@ -114,21 +117,12 @@ func (env *commonEnv) MemoryEstimate() uint64 {
 	return uint64(env.sth.State().TotalMemoryEstimate())
 }
 
-// TODO(patrick): rm once ctx becomes an anonymous field.
 func (env *commonEnv) Context() *Context {
-	return env.ctx.Context()
+	return &env.ctx
 }
 
 func (env *commonEnv) AccountFreezeEnabled() bool {
 	return env.ctx.AccountFreezeEnabled
-}
-
-func (env *commonEnv) StartSpanFromRoot(name trace.SpanName) otelTrace.Span {
-	return env.ctx.StartSpanFromRoot(name)
-}
-
-func (env *commonEnv) StartExtensiveTracingSpanFromRoot(name trace.SpanName) otelTrace.Span {
-	return env.ctx.StartExtensiveTracingSpanFromRoot(name)
 }
 
 func (env *commonEnv) VM() *VirtualMachine {
@@ -432,13 +426,18 @@ func (env *commonEnv) DecodeArgument(b []byte, _ cadence.Type) (cadence.Value, e
 }
 
 // Commit commits changes and return a list of updated keys
-func (env *commonEnv) Commit() ([]programs.ContractUpdateKey, error) {
+func (env *commonEnv) Commit() (programs.ModifiedSets, error) {
 	// commit changes and return a list of updated keys
 	err := env.programs.Cleanup()
 	if err != nil {
-		return nil, err
+		return programs.ModifiedSets{}, err
 	}
-	return env.contracts.Commit()
+
+	keys, err := env.contracts.Commit()
+	return programs.ModifiedSets{
+		ContractUpdateKeys: keys,
+		FrozenAccounts:     env.frozenAccounts,
+	}, err
 }
 
 func (commonEnv) BLSVerifyPOP(pk *runtime.PublicKey, sig []byte) (bool, error) {

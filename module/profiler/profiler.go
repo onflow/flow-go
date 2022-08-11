@@ -14,6 +14,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"go.uber.org/multierr"
+	pb "google.golang.org/genproto/googleapis/devtools/cloudprofiler/v2"
 
 	"github.com/onflow/flow-go/engine"
 )
@@ -26,16 +27,24 @@ func SetProfilerEnabled(enabled bool) {
 	profilerEnabled = enabled
 }
 
+type profile struct {
+	profileName string
+	profileType pb.ProfileType
+	profileFunc profileFunc
+}
+
 type AutoProfiler struct {
 	unit     *engine.Unit
 	dir      string // where we store profiles
 	log      zerolog.Logger
 	interval time.Duration
 	duration time.Duration
+
+	uploader Uploader
 }
 
 // New creates a new AutoProfiler instance performing profiling every interval for duration.
-func New(log zerolog.Logger, dir string, interval time.Duration, duration time.Duration, enabled bool) (*AutoProfiler, error) {
+func New(log zerolog.Logger, uploader Uploader, dir string, interval time.Duration, duration time.Duration, enabled bool) (*AutoProfiler, error) {
 	SetProfilerEnabled(enabled)
 
 	err := os.MkdirAll(dir, os.ModePerm)
@@ -49,6 +58,7 @@ func New(log zerolog.Logger, dir string, interval time.Duration, duration time.D
 		dir:      dir,
 		interval: interval,
 		duration: duration,
+		uploader: uploader,
 	}
 	return p, nil
 }
@@ -78,29 +88,41 @@ func (p *AutoProfiler) start() {
 	startTime := time.Now()
 	p.log.Info().Msg("starting profile trace")
 
-	for k, v := range map[string]profileFunc{
-		"goroutine": newProfileFunc("goroutine"),
-		"heap":      p.pprofHeap,
-		"block":     p.pprofBlock,
-		"mutex":     p.pprofMutex,
-		"cpu":       p.pprofCpu,
+	for _, prof := range [...]profile{
+		{profileName: "goroutine", profileType: pb.ProfileType_THREADS, profileFunc: newProfileFunc("goroutine")},
+		{profileName: "allocs", profileType: pb.ProfileType_HEAP_ALLOC, profileFunc: p.pprofAllocs},
+		{profileName: "block", profileType: pb.ProfileType_CONTENTION, profileFunc: p.pprofBlock},
+		{profileName: "cpu", profileType: pb.ProfileType_WALL, profileFunc: p.pprofCpu},
 	} {
-		err := p.pprof(k, v)
+		path := filepath.Join(p.dir, fmt.Sprintf("%s-%s", prof.profileName, time.Now().Format(time.RFC3339)))
+
+		logger := p.log.With().Str("profileName", prof.profileName).Str("profilePath", path).Logger()
+		logger.Info().Str("file", path).Str("profile", prof.profileName).Msg("capturing")
+
+		err := p.pprof(path, prof.profileFunc)
 		if err != nil {
-			p.log.Error().Err(err).Str("profile", k).Msg("failed to generate profile")
+			logger.Warn().Err(err).Str("profile", prof.profileName).Msg("failed to generate profile")
+			continue
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+
+		err = p.uploader.Upload(ctx, path, prof.profileType)
+		if err != nil {
+			logger.Warn().Err(err).Str("profile", prof.profileName).Msg("failed to upload profile")
+			continue
 		}
 	}
 	p.log.Info().Dur("duration", time.Since(startTime)).Msg("finished profile trace")
 }
 
-func (p *AutoProfiler) pprof(profile string, profileFunc profileFunc) (err error) {
-	path := filepath.Join(p.dir, fmt.Sprintf("%s-%s", profile, time.Now().Format(time.RFC3339)))
-	p.log.Debug().Str("file", path).Str("profile", profile).Msg("capturing")
-
+func (p *AutoProfiler) pprof(path string, profileFunc profileFunc) (err error) {
 	f, err := os.Create(path)
 	if err != nil {
 		return fmt.Errorf("failed to open %s: %w", path, err)
 	}
+
 	defer func() {
 		multierr.AppendInto(&err, f.Close())
 	}()
@@ -116,11 +138,11 @@ func newProfileFunc(name string) profileFunc {
 	}
 }
 
-func (p *AutoProfiler) pprofHeap(w io.Writer) error {
+func (p *AutoProfiler) pprofAllocs(w io.Writer) error {
 	// Forces the GC before taking each of the heap profiles and improves the profile accuracy.
 	// Autoprofiler runs very infrequently so performance impact is minimal.
 	runtime.GC()
-	return newProfileFunc("heap")(w)
+	return newProfileFunc("allocs")(w)
 }
 
 func (p *AutoProfiler) pprofBlock(w io.Writer) error {
@@ -130,18 +152,6 @@ func (p *AutoProfiler) pprofBlock(w io.Writer) error {
 	select {
 	case <-time.After(p.duration):
 		return newProfileFunc("block")(w)
-	case <-p.unit.Quit():
-		return context.Canceled
-	}
-}
-
-func (p *AutoProfiler) pprofMutex(w io.Writer) error {
-	runtime.SetMutexProfileFraction(10)
-	defer runtime.SetMutexProfileFraction(0)
-
-	select {
-	case <-time.After(p.duration):
-		return newProfileFunc("mutex")(w)
 	case <-p.unit.Quit():
 		return context.Canceled
 	}

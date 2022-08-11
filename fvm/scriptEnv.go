@@ -41,19 +41,28 @@ func NewScriptEnvironment(
 	uuidGenerator := state.NewUUIDGenerator(sth)
 	programsHandler := handler.NewProgramsHandler(programs, sth)
 	accountKeys := handler.NewAccountKeyHandler(accounts)
+	tracer := NewTracer(fvmContext.Tracer, nil, fvmContext.ExtensiveTracing)
 
-	ctx := NewEnvContext(fvmContext, nil)
 	env := &ScriptEnv{
 		commonEnv: commonEnv{
-			ctx:                   ctx,
-			ProgramLogger:         NewProgramLogger(ctx),
-			UnsafeRandomGenerator: NewUnsafeRandomGenerator(ctx),
-			sth:                   sth,
-			vm:                    vm,
-			programs:              programsHandler,
-			accounts:              accounts,
-			accountKeys:           accountKeys,
-			uuidGenerator:         uuidGenerator,
+			Tracer: tracer,
+			ProgramLogger: NewProgramLogger(
+				tracer,
+				fvmContext.Metrics,
+				fvmContext.CadenceLoggingEnabled,
+			),
+			UnsafeRandomGenerator: NewUnsafeRandomGenerator(
+				tracer,
+				fvmContext.BlockHeader,
+			),
+			ctx:            fvmContext,
+			sth:            sth,
+			vm:             vm,
+			programs:       programsHandler,
+			accounts:       accounts,
+			accountKeys:    accountKeys,
+			uuidGenerator:  uuidGenerator,
+			frozenAccounts: nil,
 		},
 		reqContext: reqContext,
 	}
@@ -111,18 +120,13 @@ func (e *ScriptEnv) setExecutionParameters() error {
 		return nil
 	}
 
-	var ok bool
-	var m *meter.WeightedMeter
-	// only set the weights if the meter is a meter.WeightedMeter
-	if m, ok = e.sth.State().Meter().(*meter.WeightedMeter); !ok {
-		return nil
-	}
+	meter := e.sth.State().Meter()
 
 	computationWeights, err := GetExecutionEffortWeights(e, service)
 	err = setIfOk(
 		"execution effort weights",
 		err,
-		func() { m.SetComputationWeights(computationWeights) })
+		func() { meter.SetComputationWeights(computationWeights) })
 	if err != nil {
 		return err
 	}
@@ -131,7 +135,7 @@ func (e *ScriptEnv) setExecutionParameters() error {
 	err = setIfOk(
 		"execution memory weights",
 		err,
-		func() { m.SetMemoryWeights(memoryWeights) })
+		func() { meter.SetMemoryWeights(memoryWeights) })
 	if err != nil {
 		return err
 	}
@@ -140,7 +144,7 @@ func (e *ScriptEnv) setExecutionParameters() error {
 	err = setIfOk(
 		"execution memory limit",
 		err,
-		func() { m.SetTotalMemoryLimit(memoryLimit) })
+		func() { meter.SetTotalMemoryLimit(memoryLimit) })
 	if err != nil {
 		return err
 	}
@@ -305,7 +309,7 @@ func (e *ScriptEnv) Meter(kind common.ComputationKind, intensity uint) error {
 		return err
 	}
 
-	if e.sth.EnforceComputationLimits {
+	if e.sth.EnforceComputationLimits() {
 		return e.sth.State().MeterComputation(kind, intensity)
 	}
 	return nil
