@@ -123,46 +123,45 @@ type NodeBuilder interface {
 // For a node running as a standalone process, the config fields will be populated from the command line params,
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
 type BaseConfig struct {
-	nodeIDHex                   string
-	AdminAddr                   string
-	AdminCert                   string
-	AdminKey                    string
-	AdminClientCAs              string
-	BindAddr                    string
-	NodeRole                    string
-	DynamicStartupANAddress     string
-	DynamicStartupANPubkey      string
-	DynamicStartupEpochPhase    string
-	DynamicStartupEpoch         string
-	DynamicStartupSleepInterval time.Duration
-	datadir                     string
-	secretsdir                  string
-	secretsDBEnabled            bool
-	InsecureSecretsDB           bool
-	level                       string
-	metricsPort                 uint
-	BootstrapDir                string
-	PeerUpdateInterval          time.Duration
-	UnicastMessageTimeout       time.Duration
-	DNSCacheTTL                 time.Duration
-	profilerEnabled             bool
-	profilerDir                 string
-	profilerInterval            time.Duration
-	profilerDuration            time.Duration
-	profilerMemProfileRate      int
-	tracerEnabled               bool
-	tracerSensitivity           uint
-	MetricsEnabled              bool
-	guaranteesCacheSize         uint
-	receiptsCacheSize           uint
-	db                          *badger.DB
-	PreferredUnicastProtocols   []string
-
+	nodeIDHex                       string
+	AdminAddr                       string
+	AdminCert                       string
+	AdminKey                        string
+	AdminClientCAs                  string
+	BindAddr                        string
+	NodeRole                        string
+	DynamicStartupANAddress         string
+	DynamicStartupANPubkey          string
+	DynamicStartupEpochPhase        string
+	DynamicStartupEpoch             string
+	DynamicStartupSleepInterval     time.Duration
+	datadir                         string
+	secretsdir                      string
+	secretsDBEnabled                bool
+	InsecureSecretsDB               bool
+	level                           string
+	metricsPort                     uint
+	BootstrapDir                    string
+	PeerUpdateInterval              time.Duration
+	UnicastMessageTimeout           time.Duration
+	DNSCacheTTL                     time.Duration
+	profilerEnabled                 bool
+	uploaderEnabled                 bool
+	profilerDir                     string
+	profilerInterval                time.Duration
+	profilerDuration                time.Duration
+	profilerMemProfileRate          int
+	tracerEnabled                   bool
+	tracerSensitivity               uint
+	MetricsEnabled                  bool
+	guaranteesCacheSize             uint
+	receiptsCacheSize               uint
+	db                              *badger.DB
+	PreferredUnicastProtocols       []string
 	// NetworkConnectionPruning determines whether connections to nodes
 	// that are not part of protocol state should be trimmed
 	// TODO: solely a fallback mechanism, can be removed upon reliable behavior in production.
 	NetworkConnectionPruning bool
-
 	NetworkReceivedMessageCacheSize uint32
 	HeroCacheMetricsEnable          bool
 	SyncCoreConfig                  synchronization.Config
@@ -242,6 +241,7 @@ func DefaultBaseConfig() *BaseConfig {
 		UnicastMessageTimeout:           p2p.DefaultUnicastTimeout,
 		metricsPort:                     8080,
 		profilerEnabled:                 false,
+		uploaderEnabled:                 false,
 		profilerDir:                     "profiler",
 		profilerInterval:                15 * time.Minute,
 		profilerDuration:                10 * time.Second,

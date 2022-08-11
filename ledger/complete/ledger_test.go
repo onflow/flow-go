@@ -14,10 +14,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/encoding"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/common/proof"
-	"github.com/onflow/flow-go/ledger/common/utils"
+	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
@@ -77,7 +76,7 @@ func TestLedger_Update(t *testing.T) {
 
 		curSC := led.InitialState()
 
-		u := utils.UpdateFixture()
+		u := testutils.UpdateFixture()
 		u.SetState(curSC)
 
 		newSc, _, err := led.Set(u)
@@ -136,7 +135,7 @@ func TestLedger_Get(t *testing.T) {
 
 		curS := led.InitialState()
 
-		q := utils.QueryFixture()
+		q := testutils.QueryFixture()
 		q.SetState(curS)
 
 		retValues, err := led.Get(q)
@@ -173,7 +172,7 @@ func TestLedger_GetSingleValue(t *testing.T) {
 
 	t.Run("non-existent key", func(t *testing.T) {
 
-		keys := utils.RandomUniqueKeys(10, 2, 1, 10)
+		keys := testutils.RandomUniqueKeys(10, 2, 1, 10)
 
 		for _, k := range keys {
 			qs, err := ledger.NewQuerySingleValue(state, k)
@@ -187,7 +186,7 @@ func TestLedger_GetSingleValue(t *testing.T) {
 
 	t.Run("existent key", func(t *testing.T) {
 
-		u := utils.UpdateFixture()
+		u := testutils.UpdateFixture()
 		u.SetState(state)
 
 		newState, _, err := led.Set(u)
@@ -206,7 +205,7 @@ func TestLedger_GetSingleValue(t *testing.T) {
 
 	t.Run("mix of existent and non-existent keys", func(t *testing.T) {
 
-		u := utils.UpdateFixture()
+		u := testutils.UpdateFixture()
 		u.SetState(state)
 
 		newState, _, err := led.Set(u)
@@ -216,14 +215,14 @@ func TestLedger_GetSingleValue(t *testing.T) {
 		// Save expected values for existent keys
 		expectedValues := make(map[string]ledger.Value)
 		for i, key := range u.Keys() {
-			encKey := encoding.EncodeKey(&key)
+			encKey := ledger.EncodeKey(&key)
 			expectedValues[string(encKey)] = u.Values()[i]
 		}
 
 		// Create a randomly ordered mix of existent and non-existent keys
 		var queryKeys []ledger.Key
 		queryKeys = append(queryKeys, u.Keys()...)
-		queryKeys = append(queryKeys, utils.RandomUniqueKeys(10, 2, 1, 10)...)
+		queryKeys = append(queryKeys, testutils.RandomUniqueKeys(10, 2, 1, 10)...)
 
 		rand.Shuffle(len(queryKeys), func(i, j int) {
 			queryKeys[i], queryKeys[j] = queryKeys[j], queryKeys[i]
@@ -236,7 +235,7 @@ func TestLedger_GetSingleValue(t *testing.T) {
 			retValue, err := led.GetSingleValue(qs)
 			require.NoError(t, err)
 
-			encKey := encoding.EncodeKey(&k)
+			encKey := ledger.EncodeKey(&k)
 			if value, ok := expectedValues[string(encKey)]; ok {
 				require.Equal(t, value, retValue)
 			} else {
@@ -295,7 +294,7 @@ func TestLedgerValueSizes(t *testing.T) {
 		}()
 
 		curState := led.InitialState()
-		q := utils.QueryFixture()
+		q := testutils.QueryFixture()
 		q.SetState(curState)
 
 		retSizes, err := led.ValueSizes(q)
@@ -326,7 +325,7 @@ func TestLedgerValueSizes(t *testing.T) {
 		}()
 
 		curState := led.InitialState()
-		u := utils.UpdateFixture()
+		u := testutils.UpdateFixture()
 		u.SetState(curState)
 
 		newState, _, err := led.Set(u)
@@ -364,7 +363,7 @@ func TestLedgerValueSizes(t *testing.T) {
 		}()
 
 		curState := led.InitialState()
-		u := utils.UpdateFixture()
+		u := testutils.UpdateFixture()
 		u.SetState(curState)
 
 		newState, _, err := led.Set(u)
@@ -374,14 +373,14 @@ func TestLedgerValueSizes(t *testing.T) {
 		// Save expected value sizes for existent keys
 		expectedValueSizes := make(map[string]int)
 		for i, key := range u.Keys() {
-			encKey := encoding.EncodeKey(&key)
+			encKey := ledger.EncodeKey(&key)
 			expectedValueSizes[string(encKey)] = len(u.Values()[i])
 		}
 
 		// Create a randomly ordered mix of existent and non-existent keys
 		var queryKeys []ledger.Key
 		queryKeys = append(queryKeys, u.Keys()...)
-		queryKeys = append(queryKeys, utils.RandomUniqueKeys(10, 2, 1, 10)...)
+		queryKeys = append(queryKeys, testutils.RandomUniqueKeys(10, 2, 1, 10)...)
 
 		rand.Shuffle(len(queryKeys), func(i, j int) {
 			queryKeys[i], queryKeys[j] = queryKeys[j], queryKeys[i]
@@ -394,7 +393,7 @@ func TestLedgerValueSizes(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, len(q.Keys()), len(retSizes))
 		for i, key := range q.Keys() {
-			encKey := encoding.EncodeKey(&key)
+			encKey := ledger.EncodeKey(&key)
 			assert.Equal(t, expectedValueSizes[string(encKey)], retSizes[i])
 		}
 	})
@@ -421,7 +420,7 @@ func TestLedger_Proof(t *testing.T) {
 		retProof, err := led.Prove(q)
 		require.NoError(t, err)
 
-		proof, err := encoding.DecodeTrieBatchProof(retProof)
+		proof, err := ledger.DecodeTrieBatchProof(retProof)
 		require.NoError(t, err)
 		assert.Equal(t, 0, len(proof.Proofs))
 	})
@@ -441,14 +440,14 @@ func TestLedger_Proof(t *testing.T) {
 		}()
 
 		curS := led.InitialState()
-		q := utils.QueryFixture()
+		q := testutils.QueryFixture()
 		q.SetState(curS)
 		require.NoError(t, err)
 
 		retProof, err := led.Prove(q)
 		require.NoError(t, err)
 
-		trieProof, err := encoding.DecodeTrieBatchProof(retProof)
+		trieProof, err := ledger.DecodeTrieBatchProof(retProof)
 		require.NoError(t, err)
 		assert.Equal(t, 2, len(trieProof.Proofs))
 		assert.True(t, proof.VerifyTrieBatchProof(trieProof, curS))
@@ -470,7 +469,7 @@ func TestLedger_Proof(t *testing.T) {
 
 		curS := led.InitialState()
 
-		u := utils.UpdateFixture()
+		u := testutils.UpdateFixture()
 		u.SetState(curS)
 
 		newSc, _, err := led.Set(u)
@@ -483,7 +482,7 @@ func TestLedger_Proof(t *testing.T) {
 		retProof, err := led.Prove(q)
 		require.NoError(t, err)
 
-		trieProof, err := encoding.DecodeTrieBatchProof(retProof)
+		trieProof, err := ledger.DecodeTrieBatchProof(retProof)
 		require.NoError(t, err)
 		assert.Equal(t, 2, len(trieProof.Proofs))
 		assert.True(t, proof.VerifyTrieBatchProof(trieProof, newSc))
@@ -526,8 +525,8 @@ func Test_WAL(t *testing.T) {
 
 		for i := 0; i < size; i++ {
 
-			keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
-			values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+			keys := testutils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+			values := testutils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
 			update, err := ledger.NewUpdate(state, keys, values)
 			assert.NoError(t, err)
 			state, _, err = led.Set(update)
@@ -535,7 +534,7 @@ func Test_WAL(t *testing.T) {
 
 			data := make(map[string]ledger.Value, len(keys))
 			for j, key := range keys {
-				encKey := encoding.EncodeKey(&key)
+				encKey := ledger.EncodeKey(&key)
 				data[string(encKey)] = values[j]
 			}
 
@@ -561,7 +560,7 @@ func Test_WAL(t *testing.T) {
 
 			keys := make([]ledger.Key, 0, len(data))
 			for encKey := range data {
-				key, err := encoding.DecodeKey([]byte(encKey))
+				key, err := ledger.DecodeKey([]byte(encKey))
 				assert.NoError(t, err)
 				keys = append(keys, *key)
 			}
@@ -575,7 +574,7 @@ func Test_WAL(t *testing.T) {
 
 			for i, key := range keys {
 				registerValue := registerValues[i]
-				encKey := encoding.EncodeKey(&key)
+				encKey := ledger.EncodeKey(&key)
 				assert.True(t, data[string(encKey)].Equals(registerValue))
 			}
 		}
@@ -622,8 +621,8 @@ func TestLedgerFunctionality(t *testing.T) {
 			for i := 0; i < steps; i++ {
 				// add new keys
 				// TODO update some of the existing keys and shuffle them
-				keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
-				values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+				keys := testutils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+				values := testutils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
 				update, err := ledger.NewUpdate(state, keys, values)
 				assert.NoError(t, err)
 				newState, _, err := led.Set(update)
@@ -631,7 +630,7 @@ func TestLedgerFunctionality(t *testing.T) {
 
 				// capture new values for future query
 				for j, k := range keys {
-					encKey := encoding.EncodeKey(&k)
+					encKey := ledger.EncodeKey(&k)
 					histStorage[string(newState[:])+string(encKey)] = values[j]
 					latestValue[string(encKey)] = values[j]
 				}
@@ -656,7 +655,7 @@ func TestLedgerFunctionality(t *testing.T) {
 				proofs, err := led.Prove(query)
 				assert.NoError(t, err)
 
-				bProof, err := encoding.DecodeTrieBatchProof(proofs)
+				bProof, err := ledger.DecodeTrieBatchProof(proofs)
 				assert.NoError(t, err)
 
 				// validate batch proofs
@@ -669,7 +668,7 @@ func TestLedgerFunctionality(t *testing.T) {
 
 				// query all exising keys (check no drop)
 				for ek, v := range latestValue {
-					k, err := encoding.DecodeKey([]byte(ek))
+					k, err := ledger.DecodeKey([]byte(ek))
 					assert.NoError(t, err)
 					query, err := ledger.NewQuery(newState, []ledger.Key{*k})
 					assert.NoError(t, err)
@@ -685,7 +684,7 @@ func TestLedgerFunctionality(t *testing.T) {
 					var state ledger.State
 					copy(state[:], s[:stateComSize])
 					enk := []byte(s[stateComSize:])
-					key, err := encoding.DecodeKey(enk)
+					key, err := ledger.DecodeKey(enk)
 					assert.NoError(t, err)
 					query, err := ledger.NewQuery(state, []ledger.Key{*key})
 					assert.NoError(t, err)
@@ -730,7 +729,7 @@ func Test_ExportCheckpointAt(t *testing.T) {
 				<-compactor.Ready()
 
 				state := led.InitialState()
-				u := utils.UpdateFixture()
+				u := testutils.UpdateFixture()
 				u.SetState(state)
 
 				state, _, err = led.Set(u)
@@ -788,7 +787,7 @@ func Test_ExportCheckpointAt(t *testing.T) {
 				<-compactor.Ready()
 
 				state := led.InitialState()
-				u := utils.UpdateFixture()
+				u := testutils.UpdateFixture()
 				u.SetState(state)
 
 				state, _, err = led.Set(u)
@@ -844,7 +843,7 @@ func Test_ExportCheckpointAt(t *testing.T) {
 				<-compactor.Ready()
 
 				state := led.InitialState()
-				u := utils.UpdateFixture()
+				u := testutils.UpdateFixture()
 				u.SetState(state)
 
 				state, _, err = led.Set(u)
@@ -950,8 +949,12 @@ func noOpMigration(p []ledger.Payload) ([]ledger.Payload, error) {
 func migrationByValue(p []ledger.Payload) ([]ledger.Payload, error) {
 	ret := make([]ledger.Payload, 0, len(p))
 	for _, p := range p {
-		if p.Value.Equals([]byte{'A'}) {
-			pp := ledger.Payload{Key: p.Key, Value: ledger.Value([]byte{'C'})}
+		if p.Value().Equals([]byte{'A'}) {
+			k, err := p.Key()
+			if err != nil {
+				return nil, err
+			}
+			pp := *ledger.NewPayload(k, ledger.Value([]byte{'C'}))
 			ret = append(ret, pp)
 		} else {
 			ret = append(ret, p)
@@ -972,8 +975,12 @@ func (w *CustomUpdateWAL) RecordUpdate(update *ledger.TrieUpdate) (int, bool, er
 func migrationByKey(p []ledger.Payload) ([]ledger.Payload, error) {
 	ret := make([]ledger.Payload, 0, len(p))
 	for _, p := range p {
-		if p.Key.String() == "/1/1/22/2" {
-			pp := ledger.Payload{Key: p.Key, Value: ledger.Value([]byte{'D'})}
+		k, err := p.Key()
+		if err != nil {
+			return nil, err
+		}
+		if k.String() == "/1/1/22/2" {
+			pp := *ledger.NewPayload(k, ledger.Value([]byte{'D'}))
 			ret = append(ret, pp)
 		} else {
 			ret = append(ret, p)
