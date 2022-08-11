@@ -384,6 +384,7 @@ func (e *Engine) processFinalizedBlock(blockID flow.Identifier) error {
 		return fmt.Errorf("could not get last full block height: %w", err)
 	}
 	if block.Header.Height <= lastFullBlockHeight {
+		e.log.Info().Msgf("skipping requesting collections for finalized block below last full block height (%d<=%d)", block.Header.Height, lastFullBlockHeight)
 		return nil
 	}
 
