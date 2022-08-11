@@ -93,6 +93,8 @@ type commonEnv struct {
 	accountKeys   *handler.AccountKeyHandler
 	contracts     *handler.ContractHandler
 	uuidGenerator *state.UUIDGenerator
+
+	frozenAccounts []common.Address
 }
 
 // TODO(patrick): rm once Meter object has been refactored
@@ -424,13 +426,18 @@ func (env *commonEnv) DecodeArgument(b []byte, _ cadence.Type) (cadence.Value, e
 }
 
 // Commit commits changes and return a list of updated keys
-func (env *commonEnv) Commit() ([]programs.ContractUpdateKey, error) {
+func (env *commonEnv) Commit() (programs.ModifiedSets, error) {
 	// commit changes and return a list of updated keys
 	err := env.programs.Cleanup()
 	if err != nil {
-		return nil, err
+		return programs.ModifiedSets{}, err
 	}
-	return env.contracts.Commit()
+
+	keys, err := env.contracts.Commit()
+	return programs.ModifiedSets{
+		ContractUpdateKeys: keys,
+		FrozenAccounts:     env.frozenAccounts,
+	}, err
 }
 
 func (commonEnv) BLSVerifyPOP(pk *runtime.PublicKey, sig []byte) (bool, error) {
