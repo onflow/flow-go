@@ -37,6 +37,7 @@ func TestLedgerViewCommitter(t *testing.T) {
 
 		err := view.Set(
 			"owner",
+			"controller",
 			"key",
 			[]byte{1},
 		)

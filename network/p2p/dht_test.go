@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	libp2pmsg "github.com/onflow/flow-go/model/libp2p/message"
-	"github.com/onflow/flow-go/network/channels"
+	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -89,7 +89,7 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	topic := channels.Topic("/flow/" + unittest.IdentifierFixture().String())
+	topic := flownet.Topic("/flow/" + unittest.IdentifierFixture().String())
 	count := 5
 	golog.SetAllLoggers(golog.LevelFatal) // change this to Debug if libp2p logs are needed
 

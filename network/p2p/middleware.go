@@ -24,7 +24,6 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/validator"
@@ -203,7 +202,7 @@ func (m *Middleware) isStakedPeerFilter() peerFilterFunc {
 	return f
 }
 
-func (m *Middleware) NewBlobService(channel channels.Channel, ds datastore.Batching, opts ...network.BlobServiceOption) network.BlobService {
+func (m *Middleware) NewBlobService(channel network.Channel, ds datastore.Batching, opts ...network.BlobServiceOption) network.BlobService {
 	return NewBlobService(m.libP2PNode.Host(), m.libP2PNode.routing, channel.String(), ds, opts...)
 }
 
@@ -545,20 +544,20 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 // Subscribe subscribes the middleware to a channel.
 // No errors are expected during normal operation.
-func (m *Middleware) Subscribe(channel channels.Channel) error {
+func (m *Middleware) Subscribe(channel network.Channel) error {
 
-	topic := channels.TopicFromChannel(channel, m.rootBlockID)
+	topic := network.TopicFromChannel(channel, m.rootBlockID)
 
 	var peerFilter peerFilterFunc
 	var validators []psValidator.MessageValidator
-	if channels.PublicChannels().Contains(channel) {
+	if network.PublicChannels().Contains(channel) {
 		// NOTE: for public channels the callback used to check if a node is staked will
 		// return true for every node.
 		peerFilter = allowAll
 	} else {
 		// for channels used by the staked nodes, add the topic validator to filter out messages from non-staked nodes
 		validators = append(validators,
-			psValidator.AuthorizedSenderMessageValidator(m.log, channel, m.ov.Identity),
+			psValidator.AuthorizedSenderValidator(m.log, channel, m.ov.Identity),
 		)
 
 		// NOTE: For non-public channels the libP2P node topic validator will reject
@@ -589,8 +588,8 @@ func (m *Middleware) Subscribe(channel channels.Channel) error {
 // - the libP2P node fails to unsubscribe to the topic created from the provided channel.
 //
 // All errors returned from this function can be considered benign.
-func (m *Middleware) Unsubscribe(channel channels.Channel) error {
-	topic := channels.TopicFromChannel(channel, m.rootBlockID)
+func (m *Middleware) Unsubscribe(channel network.Channel) error {
+	topic := network.TopicFromChannel(channel, m.rootBlockID)
 	err := m.libP2PNode.UnSubscribe(topic)
 	if err != nil {
 		return fmt.Errorf("failed to unsubscribe from channel (%s): %w", channel, err)
@@ -652,7 +651,7 @@ func (m *Middleware) processMessage(msg *message.Message, decodedMsgPayload inte
 // - the libP2P node fails to publish the message.
 //
 // All errors returned from this function can be considered benign.
-func (m *Middleware) Publish(msg *message.Message, channel channels.Channel) error {
+func (m *Middleware) Publish(msg *message.Message, channel network.Channel) error {
 	m.log.Debug().Str("channel", channel.String()).Interface("msg", msg).Msg("publishing new message")
 
 	// convert the message to bytes to be put on the wire.
@@ -670,7 +669,7 @@ func (m *Middleware) Publish(msg *message.Message, channel channels.Channel) err
 		return fmt.Errorf("message size %d exceeds configured max message size %d", msgSize, DefaultMaxPubSubMsgSize)
 	}
 
-	topic := channels.TopicFromChannel(channel, m.rootBlockID)
+	topic := network.TopicFromChannel(channel, m.rootBlockID)
 
 	// publish the bytes on the topic
 	err = m.libP2PNode.Publish(m.ctx, topic, data)

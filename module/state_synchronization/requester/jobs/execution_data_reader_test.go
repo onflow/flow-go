@@ -51,7 +51,7 @@ func (suite *ExecutionDataReaderSuite) SetupTest() {
 	suite.executionDataID = unittest.IdentifierFixture()
 
 	parent := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(1))
-	suite.block = unittest.BlockWithParentFixture(parent)
+	suite.block = unittest.BlockWithParentFixture(&parent)
 	suite.blocksByHeight = map[uint64]*flow.Block{
 		suite.block.Header.Height: suite.block,
 	}

@@ -73,11 +73,9 @@ type ExecutionState interface {
 }
 
 const (
-	KeyPartOwner = uint16(0)
-	// @deprecated - controller was used only by the very first
-	// version of cadence for access controll which was retired later on
-	// KeyPartController = uint16(1)
-	KeyPartKey = uint16(2)
+	KeyPartOwner      = uint16(0)
+	KeyPartController = uint16(1)
+	KeyPartKey        = uint16(2)
 )
 
 type state struct {
@@ -99,6 +97,7 @@ type state struct {
 func RegisterIDToKey(reg flow.RegisterID) ledger.Key {
 	return ledger.NewKey([]ledger.KeyPart{
 		ledger.NewKeyPart(KeyPartOwner, []byte(reg.Owner)),
+		ledger.NewKeyPart(KeyPartController, []byte(reg.Controller)),
 		ledger.NewKeyPart(KeyPartKey, []byte(reg.Key)),
 	})
 }
@@ -137,9 +136,9 @@ func NewExecutionState(
 
 }
 
-func makeSingleValueQuery(commitment flow.StateCommitment, owner, key string) (*ledger.QuerySingleValue, error) {
+func makeSingleValueQuery(commitment flow.StateCommitment, owner, controller, key string) (*ledger.QuerySingleValue, error) {
 	return ledger.NewQuerySingleValue(ledger.State(commitment),
-		RegisterIDToKey(flow.NewRegisterID(owner, key)),
+		RegisterIDToKey(flow.NewRegisterID(owner, controller, key)),
 	)
 }
 
@@ -173,17 +172,18 @@ func LedgerGetRegister(ldg ledger.Ledger, commitment flow.StateCommitment) delta
 
 	readCache := make(map[flow.RegisterID]flow.RegisterEntry)
 
-	return func(owner, key string) (flow.RegisterValue, error) {
+	return func(owner, controller, key string) (flow.RegisterValue, error) {
 		regID := flow.RegisterID{
-			Owner: owner,
-			Key:   key,
+			Owner:      owner,
+			Controller: controller,
+			Key:        key,
 		}
 
 		if value, ok := readCache[regID]; ok {
 			return value.Value, nil
 		}
 
-		query, err := makeSingleValueQuery(commitment, owner, key)
+		query, err := makeSingleValueQuery(commitment, owner, controller, key)
 
 		if err != nil {
 			return nil, fmt.Errorf("cannot create ledger query: %w", err)

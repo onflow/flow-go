@@ -15,14 +15,14 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/utils/unittest"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/topology"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // conditionalTopology is a topology that behaves like the underlying topology when the condition is true,
@@ -34,7 +34,7 @@ type conditionalTopology struct {
 
 var _ network.Topology = (*conditionalTopology)(nil)
 
-func (t *conditionalTopology) GenerateFanout(ids flow.IdentityList, channels channels.ChannelList) (flow.IdentityList, error) {
+func (t *conditionalTopology) GenerateFanout(ids flow.IdentityList, channels network.ChannelList) (flow.IdentityList, error) {
 	if t.condition() {
 		return t.top.GenerateFanout(ids, channels)
 	} else {
@@ -94,7 +94,7 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 	)
 	suite.networks = networks
 
-	blobExchangeChannel := channels.Channel("blob-exchange")
+	blobExchangeChannel := network.Channel("blob-exchange")
 
 	for i, net := range networks {
 		ds := sync.MutexWrap(datastore.NewMapDatastore())

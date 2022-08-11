@@ -46,7 +46,7 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 			var err error
 			reader, err = ghost.Subscribe(context.Background())
 			if err != nil {
-				t.Logf("%v error subscribing to ghost: %v\n", time.Now().UTC(), err)
+				t.Logf("error subscribing to ghost: %v\n", err)
 			} else {
 				retry = false
 			}
@@ -85,16 +85,14 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 			switch m := msg.(type) {
 			case *messages.BlockProposal:
 				tst.BlockState.Add(t, m)
-				t.Logf("%v block proposal received from %s at height %v, view %v: %x\n",
-					time.Now().UTC(),
+				t.Logf("block proposal received from %s at height %v, view %v: %x\n",
 					sender,
 					m.Header.Height,
 					m.Header.View,
 					m.Header.ID())
 			case *flow.ResultApproval:
 				tst.ApprovalState.Add(sender, m)
-				t.Logf("%v result approval received from %s for execution result ID %x and chunk index %v\n",
-					time.Now().UTC(),
+				t.Logf("result approval received from %s for execution result ID %x and chunk index %v\n",
 					sender,
 					m.Body.ExecutionResultID,
 					m.Body.ChunkIndex)
@@ -103,8 +101,7 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 				finalState, err := m.ExecutionResult.FinalStateCommitment()
 				require.NoError(t, err)
 				tst.ReceiptState.Add(m)
-				t.Logf("%v execution receipts received from %s for block ID %x by executor ID %x with final state %x result ID %x chunks %d\n",
-					time.Now().UTC(),
+				t.Logf("execution receipts received from %s for block ID %x by executor ID %x with final state %x result ID %x chunks %d\n",
 					sender,
 					m.ExecutionResult.BlockID,
 					m.ExecutorID,
@@ -113,7 +110,7 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 					len(m.ExecutionResult.Chunks))
 
 			default:
-				t.Logf("%v other msg received from %s: %#v\n", time.Now().UTC(), sender, msg)
+				t.Logf("other msg received from %s: %#v\n", sender, msg)
 				continue
 			}
 		}

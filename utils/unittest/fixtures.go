@@ -10,9 +10,8 @@ import (
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/stretchr/testify/require"
-
 	"github.com/onflow/cadence"
+	"github.com/stretchr/testify/require"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -33,7 +32,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/updatable_configs"
-	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/dsl"
@@ -157,7 +155,7 @@ func AccountFixture() (*flow.Account, error) {
 
 func BlockFixture() flow.Block {
 	header := BlockHeaderFixture()
-	return *BlockWithParentFixture(header)
+	return *BlockWithParentFixture(&header)
 }
 
 func FullBlockFixture() flow.Block {
@@ -223,7 +221,7 @@ func PendingFromBlock(block *flow.Block) *flow.PendingBlock {
 
 func StateDeltaFixture() *messages.ExecutionStateDelta {
 	header := BlockHeaderFixture()
-	block := BlockWithParentFixture(header)
+	block := BlockWithParentFixture(&header)
 	return &messages.ExecutionStateDelta{
 		ExecutableBlock: entity.ExecutableBlock{
 			Block: block,
@@ -303,7 +301,7 @@ func BlockWithParentFixture(parent *flow.Header) *flow.Block {
 	header := BlockHeaderWithParentFixture(parent)
 	header.PayloadHash = payload.Hash()
 	return &flow.Block{
-		Header:  header,
+		Header:  &header,
 		Payload: &payload,
 	}
 }
@@ -313,7 +311,7 @@ func BlockWithGuaranteesFixture(guarantees []*flow.CollectionGuarantee) *flow.Bl
 	header := BlockHeaderFixture()
 	header.PayloadHash = payload.Hash()
 	return &flow.Block{
-		Header:  header,
+		Header:  &header,
 		Payload: &payload,
 	}
 
@@ -362,7 +360,7 @@ func StateDeltaWithParentFixture(parent *flow.Header) *messages.ExecutionStateDe
 	header := BlockHeaderWithParentFixture(parent)
 	header.PayloadHash = payload.Hash()
 	block := flow.Block{
-		Header:  header,
+		Header:  &header,
 		Payload: &payload,
 	}
 
@@ -394,7 +392,7 @@ func HeaderWithView(view uint64) func(*flow.Header) {
 	}
 }
 
-func BlockHeaderFixture(opts ...func(header *flow.Header)) *flow.Header {
+func BlockHeaderFixture(opts ...func(header *flow.Header)) flow.Header {
 	height := 1 + uint64(rand.Uint32()) // avoiding edge case of height = 0 (genesis block)
 	view := height + uint64(rand.Intn(1000))
 	header := BlockHeaderWithParentFixture(&flow.Header{
@@ -405,7 +403,7 @@ func BlockHeaderFixture(opts ...func(header *flow.Header)) *flow.Header {
 	})
 
 	for _, opt := range opts {
-		opt(header)
+		opt(&header)
 	}
 
 	return header
@@ -417,7 +415,7 @@ func CidFixture() cid.Cid {
 	return blocks.NewBlock(data).Cid()
 }
 
-func BlockHeaderFixtureOnChain(chainID flow.ChainID, opts ...func(header *flow.Header)) *flow.Header {
+func BlockHeaderFixtureOnChain(chainID flow.ChainID, opts ...func(header *flow.Header)) flow.Header {
 	height := 1 + uint64(rand.Uint32()) // avoiding edge case of height = 0 (genesis block)
 	view := height + uint64(rand.Intn(1000))
 	header := BlockHeaderWithParentFixture(&flow.Header{
@@ -428,16 +426,16 @@ func BlockHeaderFixtureOnChain(chainID flow.ChainID, opts ...func(header *flow.H
 	})
 
 	for _, opt := range opts {
-		opt(header)
+		opt(&header)
 	}
 
 	return header
 }
 
-func BlockHeaderWithParentFixture(parent *flow.Header) *flow.Header {
+func BlockHeaderWithParentFixture(parent *flow.Header) flow.Header {
 	height := parent.Height + 1
 	view := parent.View + 1 + uint64(rand.Intn(10)) // Intn returns [0, n)
-	return &flow.Header{
+	return flow.Header{
 		ChainID:            parent.ChainID,
 		ParentID:           parent.ID(),
 		Height:             height,
@@ -468,7 +466,7 @@ func ClusterBlockFixture() cluster.Block {
 	header.PayloadHash = payload.Hash()
 
 	return cluster.Block{
-		Header:  header,
+		Header:  &header,
 		Payload: payload,
 	}
 }
@@ -488,7 +486,7 @@ func ClusterBlockWithParent(parent *cluster.Block) cluster.Block {
 	header.PayloadHash = payload.Hash()
 
 	block := cluster.Block{
-		Header:  header,
+		Header:  &header,
 		Payload: payload,
 	}
 
@@ -605,7 +603,7 @@ func CompleteCollectionFromTransactions(txs []*flow.TransactionBody) *entity.Com
 func ExecutableBlockFixture(collectionsSignerIDs [][]flow.Identifier) *entity.ExecutableBlock {
 
 	header := BlockHeaderFixture()
-	return ExecutableBlockFixtureWithParent(collectionsSignerIDs, header)
+	return ExecutableBlockFixtureWithParent(collectionsSignerIDs, &header)
 }
 
 func ExecutableBlockFixtureWithParent(collectionsSignerIDs [][]flow.Identifier, parent *flow.Header) *entity.ExecutableBlock {
@@ -633,7 +631,7 @@ func ExecutableBlockFromTransactions(chain flow.ChainID, txss [][]*flow.Transact
 
 	completeCollections := make(map[flow.Identifier]*entity.CompleteCollection, len(txss))
 	blockHeader := BlockHeaderFixtureOnChain(chain)
-	block := *BlockWithParentFixture(blockHeader)
+	block := *BlockWithParentFixture(&blockHeader)
 	block.Payload.Guarantees = nil
 
 	for _, txs := range txss {
@@ -1303,7 +1301,7 @@ func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunk
 	header.PayloadHash = payload.Hash()
 
 	block := flow.Block{
-		Header:  header,
+		Header:  &header,
 		Payload: &payload,
 	}
 
@@ -1503,7 +1501,7 @@ func SeedFixtures(m int, n int) [][]byte {
 }
 
 // BlockEventsFixture returns a block events model populated with random events of length n.
-func BlockEventsFixture(header *flow.Header, n int) flow.BlockEvents {
+func BlockEventsFixture(header flow.Header, n int) flow.BlockEvents {
 	types := []flow.EventType{"A.0x1.Foo.Bar", "A.0x2.Zoo.Moo", "A.0x3.Goo.Hoo"}
 
 	events := make([]flow.Event, n)
@@ -2107,19 +2105,4 @@ func NewSealingConfigs(val uint) module.SealingConfigsSetter {
 		panic(err)
 	}
 	return instance
-}
-
-func PeerIDFromFlowID(identity *flow.Identity) (peer.ID, error) {
-	networkKey := identity.NetworkPubKey
-	peerPK, err := keyutils.LibP2PPublicKeyFromFlow(networkKey)
-	if err != nil {
-		return "", err
-	}
-
-	peerID, err := peer.IDFromPublicKey(peerPK)
-	if err != nil {
-		return "", err
-	}
-
-	return peerID, nil
 }

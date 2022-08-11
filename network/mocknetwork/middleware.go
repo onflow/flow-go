@@ -4,8 +4,6 @@ package mocknetwork
 
 import (
 	datastore "github.com/ipfs/go-datastore"
-	channels "github.com/onflow/flow-go/network/channels"
-
 	flow "github.com/onflow/flow-go/model/flow"
 
 	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
@@ -62,7 +60,7 @@ func (_m *Middleware) IsConnected(nodeID flow.Identifier) (bool, error) {
 }
 
 // NewBlobService provides a mock function with given fields: channel, store, opts
-func (_m *Middleware) NewBlobService(channel channels.Channel, store datastore.Batching, opts ...network.BlobServiceOption) network.BlobService {
+func (_m *Middleware) NewBlobService(channel network.Channel, store datastore.Batching, opts ...network.BlobServiceOption) network.BlobService {
 	_va := make([]interface{}, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
@@ -73,7 +71,7 @@ func (_m *Middleware) NewBlobService(channel channels.Channel, store datastore.B
 	ret := _m.Called(_ca...)
 
 	var r0 network.BlobService
-	if rf, ok := ret.Get(0).(func(channels.Channel, datastore.Batching, ...network.BlobServiceOption) network.BlobService); ok {
+	if rf, ok := ret.Get(0).(func(network.Channel, datastore.Batching, ...network.BlobServiceOption) network.BlobService); ok {
 		r0 = rf(channel, store, opts...)
 	} else {
 		if ret.Get(0) != nil {
@@ -101,11 +99,11 @@ func (_m *Middleware) NewPingService(pingProtocol protocol.ID, provider network.
 }
 
 // Publish provides a mock function with given fields: msg, channel
-func (_m *Middleware) Publish(msg *message.Message, channel channels.Channel) error {
+func (_m *Middleware) Publish(msg *message.Message, channel network.Channel) error {
 	ret := _m.Called(msg, channel)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*message.Message, channels.Channel) error); ok {
+	if rf, ok := ret.Get(0).(func(*message.Message, network.Channel) error); ok {
 		r0 = rf(msg, channel)
 	} else {
 		r0 = ret.Error(0)
@@ -155,11 +153,11 @@ func (_m *Middleware) Start(_a0 irrecoverable.SignalerContext) {
 }
 
 // Subscribe provides a mock function with given fields: channel
-func (_m *Middleware) Subscribe(channel channels.Channel) error {
+func (_m *Middleware) Subscribe(channel network.Channel) error {
 	ret := _m.Called(channel)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(channels.Channel) error); ok {
+	if rf, ok := ret.Get(0).(func(network.Channel) error); ok {
 		r0 = rf(channel)
 	} else {
 		r0 = ret.Error(0)
@@ -169,11 +167,11 @@ func (_m *Middleware) Subscribe(channel channels.Channel) error {
 }
 
 // Unsubscribe provides a mock function with given fields: channel
-func (_m *Middleware) Unsubscribe(channel channels.Channel) error {
+func (_m *Middleware) Unsubscribe(channel network.Channel) error {
 	ret := _m.Called(channel)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(channels.Channel) error); ok {
+	if rf, ok := ret.Get(0).(func(network.Channel) error); ok {
 		r0 = rf(channel)
 	} else {
 		r0 = ret.Error(0)

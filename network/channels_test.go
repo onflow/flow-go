@@ -1,4 +1,4 @@
-package channels
+package network
 
 import (
 	"testing"
@@ -35,7 +35,7 @@ func TestGetRolesByChannel_NonClusterChannel(t *testing.T) {
 // operates on top of channelRoleMap, and correctly identifies and strips of the cluster channel.
 func TestGetRolesByChannel_ClusterChannel(t *testing.T) {
 	// creates a cluster channel.
-	conClusterChannel := ConsensusCluster("some-consensus-cluster-id")
+	conClusterChannel := ChannelConsensusCluster("some-consensus-cluster-id")
 
 	// the roles list should contain collection
 	roles, ok := RolesByChannel(conClusterChannel)
@@ -74,12 +74,12 @@ func TestGetChannelByRole(t *testing.T) {
 // against cluster and non-cluster channel.
 func TestIsClusterChannel(t *testing.T) {
 	// creates a consensus cluster channel and verifies it
-	conClusterChannel := ConsensusCluster("some-consensus-cluster-id")
+	conClusterChannel := ChannelConsensusCluster("some-consensus-cluster-id")
 	ok := IsClusterChannel(conClusterChannel)
 	require.True(t, ok)
 
 	// creates a sync cluster channel and verifies it
-	syncClusterChannel := SyncCluster("some-sync-cluster-id")
+	syncClusterChannel := ChannelSyncCluster("some-sync-cluster-id")
 	ok = IsClusterChannel(syncClusterChannel)
 	require.True(t, ok)
 
@@ -119,8 +119,8 @@ func TestUniqueChannels_Uniqueness(t *testing.T) {
 // We use the identifier of RoleList to determine their uniqueness.
 func TestUniqueChannels_ClusterChannels(t *testing.T) {
 	channels := ChannelsByRole(flow.RoleCollection)
-	consensusCluster := ConsensusCluster(flow.Emulator)
-	syncCluster := SyncCluster(flow.Emulator)
+	consensusCluster := ChannelConsensusCluster(flow.Emulator)
+	syncCluster := ChannelSyncCluster(flow.Emulator)
 	channels = append(channels, consensusCluster, syncCluster)
 	uniques := UniqueChannels(channels)
 	// collection role has two cluster and one non-cluster channels all with the same RoleList.

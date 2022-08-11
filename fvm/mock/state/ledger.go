@@ -9,13 +9,13 @@ type Ledger struct {
 	mock.Mock
 }
 
-// Delete provides a mock function with given fields: owner, key
-func (_m *Ledger) Delete(owner string, key string) error {
-	ret := _m.Called(owner, key)
+// Delete provides a mock function with given fields: owner, controller, key
+func (_m *Ledger) Delete(owner string, controller string, key string) error {
+	ret := _m.Called(owner, controller, key)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string) error); ok {
-		r0 = rf(owner, key)
+	if rf, ok := ret.Get(0).(func(string, string, string) error); ok {
+		r0 = rf(owner, controller, key)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -23,13 +23,13 @@ func (_m *Ledger) Delete(owner string, key string) error {
 	return r0
 }
 
-// Get provides a mock function with given fields: owner, key
-func (_m *Ledger) Get(owner string, key string) ([]byte, error) {
-	ret := _m.Called(owner, key)
+// Get provides a mock function with given fields: owner, controller, key
+func (_m *Ledger) Get(owner string, controller string, key string) ([]byte, error) {
+	ret := _m.Called(owner, controller, key)
 
 	var r0 []byte
-	if rf, ok := ret.Get(0).(func(string, string) []byte); ok {
-		r0 = rf(owner, key)
+	if rf, ok := ret.Get(0).(func(string, string, string) []byte); ok {
+		r0 = rf(owner, controller, key)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]byte)
@@ -37,8 +37,8 @@ func (_m *Ledger) Get(owner string, key string) ([]byte, error) {
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(string, string) error); ok {
-		r1 = rf(owner, key)
+	if rf, ok := ret.Get(1).(func(string, string, string) error); ok {
+		r1 = rf(owner, controller, key)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -46,13 +46,13 @@ func (_m *Ledger) Get(owner string, key string) ([]byte, error) {
 	return r0, r1
 }
 
-// Set provides a mock function with given fields: owner, key, value
-func (_m *Ledger) Set(owner string, key string, value []byte) error {
-	ret := _m.Called(owner, key, value)
+// Set provides a mock function with given fields: owner, controller, key, value
+func (_m *Ledger) Set(owner string, controller string, key string, value []byte) error {
+	ret := _m.Called(owner, controller, key, value)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, []byte) error); ok {
-		r0 = rf(owner, key, value)
+	if rf, ok := ret.Get(0).(func(string, string, string, []byte) error); ok {
+		r0 = rf(owner, controller, key, value)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -60,13 +60,13 @@ func (_m *Ledger) Set(owner string, key string, value []byte) error {
 	return r0
 }
 
-// Touch provides a mock function with given fields: owner, key
-func (_m *Ledger) Touch(owner string, key string) error {
-	ret := _m.Called(owner, key)
+// Touch provides a mock function with given fields: owner, controller, key
+func (_m *Ledger) Touch(owner string, controller string, key string) error {
+	ret := _m.Called(owner, controller, key)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string) error); ok {
-		r0 = rf(owner, key)
+	if rf, ok := ret.Get(0).(func(string, string, string) error); ok {
+		r0 = rf(owner, controller, key)
 	} else {
 		r0 = ret.Error(0)
 	}

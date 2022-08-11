@@ -26,8 +26,8 @@ func parseChainID(chainID string) flow.ChainID {
 		return flow.Mainnet
 	case "test":
 		return flow.Testnet
-	case "staging":
-		return flow.Stagingnet
+	case "canary":
+		return flow.Canary
 	case "bench":
 		return flow.Benchnet
 	case "local":

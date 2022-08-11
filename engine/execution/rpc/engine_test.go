@@ -292,6 +292,7 @@ func (suite *Suite) TestGetRegisterAtBlockID() {
 
 	id := unittest.IdentifierFixture()
 	serviceAddress := flow.Mainnet.Chain().ServiceAddress()
+	controller := []byte("")
 	validKey := []byte("exists")
 
 	mockEngine := new(ingestion.IngestRPC)
@@ -302,20 +303,21 @@ func (suite *Suite) TestGetRegisterAtBlockID() {
 		chain:  flow.Mainnet,
 	}
 
-	createReq := func(id, owner, key []byte) *execution.GetRegisterAtBlockIDRequest {
+	createReq := func(id, owner, controller, key []byte) *execution.GetRegisterAtBlockIDRequest {
 		return &execution.GetRegisterAtBlockIDRequest{
-			RegisterOwner: owner,
-			RegisterKey:   key,
-			BlockId:       id,
+			RegisterOwner:      owner,
+			RegisterController: controller,
+			RegisterKey:        key,
+			BlockId:            id,
 		}
 	}
 
 	suite.Run("happy path with valid request", func() {
 
 		// setup mock expectations
-		mockEngine.On("GetRegisterAtBlockID", mock.Anything, serviceAddress.Bytes(), validKey, id).Return([]uint8{1}, nil).Once()
+		mockEngine.On("GetRegisterAtBlockID", mock.Anything, serviceAddress.Bytes(), controller, validKey, id).Return([]uint8{1}, nil).Once()
 
-		req := createReq(id[:], serviceAddress.Bytes(), validKey)
+		req := createReq(id[:], serviceAddress.Bytes(), controller, validKey)
 		resp, err := handler.GetRegisterAtBlockID(context.Background(), req)
 
 		suite.Require().NoError(err)
@@ -328,9 +330,9 @@ func (suite *Suite) TestGetRegisterAtBlockID() {
 	suite.Run("invalid request with bad address", func() {
 		badOwner := []byte("\uFFFD")
 		// return error
-		mockEngine.On("GetRegisterAtBlockID", mock.Anything, badOwner, validKey, id).Return(nil, errors.New("error")).Once()
+		mockEngine.On("GetRegisterAtBlockID", mock.Anything, badOwner, controller, validKey, id).Return(nil, errors.New("error")).Once()
 
-		req := createReq(id[:], badOwner, validKey)
+		req := createReq(id[:], badOwner, controller, validKey)
 		_, err := handler.GetRegisterAtBlockID(context.Background(), req)
 		suite.Require().Error(err)
 	})

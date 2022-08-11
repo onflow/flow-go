@@ -111,9 +111,9 @@ func TestProofsForEmptyRegisters(t *testing.T) {
 
 	view := delta.NewView(executionState.LedgerGetRegister(l, flow.StateCommitment(emptyState)))
 
-	registerID := flow.NewRegisterID("b", "nk")
+	registerID := flow.NewRegisterID("b", "o", "nk")
 
-	v, err := view.Get(registerID.Owner, registerID.Key)
+	v, err := view.Get(registerID.Owner, registerID.Controller, registerID.Key)
 	require.NoError(t, err)
 	require.Empty(t, v)
 

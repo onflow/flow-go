@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine/common/splitter"
-	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -26,12 +26,12 @@ func getEvent() interface{} {
 type Suite struct {
 	suite.Suite
 
-	channel channels.Channel
+	channel network.Channel
 	engine  *splitter.Engine
 }
 
 func (suite *Suite) SetupTest() {
-	suite.channel = channels.Channel("test-channel")
+	suite.channel = network.Channel("test-channel")
 	suite.engine = splitter.New(zerolog.Logger{}, suite.channel)
 }
 
@@ -94,7 +94,7 @@ func (suite *Suite) TestProcessUnknownChannel() {
 	id := unittest.IdentifierFixture()
 	event := getEvent()
 
-	unknownChannel := channels.Channel("unknown-chan")
+	unknownChannel := network.Channel("unknown-chan")
 
 	engine := new(mocknetwork.Engine)
 

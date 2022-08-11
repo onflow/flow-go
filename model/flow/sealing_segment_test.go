@@ -285,7 +285,7 @@ func (suite *SealingSegmentSuite) TestBuild_RootSegmentWrongView() {
 	require.NoError(suite.T(), err)
 
 	_, err = suite.builder.SealingSegment()
-	require.Error(suite.T(), err)
+	require.ErrorIs(suite.T(), err, flow.ErrSegmentInvalidRootView)
 }
 
 // Test the case when the highest block in the segment does not contain seals but

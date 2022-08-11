@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
-	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -247,7 +247,7 @@ func mockAttackNetworkForCorruptedExecutionResult(
 			seen[event.CorruptedNodeId] = struct{}{}
 
 			// make sure message being sent on correct channel
-			require.Equal(t, channels.PushReceipts, event.Channel)
+			require.Equal(t, network.PushReceipts, event.Channel)
 
 			corruptedResult, ok := event.FlowProtocolEvent.(*flow.ExecutionReceipt)
 			require.True(t, ok)

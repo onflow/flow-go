@@ -533,7 +533,8 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 			fmt.Sprintf("%s:/data:z", dataDir),
 		},
 		Environment: []string{
-			"JAEGER_ENDPOINT=http://tempo:14268/api/traces",
+			"JAEGER_AGENT_HOST=jaeger",
+			"JAEGER_AGENT_PORT=6831",
 			"BINSTAT_ENABLE",
 			"BINSTAT_LEN_WHAT",
 			"BINSTAT_DMP_NAME",

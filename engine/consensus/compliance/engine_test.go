@@ -15,7 +15,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	modulemock "github.com/onflow/flow-go/module/mock"
-	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -90,10 +90,10 @@ func (cs *ComplianceSuite) TestBroadcastProposalWithDelay() {
 	parent := unittest.BlockHeaderFixture()
 	parent.ChainID = "test"
 	parent.Height = 10
-	cs.headerDB[parent.ID()] = parent
+	cs.headerDB[parent.ID()] = &parent
 
 	// create a block with the parent and store the payload with correct ID
-	block := unittest.BlockWithParentFixture(parent)
+	block := unittest.BlockWithParentFixture(&parent)
 	block.Header.ProposerID = cs.myID
 	cs.payloadDB[block.ID()] = block.Payload
 
@@ -173,7 +173,7 @@ func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
 				SigData:  vote.SigData,
 			}).Return().Once()
 			// execute the vote submission
-			_ = cs.engine.Process(channels.ConsensusCommittee, originID, &vote)
+			_ = cs.engine.Process(network.ConsensusCommittee, originID, &vote)
 		}
 		wg.Done()
 	}()
@@ -187,7 +187,7 @@ func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
 		// store the data for retrieval
 		cs.headerDB[block.Header.ParentID] = cs.head
 		cs.hotstuff.On("SubmitProposal", block.Header, cs.head.View).Return()
-		_ = cs.engine.Process(channels.ConsensusCommittee, originID, proposal)
+		_ = cs.engine.Process(network.ConsensusCommittee, originID, proposal)
 		wg.Done()
 	}()
 
@@ -217,12 +217,12 @@ func (cs *ComplianceSuite) TestProcessUnsupportedMessageType() {
 // Tests the whole processing pipeline.
 func (cs *ComplianceSuite) TestOnFinalizedBlock() {
 	finalizedBlock := unittest.BlockHeaderFixture()
-	cs.head = finalizedBlock
+	cs.head = &finalizedBlock
 
 	*cs.pending = modulemock.PendingBlockBuffer{}
 	cs.pending.On("PruneByView", finalizedBlock.View).Return(nil).Once()
 	cs.pending.On("Size").Return(uint(0)).Once()
-	cs.engine.OnFinalizedBlock(model.BlockFromFlow(finalizedBlock, finalizedBlock.View-1))
+	cs.engine.OnFinalizedBlock(model.BlockFromFlow(&finalizedBlock, finalizedBlock.View-1))
 
 	require.Eventually(cs.T(),
 		func() bool {

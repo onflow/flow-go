@@ -263,30 +263,6 @@ func TestSealingSegment(t *testing.T) {
 		})
 	})
 
-	// test sealing segment for non-root segment where the latest seal is the
-	// root seal, but the segment contains more than the root block.
-	// ROOT <- B1
-	// Expected sealing segment: [ROOT, B1]
-	t.Run("non-root with root seal as latest seal", func(t *testing.T) {
-		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
-			// build an extra block on top of root
-			block1 := unittest.BlockWithParentFixture(head)
-			buildBlock(t, state, block1)
-
-			segment, err := state.AtBlockID(block1.ID()).SealingSegment()
-			require.NoError(t, err)
-
-			// build a valid child B2 to ensure we have a QC
-			buildBlock(t, state, unittest.BlockWithParentFixture(block1.Header))
-
-			// sealing segment should contain B1 and B2
-			// B2 is reference of snapshot, B1 is latest sealed
-			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{rootSnapshot.Encodable().SealingSegment.Lowest(), block1}, segment.Blocks)
-			assert.Len(t, segment.ExecutionResults, 1)
-			assertSealingSegmentBlocksQueryableAfterBootstrap(t, state.AtBlockID(block1.ID()))
-		})
-	})
-
 	// test sealing segment for non-root segment with simple sealing structure
 	// (no blocks in between reference block and latest sealed)
 	// ROOT <- B1 <- B2(S1)

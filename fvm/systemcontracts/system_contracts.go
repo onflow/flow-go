@@ -177,14 +177,14 @@ func init() {
 	}
 	contractAddressesByChainID[flow.Testnet] = testnet
 
-	// Stagingnet test network
+	// Canary test network
 	// All system contracts are deployed to the service account
-	stagingnet := map[string]flow.Address{
-		ContractNameEpoch:     flow.Stagingnet.Chain().ServiceAddress(),
-		ContractNameClusterQC: flow.Stagingnet.Chain().ServiceAddress(),
-		ContractNameDKG:       flow.Stagingnet.Chain().ServiceAddress(),
+	canary := map[string]flow.Address{
+		ContractNameEpoch:     flow.Canary.Chain().ServiceAddress(),
+		ContractNameClusterQC: flow.Canary.Chain().ServiceAddress(),
+		ContractNameDKG:       flow.Canary.Chain().ServiceAddress(),
 	}
-	contractAddressesByChainID[flow.Stagingnet] = stagingnet
+	contractAddressesByChainID[flow.Canary] = canary
 
 	// Transient test networks
 	// All system contracts are deployed to the service account

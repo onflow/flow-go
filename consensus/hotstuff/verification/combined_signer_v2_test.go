@@ -194,7 +194,7 @@ func Test_VerifyQC_EmptySigners(t *testing.T) {
 	verifier := NewCombinedVerifier(committee, packer)
 
 	header := unittest.BlockHeaderFixture()
-	block := model.BlockFromFlow(header, header.View-1)
+	block := model.BlockFromFlow(&header, header.View-1)
 	sigData := unittest.QCSigDataFixture()
 
 	err := verifier.VerifyQC([]*flow.Identity{}, sigData, block)

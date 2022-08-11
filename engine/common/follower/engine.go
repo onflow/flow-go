@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -40,25 +39,6 @@ type Engine struct {
 	con            network.Conduit
 	sync           module.BlockRequester
 	tracer         module.Tracer
-	channel        channels.Channel
-}
-
-type Option func(*Engine)
-
-// WithComplianceOptions sets options for the engine's compliance config
-func WithComplianceOptions(opts ...compliance.Opt) Option {
-	return func(e *Engine) {
-		for _, apply := range opts {
-			apply(&e.config)
-		}
-	}
-}
-
-// WithChannel sets the channel the follower engine will use to receive blocks.
-func WithChannel(channel channels.Channel) Option {
-	return func(e *Engine) {
-		e.channel = channel
-	}
 }
 
 func New(
@@ -75,12 +55,18 @@ func New(
 	follower module.HotStuffFollower,
 	sync module.BlockRequester,
 	tracer module.Tracer,
-	opts ...Option,
+	opts ...compliance.Opt,
 ) (*Engine, error) {
+
+	config := compliance.DefaultConfig()
+	for _, apply := range opts {
+		apply(&config)
+	}
+
 	e := &Engine{
 		unit:           engine.NewUnit(),
 		log:            log.With().Str("engine", "follower").Logger(),
-		config:         compliance.DefaultConfig(),
+		config:         config,
 		me:             me,
 		engMetrics:     engMetrics,
 		mempoolMetrics: mempoolMetrics,
@@ -92,14 +78,9 @@ func New(
 		follower:       follower,
 		sync:           sync,
 		tracer:         tracer,
-		channel:        channels.ReceiveBlocks,
 	}
 
-	for _, apply := range opts {
-		apply(e)
-	}
-
-	con, err := net.Register(e.channel, e)
+	con, err := net.Register(network.ReceiveBlocks, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine to network: %w", err)
 	}
@@ -138,7 +119,7 @@ func (e *Engine) SubmitLocal(event interface{}) {
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
+func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(channel, originID, event)
 		if err != nil {
@@ -156,7 +137,7 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		return e.process(originID, event)
 	})

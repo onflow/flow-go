@@ -8,7 +8,7 @@ import (
 
 	splitterNetwork "github.com/onflow/flow-go/engine/common/splitter/network"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network"
 	testnet "github.com/onflow/flow-go/utils/unittest/network"
 )
 
@@ -27,7 +27,7 @@ func Example() {
 
 	// create engines
 	engineProcessFunc := func(engineID int) testnet.EngineProcessFunc {
-		return func(channel channels.Channel, originID flow.Identifier, event interface{}) error {
+		return func(channel network.Channel, originID flow.Identifier, event interface{}) error {
 			fmt.Printf("Engine %d received message: channel=%v, originID=%v, event=%v\n", engineID, channel, originID, event)
 			return nil
 		}
@@ -37,7 +37,7 @@ func Example() {
 	engine3 := testnet.NewEngine().OnProcess(engineProcessFunc(3))
 
 	// register engines with splitter network
-	channel := channels.Channel("foo-channel")
+	channel := network.Channel("foo-channel")
 	_, err := splitterNet.Register(channel, engine1)
 	if err != nil {
 		fmt.Println(err)

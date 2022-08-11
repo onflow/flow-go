@@ -12,7 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
-	"github.com/onflow/flow-go/network/channels"
+
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -161,7 +162,7 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 	require.NoError(t, err)
 
 	// spork topic is derived by suffixing the channel with the root block ID
-	topicBeforeSpork := channels.TopicFromChannel(channels.TestNetworkChannel, previousSporkId)
+	topicBeforeSpork := network.TopicFromChannel(network.TestNetworkChannel, previousSporkId)
 
 	// both nodes are initially on the same spork and subscribed to the same topic
 	_, err = node1.Subscribe(topicBeforeSpork, unittest.NetworkCodec(), unittest.AllowAllPeerFilter())
@@ -183,7 +184,7 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 	rootIDAfterSpork := unittest.IdentifierFixture()
 
 	// topic after the spork
-	topicAfterSpork := channels.TopicFromChannel(channels.TestNetworkChannel, rootIDAfterSpork)
+	topicAfterSpork := network.TopicFromChannel(network.TestNetworkChannel, rootIDAfterSpork)
 
 	// mimic that node1 now is now part of the new spork while node2 remains on the old spork
 	// by unsubscribing node1 from 'topicBeforeSpork' and subscribing it to 'topicAfterSpork'
@@ -220,7 +221,7 @@ func testOneToKMessagingSucceeds(ctx context.Context,
 	t *testing.T,
 	sourceNode *p2p.Node,
 	dstnSub *pubsub.Subscription,
-	topic channels.Topic) {
+	topic network.Topic) {
 
 	payload := createTestMessage(t)
 
@@ -242,7 +243,7 @@ func testOneToKMessagingFails(ctx context.Context,
 	t *testing.T,
 	sourceNode *p2p.Node,
 	dstnSub *pubsub.Subscription,
-	topic channels.Topic) {
+	topic network.Topic) {
 
 	payload := createTestMessage(t)
 

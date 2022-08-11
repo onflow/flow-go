@@ -2,7 +2,6 @@ package network
 
 import (
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/channels"
 )
 
 // Topology provides a subset of nodes which a given node should directly connect to for 1-k messaging.
@@ -20,5 +19,5 @@ type Topology interface {
 	//
 	// GenerateFanout is not concurrency safe. It is responsibility of caller to lock for it.
 	// with the channels argument, it allows the returned topology to be cached, which is necessary for randomized topology.
-	GenerateFanout(ids flow.IdentityList, channels channels.ChannelList) (flow.IdentityList, error)
+	GenerateFanout(ids flow.IdentityList, channels ChannelList) (flow.IdentityList, error)
 }

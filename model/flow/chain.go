@@ -21,8 +21,8 @@ const (
 
 	// Testnet is the chain ID for the testnet chain.
 	Testnet ChainID = "flow-testnet"
-	// Stagingnet is the chain ID for internal stagingnet chain.
-	Stagingnet ChainID = "flow-stagingnet"
+	// Canary is the chain ID for internal canary chain.
+	Canary ChainID = "flow-canary"
 
 	// Transient test networks
 
@@ -52,8 +52,8 @@ func (c ChainID) getChainCodeWord() uint64 {
 		return 0
 	case Testnet:
 		return invalidCodeTestNetwork
-	case Stagingnet:
-		return invalidCodeStagingNetwork
+	case Canary:
+		return invalidCodeCanaryNetwork
 	case Emulator, Localnet, Benchnet, BftTestnet:
 		return invalidCodeTransientNetwork
 	default:
@@ -175,9 +175,9 @@ var bftTestNet = &addressedChain{
 	},
 }
 
-var stagingnet = &addressedChain{
+var canary = &addressedChain{
 	chainImpl: &linearCodeImpl{
-		chainID: Stagingnet,
+		chainID: Canary,
 	},
 }
 
@@ -210,8 +210,8 @@ func (c ChainID) Chain() Chain {
 		return mainnet
 	case Testnet:
 		return testnet
-	case Stagingnet:
-		return stagingnet
+	case Canary:
+		return canary
 	case Benchnet:
 		return benchnet
 	case Localnet:

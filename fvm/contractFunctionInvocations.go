@@ -18,33 +18,30 @@ var deductTransactionFeesInvocationArgumentTypes = []sema.Type{
 	sema.UInt64Type,
 }
 
-// InvokeDeductTransactionFeesContract executes the fee deduction contract on
-// the service account.
-func InvokeDeductTransactionFeesContract(
+// DeductTransactionFeesInvocation prepares a function that calls fee deduction on the service account
+func DeductTransactionFeesInvocation(
 	env Environment,
 	traceSpan opentracing.Span,
-	payer flow.Address,
-	inclusionEffort uint64,
-	executionEffort uint64,
-) (cadence.Value, error) {
-
+) func(payer flow.Address, inclusionEffort uint64, executionEffort uint64) (cadence.Value, error) {
 	feesAddress := FlowFeesAddress(env.Context().Chain)
 
-	invoker := NewContractFunctionInvoker(
-		common.AddressLocation{
-			Address: common.Address(feesAddress),
-			Name:    systemcontracts.ContractNameFlowFees,
-		},
-		systemcontracts.ContractServiceAccountFunction_deductTransactionFee,
-		[]interpreter.Value{
-			interpreter.NewUnmeteredAddressValueFromBytes(payer.Bytes()),
-			interpreter.UFix64Value(inclusionEffort),
-			interpreter.UFix64Value(executionEffort),
-		},
-		deductTransactionFeesInvocationArgumentTypes,
-		env.Context().Logger,
-	)
-	return invoker.Invoke(env, traceSpan)
+	return func(payer flow.Address, inclusionEffort uint64, executionEffort uint64) (cadence.Value, error) {
+		invoker := NewContractFunctionInvoker(
+			common.AddressLocation{
+				Address: common.Address(feesAddress),
+				Name:    systemcontracts.ContractNameFlowFees,
+			},
+			systemcontracts.ContractServiceAccountFunction_deductTransactionFee,
+			[]interpreter.Value{
+				interpreter.NewUnmeteredAddressValueFromBytes(payer.Bytes()),
+				interpreter.UFix64Value(inclusionEffort),
+				interpreter.UFix64Value(executionEffort),
+			},
+			deductTransactionFeesInvocationArgumentTypes,
+			env.Context().Logger,
+		)
+		return invoker.Invoke(env, traceSpan)
+	}
 }
 
 var setupNewAccountInvocationArgumentTypes = []sema.Type{
@@ -52,110 +49,105 @@ var setupNewAccountInvocationArgumentTypes = []sema.Type{
 	sema.AuthAccountType,
 }
 
-// InvokeSetupNewAccountContract executes the new account setup contract on
-// the service account.
-func InvokeSetupNewAccountContract(
+// SetupNewAccountInvocation prepares a function that calls new account setup on the service account
+func SetupNewAccountInvocation(
 	env Environment,
 	traceSpan opentracing.Span,
-	flowAddress flow.Address,
-	payer common.Address,
-) (cadence.Value, error) {
-
-	// uses `FlowServiceAccount.setupNewAccount` from https://github.com/onflow/flow-core-contracts/blob/master/contracts/FlowServiceAccount.cdc
-	invoker := NewContractFunctionInvoker(
-		common.AddressLocation{
-			Address: common.Address(env.Context().Chain.ServiceAddress()),
-			Name:    systemcontracts.ContractServiceAccount,
-		},
-		systemcontracts.ContractServiceAccountFunction_setupNewAccount,
-		[]interpreter.Value{
-			interpreter.NewAddressValue(env, common.Address(flowAddress)),
-			interpreter.NewAddressValue(env, payer),
-		},
-		setupNewAccountInvocationArgumentTypes,
-		env.Context().Logger,
-	)
-	return invoker.Invoke(env, traceSpan)
+) func(flowAddress flow.Address, payer common.Address) (cadence.Value, error) {
+	return func(flowAddress flow.Address, payer common.Address) (cadence.Value, error) {
+		// uses `FlowServiceAccount.setupNewAccount` from https://github.com/onflow/flow-core-contracts/blob/master/contracts/FlowServiceAccount.cdc
+		invoker := NewContractFunctionInvoker(
+			common.AddressLocation{
+				Address: common.Address(env.Context().Chain.ServiceAddress()),
+				Name:    systemcontracts.ContractServiceAccount,
+			},
+			systemcontracts.ContractServiceAccountFunction_setupNewAccount,
+			[]interpreter.Value{
+				interpreter.NewAddressValue(env, common.Address(flowAddress)),
+				interpreter.NewAddressValue(env, payer),
+			},
+			setupNewAccountInvocationArgumentTypes,
+			env.Context().Logger,
+		)
+		return invoker.Invoke(env, traceSpan)
+	}
 }
 
 var accountAvailableBalanceInvocationArgumentTypes = []sema.Type{
 	&sema.AddressType{},
 }
 
-// InvokeAccountAvailableBalanceContract executes the get available balance
-// contract on the storage fees contract.
-func InvokeAccountAvailableBalanceContract(
+// AccountAvailableBalanceInvocation prepares a function that calls get available balance on the storage fees contract
+func AccountAvailableBalanceInvocation(
 	env Environment,
 	traceSpan opentracing.Span,
-	address common.Address,
-) (cadence.Value, error) {
-
-	invoker := NewContractFunctionInvoker(
-		common.AddressLocation{
-			Address: common.Address(env.Context().Chain.ServiceAddress()),
-			Name:    systemcontracts.ContractStorageFees,
-		},
-		systemcontracts.ContractStorageFeesFunction_defaultTokenAvailableBalance,
-		[]interpreter.Value{
-			interpreter.NewAddressValue(env, address),
-		},
-		accountAvailableBalanceInvocationArgumentTypes,
-		env.Context().Logger,
-	)
-	return invoker.Invoke(env, traceSpan)
+) func(address common.Address) (cadence.Value, error) {
+	return func(address common.Address) (cadence.Value, error) {
+		invoker := NewContractFunctionInvoker(
+			common.AddressLocation{
+				Address: common.Address(env.Context().Chain.ServiceAddress()),
+				Name:    systemcontracts.ContractStorageFees,
+			},
+			systemcontracts.ContractStorageFeesFunction_defaultTokenAvailableBalance,
+			[]interpreter.Value{
+				interpreter.NewAddressValue(env, address),
+			},
+			accountAvailableBalanceInvocationArgumentTypes,
+			env.Context().Logger,
+		)
+		return invoker.Invoke(env, traceSpan)
+	}
 }
 
 var accountBalanceInvocationArgumentTypes = []sema.Type{
 	sema.PublicAccountType,
 }
 
-// InvokeAccountBalanceContract executes the get available balance contract
-// on the service account.
-func InvokeAccountBalanceContract(
+// AccountBalanceInvocation prepares a function that calls get available balance on the service account
+func AccountBalanceInvocation(
 	env Environment,
 	traceSpan opentracing.Span,
-	address common.Address,
-) (cadence.Value, error) {
-
-	invoker := NewContractFunctionInvoker(
-		common.AddressLocation{
-			Address: common.Address(env.Context().Chain.ServiceAddress()),
-			Name:    systemcontracts.ContractServiceAccount},
-		systemcontracts.ContractServiceAccountFunction_defaultTokenBalance,
-		[]interpreter.Value{
-			interpreter.NewAddressValue(env, address),
-		},
-		accountBalanceInvocationArgumentTypes,
-		env.Context().Logger,
-	)
-	return invoker.Invoke(env, traceSpan)
+) func(address common.Address) (cadence.Value, error) {
+	return func(address common.Address) (cadence.Value, error) {
+		invoker := NewContractFunctionInvoker(
+			common.AddressLocation{
+				Address: common.Address(env.Context().Chain.ServiceAddress()),
+				Name:    systemcontracts.ContractServiceAccount},
+			systemcontracts.ContractServiceAccountFunction_defaultTokenBalance,
+			[]interpreter.Value{
+				interpreter.NewAddressValue(env, address),
+			},
+			accountBalanceInvocationArgumentTypes,
+			env.Context().Logger,
+		)
+		return invoker.Invoke(env, traceSpan)
+	}
 }
 
 var accountStorageCapacityInvocationArgumentTypes = []sema.Type{
 	&sema.AddressType{},
 }
 
-// InvokeAccountStorageCapacityContract executes the get storage capacity
-// contract on the storage fees contract.
-func InvokeAccountStorageCapacityContract(
+// AccountStorageCapacityInvocation prepares a function that calls get storage capacity on the storage fees contract
+func AccountStorageCapacityInvocation(
 	env Environment,
 	traceSpan opentracing.Span,
-	address common.Address,
-) (cadence.Value, error) {
-
-	invoker := NewContractFunctionInvoker(
-		common.AddressLocation{
-			Address: common.Address(env.Context().Chain.ServiceAddress()),
-			Name:    systemcontracts.ContractStorageFees,
-		},
-		systemcontracts.ContractStorageFeesFunction_calculateAccountCapacity,
-		[]interpreter.Value{
-			interpreter.NewAddressValue(env, address),
-		},
-		accountStorageCapacityInvocationArgumentTypes,
-		env.Context().Logger,
-	)
-	return invoker.Invoke(env, traceSpan)
+) func(address common.Address) (cadence.Value, error) {
+	return func(address common.Address) (cadence.Value, error) {
+		invoker := NewContractFunctionInvoker(
+			common.AddressLocation{
+				Address: common.Address(env.Context().Chain.ServiceAddress()),
+				Name:    systemcontracts.ContractStorageFees,
+			},
+			systemcontracts.ContractStorageFeesFunction_calculateAccountCapacity,
+			[]interpreter.Value{
+				interpreter.NewAddressValue(env, address),
+			},
+			accountStorageCapacityInvocationArgumentTypes,
+			env.Context().Logger,
+		)
+		return invoker.Invoke(env, traceSpan)
+	}
 }
 
 var useContractAuditVoucherInvocationArgumentTypes = []sema.Type{
@@ -163,31 +155,30 @@ var useContractAuditVoucherInvocationArgumentTypes = []sema.Type{
 	sema.StringType,
 }
 
-// InvokeUseContractAuditVoucherContract executes the use a contract
-// deployment audit voucher contract.
-func InvokeUseContractAuditVoucherContract(
+// UseContractAuditVoucherInvocation prepares a function that can use a contract deployment audit voucher
+func UseContractAuditVoucherInvocation(
 	env Environment,
 	traceSpan opentracing.Span,
-	address common.Address,
-	code string) (bool, error) {
-
-	invoker := NewContractFunctionInvoker(
-		common.AddressLocation{
-			Address: common.Address(env.Context().Chain.ServiceAddress()),
-			Name:    systemcontracts.ContractDeploymentAudits,
-		},
-		systemcontracts.ContractDeploymentAuditsFunction_useVoucherForDeploy,
-		[]interpreter.Value{
-			interpreter.NewAddressValue(env, address),
-			interpreter.NewUnmeteredStringValue(code),
-		},
-		useContractAuditVoucherInvocationArgumentTypes,
-		env.Context().Logger,
-	)
-	resultCdc, err := invoker.Invoke(env, traceSpan)
-	if err != nil {
-		return false, err
+) func(address common.Address, code string) (bool, error) {
+	return func(address common.Address, code string) (bool, error) {
+		invoker := NewContractFunctionInvoker(
+			common.AddressLocation{
+				Address: common.Address(env.Context().Chain.ServiceAddress()),
+				Name:    systemcontracts.ContractDeploymentAudits,
+			},
+			systemcontracts.ContractDeploymentAuditsFunction_useVoucherForDeploy,
+			[]interpreter.Value{
+				interpreter.NewAddressValue(env, address),
+				interpreter.NewUnmeteredStringValue(code),
+			},
+			useContractAuditVoucherInvocationArgumentTypes,
+			env.Context().Logger,
+		)
+		resultCdc, err := invoker.Invoke(env, traceSpan)
+		if err != nil {
+			return false, err
+		}
+		result := resultCdc.(cadence.Bool).ToGoValue().(bool)
+		return result, nil
 	}
-	result := resultCdc.(cadence.Bool).ToGoValue().(bool)
-	return result, nil
 }

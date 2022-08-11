@@ -5,6 +5,8 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/atomic"
+
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/access"
 	"github.com/onflow/flow-go/module/metrics"
@@ -13,8 +15,8 @@ import (
 )
 
 type TxFollower interface {
-	// Follow returns a channel that is closed when the transaction is complete.
-	Follow(ID flowsdk.Identifier) <-chan struct{}
+	// CompleteChanByID returns a channel that is closed when the transaction is complete.
+	CompleteChanByID(ID flowsdk.Identifier) <-chan struct{}
 
 	// Height returns the last acted upon block height.
 	Height() uint64
@@ -54,13 +56,15 @@ type txFollowerImpl struct {
 
 	interval time.Duration
 
-	stopped chan struct{}
+	inprogress *atomic.Int64
 
-	// Following fields are protected by mu.
-	mu       *sync.RWMutex
-	height   uint64
-	blockID  flowsdk.Identifier
-	txToChan map[flowsdk.Identifier]txInfo
+	mu      *sync.RWMutex
+	height  uint64
+	blockID flowsdk.Identifier
+
+	txToChan sync.Map
+
+	stopped chan struct{}
 }
 
 type txInfo struct {
@@ -79,12 +83,12 @@ func NewTxFollower(ctx context.Context, client access.Client, opts ...followerOp
 		ctx:    newCtx,
 		cancel: cancel,
 		logger: zerolog.Nop(),
+		mu:     &sync.RWMutex{},
+
+		inprogress: atomic.NewInt64(0),
 
 		stopped:  make(chan struct{}),
 		interval: 100 * time.Millisecond,
-
-		mu:       &sync.RWMutex{},
-		txToChan: make(map[flowsdk.Identifier]txInfo),
 	}
 
 	for _, opt := range opts {
@@ -96,15 +100,16 @@ func NewTxFollower(ctx context.Context, client access.Client, opts ...followerOp
 		if err != nil {
 			return nil, err
 		}
-		f.updateFromBlockHeader(*hdr)
+		f.height = hdr.Height
+		f.blockID = hdr.ID
 	}
 
-	go f.run()
+	go f.follow()
 
 	return f, nil
 }
 
-func (f *txFollowerImpl) run() {
+func (f *txFollowerImpl) follow() {
 	t := time.NewTicker(f.interval)
 	defer t.Stop()
 	defer close(f.stopped)
@@ -135,14 +140,16 @@ Loop:
 			}
 			for _, tx := range col.TransactionIDs {
 				blockTxs++
+				if ch, loaded := f.txToChan.LoadAndDelete(tx.Hex()); loaded {
+					txi := ch.(txInfo)
 
-				if txi, loaded := f.loadAndDelete(tx); loaded {
 					duration := time.Since(txi.submisionTime)
 					f.logger.Trace().
 						Dur("durationInMS", duration).
 						Hex("txID", tx.Bytes()).
 						Msg("returned account to the pool")
 					close(txi.C)
+					f.inprogress.Dec()
 					if f.metrics != nil {
 						f.metrics.TransactionExecuted(duration)
 					}
@@ -167,66 +174,26 @@ Loop:
 			Uint64("txsTotalUnknown", totalUnknownTxs).
 			Uint64("txsInBlock", blockTxs).
 			Uint64("txsInBlockUnknown", blockUnknownTxs).
-			Int("txsInProgress", f.InProgress()).
+			Int64("txsInProgress", f.inprogress.Load()).
 			Msg("new block parsed")
 
-		f.updateFromBlockHeader(block.BlockHeader)
+		f.mu.Lock()
+		f.height = block.Height
+		f.blockID = block.ID
+		f.mu.Unlock()
 
 		lastBlockTime = time.Now()
 	}
 }
 
-// Follow returns a channel that will be closed when the transaction is completed.
-func (f *txFollowerImpl) Follow(txID flowsdk.Identifier) <-chan struct{} {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	select {
-	case <-f.ctx.Done():
-		// This channel is closed when the follower is stopped.
-		return f.stopped
-	default:
+func (f *txFollowerImpl) CompleteChanByID(ID flowsdk.Identifier) <-chan struct{} {
+	txi, loaded := f.txToChan.LoadOrStore(ID.Hex(), txInfo{submisionTime: time.Now(), C: make(chan struct{})})
+	if !loaded {
+		f.inprogress.Inc()
 	}
-
-	// Return existing follower if exists.
-	if txi, ok := f.txToChan[txID]; ok {
-		return txi.C
-	}
-
-	// Create new one.
-	ch := make(chan struct{})
-	f.txToChan[txID] = txInfo{submisionTime: time.Now(), C: ch}
-	return ch
+	return txi.(txInfo).C
 }
 
-func (f *txFollowerImpl) loadAndDelete(txID flowsdk.Identifier) (txInfo, bool) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	txi, ok := f.txToChan[txID]
-	if ok {
-		delete(f.txToChan, txID)
-	}
-	return txi, ok
-}
-
-func (f *txFollowerImpl) updateFromBlockHeader(block flowsdk.BlockHeader) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	f.height = block.Height
-	f.blockID = block.ID
-}
-
-// InProgress returns the number of transactions in progress.
-func (f *txFollowerImpl) InProgress() int {
-	f.mu.RLock()
-	defer f.mu.RUnlock()
-
-	return len(f.txToChan)
-}
-
-// Height returns the latest block height.
 func (f *txFollowerImpl) Height() uint64 {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
@@ -234,7 +201,6 @@ func (f *txFollowerImpl) Height() uint64 {
 	return f.height
 }
 
-// BlockID returns the latest block ID.
 func (f *txFollowerImpl) BlockID() flowsdk.Identifier {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
@@ -242,28 +208,30 @@ func (f *txFollowerImpl) BlockID() flowsdk.Identifier {
 	return f.blockID
 }
 
-// Stop stops all followers, notifies existing watches, and returns.
 func (f *txFollowerImpl) Stop() {
 	f.cancel()
 	<-f.stopped
 
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	for _, v := range f.txToChan {
-		close(v.C)
+	var toDelete []string
+	f.txToChan.Range(
+		func(key, value interface{}) bool {
+			close(value.(txInfo).C)
+			toDelete = append(toDelete, key.(string))
+			return true
+		},
+	)
+	for _, val := range toDelete {
+		f.txToChan.Delete(val)
 	}
-	f.txToChan = make(map[flowsdk.Identifier]txInfo)
 }
 
 type nopTxFollower struct {
-	*txFollowerImpl
+	txFollowerImpl
 
 	closedCh chan struct{}
 }
 
-// NewNopTxFollower creates a new follower that tracks the current block height and ID
-// but does not notify on transaction completion.
+// NewNopTxFollower creates a new follower that tracks the current block height and ID but does not notify on transaction completion.
 func NewNopTxFollower(ctx context.Context, client access.Client, opts ...followerOption) (TxFollower, error) {
 	f, err := NewTxFollower(ctx, client, opts...)
 	if err != nil {
@@ -275,13 +243,13 @@ func NewNopTxFollower(ctx context.Context, client access.Client, opts ...followe
 	close(closedCh)
 
 	nop := &nopTxFollower{
-		txFollowerImpl: impl,
+		txFollowerImpl: *impl,
 		closedCh:       closedCh,
 	}
 	return nop, nil
 }
 
-// Follow always returns a closed channel.
-func (nop *nopTxFollower) Follow(ID flowsdk.Identifier) <-chan struct{} {
+// CompleteChanByID always returns a closed channel.
+func (nop *nopTxFollower) CompleteChanByID(ID flowsdk.Identifier) <-chan struct{} {
 	return nop.closedCh
 }

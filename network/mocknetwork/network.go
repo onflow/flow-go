@@ -4,10 +4,7 @@ package mocknetwork
 
 import (
 	datastore "github.com/ipfs/go-datastore"
-	channels "github.com/onflow/flow-go/network/channels"
-
 	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
-
 	mock "github.com/stretchr/testify/mock"
 
 	network "github.com/onflow/flow-go/network"
@@ -53,11 +50,11 @@ func (_m *Network) Ready() <-chan struct{} {
 }
 
 // Register provides a mock function with given fields: channel, messageProcessor
-func (_m *Network) Register(channel channels.Channel, messageProcessor network.MessageProcessor) (network.Conduit, error) {
+func (_m *Network) Register(channel network.Channel, messageProcessor network.MessageProcessor) (network.Conduit, error) {
 	ret := _m.Called(channel, messageProcessor)
 
 	var r0 network.Conduit
-	if rf, ok := ret.Get(0).(func(channels.Channel, network.MessageProcessor) network.Conduit); ok {
+	if rf, ok := ret.Get(0).(func(network.Channel, network.MessageProcessor) network.Conduit); ok {
 		r0 = rf(channel, messageProcessor)
 	} else {
 		if ret.Get(0) != nil {
@@ -66,7 +63,7 @@ func (_m *Network) Register(channel channels.Channel, messageProcessor network.M
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(channels.Channel, network.MessageProcessor) error); ok {
+	if rf, ok := ret.Get(1).(func(network.Channel, network.MessageProcessor) error); ok {
 		r1 = rf(channel, messageProcessor)
 	} else {
 		r1 = ret.Error(1)
@@ -76,7 +73,7 @@ func (_m *Network) Register(channel channels.Channel, messageProcessor network.M
 }
 
 // RegisterBlobService provides a mock function with given fields: channel, store, opts
-func (_m *Network) RegisterBlobService(channel channels.Channel, store datastore.Batching, opts ...network.BlobServiceOption) (network.BlobService, error) {
+func (_m *Network) RegisterBlobService(channel network.Channel, store datastore.Batching, opts ...network.BlobServiceOption) (network.BlobService, error) {
 	_va := make([]interface{}, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
@@ -87,7 +84,7 @@ func (_m *Network) RegisterBlobService(channel channels.Channel, store datastore
 	ret := _m.Called(_ca...)
 
 	var r0 network.BlobService
-	if rf, ok := ret.Get(0).(func(channels.Channel, datastore.Batching, ...network.BlobServiceOption) network.BlobService); ok {
+	if rf, ok := ret.Get(0).(func(network.Channel, datastore.Batching, ...network.BlobServiceOption) network.BlobService); ok {
 		r0 = rf(channel, store, opts...)
 	} else {
 		if ret.Get(0) != nil {
@@ -96,7 +93,7 @@ func (_m *Network) RegisterBlobService(channel channels.Channel, store datastore
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(channels.Channel, datastore.Batching, ...network.BlobServiceOption) error); ok {
+	if rf, ok := ret.Get(1).(func(network.Channel, datastore.Batching, ...network.BlobServiceOption) error); ok {
 		r1 = rf(channel, store, opts...)
 	} else {
 		r1 = ret.Error(1)

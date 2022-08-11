@@ -12,9 +12,9 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/onflow/flow-go/fvm/state"
 	fvm "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/rs/zerolog"
@@ -118,7 +118,7 @@ func (m *StorageUsedUpdateMigration) Migrate(payload []ledger.Payload) ([]ledger
 					// not an address
 					continue
 				}
-				if id.Key == fvm.KeyAccountStatus {
+				if id.Key == fvm.KeyStorageUsed {
 					storageUsedPayloadChan <- accountStorageUsedPayload{
 						Address: id.Owner,
 						Index:   p.Index,
@@ -177,16 +177,22 @@ Loop:
 			log.Error().Err(err).Msg("error converting key to register ID")
 			return nil, err
 		}
-		if id.Key != fvm.KeyAccountStatus {
-			return nil, fmt.Errorf("this is not a status register")
+		if id.Key != fvm.KeyStorageUsed {
+			return nil, fmt.Errorf("this is not a storage used register")
 		}
 
-		status, err := state.AccountStatusFromBytes(p.Value)
+		oldUsed, _, err := utils.ReadUint64(p.Value)
 		if err != nil {
-			log.Error().Err(err).Msg("error getting status")
-			return nil, err
+			errStr := "cannot decode storage used by address"
+			log.Error().
+				Str("address", flow.BytesToAddress([]byte(a)).Hex()).
+				Hex("storageUsed", p.Value).
+				Hex("storageUsedKey", p.Key.CanonicalForm()).
+				Err(err).
+				Msg(errStr)
+			return nil, fmt.Errorf(errStr)
 		}
-		oldUsed := status.StorageUsed()
+
 		if oldUsed > used {
 			storageDecreaseCount += 1
 			change = -int64(oldUsed - used)
@@ -201,8 +207,8 @@ Loop:
 		if err != nil {
 			return nil, err
 		}
-		status.SetStorageUsed(used)
-		payload[pIndex].Value = status.ToBytes()
+
+		payload[pIndex].Value = utils.Uint64ToBinary(used)
 	}
 
 	m.Log.Info().

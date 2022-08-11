@@ -10,16 +10,18 @@ import (
 )
 
 type RegisterID struct {
-	Owner string
-	Key   string
+	Owner      string
+	Controller string
+	Key        string
 }
 
-// this function returns a string format of a RegisterID in the form '%x/%x'
+// this function returns a string format of a RegisterID in the form '%x/%x/%x'
 // it has been optimized to avoid the memory allocations inside Sprintf
 func (r *RegisterID) String() string {
 	ownerLen := len(r.Owner)
+	controllerLen := len(r.Controller)
 
-	requiredLen := ((ownerLen + len(r.Key)) * 2) + 1
+	requiredLen := ((ownerLen + controllerLen + len(r.Key)) * 2) + 2
 
 	arr := make([]byte, requiredLen)
 
@@ -27,7 +29,11 @@ func (r *RegisterID) String() string {
 
 	arr[2*ownerLen] = byte('/')
 
-	hex.Encode(arr[(2*ownerLen)+1:], []byte(r.Key))
+	hex.Encode(arr[(2*ownerLen)+1:], []byte(r.Controller))
+
+	arr[2*(ownerLen+controllerLen)+1] = byte('/')
+
+	hex.Encode(arr[2*(ownerLen+controllerLen+1):], []byte(r.Key))
 
 	return string(arr)
 }
@@ -39,10 +45,11 @@ func (r *RegisterID) Bytes() []byte {
 	return fingerprint.Fingerprint(r)
 }
 
-func NewRegisterID(owner, key string) RegisterID {
+func NewRegisterID(owner, controller, key string) RegisterID {
 	return RegisterID{
-		Owner: owner,
-		Key:   key,
+		Owner:      owner,
+		Controller: controller,
+		Key:        key,
 	}
 }
 
@@ -64,6 +71,8 @@ func (d RegisterEntries) Len() int {
 func (d RegisterEntries) Less(i, j int) bool {
 	if d[i].Key.Owner != d[j].Key.Owner {
 		return d[i].Key.Owner < d[j].Key.Owner
+	} else if d[i].Key.Controller != d[j].Key.Controller {
+		return d[i].Key.Controller < d[j].Key.Controller
 	}
 	return d[i].Key.Key < d[j].Key.Key
 }

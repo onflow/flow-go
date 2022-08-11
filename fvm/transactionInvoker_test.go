@@ -67,13 +67,15 @@ func TestSafetyCheck(t *testing.T) {
 
 			err = view.Set(
 				string(contractAddress.Bytes()),
+				"",
 				state.KeyAccountStatus,
-				state.NewAccountStatus().ToBytes(),
+				[]byte{1},
 			)
 			require.NoError(t, err)
 
 			err = view.Set(
 				string(contractAddress.Bytes()),
+				"",
 				"contract_names",
 				encodedName,
 			)
@@ -81,6 +83,7 @@ func TestSafetyCheck(t *testing.T) {
 
 			err = view.Set(
 				string(contractAddress.Bytes()),
+				"",
 				"code.TestContract",
 				[]byte(contractCode),
 			)
@@ -143,18 +146,21 @@ func TestSafetyCheck(t *testing.T) {
 
 		err = view.Set(
 			string(contractAddress.Bytes()),
+			"",
 			state.KeyAccountStatus,
-			state.NewAccountStatus().ToBytes(),
+			[]byte{1},
 		)
 		require.NoError(t, err)
 		err = view.Set(
 			string(contractAddress.Bytes()),
+			"",
 			"contract_names",
 			encodedName,
 		)
 		require.NoError(t, err)
 		err = view.Set(
 			string(contractAddress.Bytes()),
+			"",
 			"code.TestContract",
 			[]byte(contractCode),
 		)
@@ -279,7 +285,7 @@ func TestSafetyCheck(t *testing.T) {
 
 		view := utils.NewSimpleView()
 		header := unittest.BlockHeaderFixture()
-		context := fvm.NewContext(log, fvm.WithBlockHeader(header))
+		context := fvm.NewContext(log, fvm.WithBlockHeader(&header))
 
 		sth := state.NewStateHolder(state.NewState(view))
 
@@ -352,10 +358,6 @@ func (e *ErrorReturningRuntime) SetTracingEnabled(_ bool) {
 
 func (*ErrorReturningRuntime) SetDebugger(_ *interpreter.Debugger) {
 	panic("SetDebugger not expected")
-}
-
-func (ErrorReturningRuntime) Storage(runtime.Context) (*runtime.Storage, *interpreter.Interpreter, error) {
-	panic("Storage not expected")
 }
 
 func encodeContractNames(contractNames []string) ([]byte, error) {

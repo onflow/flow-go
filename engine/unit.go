@@ -10,8 +10,6 @@ import (
 
 // Unit handles synchronization management, startup, and shutdown for engines.
 type Unit struct {
-	admitLock sync.Mutex // used for synchronizing context cancellation with work admittance
-
 	wg         sync.WaitGroup     // tracks in-progress functions
 	ctx        context.Context    // context that is cancelled when the unit is Done
 	cancel     context.CancelFunc // cancels the context
@@ -29,35 +27,16 @@ func NewUnit() *Unit {
 	return unit
 }
 
-func (u *Unit) admit() bool {
-	u.admitLock.Lock()
-	defer u.admitLock.Unlock()
-
-	select {
-	case <-u.ctx.Done():
-		return false
-	default:
-	}
-
-	u.wg.Add(1)
-	return true
-}
-
-func (u *Unit) stopAdmitting() {
-	u.admitLock.Lock()
-	defer u.admitLock.Unlock()
-
-	u.cancel()
-}
-
 // Do synchronously executes the input function f unless the unit has shut down.
 // It returns the result of f. If f is executed, the unit will not shut down
 // until after f returns.
 func (u *Unit) Do(f func() error) error {
-	if !u.admit() {
+	select {
+	case <-u.ctx.Done():
 		return nil
+	default:
 	}
-
+	u.wg.Add(1)
 	defer u.wg.Done()
 	return f()
 }
@@ -65,10 +44,12 @@ func (u *Unit) Do(f func() error) error {
 // Launch asynchronously executes the input function unless the unit has shut
 // down. If f is executed, the unit will not shut down until after f returns.
 func (u *Unit) Launch(f func()) {
-	if !u.admit() {
+	select {
+	case <-u.ctx.Done():
 		return
+	default:
 	}
-
+	u.wg.Add(1)
 	go func() {
 		defer u.wg.Done()
 		f()
@@ -156,7 +137,7 @@ func (u *Unit) Quit() <-chan struct{} {
 func (u *Unit) Done(actions ...func()) <-chan struct{} {
 	done := make(chan struct{})
 	go func() {
-		u.stopAdmitting()
+		u.cancel()
 		for _, action := range actions {
 			action()
 		}

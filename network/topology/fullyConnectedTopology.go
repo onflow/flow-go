@@ -5,7 +5,6 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
@@ -24,6 +23,6 @@ func NewFullyConnectedTopology() network.Topology {
 	return &FullyConnectedTopology{}
 }
 
-func (f *FullyConnectedTopology) GenerateFanout(ids flow.IdentityList, _ channels.ChannelList) (flow.IdentityList, error) {
+func (f *FullyConnectedTopology) GenerateFanout(ids flow.IdentityList, _ network.ChannelList) (flow.IdentityList, error) {
 	return ids, nil
 }

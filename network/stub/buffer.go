@@ -4,14 +4,14 @@ import (
 	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network"
 )
 
 // PendingMessage is a pending message to be sent
 type PendingMessage struct {
 	// The sender node id
 	From    flow.Identifier
-	Channel channels.Channel
+	Channel network.Channel
 	Event   interface{}
 	// The id of the receiver nodes
 	TargetIDs []flow.Identifier

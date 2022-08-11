@@ -44,12 +44,12 @@ func (v *view) MergeView(o state.View) error {
 	return nil
 }
 
-func (v *view) Set(owner, key string, value flow.RegisterValue) error {
-	return v.Ledger.Set(owner, key, value)
+func (v *view) Set(owner, controller, key string, value flow.RegisterValue) error {
+	return v.Ledger.Set(owner, controller, key, value)
 }
 
-func (v *view) Get(owner, key string) (flow.RegisterValue, error) {
-	value, err := v.Ledger.Get(owner, key)
+func (v *view) Get(owner, controller, key string) (flow.RegisterValue, error) {
+	value, err := v.Ledger.Get(owner, controller, key)
 	if err != nil {
 		return nil, err
 	}
@@ -58,18 +58,18 @@ func (v *view) Get(owner, key string) (flow.RegisterValue, error) {
 	}
 
 	if v.Parent != nil {
-		return v.Parent.Get(owner, key)
+		return v.Parent.Get(owner, controller, key)
 	}
 
 	return nil, nil
 }
 
-func (v *view) Touch(owner, key string) error {
-	return v.Ledger.Touch(owner, key)
+func (v *view) Touch(owner, controller, key string) error {
+	return v.Ledger.Touch(owner, controller, key)
 }
 
-func (v *view) Delete(owner, key string) error {
-	return v.Ledger.Delete(owner, key)
+func (v *view) Delete(owner, controller, key string) error {
+	return v.Ledger.Delete(owner, controller, key)
 }
 
 func (v *view) Payloads() []ledger.Payload {
@@ -88,26 +88,27 @@ type led struct {
 	payloads map[string]ledger.Payload
 }
 
-func (l *led) Set(owner, key string, value flow.RegisterValue) error {
+func (l *led) Set(owner, controller, key string, value flow.RegisterValue) error {
 	keyparts := []ledger.KeyPart{ledger.NewKeyPart(0, []byte(owner)),
+		ledger.NewKeyPart(1, []byte(controller)),
 		ledger.NewKeyPart(2, []byte(key))}
-	fk := fullKey(owner, key)
+	fk := fullKey(owner, controller, key)
 	l.payloads[fk] = ledger.Payload{Key: ledger.NewKey(keyparts), Value: ledger.Value(value)}
 	return nil
 }
 
-func (l *led) Get(owner, key string) (flow.RegisterValue, error) {
-	fk := fullKey(owner, key)
+func (l *led) Get(owner, controller, key string) (flow.RegisterValue, error) {
+	fk := fullKey(owner, controller, key)
 	return flow.RegisterValue(l.payloads[fk].Value), nil
 }
 
-func (l *led) Delete(owner, key string) error {
-	fk := fullKey(owner, key)
+func (l *led) Delete(owner, controller, key string) error {
+	fk := fullKey(owner, controller, key)
 	delete(l.payloads, fk)
 	return nil
 }
 
-func (l *led) Touch(owner, key string) error {
+func (l *led) Touch(owner, controller, key string) error {
 	return nil
 }
 
@@ -123,7 +124,8 @@ func newLed(payloads []ledger.Payload) *led {
 	mapping := make(map[string]ledger.Payload)
 	for _, p := range payloads {
 		fk := fullKey(string(p.Key.KeyParts[0].Value),
-			string(p.Key.KeyParts[1].Value))
+			string(p.Key.KeyParts[1].Value),
+			string(p.Key.KeyParts[2].Value))
 		mapping[fk] = p
 	}
 
@@ -132,6 +134,6 @@ func newLed(payloads []ledger.Payload) *led {
 	}
 }
 
-func fullKey(owner, key string) string {
-	return strings.Join([]string{owner, key}, "\x1F")
+func fullKey(owner, controller, key string) string {
+	return strings.Join([]string{owner, controller, key}, "\x1F")
 }

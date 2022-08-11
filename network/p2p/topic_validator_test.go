@@ -2,18 +2,21 @@ package p2p_test
 
 import (
 	"context"
+	"os"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
-	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
@@ -22,27 +25,31 @@ import (
 
 // TestTopicValidator_Unstaked tests that the libP2P node topic validator rejects unauthenticated messages on non-public channels (unstaked)
 func TestTopicValidator_Unstaked(t *testing.T) {
-	// create a hooked logger
-	var hook unittest.LoggerHook
-	logger, hook := unittest.HookedLogger()
+	// setup hooked logger
+	var hookCalls uint64
+	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
+		if level == zerolog.WarnLevel {
+			atomic.AddUint64(&hookCalls, 1)
+		}
+	})
+	logger := zerolog.New(os.Stdout).Level(zerolog.WarnLevel).Hook(hook)
 
 	sporkId := unittest.IdentifierFixture()
+	identity1, privateKey1 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
+	sn1 := createNode(t, identity1.NodeID, privateKey1, sporkId, logger)
 
-	nodeFixtureCtx, nodeFixtureCtxCancel := context.WithCancel(context.Background())
-	defer nodeFixtureCtxCancel()
+	identity2, privateKey2 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
+	sn2 := createNode(t, identity2.NodeID, privateKey2, sporkId, zerolog.Nop())
 
-	sn1, identity1 := nodeFixture(t, nodeFixtureCtx, sporkId, "TestAuthorizedSenderValidator_Unauthorized", withRole(flow.RoleConsensus), withLogger(logger))
-	sn2, _ := nodeFixture(t, nodeFixtureCtx, sporkId, "TestAuthorizedSenderValidator_Unauthorized", withRole(flow.RoleConsensus), withLogger(logger))
-
-	channel := channels.ConsensusCommittee
-	topic := channels.TopicFromChannel(channel, sporkId)
+	channel := network.ConsensusCommittee
+	topic := network.TopicFromChannel(channel, sporkId)
 
 	//NOTE: identity2 is not in the ids list simulating an un-staked node
-	ids := flow.IdentityList{&identity1}
+	ids := flow.IdentityList{identity1}
 	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
-	// peer filter used by the topic validator to check if node is staked
+	// callback used by the topic validator to check if node is staked
 	isStaked := func(pid peer.ID) bool {
 		fid, err := translator.GetFlowID(pid)
 		if err != nil {
@@ -74,7 +81,7 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 	defer cancel5s()
 	// create a dummy block proposal to publish from our SN node
 	header := unittest.BlockHeaderFixture()
-	data1 := getMsgFixtureBz(t, &messages.BlockProposal{Header: header})
+	data1 := getMsgFixtureBz(t, &messages.BlockProposal{Header: &header})
 
 	err = sn2.Publish(timedCtx, topic, data1)
 	require.NoError(t, err)
@@ -88,24 +95,31 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "could not receive message on time")
 
-	// ensure the correct error is contained in the logged error
-	require.Contains(t, hook.Logs(), "filtering message from un-allowed peer")
+	// expecting 1 warn calls for each rejected message from unauthenticated node
+	require.Equalf(t, uint64(1), hookCalls, "expected 1 warning to be logged")
 }
 
 // TestTopicValidator_PublicChannel tests that the libP2P node topic validator does not reject unauthenticated messages on public channels
 func TestTopicValidator_PublicChannel(t *testing.T) {
+	// setup hooked logger
+	var hookCalls uint64
+	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
+		if level == zerolog.WarnLevel {
+			atomic.AddUint64(&hookCalls, 1)
+		}
+	})
+	logger := zerolog.New(os.Stdout).Level(zerolog.WarnLevel).Hook(hook)
+
 	sporkId := unittest.IdentifierFixture()
-	logger := unittest.Logger()
+	identity1, privateKey1 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
+	sn1 := createNode(t, identity1.NodeID, privateKey1, sporkId, logger)
 
-	nodeFixtureCtx, nodeFixtureCtxCancel := context.WithCancel(context.Background())
-	defer nodeFixtureCtxCancel()
-
-	sn1, _ := nodeFixture(t, nodeFixtureCtx, sporkId, "TestTopicValidator_PublicChannel", withRole(flow.RoleConsensus), withLogger(logger))
-	sn2, _ := nodeFixture(t, nodeFixtureCtx, sporkId, "TestTopicValidator_PublicChannel", withRole(flow.RoleConsensus), withLogger(logger))
+	identity2, privateKey2 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
+	sn2 := createNode(t, identity2.NodeID, privateKey2, sporkId, zerolog.Nop())
 
 	// unauthenticated messages should not be dropped on public channels
-	channel := channels.PublicSyncCommittee
-	topic := channels.TopicFromChannel(channel, sporkId)
+	channel := network.PublicSyncCommittee
+	topic := network.TopicFromChannel(channel, sporkId)
 
 	// node1 is connected to node2
 	// sn1 <-> sn2
@@ -144,32 +158,40 @@ func TestTopicValidator_PublicChannel(t *testing.T) {
 	checkReceive(timedCtx, t, data1, sub2, nil, true)
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "could not receive message on time")
+
+	// expecting no warn calls for rejected messages
+	require.Equalf(t, uint64(0), hookCalls, "expected 0 warning to be logged")
 }
 
 // TestAuthorizedSenderValidator_Unauthorized tests that the authorized sender validator rejects messages from nodes that are not authorized to send the message
 func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
-	// create a hooked logger
-	var hook unittest.LoggerHook
-	logger, hook := unittest.HookedLogger()
-
 	sporkId := unittest.IdentifierFixture()
+	identity1, privateKey1 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
+	sn1 := createNode(t, identity1.NodeID, privateKey1, sporkId, zerolog.Nop())
 
-	nodeFixtureCtx, nodeFixtureCtxCancel := context.WithCancel(context.Background())
-	defer nodeFixtureCtxCancel()
+	identity2, privateKey2 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
+	sn2 := createNode(t, identity2.NodeID, privateKey2, sporkId, zerolog.Nop())
 
-	sn1, identity1 := nodeFixture(t, nodeFixtureCtx, sporkId, "TestAuthorizedSenderValidator_InvalidMsg", withRole(flow.RoleConsensus))
-	sn2, identity2 := nodeFixture(t, nodeFixtureCtx, sporkId, "TestAuthorizedSenderValidator_InvalidMsg", withRole(flow.RoleConsensus))
-	an1, identity3 := nodeFixture(t, nodeFixtureCtx, sporkId, "TestAuthorizedSenderValidator_InvalidMsg", withRole(flow.RoleAccess))
+	identity3, privateKey3 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleAccess))
+	an1 := createNode(t, identity3.NodeID, privateKey3, sporkId, zerolog.Nop())
 
-	channel := channels.ConsensusCommittee
-	topic := channels.TopicFromChannel(channel, sporkId)
+	channel := network.ConsensusCommittee
+	topic := network.TopicFromChannel(channel, sporkId)
 
-	ids := flow.IdentityList{&identity1, &identity2, &identity3}
-
+	ids := flow.IdentityList{identity1, identity2, identity3}
 	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
-	authorizedSenderValidator := validator.AuthorizedSenderMessageValidator(logger, channel, func(pid peer.ID) (*flow.Identity, bool) {
+	// setup hooked logger
+	var hookCalls uint64
+	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
+		if level == zerolog.WarnLevel {
+			atomic.AddUint64(&hookCalls, 1)
+		}
+	})
+	logger := zerolog.New(os.Stdout).Level(zerolog.WarnLevel).Hook(hook)
+
+	authorizedSenderValidator := validator.AuthorizedSenderValidator(logger, channel, func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translator.GetFlowID(pid)
 		if err != nil {
 			return &flow.Identity{}, false
@@ -198,11 +220,11 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 			len(an1.ListPeers(topic.String())) > 0
 	}, 3*time.Second, 100*time.Millisecond)
 
-	timedCtx, cancel5s := context.WithTimeout(context.Background(), 60*time.Second)
+	timedCtx, cancel5s := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel5s()
 	// create a dummy block proposal to publish from our SN node
 	header := unittest.BlockHeaderFixture()
-	data1 := getMsgFixtureBz(t, &messages.BlockProposal{Header: header})
+	data1 := getMsgFixtureBz(t, &messages.BlockProposal{Header: &header})
 
 	// sn2 publishes the block proposal, sn1 and an1 should receive the message because
 	// SN nodes are authorized to send block proposals
@@ -221,7 +243,7 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	timedCtx, cancel2s := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel2s()
 	header = unittest.BlockHeaderFixture()
-	data2 := getMsgFixtureBz(t, &messages.BlockProposal{Header: header})
+	data2 := getMsgFixtureBz(t, &messages.BlockProposal{Header: &header})
 
 	// the access node now publishes the block proposal message, AN are not authorized to publish block proposals
 	// the message should be rejected by the topic validator on sn1
@@ -245,33 +267,37 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "could not receive message on time")
 
-	// ensure the correct error is contained in the logged error
-	require.Contains(t, hook.Logs(), message.ErrUnauthorizedRole.Error())
+	// expecting 1 warn calls for each rejected message from unauthorized node
+	require.Equalf(t, uint64(1), hookCalls, "expected 1 warning to be logged")
 }
 
 // TestAuthorizedSenderValidator_Authorized tests that the authorized sender validator rejects messages being sent on the wrong channel
 func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
-	// create a hooked logger
-	var hook unittest.LoggerHook
-	logger, hook := unittest.HookedLogger()
-
 	sporkId := unittest.IdentifierFixture()
+	identity1, privateKey1 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
+	sn1 := createNode(t, identity1.NodeID, privateKey1, sporkId, zerolog.Nop())
 
-	nodeFixtureCtx, nodeFixtureCtxCancel := context.WithCancel(context.Background())
-	defer nodeFixtureCtxCancel()
-
-	sn1, identity1 := nodeFixture(t, nodeFixtureCtx, sporkId, "consensus_1", withRole(flow.RoleConsensus))
-	sn2, identity2 := nodeFixture(t, nodeFixtureCtx, sporkId, "consensus_2", withRole(flow.RoleConsensus))
+	identity2, privateKey2 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
+	sn2 := createNode(t, identity2.NodeID, privateKey2, sporkId, zerolog.Nop())
 
 	// try to publish BlockProposal on invalid SyncCommittee channel
-	channel := channels.SyncCommittee
-	topic := channels.TopicFromChannel(channel, sporkId)
+	channel := network.SyncCommittee
+	topic := network.TopicFromChannel(channel, sporkId)
 
-	ids := flow.IdentityList{&identity1, &identity2}
+	ids := flow.IdentityList{identity1, identity2}
 	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
-	authorizedSenderValidator := validator.AuthorizedSenderMessageValidator(logger, channel, func(pid peer.ID) (*flow.Identity, bool) {
+	// setup hooked logger
+	var hookCalls uint64
+	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
+		if level == zerolog.WarnLevel {
+			atomic.AddUint64(&hookCalls, 1)
+		}
+	})
+	logger := zerolog.New(os.Stdout).Level(zerolog.WarnLevel).Hook(hook)
+
+	authorizedSenderValidator := validator.AuthorizedSenderValidator(logger, channel, func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translator.GetFlowID(pid)
 		if err != nil {
 			return &flow.Identity{}, false
@@ -299,7 +325,7 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	defer cancel5s()
 	// create a dummy block proposal to publish from our SN node
 	header := unittest.BlockHeaderFixture()
-	data1 := getMsgFixtureBz(t, &messages.BlockProposal{Header: header})
+	data1 := getMsgFixtureBz(t, &messages.BlockProposal{Header: &header})
 
 	// sn2 publishes the block proposal on the sync committee channel
 	err = sn2.Publish(timedCtx, topic, data1)
@@ -314,33 +340,39 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "could not receive message on time")
 
-	// ensure the correct error is contained in the logged error
-	require.Contains(t, hook.Logs(), message.ErrUnauthorizedMessageOnChannel.Error())
+	// expecting 1 warn calls for each rejected message from ejected node
+	require.Equalf(t, uint64(1), hookCalls, "expected 1 warning to be logged")
 }
 
 // TestAuthorizedSenderValidator_Ejected tests that the authorized sender validator rejects messages from nodes that are ejected
 func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
-	// create a hooked logger
-	var hook unittest.LoggerHook
-	logger, hook := unittest.HookedLogger()
-
 	sporkId := unittest.IdentifierFixture()
+	identity1, privateKey1 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
+	sn1 := createNode(t, identity1.NodeID, privateKey1, sporkId, zerolog.Nop())
 
-	nodeFixtureCtx, nodeFixtureCtxCancel := context.WithCancel(context.Background())
-	defer nodeFixtureCtxCancel()
+	identity2, privateKey2 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
+	sn2 := createNode(t, identity2.NodeID, privateKey2, sporkId, zerolog.Nop())
 
-	sn1, identity1 := nodeFixture(t, nodeFixtureCtx, sporkId, "consensus_1", withRole(flow.RoleConsensus))
-	sn2, identity2 := nodeFixture(t, nodeFixtureCtx, sporkId, "consensus_2", withRole(flow.RoleConsensus))
-	an1, identity3 := nodeFixture(t, nodeFixtureCtx, sporkId, "access_1", withRole(flow.RoleAccess))
+	identity3, privateKey3 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleAccess))
+	an1 := createNode(t, identity3.NodeID, privateKey3, sporkId, zerolog.Nop())
 
-	channel := channels.ConsensusCommittee
-	topic := channels.TopicFromChannel(channel, sporkId)
+	channel := network.ConsensusCommittee
+	topic := network.TopicFromChannel(channel, sporkId)
 
-	ids := flow.IdentityList{&identity1, &identity2, &identity3}
+	ids := flow.IdentityList{identity1, identity2, identity3}
 	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
-	authorizedSenderValidator := validator.AuthorizedSenderMessageValidator(logger, channel, func(pid peer.ID) (*flow.Identity, bool) {
+	// setup hooked logger
+	var hookCalls uint64
+	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
+		if level == zerolog.WarnLevel {
+			atomic.AddUint64(&hookCalls, 1)
+		}
+	})
+	logger := zerolog.New(os.Stdout).Level(zerolog.WarnLevel).Hook(hook)
+
+	authorizedSenderValidator := validator.AuthorizedSenderValidator(logger, channel, func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translator.GetFlowID(pid)
 		if err != nil {
 			return &flow.Identity{}, false
@@ -372,7 +404,7 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	defer cancel5s()
 	// create a dummy block proposal to publish from our SN node
 	header := unittest.BlockHeaderFixture()
-	data1 := getMsgFixtureBz(t, &messages.BlockProposal{Header: header})
+	data1 := getMsgFixtureBz(t, &messages.BlockProposal{Header: &header})
 
 	// sn2 publishes the block proposal, sn1 and an1 should receive the message because
 	// SN nodes are authorized to send block proposals
@@ -392,7 +424,7 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	// "eject" sn2 to ensure messages published by ejected nodes get rejected
 	identity2.Ejected = true
 	header = unittest.BlockHeaderFixture()
-	data3 := getMsgFixtureBz(t, &messages.BlockProposal{Header: header})
+	data3 := getMsgFixtureBz(t, &messages.BlockProposal{Header: &header})
 	timedCtx, cancel2s := context.WithTimeout(context.Background(), time.Second)
 	defer cancel2s()
 	err = sn2.Publish(timedCtx, topic, data3)
@@ -405,29 +437,30 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "could not receive message on time")
 
-	// ensure the correct error is contained in the logged error
-	require.Contains(t, hook.Logs(), validator.ErrSenderEjected.Error())
+	// expecting 1 warn calls for each rejected message from ejected node
+	require.Equalf(t, uint64(1), hookCalls, "expected 1 warning to be logged")
 }
 
 // TestAuthorizedSenderValidator_ClusterChannel tests that the authorized sender validator correctly validates messages sent on cluster channels
 func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
+	identity1, privateKey1 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleCollection))
+	ln1 := createNode(t, identity1.NodeID, privateKey1, sporkId, zerolog.Nop())
 
-	nodeFixtureCtx, nodeFixtureCtxCancel := context.WithCancel(context.Background())
-	defer nodeFixtureCtxCancel()
+	identity2, privateKey2 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleCollection))
+	ln2 := createNode(t, identity2.NodeID, privateKey2, sporkId, zerolog.Nop())
 
-	ln1, identity1 := nodeFixture(t, nodeFixtureCtx, sporkId, "collection_1", withRole(flow.RoleCollection))
-	ln2, identity2 := nodeFixture(t, nodeFixtureCtx, sporkId, "collection_2", withRole(flow.RoleCollection))
-	ln3, identity3 := nodeFixture(t, nodeFixtureCtx, sporkId, "collection_3", withRole(flow.RoleCollection))
+	identity3, privateKey3 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleCollection))
+	ln3 := createNode(t, identity3.NodeID, privateKey3, sporkId, zerolog.Nop())
 
-	channel := channels.SyncCluster(flow.Testnet)
-	topic := channels.TopicFromChannel(channel, sporkId)
+	channel := network.ChannelSyncCluster(flow.Testnet)
+	topic := network.TopicFromChannel(channel, sporkId)
 
-	ids := flow.IdentityList{&identity1, &identity2, &identity3}
+	ids := flow.IdentityList{identity1, identity2}
 	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
-	authorizedSenderValidator := validator.AuthorizedSenderMessageValidator(unittest.Logger(), channel, func(pid peer.ID) (*flow.Identity, bool) {
+	authorizedSenderValidator := validator.AuthorizedSenderValidator(zerolog.Nop(), channel, func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translator.GetFlowID(pid)
 		if err != nil {
 			return &flow.Identity{}, false

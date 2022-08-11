@@ -2,7 +2,7 @@ package insecure
 
 import (
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network"
 )
 
 const (
@@ -18,10 +18,10 @@ const (
 // The attacker decodes the message into an event and relays it to the orchestrator.
 // Each corrupted conduit is uniquely identified by 1) corrupted node ID and 2) channel
 type Event struct {
-	CorruptedNodeId flow.Identifier  // identifier of corrupted flow node that this corruptible conduit belongs to
-	Channel         channels.Channel // channel of the event on the corrupted conduit
-	Protocol        Protocol         // networking-layer protocol that this event was meant to send on.
-	TargetNum       uint32           // number of randomly chosen targets (used in multicast protocol).
+	CorruptedNodeId flow.Identifier // identifier of corrupted flow node that this corruptible conduit belongs to
+	Channel         network.Channel // channel of the event on the corrupted conduit
+	Protocol        Protocol        // networking-layer protocol that this event was meant to send on.
+	TargetNum       uint32          // number of randomly chosen targets (used in multicast protocol).
 
 	// set of target identifiers (can be any subset of nodes, either honest or corrupted).
 	TargetIds flow.IdentifierList

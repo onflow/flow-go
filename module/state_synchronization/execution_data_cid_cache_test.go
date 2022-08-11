@@ -17,7 +17,7 @@ func TestCacheHit(t *testing.T) {
 	header := unittest.BlockHeaderFixture()
 	var blobTree state_synchronization.BlobTree
 	blobTree = append(blobTree, []cid.Cid{unittest.CidFixture(), unittest.CidFixture()}, []cid.Cid{unittest.CidFixture()})
-	cache.Insert(header, blobTree)
+	cache.Insert(&header, blobTree)
 
 	for height, cids := range blobTree {
 		for index, cid := range cids {
@@ -47,10 +47,10 @@ func TestCacheEviction(t *testing.T) {
 
 	for i := uint(0); i < 2*size; i++ {
 		header := unittest.BlockHeaderFixture()
-		headers = append(headers, header)
+		headers = append(headers, &header)
 		root := unittest.CidFixture()
 		cids = append(cids, root)
-		cache.Insert(header, [][]cid.Cid{{root}})
+		cache.Insert(&header, [][]cid.Cid{{root}})
 
 		expectedSize := i + 1
 		if expectedSize > size {
@@ -86,8 +86,8 @@ func TestDuplicateCID(t *testing.T) {
 	header1 := unittest.BlockHeaderFixture()
 	header2 := unittest.BlockHeaderFixture()
 
-	cache.Insert(header1, [][]cid.Cid{{c}})
-	cache.Insert(header2, [][]cid.Cid{{c}})
+	cache.Insert(&header1, [][]cid.Cid{{c}})
+	cache.Insert(&header2, [][]cid.Cid{{c}})
 
 	assert.Equal(t, cache.BlobRecords(), uint(1))
 	assert.Equal(t, cache.BlobTreeRecords(), uint(2))
@@ -117,9 +117,9 @@ func TestCacheEvictionWithDuplicateCID(t *testing.T) {
 	var blobTree3 state_synchronization.BlobTree
 	blobTree3 = append(blobTree3, []cid.Cid{unittest.CidFixture()})
 
-	cache.Insert(header1, blobTree1)
-	cache.Insert(header2, blobTree2)
-	cache.Insert(header3, blobTree3)
+	cache.Insert(&header1, blobTree1)
+	cache.Insert(&header2, blobTree2)
+	cache.Insert(&header3, blobTree3)
 
 	assert.Equal(t, cache.BlobRecords(), uint(2))
 	assert.Equal(t, cache.BlobTreeRecords(), uint(2))

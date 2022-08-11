@@ -1,4 +1,4 @@
-package channels
+package network
 
 import (
 	"sort"
@@ -8,7 +8,7 @@ import (
 
 // Channel specifies a virtual and isolated communication medium.
 // Nodes subscribed to the same channel can disseminate epidemic messages among
-// each other, i.e: multicast and publish.
+// each other, i.e.. multicast and publish.
 type Channel string
 type ChannelList []Channel
 

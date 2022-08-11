@@ -439,7 +439,7 @@ func ExecutionReceiptsFromParentBlockFixture(t *testing.T, parent *flow.Header, 
 func ExecutionResultFromParentBlockFixture(t *testing.T, parent *flow.Header, builder *CompleteExecutionReceiptBuilder) (*flow.ExecutionResult,
 	*ExecutionReceiptData) {
 	refBlkHeader := unittest.BlockHeaderWithParentFixture(parent)
-	return ExecutionResultFixture(t, builder.chunksCount, builder.chain, refBlkHeader, builder.clusterCommittee)
+	return ExecutionResultFixture(t, builder.chunksCount, builder.chain, &refBlkHeader, builder.clusterCommittee)
 }
 
 // ContainerBlockFixture builds and returns a block that contains input execution receipts.

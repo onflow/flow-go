@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/channels"
 )
 
 // Engine is the splitter engine, which maintains a list of registered engines
@@ -20,13 +19,13 @@ type Engine struct {
 	unit      *engine.Unit                          // used to manage concurrency & shutdown
 	log       zerolog.Logger                        // used to log relevant actions with context
 	engines   map[network.MessageProcessor]struct{} // stores registered engines
-	channel   channels.Channel                      // the channel that this splitter listens on
+	channel   network.Channel                       // the channel that this splitter listens on
 }
 
 // New creates a new splitter engine.
 func New(
 	log zerolog.Logger,
-	channel channels.Channel,
+	channel network.Channel,
 ) *Engine {
 	return &Engine{
 		unit:    engine.NewUnit(),
@@ -71,7 +70,7 @@ func (e *Engine) Done() <-chan struct{} {
 // Process processes the given event from the node with the given origin ID
 // in a blocking manner. It returns the potential processing error when
 // done.
-func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		if channel != e.channel {
 			return fmt.Errorf("received event on unknown channel %s", channel)

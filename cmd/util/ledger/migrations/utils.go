@@ -12,15 +12,17 @@ import (
 )
 
 func KeyToRegisterID(key ledger.Key) (flow.RegisterID, error) {
-	if len(key.KeyParts) != 2 ||
+	if len(key.KeyParts) != 3 ||
 		key.KeyParts[0].Type != state.KeyPartOwner ||
-		key.KeyParts[1].Type != state.KeyPartKey {
+		key.KeyParts[1].Type != state.KeyPartController ||
+		key.KeyParts[2].Type != state.KeyPartKey {
 		return flow.RegisterID{}, fmt.Errorf("key not in expected format %s", key.String())
 	}
 
 	return flow.NewRegisterID(
 		string(key.KeyParts[0].Value),
 		string(key.KeyParts[1].Value),
+		string(key.KeyParts[2].Value),
 	), nil
 }
 
@@ -30,6 +32,10 @@ func registerIDToKey(registerID flow.RegisterID) ledger.Key {
 		{
 			Type:  state.KeyPartOwner,
 			Value: []byte(registerID.Owner),
+		},
+		{
+			Type:  state.KeyPartController,
+			Value: []byte(registerID.Controller),
 		},
 		{
 			Type:  state.KeyPartKey,

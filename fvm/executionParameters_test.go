@@ -340,7 +340,3 @@ func (t *TestReadStoredRuntime) ReadStored(address common.Address, path cadence.
 func (t *TestReadStoredRuntime) ReadLinked(common.Address, cadence.Path, runtime.Context) (cadence.Value, error) {
 	panic("not implemented")
 }
-
-func (*TestReadStoredRuntime) Storage(runtime.Context) (*runtime.Storage, *interpreter.Interpreter, error) {
-	panic("not implemented")
-}

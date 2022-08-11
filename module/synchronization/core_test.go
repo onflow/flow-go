@@ -153,29 +153,29 @@ func (ss *SyncSuite) TestHandleBlock() {
 	requestedByID := unittest.BlockHeaderFixture()
 	ss.core.blockIDs[requestedByID.ID()] = ss.RequestedStatus()
 	received := unittest.BlockHeaderFixture()
-	ss.core.heights[received.Height] = ss.ReceivedStatus(received)
-	ss.core.blockIDs[received.ID()] = ss.ReceivedStatus(received)
+	ss.core.heights[received.Height] = ss.ReceivedStatus(&received)
+	ss.core.blockIDs[received.ID()] = ss.ReceivedStatus(&received)
 
 	// should ignore un-requested blocks
-	shouldProcess := ss.core.HandleBlock(unrequested)
+	shouldProcess := ss.core.HandleBlock(&unrequested)
 	ss.Assert().False(shouldProcess, "should not process un-requested block")
 	ss.Assert().NotContains(ss.core.heights, unrequested.Height)
 	ss.Assert().NotContains(ss.core.blockIDs, unrequested.ID())
 
 	// should mark queued blocks as received, and process them
-	shouldProcess = ss.core.HandleBlock(queuedByHeight)
+	shouldProcess = ss.core.HandleBlock(&queuedByHeight)
 	ss.Assert().True(shouldProcess, "should process queued block")
 	ss.Assert().True(ss.core.blockIDs[queuedByHeight.ID()].WasReceived(), "status should be reflected in block ID map")
 	ss.Assert().True(ss.core.heights[queuedByHeight.Height].WasReceived(), "status should be reflected in height map")
 
 	// should mark requested block as received, and process them
-	shouldProcess = ss.core.HandleBlock(requestedByID)
+	shouldProcess = ss.core.HandleBlock(&requestedByID)
 	ss.Assert().True(shouldProcess, "should process requested block")
 	ss.Assert().True(ss.core.blockIDs[requestedByID.ID()].WasReceived(), "status should be reflected in block ID map")
 	ss.Assert().True(ss.core.heights[requestedByID.Height].WasReceived(), "status should be reflected in height map")
 
 	// should leave received blocks, and not process them
-	shouldProcess = ss.core.HandleBlock(received)
+	shouldProcess = ss.core.HandleBlock(&received)
 	ss.Assert().False(shouldProcess, "should not process already received block")
 	ss.Assert().True(ss.core.blockIDs[received.ID()].WasReceived(), "status should remain reflected in block ID map")
 	ss.Assert().True(ss.core.heights[received.Height].WasReceived(), "status should remain reflected in height map")
@@ -189,15 +189,15 @@ func (ss *SyncSuite) TestHandleHeight() {
 	aboveOutsideTolerance := final.Height + uint64(ss.core.Config.Tolerance+1)
 
 	// a height lower than finalized should be a no-op
-	ss.core.HandleHeight(final, lower)
+	ss.core.HandleHeight(&final, lower)
 	ss.Assert().Len(ss.core.heights, 0)
 
 	// a height higher than finalized, but within tolerance, should be a no-op
-	ss.core.HandleHeight(final, aboveWithinTolerance)
+	ss.core.HandleHeight(&final, aboveWithinTolerance)
 	ss.Assert().Len(ss.core.heights, 0)
 
 	// a height higher than finalized and outside tolerance should queue missing heights
-	ss.core.HandleHeight(final, aboveOutsideTolerance)
+	ss.core.HandleHeight(&final, aboveOutsideTolerance)
 	ss.Assert().Len(ss.core.heights, int(aboveOutsideTolerance-final.Height))
 	for height := final.Height + 1; height <= aboveOutsideTolerance; height++ {
 		ss.Assert().Contains(ss.core.heights, height)
@@ -433,7 +433,7 @@ func (ss *SyncSuite) TestPrune() {
 	blockIDsBefore := len(ss.core.blockIDs)
 
 	// prune the pending requests
-	ss.core.prune(final)
+	ss.core.prune(&final)
 
 	assert.Equal(ss.T(), heightsBefore-len(prunableHeights), len(ss.core.heights))
 	assert.Equal(ss.T(), blockIDsBefore-len(prunableBlockIDs), len(ss.core.blockIDs))

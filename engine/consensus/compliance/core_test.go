@@ -22,7 +22,6 @@ import (
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
 	netint "github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protint "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -186,7 +185,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	// set up network module mock
 	cs.net = &mocknetwork.Network{}
 	cs.net.On("Register", mock.Anything, mock.Anything).Return(
-		func(channel channels.Channel, engine netint.MessageProcessor) netint.Conduit {
+		func(channel netint.Channel, engine netint.MessageProcessor) netint.Conduit {
 			return cs.con
 		},
 		nil,

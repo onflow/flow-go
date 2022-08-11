@@ -118,36 +118,31 @@ func (e FrozenAccountError) Code() ErrorCode {
 	return ErrCodeFrozenAccountError
 }
 
-// AccountPublicKeyLimitError is returned when an account tries to add public keys over the limit
-type AccountPublicKeyLimitError struct {
-	address flow.Address
-	counts  uint64
-	limit   uint64
+// StorageNotInitialized captures a fatal error when trying to update storage used on a non-initialized account
+type StorageNotInitialized struct {
+	Address string
 }
 
-// NewAccountPublicKeyLimitError constructs a new AccountPublicKeyLimitError
-func NewAccountPublicKeyLimitError(address flow.Address, counts, limit uint64) error {
-	return &AccountPublicKeyLimitError{
-		address: address,
-		counts:  counts,
-		limit:   limit,
+// NewStorageNotInitialized formats and returns a new StorageNotInitialized
+func NewStorageNotInitialized(address string) *StorageNotInitialized {
+	return &StorageNotInitialized{
+		Address: address,
 	}
 }
 
-// Address returns the address of frozen account
-func (e AccountPublicKeyLimitError) Address() flow.Address {
-	return e.address
-}
-
-func (e AccountPublicKeyLimitError) Error() string {
-	return fmt.Sprintf("%s account's (%s) public key count (%d) exceeded the limit (%d)",
+func (e *StorageNotInitialized) Error() string {
+	return fmt.Sprintf("%s account %s storage used is not initialized or not initialized correctly",
 		e.Code().String(),
-		e.address,
-		e.counts,
-		e.limit)
+		e.Address)
 }
 
-// Code returns the error code for this error type
-func (e AccountPublicKeyLimitError) Code() ErrorCode {
-	return ErrCodeAccountPublicKeyLimitError
+// Code returns the failure code
+func (e *StorageNotInitialized) Code() ErrorCode {
+	return ErrCodeAccountStorageNotInitializedError
+}
+
+// IsStorageNotInitializedFailure  checks if the error is a StorageNotInitializedFailure
+func IsStorageNotInitializedFailure(err error) bool {
+	var t *StorageNotInitialized
+	return errors.As(err, &t)
 }

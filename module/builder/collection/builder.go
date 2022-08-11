@@ -298,7 +298,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// build the payload from the transactions
 	payload := cluster.PayloadFromTransactions(minRefID, transactions...)
 
-	header := &flow.Header{
+	header := flow.Header{
 		ChainID:     parent.ChainID,
 		ParentID:    parentID,
 		Height:      parent.Height + 1,
@@ -310,13 +310,13 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	}
 
 	// set fields specific to the consensus algorithm
-	err = setter(header)
+	err = setter(&header)
 	if err != nil {
 		return nil, fmt.Errorf("could not set fields to header: %w", err)
 	}
 
 	proposal = cluster.Block{
-		Header:  header,
+		Header:  &header,
 		Payload: &payload,
 	}
 

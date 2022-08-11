@@ -54,10 +54,10 @@ require (
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/multiformats/go-multihash v0.1.0
 	github.com/onflow/atree v0.4.0
-	github.com/onflow/cadence v0.24.2-0.20220719165617-0b2f52970906
-	github.com/onflow/flow v0.3.2
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220719141424-653be1a34ee3
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220719141424-653be1a34ee3
+	github.com/onflow/cadence v0.24.2-0.20220627202951-5a06fec82b4a
+	github.com/onflow/flow v0.3.1
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220628221832-3d206c1d4790
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220628221832-3d206c1d4790
 	github.com/onflow/flow-go-sdk v0.26.5-0.20220629191626-900f9f91bffc
 	github.com/onflow/flow-go/crypto v0.24.4
 	github.com/onflow/flow/protobuf/go/flow v0.3.1
@@ -280,11 +280,11 @@ require (
 	go.opencensus.io v0.23.0 // indirect
 	go.uber.org/zap v1.21.0 // indirect
 	golang.org/x/image v0.0.0-20190802002840-cff245a6509b // indirect
-	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
+	golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3 // indirect
 	golang.org/x/net v0.0.0-20220418201149-a630d4f3e7a2 // indirect
 	golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b // indirect
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
-	golang.org/x/tools v0.1.11 // indirect
+	golang.org/x/tools v0.1.10 // indirect
 	golang.org/x/xerrors v0.0.0-20220411194840-2f41105eb62f // indirect
 	gonum.org/v1/gonum v0.8.2 // indirect
 	gonum.org/v1/plot v0.0.0-20190515093506-e2840ee46a6b // indirect

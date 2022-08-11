@@ -16,7 +16,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/network/channels"
+	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -55,7 +55,7 @@ func TestCorruptibleConduitFrameworkHappyPath(t *testing.T) {
 
 				hub := stub.NewNetworkHub()
 				originalEvent := &message.TestMessage{Text: "this is a test message"}
-				testChannel := channels.Channel("test-channel")
+				testChannel := flownet.Channel("test-channel")
 
 				// corrupted node network
 				corruptedEngine := &network.Engine{}
@@ -74,7 +74,7 @@ func TestCorruptibleConduitFrameworkHappyPath(t *testing.T) {
 
 				wg := &sync.WaitGroup{}
 				wg.Add(1)
-				honestEngine.OnProcess(func(channel channels.Channel, originId flow.Identifier, event interface{}) error {
+				honestEngine.OnProcess(func(channel flownet.Channel, originId flow.Identifier, event interface{}) error {
 					// implementing the process logic of the honest engine on reception of message from underlying network.
 					require.Equal(t, testChannel, channel)               // event must arrive at the channel set by orchestrator.
 					require.Equal(t, corruptedIdentity.NodeID, originId) // origin id of the message must be the corrupted node.

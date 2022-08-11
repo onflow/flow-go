@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/channels"
 )
 
 // Network is the splitter network. It is a wrapper around the default network implementation
@@ -27,8 +26,8 @@ type Network struct {
 	net       network.Network
 	mu        sync.RWMutex
 	log       zerolog.Logger
-	splitters map[channels.Channel]*splitterEngine.Engine // stores splitters for each channel
-	conduits  map[channels.Channel]network.Conduit        // stores conduits for all registered channels
+	splitters map[network.Channel]*splitterEngine.Engine // stores splitters for each channel
+	conduits  map[network.Channel]network.Conduit        // stores conduits for all registered channels
 	*component.ComponentManager
 }
 
@@ -41,8 +40,8 @@ func NewNetwork(
 ) *Network {
 	n := &Network{
 		net:       net,
-		splitters: make(map[channels.Channel]*splitterEngine.Engine),
-		conduits:  make(map[channels.Channel]network.Conduit),
+		splitters: make(map[network.Channel]*splitterEngine.Engine),
+		conduits:  make(map[network.Channel]network.Conduit),
 		log:       log,
 	}
 
@@ -62,7 +61,7 @@ func NewNetwork(
 	return n
 }
 
-func (n *Network) RegisterBlobService(channel channels.Channel, store datastore.Batching, opts ...network.BlobServiceOption) (network.BlobService, error) {
+func (n *Network) RegisterBlobService(channel network.Channel, store datastore.Batching, opts ...network.BlobServiceOption) (network.BlobService, error) {
 	return n.net.RegisterBlobService(channel, store, opts...)
 }
 
@@ -73,7 +72,7 @@ func (n *Network) RegisterPingService(pid protocol.ID, provider network.PingInfo
 // Register will subscribe the given engine with the spitter on the given channel, and all registered
 // engines will be notified with incoming messages on the channel.
 // The returned Conduit can be used to send messages to engines on other nodes subscribed to the same channel
-func (n *Network) Register(channel channels.Channel, engine network.MessageProcessor) (network.Conduit, error) {
+func (n *Network) Register(channel network.Channel, engine network.MessageProcessor) (network.Conduit, error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 

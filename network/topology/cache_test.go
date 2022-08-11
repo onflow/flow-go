@@ -11,7 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -27,7 +27,7 @@ func TestCache_GenerateFanout_HappyPath(t *testing.T) {
 	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
 	ids := unittest.IdentityListFixture(100)
 	fanout := ids.Sample(10)
-	channels := channels.ChannelList{"Channel1", "Channel2", "Channel3"}
+	channels := network.ChannelList{"Channel1", "Channel2", "Channel3"}
 	top.On("GenerateFanout", ids, channels).Return(fanout, nil).Once()
 
 	cache := NewCache(log, top)
@@ -58,7 +58,7 @@ func TestCache_GenerateFanout_Error(t *testing.T) {
 
 	// returning error on fanout generation should invalidate cache
 	// same error should be returned.
-	fanout, err := cache.GenerateFanout(ids, channels.ChannelList{})
+	fanout, err := cache.GenerateFanout(ids, network.ChannelList{})
 	require.Error(t, err)
 	require.Nil(t, fanout)
 	require.Equal(t, cache.idsFP, flow.Identifier{})
@@ -76,7 +76,7 @@ func TestCache_InputChange_IDs(t *testing.T) {
 	top := &mocknetwork.Topology{}
 	ids := unittest.IdentityListFixture(100)
 	fanout := ids.Sample(10)
-	channels := channels.ChannelList{"channel1", "channel2"}
+	channels := network.ChannelList{"channel1", "channel2"}
 	top.On("GenerateFanout", mock.Anything, channels).Return(fanout, nil).Once()
 
 	// assumes cache holding some fanout for the same
@@ -109,7 +109,7 @@ func TestCache_InputChange_Channels(t *testing.T) {
 	top := &mocknetwork.Topology{}
 	ids := unittest.IdentityListFixture(100)
 	fanout := ids.Sample(10)
-	channels := channels.ChannelList{"channel1", "channel2"}
+	channels := network.ChannelList{"channel1", "channel2"}
 	top.On("GenerateFanout", ids, mock.Anything).Return(fanout, nil).Once()
 
 	// assumes cache holding some fanout for the same
@@ -188,7 +188,7 @@ func TestCache_TopicBased(t *testing.T) {
 
 // requireDeterministicBehavior evaluates that consecutive invocations of cache on fanout generation with the same input (i.e., ids and channels),
 // results in the same output fanout as the one passed to the method.
-func requireDeterministicBehavior(t *testing.T, cache *Cache, fanout flow.IdentityList, ids flow.IdentityList, channels channels.ChannelList) {
+func requireDeterministicBehavior(t *testing.T, cache *Cache, fanout flow.IdentityList, ids flow.IdentityList, channels network.ChannelList) {
 	// Testing deterministic
 	//
 	// Over consecutive invocations of cache with the same (new) input, the same

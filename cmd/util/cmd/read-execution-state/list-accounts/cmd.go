@@ -74,9 +74,9 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msgf("invalid chain name")
 	}
 
-	ldg := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
+	ldg := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
 
-		ledgerKey := executionState.RegisterIDToKey(flow.NewRegisterID(owner, key))
+		ledgerKey := executionState.RegisterIDToKey(flow.NewRegisterID(owner, controller, key))
 		path, err := pathfinder.KeyToPath(ledgerKey, complete.DefaultPathFinderVersion)
 		if err != nil {
 			log.Fatal().Err(err).Msgf("cannot convert key to path")
