@@ -31,12 +31,6 @@ import (
 // defaultBlockQueueCapacity maximum capacity of block proposals queue
 const defaultBlockQueueCapacity = 10000
 
-// defaultVoteQueueCapacity maximum capacity of block votes queue
-const defaultVoteQueueCapacity = 1000
-
-// defaultTimeoutObjectsQueueCapacity maximum capacity of timeout objects queue
-const defaultTimeoutObjectsQueueCapacity = 1000
-
 // Engine is a wrapper struct for `Core` which implements cluster consensus algorithm.
 // Engine is responsible for handling incoming messages, queueing for processing, broadcasting proposals.
 type Engine struct {
@@ -50,8 +44,6 @@ type Engine struct {
 	state                      protocol.State
 	core                       *Core
 	pendingBlocks              engine.MessageStore
-	pendingVotes               engine.MessageStore
-	pendingTimeouts            engine.MessageStore
 	messageHandler             *engine.MessageHandler
 	finalizedView              counters.StrictMonotonousCounter
 	finalizationEventsNotifier engine.Notifier
@@ -97,27 +89,6 @@ func NewEngine(
 		FifoQueue: blocksQueue,
 	}
 
-	// FIFO queue for block votes
-	votesQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultVoteQueueCapacity),
-		fifoqueue.WithLengthObserver(func(len int) { core.mempoolMetrics.MempoolEntries(metrics.ResourceClusterBlockVoteQueue, uint(len)) }),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create queue for inbound approvals: %w", err)
-	}
-	pendingVotes := &engine.FifoMessageStore{FifoQueue: votesQueue}
-
-	// FIFO queue for timeout objects
-	timeoutObjectsQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultTimeoutObjectsQueueCapacity),
-		fifoqueue.WithLengthObserver(func(len int) {
-			core.mempoolMetrics.MempoolEntries(metrics.ResourceClusterTimeoutObjectQueue, uint(len))
-		}))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create queue for inbound timeout objects: %w", err)
-	}
-	pendingTimeouts := &engine.FifoMessageStore{FifoQueue: timeoutObjectsQueue}
-
 	// define message queueing behaviour
 	handler := engine.NewMessageHandler(
 		engineLog,
@@ -155,23 +126,28 @@ func NewEngine(
 		},
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*messages.ClusterBlockVote)
+				vote, ok := msg.Payload.(*messages.ClusterBlockVote)
 				if ok {
 					core.metrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageClusterBlockVote)
+					core.OnBlockVote(msg.OriginID, vote)
+
 				}
-				return ok
+				// always filter out since it will be handled by another component
+				return false
 			},
-			Store: pendingVotes,
+			Store: nil,
 		},
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*messages.ClusterTimeoutObject)
+				timeout, ok := msg.Payload.(*messages.ClusterTimeoutObject)
 				if ok {
 					core.metrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageClusterTimeoutObject)
+					core.OnTimeoutObject(msg.OriginID, timeout)
 				}
-				return ok
+				// always filter out since it will be handled by another component
+				return false
 			},
-			Store: pendingTimeouts,
+			Store: nil,
 		},
 	)
 
@@ -186,8 +162,6 @@ func NewEngine(
 		state:                      state,
 		core:                       core,
 		pendingBlocks:              pendingBlocks,
-		pendingVotes:               pendingVotes,
-		pendingTimeouts:            pendingTimeouts,
 		messageHandler:             handler,
 		finalizationEventsNotifier: engine.NewNotifier(),
 		con:                        nil,
@@ -323,24 +297,6 @@ func (e *Engine) processAvailableMessages() error {
 			err := e.core.OnBlockProposal(msg.OriginID, msg.Payload.(*messages.ClusterBlockProposal))
 			if err != nil {
 				return fmt.Errorf("could not handle block proposal: %w", err)
-			}
-			continue
-		}
-
-		msg, ok = e.pendingVotes.Get()
-		if ok {
-			err := e.core.OnBlockVote(msg.OriginID, msg.Payload.(*messages.ClusterBlockVote))
-			if err != nil {
-				return fmt.Errorf("could not handle block vote: %w", err)
-			}
-			continue
-		}
-
-		msg, ok = e.pendingTimeouts.Get()
-		if ok {
-			err := e.core.OnTimeoutObject(msg.OriginID, msg.Payload.(*messages.ClusterTimeoutObject))
-			if err != nil {
-				return fmt.Errorf("could not handle timeout object: %w", err)
 			}
 			continue
 		}

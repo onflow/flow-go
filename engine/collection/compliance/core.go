@@ -311,7 +311,7 @@ func (c *Core) processBlockProposal(proposal *messages.ClusterBlockProposal) err
 
 // OnBlockVote handles votes for blocks by passing them to the core consensus
 // algorithm
-func (c *Core) OnBlockVote(originID flow.Identifier, vote *messages.ClusterBlockVote) error {
+func (c *Core) OnBlockVote(originID flow.Identifier, vote *messages.ClusterBlockVote) {
 
 	c.log.Debug().
 		Hex("origin_id", originID[:]).
@@ -325,10 +325,9 @@ func (c *Core) OnBlockVote(originID flow.Identifier, vote *messages.ClusterBlock
 		SignerID: originID,
 		SigData:  vote.SigData,
 	})
-	return nil
 }
 
-func (c *Core) OnTimeoutObject(originID flow.Identifier, timeout *messages.ClusterTimeoutObject) error {
+func (c *Core) OnTimeoutObject(originID flow.Identifier, timeout *messages.ClusterTimeoutObject) {
 	t := &model.TimeoutObject{
 		View:       timeout.View,
 		NewestQC:   timeout.NewestQC,
@@ -345,8 +344,6 @@ func (c *Core) OnTimeoutObject(originID flow.Identifier, timeout *messages.Clust
 
 	// forward the timeout to hotstuff for processing
 	c.timeoutAggregator.AddTimeout(t)
-
-	return nil
 }
 
 // ProcessFinalizedView performs pruning of stale data based on finalization event

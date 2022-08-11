@@ -352,7 +352,7 @@ func (c *Core) processBlockProposal(proposal *messages.BlockProposal) error {
 }
 
 // OnBlockVote handles incoming block votes.
-func (c *Core) OnBlockVote(originID flow.Identifier, vote *messages.BlockVote) error {
+func (c *Core) OnBlockVote(originID flow.Identifier, vote *messages.BlockVote) {
 
 	span, _, isSampled := c.tracer.StartBlockSpan(context.Background(), vote.BlockID, trace.CONCompOnBlockVote)
 	if isSampled {
@@ -376,11 +376,9 @@ func (c *Core) OnBlockVote(originID flow.Identifier, vote *messages.BlockVote) e
 
 	// forward the vote to hotstuff for processing
 	c.voteAggregator.AddVote(v)
-
-	return nil
 }
 
-func (c *Core) OnTimeoutObject(originID flow.Identifier, timeout *messages.TimeoutObject) error {
+func (c *Core) OnTimeoutObject(originID flow.Identifier, timeout *messages.TimeoutObject) {
 	t := &model.TimeoutObject{
 		View:       timeout.View,
 		NewestQC:   timeout.NewestQC,
@@ -397,8 +395,6 @@ func (c *Core) OnTimeoutObject(originID flow.Identifier, timeout *messages.Timeo
 
 	// forward the timeout to hotstuff for processing
 	c.timeoutAggregator.AddTimeout(t)
-
-	return nil
 }
 
 // ProcessFinalizedView performs pruning of stale data based on finalization event
