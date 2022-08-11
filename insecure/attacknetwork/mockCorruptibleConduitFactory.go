@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/module"
 	"io"
 	"net"
 	"sync"
@@ -32,6 +33,10 @@ type mockCorruptibleConduitFactory struct {
 	attackerMsg           chan *insecure.Message // channel  keeping the last incoming (insecure) message from an attacker.
 	attackerObserveStream insecure.CorruptibleConduitFactory_ConnectAttackerServer
 }
+
+var _ insecure.CorruptibleConduitFactoryServer = &mockCorruptibleConduitFactory{}
+var _ module.ReadyDoneAware = &mockCorruptibleConduitFactory{}
+var _ module.Startable = &mockCorruptibleConduitFactory{}
 
 func newMockCorruptibleConduitFactory() *mockCorruptibleConduitFactory {
 

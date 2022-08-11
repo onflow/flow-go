@@ -56,6 +56,7 @@ type Network struct {
 var _ flownet.Network = &Network{}
 var _ insecure.EgressController = &Network{}
 var _ insecure.IngressController = &Network{}
+var _ insecure.CorruptibleConduitFactoryServer = &Network{}
 
 func NewCorruptibleNetwork(
 	logger zerolog.Logger,
