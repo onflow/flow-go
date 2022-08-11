@@ -163,7 +163,7 @@ func (s *Suite) SetupSuite() {
 	go func() {
 		select {
 		case err := <-errChan:
-			s.T().Error("attackNetwork startup encountered fatal error", err)
+			s.T().Error("orchestratorNetwork startup encountered fatal error", err)
 		case <-ctx.Done():
 			return
 		}

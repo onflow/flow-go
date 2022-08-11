@@ -38,7 +38,7 @@ type Orchestrator struct {
 	corruptedNodeIds flow.IdentifierList // identifier of corrupted nodes.
 	allNodeIds       flow.IdentityList   // identity of all nodes in the network (including non-corrupted ones)
 
-	network insecure.AttackNetwork
+	network insecure.OrchestratorNetwork
 }
 
 var _ insecure.AttackOrchestrator = &Orchestrator{}
@@ -55,7 +55,7 @@ func NewOrchestrator(logger zerolog.Logger, corruptedNodeIds flow.IdentifierList
 }
 
 // RegisterAttackNetwork sets the attack network of the orchestrator.
-func (o *Orchestrator) RegisterAttackNetwork(network insecure.AttackNetwork) {
+func (o *Orchestrator) RegisterAttackNetwork(network insecure.OrchestratorNetwork) {
 	o.network = network
 }
 

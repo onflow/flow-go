@@ -6,10 +6,12 @@ import (
 
 // mockOrchestrator represents a mock orchestrator that is utilized for composability testing.
 type mockOrchestrator struct {
-	attackNetwork insecure.AttackNetwork
+	attackNetwork insecure.OrchestratorNetwork
 	// eventCorrupter is an injectable function that tampers with the given event.
 	eventCorrupter func(event *insecure.EgressEvent)
 }
+
+var _ insecure.AttackOrchestrator = &mockOrchestrator{}
 
 // HandleEventFromCorruptedNode implements logic of processing the events received from a corrupted node.
 //
@@ -23,6 +25,14 @@ func (m *mockOrchestrator) HandleEventFromCorruptedNode(event *insecure.EgressEv
 	return m.attackNetwork.SendEgress(event)
 }
 
-func (m *mockOrchestrator) WithAttackNetwork(attackNetwork insecure.AttackNetwork) {
+func (m *mockOrchestrator) HandleEventToCorruptedNode(event *insecure.IngressEvent) error {
+	panic("unimplemented")
+}
+
+func (m *mockOrchestrator) RegisterAttackNetwork(insecure.OrchestratorNetwork) {
+	panic("unimplemented")
+}
+
+func (m *mockOrchestrator) WithAttackNetwork(attackNetwork insecure.OrchestratorNetwork) {
 	m.attackNetwork = attackNetwork
 }

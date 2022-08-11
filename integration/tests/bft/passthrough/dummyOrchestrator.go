@@ -24,9 +24,9 @@ const (
 // dummyOrchestrator represents a simple orchestrator that passes through all incoming events.
 type dummyOrchestrator struct {
 	sync.Mutex
-	logger        zerolog.Logger
-	attackNetwork insecure.AttackNetwork
-	eventTracker  map[string]flow.IdentifierList
+	logger              zerolog.Logger
+	orchestratorNetwork insecure.OrchestratorNetwork
+	eventTracker        map[string]flow.IdentifierList
 }
 
 var _ insecure.AttackOrchestrator = &dummyOrchestrator{}
@@ -71,7 +71,7 @@ func (d *dummyOrchestrator) HandleEventFromCorruptedNode(event *insecure.EgressE
 		d.eventTracker[typeResultApproval] = append(d.eventTracker[typeResultApproval], e.ID())
 	}
 
-	err := d.attackNetwork.SendEgress(event)
+	err := d.orchestratorNetwork.SendEgress(event)
 	if err != nil {
 		// dummy orchestrator is used for testing and upon error we want it to crash.
 		lg.Fatal().Err(err).Msg("could not pass through incoming event")
@@ -85,8 +85,8 @@ func (d *dummyOrchestrator) HandleEventToCorruptedNode(event *insecure.IngressEv
 	panic("Unimplemented")
 }
 
-func (d *dummyOrchestrator) RegisterAttackNetwork(attackNetwork insecure.AttackNetwork) {
-	d.attackNetwork = attackNetwork
+func (d *dummyOrchestrator) RegisterAttackNetwork(attackNetwork insecure.OrchestratorNetwork) {
+	d.orchestratorNetwork = attackNetwork
 }
 
 // mustSeenFlowProtocolEvent checks the dummy orchestrator has passed through the flow protocol events with given ids. It fails
