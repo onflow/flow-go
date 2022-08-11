@@ -457,12 +457,6 @@ func (env *commonEnv) DecodeArgument(b []byte, _ cadence.Type) (cadence.Value, e
 
 // Commit commits changes and return a list of updated keys
 func (env *commonEnv) Commit() (programs.ModifiedSets, error) {
-	// commit changes and return a list of updated keys
-	err := env.programs.Cleanup()
-	if err != nil {
-		return programs.ModifiedSets{}, err
-	}
-
 	keys, err := env.contracts.Commit()
 	return programs.ModifiedSets{
 		ContractUpdateKeys: keys,
