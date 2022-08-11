@@ -68,7 +68,8 @@ func (f *BlockBuilder) AddVersioned(qcView uint64, blockView uint64, qcVersion i
 	})
 }
 
-// Blocks returns a list of all blocks added to the BlockBuilder, and a genesis block.
+// Blocks returns a list of all blocks added to the BlockBuilder.
+// Returns an error if the blocks do not form a connected tree rooted at genesis.
 func (f *BlockBuilder) Blocks() ([]*model.Proposal, error) {
 	blocks := make([]*model.Proposal, 0, len(f.blockViews))
 

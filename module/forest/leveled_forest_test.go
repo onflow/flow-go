@@ -136,17 +136,17 @@ func TestLevelledForest_VerifyVertex(t *testing.T) {
 	// KNOWN vertex but with wrong level number
 	err := F.VerifyVertex(NewVertexMock("D", 10, "C", 2))
 	assert.Error(t, err)
-	assert.True(t, mempool.IsBelowPrunedThresholdError(err))
+	assert.True(t, IsInvalidVertexError(err))
 
 	// KNOWN vertex whose PARENT references a known vertex but with mismatching level
 	err = F.VerifyVertex(NewVertexMock("D", 10, "C", 10))
 	assert.Error(t, err)
-	assert.True(t, mempool.IsBelowPrunedThresholdError(err))
+	assert.True(t, IsInvalidVertexError(err))
 
 	// adding unknown vertex whose PARENT references a known vertex but with mismatching level
 	err = F.VerifyVertex(NewVertexMock("F", 4, "Genesis", 10))
 	assert.Error(t, err)
-	assert.True(t, mempool.IsBelowPrunedThresholdError(err))
+	assert.True(t, IsInvalidVertexError(err))
 }
 
 // TestLevelledForest_HasVertex test that vertices as correctly reported as contained in Forest

@@ -453,7 +453,7 @@ func TestNewestView(t *testing.T) {
 	err = addBlocksToForks(forks, blocks)
 	require.NoError(t, err)
 	// after inserting new blocks, newest view should be greatest view of all added blocks
-	require.Equal(t, forks.NewestView(), 4)
+	require.Equal(t, forks.NewestView(), uint64(4))
 }
 
 // ========== internal functions ===============
