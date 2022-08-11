@@ -610,7 +610,10 @@ func (m *Middleware) processUnicastStreamMessage(ctx context.Context, remotePeer
 	}
 
 	// unexpected error condition. this indicates there's a bug
-	// don't crash as a result of external inputs since that creates a DoS vector
+	// don't crash as a result of external inputs since that creates a DoS vector.
+	// NOTE: This could possibly be slashable in the following cases
+	// 		1. The sender has a bug in their encoder that causes decoding to fail.
+	// 		2. The sender intentionally sent data that could not be encoded.
 	if err != nil {
 		m.log.
 			Error().
@@ -618,7 +621,8 @@ func (m *Middleware) processUnicastStreamMessage(ctx context.Context, remotePeer
 			Hex("sender", msg.OriginID).
 			Hex("event_id", msg.EventID).
 			Str("event_type", msg.Type).
-			Str("channel", msg.ChannelID)
+			Str("channel", msg.ChannelID).
+			Msg("potential slashable offense")
 		return
 	}
 
