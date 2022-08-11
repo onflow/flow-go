@@ -143,7 +143,7 @@ func (i *TransactionInvoker) Process(
 		// so we don't error from computation/memory limits on this part.
 		// We cannot charge the user for this part, since fee deduction already happened.
 		sth.DisableAllLimitEnforcements()
-		txError = NewTransactionStorageLimiter().CheckLimits(env, sth.State().UpdatedAddresses())
+		txError = NewTransactionStorageLimiter().CheckLimits(env, sth.UpdatedAddresses())
 		sth.EnableAllLimitEnforcements()
 	}
 
@@ -216,8 +216,8 @@ func (i *TransactionInvoker) deductTransactionFees(
 		return nil
 	}
 
-	if computationUsed > uint64(sth.State().TotalComputationLimit()) {
-		computationUsed = uint64(sth.State().TotalComputationLimit())
+	if computationUsed > uint64(sth.TotalComputationLimit()) {
+		computationUsed = uint64(sth.TotalComputationLimit())
 	}
 
 	// Hardcoded inclusion effort (of 1.0 UFix). Eventually this will be
@@ -304,18 +304,18 @@ func valueDeclarations(env Environment) []runtime.ValueDeclaration {
 func (i *TransactionInvoker) logExecutionIntensities(sth *state.StateHolder, txHash string) {
 	if i.logger.Debug().Enabled() {
 		computation := zerolog.Dict()
-		for s, u := range sth.State().ComputationIntensities() {
+		for s, u := range sth.ComputationIntensities() {
 			computation.Uint(strconv.FormatUint(uint64(s), 10), u)
 		}
 		memory := zerolog.Dict()
-		for s, u := range sth.State().MemoryIntensities() {
+		for s, u := range sth.MemoryIntensities() {
 			memory.Uint(strconv.FormatUint(uint64(s), 10), u)
 		}
 		i.logger.Info().
 			Str("txHash", txHash).
-			Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
-			Uint("computationUsed", sth.State().TotalComputationUsed()).
-			Uint("memoryEstimate", sth.State().TotalMemoryEstimate()).
+			Uint64("ledgerInteractionUsed", sth.InteractionUsed()).
+			Uint("computationUsed", sth.TotalComputationUsed()).
+			Uint("memoryEstimate", sth.TotalMemoryEstimate()).
 			Dict("computationIntensities", computation).
 			Dict("memoryIntensities", memory).
 			Msg("transaction execution data")
