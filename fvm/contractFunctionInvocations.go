@@ -18,7 +18,6 @@ var deductTransactionFeesInvocationArgumentTypes = []sema.Type{
 // InvokeDeductTransactionFeesContract executes the fee deduction contract on
 // the service account.
 func InvokeDeductTransactionFeesContract(
-	envCtx *EnvContext,
 	env Environment,
 	payer flow.Address,
 	inclusionEffort uint64,
@@ -41,7 +40,7 @@ func InvokeDeductTransactionFeesContract(
 		deductTransactionFeesInvocationArgumentTypes,
 		env.Context().Logger,
 	)
-	return invoker.Invoke(envCtx, env)
+	return invoker.Invoke(env)
 }
 
 var setupNewAccountInvocationArgumentTypes = []sema.Type{
@@ -52,7 +51,6 @@ var setupNewAccountInvocationArgumentTypes = []sema.Type{
 // InvokeSetupNewAccountContract executes the new account setup contract on
 // the service account.
 func InvokeSetupNewAccountContract(
-	envCtx *EnvContext,
 	env Environment,
 	flowAddress flow.Address,
 	payer common.Address,
@@ -72,7 +70,7 @@ func InvokeSetupNewAccountContract(
 		setupNewAccountInvocationArgumentTypes,
 		env.Context().Logger,
 	)
-	return invoker.Invoke(envCtx, env)
+	return invoker.Invoke(env)
 }
 
 var accountAvailableBalanceInvocationArgumentTypes = []sema.Type{
@@ -82,7 +80,6 @@ var accountAvailableBalanceInvocationArgumentTypes = []sema.Type{
 // InvokeAccountAvailableBalanceContract executes the get available balance
 // contract on the storage fees contract.
 func InvokeAccountAvailableBalanceContract(
-	envCtx *EnvContext,
 	env Environment,
 	address common.Address,
 ) (cadence.Value, error) {
@@ -99,7 +96,7 @@ func InvokeAccountAvailableBalanceContract(
 		accountAvailableBalanceInvocationArgumentTypes,
 		env.Context().Logger,
 	)
-	return invoker.Invoke(envCtx, env)
+	return invoker.Invoke(env)
 }
 
 var accountBalanceInvocationArgumentTypes = []sema.Type{
@@ -109,7 +106,6 @@ var accountBalanceInvocationArgumentTypes = []sema.Type{
 // InvokeAccountBalanceContract executes the get available balance contract
 // on the service account.
 func InvokeAccountBalanceContract(
-	envCtx *EnvContext,
 	env Environment,
 	address common.Address,
 ) (cadence.Value, error) {
@@ -125,7 +121,7 @@ func InvokeAccountBalanceContract(
 		accountBalanceInvocationArgumentTypes,
 		env.Context().Logger,
 	)
-	return invoker.Invoke(envCtx, env)
+	return invoker.Invoke(env)
 }
 
 var accountStorageCapacityInvocationArgumentTypes = []sema.Type{
@@ -135,7 +131,6 @@ var accountStorageCapacityInvocationArgumentTypes = []sema.Type{
 // InvokeAccountStorageCapacityContract executes the get storage capacity
 // contract on the storage fees contract.
 func InvokeAccountStorageCapacityContract(
-	envCtx *EnvContext,
 	env Environment,
 	address common.Address,
 ) (cadence.Value, error) {
@@ -152,13 +147,12 @@ func InvokeAccountStorageCapacityContract(
 		accountStorageCapacityInvocationArgumentTypes,
 		env.Context().Logger,
 	)
-	return invoker.Invoke(envCtx, env)
+	return invoker.Invoke(env)
 }
 
 // InvokeAccountsStorageCapacity prepares a function that calls get storage capacity on the storage fees contract
 // for multiple accounts at once
 func InvokeAccountsStorageCapacity(
-	envCtx *EnvContext,
 	env Environment,
 	addresses []common.Address,
 ) (cadence.Value, error) {
@@ -184,7 +178,7 @@ func InvokeAccountsStorageCapacity(
 		},
 		env.Context().Logger,
 	)
-	return invoker.Invoke(envCtx, env)
+	return invoker.Invoke(env)
 }
 
 var useContractAuditVoucherInvocationArgumentTypes = []sema.Type{
@@ -195,7 +189,6 @@ var useContractAuditVoucherInvocationArgumentTypes = []sema.Type{
 // InvokeUseContractAuditVoucherContract executes the use a contract
 // deployment audit voucher contract.
 func InvokeUseContractAuditVoucherContract(
-	envCtx *EnvContext,
 	env Environment,
 	address common.Address,
 	code string) (bool, error) {
@@ -213,7 +206,7 @@ func InvokeUseContractAuditVoucherContract(
 		useContractAuditVoucherInvocationArgumentTypes,
 		env.Context().Logger,
 	)
-	resultCdc, err := invoker.Invoke(envCtx, env)
+	resultCdc, err := invoker.Invoke(env)
 	if err != nil {
 		return false, err
 	}

@@ -31,7 +31,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/meter/weighted"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -153,6 +153,13 @@ func TestComputeBlock_Uploader(t *testing.T) {
 
 	ledger, err := complete.NewLedger(&fixtures.NoopWAL{}, 10, noopCollector, zerolog.Nop(), complete.DefaultPathFinderVersion)
 	require.NoError(t, err)
+
+	compactor := fixtures.NewNoopCompactor(ledger)
+	<-compactor.Ready()
+	defer func() {
+		<-ledger.Done()
+		<-compactor.Done()
+	}()
 
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
@@ -580,7 +587,7 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 		nil)
 	view := testutil.RootBootstrappedLedger(vm, ctx)
 	programs := programs.NewEmptyPrograms()
-	st := state.NewState(view, weighted.NewMeter(math.MaxUint64, math.MaxUint64))
+	st := state.NewState(view, meter.NewMeter(math.MaxUint64, math.MaxUint64))
 	sth := state.NewStateHolder(st)
 	env, err := fvm.NewScriptEnvironment(context.Background(), ctx, vm, sth, programs)
 	require.NoError(t, err)

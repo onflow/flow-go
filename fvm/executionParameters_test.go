@@ -15,7 +15,7 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/meter/weighted"
+	"github.com/onflow/flow-go/fvm/meter"
 	fvmmock "github.com/onflow/flow-go/fvm/mock"
 )
 
@@ -110,19 +110,19 @@ func TestGetExecutionMemoryWeights(t *testing.T) {
 				})
 			weights, err := fvm.GetExecutionMemoryWeights(envMock, address)
 			require.NoError(t, err)
-			require.InDeltaMapValues(t, weighted.DefaultMemoryWeights, weights, 0)
+			require.InDeltaMapValues(t, meter.DefaultMemoryWeights, weights, 0)
 		},
 	)
 	t.Run("return merged if some dict is stored",
 		func(t *testing.T) {
-			expectedWeights := weighted.ExecutionMemoryWeights{}
+			expectedWeights := meter.ExecutionMemoryWeights{}
 			var existingWeightKey common.MemoryKind
 			var existingWeightValue uint64
-			for k, v := range weighted.DefaultMemoryWeights {
+			for k, v := range meter.DefaultMemoryWeights {
 				expectedWeights[k] = v
 			}
 			// change one existing value
-			for kind, u := range weighted.DefaultMemoryWeights {
+			for kind, u := range meter.DefaultMemoryWeights {
 				existingWeightKey = kind
 				existingWeightValue = u
 				expectedWeights[kind] = u + 1
@@ -242,19 +242,19 @@ func TestGetExecutionEffortWeights(t *testing.T) {
 				})
 			weights, err := fvm.GetExecutionEffortWeights(envMock, address)
 			require.NoError(t, err)
-			require.InDeltaMapValues(t, weighted.DefaultComputationWeights, weights, 0)
+			require.InDeltaMapValues(t, meter.DefaultComputationWeights, weights, 0)
 		},
 	)
 	t.Run("return merged if some dict is stored",
 		func(t *testing.T) {
-			expectedWeights := weighted.ExecutionEffortWeights{}
+			expectedWeights := meter.ExecutionEffortWeights{}
 			var existingWeightKey common.ComputationKind
 			var existingWeightValue uint64
-			for k, v := range weighted.DefaultComputationWeights {
+			for k, v := range meter.DefaultComputationWeights {
 				expectedWeights[k] = v
 			}
 			// change one existing value
-			for kind, u := range weighted.DefaultComputationWeights {
+			for kind, u := range meter.DefaultComputationWeights {
 				existingWeightKey = kind
 				existingWeightValue = u
 				expectedWeights[kind] = u + 1

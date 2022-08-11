@@ -1,4 +1,4 @@
-package debug
+package profiler
 
 import (
 	"context"
@@ -34,7 +34,8 @@ type AutoProfiler struct {
 	duration time.Duration
 }
 
-func NewAutoProfiler(log zerolog.Logger, dir string, interval time.Duration, duration time.Duration, enabled bool) (*AutoProfiler, error) {
+// New creates a new AutoProfiler instance performing profiling every interval for duration.
+func New(log zerolog.Logger, dir string, interval time.Duration, duration time.Duration, enabled bool) (*AutoProfiler, error) {
 	SetProfilerEnabled(enabled)
 
 	err := os.MkdirAll(dir, os.ModePerm)
@@ -78,12 +79,11 @@ func (p *AutoProfiler) start() {
 	p.log.Info().Msg("starting profile trace")
 
 	for k, v := range map[string]profileFunc{
-		"goroutine":    newProfileFunc("goroutine"),
-		"threadcreate": newProfileFunc("threadcreate"),
-		"heap":         p.pprofHeap,
-		"block":        p.pprofBlock,
-		"mutex":        p.pprofMutex,
-		"cpu":          p.pprofCpu,
+		"goroutine": newProfileFunc("goroutine"),
+		"heap":      p.pprofHeap,
+		"block":     p.pprofBlock,
+		"mutex":     p.pprofMutex,
+		"cpu":       p.pprofCpu,
 	} {
 		err := p.pprof(k, v)
 		if err != nil {
