@@ -943,7 +943,7 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 		middleware := builder.initMiddleware(builder.NodeID, builder.PublicNetworkConfig.Metrics, libP2PFactory, msgValidators...)
 
 		// topology returns empty list since peers are not known upfront
-		top := topology.EmptyListTopology{}
+		top := topology.EmptyTopology{}
 
 		var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
 		if builder.HeroCacheMetricsEnable {
@@ -1021,7 +1021,9 @@ func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 	validators ...network.MessageValidator) network.Middleware {
 
 	// disable connection pruning for the access node which supports the observer
-	peerManagerFactory := p2p.PeerManagerFactory([]p2p.Option{p2p.WithInterval(builder.PeerUpdateInterval)}, p2p.WithConnectionPruning(false))
+	peerManagerFactory := p2p.PeerManagerFactory(
+		p2p.ConnectionPruningDisabled,
+		builder.PeerUpdateInterval)
 
 	builder.Middleware = p2p.NewMiddleware(
 		builder.Logger.With().Bool("staked", false).Logger(),

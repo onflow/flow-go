@@ -156,11 +156,9 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.StringSliceVar(&fnb.BaseConfig.PreferredUnicastProtocols, "preferred-unicast-protocols", nil, "preferred unicast protocols in ascending order of preference")
 	fnb.flags.Uint32Var(&fnb.BaseConfig.NetworkReceivedMessageCacheSize, "networking-receive-cache-size", p2p.DefaultReceiveCacheSize,
 		"incoming message cache size at networking layer")
+	fnb.flags.BoolVar(&fnb.BaseConfig.NetworkConnectionPruning, "networking-connection-pruning", defaultConfig.NetworkConnectionPruning, "enabling connection trimming")
 	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
 	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
-	fnb.flags.StringVar(&fnb.BaseConfig.TopologyProtocolName, "topology", defaultConfig.TopologyProtocolName, "networking overlay topology")
-	fnb.flags.Float64Var(&fnb.BaseConfig.TopologyEdgeProbability, "topology-edge-probability", defaultConfig.TopologyEdgeProbability,
-		"pairwise edge probability between nodes in topology")
 
 	// dynamic node startup flags
 	fnb.flags.StringVar(&fnb.BaseConfig.DynamicStartupANPubkey, "dynamic-startup-access-publickey", "", "the public key of the trusted secure access node to connect to when using dynamic-startup, this access node must be staked")
@@ -284,8 +282,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		mwOpts = append(mwOpts, p2p.WithMessageValidators(fnb.MsgValidators...))
 	}
 
-	// run peer manager with the specified interval and let it also prune connections
-	peerManagerFactory := p2p.PeerManagerFactory([]p2p.Option{p2p.WithInterval(fnb.PeerUpdateInterval)})
+	peerManagerFactory := p2p.PeerManagerFactory(fnb.NetworkConnectionPruning, fnb.PeerUpdateInterval)
 	mwOpts = append(mwOpts,
 		p2p.WithPeerManager(peerManagerFactory),
 		p2p.WithPreferredUnicastProtocols(unicast.ToProtocolNames(fnb.PreferredUnicastProtocols)),
@@ -304,17 +301,6 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 	)
 
 	subscriptionManager := p2p.NewChannelSubscriptionManager(fnb.Middleware)
-
-	topologyFactory, err := topology.Factory(topology.Name(fnb.TopologyProtocolName))
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve topology factory for %s: %w", fnb.TopologyProtocolName, err)
-	}
-	top, err := topologyFactory(fnb.NodeID, fnb.Logger, fnb.State, fnb.TopologyEdgeProbability)
-	if err != nil {
-		return nil, fmt.Errorf("could not create topology: %w", err)
-	}
-	topologyCache := topology.NewCache(fnb.Logger, top)
-
 	var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
 	if fnb.HeroCacheMetricsEnable {
 		heroCacheCollector = metrics.NetworkReceiveCacheMetricsFactory(fnb.MetricsRegisterer)
@@ -324,7 +310,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		fnb.Logger,
 		heroCacheCollector)
 
-	err = node.Metrics.Mempool.Register(metrics.ResourceNetworkingReceiveCache, receiveCache.Size)
+	err := node.Metrics.Mempool.Register(metrics.ResourceNetworkingReceiveCache, receiveCache.Size)
 	if err != nil {
 		return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
 	}
@@ -335,7 +321,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		Codec:               fnb.CodecFactory(),
 		Me:                  fnb.Me,
 		MiddlewareFactory:   func() (network.Middleware, error) { return fnb.Middleware, nil },
-		Topology:            topologyCache,
+		Topology:            topology.NewFullyConnectedTopology(),
 		SubscriptionManager: subscriptionManager,
 		Metrics:             fnb.Metrics.Network,
 		IdentityProvider:    fnb.IdentityProvider,
