@@ -210,7 +210,7 @@ func GenerateNetworks(
 		// create the network
 		net, err := p2p.NewNetwork(
 			log,
-			cbor.NewCodec(),
+			unittest.NetworkCodec(),
 			me,
 			func() (network.Middleware, error) { return mws[i], nil },
 			topology.NewFullyConnectedTopology(),
