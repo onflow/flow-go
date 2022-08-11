@@ -248,11 +248,10 @@ func (s *feldmanVSSQualState) HandlePrivateMsg(orig int, msg []byte) error {
 		return nil
 	}
 
-	if len(msg) > 0 && dkgMsgTag(msg[0]) == feldmanVSSShare {
-		s.receiveShare(index(orig), msg[1:])
-	} else {
-		s.receiveShare(index(orig), msg[:0])
-	}
+	// forward all the message to receiveShare because any private message
+	// has to be a private share
+	s.receiveShare(index(orig), msg)
+
 	return nil
 }
 
@@ -326,6 +325,18 @@ func (s *feldmanVSSQualState) receiveShare(origin index, data []byte) {
 
 	// at this point, tag private share is received
 	s.xReceived = true
+
+	// private message general check
+	if len(data) == 0 || dkgMsgTag(data[0]) != feldmanVSSShare {
+		s.buildAndBroadcastComplaint()
+		s.processor.FlagMisbehavior(int(origin),
+			fmt.Sprintf("private share should be non-empty and first byte should be %d, received %#x",
+				feldmanVSSShare, data))
+		return
+	}
+
+	// consider the remaining data from message
+	data = data[1:]
 
 	if (len(data)) != shareSize {
 		s.buildAndBroadcastComplaint()
