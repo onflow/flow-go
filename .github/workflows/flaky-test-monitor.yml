@@ -65,6 +65,9 @@ jobs:
       env:
         TEST_FLAKY: true
         JSON_OUTPUT: true
+    - name: Setup tmate session
+      uses: mxschmitt/action-tmate@v3
+      if: success() || failure()
     - name: Process test results
       run: cat test-output | go run tools/test_monitor/level1/process_summary1_results.go
       env:
