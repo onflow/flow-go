@@ -15,6 +15,8 @@ import (
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
+var defaultDecMode, _ = cbor.DecOptions{ExtraReturnErrors: cbor.ExtraDecErrorUnknownField}.DecMode()
+
 // Codec represents a CBOR codec for our network.
 type Codec struct {
 }
@@ -33,7 +35,7 @@ func (c *Codec) NewEncoder(w io.Writer) network.Encoder {
 
 // NewDecoder creates a new CBOR decoder with the given underlying reader.
 func (c *Codec) NewDecoder(r io.Reader) network.Decoder {
-	dec := cbor.NewDecoder(r)
+	dec := defaultDecMode.NewDecoder(r)
 	return &Decoder{dec: dec}
 }
 
@@ -99,26 +101,11 @@ func (c *Codec) Decode(data []byte) (interface{}, error) {
 
 	// unmarshal the payload
 	//bs2 := binstat.EnterTimeVal(fmt.Sprintf("%s%s%s:%d", binstat.BinNet, ":wire>4(cbor)", what, code), int64(len(data))) // e.g. ~3net:wire>4(cbor)CodeEntityRequest:23
-	err = unmarshal(data[1:], msgInterface) // all but first byte
+	err = defaultDecMode.Unmarshal(data[1:], msgInterface) // all but first byte
 	//binstat.Leave(bs2)
 	if err != nil {
 		return nil, codec.NewMsgUnmarshalErr(data[0], what, err)
 	}
 
 	return msgInterface, nil
-}
-
-// unmarshal will attempt to unmarshal the data provided with the cbor.ExtraDecErrorUnknownField decoder option enabled.
-// This allows the decoder to return an error if a message cannot be unmarshalled due to no matching fields.
-func unmarshal(data []byte, msg interface{}) error {
-	decOptions := cbor.DecOptions{
-		ExtraReturnErrors: cbor.ExtraDecErrorUnknownField,
-	}
-
-	decoder, err := decOptions.DecMode()
-	if err != nil {
-		return err
-	}
-
-	return decoder.Unmarshal(data, msg)
 }
