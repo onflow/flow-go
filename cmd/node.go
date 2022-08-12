@@ -6,6 +6,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/onflow/flow-go/utils/logging"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module/component"
@@ -95,7 +96,10 @@ func (node *FlowNodeImp) run(ctx context.Context, shutdown context.CancelFunc) e
 	go func() {
 		select {
 		case <-node.Ready():
-			node.logger.Info().Msgf("%s node startup complete", node.BaseConfig.NodeRole)
+			node.logger.
+				Info().
+				Hex("spork_id", logging.ID(node.SporkID)).
+				Msgf("%s node startup complete", node.BaseConfig.NodeRole)
 		case <-ctx.Done():
 		}
 	}()
