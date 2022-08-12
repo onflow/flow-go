@@ -529,7 +529,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 		m.wg.Add(1)
 		go func() {
 			defer m.wg.Done()
-			m.processUnicastStreamMessage(ctx, remotePeer, &msg)
+			m.processUnicastStreamMessage(remotePeer, &msg)
 		}()
 	}
 
@@ -597,20 +597,25 @@ func (m *Middleware) Unsubscribe(channel channels.Channel) error {
 
 // processUnicastStreamMessage will decode, perform authorized sender validation and process a message
 // sent via unicast stream. This func should be invoked in a separate goroutine to avoid creating a message decoding bottleneck.
-func (m *Middleware) processUnicastStreamMessage(ctx context.Context, remotePeer peer.ID, msg *message.Message) {
+func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *message.Message) {
 	channel := channels.Channel(msg.ChannelID)
 
 	decodedMsgPayload, err := m.codec.Decode(msg.Payload)
-	// collect slashing information for messages sent with unknown an message code byte
 	if codec.IsErrUnknownMsgCode(err) {
 		// slash peer if message contains unknown message code byte
 		violation := &slashing.Violation{PeerID: remotePeer.String(), Channel: channel, IsUnicast: true, Err: err}
 		m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
 		return
 	}
+	if codec.IsErrMsgUnmarshal(err) {
+		// slash if peer sent a message that could not be marshalled into the message type denoted by the message code byte
+		violation := &slashing.Violation{PeerID: remotePeer.String(), Channel: channel, IsUnicast: true, Err: err}
+		m.slashingViolationsConsumer.OnInvalidMsgError(violation)
+		return
+	}
 
 	// unexpected error condition. this indicates there's a bug
-	// don't crash as a result of external inputs since that creates a DoS vector
+	// don't crash as a result of external inputs since that creates a DoS vector.
 	if err != nil {
 		m.log.
 			Error().

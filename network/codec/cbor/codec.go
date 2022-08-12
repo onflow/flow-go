@@ -84,6 +84,7 @@ func (c *Codec) Encode(v interface{}) ([]byte, error) {
 // i.e.  1st byte is 'code' and remaining bytes are CBOR encoded 'v'.
 // Expected error returns during normal operations:
 //  * codec.UnknownMsgCodeErr if message code byte does not match any of the configured message codes.
+//  * codec.ErrMsgUnmarshal if the codec fails to unmarshal the data to the message type denoted by the message code.
 func (c *Codec) Decode(data []byte) (interface{}, error) {
 
 	// decode the envelope
@@ -98,11 +99,26 @@ func (c *Codec) Decode(data []byte) (interface{}, error) {
 
 	// unmarshal the payload
 	//bs2 := binstat.EnterTimeVal(fmt.Sprintf("%s%s%s:%d", binstat.BinNet, ":wire>4(cbor)", what, code), int64(len(data))) // e.g. ~3net:wire>4(cbor)CodeEntityRequest:23
-	err = cbor.Unmarshal(data[1:], msgInterface) // all but first byte
+	err = unmarshal(data[1:], msgInterface) // all but first byte
 	//binstat.Leave(bs2)
 	if err != nil {
-		return nil, fmt.Errorf("could not decode cbor payload with message code %d aka %s: %w", data[0], what, err) // e.g. 2, "CodeBlockProposal", <CBOR error>
+		return nil, codec.NewMsgUnmarshalErr(data[0], what, err)
 	}
 
 	return msgInterface, nil
+}
+
+// unmarshal will attempt to unmarshal the data provided with the cbor.ExtraDecErrorUnknownField decoder option enabled.
+// This allows the decoder to return an error if a message cannot be unmarshalled due to no matching fields.
+func unmarshal(data []byte, msg interface{}) error {
+	decOptions := cbor.DecOptions{
+		ExtraReturnErrors: cbor.ExtraDecErrorUnknownField,
+	}
+
+	decoder, err := decOptions.DecMode()
+	if err != nil {
+		return err
+	}
+
+	return decoder.Unmarshal(data, msg)
 }
