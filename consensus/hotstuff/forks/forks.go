@@ -298,7 +298,7 @@ func (f *Forks) updateFinalizedBlockQC(blockContainer *BlockContainer) error {
 	// The rule from 'Diem BFT' for finalizing block b is
 	//     b <- b' <~ b*     (aka a DIRECT 1-chain PLUS any 1-chain)
 	// where b* is the head block of the ancestryChain
-	// Hence, we can finalize b, if and only the viewNumber of b' is exactly 1 higher than the view of b
+	// Hence, we can finalize b as head of 2-chain, if and only the viewNumber of b' is exactly 1 higher than the view of b
 	b := ancestryChain.twoChain
 	if ancestryChain.oneChain.Block.View != b.Block.View+1 {
 		return nil
