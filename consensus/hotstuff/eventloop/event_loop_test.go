@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
@@ -88,8 +90,8 @@ func (s *EventLoopTestSuite) Test_SubmitQC() {
 	// qcIngestionFunction is the archetype for EventLoop.OnQcConstructedFromVotes and EventLoop.OnNewQcDiscovered
 	type qcIngestionFunction func(*flow.QuorumCertificate)
 
-	testQCIngestionFunction := func(f qcIngestionFunction) {
-		qc := unittest.QuorumCertificateFixture()
+	testQCIngestionFunction := func(f qcIngestionFunction, qcView uint64) {
+		qc := helper.MakeQC(helper.WithQCView(qcView))
 		processed := atomic.NewBool(false)
 		s.eh.On("OnReceiveQc", qc).Run(func(args mock.Arguments) {
 			processed.Store(true)
@@ -99,11 +101,11 @@ func (s *EventLoopTestSuite) Test_SubmitQC() {
 	}
 
 	s.Run("QCs handed to EventLoop.OnQcConstructedFromVotes are forwarded to EventHandler", func() {
-		testQCIngestionFunction(s.eventLoop.OnQcConstructedFromVotes)
+		testQCIngestionFunction(s.eventLoop.OnQcConstructedFromVotes, 100)
 	})
 
 	s.Run("QCs handed to EventLoop.OnNewQcDiscovered are forwarded to EventHandler", func() {
-		testQCIngestionFunction(s.eventLoop.OnNewQcDiscovered)
+		testQCIngestionFunction(s.eventLoop.OnNewQcDiscovered, 101)
 	})
 }
 
@@ -112,8 +114,8 @@ func (s *EventLoopTestSuite) Test_SubmitTC() {
 	// tcIngestionFunction is the archetype for EventLoop.OnTcConstructedFromTimeouts and EventLoop.OnNewTcDiscovered
 	type tcIngestionFunction func(*flow.TimeoutCertificate)
 
-	testTCIngestionFunction := func(f tcIngestionFunction) {
-		tc := &flow.TimeoutCertificate{}
+	testTCIngestionFunction := func(f tcIngestionFunction, tcView uint64) {
+		tc := helper.MakeTC(helper.WithTCView(tcView))
 		processed := atomic.NewBool(false)
 		s.eh.On("OnReceiveTc", tc).Run(func(args mock.Arguments) {
 			processed.Store(true)
@@ -122,13 +124,68 @@ func (s *EventLoopTestSuite) Test_SubmitTC() {
 		require.Eventually(s.T(), processed.Load, time.Millisecond*100, time.Millisecond*10)
 	}
 
+	s.Run("TCs handed to EventLoop.OnTcConstructedFromTimeouts are forwarded to EventHandler", func() {
+		testTCIngestionFunction(s.eventLoop.OnTcConstructedFromTimeouts, 100)
+	})
+
+	s.Run("TCs handed to EventLoop.OnNewTcDiscovered are forwarded to EventHandler", func() {
+		testTCIngestionFunction(s.eventLoop.OnNewTcDiscovered, 101)
+	})
+}
+
+// Test_SubmitTC_IngestNewestQC tests that included QC in TC is eventually sent to `EventHandler.OnReceiveQc` for processing
+func (s *EventLoopTestSuite) Test_SubmitTC_IngestNewestQC() {
+	// tcIngestionFunction is the archetype for EventLoop.OnTcConstructedFromTimeouts and EventLoop.OnNewTcDiscovered
+	type tcIngestionFunction func(*flow.TimeoutCertificate)
+
+	testTCIngestionFunction := func(f tcIngestionFunction, tcView, qcView uint64) {
+		tc := helper.MakeTC(helper.WithTCView(tcView),
+			helper.WithTCNewestQC(helper.MakeQC(helper.WithQCView(qcView))))
+		processed := atomic.NewBool(false)
+		s.eh.On("OnReceiveQc", tc.NewestQC).Run(func(args mock.Arguments) {
+			processed.Store(true)
+		}).Return(nil).Once()
+		f(tc)
+		require.Eventually(s.T(), processed.Load, time.Millisecond*100, time.Millisecond*10)
+	}
+
+	// process initial TC, this will track the newest TC
+	s.eh.On("OnReceiveTc", mock.Anything).Return(nil).Once()
+	s.eventLoop.OnTcConstructedFromTimeouts(helper.MakeTC(
+		helper.WithTCView(100),
+		helper.WithTCNewestQC(
+			helper.MakeQC(
+				helper.WithQCView(80),
+			),
+		),
+	))
+
 	s.Run("QCs handed to EventLoop.OnTcConstructedFromTimeouts are forwarded to EventHandler", func() {
-		testTCIngestionFunction(s.eventLoop.OnTcConstructedFromTimeouts)
+		testTCIngestionFunction(s.eventLoop.OnTcConstructedFromTimeouts, 100, 99)
 	})
 
 	s.Run("QCs handed to EventLoop.OnNewTcDiscovered are forwarded to EventHandler", func() {
-		testTCIngestionFunction(s.eventLoop.OnNewTcDiscovered)
+		testTCIngestionFunction(s.eventLoop.OnNewTcDiscovered, 100, 100)
 	})
+}
+
+// Test_OnPartialTcCreated tests that event loop delivers partialTcCreated events to event handler.
+func (s *EventLoopTestSuite) Test_OnPartialTcCreated() {
+	view := uint64(1000)
+	newestQC := helper.MakeQC(helper.WithQCView(view - 10))
+	lastViewTC := helper.MakeTC(helper.WithTCView(view-1), helper.WithTCNewestQC(newestQC))
+
+	processed := atomic.NewBool(false)
+	partialTcCreated := &hotstuff.PartialTcCreated{
+		View:       view,
+		NewestQC:   newestQC,
+		LastViewTC: lastViewTC,
+	}
+	s.eh.On("OnPartialTcCreated", partialTcCreated).Run(func(args mock.Arguments) {
+		processed.Store(true)
+	}).Return(nil).Once()
+	s.eventLoop.OnPartialTcCreated(view, newestQC, lastViewTC)
+	require.Eventually(s.T(), processed.Load, time.Millisecond*100, time.Millisecond*10)
 }
 
 // TestEventLoop_Timeout tests that event loop delivers timeout events to event handler under pressure
