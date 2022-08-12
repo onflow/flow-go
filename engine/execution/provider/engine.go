@@ -137,6 +137,7 @@ func (e *Engine) Done() <-chan struct{} {
 func (e *Engine) processChunkDataPackRequestWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 	ticker := time.NewTicker(e.chdpRequestProcessInterval)
+	defer ticker.Stop()
 	e.log.Debug().
 		Dur("process_inveral", e.chdpRequestProcessInterval).
 		Msg("process chunk data pack request worker started")
