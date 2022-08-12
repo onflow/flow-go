@@ -18,6 +18,9 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	p2ppubsub "github.com/libp2p/go-libp2p-pubsub"
 
+	"github.com/rs/zerolog"
+	"github.com/spf13/pflag"
+
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
@@ -67,8 +70,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/io"
-	"github.com/rs/zerolog"
-	"github.com/spf13/pflag"
 )
 
 // ObserverBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node
