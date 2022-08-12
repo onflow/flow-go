@@ -623,7 +623,8 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 			Hex("sender", msg.OriginID).
 			Hex("event_id", msg.EventID).
 			Str("event_type", msg.Type).
-			Str("channel", msg.ChannelID)
+			Str("channel", msg.ChannelID).
+			Msg("failed to decode message payload")
 		return
 	}
 
