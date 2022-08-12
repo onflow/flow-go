@@ -295,6 +295,24 @@ func (params MeterParameters) WithMemoryWeights(
 	return newParams
 }
 
+func (params MeterParameters) ComputationWeights() ExecutionEffortWeights {
+	return params.computationWeights
+}
+
+// TotalComputationLimit returns the total computation limit
+func (params MeterParameters) TotalComputationLimit() uint {
+	return uint(params.computationLimit >> MeterExecutionInternalPrecisionBytes)
+}
+
+func (params MeterParameters) MemoryWeights() ExecutionMemoryWeights {
+	return params.memoryWeights
+}
+
+// TotalMemoryLimit returns the total memory limit
+func (params MeterParameters) TotalMemoryLimit() uint64 {
+	return params.memoryLimit
+}
+
 // WeightedMeter collects memory and computation usage and enforces limits
 // for any each memory/computation usage call it sums intensity multiplied by the weight of the intensity to the total
 // memory/computation usage metrics and returns error if limits are not met.
@@ -365,11 +383,6 @@ func (m *WeightedMeter) MergeMeter(child Meter, enforceLimits bool) error {
 	return nil
 }
 
-// SetComputationWeights sets the computation weights
-func (m *WeightedMeter) SetComputationWeights(weights ExecutionEffortWeights) {
-	m.computationWeights = weights
-}
-
 // MeterComputation captures computation usage and returns an error if it goes beyond the limit
 func (m *WeightedMeter) MeterComputation(kind common.ComputationKind, intensity uint) error {
 	m.computationIntensities[kind] += intensity
@@ -394,16 +407,6 @@ func (m *WeightedMeter) TotalComputationUsed() uint {
 	return uint(m.computationUsed >> MeterExecutionInternalPrecisionBytes)
 }
 
-// TotalComputationLimit returns the total computation limit
-func (m *WeightedMeter) TotalComputationLimit() uint {
-	return uint(m.computationLimit >> MeterExecutionInternalPrecisionBytes)
-}
-
-// SetMemoryWeights sets the memory weights
-func (m *WeightedMeter) SetMemoryWeights(weights ExecutionMemoryWeights) {
-	m.memoryWeights = weights
-}
-
 // MeterMemory captures memory usage and returns an error if it goes beyond the limit
 func (m *WeightedMeter) MeterMemory(kind common.MemoryKind, intensity uint) error {
 	m.memoryIntensities[kind] += intensity
@@ -426,14 +429,4 @@ func (m *WeightedMeter) MemoryIntensities() MeteredMemoryIntensities {
 // TotalMemoryEstimate returns the total memory used
 func (m *WeightedMeter) TotalMemoryEstimate() uint {
 	return uint(m.memoryEstimate)
-}
-
-// TotalMemoryLimit returns the total memory limit
-func (m *WeightedMeter) TotalMemoryLimit() uint {
-	return uint(m.memoryLimit)
-}
-
-// SetTotalMemoryLimit sets the total memory limit
-func (m *WeightedMeter) SetTotalMemoryLimit(limit uint64) {
-	m.memoryLimit = limit
 }
