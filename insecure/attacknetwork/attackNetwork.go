@@ -110,14 +110,14 @@ func (a *AttackNetwork) stop() error {
 // Instead of dispatching their messages to the networking layer of Flow, the conduits of corrupted nodes
 // dispatch the outgoing messages to the attack network by calling the InboundHandler method of it remotely.
 func (a *AttackNetwork) Observe(message *insecure.Message) {
-	if err := a.processMessageFromCorruptedNode(message); err != nil {
+	if err := a.processEgressMessage(message); err != nil {
 		a.logger.Fatal().Err(err).Msg("could not process message of corrupted node")
 	}
 }
 
-// processMessageFromCorruptedNode processes incoming messages arrived from corruptible conduits by passing them
+// processEgressMessage processes incoming messages arrived from corruptible conduits by passing them
 // to the orchestrator.
-func (a *AttackNetwork) processMessageFromCorruptedNode(message *insecure.Message) error {
+func (a *AttackNetwork) processEgressMessage(message *insecure.Message) error {
 	event, err := a.codec.Decode(message.Egress.Payload)
 	if err != nil {
 		return fmt.Errorf("could not decode observed payload: %w", err)
