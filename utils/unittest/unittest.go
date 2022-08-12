@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
+	"github.com/onflow/flow-go/network/topology"
 )
 
 type SkipReason int
@@ -381,9 +382,14 @@ func AssertEqualBlocksLenAndOrder(t *testing.T, expectedBlocks, actualSegmentBlo
 	assert.Equal(t, flow.GetIDs(expectedBlocks), flow.GetIDs(actualSegmentBlocks))
 }
 
-// NetworkCodec returns cbor codec
+// NetworkCodec returns cbor codec.
 func NetworkCodec() network.Codec {
 	return cborcodec.NewCodec()
+}
+
+// NetworkTopology returns the default topology for testing purposes.
+func NetworkTopology() network.Topology {
+	return topology.NewFullyConnectedTopology()
 }
 
 // CrashTest safely tests functions that crash (as the expected behavior) by checking that running the function creates an error and

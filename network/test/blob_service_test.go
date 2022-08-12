@@ -15,6 +15,8 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/utils/unittest"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/util"
@@ -22,8 +24,6 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/topology"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // conditionalTopology is a topology that behaves like the underlying topology when the condition is true,
@@ -35,11 +35,11 @@ type conditionalTopology struct {
 
 var _ network.Topology = (*conditionalTopology)(nil)
 
-func (t *conditionalTopology) GenerateFanout(ids flow.IdentityList, channels channels.ChannelList) (flow.IdentityList, error) {
+func (t *conditionalTopology) Fanout(ids flow.IdentityList) flow.IdentityList {
 	if t.condition() {
-		return t.top.GenerateFanout(ids, channels)
+		return t.top.Fanout(ids)
 	} else {
-		return flow.IdentityList{}, nil
+		return flow.IdentityList{}
 	}
 }
 
@@ -75,10 +75,6 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 	// on Bitswap before connecting to each other, otherwise their Bitswap requests may never reach each other.
 	// See https://github.com/ipfs/go-bitswap/issues/525 for more details.
 	topologyActive := atomic.NewBool(false)
-	tops := make([]network.Topology, suite.numNodes)
-	for i := 0; i < suite.numNodes; i++ {
-		tops[i] = &conditionalTopology{topology.NewFullyConnectedTopology(), topologyActive.Load}
-	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	suite.cancel = cancel
@@ -88,11 +84,10 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 		suite.T(),
 		suite.numNodes,
 		logger,
-		tops,
 		unittest.NetworkCodec(),
 		mocknetwork.NewViolationsConsumer(suite.T()),
 		WithDHT("blob_service_test", p2p.AsServer()),
-		WithPeerManagerOpts(p2p.WithInterval(time.Second)),
+		WithPeerUpdateInterval(time.Second),
 	)
 	suite.networks = networks
 

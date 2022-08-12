@@ -3,12 +3,10 @@ package test
 import (
 	"context"
 	"fmt"
-	"os"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/ipfs/go-log"
 	swarm "github.com/libp2p/go-libp2p-swarm"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -87,9 +85,7 @@ func TestMiddlewareTestSuite(t *testing.T) {
 
 // SetupTest initiates the test setups prior to each test
 func (m *MiddlewareTestSuite) SetupTest() {
-	logger := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
-	log.SetAllLoggers(log.LevelError)
-	m.logger = logger
+	m.logger = unittest.Logger()
 
 	m.size = 2 // operates on two middlewares
 	m.metrics = metrics.NewNoopCollector()
@@ -99,12 +95,12 @@ func (m *MiddlewareTestSuite) SetupTest() {
 	peerChannel := make(chan string)
 	ob := tagsObserver{
 		tags: peerChannel,
-		log:  logger,
+		log:  m.logger,
 	}
 
 	m.slashingViolationsConsumer = mocknetwork.NewViolationsConsumer(m.T())
 
-	m.ids, m.mws, obs, m.providers = GenerateIDsAndMiddlewares(m.T(), m.size, logger, unittest.NetworkCodec(), m.slashingViolationsConsumer)
+	m.ids, m.mws, obs, m.providers = GenerateIDsAndMiddlewares(m.T(), m.size, m.logger, unittest.NetworkCodec(), m.slashingViolationsConsumer)
 
 	for _, observableConnMgr := range obs {
 		observableConnMgr.Subscribe(&ob)

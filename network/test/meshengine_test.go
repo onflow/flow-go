@@ -70,7 +70,6 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 		suite.T(),
 		count,
 		logger,
-		nil,
 		unittest.NetworkCodec(),
 		mocknetwork.NewViolationsConsumer(suite.T()),
 		WithIdentityOpts(unittest.WithAllRoles()),

@@ -183,7 +183,6 @@ func (suite *MutableIdentityTableSuite) addNodes(count int) {
 		suite.T(),
 		count,
 		suite.logger,
-		nil,
 		unittest.NetworkCodec(),
 		mocknetwork.NewViolationsConsumer(suite.T()),
 	)
