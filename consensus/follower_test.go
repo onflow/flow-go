@@ -181,12 +181,11 @@ func (s *HotStuffFollowerSuite) TestSubmitProposal() {
 	s.submitWithTimeout(nextBlock, rootBlockView)
 }
 
-// TestFollowerFinalizedBlock verifies that when submitting 4 extra blocks
+// TestFollowerFinalizedBlock verifies that when submitting 3 extra blocks
 // the Follower reacts with callbacks to s.updater.MakeValid or s.notifier.OnBlockIncorporated
 // for all the added blocks. Furthermore, the follower should finalize the first submitted block,
 // i.e. call s.updater.MakeFinal and s.notifier.OnFinalizedBlock
 func (s *HotStuffFollowerSuite) TestFollowerFinalizedBlock() {
-	// TODO(active-pacemaker): this test needs to be updated to follow new finalization rules(2-chain instead of 3-chain)
 	expectedFinalized := s.mockConsensus.extendBlock(s.rootHeader.View+1, s.rootHeader)
 	s.notifier.On("OnBlockIncorporated", blockWithID(expectedFinalized.ID())).Return().Once()
 	s.updater.On("MakeValid", blockID(expectedFinalized.ID())).Return(nil).Once()
@@ -198,20 +197,13 @@ func (s *HotStuffFollowerSuite) TestFollowerFinalizedBlock() {
 	s.updater.On("MakeValid", blockID(nextBlock.ID())).Return(nil).Once()
 	s.submitWithTimeout(nextBlock, expectedFinalized.View)
 
-	// direct 2-chain on top of expectedFinalized
+	// indirect 2-chain on top of expectedFinalized
 	lastBlock := nextBlock
-	nextBlock = s.mockConsensus.extendBlock(lastBlock.View+1, lastBlock)
-	s.notifier.On("OnBlockIncorporated", blockWithID(nextBlock.ID())).Return().Once()
-	s.updater.On("MakeValid", blockID(nextBlock.ID())).Return(nil).Once()
-	s.submitWithTimeout(nextBlock, lastBlock.View)
-
-	// indirect 3-chain on top of expectedFinalized => finalization
-	lastBlock = nextBlock
 	nextBlock = s.mockConsensus.extendBlock(lastBlock.View+5, lastBlock)
-	s.notifier.On("OnFinalizedBlock", blockWithID(expectedFinalized.ID())).Return().Once()
 	s.notifier.On("OnBlockIncorporated", blockWithID(nextBlock.ID())).Return().Once()
-	s.updater.On("MakeFinal", blockID(expectedFinalized.ID())).Return(nil).Once()
+	s.notifier.On("OnFinalizedBlock", blockWithID(expectedFinalized.ID())).Return().Once()
 	s.updater.On("MakeValid", blockID(nextBlock.ID())).Return(nil).Once()
+	s.updater.On("MakeFinal", blockID(expectedFinalized.ID())).Return(nil).Once()
 	s.submitWithTimeout(nextBlock, lastBlock.View)
 }
 
