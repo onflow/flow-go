@@ -1,7 +1,6 @@
 package programs
 
 import (
-	"math"
 	"testing"
 
 	"github.com/onflow/cadence/runtime/ast"
@@ -27,7 +26,7 @@ func Test_Programs(t *testing.T) {
 
 	newState := state.NewState(
 		utils.NewSimpleView(),
-		meter.NewMeter(math.MaxUint64, math.MaxUint64))
+		meter.NewMeter(meter.DefaultParameters()))
 
 	addressLocation := common.AddressLocation{
 		Address: common.MustBytesToAddress([]byte{2, 3, 4}),

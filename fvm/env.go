@@ -33,9 +33,6 @@ type Environment interface {
 	VM() *VirtualMachine
 	runtime.Interface
 
-	// TODO(patrick): we should probably make this non-optional
-	AccountFreezeEnabled() bool
-
 	StartSpanFromRoot(name trace.SpanName) otelTrace.Span
 	StartExtensiveTracingSpanFromRoot(name trace.SpanName) otelTrace.Span
 }
@@ -95,6 +92,9 @@ type commonEnv struct {
 	uuidGenerator *state.UUIDGenerator
 
 	frozenAccounts []common.Address
+
+	// TODO(patrick): rm once fully refactored
+	fullEnv Environment
 }
 
 // TODO(patrick): rm once Meter object has been refactored
@@ -119,10 +119,6 @@ func (env *commonEnv) MemoryEstimate() uint64 {
 
 func (env *commonEnv) Context() *Context {
 	return &env.ctx
-}
-
-func (env *commonEnv) AccountFreezeEnabled() bool {
-	return env.ctx.AccountFreezeEnabled
 }
 
 func (env *commonEnv) VM() *VirtualMachine {
