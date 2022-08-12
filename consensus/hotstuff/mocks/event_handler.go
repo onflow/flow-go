@@ -3,6 +3,7 @@
 package mocks
 
 import (
+	hotstuff "github.com/onflow/flow-go/consensus/hotstuff"
 	flow "github.com/onflow/flow-go/model/flow"
 
 	mock "github.com/stretchr/testify/mock"
@@ -24,6 +25,20 @@ func (_m *EventHandler) OnLocalTimeout() error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func() error); ok {
 		r0 = rf()
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// OnPartialTcCreated provides a mock function with given fields: partialTC
+func (_m *EventHandler) OnPartialTcCreated(partialTC *hotstuff.PartialTcCreated) error {
+	ret := _m.Called(partialTC)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*hotstuff.PartialTcCreated) error); ok {
+		r0 = rf(partialTC)
 	} else {
 		r0 = ret.Error(0)
 	}

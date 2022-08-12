@@ -65,6 +65,7 @@ type PaceMaker interface {
 
 	// ProcessTC will check if the given TC will allow PaceMaker to fast-forward to TC.view+1.
 	// If PaceMaker incremented the current View, a NewViewEvent will be returned.
+	// A nil TC is an expected valid input.
 	// No errors are expected during normal operation.
 	ProcessTC(tc *flow.TimeoutCertificate) (*model.NewViewEvent, error)
 
