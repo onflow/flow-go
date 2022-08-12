@@ -126,13 +126,6 @@ type Consumer interface {
 	// and must handle repetition of the same events (with some processing overhead).
 	OnReachedTimeout(timeout *model.TimerInfo)
 
-	// OnQcIncorporated notifications are produced by ForkChoice
-	// whenever a quorum certificate is incorporated into the consensus state.
-	// Prerequisites:
-	// Implementation must be concurrency safe; Non-blocking;
-	// and must handle repetition of the same events (with some processing overhead).
-	OnQcIncorporated(*flow.QuorumCertificate)
-
 	// OnDoubleVotingDetected notifications are produced by the Vote Aggregation logic
 	// whenever a double voting (same voter voting for different blocks at the same view) was detected.
 	// Prerequisites:

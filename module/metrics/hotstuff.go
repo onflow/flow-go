@@ -30,7 +30,8 @@ type HotstuffCollector struct {
 	idleDuration                  prometheus.Histogram
 	waitDuration                  *prometheus.HistogramVec
 	curView                       prometheus.Gauge
-	qcView                        prometheus.Gauge
+	qcView                        *prometheus.GaugeVec
+	tcView                        *prometheus.GaugeVec
 	skips                         prometheus.Counter
 	timeouts                      prometheus.Counter
 	timeoutDuration               prometheus.Gauge
@@ -79,13 +80,19 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
-		qcView: promauto.NewGauge(prometheus.GaugeOpts{
-			Name:        "qc_view",
-			Namespace:   namespaceConsensus,
-			Subsystem:   subsystemHotstuff,
-			Help:        "The view of the newest known qc from HotStuff",
-			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
-		}),
+		qcView: promauto.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: namespaceConsensus,
+			Subsystem: subsystemHotstuff,
+			Name:      "qc_view",
+			Help:      "The view of latest TC that has triggered a view change",
+		}, []string{chain.String()}),
+
+		tcView: promauto.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: namespaceConsensus,
+			Subsystem: subsystemHotstuff,
+			Name:      "tc_view",
+			Help:      "The view of latest TC that has triggered a view change",
+		}, []string{chain.String()}),
 
 		skips: promauto.NewCounter(prometheus.CounterOpts{
 			Name:        "skips_total",
@@ -167,13 +174,20 @@ func (hc *HotstuffCollector) HotStuffWaitDuration(duration time.Duration, event 
 }
 
 // HotstuffCollector reports Metrics C8: Current View
-func (hc *HotstuffCollector) SetCurView(view uint64) {
+func (hc *HotstuffCollector) SetCurView(oldView, view uint64) {
 	hc.curView.Set(float64(view))
 }
 
-// NewestKnownQC reports Metrics C9: View of Newest Known QC
-func (hc *HotstuffCollector) SetQCView(view uint64) {
-	hc.qcView.Set(float64(view))
+// SetQCView reports Metrics C9: Reports the latest view transition using QC
+func (hc *HotstuffCollector) SetQCView(oldView, view uint64) {
+	hc.qcView.WithLabelValues("old_view").Set(float64(oldView))
+	hc.qcView.WithLabelValues("cur_view").Set(float64(view))
+}
+
+// SetTCView reports Metrics C10: Reports the latest view transition using TC
+func (hc *HotstuffCollector) SetTCView(oldView, view uint64) {
+	hc.tcView.WithLabelValues("old_view").Set(float64(oldView))
+	hc.tcView.WithLabelValues("cur_view").Set(float64(view))
 }
 
 // CountSkipped counts the number of skips we did.

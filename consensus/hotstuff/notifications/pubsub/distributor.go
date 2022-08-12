@@ -117,14 +117,6 @@ func (p *Distributor) OnReachedTimeout(timeout *model.TimerInfo) {
 	}
 }
 
-func (p *Distributor) OnQcIncorporated(qc *flow.QuorumCertificate) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	for _, subscriber := range p.subscribers {
-		subscriber.OnQcIncorporated(qc)
-	}
-}
-
 func (p *Distributor) OnBlockIncorporated(block *model.Block) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()

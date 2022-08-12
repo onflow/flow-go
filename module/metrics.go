@@ -124,8 +124,11 @@ type HotstuffMetrics interface {
 	// SetCurView reports Metrics C8: Current View
 	SetCurView(view uint64)
 
-	// SetQCView reports Metrics C9: View of Newest Known QC
-	SetQCView(view uint64)
+	// SetQCView reports Metrics C9: Reports the latest view transition using QC
+	SetQCView(oldView uint64, view uint64)
+
+	// SetTCView reports Metrics C10: Reports the latest view transition using TC
+	SetTCView(oldView uint64, view uint64)
 
 	// CountSkipped reports the number of times we skipped ahead.
 	CountSkipped()
