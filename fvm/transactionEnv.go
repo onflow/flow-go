@@ -52,7 +52,6 @@ func NewTransactionEnvironment(
 	programsHandler := handler.NewProgramsHandler(programs, sth)
 	// TODO set the flags on context
 	eventHandler := handler.NewEventHandler(ctx.Chain,
-		ctx.EventCollectionEnabled,
 		ctx.ServiceEventCollectionEnabled,
 		ctx.EventCollectionByteSizeLimit,
 	)

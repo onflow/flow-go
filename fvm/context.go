@@ -36,7 +36,6 @@ type Context struct {
 	LimitAccountStorage           bool
 	TransactionFeesEnabled        bool
 	CadenceLoggingEnabled         bool
-	EventCollectionEnabled        bool
 	ServiceEventCollectionEnabled bool
 	ExtensiveTracing              bool
 	TransactionProcessors         []TransactionProcessor
@@ -88,7 +87,6 @@ func defaultContext(logger zerolog.Logger) Context {
 		RestrictContractDeployment:           true,
 		RestrictContractRemoval:              true,
 		CadenceLoggingEnabled:                false,
-		EventCollectionEnabled:               true,
 		ServiceEventCollectionEnabled:        false,
 		ExtensiveTracing:                     false,
 		TransactionProcessors: []TransactionProcessor{
