@@ -6,8 +6,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/onflow/flow-go/utils/logging"
 	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/utils/logging"
 
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
