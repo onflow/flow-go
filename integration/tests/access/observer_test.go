@@ -147,6 +147,9 @@ func (suite *ObserverSuite) TestObserverWithoutAccess() {
 			}
 			t.Run(rpc.name, func(t *testing.T) {
 				err := rpc.call(ctx, observer)
+				if err == nil {
+					return
+				}
 				code := grpc.Code(err)
 				assert.Equal(t, codes.NotFound, code)
 			})
