@@ -98,7 +98,7 @@ func TestFinalize_IndirectDirect2Chain(t *testing.T) {
 }
 
 // TestFinalize_Direct2ChainOnIndirect tests adding a direct 2-chain on an indirect 2-chain.
-// The highest 2-chain should be finalized.
+// The head of highest 2-chain should be finalized.
 // receives [1,3] [3,5] [5,6] [6,7] [7,8]
 // it should finalize [5,6]
 func TestFinalize_Direct2ChainOnIndirect(t *testing.T) {
@@ -121,7 +121,7 @@ func TestFinalize_Direct2ChainOnIndirect(t *testing.T) {
 }
 
 // TestFinalize_Direct2ChainOnDirect tests adding a sequence of direct 2-chains.
-// The highest 2-chain should be finalized.
+// The head of highest 2-chain should be finalized.
 // receives [1,2] [2,3] [3,4] [4,5] [5,6]
 // it should finalize [3,4]
 func TestFinalize_Direct2ChainOnDirect(t *testing.T) {
