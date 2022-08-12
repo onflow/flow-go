@@ -817,7 +817,7 @@ func (m *FollowerState) epochPhaseMetricsAndEventsOnBlockFinalized(block *flow.H
 //
 // Returns the EpochStatus for the input block.
 // No error returns are expected under normal operations
-func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, error) {
+func (m *FollowerState) epochStatus(block *flow.Header, epochFallbackTriggered bool) (*flow.EpochStatus, error) {
 	parentStatus, err := m.epoch.statuses.ByBlockID(block.ParentID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve epoch state for parent: %w", err)
@@ -825,10 +825,6 @@ func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, erro
 	parentSetup, err := m.epoch.setups.ByID(parentStatus.CurrentEpoch.SetupID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve EpochSetup event for parent: %w", err)
-	}
-	epochFallbackTriggered, err := m.isEpochEmergencyFallbackTriggered()
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve epoch fallback status: %w", err)
 	}
 
 	// Case 1 or 2b (still in parent block's epoch or epoch fallback triggered):
@@ -885,7 +881,12 @@ func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, erro
 //
 // No errors are expected during normal operation.
 func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (dbUpdates []func(*transaction.Tx) error, err error) {
-	epochStatus, err := m.epochStatus(candidate.Header)
+
+	epochFallbackTriggered, err := m.isEpochEmergencyFallbackTriggered()
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve epoch fallback status: %w", err)
+	}
+	epochStatus, err := m.epochStatus(candidate.Header, epochFallbackTriggered)
 	if err != nil {
 		return nil, fmt.Errorf("could not determine epoch status for candidate block: %w", err)
 	}
@@ -901,7 +902,7 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (dbUpdat
 	dbUpdates = append(dbUpdates, m.epoch.statuses.StoreTx(blockID, epochStatus))
 
 	// never process service events after epoch fallback is triggered
-	if epochStatus.InvalidServiceEventIncorporated {
+	if epochStatus.InvalidServiceEventIncorporated || epochFallbackTriggered {
 		return dbUpdates, nil
 	}
 
