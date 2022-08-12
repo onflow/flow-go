@@ -948,8 +948,13 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (dbUpdat
 			case *flow.EpochCommit:
 
 				extendingSetup, err := m.epoch.setups.ByID(epochStatus.NextEpoch.SetupID)
+				if errors.Is(err, storage.ErrNotFound) {
+					// we have observed an EpochCommit without corresponding EpochSetup, which triggers epoch fallback mode
+					epochStatus.InvalidServiceEventIncorporated = true
+					return dbUpdates, nil
+				}
 				if err != nil {
-					return nil, state.NewInvalidExtensionErrorf("could not retrieve next epoch setup: %s", err)
+					return nil, fmt.Errorf("unexpected error retrieving next epoch setup: %w", err)
 				}
 				// validate the service event
 				err = isValidExtendingEpochCommit(ev, extendingSetup, activeSetup, epochStatus)
