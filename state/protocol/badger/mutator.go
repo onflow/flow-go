@@ -641,9 +641,11 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 // epochFallbackTriggeredByFinalizedBlock checks whether finalizing the input block
 // would trigger epoch emergency fallback mode. In particular, we trigger epoch
 // fallback mode when finalizing a block B when:
-// 1. B is the first finalized block with view greater than or equal to the epoch
-//    commitment deadline for the current epoch.
-// 2. The next epoch has not been committed as of B.
+// 1. B is the head of a fork in which epoch fallback was tentatively triggered,
+//    due to incorporating an invalid service event.
+// 2. (a) B is the first finalized block with view greater than or equal to the epoch
+//    commitment deadline for the current epoch AND
+//    (b) the next epoch has not been committed as of B.
 //
 // This function should only be called when epoch fallback *has not already been triggered*.
 // See protocol.Params for more details on the epoch commitment deadline.
@@ -651,14 +653,19 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 // No errors are expected during normal operation.
 func (m *FollowerState) epochFallbackTriggeredByFinalizedBlock(block *flow.Header, epochStatus *flow.EpochStatus, currentEpochSetup *flow.EpochSetup) (bool, error) {
 
-	// 1. determine whether block B is past the epoch commitment deadline
+	// 1. Epoch fallback is tentatively triggered on this fork
+	if epochStatus.InvalidServiceEventIncorporated {
+		return true, nil
+	}
+
+	// 2.(a) determine whether block B is past the epoch commitment deadline
 	safetyThreshold, err := m.Params().EpochCommitSafetyThreshold()
 	if err != nil {
 		return false, fmt.Errorf("could not get epoch commit safety threshold: %w", err)
 	}
 	blockExceedsDeadline := block.View+safetyThreshold >= currentEpochSetup.FinalView
 
-	// 2. determine whether the next epoch is committed w.r.t. block B
+	// 2.(b) determine whether the next epoch is committed w.r.t. block B
 	currentEpochPhase, err := epochStatus.Phase()
 	if err != nil {
 		return false, fmt.Errorf("could not get current epoch phase: %w", err)
@@ -808,44 +815,42 @@ func (m *FollowerState) epochPhaseMetricsAndEventsOnBlockFinalized(block *flow.H
 // As the parent was a valid extension of the chain, by induction, the parent
 // satisfies all consistency requirements of the protocol.
 //
-// Return values:
-//  1. EpochStatus for `block`
-//  2. boolean flag indicating whether we are in EECC
+// Returns the EpochStatus for the input block.
 // No error returns are expected under normal operations
-func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, bool, error) {
+func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, error) {
 	parentStatus, err := m.epoch.statuses.ByBlockID(block.ParentID)
 	if err != nil {
-		return nil, false, fmt.Errorf("could not retrieve epoch state for parent: %w", err)
+		return nil, fmt.Errorf("could not retrieve epoch state for parent: %w", err)
 	}
 	parentSetup, err := m.epoch.setups.ByID(parentStatus.CurrentEpoch.SetupID)
 	if err != nil {
-		return nil, false, fmt.Errorf("could not retrieve EpochSetup event for parent: %w", err)
+		return nil, fmt.Errorf("could not retrieve EpochSetup event for parent: %w", err)
 	}
 	epochFallbackTriggered, err := m.isEpochEmergencyFallbackTriggered()
 	if err != nil {
-		return nil, false, fmt.Errorf("could not retrieve epoch fallback status: %w", err)
+		return nil, fmt.Errorf("could not retrieve epoch fallback status: %w", err)
 	}
 
 	// Case 1 or 2b (still in parent block's epoch or epoch fallback triggered):
 	if block.View <= parentSetup.FinalView || epochFallbackTriggered {
 		// IMPORTANT: copy the status to avoid modifying the parent status in the cache
-		return parentStatus.Copy(), epochFallbackTriggered, nil
+		return parentStatus.Copy(), nil
 	}
 
 	// Case 2a (first block of new epoch):
 	// sanity check: parent's epoch Preparation should be completed and have EpochSetup and EpochCommit events
 	if parentStatus.NextEpoch.SetupID == flow.ZeroID {
-		return nil, false, fmt.Errorf("missing setup event for starting next epoch")
+		return nil, fmt.Errorf("missing setup event for starting next epoch")
 	}
 	if parentStatus.NextEpoch.CommitID == flow.ZeroID {
-		return nil, false, fmt.Errorf("missing commit event for starting next epoch")
+		return nil, fmt.Errorf("missing commit event for starting next epoch")
 	}
 	epochStatus, err := flow.NewEpochStatus(
 		parentStatus.CurrentEpoch.SetupID, parentStatus.CurrentEpoch.CommitID,
 		parentStatus.NextEpoch.SetupID, parentStatus.NextEpoch.CommitID,
 		flow.ZeroID, flow.ZeroID,
 	)
-	return epochStatus, epochFallbackTriggered, err
+	return epochStatus, err
 
 }
 
@@ -877,15 +882,10 @@ func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, bool
 //    this method returns a slice of Badger operations to apply while storing the block.
 //    This includes an operation to index the epoch status for every block, and
 //    operations to insert service events for blocks that include them.
-//  * insertingCandidateTriggersEpochFallback - if inserting this block causes epoch
-//    fallback mode to be triggered, this is true. This causes flag to be set in the
-//    database and a protocol event to be emitted. This can only be true for at most
-//    one block for a given database instance.
 //
 // No errors are expected during normal operation.
-// TODO: we should only consider an incorporated service fatal, and trigger EECC, on finalization of block D https://github.com/dapperlabs/flow-go/issues/6316
 func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (dbUpdates []func(*transaction.Tx) error, err error) {
-	epochStatus, isEpochFallbackTriggered, err := m.epochStatus(candidate.Header)
+	epochStatus, err := m.epochStatus(candidate.Header)
 	if err != nil {
 		return nil, fmt.Errorf("could not determine epoch status for candidate block: %w", err)
 	}
@@ -901,7 +901,7 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (dbUpdat
 	dbUpdates = append(dbUpdates, m.epoch.statuses.StoreTx(blockID, epochStatus))
 
 	// never process service events after epoch fallback is triggered
-	if isEpochFallbackTriggered {
+	if epochStatus.InvalidServiceEventIncorporated {
 		return dbUpdates, nil
 	}
 
@@ -931,6 +931,7 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (dbUpdat
 				err := isValidExtendingEpochSetup(ev, activeSetup, epochStatus)
 				if protocol.IsInvalidServiceEventError(err) {
 					// we have observed an invalid service event, which triggers epoch fallback mode
+					epochStatus.InvalidServiceEventIncorporated = true
 					return dbUpdates, nil
 				}
 				if err != nil {
@@ -953,6 +954,7 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (dbUpdat
 				err = isValidExtendingEpochCommit(ev, extendingSetup, activeSetup, epochStatus)
 				if protocol.IsInvalidServiceEventError(err) {
 					// we have observed an invalid service event, which triggers epoch fallback mode
+					epochStatus.InvalidServiceEventIncorporated = true
 					return dbUpdates, nil
 				}
 				if err != nil {
@@ -966,7 +968,7 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (dbUpdat
 				dbUpdates = append(dbUpdates, m.epoch.commits.StoreTx(ev))
 
 			default:
-				return nil, fmt.Errorf("invalid service event type: %s", event.Type)
+				return nil, fmt.Errorf("invalid service event type (type_name=%s, go_type=%T)", event.Type, ev)
 			}
 		}
 	}
