@@ -526,8 +526,8 @@ func (s *feldmanVSSQualState) receiveComplaint(origin index, data []byte) {
 		return
 	}
 	c.received = true
-	// first flag check is a sanity check
-	if c.answerReceived && s.myIndex != s.leaderIndex {
+	// answerReceived flag check is a sanity check
+	if s.vAReceived && c.answerReceived && s.myIndex != s.leaderIndex {
 		s.disqualified = s.checkComplaint(origin, c)
 		if s.disqualified {
 			s.processor.Disqualify(int(s.leaderIndex),
@@ -607,14 +607,16 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 				fmt.Sprintf("invalid complaint answer value %x", data))
 			return
 		}
-		s.disqualified = s.checkComplaint(complainer, c)
-		if s.disqualified {
-			s.processor.Disqualify(int(s.leaderIndex),
-				fmt.Sprintf("complaint answer received: complaint answer to %d is invalid",
-					complainer))
+		if s.vAReceived {
+			s.disqualified = s.checkComplaint(complainer, c)
+			if s.disqualified {
+				s.processor.Disqualify(int(s.leaderIndex),
+					fmt.Sprintf("complaint answer received: complaint answer to %d is invalid",
+						complainer))
+			}
 		}
 
-		// fix the share of the current participant if the complaint in invalid
+		// fix the share of the current participant if the complaint is invalid
 		if !s.disqualified && complainer == s.myIndex {
 			s.x = c.answer
 		}
