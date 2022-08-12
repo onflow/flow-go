@@ -35,9 +35,9 @@ type EgressEvent struct {
 
 // IngressEvent is the incoming event coming to a corrupted node (from an honest or corrupted node)
 type IngressEvent struct {
-	OriginID            flow.Identifier
-	Channel             channels.Channel
-	FlowProtocolContent interface{}
+	OriginID          flow.Identifier
+	Channel           channels.Channel
+	FlowProtocolEvent interface{}
 }
 
 func ProtocolStr(p Protocol) string {
