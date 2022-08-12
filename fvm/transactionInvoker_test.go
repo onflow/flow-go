@@ -2,7 +2,6 @@ package fvm_test
 
 import (
 	"bytes"
-	"math"
 	"testing"
 
 	"github.com/onflow/cadence"
@@ -42,7 +41,7 @@ func TestSafetyCheck(t *testing.T) {
 
 		sth := state.NewStateHolder(state.NewState(
 			view,
-			meter.NewMeter(math.MaxUint64, math.MaxUint64),
+			meter.NewMeter(meter.DefaultParameters()),
 			state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
 			state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
 			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
@@ -75,7 +74,7 @@ func TestSafetyCheck(t *testing.T) {
 
 		sth := state.NewStateHolder(state.NewState(
 			view,
-			meter.NewMeter(math.MaxUint64, math.MaxUint64),
+			meter.NewMeter(meter.DefaultParameters()),
 			state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
 			state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
 			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
