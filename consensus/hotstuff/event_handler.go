@@ -43,8 +43,8 @@ type EventHandler interface {
 	// No errors are expected during normal operation.
 	OnLocalTimeout() error
 
-	// OnPartialTcCreated handles notification produces by by the internal timeout aggregator. If the notification is for the current view,
-	// a corresponding model.TimeoutObject is broadcasted to the consensus committee.
+	// OnPartialTcCreated handles notification produces by the internal timeout aggregator. If the notification is for the current view,
+	// a corresponding model.TimeoutObject is broadcast to the consensus committee.
 	// No errors are expected during normal operation.
 	OnPartialTcCreated(partialTC *PartialTcCreated) error
 
