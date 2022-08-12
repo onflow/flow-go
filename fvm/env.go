@@ -33,9 +33,6 @@ type Environment interface {
 	VM() *VirtualMachine
 	runtime.Interface
 
-	// TODO(patrick): we should probably make this non-optional
-	AccountFreezeEnabled() bool
-
 	StartSpanFromRoot(name trace.SpanName) otelTrace.Span
 	StartExtensiveTracingSpanFromRoot(name trace.SpanName) otelTrace.Span
 }
@@ -122,10 +119,6 @@ func (env *commonEnv) MemoryEstimate() uint64 {
 
 func (env *commonEnv) Context() *Context {
 	return &env.ctx
-}
-
-func (env *commonEnv) AccountFreezeEnabled() bool {
-	return env.ctx.AccountFreezeEnabled
 }
 
 func (env *commonEnv) VM() *VirtualMachine {
