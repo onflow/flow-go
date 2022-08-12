@@ -11,6 +11,7 @@ import (
 const (
 	unAuthorizedSenderViolation = "unauthorized_sender"
 	unknownMsgTypeViolation     = "unknown_message_type"
+	invalidMsgViolation         = "invalid_message"
 	senderEjectedViolation      = "sender_ejected"
 )
 
@@ -48,6 +49,12 @@ func (c *Consumer) OnUnAuthorizedSenderError(violation *Violation) {
 // OnUnknownMsgTypeError logs an error for unknown message type error
 func (c *Consumer) OnUnknownMsgTypeError(violation *Violation) {
 	c.logOffense(unknownMsgTypeViolation, violation)
+}
+
+// OnInvalidMsgError logs an error for messages that contained payloads that could not
+//	// be unmarshalled into the message type denoted by message code byte.
+func (c *Consumer) OnInvalidMsgError(violation *Violation) {
+	c.logOffense(invalidMsgViolation, violation)
 }
 
 // OnSenderEjectedError logs an error for sender ejected error

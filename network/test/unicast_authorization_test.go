@@ -2,6 +2,7 @@ package test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -284,6 +285,63 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnknownMsgCode(
 
 	slashingViolationsConsumer.On(
 		"OnUnknownMsgTypeError",
+		expectedViolation,
+	).Once().Run(func(args mockery.Arguments) {
+		close(u.waitCh)
+	})
+
+	defer slashingViolationsConsumer.AssertExpectations(u.T())
+
+	overlay := &mocknetwork.Overlay{}
+	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
+		return u.providers[0].Identities(filter.Any)
+	})
+	overlay.On("Topology").Maybe().Return(func() flow.IdentityList {
+		return u.providers[0].Identities(filter.Any)
+	}, nil)
+	overlay.On("Identity", mock.AnythingOfType("peer.ID")).Return(u.senderID, true)
+
+	// message will be rejected so assert overlay never receives it
+	defer overlay.AssertNotCalled(u.T(), "Receive", u.senderID.NodeID, mock.AnythingOfType("*message.Message"))
+
+	u.startMiddlewares(overlay)
+
+	msg, _ := createMessage(u.senderID.NodeID, u.receiverID.NodeID, "hello")
+	// manipulate message code byte
+	msg.Payload[0] = invalidMessageCode
+
+	// send message via unicast
+	err = u.senderMW.SendDirect(msg, u.receiverID.NodeID)
+	require.NoError(u.T(), err)
+
+	// wait for slashing violations consumer mock to invoke run func and close ch if expected method call happens
+	unittest.RequireCloseBefore(u.T(), u.waitCh, u.channelCloseDuration, "could close ch on time")
+}
+
+// TestUnicastAuthorization_WrongMsgCode tests that messages sent via unicast with a message code that does not match the underlying message type are correctly rejected.
+func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() {
+	// setup mock slashing violations consumer and middlewares
+	slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(u.T())
+	u.setupMiddlewaresAndProviders(slashingViolationsConsumer)
+
+	expectedSenderPeerID, err := unittest.PeerIDFromFlowID(u.senderID)
+	require.NoError(u.T(), err)
+
+	invalidMessageCode := codec.CodeDKGMessage
+
+	var nilID *flow.Identity
+	expectedViolation := &slashing.Violation{
+		Identity:  nilID,
+		PeerID:    expectedSenderPeerID.String(),
+		MsgType:   "",
+		Channel:   channels.TestNetworkChannel,
+		IsUnicast: true,
+		//NOTE: in this test the message code does not match the underlying message type causing the codec to fail to unmarshal the message when decoding.
+		Err: codec.NewMsgUnmarshalErr(invalidMessageCode, message.DKGMessage, fmt.Errorf("cbor: found unknown field at map element index 0")),
+	}
+
+	slashingViolationsConsumer.On(
+		"OnInvalidMsgError",
 		expectedViolation,
 	).Once().Run(func(args mockery.Arguments) {
 		close(u.waitCh)

@@ -12,6 +12,10 @@ type ViolationsConsumer interface {
 	// OnUnknownMsgTypeError logs an error for unknown message type error
 	OnUnknownMsgTypeError(violation *Violation)
 
+	// OnInvalidMsgError logs an error for messages that contained payloads that could not
+	// be unmarshalled into the message type denoted by message code byte.
+	OnInvalidMsgError(violation *Violation)
+
 	// OnSenderEjectedError logs an error for sender ejected error
 	OnSenderEjectedError(violation *Violation)
 }
