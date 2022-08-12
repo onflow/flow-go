@@ -9,6 +9,8 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/tracker"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
@@ -23,8 +25,11 @@ type EventLoop struct {
 	eventHandler        hotstuff.EventHandler
 	metrics             module.HotstuffMetrics
 	proposals           chan *model.Proposal
-	quorumCertificates  chan *flow.QuorumCertificate
-	timeoutCertificates chan *flow.TimeoutCertificate
+	partialTcCreated    chan *hotstuff.PartialTcCreated
+	newestSubmittedTc   *tracker.NewestTCTracker
+	newestSubmittedQc   *tracker.NewestQCTracker
+	tcSubmittedNotifier engine.Notifier
+	qcSubmittedNotifier engine.Notifier
 	startTime           time.Time
 }
 
@@ -33,17 +38,28 @@ var _ component.Component = (*EventLoop)(nil)
 
 // NewEventLoop creates an instance of EventLoop.
 func NewEventLoop(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandler hotstuff.EventHandler, startTime time.Time) (*EventLoop, error) {
-	proposals := make(chan *model.Proposal)
-	quorumCertificates := make(chan *flow.QuorumCertificate, 1)
-	timeoutCertificates := make(chan *flow.TimeoutCertificate, 1)
+	// we will use a buffered channel to avoid blocking of caller
+	// we can't afford to drop messages since it undermines liveness, but we also want to avoid blocking of compliance
+	// engine. We assume that we should be able to process proposals faster than compliance engine feeds them, worst case
+	// we will fill the buffer and block compliance engine worker but that should happen only if compliance engine receives
+	// large number of blocks in short period of time(when catching up for instance).
+	// TODO(active-pacemaker) add metrics for length of inbound channels
+	proposals := make(chan *model.Proposal, 1000)
+	// we will use a buffered channel to avoid blocking of caller
+	// we will create at most one partial TC per view and only in recovery path
+	// since we don't expect a large number of messages we are using a buffered channel.
+	partialTcCreated := make(chan *hotstuff.PartialTcCreated, 10)
 
 	el := &EventLoop{
 		log:                 log,
 		eventHandler:        eventHandler,
 		metrics:             metrics,
 		proposals:           proposals,
-		quorumCertificates:  quorumCertificates,
-		timeoutCertificates: timeoutCertificates,
+		tcSubmittedNotifier: engine.NewNotifier(),
+		qcSubmittedNotifier: engine.NewNotifier(),
+		newestSubmittedTc:   tracker.NewNewestTCTracker(),
+		newestSubmittedQc:   tracker.NewNewestQCTracker(),
+		partialTcCreated:    partialTcCreated,
 		startTime:           startTime,
 	}
 
@@ -84,6 +100,9 @@ func (el *EventLoop) loop(ctx context.Context) error {
 	// if hotstuff hits any unknown error, it will exit the loop
 
 	shutdownSignaled := ctx.Done()
+	timeoutCertificates := el.tcSubmittedNotifier.Channel()
+	quorumCertificates := el.qcSubmittedNotifier.Channel()
+
 	for {
 		// Giving timeout events the priority to be processed first
 		// This is to prevent attacks from malicious nodes that attempt
@@ -98,7 +117,9 @@ func (el *EventLoop) loop(ctx context.Context) error {
 		case <-shutdownSignaled:
 			return nil
 
-		// if we receive a time out, process it and log errors
+		// processing timeout or partial TC event are top priority since
+		// they allow node to contribute to TC aggregation when replicas can't
+		// make progress on happy path
 		case <-timeoutChannel:
 
 			processStart := time.Now()
@@ -116,6 +137,22 @@ func (el *EventLoop) loop(ctx context.Context) error {
 			// A timeout also means, we have made progress. A new timeout will have
 			// been started and el.eventHandler.TimeoutChannel() will be a NEW channel (for the just-started timeout)
 			// Very important to start the for loop from the beginning, to continue the with the new timeout channel!
+			continue
+
+		case ev := <-el.partialTcCreated:
+			// TODO(active-pacemaker): measure how long it takes for event to be processed
+			err := el.eventHandler.OnPartialTcCreated(ev)
+
+			if err != nil {
+				return fmt.Errorf("could no process partial created TC event: %w", err)
+			}
+
+			// At this point, we have received and processed partial TC event, it could have resulted in several scenarios:
+			// 1. a view change with potential voting or proposal creation
+			// 2. a created and broadcast timeout object
+			// 3. QC and TC didn't result in view change and no timeout was created since we have already timed out or
+			// the partial TC was created for view different from current one.
+
 			continue
 
 		default:
@@ -172,14 +209,14 @@ func (el *EventLoop) loop(ctx context.Context) error {
 				Msg("block proposal has been processed successfully")
 
 		// if we have a new QC, process it
-		case qc := <-el.quorumCertificates:
+		case <-quorumCertificates:
 			// measure how long the event loop was idle waiting for an
 			// incoming event
 			el.metrics.HotStuffIdleDuration(time.Since(idleStart))
 
 			processStart := time.Now()
 
-			err := el.eventHandler.OnReceiveQc(qc)
+			err := el.eventHandler.OnReceiveQc(el.newestSubmittedQc.NewestQC())
 
 			// measure how long it takes for a QC to be processed
 			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeOnQC)
@@ -189,20 +226,28 @@ func (el *EventLoop) loop(ctx context.Context) error {
 			}
 
 			// if we have a new TC, process it
-		case tc := <-el.timeoutCertificates:
+		case <-timeoutCertificates:
 			// measure how long the event loop was idle waiting for an
 			// incoming event
 			el.metrics.HotStuffIdleDuration(time.Since(idleStart))
 
 			processStart := time.Now()
 
-			err := el.eventHandler.OnReceiveTc(tc)
+			err := el.eventHandler.OnReceiveTc(el.newestSubmittedTc.NewestTC())
 
 			// measure how long it takes for a TC to be processed
 			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeOnTC)
 
 			if err != nil {
 				return fmt.Errorf("could not process TC: %w", err)
+			}
+
+		case ev := <-el.partialTcCreated:
+			err := el.eventHandler.OnPartialTcCreated(ev)
+
+			// TODO(active-pacemaker): measure how long it takes for event to be processed
+			if err != nil {
+				return fmt.Errorf("could no process partial created TC event: %w", err)
 			}
 		}
 	}
@@ -227,32 +272,29 @@ func (el *EventLoop) SubmitProposal(proposalHeader *flow.Header, parentView uint
 
 // onTrustedQC pushes the received QC(which MUST be validated) to the quorumCertificates channel
 func (el *EventLoop) onTrustedQC(qc *flow.QuorumCertificate) {
-	received := time.Now()
-
-	select {
-	case el.quorumCertificates <- qc:
-	case <-el.ComponentManager.ShutdownSignal():
-		return
+	if el.newestSubmittedQc.Track(qc) {
+		el.qcSubmittedNotifier.Notify()
 	}
 
+	//received := time.Now()
 	// the wait duration is measured as how long it takes from a qc being
 	// received to event handler commencing the processing of the qc
-	el.metrics.HotStuffWaitDuration(time.Since(received), metrics.HotstuffEventTypeOnQC)
+	//el.metrics.HotStuffWaitDuration(time.Since(received), metrics.HotstuffEventTypeOnQC)
 }
 
 // onTrustedTC pushes the received TC(which MUST be validated) to the timeoutCertificates channel
 func (el *EventLoop) onTrustedTC(tc *flow.TimeoutCertificate) {
-	received := time.Now()
+	//received := time.Now()
 
-	select {
-	case el.timeoutCertificates <- tc:
-	case <-el.ComponentManager.ShutdownSignal():
-		return
+	if el.newestSubmittedTc.Track(tc) {
+		el.tcSubmittedNotifier.Notify()
+	} else if el.newestSubmittedQc.Track(tc.NewestQC) {
+		el.qcSubmittedNotifier.Notify()
 	}
 
 	// the wait duration is measured as how long it takes from a tc being
 	// received to event handler commencing the processing of the tc
-	el.metrics.HotStuffWaitDuration(time.Since(received), metrics.HotstuffEventTypeOnTC)
+	//el.metrics.HotStuffWaitDuration(time.Since(received), metrics.HotstuffEventTypeOnTC)
 }
 
 // OnTcConstructedFromTimeouts pushes the received TC to the timeoutCertificates channel
@@ -260,8 +302,23 @@ func (el *EventLoop) OnTcConstructedFromTimeouts(tc *flow.TimeoutCertificate) {
 	el.onTrustedTC(tc)
 }
 
+// OnPartialTcCreated created a hotstuff.PartialTcCreated payload and pushes it into partialTcCreated buffered channel for
+// further processing by EventHandler. Since we use buffered channel this function can block if buffer is full.
 func (el *EventLoop) OnPartialTcCreated(view uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) {
-	// TODO(active-pacemaker): implement handler to support Bracha timeouts.
+
+	event := &hotstuff.PartialTcCreated{
+		View:       view,
+		NewestQC:   newestQC,
+		LastViewTC: lastViewTC,
+	}
+
+	// TODO(active-pacemaker): maybe measure how long it takes for event to be processed
+
+	select {
+	case el.partialTcCreated <- event:
+	case <-el.ComponentManager.ShutdownSignal():
+		return
+	}
 }
 
 // OnNewQcDiscovered pushes already validated QCs that were submitted from TimeoutAggregator to the event handler
