@@ -35,6 +35,8 @@ type LoadCase struct {
 	duration time.Duration
 }
 
+// This struct is used for uploading data to BigQuery, changes here should
+// remain in sync with tps_results_schema.json
 type dataSlice struct {
 	GitSha              string
 	StartTime           time.Time
@@ -46,10 +48,9 @@ type dataSlice struct {
 }
 
 func main() {
+	// holdover flags from loader/main.go
 	sleep := flag.Duration("sleep", 0, "duration to sleep before benchmarking starts")
 	loadTypeFlag := flag.String("load-type", "token-transfer", "type of loads (\"token-transfer\", \"add-keys\", \"computation-heavy\", \"event-heavy\", \"ledger-heavy\", \"const-exec\")")
-	tpsFlag := flag.String("tps", "300", "transactions per second (TPS) to send, accepts a comma separated list of values if used in conjunction with `tps-durations`")
-	tpsDurationsFlag := flag.String("tps-durations", "10m", "duration that each load test will run, accepts a comma separted list that will be applied to multiple values of the `tps` flag (defaults to infinite if not provided, meaning only the first tps case will be tested; additional values will be ignored)")
 	chainIDStr := flag.String("chain", string(flowsdk.Emulator), "chain ID")
 	access := flag.String("access", net.JoinHostPort("127.0.0.1", "3569"), "access node address")
 	serviceAccountPrivateKeyHex := flag.String("servPrivHex", unittest.ServiceAccountPrivateKeyHex, "service account private key hex")
@@ -64,6 +65,9 @@ func main() {
 	argSizeInByteInConstExecTx := flag.Uint("const-exec-arg-size", 100, "byte size of tx argument for each constant exec transaction to generate")
 	payerKeyCountInConstExecTx := flag.Uint("const-exec-payer-key-count", 2, "num of payer keys for each constant exec transaction to generate")
 
+	// CI relevant flags
+	tpsFlag := flag.String("tps", "300", "transactions per second (TPS) to send, accepts a comma separated list of values if used in conjunction with `tps-durations`")
+	tpsDurationsFlag := flag.String("tps-durations", "10m", "duration that each load test will run, accepts a comma separted list that will be applied to multiple values of the `tps` flag (defaults to infinite if not provided, meaning only the first tps case will be tested; additional values will be ignored)")
 	ciFlag := flag.Bool("ci-run", false, "whether or not the run is part of CI")
 	leadTime := flag.String("leadTime", "30s", "the amount of time before data slices are started")
 	sliceSize := flag.String("sliceSize", "2m", "the amount of time that each slice covers")
@@ -229,8 +233,8 @@ func calculateTpsSlices(start, end time.Time, leadTime, sliceTime string, commit
 		sliceEndTime := currentTime.Add(sliceDuration)
 
 		inputTps := lg.AvgTpsBetween(currentTime, sliceEndTime)
-		proStart := getPrometheusTransactionAtTime(currentTime, log)
-		proEnd := getPrometheusTransactionAtTime(sliceEndTime, log)
+		proStart := getPrometheusTransactionAtTime(currentTime)
+		proEnd := getPrometheusTransactionAtTime(sliceEndTime)
 
 		outputTps := (proEnd - proStart) / (sliceDuration).Seconds()
 
@@ -250,8 +254,6 @@ func calculateTpsSlices(start, end time.Time, leadTime, sliceTime string, commit
 }
 
 func prepareDataForBigQuery(slices []dataSlice, ci bool) {
-	//fmt.Printf("Slices: %+v", slices)
-
 	jsonText, err := json.Marshal(slices)
 	if err != nil {
 		println("Error converting slice data to json")
@@ -261,11 +263,8 @@ func prepareDataForBigQuery(slices []dataSlice, ci bool) {
 	// that is newline delimited json
 	if ci {
 		jsonString := string(jsonText)
-		// remove the surrounding curly braces
+		// remove the surrounding square brackets
 		jsonString = jsonString[1 : len(jsonString)-1]
-		// remove existing whitespace to prepare to add required newlines.
-		jsonString = strings.ReplaceAll(jsonString, "\n", "")
-		jsonString = strings.ReplaceAll(jsonString, "\t", "")
 		// end of object commas will be replaced with newlines
 		jsonString = strings.ReplaceAll(jsonString, "},", "}\n")
 
@@ -289,12 +288,9 @@ func prepareDataForBigQuery(slices []dataSlice, ci bool) {
 	} else {
 		fmt.Println(err)
 	}
-
-	//fmt.Println("Full JSON: ")
-	//fmt.Println(string(jsonText))
 }
 
-func getPrometheusTransactionAtTime(time time.Time, log zerolog.Logger) float64 {
+func getPrometheusTransactionAtTime(time time.Time) float64 {
 	url := fmt.Sprintf("http://localhost:9090/api/v1/query?query=execution_runtime_total_executed_transactions&time=%v", time.Unix())
 	resp, err := http.Get(url)
 	if err != nil {
