@@ -544,42 +544,61 @@ func (proc *testDKGProcessor) invalidShareSend(dest int, data []byte) {
 		panic("invalid share send not supported")
 	}
 
-	newMsg := &message{proc.current, proc.protocol, private, data}
+	// copy of data
+	newData := make([]byte, len(data))
+	copy(newData, data)
+
+	newMsg := &message{proc.current, proc.protocol, private, newData}
+	originalMsg := &message{proc.current, proc.protocol, private, data}
+
 	// check destination
 	if (dest < recipients) || (proc.current < recipients && dest < recipients+1) ||
 		(proc.malicious == invalidComplaintAnswerBroadcast && dest == proc.dkg.Size()-1) {
 		// choose a random reason for an invalid share
-		coin := mrand.Intn(6)
+		coin := mrand.Intn(7)
 		gt.Logf("%d maliciously sending to %d, coin is %d\n", proc.current, dest, coin)
 		switch coin {
 		case 0:
 			// value doesn't match the verification vector
 			newMsg.data[8]++
+			proc.chans[dest] <- newMsg
 		case 1:
-			// invalid length
-			newMsg.data = newMsg.data[:1]
+			// empty message
+			newMsg.data = newMsg.data[:0]
+			proc.chans[dest] <- newMsg
 		case 2:
+			// valid message length but invalid share length
+			newMsg.data = newMsg.data[:1]
+			proc.chans[dest] <- newMsg
+		case 3:
 			// invalid value
 			for i := 0; i < len(newMsg.data); i++ {
 				newMsg.data[i] = 0xFF
 			}
-		case 3:
+			proc.chans[dest] <- newMsg
+		case 4:
 			// do not send the share at all
 			return
-		case 4:
-			// wrong header: equivalent to not sending the share at all
-			newMsg.data[0] = byte(feldmanVSSVerifVec)
 		case 5:
+			// wrong header: will cause a complaint
+			newMsg.data[0] = byte(feldmanVSSVerifVec)
+			proc.chans[dest] <- newMsg
+		case 6:
 			// message will be sent after the shares timeout and will be considered late
 			// by the receiver. All late messages go into a separate channel and will be sent to
 			// the main channel after the shares timeout.
 			proc.lateChansTimeout1[dest] <- newMsg
 			return
 		}
+
 	} else {
 		gt.Logf("turns out to be a honest send\n%x\n", data)
-		proc.chans[dest] <- newMsg
 	}
+	// honest send case: this is the only message sent
+	// malicious send case: this is a second correct send, to test the second message gets ignored
+	// by the receiver (sender has been tagged malicious after the first send)
+	proc.chans[dest] <- originalMsg
+
 }
 
 // This is a testing function
