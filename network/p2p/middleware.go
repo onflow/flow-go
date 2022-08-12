@@ -211,18 +211,6 @@ func (m *Middleware) NewPingService(pingProtocol protocol.ID, provider network.P
 	return NewPingService(m.libP2PNode.Host(), pingProtocol, m.log, provider)
 }
 
-// topologyPeers callback used by the peer manager to get the list of peer ID's
-// which this node should be directly connected to as peers.
-// No errors are expected during normal operation.
-func (m *Middleware) topologyPeers() (peer.IDSlice, error) {
-	identities, err := m.ov.Topology()
-	if err != nil {
-		return nil, err
-	}
-
-	return m.peerIDs(identities.NodeIDs()), nil
-}
-
 func (m *Middleware) peerIDs(flowIDs flow.IdentifierList) peer.IDSlice {
 	result := make([]peer.ID, len(flowIDs))
 
@@ -308,7 +296,9 @@ func (m *Middleware) start(ctx context.Context) error {
 
 	// create and use a peer manager if a peer manager factory was passed in during initialization
 	if m.peerManagerFactory != nil {
-		m.peerManager, err = m.peerManagerFactory(m.libP2PNode.host, m.topologyPeers, m.log)
+		m.peerManager, err = m.peerManagerFactory(m.libP2PNode.host, func() peer.IDSlice {
+			return m.topologyPeers()
+		}, m.log)
 		if err != nil {
 			return fmt.Errorf("failed to create peer manager: %w", err)
 		}
@@ -322,6 +312,12 @@ func (m *Middleware) start(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// topologyPeers callback used by the peer manager to get the list of peer ID's
+// which this node should be directly connected to as peers.
+func (m *Middleware) topologyPeers() peer.IDSlice {
+	return m.peerIDs(m.ov.Topology().NodeIDs())
 }
 
 // stop will end the execution of the middleware and wait for it to end.

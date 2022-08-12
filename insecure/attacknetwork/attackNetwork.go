@@ -27,8 +27,9 @@ type AttackNetwork struct {
 	corruptedNodeIds     flow.IdentityList                                    // identity of the corrupted nodes
 	corruptedConnections map[flow.Identifier]insecure.CorruptedNodeConnection // existing connections to the corrupted nodes.
 	corruptedConnector   insecure.CorruptedNodeConnector                      // connection generator to corrupted nodes.
-
 }
+
+var _ insecure.AttackNetwork = &AttackNetwork{}
 
 func NewAttackNetwork(
 	logger zerolog.Logger,

@@ -154,7 +154,7 @@ func (e *TransactionEnv) setExecutionParameters() error {
 		return nil
 	}
 
-	meter := e.sth.State().Meter()
+	meter := e.sth.Meter()
 
 	computationWeights, err := GetExecutionEffortWeights(e, service)
 	err = setIfOk(
@@ -438,14 +438,14 @@ func (e *TransactionEnv) ServiceEvents() []flow.Event {
 
 func (e *TransactionEnv) Meter(kind common.ComputationKind, intensity uint) error {
 	if e.sth.EnforceComputationLimits() {
-		return e.sth.State().MeterComputation(kind, intensity)
+		return e.sth.MeterComputation(kind, intensity)
 	}
 	return nil
 }
 
 func (e *TransactionEnv) meterMemory(kind common.MemoryKind, intensity uint) error {
 	if e.sth.EnforceMemoryLimits() {
-		return e.sth.State().MeterMemory(kind, intensity)
+		return e.sth.MeterMemory(kind, intensity)
 	}
 	return nil
 }
