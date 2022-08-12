@@ -1285,7 +1285,7 @@ func TestAccountBalanceFields(t *testing.T) {
 			fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())),
 			fvm.WithCadenceLogging(true),
 		).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, _ state.View, programs *programs.Programs) {
 				address := chain.ServiceAddress()
 
 				script := fvm.Script([]byte(fmt.Sprintf(`
@@ -1295,7 +1295,7 @@ func TestAccountBalanceFields(t *testing.T) {
 					}
 				`, address)))
 
-				view = delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
+				view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 					return nil, fmt.Errorf("error getting register %s, %s", flow.BytesToAddress([]byte(owner)).Hex(), key)
 				})
 
@@ -1484,7 +1484,7 @@ func TestGetStorageCapacity(t *testing.T) {
 			fvm.WithAccountCreationFee(100_000),
 			fvm.WithMinimumStorageReservation(100_000),
 		).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, _ state.View, programs *programs.Programs) {
 				address := chain.ServiceAddress()
 
 				script := fvm.Script([]byte(fmt.Sprintf(`
@@ -1494,7 +1494,7 @@ func TestGetStorageCapacity(t *testing.T) {
 					}
 				`, address)))
 
-				view = delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
+				view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 					return nil, fmt.Errorf("error getting register %s, %s", flow.BytesToAddress([]byte(owner)).Hex(), key)
 				})
 

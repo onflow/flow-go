@@ -7,10 +7,10 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// PartialTcCreated is a helper structure which is used as notification payload by TimeoutProcessor component,
+// PartialTcCreated represents a notification emitted by the TimeoutProcessor component,
 // whenever it has collected TimeoutObjects from a superminority
 // of consensus participants for a specific view. Along with the view, it
-// reports the newest QC and TC (for previous view) discovered in process of
+// reports the newest QC and TC (for previous view) discovered during
 // timeout collection. Per convention, the newest QC is never nil, while
 // the TC for the previous view might be nil.
 type PartialTcCreated struct {
@@ -39,12 +39,12 @@ type EventHandler interface {
 	// No errors are expected during normal operation.
 	OnReceiveProposal(proposal *model.Proposal) error
 
-	// OnLocalTimeout will handle local timeout event by creating model.TimeoutObject and broadcasting it.
+	// OnLocalTimeout handles a local timeout event by creating a model.TimeoutObject and broadcasting it.
 	// No errors are expected during normal operation.
 	OnLocalTimeout() error
 
-	// OnPartialTcCreated handles notification produces by aggregation logic. If event was delivered for current view
-	// it will result in producing of model.TimeoutObject and subsequent broadcast to the consensus committee.
+	// OnPartialTcCreated handles notification produces by the internal timeout aggregator. If the notification is for the current view,
+	// a corresponding model.TimeoutObject is broadcast to the consensus committee.
 	// No errors are expected during normal operation.
 	OnPartialTcCreated(partialTC *PartialTcCreated) error
 
