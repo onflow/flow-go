@@ -1204,9 +1204,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 		// add a block for the first seal to reference
 		block1 := unittest.BlockWithParentFixture(head)
 		block1.SetPayload(flow.EmptyPayload())
-		err = state.Extend(context.Background(), block1)
-		require.NoError(t, err)
-		err = state.Finalize(context.Background(), block1.ID())
+		unittest.InsertAndFinalize(t, state, block1)
 
 		epoch1Setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 
