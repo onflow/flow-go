@@ -18,8 +18,7 @@ var ErrPrunedAncestry = errors.New("cannot resolve pruned ancestor")
 // ancestryChain encapsulates a block, its parent (oneChain) and its grand-parent (twoChain).
 // Given a chain structure like:
 //   b <~ b' <~ b*
-//
-// This data structure looks like:
+// where the QC certifying b is qc_b, this data structure looks like:
 //   twoChain   oneChain     block
 //   [b<-qc_b]  [b'<-qc_b']  [b*]
 type ancestryChain struct {
