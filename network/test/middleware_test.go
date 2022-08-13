@@ -128,7 +128,7 @@ func (m *MiddlewareTestSuite) SetupTest() {
 	for i, mw := range m.mws {
 		mw.SetOverlay(m.ov[i])
 		mw.Start(m.mwCtx)
-		<-mw.Ready()
+		unittest.RequireComponentsReadyBefore(m.T(), 100*time.Millisecond, mw)
 	}
 
 	StartNodes(m.mwCtx, m.T(), m.nodes, 100*time.Millisecond)
@@ -153,7 +153,7 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	).Return(nil)
 	newMw.SetOverlay(overlay)
 	newMw.Start(m.mwCtx)
-	<-newMw.Ready()
+	unittest.RequireComponentsReadyBefore(m.T(), 100*time.Millisecond, newMw)
 
 	// start up nodes and peer managers
 	StartNodes(m.mwCtx, m.T(), libP2PNodes, 100*time.Millisecond)

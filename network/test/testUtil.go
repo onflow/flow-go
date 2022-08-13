@@ -30,7 +30,6 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/observable"
-	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/channels"
@@ -309,7 +308,7 @@ func StartNetworks(ctx context.Context, t *testing.T, nodes []*p2p.Node, nets []
 	// start up networks (this will implicitly start middlewares)
 	for _, net := range nets {
 		net.Start(signalerCtx)
-		<-net.Ready()
+		unittest.RequireComponentsReadyBefore(t, duration, net)
 	}
 
 	// start up nodes and peer managers
@@ -425,27 +424,23 @@ func GenerateSubscriptionManagers(t *testing.T, mws []network.Middleware) []netw
 // stopNetworks stops network instances in parallel and fails the test if they could not be stopped within the
 // duration.
 func stopNetworks(t *testing.T, nets []network.Network, duration time.Duration) {
-
 	// casts nets instances into ReadyDoneAware components
 	comps := make([]module.ReadyDoneAware, 0, len(nets))
 	for _, net := range nets {
 		comps = append(comps, net)
 	}
 
-	unittest.RequireCloseBefore(t, util.AllDone(comps...), duration,
-		"could not stop the networks")
+	unittest.RequireComponentsDoneBefore(t, duration, comps...)
 }
 
 func stopMiddlewares(t *testing.T, mws []network.Middleware, duration time.Duration) {
-
 	// casts mws instances into ReadyDoneAware components
 	comps := make([]module.ReadyDoneAware, 0, len(mws))
 	for _, net := range mws {
 		comps = append(comps, net)
 	}
 
-	unittest.RequireCloseBefore(t, util.AllDone(comps...), duration,
-		"could not stop the middlewares")
+	unittest.RequireComponentsDoneBefore(t, duration, comps...)
 }
 
 // networkPayloadFixture creates a blob of random bytes with the given size (in bytes) and returns it.
