@@ -175,6 +175,7 @@ func (pm *PeerManager) updatePeers(ctx irrecoverable.SignalerContext) {
 	pm.connector.UpdatePeers(ctx, peers)
 }
 
+// ForceUpdatePeers initiates an update to the peer connections of this node immediately
 func (pm *PeerManager) ForceUpdatePeers(ctx irrecoverable.SignalerContext) {
 	pm.updatePeers(ctx)
 }
