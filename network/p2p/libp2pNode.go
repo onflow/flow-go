@@ -289,6 +289,9 @@ func (n *Node) WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler
 	return nil
 }
 
+// WithPeersProvider sets the PeersProvider for the peer manager.
+// If a peer manager factory is set, this method will build the peer manager and initialize it with
+// the provided PeersProvider.
 func (n *Node) WithPeersProvider(peersProvider PeersProvider) error {
 	if n.peerManagerFactory == nil {
 		return nil
@@ -304,10 +307,12 @@ func (n *Node) WithPeersProvider(peersProvider PeersProvider) error {
 	return nil
 }
 
+// PeerManagerComponent returns the component interface of the peer manager.
 func (n *Node) PeerManagerComponent() component.Component {
 	return n.peerManager
 }
 
+// RequestPeerUpdate requests an update to the peer connections of this node using the peer manager.
 func (n *Node) RequestPeerUpdate() {
 	if n.peerManager != nil {
 		n.peerManager.RequestPeerUpdate()

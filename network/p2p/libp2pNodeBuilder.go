@@ -130,41 +130,49 @@ func NewNodeBuilder(
 	}
 }
 
+// SetBasicResolver sets the DNS resolver for the node.
 func (builder *LibP2PNodeBuilder) SetBasicResolver(br madns.BasicResolver) NodeBuilder {
 	builder.basicResolver = br
 	return builder
 }
 
+// SetSubscriptionFilter sets the pubsub subscription filter for the node.
 func (builder *LibP2PNodeBuilder) SetSubscriptionFilter(filter pubsub.SubscriptionFilter) NodeBuilder {
 	builder.subscriptionFilter = filter
 	return builder
 }
 
+// SetConnectionManager sets the connection manager for the node.
 func (builder *LibP2PNodeBuilder) SetConnectionManager(manager connmgr.ConnManager) NodeBuilder {
 	builder.connManager = manager
 	return builder
 }
 
+// SetConnectionGater sets the connection gater for the node.
 func (builder *LibP2PNodeBuilder) SetConnectionGater(gater connmgr.ConnectionGater) NodeBuilder {
 	builder.connGater = gater
 	return builder
 }
 
+// SetRoutingSystem sets the routing factory function.
 func (builder *LibP2PNodeBuilder) SetRoutingSystem(f func(context.Context, host.Host) (routing.Routing, error)) NodeBuilder {
 	builder.routingFactory = f
 	return builder
 }
 
+// SetPubSub sets the pubsub factory function.
 func (builder *LibP2PNodeBuilder) SetPubSub(f func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)) NodeBuilder {
 	builder.pubsubFactory = f
 	return builder
 }
 
+// SetPeerManagerFactory sets the factory function for creating a peer manager for the node.
 func (builder *LibP2PNodeBuilder) SetPeerManagerFactory(fn PeerManagerFactoryFunc) NodeBuilder {
 	builder.peerManagerFactory = fn
 	return builder
 }
 
+// Build creates a new libp2p node using the configured options.
 func (builder *LibP2PNodeBuilder) Build() (*Node, error) {
 	if builder.routingFactory == nil {
 		return nil, errors.New("routing factory is not set")
