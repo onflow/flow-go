@@ -166,7 +166,7 @@ func (builder *LibP2PNodeBuilder) SetPubSub(f func(context.Context, host.Host, .
 	return builder
 }
 
-// SetPeerManagerFactory sets the factory function for creating a peer manager for the node.
+// SetPeerManagerFactory sets the peer manager factory function.
 func (builder *LibP2PNodeBuilder) SetPeerManagerFactory(fn PeerManagerFactoryFunc) NodeBuilder {
 	builder.peerManagerFactory = fn
 	return builder
