@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/crypto"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/meter"
@@ -41,17 +42,17 @@ func NewScriptEnvironment(
 	uuidGenerator := state.NewUUIDGenerator(sth)
 	programsHandler := handler.NewProgramsHandler(programs, sth)
 	accountKeys := handler.NewAccountKeyHandler(accounts)
-	tracer := NewTracer(fvmContext.Tracer, nil, fvmContext.ExtensiveTracing)
+	tracer := environment.NewTracer(fvmContext.Tracer, nil, fvmContext.ExtensiveTracing)
 
 	env := &ScriptEnv{
 		commonEnv: commonEnv{
 			Tracer: tracer,
-			ProgramLogger: NewProgramLogger(
+			ProgramLogger: environment.NewProgramLogger(
 				tracer,
 				fvmContext.Metrics,
 				fvmContext.CadenceLoggingEnabled,
 			),
-			UnsafeRandomGenerator: NewUnsafeRandomGenerator(
+			UnsafeRandomGenerator: environment.NewUnsafeRandomGenerator(
 				tracer,
 				fvmContext.BlockHeader,
 			),

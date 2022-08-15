@@ -14,6 +14,7 @@ import (
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/crypto"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/meter"
@@ -73,9 +74,9 @@ type AccountInterface interface {
 // Parts of the environment that are common to all transaction and script
 // executions.
 type commonEnv struct {
-	*Tracer
-	*ProgramLogger
-	*UnsafeRandomGenerator
+	*environment.Tracer
+	*environment.ProgramLogger
+	*environment.UnsafeRandomGenerator
 
 	// TODO(patrick): rm
 	ctx Context
