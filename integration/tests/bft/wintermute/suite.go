@@ -40,9 +40,9 @@ type Suite struct {
 	corruptedVnIds flow.IdentifierList
 	honestVN       flow.Identifier // honest verification node
 
-	PreferredUnicasts string // preferred unicast protocols between execution and verification nodes.
-	Orchestrator      *wintermute.Orchestrator
-	attackNet         *attacknetwork.AttackNetwork
+	PreferredUnicasts   string // preferred unicast protocols between execution and verification nodes.
+	Orchestrator        *wintermute.Orchestrator
+	orchestratorNetwork *attacknetwork.OrchestratorNetwork
 }
 
 // Ghost returns a client to interact with the Ghost node on testnet.
@@ -187,7 +187,7 @@ func (s *Suite) SetupSuite() {
 		connector,
 		s.net.CorruptedIdentities())
 	require.NoError(s.T(), err)
-	s.attackNet = attackNetwork
+	s.orchestratorNetwork = attackNetwork
 
 	attackCtx, errChan := irrecoverable.WithSignaler(ctx)
 	go func() {
@@ -210,5 +210,5 @@ func (s *Suite) SetupSuite() {
 func (s *Suite) TearDownSuite() {
 	s.net.Remove()
 	s.cancel()
-	unittest.RequireCloseBefore(s.T(), s.attackNet.Done(), 1*time.Second, "could not stop attack network on time")
+	unittest.RequireCloseBefore(s.T(), s.orchestratorNetwork.Done(), 1*time.Second, "could not stop attack network on time")
 }

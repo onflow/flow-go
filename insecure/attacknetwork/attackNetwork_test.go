@@ -35,7 +35,7 @@ func testAttackNetworkObserve(t *testing.T, concurrencyDegree int) {
 	withMockOrchestrator(
 		t,
 		corruptedIds,
-		func(network *AttackNetwork, orchestrator *mockinsecure.AttackOrchestrator, ccfs []*mockCorruptibleConduitFactory) {
+		func(orchestratorNetwork *OrchestratorNetwork, orchestrator *mockinsecure.AttackOrchestrator, ccfs []*mockCorruptibleConduitFactory) {
 			// mocks orchestrator to receive each event exactly once.
 			orchestratorWG := mockOrchestratorHandlingEgressEvent(t, orchestrator, egressEvents)
 
@@ -56,7 +56,7 @@ func testAttackNetworkObserve(t *testing.T, concurrencyDegree int) {
 			}
 
 			// all messages should be sent to attack network in a timely fashion.
-			unittest.RequireReturnsBefore(t, attackNetworkSendWG.Wait, 1*time.Second, "could not send all messages to attack network on time")
+			unittest.RequireReturnsBefore(t, attackNetworkSendWG.Wait, 1*time.Second, "could not send all messages to attack orchestratorNetwork on time")
 			// all events should be relayed to the orchestrator by the attack network in a timely fashion.
 			unittest.RequireReturnsBefore(t, orchestratorWG.Wait, 1*time.Second, "orchestrator could not receive messages on time")
 		})
@@ -94,7 +94,7 @@ func testAttackNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegr
 
 	withMockOrchestrator(t,
 		corruptedIds,
-		func(attackNetwork *AttackNetwork, _ *mockinsecure.AttackOrchestrator, ccfs []*mockCorruptibleConduitFactory) {
+		func(orchestratorNetwork *OrchestratorNetwork, _ *mockinsecure.AttackOrchestrator, ccfs []*mockCorruptibleConduitFactory) {
 			attackerMsgReceived := &sync.WaitGroup{}
 			attackerMsgReceived.Add(concurrencyDegree)
 
@@ -116,16 +116,16 @@ func testAttackNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegr
 			for _, event := range egressEvents {
 				event := event
 				go func() {
-					err := attackNetwork.SendEgress(event)
+					err := orchestratorNetwork.SendEgress(event)
 					require.NoError(t, err)
 
 					attackNetworkSendWG.Done()
 				}()
 			}
 
-			// all events should be sent to attackNetwork in a timely fashion.
-			unittest.RequireReturnsBefore(t, attackNetworkSendWG.Wait, 1*time.Second, "could not send all events to attackNetwork on time")
-			// all events should be relayed to the connections by the attackNetwork in a timely fashion.
+			// all events should be sent to orchestratorNetwork in a timely fashion.
+			unittest.RequireReturnsBefore(t, attackNetworkSendWG.Wait, 1*time.Second, "could not send all events to orchestratorNetwork on time")
+			// all events should be relayed to the connections by the orchestratorNetwork in a timely fashion.
 			unittest.RequireReturnsBefore(t, attackerMsgReceived.Wait, 1*time.Second, "connections could not receive messages on time")
 		})
 }
@@ -162,7 +162,7 @@ func matchEventForMessage(t *testing.T, egressEvents []*insecure.EgressEvent, me
 // Once the attack network, CCFs, and mock orchestrator are all ready, it executes the injected "run" function.
 func withMockOrchestrator(t *testing.T,
 	corruptedIds flow.IdentityList,
-	run func(*AttackNetwork, *mockinsecure.AttackOrchestrator, []*mockCorruptibleConduitFactory)) {
+	run func(*OrchestratorNetwork, *mockinsecure.AttackOrchestrator, []*mockCorruptibleConduitFactory)) {
 
 	withMockCorruptibleConduitFactories(t,
 		corruptedIds.NodeIDs(),
