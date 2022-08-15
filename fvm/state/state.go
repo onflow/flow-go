@@ -28,29 +28,51 @@ type mapKey struct {
 // it holds draft of updates and captures
 // all register touches
 type State struct {
-	view                  View
-	meter                 meter.Meter
-	updatedAddresses      map[flow.Address]struct{}
-	updateSize            map[mapKey]uint64
+	view             View
+	meter            meter.Meter
+	updatedAddresses map[flow.Address]struct{}
+	updateSize       map[mapKey]uint64
+	StateParameters
+	ReadCounter       uint64
+	WriteCounter      uint64
+	TotalBytesRead    uint64
+	TotalBytesWritten uint64
+}
+
+type StateParameters struct {
+	// TODO(patrick): nest meter parameters into this
 	maxKeySizeAllowed     uint64
 	maxValueSizeAllowed   uint64
 	maxInteractionAllowed uint64
-	ReadCounter           uint64
-	WriteCounter          uint64
-	TotalBytesRead        uint64
-	TotalBytesWritten     uint64
 }
 
-func defaultState(view View, meter meter.Meter) *State {
-	return &State{
-		view:                  view,
-		meter:                 meter,
-		updatedAddresses:      make(map[flow.Address]struct{}),
-		updateSize:            make(map[mapKey]uint64),
+func DefaultParameters() StateParameters {
+	return StateParameters{
 		maxKeySizeAllowed:     DefaultMaxKeySize,
 		maxValueSizeAllowed:   DefaultMaxValueSize,
 		maxInteractionAllowed: DefaultMaxInteractionSize,
 	}
+}
+
+// WithMaxKeySizeAllowed sets limit on max key size
+func (params StateParameters) WithMaxKeySizeAllowed(limit uint64) StateParameters {
+	newParams := params
+	newParams.maxKeySizeAllowed = limit
+	return newParams
+}
+
+// WithMaxValueSizeAllowed sets limit on max value size
+func (params StateParameters) WithMaxValueSizeAllowed(limit uint64) StateParameters {
+	newParams := params
+	newParams.maxValueSizeAllowed = limit
+	return newParams
+}
+
+// WithMaxInteractionSizeAllowed sets limit on total byte interaction with ledger
+func (params StateParameters) WithMaxInteractionSizeAllowed(limit uint64) StateParameters {
+	newParams := params
+	newParams.maxInteractionAllowed = limit
+	return newParams
 }
 
 func (s *State) View() View {
@@ -63,36 +85,15 @@ func (s *State) Meter() meter.Meter {
 
 type StateOption func(st *State) *State
 
+// TODO(patrick): stop passing in meter.  Create meter internally.
 // NewState constructs a new state
-func NewState(view View, meter meter.Meter, opts ...StateOption) *State {
-	ctx := defaultState(view, meter)
-	for _, applyOption := range opts {
-		ctx = applyOption(ctx)
-	}
-	return ctx
-}
-
-// WithMaxKeySizeAllowed sets limit on max key size
-func WithMaxKeySizeAllowed(limit uint64) func(st *State) *State {
-	return func(st *State) *State {
-		st.maxKeySizeAllowed = limit
-		return st
-	}
-}
-
-// WithMaxValueSizeAllowed sets limit on max value size
-func WithMaxValueSizeAllowed(limit uint64) func(st *State) *State {
-	return func(st *State) *State {
-		st.maxValueSizeAllowed = limit
-		return st
-	}
-}
-
-// WithMaxInteractionSizeAllowed sets limit on total byte interaction with ledger
-func WithMaxInteractionSizeAllowed(limit uint64) func(st *State) *State {
-	return func(st *State) *State {
-		st.maxInteractionAllowed = limit
-		return st
+func NewState(view View, meter meter.Meter, params StateParameters) *State {
+	return &State{
+		view:             view,
+		meter:            meter,
+		updatedAddresses: make(map[flow.Address]struct{}),
+		updateSize:       make(map[mapKey]uint64),
+		StateParameters:  params,
 	}
 }
 
@@ -218,7 +219,7 @@ func (s *State) TotalMemoryEstimate() uint {
 
 // TotalMemoryLimit returns total memory limit
 func (s *State) TotalMemoryLimit() uint {
-	return s.meter.TotalMemoryLimit()
+	return uint(s.meter.TotalMemoryLimit())
 }
 
 // NewChild generates a new child state
@@ -226,9 +227,7 @@ func (s *State) NewChild() *State {
 	return NewState(
 		s.view.NewChild(),
 		s.meter.NewChild(),
-		WithMaxKeySizeAllowed(s.maxKeySizeAllowed),
-		WithMaxValueSizeAllowed(s.maxValueSizeAllowed),
-		WithMaxInteractionSizeAllowed(s.maxInteractionAllowed),
+		s.StateParameters,
 	)
 }
 

@@ -19,7 +19,7 @@ import (
 func TestConduitRelayMessage_Publish(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	controller := &mockinsecure.EgressController{}
-	channel := channels.Channel("test-channel")
+	channel := channels.TestNetworkChannel
 
 	c := &Conduit{
 		ctx:              ctx,
@@ -47,7 +47,7 @@ func TestConduitRelayMessage_Publish(t *testing.T) {
 func TestConduitRelayMessage_Multicast(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	controller := &mockinsecure.EgressController{}
-	channel := channels.Channel("test-channel")
+	channel := channels.TestNetworkChannel
 	num := 3 // targets of multicast
 
 	c := &Conduit{
@@ -76,7 +76,7 @@ func TestConduitRelayMessage_Multicast(t *testing.T) {
 func TestConduitRelayMessage_Unicast(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	controller := &mockinsecure.EgressController{}
-	channel := channels.Channel("test-channel")
+	channel := channels.TestNetworkChannel
 
 	c := &Conduit{
 		ctx:              ctx,
@@ -101,7 +101,7 @@ func TestConduitRelayMessage_Unicast(t *testing.T) {
 func TestConduitReflectError_Unicast(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	controller := &mockinsecure.EgressController{}
-	channel := channels.Channel("test-channel")
+	channel := channels.TestNetworkChannel
 
 	c := &Conduit{
 		ctx:              ctx,
@@ -126,7 +126,7 @@ func TestConduitReflectError_Unicast(t *testing.T) {
 func TestConduitReflectError_Multicast(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	controller := &mockinsecure.EgressController{}
-	channel := channels.Channel("test-channel")
+	channel := channels.TestNetworkChannel
 	num := 3 // targets of multicast
 
 	c := &Conduit{
@@ -156,7 +156,7 @@ func TestConduitReflectError_Multicast(t *testing.T) {
 func TestConduitReflectError_Publish(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	controller := &mockinsecure.EgressController{}
-	channel := channels.Channel("test-channel")
+	channel := channels.TestNetworkChannel
 
 	c := &Conduit{
 		ctx:              ctx,
@@ -185,7 +185,7 @@ func TestConduitReflectError_Publish(t *testing.T) {
 func TestConduitClose_HappyPath(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	controller := &mockinsecure.EgressController{}
-	channel := channels.Channel("test-channel")
+	channel := channels.TestNetworkChannel
 
 	c := &Conduit{
 		ctx:              ctx,
@@ -211,7 +211,7 @@ func TestConduitClose_HappyPath(t *testing.T) {
 func TestConduitClose_Error(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	controller := &mockinsecure.EgressController{}
-	channel := channels.Channel("test-channel")
+	channel := channels.TestNetworkChannel
 
 	c := &Conduit{
 		ctx:              ctx,

@@ -184,6 +184,7 @@ func (suite *BlobServiceTestSuite) TestGetBlobsWithSession() {
 func (suite *BlobServiceTestSuite) TestHas() {
 	var blobChans []<-chan blobs.Blob
 	unreceivedBlobs := make([]map[cid.Cid]struct{}, len(suite.blobServices))
+
 	for i, bex := range suite.blobServices {
 		unreceivedBlobs[i] = make(map[cid.Cid]struct{})
 		// check that peers are notified when we have a new blob
