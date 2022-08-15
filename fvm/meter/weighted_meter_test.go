@@ -23,7 +23,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 				WithMemoryLimit(2),
 		)
 		require.Equal(t, uint(1), m.TotalComputationLimit())
-		require.Equal(t, uint(2), m.TotalMemoryLimit())
+		require.Equal(t, uint64(2), m.TotalMemoryLimit())
 	})
 
 	t.Run("get limits max", func(t *testing.T) {
@@ -33,7 +33,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 				WithMemoryLimit(math.MaxUint32),
 		)
 		require.Equal(t, uint(math.MaxUint32), m.TotalComputationLimit())
-		require.Equal(t, uint(math.MaxUint32), m.TotalMemoryLimit())
+		require.Equal(t, uint64(math.MaxUint32), m.TotalMemoryLimit())
 	})
 
 	t.Run("meter computation and memory", func(t *testing.T) {

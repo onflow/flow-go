@@ -114,7 +114,8 @@ func Test_Programs(t *testing.T) {
 
 	sth := state.NewStateHolder(state.NewState(
 		mainView,
-		meter.NewMeter(meter.DefaultParameters())))
+		meter.NewMeter(meter.DefaultParameters()),
+		state.DefaultParameters()))
 
 	rt := fvm.NewInterpreterRuntime()
 	vm := fvm.NewVirtualMachine(rt)

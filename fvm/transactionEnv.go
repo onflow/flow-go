@@ -44,7 +44,7 @@ func NewTransactionEnvironment(
 	tx *flow.TransactionBody,
 	txIndex uint32,
 	traceSpan otelTrace.Span,
-) (*TransactionEnv, error) {
+) *TransactionEnv {
 
 	accounts := state.NewAccounts(sth)
 	generator := state.NewStateBoundAddressGenerator(sth, ctx.Chain)
@@ -113,9 +113,7 @@ func NewTransactionEnvironment(
 		env.useContractAuditVoucher,
 	)
 
-	err := setMeterParameters(&env.commonEnv)
-
-	return env, err
+	return env
 }
 
 func (e *TransactionEnv) TxIndex() uint32 {

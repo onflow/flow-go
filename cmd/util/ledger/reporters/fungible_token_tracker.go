@@ -143,7 +143,7 @@ func (r *FungibleTokenTracker) worker(
 
 		view := migrations.NewView(j.payloads)
 		meter := metering.NewMeter(metering.DefaultParameters())
-		st := state.NewState(view, meter)
+		st := state.NewState(view, meter, state.DefaultParameters())
 		sth := state.NewStateHolder(st)
 		accounts := state.NewAccounts(sth)
 		storage := cadenceRuntime.NewStorage(

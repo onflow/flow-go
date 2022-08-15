@@ -13,17 +13,15 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
-	"github.com/onflow/flow-go/crypto"
-
-	"github.com/onflow/flow-go/module/compliance"
-
 	"github.com/onflow/flow-go/admin/commands"
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/chainsync"
+	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/id"
-	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
@@ -164,7 +162,7 @@ type BaseConfig struct {
 	NetworkConnectionPruning        bool
 	NetworkReceivedMessageCacheSize uint32
 	HeroCacheMetricsEnable          bool
-	SyncCoreConfig                  synchronization.Config
+	SyncCoreConfig                  chainsync.Config
 	CodecFactory                    func() network.Codec
 	// ComplianceConfig configures either the compliance engine (consensus nodes)
 	// or the follower engine (all other node roles)
@@ -257,7 +255,7 @@ func DefaultBaseConfig() *BaseConfig {
 		NetworkConnectionPruning: p2p.ConnectionPruningEnabled,
 
 		HeroCacheMetricsEnable: false,
-		SyncCoreConfig:         synchronization.DefaultConfig(),
+		SyncCoreConfig:         chainsync.DefaultConfig(),
 		CodecFactory:           codecFactory,
 		ComplianceConfig:       compliance.DefaultConfig(),
 	}

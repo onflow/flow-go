@@ -99,7 +99,7 @@ func run(*cobra.Command, []string) {
 	})
 
 	meter := metering.NewMeter(metering.DefaultParameters())
-	sth := state.NewStateHolder(state.NewState(ldg, meter))
+	sth := state.NewStateHolder(state.NewState(ldg, meter, state.DefaultParameters()))
 	accounts := state.NewAccounts(sth)
 	finalGenerator := state.NewStateBoundAddressGenerator(sth, chain)
 	finalState := finalGenerator.Bytes()
