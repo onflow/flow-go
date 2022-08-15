@@ -187,6 +187,34 @@ func New(
 	return e, nil
 }
 
+func (e *Engine) Start(parent irrecoverable.SignalerContext) {
+	rootBlock, err := e.state.Params().Root()
+	if err != nil {
+		parent.Throw(fmt.Errorf("failed to get root block: %w", err))
+	}
+
+	rootSnapshot := e.state.AtBlockID(rootBlock.ID())
+
+	isSporkRootSnapshot, err := protocol.IsSporkRootSnapshot(rootSnapshot)
+	if err != nil {
+		parent.Throw(fmt.Errorf("could not check if root snapshot is a spork root snapshot: %w", err))
+	}
+
+	// This is useful for dynamically bootstrapped access node, they will request missing collections. In order to ensure all txs
+	// from the missing collections can be verified, we must ensure they are referencing to known blocks.
+	// That's why we set the full block height to be rootHeight + TransactionExpiry, so that we only request missing collections
+	// in blocks above that height.
+	if !isSporkRootSnapshot {
+		firstFullHeight := rootBlock.Height + flow.DefaultTransactionExpiry
+		err := e.blocks.UpdateLastFullBlockHeight(firstFullHeight)
+		if err != nil {
+			parent.Throw(fmt.Errorf("failed to update last full block height during ingestion engine startup: %w", err))
+		}
+	}
+
+	e.ComponentManager.Start(parent)
+}
+
 func (e *Engine) processBackground(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	// context with timeout
 	requestCtx, cancel := context.WithTimeout(ctx, defaultCollectionCatchupTimeout)
@@ -375,6 +403,19 @@ func (e *Engine) processFinalizedBlock(blockID flow.Identifier) error {
 		if err != nil {
 			return fmt.Errorf("could not index block for execution result: %w", err)
 		}
+	}
+
+	// skip requesting collections, if this block is below the last full block height
+	// this means that either we have already received these collections, or the block
+	// may contain unverifiable guarantees (in case this node has just joined the network)
+	lastFullBlockHeight, err := e.blocks.GetLastFullBlockHeight()
+	if err != nil {
+		return fmt.Errorf("could not get last full block height: %w", err)
+	}
+
+	if block.Header.Height <= lastFullBlockHeight {
+		e.log.Info().Msgf("skipping requesting collections for finalized block below last full block height (%d<=%d)", block.Header.Height, lastFullBlockHeight)
+		return nil
 	}
 
 	// queue requesting each of the collections from the collection node
