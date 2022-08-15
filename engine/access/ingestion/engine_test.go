@@ -2,7 +2,7 @@ package ingestion
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"math/rand"
 	"os"
 	"sync"
@@ -112,12 +112,22 @@ func (suite *Suite) SetupTest() {
 		blocksToMarkExecuted, rpcEng)
 	require.NoError(suite.T(), err)
 
-	// stops requestMissingCollections from executing in processBackground worker
-	suite.blocks.On("GetLastFullBlockHeight").Once().Return(uint64(0), errors.New("do nothing"))
+	getLastFullBlockHeightCalls := 0
+	returnErr := func() error {
+		// stops requestMissingCollections from executing in processBackground worker during component startup
+		if getLastFullBlockHeightCalls < 2 {
+			return fmt.Errorf("do nothing")
+		}
+
+		return nil
+	}
+	suite.blocks.On("GetLastFullBlockHeight").Run(func(args mock.Arguments) {
+		getLastFullBlockHeightCalls++
+	}).Return(uint64(0), returnErr).Twice()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	irrecoverableCtx, _ := irrecoverable.WithSignaler(ctx)
-	eng.Start(irrecoverableCtx)
+	eng.ComponentManager.Start(irrecoverableCtx)
 	<-eng.Ready()
 
 	suite.eng = eng
