@@ -95,13 +95,13 @@ func withCorruptibleNetwork(t *testing.T, run func(*testing.T, flow.Identity, *c
 	codec := unittest.NetworkCodec()
 	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DefaultAddress))
 
-	// life-cycle management of attackNetwork.
+	// life-cycle management of orchestratorNetwork.
 	ctx, cancel := context.WithCancel(context.Background())
 	ccfCtx, errChan := irrecoverable.WithSignaler(ctx)
 	go func() {
 		select {
 		case err := <-errChan:
-			t.Error("attackNetwork startup encountered fatal error", err)
+			t.Error("orchestratorNetwork startup encountered fatal error", err)
 		case <-ctx.Done():
 			return
 		}
@@ -134,7 +134,7 @@ func withCorruptibleNetwork(t *testing.T, run func(*testing.T, flow.Identity, *c
 
 	run(t, *corruptedIdentity, corruptibleNetwork, hub)
 
-	// terminates attackNetwork
+	// terminates orchestratorNetwork
 	cancel()
 	unittest.RequireCloseBefore(t, corruptibleNetwork.Done(), 1*time.Second, "could not stop corruptible network on time")
 
@@ -160,13 +160,13 @@ func withAttackOrchestrator(t *testing.T, corruptedIds flow.IdentityList, corrup
 		corruptedIds)
 	require.NoError(t, err)
 
-	// life-cycle management of attackNetwork.
+	// life-cycle management of orchestratorNetwork.
 	ctx, cancel := context.WithCancel(context.Background())
 	attackNetworkCtx, errChan := irrecoverable.WithSignaler(ctx)
 	go func() {
 		select {
 		case err := <-errChan:
-			t.Error("attackNetwork startup encountered fatal error", err)
+			t.Error("orchestratorNetwork startup encountered fatal error", err)
 		case <-ctx.Done():
 			return
 		}
@@ -177,7 +177,7 @@ func withAttackOrchestrator(t *testing.T, corruptedIds flow.IdentityList, corrup
 	unittest.RequireCloseBefore(t, attackNetwork.Ready(), 1*time.Second, "could not start attack network on time")
 	run(t)
 
-	// terminates attackNetwork
+	// terminates orchestratorNetwork
 	cancel()
 	unittest.RequireCloseBefore(t, attackNetwork.Done(), 1*time.Second, "could not stop attack network on time")
 }
