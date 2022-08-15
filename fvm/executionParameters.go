@@ -11,6 +11,87 @@ import (
 	"github.com/onflow/flow-go/fvm/utils"
 )
 
+func setMeterParameters(env *commonEnv) error {
+	// TODO(patrick): Don't enforce limits while setting up limits.
+
+	if env.ctx.AllowContextOverrideByExecutionState {
+		err := setExecutionParameters(env)
+		if err != nil {
+			return err
+		}
+	}
+
+	// TODO(patrick): disable memory/interaction limits for service account
+
+	return nil
+}
+
+func setExecutionParameters(env *commonEnv) error {
+	// Check that the service account exists because all the settings are
+	// stored in it
+	serviceAddress := env.Context().Chain.ServiceAddress()
+	service := runtime.Address(serviceAddress)
+
+	// set the property if no error, but if the error is a fatal error then
+	// return it
+	setIfOk := func(prop string, err error, setter func()) (fatal error) {
+		err, fatal = errors.SplitErrorTypes(err)
+		if fatal != nil {
+			// this is a fatal error. return it
+			env.ctx.Logger.
+				Error().
+				Err(fatal).
+				Msgf("error getting %s", prop)
+			return fatal
+		}
+		if err != nil {
+			// this is a general error.
+			// could be that no setting was present in the state,
+			// or that the setting was not parseable,
+			// or some other deterministic thing.
+			env.ctx.Logger.
+				Debug().
+				Err(err).
+				Msgf("could not set %s. Using defaults", prop)
+			return nil
+		}
+		// everything is ok. do the setting
+		setter()
+		return nil
+	}
+
+	meter := env.sth.Meter()
+
+	computationWeights, err := GetExecutionEffortWeights(env.fullEnv, service)
+	err = setIfOk(
+		"execution effort weights",
+		err,
+		func() { meter.SetComputationWeights(computationWeights) })
+	if err != nil {
+		return err
+	}
+
+	memoryWeights, err := GetExecutionMemoryWeights(env.fullEnv, service)
+	err = setIfOk(
+		"execution memory weights",
+		err,
+		func() { meter.SetMemoryWeights(memoryWeights) })
+	if err != nil {
+		return err
+	}
+
+	memoryLimit, err := GetExecutionMemoryLimit(env.fullEnv, service)
+	err = setIfOk(
+		"execution memory limit",
+		err,
+		func() { meter.SetTotalMemoryLimit(memoryLimit) })
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func getExecutionWeights[KindType common.ComputationKind | common.MemoryKind](
 	env Environment,
 	service runtime.Address,

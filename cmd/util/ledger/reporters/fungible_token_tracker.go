@@ -2,7 +2,6 @@ package reporters
 
 import (
 	"fmt"
-	"math"
 	"runtime"
 	"strings"
 	"sync"
@@ -97,7 +96,11 @@ func (r *FungibleTokenTracker) Report(payloads []ledger.Payload, commit ledger.S
 	payloadsByOwner := make(map[flow.Address][]ledger.Payload)
 
 	for _, pay := range payloads {
-		owner := flow.BytesToAddress(pay.Key.KeyParts[0].Value)
+		k, err := pay.Key()
+		if err != nil {
+			return nil
+		}
+		owner := flow.BytesToAddress(k.KeyParts[0].Value)
 		if len(owner) > 0 { // ignoring payloads without ownership (fvm ones)
 			m, ok := payloadsByOwner[owner]
 			if !ok {
@@ -139,7 +142,7 @@ func (r *FungibleTokenTracker) worker(
 	for j := range jobs {
 
 		view := migrations.NewView(j.payloads)
-		meter := metering.NewMeter(math.MaxUint64, math.MaxUint64)
+		meter := metering.NewMeter(metering.DefaultParameters())
 		st := state.NewState(view, meter)
 		sth := state.NewStateHolder(st)
 		accounts := state.NewAccounts(sth)

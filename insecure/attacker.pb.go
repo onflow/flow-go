@@ -56,7 +56,7 @@ func (Protocol) EnumDescriptor() ([]byte, []int) {
 	return fileDescriptor_de1530a0da5eef1a, []int{0}
 }
 
-// Message represents the messages exchanged between the CorruptibleNetwork and Attacker services.
+// Message represents the messages exchanged between the CorruptibleNetwork (server) and Orchestrator (client).
 // This is a wrapper for both egress and ingress messages.
 type Message struct {
 	Egress               *EgressMessage  `protobuf:"bytes,1,opt,name=Egress,proto3" json:"Egress,omitempty"`

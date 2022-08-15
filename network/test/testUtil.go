@@ -37,8 +37,6 @@ import (
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/unicast"
-	"github.com/onflow/flow-go/network/topology"
-	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -106,7 +104,7 @@ func GenerateIDs(
 	libP2PNodes := make([]*p2p.Node, n)
 	tagObservables := make([]observable.Observable, n)
 
-	o := &optsConfig{}
+	o := &optsConfig{peerUpdateInterval: p2p.DefaultPeerUpdateInterval}
 	for _, opt := range opts {
 		opt(o)
 	}
@@ -149,7 +147,7 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 	mws := make([]network.Middleware, len(identities))
 	idProviders := make([]*UpdatableIDProvider, len(identities))
 
-	o := &optsConfig{}
+	o := &optsConfig{peerUpdateInterval: p2p.DefaultPeerUpdateInterval}
 	for _, opt := range opts {
 		opt(o)
 	}
@@ -167,7 +165,7 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 
 		idProviders[i] = NewUpdatableIDProvider(identities)
 
-		peerManagerFactory := p2p.PeerManagerFactory(o.peerManagerOpts)
+		peerManagerFactory := p2p.PeerManagerFactory(p2p.ConnectionPruningEnabled, o.peerUpdateInterval)
 
 		// creating middleware of nodes
 		mws[i] = p2p.NewMiddleware(logger,
@@ -191,26 +189,10 @@ func GenerateNetworks(
 	log zerolog.Logger,
 	ids flow.IdentityList,
 	mws []network.Middleware,
-	tops []network.Topology,
 	sms []network.SubscriptionManager,
 ) []network.Network {
 	count := len(ids)
 	nets := make([]network.Network, 0)
-
-	// checks if necessary to generate topology managers
-	if tops == nil {
-		// nil topology managers means generating default ones
-
-		// creates default topology
-		//
-		// mocks state for collector nodes topology
-		// considers only a single cluster as higher cluster numbers are tested
-		// in collectionTopology_test
-		state, _ := topology.MockStateForCollectionNodes(t,
-			ids.Filter(filter.HasRole(flow.RoleCollection)), 1)
-		// creates topology instances for the nodes based on their roles
-		tops = GenerateTopologies(t, state, ids, log)
-	}
 
 	for i := 0; i < count; i++ {
 
@@ -230,7 +212,7 @@ func GenerateNetworks(
 			Codec:               cbor.NewCodec(),
 			Me:                  me,
 			MiddlewareFactory:   func() (network.Middleware, error) { return mws[i], nil },
-			Topology:            tops[i],
+			Topology:            unittest.NetworkTopology(),
 			SubscriptionManager: sms[i],
 			Metrics:             metrics.NewNoopCollector(),
 			IdentityProvider:    id.NewFixedIdentityProvider(ids),
@@ -274,11 +256,11 @@ func GenerateIDsAndMiddlewares(t *testing.T,
 }
 
 type optsConfig struct {
-	idOpts           []func(*flow.Identity)
-	dhtPrefix        string
-	dhtOpts          []dht.Option
-	peerManagerOpts  []p2p.Option
-	connectionGating bool
+	idOpts             []func(*flow.Identity)
+	dhtPrefix          string
+	dhtOpts            []dht.Option
+	peerUpdateInterval time.Duration
+	connectionGating   bool
 }
 
 func WithIdentityOpts(idOpts ...func(*flow.Identity)) func(*optsConfig) {
@@ -294,9 +276,9 @@ func WithDHT(prefix string, dhtOpts ...dht.Option) func(*optsConfig) {
 	}
 }
 
-func WithPeerManagerOpts(peerManagerOpts ...p2p.Option) func(*optsConfig) {
+func WithPeerUpdateInterval(interval time.Duration) func(*optsConfig) {
 	return func(o *optsConfig) {
-		o.peerManagerOpts = peerManagerOpts
+		o.peerUpdateInterval = interval
 	}
 }
 
@@ -305,13 +287,12 @@ func GenerateIDsMiddlewaresNetworks(
 	t *testing.T,
 	n int,
 	log zerolog.Logger,
-	tops []network.Topology,
 	codec network.Codec,
 	opts ...func(*optsConfig),
 ) (flow.IdentityList, []network.Middleware, []network.Network, []observable.Observable) {
 	ids, mws, observables, _ := GenerateIDsAndMiddlewares(t, n, log, codec, opts...)
 	sms := GenerateSubscriptionManagers(t, mws)
-	networks := GenerateNetworks(ctx, t, log, ids, mws, tops, sms)
+	networks := GenerateNetworks(ctx, t, log, ids, mws, sms)
 	return ids, mws, networks, observables
 }
 
@@ -385,22 +366,6 @@ func generateNetworkingKey(s flow.Identifier) (crypto.PrivateKey, error) {
 	seed := make([]byte, crypto.KeyGenSeedMinLenECDSASecp256k1)
 	copy(seed, s[:])
 	return crypto.GeneratePrivateKey(crypto.ECDSASecp256k1, seed)
-}
-
-// CreateTopologies is a test helper on receiving an identity list, creates a topology per identity
-// and returns the slice of topologies.
-func GenerateTopologies(t *testing.T, state protocol.State, identities flow.IdentityList, logger zerolog.Logger) []network.Topology {
-	tops := make([]network.Topology, 0)
-	for _, id := range identities {
-		var top network.Topology
-		var err error
-
-		top, err = topology.NewTopicBasedTopology(id.NodeID, logger, state)
-		require.NoError(t, err)
-
-		tops = append(tops, top)
-	}
-	return tops
 }
 
 // GenerateSubscriptionManagers creates and returns a ChannelSubscriptionManager for each middleware object.

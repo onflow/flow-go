@@ -130,7 +130,7 @@ func testAttackNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegr
 		})
 }
 
-// mackEventForMessage fails the test if given message is not meant to be sent on behalf of the corrupted id, or it does not correspond to any
+// matchEgressEventForMessage fails the test if given message is not meant to be sent on behalf of the corrupted id, or it does not correspond to any
 // of the given events.
 func matchEventForMessage(t *testing.T, egressEvents []*insecure.EgressEvent, message *insecure.Message, corruptedId flow.Identifier) {
 	codec := unittest.NetworkCodec()
@@ -219,14 +219,14 @@ func withMockOrchestrator(t *testing.T,
 		})
 }
 
-// mockOrchestratorHandlingEvent mocks the given orchestrator to receive each of the given events exactly once. The returned wait group is
+// mockOrchestratorHandlingEgressEvent mocks the given orchestrator to receive each of the given egress events exactly once. The returned wait group is
 // released when individual events are seen by orchestrator exactly once.
-func mockOrchestratorHandlingEvent(t *testing.T, orchestrator *mockinsecure.AttackOrchestrator, events []*insecure.EgressEvent) *sync.WaitGroup {
+func mockOrchestratorHandlingEgressEvent(t *testing.T, orchestrator *mockinsecure.AttackOrchestrator, egressEvents []*insecure.EgressEvent) *sync.WaitGroup {
 	orchestratorWG := &sync.WaitGroup{}
-	orchestratorWG.Add(len(events)) // keeps track of total events that orchestrator receives
+	orchestratorWG.Add(len(egressEvents)) // keeps track of total egress events that orchestrator receives
 
 	mu := sync.Mutex{}
-	seen := make(map[*insecure.EgressEvent]struct{}) // keeps track of unique events received by orchestrator
+	seen := make(map[*insecure.EgressEvent]struct{}) // keeps track of unique egress events received by orchestrator
 	orchestrator.On("HandleEventFromCorruptedNode", mock.Anything).Run(func(args mock.Arguments) {
 		mu.Lock()
 		defer mu.Unlock()
@@ -239,7 +239,7 @@ func mockOrchestratorHandlingEvent(t *testing.T, orchestrator *mockinsecure.Atta
 		require.False(t, ok)
 
 		// received event by orchestrator must be an expected one.
-		require.Contains(t, events, e)
+		require.Contains(t, egressEvents, e)
 		seen[e] = struct{}{}
 		orchestratorWG.Done()
 

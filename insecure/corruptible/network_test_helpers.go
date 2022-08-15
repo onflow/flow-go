@@ -5,10 +5,11 @@ package corruptible
 import (
 	"context"
 	"fmt"
-	"github.com/rs/zerolog"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/rs/zerolog"
 
 	"google.golang.org/grpc"
 	grpcinsecure "google.golang.org/grpc/credentials/insecure"

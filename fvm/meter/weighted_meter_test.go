@@ -18,30 +18,32 @@ func TestWeightedComputationMetering(t *testing.T) {
 
 	t.Run("get limits", func(t *testing.T) {
 		m := meter.NewMeter(
-			1,
-			2,
-			meter.WithComputationWeights(map[common.ComputationKind]uint64{}),
-			meter.WithMemoryWeights(map[common.MemoryKind]uint64{}))
+			meter.DefaultParameters().
+				WithComputationLimit(1).
+				WithMemoryLimit(2),
+		)
 		require.Equal(t, uint(1), m.TotalComputationLimit())
 		require.Equal(t, uint(2), m.TotalMemoryLimit())
 	})
 
 	t.Run("get limits max", func(t *testing.T) {
 		m := meter.NewMeter(
-			math.MaxUint32,
-			math.MaxUint32,
-			meter.WithComputationWeights(map[common.ComputationKind]uint64{}),
-			meter.WithMemoryWeights(map[common.MemoryKind]uint64{}))
+			meter.DefaultParameters().
+				WithComputationLimit(math.MaxUint32).
+				WithMemoryLimit(math.MaxUint32),
+		)
 		require.Equal(t, uint(math.MaxUint32), m.TotalComputationLimit())
 		require.Equal(t, uint(math.MaxUint32), m.TotalMemoryLimit())
 	})
 
 	t.Run("meter computation and memory", func(t *testing.T) {
 		m := meter.NewMeter(
-			10,
-			10,
-			meter.WithComputationWeights(map[common.ComputationKind]uint64{0: 1 << meter.MeterExecutionInternalPrecisionBytes}),
-			meter.WithMemoryWeights(map[common.MemoryKind]uint64{0: 1}),
+			meter.DefaultParameters().
+				WithComputationLimit(10).
+				WithComputationWeights(
+					map[common.ComputationKind]uint64{0: 1 << meter.MeterExecutionInternalPrecisionBytes}).
+				WithMemoryLimit(10).
+				WithMemoryWeights(map[common.MemoryKind]uint64{0: 1}),
 		)
 
 		err := m.MeterComputation(0, 1)
@@ -73,10 +75,12 @@ func TestWeightedComputationMetering(t *testing.T) {
 
 	t.Run("meter computation and memory with weights", func(t *testing.T) {
 		m := meter.NewMeter(
-			100,
-			100,
-			meter.WithComputationWeights(map[common.ComputationKind]uint64{0: 13 << meter.MeterExecutionInternalPrecisionBytes}),
-			meter.WithMemoryWeights(map[common.MemoryKind]uint64{0: 17}),
+			meter.DefaultParameters().
+				WithComputationLimit(100).
+				WithComputationWeights(
+					map[common.ComputationKind]uint64{0: 13 << meter.MeterExecutionInternalPrecisionBytes}).
+				WithMemoryLimit(100).
+				WithMemoryWeights(map[common.MemoryKind]uint64{0: 17}),
 		)
 
 		err := m.MeterComputation(0, 1)
@@ -92,10 +96,11 @@ func TestWeightedComputationMetering(t *testing.T) {
 
 	t.Run("meter computation with weights lower than MeterInternalPrecisionBytes", func(t *testing.T) {
 		m := meter.NewMeter(
-			100,
-			100,
-			meter.WithComputationWeights(map[common.ComputationKind]uint64{0: 1}),
-			meter.WithMemoryWeights(map[common.MemoryKind]uint64{0: 1}),
+			meter.DefaultParameters().
+				WithComputationLimit(100).
+				WithComputationWeights(map[common.ComputationKind]uint64{0: 1}).
+				WithMemoryLimit(100).
+				WithMemoryWeights(map[common.MemoryKind]uint64{0: 1}),
 		)
 
 		internalPrecisionMinusOne := uint((1 << meter.MeterExecutionInternalPrecisionBytes) - 1)
@@ -114,10 +119,12 @@ func TestWeightedComputationMetering(t *testing.T) {
 	t.Run("merge meters", func(t *testing.T) {
 		compKind := common.ComputationKind(0)
 		m := meter.NewMeter(
-			9,
-			0,
-			meter.WithComputationWeights(map[common.ComputationKind]uint64{0: 1 << meter.MeterExecutionInternalPrecisionBytes}),
-			meter.WithMemoryWeights(map[common.MemoryKind]uint64{0: 1}),
+			meter.DefaultParameters().
+				WithComputationLimit(9).
+				WithComputationWeights(
+					map[common.ComputationKind]uint64{0: 1 << meter.MeterExecutionInternalPrecisionBytes}).
+				WithMemoryLimit(0).
+				WithMemoryWeights(map[common.MemoryKind]uint64{0: 1}),
 		)
 
 		err := m.MeterComputation(compKind, 1)
@@ -155,9 +162,10 @@ func TestWeightedComputationMetering(t *testing.T) {
 	t.Run("merge meters - ignore limits", func(t *testing.T) {
 		compKind := common.ComputationKind(0)
 		m := meter.NewMeter(
-			9,
-			0,
-			meter.WithComputationWeights(map[common.ComputationKind]uint64{0: 1 << meter.MeterExecutionInternalPrecisionBytes}),
+			meter.DefaultParameters().
+				WithComputationLimit(9).
+				WithMemoryLimit(0).
+				WithComputationWeights(map[common.ComputationKind]uint64{0: 1 << meter.MeterExecutionInternalPrecisionBytes}),
 		)
 
 		err := m.MeterComputation(compKind, 1)
@@ -176,11 +184,11 @@ func TestWeightedComputationMetering(t *testing.T) {
 
 	t.Run("merge meters - large values - computation", func(t *testing.T) {
 		m := meter.NewMeter(
-			math.MaxUint32,
-			math.MaxUint32,
-			meter.WithComputationWeights(map[common.ComputationKind]uint64{
-				0: math.MaxUint32 << meter.MeterExecutionInternalPrecisionBytes,
-			}),
+			meter.DefaultParameters().
+				WithComputationLimit(math.MaxUint32).
+				WithComputationWeights(map[common.ComputationKind]uint64{
+					0: math.MaxUint32 << meter.MeterExecutionInternalPrecisionBytes,
+				}),
 		)
 
 		err := m.MeterComputation(0, 1)
@@ -196,11 +204,11 @@ func TestWeightedComputationMetering(t *testing.T) {
 
 	t.Run("merge meters - large values - memory", func(t *testing.T) {
 		m := meter.NewMeter(
-			math.MaxUint32,
-			math.MaxUint32,
-			meter.WithMemoryWeights(map[common.MemoryKind]uint64{
-				0: math.MaxUint32,
-			}),
+			meter.DefaultParameters().
+				WithMemoryLimit(math.MaxUint32).
+				WithMemoryWeights(map[common.MemoryKind]uint64{
+					0: math.MaxUint32,
+				}),
 		)
 
 		err := m.MeterMemory(0, 1)
@@ -221,14 +229,14 @@ func TestWeightedComputationMetering(t *testing.T) {
 		var m meter.Meter
 		reset := func() {
 			m = meter.NewMeter(
-				math.MaxUint32,
-				math.MaxUint32,
-				meter.WithComputationWeights(map[common.ComputationKind]uint64{
-					0: 0,
-					1: 1,
-					2: 1 << meter.MeterExecutionInternalPrecisionBytes,
-					3: math.MaxUint64,
-				}),
+				meter.DefaultParameters().
+					WithComputationLimit(math.MaxUint32).
+					WithComputationWeights(map[common.ComputationKind]uint64{
+						0: 0,
+						1: 1,
+						2: 1 << meter.MeterExecutionInternalPrecisionBytes,
+						3: math.MaxUint64,
+					}),
 			)
 		}
 
@@ -286,14 +294,14 @@ func TestWeightedComputationMetering(t *testing.T) {
 		var m meter.Meter
 		reset := func() {
 			m = meter.NewMeter(
-				math.MaxUint32,
-				math.MaxUint32,
-				meter.WithMemoryWeights(map[common.MemoryKind]uint64{
-					0: 0,
-					1: 1,
-					2: 2,
-					3: math.MaxUint64,
-				}),
+				meter.DefaultParameters().
+					WithMemoryLimit(math.MaxUint32).
+					WithMemoryWeights(map[common.MemoryKind]uint64{
+						0: 0,
+						1: 1,
+						2: 2,
+						3: math.MaxUint64,
+					}),
 			)
 		}
 
