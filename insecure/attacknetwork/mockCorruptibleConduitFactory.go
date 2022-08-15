@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/module"
 	"io"
 	"net"
 	"sync"
+
+	"github.com/onflow/flow-go/module"
 
 	"github.com/golang/protobuf/ptypes/empty"
 	"google.golang.org/grpc"

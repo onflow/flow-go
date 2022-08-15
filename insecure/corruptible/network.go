@@ -170,9 +170,9 @@ func (n *Network) ProcessAttackerMessage(stream insecure.CorruptibleConduitFacto
 				return stream.SendAndClose(&empty.Empty{})
 			}
 			// received ingress message
-			if msg.Ingress != nil {
-				// TODO implement ingress message processing
-			}
+			//if msg.Ingress != nil {
+			//	// TODO implement ingress message processing
+			//}
 			// received egress message
 			if msg.Egress != nil {
 				if err := n.processAttackerEgressMessage(msg); err != nil {

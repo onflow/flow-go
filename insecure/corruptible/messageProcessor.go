@@ -1,13 +1,12 @@
 package corruptible
 
 import (
-	"github.com/onflow/flow-go/insecure"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/network/channels"
-
+	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/model/flow"
 	flownet "github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 )
 
 type MessageProcessor struct {

@@ -3,6 +3,7 @@ package corruptible
 import (
 	"context"
 	"fmt"
+
 	"github.com/onflow/flow-go/network"
 
 	"github.com/onflow/flow-go/insecure"
