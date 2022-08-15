@@ -35,7 +35,7 @@ func NewScriptEnvironment(
 	vm *VirtualMachine,
 	sth *state.StateHolder,
 	programs *programs.Programs,
-) (*ScriptEnv, error) {
+) *ScriptEnv {
 
 	accounts := state.NewAccounts(sth)
 	uuidGenerator := state.NewUUIDGenerator(sth)
@@ -80,9 +80,7 @@ func NewScriptEnvironment(
 		func() []common.Address { return []common.Address{} },
 		func(address runtime.Address, code []byte) (bool, error) { return false, nil })
 
-	err := setMeterParameters(&env.commonEnv)
-
-	return env, err
+	return env
 }
 
 func (e *ScriptEnv) GetStorageCapacity(address common.Address) (value uint64, err error) {

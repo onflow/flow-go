@@ -148,10 +148,7 @@ func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
 	sth := state.NewStateHolder(st)
 	accounts := state.NewAccounts(sth)
 
-	env, err := fvm.NewScriptEnvironment(context.Background(), ctx, vm, sth, prog)
-	if err != nil {
-		panic(err)
-	}
+	env := fvm.NewScriptEnvironment(context.Background(), ctx, vm, sth, prog)
 
 	return &balanceProcessor{
 		vm:       vm,

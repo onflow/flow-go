@@ -219,7 +219,7 @@ func (s *State) TotalMemoryEstimate() uint {
 
 // TotalMemoryLimit returns total memory limit
 func (s *State) TotalMemoryLimit() uint {
-	return s.meter.TotalMemoryLimit()
+	return uint(s.meter.TotalMemoryLimit())
 }
 
 // NewChild generates a new child state

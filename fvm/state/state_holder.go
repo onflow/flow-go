@@ -65,12 +65,6 @@ func (s *StateHolder) UpdatedAddresses() []flow.Address {
 	return s.activeState.UpdatedAddresses()
 }
 
-// TODO(patrick): remove once we no longer support updating limit/weights after
-// meter initialization.
-func (s *StateHolder) Meter() meter.Meter {
-	return s.activeState.Meter()
-}
-
 func (s *StateHolder) MeterComputation(
 	kind common.ComputationKind,
 	intensity uint,
