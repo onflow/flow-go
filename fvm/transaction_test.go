@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
@@ -24,24 +23,22 @@ import (
 
 func makeTwoAccounts(t *testing.T, aPubKeys []flow.AccountPublicKey, bPubKeys []flow.AccountPublicKey) (flow.Address, flow.Address, *state.StateHolder) {
 
-	ledger := utils.NewSimpleView()
-	sth := state.NewStateHolder(state.NewState(
-		ledger,
-		meter.NewMeter(meter.DefaultParameters()),
+	stTxn := state.NewStateTransaction(
+		utils.NewSimpleView(),
 		state.DefaultParameters(),
-	))
+	)
 
 	a := flow.HexToAddress("1234")
 	b := flow.HexToAddress("5678")
 
 	//create accounts
-	accounts := state.NewAccounts(sth)
+	accounts := state.NewAccounts(stTxn)
 	err := accounts.Create(aPubKeys, a)
 	require.NoError(t, err)
 	err = accounts.Create(bPubKeys, b)
 	require.NoError(t, err)
 
-	return a, b, sth
+	return a, b, stTxn
 }
 
 func TestAccountFreezing(t *testing.T) {
@@ -406,11 +403,10 @@ func TestAccountFreezing(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, tx.Err)
 
-		accountsService := state.NewAccounts(state.NewStateHolder(state.NewState(
+		accountsService := state.NewAccounts(state.NewStateTransaction(
 			ledger,
-			meter.NewMeter(meter.DefaultParameters()),
 			state.DefaultParameters(),
-		)))
+		))
 
 		frozen, err := accountsService.GetAccountFrozen(address)
 		require.NoError(t, err)
@@ -438,11 +434,10 @@ func TestAccountFreezing(t *testing.T) {
 		require.NoError(t, err)
 		require.Error(t, tx.Err)
 
-		accountsService = state.NewAccounts(state.NewStateHolder(state.NewState(
+		accountsService = state.NewAccounts(state.NewStateTransaction(
 			ledger,
-			meter.NewMeter(meter.DefaultParameters()),
 			state.DefaultParameters(),
-		)))
+		))
 
 		frozen, err = accountsService.GetAccountFrozen(serviceAddress)
 		require.NoError(t, err)

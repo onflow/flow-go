@@ -5,7 +5,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
@@ -14,18 +13,16 @@ import (
 func Test_NewStateBoundAddressGenerator_NoError(t *testing.T) {
 	view := utils.NewSimpleView()
 	chain := flow.MonotonicEmulator.Chain()
-	meter := meter.NewMeter(meter.DefaultParameters())
-	sth := state.NewStateHolder(state.NewState(view, meter, state.DefaultParameters()))
-	env := state.NewStateBoundAddressGenerator(sth, chain)
+	stTxn := state.NewStateTransaction(view, state.DefaultParameters())
+	env := state.NewStateBoundAddressGenerator(stTxn, chain)
 	require.NotNil(t, env)
 }
 
 func Test_NewStateBoundAddressGenerator_GeneratingUpdatesState(t *testing.T) {
 	view := utils.NewSimpleView()
 	chain := flow.MonotonicEmulator.Chain()
-	meter := meter.NewMeter(meter.DefaultParameters())
-	sth := state.NewStateHolder(state.NewState(view, meter, state.DefaultParameters()))
-	generator := state.NewStateBoundAddressGenerator(sth, chain)
+	stTxn := state.NewStateTransaction(view, state.DefaultParameters())
+	generator := state.NewStateBoundAddressGenerator(stTxn, chain)
 	_, err := generator.NextAddress()
 	require.NoError(t, err)
 
@@ -41,9 +38,8 @@ func Test_NewStateBoundAddressGenerator_UsesLedgerState(t *testing.T) {
 	require.NoError(t, err)
 
 	chain := flow.MonotonicEmulator.Chain()
-	meter := meter.NewMeter(meter.DefaultParameters())
-	sth := state.NewStateHolder(state.NewState(view, meter, state.DefaultParameters()))
-	generator := state.NewStateBoundAddressGenerator(sth, chain)
+	stTxn := state.NewStateTransaction(view, state.DefaultParameters())
+	generator := state.NewStateBoundAddressGenerator(stTxn, chain)
 
 	_, err = generator.NextAddress()
 	require.NoError(t, err)
