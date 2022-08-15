@@ -85,7 +85,7 @@ func (d *dummyOrchestrator) HandleEventToCorruptedNode(event *insecure.IngressEv
 	panic("Unimplemented")
 }
 
-func (d *dummyOrchestrator) RegisterAttackNetwork(orchestratorNetwork insecure.OrchestratorNetwork) {
+func (d *dummyOrchestrator) Register(orchestratorNetwork insecure.OrchestratorNetwork) {
 	d.orchestratorNetwork = orchestratorNetwork
 }
 
