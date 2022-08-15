@@ -54,8 +54,8 @@ func NewOrchestrator(logger zerolog.Logger, corruptedNodeIds flow.IdentifierList
 	return o
 }
 
-// RegisterAttackNetwork sets the attack network of the orchestrator.
-func (o *Orchestrator) RegisterAttackNetwork(network insecure.OrchestratorNetwork) {
+// Register sets the attack network of the orchestrator.
+func (o *Orchestrator) Register(network insecure.OrchestratorNetwork) {
 	o.network = network
 }
 

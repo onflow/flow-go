@@ -16,8 +16,8 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// AttackNetworkFactory implements a middleware for mounting an attack orchestrator and empowering it to communicate with the corrupted nodes.
-type AttackNetworkFactory struct {
+// AttackNetwork implements a middleware for mounting an attack orchestrator and empowering it to communicate with the corrupted nodes.
+type AttackNetwork struct {
 	component.Component
 	cm                   *component.ComponentManager
 	orchestratorMutex    sync.Mutex // to ensure thread-safe calls into orchestrator.
@@ -29,16 +29,16 @@ type AttackNetworkFactory struct {
 	corruptedConnector   insecure.CorruptedNodeConnector                      // connection generator to corrupted nodes.
 }
 
-var _ insecure.AttackNetwork = &AttackNetwork{}
+var _ insecure.OrchestratorNetwork = &AttackNetwork{}
 
 func NewAttackNetwork(
 	logger zerolog.Logger,
 	codec network.Codec,
 	orchestrator insecure.AttackOrchestrator,
 	connector insecure.CorruptedNodeConnector,
-	corruptedNodeIds flow.IdentityList) (*AttackNetworkFactory, error) {
+	corruptedNodeIds flow.IdentityList) (*AttackNetwork, error) {
 
-	attackNetwork := &AttackNetworkFactory{
+	attackNetwork := &AttackNetwork{
 		orchestrator:         orchestrator,
 		logger:               logger,
 		codec:                codec,
@@ -74,7 +74,7 @@ func NewAttackNetwork(
 }
 
 // start triggers the sub-modules of attack network.
-func (a *AttackNetworkFactory) start(ctx irrecoverable.SignalerContext) error {
+func (a *AttackNetwork) start(ctx irrecoverable.SignalerContext) error {
 	// creates a connection to all corrupted nodes in the attack network.
 	for _, corruptedNodeId := range a.corruptedNodeIds {
 		connection, err := a.corruptedConnector.Connect(ctx, corruptedNodeId.NodeID)
@@ -92,7 +92,7 @@ func (a *AttackNetworkFactory) start(ctx irrecoverable.SignalerContext) error {
 }
 
 // stop conducts the termination logic of the sub-modules of attack network.
-func (a *AttackNetworkFactory) stop() error {
+func (a *AttackNetwork) stop() error {
 	// tears down connections to corruptible nodes.
 	var errors *multierror.Error
 	for _, connection := range a.corruptedConnections {
@@ -154,7 +154,7 @@ func (a *AttackNetwork) processEgressMessage(message *insecure.Message) error {
 
 // SendEgress enforces dissemination of given event via its encapsulated corrupted node networking layer through the Flow network
 // An orchestrator decides when to send an egress message on behalf of a corrupted node
-func (a *AttackNetworkFactory) SendEgress(event *insecure.EgressEvent) error {
+func (a *AttackNetwork) SendEgress(event *insecure.EgressEvent) error {
 	msg, err := a.eventToEgressMessage(event.OriginId, event.FlowProtocolEvent, event.Channel, event.Protocol, event.TargetNum, event.TargetIds...)
 	if err != nil {
 		return fmt.Errorf("could not convert event to message: %w", err)
@@ -171,7 +171,7 @@ func (a *AttackNetworkFactory) SendEgress(event *insecure.EgressEvent) error {
 // SendIngress sends an incoming message from the flow network (from another node that could be or honest or corrupted)
 // to the corrupted node. This message was intercepted by the attack network and relayed to the orchestrator before being sent
 // to the corrupted node.
-func (a *AttackNetworkFactory) SendIngress(event *insecure.IngressEvent) error {
+func (a *AttackNetwork) SendIngress(event *insecure.IngressEvent) error {
 	msg, err := a.eventToIngressMessage(event.OriginID, event.FlowProtocolEvent, event.Channel, event.TargetID)
 	if err != nil {
 		return fmt.Errorf("could not convert event to message: %w", err)
@@ -185,7 +185,7 @@ func (a *AttackNetworkFactory) SendIngress(event *insecure.IngressEvent) error {
 }
 
 // sendMessage is a helper function for sending both ingress and egress messages
-func (a *AttackNetworkFactory) sendMessage(msg *insecure.Message, lookupId flow.Identifier) error {
+func (a *AttackNetwork) sendMessage(msg *insecure.Message, lookupId flow.Identifier) error {
 	connection, ok := a.corruptedConnections[lookupId]
 	if !ok {
 		return fmt.Errorf("no connection available for corrupted conduit factory to node %x: ", lookupId)
@@ -200,7 +200,7 @@ func (a *AttackNetworkFactory) sendMessage(msg *insecure.Message, lookupId flow.
 }
 
 // eventToEgressMessage converts the given application layer event to a protobuf message that is meant to be sent FROM the corrupted node.
-func (a *AttackNetworkFactory) eventToEgressMessage(corruptedId flow.Identifier,
+func (a *AttackNetwork) eventToEgressMessage(corruptedId flow.Identifier,
 	event interface{},
 	channel channels.Channel,
 	protocol insecure.Protocol,
@@ -227,7 +227,7 @@ func (a *AttackNetworkFactory) eventToEgressMessage(corruptedId flow.Identifier,
 }
 
 // eventToIngressMessage converts the given application layer event to a protobuf message that is meant to be sent TO the corrupted node.
-func (a *AttackNetworkFactory) eventToIngressMessage(originId flow.Identifier,
+func (a *AttackNetwork) eventToIngressMessage(originId flow.Identifier,
 	event interface{},
 	channel channels.Channel,
 	targetId flow.Identifier) (*insecure.Message, error) {

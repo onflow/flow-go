@@ -29,7 +29,7 @@ func (m *mockOrchestrator) HandleEventToCorruptedNode(event *insecure.IngressEve
 	panic("unimplemented")
 }
 
-func (m *mockOrchestrator) RegisterAttackNetwork(insecure.OrchestratorNetwork) {
+func (m *mockOrchestrator) Register(insecure.OrchestratorNetwork) {
 	panic("unimplemented")
 }
 

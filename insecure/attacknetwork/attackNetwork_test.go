@@ -35,9 +35,9 @@ func testAttackNetworkObserve(t *testing.T, concurrencyDegree int) {
 	withMockOrchestrator(
 		t,
 		corruptedIds,
-		func(network *AttackNetworkFactory, orchestrator *mockinsecure.AttackOrchestrator, ccfs []*mockCorruptibleConduitFactory) {
+		func(network *AttackNetwork, orchestrator *mockinsecure.AttackOrchestrator, ccfs []*mockCorruptibleConduitFactory) {
 			// mocks orchestrator to receive each event exactly once.
-			orchestratorWG := mockOrchestratorHandlingEvent(t, orchestrator, egressEvents)
+			orchestratorWG := mockOrchestratorHandlingEgressEvent(t, orchestrator, egressEvents)
 
 			// sends all messages concurrently to the attack network (imitating corruptible conduits sending
 			// messages concurrently to attack network).
@@ -94,7 +94,7 @@ func testAttackNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegr
 
 	withMockOrchestrator(t,
 		corruptedIds,
-		func(attackNetwork *AttackNetworkFactory, _ *mockinsecure.AttackOrchestrator, ccfs []*mockCorruptibleConduitFactory) {
+		func(attackNetwork *AttackNetwork, _ *mockinsecure.AttackOrchestrator, ccfs []*mockCorruptibleConduitFactory) {
 			attackerMsgReceived := &sync.WaitGroup{}
 			attackerMsgReceived.Add(concurrencyDegree)
 
@@ -162,7 +162,7 @@ func matchEventForMessage(t *testing.T, egressEvents []*insecure.EgressEvent, me
 // Once the attack network, CCFs, and mock orchestrator are all ready, it executes the injected "run" function.
 func withMockOrchestrator(t *testing.T,
 	corruptedIds flow.IdentityList,
-	run func(*AttackNetworkFactory, *mockinsecure.AttackOrchestrator, []*mockCorruptibleConduitFactory)) {
+	run func(*AttackNetwork, *mockinsecure.AttackOrchestrator, []*mockCorruptibleConduitFactory)) {
 
 	withMockCorruptibleConduitFactories(t,
 		corruptedIds.NodeIDs(),

@@ -46,7 +46,7 @@ func TestSingleExecutionReceipt(t *testing.T) {
 	wintermuteOrchestrator := NewOrchestrator(unittest.Logger(), corruptedIds, allIds)
 
 	// register mock network with orchestrator
-	wintermuteOrchestrator.RegisterAttackNetwork(mockOrchestratorNetwork)
+	wintermuteOrchestrator.Register(mockOrchestratorNetwork)
 	err = wintermuteOrchestrator.HandleEventFromCorruptedNode(eventMap[receipts[0].ID()])
 	require.NoError(t, err)
 
@@ -177,7 +177,7 @@ func testConcurrentExecutionReceipts(t *testing.T,
 			orchestratorSentAllEventsWg.Done()
 		}).Return(nil)
 	// registers mock network with orchestrator
-	wintermuteOrchestrator.RegisterAttackNetwork(mockOrchestratorNetwork)
+	wintermuteOrchestrator.Register(mockOrchestratorNetwork)
 
 	// imitates sending events from corrupted execution nodes to the attacker orchestrator.
 	corruptedEnEventSendWG := &sync.WaitGroup{}
@@ -308,7 +308,7 @@ func TestRespondingWithCorruptedAttestation(t *testing.T) {
 		}).Return(nil)
 
 	// registers mock network with orchestrator
-	wintermuteOrchestrator.RegisterAttackNetwork(mockOrchestratorNetwork)
+	wintermuteOrchestrator.Register(mockOrchestratorNetwork)
 
 	// chunk data pack request event for original receipt
 	cdpReqs, _ := chunkDataPackRequestForReceipts(t,
@@ -385,7 +385,7 @@ func TestPassingThroughChunkDataRequests(t *testing.T) {
 		}).Return(nil)
 
 	// registers mock network with orchestrator
-	wintermuteOrchestrator.RegisterAttackNetwork(mockOrchestratorNetwork)
+	wintermuteOrchestrator.Register(mockOrchestratorNetwork)
 
 	corruptedChunkRequestWG := &sync.WaitGroup{}
 	corruptedChunkRequestWG.Add(totalChunks * len(corruptedVerIds))
@@ -473,7 +473,7 @@ func testPassingThroughChunkDataResponse(t *testing.T, state *attackState) {
 		}).Return(nil)
 
 	// registers mock network with orchestrator
-	wintermuteOrchestrator.RegisterAttackNetwork(mockOrchestratorNetwork)
+	wintermuteOrchestrator.Register(mockOrchestratorNetwork)
 
 	// sends responses to the orchestrator
 	corruptedChunkResponseWG := &sync.WaitGroup{}
@@ -587,7 +587,7 @@ func TestPassingThroughMiscellaneousEvents(t *testing.T) {
 
 	// creates orchestrator
 	wintermuteOrchestrator := NewOrchestrator(unittest.Logger(), corruptedIds, allIds)
-	wintermuteOrchestrator.RegisterAttackNetwork(mockOrchestratorNetwork)
+	wintermuteOrchestrator.Register(mockOrchestratorNetwork)
 
 	// sends miscellaneous event to orchestrator.
 	eventPassThroughWG := &sync.WaitGroup{}
@@ -662,7 +662,7 @@ func TestPassingThrough_ResultApproval(t *testing.T) {
 		}).Return(nil)
 
 	// registers mock network with orchestrator
-	wintermuteOrchestrator.RegisterAttackNetwork(mockOrchestratorNetwork)
+	wintermuteOrchestrator.Register(mockOrchestratorNetwork)
 
 	// sends approval to the orchestrator
 	resultApprovalPassThroughWG := &sync.WaitGroup{}
@@ -716,7 +716,7 @@ func TestWintermute_ResultApproval(t *testing.T) {
 	// mocks attack network
 	mockOrchestratorNetwork := &mockinsecure.OrchestratorNetwork{}
 	// SendEgress() method should never be called, don't set method mock
-	wintermuteOrchestrator.RegisterAttackNetwork(mockOrchestratorNetwork)
+	wintermuteOrchestrator.Register(mockOrchestratorNetwork)
 
 	// sends approval to the orchestrator
 	resultSendWG := &sync.WaitGroup{}
