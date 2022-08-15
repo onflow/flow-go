@@ -33,9 +33,6 @@ type Environment interface {
 	VM() *VirtualMachine
 	runtime.Interface
 
-	// TODO(patrick): we should probably make this non-optional
-	AccountFreezeEnabled() bool
-
 	StartSpanFromRoot(name trace.SpanName) otelTrace.Span
 	StartExtensiveTracingSpanFromRoot(name trace.SpanName) otelTrace.Span
 }
@@ -93,6 +90,11 @@ type commonEnv struct {
 	accountKeys   *handler.AccountKeyHandler
 	contracts     *handler.ContractHandler
 	uuidGenerator *state.UUIDGenerator
+
+	frozenAccounts []common.Address
+
+	// TODO(patrick): rm once fully refactored
+	fullEnv Environment
 }
 
 // TODO(patrick): rm once Meter object has been refactored
@@ -102,7 +104,7 @@ func (env *commonEnv) MeterComputation(kind common.ComputationKind, intensity ui
 
 // TODO(patrick): rm once Meter object has been refactored
 func (env *commonEnv) ComputationUsed() uint64 {
-	return uint64(env.sth.State().TotalComputationUsed())
+	return uint64(env.sth.TotalComputationUsed())
 }
 
 // TODO(patrick): rm once Meter object has been refactored
@@ -112,15 +114,11 @@ func (env *commonEnv) MeterMemory(usage common.MemoryUsage) error {
 
 // TODO(patrick): rm once Meter object has been refactored
 func (env *commonEnv) MemoryEstimate() uint64 {
-	return uint64(env.sth.State().TotalMemoryEstimate())
+	return uint64(env.sth.TotalMemoryEstimate())
 }
 
 func (env *commonEnv) Context() *Context {
 	return &env.ctx
-}
-
-func (env *commonEnv) AccountFreezeEnabled() bool {
-	return env.ctx.AccountFreezeEnabled
 }
 
 func (env *commonEnv) VM() *VirtualMachine {
@@ -424,13 +422,18 @@ func (env *commonEnv) DecodeArgument(b []byte, _ cadence.Type) (cadence.Value, e
 }
 
 // Commit commits changes and return a list of updated keys
-func (env *commonEnv) Commit() ([]programs.ContractUpdateKey, error) {
+func (env *commonEnv) Commit() (programs.ModifiedSets, error) {
 	// commit changes and return a list of updated keys
 	err := env.programs.Cleanup()
 	if err != nil {
-		return nil, err
+		return programs.ModifiedSets{}, err
 	}
-	return env.contracts.Commit()
+
+	keys, err := env.contracts.Commit()
+	return programs.ModifiedSets{
+		ContractUpdateKeys: keys,
+		FrozenAccounts:     env.frozenAccounts,
+	}, err
 }
 
 func (commonEnv) BLSVerifyPOP(pk *runtime.PublicKey, sig []byte) (bool, error) {

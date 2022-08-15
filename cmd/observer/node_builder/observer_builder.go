@@ -11,16 +11,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/routing"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	p2ppubsub "github.com/libp2p/go-libp2p-pubsub"
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/cmd"
@@ -32,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/engine/access/apiproxy"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/common/follower"
@@ -67,7 +64,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow-go/utils/io"
 
 	"github.com/rs/zerolog"
@@ -575,6 +571,8 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 		flags.DurationVar(&builder.apiTimeout, "upstream-api-timeout", defaultConfig.apiTimeout, "tcp timeout for Flow API gRPC sockets to upstrem nodes")
 		flags.StringSliceVar(&builder.upstreamNodeAddresses, "upstream-node-addresses", defaultConfig.upstreamNodeAddresses, "the gRPC network addresses of the upstream access node. e.g. access-001.mainnet.flow.org:9000,access-002.mainnet.flow.org:9000")
 		flags.StringSliceVar(&builder.upstreamNodePublicKeys, "upstream-node-public-keys", defaultConfig.upstreamNodePublicKeys, "the networking public key of the upstream access node (in the same order as the upstream node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
+		flags.BoolVar(&builder.rpcMetricsEnabled, "rpc-metrics-enabled", defaultConfig.rpcMetricsEnabled, "whether to enable the rpc metrics")
+
 		// ExecutionDataRequester config
 		flags.BoolVar(&builder.executionDataSyncEnabled, "execution-data-sync-enabled", defaultConfig.executionDataSyncEnabled, "whether to enable the execution data sync protocol")
 		flags.StringVar(&builder.executionDataDir, "execution-data-dir", defaultConfig.executionDataDir, "directory to use for Execution Data database")
@@ -612,20 +610,18 @@ func (builder *ObserverServiceBuilder) initNetwork(nodeID module.Local,
 	receiveCache *netcache.ReceiveCache,
 ) (*p2p.Network, error) {
 
-	codec := cborcodec.NewCodec()
-
 	// creates network instance
-	net, err := p2p.NewNetwork(
-		builder.Logger,
-		codec,
-		nodeID,
-		func() (network.Middleware, error) { return builder.Middleware, nil },
-		topology,
-		p2p.NewChannelSubscriptionManager(middleware),
-		networkMetrics,
-		builder.IdentityProvider,
-		receiveCache,
-	)
+	net, err := p2p.NewNetwork(&p2p.NetworkParameters{
+		Logger:              builder.Logger,
+		Codec:               cborcodec.NewCodec(),
+		Me:                  nodeID,
+		MiddlewareFactory:   func() (network.Middleware, error) { return builder.Middleware, nil },
+		Topology:            topology,
+		SubscriptionManager: p2p.NewChannelSubscriptionManager(middleware),
+		Metrics:             networkMetrics,
+		IdentityProvider:    builder.IdentityProvider,
+		ReceiveCache:        receiveCache,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize network: %w", err)
 	}
@@ -987,56 +983,25 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return nil, err
 		}
 
-		client, err := builder.initUpstreamClient()
+		// upstream access node forwarder
+		forwarder, err := apiproxy.NewFlowAccessAPIForwarder(builder.upstreamIdentities, builder.apiTimeout)
 		if err != nil {
 			return nil, err
 		}
 
+		proxy := &apiproxy.FlowAccessAPIRouter{
+			Logger:          builder.Logger,
+			Metrics:         metrics.NewObserverCollector(),
+			Upstream:        forwarder,
+			AccessAPIServer: engineBuilder.Handler(),
+		}
+
 		// build the rpc engine
-		engineBuilder.WithNewHandler(&rpc.Forwarder{UpstreamHandler: client})
+		engineBuilder.WithNewHandler(proxy)
 		engineBuilder.WithLegacy()
 		builder.RpcEng = engineBuilder.Build()
 		return builder.RpcEng, nil
 	})
-}
-
-func (builder *ObserverServiceBuilder) initUpstreamClient() (accessproto.AccessAPIClient, error) {
-	// config must prove at least one upstream identity
-	if len(builder.upstreamIdentities) == 0 {
-		return nil, errors.New("please specify an upstream identity")
-	}
-
-	var errs *multierror.Error
-
-	for _, identity := range builder.upstreamIdentities {
-		// TLS
-		tlsConfig, err := grpcutils.DefaultClientTLSConfig(identity.NetworkPubKey)
-		if err != nil {
-			errs = multierror.Append(err,
-				fmt.Errorf("failed to get default TLS client config using public flow networking key %s %w",
-					identity.NetworkPubKey.String(), err),
-			)
-			continue
-		}
-
-		// connect to the upstream access node
-		conn, err := grpc.Dial(
-			identity.Address,
-			grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
-			grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
-			backend.WithClientUnaryInterceptor(time.Minute))
-
-		if err != nil {
-			errs = multierror.Append(err, errs)
-			continue
-		}
-
-		// return the client and ignore previous errors
-		client := accessproto.NewAccessAPIClient(conn)
-		return client, nil
-	}
-
-	return nil, errs.ErrorOrNil()
 }
 
 // initMiddleware creates the network.Middleware implementation with the libp2p factory function, metrics, peer update

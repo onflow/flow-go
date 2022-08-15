@@ -52,7 +52,6 @@ func NewTransactionEnvironment(
 	programsHandler := handler.NewProgramsHandler(programs, sth)
 	// TODO set the flags on context
 	eventHandler := handler.NewEventHandler(ctx.Chain,
-		ctx.EventCollectionEnabled,
 		ctx.ServiceEventCollectionEnabled,
 		ctx.EventCollectionByteSizeLimit,
 	)
@@ -71,13 +70,14 @@ func NewTransactionEnvironment(
 				tracer,
 				ctx.BlockHeader,
 			),
-			ctx:           ctx,
-			sth:           sth,
-			vm:            vm,
-			programs:      programsHandler,
-			accounts:      accounts,
-			accountKeys:   accountKeys,
-			uuidGenerator: uuidGenerator,
+			ctx:            ctx,
+			sth:            sth,
+			vm:             vm,
+			programs:       programsHandler,
+			accounts:       accounts,
+			accountKeys:    accountKeys,
+			uuidGenerator:  uuidGenerator,
+			frozenAccounts: nil,
 		},
 
 		addressGenerator: generator,
@@ -90,6 +90,7 @@ func NewTransactionEnvironment(
 	// TODO(patrick): rm this hack
 	env.MeterInterface = env
 	env.AccountInterface = env
+	env.fullEnv = env
 
 	env.contracts = handler.NewContractHandler(accounts,
 		func() bool {
@@ -112,77 +113,9 @@ func NewTransactionEnvironment(
 		env.useContractAuditVoucher,
 	)
 
-	var err error
-	// set the execution parameters from the state
-	if ctx.AllowContextOverrideByExecutionState {
-		err = env.setExecutionParameters()
-	}
+	err := setMeterParameters(&env.commonEnv)
 
 	return env, err
-}
-
-func (e *TransactionEnv) setExecutionParameters() error {
-	// Check that the service account exists because all the settings are stored in it
-	serviceAddress := e.Context().Chain.ServiceAddress()
-	service := runtime.Address(serviceAddress)
-
-	// set the property if no error, but if the error is a fatal error then return it
-	setIfOk := func(prop string, err error, setter func()) (fatal error) {
-		err, fatal = errors.SplitErrorTypes(err)
-		if fatal != nil {
-			// this is a fatal error. return it
-			e.ctx.Logger.
-				Error().
-				Err(fatal).
-				Msgf("error getting %s", prop)
-			return fatal
-		}
-		if err != nil {
-			// this is a general error.
-			// could be that no setting was present in the state,
-			// or that the setting was not parseable,
-			// or some other deterministic thing.
-			e.ctx.Logger.
-				Debug().
-				Err(err).
-				Msgf("could not set %s. Using defaults", prop)
-			return nil
-		}
-		// everything is ok. do the setting
-		setter()
-		return nil
-	}
-
-	meter := e.sth.State().Meter()
-
-	computationWeights, err := GetExecutionEffortWeights(e, service)
-	err = setIfOk(
-		"execution effort weights",
-		err,
-		func() { meter.SetComputationWeights(computationWeights) })
-	if err != nil {
-		return err
-	}
-
-	memoryWeights, err := GetExecutionMemoryWeights(e, service)
-	err = setIfOk(
-		"execution memory weights",
-		err,
-		func() { meter.SetMemoryWeights(memoryWeights) })
-	if err != nil {
-		return err
-	}
-
-	memoryLimit, err := GetExecutionMemoryLimit(e, service)
-	err = setIfOk(
-		"execution memory limit",
-		err,
-		func() { meter.SetTotalMemoryLimit(memoryLimit) })
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (e *TransactionEnv) TxIndex() uint32 {
@@ -437,23 +370,19 @@ func (e *TransactionEnv) ServiceEvents() []flow.Event {
 
 func (e *TransactionEnv) Meter(kind common.ComputationKind, intensity uint) error {
 	if e.sth.EnforceComputationLimits() {
-		return e.sth.State().MeterComputation(kind, intensity)
+		return e.sth.MeterComputation(kind, intensity)
 	}
 	return nil
 }
 
 func (e *TransactionEnv) meterMemory(kind common.MemoryKind, intensity uint) error {
 	if e.sth.EnforceMemoryLimits() {
-		return e.sth.State().MeterMemory(kind, intensity)
+		return e.sth.MeterMemory(kind, intensity)
 	}
 	return nil
 }
 
 func (e *TransactionEnv) SetAccountFrozen(address common.Address, frozen bool) error {
-
-	if !e.ctx.AccountFreezeEnabled {
-		return errors.NewOperationNotSupportedError("SetAccountFrozen")
-	}
 
 	flowAddress := flow.Address(address)
 
@@ -471,6 +400,11 @@ func (e *TransactionEnv) SetAccountFrozen(address common.Address, frozen bool) e
 	if err != nil {
 		return fmt.Errorf("setting account frozen failed: %w", err)
 	}
+
+	if frozen {
+		e.frozenAccounts = append(e.frozenAccounts, address)
+	}
+
 	return nil
 }
 

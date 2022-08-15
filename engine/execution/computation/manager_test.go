@@ -644,7 +644,7 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 	)
 	view := testutil.RootBootstrappedLedger(vm, ctx)
 	programs := programs.NewEmptyPrograms()
-	st := state.NewState(view, meter.NewMeter(math.MaxUint64, math.MaxUint64))
+	st := state.NewState(view, meter.NewMeter(meter.DefaultParameters()), state.DefaultParameters())
 	sth := state.NewStateHolder(st)
 	env, err := fvm.NewScriptEnvironment(context.Background(), ctx, vm, sth, programs)
 	require.NoError(t, err)

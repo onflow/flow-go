@@ -317,64 +317,15 @@ func prepareServiceDirs(role string, nodeId string) (string, string) {
 func prepareService(container testnet.ContainerConfig, i int, n int) Service {
 	dataDir, profilerDir := prepareServiceDirs(container.Role.String(), container.NodeID.String())
 
-	service := Service{
-		Image: fmt.Sprintf("localnet-%s", container.Role),
-		Command: []string{
-			fmt.Sprintf("--nodeid=%s", container.NodeID),
-			"--bootstrapdir=/bootstrap",
-			"--datadir=/data/protocol",
-			"--secretsdir=/data/secret",
-			"--loglevel=DEBUG",
-			fmt.Sprintf("--profiler-enabled=%t", profiler),
-			fmt.Sprintf("--tracer-enabled=%t", tracing),
-			"--profiler-dir=/profiler",
-			"--profiler-interval=2m",
-		},
-		Volumes: []string{
-			fmt.Sprintf("%s:/bootstrap:z", BootstrapDir),
-			fmt.Sprintf("%s:/profiler:z", profilerDir),
-			fmt.Sprintf("%s:/data:z", dataDir),
-		},
-		Environment: []string{
-			// https://github.com/open-telemetry/opentelemetry-specification/blob/v1.12.0/specification/protocol/exporter.md
-			"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4317",
-			"OTEL_EXPORTER_OTLP_TRACES_INSECURE=true",
-			"BINSTAT_ENABLE",
-			"BINSTAT_LEN_WHAT",
-			"BINSTAT_DMP_NAME",
-			"BINSTAT_DMP_PATH",
-		},
-		Labels: map[string]string{
-			"com.dapperlabs.role": container.Role.String(),
-			"com.dapperlabs.num":  fmt.Sprintf("%03d", i+1),
-		},
-	}
+	service := defaultService(container.Role.String(), dataDir, profilerDir, i)
+	service.Command = append(service.Command,
+		fmt.Sprintf("--nodeid=%s", container.NodeID),
+	)
 
-	service.Command = append(service.Command, fmt.Sprintf("--admin-addr=:%v", AdminToolPort))
-
-	// only specify build config for first service of each role
 	if i == 0 {
-		service.Build = Build{
-			Context:    "../../",
-			Dockerfile: "cmd/Dockerfile",
-			Args: map[string]string{
-				"TARGET":  fmt.Sprintf("./cmd/%s", container.Role.String()),
-				"VERSION": build.Semver(),
-				"COMMIT":  build.Commit(),
-				"GOARCH":  runtime.GOARCH,
-			},
-			Target: "production",
-		}
-
 		// bring up access node before any other nodes
 		if container.Role == flow.RoleConsensus || container.Role == flow.RoleCollection {
-			service.DependsOn = []string{"access_1"}
-		}
-
-	} else {
-		// remaining services of this role must depend on first service
-		service.DependsOn = []string{
-			fmt.Sprintf("%s_1", container.Role),
+			service.DependsOn = append(service.DependsOn, "access_1")
 		}
 	}
 
@@ -508,18 +459,37 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 	// Observers have a unique naming scheme omitting node id being on the public network
 	dataDir, profilerDir := prepareServiceDirs(observerName, "")
 
-	observerService := Service{
-		Image: fmt.Sprintf("localnet-%s", DefaultObserverName),
+	observerService := defaultService(DefaultObserverName, dataDir, profilerDir, i)
+	observerService.Command = append(observerService.Command,
+		fmt.Sprintf("--bootstrap-node-addresses=%s:%d", DefaultAccessGatewayName, AccessPubNetworkPort),
+		fmt.Sprintf("--bootstrap-node-public-keys=%s", agPublicKey),
+		fmt.Sprintf("--upstream-node-addresses=%s:%d", DefaultAccessGatewayName, SecuredRPCPort),
+		fmt.Sprintf("--upstream-node-public-keys=%s", agPublicKey),
+		fmt.Sprintf("--observer-networking-key-path=/bootstrap/private-root-information/%s_key", observerName),
+		fmt.Sprintf("--bind=0.0.0.0:0"),
+		fmt.Sprintf("--rpc-addr=%s:%d", observerName, RPCPort),
+		fmt.Sprintf("--secure-rpc-addr=%s:%d", observerName, SecuredRPCPort),
+		fmt.Sprintf("--http-addr=%s:%d", observerName, HTTPPort),
+	)
+
+	// observer services rely on the access gateway
+	observerService.DependsOn = append(observerService.DependsOn, DefaultAccessGatewayName)
+	observerService.Ports = []string{
+		// Flow API ports come in pairs, open and secure. While the guest port is always
+		// the same from the guest's perspective, the host port numbering accounts for the presence
+		// of multiple pairs of listeners on the host to avoid port collisions. Observer listener pairs
+		// are numbered just after the Access listeners on the host network by prior convention
+		fmt.Sprintf("%d:%d", (accessCount*2)+AccessAPIPort+(2*i), RPCPort),
+		fmt.Sprintf("%d:%d", (accessCount*2)+AccessAPIPort+(2*i)+1, SecuredRPCPort),
+	}
+	return observerService
+}
+
+func defaultService(role, dataDir, profilerDir string, i int) Service {
+	num := fmt.Sprintf("%03d", i+1)
+	service := Service{
+		Image: fmt.Sprintf("localnet-%s", role),
 		Command: []string{
-			fmt.Sprintf("--bootstrap-node-addresses=%s:%d", DefaultAccessGatewayName, AccessPubNetworkPort),
-			fmt.Sprintf("--bootstrap-node-public-keys=%s", agPublicKey),
-			fmt.Sprintf("--upstream-node-addresses=%s:%d", DefaultAccessGatewayName, SecuredRPCPort),
-			fmt.Sprintf("--upstream-node-public-keys=%s", agPublicKey),
-			fmt.Sprintf("--observer-networking-key-path=/bootstrap/private-root-information/%s_key", observerName),
-			fmt.Sprintf("--bind=0.0.0.0:0"),
-			fmt.Sprintf("--rpc-addr=%s:%d", observerName, RPCPort),
-			fmt.Sprintf("--secure-rpc-addr=%s:%d", observerName, SecuredRPCPort),
-			fmt.Sprintf("--http-addr=%s:%d", observerName, HTTPPort),
 			"--bootstrapdir=/bootstrap",
 			"--datadir=/data/protocol",
 			"--secretsdir=/data/secret",
@@ -538,19 +508,25 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 			// https://github.com/open-telemetry/opentelemetry-specification/blob/v1.12.0/specification/protocol/exporter.md
 			"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4317",
 			"OTEL_EXPORTER_OTLP_TRACES_INSECURE=true",
+			fmt.Sprintf("OTEL_RESOURCE_ATTRIBUTES=network=localnet,role=%s,num=%s", role, num),
 			"BINSTAT_ENABLE",
 			"BINSTAT_LEN_WHAT",
 			"BINSTAT_DMP_NAME",
 			"BINSTAT_DMP_PATH",
 		},
+		Labels: map[string]string{
+			"com.dapperlabs.role": role,
+			"com.dapperlabs.num":  num,
+		},
 	}
-	observerService.DependsOn = []string{}
+
 	if i == 0 {
-		observerService.Build = Build{
+		// only specify build config for first service of each role
+		service.Build = Build{
 			Context:    "../../",
 			Dockerfile: "cmd/Dockerfile",
 			Args: map[string]string{
-				"TARGET":  "./cmd/observer",
+				"TARGET":  fmt.Sprintf("./cmd/%s", role),
 				"VERSION": build.Semver(),
 				"COMMIT":  build.Commit(),
 				"GOARCH":  runtime.GOARCH,
@@ -559,19 +535,12 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 		}
 	} else {
 		// remaining services of this role must depend on first service
-		observerService.DependsOn = append(observerService.DependsOn, fmt.Sprintf("%s_1", DefaultObserverName))
+		service.DependsOn = []string{
+			fmt.Sprintf("%s_1", role),
+		}
 	}
-	// observer services rely on the access gateway
-	observerService.DependsOn = append(observerService.DependsOn, DefaultAccessGatewayName)
-	observerService.Ports = []string{
-		// Flow API ports come in pairs, open and secure. While the guest port is always
-		// the same from the guest's perspective, the host port numbering accounts for the presence
-		// of multiple pairs of listeners on the host to avoid port collisions. Observer listener pairs
-		// are numbered just after the Access listeners on the host network by prior convention
-		fmt.Sprintf("%d:%d", (accessCount*2)+AccessAPIPort+(2*i), RPCPort),
-		fmt.Sprintf("%d:%d", (accessCount*2)+AccessAPIPort+(2*i)+1, SecuredRPCPort),
-	}
-	return observerService
+
+	return service
 }
 
 func writeDockerComposeConfig(services Services) error {

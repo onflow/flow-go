@@ -55,13 +55,14 @@ func NewScriptEnvironment(
 				tracer,
 				fvmContext.BlockHeader,
 			),
-			ctx:           fvmContext,
-			sth:           sth,
-			vm:            vm,
-			programs:      programsHandler,
-			accounts:      accounts,
-			accountKeys:   accountKeys,
-			uuidGenerator: uuidGenerator,
+			ctx:            fvmContext,
+			sth:            sth,
+			vm:             vm,
+			programs:       programsHandler,
+			accounts:       accounts,
+			accountKeys:    accountKeys,
+			uuidGenerator:  uuidGenerator,
+			frozenAccounts: nil,
 		},
 		reqContext: reqContext,
 	}
@@ -69,6 +70,7 @@ func NewScriptEnvironment(
 	// TODO(patrick): remove this hack
 	env.MeterInterface = env
 	env.AccountInterface = env
+	env.fullEnv = env
 
 	env.contracts = handler.NewContractHandler(
 		accounts,
@@ -78,77 +80,9 @@ func NewScriptEnvironment(
 		func() []common.Address { return []common.Address{} },
 		func(address runtime.Address, code []byte) (bool, error) { return false, nil })
 
-	var err error
-	// set the execution parameters from the state
-	if fvmContext.AllowContextOverrideByExecutionState {
-		err = env.setExecutionParameters()
-	}
+	err := setMeterParameters(&env.commonEnv)
 
 	return env, err
-}
-
-func (e *ScriptEnv) setExecutionParameters() error {
-	// Check that the service account exists because all the settings are stored in it
-	serviceAddress := e.Context().Chain.ServiceAddress()
-	service := runtime.Address(serviceAddress)
-
-	// set the property if no error, but if the error is a fatal error then return it
-	setIfOk := func(prop string, err error, setter func()) (fatal error) {
-		err, fatal = errors.SplitErrorTypes(err)
-		if fatal != nil {
-			// this is a fatal error. return it
-			e.ctx.Logger.
-				Error().
-				Err(fatal).
-				Msgf("error getting %s", prop)
-			return fatal
-		}
-		if err != nil {
-			// this is a general error.
-			// could be that no setting was present in the state,
-			// or that the setting was not parseable,
-			// or some other deterministic thing.
-			e.ctx.Logger.
-				Debug().
-				Err(err).
-				Msgf("could not set %s. Using defaults", prop)
-			return nil
-		}
-		// everything is ok. do the setting
-		setter()
-		return nil
-	}
-
-	meter := e.sth.State().Meter()
-
-	computationWeights, err := GetExecutionEffortWeights(e, service)
-	err = setIfOk(
-		"execution effort weights",
-		err,
-		func() { meter.SetComputationWeights(computationWeights) })
-	if err != nil {
-		return err
-	}
-
-	memoryWeights, err := GetExecutionMemoryWeights(e, service)
-	err = setIfOk(
-		"execution memory weights",
-		err,
-		func() { meter.SetMemoryWeights(memoryWeights) })
-	if err != nil {
-		return err
-	}
-
-	memoryLimit, err := GetExecutionMemoryLimit(e, service)
-	err = setIfOk(
-		"execution memory limit",
-		err,
-		func() { meter.SetTotalMemoryLimit(memoryLimit) })
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (e *ScriptEnv) GetStorageCapacity(address common.Address) (value uint64, err error) {
@@ -309,14 +243,14 @@ func (e *ScriptEnv) Meter(kind common.ComputationKind, intensity uint) error {
 	}
 
 	if e.sth.EnforceComputationLimits() {
-		return e.sth.State().MeterComputation(kind, intensity)
+		return e.sth.MeterComputation(kind, intensity)
 	}
 	return nil
 }
 
 func (e *ScriptEnv) meterMemory(kind common.MemoryKind, intensity uint) error {
 	if e.sth.EnforceMemoryLimits() {
-		return e.sth.State().MeterMemory(kind, intensity)
+		return e.sth.MeterMemory(kind, intensity)
 	}
 	return nil
 }

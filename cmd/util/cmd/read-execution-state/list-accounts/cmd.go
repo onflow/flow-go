@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"math"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -99,8 +98,8 @@ func run(*cobra.Command, []string) {
 		return values[0], nil
 	})
 
-	meter := metering.NewMeter(math.MaxUint64, math.MaxUint64)
-	sth := state.NewStateHolder(state.NewState(ldg, meter))
+	meter := metering.NewMeter(metering.DefaultParameters())
+	sth := state.NewStateHolder(state.NewState(ldg, meter, state.DefaultParameters()))
 	accounts := state.NewAccounts(sth)
 	finalGenerator := state.NewStateBoundAddressGenerator(sth, chain)
 	finalState := finalGenerator.Bytes()

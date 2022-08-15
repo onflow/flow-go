@@ -67,8 +67,8 @@ func (r *AccountReporter) Report(payload []ledger.Payload, commit ledger.State) 
 	defer rwm.Close()
 
 	l := migrations.NewView(payload)
-	meter := metering.NewMeter(math.MaxUint64, math.MaxUint64)
-	st := state.NewState(l, meter, state.WithMaxInteractionSizeAllowed(math.MaxUint64))
+	meter := metering.NewMeter(metering.DefaultParameters())
+	st := state.NewState(l, meter, state.DefaultParameters().WithMaxInteractionSizeAllowed(math.MaxUint64))
 	sth := state.NewStateHolder(st)
 	gen := state.NewStateBoundAddressGenerator(sth, r.Chain)
 
@@ -143,8 +143,8 @@ func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
 	prog := programs.NewEmptyPrograms()
 
 	v := view.NewChild()
-	meter := metering.NewMeter(math.MaxUint64, math.MaxUint64)
-	st := state.NewState(v, meter, state.WithMaxInteractionSizeAllowed(math.MaxUint64))
+	meter := metering.NewMeter(metering.DefaultParameters())
+	st := state.NewState(v, meter, state.DefaultParameters().WithMaxInteractionSizeAllowed(math.MaxUint64))
 	sth := state.NewStateHolder(st)
 	accounts := state.NewAccounts(sth)
 

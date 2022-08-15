@@ -13,11 +13,11 @@ type AttackOrchestrator struct {
 }
 
 // HandleEventFromCorruptedNode provides a mock function with given fields: _a0
-func (_m *AttackOrchestrator) HandleEventFromCorruptedNode(_a0 *insecure.Event) error {
+func (_m *AttackOrchestrator) HandleEventFromCorruptedNode(_a0 *insecure.EgressEvent) error {
 	ret := _m.Called(_a0)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*insecure.Event) error); ok {
+	if rf, ok := ret.Get(0).(func(*insecure.EgressEvent) error); ok {
 		r0 = rf(_a0)
 	} else {
 		r0 = ret.Error(0)
