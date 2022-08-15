@@ -71,7 +71,7 @@ func (a *StatefulAccounts) AllocateStorageIndex(address flow.Address) (atree.Sto
 	// and won't do ledger getValue for every new slabs (currently happening to compute storage size changes)
 	// this way the getValue would load this value from deltas
 	key := atree.SlabIndexToLedgerKey(index)
-	err = a.stateHolder.State().Set(string(address.Bytes()), string(key), []byte{}, false)
+	err = a.stateHolder.Set(string(address.Bytes()), string(key), []byte{}, false)
 	if err != nil {
 		return atree.StorageIndex{}, fmt.Errorf("failed to allocate an storage index: %w", err)
 	}
@@ -410,7 +410,7 @@ func (a *StatefulAccounts) setStorageUsed(address flow.Address, used uint64) err
 }
 
 func (a *StatefulAccounts) GetValue(address flow.Address, key string) (flow.RegisterValue, error) {
-	return a.stateHolder.State().Get(string(address.Bytes()), key, a.stateHolder.EnforceInteractionLimits())
+	return a.stateHolder.Get(string(address.Bytes()), key, a.stateHolder.EnforceInteractionLimits())
 }
 
 // SetValue sets a value in address' storage
@@ -419,7 +419,7 @@ func (a *StatefulAccounts) SetValue(address flow.Address, key string, value flow
 	if err != nil {
 		return fmt.Errorf("failed to update storage used by key %s on account %s: %w", PrintableKey(key), address, err)
 	}
-	return a.stateHolder.State().Set(string(address.Bytes()), key, value, a.stateHolder.EnforceInteractionLimits())
+	return a.stateHolder.Set(string(address.Bytes()), key, value, a.stateHolder.EnforceInteractionLimits())
 
 }
 
@@ -481,7 +481,7 @@ func RegisterSize(address flow.Address, key string, value flow.RegisterValue) in
 // TODO replace with touch
 // TODO handle errors
 func (a *StatefulAccounts) touch(address flow.Address, key string) {
-	_, _ = a.stateHolder.State().Get(string(address.Bytes()), key, a.stateHolder.EnforceInteractionLimits())
+	_, _ = a.stateHolder.Get(string(address.Bytes()), key, a.stateHolder.EnforceInteractionLimits())
 }
 
 func (a *StatefulAccounts) TouchContract(contractName string, address flow.Address) {
@@ -575,7 +575,9 @@ func (a *StatefulAccounts) getAccountStatus(address flow.Address) (*AccountStatu
 	if err != nil {
 		return nil, fmt.Errorf("failed to load account status for the account (%s): %w", address.String(), err)
 	}
-
+	if len(statusBytes) == 0 {
+		return nil, errors.NewAccountNotFoundError(address)
+	}
 	return AccountStatusFromBytes(statusBytes)
 }
 

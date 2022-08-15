@@ -36,7 +36,7 @@ func TestBasicPrune(t *testing.T) {
 	pruner.Start(signalerCtx)
 
 	pruned := make(chan struct{})
-	trackerStorage.On("Prune", uint64(6)).Return(func(height uint64) error {
+	trackerStorage.On("PruneUpToHeight", uint64(6)).Return(func(height uint64) error {
 		close(pruned)
 		return nil
 	}).Once()
@@ -74,7 +74,7 @@ func TestInitialPrune(t *testing.T) {
 	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
 
 	pruned := make(chan struct{})
-	trackerStorage.On("Prune", uint64(10)).Return(func(height uint64) error {
+	trackerStorage.On("PruneUpToHeight", uint64(10)).Return(func(height uint64) error {
 		close(pruned)
 		return nil
 	}).Once()
@@ -114,12 +114,12 @@ func TestUpdateThreshold(t *testing.T) {
 	pruner.Start(signalerCtx)
 
 	pruned := make(chan struct{})
-	trackerStorage.On("Prune", uint64(5)).Return(func(height uint64) error {
+	trackerStorage.On("PruneUpToHeight", uint64(5)).Return(func(height uint64) error {
 		close(pruned)
 		return nil
 	}).Once()
 
-	pruner.SetThreshold(4)
+	require.NoError(t, pruner.SetThreshold(4))
 	unittest.AssertClosesBefore(t, pruned, time.Second)
 	trackerStorage.AssertExpectations(t)
 
@@ -154,12 +154,12 @@ func TestUpdateHeightRangeTarget(t *testing.T) {
 	pruner.Start(signalerCtx)
 
 	pruned := make(chan struct{})
-	trackerStorage.On("Prune", uint64(5)).Return(func(height uint64) error {
+	trackerStorage.On("PruneUpToHeight", uint64(5)).Return(func(height uint64) error {
 		close(pruned)
 		return nil
 	}).Once()
 
-	pruner.SetHeightRangeTarget(5)
+	require.NoError(t, pruner.SetHeightRangeTarget(5))
 	unittest.AssertClosesBefore(t, pruned, time.Second)
 	trackerStorage.AssertExpectations(t)
 

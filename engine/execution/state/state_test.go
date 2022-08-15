@@ -31,6 +31,12 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState, l *ledger.Ledger)
 			diskWal := &fixtures.NoopWAL{}
 			ls, err := ledger.NewLedger(diskWal, 100, metricsCollector, zerolog.Nop(), ledger.DefaultPathFinderVersion)
 			require.NoError(t, err)
+			compactor := fixtures.NewNoopCompactor(ls)
+			<-compactor.Ready()
+			defer func() {
+				<-ls.Done()
+				<-compactor.Done()
+			}()
 
 			ctrl := gomock.NewController(t)
 
@@ -95,11 +101,17 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		assert.Equal(t, path1, update.Paths[0])
 		assert.Equal(t, path2, update.Paths[1])
 
-		assert.Equal(t, key1, update.Payloads[0].Key)
-		assert.Equal(t, key2, update.Payloads[1].Key)
+		k1, err := update.Payloads[0].Key()
+		require.NoError(t, err)
 
-		assert.Equal(t, []byte("apple"), []byte(update.Payloads[0].Value))
-		assert.Equal(t, []byte("carrot"), []byte(update.Payloads[1].Value))
+		k2, err := update.Payloads[1].Key()
+		require.NoError(t, err)
+
+		assert.Equal(t, key1, k1)
+		assert.Equal(t, key2, k2)
+
+		assert.Equal(t, []byte("apple"), []byte(update.Payloads[0].Value()))
+		assert.Equal(t, []byte("carrot"), []byte(update.Payloads[1].Value()))
 
 		view2 := es.NewView(sc2)
 

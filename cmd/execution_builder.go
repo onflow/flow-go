@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
 	"path/filepath"
 	goruntime "runtime"
 	"time"
@@ -48,7 +47,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/extralog"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
@@ -161,8 +159,8 @@ func (e *ExecutionNodeBuilder) LoadFlags() {
 			flags.BoolVar(&e.exeConf.enableBlockDataUpload, "enable-blockdata-upload", false, "enable uploading block data to Cloud Bucket")
 			flags.StringVar(&e.exeConf.gcpBucketName, "gcp-bucket-name", "", "GCP Bucket name for block data uploader")
 			flags.StringVar(&e.exeConf.s3BucketName, "s3-bucket-name", "", "S3 Bucket name for block data uploader")
-			flags.Uint64Var(&e.exeConf.executionDataPrunerHeightRangeTarget, "execution-data-height-range-target", 65000, "target height range size used to limit the amount of Execution Data kept on disk")
-			flags.Uint64Var(&e.exeConf.executionDataPrunerThreshold, "execution-data-height-range-threshold", 65000, "height threshold used to trigger Execution Data pruning")
+			flags.Uint64Var(&e.exeConf.executionDataPrunerHeightRangeTarget, "execution-data-height-range-target", 0, "target height range size used to limit the amount of Execution Data kept on disk")
+			flags.Uint64Var(&e.exeConf.executionDataPrunerThreshold, "execution-data-height-range-threshold", 100_000, "height threshold used to trigger Execution Data pruning")
 			flags.StringToIntVar(&e.exeConf.apiRatelimits, "api-rate-limits", map[string]int{}, "per second rate limits for GRPC API methods e.g. Ping=300,ExecuteScriptAtBlockID=500 etc. note limits apply globally to all clients.")
 			flags.StringToIntVar(&e.exeConf.apiBurstlimits, "api-burst-limits", map[string]int{}, "burst limits for gRPC API methods e.g. Ping=100,ExecuteScriptAtBlockID=100 etc. note limits apply globally to all clients.")
 		}).
@@ -178,40 +176,38 @@ func (e *ExecutionNodeBuilder) LoadFlags() {
 
 func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 	var (
-		collector                            module.ExecutionMetrics
-		executionState                       state.ExecutionState
-		followerState                        protocol.MutableState
-		committee                            hotstuff.Committee
-		ledgerStorage                        *ledger.Ledger
-		events                               *storage.Events
-		serviceEvents                        *storage.ServiceEvents
-		txResults                            *storage.TransactionResults
-		results                              *storage.ExecutionResults
-		myReceipts                           *storage.MyExecutionReceipts
-		providerEngine                       *exeprovider.Engine
-		checkerEng                           *checker.Engine
-		syncCore                             *chainsync.Core
-		pendingBlocks                        *buffer.PendingBlocks // used in follower engine
-		deltas                               *ingestion.Deltas
-		syncEngine                           *synchronization.Engine
-		followerEng                          *followereng.Engine // to sync blocks from consensus nodes
-		computationManager                   *computation.Manager
-		collectionRequester                  *requester.Engine
-		ingestionEng                         *ingestion.Engine
-		finalizationDistributor              *pubsub.FinalizationDistributor
-		finalizedHeader                      *synchronization.FinalizedHeaderCache
-		checkAuthorizedAtBlock               func(blockID flow.Identifier) (bool, error)
-		diskWAL                              *wal.DiskWAL
-		blockDataUploaders                   []uploader.Uploader
-		blockDataUploaderMaxRetry            uint64 = 5
-		blockdataUploaderRetryTimeout               = 1 * time.Second
-		executionDataStore                   execution_data.ExecutionDataStore
-		executionDataDatastore               *badger.Datastore
-		executionDataPruner                  *pruner.Pruner
-		executionDataBlobstore               blobs.Blobstore
-		executionDataTracker                 tracker.Storage
-		executionDataPrunerHeightRangeTarget uint64
-		executionDataPrunerThreshold         uint64
+		collector                     module.ExecutionMetrics
+		executionState                state.ExecutionState
+		followerState                 protocol.MutableState
+		committee                     hotstuff.Committee
+		ledgerStorage                 *ledger.Ledger
+		events                        *storage.Events
+		serviceEvents                 *storage.ServiceEvents
+		txResults                     *storage.TransactionResults
+		results                       *storage.ExecutionResults
+		myReceipts                    *storage.MyExecutionReceipts
+		providerEngine                *exeprovider.Engine
+		checkerEng                    *checker.Engine
+		syncCore                      *chainsync.Core
+		pendingBlocks                 *buffer.PendingBlocks // used in follower engine
+		deltas                        *ingestion.Deltas
+		syncEngine                    *synchronization.Engine
+		followerEng                   *followereng.Engine // to sync blocks from consensus nodes
+		computationManager            *computation.Manager
+		collectionRequester           *requester.Engine
+		ingestionEng                  *ingestion.Engine
+		finalizationDistributor       *pubsub.FinalizationDistributor
+		finalizedHeader               *synchronization.FinalizedHeaderCache
+		checkAuthorizedAtBlock        func(blockID flow.Identifier) (bool, error)
+		diskWAL                       *wal.DiskWAL
+		blockDataUploaders            []uploader.Uploader
+		blockDataUploaderMaxRetry     uint64 = 5
+		blockdataUploaderRetryTimeout        = 1 * time.Second
+		executionDataStore            execution_data.ExecutionDataStore
+		executionDataDatastore        *badger.Datastore
+		executionDataPruner           *pruner.Pruner
+		executionDataBlobstore        blobs.Blobstore
+		executionDataTracker          tracker.Storage
 	)
 
 	e.FlowNodeBuilder.
@@ -363,12 +359,6 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			executionDataStore = execution_data.NewExecutionDataStore(executionDataBlobstore, execution_data.DefaultSerializer)
 			return nil
 		}).
-		Component("Write-Ahead Log", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-			var err error
-			diskWAL, err = wal.NewDiskWAL(node.Logger.With().Str("subcomponent", "wal").Logger(),
-				node.MetricsRegisterer, collector, e.exeConf.triedir, int(e.exeConf.mTrieCacheSize), pathfinder.PathByteSize, wal.SegmentSize)
-			return diskWAL, err
-		}).
 		Component("execution state ledger", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 
 			// check if the execution database already exists
@@ -404,23 +394,28 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				}
 			}
 
+			// DiskWal is a dependent component because we need to ensure
+			// that all WAL updates are completed before closing opened WAL segment.
+			diskWAL, err = wal.NewDiskWAL(node.Logger.With().Str("subcomponent", "wal").Logger(),
+				node.MetricsRegisterer, collector, e.exeConf.triedir, int(e.exeConf.mTrieCacheSize), pathfinder.PathByteSize, wal.SegmentSize)
+			if err != nil {
+				return nil, fmt.Errorf("failed to initialize wal: %w", err)
+			}
+
 			ledgerStorage, err = ledger.NewLedger(diskWAL, int(e.exeConf.mTrieCacheSize), collector, node.Logger.With().Str("subcomponent",
 				"ledger").Logger(), ledger.DefaultPathFinderVersion)
 			return ledgerStorage, err
 		}).
 		Component("execution state ledger WAL compactor", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 
-			checkpointer, err := ledgerStorage.Checkpointer()
-			if err != nil {
-				return nil, fmt.Errorf("cannot create checkpointer: %w", err)
-			}
-			compactor := wal.NewCompactor(checkpointer,
-				10*time.Second,
+			return ledger.NewCompactor(
+				ledgerStorage,
+				diskWAL,
+				node.Logger.With().Str("subcomponent", "checkpointer").Logger(),
+				uint(e.exeConf.mTrieCacheSize),
 				e.exeConf.checkpointDistance,
 				e.exeConf.checkpointsToKeep,
-				node.Logger.With().Str("subcomponent", "checkpointer").Logger())
-
-			return compactor, nil
+			)
 		}).
 		Component("execution data pruner", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			sealed, err := node.State.Sealed().Head()
@@ -442,6 +437,11 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				return nil, err
 			}
 
+			// by default, pruning is disabled
+			if e.exeConf.executionDataPrunerHeightRangeTarget == 0 {
+				return &module.NoopReadyDoneAware{}, nil
+			}
+
 			var prunerMetrics module.ExecutionDataPrunerMetrics = metrics.NewNoopCollector()
 			if node.MetricsEnabled {
 				prunerMetrics = metrics.NewExecutionDataPrunerCollector()
@@ -454,8 +454,8 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				pruner.WithPruneCallback(func(ctx context.Context) error {
 					return executionDataDatastore.CollectGarbage(ctx)
 				}),
-				pruner.WithHeightRangeTarget(executionDataPrunerHeightRangeTarget),
-				pruner.WithThreshold(executionDataPrunerThreshold),
+				pruner.WithHeightRangeTarget(e.exeConf.executionDataPrunerHeightRangeTarget),
+				pruner.WithThreshold(e.exeConf.executionDataPrunerThreshold),
 			)
 			return executionDataPruner, err
 		}).
@@ -478,15 +478,10 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				executionDataTracker,
 			)
 
-			extraLogPath := path.Join(e.exeConf.triedir, "extralogs")
-			err = os.MkdirAll(extraLogPath, 0777)
-			if err != nil {
-				return nil, fmt.Errorf("cannot create %s path for extra logs: %w", extraLogPath, err)
+			options := []runtime.Option{}
+			if e.exeConf.cadenceTracing {
+				options = append(options, runtime.WithTracingEnabled(true))
 			}
-
-			extralog.ExtraLogDumpPath = extraLogPath
-
-			options := []runtime.Option{runtime.WithTracingEnabled(e.exeConf.cadenceTracing)}
 			rt := fvm.NewInterpreterRuntime(options...)
 
 			vm := fvm.NewVirtualMachine(rt)

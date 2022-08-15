@@ -5,6 +5,7 @@ const (
 	namespaceNetwork           = "network"
 	namespaceStorage           = "storage"
 	namespaceAccess            = "access"
+	namespaceObserver          = "observer"
 	namespaceCollection        = "collection"
 	namespaceConsensus         = "consensus"
 	namespaceVerification      = "verification"
@@ -36,6 +37,11 @@ const (
 	subsystemTransactionTiming     = "transaction_timing"
 	subsystemTransactionSubmission = "transaction_submission"
 	subsystemConnectionPool        = "connection_pool"
+)
+
+// Observer subsystem
+const (
+	subsystemObserverGRPC = "observer_grpc"
 )
 
 // Collection subsystem
@@ -75,7 +81,6 @@ const (
 	subsystemExeDataRequester       = "requester"
 	subsystemExeDataProvider        = "provider"
 	subsystemExeDataPruner          = "pruner"
-	subsystemExecutionDataService   = "execution_data_service"
 	subsystemExecutionDataRequester = "execution_data_requester"
 )
 

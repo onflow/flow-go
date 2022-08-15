@@ -24,8 +24,15 @@ func (e *BlobSizeLimitExceededError) Error() string {
 	return fmt.Sprintf("blob %v exceeds maximum blob size", e.cid.String())
 }
 
+// Downloader is used to download execution data blobs from the network via a blob service.
 type Downloader interface {
 	module.ReadyDoneAware
+
+	// Download downloads and returns a Block Execution Data from the network.
+	// The returned error will be:
+	// - MalformedDataError if some level of the blob tree cannot be properly deserialized
+	// - BlobNotFoundError if some CID in the blob tree could not be found from the blob service
+	// - BlobSizeLimitExceededError if some blob in the blob tree exceeds the maximum allowed size
 	Download(ctx context.Context, executionDataID flow.Identifier) (*BlockExecutionData, error)
 }
 
@@ -64,9 +71,16 @@ func (d *downloader) Done() <-chan struct{} {
 	return d.blobService.Done()
 }
 
+// Download downloads a blob tree identified by executionDataID from the network and returns the deserialized BlockExecutionData struct
+// During normal operation, the returned error will be:
+// - MalformedDataError if some level of the blob tree cannot be properly deserialized
+// - BlobNotFoundError if some CID in the blob tree could not be found from the blob service
+// - BlobSizeLimitExceededError if some blob in the blob tree exceeds the maximum allowed size
 func (d *downloader) Download(ctx context.Context, executionDataID flow.Identifier) (*BlockExecutionData, error) {
 	blobGetter := d.blobService.GetSession(ctx)
 
+	// First, download the root execution data record which contains a list of chunk execution data
+	// blobs included in the original record.
 	edRoot, err := d.getExecutionDataRoot(ctx, executionDataID, blobGetter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get execution data root: %w", err)
@@ -74,6 +88,7 @@ func (d *downloader) Download(ctx context.Context, executionDataID flow.Identifi
 
 	g, gCtx := errgroup.WithContext(ctx)
 
+	// Next, download each of the chunk execution data blobs
 	chunkExecutionDatas := make([]*ChunkExecutionData, len(edRoot.ChunkExecutionDataIDs))
 	for i, chunkDataID := range edRoot.ChunkExecutionDataIDs {
 		i := i
@@ -100,6 +115,7 @@ func (d *downloader) Download(ctx context.Context, executionDataID flow.Identifi
 		return nil, err
 	}
 
+	// Finally, recombine data into original record.
 	bed := &BlockExecutionData{
 		BlockID:             edRoot.BlockID,
 		ChunkExecutionDatas: chunkExecutionDatas,
@@ -137,7 +153,7 @@ func (d *downloader) getExecutionDataRoot(
 
 	edRoot, ok := v.(*BlockExecutionDataRoot)
 	if !ok {
-		return nil, NewMalformedDataError(fmt.Errorf("execution data root blob does not deserialize to a BlockExecutionDataRoot"))
+		return nil, NewMalformedDataError(fmt.Errorf("execution data root blob does not deserialize to a BlockExecutionDataRoot, got %T instead", v))
 	}
 
 	return edRoot, nil
@@ -150,6 +166,8 @@ func (d *downloader) getChunkExecutionData(
 ) (*ChunkExecutionData, error) {
 	cids := []cid.Cid{chunkExecutionDataID}
 
+	// iteratively process each level of the blob tree until a ChunkExecutionData is returned or an
+	// error is encountered
 	for i := 0; ; i++ {
 		v, err := d.getBlobs(ctx, blobGetter, cids)
 		if err != nil {
@@ -185,7 +203,7 @@ func (d *downloader) getBlobs(ctx context.Context, blobGetter network.BlobGetter
 	return v, nil
 }
 
-// retrieveBlobs retrieves the blobs for the given CIDs with the given BlobGetter.
+// retrieveBlobs asynchronously retrieves the blobs for the given CIDs with the given BlobGetter.
 func (d *downloader) retrieveBlobs(parent context.Context, blobGetter network.BlobGetter, cids []cid.Cid) (<-chan blobs.Blob, <-chan error) {
 	blobsOut := make(chan blobs.Blob, len(cids))
 	errCh := make(chan error, 1)
@@ -209,6 +227,8 @@ func (d *downloader) retrieveBlobs(parent context.Context, blobGetter network.Bl
 			cidCounts[c] += 1
 		}
 
+		// for each cid, find the corresponding blob from the incoming blob channel and send it to
+		// the outgoing blob channel in the proper order
 		for _, c := range cids {
 			blob, ok := cachedBlobs[c]
 

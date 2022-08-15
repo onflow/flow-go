@@ -19,7 +19,6 @@ import (
 	p2ppubsub "github.com/libp2p/go-libp2p-pubsub"
 
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
-	"github.com/onflow/flow-go/apiproxy"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -29,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/engine/access/apiproxy"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/common/follower"
@@ -571,6 +571,8 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 		flags.DurationVar(&builder.apiTimeout, "upstream-api-timeout", defaultConfig.apiTimeout, "tcp timeout for Flow API gRPC sockets to upstrem nodes")
 		flags.StringSliceVar(&builder.upstreamNodeAddresses, "upstream-node-addresses", defaultConfig.upstreamNodeAddresses, "the gRPC network addresses of the upstream access node. e.g. access-001.mainnet.flow.org:9000,access-002.mainnet.flow.org:9000")
 		flags.StringSliceVar(&builder.upstreamNodePublicKeys, "upstream-node-public-keys", defaultConfig.upstreamNodePublicKeys, "the networking public key of the upstream access node (in the same order as the upstream node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
+		flags.BoolVar(&builder.rpcMetricsEnabled, "rpc-metrics-enabled", defaultConfig.rpcMetricsEnabled, "whether to enable the rpc metrics")
+
 		// ExecutionDataRequester config
 		flags.BoolVar(&builder.executionDataSyncEnabled, "execution-data-sync-enabled", defaultConfig.executionDataSyncEnabled, "whether to enable the execution data sync protocol")
 		flags.StringVar(&builder.executionDataDir, "execution-data-dir", defaultConfig.executionDataDir, "directory to use for Execution Data database")
@@ -608,20 +610,18 @@ func (builder *ObserverServiceBuilder) initNetwork(nodeID module.Local,
 	receiveCache *netcache.ReceiveCache,
 ) (*p2p.Network, error) {
 
-	codec := cborcodec.NewCodec()
-
 	// creates network instance
-	net, err := p2p.NewNetwork(
-		builder.Logger,
-		codec,
-		nodeID,
-		func() (network.Middleware, error) { return builder.Middleware, nil },
-		topology,
-		p2p.NewChannelSubscriptionManager(middleware),
-		networkMetrics,
-		builder.IdentityProvider,
-		receiveCache,
-	)
+	net, err := p2p.NewNetwork(&p2p.NetworkParameters{
+		Logger:              builder.Logger,
+		Codec:               cborcodec.NewCodec(),
+		Me:                  nodeID,
+		MiddlewareFactory:   func() (network.Middleware, error) { return builder.Middleware, nil },
+		Topology:            topology,
+		SubscriptionManager: p2p.NewChannelSubscriptionManager(middleware),
+		Metrics:             networkMetrics,
+		IdentityProvider:    builder.IdentityProvider,
+		ReceiveCache:        receiveCache,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize network: %w", err)
 	}
@@ -957,11 +957,6 @@ func (builder *ObserverServiceBuilder) enqueueConnectWithStakedAN() {
 
 func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 	builder.Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		ids := builder.upstreamIdentities
-		proxy, err := apiproxy.NewFlowAccessAPIRouter(ids, builder.apiTimeout)
-		if err != nil {
-			return nil, err
-		}
 		engineBuilder, err := rpc.NewBuilder(
 			node.Logger,
 			node.State,
@@ -987,7 +982,22 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		if err != nil {
 			return nil, err
 		}
-		engineBuilder.WithRouting(proxy)
+
+		// upstream access node forwarder
+		forwarder, err := apiproxy.NewFlowAccessAPIForwarder(builder.upstreamIdentities, builder.apiTimeout)
+		if err != nil {
+			return nil, err
+		}
+
+		proxy := &apiproxy.FlowAccessAPIRouter{
+			Logger:          builder.Logger,
+			Metrics:         metrics.NewObserverCollector(),
+			Upstream:        forwarder,
+			AccessAPIServer: engineBuilder.Handler(),
+		}
+
+		// build the rpc engine
+		engineBuilder.WithNewHandler(proxy)
 		engineBuilder.WithLegacy()
 		builder.RpcEng = engineBuilder.Build()
 		return builder.RpcEng, nil

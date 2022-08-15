@@ -111,7 +111,7 @@ func NewFullConsensusState(
 func (m *FollowerState) Extend(ctx context.Context, candidate *flow.Block) error {
 
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorHeaderExtend)
-	defer span.Finish()
+	defer span.End()
 
 	// check if the block header is a valid extension of the finalized state
 	err := m.headerExtend(candidate)
@@ -139,7 +139,7 @@ func (m *FollowerState) Extend(ctx context.Context, candidate *flow.Block) error
 func (m *MutableState) Extend(ctx context.Context, candidate *flow.Block) error {
 
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtend)
-	defer span.Finish()
+	defer span.End()
 
 	// check if the block header is a valid extension of the finalized state
 	err := m.headerExtend(candidate)
@@ -258,7 +258,7 @@ func (m *FollowerState) headerExtend(candidate *flow.Block) error {
 func (m *MutableState) guaranteeExtend(ctx context.Context, candidate *flow.Block) error {
 
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckGuarantees)
-	defer span.Finish()
+	defer span.End()
 
 	header := candidate.Header
 	payload := candidate.Payload
@@ -347,7 +347,7 @@ func (m *MutableState) guaranteeExtend(ctx context.Context, candidate *flow.Bloc
 func (m *MutableState) sealExtend(ctx context.Context, candidate *flow.Block) (*flow.Seal, error) {
 
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckSeals)
-	defer span.Finish()
+	defer span.End()
 
 	lastSeal, err := m.sealValidator.Validate(candidate)
 	if err != nil {
@@ -366,7 +366,7 @@ func (m *MutableState) sealExtend(ctx context.Context, candidate *flow.Block) (*
 func (m *MutableState) receiptExtend(ctx context.Context, candidate *flow.Block) error {
 
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckReceipts)
-	defer span.Finish()
+	defer span.End()
 
 	err := m.receiptValidator.ValidatePayload(candidate)
 	if err != nil {
@@ -424,7 +424,7 @@ func (m *FollowerState) lastSealed(candidate *flow.Block) (*flow.Seal, error) {
 func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last *flow.Seal) error {
 
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendDBInsert)
-	defer span.Finish()
+	defer span.End()
 
 	blockID := candidate.ID()
 
@@ -488,7 +488,7 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) error {
 	// preliminaries: start tracer and retrieve full block
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorFinalize)
-	defer span.Finish()
+	defer span.End()
 	block, err := m.blocks.ByID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve full block that should be finalized: %w", err)

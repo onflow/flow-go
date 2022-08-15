@@ -32,8 +32,8 @@ func (bw *BlobChannelWriter) CidsSent() []cid.Cid {
 }
 
 // Write writes len(data) bytes from data to the underlying blob channel. It returns the number of bytes written
-// from data (0 <= n <= len(data)) and any error encountered that caused the write to stop early. It will always
-// return a non-nil error if it returns n < len(data)
+// from data (0 <= n <= len(data)) or ErrBlobChannelWriterClosed if the Blob Channel Writer was already previously
+// closed via a call to Close. It will always return a non-nil error if it returns n < len(data).
 func (bw *BlobChannelWriter) Write(data []byte) (int, error) {
 	if bw.closed {
 		return 0, ErrBlobChannelWriterClosed
@@ -75,6 +75,7 @@ func (bw *BlobChannelWriter) sendNewBlob() {
 }
 
 // WriteByte writes a single byte to the underlying blob channel. It returns an error if the byte could not be written.
+// Returns ErrBlobChannelWriterClosed if the Blob Channel Writer was already previously closed via a call to Close
 func (bw *BlobChannelWriter) WriteByte(c byte) error {
 	if bw.closed {
 		return ErrBlobChannelWriterClosed
@@ -92,6 +93,7 @@ func (bw *BlobChannelWriter) WriteByte(c byte) error {
 }
 
 // Flush flushes any buffered data to the underlying blob channel as a new blob. It returns an error if the flush failed.
+// Returns ErrBlobChannelWriterClosed if the Blob Channel Writer was already previously closed via a call to Close
 func (bw *BlobChannelWriter) Flush() error {
 	if bw.closed {
 		return ErrBlobChannelWriterClosed
@@ -144,6 +146,7 @@ func (br *BlobChannelReader) CidsReceived() []cid.Cid {
 
 // Read reads up to len(data) bytes from the underlying blob channel into data. It returns the number of bytes read
 // (0 <= n <= len(data)) and any error encountered.
+// Returns io.EOF if the incoming blob channel was closed and all available data has been read.
 func (br *BlobChannelReader) Read(data []byte) (int, error) {
 	if br.finished {
 		return 0, io.EOF
@@ -179,6 +182,7 @@ func (br *BlobChannelReader) receiveNewBlob() bool {
 }
 
 // ReadByte reads a single byte from the underlying blob channel. It returns an error if the byte could not be read.
+// Returns io.EOF if the incoming blob channel was closed and all available data has been read.
 func (br *BlobChannelReader) ReadByte() (byte, error) {
 	if br.finished {
 		return 0, io.EOF

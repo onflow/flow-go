@@ -7,7 +7,7 @@ import (
 	"github.com/rs/zerolog"
 
 	errors "github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/meter/weighted"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -45,13 +45,17 @@ func NewVirtualMachine(rt runtime.Runtime) *VirtualMachine {
 
 // Run runs a procedure against a ledger in the given context.
 func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, programs *programs.Programs) (err error) {
-	st := state.NewState(v,
-		state.WithMeter(weighted.NewMeter(
-			uint(proc.ComputationLimit(ctx)),
-			uint(proc.MemoryLimit(ctx)))),
-		state.WithMaxKeySizeAllowed(ctx.MaxStateKeySize),
-		state.WithMaxValueSizeAllowed(ctx.MaxStateValueSize),
-		state.WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize))
+	st := state.NewState(
+		v,
+		meter.NewMeter(
+			meter.DefaultParameters().
+				WithComputationLimit(uint(proc.ComputationLimit(ctx))).
+				WithMemoryLimit(proc.MemoryLimit(ctx))),
+		state.DefaultParameters().
+			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
+			WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
+			WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize),
+	)
 	sth := state.NewStateHolder(st)
 
 	err = proc.Run(vm, ctx, sth, programs)
@@ -64,10 +68,14 @@ func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, program
 
 // GetAccount returns an account by address or an error if none exists.
 func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.View, programs *programs.Programs) (*flow.Account, error) {
-	st := state.NewState(v,
-		state.WithMaxKeySizeAllowed(ctx.MaxStateKeySize),
-		state.WithMaxValueSizeAllowed(ctx.MaxStateValueSize),
-		state.WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize))
+	st := state.NewState(
+		v,
+		meter.NewMeter(meter.DefaultParameters()),
+		state.DefaultParameters().
+			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
+			WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
+			WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize),
+	)
 
 	sth := state.NewStateHolder(st)
 	account, err := getAccount(vm, ctx, sth, programs, address)

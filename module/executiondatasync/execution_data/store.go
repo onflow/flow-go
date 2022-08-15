@@ -7,11 +7,12 @@ import (
 	"fmt"
 
 	"github.com/ipfs/go-cid"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 )
 
-// ExecutionDataStore handles adding / getting execution data to / from a blobstore
+// ExecutionDataStore handles adding / getting execution data to / from a local blobstore
 type ExecutionDataStore interface {
 	// GetExecutionData gets the BlockExecutionData for the given root ID from the blobstore.
 	// The returned error will be:
@@ -26,6 +27,7 @@ type ExecutionDataStore interface {
 
 type ExecutionDataStoreOption func(*store)
 
+// WithMaxBlobSize configures the maximum blob size of the store
 func WithMaxBlobSize(size int) ExecutionDataStoreOption {
 	return func(s *store) {
 		s.maxBlobSize = size
@@ -38,6 +40,7 @@ type store struct {
 	maxBlobSize int
 }
 
+// NewExecutionDataStore creates a new Execution Data Store.
 func NewExecutionDataStore(blobstore blobs.Blobstore, serializer Serializer, opts ...ExecutionDataStoreOption) *store {
 	s := &store{
 		blobstore:   blobstore,
@@ -70,6 +73,10 @@ func (s *store) AddExecutionData(ctx context.Context, executionData *BlockExecut
 	buf := new(bytes.Buffer)
 	if err := s.serializer.Serialize(buf, executionDataRoot); err != nil {
 		return flow.ZeroID, fmt.Errorf("could not serialize execution data root: %w", err)
+	}
+
+	if buf.Len() > s.maxBlobSize {
+		return flow.ZeroID, errors.New("root blob exceeds blob size limit")
 	}
 
 	rootBlob := blobs.NewBlob(buf.Bytes())
@@ -150,7 +157,7 @@ func (s *store) GetExecutionData(ctx context.Context, rootID flow.Identifier) (*
 
 	executionDataRoot, ok := rootData.(*flow.BlockExecutionDataRoot)
 	if !ok {
-		return nil, NewMalformedDataError(fmt.Errorf("root blob does not deserialize to a BlockExecutionDataRoot"))
+		return nil, NewMalformedDataError(fmt.Errorf("root blob does not deserialize to a BlockExecutionDataRoot, got %T instead", rootData))
 	}
 
 	blockExecutionData := &BlockExecutionData{
@@ -233,6 +240,12 @@ func (e *MalformedDataError) Error() string {
 }
 
 func (e *MalformedDataError) Unwrap() error { return e.err }
+
+// IsMalformedDataError returns whether an error is MalformedDataError
+func IsMalformedDataError(err error) bool {
+	var malformedDataErr *MalformedDataError
+	return errors.As(err, &malformedDataErr)
+}
 
 // BlobNotFoundError is returned when a blob could not be found.
 type BlobNotFoundError struct {

@@ -15,6 +15,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/fvm"
+	metering "github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
@@ -95,7 +96,11 @@ func (r *FungibleTokenTracker) Report(payloads []ledger.Payload, commit ledger.S
 	payloadsByOwner := make(map[flow.Address][]ledger.Payload)
 
 	for _, pay := range payloads {
-		owner := flow.BytesToAddress(pay.Key.KeyParts[0].Value)
+		k, err := pay.Key()
+		if err != nil {
+			return nil
+		}
+		owner := flow.BytesToAddress(k.KeyParts[0].Value)
 		if len(owner) > 0 { // ignoring payloads without ownership (fvm ones)
 			m, ok := payloadsByOwner[owner]
 			if !ok {
@@ -137,7 +142,8 @@ func (r *FungibleTokenTracker) worker(
 	for j := range jobs {
 
 		view := migrations.NewView(j.payloads)
-		st := state.NewState(view)
+		meter := metering.NewMeter(metering.DefaultParameters())
+		st := state.NewState(view, meter, state.DefaultParameters())
 		sth := state.NewStateHolder(st)
 		accounts := state.NewAccounts(sth)
 		storage := cadenceRuntime.NewStorage(

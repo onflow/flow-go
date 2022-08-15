@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
@@ -18,7 +19,11 @@ import (
 
 func TestTransactionVerification(t *testing.T) {
 	ledger := utils.NewSimpleView()
-	sth := state.NewStateHolder(state.NewState(ledger))
+	sth := state.NewStateHolder(state.NewState(
+		ledger,
+		meter.NewMeter(meter.DefaultParameters()),
+		state.DefaultParameters(),
+	))
 	accounts := state.NewAccounts(sth)
 
 	// create 2 accounts

@@ -285,8 +285,8 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 
 		// create a mock connection factory
 		connFactory := new(factorymock.ConnectionFactory)
-		connFactory.On("GetAccessAPIClient", collNode1.Address).Return(col1ApiClient, nil)
-		connFactory.On("GetAccessAPIClient", collNode2.Address).Return(col2ApiClient, nil)
+		connFactory.On("GetAccessAPIClient", collNode1.Address).Return(col1ApiClient, &mockCloser{}, nil)
+		connFactory.On("GetAccessAPIClient", collNode2.Address).Return(col2ApiClient, &mockCloser{}, nil)
 
 		backend := backend.New(suite.state,
 			nil,
@@ -585,7 +585,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		// create a mock connection factory
 		connFactory := new(factorymock.ConnectionFactory)
-		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, nil)
+		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
 		// initialize storage
 		metrics := metrics.NewNoopCollector()
@@ -627,7 +627,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		// create the ingest engine
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, blocks, headers, collections,
-			transactions, results, receipts, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, rpcEng, nil)
+			transactions, results, receipts, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, rpcEng)
 		require.NoError(suite.T(), err)
 
 		background, cancel := context.WithCancel(context.Background())
@@ -688,7 +688,7 @@ func (suite *Suite) TestExecuteScript() {
 
 		// create a mock connection factory
 		connFactory := new(factorymock.ConnectionFactory)
-		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, nil)
+		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
 		suite.backend = backend.New(suite.state,
 			suite.collClient,
@@ -726,7 +726,7 @@ func (suite *Suite) TestExecuteScript() {
 			Once()
 		// create the ingest engine
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, blocks, headers, collections,
-			transactions, results, receipts, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, nil, nil)
+			transactions, results, receipts, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, nil)
 		require.NoError(suite.T(), err)
 
 		// create a block and a seal pointing to that block
