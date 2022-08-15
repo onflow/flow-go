@@ -21,6 +21,7 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		sth := state.NewStateHolder(state.NewState(
 			ledger,
 			meter.NewMeter(meter.DefaultParameters()),
+			state.DefaultParameters(),
 		))
 		accounts := state.NewAccounts(sth)
 
@@ -49,6 +50,7 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		sth := state.NewStateHolder(state.NewState(
 			ledger,
 			meter.NewMeter(meter.DefaultParameters()),
+			state.DefaultParameters(),
 		))
 		accounts := state.NewAccounts(sth)
 
@@ -79,6 +81,7 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		sth := state.NewStateHolder(state.NewState(
 			ledger,
 			meter.NewMeter(meter.DefaultParameters()),
+			state.DefaultParameters(),
 		))
 		accounts := state.NewAccounts(sth)
 

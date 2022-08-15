@@ -22,7 +22,8 @@ import (
 func TestContract_ChildMergeFunctionality(t *testing.T) {
 	sth := state.NewStateHolder(state.NewState(
 		utils.NewSimpleView(),
-		meter.NewMeter(meter.DefaultParameters())))
+		meter.NewMeter(meter.DefaultParameters()),
+		state.DefaultParameters()))
 	accounts := state.NewAccounts(sth)
 	address := flow.HexToAddress("01")
 	rAdd := runtime.Address(address)
@@ -98,7 +99,8 @@ func TestContract_ChildMergeFunctionality(t *testing.T) {
 func TestContract_AuthorizationFunctionality(t *testing.T) {
 	sth := state.NewStateHolder(state.NewState(
 		utils.NewSimpleView(),
-		meter.NewMeter(meter.DefaultParameters())))
+		meter.NewMeter(meter.DefaultParameters()),
+		state.DefaultParameters()))
 	accounts := state.NewAccounts(sth)
 
 	authAdd := flow.HexToAddress("01")
@@ -219,7 +221,8 @@ func TestContract_DeploymentVouchers(t *testing.T) {
 
 	sth := state.NewStateHolder(state.NewState(
 		utils.NewSimpleView(),
-		meter.NewMeter(meter.DefaultParameters())))
+		meter.NewMeter(meter.DefaultParameters()),
+		state.DefaultParameters()))
 	accounts := state.NewAccounts(sth)
 
 	addressWithVoucher := flow.HexToAddress("01")
@@ -278,7 +281,8 @@ func TestContract_ContractUpdate(t *testing.T) {
 
 	sth := state.NewStateHolder(state.NewState(
 		utils.NewSimpleView(),
-		meter.NewMeter(meter.DefaultParameters())))
+		meter.NewMeter(meter.DefaultParameters()),
+		state.DefaultParameters()))
 	accounts := state.NewAccounts(sth)
 
 	flowAddress := flow.HexToAddress("01")
@@ -386,7 +390,8 @@ func TestContract_ContractRemoval(t *testing.T) {
 
 	sth := state.NewStateHolder(state.NewState(
 		utils.NewSimpleView(),
-		meter.NewMeter(meter.DefaultParameters())))
+		meter.NewMeter(meter.DefaultParameters()),
+		state.DefaultParameters()))
 	accounts := state.NewAccounts(sth)
 
 	flowAddress := flow.HexToAddress("01")
