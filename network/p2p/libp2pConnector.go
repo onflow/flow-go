@@ -14,6 +14,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
+	libP2PUtils "github.com/onflow/flow-go/network/p2p/utils"
 )
 
 const (
@@ -138,7 +139,7 @@ func (l *Libp2pConnector) pruneAllConnectionsExcept(peerIDs peer.IDSlice) {
 
 		// retain the connection if there is a Flow One-to-One stream on that connection
 		// (we do not want to sever a connection with on going direct one-to-one traffic)
-		flowStream := flowStream(conn)
+		flowStream := libP2PUtils.FlowStream(conn)
 		if flowStream != nil {
 			log.Info().
 				Str("stream_protocol", string(flowStream.Protocol())).

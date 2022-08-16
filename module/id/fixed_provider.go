@@ -2,9 +2,11 @@ package id
 
 import (
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/multiformats/go-multiaddr"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
+	libP2PUtils "github.com/onflow/flow-go/network/p2p/utils"
 )
 
 // FixedIdentifierProvider implements an IdentifierProvider which provides a fixed list
@@ -55,4 +57,15 @@ func (p *FixedIdentityProvider) ByPeerID(peerID peer.ID) (*flow.Identity, bool) 
 	}
 	return nil, false
 
+}
+
+func (p *FixedIdentityProvider) ByMultiAddress(addr multiaddr.Multiaddr) (*flow.Identity, bool) {
+	for _, v := range p.identities {
+		if multiAddr, err := libP2PUtils.MultiAddrFromIdentity(*v); err == nil {
+			if addr.Equal(multiAddr) {
+				return v, true
+			}
+		}
+	}
+	return nil, false
 }

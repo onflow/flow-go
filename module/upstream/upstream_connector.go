@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/network/p2p"
+	libP2PUtils "github.com/onflow/flow-go/network/p2p/utils"
 )
 
 // upstreamConnector tries to connect the unstaked AN with atleast one of the configured bootstrap access nodes
@@ -92,7 +93,7 @@ func (connector *upstreamConnector) connect(ctx context.Context, bootstrapPeer f
 	default:
 	}
 
-	peerAddrInfo, err := p2p.PeerAddressInfo(bootstrapPeer)
+	peerAddrInfo, err := libP2PUtils.PeerAddressInfo(bootstrapPeer)
 
 	if err != nil {
 		return err

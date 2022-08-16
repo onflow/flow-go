@@ -5,11 +5,13 @@ import (
 	"sync"
 
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
+	libP2PUtils "github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 )
@@ -18,13 +20,14 @@ import (
 // Flow network participants as according to the given `protocol.State`.
 type ProtocolStateIDCache struct {
 	events.Noop
-	identities flow.IdentityList
-	state      protocol.State
-	mu         sync.RWMutex
-	peerIDs    map[flow.Identifier]peer.ID
-	flowIDs    map[peer.ID]flow.Identifier
-	lookup     map[flow.Identifier]*flow.Identity
-	logger     zerolog.Logger
+	identities         flow.IdentityList
+	state              protocol.State
+	mu                 sync.RWMutex
+	peerIDs            map[flow.Identifier]peer.ID
+	flowIDs            map[peer.ID]flow.Identifier
+	flowIDsByMultiAddr map[string]flow.Identifier
+	lookup             map[flow.Identifier]*flow.Identity
+	logger             zerolog.Logger
 }
 
 func NewProtocolStateIDCache(
@@ -79,6 +82,7 @@ func (p *ProtocolStateIDCache) update(blockID flow.Identifier) {
 
 	peerIDs := make(map[flow.Identifier]peer.ID, nIds)
 	flowIDs := make(map[peer.ID]flow.Identifier, nIds)
+	flowIDsByMultiAddr := make(map[string]flow.Identifier, nIds)
 
 	for _, identity := range identities {
 		p.logger.Debug().Interface("identity", identity).Msg("extracting peer ID from network key")
@@ -89,8 +93,15 @@ func (p *ProtocolStateIDCache) update(blockID flow.Identifier) {
 			continue
 		}
 
+		multiAddr, err := libP2PUtils.MultiAddrFromIdentity(*identity)
+		if err != nil {
+			p.logger.Err(err).Interface("identity", identity).Msg("failed to extract multi address from identity")
+			continue
+		}
+
 		flowIDs[pid] = identity.NodeID
 		peerIDs[identity.NodeID] = pid
+		flowIDsByMultiAddr[multiAddr.String()] = identity.NodeID
 	}
 
 	p.mu.Lock()
@@ -98,6 +109,7 @@ func (p *ProtocolStateIDCache) update(blockID flow.Identifier) {
 	p.identities = identities
 	p.flowIDs = flowIDs
 	p.peerIDs = peerIDs
+	p.flowIDsByMultiAddr = flowIDsByMultiAddr
 	p.lookup = identities.Lookup()
 }
 
@@ -118,6 +130,16 @@ func (p *ProtocolStateIDCache) ByPeerID(peerID peer.ID) (*flow.Identity, bool) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	if flowID, ok := p.flowIDs[peerID]; ok {
+		id, ok := p.lookup[flowID]
+		return id, ok
+	}
+	return nil, false
+}
+
+func (p *ProtocolStateIDCache) ByMultiAddress(addr multiaddr.Multiaddr) (*flow.Identity, bool) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	if flowID, ok := p.flowIDsByMultiAddr[addr.String()]; ok {
 		id, ok := p.lookup[flowID]
 		return id, ok
 	}

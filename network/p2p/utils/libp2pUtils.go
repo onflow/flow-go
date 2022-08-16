@@ -1,4 +1,4 @@
-package p2p
+package utils
 
 // All utilities for libp2p not natively provided by the library.
 
@@ -131,6 +131,22 @@ func MultiAddressStr(ip, port string) string {
 	return fmt.Sprintf("/dns4/%s/tcp/%s", ip, port)
 }
 
+// MultiAddrFromIdentity returns the multi address for the provided identity.
+func MultiAddrFromIdentity(identity flow.Identity) (multiaddr.Multiaddr, error) {
+	ip, port, _, err := NetworkingInfo(identity)
+	if err != nil {
+		return nil, err
+	}
+
+	multiAddrStr := MultiAddressStr(ip, port)
+	multiAddr, err := multiaddr.NewMultiaddr(multiAddrStr)
+	if err != nil {
+		return nil, err
+	}
+
+	return multiAddr, nil
+}
+
 // IPPortFromMultiAddress returns the IP/hostname and the port for the given multi-addresses
 // associated with a libp2p host
 func IPPortFromMultiAddress(addrs ...multiaddr.Multiaddr) (string, string, error) {
@@ -204,8 +220,8 @@ func PeerInfosFromIDs(ids flow.IdentityList) ([]peer.AddrInfo, map[flow.Identifi
 	return validIDs, invalidIDs
 }
 
-// streamLogger creates a logger for libp2p stream which logs the remote and local peer IDs and addresses
-func streamLogger(log zerolog.Logger, stream libp2pnetwork.Stream) zerolog.Logger {
+// StreamLogger creates a logger for libp2p stream which logs the remote and local peer IDs and addresses
+func StreamLogger(log zerolog.Logger, stream libp2pnetwork.Stream) zerolog.Logger {
 	logger := log.With().
 		Str("protocol", string(stream.Protocol())).
 		Str("remote_peer", stream.Conn().RemotePeer().String()).
@@ -215,8 +231,8 @@ func streamLogger(log zerolog.Logger, stream libp2pnetwork.Stream) zerolog.Logge
 	return logger
 }
 
-// flowStream returns the Flow protocol Stream in the connection if one exist, else it returns nil
-func flowStream(conn network.Conn) network.Stream {
+// FlowStream returns the Flow protocol Stream in the connection if one exist, else it returns nil
+func FlowStream(conn network.Conn) network.Stream {
 	for _, s := range conn.GetStreams() {
 		if unicast.IsFlowProtocolStream(s) {
 			return s

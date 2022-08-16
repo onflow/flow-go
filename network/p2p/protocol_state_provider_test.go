@@ -5,7 +5,6 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -14,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
+	libP2PUtils "github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -107,13 +107,13 @@ func (suite *ProtocolStateProviderTestSuite) checkStateTransition() {
 
 	suite.triggerUpdate()
 
-	assert.ElementsMatch(suite.T(), suite.participants, suite.provider.Identities(filter.Any))
+	require.ElementsMatch(suite.T(), suite.participants, suite.provider.Identities(filter.Any))
 	for _, participant := range suite.participants {
 		pid, err := suite.provider.GetPeerID(participant.NodeID)
 		require.NoError(suite.T(), err)
 		fid, err := suite.provider.GetFlowID(pid)
 		require.NoError(suite.T(), err)
-		assert.Equal(suite.T(), fid, participant.NodeID)
+		require.Equal(suite.T(), fid, participant.NodeID)
 	}
 	for _, participant := range oldParticipants {
 		_, err := suite.provider.GetPeerID(participant.NodeID)
@@ -135,9 +135,20 @@ func (suite *ProtocolStateProviderTestSuite) TestIDTranslation() {
 		require.NoError(suite.T(), err)
 		expectedPid, err := peer.IDFromPublicKey(key)
 		require.NoError(suite.T(), err)
-		assert.Equal(suite.T(), expectedPid, pid)
+		require.Equal(suite.T(), expectedPid, pid)
 		fid, err := suite.provider.GetFlowID(pid)
 		require.NoError(suite.T(), err)
-		assert.Equal(suite.T(), fid, participant.NodeID)
+		require.Equal(suite.T(), fid, participant.NodeID)
+	}
+}
+
+func (suite *ProtocolStateProviderTestSuite) TestByMultiAddress() {
+	for _, participant := range suite.participants {
+		multiAddr, err := libP2PUtils.MultiAddrFromIdentity(*participant)
+		require.NoError(suite.T(), err)
+
+		identity, found := suite.provider.ByMultiAddress(multiAddr)
+		require.True(suite.T(), found)
+		require.Equal(suite.T(), identity, participant)
 	}
 }

@@ -27,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	libP2PUtils "github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/network/validator"
 	psValidator "github.com/onflow/flow-go/network/validator/pubsub"
 	_ "github.com/onflow/flow-go/utils/binstat"
@@ -249,7 +250,7 @@ func (m *Middleware) UpdateNodeAddresses() {
 	m.log.Info().Msg("Updating protocol state node addresses")
 
 	ids := m.ov.Identities()
-	newInfos, invalid := PeerInfosFromIDs(ids)
+	newInfos, invalid := libP2PUtils.PeerInfosFromIDs(ids)
 
 	for id, err := range invalid {
 		m.log.Err(err).Str("node_id", id.String()).Msg("failed to extract peer info from identity")
@@ -444,7 +445,7 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 // it is a callback that gets called for each incoming stream by libp2p with a new stream object
 func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 	// qualify the logger with local and remote address
-	log := streamLogger(m.log, s)
+	log := libP2PUtils.StreamLogger(m.log, s)
 
 	log.Info().Msg("incoming stream received")
 

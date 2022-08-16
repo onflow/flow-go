@@ -4,14 +4,15 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-
-	"github.com/stretchr/testify/assert"
-
+	libP2PUtils "github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TestFixedIdentifierProvider ensure the fixed identity provider contains the expected identifiers
 func TestFixedIdentifierProvider(t *testing.T) {
 	identifiers := make([]flow.Identifier, 10)
 	for i := 0; i < len(identifiers); i++ {
@@ -23,11 +24,31 @@ func TestFixedIdentifierProvider(t *testing.T) {
 	in := identifiers[rand.Intn(10)]
 	out := unittest.IdentifierFixture()
 
-	assert.True(t, contains(fp.Identifiers(), in))
-	assert.False(t, contains(fp.Identifiers(), out))
+	require.True(t, contains(fp.Identifiers(), in))
+	require.False(t, contains(fp.Identifiers(), out))
 
 }
 
+// TestFixedIdentifierProvider_ByMultiAddress tests that the identifier provider provides the correct identity by multi address.
+func TestFixedIdentifierProvider_ByMultiAddress(t *testing.T) {
+	identities := make([]*flow.Identity, 10)
+	for i := 0; i < len(identities); i++ {
+		id, _ := unittest.IdentityWithNetworkingKeyFixture()
+		identities[i] = id
+	}
+
+	fp := NewFixedIdentityProvider(identities)
+
+	expectedIdentity := identities[0]
+	multiAddr, err := libP2PUtils.MultiAddrFromIdentity(*expectedIdentity)
+	require.NoError(t, err)
+
+	identity, found := fp.ByMultiAddress(multiAddr)
+	require.True(t, found)
+	require.Equal(t, expectedIdentity, identity)
+}
+
+// TestFixedIdentitiesProvider ensure the fixed identity provider contains the expected identities
 func TestFixedIdentitiesProvider(t *testing.T) {
 	identities := make([]*flow.Identity, 10)
 	for i := 0; i < len(identities); i++ {
@@ -39,8 +60,8 @@ func TestFixedIdentitiesProvider(t *testing.T) {
 	in := identities[rand.Intn(10)]
 	out := unittest.IdentityFixture()
 
-	assert.True(t, idContains(fp.Identities(filter.Any), in))
-	assert.False(t, idContains(fp.Identities(filter.Any), out))
+	require.True(t, idContains(fp.Identities(filter.Any), in))
+	require.False(t, idContains(fp.Identities(filter.Any), out))
 
 }
 

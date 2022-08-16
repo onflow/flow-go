@@ -58,6 +58,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	libP2PUtils "github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
@@ -825,7 +826,7 @@ func (builder *ObserverServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 		var pis []peer.AddrInfo
 
 		for _, b := range builder.bootstrapIdentities {
-			pi, err := p2p.PeerAddressInfo(*b)
+			pi, err := libP2PUtils.PeerAddressInfo(*b)
 
 			if err != nil {
 				return nil, fmt.Errorf("could not extract peer address info from bootstrap identity %v: %w", b, err)

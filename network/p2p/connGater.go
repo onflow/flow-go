@@ -13,20 +13,36 @@ import (
 
 var _ connmgr.ConnectionGater = (*ConnGater)(nil)
 
+// OnInterceptAccept func used to filter peers when the InterceptAccept callback is invoked by libP2P.
+type OnInterceptAccept func(addr multiaddr.Multiaddr) bool
+
+type ConnGaterOption func(*ConnGater)
+
+func WithOnInterceptAccept(f OnInterceptAccept) ConnGaterOption {
+	return func(cg *ConnGater) {
+		cg.onInterceptAccept = f
+	}
+}
+
 // ConnGater is the implementation of the libp2p connmgr.ConnectionGater interface
 // It provides node allowlisting by libp2p peer.ID which is derived from the node public networking key
 type ConnGater struct {
 	sync.RWMutex
-	peerFilter PeerFilter
-	log        zerolog.Logger
+	onInterceptAccept OnInterceptAccept
+	peerFilter        PeerFilter
+	log               zerolog.Logger
 }
 
 type PeerFilter func(peer.ID) bool
 
-func NewConnGater(log zerolog.Logger, peerFilter PeerFilter) *ConnGater {
+func NewConnGater(log zerolog.Logger, peerFilter PeerFilter, opts ...ConnGaterOption) *ConnGater {
 	cg := &ConnGater{
 		log:        log,
 		peerFilter: peerFilter,
+	}
+
+	for _, opt := range opts {
+		opt(cg)
 	}
 
 	return cg
@@ -44,10 +60,13 @@ func (c *ConnGater) InterceptAddrDial(_ peer.ID, ma multiaddr.Multiaddr) bool {
 
 // InterceptAccept is not used. Currently, allowlisting is only implemented by Peer IDs and not multi-addresses
 func (c *ConnGater) InterceptAccept(cm network.ConnMultiaddrs) bool {
+	if c.onInterceptAccept != nil {
+		return c.onInterceptAccept(cm.RemoteMultiaddr())
+	}
 	return true
 }
 
-// InterceptSecured - a callback executed after the libp2p security handshake. It tests whether to accept or reject
+// InterceptSecured a callback executed after the libp2p security handshake. It tests whether to accept or reject
 // an inbound connection based on its peer id.
 func (c *ConnGater) InterceptSecured(dir network.Direction, p peer.ID, addr network.ConnMultiaddrs) bool {
 	switch dir {
@@ -68,7 +87,7 @@ func (c *ConnGater) InterceptSecured(dir network.Direction, p peer.ID, addr netw
 	}
 }
 
-// Decision to continue or drop the connection should have been made before this call
+// InterceptUpgraded decision to continue or drop the connection should have been made before this call
 func (c *ConnGater) InterceptUpgraded(network.Conn) (allow bool, reason control.DisconnectReason) {
 	return true, 0
 }

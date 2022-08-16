@@ -15,6 +15,7 @@ import (
 
 	fnetwork "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
+	libP2PUtils "github.com/onflow/flow-go/network/p2p/utils"
 )
 
 const maxPingMessageSize = 5 * kb
@@ -76,7 +77,7 @@ func (ps *PingService) pingHandler(s network.Stream) {
 	defer timer.Stop()
 
 	go func() {
-		log := streamLogger(ps.logger, s)
+		log := libP2PUtils.StreamLogger(ps.logger, s)
 		select {
 		case <-timer.C:
 			// if read or write took longer than configured timeout, then reset the stream
@@ -189,7 +190,7 @@ func (ps *PingService) ping(ctx context.Context, p peer.ID) (message.PingRespons
 
 	// if ping succeeded, close the stream else reset the stream
 	go func() {
-		log := streamLogger(ps.logger, s)
+		log := libP2PUtils.StreamLogger(ps.logger, s)
 		select {
 		case <-ctx.Done():
 			// time expired without a response, log an error and reset the stream

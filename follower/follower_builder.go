@@ -12,11 +12,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/routing"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	p2ppubsub "github.com/libp2p/go-libp2p-pubsub"
-
-	followereng "github.com/onflow/flow-go/engine/common/follower"
-	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
-	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
-	badgerState "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
@@ -28,6 +24,7 @@ import (
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/common/follower"
+	followereng "github.com/onflow/flow-go/engine/common/follower"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
@@ -35,6 +32,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
 	"github.com/onflow/flow-go/module/compliance"
+	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/metrics"
@@ -43,17 +41,18 @@ import (
 	"github.com/onflow/flow-go/network"
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/channels"
+	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/converter"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	libP2PUtils "github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/state/protocol"
+	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	storage "github.com/onflow/flow-go/storage/badger"
-
-	"github.com/rs/zerolog"
 )
 
 // FlowBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node
@@ -559,7 +558,7 @@ func (builder *FollowerServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 		var pis []peer.AddrInfo
 
 		for _, b := range builder.bootstrapIdentities {
-			pi, err := p2p.PeerAddressInfo(*b)
+			pi, err := libP2PUtils.PeerAddressInfo(*b)
 
 			if err != nil {
 				return nil, fmt.Errorf("could not extract peer address info from bootstrap identity %v: %w", b, err)

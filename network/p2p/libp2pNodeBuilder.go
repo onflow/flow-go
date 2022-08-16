@@ -29,6 +29,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	libP2PUtils "github.com/onflow/flow-go/network/p2p/utils"
 )
 
 // LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
@@ -49,11 +50,18 @@ func DefaultLibP2PNodeFactory(
 
 	return func(ctx context.Context) (*Node, error) {
 		connManager := NewConnManager(log, metrics)
-		connGater := NewConnGater(log, func(pid peer.ID) bool {
-			_, found := idProvider.ByPeerID(pid)
 
+		onInterceptAccept := func(addr multiaddr.Multiaddr) bool {
+			_, found := idProvider.ByMultiAddress(addr)
 			return found
-		})
+		}
+
+		peerFilter := func(pid peer.ID) bool {
+			_, found := idProvider.ByPeerID(pid)
+			return found
+		}
+
+		connGater := NewConnGater(log, peerFilter, WithOnInterceptAccept(onInterceptAccept))
 
 		builder := NewNodeBuilder(log, address, flowKey, sporkId).
 			SetBasicResolver(resolver).
@@ -268,7 +276,7 @@ func defaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Opti
 		return nil, fmt.Errorf("could not split node address %s:%w", address, err)
 	}
 
-	sourceMultiAddr, err := multiaddr.NewMultiaddr(MultiAddressStr(ip, port))
+	sourceMultiAddr, err := multiaddr.NewMultiaddr(libP2PUtils.MultiAddressStr(ip, port))
 	if err != nil {
 		return nil, fmt.Errorf("failed to translate Flow address to Libp2p multiaddress: %w", err)
 	}

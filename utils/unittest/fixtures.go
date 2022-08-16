@@ -991,7 +991,7 @@ func IdentityFixture(opts ...func(*flow.Identity)) *flow.Identity {
 	stakingKey := StakingPrivKeyByIdentifier(nodeID)
 	identity := flow.Identity{
 		NodeID:        nodeID,
-		Address:       fmt.Sprintf("address-%x", nodeID[0:7]),
+		Address:       fmt.Sprintf("address-%x:1234", nodeID[0:7]),
 		Role:          flow.RoleConsensus,
 		Weight:        1000,
 		StakingPubKey: stakingKey.PublicKey(),
