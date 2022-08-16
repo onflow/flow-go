@@ -16,6 +16,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-libp2p-core/routing"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
@@ -70,6 +71,7 @@ func NewBlobService(
 	prefix string,
 	ds datastore.Batching,
 	metrics module.BitswapMetrics,
+	logger zerolog.Logger,
 	opts ...network.BlobServiceOption,
 ) *blobService {
 	bsNetwork := bsnet.NewFromIpfsHost(host, r, bsnet.Prefix(protocol.ID(prefix)))
@@ -99,7 +101,7 @@ func NewBlobService(
 				case <-ticker.C:
 					stat, err := btswp.Stat()
 					if err != nil {
-						// TODO: log error
+						logger.Err(err).Str("component", "blob_service").Str("prefix", prefix).Msg("failed to get bitswap stats")
 						continue
 					}
 

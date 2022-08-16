@@ -420,7 +420,7 @@ func createBlobService(ctx irrecoverable.SignalerContext, t *testing.T, ds datas
 	cr, err := dht.New(ctx, h, dhtOpts...)
 	require.NoError(t, err)
 
-	service := p2p.NewBlobService(h, cr, name, ds, metrics.NewNoopCollector())
+	service := p2p.NewBlobService(h, cr, name, ds, metrics.NewNoopCollector(), zerolog.Nop())
 	service.Start(ctx)
 	<-service.Ready()
 
