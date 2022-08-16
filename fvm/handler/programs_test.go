@@ -3,7 +3,6 @@ package handler_test
 import (
 	"encoding/hex"
 	"fmt"
-	"math"
 	"testing"
 
 	"github.com/onflow/cadence/runtime/common"
@@ -115,7 +114,8 @@ func Test_Programs(t *testing.T) {
 
 	sth := state.NewStateHolder(state.NewState(
 		mainView,
-		meter.NewMeter(math.MaxUint64, math.MaxUint64)))
+		meter.NewMeter(meter.DefaultParameters()),
+		state.DefaultParameters()))
 
 	rt := fvm.NewInterpreterRuntime()
 	vm := fvm.NewVirtualMachine(rt)

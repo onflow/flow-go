@@ -56,7 +56,12 @@ func (r *AtreeReporter) Report(payloads []ledger.Payload, commit ledger.State) e
 			for p := range jobs {
 				err := stats.process(p)
 				if err != nil {
-					r.Log.Err(err).Msgf("failed to process payload %s", p.Key.String())
+					k, keyErr := p.Key()
+					if keyErr != nil {
+						r.Log.Err(keyErr).Msg("failed to get payload key")
+					} else {
+						r.Log.Err(err).Msgf("failed to process payload %s", k.String())
+					}
 				}
 			}
 			results <- stats
@@ -103,20 +108,24 @@ const (
 	slabPayloadType
 )
 
-func getPayloadType(p *ledger.Payload) payloadType {
-	if len(p.Key.KeyParts) < 2 {
-		return unknownPayloadType
+func getPayloadType(p *ledger.Payload) (payloadType, error) {
+	k, err := p.Key()
+	if err != nil {
+		return unknownPayloadType, err
+	}
+	if len(k.KeyParts) < 2 {
+		return unknownPayloadType, nil
 	}
 	if fvmState.IsFVMStateKey(
-		string(p.Key.KeyParts[0].Value),
-		string(p.Key.KeyParts[1].Value),
+		string(k.KeyParts[0].Value),
+		string(k.KeyParts[1].Value),
 	) {
-		return fvmPayloadType
+		return fvmPayloadType, nil
 	}
-	if bytes.HasPrefix(p.Key.KeyParts[1].Value, []byte(atree.LedgerBaseStorageSlabPrefix)) {
-		return slabPayloadType
+	if bytes.HasPrefix(k.KeyParts[1].Value, []byte(atree.LedgerBaseStorageSlabPrefix)) {
+		return slabPayloadType, nil
 	}
-	return storagePayloadType
+	return storagePayloadType, nil
 }
 
 type slabPayloadStats struct {
@@ -156,10 +165,13 @@ func (s *payloadStats) add(s1 *payloadStats) {
 }
 
 func (s *payloadStats) process(p *ledger.Payload) error {
-	pt := getPayloadType(p)
+	pt, err := getPayloadType(p)
+	if err != nil {
+		return err
+	}
 	switch pt {
 	case unknownPayloadType:
-		return fmt.Errorf("unknown payload: key %v", p.Key.KeyParts)
+		return fmt.Errorf("unknown payload: %s", p.String())
 	case fvmPayloadType:
 		s.FVMPayloadCount++
 	case storagePayloadType:
@@ -172,11 +184,11 @@ func (s *payloadStats) process(p *ledger.Payload) error {
 		return nil
 	}
 
-	if len(p.Value) < versionAndFlagSize {
+	if len(p.Value()) < versionAndFlagSize {
 		return errors.New("data is too short")
 	}
 
-	flag := p.Value[flagIndex]
+	flag := p.Value()[flagIndex]
 
 	switch dataType := getSlabType(flag); dataType {
 	case slabArray:
@@ -194,12 +206,12 @@ func (s *payloadStats) process(p *ledger.Payload) error {
 	case slabMap:
 		switch mapDataType := getSlabMapType(flag); mapDataType {
 		case slabMapData:
-			_, collisionGroupCount, err := getCollisionGroupCountFromSlabMapData(p.Value)
+			_, collisionGroupCount, err := getCollisionGroupCountFromSlabMapData(p.Value())
 			if err != nil {
 				return err
 			}
 			if collisionGroupCount > 0 {
-				_, inlineCollisionCount, err := getInlineCollisionCountsFromSlabMapData(p.Value)
+				_, inlineCollisionCount, err := getInlineCollisionCountsFromSlabMapData(p.Value())
 				if err != nil {
 					return err
 				}
@@ -211,7 +223,7 @@ func (s *payloadStats) process(p *ledger.Payload) error {
 			s.SlabMapDataCount++
 
 		case slabMapCollisionGroup:
-			elements, err := parseSlabMapData(p.Value)
+			elements, err := parseSlabMapData(p.Value())
 			if err != nil {
 				return err
 			}
