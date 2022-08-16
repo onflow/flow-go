@@ -82,7 +82,8 @@ func (suite *Suite) SetupTest() {
 	params := new(protocol.Params)
 	params.On("Root").Return(header, nil)
 	suite.state.On("Params").Return(params).Maybe()
-
+	suite.state.On("AtBlockID", header.ID()).Return(suite.snapshot).Maybe()
+	suite.snapshot.On("SealingSegment").Return(&flow.SealingSegment{Blocks: unittest.BlockFixtures(1)}, nil).Maybe()
 	suite.collClient = new(accessmock.AccessAPIClient)
 	suite.execClient = new(accessmock.ExecutionAPIClient)
 

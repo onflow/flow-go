@@ -2,7 +2,7 @@ package ingestion
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"math/rand"
 	"os"
 	"sync"
@@ -112,19 +112,8 @@ func (suite *Suite) SetupTest() {
 		blocksToMarkExecuted, rpcEng)
 	require.NoError(suite.T(), err)
 
-	getLastFullBlockHeightCalls := 0
-	returnErr := func() error {
-		// stops requestMissingCollections from executing in processBackground worker during component startup
-		if getLastFullBlockHeightCalls < 2 {
-			return fmt.Errorf("do nothing")
-		}
-
-		return nil
-	}
-	suite.blocks.On("GetLastFullBlockHeight").Run(func(args mock.Arguments) {
-		getLastFullBlockHeightCalls++
-	}).Return(uint64(0), returnErr).Twice()
-
+	suite.blocks.On("GetLastFullBlockHeight").Once().Return(uint64(0), errors.New("do nothing"))
+	
 	ctx, cancel := context.WithCancel(context.Background())
 	irrecoverableCtx, _ := irrecoverable.WithSignaler(ctx)
 	eng.ComponentManager.Start(irrecoverableCtx)
@@ -136,6 +125,8 @@ func (suite *Suite) SetupTest() {
 
 // TestOnFinalizedBlock checks that when a block is received, a request for each individual collection is made
 func (suite *Suite) TestOnFinalizedBlock() {
+	suite.blocks.On("GetLastFullBlockHeight").Return(uint64(0), nil).Once()
+
 	block := unittest.BlockFixture()
 	block.SetPayload(unittest.PayloadFixture(
 		unittest.WithGuarantees(unittest.CollectionGuaranteesFixture(4)...),
