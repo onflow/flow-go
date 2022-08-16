@@ -138,7 +138,7 @@ func matchEventForMessage(t *testing.T, egressEvents []*insecure.EgressEvent, me
 	require.Equal(t, corruptedId[:], message.Egress.OriginID[:])
 
 	for _, egressEvent := range egressEvents {
-		if egressEvent.OriginId == corruptedId {
+		if egressEvent.CorruptOriginId == corruptedId {
 			require.Equal(t, egressEvent.Channel.String(), message.Egress.ChannelID)
 			require.Equal(t, egressEvent.Protocol, message.Egress.Protocol)
 			require.Equal(t, flow.IdsToBytes(egressEvent.TargetIds), message.Egress.TargetIDs)

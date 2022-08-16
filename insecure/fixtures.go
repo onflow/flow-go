@@ -44,12 +44,12 @@ func EgressMessageFixture(t *testing.T, codec network.Codec, protocol Protocol, 
 	// creates egress message that goes over gRPC.
 
 	egressMsg := &EgressMessage{
-		ChannelID: channels.TestNetworkChannel.String(),
-		OriginID:  originId[:],
-		TargetNum: targetNum,
-		TargetIDs: flow.IdsToBytes(targetIds),
-		Payload:   payload,
-		Protocol:  protocol,
+		ChannelID:       channels.TestNetworkChannel.String(),
+		CorruptOriginID: originId[:],
+		TargetNum:       targetNum,
+		TargetIDs:       flow.IdsToBytes(targetIds),
+		Payload:         payload,
+		Protocol:        protocol,
 	}
 
 	m := &Message{
@@ -59,7 +59,7 @@ func EgressMessageFixture(t *testing.T, codec network.Codec, protocol Protocol, 
 	// creates corresponding event of that message that
 	// is sent by attack network to orchestrator.
 	e := &EgressEvent{
-		OriginId:          originId,
+		CorruptOriginId:   originId,
 		Channel:           channel,
 		FlowProtocolEvent: content,
 		Protocol:          protocol,
@@ -80,10 +80,10 @@ func IngressMessageFixture(t *testing.T, codec network.Codec, protocol Protocol,
 
 	// creates ingress message that goes over gRPC.
 	ingressMsg := &IngressMessage{
-		ChannelID: channels.TestNetworkChannel.String(),
-		OriginID:  originId[:],
-		TargetID:  targetId[:],
-		Payload:   payload,
+		ChannelID:       channels.TestNetworkChannel.String(),
+		OriginID:        originId[:],
+		CorruptTargetID: targetId[:],
+		Payload:         payload,
 	}
 
 	return &Message{

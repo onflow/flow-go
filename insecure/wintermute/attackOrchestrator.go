@@ -98,7 +98,7 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.EgressEvent)
 			return fmt.Errorf("could not send rpc on channel: %w", err)
 		}
 		o.logger.Debug().
-			Hex("corrupted_node_id", logging.ID(event.OriginId)).
+			Hex("corrupted_node_id", logging.ID(event.CorruptOriginId)).
 			Str("channel_id", string(event.Channel)).
 			Str("protocol", event.Protocol.String()).
 			Str("type", fmt.Sprintf("%T", event)).
@@ -144,14 +144,14 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Egress
 	o.receiptHandleLock.Lock()
 	defer o.receiptHandleLock.Unlock()
 
-	ok := o.corruptedNodeIds.Contains(receiptEvent.OriginId)
+	ok := o.corruptedNodeIds.Contains(receiptEvent.CorruptOriginId)
 	if !ok {
 		return fmt.Errorf("sender of the event is not a corrupted node")
 	}
 
-	corruptedIdentity, ok := o.allNodeIds.ByNodeID(receiptEvent.OriginId)
+	corruptedIdentity, ok := o.allNodeIds.ByNodeID(receiptEvent.CorruptOriginId)
 	if !ok {
-		return fmt.Errorf("could not find corrupted identity for: %x", receiptEvent.OriginId)
+		return fmt.Errorf("could not find corrupted identity for: %x", receiptEvent.CorruptOriginId)
 	}
 
 	if corruptedIdentity.Role != flow.RoleExecution {
@@ -168,7 +168,7 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Egress
 		Hex("executor_id", logging.ID(receipt.ExecutorID)).
 		Hex("result_id", logging.ID(receipt.ExecutionResult.ID())).
 		Hex("block_id", logging.ID(receipt.ExecutionResult.BlockID)).
-		Hex("corrupted_id", logging.ID(receiptEvent.OriginId)).
+		Hex("corrupted_id", logging.ID(receiptEvent.CorruptOriginId)).
 		Str("protocol", insecure.ProtocolStr(receiptEvent.Protocol)).
 		Str("channel", string(receiptEvent.Channel)).
 		Uint32("targets_num", receiptEvent.TargetNum).
@@ -204,11 +204,11 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Egress
 		// sets executor id of the result as the same corrupted execution node id that
 		// is meant to send this message to the flow network.
 		err := o.network.SendEgress(&insecure.EgressEvent{
-			OriginId:  corruptedExecutionId,
-			Channel:   receiptEvent.Channel,
-			Protocol:  receiptEvent.Protocol,
-			TargetNum: receiptEvent.TargetNum,
-			TargetIds: receiptEvent.TargetIds,
+			CorruptOriginId: corruptedExecutionId,
+			Channel:         receiptEvent.Channel,
+			Protocol:        receiptEvent.Protocol,
+			TargetNum:       receiptEvent.TargetNum,
+			TargetIds:       receiptEvent.TargetIds,
 
 			// wrapping execution result in an execution receipt for sake of encoding and decoding.
 			FlowProtocolEvent: &flow.ExecutionReceipt{ExecutionResult: *corruptedResult},
@@ -236,14 +236,14 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Egress
 // chunk.
 // Otherwise, it is passed through.
 func (o *Orchestrator) handleChunkDataPackRequestEvent(chunkDataPackRequestEvent *insecure.EgressEvent) error {
-	ok := o.corruptedNodeIds.Contains(chunkDataPackRequestEvent.OriginId)
+	ok := o.corruptedNodeIds.Contains(chunkDataPackRequestEvent.CorruptOriginId)
 	if !ok {
 		return fmt.Errorf("sender of the event is not a corrupted node")
 	}
 
-	corruptedIdentity, ok := o.allNodeIds.ByNodeID(chunkDataPackRequestEvent.OriginId)
+	corruptedIdentity, ok := o.allNodeIds.ByNodeID(chunkDataPackRequestEvent.CorruptOriginId)
 	if !ok {
-		return fmt.Errorf("could not find corrupted identity for: %x", chunkDataPackRequestEvent.OriginId)
+		return fmt.Errorf("could not find corrupted identity for: %x", chunkDataPackRequestEvent.CorruptOriginId)
 	}
 	if corruptedIdentity.Role != flow.RoleVerification {
 		return fmt.Errorf("wrong sender role for chunk data pack request: %s", corruptedIdentity.Role.String())
@@ -271,7 +271,7 @@ func (o *Orchestrator) handleChunkDataPackRequestEvent(chunkDataPackRequestEvent
 	}
 
 	o.logger.Info().
-		Hex("corrupted_id", logging.ID(chunkDataPackRequestEvent.OriginId)).
+		Hex("corrupted_id", logging.ID(chunkDataPackRequestEvent.CorruptOriginId)).
 		Str("protocol", insecure.ProtocolStr(chunkDataPackRequestEvent.Protocol)).
 		Str("channel", string(chunkDataPackRequestEvent.Channel)).
 		Uint32("targets_num", chunkDataPackRequestEvent.TargetNum).
@@ -289,7 +289,7 @@ func (o *Orchestrator) handleChunkDataPackResponseEvent(chunkDataPackReplyEvent 
 		// an attack has already been conducted
 		lg := o.logger.With().
 			Hex("chunk_id", logging.ID(cdpRep.ChunkDataPack.ChunkID)).
-			Hex("sender_id", logging.ID(chunkDataPackReplyEvent.OriginId)).
+			Hex("sender_id", logging.ID(chunkDataPackReplyEvent.CorruptOriginId)).
 			Hex("target_id", logging.ID(chunkDataPackReplyEvent.TargetIds[0])).Logger()
 
 		// chunk data pack reply goes over a unicast, hence, we only check first target id.
@@ -318,7 +318,7 @@ func (o *Orchestrator) handleChunkDataPackResponseEvent(chunkDataPackReplyEvent 
 		return fmt.Errorf("could not passed through chunk data reply: %w", err)
 	}
 	o.logger.Debug().
-		Hex("corrupted_id", logging.ID(chunkDataPackReplyEvent.OriginId)).
+		Hex("corrupted_id", logging.ID(chunkDataPackReplyEvent.CorruptOriginId)).
 		Hex("chunk_id", logging.ID(cdpRep.ChunkDataPack.ID())).
 		Msg("chunk data pack response passed through")
 	return nil
@@ -334,7 +334,7 @@ func (o *Orchestrator) handleResultApprovalEvent(resultApprovalEvent *insecure.E
 		Hex("result_id", logging.ID(approval.Body.ExecutionResultID)).
 		Uint64("chunk_index", approval.Body.ChunkIndex).
 		Hex("result_id", logging.ID(approval.Body.BlockID)).
-		Hex("sender_id", logging.ID(resultApprovalEvent.OriginId)).
+		Hex("sender_id", logging.ID(resultApprovalEvent.CorruptOriginId)).
 		Str("target_ids", fmt.Sprintf("%v", resultApprovalEvent.TargetIds)).Logger()
 
 	if _, _, conducted := o.AttackState(); conducted {
@@ -375,11 +375,11 @@ func (o *Orchestrator) replyWithAttestation(chunkDataPackRequestEvent *insecure.
 		// sends an attestation on behalf of verification node to all consensus nodes
 		consensusIds := o.allNodeIds.Filter(filter.HasRole(flow.RoleConsensus)).NodeIDs()
 		err = o.network.SendEgress(&insecure.EgressEvent{
-			OriginId:  chunkDataPackRequestEvent.OriginId,
-			Channel:   channels.PushApprovals,
-			Protocol:  insecure.Protocol_PUBLISH,
-			TargetNum: 0,
-			TargetIds: consensusIds,
+			CorruptOriginId: chunkDataPackRequestEvent.CorruptOriginId,
+			Channel:         channels.PushApprovals,
+			Protocol:        insecure.Protocol_PUBLISH,
+			TargetNum:       0,
+			TargetIds:       consensusIds,
 
 			// wrapping attestation in a result approval for sake of encoding and decoding.
 			FlowProtocolEvent: &flow.ResultApproval{Body: flow.ResultApprovalBody{Attestation: *attestation}},
@@ -389,7 +389,7 @@ func (o *Orchestrator) replyWithAttestation(chunkDataPackRequestEvent *insecure.
 		}
 
 		o.logger.Info().
-			Hex("corrupted_id", logging.ID(chunkDataPackRequestEvent.OriginId)).
+			Hex("corrupted_id", logging.ID(chunkDataPackRequestEvent.CorruptOriginId)).
 			Str("protocol", insecure.ProtocolStr(chunkDataPackRequestEvent.Protocol)).
 			Str("channel", string(chunkDataPackRequestEvent.Channel)).
 			Uint32("targets_num", chunkDataPackRequestEvent.TargetNum).

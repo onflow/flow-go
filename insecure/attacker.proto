@@ -23,21 +23,21 @@ message Message {
 }
 
 // EgressMessage represents the message exchanged between the CorruptibleConduitFactory and Attacker services.
-// OriginID for EgressMessage represents the corrupted node id where the message is coming from.
+// CorruptOriginID for EgressMessage represents the corrupt node id where the message is coming from.
 message EgressMessage {
   string ChannelID = 1;
-  bytes OriginID = 2;
+  bytes CorruptOriginID = 2;
   uint32 TargetNum = 3;
   repeated bytes TargetIDs = 4;
   bytes Payload = 5;
   Protocol protocol = 6;
 }
 
-// OriginID for IngressMessage represents the node id where the message is coming from - that node could be corrupted or honest.
+// OriginID for IngressMessage represents the node id where the message is coming from - that node could be corrupt or honest.
 message IngressMessage {
   string ChannelID = 1;
   bytes OriginID = 2;
-  bytes TargetID = 3;
+  bytes CorruptTargetID = 3;
   bytes Payload = 4;
 }
 

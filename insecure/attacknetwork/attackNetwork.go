@@ -123,7 +123,7 @@ func (a *OrchestratorNetwork) processEgressMessage(message *insecure.Message) er
 		return fmt.Errorf("could not decode observed payload: %w", err)
 	}
 
-	sender, err := flow.ByteSliceToId(message.Egress.OriginID)
+	sender, err := flow.ByteSliceToId(message.Egress.CorruptOriginID)
 	if err != nil {
 		return fmt.Errorf("could not convert origin id to flow identifier: %w", err)
 	}
@@ -138,7 +138,7 @@ func (a *OrchestratorNetwork) processEgressMessage(message *insecure.Message) er
 	defer a.orchestratorMutex.Unlock()
 
 	err = a.orchestrator.HandleEventFromCorruptedNode(&insecure.EgressEvent{
-		OriginId:          sender,
+		CorruptOriginId:   sender,
 		Channel:           channels.Channel(message.Egress.ChannelID),
 		FlowProtocolEvent: event,
 		Protocol:          message.Egress.Protocol,
@@ -155,12 +155,12 @@ func (a *OrchestratorNetwork) processEgressMessage(message *insecure.Message) er
 // SendEgress enforces dissemination of given event via its encapsulated corrupted node networking layer through the Flow network
 // An orchestrator decides when to send an egress message on behalf of a corrupted node
 func (a *OrchestratorNetwork) SendEgress(event *insecure.EgressEvent) error {
-	msg, err := a.eventToEgressMessage(event.OriginId, event.FlowProtocolEvent, event.Channel, event.Protocol, event.TargetNum, event.TargetIds...)
+	msg, err := a.eventToEgressMessage(event.CorruptOriginId, event.FlowProtocolEvent, event.Channel, event.Protocol, event.TargetNum, event.TargetIds...)
 	if err != nil {
 		return fmt.Errorf("could not convert event to message: %w", err)
 	}
 
-	err = a.sendMessage(msg, event.OriginId)
+	err = a.sendMessage(msg, event.CorruptOriginId)
 	if err != nil {
 		return fmt.Errorf("could not send egress event from corrupted node: %w", err)
 	}
@@ -172,12 +172,12 @@ func (a *OrchestratorNetwork) SendEgress(event *insecure.EgressEvent) error {
 // to the corrupted node. This message was intercepted by the attack network and relayed to the orchestrator before being sent
 // to the corrupted node.
 func (a *OrchestratorNetwork) SendIngress(event *insecure.IngressEvent) error {
-	msg, err := a.eventToIngressMessage(event.OriginID, event.FlowProtocolEvent, event.Channel, event.TargetID)
+	msg, err := a.eventToIngressMessage(event.OriginID, event.FlowProtocolEvent, event.Channel, event.CorruptTargetID)
 	if err != nil {
 		return fmt.Errorf("could not convert event to message: %w", err)
 	}
 
-	err = a.sendMessage(msg, event.TargetID)
+	err = a.sendMessage(msg, event.CorruptTargetID)
 	if err != nil {
 		return fmt.Errorf("could not send ingress event to corrupted node: %w", err)
 	}
@@ -213,12 +213,12 @@ func (a *OrchestratorNetwork) eventToEgressMessage(corruptedId flow.Identifier,
 	}
 
 	egressMsg := &insecure.EgressMessage{
-		ChannelID: channel.String(),
-		OriginID:  corruptedId[:],
-		TargetNum: num,
-		TargetIDs: flow.IdsToBytes(targetIds),
-		Payload:   payload,
-		Protocol:  protocol,
+		ChannelID:       channel.String(),
+		CorruptOriginID: corruptedId[:],
+		TargetNum:       num,
+		TargetIDs:       flow.IdsToBytes(targetIds),
+		Payload:         payload,
+		Protocol:        protocol,
 	}
 
 	return &insecure.Message{
@@ -238,10 +238,10 @@ func (a *OrchestratorNetwork) eventToIngressMessage(originId flow.Identifier,
 	}
 
 	ingressMsg := &insecure.IngressMessage{
-		ChannelID: channel.String(),
-		OriginID:  originId[:], // origin node ID this message was sent from
-		TargetID:  targetId[:], // corrupted node ID this message is intended for
-		Payload:   payload,
+		ChannelID:       channel.String(),
+		OriginID:        originId[:], // origin node ID this message was sent from
+		CorruptTargetID: targetId[:], // corrupted node ID this message is intended for
+		Payload:         payload,
 	}
 
 	return &insecure.Message{

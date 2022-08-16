@@ -310,12 +310,12 @@ func (n *Network) eventToEgressMessage(
 	myId := n.me.NodeID()
 
 	egressMsg := &insecure.EgressMessage{
-		ChannelID: channel.String(),
-		OriginID:  myId[:],
-		TargetNum: targetNum,
-		TargetIDs: flow.IdsToBytes(targetIds),
-		Payload:   payload,
-		Protocol:  protocol,
+		ChannelID:       channel.String(),
+		CorruptOriginID: myId[:],
+		TargetNum:       targetNum,
+		TargetIDs:       flow.IdsToBytes(targetIds),
+		Payload:         payload,
+		Protocol:        protocol,
 	}
 
 	msg := &insecure.Message{
@@ -334,8 +334,8 @@ func (n *Network) eventToIngressMessage(event interface{}, channel channels.Chan
 	ingressMsg := &insecure.IngressMessage{
 		ChannelID: channel.String(),
 		OriginID:  originId[:],
-		//TODO need to process TargetID
-		//TargetID:
+		//TODO need to process CorruptTargetID
+		//CorruptTargetID:
 		Payload: payload,
 	}
 
