@@ -470,11 +470,6 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 			}
 		}
 
-		// TODO deliver protocol events async https://github.com/dapperlabs/flow-go/issues/6317
-		if insertingBlockTriggersEpochFallback {
-			m.consumer.EpochEmergencyFallbackTriggered()
-		}
-
 		return nil
 	})
 	if err != nil {
@@ -482,6 +477,8 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 	}
 
 	if insertingBlockTriggersEpochFallback {
+		// emit protocol events after database transaction succeeds
+		m.consumer.EpochEmergencyFallbackTriggered()
 		m.metrics.EpochEmergencyFallbackTriggered()
 	}
 
@@ -622,17 +619,16 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 			}
 		}
 
-		// emit protocol events within the scope of the Badger transaction to
-		// guarantee at-least-once delivery
-		// TODO deliver protocol events async https://github.com/dapperlabs/flow-go/issues/6317
-		m.consumer.BlockFinalized(header)
-		for _, emit := range events {
-			emit()
-		}
 		return nil
 	})
 	if err != nil {
 		return fmt.Errorf("could not persist finalization operations for block (%x): %w", blockID, err)
+	}
+
+	// emit protocol events after database transaction succeeds
+	m.consumer.BlockFinalized(header)
+	for _, emit := range events {
+		emit()
 	}
 
 	// update sealed/finalized block metrics
@@ -1046,15 +1042,16 @@ func (m *FollowerState) MarkValid(blockID flow.Identifier) error {
 			return fmt.Errorf("could not insert validity for block (id=%x, height=%d): %w", blockID, header.Height, err)
 		}
 
-		// trigger BlockProcessable for parent blocks above root height
-		if parent.Height > rootHeight {
-			// TODO deliver protocol events async https://github.com/dapperlabs/flow-go/issues/6317
-			m.consumer.BlockProcessable(parent)
-		}
 		return nil
 	})
 	if err != nil {
 		return fmt.Errorf("could not mark block as valid (%x): %w", blockID, err)
+	}
+
+	// skip emitting BlockProcessable for root block, as it is always processable
+	if parent.Height > rootHeight {
+		// emit protocol events after database transaction succeeds
+		m.consumer.BlockProcessable(parent)
 	}
 
 	return nil
