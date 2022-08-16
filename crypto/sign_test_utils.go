@@ -268,7 +268,7 @@ func benchVerify(b *testing.B, algo SigningAlgorithm, halg hash.Hasher) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		pk.Verify(s, input, halg)
+		_, _ = pk.Verify(s, input, halg)
 	}
 
 	b.StopTimer()
@@ -285,7 +285,7 @@ func benchSign(b *testing.B, algo SigningAlgorithm, halg hash.Hasher) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		sk.Sign(input, halg)
+		_, _ = sk.Sign(input, halg)
 	}
 	b.StopTimer()
 }

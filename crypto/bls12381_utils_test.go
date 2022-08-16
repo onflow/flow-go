@@ -132,7 +132,6 @@ func BenchmarkMapToG1(b *testing.B) {
 		mapToG1(input)
 	}
 	b.StopTimer()
-	return
 }
 
 // test Bowe subgroup check in G1
@@ -171,5 +170,4 @@ func BenchmarkCheckG1(b *testing.B) {
 		benchG1Test()
 	}
 	b.StopTimer()
-	return
 }

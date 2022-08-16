@@ -652,7 +652,7 @@ func (proc *testDKGProcessor) invalidVectorBroadcast(data []byte) {
 		// do not send the vector at all
 		return
 	case 3:
-		// wrong header, equivalent to not sending at all
+		// wrong header
 		newMsg.data[0] = byte(feldmanVSSShare)
 	case 4:
 		// send the vector after the first timeout, equivalent to not sending at all
