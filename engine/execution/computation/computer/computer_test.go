@@ -3,7 +3,6 @@ package computer_test
 import (
 	"context"
 	"fmt"
-	"math"
 	"math/rand"
 	"testing"
 
@@ -14,6 +13,10 @@ import (
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/stdlib"
 
+	"github.com/ipfs/go-cid"
+	"github.com/ipfs/go-datastore"
+	dssync "github.com/ipfs/go-datastore/sync"
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -33,9 +36,14 @@ import (
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/executiondatasync/provider"
+	"github.com/onflow/flow-go/module/executiondatasync/tracker"
+	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
 	modulemock "github.com/onflow/flow-go/module/mock"
+	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -64,16 +72,30 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(nil, nil, nil, nil).
 			Times(2 + 1) // 2 txs in collection + system chunk
 
-		metrics := new(modulemock.ExecutionMetrics)
-		metrics.On("ExecutionCollectionExecuted", mock.Anything, mock.Anything, mock.Anything).
+		exemetrics := new(modulemock.ExecutionMetrics)
+		exemetrics.On("ExecutionCollectionExecuted", mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).
 			Times(2) // 1 collection + system collection
 
-		metrics.On("ExecutionTransactionExecuted", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		exemetrics.On("ExecutionTransactionExecuted", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).
 			Times(2 + 1) // 2 txs in collection + system chunk tx
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, metrics, trace.NewNoopTracer(), zerolog.Nop(), committer)
+		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+		trackerStorage := new(mocktracker.Storage)
+		trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
+			return fn(func(uint64, ...cid.Cid) error { return nil })
+		})
+
+		prov := provider.NewProvider(
+			zerolog.Nop(),
+			metrics.NewNoopCollector(),
+			execution_data.DefaultSerializer,
+			bservice,
+			trackerStorage,
+		)
+
+		exe, err := computer.NewBlockComputer(vm, execCtx, exemetrics, trace.NewNoopTracer(), zerolog.Nop(), committer, prov)
 		require.NoError(t, err)
 
 		// create a block with 1 collection with 2 transactions
@@ -102,7 +124,21 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		vm := new(computermock.VirtualMachine)
 		committer := new(computermock.ViewCommitter)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer)
+		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+		trackerStorage := new(mocktracker.Storage)
+		trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
+			return fn(func(uint64, ...cid.Cid) error { return nil })
+		})
+
+		prov := provider.NewProvider(
+			zerolog.Nop(),
+			metrics.NewNoopCollector(),
+			execution_data.DefaultSerializer,
+			bservice,
+			trackerStorage,
+		)
+
+		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer, prov)
 		require.NoError(t, err)
 
 		// create an empty block
@@ -174,7 +210,21 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		comm := new(computermock.ViewCommitter)
 
-		exe, err := computer.NewBlockComputer(vm, ctx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), comm)
+		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+		trackerStorage := new(mocktracker.Storage)
+		trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
+			return fn(func(uint64, ...cid.Cid) error { return nil })
+		})
+
+		prov := provider.NewProvider(
+			zerolog.Nop(),
+			metrics.NewNoopCollector(),
+			execution_data.DefaultSerializer,
+			bservice,
+			trackerStorage,
+		)
+
+		exe, err := computer.NewBlockComputer(vm, ctx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), comm, prov)
 		require.NoError(t, err)
 
 		// create an empty block
@@ -199,7 +249,21 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		vm := new(computermock.VirtualMachine)
 		committer := new(computermock.ViewCommitter)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer)
+		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+		trackerStorage := new(mocktracker.Storage)
+		trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
+			return fn(func(uint64, ...cid.Cid) error { return nil })
+		})
+
+		prov := provider.NewProvider(
+			zerolog.Nop(),
+			metrics.NewNoopCollector(),
+			execution_data.DefaultSerializer,
+			bservice,
+			trackerStorage,
+		)
+
+		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer, prov)
 		require.NoError(t, err)
 
 		collectionCount := 2
@@ -345,7 +409,21 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		vm := fvm.NewVirtualMachine(emittingRuntime)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
+		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+		trackerStorage := new(mocktracker.Storage)
+		trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
+			return fn(func(uint64, ...cid.Cid) error { return nil })
+		})
+
+		prov := provider.NewProvider(
+			zerolog.Nop(),
+			metrics.NewNoopCollector(),
+			execution_data.DefaultSerializer,
+			bservice,
+			trackerStorage,
+		)
+
+		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
 		require.NoError(t, err)
 
 		view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
@@ -393,7 +471,21 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		vm := fvm.NewVirtualMachine(rt)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
+		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+		trackerStorage := new(mocktracker.Storage)
+		trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
+			return fn(func(uint64, ...cid.Cid) error { return nil })
+		})
+
+		prov := provider.NewProvider(
+			zerolog.Nop(),
+			metrics.NewNoopCollector(),
+			execution_data.DefaultSerializer,
+			bservice,
+			trackerStorage,
+		)
+
+		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
 		require.NoError(t, err)
 
 		block := generateBlock(0, 0, rag)
@@ -441,7 +533,21 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		vm := fvm.NewVirtualMachine(rt)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
+		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+		trackerStorage := new(mocktracker.Storage)
+		trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
+			return fn(func(uint64, ...cid.Cid) error { return nil })
+		})
+
+		prov := provider.NewProvider(
+			zerolog.Nop(),
+			metrics.NewNoopCollector(),
+			execution_data.DefaultSerializer,
+			bservice,
+			trackerStorage,
+		)
+
+		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
 		require.NoError(t, err)
 
 		const collectionCount = 2
@@ -518,7 +624,21 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		vm := fvm.NewVirtualMachine(rt)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
+		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+		trackerStorage := new(mocktracker.Storage)
+		trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
+			return fn(func(uint64, ...cid.Cid) error { return nil })
+		})
+
+		prov := provider.NewProvider(
+			zerolog.Nop(),
+			metrics.NewNoopCollector(),
+			execution_data.DefaultSerializer,
+			bservice,
+			trackerStorage,
+		)
+
+		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
 		require.NoError(t, err)
 
 		block := generateBlock(collectionCount, transactionCount, rag)
@@ -680,7 +800,7 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 	view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 		return ledger.Get(owner, key)
 	})
-	sth := state.NewStateHolder(state.NewState(view, meter.NewMeter(math.MaxUint64, math.MaxUint64)))
+	sth := state.NewStateHolder(state.NewState(view, meter.NewMeter(meter.DefaultParameters()), state.DefaultParameters()))
 	accounts := state.NewAccounts(sth)
 
 	// account creation, signing of transaction and bootstrapping ledger should not be required for this test
@@ -689,7 +809,21 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 	err = accounts.Create([]flow.AccountPublicKey{key.PublicKey(1000)}, address)
 	require.NoError(t, err)
 
-	exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
+	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+	trackerStorage := new(mocktracker.Storage)
+	trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
+		return fn(func(uint64, ...cid.Cid) error { return nil })
+	})
+
+	prov := provider.NewProvider(
+		zerolog.Nop(),
+		metrics.NewNoopCollector(),
+		execution_data.DefaultSerializer,
+		bservice,
+		trackerStorage,
+	)
+
+	exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
 	require.NoError(t, err)
 
 	block := generateBlockWithVisitor(1, 1, fag, func(txBody *flow.TransactionBody) {
@@ -732,6 +866,8 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		Return(nil, nil, nil, nil).
 		Times(1) // only system chunk
 
+	noopCollector := metrics.NewNoopCollector()
+
 	metrics := new(modulemock.ExecutionMetrics)
 	metrics.On("ExecutionCollectionExecuted", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil).
@@ -741,7 +877,21 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		Return(nil).
 		Times(1) // system chunk tx
 
-	exe, err := computer.NewBlockComputer(vm, execCtx, metrics, trace.NewNoopTracer(), zerolog.Nop(), committer)
+	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+	trackerStorage := new(mocktracker.Storage)
+	trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
+		return fn(func(uint64, ...cid.Cid) error { return nil })
+	})
+
+	prov := provider.NewProvider(
+		zerolog.Nop(),
+		noopCollector,
+		execution_data.DefaultSerializer,
+		bservice,
+		trackerStorage,
+	)
+
+	exe, err := computer.NewBlockComputer(vm, execCtx, metrics, trace.NewNoopTracer(), zerolog.Nop(), committer, prov)
 	require.NoError(t, err)
 
 	// create empty block, it will have system collection attached while executing

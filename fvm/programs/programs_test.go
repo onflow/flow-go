@@ -1,7 +1,6 @@
 package programs
 
 import (
-	"math"
 	"testing"
 
 	"github.com/onflow/cadence/runtime/ast"
@@ -27,7 +26,9 @@ func Test_Programs(t *testing.T) {
 
 	newState := state.NewState(
 		utils.NewSimpleView(),
-		meter.NewMeter(math.MaxUint64, math.MaxUint64))
+		meter.NewMeter(meter.DefaultParameters()),
+		state.DefaultParameters(),
+	)
 
 	addressLocation := common.AddressLocation{
 		Address: common.MustBytesToAddress([]byte{2, 3, 4}),
@@ -60,7 +61,7 @@ func Test_Programs(t *testing.T) {
 		require.NotNil(t, retrieved)
 		require.True(t, has)
 
-		programs.Cleanup(nil)
+		programs.Cleanup(ModifiedSets{})
 
 		retrieved, _, has = programs.Get(someLocation)
 		require.NotNil(t, retrieved)
@@ -100,8 +101,58 @@ func Test_Programs(t *testing.T) {
 		require.NotNil(t, retrieved)
 		require.True(t, has)
 
-		// we don't care about the changed program, just their amount (for now)
-		programs.Cleanup([]ContractUpdateKey{{}, {}})
+		programs.Cleanup(ModifiedSets{
+			// we don't care about the changed program, just their amount (for
+			// now)
+			[]ContractUpdateKey{{}, {}},
+			nil,
+		})
+
+		retrieved, _, has = programs.Get(someLocation)
+		require.Nil(t, retrieved)
+		require.False(t, has)
+
+		retrieved, _, has = programs.Get(addressLocation)
+		require.Nil(t, retrieved)
+		require.False(t, has)
+
+		retrieved, _, has = programs.Get(parentLocation)
+		require.Nil(t, retrieved)
+		require.False(t, has)
+	})
+
+	t.Run("cleanup with frozen accounts", func(t *testing.T) {
+
+		parentLocation := common.AddressLocation{
+			Address: common.MustBytesToAddress([]byte{3, 4, 5}),
+			Name:    "parent",
+		}
+
+		parent := NewEmptyPrograms()
+		parent.Set(parentLocation, &interpreter.Program{}, newState)
+
+		programs := parent.ChildPrograms()
+		programs.Set(someLocation, someProgram, newState)
+		programs.Set(addressLocation, &interpreter.Program{}, newState)
+
+		retrieved, _, has := programs.Get(someLocation)
+		require.NotNil(t, retrieved)
+		require.True(t, has)
+
+		retrieved, _, has = programs.Get(addressLocation)
+		require.NotNil(t, retrieved)
+		require.True(t, has)
+
+		retrieved, _, has = programs.Get(parentLocation)
+		require.NotNil(t, retrieved)
+		require.True(t, has)
+
+		programs.Cleanup(ModifiedSets{
+			nil,
+			// For now, we don't care about the frozen account's address, just
+			// their presences.
+			make([]common.Address, 1),
+		})
 
 		retrieved, _, has = programs.Get(someLocation)
 		require.Nil(t, retrieved)
@@ -164,7 +215,10 @@ func Test_Programs(t *testing.T) {
 		child := parent.ChildPrograms()
 		require.False(t, child.HasChanges())
 
-		child.Cleanup([]ContractUpdateKey{{}, {}})
+		child.Cleanup(ModifiedSets{
+			[]ContractUpdateKey{{}, {}},
+			nil,
+		})
 		require.True(t, child.HasChanges())
 
 		child = parent.ChildPrograms()
