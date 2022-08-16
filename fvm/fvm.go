@@ -45,12 +45,21 @@ func NewVirtualMachine(rt runtime.Runtime) *VirtualMachine {
 
 // Run runs a procedure against a ledger in the given context.
 func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, programs *programs.Programs) (err error) {
+	meterParams, err := getEnvironmentMeterParameters(
+		vm,
+		ctx,
+		v,
+		programs,
+		uint(proc.ComputationLimit(ctx)),
+		proc.MemoryLimit(ctx),
+	)
+	if err != nil {
+		return fmt.Errorf("error gettng environment meter parameters: %w", err)
+	}
+
 	st := state.NewState(
 		v,
-		meter.NewMeter(
-			meter.DefaultParameters().
-				WithComputationLimit(uint(proc.ComputationLimit(ctx))).
-				WithMemoryLimit(proc.MemoryLimit(ctx))),
+		meter.NewMeter(meterParams),
 		state.DefaultParameters().
 			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
 			WithMaxValueSizeAllowed(ctx.MaxStateValueSize).

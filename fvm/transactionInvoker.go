@@ -78,16 +78,13 @@ func (i *TransactionInvoker) Process(
 		sth.SetActiveState(parentState)
 	}()
 
-	env, err := NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
-	if err != nil {
-		return fmt.Errorf("error creating new environment: %w", err)
-	}
+	env := NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
 	predeclaredValues := valueDeclarations(env)
 
 	location := common.TransactionLocation(proc.ID)
 
 	var txError error
-	err = vm.Runtime.ExecuteTransaction(
+	err := vm.Runtime.ExecuteTransaction(
 		runtime.Script{
 			Source:    proc.Transaction.Script,
 			Arguments: proc.Transaction.Arguments,
@@ -163,10 +160,7 @@ func (i *TransactionInvoker) Process(
 			Msg("transaction executed with error")
 
 		// reset env
-		env, err = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
-		if err != nil {
-			return fmt.Errorf("error creating new environment: %w", err)
-		}
+		env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
 
 		// try to deduct fees again, to get the fee deduction events
 		feesError = i.deductTransactionFees(env, proc, sth, computationUsed)
