@@ -26,7 +26,9 @@ func Test_Programs(t *testing.T) {
 
 	newState := state.NewState(
 		utils.NewSimpleView(),
-		meter.NewMeter(meter.DefaultParameters()))
+		meter.NewMeter(meter.DefaultParameters()),
+		state.DefaultParameters(),
+	)
 
 	addressLocation := common.AddressLocation{
 		Address: common.MustBytesToAddress([]byte{2, 3, 4}),

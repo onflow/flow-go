@@ -22,6 +22,7 @@ func TestTransactionVerification(t *testing.T) {
 	sth := state.NewStateHolder(state.NewState(
 		ledger,
 		meter.NewMeter(meter.DefaultParameters()),
+		state.DefaultParameters(),
 	))
 	accounts := state.NewAccounts(sth)
 

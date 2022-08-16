@@ -27,8 +27,9 @@ func makeTwoAccounts(t *testing.T, aPubKeys []flow.AccountPublicKey, bPubKeys []
 	ledger := utils.NewSimpleView()
 	sth := state.NewStateHolder(state.NewState(
 		ledger,
-		meter.NewMeter(meter.DefaultParameters())),
-	)
+		meter.NewMeter(meter.DefaultParameters()),
+		state.DefaultParameters(),
+	))
 
 	a := flow.HexToAddress("1234")
 	b := flow.HexToAddress("5678")
@@ -408,6 +409,7 @@ func TestAccountFreezing(t *testing.T) {
 		accountsService := state.NewAccounts(state.NewStateHolder(state.NewState(
 			ledger,
 			meter.NewMeter(meter.DefaultParameters()),
+			state.DefaultParameters(),
 		)))
 
 		frozen, err := accountsService.GetAccountFrozen(address)
@@ -439,6 +441,7 @@ func TestAccountFreezing(t *testing.T) {
 		accountsService = state.NewAccounts(state.NewStateHolder(state.NewState(
 			ledger,
 			meter.NewMeter(meter.DefaultParameters()),
+			state.DefaultParameters(),
 		)))
 
 		frozen, err = accountsService.GetAccountFrozen(serviceAddress)

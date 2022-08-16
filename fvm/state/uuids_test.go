@@ -13,7 +13,7 @@ import (
 func TestUUIDs_GetAndSetUUID(t *testing.T) {
 	view := utils.NewSimpleView()
 	meter := meter.NewMeter(meter.DefaultParameters())
-	sth := state.NewStateHolder(state.NewState(view, meter))
+	sth := state.NewStateHolder(state.NewState(view, meter, state.DefaultParameters()))
 	uuidsA := state.NewUUIDGenerator(sth)
 
 	uuid, err := uuidsA.GetUUID() // start from zero
@@ -34,7 +34,7 @@ func TestUUIDs_GetAndSetUUID(t *testing.T) {
 func Test_GenerateUUID(t *testing.T) {
 	view := utils.NewSimpleView()
 	meter := meter.NewMeter(meter.DefaultParameters())
-	sth := state.NewStateHolder(state.NewState(view, meter))
+	sth := state.NewStateHolder(state.NewState(view, meter, state.DefaultParameters()))
 	genA := state.NewUUIDGenerator(sth)
 
 	uuidA, err := genA.GenerateUUID()
