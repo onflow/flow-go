@@ -12,10 +12,11 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 )
 
 func TestObserver(t *testing.T) {
