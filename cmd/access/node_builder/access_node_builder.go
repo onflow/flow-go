@@ -396,6 +396,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 	var bs network.BlobService
 	var processedBlockHeight storage.ConsumerProgress
 	var processedNotifications storage.ConsumerProgress
+	var bsDependable *module.ProxiedReadyDoneAware
 
 	builder.
 		Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
@@ -427,6 +428,11 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 		Module("processed notifications consumer progress", func(node *cmd.NodeConfig) error {
 			// uses the datastore's DB
 			processedNotifications = bstorage.NewConsumerProgress(ds.DB, module.ConsumeProgressExecutionDataRequesterNotification)
+			return nil
+		}).
+		Module("blobservice peer manager dependencies", func(node *cmd.NodeConfig) error {
+			bsDependable = module.NewProxiedReadyDoneAware()
+			builder.PeerManagerDependencies = append(builder.PeerManagerDependencies, bsDependable)
 			return nil
 		}).
 		Component("execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {

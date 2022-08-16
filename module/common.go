@@ -2,6 +2,7 @@ package module
 
 import (
 	"errors"
+	"sync"
 
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
@@ -43,6 +44,48 @@ func (n *NoopReadyDoneAware) Done() <-chan struct{} {
 	done := make(chan struct{})
 	defer close(done)
 	return done
+}
+
+// ProxiedReadyDoneAware is a ReadyDoneAware implementation that proxies the ReadyDoneAware interface
+// from another implementation. This allows for usecases where the Ready/Done methods are needed before
+// the proxied object is initialized.
+type ProxiedReadyDoneAware struct {
+	ready chan struct{}
+	done  chan struct{}
+
+	initOnce sync.Once
+}
+
+// NewProxiedReadyDoneAware returns a new ProxiedReadyDoneAware instance
+func NewProxiedReadyDoneAware() *ProxiedReadyDoneAware {
+	return &ProxiedReadyDoneAware{
+		ready: make(chan struct{}),
+		done:  make(chan struct{}),
+	}
+}
+
+// Init adds the proxied ReadyDoneAware implementation and sets up the ready/done channels
+// to close when the respective channel on the proxied object closes.
+// Init can only be called once.
+func (n *ProxiedReadyDoneAware) Init(rda ReadyDoneAware) {
+	n.initOnce.Do(func() {
+		go func() {
+			defer close(n.ready)
+			<-rda.Ready()
+		}()
+		go func() {
+			defer close(n.done)
+			<-rda.Done()
+		}()
+	})
+}
+
+func (n *ProxiedReadyDoneAware) Ready() <-chan struct{} {
+	return n.ready
+}
+
+func (n *ProxiedReadyDoneAware) Done() <-chan struct{} {
+	return n.done
 }
 
 var ErrMultipleStartup = errors.New("component may only be started once")
