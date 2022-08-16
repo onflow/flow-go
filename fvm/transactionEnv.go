@@ -5,13 +5,11 @@ import (
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/blueprints"
-	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/handler"
@@ -225,129 +223,6 @@ func (e *TransactionEnv) isAuthorizer(address runtime.Address) bool {
 	return false
 }
 
-func (e *TransactionEnv) GetStorageCapacity(address common.Address) (value uint64, err error) {
-	defer e.StartSpanFromRoot(trace.FVMEnvGetStorageCapacity).End()
-
-	err = e.Meter(meter.ComputationKindGetStorageCapacity, 1)
-	if err != nil {
-		return value, fmt.Errorf("get storage capacity failed: %w", err)
-	}
-
-	result, invokeErr := InvokeAccountStorageCapacityContract(
-		e,
-		address)
-	if invokeErr != nil {
-		return 0, errors.HandleRuntimeError(invokeErr)
-	}
-
-	return storageMBUFixToBytesUInt(result), nil
-}
-
-func (e *TransactionEnv) GetAccountBalance(address common.Address) (value uint64, err error) {
-	defer e.StartSpanFromRoot(trace.FVMEnvGetAccountBalance).End()
-
-	err = e.Meter(meter.ComputationKindGetAccountBalance, 1)
-	if err != nil {
-		return value, fmt.Errorf("get account balance failed: %w", err)
-	}
-
-	result, invokeErr := InvokeAccountBalanceContract(e, address)
-	if invokeErr != nil {
-		return 0, errors.HandleRuntimeError(invokeErr)
-	}
-	return result.ToGoValue().(uint64), nil
-}
-
-func (e *TransactionEnv) GetAccountAvailableBalance(address common.Address) (value uint64, err error) {
-	defer e.StartSpanFromRoot(trace.FVMEnvGetAccountBalance).End()
-
-	err = e.Meter(meter.ComputationKindGetAccountAvailableBalance, 1)
-	if err != nil {
-		return value, fmt.Errorf("get account available balance failed: %w", err)
-	}
-
-	result, invokeErr := InvokeAccountAvailableBalanceContract(
-		e,
-		address)
-
-	if invokeErr != nil {
-		return 0, errors.HandleRuntimeError(invokeErr)
-	}
-	return result.ToGoValue().(uint64), nil
-}
-
-func (e *TransactionEnv) ResolveLocation(
-	identifiers []runtime.Identifier,
-	location runtime.Location,
-) ([]runtime.ResolvedLocation, error) {
-	defer e.StartExtensiveTracingSpanFromRoot(trace.FVMEnvResolveLocation).End()
-
-	err := e.Meter(meter.ComputationKindResolveLocation, 1)
-	if err != nil {
-		return nil, fmt.Errorf("resolve location failed: %w", err)
-	}
-
-	addressLocation, isAddress := location.(common.AddressLocation)
-
-	// if the location is not an address location, e.g. an identifier location (`import Crypto`),
-	// then return a single resolved location which declares all identifiers.
-	if !isAddress {
-		return []runtime.ResolvedLocation{
-			{
-				Location:    location,
-				Identifiers: identifiers,
-			},
-		}, nil
-	}
-
-	// if the location is an address,
-	// and no specific identifiers where requested in the import statement,
-	// then fetch all identifiers at this address
-	if len(identifiers) == 0 {
-		address := flow.Address(addressLocation.Address)
-
-		err := e.accounts.CheckAccountNotFrozen(address)
-		if err != nil {
-			return nil, fmt.Errorf("resolving location failed: %w", err)
-		}
-
-		contractNames, err := e.contracts.GetContractNames(addressLocation.Address)
-		if err != nil {
-			return nil, fmt.Errorf("resolving location failed: %w", err)
-		}
-
-		// if there are no contractNames deployed,
-		// then return no resolved locations
-		if len(contractNames) == 0 {
-			return nil, nil
-		}
-
-		identifiers = make([]ast.Identifier, len(contractNames))
-
-		for i := range identifiers {
-			identifiers[i] = runtime.Identifier{
-				Identifier: contractNames[i],
-			}
-		}
-	}
-
-	// return one resolved location per identifier.
-	// each resolved location is an address contract location
-	resolvedLocations := make([]runtime.ResolvedLocation, len(identifiers))
-	for i := range resolvedLocations {
-		identifier := identifiers[i]
-		resolvedLocations[i] = runtime.ResolvedLocation{
-			Location: common.AddressLocation{
-				Address: addressLocation.Address,
-				Name:    identifier.Identifier,
-			},
-			Identifiers: []runtime.Identifier{identifier},
-		}
-	}
-
-	return resolvedLocations, nil
-}
-
 func (e *TransactionEnv) EmitEvent(event cadence.Event) error {
 	defer e.StartExtensiveTracingSpanFromRoot(trace.FVMEnvEmitEvent).End()
 
@@ -370,13 +245,6 @@ func (e *TransactionEnv) ServiceEvents() []flow.Event {
 func (e *TransactionEnv) Meter(kind common.ComputationKind, intensity uint) error {
 	if e.sth.EnforceComputationLimits() {
 		return e.sth.MeterComputation(kind, intensity)
-	}
-	return nil
-}
-
-func (e *TransactionEnv) meterMemory(kind common.MemoryKind, intensity uint) error {
-	if e.sth.EnforceMemoryLimits() {
-		return e.sth.MeterMemory(kind, intensity)
 	}
 	return nil
 }
@@ -406,48 +274,6 @@ func (e *TransactionEnv) SetAccountFrozen(address common.Address, frozen bool) e
 
 	return nil
 }
-
-func (e *TransactionEnv) VerifySignature(
-	signature []byte,
-	tag string,
-	signedData []byte,
-	publicKey []byte,
-	signatureAlgorithm runtime.SignatureAlgorithm,
-	hashAlgorithm runtime.HashAlgorithm,
-) (bool, error) {
-	defer e.StartSpanFromRoot(trace.FVMEnvVerifySignature).End()
-
-	err := e.Meter(meter.ComputationKindVerifySignature, 1)
-	if err != nil {
-		return false, fmt.Errorf("verify signature failed: %w", err)
-	}
-
-	valid, err := crypto.VerifySignatureFromRuntime(
-		signature,
-		tag,
-		signedData,
-		publicKey,
-		signatureAlgorithm,
-		hashAlgorithm,
-	)
-
-	if err != nil {
-		return false, fmt.Errorf("verify signature failed: %w", err)
-	}
-
-	return valid, nil
-}
-
-func (e *TransactionEnv) ValidatePublicKey(pk *runtime.PublicKey) error {
-	err := e.Meter(meter.ComputationKindValidatePublicKey, 1)
-	if err != nil {
-		return fmt.Errorf("validate public key failed: %w", err)
-	}
-
-	return crypto.ValidatePublicKey(pk.SignAlgo, pk.PublicKey)
-}
-
-// Block Environment Functions
 
 func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.Address, err error) {
 	defer e.StartSpanFromRoot(trace.FVMEnvCreateAccount).End()
@@ -564,26 +390,6 @@ func (e *TransactionEnv) AddAccountKey(
 	}
 
 	return accKey, nil
-}
-
-// GetAccountKey retrieves a public key by index from an existing account.
-//
-// This function returns a nil key with no errors, if a key doesn't exist at the given index.
-// An error is returned if the specified account does not exist, the provided index is not valid,
-// or if the key retrieval fails.
-func (e *TransactionEnv) GetAccountKey(address runtime.Address, keyIndex int) (*runtime.AccountKey, error) {
-	defer e.StartSpanFromRoot(trace.FVMEnvGetAccountKey).End()
-
-	err := e.Meter(meter.ComputationKindGetAccountKey, 1)
-	if err != nil {
-		return nil, fmt.Errorf("get account key failed: %w", err)
-	}
-
-	accKey, err := e.accountKeys.GetAccountKey(address, keyIndex)
-	if err != nil {
-		return nil, fmt.Errorf("get account key failed: %w", err)
-	}
-	return accKey, err
 }
 
 // RevokeAccountKey revokes a public key by index from an existing account,
