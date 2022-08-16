@@ -16,11 +16,15 @@ import (
 // Components consuming protocol events which cannot tolerate missed events
 // must implement initialization logic which accounts for any missed events.
 //
+// EXAMPLE:
+// Suppose block A is finalized at height 100. If the BlockFinalized(A) event is
+// dropped due to a crash, then when the node restarts, the latest finalized block
+// in the Protocol State is guaranteed to be A.
+//
 // CAUTION: Protocol event subscriber callbacks are invoked synchronously in the
 // critical path of protocol state mutations. Most subscribers should immediately
 // spawn a goroutine to handle the notification to avoid blocking protocol state
 // progression, especially for frequent protocol events (eg. BlockFinalized).
-// TODO deliver protocol events async https://github.com/dapperlabs/flow-go/issues/6317
 //
 // NOTE: the epoch-related callbacks are only called once the fork containing
 // the relevant event has been finalized.
