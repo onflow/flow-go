@@ -118,6 +118,10 @@ func (b *Blocks) UpdateLastFullBlockHeight(height uint64) error {
 			return nil
 		}
 
+		if errors.Is(err, storage.ErrAlreadyExists) {
+			return nil
+		}
+
 		if !errors.Is(err, storage.ErrNotFound) {
 			return fmt.Errorf("could not update LastFullBlockHeight: %w", err)
 		}
