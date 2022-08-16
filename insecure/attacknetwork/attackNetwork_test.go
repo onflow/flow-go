@@ -135,7 +135,7 @@ func testAttackNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegr
 func matchEventForMessage(t *testing.T, egressEvents []*insecure.EgressEvent, message *insecure.Message, corruptedId flow.Identifier) {
 	codec := unittest.NetworkCodec()
 
-	require.Equal(t, corruptedId[:], message.Egress.OriginID[:])
+	require.Equal(t, corruptedId[:], message.Egress.CorruptOriginID[:])
 
 	for _, egressEvent := range egressEvents {
 		if egressEvent.CorruptOriginId == corruptedId {

@@ -52,7 +52,7 @@ func TestConnectorHappyPath_Send(t *testing.T) {
 			// are filled by gRPC on the fly, which are not relevant to the test's sanity.
 			require.Equal(t, receivedMsg.Egress.Payload, msg.Egress.Payload)
 			require.Equal(t, receivedMsg.Egress.Protocol, msg.Egress.Protocol)
-			require.Equal(t, receivedMsg.Egress.OriginID, msg.Egress.OriginID)
+			require.Equal(t, receivedMsg.Egress.CorruptOriginID, msg.Egress.CorruptOriginID)
 			require.Equal(t, receivedMsg.Egress.TargetNum, msg.Egress.TargetNum)
 			require.Equal(t, receivedMsg.Egress.TargetIDs, msg.Egress.TargetIDs)
 			require.Equal(t, receivedMsg.Egress.ChannelID, msg.Egress.ChannelID)
@@ -101,7 +101,7 @@ func TestConnectorHappyPath_Receive(t *testing.T) {
 				// are filled by gRPC on the fly, which are not relevant to the test's sanity.
 				require.Equal(t, receivedMsg.Egress.Payload, msg.Egress.Payload)
 				require.Equal(t, receivedMsg.Egress.Protocol, msg.Egress.Protocol)
-				require.Equal(t, receivedMsg.Egress.OriginID, msg.Egress.OriginID)
+				require.Equal(t, receivedMsg.Egress.CorruptOriginID, msg.Egress.CorruptOriginID)
 				require.Equal(t, receivedMsg.Egress.TargetNum, msg.Egress.TargetNum)
 				require.Equal(t, receivedMsg.Egress.TargetIDs, msg.Egress.TargetIDs)
 				require.Equal(t, receivedMsg.Egress.ChannelID, msg.Egress.ChannelID)
