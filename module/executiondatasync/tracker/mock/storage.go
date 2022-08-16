@@ -54,8 +54,8 @@ func (_m *Storage) GetPrunedHeight() (uint64, error) {
 	return r0, r1
 }
 
-// Prune provides a mock function with given fields: height
-func (_m *Storage) Prune(height uint64) error {
+// PruneUpToHeight provides a mock function with given fields: height
+func (_m *Storage) PruneUpToHeight(height uint64) error {
 	ret := _m.Called(height)
 
 	var r0 error
