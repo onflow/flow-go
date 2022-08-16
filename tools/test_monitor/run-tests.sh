@@ -29,7 +29,7 @@ else
     case $TEST_CATEGORY in
         unit)
           echo "running unittest-main">&2
-          make -s unittest-main
+          make unittest-main
         ;;
         unit-crypto)
           echo "running crypto unit tests">&2
