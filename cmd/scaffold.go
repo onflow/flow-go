@@ -90,6 +90,7 @@ type namedComponentFunc struct {
 	name string
 
 	errorHandler component.OnError
+	dependencies []module.ReadyDoneAware
 }
 
 // FlowNodeBuilder is the default builder struct used for all flow nodes
@@ -294,14 +295,15 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		return fnb.InitFlowNetworkWithConduitFactory(node, fnb.ConduitFactory)
 	})
 
-	fnb.Component("peer manager", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		// TODO: make this component start after its dependencies are ready. This will require a dependable type of component
-		// Depends on:
-		// * middleware
-		// * network
-		// * bitswap
-		return fnb.LibP2PNode.PeerManagerComponent(), nil
+	fnb.Module("middleware dependency", func(node *NodeConfig) error {
+		fnb.middlewareDependable = module.NewProxiedReadyDoneAware()
+		fnb.PeerManagerDependencies = append(fnb.PeerManagerDependencies, fnb.middlewareDependable)
+		return nil
 	})
+
+	fnb.DependableComponent("peer manager", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		return fnb.LibP2PNode.PeerManagerComponent(), nil
+	}, fnb.PeerManagerDependencies)
 }
 
 func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, cf network.ConduitFactory) (network.Network, error) {
@@ -370,6 +372,11 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 	}
 
 	fnb.Network = net
+
+	// register middleware's ReadyDoneAware interface so other components can depend on it for startup
+	if fnb.middlewareDependable != nil {
+		fnb.middlewareDependable.Init(fnb.Middleware)
+	}
 
 	idEvents := gadgets.NewIdentityDeltas(fnb.Middleware.UpdateNodeAddresses)
 	fnb.ProtocolEvents.AddConsumer(idEvents)
@@ -967,8 +974,16 @@ func (fnb *FlowNodeBuilder) handleComponents() error {
 	close(parent)
 
 	var err error
+	asyncComponents := []namedComponentFunc{}
+
 	// Run all components
 	for _, f := range fnb.components {
+		// Components with explicit dependencies are not started serially
+		if len(f.dependencies) > 0 {
+			asyncComponents = append(asyncComponents, f)
+			continue
+		}
+
 		started := make(chan struct{})
 
 		if f.errorHandler != nil {
@@ -983,6 +998,13 @@ func (fnb *FlowNodeBuilder) handleComponents() error {
 
 		parent = started
 	}
+
+	// Components with explicit dependencies are run asynchronously, which means dependencies in
+	// the dependency list must be initialized outside of the component factory.
+	for _, f := range asyncComponents {
+		err = fnb.handleComponent(f, util.AllReady(f.dependencies...), func() {})
+	}
+
 	return nil
 }
 
@@ -999,14 +1021,14 @@ func (fnb *FlowNodeBuilder) handleComponents() error {
 // using their ReadyDoneAware interface. After components are updated to use the idempotent
 // ReadyDoneAware interface and explicitly wait for their dependencies to be ready, we can remove
 // this channel chaining.
-func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc, parentReady <-chan struct{}, started func()) error {
+func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc, dependencies <-chan struct{}, started func()) error {
 	// Add a closure that starts the component when the node is started, and then waits for it to exit
 	// gracefully.
 	// Startup for all components will happen in parallel, and components can use their dependencies'
 	// ReadyDoneAware interface to wait until they are ready.
 	fnb.componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-		// wait for the previous component to be ready before starting
-		if err := util.WaitClosed(ctx, parentReady); err != nil {
+		// wait for the dependencies to be ready before starting
+		if err := util.WaitClosed(ctx, dependencies); err != nil {
 			return
 		}
 
@@ -1160,6 +1182,28 @@ func (fnb *FlowNodeBuilder) Component(name string, f ReadyDoneFactory) NodeBuild
 	fnb.components = append(fnb.components, namedComponentFunc{
 		fn:   f,
 		name: name,
+	})
+	return fnb
+}
+
+// DependableComponent adds a new component to the node that conforms to the ReadyDoneAware
+// interface. The builder will wait until all of the components in the dependencies list are ready
+// before constructing the component.
+//
+// The ReadyDoneFactory may return either a `Component` or `ReadyDoneAware` instance.
+// In both cases, the object is started when the node is run, and the node will wait for the
+// component to exit gracefully.
+//
+// IMPORTANT: All dependencies' `Ready()` method MUST be idempotent since it will be called more than
+// once and in no guaranteed order.
+//
+// Dependable components are started in parallel with no guaranteed run order, so all dependencies
+// must be initialized outside of the ReadyDoneFactory.
+func (fnb *FlowNodeBuilder) DependableComponent(name string, f ReadyDoneFactory, dependencies []module.ReadyDoneAware) NodeBuilder {
+	fnb.components = append(fnb.components, namedComponentFunc{
+		fn:           f,
+		name:         name,
+		dependencies: dependencies,
 	})
 	return fnb
 }

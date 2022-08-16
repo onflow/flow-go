@@ -198,6 +198,9 @@ type NodeConfig struct {
 	StakingKey        crypto.PrivateKey
 	NetworkKey        crypto.PrivateKey
 
+	middlewareDependable    *module.ProxiedReadyDoneAware
+	PeerManagerDependencies []module.ReadyDoneAware
+
 	// ID providers
 	IdentityProvider             id.IdentityProvider
 	IDTranslator                 p2p.IDTranslator

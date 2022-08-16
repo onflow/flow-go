@@ -397,6 +397,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 	var bs network.BlobService
 	var processedBlockHeight storage.ConsumerProgress
 	var processedNotifications storage.ConsumerProgress
+	var bsDependable *module.ProxiedReadyDoneAware
 
 	builder.
 		Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
@@ -429,12 +430,21 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			processedNotifications = bstorage.NewConsumerProgress(ds.DB, module.ConsumeProgressExecutionDataRequesterNotification)
 			return nil
 		}).
+		Module("blobservice peer manager dependencies", func(node *cmd.NodeConfig) error {
+			bsDependable = module.NewProxiedReadyDoneAware()
+			builder.PeerManagerDependencies = append(builder.PeerManagerDependencies, bsDependable)
+			return nil
+		}).
 		Component("execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			var err error
 			bs, err = node.Network.RegisterBlobService(channels.ExecutionDataService, ds)
 			if err != nil {
 				return nil, fmt.Errorf("could not register blob service: %w", err)
 			}
+
+			// add blobservice into ReadyDoneAware dependency passed to peer manager
+			// this configures peer manager to wait for the blobservice to be ready before starting
+			bsDependable.Init(bs)
 
 			decMode, err := cborlib.DecOptions{
 				MaxArrayElements: math.MaxInt64,
