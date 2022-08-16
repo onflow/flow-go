@@ -3,9 +3,10 @@ package main
 import (
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io/fs"
 	"net"
 	"os"
 	"path/filepath"
@@ -183,7 +184,7 @@ func displayPortAssignments() {
 
 func prepareCommonHostFolders() {
 	for _, dir := range []string{BootstrapDir, ProfilerDir, DataDir, TrieDir} {
-		if err := os.RemoveAll(dir); err != nil && !os.IsNotExist(err) {
+		if err := os.RemoveAll(dir); err != nil && !errors.Is(err, fs.ErrNotExist) {
 			panic(err)
 		}
 
@@ -297,7 +298,7 @@ func prepareServiceDirs(role string, nodeId string) (string, string) {
 	}
 
 	err := os.MkdirAll(dataDir, 0755)
-	if err != nil && !os.IsExist(err) {
+	if err != nil && !errors.Is(err, fs.ErrExist) {
 		panic(err)
 	}
 
@@ -307,7 +308,7 @@ func prepareServiceDirs(role string, nodeId string) (string, string) {
 		profilerDir = "./" + filepath.Join(ProfilerDir, role, nodeId)
 	}
 	err = os.MkdirAll(profilerDir, 0755)
-	if err != nil && !os.IsExist(err) {
+	if err != nil && !errors.Is(err, fs.ErrExist) {
 		panic(err)
 	}
 
@@ -398,7 +399,7 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 	// create the execution state dir for the node
 	trieDir := "./" + filepath.Join(TrieDir, container.Role.String(), container.NodeID.String())
 	err := os.MkdirAll(trieDir, 0755)
-	if err != nil && !os.IsExist(err) {
+	if err != nil && !errors.Is(err, fs.ErrExist) {
 		panic(err)
 	}
 
@@ -661,7 +662,7 @@ func writeObserverPrivateKey(observerName string) {
 
 	// write to file
 	outputFile := fmt.Sprintf("%s/private-root-information/%s_key", BootstrapDir, observerName)
-	err = ioutil.WriteFile(outputFile, output, 0600)
+	err = os.WriteFile(outputFile, output, 0600)
 	if err != nil {
 		panic(err)
 	}
