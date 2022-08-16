@@ -105,10 +105,11 @@ func (m *Message) GetIngress() *IngressMessage {
 	return nil
 }
 
-// EgressMessage represents the message exchanged between the CorruptibleConduitFactory and Attacker services.
-// CorruptOriginID for EgressMessage represents the corrupt node id where the message is coming from.
+// EgressMessage represents an outgoing message from a corrupt node to another (honest or corrupt) node.
+// The exchanged message is between the CorruptibleConduitFactory and Attacker services.
 type EgressMessage struct {
-	ChannelID            string   `protobuf:"bytes,1,opt,name=ChannelID,proto3" json:"ChannelID,omitempty"`
+	ChannelID string `protobuf:"bytes,1,opt,name=ChannelID,proto3" json:"ChannelID,omitempty"`
+	// CorruptOriginID represents the corrupt node id where the outgoing message is coming from.
 	CorruptOriginID      []byte   `protobuf:"bytes,2,opt,name=CorruptOriginID,proto3" json:"CorruptOriginID,omitempty"`
 	TargetNum            uint32   `protobuf:"varint,3,opt,name=TargetNum,proto3" json:"TargetNum,omitempty"`
 	TargetIDs            [][]byte `protobuf:"bytes,4,rep,name=TargetIDs,proto3" json:"TargetIDs,omitempty"`
@@ -186,9 +187,10 @@ func (m *EgressMessage) GetProtocol() Protocol {
 	return Protocol_UNKNOWN
 }
 
-// OriginID for IngressMessage represents the node id where the message is coming from - that node could be corrupt or honest.
+// IngressMessage represents an incoming message from another node (honest or corrupt) to a corrupt node.
 type IngressMessage struct {
-	ChannelID            string   `protobuf:"bytes,1,opt,name=ChannelID,proto3" json:"ChannelID,omitempty"`
+	ChannelID string `protobuf:"bytes,1,opt,name=ChannelID,proto3" json:"ChannelID,omitempty"`
+	// OriginID represents the node id where the incoming message is coming from - that node could be corrupt or honest.
 	OriginID             []byte   `protobuf:"bytes,2,opt,name=OriginID,proto3" json:"OriginID,omitempty"`
 	CorruptTargetID      []byte   `protobuf:"bytes,3,opt,name=CorruptTargetID,proto3" json:"CorruptTargetID,omitempty"`
 	Payload              []byte   `protobuf:"bytes,4,opt,name=Payload,proto3" json:"Payload,omitempty"`
