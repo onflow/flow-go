@@ -206,7 +206,7 @@ func (m *Middleware) isStakedPeerFilter() peerFilterFunc {
 }
 
 func (m *Middleware) NewBlobService(channel channels.Channel, ds datastore.Batching, opts ...network.BlobServiceOption) network.BlobService {
-	return NewBlobService(m.libP2PNode.Host(), m.libP2PNode.routing, channel.String(), ds, m.bitswapMetrics, opts...)
+	return NewBlobService(m.libP2PNode.Host(), m.libP2PNode.routing, channel.String(), ds, m.bitswapMetrics, m.log, opts...)
 }
 
 func (m *Middleware) NewPingService(pingProtocol protocol.ID, provider network.PingInfoProvider) network.PingService {
