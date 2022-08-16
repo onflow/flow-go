@@ -21,6 +21,8 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
+
+	ipld "github.com/ipfs/go-ipld-format"
 )
 
 type blobService struct {
@@ -123,7 +125,7 @@ func (bs *blobService) TriggerReprovide(ctx context.Context) error {
 
 func (bs *blobService) GetBlob(ctx context.Context, c cid.Cid) (blobs.Blob, error) {
 	blob, err := bs.blockService.GetBlock(ctx, c)
-	if err == blockservice.ErrNotFound {
+	if ipld.IsNotFound(err) {
 		return nil, network.ErrBlobNotFound
 	}
 
