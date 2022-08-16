@@ -1350,8 +1350,6 @@ func (fnb *FlowNodeBuilder) onStart() error {
 
 	fnb.initLogger()
 
-	fnb.initProfiler()
-
 	fnb.initDB()
 	fnb.initSecretsDB()
 
@@ -1366,6 +1364,8 @@ func (fnb *FlowNodeBuilder) onStart() error {
 	}
 
 	fnb.initState()
+
+	fnb.initProfiler()
 
 	fnb.initFvmOptions()
 
