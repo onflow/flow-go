@@ -11,8 +11,8 @@ import (
 
 	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/insecure"
-	"github.com/onflow/flow-go/insecure/attacknetwork"
 	"github.com/onflow/flow-go/insecure/corruptible"
+	"github.com/onflow/flow-go/insecure/orchestrator"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -150,9 +150,9 @@ func withAttackOrchestrator(t *testing.T, corruptedIds flow.IdentityList, corrup
 	run func(t *testing.T)) {
 	codec := unittest.NetworkCodec()
 	o := &mockOrchestrator{eventCorrupter: corrupter}
-	connector := attacknetwork.NewCorruptedConnector(unittest.Logger(), corruptedIds, corruptedPortMap)
+	connector := orchestrator.NewCorruptedConnector(unittest.Logger(), corruptedIds, corruptedPortMap)
 
-	attackNetwork, err := attacknetwork.NewAttackNetwork(
+	attackNetwork, err := orchestrator.NewAttackNetwork(
 		unittest.Logger(),
 		codec,
 		o,

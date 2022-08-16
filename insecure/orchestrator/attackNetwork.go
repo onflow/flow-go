@@ -1,4 +1,4 @@
-package attacknetwork
+package orchestrator
 
 import (
 	"fmt"
