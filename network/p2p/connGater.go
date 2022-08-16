@@ -19,8 +19,8 @@ type OnInterceptAccept func(addr multiaddr.Multiaddr) bool
 type ConnGaterOption func(*ConnGater)
 
 func WithOnInterceptAccept(f OnInterceptAccept) ConnGaterOption {
-	return func(cg *ConnGater) {
-		cg.onInterceptAccept = f
+	return func(c *ConnGater) {
+		c.onInterceptAccept = f
 	}
 }
 
