@@ -402,6 +402,7 @@ func (e *Engine) reloadBlock(
 // have passed consensus validation) received from the consensus nodes
 // Note: BlockProcessable might be called multiple times for the same block.
 func (e *Engine) BlockProcessable(b *flow.Header) {
+	// TODO handle missed delivery
 
 	// when the flag is on, no block will be executed. Useful for EN to serve
 	// execution state queries

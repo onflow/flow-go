@@ -8,8 +8,13 @@ import (
 // can be propagated to other components via an implementation of this interface.
 // Collectively, these are referred to as "Protocol Events".
 //
-// Protocol events are guaranteed to be delivered at least once. Subscribers must
-// handle multiple deliveries.
+// Protocol events are delivered immediately after the database transaction
+// committing the corresponding state change completes successfully.
+// This means that events are delivered exactly once, while the system is running.
+// Events may not be delivered during crashes and restarts, but any missed events
+// are guaranteed to be reflected in the Protocol State upon restarting.
+// Components consuming protocol events which cannot tolerate missed events
+// must implement initialization logic which accounts for any missed events.
 //
 // CAUTION: Protocol event subscriber callbacks are invoked synchronously in the
 // critical path of protocol state mutations. Most subscribers should immediately

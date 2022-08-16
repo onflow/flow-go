@@ -241,6 +241,7 @@ func (e *Engine) createEpochComponents(epoch protocol.Epoch) (*EpochComponents, 
 
 // EpochTransition handles the epoch transition protocol event.
 func (e *Engine) EpochTransition(_ uint64, first *flow.Header) {
+	// TODO handle missed delivery
 	e.unit.Launch(func() {
 		err := e.onEpochTransition(first)
 		if err != nil {
@@ -252,6 +253,7 @@ func (e *Engine) EpochTransition(_ uint64, first *flow.Header) {
 
 // EpochSetupPhaseStarted handles the epoch setup phase started protocol event.
 func (e *Engine) EpochSetupPhaseStarted(_ uint64, first *flow.Header) {
+	// TODO handle missed delivery
 	e.unit.Launch(func() {
 		nextEpoch := e.state.AtBlockID(first.ID()).Epochs().Next()
 		e.onEpochSetupPhaseStarted(nextEpoch)
@@ -339,6 +341,7 @@ func (e *Engine) prepareToStopEpochComponents(epochCounter, epochMaxHeight uint6
 
 	log.Info().Msgf("preparing to stop epoch components at height %d", stopAtHeight)
 
+	// TODO handle missed delivery
 	e.heightEvents.OnHeight(stopAtHeight, func() {
 		e.unit.Launch(func() {
 			e.unit.Lock()

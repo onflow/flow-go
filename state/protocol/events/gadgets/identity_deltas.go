@@ -24,13 +24,16 @@ func NewIdentityDeltas(cb func()) *IdentityDeltas {
 }
 
 func (g *IdentityDeltas) EpochTransition(_ uint64, _ *flow.Header) {
+	// TODO handle missed delivery
 	g.callback()
 }
 
 func (g *IdentityDeltas) EpochSetupPhaseStarted(_ uint64, _ *flow.Header) {
+	// TODO handle missed delivery
 	g.callback()
 }
 
 func (g *IdentityDeltas) EpochCommittedPhaseStarted(_ uint64, _ *flow.Header) {
+	// TODO handle missed delivery
 	g.callback()
 }
