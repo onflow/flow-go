@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/crypto"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/meter"
@@ -56,17 +57,17 @@ func NewTransactionEnvironment(
 		ctx.EventCollectionByteSizeLimit,
 	)
 	accountKeys := handler.NewAccountKeyHandler(accounts)
-	tracer := NewTracer(ctx.Tracer, traceSpan, ctx.ExtensiveTracing)
+	tracer := environment.NewTracer(ctx.Tracer, traceSpan, ctx.ExtensiveTracing)
 
 	env := &TransactionEnv{
 		commonEnv: commonEnv{
 			Tracer: tracer,
-			ProgramLogger: NewProgramLogger(
+			ProgramLogger: environment.NewProgramLogger(
 				tracer,
 				ctx.Metrics,
 				ctx.CadenceLoggingEnabled,
 			),
-			UnsafeRandomGenerator: NewUnsafeRandomGenerator(
+			UnsafeRandomGenerator: environment.NewUnsafeRandomGenerator(
 				tracer,
 				ctx.BlockHeader,
 			),
