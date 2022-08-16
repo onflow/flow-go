@@ -1133,7 +1133,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 	if nodeConf.Corrupted {
 		// corrupted nodes are running with a Corrupted Conduit Factory (CCF), hence need to bind their
-		// CCF port to local host so they can be accessible by the attack network.
+		// CCF port to local host, so they can be accessible by the orchestrator network.
 		hostPort := testingdock.RandomPort(t)
 		nodeContainer.bindPort(hostPort, strconv.Itoa(cmd.CorruptibleConduitFactoryPort))
 		net.CorruptedPortMapping[nodeConf.NodeID] = hostPort

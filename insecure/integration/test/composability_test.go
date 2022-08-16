@@ -27,12 +27,12 @@ import (
 // and one with a corruptible conduit factory (ccf).
 //
 // The engine running on ccf is sending a message to the other engine (running with normal conduit).
-// The message goes through ccf to the attack network and reaches the attack orchestrator.
+// The message goes through ccf to the orchestrator network and reaches the attack orchestrator.
 // The orchestrator corrupts the message and sends it back to the ccf to be dispatched on the flow network.
 // The test passes if the engine running with normal conduit receives the corrupted message in a timely fashion (and also never gets the
 // original messages).
 func TestCorruptibleConduitFrameworkHappyPath(t *testing.T) {
-	// We first start ccf and then the attack network, since the order of startup matters, i.e., on startup, the attack network tries
+	// We first start ccf and then the orchestrator network, since the order of startup matters, i.e., on startup, the orchestrator network tries
 	// to connect to all ccfs.
 	withCorruptibleNetwork(t, func(t *testing.T, corruptedIdentity flow.Identity, corruptibleNetwork *corruptible.Network, hub *stub.Hub) {
 		// this is the event orchestrator will send instead of the original event coming from corrupted engine.
@@ -144,15 +144,15 @@ func withCorruptibleNetwork(t *testing.T, run func(*testing.T, flow.Identity, *c
 	}, 100*time.Millisecond, "failed to stop verification network")
 }
 
-// withAttackOrchestrator creates a mock orchestrator with the injected "corrupter" function, which entirely runs on top of a real attack network.
-// It then starts the attack network, executes the "run" function, and stops the attack network afterwards.
+// withAttackOrchestrator creates a mock orchestrator with the injected "corrupter" function, which entirely runs on top of a real orchestrator network.
+// It then starts the orchestrator network, executes the "run" function, and stops the orchestrator network afterwards.
 func withAttackOrchestrator(t *testing.T, corruptedIds flow.IdentityList, corruptedPortMap map[flow.Identifier]string, corrupter func(*insecure.EgressEvent),
 	run func(t *testing.T)) {
 	codec := unittest.NetworkCodec()
 	o := &mockOrchestrator{eventCorrupter: corrupter}
 	connector := orchestrator.NewCorruptedConnector(unittest.Logger(), corruptedIds, corruptedPortMap)
 
-	attackNetwork, err := orchestrator.NewOrchestratorNetwork(
+	orchestratorNetwork, err := orchestrator.NewOrchestratorNetwork(
 		unittest.Logger(),
 		codec,
 		o,
@@ -162,7 +162,7 @@ func withAttackOrchestrator(t *testing.T, corruptedIds flow.IdentityList, corrup
 
 	// life-cycle management of orchestratorNetwork.
 	ctx, cancel := context.WithCancel(context.Background())
-	attackNetworkCtx, errChan := irrecoverable.WithSignaler(ctx)
+	orchestratorNetworkCtx, errChan := irrecoverable.WithSignaler(ctx)
 	go func() {
 		select {
 		case err := <-errChan:
@@ -173,11 +173,11 @@ func withAttackOrchestrator(t *testing.T, corruptedIds flow.IdentityList, corrup
 	}()
 
 	// starts corruptible conduit factory
-	attackNetwork.Start(attackNetworkCtx)
-	unittest.RequireCloseBefore(t, attackNetwork.Ready(), 1*time.Second, "could not start attack network on time")
+	orchestratorNetwork.Start(orchestratorNetworkCtx)
+	unittest.RequireCloseBefore(t, orchestratorNetwork.Ready(), 1*time.Second, "could not start orchestrator network on time")
 	run(t)
 
 	// terminates orchestratorNetwork
 	cancel()
-	unittest.RequireCloseBefore(t, attackNetwork.Done(), 1*time.Second, "could not stop attack network on time")
+	unittest.RequireCloseBefore(t, orchestratorNetwork.Done(), 1*time.Second, "could not stop orchestrator network on time")
 }

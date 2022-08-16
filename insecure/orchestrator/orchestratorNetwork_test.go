@@ -288,7 +288,7 @@ func withMockCorruptibleConduitFactories(
 
 	run(ccfCtx, ccfs, ccfPorts)
 
-	// terminates attackNetwork
+	// terminates orchestratorNetwork
 	cancel()
 
 	// stop all ccfs

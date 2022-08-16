@@ -16,8 +16,8 @@ import (
 
 const DefaultAddress = "localhost:0"
 
-// EgressMessageFixture creates and returns a randomly generated gRPC egress message that is sent between a corruptible conduit and the attack network.
-// It also generates and returns the corresponding application-layer event of that message, which is sent between the attack network and the
+// EgressMessageFixture creates and returns a randomly generated gRPC egress message that is sent between a corruptible conduit and the orchestrator network.
+// It also generates and returns the corresponding application-layer event of that message, which is sent between the orchestrator network and the
 // orchestrator.
 func EgressMessageFixture(t *testing.T, codec network.Codec, protocol Protocol, content interface{}) (*Message, *EgressEvent, *flow.Identity) {
 	// fixture for content of message
@@ -57,7 +57,7 @@ func EgressMessageFixture(t *testing.T, codec network.Codec, protocol Protocol, 
 	}
 
 	// creates corresponding event of that message that
-	// is sent by attack network to orchestrator.
+	// is sent by orchestrator network to orchestrator.
 	e := &EgressEvent{
 		CorruptOriginId:   originId,
 		Channel:           channel,
@@ -92,7 +92,7 @@ func IngressMessageFixture(t *testing.T, codec network.Codec, protocol Protocol,
 }
 
 // EgressMessageFixtures creates and returns randomly generated gRCP messages and their corresponding protocol-level events.
-// The messages are sent between a corruptible conduit and the attack network.
+// The messages are sent between a corruptible conduit and the orchestrator network.
 // The events are the corresponding protocol-level representation of messages.
 func EgressMessageFixtures(t *testing.T, codec network.Codec, protocol Protocol, count int) ([]*Message, []*EgressEvent,
 	flow.IdentityList) {

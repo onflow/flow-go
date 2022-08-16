@@ -16,11 +16,11 @@ type OrchestratorNetwork interface {
 	// The message could be the originally intended message or another valid message (as necessary for the attack).
 	SendIngress(*IngressEvent) error
 
-	// Observe is the inbound message handler of the attack network (NOT the ingress message to a corrupted node).
+	// Observe is the inbound message handler of the orchestrator network (NOT the ingress message to a corrupted node).
 	// The message that is observed can be an ingress or egress message.
 	// An observed egress message is when a corrupted node (that's controlled by an attacker) sends a message to another node.
 	// An observed ingress message is when another node is sending a message to a corrupted node that's controlled by the attacker.
 	// Instead of dispatching messages to the networking layer of Flow, the corrupted network
-	// dispatches the outgoing message to the attack network through a remote call to this method.
+	// dispatches the outgoing message to the orchestrator network through a remote call to this method.
 	Observe(*Message)
 }

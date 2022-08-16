@@ -43,7 +43,7 @@ type Network struct {
 	mu                    sync.Mutex
 	me                    module.Local
 	flowNetwork           flownet.Network // original flow network of the node.
-	server                *grpc.Server    // touch point of attack network to this factory.
+	server                *grpc.Server    // touch point of orchestrator network to this factory.
 	gRPCListenAddress     net.Addr
 	conduitFactory        insecure.CorruptibleConduitFactory
 	attackerInboundStream insecure.CorruptibleConduitFactory_ConnectAttackerServer // inbound stream to attacker

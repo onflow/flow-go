@@ -54,7 +54,7 @@ func processAttackerMessage_EmptyEgressIngressMessage_Exit(t *testing.T) {
 			corruptedId flow.Identity, // identity of ccf
 			corruptibleNetwork *Network,
 			adapter *mocknetwork.Adapter, // mock adapter that ccf uses to communicate with authorized flow nodes.
-			stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that attack network uses to send messages to this ccf.
+			stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to this ccf.
 		) {
 			corruptedEventDispatchedOnFlowNetWg := sync.WaitGroup{}
 			corruptedEventDispatchedOnFlowNetWg.Add(1)
@@ -67,7 +67,7 @@ func processAttackerMessage_EmptyEgressIngressMessage_Exit(t *testing.T) {
 			require.Nil(t, msg.Ingress)
 			require.Nil(t, msg.Egress)
 
-			// imitates a gRPC call from orchestrator to ccf through attack network
+			// imitates a gRPC call from orchestrator to ccf through orchestrator network
 			require.NoError(t, stream.Send(msg))
 
 			unittest.RequireReturnsBefore(
@@ -95,7 +95,7 @@ func processAttackerMessage_NotEmptyEgressIngressMessage_Exit(t *testing.T) {
 			corruptedId flow.Identity, // identity of ccf
 			corruptibleNetwork *Network,
 			adapter *mocknetwork.Adapter, // mock adapter that ccf uses to communicate with authorized flow nodes.
-			stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that attack network uses to send messages to this ccf.
+			stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to this ccf.
 		) {
 			// creates a corrupted event that attacker is sending on the flow network through the
 			// corrupted conduit factory.
@@ -125,7 +125,7 @@ func processAttackerMessage_NotEmptyEgressIngressMessage_Exit(t *testing.T) {
 			doubleMsg.Ingress = ingressMsg.Ingress
 			require.NotNil(t, doubleMsg.Ingress)
 
-			// imitates a gRPC call from orchestrator to ccf through attack network
+			// imitates a gRPC call from orchestrator to ccf through orchestrator network
 			require.NoError(t, stream.Send(doubleMsg))
 
 			unittest.RequireReturnsBefore(
