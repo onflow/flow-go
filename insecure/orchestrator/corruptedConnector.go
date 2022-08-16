@@ -20,7 +20,7 @@ type CorruptedConnector struct {
 	corruptedNodeIds flow.IdentityList // identifier of the corrupted nodes
 
 	// ports on which each corrupted node's conduit factory is running.
-	// corrupted nodes are running on docker containers, while the attack network is on local host.
+	// corrupted nodes are running on docker containers, while the orchestrator network is on local host.
 	// hence, each container comes with a port binding on local host.
 	corruptedPortMapping map[flow.Identifier]string
 }
@@ -47,7 +47,7 @@ func (c *CorruptedConnector) Connect(ctx irrecoverable.SignalerContext, targetId
 		return nil, fmt.Errorf("could not find port mapping for corrupted id: %x", targetId)
 	}
 
-	// corrupted nodes are running on docker containers, while the attack network is on local host.
+	// corrupted nodes are running on docker containers, while the orchestrator network is on local host.
 	// hence, each container is accessible on local host through port binding.
 	corruptedAddress := fmt.Sprintf("localhost:%s", port)
 	gRpcClient, err := grpc.Dial(

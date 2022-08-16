@@ -14,7 +14,7 @@ import (
 )
 
 // CorruptedNodeConnection abstracts connection between an attack orchestrator to a corruptible conduit factory (ccf)
-// through the attack network.
+// through the orchestrator network.
 type CorruptedNodeConnection struct {
 	component.Component
 	cm             *component.ComponentManager

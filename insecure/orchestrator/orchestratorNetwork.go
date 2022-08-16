@@ -31,7 +31,7 @@ type OrchestratorNetwork struct {
 
 var _ insecure.OrchestratorNetwork = &OrchestratorNetwork{}
 
-func NewAttackNetwork(
+func NewOrchestratorNetwork(
 	logger zerolog.Logger,
 	codec network.Codec,
 	orchestrator insecure.AttackOrchestrator,
@@ -73,9 +73,9 @@ func NewAttackNetwork(
 	return orchestratorNetwork, nil
 }
 
-// start triggers the sub-modules of attack network.
+// start triggers the sub-modules of orchestrator network.
 func (a *OrchestratorNetwork) start(ctx irrecoverable.SignalerContext) error {
-	// creates a connection to all corrupted nodes in the attack network.
+	// creates a connection to all corrupted nodes in the orchestrator network.
 	for _, corruptedNodeId := range a.corruptedNodeIds {
 		connection, err := a.corruptedConnector.Connect(ctx, corruptedNodeId.NodeID)
 		if err != nil {
@@ -85,13 +85,13 @@ func (a *OrchestratorNetwork) start(ctx irrecoverable.SignalerContext) error {
 		a.logger.Info().Hex("node_id", logging.ID(corruptedNodeId.NodeID)).Msg("attacker successfully registered on corrupted node")
 	}
 
-	// registers attack network for orchestrator.
+	// registers orchestrator network for orchestrator.
 	a.orchestrator.Register(a)
 
 	return nil
 }
 
-// stop conducts the termination logic of the sub-modules of attack network.
+// stop conducts the termination logic of the sub-modules of orchestrator network.
 func (a *OrchestratorNetwork) stop() error {
 	// tears down connections to corruptible nodes.
 	var errors *multierror.Error
@@ -106,9 +106,9 @@ func (a *OrchestratorNetwork) stop() error {
 	return errors.ErrorOrNil()
 }
 
-// Observe is the inbound message handler of the attack network.
+// Observe is the inbound message handler of the orchestrator network.
 // Instead of dispatching their messages to the networking layer of Flow, the conduits of corrupted nodes
-// dispatch the outgoing messages to the attack network by calling the InboundHandler method of it remotely.
+// dispatch the outgoing messages to the orchestrator network by calling the InboundHandler method of it remotely.
 func (a *OrchestratorNetwork) Observe(message *insecure.Message) {
 	if err := a.processEgressMessage(message); err != nil {
 		a.logger.Fatal().Err(err).Msg("could not process message of corrupted node")
@@ -152,8 +152,8 @@ func (a *OrchestratorNetwork) processEgressMessage(message *insecure.Message) er
 	return nil
 }
 
-// SendEgress enforces dissemination of given event via its encapsulated corrupted node networking layer through the Flow network
-// An orchestrator decides when to send an egress message on behalf of a corrupted node
+// SendEgress enforces dissemination of given event via its encapsulated corrupted node networking layer through the Flow network.
+// An orchestrator decides when to send an egress message on behalf of a corrupted node.
 func (a *OrchestratorNetwork) SendEgress(event *insecure.EgressEvent) error {
 	msg, err := a.eventToEgressMessage(event.CorruptOriginId, event.FlowProtocolEvent, event.Channel, event.Protocol, event.TargetNum, event.TargetIds...)
 	if err != nil {
@@ -169,7 +169,7 @@ func (a *OrchestratorNetwork) SendEgress(event *insecure.EgressEvent) error {
 }
 
 // SendIngress sends an incoming message from the flow network (from another node that could be or honest or corrupted)
-// to the corrupted node. This message was intercepted by the attack network and relayed to the orchestrator before being sent
+// to the corrupted node. This message was intercepted by the orchestrator network and relayed to the orchestrator before being sent
 // to the corrupted node.
 func (a *OrchestratorNetwork) SendIngress(event *insecure.IngressEvent) error {
 	msg, err := a.eventToIngressMessage(event.OriginID, event.FlowProtocolEvent, event.Channel, event.CorruptTargetID)
@@ -184,7 +184,7 @@ func (a *OrchestratorNetwork) SendIngress(event *insecure.IngressEvent) error {
 	return nil
 }
 
-// sendMessage is a helper function for sending both ingress and egress messages
+// sendMessage is a helper function for sending both ingress and egress messages.
 func (a *OrchestratorNetwork) sendMessage(msg *insecure.Message, lookupId flow.Identifier) error {
 	connection, ok := a.corruptedConnections[lookupId]
 	if !ok {

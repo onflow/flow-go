@@ -156,7 +156,7 @@ func withMockCorruptibleConduitFactory(t *testing.T, run func(flow.Identity, irr
 
 	run(*corruptedIdentity, ccfCtx, ccf)
 
-	// terminates attackNetwork
+	// terminates orchestratorNetwork
 	cancel()
 	unittest.RequireCloseBefore(t, ccf.Done(), 1*time.Second, "could not stop corruptible conduit on time")
 }

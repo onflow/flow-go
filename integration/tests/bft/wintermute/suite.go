@@ -181,7 +181,7 @@ func (s *Suite) SetupSuite() {
 	// start attack network
 	codec := unittest.NetworkCodec()
 	connector := orchestrator.NewCorruptedConnector(s.log, s.net.CorruptedIdentities(), s.net.CorruptedPortMapping)
-	attackNetwork, err := orchestrator.NewAttackNetwork(s.log,
+	attackNetwork, err := orchestrator.NewOrchestratorNetwork(s.log,
 		codec,
 		s.Orchestrator,
 		connector,

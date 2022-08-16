@@ -18,17 +18,17 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestAttackNetworkObserve_SingleMessage(t *testing.T) {
-	testAttackNetworkObserve(t, 1)
+func TestOrchestratorNetworkObserve_SingleMessage(t *testing.T) {
+	testOrchestratorNetworkObserve(t, 1)
 }
 
-func TestAttackNetworkObserve_MultipleConcurrentMessages(t *testing.T) {
-	testAttackNetworkObserve(t, 10)
+func TestOrchestratorNetworkObserve_MultipleConcurrentMessages(t *testing.T) {
+	testOrchestratorNetworkObserve(t, 10)
 }
 
-// testAttackNetworkObserve evaluates that upon receiving concurrent messages from corruptible conduits, the attack network
+// testOrchestratorNetworkObserve evaluates that upon receiving concurrent messages from corruptible conduits, the orchestrator network
 // decodes the messages into events and relays them to its registered orchestrator.
-func testAttackNetworkObserve(t *testing.T, concurrencyDegree int) {
+func testOrchestratorNetworkObserve(t *testing.T, concurrencyDegree int) {
 	// creates event fixtures and their corresponding messages.
 	messages, egressEvents, corruptedIds := insecure.EgressMessageFixtures(t, unittest.NetworkCodec(), insecure.Protocol_MULTICAST, concurrencyDegree)
 
@@ -39,10 +39,10 @@ func testAttackNetworkObserve(t *testing.T, concurrencyDegree int) {
 			// mocks orchestrator to receive each event exactly once.
 			orchestratorWG := mockOrchestratorHandlingEgressEvent(t, orchestrator, egressEvents)
 
-			// sends all messages concurrently to the attack network (imitating corruptible conduits sending
-			// messages concurrently to attack network).
-			attackNetworkSendWG := sync.WaitGroup{}
-			attackNetworkSendWG.Add(concurrencyDegree)
+			// sends all messages concurrently to the orchestrator network (imitating corruptible conduits sending
+			// messages concurrently to orchestrator network).
+			orchestratorNetworkSendWG := sync.WaitGroup{}
+			orchestratorNetworkSendWG.Add(concurrencyDegree)
 
 			for i, msg := range messages {
 				msg := msg
@@ -51,44 +51,44 @@ func testAttackNetworkObserve(t *testing.T, concurrencyDegree int) {
 				go func() {
 					err := ccf.attackerObserveStream.Send(msg) // pretends the ith ccf is sending message to attacker for observe
 					require.NoError(t, err)
-					attackNetworkSendWG.Done()
+					orchestratorNetworkSendWG.Done()
 				}()
 			}
 
-			// all messages should be sent to attack network in a timely fashion.
-			unittest.RequireReturnsBefore(t, attackNetworkSendWG.Wait, 1*time.Second, "could not send all messages to attack orchestratorNetwork on time")
-			// all events should be relayed to the orchestrator by the attack network in a timely fashion.
+			// all messages should be sent to orchestrator network in a timely fashion.
+			unittest.RequireReturnsBefore(t, orchestratorNetworkSendWG.Wait, 1*time.Second, "could not send all messages to attack orchestratorNetwork on time")
+			// all events should be relayed to the orchestrator by the orchestrator network in a timely fashion.
 			unittest.RequireReturnsBefore(t, orchestratorWG.Wait, 1*time.Second, "orchestrator could not receive messages on time")
 		})
 }
 
-func TestAttackNetworkUnicast_SingleMessage(t *testing.T) {
-	testAttackNetwork(t, insecure.Protocol_UNICAST, 1)
+func TestOrchestratorNetworkUnicast_SingleMessage(t *testing.T) {
+	testOrchestratorNetwork(t, insecure.Protocol_UNICAST, 1)
 }
 
-func TestAttackNetworkUnicast_ConcurrentMessages(t *testing.T) {
-	testAttackNetwork(t, insecure.Protocol_UNICAST, 10)
+func TestOrchestratorNetworkUnicast_ConcurrentMessages(t *testing.T) {
+	testOrchestratorNetwork(t, insecure.Protocol_UNICAST, 10)
 }
 
-func TestAttackNetworkMulticast_SingleMessage(t *testing.T) {
-	testAttackNetwork(t, insecure.Protocol_MULTICAST, 1)
+func TestOrchestratorNetworkMulticast_SingleMessage(t *testing.T) {
+	testOrchestratorNetwork(t, insecure.Protocol_MULTICAST, 1)
 }
 
-func TestAttackNetworkMulticast_ConcurrentMessages(t *testing.T) {
-	testAttackNetwork(t, insecure.Protocol_MULTICAST, 10)
+func TestOrchestratorNetworkMulticast_ConcurrentMessages(t *testing.T) {
+	testOrchestratorNetwork(t, insecure.Protocol_MULTICAST, 10)
 }
 
-func TestAttackNetworkPublish_SingleMessage(t *testing.T) {
-	testAttackNetwork(t, insecure.Protocol_PUBLISH, 1)
+func TestOrchestratorNetworkPublish_SingleMessage(t *testing.T) {
+	testOrchestratorNetwork(t, insecure.Protocol_PUBLISH, 1)
 }
 
-func TestAttackNetworkPublish_ConcurrentMessages(t *testing.T) {
-	testAttackNetwork(t, insecure.Protocol_PUBLISH, 10)
+func TestOrchestratorNetworkPublish_ConcurrentMessages(t *testing.T) {
+	testOrchestratorNetwork(t, insecure.Protocol_PUBLISH, 10)
 }
 
-// testAttackNetwork evaluates that the orchestrator can successfully route an event to a corrupted node through the attack network.
+// testOrchestratorNetwork evaluates that the orchestrator can successfully route an event to a corrupted node through the orchestrator network.
 // By a corrupted node here, we mean a node that runs with a corruptible conduit factory.
-func testAttackNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegree int) {
+func testOrchestratorNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegree int) {
 	// creates event fixtures and their corresponding messages.
 	_, egressEvents, corruptedIds := insecure.EgressMessageFixtures(t, unittest.NetworkCodec(), protocol, concurrencyDegree)
 
@@ -102,7 +102,7 @@ func testAttackNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegr
 				corruptedId := corruptedId
 				ccf := ccfs[i]
 
-				// testing message delivery from attack network to ccfs
+				// testing message delivery from orchestrator network to ccfs
 				go func() {
 					msg := <-ccf.attackerMsg
 					matchEventForMessage(t, egressEvents, msg, corruptedId.NodeID)
@@ -110,8 +110,8 @@ func testAttackNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegr
 				}()
 			}
 
-			attackNetworkSendWG := &sync.WaitGroup{}
-			attackNetworkSendWG.Add(concurrencyDegree)
+			orchestratorNetworkSendWG := &sync.WaitGroup{}
+			orchestratorNetworkSendWG.Add(concurrencyDegree)
 
 			for _, event := range egressEvents {
 				event := event
@@ -119,12 +119,12 @@ func testAttackNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegr
 					err := orchestratorNetwork.SendEgress(event)
 					require.NoError(t, err)
 
-					attackNetworkSendWG.Done()
+					orchestratorNetworkSendWG.Done()
 				}()
 			}
 
 			// all events should be sent to orchestratorNetwork in a timely fashion.
-			unittest.RequireReturnsBefore(t, attackNetworkSendWG.Wait, 1*time.Second, "could not send all events to orchestratorNetwork on time")
+			unittest.RequireReturnsBefore(t, orchestratorNetworkSendWG.Wait, 1*time.Second, "could not send all events to orchestratorNetwork on time")
 			// all events should be relayed to the connections by the orchestratorNetwork in a timely fashion.
 			unittest.RequireReturnsBefore(t, attackerMsgReceived.Wait, 1*time.Second, "connections could not receive messages on time")
 		})
@@ -157,9 +157,9 @@ func matchEventForMessage(t *testing.T, egressEvents []*insecure.EgressEvent, me
 }
 
 // withMockOrchestrator creates a Corrupted Conduit Factory (CCF) for each given corrupted identity.
-// It then creates an attack network, establishes a connection to each CCF, and then registers a mock orchestrator
-// on top of the attack network.
-// Once the attack network, CCFs, and mock orchestrator are all ready, it executes the injected "run" function.
+// It then creates an orchestrator network, establishes a connection to each CCF, and then registers a mock orchestrator
+// on top of the orchestrator network.
+// Once the orchestrator network, CCFs, and mock orchestrator are all ready, it executes the injected "run" function.
 func withMockOrchestrator(t *testing.T,
 	corruptedIds flow.IdentityList,
 	run func(*OrchestratorNetwork, *mockinsecure.AttackOrchestrator, []*mockCorruptibleConduitFactory)) {
@@ -171,7 +171,7 @@ func withMockOrchestrator(t *testing.T,
 			orchestrator := &mockinsecure.AttackOrchestrator{}
 			connector := NewCorruptedConnector(unittest.Logger(), corruptedIds, ccfPorts)
 
-			attackNetwork, err := NewAttackNetwork(
+			orchestratorNetwork, err := NewOrchestratorNetwork(
 				unittest.Logger(),
 				unittest.NetworkCodec(),
 				orchestrator,
@@ -179,24 +179,24 @@ func withMockOrchestrator(t *testing.T,
 				corruptedIds)
 			require.NoError(t, err)
 
-			// mocks registering attackNetwork as the attack network functionality for orchestrator.
-			orchestrator.On("Register", attackNetwork).Return().Once()
+			// mocks registering orchestratorNetwork as the orchestrator network functionality for orchestrator.
+			orchestrator.On("Register", orchestratorNetwork).Return().Once()
 
-			// life-cycle management of attackNetwork.
+			// life-cycle management of orchestratorNetwork.
 			ctx, cancel := context.WithCancel(context.Background())
 			attackCtx, errChan := irrecoverable.WithSignaler(ctx)
 			go func() {
 				select {
 				case err := <-errChan:
-					t.Error("attackNetwork startup encountered fatal error", err)
+					t.Error("orchestratorNetwork startup encountered fatal error", err)
 				case <-ctx.Done():
 					return
 				}
 			}()
 
-			// starts attackNetwork
-			attackNetwork.Start(attackCtx)
-			unittest.RequireCloseBefore(t, attackNetwork.Ready(), 1*time.Second, "could not start attackNetwork on time")
+			// starts orchestratorNetwork
+			orchestratorNetwork.Start(attackCtx)
+			unittest.RequireCloseBefore(t, orchestratorNetwork.Ready(), 1*time.Second, "could not start orchestratorNetwork on time")
 
 			attackerRegisteredOnAllCCFs := &sync.WaitGroup{}
 			attackerRegisteredOnAllCCFs.Add(len(ccfs))
@@ -211,11 +211,11 @@ func withMockOrchestrator(t *testing.T,
 
 			unittest.RequireReturnsBefore(t, attackerRegisteredOnAllCCFs.Wait, 1*time.Second, "could not register attacker on all ccfs on time")
 
-			run(attackNetwork, orchestrator, ccfs)
+			run(orchestratorNetwork, orchestrator, ccfs)
 
-			// terminates attackNetwork
+			// terminates orchestratorNetwork
 			cancel()
-			unittest.RequireCloseBefore(t, attackNetwork.Done(), 1*time.Second, "could not stop attackNetwork on time")
+			unittest.RequireCloseBefore(t, orchestratorNetwork.Done(), 1*time.Second, "could not stop orchestratorNetwork on time")
 		})
 }
 

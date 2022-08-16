@@ -152,7 +152,7 @@ func withAttackOrchestrator(t *testing.T, corruptedIds flow.IdentityList, corrup
 	o := &mockOrchestrator{eventCorrupter: corrupter}
 	connector := orchestrator.NewCorruptedConnector(unittest.Logger(), corruptedIds, corruptedPortMap)
 
-	attackNetwork, err := orchestrator.NewAttackNetwork(
+	attackNetwork, err := orchestrator.NewOrchestratorNetwork(
 		unittest.Logger(),
 		codec,
 		o,

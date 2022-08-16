@@ -20,15 +20,15 @@ import (
 
 const networkingProtocolTCP = "tcp"
 
-// mockCorruptibleConduitFactory is a mock corruptible conduit factory (ccf) that implements only the side that interacts with the attack network,
-// i.e., running a gRPC server, and accepting gRPC streams from attack network. However,
+// mockCorruptibleConduitFactory is a mock corruptible conduit factory (ccf) that implements only the side that interacts with the orchestrator network,
+// i.e., running a gRPC server, and accepting gRPC streams from orchestrator network. However,
 // instead of dispatching incoming messages to the networking layer, the
 // mock ccf only keeps the incoming message in a channel. The purpose of this mock ccf is to empower tests evaluating the interactions
-// between the attack network and the gRPC side of ccf.
+// between the orchestrator network and the gRPC side of ccf.
 type mockCorruptibleConduitFactory struct {
 	component.Component
 	cm                    *component.ComponentManager
-	server                *grpc.Server           // touch point of attack network to this factory.
+	server                *grpc.Server           // touch point of orchestrator network to this factory.
 	address               net.Addr               // address of gRPC endpoint for this mock ccf
 	attackerRegMsg        chan interface{}       // channel indicating whether attacker has registered.
 	attackerMsg           chan *insecure.Message // channel  keeping the last incoming (insecure) message from an attacker.
@@ -67,7 +67,7 @@ func (c *mockCorruptibleConduitFactory) ServerAddress() string {
 }
 
 func (c *mockCorruptibleConduitFactory) start(ctx irrecoverable.SignalerContext, address string) {
-	// starts up gRPC server of attack network at given address.
+	// starts up gRPC server of orchestrator network at given address.
 	s := grpc.NewServer()
 	insecure.RegisterCorruptibleConduitFactoryServer(s, c)
 	ln, err := net.Listen(networkingProtocolTCP, address)
@@ -93,7 +93,7 @@ func (c *mockCorruptibleConduitFactory) stop() {
 	c.server.Stop()
 }
 
-// ProcessAttackerMessage is a gRPC end-point of this mock corruptible conduit factory, that accepts messages from attack network, and
+// ProcessAttackerMessage is a gRPC end-point of this mock corruptible conduit factory, that accepts messages from orchestrator network, and
 // puts the incoming message in a channel to be read by the test procedure.
 func (c *mockCorruptibleConduitFactory) ProcessAttackerMessage(stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageServer) error {
 	for {
@@ -113,7 +113,7 @@ func (c *mockCorruptibleConduitFactory) ProcessAttackerMessage(stream insecure.C
 	}
 }
 
-// ConnectAttacker is a gRPC end-point of this mock corruptible conduit factory, that accepts attacker registration messages from the attack network.
+// ConnectAttacker is a gRPC end-point of this mock corruptible conduit factory, that accepts attacker registration messages from the orchestrator network.
 // It puts the incoming message into a channel to be read by test procedure.
 func (c *mockCorruptibleConduitFactory) ConnectAttacker(_ *empty.Empty, stream insecure.CorruptibleConduitFactory_ConnectAttackerServer) error {
 	select {
