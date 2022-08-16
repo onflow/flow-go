@@ -120,15 +120,15 @@ func (e *ReactorEngine) Done() <-chan struct{} {
 
 // EpochSetupPhaseStarted handles the EpochSetupPhaseStarted protocol event by
 // starting the DKG process.
+// NOTE: ReactorEngine will not recover form mid-DKG crashes, therefore we do not need to handle dropped protocol events here.
 func (e *ReactorEngine) EpochSetupPhaseStarted(currentEpochCounter uint64, first *flow.Header) {
-	// TODO handle missed delivery
 	e.startDKGForEpoch(currentEpochCounter, first)
 }
 
 // EpochCommittedPhaseStarted handles the EpochCommittedPhaseStarted protocol
 // event by checking the consistency of our locally computed key share.
+// NOTE: ReactorEngine will not recover form mid-DKG crashes, therefore we do not need to handle dropped protocol events here.
 func (e *ReactorEngine) EpochCommittedPhaseStarted(currentEpochCounter uint64, first *flow.Header) {
-	// TODO handle missed delivery
 	e.handleEpochCommittedPhaseStarted(currentEpochCounter, first)
 }
 
@@ -353,7 +353,6 @@ func (e *ReactorEngine) getDKGInfo(firstBlockID flow.Identifier) (*dkgInfo, erro
 // registerPoll instructs the engine to query the DKG smart-contract for new
 // broadcast messages at the specified view.
 func (e *ReactorEngine) registerPoll(view uint64) {
-	// TODO handle missed delivery
 	e.viewEvents.OnView(view, func(header *flow.Header) {
 		e.unit.Launch(func() {
 			e.unit.Lock()
@@ -378,7 +377,6 @@ func (e *ReactorEngine) registerPoll(view uint64) {
 // registerPhaseTransition instructs the engine to change phases at the
 // specified view.
 func (e *ReactorEngine) registerPhaseTransition(view uint64, fromState dkgmodule.State, phaseTransition func() error) {
-	// TODO handle missed delivery
 	e.viewEvents.OnView(view, func(header *flow.Header) {
 		e.unit.Launch(func() {
 			e.unit.Lock()

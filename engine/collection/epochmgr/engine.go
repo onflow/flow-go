@@ -240,8 +240,10 @@ func (e *Engine) createEpochComponents(epoch protocol.Epoch) (*EpochComponents, 
 }
 
 // EpochTransition handles the epoch transition protocol event.
+// NOTE: epochmgr.Engine will not restart trailing cluster consensus instances from previous epoch,
+// therefore no need to handle dropped protocol events here (see issue below).
+// TODO gracefully handle restarts in first 600 blocks of epoch https://github.com/dapperlabs/flow-go/issues/5659
 func (e *Engine) EpochTransition(_ uint64, first *flow.Header) {
-	// TODO handle missed delivery
 	e.unit.Launch(func() {
 		err := e.onEpochTransition(first)
 		if err != nil {
@@ -252,8 +254,9 @@ func (e *Engine) EpochTransition(_ uint64, first *flow.Header) {
 }
 
 // EpochSetupPhaseStarted handles the epoch setup phase started protocol event.
+// NOTE: Ready will check if we start up in the EpochSetup phase at initialization and trigger QC voting.
+// This handles dropped protocol events and restarts interrupting QC voting.
 func (e *Engine) EpochSetupPhaseStarted(_ uint64, first *flow.Header) {
-	// TODO handle missed delivery
 	e.unit.Launch(func() {
 		nextEpoch := e.state.AtBlockID(first.ID()).Epochs().Next()
 		e.onEpochSetupPhaseStarted(nextEpoch)
@@ -262,6 +265,7 @@ func (e *Engine) EpochSetupPhaseStarted(_ uint64, first *flow.Header) {
 
 // onEpochTransition is called when we transition to a new epoch. It arranges
 // to shut down the last epoch's components and starts up the new epoch's.
+// No errors are expected during normal operation.
 func (e *Engine) onEpochTransition(first *flow.Header) error {
 	e.unit.Lock()
 	defer e.unit.Unlock()
@@ -341,7 +345,6 @@ func (e *Engine) prepareToStopEpochComponents(epochCounter, epochMaxHeight uint6
 
 	log.Info().Msgf("preparing to stop epoch components at height %d", stopAtHeight)
 
-	// TODO handle missed delivery
 	e.heightEvents.OnHeight(stopAtHeight, func() {
 		e.unit.Launch(func() {
 			e.unit.Lock()

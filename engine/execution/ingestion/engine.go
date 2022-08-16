@@ -400,9 +400,9 @@ func (e *Engine) reloadBlock(
 
 // BlockProcessable handles the new verified blocks (blocks that
 // have passed consensus validation) received from the consensus nodes
-// Note: BlockProcessable might be called multiple times for the same block.
+// NOTE: BlockProcessable might be called multiple times for the same block.
+// NOTE: Ready calls reloadUnexecutedBlocks during initialization, which handles dropped protocol events.
 func (e *Engine) BlockProcessable(b *flow.Header) {
-	// TODO handle missed delivery
 
 	// when the flag is on, no block will be executed. Useful for EN to serve
 	// execution state queries
