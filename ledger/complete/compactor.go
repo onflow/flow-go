@@ -45,16 +45,17 @@ type checkpointResult struct {
 // This will be resolved automaticaly after the forest LRU Cache
 // (code outside checkpointing) is replaced by something like a FIFO queue.
 type Compactor struct {
-	checkpointer       *realWAL.Checkpointer
-	wal                realWAL.LedgerWAL
-	trieQueue          *realWAL.TrieQueue
-	logger             zerolog.Logger
-	lm                 *lifecycle.LifecycleManager
-	observers          map[observable.Observer]struct{}
-	checkpointDistance uint
-	checkpointsToKeep  uint
-	stopCh             chan chan struct{}
-	trieUpdateCh       <-chan *WALTrieUpdate
+	checkpointer                           *realWAL.Checkpointer
+	wal                                    realWAL.LedgerWAL
+	trieQueue                              *realWAL.TrieQueue
+	logger                                 zerolog.Logger
+	lm                                     *lifecycle.LifecycleManager
+	observers                              map[observable.Observer]struct{}
+	checkpointDistance                     uint
+	checkpointsToKeep                      uint
+	stopCh                                 chan chan struct{}
+	trieUpdateCh                           <-chan *WALTrieUpdate
+	triggerCheckpointOnNextSegmentFinishCh <-chan interface{} // to trigger checkpoint manually
 }
 
 // NewCompactor creates new Compactor which writes WAL record and triggers
@@ -73,6 +74,7 @@ func NewCompactor(
 	checkpointCapacity uint,
 	checkpointDistance uint,
 	checkpointsToKeep uint,
+	triggerCheckpointOnNextSegmentFinishCh <-chan interface{},
 ) (*Compactor, error) {
 	if checkpointDistance < 1 {
 		checkpointDistance = 1
@@ -100,16 +102,17 @@ func NewCompactor(
 	trieQueue := realWAL.NewTrieQueueWithValues(checkpointCapacity, tries)
 
 	return &Compactor{
-		checkpointer:       checkpointer,
-		wal:                w,
-		trieQueue:          trieQueue,
-		logger:             logger,
-		stopCh:             make(chan chan struct{}),
-		trieUpdateCh:       trieUpdateCh,
-		observers:          make(map[observable.Observer]struct{}),
-		lm:                 lifecycle.NewLifecycleManager(),
-		checkpointDistance: checkpointDistance,
-		checkpointsToKeep:  checkpointsToKeep,
+		checkpointer:                           checkpointer,
+		wal:                                    w,
+		trieQueue:                              trieQueue,
+		logger:                                 logger,
+		stopCh:                                 make(chan chan struct{}),
+		trieUpdateCh:                           trieUpdateCh,
+		observers:                              make(map[observable.Observer]struct{}),
+		lm:                                     lifecycle.NewLifecycleManager(),
+		checkpointDistance:                     checkpointDistance,
+		checkpointsToKeep:                      checkpointsToKeep,
+		triggerCheckpointOnNextSegmentFinishCh: triggerCheckpointOnNextSegmentFinishCh,
 	}, nil
 }
 
@@ -246,6 +249,24 @@ Loop:
 				// Try again when active segment is finalized.
 				c.logger.Info().Msgf("compactor delayed checkpoint %d because prior checkpointing is ongoing", nextCheckpointNum)
 				nextCheckpointNum = activeSegmentNum
+			}
+
+		case _, ok := <-c.triggerCheckpointOnNextSegmentFinishCh:
+			// listen to signals from admin tool in order to trigger a checkpoint when the current segment file is finished
+			if !ok {
+				// channel is closed
+				// wait for signal from stopCh
+				continue
+			}
+
+			// sanity checking, usually the nextCheckpointNum is a segment number in the future that when the activeSegmentNum
+			// finishes and reaches the nextCheckpointNum, then checkpoint will be triggered.
+			if nextCheckpointNum >= activeSegmentNum {
+				originalNextCheckpointNum := nextCheckpointNum
+				nextCheckpointNum = activeSegmentNum
+				c.logger.Info().Msgf("compactor will trigger once finish writing segment %v, originalNextCheckpointNum: %v", nextCheckpointNum, originalNextCheckpointNum)
+			} else {
+				c.logger.Warn().Msgf("could not force triggering checkpoint, nextCheckpointNum %v is smaller than activeSegmentNum %v", nextCheckpointNum, activeSegmentNum)
 			}
 		}
 	}

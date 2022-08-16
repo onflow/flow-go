@@ -80,7 +80,8 @@ func TestCompactor(t *testing.T) {
 			// WAL segments are 32kB, so here we generate 2 keys 64kB each, times `size`
 			// so we should get at least `size` segments
 
-			compactor, err := NewCompactor(l, wal, zerolog.Nop(), forestCapacity, checkpointDistance, checkpointsToKeep)
+			noopTrigger := make(chan interface{})
+			compactor, err := NewCompactor(l, wal, zerolog.Nop(), forestCapacity, checkpointDistance, checkpointsToKeep, noopTrigger)
 			require.NoError(t, err)
 
 			co := CompactorObserver{fromBound: 8, done: make(chan struct{})}
@@ -281,7 +282,8 @@ func TestCompactorSkipCheckpointing(t *testing.T) {
 		// WAL segments are 32kB, so here we generate 2 keys 64kB each, times `size`
 		// so we should get at least `size` segments
 
-		compactor, err := NewCompactor(l, wal, zerolog.Nop(), forestCapacity, checkpointDistance, checkpointsToKeep)
+		noopTrigger := make(chan interface{})
+		compactor, err := NewCompactor(l, wal, zerolog.Nop(), forestCapacity, checkpointDistance, checkpointsToKeep, noopTrigger)
 		require.NoError(t, err)
 
 		co := CompactorObserver{fromBound: 8, done: make(chan struct{})}
@@ -401,7 +403,8 @@ func TestCompactorAccuracy(t *testing.T) {
 			l, err := NewLedger(wal, forestCapacity, metricsCollector, zerolog.Logger{}, DefaultPathFinderVersion)
 			require.NoError(t, err)
 
-			compactor, err := NewCompactor(l, wal, zerolog.Nop(), forestCapacity, checkpointDistance, checkpointsToKeep)
+			noopTrigger := make(chan interface{})
+			compactor, err := NewCompactor(l, wal, zerolog.Nop(), forestCapacity, checkpointDistance, checkpointsToKeep, noopTrigger)
 			require.NoError(t, err)
 
 			fromBound := lastCheckpointNum + (size / 2)
@@ -517,7 +520,8 @@ func TestCompactorConcurrency(t *testing.T) {
 		l, err := NewLedger(wal, forestCapacity, metricsCollector, zerolog.Logger{}, DefaultPathFinderVersion)
 		require.NoError(t, err)
 
-		compactor, err := NewCompactor(l, wal, zerolog.Nop(), forestCapacity, checkpointDistance, checkpointsToKeep)
+		noopTrigger := make(chan interface{})
+		compactor, err := NewCompactor(l, wal, zerolog.Nop(), forestCapacity, checkpointDistance, checkpointsToKeep, noopTrigger)
 		require.NoError(t, err)
 
 		fromBound := lastCheckpointNum + (size / 2 * numGoroutine)

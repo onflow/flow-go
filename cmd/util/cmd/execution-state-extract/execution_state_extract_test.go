@@ -90,7 +90,8 @@ func TestExtractExecutionState(t *testing.T) {
 			require.NoError(t, err)
 			f, err := complete.NewLedger(diskWal, size*10, metr, zerolog.Nop(), complete.DefaultPathFinderVersion)
 			require.NoError(t, err)
-			compactor, err := complete.NewCompactor(f, diskWal, zerolog.Nop(), uint(size), checkpointDistance, checkpointsToKeep)
+			noopTrigger := make(chan interface{})
+			compactor, err := complete.NewCompactor(f, diskWal, zerolog.Nop(), uint(size), checkpointDistance, checkpointsToKeep, noopTrigger)
 			require.NoError(t, err)
 			<-compactor.Ready()
 
@@ -166,7 +167,8 @@ func TestExtractExecutionState(t *testing.T) {
 						checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
 						checkpointsToKeep  = 1
 					)
-					compactor, err := complete.NewCompactor(storage, diskWal, zerolog.Nop(), uint(size), checkpointDistance, checkpointsToKeep)
+					noopTrigger := make(chan interface{})
+					compactor, err := complete.NewCompactor(storage, diskWal, zerolog.Nop(), uint(size), checkpointDistance, checkpointsToKeep, noopTrigger)
 					require.NoError(t, err)
 
 					<-compactor.Ready()

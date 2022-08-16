@@ -56,7 +56,8 @@ func GenerateExecutionState(
 		return flow.DummyStateCommitment, err
 	}
 
-	compactor, err := complete.NewCompactor(ledgerStorage, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep)
+	noopTrigger := make(chan interface{})
+	compactor, err := complete.NewCompactor(ledgerStorage, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, noopTrigger)
 	if err != nil {
 		return flow.DummyStateCommitment, err
 	}

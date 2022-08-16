@@ -59,7 +59,9 @@ func extractExecutionState(
 		checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
 		checkpointsToKeep  = 1
 	)
-	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), complete.DefaultCacheSize, checkpointDistance, checkpointsToKeep)
+
+	noopTrigger := make(chan interface{})
+	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), complete.DefaultCacheSize, checkpointDistance, checkpointsToKeep, noopTrigger)
 	if err != nil {
 		return fmt.Errorf("cannot create compactor: %w", err)
 	}

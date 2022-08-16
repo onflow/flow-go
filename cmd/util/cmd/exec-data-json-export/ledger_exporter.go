@@ -33,7 +33,9 @@ func ExportLedger(ledgerPath string, targetstate string, outputPath string) erro
 	if err != nil {
 		return fmt.Errorf("cannot create ledger from write-a-head logs and checkpoints: %w", err)
 	}
-	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), complete.DefaultCacheSize, checkpointDistance, checkpointsToKeep)
+
+	noopTrigger := make(chan interface{})
+	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), complete.DefaultCacheSize, checkpointDistance, checkpointsToKeep, noopTrigger)
 	if err != nil {
 		return fmt.Errorf("cannot create compactor: %w", err)
 	}
