@@ -327,7 +327,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() 
 	expectedSenderPeerID, err := unittest.PeerIDFromFlowID(u.senderID)
 	require.NoError(u.T(), err)
 
-	invalidMessageCode := codec.CodeDKGMessage
+	modifiedMessageCode := codec.CodeDKGMessage
 
 	var nilID *flow.Identity
 	expectedViolation := &slashing.Violation{
@@ -337,7 +337,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() 
 		Channel:   channels.TestNetworkChannel,
 		IsUnicast: true,
 		//NOTE: in this test the message code does not match the underlying message type causing the codec to fail to unmarshal the message when decoding.
-		Err: codec.NewMsgUnmarshalErr(invalidMessageCode, message.DKGMessage, fmt.Errorf("cbor: found unknown field at map element index 0")),
+		Err: codec.NewMsgUnmarshalErr(modifiedMessageCode, message.DKGMessage, fmt.Errorf("cbor: found unknown field at map element index 0")),
 	}
 
 	slashingViolationsConsumer.On(
@@ -365,7 +365,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() 
 
 	msg, _ := createMessage(u.senderID.NodeID, u.receiverID.NodeID, "hello")
 	// manipulate message code byte
-	msg.Payload[0] = invalidMessageCode
+	msg.Payload[0] = modifiedMessageCode
 
 	// send message via unicast
 	err = u.senderMW.SendDirect(msg, u.receiverID.NodeID)
