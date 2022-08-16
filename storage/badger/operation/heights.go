@@ -43,6 +43,7 @@ func InsertLastCompleteBlockHeight(height uint64) func(*badger.Txn) error {
 }
 
 func UpdateLastCompleteBlockHeight(height uint64) func(*badger.Txn) error {
+	//return SkipDuplicates(update(makePrefix(codeLastCompleteBlockHeight), height))
 	return update(makePrefix(codeLastCompleteBlockHeight), height)
 }
 
