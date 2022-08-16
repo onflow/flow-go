@@ -290,14 +290,18 @@ func (c *Cache) put(entityId flow.Identifier, entity flow.Entity) bool {
 	}
 
 	c.slotCount++
-	entityIndex, ejection := c.entities.Add(entityId, entity, c.ownerIndexOf(b, slotToUse))
-	if ejection {
+	result := c.entities.Add(entityId, entity, c.ownerIndexOf(b, slotToUse))
+	if !result.Success {
+		return false
+	}
+
+	if result.Ejection {
 		// cache is at its full size and ejection happened to make room for this new entity.
 		c.collector.OnEntityEjectionDueToFullCapacity()
 	}
 
 	c.buckets[b].slots[slotToUse].slotAge = c.slotCount
-	c.buckets[b].slots[slotToUse].entityIndex = entityIndex
+	c.buckets[b].slots[slotToUse].entityIndex = result.EntityIndex
 	c.buckets[b].slots[slotToUse].entityId32of256 = entityId32of256
 	c.collector.OnKeyPutSuccess()
 	return true

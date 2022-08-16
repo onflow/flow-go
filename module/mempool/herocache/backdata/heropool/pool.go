@@ -11,6 +11,7 @@ type EjectionMode string
 const (
 	RandomEjection = EjectionMode("random-ejection")
 	LRUEjection    = EjectionMode("lru-ejection")
+	NoEjection     = EjectionMode("no-ejection")
 )
 
 // EIndex is data type representing an entity index in Pool.
@@ -27,6 +28,16 @@ type poolEntity struct {
 	// When this entity is allocated, the node maintains the connections it to the next and previous (used) pool entities.
 	// When this entity is unallocated, the node maintains the connections to the next and previous unallocated (free) pool entities.
 	node link
+}
+
+type PoolAddResult struct {
+	// whether entity successfully added to the pool (a false value means entity failed to be added and other
+	// fields are no longer valid).
+	Success bool
+	// index at which given entity is written on entities linked-list so that it can be accessed directly later.
+	EntityIndex EIndex
+	// whether an ejection happened to add this entity.
+	Ejection bool
 }
 
 type PoolEntity struct {
@@ -86,33 +97,33 @@ func (p *Pool) initFreeEntities() {
 }
 
 // Add writes given entity into a poolEntity on the underlying entities linked-list. Return value is
-// the index at which given entity is written on entities linked-list so that it can be accessed directly later.
-//
-// Boolean returned value determines whether an ejection happened to add this entity.
-func (p *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) (EIndex, bool) {
-	entityIndex, ejection := p.sliceIndexForEntity()
-	p.poolEntities[entityIndex].entity = entity
-	p.poolEntities[entityIndex].id = entityId
-	p.poolEntities[entityIndex].owner = owner
-	p.poolEntities[entityIndex].node.next.setUndefined()
-	p.poolEntities[entityIndex].node.prev.setUndefined()
+func (p *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) *PoolAddResult {
+	result := p.sliceIndexForEntity()
+	if result.Success {
+		p.poolEntities[result.EntityIndex].entity = entity
+		p.poolEntities[result.EntityIndex].id = entityId
+		p.poolEntities[result.EntityIndex].owner = owner
+		p.poolEntities[result.EntityIndex].node.next.setUndefined()
+		p.poolEntities[result.EntityIndex].node.prev.setUndefined()
 
-	if p.used.head.isUndefined() {
-		// used list is empty, hence setting head of used list to current entityIndex.
-		p.used.head.setPoolIndex(entityIndex)
-		p.poolEntities[p.used.head.getSliceIndex()].node.prev.setUndefined()
+		if p.used.head.isUndefined() {
+			// used list is empty, hence setting head of used list to current entityIndex.
+			p.used.head.setPoolIndex(result.EntityIndex)
+			p.poolEntities[p.used.head.getSliceIndex()].node.prev.setUndefined()
+		}
+
+		if !p.used.tail.isUndefined() {
+			// links new entity to the tail
+			p.connect(p.used.tail, result.EntityIndex)
+		}
+
+		// since we are appending to the used list, entityIndex also acts as tail of the list.
+		p.used.tail.setPoolIndex(result.EntityIndex)
+
+		p.size++
 	}
 
-	if !p.used.tail.isUndefined() {
-		// links new entity to the tail
-		p.connect(p.used.tail, entityIndex)
-	}
-
-	// since we are appending to the used list, entityIndex also acts as tail of the list.
-	p.used.tail.setPoolIndex(entityIndex)
-
-	p.size++
-	return entityIndex, ejection
+	return result
 }
 
 // Get returns entity corresponding to the entity index from the underlying list.
@@ -146,25 +157,36 @@ func (p Pool) Head() (flow.Entity, bool) {
 
 // sliceIndexForEntity returns a slice index which hosts the next entity to be added to the list.
 // The boolean returned value determines whether an ejection happened to make one slot free or not.
-func (p *Pool) sliceIndexForEntity() (EIndex, bool) {
+func (p *Pool) sliceIndexForEntity() *PoolAddResult {
 	ejection := false
 
 	if p.free.head.isUndefined() {
-		ejection = true
 		// the free list is empty, so we are out of space, and we need to eject.
-		if p.ejectionMode == RandomEjection {
-			// we only eject randomly when the pool is full and random ejection is on.
-			randomIndex := EIndex(rand.Uint32() % p.size)
-			p.invalidateEntityAtIndex(randomIndex)
-		} else {
+		switch p.ejectionMode {
+		case NoEjection:
+			// pool is set for no ejection, hence, no slice index is selected, abort immediately.
+			return &PoolAddResult{
+				Success: false,
+			}
+		case LRUEjection:
+			ejection = true
 			// LRU ejection
 			// the used head is the oldest entity, so we turn the used head to a free head here.
 			p.invalidateUsedHead()
+		case RandomEjection:
+			ejection = true
+			// we only eject randomly when the pool is full and random ejection is on.
+			randomIndex := EIndex(rand.Uint32() % p.size)
+			p.invalidateEntityAtIndex(randomIndex)
 		}
 	}
 
 	// claiming the head of free list as the slice index for the next entity to be added
-	return p.claimFreeHead(), ejection
+	return &PoolAddResult{
+		Success:     true,
+		EntityIndex: p.claimFreeHead(),
+		Ejection:    ejection,
+	}
 }
 
 // Size returns total number of entities that this list maintains.
