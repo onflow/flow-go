@@ -75,5 +75,5 @@ func (c *compressedStream) Close() error {
 	c.writeLock.Lock()
 	defer c.writeLock.Unlock()
 
-	return multierr.Combine(c.w.Close(), c.Stream.Close())
+	return c.Stream.Close()
 }
