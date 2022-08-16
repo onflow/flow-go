@@ -78,16 +78,13 @@ func (i *TransactionInvoker) Process(
 		sth.SetActiveState(parentState)
 	}()
 
-	env, err := NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
-	if err != nil {
-		return fmt.Errorf("error creating new environment: %w", err)
-	}
+	env := NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
 	predeclaredValues := valueDeclarations(env)
 
 	location := common.TransactionLocation(proc.ID)
 
 	var txError error
-	err = vm.Runtime.ExecuteTransaction(
+	err := vm.Runtime.ExecuteTransaction(
 		runtime.Script{
 			Source:    proc.Transaction.Script,
 			Arguments: proc.Transaction.Arguments,
@@ -163,10 +160,7 @@ func (i *TransactionInvoker) Process(
 			Msg("transaction executed with error")
 
 		// reset env
-		env, err = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
-		if err != nil {
-			return fmt.Errorf("error creating new environment: %w", err)
-		}
+		env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
 
 		// try to deduct fees again, to get the fee deduction events
 		feesError = i.deductTransactionFees(env, proc, sth, computationUsed)
@@ -254,50 +248,45 @@ var setAccountFrozenFunctionType = &sema.FunctionType{
 }
 
 func valueDeclarations(env Environment) []runtime.ValueDeclaration {
-	var predeclaredValues []runtime.ValueDeclaration
+	// TODO return the errors instead of panicing
 
-	if env.AccountFreezeEnabled() {
-		// TODO return the errors instead of panicing
+	setAccountFrozen := runtime.ValueDeclaration{
+		Name:           "setAccountFrozen",
+		Type:           setAccountFrozenFunctionType,
+		Kind:           common.DeclarationKindFunction,
+		IsConstant:     true,
+		ArgumentLabels: nil,
+		Value: interpreter.NewUnmeteredHostFunctionValue(
+			func(invocation interpreter.Invocation) interpreter.Value {
+				address, ok := invocation.Arguments[0].(interpreter.AddressValue)
+				if !ok {
+					panic(errors.NewValueErrorf(invocation.Arguments[0].String(),
+						"first argument of setAccountFrozen must be an address"))
+				}
 
-		setAccountFrozen := runtime.ValueDeclaration{
-			Name:           "setAccountFrozen",
-			Type:           setAccountFrozenFunctionType,
-			Kind:           common.DeclarationKindFunction,
-			IsConstant:     true,
-			ArgumentLabels: nil,
-			Value: interpreter.NewUnmeteredHostFunctionValue(
-				func(invocation interpreter.Invocation) interpreter.Value {
-					address, ok := invocation.Arguments[0].(interpreter.AddressValue)
-					if !ok {
-						panic(errors.NewValueErrorf(invocation.Arguments[0].String(),
-							"first argument of setAccountFrozen must be an address"))
-					}
+				frozen, ok := invocation.Arguments[1].(interpreter.BoolValue)
+				if !ok {
+					panic(errors.NewValueErrorf(invocation.Arguments[0].String(),
+						"second argument of setAccountFrozen must be a boolean"))
+				}
 
-					frozen, ok := invocation.Arguments[1].(interpreter.BoolValue)
-					if !ok {
-						panic(errors.NewValueErrorf(invocation.Arguments[0].String(),
-							"second argument of setAccountFrozen must be a boolean"))
-					}
+				var err error
+				if env, isTXEnv := env.(*TransactionEnv); isTXEnv {
+					err = env.SetAccountFrozen(common.Address(address), bool(frozen))
+				} else {
+					err = errors.NewOperationNotSupportedError("SetAccountFrozen")
+				}
+				if err != nil {
+					panic(err)
+				}
 
-					var err error
-					if env, isTXEnv := env.(*TransactionEnv); isTXEnv {
-						err = env.SetAccountFrozen(common.Address(address), bool(frozen))
-					} else {
-						err = errors.NewOperationNotSupportedError("SetAccountFrozen")
-					}
-					if err != nil {
-						panic(err)
-					}
-
-					return interpreter.VoidValue{}
-				},
-				setAccountFrozenFunctionType,
-			),
-		}
-
-		predeclaredValues = append(predeclaredValues, setAccountFrozen)
+				return interpreter.VoidValue{}
+			},
+			setAccountFrozenFunctionType,
+		),
 	}
-	return predeclaredValues
+
+	return []runtime.ValueDeclaration{setAccountFrozen}
 }
 
 // logExecutionIntensities logs execution intensities of the transaction

@@ -1,7 +1,6 @@
 package state_test
 
 import (
-	"math"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -13,8 +12,8 @@ import (
 
 func TestUUIDs_GetAndSetUUID(t *testing.T) {
 	view := utils.NewSimpleView()
-	meter := meter.NewMeter(math.MaxUint64, math.MaxUint64)
-	sth := state.NewStateHolder(state.NewState(view, meter))
+	meter := meter.NewMeter(meter.DefaultParameters())
+	sth := state.NewStateHolder(state.NewState(view, meter, state.DefaultParameters()))
 	uuidsA := state.NewUUIDGenerator(sth)
 
 	uuid, err := uuidsA.GetUUID() // start from zero
@@ -34,8 +33,8 @@ func TestUUIDs_GetAndSetUUID(t *testing.T) {
 
 func Test_GenerateUUID(t *testing.T) {
 	view := utils.NewSimpleView()
-	meter := meter.NewMeter(math.MaxUint64, math.MaxUint64)
-	sth := state.NewStateHolder(state.NewState(view, meter))
+	meter := meter.NewMeter(meter.DefaultParameters())
+	sth := state.NewStateHolder(state.NewState(view, meter, state.DefaultParameters()))
 	genA := state.NewUUIDGenerator(sth)
 
 	uuidA, err := genA.GenerateUUID()

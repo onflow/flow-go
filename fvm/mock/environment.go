@@ -34,20 +34,6 @@ type Environment struct {
 	mock.Mock
 }
 
-// AccountFreezeEnabled provides a mock function with given fields:
-func (_m *Environment) AccountFreezeEnabled() bool {
-	ret := _m.Called()
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func() bool); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	return r0
-}
-
 // AddAccountKey provides a mock function with given fields: address, publicKey, hashAlgo, weight
 func (_m *Environment) AddAccountKey(address common.Address, publicKey *runtime.PublicKey, hashAlgo sema.HashAlgorithm, weight int) (*runtime.AccountKey, error) {
 	ret := _m.Called(address, publicKey, hashAlgo, weight)

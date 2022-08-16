@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/crypto"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/meter"
@@ -35,23 +36,23 @@ func NewScriptEnvironment(
 	vm *VirtualMachine,
 	sth *state.StateHolder,
 	programs *programs.Programs,
-) (*ScriptEnv, error) {
+) *ScriptEnv {
 
 	accounts := state.NewAccounts(sth)
 	uuidGenerator := state.NewUUIDGenerator(sth)
 	programsHandler := handler.NewProgramsHandler(programs, sth)
 	accountKeys := handler.NewAccountKeyHandler(accounts)
-	tracer := NewTracer(fvmContext.Tracer, nil, fvmContext.ExtensiveTracing)
+	tracer := environment.NewTracer(fvmContext.Tracer, nil, fvmContext.ExtensiveTracing)
 
 	env := &ScriptEnv{
 		commonEnv: commonEnv{
 			Tracer: tracer,
-			ProgramLogger: NewProgramLogger(
+			ProgramLogger: environment.NewProgramLogger(
 				tracer,
 				fvmContext.Metrics,
 				fvmContext.CadenceLoggingEnabled,
 			),
-			UnsafeRandomGenerator: NewUnsafeRandomGenerator(
+			UnsafeRandomGenerator: environment.NewUnsafeRandomGenerator(
 				tracer,
 				fvmContext.BlockHeader,
 			),
@@ -70,6 +71,7 @@ func NewScriptEnvironment(
 	// TODO(patrick): remove this hack
 	env.MeterInterface = env
 	env.AccountInterface = env
+	env.fullEnv = env
 
 	env.contracts = handler.NewContractHandler(
 		accounts,
@@ -79,77 +81,7 @@ func NewScriptEnvironment(
 		func() []common.Address { return []common.Address{} },
 		func(address runtime.Address, code []byte) (bool, error) { return false, nil })
 
-	var err error
-	// set the execution parameters from the state
-	if fvmContext.AllowContextOverrideByExecutionState {
-		err = env.setExecutionParameters()
-	}
-
-	return env, err
-}
-
-func (e *ScriptEnv) setExecutionParameters() error {
-	// Check that the service account exists because all the settings are stored in it
-	serviceAddress := e.Context().Chain.ServiceAddress()
-	service := runtime.Address(serviceAddress)
-
-	// set the property if no error, but if the error is a fatal error then return it
-	setIfOk := func(prop string, err error, setter func()) (fatal error) {
-		err, fatal = errors.SplitErrorTypes(err)
-		if fatal != nil {
-			// this is a fatal error. return it
-			e.ctx.Logger.
-				Error().
-				Err(fatal).
-				Msgf("error getting %s", prop)
-			return fatal
-		}
-		if err != nil {
-			// this is a general error.
-			// could be that no setting was present in the state,
-			// or that the setting was not parseable,
-			// or some other deterministic thing.
-			e.ctx.Logger.
-				Debug().
-				Err(err).
-				Msgf("could not set %s. Using defaults", prop)
-			return nil
-		}
-		// everything is ok. do the setting
-		setter()
-		return nil
-	}
-
-	meter := e.sth.Meter()
-
-	computationWeights, err := GetExecutionEffortWeights(e, service)
-	err = setIfOk(
-		"execution effort weights",
-		err,
-		func() { meter.SetComputationWeights(computationWeights) })
-	if err != nil {
-		return err
-	}
-
-	memoryWeights, err := GetExecutionMemoryWeights(e, service)
-	err = setIfOk(
-		"execution memory weights",
-		err,
-		func() { meter.SetMemoryWeights(memoryWeights) })
-	if err != nil {
-		return err
-	}
-
-	memoryLimit, err := GetExecutionMemoryLimit(e, service)
-	err = setIfOk(
-		"execution memory limit",
-		err,
-		func() { meter.SetTotalMemoryLimit(memoryLimit) })
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return env
 }
 
 func (e *ScriptEnv) GetStorageCapacity(address common.Address) (value uint64, err error) {

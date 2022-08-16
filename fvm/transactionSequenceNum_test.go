@@ -1,7 +1,6 @@
 package fvm_test
 
 import (
-	"math"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -21,7 +20,8 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		ledger := utils.NewSimpleView()
 		sth := state.NewStateHolder(state.NewState(
 			ledger,
-			meter.NewMeter(math.MaxUint64, math.MaxUint64),
+			meter.NewMeter(meter.DefaultParameters()),
+			state.DefaultParameters(),
 		))
 		accounts := state.NewAccounts(sth)
 
@@ -49,7 +49,8 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		ledger := utils.NewSimpleView()
 		sth := state.NewStateHolder(state.NewState(
 			ledger,
-			meter.NewMeter(math.MaxUint64, math.MaxUint64),
+			meter.NewMeter(meter.DefaultParameters()),
+			state.DefaultParameters(),
 		))
 		accounts := state.NewAccounts(sth)
 
@@ -79,7 +80,8 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		ledger := utils.NewSimpleView()
 		sth := state.NewStateHolder(state.NewState(
 			ledger,
-			meter.NewMeter(math.MaxUint64, math.MaxUint64),
+			meter.NewMeter(meter.DefaultParameters()),
+			state.DefaultParameters(),
 		))
 		accounts := state.NewAccounts(sth)
 

@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/crypto"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/meter"
@@ -44,7 +45,7 @@ func NewTransactionEnvironment(
 	tx *flow.TransactionBody,
 	txIndex uint32,
 	traceSpan otelTrace.Span,
-) (*TransactionEnv, error) {
+) *TransactionEnv {
 
 	accounts := state.NewAccounts(sth)
 	generator := state.NewStateBoundAddressGenerator(sth, ctx.Chain)
@@ -52,22 +53,21 @@ func NewTransactionEnvironment(
 	programsHandler := handler.NewProgramsHandler(programs, sth)
 	// TODO set the flags on context
 	eventHandler := handler.NewEventHandler(ctx.Chain,
-		ctx.EventCollectionEnabled,
 		ctx.ServiceEventCollectionEnabled,
 		ctx.EventCollectionByteSizeLimit,
 	)
 	accountKeys := handler.NewAccountKeyHandler(accounts)
-	tracer := NewTracer(ctx.Tracer, traceSpan, ctx.ExtensiveTracing)
+	tracer := environment.NewTracer(ctx.Tracer, traceSpan, ctx.ExtensiveTracing)
 
 	env := &TransactionEnv{
 		commonEnv: commonEnv{
 			Tracer: tracer,
-			ProgramLogger: NewProgramLogger(
+			ProgramLogger: environment.NewProgramLogger(
 				tracer,
 				ctx.Metrics,
 				ctx.CadenceLoggingEnabled,
 			),
-			UnsafeRandomGenerator: NewUnsafeRandomGenerator(
+			UnsafeRandomGenerator: environment.NewUnsafeRandomGenerator(
 				tracer,
 				ctx.BlockHeader,
 			),
@@ -91,6 +91,7 @@ func NewTransactionEnvironment(
 	// TODO(patrick): rm this hack
 	env.MeterInterface = env
 	env.AccountInterface = env
+	env.fullEnv = env
 
 	env.contracts = handler.NewContractHandler(accounts,
 		func() bool {
@@ -113,77 +114,7 @@ func NewTransactionEnvironment(
 		env.useContractAuditVoucher,
 	)
 
-	var err error
-	// set the execution parameters from the state
-	if ctx.AllowContextOverrideByExecutionState {
-		err = env.setExecutionParameters()
-	}
-
-	return env, err
-}
-
-func (e *TransactionEnv) setExecutionParameters() error {
-	// Check that the service account exists because all the settings are stored in it
-	serviceAddress := e.Context().Chain.ServiceAddress()
-	service := runtime.Address(serviceAddress)
-
-	// set the property if no error, but if the error is a fatal error then return it
-	setIfOk := func(prop string, err error, setter func()) (fatal error) {
-		err, fatal = errors.SplitErrorTypes(err)
-		if fatal != nil {
-			// this is a fatal error. return it
-			e.ctx.Logger.
-				Error().
-				Err(fatal).
-				Msgf("error getting %s", prop)
-			return fatal
-		}
-		if err != nil {
-			// this is a general error.
-			// could be that no setting was present in the state,
-			// or that the setting was not parseable,
-			// or some other deterministic thing.
-			e.ctx.Logger.
-				Debug().
-				Err(err).
-				Msgf("could not set %s. Using defaults", prop)
-			return nil
-		}
-		// everything is ok. do the setting
-		setter()
-		return nil
-	}
-
-	meter := e.sth.Meter()
-
-	computationWeights, err := GetExecutionEffortWeights(e, service)
-	err = setIfOk(
-		"execution effort weights",
-		err,
-		func() { meter.SetComputationWeights(computationWeights) })
-	if err != nil {
-		return err
-	}
-
-	memoryWeights, err := GetExecutionMemoryWeights(e, service)
-	err = setIfOk(
-		"execution memory weights",
-		err,
-		func() { meter.SetMemoryWeights(memoryWeights) })
-	if err != nil {
-		return err
-	}
-
-	memoryLimit, err := GetExecutionMemoryLimit(e, service)
-	err = setIfOk(
-		"execution memory limit",
-		err,
-		func() { meter.SetTotalMemoryLimit(memoryLimit) })
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return env
 }
 
 func (e *TransactionEnv) TxIndex() uint32 {
@@ -451,10 +382,6 @@ func (e *TransactionEnv) meterMemory(kind common.MemoryKind, intensity uint) err
 }
 
 func (e *TransactionEnv) SetAccountFrozen(address common.Address, frozen bool) error {
-
-	if !e.ctx.AccountFreezeEnabled {
-		return errors.NewOperationNotSupportedError("SetAccountFrozen")
-	}
 
 	flowAddress := flow.Address(address)
 

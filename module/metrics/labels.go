@@ -123,3 +123,5 @@ const (
 	MessageEntityRequest        = "entity_request"
 	MessageEntityResponse       = "entity_response"
 )
+
+const ExecutionDataRequestRetryable = "retryable"
