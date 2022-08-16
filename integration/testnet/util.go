@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"os"
 	"os/user"
@@ -108,7 +107,7 @@ func WriteJSON(path string, data interface{}) error {
 }
 
 func WriteFile(path string, data []byte) error {
-	err := ioutil.WriteFile(path, data, 0644)
+	err := os.WriteFile(path, data, 0644)
 	return err
 }
 
