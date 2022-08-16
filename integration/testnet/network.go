@@ -3,8 +3,9 @@ package testnet
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
-	"io/ioutil"
+	"io/fs"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -579,7 +580,7 @@ func WithAdditionalFlag(flag string) func(config *NodeConfig) {
 
 // integrationBootstrapDir creates a temporary directory at /tmp/flow-integration-bootstrap
 func integrationBootstrapDir() (string, error) {
-	return ioutil.TempDir(TmpRoot, integrationBootstrap)
+	return os.MkdirTemp(TmpRoot, integrationBootstrap)
 }
 
 func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.ChainID) *FlowNetwork {
@@ -700,7 +701,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 }
 
 func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotPath string, followerConf ConsensusFollowerConfig, containers []ContainerConfig) {
-	tmpdir, err := ioutil.TempDir(TmpRoot, "flow-consensus-follower")
+	tmpdir, err := os.MkdirTemp(TmpRoot, "flow-consensus-follower")
 	require.NoError(t, err)
 
 	// create a directory for the follower database
@@ -804,14 +805,14 @@ func (net *FlowNetwork) AddObserver(t *testing.T, ctx context.Context, conf *Obs
 
 		// write to file
 		outputFile := fmt.Sprintf("%s/private-root-information/%s_key", net.BootstrapDir, conf.ObserverName)
-		err = ioutil.WriteFile(outputFile, output, 0600)
+		err = os.WriteFile(outputFile, output, 0600)
 		if err != nil {
 			panic(err)
 		}
 	}()
 
 	// Setup directories
-	tmpdir, _ := ioutil.TempDir(TmpRoot, "flow-integration-node")
+	tmpdir, _ := os.MkdirTemp(TmpRoot, "flow-integration-node")
 	flowDataDir := filepath.Join(tmpdir, DefaultFlowDataDir)
 	nodeBootstrapDir := filepath.Join(tmpdir, DefaultBootstrapDir)
 	flowProfilerDir := filepath.Join(flowDataDir, "./profiler")
@@ -920,7 +921,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	// get a temporary directory in the host. On macOS the default tmp
 	// directory is NOT accessible to Docker by default, so we use /tmp
 	// instead.
-	tmpdir, err := ioutil.TempDir(TmpRoot, "flow-integration-node")
+	tmpdir, err := os.MkdirTemp(TmpRoot, "flow-integration-node")
 	if err != nil {
 		return fmt.Errorf("could not get tmp dir: %w", err)
 	}
@@ -944,7 +945,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	flowProfilerDir := filepath.Join(flowDataDir, "./profiler")
 	t.Logf("create profiler dir: %v", flowProfilerDir)
 	err = os.MkdirAll(flowProfilerDir, 0755)
-	if err != nil && !os.IsExist(err) {
+	if err != nil && !errors.Is(err, fs.ErrExist) {
 		panic(err)
 	}
 
@@ -1023,7 +1024,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 			// create directories for execution state trie and values in the tmp
 			// host directory.
-			tmpLedgerDir, err := ioutil.TempDir(tmpdir, "flow-integration-trie")
+			tmpLedgerDir, err := os.MkdirTemp(tmpdir, "flow-integration-trie")
 			require.NoError(t, err)
 
 			opts.HostConfig.Binds = append(
@@ -1500,8 +1501,8 @@ func runDKG(confs []ContainerConfig) (dkgmod.DKGData, error) {
 }
 
 // setupClusterGenesisBlockQCs generates bootstrapping resources necessary for each collector cluster:
-//   * a cluster-specific root block
-//   * a cluster-specific root QC
+//   - a cluster-specific root block
+//   - a cluster-specific root QC
 func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []ContainerConfig) ([]*cluster.Block, flow.AssignmentList, []*flow.QuorumCertificate, error) {
 
 	participantsUnsorted := toParticipants(confs)
