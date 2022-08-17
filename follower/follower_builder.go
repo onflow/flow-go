@@ -139,7 +139,7 @@ func (builder *FollowerServiceBuilder) deriveBootstrapPeerIdentities() error {
 }
 
 func (builder *FollowerServiceBuilder) buildFollowerState() *FollowerServiceBuilder {
-	builder.FlowNodeBuilder.Module("mutable follower state", func(node *cmd.NodeConfig) error {
+	builder.Module("mutable follower state", func(node *cmd.NodeConfig) error {
 		// For now, we only support state implementations from package badger.
 		// If we ever support different implementations, the following can be replaced by a type-aware factory
 		state, ok := node.State.(*badgerState.State)
@@ -164,7 +164,7 @@ func (builder *FollowerServiceBuilder) buildFollowerState() *FollowerServiceBuil
 }
 
 func (builder *FollowerServiceBuilder) buildSyncCore() *FollowerServiceBuilder {
-	builder.FlowNodeBuilder.Module("sync core", func(node *cmd.NodeConfig) error {
+	builder.Module("sync core", func(node *cmd.NodeConfig) error {
 		syncCore, err := synchronization.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector())
 		builder.SyncCore = syncCore
 
@@ -175,7 +175,7 @@ func (builder *FollowerServiceBuilder) buildSyncCore() *FollowerServiceBuilder {
 }
 
 func (builder *FollowerServiceBuilder) buildCommittee() *FollowerServiceBuilder {
-	builder.FlowNodeBuilder.Module("committee", func(node *cmd.NodeConfig) error {
+	builder.Module("committee", func(node *cmd.NodeConfig) error {
 		// initialize consensus committee's membership state
 		// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
 		// Note: node.Me.NodeID() is not part of the consensus committee
@@ -189,7 +189,7 @@ func (builder *FollowerServiceBuilder) buildCommittee() *FollowerServiceBuilder 
 }
 
 func (builder *FollowerServiceBuilder) buildLatestHeader() *FollowerServiceBuilder {
-	builder.FlowNodeBuilder.Module("latest header", func(node *cmd.NodeConfig) error {
+	builder.Module("latest header", func(node *cmd.NodeConfig) error {
 		finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 		builder.Finalized, builder.Pending = finalized, pending
 
@@ -200,7 +200,7 @@ func (builder *FollowerServiceBuilder) buildLatestHeader() *FollowerServiceBuild
 }
 
 func (builder *FollowerServiceBuilder) buildFollowerCore() *FollowerServiceBuilder {
-	builder.FlowNodeBuilder.Component("follower core", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+	builder.Component("follower core", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		// create a finalizer that will handle updating the protocol
 		// state when the follower detects newly finalized blocks
 		final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, builder.FollowerState, node.Tracer)
@@ -223,9 +223,9 @@ func (builder *FollowerServiceBuilder) buildFollowerCore() *FollowerServiceBuild
 }
 
 func (builder *FollowerServiceBuilder) buildFollowerEngine() *FollowerServiceBuilder {
-	builder.FlowNodeBuilder.Component("follower engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+	builderr.Component("follower engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		// initialize cleaner for DB
-		cleaner := storage.NewCleaner(node.Logger, node.DB, builder.FlowNodeBuilder.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
+		cleaner := storage.NewCleaner(node.Logger, node.DB, builder.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
 		conCache := buffer.NewPendingBlocks()
 
 		followerEng, err := follower.New(
@@ -242,7 +242,7 @@ func (builder *FollowerServiceBuilder) buildFollowerEngine() *FollowerServiceBui
 			builder.FollowerCore,
 			builder.SyncCore,
 			node.Tracer,
-			follower.WithComplianceOptions(compliance.WithSkipNewProposalsThreshold(builder.FlowNodeBuilder.ComplianceConfig.SkipNewProposalsThreshold)),
+			follower.WithComplianceOptions(compliance.WithSkipNewProposalsThreshold(builder.ComplianceConfig.SkipNewProposalsThreshold)),
 			follower.WithChannel(channels.PublicReceiveBlocks),
 		)
 		if err != nil {
@@ -257,7 +257,7 @@ func (builder *FollowerServiceBuilder) buildFollowerEngine() *FollowerServiceBui
 }
 
 func (builder *FollowerServiceBuilder) buildFinalizedHeader() *FollowerServiceBuilder {
-	builder.FlowNodeBuilder.Component("finalized snapshot", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+	builder.Component("finalized snapshot", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		finalizedHeader, err := synceng.NewFinalizedHeaderCache(node.Logger, node.State, builder.FinalizationDistributor)
 		if err != nil {
 			return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
@@ -271,7 +271,7 @@ func (builder *FollowerServiceBuilder) buildFinalizedHeader() *FollowerServiceBu
 }
 
 func (builder *FollowerServiceBuilder) buildSyncEngine() *FollowerServiceBuilder {
-	builder.FlowNodeBuilder.Component("sync engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+	builder.Component("sync engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		sync, err := synceng.New(
 			node.Logger,
 			node.Metrics.Engine,
@@ -442,34 +442,34 @@ func (builder *FollowerServiceBuilder) initNodeInfo() error {
 		return fmt.Errorf("could not get peer ID from public key: %w", err)
 	}
 
-	builder.FlowNodeBuilder.NodeID, err = p2p.NewPublicNetworkIDTranslator().GetFlowID(builder.peerID)
+	builder.NodeID, err = p2p.NewPublicNetworkIDTranslator().GetFlowID(builder.peerID)
 	if err != nil {
 		return fmt.Errorf("could not get flow node ID: %w", err)
 	}
 
-	builder.FlowNodeBuilder.NodeConfig.NetworkKey = networkingKey // copy the key to NodeConfig
-	builder.FlowNodeBuilder.NodeConfig.StakingKey = nil           // no staking key for the observer
+	builder.NodeConfig.NetworkKey = networkingKey // copy the key to NodeConfig
+	builder.NodeConfig.StakingKey = nil           // no staking key for the observer
 
 	return nil
 }
 
 func (builder *FollowerServiceBuilder) InitIDProviders() {
-	builder.FlowNodeBuilder.Module("id providers", func(node *cmd.NodeConfig) error {
-		idCache, err := p2p.NewProtocolStateIDCache(node.Logger, node.State, builder.FlowNodeBuilder.ProtocolEvents)
+	builder.Module("id providers", func(node *cmd.NodeConfig) error {
+		idCache, err := p2p.NewProtocolStateIDCache(node.Logger, node.State, builder.ProtocolEvents)
 		if err != nil {
 			return err
 		}
 
-		builder.FlowNodeBuilder.IdentityProvider = idCache
+		builder.IdentityProvider = idCache
 
-		builder.FlowNodeBuilder.IDTranslator = p2p.NewHierarchicalIDTranslator(idCache, p2p.NewPublicNetworkIDTranslator())
+		builder.IDTranslator = p2p.NewHierarchicalIDTranslator(idCache, p2p.NewPublicNetworkIDTranslator())
 
 		// use the default identifier provider
 		builder.SyncEngineParticipantsProviderFactory = func() id.IdentifierProvider {
 			return id.NewCustomIdentifierProvider(func() flow.IdentifierList {
 				var result flow.IdentifierList
 
-				pids := builder.LibP2PNode.GetPeersForProtocol(unicast.FlowProtocolID(builder.FlowNodeBuilder.SporkID))
+				pids := builder.LibP2PNode.GetPeersForProtocol(unicast.FlowProtocolID(builder.SporkID))
 
 				for _, pid := range pids {
 					// exclude own Identifier
@@ -477,8 +477,8 @@ func (builder *FollowerServiceBuilder) InitIDProviders() {
 						continue
 					}
 
-					if flowID, err := builder.FlowNodeBuilder.IDTranslator.GetFlowID(pid); err != nil {
-						builder.FlowNodeBuilder.Logger.Err(err).Str("peer", pid.Pretty()).Msg("failed to translate to Flow ID")
+					if flowID, err := builder.IDTranslator.GetFlowID(pid); err != nil {
+						builder.Logger.Err(err).Str("peer", pid.Pretty()).Msg("failed to translate to Flow ID")
 					} else {
 						result = append(result, flowID)
 					}
@@ -513,20 +513,20 @@ func (builder *FollowerServiceBuilder) Initialize() error {
 
 	builder.enqueueConnectWithStakedAN()
 
-	if builder.FlowNodeBuilder.BaseConfig.MetricsEnabled {
-		builder.FlowNodeBuilder.EnqueueMetricsServerInit()
-		if err := builder.FlowNodeBuilder.RegisterBadgerMetrics(); err != nil {
+	if builder.BaseConfig.MetricsEnabled {
+		builder.EnqueueMetricsServerInit()
+		if err := builder.RegisterBadgerMetrics(); err != nil {
 			return err
 		}
 	}
 
-	builder.FlowNodeBuilder.PreInit(builder.initObserverLocal())
+	builder.PreInit(builder.initObserverLocal())
 
 	return nil
 }
 
 func (builder *FollowerServiceBuilder) validateParams() error {
-	if builder.FlowNodeBuilder.BaseConfig.BindAddr == cmd.NotSet || builder.FlowNodeBuilder.BaseConfig.BindAddr == "" {
+	if builder.BaseConfig.BindAddr == cmd.NotSet || builder.BaseConfig.BindAddr == "" {
 		return errors.New("bind address not specified")
 	}
 	if builder.FollowerServiceConfig.NetworkKey == nil {
@@ -567,16 +567,16 @@ func (builder *FollowerServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 			pis = append(pis, pi)
 		}
 
-		node, err := p2p.NewNodeBuilder(builder.FlowNodeBuilder.Logger, builder.FlowNodeBuilder.BaseConfig.BindAddr, networkKey, builder.FlowNodeBuilder.SporkID).
+		node, err := p2p.NewNodeBuilder(builder.Logger, builder.BaseConfig.BindAddr, networkKey, builder.SporkID).
 			SetSubscriptionFilter(
 				p2p.NewRoleBasedFilter(
-					p2p.UnstakedRole, builder.FlowNodeBuilder.IdentityProvider,
+					p2p.UnstakedRole, builder.IdentityProvider,
 				),
 			).
 			SetRoutingSystem(func(ctx context.Context, h host.Host) (routing.Routing, error) {
-				return p2p.NewDHT(ctx, h, unicast.FlowPublicDHTProtocolID(builder.FlowNodeBuilder.SporkID),
-					builder.FlowNodeBuilder.Logger,
-					builder.FlowNodeBuilder.Metrics.Network,
+				return p2p.NewDHT(ctx, h, unicast.FlowPublicDHTProtocolID(builder.SporkID),
+					builder.Logger,
+					builder.Metrics.Network,
 					p2p.AsClient(),
 					dht.BootstrapPeers(pis...),
 				)
@@ -605,7 +605,7 @@ func (builder *FollowerServiceBuilder) initObserverLocal() func(node *cmd.NodeCo
 			NetworkPubKey: node.NetworkKey.PublicKey(),
 			StakingPubKey: nil,             // no staking key needed for the observer
 			Role:          flow.RoleAccess, // observer can only run as an access node
-			Address:       builder.FlowNodeBuilder.BindAddr,
+			Address:       builder.BindAddr,
 		}
 
 		var err error
@@ -643,19 +643,19 @@ func (builder *FollowerServiceBuilder) enqueueMiddleware() {
 // Currently, the observer only runs the follower engine.
 func (builder *FollowerServiceBuilder) Build() (cmd.Node, error) {
 	builder.BuildConsensusFollower()
-	return builder.FlowNodeBuilder.Build()
+	return builder.Build()
 }
 
 // enqueuePublicNetworkInit enqueues the observer network component initialized for the observer
 func (builder *FollowerServiceBuilder) enqueuePublicNetworkInit() {
 
-	builder.FlowNodeBuilder.Component("public network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+	builder.Component("public network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
-		if builder.FlowNodeBuilder.HeroCacheMetricsEnable {
-			heroCacheCollector = metrics.NetworkReceiveCacheMetricsFactory(builder.FlowNodeBuilder.MetricsRegisterer)
+		if builder.HeroCacheMetricsEnable {
+			heroCacheCollector = metrics.NetworkReceiveCacheMetricsFactory(builder.MetricsRegisterer)
 		}
-		receiveCache := netcache.NewHeroReceiveCache(builder.FlowNodeBuilder.NetworkReceivedMessageCacheSize,
-			builder.FlowNodeBuilder.Logger,
+		receiveCache := netcache.NewHeroReceiveCache(builder.NetworkReceivedMessageCacheSize,
+			builder.Logger,
 			heroCacheCollector)
 
 		err := node.Metrics.Mempool.Register(metrics.ResourceNetworkingReceiveCache, receiveCache.Size)
@@ -664,19 +664,19 @@ func (builder *FollowerServiceBuilder) enqueuePublicNetworkInit() {
 		}
 
 		// topology is nil since it is automatically managed by libp2p
-		net, err := builder.initNetwork(builder.FlowNodeBuilder.Me, builder.FlowNodeBuilder.Metrics.Network, builder.FlowNodeBuilder.Middleware, nil, receiveCache)
+		net, err := builder.initNetwork(builder.Me, builder.Metrics.Network, builder.Middleware, nil, receiveCache)
 		if err != nil {
 			return nil, err
 		}
 
-		builder.FlowNodeBuilder.Network = converter.NewNetwork(net, channels.SyncCommittee, channels.PublicSyncCommittee)
+		builder.Network = converter.NewNetwork(net, channels.SyncCommittee, channels.PublicSyncCommittee)
 
-		builder.FlowNodeBuilder.Logger.Info().Msgf("network will run on address: %s", builder.FlowNodeBuilder.BindAddr)
+		builder.Logger.Info().Msgf("network will run on address: %s", builder.BindAddr)
 
-		idEvents := gadgets.NewIdentityDeltas(builder.FlowNodeBuilder.Middleware.UpdateNodeAddresses)
-		builder.FlowNodeBuilder.ProtocolEvents.AddConsumer(idEvents)
+		idEvents := gadgets.NewIdentityDeltas(builder.Middleware.UpdateNodeAddresses)
+		builder.ProtocolEvents.AddConsumer(idEvents)
 
-		return builder.FlowNodeBuilder.Network, nil
+		return builder.Network, nil
 	})
 }
 
@@ -687,8 +687,8 @@ func (builder *FollowerServiceBuilder) enqueuePublicNetworkInit() {
 // discovered by other observers if it subscribes to a topic before connecting to the staked AN. Hence, the need
 // of an explicit connect to the staked AN before the node attempts to subscribe to topics.
 func (builder *FollowerServiceBuilder) enqueueConnectWithStakedAN() {
-	builder.FlowNodeBuilder.Component("upstream connector", func(_ *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		return upstream.NewUpstreamConnector(builder.bootstrapIdentities, builder.LibP2PNode, builder.FlowNodeBuilder.Logger), nil
+	builder.Component("upstream connector", func(_ *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		return upstream.NewUpstreamConnector(builder.bootstrapIdentities, builder.LibP2PNode, builder.Logger), nil
 	})
 }
 
@@ -704,7 +704,7 @@ func (builder *FollowerServiceBuilder) initMiddleware(nodeID flow.Identifier,
 		factoryFunc,
 		nodeID,
 		networkMetrics,
-		builder.FlowNodeBuilder.SporkID,
+		builder.SporkID,
 		p2p.DefaultUnicastTimeout,
 		builder.IDTranslator,
 		builder.CodecFactory(),
@@ -714,5 +714,5 @@ func (builder *FollowerServiceBuilder) initMiddleware(nodeID flow.Identifier,
 		// use default identifier provider
 	)
 
-	return builder.FlowNodeBuilder.Middleware
+	return builder.Middleware
 }
