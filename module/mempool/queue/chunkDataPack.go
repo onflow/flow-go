@@ -27,7 +27,7 @@ func NewChunkDataPackRequestQueue(sizeLimit uint32, logger zerolog.Logger, colle
 		cache: herocache.NewCache(
 			sizeLimit,
 			herocache.DefaultOversizeFactor,
-			heropool.LRUEjection,
+			heropool.NoEjection,
 			logger.With().Str("mempool", "chunk-data-pack-request-queue-herocache").Logger(),
 			collector),
 		sizeLimit: uint(sizeLimit),
@@ -42,6 +42,9 @@ func (c *ChunkDataPackRequestQueue) Push(chunkId flow.Identifier, requesterId fl
 	defer c.mu.Unlock()
 
 	if c.cache.Size() >= c.sizeLimit {
+		// we check size before attempt on a push,
+		// although HeroCache is on no-ejection mode and discards pushes beyond limit,
+		// we save an id computation by just checking the size here.
 		return false
 	}
 
