@@ -49,6 +49,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	edrequester "github.com/onflow/flow-go/module/state_synchronization/requester"
+	"github.com/onflow/flow-go/module/synchronization"
 	consensus_follower "github.com/onflow/flow-go/module/upstream"
 	"github.com/onflow/flow-go/network"
 	netcache "github.com/onflow/flow-go/network/cache"
