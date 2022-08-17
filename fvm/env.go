@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"go.opentelemetry.io/otel/attribute"
@@ -42,8 +43,6 @@ type Environment interface {
 // TODO(patrick): rename the method names to match meter.Meter interface.
 type MeterInterface interface {
 	Meter(common.ComputationKind, uint) error
-
-	meterMemory(kind common.MemoryKind, intensity uint) error
 }
 
 // TODO(patrick): refactor this into an object
@@ -108,9 +107,11 @@ func (env *commonEnv) ComputationUsed() uint64 {
 	return uint64(env.sth.TotalComputationUsed())
 }
 
-// TODO(patrick): rm once Meter object has been refactored
 func (env *commonEnv) MeterMemory(usage common.MemoryUsage) error {
-	return env.meterMemory(usage.Kind, uint(usage.Amount))
+	if env.sth.EnforceMemoryLimits() {
+		return env.sth.MeterMemory(usage.Kind, uint(usage.Amount))
+	}
+	return nil
 }
 
 // TODO(patrick): rm once Meter object has been refactored
@@ -284,6 +285,75 @@ func storageMBUFixToBytesUInt(result cadence.Value) uint64 {
 	return result.ToGoValue().(uint64) / 100
 }
 
+func (env *commonEnv) GetStorageCapacity(
+	address common.Address,
+) (
+	value uint64,
+	err error,
+) {
+	defer env.StartSpanFromRoot(trace.FVMEnvGetStorageCapacity).End()
+
+	err = env.Meter(meter.ComputationKindGetStorageCapacity, 1)
+	if err != nil {
+		return 0, fmt.Errorf("get storage capacity failed: %w", err)
+	}
+
+	result, invokeErr := InvokeAccountStorageCapacityContract(
+		env.fullEnv,
+		address)
+	if invokeErr != nil {
+		return 0, errors.HandleRuntimeError(invokeErr)
+	}
+
+	// Return type is actually a UFix64 with the unit of megabytes so some
+	// conversion is necessary divide the unsigned int by (1e8 (the scale of
+	// Fix64) / 1e6 (for mega)) to get bytes (rounded down)
+	return storageMBUFixToBytesUInt(result), nil
+}
+
+func (env *commonEnv) GetAccountBalance(
+	address common.Address,
+) (
+	value uint64,
+	err error,
+) {
+	defer env.StartSpanFromRoot(trace.FVMEnvGetAccountBalance).End()
+
+	err = env.Meter(meter.ComputationKindGetAccountBalance, 1)
+	if err != nil {
+		return 0, fmt.Errorf("get account balance failed: %w", err)
+	}
+
+	result, invokeErr := InvokeAccountBalanceContract(env.fullEnv, address)
+	if invokeErr != nil {
+		return 0, errors.HandleRuntimeError(invokeErr)
+	}
+	return result.ToGoValue().(uint64), nil
+}
+
+func (env *commonEnv) GetAccountAvailableBalance(
+	address common.Address,
+) (
+	value uint64,
+	err error,
+) {
+	defer env.StartSpanFromRoot(trace.FVMEnvGetAccountBalance).End()
+
+	err = env.Meter(meter.ComputationKindGetAccountAvailableBalance, 1)
+	if err != nil {
+		return 0, fmt.Errorf("get account available balance failed: %w", err)
+	}
+
+	result, invokeErr := InvokeAccountAvailableBalanceContract(
+		env.fullEnv,
+		address)
+
+	if invokeErr != nil {
+		return 0, errors.HandleRuntimeError(invokeErr)
+	}
+	return result.ToGoValue().(uint64), nil
+}
+
 func (env *commonEnv) GetAccountContractNames(address runtime.Address) ([]string, error) {
 	defer env.StartSpanFromRoot(trace.FVMEnvGetAccountContractNames).End()
 
@@ -300,6 +370,80 @@ func (env *commonEnv) GetAccountContractNames(address runtime.Address) ([]string
 	}
 
 	return env.accounts.GetContractNames(a)
+}
+
+func (env *commonEnv) ResolveLocation(
+	identifiers []runtime.Identifier,
+	location runtime.Location,
+) ([]runtime.ResolvedLocation, error) {
+	defer env.StartExtensiveTracingSpanFromRoot(trace.FVMEnvResolveLocation).End()
+
+	err := env.Meter(meter.ComputationKindResolveLocation, 1)
+	if err != nil {
+		return nil, fmt.Errorf("resolve location failed: %w", err)
+	}
+
+	addressLocation, isAddress := location.(common.AddressLocation)
+
+	// if the location is not an address location, e.g. an identifier location
+	// (`import Crypto`), then return a single resolved location which declares
+	// all identifiers.
+	if !isAddress {
+		return []runtime.ResolvedLocation{
+			{
+				Location:    location,
+				Identifiers: identifiers,
+			},
+		}, nil
+	}
+
+	// if the location is an address,
+	// and no specific identifiers where requested in the import statement,
+	// then fetch all identifiers at this address
+	if len(identifiers) == 0 {
+		address := flow.Address(addressLocation.Address)
+
+		err := env.accounts.CheckAccountNotFrozen(address)
+		if err != nil {
+			return nil, fmt.Errorf("resolving location's account frozen check failed: %w", err)
+		}
+
+		contractNames, err := env.contracts.GetContractNames(
+			addressLocation.Address)
+		if err != nil {
+			return nil, fmt.Errorf("resolving location failed: %w", err)
+		}
+
+		// if there are no contractNames deployed,
+		// then return no resolved locations
+		if len(contractNames) == 0 {
+			return nil, nil
+		}
+
+		identifiers = make([]ast.Identifier, len(contractNames))
+
+		for i := range identifiers {
+			identifiers[i] = runtime.Identifier{
+				Identifier: contractNames[i],
+			}
+		}
+	}
+
+	// return one resolved location per identifier.
+	// each resolved location is an address contract location
+	resolvedLocations := make([]runtime.ResolvedLocation, len(identifiers))
+	for i := range resolvedLocations {
+		identifier := identifiers[i]
+		resolvedLocations[i] = runtime.ResolvedLocation{
+			Location: common.AddressLocation{
+				Address: addressLocation.Address,
+				Name:    identifier.Identifier,
+			},
+			Identifiers: []runtime.Identifier{identifier},
+		}
+	}
+
+	return resolvedLocations, nil
 }
 
 func (env *commonEnv) GetCode(location runtime.Location) ([]byte, error) {
@@ -437,6 +581,49 @@ func (env *commonEnv) Commit() (programs.ModifiedSets, error) {
 	}, err
 }
 
+func (env *commonEnv) VerifySignature(
+	signature []byte,
+	tag string,
+	signedData []byte,
+	publicKey []byte,
+	signatureAlgorithm runtime.SignatureAlgorithm,
+	hashAlgorithm runtime.HashAlgorithm,
+) (
+	bool,
+	error,
+) {
+	defer env.StartSpanFromRoot(trace.FVMEnvVerifySignature).End()
+
+	err := env.Meter(meter.ComputationKindVerifySignature, 1)
+	if err != nil {
+		return false, fmt.Errorf("verify signature failed: %w", err)
+	}
+
+	valid, err := crypto.VerifySignatureFromRuntime(
+		signature,
+		tag,
+		signedData,
+		publicKey,
+		signatureAlgorithm,
+		hashAlgorithm,
+	)
+
+	if err != nil {
+		return false, fmt.Errorf("verify signature failed: %w", err)
+	}
+
+	return valid, nil
+}
+
+func (env *commonEnv) ValidatePublicKey(pk *runtime.PublicKey) error {
+	err := env.Meter(meter.ComputationKindValidatePublicKey, 1)
+	if err != nil {
+		return fmt.Errorf("validate public key failed: %w", err)
+	}
+
+	return crypto.ValidatePublicKey(pk.SignAlgo, pk.PublicKey)
+}
+
 func (commonEnv) BLSVerifyPOP(pk *runtime.PublicKey, sig []byte) (bool, error) {
 	return crypto.VerifyPOP(pk, sig)
 }
@@ -472,4 +659,30 @@ func (env *commonEnv) AllocateStorageIndex(owner []byte) (atree.StorageIndex, er
 		return atree.StorageIndex{}, fmt.Errorf("storage address allocation failed: %w", err)
 	}
 	return v, nil
+}
+
+// GetAccountKey retrieves a public key by index from an existing account.
+//
+// This function returns a nil key with no errors, if a key doesn't exist at
+// the given index. An error is returned if the specified account does not
+// exist, the provided index is not valid, or if the key retrieval fails.
+func (env *commonEnv) GetAccountKey(
+	address runtime.Address,
+	keyIndex int,
+) (
+	*runtime.AccountKey,
+	error,
+) {
+	defer env.StartSpanFromRoot(trace.FVMEnvGetAccountKey).End()
+
+	err := env.Meter(meter.ComputationKindGetAccountKey, 1)
+	if err != nil {
+		return nil, fmt.Errorf("get account key failed: %w", err)
+	}
+
+	accKey, err := env.accountKeys.GetAccountKey(address, keyIndex)
+	if err != nil {
+		return nil, fmt.Errorf("get account key failed: %w", err)
+	}
+	return accKey, err
 }
