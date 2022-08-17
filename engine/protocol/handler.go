@@ -37,6 +37,29 @@ func WithBlockSignerDecoder(signerIndicesDecoder hotstuff.BlockSignerDecoder) fu
 	}
 }
 
+func (h *Handler) GetNetworkParameters(
+	ctx context.Context,
+	_ *access.GetNetworkParametersRequest,
+) (*access.GetNetworkParametersResponse, error) {
+	params := h.api.GetNetworkParameters(ctx)
+
+	return &access.GetNetworkParametersResponse{
+		ChainId: string(params.ChainID),
+	}, nil
+}
+
+// GetLatestProtocolStateSnapshot returns the latest serializable Snapshot
+func (h *Handler) GetLatestProtocolStateSnapshot(ctx context.Context, req *access.GetLatestProtocolStateSnapshotRequest) (*access.ProtocolStateSnapshotResponse, error) {
+	snapshot, err := h.api.GetLatestProtocolStateSnapshot(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &access.ProtocolStateSnapshotResponse{
+		SerializedSnapshot: snapshot,
+	}, nil
+}
+
 // GetLatestBlockHeader gets the latest sealed block header.
 func (h *Handler) GetLatestBlockHeader(
 	ctx context.Context,

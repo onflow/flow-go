@@ -7,12 +7,19 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
 
+type NetworkAPI interface {
+	GetNetworkParameters(ctx context.Context) access.NetworkParameters
+	GetLatestProtocolStateSnapshot(ctx context.Context) ([]byte, error)
+}
+
 type API interface {
+	NetworkAPI
 	GetLatestBlockHeader(ctx context.Context, isSealed bool) (*flow.Header, error)
 	GetBlockHeaderByID(ctx context.Context, id flow.Identifier) (*flow.Header, error)
 	GetBlockHeaderByHeight(ctx context.Context, height uint64) (*flow.Header, error)
@@ -22,20 +29,23 @@ type API interface {
 }
 
 type backend struct {
-	blocks           storage.Blocks
-	headers          storage.Headers
-	state            protocol.State
+	NetworkAPI
+	blocks  storage.Blocks
+	headers storage.Headers
+	state   protocol.State
 }
 
 func New(
 	state protocol.State,
 	blocks storage.Blocks,
 	headers storage.Headers,
+	network NetworkAPI,
 ) API {
 	return &backend{
-		headers:          headers,
-		blocks:           blocks,
-		state:            state,
+		NetworkAPI: network,
+		headers:    headers,
+		blocks:     blocks,
+		state:      state,
 	}
 }
 
