@@ -12,10 +12,11 @@ import (
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
 
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 )
 
 func TestAccess(t *testing.T) {

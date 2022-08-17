@@ -4,30 +4,24 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"github.com/onflow/cadence"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/flow-core-contracts/lib/go/contracts"
+	"github.com/onflow/flow-core-contracts/lib/go/templates"
+	emulator "github.com/onflow/flow-emulator"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
-	emulator "github.com/onflow/flow-emulator"
-
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
-
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
-
-	"github.com/onflow/flow-core-contracts/lib/go/contracts"
-	"github.com/onflow/flow-core-contracts/lib/go/templates"
-
 	"github.com/onflow/flow-go-sdk/test"
-
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/utils/unittest"
-
-	"github.com/onflow/flow-go/integration/utils"
 )
 
 // Suite tests the quorum certificate voting process against the
