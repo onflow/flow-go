@@ -1,11 +1,7 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package validator
 
 import (
-	"context"
 	"errors"
-	"fmt"
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -22,51 +18,52 @@ var (
 	ErrIdentityUnverified = errors.New("validation failed: could not verify identity of sender")
 )
 
-type validateFunc func(ctx context.Context, from peer.ID, msg interface{}) (string, error)
+type GetIdentityFunc func(peer.ID) (*flow.Identity, bool)
 
 // AuthorizedSenderValidator returns a MessageValidator that will check if the sender of a message is authorized to send the message.
 // The MessageValidator returned will use the getIdentity to get the flow identity for the sender, asserting that the sender is a staked node and not ejected. Otherwise, the message is rejected.
 // The message is also authorized by checking that the sender is allowed to send the message on the channel.
 // If validation fails the message is rejected, and if the validation error is an expected error, slashing data is also collected.
-// Authorization config is defined in message.MsgAuthConfig
-func AuthorizedSenderValidator(log zerolog.Logger, channel channels.Channel, getIdentity func(peer.ID) (*flow.Identity, bool)) validateFunc {
-	log = log.With().
-		Str("component", "authorized_sender_validator").
-		Str("network_channel", channel.String()).
-		Logger()
-
-	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(log)
-
-	return func(ctx context.Context, from peer.ID, msg interface{}) (string, error) {
-		// NOTE: messages from unstaked nodes should be reject by the libP2P node topic validator
-		// before they reach message validators. If a message from a unstaked gets to this point
+// Authorization config is defined in message.MsgAuthConfig.
+func AuthorizedSenderValidator(log zerolog.Logger, slashingViolationsConsumer slashing.ViolationsConsumer, channel channels.Channel, isUnicast bool, getIdentity GetIdentityFunc) MessageValidator {
+	return func(from peer.ID, msg interface{}) (string, error) {
+		// NOTE: messages from unstaked nodes should be rejected by the libP2P node topic validator
+		// before they reach message validators. If a message from a unstaked peer gets to this point
 		// something terrible went wrong.
 		identity, ok := getIdentity(from)
 		if !ok {
-			log.Error().Str("peer_id", from.String()).Msg(fmt.Sprintf("rejecting message: %s", ErrIdentityUnverified))
+			violation := &slashing.Violation{Identity: identity, PeerID: from.String(), Channel: channel, IsUnicast: isUnicast, Err: ErrIdentityUnverified}
+			slashingViolationsConsumer.OnUnAuthorizedSenderError(violation)
 			return "", ErrIdentityUnverified
 		}
 
 		msgType, err := isAuthorizedSender(identity, channel, msg)
+
 		switch {
 		case err == nil:
 			return msgType, nil
 		case message.IsUnknownMsgTypeErr(err):
-			slashingViolationsConsumer.OnUnknownMsgTypeError(identity, from.String(), msgType, err)
+			violation := &slashing.Violation{Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, IsUnicast: isUnicast, Err: err}
+			slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
 			return msgType, err
 		case errors.Is(err, message.ErrUnauthorizedMessageOnChannel) || errors.Is(err, message.ErrUnauthorizedRole):
-			slashingViolationsConsumer.OnUnAuthorizedSenderError(identity, from.String(), msgType, err)
+			violation := &slashing.Violation{Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, IsUnicast: isUnicast, Err: err}
+			slashingViolationsConsumer.OnUnAuthorizedSenderError(violation)
 			return msgType, err
 		case errors.Is(err, ErrSenderEjected):
-			slashingViolationsConsumer.OnSenderEjectedError(identity, from.String(), msgType, err)
+			violation := &slashing.Violation{Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, IsUnicast: isUnicast, Err: err}
+			slashingViolationsConsumer.OnSenderEjectedError(violation)
 			return msgType, ErrSenderEjected
 		default:
+			// this condition should never happen and indicates there's a bug
+			// don't crash as a result of external inputs since that creates a DoS vector
 			log.Error().
 				Err(err).
 				Str("peer_id", from.String()).
 				Str("role", identity.Role.String()).
 				Str("peer_node_id", identity.NodeID.String()).
 				Str("message_type", msgType).
+				Bool("unicast_message", isUnicast).
 				Msg("unexpected error during message validation")
 			return msgType, err
 		}
@@ -75,11 +72,11 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel channels.Channel, get
 
 // AuthorizedSenderMessageValidator wraps the callback returned by AuthorizedSenderValidator and returns
 // MessageValidator callback that returns pubsub.ValidationReject if validation fails and pubsub.ValidationAccept if validation passes.
-func AuthorizedSenderMessageValidator(log zerolog.Logger, channel channels.Channel, getIdentity func(peer.ID) (*flow.Identity, bool)) MessageValidator {
-	return func(ctx context.Context, from peer.ID, msg interface{}) pubsub.ValidationResult {
-		validate := AuthorizedSenderValidator(log, channel, getIdentity)
+func AuthorizedSenderMessageValidator(log zerolog.Logger, slashingViolationsConsumer slashing.ViolationsConsumer, channel channels.Channel, getIdentity GetIdentityFunc) PubSubMessageValidator {
+	return func(from peer.ID, msg interface{}) pubsub.ValidationResult {
+		validate := AuthorizedSenderValidator(log, slashingViolationsConsumer, channel, false, getIdentity)
 
-		_, err := validate(ctx, from, msg)
+		_, err := validate(from, msg)
 		if err != nil {
 			return pubsub.ValidationReject
 		}
