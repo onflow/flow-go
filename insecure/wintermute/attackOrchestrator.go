@@ -95,21 +95,36 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.EgressEvent)
 		err := o.network.SendEgress(event)
 
 		if err != nil {
-			return fmt.Errorf("could not send rpc on channel: %w", err)
+			return fmt.Errorf("could not send rpc egress event on channel: %w", err)
 		}
 		o.logger.Debug().
-			Hex("corrupted_node_id", logging.ID(event.CorruptOriginId)).
-			Str("channel_id", string(event.Channel)).
+			Hex("corrupt_origin_id", logging.ID(event.CorruptOriginId)).
+			Str("channel", string(event.Channel)).
 			Str("protocol", event.Protocol.String()).
 			Str("type", fmt.Sprintf("%T", event)).
-			Msg("miscellaneous event has passed through")
+			Msg("egress event has passed through")
 	}
 
 	return nil
 }
 
+// HandleEventToCorruptedNode implements logic of processing the incoming (ingress) events to a corrupt node.
+// Wintermute orchestrator doesn't corrupt ingress events, so it just passes them through.
 func (o *Orchestrator) HandleEventToCorruptedNode(event *insecure.IngressEvent) error {
-	panic("unimplemented")
+	err := o.network.SendIngress(event)
+
+	if err != nil {
+		return fmt.Errorf("could not send rpc ingress event on channel: %w", err)
+	}
+	o.logger.Debug().
+		Hex("origin_id", logging.ID(event.OriginID)).
+		Str("channel", string(event.Channel)).
+		Str("corrupt_target_id", fmt.Sprintf("%v", event.CorruptTargetID)).
+		Str("flow_protocol_event", fmt.Sprintf("%T", event.FlowProtocolEvent)).
+		Str("type", fmt.Sprintf("%T", event)).
+		Msg("ingress event has passed through")
+
+	return nil
 }
 
 // corruptExecutionResult creates a corrupted version of the input receipt by tampering its content so that

@@ -43,7 +43,7 @@ func NewDummyOrchestrator(logger zerolog.Logger) *dummyOrchestrator {
 	}
 }
 
-// HandleEventFromCorruptedNode implements logic of processing the events received from a corrupted node.
+// HandleEventFromCorruptedNode implements logic of processing the outgoing (egress) events received from a corrupted node.
 //
 // In Corruptible Conduit Framework for BFT testing, corrupted nodes relay their outgoing events to
 // the attacker instead of dispatching them to the network.
@@ -53,7 +53,7 @@ func NewDummyOrchestrator(logger zerolog.Logger) *dummyOrchestrator {
 // dispatch them on the Flow network.
 func (d *dummyOrchestrator) HandleEventFromCorruptedNode(event *insecure.EgressEvent) error {
 	lg := d.logger.With().
-		Hex("corrupted_id", logging.ID(event.CorruptOriginId)).
+		Hex("corrupt_origin_id", logging.ID(event.CorruptOriginId)).
 		Str("channel", event.Channel.String()).
 		Str("protocol", event.Protocol.String()).
 		Uint32("target_num", event.TargetNum).
@@ -74,15 +74,30 @@ func (d *dummyOrchestrator) HandleEventFromCorruptedNode(event *insecure.EgressE
 	err := d.orchestratorNetwork.SendEgress(event)
 	if err != nil {
 		// dummy orchestrator is used for testing and upon error we want it to crash.
-		lg.Fatal().Err(err).Msg("could not pass through incoming event")
+		lg.Fatal().Err(err).Msg("could not pass through egress event")
 		return err
 	}
-	lg.Info().Msg("incoming event passed through successfully")
+	lg.Info().Msg("egress event passed through successfully")
 	return nil
 }
 
+// HandleEventToCorruptedNode implements logic of processing the incoming (ingress) events to a corrupt node.
 func (d *dummyOrchestrator) HandleEventToCorruptedNode(event *insecure.IngressEvent) error {
-	panic("Unimplemented")
+	lg := d.logger.With().
+		Hex("origin_id", logging.ID(event.OriginID)).
+		Str("channel", event.Channel.String()).
+		Str("corrupt_target_id", fmt.Sprintf("%v", event.CorruptTargetID)).
+		Str("flow_protocol_event", fmt.Sprintf("%T", event.FlowProtocolEvent)).Logger()
+
+	err := d.orchestratorNetwork.SendIngress(event)
+
+	if err != nil {
+		// dummy orchestrator is used for testing and upon error we want it to crash.
+		lg.Fatal().Err(err).Msg("could not pass through ingress event")
+		return err
+	}
+	lg.Info().Msg("ingress event passed through successfully")
+	return nil
 }
 
 func (d *dummyOrchestrator) Register(orchestratorNetwork insecure.OrchestratorNetwork) {
