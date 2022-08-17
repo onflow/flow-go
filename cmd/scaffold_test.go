@@ -527,113 +527,86 @@ func testErrorHandler(logger *testLog, expected error) component.OnError {
 	}
 }
 
-func newTestReadyDone(logger *testLog, name string) *testReadyDone {
-	return &testReadyDone{
-		name:    name,
-		logger:  logger,
-		readyFn: func(string) {},
-		doneFn:  func(string) {},
-		ready:   make(chan struct{}),
-		done:    make(chan struct{}),
-	}
-}
+func TestDependableComponentWaitForDependencies(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
 
-type testReadyDone struct {
-	name   string
-	logger *testLog
+	nb := FlowNode("scaffold test")
+	nb.componentBuilder = component.NewComponentManagerBuilder()
 
-	readyFn func(string)
-	doneFn  func(string)
+	logger := &testLog{}
 
-	ready chan struct{}
-	done  chan struct{}
+	// Components 1 & 2 are DependableComponents
+	// Component 3 is a normal Component
+	// 1 depends on 3
+	// 2 depends on 1
+	// Start order should be 3, 1, 2
 
-	started bool
-	stopped bool
-	mu      sync.Mutex
-}
+	component1Dependable := module.NewProxiedReadyDoneAware()
+	component3Dependable := module.NewProxiedReadyDoneAware()
 
-func (c *testReadyDone) Ready() <-chan struct{} {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if !c.started {
-		c.started = true
-		go func() {
-			c.readyFn(c.name)
+	name1 := "component 1"
+	nb.DependableComponent(name1, func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		logger.Logf("%s initialized", name1)
+		c := newTestComponent(logger, name1)
+		component1Dependable.Init(c)
+		return c, nil
+	}, []module.ReadyDoneAware{component3Dependable})
 
-			c.logger.Logf("%s ready", c.name)
-			close(c.ready)
-		}()
-	}
+	name2 := "component 2"
+	nb.DependableComponent(name2, func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		logger.Logf("%s initialized", name2)
+		return newTestComponent(logger, name2), nil
+	}, []module.ReadyDoneAware{component1Dependable})
 
-	return c.ready
-}
+	name3 := "component 3"
+	nb.Component(name3, func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		logger.Logf("%s initialized", name3)
+		c := newTestComponent(logger, name3)
+		c.startFn = func(ctx irrecoverable.SignalerContext, name string) {
+			// add delay to test components are run serially
+			time.Sleep(5 * time.Millisecond)
+		}
+		component3Dependable.Init(c)
+		return c, nil
+	})
 
-func (c *testReadyDone) Done() <-chan struct{} {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if !c.stopped {
-		c.stopped = true
-		go func() {
-			c.doneFn(c.name)
+	err := nb.handleComponents()
+	require.NoError(t, err)
 
-			c.logger.Logf("%s done", c.name)
-			close(c.done)
-		}()
-	}
+	cm := nb.componentBuilder.Build()
 
-	return c.done
-}
+	cm.Start(signalerCtx)
+	<-cm.Ready()
 
-func newTestComponent(logger *testLog, name string) *testComponent {
-	return &testComponent{
-		name:    name,
-		logger:  logger,
-		readyFn: func(string) {},
-		doneFn:  func(string) {},
-		startFn: func(irrecoverable.SignalerContext, string) {},
-		ready:   make(chan struct{}),
-		done:    make(chan struct{}),
-	}
-}
+	cancel()
+	<-cm.Done()
 
-type testComponent struct {
-	name   string
-	logger *testLog
+	logs := logger.logs
 
-	readyFn func(string)
-	doneFn  func(string)
-	startFn func(irrecoverable.SignalerContext, string)
+	assert.Len(t, logs, 12)
 
-	ready chan struct{}
-	done  chan struct{}
-}
+	// components are initialized in a specific order, so check that the order is correct
+	startLogs := logs[:len(logs)-3]
+	assert.Equal(t, []string{
+		"component 3 initialized",
+		"component 3 started",
+		"component 3 ready",
+		"component 1 initialized",
+		"component 1 started",
+		"component 1 ready",
+		"component 2 initialized",
+		"component 2 started",
+		"component 2 ready",
+	}, startLogs)
 
-func (c *testComponent) Start(ctx irrecoverable.SignalerContext) {
-	c.startFn(ctx, c.name)
-	c.logger.Logf("%s started", c.name)
-
-	go func() {
-		c.readyFn(c.name)
-		c.logger.Logf("%s ready", c.name)
-		close(c.ready)
-	}()
-
-	go func() {
-		<-ctx.Done()
-
-		c.doneFn(c.name)
-		c.logger.Logf("%s done", c.name)
-		close(c.done)
-	}()
-}
-
-func (c *testComponent) Ready() <-chan struct{} {
-	return c.ready
-}
-
-func (c *testComponent) Done() <-chan struct{} {
-	return c.done
+	// components are stopped via context cancellation, so the specific order is random
+	doneLogs := logs[len(logs)-3:]
+	assert.ElementsMatch(t, []string{
+		"component 1 done",
+		"component 2 done",
+		"component 3 done",
+	}, doneLogs)
 }
 
 func TestCreateUploader(t *testing.T) {
