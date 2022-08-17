@@ -2,7 +2,6 @@ package network
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -62,7 +61,7 @@ func TestNetwork(t *testing.T) {
 	targets := ids[1:]
 
 	event := &message.TestMessage{
-		Text: fmt.Sprintf("hello"),
+		Text: "hello",
 	}
 
 	// kick off a read loop for each of the nodes (except the first)
