@@ -223,7 +223,7 @@ func (builder *FollowerServiceBuilder) buildFollowerCore() *FollowerServiceBuild
 }
 
 func (builder *FollowerServiceBuilder) buildFollowerEngine() *FollowerServiceBuilder {
-	builderr.Component("follower engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+	builder.Component("follower engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		// initialize cleaner for DB
 		cleaner := storage.NewCleaner(node.Logger, node.DB, builder.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
 		conCache := buffer.NewPendingBlocks()
@@ -621,22 +621,22 @@ func (builder *FollowerServiceBuilder) initObserverLocal() func(node *cmd.NodeCo
 // this needs to be done before sync engine participants module
 func (builder *FollowerServiceBuilder) enqueueMiddleware() {
 	builder.
-		FlowNodeBuilder.Module("network middleware", func(node *cmd.NodeConfig) error {
+		Module("network middleware", func(node *cmd.NodeConfig) error {
 
-		// NodeID for the observer on the observer network
-		observerNodeID := node.NodeID
+			// NodeID for the observer on the observer network
+			observerNodeID := node.NodeID
 
-		// Networking key
-		observerNetworkKey := node.NetworkKey
+			// Networking key
+			observerNetworkKey := node.NetworkKey
 
-		libP2PFactory := builder.initLibP2PFactory(observerNetworkKey)
+			libP2PFactory := builder.initLibP2PFactory(observerNetworkKey)
 
-		msgValidators := publicNetworkMsgValidators(node.Logger, node.IdentityProvider, observerNodeID)
+			msgValidators := publicNetworkMsgValidators(node.Logger, node.IdentityProvider, observerNodeID)
 
-		builder.initMiddleware(observerNodeID, node.Metrics.Network, libP2PFactory, msgValidators...)
+			builder.initMiddleware(observerNodeID, node.Metrics.Network, libP2PFactory, msgValidators...)
 
-		return nil
-	})
+			return nil
+		})
 }
 
 // Build enqueues the sync engine and the follower engine for the observer.
