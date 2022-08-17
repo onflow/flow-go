@@ -330,13 +330,13 @@ func (n *Network) eventToIngressMessage(event interface{}, channel channels.Chan
 	if err != nil {
 		return nil, fmt.Errorf("could not encode event: %w", err)
 	}
+	myId := n.me.NodeID()
 
 	ingressMsg := &insecure.IngressMessage{
-		ChannelID: channel.String(),
-		OriginID:  originId[:],
-		//TODO need to process CorruptTargetID
-		//CorruptTargetID:
-		Payload: payload,
+		ChannelID:       channel.String(),
+		OriginID:        originId[:],
+		CorruptTargetID: myId[:],
+		Payload:         payload,
 	}
 
 	msg := &insecure.Message{
@@ -457,14 +457,14 @@ func (n *Network) HandleIncomingEvent(channel channels.Channel, originId flow.Id
 
 	msg, err := n.eventToIngressMessage(event, channel, originId)
 	if err != nil {
-		n.logger.Fatal().Msgf("could not convert event to message: %s", err)
+		lg.Fatal().Err(err).Msg("could not convert event to ingress message")
 	}
 
 	err = n.attackerInboundStream.Send(msg)
 	if err != nil {
-		n.logger.Fatal().Msgf("could not send message to attacker to observe: %s", err)
+		lg.Fatal().Err(err).Msg("could not send message to attacker to observe")
 	}
 
-	lg.Info().Msg("event sent to attacker")
+	lg.Info().Msg("ingress event successfully sent to attacker")
 	return true
 }
