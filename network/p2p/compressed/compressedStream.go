@@ -80,9 +80,12 @@ func (c *compressedStream) Close() error {
 		return fmt.Errorf("could not close original libp2p stream: %w", err)
 	}
 
-	// closing gzip writer, we expect a stream reset error as we are closing it post closing the
-	// original libp2p stream.
-	if err := c.w.Close(); err != nil && !strings.Contains(err.Error(), "stream reset") {
+	if err := c.w.Close(); err != nil {
+		if strings.Contains(err.Error(), "stream reset") || strings.Contains(err.Error(), "stream closed") {
+			// closing gzip writer, we expect a stream reset or closed error as we are closing it post closing the
+			// original libp2p stream.
+			return nil
+		}
 		return fmt.Errorf("could not close gzip writer: %w", err)
 	}
 
