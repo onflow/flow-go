@@ -95,7 +95,7 @@ func (s *StateHolder) MemoryIntensities() meter.MeteredMemoryIntensities {
 	return s.activeState.MemoryIntensities()
 }
 
-func (s *StateHolder) TotalMemoryEstimate() uint {
+func (s *StateHolder) TotalMemoryEstimate() uint64 {
 	return s.activeState.TotalMemoryEstimate()
 }
 
