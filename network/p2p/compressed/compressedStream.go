@@ -3,6 +3,7 @@ package compressed
 import (
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 
 	"github.com/libp2p/go-libp2p-core/network"
@@ -74,7 +75,16 @@ func (c *compressedStream) Read(b []byte) (int, error) {
 func (c *compressedStream) Close() error {
 	c.writeLock.Lock()
 	defer c.writeLock.Unlock()
-	defer c.w.Close()
 
-	return c.Stream.Close()
+	if err := c.Stream.Close(); err != nil {
+		return fmt.Errorf("could not close original libp2p stream: %w", err)
+	}
+
+	// closing gzip writer, we expect a stream reset error as we are closing it post closing the
+	// original libp2p stream.
+	if err := c.w.Close(); err != nil && strings.Contains(err.Error(), "stream reset") {
+		return fmt.Errorf("could not close gzip writer: %w", err)
+	}
+
+	return nil
 }
