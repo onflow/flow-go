@@ -111,9 +111,6 @@ type AccessNodeConfig struct {
 	executionDataConfig          edrequester.ExecutionDataConfig
 	baseOptions                  []cmd.Option
 
-	executionDataPrunerHeightRangeTarget uint64
-	executionDataPrunerThreshold         uint64
-
 	PublicNetworkConfig PublicNetworkConfig
 }
 
