@@ -1003,7 +1003,6 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 				node.State,
 				node.Storage.Blocks,
 				node.Storage.Headers,
-				node.Storage.Results,
 			)),
 		}
 

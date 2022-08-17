@@ -25,20 +25,17 @@ type backend struct {
 	blocks           storage.Blocks
 	headers          storage.Headers
 	state            protocol.State
-	executionResults storage.ExecutionResults
 }
 
 func New(
 	state protocol.State,
 	blocks storage.Blocks,
 	headers storage.Headers,
-	executionResults storage.ExecutionResults,
 ) API {
 	return &backend{
 		headers:          headers,
 		blocks:           blocks,
 		state:            state,
-		executionResults: executionResults,
 	}
 }
 
