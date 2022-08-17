@@ -623,7 +623,6 @@ func (builder *ObserverServiceBuilder) initNetwork(nodeID module.Local,
 		IdentityProvider:    builder.IdentityProvider,
 		ReceiveCache:        receiveCache,
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize network: %w", err)
 	}
@@ -908,7 +907,7 @@ func (builder *ObserverServiceBuilder) Build() (cmd.Node, error) {
 	if builder.executionDataSyncEnabled {
 		builder.BuildExecutionDataRequester()
 	}
-	return builder.Build()
+	return builder.FlowNodeBuilder.Build()
 }
 
 // enqueuePublicNetworkInit enqueues the observer network component initialized for the observer
