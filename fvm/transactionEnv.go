@@ -62,6 +62,7 @@ func NewTransactionEnvironment(
 			Tracer: tracer,
 			ProgramLogger: environment.NewProgramLogger(
 				tracer,
+				ctx.Logger,
 				ctx.Metrics,
 				ctx.CadenceLoggingEnabled,
 			),
