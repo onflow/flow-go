@@ -120,14 +120,14 @@ func (e *ReactorEngine) Done() <-chan struct{} {
 
 // EpochSetupPhaseStarted handles the EpochSetupPhaseStarted protocol event by
 // starting the DKG process.
-// NOTE: ReactorEngine will not recover form mid-DKG crashes, therefore we do not need to handle dropped protocol events here.
+// NOTE: ReactorEngine will not recover from mid-DKG crashes, therefore we do not need to handle dropped protocol events here.
 func (e *ReactorEngine) EpochSetupPhaseStarted(currentEpochCounter uint64, first *flow.Header) {
 	e.startDKGForEpoch(currentEpochCounter, first)
 }
 
 // EpochCommittedPhaseStarted handles the EpochCommittedPhaseStarted protocol
 // event by checking the consistency of our locally computed key share.
-// NOTE: ReactorEngine will not recover form mid-DKG crashes, therefore we do not need to handle dropped protocol events here.
+// NOTE: ReactorEngine will not recover from mid-DKG crashes, therefore we do not need to handle dropped protocol events here.
 func (e *ReactorEngine) EpochCommittedPhaseStarted(currentEpochCounter uint64, first *flow.Header) {
 	e.handleEpochCommittedPhaseStarted(currentEpochCounter, first)
 }
