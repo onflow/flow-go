@@ -15,7 +15,6 @@ import (
 	mockinsecure "github.com/onflow/flow-go/insecure/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -31,14 +30,14 @@ func TestAttackNetworkObserve_MultipleConcurrentMessages(t *testing.T) {
 // decodes the messages into events and relays them to its registered orchestrator.
 func testAttackNetworkObserve(t *testing.T, concurrencyDegree int) {
 	// creates event fixtures and their corresponding messages.
-	messages, events, corruptedIds := insecure.MessageFixtures(t, cbor.NewCodec(), insecure.Protocol_MULTICAST, concurrencyDegree)
+	messages, events, corruptedIds := insecure.EgressMessageFixtures(t, unittest.NetworkCodec(), insecure.Protocol_MULTICAST, concurrencyDegree)
 
 	withMockOrchestrator(
 		t,
 		corruptedIds,
 		func(network *AttackNetwork, orchestrator *mockinsecure.AttackOrchestrator, ccfs []*mockCorruptibleConduitFactory) {
 			// mocks orchestrator to receive each event exactly once.
-			orchestratorWG := mockOrchestratorHandlingEvent(t, orchestrator, events)
+			orchestratorWG := mockOrchestratorHandlingEgressEvent(t, orchestrator, events)
 
 			// sends all messages concurrently to the attack network (imitating corruptible conduits sending
 			// messages concurrently to attack network).
@@ -91,7 +90,7 @@ func TestAttackNetworkPublish_ConcurrentMessages(t *testing.T) {
 // By a corrupted node here, we mean a node that runs with a corruptible conduit factory.
 func testAttackNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegree int) {
 	// creates event fixtures and their corresponding messages.
-	_, events, corruptedIds := insecure.MessageFixtures(t, cbor.NewCodec(), protocol, concurrencyDegree)
+	_, events, corruptedIds := insecure.EgressMessageFixtures(t, unittest.NetworkCodec(), protocol, concurrencyDegree)
 
 	withMockOrchestrator(t,
 		corruptedIds,
@@ -106,7 +105,7 @@ func testAttackNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegr
 				// testing message delivery from attack network to ccfs
 				go func() {
 					msg := <-ccf.attackerMsg
-					matchEventForMessage(t, events, msg, corruptedId.NodeID)
+					matchEgressEventForMessage(t, events, msg, corruptedId.NodeID)
 					attackerMsgReceived.Done()
 				}()
 			}
@@ -131,21 +130,21 @@ func testAttackNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegr
 		})
 }
 
-// mackEventForMessage fails the test if given message is not meant to be sent on behalf of the corrupted id, or it does not correspond to any
+// matchEgressEventForMessage fails the test if given message is not meant to be sent on behalf of the corrupted id, or it does not correspond to any
 // of the given events.
-func matchEventForMessage(t *testing.T, events []*insecure.Event, message *insecure.Message, corruptedId flow.Identifier) {
-	codec := cbor.NewCodec()
+func matchEgressEventForMessage(t *testing.T, events []*insecure.EgressEvent, message *insecure.Message, corruptedId flow.Identifier) {
+	codec := unittest.NetworkCodec()
 
-	require.Equal(t, corruptedId[:], message.OriginID[:])
+	require.Equal(t, corruptedId[:], message.Egress.OriginID[:])
 
 	for _, event := range events {
 		if event.CorruptedNodeId == corruptedId {
-			require.Equal(t, event.Channel.String(), message.ChannelID)
-			require.Equal(t, event.Protocol, message.Protocol)
-			require.Equal(t, flow.IdsToBytes(event.TargetIds), message.TargetIDs)
-			require.Equal(t, event.TargetNum, message.TargetNum)
+			require.Equal(t, event.Channel.String(), message.Egress.ChannelID)
+			require.Equal(t, event.Protocol, message.Egress.Protocol)
+			require.Equal(t, flow.IdsToBytes(event.TargetIds), message.Egress.TargetIDs)
+			require.Equal(t, event.TargetNum, message.Egress.TargetNum)
 
-			content, err := codec.Decode(message.Payload)
+			content, err := codec.Decode(message.Egress.Payload)
 			require.NoError(t, err)
 
 			require.Equal(t, event.FlowProtocolEvent, content)
@@ -174,7 +173,7 @@ func withMockOrchestrator(t *testing.T,
 
 			attackNetwork, err := NewAttackNetwork(
 				unittest.Logger(),
-				cbor.NewCodec(),
+				unittest.NetworkCodec(),
 				orchestrator,
 				connector,
 				corruptedIds)
@@ -220,19 +219,19 @@ func withMockOrchestrator(t *testing.T,
 		})
 }
 
-// mockOrchestratorHandlingEvent mocks the given orchestrator to receive each of the given events exactly once. The returned wait group is
+// mockOrchestratorHandlingEgressEvent mocks the given orchestrator to receive each of the given egress events exactly once. The returned wait group is
 // released when individual events are seen by orchestrator exactly once.
-func mockOrchestratorHandlingEvent(t *testing.T, orchestrator *mockinsecure.AttackOrchestrator, events []*insecure.Event) *sync.WaitGroup {
+func mockOrchestratorHandlingEgressEvent(t *testing.T, orchestrator *mockinsecure.AttackOrchestrator, egressEvents []*insecure.EgressEvent) *sync.WaitGroup {
 	orchestratorWG := &sync.WaitGroup{}
-	orchestratorWG.Add(len(events)) // keeps track of total events that orchestrator receives
+	orchestratorWG.Add(len(egressEvents)) // keeps track of total egress events that orchestrator receives
 
 	mu := sync.Mutex{}
-	seen := make(map[*insecure.Event]struct{}) // keeps track of unique events received by orchestrator
+	seen := make(map[*insecure.EgressEvent]struct{}) // keeps track of unique egress events received by orchestrator
 	orchestrator.On("HandleEventFromCorruptedNode", mock.Anything).Run(func(args mock.Arguments) {
 		mu.Lock()
 		defer mu.Unlock()
 
-		e, ok := args[0].(*insecure.Event)
+		e, ok := args[0].(*insecure.EgressEvent)
 		require.True(t, ok)
 
 		// event should not be seen before.
@@ -240,7 +239,7 @@ func mockOrchestratorHandlingEvent(t *testing.T, orchestrator *mockinsecure.Atta
 		require.False(t, ok)
 
 		// received event by orchestrator must be an expected one.
-		require.Contains(t, events, e)
+		require.Contains(t, egressEvents, e)
 		seen[e] = struct{}{}
 		orchestratorWG.Done()
 

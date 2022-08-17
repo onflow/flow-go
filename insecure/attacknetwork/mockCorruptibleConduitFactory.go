@@ -42,7 +42,7 @@ func newMockCorruptibleConduitFactory() *mockCorruptibleConduitFactory {
 
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			factory.start(ctx, "localhost:0")
+			factory.start(ctx, insecure.DefaultAddress)
 
 			ready()
 

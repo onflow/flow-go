@@ -58,7 +58,7 @@ unittest-main:
 .PHONY: install-mock-generators
 install-mock-generators:
 	cd ${GOPATH}; \
-    go install github.com/vektra/mockery/v2@v2.13.0; \
+    go install github.com/vektra/mockery/v2@v2.13.1; \
     go install github.com/golang/mock/mockgen@v1.3.1;
 
 ############################################################################################
@@ -123,7 +123,9 @@ generate-mocks:
 	mockgen -destination=module/mocks/network.go -package=mocks github.com/onflow/flow-go/module Local,Requester
 	mockgen -destination=network/mocknetwork/engine.go -package=mocknetwork github.com/onflow/flow-go/network Engine
 	mockgen -destination=network/mocknetwork/mock_network.go -package=mocknetwork github.com/onflow/flow-go/network Network
-	mockery --name '(ExecutionDataService|ExecutionDataCIDCache|ExecutionDataRequester)' --dir=module/state_synchronization --case=underscore --output="./module/state_synchronization/mock" --outpkg="state_synchronization"
+	mockery --name=ExecutionDataStore --dir=module/executiondatasync/execution_data --case=underscore --output="./module/executiondatasync/execution_data/mock" --outpkg="mock"
+	mockery --name=Downloader --dir=module/executiondatasync/execution_data --case=underscore --output="./module/executiondatasync/execution_data/mock" --outpkg="mock"
+	mockery --name 'ExecutionDataRequester' --dir=module/state_synchronization --case=underscore --output="./module/state_synchronization/mock" --outpkg="state_synchronization"
 	mockery --name 'ExecutionState' --dir=engine/execution/state --case=underscore --output="engine/execution/state/mock" --outpkg="mock"
 	mockery --name 'BlockComputer' --dir=engine/execution/computation/computer --case=underscore --output="engine/execution/computation/computer/mock" --outpkg="mock"
 	mockery --name 'ComputationManager' --dir=engine/execution/computation --case=underscore --output="engine/execution/computation/mock" --outpkg="mock"
@@ -147,6 +149,7 @@ generate-mocks:
 	mockery --name '.*' --dir=fvm/state --case=underscore --output="./fvm/mock/state" --outpkg="mock"
 	mockery --name '.*' --dir=ledger --case=underscore --output="./ledger/mock" --outpkg="mock"
 	mockery --name 'SubscriptionManager' --dir=network/ --case=underscore --output="./network/mocknetwork" --outpkg="mocknetwork"
+	mockery --name 'ViolationsConsumer' --dir=network/slashing --case=underscore --output="./network/mocknetwork" --outpkg="mocknetwork"
 	mockery --name 'Vertex' --dir="./module/forest" --case=underscore --output="./module/forest/mock" --outpkg="mock"
 	mockery --name '.*' --dir="./consensus/hotstuff" --case=underscore --output="./consensus/hotstuff/mocks" --outpkg="mocks"
 	mockery --name '.*' --dir="./engine/access/wrapper" --case=underscore --output="./engine/access/mock" --outpkg="mock"
@@ -158,6 +161,7 @@ generate-mocks:
 	mockery --name '.*' --dir=engine/verification/fetcher/ --case=underscore --output="./engine/verification/fetcher/mock" --outpkg="mockfetcher"
 	mockery --name '.*' --dir=insecure/ --case=underscore --output="./insecure/mock"  --outpkg="mockinsecure"
 	mockery --name '.*' --dir=./cmd/util/ledger/reporters --case=underscore --output="./cmd/util/ledger/reporters/mock" --outpkg="mock"
+	mockery --name 'Storage' --dir=module/executiondatasync/tracker --case=underscore --output="module/executiondatasync/tracker/mock" --outpkg="mocktracker"
 
 # this ensures there is no unused dependency being added by accident
 .PHONY: tidy
@@ -472,10 +476,17 @@ PHONY: tool-remove-execution-fork
 tool-remove-execution-fork: docker-build-remove-execution-fork
 	docker container create --name remove-execution-fork $(CONTAINER_REGISTRY)/remove-execution-fork:latest;docker container cp remove-execution-fork:/bin/app ./remove-execution-fork;docker container rm remove-execution-fork
 
-# Check if the go version is 1.16 or higher. flow-go only supports go 1.16 and up.
 .PHONY: check-go-version
 check-go-version:
-	go version | grep '1.1[6-9]'
+	@bash -c '\
+		MINGOVERSION=1.18; \
+		function ver { printf "%d%03d%03d%03d" $$(echo "$$1" | tr . " "); }; \
+		GOVER=$$(go version | sed -rne "s/.* go([0-9.]+).*/\1/p" ); \
+		if [ "$$(ver $$GOVER)" -lt "$$(ver $$MINGOVERSION)" ]; then \
+			echo "go $$GOVER is too old. flow-go only supports go $$MINGOVERSION and up."; \
+			exit 1; \
+		fi; \
+		'
 
 #----------------------------------------------------------------------
 # CD COMMANDS

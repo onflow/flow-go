@@ -5,17 +5,17 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/encoding"
 	"github.com/onflow/flow-go/ledger/common/proof"
 	"github.com/onflow/flow-go/ledger/partial"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 )
 
 func TestExecutionChunkDataPacks(t *testing.T) {
@@ -68,7 +68,7 @@ func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 	// TODO clear messages
 
 	// send a ChunkDataRequest from Ghost node
-	err = gs.Ghost().Send(context.Background(), channels.PushReceipts,
+	err = gs.Ghost().Send(context.Background(), channels.RequestChunks,
 		&messages.ChunkDataRequest{ChunkID: chunkID, Nonce: rand.Uint64()},
 		[]flow.Identifier{gs.exe1ID}...)
 	require.NoError(gs.T(), err)
@@ -80,7 +80,7 @@ func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 	require.Equal(gs.T(), erExe1BlockB.ExecutionResult.Chunks[0].StartState, pack2.ChunkDataPack.StartState)
 
 	// verify state proofs
-	batchProof, err := encoding.DecodeTrieBatchProof(pack2.ChunkDataPack.Proof)
+	batchProof, err := ledger.DecodeTrieBatchProof(pack2.ChunkDataPack.Proof)
 	require.NoError(gs.T(), err)
 
 	isValid := proof.VerifyTrieBatchProof(batchProof, ledger.State(erExe1BlockB.ExecutionResult.Chunks[0].StartState))

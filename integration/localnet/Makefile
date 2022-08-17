@@ -62,14 +62,8 @@ init-light:
 init-short-epochs:
 	$(MAKE) -e EPOCHLEN=200 STAKINGLEN=10 DKGLEN=50 init
 
-# Uninstall logging plugin
-.PHONY: uninstall-docker-plugin
-uninstall-docker-plugin:
-	$(shell docker plugin inspect loki >/dev/null 2>&1 && \
-		(docker plugin disable loki; docker plugin rm loki))
-
 .PHONY: start
-start: uninstall-docker-plugin
+start:
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.metrics.yml up -d --remove-orphans
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml build
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml up -d

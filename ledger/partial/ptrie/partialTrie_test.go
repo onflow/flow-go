@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/utils"
+	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/module/metrics"
 )
@@ -32,8 +32,8 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 
 		// add path1 to the empty trie
 		// 00000000...0 (0)
-		path1 := utils.PathByUint16(0)
-		payload1 := utils.LightPayload('A', 'a')
+		path1 := testutils.PathByUint16(0)
+		payload1 := testutils.LightPayload('A', 'a')
 
 		paths := []ledger.Path{path1}
 		payloads := []*ledger.Payload{payload1}
@@ -55,7 +55,7 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 		require.NoError(t, err, "error updating psmt")
 		ensureRootHash(t, rootHash, psmt)
 
-		updatedPayload1 := utils.LightPayload('B', 'b')
+		updatedPayload1 := testutils.LightPayload('B', 'b')
 		payloads = []*ledger.Payload{updatedPayload1}
 
 		u = &ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads}
@@ -74,11 +74,11 @@ func TestPartialTrieGet(t *testing.T) {
 	pathByteSize := 32
 	withForest(t, pathByteSize, 10, func(t *testing.T, f *mtrie.Forest) {
 
-		path1 := utils.PathByUint16(0)
-		payload1 := utils.LightPayload('A', 'a')
+		path1 := testutils.PathByUint16(0)
+		payload1 := testutils.LightPayload('A', 'a')
 
-		path2 := utils.PathByUint16(1)
-		payload2 := utils.LightPayload('B', 'b')
+		path2 := testutils.PathByUint16(1)
+		payload2 := testutils.LightPayload('B', 'b')
 
 		paths := []ledger.Path{path1, path2}
 		payloads := []*ledger.Payload{payload1, payload2}
@@ -96,8 +96,8 @@ func TestPartialTrieGet(t *testing.T) {
 		ensureRootHash(t, rootHash, psmt)
 
 		t.Run("non-existent key", func(t *testing.T) {
-			path3 := utils.PathByUint16(2)
-			path4 := utils.PathByUint16(4)
+			path3 := testutils.PathByUint16(2)
+			path4 := testutils.PathByUint16(4)
 
 			nonExistentPaths := []ledger.Path{path3, path4}
 			retPayloads, err := psmt.Get(nonExistentPaths)
@@ -119,8 +119,8 @@ func TestPartialTrieGet(t *testing.T) {
 		})
 
 		t.Run("mix of existent and non-existent keys", func(t *testing.T) {
-			path3 := utils.PathByUint16(2)
-			path4 := utils.PathByUint16(4)
+			path3 := testutils.PathByUint16(2)
+			path4 := testutils.PathByUint16(4)
 
 			retPayloads, err := psmt.Get([]ledger.Path{path1, path2, path3, path4})
 			require.Nil(t, retPayloads)
@@ -140,11 +140,11 @@ func TestPartialTrieGetSinglePayload(t *testing.T) {
 	pathByteSize := 32
 	withForest(t, pathByteSize, 10, func(t *testing.T, f *mtrie.Forest) {
 
-		path1 := utils.PathByUint16(0)
-		payload1 := utils.LightPayload('A', 'a')
+		path1 := testutils.PathByUint16(0)
+		payload1 := testutils.LightPayload('A', 'a')
 
-		path2 := utils.PathByUint16(1)
-		payload2 := utils.LightPayload('B', 'b')
+		path2 := testutils.PathByUint16(1)
+		payload2 := testutils.LightPayload('B', 'b')
 
 		paths := []ledger.Path{path1, path2}
 		payloads := []*ledger.Payload{payload1, payload2}
@@ -169,7 +169,7 @@ func TestPartialTrieGetSinglePayload(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, payload2, retPayload)
 
-		path3 := utils.PathByUint16(2)
+		path3 := testutils.PathByUint16(2)
 
 		retPayload, err = psmt.GetSinglePayload(path3)
 		require.Nil(t, retPayload)
@@ -187,13 +187,16 @@ func TestPartialTrieLeafUpdates(t *testing.T) {
 	pathByteSize := 32
 	withForest(t, pathByteSize, 10, func(t *testing.T, f *mtrie.Forest) {
 
-		path1 := utils.PathByUint16(0)
-		payload1 := utils.LightPayload('A', 'a')
-		updatedPayload1 := utils.LightPayload('B', 'b')
+		path1 := testutils.PathByUint16(0)
+		payload1 := testutils.LightPayload('A', 'a')
+		updatedPayload1 := testutils.LightPayload('B', 'b')
 
-		path2 := utils.PathByUint16(1)
-		payload2 := utils.LightPayload('C', 'c')
-		updatedPayload2 := utils.LightPayload('D', 'd')
+		path2 := testutils.PathByUint16(1)
+		payload2 := testutils.LightPayload('C', 'c')
+		updatedPayload2 := testutils.LightPayload('D', 'd')
+
+		path3 := testutils.PathByUint16(2)
+		payload3 := testutils.LightPayload('E', 'e')
 
 		paths := []ledger.Path{path1, path2}
 		payloads := []*ledger.Payload{payload1, payload2}
@@ -217,6 +220,13 @@ func TestPartialTrieLeafUpdates(t *testing.T) {
 		_, err = psmt.Update(paths, payloads)
 		require.NoError(t, err, "error updating psmt")
 		ensureRootHash(t, rootHash, psmt)
+
+		// Update on non-existent leafs
+		_, err = psmt.Update([]ledger.Path{path3}, []*ledger.Payload{payload3})
+		missingPathErr, ok := err.(*ErrMissingPath)
+		require.True(t, ok)
+		require.Equal(t, 1, len(missingPathErr.Paths))
+		require.Equal(t, path3, missingPathErr.Paths[0])
 	})
 
 }
@@ -226,17 +236,17 @@ func TestPartialTrieMiddleBranching(t *testing.T) {
 	pathByteSize := 32
 	withForest(t, pathByteSize, 10, func(t *testing.T, f *mtrie.Forest) {
 
-		path1 := utils.PathByUint16(0)
-		payload1 := utils.LightPayload('A', 'a')
-		updatedPayload1 := utils.LightPayload('B', 'b')
+		path1 := testutils.PathByUint16(0)
+		payload1 := testutils.LightPayload('A', 'a')
+		updatedPayload1 := testutils.LightPayload('B', 'b')
 
-		path2 := utils.PathByUint16(2)
-		payload2 := utils.LightPayload('C', 'c')
-		updatedPayload2 := utils.LightPayload('D', 'd')
+		path2 := testutils.PathByUint16(2)
+		payload2 := testutils.LightPayload('C', 'c')
+		updatedPayload2 := testutils.LightPayload('D', 'd')
 
-		path3 := utils.PathByUint16(8)
-		payload3 := utils.LightPayload('E', 'e')
-		updatedPayload3 := utils.LightPayload('F', 'f')
+		path3 := testutils.PathByUint16(8)
+		payload3 := testutils.LightPayload('E', 'e')
+		updatedPayload3 := testutils.LightPayload('F', 'f')
 
 		paths := []ledger.Path{path1, path2, path3}
 		payloads := []*ledger.Payload{payload1, payload2, payload3}
@@ -274,13 +284,13 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 	pathByteSize := 32
 	withForest(t, pathByteSize, 10, func(t *testing.T, f *mtrie.Forest) {
 
-		path1 := utils.PathByUint16(0)
-		payload1 := utils.LightPayload('A', 'a')
-		updatedPayload1 := utils.LightPayload('B', 'b')
+		path1 := testutils.PathByUint16(0)
+		payload1 := testutils.LightPayload('A', 'a')
+		updatedPayload1 := testutils.LightPayload('B', 'b')
 		//  10000....0
-		path2 := utils.PathByUint16(32768)
-		payload2 := utils.LightPayload('C', 'c')
-		updatedPayload2 := utils.LightPayload('D', 'd')
+		path2 := testutils.PathByUint16(32768)
+		payload2 := testutils.LightPayload('C', 'c')
+		updatedPayload2 := testutils.LightPayload('D', 'd')
 
 		paths := []ledger.Path{path1, path2}
 		payloads := []*ledger.Payload{payload1, payload2}
@@ -317,14 +327,14 @@ func TestMixProof(t *testing.T) {
 	pathByteSize := 32
 	withForest(t, pathByteSize, 10, func(t *testing.T, f *mtrie.Forest) {
 
-		path1 := utils.PathByUint16(0)
-		payload1 := utils.LightPayload('A', 'a')
+		path1 := testutils.PathByUint16(0)
+		payload1 := testutils.LightPayload('A', 'a')
 
-		path2 := utils.PathByUint16(2)
-		updatedPayload2 := utils.LightPayload('D', 'd')
+		path2 := testutils.PathByUint16(2)
+		updatedPayload2 := testutils.LightPayload('D', 'd')
 
-		path3 := utils.PathByUint16(8)
-		payload3 := utils.LightPayload('E', 'e')
+		path3 := testutils.PathByUint16(8)
+		payload3 := testutils.LightPayload('E', 'e')
 
 		paths := []ledger.Path{path1, path3}
 		payloads := []*ledger.Payload{payload1, payload3}
@@ -369,8 +379,8 @@ func TestRandomProofs(t *testing.T) {
 			rand.Seed(seed)
 			t.Logf("rand seed is %x", seed)
 			numberOfPaths := rand.Intn(256) + 1
-			paths := utils.RandomPaths(numberOfPaths)
-			payloads := utils.RandomPayloads(numberOfPaths, minPayloadSize, maxPayloadSize)
+			paths := testutils.RandomPaths(numberOfPaths)
+			payloads := testutils.RandomPayloads(numberOfPaths, minPayloadSize, maxPayloadSize)
 			// keep a subset as initial insert and keep the rest for reading default values
 			split := rand.Intn(numberOfPaths)
 			insertPaths := paths[:split]
