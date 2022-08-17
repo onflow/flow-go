@@ -11,12 +11,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine"
 	ghostclient "github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -78,7 +78,7 @@ func TestNetwork(t *testing.T) {
 
 	// seed a message, it should propagate to all nodes.
 	// (unlike regular nodes, a ghost node subscribes to all topics)
-	err = ghostClient.Send(ctx, engine.PushGuarantees, event, targets...)
+	err = ghostClient.Send(ctx, channels.PushGuarantees, event, targets...)
 	require.NoError(t, err)
 
 	// wait for all read loops to finish

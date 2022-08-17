@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/onflow/cadence"
+
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go-sdk/crypto"
@@ -228,7 +229,8 @@ func (gs *TransactionsPerSecondSuite) CreateAccountAndTransfer(keyIndex int) (fl
 		FromPrivateKey(myPrivateKey).
 		SetHashAlgo(crypto.SHA3_256).
 		SetWeight(flowsdk.AccountKeyWeightThreshold)
-	mySigner := crypto.NewInMemorySigner(myPrivateKey, accountKey.HashAlgo)
+	mySigner, err := crypto.NewInMemorySigner(myPrivateKey, accountKey.HashAlgo)
+	handle(err)
 
 	// Generate the account creation transaction
 	createAccountTx, err := templates.CreateAccount([]*flowsdk.AccountKey{accountKey}, nil, gs.rootAcctAddr)
@@ -384,7 +386,10 @@ func ServiceAccountWithKey(flowClient *client.Client, key string) (flowsdk.Addre
 		panic(err)
 	}
 
-	signer := crypto.NewInMemorySigner(privateKey, accountKey.HashAlgo)
+	signer, err := crypto.NewInMemorySigner(privateKey, accountKey.HashAlgo)
+	if err != nil {
+		panic(err)
+	}
 
 	return addr, accountKey, signer
 }

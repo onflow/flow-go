@@ -87,6 +87,7 @@ const (
 	ResourceApprovalQueue             = "sealing_approval_queue"            // consensus node, sealing engine
 	ResourceReceiptQueue              = "sealing_receipt_queue"             // consensus node, sealing engine
 	ResourceApprovalResponseQueue     = "sealing_approval_response_queue"   // consensus node, sealing engine
+	ResourceBlockResponseQueue        = "compliance_block_response_queue"   // consensus node, compliance engine
 	ResourceBlockProposalQueue        = "compliance_proposal_queue"         // consensus node, compliance engine
 	ResourceBlockVoteQueue            = "compliance_vote_queue"             // consensus node, compliance engine
 	ResourceCollectionGuaranteesQueue = "ingestion_col_guarantee_queue"     // consensus node, ingestion engine
@@ -121,3 +122,5 @@ const (
 	MessageEntityRequest        = "entity_request"
 	MessageEntityResponse       = "entity_response"
 )
+
+const ExecutionDataRequestRetryable = "retryable"

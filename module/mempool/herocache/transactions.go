@@ -82,9 +82,9 @@ func (t Transactions) Size() uint {
 	return t.c.Size()
 }
 
-// Rem removes transaction from mempool.
-func (t *Transactions) Rem(id flow.Identifier) bool {
-	return t.c.Rem(id)
+// Remove removes transaction from mempool.
+func (t *Transactions) Remove(id flow.Identifier) bool {
+	return t.c.Remove(id)
 }
 
 // Hash will return a fingerprint hash representing the contents of the

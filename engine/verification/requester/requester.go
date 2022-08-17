@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/exp/rand"
 
 	"github.com/onflow/flow-go/engine"
@@ -17,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -87,7 +89,7 @@ func New(log zerolog.Logger,
 		reqQualifierFunc: reqQualifierFunc,
 	}
 
-	con, err := net.Register(engine.RequestChunks, e)
+	con, err := net.Register(channels.RequestChunks, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register chunk data pack provider engine: %w", err)
 	}
@@ -108,7 +110,7 @@ func (e *Engine) SubmitLocal(event interface{}) {
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
+func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(channel, originID, event)
 		if err != nil {
@@ -124,7 +126,7 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		return e.process(originID, event)
 	})
@@ -168,9 +170,9 @@ func (e *Engine) handleChunkDataPackWithTracing(originID flow.Identifier, chunkD
 	if chunkDataPack.Collection != nil {
 		span, _, isSampled := e.tracer.StartCollectionSpan(e.unit.Ctx(), chunkDataPack.Collection.ID(), trace.VERRequesterHandleChunkDataResponse)
 		if isSampled {
-			span.SetTag("chunk_id", chunkDataPack.ChunkID)
+			span.SetAttributes(attribute.String("chunk_id", chunkDataPack.ChunkID.String()))
 		}
-		defer span.Finish()
+		defer span.End()
 	}
 	e.handleChunkDataPack(originID, chunkDataPack)
 }

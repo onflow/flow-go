@@ -10,11 +10,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 
-	"github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/state_synchronization"
-	"github.com/onflow/flow-go/network/compressor"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 )
 
 var (
@@ -34,18 +31,12 @@ func init() {
 }
 
 func run(*cobra.Command, []string) {
-	bs, ds := initBlobservice()
+	bs, ds := initBlobstore()
 	defer ds.Close()
 
 	logger := zerolog.New(os.Stdout)
 
-	eds := state_synchronization.NewExecutionDataService(
-		&cbor.Codec{},
-		compressor.NewLz4Compressor(),
-		bs,
-		metrics.NewNoopCollector(),
-		logger,
-	)
+	eds := execution_data.NewExecutionDataStore(bs, execution_data.DefaultSerializer)
 
 	b, err := hex.DecodeString(flagID)
 	if err != nil {
@@ -54,7 +45,7 @@ func run(*cobra.Command, []string) {
 
 	edID := flow.HashToID(b)
 
-	ed, err := eds.Get(context.Background(), edID)
+	ed, err := eds.GetExecutionData(context.Background(), edID)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("failed to get execution data")
 	}

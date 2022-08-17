@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"math"
 	"os"
+	"os/exec"
 	"regexp"
 	"strings"
 	"sync"
@@ -12,6 +13,9 @@ import (
 	"time"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network"
+	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
+	"github.com/onflow/flow-go/network/topology"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
@@ -175,7 +179,7 @@ func AssertNotClosesBefore(t assert.TestingT, done <-chan struct{}, duration tim
 	}
 }
 
-// RequireReturnBefore requires that the given function returns before the
+// RequireReturnsBefore requires that the given function returns before the
 // duration expires.
 func RequireReturnsBefore(t testing.TB, f func(), duration time.Duration, message string) {
 	done := make(chan struct{})
@@ -377,4 +381,35 @@ func Concurrently(n int, f func(int)) {
 // AssertEqualBlocksLenAndOrder asserts that both a segment of blocks have the same len and blocks are in the same order
 func AssertEqualBlocksLenAndOrder(t *testing.T, expectedBlocks, actualSegmentBlocks []*flow.Block) {
 	assert.Equal(t, flow.GetIDs(expectedBlocks), flow.GetIDs(actualSegmentBlocks))
+}
+
+// NetworkCodec returns cbor codec.
+func NetworkCodec() network.Codec {
+	return cborcodec.NewCodec()
+}
+
+// NetworkTopology returns the default topology for testing purposes.
+func NetworkTopology() network.Topology {
+	return topology.NewFullyConnectedTopology()
+}
+
+// CrashTest safely tests functions that crash (as the expected behavior) by checking that running the function creates an error and
+// an expected error message.
+func CrashTest(t *testing.T, scenario func(*testing.T), expectedErrorMsg string, testName string) {
+	if os.Getenv("CRASH_TEST") == "1" {
+		scenario(t)
+		return
+	}
+
+	cmd := exec.Command(os.Args[0], "-test.run="+testName)
+	cmd.Env = append(os.Environ(), "CRASH_TEST=1")
+
+	outBytes, err := cmd.Output()
+	// expect error from run
+	require.Error(t, err)
+	require.Contains(t, "exit status 1", err.Error())
+
+	// expect logger.Fatal() message to be pushed to stdout
+	outStr := string(outBytes)
+	require.Contains(t, outStr, expectedErrorMsg)
 }

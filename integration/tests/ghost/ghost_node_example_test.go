@@ -9,11 +9,11 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -70,7 +70,7 @@ func TestGhostNodeExample_Send(t *testing.T) {
 	tx := unittest.TransactionBodyFixture()
 
 	// send the transaction as an event to a real collection node
-	err = ghostClient.Send(ctx, engine.PushTransactions, &tx, realCollNode.Identifier)
+	err = ghostClient.Send(ctx, channels.PushTransactions, &tx, realCollNode.Identifier)
 	assert.NoError(t, err)
 	t.Logf("%v ================> FINISH TESTING %v", time.Now().UTC(), t.Name())
 }

@@ -4,11 +4,12 @@ import (
 	"context"
 	"time"
 
-	sdk "github.com/onflow/flow-go-sdk"
-	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+
+	sdk "github.com/onflow/flow-go-sdk"
+	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
 	ghostclient "github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/convert"
@@ -104,7 +105,9 @@ func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
 	suite.net.Start(suite.ctx)
 
 	// create an account to use for sending transactions
-	suite.acct.addr, suite.acct.key, suite.acct.signer = lib.GetAccount(suite.net.Root().Header.ChainID.Chain())
+	var err error
+	suite.acct.addr, suite.acct.key, suite.acct.signer, err = lib.GetAccount(suite.net.Root().Header.ChainID.Chain())
+	require.NoError(suite.T(), err)
 	suite.serviceAccountIdx = 2
 
 	// subscribe to the ghost

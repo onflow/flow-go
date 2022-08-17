@@ -11,6 +11,8 @@ type sealSet map[flow.Identifier]*flow.IncorporatedResultSeal
 
 // IncorporatedResultSeals implements the incorporated result seals memory pool
 // of the consensus nodes, used to store seals that need to be added to blocks.
+// ATTENTION: This data structure should NEVER eject seals because it can break liveness.
+// Modules that are using this structure expect that it NEVER ejects a seal.
 type IncorporatedResultSeals struct {
 	*Backend
 	// index the seals by the height of the executed block
@@ -54,7 +56,7 @@ func (ir *IncorporatedResultSeals) removeFromIndex(id flow.Identifier, height ui
 
 func (ir *IncorporatedResultSeals) removeByHeight(height uint64) {
 	for sealID := range ir.byHeight[height] {
-		ir.backData.Rem(sealID)
+		ir.backData.Remove(sealID)
 	}
 	delete(ir.byHeight, height)
 }
@@ -113,12 +115,12 @@ func (ir *IncorporatedResultSeals) ByID(id flow.Identifier) (*flow.IncorporatedR
 	return entity.(*flow.IncorporatedResultSeal), true
 }
 
-// Rem removes an IncorporatedResultSeal from the mempool
-func (ir *IncorporatedResultSeals) Rem(id flow.Identifier) bool {
+// Remove removes an IncorporatedResultSeal from the mempool
+func (ir *IncorporatedResultSeals) Remove(id flow.Identifier) bool {
 	removed := false
 	err := ir.Backend.Run(func(_ mempool.BackData) error {
 		var entity flow.Entity
-		entity, removed = ir.backData.Rem(id)
+		entity, removed = ir.backData.Remove(id)
 		if !removed {
 			return nil
 		}

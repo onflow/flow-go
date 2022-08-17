@@ -7,10 +7,10 @@ import (
 	context "context"
 	fmt "fmt"
 	proto "github.com/golang/protobuf/proto"
-	empty "github.com/golang/protobuf/ptypes/empty"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	math "math"
 )
 
@@ -56,17 +56,14 @@ func (Protocol) EnumDescriptor() ([]byte, []int) {
 	return fileDescriptor_de1530a0da5eef1a, []int{0}
 }
 
-// Message is represents the message exchanged between the CorruptibleConduitFactory and Attacker services.
+// Message represents the messages exchanged between the CorruptibleNetwork (server) and Orchestrator (client).
+// This is a wrapper for both egress and ingress messages.
 type Message struct {
-	ChannelID            string   `protobuf:"bytes,1,opt,name=ChannelID,proto3" json:"ChannelID,omitempty"`
-	OriginID             []byte   `protobuf:"bytes,2,opt,name=OriginID,proto3" json:"OriginID,omitempty"`
-	TargetNum            uint32   `protobuf:"varint,3,opt,name=TargetNum,proto3" json:"TargetNum,omitempty"`
-	TargetIDs            [][]byte `protobuf:"bytes,4,rep,name=TargetIDs,proto3" json:"TargetIDs,omitempty"`
-	Payload              []byte   `protobuf:"bytes,5,opt,name=Payload,proto3" json:"Payload,omitempty"`
-	Protocol             Protocol `protobuf:"varint,6,opt,name=protocol,proto3,enum=corruptible.Protocol" json:"protocol,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
+	Egress               *EgressMessage  `protobuf:"bytes,1,opt,name=Egress,proto3" json:"Egress,omitempty"`
+	Ingress              *IngressMessage `protobuf:"bytes,2,opt,name=Ingress,proto3" json:"Ingress,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}        `json:"-"`
+	XXX_unrecognized     []byte          `json:"-"`
+	XXX_sizecache        int32           `json:"-"`
 }
 
 func (m *Message) Reset()         { *m = Message{} }
@@ -94,124 +91,202 @@ func (m *Message) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_Message proto.InternalMessageInfo
 
-func (m *Message) GetChannelID() string {
+func (m *Message) GetEgress() *EgressMessage {
+	if m != nil {
+		return m.Egress
+	}
+	return nil
+}
+
+func (m *Message) GetIngress() *IngressMessage {
+	if m != nil {
+		return m.Ingress
+	}
+	return nil
+}
+
+// EgressMessage represents the message exchanged between the CorruptibleConduitFactory and Attacker services.
+type EgressMessage struct {
+	ChannelID            string   `protobuf:"bytes,1,opt,name=ChannelID,proto3" json:"ChannelID,omitempty"`
+	OriginID             []byte   `protobuf:"bytes,2,opt,name=OriginID,proto3" json:"OriginID,omitempty"`
+	TargetNum            uint32   `protobuf:"varint,3,opt,name=TargetNum,proto3" json:"TargetNum,omitempty"`
+	TargetIDs            [][]byte `protobuf:"bytes,4,rep,name=TargetIDs,proto3" json:"TargetIDs,omitempty"`
+	Payload              []byte   `protobuf:"bytes,5,opt,name=Payload,proto3" json:"Payload,omitempty"`
+	Protocol             Protocol `protobuf:"varint,6,opt,name=protocol,proto3,enum=corruptible.Protocol" json:"protocol,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *EgressMessage) Reset()         { *m = EgressMessage{} }
+func (m *EgressMessage) String() string { return proto.CompactTextString(m) }
+func (*EgressMessage) ProtoMessage()    {}
+func (*EgressMessage) Descriptor() ([]byte, []int) {
+	return fileDescriptor_de1530a0da5eef1a, []int{1}
+}
+
+func (m *EgressMessage) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_EgressMessage.Unmarshal(m, b)
+}
+func (m *EgressMessage) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_EgressMessage.Marshal(b, m, deterministic)
+}
+func (m *EgressMessage) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_EgressMessage.Merge(m, src)
+}
+func (m *EgressMessage) XXX_Size() int {
+	return xxx_messageInfo_EgressMessage.Size(m)
+}
+func (m *EgressMessage) XXX_DiscardUnknown() {
+	xxx_messageInfo_EgressMessage.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_EgressMessage proto.InternalMessageInfo
+
+func (m *EgressMessage) GetChannelID() string {
 	if m != nil {
 		return m.ChannelID
 	}
 	return ""
 }
 
-func (m *Message) GetOriginID() []byte {
+func (m *EgressMessage) GetOriginID() []byte {
 	if m != nil {
 		return m.OriginID
 	}
 	return nil
 }
 
-func (m *Message) GetTargetNum() uint32 {
+func (m *EgressMessage) GetTargetNum() uint32 {
 	if m != nil {
 		return m.TargetNum
 	}
 	return 0
 }
 
-func (m *Message) GetTargetIDs() [][]byte {
+func (m *EgressMessage) GetTargetIDs() [][]byte {
 	if m != nil {
 		return m.TargetIDs
 	}
 	return nil
 }
 
-func (m *Message) GetPayload() []byte {
+func (m *EgressMessage) GetPayload() []byte {
 	if m != nil {
 		return m.Payload
 	}
 	return nil
 }
 
-func (m *Message) GetProtocol() Protocol {
+func (m *EgressMessage) GetProtocol() Protocol {
 	if m != nil {
 		return m.Protocol
 	}
 	return Protocol_UNKNOWN
 }
 
-// AttackerRegisterMessage is the message an attacker uses to register itself to the chosen CorruptibleConduitFactory,
-// and takes its control.
-type AttackerRegisterMessage struct {
-	Address              string   `protobuf:"bytes,1,opt,name=address,proto3" json:"address,omitempty"`
+// OriginID for IngressMessage represents the node id where the message is coming from - that node could be corrupted or honest.
+type IngressMessage struct {
+	ChannelID            string   `protobuf:"bytes,1,opt,name=ChannelID,proto3" json:"ChannelID,omitempty"`
+	OriginID             []byte   `protobuf:"bytes,2,opt,name=OriginID,proto3" json:"OriginID,omitempty"`
+	TargetID             []byte   `protobuf:"bytes,3,opt,name=TargetID,proto3" json:"TargetID,omitempty"`
+	Payload              []byte   `protobuf:"bytes,4,opt,name=Payload,proto3" json:"Payload,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *AttackerRegisterMessage) Reset()         { *m = AttackerRegisterMessage{} }
-func (m *AttackerRegisterMessage) String() string { return proto.CompactTextString(m) }
-func (*AttackerRegisterMessage) ProtoMessage()    {}
-func (*AttackerRegisterMessage) Descriptor() ([]byte, []int) {
-	return fileDescriptor_de1530a0da5eef1a, []int{1}
+func (m *IngressMessage) Reset()         { *m = IngressMessage{} }
+func (m *IngressMessage) String() string { return proto.CompactTextString(m) }
+func (*IngressMessage) ProtoMessage()    {}
+func (*IngressMessage) Descriptor() ([]byte, []int) {
+	return fileDescriptor_de1530a0da5eef1a, []int{2}
 }
 
-func (m *AttackerRegisterMessage) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_AttackerRegisterMessage.Unmarshal(m, b)
+func (m *IngressMessage) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_IngressMessage.Unmarshal(m, b)
 }
-func (m *AttackerRegisterMessage) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_AttackerRegisterMessage.Marshal(b, m, deterministic)
+func (m *IngressMessage) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_IngressMessage.Marshal(b, m, deterministic)
 }
-func (m *AttackerRegisterMessage) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_AttackerRegisterMessage.Merge(m, src)
+func (m *IngressMessage) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_IngressMessage.Merge(m, src)
 }
-func (m *AttackerRegisterMessage) XXX_Size() int {
-	return xxx_messageInfo_AttackerRegisterMessage.Size(m)
+func (m *IngressMessage) XXX_Size() int {
+	return xxx_messageInfo_IngressMessage.Size(m)
 }
-func (m *AttackerRegisterMessage) XXX_DiscardUnknown() {
-	xxx_messageInfo_AttackerRegisterMessage.DiscardUnknown(m)
+func (m *IngressMessage) XXX_DiscardUnknown() {
+	xxx_messageInfo_IngressMessage.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_AttackerRegisterMessage proto.InternalMessageInfo
+var xxx_messageInfo_IngressMessage proto.InternalMessageInfo
 
-func (m *AttackerRegisterMessage) GetAddress() string {
+func (m *IngressMessage) GetChannelID() string {
 	if m != nil {
-		return m.Address
+		return m.ChannelID
 	}
 	return ""
+}
+
+func (m *IngressMessage) GetOriginID() []byte {
+	if m != nil {
+		return m.OriginID
+	}
+	return nil
+}
+
+func (m *IngressMessage) GetTargetID() []byte {
+	if m != nil {
+		return m.TargetID
+	}
+	return nil
+}
+
+func (m *IngressMessage) GetPayload() []byte {
+	if m != nil {
+		return m.Payload
+	}
+	return nil
 }
 
 func init() {
 	proto.RegisterEnum("corruptible.Protocol", Protocol_name, Protocol_value)
 	proto.RegisterType((*Message)(nil), "corruptible.Message")
-	proto.RegisterType((*AttackerRegisterMessage)(nil), "corruptible.AttackerRegisterMessage")
+	proto.RegisterType((*EgressMessage)(nil), "corruptible.EgressMessage")
+	proto.RegisterType((*IngressMessage)(nil), "corruptible.IngressMessage")
 }
 
 func init() { proto.RegisterFile("insecure/attacker.proto", fileDescriptor_de1530a0da5eef1a) }
 
 var fileDescriptor_de1530a0da5eef1a = []byte{
-	// 386 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x52, 0x4d, 0xaf, 0xd2, 0x40,
-	0x14, 0x7d, 0xf3, 0xd0, 0xd7, 0x72, 0xdf, 0x7b, 0xa6, 0x99, 0x28, 0x8c, 0xe8, 0xa2, 0x21, 0x2e,
-	0x1a, 0x17, 0x25, 0xc2, 0xd2, 0x8d, 0x50, 0xfc, 0xa8, 0x42, 0x69, 0x0a, 0xc4, 0xc4, 0xdd, 0xb4,
-	0x1d, 0x6b, 0x63, 0xe9, 0x90, 0x99, 0xa9, 0x09, 0xbf, 0xcd, 0xbf, 0xe0, 0x8f, 0x32, 0xb4, 0x0c,
-	0x95, 0x85, 0x31, 0x71, 0x79, 0xee, 0xb9, 0xf7, 0xe4, 0x9c, 0x39, 0x03, 0xfd, 0xbc, 0x94, 0x2c,
-	0xa9, 0x04, 0x1b, 0x51, 0xa5, 0x68, 0xf2, 0x9d, 0x09, 0x77, 0x2f, 0xb8, 0xe2, 0xf8, 0x36, 0xe1,
-	0x42, 0x54, 0x7b, 0x95, 0xc7, 0x05, 0x1b, 0x3c, 0xcb, 0x38, 0xcf, 0x0a, 0x36, 0xaa, 0xa9, 0xb8,
-	0xfa, 0x3a, 0x62, 0xbb, 0xbd, 0x3a, 0x34, 0x9b, 0xc3, 0x5f, 0x08, 0x8c, 0x25, 0x93, 0x92, 0x66,
-	0x0c, 0x3f, 0x87, 0xae, 0xf7, 0x8d, 0x96, 0x25, 0x2b, 0xfc, 0x39, 0x41, 0x36, 0x72, 0xba, 0x51,
-	0x3b, 0xc0, 0x03, 0x30, 0x57, 0x22, 0xcf, 0xf2, 0xd2, 0x9f, 0x93, 0x6b, 0x1b, 0x39, 0x77, 0xd1,
-	0x19, 0x1f, 0x2f, 0x37, 0x54, 0x64, 0x4c, 0x05, 0xd5, 0x8e, 0x74, 0x6c, 0xe4, 0xdc, 0x47, 0xed,
-	0xa0, 0x65, 0xfd, 0xb9, 0x24, 0x0f, 0xec, 0x8e, 0x73, 0x17, 0xb5, 0x03, 0x4c, 0xc0, 0x08, 0xe9,
-	0xa1, 0xe0, 0x34, 0x25, 0x0f, 0x6b, 0x59, 0x0d, 0xf1, 0x2b, 0x30, 0x6b, 0x93, 0x09, 0x2f, 0xc8,
-	0x8d, 0x8d, 0x9c, 0x47, 0xe3, 0x27, 0xee, 0x1f, 0xc1, 0xdc, 0xf0, 0x44, 0x46, 0xe7, 0xb5, 0xe1,
-	0x04, 0xfa, 0xd3, 0xd3, 0x53, 0x44, 0x2c, 0xcb, 0xa5, 0x62, 0x42, 0xa7, 0x23, 0x60, 0xd0, 0x34,
-	0x15, 0x4c, 0xca, 0x53, 0x36, 0x0d, 0x5f, 0xbe, 0x01, 0x53, 0x4b, 0xe1, 0x5b, 0x30, 0xb6, 0xc1,
-	0xa7, 0x60, 0xf5, 0x39, 0xb0, 0xae, 0x1a, 0xe0, 0x7b, 0xd3, 0xf5, 0xc6, 0x42, 0xf8, 0x1e, 0xba,
-	0xcb, 0xed, 0x62, 0xd3, 0xc0, 0xeb, 0x23, 0x17, 0x6e, 0x67, 0x0b, 0x7f, 0xfd, 0xc1, 0xea, 0x8c,
-	0x7f, 0x22, 0x78, 0xea, 0xb5, 0xce, 0x3c, 0x5e, 0xa6, 0x55, 0xae, 0xde, 0xd1, 0x44, 0x71, 0x71,
-	0xc0, 0x11, 0x58, 0xda, 0x8c, 0x36, 0x87, 0x5f, 0x5c, 0x24, 0xf9, 0x8b, 0xe7, 0x41, 0xcf, 0x6d,
-	0xba, 0x73, 0x75, 0x77, 0xee, 0xdb, 0x63, 0x77, 0xc3, 0x2b, 0xfc, 0x11, 0x7a, 0xa1, 0xe0, 0x09,
-	0x93, 0x52, 0xdf, 0xea, 0x9c, 0x8f, 0x2f, 0x94, 0xff, 0xa9, 0xe4, 0xa0, 0xf1, 0x7b, 0x30, 0xcf,
-	0xbe, 0x5e, 0x83, 0xb1, 0x8a, 0x25, 0x13, 0x3f, 0xfe, 0x43, 0x68, 0x06, 0x5f, 0x4c, 0xfd, 0x23,
-	0xe3, 0x9b, 0x9a, 0x9f, 0xfc, 0x0e, 0x00, 0x00, 0xff, 0xff, 0x6b, 0xc3, 0x76, 0x70, 0xa4, 0x02,
-	0x00, 0x00,
+	// 420 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xa4, 0x53, 0xc1, 0x6e, 0xd3, 0x40,
+	0x10, 0xcd, 0x36, 0x25, 0x71, 0x26, 0x49, 0x89, 0x56, 0x50, 0x8c, 0xcb, 0x21, 0xf2, 0xc9, 0xe2,
+	0xe0, 0x80, 0x11, 0x77, 0x5a, 0xa7, 0x08, 0x43, 0xeb, 0x5a, 0x6e, 0x22, 0x24, 0x6e, 0x1b, 0x77,
+	0x31, 0x16, 0xee, 0x6e, 0xb4, 0xbb, 0x3e, 0xe4, 0xc6, 0x07, 0xf1, 0x35, 0x7c, 0x11, 0xca, 0xda,
+	0x1b, 0xd7, 0x12, 0x9c, 0x7a, 0x7c, 0xfb, 0xde, 0x9b, 0x99, 0x37, 0x9a, 0x85, 0x17, 0x05, 0x93,
+	0x34, 0xab, 0x04, 0x5d, 0x10, 0xa5, 0x48, 0xf6, 0x93, 0x0a, 0x7f, 0x2b, 0xb8, 0xe2, 0x78, 0x9c,
+	0x71, 0x21, 0xaa, 0xad, 0x2a, 0x36, 0x25, 0x75, 0xce, 0x72, 0xce, 0xf3, 0x92, 0x2e, 0x34, 0xb5,
+	0xa9, 0xbe, 0x2f, 0xe8, 0xfd, 0x56, 0xed, 0x6a, 0xa5, 0xab, 0x60, 0x78, 0x4d, 0xa5, 0x24, 0x39,
+	0xc5, 0x01, 0x0c, 0x2e, 0x73, 0x41, 0xa5, 0xb4, 0xd1, 0x1c, 0x79, 0xe3, 0xc0, 0xf1, 0x1f, 0x54,
+	0xf1, 0x6b, 0xaa, 0xd1, 0xa6, 0x8d, 0x12, 0xbf, 0x87, 0x61, 0xc4, 0x6a, 0xd3, 0x91, 0x36, 0x9d,
+	0x75, 0x4c, 0x0d, 0x67, 0x5c, 0x46, 0xeb, 0xfe, 0x41, 0x30, 0xed, 0x14, 0xc4, 0xaf, 0x60, 0x14,
+	0xfe, 0x20, 0x8c, 0xd1, 0x32, 0x5a, 0xea, 0xfe, 0xa3, 0xb4, 0x7d, 0xc0, 0x0e, 0x58, 0x37, 0xa2,
+	0xc8, 0x0b, 0x16, 0x2d, 0x75, 0x9f, 0x49, 0x7a, 0xc0, 0x7b, 0xe7, 0x8a, 0x88, 0x9c, 0xaa, 0xb8,
+	0xba, 0xb7, 0xfb, 0x73, 0xe4, 0x4d, 0xd3, 0xf6, 0xa1, 0x65, 0xa3, 0xa5, 0xb4, 0x8f, 0xe7, 0x7d,
+	0x6f, 0x92, 0xb6, 0x0f, 0xd8, 0x86, 0x61, 0x42, 0x76, 0x25, 0x27, 0x77, 0xf6, 0x13, 0x5d, 0xd6,
+	0x40, 0xfc, 0x16, 0x2c, 0xbd, 0xa0, 0x8c, 0x97, 0xf6, 0x60, 0x8e, 0xbc, 0x93, 0xe0, 0x79, 0x27,
+	0x59, 0xd2, 0x90, 0xe9, 0x41, 0xe6, 0xfe, 0x42, 0x70, 0xd2, 0x0d, 0xfc, 0x88, 0x54, 0x0e, 0x58,
+	0x66, 0x4c, 0x1d, 0x6a, 0x92, 0x1e, 0xf0, 0xc3, 0xa9, 0x8f, 0x3b, 0x53, 0xbf, 0xfe, 0x00, 0x96,
+	0x19, 0x0c, 0x8f, 0x61, 0xb8, 0x8e, 0xbf, 0xc4, 0x37, 0x5f, 0xe3, 0x59, 0xaf, 0x06, 0x51, 0x78,
+	0x7e, 0xbb, 0x9a, 0x21, 0x3c, 0x85, 0xd1, 0xf5, 0xfa, 0x6a, 0x55, 0xc3, 0xa3, 0x3d, 0x97, 0xac,
+	0x2f, 0xae, 0xa2, 0xdb, 0x4f, 0xb3, 0x7e, 0xf0, 0x1b, 0xc1, 0xcb, 0xb0, 0xcd, 0x19, 0x72, 0x76,
+	0x57, 0x15, 0xea, 0x23, 0xc9, 0x14, 0x17, 0x3b, 0x1c, 0xc2, 0xd3, 0x90, 0x33, 0x46, 0x33, 0x75,
+	0xde, 0x1c, 0x1c, 0x3e, 0xf5, 0xeb, 0xf3, 0xf2, 0xcd, 0x79, 0xf9, 0x97, 0xfb, 0xf3, 0x72, 0x9e,
+	0x75, 0xd6, 0xd5, 0x2c, 0xc4, 0xed, 0xbd, 0x41, 0xf8, 0x33, 0x9c, 0x26, 0x82, 0x67, 0x54, 0x4a,
+	0x53, 0xc4, 0xac, 0xeb, 0x9f, 0x1e, 0xe7, 0x3f, 0x1d, 0xdc, 0x9e, 0x87, 0x2e, 0xe0, 0x9b, 0x65,
+	0xfe, 0xc0, 0x66, 0xa0, 0xf9, 0x77, 0x7f, 0x03, 0x00, 0x00, 0xff, 0xff, 0xc3, 0x8b, 0x87, 0xb4,
+	0x16, 0x03, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -226,7 +301,7 @@ const _ = grpc.SupportPackageIsVersion4
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
 type CorruptibleConduitFactoryClient interface {
-	RegisterAttacker(ctx context.Context, in *AttackerRegisterMessage, opts ...grpc.CallOption) (*empty.Empty, error)
+	ConnectAttacker(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (CorruptibleConduitFactory_ConnectAttackerClient, error)
 	ProcessAttackerMessage(ctx context.Context, opts ...grpc.CallOption) (CorruptibleConduitFactory_ProcessAttackerMessageClient, error)
 }
 
@@ -238,17 +313,40 @@ func NewCorruptibleConduitFactoryClient(cc *grpc.ClientConn) CorruptibleConduitF
 	return &corruptibleConduitFactoryClient{cc}
 }
 
-func (c *corruptibleConduitFactoryClient) RegisterAttacker(ctx context.Context, in *AttackerRegisterMessage, opts ...grpc.CallOption) (*empty.Empty, error) {
-	out := new(empty.Empty)
-	err := c.cc.Invoke(ctx, "/corruptible.CorruptibleConduitFactory/RegisterAttacker", in, out, opts...)
+func (c *corruptibleConduitFactoryClient) ConnectAttacker(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (CorruptibleConduitFactory_ConnectAttackerClient, error) {
+	stream, err := c.cc.NewStream(ctx, &_CorruptibleConduitFactory_serviceDesc.Streams[0], "/corruptible.CorruptibleConduitFactory/ConnectAttacker", opts...)
 	if err != nil {
 		return nil, err
 	}
-	return out, nil
+	x := &corruptibleConduitFactoryConnectAttackerClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type CorruptibleConduitFactory_ConnectAttackerClient interface {
+	Recv() (*Message, error)
+	grpc.ClientStream
+}
+
+type corruptibleConduitFactoryConnectAttackerClient struct {
+	grpc.ClientStream
+}
+
+func (x *corruptibleConduitFactoryConnectAttackerClient) Recv() (*Message, error) {
+	m := new(Message)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
 }
 
 func (c *corruptibleConduitFactoryClient) ProcessAttackerMessage(ctx context.Context, opts ...grpc.CallOption) (CorruptibleConduitFactory_ProcessAttackerMessageClient, error) {
-	stream, err := c.cc.NewStream(ctx, &_CorruptibleConduitFactory_serviceDesc.Streams[0], "/corruptible.CorruptibleConduitFactory/ProcessAttackerMessage", opts...)
+	stream, err := c.cc.NewStream(ctx, &_CorruptibleConduitFactory_serviceDesc.Streams[1], "/corruptible.CorruptibleConduitFactory/ProcessAttackerMessage", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -258,7 +356,7 @@ func (c *corruptibleConduitFactoryClient) ProcessAttackerMessage(ctx context.Con
 
 type CorruptibleConduitFactory_ProcessAttackerMessageClient interface {
 	Send(*Message) error
-	CloseAndRecv() (*empty.Empty, error)
+	CloseAndRecv() (*emptypb.Empty, error)
 	grpc.ClientStream
 }
 
@@ -270,11 +368,11 @@ func (x *corruptibleConduitFactoryProcessAttackerMessageClient) Send(m *Message)
 	return x.ClientStream.SendMsg(m)
 }
 
-func (x *corruptibleConduitFactoryProcessAttackerMessageClient) CloseAndRecv() (*empty.Empty, error) {
+func (x *corruptibleConduitFactoryProcessAttackerMessageClient) CloseAndRecv() (*emptypb.Empty, error) {
 	if err := x.ClientStream.CloseSend(); err != nil {
 		return nil, err
 	}
-	m := new(empty.Empty)
+	m := new(emptypb.Empty)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -283,7 +381,7 @@ func (x *corruptibleConduitFactoryProcessAttackerMessageClient) CloseAndRecv() (
 
 // CorruptibleConduitFactoryServer is the server API for CorruptibleConduitFactory service.
 type CorruptibleConduitFactoryServer interface {
-	RegisterAttacker(context.Context, *AttackerRegisterMessage) (*empty.Empty, error)
+	ConnectAttacker(*emptypb.Empty, CorruptibleConduitFactory_ConnectAttackerServer) error
 	ProcessAttackerMessage(CorruptibleConduitFactory_ProcessAttackerMessageServer) error
 }
 
@@ -291,8 +389,8 @@ type CorruptibleConduitFactoryServer interface {
 type UnimplementedCorruptibleConduitFactoryServer struct {
 }
 
-func (*UnimplementedCorruptibleConduitFactoryServer) RegisterAttacker(ctx context.Context, req *AttackerRegisterMessage) (*empty.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method RegisterAttacker not implemented")
+func (*UnimplementedCorruptibleConduitFactoryServer) ConnectAttacker(req *emptypb.Empty, srv CorruptibleConduitFactory_ConnectAttackerServer) error {
+	return status.Errorf(codes.Unimplemented, "method ConnectAttacker not implemented")
 }
 func (*UnimplementedCorruptibleConduitFactoryServer) ProcessAttackerMessage(srv CorruptibleConduitFactory_ProcessAttackerMessageServer) error {
 	return status.Errorf(codes.Unimplemented, "method ProcessAttackerMessage not implemented")
@@ -302,22 +400,25 @@ func RegisterCorruptibleConduitFactoryServer(s *grpc.Server, srv CorruptibleCond
 	s.RegisterService(&_CorruptibleConduitFactory_serviceDesc, srv)
 }
 
-func _CorruptibleConduitFactory_RegisterAttacker_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(AttackerRegisterMessage)
-	if err := dec(in); err != nil {
-		return nil, err
+func _CorruptibleConduitFactory_ConnectAttacker_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(emptypb.Empty)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
 	}
-	if interceptor == nil {
-		return srv.(CorruptibleConduitFactoryServer).RegisterAttacker(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/corruptible.CorruptibleConduitFactory/RegisterAttacker",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(CorruptibleConduitFactoryServer).RegisterAttacker(ctx, req.(*AttackerRegisterMessage))
-	}
-	return interceptor(ctx, in, info, handler)
+	return srv.(CorruptibleConduitFactoryServer).ConnectAttacker(m, &corruptibleConduitFactoryConnectAttackerServer{stream})
+}
+
+type CorruptibleConduitFactory_ConnectAttackerServer interface {
+	Send(*Message) error
+	grpc.ServerStream
+}
+
+type corruptibleConduitFactoryConnectAttackerServer struct {
+	grpc.ServerStream
+}
+
+func (x *corruptibleConduitFactoryConnectAttackerServer) Send(m *Message) error {
+	return x.ServerStream.SendMsg(m)
 }
 
 func _CorruptibleConduitFactory_ProcessAttackerMessage_Handler(srv interface{}, stream grpc.ServerStream) error {
@@ -325,7 +426,7 @@ func _CorruptibleConduitFactory_ProcessAttackerMessage_Handler(srv interface{}, 
 }
 
 type CorruptibleConduitFactory_ProcessAttackerMessageServer interface {
-	SendAndClose(*empty.Empty) error
+	SendAndClose(*emptypb.Empty) error
 	Recv() (*Message, error)
 	grpc.ServerStream
 }
@@ -334,7 +435,7 @@ type corruptibleConduitFactoryProcessAttackerMessageServer struct {
 	grpc.ServerStream
 }
 
-func (x *corruptibleConduitFactoryProcessAttackerMessageServer) SendAndClose(m *empty.Empty) error {
+func (x *corruptibleConduitFactoryProcessAttackerMessageServer) SendAndClose(m *emptypb.Empty) error {
 	return x.ServerStream.SendMsg(m)
 }
 
@@ -349,122 +450,16 @@ func (x *corruptibleConduitFactoryProcessAttackerMessageServer) Recv() (*Message
 var _CorruptibleConduitFactory_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "corruptible.CorruptibleConduitFactory",
 	HandlerType: (*CorruptibleConduitFactoryServer)(nil),
-	Methods: []grpc.MethodDesc{
-		{
-			MethodName: "RegisterAttacker",
-			Handler:    _CorruptibleConduitFactory_RegisterAttacker_Handler,
-		},
-	},
-	Streams: []grpc.StreamDesc{
-		{
-			StreamName:    "ProcessAttackerMessage",
-			Handler:       _CorruptibleConduitFactory_ProcessAttackerMessage_Handler,
-			ClientStreams: true,
-		},
-	},
-	Metadata: "insecure/attacker.proto",
-}
-
-// AttackerClient is the client API for Attacker service.
-//
-// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
-type AttackerClient interface {
-	Observe(ctx context.Context, opts ...grpc.CallOption) (Attacker_ObserveClient, error)
-}
-
-type attackerClient struct {
-	cc *grpc.ClientConn
-}
-
-func NewAttackerClient(cc *grpc.ClientConn) AttackerClient {
-	return &attackerClient{cc}
-}
-
-func (c *attackerClient) Observe(ctx context.Context, opts ...grpc.CallOption) (Attacker_ObserveClient, error) {
-	stream, err := c.cc.NewStream(ctx, &_Attacker_serviceDesc.Streams[0], "/corruptible.Attacker/Observe", opts...)
-	if err != nil {
-		return nil, err
-	}
-	x := &attackerObserveClient{stream}
-	return x, nil
-}
-
-type Attacker_ObserveClient interface {
-	Send(*Message) error
-	CloseAndRecv() (*empty.Empty, error)
-	grpc.ClientStream
-}
-
-type attackerObserveClient struct {
-	grpc.ClientStream
-}
-
-func (x *attackerObserveClient) Send(m *Message) error {
-	return x.ClientStream.SendMsg(m)
-}
-
-func (x *attackerObserveClient) CloseAndRecv() (*empty.Empty, error) {
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	m := new(empty.Empty)
-	if err := x.ClientStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-
-// AttackerServer is the server API for Attacker service.
-type AttackerServer interface {
-	Observe(Attacker_ObserveServer) error
-}
-
-// UnimplementedAttackerServer can be embedded to have forward compatible implementations.
-type UnimplementedAttackerServer struct {
-}
-
-func (*UnimplementedAttackerServer) Observe(srv Attacker_ObserveServer) error {
-	return status.Errorf(codes.Unimplemented, "method Observe not implemented")
-}
-
-func RegisterAttackerServer(s *grpc.Server, srv AttackerServer) {
-	s.RegisterService(&_Attacker_serviceDesc, srv)
-}
-
-func _Attacker_Observe_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(AttackerServer).Observe(&attackerObserveServer{stream})
-}
-
-type Attacker_ObserveServer interface {
-	SendAndClose(*empty.Empty) error
-	Recv() (*Message, error)
-	grpc.ServerStream
-}
-
-type attackerObserveServer struct {
-	grpc.ServerStream
-}
-
-func (x *attackerObserveServer) SendAndClose(m *empty.Empty) error {
-	return x.ServerStream.SendMsg(m)
-}
-
-func (x *attackerObserveServer) Recv() (*Message, error) {
-	m := new(Message)
-	if err := x.ServerStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-
-var _Attacker_serviceDesc = grpc.ServiceDesc{
-	ServiceName: "corruptible.Attacker",
-	HandlerType: (*AttackerServer)(nil),
 	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "Observe",
-			Handler:       _Attacker_Observe_Handler,
+			StreamName:    "ConnectAttacker",
+			Handler:       _CorruptibleConduitFactory_ConnectAttacker_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "ProcessAttackerMessage",
+			Handler:       _CorruptibleConduitFactory_ProcessAttackerMessage_Handler,
 			ClientStreams: true,
 		},
 	},

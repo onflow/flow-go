@@ -7,8 +7,8 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -16,14 +16,15 @@ import (
 type BlockEntry struct {
 	BlockID       flow.Identifier
 	Height        uint64
-	ExecutionData *state_synchronization.ExecutionData
+	ExecutionData *execution_data.BlockExecutionData
 }
 
 // ExecutionDataReader provides an abstraction for consumers to read blocks as job.
 type ExecutionDataReader struct {
-	eds     state_synchronization.ExecutionDataService
-	headers storage.Headers
-	results storage.ExecutionResults
+	downloader execution_data.Downloader
+	headers    storage.Headers
+	results    storage.ExecutionResults
+	seals      storage.Seals
 
 	fetchTimeout           time.Duration
 	highestAvailableHeight func() uint64
@@ -35,16 +36,18 @@ type ExecutionDataReader struct {
 
 // NewExecutionDataReader creates and returns a ExecutionDataReader.
 func NewExecutionDataReader(
-	eds state_synchronization.ExecutionDataService,
+	downloader execution_data.Downloader,
 	headers storage.Headers,
 	results storage.ExecutionResults,
+	seals storage.Seals,
 	fetchTimeout time.Duration,
 	highestAvailableHeight func() uint64,
 ) *ExecutionDataReader {
 	return &ExecutionDataReader{
-		eds:                    eds,
+		downloader:             downloader,
 		headers:                headers,
 		results:                results,
+		seals:                  seals,
 		fetchTimeout:           fetchTimeout,
 		highestAvailableHeight: highestAvailableHeight,
 	}
@@ -88,13 +91,19 @@ func (r *ExecutionDataReader) Head() (uint64, error) {
 
 // getExecutionData returns the ExecutionData for the given block height.
 // This is used by the execution data reader to get the ExecutionData for a block.
-func (r *ExecutionDataReader) getExecutionData(signalCtx irrecoverable.SignalerContext, height uint64) (*state_synchronization.ExecutionData, error) {
+func (r *ExecutionDataReader) getExecutionData(signalCtx irrecoverable.SignalerContext, height uint64) (*execution_data.BlockExecutionData, error) {
 	header, err := r.headers.ByHeight(height)
 	if err != nil {
 		return nil, fmt.Errorf("failed to lookup header for height %d: %w", height, err)
 	}
 
-	result, err := r.results.ByBlockID(header.ID())
+	// get the ExecutionResultID for the block from the block's seal
+	seal, err := r.seals.FinalizedSealForBlock(header.ID())
+	if err != nil {
+		return nil, fmt.Errorf("failed to lookup seal for block %s: %w", header.ID(), err)
+	}
+
+	result, err := r.results.ByID(seal.ResultID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to lookup execution result for block %s: %w", header.ID(), err)
 	}
@@ -102,7 +111,7 @@ func (r *ExecutionDataReader) getExecutionData(signalCtx irrecoverable.SignalerC
 	ctx, cancel := context.WithTimeout(signalCtx, r.fetchTimeout)
 	defer cancel()
 
-	executionData, err := r.eds.Get(ctx, result.ExecutionDataID)
+	executionData, err := r.downloader.Download(ctx, result.ExecutionDataID)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get execution data for block %s: %w", header.ID(), err)
