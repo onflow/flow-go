@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -183,6 +184,7 @@ func (suite *MutableIdentityTableSuite) addNodes(count int) {
 		count,
 		suite.logger,
 		unittest.NetworkCodec(),
+		mocknetwork.NewViolationsConsumer(suite.T()),
 	)
 	suite.cancels = append(suite.cancels, cancel)
 
