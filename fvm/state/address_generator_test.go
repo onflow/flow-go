@@ -1,7 +1,6 @@
 package state_test
 
 import (
-	"math"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -15,8 +14,8 @@ import (
 func Test_NewStateBoundAddressGenerator_NoError(t *testing.T) {
 	view := utils.NewSimpleView()
 	chain := flow.MonotonicEmulator.Chain()
-	meter := meter.NewMeter(math.MaxUint64, math.MaxUint64)
-	sth := state.NewStateHolder(state.NewState(view, meter))
+	meter := meter.NewMeter(meter.DefaultParameters())
+	sth := state.NewStateHolder(state.NewState(view, meter, state.DefaultParameters()))
 	env := state.NewStateBoundAddressGenerator(sth, chain)
 	require.NotNil(t, env)
 }
@@ -24,8 +23,8 @@ func Test_NewStateBoundAddressGenerator_NoError(t *testing.T) {
 func Test_NewStateBoundAddressGenerator_GeneratingUpdatesState(t *testing.T) {
 	view := utils.NewSimpleView()
 	chain := flow.MonotonicEmulator.Chain()
-	meter := meter.NewMeter(math.MaxUint64, math.MaxUint64)
-	sth := state.NewStateHolder(state.NewState(view, meter))
+	meter := meter.NewMeter(meter.DefaultParameters())
+	sth := state.NewStateHolder(state.NewState(view, meter, state.DefaultParameters()))
 	generator := state.NewStateBoundAddressGenerator(sth, chain)
 	_, err := generator.NextAddress()
 	require.NoError(t, err)
@@ -42,8 +41,8 @@ func Test_NewStateBoundAddressGenerator_UsesLedgerState(t *testing.T) {
 	require.NoError(t, err)
 
 	chain := flow.MonotonicEmulator.Chain()
-	meter := meter.NewMeter(math.MaxUint64, math.MaxUint64)
-	sth := state.NewStateHolder(state.NewState(view, meter))
+	meter := meter.NewMeter(meter.DefaultParameters())
+	sth := state.NewStateHolder(state.NewState(view, meter, state.DefaultParameters()))
 	generator := state.NewStateBoundAddressGenerator(sth, chain)
 
 	_, err = generator.NextAddress()

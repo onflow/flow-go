@@ -740,11 +740,11 @@ func TestTransactionFeeDeduction(t *testing.T) {
 		},
 		{
 			name:          "If tx fails because of gas limit reached, fee deduction events are emitted",
-			fundWith:      fundingAmount,
-			tryToTransfer: 2 * fundingAmount,
+			fundWith:      txFees + transferAmount,
+			tryToTransfer: transferAmount,
 			gasLimit:      uint64(10),
 			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure) {
-				require.Error(t, tx.Err)
+				require.ErrorContains(t, tx.Err, "computation exceeds limit (10)")
 
 				var deposits []flow.Event
 				var withdraws []flow.Event
@@ -1343,8 +1343,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithTransactionFee(fvm.DefaultTransactionFees),
 		fvm.WithExecutionEffortWeights(
 			meter.ExecutionEffortWeights{
-				common.ComputationKindStatement:          1 << meter.MeterExecutionInternalPrecisionBytes,
-				common.ComputationKindLoop:               0,
+				common.ComputationKindStatement:          0,
+				common.ComputationKindLoop:               1 << meter.MeterExecutionInternalPrecisionBytes,
 				common.ComputationKindFunctionInvocation: 0,
 			},
 		),
@@ -1356,7 +1356,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 			// Use the maximum amount of computation so that the transaction still passes.
 			loops := uint64(997)
-			maxExecutionEffort := uint64(999)
+			maxExecutionEffort := uint64(997)
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(fmt.Sprintf(`
 				transaction() {prepare(signer: AuthAccount){var i=0;  while i < %d {i = i +1 } } execute{}}
@@ -1374,8 +1374,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 			require.NoError(t, err)
 			require.NoError(t, tx.Err)
 
-			// expected used is number of loops + 2 invocations.
-			assert.Equal(t, loops+2, tx.ComputationUsed)
+			// expected used is number of loops.
+			assert.Equal(t, loops, tx.ComputationUsed)
 
 			// increasing the number of loops should fail the transaction.
 			loops = loops + 1
@@ -1395,9 +1395,9 @@ func TestSettingExecutionWeights(t *testing.T) {
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
 
-			require.Error(t, tx.Err)
+			require.ErrorContains(t, tx.Err, "computation exceeds limit (997)")
 			// computation used should the actual computation used.
-			assert.Equal(t, loops+2, tx.ComputationUsed)
+			assert.Equal(t, loops, tx.ComputationUsed)
 
 			for _, event := range tx.Events {
 				// the fee deduction event should only contain the max gas worth of execution effort.

@@ -178,7 +178,7 @@ func AssertNotClosesBefore(t assert.TestingT, done <-chan struct{}, duration tim
 	}
 }
 
-// RequireReturnBefore requires that the given function returns before the
+// RequireReturnsBefore requires that the given function returns before the
 // duration expires.
 func RequireReturnsBefore(t testing.TB, f func(), duration time.Duration, message string) {
 	done := make(chan struct{})
