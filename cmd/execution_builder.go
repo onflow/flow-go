@@ -87,7 +87,7 @@ type ExecutionConfig struct {
 	stateDeltasLimit                     uint
 	cadenceExecutionCache                uint
 	cadenceTracing                       bool
-	chdpCacheSize                        uint
+	chunkDataPackCacheSize               uint
 	requestInterval                      time.Duration
 	preferredExeNodeIDStr                string
 	syncByBlocks                         bool
@@ -105,10 +105,11 @@ type ExecutionConfig struct {
 	apiBurstlimits                       map[string]int
 	executionDataPrunerHeightRangeTarget uint64
 	executionDataPrunerThreshold         uint64
-	chunkDataPackQueryTimeout      time.Duration
-	chunkDataPackDeliveryTimeout   time.Duration
-	chunkDataPackProcessInterval   time.Duration
-	chunkDataPackRequestWorkers    uint
+	chunkDataPackRequestsCacheSize       uint32
+	chunkDataPackQueryTimeout            time.Duration
+	chunkDataPackDeliveryTimeout         time.Duration
+	chunkDataPackProcessInterval         time.Duration
+	chunkDataPackRequestWorkers          uint
 }
 
 type ExecutionNodeBuilder struct {
