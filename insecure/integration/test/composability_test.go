@@ -109,7 +109,7 @@ func withCorruptibleNetwork(t *testing.T, run func(*testing.T, flow.Identity, *c
 	hub := stub.NewNetworkHub()
 	ccf := corruptible.NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet)
 	flowNetwork := stub.NewNetwork(t, corruptedIdentity.NodeID, hub, stub.WithConduitFactory(ccf))
-	corruptibleNetwork, err := corruptible.NewCorruptibleNetwork(
+	corruptibleNetwork, err := corruptible.NewCorruptNetwork(
 		unittest.Logger(),
 		flow.BftTestnet,
 		insecure.DefaultAddress,

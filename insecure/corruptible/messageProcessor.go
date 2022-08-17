@@ -17,7 +17,7 @@ type MessageProcessor struct {
 
 var _ flownet.MessageProcessor = &MessageProcessor{}
 
-func NewCorruptibleMessageProcessor(logger zerolog.Logger, originalProcessor flownet.MessageProcessor) *MessageProcessor {
+func NewCorruptMessageProcessor(logger zerolog.Logger, originalProcessor flownet.MessageProcessor) *MessageProcessor {
 	return &MessageProcessor{
 		logger:            logger,
 		originalProcessor: originalProcessor,

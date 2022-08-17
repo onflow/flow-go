@@ -31,7 +31,7 @@ func TestHandleOutgoingEvent_AttackerObserve(t *testing.T) {
 	ccf := &mockinsecure.CorruptibleConduitFactory{}
 	ccf.On("RegisterEgressController", mock.Anything).Return(nil)
 
-	corruptibleNetwork, err := NewCorruptibleNetwork(
+	corruptibleNetwork, err := NewCorruptNetwork(
 		unittest.Logger(),
 		flow.BftTestnet,
 		insecure.DefaultAddress,

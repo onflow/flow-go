@@ -61,7 +61,7 @@ func corruptibleNetworkFixture(t *testing.T, logger zerolog.Logger, corruptedID 
 	err := ccf.RegisterAdapter(adapter)
 	require.NoError(t, err)
 
-	corruptibleNetwork, err := NewCorruptibleNetwork(
+	corruptibleNetwork, err := NewCorruptNetwork(
 		logger,
 		flow.BftTestnet,
 		insecure.DefaultAddress,
