@@ -1,27 +1,57 @@
-package state_synchronization
+package execution_data
 
 import (
 	"fmt"
 	"io"
+	"math"
 
+	cborlib "github.com/fxamacker/cbor/v2"
 	"github.com/ipfs/go-cid"
 
 	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/compressor"
 )
 
+var DefaultSerializer Serializer
+
+func init() {
+	var codec encoding.Codec
+
+	decMode, err := cborlib.DecOptions{
+		MaxArrayElements: math.MaxInt64,
+		MaxMapPairs:      math.MaxInt64,
+		MaxNestedLevels:  math.MaxInt16,
+	}.DecMode()
+
+	if err != nil {
+		panic(err)
+	}
+
+	codec = cbor.NewCodec(cbor.WithDecMode(decMode))
+	DefaultSerializer = NewSerializer(codec, compressor.NewLz4Compressor())
+}
+
 // header codes to distinguish between different types of data
+// these codes provide simple versioning of execution state data blobs and indicate how the data
+// should be deserialized into their original form. Therefore, each input format must have a unique
+// code, and the codes must never be reused. This allows for libraries that can accurately decode
+// the data without juggling software versions.
 const (
-	CodeRecursiveCIDs = iota + 1
-	CodeExecutionData
+	codeRecursiveCIDs = iota + 1
+	codeExecutionDataRoot
+	codeChunkExecutionData
 )
 
 func getCode(v interface{}) (byte, error) {
 	switch v.(type) {
-	case *ExecutionData:
-		return CodeExecutionData, nil
+	case *BlockExecutionDataRoot:
+		return codeExecutionDataRoot, nil
+	case *ChunkExecutionData:
+		return codeChunkExecutionData, nil
 	case []cid.Cid:
-		return CodeRecursiveCIDs, nil
+		return codeRecursiveCIDs, nil
 	default:
 		return 0, fmt.Errorf("invalid type for interface: %T", v)
 	}
@@ -29,24 +59,39 @@ func getCode(v interface{}) (byte, error) {
 
 func getPrototype(code byte) (interface{}, error) {
 	switch code {
-	case CodeExecutionData:
-		return &ExecutionData{}, nil
-	case CodeRecursiveCIDs:
+	case codeExecutionDataRoot:
+		return &BlockExecutionDataRoot{}, nil
+	case codeChunkExecutionData:
+		return &ChunkExecutionData{}, nil
+	case codeRecursiveCIDs:
 		return &[]cid.Cid{}, nil
 	default:
 		return nil, fmt.Errorf("invalid code: %v", code)
 	}
 }
 
-// serializer is used to serialize / deserialize Execution Data and CID lists for the
-// Execution Data Service. An object is serialized by encoding and compressing it using
-// the given codec and compressor.
+// Serializer is used to serialize / deserialize Execution Data and CID lists for the
+// Execution Data Service.
+type Serializer interface {
+	Serialize(io.Writer, interface{}) error
+	Deserialize(io.Reader) (interface{}, error)
+}
+
+// serializer implements the Serializer interface. Object are serialized by encoding and
+// compressing them using the given codec and compressor.
 //
 // The serialized data is prefixed with a single byte header that identifies the underlying
 // data format. This allows adding new data types in a backwards compatible way.
 type serializer struct {
 	codec      encoding.Codec
 	compressor network.Compressor
+}
+
+func NewSerializer(codec encoding.Codec, compressor network.Compressor) *serializer {
+	return &serializer{
+		codec:      codec,
+		compressor: compressor,
+	}
 }
 
 // writePrototype writes the header code for the given value to the given writer

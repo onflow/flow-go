@@ -1,4 +1,4 @@
-package synchronization
+package chainsync
 
 import (
 	"sort"

@@ -18,7 +18,6 @@ import (
 	mockinsecure "github.com/onflow/flow-go/insecure/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
-	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -26,8 +25,8 @@ import (
 // TestHandleOutgoingEvent_AttackerObserve evaluates that the incoming messages to the corrupted network are routed to the
 // registered attacker if one exists.
 func TestHandleOutgoingEvent_AttackerObserve(t *testing.T) {
-	codec := cbor.NewCodec()
-	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress("localhost:0"))
+	codec := unittest.NetworkCodec()
+	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DefaultAddress))
 	flowNetwork := &mocknetwork.Network{}
 	ccf := &mockinsecure.CorruptibleConduitFactory{}
 	ccf.On("RegisterEgressController", mock.Anything).Return(nil)
@@ -35,7 +34,7 @@ func TestHandleOutgoingEvent_AttackerObserve(t *testing.T) {
 	corruptibleNetwork, err := NewCorruptibleNetwork(
 		unittest.Logger(),
 		flow.BftTestnet,
-		"localhost:0",
+		insecure.DefaultAddress,
 		testutil.LocalFixture(t, corruptedIdentity),
 		codec,
 		flowNetwork,
@@ -56,7 +55,7 @@ func TestHandleOutgoingEvent_AttackerObserve(t *testing.T) {
 
 	targetIds := unittest.IdentifierListFixture(10)
 	msg := &message.TestMessage{Text: "this is a test msg"}
-	channel := channels.Channel("test-channel")
+	channel := channels.TestNetworkChannel
 
 	go func() {
 		err := corruptibleNetwork.HandleOutgoingEvent(msg, channel, insecure.Protocol_MULTICAST, uint32(3), targetIds...)
@@ -71,12 +70,12 @@ func TestHandleOutgoingEvent_AttackerObserve(t *testing.T) {
 	}, 100*time.Millisecond, "mock attack could not receive incoming message on time")
 
 	// checks content of the received message matches what has been sent.
-	require.ElementsMatch(t, receivedMsg.TargetIDs, flow.IdsToBytes(targetIds))
-	require.Equal(t, receivedMsg.TargetNum, uint32(3))
-	require.Equal(t, receivedMsg.Protocol, insecure.Protocol_MULTICAST)
-	require.Equal(t, receivedMsg.ChannelID, string(channel))
+	require.ElementsMatch(t, receivedMsg.Egress.TargetIDs, flow.IdsToBytes(targetIds))
+	require.Equal(t, receivedMsg.Egress.TargetNum, uint32(3))
+	require.Equal(t, receivedMsg.Egress.Protocol, insecure.Protocol_MULTICAST)
+	require.Equal(t, receivedMsg.Egress.ChannelID, string(channel))
 
-	decodedEvent, err := codec.Decode(receivedMsg.Payload)
+	decodedEvent, err := codec.Decode(receivedMsg.Egress.Payload)
 	require.NoError(t, err)
 	require.Equal(t, msg, decodedEvent)
 }
@@ -84,10 +83,10 @@ func TestHandleOutgoingEvent_AttackerObserve(t *testing.T) {
 // TestHandleOutgoingEvent_NoAttacker_UnicastOverNetwork checks that outgoing unicast events to the corrupted network
 // are routed to the network adapter when no attacker is registered to the network.
 func TestHandleOutgoingEvent_NoAttacker_UnicastOverNetwork(t *testing.T) {
-	corruptibleNetwork, adapter := corruptibleNetworkFixture(t)
+	corruptibleNetwork, adapter := corruptibleNetworkFixture(t, unittest.Logger())
 
 	msg := &message.TestMessage{Text: "this is a test msg"}
-	channel := channels.Channel("test-channel")
+	channel := channels.TestNetworkChannel
 
 	targetId := unittest.IdentifierFixture()
 
@@ -104,10 +103,10 @@ func TestHandleOutgoingEvent_NoAttacker_UnicastOverNetwork(t *testing.T) {
 // TestHandleOutgoingEvent_NoAttacker_PublishOverNetwork checks that the outgoing publish events to the corrupted network
 // are routed to the network adapter when no attacker registered to the network.
 func TestHandleOutgoingEvent_NoAttacker_PublishOverNetwork(t *testing.T) {
-	corruptibleNetwork, adapter := corruptibleNetworkFixture(t)
+	corruptibleNetwork, adapter := corruptibleNetworkFixture(t, unittest.Logger())
 
 	msg := &message.TestMessage{Text: "this is a test msg"}
-	channel := channels.Channel("test-channel")
+	channel := channels.TestNetworkChannel
 
 	targetIds := unittest.IdentifierListFixture(10)
 	params := []interface{}{channel, msg}
@@ -128,10 +127,10 @@ func TestHandleOutgoingEvent_NoAttacker_PublishOverNetwork(t *testing.T) {
 // TestHandleOutgoingEvent_NoAttacker_MulticastOverNetwork checks that the outgoing multicast events to the corrupted network
 // are routed to the network adapter when no attacker registered to the network.
 func TestHandleOutgoingEvent_NoAttacker_MulticastOverNetwork(t *testing.T) {
-	corruptibleNetwork, adapter := corruptibleNetworkFixture(t)
+	corruptibleNetwork, adapter := corruptibleNetworkFixture(t, unittest.Logger())
 
 	msg := &message.TestMessage{Text: "this is a test msg"}
-	channel := channels.Channel("test-channel")
+	channel := channels.TestNetworkChannel
 
 	targetIds := unittest.IdentifierListFixture(10)
 
@@ -149,9 +148,9 @@ func TestHandleOutgoingEvent_NoAttacker_MulticastOverNetwork(t *testing.T) {
 	mock.AssertExpectationsForObjects(t, adapter)
 }
 
-// TestProcessAttackerMessage evaluates that corrupted network relays the messages to its underlying flow network.
-func TestProcessAttackerMessage(t *testing.T) {
-	withCorruptibleNetwork(t,
+// TestProcessAttackerMessage checks that a corrupted network relays the messages to its underlying flow network.
+func TestProcessAttackerMessage_MessageSentOnFlowNetwork(t *testing.T) {
+	withCorruptibleNetwork(t, unittest.Logger(),
 		func(
 			corruptedId flow.Identity, // identity of ccf
 			corruptibleNetwork *Network,
@@ -160,12 +159,12 @@ func TestProcessAttackerMessage(t *testing.T) {
 		) {
 			// creates a corrupted event that attacker is sending on the flow network through the
 			// corrupted conduit factory.
-			msg, event, _ := insecure.MessageFixture(t, cbor.NewCodec(), insecure.Protocol_MULTICAST, &message.TestMessage{
+			msg, event, _ := insecure.EgressMessageFixture(t, unittest.NetworkCodec(), insecure.Protocol_MULTICAST, &message.TestMessage{
 				Text: fmt.Sprintf("this is a test message: %d", rand.Int()),
 			})
 
-			params := []interface{}{channels.Channel(msg.ChannelID), event.FlowProtocolEvent, uint(3)}
-			targetIds, err := flow.ByteSlicesToIds(msg.TargetIDs)
+			params := []interface{}{channels.Channel(msg.Egress.ChannelID), event.FlowProtocolEvent, uint(3)}
+			targetIds, err := flow.ByteSlicesToIds(msg.Egress.TargetIDs)
 			require.NoError(t, err)
 
 			for _, id := range targetIds {
@@ -188,11 +187,10 @@ func TestProcessAttackerMessage(t *testing.T) {
 		})
 }
 
-// TestProcessAttackerMessage_ResultApproval_Dictated checks that when corruptible network receives a result approval with
-// empty signature field,
-// it fills its related fields with its own credentials (e.g., signature), and passes it through the Flow network.
+// TestProcessAttackerMessage_ResultApproval_Dictated checks that when a corruptible network receives a result approval with an
+// empty signature field, it fills its related fields with its own credentials (e.g., signature), and passes it through the Flow network.
 func TestProcessAttackerMessage_ResultApproval_Dictated(t *testing.T) {
-	withCorruptibleNetwork(t,
+	withCorruptibleNetwork(t, unittest.Logger(),
 		func(
 			corruptedId flow.Identity, // identity of ccf
 			corruptibleNetwork *Network,
@@ -204,14 +202,14 @@ func TestProcessAttackerMessage_ResultApproval_Dictated(t *testing.T) {
 			// corrupted result approval dictated by attacker needs to only have the attestation field, as the rest will be
 			// filled up by the CCF.
 			dictatedAttestation := *unittest.AttestationFixture()
-			msg, _, _ := insecure.MessageFixture(t, cbor.NewCodec(), insecure.Protocol_PUBLISH, &flow.ResultApproval{
+			msg, _, _ := insecure.EgressMessageFixture(t, unittest.NetworkCodec(), insecure.Protocol_PUBLISH, &flow.ResultApproval{
 				Body: flow.ResultApprovalBody{
 					Attestation: dictatedAttestation,
 				},
 			})
 
-			params := []interface{}{channels.Channel(msg.ChannelID), mock.Anything}
-			targetIds, err := flow.ByteSlicesToIds(msg.TargetIDs)
+			params := []interface{}{channels.Channel(msg.Egress.ChannelID), mock.Anything}
+			targetIds, err := flow.ByteSlicesToIds(msg.Egress.TargetIDs)
 			require.NoError(t, err)
 			for _, id := range targetIds {
 				params = append(params, id)
@@ -247,25 +245,24 @@ func TestProcessAttackerMessage_ResultApproval_Dictated(t *testing.T) {
 				require.True(t, valid)
 
 				corruptedEventDispatchedOnFlowNetWg.Done()
+				//}).Return(nil).Once()
 			}).Return(nil).Once()
-
 			// imitates a gRPC call from orchestrator to ccf through attack network
 			require.NoError(t, stream.Send(msg))
 
 			unittest.RequireReturnsBefore(
 				t,
 				corruptedEventDispatchedOnFlowNetWg.Wait,
-				//1*time.Second,
-				1000*time.Second,
+				1*time.Second,
 				"attacker's message was not dispatched on flow network on time")
 		})
 }
 
-// TestProcessAttackerMessage_ResultApproval_PassThrough evaluates that when corrupted network
+// TestProcessAttackerMessage_ResultApproval_PassThrough checks that when a corrupted network
 // receives a completely filled result approval,
 // it fills its related fields with its own credentials (e.g., signature), and passes it through the Flow network.
 func TestProcessAttackerMessage_ResultApproval_PassThrough(t *testing.T) {
-	withCorruptibleNetwork(t,
+	withCorruptibleNetwork(t, unittest.Logger(),
 		func(
 			corruptedId flow.Identity, // identity of ccf
 			corruptibleNetwork *Network,
@@ -274,10 +271,10 @@ func TestProcessAttackerMessage_ResultApproval_PassThrough(t *testing.T) {
 		) {
 
 			passThroughApproval := unittest.ResultApprovalFixture()
-			msg, _, _ := insecure.MessageFixture(t, cbor.NewCodec(), insecure.Protocol_PUBLISH, passThroughApproval)
+			msg, _, _ := insecure.EgressMessageFixture(t, unittest.NetworkCodec(), insecure.Protocol_PUBLISH, passThroughApproval)
 
-			params := []interface{}{channels.Channel(msg.ChannelID), mock.Anything}
-			targetIds, err := flow.ByteSlicesToIds(msg.TargetIDs)
+			params := []interface{}{channels.Channel(msg.Egress.ChannelID), mock.Anything}
+			targetIds, err := flow.ByteSlicesToIds(msg.Egress.TargetIDs)
 			require.NoError(t, err)
 			for _, id := range targetIds {
 				params = append(params, id)
@@ -306,10 +303,10 @@ func TestProcessAttackerMessage_ResultApproval_PassThrough(t *testing.T) {
 		})
 }
 
-// TestProcessAttackerMessage_ExecutionReceipt_Dictated evaluates that when corrupted network receives an execution receipt with
+// TestProcessAttackerMessage_ExecutionReceipt_Dictated checks that when a corrupted network receives an execution receipt with
 // empty signature field, it fills its related fields with its own credentials (e.g., signature), and passes it through the Flow network.
 func TestProcessAttackerMessage_ExecutionReceipt_Dictated(t *testing.T) {
-	withCorruptibleNetwork(t,
+	withCorruptibleNetwork(t, unittest.Logger(),
 		func(
 			corruptedId flow.Identity, // identity of ccf
 			corruptibleNetwork *Network,
@@ -321,12 +318,12 @@ func TestProcessAttackerMessage_ExecutionReceipt_Dictated(t *testing.T) {
 			// corrupted execution receipt dictated by attacker needs to only have the result field, as the rest will be
 			// filled up by the CCF.
 			dictatedResult := *unittest.ExecutionResultFixture()
-			msg, _, _ := insecure.MessageFixture(t, cbor.NewCodec(), insecure.Protocol_PUBLISH, &flow.ExecutionReceipt{
+			msg, _, _ := insecure.EgressMessageFixture(t, unittest.NetworkCodec(), insecure.Protocol_PUBLISH, &flow.ExecutionReceipt{
 				ExecutionResult: dictatedResult,
 			})
 
-			params := []interface{}{channels.Channel(msg.ChannelID), mock.Anything}
-			targetIds, err := flow.ByteSlicesToIds(msg.TargetIDs)
+			params := []interface{}{channels.Channel(msg.Egress.ChannelID), mock.Anything}
+			targetIds, err := flow.ByteSlicesToIds(msg.Egress.TargetIDs)
 			require.NoError(t, err)
 			for _, id := range targetIds {
 				params = append(params, id)
@@ -366,10 +363,10 @@ func TestProcessAttackerMessage_ExecutionReceipt_Dictated(t *testing.T) {
 		})
 }
 
-// TestProcessAttackerMessage_ExecutionReceipt_PassThrough evaluates that when corrupted network
+// TestProcessAttackerMessage_ExecutionReceipt_PassThrough checks that when a corrupted network
 // receives a completely filled execution receipt, it treats it as a pass-through event and passes it as it is on the Flow network.
 func TestProcessAttackerMessage_ExecutionReceipt_PassThrough(t *testing.T) {
-	withCorruptibleNetwork(t,
+	withCorruptibleNetwork(t, unittest.Logger(),
 		func(
 			corruptedId flow.Identity, // identity of ccf
 			corruptibleNetwork *Network,
@@ -378,10 +375,10 @@ func TestProcessAttackerMessage_ExecutionReceipt_PassThrough(t *testing.T) {
 		) {
 
 			passThroughReceipt := unittest.ExecutionReceiptFixture()
-			msg, _, _ := insecure.MessageFixture(t, cbor.NewCodec(), insecure.Protocol_PUBLISH, passThroughReceipt)
+			msg, _, _ := insecure.EgressMessageFixture(t, unittest.NetworkCodec(), insecure.Protocol_PUBLISH, passThroughReceipt)
 
-			params := []interface{}{channels.Channel(msg.ChannelID), mock.Anything}
-			targetIds, err := flow.ByteSlicesToIds(msg.TargetIDs)
+			params := []interface{}{channels.Channel(msg.Egress.ChannelID), mock.Anything}
+			targetIds, err := flow.ByteSlicesToIds(msg.Egress.TargetIDs)
 			require.NoError(t, err)
 			for _, id := range targetIds {
 				params = append(params, id)
@@ -408,21 +405,4 @@ func TestProcessAttackerMessage_ExecutionReceipt_PassThrough(t *testing.T) {
 				1*time.Second,
 				"attacker's message was not dispatched on flow network on time")
 		})
-}
-
-// TestEngineClosingChannel evaluates that corruptible network closes the channel whenever the corresponding
-// engine of that channel attempts on closing it.
-func TestEngineClosingChannel(t *testing.T) {
-	corruptibleNetwork, adapter := corruptibleNetworkFixture(t)
-	channel := channels.Channel("test-channel")
-
-	// on invoking adapter.UnRegisterChannel(channel), it must return a nil, which means
-	// that the channel has been unregistered by the adapter successfully.
-	adapter.On("UnRegisterChannel", channel).Return(nil).Once()
-
-	err := corruptibleNetwork.EngineClosingChannel(channel)
-	require.NoError(t, err)
-
-	// adapter's UnRegisterChannel method must be called once.
-	mock.AssertExpectationsForObjects(t, adapter)
 }

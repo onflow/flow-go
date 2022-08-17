@@ -18,7 +18,7 @@ import (
 // it can successfully create conduits.
 func TestNewConduit_HappyPath(t *testing.T) {
 	ccf := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet)
-	channel := channels.Channel("test-channel")
+	channel := channels.TestNetworkChannel
 	require.NoError(t, ccf.RegisterEgressController(&mockinsecure.EgressController{}))
 	require.NoError(t, ccf.RegisterAdapter(&mocknetwork.Adapter{}))
 
@@ -56,7 +56,7 @@ func TestRegisterEgressController_FailDoubleRegistration(t *testing.T) {
 // any attempts on creating a conduit fails with an error.
 func TestNewConduit_MissingAdapter(t *testing.T) {
 	ccf := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet)
-	channel := channels.Channel("test-channel")
+	channel := channels.TestNetworkChannel
 	require.NoError(t, ccf.RegisterEgressController(&mockinsecure.EgressController{}))
 
 	c, err := ccf.NewConduit(context.Background(), channel)
@@ -68,7 +68,7 @@ func TestNewConduit_MissingAdapter(t *testing.T) {
 // but does have adapter.
 func TestNewConduit_MissingEgressController(t *testing.T) {
 	ccf := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet)
-	channel := channels.Channel("test-channel")
+	channel := channels.TestNetworkChannel
 	require.NoError(t, ccf.RegisterAdapter(&mocknetwork.Adapter{}))
 
 	c, err := ccf.NewConduit(context.Background(), channel)
