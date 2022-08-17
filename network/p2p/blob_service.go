@@ -67,7 +67,9 @@ func WithHashOnRead(enabled bool) network.BlobServiceOption {
 }
 
 // WithRateLimit sets a rate limit on reads from the underlying datastore that allows up
-// to r bytes per second and permits bursts of at most b bytes
+// to r bytes per second and permits bursts of at most b bytes. Note that b should be
+// set to at least the max blob size, otherwise blobs larger than b cannot be read from
+// the blobstore.
 func WithRateLimit(r float64, b int) network.BlobServiceOption {
 	return func(bs network.BlobService) {
 		blobService := bs.(*blobService)
