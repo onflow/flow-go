@@ -49,7 +49,6 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	edrequester "github.com/onflow/flow-go/module/state_synchronization/requester"
-	"github.com/onflow/flow-go/module/synchronization"
 	consensus_follower "github.com/onflow/flow-go/module/upstream"
 	"github.com/onflow/flow-go/network"
 	netcache "github.com/onflow/flow-go/network/cache"
@@ -158,7 +157,7 @@ type ObserverServiceBuilder struct {
 	// components
 	LibP2PNode              *p2p.Node
 	FollowerState           stateprotocol.MutableState
-	SyncCore                *synchronization.Core
+	SyncCore                *chainsync.Core
 	RpcEng                  *rpc.Engine
 	FinalizationDistributor *pubsub.FinalizationDistributor
 	FinalizedHeader         *synceng.FinalizedHeaderCache
