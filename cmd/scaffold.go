@@ -1201,11 +1201,9 @@ func (fnb *FlowNodeBuilder) Component(name string, f ReadyDoneFactory) NodeBuild
 // In both cases, the object is started when the node is run, and the node will wait for the
 // component to exit gracefully.
 //
-// IMPORTANT: All dependencies' `Ready()` method MUST be idempotent since it will be called more than
-// once and in no guaranteed order.
-//
-// Dependable components are started in parallel with no guaranteed run order, so all dependencies
-// must be initialized outside of the ReadyDoneFactory.
+// IMPORTANT: Dependable components are started in parallel with no guaranteed run order, so all
+// dependencies must be initialized outside of the ReadyDoneFactory, and their `Ready()` method
+// MUST be idempotent.
 func (fnb *FlowNodeBuilder) DependableComponent(name string, f ReadyDoneFactory, dependencies []module.ReadyDoneAware) NodeBuilder {
 	fnb.components = append(fnb.components, namedComponentFunc{
 		fn:           f,
