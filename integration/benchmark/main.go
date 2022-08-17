@@ -1,28 +1,27 @@
 package main
 
 import (
-	"context"
 	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
-	"net"
-	"net/http"
-	"os"
-	"strconv"
-	"strings"
-	"time"
-
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/push"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"io"
+	"net/http"
+	"os"
+	"runtime"
+	"strconv"
+	"strings"
+	"time"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 
+	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/flow"
@@ -38,6 +37,8 @@ type LoadCase struct {
 // This struct is used for uploading data to BigQuery, changes here should
 // remain in sync with tps_results_schema.json
 type dataSlice struct {
+	GoVersion           string
+	OsVersion           string
 	GitSha              string
 	StartTime           time.Time
 	EndTime             time.Time
@@ -47,19 +48,19 @@ type dataSlice struct {
 	ProEndTransaction   float64
 }
 
+// Hardcoded CI values
+const loadType = "token-transfer"
+const metricport = uint(8080)
+const accessNodeAddress = "127.0.0.1:3569"
+const pushgateway = "127.0.0.1:9091"
+const accountMultiplier = 50
+const feedbackEnabled = true
+const serviceAccountPrivateKeyHex = unittest.ServiceAccountPrivateKeyHex
+
 func main() {
 	// holdover flags from loader/main.go
-	sleep := flag.Duration("sleep", 0, "duration to sleep before benchmarking starts")
-	loadTypeFlag := flag.String("load-type", "token-transfer", "type of loads (\"token-transfer\", \"add-keys\", \"computation-heavy\", \"event-heavy\", \"ledger-heavy\", \"const-exec\")")
-	chainIDStr := flag.String("chain", string(flowsdk.Emulator), "chain ID")
-	access := flag.String("access", net.JoinHostPort("127.0.0.1", "3569"), "access node address")
-	serviceAccountPrivateKeyHex := flag.String("servPrivHex", unittest.ServiceAccountPrivateKeyHex, "service account private key hex")
 	logLvl := flag.String("log-level", "info", "set log level")
-	metricport := flag.Uint("metricport", 8080, "port for /metrics endpoint")
-	pushgateway := flag.String("pushgateway", "127.0.0.1:9091", "host:port for pushgateway")
 	profilerEnabled := flag.Bool("profiler-enabled", false, "whether to enable the auto-profiler")
-	accountMultiplierFlag := flag.Int("account-multiplier", 50, "number of accounts to create per load tps")
-	feedbackEnabled := flag.Bool("feedback-enabled", true, "wait for trannsaction execution before submitting new transaction")
 	maxConstExecTxSizeInBytes := flag.Uint("const-exec-max-tx-size", flow.DefaultMaxTransactionByteSize/10, "max byte size of constant exec transaction size to generate")
 	authAccNumInConstExecTx := flag.Uint("const-exec-num-authorizer", 1, "num of authorizer for each constant exec transaction to generate")
 	argSizeInByteInConstExecTx := flag.Uint("const-exec-arg-size", 100, "byte size of tx argument for each constant exec transaction to generate")
@@ -71,12 +72,14 @@ func main() {
 	ciFlag := flag.Bool("ci-run", false, "whether or not the run is part of CI")
 	leadTime := flag.String("leadTime", "30s", "the amount of time before data slices are started")
 	sliceSize := flag.String("sliceSize", "2m", "the amount of time that each slice covers")
-	gitSha := flag.String("gitSha", "", "the git hash of the run, used for BigQuery result tracking")
 	flag.Parse()
 
-	chainID := flowsdk.ChainID([]byte(*chainIDStr))
+	// Version and Commit Info
+	gitSha := build.Commit()
+	goVersion := runtime.Version()
+	osVersion := runtime.GOOS + runtime.GOARCH
 
-	ctx, cancel := context.WithCancel(context.Background())
+	chainID := flowsdk.Emulator
 
 	// parse log level and apply to logger
 	log := zerolog.New(os.Stderr).With().Timestamp().Logger().Output(zerolog.ConsoleWriter{Out: os.Stderr})
@@ -86,33 +89,34 @@ func main() {
 	}
 	log = log.Level(lvl)
 
-	server := metrics.NewServer(log, *metricport, *profilerEnabled)
+	server := metrics.NewServer(log, metricport, *profilerEnabled)
 	<-server.Ready()
 	loaderMetrics := metrics.NewLoaderCollector()
 
-	if *pushgateway != "" {
-		pusher := push.New(*pushgateway, "loader").Gatherer(prometheus.DefaultGatherer)
-		go func() {
-			t := time.NewTicker(10 * time.Second)
-			defer t.Stop()
+	pusher := push.New(pushgateway, "loader").Gatherer(prometheus.DefaultGatherer)
+	go func() {
+		t := time.NewTicker(10 * time.Second)
+		defer t.Stop()
 
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-t.C:
-					err := pusher.Push()
-					if err != nil {
-						log.Warn().Err(err).Msg("failed to push metrics to pushgateway")
-					}
-				}
+		for {
+			err := pusher.Push()
+			if err != nil {
+				log.Warn().Err(err).Msg("failed to push metrics to pushgateway")
 			}
-		}()
+		}
+	}()
+
+	tps, err := strconv.ParseInt(*tpsFlag, 0, 32)
+	if err != nil {
+		log.Fatal().Err(err).Str("value", *tpsFlag).
+			Msg("could not parse tps flag")
 	}
-
-	accessNodeAddrs := strings.Split(*access, ",")
-
-	cases := parseLoadCases(log, tpsFlag, tpsDurationsFlag)
+	tpsDuration, err := time.ParseDuration(*tpsDurationsFlag)
+	if err != nil {
+		log.Fatal().Err(err).Str("value", *tpsDurationsFlag).
+			Msg("could not parse tps-durations flag")
+	}
+	loadCase := LoadCase{tps: int(tps), duration: tpsDuration}
 
 	addressGen := flowsdk.NewAddressGenerator(chainID)
 	serviceAccountAddress := addressGen.NextAddress()
@@ -122,7 +126,7 @@ func main() {
 	flowTokenAddress := addressGen.NextAddress()
 	log.Info().Msgf("Flow Token Address: %v", flowTokenAddress)
 
-	serviceAccountPrivateKeyBytes, err := hex.DecodeString(*serviceAccountPrivateKeyHex)
+	serviceAccountPrivateKeyBytes, err := hex.DecodeString(serviceAccountPrivateKeyHex)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("error while hex decoding hardcoded root key")
 	}
@@ -140,88 +144,73 @@ func main() {
 	// get the private key string
 	priv := hex.EncodeToString(ServiceAccountPrivateKey.PrivateKey.Encode())
 
-	// sleep in order to ensure the testnet is up and running
-	if *sleep > 0 {
-		log.Info().Msgf("Sleeping for %v before starting benchmark", sleep)
-		time.Sleep(*sleep)
-	}
-
-	loadedAccessAddr := accessNodeAddrs[0]
+	loadedAccessAddr := accessNodeAddress
 	flowClient, err := client.NewClient(loadedAccessAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatal().Err(err).Msgf("unable to initialize Flow client")
 	}
 
-	supervisorAccessAddr := accessNodeAddrs[0]
-	if len(accessNodeAddrs) > 1 {
-		supervisorAccessAddr = accessNodeAddrs[1]
-	}
+	supervisorAccessAddr := accessNodeAddress
 	supervisorClient, err := client.NewClient(supervisorAccessAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatal().Err(err).Msgf("unable to initialize Flow supervisor client")
 	}
 
-	go func() {
-		// run load cases
-		for i, c := range cases {
-			log.Info().Str("load_type", *loadTypeFlag).Int("number", i).Int("tps", c.tps).Dur("duration", c.duration).Msgf("Running load case...")
+	// run load
+	log.Info().Str("load_type", loadType).Int("tps", loadCase.tps).Dur("duration", loadCase.duration).Msgf("Running load case...")
 
-			loaderMetrics.SetTPSConfigured(c.tps)
+	loaderMetrics.SetTPSConfigured(loadCase.tps)
 
-			var lg *utils.ContLoadGenerator
-			if c.tps > 0 {
-				var err error
-				lg, err = utils.NewContLoadGenerator(
-					log,
-					loaderMetrics,
-					flowClient,
-					supervisorClient,
-					loadedAccessAddr,
-					priv,
-					&serviceAccountAddress,
-					&fungibleTokenAddress,
-					&flowTokenAddress,
-					c.tps,
-					*accountMultiplierFlag,
-					utils.LoadType(*loadTypeFlag),
-					*feedbackEnabled,
-					utils.ConstExecParam{
-						MaxTxSizeInByte: *maxConstExecTxSizeInBytes,
-						AuthAccountNum:  *authAccNumInConstExecTx,
-						ArgSizeInByte:   *argSizeInByteInConstExecTx,
-						PayerKeyCount:   *payerKeyCountInConstExecTx,
-					},
-				)
-				if err != nil {
-					log.Fatal().Err(err).Msgf("unable to create new cont load generator")
-				}
+	var lg *utils.ContLoadGenerator
+	lg, err = utils.NewContLoadGenerator(
+		log,
+		loaderMetrics,
+		flowClient,
+		supervisorClient,
+		loadedAccessAddr,
+		priv,
+		&serviceAccountAddress,
+		&fungibleTokenAddress,
+		&flowTokenAddress,
+		loadCase.tps,
+		accountMultiplier,
+		utils.LoadType(loadType),
+		feedbackEnabled,
+		utils.ConstExecParam{
+			MaxTxSizeInByte: *maxConstExecTxSizeInBytes,
+			AuthAccountNum:  *authAccNumInConstExecTx,
+			ArgSizeInByte:   *argSizeInByteInConstExecTx,
+			PayerKeyCount:   *payerKeyCountInConstExecTx,
+		},
+	)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("unable to create new cont load generator")
+	}
 
-				err = lg.Init()
-				if err != nil {
-					log.Fatal().Err(err).Msgf("unable to init loader")
-				}
-				lg.Start()
-			}
+	err = lg.Init()
+	if err != nil {
+		log.Fatal().Err(err).Msgf("unable to init loader")
+	}
+	lg.Start()
 
-			testStartTime := time.Now()
-			time.Sleep(c.duration)
-			testEndTime := time.Now()
+	testStartTime := time.Now()
+	time.Sleep(loadCase.duration)
+	lg.Stop()
+	testEndTime := time.Now()
 
-			if lg != nil {
-				lg.Stop()
-			}
-
-			dataSlices := calculateTpsSlices(testStartTime, testEndTime, *leadTime, *sliceSize, *gitSha, lg, log)
-			prepareDataForBigQuery(dataSlices, *ciFlag)
-		}
-
-		cancel()
-	}()
-
-	<-ctx.Done()
+	dataSlices := calculateTpsSlices(
+		testStartTime,
+		testEndTime,
+		*leadTime,
+		*sliceSize,
+		gitSha,
+		goVersion,
+		osVersion,
+		lg)
+	prepareDataForBigQuery(dataSlices, *ciFlag)
 }
 
-func calculateTpsSlices(start, end time.Time, leadTime, sliceTime string, commit string, lg *utils.ContLoadGenerator, log zerolog.Logger) []dataSlice {
+func calculateTpsSlices(start, end time.Time, leadTime, sliceTime, commit, goVersion, osVersion string, lg *utils.ContLoadGenerator) []dataSlice {
 	//remove the lead time on both start and end, this should remove spin-up and spin-down times
 	leadDuration, _ := time.ParseDuration(leadTime)
 	endTime := end.Add(-1 * leadDuration)
@@ -240,6 +229,8 @@ func calculateTpsSlices(start, end time.Time, leadTime, sliceTime string, commit
 
 		slice := dataSlice{
 			GitSha:              commit,
+			GoVersion:           goVersion,
+			OsVersion:           osVersion,
 			StartTime:           currentTime,
 			EndTime:             currentTime.Add(sliceDuration),
 			InputTps:            inputTps,
@@ -269,11 +260,8 @@ func prepareDataForBigQuery(slices []dataSlice, ci bool) {
 		jsonString = strings.ReplaceAll(jsonString, "},", "}\n")
 
 		// output tps-bq-results
-		f, err := os.Create("tps-bq-results.json")
-		if err == nil {
-			f.Write([]byte(jsonString))
-			f.Close()
-		} else {
+		err = os.WriteFile("tps-bq-results.json", []byte(jsonString), 0666)
+		if err != nil {
 			fmt.Println(err)
 		}
 	}
@@ -281,11 +269,8 @@ func prepareDataForBigQuery(slices []dataSlice, ci bool) {
 	// output human-readable json blob
 	timestamp := time.Now()
 	fileName := fmt.Sprintf("tps-results-%v.json", timestamp)
-	f, err := os.Create(fileName)
-	if err == nil {
-		f.Write(jsonText)
-		f.Close()
-	} else {
+	err = os.WriteFile(fileName, jsonText, 0666)
+	if err != nil {
 		fmt.Println(err)
 	}
 }
@@ -335,38 +320,4 @@ func getPrometheusTransactionAtTime(time time.Time) float64 {
 
 	avgTps := float64(totalTxs) / float64(executionNodeCount)
 	return avgTps
-}
-
-func parseLoadCases(log zerolog.Logger, tpsFlag, tpsDurationsFlag *string) []LoadCase {
-	tpsStrings := strings.Split(*tpsFlag, ",")
-	var cases []LoadCase
-	for _, s := range tpsStrings {
-		t, err := strconv.ParseInt(s, 0, 32)
-		if err != nil {
-			log.Fatal().Err(err).Str("value", s).
-				Msg("could not parse tps flag, expected comma separated list of integers")
-		}
-		cases = append(cases, LoadCase{tps: int(t)})
-	}
-
-	tpsDurationsStrings := strings.Split(*tpsDurationsFlag, ",")
-	for i := range cases {
-		if i >= len(tpsDurationsStrings) {
-			break
-		}
-
-		// ignore empty entries (implying that case will run indefinitely)
-		if tpsDurationsStrings[i] == "" {
-			continue
-		}
-
-		d, err := time.ParseDuration(tpsDurationsStrings[i])
-		if err != nil {
-			log.Fatal().Err(err).Str("value", tpsDurationsStrings[i]).
-				Msg("could not parse tps-durations flag, expected comma separated list of durations")
-		}
-		cases[i].duration = d
-	}
-
-	return cases
 }

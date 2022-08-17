@@ -77,12 +77,12 @@ load:
 	go run --tags relic ../loader -log-level info -tps 1,0,10,0,100 -tps-durations 30s,10s,30s,10s
 
 .PHONY: tps-test
-tpsTest:
+tps-test:
 	go run --tags relic ../benchmark -log-level info -tps 25 -tps-durations 10m
 
 .PHONY: tps-test-ci
-end2endTest:
+tps-test-ci:
 	make init
 	make start
-	go run --tags relic ../benchmark -ci-run -gitSha $(COMMIT_SHA)
+	go run --tags relic ../benchmark -ci-run -gitSha $(COMMIT)
 	make stop

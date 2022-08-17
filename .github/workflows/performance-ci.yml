@@ -51,7 +51,7 @@ jobs:
       - name: Build relic and other tools
           run: make install-tools
       - name: Run Localnet TPS test
-          run: bash -c "cd integration/localnet/ && make tpsTestCI
+          run: bash -c "cd integration/localnet/ && make tps-test-ci
       - name: Upload results to BigQuery
         uses: nick-fields/retry@v2
         with:
