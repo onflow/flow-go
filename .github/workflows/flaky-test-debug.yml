@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - '**/*flaky-test*'
-      - 'misha/6272*'
 env:
   GO_VERSION: 1.18
 

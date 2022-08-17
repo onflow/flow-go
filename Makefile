@@ -53,7 +53,6 @@ cmd/util/util:
 .PHONY: unittest-main
 unittest-main:
 	# test all packages with Relic library enabled
-	cd insecure
 	go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) --tags relic ./...
 
 .PHONY: install-mock-generators
