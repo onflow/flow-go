@@ -206,7 +206,7 @@ func (e *Engine) Start(parent irrecoverable.SignalerContext) {
 	// in blocks above that height.
 	if !isSporkRootSnapshot {
 		firstFullHeight := rootBlock.Height + flow.DefaultTransactionExpiry
-		err := e.blocks.InsertLastFullBlockHeight(firstFullHeight)
+		err := e.blocks.InsertLastFullBlockHeightIfNotExists(firstFullHeight)
 		if err != nil {
 			parent.Throw(fmt.Errorf("failed to update last full block height during ingestion engine startup: %w", err))
 		}
