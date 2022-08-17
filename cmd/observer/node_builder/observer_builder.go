@@ -434,8 +434,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionDataRequester() *ObserverSe
 	var processedBlockHeight storage.ConsumerProgress
 	var processedNotifications storage.ConsumerProgress
 
-	builder.
-		FlowNodeBuilder.Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
+	builder.Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
 		err := os.MkdirAll(builder.executionDataDir, 0700)
 		if err != nil {
 			return err
@@ -542,7 +541,7 @@ func NewFlowObserverServiceBuilder(opts ...Option) *ObserverServiceBuilder {
 	}
 	// the observer gets a version of the root snapshot file that does not contain any node addresses
 	// hence skip all the root snapshot validations that involved an identity address
-	anb.FlowNodeBuilder.SkipNwAddressBasedValidations = true
+	anb.SkipNwAddressBasedValidations = true
 	return anb
 }
 
@@ -882,8 +881,7 @@ func (builder *ObserverServiceBuilder) initObserverLocal() func(node *cmd.NodeCo
 // enqueueMiddleware enqueues the creation of the network middleware
 // this needs to be done before sync engine participants module
 func (builder *ObserverServiceBuilder) enqueueMiddleware() {
-	builder.
-		FlowNodeBuilder.Module("network middleware", func(node *cmd.NodeConfig) error {
+	builder.Module("network middleware", func(node *cmd.NodeConfig) error {
 
 		// NodeID for the observer on the observer network
 		observerNodeID := node.NodeID
@@ -934,14 +932,14 @@ func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
 			return nil, err
 		}
 
-		builder.FlowNodeBuilder.Network = converter.NewNetwork(net, channels.SyncCommittee, channels.PublicSyncCommittee)
+		builder.Network = converter.NewNetwork(net, channels.SyncCommittee, channels.PublicSyncCommittee)
 
-		builder.FlowNodeBuilder.Logger.Info().Msgf("network will run on address: %s", builder.FlowNodeBuilder.BindAddr)
+		builder.Logger.Info().Msgf("network will run on address: %s", builder.BindAddr)
 
-		idEvents := gadgets.NewIdentityDeltas(builder.FlowNodeBuilder.Middleware.UpdateNodeAddresses)
-		builder.FlowNodeBuilder.ProtocolEvents.AddConsumer(idEvents)
+		idEvents := gadgets.NewIdentityDeltas(builder.Middleware.UpdateNodeAddresses)
+		builder.ProtocolEvents.AddConsumer(idEvents)
 
-		return builder.FlowNodeBuilder.Network, nil
+		return builder.Network, nil
 	})
 }
 
@@ -952,13 +950,13 @@ func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
 // discovered by other observers if it subscribes to a topic before connecting to the AN. Hence, the need
 // of an explicit connect to the AN before the node attempts to subscribe to topics.
 func (builder *ObserverServiceBuilder) enqueueConnectWithStakedAN() {
-	builder.FlowNodeBuilder.Component("upstream connector", func(_ *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		return consensus_follower.NewUpstreamConnector(builder.bootstrapIdentities, builder.LibP2PNode, builder.FlowNodeBuilder.Logger), nil
+	builder.Component("upstream connector", func(_ *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		return consensus_follower.NewUpstreamConnector(builder.bootstrapIdentities, builder.LibP2PNode, builder.Logger), nil
 	})
 }
 
 func (builder *ObserverServiceBuilder) enqueueRPCServer() {
-	builder.FlowNodeBuilder.Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+	builder.Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		engineBuilder, err := rpc.NewBuilder(
 			node.Logger,
 			node.State,
@@ -1018,7 +1016,7 @@ func (builder *ObserverServiceBuilder) initMiddleware(nodeID flow.Identifier,
 		factoryFunc,
 		nodeID,
 		networkMetrics,
-		builder.FlowNodeBuilder.SporkID,
+		builder.SporkID,
 		p2p.DefaultUnicastTimeout,
 		builder.IDTranslator,
 		builder.CodecFactory(),
@@ -1028,7 +1026,7 @@ func (builder *ObserverServiceBuilder) initMiddleware(nodeID flow.Identifier,
 		// use default identifier provider
 	)
 
-	return builder.FlowNodeBuilder.Middleware
+	return builder.Middleware
 }
 
 func loadNetworkingKey(path string) (crypto.PrivateKey, error) {
