@@ -266,14 +266,14 @@ func (h *FlowAccessAPIRouter) GetEventsForBlockIDs(context context.Context, req 
 }
 
 func (h *FlowAccessAPIRouter) GetNetworkParameters(context context.Context, req *access.GetNetworkParametersRequest) (*access.GetNetworkParametersResponse, error) {
-	res, err := h.Upstream.GetNetworkParameters(context, req)
-	h.log("upstream", "GetNetworkParameters", err)
+	res, err := h.Observer.GetNetworkParameters(context, req)
+	h.log("observer", "GetNetworkParameters", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetLatestProtocolStateSnapshot(context context.Context, req *access.GetLatestProtocolStateSnapshotRequest) (*access.ProtocolStateSnapshotResponse, error) {
-	res, err := h.Upstream.GetLatestProtocolStateSnapshot(context, req)
-	h.log("upstream", "GetLatestProtocolStateSnapshot", err)
+	res, err := h.Observer.GetLatestProtocolStateSnapshot(context, req)
+	h.log("observer", "GetLatestProtocolStateSnapshot", err)
 	return res, err
 }
 
