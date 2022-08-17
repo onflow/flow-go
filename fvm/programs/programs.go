@@ -16,6 +16,11 @@ type ContractUpdateKey struct {
 	Name    string
 }
 
+type ModifiedSets struct {
+	ContractUpdateKeys []ContractUpdateKey
+	FrozenAccounts     []common.Address
+}
+
 type ContractUpdate struct {
 	ContractUpdateKey
 	Code []byte
@@ -93,7 +98,19 @@ func (p *Programs) HasChanges() bool {
 	return len(p.programs) > 0 || p.cleaned
 }
 
-func (p *Programs) unsafeForceCleanup() {
+func (p *Programs) Cleanup(modifiedSets ModifiedSets) {
+	if len(modifiedSets.ContractUpdateKeys) == 0 &&
+		len(modifiedSets.FrozenAccounts) == 0 {
+		return
+	}
+
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	// In mature system, we would track dependencies between contracts
+	// and invalidate only affected ones, possibly setting them to
+	// nil so they will override parent's data, but for now
+	// just throw everything away and use a special flag for this
 	p.cleaned = true
 
 	// Stop using parent's data to prevent
@@ -102,29 +119,4 @@ func (p *Programs) unsafeForceCleanup() {
 
 	// start with empty storage
 	p.programs = make(map[common.LocationID]*ProgramEntry)
-}
-
-// ForceCleanup is used to force a complete cleanup
-// It exists temporarily to facilitate a temporary measure which can retry
-// a transaction in case checking fails
-// It should be gone when the extra retry is gone
-func (p *Programs) ForceCleanup() {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-
-	p.unsafeForceCleanup()
-}
-
-func (p *Programs) Cleanup(changedContracts []ContractUpdateKey) {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-
-	// In mature system, we would track dependencies between contracts
-	// and invalidate only affected ones, possibly setting them to
-	// nil so they will override parent's data, but for now
-	// just throw everything away and use a special flag for this
-	if len(changedContracts) > 0 {
-		p.unsafeForceCleanup()
-		return
-	}
 }

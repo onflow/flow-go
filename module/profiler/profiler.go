@@ -13,18 +13,23 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"go.uber.org/atomic"
 	"go.uber.org/multierr"
 	pb "google.golang.org/genproto/googleapis/devtools/cloudprofiler/v2"
 
 	"github.com/onflow/flow-go/engine"
 )
 
-var profilerEnabled bool
+var profilerEnabled atomic.Bool
 
 // SetProfilerEnabled enable or disable generating profiler data
-func SetProfilerEnabled(enabled bool) {
-	log.Info().Bool("newState", enabled).Bool("oldState", profilerEnabled).Msg("changed profilerEnabled")
-	profilerEnabled = enabled
+func SetProfilerEnabled(newState bool) {
+	oldState := profilerEnabled.Swap(newState)
+	if oldState != newState {
+		log.Info().Bool("newState", newState).Bool("oldState", oldState).Msg("profilerEnabled changed")
+	} else {
+		log.Info().Bool("currentState", oldState).Msg("profilerEnabled unchanged")
+	}
 }
 
 type profile struct {
@@ -67,7 +72,7 @@ func (p *AutoProfiler) Ready() <-chan struct{} {
 	delay := time.Duration(float64(p.interval) * rand.Float64())
 	p.unit.LaunchPeriodically(p.start, p.interval, delay)
 
-	if profilerEnabled {
+	if profilerEnabled.Load() {
 		p.log.Info().Dur("duration", p.duration).Time("nextRunAt", time.Now().Add(p.interval)).Msg("AutoProfiler has started")
 	} else {
 		p.log.Info().Msg("AutoProfiler has started, profiler is disabled")
@@ -81,7 +86,7 @@ func (p *AutoProfiler) Done() <-chan struct{} {
 }
 
 func (p *AutoProfiler) start() {
-	if !profilerEnabled {
+	if !profilerEnabled.Load() {
 		return
 	}
 

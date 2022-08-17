@@ -68,7 +68,6 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 		suite.T(),
 		count,
 		logger,
-		nil,
 		unittest.NetworkCodec(),
 		WithIdentityOpts(unittest.WithAllRoles()),
 	)

@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
+	"github.com/onflow/flow-go/network/topology"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
@@ -178,7 +179,7 @@ func AssertNotClosesBefore(t assert.TestingT, done <-chan struct{}, duration tim
 	}
 }
 
-// RequireReturnBefore requires that the given function returns before the
+// RequireReturnsBefore requires that the given function returns before the
 // duration expires.
 func RequireReturnsBefore(t testing.TB, f func(), duration time.Duration, message string) {
 	done := make(chan struct{})
@@ -382,9 +383,14 @@ func AssertEqualBlocksLenAndOrder(t *testing.T, expectedBlocks, actualSegmentBlo
 	assert.Equal(t, flow.GetIDs(expectedBlocks), flow.GetIDs(actualSegmentBlocks))
 }
 
-// NetworkCodec returns cbor codec
+// NetworkCodec returns cbor codec.
 func NetworkCodec() network.Codec {
 	return cborcodec.NewCodec()
+}
+
+// NetworkTopology returns the default topology for testing purposes.
+func NetworkTopology() network.Topology {
+	return topology.NewFullyConnectedTopology()
 }
 
 // CrashTest safely tests functions that crash (as the expected behavior) by checking that running the function creates an error and

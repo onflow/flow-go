@@ -27,8 +27,9 @@ type AttackNetwork struct {
 	corruptedNodeIds     flow.IdentityList                                    // identity of the corrupted nodes
 	corruptedConnections map[flow.Identifier]insecure.CorruptedNodeConnection // existing connections to the corrupted nodes.
 	corruptedConnector   insecure.CorruptedNodeConnector                      // connection generator to corrupted nodes.
-
 }
+
+var _ insecure.AttackNetwork = &AttackNetwork{}
 
 func NewAttackNetwork(
 	logger zerolog.Logger,
@@ -109,25 +110,25 @@ func (a *AttackNetwork) stop() error {
 // Instead of dispatching their messages to the networking layer of Flow, the conduits of corrupted nodes
 // dispatch the outgoing messages to the attack network by calling the InboundHandler method of it remotely.
 func (a *AttackNetwork) Observe(message *insecure.Message) {
-	if err := a.processMessageFromCorruptedNode(message); err != nil {
+	if err := a.processEgressMessage(message); err != nil {
 		a.logger.Fatal().Err(err).Msg("could not process message of corrupted node")
 	}
 }
 
-// processMessageFromCorruptedNode processes incoming messages arrived from corruptible conduits by passing them
+// processEgressMessage processes incoming messages arrived from corruptible conduits by passing them
 // to the orchestrator.
-func (a *AttackNetwork) processMessageFromCorruptedNode(message *insecure.Message) error {
-	event, err := a.codec.Decode(message.Payload)
+func (a *AttackNetwork) processEgressMessage(message *insecure.Message) error {
+	event, err := a.codec.Decode(message.Egress.Payload)
 	if err != nil {
 		return fmt.Errorf("could not decode observed payload: %w", err)
 	}
 
-	sender, err := flow.ByteSliceToId(message.OriginID)
+	sender, err := flow.ByteSliceToId(message.Egress.OriginID)
 	if err != nil {
 		return fmt.Errorf("could not convert origin id to flow identifier: %w", err)
 	}
 
-	targetIds, err := flow.ByteSlicesToIds(message.TargetIDs)
+	targetIds, err := flow.ByteSlicesToIds(message.Egress.TargetIDs)
 	if err != nil {
 		return fmt.Errorf("could not convert target ids to flow identifiers: %w", err)
 	}
@@ -136,12 +137,12 @@ func (a *AttackNetwork) processMessageFromCorruptedNode(message *insecure.Messag
 	a.orchestratorMutex.Lock()
 	defer a.orchestratorMutex.Unlock()
 
-	err = a.orchestrator.HandleEventFromCorruptedNode(&insecure.Event{
+	err = a.orchestrator.HandleEventFromCorruptedNode(&insecure.EgressEvent{
 		CorruptedNodeId:   sender,
-		Channel:           channels.Channel(message.ChannelID),
+		Channel:           channels.Channel(message.Egress.ChannelID),
 		FlowProtocolEvent: event,
-		Protocol:          message.Protocol,
-		TargetNum:         message.TargetNum,
+		Protocol:          message.Egress.Protocol,
+		TargetNum:         message.Egress.TargetNum,
 		TargetIds:         targetIds,
 	})
 	if err != nil {
@@ -151,15 +152,15 @@ func (a *AttackNetwork) processMessageFromCorruptedNode(message *insecure.Messag
 	return nil
 }
 
-// Send enforces dissemination of given event via its encapsulated corrupted node networking layer through the Flow network
-func (a *AttackNetwork) Send(event *insecure.Event) error {
+// Send enforces dissemination of given egress event via its encapsulated corrupted node networking layer through the Flow network
+func (a *AttackNetwork) Send(event *insecure.EgressEvent) error {
 
 	connection, ok := a.corruptedConnections[event.CorruptedNodeId]
 	if !ok {
 		return fmt.Errorf("no connection available for corrupted conduit factory to node %x: ", event.CorruptedNodeId)
 	}
 
-	msg, err := a.eventToMessage(event.CorruptedNodeId, event.FlowProtocolEvent, event.Channel, event.Protocol, event.TargetNum, event.TargetIds...)
+	msg, err := a.eventToEgressMessage(event.CorruptedNodeId, event.FlowProtocolEvent, event.Channel, event.Protocol, event.TargetNum, event.TargetIds...)
 	if err != nil {
 		return fmt.Errorf("could not convert event to message: %w", err)
 	}
@@ -172,8 +173,8 @@ func (a *AttackNetwork) Send(event *insecure.Event) error {
 	return nil
 }
 
-// eventToMessage converts the given application layer event to a protobuf message that is meant to be sent to the corrupted node.
-func (a *AttackNetwork) eventToMessage(corruptedId flow.Identifier,
+// eventToEgressMessage converts the given application layer event to a protobuf message that is meant to be sent to the corrupted node.
+func (a *AttackNetwork) eventToEgressMessage(corruptedId flow.Identifier,
 	event interface{},
 	channel channels.Channel,
 	protocol insecure.Protocol,
@@ -185,12 +186,16 @@ func (a *AttackNetwork) eventToMessage(corruptedId flow.Identifier,
 		return nil, fmt.Errorf("could not encode event: %w", err)
 	}
 
-	return &insecure.Message{
+	egressMsg := &insecure.EgressMessage{
 		ChannelID: channel.String(),
 		OriginID:  corruptedId[:],
 		TargetNum: num,
 		TargetIDs: flow.IdsToBytes(targetIds),
 		Payload:   payload,
 		Protocol:  protocol,
+	}
+
+	return &insecure.Message{
+		Egress: egressMsg,
 	}, nil
 }
