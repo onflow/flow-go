@@ -51,6 +51,7 @@ func DefaultLibP2PNodeFactory(
 	return func(ctx context.Context) (*Node, error) {
 		connManager := NewConnManager(log, metrics)
 
+		// drop incoming connections from unknown peers
 		onInterceptAccept := func(addr multiaddr.Multiaddr) bool {
 			_, found := idProvider.ByMultiAddress(addr)
 			return found
