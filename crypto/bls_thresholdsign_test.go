@@ -596,7 +596,7 @@ func testCentralizedStatelessAPI(t *testing.T) {
 func BenchmarkSimpleKeyGen(b *testing.B) {
 	n := 60
 	seed := make([]byte, SeedMinLenDKG)
-	rand.Read(seed)
+	_, _ = rand.Read(seed)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, _, _, _ = BLSThresholdKeyGen(n, optimalThreshold(n), seed)

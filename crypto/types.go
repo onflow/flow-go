@@ -42,8 +42,8 @@ const (
 	fieldSize = 48
 	//
 	// 1 for compressed, 0 for uncompressed - values should not be changed
-	uncompressed = 0
-	compressed   = 1
+	//uncompressed = 0
+	compressed = 1
 	// Points compression when serialized
 	serializationG1 = compressed
 	serializationG2 = compressed
