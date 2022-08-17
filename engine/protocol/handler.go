@@ -20,12 +20,21 @@ type Handler struct {
 // HandlerOption is used to hand over optional constructor parameters
 type HandlerOption func(*Handler)
 
-func NewHandler(api API) *Handler {
+func NewHandler(api API, options ...HandlerOption) *Handler {
 	h := &Handler{
 		api:                  api,
 		signerIndicesDecoder: &signature.NoopBlockSignerDecoder{},
 	}
+	for _, opt := range options {
+		opt(h)
+	}
 	return h
+}
+
+func WithBlockSignerDecoder(signerIndicesDecoder hotstuff.BlockSignerDecoder) func(*Handler) {
+	return func(handler *Handler) {
+		handler.signerIndicesDecoder = signerIndicesDecoder
+	}
 }
 
 // GetLatestBlockHeader gets the latest sealed block header.
