@@ -67,15 +67,18 @@ func NewProxiedReadyDoneAware() *ProxiedReadyDoneAware {
 // Init adds the proxied ReadyDoneAware implementation and sets up the ready/done channels
 // to close when the respective channel on the proxied object closes.
 // Init can only be called once.
+//
+// IMPORTANT: the proxied ReadyDoneAware implementation must be idempotent since the Ready and Done
+// methods will be called immediately in when calling Init.
 func (n *ProxiedReadyDoneAware) Init(rda ReadyDoneAware) {
 	n.initOnce.Do(func() {
 		go func() {
-			defer close(n.ready)
 			<-rda.Ready()
+			close(n.ready)
 		}()
 		go func() {
-			defer close(n.done)
 			<-rda.Done()
+			close(n.done)
 		}()
 	})
 }
