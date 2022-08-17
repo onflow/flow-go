@@ -44,6 +44,7 @@ func NewScriptEnvironment(
 			Tracer: tracer,
 			ProgramLogger: environment.NewProgramLogger(
 				tracer,
+				fvmContext.Logger,
 				fvmContext.Metrics,
 				fvmContext.CadenceLoggingEnabled,
 			),
