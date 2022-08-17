@@ -74,28 +74,28 @@ func NewOrchestratorNetwork(
 }
 
 // start triggers the sub-modules of orchestrator network.
-func (a *OrchestratorNetwork) start(ctx irrecoverable.SignalerContext) error {
+func (on *OrchestratorNetwork) start(ctx irrecoverable.SignalerContext) error {
 	// creates a connection to all corrupt nodes in the orchestrator network.
-	for _, corruptNodeId := range a.corruptNodeIds {
-		connection, err := a.corruptConnector.Connect(ctx, corruptNodeId.NodeID)
+	for _, corruptNodeId := range on.corruptNodeIds {
+		connection, err := on.corruptConnector.Connect(ctx, corruptNodeId.NodeID)
 		if err != nil {
 			return fmt.Errorf("could not establish corrupt connection to node %x: %w", corruptNodeId.NodeID, err)
 		}
-		a.corruptConnections[corruptNodeId.NodeID] = connection
-		a.logger.Info().Hex("node_id", logging.ID(corruptNodeId.NodeID)).Msg("attacker successfully registered on corrupt node")
+		on.corruptConnections[corruptNodeId.NodeID] = connection
+		on.logger.Info().Hex("node_id", logging.ID(corruptNodeId.NodeID)).Msg("attack orchestrator successfully registered on corrupt node")
 	}
 
 	// registers orchestrator network for orchestrator.
-	a.orchestrator.Register(a)
+	on.orchestrator.Register(on)
 
 	return nil
 }
 
 // stop conducts the termination logic of the sub-modules of orchestrator network.
-func (a *OrchestratorNetwork) stop() error {
+func (on *OrchestratorNetwork) stop() error {
 	// tears down connections to corrupt nodes.
 	var errors *multierror.Error
-	for _, connection := range a.corruptConnections {
+	for _, connection := range on.corruptConnections {
 		err := connection.CloseConnection()
 
 		if err != nil {
@@ -109,16 +109,16 @@ func (a *OrchestratorNetwork) stop() error {
 // Observe is the inbound message handler of the orchestrator network.
 // Instead of dispatching their messages to the networking layer of Flow, the conduits of corrupt nodes
 // dispatch the outgoing messages to the orchestrator network by calling the InboundHandler method of it remotely.
-func (a *OrchestratorNetwork) Observe(message *insecure.Message) {
-	if err := a.processEgressMessage(message); err != nil {
-		a.logger.Fatal().Err(err).Msg("could not process message of corrupt node")
+func (on *OrchestratorNetwork) Observe(message *insecure.Message) {
+	if err := on.processEgressMessage(message); err != nil {
+		on.logger.Fatal().Err(err).Msg("could not process message of corrupt node")
 	}
 }
 
 // processEgressMessage processes incoming messages arrived from corrupt conduits by passing them
 // to the orchestrator.
-func (a *OrchestratorNetwork) processEgressMessage(message *insecure.Message) error {
-	event, err := a.codec.Decode(message.Egress.Payload)
+func (on *OrchestratorNetwork) processEgressMessage(message *insecure.Message) error {
+	event, err := on.codec.Decode(message.Egress.Payload)
 	if err != nil {
 		return fmt.Errorf("could not decode observed payload: %w", err)
 	}
@@ -134,10 +134,10 @@ func (a *OrchestratorNetwork) processEgressMessage(message *insecure.Message) er
 	}
 
 	// making sure events are sent sequentially to orchestrator.
-	a.orchestratorMutex.Lock()
-	defer a.orchestratorMutex.Unlock()
+	on.orchestratorMutex.Lock()
+	defer on.orchestratorMutex.Unlock()
 
-	err = a.orchestrator.HandleEventFromCorruptedNode(&insecure.EgressEvent{
+	err = on.orchestrator.HandleEventFromCorruptedNode(&insecure.EgressEvent{
 		CorruptOriginId:   sender,
 		Channel:           channels.Channel(message.Egress.ChannelID),
 		FlowProtocolEvent: event,
@@ -154,13 +154,13 @@ func (a *OrchestratorNetwork) processEgressMessage(message *insecure.Message) er
 
 // SendEgress enforces dissemination of given event via its encapsulated corrupt node networking layer through the Flow network.
 // An orchestrator decides when to send an egress message on behalf of a corrupt node.
-func (a *OrchestratorNetwork) SendEgress(event *insecure.EgressEvent) error {
-	msg, err := a.eventToEgressMessage(event.CorruptOriginId, event.FlowProtocolEvent, event.Channel, event.Protocol, event.TargetNum, event.TargetIds...)
+func (on *OrchestratorNetwork) SendEgress(event *insecure.EgressEvent) error {
+	msg, err := on.eventToEgressMessage(event.CorruptOriginId, event.FlowProtocolEvent, event.Channel, event.Protocol, event.TargetNum, event.TargetIds...)
 	if err != nil {
 		return fmt.Errorf("could not convert egress event to egress message: %w", err)
 	}
 
-	err = a.sendMessage(msg, event.CorruptOriginId)
+	err = on.sendMessage(msg, event.CorruptOriginId)
 	if err != nil {
 		return fmt.Errorf("could not send egress event from corrupt node: %w", err)
 	}
@@ -171,13 +171,13 @@ func (a *OrchestratorNetwork) SendEgress(event *insecure.EgressEvent) error {
 // SendIngress sends an incoming message from the flow network (from another node that could be or honest or corrupt)
 // to the corrupt node. This message was intercepted by the orchestrator network and relayed to the orchestrator before being sent
 // to the corrupt node.
-func (a *OrchestratorNetwork) SendIngress(event *insecure.IngressEvent) error {
-	msg, err := a.eventToIngressMessage(event.OriginID, event.FlowProtocolEvent, event.Channel, event.CorruptTargetID)
+func (on *OrchestratorNetwork) SendIngress(event *insecure.IngressEvent) error {
+	msg, err := on.eventToIngressMessage(event.OriginID, event.FlowProtocolEvent, event.Channel, event.CorruptTargetID)
 	if err != nil {
 		return fmt.Errorf("could not convert ingress event to ingress message: %w", err)
 	}
 
-	err = a.sendMessage(msg, event.CorruptTargetID)
+	err = on.sendMessage(msg, event.CorruptTargetID)
 	if err != nil {
 		return fmt.Errorf("could not send ingress event to corrupt node: %w", err)
 	}
@@ -185,8 +185,8 @@ func (a *OrchestratorNetwork) SendIngress(event *insecure.IngressEvent) error {
 }
 
 // sendMessage is a helper function for sending both ingress and egress messages.
-func (a *OrchestratorNetwork) sendMessage(msg *insecure.Message, corruptNodeId flow.Identifier) error {
-	connection, ok := a.corruptConnections[corruptNodeId]
+func (on *OrchestratorNetwork) sendMessage(msg *insecure.Message, corruptNodeId flow.Identifier) error {
+	connection, ok := on.corruptConnections[corruptNodeId]
 	if !ok {
 		return fmt.Errorf("no connection available for corrupt conduit factory to node %x: ", corruptNodeId)
 	}
@@ -200,14 +200,14 @@ func (a *OrchestratorNetwork) sendMessage(msg *insecure.Message, corruptNodeId f
 }
 
 // eventToEgressMessage converts the given application layer event to a protobuf message that is meant to be sent FROM the corrupt node.
-func (a *OrchestratorNetwork) eventToEgressMessage(corruptId flow.Identifier,
+func (on *OrchestratorNetwork) eventToEgressMessage(corruptId flow.Identifier,
 	event interface{},
 	channel channels.Channel,
 	protocol insecure.Protocol,
 	num uint32,
 	targetIds ...flow.Identifier) (*insecure.Message, error) {
 
-	payload, err := a.codec.Encode(event)
+	payload, err := on.codec.Encode(event)
 	if err != nil {
 		return nil, fmt.Errorf("could not encode event: %w", err)
 	}
@@ -227,12 +227,12 @@ func (a *OrchestratorNetwork) eventToEgressMessage(corruptId flow.Identifier,
 }
 
 // eventToIngressMessage converts the given application layer event to a protobuf message that is meant to be sent TO the corrupt node.
-func (a *OrchestratorNetwork) eventToIngressMessage(originId flow.Identifier,
+func (on *OrchestratorNetwork) eventToIngressMessage(originId flow.Identifier,
 	event interface{},
 	channel channels.Channel,
 	targetId flow.Identifier) (*insecure.Message, error) {
 
-	payload, err := a.codec.Encode(event)
+	payload, err := on.codec.Encode(event)
 	if err != nil {
 		return nil, fmt.Errorf("could not encode event: %w", err)
 	}
