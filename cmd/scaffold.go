@@ -76,6 +76,7 @@ type Metrics struct {
 	Cache          module.CacheMetrics
 	Mempool        module.MempoolMetrics
 	CleanCollector module.CleanerMetrics
+	Bitswap        module.BitswapMetrics
 }
 
 type Storage = storage.All
@@ -293,6 +294,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		libP2PNodeFactory,
 		fnb.Me.NodeID(),
 		fnb.Metrics.Network,
+		fnb.Metrics.Bitswap,
 		fnb.SporkID,
 		fnb.BaseConfig.UnicastMessageTimeout,
 		fnb.IDTranslator,
@@ -497,6 +499,7 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 		Cache:          metrics.NewNoopCollector(),
 		Mempool:        metrics.NewNoopCollector(),
 		CleanCollector: metrics.NewNoopCollector(),
+		Bitswap:        metrics.NewNoopCollector(),
 	}
 	if fnb.BaseConfig.MetricsEnabled {
 		fnb.MetricsRegisterer = prometheus.DefaultRegisterer
@@ -512,6 +515,7 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 			Cache:          metrics.NewNoopCollector(),
 			CleanCollector: metrics.NewCleanerCollector(),
 			Mempool:        mempools,
+			Bitswap:        metrics.NewBitswapCollector(),
 		}
 
 		// registers mempools as a Component so that its Ready method is invoked upon startup

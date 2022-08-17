@@ -172,6 +172,7 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 			factory,
 			nodeId,
 			metrics,
+			metrics,
 			sporkID,
 			p2p.DefaultUnicastTimeout,
 			p2p.NewIdentityProviderIDTranslator(idProviders[i]),
