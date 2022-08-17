@@ -111,7 +111,7 @@ func (b *Blocks) IndexBlockForCollections(blockID flow.Identifier, collIDs []flo
 // InsertLastFullBlockHeightIfNotExists inserts the last full block height
 func (b *Blocks) InsertLastFullBlockHeightIfNotExists(height uint64) error {
 	return operation.RetryOnConflict(b.db.Update, func(tx *badger.Txn) error {
-		err := operation.SetLastCompleteBlockHeight(height)(tx)
+		err := operation.InsertLastCompleteBlockHeightIfNotExists(height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not set LastFullBlockHeight: %w", err)
 		}
