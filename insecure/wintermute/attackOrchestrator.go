@@ -59,12 +59,12 @@ func (o *Orchestrator) Register(network insecure.OrchestratorNetwork) {
 	o.network = network
 }
 
-// HandleEventFromCorruptedNode implements logic of processing the events received from a corrupted node.
+// HandleEgressEvent implements logic of processing the events received from a corrupted node.
 //
 // In Corruptible Conduit Framework for BFT testing, corrupted nodes relay their outgoing events to
 // the attack Orchestrator instead of dispatching them directly to the network.
 // The Orchestrator completely determines what the corrupted conduit should send to the network.
-func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.EgressEvent) error {
+func (o *Orchestrator) HandleEgressEvent(event *insecure.EgressEvent) error {
 	switch event.FlowProtocolEvent.(type) {
 
 	case *flow.ExecutionReceipt:
@@ -108,9 +108,9 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.EgressEvent)
 	return nil
 }
 
-// HandleEventToCorruptedNode implements logic of processing the incoming (ingress) events to a corrupt node.
+// HandleIngressEvent implements logic of processing the incoming (ingress) events to a corrupt node.
 // Wintermute orchestrator doesn't corrupt ingress events, so it just passes them through.
-func (o *Orchestrator) HandleEventToCorruptedNode(event *insecure.IngressEvent) error {
+func (o *Orchestrator) HandleIngressEvent(event *insecure.IngressEvent) error {
 	err := o.network.SendIngress(event)
 
 	if err != nil {

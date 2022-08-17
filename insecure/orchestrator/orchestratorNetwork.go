@@ -137,7 +137,7 @@ func (on *OrchestratorNetwork) processEgressMessage(message *insecure.Message) e
 	on.orchestratorMutex.Lock()
 	defer on.orchestratorMutex.Unlock()
 
-	err = on.orchestrator.HandleEventFromCorruptedNode(&insecure.EgressEvent{
+	err = on.orchestrator.HandleEgressEvent(&insecure.EgressEvent{
 		CorruptOriginId:   sender,
 		Channel:           channels.Channel(message.Egress.ChannelID),
 		FlowProtocolEvent: event,

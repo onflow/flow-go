@@ -47,7 +47,7 @@ func TestSingleExecutionReceipt(t *testing.T) {
 
 	// register mock network with orchestrator
 	wintermuteOrchestrator.Register(mockOrchestratorNetwork)
-	err = wintermuteOrchestrator.HandleEventFromCorruptedNode(eventMap[receipts[0].ID()])
+	err = wintermuteOrchestrator.HandleEgressEvent(eventMap[receipts[0].ID()])
 	require.NoError(t, err)
 
 	// waits till corrupted receipts dictated to all execution nodes.
@@ -187,7 +187,7 @@ func testConcurrentExecutionReceipts(t *testing.T,
 		event := event // suppress loop variable
 
 		go func() {
-			err := wintermuteOrchestrator.HandleEventFromCorruptedNode(event)
+			err := wintermuteOrchestrator.HandleEgressEvent(event)
 			require.NoError(t, err)
 			corruptedEnEventSendWG.Done()
 		}()
@@ -322,7 +322,7 @@ func TestRespondingWithCorruptedAttestation(t *testing.T) {
 			cdpReq := cdpReq // suppress loop variable
 
 			go func() {
-				err := wintermuteOrchestrator.HandleEventFromCorruptedNode(cdpReq)
+				err := wintermuteOrchestrator.HandleEgressEvent(cdpReq)
 				require.NoError(t, err)
 
 				corruptedChunkRequestWG.Done()
@@ -394,7 +394,7 @@ func TestPassingThroughChunkDataRequests(t *testing.T) {
 			cdpReq := cdpReq // suppress loop variable
 
 			go func() {
-				err := wintermuteOrchestrator.HandleEventFromCorruptedNode(cdpReq)
+				err := wintermuteOrchestrator.HandleEgressEvent(cdpReq)
 				require.NoError(t, err)
 
 				corruptedChunkRequestWG.Done()
@@ -482,7 +482,7 @@ func testPassingThroughChunkDataResponse(t *testing.T, state *attackState) {
 		cdpRep := cdpRep // suppress loop variable
 
 		go func() {
-			err := wintermuteOrchestrator.HandleEventFromCorruptedNode(cdpRep)
+			err := wintermuteOrchestrator.HandleEgressEvent(cdpRep)
 			require.NoError(t, err)
 
 			corruptedChunkResponseWG.Done()
@@ -533,7 +533,7 @@ func TestWintermuteChunkResponseForCorruptedChunks(t *testing.T) {
 		cdpRep := cdpRep // suppress loop variable
 
 		go func() {
-			err := wintermuteOrchestrator.HandleEventFromCorruptedNode(cdpRep)
+			err := wintermuteOrchestrator.HandleEgressEvent(cdpRep)
 			require.NoError(t, err)
 
 			corruptedChunkResponseWG.Done()
@@ -594,7 +594,7 @@ func TestPassingThroughMiscellaneousEvents(t *testing.T) {
 	eventPassThroughWG.Add(1)
 
 	go func() {
-		err := wintermuteOrchestrator.HandleEventFromCorruptedNode(miscellaneousEvent)
+		err := wintermuteOrchestrator.HandleEgressEvent(miscellaneousEvent)
 		require.NoError(t, err)
 
 		eventPassThroughWG.Done()
@@ -668,7 +668,7 @@ func TestPassingThrough_ResultApproval(t *testing.T) {
 	resultApprovalPassThroughWG := &sync.WaitGroup{}
 	resultApprovalPassThroughWG.Add(1)
 	go func() {
-		err := wintermuteOrchestrator.HandleEventFromCorruptedNode(approvalEvent)
+		err := wintermuteOrchestrator.HandleEgressEvent(approvalEvent)
 		require.NoError(t, err)
 
 		resultApprovalPassThroughWG.Done()
@@ -722,7 +722,7 @@ func TestWintermute_ResultApproval(t *testing.T) {
 	resultSendWG := &sync.WaitGroup{}
 	resultSendWG.Add(1)
 	go func() {
-		err := wintermuteOrchestrator.HandleEventFromCorruptedNode(approvalEvent)
+		err := wintermuteOrchestrator.HandleEgressEvent(approvalEvent)
 		require.NoError(t, err)
 
 		resultSendWG.Done()

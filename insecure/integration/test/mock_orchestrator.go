@@ -13,19 +13,19 @@ type mockOrchestrator struct {
 
 var _ insecure.AttackOrchestrator = &mockOrchestrator{}
 
-// HandleEventFromCorruptedNode implements logic of processing the events received from a corrupted node.
+// HandleEgressEvent implements logic of processing the events received from a corrupted node.
 //
 // In Corruptible Conduit Framework for BFT testing, corrupted nodes relay their outgoing events to
 // the attacker instead of dispatching them to the network.
 //
 // In this mock orchestrator, the event corrupter is invoked on the event, and the altered event is sent back to
 // the flow network.
-func (m *mockOrchestrator) HandleEventFromCorruptedNode(event *insecure.EgressEvent) error {
+func (m *mockOrchestrator) HandleEgressEvent(event *insecure.EgressEvent) error {
 	m.eventCorrupter(event)
 	return m.orchestratorNetwork.SendEgress(event)
 }
 
-func (m *mockOrchestrator) HandleEventToCorruptedNode(event *insecure.IngressEvent) error {
+func (m *mockOrchestrator) HandleIngressEvent(event *insecure.IngressEvent) error {
 	panic("unimplemented")
 }
 

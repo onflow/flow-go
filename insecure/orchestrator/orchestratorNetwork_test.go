@@ -227,7 +227,7 @@ func mockOrchestratorHandlingEgressEvent(t *testing.T, orchestrator *mockinsecur
 
 	mu := sync.Mutex{}
 	seen := make(map[*insecure.EgressEvent]struct{}) // keeps track of unique egress events received by orchestrator
-	orchestrator.On("HandleEventFromCorruptedNode", mock.Anything).Run(func(args mock.Arguments) {
+	orchestrator.On("HandleEgressEvent", mock.Anything).Run(func(args mock.Arguments) {
 		mu.Lock()
 		defer mu.Unlock()
 
