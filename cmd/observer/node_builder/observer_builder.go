@@ -434,26 +434,27 @@ func (builder *ObserverServiceBuilder) BuildExecutionDataRequester() *ObserverSe
 	var processedBlockHeight storage.ConsumerProgress
 	var processedNotifications storage.ConsumerProgress
 
-	builder.Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
-		err := os.MkdirAll(builder.executionDataDir, 0700)
-		if err != nil {
-			return err
-		}
-
-		ds, err = badger.NewDatastore(builder.executionDataDir, &badger.DefaultOptions)
-		if err != nil {
-			return err
-		}
-
-		builder.ShutdownFunc(func() error {
-			if err := ds.Close(); err != nil {
-				return fmt.Errorf("could not close execution data datastore: %w", err)
+	builder.
+		Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
+			err := os.MkdirAll(builder.executionDataDir, 0700)
+			if err != nil {
+				return err
 			}
-			return nil
-		})
 
-		return nil
-	}).
+			ds, err = badger.NewDatastore(builder.executionDataDir, &badger.DefaultOptions)
+			if err != nil {
+				return err
+			}
+
+			builder.ShutdownFunc(func() error {
+				if err := ds.Close(); err != nil {
+					return fmt.Errorf("could not close execution data datastore: %w", err)
+				}
+				return nil
+			})
+
+			return nil
+		}).
 		Module("processed block height consumer progress", func(node *cmd.NodeConfig) error {
 			// uses the datastore's DB
 			processedBlockHeight = bstorage.NewConsumerProgress(ds.DB, module.ConsumeProgressExecutionDataRequesterBlockHeight)
@@ -541,7 +542,7 @@ func NewFlowObserverServiceBuilder(opts ...Option) *ObserverServiceBuilder {
 	}
 	// the observer gets a version of the root snapshot file that does not contain any node addresses
 	// hence skip all the root snapshot validations that involved an identity address
-	anb.SkipNwAddressBasedValidations = true
+	anb.FlowNodeBuilder.SkipNwAddressBasedValidations = true
 	return anb
 }
 
@@ -881,22 +882,23 @@ func (builder *ObserverServiceBuilder) initObserverLocal() func(node *cmd.NodeCo
 // enqueueMiddleware enqueues the creation of the network middleware
 // this needs to be done before sync engine participants module
 func (builder *ObserverServiceBuilder) enqueueMiddleware() {
-	builder.Module("network middleware", func(node *cmd.NodeConfig) error {
+	builder.
+		Module("network middleware", func(node *cmd.NodeConfig) error {
 
-		// NodeID for the observer on the observer network
-		observerNodeID := node.NodeID
+			// NodeID for the observer on the observer network
+			observerNodeID := node.NodeID
 
-		// Networking key
-		observerNetworkKey := node.NetworkKey
+			// Networking key
+			observerNetworkKey := node.NetworkKey
 
-		libP2PFactory := builder.initLibP2PFactory(observerNetworkKey)
+			libP2PFactory := builder.initLibP2PFactory(observerNetworkKey)
 
-		msgValidators := publicNetworkMsgValidators(node.Logger, node.IdentityProvider, observerNodeID)
+			msgValidators := publicNetworkMsgValidators(node.Logger, node.IdentityProvider, observerNodeID)
 
-		builder.initMiddleware(observerNodeID, node.Metrics.Network, libP2PFactory, msgValidators...)
+			builder.initMiddleware(observerNodeID, node.Metrics.Network, libP2PFactory, msgValidators...)
 
-		return nil
-	})
+			return nil
+		})
 }
 
 // Build enqueues the sync engine and the follower engine for the observer.
