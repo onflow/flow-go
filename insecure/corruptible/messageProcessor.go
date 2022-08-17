@@ -25,13 +25,13 @@ func NewCorruptMessageProcessor(logger zerolog.Logger, originalProcessor flownet
 }
 
 func (m *MessageProcessor) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
-	// relay message to the attacker
+	// Relay message to the attack orchestrator.
 	attackerRegistered := m.ingressController.HandleIncomingEvent(channel, originID, message)
 	if !attackerRegistered {
-		// if no attacker registered, pass it back to flow network and treat the message as a pass through
+		// No attack orchestrator registered yet, hence pass the ingress message back to the original processor.
 		err := m.originalProcessor.Process(channel, originID, message)
 		if err != nil {
-			m.logger.Fatal().Msgf("could not send message back to original message processor: %s", err)
+			m.logger.Fatal().Err(err).Msg("could not send message back to original message processor")
 			return err
 		}
 	}
