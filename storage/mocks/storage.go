@@ -109,18 +109,18 @@ func (mr *MockBlocksMockRecorder) IndexBlockForCollections(arg0, arg1 interface{
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IndexBlockForCollections", reflect.TypeOf((*MockBlocks)(nil).IndexBlockForCollections), arg0, arg1)
 }
 
-// InsertLastFullBlockHeight mocks base method
-func (m *MockBlocks) InsertLastFullBlockHeight(arg0 uint64) error {
+// InsertLastFullBlockHeightIfNotExists mocks base method
+func (m *MockBlocks) InsertLastFullBlockHeightIfNotExists(arg0 uint64) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "InsertLastFullBlockHeight", arg0)
+	ret := m.ctrl.Call(m, "InsertLastFullBlockHeightIfNotExists", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// InsertLastFullBlockHeight indicates an expected call of InsertLastFullBlockHeight
-func (mr *MockBlocksMockRecorder) InsertLastFullBlockHeight(arg0 interface{}) *gomock.Call {
+// InsertLastFullBlockHeightIfNotExists indicates an expected call of InsertLastFullBlockHeightIfNotExists
+func (mr *MockBlocksMockRecorder) InsertLastFullBlockHeightIfNotExists(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertLastFullBlockHeight", reflect.TypeOf((*MockBlocks)(nil).InsertLastFullBlockHeight), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertLastFullBlockHeightIfNotExists", reflect.TypeOf((*MockBlocks)(nil).InsertLastFullBlockHeightIfNotExists), arg0)
 }
 
 // Store mocks base method
