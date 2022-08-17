@@ -9,15 +9,15 @@ func main() {
 	exeBuilder := cmd.NewExecutionNodeBuilder(cmd.FlowNode(flow.RoleExecution.String()))
 	exeBuilder.LoadFlags()
 
-	if err := exeBuilder.FlowNodeBuilder.Initialize(); err != nil {
-		exeBuilder.FlowNodeBuilder.Logger.Fatal().Err(err).Send()
+	if err := exeBuilder.Initialize(); err != nil {
+		exeBuilder.Logger.Fatal().Err(err).Send()
 	}
 
 	exeBuilder.LoadComponentsAndModules()
 
-	node, err := exeBuilder.FlowNodeBuilder.Build()
+	node, err := exeBuilder.Build()
 	if err != nil {
-		exeBuilder.FlowNodeBuilder.Logger.Fatal().Err(err).Send()
+		exeBuilder.Logger.Fatal().Err(err).Send()
 	}
 	node.Run()
 }
