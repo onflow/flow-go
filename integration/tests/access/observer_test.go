@@ -36,13 +36,15 @@ func (suite *ObserverSuite) TearDownTest() {
 
 func (suite *ObserverSuite) SetupTest() {
 	suite.local = map[string]struct{}{
-		"Ping":                   {},
-		"GetLatestBlockHeader":   {},
-		"GetBlockHeaderByID":     {},
-		"GetBlockHeaderByHeight": {},
-		"GetLatestBlock":         {},
-		"GetBlockByID":           {},
-		"GetBlockByHeight":       {},
+		"Ping":                           {},
+		"GetLatestBlockHeader":           {},
+		"GetBlockHeaderByID":             {},
+		"GetBlockHeaderByHeight":         {},
+		"GetLatestBlock":                 {},
+		"GetBlockByID":                   {},
+		"GetBlockByHeight":               {},
+		"GetLatestProtocolStateSnapshot": {},
+		"GetNetworkParameters":           {},
 	}
 
 	nodeConfigs := []testnet.NodeConfig{
