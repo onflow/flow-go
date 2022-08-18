@@ -344,14 +344,10 @@ func (s *feldmanVSSstate) receiveVerifVector(origin index, data []byte) {
 	s.vA = make([]pointG2, s.threshold+1)
 	err := readVerifVector(s.vA, data)
 	if err != nil {
-		if IsInvalidInputsError(err) { // case where vector format is invalid
-			s.vAReceived = true
-			s.validKey = false
-			s.processor.Disqualify(int(origin),
-				fmt.Sprintf("reading the verification vector failed: %s", err))
-		}
-		// verification vector should not be tagged as received if unexpected error
-		return
+		s.vAReceived = true
+		s.validKey = false
+		s.processor.Disqualify(int(origin),
+			fmt.Sprintf("reading the verification vector failed: %s", err))
 	}
 
 	s.y = make([]pointG2, s.size)
@@ -387,16 +383,14 @@ func writeVerifVector(dest []byte, A []pointG2) {
 // readVerifVector imports A vector from an array of bytes,
 // assuming the slice length matches the vector length
 func readVerifVector(A []pointG2, src []byte) error {
-	switch C.ep2_vector_read_bin((*C.ep2_st)(&A[0]),
+	read := C.ep2_vector_read_bin((*C.ep2_st)(&A[0]),
 		(*C.uchar)(&src[0]),
-		(C.int)(len(A))) {
-	case valid:
+		(C.int)(len(A)))
+	if read == valid {
 		return nil
-	case invalid:
-		return invalidInputsErrorf("the verifcation vector does not serialize G2 points")
-	default:
-		return errors.New("reading the verifcation vector failed")
 	}
+	// invalid A vector
+	return invalidInputsErrorf("the verifcation vector does not serialize G2 points")
 }
 
 func (s *feldmanVSSstate) verifyShare() bool {

@@ -193,8 +193,10 @@ func (a *blsBLS12381Algo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 	sk := newPrKeyBLSBLS12381(nil)
 
 	// maps the seed to a private key
-	// error is not checked as it is guaranteed to be nil
-	_ = mapToZr(&sk.scalar, seed)
+	err := mapToZr(&sk.scalar, seed)
+	if err != nil {
+		return nil, invalidInputsErrorf("private key generation failed %w", err)
+	}
 	return sk, nil
 }
 
