@@ -21,41 +21,24 @@ func TestChunkDataPackRequestQueue_Sequential(t *testing.T) {
 	require.Zero(t, q.Size())
 
 	// initially there should be nothing to pop
-	request, ok := q.Pop()
-	require.False(t, ok)
-	require.Nil(t, request)
-
-	// initially there should be no head
-	request, ok = q.Head()
+	request, ok := q.pop()
 	require.False(t, ok)
 	require.Nil(t, request)
 
 	requests := chunkDataRequestListFixture(sizeLimit)
 	// pushing requests sequentially.
 	for i, req := range requests {
-		require.True(t, q.Push(req.ChunkId, req.RequesterId))
+		require.True(t, q.push(req.ChunkId, req.RequesterId))
 
 		// duplicate push should fail
-		require.False(t, q.Push(req.ChunkId, req.RequesterId))
-
-		// head should always point to the first element
-		head, ok := q.Head()
-		require.True(t, ok)
-		require.Equal(t, head.ChunkId, requests[0].ChunkId)
-		require.Equal(t, head.RequesterId, requests[0].RequesterId)
+		require.False(t, q.push(req.ChunkId, req.RequesterId))
 
 		require.Equal(t, q.Size(), uint(i+1))
 	}
 
 	// once queue meets the size limit, any extra push should fail.
 	for i := 0; i < 100; i++ {
-		require.False(t, q.Push(unittest.IdentifierFixture(), unittest.IdentifierFixture()))
-
-		// head should still point to the first element
-		head, ok := q.Head()
-		require.True(t, ok)
-		require.Equal(t, head.ChunkId, requests[0].ChunkId)
-		require.Equal(t, head.RequesterId, requests[0].RequesterId)
+		require.False(t, q.push(unittest.IdentifierFixture(), unittest.IdentifierFixture()))
 
 		// size should not change
 		require.Equal(t, q.Size(), uint(sizeLimit))
@@ -63,25 +46,10 @@ func TestChunkDataPackRequestQueue_Sequential(t *testing.T) {
 
 	// pop-ing requests sequentially.
 	for i, req := range requests {
-		popedReq, ok := q.Pop()
+		popedReq, ok := q.pop()
 		require.True(t, ok)
 		require.Equal(t, req.RequesterId, popedReq.RequesterId)
 		require.Equal(t, req.ChunkId, popedReq.ChunkId)
-
-		if i < len(requests)-1 {
-			// queue is not empty yet.
-			// head should be updated per pop (next element).
-			head, ok := q.Head()
-			require.True(t, ok, i)
-			require.Equal(t, head.ChunkId, requests[i+1].ChunkId)
-			require.Equal(t, head.RequesterId, requests[i+1].RequesterId)
-		} else {
-			// queue is empty,
-			// head should be nil.
-			head, ok := q.Head()
-			require.False(t, ok)
-			require.Nil(t, head)
-		}
 
 		require.Equal(t, q.Size(), uint(len(requests)-i-1))
 	}
@@ -96,12 +64,7 @@ func TestChunkDataPackRequestQueue_Concurrent(t *testing.T) {
 	require.Zero(t, q.Size())
 
 	// initially there should be nothing to pop
-	request, ok := q.Pop()
-	require.False(t, ok)
-	require.Nil(t, request)
-
-	// initially there should be no head
-	request, ok = q.Head()
+	request, ok := q.pop()
 	require.False(t, ok)
 	require.Nil(t, request)
 
@@ -113,7 +76,7 @@ func TestChunkDataPackRequestQueue_Concurrent(t *testing.T) {
 	for _, req := range requests {
 		req := req // suppress loop variable
 		go func() {
-			require.True(t, q.Push(req.ChunkId, req.RequesterId))
+			require.True(t, q.push(req.ChunkId, req.RequesterId))
 			pushWG.Done()
 		}()
 	}
@@ -123,7 +86,7 @@ func TestChunkDataPackRequestQueue_Concurrent(t *testing.T) {
 	pushWG.Add(sizeLimit)
 	for i := 0; i < sizeLimit; i++ {
 		go func() {
-			require.False(t, q.Push(unittest.IdentifierFixture(), unittest.IdentifierFixture()))
+			require.False(t, q.push(unittest.IdentifierFixture(), unittest.IdentifierFixture()))
 			pushWG.Done()
 		}()
 	}
@@ -136,7 +99,7 @@ func TestChunkDataPackRequestQueue_Concurrent(t *testing.T) {
 	// pop-ing requests concurrently.
 	for i := 0; i < sizeLimit; i++ {
 		go func() {
-			popedReq, ok := q.Pop()
+			popedReq, ok := q.pop()
 			require.True(t, ok)
 
 			matchLock.Lock()
@@ -147,12 +110,6 @@ func TestChunkDataPackRequestQueue_Concurrent(t *testing.T) {
 		}()
 	}
 	unittest.RequireReturnsBefore(t, popWG.Wait, 100*time.Millisecond, "could not pop all requests on time")
-
-	// queue is empty,
-	// head should be nil.
-	head, ok := q.Head()
-	require.False(t, ok)
-	require.Nil(t, head)
 
 	// queue must be empty after pop-ing all
 	require.Zero(t, q.Size())

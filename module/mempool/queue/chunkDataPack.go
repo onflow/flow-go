@@ -13,20 +13,28 @@ import (
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 )
 
-// ChunkDataPackRequestQueue implements a HeroCache-based in-memory queue for storing chunk data pack requests.
+// ChunkDataPackRequestMessageStore implements a HeroCache-based in-memory queue for storing chunk data pack requests.
 // It is designed to be utilized at Execution Nodes to maintain and respond chunk data pack requests.
-type ChunkDataPackRequestQueue struct {
+type ChunkDataPackRequestMessageStore struct {
 	mu        sync.RWMutex
 	cache     *herocache.Cache
 	sizeLimit uint
 }
 
-func (c *ChunkDataPackRequestQueue) Put(message *engine.Message) bool {
-	return c.Push(message.Payload.(flow.Identifier), message.OriginID)
+// Put enqueues the chunk data pack request message into the message store.
+// It expects the message.OriginID to be the requester identifier, and
+// message.Payload to be a chunk identifier.
+//
+// Boolean returned variable determines whether enqueuing was successful, i.e.,
+// put may be dropped if queue is full or already exists.
+func (c *ChunkDataPackRequestMessageStore) Put(message *engine.Message) bool {
+	return c.push(message.Payload.(flow.Identifier), message.OriginID)
 }
 
-func (c *ChunkDataPackRequestQueue) Get() (*engine.Message, bool) {
-	head, ok := c.Pop()
+// Get pops the queue, i.e., it returns the head of queue, and updates the head to the next element.
+// Boolean return value determines whether pop is successful, i.e., poping an empty queue returns false.
+func (c *ChunkDataPackRequestMessageStore) Get() (*engine.Message, bool) {
+	head, ok := c.pop()
 	if !ok {
 		return nil, false
 	}
@@ -36,10 +44,10 @@ func (c *ChunkDataPackRequestQueue) Get() (*engine.Message, bool) {
 	}, true
 }
 
-var _ mempool.ChunkDataPackRequestQueue = &ChunkDataPackRequestQueue{}
+var _ mempool.ChunkDataPackMessageStore = &ChunkDataPackRequestMessageStore{}
 
-func NewChunkDataPackRequestQueue(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics) *ChunkDataPackRequestQueue {
-	return &ChunkDataPackRequestQueue{
+func NewChunkDataPackRequestQueue(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics) *ChunkDataPackRequestMessageStore {
+	return &ChunkDataPackRequestMessageStore{
 		cache: herocache.NewCache(
 			sizeLimit,
 			herocache.DefaultOversizeFactor,
@@ -50,10 +58,10 @@ func NewChunkDataPackRequestQueue(sizeLimit uint32, logger zerolog.Logger, colle
 	}
 }
 
-// Push stores chunk data pack request into the queue.
+// push stores chunk data pack request into the queue.
 // Boolean returned variable determines whether push was successful, i.e.,
 // push may be dropped if queue is full or already exists.
-func (c *ChunkDataPackRequestQueue) Push(chunkId flow.Identifier, requesterId flow.Identifier) bool {
+func (c *ChunkDataPackRequestMessageStore) push(chunkId flow.Identifier, requesterId flow.Identifier) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -75,25 +83,9 @@ func (c *ChunkDataPackRequestQueue) Push(chunkId flow.Identifier, requesterId fl
 	return c.cache.Add(req.id, req)
 }
 
-// Head returns the head of queue.
-// Boolean return value determines whether there is a head available.
-func (c *ChunkDataPackRequestQueue) Head() (*mempool.ChunkDataPackRequest, bool) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	head, ok := c.cache.Head()
-	if !ok {
-		// cache is empty, and there is no head.
-		return nil, false
-	}
-
-	request := head.(chunkDataPackRequestEntity)
-	return &mempool.ChunkDataPackRequest{RequesterId: request.RequesterId, ChunkId: request.ChunkId}, true
-}
-
-// Pop removes and returns the head of queue, and updates the head to the next element.
+// pop removes and returns the head of queue, and updates the head to the next element.
 // Boolean return value determines whether pop is successful, i.e., poping an empty queue returns false.
-func (c *ChunkDataPackRequestQueue) Pop() (*mempool.ChunkDataPackRequest, bool) {
+func (c *ChunkDataPackRequestMessageStore) pop() (*mempool.ChunkDataPackRequest, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -108,7 +100,7 @@ func (c *ChunkDataPackRequestQueue) Pop() (*mempool.ChunkDataPackRequest, bool) 
 	return &mempool.ChunkDataPackRequest{RequesterId: request.RequesterId, ChunkId: request.ChunkId}, true
 }
 
-func (c *ChunkDataPackRequestQueue) Size() uint {
+func (c *ChunkDataPackRequestMessageStore) Size() uint {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 

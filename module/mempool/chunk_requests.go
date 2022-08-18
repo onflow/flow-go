@@ -100,22 +100,10 @@ type ChunkRequests interface {
 
 const DefaultChunkDataPackRequestQueueSize = 100_000
 
-// ChunkDataPackRequestQueue is a FIFO (first-in-first-out) size-bound queue for maintaining chunk data pack requests.
+// ChunkDataPackMessageStore is a FIFO (first-in-first-out) size-bound queue for maintaining chunk data pack requests.
 // It is designed to be utilized at Execution Nodes to maintain and respond chunk data pack requests.
-type ChunkDataPackRequestQueue interface {
+type ChunkDataPackMessageStore interface {
 	engine.MessageStore
-	// Push stores chunk data pack request into the queue.
-	// Boolean returned variable determines whether push was successful, i.e.,
-	// push may be dropped if queue is full.
-	Push(chunkId flow.Identifier, requesterId flow.Identifier) bool
-
-	// Pop removes and returns the head of queue, and updates the head to the next element.
-	// Boolean return value determines whether pop is successful, i.e., poping an empty queue returns false.
-	Pop() (*ChunkDataPackRequest, bool)
-
-	// Head returns the head of queue.
-	// Boolean return value determines whether there is a head available.
-	Head() (*ChunkDataPackRequest, bool)
 
 	// Size returns total chunk data pack requests stored in queue.
 	Size() uint

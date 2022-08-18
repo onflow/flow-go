@@ -53,7 +53,7 @@ type Engine struct {
 	metrics                module.ExecutionMetrics
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
 	chdpRequestHandler     *engine.MessageHandler
-	chdpRequestQueue       mempool.ChunkDataPackRequestQueue
+	chdpRequestQueue       mempool.ChunkDataPackMessageStore
 	chdpRequestChannel     chan *mempool.ChunkDataPackRequest
 }
 
@@ -65,7 +65,7 @@ func New(
 	execState state.ReadOnlyExecutionState,
 	metrics module.ExecutionMetrics,
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error),
-	chunkDataPackRequestQueue mempool.ChunkDataPackRequestQueue,
+	chunkDataPackRequestQueue mempool.ChunkDataPackMessageStore,
 	chdpRequestWorkers uint,
 ) (*Engine, error) {
 
