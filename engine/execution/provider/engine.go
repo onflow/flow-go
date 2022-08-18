@@ -167,6 +167,7 @@ func (e *Engine) processQueuedChunkDataPackRequestsShovllerWorker(ctx irrecovera
 			// there is at list a single chunk data pack request queued up.
 			e.chunkDataPackRequestShovller(ctx)
 		case <-ctx.Done():
+			close(e.chdpRequestChannel)
 			e.log.Trace().Msg("processing chunk data pack request worker terminated")
 			return
 		}
@@ -175,12 +176,6 @@ func (e *Engine) processQueuedChunkDataPackRequestsShovllerWorker(ctx irrecovera
 
 func (e *Engine) chunkDataPackRequestShovller(ctx irrecoverable.SignalerContext) {
 	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-		}
-
 		msg, ok := e.chdpRequestQueue.Get()
 		if !ok {
 			// no more requests, return
@@ -207,18 +202,17 @@ func (e *Engine) processChunkDataPackRequestWorker(ctx irrecoverable.SignalerCon
 	ready()
 
 	for {
-		select {
-		case request := <-e.chdpRequestChannel:
-			lg := e.log.With().
-				Hex("chunk_id", logging.ID(request.ChunkId)).
-				Hex("origin_id", logging.ID(request.RequesterId)).Logger()
-			lg.Trace().Msg("worker picked up chunk data pack request for processing")
-			e.onChunkDataRequest(request)
-			lg.Trace().Msg("worker finished chunk data pack processing")
-		case <-ctx.Done():
+		request, ok := <-e.chdpRequestChannel
+		if !ok {
 			e.log.Trace().Msg("processing chunk data pack request worker terminated")
 			return
 		}
+		lg := e.log.With().
+			Hex("chunk_id", logging.ID(request.ChunkId)).
+			Hex("origin_id", logging.ID(request.RequesterId)).Logger()
+		lg.Trace().Msg("worker picked up chunk data pack request for processing")
+		e.onChunkDataRequest(request)
+		lg.Trace().Msg("worker finished chunk data pack processing")
 	}
 }
 
