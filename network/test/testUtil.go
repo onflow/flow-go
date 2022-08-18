@@ -20,7 +20,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/libp2p/message"
@@ -37,6 +36,7 @@ import (
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -144,7 +144,7 @@ func GenerateIDs(
 }
 
 // GenerateMiddlewares creates and initializes middleware instances for all the identities
-func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.IdentityList, libP2PNodes []*p2p.Node, codec network.Codec, opts ...func(*optsConfig)) ([]network.Middleware, []*UpdatableIDProvider) {
+func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.IdentityList, libP2PNodes []*p2p.Node, codec network.Codec, consumer slashing.ViolationsConsumer, opts ...func(*optsConfig)) ([]network.Middleware, []*UpdatableIDProvider) {
 	metrics := metrics.NewNoopCollector()
 	mws := make([]network.Middleware, len(identities))
 	idProviders := make([]*UpdatableIDProvider, len(identities))
@@ -178,6 +178,7 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 			p2p.DefaultUnicastTimeout,
 			p2p.NewIdentityProviderIDTranslator(idProviders[i]),
 			codec,
+			consumer,
 			p2p.WithPeerManager(peerManagerFactory),
 		)
 	}
@@ -265,11 +266,12 @@ func GenerateIDsAndMiddlewares(t *testing.T,
 	n int,
 	logger zerolog.Logger,
 	codec network.Codec,
+	consumer slashing.ViolationsConsumer,
 	opts ...func(*optsConfig),
 ) (flow.IdentityList, []network.Middleware, []observable.Observable, []*UpdatableIDProvider) {
 
 	ids, libP2PNodes, protectObservables := GenerateIDs(t, logger, n, opts...)
-	mws, providers := GenerateMiddlewares(t, logger, ids, libP2PNodes, codec, opts...)
+	mws, providers := GenerateMiddlewares(t, logger, ids, libP2PNodes, codec, consumer, opts...)
 	return ids, mws, protectObservables, providers
 }
 
@@ -307,9 +309,10 @@ func GenerateIDsMiddlewaresNetworks(
 	log zerolog.Logger,
 	tops []network.Topology,
 	codec network.Codec,
+	consumer slashing.ViolationsConsumer,
 	opts ...func(*optsConfig),
 ) (flow.IdentityList, []network.Middleware, []network.Network, []observable.Observable) {
-	ids, mws, observables, _ := GenerateIDsAndMiddlewares(t, n, log, codec, opts...)
+	ids, mws, observables, _ := GenerateIDsAndMiddlewares(t, n, log, codec, consumer, opts...)
 	sms := GenerateSubscriptionManagers(t, mws)
 	networks := GenerateNetworks(ctx, t, log, ids, mws, tops, sms)
 	return ids, mws, networks, observables

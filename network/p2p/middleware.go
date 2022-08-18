@@ -25,10 +25,11 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/codec"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/validator"
-	psValidator "github.com/onflow/flow-go/network/validator/pubsub"
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
@@ -66,11 +67,6 @@ var (
 	allowAll = func(_ peer.ID) bool { return true }
 )
 
-// peerFilterFunc is a func type that will be used in the TopicValidator to filter
-// peers by ID and drop messages from unwanted peers before message payload decoding
-// happens.
-type peerFilterFunc func(id peer.ID) bool
-
 // Middleware handles the input & output on the direct connections we have to
 // our neighbours on the peer-to-peer network.
 type Middleware struct {
@@ -96,6 +92,7 @@ type Middleware struct {
 	idTranslator               IDTranslator
 	previousProtocolStatePeers []peer.AddrInfo
 	codec                      network.Codec
+	slashingViolationsConsumer slashing.ViolationsConsumer
 	component.Component
 }
 
@@ -139,6 +136,7 @@ func NewMiddleware(
 	unicastMessageTimeout time.Duration,
 	idTranslator IDTranslator,
 	codec network.Codec,
+	slashingViolationsConsumer slashing.ViolationsConsumer,
 	opts ...MiddlewareOption,
 ) *Middleware {
 
@@ -148,17 +146,18 @@ func NewMiddleware(
 
 	// create the node entity and inject dependencies & config
 	mw := &Middleware{
-		log:                   log,
-		wg:                    &sync.WaitGroup{},
-		me:                    flowID,
-		libP2PNodeFactory:     libP2PNodeFactory,
-		metrics:               metrics,
-		rootBlockID:           rootBlockID,
-		validators:            DefaultValidators(log, flowID),
-		unicastMessageTimeout: unicastMessageTimeout,
-		peerManagerFactory:    nil,
-		idTranslator:          idTranslator,
-		codec:                 codec,
+		log:                        log,
+		wg:                         &sync.WaitGroup{},
+		me:                         flowID,
+		libP2PNodeFactory:          libP2PNodeFactory,
+		metrics:                    metrics,
+		rootBlockID:                rootBlockID,
+		validators:                 DefaultValidators(log, flowID),
+		unicastMessageTimeout:      unicastMessageTimeout,
+		peerManagerFactory:         nil,
+		idTranslator:               idTranslator,
+		codec:                      codec,
+		slashingViolationsConsumer: slashingViolationsConsumer,
 	}
 
 	for _, opt := range opts {
@@ -192,15 +191,12 @@ func DefaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.Mes
 	}
 }
 
-// isStakedPeerFilter returns a peerFilterFunc that uses m.ov.Identity to get the identity
-// for a peer ID. If a identity is not found the peer is unstaked.
-func (m *Middleware) isStakedPeerFilter() peerFilterFunc {
-	f := func(id peer.ID) bool {
-		_, ok := m.ov.Identity(id)
+// isProtocolParticipant returns a PeerFilter that returns true if a peer is a staked node.
+func (m *Middleware) isProtocolParticipant() PeerFilter {
+	return func(peerID peer.ID) bool {
+		_, ok := m.ov.Identity(peerID)
 		return ok
 	}
-
-	return f
 }
 
 func (m *Middleware) NewBlobService(channel channels.Channel, ds datastore.Batching, opts ...network.BlobServiceOption) network.BlobService {
@@ -284,6 +280,13 @@ func (m *Middleware) UpdateNodeAddresses() {
 
 func (m *Middleware) SetOverlay(ov network.Overlay) {
 	m.ov = ov
+}
+
+// validateUnicastAuthorizedSender will validate messages sent via unicast stream.
+func (m *Middleware) validateUnicastAuthorizedSender(remotePeer peer.ID, channel channels.Channel, msg interface{}) error {
+	validate := validator.AuthorizedSenderValidator(m.log, m.slashingViolationsConsumer, channel, true, m.ov.Identity)
+	_, err := validate(remotePeer, msg)
+	return err
 }
 
 // start will start the middleware.
@@ -454,6 +457,8 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 	success := false
 
+	remotePeer := s.Conn().RemotePeer()
+
 	defer func() {
 		if success {
 			err := s.Close()
@@ -522,22 +527,10 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 		}
 
 		m.wg.Add(1)
-		go func(msg *message.Message) {
+		go func() {
 			defer m.wg.Done()
-			if decodedMsgPayload, err := m.codec.Decode(msg.Payload); err != nil {
-				m.log.
-					Warn().
-					Err(fmt.Errorf("could not decode message: %w", err)).
-					Hex("sender", msg.OriginID).
-					Hex("event_id", msg.EventID).
-					Str("event_type", msg.Type).
-					Str("channel", msg.ChannelID)
-			} else {
-				// log metrics with the channel name as OneToOne
-				m.metrics.NetworkMessageReceived(msg.Size(), metrics.ChannelOneToOne, msg.Type)
-				m.processAuthenticatedMessage(msg, decodedMsgPayload, s.Conn().RemotePeer())
-			}
-		}(&msg)
+			m.processUnicastStreamMessage(remotePeer, &msg)
+		}()
 	}
 
 	success = true
@@ -549,21 +542,21 @@ func (m *Middleware) Subscribe(channel channels.Channel) error {
 
 	topic := channels.TopicFromChannel(channel, m.rootBlockID)
 
-	var peerFilter peerFilterFunc
-	var validators []psValidator.MessageValidator
-	if channels.PublicChannels().Contains(channel) {
+	var peerFilter PeerFilter
+	var validators []validator.PubSubMessageValidator
+	if channels.IsPublicChannel(channel) {
 		// NOTE: for public channels the callback used to check if a node is staked will
 		// return true for every node.
 		peerFilter = allowAll
 	} else {
 		// for channels used by the staked nodes, add the topic validator to filter out messages from non-staked nodes
 		validators = append(validators,
-			psValidator.AuthorizedSenderMessageValidator(m.log, channel, m.ov.Identity),
+			validator.AuthorizedSenderMessageValidator(m.log, m.slashingViolationsConsumer, channel, m.ov.Identity),
 		)
 
 		// NOTE: For non-public channels the libP2P node topic validator will reject
 		// messages from unstaked nodes.
-		peerFilter = m.isStakedPeerFilter()
+		peerFilter = m.isProtocolParticipant()
 	}
 
 	s, err := m.libP2PNode.Subscribe(topic, m.codec, peerFilter, validators...)
@@ -600,6 +593,60 @@ func (m *Middleware) Unsubscribe(channel channels.Channel) error {
 	m.peerManagerUpdate()
 
 	return nil
+}
+
+// processUnicastStreamMessage will decode, perform authorized sender validation and process a message
+// sent via unicast stream. This func should be invoked in a separate goroutine to avoid creating a message decoding bottleneck.
+func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *message.Message) {
+	channel := channels.Channel(msg.ChannelID)
+
+	decodedMsgPayload, err := m.codec.Decode(msg.Payload)
+	if codec.IsErrUnknownMsgCode(err) {
+		// slash peer if message contains unknown message code byte
+		violation := &slashing.Violation{PeerID: remotePeer.String(), Channel: channel, IsUnicast: true, Err: err}
+		m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
+		return
+	}
+	if codec.IsErrMsgUnmarshal(err) {
+		// slash if peer sent a message that could not be marshalled into the message type denoted by the message code byte
+		violation := &slashing.Violation{PeerID: remotePeer.String(), Channel: channel, IsUnicast: true, Err: err}
+		m.slashingViolationsConsumer.OnInvalidMsgError(violation)
+		return
+	}
+
+	// unexpected error condition. this indicates there's a bug
+	// don't crash as a result of external inputs since that creates a DoS vector.
+	if err != nil {
+		m.log.
+			Error().
+			Err(fmt.Errorf("unexpected error while decoding message: %w", err)).
+			Hex("sender", msg.OriginID).
+			Hex("event_id", msg.EventID).
+			Str("event_type", msg.Type).
+			Str("channel", msg.ChannelID).
+			Msg("failed to decode message payload")
+		return
+	}
+
+	// if message channel is not public perform authorized sender validation
+	if !channels.IsPublicChannel(channel) {
+		err := m.validateUnicastAuthorizedSender(remotePeer, channel, decodedMsgPayload)
+		if err != nil {
+			m.log.
+				Error().
+				Err(err).
+				Hex("sender", msg.OriginID).
+				Hex("event_id", msg.EventID).
+				Str("event_type", msg.Type).
+				Str("channel", msg.ChannelID).
+				Msg("unicast authorized sender validation failed")
+			return
+		}
+	}
+
+	// message decoding and validation was successful now log metrics with the channel name as OneToOne and process message
+	m.metrics.NetworkMessageReceived(msg.Size(), metrics.ChannelOneToOne, msg.Type)
+	m.processAuthenticatedMessage(msg, decodedMsgPayload, remotePeer)
 }
 
 // processAuthenticatedMessage processes a message and a source (indicated by its peer ID) and eventually passes it to the overlay
