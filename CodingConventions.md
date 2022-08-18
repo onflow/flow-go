@@ -210,8 +210,10 @@ We model the data flow inside a node as a 'data flow graph'. An `Engine` is the 
 New vertices should implement the [`Component` interface](https://github.com/onflow/flow-go/blob/57f89d4e96259f08fe84163c91ecd32484401b45/module/component/component.go#L22)
 and throw unexpected errors using the related [irrecoverable context](https://github.com/onflow/flow-go/blob/277b6515add6136946913747efebd508f0419a25/module/irrecoverable/irrecoverable.go).
 
-Generally, we consider node-internal components as _trusted_ and external nodes as untrusted data sources. The `Engine`
-API differentiates between trusted and untrusted inputs:
+See [related tech debt issue](https://github.com/dapperlabs/flow-go/issues/6361) for more information on the deprecation.
+
+Generally, we consider node-internal components as _trusted_ and external nodes as untrusted data sources. 
+The `Engine` API differentiates between trusted and untrusted inputs:
 
 * **Trusted inputs** from other components within the same node are handed to the `Engine` through
   ```golang
