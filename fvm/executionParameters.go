@@ -139,8 +139,8 @@ func getExecutionWeights[KindType common.ComputationKind | common.MemoryKind](
 	)
 
 	if err != nil {
-		// this might be fatal, return as is
-		return nil, err
+		// this might be fatal, handle it and return it
+		return nil, errors.HandleRuntimeError(err)
 	}
 
 	weightsRaw, ok := utils.CadenceValueToWeights(value)
