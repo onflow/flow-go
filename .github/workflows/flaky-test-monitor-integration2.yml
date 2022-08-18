@@ -1,0 +1,42 @@
+name: Flaky Test Monitor Integration Test
+
+# Dry run of Flaky Test Monitor to ensure that nothing has been broken
+
+on:
+  push:
+    branches:
+      - staging
+      - trying
+  pull_request:
+    branches:
+      - master
+env:
+  GO_VERSION: 1.18
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  generate-flaky-test-summary:
+    name: Generate Flaky Test Summary
+    strategy:
+      fail-fast: false
+      matrix:
+        test-category:
+          - unit
+          - unit-crypto
+          - unit-integration
+          - integration-bft
+          - integration-mvp
+          - integration-ghost
+          - integration-network
+          - integration-epochs
+          - integration-access
+          - integration-collection
+          - integration-consensus
+          - integration-execution
+          - integration-verification
+    runs-on: ubuntu-latest
+    steps:
+    - run: 'echo "No build required" '
