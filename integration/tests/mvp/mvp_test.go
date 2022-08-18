@@ -244,7 +244,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 	t.Log(">> funding new account...")
 
 	childCtx, cancel = context.WithTimeout(ctx, defaultTimeout)
-	err = serviceAccountClient.SignAndSendTransaction(ctx, fundAccountTx)
+	err = serviceAccountClient.SignAndSendTransaction(childCtx, fundAccountTx)
 	require.NoError(t, err)
 
 	cancel()

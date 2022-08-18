@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/fvm/handler"
@@ -13,6 +14,8 @@ import (
 type ProgramLogger struct {
 	tracer *Tracer
 
+	logger zerolog.Logger
+
 	cadenceLoggingEnabled bool
 	logs                  []string
 
@@ -21,6 +24,7 @@ type ProgramLogger struct {
 
 func NewProgramLogger(
 	tracer *Tracer,
+	logger zerolog.Logger,
 	reporter handler.MetricsReporter,
 	cadenceLoggingEnabled bool,
 ) *ProgramLogger {
@@ -30,6 +34,11 @@ func NewProgramLogger(
 		logs:                  nil,
 		reporter:              reporter,
 	}
+}
+
+func (logger *ProgramLogger) ImplementationDebugLog(message string) error {
+	logger.logger.Debug().Msgf("Cadence: %s", message)
+	return nil
 }
 
 func (logger *ProgramLogger) ProgramLog(message string) error {
