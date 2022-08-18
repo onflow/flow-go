@@ -329,7 +329,7 @@ func (e *Engine) ensureAuthorized(chunkID flow.Identifier, originID flow.Identif
 
 	// only verifier nodes are allowed to request chunk data packs
 	if origin.Role != flow.RoleVerification {
-		return nil, engine.("invalid role for receiving collection: %s", origin.Role)
+		return nil, engine.NewInvalidInputErrorf("invalid role for receiving collection: %s", origin.Role)
 	}
 
 	if origin.Weight == 0 {
