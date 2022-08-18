@@ -49,9 +49,10 @@ jobs:
         id: commit_date
         run: echo "::set-output name=date::$(git show --no-patch --no-notes --pretty='%cI' $COMMIT_SHA)"
       - name: Build relic and other tools
-          run: make install-tools
+        run: make install-tools
       - name: Run Localnet TPS test
-          run: bash -c "cd integration/localnet/ && make tps-test-ci
+        working-directory: integration/localnet
+        run: make tps-test-ci
       - name: Upload results to BigQuery
         uses: nick-fields/retry@v2
         with:

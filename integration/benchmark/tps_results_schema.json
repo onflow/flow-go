@@ -33,5 +33,15 @@
     "mode": "NULLABLE",
     "name": "prometheusTransactionCountEnd",
     "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "goVersion",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "osVersion",
+    "type": "STRING"
   }
 ]
