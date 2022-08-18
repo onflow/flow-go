@@ -57,7 +57,8 @@ Per convention, failure case due to a byzantine inputs are represented by specif
 
 Byzantine inputs are one particular case, where a function returns a 'benign error'. The critical property for an error
 to be benign is that the component returning it is still fully functional, despite encountering the error condition. All
-benign errors should be handled within the vertex.
+benign errors should be handled within the vertex. As part of implementing error handling, developers must consider which
+error conditions are benign in the context of the current component.
 
 ## Error handling
 
