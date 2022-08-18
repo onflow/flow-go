@@ -29,7 +29,7 @@ and external sources. We model the data flow inside a Flow node as a graph, aka 
 Generally, an individual vertex (data processing component) has a dedicated pool of go-routines for processing its work.
 Inbound data packages are appended to queue(s), and the vertex's internal worker threads process the inbound messages from the queue(s).
 In this design, there is an upper limit to the CPU resources an individual vertex can consume. A vertex with `k` go-routines as workers can
-at most keep `k` cores busy. The benefit of this desin is that the node can remain responsive even if one (or a few) of
+at most keep `k` cores busy. The benefit of this design is that the node can remain responsive even if one (or a few) of
 its data processing vertices are completely overwhelmed.
 
 In its entirety, a node is composed of many data flow vertices, that together form the node's data flow graph. The vertices
@@ -45,12 +45,12 @@ treats all inputs as untrusted. Furthermore, `VoteAggregator` consumes auxiliary
 ([`AddBlock(block *model.Proposal)`](https://github.com/onflow/flow-go/blob/3899d335d5a6ce3cbbb9fde4f7af780d6bec8c9a/consensus/hotstuff/vote_aggregator.go#L45),
 [`InvalidBlock(block *model.Proposal)`](https://github.com/onflow/flow-go/blob/3899d335d5a6ce3cbbb9fde4f7af780d6bec8c9a/consensus/hotstuff/vote_aggregator.go#L51),
 [`PruneUpToView(view uint64)`](https://github.com/onflow/flow-go/blob/3899d335d5a6ce3cbbb9fde4f7af780d6bec8c9a/consensus/hotstuff/vote_aggregator.go#L57))
-from the node's main consensus logic, which trusted.
+from the node's main consensus logic, which is trusted.
 
 
 ### Byzantine Inputs result in benign sentinel errors
 
-Any input that is coming from another node is untrusted and the vertex processing it should gracefully handle any arbitrarily malicious input.
+Any input that is coming from another node is untrusted and the vertex processing should gracefully handle any arbitrarily malicious input.
 Under no circumstances should a byzantine input result in the vertex's internal state being corrupted.
 Per convention, failure case due to a byzantine inputs are represented by specifically-typed
 [sentinel errors](https://pkg.go.dev/errors#New) (for further details, see error handling section).
@@ -74,9 +74,9 @@ happy path is either
 
 ### Best Practice Guidelines
 
-1. **Errors are part of your API:** If there is an error return, there is a documentation what the error means. We conceptually differentiate between the following two classes of errors:
+1. **Errors are part of your API:** If an error is returned by a function, the error's meaning is clearly documented in the function's GoDoc. We conceptually differentiate between the following two classes of errors:
 
-   1. _benign error: the component returning the error still _fully functional_ despite the error_.  
+   1. _benign error: the component returning the error is still fully functional despite the error_.  
        Benign failure cases are represented as typed sentinel errors
        ([basic errors](https://pkg.go.dev/errors#New) and [higher-level errors](https://dev.to/tigorlazuardi/go-creating-custom-error-wrapper-and-do-proper-error-equality-check-11k7)),
        so we can do type checks.  
