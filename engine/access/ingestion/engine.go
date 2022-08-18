@@ -193,23 +193,14 @@ func (e *Engine) Start(parent irrecoverable.SignalerContext) {
 		parent.Throw(fmt.Errorf("failed to get root block: %w", err))
 	}
 
-	rootSnapshot := e.state.AtBlockID(rootBlock.ID())
-
-	isSporkRootSnapshot, err := protocol.IsSporkRootSnapshot(rootSnapshot)
-	if err != nil {
-		parent.Throw(fmt.Errorf("could not check if root snapshot is a spork root snapshot: %w", err))
-	}
-
 	// This is useful for dynamically bootstrapped access node, they will request missing collections. In order to ensure all txs
 	// from the missing collections can be verified, we must ensure they are referencing to known blocks.
 	// That's why we set the full block height to be rootHeight + TransactionExpiry, so that we only request missing collections
 	// in blocks above that height.
-	if !isSporkRootSnapshot {
-		firstFullHeight := rootBlock.Height + flow.DefaultTransactionExpiry
-		err := e.blocks.InsertLastFullBlockHeightIfNotExists(firstFullHeight)
-		if err != nil {
-			parent.Throw(fmt.Errorf("failed to update last full block height during ingestion engine startup: %w", err))
-		}
+	firstFullHeight := rootBlock.Height + flow.DefaultTransactionExpiry
+	err = e.blocks.InsertLastFullBlockHeightIfNotExists(firstFullHeight)
+	if err != nil {
+		parent.Throw(fmt.Errorf("failed to update last full block height during ingestion engine startup: %w", err))
 	}
 
 	e.ComponentManager.Start(parent)
