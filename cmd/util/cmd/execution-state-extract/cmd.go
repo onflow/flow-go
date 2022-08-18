@@ -18,14 +18,15 @@ import (
 )
 
 var (
-	flagExecutionStateDir string
-	flagOutputDir         string
-	flagBlockHash         string
-	flagStateCommitment   string
-	flagDatadir           string
-	flagChain             string
-	flagNoMigration       bool
-	flagNoReport          bool
+	flagExecutionStateDir         string
+	flagOutputDir                 string
+	flagBlockHash                 string
+	flagStateCommitment           string
+	flagDatadir                   string
+	flagChain                     string
+	flagNoMigration               bool
+	flagNoReport                  bool
+	flagSetExportOnPostCheckpoint bool
 )
 
 func getChain(chainName string) (chain flow.Chain, err error) {
@@ -70,6 +71,8 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagNoReport, "no-report", false,
 		"don't report the state")
+
+	Cmd.Flags().BoolVar(&flagSetExportOnPostCheckpoint, "export-on-post-checkpoint", false, "move the export reporter to post checkpoint, if set to true, it assumes we have the epoch counter and don't depend on the export reporter to retrieve it")
 }
 
 func run(*cobra.Command, []string) {
@@ -145,6 +148,7 @@ func run(*cobra.Command, []string) {
 		chain,
 		!flagNoMigration,
 		!flagNoReport,
+		flagSetExportOnPostCheckpoint,
 	)
 
 	if err != nil {

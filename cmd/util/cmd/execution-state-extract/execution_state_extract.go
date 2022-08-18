@@ -30,6 +30,7 @@ func extractExecutionState(
 	chain flow.Chain,
 	migrate bool,
 	report bool,
+	setExportOnPostCheckpoint bool,
 ) error {
 
 	diskWal, err := wal.NewDiskWAL(
@@ -97,13 +98,7 @@ func extractExecutionState(
 		log.Info().Msgf("preparing reporter files")
 		reportFileWriterFactory := reporters.NewReportFileWriterFactory(outputDir, log)
 
-		preCheckpointReporters = []ledger.Reporter{
-			// report epoch counter which is needed for finalizing root block
-			reporters.NewExportReporter(log,
-				chain,
-				func() flow.StateCommitment { return targetHash },
-			),
-		}
+		preCheckpointReporters = []ledger.Reporter{}
 
 		postCheckpointReporters = []ledger.Reporter{
 			&reporters.AccountReporter{
@@ -116,6 +111,20 @@ func extractExecutionState(
 				Log: log,
 				RWF: reportFileWriterFactory,
 			},
+		}
+
+		// report epoch counter which is needed for finalizing root block
+		exportReporter := reporters.NewExportReporter(log,
+			chain,
+			func() flow.StateCommitment { return targetHash },
+		)
+
+		if setExportOnPostCheckpoint {
+			// make the export reporter is the first reporter, so that we can see the epoch counter first
+			// and use it to double compare with the epoch counter we used for finalizing root block during spork
+			postCheckpointReporters = append([]ledger.Reporter{exportReporter}, postCheckpointReporters...)
+		} else {
+			preCheckpointReporters = append(preCheckpointReporters, exportReporter)
 		}
 	}
 
