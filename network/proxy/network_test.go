@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/proxy"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -42,13 +43,13 @@ func (suite *Suite) SetupTest() {
 	suite.proxyNet = proxy.NewProxyNetwork(suite.net, suite.targetNodeID)
 	suite.engine = new(mocknetwork.Engine)
 
-	net.On("Register", mock.AnythingOfType("network.Channel"), mock.Anything).Return(suite.con, nil)
+	net.On("Register", mock.AnythingOfType("channels.Channel"), mock.Anything).Return(suite.con, nil)
 }
 
 // TestUnicast tests that the Unicast method is translated to a unicast to the target node
 // on the underlying network instance.
 func (suite *Suite) TestUnicast() {
-	channel := network.Channel("test-channel")
+	channel := channels.TestNetworkChannel
 	targetID := unittest.IdentifierFixture()
 	event := getEvent()
 
@@ -67,7 +68,7 @@ func (suite *Suite) TestUnicast() {
 // TestPublish tests that the Publish method is translated to a publish to the target node
 // on the underlying network instance.
 func (suite *Suite) TestPublish() {
-	channel := network.Channel("test-channel")
+	channel := channels.TestNetworkChannel
 	targetIDs := make([]flow.Identifier, 10)
 
 	for i := 0; i < 10; i++ {
@@ -91,7 +92,7 @@ func (suite *Suite) TestPublish() {
 // TestUnicast tests that the Multicast method is translated to a multicast to the target node
 // on the underlying network instance.
 func (suite *Suite) TestMulticast() {
-	channel := network.Channel("test-channel")
+	channel := channels.TestNetworkChannel
 	targetIDs := make([]flow.Identifier, 10)
 
 	for i := 0; i < 10; i++ {
@@ -114,7 +115,7 @@ func (suite *Suite) TestMulticast() {
 
 // TestClose tests that closing the proxy conduit closes the wrapped conduit.
 func (suite *Suite) TestClose() {
-	channel := network.Channel("test-channel")
+	channel := channels.TestNetworkChannel
 
 	con, err := suite.proxyNet.Register(channel, suite.engine)
 	suite.Assert().NoError(err)

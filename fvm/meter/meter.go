@@ -55,8 +55,8 @@ type Meter interface {
 	// memory metering
 	MeterMemory(kind common.MemoryKind, intensity uint) error
 	MemoryIntensities() MeteredMemoryIntensities
-	TotalMemoryUsed() uint
-	TotalMemoryLimit() uint
+	TotalMemoryEstimate() uint
+	TotalMemoryLimit() uint64
 
 	// TODO move storage metering to here
 	// MeterStorageRead(byteSize uint) error

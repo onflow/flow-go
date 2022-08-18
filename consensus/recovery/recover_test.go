@@ -14,7 +14,7 @@ import (
 
 func TestRecover(t *testing.T) {
 	finalized := unittest.BlockHeaderFixture()
-	blocks := unittest.ChainFixtureFrom(100, &finalized)
+	blocks := unittest.ChainFixtureFrom(100, finalized)
 
 	pending := make([]*flow.Header, 0)
 	for _, b := range blocks {
@@ -47,7 +47,7 @@ func TestRecover(t *testing.T) {
 		return nil
 	})
 
-	err := Recover(unittest.Logger(), &finalized, pending, validator, onProposal)
+	err := Recover(unittest.Logger(), finalized, pending, validator, onProposal)
 	require.NoError(t, err)
 
 	// only pending blocks are valid

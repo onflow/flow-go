@@ -16,7 +16,6 @@ import (
 )
 
 type TestnetStateTracker struct {
-	ghostTracking bool
 	BlockState    *BlockState
 	ReceiptState  *ReceiptState
 	ApprovalState *ResultApprovalState
@@ -36,17 +35,18 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 
 	// subscribe to the ghost
 	timeout := time.After(20 * time.Second)
-	ticker := time.Tick(100 * time.Millisecond)
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
 	for retry := true; retry; {
 		select {
 		case <-timeout:
 			require.FailNowf(t, "could not subscribe to ghost", "%v", timeout)
 			return
-		case <-ticker:
+		case <-ticker.C:
 			var err error
 			reader, err = ghost.Subscribe(context.Background())
 			if err != nil {
-				t.Logf("error subscribing to ghost: %v\n", err)
+				t.Logf("%v error subscribing to ghost: %v\n", time.Now().UTC(), err)
 			} else {
 				retry = false
 			}
@@ -85,30 +85,35 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 			switch m := msg.(type) {
 			case *messages.BlockProposal:
 				tst.BlockState.Add(t, m)
-				t.Logf("block proposal received from %s at height %v, view %v: %x\n",
+				t.Logf("%v block proposal received from %s at height %v, view %v: %x\n",
+					time.Now().UTC(),
 					sender,
 					m.Header.Height,
 					m.Header.View,
 					m.Header.ID())
 			case *flow.ResultApproval:
 				tst.ApprovalState.Add(sender, m)
-				t.Logf("result approval received from %s for execution result ID %x and chunk index %v\n",
+				t.Logf("%v result approval received from %s for execution result ID %x and chunk index %v\n",
+					time.Now().UTC(),
 					sender,
 					m.Body.ExecutionResultID,
 					m.Body.ChunkIndex)
+
 			case *flow.ExecutionReceipt:
 				finalState, err := m.ExecutionResult.FinalStateCommitment()
 				require.NoError(t, err)
-
 				tst.ReceiptState.Add(m)
-				t.Logf("execution receipts received from %s for block ID %x by executor ID %x with SC %x resultID %x\n",
+				t.Logf("%v execution receipts received from %s for block ID %x by executor ID %x with final state %x result ID %x chunks %d\n",
+					time.Now().UTC(),
 					sender,
 					m.ExecutionResult.BlockID,
 					m.ExecutorID,
 					finalState,
-					m.ExecutionResult.ID())
+					m.ExecutionResult.ID(),
+					len(m.ExecutionResult.Chunks))
+
 			default:
-				t.Logf("other msg received from %s: %#v\n", sender, msg)
+				t.Logf("%v other msg received from %s: %#v\n", time.Now().UTC(), sender, msg)
 				continue
 			}
 		}

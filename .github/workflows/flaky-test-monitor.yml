@@ -12,6 +12,10 @@ env:
   BIGQUERY_TABLE: test_results
   GO_VERSION: 1.18
 
+concurrency: 
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   upload-flaky-test-summary:
     name: Upload Flaky Test Summary
@@ -22,6 +26,7 @@ jobs:
           - unit
           - unit-crypto
           - unit-integration
+          - integration-bft
           - integration-mvp
           - integration-ghost
           - integration-network

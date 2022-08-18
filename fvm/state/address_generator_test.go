@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
@@ -13,7 +14,8 @@ import (
 func Test_NewStateBoundAddressGenerator_NoError(t *testing.T) {
 	view := utils.NewSimpleView()
 	chain := flow.MonotonicEmulator.Chain()
-	sth := state.NewStateHolder(state.NewState(view))
+	meter := meter.NewMeter(meter.DefaultParameters())
+	sth := state.NewStateHolder(state.NewState(view, meter, state.DefaultParameters()))
 	env := state.NewStateBoundAddressGenerator(sth, chain)
 	require.NotNil(t, env)
 }
@@ -21,12 +23,13 @@ func Test_NewStateBoundAddressGenerator_NoError(t *testing.T) {
 func Test_NewStateBoundAddressGenerator_GeneratingUpdatesState(t *testing.T) {
 	view := utils.NewSimpleView()
 	chain := flow.MonotonicEmulator.Chain()
-	sth := state.NewStateHolder(state.NewState(view))
+	meter := meter.NewMeter(meter.DefaultParameters())
+	sth := state.NewStateHolder(state.NewState(view, meter, state.DefaultParameters()))
 	generator := state.NewStateBoundAddressGenerator(sth, chain)
 	_, err := generator.NextAddress()
 	require.NoError(t, err)
 
-	stateBytes, err := view.Get("", "", "account_address_state")
+	stateBytes, err := view.Get("", "account_address_state")
 	require.NoError(t, err)
 
 	require.Equal(t, flow.BytesToAddress(stateBytes), flow.HexToAddress("01"))
@@ -34,17 +37,18 @@ func Test_NewStateBoundAddressGenerator_GeneratingUpdatesState(t *testing.T) {
 
 func Test_NewStateBoundAddressGenerator_UsesLedgerState(t *testing.T) {
 	view := utils.NewSimpleView()
-	err := view.Set("", "", "account_address_state", flow.HexToAddress("01").Bytes())
+	err := view.Set("", "account_address_state", flow.HexToAddress("01").Bytes())
 	require.NoError(t, err)
 
 	chain := flow.MonotonicEmulator.Chain()
-	sth := state.NewStateHolder(state.NewState(view))
+	meter := meter.NewMeter(meter.DefaultParameters())
+	sth := state.NewStateHolder(state.NewState(view, meter, state.DefaultParameters()))
 	generator := state.NewStateBoundAddressGenerator(sth, chain)
 
 	_, err = generator.NextAddress()
 	require.NoError(t, err)
 
-	stateBytes, err := view.Get("", "", "account_address_state")
+	stateBytes, err := view.Get("", "account_address_state")
 	require.NoError(t, err)
 
 	require.Equal(t, flow.BytesToAddress(stateBytes), flow.HexToAddress("02"))

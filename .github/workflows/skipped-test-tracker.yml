@@ -10,6 +10,10 @@ env:
   BIGQUERY_TABLE: skipped_tests
   GO_VERSION: 1.18
 
+concurrency: 
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   upload-skipped-test-summary:
     name: Upload Skipped Test Summary
@@ -20,6 +24,7 @@ jobs:
           - unit
           - unit-crypto
           - unit-integration
+          - integration-bft
           - integration-mvp
           - integration-ghost
           - integration-network

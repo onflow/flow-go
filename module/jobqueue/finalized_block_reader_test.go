@@ -50,7 +50,7 @@ func withReader(
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
 		collector := &metrics.NoopCollector{}
-		tracer := &trace.NoopTracer{}
+		tracer := trace.NewNoopTracer()
 		participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
 		s := testutil.CompleteStateFixture(t, collector, tracer, rootSnapshot)

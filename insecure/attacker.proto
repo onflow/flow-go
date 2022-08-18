@@ -11,16 +11,19 @@ option go_package = "insecure";
 
 // CorruptibleConduitFactory allows an attacker to register itself to the factory, and send messages on behalf of its conduits.
 service CorruptibleConduitFactory {
-  rpc RegisterAttacker(AttackerRegisterMessage) returns (google.protobuf.Empty) {}
+  rpc ConnectAttacker(google.protobuf.Empty) returns (stream Message) {}
   rpc ProcessAttackerMessage(stream Message) returns (google.protobuf.Empty) {}
 }
 
-service Attacker {
-  rpc Observe(stream Message) returns (google.protobuf.Empty) {}
+// Message represents the messages exchanged between the CorruptibleNetwork (server) and Orchestrator (client).
+// This is a wrapper for both egress and ingress messages.
+message Message {
+  EgressMessage Egress = 1;
+  IngressMessage Ingress = 2;
 }
 
-// Message is represents the message exchanged between the CorruptibleConduitFactory and Attacker services.
-message Message {
+// EgressMessage represents the message exchanged between the CorruptibleConduitFactory and Attacker services.
+message EgressMessage {
   string ChannelID = 1;
   bytes OriginID = 2;
   uint32 TargetNum = 3;
@@ -29,15 +32,17 @@ message Message {
   Protocol protocol = 6;
 }
 
+// OriginID for IngressMessage represents the node id where the message is coming from - that node could be corrupted or honest.
+message IngressMessage {
+  string ChannelID = 1;
+  bytes OriginID = 2;
+  bytes TargetID = 3;
+  bytes Payload = 4;
+}
+
 enum Protocol {
   UNKNOWN = 0;
   UNICAST = 1;
   MULTICAST = 2;
   PUBLISH = 3;
-}
-
-// AttackerRegisterMessage is the message an attacker uses to register itself to the chosen CorruptibleConduitFactory,
-// and takes its control.
-message AttackerRegisterMessage {
-  string address = 1;
 }

@@ -2,6 +2,7 @@ package extract
 
 import (
 	"crypto/rand"
+	"math"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -74,6 +75,11 @@ func TestExtractExecutionState(t *testing.T) {
 
 		withDirs(t, func(datadir, execdir, _ string) {
 
+			const (
+				checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
+				checkpointsToKeep  = 1
+			)
+
 			db := common.InitStorage(datadir)
 			commits := badger.NewCommits(metr, db)
 
@@ -84,6 +90,9 @@ func TestExtractExecutionState(t *testing.T) {
 			require.NoError(t, err)
 			f, err := complete.NewLedger(diskWal, size*10, metr, zerolog.Nop(), complete.DefaultPathFinderVersion)
 			require.NoError(t, err)
+			compactor, err := complete.NewCompactor(f, diskWal, zerolog.Nop(), uint(size), checkpointDistance, checkpointsToKeep)
+			require.NoError(t, err)
+			<-compactor.Ready()
 
 			var stateCommitment = f.InitialState()
 
@@ -120,8 +129,9 @@ func TestExtractExecutionState(t *testing.T) {
 				blocksInOrder[i] = blockID
 			}
 
-			<-diskWal.Done()
 			<-f.Done()
+			<-compactor.Done()
+
 			err = db.Close()
 			require.NoError(t, err)
 
@@ -152,6 +162,15 @@ func TestExtractExecutionState(t *testing.T) {
 					storage, err := complete.NewLedger(diskWal, 1000, metr, zerolog.Nop(), complete.DefaultPathFinderVersion)
 					require.NoError(t, err)
 
+					const (
+						checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
+						checkpointsToKeep  = 1
+					)
+					compactor, err := complete.NewCompactor(storage, diskWal, zerolog.Nop(), uint(size), checkpointDistance, checkpointsToKeep)
+					require.NoError(t, err)
+
+					<-compactor.Ready()
+
 					data := keysValuesByCommit[string(stateCommitment[:])]
 
 					keys := make([]ledger.Key, 0, len(data))
@@ -181,8 +200,8 @@ func TestExtractExecutionState(t *testing.T) {
 						require.Error(t, err)
 					}
 
-					<-diskWal.Done()
 					<-storage.Done()
+					<-compactor.Done()
 				})
 			}
 		})
@@ -192,17 +211,17 @@ func TestExtractExecutionState(t *testing.T) {
 func getSampleKeyValues(i int) ([]ledger.Key, []ledger.Value) {
 	switch i {
 	case 0:
-		return []ledger.Key{getKey("", "", "uuid"), getKey("", "", "account_address_state")},
+		return []ledger.Key{getKey("", "uuid"), getKey("", "account_address_state")},
 			[]ledger.Value{[]byte{'1'}, []byte{'A'}}
 	case 1:
-		return []ledger.Key{getKey("ADDRESS", "ADDRESS", "public_key_count"),
-				getKey("ADDRESS", "ADDRESS", "public_key_0"),
-				getKey("ADDRESS", "", "exists"),
-				getKey("ADDRESS", "", "storage_used")},
+		return []ledger.Key{getKey("ADDRESS", "public_key_count"),
+				getKey("ADDRESS", "public_key_0"),
+				getKey("ADDRESS", "exists"),
+				getKey("ADDRESS", "storage_used")},
 			[]ledger.Value{[]byte{1}, []byte("PUBLICKEYXYZ"), []byte{1}, []byte{100}}
 	case 2:
 		// TODO change the contract_names to CBOR encoding
-		return []ledger.Key{getKey("ADDRESS", "ADDRESS", "contract_names"), getKey("ADDRESS", "ADDRESS", "code.mycontract")},
+		return []ledger.Key{getKey("ADDRESS", "contract_names"), getKey("ADDRESS", "code.mycontract")},
 			[]ledger.Value{[]byte("mycontract"), []byte("CONTRACT Content")}
 	default:
 		keys := make([]ledger.Key, 0)
@@ -213,17 +232,16 @@ func getSampleKeyValues(i int) ([]ledger.Key, []ledger.Value) {
 			if err != nil {
 				panic(err)
 			}
-			keys = append(keys, getKey(string(address), "", "test"))
+			keys = append(keys, getKey(string(address), "test"))
 			values = append(values, getRandomCadenceValue())
 		}
 		return keys, values
 	}
 }
 
-func getKey(owner, controller, key string) ledger.Key {
+func getKey(owner, key string) ledger.Key {
 	return ledger.Key{KeyParts: []ledger.KeyPart{
 		{Type: uint16(0), Value: []byte(owner)},
-		{Type: uint16(1), Value: []byte(controller)},
 		{Type: uint16(2), Value: []byte(key)},
 	},
 	}

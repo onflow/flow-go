@@ -6,7 +6,8 @@ import (
 	syncengine "github.com/onflow/flow-go/engine/collection/synchronization"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	chainsync "github.com/onflow/flow-go/module/synchronization"
+	chainsync "github.com/onflow/flow-go/module/chainsync"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/storage"
@@ -45,7 +46,7 @@ func (f *SyncEngineFactory) Create(
 	comp network.Engine,
 ) (*chainsync.Core, *syncengine.Engine, error) {
 
-	core, err := chainsync.New(f.log, f.conf)
+	core, err := chainsync.New(f.log, f.conf, metrics.NewChainSyncCollector())
 	if err != nil {
 		return nil, nil, err
 	}

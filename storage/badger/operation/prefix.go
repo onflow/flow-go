@@ -46,10 +46,11 @@ const (
 
 	// codes for indexing single identifier by identifier/integeter
 	codeHeightToBlock           = 40 // index mapping height to block ID
-	codeBlockToSeal             = 41 // index mapping a block its last payload seal
+	codeBlockIDToLatestSealID   = 41 // index mapping a block its last payload seal
 	codeClusterBlockToRefBlock  = 42 // index cluster block ID to reference block ID
 	codeBlockValidity           = 43 // validity of block per HotStuff
 	codeRefHeightToClusterBlock = 44 // index reference block height to cluster block IDs
+	codeBlockIDToFinalizedSeal  = 45 // index _finalized_ seal by sealed block ID
 
 	// codes for indexing multiple identifiers by identifier
 	// NOTE: 51 was used for identity indexes before epochs

@@ -280,7 +280,7 @@ func (bs *BuilderSuite) SetupTest() {
 
 	// set up storage mocks for tests
 	bs.sealDB = &storage.Seals{}
-	bs.sealDB.On("ByBlockID", mock.Anything).Return(bs.lastSeal, nil)
+	bs.sealDB.On("HighestInFork", mock.Anything).Return(bs.lastSeal, nil)
 
 	bs.headerDB = &storage.Headers{}
 	bs.headerDB.On("ByBlockID", mock.Anything).Return(
@@ -498,7 +498,7 @@ func (bs *BuilderSuite) TestPayloadGuaranteeReferenceExpired() {
 	// create 4 expired guarantees
 	header := unittest.BlockHeaderFixture()
 	header.Height = bs.headers[bs.finalID].Height - 12
-	bs.headers[header.ID()] = &header
+	bs.headers[header.ID()] = header
 	expired := unittest.CollectionGuaranteesFixture(4, unittest.WithCollRef(header.ID()))
 
 	// add all guarantees to the pool
@@ -642,7 +642,7 @@ func (bs *BuilderSuite) TestPayloadSeals_EnforceGap() {
 	bs.build.seals = bs.sealDB
 
 	bs.T().Run("Build on top of B4 and check that no seals are included", func(t *testing.T) {
-		bs.sealDB.On("ByBlockID", b4.ID()).Return(b0seal, nil)
+		bs.sealDB.On("HighestInFork", b4.ID()).Return(b0seal, nil)
 
 		_, err := bs.build.BuildOn(b4.ID(), bs.setter)
 		require.NoError(t, err)
@@ -653,7 +653,7 @@ func (bs *BuilderSuite) TestPayloadSeals_EnforceGap() {
 	bs.T().Run("Build on top of B5 and check that seals for B1 is included", func(t *testing.T) {
 		b5 := unittest.BlockWithParentFixture(b4.Header) // creating block b5
 		bs.storeBlock(b5)
-		bs.sealDB.On("ByBlockID", b5.ID()).Return(b0seal, nil)
+		bs.sealDB.On("HighestInFork", b5.ID()).Return(b0seal, nil)
 
 		_, err := bs.build.BuildOn(b5.ID(), bs.setter)
 		require.NoError(t, err)
@@ -675,7 +675,7 @@ func (bs *BuilderSuite) TestPayloadSeals_Duplicate() {
 	n := 4
 	lastSeal := bs.chain[n-1]
 	mockSealDB := &storage.Seals{}
-	mockSealDB.On("ByBlockID", mock.Anything).Return(lastSeal, nil)
+	mockSealDB.On("HighestInFork", mock.Anything).Return(lastSeal, nil)
 	bs.build.seals = mockSealDB
 
 	// seals for all blocks [F0], ..., [A3] are still in the mempool:
@@ -778,7 +778,7 @@ func (bs *BuilderSuite) TestValidatePayloadSeals_ExecutionForks() {
 	}
 	bs.sealDB = &storage.Seals{}
 	bs.build.seals = bs.sealDB
-	bs.sealDB.On("ByBlockID", mock.Anything).Return(sealF, nil)
+	bs.sealDB.On("HighestInFork", mock.Anything).Return(sealF, nil)
 	bs.resultByID[sealedResult.ID()] = &sealedResult
 
 	bs.T().Run("verify that execution fork conflicting with sealed result is not sealed", func(t *testing.T) {
@@ -831,21 +831,21 @@ func (bs *BuilderSuite) TestPayloadReceipts_TraverseExecutionTreeFromLastSealedR
 	bs.build.recPool = bs.recPool
 
 	// building on top of X0: latest finalized block in fork is [lastSeal]; expect search to start with sealed result
-	bs.sealDB.On("ByBlockID", x0.ID()).Return(bs.lastSeal, nil)
+	bs.sealDB.On("HighestInFork", x0.ID()).Return(bs.lastSeal, nil)
 	bs.recPool.On("ReachableReceipts", bs.lastSeal.ResultID, mock.Anything, mock.Anything).Return([]*flow.ExecutionReceipt{}, nil).Once()
 	_, err := bs.build.BuildOn(x0.ID(), bs.setter)
 	bs.Require().NoError(err)
 	bs.recPool.AssertExpectations(bs.T())
 
 	// building on top of X1: latest finalized block in fork is [F4]; expect search to start with sealed result
-	bs.sealDB.On("ByBlockID", x1.ID()).Return(f4Seal, nil)
+	bs.sealDB.On("HighestInFork", x1.ID()).Return(f4Seal, nil)
 	bs.recPool.On("ReachableReceipts", f4Seal.ResultID, mock.Anything, mock.Anything).Return([]*flow.ExecutionReceipt{}, nil).Once()
 	_, err = bs.build.BuildOn(x1.ID(), bs.setter)
 	bs.Require().NoError(err)
 	bs.recPool.AssertExpectations(bs.T())
 
 	// building on top of A3 (with ID bs.parentID): latest finalized block in fork is [F4]; expect search to start with sealed result
-	bs.sealDB.On("ByBlockID", bs.parentID).Return(f2eal, nil)
+	bs.sealDB.On("HighestInFork", bs.parentID).Return(f2eal, nil)
 	bs.recPool.On("ReachableReceipts", f2eal.ResultID, mock.Anything, mock.Anything).Return([]*flow.ExecutionReceipt{}, nil).Once()
 	_, err = bs.build.BuildOn(bs.parentID, bs.setter)
 	bs.Require().NoError(err)
@@ -884,7 +884,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_IncludeOnlyReceiptsForCurrentFork() 
 	// set last sealed blocks:
 	b1Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(bs.resultForBlock[b1.ID()]))
 	bs.sealDB = &storage.Seals{}
-	bs.sealDB.On("ByBlockID", b5.ID()).Return(b1Seal, nil)
+	bs.sealDB.On("HighestInFork", b5.ID()).Return(b1Seal, nil)
 	bs.build.seals = bs.sealDB
 
 	// setup mock to test the BlockFilter provided by Builder

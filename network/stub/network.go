@@ -8,10 +8,12 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p/conduit"
 )
@@ -25,11 +27,11 @@ type Network struct {
 	mocknetwork.Network
 	ctx context.Context
 	sync.Mutex
-	myId           flow.Identifier                              // used to represent information of the attached node.
-	hub            *Hub                                         // used to attach Network layers of nodes together.
-	engines        map[network.Channel]network.MessageProcessor // used to keep track of attached engines of the node.
-	seenEventIDs   sync.Map                                     // used to keep track of event IDs seen by attached engines.
-	qCD            chan struct{}                                // used to stop continuous delivery mode of the Network.
+	myId           flow.Identifier                               // used to represent information of the attached node.
+	hub            *Hub                                          // used to attach Network layers of nodes together.
+	engines        map[channels.Channel]network.MessageProcessor // used to keep track of attached engines of the node.
+	seenEventIDs   sync.Map                                      // used to keep track of event IDs seen by attached engines.
+	qCD            chan struct{}                                 // used to stop continuous delivery mode of the Network.
 	conduitFactory network.ConduitFactory
 }
 
@@ -47,7 +49,7 @@ func NewNetwork(t testing.TB, myId flow.Identifier, hub *Hub, opts ...func(*Netw
 		ctx:            context.Background(),
 		myId:           myId,
 		hub:            hub,
-		engines:        make(map[network.Channel]network.MessageProcessor),
+		engines:        make(map[channels.Channel]network.MessageProcessor),
 		qCD:            make(chan struct{}),
 		conduitFactory: conduit.NewDefaultConduitFactory(),
 	}
@@ -55,6 +57,20 @@ func NewNetwork(t testing.TB, myId flow.Identifier, hub *Hub, opts ...func(*Netw
 	for _, opt := range opts {
 		opt(net)
 	}
+
+	// mocks the Start, Ready, and Done behavior of the network.
+	net.On("Start", mock.Anything).Return()
+	ready := make(chan struct{})
+	close(ready)
+	net.On("Ready", mock.Anything).Return(func() <-chan struct{} {
+		return ready
+	})
+
+	done := make(chan struct{})
+	close(done)
+	net.On("Done", mock.Anything).Return(func() <-chan struct{} {
+		return done
+	})
 
 	require.NoError(t, net.conduitFactory.RegisterAdapter(net))
 
@@ -70,7 +86,7 @@ func (n *Network) GetID() flow.Identifier {
 
 // Register registers an Engine of the attached node to the channel via a Conduit, and returns the
 // Conduit instance.
-func (n *Network) Register(channel network.Channel, engine network.MessageProcessor) (network.Conduit, error) {
+func (n *Network) Register(channel channels.Channel, engine network.MessageProcessor) (network.Conduit, error) {
 	n.Lock()
 	defer n.Unlock()
 	_, ok := n.engines[channel]
@@ -88,7 +104,7 @@ func (n *Network) Register(channel network.Channel, engine network.MessageProces
 	return c, nil
 }
 
-func (n *Network) UnRegisterChannel(channel network.Channel) error {
+func (n *Network) UnRegisterChannel(channel channels.Channel) error {
 	n.Lock()
 	defer n.Unlock()
 	delete(n.engines, channel)
@@ -97,7 +113,7 @@ func (n *Network) UnRegisterChannel(channel network.Channel) error {
 
 // submit is called when the attached Engine to the channel is sending an event to an
 // Engine attached to the same channel on another node or nodes.
-func (n *Network) submit(channel network.Channel, event interface{}, targetIDs ...flow.Identifier) error {
+func (n *Network) submit(channel channels.Channel, event interface{}, targetIDs ...flow.Identifier) error {
 	m := &PendingMessage{
 		From:      n.GetID(),
 		Channel:   channel,
@@ -112,7 +128,7 @@ func (n *Network) submit(channel network.Channel, event interface{}, targetIDs .
 
 // unicast is called when the attached Engine to the channel is sending an event to a single target
 // Engine attached to the same channel on another node.
-func (n *Network) UnicastOnChannel(channel network.Channel, event interface{}, targetID flow.Identifier) error {
+func (n *Network) UnicastOnChannel(channel channels.Channel, event interface{}, targetID flow.Identifier) error {
 	m := &PendingMessage{
 		From:      n.GetID(),
 		Channel:   channel,
@@ -127,7 +143,7 @@ func (n *Network) UnicastOnChannel(channel network.Channel, event interface{}, t
 // publish is called when the attached Engine is sending an event to a group of Engines attached to the
 // same channel on other nodes based on selector.
 // In this test helper implementation, publish uses submit method under the hood.
-func (n *Network) PublishOnChannel(channel network.Channel, event interface{}, targetIDs ...flow.Identifier) error {
+func (n *Network) PublishOnChannel(channel channels.Channel, event interface{}, targetIDs ...flow.Identifier) error {
 
 	if len(targetIDs) == 0 {
 		return fmt.Errorf("publish found empty target ID list for the message")
@@ -139,7 +155,7 @@ func (n *Network) PublishOnChannel(channel network.Channel, event interface{}, t
 // multicast is called when an engine attached to the channel is sending an event to a number of randomly chosen
 // Engines attached to the same channel on other nodes. The targeted nodes are selected based on the selector.
 // In this test helper implementation, multicast uses submit method under the hood.
-func (n *Network) MulticastOnChannel(channel network.Channel, event interface{}, num uint, targetIDs ...flow.Identifier) error {
+func (n *Network) MulticastOnChannel(channel channels.Channel, event interface{}, num uint, targetIDs ...flow.Identifier) error {
 	targetIDs = flow.Sample(num, targetIDs...)
 	return n.submit(channel, event, targetIDs...)
 }
