@@ -55,7 +55,7 @@ func TestChunkDataPackRequestQueue_Sequential(t *testing.T) {
 	}
 }
 
-// TestChunkDataPackRequestQueue_Sequential evaluates correctness of queue implementation against concurrent push and pop.
+// TestChunkDataPackRequestQueue_Concurrent evaluates correctness of queue implementation against concurrent push and pop.
 func TestChunkDataPackRequestQueue_Concurrent(t *testing.T) {
 	sizeLimit := 100
 	q := NewChunkDataPackRequestQueue(uint32(sizeLimit), unittest.Logger(), metrics.NewNoopCollector())
