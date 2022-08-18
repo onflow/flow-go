@@ -3,6 +3,7 @@ package queue
 import (
 	"sync"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -18,6 +19,21 @@ type ChunkDataPackRequestQueue struct {
 	mu        sync.RWMutex
 	cache     *herocache.Cache
 	sizeLimit uint
+}
+
+func (c *ChunkDataPackRequestQueue) Put(message *engine.Message) bool {
+	return c.Push(message.Payload.(flow.Identifier), message.OriginID)
+}
+
+func (c *ChunkDataPackRequestQueue) Get() (*engine.Message, bool) {
+	head, ok := c.Pop()
+	if !ok {
+		return nil, false
+	}
+	return &engine.Message{
+		OriginID: head.RequesterId,
+		Payload:  head.ChunkId,
+	}, true
 }
 
 var _ mempool.ChunkDataPackRequestQueue = &ChunkDataPackRequestQueue{}
