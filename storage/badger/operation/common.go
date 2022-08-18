@@ -47,6 +47,10 @@ func batchWrite(key []byte, entity interface{}) func(writeBatch *badger.WriteBat
 // insert will encode the given entity using msgpack and will insert the resulting
 // binary data in the badger DB under the provided key. It will error if the
 // key already exists.
+// Error returns:
+// * storage.ErrAlreadyExists if the key already exists in the database.
+// * generic error in case of unexpected failure from the database layer or
+//   encoding failure.
 func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
@@ -85,8 +89,11 @@ func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 }
 
 // update will encode the given entity with MsgPack and update the binary data
-// under the given key in the badger DB. It will error if the key does not exist
-// yet.
+// under the given key in the badger DB. The key must already exist.
+// Error returns:
+// * storage.ErrNotFound if the key does not already exist in the database.
+// * generic error in case of unexpected failure from the database layer or
+//   encoding failure.
 func update(key []byte, entity interface{}) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
@@ -117,6 +124,9 @@ func update(key []byte, entity interface{}) func(*badger.Txn) error {
 
 // remove removes the entity with the given key, if it exists. If it doesn't
 // exist, this is a no-op.
+// Error returns:
+// * storage.ErrNotFound if the key to delete does not exist.
+// * generic error in case of unexpected database error
 func remove(key []byte) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		// retrieve the item from the key-value store
@@ -158,6 +168,10 @@ func removeByPrefix(prefix []byte) func(*badger.Txn) error {
 // retrieve will retrieve the binary data under the given key from the badger DB
 // and decode it into the given entity. The provided entity needs to be a
 // pointer to an initialized entity of the correct type.
+// Error returns:
+// * storage.ErrNotFound if the key does not exist in the database
+// * generic error in case of unexpected failure from the database layer, or failure
+//   to decode an existing database value
 func retrieve(key []byte, entity interface{}) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
