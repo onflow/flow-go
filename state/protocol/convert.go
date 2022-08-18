@@ -12,6 +12,7 @@ import (
 
 // ToEpochSetup converts an Epoch interface instance to the underlying
 // concrete epoch setup service event.
+// TODO error docs
 func ToEpochSetup(epoch Epoch) (*flow.EpochSetup, error) {
 	counter, err := epoch.Counter()
 	if err != nil {
@@ -59,6 +60,7 @@ func ToEpochSetup(epoch Epoch) (*flow.EpochSetup, error) {
 
 // ToEpochCommit converts an Epoch interface instance to the underlying
 // concrete epoch commit service event. The epoch must have been committed.
+// TODO error docs
 func ToEpochCommit(epoch Epoch) (*flow.EpochCommit, error) {
 	counter, err := epoch.Counter()
 	if err != nil {
@@ -112,6 +114,7 @@ func ToEpochCommit(epoch Epoch) (*flow.EpochCommit, error) {
 
 // GetDKGParticipantKeys retrieves the canonically ordered list of DKG
 // participant keys from the DKG.
+// TODO error docs
 func GetDKGParticipantKeys(dkg DKG, participants flow.IdentityList) ([]crypto.PublicKey, error) {
 
 	keys := make([]crypto.PublicKey, 0, len(participants))
@@ -137,6 +140,7 @@ func GetDKGParticipantKeys(dkg DKG, participants flow.IdentityList) ([]crypto.Pu
 
 // ToDKGParticipantLookup computes the nodeID -> DKGParticipant lookup for a
 // DKG instance. The participants must exactly match the DKG instance configuration.
+// TODO error docs
 func ToDKGParticipantLookup(dkg DKG, participants flow.IdentityList) (map[flow.Identifier]flow.DKGParticipant, error) {
 
 	lookup := make(map[flow.Identifier]flow.DKGParticipant)
@@ -161,6 +165,7 @@ func ToDKGParticipantLookup(dkg DKG, participants flow.IdentityList) (map[flow.I
 }
 
 // DKGPhaseViews returns the DKG final phase views for an epoch.
+// TODO error docs
 func DKGPhaseViews(epoch Epoch) (phase1FinalView uint64, phase2FinalView uint64, phase3FinalView uint64, err error) {
 	phase1FinalView, err = epoch.DKGPhase1FinalView()
 	if err != nil {

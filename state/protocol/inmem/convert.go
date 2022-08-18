@@ -14,7 +14,7 @@ import (
 // FromSnapshot generates a memory-backed snapshot from the input snapshot.
 // Typically, this would be used to convert a database-backed snapshot to
 // one that can easily be serialized to disk or to network.
-//
+// TODO error docs
 func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 
 	var (
@@ -111,6 +111,7 @@ func FromParams(from protocol.GlobalParams) (*Params, error) {
 }
 
 // FromEpoch converts any protocol.Epoch to a memory-backed Epoch.
+// TODO error docs
 func FromEpoch(from protocol.Epoch) (*Epoch, error) {
 
 	var (
@@ -195,6 +196,7 @@ func FromCluster(from protocol.Cluster) (*Cluster, error) {
 // FromDKG converts any protocol.DKG to a memory-backed DKG.
 //
 // The given participant list must exactly match the DKG members.
+// TODO error docs
 func FromDKG(from protocol.DKG, participants flow.IdentityList) (*DKG, error) {
 	var dkg EncodableDKG
 	dkg.GroupKey = encodable.RandomBeaconPubKey{PublicKey: from.GroupKey()}

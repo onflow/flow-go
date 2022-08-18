@@ -6,8 +6,15 @@ import (
 )
 
 // Epoch represents an epoch that does not exist or could not be retrieved.
+// TODO error docs - what errors are expected at construction
 type Epoch struct {
 	err error
+}
+
+// NewEpoch returns a new invalid epoch, containing an error describing why the
+// epoch could not be retrieved.
+func NewEpoch(err error) *Epoch {
+	return &Epoch{err: err}
 }
 
 func (u *Epoch) Counter() (uint64, error) {
@@ -46,7 +53,7 @@ func (u *Epoch) Cluster(uint) (protocol.Cluster, error) {
 	return nil, u.err
 }
 
-func (u Epoch) ClusterByChainID(chainID flow.ChainID) (protocol.Cluster, error) {
+func (u *Epoch) ClusterByChainID(chainID flow.ChainID) (protocol.Cluster, error) {
 	return nil, u.err
 }
 
@@ -56,10 +63,6 @@ func (u *Epoch) DKG() (protocol.DKG, error) {
 
 func (u *Epoch) RandomSource() ([]byte, error) {
 	return nil, u.err
-}
-
-func NewEpoch(err error) *Epoch {
-	return &Epoch{err: err}
 }
 
 // Epochs is an epoch query for an invalid snapshot.
