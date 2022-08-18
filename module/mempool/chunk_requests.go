@@ -98,7 +98,7 @@ type ChunkRequests interface {
 	Size() uint
 }
 
-const DefaultChunkDataPackRequestQueueSize = 10e4
+const DefaultChunkDataPackRequestQueueSize = 100_000
 
 // ChunkDataPackRequestQueue is a FIFO (first-in-first-out) size-bound queue for maintaining chunk data pack requests.
 // It is designed to be utilized at Execution Nodes to maintain and respond chunk data pack requests.
