@@ -273,7 +273,7 @@ func (e *Engine) onChunkDataRequest(request *mempool.ChunkDataPackRequest) error
 	if sinceProcess > e.chdpQueryTimeout {
 		lg.Warn().Msgf("chunk data pack query takes longer than %v secs", e.chdpQueryTimeout.Seconds())
 	}
-	lg.Info().Msg("chunk data pack response lunched to dispatch")
+	lg.Info().Msg("sending chunk data pack response")
 
 	// sends requested chunk data pack to the requester
 	deliveryStart := time.Now()
