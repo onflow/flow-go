@@ -199,7 +199,10 @@ func (e *Engine) processChunkDataPackRequestWorker(ctx irrecoverable.SignalerCon
 			Hex("chunk_id", logging.ID(request.ChunkId)).
 			Hex("origin_id", logging.ID(request.RequesterId)).Logger()
 		lg.Trace().Msg("worker picked up chunk data pack request for processing")
-		e.onChunkDataRequest(request)
+		err := e.onChunkDataRequest(request)
+		if err != nil {
+			ctx.Throw(err)
+		}
 		lg.Trace().Msg("worker finished chunk data pack processing")
 	}
 }
@@ -226,7 +229,10 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 
 // onChunkDataRequest receives a request for a chunk data pack,
 // and if such a chunk data pack is available in the execution state, it is sent to the requester node.
-func (e *Engine) onChunkDataRequest(request *mempool.ChunkDataPackRequest) {
+// It returns an error if either of the following situatations hit:
+// 1. The chunk data pack exists, but not retrievable from the storage (e.g., inconsistent storage state).
+// 2. The requester for chunk data pack is not authorized in this current epoch.
+func (e *Engine) onChunkDataRequest(request *mempool.ChunkDataPackRequest) error {
 	processStart := time.Now()
 
 	lg := e.log.With().
@@ -245,21 +251,15 @@ func (e *Engine) onChunkDataRequest(request *mempool.ChunkDataPackRequest) {
 		lg.Warn().
 			Err(err).
 			Msg("chunk data pack not found, execution node may be behind")
-		return
+		return nil
 	}
 	if err != nil {
-		lg.Error().
-			Err(err).
-			Msg("could not retrieve chunk ID from storage")
-		return
+		fmt.Errorf("could not retrive chunk data pack request from storage: %w", err)
 	}
 
 	_, err = e.ensureAuthorized(chunkDataPack.ChunkID, request.RequesterId)
 	if err != nil {
-		lg.Error().
-			Err(err).
-			Msg("could not verify authorization of identity of chunk data pack request, dropping it")
-		return
+		return fmt.Errorf("could not verify authorization of identity of chunk data pack request: %w", err)
 	}
 
 	response := &messages.ChunkDataResponse{
@@ -291,7 +291,7 @@ func (e *Engine) onChunkDataRequest(request *mempool.ChunkDataPackRequest) {
 		lg.Warn().
 			Err(err).
 			Msg("could not send requested chunk data pack to requester")
-		return
+		return nil
 	}
 
 	if response.ChunkDataPack.Collection != nil {
@@ -303,6 +303,8 @@ func (e *Engine) onChunkDataRequest(request *mempool.ChunkDataPackRequest) {
 	}
 
 	lg.Info().Msg("chunk data pack request successfully replied")
+
+	return nil
 }
 
 func (e *Engine) ensureAuthorized(chunkID flow.Identifier, originID flow.Identifier) (*flow.Identity, error) {
@@ -327,7 +329,7 @@ func (e *Engine) ensureAuthorized(chunkID flow.Identifier, originID flow.Identif
 
 	// only verifier nodes are allowed to request chunk data packs
 	if origin.Role != flow.RoleVerification {
-		return nil, engine.NewInvalidInputErrorf("invalid role for receiving collection: %s", origin.Role)
+		return nil, engine.("invalid role for receiving collection: %s", origin.Role)
 	}
 
 	if origin.Weight == 0 {
