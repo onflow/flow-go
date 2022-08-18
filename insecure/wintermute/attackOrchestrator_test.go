@@ -146,7 +146,7 @@ func testConcurrentExecutionReceipts(t *testing.T,
 	receiptTargetIds, err := rootStateFixture.State.Final().Identities(filter.HasRole(flow.RoleAccess, flow.RoleConsensus, flow.RoleVerification))
 	require.NoError(t, err)
 
-	var eventMap map[flow.Identifier]*insecure.Event
+	var eventMap map[flow.Identifier]*insecure.EgressEvent
 	var receipts []*flow.ExecutionReceipt
 
 	if sameResult {
@@ -158,7 +158,7 @@ func testConcurrentExecutionReceipts(t *testing.T,
 	wintermuteOrchestrator := NewOrchestrator(unittest.Logger(), corruptedIds, allIds)
 
 	// keeps list of output events sent by orchestrator to the attack network.
-	orchestratorOutputEvents := make([]*insecure.Event, 0)
+	orchestratorOutputEvents := make([]*insecure.EgressEvent, 0)
 	orchestratorSentAllEventsWg := &sync.WaitGroup{}
 	orchestratorSentAllEventsWg.Add(expectedOrchestratorOutputEvents)
 
@@ -169,8 +169,8 @@ func testConcurrentExecutionReceipts(t *testing.T,
 		On("Send", mock.Anything).
 		Run(func(args mock.Arguments) {
 			// assert that args passed are correct
-			// extracts Event sent
-			event, ok := args[0].(*insecure.Event)
+			// extracts EgressEvent sent
+			event, ok := args[0].(*insecure.EgressEvent)
 			require.True(t, ok)
 
 			orchestratorOutputEvents = append(orchestratorOutputEvents, event)
@@ -233,8 +233,8 @@ func mockAttackNetworkForCorruptedExecutionResult(
 		Run(func(args mock.Arguments) {
 			// assert that args passed are correct
 
-			// extract Event sent
-			event, ok := args[0].(*insecure.Event)
+			// extract EgressEvent sent
+			event, ok := args[0].(*insecure.EgressEvent)
 			require.True(t, ok)
 
 			// make sure sender is a corrupted execution node.
@@ -288,8 +288,8 @@ func TestRespondingWithCorruptedAttestation(t *testing.T) {
 	mockAttackNetwork.On("Send", mock.Anything).
 		Run(func(args mock.Arguments) {
 			// assert that args passed are correct
-			// extracts Event sent
-			event, ok := args[0].(*insecure.Event)
+			// extracts EgressEvent sent
+			event, ok := args[0].(*insecure.EgressEvent)
 			require.True(t, ok)
 
 			// output of orchestrator for a corrupted chunk request from a corrupted verification node
@@ -370,8 +370,8 @@ func TestPassingThroughChunkDataRequests(t *testing.T) {
 	mockAttackNetwork.On("Send", mock.Anything).
 		Run(func(args mock.Arguments) {
 			// assert that args passed are correct
-			// extracts Event sent
-			event, ok := args[0].(*insecure.Event)
+			// extracts EgressEvent sent
+			event, ok := args[0].(*insecure.EgressEvent)
 			require.True(t, ok)
 
 			// since no attack yet conducted, the chunk data request must be passed through.
@@ -459,8 +459,8 @@ func testPassingThroughChunkDataResponse(t *testing.T, state *attackState) {
 	mockAttackNetwork.On("Send", mock.Anything).
 		Run(func(args mock.Arguments) {
 			// assert that args passed are correct
-			// extracts Event sent
-			event, ok := args[0].(*insecure.Event)
+			// extracts EgressEvent sent
+			event, ok := args[0].(*insecure.EgressEvent)
 			require.True(t, ok)
 
 			_, ok = event.FlowProtocolEvent.(*messages.ChunkDataResponse)
@@ -556,9 +556,9 @@ func TestPassingThroughMiscellaneousEvents(t *testing.T) {
 
 	// creates a block event fixture that is out of the context of
 	// the wintermute attack.
-	miscellaneousEvent := &insecure.Event{
+	miscellaneousEvent := &insecure.EgressEvent{
 		CorruptedNodeId:   corruptedIds.Sample(1)[0],
-		Channel:           "test_channel",
+		Channel:           channels.TestNetworkChannel,
 		Protocol:          insecure.Protocol_MULTICAST,
 		TargetNum:         3,
 		TargetIds:         unittest.IdentifierListFixture(10),
@@ -573,8 +573,8 @@ func TestPassingThroughMiscellaneousEvents(t *testing.T) {
 	mockAttackNetwork.On("Send", mock.Anything).
 		Run(func(args mock.Arguments) {
 			// assert that args passed are correct
-			// extracts Event sent
-			event, ok := args[0].(*insecure.Event)
+			// extracts EgressEvent sent
+			event, ok := args[0].(*insecure.EgressEvent)
 			require.True(t, ok)
 
 			_, ok = event.FlowProtocolEvent.(flow.Block)
@@ -630,9 +630,9 @@ func TestPassingThrough_ResultApproval(t *testing.T) {
 	approval := unittest.ResultApprovalFixture()
 	require.NotEqual(t, wintermuteOrchestrator.state.originalResult.ID(), approval.ID())
 	require.NotEqual(t, wintermuteOrchestrator.state.corruptedResult.ID(), approval.ID())
-	approvalEvent := &insecure.Event{
+	approvalEvent := &insecure.EgressEvent{
 		CorruptedNodeId:   corruptedIds.Sample(1)[0],
-		Channel:           "test_channel",
+		Channel:           channels.TestNetworkChannel,
 		Protocol:          insecure.Protocol_MULTICAST,
 		TargetNum:         3,
 		TargetIds:         unittest.IdentifierListFixture(10),
@@ -647,8 +647,8 @@ func TestPassingThrough_ResultApproval(t *testing.T) {
 	mockAttackNetwork.On("Send", mock.Anything).
 		Run(func(args mock.Arguments) {
 			// assert that args passed are correct
-			// extracts Event sent
-			event, ok := args[0].(*insecure.Event)
+			// extracts EgressEvent sent
+			event, ok := args[0].(*insecure.EgressEvent)
 			require.True(t, ok)
 
 			// passed through event must be a result approval
@@ -702,9 +702,9 @@ func TestWintermute_ResultApproval(t *testing.T) {
 	}
 
 	// generates a result approval event for one of the chunks of the original result.
-	approvalEvent := &insecure.Event{
+	approvalEvent := &insecure.EgressEvent{
 		CorruptedNodeId: corruptedIds.Sample(1)[0],
-		Channel:         "test_channel",
+		Channel:         channels.TestNetworkChannel,
 		Protocol:        insecure.Protocol_MULTICAST,
 		TargetNum:       3,
 		TargetIds:       unittest.IdentifierListFixture(10),

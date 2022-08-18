@@ -33,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/id"
@@ -41,7 +42,6 @@ import (
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/profiler"
-	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
@@ -50,6 +50,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
@@ -288,6 +289,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		p2p.WithPreferredUnicastProtocols(unicast.ToProtocolNames(fnb.PreferredUnicastProtocols)),
 	)
 
+	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(fnb.Logger)
 	fnb.Middleware = p2p.NewMiddleware(
 		fnb.Logger,
 		libP2PNodeFactory,
@@ -297,6 +299,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		fnb.BaseConfig.UnicastMessageTimeout,
 		fnb.IDTranslator,
 		fnb.CodecFactory(),
+		slashingViolationsConsumer,
 		mwOpts...,
 	)
 
@@ -1243,7 +1246,7 @@ func WithMetricsEnabled(enabled bool) Option {
 	}
 }
 
-func WithSyncCoreConfig(syncConfig synchronization.Config) Option {
+func WithSyncCoreConfig(syncConfig chainsync.Config) Option {
 	return func(config *BaseConfig) {
 		config.SyncCoreConfig = syncConfig
 	}
@@ -1364,8 +1367,6 @@ func (fnb *FlowNodeBuilder) onStart() error {
 
 	fnb.initLogger()
 
-	fnb.initProfiler()
-
 	fnb.initDB()
 	fnb.initSecretsDB()
 
@@ -1380,6 +1381,8 @@ func (fnb *FlowNodeBuilder) onStart() error {
 	}
 
 	fnb.initState()
+
+	fnb.initProfiler()
 
 	fnb.initFvmOptions()
 

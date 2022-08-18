@@ -2,7 +2,6 @@ package reporters
 
 import (
 	"fmt"
-	"math"
 	"runtime"
 	"strings"
 	"sync"
@@ -143,8 +142,8 @@ func (r *FungibleTokenTracker) worker(
 	for j := range jobs {
 
 		view := migrations.NewView(j.payloads)
-		meter := metering.NewMeter(math.MaxUint64, math.MaxUint64)
-		st := state.NewState(view, meter)
+		meter := metering.NewMeter(metering.DefaultParameters())
+		st := state.NewState(view, meter, state.DefaultParameters())
 		sth := state.NewStateHolder(st)
 		accounts := state.NewAccounts(sth)
 		storage := cadenceRuntime.NewStorage(

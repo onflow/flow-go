@@ -152,25 +152,46 @@ func (n *Network) ProcessAttackerMessage(stream insecure.CorruptibleConduitFacto
 				n.logger.Fatal().Err(err).Msg("could not read attacker's stream")
 				return stream.SendAndClose(&empty.Empty{})
 			}
-			if err := n.processAttackerMessage(msg); err != nil {
-				n.logger.Fatal().Err(err).Msg("could not process attacker's message")
+
+			// this should never happen - one of them (and only one) should be non-nil
+			// can't have a message with nil for both ingress and egress
+			if msg.Egress == nil && msg.Ingress == nil {
+				n.logger.Fatal().Err(err).Msg("could not process attacker's message - both ingress and egress messages can't be nil")
 				return stream.SendAndClose(&empty.Empty{})
+			}
+
+			// this should never happen - one of them (and only one) should be not nil
+			// can't have a message with not nil for both ingress and egress
+			if msg.Egress != nil && msg.Ingress != nil {
+				n.logger.Fatal().Err(err).Msg("could not process attacker's message - both ingress and egress messages can't be set")
+				return stream.SendAndClose(&empty.Empty{})
+			}
+			// received ingress message
+			//if msg.Ingress != nil {
+			// TODO implement ingress message processing
+			//}
+			// received egress message
+			if msg.Egress != nil {
+				if err := n.processAttackerEgressMessage(msg); err != nil {
+					n.logger.Fatal().Err(err).Msg("could not process attacker's egress message")
+					return stream.SendAndClose(&empty.Empty{})
+				}
 			}
 		}
 	}
 }
 
-// processAttackerMessage dispatches the attacker message on the Flow network on behalf of this node.
-func (n *Network) processAttackerMessage(msg *insecure.Message) error {
+// processAttackerEgressMessage dispatches the attacker message on the Flow network on behalf of this node.
+func (n *Network) processAttackerEgressMessage(msg *insecure.Message) error {
 	lg := n.logger.With().
-		Str("protocol", insecure.ProtocolStr(msg.Protocol)).
-		Uint32("target_num", msg.TargetNum).
-		Str("channel", msg.ChannelID).Logger()
+		Str("protocol", insecure.ProtocolStr(msg.Egress.Protocol)).
+		Uint32("target_num", msg.Egress.TargetNum).
+		Str("channel", msg.Egress.ChannelID).Logger()
 
-	event, err := n.codec.Decode(msg.Payload)
+	event, err := n.codec.Decode(msg.Egress.Payload)
 	if err != nil {
-		lg.Err(err).Msg("could not decode attacker's message")
-		return fmt.Errorf("could not decode message: %w", err)
+		lg.Err(err).Msg("could not decode attacker's egress message")
+		return fmt.Errorf("could not decode egress message: %w", err)
 	}
 
 	lg = n.logger.With().
@@ -212,17 +233,17 @@ func (n *Network) processAttackerMessage(msg *insecure.Message) error {
 		Str("event", fmt.Sprintf("%+v", event)).
 		Logger()
 
-	targetIds, err := flow.ByteSlicesToIds(msg.TargetIDs)
+	targetIds, err := flow.ByteSlicesToIds(msg.Egress.TargetIDs)
 	if err != nil {
-		lg.Err(err).Msg("could not convert target ids from byte to identifiers for attacker's dictated message")
+		lg.Err(err).Msg("could not convert target ids from byte to identifiers for attacker's dictated egress message")
 		return fmt.Errorf("could not convert target ids from byte to identifiers: %w", err)
 	}
 
-	lg = lg.With().Str("target_ids", fmt.Sprintf("%v", msg.TargetIDs)).Logger()
-	err = n.conduitFactory.SendOnFlowNetwork(event, channels.Channel(msg.ChannelID), msg.Protocol, uint(msg.TargetNum), targetIds...)
+	lg = lg.With().Str("target_ids", fmt.Sprintf("%v", msg.Egress.TargetIDs)).Logger()
+	err = n.conduitFactory.SendOnFlowNetwork(event, channels.Channel(msg.Egress.ChannelID), msg.Egress.Protocol, uint(msg.Egress.TargetNum), targetIds...)
 	if err != nil {
-		lg.Err(err).Msg("could not send attacker message to the network")
-		return fmt.Errorf("could not send attacker message to the network: %w", err)
+		lg.Err(err).Msg("could not send attacker egress message to the network")
+		return fmt.Errorf("could not send attacker egress message to the network: %w", err)
 	}
 
 	lg.Info().Msg("incoming attacker's message dispatched on flow network")
@@ -284,14 +305,21 @@ func (n *Network) eventToMessage(
 	}
 
 	myId := n.me.NodeID()
-	return &insecure.Message{
+
+	egressMsg := &insecure.EgressMessage{
 		ChannelID: channel.String(),
 		OriginID:  myId[:],
 		TargetNum: targetNum,
 		TargetIDs: flow.IdsToBytes(targetIds),
 		Payload:   payload,
 		Protocol:  protocol,
-	}, nil
+	}
+
+	msg := &insecure.Message{
+		Egress: egressMsg,
+	}
+
+	return msg, nil
 }
 
 func (n *Network) generateExecutionReceipt(result *flow.ExecutionResult) (*flow.ExecutionReceipt, error) {

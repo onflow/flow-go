@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	mockery "github.com/stretchr/testify/mock"
-
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -24,14 +23,14 @@ import (
 	"github.com/onflow/flow-go/module/observable"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-const testChannel = channels.PublicSyncCommittee
+const testChannel = channels.TestNetworkChannel
 
 // libp2p emits a call to `Protect` with a topic-specific tag upon establishing each peering connection in a GossipSUb mesh, see:
 // https://github.com/libp2p/go-libp2p-pubsub/blob/master/tag_tracer.go
@@ -73,6 +72,8 @@ type MiddlewareTestSuite struct {
 
 	mwCancel context.CancelFunc
 	mwCtx    irrecoverable.SignalerContext
+
+	slashingViolationsConsumer slashing.ViolationsConsumer
 }
 
 // TestMiddlewareTestSuit runs all the test methods in this test suit
@@ -96,7 +97,9 @@ func (m *MiddlewareTestSuite) SetupTest() {
 		log:  m.logger,
 	}
 
-	m.ids, m.mws, obs, m.providers = GenerateIDsAndMiddlewares(m.T(), m.size, m.logger, unittest.NetworkCodec())
+	m.slashingViolationsConsumer = mocknetwork.NewViolationsConsumer(m.T())
+
+	m.ids, m.mws, obs, m.providers = GenerateIDsAndMiddlewares(m.T(), m.size, m.logger, unittest.NetworkCodec(), m.slashingViolationsConsumer)
 
 	for _, observableConnMgr := range obs {
 		observableConnMgr.Subscribe(&ob)
@@ -140,7 +143,7 @@ func (m *MiddlewareTestSuite) SetupTest() {
 func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	// create a new staked identity
 	ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1)
-	mws, providers := GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, unittest.NetworkCodec())
+	mws, providers := GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, unittest.NetworkCodec(), m.slashingViolationsConsumer)
 	require.Len(m.T(), ids, 1)
 	require.Len(m.T(), providers, 1)
 	require.Len(m.T(), mws, 1)
@@ -382,7 +385,7 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_SendDirect() {
 		Text: string(payload),
 	}
 
-	codec := cbor.NewCodec()
+	codec := unittest.NetworkCodec()
 	encodedEvent, err := codec.Encode(event)
 	require.NoError(m.T(), err)
 
@@ -412,7 +415,7 @@ func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 	// set the message type to a known large message type
 	msg.Type = "messages.ChunkDataResponse"
 
-	codec := cbor.NewCodec()
+	codec := unittest.NetworkCodec()
 	encodedEvent, err := codec.Encode(event)
 	require.NoError(m.T(), err)
 
@@ -459,7 +462,7 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_Publish() {
 		Text: string(payload),
 	}
 
-	codec := cbor.NewCodec()
+	codec := unittest.NetworkCodec()
 	encodedEvent, err := codec.Encode(event)
 	require.NoError(m.T(), err)
 

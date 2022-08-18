@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -54,6 +55,7 @@ func (suite *EchoEngineTestSuite) SetupTest() {
 		count,
 		logger,
 		unittest.NetworkCodec(),
+		mocknetwork.NewViolationsConsumer(suite.T()),
 	)
 }
 

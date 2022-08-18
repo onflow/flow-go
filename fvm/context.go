@@ -25,9 +25,10 @@ type Context struct {
 	MaxStateValueSize                    uint64
 	MaxStateInteractionSize              uint64
 	EventCollectionByteSizeLimit         uint64
-	MaxNumOfTxRetries                    uint8
 	BlockHeader                          *flow.Header
-	ServiceAccountEnabled                bool
+	// NOTE: The ServiceAccountEnabled option is used by the playground
+	// https://github.com/onflow/flow-playground-api/blob/1ad967055f31db8f1ce88e008960e5fc14a9fbd1/compute/computer.go#L76
+	ServiceAccountEnabled bool
 	// Depricated: RestrictedDeploymentEnabled is deprecated use SetIsContractDeploymentRestrictedTransaction instead.
 	// Can be removed after all networks are migrated to SetIsContractDeploymentRestrictedTransaction
 	RestrictContractDeployment    bool
@@ -35,9 +36,7 @@ type Context struct {
 	LimitAccountStorage           bool
 	TransactionFeesEnabled        bool
 	CadenceLoggingEnabled         bool
-	EventCollectionEnabled        bool
 	ServiceEventCollectionEnabled bool
-	AccountFreezeEnabled          bool
 	ExtensiveTracing              bool
 	TransactionProcessors         []TransactionProcessor
 	ScriptProcessors              []ScriptProcessor
@@ -68,7 +67,6 @@ const (
 	DefaultComputationLimit             = 100_000        // 100K
 	DefaultMemoryLimit                  = math.MaxUint64 //
 	DefaultEventCollectionByteSizeLimit = 256_000        // 256KB
-	DefaultMaxNumOfTxRetries            = 3
 )
 
 func defaultContext(logger zerolog.Logger) Context {
@@ -84,15 +82,12 @@ func defaultContext(logger zerolog.Logger) Context {
 		MaxStateValueSize:                    state.DefaultMaxValueSize,
 		MaxStateInteractionSize:              state.DefaultMaxInteractionSize,
 		EventCollectionByteSizeLimit:         DefaultEventCollectionByteSizeLimit,
-		MaxNumOfTxRetries:                    DefaultMaxNumOfTxRetries,
 		BlockHeader:                          nil,
 		ServiceAccountEnabled:                true,
 		RestrictContractDeployment:           true,
 		RestrictContractRemoval:              true,
 		CadenceLoggingEnabled:                false,
-		EventCollectionEnabled:               true,
 		ServiceEventCollectionEnabled:        false,
-		AccountFreezeEnabled:                 true,
 		ExtensiveTracing:                     false,
 		TransactionProcessors: []TransactionProcessor{
 			NewTransactionVerifier(AccountKeyWeightThreshold),
@@ -190,16 +185,6 @@ func WithEventCollectionSizeLimit(limit uint64) Option {
 func WithBlockHeader(header *flow.Header) Option {
 	return func(ctx Context) Context {
 		ctx.BlockHeader = header
-		return ctx
-	}
-}
-
-// WithAccountFreezeEnabled enable/disable of account freeze functionality for a virtual machine context.
-//
-// With this option set to true, a setAccountFreeze function will be enabled for transactions processed by the VM
-func WithAccountFreezeEnabled(accountFreezeEnabled bool) Option {
-	return func(ctx Context) Context {
-		ctx.AccountFreezeEnabled = accountFreezeEnabled
 		return ctx
 	}
 }
