@@ -78,6 +78,19 @@ type NodeBuilder interface {
 	// and the node will wait for the component to exit gracefully.
 	Component(name string, f ReadyDoneFactory) NodeBuilder
 
+	// DependableComponent adds a new component to the node that conforms to the ReadyDoneAware
+	// interface. The builder will wait until all of the components in the dependencies list are ready
+	// before constructing the component.
+	//
+	// The ReadyDoneFactory may return either a `Component` or `ReadyDoneAware` instance.
+	// In both cases, the object is started when the node is run, and the node will wait for the
+	// component to exit gracefully.
+	//
+	// IMPORTANT: Dependable components are started in parallel with no guaranteed run order, so all
+	// dependencies must be initialized outside of the ReadyDoneFactory, and their `Ready()` method
+	// MUST be idempotent.
+	DependableComponent(name string, f ReadyDoneFactory, dependencies []module.ReadyDoneAware) NodeBuilder
+
 	// RestartableComponent adds a new component to the node that conforms to the ReadyDoneAware
 	// interface, and calls the provided error handler when an irrecoverable error is encountered.
 	// Use RestartableComponent if the component is not critical to the node's safe operation and

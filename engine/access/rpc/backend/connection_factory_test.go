@@ -6,6 +6,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -425,10 +426,16 @@ func (n *node) setupNode(t *testing.T) {
 }
 
 func (n *node) start(t *testing.T) {
+	// using a wait group here to ensure the goroutine has started before returning. Otherwise,
+	// there's a race condition where the server is sometimes stopped before it has started
+	wg := sync.WaitGroup{}
+	wg.Add(1)
 	go func() {
+		wg.Done()
 		err := n.server.Serve(n.listener)
 		assert.NoError(t, err)
 	}()
+	wg.Wait()
 }
 
 func (n *node) stop(t *testing.T) {
