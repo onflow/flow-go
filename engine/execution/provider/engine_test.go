@@ -49,7 +49,6 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			queue.NewChunkDataPackRequestQueue(10, unittest.Logger(), metrics.NewNoopCollector()),
 			DefaultChunkDataPackQueryTimeout,
 			DefaultChunkDataPackDeliveryTimeout,
-			DefaultChunkDataPackProcessInterval,
 			DefaultChunkDataPackRequestWorker)
 		require.NoError(t, err)
 
@@ -108,7 +107,6 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			queue.NewChunkDataPackRequestQueue(10, unittest.Logger(), metrics.NewNoopCollector()),
 			DefaultChunkDataPackQueryTimeout,
 			DefaultChunkDataPackDeliveryTimeout,
-			DefaultChunkDataPackProcessInterval,
 			DefaultChunkDataPackRequestWorker)
 		require.NoError(t, err)
 
@@ -166,7 +164,6 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			queue.NewChunkDataPackRequestQueue(10, unittest.Logger(), metrics.NewNoopCollector()),
 			DefaultChunkDataPackQueryTimeout,
 			DefaultChunkDataPackDeliveryTimeout,
-			DefaultChunkDataPackProcessInterval,
 			DefaultChunkDataPackRequestWorker)
 		require.NoError(t, err)
 
@@ -226,7 +223,6 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			queue.NewChunkDataPackRequestQueue(10, unittest.Logger(), metrics.NewNoopCollector()),
 			DefaultChunkDataPackQueryTimeout,
 			DefaultChunkDataPackDeliveryTimeout,
-			DefaultChunkDataPackProcessInterval,
 			DefaultChunkDataPackRequestWorker)
 		require.NoError(t, err)
 
@@ -280,7 +276,6 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			queue.NewChunkDataPackRequestQueue(10, unittest.Logger(), metrics.NewNoopCollector()),
 			DefaultChunkDataPackQueryTimeout,
 			DefaultChunkDataPackDeliveryTimeout,
-			DefaultChunkDataPackProcessInterval,
 			DefaultChunkDataPackRequestWorker)
 		require.NoError(t, err)
 
@@ -350,7 +345,6 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			queue.NewChunkDataPackRequestQueue(10, unittest.Logger(), metrics.NewNoopCollector()),
 			DefaultChunkDataPackQueryTimeout,
 			DefaultChunkDataPackDeliveryTimeout,
-			DefaultChunkDataPackProcessInterval,
 			DefaultChunkDataPackRequestWorker)
 		require.NoError(t, err)
 

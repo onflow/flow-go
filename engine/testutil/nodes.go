@@ -59,7 +59,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
-	chainsync "github.com/onflow/flow-go/module/chainsync"
+	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/chunks"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
@@ -564,7 +564,6 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		queue.NewChunkDataPackRequestQueue(uint32(1000), unittest.Logger(), metrics.NewNoopCollector()),
 		executionprovider.DefaultChunkDataPackQueryTimeout,
 		executionprovider.DefaultChunkDataPackDeliveryTimeout,
-		executionprovider.DefaultChunkDataPackProcessInterval,
 		executionprovider.DefaultChunkDataPackRequestWorker,
 	)
 	require.NoError(t, err)

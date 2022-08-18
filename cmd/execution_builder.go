@@ -108,7 +108,6 @@ type ExecutionConfig struct {
 	chunkDataPackRequestsCacheSize       uint32
 	chunkDataPackQueryTimeout            time.Duration
 	chunkDataPackDeliveryTimeout         time.Duration
-	chunkDataPackProcessInterval         time.Duration
 	chunkDataPackRequestWorkers          uint
 }
 
@@ -161,8 +160,6 @@ func (e *ExecutionNodeBuilder) LoadFlags() {
 				"timeout duration to determine a chunk data pack query being slow")
 			flags.DurationVar(&e.exeConf.chunkDataPackDeliveryTimeout, "chunk-data-pack-delivery-timeout", exeprovider.DefaultChunkDataPackDeliveryTimeout,
 				"timeout duration to determine a chunk data pack response delivery being slow")
-			flags.DurationVar(&e.exeConf.chunkDataPackProcessInterval, "chunk-data-pack-process-interval", exeprovider.DefaultChunkDataPackProcessInterval,
-				"time intervals on which workers check chunk data pack queue")
 			flags.UintVar(&e.exeConf.chunkDataPackRequestWorkers, "chunk-data-pack-workers", exeprovider.DefaultChunkDataPackRequestWorker, "number of workers to process chunk data pack requests")
 			flags.BoolVar(&e.exeConf.pauseExecution, "pause-execution", false, "pause the execution. when set to true, no block will be executed, "+
 				"but still be able to serve queries")
@@ -563,7 +560,6 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				chdpReqQueue,
 				e.exeConf.chunkDataPackQueryTimeout,
 				e.exeConf.chunkDataPackDeliveryTimeout,
-				e.exeConf.chunkDataPackProcessInterval,
 				e.exeConf.chunkDataPackRequestWorkers,
 			)
 			if err != nil {

@@ -36,9 +36,7 @@ const (
 	// DefaultChunkDataPackRequestWorker is the default number of concurrent workers processing chunk data pack requests on
 	// execution nodes.
 	DefaultChunkDataPackRequestWorker = 100
-	// DefaultChunkDataPackProcessInterval is the default time interval that a free worker checks head of the chunk data pack
-	// requests queue for new chunk data packs.
-	DefaultChunkDataPackProcessInterval = 10 * time.Millisecond
+
 	// DefaultChunkDataPackQueryTimeout is the default timeout value for querying a chunk data pack from storage.
 	DefaultChunkDataPackQueryTimeout = 10 * time.Second
 	// DefaultChunkDataPackDeliveryTimeout is the default timeout value for delivery of a chunk data pack to a verification
@@ -52,20 +50,19 @@ type Engine struct {
 	component.Component
 	cm *component.ComponentManager
 
-	log                        zerolog.Logger
-	tracer                     module.Tracer
-	receiptCon                 network.Conduit
-	state                      protocol.State
-	execState                  state.ReadOnlyExecutionState
-	chunksConduit              network.Conduit
-	metrics                    module.ExecutionMetrics
-	checkAuthorizedAtBlock     func(blockID flow.Identifier) (bool, error)
-	chdpQueryTimeout           time.Duration
-	chdpDeliveryTimeout        time.Duration
-	chdpRequestProcessInterval time.Duration
-	chdpRequestHandler         *engine.MessageHandler
-	chdpRequestQueue           mempool.ChunkDataPackRequestQueue
-	chdpRequestChannel         chan *mempool.ChunkDataPackRequest
+	log                    zerolog.Logger
+	tracer                 module.Tracer
+	receiptCon             network.Conduit
+	state                  protocol.State
+	execState              state.ReadOnlyExecutionState
+	chunksConduit          network.Conduit
+	metrics                module.ExecutionMetrics
+	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
+	chdpQueryTimeout       time.Duration
+	chdpDeliveryTimeout    time.Duration
+	chdpRequestHandler     *engine.MessageHandler
+	chdpRequestQueue       mempool.ChunkDataPackRequestQueue
+	chdpRequestChannel     chan *mempool.ChunkDataPackRequest
 }
 
 func New(
@@ -79,7 +76,6 @@ func New(
 	chunkDataPackRequestQueue mempool.ChunkDataPackRequestQueue,
 	chdpQueryTimeout time.Duration,
 	chdpDeliveryTimeout time.Duration,
-	chdpRequestProcessInterval time.Duration,
 	chdpRequestWorkers uint,
 ) (*Engine, error) {
 
@@ -110,18 +106,17 @@ func New(
 		})
 
 	engine := Engine{
-		log:                        log,
-		tracer:                     tracer,
-		state:                      state,
-		execState:                  execState,
-		metrics:                    metrics,
-		checkAuthorizedAtBlock:     checkAuthorizedAtBlock,
-		chdpQueryTimeout:           chdpQueryTimeout,
-		chdpDeliveryTimeout:        chdpDeliveryTimeout,
-		chdpRequestProcessInterval: chdpRequestProcessInterval,
-		chdpRequestHandler:         handler,
-		chdpRequestQueue:           chunkDataPackRequestQueue,
-		chdpRequestChannel:         make(chan *mempool.ChunkDataPackRequest, chdpRequestWorkers),
+		log:                    log,
+		tracer:                 tracer,
+		state:                  state,
+		execState:              execState,
+		metrics:                metrics,
+		checkAuthorizedAtBlock: checkAuthorizedAtBlock,
+		chdpQueryTimeout:       chdpQueryTimeout,
+		chdpDeliveryTimeout:    chdpDeliveryTimeout,
+		chdpRequestHandler:     handler,
+		chdpRequestQueue:       chunkDataPackRequestQueue,
+		chdpRequestChannel:     make(chan *mempool.ChunkDataPackRequest, chdpRequestWorkers),
 	}
 
 	var err error
@@ -138,7 +133,7 @@ func New(
 	engine.chunksConduit = chunksConduit
 
 	cm := component.NewComponentManagerBuilder()
-	cm.AddWorker(engine.processQueuedChunkDataPackRequests)
+	cm.AddWorker(engine.processQueuedChunkDataPackRequestsShovllerWorker)
 	for i := uint(0); i < chdpRequestWorkers; i++ {
 		cm.AddWorker(engine.processChunkDataPackRequestWorker)
 	}
@@ -161,12 +156,10 @@ func (e *Engine) Done() <-chan struct{} {
 	return e.cm.Done()
 }
 
-func (e *Engine) processQueuedChunkDataPackRequests(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+func (e *Engine) processQueuedChunkDataPackRequestsShovllerWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
-	e.log.Debug().
-		Dur("process_inveral", e.chdpRequestProcessInterval).
-		Msg("process chunk data pack request worker started")
+	e.log.Debug().Msg("process chunk data pack request shovller worker started")
 
 	for {
 		select {
