@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
@@ -30,7 +31,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
@@ -82,8 +82,6 @@ func (suite *Suite) SetupTest() {
 	params := new(protocol.Params)
 	params.On("Root").Return(header, nil)
 	suite.state.On("Params").Return(params).Maybe()
-	suite.state.On("AtBlockID", header.ID()).Return(suite.snapshot).Maybe()
-	suite.snapshot.On("SealingSegment").Return(&flow.SealingSegment{Blocks: unittest.BlockFixtures(1)}, nil).Maybe()
 	suite.collClient = new(accessmock.AccessAPIClient)
 	suite.execClient = new(accessmock.ExecutionAPIClient)
 
@@ -631,17 +629,17 @@ func (suite *Suite) TestGetSealedTransaction() {
 			transactions, results, receipts, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, rpcEng)
 		require.NoError(suite.T(), err)
 
+		// 1. Assume that follower engine updated the block storage and the protocol state. The block is reported as sealed
+		err = blocks.Store(&block)
+		require.NoError(suite.T(), err)
+		suite.snapshot.On("Head").Return(block.Header, nil).Twice()
+
 		background, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
 		ctx, _ := irrecoverable.WithSignaler(background)
 		ingestEng.Start(ctx)
 		<-ingestEng.Ready()
-
-		// 1. Assume that follower engine updated the block storage and the protocol state. The block is reported as sealed
-		err = blocks.Store(&block)
-		require.NoError(suite.T(), err)
-		suite.snapshot.On("Head").Return(block.Header, nil).Once()
 
 		// 2. Ingest engine was notified by the follower engine about a new block.
 		// Follower engine --> Ingest engine
