@@ -144,18 +144,6 @@ func New(
 	return &engine, nil
 }
 
-// Ready returns a channel that will close when the engine has
-// successfully started.
-func (e *Engine) Ready() <-chan struct{} {
-	return e.cm.Ready()
-}
-
-// Done returns a channel that will close when the engine has
-// successfully stopped.
-func (e *Engine) Done() <-chan struct{} {
-	return e.cm.Done()
-}
-
 func (e *Engine) processQueuedChunkDataPackRequestsShovllerWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
