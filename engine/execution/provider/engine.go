@@ -59,11 +59,13 @@ type Engine struct {
 	execState                  state.ReadOnlyExecutionState
 	chunksConduit              network.Conduit
 	metrics                    module.ExecutionMetrics
-	chdpRequestsQueue          mempool.ChunkDataPackRequestQueue
 	checkAuthorizedAtBlock     func(blockID flow.Identifier) (bool, error)
 	chdpQueryTimeout           time.Duration
 	chdpDeliveryTimeout        time.Duration
 	chdpRequestProcessInterval time.Duration
+	chdpRequestHandler         *engine.MessageHandler
+	chdpRequestQueue           mempool.ChunkDataPackRequestQueue
+	chdpRequestChannel         chan *mempool.ChunkDataPackRequest
 }
 
 func New(
@@ -83,6 +85,30 @@ func New(
 
 	log := logger.With().Str("engine", "receipts").Logger()
 
+	handler := engine.NewMessageHandler(
+		log,
+		engine.NewNotifier(),
+		engine.Pattern{
+			Match: func(message *engine.Message) bool {
+				chdpReq, ok := message.Payload.(*messages.ChunkDataRequest)
+				if ok {
+					log.Info().
+						Hex("chunk_id", logging.ID(chdpReq.ChunkID)).
+						Hex("requester_id", logging.ID(message.OriginID)).
+						Msg("chunk data pack request received")
+				}
+				return ok
+			},
+			Map: func(message *engine.Message) (*engine.Message, bool) {
+				chdpReq := message.Payload.(*messages.ChunkDataRequest)
+				return &engine.Message{
+					OriginID: message.OriginID,
+					Payload:  chdpReq.ChunkID,
+				}, true
+			},
+			Store: chunkDataPackRequestQueue,
+		})
+
 	engine := Engine{
 		log:                        log,
 		tracer:                     tracer,
@@ -93,7 +119,9 @@ func New(
 		chdpQueryTimeout:           chdpQueryTimeout,
 		chdpDeliveryTimeout:        chdpDeliveryTimeout,
 		chdpRequestProcessInterval: chdpRequestProcessInterval,
-		chdpRequestsQueue:          chunkDataPackRequestQueue,
+		chdpRequestHandler:         handler,
+		chdpRequestQueue:           chunkDataPackRequestQueue,
+		chdpRequestChannel:         make(chan *mempool.ChunkDataPackRequest, chdpRequestWorkers),
 	}
 
 	var err error
@@ -110,6 +138,7 @@ func New(
 	engine.chunksConduit = chunksConduit
 
 	cm := component.NewComponentManagerBuilder()
+	cm.AddWorker(engine.processQueuedChunkDataPackRequests)
 	for i := uint(0); i < chdpRequestWorkers; i++ {
 		cm.AddWorker(engine.processChunkDataPackRequestWorker)
 	}
@@ -132,30 +161,67 @@ func (e *Engine) Done() <-chan struct{} {
 	return e.cm.Done()
 }
 
-// processChunkDataPackRequestWorker encapsulates the logic of a single (concurrent) worker that picks a chunk data pack
-// request from this engine's queue and processes it.
-func (e *Engine) processChunkDataPackRequestWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+func (e *Engine) processQueuedChunkDataPackRequests(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
-	ticker := time.NewTicker(e.chdpRequestProcessInterval)
-	defer ticker.Stop()
+
 	e.log.Debug().
 		Dur("process_inveral", e.chdpRequestProcessInterval).
 		Msg("process chunk data pack request worker started")
 
 	for {
 		select {
-		case <-ticker.C:
-			request, exists := e.chdpRequestsQueue.Pop()
-			if !exists {
-				e.log.Trace().Msg("worker did not find any chunk data pack request, sleeping till next cycle")
-				continue
-			}
+		case <-e.chdpRequestHandler.GetNotifier():
+			// there is at list a single chunk data pack request queued up.
+			e.chunkDataPackRequestShovller(ctx)
+		case <-ctx.Done():
+			e.log.Trace().Msg("processing chunk data pack request worker terminated")
+			return
+		}
+	}
+}
+
+func (e *Engine) chunkDataPackRequestShovller(ctx irrecoverable.SignalerContext) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		msg, ok := e.chdpRequestQueue.Get()
+		if !ok {
+			// no more requests, return
+			return
+		}
+
+		request := &mempool.ChunkDataPackRequest{
+			RequesterId: msg.OriginID,
+			ChunkId:     msg.Payload.(flow.Identifier),
+		}
+		lg := e.log.With().
+			Hex("chunk_id", logging.ID(request.ChunkId)).
+			Hex("origin_id", logging.ID(request.RequesterId)).Logger()
+
+		lg.Trace().Msg("shovller is queuing chunk data pack request for processing")
+		e.chdpRequestChannel <- request
+		lg.Trace().Msg("shovller queued up chunk data pack request for processing")
+	}
+}
+
+// processChunkDataPackRequestWorker encapsulates the logic of a single (concurrent) worker that picks a chunk data pack
+// request from this engine's queue and processes it.
+func (e *Engine) processChunkDataPackRequestWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+
+	for {
+		select {
+		case request := <-e.chdpRequestChannel:
 			lg := e.log.With().
 				Hex("chunk_id", logging.ID(request.ChunkId)).
 				Hex("origin_id", logging.ID(request.RequesterId)).Logger()
-			lg.Trace().Msg("chunk data pack request picked for processing")
+			lg.Trace().Msg("worker picked up chunk data pack request for processing")
 			e.onChunkDataRequest(request)
-			lg.Trace().Msg("chunk data pack request processed")
+			lg.Trace().Msg("worker finished chunk data pack processing")
 		case <-ctx.Done():
 			e.log.Trace().Msg("processing chunk data pack request worker terminated")
 			return
@@ -164,21 +230,22 @@ func (e *Engine) processChunkDataPackRequestWorker(ctx irrecoverable.SignalerCon
 }
 
 func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
-	return e.process(originID, event)
-}
-
-func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	switch v := event.(type) {
-	case *messages.ChunkDataRequest:
-		pushed := e.chdpRequestsQueue.Push(v.ChunkID, originID)
-		e.log.Info().
-			Hex("chunk_id", logging.ID(v.ChunkID)).
-			Hex("origin_id", logging.ID(originID)).
-			Bool("enqueued", pushed).
-			Msg("chunk data pack request received")
+	select {
+	case <-e.cm.ShutdownSignal():
+		e.log.Warn().Msgf("received message from %x after shut down", originID)
+		return nil
 	default:
-		return fmt.Errorf("invalid event type (%T)", event)
 	}
+
+	err := e.chdpRequestHandler.Process(originID, event)
+	if err != nil {
+		if engine.IsIncompatibleInputTypeError(err) {
+			e.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, event, channel)
+			return nil
+		}
+		return fmt.Errorf("unexpected error while processing engine message: %w", err)
+	}
+
 	return nil
 }
 
@@ -191,7 +258,7 @@ func (e *Engine) onChunkDataRequest(request *mempool.ChunkDataPackRequest) {
 		Hex("origin_id", logging.ID(request.RequesterId)).
 		Hex("chunk_id", logging.ID(request.ChunkId)).
 		Logger()
-	lg.Info().Msg("received chunk data pack request")
+	lg.Info().Msg("started processing chunk data pack request")
 
 	// increases collector metric
 	e.metrics.ChunkDataPackRequested()
