@@ -36,12 +36,6 @@ const (
 	// DefaultChunkDataPackRequestWorker is the default number of concurrent workers processing chunk data pack requests on
 	// execution nodes.
 	DefaultChunkDataPackRequestWorker = 100
-
-	// DefaultChunkDataPackQueryTimeout is the default timeout value for querying a chunk data pack from storage.
-	DefaultChunkDataPackQueryTimeout = 10 * time.Second
-	// DefaultChunkDataPackDeliveryTimeout is the default timeout value for delivery of a chunk data pack to a verification
-	// node.
-	DefaultChunkDataPackDeliveryTimeout = 10 * time.Second
 )
 
 // An Engine provides means of accessing data about execution state and broadcasts execution receipts to nodes in the network.
@@ -58,8 +52,6 @@ type Engine struct {
 	chunksConduit          network.Conduit
 	metrics                module.ExecutionMetrics
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
-	chdpQueryTimeout       time.Duration
-	chdpDeliveryTimeout    time.Duration
 	chdpRequestHandler     *engine.MessageHandler
 	chdpRequestQueue       mempool.ChunkDataPackRequestQueue
 	chdpRequestChannel     chan *mempool.ChunkDataPackRequest
@@ -74,8 +66,6 @@ func New(
 	metrics module.ExecutionMetrics,
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error),
 	chunkDataPackRequestQueue mempool.ChunkDataPackRequestQueue,
-	chdpQueryTimeout time.Duration,
-	chdpDeliveryTimeout time.Duration,
 	chdpRequestWorkers uint,
 ) (*Engine, error) {
 
@@ -112,8 +102,6 @@ func New(
 		execState:              execState,
 		metrics:                metrics,
 		checkAuthorizedAtBlock: checkAuthorizedAtBlock,
-		chdpQueryTimeout:       chdpQueryTimeout,
-		chdpDeliveryTimeout:    chdpDeliveryTimeout,
 		chdpRequestHandler:     handler,
 		chdpRequestQueue:       chunkDataPackRequestQueue,
 		chdpRequestChannel:     make(chan *mempool.ChunkDataPackRequest, chdpRequestWorkers),
@@ -233,7 +221,7 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 // 1. The chunk data pack exists, but not retrievable from the storage (e.g., inconsistent storage state).
 // 2. The requester for chunk data pack is not authorized in this current epoch.
 func (e *Engine) onChunkDataRequest(request *mempool.ChunkDataPackRequest) error {
-	processStart := time.Now()
+	processStartTime := time.Now()
 
 	lg := e.log.With().
 		Hex("origin_id", logging.ID(request.RequesterId)).
@@ -242,7 +230,7 @@ func (e *Engine) onChunkDataRequest(request *mempool.ChunkDataPackRequest) error
 	lg.Info().Msg("started processing chunk data pack request")
 
 	// increases collector metric
-	e.metrics.ChunkDataPackRequested()
+	e.metrics.ChunkDataPackRequestProcessed()
 	chunkDataPack, err := e.execState.ChunkDataPackByChunkID(request.ChunkId)
 
 	// we might be behind when we don't have the requested chunk.
@@ -254,57 +242,58 @@ func (e *Engine) onChunkDataRequest(request *mempool.ChunkDataPackRequest) error
 		return nil
 	}
 	if err != nil {
-		fmt.Errorf("could not retrive chunk data pack request from storage: %w", err)
+		return fmt.Errorf("could not retrive chunk data pack request from storage: %w", err)
 	}
+	queryTime := time.Since(processStartTime)
+	lg = lg.With().Dur("query_time", queryTime).Logger()
+	e.metrics.ChunkDataPackRetrievedFromDatabase(queryTime)
 
 	_, err = e.ensureAuthorized(chunkDataPack.ChunkID, request.RequesterId)
 	if err != nil {
 		return fmt.Errorf("could not verify authorization of identity of chunk data pack request: %w", err)
 	}
 
+	e.deliverChunkDataResponse(chunkDataPack, request.RequesterId)
+	return nil
+}
+
+// deliverChunkDataResponse delivers chunk data pack to the requester through network.
+func (e *Engine) deliverChunkDataResponse(chunkDataPack *flow.ChunkDataPack, requesterId flow.Identifier) {
+	lg := e.log.With().
+		Hex("origin_id", logging.ID(requesterId)).
+		Hex("chunk_id", logging.ID(chunkDataPack.ChunkID)).
+		Logger()
+	lg.Info().Msg("sending chunk data pack response")
+
+	// sends requested chunk data pack to the requester
+	deliveryStartTime := time.Now()
+
 	response := &messages.ChunkDataResponse{
 		ChunkDataPack: *chunkDataPack,
 		Nonce:         rand.Uint64(),
 	}
 
-	sinceProcess := time.Since(processStart)
-	lg = lg.With().Dur("sinceProcess", sinceProcess).Logger()
-
-	if sinceProcess > e.chdpQueryTimeout {
-		lg.Warn().Msgf("chunk data pack query takes longer than %v secs", e.chdpQueryTimeout.Seconds())
-	}
-	lg.Info().Msg("sending chunk data pack response")
-
-	// sends requested chunk data pack to the requester
-	deliveryStart := time.Now()
-
-	err = e.chunksConduit.Unicast(response, request.RequesterId)
-
-	sinceDeliver := time.Since(deliveryStart)
-	lg = lg.With().Dur("since_deliver", sinceDeliver).Logger()
-
-	if sinceDeliver > e.chdpDeliveryTimeout {
-		lg.Warn().Msgf("chunk data pack response delivery has taken longer than %v secs", e.chdpDeliveryTimeout.Seconds())
-	}
-
+	err := e.chunksConduit.Unicast(response, requesterId)
 	if err != nil {
 		lg.Warn().
 			Err(err).
 			Msg("could not send requested chunk data pack to requester")
-		return nil
+		return
 	}
 
-	if response.ChunkDataPack.Collection != nil {
+	sinceDeliver := time.Since(deliveryStartTime)
+	lg = lg.With().Dur("delivery_time", sinceDeliver).Logger()
+
+	e.metrics.ChunkDataPackResponseDispatchedInNetwork(sinceDeliver)
+
+	if chunkDataPack.Collection != nil {
 		// logging collection id of non-system chunks.
 		// A system chunk has both the collection and collection id set to nil.
 		lg = lg.With().
-			Hex("collection_id", logging.ID(response.ChunkDataPack.Collection.ID())).
+			Hex("collection_id", logging.ID(chunkDataPack.Collection.ID())).
 			Logger()
 	}
-
 	lg.Info().Msg("chunk data pack request successfully replied")
-
-	return nil
 }
 
 func (e *Engine) ensureAuthorized(chunkID flow.Identifier, originID flow.Identifier) (*flow.Identity, error) {

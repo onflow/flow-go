@@ -47,8 +47,6 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			metrics.NewNoopCollector(),
 			func(_ flow.Identifier) (bool, error) { return true, nil },
 			queue.NewChunkDataPackRequestQueue(10, unittest.Logger(), metrics.NewNoopCollector()),
-			DefaultChunkDataPackQueryTimeout,
-			DefaultChunkDataPackDeliveryTimeout,
 			DefaultChunkDataPackRequestWorker)
 		require.NoError(t, err)
 
@@ -104,8 +102,6 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			metrics.NewNoopCollector(),
 			func(_ flow.Identifier) (bool, error) { return true, nil },
 			queue.NewChunkDataPackRequestQueue(10, unittest.Logger(), metrics.NewNoopCollector()),
-			DefaultChunkDataPackQueryTimeout,
-			DefaultChunkDataPackDeliveryTimeout,
 			DefaultChunkDataPackRequestWorker)
 		require.NoError(t, err)
 
@@ -160,8 +156,6 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			metrics.NewNoopCollector(),
 			func(_ flow.Identifier) (bool, error) { return true, nil },
 			queue.NewChunkDataPackRequestQueue(10, unittest.Logger(), metrics.NewNoopCollector()),
-			DefaultChunkDataPackQueryTimeout,
-			DefaultChunkDataPackDeliveryTimeout,
 			DefaultChunkDataPackRequestWorker)
 		require.NoError(t, err)
 
@@ -218,8 +212,6 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			metrics.NewNoopCollector(),
 			func(_ flow.Identifier) (bool, error) { return true, nil },
 			queue.NewChunkDataPackRequestQueue(10, unittest.Logger(), metrics.NewNoopCollector()),
-			DefaultChunkDataPackQueryTimeout,
-			DefaultChunkDataPackDeliveryTimeout,
 			DefaultChunkDataPackRequestWorker)
 		require.NoError(t, err)
 
@@ -270,8 +262,6 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			metrics.NewNoopCollector(),
 			func(_ flow.Identifier) (bool, error) { return true, nil },
 			queue.NewChunkDataPackRequestQueue(10, unittest.Logger(), metrics.NewNoopCollector()),
-			DefaultChunkDataPackQueryTimeout,
-			DefaultChunkDataPackDeliveryTimeout,
 			DefaultChunkDataPackRequestWorker)
 		require.NoError(t, err)
 
@@ -338,8 +328,6 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			metrics.NewNoopCollector(),
 			func(_ flow.Identifier) (bool, error) { return currentAuthorizedState, nil },
 			queue.NewChunkDataPackRequestQueue(10, unittest.Logger(), metrics.NewNoopCollector()),
-			DefaultChunkDataPackQueryTimeout,
-			DefaultChunkDataPackDeliveryTimeout,
 			DefaultChunkDataPackRequestWorker)
 		require.NoError(t, err)
 

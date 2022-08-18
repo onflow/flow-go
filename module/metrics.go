@@ -350,9 +350,18 @@ type RuntimeMetrics interface {
 }
 
 type ProviderMetrics interface {
-	// ChunkDataPackRequested is executed every time a chunk data pack request is arrived at execution node.
-	// It increases the request counter by one.
-	ChunkDataPackRequested()
+	// ChunkDataPackRequestProcessed is executed every time a chunk data pack request is picked up for processing at execution node.
+	// It increases the request processed counter by one.
+	ChunkDataPackRequestProcessed()
+
+	// ChunkDataPackResponseDispatchedInNetwork is executed every time a chunk data pack response is dispatched in the network.
+	// It records the time it took to dispatch the reply on the network.
+	// It also increases the response counter by one.
+	ChunkDataPackResponseDispatchedInNetwork(time.Duration)
+
+	// ChunkDataPackRetrievedFromDatabase is executed every time a chunk data pack is queried from database.
+	// It records the time it took to query the chunk data pack.
+	ChunkDataPackRetrievedFromDatabase(queryTime time.Duration)
 }
 
 type ExecutionDataProviderMetrics interface {

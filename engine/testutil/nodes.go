@@ -562,8 +562,6 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		metricsCollector,
 		checkAuthorizedAtBlock,
 		queue.NewChunkDataPackRequestQueue(uint32(1000), unittest.Logger(), metrics.NewNoopCollector()),
-		executionprovider.DefaultChunkDataPackQueryTimeout,
-		executionprovider.DefaultChunkDataPackDeliveryTimeout,
 		executionprovider.DefaultChunkDataPackRequestWorker,
 	)
 	require.NoError(t, err)
