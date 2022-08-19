@@ -30,13 +30,14 @@ import (
 
 func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 	t.Run("non-verification engine", func(t *testing.T) {
-		ps := new(mockprotocol.State)
-		ss := new(mockprotocol.Snapshot)
-		net := new(mocknetwork.Network)
-		chunkConduit := &mocknetwork.Conduit{}
+		ps := mockprotocol.NewState(t)
+		ss := mockprotocol.NewSnapshot(t)
+		net := mocknetwork.NewNetwork(t)
+		chunkConduit := mocknetwork.NewConduit(t)
+		execState := state.NewExecutionState(t)
+
 		net.On("Register", channels.PushReceipts, mock.Anything).Return(&mocknetwork.Conduit{}, nil)
 		net.On("Register", channels.ProvideChunks, mock.Anything).Return(chunkConduit, nil)
-		execState := new(state.ExecutionState)
 
 		e, err := New(
 			unittest.Logger(),
@@ -55,7 +56,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 		chunkDataPack := unittest.ChunkDataPackFixture(chunkID)
 
-		ps.On("AtBlockID", blockID).Return(ss)
+		ps.On("AtBlockID", blockID).Return(ss).Once()
 		ss.On("Identity", originID).Return(unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution)), nil)
 		execState.On("ChunkDataPackByChunkID", mock.Anything).Return(chunkDataPack, nil)
 		execState.On("GetBlockIDByChunkID", chunkID).Return(blockID, nil)
@@ -77,21 +78,17 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		// no chunk data pack response should be sent to an invalid role's request
 		chunkConduit.AssertNotCalled(t, "Unicast")
-
-		ps.AssertExpectations(t)
-		ss.AssertExpectations(t)
-		execState.AssertExpectations(t)
-		chunkConduit.AssertExpectations(t)
 	})
 
 	t.Run("unauthorized (0 weight) origin", func(t *testing.T) {
-		ps := new(mockprotocol.State)
-		ss := new(mockprotocol.Snapshot)
-		net := new(mocknetwork.Network)
-		chunkConduit := &mocknetwork.Conduit{}
+		ps := mockprotocol.NewState(t)
+		ss := mockprotocol.NewSnapshot(t)
+		net := mocknetwork.NewNetwork(t)
+		chunkConduit := mocknetwork.NewConduit(t)
+		execState := state.NewExecutionState(t)
+
 		net.On("Register", channels.PushReceipts, mock.Anything).Return(&mocknetwork.Conduit{}, nil)
 		net.On("Register", channels.ProvideChunks, mock.Anything).Return(chunkConduit, nil)
-		execState := new(state.ExecutionState)
 
 		e, err := New(
 			unittest.Logger(),
@@ -110,7 +107,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 		chunkDataPack := unittest.ChunkDataPackFixture(chunkID)
 
-		ps.On("AtBlockID", blockID).Return(ss)
+		ps.On("AtBlockID", blockID).Return(ss).Once()
 		ss.On("Identity", originID).Return(unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution), unittest.WithWeight(0)), nil)
 		execState.On("ChunkDataPackByChunkID", mock.Anything).Return(chunkDataPack, nil)
 		execState.On("GetBlockIDByChunkID", chunkID).Return(blockID, nil)
@@ -131,21 +128,17 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		// no chunk data pack response should be sent to a request coming from 0-weight node
 		chunkConduit.AssertNotCalled(t, "Unicast")
-
-		ps.AssertExpectations(t)
-		ss.AssertExpectations(t)
-		execState.AssertExpectations(t)
-		chunkConduit.AssertExpectations(t)
 	})
 
 	t.Run("un-authorized (not found origin) origin", func(t *testing.T) {
-		ps := new(mockprotocol.State)
-		ss := new(mockprotocol.Snapshot)
-		net := new(mocknetwork.Network)
-		chunkConduit := &mocknetwork.Conduit{}
+		ps := mockprotocol.NewState(t)
+		ss := mockprotocol.NewSnapshot(t)
+		net := mocknetwork.NewNetwork(t)
+		chunkConduit := mocknetwork.NewConduit(t)
+		execState := state.NewExecutionState(t)
+
 		net.On("Register", channels.PushReceipts, mock.Anything).Return(&mocknetwork.Conduit{}, nil)
 		net.On("Register", channels.ProvideChunks, mock.Anything).Return(chunkConduit, nil)
-		execState := new(state.ExecutionState)
 
 		e, err := New(
 			unittest.Logger(),
@@ -164,7 +157,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 		chunkDataPack := unittest.ChunkDataPackFixture(chunkID)
 
-		ps.On("AtBlockID", blockID).Return(ss)
+		ps.On("AtBlockID", blockID).Return(ss).Once()
 		ss.On("Identity", originID).Return(nil, protocol.IdentityNotFoundError{})
 		execState.On("ChunkDataPackByChunkID", mock.Anything).Return(chunkDataPack, nil)
 		execState.On("GetBlockIDByChunkID", chunkID).Return(blockID, nil)
@@ -185,22 +178,17 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		// no chunk data pack response should be sent to a request coming from a non-existing origin ID
 		chunkConduit.AssertNotCalled(t, "Unicast")
-
-		ps.AssertExpectations(t)
-		ss.AssertExpectations(t)
-		execState.AssertExpectations(t)
-		chunkConduit.AssertExpectations(t)
 	})
 
 	t.Run("non-existent chunk", func(t *testing.T) {
-		ps := new(mockprotocol.State)
-		ss := new(mockprotocol.Snapshot)
-		net := new(mocknetwork.Network)
-		chunkConduit := &mocknetwork.Conduit{}
+		ps := mockprotocol.NewState(t)
+		net := mocknetwork.NewNetwork(t)
+		chunkConduit := mocknetwork.NewConduit(t)
+		execState := state.NewExecutionState(t)
+
 		net.On("Register", channels.PushReceipts, mock.Anything).Return(&mocknetwork.Conduit{}, nil)
 		net.On("Register", channels.ProvideChunks, mock.Anything).Return(chunkConduit, nil)
 
-		execState := new(state.ExecutionState)
 		execState.On("ChunkDataPackByChunkID", mock.Anything).Return(nil, errors.New("not found!"))
 
 		e, err := New(
@@ -236,11 +224,6 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		// no chunk data pack response should be sent to a request coming from a non-existing origin ID
 		chunkConduit.AssertNotCalled(t, "Unicast")
-
-		ps.AssertExpectations(t)
-		ss.AssertExpectations(t)
-		execState.AssertExpectations(t)
-		chunkConduit.AssertExpectations(t)
 	})
 
 	t.Run("success", func(t *testing.T) {
@@ -271,7 +254,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		chunkDataPack := unittest.ChunkDataPackFixture(chunkID)
 		blockID := unittest.IdentifierFixture()
 
-		ps.On("AtBlockID", blockID).Return(ss)
+		ps.On("AtBlockID", blockID).Return(ss).Once()
 		ss.On("Identity", originIdentity.NodeID).Return(originIdentity, nil)
 		chunkConduit.On("Unicast", mock.Anything, originIdentity.NodeID).
 			Run(func(args mock.Arguments) {
@@ -300,21 +283,15 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		require.NoError(t, e.Process(channels.RequestChunks, originIdentity.NodeID, req))
 		cancel()
 		unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
-
-		ps.AssertExpectations(t)
-		ss.AssertExpectations(t)
-		execState.AssertExpectations(t)
-		chunkConduit.AssertExpectations(t)
 	})
 
 	t.Run("reply to chunk data pack request only when authorized", func(t *testing.T) {
 		currentAuthorizedState := true
-
-		ps := new(mockprotocol.State)
-		ss := new(mockprotocol.Snapshot)
-		net := new(mocknetwork.Network)
-		chunkConduit := &mocknetwork.Conduit{}
-		execState := new(state.ExecutionState)
+		ps := mockprotocol.NewState(t)
+		ss := mockprotocol.NewSnapshot(t)
+		net := mocknetwork.NewNetwork(t)
+		chunkConduit := mocknetwork.NewConduit(t)
+		execState := state.NewExecutionState(t)
 
 		net.On("Register", channels.PushReceipts, mock.Anything).Return(&mocknetwork.Conduit{}, nil)
 		net.On("Register", channels.ProvideChunks, mock.Anything).Return(chunkConduit, nil)
@@ -338,8 +315,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 
 		execState.On("GetBlockIDByChunkID", chunkID).Return(blockID, nil)
-		ps.On("AtBlockID", blockID).Return(ss)
-
+		ps.On("AtBlockID", blockID).Return(ss).Once()
 		ss.On("Identity", originIdentity.NodeID).Return(originIdentity, nil).Once()
 
 		// channel tracking for the first chunk data pack request responded.
@@ -377,10 +353,5 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		require.NoError(t, e.Process(channels.RequestChunks, originIdentity.NodeID, req))
 		cancel()
 		unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
-
-		ps.AssertExpectations(t)
-		ss.AssertExpectations(t)
-		execState.AssertExpectations(t)
-		chunkConduit.AssertExpectations(t)
 	})
 }
