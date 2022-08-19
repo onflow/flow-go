@@ -49,6 +49,7 @@ import (
 	vereq "github.com/onflow/flow-go/engine/verification/requester"
 	"github.com/onflow/flow-go/engine/verification/verifier"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
@@ -560,7 +561,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	vm := fvm.NewVirtualMachine(rt)
 
-	blockFinder := fvm.NewBlockFinder(node.Headers)
+	blockFinder := environment.NewBlockFinder(node.Headers)
 
 	vmCtx := fvm.NewContext(
 		node.Log,
@@ -862,7 +863,7 @@ func VerificationNode(t testing.TB,
 
 		vm := fvm.NewVirtualMachine(rt)
 
-		blockFinder := fvm.NewBlockFinder(node.Headers)
+		blockFinder := environment.NewBlockFinder(node.Headers)
 
 		vmCtx := fvm.NewContext(
 			node.Log,
