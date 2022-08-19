@@ -20,8 +20,10 @@ type StateHolder struct {
 	activeState           *State
 }
 
-// NewStateHolder constructs a new state manager
-func NewStateHolder(startState *State) *StateHolder {
+// NewStateTransaction constructs a new state transaction which manages nested
+// transactions.
+func NewStateTransaction(startView View, params StateParameters) *StateHolder {
+	startState := NewState(startView, params)
 	return &StateHolder{
 		enforceLimits: true,
 		startState:    startState,
