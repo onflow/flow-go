@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/engine/verification/fetcher"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/programs"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
@@ -637,7 +638,7 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 	logger := zerolog.Nop()
 
 	opts = append(opts, fvm.WithChain(chain))
-	opts = append(opts, fvm.WithBlocks(&fvm.NoopBlockFinder{}))
+	opts = append(opts, fvm.WithBlocks(&environment.NoopBlockFinder{}))
 
 	fvmContext :=
 		fvm.NewContext(

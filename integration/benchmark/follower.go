@@ -1,4 +1,4 @@
-package utils
+package benchmark
 
 import (
 	"context"
@@ -27,10 +27,6 @@ type TxFollower interface {
 }
 
 type followerOption func(f *txFollowerImpl)
-
-func WithBlockHeight(height uint64) followerOption {
-	return func(f *txFollowerImpl) { f.height = height }
-}
 
 func WithLogger(logger zerolog.Logger) followerOption {
 	return func(f *txFollowerImpl) { f.logger = logger }
@@ -91,13 +87,11 @@ func NewTxFollower(ctx context.Context, client access.Client, opts ...followerOp
 		opt(f)
 	}
 
-	if f.height == 0 {
-		hdr, err := client.GetLatestBlockHeader(newCtx, false)
-		if err != nil {
-			return nil, err
-		}
-		f.updateFromBlockHeader(*hdr)
+	hdr, err := client.GetLatestBlockHeader(newCtx, false)
+	if err != nil {
+		return nil, err
 	}
+	f.updateFromBlockHeader(*hdr)
 
 	go f.run()
 

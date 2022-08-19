@@ -1,4 +1,4 @@
-package utils
+package benchmark
 
 import (
 	"context"
@@ -274,6 +274,10 @@ func (lg *ContLoadGenerator) Stop() {
 	lg.workerStatsTracker.StopPrinting()
 	lg.log.Debug().Msg("stopping follower")
 	lg.follower.Stop()
+}
+
+func (lg *ContLoadGenerator) AvgTpsBetween(start, stop time.Time) float64 {
+	return lg.workerStatsTracker.AvgTPSBetween(start, stop)
 }
 
 func (lg *ContLoadGenerator) createAccounts(num int) error {
