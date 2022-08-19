@@ -24,7 +24,7 @@ func NewSnapshot(err error) *Snapshot {
 	if errors.Is(err, state.ErrUnknownSnapshotReference) {
 		return &Snapshot{err: err}
 	}
-	return &Snapshot{fmt.Errorf("critical unexpected error creating snapshot: %w", err)}
+	return &Snapshot{fmt.Errorf("critical unexpected error querying snapshot: %w", err)}
 }
 
 // NewSnapshotf is NewSnapshot with ergonomic error formatting.

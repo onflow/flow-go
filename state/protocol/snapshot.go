@@ -11,16 +11,19 @@ import (
 // The Snapshot is fork-specific and only accounts for the information contained
 // in blocks along this fork up to (including) Head.
 // It allows us to read the parameters at the selected block in a deterministic manner.
+// TODO document error returns
 type Snapshot interface {
 
 	// Head returns the latest block at the selected point of the protocol state
 	// history. It can represent either a finalized or ambiguous block,
 	// depending on our selection criteria. Either way, it's the block on which
 	// we should build the next block in the context of the selected state.
+	// TODO document error returns
 	Head() (*flow.Header, error)
 
 	// QuorumCertificate returns a valid quorum certificate for the header at
 	// this snapshot, if one exists.
+	// TODO document error returns
 	QuorumCertificate() (*flow.QuorumCertificate, error)
 
 	// Identities returns a list of identities at the selected point of the
@@ -33,20 +36,24 @@ type Snapshot interface {
 	//
 	// It allows us to provide optional upfront filters which can be used by the
 	// implementation to speed up database lookups.
+	// TODO document error returns
 	Identities(selector flow.IdentityFilter) (flow.IdentityList, error)
 
 	// Identity attempts to retrieve the node with the given identifier at the
 	// selected point of the protocol state history. It will error if it doesn't exist.
+	// TODO document error returns
 	Identity(nodeID flow.Identifier) (*flow.Identity, error)
 
 	// SealedResult returns the most recent included seal as of this block and
 	// the corresponding execution result. The seal may have been included in a
 	// parent block, if this block is empty. If this block contains multiple
 	// seals, this returns the seal for the block with the greatest height.
+	// TODO document error returns
 	SealedResult() (*flow.ExecutionResult, *flow.Seal, error)
 
 	// Commit returns the state commitment of the most recently included seal
 	// as of this block. It represents the sealed state.
+	// TODO document error returns
 	Commit() (flow.StateCommitment, error)
 
 	// SealingSegment returns the chain segment such that the highest block
@@ -68,16 +75,19 @@ type Snapshot interface {
 	// an execution receipt in it's payload that references an execution result
 	// missing from the payload. These missing execution results are stored on the
 	// flow.SealingSegment.ExecutionResults field.
+	// TODO document error returns
 	SealingSegment() (*flow.SealingSegment, error)
 
 	// Descendants returns the IDs of all descendants of the Head block. The IDs
 	// are ordered such that parents are included before their children. These
 	// are NOT guaranteed to have been validated by HotStuff.
+	// TODO document error returns
 	Descendants() ([]flow.Identifier, error)
 
 	// ValidDescendants returns the IDs of all descendants of the Head block.
 	// The IDs are ordered such that parents are included before their children. Includes
 	// only blocks that have been validated by HotStuff.
+	// TODO document error returns
 	ValidDescendants() ([]flow.Identifier, error)
 
 	// RandomSource returns the source of randomness derived from the
@@ -87,9 +97,11 @@ type Snapshot interface {
 	//  * NoValidChildBlockError indicates that no valid child block is known
 	//    (which contains the block's source of randomness)
 	//  * unexpected errors should be considered symptoms of internal bugs
+	// TODO document error returns
 	RandomSource() ([]byte, error)
 
 	// Phase returns the epoch phase for the current epoch, as of the Head block.
+	// TODO document error returns
 	Phase() (flow.EpochPhase, error)
 
 	// Epochs returns a query object enabling querying detailed information about
@@ -98,8 +110,10 @@ type Snapshot interface {
 	// For epochs that are in the future w.r.t. the Head block, some of Epoch's
 	// methods may return errors, since the Epoch Preparation Protocol may be
 	// in-progress and incomplete for the epoch.
+	// TODO document error returns
 	Epochs() EpochQuery
 
 	// Params returns global parameters of the state this snapshot is taken from.
+	// TODO document error returns
 	Params() GlobalParams
 }

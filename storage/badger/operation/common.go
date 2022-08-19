@@ -16,7 +16,8 @@ import (
 
 // batchWrite will encode the given entity using msgpack and will upsert the resulting
 // binary data in the badger wrote batch under the provided key - if the value already exists
-// in the database it will be overridden
+// in the database it will be overridden.
+// No errors are expected during normal operation.
 func batchWrite(key []byte, entity interface{}) func(writeBatch *badger.WriteBatch) error {
 	return func(writeBatch *badger.WriteBatch) error {
 
@@ -145,6 +146,7 @@ func remove(key []byte) func(*badger.Txn) error {
 
 // removeByPrefix removes all the entities if the prefix of the key matches the given prefix.
 // if no key matches, this is a no-op
+// No errors are expected during normal operation.
 func removeByPrefix(prefix []byte) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
@@ -210,6 +212,7 @@ type createFunc func() interface{}
 // handleFunc is a function that starts the processing of the current key-value
 // pair during a badger iteration. It should be called after the key was checked
 // and the entity was decoded.
+// No errors are expected during normal operation. Any errors will halt the iteration.
 type handleFunc func() error
 
 // iterationFunc is a function provided to our low-level iteration function that
@@ -263,6 +266,8 @@ func withPrefetchValuesFalse(options *badger.IteratorOptions) {
 //
 // TODO: this function is unbounded – pass context.Context to this or calling
 // functions to allow timing functions out.
+// No errors are expected during normal operation. Any errors returned by the
+// provided handleFunc will be propagated back to the caller of iterate.
 func iterate(start []byte, end []byte, iteration iterationFunc, opts ...func(*badger.IteratorOptions)) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
