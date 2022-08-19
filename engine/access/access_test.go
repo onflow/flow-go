@@ -74,6 +74,7 @@ func (suite *Suite) SetupTest() {
 	suite.net = new(mocknetwork.Network)
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
+	suite.snapshot.On("SealingSegment").Return(&flow.SealingSegment{Blocks: unittest.BlockFixtures(2)}, nil).Maybe()
 
 	suite.epochQuery = new(protocol.EpochQuery)
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
@@ -555,6 +556,8 @@ func (suite *Suite) TestGetSealedTransaction() {
 		receipts := storage.NewExecutionReceipts(suite.metrics, db, results, storage.DefaultCacheSize)
 		enIdentities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 		enNodeIDs := flow.IdentifierList(enIdentities.NodeIDs())
+
+		suite.state.On("AtBlockID", mock.Anything).Return(suite.snapshot, nil)
 
 		// create block -> collection -> transactions
 		block, collection := suite.createChain()
