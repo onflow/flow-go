@@ -16,6 +16,15 @@ func NewNoopCollector() *NoopCollector {
 	return nc
 }
 
+func (nc *NoopCollector) Peers(prefix string, n int)                                             {}
+func (nc *NoopCollector) Wantlist(prefix string, n int)                                          {}
+func (nc *NoopCollector) BlobsReceived(prefix string, n uint64)                                  {}
+func (nc *NoopCollector) DataReceived(prefix string, n uint64)                                   {}
+func (nc *NoopCollector) BlobsSent(prefix string, n uint64)                                      {}
+func (nc *NoopCollector) DataSent(prefix string, n uint64)                                       {}
+func (nc *NoopCollector) DupBlobsReceived(prefix string, n uint64)                               {}
+func (nc *NoopCollector) DupDataReceived(prefix string, n uint64)                                {}
+func (nc *NoopCollector) MessagesReceived(prefix string, n uint64)                               {}
 func (nc *NoopCollector) NetworkMessageSent(sizeBytes int, topic string, messageType string)     {}
 func (nc *NoopCollector) NetworkMessageReceived(sizeBytes int, topic string, messageType string) {}
 func (nc *NoopCollector) NetworkDuplicateMessagesDropped(topic string, messageType string)       {}
