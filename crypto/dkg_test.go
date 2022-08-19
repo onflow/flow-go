@@ -141,12 +141,12 @@ const (
 )
 
 func newDKG(dkg int, size int, threshold int, myIndex int,
-	processor DKGProcessor, leaderIndex int) (DKGState, error) {
+	processor DKGProcessor, dealerIndex int) (DKGState, error) {
 	switch dkg {
 	case feldmanVSS:
-		return NewFeldmanVSS(size, threshold, myIndex, processor, leaderIndex)
+		return NewFeldmanVSS(size, threshold, myIndex, processor, dealerIndex)
 	case feldmanVSSQual:
-		return NewFeldmanVSSQual(size, threshold, myIndex, processor, leaderIndex)
+		return NewFeldmanVSSQual(size, threshold, myIndex, processor, dealerIndex)
 	case jointFeldman:
 		return NewJointFeldman(size, threshold, myIndex, processor)
 	default:
@@ -235,7 +235,7 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 
 	case invalidComplaint:
 		r1 = 1 + mrand.Intn(leaders-1) // participants with invalid complaints and will get disqualified.
-		// r1>= 1 to have at least one malicious leader, and r1<leadrers-1 to leave space for the trigger leader below.
+		// r1>= 1 to have at least one malicious dealer, and r1<leadrers-1 to leave space for the trigger dealer below.
 		r2 = mrand.Intn(leaders - r1) // participants with timeouted complaints: they are considered qualified by honest participants
 		// but their results are invalid
 		h = r1 + r2 // r2 shouldn't be verified for protocol correctness
@@ -254,7 +254,7 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 
 	case invalidComplaintAnswer:
 		r1 = 1 + mrand.Intn(leaders-1) // participants with invalid complaint answers and will get disqualified.
-		// r1>= 1 to have at least one malicious leader, and r1<leadrers-1 to leave space for the complaint sender.
+		// r1>= 1 to have at least one malicious dealer, and r1<leadrers-1 to leave space for the complaint sender.
 		h = r1
 		// the 0..r1-1 leaders will send invalid shares to n-1 to trigger complaints.
 		for i := 0; i < r1; i++ {
@@ -347,7 +347,7 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 	}
 	// check if DKG is successful
 	if (dkg == jointFeldman && (r1 > threshold || (n-r1) <= threshold)) ||
-		(dkg == feldmanVSSQual && r1 == 1) { // case of a single leader
+		(dkg == feldmanVSSQual && r1 == 1) { // case of a single dealer
 		t.Logf("dkg failed, there are %d disqualified participants\n", r1)
 		// DKG failed, check for final errors
 		for i := r1; i < n; i++ {
@@ -544,42 +544,61 @@ func (proc *testDKGProcessor) invalidShareSend(dest int, data []byte) {
 		panic("invalid share send not supported")
 	}
 
-	newMsg := &message{proc.current, proc.protocol, private, data}
+	// copy of data
+	newData := make([]byte, len(data))
+	copy(newData, data)
+
+	newMsg := &message{proc.current, proc.protocol, private, newData}
+	originalMsg := &message{proc.current, proc.protocol, private, data}
+
 	// check destination
 	if (dest < recipients) || (proc.current < recipients && dest < recipients+1) ||
 		(proc.malicious == invalidComplaintAnswerBroadcast && dest == proc.dkg.Size()-1) {
 		// choose a random reason for an invalid share
-		coin := mrand.Intn(6)
+		coin := mrand.Intn(7)
 		gt.Logf("%d maliciously sending to %d, coin is %d\n", proc.current, dest, coin)
 		switch coin {
 		case 0:
 			// value doesn't match the verification vector
 			newMsg.data[8]++
+			proc.chans[dest] <- newMsg
 		case 1:
-			// invalid length
-			newMsg.data = newMsg.data[:1]
+			// empty message
+			newMsg.data = newMsg.data[:0]
+			proc.chans[dest] <- newMsg
 		case 2:
+			// valid message length but invalid share length
+			newMsg.data = newMsg.data[:1]
+			proc.chans[dest] <- newMsg
+		case 3:
 			// invalid value
 			for i := 0; i < len(newMsg.data); i++ {
 				newMsg.data[i] = 0xFF
 			}
-		case 3:
+			proc.chans[dest] <- newMsg
+		case 4:
 			// do not send the share at all
 			return
-		case 4:
-			// wrong header: equivalent to not sending the share at all
-			newMsg.data[0] = byte(feldmanVSSVerifVec)
 		case 5:
+			// wrong header: will cause a complaint
+			newMsg.data[0] = byte(feldmanVSSVerifVec)
+			proc.chans[dest] <- newMsg
+		case 6:
 			// message will be sent after the shares timeout and will be considered late
 			// by the receiver. All late messages go into a separate channel and will be sent to
 			// the main channel after the shares timeout.
 			proc.lateChansTimeout1[dest] <- newMsg
 			return
 		}
+
 	} else {
 		gt.Logf("turns out to be a honest send\n%x\n", data)
-		proc.chans[dest] <- newMsg
 	}
+	// honest send case: this is the only message sent
+	// malicious send case: this is a second correct send, to test the second message gets ignored
+	// by the receiver (sender has been tagged malicious after the first send)
+	proc.chans[dest] <- originalMsg
+
 }
 
 // This is a testing function
@@ -633,7 +652,7 @@ func (proc *testDKGProcessor) invalidVectorBroadcast(data []byte) {
 		// do not send the vector at all
 		return
 	case 3:
-		// wrong header, equivalent to not sending at all
+		// wrong header
 		newMsg.data[0] = byte(feldmanVSSShare)
 	case 4:
 		// send the vector after the first timeout, equivalent to not sending at all

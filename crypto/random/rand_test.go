@@ -98,7 +98,7 @@ func TestUint(t *testing.T) {
 	seedMathRand(t)
 
 	seed := make([]byte, Chacha20SeedLen)
-	rand.Read(seed)
+	_, _ = rand.Read(seed)
 	customizer := make([]byte, Chacha20CustomizerMaxLen)
 	rand.Read(customizer)
 
@@ -136,7 +136,7 @@ func TestSubPermutation(t *testing.T) {
 	seedMathRand(t)
 
 	seed := make([]byte, Chacha20SeedLen)
-	rand.Read(seed)
+	_, _ = rand.Read(seed)
 	customizer := make([]byte, Chacha20CustomizerMaxLen)
 	rand.Read(customizer)
 
@@ -219,7 +219,7 @@ func TestShuffle(t *testing.T) {
 	seedMathRand(t)
 
 	seed := make([]byte, Chacha20SeedLen)
-	rand.Read(seed)
+	_, _ = rand.Read(seed)
 	customizer := make([]byte, Chacha20CustomizerMaxLen)
 	rand.Read(customizer)
 
@@ -302,7 +302,7 @@ func TestSamples(t *testing.T) {
 	seedMathRand(t)
 
 	seed := make([]byte, Chacha20SeedLen)
-	rand.Read(seed)
+	_, _ = rand.Read(seed)
 	customizer := make([]byte, Chacha20CustomizerMaxLen)
 	rand.Read(customizer)
 
@@ -394,7 +394,7 @@ func TestStateRestore(t *testing.T) {
 
 	// generate a seed
 	seed := make([]byte, Chacha20SeedLen)
-	rand.Read(seed)
+	_, _ = rand.Read(seed)
 	customizer := make([]byte, Chacha20CustomizerMaxLen)
 	rand.Read(customizer)
 	t.Logf("seed is %x, customizer is %x\n", seed, customizer)
