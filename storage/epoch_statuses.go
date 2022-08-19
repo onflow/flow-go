@@ -13,5 +13,7 @@ type EpochStatuses interface {
 	StoreTx(blockID flow.Identifier, state *flow.EpochStatus) func(*transaction.Tx) error
 
 	// ByBlockID will return the epoch status for the given block
+	// Error returns:
+	// * storage.ErrNotFound if EpochStatus for the block does not exist
 	ByBlockID(flow.Identifier) (*flow.EpochStatus, error)
 }

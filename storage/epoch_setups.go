@@ -13,5 +13,7 @@ type EpochSetups interface {
 	StoreTx(*flow.EpochSetup) func(*transaction.Tx) error
 
 	// ByID will return the EpochSetup event by its ID.
+	// Error returns:
+	// * storage.ErrNotFound if no EpochSetup with the ID exists
 	ByID(flow.Identifier) (*flow.EpochSetup, error)
 }

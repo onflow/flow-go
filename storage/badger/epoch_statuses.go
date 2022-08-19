@@ -58,6 +58,9 @@ func (es *EpochStatuses) retrieveTx(blockID flow.Identifier) func(tx *badger.Txn
 	}
 }
 
+// ByBlockID will return the epoch status for the given block
+// Error returns:
+// * storage.ErrNotFound if EpochStatus for the block does not exist
 func (es *EpochStatuses) ByBlockID(blockID flow.Identifier) (*flow.EpochStatus, error) {
 	tx := es.db.NewTransaction(false)
 	defer tx.Discard()
