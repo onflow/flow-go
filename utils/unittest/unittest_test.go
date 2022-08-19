@@ -12,7 +12,7 @@ func TestCrashTest_NoMessage(t *testing.T) {
 		crash_NoMessage()
 	}
 
-	CrashTest(t, f, "", "TestCrashTest_NoMessage")
+	CrashTest(t, f, "")
 }
 
 // TestCrashTest_ErrorMessage tests that CrashTest() can read standard messages from stdout before a crash.
@@ -20,7 +20,7 @@ func TestCrashTest_ErrorMessage(t *testing.T) {
 	f := func(t *testing.T) {
 		crash_ErrorMessage()
 	}
-	CrashTest(t, f, "about to crash", "TestCrashTest_ErrorMessage")
+	CrashTest(t, f, "about to crash")
 }
 
 // TestCrashTest_Logger tests that CrashTest() can read fatal logger messages from stdout before a crash. This test
@@ -29,7 +29,7 @@ func TestCrashTest_Logger(t *testing.T) {
 	f := func(t *testing.T) {
 		crash_LoggerFatal()
 	}
-	CrashTest(t, f, "fatal crash from logger", "TestCrashTest_Logger")
+	CrashTest(t, f, "fatal crash from logger")
 }
 
 func crash_NoMessage() {

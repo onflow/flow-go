@@ -394,13 +394,13 @@ func NetworkTopology() network.Topology {
 
 // CrashTest safely tests functions that crash (as the expected behavior) by checking that running the function creates an error and
 // an expected error message.
-func CrashTest(t *testing.T, scenario func(*testing.T), expectedErrorMsg string, testName string) {
+func CrashTest(t *testing.T, scenario func(*testing.T), expectedErrorMsg string) {
 	if os.Getenv("CRASH_TEST") == "1" {
 		scenario(t)
 		return
 	}
 
-	cmd := exec.Command(os.Args[0], "-test.run="+testName)
+	cmd := exec.Command(os.Args[0], "-test.run="+t.Name())
 	cmd.Env = append(os.Environ(), "CRASH_TEST=1")
 
 	outBytes, err := cmd.Output()
