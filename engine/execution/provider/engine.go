@@ -54,7 +54,10 @@ type Engine struct {
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
 	chdpRequestHandler     *engine.MessageHandler
 	chdpRequestQueue       mempool.ChunkDataPackMessageStore
-	chdpRequestChannel     chan *mempool.ChunkDataPackRequest
+
+	// buffered channel for ChunkDataRequest workers to pick
+	// requests and process.
+	chdpRequestChannel chan *mempool.ChunkDataPackRequest
 }
 
 func New(
@@ -75,6 +78,9 @@ func New(
 		log,
 		engine.NewNotifier(),
 		engine.Pattern{
+			// Match is called on every new message coming to this engine.
+			// Provider enigne only expects ChunkDataRequests.
+			// Other message types are discarded by Match.
 			Match: func(message *engine.Message) bool {
 				chdpReq, ok := message.Payload.(*messages.ChunkDataRequest)
 				if ok {
@@ -85,6 +91,9 @@ func New(
 				}
 				return ok
 			},
+			// Map is called on messages that are Match(ed) successfully, i.e.,
+			// ChunkDataRequests.
+			// It replaces the payload of message with requested chunk id.
 			Map: func(message *engine.Message) (*engine.Message, bool) {
 				chdpReq := message.Payload.(*messages.ChunkDataRequest)
 				return &engine.Message{
@@ -121,7 +130,7 @@ func New(
 	engine.chunksConduit = chunksConduit
 
 	cm := component.NewComponentManagerBuilder()
-	cm.AddWorker(engine.processQueuedChunkDataPackRequestsShovllerWorker)
+	cm.AddWorker(engine.processQueuedChunkDataPackRequestsShovelerWorker)
 	for i := uint(0); i < chdpRequestWorkers; i++ {
 		cm.AddWorker(engine.processChunkDataPackRequestWorker)
 	}
@@ -132,7 +141,9 @@ func New(
 	return &engine, nil
 }
 
-func (e *Engine) processQueuedChunkDataPackRequestsShovllerWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+// processQueuedChunkDataPackRequestsShovelerWorker is constantly listening on the MessageHandler for ChunkDataRequests,
+// and pushes new ChunkDataRequests into the request channel to be picked by workers.
+func (e *Engine) processQueuedChunkDataPackRequestsShovelerWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
 	e.log.Debug().Msg("process chunk data pack request shovller worker started")
@@ -141,7 +152,7 @@ func (e *Engine) processQueuedChunkDataPackRequestsShovllerWorker(ctx irrecovera
 		select {
 		case <-e.chdpRequestHandler.GetNotifier():
 			// there is at list a single chunk data pack request queued up.
-			e.chunkDataPackRequestShovller(ctx)
+			e.shovelChunkDataPackRequests()
 		case <-ctx.Done():
 			close(e.chdpRequestChannel)
 			e.log.Trace().Msg("processing chunk data pack request worker terminated")
@@ -150,7 +161,10 @@ func (e *Engine) processQueuedChunkDataPackRequestsShovllerWorker(ctx irrecovera
 	}
 }
 
-func (e *Engine) chunkDataPackRequestShovller(ctx irrecoverable.SignalerContext) {
+// shovelChunkDataPackRequests is a blocking method that reads all queued ChunkDataRequests till the queue gets empty.
+// Each ChunkDataRequest is processed by a single concurrent worker. However, there are limited number of such workers.
+// If there is no worker available for a request, the method blocks till one is available.
+func (e *Engine) shovelChunkDataPackRequests() {
 	for {
 		msg, ok := e.chdpRequestQueue.Get()
 		if !ok {
@@ -172,8 +186,8 @@ func (e *Engine) chunkDataPackRequestShovller(ctx irrecoverable.SignalerContext)
 	}
 }
 
-// processChunkDataPackRequestWorker encapsulates the logic of a single (concurrent) worker that picks a chunk data pack
-// request from this engine's queue and processes it.
+// processChunkDataPackRequestWorker encapsulates the logic of a single (concurrent) worker that picks a
+// ChunkDataRequest from this engine's queue and processes it.
 func (e *Engine) processChunkDataPackRequestWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
@@ -281,10 +295,9 @@ func (e *Engine) deliverChunkDataResponse(chunkDataPack *flow.ChunkDataPack, req
 		return
 	}
 
-	sinceDeliver := time.Since(deliveryStartTime)
-	lg = lg.With().Dur("delivery_time", sinceDeliver).Logger()
-
-	e.metrics.ChunkDataPackResponseDispatchedInNetwork(sinceDeliver)
+	deliveryTime := time.Since(deliveryStartTime)
+	lg = lg.With().Dur("delivery_time", deliveryTime).Logger()
+	e.metrics.ChunkDataPackResponseDispatchedInNetwork(deliveryTime)
 
 	if chunkDataPack.Collection != nil {
 		// logging collection id of non-system chunks.
@@ -297,7 +310,6 @@ func (e *Engine) deliverChunkDataResponse(chunkDataPack *flow.ChunkDataPack, req
 }
 
 func (e *Engine) ensureAuthorized(chunkID flow.Identifier, originID flow.Identifier) (*flow.Identity, error) {
-
 	blockID, err := e.execState.GetBlockIDByChunkID(chunkID)
 	if err != nil {
 		return nil, engine.NewInvalidInputErrorf("cannot find blockID corresponding to chunk data pack: %w", err)
