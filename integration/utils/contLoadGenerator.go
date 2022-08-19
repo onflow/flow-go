@@ -276,6 +276,10 @@ func (lg *ContLoadGenerator) Stop() {
 	lg.follower.Stop()
 }
 
+func (lg *ContLoadGenerator) AvgTpsBetween(start, stop time.Time) float64 {
+	return lg.workerStatsTracker.AvgTPSBetween(start, stop)
+}
+
 func (lg *ContLoadGenerator) createAccounts(num int) error {
 	privKey := randomPrivateKey()
 	accountKey := flowsdk.NewAccountKey().
