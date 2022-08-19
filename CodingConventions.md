@@ -15,7 +15,7 @@ yourself in a situation where you feel that sticking to a guideline would have s
 of code
 (e.g. bloats it significantly, makes it highly error-prone) you have the freedom to break with the conventions. In this
 case, please include a comment in the code with a brief motivation for your decision. This will help reviewers and
-prevent others from going through the same learning process that led to your decission to break with the conventions.
+prevent others from going through the same learning process that led to your decision to break with the conventions.
 
 
 ## Motivation and Context
@@ -174,7 +174,7 @@ why it is acceptable to keep going, even if the other component returned an erro
 **Ideally, a vertex should restart** (from a known good state), **when it encounters an unexpected error.**
 Per convention, a vertex should throw any unexpected exceptions using the related [irrecoverable context](https://github.com/onflow/flow-go/blob/277b6515add6136946913747efebd508f0419a25/module/irrecoverable/irrecoverable.go).
 
-[TODO: expend this section] 
+<!-- TODO(alex) expand this section -->
 
 If this is out of scope, we _prioritize safety over liveness_. This means that we rather crash the node than continue on a best-effort basis.
 When in doubt, use the following as a fall-back:
