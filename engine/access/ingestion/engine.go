@@ -207,7 +207,7 @@ func (e *Engine) Start(parent irrecoverable.SignalerContext) {
 	// in blocks above that height.
 	if isSporkRootSnapshot {
 		// for snapshot with a single block in the sealing segment the first full block is the root block.
-		err := e.blocks.UpdateLastFullBlockHeight(rootBlock.Height)
+		err := e.blocks.InsertLastFullBlockHeightIfNotExists(rootBlock.Height)
 		if err != nil {
 			parent.Throw(fmt.Errorf("failed to update last full block height during ingestion engine startup: %w", err))
 		}
@@ -215,7 +215,7 @@ func (e *Engine) Start(parent irrecoverable.SignalerContext) {
 		// for midspork snapshots with a sealing segment that has more than 1 block add the transaction expiry to the root block height to avoid
 		// requesting resources for blocks below the expiry.
 		firstFullHeight := rootBlock.Height + flow.DefaultTransactionExpiry
-		err := e.blocks.UpdateLastFullBlockHeight(firstFullHeight)
+		err := e.blocks.InsertLastFullBlockHeightIfNotExists(firstFullHeight)
 		if err != nil {
 			parent.Throw(fmt.Errorf("failed to update last full block height during ingestion engine startup: %w", err))
 		}
