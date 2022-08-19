@@ -15,7 +15,7 @@ func NewRateLimitedBlockstoreCollector() module.RateLimitedBlockstoreMetrics {
 	return &RateLimitedBlockstoreCollector{
 		bytesRead: promauto.NewCounter(prometheus.CounterOpts{
 			Namespace: namespaceStateSync,
-			Subsystem: subsystemExecutionDataService,
+			Subsystem: subsystemExeDataBlobstore,
 			Name:      "bytes_read",
 			Help:      "number of bytes read from the blockstore",
 		}),
