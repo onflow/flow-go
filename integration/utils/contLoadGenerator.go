@@ -276,6 +276,10 @@ func (lg *ContLoadGenerator) Stop() {
 	lg.follower.Stop()
 }
 
+func (lg *ContLoadGenerator) AvgTpsBetween(start, stop time.Time) float64 {
+	return lg.workerStatsTracker.AvgTPSBetween(start, stop)
+}
+
 func (lg *ContLoadGenerator) createAccounts(num int) error {
 	privKey := randomPrivateKey()
 	accountKey := flowsdk.NewAccountKey().
@@ -500,7 +504,10 @@ func (lg *ContLoadGenerator) sendConstExecCostTx(workerID int) {
 	if err != nil {
 		log.Trace().Msg("Failed to generate cadence String parameter. Using empty string.")
 	}
-	tx.AddArgument(txArg)
+	err = tx.AddArgument(txArg)
+	if err != nil {
+		log.Trace().Msg("Failed to add argument. Skipping.")
+	}
 
 	// Add authorizers. lg.accounts[0] used as proposer\payer
 	log.Trace().Msg("Adding tx authorizers")

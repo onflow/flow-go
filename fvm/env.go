@@ -533,11 +533,6 @@ func (env *commonEnv) SetProgram(location common.Location, program *interpreter.
 	return nil
 }
 
-func (env *commonEnv) ImplementationDebugLog(message string) error {
-	env.ctx.Logger.Debug().Msgf("Cadence: %s", message)
-	return nil
-}
-
 func (env *commonEnv) Hash(
 	data []byte,
 	tag string,

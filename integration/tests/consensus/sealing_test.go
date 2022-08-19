@@ -291,11 +291,11 @@ SearchLoop:
 ReceiptLoop:
 	for time.Now().Before(deadline) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		err := ss.Execution().Send(ctx, channels.PushReceipts, &receipt, ss.conIDs...)
-		err = ss.Execution2().Send(ctx, channels.PushReceipts, &receipt2, ss.conIDs...)
+		err1 := ss.Execution().Send(ctx, channels.PushReceipts, &receipt, ss.conIDs...)
+		err2 := ss.Execution2().Send(ctx, channels.PushReceipts, &receipt2, ss.conIDs...)
 		cancel()
-		if err != nil {
-			ss.T().Logf("could not send execution receipt: %s\n", err)
+		if err1 != nil || err2 != nil {
+			ss.T().Logf("could not send execution receipt: %s/%s\n", err1, err2)
 			continue
 		}
 		break ReceiptLoop
