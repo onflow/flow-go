@@ -20,8 +20,10 @@ import (
 	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/spf13/pflag"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/admin/commands"
+	executionCommands "github.com/onflow/flow-go/admin/commands/execution"
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	uploaderCommands "github.com/onflow/flow-go/admin/commands/uploader"
@@ -204,6 +206,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		blockDataUploaderMaxRetry     uint64 = 5
 		blockdataUploaderRetryTimeout        = 1 * time.Second
 		executionDataStore            execution_data.ExecutionDataStore
+		toTriggerCheckpoint           = atomic.NewBool(false) // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
 		executionDataDatastore        *badger.Datastore
 		executionDataPruner           *pruner.Pruner
 		executionDataBlobstore        blobs.Blobstore
@@ -213,6 +216,9 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 	e.FlowNodeBuilder.
 		AdminCommand("read-execution-data", func(config *NodeConfig) commands.AdminCommand {
 			return stateSyncCommands.NewReadExecutionDataCommand(executionDataStore)
+		}).
+		AdminCommand("trigger-checkpoint", func(config *NodeConfig) commands.AdminCommand {
+			return executionCommands.NewTriggerCheckpointCommand(toTriggerCheckpoint)
 		}).
 		AdminCommand("set-uploader-enabled", func(config *NodeConfig) commands.AdminCommand {
 			return uploaderCommands.NewToggleUploaderCommand()
@@ -415,6 +421,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				uint(e.exeConf.mTrieCacheSize),
 				e.exeConf.checkpointDistance,
 				e.exeConf.checkpointsToKeep,
+				toTriggerCheckpoint, // compactor will listen to the signal from admin tool for force triggering checkpointing
 			)
 		}).
 		Component("execution data pruner", func(node *NodeConfig) (module.ReadyDoneAware, error) {
