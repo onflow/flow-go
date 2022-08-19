@@ -213,7 +213,7 @@ func (s *State) MemoryIntensities() meter.MeteredMemoryIntensities {
 }
 
 // TotalMemoryEstimate returns total memory used
-func (s *State) TotalMemoryEstimate() uint {
+func (s *State) TotalMemoryEstimate() uint64 {
 	return s.meter.TotalMemoryEstimate()
 }
 

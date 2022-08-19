@@ -306,7 +306,7 @@ func (i *TransactionInvoker) logExecutionIntensities(sth *state.StateHolder, txH
 			Str("txHash", txHash).
 			Uint64("ledgerInteractionUsed", sth.InteractionUsed()).
 			Uint("computationUsed", sth.TotalComputationUsed()).
-			Uint("memoryEstimate", sth.TotalMemoryEstimate()).
+			Uint64("memoryEstimate", sth.TotalMemoryEstimate()).
 			Dict("computationIntensities", computation).
 			Dict("memoryIntensities", memory).
 			Msg("transaction execution data")
