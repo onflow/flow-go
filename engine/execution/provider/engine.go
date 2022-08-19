@@ -201,10 +201,7 @@ func (e *Engine) processChunkDataPackRequestWorker(ctx irrecoverable.SignalerCon
 			Hex("chunk_id", logging.ID(request.ChunkId)).
 			Hex("origin_id", logging.ID(request.RequesterId)).Logger()
 		lg.Trace().Msg("worker picked up chunk data pack request for processing")
-		err := e.onChunkDataRequest(request)
-		if err != nil {
-			ctx.Throw(err)
-		}
+		e.onChunkDataRequest(request)
 		lg.Trace().Msg("worker finished chunk data pack processing")
 	}
 }
@@ -234,7 +231,7 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 // It returns an error if either of the following situatations hit:
 // 1. The chunk data pack exists, but not retrievable from the storage (e.g., inconsistent storage state).
 // 2. The requester for chunk data pack is not authorized in this current epoch.
-func (e *Engine) onChunkDataRequest(request *mempool.ChunkDataPackRequest) error {
+func (e *Engine) onChunkDataRequest(request *mempool.ChunkDataPackRequest) {
 	processStartTime := time.Now()
 
 	lg := e.log.With().
@@ -253,22 +250,29 @@ func (e *Engine) onChunkDataRequest(request *mempool.ChunkDataPackRequest) error
 		lg.Warn().
 			Err(err).
 			Msg("chunk data pack not found, execution node may be behind")
-		return nil
+		return
 	}
 	if err != nil {
-		return fmt.Errorf("could not retrive chunk data pack request from storage: %w", err)
+		lg.Error().
+			Err(err).
+			Msg("could not retrieve chunk ID from storage")
+		return
 	}
+
 	queryTime := time.Since(processStartTime)
 	lg = lg.With().Dur("query_time", queryTime).Logger()
 	e.metrics.ChunkDataPackRetrievedFromDatabase(queryTime)
 
 	_, err = e.ensureAuthorized(chunkDataPack.ChunkID, request.RequesterId)
 	if err != nil {
-		return fmt.Errorf("could not verify authorization of identity of chunk data pack request: %w", err)
+		lg.Error().
+			Err(err).
+			Msg("could not verify authorization of identity of chunk data pack request")
+		return
 	}
 
 	e.deliverChunkDataResponse(chunkDataPack, request.RequesterId)
-	return nil
+	return
 }
 
 // deliverChunkDataResponse delivers chunk data pack to the requester through network.
