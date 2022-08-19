@@ -5,11 +5,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/push"
-	"github.com/rs/zerolog"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"io"
 	"net/http"
 	"os"
@@ -18,12 +13,18 @@ import (
 	"strings"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/push"
+	"github.com/rs/zerolog"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+
 	flowsdk "github.com/onflow/flow-go-sdk"
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/integration/utils"
+	"github.com/onflow/flow-go/integration/benchmark"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -161,8 +162,8 @@ func main() {
 
 	loaderMetrics.SetTPSConfigured(loadCase.tps)
 
-	var lg *utils.ContLoadGenerator
-	lg, err = utils.NewContLoadGenerator(
+	var lg *benchmark.ContLoadGenerator
+	lg, err = benchmark.NewContLoadGenerator(
 		log,
 		loaderMetrics,
 		flowClient,
@@ -174,9 +175,9 @@ func main() {
 		&flowTokenAddress,
 		loadCase.tps,
 		accountMultiplier,
-		utils.LoadType(loadType),
+		benchmark.LoadType(loadType),
 		feedbackEnabled,
-		utils.ConstExecParam{
+		benchmark.ConstExecParam{
 			MaxTxSizeInByte: *maxConstExecTxSizeInBytes,
 			AuthAccountNum:  *authAccNumInConstExecTx,
 			ArgSizeInByte:   *argSizeInByteInConstExecTx,
@@ -210,7 +211,7 @@ func main() {
 	prepareDataForBigQuery(dataSlices, *ciFlag)
 }
 
-func calculateTpsSlices(start, end time.Time, leadTime, sliceTime, commit, goVersion, osVersion string, lg *utils.ContLoadGenerator) []dataSlice {
+func calculateTpsSlices(start, end time.Time, leadTime, sliceTime, commit, goVersion, osVersion string, lg *benchmark.ContLoadGenerator) []dataSlice {
 	//remove the lead time on both start and end, this should remove spin-up and spin-down times
 	leadDuration, _ := time.ParseDuration(leadTime)
 	endTime := end.Add(-1 * leadDuration)
