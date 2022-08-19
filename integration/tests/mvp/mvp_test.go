@@ -8,12 +8,13 @@ import (
 
 	"github.com/dapperlabs/testingdock"
 	"github.com/onflow/cadence"
-	sdk "github.com/onflow/flow-go-sdk"
-	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
-	"github.com/onflow/flow-go-sdk/templates"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	sdk "github.com/onflow/flow-go-sdk"
+	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
+	"github.com/onflow/flow-go-sdk/templates"
 
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/integration/testnet"
@@ -243,7 +244,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 	t.Log(">> funding new account...")
 
 	childCtx, cancel = context.WithTimeout(ctx, defaultTimeout)
-	err = serviceAccountClient.SignAndSendTransaction(ctx, fundAccountTx)
+	err = serviceAccountClient.SignAndSendTransaction(childCtx, fundAccountTx)
 	require.NoError(t, err)
 
 	cancel()

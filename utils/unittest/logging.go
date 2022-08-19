@@ -46,6 +46,7 @@ func LoggerWithLevel(level zerolog.Level) zerolog.Logger {
 func NewLoggerHook() LoggerHook {
 	return LoggerHook{
 		logs: &strings.Builder{},
+		mu:   &sync.Mutex{},
 	}
 }
 
@@ -59,20 +60,27 @@ func HookedLogger() (zerolog.Logger, LoggerHook) {
 // logs for testing purposes.
 type LoggerHook struct {
 	logs *strings.Builder
+	mu   *sync.Mutex
 }
 
 // Logs returns the logs as a string
 func (hook LoggerHook) Logs() string {
+	hook.mu.Lock()
+	defer hook.mu.Unlock()
+
 	return hook.logs.String()
 }
 
 // Run implements zerolog.Hook and appends the log message to the log.
 func (hook LoggerHook) Run(_ *zerolog.Event, level zerolog.Level, msg string) {
-	hook.logs.WriteString(msg)
-
 	// for tests that need to test logger.Fatal(), this is useful because the parent test process will read from stdout
 	// to determine if the test sub-process (that generated the logger.Fatal() call) called logger.Fatal() with the expected message
 	if level == zerolog.FatalLevel {
 		fmt.Println(msg)
 	}
+
+	hook.mu.Lock()
+	defer hook.mu.Unlock()
+
+	hook.logs.WriteString(msg)
 }

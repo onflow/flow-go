@@ -78,7 +78,7 @@ func (r *readSubscription) receiveLoop(wg *sync.WaitGroup) {
 			return
 		}
 
-		validatorData, ok := rawMsg.ValidatorData.(validator.ValidatorData)
+		validatorData, ok := rawMsg.ValidatorData.(validator.TopicValidatorData)
 		if !ok {
 			r.log.Error().Str("raw_msg", rawMsg.String()).Msg("[BUG] validator data missing!")
 			return
