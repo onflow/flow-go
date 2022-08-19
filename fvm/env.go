@@ -57,9 +57,6 @@ type AccountInterface interface {
 	RevokeAccountKey(address runtime.Address, keyIndex int) (*runtime.AccountKey, error)
 
 	AddEncodedAccountKey(address runtime.Address, publicKey []byte) error
-
-	// TODO(patrick): figure out where this belongs
-	GetSigningAccounts() ([]runtime.Address, error)
 }
 
 // Parts of the environment that are common to all transaction and script
@@ -72,6 +69,7 @@ type commonEnv struct {
 	*environment.UnsafeRandomGenerator
 	*environment.CryptoLibrary
 	*environment.BlockInfo
+	environment.TransactionInfo
 
 	// TODO(patrick): rm
 	ctx Context
