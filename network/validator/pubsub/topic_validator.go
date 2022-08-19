@@ -10,8 +10,8 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/network"
-
 	"github.com/onflow/flow-go/network/message"
+	"github.com/onflow/flow-go/network/validator"
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
@@ -54,17 +54,16 @@ func messageSigningID(m *pubsub.Message) (peer.ID, error) {
 	return pid, nil
 }
 
-// MessageValidator validates the given message with original sender `from`.
-// Note: contrarily to pubsub.ValidatorEx, the peerID parameter does not represent the bearer of the message, but its source.
-type MessageValidator func(ctx context.Context, from peer.ID, msg interface{}) pubsub.ValidationResult
-
-type ValidatorData struct {
+// TopicValidatorData includes information about the message being sent.
+type TopicValidatorData struct {
 	Message           *message.Message
 	DecodedMsgPayload interface{}
 	From              peer.ID
 }
 
-func TopicValidator(log zerolog.Logger, codec network.Codec, peerFilter func(peer.ID) bool, validators ...MessageValidator) pubsub.ValidatorEx {
+// TopicValidator is the topic validator that is registered with libP2P whenever a flow libP2P node subscribes to a topic.
+// The TopicValidator will decode and perform validation on the raw pubsub message.
+func TopicValidator(log zerolog.Logger, codec network.Codec, peerFilter func(peer.ID) bool, validators ...validator.PubSubMessageValidator) pubsub.ValidatorEx {
 	log = log.With().
 		Str("component", "libp2p_node_topic_validator").
 		Logger()
@@ -103,7 +102,7 @@ func TopicValidator(log zerolog.Logger, codec network.Codec, peerFilter func(pee
 			return pubsub.ValidationReject
 		}
 
-		rawMsg.ValidatorData = ValidatorData{
+		rawMsg.ValidatorData = TopicValidatorData{
 			Message:           &msg,
 			DecodedMsgPayload: decodedMsgPayload,
 			From:              from,
@@ -111,7 +110,7 @@ func TopicValidator(log zerolog.Logger, codec network.Codec, peerFilter func(pee
 
 		result := pubsub.ValidationAccept
 		for _, validator := range validators {
-			switch res := validator(ctx, from, decodedMsgPayload); res {
+			switch res := validator(from, decodedMsgPayload); res {
 			case pubsub.ValidationReject:
 				return res
 			case pubsub.ValidationIgnore:

@@ -18,9 +18,12 @@ import (
 	"github.com/libp2p/go-libp2p-core/routing"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	p2ppubsub "github.com/libp2p/go-libp2p-pubsub"
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/rs/zerolog"
+	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/cmd"
@@ -60,6 +63,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
@@ -69,9 +73,6 @@ import (
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow-go/utils/io"
-
-	"github.com/rs/zerolog"
-	"github.com/spf13/pflag"
 )
 
 // ObserverBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node
@@ -1047,7 +1048,7 @@ func (builder *ObserverServiceBuilder) initMiddleware(nodeID flow.Identifier,
 	networkMetrics module.NetworkMetrics,
 	factoryFunc p2p.LibP2PFactoryFunc,
 	validators ...network.MessageValidator) network.Middleware {
-
+	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(builder.Logger)
 	builder.Middleware = p2p.NewMiddleware(
 		builder.Logger,
 		factoryFunc,
@@ -1058,6 +1059,7 @@ func (builder *ObserverServiceBuilder) initMiddleware(nodeID flow.Identifier,
 		p2p.DefaultUnicastTimeout,
 		builder.IDTranslator,
 		builder.CodecFactory(),
+		slashingViolationsConsumer,
 		p2p.WithMessageValidators(validators...),
 		// no peer manager
 		// use default identifier provider

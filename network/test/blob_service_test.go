@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -89,6 +90,7 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 		logger,
 		tops,
 		unittest.NetworkCodec(),
+		mocknetwork.NewViolationsConsumer(suite.T()),
 		WithDHT("blob_service_test", p2p.AsServer()),
 		WithPeerManagerOpts(p2p.WithInterval(time.Second)),
 	)
