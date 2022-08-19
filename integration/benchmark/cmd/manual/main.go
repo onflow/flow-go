@@ -19,7 +19,7 @@ import (
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/integration/utils"
+	"github.com/onflow/flow-go/integration/benchmark"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -137,10 +137,10 @@ func main() {
 
 		loaderMetrics.SetTPSConfigured(c.tps)
 
-		var lg *utils.ContLoadGenerator
+		var lg *benchmark.ContLoadGenerator
 		if c.tps > 0 {
 			var err error
-			lg, err = utils.NewContLoadGenerator(
+			lg, err = benchmark.NewContLoadGenerator(
 				log,
 				loaderMetrics,
 				flowClient,
@@ -152,9 +152,9 @@ func main() {
 				&flowTokenAddress,
 				c.tps,
 				*accountMultiplierFlag,
-				utils.LoadType(*loadTypeFlag),
+				benchmark.LoadType(*loadTypeFlag),
 				*feedbackEnabled,
-				utils.ConstExecParam{
+				benchmark.ConstExecParam{
 					MaxTxSizeInByte: *maxConstExecTxSizeInBytes,
 					AuthAccountNum:  *authAccNumInConstExecTx,
 					ArgSizeInByte:   *argSizeInByteInConstExecTx,

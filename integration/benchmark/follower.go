@@ -1,4 +1,4 @@
-package utils
+package benchmark
 
 import (
 	"context"
