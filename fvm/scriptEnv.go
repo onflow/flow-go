@@ -21,8 +21,6 @@ var _ Environment = &ScriptEnv{}
 // ScriptEnv is a read-only mostly used for executing scripts.
 type ScriptEnv struct {
 	commonEnv
-
-	reqContext context.Context
 }
 
 func NewScriptEnvironment(
@@ -38,12 +36,15 @@ func NewScriptEnvironment(
 	programsHandler := handler.NewProgramsHandler(programs, sth)
 	accountKeys := handler.NewAccountKeyHandler(accounts)
 	tracer := environment.NewTracer(fvmContext.Tracer, nil, fvmContext.ExtensiveTracing)
+	meter := environment.NewCancellableMeter(reqContext, sth)
 
 	env := &ScriptEnv{
 		commonEnv: commonEnv{
 			Tracer: tracer,
+			Meter:  meter,
 			ProgramLogger: environment.NewProgramLogger(
 				tracer,
+				fvmContext.Logger,
 				fvmContext.Metrics,
 				fvmContext.CadenceLoggingEnabled,
 			),
@@ -60,11 +61,9 @@ func NewScriptEnvironment(
 			uuidGenerator:  uuidGenerator,
 			frozenAccounts: nil,
 		},
-		reqContext: reqContext,
 	}
 
 	// TODO(patrick): remove this hack
-	env.MeterInterface = env
 	env.AccountInterface = env
 	env.fullEnv = env
 
@@ -85,36 +84,6 @@ func (e *ScriptEnv) EmitEvent(_ cadence.Event) error {
 
 func (e *ScriptEnv) Events() []flow.Event {
 	return []flow.Event{}
-}
-
-func (e *ScriptEnv) checkContext() error {
-	// in the future this context check should be done inside the cadence
-	select {
-	case <-e.reqContext.Done():
-		err := e.reqContext.Err()
-		if errors.Is(err, context.DeadlineExceeded) {
-			return errors.NewScriptExecutionTimedOutError()
-		}
-		return errors.NewScriptExecutionCancelledError(err)
-	default:
-		return nil
-	}
-}
-
-func (e *ScriptEnv) Meter(kind common.ComputationKind, intensity uint) error {
-	// this method is called on every unit of operation, so
-	// checking the context here is the most likely would capture
-	// timeouts or cancellation as soon as they happen, though
-	// we might revisit this when optimizing script execution
-	// by only checking on specific kind of Meter calls.
-	if err := e.checkContext(); err != nil {
-		return err
-	}
-
-	if e.sth.EnforceComputationLimits() {
-		return e.sth.MeterComputation(kind, intensity)
-	}
-	return nil
 }
 
 func (e *ScriptEnv) CreateAccount(_ runtime.Address) (address runtime.Address, err error) {
