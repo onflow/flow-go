@@ -33,8 +33,7 @@ func NewEpoch(err error) *Epoch {
 	if errors.Is(err, state.ErrUnknownSnapshotReference) {
 		return &Epoch{err: err}
 	}
-	// strip error type information for unexpected errors
-	return &Epoch{err: fmt.Errorf("critical unexpected error creating epoch: %s", err.Error())}
+	return &Epoch{err: fmt.Errorf("critical unexpected error creating epoch: %w", err)}
 }
 
 // NewEpochf is NewEpoch with ergonomic error formatting.
