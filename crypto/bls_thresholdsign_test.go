@@ -318,7 +318,7 @@ func testDistributedStatefulAPI_FeldmanVSS(t *testing.T) {
 	gt = t
 	// number of participants to test
 	n := 5
-	lead := mrand.Intn(n) // random leader
+	lead := mrand.Intn(n) // random
 	var sync sync.WaitGroup
 	chans := make([]chan *message, n)
 	processors := make([]testDKGProcessor, 0, n)
@@ -400,7 +400,7 @@ func testDistributedStatefulAPI_JointFeldman(t *testing.T) {
 		for i := 0; i < n; i++ {
 			chans[i] = make(chan *message, 2*n)
 		}
-		// start DKG in all participants but the leader
+		// start DKG in all participants but the
 		seed := make([]byte, SeedMinLenDKG)
 		read, err := rand.Read(seed)
 		require.Equal(t, read, SeedMinLenDKG)

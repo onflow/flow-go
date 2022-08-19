@@ -141,12 +141,12 @@ const (
 )
 
 func newDKG(dkg int, size int, threshold int, myIndex int,
-	processor DKGProcessor, leaderIndex int) (DKGState, error) {
+	processor DKGProcessor, dealerIndex int) (DKGState, error) {
 	switch dkg {
 	case feldmanVSS:
-		return NewFeldmanVSS(size, threshold, myIndex, processor, leaderIndex)
+		return NewFeldmanVSS(size, threshold, myIndex, processor, dealerIndex)
 	case feldmanVSSQual:
-		return NewFeldmanVSSQual(size, threshold, myIndex, processor, leaderIndex)
+		return NewFeldmanVSSQual(size, threshold, myIndex, processor, dealerIndex)
 	case jointFeldman:
 		return NewJointFeldman(size, threshold, myIndex, processor)
 	default:
@@ -235,7 +235,7 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 
 	case invalidComplaint:
 		r1 = 1 + mrand.Intn(leaders-1) // participants with invalid complaints and will get disqualified.
-		// r1>= 1 to have at least one malicious leader, and r1<leadrers-1 to leave space for the trigger leader below.
+		// r1>= 1 to have at least one malicious dealer, and r1<leadrers-1 to leave space for the trigger dealer below.
 		r2 = mrand.Intn(leaders - r1) // participants with timeouted complaints: they are considered qualified by honest participants
 		// but their results are invalid
 		h = r1 + r2 // r2 shouldn't be verified for protocol correctness
@@ -254,7 +254,7 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 
 	case invalidComplaintAnswer:
 		r1 = 1 + mrand.Intn(leaders-1) // participants with invalid complaint answers and will get disqualified.
-		// r1>= 1 to have at least one malicious leader, and r1<leadrers-1 to leave space for the complaint sender.
+		// r1>= 1 to have at least one malicious dealer, and r1<leadrers-1 to leave space for the complaint sender.
 		h = r1
 		// the 0..r1-1 leaders will send invalid shares to n-1 to trigger complaints.
 		for i := 0; i < r1; i++ {
@@ -347,7 +347,7 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 	}
 	// check if DKG is successful
 	if (dkg == jointFeldman && (r1 > threshold || (n-r1) <= threshold)) ||
-		(dkg == feldmanVSSQual && r1 == 1) { // case of a single leader
+		(dkg == feldmanVSSQual && r1 == 1) { // case of a single dealer
 		t.Logf("dkg failed, there are %d disqualified participants\n", r1)
 		// DKG failed, check for final errors
 		for i := r1; i < n; i++ {
