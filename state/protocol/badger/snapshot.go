@@ -465,17 +465,18 @@ type EpochQuery struct {
 // Current returns the current epoch.
 func (q *EpochQuery) Current() protocol.Epoch {
 
+	// all errors returned from storage reads here are unexpected, because the
 	status, err := q.snap.state.epoch.statuses.ByBlockID(q.snap.blockID)
 	if err != nil {
-		return invalid.NewEpoch(err)
+		return invalid.NewEpochf("could not get epoch status for block %x: %w", q.snap.blockID, err)
 	}
 	setup, err := q.snap.state.epoch.setups.ByID(status.CurrentEpoch.SetupID)
 	if err != nil {
-		return invalid.NewEpoch(err)
+		return invalid.NewEpochf("could not get EpochSetup (id=%x) for block %x: %w", q.snap.blockID, err)
 	}
 	commit, err := q.snap.state.epoch.commits.ByID(status.CurrentEpoch.CommitID)
 	if err != nil {
-		return invalid.NewEpoch(err)
+		return invalid.NewEpochf("could not get EpochCommit (id=%x) for block %x: %w", q.snap.blockID, err)
 	}
 
 	epoch, err := inmem.NewCommittedEpoch(setup, commit)
