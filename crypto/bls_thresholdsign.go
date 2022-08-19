@@ -198,8 +198,8 @@ func (s *blsThresholdSignatureParticipant) SignShare() (Signature, error) {
 
 // validIndex returns InvalidInputsError error if given index is valid and nil otherwise
 // This function is thread safe
-func (s *blsThresholdSignatureInspector) validIndex(orig index) error {
-	if int(orig) >= s.size || orig < 0 {
+func (s *blsThresholdSignatureInspector) validIndex(orig int) error {
+	if orig >= s.size || orig < 0 {
 		return invalidInputsErrorf(
 			"origin input is invalid, should be positive less than %d, got %d",
 			s.size, orig)
@@ -218,7 +218,7 @@ func (s *blsThresholdSignatureInspector) validIndex(orig index) error {
 //  - (false, error) for all other unexpected errors
 func (s *blsThresholdSignatureInspector) VerifyShare(orig int, share Signature) (bool, error) {
 	// validate index
-	if err := s.validIndex(index(orig)); err != nil {
+	if err := s.validIndex(orig); err != nil {
 		return false, err
 	}
 	return s.publicKeyShares[orig].Verify(share, s.message, s.hasher)
@@ -260,7 +260,7 @@ func (s *blsThresholdSignatureInspector) enoughShares() bool {
 // The function errors with InvalidInputsError if the index is invalid.
 func (s *blsThresholdSignatureInspector) HasShare(orig int) (bool, error) {
 	// validate index
-	if err := s.validIndex(index(orig)); err != nil {
+	if err := s.validIndex(orig); err != nil {
 		return false, err
 	}
 
@@ -289,7 +289,7 @@ func (s *blsThresholdSignatureInspector) hasShare(orig index) bool {
 //  - (false, duplicatedSignerError) if a signature for the index was previously added
 func (s *blsThresholdSignatureInspector) TrustedAdd(orig int, share Signature) (bool, error) {
 	// validate index
-	if err := s.validIndex(index(orig)); err != nil {
+	if err := s.validIndex(orig); err != nil {
 		return false, err
 	}
 
@@ -323,7 +323,7 @@ func (s *blsThresholdSignatureInspector) TrustedAdd(orig int, share Signature) (
 //  - other errors if an unexpected exception occurred.
 func (s *blsThresholdSignatureInspector) VerifyAndAdd(orig int, share Signature) (bool, bool, error) {
 	// validate index
-	if err := s.validIndex(index(orig)); err != nil {
+	if err := s.validIndex(orig); err != nil {
 		return false, false, err
 	}
 
