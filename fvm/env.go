@@ -147,7 +147,7 @@ func (env *commonEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, erro
 	}
 
 	if env.ctx.BlockHeader != nil && height == env.ctx.BlockHeader.Height {
-		return runtimeBlockFromHeader(env.ctx.BlockHeader), true, nil
+		return environment.RuntimeBlockFromHeader(env.ctx.BlockHeader), true, nil
 	}
 
 	header, err := env.ctx.Blocks.ByHeightFrom(height, env.ctx.BlockHeader)
@@ -158,7 +158,7 @@ func (env *commonEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, erro
 		return runtime.Block{}, false, fmt.Errorf("get block at height failed for height %v: %w", height, err)
 	}
 
-	return runtimeBlockFromHeader(header), true, nil
+	return environment.RuntimeBlockFromHeader(header), true, nil
 }
 
 func (env *commonEnv) GetValue(owner, key []byte) ([]byte, error) {
