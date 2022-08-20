@@ -509,7 +509,7 @@ func (q *EpochQuery) Next() protocol.Epoch {
 	nextSetup, err := q.snap.state.epoch.setups.ByID(status.NextEpoch.SetupID)
 	if err != nil {
 		// all errors are critical, because we must be able to retrieve EpochSetup when in setup phase
-		return invalid.NewEpochf("could not get next EpochSetup (id=%x) for block %x: %w", q.snap.blockID, err)
+		return invalid.NewEpochf("could not get next EpochSetup (id=%x) for block %x: %w", status.NextEpoch.SetupID, q.snap.blockID, err)
 	}
 	if phase == flow.EpochPhaseSetup {
 		// TODO errors?
@@ -524,7 +524,7 @@ func (q *EpochQuery) Next() protocol.Epoch {
 	nextCommit, err := q.snap.state.epoch.commits.ByID(status.NextEpoch.CommitID)
 	if err != nil {
 		// all errors are critical, because we must be able to retrieve EpochCommit when in committed phase
-		return invalid.NewEpochf("could not get next EpochCommit (id=%x) for block %x: %w", q.snap.blockID, err)
+		return invalid.NewEpochf("could not get next EpochCommit (id=%x) for block %x: %w", status.NextEpoch.CommitID, q.snap.blockID, err)
 	}
 	// TODO errors
 	epoch, err := inmem.NewCommittedEpoch(nextSetup, nextCommit)
@@ -555,12 +555,12 @@ func (q *EpochQuery) Previous() protocol.Epoch {
 	setup, err := q.snap.state.epoch.setups.ByID(status.PreviousEpoch.SetupID)
 	if err != nil {
 		// all errors are critical, because we must be able to retrieve EpochSetup for previous epoch
-		return invalid.NewEpochf("could not get previous EpochSetup (id=%x) for block %x: %w", q.snap.blockID, err)
+		return invalid.NewEpochf("could not get previous EpochSetup (id=%x) for block %x: %w", status.PreviousEpoch.SetupID, q.snap.blockID, err)
 	}
 	commit, err := q.snap.state.epoch.commits.ByID(status.PreviousEpoch.CommitID)
 	if err != nil {
 		// all errors are critical, because we must be able to retrieve EpochCommit for previous epoch
-		return invalid.NewEpochf("could not get current EpochCommit (id=%x) for block %x: %w", q.snap.blockID, err)
+		return invalid.NewEpochf("could not get current EpochCommit (id=%x) for block %x: %w", status.PreviousEpoch.CommitID, q.snap.blockID, err)
 	}
 
 	epoch, err := inmem.NewCommittedEpoch(setup, commit)

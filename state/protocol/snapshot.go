@@ -110,10 +110,8 @@ type Snapshot interface {
 	// For epochs that are in the future w.r.t. the Head block, some of Epoch's
 	// methods may return errors, since the Epoch Preparation Protocol may be
 	// in-progress and incomplete for the epoch.
-	// TODO document error returns
 	Epochs() EpochQuery
 
 	// Params returns global parameters of the state this snapshot is taken from.
-	// TODO document error returns
 	Params() GlobalParams
 }
