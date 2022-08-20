@@ -600,18 +600,18 @@ func TestConnectionGating(t *testing.T) {
 		_, ok := node1Peers[p]
 		return ok
 	}))
+	defer stopNode(t, node1)
 
 	node2Peers := make(map[peer.ID]struct{})
 	node2, node2Id := nodeFixture(t, ctx, sporkID, "test_connection_gating", withPeerFilter(func(p peer.ID) bool {
 		_, ok := node2Peers[p]
 		return ok
 	}))
+	defer stopNode(t, node2)
 
-	defer stopNode(t, node1)
 	node1Info, err := p2p.PeerAddressInfo(node1Id)
 	assert.NoError(t, err)
 
-	defer stopNode(t, node2)
 	node2Info, err := p2p.PeerAddressInfo(node2Id)
 	assert.NoError(t, err)
 
