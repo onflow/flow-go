@@ -7,9 +7,6 @@ on:
     branches:
       - staging
       - trying
-  pull_request:
-    branches:
-      - master
 
 env:
   GO_VERSION: 1.18
