@@ -87,6 +87,7 @@ func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 }
 
 // FromParams converts any protocol.GlobalParams to a memory-backed Params.
+// TODO error docs
 func FromParams(from protocol.GlobalParams) (*Params, error) {
 
 	var (
@@ -111,7 +112,10 @@ func FromParams(from protocol.GlobalParams) (*Params, error) {
 }
 
 // FromEpoch converts any protocol.Epoch to a memory-backed Epoch.
-// TODO error docs
+// Error returns:
+// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
+// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
+// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
 func FromEpoch(from protocol.Epoch) (*Epoch, error) {
 
 	var (
@@ -181,7 +185,8 @@ func FromEpoch(from protocol.Epoch) (*Epoch, error) {
 	return &Epoch{epoch}, nil
 }
 
-// FromCluster converts any protocol.Cluster to a memory-backed Cluster
+// FromCluster converts any protocol.Cluster to a memory-backed Cluster.
+// No errors are expected during normal operation.
 func FromCluster(from protocol.Cluster) (*Cluster, error) {
 	cluster := EncodableCluster{
 		Counter:   from.EpochCounter(),
@@ -196,7 +201,8 @@ func FromCluster(from protocol.Cluster) (*Cluster, error) {
 // FromDKG converts any protocol.DKG to a memory-backed DKG.
 //
 // The given participant list must exactly match the DKG members.
-// TODO error docs
+// All errors indicate inconsistent or invalid inputs.
+// No errors are expected during normal operation.
 func FromDKG(from protocol.DKG, participants flow.IdentityList) (*DKG, error) {
 	var dkg EncodableDKG
 	dkg.GroupKey = encodable.RandomBeaconPubKey{PublicKey: from.GroupKey()}

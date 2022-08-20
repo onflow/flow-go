@@ -140,7 +140,8 @@ func GetDKGParticipantKeys(dkg DKG, participants flow.IdentityList) ([]crypto.Pu
 
 // ToDKGParticipantLookup computes the nodeID -> DKGParticipant lookup for a
 // DKG instance. The participants must exactly match the DKG instance configuration.
-// TODO error docs
+// All errors indicate inconsistent or invalid inputs.
+// No errors are expected during normal operation.
 func ToDKGParticipantLookup(dkg DKG, participants flow.IdentityList) (map[flow.Identifier]flow.DKGParticipant, error) {
 
 	lookup := make(map[flow.Identifier]flow.DKGParticipant)

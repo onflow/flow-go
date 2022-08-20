@@ -480,10 +480,10 @@ func (q *EpochQuery) Current() protocol.Epoch {
 		return invalid.NewEpochf("could not get current EpochCommit (id=%x) for block %x: %w", q.snap.blockID, err)
 	}
 
-	// TODO errors?
 	epoch, err := inmem.NewCommittedEpoch(setup, commit)
 	if err != nil {
-		return invalid.NewEpoch(err)
+		// all conversion errors are critical and indicate we have stored invalid epoch info - strip error type info
+		return invalid.NewEpochf("could not convert current epoch: %s", err.Error())
 	}
 	return epoch
 }
@@ -512,10 +512,10 @@ func (q *EpochQuery) Next() protocol.Epoch {
 		return invalid.NewEpochf("could not get next EpochSetup (id=%x) for block %x: %w", status.NextEpoch.SetupID, q.snap.blockID, err)
 	}
 	if phase == flow.EpochPhaseSetup {
-		// TODO errors?
 		epoch, err := inmem.NewSetupEpoch(nextSetup)
 		if err != nil {
-			return invalid.NewEpoch(err)
+			// all conversion errors are critical and indicate we have stored invalid epoch info - strip error type info
+			return invalid.NewEpochf("could not convert next (setup) epoch: %s", err.Error())
 		}
 		return epoch
 	}
@@ -526,10 +526,10 @@ func (q *EpochQuery) Next() protocol.Epoch {
 		// all errors are critical, because we must be able to retrieve EpochCommit when in committed phase
 		return invalid.NewEpochf("could not get next EpochCommit (id=%x) for block %x: %w", status.NextEpoch.CommitID, q.snap.blockID, err)
 	}
-	// TODO errors
 	epoch, err := inmem.NewCommittedEpoch(nextSetup, nextCommit)
 	if err != nil {
-		return invalid.NewEpoch(err)
+		// all conversion errors are critical and indicate we have stored invalid epoch info - strip error type info
+		return invalid.NewEpochf("could not convert next (committed) epoch: %s", err.Error())
 	}
 	return epoch
 }
@@ -564,9 +564,9 @@ func (q *EpochQuery) Previous() protocol.Epoch {
 	}
 
 	epoch, err := inmem.NewCommittedEpoch(setup, commit)
-	// TODO error docs
 	if err != nil {
-		return invalid.NewEpoch(err)
+		// all conversion errors are critical and indicate we have stored invalid epoch info - strip error type info
+		return invalid.NewEpochf("could not convert previous epoch: %s", err.Error())
 	}
 	return epoch
 }
