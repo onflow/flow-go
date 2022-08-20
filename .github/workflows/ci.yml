@@ -79,6 +79,8 @@ jobs:
     - name: Run tests
       if: github.actor != 'bors[bot]'
       run: make ci
+      env:
+        RACE_DETECTOR: 1
     - name: Run tests (Bors)
       if: github.actor == 'bors[bot]'
       uses: nick-invision/retry@v2
@@ -127,6 +129,8 @@ jobs:
     - name: Run tests
       if: github.actor != 'bors[bot]'
       run: ./tools/test_monitor/run-tests.sh
+      env:
+        RACE_DETECTOR: 1
     - name: Run tests (Bors)
       if: github.actor == 'bors[bot]'
       uses: nick-invision/retry@v2
