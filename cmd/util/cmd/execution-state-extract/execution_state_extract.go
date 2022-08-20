@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"github.com/rs/zerolog"
+	"go.uber.org/atomic"
 
 	mgr "github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
@@ -59,7 +60,8 @@ func extractExecutionState(
 		checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
 		checkpointsToKeep  = 1
 	)
-	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), complete.DefaultCacheSize, checkpointDistance, checkpointsToKeep)
+
+	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), complete.DefaultCacheSize, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
 	if err != nil {
 		return fmt.Errorf("cannot create compactor: %w", err)
 	}
