@@ -6,7 +6,6 @@ import (
 
 // EpochQuery defines the different ways to query for epoch information
 // given a Snapshot. It only exists to simplify the main Snapshot interface.
-// TODO error docs
 type EpochQuery interface {
 
 	// Current returns the current epoch as of this snapshot. All valid snapshots

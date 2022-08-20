@@ -10,9 +10,12 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 )
 
-// ToEpochSetup converts an Epoch interface instance to the underlying
-// concrete epoch setup service event.
-// TODO error docs
+// ToEpochSetup converts an Epoch interface instance to the underlying concrete
+// epoch setup service event. The input must be a valid, set up epoch.
+// Error returns:
+// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
+// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
+// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
 func ToEpochSetup(epoch Epoch) (*flow.EpochSetup, error) {
 	counter, err := epoch.Counter()
 	if err != nil {
@@ -60,7 +63,11 @@ func ToEpochSetup(epoch Epoch) (*flow.EpochSetup, error) {
 
 // ToEpochCommit converts an Epoch interface instance to the underlying
 // concrete epoch commit service event. The epoch must have been committed.
-// TODO error docs
+// Error returns:
+// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
+// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
+// * protocol.ErrEpochNotCommitted - if the epoch has not been committed.
+// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
 func ToEpochCommit(epoch Epoch) (*flow.EpochCommit, error) {
 	counter, err := epoch.Counter()
 	if err != nil {
@@ -114,7 +121,8 @@ func ToEpochCommit(epoch Epoch) (*flow.EpochCommit, error) {
 
 // GetDKGParticipantKeys retrieves the canonically ordered list of DKG
 // participant keys from the DKG.
-// TODO error docs
+// All errors indicate inconsistent or invalid inputs.
+// No errors are expected during normal operation.
 func GetDKGParticipantKeys(dkg DKG, participants flow.IdentityList) ([]crypto.PublicKey, error) {
 
 	keys := make([]crypto.PublicKey, 0, len(participants))
@@ -166,7 +174,11 @@ func ToDKGParticipantLookup(dkg DKG, participants flow.IdentityList) (map[flow.I
 }
 
 // DKGPhaseViews returns the DKG final phase views for an epoch.
-// TODO error docs
+// Error returns:
+// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
+// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
+// * protocol.ErrEpochNotCommitted - if the epoch has not been committed.
+// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
 func DKGPhaseViews(epoch Epoch) (phase1FinalView uint64, phase2FinalView uint64, phase3FinalView uint64, err error) {
 	phase1FinalView, err = epoch.DKGPhase1FinalView()
 	if err != nil {
