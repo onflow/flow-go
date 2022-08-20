@@ -69,7 +69,7 @@ func HandleRuntimeError(err error) error {
 	// if is not a runtime error return as vm error
 	// this should never happen unless a bug in the code
 	if runErr, ok = err.(runtime.Error); !ok {
-		return NewUnknownFailure(runErr)
+		return NewUnknownFailure(err)
 	}
 
 	// External errors are reported by the runtime but originate from the VM.
