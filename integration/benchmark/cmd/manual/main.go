@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/hex"
 	"flag"
 	"net"
@@ -10,7 +11,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/push"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -65,20 +65,11 @@ func main() {
 	<-server.Ready()
 	loaderMetrics := metrics.NewLoaderCollector()
 
-	if *pushgateway != "" {
-		pusher := push.New(*pushgateway, "loader").Gatherer(prometheus.DefaultGatherer)
-		go func() {
-			t := time.NewTicker(10 * time.Second)
-			defer t.Stop()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-			for {
-				err := pusher.Push()
-				if err != nil {
-					log.Warn().Err(err).Msg("failed to push metrics to pushgateway")
-				}
-			}
-		}()
-	}
+	sp := benchmark.NewStatsPusher(ctx, log, *pushgateway, "loader", prometheus.DefaultGatherer)
+	defer sp.Close()
 
 	accessNodeAddrs := strings.Split(*access, ",")
 
