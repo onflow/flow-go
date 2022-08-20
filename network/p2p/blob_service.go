@@ -104,7 +104,7 @@ func NewBlobService(
 
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			btswp := bitswap.New(ctx, bsNetwork, bs.blockStore, bs.config.BitswapOptions...).(*bitswap.Bitswap)
+			btswp := bitswap.New(ctx, bsNetwork, bs.blockStore, bs.config.BitswapOptions...)
 			bs.blockService = blockservice.New(bs.blockStore, btswp)
 
 			ready()
