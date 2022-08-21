@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
-	libP2PUtils "github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -139,16 +138,5 @@ func (suite *ProtocolStateProviderTestSuite) TestIDTranslation() {
 		fid, err := suite.provider.GetFlowID(pid)
 		require.NoError(suite.T(), err)
 		require.Equal(suite.T(), fid, participant.NodeID)
-	}
-}
-
-func (suite *ProtocolStateProviderTestSuite) TestByMultiAddress() {
-	for _, participant := range suite.participants {
-		multiAddr, err := libP2PUtils.MultiAddrFromIdentity(*participant)
-		require.NoError(suite.T(), err)
-
-		identity, found := suite.provider.ByMultiAddress(multiAddr)
-		require.True(suite.T(), found)
-		require.Equal(suite.T(), identity, participant)
 	}
 }

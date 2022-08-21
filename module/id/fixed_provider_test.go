@@ -8,7 +8,6 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	libP2PUtils "github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -27,25 +26,6 @@ func TestFixedIdentifierProvider(t *testing.T) {
 	require.True(t, contains(fp.Identifiers(), in))
 	require.False(t, contains(fp.Identifiers(), out))
 
-}
-
-// TestFixedIdentifierProvider_ByMultiAddress tests that the identifier provider provides the correct identity by multi address.
-func TestFixedIdentifierProvider_ByMultiAddress(t *testing.T) {
-	identities := make([]*flow.Identity, 10)
-	for i := 0; i < len(identities); i++ {
-		id, _ := unittest.IdentityWithNetworkingKeyFixture()
-		identities[i] = id
-	}
-
-	fp := NewFixedIdentityProvider(identities)
-
-	expectedIdentity := identities[0]
-	multiAddr, err := libP2PUtils.MultiAddrFromIdentity(*expectedIdentity)
-	require.NoError(t, err)
-
-	identity, found := fp.ByMultiAddress(multiAddr)
-	require.True(t, found)
-	require.Equal(t, expectedIdentity, identity)
 }
 
 // TestFixedIdentitiesProvider ensure the fixed identity provider contains the expected identities
