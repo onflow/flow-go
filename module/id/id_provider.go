@@ -2,8 +2,6 @@ package id
 
 import (
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/multiformats/go-multiaddr"
-
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -19,5 +17,4 @@ type IdentityProvider interface {
 	Identities(flow.IdentityFilter) flow.IdentityList
 	ByNodeID(flow.Identifier) (*flow.Identity, bool)
 	ByPeerID(peer.ID) (*flow.Identity, bool)
-	ByMultiAddress(multiaddr.Multiaddr) (*flow.Identity, bool)
 }
