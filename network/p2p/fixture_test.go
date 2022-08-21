@@ -25,7 +25,6 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/unicast"
-	libP2PUtils "github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -202,7 +201,7 @@ func silentNodeFixture(t *testing.T) (net.Listener, flow.Identity) {
 
 	go acceptAndHang(t, lst)
 
-	ip, port, err := libP2PUtils.IPPortFromMultiAddress(addrs...)
+	ip, port, err := p2p.IPPortFromMultiAddress(addrs...)
 	require.NoError(t, err)
 
 	identity := unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress(ip+":"+port))

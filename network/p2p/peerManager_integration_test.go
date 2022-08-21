@@ -14,7 +14,6 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/p2p"
-	libP2PUtils "github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -35,7 +34,7 @@ func TestPeerManager_Integration(t *testing.T) {
 	topologyPeers := identities[1:]
 
 	// adds address of all other nodes into the peer store of this node, so that it can dial them.
-	info, invalid := libP2PUtils.PeerInfosFromIDs(topologyPeers)
+	info, invalid := p2p.PeerInfosFromIDs(topologyPeers)
 	require.Empty(t, invalid)
 	for _, i := range info {
 		thisNode.Host().Peerstore().SetAddrs(i.ID, i.Addrs, peerstore.PermanentAddrTTL)

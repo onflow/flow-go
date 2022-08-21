@@ -11,7 +11,6 @@ import (
 
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/p2p"
-	libP2PUtils "github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -82,7 +81,7 @@ func testSequence(t *testing.T, sequence []fun, connMgr *p2p.ConnManager) {
 func generatePeerInfo(t *testing.T) peer.ID {
 	key := generateNetworkingKey(t)
 	identity := unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress("1.1.1.1:0"))
-	pInfo, err := libP2PUtils.PeerAddressInfo(*identity)
+	pInfo, err := p2p.PeerAddressInfo(*identity)
 	require.NoError(t, err)
 	return pInfo.ID
 }

@@ -22,7 +22,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/unicast"
-	libP2PUtils "github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -44,7 +43,7 @@ func TestStreamClosing(t *testing.T) {
 	defer stopNodes(t, nodes)
 	defer cancel()
 
-	nodeInfo1, err := libP2PUtils.PeerAddressInfo(*identities[1])
+	nodeInfo1, err := p2p.PeerAddressInfo(*identities[1])
 	require.NoError(t, err)
 
 	senderWG := sync.WaitGroup{}
@@ -152,13 +151,13 @@ func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []unicast.
 	id2 := identities[1]
 
 	// Assert that there is no outbound stream to the target yet
-	require.Equal(t, 0, libP2PUtils.CountStream(nodes[0].Host(), nodes[1].Host().ID(), protocolID, network.DirOutbound))
+	require.Equal(t, 0, p2p.CountStream(nodes[0].Host(), nodes[1].Host().ID(), protocolID, network.DirOutbound))
 
 	// Now attempt to create another 100 outbound stream to the same destination by calling CreateStream
 	streamCount := 100
 	var streams []network.Stream
 	for i := 0; i < streamCount; i++ {
-		pInfo, err := libP2PUtils.PeerAddressInfo(*id2)
+		pInfo, err := p2p.PeerAddressInfo(*id2)
 		require.NoError(t, err)
 		nodes[0].Host().Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
 		anotherStream, err := nodes[0].CreateStream(ctx, pInfo.ID)
@@ -166,7 +165,7 @@ func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []unicast.
 		require.NoError(t, err)
 		require.NotNil(t, anotherStream)
 		// assert that the stream count within libp2p incremented (a new stream was created)
-		require.Equal(t, i+1, libP2PUtils.CountStream(nodes[0].Host(), nodes[1].Host().ID(), protocolID, network.DirOutbound))
+		require.Equal(t, i+1, p2p.CountStream(nodes[0].Host(), nodes[1].Host().ID(), protocolID, network.DirOutbound))
 		// assert that the same connection is reused
 		require.Len(t, nodes[0].Host().Network().Conns(), 1)
 		streams = append(streams, anotherStream)
@@ -184,7 +183,7 @@ func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []unicast.
 		}()
 		unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not close streams on time")
 		// assert that the stream count within libp2p decremented
-		require.Equal(t, i, libP2PUtils.CountStream(nodes[0].Host(), nodes[1].Host().ID(), protocolID, network.DirOutbound))
+		require.Equal(t, i, p2p.CountStream(nodes[0].Host(), nodes[1].Host().ID(), protocolID, network.DirOutbound))
 	}
 }
 
@@ -211,14 +210,14 @@ func TestCreateStream_FallBack(t *testing.T) {
 	// Assert that there is no outbound stream to the target yet (neither default nor preferred)
 	defaultProtocolId := unicast.FlowProtocolID(sporkId)
 	preferredProtocolId := unicast.FlowGzipProtocolId(sporkId)
-	require.Equal(t, 0, libP2PUtils.CountStream(thisNode.Host(), otherNode.Host().ID(), defaultProtocolId, network.DirOutbound))
-	require.Equal(t, 0, libP2PUtils.CountStream(thisNode.Host(), otherNode.Host().ID(), preferredProtocolId, network.DirOutbound))
+	require.Equal(t, 0, p2p.CountStream(thisNode.Host(), otherNode.Host().ID(), defaultProtocolId, network.DirOutbound))
+	require.Equal(t, 0, p2p.CountStream(thisNode.Host(), otherNode.Host().ID(), preferredProtocolId, network.DirOutbound))
 
 	// Now attempt to create another 100 outbound stream to the same destination by calling CreateStream
 	streamCount := 100
 	var streams []network.Stream
 	for i := 0; i < streamCount; i++ {
-		pInfo, err := libP2PUtils.PeerAddressInfo(otherId)
+		pInfo, err := p2p.PeerAddressInfo(otherId)
 		require.NoError(t, err)
 		thisNode.Host().Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
 
@@ -229,8 +228,8 @@ func TestCreateStream_FallBack(t *testing.T) {
 
 		// number of default-protocol streams must be incremented, while preferred ones must be zero, since the other node
 		// only supports default ones.
-		require.Equal(t, i+1, libP2PUtils.CountStream(thisNode.Host(), otherNode.Host().ID(), defaultProtocolId, network.DirOutbound))
-		require.Equal(t, 0, libP2PUtils.CountStream(thisNode.Host(), otherNode.Host().ID(), preferredProtocolId, network.DirOutbound))
+		require.Equal(t, i+1, p2p.CountStream(thisNode.Host(), otherNode.Host().ID(), defaultProtocolId, network.DirOutbound))
+		require.Equal(t, 0, p2p.CountStream(thisNode.Host(), otherNode.Host().ID(), preferredProtocolId, network.DirOutbound))
 
 		// assert that the same connection is reused
 		require.Len(t, thisNode.Host().Network().Conns(), 1)
@@ -251,8 +250,8 @@ func TestCreateStream_FallBack(t *testing.T) {
 
 		// number of default-protocol streams must be decremented, while preferred ones must be zero, since the other node
 		// only supports default ones.
-		require.Equal(t, i, libP2PUtils.CountStream(thisNode.Host(), otherNode.Host().ID(), defaultProtocolId, network.DirOutbound))
-		require.Equal(t, 0, libP2PUtils.CountStream(thisNode.Host(), otherNode.Host().ID(), preferredProtocolId, network.DirOutbound))
+		require.Equal(t, i, p2p.CountStream(thisNode.Host(), otherNode.Host().ID(), defaultProtocolId, network.DirOutbound))
+		require.Equal(t, 0, p2p.CountStream(thisNode.Host(), otherNode.Host().ID(), preferredProtocolId, network.DirOutbound))
 	}
 }
 
@@ -265,7 +264,7 @@ func TestCreateStreamIsConcurrencySafe(t *testing.T) {
 	nodes, identities := nodesFixture(t, ctx, unittest.IdentifierFixture(), "test_create_stream_is_concurrency_safe", 2)
 	defer stopNodes(t, nodes)
 	require.Len(t, identities, 2)
-	nodeInfo1, err := libP2PUtils.PeerAddressInfo(*identities[1])
+	nodeInfo1, err := p2p.PeerAddressInfo(*identities[1])
 	require.NoError(t, err)
 
 	wg := sync.WaitGroup{}
@@ -315,7 +314,7 @@ func TestNoBackoffWhenCreatingStream(t *testing.T) {
 	defer stopNode(t, node1)
 
 	id2 := identities[1]
-	pInfo, err := libP2PUtils.PeerAddressInfo(*id2)
+	pInfo, err := p2p.PeerAddressInfo(*id2)
 	require.NoError(t, err)
 	nodes[0].Host().Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
 	maxTimeToWait := maxConnectAttempt * unicast.MaxConnectAttemptSleepDuration * time.Millisecond
@@ -445,9 +444,9 @@ func testUnicastOverStreamRoundTrip(t *testing.T,
 	node2 *p2p.Node,
 	ch <-chan string) {
 
-	pInfo1, err := libP2PUtils.PeerAddressInfo(id1)
+	pInfo1, err := p2p.PeerAddressInfo(id1)
 	require.NoError(t, err)
-	pInfo2, err := libP2PUtils.PeerAddressInfo(id2)
+	pInfo2, err := p2p.PeerAddressInfo(id2)
 	require.NoError(t, err)
 
 	// Create stream from node 1 to node 2
@@ -518,7 +517,7 @@ func TestCreateStreamTimeoutWithUnresponsiveNode(t *testing.T) {
 		require.NoError(t, listener.Close())
 	}()
 
-	silentNodeInfo, err := libP2PUtils.PeerAddressInfo(silentNodeId)
+	silentNodeInfo, err := p2p.PeerAddressInfo(silentNodeId)
 	require.NoError(t, err)
 
 	timeout := 1 * time.Second
@@ -552,7 +551,7 @@ func TestCreateStreamIsConcurrent(t *testing.T) {
 
 	defer stopNodes(t, goodNodes)
 	require.Len(t, goodNodeIds, 2)
-	goodNodeInfo1, err := libP2PUtils.PeerAddressInfo(*goodNodeIds[1])
+	goodNodeInfo1, err := p2p.PeerAddressInfo(*goodNodeIds[1])
 	require.NoError(t, err)
 
 	// create a silent node which never replies
@@ -560,7 +559,7 @@ func TestCreateStreamIsConcurrent(t *testing.T) {
 	defer func() {
 		require.NoError(t, listener.Close())
 	}()
-	silentNodeInfo, err := libP2PUtils.PeerAddressInfo(silentNodeId)
+	silentNodeInfo, err := p2p.PeerAddressInfo(silentNodeId)
 	require.NoError(t, err)
 
 	// creates a stream to unresponsive node and makes sure that the stream creation is blocked
@@ -609,11 +608,11 @@ func TestConnectionGating(t *testing.T) {
 	}))
 
 	defer stopNode(t, node1)
-	node1Info, err := libP2PUtils.PeerAddressInfo(node1Id)
+	node1Info, err := p2p.PeerAddressInfo(node1Id)
 	assert.NoError(t, err)
 
 	defer stopNode(t, node2)
-	node2Info, err := libP2PUtils.PeerAddressInfo(node2Id)
+	node2Info, err := p2p.PeerAddressInfo(node2Id)
 	assert.NoError(t, err)
 
 	requireError := func(err error) {

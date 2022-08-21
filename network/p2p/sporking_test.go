@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
-	libP2PUtils "github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -57,7 +56,7 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 		"test_crosstalk_prevention_on_network_key_change",
 		withNetworkingPrivateKey(node2key),
 	)
-	peerInfo2, err := libP2PUtils.PeerAddressInfo(id2)
+	peerInfo2, err := p2p.PeerAddressInfo(id2)
 	require.NoError(t, err)
 
 	// create stream from node 1 to node 2
@@ -101,7 +100,7 @@ func TestOneToOneCrosstalkPrevention(t *testing.T) {
 	node1, id1 := nodeFixture(t, ctx, sporkId1, "test_one_to_one_crosstalk_prevention")
 
 	defer stopNode(t, node1)
-	peerInfo1, err := libP2PUtils.PeerAddressInfo(id1)
+	peerInfo1, err := p2p.PeerAddressInfo(id1)
 	require.NoError(t, err)
 
 	// create and start node 2 on localhost and random port
@@ -157,7 +156,7 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 		"test_one_to_k_crosstalk_prevention",
 	)
 
-	pInfo2, err := libP2PUtils.PeerAddressInfo(id2)
+	pInfo2, err := p2p.PeerAddressInfo(id2)
 	defer stopNode(t, node2)
 	require.NoError(t, err)
 

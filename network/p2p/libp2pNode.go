@@ -21,7 +21,6 @@ import (
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p/unicast"
-	libP2PUtils "github.com/onflow/flow-go/network/p2p/utils"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
 )
 
@@ -160,7 +159,7 @@ func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stre
 
 // GetIPPort returns the IP and Port the libp2p node is listening on.
 func (n *Node) GetIPPort() (string, string, error) {
-	return libP2PUtils.IPPortFromMultiAddress(n.host.Network().ListenAddresses()...)
+	return IPPortFromMultiAddress(n.host.Network().ListenAddresses()...)
 }
 
 func (n *Node) RoutingTable() *kbucket.RoutingTable {
