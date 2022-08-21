@@ -467,20 +467,24 @@ func (q *EpochQuery) Current() protocol.Epoch {
 
 	status, err := q.snap.state.epoch.statuses.ByBlockID(q.snap.blockID)
 	if err != nil {
-		return invalid.NewEpoch(err)
+		return invalid.NewEpoch(fmt.Errorf("failed to get epoch statuses for block ID %s: %w",
+			q.snap.blockID, err))
 	}
 	setup, err := q.snap.state.epoch.setups.ByID(status.CurrentEpoch.SetupID)
 	if err != nil {
-		return invalid.NewEpoch(err)
+		return invalid.NewEpoch(fmt.Errorf("failed to get epoch setups for setup ID %s at block %v: %w",
+			status.CurrentEpoch.SetupID, q.snap.blockID, err))
 	}
 	commit, err := q.snap.state.epoch.commits.ByID(status.CurrentEpoch.CommitID)
 	if err != nil {
-		return invalid.NewEpoch(err)
+		return invalid.NewEpoch(fmt.Errorf("failed to get epoch commits for commit ID %s at block %v: %w",
+			status.CurrentEpoch.CommitID, q.snap.blockID, err))
 	}
 
 	epoch, err := inmem.NewCommittedEpoch(setup, commit)
 	if err != nil {
-		return invalid.NewEpoch(err)
+		return invalid.NewEpoch(fmt.Errorf("failed to get new committed epoch with setup (%s) and commit (%s) at block %v: %w",
+			setup.ID(), commit.ID(), q.snap.blockID, err))
 	}
 	return epoch
 }
