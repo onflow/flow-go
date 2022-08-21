@@ -138,7 +138,7 @@ func (l *Libp2pConnector) pruneAllConnectionsExcept(peerIDs peer.IDSlice) {
 
 		// retain the connection if there is a Flow One-to-One stream on that connection
 		// (we do not want to sever a connection with on going direct one-to-one traffic)
-		flowStream := FlowStream(conn)
+		flowStream := flowStream(conn)
 		if flowStream != nil {
 			log.Info().
 				Str("stream_protocol", string(flowStream.Protocol())).

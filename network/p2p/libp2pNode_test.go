@@ -7,7 +7,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
-	libP2PUtils "github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -39,10 +39,10 @@ func TestMultiAddress(t *testing.T) {
 	}
 
 	for _, tc := range tt {
-		ip, port, _, err := libP2PUtils.NetworkingInfo(*tc.identity)
+		ip, port, _, err := p2p.NetworkingInfo(*tc.identity)
 		require.NoError(t, err)
 
-		actualAddress := libP2PUtils.MultiAddressStr(ip, port)
+		actualAddress := p2p.MultiAddressStr(ip, port)
 		assert.Equal(t, tc.multiaddress, actualAddress, "incorrect multi-address translation")
 	}
 
@@ -74,12 +74,12 @@ func TestGetPeerInfo(t *testing.T) {
 		identity := unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress("1.1.1.1:0"))
 
 		// translates node-i address into info
-		info, err := libP2PUtils.PeerAddressInfo(*identity)
+		info, err := p2p.PeerAddressInfo(*identity)
 		require.NoError(t, err)
 
 		// repeats the translation for node-i
 		for j := 0; j < 10; j++ {
-			rinfo, err := libP2PUtils.PeerAddressInfo(*identity)
+			rinfo, err := p2p.PeerAddressInfo(*identity)
 			require.NoError(t, err)
 			assert.Equal(t, rinfo.String(), info.String(), "inconsistent id generated")
 		}
@@ -98,7 +98,7 @@ func TestAddPeers(t *testing.T) {
 
 	// add the remaining nodes to the first node as its set of peers
 	for _, identity := range identities[1:] {
-		peerInfo, err := libP2PUtils.PeerAddressInfo(*identity)
+		peerInfo, err := p2p.PeerAddressInfo(*identity)
 		require.NoError(t, err)
 		require.NoError(t, nodes[0].AddPeer(ctx, peerInfo))
 	}
@@ -115,7 +115,7 @@ func TestRemovePeers(t *testing.T) {
 
 	// create nodes
 	nodes, identities := nodesFixture(t, ctx, unittest.IdentifierFixture(), "test_remove_peers", count)
-	peerInfos, errs := libP2PUtils.PeerInfosFromIDs(identities)
+	peerInfos, errs := p2p.PeerInfosFromIDs(identities)
 	assert.Len(t, errs, 0)
 	defer stopNodes(t, nodes)
 
@@ -146,7 +146,7 @@ func TestConnGater(t *testing.T) {
 		return ok
 	}))
 	defer stopNode(t, node1)
-	node1Info, err := libP2PUtils.PeerAddressInfo(identity1)
+	node1Info, err := p2p.PeerAddressInfo(identity1)
 	assert.NoError(t, err)
 
 	node2Peers := make(map[peer.ID]struct{})
@@ -155,7 +155,7 @@ func TestConnGater(t *testing.T) {
 		return ok
 	}))
 	defer stopNode(t, node2)
-	node2Info, err := libP2PUtils.PeerAddressInfo(identity2)
+	node2Info, err := p2p.PeerAddressInfo(identity2)
 	assert.NoError(t, err)
 
 	node1.Host().Peerstore().AddAddrs(node2Info.ID, node2Info.Addrs, peerstore.PermanentAddrTTL)
