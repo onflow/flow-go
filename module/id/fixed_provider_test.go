@@ -4,14 +4,14 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestFixedIdentifierProvider ensure the fixed identity provider contains the expected identifiers
 func TestFixedIdentifierProvider(t *testing.T) {
 	identifiers := make([]flow.Identifier, 10)
 	for i := 0; i < len(identifiers); i++ {
@@ -23,12 +23,11 @@ func TestFixedIdentifierProvider(t *testing.T) {
 	in := identifiers[rand.Intn(10)]
 	out := unittest.IdentifierFixture()
 
-	require.True(t, contains(fp.Identifiers(), in))
-	require.False(t, contains(fp.Identifiers(), out))
+	assert.True(t, contains(fp.Identifiers(), in))
+	assert.False(t, contains(fp.Identifiers(), out))
 
 }
 
-// TestFixedIdentitiesProvider ensure the fixed identity provider contains the expected identities
 func TestFixedIdentitiesProvider(t *testing.T) {
 	identities := make([]*flow.Identity, 10)
 	for i := 0; i < len(identities); i++ {
@@ -40,8 +39,8 @@ func TestFixedIdentitiesProvider(t *testing.T) {
 	in := identities[rand.Intn(10)]
 	out := unittest.IdentityFixture()
 
-	require.True(t, idContains(fp.Identities(filter.Any), in))
-	require.False(t, idContains(fp.Identities(filter.Any), out))
+	assert.True(t, idContains(fp.Identities(filter.Any), in))
+	assert.False(t, idContains(fp.Identities(filter.Any), out))
 
 }
 

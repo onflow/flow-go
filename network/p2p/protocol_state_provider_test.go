@@ -5,6 +5,7 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -106,13 +107,13 @@ func (suite *ProtocolStateProviderTestSuite) checkStateTransition() {
 
 	suite.triggerUpdate()
 
-	require.ElementsMatch(suite.T(), suite.participants, suite.provider.Identities(filter.Any))
+	assert.ElementsMatch(suite.T(), suite.participants, suite.provider.Identities(filter.Any))
 	for _, participant := range suite.participants {
 		pid, err := suite.provider.GetPeerID(participant.NodeID)
 		require.NoError(suite.T(), err)
 		fid, err := suite.provider.GetFlowID(pid)
 		require.NoError(suite.T(), err)
-		require.Equal(suite.T(), fid, participant.NodeID)
+		assert.Equal(suite.T(), fid, participant.NodeID)
 	}
 	for _, participant := range oldParticipants {
 		_, err := suite.provider.GetPeerID(participant.NodeID)
@@ -134,9 +135,9 @@ func (suite *ProtocolStateProviderTestSuite) TestIDTranslation() {
 		require.NoError(suite.T(), err)
 		expectedPid, err := peer.IDFromPublicKey(key)
 		require.NoError(suite.T(), err)
-		require.Equal(suite.T(), expectedPid, pid)
+		assert.Equal(suite.T(), expectedPid, pid)
 		fid, err := suite.provider.GetFlowID(pid)
 		require.NoError(suite.T(), err)
-		require.Equal(suite.T(), fid, participant.NodeID)
+		assert.Equal(suite.T(), fid, participant.NodeID)
 	}
 }
