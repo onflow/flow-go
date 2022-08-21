@@ -52,17 +52,26 @@ func DefaultLibP2PNodeFactory(
 		connManager := NewConnManager(log, metrics)
 
 		// drop incoming connections from unknown peers
-		onInterceptAccept := func(addr multiaddr.Multiaddr) bool {
-			_, found := idProvider.ByMultiAddress(addr)
-			return found
-		}
-
 		peerFilter := func(pid peer.ID) bool {
 			_, found := idProvider.ByPeerID(pid)
 			return found
 		}
+		// drop incoming connections from unknown and ejected peers
+		isEjectedPeerFilter := func(pid peer.ID) bool {
+			id, found := idProvider.ByPeerID(pid)
+			if !found {
+				return false
+			}
+			if id.Ejected {
+				return false
+			}
+			return true
+		}
 
-		connGater := NewConnGater(log, peerFilter, WithOnInterceptAccept(onInterceptAccept))
+		connGater := NewConnGater(log,
+			WithOnInterceptPeerDialFilters([]PeerFilter{peerFilter}),
+			WithOnInterceptSecuredFilters([]PeerFilter{isEjectedPeerFilter}),
+		)
 
 		builder := NewNodeBuilder(log, address, flowKey, sporkId).
 			SetBasicResolver(resolver).

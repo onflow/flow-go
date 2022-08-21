@@ -13,14 +13,17 @@ import (
 
 var _ connmgr.ConnectionGater = (*ConnGater)(nil)
 
-// OnInterceptAccept func used to filter peers when the InterceptAccept callback is invoked by libP2P.
-type OnInterceptAccept func(addr multiaddr.Multiaddr) bool
-
 type ConnGaterOption func(*ConnGater)
 
-func WithOnInterceptAccept(f OnInterceptAccept) ConnGaterOption {
+func WithOnInterceptPeerDialFilters(filters []PeerFilter) ConnGaterOption {
 	return func(c *ConnGater) {
-		c.onInterceptAccept = f
+		c.onInterceptPeerDialFilters = filters
+	}
+}
+
+func WithOnInterceptSecuredFilters(filters []PeerFilter) ConnGaterOption {
+	return func(c *ConnGater) {
+		c.onInterceptSecuredFilters = filters
 	}
 }
 
@@ -28,17 +31,16 @@ func WithOnInterceptAccept(f OnInterceptAccept) ConnGaterOption {
 // It provides node allowlisting by libp2p peer.ID which is derived from the node public networking key
 type ConnGater struct {
 	sync.RWMutex
-	onInterceptAccept OnInterceptAccept
-	peerFilter        PeerFilter
-	log               zerolog.Logger
+	onInterceptPeerDialFilters []PeerFilter
+	onInterceptSecuredFilters  []PeerFilter
+	log                        zerolog.Logger
 }
 
 type PeerFilter func(peer.ID) bool
 
-func NewConnGater(log zerolog.Logger, peerFilter PeerFilter, opts ...ConnGaterOption) *ConnGater {
+func NewConnGater(log zerolog.Logger, opts ...ConnGaterOption) *ConnGater {
 	cg := &ConnGater{
-		log:        log,
-		peerFilter: peerFilter,
+		log: log,
 	}
 
 	for _, opt := range opts {
@@ -50,7 +52,7 @@ func NewConnGater(log zerolog.Logger, peerFilter PeerFilter, opts ...ConnGaterOp
 
 // InterceptPeerDial - a callback which allows or disallows outbound connection
 func (c *ConnGater) InterceptPeerDial(p peer.ID) bool {
-	return c.peerFilter(p)
+	return c.isAllowed(p, c.onInterceptPeerDialFilters)
 }
 
 // InterceptAddrDial is not used. Currently, allowlisting is only implemented by Peer IDs and not multi-addresses
@@ -60,9 +62,6 @@ func (c *ConnGater) InterceptAddrDial(_ peer.ID, ma multiaddr.Multiaddr) bool {
 
 // InterceptAccept is not used. Currently, allowlisting is only implemented by Peer IDs and not multi-addresses
 func (c *ConnGater) InterceptAccept(cm network.ConnMultiaddrs) bool {
-	if c.onInterceptAccept != nil {
-		return c.onInterceptAccept(cm.RemoteMultiaddr())
-	}
 	return true
 }
 
@@ -71,7 +70,7 @@ func (c *ConnGater) InterceptAccept(cm network.ConnMultiaddrs) bool {
 func (c *ConnGater) InterceptSecured(dir network.Direction, p peer.ID, addr network.ConnMultiaddrs) bool {
 	switch dir {
 	case network.DirInbound:
-		allowed := c.peerFilter(p)
+		allowed := c.isAllowed(p, c.onInterceptSecuredFilters)
 		if !allowed {
 			// log the illegal connection attempt from the remote node
 			c.log.Info().
@@ -90,4 +89,14 @@ func (c *ConnGater) InterceptSecured(dir network.Direction, p peer.ID, addr netw
 // InterceptUpgraded decision to continue or drop the connection should have been made before this call
 func (c *ConnGater) InterceptUpgraded(network.Conn) (allow bool, reason control.DisconnectReason) {
 	return true, 0
+}
+
+func (c *ConnGater) isAllowed(p peer.ID, filters []PeerFilter) bool {
+	for _, allowed := range filters {
+		if !allowed(p) {
+			return false
+		}
+	}
+
+	return true
 }
