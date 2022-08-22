@@ -417,14 +417,7 @@ func CrashTest(
 		require.Greater(t, cmd.ProcessState.ExitCode(), 0)
 	} else {
 		// expect specific status
-		anyStatus := false
-		for _, status := range expectedStatus {
-			if cmd.ProcessState.ExitCode() == status {
-				anyStatus = true
-				break
-			}
-		}
-		require.True(t, anyStatus, "expected status %+v, got %v", expectedStatus, cmd.ProcessState.ExitCode())
+		require.Contains(t, expectedStatus, cmd.ProcessState.ExitCode())
 	}
 
 	// expect logger.Fatal() message to be pushed to stdout
