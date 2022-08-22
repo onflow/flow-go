@@ -83,7 +83,7 @@ emulator-build:
 	cd ./fvm && go test ./... -run=NoTestHasThisPrefix
 
 .PHONY: test
-test: generate-mocks emulator-build unittest
+test: verfiy-mocks emulator-build unittest
 
 .PHONY: integration-test
 integration-test: docker-build-flow
@@ -115,6 +115,10 @@ generate: generate-proto generate-mocks
 .PHONY: generate-proto
 generate-proto:
 	prototool generate protobuf
+
+.PHONY: verfiy-mocks
+verfiy-mocks: generate-mocks
+	git diff --exit-code
 
 .PHONY: generate-mocks
 generate-mocks:
