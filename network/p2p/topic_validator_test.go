@@ -57,11 +57,11 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 	require.NoError(t, sn1.AddPeer(context.TODO(), *host.InfoFromHost(sn2.Host())))
 
 	// sn1 will subscribe with is staked callback that should force the TopicValidator to drop the message received from sn2
-	sub1, err := sn1.Subscribe(topic, unittest.NetworkCodec(), isStaked)
+	sub1, err := sn1.Subscribe(topic, unittest.NetworkCodec(), isStaked, unittest.NetworkSlashingViolationsConsumer(logger))
 	require.NoError(t, err)
 
 	// sn2 will subscribe with an unauthenticated callback to allow it to send the unauthenticated message
-	_, err = sn2.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter())
+	_, err = sn2.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(logger))
 	require.NoError(t, err)
 
 	// assert that the nodes are connected as expected
@@ -112,9 +112,9 @@ func TestTopicValidator_PublicChannel(t *testing.T) {
 	require.NoError(t, sn1.AddPeer(context.TODO(), *host.InfoFromHost(sn2.Host())))
 
 	// sn1 & sn2 will subscribe with unauthenticated callback to allow it to send and receive unauthenticated messages
-	sub1, err := sn1.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter())
+	sub1, err := sn1.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(logger))
 	require.NoError(t, err)
-	sub2, err := sn2.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter())
+	sub2, err := sn2.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(logger))
 	require.NoError(t, err)
 
 	// assert that the nodes are connected as expected
@@ -184,11 +184,11 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	require.NoError(t, an1.AddPeer(context.TODO(), *host.InfoFromHost(sn1.Host())))
 
 	// sn1 and sn2 subscribe to the topic with the topic validator
-	sub1, err := sn1.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), authorizedSenderValidator)
+	sub1, err := sn1.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(logger), authorizedSenderValidator)
 	require.NoError(t, err)
-	sub2, err := sn2.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), authorizedSenderValidator)
+	sub2, err := sn2.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(logger), authorizedSenderValidator)
 	require.NoError(t, err)
-	sub3, err := an1.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter())
+	sub3, err := an1.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(logger))
 	require.NoError(t, err)
 
 	// assert that the nodes are connected as expected
@@ -284,9 +284,9 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	require.NoError(t, sn1.AddPeer(context.TODO(), *host.InfoFromHost(sn2.Host())))
 
 	// sn1 subscribe to the topic with the topic validator, while sn2 will subscribe without the topic validator to allow sn2 to publish unauthorized messages
-	sub1, err := sn1.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), authorizedSenderValidator)
+	sub1, err := sn1.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(logger), authorizedSenderValidator)
 	require.NoError(t, err)
-	_, err = sn2.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter())
+	_, err = sn2.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(logger))
 	require.NoError(t, err)
 
 	// assert that the nodes are connected as expected
@@ -354,11 +354,11 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	require.NoError(t, an1.AddPeer(context.TODO(), *host.InfoFromHost(sn1.Host())))
 
 	// sn1 subscribe to the topic with the topic validator, while sn2 will subscribe without the topic validator to allow sn2 to publish unauthorized messages
-	sub1, err := sn1.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), authorizedSenderValidator)
+	sub1, err := sn1.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(logger), authorizedSenderValidator)
 	require.NoError(t, err)
-	sub2, err := sn2.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter())
+	sub2, err := sn2.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(logger))
 	require.NoError(t, err)
-	sub3, err := an1.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter())
+	sub3, err := an1.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(logger))
 	require.NoError(t, err)
 
 	// assert that the nodes are connected as expected
@@ -441,11 +441,11 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	require.NoError(t, ln1.AddPeer(context.TODO(), *host.InfoFromHost(ln2.Host())))
 	require.NoError(t, ln3.AddPeer(context.TODO(), *host.InfoFromHost(ln1.Host())))
 
-	sub1, err := ln1.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), authorizedSenderValidator)
+	sub1, err := ln1.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(logger), authorizedSenderValidator)
 	require.NoError(t, err)
-	sub2, err := ln2.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), authorizedSenderValidator)
+	sub2, err := ln2.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(logger), authorizedSenderValidator)
 	require.NoError(t, err)
-	sub3, err := ln3.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), authorizedSenderValidator)
+	sub3, err := ln3.Subscribe(topic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(logger), authorizedSenderValidator)
 	require.NoError(t, err)
 
 	// assert that the nodes are connected as expected

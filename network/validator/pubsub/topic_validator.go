@@ -7,6 +7,9 @@ import (
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/codec"
+	"github.com/onflow/flow-go/network/slashing"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/network"
@@ -63,7 +66,7 @@ type TopicValidatorData struct {
 
 // TopicValidator is the topic validator that is registered with libP2P whenever a flow libP2P node subscribes to a topic.
 // The TopicValidator will decode and perform validation on the raw pubsub message.
-func TopicValidator(log zerolog.Logger, codec network.Codec, peerFilter func(peer.ID) bool, validators ...validator.PubSubMessageValidator) pubsub.ValidatorEx {
+func TopicValidator(log zerolog.Logger, c network.Codec, slashingViolationsConsumer slashing.ViolationsConsumer, peerFilter func(peer.ID) bool, validators ...validator.PubSubMessageValidator) pubsub.ValidatorEx {
 	log = log.With().
 		Str("component", "libp2p_node_topic_validator").
 		Logger()
@@ -92,10 +95,24 @@ func TopicValidator(log zerolog.Logger, codec network.Codec, peerFilter func(pee
 		}
 
 		// Convert message payload to a known message type
-		decodedMsgPayload, err := codec.Decode(msg.Payload)
+		decodedMsgPayload, err := c.Decode(msg.Payload)
+		if codec.IsErrUnknownMsgCode(err) {
+			// slash peer if message contains unknown message code byte
+			slashingViolationsConsumer.OnUnknownMsgTypeError(violation(from, msg, err))
+			return pubsub.ValidationReject
+		}
+		if codec.IsErrMsgUnmarshal(err) {
+			// slash if peer sent a message that could not be marshalled into the message type denoted by the message code byte
+			slashingViolationsConsumer.OnInvalidMsgError(violation(from, msg, err))
+			return pubsub.ValidationReject
+		}
+
+		// unexpected error condition. this indicates there's a bug
+		// don't crash as a result of external inputs since that creates a DoS vector.
 		if err != nil {
-			log.Warn().
-				Err(fmt.Errorf("could not decode message: %w", err)).
+			log.
+				Error().
+				Err(fmt.Errorf("unexpected error while decoding message: %w", err)).
 				Str("peer_id", from.String()).
 				Hex("sender", msg.OriginID).
 				Msg("rejecting message")
@@ -119,5 +136,15 @@ func TopicValidator(log zerolog.Logger, codec network.Codec, peerFilter func(pee
 		}
 
 		return result
+	}
+}
+
+func violation(pid peer.ID, msg message.Message, err error) *slashing.Violation {
+	return &slashing.Violation{
+		PeerID:    pid.String(),
+		MsgType:   msg.Type,
+		Channel:   channels.Channel(msg.ChannelID),
+		IsUnicast: false,
+		Err:       err,
 	}
 }

@@ -41,13 +41,13 @@ func TestFilterSubscribe(t *testing.T) {
 
 	badTopic := channels.TopicFromChannel(channels.SyncCommittee, sporkId)
 
-	sub1, err := node1.Subscribe(badTopic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter())
+	sub1, err := node1.Subscribe(badTopic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(unittest.Logger()))
 	require.NoError(t, err)
 
-	sub2, err := node2.Subscribe(badTopic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter())
+	sub2, err := node2.Subscribe(badTopic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(unittest.Logger()))
 	require.NoError(t, err)
 
-	unstakedSub, err := unstakedNode.Subscribe(badTopic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter())
+	unstakedSub, err := unstakedNode.Subscribe(badTopic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(unittest.Logger()))
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
@@ -112,7 +112,7 @@ func TestCanSubscribe(t *testing.T) {
 	}()
 
 	goodTopic := channels.TopicFromChannel(channels.ProvideCollections, sporkId)
-	_, err := collectionNode.Subscribe(goodTopic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter())
+	_, err := collectionNode.Subscribe(goodTopic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(unittest.Logger()))
 	require.NoError(t, err)
 
 	var badTopic channels.Topic
@@ -126,11 +126,11 @@ func TestCanSubscribe(t *testing.T) {
 			break
 		}
 	}
-	_, err = collectionNode.Subscribe(badTopic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter())
+	_, err = collectionNode.Subscribe(badTopic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(unittest.Logger()))
 	require.Error(t, err)
 
 	clusterTopic := channels.TopicFromChannel(channels.SyncCluster(flow.Emulator), sporkId)
-	_, err = collectionNode.Subscribe(clusterTopic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter())
+	_, err = collectionNode.Subscribe(clusterTopic, unittest.NetworkCodec(), unittest.AllowAllPeerFilter(), unittest.NetworkSlashingViolationsConsumer(unittest.Logger()))
 	require.NoError(t, err)
 }
 

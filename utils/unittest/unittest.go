@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/onflow/flow-go/network/slashing"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -411,4 +413,9 @@ func CrashTest(t *testing.T, scenario func(*testing.T), expectedErrorMsg string,
 	// expect logger.Fatal() message to be pushed to stdout
 	outStr := string(outBytes)
 	require.Contains(t, outStr, expectedErrorMsg)
+}
+
+// NetworkSlashingViolationsConsumer returns a slashing violations consumer for network middleware
+func NetworkSlashingViolationsConsumer(logger zerolog.Logger) slashing.ViolationsConsumer {
+	return slashing.NewSlashingViolationsConsumer(logger)
 }
