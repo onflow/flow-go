@@ -31,6 +31,14 @@ func TestCrashTest_ExitCode(t *testing.T) {
 	CrashTest(t, f, "exit code != 1")
 }
 
+// TestCrashTest_ExitCodeExplicit tests that CrashTest() catches exit codes other than 1 w/ an explicit exit code.
+func TestCrashTest_ExitCodeExplicit(t *testing.T) {
+	f := func(t *testing.T) {
+		crash_ExitCode()
+	}
+	CrashTest(t, f, "exit code != 1", 4, 3, 2)
+}
+
 // TestCrashTest_Logger tests that CrashTest() can read fatal logger messages from stdout before a crash. This test
 // assumes that the logger uses a hook to send fatal messages to stdout.
 func TestCrashTest_Logger(t *testing.T) {
