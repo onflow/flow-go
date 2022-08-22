@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 
 	"github.com/onflow/flow-go/fvm/blueprints"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -523,7 +524,7 @@ func (b *BootstrapProcedure) deployEpoch(service, fungibleToken, flowToken, flow
 
 	context := NewContextFromParent(b.ctx,
 		WithBlockHeader(b.rootBlock),
-		WithBlocks(&NoopBlockFinder{}),
+		WithBlocks(&environment.NoopBlockFinder{}),
 	)
 
 	txError, err := b.vm.invokeMetaTransaction(

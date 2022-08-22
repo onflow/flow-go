@@ -43,6 +43,10 @@ func LoggerWithLevel(level zerolog.Level) zerolog.Logger {
 	return LoggerWithWriterAndLevel(os.Stderr, level)
 }
 
+func LoggerWithName(mod string) zerolog.Logger {
+	return Logger().With().Str("module", mod).Logger()
+}
+
 func NewLoggerHook() LoggerHook {
 	return LoggerHook{
 		logs: &strings.Builder{},

@@ -32,18 +32,16 @@ func getEnvironmentMeterParameters(
 
 	var err error
 	if ctx.AllowContextOverrideByExecutionState {
-		sth := state.NewStateHolder(
-			state.NewState(
-				view,
-				meter.NewMeter(meter.DefaultParameters()),
-				state.DefaultParameters().
-					WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
-					WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
-					WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize)))
+		stTxn := state.NewStateTransaction(
+			view,
+			state.DefaultParameters().
+				WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
+				WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
+				WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize))
 
-		sth.DisableAllLimitEnforcements()
+		stTxn.DisableAllLimitEnforcements()
 
-		env := NewScriptEnvironment(context.Background(), ctx, vm, sth, programs)
+		env := NewScriptEnvironment(context.Background(), ctx, vm, stTxn, programs)
 
 		params, err = fillEnvironmentMeterParameters(ctx, env, params)
 	}

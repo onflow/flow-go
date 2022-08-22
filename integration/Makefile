@@ -8,14 +8,6 @@ integration-test: access-tests ghost-tests mvp-tests execution-tests verificatio
 .PHONY: ci-integration-test
 ci-integration-test: access-tests ghost-tests mvp-tests epochs-tests consensus-tests execution-tests verification-tests network-tests collection-tests
 
-.PHONY: benchmark
-benchmark:
-	go test -v -tags relic -count=1 -timeout 30m ./benchmark -run Benchmark
-
-.PHONY: ci-benchmark
-ci-benchmark:
-	ENV=TEAMCITY go test -v -tags relic -count=1 -timeout 15m ./benchmark -run Benchmark
-
 ############################################################################################
 # CAUTION: DO NOT MODIFY THE TARGETS BELOW! DOING SO WILL BREAK THE FLAKY TEST MONITOR
 # In particular, do not skip tests by commenting them out here.
@@ -23,7 +15,7 @@ ci-benchmark:
 # Run unit tests for test utilities in this module
 .PHONY: test
 test:
-	go test $(if $(VERBOSE),-v,) -tags relic -coverprofile=$(COVER_PROFILE) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) `go list ./... | grep -v -e integration/tests -e integration/benchmark`
+	go test $(if $(VERBOSE),-v,) -tags relic -coverprofile=$(COVER_PROFILE) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) `go list ./... | grep -v -e integration/tests`
 
 .PHONY: access-tests
 access-tests:
