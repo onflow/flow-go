@@ -14,6 +14,29 @@ import (
 
 // revive:enable
 
+// SigningAlgorithm is an identifier for a signing algorithm
+// (and parameters if applicable)
+type SigningAlgorithm int
+
+const (
+	// Supported signing algorithms
+	UnknownSigningAlgorithm SigningAlgorithm = iota
+	// BLSBLS12381 is BLS on BLS 12-381 curve
+	BLSBLS12381
+	// ECDSAP256 is ECDSA on NIST P-256 curve
+	ECDSAP256
+	// ECDSASecp256k1 is ECDSA on secp256k1 curve
+	ECDSASecp256k1
+)
+
+// String returns the string representation of this signing algorithm.
+func (f SigningAlgorithm) String() string {
+	return [...]string{"UNKNOWN", "BLS_BLS12381", "ECDSA_P256", "ECDSA_secp256k1"}[f]
+}
+
+// Signature is a generic type, regardless of the signature scheme
+type Signature []byte
+
 // Signer interface
 type signer interface {
 	// generatePrivateKey generates a private key

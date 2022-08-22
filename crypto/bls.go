@@ -43,6 +43,38 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 )
 
+const (
+	// BLS12-381
+	// p size in bytes, where G1 is defined over the field Zp
+	fieldSize = 48
+	//
+	// 1 for compressed, 0 for uncompressed - values should not be changed
+	uncompressed = 0 //nolint
+	compressed   = 1
+	// Points compression when serialized
+	serializationG1 = compressed
+	serializationG2 = compressed
+	//
+	// SignatureLenBLSBLS12381 is the size of G1 elements
+	SignatureLenBLSBLS12381 = fieldSize * (2 - serializationG1) // the length is divided by 2 if compression is on
+	PrKeyLenBLSBLS12381     = 32
+	// PubKeyLenBLSBLS12381 is the size of G2 elements
+	PubKeyLenBLSBLS12381        = 2 * fieldSize * (2 - serializationG2) // the length is divided by 2 if compression is on
+	KeyGenSeedMinLenBLSBLS12381 = PrKeyLenBLSBLS12381 + (securityBits / 8)
+	KeyGenSeedMaxLenBLSBLS12381 = maxScalarSize
+	// expandMsgOutput is the output length of the expand_message step as required by the hash_to_curve algorithm
+	expandMsgOutput = 2 * (fieldSize + (securityBits / 8))
+	// hash to curve suite ID of the form : CurveID_ || HashID_ || MapID_ || encodingVariant_
+	h2cSuiteID = "BLS12381G1_XOF:KMAC128_SSWU_RO_"
+	// scheme implemented as a countermasure for Rogue attacks of the form : SchemeTag_
+	schemeTag = "POP_"
+	// Cipher suite used for BLS signatures of the form : BLS_SIG_ || h2cSuiteID || SchemeTag_
+	blsSigCipherSuite = "BLS_SIG_" + h2cSuiteID + schemeTag
+	// Cipher suite used for BLS PoP of the form : BLS_POP_ || h2cSuiteID || SchemeTag_
+	// The PoP cipher suite is guaranteed to be different than all signature ciphersuites
+	blsPOPCipherSuite = "BLS_POP_" + h2cSuiteID + schemeTag
+)
+
 // blsBLS12381Algo, embeds SignAlgo
 type blsBLS12381Algo struct {
 	// points to Relic context of BLS12-381 with all the parameters

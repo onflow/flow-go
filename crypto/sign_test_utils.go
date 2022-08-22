@@ -176,13 +176,13 @@ func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
 		assert.Nil(t, sk)
 	})
 
-	// test invalid private keys (equal to the curve group order)
+	// test invalid private and public keys (invalid length)
 	t.Run("invalid key length", func(t *testing.T) {
 		// private key
 		skLens := make(map[SigningAlgorithm]int)
 		skLens[ECDSAP256] = PrKeyLenECDSAP256
 		skLens[ECDSASecp256k1] = PrKeyLenECDSASecp256k1
-		skLens[BLSBLS12381] = PrKeyLenBLSBLS12381
+		skLens[BLSBLS12381] = 32
 
 		bytes := make([]byte, skLens[salg]+1)
 		sk, err := DecodePrivateKey(salg, bytes)
@@ -194,7 +194,7 @@ func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
 		pkLens := make(map[SigningAlgorithm]int)
 		pkLens[ECDSAP256] = PubKeyLenECDSAP256
 		pkLens[ECDSASecp256k1] = PubKeyLenECDSASecp256k1
-		pkLens[BLSBLS12381] = PubKeyLenBLSBLS12381
+		pkLens[BLSBLS12381] = 96
 
 		bytes = make([]byte, pkLens[salg]+1)
 		pk, err := DecodePublicKey(salg, bytes)

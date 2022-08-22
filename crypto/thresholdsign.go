@@ -15,6 +15,13 @@ import (
 // In order to optimize equally for unforgeability and robustness,
 // the input threshold value (t) should be set to t = floor((n-1)/2).
 
+const (
+	// ThresholdSignMinSize is the minimum size of a group participating in a threshold signature protocol
+	ThresholdSignMinSize = MinimumThreshold + 1
+	// ThresholdSignMaxSize is the maximum size of a group participating in a threshold signature protocol
+	ThresholdSignMaxSize = DKGMaxSize
+)
+
 // ThresholdSignatureInspector is an inspector of the threshold signature protocol.
 // The interface only allows inspecting the threshold signing protocol without taking part in it.
 type ThresholdSignatureInspector interface {

@@ -19,6 +19,26 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 )
 
+const (
+	// ECDSA
+
+	KeyGenSeedMaxLenECDSA = 2048 // large enough constant accepted by the implementation
+
+	// NIST P256
+	SignatureLenECDSAP256 = 64
+	PrKeyLenECDSAP256     = 32
+	// PubKeyLenECDSAP256 is the size of uncompressed points on P256
+	PubKeyLenECDSAP256        = 64
+	KeyGenSeedMinLenECDSAP256 = PrKeyLenECDSAP256 + (securityBits / 8)
+
+	// SECG secp256k1
+	SignatureLenECDSASecp256k1 = 64
+	PrKeyLenECDSASecp256k1     = 32
+	// PubKeyLenECDSASecp256k1 is the size of uncompressed points on P256
+	PubKeyLenECDSASecp256k1        = 64
+	KeyGenSeedMinLenECDSASecp256k1 = PrKeyLenECDSASecp256k1 + (securityBits / 8)
+)
+
 // ecdsaAlgo embeds SignAlgo
 type ecdsaAlgo struct {
 	// elliptic curve

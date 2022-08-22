@@ -25,6 +25,20 @@ import (
 // Private keys are scalar in Zr, where r is the group order of G1/G2.
 // Public keys are in G2.
 
+const (
+	// DKG and Threshold Signatures
+
+	// MinimumThreshold is the minimum value of the threshold parameter in all threshold-based protocols.
+	MinimumThreshold = 1
+	// DKGMinSize is the minimum size of a group participating in a DKG protocol
+	DKGMinSize int = MinimumThreshold + 1
+	// DKGMaxSize is the maximum size of a group participating in a DKG protocol
+	DKGMaxSize int = 254
+	// SeedMinLenDKG is the minumum seed length required to participate in a DKG protocol
+	SeedMinLenDKG = securityBits / 8
+	SeedMaxLenDKG = maxRelicPrgSeed
+)
+
 type DKGState interface {
 	// Size returns the size of the DKG group n
 	Size() int
