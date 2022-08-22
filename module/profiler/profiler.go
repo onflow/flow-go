@@ -1,6 +1,7 @@
 package profiler
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -11,6 +12,7 @@ import (
 	"runtime/pprof"
 	"time"
 
+	"github.com/google/pprof/profile"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"go.uber.org/atomic"
@@ -32,7 +34,7 @@ func SetProfilerEnabled(newState bool) {
 	}
 }
 
-type profile struct {
+type profileDef struct {
 	profileName string
 	profileType pb.ProfileType
 	profileFunc profileFunc
@@ -93,8 +95,9 @@ func (p *AutoProfiler) start() {
 	startTime := time.Now()
 	p.log.Info().Msg("starting profile trace")
 
-	for _, prof := range [...]profile{
+	for _, prof := range [...]profileDef{
 		{profileName: "goroutine", profileType: pb.ProfileType_THREADS, profileFunc: newProfileFunc("goroutine")},
+		{profileName: "heap", profileType: pb.ProfileType_HEAP, profileFunc: p.pprofHeap},
 		{profileName: "allocs", profileType: pb.ProfileType_HEAP_ALLOC, profileFunc: p.pprofAllocs},
 		{profileName: "block", profileType: pb.ProfileType_CONTENTION, profileFunc: p.pprofBlock},
 		{profileName: "cpu", profileType: pb.ProfileType_WALL, profileFunc: p.pprofCpu},
@@ -143,11 +146,96 @@ func newProfileFunc(name string) profileFunc {
 	}
 }
 
-func (p *AutoProfiler) pprofAllocs(w io.Writer) error {
+func (p *AutoProfiler) goHeapProfile() (*profile.Profile, error) {
 	// Forces the GC before taking each of the heap profiles and improves the profile accuracy.
 	// Autoprofiler runs very infrequently so performance impact is minimal.
 	runtime.GC()
-	return newProfileFunc("allocs")(w)
+
+	buf := &bytes.Buffer{}
+	err := newProfileFunc("heap")(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate allocs profile: %w", err)
+	}
+
+	prof, err := profile.Parse(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse allocs profile: %w", err)
+	}
+	prof.TimeNanos = time.Now().UnixNano()
+
+	if got := len(prof.SampleType); got != 4 {
+		return nil, fmt.Errorf("expected 4 sample types, got %d", got)
+	}
+
+	for i, want := range []string{"alloc_objects", "alloc_space", "inuse_objects", "inuse_space"} {
+		if got := prof.SampleType[i].Type; got != want {
+			return nil, fmt.Errorf("expected sample type %d to be %q, got %q", i, want, got)
+		}
+	}
+
+	return prof, nil
+}
+
+// pprofHeap produces cumulative heap profile since the program start.
+func (p *AutoProfiler) pprofHeap(w io.Writer) error {
+	prof, err := p.goHeapProfile()
+	if err != nil {
+		return fmt.Errorf("failed to get heap profile: %w", err)
+	}
+
+	// zero out "alloc_objects" and "alloc_space"
+	for _, s := range prof.Sample {
+		s.Value[0] = 0
+		s.Value[1] = 0
+	}
+
+	// Merge profile with itself to remove empty samples.
+	prof, err = profile.Merge([]*profile.Profile{prof})
+	if err != nil {
+		return fmt.Errorf("failed to merge allocs profile: %w", err)
+	}
+
+	return prof.Write(w)
+}
+
+// pprofAllocs produces differential allocs profile for the given duration.
+func (p *AutoProfiler) pprofAllocs(w io.Writer) (err error) {
+	// only leaves "alloc_objects" and "alloc_space" sample types
+	postProcess := func(prof *profile.Profile) {
+		prof.SampleType = prof.SampleType[:2]
+		for _, s := range prof.Sample {
+			s.Value = s.Value[:2]
+		}
+	}
+
+	p1, err := p.goHeapProfile()
+	if err != nil {
+		return fmt.Errorf("failed to get allocs profile: %w", err)
+	}
+	postProcess(p1)
+
+	select {
+	case <-time.After(p.duration):
+	case <-p.unit.Quit():
+		return context.Canceled
+	}
+
+	p2, err := p.goHeapProfile()
+	if err != nil {
+		return fmt.Errorf("failed to get allocs profile: %w", err)
+	}
+	postProcess(p2)
+
+	// multiply values by -1 and merge to get differential profile.
+	p1.Scale(-1)
+	diff, err := profile.Merge([]*profile.Profile{p1, p2})
+	if err != nil {
+		return fmt.Errorf("failed to merge allocs profiles: %w", err)
+	}
+	diff.TimeNanos = time.Now().UnixNano()
+	diff.DurationNanos = p.duration.Nanoseconds()
+
+	return diff.Write(w)
 }
 
 func (p *AutoProfiler) pprofBlock(w io.Writer) error {
