@@ -167,7 +167,6 @@ func (p *AutoProfiler) goHeapProfile(sampleTypes ...string) (*profile.Profile, e
 	}
 	prof.TimeNanos = time.Now().UnixNano()
 
-	// TODO(rbtz): add tests.
 	selectedSampleTypes := make([]int, 0, len(sampleTypes))
 	for _, name := range sampleTypes {
 		for i, sampleType := range prof.SampleType {
