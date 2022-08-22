@@ -48,7 +48,7 @@ treats all inputs as untrusted. Furthermore, `VoteAggregator` consumes auxiliary
 from the node's main consensus logic, which is trusted.
 
 
-### Byzantine Inputs result in benign sentinel errors
+### External Byzantine messages result in benign sentinel errors
 
 Any input that is coming from another node is untrusted and the vertex processing should gracefully handle any arbitrarily malicious input.
 Under no circumstances should a byzantine input result in the vertex's internal state being corrupted.
@@ -59,6 +59,16 @@ Byzantine inputs are one particular case, where a function returns a 'benign err
 to be benign is that the component returning it is still fully functional, despite encountering the error condition. All
 benign errors should be handled within the vertex. As part of implementing error handling, developers must consider which
 error conditions are benign in the context of the current component.
+
+### Invalid internal messages result in exceptions
+
+Any input that is coming from another internal component is trusted by default. 
+If the internal message is malformed, this should be considered a critical exception.
+
+**Exception:** some internal components forward external messages without verification. 
+For example, the `sync` engine forwards `Block` messages to the `compliance` engine without verifying that the block is valid.
+In this case, validity of the forwarded `Block` is not part of the contract between the `sync` and `compliance` engines,
+so an invalid forwarded `Block` should not be considered an invalid internal message.
 
 ## Error handling
 
@@ -251,7 +261,7 @@ Furthermore, engines offer synchronous and asynchronous processing of their inpu
   engines expect specific input types. Inputs with incompatible type should result in a specific sentinel error (
   e.g. `InvalidMessageType`).    
   For messages that come from the network (methods `Submit` and `Process`), we expect invalid types. But if we get an
-  invalid message from a trusted local engine
+  invalid message type from a trusted local engine:
   (methods `SubmitLocal` and `ProcessLocal`), something is broken (critical failure).
   ```golang
   func (e *engine) process(event interface{}) error {
