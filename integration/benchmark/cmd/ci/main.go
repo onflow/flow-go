@@ -1,15 +1,11 @@
 package main
 
 import (
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/push"
-	"github.com/rs/zerolog"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"io"
 	"net/http"
 	"os"
@@ -18,12 +14,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/rs/zerolog"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+
 	flowsdk "github.com/onflow/flow-go-sdk"
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/integration/utils"
+	"github.com/onflow/flow-go/integration/benchmark"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -49,13 +50,15 @@ type dataSlice struct {
 }
 
 // Hardcoded CI values
-const loadType = "token-transfer"
-const metricport = uint(8080)
-const accessNodeAddress = "127.0.0.1:3569"
-const pushgateway = "127.0.0.1:9091"
-const accountMultiplier = 50
-const feedbackEnabled = true
-const serviceAccountPrivateKeyHex = unittest.ServiceAccountPrivateKeyHex
+const (
+	loadType                    = "token-transfer"
+	metricport                  = uint(8080)
+	accessNodeAddress           = "127.0.0.1:3569"
+	pushgateway                 = "127.0.0.1:9091"
+	accountMultiplier           = 50
+	feedbackEnabled             = true
+	serviceAccountPrivateKeyHex = unittest.ServiceAccountPrivateKeyHex
+)
 
 func main() {
 	// holdover flags from loader/main.go
@@ -93,18 +96,11 @@ func main() {
 	<-server.Ready()
 	loaderMetrics := metrics.NewLoaderCollector()
 
-	pusher := push.New(pushgateway, "loader").Gatherer(prometheus.DefaultGatherer)
-	go func() {
-		t := time.NewTicker(10 * time.Second)
-		defer t.Stop()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-		for {
-			err := pusher.Push()
-			if err != nil {
-				log.Warn().Err(err).Msg("failed to push metrics to pushgateway")
-			}
-		}
-	}()
+	sp := benchmark.NewStatsPusher(ctx, log, pushgateway, "loader", prometheus.DefaultGatherer)
+	defer sp.Close()
 
 	tps, err := strconv.ParseInt(*tpsFlag, 0, 32)
 	if err != nil {
@@ -161,8 +157,8 @@ func main() {
 
 	loaderMetrics.SetTPSConfigured(loadCase.tps)
 
-	var lg *utils.ContLoadGenerator
-	lg, err = utils.NewContLoadGenerator(
+	var lg *benchmark.ContLoadGenerator
+	lg, err = benchmark.NewContLoadGenerator(
 		log,
 		loaderMetrics,
 		flowClient,
@@ -174,9 +170,9 @@ func main() {
 		&flowTokenAddress,
 		loadCase.tps,
 		accountMultiplier,
-		utils.LoadType(loadType),
+		benchmark.LoadType(loadType),
 		feedbackEnabled,
-		utils.ConstExecParam{
+		benchmark.ConstExecParam{
 			MaxTxSizeInByte: *maxConstExecTxSizeInBytes,
 			AuthAccountNum:  *authAccNumInConstExecTx,
 			ArgSizeInByte:   *argSizeInByteInConstExecTx,
@@ -210,7 +206,7 @@ func main() {
 	prepareDataForBigQuery(dataSlices, *ciFlag)
 }
 
-func calculateTpsSlices(start, end time.Time, leadTime, sliceTime, commit, goVersion, osVersion string, lg *utils.ContLoadGenerator) []dataSlice {
+func calculateTpsSlices(start, end time.Time, leadTime, sliceTime, commit, goVersion, osVersion string, lg *benchmark.ContLoadGenerator) []dataSlice {
 	//remove the lead time on both start and end, this should remove spin-up and spin-down times
 	leadDuration, _ := time.ParseDuration(leadTime)
 	endTime := end.Add(-1 * leadDuration)

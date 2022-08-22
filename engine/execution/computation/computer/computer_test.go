@@ -29,6 +29,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -174,7 +175,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		contextOptions := []fvm.Option{
 			fvm.WithTransactionFeesEnabled(true),
 			fvm.WithAccountStorageLimit(true),
-			fvm.WithBlocks(&fvm.NoopBlockFinder{}),
+			fvm.WithBlocks(&environment.NoopBlockFinder{}),
 		}
 		// set 0 clusters to pass n_collectors >= n_clusters check
 		epochConfig := epochs.DefaultEpochConfig()
@@ -800,8 +801,8 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 	view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
 		return ledger.Get(owner, key)
 	})
-	sth := state.NewStateHolder(state.NewState(view, meter.NewMeter(meter.DefaultParameters()), state.DefaultParameters()))
-	accounts := state.NewAccounts(sth)
+	stTxn := state.NewStateTransaction(view, state.DefaultParameters())
+	accounts := state.NewAccounts(stTxn)
 
 	// account creation, signing of transaction and bootstrapping ledger should not be required for this test
 	// as freeze check should happen before a transaction signature is checked
@@ -851,7 +852,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 	execCtx := fvm.NewContext(
 		zerolog.Nop(),
 		fvm.WithChain(flow.Localnet.Chain()),
-		fvm.WithBlocks(&fvm.NoopBlockFinder{}),
+		fvm.WithBlocks(&environment.NoopBlockFinder{}),
 	)
 
 	runtime := fvm.NewInterpreterRuntime()

@@ -427,6 +427,6 @@ func (m *WeightedMeter) MemoryIntensities() MeteredMemoryIntensities {
 }
 
 // TotalMemoryEstimate returns the total memory used
-func (m *WeightedMeter) TotalMemoryEstimate() uint {
-	return uint(m.memoryEstimate)
+func (m *WeightedMeter) TotalMemoryEstimate() uint64 {
+	return m.memoryEstimate
 }
