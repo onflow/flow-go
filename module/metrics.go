@@ -321,6 +321,10 @@ type LedgerMetrics interface {
 type WALMetrics interface {
 }
 
+type RateLimitedBlockstoreMetrics interface {
+	BytesRead(int)
+}
+
 type BitswapMetrics interface {
 	Peers(prefix string, n int)
 	Wantlist(prefix string, n int)
