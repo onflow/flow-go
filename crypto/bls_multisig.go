@@ -45,7 +45,7 @@ var popKMAC = internalExpandMsgXOFKMAC128(blsPOPCipherSuite)
 // and is not used by any other application.
 //
 // The function returns:
-//  - (nil, invalidInputErrors) if the input key is not of type PrKeyBLSBLS12381
+//  - (nil, invalidInputError) if the input key is not of type PrKeyBLSBLS12381
 //  - (pop, nil) otherwise
 func BLSGeneratePOP(sk PrivateKey) (Signature, error) {
 	_, ok := sk.(*PrKeyBLSBLS12381)
@@ -61,7 +61,7 @@ func BLSGeneratePOP(sk PrivateKey) (Signature, error) {
 // The function internally uses the same KMAC hasher used to generate the PoP.
 //
 // The function returns:
-//  - (false, invalidInputErrors) if the input key is not of type PubKeyBLSBLS12381
+//  - (false, invalidInputError) if the input key is not of type PubKeyBLSBLS12381
 //  - (validity, nil) otherwise
 func BLSVerifyPOP(pk PublicKey, s Signature) (bool, error) {
 	_, ok := pk.(*PubKeyBLSBLS12381)
@@ -80,7 +80,7 @@ func BLSVerifyPOP(pk PublicKey, s Signature) (bool, error) {
 // is commutative. The slice should not be empty.
 // No subgroup membership check is performed on the input signatures.
 //
-// The function retruns:
+// The function returns:
 //  - (nil, invalidInputsError):
 //		- (nil, aggregationEmptyListError) : if no signatures are provided (input slice is empty)
 //      - Or a deserialization of at least one signature fails (input is an invalid serialization of a
@@ -131,7 +131,7 @@ func AggregateBLSSignatures(sigs []Signature) (Signature, error) {
 // is commutative. The slice should not be empty.
 // No check is performed on the input private keys.
 //
-// The function retruns:
+// The function returns:
 //  - (nil, invalidInputsError) if at least one key is not of type PrKeyBLSBLS12381
 //  - (nil, invalidInputsError/aggregationEmptyListError): if no keys are provided (input slice is empty)
 //  - (aggregated_key, nil) otherwise
@@ -166,7 +166,7 @@ func AggregateBLSPrivateKeys(keys []PrivateKey) (PrivateKey, error) {
 // is commutative. The slice should not be empty.
 // No check is performed on the input public keys.
 //
-// The function retruns:
+// The function returns:
 //  - (nil, invalidInputsError) if at least one key is not of type PubKeyBLSBLS12381
 //  - (nil, invalidInputsError/aggregationEmptyListError) no keys are provided (input slice is empty)
 //  - (aggregated_key, nil) otherwise
@@ -215,7 +215,7 @@ func NeutralBLSPublicKey() PublicKey {
 // is commutative. The slice of keys to be removed can be empty.
 // No membership check is performed on the input public keys.
 //
-// The function retruns:
+// The function returns:
 //  - (nil, invalidInputsError) if at least one input key is not of type PubKeyBLSBLS12381
 //  - (remaining_key, nil) otherwise
 func RemoveBLSPublicKeys(aggKey PublicKey, keysToRemove []PublicKey) (PublicKey, error) {

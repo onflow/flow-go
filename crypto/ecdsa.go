@@ -63,7 +63,7 @@ func (sk *PrKeyECDSA) signHash(h hash.Hash) (Signature, error) {
 // modified temporarily.
 //
 // The function returns:
-//  - (nil, invalidInputErrors) if the hasher is nil
+//  - (nil, invalidInputError) if the hasher is nil
 //  - (nil, error) if an unexpected error occurs
 //  - (signature, nil) otherwise
 func (sk *PrKeyECDSA) Sign(data []byte, alg hash.Hasher) (Signature, error) {
@@ -100,7 +100,7 @@ func (pk *PubKeyECDSA) verifyHash(sig Signature, h hash.Hash) (bool, error) {
 // modified temporarily.
 //
 // The function returns:
-//  - (false, invalidInputErrors) if the hasher is nil
+//  - (false, invalidInputError) if the hasher is nil
 //  - (false, error) if an unexpected error occurs
 //  - (validity, nil) otherwise
 func (pk *PubKeyECDSA) Verify(sig Signature, data []byte, alg hash.Hasher) (bool, error) {
