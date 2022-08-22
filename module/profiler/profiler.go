@@ -146,7 +146,11 @@ func newProfileFunc(name string) profileFunc {
 	}
 }
 
-func (p *AutoProfiler) goHeapProfile() (*profile.Profile, error) {
+func (p *AutoProfiler) goHeapProfile(sampleTypes ...string) (*profile.Profile, error) {
+	if len(sampleTypes) == 0 {
+		return nil, fmt.Errorf("no sample types specified")
+	}
+
 	// Forces the GC before taking each of the heap profiles and improves the profile accuracy.
 	// Autoprofiler runs very infrequently so performance impact is minimal.
 	runtime.GC()
@@ -163,14 +167,35 @@ func (p *AutoProfiler) goHeapProfile() (*profile.Profile, error) {
 	}
 	prof.TimeNanos = time.Now().UnixNano()
 
-	if got := len(prof.SampleType); got != 4 {
-		return nil, fmt.Errorf("expected 4 sample types, got %d", got)
+	// TODO(rbtz): add tests.
+	selectedSampleTypes := make([]int, 0, len(sampleTypes))
+	for _, name := range sampleTypes {
+		for i, sampleType := range prof.SampleType {
+			if sampleType.Type == name {
+				selectedSampleTypes = append(selectedSampleTypes, i)
+			}
+		}
+	}
+	if len(selectedSampleTypes) != len(sampleTypes) {
+		return nil, fmt.Errorf("failed to find all sample types: want: %+v, got: %+v", sampleTypes, prof.SampleType)
 	}
 
-	for i, want := range []string{"alloc_objects", "alloc_space", "inuse_objects", "inuse_space"} {
-		if got := prof.SampleType[i].Type; got != want {
-			return nil, fmt.Errorf("expected sample type %d to be %q, got %q", i, want, got)
+	for i, j := range selectedSampleTypes {
+		prof.SampleType[i] = prof.SampleType[j]
+	}
+	prof.SampleType = prof.SampleType[:len(selectedSampleTypes)]
+
+	for _, s := range prof.Sample {
+		for i, j := range selectedSampleTypes {
+			s.Value[i] = s.Value[j]
 		}
+		s.Value = s.Value[:len(selectedSampleTypes)]
+	}
+
+	// Merge profile with itself to remove empty samples.
+	prof, err = profile.Merge([]*profile.Profile{prof})
+	if err != nil {
+		return nil, fmt.Errorf("failed to merge profile: %w", err)
 	}
 
 	return prof, nil
@@ -178,21 +203,9 @@ func (p *AutoProfiler) goHeapProfile() (*profile.Profile, error) {
 
 // pprofHeap produces cumulative heap profile since the program start.
 func (p *AutoProfiler) pprofHeap(w io.Writer) error {
-	prof, err := p.goHeapProfile()
+	prof, err := p.goHeapProfile("inuse_objects", "inuse_space")
 	if err != nil {
 		return fmt.Errorf("failed to get heap profile: %w", err)
-	}
-
-	// zero out "alloc_objects" and "alloc_space"
-	for _, s := range prof.Sample {
-		s.Value[0] = 0
-		s.Value[1] = 0
-	}
-
-	// Merge profile with itself to remove empty samples.
-	prof, err = profile.Merge([]*profile.Profile{prof})
-	if err != nil {
-		return fmt.Errorf("failed to merge allocs profile: %w", err)
 	}
 
 	return prof.Write(w)
@@ -200,19 +213,10 @@ func (p *AutoProfiler) pprofHeap(w io.Writer) error {
 
 // pprofAllocs produces differential allocs profile for the given duration.
 func (p *AutoProfiler) pprofAllocs(w io.Writer) (err error) {
-	// only leaves "alloc_objects" and "alloc_space" sample types
-	postProcess := func(prof *profile.Profile) {
-		prof.SampleType = prof.SampleType[:2]
-		for _, s := range prof.Sample {
-			s.Value = s.Value[:2]
-		}
-	}
-
-	p1, err := p.goHeapProfile()
+	p1, err := p.goHeapProfile("alloc_objects", "alloc_space")
 	if err != nil {
 		return fmt.Errorf("failed to get allocs profile: %w", err)
 	}
-	postProcess(p1)
 
 	select {
 	case <-time.After(p.duration):
@@ -224,7 +228,6 @@ func (p *AutoProfiler) pprofAllocs(w io.Writer) (err error) {
 	if err != nil {
 		return fmt.Errorf("failed to get allocs profile: %w", err)
 	}
-	postProcess(p2)
 
 	// multiply values by -1 and merge to get differential profile.
 	p1.Scale(-1)
