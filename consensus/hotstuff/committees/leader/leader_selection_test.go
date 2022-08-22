@@ -3,7 +3,6 @@ package leader
 import (
 	"fmt"
 	"math/rand"
-	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -32,86 +31,6 @@ func TestSingleConsensusNode(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, identity.NodeID, leaderID)
 	}
-}
-
-// compare this binary search method with sort.Search()
-func TestBsearchVSsortSearch(t *testing.T) {
-	weights := []uint64{1, 2, 3, 4, 5, 6, 7, 9, 12, 21, 32}
-	weights2 := []int{1, 2, 3, 4, 5, 6, 7, 9, 12, 21, 32}
-	var sum uint64
-	var sum2 int
-	sums := make([]uint64, 0)
-	sums2 := make([]int, 0)
-	for i := 0; i < len(weights); i++ {
-		sum += weights[i]
-		sum2 += weights2[i]
-		sums = append(sums, sum)
-		sums2 = append(sums2, sum2)
-	}
-	sel := make([]int, 0, 10)
-	for i := 0; i < 10; i++ {
-		index := binarySearchStrictlyBigger(uint64(i), sums)
-		sel = append(sel, index)
-	}
-
-	sel2 := make([]int, 0, 10)
-	for i2 := 1; i2 < 11; i2++ {
-		index := sort.SearchInts(sums2, i2)
-		sel2 = append(sel2, index)
-	}
-
-	require.Equal(t, sel, sel2)
-}
-
-// Test binary search implementation
-func TestBsearch(t *testing.T) {
-	weights := []uint64{1, 2, 3, 4}
-	var sum uint64
-	sums := make([]uint64, 0)
-	for i := 0; i < len(weights); i++ {
-		sum += weights[i]
-		sums = append(sums, sum)
-	}
-	sel := make([]int, 0, 10)
-	for i := 0; i < 10; i++ {
-		index := binarySearchStrictlyBigger(uint64(i), sums)
-		sel = append(sel, index)
-	}
-	require.Equal(t, []int{0, 1, 1, 2, 2, 2, 3, 3, 3, 3}, sel)
-}
-
-// compare the result of binary search with the brute force search,
-// should be the same.
-func TestBsearchWithNormalSearch(t *testing.T) {
-	count := 100
-	sums := make([]uint64, 0, count)
-	sum := 0
-	for i := 0; i < count; i++ {
-		sum += i
-		sums = append(sums, uint64(sum))
-	}
-
-	var value uint64
-	total := sums[len(sums)-1]
-	for value = 0; value < total; value++ {
-		expected, err := bruteSearch(value, sums)
-		require.NoError(t, err)
-
-		actual := binarySearchStrictlyBigger(value, sums)
-		require.NoError(t, err)
-
-		require.Equal(t, expected, actual)
-	}
-}
-
-func bruteSearch(value uint64, arr []uint64) (int, error) {
-	// value ranges from [arr[0], arr[len(arr) -1 ]) exclusive
-	for i, a := range arr {
-		if a > value {
-			return i, nil
-		}
-	}
-	return 0, fmt.Errorf("not found")
 }
 
 func prg(t testing.TB, seed []byte) random.Rand {

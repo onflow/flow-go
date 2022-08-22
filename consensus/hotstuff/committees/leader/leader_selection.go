@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/onflow/flow-go/crypto/random"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -159,35 +161,8 @@ func weightedRandomSelection(
 		randomness := rng.UintN(cumsum)
 
 		// binary search to find the leader index by the random number
-		leader := binarySearchStrictlyBigger(randomness, weightSums)
-
+		leader, _ := slices.BinarySearch(weightSums, randomness+1)
 		leaders = append(leaders, uint16(leader))
 	}
 	return leaders, nil
-}
-
-// binarySearchStriclyBigger finds the index of the first item in the given array that is
-// strictly bigger to the given value.
-// There are a few assumptions on inputs:
-// - `arr` must be non-empty
-// - items in `arr` must be in non-decreasing order
-// - `value` must be less than the last item in `arr`
-func binarySearchStrictlyBigger(value uint64, arr []uint64) int {
-	left := 0
-	arrayLen := len(arr)
-	right := arrayLen - 1
-	mid := arrayLen >> 1
-	for {
-		if arr[mid] <= value {
-			left = mid + 1
-		} else {
-			right = mid
-		}
-
-		if left >= right {
-			return left
-		}
-
-		mid = int(left+right) >> 1
-	}
 }
