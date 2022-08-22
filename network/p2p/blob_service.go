@@ -17,6 +17,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-libp2p-core/routing"
+	"github.com/rs/zerolog"
 	"golang.org/x/time/rate"
 
 	"github.com/onflow/flow-go/module"
@@ -83,6 +84,8 @@ func NewBlobService(
 	r routing.ContentRouting,
 	prefix string,
 	ds datastore.Batching,
+	metrics module.BitswapMetrics,
+	logger zerolog.Logger,
 	opts ...network.BlobServiceOption,
 ) *blobService {
 	bsNetwork := bsnet.NewFromIpfsHost(host, r, bsnet.Prefix(protocol.ID(prefix)))
@@ -99,9 +102,34 @@ func NewBlobService(
 
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			bs.blockService = blockservice.New(bs.blockStore, bitswap.New(ctx, bsNetwork, bs.blockStore, bs.config.BitswapOptions...))
+			btswp := bitswap.New(ctx, bsNetwork, bs.blockStore, bs.config.BitswapOptions...).(*bitswap.Bitswap)
+			bs.blockService = blockservice.New(bs.blockStore, btswp)
 
 			ready()
+
+			ticker := time.NewTicker(15 * time.Second)
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					stat, err := btswp.Stat()
+					if err != nil {
+						logger.Err(err).Str("component", "blob_service").Str("prefix", prefix).Msg("failed to get bitswap stats")
+						continue
+					}
+
+					metrics.Peers(prefix, len(stat.Peers))
+					metrics.Wantlist(prefix, len(stat.Wantlist))
+					metrics.BlobsReceived(prefix, stat.BlocksReceived)
+					metrics.DataReceived(prefix, stat.DataReceived)
+					metrics.BlobsSent(prefix, stat.BlocksSent)
+					metrics.DataSent(prefix, stat.DataSent)
+					metrics.DupBlobsReceived(prefix, stat.DupBlksReceived)
+					metrics.DupDataReceived(prefix, stat.DupDataReceived)
+					metrics.MessagesReceived(prefix, stat.MessagesReceived)
+				}
+			}
 		}).
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			bs.reprovider = simple.NewReprovider(ctx, bs.config.ReprovideInterval, r, simple.NewBlockstoreProvider(bs.blockStore))

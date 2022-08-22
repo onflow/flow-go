@@ -325,6 +325,18 @@ type RateLimitedBlockstoreMetrics interface {
 	BytesRead(int)
 }
 
+type BitswapMetrics interface {
+	Peers(prefix string, n int)
+	Wantlist(prefix string, n int)
+	BlobsReceived(prefix string, n uint64)
+	DataReceived(prefix string, n uint64)
+	BlobsSent(prefix string, n uint64)
+	DataSent(prefix string, n uint64)
+	DupBlobsReceived(prefix string, n uint64)
+	DupDataReceived(prefix string, n uint64)
+	MessagesReceived(prefix string, n uint64)
+}
+
 type ExecutionDataRequesterMetrics interface {
 	// ExecutionDataFetchStarted records an in-progress download
 	ExecutionDataFetchStarted()

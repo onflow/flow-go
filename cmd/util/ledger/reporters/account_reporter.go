@@ -17,7 +17,6 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/fvm"
-	metering "github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
@@ -67,10 +66,11 @@ func (r *AccountReporter) Report(payload []ledger.Payload, commit ledger.State) 
 	defer rwm.Close()
 
 	l := migrations.NewView(payload)
-	meter := metering.NewMeter(metering.DefaultParameters())
-	st := state.NewState(l, meter, state.DefaultParameters().WithMaxInteractionSizeAllowed(math.MaxUint64))
-	sth := state.NewStateHolder(st)
-	gen := state.NewStateBoundAddressGenerator(sth, r.Chain)
+	stTxn := state.NewStateTransaction(
+		l,
+		state.DefaultParameters().WithMaxInteractionSizeAllowed(math.MaxUint64),
+	)
+	gen := state.NewStateBoundAddressGenerator(stTxn, r.Chain)
 
 	progress := progressbar.Default(int64(gen.AddressCount()), "Processing:")
 
@@ -128,7 +128,6 @@ type balanceProcessor struct {
 	momentsScript []byte
 
 	accounts state.Accounts
-	st       *state.State
 
 	rwa        ReportWriter
 	rwc        ReportWriter
@@ -143,19 +142,19 @@ func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
 	prog := programs.NewEmptyPrograms()
 
 	v := view.NewChild()
-	meter := metering.NewMeter(metering.DefaultParameters())
-	st := state.NewState(v, meter, state.DefaultParameters().WithMaxInteractionSizeAllowed(math.MaxUint64))
-	sth := state.NewStateHolder(st)
-	accounts := state.NewAccounts(sth)
+	stTxn := state.NewStateTransaction(
+		v,
+		state.DefaultParameters().WithMaxInteractionSizeAllowed(math.MaxUint64),
+	)
+	accounts := state.NewAccounts(stTxn)
 
-	env := fvm.NewScriptEnvironment(context.Background(), ctx, vm, sth, prog)
+	env := fvm.NewScriptEnvironment(context.Background(), ctx, vm, stTxn, prog)
 
 	return &balanceProcessor{
 		vm:       vm,
 		ctx:      ctx,
 		view:     v,
 		accounts: accounts,
-		st:       st,
 		prog:     prog,
 		intf:     env,
 	}

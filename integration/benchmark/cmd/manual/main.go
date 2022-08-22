@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/push"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -20,7 +19,7 @@ import (
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/integration/utils"
+	"github.com/onflow/flow-go/integration/benchmark"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -54,9 +53,6 @@ func main() {
 
 	chainID := flowsdk.ChainID([]byte(*chainIDStr))
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	// parse log level and apply to logger
 	log := zerolog.New(os.Stderr).With().Timestamp().Logger().Output(zerolog.ConsoleWriter{Out: os.Stderr})
 	lvl, err := zerolog.ParseLevel(strings.ToLower(*logLvl))
@@ -69,25 +65,11 @@ func main() {
 	<-server.Ready()
 	loaderMetrics := metrics.NewLoaderCollector()
 
-	if *pushgateway != "" {
-		pusher := push.New(*pushgateway, "loader").Gatherer(prometheus.DefaultGatherer)
-		go func() {
-			t := time.NewTicker(10 * time.Second)
-			defer t.Stop()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-t.C:
-					err := pusher.Push()
-					if err != nil {
-						log.Warn().Err(err).Msg("failed to push metrics to pushgateway")
-					}
-				}
-			}
-		}()
-	}
+	sp := benchmark.NewStatsPusher(ctx, log, *pushgateway, "loader", prometheus.DefaultGatherer)
+	defer sp.Close()
 
 	accessNodeAddrs := strings.Split(*access, ",")
 
@@ -140,62 +122,60 @@ func main() {
 		log.Fatal().Err(err).Msgf("unable to initialize Flow supervisor client")
 	}
 
-	go func() {
-		// run load cases
-		for i, c := range cases {
-			log.Info().Str("load_type", *loadTypeFlag).Int("number", i).Int("tps", c.tps).Dur("duration", c.duration).Msgf("Running load case...")
+	// run load cases
+	for i, c := range cases {
+		log.Info().Str("load_type", *loadTypeFlag).Int("number", i).Int("tps", c.tps).Dur("duration", c.duration).Msgf("Running load case...")
 
-			loaderMetrics.SetTPSConfigured(c.tps)
+		loaderMetrics.SetTPSConfigured(c.tps)
 
-			var lg *utils.ContLoadGenerator
-			if c.tps > 0 {
-				var err error
-				lg, err = utils.NewContLoadGenerator(
-					log,
-					loaderMetrics,
-					flowClient,
-					supervisorClient,
-					loadedAccessAddr,
-					priv,
-					&serviceAccountAddress,
-					&fungibleTokenAddress,
-					&flowTokenAddress,
-					c.tps,
-					*accountMultiplierFlag,
-					utils.LoadType(*loadTypeFlag),
-					*feedbackEnabled,
-					utils.ConstExecParam{
-						MaxTxSizeInByte: *maxConstExecTxSizeInBytes,
-						AuthAccountNum:  *authAccNumInConstExecTx,
-						ArgSizeInByte:   *argSizeInByteInConstExecTx,
-						PayerKeyCount:   *payerKeyCountInConstExecTx,
-					},
-				)
-				if err != nil {
-					log.Fatal().Err(err).Msgf("unable to create new cont load generator")
-				}
-
-				err = lg.Init()
-				if err != nil {
-					log.Fatal().Err(err).Msgf("unable to init loader")
-				}
-				lg.Start()
+		var lg *benchmark.ContLoadGenerator
+		if c.tps > 0 {
+			var err error
+			lg, err = benchmark.NewContLoadGenerator(
+				log,
+				loaderMetrics,
+				flowClient,
+				supervisorClient,
+				loadedAccessAddr,
+				priv,
+				&serviceAccountAddress,
+				&fungibleTokenAddress,
+				&flowTokenAddress,
+				c.tps,
+				*accountMultiplierFlag,
+				benchmark.LoadType(*loadTypeFlag),
+				*feedbackEnabled,
+				benchmark.ConstExecParam{
+					MaxTxSizeInByte: *maxConstExecTxSizeInBytes,
+					AuthAccountNum:  *authAccNumInConstExecTx,
+					ArgSizeInByte:   *argSizeInByteInConstExecTx,
+					PayerKeyCount:   *payerKeyCountInConstExecTx,
+				},
+			)
+			if err != nil {
+				log.Fatal().Err(err).Msgf("unable to create new cont load generator")
 			}
 
-			// if the duration is 0, we run this case forever
-			if c.duration.Nanoseconds() == 0 {
-				return
+			err = lg.Init()
+			if err != nil {
+				log.Fatal().Err(err).Msgf("unable to init loader")
 			}
+			lg.Start()
+		}
 
-			time.Sleep(c.duration)
-
-			if lg != nil {
-				lg.Stop()
+		// if the duration is 0, we run this case forever
+		if c.duration.Nanoseconds() == 0 {
+			for {
+				time.Sleep(time.Minute)
 			}
 		}
-	}()
 
-	<-ctx.Done()
+		time.Sleep(c.duration)
+
+		if lg != nil {
+			lg.Stop()
+		}
+	}
 }
 
 func parseLoadCases(log zerolog.Logger, tpsFlag, tpsDurationsFlag *string) []LoadCase {

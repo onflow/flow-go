@@ -1,3 +1,4 @@
+//go:build relic
 // +build relic
 
 package crypto
@@ -15,7 +16,7 @@ import (
 // Implements Joint Feldman (Pedersen) protocol using
 // the BLS set up on the BLS12-381 curve.
 // The protocol runs (n) parallel instances of Feldman vss with
-// the complaints mechanism, each participant being a leader
+// the complaints mechanism, each participant being a dealer
 // once.
 
 // This is a fully distributed generation. The secret is a BLS
@@ -28,9 +29,9 @@ import (
 // t = floor((n-1)/2) to optimize for unforgeability and robustness of the threshold
 // signature scheme using the output keys.
 
-// In each feldman VSS istance, the leader generates a chunk of the
+// In each feldman VSS instance, the dealer generates a chunk of the
 // the private key of a BLS threshold signature scheme.
-// Using the complaints mechanism, each leader is qualified or disqualified
+// Using the complaints mechanism, each dealer is qualified or disqualified
 // from the protocol, and the overall key is taking into account
 // all chunks from qualified leaders.
 
@@ -83,7 +84,7 @@ func (s *JointFeldmanState) init() {
 	for i := 0; i < s.size; i++ {
 		fvss := &feldmanVSSstate{
 			dkgCommon:   s.dkgCommon,
-			leaderIndex: index(i),
+			dealerIndex: index(i),
 		}
 		s.fvss[i] = feldmanVSSQualState{
 			feldmanVSSstate: fvss,
@@ -96,7 +97,7 @@ func (s *JointFeldmanState) init() {
 // Start starts running Joint Feldman protocol in the current participant
 // The seed is used to generate the FVSS secret polynomial
 // (including the instance group private key) when the current
-// participant is the leader.
+// participant is the dealer.
 func (s *JointFeldmanState) Start(seed []byte) error {
 	if s.jointRunning {
 		return errors.New("dkg is already running")
@@ -152,7 +153,7 @@ func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 		}
 
 		// check if a complaint has remained without an answer
-		// a leader is disqualified if a complaint was never answered
+		// a dealer is disqualified if a complaint was never answered
 		if !s.fvss[i].disqualified {
 			for complainer, c := range s.fvss[i].complaints {
 				if c.received && !c.answerReceived {
@@ -237,7 +238,7 @@ func (s *JointFeldmanState) ForceDisqualify(participant int) error {
 	if !s.jointRunning {
 		return errors.New("dkg is not running")
 	}
-	// disqualify the participant in the fvss instance where they are a leader
+	// disqualify the participant in the fvss instance where they are a dealer
 	err := s.fvss[participant].ForceDisqualify(participant)
 	if err != nil {
 		return fmt.Errorf("force disqualify failed: %w", err)
