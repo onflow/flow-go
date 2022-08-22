@@ -51,7 +51,7 @@ func createAccounts(b *testing.B, vm *fvm.VirtualMachine, ledger state.View, num
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(num)
 	require.NoError(b, err)
 
-	addresses, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
+	addresses, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyBlockPrograms(), privateKeys, chain)
 	require.NoError(b, err)
 
 	accs := &testAccounts{
@@ -75,7 +75,7 @@ func mustFundAccounts(b *testing.B, vm *fvm.VirtualMachine, ledger state.View, e
 		accs.seq++
 
 		tx := fvm.Transaction(transferTx, uint32(i))
-		err = vm.Run(execCtx, tx, ledger, programs.NewEmptyPrograms())
+		err = vm.Run(execCtx, tx, ledger, programs.NewEmptyBlockPrograms())
 		require.NoError(b, err)
 		require.NoError(b, tx.Err)
 	}

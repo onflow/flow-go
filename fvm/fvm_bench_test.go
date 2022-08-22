@@ -213,7 +213,7 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 
 	return &BasicBlockExecutor{
 		blockComputer:         blockComputer,
-		programCache:          programs.NewEmptyPrograms(),
+		programCache:          programs.NewEmptyBlockPrograms(),
 		activeStateCommitment: initialCommit,
 		activeView:            view,
 		chain:                 chain,
@@ -227,7 +227,7 @@ func (b *BasicBlockExecutor) Chain(_ testing.TB) flow.Chain {
 }
 
 func (b *BasicBlockExecutor) ResetProgramCache(tb testing.TB) {
-	b.programCache = programs.NewEmptyPrograms()
+	b.programCache = programs.NewEmptyBlockPrograms()
 }
 
 func (b *BasicBlockExecutor) ServiceAccount(_ testing.TB) *TestBenchAccount {

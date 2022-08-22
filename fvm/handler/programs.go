@@ -18,19 +18,14 @@ import (
 // views must be merged in order to make sure they are recorded
 type ProgramsHandler struct {
 	masterState *state.StateHolder
-	Programs    *programs.Programs
-
-	// NOTE: non-address programs are not reusable across transactions, hence
-	// they are kept out of the shared program cache.
-	nonAddressPrograms map[common.LocationID]*interpreter.Program
+	Programs    *programs.TransactionPrograms
 }
 
 // NewProgramsHandler construts a new ProgramHandler
-func NewProgramsHandler(programs *programs.Programs, stateHolder *state.StateHolder) *ProgramsHandler {
+func NewProgramsHandler(programs *programs.TransactionPrograms, stateHolder *state.StateHolder) *ProgramsHandler {
 	return &ProgramsHandler{
-		masterState:        stateHolder,
-		Programs:           programs,
-		nonAddressPrograms: map[common.LocationID]*interpreter.Program{},
+		masterState: stateHolder,
+		Programs:    programs,
 	}
 }
 
@@ -41,11 +36,8 @@ func (h *ProgramsHandler) Set(location common.Location, program *interpreter.Pro
 	}
 
 	address, ok := location.(common.AddressLocation)
-
-	// program cache track only for AddressLocation, so for anything other
-	// simply put a value
 	if !ok {
-		h.nonAddressPrograms[location.ID()] = program
+		h.Programs.Set(location, program, nil)
 		return nil
 	}
 
@@ -64,26 +56,25 @@ func (h *ProgramsHandler) Get(location common.Location) (*interpreter.Program, b
 		return nil, false
 	}
 
-	address, ok := location.(common.AddressLocation)
-
-	// program cache track only for AddressLocation
-	if !ok {
-		prog, ok := h.nonAddressPrograms[location.ID()]
-		return prog, ok
-	}
-
-	program, state, has := h.Programs.Get(address)
+	program, state, has := h.Programs.Get(location)
 	if has {
-		err := h.masterState.AttachAndCommitParseRestricted(state)
-		if err != nil {
-			panic(fmt.Sprintf("merge error while getting program, panic: %s", err))
+		if state != nil {
+			err := h.masterState.AttachAndCommitParseRestricted(state)
+			if err != nil {
+				panic(fmt.Sprintf("merge error while getting program, panic: %s", err))
+			}
 		}
+
 		return program, true
 	}
 
-	_, err := h.masterState.BeginParseRestrictedNestedTransaction(address)
-	if err != nil {
-		panic(err)
+	address, ok := location.(common.AddressLocation)
+	if ok {
+		_, err := h.masterState.BeginParseRestrictedNestedTransaction(address)
+		if err != nil {
+			panic(err)
+		}
 	}
+
 	return nil, false
 }

@@ -50,7 +50,9 @@ func TestAccountFreezing(t *testing.T) {
 
 		address, _, st := makeTwoAccounts(t, nil, nil)
 		accounts := environment.NewAccounts(st)
-		programsStorage := programs.NewEmptyPrograms()
+		programsStorage := programs.NewEmptyBlockPrograms()
+		txnProgs, err := programsStorage.NewTransactionPrograms(0, 0)
+		require.NoError(t, err)
 
 		// account should no be frozen
 		frozen, err := accounts.GetAccountFrozen(address)
@@ -75,7 +77,7 @@ func TestAccountFreezing(t *testing.T) {
 
 		context := fvm.NewContext(fvm.WithChain(chain))
 
-		err = txInvoker.Process(vm, &context, proc, st, programsStorage)
+		err = txInvoker.Process(vm, &context, proc, st, txnProgs)
 		require.NoError(t, err)
 
 		// account should be frozen now
@@ -87,7 +89,7 @@ func TestAccountFreezing(t *testing.T) {
 	t.Run("freezing account triggers program cache eviction", func(t *testing.T) {
 		address, _, st := makeTwoAccounts(t, nil, nil)
 		accounts := environment.NewAccounts(st)
-		programsStorage := programs.NewEmptyPrograms()
+		programsStorage := programs.NewEmptyBlockPrograms()
 
 		// account should no be frozen
 		frozen, err := accounts.GetAccountFrozen(address)
@@ -225,7 +227,7 @@ func TestAccountFreezing(t *testing.T) {
 
 		frozenAddress, notFrozenAddress, st := makeTwoAccounts(t, nil, nil)
 		accounts := environment.NewAccounts(st)
-		programsStorage := programs.NewEmptyPrograms()
+		programsStorage := programs.NewEmptyBlockPrograms()
 
 		rt := fvm.NewInterpreterRuntime(runtime.Config{})
 
@@ -372,7 +374,7 @@ func TestAccountFreezing(t *testing.T) {
 		vm := fvm.NewVirtualMachine(rt)
 		// create default context
 		context := fvm.NewContext()
-		programsStorage := programs.NewEmptyPrograms()
+		programsStorage := programs.NewEmptyBlockPrograms()
 
 		ledger := testutil.RootBootstrappedLedger(vm, context)
 
@@ -462,7 +464,9 @@ func TestAccountFreezing(t *testing.T) {
 
 		frozenAddress, notFrozenAddress, st := makeTwoAccounts(t, nil, nil)
 		accounts := environment.NewAccounts(st)
-		programsStorage := programs.NewEmptyPrograms()
+		programsStorage := programs.NewEmptyBlockPrograms()
+		txnProgs, err := programsStorage.NewTransactionPrograms(0, 0)
+		require.NoError(t, err)
 
 		rt := fvm.NewInterpreterRuntime(runtime.Config{})
 		vm := fvm.NewVirtualMachine(rt)
@@ -500,7 +504,7 @@ func TestAccountFreezing(t *testing.T) {
 		proc := fvm.Transaction(tx, 0)
 
 		txInvoker := fvm.NewTransactionInvoker()
-		err := txInvoker.Process(vm, &context, proc, st, programsStorage)
+		err = txInvoker.Process(vm, &context, proc, st, txnProgs)
 		require.NoError(t, err)
 
 		// make sure freeze status is correct

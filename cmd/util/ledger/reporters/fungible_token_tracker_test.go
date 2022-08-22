@@ -46,7 +46,7 @@ func TestFungibleTokenTracker(t *testing.T) {
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
 	}
-	programs := programs.NewEmptyPrograms()
+	programs := programs.NewEmptyBlockPrograms()
 
 	err := vm.Run(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOptions...), view, programs)
 	require.NoError(t, err)

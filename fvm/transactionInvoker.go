@@ -11,7 +11,7 @@ import (
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/errors"
-	programsCache "github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -29,7 +29,7 @@ func (i TransactionInvoker) Process(
 	ctx *Context,
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
-	programs *programsCache.Programs,
+	txnProgs *programs.TransactionPrograms,
 ) (processErr error) {
 
 	txIDStr := proc.ID.String()
@@ -47,12 +47,12 @@ func (i TransactionInvoker) Process(
 		return err
 	}
 
-	var modifiedSets programsCache.ModifiedSets
+	var modifiedSets programs.ModifiedSetsInvalidator
 	defer func() {
 		// based on the contract and frozen account updates we decide how to
 		// clean up the programs for failed transactions we also do the same as
 		// transaction without any deployed contracts
-		programs.Cleanup(modifiedSets)
+		txnProgs.AddInvalidator(modifiedSets)
 
 		if sth.NumNestedTransactions() > 1 {
 			err := sth.RestartNestedTransaction(nestedTxnId)
@@ -80,7 +80,7 @@ func (i TransactionInvoker) Process(
 		}
 	}()
 
-	env := NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
+	env := NewTransactionEnvironment(*ctx, vm, sth, txnProgs, proc.Transaction, proc.TxIndex, span)
 
 	location := common.TransactionLocation(proc.ID)
 
@@ -156,7 +156,7 @@ func (i TransactionInvoker) Process(
 		sth.DisableAllLimitEnforcements()
 		defer sth.EnableAllLimitEnforcements()
 
-		modifiedSets = programsCache.ModifiedSets{}
+		modifiedSets = programs.ModifiedSetsInvalidator{}
 
 		// drop delta since transaction failed
 		err := sth.RestartNestedTransaction(nestedTxnId)
@@ -173,7 +173,7 @@ func (i TransactionInvoker) Process(
 
 		// TODO(patrick): make env reusable on error
 		// reset env
-		env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
+		env = NewTransactionEnvironment(*ctx, vm, sth, txnProgs, proc.Transaction, proc.TxIndex, span)
 
 		// try to deduct fees again, to get the fee deduction events
 		feesError = i.deductTransactionFees(env, proc, sth, computationUsed)

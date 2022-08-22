@@ -123,7 +123,7 @@ type balanceProcessor struct {
 	vm            *fvm.VirtualMachine
 	ctx           fvm.Context
 	view          state.View
-	prog          *programs.Programs
+	progs         *programs.BlockPrograms
 	intf          runtime.Interface
 	balanceScript []byte
 	momentsScript []byte
@@ -142,7 +142,13 @@ func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
 	ctx := fvm.NewContext(
 		fvm.WithChain(chain),
 		fvm.WithMemoryAndInteractionLimitsDisabled())
-	prog := programs.NewEmptyPrograms()
+	blockProgs := programs.NewEmptyBlockPrograms()
+	txnProgs, err := blockProgs.NewSnapshotReadTransactionPrograms(
+		programs.EndOfBlockExecutionTime,
+		programs.EndOfBlockExecutionTime)
+	if err != nil {
+		panic(err)
+	}
 
 	v := view.NewChild()
 	stTxn := state.NewStateTransaction(
@@ -151,14 +157,14 @@ func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
 	)
 	accounts := environment.NewAccounts(stTxn)
 
-	env := fvm.NewScriptEnvironment(context.Background(), ctx, vm, stTxn, prog)
+	env := fvm.NewScriptEnvironment(context.Background(), ctx, vm, stTxn, txnProgs)
 
 	return &balanceProcessor{
 		vm:       vm,
 		ctx:      ctx,
 		view:     v,
 		accounts: accounts,
-		prog:     prog,
+		progs:    blockProgs,
 		intf:     env,
 	}
 }
@@ -317,7 +323,7 @@ func (c *balanceProcessor) balance(address flow.Address) (uint64, bool, error) {
 		jsoncdc.MustEncode(cadence.NewAddress(address)),
 	)
 
-	err := c.vm.Run(c.ctx, script, c.view, c.prog)
+	err := c.vm.Run(c.ctx, script, c.view, c.progs)
 	if err != nil {
 		return 0, false, err
 	}
@@ -338,7 +344,7 @@ func (c *balanceProcessor) fusdBalance(address flow.Address) (uint64, error) {
 		jsoncdc.MustEncode(cadence.NewAddress(address)),
 	)
 
-	err := c.vm.Run(c.ctx, script, c.view, c.prog)
+	err := c.vm.Run(c.ctx, script, c.view, c.progs)
 	if err != nil {
 		return 0, err
 	}
@@ -355,7 +361,7 @@ func (c *balanceProcessor) moments(address flow.Address) (int, error) {
 		jsoncdc.MustEncode(cadence.NewAddress(address)),
 	)
 
-	err := c.vm.Run(c.ctx, script, c.view, c.prog)
+	err := c.vm.Run(c.ctx, script, c.view, c.progs)
 	if err != nil {
 		return 0, err
 	}

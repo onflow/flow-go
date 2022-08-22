@@ -117,7 +117,7 @@ func Test_Programs(t *testing.T) {
 
 	rt := fvm.NewInterpreterRuntime(runtime.Config{})
 	vm := fvm.NewVirtualMachine(rt)
-	programs := programsStorage.NewEmptyPrograms()
+	programs := programsStorage.NewEmptyBlockPrograms()
 
 	accounts := environment.NewAccounts(stTxn)
 

@@ -15,7 +15,7 @@ func getAccount(
 	vm *VirtualMachine,
 	ctx Context,
 	sth *state.StateHolder,
-	programs *programs.Programs,
+	txnProgs *programs.TransactionPrograms,
 	address flow.Address,
 ) (*flow.Account, error) {
 	accounts := environment.NewAccounts(sth)
@@ -26,7 +26,7 @@ func getAccount(
 	}
 
 	if ctx.ServiceAccountEnabled {
-		env := NewScriptEnvironment(context.Background(), ctx, vm, sth, programs)
+		env := NewScriptEnvironment(context.Background(), ctx, vm, sth, txnProgs)
 
 		balance, err := env.GetAccountBalance(common.Address(address))
 		if err != nil {

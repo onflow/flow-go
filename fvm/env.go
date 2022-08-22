@@ -81,7 +81,7 @@ func newCommonEnv(
 	ctx Context,
 	vm *VirtualMachine,
 	stateTransaction *state.StateHolder,
-	programs *programs.Programs,
+	programs *programs.TransactionPrograms,
 	tracer *environment.Tracer,
 	meter environment.Meter,
 ) commonEnv {

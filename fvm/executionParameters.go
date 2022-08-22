@@ -19,7 +19,9 @@ func getEnvironmentMeterParameters(
 	vm *VirtualMachine,
 	ctx Context,
 	view state.View,
-	programs *programs.Programs,
+	blockProgs *programs.BlockPrograms,
+	snapshotTime programs.LogicalTime,
+	executionTime programs.LogicalTime,
 	params meter.MeterParameters,
 ) (
 	meter.MeterParameters,
@@ -34,7 +36,23 @@ func getEnvironmentMeterParameters(
 
 	sth.DisableAllLimitEnforcements()
 
-	env := NewScriptEnvironment(context.Background(), ctx, vm, sth, programs)
+	txnProgs, err := blockProgs.NewSnapshotReadTransactionPrograms(
+		snapshotTime,
+		executionTime)
+	if err != nil {
+		return params, err
+	}
+
+	defer func() {
+		commitErr := txnProgs.Commit()
+		if commitErr != nil {
+			// NOTE: This does not impact correctness.
+			ctx.Logger.Err(commitErr).Msg(
+				"failed to commit transaction programs")
+		}
+	}()
+
+	env := NewScriptEnvironment(context.Background(), ctx, vm, sth, txnProgs)
 
 	return fillEnvironmentMeterParameters(ctx, env, params)
 }

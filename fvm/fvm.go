@@ -15,10 +15,22 @@ import (
 
 // An Procedure is an operation (or set of operations) that reads or writes ledger state.
 type Procedure interface {
-	Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error
+	Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, txnProgs *programs.TransactionPrograms) error
 	ComputationLimit(ctx Context) uint64
 	MemoryLimit(ctx Context) uint64
 	ShouldDisableMemoryAndInteractionLimits(ctx Context) bool
+
+	IsSnapshotReadTransaction() bool
+	IsBootstrapping() bool
+
+	// The initial snapshot time.  Note that once we start supporting parallel
+	// preprocessing/execution, a transaction may operation on mutliple
+	// snapshots.  For scripts, the snapshot time is EndOfBlockExecutionTime.
+	InitialSnapshotTime() programs.LogicalTime
+
+	// For transactions, the execution time is TxIndex.  For scripts, the
+	// execution time is EndOfBlockExecutionTime.
+	ExecutionTime() programs.LogicalTime
 }
 
 func NewInterpreterRuntime(config runtime.Config) runtime.Runtime {
@@ -39,7 +51,7 @@ func NewVirtualMachine(rt runtime.Runtime) *VirtualMachine {
 }
 
 // Run runs a procedure against a ledger in the given context.
-func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, programs *programs.Programs) (err error) {
+func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, blockProgs *programs.BlockPrograms) (err error) {
 	meterParams := meter.DefaultParameters().
 		WithComputationLimit(uint(proc.ComputationLimit(ctx))).
 		WithMemoryLimit(proc.MemoryLimit(ctx))
@@ -48,7 +60,9 @@ func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, program
 		vm,
 		ctx,
 		v,
-		programs,
+		blockProgs,
+		proc.InitialSnapshotTime(),
+		proc.ExecutionTime(),
 		meterParams,
 	)
 	if err != nil {
@@ -70,7 +84,30 @@ func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, program
 			WithMaxInteractionSizeAllowed(interactionLimit),
 	)
 
-	err = proc.Run(vm, ctx, stTxn, programs)
+	newTxnProgs := blockProgs.NewTransactionPrograms
+	if proc.IsSnapshotReadTransaction() {
+		newTxnProgs = blockProgs.NewSnapshotReadTransactionPrograms
+	}
+
+	txnProgs, err := newTxnProgs(
+		proc.InitialSnapshotTime(),
+		proc.ExecutionTime())
+	if err != nil {
+		return err
+	}
+
+	if !proc.IsBootstrapping() {
+		defer func() {
+			commitErr := txnProgs.Commit()
+			if commitErr != nil {
+				// NOTE: This does not impact correctness.
+				ctx.Logger.Err(commitErr).Msg(
+					"failed to commit transaction programs")
+			}
+		}()
+	}
+
+	err = proc.Run(vm, ctx, stTxn, txnProgs)
 	if err != nil {
 		return err
 	}
@@ -79,7 +116,7 @@ func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, program
 }
 
 // GetAccount returns an account by address or an error if none exists.
-func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.View, programs *programs.Programs) (*flow.Account, error) {
+func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.View, blockProgs *programs.BlockPrograms) (*flow.Account, error) {
 	stTxn := state.NewStateTransaction(
 		v,
 		state.DefaultParameters().
@@ -88,7 +125,23 @@ func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.
 			WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize),
 	)
 
-	account, err := getAccount(vm, ctx, stTxn, programs, address)
+	txnProgs, err := blockProgs.NewSnapshotReadTransactionPrograms(
+		programs.EndOfBlockExecutionTime,
+		programs.EndOfBlockExecutionTime)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		commitErr := txnProgs.Commit()
+		if commitErr != nil {
+			// NOTE: This does not impact correctness.
+			ctx.Logger.Err(commitErr).Msg(
+				"failed to commit transaction programs")
+		}
+	}()
+
+	account, err := getAccount(vm, ctx, stTxn, txnProgs, address)
 	if err != nil {
 		if errors.IsALedgerFailure(err) {
 			return nil, fmt.Errorf("cannot get account, this error usually happens if the reference block for this query is not set to a recent block: %w", err)
@@ -102,7 +155,7 @@ func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.
 //
 // Errors that occur in a meta transaction are propagated as a single error that can be
 // captured by the Cadence runtime and eventually disambiguated by the parent context.
-func (vm *VirtualMachine) invokeMetaTransaction(parentCtx Context, tx *TransactionProcedure, stTxn *state.StateHolder, programs *programs.Programs) (errors.Error, error) {
+func (vm *VirtualMachine) invokeMetaTransaction(parentCtx Context, tx *TransactionProcedure, stTxn *state.StateHolder, txnProgs *programs.TransactionPrograms) (errors.Error, error) {
 	invoker := NewTransactionInvoker()
 
 	// do not deduct fees or check storage in meta transactions
@@ -111,7 +164,7 @@ func (vm *VirtualMachine) invokeMetaTransaction(parentCtx Context, tx *Transacti
 		WithTransactionFeesEnabled(false),
 	)
 
-	err := invoker.Process(vm, &ctx, tx, stTxn, programs)
+	err := invoker.Process(vm, &ctx, tx, stTxn, txnProgs)
 	txErr, fatalErr := errors.SplitErrorTypes(err)
 	return txErr, fatalErr
 }

@@ -182,7 +182,7 @@ func (e *Manager) VM() VirtualMachine {
 func (e *Manager) getChildProgramsOrEmpty(blockID flow.Identifier) *programs.Programs {
 	blockPrograms := e.programsCache.Get(blockID)
 	if blockPrograms == nil {
-		return programs.NewEmptyPrograms()
+		return programs.NewEmptyBlockPrograms()
 	}
 	return blockPrograms.ChildPrograms()
 }
@@ -299,7 +299,7 @@ func (e *Manager) ComputeBlock(
 	fromCache := e.programsCache.Get(block.ParentID())
 
 	if fromCache == nil {
-		blockPrograms = programs.NewEmptyPrograms()
+		blockPrograms = programs.NewEmptyBlockPrograms()
 	} else {
 		blockPrograms = fromCache.ChildPrograms()
 	}

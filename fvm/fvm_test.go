@@ -84,7 +84,7 @@ func (vmt vmTest) run(
 			fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
 		}
 
-		programs := programs.NewEmptyPrograms()
+		programs := programs.NewEmptyBlockPrograms()
 
 		bootstrapOpts := append(baseBootstrapOpts, vmt.bootstrapOptions...)
 
@@ -116,7 +116,7 @@ func (vmt vmTest) bootstrapWith(
 		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
 	}
 
-	programs := programs.NewEmptyPrograms()
+	programs := programs.NewEmptyBlockPrograms()
 
 	bootstrapOpts := append(baseBootstrapOpts, vmt.bootstrapOptions...)
 
@@ -401,7 +401,7 @@ func TestHashing(t *testing.T) {
 				)
 			}
 
-			err := vm.Run(ctx, script, ledger, programs.NewEmptyPrograms())
+			err := vm.Run(ctx, script, ledger, programs.NewEmptyBlockPrograms())
 
 			byteResult := make([]byte, 0)
 			if err == nil && script.Err == nil {
@@ -432,7 +432,7 @@ func TestHashing(t *testing.T) {
 				cadenceData,
 				jsoncdc.MustEncode(cadence.String("")),
 			)
-			err := vm.Run(ctx, script, ledger, programs.NewEmptyPrograms())
+			err := vm.Run(ctx, script, ledger, programs.NewEmptyBlockPrograms())
 			require.NoError(t, err)
 			require.NoError(t, script.Err)
 
@@ -447,7 +447,7 @@ func TestHashing(t *testing.T) {
 			script = script.WithArguments(
 				cadenceData,
 			)
-			err = vm.Run(ctx, script, ledger, programs.NewEmptyPrograms())
+			err = vm.Run(ctx, script, ledger, programs.NewEmptyBlockPrograms())
 			require.NoError(t, err)
 			require.NoError(t, script.Err)
 
@@ -488,7 +488,7 @@ func TestWithServiceAccount(t *testing.T) {
 	t.Run("With service account enabled", func(t *testing.T) {
 		tx := fvm.Transaction(txBody, 0)
 
-		err := vm.Run(ctxA, tx, view, programs.NewEmptyPrograms())
+		err := vm.Run(ctxA, tx, view, programs.NewEmptyBlockPrograms())
 		require.NoError(t, err)
 
 		// transaction should fail on non-bootstrapped ledger
@@ -500,7 +500,7 @@ func TestWithServiceAccount(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err := vm.Run(ctxB, tx, view, programs.NewEmptyPrograms())
+		err := vm.Run(ctxB, tx, view, programs.NewEmptyBlockPrograms())
 		require.NoError(t, err)
 
 		// transaction should succeed on non-bootstrapped ledger
@@ -563,7 +563,7 @@ func TestEventLimits(t *testing.T) {
 		SetPayer(chain.ServiceAddress()).
 		AddAuthorizer(chain.ServiceAddress())
 
-	programs := programs.NewEmptyPrograms()
+	programs := programs.NewEmptyBlockPrograms()
 
 	tx := fvm.Transaction(txBody, programs.NextTxIndexForTestingOnly())
 	err := vm.Run(ctx, tx, ledger, programs)
@@ -657,7 +657,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			jsoncdc.MustEncode(cadence.NewAddress(address)),
 		)
 
-		err := vm.Run(ctx, script, view, programs.NewEmptyPrograms())
+		err := vm.Run(ctx, script, view, programs.NewEmptyBlockPrograms())
 		require.NoError(t, err)
 		require.NoError(t, script.Err)
 		return script.Value.ToGoValue().(uint64)
@@ -1473,7 +1473,7 @@ func TestStorageUsed(t *testing.T) {
 
 	script := fvm.Script(code)
 
-	err = vm.Run(ctx, script, simpleView, programs.NewEmptyPrograms())
+	err = vm.Run(ctx, script, simpleView, programs.NewEmptyBlockPrograms())
 	require.NoError(t, err)
 
 	assert.Equal(t, cadence.NewUInt64(5), script.Value)
@@ -1581,7 +1581,7 @@ func TestEnforcingComputationLimit(t *testing.T) {
 			}
 			tx := fvm.Transaction(txBody, 0)
 
-			err := vm.Run(ctx, tx, simpleView, programs.NewEmptyPrograms())
+			err := vm.Run(ctx, tx, simpleView, programs.NewEmptyBlockPrograms())
 			require.NoError(t, err)
 			require.Equal(t, test.expCompUsed, tx.ComputationUsed)
 			if test.ok {

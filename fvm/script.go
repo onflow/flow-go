@@ -29,7 +29,7 @@ type ScriptProcedure struct {
 }
 
 type ScriptProcessor interface {
-	Process(*VirtualMachine, Context, *ScriptProcedure, *state.StateHolder, *programs.Programs) error
+	Process(*VirtualMachine, Context, *ScriptProcedure, *state.StateHolder, *programs.TransactionPrograms) error
 }
 
 func Script(code []byte) *ScriptProcedure {
@@ -70,9 +70,9 @@ func NewScriptWithContextAndArgs(code []byte, reqContext context.Context, args .
 	}
 }
 
-func (proc *ScriptProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error {
+func (proc *ScriptProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, txnProgs *programs.TransactionPrograms) error {
 	for _, p := range ctx.ScriptProcessors {
-		err := p.Process(vm, ctx, proc, sth, programs)
+		err := p.Process(vm, ctx, proc, sth, txnProgs)
 		txError, failure := errors.SplitErrorTypes(err)
 		if failure != nil {
 			if errors.IsALedgerFailure(failure) {
@@ -113,6 +113,22 @@ func (proc *ScriptProcedure) ShouldDisableMemoryAndInteractionLimits(
 	return ctx.DisableMemoryAndInteractionLimits
 }
 
+func (proc *ScriptProcedure) IsSnapshotReadTransaction() bool {
+	return true
+}
+
+func (proc *ScriptProcedure) IsBootstrapping() bool {
+	return false
+}
+
+func (proc *ScriptProcedure) InitialSnapshotTime() programs.LogicalTime {
+	return programs.EndOfBlockExecutionTime
+}
+
+func (proc *ScriptProcedure) ExecutionTime() programs.LogicalTime {
+	return programs.EndOfBlockExecutionTime
+}
+
 type ScriptInvoker struct{}
 
 func NewScriptInvoker() ScriptInvoker {
@@ -124,9 +140,9 @@ func (i ScriptInvoker) Process(
 	ctx Context,
 	proc *ScriptProcedure,
 	sth *state.StateHolder,
-	programs *programs.Programs,
+	txnProgs *programs.TransactionPrograms,
 ) error {
-	env := NewScriptEnvironment(proc.RequestContext, ctx, vm, sth, programs)
+	env := NewScriptEnvironment(proc.RequestContext, ctx, vm, sth, txnProgs)
 
 	location := common.ScriptLocation(proc.ID)
 	value, err := vm.Runtime.ExecuteScript(

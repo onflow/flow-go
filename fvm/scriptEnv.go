@@ -26,7 +26,7 @@ func NewScriptEnvironment(
 	fvmContext Context,
 	vm *VirtualMachine,
 	sth *state.StateHolder,
-	programs *programs.Programs,
+	txnProgs *programs.TransactionPrograms,
 ) *ScriptEnv {
 
 	tracer := environment.NewTracer(fvmContext.Tracer, nil, fvmContext.ExtensiveTracing)
@@ -37,7 +37,7 @@ func NewScriptEnvironment(
 			fvmContext,
 			vm,
 			sth,
-			programs,
+			txnProgs,
 			tracer,
 			meter,
 		),

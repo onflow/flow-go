@@ -284,7 +284,7 @@ func CreateAccountsWithSimpleAddresses(
 
 func RootBootstrappedLedger(vm *fvm.VirtualMachine, ctx fvm.Context, additionalOptions ...fvm.BootstrapProcedureOption) state.View {
 	view := fvmUtils.NewSimpleView()
-	programs := programs.NewEmptyPrograms()
+	programs := programs.NewEmptyBlockPrograms()
 
 	// set 0 clusters to pass n_collectors >= n_clusters check
 	epochConfig := epochs.DefaultEpochConfig()

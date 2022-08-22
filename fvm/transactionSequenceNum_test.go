@@ -16,6 +16,12 @@ import (
 )
 
 func TestTransactionSequenceNumProcess(t *testing.T) {
+	newTxnProgs := func() *programs.TransactionPrograms {
+		p, err := programs.NewEmptyBlockPrograms().NewTransactionPrograms(0, 0)
+		require.NoError(t, err)
+		return p
+	}
+
 	t.Run("sequence number update (happy path)", func(t *testing.T) {
 		ledger := utils.NewSimpleView()
 		stTxn := state.NewStateTransaction(ledger, state.DefaultParameters())
@@ -33,7 +39,7 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		proc := fvm.Transaction(&tx, 0)
 
 		seqChecker := &fvm.TransactionSequenceNumberChecker{}
-		err = seqChecker.Process(nil, &fvm.Context{}, proc, stTxn, programs.NewEmptyPrograms())
+		err = seqChecker.Process(nil, &fvm.Context{}, proc, stTxn, newTxnProgs())
 		require.NoError(t, err)
 
 		// get fetch the sequence number and it should be updated
@@ -59,7 +65,7 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		proc := fvm.Transaction(&tx, 0)
 
 		seqChecker := &fvm.TransactionSequenceNumberChecker{}
-		err = seqChecker.Process(nil, &fvm.Context{}, proc, stTxn, programs.NewEmptyPrograms())
+		err = seqChecker.Process(nil, &fvm.Context{}, proc, stTxn, newTxnProgs())
 		require.Error(t, err)
 		require.Equal(t, err.(errors.Error).Code(), errors.ErrCodeInvalidProposalSeqNumberError)
 
@@ -86,7 +92,7 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		proc := fvm.Transaction(&tx, 0)
 
 		seqChecker := &fvm.TransactionSequenceNumberChecker{}
-		err = seqChecker.Process(nil, &fvm.Context{}, proc, stTxn, programs.NewEmptyPrograms())
+		err = seqChecker.Process(nil, &fvm.Context{}, proc, stTxn, newTxnProgs())
 		require.Error(t, err)
 
 		// get fetch the sequence number and check it to be unchanged

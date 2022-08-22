@@ -913,7 +913,7 @@ func getContractEpochCounter(vm computation.VirtualMachine, vmCtx fvm.Context, v
 	script := fvm.Script(scriptCode)
 
 	// Create empty programs cache
-	p := programs.NewEmptyPrograms()
+	p := programs.NewEmptyBlockPrograms()
 
 	// execute the script
 	err = vm.Run(vmCtx, script, view, p)

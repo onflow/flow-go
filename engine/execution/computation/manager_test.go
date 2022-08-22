@@ -64,7 +64,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	require.NoError(t, err)
 
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
-	accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
+	accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyBlockPrograms(), privateKeys, chain)
 	require.NoError(t, err)
 
 	tx1 := testutil.DeployCounterContractTransaction(accounts[0], chain)
@@ -653,16 +653,18 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 	)
 	vm := manager.vm.(*fvm.VirtualMachine)
 	view := testutil.RootBootstrappedLedger(vm, ctx)
-	programs := programs.NewEmptyPrograms()
+	blockProgs := programs.NewEmptyBlockPrograms()
+	txnProgs, err := blockProgs.NewSnapshotReadTransactionPrograms(0, 0)
+	require.NoError(t, err)
 	stTxn := state.NewStateTransaction(view, state.DefaultParameters())
-	env := fvm.NewScriptEnvironment(context.Background(), ctx, vm, stTxn, programs)
+	env := fvm.NewScriptEnvironment(context.Background(), ctx, vm, stTxn, txnProgs)
 
 	// Create an account private key.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
 
 	// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-	accounts, err := testutil.CreateAccounts(vm, view, programs, privateKeys, chain)
+	accounts, err := testutil.CreateAccounts(vm, view, blockProgs, privateKeys, chain)
 	require.NoError(t, err)
 	account := accounts[0]
 	address := cadence.NewAddress(account)
