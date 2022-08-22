@@ -20,8 +20,10 @@ import (
 	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/spf13/pflag"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/admin/commands"
+	executionCommands "github.com/onflow/flow-go/admin/commands/execution"
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
 	uploaderCommands "github.com/onflow/flow-go/admin/commands/uploader"
 	"github.com/onflow/flow-go/consensus"
@@ -199,11 +201,15 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		executionDataService          state_synchronization.ExecutionDataService
 		executionDataCIDCache         state_synchronization.ExecutionDataCIDCache
 		executionDataCIDCacheSize     uint = 100
+		toTriggerCheckpoint                = atomic.NewBool(false) // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
 	)
 
 	e.FlowNodeBuilder.
 		AdminCommand("read-execution-data", func(config *NodeConfig) commands.AdminCommand {
 			return stateSyncCommands.NewReadExecutionDataCommand(executionDataService)
+		}).
+		AdminCommand("trigger-checkpoint", func(config *NodeConfig) commands.AdminCommand {
+			return executionCommands.NewTriggerCheckpointCommand(toTriggerCheckpoint)
 		}).
 		AdminCommand("set-uploader-enabled", func(config *NodeConfig) commands.AdminCommand {
 			return uploaderCommands.NewToggleUploaderCommand()
@@ -386,7 +392,9 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				10*time.Second,
 				e.exeConf.checkpointDistance,
 				e.exeConf.checkpointsToKeep,
-				node.Logger.With().Str("subcomponent", "checkpointer").Logger())
+				node.Logger.With().Str("subcomponent", "checkpointer").Logger(),
+				toTriggerCheckpoint, // compactor will listen to the signal from admin tool for force triggering checkpointing
+			)
 
 			return compactor, nil
 		}).
