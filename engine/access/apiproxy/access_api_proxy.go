@@ -29,7 +29,7 @@ type FlowAccessAPIRouter struct {
 	Logger   zerolog.Logger
 	Metrics  *metrics.ObserverCollector
 	Upstream *FlowAccessAPIForwarder
-	Observer protocol.API
+	Observer *protocol.Handler
 }
 
 func (h *FlowAccessAPIRouter) log(handler, rpc string, err error) {
