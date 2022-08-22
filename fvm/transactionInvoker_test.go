@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
@@ -39,16 +38,15 @@ func TestSafetyCheck(t *testing.T) {
 		view := utils.NewSimpleView()
 		context := fvm.NewContext(log)
 
-		sth := state.NewStateHolder(state.NewState(
+		stTxn := state.NewStateTransaction(
 			view,
-			meter.NewMeter(meter.DefaultParameters()),
 			state.DefaultParameters().
 				WithMaxKeySizeAllowed(context.MaxStateKeySize).
 				WithMaxValueSizeAllowed(context.MaxStateValueSize).
 				WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
-		))
+		)
 
-		err := txInvoker.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
+		err := txInvoker.Process(vm, &context, proc, stTxn, programs.NewEmptyPrograms())
 		require.Error(t, err)
 
 		require.NotContains(t, buffer.String(), "programs")
@@ -73,16 +71,15 @@ func TestSafetyCheck(t *testing.T) {
 		view := utils.NewSimpleView()
 		context := fvm.NewContext(log)
 
-		sth := state.NewStateHolder(state.NewState(
+		stTxn := state.NewStateTransaction(
 			view,
-			meter.NewMeter(meter.DefaultParameters()),
 			state.DefaultParameters().
 				WithMaxKeySizeAllowed(context.MaxStateKeySize).
 				WithMaxValueSizeAllowed(context.MaxStateValueSize).
 				WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
-		))
+		)
 
-		err := txInvoker.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
+		err := txInvoker.Process(vm, &context, proc, stTxn, programs.NewEmptyPrograms())
 		require.Error(t, err)
 
 		require.NotContains(t, buffer.String(), "programs")

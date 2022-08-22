@@ -696,35 +696,9 @@ func (c *testComponent) Done() <-chan struct{} {
 
 func TestCreateUploader(t *testing.T) {
 	t.Parallel()
-
-	t.Run("create defualt uploader", func(t *testing.T) {
+	t.Run("create uploader", func(t *testing.T) {
 		t.Parallel()
 		nb := FlowNode("scaffold_uploader")
-		mockHttp := &http.Client{
-			Transport: &mockRoundTripper{
-				DoFunc: func(req *http.Request) (*http.Response, error) {
-					return &http.Response{
-						StatusCode: 403,
-						Body:       ioutil.NopCloser(bytes.NewBufferString("")),
-					}, nil
-				},
-			},
-		}
-		testClient := gcemd.NewClient(mockHttp)
-		uploader, err := nb.createGCEProfileUploader(
-			testClient,
-
-			option.WithoutAuthentication(),
-			option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
-		)
-		require.ErrorContains(t, err, "403")
-		require.NotNil(t, uploader)
-	})
-
-	t.Run("create mocked uploader", func(t *testing.T) {
-		t.Parallel()
-		nb := FlowNode("scaffold_uploader")
-
 		mockHttp := &http.Client{
 			Transport: &mockRoundTripper{
 				DoFunc: func(req *http.Request) (*http.Response, error) {

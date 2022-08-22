@@ -1,11 +1,12 @@
-package utils
+package benchmark
 
 import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/utils/unittest"
 	"go.uber.org/atomic"
+
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestWorkerImmediate tests that first job is executed immeediately.
