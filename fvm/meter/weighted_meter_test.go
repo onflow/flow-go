@@ -23,7 +23,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 				WithMemoryLimit(2),
 		)
 		require.Equal(t, uint(1), m.TotalComputationLimit())
-		require.Equal(t, uint(2), m.TotalMemoryLimit())
+		require.Equal(t, uint64(2), m.TotalMemoryLimit())
 	})
 
 	t.Run("get limits max", func(t *testing.T) {
@@ -33,7 +33,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 				WithMemoryLimit(math.MaxUint32),
 		)
 		require.Equal(t, uint(math.MaxUint32), m.TotalComputationLimit())
-		require.Equal(t, uint(math.MaxUint32), m.TotalMemoryLimit())
+		require.Equal(t, uint64(math.MaxUint32), m.TotalMemoryLimit())
 	})
 
 	t.Run("meter computation and memory", func(t *testing.T) {
@@ -61,11 +61,11 @@ func TestWeightedComputationMetering(t *testing.T) {
 
 		err = m.MeterMemory(0, 2)
 		require.NoError(t, err)
-		require.Equal(t, uint(2), m.TotalMemoryEstimate())
+		require.Equal(t, uint64(2), m.TotalMemoryEstimate())
 
 		err = m.MeterMemory(0, 3)
 		require.NoError(t, err)
-		require.Equal(t, uint(2+3), m.TotalMemoryEstimate())
+		require.Equal(t, uint64(2+3), m.TotalMemoryEstimate())
 
 		err = m.MeterMemory(0, 8)
 		require.Error(t, err)
@@ -90,7 +90,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 
 		err = m.MeterMemory(0, 2)
 		require.NoError(t, err)
-		require.Equal(t, uint(34), m.TotalMemoryEstimate())
+		require.Equal(t, uint64(34), m.TotalMemoryEstimate())
 		require.Equal(t, uint(2), m.MemoryIntensities()[0])
 	})
 
@@ -308,37 +308,37 @@ func TestWeightedComputationMetering(t *testing.T) {
 		reset()
 		err := m.MeterMemory(0, 1)
 		require.NoError(t, err)
-		require.Equal(t, uint(0), m.TotalMemoryEstimate())
+		require.Equal(t, uint64(0), m.TotalMemoryEstimate())
 		reset()
 		err = m.MeterMemory(0, 1)
 		require.NoError(t, err)
-		require.Equal(t, uint(0), m.TotalMemoryEstimate())
+		require.Equal(t, uint64(0), m.TotalMemoryEstimate())
 		reset()
 		err = m.MeterMemory(0, math.MaxUint32)
 		require.NoError(t, err)
-		require.Equal(t, uint(0), m.TotalMemoryEstimate())
+		require.Equal(t, uint64(0), m.TotalMemoryEstimate())
 
 		reset()
 		err = m.MeterMemory(1, 1)
 		require.NoError(t, err)
-		require.Equal(t, uint(1), m.TotalMemoryEstimate())
+		require.Equal(t, uint64(1), m.TotalMemoryEstimate())
 		reset()
 		err = m.MeterMemory(1, 1)
 		require.NoError(t, err)
-		require.Equal(t, uint(1), m.TotalMemoryEstimate())
+		require.Equal(t, uint64(1), m.TotalMemoryEstimate())
 		reset()
 		err = m.MeterMemory(1, math.MaxUint32)
 		require.NoError(t, err)
-		require.Equal(t, uint(math.MaxUint32), m.TotalMemoryEstimate())
+		require.Equal(t, uint64(math.MaxUint32), m.TotalMemoryEstimate())
 
 		reset()
 		err = m.MeterMemory(2, 1)
 		require.NoError(t, err)
-		require.Equal(t, uint(2), m.TotalMemoryEstimate())
+		require.Equal(t, uint64(2), m.TotalMemoryEstimate())
 		reset()
 		err = m.MeterMemory(2, 1)
 		require.NoError(t, err)
-		require.Equal(t, uint(2), m.TotalMemoryEstimate())
+		require.Equal(t, uint64(2), m.TotalMemoryEstimate())
 		reset()
 		err = m.MeterMemory(2, math.MaxUint32)
 		require.True(t, errors.IsMemoryLimitExceededError(err))

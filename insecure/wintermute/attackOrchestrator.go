@@ -62,7 +62,7 @@ func (o *Orchestrator) WithAttackNetwork(network insecure.AttackNetwork) {
 // In Corruptible Conduit Framework for BFT testing, corrupted nodes relay their outgoing events to
 // the attack Orchestrator instead of dispatching them directly to the network.
 // The Orchestrator completely determines what the corrupted conduit should send to the network.
-func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error {
+func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.EgressEvent) error {
 	switch event.FlowProtocolEvent.(type) {
 
 	case *flow.ExecutionReceipt:
@@ -133,7 +133,7 @@ func (o *Orchestrator) corruptExecutionResult(receipt *flow.ExecutionReceipt) *f
 // handleExecutionReceiptEvent processes incoming execution receipt event from a corrupted execution node.
 // If no attack has already been conducted, it corrupts the result of receipt and sends it to all corrupted execution nodes.
 // Otherwise, it just passes through the receipt to the sender.
-func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Event) error {
+func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.EgressEvent) error {
 	// ensuring at most one receipt is handled at a time, to avoid corrupting two concurrent receipts
 	o.receiptHandleLock.Lock()
 	defer o.receiptHandleLock.Unlock()
@@ -197,7 +197,7 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Event)
 	for _, corruptedExecutionId := range corruptedExecutionIds {
 		// sets executor id of the result as the same corrupted execution node id that
 		// is meant to send this message to the flow network.
-		err := o.network.Send(&insecure.Event{
+		err := o.network.Send(&insecure.EgressEvent{
 			CorruptedNodeId: corruptedExecutionId,
 			Channel:         receiptEvent.Channel,
 			Protocol:        receiptEvent.Protocol,
@@ -229,7 +229,7 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Event)
 // If request is for a corrupted chunk and comes from a corrupted verification node it is replied with an attestation for that
 // chunk.
 // Otherwise, it is passed through.
-func (o *Orchestrator) handleChunkDataPackRequestEvent(chunkDataPackRequestEvent *insecure.Event) error {
+func (o *Orchestrator) handleChunkDataPackRequestEvent(chunkDataPackRequestEvent *insecure.EgressEvent) error {
 	ok := o.corruptedNodeIds.Contains(chunkDataPackRequestEvent.CorruptedNodeId)
 	if !ok {
 		return fmt.Errorf("sender of the event is not a corrupted node")
@@ -277,7 +277,7 @@ func (o *Orchestrator) handleChunkDataPackRequestEvent(chunkDataPackRequestEvent
 
 // handleChunkDataPackResponseEvent wintermutes the chunk data pack reply if it belongs to a corrupted result, and is meant to
 // be sent to an honest verification node. Otherwise, it is passed through.
-func (o *Orchestrator) handleChunkDataPackResponseEvent(chunkDataPackReplyEvent *insecure.Event) error {
+func (o *Orchestrator) handleChunkDataPackResponseEvent(chunkDataPackReplyEvent *insecure.EgressEvent) error {
 	cdpRep := chunkDataPackReplyEvent.FlowProtocolEvent.(*messages.ChunkDataResponse)
 	if _, _, conducted := o.AttackState(); conducted {
 		// an attack has already been conducted
@@ -320,7 +320,7 @@ func (o *Orchestrator) handleChunkDataPackResponseEvent(chunkDataPackReplyEvent 
 
 // handleResultApprovalEvent wintermutes the result approvals for the chunks of original result that are coming from
 // corrupted verification nodes. Otherwise, it is passed through.
-func (o *Orchestrator) handleResultApprovalEvent(resultApprovalEvent *insecure.Event) error {
+func (o *Orchestrator) handleResultApprovalEvent(resultApprovalEvent *insecure.EgressEvent) error {
 	// non-nil state means a result has been corrupted, hence checking whether the approval
 	// belongs to the chunks of the original (non-corrupted) result.
 	approval := resultApprovalEvent.FlowProtocolEvent.(*flow.ResultApproval)
@@ -349,7 +349,7 @@ func (o *Orchestrator) handleResultApprovalEvent(resultApprovalEvent *insecure.E
 
 // replyWithAttestation sends an attestation for the given chunk data pack request if it belongs to
 // the corrupted result of orchestrator's state.
-func (o *Orchestrator) replyWithAttestation(chunkDataPackRequestEvent *insecure.Event) (bool, error) {
+func (o *Orchestrator) replyWithAttestation(chunkDataPackRequestEvent *insecure.EgressEvent) (bool, error) {
 	cdpReq := chunkDataPackRequestEvent.FlowProtocolEvent.(*messages.ChunkDataRequest)
 
 	// a result corruption has already conducted
@@ -368,7 +368,7 @@ func (o *Orchestrator) replyWithAttestation(chunkDataPackRequestEvent *insecure.
 
 		// sends an attestation on behalf of verification node to all consensus nodes
 		consensusIds := o.allNodeIds.Filter(filter.HasRole(flow.RoleConsensus)).NodeIDs()
-		err = o.network.Send(&insecure.Event{
+		err = o.network.Send(&insecure.EgressEvent{
 			CorruptedNodeId: chunkDataPackRequestEvent.CorruptedNodeId,
 			Channel:         channels.PushApprovals,
 			Protocol:        insecure.Protocol_PUBLISH,

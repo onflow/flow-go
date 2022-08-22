@@ -3,9 +3,10 @@ package main
 import (
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io/fs"
 	"net"
 	"os"
 	"path/filepath"
@@ -183,7 +184,7 @@ func displayPortAssignments() {
 
 func prepareCommonHostFolders() {
 	for _, dir := range []string{BootstrapDir, ProfilerDir, DataDir, TrieDir} {
-		if err := os.RemoveAll(dir); err != nil && !os.IsNotExist(err) {
+		if err := os.RemoveAll(dir); err != nil && !errors.Is(err, fs.ErrNotExist) {
 			panic(err)
 		}
 
@@ -297,7 +298,7 @@ func prepareServiceDirs(role string, nodeId string) (string, string) {
 	}
 
 	err := os.MkdirAll(dataDir, 0755)
-	if err != nil && !os.IsExist(err) {
+	if err != nil && !errors.Is(err, fs.ErrExist) {
 		panic(err)
 	}
 
@@ -307,7 +308,7 @@ func prepareServiceDirs(role string, nodeId string) (string, string) {
 		profilerDir = "./" + filepath.Join(ProfilerDir, role, nodeId)
 	}
 	err = os.MkdirAll(profilerDir, 0755)
-	if err != nil && !os.IsExist(err) {
+	if err != nil && !errors.Is(err, fs.ErrExist) {
 		panic(err)
 	}
 
@@ -342,10 +343,10 @@ func prepareConsensusService(container testnet.ContainerConfig, i int, n int) Se
 		fmt.Sprintf("--block-rate-delay=%s", consensusDelay),
 		fmt.Sprintf("--hotstuff-timeout=%s", timeout),
 		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
-		fmt.Sprintf("--chunk-alpha=1"),
-		fmt.Sprintf("--emergency-sealing-active=false"),
-		fmt.Sprintf("--insecure-access-api=false"),
-		fmt.Sprint("--access-node-ids=*"),
+		"--chunk-alpha=1",
+		"--emergency-sealing-active=false",
+		"--insecure-access-api=false",
+		"--access-node-ids=*",
 	)
 
 	service.Ports = []string{
@@ -360,7 +361,7 @@ func prepareVerificationService(container testnet.ContainerConfig, i int, n int)
 
 	service.Command = append(
 		service.Command,
-		fmt.Sprintf("--chunk-alpha=1"),
+		"--chunk-alpha=1",
 	)
 
 	service.Ports = []string{
@@ -381,8 +382,8 @@ func prepareCollectionService(container testnet.ContainerConfig, i int, n int) S
 		fmt.Sprintf("--hotstuff-timeout=%s", timeout),
 		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
 		fmt.Sprintf("--ingress-addr=%s:%d", container.ContainerName, RPCPort),
-		fmt.Sprintf("--insecure-access-api=false"),
-		fmt.Sprint("--access-node-ids=*"),
+		"--insecure-access-api=false",
+		"--access-node-ids=*",
 	)
 
 	service.Ports = []string{
@@ -398,7 +399,7 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 	// create the execution state dir for the node
 	trieDir := "./" + filepath.Join(TrieDir, container.Role.String(), container.NodeID.String())
 	err := os.MkdirAll(trieDir, 0755)
-	if err != nil && !os.IsExist(err) {
+	if err != nil && !errors.Is(err, fs.ErrExist) {
 		panic(err)
 	}
 
@@ -466,7 +467,7 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 		fmt.Sprintf("--upstream-node-addresses=%s:%d", DefaultAccessGatewayName, SecuredRPCPort),
 		fmt.Sprintf("--upstream-node-public-keys=%s", agPublicKey),
 		fmt.Sprintf("--observer-networking-key-path=/bootstrap/private-root-information/%s_key", observerName),
-		fmt.Sprintf("--bind=0.0.0.0:0"),
+		"--bind=0.0.0.0:0",
 		fmt.Sprintf("--rpc-addr=%s:%d", observerName, RPCPort),
 		fmt.Sprintf("--secure-rpc-addr=%s:%d", observerName, SecuredRPCPort),
 		fmt.Sprintf("--http-addr=%s:%d", observerName, HTTPPort),
@@ -661,7 +662,7 @@ func writeObserverPrivateKey(observerName string) {
 
 	// write to file
 	outputFile := fmt.Sprintf("%s/private-root-information/%s_key", BootstrapDir, observerName)
-	err = ioutil.WriteFile(outputFile, output, 0600)
+	err = os.WriteFile(outputFile, output, 0600)
 	if err != nil {
 		panic(err)
 	}

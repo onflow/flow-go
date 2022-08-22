@@ -16,14 +16,14 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
-	validator "github.com/onflow/flow-go/network/validator/pubsub"
+	"github.com/onflow/flow-go/network/slashing"
+	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestTopicValidator_Unstaked tests that the libP2P node topic validator rejects unauthenticated messages on non-public channels (unstaked)
 func TestTopicValidator_Unstaked(t *testing.T) {
 	// create a hooked logger
-	var hook unittest.LoggerHook
 	logger, hook := unittest.HookedLogger()
 
 	sporkId := unittest.IdentifierFixture()
@@ -149,7 +149,6 @@ func TestTopicValidator_PublicChannel(t *testing.T) {
 // TestAuthorizedSenderValidator_Unauthorized tests that the authorized sender validator rejects messages from nodes that are not authorized to send the message
 func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	// create a hooked logger
-	var hook unittest.LoggerHook
 	logger, hook := unittest.HookedLogger()
 
 	sporkId := unittest.IdentifierFixture()
@@ -169,7 +168,8 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
-	authorizedSenderValidator := validator.AuthorizedSenderMessageValidator(logger, channel, func(pid peer.ID) (*flow.Identity, bool) {
+	violationsConsumer := slashing.NewSlashingViolationsConsumer(logger)
+	authorizedSenderValidator := validator.AuthorizedSenderMessageValidator(logger, violationsConsumer, channel, func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translator.GetFlowID(pid)
 		if err != nil {
 			return &flow.Identity{}, false
@@ -252,7 +252,6 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 // TestAuthorizedSenderValidator_Authorized tests that the authorized sender validator rejects messages being sent on the wrong channel
 func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	// create a hooked logger
-	var hook unittest.LoggerHook
 	logger, hook := unittest.HookedLogger()
 
 	sporkId := unittest.IdentifierFixture()
@@ -271,7 +270,8 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
-	authorizedSenderValidator := validator.AuthorizedSenderMessageValidator(logger, channel, func(pid peer.ID) (*flow.Identity, bool) {
+	violationsConsumer := slashing.NewSlashingViolationsConsumer(logger)
+	authorizedSenderValidator := validator.AuthorizedSenderMessageValidator(logger, violationsConsumer, channel, func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translator.GetFlowID(pid)
 		if err != nil {
 			return &flow.Identity{}, false
@@ -321,7 +321,6 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 // TestAuthorizedSenderValidator_Ejected tests that the authorized sender validator rejects messages from nodes that are ejected
 func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	// create a hooked logger
-	var hook unittest.LoggerHook
 	logger, hook := unittest.HookedLogger()
 
 	sporkId := unittest.IdentifierFixture()
@@ -340,7 +339,8 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
-	authorizedSenderValidator := validator.AuthorizedSenderMessageValidator(logger, channel, func(pid peer.ID) (*flow.Identity, bool) {
+	violationsConsumer := slashing.NewSlashingViolationsConsumer(logger)
+	authorizedSenderValidator := validator.AuthorizedSenderMessageValidator(logger, violationsConsumer, channel, func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translator.GetFlowID(pid)
 		if err != nil {
 			return &flow.Identity{}, false
@@ -427,7 +427,9 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
-	authorizedSenderValidator := validator.AuthorizedSenderMessageValidator(unittest.Logger(), channel, func(pid peer.ID) (*flow.Identity, bool) {
+	logger := unittest.Logger()
+	violationsConsumer := slashing.NewSlashingViolationsConsumer(logger)
+	authorizedSenderValidator := validator.AuthorizedSenderMessageValidator(logger, violationsConsumer, channel, func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translator.GetFlowID(pid)
 		if err != nil {
 			return &flow.Identity{}, false

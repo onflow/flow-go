@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -150,7 +149,7 @@ func (s *Suite) SetupSuite() {
 	s.Orchestrator = NewDummyOrchestrator(logger)
 
 	// start attack network
-	codec := cbor.NewCodec()
+	codec := unittest.NetworkCodec()
 	connector := attacknetwork.NewCorruptedConnector(s.log, s.net.CorruptedIdentities(), s.net.CorruptedPortMapping)
 	attackNetwork, err := attacknetwork.NewAttackNetwork(s.log,
 		codec,

@@ -20,8 +20,10 @@ type StateHolder struct {
 	activeState           *State
 }
 
-// NewStateHolder constructs a new state manager
-func NewStateHolder(startState *State) *StateHolder {
+// NewStateTransaction constructs a new state transaction which manages nested
+// transactions.
+func NewStateTransaction(startView View, params StateParameters) *StateHolder {
+	startState := NewState(startView, params)
 	return &StateHolder{
 		enforceLimits: true,
 		startState:    startState,
@@ -65,12 +67,6 @@ func (s *StateHolder) UpdatedAddresses() []flow.Address {
 	return s.activeState.UpdatedAddresses()
 }
 
-// TODO(patrick): remove once we no longer support updating limit/weights after
-// meter initialization.
-func (s *StateHolder) Meter() meter.Meter {
-	return s.activeState.Meter()
-}
-
 func (s *StateHolder) MeterComputation(
 	kind common.ComputationKind,
 	intensity uint,
@@ -101,7 +97,7 @@ func (s *StateHolder) MemoryIntensities() meter.MeteredMemoryIntensities {
 	return s.activeState.MemoryIntensities()
 }
 
-func (s *StateHolder) TotalMemoryEstimate() uint {
+func (s *StateHolder) TotalMemoryEstimate() uint64 {
 	return s.activeState.TotalMemoryEstimate()
 }
 

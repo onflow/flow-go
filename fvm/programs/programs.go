@@ -99,6 +99,11 @@ func (p *Programs) HasChanges() bool {
 }
 
 func (p *Programs) Cleanup(modifiedSets ModifiedSets) {
+	if len(modifiedSets.ContractUpdateKeys) == 0 &&
+		len(modifiedSets.FrozenAccounts) == 0 {
+		return
+	}
+
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -106,17 +111,12 @@ func (p *Programs) Cleanup(modifiedSets ModifiedSets) {
 	// and invalidate only affected ones, possibly setting them to
 	// nil so they will override parent's data, but for now
 	// just throw everything away and use a special flag for this
-	if len(modifiedSets.ContractUpdateKeys) > 0 ||
-		len(modifiedSets.FrozenAccounts) > 0 {
+	p.cleaned = true
 
-		p.cleaned = true
+	// Stop using parent's data to prevent
+	// infinite chaining of objects
+	p.parent = nil
 
-		// Stop using parent's data to prevent
-		// infinite chaining of objects
-		p.parent = nil
-
-		// start with empty storage
-		p.programs = make(map[common.LocationID]*ProgramEntry)
-		return
-	}
+	// start with empty storage
+	p.programs = make(map[common.LocationID]*ProgramEntry)
 }

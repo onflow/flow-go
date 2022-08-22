@@ -78,16 +78,14 @@ func (i *TransactionInvoker) Process(
 		sth.SetActiveState(parentState)
 	}()
 
-	env, err := NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
-	if err != nil {
-		return fmt.Errorf("error creating new environment: %w", err)
-	}
+	env := NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
+
 	predeclaredValues := valueDeclarations(env)
 
 	location := common.TransactionLocation(proc.ID)
 
 	var txError error
-	err = vm.Runtime.ExecuteTransaction(
+	err := vm.Runtime.ExecuteTransaction(
 		runtime.Script{
 			Source:    proc.Transaction.Script,
 			Arguments: proc.Transaction.Arguments,
@@ -162,11 +160,9 @@ func (i *TransactionInvoker) Process(
 			Uint64("blockHeight", blockHeight).
 			Msg("transaction executed with error")
 
+		// TODO(patrick): make env reusable on error
 		// reset env
-		env, err = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
-		if err != nil {
-			return fmt.Errorf("error creating new environment: %w", err)
-		}
+		env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
 
 		// try to deduct fees again, to get the fee deduction events
 		feesError = i.deductTransactionFees(env, proc, sth, computationUsed)
@@ -186,7 +182,7 @@ func (i *TransactionInvoker) Process(
 				Uint64("blockHeight", blockHeight).
 				Msg("transaction fee deduction executed with error")
 
-			return feesError
+			txError = feesError
 		}
 	}
 
@@ -310,7 +306,7 @@ func (i *TransactionInvoker) logExecutionIntensities(sth *state.StateHolder, txH
 			Str("txHash", txHash).
 			Uint64("ledgerInteractionUsed", sth.InteractionUsed()).
 			Uint("computationUsed", sth.TotalComputationUsed()).
-			Uint("memoryEstimate", sth.TotalMemoryEstimate()).
+			Uint64("memoryEstimate", sth.TotalMemoryEstimate()).
 			Dict("computationIntensities", computation).
 			Dict("memoryIntensities", memory).
 			Msg("transaction execution data")

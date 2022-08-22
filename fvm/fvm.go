@@ -7,7 +7,6 @@ import (
 	"github.com/rs/zerolog"
 
 	errors "github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -45,18 +44,28 @@ func NewVirtualMachine(rt runtime.Runtime) *VirtualMachine {
 
 // Run runs a procedure against a ledger in the given context.
 func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, programs *programs.Programs) (err error) {
-	st := state.NewState(
+	meterParams, err := getEnvironmentMeterParameters(
+		vm,
+		ctx,
 		v,
-		meter.NewMeter(
-			meter.DefaultParameters().
-				WithComputationLimit(uint(proc.ComputationLimit(ctx))).
-				WithMemoryLimit(proc.MemoryLimit(ctx))),
-		state.WithMaxKeySizeAllowed(ctx.MaxStateKeySize),
-		state.WithMaxValueSizeAllowed(ctx.MaxStateValueSize),
-		state.WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize))
-	sth := state.NewStateHolder(st)
+		programs,
+		uint(proc.ComputationLimit(ctx)),
+		proc.MemoryLimit(ctx),
+	)
+	if err != nil {
+		return fmt.Errorf("error gettng environment meter parameters: %w", err)
+	}
 
-	err = proc.Run(vm, ctx, sth, programs)
+	stTxn := state.NewStateTransaction(
+		v,
+		state.DefaultParameters().
+			WithMeterParameters(meterParams).
+			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
+			WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
+			WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize),
+	)
+
+	err = proc.Run(vm, ctx, stTxn, programs)
 	if err != nil {
 		return err
 	}
@@ -66,15 +75,15 @@ func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, program
 
 // GetAccount returns an account by address or an error if none exists.
 func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.View, programs *programs.Programs) (*flow.Account, error) {
-	st := state.NewState(
+	stTxn := state.NewStateTransaction(
 		v,
-		meter.NewMeter(meter.DefaultParameters()),
-		state.WithMaxKeySizeAllowed(ctx.MaxStateKeySize),
-		state.WithMaxValueSizeAllowed(ctx.MaxStateValueSize),
-		state.WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize))
+		state.DefaultParameters().
+			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
+			WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
+			WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize),
+	)
 
-	sth := state.NewStateHolder(st)
-	account, err := getAccount(vm, ctx, sth, programs, address)
+	account, err := getAccount(vm, ctx, stTxn, programs, address)
 	if err != nil {
 		if errors.IsALedgerFailure(err) {
 			return nil, fmt.Errorf("cannot get account, this error usually happens if the reference block for this query is not set to a recent block: %w", err)
@@ -88,7 +97,7 @@ func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.
 //
 // Errors that occur in a meta transaction are propagated as a single error that can be
 // captured by the Cadence runtime and eventually disambiguated by the parent context.
-func (vm *VirtualMachine) invokeMetaTransaction(parentCtx Context, tx *TransactionProcedure, sth *state.StateHolder, programs *programs.Programs) (errors.Error, error) {
+func (vm *VirtualMachine) invokeMetaTransaction(parentCtx Context, tx *TransactionProcedure, stTxn *state.StateHolder, programs *programs.Programs) (errors.Error, error) {
 	invoker := NewTransactionInvoker(zerolog.Nop())
 
 	// do not deduct fees or check storage in meta transactions
@@ -97,7 +106,7 @@ func (vm *VirtualMachine) invokeMetaTransaction(parentCtx Context, tx *Transacti
 		WithTransactionFeesEnabled(false),
 	)
 
-	err := invoker.Process(vm, &ctx, tx, sth, programs)
+	err := invoker.Process(vm, &ctx, tx, stTxn, programs)
 	txErr, fatalErr := errors.SplitErrorTypes(err)
 	return txErr, fatalErr
 }
